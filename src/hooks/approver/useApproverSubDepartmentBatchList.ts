@@ -26,9 +26,10 @@ const APPROVER_UI_STATUS_TO_API: Partial<Record<string, string>> = {
   [OPERATION_STATUS.REJECTED]: "REJECTED",
 };
 
-const toRocketMotorApproverApiStatus = (uiStatus: string) =>
+const toApproverApiStatus = (uiStatus: string) =>
   APPROVER_UI_STATUS_TO_API[uiStatus] ??
   uiStatus.trim().toUpperCase().replace(/\s+/g, "_");
+
 
 type ApproverBatchStatusCounts = {
   initiated?: number;
@@ -97,6 +98,12 @@ const STATUS_LABELS: Record<string, string> = {
   inProgress: "In Progress",
   waitingForApproval: "Waiting for Approval",
   rejected: "Rejected",
+
+  INITIATED: "Initiated",
+  APPROVED: "Approved",
+  IN_PROGRESS: "In Progress",
+  WAITING_FOR_APPROVAL: "Waiting for Approval",
+  REJECTED: "Rejected",
 };
 
 const createLookupKeys = (item: Record<string, unknown>) =>
@@ -123,9 +130,13 @@ const mapStatusCounts = (
     if (!batch.status) {
       return;
     }
-
-    if (mapped[batch.status] === undefined) {
-      mapped[batch.status] = fallbackBatches.filter((item) => item.status === batch.status).length;
+    const normalizedStatus =
+    STATUS_LABELS[batch.status] ?? batch.status;
+    if (mapped[normalizedStatus] === undefined) {
+    mapped[normalizedStatus] =
+      fallbackBatches.filter(
+        (item) => item.status === batch.status
+      ).length;
     }
   });
 
@@ -205,11 +216,12 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
       setLoading(true);
 
       if (subDepartment === RAW_MATERIAL_PROCUREMENT_SUBDEPT) {
+        const apiStatus = status !== allLabel ? toApproverApiStatus(status) : null;
         const payload = {
           subDepartmentId: selectedSubDepartment.subDepartmentId,
           page,
           limit: DEFAULT_PAGINATION.limit,
-          ...(status !== allLabel ? { status: [status] } : {}),
+          ...(apiStatus ? { status: [apiStatus] } : {}),
           ...(extraFilters.priority && extraFilters.priority !== allLabel
             ? { priority: [extraFilters.priority] }
             : {}),
@@ -247,7 +259,7 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
       }
 
       if (subDepartment === ROCKET_MOTOR_CASING_SUBDEPT) {
-        const apiStatus = status !== allLabel ? toRocketMotorApproverApiStatus(status) : null;
+        const apiStatus = status !== allLabel ? toApproverApiStatus(status) : null;
 
         const payload = {
           subDepartmentId: selectedSubDepartment.subDepartmentId,

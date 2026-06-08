@@ -72,7 +72,6 @@ export const mapRocketMotorCasingApproverListItem = (
   index: number,
 ) => ({
   id: casing.motorCasingId || casing.procurementId || index + 1,
-  procurementId: casing.procurementId,
   motorCasingId: casing.motorCasingId,
   motorStage: casing.motorStage,
   motorNo: casing.motorNo,
@@ -87,7 +86,7 @@ export const mapRocketMotorCasingApproverListItem = (
   createdOn: casing.createdOn,
   submittedBy: casing.createdBy?.fullName ?? casing.assignedTo?.fullName ?? "—",
   batchId: casing.motorCasingId,
-  formId: casing.procurementId,
+  formId: casing.motorCasingId,
   batchType: casing.casingType,
   motorId: casing.motorNo || casing.motorStage,
   motorType: casing.motorStage,

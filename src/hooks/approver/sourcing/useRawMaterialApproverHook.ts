@@ -11,6 +11,7 @@ import type { ApproverFormActionType } from "../../../data/api/approver/approver
 import {
   RawMaterialLotDetailsModel,
 } from "../../../data/models/user/RawMaterialProcurementModel";
+import { submitApproverFormStatusChange } from "../../../controllers/approver/approverController";
 
 const DEPARTMENT_SLUG = "sourcing";
 const SUB_DEPARTMENT_SLUG = "raw-material";
@@ -57,9 +58,8 @@ export const useRawMaterialApproverHook = () => {
     }
 
     const lotId = String(item?.lotId ?? item?.batchId ?? "").trim();
-    const procurementId = String(item?.procurementId ?? item?.formId ?? "").trim();
 
-    if (!lotId || !procurementId) {
+    if (!lotId) {
       showAlert(A.FORM_ID_MISSING, "error", { autoCloseMs: 3000 });
       return;
     }
@@ -78,6 +78,7 @@ export const useRawMaterialApproverHook = () => {
   };
 
   const handleConfirm = async () => {
+
     if (!dialogItem || !actionType || !subDepartmentId) return;
 
     const trimmedValue = dialogValue.trim();
@@ -97,9 +98,8 @@ export const useRawMaterialApproverHook = () => {
     setSubmitting(true);
     showAlert(actionType === "APPROVED" ? A.APPROVING : A.REJECTING, "info", { loading: true });
 
-    const response = await rawMaterialProcurementApproverController.changeStatus({
-      procurementId,
-      lotId,
+    const response = await submitApproverFormStatusChange({
+      formId: lotId,
       subDepartmentId,
       actionType,
       remarks: actionType === "APPROVED" ? trimmedValue || null : null,
@@ -157,7 +157,7 @@ export const useRawMaterialApproverHook = () => {
       lotId: model.lotId || lotId,
       procurementId: row.procurementId ?? "",
       batchId: lotId,
-      formId: row.procurementId ?? "",
+      formId: row.lotId,
       materialCode: model.materialCode || row.materialCode,
       materialName: model.materialName || row.materialName,
       qcBlocks: RawMaterialLotDetailsModel.toMaterialBlocks(model),

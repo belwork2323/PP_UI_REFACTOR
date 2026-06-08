@@ -193,12 +193,7 @@ export const useRawMaterialLotList = () => {
       };
 
       if (statusFilter !== FILTER_ALL) {
-        const apiStatus = RAW_MATERIAL_UI_STATUS_TO_API[statusFilter];
-        if (apiStatus) {
-          payload.status = [apiStatus];
-        } else {
-          payload.status = [statusFilter];
-        }
+        payload.status = [RAW_MATERIAL_UI_STATUS_TO_API[statusFilter] ?? statusFilter];
       }
 
       if (advancedFilters.materialCodes.length) {

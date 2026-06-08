@@ -4,6 +4,7 @@
 ───────────────────────────────────────────────────────────────────────────── */
 
 import { icons } from "../../../app/theme";
+import { normalizeSubdepartmentBatchStatus } from "../user/SubdepartmentBatchModel";
 
 /** Map display / list labels to form/API enum values */
 function normalizeBatchTypeForForm(raw: string | undefined | null): string {
@@ -15,29 +16,36 @@ function normalizeBatchTypeForForm(raw: string | undefined | null): string {
   return s;
 }
 
-/** List endpoint may return motorType as a string (e.g. "B"); details return an object */
-function normalizeMotorType(raw: any): { motorTypeId: number | null; motorTypeName: string } {
-  if (!raw) return { motorTypeId: null, motorTypeName: "" };
+/** API motorStage may be a number (0, 1) or stage letter ("B") */
+export function normalizeMotorStage(raw: unknown): string | number | null {
+  if (raw === null || raw === undefined || raw === "") return null;
+  if (typeof raw === "number") return raw;
   if (typeof raw === "string") {
-    return { motorTypeId: null, motorTypeName: raw };
+    const trimmed = raw.trim();
+    if (trimmed === "") return null;
+    const asNumber = Number(trimmed);
+    return Number.isFinite(asNumber) && String(asNumber) === trimmed ? asNumber : trimmed;
   }
-  return {
-    motorTypeId: raw.motorTypeId ?? null,
-    motorTypeName: raw.motorTypeName ?? "",
-  };
+  if (typeof raw === "object") {
+    const obj = raw as { motorStage?: unknown; motorTypeName?: string };
+    if (obj.motorStage !== undefined && obj.motorStage !== null) {
+      return normalizeMotorStage(obj.motorStage);
+    }
+    if (obj.motorTypeName) return String(obj.motorTypeName).trim();
+  }
+  return String(raw);
 }
 
-/** Infer motorTypeId when UI only has letter codes (A/B/…); prefer explicit API values */
-const MOTOR_TYPE_LETTER_TO_ID: Record<string, number> = {
-  A: 1,
-  B: 2,
-  C: 3,
-};
+/** Coerce form motor stage to API value (numeric when applicable) */
+export function motorStageForApi(raw: unknown): string | number | undefined {
+  const normalized = normalizeMotorStage(raw);
+  if (normalized === null) return undefined;
+  return normalized;
+}
 
-export function inferMotorTypeId(motorTypeName: string, explicitId?: number | null): number {
-  if (explicitId != null && explicitId > 0) return explicitId;
-  const letter = (motorTypeName ?? "").trim().toUpperCase().charAt(0);
-  return MOTOR_TYPE_LETTER_TO_ID[letter] ?? 0;
+export function motorStageLabel(stage: string | number | null | undefined): string {
+  if (stage === null || stage === undefined || stage === "") return "—";
+  return String(stage);
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -57,7 +65,7 @@ export class BatchListItemModel {
   numberOfMotors      : number;
   motorIds            : string[];
   lotIds              : string[];
-  motorType           : { motorTypeId: number | null; motorTypeName: string };
+  motorStage          : string | number | null;
   priority            : string;
   systemManagerId     : string;
   systemManager       : { id: string; name: string } | null;
@@ -91,14 +99,16 @@ export class BatchListItemModel {
     this.motorIds        = Array.isArray(data.motorIds) ? data.motorIds : [];
     this.lotIds          = Array.isArray(data.lotIds) ? data.lotIds : [];
     this.priority        = data.priority        ?? "Medium";
-    this.status          = data.status          ?? "Initiated";
+    this.status          = normalizeSubdepartmentBatchStatus(data.status);
 
-    this.motorType = normalizeMotorType(data.motorType);
+    this.motorStage = normalizeMotorStage(
+      data.motorStage ?? data.motorType ?? data.motorTypeName
+    );
 
     if (data.systemManager && typeof data.systemManager === "object") {
       this.systemManager = {
         id: data.systemManager.id ?? "",
-        name: data.systemManager.name ?? "",
+        name: data.systemManager.name ?? data.systemManager.fullName ?? "",
       };
       this.systemManagerId = this.systemManager.id;
     } else {
@@ -109,13 +119,20 @@ export class BatchListItemModel {
     this.identificationSheetStatus =
       data.identificationSheetStatus ?? data.identification_sheet_status ?? null;
 
-    // stage → department (nested in API response)
-    const dept = data.stage?.department ?? null;
+    // stage may be { department, subDepartments } or flat { departmentId, departmentName, subDepartments }
+    const stageRoot =
+      data.stage && typeof data.stage === "object" ? data.stage : null;
+    const dept =
+      stageRoot?.department && typeof stageRoot.department === "object"
+        ? stageRoot.department
+        : stageRoot?.departmentId != null || stageRoot?.departmentName
+          ? stageRoot
+          : null;
+
     this.department = dept
       ? { departmentId: dept.departmentId ?? null, departmentName: dept.departmentName ?? "" }
       : null;
 
-    // The API may return either subDepartments or legacy subDepartment.
     const nestedSubDepartments = Array.isArray(dept?.subDepartments)
       ? dept.subDepartments
       : Array.isArray(dept?.subDepartment)
@@ -132,7 +149,7 @@ export class BatchListItemModel {
     // Audit fields
     this.createdOn = data.createdOn ?? null;
     this.createdBy = data.createdBy
-      ? { id: data.createdBy.id ?? "", name: data.createdBy.name ?? "" }
+      ? { id: data.createdBy.id ?? "", name: data.createdBy.name ?? data.createdBy.fullName ?? "" }
       : null;
 
     // updatedOn / updatedBy only present in the detail endpoint response
@@ -142,7 +159,9 @@ export class BatchListItemModel {
       : null;
 
     // Implementation details (optional)
-    this.identificationSheet = data.identificationSheet ?? null;
+    this.identificationSheet = data.identificationSheet
+      ? parseIdentificationSheetFromApi(data.identificationSheet)
+      : null;
     this.objective           = data.objective ?? null;
     this.articles            = Array.isArray(data.articles) ? data.articles : [];
   }
@@ -156,24 +175,127 @@ export class BatchListItemModel {
    IDENTIFICATION SHEET MODELS
 ───────────────────────────────────────────────────────────────────────────── */
 
+/** UI / read model — may include display-only fields from lot lookup */
 export interface MaterialItem {
-  srNo                : number;
-  materialCode        : string;
-  lotId               : string;
-  make                : string;
-  requiredComposition : number;
-  quantityPerPremix   : number;
-  revalidationDate    : string;
+  srNo                  : number;
+  materialCode          : string;
+  materialName?         : string;
+  lotId                 : string;
+  make                  : string;
+  manufacturerName?     : string;
+  requiredComposition   : number;
+  quantityPerPremix     : number;
+  revalidationFromDate? : string;
+  revalidationToDate?   : string;
+  /** @deprecated Legacy single date — mapped to from/to when posting */
+  revalidationDate?     : string;
 }
 
 export interface IdentificationSheet {
   date              : string;
   batchSize         : number;
   bondingSheetNo    : string;
-  mixerDetails      : string;
+  mixerType         : string;
+  BldgNo            : string;
   numberOfPremix    : number;
-  remarks?          : string;
+  remarks           : string;
   materials         : MaterialItem[];
+  /** @deprecated Legacy field — read from API responses when mixerType absent */
+  mixerDetails?     : string;
+}
+
+function serializeMaterialForApi(material: Record<string, any>): Record<string, unknown> {
+  const fromDate =
+    material.revalidationFromDate ?? material.revalidationDate ?? "";
+  const toDate =
+    material.revalidationToDate ?? material.revalidationDate ?? fromDate;
+
+  return {
+    srNo                : material.srNo,
+    materialCode        : material.materialCode,
+    lotId               : material.lotId ?? "",
+    make                : String(material.make ?? material.manufacturerName ?? "").trim(),
+    requiredComposition : material.requiredComposition ?? 0,
+    quantityPerPremix   : material.quantityPerPremix ?? 0,
+    revalidationFromDate: fromDate,
+    revalidationToDate  : toDate,
+  };
+}
+
+/** Map form identification sheet to API request body */
+export function serializeIdentificationSheetForApi(
+  sheet: Record<string, any> | null | undefined
+): Record<string, unknown> {
+  if (!sheet || typeof sheet !== "object") return {};
+
+  const isDefaultEmpty =
+    !sheet.date &&
+    (!sheet.batchSize || sheet.batchSize === 0) &&
+    !sheet.bondingSheetNo &&
+    !sheet.mixerType && !sheet.mixerDetails &&
+    !sheet.BldgNo && !sheet.bldgNo &&
+    (sheet.numberOfPremix === 1 || sheet.numberOfPremix == null) &&
+    !sheet.remarks &&
+    (!Array.isArray(sheet.materials) || sheet.materials.length === 0);
+
+  if (isDefaultEmpty) return {};
+
+  const payload: Record<string, unknown> = {
+    date           : sheet.date ?? "",
+    batchSize      : sheet.batchSize ?? 0,
+    bondingSheetNo : sheet.bondingSheetNo ?? "",
+    mixerType      : String(sheet.mixerType ?? sheet.mixerDetails ?? "").trim(),
+    BldgNo         : String(sheet.BldgNo ?? sheet.bldgNo ?? "").trim(),
+    numberOfPremix : sheet.numberOfPremix ?? 0,
+    remarks        : sheet.remarks ?? "",
+  };
+
+  if (Array.isArray(sheet.materials)) {
+    payload.materials = sheet.materials.length > 0
+      ? sheet.materials.map(serializeMaterialForApi)
+      : [];
+  }
+
+  return payload;
+}
+
+/** Map API identification sheet to form state */
+export function parseIdentificationSheetFromApi(
+  sheet: Record<string, any> | null | undefined
+): IdentificationSheet {
+  if (!sheet || typeof sheet !== "object") {
+    return {
+      date: "", batchSize: 0, bondingSheetNo: "", mixerType: "", BldgNo: "",
+      numberOfPremix: 1, remarks: "", materials: [],
+    };
+  }
+
+  const materials = Array.isArray(sheet.materials)
+    ? sheet.materials.map((m: Record<string, any>) => ({
+        srNo                : m.srNo ?? 0,
+        materialCode        : m.materialCode ?? "",
+        materialName        : m.materialName ?? "",
+        lotId               : m.lotId ?? "",
+        make                : m.make ?? m.manufacturerName ?? "",
+        manufacturerName    : m.manufacturerName ?? m.make ?? "",
+        requiredComposition : m.requiredComposition ?? 0,
+        quantityPerPremix   : m.quantityPerPremix ?? 0,
+        revalidationFromDate: m.revalidationFromDate ?? m.revalidationDate ?? "",
+        revalidationToDate  : m.revalidationToDate ?? m.revalidationDate ?? "",
+        revalidationDate    : m.revalidationFromDate ?? m.revalidationDate ?? "",
+      }))
+    : [];
+
+  return {
+    date           : sheet.date ?? "",
+    batchSize      : sheet.batchSize ?? 0,
+    bondingSheetNo : sheet.bondingSheetNo ?? "",
+    mixerType      : sheet.mixerType ?? sheet.mixerDetails ?? "",
+    BldgNo         : sheet.BldgNo ?? sheet.bldgNo ?? "",
+    numberOfPremix : sheet.numberOfPremix ?? 1,
+    remarks        : sheet.remarks ?? "",
+    materials,
+  };
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
@@ -187,12 +309,12 @@ export interface BatchWritePayload {
   batchType           : string;
   subBatchType?       : string;
   projectId?          : string | null;
-  motorType           : { motorTypeId: number; motorTypeName: string };
-  numberOfMotors      : number;
-  motorIds            : string[];
+  motorStage?         : string | number;
+  numberOfMotors?     : number;
+  motorIds?           : string[];
   priority            : string;
   systemManagerId     : string;
-  identificationSheet?: IdentificationSheet;
+  identificationSheet?: Record<string, unknown>;
   objective?          : string;
   articles?           : string[];
 }
@@ -202,53 +324,67 @@ export interface BatchWritePayload {
  * identificationSheet is optional in create API.
  * Controller builds this from raw form values.
  */
+function applyBatchWriteFields(
+  target: BatchWritePayload,
+  form: Record<string, any>
+): void {
+  target.batchType = form.batchType ?? "MAIN";
+  target.subBatchType =
+    target.batchType === "SUBSCALE" && form.subBatchType ? form.subBatchType : undefined;
+
+  const isExperimental =
+    target.batchType === "SUBSCALE" && form.subBatchType === "EXPERIMENTAL";
+
+  if (isExperimental) {
+    const raw = form.projectId;
+    target.projectId =
+      raw === "" || raw === undefined || raw === null ? null : String(raw).trim();
+  } else {
+    const raw = form.projectId;
+    target.projectId =
+      raw === "" || raw === undefined || raw === null ? undefined : String(raw).trim();
+  }
+
+  if (!isExperimental) {
+    const stage = motorStageForApi(form.motorStage ?? form.motorType);
+    if (stage !== undefined) target.motorStage = stage;
+
+    target.numberOfMotors = form.numberOfMotors ?? 0;
+    target.motorIds = Array.isArray(form.motorIds)
+      ? form.motorIds.filter((id: string) => String(id ?? "").trim())
+      : form.motorIds
+        ? [form.motorIds]
+        : [];
+  }
+
+  target.priority = form.priority ?? "Medium";
+  target.systemManagerId = String(form.systemManagerId ?? "").trim();
+
+  if (form.identificationSheet !== undefined) {
+    target.identificationSheet = serializeIdentificationSheetForApi(form.identificationSheet);
+  }
+
+  if (form.objective?.trim()) target.objective = form.objective.trim();
+  if (Array.isArray(form.articles) && form.articles.length > 0) {
+    target.articles = form.articles;
+  }
+}
+
 export class CreateBatchPayload implements BatchWritePayload {
   batchType           : string;
   subBatchType?       : string;
   projectId?          : string | null;
-  motorType           : { motorTypeId: number; motorTypeName: string };
-  numberOfMotors      : number;
-  motorIds            : string[];
+  motorStage?         : string | number;
+  numberOfMotors?     : number;
+  motorIds?           : string[];
   priority            : string;
   systemManagerId     : string;
-  identificationSheet?: IdentificationSheet;
+  identificationSheet?: Record<string, unknown>;
   objective?          : string;
   articles?           : string[];
 
   constructor(form: Record<string, any>) {
-    this.batchType = form.batchType ?? "MAIN";
-    this.subBatchType =
-      this.batchType === "SUBSCALE" && form.subBatchType ? form.subBatchType : undefined;
-
-    const isExperimental =
-      this.batchType === "SUBSCALE" && form.subBatchType === "EXPERIMENTAL";
-    if (isExperimental) {
-      const raw = form.projectId;
-      this.projectId =
-        raw === "" || raw === undefined || raw === null ? null : String(raw).trim();
-    } else {
-      const raw = form.projectId;
-      this.projectId =
-        raw === "" || raw === undefined || raw === null ? undefined : String(raw).trim();
-    }
-
-    const motorTypeName =
-      typeof form.motorType === "string"
-        ? form.motorType.trim()
-        : String(form.motorType?.motorTypeName ?? "").trim();
-    const motorTypeId = inferMotorTypeId(
-      motorTypeName,
-      form.motorTypeId ?? (typeof form.motorType === "object" ? form.motorType?.motorTypeId : undefined)
-    );
-    this.motorType = { motorTypeId: motorTypeId, motorTypeName: motorTypeName };
-
-    this.numberOfMotors    = form.numberOfMotors      ?? 0;
-    this.motorIds          = Array.isArray(form.motorIds) ? form.motorIds : (form.motorIds ? [form.motorIds] : []);
-    this.priority          = form.priority            ?? "Medium";
-    this.systemManagerId   = String(form.systemManagerId ?? "").trim();
-    this.identificationSheet = form.identificationSheet ?? undefined;
-    this.objective         = form.objective           ?? undefined;
-    this.articles          = Array.isArray(form.articles) ? form.articles : undefined;
+    applyBatchWriteFields(this, form);
   }
 }
 
@@ -260,50 +396,18 @@ export class UpdateBatchPayload implements BatchWritePayload {
   batchType           : string;
   subBatchType?       : string;
   projectId?          : string | null;
-  motorType           : { motorTypeId: number; motorTypeName: string };
-  numberOfMotors      : number;
-  motorIds            : string[];
+  motorStage?         : string | number;
+  numberOfMotors?     : number;
+  motorIds?           : string[];
   priority            : string;
   systemManagerId     : string;
-  identificationSheet?: IdentificationSheet;
+  identificationSheet?: Record<string, unknown>;
   objective?          : string;
   articles?           : string[];
 
   constructor(batchId: string, form: Record<string, any>) {
     this.batchId = String(batchId ?? "").trim();
-    this.batchType = form.batchType ?? "MAIN";
-    this.subBatchType =
-      this.batchType === "SUBSCALE" && form.subBatchType ? form.subBatchType : undefined;
-
-    const isExperimental =
-      this.batchType === "SUBSCALE" && form.subBatchType === "EXPERIMENTAL";
-    if (isExperimental) {
-      const raw = form.projectId;
-      this.projectId =
-        raw === "" || raw === undefined || raw === null ? null : String(raw).trim();
-    } else {
-      const raw = form.projectId;
-      this.projectId =
-        raw === "" || raw === undefined || raw === null ? undefined : String(raw).trim();
-    }
-
-    const motorTypeName =
-      typeof form.motorType === "string"
-        ? form.motorType.trim()
-        : String(form.motorType?.motorTypeName ?? "").trim();
-    const motorTypeId = inferMotorTypeId(
-      motorTypeName,
-      form.motorTypeId ?? (typeof form.motorType === "object" ? form.motorType?.motorTypeId : undefined)
-    );
-    this.motorType = { motorTypeId: motorTypeId, motorTypeName: motorTypeName };
-
-    this.numberOfMotors    = form.numberOfMotors      ?? 0;
-    this.motorIds          = Array.isArray(form.motorIds) ? form.motorIds : (form.motorIds ? [form.motorIds] : []);
-    this.priority          = form.priority            ?? "Medium";
-    this.systemManagerId   = String(form.systemManagerId ?? "").trim();
-    this.identificationSheet = form.identificationSheet ?? undefined;
-    this.objective         = form.objective           ?? undefined;
-    this.articles          = Array.isArray(form.articles) ? form.articles : undefined;
+    applyBatchWriteFields(this, form);
   }
 }
 

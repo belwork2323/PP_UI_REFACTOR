@@ -21,9 +21,6 @@ import { useBatchActions } from "../../../../../hooks/admin/batch_management/use
 
 const S = STRINGS.BATCH_MANAGEMENT;
 
-/** Raw material sub-department id for admin lot-list API calls */
-const ADMIN_LOT_LIST_SUB_DEPARTMENT_ID = 111;
-
 /* ── Stat icon map keyed by variant (same pattern as UserManagementPage) ── */
 const STAT_ICONS: Record<string, React.ReactNode> = {
   total:      <icons.batchMgmt.batchIcon   sx={{ fontSize: 22 }} />,
@@ -242,7 +239,6 @@ const BatchManagementPage = ({ mode = "light" }: any) => {
         form={actions.implForm}
         onFormChange={actions.handleImplFormChange}
         onMaterialsChange={actions.handleMaterialsChange}
-        subDepartmentId={ADMIN_LOT_LIST_SUB_DEPARTMENT_ID}
         readOnly={actions.implViewOnly}
         saving={actions.implSaving}
         t={t}

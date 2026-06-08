@@ -384,13 +384,13 @@ export const stageConfig: Record<string, { Icon: any; color: string; bg: string 
   Dispatch:         { Icon: icons.batchMgmt.dispatchStage,       color: "#047857", bg: "rgba(4,120,87,0.10)" },
 };
 
+/** Aligned with operations_theme.batchList.statusConfig (subdepartment batch lists) */
 export const statusConfig: Record<string, { Icon: any; color: string; bg: string }> = {
-  Pending:      { Icon: icons.batchMgmt.pendingStatus,    color: "#6b7280", bg: "rgba(107,114,128,0.10)" },
-  "In Progress":{ Icon: icons.batchMgmt.inProgressStatus, color: "#0369a1", bg: "rgba(3,105,161,0.10)" },
-  Completed:    { Icon: icons.batchMgmt.completedStatus,  color: "#16a34a", bg: "rgba(22,163,74,0.10)" },
-  Approved:     { Icon: icons.batchMgmt.approvedStatus,   color: "#7c3aed", bg: "rgba(124,58,237,0.10)" },
-  Dispatched:   { Icon: icons.batchMgmt.dispatchedStatus, color: "#047857", bg: "rgba(4,120,87,0.10)" },
-  Rejected:     { Icon: icons.batchMgmt.rejectedStatus,   color: "#dc2626", bg: "rgba(220,38,38,0.10)" },
+  Initiated:              { Icon: icons.batchMgmt.pendingStatus,             color: "#475569", bg: "rgba(71,85,105,0.08)" },
+  "In Progress":          { Icon: icons.batchMgmt.inProgressStatus,          color: "#2E86C1", bg: "rgba(46,134,193,0.10)" },
+  "Waiting for Approval": { Icon: icons.batchMgmt.waitingForApprovalStatus,  color: "#D4AC0D", bg: "rgba(212,172,13,0.10)" },
+  Approved:               { Icon: icons.batchMgmt.approvedStatus,            color: "#148F77", bg: "rgba(20,143,119,0.10)" },
+  Rejected:               { Icon: icons.batchMgmt.rejectedStatus,            color: "#C0392B", bg: "rgba(192,57,43,0.10)" },
 };
 
 export const priorityConfig: Record<string, { color: string; bg: string }> = {

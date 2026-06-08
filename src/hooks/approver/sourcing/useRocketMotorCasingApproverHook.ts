@@ -13,6 +13,7 @@ import rocketMotorCasingController from "../../../controllers/user/sourcing/rock
 import rocketMotorCasingApproverController from "../../../controllers/approver/rocketMotorCasingApproverController";
 import type { ApproverFormActionType } from "../../../data/api/approver/approverApi";
 import { RocketMotorCasingDetailsModel } from "../../../data/models/user/RocketMotorCasingProcurementModel";
+import { submitApproverFormStatusChange } from "../../../controllers/approver/approverController";
 
 const DEPARTMENT_SLUG = "sourcing";
 const SUB_DEPARTMENT_SLUG = "rocket-motor";
@@ -53,15 +54,19 @@ export const useRocketMotorCasingApproverHook = () => {
   };
 
   const requestAction = (item: any, nextActionType: ApproverFormActionType) => {
+
+    console.log("ITEM", item);
+    console.log("motorCasingId", item?.motorCasingId);
+    console.log("procurementId", item?.procurementId);
+    console.log("formId", item?.formId);
     if (!subDepartmentId) {
       showAlert(A.SUBDEPARTMENT_MISSING, "error", { autoCloseMs: 3000 });
       return;
     }
 
     const motorCasingId = String(item?.motorCasingId ?? item?.batchId ?? "").trim();
-    const procurementId = String(item?.procurementId ?? item?.formId ?? "").trim();
 
-    if (!motorCasingId || !procurementId) {
+    if (!motorCasingId) {
       showAlert(A.FORM_ID_MISSING, "error", { autoCloseMs: 3000 });
       return;
     }
@@ -81,33 +86,31 @@ export const useRocketMotorCasingApproverHook = () => {
 
   const handleConfirm = async () => {
     if (!dialogItem || !actionType || !subDepartmentId) return;
-
+    
     const trimmedValue = dialogValue.trim();
     const motorCasingId = String(dialogItem?.motorCasingId ?? dialogItem?.batchId ?? "").trim();
-    const procurementId = String(dialogItem?.procurementId ?? dialogItem?.formId ?? "").trim();
-
+    
     if (actionType === "REJECTED" && !trimmedValue) {
       setDialogError(A.REJECTION_REASON_REQUIRED);
       return;
     }
-
-    if (!motorCasingId || !procurementId) {
+    
+    if (!motorCasingId) {
       showAlert(A.FORM_ID_MISSING, "error", { autoCloseMs: 3000 });
       return;
     }
-
+    
     setSubmitting(true);
     showAlert(actionType === "APPROVED" ? A.APPROVING : A.REJECTING, "info", { loading: true });
-
-    const response = await rocketMotorCasingApproverController.changeStatus({
-      procurementId,
-      motorCasingId,
+    
+    const response = await submitApproverFormStatusChange({
+      formId: motorCasingId,
       subDepartmentId,
       actionType,
       remarks: actionType === "APPROVED" ? trimmedValue || null : null,
       rejectionReason: actionType === "REJECTED" ? trimmedValue : null,
     });
-
+    
     setSubmitting(false);
 
     if (response.success) {
@@ -151,9 +154,9 @@ export const useRocketMotorCasingApproverHook = () => {
     setSelected({
       ...row,
       motorCasingId,
-      procurementId: row.procurementId ?? model.formId ?? "",
+      procurementId: row.procurementId ?? "",
       batchId: motorCasingId,
-      formId: model.formId ?? row.procurementId ?? "",
+      formId: motorCasingId,
       casingBlocks: RocketMotorCasingDetailsModel.toDetailBlocks(model),
     });
   };

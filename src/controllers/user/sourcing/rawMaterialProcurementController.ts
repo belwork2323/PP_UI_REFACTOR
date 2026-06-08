@@ -3,6 +3,7 @@ import {
   RawMaterialCreateFormPayload,
   RawMaterialLotDetailsModel,
   RawMaterialLotListRequest,
+  normalizeRawMaterialLotListRequest,
   RawMaterialLotDeletePayload,
   RawMaterialLotDeleteResponse,
   RawMaterialLotUpdatePayload,
@@ -33,7 +34,9 @@ export type RawMaterialLotDetailsPayload = {
 export const rawMaterialProcurementController = {
   fetchLotList: async (payload: RawMaterialLotListRequest) => {
     try {
-      const response = await fetchRawMaterialLotListApi(payload as unknown as Record<string, unknown>);
+      const response = await fetchRawMaterialLotListApi(
+        normalizeRawMaterialLotListRequest(payload) as unknown as Record<string, unknown>,
+      );
       return new ApiResponseModel(response);
     } catch (error) {
       console.error("Failed to fetch raw material lot list:", error);

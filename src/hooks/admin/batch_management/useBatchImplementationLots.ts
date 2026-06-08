@@ -6,8 +6,15 @@ import {
   type MaterialsListItem,
 } from "../../../data/models/user/MaterialsListModel";
 import rawMaterialProcurementController from "../../../controllers/user/sourcing/rawMaterialProcurementController";
-import { mapLotListApiRow, type RawMaterialLotListRow } from "../../../data/models/user/RawMaterialProcurementModel";
+import {
+  mapLotListApiRow,
+  toRawMaterialLotListApiStatus,
+  type RawMaterialLotListRow,
+} from "../../../data/models/user/RawMaterialProcurementModel";
 import { OPERATION_STATUS } from "../../operationStatus";
+
+/** Raw material procurement sub-department used for admin lot-list API calls */
+export const ADMIN_RAW_MATERIAL_SUB_DEPARTMENT_ID = 1;
 
 export type BatchMaterialOption = {
   materialCode: string;
@@ -33,10 +40,9 @@ const groupLotsByMaterialCode = (lots: RawMaterialLotListRow[]) => {
 
 type UseBatchImplementationLotsArgs = {
   open: boolean;
-  subDepartmentId?: number | null;
 };
 
-export const useBatchImplementationLots = ({ open, subDepartmentId }: UseBatchImplementationLotsArgs) => {
+export const useBatchImplementationLots = ({ open }: UseBatchImplementationLotsArgs) => {
   const [materialOptions, setMaterialOptions] = useState<BatchMaterialOption[]>([]);
   const [lotsByMaterialCode, setLotsByMaterialCode] = useState<Record<string, RawMaterialLotListRow[]>>({});
   const [loadingMaterials, setLoadingMaterials] = useState(false);
@@ -59,18 +65,13 @@ export const useBatchImplementationLots = ({ open, subDepartmentId }: UseBatchIm
   }, []);
 
   const loadApprovedLots = useCallback(async () => {
-    if (!subDepartmentId) {
-      setLotsByMaterialCode({});
-      return;
-    }
-
     setLoadingLots(true);
     try {
       const res = await rawMaterialProcurementController.fetchLotList({
-        subDepartmentId,
+        subDepartmentId: ADMIN_RAW_MATERIAL_SUB_DEPARTMENT_ID,
         page: 1,
         limit: 500,
-        status: [OPERATION_STATUS.APPROVED],
+        status: [toRawMaterialLotListApiStatus(OPERATION_STATUS.APPROVED)],
       });
 
       if (res?.success && res.data) {
@@ -85,7 +86,7 @@ export const useBatchImplementationLots = ({ open, subDepartmentId }: UseBatchIm
     } finally {
       setLoadingLots(false);
     }
-  }, [subDepartmentId]);
+  }, []);
 
   useEffect(() => {
     if (!open) return;

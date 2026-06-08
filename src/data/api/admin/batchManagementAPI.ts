@@ -101,12 +101,12 @@ export interface CreateBatchPayloadAPI {
   batchType           : string;
   subBatchType?       : string;
   projectId?          : string | null;
-  motorType           : { motorTypeId: number; motorTypeName: string };
-  numberOfMotors      : number;
-  motorIds            : string[];
+  motorStage?         : string | number;
+  numberOfMotors?     : number;
+  motorIds?           : string[];
   priority            : string;
   systemManagerId     : string;
-  identificationSheet?: any;
+  identificationSheet?: Record<string, unknown>;
   objective?          : string;
   articles?           : string[];
 }
@@ -129,12 +129,12 @@ export interface UpdateBatchPayloadAPI {
   batchType           : string;
   subBatchType?       : string;
   projectId?          : string | null;
-  motorType           : { motorTypeId: number; motorTypeName: string };
-  numberOfMotors      : number;
-  motorIds            : string[];
+  motorStage?         : string | number;
+  numberOfMotors?     : number;
+  motorIds?           : string[];
   priority            : string;
   systemManagerId     : string;
-  identificationSheet?: any;
+  identificationSheet?: Record<string, unknown>;
   objective?          : string;
   articles?           : string[];
 }

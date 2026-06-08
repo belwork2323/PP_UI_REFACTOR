@@ -102,6 +102,7 @@ export class MotorsStageListModel {
 
 export type AvailableMotorOption = {
   motorCasingId: string;
+  motorId: string;
   motorStage: string;
   motorNo: string;
   projectId: string;
@@ -110,6 +111,7 @@ export type AvailableMotorOption = {
 
 export class AvailableMotorModel implements AvailableMotorOption {
   motorCasingId: string;
+  motorId: string;
   motorStage: string;
   motorNo: string;
   projectId: string;
@@ -117,8 +119,9 @@ export class AvailableMotorModel implements AvailableMotorOption {
 
   constructor(payload: Record<string, unknown>) {
     this.motorCasingId = String(payload?.motorCasingId ?? "").trim();
+    this.motorId = String(payload?.motorId ?? payload?.motorNo ?? "").trim();
     this.motorStage = String(payload?.motorStage ?? "").trim();
-    this.motorNo = String(payload?.motorNo ?? "").trim();
+    this.motorNo = String(payload?.motorNo ?? payload?.motorId ?? "").trim();
     this.projectId = String(payload?.projectId ?? "").trim();
     this.status = String(payload?.status ?? "").trim();
   }
@@ -156,7 +159,7 @@ export class AvailableMotorsListModel {
             motorStage: row.motorStage ?? motorStage,
           });
         })
-        .filter((m) => m.motorCasingId),
+        .filter((m) => m.motorId || m.motorCasingId),
     );
   }
 }

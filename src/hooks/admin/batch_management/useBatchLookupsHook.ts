@@ -130,8 +130,9 @@ export const useBatchLookups = () => {
 
   const availableMotorOptions = availableMotors.map((motor: any) => ({
     motorCasingId: motor.motorCasingId ?? "",
+    motorId: motor.motorId ?? motor.motorNo ?? "",
     motorStage: motor.motorStage ?? "",
-    motorNo: motor.motorNo ?? "",
+    motorNo: motor.motorNo ?? motor.motorId ?? "",
     projectId: motor.projectId ?? "",
     status: motor.status ?? "",
   }));

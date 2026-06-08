@@ -64,7 +64,7 @@ const BatchFormModal = ({
     form.priority &&
     form.systemManagerId &&
     ((isMain || isQualification) ? !!form.projectId : true) &&
-    ((!isSubscale || isQualification) ? !!form.motorType : true) &&
+    ((!isSubscale || isQualification) ? !!form.motorStage : true) &&
     (!(isExperimental) || !!form.objective?.trim());
 
   const formValid = basicFormValid;
@@ -100,27 +100,20 @@ const BatchFormModal = ({
 
   const handleProjectChange = (projectId: string) => {
     onFormChange("projectId")({ target: { value: projectId } });
-    onFormChange("motorType")({ target: { value: "" } });
-    onFormChange("motorTypeId")({ target: { value: "" } });
+    onFormChange("motorStage")({ target: { value: "" } });
     resetMotorIdSlots();
     onClearApprovedMotors?.();
   };
 
   const handleMotorStageChange = (motorStage: string) => {
-    const selected = motorStageOptions.find(
-      (stage: { motorStage: string }) => stage.motorStage === motorStage
-    );
-    onFormChange("motorType")({ target: { value: motorStage } });
-    onFormChange("motorTypeId")({
-      target: { value: selected?.motorTypeId ?? "" },
-    });
+    onFormChange("motorStage")({ target: { value: motorStage } });
     resetMotorIdSlots();
     onClearApprovedMotors?.();
   };
 
   const motorIdsPrerequisitesMet =
     Boolean(String(form.projectId ?? "").trim()) &&
-    Boolean(String(form.motorType ?? "").trim()) &&
+    Boolean(String(form.motorStage ?? "").trim()) &&
     (form.numberOfMotors ?? 0) > 0;
 
   useEffect(() => {
@@ -129,12 +122,12 @@ const BatchFormModal = ({
       onClearApprovedMotors?.();
       return;
     }
-    void onFetchApprovedMotors?.(form.projectId, form.motorType);
+    void onFetchApprovedMotors?.(form.projectId, form.motorStage);
   }, [
     open,
     motorIdsPrerequisitesMet,
     form.projectId,
-    form.motorType,
+    form.motorStage,
     form.numberOfMotors,
     onFetchApprovedMotors,
     onClearApprovedMotors,
@@ -154,13 +147,21 @@ const BatchFormModal = ({
     );
 
     let list = availableMotorOptions.filter(
-      (motor: { motorCasingId: string }) => !selectedElsewhere.has(motor.motorCasingId)
+      (motor: { motorId: string }) =>
+        Boolean(motor.motorId) && !selectedElsewhere.has(motor.motorId)
     );
 
     const current = String(form.motorIds[index] ?? "").trim();
-    if (current && !list.some((m: { motorCasingId: string }) => m.motorCasingId === current)) {
+    if (current && !list.some((m: { motorId: string }) => m.motorId === current)) {
       list = [
-        { motorCasingId: current, motorStage: "", motorNo: "", projectId: "", status: "" },
+        {
+          motorId: current,
+          motorCasingId: "",
+          motorStage: "",
+          motorNo: current,
+          projectId: "",
+          status: "",
+        },
         ...list,
       ];
     }
@@ -169,14 +170,16 @@ const BatchFormModal = ({
   };
 
   const renderMotorOptionLabel = (motor: {
-    motorCasingId: string;
+    motorId: string;
+    motorCasingId?: string;
     motorStage?: string;
-    motorNo?: string;
   }) => {
-    const stagePart = motor.motorStage ? `Stage ${motor.motorStage}` : "";
-    const noPart = motor.motorNo ? `Motor ${motor.motorNo}` : "";
-    const meta = [stagePart, noPart].filter(Boolean).join(" · ");
-    return meta ? `${motor.motorCasingId} — ${meta}` : motor.motorCasingId;
+    const parts = [
+      motor.motorId,
+      motor.motorCasingId ? `Casing ${motor.motorCasingId}` : "",
+      motor.motorStage ? `Stage ${motor.motorStage}` : "",
+    ].filter(Boolean);
+    return parts.join(" · ");
   };
 
   const motorsEmptyHint = useMemo(() => {
@@ -185,7 +188,7 @@ const BatchFormModal = ({
     }
     if (availableMotorsLoading) return "Loading approved motors...";
     if (availableMotorOptions.length === 0) return "No approved motors for this project and stage";
-    return "Select motor casing ID";
+    return "Select motor";
   }, [motorIdsPrerequisitesMet, availableMotorsLoading, availableMotorOptions.length]);
 
   const handleNumberOfMotorsChange = (value: number) => {
@@ -326,7 +329,7 @@ const BatchFormModal = ({
                 <FormControl fullWidth size="small" sx={input}>
                   <InputLabel>Motor Type / Stage</InputLabel>
                   <Select
-                    value={form.motorType}
+                    value={form.motorStage}
                     label="Motor Type / Stage"
                     onChange={(event) => handleMotorStageChange(event.target.value)}
                     MenuProps={t.menuPaper}
@@ -432,7 +435,7 @@ const BatchFormModal = ({
                                 return <em>{motorsEmptyHint}</em>;
                               }
                               const match = availableMotorOptions.find(
-                                (m: { motorCasingId: string }) => m.motorCasingId === value
+                                (m: { motorId: string }) => m.motorId === value
                               );
                               return match ? renderMotorOptionLabel(match) : value;
                             }}
@@ -440,8 +443,11 @@ const BatchFormModal = ({
                             <MenuItem value="">
                               <em>{motorsEmptyHint}</em>
                             </MenuItem>
-                            {slotOptions.map((motor: { motorCasingId: string }) => (
-                              <MenuItem key={motor.motorCasingId} value={motor.motorCasingId}>
+                            {slotOptions.map((motor: { motorId: string; motorCasingId: string }) => (
+                              <MenuItem
+                                key={motor.motorCasingId || motor.motorId}
+                                value={motor.motorId}
+                              >
                                 {renderMotorOptionLabel(motor)}
                               </MenuItem>
                             ))}

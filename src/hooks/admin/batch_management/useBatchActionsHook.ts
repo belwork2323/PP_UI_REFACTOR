@@ -1,43 +1,38 @@
 import { useState } from "react";
 import { batchManagementController } from "../../../controllers/admin/batch_management/batchManagementController";
+import { parseIdentificationSheetFromApi } from "../../../data/models/admin/BatchManagementModel";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { STRINGS } from "../../../app/config/strings";
 
 const S = STRINGS.BATCH_MANAGEMENT;
 
+const EMPTY_IDENTIFICATION_SHEET = {
+  date:            "",
+  batchSize:       0,
+  bondingSheetNo:  "",
+  mixerType:       "",
+  BldgNo:          "",
+  numberOfPremix:  1,
+  remarks:         "",
+  materials:       [] as any[],
+};
+
 const EMPTY_BATCH_FORM = {
   batchType:       "",
   subBatchType:    "",
   projectId:       "",
-  motorType:       "", // Motor stage letter; converted to { motorTypeId, motorTypeName } when posting
-  motorTypeId:     null as number | null,
+  motorStage:      "",
   numberOfMotors:  1,
   motorIds:        [""],
   priority:        "Medium",
   systemManagerId: "",
   objective:       "",
   articles:        [],
-  identificationSheet: {
-    date:            "",
-    batchSize:       0,
-    bondingSheetNo:  "",
-    mixerDetails:    "",
-    numberOfPremix:  1,
-    remarks:         "",
-    materials:       [],
-  },
+  identificationSheet: { ...EMPTY_IDENTIFICATION_SHEET },
 };
 
 const EMPTY_IMPL_FORM = {
-  identificationSheet: {
-    date:            "",
-    batchSize:       0,
-    bondingSheetNo:  "",
-    mixerDetails:    "",
-    numberOfPremix:  1,
-    remarks:         "",
-    materials:       [],
-  },
+  identificationSheet: { ...EMPTY_IDENTIFICATION_SHEET },
   objective:       "",
   articles:        [],
 };
@@ -61,24 +56,39 @@ export const useBatchActions = (userOptions: any[], onSuccess: () => void) => {
   const [deleting, setDeleting]             = useState(false);
 
   /* ── Convert BatchListItemModel to batch form ──────────────────────────── */
-  const batchModelToForm = (b: any) => ({
-    batchType:       b.batchType       ?? "MAIN",
-    subBatchType:    b.subBatchType    ?? "",
-    projectId:       b.projectId       ?? "",
-    motorType:       b.motorType?.motorTypeName ?? (typeof b.motorType === "string" ? b.motorType : ""),
-    motorTypeId:     b.motorType?.motorTypeId ?? null,
-    numberOfMotors:  b.numberOfMotors  ?? 1,
-    motorIds:        Array.isArray(b.motorIds) ? b.motorIds : [""],
-    priority:        b.priority        ?? "Medium",
-    systemManagerId: b.systemManager?.id ?? b.systemManagerId ?? "",
-    objective:       b.objective ?? "",
-    articles:        Array.isArray(b.articles) ? b.articles : [],
-    identificationSheet: b.identificationSheet ?? { ...EMPTY_BATCH_FORM.identificationSheet },
-  });
+  const batchModelToForm = (b: any) => {
+    const motorStageRaw = b.motorStage ?? b.motorType;
+    const motorStage =
+      motorStageRaw != null && motorStageRaw !== ""
+        ? String(
+            typeof motorStageRaw === "object"
+              ? motorStageRaw.motorTypeName ?? motorStageRaw.motorStage ?? ""
+              : motorStageRaw
+          )
+        : "";
+
+    return {
+      batchType:       b.batchType       ?? "MAIN",
+      subBatchType:    b.subBatchType    ?? "",
+      projectId:       b.projectId       ?? "",
+      motorStage,
+      numberOfMotors:  b.numberOfMotors  ?? 1,
+      motorIds:        Array.isArray(b.motorIds) && b.motorIds.length > 0 ? b.motorIds : [""],
+      priority:        b.priority        ?? "Medium",
+      systemManagerId: b.systemManager?.id ?? b.systemManagerId ?? "",
+      objective:       b.objective ?? "",
+      articles:        Array.isArray(b.articles) ? b.articles : [],
+      identificationSheet: b.identificationSheet
+        ? parseIdentificationSheetFromApi(b.identificationSheet)
+        : { ...EMPTY_IDENTIFICATION_SHEET },
+    };
+  };
 
   /* ── Convert BatchListItemModel to implementation form ───────────────────── */
   const implModelToForm = (b: any) => ({
-    identificationSheet: b.identificationSheet ?? { ...EMPTY_IMPL_FORM.identificationSheet },
+    identificationSheet: b.identificationSheet
+      ? parseIdentificationSheetFromApi(b.identificationSheet)
+      : { ...EMPTY_IDENTIFICATION_SHEET },
     objective:          b.objective ?? "",
     articles:           Array.isArray(b.articles) ? b.articles : [],
   });

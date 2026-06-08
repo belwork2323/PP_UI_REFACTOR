@@ -19,7 +19,7 @@ export const APPROVER_ENDPOINTS = {
   CHANGE_STATUS: `${API_BASE}/approver/form/change-status`,
   FORM_PDF: `${API_BASE}/approver/form/pdf`,
   RAW_MATERIAL_PROCUREMENT_LIST: `${API_BASE}/approver/raw-material-procurement/list`,
-  RAW_MATERIAL_PROCUREMENT_CHANGE_STATUS: `${API_BASE}/approver/raw-material-procurement/change-status`,
+  RAW_MATERIAL_PROCUREMENT_CHANGE_STATUS: `${API_BASE}/approver/form/change-status`,
   ROCKET_MOTOR_CASING_LIST: `${API_BASE}/approver/rocket-motor-casing/list`,
   ROCKET_MOTOR_CASING_CHANGE_STATUS: `${API_BASE}/approver/rocket-motor-casing/change-status`,
 };

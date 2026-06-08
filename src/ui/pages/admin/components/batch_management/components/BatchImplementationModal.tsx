@@ -10,7 +10,7 @@ import {
 import { icons } from "../../../../../../app/theme";
 import { STRINGS } from "../../../../../../app/config/strings";
 import Input from "../../../../../components/common/Input";
-import useBatchImplementationLots from "../../../../../../hooks/admin/batch_management/useBatchImplementationLots";
+import { useBatchImplementationLots } from "../../../../../../hooks/admin/batch_management/useBatchImplementationLots";
 
 const S = STRINGS.BATCH_MANAGEMENT.FORM;
 
@@ -23,7 +23,8 @@ interface Material {
   make?: string;
   requiredComposition: number;
   quantityPerPremix: number;
-  revalidationDate: string;
+  revalidationFromDate: string;
+  revalidationToDate: string;
 }
 
 const displayNumberValue = (value: number | undefined | null, emptyWhenZero = true): string => {
@@ -40,7 +41,7 @@ const parseIntField = (raw: string): number => {
 const materialManufacturer = (material: Material): string =>
   String(material.manufacturerName ?? material.make ?? "").trim();
 
-const BatchImplementationModal = ({
+export default function BatchImplementationModal({
   open,
   onClose,
   onSave,
@@ -48,11 +49,10 @@ const BatchImplementationModal = ({
   form,
   onFormChange,
   onMaterialsChange,
-  subDepartmentId = null,
   readOnly = false,
   saving,
   t,
-}: any) => {
+}: any) {
   const { modal, input } = t;
   const [selectedMaterialCode, setSelectedMaterialCode] = useState<string>("");
   const {
@@ -61,12 +61,7 @@ const BatchImplementationModal = ({
     loadingLots,
     getLotByMaterialAndId,
     getLotOptionsForRow,
-  } = useBatchImplementationLots({ open, subDepartmentId });
-
-  const formValid = form.identificationSheet && form.identificationSheet.date && 
-                    form.identificationSheet.batchSize > 0 &&
-                    form.identificationSheet.materials && 
-                    form.identificationSheet.materials.length > 0;
+  } = useBatchImplementationLots({ open });
 
   const fieldDisabled = readOnly || saving;
 
@@ -80,7 +75,6 @@ const BatchImplementationModal = ({
   }, [form.identificationSheet?.materials]);
 
   const getLotSelectPlaceholder = (materialCode: string, lotOptionCount: number): string => {
-    if (!subDepartmentId) return "Sub-department not configured";
     if (loadingLots) return "Loading approved lots...";
     if (lotOptionCount > 0) return "Select lot";
     return "No approved lots for this material";
@@ -129,7 +123,8 @@ const BatchImplementationModal = ({
       make: "",
       requiredComposition: 0,
       quantityPerPremix: 0,
-      revalidationDate: "",
+      revalidationFromDate: "",
+      revalidationToDate: "",
     };
     onMaterialsChange([...(form.identificationSheet?.materials ?? []), newMaterial]);
     setSelectedMaterialCode("");
@@ -245,10 +240,10 @@ const BatchImplementationModal = ({
                 disabled={fieldDisabled}
               />
               <Input
-                fullWidth label="Mixer Details"
-                value={form.identificationSheet?.mixerDetails ?? ""}
+                fullWidth label="Mixer Type"
+                value={form.identificationSheet?.mixerType ?? form.identificationSheet?.mixerDetails ?? ""}
                 onChange={(e) => {
-                  const newIdent = { ...form.identificationSheet, mixerDetails: e.target.value };
+                  const newIdent = { ...form.identificationSheet, mixerType: e.target.value };
                   onFormChange("identificationSheet", newIdent);
                 }}
                 size="small" sx={input}
@@ -259,6 +254,16 @@ const BatchImplementationModal = ({
 
           <Box>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={modal.fieldRowSpacing}>
+              <Input
+                fullWidth label="Building No"
+                value={form.identificationSheet?.BldgNo ?? ""}
+                onChange={(e) => {
+                  const newIdent = { ...form.identificationSheet, BldgNo: e.target.value };
+                  onFormChange("identificationSheet", newIdent);
+                }}
+                size="small" sx={input}
+                disabled={fieldDisabled}
+              />
               <Input
                 fullWidth label="Number of Premix" type="number"
                 value={form.identificationSheet?.numberOfPremix ?? 1}
@@ -328,7 +333,8 @@ const BatchImplementationModal = ({
                       <TableCell>Manufacturer</TableCell>
                       <TableCell>Required Composition %</TableCell>
                       <TableCell>Qty/Premix</TableCell>
-                      <TableCell>Revalidation Date</TableCell>
+                      <TableCell>Revalidation From</TableCell>
+                      <TableCell>Revalidation To</TableCell>
                       {!readOnly && <TableCell>Action</TableCell>}
                     </TableRow>
                   </TableHead>
@@ -435,8 +441,18 @@ const BatchImplementationModal = ({
                         <TableCell>
                           <Input
                             type="date"
-                            value={material.revalidationDate}
-                            onChange={(e) => handleMaterialChange(idx, "revalidationDate", e.target.value)}
+                            value={material.revalidationFromDate ?? ""}
+                            onChange={(e) => handleMaterialChange(idx, "revalidationFromDate", e.target.value)}
+                            size="small" sx={input}
+                            InputLabelProps={{ shrink: true }}
+                            disabled={fieldDisabled}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            type="date"
+                            value={material.revalidationToDate ?? ""}
+                            onChange={(e) => handleMaterialChange(idx, "revalidationToDate", e.target.value)}
                             size="small" sx={input}
                             InputLabelProps={{ shrink: true }}
                             disabled={fieldDisabled}
@@ -476,7 +492,7 @@ const BatchImplementationModal = ({
           <Button
             variant="contained"
             onClick={onSave}
-            disabled={!formValid || saving}
+            disabled={saving}
             sx={modal.saveButton}
           >
             {saving ? (
@@ -487,6 +503,4 @@ const BatchImplementationModal = ({
       </DialogActions>
     </Dialog>
   );
-};
-
-export default BatchImplementationModal;
+}

@@ -20,16 +20,9 @@ import {
   AvailableMotorsListModel,
   SolidProcessesListModel,
 } from "../../data/models/user/SubdepartmentCommonModel";
+import type { SubdepartmentBatchListRequest } from "../../data/models/user/SubdepartmentBatchModel";
 
-export type BatchListPayload = {
-  subDepartmentId: number;
-  userId: string;
-  page: number;
-  limit: number;
-  status?: string[];
-  priority?: string[];
-  search?: string;
-};
+export type BatchListPayload = SubdepartmentBatchListRequest;
 
 export type MaterialSpecificationPayload = {
   materialCode: string;
@@ -47,7 +40,7 @@ export const operationsController = {
   /**
    * Common API to fetch paginated batches dynamically based on subDepartmentId.
    */
-  fetchSubdepartmentBatches: async (payload: BatchListPayload) => {
+  fetchSubdepartmentBatches: async (payload: SubdepartmentBatchListRequest) => {
     try {
       const response = await fetchSubdepartmentBatchesApi(payload);
       return new ApiResponseModel(response);

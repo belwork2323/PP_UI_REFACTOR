@@ -34,6 +34,17 @@ export const RAW_MATERIAL_UI_STATUS_TO_API: Record<string, string> = {
   [OPERATION_STATUS.REJECTED]: "REJECTED",
 };
 
+/** Map UI / display status labels to uppercase API enum values for lot-list requests */
+export function toRawMaterialLotListApiStatus(status: string): string {
+  const mapped = RAW_MATERIAL_UI_STATUS_TO_API[status];
+  if (mapped) return mapped;
+
+  return String(status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+}
+
 /** Soft-delete is allowed only while the lot is still in progress */
 export const canDeleteRawMaterialLot = (status: string | null | undefined) =>
   status === OPERATION_STATUS.IN_PROGRESS;
@@ -411,6 +422,19 @@ export type RawMaterialLotListRequest = {
   toDate?: string;
 };
 
+export function normalizeRawMaterialLotListRequest(
+  payload: RawMaterialLotListRequest,
+): RawMaterialLotListRequest {
+  if (!payload.status?.length) {
+    return payload;
+  }
+
+  return {
+    ...payload,
+    status: payload.status.map(toRawMaterialLotListApiStatus),
+  };
+}
+
 export type RawMaterialLotListPagination = {
   page: number;
   limit: number;
@@ -441,7 +465,28 @@ export class RawMaterialProcurementSubmitResponseModel {
     return new RawMaterialProcurementSubmitResponseModel(apiResponse?.data ?? {});
   }
 }
+export function normalizeRawMaterialStatus(status: string): OperationStatus {
+  const u = String(status ?? "").toUpperCase();
 
+  const map: Record<string, OperationStatus> = {
+    INITIATED: OPERATION_STATUS.INITIATED,
+    IN_PROGRESS: OPERATION_STATUS.IN_PROGRESS,
+    WAITING_FOR_APPROVAL: OPERATION_STATUS.WAITING_FOR_APPROVAL,
+    APPROVED: OPERATION_STATUS.APPROVED,
+    REJECTED: OPERATION_STATUS.REJECTED,
+  };
+
+  const fromApiKey = map[u];
+  if (fromApiKey) return fromApiKey;
+
+  const trimmed = String(status ?? "").trim();
+
+  if (OPERATION_STATUS_VALUES.includes(trimmed as OperationStatus)) {
+    return trimmed as OperationStatus;
+  }
+
+  return OPERATION_STATUS.INITIATED;
+}
 /** Legacy batch-style details (multi-material) — kept for approver until migrated */
 export class RawMaterialProcurementDetailsModel {
   formId: string;

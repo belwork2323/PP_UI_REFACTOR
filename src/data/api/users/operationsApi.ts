@@ -1,8 +1,9 @@
 import { get, post } from "../httpClient";
 import { USER_OPERATIONS_ENDPOINTS } from "../endPoints";
 import type { MaterialsListRequest } from "../../models/user/MaterialsListModel";
+import type { SubdepartmentBatchListRequest } from "../../models/user/SubdepartmentBatchModel";
 
-export const fetchSubdepartmentBatchesApi = async (payload: any) => {
+export const fetchSubdepartmentBatchesApi = async (payload: SubdepartmentBatchListRequest) => {
   return await post(USER_OPERATIONS_ENDPOINTS.BATCH_LIST, payload);
 };
 

@@ -801,6 +801,16 @@ export const STRINGS = {
       CONTINUE_ACTION: "Continue Filling",
       EDIT_ACTION: "Edit & Resubmit",
       EDIT_ACTION_TOOLTIP: "Load previously submitted data for editing",
+      FILTERS_TOGGLE: "Filters",
+      FILTERS_TITLE: "Refine batch list",
+      FILTERS_PRIORITY: "Priority",
+      FILTERS_STATUS: "Status",
+      FILTERS_MOTOR_ID: "Motor ID",
+      FILTERS_LOT_ID: "Lot ID",
+      FILTERS_ALL_PRIORITIES: "All priorities",
+      FILTERS_APPLY: "Apply filters",
+      FILTERS_CLEAR: "Clear all",
+      FILTERS_CLOSE_PANEL: "Close",
     },
 
     // ── Form Header Strings ─────────────────────────────────────────────────

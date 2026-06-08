@@ -1,3 +1,5 @@
+import { normalizeRawMaterialStatus } from "../user/RawMaterialProcurementModel";
+
 export type RawMaterialProcurementApproverLotRow = {
   lotId: string;
   procurementId: string;
@@ -51,7 +53,7 @@ export const mapRawMaterialProcurementApproverLotRow = (
     receiptDate: String(lot.receiptDate ?? "").trim(),
     manufacturerName: String(lot.manufacturerName ?? "").trim(),
     priority: String(lot.priority ?? "Medium").trim(),
-    status: String(lot.status ?? "").trim(),
+    status: normalizeRawMaterialStatus(String(lot.status ?? "").trim()),
     assignedTo: mapPerson(lot.assignedTo),
     createdBy: mapPerson(lot.createdBy),
     createdOn: String(lot.createdOn ?? "").trim(),
@@ -71,7 +73,7 @@ export const mapRawMaterialProcurementApproverListItem = (
   lotId: lot.lotId,
   procurementId: lot.procurementId,
   batchId: lot.lotId,
-  formId: lot.procurementId,
+  formId: lot.lotId,
   materialCode: lot.materialCode,
   materialName: lot.materialName,
   supplyOrderNo: lot.supplyOrderNo,

@@ -7,6 +7,8 @@
  * backwards compatibility.
  */
 
+import { normalizeSubdepartmentBatchStatus } from "../../../../../../data/models/user/SubdepartmentBatchModel";
+
 // Re-export style configs from their canonical home in the theme
 export {
   stageConfig,
@@ -26,12 +28,16 @@ export const getMotorId    = (b: any): string => {
   }
   return b.motorId || "—";
 };
-/** motorType is an object { motorTypeId, motorTypeName } in the model */
-export const getMotorType  = (b: any): string =>
-  b.motorType?.motorTypeName ?? (typeof b.motorType === "string" ? b.motorType : "—");
+/** motorStage from list/details API (number or stage letter); legacy motorType supported */
+export const getMotorType  = (b: any): string => {
+  const stage = b.motorStage ?? b.motorType;
+  if (stage == null || stage === "") return "—";
+  if (typeof stage === "object") return stage.motorTypeName ?? stage.motorStage ?? "—";
+  return String(stage);
+};
 /** stage is not a flat string; the stage department is in b.department.departmentName */
 export const getStage      = (b: any): string => b.department?.departmentName || "—";
-export const getStatus     = (b: any): string => b.status      || "Initiated";
+export const getStatus     = (b: any): string => normalizeSubdepartmentBatchStatus(b.status);
 export const getPriority   = (b: any): string => b.priority    || "Medium";
 /** top-level department object */
 export const getDept       = (b: any): string => b.department?.departmentName || "—";

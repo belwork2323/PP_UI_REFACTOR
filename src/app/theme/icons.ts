@@ -335,6 +335,7 @@ export const icons = {
 
     // Status chips
     pendingStatus:    HourglassEmptyIcon,
+    waitingForApprovalStatus: PendingActionsRoundedIcon,
     inProgressStatus: AutorenewIcon,
     completedStatus:  TaskAltIcon,
     approvedStatus:   VerifiedIcon,
