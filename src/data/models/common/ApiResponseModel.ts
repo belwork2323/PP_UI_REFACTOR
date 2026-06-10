@@ -36,7 +36,7 @@ export class ApiResponseModel<T = any> {
     } else {
       // Direct API response
       this.success = apiResponse.success ?? false;
-      this.statusCode = apiResponse.statusCode ?? (this.success ? 200 : 400);
+      this.statusCode = apiResponse.statusCode ?? apiResponse.code ?? (this.success ? 200 : 400);
       this.message = apiResponse.message ?? (this.success ? "Success" : "Failed");
       this.error = apiResponse.error ?? null;
       this.errorCode =

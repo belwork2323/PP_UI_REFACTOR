@@ -5,6 +5,7 @@ import { useApproverListRefreshStore } from "../../app/store/approverListRefresh
 import { useAuthStore } from "../../app/store/authStore";
 import type { ApproverDepartmentKey } from "../../app/theme/approver";
 import { isApproverActionableStatus } from "../../app/theme/approver";
+import { normalizeApproverBatchStatus } from "../../data/models/approver/ApproverBatchListModel";
 import { useAlertStore } from "../../app/store/alertStore";
 import type { ApproverFormActionType } from "../../data/api/approver/approverApi";
 import { submitApproverFormStatusChange } from "../../controllers/approver/approverController";
@@ -135,7 +136,8 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
     setSubmitting(false);
 
     if (response.success) {
-      const nextStatus = actionType === "APPROVED" ? "Approved" : "Rejected";
+      const nextStatus =
+        actionType === "APPROVED" ? "Approved" : "Rejected";
 
       setItems((current) =>
         current.map((item) => {
@@ -150,7 +152,9 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
 
           return {
             ...item,
-            status: (response.data as any)?.status ?? nextStatus,
+            status: normalizeApproverBatchStatus(
+              (response.data as { status?: string })?.status ?? nextStatus,
+            ),
             remarks: actionType === "APPROVED" ? (trimmedValue || null) : item.remarks ?? null,
             rejectionReason: actionType === "REJECTED" ? trimmedValue : null,
           };

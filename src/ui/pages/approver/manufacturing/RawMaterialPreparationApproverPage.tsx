@@ -16,6 +16,7 @@ import {
   alpha,
   Card,
   Button,
+  CircularProgress,
   Dialog,
   DialogContent,
   IconButton,
@@ -33,7 +34,7 @@ import ApproverList from "../components/ApproverList";
 import ApproverActionDialog from "../../../components/custom/ApproverActionDialog";
 import { icons } from "../../../../app/theme/icons";
 import { APPROVER_PRIORITY_META, APPROVER_STATUS_META, isApproverActionableStatus } from "../../../../app/theme/approver";
-import useApproverFormAction from "../../../../hooks/approver/useApproverFormAction";
+import useRawMaterialPreparationApproverHook from "../../../../hooks/approver/manufacturing/useRawMaterialPreparationApproverHook";
 
 const {
   approved: CheckCircleRoundedIcon,
@@ -193,6 +194,41 @@ const SectionDivider = ({ icon: Icon, label, color }) => (
 );
 
 // ─── Process block renderer (Solid) ──────────────────────────────────────────
+const PROCESS_LABELS: Record<string, string> = {
+  ap_blending: "AP Blending",
+  blending_cum_drying: "Blending cum Drying",
+  drying_rvd: "Drying Operation in RVD",
+  drying_oven: "Drying in Oven",
+  screening: "Screening",
+  psd: "Particle Size Distribution Details",
+  al_processing: "Aluminium Processing",
+};
+
+/** Reads a display string from a process row field (plain scalar or API `{ source, parsedValue }`). */
+const getTextValue = (row: unknown, key: string): string | null => {
+  if (!row || typeof row !== "object") return null;
+
+  const raw = (row as Record<string, unknown>)[key];
+  if (raw === null || raw === undefined) return null;
+
+  if (typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    if (obj.source != null && String(obj.source).trim() !== "") {
+      return String(obj.source).trim();
+    }
+    if (obj.parsedValue != null && String(obj.parsedValue).trim() !== "") {
+      return String(obj.parsedValue).trim();
+    }
+    if (obj.value != null && String(obj.value).trim() !== "") {
+      return String(obj.value).trim();
+    }
+    return null;
+  }
+
+  const text = String(raw).trim();
+  return text.length > 0 ? text : null;
+};
+
 const AP_ROW_LABELS = {
   row_tumbling: "Tumbling of Blender @ RPM",
   row_jacket: "Jacket Water Temperature",
@@ -554,13 +590,220 @@ const LinearSection = ({ linearData }) => {
   );
 };
 
+const formatSectionLabel = (sectionId: string) =>
+  sectionId
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (char) => char.toUpperCase())
+    .trim();
+
+const formatCellValue = (value: unknown): string => {
+  if (value === null || value === undefined || value === "") return "—";
+  if (typeof value === "object") {
+    if (Array.isArray(value)) {
+      return value.length > 0 ? value.map((entry) => formatCellValue(entry)).join(", ") : "—";
+    }
+    const entries = Object.entries(value as Record<string, unknown>).filter(
+      ([, entryValue]) => entryValue !== null && entryValue !== undefined && entryValue !== "",
+    );
+    if (entries.length === 0) return "—";
+    return entries.map(([key, entryValue]) => `${formatSectionLabel(key)}: ${formatCellValue(entryValue)}`).join("; ");
+  }
+  return String(value);
+};
+
+const SchemaSectionBlock = ({ section }) => {
+  const rows = section.sectionData ?? [];
+  if (rows.length === 0) return null;
+
+  const columns: string[] = Array.from(
+    rows.reduce((keys, row) => {
+      Object.keys(row ?? {}).forEach((key) => keys.add(key));
+      return keys;
+    }, new Set<string>()),
+  );
+
+  return (
+    <Box sx={{ mb: 2 }}>
+      <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.textSub, mb: 0.75 }}>
+        {formatSectionLabel(section.sectionId)}
+      </Typography>
+      <TableContainer
+        sx={{
+          borderRadius: "6px",
+          border: `1px solid ${BRAND.border}`,
+          boxShadow: `0 1px 6px ${alpha(BRAND.primary, 0.05)}`,
+        }}
+      >
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              {columns.map((column) => (
+                <DTH key={column}>{formatSectionLabel(column)}</DTH>
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {rows.map((row, rowIndex) => (
+              <TableRow key={rowIndex} sx={{ background: rowBg(rowIndex), ...lastRow }}>
+                {columns.map((column) => (
+                  <DTD key={column}>{formatCellValue(row?.[column])}</DTD>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Box>
+  );
+};
+
+const ProcessDetailBlock = ({ process, slotLabel, slotIcon: SlotIcon, slotColor }) => (
+  <Box sx={{ mb: 2.5 }}>
+    <Stack direction="row" alignItems="center" gap={1} mb={1}>
+      <Chip
+        icon={<SlotIcon sx={{ fontSize: "12px !important" }} />}
+        label={slotLabel}
+        size="small"
+        sx={{
+          height: 22,
+          fontSize: "0.68rem",
+          fontWeight: 800,
+          background: alpha(slotColor, 0.1),
+          color: slotColor,
+          border: `1px solid ${alpha(slotColor, 0.25)}`,
+        }}
+      />
+      <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: BRAND.text }}>
+        {process.materialName || process.materialCode}
+        {process.gradeCode ? ` (${process.gradeCode})` : ""}
+      </Typography>
+    </Stack>
+    {process.sections.map((section) => (
+      <SchemaSectionBlock key={section.sectionId} section={section} />
+    ))}
+  </Box>
+);
+
+const PremixDetailBlock = ({ premix }) => (
+  <Box sx={{ mb: 3 }}>
+    <Stack direction="row" alignItems="center" gap={1} mb={1.5}>
+      <Chip
+        label={`Premix ${premix.premixNo}`}
+        size="small"
+        sx={{
+          height: 22,
+          fontSize: "0.68rem",
+          fontWeight: 800,
+          background: `linear-gradient(135deg, ${BRAND.primary}, ${BRAND.primaryLight})`,
+          color: "#fff",
+        }}
+      />
+      <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub, fontWeight: 700 }}>
+        {premix.materialType}
+      </Typography>
+    </Stack>
+    {premix.solidProcesses.map((process, index) => (
+      <ProcessDetailBlock
+        key={`solid-${process.materialCode}-${index}`}
+        process={process}
+        slotLabel="Solid"
+        slotIcon={GrainRoundedIcon}
+        slotColor="#1565C0"
+      />
+    ))}
+    {premix.liquidProcesses.map((process, index) => (
+      <ProcessDetailBlock
+        key={`liquid-${process.materialCode}-${index}`}
+        process={process}
+        slotLabel="Liquid"
+        slotIcon={OpacityRoundedIcon}
+        slotColor="#1565C0"
+      />
+    ))}
+  </Box>
+);
+
+const WeightmentSheetBlock = ({ weightmentSheet }) => {
+  if (!weightmentSheet) return null;
+
+  const rows = Array.isArray(weightmentSheet.weightmentDetails)
+    ? weightmentSheet.weightmentDetails
+    : [];
+
+  return (
+    <Box>
+      <SectionDivider icon={OpacityRoundedIcon} label="Weightment Sheet" color="#1565C0" />
+      {weightmentSheet.mixerBuildingNumber ? (
+        <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub, mb: 1 }}>
+          Mixer Building:{" "}
+          <Box component="span" sx={{ fontWeight: 700, color: BRAND.text }}>
+            {String(weightmentSheet.mixerBuildingNumber)}
+          </Box>
+        </Typography>
+      ) : null}
+      {rows.length > 0 ? (
+        <TableContainer
+          sx={{
+            borderRadius: "6px",
+            border: `1px solid ${BRAND.border}`,
+            boxShadow: `0 1px 6px ${alpha(BRAND.primary, 0.05)}`,
+          }}
+        >
+          <Table size="small">
+            <TableHead>
+              <TableRow>
+                {[
+                  "Material",
+                  "Percentage",
+                  "Weight Transferred",
+                  "Container Type",
+                  "Container Number",
+                  "Weigh Scale",
+                  "Weighing Date & Time",
+                ].map((header) => (
+                  <DTH key={header}>{header}</DTH>
+                ))}
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {rows.map((entry, index) => {
+                const row = entry as Record<string, unknown>;
+                return (
+                <TableRow key={index} sx={{ background: rowBg(index), ...lastRow }}>
+                  <DTD sx={{ fontWeight: 600 }}>
+                    {String(row.materialName ?? row.materialCode ?? "—")}
+                  </DTD>
+                  <DTD>{row.percentage != null ? `${row.percentage}%` : "—"}</DTD>
+                  <DTD>{row.weightTransferred != null ? `${row.weightTransferred} Kg` : "—"}</DTD>
+                  <DTD>{String(row.containerType ?? "—")}</DTD>
+                  <DTD>{String(row.containerNumber ?? "—")}</DTD>
+                  <DTD>{String(row.weighScaleNumber ?? "—")}</DTD>
+                  <DTD sx={{ whiteSpace: "nowrap" }}>
+                    {row.weighingDateTime
+                      ? new Date(String(row.weighingDateTime)).toLocaleString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })
+                      : "—"}
+                  </DTD>
+                </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      ) : null}
+    </Box>
+  );
+};
+
 // ─── Detail Dialog ────────────────────────────────────────────────────────────
-const RMPDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
+const RMPDetailDialog = ({ open, onClose, item, loading, onApprove, onReject }) => {
   const [pdfOpen, setPdfOpen] = useState(false);
   if (!item) return null;
-
-  const today = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-  const types = item.types ?? {};
 
   return (
     <>
@@ -637,89 +880,26 @@ const RMPDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
           </Stack>
         </Box>
 
-        {/* Type badges strip */}
-        <Box
-          sx={{
-            px: 2.5,
-            py: 1,
-            background: alpha(BRAND.primary, 0.04),
-            borderBottom: `1px solid ${BRAND.border}`,
-            flexShrink: 0,
-          }}
-        >
-          <Stack direction="row" gap={1} alignItems="center">
-            <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: BRAND.textSub, mr: 0.5 }}>
-              Types included:
-            </Typography>
-            {types.solid && (
-              <Chip
-                icon={<GrainRoundedIcon sx={{ fontSize: "12px !important" }} />}
-                label="Solid"
-                size="small"
-                sx={{
-                  height: 20,
-                  fontSize: "0.62rem",
-                  fontWeight: 700,
-                  background: alpha("#1565C0", 0.1),
-                  color: "#1565C0",
-                  border: `1px solid ${alpha("#1565C0", 0.25)}`,
-                }}
-              />
-            )}
-            {types.liquid && (
-              <Chip
-                icon={<OpacityRoundedIcon sx={{ fontSize: "12px !important" }} />}
-                label="Liquid"
-                size="small"
-                sx={{
-                  height: 20,
-                  fontSize: "0.62rem",
-                  fontWeight: 700,
-                  background: alpha("#1565C0", 0.1),
-                  color: "#1565C0",
-                  border: `1px solid ${alpha("#1565C0", 0.25)}`,
-                }}
-              />
-            )}
-            {types.linear && (
-              <Chip
-                icon={<BlurLinearRoundedIcon sx={{ fontSize: "12px !important" }} />}
-                label="Linear"
-                size="small"
-                sx={{
-                  height: 20,
-                  fontSize: "0.62rem",
-                  fontWeight: 700,
-                  background: alpha("#1565C0", 0.1),
-                  color: "#1565C0",
-                  border: `1px solid ${alpha("#1565C0", 0.25)}`,
-                }}
-              />
-            )}
-          </Stack>
-        </Box>
-
         {/* Content */}
         <DialogContent sx={{ p: 2.5, overflowY: "auto", background: BRAND.surface }}>
-          {types.solid && (item.solidProcesses ?? []).length > 0 && (
-            <Box sx={{ mb: 3 }}>
-              <SectionDivider icon={GrainRoundedIcon} label="Solid Preparation" color="#1565C0" />
-              {item.solidProcesses.map((proc) => (
-                <ProcessBlock key={`${proc.processKey}-${proc.instanceId}`} proc={proc} />
+          {loading ? (
+            <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", py: 6, gap: 1.5 }}>
+              <CircularProgress size={32} sx={{ color: BRAND.primaryLight }} />
+              <Typography sx={{ fontSize: "0.82rem", color: BRAND.textSub }}>
+                Loading preparation details…
+              </Typography>
+            </Box>
+          ) : (item.premixes ?? []).length > 0 || item.weightmentSheet ? (
+            <>
+              {(item.premixes ?? []).map((premix) => (
+                <PremixDetailBlock key={premix.premixNo} premix={premix} />
               ))}
-            </Box>
-          )}
-          {types.liquid && item.liquidData && (
-            <Box sx={{ mb: 3 }}>
-              <SectionDivider icon={OpacityRoundedIcon} label="Liquid Preparation" color="#1565C0" />
-              <LiquidSection liquidData={item.liquidData} />
-            </Box>
-          )}
-          {types.linear && item.linearData && (
-            <Box>
-              <SectionDivider icon={BlurLinearRoundedIcon} label="Linear Preparation" color="#1565C0" />
-              <LinearSection linearData={item.linearData} />
-            </Box>
+              <WeightmentSheetBlock weightmentSheet={item.weightmentSheet} />
+            </>
+          ) : (
+            <Typography sx={{ fontSize: "0.82rem", color: BRAND.textSub, textAlign: "center", py: 4 }}>
+              No preparation details available for this submission.
+            </Typography>
           )}
         </DialogContent>
 
@@ -738,6 +918,7 @@ const RMPDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
           <Button
             variant="outlined"
             onClick={onClose}
+            disabled={loading}
             sx={{
               borderRadius: 2,
               fontWeight: 700,
@@ -753,6 +934,7 @@ const RMPDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
             variant="contained"
             startIcon={<CancelRoundedIcon />}
             onClick={() => onReject(item)}
+            disabled={loading}
             sx={{
               borderRadius: 2,
               fontWeight: 700,
@@ -769,6 +951,7 @@ const RMPDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
             variant="contained"
             startIcon={<CheckCircleRoundedIcon />}
             onClick={() => onApprove(item)}
+            disabled={loading}
             sx={{
               borderRadius: 2,
               fontWeight: 700,
@@ -827,14 +1010,16 @@ const PrepTypeBadges = ({ types, solidProcesses }) => {
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 const RawMaterialPreparationApproverPage = () => {
-  const [items, setItems] = useState(MOCK_RMP_SUBMISSIONS);
-  const [selected, setSelected] = useState(null);
-  const { dialogProps, requestApprove, requestReject } = useApproverFormAction({
-    department: "manufacturing",
-    setItems,
-    setSelected,
-    subDepartment: "raw-material-prep",
-  });
+  const {
+    items,
+    selected,
+    detailsLoading,
+    dialogProps,
+    requestApprove,
+    requestReject,
+    handleViewDetails,
+    handleCloseDetail,
+  } = useRawMaterialPreparationApproverHook();
 
   return (
     <ApproverList
@@ -888,26 +1073,28 @@ const RawMaterialPreparationApproverPage = () => {
                     >
                       <TD>
                         <Typography sx={{ fontWeight: 800, fontSize: "0.82rem", color: BRAND.primary }}>
-                          {row.batchId}
+                          {String(row.batchId ?? "—")}
                         </Typography>
                       </TD>
                       <TD>
                         <BatchTypeChip type={row.batchType} />
                       </TD>
-                      <TD sx={{ fontSize: "0.78rem", color: BRAND.textSub }}>{row.motorId}</TD>
+                      <TD sx={{ fontSize: "0.78rem", color: BRAND.textSub }}>{String(row.motorId ?? "—")}</TD>
                       <TD>
                         <TypeChip type={row.motorType} />
                       </TD>
                       {/* <TD>
                         <PrepTypeBadges types={row.types} solidProcesses={row.solidProcesses} />
                       </TD> */}
-                      <TD sx={{ fontSize: "0.78rem" }}>{row.submittedBy}</TD>
+                      <TD sx={{ fontSize: "0.78rem" }}>{String(row.submittedBy ?? "—")}</TD>
                       <TD sx={{ color: BRAND.textSub, fontSize: "0.76rem", whiteSpace: "nowrap" }}>
-                        {new Date(row.createdOn).toLocaleDateString("en-IN", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
+                        {row.createdOn
+                          ? new Date(String(row.createdOn)).toLocaleDateString("en-IN", {
+                              day: "2-digit",
+                              month: "short",
+                              year: "numeric",
+                            })
+                          : "—"}
                       </TD>
                       <TD>
                         <PriorityChip priority={row.priority} />
@@ -920,7 +1107,7 @@ const RawMaterialPreparationApproverPage = () => {
                           size="small"
                           variant="outlined"
                           startIcon={<VisibilityRoundedIcon sx={{ fontSize: "13px !important" }} />}
-                          onClick={() => setSelected(row)}
+                          onClick={() => handleViewDetails(row)}
                           disabled={!isApproverActionableStatus(row.status)}
                           sx={{
                             borderRadius: 2,
@@ -947,8 +1134,9 @@ const RawMaterialPreparationApproverPage = () => {
 
           <RMPDetailDialog
             open={!!selected}
-            onClose={() => setSelected(null)}
+            onClose={handleCloseDetail}
             item={selected}
+            loading={detailsLoading}
             onApprove={requestApprove}
             onReject={requestReject}
           />

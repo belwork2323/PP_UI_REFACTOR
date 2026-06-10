@@ -45,7 +45,7 @@ const SchemaUI = ({
   if (!schema) {
     return (
       <Typography sx={{ fontSize: "0.8rem", color: theme.textSub }}>
-        Select a material to load the preparation form schema.
+        Schema is not loaded yet.
       </Typography>
     );
   }

@@ -17,7 +17,7 @@ import {
   priorityConfig,
   getBatchId,
   getMotorId,
-  getMotorType,
+  getMotorStage,
   getStage,
   getStatus,
   getPriority,
@@ -84,7 +84,7 @@ const BatchListTable = ({
               paginated.map((batch: any) => {
                 const batchId    = getBatchId(batch);
                 const motorId    = getMotorId(batch);
-                const motorType  = getMotorType(batch);
+                const motorStage = getMotorStage(batch);
                 const stage      = getStage(batch);
                 const status     = getStatus(batch);
                 const priority   = getPriority(batch);
@@ -115,11 +115,11 @@ const BatchListTable = ({
                       </Box>
                     </TableCell>
 
-                    {/* Motor Type */}
+                    {/* Motor Stage */}
                     <TableCell sx={table.cell}>
                       <Box sx={tableCell.motorIdBox}>
                         <icons.batchMgmt.motorId sx={tableCell.motorIdIcon} />
-                        <Typography sx={tableCell.motorIdText}>{motorType}</Typography>
+                        <Typography sx={tableCell.motorIdText}>{motorStage}</Typography>
                       </Box>
                     </TableCell>
 

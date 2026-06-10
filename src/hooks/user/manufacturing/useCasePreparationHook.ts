@@ -6,11 +6,27 @@ import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshSto
 import casePreparationController from "../../../controllers/user/manufacturing/casePreparationController";
 import {
   createDefaultCasePreparationFormState,
+  createEmptyMotorSession,
   hasAnyCasePreparationValue,
+  hydrateCasePreparationFormState,
   mapCasePreparationDetailsToFormState,
   mapCasePreparationFormStateToPayload,
+  type CasePrepMotorSession,
   type CasePreparationFormState,
 } from "../../../data/models/user/CasePreparationFormModel";
+import {
+  buildCasePreparationSchemaRequest,
+  casePreparationSchemaFetchConfig,
+  createCasePrepInitialValues,
+  type SchemaDocument,
+  type SchemaFormValues,
+} from "../../../schemaManagement";
+import schemaManagementController from "../../../schemaManagement/controllers/schemaManagementController";
+import {
+  isMainMotorBatch,
+  isSubscaleBatch,
+  type CasePrepAddedMotor,
+} from "./casePreparationFlowConfig";
 import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 
@@ -20,12 +36,20 @@ type CasePrepBatch = {
   batchId: string;
   cpStatus?: string;
   formId?: string | null;
+  batchType?: string;
+  motorId?: string;
   [key: string]: any;
 };
 
 const CP_STATUS = MANUFACTURING_STATUS;
 
 const parseStatus = (status: string | undefined) => String(status ?? "").toLowerCase();
+
+const buildAddedMotorsFromForm = (formData: CasePreparationFormState): CasePrepAddedMotor[] =>
+  (formData.motors ?? []).map((motor) => ({
+    motorId: motor.motorId,
+    prrcClearanceDate: motor.prrcClearanceDate,
+  }));
 
 export const useCasePreparationHook = () => {
   const listParams = useSubdepartmentBatches("case-preparation");
@@ -44,6 +68,8 @@ export const useCasePreparationHook = () => {
   const [activeBatch, setActiveBatch] = useState<CasePrepBatch | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [loadingFormDetails, setLoadingFormDetails] = useState(false);
+  const [schemaLoading, setSchemaLoading] = useState(false);
+  const [schemaError, setSchemaError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
@@ -52,12 +78,32 @@ export const useCasePreparationHook = () => {
   );
   const [initialSnapshot, setInitialSnapshot] = useState("{}");
 
-  const formSnapshot = useMemo(() => JSON.stringify(formData), [formData]);
+  const [motorCount, setMotorCount] = useState<number | "">("");
+  const [draftMotorIds, setDraftMotorIds] = useState<string[]>([]);
+  const [prrcClearanceDate, setPrrcClearanceDate] = useState("");
+  const [addedMotors, setAddedMotors] = useState<CasePrepAddedMotor[]>([]);
+
+  const formSnapshot = useMemo(
+    () =>
+      JSON.stringify({
+        formData,
+        addedMotors,
+      }),
+    [formData, addedMotors]
+  );
 
   const isFormDirty = useMemo(
     () => view === "form" && formSnapshot !== initialSnapshot,
     [view, formSnapshot, initialSnapshot]
   );
+
+  const resetFlowDraft = useCallback(() => {
+    setMotorCount("");
+    setDraftMotorIds([]);
+    setPrrcClearanceDate("");
+    setAddedMotors([]);
+    setSchemaError(null);
+  }, []);
 
   const resetFormContext = useCallback(() => {
     const defaults = createDefaultCasePreparationFormState();
@@ -65,12 +111,20 @@ export const useCasePreparationHook = () => {
     setActiveBatch(null);
     setIsEditMode(false);
     setLoadingFormDetails(false);
+    setSchemaLoading(false);
+    setSchemaError(null);
     setActionLoading(false);
     setBackConfirmOpen(false);
     setHasSavedDraft(false);
     setFormData(defaults);
-    setInitialSnapshot(JSON.stringify(defaults));
-  }, []);
+    resetFlowDraft();
+    setInitialSnapshot(
+      JSON.stringify({
+        formData: defaults,
+        addedMotors: [],
+      })
+    );
+  }, [resetFlowDraft]);
 
   const getErrorMessage = (response: any, fallbackMessage: string) => {
     if (response?.error?.details) return response.error.details;
@@ -78,11 +132,44 @@ export const useCasePreparationHook = () => {
     return fallbackMessage;
   };
 
+  const fetchCasePrepSchema = useCallback(
+    async (batchType: string | undefined): Promise<SchemaDocument | null> => {
+      if (!subDepartmentId) {
+        showAlert(STRINGS.MANUFACTURING.CASE_PREP.SUB_DEPARTMENT_MISSING, "error");
+        return null;
+      }
+
+      setSchemaLoading(true);
+      setSchemaError(null);
+
+      const response = await schemaManagementController.fetchSchema(
+        casePreparationSchemaFetchConfig,
+        buildCasePreparationSchemaRequest({
+          subDepartmentId,
+          batchType: batchType ?? "",
+        })
+      );
+
+      setSchemaLoading(false);
+
+      if (!response?.success || !response.data) {
+        const message = getErrorMessage(response, STRINGS.MANUFACTURING.CASE_PREP.SCHEMA_LOAD_ERROR);
+        setSchemaError(message);
+        showAlert(message, "error");
+        return null;
+      }
+
+      return response.data;
+    },
+    [showAlert, subDepartmentId]
+  );
+
   const openFormWithResolvedData = useCallback(
     async (batch: CasePrepBatch, editMode: boolean) => {
       const status = parseStatus(batch.cpStatus);
       const shouldFetchDetails =
         editMode ||
+        Boolean(batch.formId) ||
         status === parseStatus(CP_STATUS.IN_PROGRESS) ||
         status === parseStatus(CP_STATUS.REJECTED);
 
@@ -121,15 +208,31 @@ export const useCasePreparationHook = () => {
           formId: detailsResponse.data.formId || batch.formId,
         };
         nextFormData = mapCasePreparationDetailsToFormState(detailsResponse.data);
+
+        const schema = await fetchCasePrepSchema(nextBatch.batchType);
+        if (schema) {
+          nextFormData = hydrateCasePreparationFormState(nextFormData, schema);
+        }
       }
+
+      const nextAddedMotors = buildAddedMotorsFromForm(nextFormData);
 
       setActiveBatch(nextBatch);
       setIsEditMode(editMode);
       setFormData(nextFormData);
-      setInitialSnapshot(JSON.stringify(nextFormData));
+      setAddedMotors(nextAddedMotors);
+      setMotorCount(nextAddedMotors.length > 0 ? nextAddedMotors.length : "");
+      setDraftMotorIds([]);
+      setPrrcClearanceDate("");
+      setInitialSnapshot(
+        JSON.stringify({
+          formData: nextFormData,
+          addedMotors: nextAddedMotors,
+        })
+      );
       setView("form");
     },
-    [showAlert, subDepartmentId]
+    [fetchCasePrepSchema, showAlert, subDepartmentId]
   );
 
   const handleFillForm = useCallback(
@@ -156,9 +259,124 @@ export const useCasePreparationHook = () => {
     resetFormContext();
   }, [resetFormContext, bumpBatchRefresh, hasSavedDraft]);
 
-  const handleFormChange = useCallback((payload: CasePreparationFormState) => {
-    setFormData(payload ?? createDefaultCasePreparationFormState());
+  const handleMotorCountChange = useCallback((count: number | "") => {
+    setMotorCount(count);
+    if (count === "") {
+      setDraftMotorIds([]);
+      return;
+    }
+    setDraftMotorIds((prev) => Array.from({ length: Number(count) }, (_, idx) => prev[idx] ?? ""));
   }, []);
+
+  const handleDraftMotorIdChange = useCallback((index: number, motorId: string) => {
+    setDraftMotorIds((prev) => {
+      const next = [...prev];
+      next[index] = motorId;
+      return next;
+    });
+  }, []);
+
+  const handleAddMotors = useCallback(async () => {
+    if (!activeBatch) return;
+
+    const schema =
+      formData.schema ?? (await fetchCasePrepSchema(activeBatch.batchType));
+    if (!schema) return;
+
+    if (isSubscaleBatch(activeBatch.batchType)) {
+      const nextFormData = hydrateCasePreparationFormState(
+        {
+          ...formData,
+          schema,
+          motors: [],
+          subscaleFormValues: createCasePrepInitialValues(schema),
+        },
+        schema
+      );
+      setFormData(nextFormData);
+      return;
+    }
+
+    if (!isMainMotorBatch(activeBatch.batchType)) return;
+
+    const count = motorCount === "" ? 0 : Number(motorCount);
+    if (count <= 0) return;
+
+    const selectedIds = Array.from({ length: count }, (_, idx) => draftMotorIds[idx]?.trim()).filter(
+      Boolean
+    ) as string[];
+    if (selectedIds.length !== count || !prrcClearanceDate.trim()) return;
+
+    const existingIds = new Set(addedMotors.map((m) => m.motorId));
+    const newEntries: CasePrepAddedMotor[] = selectedIds
+      .filter((id) => !existingIds.has(id))
+      .map((motorId) => ({
+        motorId,
+        prrcClearanceDate: prrcClearanceDate.trim(),
+      }));
+
+    if (newEntries.length === 0) return;
+
+    const nextAdded = [...addedMotors, ...newEntries];
+    const existingSessions = formData.motors ?? [];
+    const nextSessions: CasePrepMotorSession[] = [
+      ...existingSessions,
+      ...newEntries.map((entry) => {
+        const existing = existingSessions.find((m) => m.motorId === entry.motorId);
+        return existing ?? createEmptyMotorSession(entry.motorId, entry.prrcClearanceDate, schema);
+      }),
+    ];
+
+    const nextFormData = hydrateCasePreparationFormState(
+      {
+        ...formData,
+        schema,
+        motors: nextSessions,
+      },
+      schema
+    );
+
+    setAddedMotors(nextAdded);
+    setFormData(nextFormData);
+    setDraftMotorIds([]);
+    setMotorCount("");
+    setPrrcClearanceDate("");
+  }, [
+    activeBatch,
+    addedMotors,
+    draftMotorIds,
+    fetchCasePrepSchema,
+    formData,
+    motorCount,
+    prrcClearanceDate,
+  ]);
+
+  const handleRemoveMotor = useCallback(
+    (motorId: string) => {
+      const nextAdded = addedMotors.filter((m) => m.motorId !== motorId);
+      const nextSessions = (formData.motors ?? []).filter((m) => m.motorId !== motorId);
+      setAddedMotors(nextAdded);
+      setFormData({ ...formData, motors: nextSessions });
+    },
+    [addedMotors, formData]
+  );
+
+  const handleMotorSessionChange = useCallback(
+    (motorId: string, nextMotor: CasePrepMotorSession) => {
+      const nextSessions = (formData.motors ?? []).map((motor) =>
+        motor.motorId === motorId ? nextMotor : motor
+      );
+      setFormData({ ...formData, motors: nextSessions });
+    },
+    [formData]
+  );
+
+  const handleSubscaleValuesChange = useCallback(
+    (values: SchemaFormValues) => {
+      setFormData({ ...formData, subscaleFormValues: values });
+    },
+    [formData]
+  );
 
   const submitForm = useCallback(
     async (intent: "draft" | "submit") => {
@@ -166,6 +384,11 @@ export const useCasePreparationHook = () => {
 
       if (!subDepartmentId) {
         showAlert(STRINGS.MANUFACTURING.CASE_PREP.SUB_DEPARTMENT_MISSING, "error");
+        return false;
+      }
+
+      if (!formData.schema) {
+        showAlert(STRINGS.MANUFACTURING.CASE_PREP.SCHEMA_LOAD_ERROR, "warning");
         return false;
       }
 
@@ -273,6 +496,13 @@ export const useCasePreparationHook = () => {
     activeBatch,
     isEditMode,
     formData,
+    addedMotors,
+    motorCount,
+    draftMotorIds,
+    prrcClearanceDate,
+    schemaLoading,
+    schemaError,
+    subDepartmentId,
     isFormDirty,
     actionLoading,
     backConfirmOpen,
@@ -281,7 +511,13 @@ export const useCasePreparationHook = () => {
     handleEditForm,
     handleBack,
     handleDiscardAndBack,
-    handleFormChange,
+    handleMotorCountChange,
+    handleDraftMotorIdChange,
+    setPrrcClearanceDate,
+    handleAddMotors,
+    handleRemoveMotor,
+    handleMotorSessionChange,
+    handleSubscaleValuesChange,
     handleSaveDraft,
     handleSubmit,
   };

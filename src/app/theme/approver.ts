@@ -36,27 +36,32 @@ export type ApproverDepartmentBrand = {
   background: string;
 };
 
+const WAITING_FOR_APPROVAL_META = {
+  bg: alpha("#D4AC0D", 0.1),
+  color: "#7D6608",
+  border: alpha("#D4AC0D", 0.35),
+};
+
+const APPROVED_META = {
+  bg: alpha("#148F77", 0.1),
+  color: "#0E6655",
+  border: alpha("#148F77", 0.3),
+};
+
+const REJECTED_META = {
+  bg: alpha("#C0392B", 0.1),
+  color: "#922B21",
+  border: alpha("#C0392B", 0.3),
+};
+
 export const APPROVER_STATUS_META: ApproverStatusMeta = {
-  Pending: {
-    bg: alpha("#D4AC0D", 0.1),
-    color: "#7D6608",
-    border: alpha("#D4AC0D", 0.35),
-  },
-  "Waiting for Approval": {
-    bg: alpha("#D4AC0D", 0.1),
-    color: "#7D6608",
-    border: alpha("#D4AC0D", 0.35),
-  },
-  Approved: {
-    bg: alpha("#148F77", 0.1),
-    color: "#0E6655",
-    border: alpha("#148F77", 0.3),
-  },
-  Rejected: {
-    bg: alpha("#C0392B", 0.1),
-    color: "#922B21",
-    border: alpha("#C0392B", 0.3),
-  },
+  Pending: WAITING_FOR_APPROVAL_META,
+  "Waiting for Approval": WAITING_FOR_APPROVAL_META,
+  WAITING_FOR_APPROVAL: WAITING_FOR_APPROVAL_META,
+  Approved: APPROVED_META,
+  APPROVED: APPROVED_META,
+  Rejected: REJECTED_META,
+  REJECTED: REJECTED_META,
 };
 
 export const APPROVER_PRIORITY_META: ApproverStatusMeta = {
@@ -186,5 +191,11 @@ export const getApproverBrand = (
   department: ApproverDepartmentKey,
 ): ApproverDepartmentBrand => APPROVER_DEPARTMENT_BRANDS[department];
 
-export const isApproverActionableStatus = (status?: string | null) =>
-  status === "Pending" || status === "Waiting for Approval";
+export const isApproverActionableStatus = (status?: string | null) => {
+  const normalized = String(status ?? "").trim();
+  return (
+    normalized === "Pending" ||
+    normalized === "Waiting for Approval" ||
+    normalized === "WAITING_FOR_APPROVAL"
+  );
+};

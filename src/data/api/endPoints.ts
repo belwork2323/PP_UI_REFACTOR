@@ -234,6 +234,7 @@ export const USER_CASE_PREPARATION_ENDPOINTS = {
   CREATE_FORM: `${API_BASE}/user/case-preparation/form/create`,
   FORM_DETAILS: `${API_BASE}/user/case-preparation/form/details`,
   UPDATE_FORM: `${API_BASE}/user/case-preparation/form/update`,
+  SCHEMA: `${API_BASE}/user/case-preparation/schema`,
 };
 
 export const USER_MIXING_FORM_ENDPOINTS = {

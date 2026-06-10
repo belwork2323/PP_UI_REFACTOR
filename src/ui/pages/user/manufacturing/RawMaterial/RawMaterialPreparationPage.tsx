@@ -47,6 +47,8 @@ const RawMaterialPreparationPage = () => {
     handleAddPremixSelection,
     addedPremixSelections,
     premixSessions,
+    weightmentSheet,
+    handleWeightmentSheetChange,
     handlePremixSlotChange,
     handleDeletePremixSelection,
     handleBack,
@@ -93,6 +95,8 @@ const RawMaterialPreparationPage = () => {
             onAddPremixSelection={handleAddPremixSelection}
             addedPremixSelections={addedPremixSelections}
             premixSessions={premixSessions}
+            weightmentSheet={weightmentSheet}
+            onWeightmentSheetChange={handleWeightmentSheetChange}
             onPremixSlotChange={handlePremixSlotChange}
             onDeletePremixSelection={handleDeletePremixSelection}
             subDepartmentId={subDepartmentId}

@@ -45,7 +45,10 @@ export function motorStageForApi(raw: unknown): string | number | undefined {
 
 export function motorStageLabel(stage: string | number | null | undefined): string {
   if (stage === null || stage === undefined || stage === "") return "—";
-  return String(stage);
+  const value = String(stage).trim();
+  if (!value) return "—";
+  if (/^stage\s/i.test(value)) return value;
+  return `Stage ${value}`;
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────

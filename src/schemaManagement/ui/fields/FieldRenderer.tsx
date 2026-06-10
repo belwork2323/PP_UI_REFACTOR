@@ -1,4 +1,4 @@
-import { Box, MenuItem, TextField, Typography } from "@mui/material";
+import { Box, FormControlLabel, MenuItem, Radio, RadioGroup, TextField, Typography } from "@mui/material";
 import type { SchemaApiContext, SchemaField, SchemaThemeTokens } from "../../models/schema.types";
 import { buildInputSx } from "../theme";
 import SchemaApiDropdownField from "./SchemaApiDropdownField";
@@ -26,11 +26,75 @@ const FieldRenderer = ({
   const stringValue = String(value ?? "");
 
   const inputType =
-    field.type === "number"
+    field.type === "number" || field.type === "decimal"
       ? "number"
       : field.type === "datetime"
         ? "datetime-local"
-        : "text";
+        : field.type === "date"
+          ? "date"
+          : "text";
+
+  if (field.type === "radio") {
+    return (
+      <Box sx={{ minWidth: 220, flex: "1 1 220px", maxWidth: 360 }}>
+        <Typography
+          component="label"
+          sx={{
+            display: "block",
+            fontSize: "0.67rem",
+            fontWeight: 700,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+            color: theme.textSub,
+            mb: 0.6,
+          }}
+        >
+          {fieldLabel}
+        </Typography>
+        <RadioGroup
+          row
+          value={stringValue}
+          onChange={(e) => onChange(e.target.value)}
+        >
+          <FormControlLabel value="yes" control={<Radio size="small" disabled={disabled} />} label="Yes" />
+          <FormControlLabel value="no" control={<Radio size="small" disabled={disabled} />} label="No" />
+        </RadioGroup>
+      </Box>
+    );
+  }
+
+  if (field.type === "file") {
+    return (
+      <Box sx={{ minWidth: 220, flex: "1 1 220px", maxWidth: 360 }}>
+        <Typography
+          component="label"
+          sx={{
+            display: "block",
+            fontSize: "0.67rem",
+            fontWeight: 700,
+            letterSpacing: "0.04em",
+            textTransform: "uppercase",
+            color: theme.textSub,
+            mb: 0.6,
+          }}
+        >
+          {fieldLabel}
+        </Typography>
+        <TextField
+          size="small"
+          fullWidth
+          type="file"
+          disabled={disabled}
+          inputProps={{ multiple: field.multiple }}
+          onChange={(e) => {
+            const files = (e.target as HTMLInputElement).files;
+            onChange(files?.length ? Array.from(files).map((f) => f.name).join(", ") : "");
+          }}
+          sx={buildInputSx(theme, "100%")}
+        />
+      </Box>
+    );
+  }
 
   if (field.type === "dropdown" && field.dataSource?.type === "api") {
     return (

@@ -5,10 +5,7 @@ export const createRawMaterialPreparationFormApi = async (payload: any) => {
   return await post(USER_RAW_MATERIAL_PREPARATION_ENDPOINTS.CREATE_FORM, payload);
 };
 
-export const fetchRawMaterialPreparationFormDetailsApi = async (payload: {
-  formId: string;
-  subDepartmentId: number;
-}) => {
+export const fetchRawMaterialPreparationFormDetailsApi = async (payload: { formId: string }) => {
   return await post(USER_RAW_MATERIAL_PREPARATION_ENDPOINTS.FORM_DETAILS, payload);
 };
 

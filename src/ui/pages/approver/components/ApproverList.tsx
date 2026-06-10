@@ -11,6 +11,7 @@ import { getApproverListTheme } from "../../../../app/theme/custom_themes/approv
 import type { ApproverFilterField } from "../../../../hooks/approver/useApproverList";
 import { useApproverList } from "../../../../hooks/approver/useApproverList";
 import useApproverSubDepartmentBatchList from "../../../../hooks/approver/useApproverSubDepartmentBatchList";
+import { APPROVER_BATCH_STATUS_TABS } from "../../../../data/models/approver/ApproverBatchListModel";
 import BatchListShell from "../../../components/custom/BatchListShell";
 import Pagination from "../../../components/common/Pagination";
 
@@ -159,18 +160,8 @@ const ApproverList = <T extends Record<string, unknown>,>({
       return statusTabs;
     }
 
-    return [
-      allLabel,
-      ...Array.from(
-        new Set([
-          ...Object.keys(statusCounts).filter((key) => key !== allLabel),
-          ...resolvedItems
-            .map((item) => String((item as Record<string, unknown>)[statusField] ?? ""))
-            .filter(Boolean),
-        ]),
-      ),
-    ];
-  }, [allLabel, resolvedItems, statusCounts, statusField, statusTabs, subDepartment]);
+    return [allLabel, ...APPROVER_BATCH_STATUS_TABS];
+  }, [allLabel, statusTabs, subDepartment]);
 
   const resolvedSearchPlaceholder =
     searchPlaceholder ?? STRINGS.APPROVER.LIST.SEARCH_PLACEHOLDER(searchKeys);

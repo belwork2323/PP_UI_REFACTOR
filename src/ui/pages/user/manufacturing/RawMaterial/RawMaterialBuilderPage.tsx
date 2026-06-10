@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Box, Button, Stack, Typography } from "@mui/material";
 import RawMaterialPrepFlowBar from "./RawMaterialPrepFlowBar";
 import RawMaterialPremixSchemaPanel from "./RawMaterialPremixSchemaPanel";
+import RawMaterialWeightmentSheetPanel from "./RawMaterialWeightmentSheetPanel";
 import RemoveProcessButton from "../../../../components/common/RemoveProcessButton";
 import { STRINGS } from "../../../../../app/config/strings";
 import { icons } from "../../../../../app/theme/icons";
@@ -37,6 +38,8 @@ const RawMaterialBuilderForm = ({
   premixSessions,
   onPremixSlotChange,
   onDeletePremixSelection,
+  weightmentSheet,
+  onWeightmentSheetChange,
   subDepartmentId,
   theme,
   handleBack,
@@ -243,6 +246,14 @@ const RawMaterialBuilderForm = ({
           </Box>
 
         </Stack>
+      )}
+
+      {premixCards.length > 0 && (
+        <RawMaterialWeightmentSheetPanel
+          value={weightmentSheet}
+          onChange={onWeightmentSheetChange}
+          theme={theme}
+        />
       )}
 
       {premixCards.length === 0 && (

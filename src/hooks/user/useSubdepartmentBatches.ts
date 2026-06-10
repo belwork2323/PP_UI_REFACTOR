@@ -5,11 +5,9 @@ import { useAuthStore } from "../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../app/store/userBatchRefreshStore";
 import {
   buildSubdepartmentBatchListPayload,
-  buildSubdepartmentBatchStatusCountsFromRows,
   emptySubdepartmentBatchAdvancedFilters,
   mapSubdepartmentBatchListRow,
   mapSubdepartmentBatchStatusCounts,
-  subdepartmentBatchMatchesSearch,
   type SubdepartmentBatchListAdvancedFilters,
 } from "../../data/models/user/SubdepartmentBatchModel";
 
@@ -87,6 +85,8 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
       rows: Record<string, unknown>[],
       serverCounts: Record<string, number> | undefined,
       total: number,
+      subDepartmentId: number,
+      userId: string,
     ) => {
       const mapped = mapSubdepartmentBatchStatusCounts(serverCounts, total, rows);
       const hasNonZeroStatusCounts = Object.entries(mapped).some(
@@ -98,6 +98,8 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
       }
 
       const countPayload = buildSubdepartmentBatchListPayload({
+        subDepartmentId,
+        userId,
         page: 1,
         limit: CLIENT_SEARCH_FETCH_LIMIT,
         advancedFilters,
@@ -121,7 +123,10 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
   );
 
   const fetchBatches = useCallback(async () => {
-    if (!selectedSubDepartment) {
+    const subDepartmentId = selectedSubDepartment?.subDepartmentId;
+    const userId = user?.userId != null ? String(user.userId) : "";
+
+    if (!subDepartmentId || !userId) {
       setLoading(false);
       setBatches([]);
       setTotalRecords(0);
@@ -131,11 +136,13 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
 
     setLoading(true);
     try {
-      const isClientSearch = Boolean(debouncedSearch.trim());
       const payload = buildSubdepartmentBatchListPayload({
-        page: isClientSearch ? 1 : page + 1,
-        limit: isClientSearch ? CLIENT_SEARCH_FETCH_LIMIT : rowsPerPage,
+        subDepartmentId,
+        userId,
+        page: page + 1,
+        limit: rowsPerPage,
         statusFilter,
+        search: debouncedSearch,
         advancedFilters,
       });
 
@@ -150,19 +157,11 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
           pagination.totalRecords ?? pagination.total ?? rows.length,
         );
 
-        if (isClientSearch) {
-          const matched = rows.filter((batch) =>
-            subdepartmentBatchMatchesSearch(batch, debouncedSearch),
-          );
-          const paged = matched.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-          setBatches(paged);
-          setTotalRecords(matched.length);
-          setStatusCounts(buildSubdepartmentBatchStatusCountsFromRows(matched, matched.length));
-        } else {
-          setBatches(rows);
-          setTotalRecords(total);
-          setStatusCounts(await resolveStatusCounts(rows, res.data.statusCounts, total));
-        }
+        setBatches(rows);
+        setTotalRecords(total);
+        setStatusCounts(
+          await resolveStatusCounts(rows, res.data.statusCounts, total, subDepartmentId, userId),
+        );
       } else {
         setBatches([]);
         setTotalRecords(0);
@@ -178,6 +177,7 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
     }
   }, [
     selectedSubDepartment,
+    user?.userId,
     page,
     rowsPerPage,
     debouncedSearch,

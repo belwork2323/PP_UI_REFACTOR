@@ -22,6 +22,122 @@ export type RawMaterialPreparationSubmitResponse = {
   status: string;
 };
 
+export type RawMaterialPrepWeightmentDetail = {
+  materialCode: string;
+  materialName: string;
+  percentage: string;
+  weightTransferred: string;
+  containerType: string;
+  containerNumber: string;
+  weighScaleNumber: string;
+  weighingDateTime: string;
+};
+
+export type RawMaterialPrepWeightmentSheet = {
+  mixerBuildingNumber: string;
+  weightmentDetails: RawMaterialPrepWeightmentDetail[];
+  validation: {
+    compareWithIdentificationSheet: boolean;
+    deviationFound: boolean;
+    deviationMessage: string;
+  };
+};
+
+export const createEmptyWeightmentDetail = (): RawMaterialPrepWeightmentDetail => ({
+  materialCode: "",
+  materialName: "",
+  percentage: "",
+  weightTransferred: "",
+  containerType: "",
+  containerNumber: "",
+  weighScaleNumber: "",
+  weighingDateTime: "",
+});
+
+export const createEmptyWeightmentSheet = (): RawMaterialPrepWeightmentSheet => ({
+  mixerBuildingNumber: "",
+  weightmentDetails: [],
+  validation: {
+    compareWithIdentificationSheet: false,
+    deviationFound: false,
+    deviationMessage: "",
+  },
+});
+
+const formatDateTimeLocal = (value: unknown): string => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(raw)) return raw;
+  const date = new Date(raw);
+  if (Number.isNaN(date.getTime())) return raw.slice(0, 16);
+  const pad = (part: number) => String(part).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+const mapWeightmentDetailFromApi = (row: Record<string, unknown>): RawMaterialPrepWeightmentDetail => ({
+  materialCode: String(row.materialCode ?? ""),
+  materialName: String(row.materialName ?? row.materialCode ?? ""),
+  percentage: row.percentage != null ? String(row.percentage) : "",
+  weightTransferred: row.weightTransferred != null ? String(row.weightTransferred) : "",
+  containerType: String(row.containerType ?? ""),
+  containerNumber: String(row.containerNumber ?? ""),
+  weighScaleNumber: String(row.weighScaleNumber ?? ""),
+  weighingDateTime: formatDateTimeLocal(row.weighingDateTime),
+});
+
+export const mapWeightmentSheetFromApi = (value: unknown): RawMaterialPrepWeightmentSheet => {
+  if (!value || typeof value !== "object") return createEmptyWeightmentSheet();
+
+  const sheet = value as Record<string, unknown>;
+  const validation = (sheet.validation ?? {}) as Record<string, unknown>;
+  const rows = Array.isArray(sheet.weightmentDetails) ? sheet.weightmentDetails : [];
+
+  return {
+    mixerBuildingNumber: String(sheet.mixerBuildingNumber ?? ""),
+    weightmentDetails: rows.map((row) => mapWeightmentDetailFromApi(row as Record<string, unknown>)),
+    validation: {
+      compareWithIdentificationSheet: Boolean(validation.compareWithIdentificationSheet),
+      deviationFound: Boolean(validation.deviationFound),
+      deviationMessage: String(validation.deviationMessage ?? ""),
+    },
+  };
+};
+
+export const mapWeightmentSheetToApi = (sheet: RawMaterialPrepWeightmentSheet | null | undefined) => {
+  if (!sheet) return null;
+
+  const rows = (sheet.weightmentDetails ?? []).filter(
+    (row) =>
+      row.materialCode.trim() ||
+      row.materialName.trim() ||
+      row.weightTransferred.trim() ||
+      row.percentage.trim(),
+  );
+
+  if (!sheet.mixerBuildingNumber.trim() && rows.length === 0) {
+    return null;
+  }
+
+  return {
+    mixerBuildingNumber: sheet.mixerBuildingNumber.trim() || null,
+    weightmentDetails: rows.map((row) => ({
+      materialCode: row.materialCode.trim(),
+      materialName: row.materialName.trim() || row.materialCode.trim(),
+      percentage: row.percentage.trim() ? Number(row.percentage) : null,
+      weightTransferred: row.weightTransferred.trim() ? Number(row.weightTransferred) : null,
+      containerType: row.containerType.trim() || null,
+      containerNumber: row.containerNumber.trim() || null,
+      weighScaleNumber: row.weighScaleNumber.trim() || null,
+      weighingDateTime: row.weighingDateTime.trim() || null,
+    })),
+    validation: {
+      compareWithIdentificationSheet: sheet.validation.compareWithIdentificationSheet,
+      deviationFound: sheet.validation.deviationFound,
+      deviationMessage: sheet.validation.deviationMessage.trim() || null,
+    },
+  };
+};
+
 export type RawMaterialPrepPremixSelection = {
   premix: number;
   selectedProcesses: { solid: boolean; liquid: boolean };
@@ -124,6 +240,7 @@ export const mapPreparationDetailsPayload = (params: {
   premixSessions: Record<number, RawMaterialPrepPremixSession>;
   solidMaterials: MaterialsListItem[];
   liquidMaterials: MaterialsListItem[];
+  weightmentSheet?: RawMaterialPrepWeightmentSheet | null;
 }) => {
   const premixes: PreparationPremixEntry[] = [];
 
@@ -179,6 +296,7 @@ export const mapPreparationDetailsPayload = (params: {
   return {
     preparationDetails: {
       premixes,
+      weightmentSheet: mapWeightmentSheetToApi(params.weightmentSheet),
     },
   };
 };
@@ -188,6 +306,7 @@ export const mapPreparationDetailsFromApi = (
 ): {
   addedPremixSelections: RawMaterialPrepPremixSelection[];
   premixSessions: Record<number, RawMaterialPrepPremixSession>;
+  weightmentSheet: RawMaterialPrepWeightmentSheet;
 } => {
   const premixes = details.preparationDetails?.premixes ?? [];
   const addedPremixSelections: RawMaterialPrepPremixSelection[] = [];
@@ -224,7 +343,11 @@ export const mapPreparationDetailsFromApi = (
     };
   });
 
-  return { addedPremixSelections, premixSessions };
+  return {
+    addedPremixSelections,
+    premixSessions,
+    weightmentSheet: mapWeightmentSheetFromApi(details.preparationDetails?.weightmentSheet),
+  };
 };
 
 export const premixSessionHasData = (session: RawMaterialPrepPremixSession) => {
@@ -246,7 +369,8 @@ export class RawMaterialPreparationSubmitResponseModel {
     this.status = data.status ?? "";
   }
 
-  static fromApi(data: any) {
+  static fromApi(apiResponse: any) {
+    const data = apiResponse?.data ?? apiResponse;
     return new RawMaterialPreparationSubmitResponseModel({
       formId: data?.formId,
       batchId: data?.batchId,
@@ -256,7 +380,8 @@ export class RawMaterialPreparationSubmitResponseModel {
 }
 
 export class RawMaterialPreparationDetailsModel {
-  static fromApi(data: any): RawMaterialPreparationDetails {
+  static fromApi(apiResponse: any): RawMaterialPreparationDetails {
+    const data = apiResponse?.data ?? apiResponse;
     return {
       formId: String(data?.formId ?? ""),
       batchId: String(data?.batchId ?? ""),
@@ -266,3 +391,61 @@ export class RawMaterialPreparationDetailsModel {
     };
   }
 }
+
+export type RawMaterialPrepApproverSectionView = {
+  sectionId: string;
+  sectionData: Record<string, unknown>[];
+};
+
+export type RawMaterialPrepApproverProcessView = {
+  materialCode: string;
+  materialName: string;
+  gradeCode: string | null;
+  sections: RawMaterialPrepApproverSectionView[];
+};
+
+export type RawMaterialPrepApproverPremixView = {
+  premixNo: number;
+  materialType: string;
+  solidProcesses: RawMaterialPrepApproverProcessView[];
+  liquidProcesses: RawMaterialPrepApproverProcessView[];
+};
+
+export type RawMaterialPrepApproverDetailView = {
+  formId: string;
+  batchId: string;
+  formSubmissionType: string;
+  premixes: RawMaterialPrepApproverPremixView[];
+  weightmentSheet: Record<string, unknown> | null;
+};
+
+const mapProcessSections = (process: PreparationProcessEntry): RawMaterialPrepApproverProcessView => ({
+  materialCode: String(process.materialCode ?? ""),
+  materialName: String(process.materialName ?? process.materialCode ?? ""),
+  gradeCode: process.gradeCode ?? null,
+  sections: (process.sections ?? []).map((section) => ({
+    sectionId: String(section.sectionId ?? ""),
+    sectionData: Array.isArray(section.sectionData)
+      ? (section.sectionData as Record<string, unknown>[])
+      : [],
+  })),
+});
+
+export const mapRawMaterialPreparationApproverDetailView = (
+  details: RawMaterialPreparationDetails,
+): RawMaterialPrepApproverDetailView => ({
+  formId: details.formId,
+  batchId: details.batchId,
+  formSubmissionType: details.formSubmissionType,
+  premixes: (details.preparationDetails?.premixes ?? []).map((premix) => ({
+    premixNo: Number(premix.premixNo ?? 0),
+    materialType: String(premix.materialType ?? ""),
+    solidProcesses: (premix.solidProcess ?? []).map(mapProcessSections),
+    liquidProcesses: (premix.liquidProcess ?? []).map(mapProcessSections),
+  })),
+  weightmentSheet:
+    details.preparationDetails?.weightmentSheet &&
+    typeof details.preparationDetails.weightmentSheet === "object"
+      ? (details.preparationDetails.weightmentSheet as Record<string, unknown>)
+      : null,
+});

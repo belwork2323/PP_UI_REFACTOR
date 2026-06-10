@@ -1,144 +1,117 @@
-export type CasePrepMotorPair = {
-  m1: string;
-  m2: string;
+import type { SchemaDocument, SchemaFormValues, SchemaSectionSubmission } from "../../../schemaManagement";
+import {
+  buildCasePrepMotorSubmission,
+  buildCasePrepSectionPayload,
+  createCasePrepInitialValues,
+  hydrateCasePrepValuesFromSections,
+} from "../../../schemaManagement";
+import { schemaValuesHaveUserData } from "../../../schemaManagement/models/schemaFormState";
+
+export type CasePrepMotorSession = {
+  motorId: string;
+  prrcClearanceDate: string;
+  formValues: SchemaFormValues;
+  savedSections?: SchemaSectionSubmission[];
 };
 
 export type CasePreparationFormState = {
-  motorCaseIds: CasePrepMotorPair;
-  motorNos: CasePrepMotorPair;
-  ga: {
-    r1: CasePrepMotorPair;
-    r2: CasePrepMotorPair;
-    r3: CasePrepMotorPair;
-    r4a: CasePrepMotorPair;
-    r4b: CasePrepMotorPair;
-    r4c: CasePrepMotorPair;
-    r5: CasePrepMotorPair;
-    r6: CasePrepMotorPair;
-  };
-  lco: {
-    r1: CasePrepMotorPair;
-    r2: CasePrepMotorPair;
-    r3a: CasePrepMotorPair;
-    r3b: CasePrepMotorPair;
-    r3c: CasePrepMotorPair;
-    r4a: CasePrepMotorPair;
-    r4b: CasePrepMotorPair;
-    r5: CasePrepMotorPair;
-  };
+  schema: SchemaDocument | null;
+  motors: CasePrepMotorSession[];
+  subscaleFormValues: SchemaFormValues;
+  subscaleSavedSections?: SchemaSectionSubmission[];
 };
-
-export type CasePreparationDetails = {
-  formId: string;
-  batchId: string;
-  subDepartmentId: number;
-  formSubmissionType: string;
-  generalActivities: Record<string, CasePrepMotorPair>;
-  linearCoatingOperation: Record<string, CasePrepMotorPair>;
-};
-
-export const createEmptyMotorPair = (): CasePrepMotorPair => ({
-  m1: "",
-  m2: "",
-});
-
-const normalizePair = (pair: any): CasePrepMotorPair => ({
-  m1: String(pair?.m1 ?? ""),
-  m2: String(pair?.m2 ?? ""),
-});
 
 export const createDefaultCasePreparationFormState = (): CasePreparationFormState => ({
-  motorCaseIds: createEmptyMotorPair(),
-  motorNos: createEmptyMotorPair(),
-  ga: {
-    r1: createEmptyMotorPair(),
-    r2: createEmptyMotorPair(),
-    r3: createEmptyMotorPair(),
-    r4a: createEmptyMotorPair(),
-    r4b: createEmptyMotorPair(),
-    r4c: createEmptyMotorPair(),
-    r5: createEmptyMotorPair(),
-    r6: createEmptyMotorPair(),
-  },
-  lco: {
-    r1: createEmptyMotorPair(),
-    r2: createEmptyMotorPair(),
-    r3a: createEmptyMotorPair(),
-    r3b: createEmptyMotorPair(),
-    r3c: createEmptyMotorPair(),
-    r4a: createEmptyMotorPair(),
-    r4b: createEmptyMotorPair(),
-    r5: createEmptyMotorPair(),
-  },
+  schema: null,
+  motors: [],
+  subscaleFormValues: {},
 });
 
-export const mapCasePreparationDetailsToFormState = (details: Partial<CasePreparationDetails>) => {
-  const state = createDefaultCasePreparationFormState();
-  const ga = details?.generalActivities ?? {};
-  const lco = details?.linearCoatingOperation ?? {};
+export const createEmptyMotorSession = (
+  motorId: string,
+  prrcClearanceDate: string,
+  schema: SchemaDocument | null
+): CasePrepMotorSession => ({
+  motorId,
+  prrcClearanceDate,
+  formValues: schema ? createCasePrepInitialValues(schema) : {},
+  savedSections: undefined,
+});
+
+export const mapCasePreparationDetailsToFormState = (details: any): CasePreparationFormState => {
+  const motors = Array.isArray(details?.motors)
+    ? details.motors.map((motor: any) => ({
+        motorId: String(motor?.motorId ?? ""),
+        prrcClearanceDate: String(motor?.prrcClearanceDate ?? ""),
+        formValues: {},
+        savedSections: Array.isArray(motor?.sections) ? motor.sections : undefined,
+      }))
+    : [];
 
   return {
-    motorCaseIds: normalizePair(ga.motorCaseIds),
-    motorNos: normalizePair(lco.motorNos),
-    ga: {
-      r1: normalizePair(ga.inspectInsulatorSurface),
-      r2: normalizePair(ga.abrading),
-      r3: normalizePair(ga.inspectAbrading),
-      r4a: normalizePair(ga.bellowDateOfPreparation),
-      r4b: normalizePair(ga.bellowDimension),
-      r4c: normalizePair(ga.bellowBondingDate),
-      r5: normalizePair(ga.surfaceCleaning),
-      r6: normalizePair(ga.preheating),
-    },
-    lco: {
-      r1: normalizePair(lco.inspection),
-      r2: normalizePair(lco.insulationTemperature),
-      r3a: normalizePair(lco.premixBatchNo),
-      r3b: normalizePair(lco.measuredMoisture),
-      r3c: normalizePair(lco.qualifiedPeelStrength),
-      r4a: normalizePair(lco.coatingDuration),
-      r4b: normalizePair(lco.coatingQuantity),
-      r5: normalizePair(lco.visualInspection),
-    },
-  } as CasePreparationFormState;
+    schema: null,
+    motors,
+    subscaleFormValues: {},
+    subscaleSavedSections: Array.isArray(details?.sections) ? details.sections : undefined,
+  };
+};
+
+export const hydrateCasePreparationFormState = (
+  state: CasePreparationFormState,
+  schema: SchemaDocument | null
+): CasePreparationFormState => {
+  if (!schema) return state;
+
+  const motors = (state.motors ?? []).map((motor) => ({
+    ...motor,
+    formValues: motor.savedSections?.length
+      ? hydrateCasePrepValuesFromSections(schema, motor.savedSections)
+      : Object.keys(motor.formValues ?? {}).length > 0
+        ? motor.formValues
+        : createCasePrepInitialValues(schema),
+  }));
+
+  const subscaleFormValues = state.subscaleSavedSections?.length
+    ? hydrateCasePrepValuesFromSections(schema, state.subscaleSavedSections)
+    : Object.keys(state.subscaleFormValues ?? {}).length > 0
+      ? state.subscaleFormValues
+      : createCasePrepInitialValues(schema);
+
+  return {
+    ...state,
+    schema,
+    motors,
+    subscaleFormValues,
+  };
 };
 
 export const mapCasePreparationFormStateToPayload = (form: CasePreparationFormState) => {
+  const schema = form.schema;
+
+  if (!schema) {
+    return {
+      motors: [],
+      sections: [],
+    };
+  }
+
+  const motors = (form.motors ?? []).map((motor) =>
+    buildCasePrepMotorSubmission(schema, motor.motorId, motor.prrcClearanceDate, motor.formValues)
+  );
+
   return {
-    generalActivities: {
-      motorCaseIds: normalizePair(form.motorCaseIds),
-      inspectInsulatorSurface: normalizePair(form.ga.r1),
-      abrading: normalizePair(form.ga.r2),
-      inspectAbrading: normalizePair(form.ga.r3),
-      bellowDateOfPreparation: normalizePair(form.ga.r4a),
-      bellowDimension: normalizePair(form.ga.r4b),
-      bellowBondingDate: normalizePair(form.ga.r4c),
-      surfaceCleaning: normalizePair(form.ga.r5),
-      preheating: normalizePair(form.ga.r6),
-    },
-    linearCoatingOperation: {
-      motorNos: normalizePair(form.motorNos),
-      inspection: normalizePair(form.lco.r1),
-      insulationTemperature: normalizePair(form.lco.r2),
-      premixBatchNo: normalizePair(form.lco.r3a),
-      measuredMoisture: normalizePair(form.lco.r3b),
-      qualifiedPeelStrength: normalizePair(form.lco.r3c),
-      coatingDuration: normalizePair(form.lco.r4a),
-      coatingQuantity: normalizePair(form.lco.r4b),
-      visualInspection: normalizePair(form.lco.r5),
-    },
+    schemaVersion: schema.schemaVersion,
+    schemaType: schema.schemaType,
+    motors,
+    sections: motors.length === 0 ? buildCasePrepSectionPayload(schema, form.subscaleFormValues) : undefined,
   };
 };
 
 export const hasAnyCasePreparationValue = (form: CasePreparationFormState) => {
-  const fields = [
-    form.motorCaseIds,
-    form.motorNos,
-    ...Object.values(form.ga),
-    ...Object.values(form.lco),
-  ];
-
-  return fields.some((pair) => String(pair.m1).trim().length > 0 || String(pair.m2).trim().length > 0);
+  if ((form.motors ?? []).some((motor) => schemaValuesHaveUserData(motor.formValues ?? {}))) {
+    return true;
+  }
+  return schemaValuesHaveUserData(form.subscaleFormValues ?? {});
 };
 
 export class CasePreparationSubmitResponseModel {
@@ -158,12 +131,14 @@ export class CasePreparationSubmitResponseModel {
 }
 
 export class CasePreparationDetailsModel {
-  static fromApi(data: any): CasePreparationDetails {
+  static fromApi(data: any) {
     return {
       formId: String(data?.formId ?? ""),
       batchId: String(data?.batchId ?? ""),
       subDepartmentId: Number(data?.subDepartmentId ?? 0),
       formSubmissionType: String(data?.formSubmissionType ?? ""),
+      motors: data?.motors ?? [],
+      sections: data?.sections ?? [],
       generalActivities: data?.generalActivities ?? {},
       linearCoatingOperation: data?.linearCoatingOperation ?? {},
     };

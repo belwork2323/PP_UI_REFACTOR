@@ -8,6 +8,7 @@ import {
   THERMAL_PROP_KEYS,
   type RocketMotorCasingFormData,
 } from "./RocketMotorCasingFormModel";
+import type { SchemaSectionSubmission } from "../../../schemaManagement/models/schema.types";
 
 /** Soft-delete is allowed only while the casing form is still in progress (draft). */
 export const canDeleteRocketMotorCasing = (status: string | null | undefined) =>
@@ -545,6 +546,72 @@ const mapDimensionalTableRows = (form: RocketMotorCasingFormData): CasingDimensi
     isLooseFlap: isLooseFlapDimensionalParam(d),
   }));
 
+/**
+ * Builds detail rows from mock trial saved sections.
+ * Expands all section data for comprehensive display.
+ */
+const buildMockTrialDetailRows = (
+  sections: SchemaSectionSubmission[] | undefined
+): CasingDetailBlock["rows"] => {
+  if (!Array.isArray(sections) || sections.length === 0) {
+    return [detailRow("No mock trial data recorded", "—")];
+  }
+
+  const rows: CasingDetailBlock["rows"] = [];
+
+  for (const section of sections) {
+    const sectionId = String(section.sectionId ?? "").toLowerCase();
+    const sectionData = Array.isArray(section.sectionData) ? section.sectionData : [];
+
+    if (sectionData.length === 0) continue;
+
+    if (sectionId === "basicdetails") {
+      const data = sectionData[0] as Record<string, unknown> | undefined;
+      if (data) {
+        rows.push(detailRow("Basic details — Casting station", String(data.castingStation ?? "—")));
+        rows.push(detailRow("Basic details — Mandrel ID", String(data.mandrelId ?? "—")));
+        rows.push(detailRow("Basic details — Bottom cup ID", String(data.bottomCupId ?? "—")));
+      }
+    } else if (sectionId === "mockassydetails") {
+      for (let i = 0; i < sectionData.length; i++) {
+        const data = sectionData[i] as Record<string, unknown> | undefined;
+        if (!data) continue;
+        const prefix = `Mock assy details (row ${i + 1})`;
+        rows.push(detailRow(`${prefix} — Sr. No.`, String(data.srNo ?? "—")));
+        rows.push(detailRow(`${prefix} — Mandrel rest on dome (A)`, String(data.mandrelRestOnDomeA ?? "—")));
+        rows.push(detailRow(`${prefix} — Mandrel rest on bottom cup (B)`, String(data.mandrelRestOnBottomCupB ?? "—")));
+        rows.push(detailRow(`${prefix} — Difference (C)`, String(data.differenceC ?? "—")));
+        rows.push(detailRow(`${prefix} — Bellow thickness (D)`, String(data.bellowThicknessD ?? "—")));
+        rows.push(detailRow(`${prefix} — Mandrel lift (E)`, String(data.mandrelLiftE ?? "—")));
+      }
+    } else if (sectionId === "motorlengthmeasurements") {
+      for (let i = 0; i < sectionData.length; i++) {
+        const data = sectionData[i] as Record<string, unknown> | undefined;
+        if (!data) continue;
+        const prefix = `Motor length measurements (row ${i + 1})`;
+        rows.push(detailRow(`${prefix} — Sr. No.`, String(data.srNo ?? "—")));
+        rows.push(detailRow(`${prefix} — LF rubber thickness (HE)`, String(data.lfRubberThicknessHe ?? "—")));
+        rows.push(detailRow(`${prefix} — HE boss width without LF rubber`, String(data.heBossWidthWithoutLfRubber ?? "—")));
+        rows.push(detailRow(`${prefix} — HE dia ID`, String(data.heDiaId ?? "—")));
+        rows.push(detailRow(`${prefix} — HE outer to NE outer`, String(data.heOuterToNeOuter ?? "—")));
+        rows.push(detailRow(`${prefix} — HE inner to NE inner`, String(data.heInnerToNeInner ?? "—")));
+        rows.push(detailRow(`${prefix} — NE outer to HE inner`, String(data.neOuterToHeInner ?? "—")));
+      }
+    } else if (sectionId === "mandrelassembly") {
+      for (let i = 0; i < sectionData.length; i++) {
+        const data = sectionData[i] as Record<string, unknown> | undefined;
+        if (!data) continue;
+        const prefix = `Mandrel assembly (row ${i + 1})`;
+        rows.push(detailRow(`${prefix} — Sr. No.`, String(data.srNo ?? "—")));
+        rows.push(detailRow(`${prefix} — Reading without cup`, String(data.readingWithoutCup ?? "—")));
+        rows.push(detailRow(`${prefix} — Reading with bottom cup & gasket`, String(data.readingWithBottomCupAndGasket ?? "—")));
+      }
+    }
+  }
+
+  return rows.length > 0 ? rows : [detailRow("No mock trial data recorded", "—")];
+};
+
 /** Read-only document blocks from parsed API form data (v2 sections) */
 export function mapCasingFormDataToDetailBlocks(form: RocketMotorCasingFormData): CasingDetailBlock[] {
   const mechKeyDefs = form.insulationType === "EPDM" ? EPDM_MECH_KEYS : ROCASIN_MECH_KEYS;
@@ -583,12 +650,12 @@ export function mapCasingFormDataToDetailBlocks(form: RocketMotorCasingFormData)
     detailRow("Receipt status", form.insulationReceiptStatus),
     ...(form.insulationReportExisting
       ? [
-          detailRow(
-            "Report upload",
-            form.insulationReportExisting.fileName,
-            form.insulationReportExisting.fileUrl
-          ),
-        ]
+        detailRow(
+          "Report upload",
+          form.insulationReportExisting.fileName,
+          form.insulationReportExisting.fileUrl
+        ),
+      ]
       : []),
     ...mechRows,
     ...thermalRows,
@@ -597,20 +664,20 @@ export function mapCasingFormDataToDetailBlocks(form: RocketMotorCasingFormData)
   const visualRows =
     form.visualInspection?.length > 0
       ? form.visualInspection.flatMap((v) => {
-          const base = detailRow(
-            v.description || v.itemKey,
-            v.observations,
-            v.remark || (v.mediaExisting?.fileUrl ? v.mediaExisting.fileUrl : "—")
-          );
-          const mediaRow = v.mediaExisting
-            ? detailRow("Attached media", v.mediaExisting.fileName, v.mediaExisting.fileUrl)
-            : null;
-          const subRows =
-            v.subItems?.map((s) =>
-              detailRow(s.description || s.itemKey, s.observations, s.remark)
-            ) ?? [];
-          return [base, ...(mediaRow ? [mediaRow] : []), ...subRows];
-        })
+        const base = detailRow(
+          v.description || v.itemKey,
+          v.observations,
+          v.remark || (v.mediaExisting?.fileUrl ? v.mediaExisting.fileUrl : "—")
+        );
+        const mediaRow = v.mediaExisting
+          ? detailRow("Attached media", v.mediaExisting.fileName, v.mediaExisting.fileUrl)
+          : null;
+        const subRows =
+          v.subItems?.map((s) =>
+            detailRow(s.description || s.itemKey, s.observations, s.remark)
+          ) ?? [];
+        return [base, ...(mediaRow ? [mediaRow] : []), ...subRows];
+      })
       : [detailRow("No visual inspection recorded", "—")];
 
   const dimensionalTable = mapDimensionalTableRows(form);
@@ -684,6 +751,15 @@ export function mapCasingFormDataToDetailBlocks(form: RocketMotorCasingFormData)
       rows: dimensionalTable.length ? [] : [detailRow("No dimensional data recorded", "—")],
       dimensionalTable: dimensionalTable.length ? dimensionalTable : undefined,
     },
+    ...(form.mockTrial?.savedSections && form.mockTrial.savedSections.length > 0
+      ? [
+        {
+          material: "Mock trial",
+          rows: buildMockTrialDetailRows(form.mockTrial.savedSections),
+          _columns: CASING_DETAIL_COLS,
+        },
+      ]
+      : []),
   ];
 
   return blocks;

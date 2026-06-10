@@ -38,6 +38,22 @@ export type {
 } from "./adapters/rawMaterialPreparation.adapter";
 
 export {
+  CP_SCHEMA_FUNCTIONALITY,
+  CP_SCHEMA_TYPE,
+  CP_SCHEMA_VERSION,
+  casePreparationSchemaFetchConfig,
+  buildCasePreparationSchemaRequest,
+  mapCasePrepBatchTypeToSchema,
+  createCasePrepInitialValues,
+  hydrateCasePrepValuesFromSections,
+  buildCasePrepSectionPayload,
+  buildCasePrepMotorSubmission,
+  isCasePrepSchemaDocument,
+} from "./adapters/casePreparation.adapter";
+
+export { flattenCasePrepSections, normalizeCasePrepSection } from "./utils/casePreparationSchema";
+
+export {
   MOCK_TRIAL_SCHEMA_FUNCTIONALITY,
   MOCK_TRIAL_SCHEMA_TYPE,
   MOCK_TRIAL_SCHEMA_VERSION,

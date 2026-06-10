@@ -7,6 +7,7 @@
  * backwards compatibility.
  */
 
+import { motorStageLabel } from "../../../../../../data/models/admin/BatchManagementModel";
 import { normalizeSubdepartmentBatchStatus } from "../../../../../../data/models/user/SubdepartmentBatchModel";
 
 // Re-export style configs from their canonical home in the theme
@@ -29,12 +30,17 @@ export const getMotorId    = (b: any): string => {
   return b.motorId || "—";
 };
 /** motorStage from list/details API (number or stage letter); legacy motorType supported */
-export const getMotorType  = (b: any): string => {
+export const getMotorStage = (b: any): string => {
   const stage = b.motorStage ?? b.motorType;
   if (stage == null || stage === "") return "—";
-  if (typeof stage === "object") return stage.motorTypeName ?? stage.motorStage ?? "—";
-  return String(stage);
+  if (typeof stage === "object") {
+    return motorStageLabel(stage.motorStage ?? stage.motorTypeName);
+  }
+  return motorStageLabel(stage);
 };
+
+/** @deprecated Use getMotorStage */
+export const getMotorType = getMotorStage;
 /** stage is not a flat string; the stage department is in b.department.departmentName */
 export const getStage      = (b: any): string => b.department?.departmentName || "—";
 export const getStatus     = (b: any): string => normalizeSubdepartmentBatchStatus(b.status);

@@ -89,7 +89,7 @@ const RawMaterialPremixSchemaPanel = ({
 
   useEffect(() => {
     hydratedRef.current = false;
-  }, [materialCode, gradeCode, slot]);
+  }, [materialCode, gradeCode, slot, savedSections]);
 
   useEffect(() => {
     if (!schema) return;

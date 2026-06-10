@@ -1,4 +1,5 @@
 import type { SchemaDocument, SchemaField, SchemaSection } from "./schema.types";
+import { normalizeCasePrepSection } from "../utils/casePreparationSchema";
 
 const normalizeSetParameter = (value: unknown): unknown => {
   if (value && typeof value === "object" && !Array.isArray(value)) {
@@ -79,12 +80,13 @@ export const normalizeSchemaDocument = (payload: unknown): SchemaDocument | null
     root.schemaType ?? outerData.schemaType ?? innerData.schemaType ?? "RAW_MATERIALS"
   );
   const isMockTrial = schemaType === "MOCK_TRIAL";
+  const isCasePreparation = schemaType === "CASE_PREPARATION";
   const formDetails = (outerData.formDetails ?? innerData.formDetails) as
     | { title?: string; description?: string }
     | undefined;
 
   if (sections.length === 0) return null;
-  if (!isMockTrial && !details?.materialCode) return null;
+  if (!isMockTrial && !isCasePreparation && !details?.materialCode) return null;
 
   const grade = details?.grade
     ? {
@@ -102,6 +104,14 @@ export const normalizeSchemaDocument = (payload: unknown): SchemaDocument | null
         materialType: "MOCK_TRIAL",
         grade: null,
       }
+    : isCasePreparation
+      ? {
+          materialId: 0,
+          materialCode: "CASE_PREPARATION",
+          materialName: String(formDetails?.title ?? "Case Preparation").trim(),
+          materialType: "CASE_PREPARATION",
+          grade: null,
+        }
     : {
         materialId: Number(details!.materialId ?? 0),
         materialCode: String(details!.materialCode ?? "").trim(),
@@ -125,6 +135,8 @@ export const normalizeSchemaDocument = (payload: unknown): SchemaDocument | null
         }
       : undefined,
     rawMaterialDetails,
-    sections: sections.map(normalizeSection),
+    sections: isCasePreparation
+      ? sections.map((section) => normalizeCasePrepSection(normalizeSection(section)))
+      : sections.map(normalizeSection),
   };
 };

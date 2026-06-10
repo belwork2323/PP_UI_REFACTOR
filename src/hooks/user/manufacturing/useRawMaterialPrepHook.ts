@@ -12,11 +12,13 @@ import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import rawMaterialPreparationController from "../../../controllers/user/manufacturing/rawMaterialPreparationController";
 import {
   createEmptyPremixSchemaSession,
+  createEmptyWeightmentSheet,
   mapPreparationDetailsFromApi,
   mapPreparationDetailsPayload,
   premixSessionHasData,
   type RawMaterialPrepPremixSession,
   type RawMaterialPrepPremixSelection,
+  type RawMaterialPrepWeightmentSheet,
 } from "../../../data/models/user/RawMaterialPreparationModel";
 import type { MaterialsListItem } from "../../../data/models/user/MaterialsListModel";
 import {
@@ -131,6 +133,9 @@ export const useRawMaterialPrepHook = () => {
   >({});
   const [addedPremixSelectionsByBatch, setAddedPremixSelectionsByBatch] = useState<
     Record<string, AddedPremixSelection[]>
+  >({});
+  const [weightmentSheetByBatch, setWeightmentSheetByBatch] = useState<
+    Record<string, RawMaterialPrepWeightmentSheet>
   >({});
 
   const [initialSnapshot, setInitialSnapshot] = useState("{}");
@@ -336,6 +341,10 @@ export const useRawMaterialPrepHook = () => {
     () => addedPremixSelectionsByBatch[activeFormBatchKey] ?? [],
     [addedPremixSelectionsByBatch, activeFormBatchKey]
   );
+  const weightmentSheet = useMemo(
+    () => weightmentSheetByBatch[activeFormBatchKey] ?? createEmptyWeightmentSheet(),
+    [weightmentSheetByBatch, activeFormBatchKey]
+  );
 
   const availablePremixOptions = useMemo(() => {
     const used = new Set(addedPremixSelections.map((entry) => entry.premix));
@@ -367,8 +376,9 @@ export const useRawMaterialPrepHook = () => {
       JSON.stringify({
         addedPremixSelections,
         premixSessions,
+        weightmentSheet,
       }),
-    [addedPremixSelections, premixSessions]
+    [addedPremixSelections, premixSessions, weightmentSheet]
   );
 
   const premixCardsHaveData = useMemo(
@@ -428,10 +438,13 @@ export const useRawMaterialPrepHook = () => {
     setLoadingMaterials(false);
     setAddedPremixSelectionsByBatch({});
     setPremixSessionsByBatch({});
+    setCompletedPremixesByBatch({});
+    setWeightmentSheetByBatch({});
     setInitialSnapshot(
       JSON.stringify({
         addedPremixSelections: [],
         premixSessions: {},
+        weightmentSheet: createEmptyWeightmentSheet(),
       })
     );
   }, []);
@@ -443,22 +456,14 @@ export const useRawMaterialPrepHook = () => {
   };
 
   const openFormWithResolvedData = useCallback(async (batch: RawMaterialPrepBatch, editMode: boolean) => {
-    const status = parseStatus(batch.rmStatus);
-    const shouldFetchDetails =
-      editMode ||
-      status === parseStatus(RM_STATUS.IN_PROGRESS) ||
-      status === parseStatus(RM_STATUS.REJECTED);
+    const shouldFetchDetails = Boolean(batch.formId);
 
     let nextBatch = batch;
     let nextAddedPremixSelections: AddedPremixSelection[] = [];
     let nextPremixSessions: Record<number, PremixSession> = {};
+    let nextWeightmentSheet = createEmptyWeightmentSheet();
 
     if (shouldFetchDetails) {
-      if (!subDepartmentId) {
-        showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.SUB_DEPARTMENT_MISSING, "error");
-        return;
-      }
-
       if (!batch.formId) {
         showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.FORM_ID_MISSING, "error");
         return;
@@ -467,7 +472,6 @@ export const useRawMaterialPrepHook = () => {
       setLoadingFormDetails(true);
       const detailsResponse = await rawMaterialPreparationController.fetchFormDetails({
         formId: batch.formId,
-        subDepartmentId,
       });
       setLoadingFormDetails(false);
 
@@ -488,11 +492,13 @@ export const useRawMaterialPrepHook = () => {
       const mapped = mapPreparationDetailsFromApi(details);
       nextAddedPremixSelections = mapped.addedPremixSelections;
       nextPremixSessions = mapped.premixSessions;
+      nextWeightmentSheet = mapped.weightmentSheet;
     }
 
     const snapshot = JSON.stringify({
       addedPremixSelections: nextAddedPremixSelections,
       premixSessions: nextPremixSessions,
+      weightmentSheet: nextWeightmentSheet,
     });
 
     setActiveBatch(nextBatch);
@@ -511,9 +517,13 @@ export const useRawMaterialPrepHook = () => {
       ...prev,
       [batchKey]: nextPremixSessions,
     }));
+    setWeightmentSheetByBatch((prev) => ({
+      ...prev,
+      [batchKey]: nextWeightmentSheet,
+    }));
     setInitialSnapshot(snapshot);
     setView("form");
-  }, [showAlert, subDepartmentId]);
+  }, [showAlert]);
 
   const handleFillForm = useCallback(
     async (batch: RawMaterialPrepBatch) => await openFormWithResolvedData(batch, false),
@@ -735,6 +745,16 @@ export const useRawMaterialPrepHook = () => {
     [activeFormBatchKey, activeBatchId, selectedPremix]
   );
 
+  const handleWeightmentSheetChange = useCallback(
+    (nextSheet: RawMaterialPrepWeightmentSheet) => {
+      setWeightmentSheetByBatch((prev) => ({
+        ...prev,
+        [activeFormBatchKey]: nextSheet,
+      }));
+    },
+    [activeFormBatchKey]
+  );
+
   const submitForm = useCallback(async (intent: "draft" | "submit") => {
     if (!activeBatch) return false;
 
@@ -758,14 +778,14 @@ export const useRawMaterialPrepHook = () => {
       return false;
     }
 
-    const status = parseStatus(activeBatch.rmStatus);
-    const isCreateFlow = status === parseStatus(RM_STATUS.INITIATED) && !activeBatch.formId;
+    const isCreateFlow = !activeBatch.formId;
 
     const payloadBody = mapPreparationDetailsPayload({
       addedPremixSelections,
       premixSessions,
       solidMaterials: availableSolidMaterials as MaterialsListItem[],
       liquidMaterials: availableLiquidMaterials as MaterialsListItem[],
+      weightmentSheet,
     });
 
     if (!payloadBody.preparationDetails.premixes.length) {
@@ -798,7 +818,7 @@ export const useRawMaterialPrepHook = () => {
         response = await rawMaterialPreparationController.updateForm({
           formId: activeBatch.formId,
           subDepartmentId,
-          formSubmissionType: intent === "draft" ? "DRAFT" : "UPDATE",
+          formSubmissionType: intent === "draft" ? "DRAFT" : "SUBMIT",
           ...payloadBody,
         });
       }
@@ -857,6 +877,7 @@ export const useRawMaterialPrepHook = () => {
     formSnapshot,
     listParams,
     resetFormContext,
+    weightmentSheet,
     clearMaterialsCacheForKey,
     activeFormBatchKey,
   ]);
@@ -905,6 +926,8 @@ export const useRawMaterialPrepHook = () => {
     handleDeletePremixSelection,
     addedPremixSelections,
     premixSessions,
+    weightmentSheet,
+    handleWeightmentSheetChange,
     handleFillForm,
     handleEditForm,
     handleBack,

@@ -4,16 +4,6 @@ import { OPERATION_STATUS, type OperationStatus } from "../../../hooks/operation
 const FILTER_ALL = STRINGS.USER_BATCH_LIST.FILTER_ALL;
 const OPERATION_STATUS_VALUES = Object.values(OPERATION_STATUS) as OperationStatus[];
 
-export type SubdepartmentBatchListFilters = {
-  search?: string;
-  status?: string;
-  priority?: string;
-  department?: string;
-  subDepartment?: string;
-  motorIds?: string[];
-  lotIds?: string[];
-};
-
 export type SubdepartmentBatchListAdvancedFilters = {
   priority: string;
   motorIds: string[];
@@ -56,24 +46,17 @@ export const subdepartmentBatchMatchesSearch = (batch: Record<string, unknown>, 
   );
 };
 
-export type SubdepartmentBatchListSort = {
-  field?: string;
-  order?: "asc" | "desc";
-};
-
+/** POST /user/subdepartment/batch-list request body */
 export type SubdepartmentBatchListRequest = {
-  pagination: { page: number; limit: number };
-  filters: SubdepartmentBatchListFilters;
-  sort: { field: string; order: "asc" | "desc" };
-};
-
-/** UI operation-status labels → API filter enum */
-export const UI_OPERATION_STATUS_TO_API: Record<string, string> = {
-  [OPERATION_STATUS.INITIATED]: "INITIATED",
-  [OPERATION_STATUS.IN_PROGRESS]: "IN_PROGRESS",
-  [OPERATION_STATUS.WAITING_FOR_APPROVAL]: "WAITING_FOR_APPROVAL",
-  [OPERATION_STATUS.APPROVED]: "APPROVED",
-  [OPERATION_STATUS.REJECTED]: "REJECTED",
+  subDepartmentId: number;
+  userId: string;
+  page: number;
+  limit: number;
+  status?: string[];
+  priority?: string[];
+  search?: string;
+  motorIds?: string[];
+  lotIds?: string[];
 };
 
 /** Per route slug → row status field used by list components */
@@ -276,54 +259,53 @@ export function mapSubdepartmentBatchStatusCounts(
 }
 
 type BuildPayloadArgs = {
+  subDepartmentId: number;
+  userId: string;
   page: number;
   limit: number;
   statusFilter?: string;
+  search?: string;
   advancedFilters?: SubdepartmentBatchListAdvancedFilters;
-  sort?: SubdepartmentBatchListSort;
 };
 
-/** Compact API filter value, e.g. "Casting and Curing" → "CastingAndCuring" */
-export const toApiFilterName = (name: string) =>
-  String(name ?? "")
-    .trim()
-    .replace(/&/g, "And")
-    .replace(/[^a-zA-Z0-9]/g, "");
-
 export function buildSubdepartmentBatchListPayload({
+  subDepartmentId,
+  userId,
   page,
   limit,
   statusFilter,
+  search,
   advancedFilters,
-  sort,
 }: BuildPayloadArgs): SubdepartmentBatchListRequest {
-  const filters: SubdepartmentBatchListFilters = {};
   const advanced = advancedFilters ?? emptySubdepartmentBatchAdvancedFilters();
 
+  const payload: SubdepartmentBatchListRequest = {
+    subDepartmentId,
+    userId,
+    page,
+    limit,
+  };
+
   if (statusFilter && statusFilter !== FILTER_ALL) {
-    filters.status =
-      UI_OPERATION_STATUS_TO_API[statusFilter] ??
-      statusFilter.trim().toUpperCase().replace(/\s+/g, "_");
+    payload.status = [statusFilter];
   }
 
   if (advanced.priority?.trim()) {
-    filters.priority = advanced.priority.trim();
+    payload.priority = [advanced.priority.trim()];
+  }
+
+  const trimmedSearch = search?.trim();
+  if (trimmedSearch) {
+    payload.search = trimmedSearch;
   }
 
   if (advanced.motorIds.length > 0) {
-    filters.motorIds = advanced.motorIds;
+    payload.motorIds = advanced.motorIds;
   }
 
   if (advanced.lotIds.length > 0) {
-    filters.lotIds = advanced.lotIds;
+    payload.lotIds = advanced.lotIds;
   }
 
-  return {
-    pagination: { page, limit },
-    filters,
-    sort: {
-      field: sort?.field ?? "createdOn",
-      order: sort?.order ?? "desc",
-    },
-  };
+  return payload;
 }

@@ -25,12 +25,25 @@ const CasePreparationPage = () => {
     activeBatch,
     isEditMode,
     formData,
+    addedMotors,
+    motorCount,
+    draftMotorIds,
+    prrcClearanceDate,
+    schemaLoading,
+    schemaError,
+    subDepartmentId,
     actionLoading,
     backConfirmOpen,
     setBackConfirmOpen,
     handleBack,
     handleDiscardAndBack,
-    handleFormChange,
+    handleMotorCountChange,
+    handleDraftMotorIdChange,
+    setPrrcClearanceDate,
+    handleAddMotors,
+    handleRemoveMotor,
+    handleMotorSessionChange,
+    handleSubscaleValuesChange,
     handleSaveDraft,
     handleSubmit,
   } = hookState;
@@ -60,9 +73,23 @@ const CasePreparationPage = () => {
         theme={theme}
       />
       <CasePreparationForm
-        initialData={formData}
-        isEditMode={isEditMode}
-        onBlocksChange={handleFormChange}
+        batch={activeBatch}
+        formData={formData}
+        addedMotors={addedMotors}
+        motorCount={motorCount}
+        draftMotorIds={draftMotorIds}
+        prrcClearanceDate={prrcClearanceDate}
+        schemaLoading={schemaLoading}
+        schemaError={schemaError}
+        subDepartmentId={subDepartmentId}
+        onMotorCountChange={handleMotorCountChange}
+        onDraftMotorIdChange={handleDraftMotorIdChange}
+        onPrrcDateChange={setPrrcClearanceDate}
+        onAddMotors={handleAddMotors}
+        onRemoveMotor={handleRemoveMotor}
+        onMotorSessionChange={handleMotorSessionChange}
+        onSubscaleValuesChange={handleSubscaleValuesChange}
+        theme={theme}
       />
 
       <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} mt={3} justifyContent="flex-end">

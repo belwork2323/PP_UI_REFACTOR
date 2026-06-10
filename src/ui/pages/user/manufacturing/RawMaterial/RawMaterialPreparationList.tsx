@@ -13,6 +13,7 @@ import { useThemeStore } from "../../../../../app/store/themeStore";
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import { getOperationStatusConfig, OPERATION_STATUS } from "../../../../../hooks/operationStatus";
 import { STRINGS } from "../../../../../app/config/strings";
+import { motorStageLabel } from "../../../../../data/models/admin/BatchManagementModel";
 import { SUBDEPARTMENT_BATCH_SEARCH_FIELDS } from "../../../../../data/models/user/SubdepartmentBatchModel";
 import type { SubdepartmentBatchListAdvancedFilters } from "../../../../../hooks/user/useSubdepartmentBatches";
 
@@ -196,9 +197,15 @@ const RawMaterialPrepList = ({ hookState, rowsPerPageOptions }: any) => {
       },
       {
         key: "motorType",
-        label: S.BATCH_LIST.COL_MOTOR_TYPE,
+        label: S.BATCH_LIST.COL_MOTOR_STAGE,
         align: "center",
-        render: (v: string) => <Chip label={`${S.BATCH_LIST.MOTOR_TYPE_PREFIX}${v}`} size="small" sx={theme.batchList.batchTypeChip} />,
+        render: (v: string, row: { motorStage?: string | number; motorType?: string }) => (
+          <Chip
+            label={motorStageLabel(row.motorStage ?? row.motorType ?? v)}
+            size="small"
+            sx={theme.batchList.batchTypeChip}
+          />
+        ),
       },
       {
         key: "assignedTo.fullName",

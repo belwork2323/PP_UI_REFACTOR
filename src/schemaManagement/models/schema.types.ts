@@ -19,6 +19,13 @@ export type SchemaApiContext = {
   subDepartmentId?: number;
 };
 
+export type SchemaFieldOption =
+  | string
+  | {
+      label?: string;
+      value?: string;
+    };
+
 export type SchemaField = {
   key: string;
   label: string;
@@ -27,7 +34,7 @@ export type SchemaField = {
   required?: boolean;
   readonly?: boolean;
   group?: string;
-  options?: string[];
+  options?: SchemaFieldOption[];
   addRowAllowed?: boolean;
   columns?: SchemaColumn[];
   defaultRows?: Record<string, unknown>[];
@@ -36,6 +43,8 @@ export type SchemaField = {
   valueKey?: string;
   measurementConfig?: { valueType?: string; unit?: string };
   formula?: { expression?: string; unit?: string };
+  multiple?: boolean;
+  allowedTypes?: string[];
 };
 
 export type SchemaColumn = {
@@ -58,16 +67,27 @@ export type SchemaNestedGroup = {
   fields: SchemaField[];
 };
 
+export type SchemaTableDefinition = {
+  columns?: SchemaColumn[];
+  defaultRows?: Record<string, unknown>[];
+  addRowAllowed?: boolean;
+  dynamicRowGeneration?: boolean;
+};
+
 export type SchemaSection = {
   sectionId: string;
   title: string;
-  type: "dynamic-group" | "table" | "form" | "complex-table" | string;
+  type: "dynamic-group" | "table" | "form" | "complex-table" | "group" | string;
   addRowAllowed?: boolean;
   groupLabel?: string;
+  groupType?: string;
+  repeatFor?: string;
   fields?: SchemaField[];
   columns?: SchemaColumn[];
   groupedColumns?: SchemaGroupedColumn[];
   defaultRows?: Record<string, unknown>[];
+  sections?: SchemaSection[];
+  table?: SchemaTableDefinition;
   lots?: SchemaNestedGroup;
   drums?: SchemaNestedGroup;
 };

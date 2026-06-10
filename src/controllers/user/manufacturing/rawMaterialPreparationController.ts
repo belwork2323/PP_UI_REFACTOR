@@ -29,12 +29,11 @@ export type RawMaterialPreparationUpdatePayload = Omit<
   "batchId" | "formSubmissionType"
 > & {
   formId: string;
-  formSubmissionType: "DRAFT" | "UPDATE";
+  formSubmissionType: "DRAFT" | "SUBMIT";
 };
 
 export type RawMaterialPreparationDetailsPayload = {
   formId: string;
-  subDepartmentId: number;
 };
 
 export const rawMaterialPreparationController = {
