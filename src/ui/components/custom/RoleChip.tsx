@@ -1,6 +1,6 @@
 import React from "react";
 import { Chip } from "@mui/material";
-import { roleConfig } from "../../../app/theme/custom_themes/admin/userManagement_theme";
+import { roleConfig } from "@app/theme/roleConfig";
 
 const RoleChip = ({ role, size = "small", sx = {} }: { role: string; size?: "small" | "medium"; sx?: any }) => {
   const config = roleConfig[role] || roleConfig["User"];

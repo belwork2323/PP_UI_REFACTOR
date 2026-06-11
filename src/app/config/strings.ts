@@ -21,6 +21,9 @@ export const STRINGS = {
     USERNAME_LABEL: "Username",
     PASSWORD_LABEL: "Password",
     LOGIN_BUTTON: "Login",
+    ROLE_LABEL: "Select Role",
+    SUB_DEPARTMENT_LABEL: "Select Sub Department",
+    AUTHENTICATING: "Authenticating...",
     FORGOT_PASSWORD: "Forgot password or first-time reset?",
     /* Features - Left Panel Information */
     FEATURES: [
@@ -62,6 +65,7 @@ export const STRINGS = {
     
     /* Logout */
     LOGOUT_SUCCESS: "Logged out successfully.",
+    LOGOUT_FAILED: "Logout failed. Please try again.",
 
     // ── Field validation messages ──────────────────────────────────────────
     VALIDATION: {
@@ -171,6 +175,20 @@ export const STRINGS = {
       { value: "raw-material",  label: "Raw Material Procurement" },
       { value: "rocket-motor",  label: "Rocket Motor Casing" },
     ],
+  },
+
+  /* -------- MAIN LAYOUT -------- */
+  MAIN_LAYOUT: {
+    HEADER_TITLE: "Blockchain Based Propellant Processing System",
+    LOGOUT_CONFIRM_TITLE: "Confirm Logout",
+    LOGOUT_CONFIRM_MESSAGE: "Are you sure you want to logout?",
+    LOGOUT_CONFIRM_LABEL: "Logout",
+    LOGOUT_CANCEL_LABEL: "Cancel",
+    SUBDEPT_SWITCH_TITLE: "Switching Sub-Department?",
+    SUBDEPT_SWITCH_MESSAGE:
+      "Any unsaved data will be lost. Please go back, save your work, and then continue.",
+    SUBDEPT_SWITCH_CONFIRM: "Switch",
+    SUBDEPT_SWITCH_CANCEL: "Go Back",
   },
 
    /* -------- APP FOOTER -------- */

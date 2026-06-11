@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from "react";
 import { batchManagementController } from "../../../controllers/admin/batch_management/batchManagementController";
-import { getDateRange } from "../../../utils/DateUtlis";
+import { getDateRange } from "@utils/dateUtils";
 
 export const useBatchStats = (initialType = "month") => {
   const [stats, setStats] = useState(null);

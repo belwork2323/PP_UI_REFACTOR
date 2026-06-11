@@ -1,25 +1,28 @@
 import { useCallback, useState } from "react";
-import { resetPasswordController } from "../../controllers/auth/authController";
-import { STRINGS } from "../../app/config/strings";
-import { useAlertStore } from "../../app/store/alertStore";
+import { authLoginController } from "@controllers/auth/login/loginController";
+import { STRINGS } from "@app/config/strings";
+import { useAlertStore } from "@app/store/alertStore";
+import type {
+  ResetPasswordFormErrors,
+  ResetPasswordFormValues,
+} from "@ui/pages/auth/login/components/ResetPasswordForm";
 
-const INITIAL = { userId: "", reason: "" };
-const INITIAL_ERRORS = { userId: "", reason: "" };
+export type UseResetPasswordHookOptions = {
+  onBack?: () => void;
+};
 
-/**
- * State, validation, and submit handler for the login-page inline reset request form.
- * Keeps MUI-only components free of business logic.
- */
-export function useResetPasswordForm({ onBack }) {
+const INITIAL: ResetPasswordFormValues = { userId: "", reason: "" };
+const INITIAL_ERRORS: ResetPasswordFormErrors = { userId: "", reason: "" };
+
+export function useResetPasswordHook({ onBack }: UseResetPasswordHookOptions = {}) {
   const [values, setValues] = useState(INITIAL);
   const [errors, setErrors] = useState(INITIAL_ERRORS);
   const [submitting, setSubmitting] = useState(false);
   const { showAlert } = useAlertStore();
 
-  const canSubmit =
-    values.userId.trim().length > 0 && values.reason.trim().length > 0;
+  const canSubmit = values.userId.trim().length > 0 && values.reason.trim().length > 0;
 
-  const setField = useCallback((field, value) => {
+  const setField = useCallback((field: keyof ResetPasswordFormValues, value: string) => {
     setValues((prev) => ({ ...prev, [field]: value }));
     setErrors((prev) => (prev[field] ? { ...prev, [field]: "" } : prev));
   }, []);
@@ -54,7 +57,7 @@ export function useResetPasswordForm({ onBack }) {
   const handleSubmit = useCallback(async () => {
     if (!validate()) return;
     setSubmitting(true);
-    const response = await resetPasswordController({
+    const response = await authLoginController.resetPassword({
       userId: values.userId.trim(),
       reason: values.reason.trim(),
     });
@@ -64,31 +67,21 @@ export function useResetPasswordForm({ onBack }) {
       resetLocal();
       onBack?.();
     } else {
-      // Check if error has field-level validation errors
       const errorDetails = response.errorCode;
-      if (
-        errorDetails &&
-        typeof errorDetails === "object"
-      ) {
+      if (errorDetails && typeof errorDetails === "object") {
         const fieldErrors = errorDetails as Record<string, string>;
-        // If we have field-level errors, set them in the form
         if (Object.keys(fieldErrors).length > 0) {
           const newErrors = { userId: "", reason: "" };
-          if (fieldErrors.userId) {
-            newErrors.userId = fieldErrors.userId;
-          }
-          if (fieldErrors.reason) {
-            newErrors.reason = fieldErrors.reason;
-          }
+          if (fieldErrors.userId) newErrors.userId = fieldErrors.userId;
+          if (fieldErrors.reason) newErrors.reason = fieldErrors.reason;
           setErrors(newErrors);
         }
       }
-      const errMessage = response.message || STRINGS.AUTH.RESET_FAILED;
-      showAlert(errMessage, "error");
+      showAlert(response.message || STRINGS.AUTH.RESET_FAILED, "error");
     }
-    
+
     setSubmitting(false);
-  }, [validate, values.userId, values.reason, setErrors]);
+  }, [validate, values.userId, values.reason, onBack, showAlert, resetLocal]);
 
   return {
     values,

@@ -86,12 +86,12 @@ api.interceptors.response.use(
 
       try {
         // Dynamically import to avoid circular dependency
-        const { refreshAuthToken } = await import(
-          "../../controllers/auth/authController"
+        const { authLoginController } = await import(
+          "@controllers/auth/login/loginController"
         );
 
-        // ✅ refreshAuthToken now returns ApiResponseModel on success, null on failure
-        const refreshResult = await refreshAuthToken();
+        // refreshToken returns ApiResponseModel<UserModel> on success, null on failure
+        const refreshResult = await authLoginController.refreshToken();
 
         // ✅ Check success explicitly — refreshResult is null on any failure
         if (refreshResult?.success && refreshResult?.data) {

@@ -6,36 +6,17 @@ import { useThemeStore }    from "../../../app/store/themeStore";
 import { useAuthStore }     from "../../../app/store/authStore";
 import { useLocation, useNavigate } from "react-router-dom";
 import { STRINGS }          from "../../../app/config/strings";
-import { icons }            from "../../../app/theme/icons";
-import getDrawerTheme, {
-  DRAWER_NAV,
-}                           from "../../../app/theme/custom_themes/common/drawer_theme";
+import { icons } from "../../../app/theme/icons";
+import { APP_IMAGES } from "@app/assets/images";
+import {
+  ROLE_ICON_MAP,
+  normalizeRoleKey,
+  getInitials,
+  formatRoleLabel,
+} from "@app/theme/roleConfig";
+import getDrawerTheme, { DRAWER_NAV } from "../../../app/theme/custom_themes/common/drawer_theme";
 
 const S = STRINGS.APP_HEADER;
-
-const ROLE_ICON_MAP = {
-  ADMIN: icons.userMgmt.adminRole,
-  SYSTEM_MANAGER: icons.userMgmt.managerRole,
-  APPROVER: icons.userMgmt.approverRole,
-  USER: icons.userMgmt.userRole,
-};
-
-const getInitials = (name = "") =>
-  name
-    .split(" ")
-    .filter(Boolean)
-    .map((part) => part[0])
-    .join("")
-    .slice(0, 2)
-    .toUpperCase();
-
-const formatRoleLabel = (role = "") =>
-  String(role)
-    .toLowerCase()
-    .split("_")
-    .filter(Boolean)
-    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
-    .join(" ");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Props
@@ -47,18 +28,19 @@ const formatRoleLabel = (role = "") =>
 const AdminDrawer = ({ open, onClose, onLogout }) => {
   const mode       = useThemeStore((s) => s.mode);
   const user       = useAuthStore((s)  => s.user);
-  const roleName   = user?.role ?? "";
-  const username   = user?.username ?? "User";
-  const userId     = user?.userId ?? "--";
+  const roleName = user?.role ?? "";
+  const roleKey = normalizeRoleKey(roleName);
+  const username = user?.username ?? "User";
+  const userId = user?.userId ?? "--";
 
   // ── Determine active route from location and navigate on click ───────────
   const navigate   = useNavigate();
   const location   = useLocation();
   const t          = getDrawerTheme(mode);
   const LogoutIcon = icons.drawerLogout;
-  const RoleIcon   = ROLE_ICON_MAP[roleName] ?? icons.headerUser;
+  const RoleIcon = ROLE_ICON_MAP[roleKey] ?? icons.headerUser;
   const UserIdIcon = icons.userMgmt.userId;
-  const displayRole = formatRoleLabel(roleName || "member");
+  const displayRole = formatRoleLabel(roleKey || "member");
 
   const activeView = DRAWER_NAV.find((item) => item.path === location.pathname)?.key ?? "";
   const handleNavClick = (path) => {
@@ -78,7 +60,7 @@ const AdminDrawer = ({ open, onClose, onLogout }) => {
         <Box sx={t.header.logoCircle}>
           <Box
             component="img"
-            src="/src/assets/images/DRDO-logo.png"
+            src={APP_IMAGES.drdoLogo}
             alt={S.DRDO_ALT}
             sx={t.header.logoImg}
           />

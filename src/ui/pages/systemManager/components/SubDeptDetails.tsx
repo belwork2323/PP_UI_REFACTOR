@@ -7,7 +7,7 @@ import { Box, Stack, Typography, CircularProgress } from "@mui/material";
 import StatusChip from "../../../components/common/StatusChip";
 import ProgressBar from "../../../components/common/ProgressBar";
 import { STRINGS } from "../../../../app/config/strings";
-import { BatchSubDeptDetailsModel } from "../../../../data/models/SystemManagerModel";
+import { BatchSubDeptDetailsModel } from "../../../../data/models/systemManager/SystemManagerModel";
 import useSubDeptDetailsViewModel from "../../../../hooks/system_manager/useSubDeptDetailsViewModel";
 
 const BD = STRINGS.SYSTEM_MANAGER.BATCH_DETAILS;

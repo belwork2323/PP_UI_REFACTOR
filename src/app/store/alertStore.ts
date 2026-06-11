@@ -20,6 +20,7 @@ export type AlertState = {
     options?: AlertShowOptions,
   ) => void;
   hideAlert: () => void;
+  setLoading: (loading: boolean) => void;
 };
 
 let alertTimer: ReturnType<typeof setTimeout> | null = null;
@@ -88,4 +89,6 @@ export const useAlertStore = create<AlertState>()((set, get) => ({
       onCloseAction: null,
     });
   },
+
+  setLoading: (loading) => set({ loading }),
 }));

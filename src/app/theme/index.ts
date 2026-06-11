@@ -24,4 +24,5 @@ export {
 };
 
 export default muiTheme;
+export { roleConfig, statusConfig, getDeptConfig, ROLE_ICON_MAP } from "./roleConfig";
 export { colors, fonts, spacing, margins, icons, layout };

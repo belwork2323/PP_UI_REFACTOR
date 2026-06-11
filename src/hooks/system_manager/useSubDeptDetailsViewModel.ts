@@ -1,4 +1,4 @@
-import { BatchSubDeptDetailsModel } from "../../data/models/SystemManagerModel";
+import { BatchSubDeptDetailsModel } from "../../data/models/systemManager/SystemManagerModel";
 import { STRINGS } from "../../app/config/strings";
 
 const EMPTY_DETAILS = BatchSubDeptDetailsModel.fromApi({});

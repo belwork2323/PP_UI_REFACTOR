@@ -60,6 +60,7 @@ import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
 import ErrorOutlineIcon       from "@mui/icons-material/ErrorOutline";
 
 import KeyboardArrowDownIcon        from "@mui/icons-material/KeyboardArrowDown";
+import KeyboardArrowUpIcon          from "@mui/icons-material/KeyboardArrowUp";
 import AccountCircleOutlinedIcon    from "@mui/icons-material/AccountCircleOutlined";
 import LogoutIcon                   from "@mui/icons-material/Logout";
 import MenuOpenIcon                 from "@mui/icons-material/MenuOpen";
@@ -106,6 +107,7 @@ import InfoOutlinedIcon        from "@mui/icons-material/InfoOutlined";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import AirRoundedIcon from "@mui/icons-material/AirRounded";
 import AssignmentRoundedIcon from "@mui/icons-material/AssignmentRounded";
+import DescriptionOutlinedIcon       from "@mui/icons-material/DescriptionOutlined";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import AttachFileRoundedIcon from "@mui/icons-material/AttachFileRounded";
@@ -262,6 +264,13 @@ export const icons = {
   trendingUp:   TrendingUpIcon,
   trendingDown: TrendingDownIcon,
   moreVert:     MoreVertIcon,
+  calendarMonth: CalendarMonthRoundedIcon,
+
+  filter: {
+    tune: TuneRoundedIcon,
+    chevronUp: KeyboardArrowUpIcon,
+    chevronDown: KeyboardArrowDownIcon,
+  },
 
   systemManager: {
     Notifications: NotificationsIcon,
@@ -349,6 +358,30 @@ export const icons = {
       warning: WarningAmberRoundedIcon,
       error:   ErrorOutlineRoundedIcon,
       info:    InfoOutlinedIcon,
+    },
+  },
+
+  // ─── Auth ──────────────────────────────────────────────────────────────────
+  auth: {
+    login: {
+      page: {
+        lightModeToggle: LightModeIcon,
+        darkModeToggle: DarkModeIcon,
+        person: PersonIcon,
+        lock: LockIcon,
+        login: LoginIcon,
+      },
+      captcha: {
+        reload: RefreshIcon,
+        success: CheckCircleOutlineIcon,
+        error: ErrorOutlineIcon,
+      },
+      resetPasswordForm: {
+        back: ArrowBackRoundedIcon,
+        person: PersonIcon,
+        reason: DescriptionOutlinedIcon,
+        submit: RestartAltIcon,
+      },
     },
   },
 

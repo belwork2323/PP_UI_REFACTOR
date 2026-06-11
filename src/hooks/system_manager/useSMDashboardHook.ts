@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuthStore } from "../../app/store/authStore";
 import { systemManagerController } from "../../controllers/system_manager/systemManagerController";
-import { SMChartDataModel } from "../../data/models/SystemManagerModel";
+import { SMChartDataModel } from "../../data/models/systemManager/SystemManagerModel";
 
 const createEmptyDashboard = (stageConfig: any[]) => ({
 	kpiData: [], stageMetrics: [],

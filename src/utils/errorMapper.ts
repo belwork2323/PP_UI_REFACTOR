@@ -1,10 +1,9 @@
 import * as axiosNS from "axios";
-import { AppError } from "../utils/AppError";
-import { HTTP_STATUS } from "../app/config/constants";
-import { STRINGS } from "../app/config/strings";
+import { AppError } from "./AppError";
+import { HTTP_STATUS } from "@app/config/constants";
+import { STRINGS } from "@app/config/strings";
 
 /* Axios ships CJS-oriented typings (`export =`); the ESM bundle exposes `default`. */
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const axios: any = (axiosNS as any).default ?? axiosNS;
 
 /** Backend JSON: `{ success, statusCode?, message, error?, data }` */
@@ -109,5 +108,40 @@ export function mapToAppError(error: unknown) {
         message: backendMessage(data) ?? STRINGS.SYSTEM.SERVER_NOT_REACHABLE,
         details: typeof data === "object" && data !== null && "error" in data ? (data as { error: unknown }).error : null,
       });
+  }
+}
+
+/** Maps reset-password API error detail codes to user-facing messages. */
+export function mapResetPasswordError(details?: string, fallback?: string): string {
+  switch (details) {
+    case "INVALID_REQUEST":
+      return STRINGS.AUTH.RESET_INVALID_INPUT;
+    case "USER_NOT_FOUND":
+      return STRINGS.AUTH.RESET_USER_NOT_FOUND;
+    case "RESET_REQUEST_ALREADY_EXISTS":
+      return STRINGS.AUTH.RESET_ALREADY_EXISTS;
+    case "RATE_LIMIT_EXCEEDED":
+      return STRINGS.AUTH.RESET_RATE_LIMITED;
+    case "INTERNAL_SERVER_ERROR":
+      return STRINGS.SYSTEM.SERVER_ERROR;
+    default:
+      return fallback ?? STRINGS.AUTH.RESET_FAILED;
+  }
+}
+
+/** Maps an AppError (or error-like object) to a user-facing message for UI components. */
+export function mapUiError(error: { status?: number; message?: string }) {
+  switch (error.status) {
+    case HTTP_STATUS.UNAUTHORIZED:
+      return STRINGS.SYSTEM.SESSION_EXPIRED;
+
+    case HTTP_STATUS.FORBIDDEN:
+      return STRINGS.SYSTEM.ACCESS_DENIED;
+
+    case HTTP_STATUS.NOT_FOUND:
+      return STRINGS.SYSTEM.RESOURCE_NOT_FOUND;
+
+    default:
+      return error.message || STRINGS.SYSTEM.UNKNOWN_ERROR;
   }
 }

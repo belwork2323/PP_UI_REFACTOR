@@ -33,7 +33,6 @@ const getBatchManagementTheme = (mode = "light") => {
       newBatchButton: adminTheme.primaryButton,
     },
 
-    // ─── STAT PILLS (kept for StatPill component compatibility) ───────────────
     statPills: {
       ...adminTheme.statPills,
       colors: {

@@ -1,53 +1,36 @@
-// app/layout/MainLayout.jsx
 import { Box } from "@mui/material";
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import AppHeader from "./components/custom/AppHeader";
 import AppFooter from "./components/custom/AppFooter";
 import ConfirmAlertDialog from "./components/common/ConfirmAlertDialog";
-import { logoutController } from "../controllers/auth/authController";
 import { Outlet } from "react-router-dom";
+import { useMainLayoutHook } from "@hooks/custom/useMainLayoutHook";
+import { STRINGS } from "@app/config/strings";
+
+const ML = STRINGS.MAIN_LAYOUT;
 
 const MainLayout = () => {
-  const navigate = useNavigate();
-  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
-
-  const handleLogout = async () => {
-    setLogoutConfirmOpen(true);
-  };
-
-  const confirmLogout = async () => {
-    setLogoutConfirmOpen(false);
-    const success = await logoutController();
-    if (success) {
-      navigate("/login", { replace: true });
-    }
-  };
-
-  const cancelLogout = () => {
-    setLogoutConfirmOpen(false);
-  };
+  const {
+    logoutConfirmOpen,
+    handleLogout,
+    handleConfirmLogout,
+    cancelLogout,
+  } = useMainLayoutHook();
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
-      <AppHeader
-        title="Blockchain Based Propellant Processing System"
-        onNavSelect={() => {}}
-        onLogout={handleLogout}
-      />
+      <AppHeader title={ML.HEADER_TITLE} onLogout={handleLogout} />
 
       <ConfirmAlertDialog
         open={logoutConfirmOpen}
-        title="Confirm Logout"
-        message="Are you sure you want to logout?"
-        confirmLabel="Logout"
-        cancelLabel="Cancel"
+        title={ML.LOGOUT_CONFIRM_TITLE}
+        message={ML.LOGOUT_CONFIRM_MESSAGE}
+        confirmLabel={ML.LOGOUT_CONFIRM_LABEL}
+        cancelLabel={ML.LOGOUT_CANCEL_LABEL}
         severity="warning"
-        onConfirm={confirmLogout}
+        onConfirm={handleConfirmLogout}
         onCancel={cancelLogout}
       />
 
-      {/* Routed page content */}
       <Box sx={{ flex: 1 }}>
         <Outlet />
       </Box>
