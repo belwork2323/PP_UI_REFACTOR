@@ -1,191 +1,285 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  countMixingTotalFields,
-  countMixingTotalFilled,
-  createMixingData,
+  createProcessParticularRows,
+  getAvailableStageNumbers,
+  getMixingCycleByValue,
+  type MixingStageValue,
 } from "./mixingConfig";
-import type { MixingFormState } from "../../../data/models/user/MixingFormModel";
-
-type MixingData = ReturnType<typeof createMixingData>;
-type MixingFormRow = {
-  id?: number;
-  operation: string;
-  rpm: string;
-  time: string;
-  temp: string;
-  vacuum: string;
-};
-
-const withFixedIds = (rows: MixingFormRow[]) =>
-  rows.map((row, index) => ({ ...row, id: index + 1 }));
-
-const withDynamicIds = (rows: MixingFormRow[]) =>
-  rows.map((row, index) => ({ ...row, id: row.id ?? index + 1 }));
-
-const toFormPayload = (
-  preFixedRows: MixingFormRow[],
-  preDynamicRows: MixingFormRow[],
-  samplingRow: MixingFormRow,
-  finalState: { tdi: MixingFormRow; viscosity: MixingFormRow }
-): MixingFormState => ({
-  pre: {
-    fixed: preFixedRows,
-    dynamic: preDynamicRows,
-    sampling: samplingRow,
-  },
-  final: {
-    tdi: finalState.tdi,
-    viscosity: finalState.viscosity,
-  },
-});
+import {
+  createDefaultMixingFormState,
+  createEmptyFinalMixEntry,
+  createEmptyPremixEntry,
+  type FinalMixEntry,
+  type MixingFormState,
+  type PremixEntry,
+  type ProcessParticularRow,
+  type QualityCheckRow,
+} from "../../../data/models/user/MixingFormModel";
 
 export const useMixingFormHook = (
-  initialData?: Partial<MixingData>,
-  onBlocksChange?: (payload: MixingFormState) => void
+  initialData?: MixingFormState,
+  onBlocksChange?: (payload: MixingFormState) => void,
+  maxStageCount = 4,
 ) => {
-  const defaults = useMemo(() => createMixingData(), []);
-  const dynamicIdRef = useRef(0);
-
-  const [preFixed, setPreFixed] = useState<MixingFormRow[]>(() =>
-    withFixedIds((initialData?.pre?.fixed ?? defaults.pre.fixed) as MixingFormRow[])
+  const [premixCards, setPremixCards] = useState<PremixEntry[]>(
+    initialData?.premixCards ?? createDefaultMixingFormState().premixCards,
   );
-  const [preDynamic, setPreDynamic] = useState<MixingFormRow[]>(
-    withDynamicIds((initialData?.pre?.dynamic ?? []) as MixingFormRow[])
+  const [finalMixCards, setFinalMixCards] = useState<FinalMixEntry[]>(
+    initialData?.finalMixCards ?? createDefaultMixingFormState().finalMixCards,
   );
-  const [sampling, setSampling] = useState(
-    (initialData?.pre?.sampling ?? defaults.pre.sampling) as MixingFormRow
-  );
-  const [finalRows, setFinalRows] = useState({
-    tdi: (initialData?.final?.tdi ?? defaults.final.tdi) as MixingFormRow,
-    viscosity: (initialData?.final?.viscosity ?? defaults.final.viscosity) as MixingFormRow,
-  });
+  const [selectedMixingStage, setSelectedMixingStage] = useState<MixingStageValue | "">("");
+  const [selectedStageNo, setSelectedStageNo] = useState<number | "">("");
 
   useEffect(() => {
-    const nextFixed = withFixedIds((initialData?.pre?.fixed ?? defaults.pre.fixed) as MixingFormRow[]);
-    const nextDynamic = withDynamicIds((initialData?.pre?.dynamic ?? []) as MixingFormRow[]);
-    const nextSampling = (initialData?.pre?.sampling ?? defaults.pre.sampling) as MixingFormRow;
-    const nextFinal = {
-      tdi: (initialData?.final?.tdi ?? defaults.final.tdi) as MixingFormRow,
-      viscosity: (initialData?.final?.viscosity ?? defaults.final.viscosity) as MixingFormRow,
-    };
-
-    dynamicIdRef.current = nextDynamic.reduce<number>(
-      (maxId, row, index) => Math.max(maxId, row.id ?? index + 1),
-      0
-    );
-
-    setPreFixed(nextFixed);
-    setPreDynamic(nextDynamic);
-    setSampling(nextSampling);
-    setFinalRows(nextFinal);
-  }, [initialData, defaults]);
+    const next = initialData ?? createDefaultMixingFormState();
+    setPremixCards(next.premixCards);
+    setFinalMixCards(next.finalMixCards);
+    setSelectedMixingStage("");
+    setSelectedStageNo("");
+  }, [initialData]);
 
   const notify = useCallback(
+    (nextPremixCards: PremixEntry[], nextFinalMixCards: FinalMixEntry[]) => {
+      onBlocksChange?.({ premixCards: nextPremixCards, finalMixCards: nextFinalMixCards });
+    },
+    [onBlocksChange],
+  );
+
+  const usedPremixNumbers = useMemo(
+    () => premixCards.map((entry) => Number(entry.premixNo)).filter((value) => value > 0),
+    [premixCards],
+  );
+
+  const usedFinalMixNumbers = useMemo(
+    () => finalMixCards.map((entry) => Number(entry.mixNo)).filter((value) => value > 0),
+    [finalMixCards],
+  );
+
+  const availablePremixNumbers = useMemo(
+    () => getAvailableStageNumbers(usedPremixNumbers, maxStageCount),
+    [usedPremixNumbers, maxStageCount],
+  );
+
+  const availableFinalMixNumbers = useMemo(
+    () => getAvailableStageNumbers(usedFinalMixNumbers, maxStageCount),
+    [usedFinalMixNumbers, maxStageCount],
+  );
+
+  const availableStageNumbers =
+    selectedMixingStage === "PREMIX"
+      ? availablePremixNumbers
+      : selectedMixingStage === "FINAL_MIX"
+        ? availableFinalMixNumbers
+        : [];
+
+  const canAddStageCard = selectedMixingStage !== "" && selectedStageNo !== "";
+
+  const handleMixingStageChange = useCallback((stage: MixingStageValue | "") => {
+    setSelectedMixingStage(stage);
+    setSelectedStageNo("");
+  }, []);
+
+  const handleStageNoChange = useCallback((stageNo: number | "") => {
+    setSelectedStageNo(stageNo);
+  }, []);
+
+  const handleAddStageCard = useCallback(() => {
+    if (!canAddStageCard || selectedStageNo === "") return;
+
+    if (selectedMixingStage === "PREMIX") {
+      if (premixCards.some((entry) => entry.premixNo === String(selectedStageNo))) return;
+      const nextPremixCards = [...premixCards, createEmptyPremixEntry(selectedStageNo)].sort(
+        (a, b) => Number(a.premixNo) - Number(b.premixNo),
+      );
+      setPremixCards(nextPremixCards);
+      notify(nextPremixCards, finalMixCards);
+    }
+
+    if (selectedMixingStage === "FINAL_MIX") {
+      if (finalMixCards.some((entry) => entry.mixNo === String(selectedStageNo))) return;
+      const nextFinalMixCards = [...finalMixCards, createEmptyFinalMixEntry(selectedStageNo)].sort(
+        (a, b) => Number(a.mixNo) - Number(b.mixNo),
+      );
+      setFinalMixCards(nextFinalMixCards);
+      notify(premixCards, nextFinalMixCards);
+    }
+
+    setSelectedStageNo("");
+  }, [
+    canAddStageCard,
+    finalMixCards,
+    notify,
+    premixCards,
+    selectedMixingStage,
+    selectedStageNo,
+  ]);
+
+  const removePremixCard = useCallback(
+    (premixNo: string) => {
+      const nextPremixCards = premixCards.filter((entry) => entry.premixNo !== premixNo);
+      setPremixCards(nextPremixCards);
+      notify(nextPremixCards, finalMixCards);
+      if (selectedStageNo === Number(premixNo)) {
+        setSelectedStageNo("");
+      }
+    },
+    [finalMixCards, notify, premixCards, selectedStageNo],
+  );
+
+  const removeFinalMixCard = useCallback(
+    (mixNo: string) => {
+      const nextFinalMixCards = finalMixCards.filter((entry) => entry.mixNo !== mixNo);
+      setFinalMixCards(nextFinalMixCards);
+      notify(premixCards, nextFinalMixCards);
+      if (selectedStageNo === Number(mixNo)) {
+        setSelectedStageNo("");
+      }
+    },
+    [finalMixCards, notify, premixCards, selectedStageNo],
+  );
+
+  const updatePremixField = useCallback(
     (
-      nextPreFixed: MixingFormRow[],
-      nextPreDynamic: MixingFormRow[],
-      nextSampling: MixingFormRow,
-      nextFinalRows: { tdi: MixingFormRow; viscosity: MixingFormRow }
+      premixNo: string,
+      field: keyof Omit<PremixEntry, "premixNo" | "processParticulars" | "qualityChecks">,
+      value: string,
     ) => {
-      onBlocksChange?.(toFormPayload(nextPreFixed, nextPreDynamic, nextSampling, nextFinalRows));
+      setPremixCards((prev) => {
+        const next = prev.map((premix) => {
+          if (premix.premixNo !== premixNo) return premix;
+
+          if (field === "mixingCycle") {
+            const cycle = getMixingCycleByValue(value);
+            return {
+              ...premix,
+              mixingCycle: value,
+              processParticulars: cycle ? createProcessParticularRows(cycle.operations) : [],
+            };
+          }
+
+          return { ...premix, [field]: value };
+        });
+        notify(next, finalMixCards);
+        return next;
+      });
     },
-    [onBlocksChange]
+    [finalMixCards, notify],
   );
 
-  const updateFixed = useCallback(
-    (index: number, field: string, value: string) => {
-      setPreFixed((prev) => {
-        const next = prev.map((row: MixingFormRow, rowIndex: number) =>
-          rowIndex === index ? { ...row, [field]: value } : row
+  const updateProcessParticular = useCallback(
+    (
+      premixNo: string,
+      rowId: number,
+      field: keyof ProcessParticularRow,
+      value: string,
+    ) => {
+      setPremixCards((prev) => {
+        const next = prev.map((premix) => {
+          if (premix.premixNo !== premixNo) return premix;
+          return {
+            ...premix,
+            processParticulars: premix.processParticulars.map((row) =>
+              row.id === rowId ? { ...row, [field]: value } : row,
+            ),
+          };
+        });
+        notify(next, finalMixCards);
+        return next;
+      });
+    },
+    [finalMixCards, notify],
+  );
+
+  const updateQualityCheck = useCallback(
+    (
+      premixNo: string,
+      parameter: string,
+      field: keyof QualityCheckRow,
+      value: string,
+    ) => {
+      setPremixCards((prev) => {
+        const next = prev.map((premix) => {
+          if (premix.premixNo !== premixNo) return premix;
+          return {
+            ...premix,
+            qualityChecks: premix.qualityChecks.map((row) =>
+              row.parameter === parameter ? { ...row, [field]: value } : row,
+            ),
+          };
+        });
+        notify(next, finalMixCards);
+        return next;
+      });
+    },
+    [finalMixCards, notify],
+  );
+
+  const updateFinalMixField = useCallback(
+    (
+      mixNo: string,
+      field: keyof Omit<FinalMixEntry, "mixNo" | "qualityChecks">,
+      value: string,
+    ) => {
+      setFinalMixCards((prev) => {
+        const next = prev.map((entry) =>
+          entry.mixNo === mixNo ? { ...entry, [field]: value } : entry,
         );
-        notify(next, preDynamic, sampling, finalRows);
+        notify(premixCards, next);
         return next;
       });
     },
-    [finalRows, notify, preDynamic, sampling]
+    [notify, premixCards],
   );
 
-  const addDynamicRow = useCallback(() => {
-    dynamicIdRef.current += 1;
-    setPreDynamic((prev) => {
-      const next = [...prev, { id: dynamicIdRef.current, operation: "", rpm: "", time: "", temp: "", vacuum: "" }];
-      notify(preFixed, next, sampling, finalRows);
-      return next;
-    });
-  }, [finalRows, notify, preFixed, sampling]);
-
-  const deleteDynamicRow = useCallback(
-    (id: number) => {
-      setPreDynamic((prev) => {
-        const next = prev.filter((row: MixingFormRow) => row.id !== id);
-        notify(preFixed, next, sampling, finalRows);
+  const updateFinalMixQualityCheck = useCallback(
+    (
+      mixNo: string,
+      parameter: string,
+      field: keyof QualityCheckRow,
+      value: string,
+    ) => {
+      setFinalMixCards((prev) => {
+        const next = prev.map((entry) => {
+          if (entry.mixNo !== mixNo) return entry;
+          return {
+            ...entry,
+            qualityChecks: entry.qualityChecks.map((row) =>
+              row.parameter === parameter ? { ...row, [field]: value } : row,
+            ),
+          };
+        });
+        notify(premixCards, next);
         return next;
       });
     },
-    [finalRows, notify, preFixed, sampling]
+    [notify, premixCards],
   );
 
-  const updateDynamic = useCallback(
-    (id: number, field: string, value: string) => {
-      setPreDynamic((prev) => {
-        const next = prev.map((row: MixingFormRow) =>
-          row.id === id ? { ...row, [field]: value } : row
-        );
-        notify(preFixed, next, sampling, finalRows);
-        return next;
-      });
-    },
-    [finalRows, notify, preFixed, sampling]
+  const formState = useMemo(
+    () => ({ premixCards, finalMixCards }),
+    [finalMixCards, premixCards],
   );
-
-  const updateSampling = useCallback(
-    (field: string, value: string) => {
-      setSampling((prev) => {
-        const next = { ...prev, [field]: value };
-        notify(preFixed, preDynamic, next, finalRows);
-        return next;
-      });
-    },
-    [finalRows, notify, preDynamic, preFixed]
-  );
-
-  const updateFinal = useCallback(
-    (key: "tdi" | "viscosity", field: string, value: string) => {
-      setFinalRows((prev) => {
-        const next = { ...prev, [key]: { ...prev[key], [field]: value } };
-        notify(preFixed, preDynamic, sampling, next);
-        return next;
-      });
-    },
-    [notify, preDynamic, preFixed, sampling]
-  );
-
-  const preFilled = useMemo(
-    () => countMixingTotalFilled([...preFixed, sampling], preDynamic),
-    [preDynamic, preFixed, sampling]
-  );
-  const preTotal = useMemo(
-    () => countMixingTotalFields([...preFixed, sampling], preDynamic),
-    [preDynamic, preFixed, sampling]
-  );
-  const finalFilled = useMemo(() => countMixingTotalFilled(Object.values(finalRows), []), [finalRows]);
-  const finalTotal = useMemo(() => countMixingTotalFields(Object.values(finalRows), []), [finalRows]);
 
   return {
-    preFixed,
-    preDynamic,
-    sampling,
-    finalRows,
-    preFilled,
-    preTotal,
-    finalFilled,
-    finalTotal,
-    updateFixed,
-    addDynamicRow,
-    deleteDynamicRow,
-    updateDynamic,
-    updateSampling,
-    updateFinal,
+    premixCards,
+    finalMixCards,
+    formState,
+    selectedMixingStage,
+    selectedStageNo,
+    availablePremixNumbers,
+    availableFinalMixNumbers,
+    availableStageNumbers,
+    canAddStageCard,
+    handleMixingStageChange,
+    handleStageNoChange,
+    handleAddStageCard,
+    removePremixCard,
+    removeFinalMixCard,
+    updatePremixField,
+    updateProcessParticular,
+    updateQualityCheck,
+    updateFinalMixField,
+    updateFinalMixQualityCheck,
   };
 };
 

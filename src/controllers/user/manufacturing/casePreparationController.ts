@@ -2,6 +2,7 @@ import { ApiResponseModel } from "../../../data/models/common/ApiResponseModel";
 import {
   CasePreparationDetailsModel,
   CasePreparationSubmitResponseModel,
+  type CasePreparationFormBody,
 } from "../../../data/models/user/CasePreparationFormModel";
 import {
   createCasePreparationFormApi,
@@ -11,18 +12,21 @@ import {
 
 export type CasePreparationCreatePayload = {
   batchId: string;
+  batchType: string;
   subDepartmentId: number;
   formSubmissionType: "DRAFT" | "SUBMIT";
-  generalActivities: Record<string, { m1: string; m2: string }>;
-  linearCoatingOperation: Record<string, { m1: string; m2: string }>;
+  casePreparationDetails: any;
+  // generalActivities: Record<string, { m1: string; m2: string }>;
+  // linearCoatingOperation: Record<string, { m1: string; m2: string }>;
 };
 
 export type CasePreparationUpdatePayload = {
+  batchId: string;
   formId: string;
+  batchType: string;
   subDepartmentId: number;
-  formSubmissionType: "DRAFT" | "UPDATE";
-  generalActivities: Record<string, { m1: string; m2: string }>;
-  linearCoatingOperation: Record<string, { m1: string; m2: string }>;
+  formSubmissionType: "DRAFT" | "SUBMIT";
+  casePreparationDetails: any;
 };
 
 export type CasePreparationDetailsPayload = {

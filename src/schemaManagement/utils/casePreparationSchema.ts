@@ -1,21 +1,6 @@
 import type { SchemaField, SchemaSection } from "../models/schema.types";
 
-const normalizeFieldOptions = (field: SchemaField): SchemaField => {
-  if (!Array.isArray(field.options) || field.options.length === 0) return field;
-
-  const normalized = field.options.map((opt) => {
-    if (typeof opt === "string") return opt;
-    if (opt && typeof opt === "object") {
-      const row = opt as { label?: string; value?: string };
-      return String(row.value ?? row.label ?? "");
-    }
-    return String(opt ?? "");
-  });
-
-  return { ...field, options: normalized };
-};
-
-const normalizeFields = (fields?: SchemaField[]) => fields?.map(normalizeFieldOptions);
+const normalizeFields = (fields?: SchemaField[]) => fields;
 
 export const normalizeCasePrepSection = (section: SchemaSection): SchemaSection => {
   const table = section.table;

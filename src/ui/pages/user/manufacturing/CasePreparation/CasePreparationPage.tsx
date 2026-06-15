@@ -6,6 +6,7 @@ import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog
 import CasePrepList from "./CasePreparationList";
 import CasePreparationForm from "./CasePreparationForm";
 import CasePreparationHeader from "./CasePreparationHeader";
+import CasePreparationDetailsView from "./CasePreparationDetailsView";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import useCasePreparationHook from "../../../../../hooks/user/manufacturing/useCasePreparationWorkflowHook";
@@ -35,6 +36,11 @@ const CasePreparationPage = () => {
     actionLoading,
     backConfirmOpen,
     setBackConfirmOpen,
+    detailsRow,
+    detailsData,
+    detailsLoading,
+    handleViewCasePrepDetails,
+    handleBackFromDetails,
     handleBack,
     handleDiscardAndBack,
     handleMotorCountChange,
@@ -56,58 +62,65 @@ const CasePreparationPage = () => {
     );
   }
 
-  if (view === "list") {
-    return (
-      <Box sx={theme.workflow.animatedContainer}>
-        <CasePrepList hookState={hookState} />
-      </Box>
-    );
-  }
-
   return (
     <Box sx={theme.workflow.animatedContainer}>
-      <CasePreparationHeader
-        batch={activeBatch}
-        isEdit={isEditMode}
-        onBack={handleBack}
-        theme={theme}
-      />
-      <CasePreparationForm
-        batch={activeBatch}
-        formData={formData}
-        addedMotors={addedMotors}
-        motorCount={motorCount}
-        draftMotorIds={draftMotorIds}
-        prrcClearanceDate={prrcClearanceDate}
-        schemaLoading={schemaLoading}
-        schemaError={schemaError}
-        subDepartmentId={subDepartmentId}
-        onMotorCountChange={handleMotorCountChange}
-        onDraftMotorIdChange={handleDraftMotorIdChange}
-        onPrrcDateChange={setPrrcClearanceDate}
-        onAddMotors={handleAddMotors}
-        onRemoveMotor={handleRemoveMotor}
-        onMotorSessionChange={handleMotorSessionChange}
-        onSubscaleValuesChange={handleSubscaleValuesChange}
-        theme={theme}
-      />
+      {view === "list" && <CasePrepList hookState={hookState} />}
 
-      <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} mt={3} justifyContent="flex-end">
-        <Button
-          variant="outlined"
-          disabled={actionLoading}
-          onClick={() => setDraftConfirmOpen(true)}
-        >
-          {actionStrings.SAVE_DRAFT}
-        </Button>
-        <Button
-          variant="contained"
-          disabled={actionLoading}
-          onClick={() => setSubmitConfirmOpen(true)}
-        >
-          {isEditMode ? actionStrings.RESUBMIT_APPROVAL : actionStrings.SUBMIT_APPROVAL}
-        </Button>
-      </Stack>
+      {view === "details" && detailsRow && (
+        <CasePreparationDetailsView
+          row={detailsRow}
+          data={detailsData}
+          loading={detailsLoading}
+          onBack={handleBackFromDetails}
+        />
+      )}
+
+      {view === "form" && activeBatch && (
+        <>
+          <CasePreparationHeader
+            batch={activeBatch}
+            isEdit={isEditMode}
+            onBack={handleBack}
+            theme={theme}
+          />
+          <CasePreparationForm
+            batch={activeBatch}
+            formData={formData}
+            addedMotors={addedMotors}
+            motorCount={motorCount}
+            draftMotorIds={draftMotorIds}
+            prrcClearanceDate={prrcClearanceDate}
+            schemaLoading={schemaLoading}
+            schemaError={schemaError}
+            subDepartmentId={subDepartmentId}
+            onMotorCountChange={handleMotorCountChange}
+            onDraftMotorIdChange={handleDraftMotorIdChange}
+            onPrrcDateChange={setPrrcClearanceDate}
+            onAddMotors={handleAddMotors}
+            onRemoveMotor={handleRemoveMotor}
+            onMotorSessionChange={handleMotorSessionChange}
+            onSubscaleValuesChange={handleSubscaleValuesChange}
+            theme={theme}
+          />
+
+          <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} mt={3} justifyContent="flex-end">
+            <Button
+              variant="outlined"
+              disabled={actionLoading}
+              onClick={() => setDraftConfirmOpen(true)}
+            >
+              {actionStrings.SAVE_DRAFT}
+            </Button>
+            <Button
+              variant="contained"
+              disabled={actionLoading}
+              onClick={() => setSubmitConfirmOpen(true)}
+            >
+              {isEditMode ? actionStrings.RESUBMIT_APPROVAL : actionStrings.SUBMIT_APPROVAL}
+            </Button>
+          </Stack>
+        </>
+      )}
 
       <ConfirmAlertDialog
         open={backConfirmOpen}

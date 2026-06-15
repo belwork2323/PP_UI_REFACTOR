@@ -2,8 +2,8 @@ import { Box, Button, CircularProgress } from "@mui/material";
 import {
   CASE_PREP_FLOW_LABELS,
   getCasePrepMotorCountOptions,
-  isMainMotorBatch,
   isSubscaleBatch,
+  supportsCasePrepSchemaFlow,
   type CasePrepMotorOption,
 } from "../../../../../hooks/user/manufacturing/casePreparationFlowConfig";
 import CasePrepSelect from "./CasePrepSelect";
@@ -21,6 +21,7 @@ type CasePrepFlowBarProps = {
   onPrrcDateChange: (value: string) => void;
   onAddMotors: () => void;
   canAddMotors: boolean;
+  hasSchema?: boolean;
   schemaLoading?: boolean;
   theme: any;
 };
@@ -37,15 +38,21 @@ const CasePrepFlowBar = ({
   onPrrcDateChange,
   onAddMotors,
   canAddMotors,
+  hasSchema = false,
   schemaLoading = false,
   theme,
 }: CasePrepFlowBarProps) => {
   const cpTheme = theme.manufacturing.casePreparation;
   const flowBar = cpTheme?.flowBar ?? {};
-  const isMain = isMainMotorBatch(batchType);
+  const showMotorSelection = supportsCasePrepSchemaFlow(batchType);
   const isSubscale = isSubscaleBatch(batchType);
+  const hasMotorOptions = availableMotorOptions.length > 0;
   const count = motorCount === "" ? 0 : Number(motorCount);
   const countSelected = count > 0;
+  const showMotorFields = hasMotorOptions;
+  const showAddSection =
+    showMotorSelection &&
+    (showMotorFields ? countSelected : isSubscale && !hasSchema);
 
   const motorCountOptions = getCasePrepMotorCountOptions(availableMotorOptions);
 
@@ -60,7 +67,7 @@ const CasePrepFlowBar = ({
   return (
     <Box sx={flowBar.container}>
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        {isMain && (
+        {showMotorSelection && showMotorFields && (
           <Box sx={flowBar.topRow}>
             <CasePrepSelect
               label={CASE_PREP_FLOW_LABELS.motorCount}
@@ -83,9 +90,9 @@ const CasePrepFlowBar = ({
           </Box>
         )}
 
-        {(isMain && countSelected) || isSubscale ? (
+        {showAddSection ? (
           <Box sx={flowBar.motorSelectorBox}>
-            {isMain && countSelected && (
+            {showMotorFields && countSelected ? (
               <Box
                 sx={{
                   display: "flex",
@@ -109,7 +116,7 @@ const CasePrepFlowBar = ({
                   />
                 ))}
               </Box>
-            )}
+            ) : null}
 
             <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
               <Button

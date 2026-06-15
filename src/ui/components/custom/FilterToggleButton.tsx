@@ -1,5 +1,7 @@
 import { Box, Typography, SxProps, Theme } from '@mui/material';
-import { icons } from '@app/theme/icons';
+import TuneIcon from '@mui/icons-material/Tune';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 
 interface FilterToggleButtonProps {
   label: string;
@@ -16,17 +18,16 @@ interface FilterToggleButtonProps {
 const FilterToggleButton = ({
   label, count, isOpen, onClick,
   sx, iconSx, textSx, badgeSx, chevronSx,
-}: FilterToggleButtonProps) => {
-  const ChevronIcon = isOpen ? icons.filter.chevronUp : icons.filter.chevronDown;
-
-  return (
-    <Box onClick={onClick} sx={sx}>
-      <icons.filter.tune sx={iconSx} />
-      <Typography sx={textSx}>{label}</Typography>
-      {count > 0 && <Box sx={badgeSx}>{count}</Box>}
-      <ChevronIcon sx={chevronSx} />
-    </Box>
-  );
-};
+}: FilterToggleButtonProps) => (
+  <Box onClick={onClick} sx={sx}>
+    <TuneIcon sx={iconSx} />
+    <Typography sx={textSx}>{label}</Typography>
+    {count > 0 && <Box sx={badgeSx}>{count}</Box>}
+    {isOpen
+      ? <KeyboardArrowUpIcon sx={chevronSx} />
+      : <KeyboardArrowDownIcon sx={chevronSx} />
+    }
+  </Box>
+);
 
 export default FilterToggleButton;

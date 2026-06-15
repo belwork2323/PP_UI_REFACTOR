@@ -1,0 +1,324 @@
+{
+  "schemaVersion": "1.0",
+  "schemaType": "CASTING",
+  "functionality": "CREATE_CASTING_FORM",
+  "data": {
+    "layout": {
+      "type": "flat",
+      "gap": "md",
+      "sectionVariant": "card"
+    },
+    "designSystem": {
+      "colors": {
+        "primary": "#1565C0",
+        "primaryLight": "#1976D2",
+        "surface": "#F4F6F8",
+        "border": "#D5D8DC",
+        "text": "#1C2833",
+        "textSub": "#5D6D7E"
+      },
+      "typography": {
+        "fontFamily": "'DM Sans', sans-serif",
+        "scale": {
+          "xs": "0.68rem",
+          "sm": "0.78rem",
+          "md": "0.86rem",
+          "lg": "0.98rem"
+        },
+        "label": {
+          "size": "xs",
+          "weight": 700,
+          "transform": "uppercase",
+          "letterSpacing": "0.04em"
+        }
+      },
+      "spacing": {
+        "xs": 4,
+        "sm": 8,
+        "md": 12,
+        "lg": 16,
+        "xl": 24
+      },
+      "radius": {
+        "sm": 7,
+        "md": 11,
+        "lg": 16
+      },
+      "icons": {
+        "sectionDefault": "description",
+        "casting": "precision_manufacturing"
+      }
+    },
+    "meta": {
+      "title": "Casting — Final Assembly Details",
+      "description": "Project A Stage-I important measurements per motor."
+    },
+    "context": {
+      "motorStage": 1,
+      "subDepartmentId": 111
+    },
+    "nodes": [
+      {
+        "id": "FINAL_ASSEMBLY_DETAILS",
+        "component": "section",
+        "label": "Section A: Final Assembly Details",
+        "style": {
+          "variant": "card",
+          "icon": "precision_manufacturing",
+          "iconColor": "primary",
+          "padding": "md"
+        },
+        "children": [
+          {
+            "id": "MANDREL_MEASUREMENTS",
+            "component": "table",
+            "label": "Distance between centering top to mandrel top (mm)",
+            "style": {
+              "gap": "sm"
+            },
+            "behavior": {
+              "table": {
+                "defaultRows": 3,
+                "minRows": 1,
+                "maxRows": 20,
+                "allowAddRow": true,
+                "allowDeleteRow": true,
+                "autoIncrementKey": "srNo",
+                "presetRows": [
+                  {
+                    "type": "header",
+                    "label": "Important Measurements"
+                  }
+                ]
+              }
+            },
+            "children": [
+              {
+                "id": "srNo",
+                "component": "column",
+                "fieldType": "autoIncrement",
+                "label": "Sr. No.",
+                "style": {
+                  "width": "60px"
+                },
+                "behavior": {
+                  "readonly": true
+                }
+              },
+              {
+                "id": "groupA",
+                "component": "columnGroup",
+                "label": "Mandrel rest on dome of motor (A)",
+                "children": [
+                  {
+                    "id": "aMock",
+                    "component": "column",
+                    "fieldType": "number",
+                    "label": "Mock assy.",
+                    "unit": "mm",
+                    "style": {
+                      "width": "100px"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "groupB",
+                "component": "columnGroup",
+                "label": "Mandrel rest on bottom cup (with Teflon sleeve) (B)",
+                "children": [
+                  {
+                    "id": "bMock",
+                    "component": "column",
+                    "fieldType": "number",
+                    "label": "Mock assy.",
+                    "unit": "mm",
+                    "style": {
+                      "width": "100px"
+                    }
+                  },
+                  {
+                    "id": "bFinal",
+                    "component": "column",
+                    "fieldType": "number",
+                    "label": "Final assy.",
+                    "unit": "mm",
+                    "style": {
+                      "width": "100px"
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "groupC",
+                "component": "columnGroup",
+                "label": "Difference C=(A-B)",
+                "children": [
+                  {
+                    "id": "cMock",
+                    "component": "column",
+                    "fieldType": "formula",
+                    "label": "Mock assy.",
+                    "unit": "mm",
+                    "style": {
+                      "width": "100px"
+                    },
+                    "behavior": {
+                      "readonly": true,
+                      "formula": {
+                        "expression": "aMock - bMock",
+                        "dependencies": [
+                          "aMock",
+                          "bMock"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "id": "cFinal",
+                    "component": "column",
+                    "fieldType": "formula",
+                    "label": "Final assy.",
+                    "unit": "mm",
+                    "style": {
+                      "width": "100px"
+                    },
+                    "behavior": {
+                      "readonly": true,
+                      "formula": {
+                        "expression": "aFinal - bFinal",
+                        "dependencies": [
+                          "aFinal",
+                          "bFinal"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "bellowThickness",
+                "component": "column",
+                "fieldType": "number",
+                "label": "Bellow thickness (D)",
+                "unit": "mm",
+                "style": {
+                  "width": "110px"
+                }
+              },
+              {
+                "id": "groupE",
+                "component": "columnGroup",
+                "label": "Mandrel lift E=(C-D)",
+                "children": [
+                  {
+                    "id": "eMock",
+                    "component": "column",
+                    "fieldType": "formula",
+                    "label": "Mock assy.",
+                    "unit": "mm",
+                    "style": {
+                      "width": "100px"
+                    },
+                    "behavior": {
+                      "readonly": true,
+                      "formula": {
+                        "expression": "cMock - bellowThickness",
+                        "dependencies": [
+                          "cMock",
+                          "bellowThickness"
+                        ]
+                      }
+                    }
+                  },
+                  {
+                    "id": "eFinal",
+                    "component": "column",
+                    "fieldType": "formula",
+                    "label": "Final assy.",
+                    "unit": "mm",
+                    "style": {
+                      "width": "100px"
+                    },
+                    "behavior": {
+                      "readonly": true,
+                      "formula": {
+                        "expression": "cFinal - bellowThickness",
+                        "dependencies": [
+                          "cFinal",
+                          "bellowThickness"
+                        ]
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "FEED_PIPE_MEASUREMENTS",
+            "component": "section",
+            "label": "Measurement of distance between feed pipe & cone apex",
+            "style": {
+              "variant": "outlined",
+              "padding": "sm",
+              "gap": "sm"
+            },
+            "layout": {
+              "direction": "row",
+              "wrap": true,
+              "gap": "md"
+            },
+            "children": [
+              {
+                "id": "FEED_PIPE_READING_1",
+                "component": "field",
+                "fieldType": "number",
+                "label": "Reading 1",
+                "unit": "mm",
+                "style": {
+                  "colSpan": {
+                    "xs": 12,
+                    "sm": 6,
+                    "md": 4
+                  },
+                  "width": "180px"
+                }
+              },
+              {
+                "id": "FEED_PIPE_READING_2",
+                "component": "field",
+                "fieldType": "number",
+                "label": "Reading 2",
+                "unit": "mm",
+                "style": {
+                  "colSpan": {
+                    "xs": 12,
+                    "sm": 6,
+                    "md": 4
+                  },
+                  "width": "180px"
+                }
+              }
+            ]
+          },
+          {
+            "id": "EMPTY_MOTOR_CASING_WEIGHT",
+            "component": "field",
+            "fieldType": "number",
+            "label": "Weight of assembled empty motor casing",
+            "unit": "kg",
+            "style": {
+              "colSpan": {
+                "xs": 12,
+                "sm": 6,
+                "md": 4
+              },
+              "width": "220px"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

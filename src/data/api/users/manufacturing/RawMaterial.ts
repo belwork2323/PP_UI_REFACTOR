@@ -1,5 +1,5 @@
-import { USER_MANUFACTURING } from "../endPoints";
-import { get, post } from "../httpClient";
+import { USER_MANUFACTURING } from "../../endPoints";
+import { get, post } from "../../httpClient";
 
 export const fetchAllBatches = () =>
   get(USER_MANUFACTURING.RAW_MATERIAL.BATCH_LIST);

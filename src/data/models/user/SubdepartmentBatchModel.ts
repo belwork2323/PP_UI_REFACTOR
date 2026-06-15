@@ -73,26 +73,41 @@ export const SUBDEPT_STATUS_FIELD: Record<string, string> = {
   "static-test-facility": "stfStatus",
 };
 
+const compactStatusKey = (value: string) => value.replace(/[\s_-]/g, "").toLowerCase();
+
+const STATUS_KEY_ALIASES: Record<string, OperationStatus> = {
+  initiated: OPERATION_STATUS.INITIATED,
+  inprogress: OPERATION_STATUS.IN_PROGRESS,
+  waitingforapproval: OPERATION_STATUS.WAITING_FOR_APPROVAL,
+  approved: OPERATION_STATUS.APPROVED,
+  rejected: OPERATION_STATUS.REJECTED,
+  active: OPERATION_STATUS.INITIATED,
+};
+
 export function normalizeSubdepartmentBatchStatus(status: unknown): OperationStatus {
-  const u = String(status ?? "").toUpperCase();
+  const trimmed = String(status ?? "").trim();
+  if (!trimmed) return OPERATION_STATUS.INITIATED;
+
+  if (OPERATION_STATUS_VALUES.includes(trimmed as OperationStatus)) {
+    return trimmed as OperationStatus;
+  }
+
+  const fromAlias = STATUS_KEY_ALIASES[compactStatusKey(trimmed)];
+  if (fromAlias) return fromAlias;
+
+  const u = trimmed.toUpperCase();
   const map: Record<string, OperationStatus> = {
     INITIATED: OPERATION_STATUS.INITIATED,
     IN_PROGRESS: OPERATION_STATUS.IN_PROGRESS,
+    INPROGRESS: OPERATION_STATUS.IN_PROGRESS,
     WAITING_FOR_APPROVAL: OPERATION_STATUS.WAITING_FOR_APPROVAL,
+    WAITINGFORAPPROVAL: OPERATION_STATUS.WAITING_FOR_APPROVAL,
     APPROVED: OPERATION_STATUS.APPROVED,
     REJECTED: OPERATION_STATUS.REJECTED,
     ACTIVE: OPERATION_STATUS.INITIATED,
   };
 
-  const fromApiKey = map[u];
-  if (fromApiKey) return fromApiKey;
-
-  const trimmed = String(status ?? "").trim();
-  if (OPERATION_STATUS_VALUES.includes(trimmed as OperationStatus)) {
-    return trimmed as OperationStatus;
-  }
-
-  return OPERATION_STATUS.INITIATED;
+  return map[u] ?? OPERATION_STATUS.INITIATED;
 }
 
 const resolveMotorType = (batch: Record<string, unknown>) => {
@@ -157,7 +172,12 @@ export function mapSubdepartmentBatchListRow(
     priority: batch.priority,
     assignedTo: resolveAssignedTo(batch),
     createdOn: batch.createdOn,
-    formId: batch.formId ?? null,
+    formId:
+      batch.formId ??
+      batch.casePreparationFormId ??
+      batch.cpFormId ??
+      batch.subDepartmentFormId ??
+      null,
     rejectionReason: batch.rejectionReason ?? null,
     material: batch.material ?? batch.materialType ?? null,
     projectName: batch.projectName,

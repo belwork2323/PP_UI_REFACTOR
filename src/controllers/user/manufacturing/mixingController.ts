@@ -9,40 +9,21 @@ import {
   updateMixingFormApi,
 } from "../../../data/api/users/manufacturing/mixingFormApi";
 
-type MixingPayloadRow = {
-  operationLabel: string;
-  rpm: string;
-  time: string;
-  temp: string;
-  vacuum: string;
+export type MixingFormBody = {
+  premixes: Array<Record<string, unknown>>;
+  finalMixes: Array<Record<string, unknown>>;
 };
 
-export type MixingCreatePayload = {
+export type MixingCreatePayload = MixingFormBody & {
   batchId: string;
   subDepartmentId: number;
   formSubmissionType: "DRAFT" | "SUBMIT";
-  preMixing: {
-    operations: MixingPayloadRow[];
-    sampling: MixingPayloadRow;
-  };
-  finalMixing: {
-    tdiAddition: MixingPayloadRow;
-    viscositySampling: MixingPayloadRow;
-  };
 };
 
-export type MixingUpdatePayload = {
+export type MixingUpdatePayload = MixingFormBody & {
   formId: string;
   subDepartmentId: number;
   formSubmissionType: "DRAFT" | "UPDATE";
-  preMixing: {
-    operations: MixingPayloadRow[];
-    sampling: MixingPayloadRow;
-  };
-  finalMixing: {
-    tdiAddition: MixingPayloadRow;
-    viscositySampling: MixingPayloadRow;
-  };
 };
 
 export type MixingDetailsPayload = {

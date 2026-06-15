@@ -1,6 +1,6 @@
 import React from "react";
 import { Chip } from "@mui/material";
-import { statusConfig } from "../../../app/theme/custom_themes/admin/userManagement_theme";
+import { statusConfig } from "@app/theme/roleConfig";
 
 const StatusChip = ({ status, size = "small", sx = {} }: { status: string; size?: "small" | "medium"; sx?: any }) => {
   const config = statusConfig[status] || statusConfig["Active"];

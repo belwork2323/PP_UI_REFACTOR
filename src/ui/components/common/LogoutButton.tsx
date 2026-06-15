@@ -1,20 +1,13 @@
-import Button from "./Button";
-import { icons } from "@app/theme/icons";
-import { STRINGS } from "@app/config/strings";
+import React from "react";
+import { Button } from "@mui/material";
+import LoginIcon from "@mui/icons-material/Login";
 
-type LogoutButtonProps = {
-  onClick: () => void;
+const LogoutButton = ({ onClick }) => {
+  return (
+    <Button variant="outlined" color="error" startIcon={<LoginIcon />} onClick={onClick}>
+      Logout
+    </Button>
+  );
 };
-
-const LogoutButton = ({ onClick }: LogoutButtonProps) => (
-  <Button
-    variant="outlined"
-    color="error"
-    startIcon={<icons.headerLogout />}
-    onClick={onClick}
-  >
-    {STRINGS.APP_HEADER.LOGOUT_LABEL}
-  </Button>
-);
 
 export default LogoutButton;

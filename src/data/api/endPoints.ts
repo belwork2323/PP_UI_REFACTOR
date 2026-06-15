@@ -203,6 +203,7 @@ export const USER_OPERATIONS_ENDPOINTS = {
   MOTORS_STAGE_LIST: `${API_BASE}/user/subdepartment/motors-stage-list`,
   APPROVED_MOTORS_LIST: `${API_BASE}/user/subdepartment/approved-motors-list`,
   CASTING_STATION_LIST: `${API_BASE}/user/subdepartment/casting-station`,
+  MATERIAL_LOTS: `${API_BASE}/user/subdepartment/material-lots`,
 };
 
 export const USER_RAW_MATERIAL_PROCUREMENT_ENDPOINTS = {
@@ -247,6 +248,8 @@ export const USER_CASTING_CURING_FORM_ENDPOINTS = {
   CREATE_FORM: `${API_BASE}/user/casting-curing/forms/create`,
   FORM_DETAILS: `${API_BASE}/user/casting-curing/forms/details`,
   UPDATE_FORM: `${API_BASE}/user/casting-curing/forms/update`,
+  CASTING_SCHEMA: `${API_BASE}/user/casting-curing/schema/casting`,
+  CURING_SCHEMA: `${API_BASE}/user/casting-curing/schema/curing`,
 };
 
 export const USER_POST_CURE_FORM_ENDPOINTS = {

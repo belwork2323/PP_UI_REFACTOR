@@ -80,23 +80,8 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
     return count;
   }, [advancedFilters, statusFilter]);
 
-  const resolveStatusCounts = useCallback(
-    async (
-      rows: Record<string, unknown>[],
-      serverCounts: Record<string, number> | undefined,
-      total: number,
-      subDepartmentId: number,
-      userId: string,
-    ) => {
-      const mapped = mapSubdepartmentBatchStatusCounts(serverCounts, total, rows);
-      const hasNonZeroStatusCounts = Object.entries(mapped).some(
-        ([key, value]) => key !== FILTER_ALL && value > 0,
-      );
-
-      if (hasNonZeroStatusCounts || statusFilter === FILTER_ALL) {
-        return mapped;
-      }
-
+  const fetchGlobalStatusCounts = useCallback(
+    async (subDepartmentId: number, userId: string) => {
       const countPayload = buildSubdepartmentBatchListPayload({
         subDepartmentId,
         userId,
@@ -106,20 +91,51 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
       });
       const countRes = await operationsController.fetchSubdepartmentBatches(countPayload);
 
-      if (countRes?.success && countRes.data) {
-        const allRows = (countRes.data.batches || []).map((batch: Record<string, unknown>) =>
-          mapSubdepartmentBatchListRow(batch, targetSlug),
-        );
-        const countPagination = countRes.data.pagination ?? {};
-        const allTotal = Number(
-          countPagination.totalRecords ?? countPagination.total ?? allRows.length,
-        );
-        return mapSubdepartmentBatchStatusCounts(countRes.data.statusCounts, allTotal, allRows);
+      if (!countRes?.success || !countRes.data) {
+        return null;
       }
 
-      return mapped;
+      const allRows = (countRes.data.batches || []).map((batch: Record<string, unknown>) =>
+        mapSubdepartmentBatchListRow(batch, targetSlug),
+      );
+      const countPagination = countRes.data.pagination ?? {};
+      const allTotal = Number(
+        countPagination.totalRecords ?? countPagination.total ?? allRows.length,
+      );
+
+      return mapSubdepartmentBatchStatusCounts(countRes.data.statusCounts, allTotal, allRows);
     },
-    [advancedFilters, statusFilter, targetSlug],
+    [advancedFilters, targetSlug],
+  );
+
+  const resolveStatusCounts = useCallback(
+    async (
+      rows: Record<string, unknown>[],
+      serverCounts: Record<string, number> | undefined,
+      total: number,
+      subDepartmentId: number,
+      userId: string,
+    ) => {
+      const mapped = mapSubdepartmentBatchStatusCounts(serverCounts, total, rows);
+
+      // Status-tab counts must reflect the full list, not the active status slice.
+      if (statusFilter !== FILTER_ALL) {
+        const globalCounts = await fetchGlobalStatusCounts(subDepartmentId, userId);
+        return globalCounts ?? mapped;
+      }
+
+      const hasNonZeroStatusCounts = Object.entries(mapped).some(
+        ([key, value]) => key !== FILTER_ALL && value > 0,
+      );
+
+      if (hasNonZeroStatusCounts) {
+        return mapped;
+      }
+
+      const globalCounts = await fetchGlobalStatusCounts(subDepartmentId, userId);
+      return globalCounts ?? mapped;
+    },
+    [fetchGlobalStatusCounts, statusFilter],
   );
 
   const fetchBatches = useCallback(async () => {

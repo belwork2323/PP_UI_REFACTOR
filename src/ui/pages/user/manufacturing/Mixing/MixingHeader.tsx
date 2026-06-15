@@ -13,6 +13,12 @@ const MixingHeader = ({ batch, isEdit, onBack, theme }: any) => {
       backLabel={S.FORM_HEADER.BACK_TO_LIST}
       editLabel={S.FORM_HEADER.EDITING_REJECTED}
       rejectionTitle={S.FORM_HEADER.REJECTION_REASON}
+      batchHeadingOverride={{
+        title: batch?.batchId ?? batch?.lotId ?? "—",
+        subtitle: [batch?.motorId, batch?.motorType ? `Type ${batch.motorType}` : null]
+          .filter(Boolean)
+          .join(" · "),
+      }}
       theme={theme}
     />
   );

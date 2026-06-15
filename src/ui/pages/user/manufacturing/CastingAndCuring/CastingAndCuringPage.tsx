@@ -17,19 +17,41 @@ const CastingCuringPage = () => {
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
 
   const hookState = useCastingAndCuringHook();
-
   const {
     loading,
     view,
     activeBatch,
     isEditMode,
     formData,
+    castingType,
+    castingStation,
+    motorCount,
+    draftMotorIds,
+    motorReceivedAt,
+    castingSetupDraft,
+    addedMotors,
+    schemaLoading,
+    schemaError,
+    castingSchemaError,
+    curingSchemaError,
+    subDepartmentId,
     actionLoading,
     backConfirmOpen,
     setBackConfirmOpen,
     handleBack,
     handleDiscardAndBack,
-    handleFormChange,
+    setCastingType,
+    setCastingStation,
+    handleMotorCountChange,
+    handleDraftMotorIdChange,
+    setMotorReceivedAt,
+    handleSetupDraftChange,
+    handleLoadCastingForm,
+    handleRemoveLoadedCastingForm,
+    handleLoadCuringForm,
+    getCuringSetupDraft,
+    handleCuringSetupDraftChange,
+    handleMotorSessionChange,
     handleSaveDraft,
     handleSubmit,
   } = hookState;
@@ -42,43 +64,61 @@ const CastingCuringPage = () => {
     );
   }
 
-  if (view === "list") {
-    return (
-      <Box sx={theme.workflow.animatedContainer}>
-        <CastingCuringList hookState={hookState} />
-      </Box>
-    );
-  }
-
   return (
     <Box sx={theme.workflow.animatedContainer}>
-      <CastingAndCuringHeader
-        batch={activeBatch}
-        isEdit={isEditMode}
-        onBack={handleBack}
-      />
-      <CastingCuringForm
-        initialData={formData}
-        isEditMode={isEditMode}
-        onBlocksChange={handleFormChange}
-      />
+      {view === "list" && <CastingCuringList hookState={hookState} />}
 
-      <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} mt={3} justifyContent="flex-end">
-        <Button
-          variant="outlined"
-          disabled={actionLoading}
-          onClick={() => setDraftConfirmOpen(true)}
-        >
-          {actionStrings.SAVE_DRAFT}
-        </Button>
-        <Button
-          variant="contained"
-          disabled={actionLoading}
-          onClick={() => setSubmitConfirmOpen(true)}
-        >
-          {isEditMode ? actionStrings.RESUBMIT_APPROVAL : actionStrings.SUBMIT_APPROVAL}
-        </Button>
-      </Stack>
+      {view === "form" && activeBatch && (
+        <>
+          <CastingAndCuringHeader batch={activeBatch} isEdit={isEditMode} onBack={handleBack} />
+          <CastingCuringForm
+            batch={activeBatch}
+            formData={formData}
+            castingType={castingType}
+            castingStation={castingStation}
+            motorCount={motorCount}
+            draftMotorIds={draftMotorIds}
+            motorReceivedAt={motorReceivedAt}
+            castingSetupDraft={castingSetupDraft}
+            addedMotors={addedMotors}
+            schemaLoading={schemaLoading}
+            schemaError={schemaError}
+            castingSchemaError={castingSchemaError}
+            curingSchemaError={curingSchemaError}
+            subDepartmentId={subDepartmentId}
+            onCastingTypeChange={setCastingType}
+            onCastingStationChange={setCastingStation}
+            onMotorCountChange={handleMotorCountChange}
+            onDraftMotorIdChange={handleDraftMotorIdChange}
+            onMotorReceivedAtChange={setMotorReceivedAt}
+            onSetupDraftChange={handleSetupDraftChange}
+            onLoadCastingForm={handleLoadCastingForm}
+            onRemoveLoadedCastingForm={handleRemoveLoadedCastingForm}
+            onLoadCuringForm={handleLoadCuringForm}
+            getCuringSetupDraft={getCuringSetupDraft}
+            onCuringSetupDraftChange={handleCuringSetupDraftChange}
+            onMotorSessionChange={handleMotorSessionChange}
+            theme={theme}
+          />
+
+          <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} mt={3} justifyContent="flex-end">
+            <Button
+              variant="outlined"
+              disabled={actionLoading}
+              onClick={() => setDraftConfirmOpen(true)}
+            >
+              {actionStrings.SAVE_DRAFT}
+            </Button>
+            <Button
+              variant="contained"
+              disabled={actionLoading}
+              onClick={() => setSubmitConfirmOpen(true)}
+            >
+              {isEditMode ? actionStrings.RESUBMIT_APPROVAL : actionStrings.SUBMIT_APPROVAL}
+            </Button>
+          </Stack>
+        </>
+      )}
 
       <ConfirmAlertDialog
         open={backConfirmOpen}

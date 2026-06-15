@@ -1,277 +1,258 @@
+import type { SchemaDocument, SchemaFormValues, SchemaSectionSubmission } from "../../../schemaManagement";
 import {
-  createCastingAndCuringData,
-  nextTLabel,
-} from "../../../hooks/user/manufacturing/castingAndCuringConfig";
+  buildCastingCuringSectionPayload,
+  createCastingCuringInitialValues,
+  hydrateCastingCuringValuesFromSections,
+} from "../../../schemaManagement";
+import { buildCastingSetupContext } from "../../../schemaManagement/utils/schemaSetupContext";
+import type { SchemaSetupContext } from "../../../schemaManagement/utils/schemaSetupContext";
+import { schemaValuesHaveUserData } from "../../../schemaManagement/models/schemaFormState";
 
-export type CastingCuringPair = { m1: string; m2: string };
-
-export type CastingCuringBowlRow = {
-  id?: number;
-  bowlNo: string;
-  propellantQty: string;
-  viscosity: string;
-  viscosityTemp: string;
-  arrivalTime: string;
-  slurry1: string;
-  slurry2: string;
+export type CastingProcessSetup = {
+  initialVacuum: string;
+  castingVacuumPressure: string;
+  soakingVacuumPressure: string;
+  finalMixCount: string;
 };
 
-export type CastingCuringIntervalRow = {
-  id?: string;
-  label: string;
-  m1: string;
-  m2: string;
+export type CuringProcessSetup = {
+  oven: string;
+  curingType: string;
+  configuration: string;
+  motorsToCureCount: number | "";
+  ovensUtilized: string;
+};
+
+export type CastingCuringMotorSession = {
+  motorId: string;
+  motorReceivedAt: string;
+  formValues: SchemaFormValues;
+  curingSetup: CuringProcessSetup;
+  curingFormLoaded?: boolean;
+  curingFormValues?: SchemaFormValues;
+  savedSections?: SchemaSectionSubmission[];
 };
 
 export type CastingCuringFormState = {
-  bowl: {
-    motorIds: CastingCuringPair;
-    rows: CastingCuringBowlRow[];
-  };
-  casting: {
-    motorIds: CastingCuringPair;
-    r1: CastingCuringPair;
-    r2: CastingCuringPair;
-    r3: CastingCuringIntervalRow[];
-    r4: { param: string; m1: string; m2: string };
-    r5a: CastingCuringPair;
-    r5b: CastingCuringPair;
-    r6: { param: string; m1: string; m2: string };
-  };
-  curing: {
-    motorIds: CastingCuringPair;
-    r1: CastingCuringPair;
-    r2: CastingCuringPair;
-    r3: CastingCuringPair;
-    r4: CastingCuringPair;
-  };
+  castingType: string;
+  castingStation: string;
+  castingSetup: CastingProcessSetup;
+  castingFormLoaded: boolean;
+  readyForCuring: boolean;
+  castingSchema: SchemaDocument | null;
+  curingSchema: SchemaDocument | null;
+  motors: CastingCuringMotorSession[];
+  curingFormValues: SchemaFormValues;
+  curingSavedSections?: SchemaSectionSubmission[];
 };
 
-export type CastingCuringDetails = {
-  formId: string;
-  batchId: string;
-  subDepartmentId: number;
-  formSubmissionType: string;
-  bowlDetails: {
-    motorIds: CastingCuringPair;
-    rows: Array<{
-      rowIndex?: number;
-      bowlNo: string;
-      propellantQty: string;
-      viscosity: string;
-      viscosityTemp: string;
-      arrivalTime: string;
-      slurry: CastingCuringPair;
-    }>;
+export type CastingCuringFormBody = {
+  schemaVersion?: string;
+  setup: {
+    castingType: string;
+    castingStation: string;
+    initialVacuum?: string;
+    castingVacuumPressure?: string;
+    soakingVacuumPressure?: string;
+    finalMixCount?: string;
   };
-  castingDetails: {
-    motorIds: CastingCuringPair;
-    vacuumBuildUp: CastingCuringPair;
-    startCasting: CastingCuringPair;
-    vacuumCheckIntervals: Array<{
-      intervalIndex?: number;
-      label: string;
-      m1: string;
-      m2: string;
-    }>;
-    castingDuration: { parameter: string; m1: string; m2: string };
-    loadCellReading: {
-      initial: CastingCuringPair;
-      final: CastingCuringPair;
-    };
-    totalWeight: { parameter: string; m1: string; m2: string };
-  };
-  curingDetails: {
-    motorIds: CastingCuringPair;
-    achievingDesiredTemp: CastingCuringPair;
-    curingCycleFollow: CastingCuringPair;
-    soaking: CastingCuringPair;
-    hardness: CastingCuringPair;
-  };
+  motors: Array<{
+    motorId: string;
+    motorReceivedAt: string;
+    sections: SchemaSectionSubmission[];
+  }>;
+  curingSections: SchemaSectionSubmission[];
 };
 
-const normalizePair = (pair: any): CastingCuringPair => ({
-  m1: String(pair?.m1 ?? ""),
-  m2: String(pair?.m2 ?? ""),
+export const createDefaultCastingProcessSetup = (): CastingProcessSetup => ({
+  initialVacuum: "",
+  castingVacuumPressure: "",
+  soakingVacuumPressure: "",
+  finalMixCount: "",
 });
 
-const normalizeBowlRow = (row: any, fallbackBowlNo: string, fallbackId: number): CastingCuringBowlRow => ({
-  id: fallbackId,
-  bowlNo: String(row?.bowlNo ?? fallbackBowlNo),
-  propellantQty: String(row?.propellantQty ?? ""),
-  viscosity: String(row?.viscosity ?? ""),
-  viscosityTemp: String(row?.viscosityTemp ?? ""),
-  arrivalTime: String(row?.arrivalTime ?? ""),
-  slurry1: String(row?.slurry1 ?? row?.slurry?.m1 ?? ""),
-  slurry2: String(row?.slurry2 ?? row?.slurry?.m2 ?? ""),
+export const createDefaultCuringProcessSetup = (): CuringProcessSetup => ({
+  oven: "",
+  curingType: "",
+  configuration: "",
+  motorsToCureCount: "",
+  ovensUtilized: "",
 });
 
-const normalizeIntervalRow = (row: any, index: number): CastingCuringIntervalRow => ({
-  id: String(row?.id ?? `t_${index}`),
-  label: String(row?.label ?? nextTLabel([])),
-  m1: String(row?.m1 ?? ""),
-  m2: String(row?.m2 ?? ""),
+export const createDefaultCastingCuringFormState = (): CastingCuringFormState => ({
+  castingType: "",
+  castingStation: "",
+  castingSetup: createDefaultCastingProcessSetup(),
+  castingFormLoaded: false,
+  readyForCuring: false,
+  castingSchema: null,
+  curingSchema: null,
+  motors: [],
+  curingFormValues: {},
 });
 
-export const createDefaultCastingCuringFormState = (): CastingCuringFormState => {
-  const defaults = createCastingAndCuringData();
+export const createEmptyMotorSession = (
+  motorId: string,
+  motorReceivedAt: string,
+  schema: SchemaDocument | null,
+  setupContext?: SchemaSetupContext,
+): CastingCuringMotorSession => ({
+  motorId,
+  motorReceivedAt,
+  formValues: schema ? createCastingCuringInitialValues(schema, setupContext) : {},
+  curingSetup: createDefaultCuringProcessSetup(),
+  curingFormLoaded: false,
+  savedSections: undefined,
+});
+
+const resolveDetailsPayload = (details: any) =>
+  details?.castingCuringDetails ?? details?.preparationDetails ?? details ?? {};
+
+export const mapCastingCuringDetailsToFormState = (details: any): CastingCuringFormState => {
+  const payload = resolveDetailsPayload(details);
+  const rawMotors = Array.isArray(payload?.motors) ? payload.motors : [];
+
+  const motors = rawMotors
+    .map((motor: any) => ({
+      motorId: String(motor?.motorId ?? "").trim(),
+      motorReceivedAt: String(motor?.motorReceivedAt ?? motor?.motorReceivedDate ?? "").trim(),
+      formValues: {},
+      curingSetup: {
+        oven: String(motor?.curingSetup?.oven ?? ""),
+        curingType: String(motor?.curingSetup?.curingType ?? ""),
+        configuration: String(motor?.curingSetup?.configuration ?? ""),
+        motorsToCureCount: Number(motor?.curingSetup?.motorsToCureCount ?? "") || "",
+        ovensUtilized: String(motor?.curingSetup?.ovensUtilized ?? ""),
+      },
+      curingFormLoaded: Boolean(
+        String(motor?.curingSetup?.oven ?? "").trim() &&
+          String(motor?.curingSetup?.curingType ?? "").trim() &&
+          String(motor?.curingSetup?.configuration ?? "").trim() &&
+          String(motor?.curingSetup?.ovensUtilized ?? "").trim(),
+      ),
+      savedSections: Array.isArray(motor?.sections) ? motor.sections : undefined,
+    }))
+    .filter((motor) => motor.motorId.length > 0);
+
+  const curingSections = Array.isArray(payload?.curingSections)
+    ? payload.curingSections
+    : Array.isArray(payload?.sections)
+      ? payload.sections
+      : undefined;
+
   return {
-    bowl: {
-      motorIds: normalizePair(defaults.bowl.motorIds),
-      rows: (defaults.bowl.rows ?? []).map((row: any, index: number) =>
-        normalizeBowlRow(row, String(index + 1), index + 1)
+    castingType: String(payload?.setup?.castingType ?? payload?.castingType ?? ""),
+    castingStation: String(payload?.setup?.castingStation ?? payload?.castingStation ?? ""),
+    castingSetup: {
+      initialVacuum: String(payload?.setup?.initialVacuum ?? payload?.initialVacuum ?? ""),
+      castingVacuumPressure: String(
+        payload?.setup?.castingVacuumPressure ?? payload?.castingVacuumPressure ?? "",
       ),
-    },
-    casting: {
-      motorIds: normalizePair(defaults.curingDetails.motorIds),
-      r1: normalizePair(defaults.curingDetails.r1),
-      r2: normalizePair(defaults.curingDetails.r2),
-      r3: (defaults.curingDetails.r3 ?? []).map((row: any, index: number) =>
-        normalizeIntervalRow(row, index + 1)
+      soakingVacuumPressure: String(
+        payload?.setup?.soakingVacuumPressure ?? payload?.soakingVacuumPressure ?? "",
       ),
-      r4: {
-        param: String(defaults.curingDetails.r4?.param ?? ""),
-        m1: String(defaults.curingDetails.r4?.m1 ?? ""),
-        m2: String(defaults.curingDetails.r4?.m2 ?? ""),
-      },
-      r5a: normalizePair(defaults.curingDetails.r5a),
-      r5b: normalizePair(defaults.curingDetails.r5b),
-      r6: {
-        param: String(defaults.curingDetails.r6?.param ?? ""),
-        m1: String(defaults.curingDetails.r6?.m1 ?? ""),
-        m2: String(defaults.curingDetails.r6?.m2 ?? ""),
-      },
+      finalMixCount: String(payload?.setup?.finalMixCount ?? payload?.finalMixCount ?? ""),
     },
-    curing: {
-      motorIds: normalizePair(defaults.curingDetails2.motorIds),
-      r1: normalizePair(defaults.curingDetails2.r1),
-      r2: normalizePair(defaults.curingDetails2.r2),
-      r3: normalizePair(defaults.curingDetails2.r3),
-      r4: normalizePair(defaults.curingDetails2.r4),
-    },
+    castingFormLoaded: motors.length > 0,
+    readyForCuring: Boolean(curingSections?.length),
+    castingSchema: null,
+    curingSchema: null,
+    motors,
+    curingFormValues: {},
+    curingSavedSections: curingSections,
   };
 };
 
-export const mapCastingCuringDetailsToFormState = (
-  details: Partial<CastingCuringDetails>
+export const hydrateCastingCuringFormState = (
+  state: CastingCuringFormState,
+  castingSchema: SchemaDocument | null,
+  curingSchema: SchemaDocument | null,
 ): CastingCuringFormState => {
-  const defaults = createDefaultCastingCuringFormState();
-  const bowlRows = Array.isArray(details?.bowlDetails?.rows) ? details.bowlDetails!.rows : [];
-  const intervalRows = Array.isArray(details?.castingDetails?.vacuumCheckIntervals)
-    ? details.castingDetails!.vacuumCheckIntervals
-    : [];
+  const setupContext = buildCastingSetupContext(state.castingSetup);
+  const motors = (state.motors ?? []).map((motor) => ({
+    ...motor,
+    curingSetup: motor.curingSetup ?? createDefaultCuringProcessSetup(),
+    curingFormLoaded: Boolean(motor.curingFormLoaded),
+    curingFormValues:
+      curingSchema && motor.curingFormLoaded
+        ? Object.keys(motor.curingFormValues ?? {}).length > 0
+          ? motor.curingFormValues
+          : createCastingCuringInitialValues(curingSchema, setupContext)
+        : motor.curingFormValues,
+    formValues: castingSchema
+      ? motor.savedSections?.length
+        ? hydrateCastingCuringValuesFromSections(castingSchema, motor.savedSections, setupContext)
+        : Object.keys(motor.formValues ?? {}).length > 0
+          ? motor.formValues
+          : createCastingCuringInitialValues(castingSchema, setupContext)
+      : motor.formValues,
+  }));
+
+  const curingFormValues = curingSchema
+    ? state.curingSavedSections?.length
+      ? hydrateCastingCuringValuesFromSections(curingSchema, state.curingSavedSections, setupContext)
+      : Object.keys(state.curingFormValues ?? {}).length > 0
+        ? state.curingFormValues
+        : createCastingCuringInitialValues(curingSchema, setupContext)
+    : state.curingFormValues;
 
   return {
-    bowl: {
-      motorIds: normalizePair(details?.bowlDetails?.motorIds ?? defaults.bowl.motorIds),
-      rows: bowlRows.length
-        ? bowlRows.map((row: any, index: number) => normalizeBowlRow(row, String(index + 1), index + 1))
-        : defaults.bowl.rows,
-    },
-    casting: {
-      motorIds: normalizePair(details?.castingDetails?.motorIds ?? defaults.casting.motorIds),
-      r1: normalizePair(details?.castingDetails?.vacuumBuildUp ?? defaults.casting.r1),
-      r2: normalizePair(details?.castingDetails?.startCasting ?? defaults.casting.r2),
-      r3: intervalRows.length
-        ? intervalRows.map((row: any, index: number) => normalizeIntervalRow(row, index + 1))
-        : defaults.casting.r3,
-      r4: {
-        param: String(details?.castingDetails?.castingDuration?.parameter ?? defaults.casting.r4.param),
-        m1: String(details?.castingDetails?.castingDuration?.m1 ?? defaults.casting.r4.m1),
-        m2: String(details?.castingDetails?.castingDuration?.m2 ?? defaults.casting.r4.m2),
-      },
-      r5a: normalizePair(details?.castingDetails?.loadCellReading?.initial ?? defaults.casting.r5a),
-      r5b: normalizePair(details?.castingDetails?.loadCellReading?.final ?? defaults.casting.r5b),
-      r6: {
-        param: String(details?.castingDetails?.totalWeight?.parameter ?? defaults.casting.r6.param),
-        m1: String(details?.castingDetails?.totalWeight?.m1 ?? defaults.casting.r6.m1),
-        m2: String(details?.castingDetails?.totalWeight?.m2 ?? defaults.casting.r6.m2),
-      },
-    },
-    curing: {
-      motorIds: normalizePair(details?.curingDetails?.motorIds ?? defaults.curing.motorIds),
-      r1: normalizePair(details?.curingDetails?.achievingDesiredTemp ?? defaults.curing.r1),
-      r2: normalizePair(details?.curingDetails?.curingCycleFollow ?? defaults.curing.r2),
-      r3: normalizePair(details?.curingDetails?.soaking ?? defaults.curing.r3),
-      r4: normalizePair(details?.curingDetails?.hardness ?? defaults.curing.r4),
-    },
+    ...state,
+    castingSchema,
+    curingSchema,
+    motors,
+    curingFormValues,
   };
 };
 
-export const mapCastingCuringFormStateToPayload = (form: CastingCuringFormState) => ({
-  bowlDetails: {
-    motorIds: normalizePair(form.bowl.motorIds),
-    rows: (form.bowl.rows ?? []).map((row) => ({
-      bowlNo: String(row.bowlNo ?? ""),
-      propellantQty: String(row.propellantQty ?? ""),
-      viscosity: String(row.viscosity ?? ""),
-      viscosityTemp: String(row.viscosityTemp ?? ""),
-      arrivalTime: String(row.arrivalTime ?? ""),
-      slurry: {
-        m1: String(row.slurry1 ?? ""),
-        m2: String(row.slurry2 ?? ""),
-      },
-    })),
-  },
-  castingDetails: {
-    motorIds: normalizePair(form.casting.motorIds),
-    vacuumBuildUp: normalizePair(form.casting.r1),
-    startCasting: normalizePair(form.casting.r2),
-    vacuumCheckIntervals: (form.casting.r3 ?? []).map((row) => ({
-      label: String(row.label ?? ""),
-      m1: String(row.m1 ?? ""),
-      m2: String(row.m2 ?? ""),
-    })),
-    castingDuration: {
-      parameter: String(form.casting.r4.param ?? ""),
-      m1: String(form.casting.r4.m1 ?? ""),
-      m2: String(form.casting.r4.m2 ?? ""),
+export const mapCastingCuringFormStateToPayload = (
+  form: CastingCuringFormState,
+): CastingCuringFormBody => {
+  const castingSchema = form.castingSchema;
+  const curingSchema = form.curingSchema;
+
+  return {
+    schemaVersion: curingSchema?.schemaVersion ?? castingSchema?.schemaVersion,
+    setup: {
+      castingType: String(form.castingType ?? ""),
+      castingStation: String(form.castingStation ?? ""),
+      initialVacuum: String(form.castingSetup?.initialVacuum ?? ""),
+      castingVacuumPressure: String(form.castingSetup?.castingVacuumPressure ?? ""),
+      soakingVacuumPressure: String(form.castingSetup?.soakingVacuumPressure ?? ""),
+      finalMixCount: String(form.castingSetup?.finalMixCount ?? ""),
     },
-    loadCellReading: {
-      initial: normalizePair(form.casting.r5a),
-      final: normalizePair(form.casting.r5b),
-    },
-    totalWeight: {
-      parameter: String(form.casting.r6.param ?? ""),
-      m1: String(form.casting.r6.m1 ?? ""),
-      m2: String(form.casting.r6.m2 ?? ""),
-    },
-  },
-  curingDetails: {
-    motorIds: normalizePair(form.curing.motorIds),
-    achievingDesiredTemp: normalizePair(form.curing.r1),
-    curingCycleFollow: normalizePair(form.curing.r2),
-    soaking: normalizePair(form.curing.r3),
-    hardness: normalizePair(form.curing.r4),
-  },
-});
+    motors: castingSchema
+      ? (form.motors ?? []).map((motor) => ({
+          motorId: motor.motorId,
+          motorReceivedAt: motor.motorReceivedAt,
+          sections: buildCastingCuringSectionPayload(castingSchema, motor.formValues),
+        }))
+      : [],
+    curingSections: curingSchema
+      ? buildCastingCuringSectionPayload(curingSchema, form.curingFormValues)
+      : [],
+  };
+};
 
 export const hasAnyCastingCuringValue = (form: CastingCuringFormState) => {
-  const pairs: CastingCuringPair[] = [
-    ...((form.bowl.rows ?? []).flatMap((row) => [
-      { m1: String(row.propellantQty ?? ""), m2: "" },
-      { m1: String(row.viscosity ?? ""), m2: String(row.viscosityTemp ?? "") },
-      { m1: String(row.arrivalTime ?? ""), m2: "" },
-      { m1: String(row.slurry1 ?? ""), m2: String(row.slurry2 ?? "") },
-    ]) as CastingCuringPair[]),
-    form.casting.r1,
-    form.casting.r2,
-    ...(form.casting.r3 ?? []),
-    { m1: String(form.casting.r4.param ?? ""), m2: String(form.casting.r4.m1 ?? "") },
-    { m1: String(form.casting.r4.m2 ?? ""), m2: "" },
-    form.casting.r5a,
-    form.casting.r5b,
-    { m1: String(form.casting.r6.param ?? ""), m2: String(form.casting.r6.m1 ?? "") },
-    { m1: String(form.casting.r6.m2 ?? ""), m2: "" },
-    form.curing.r1,
-    form.curing.r2,
-    form.curing.r3,
-    form.curing.r4,
-  ].filter(Boolean) as CastingCuringPair[];
+  if (String(form.castingType ?? "").trim() || String(form.castingStation ?? "").trim()) {
+    return true;
+  }
 
-  return pairs.some(
-    (pair) => String(pair.m1 ?? "").trim().length > 0 || String(pair.m2 ?? "").trim().length > 0
-  );
+  if (
+    String(form.castingSetup?.initialVacuum ?? "").trim() ||
+    String(form.castingSetup?.castingVacuumPressure ?? "").trim() ||
+    String(form.castingSetup?.soakingVacuumPressure ?? "").trim() ||
+    String(form.castingSetup?.finalMixCount ?? "").trim()
+  ) {
+    return true;
+  }
+
+  if ((form.motors ?? []).some((motor) => schemaValuesHaveUserData(motor.formValues ?? {}))) {
+    return true;
+  }
+
+  return schemaValuesHaveUserData(form.curingFormValues ?? {});
 };
 
 export class CastingCuringSubmitResponseModel {
@@ -292,30 +273,14 @@ export class CastingCuringSubmitResponseModel {
 }
 
 export class CastingCuringDetailsModel {
-  static fromApi(data: any): CastingCuringDetails {
+  static fromApi(data: any) {
     const payload = data?.data ?? data ?? {};
     return {
       formId: String(payload?.formId ?? ""),
       batchId: String(payload?.batchId ?? ""),
       subDepartmentId: Number(payload?.subDepartmentId ?? 0),
       formSubmissionType: String(payload?.formSubmissionType ?? ""),
-      bowlDetails: payload?.bowlDetails ?? { motorIds: { m1: "", m2: "" }, rows: [] },
-      castingDetails: payload?.castingDetails ?? {
-        motorIds: { m1: "", m2: "" },
-        vacuumBuildUp: { m1: "", m2: "" },
-        startCasting: { m1: "", m2: "" },
-        vacuumCheckIntervals: [],
-        castingDuration: { parameter: "", m1: "", m2: "" },
-        loadCellReading: { initial: { m1: "", m2: "" }, final: { m1: "", m2: "" } },
-        totalWeight: { parameter: "", m1: "", m2: "" },
-      },
-      curingDetails: payload?.curingDetails ?? {
-        motorIds: { m1: "", m2: "" },
-        achievingDesiredTemp: { m1: "", m2: "" },
-        curingCycleFollow: { m1: "", m2: "" },
-        soaking: { m1: "", m2: "" },
-        hardness: { m1: "", m2: "" },
-      },
+      castingCuringDetails: payload?.castingCuringDetails ?? payload,
     };
   }
 }

@@ -6,6 +6,7 @@ import { useThemeStore } from "../../../../../app/store/themeStore";
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import useRawMaterialPrepHook from "../../../../../hooks/user/manufacturing/useRawMaterialPrepHook";
 import RawMaterialBuilderForm from "./RawMaterialBuilderPage";
+import RawMaterialPreparationDetailsView from "./RawMaterialPreparationDetailsView";
 import RawMaterialPreparationHeader from "./RawMaterialPreparationHeader";
 import RawMaterialPreparationList from "./RawMaterialPreparationList";
 
@@ -39,6 +40,10 @@ const RawMaterialPreparationPage = () => {
     availableLiquidMaterials,
     loadingMaterials,
     availablePremixOptions,
+    detailsRow,
+    detailsData,
+    detailsLoading,
+    handleBackFromDetails,
     handlePremixChange,
     handleProcessToggle,
     handleSolidMaterialChange,
@@ -64,6 +69,15 @@ const RawMaterialPreparationPage = () => {
   return (
     <Box sx={theme.workflow.animatedContainer}>
       {view === "list" && <RawMaterialPreparationList hookState={hookState} />}
+
+      {view === "details" && detailsRow && (
+        <RawMaterialPreparationDetailsView
+          row={detailsRow}
+          data={detailsData}
+          loading={detailsLoading}
+          onBack={handleBackFromDetails}
+        />
+      )}
 
       {view === "form" && activeBatch && (
         <Box>

@@ -1,0 +1,375 @@
+{
+  "schemaVersion": "1.0",
+  "schemaType": "CASTING",
+  "functionality": "CREATE_CASTING_FORM",
+  "data": {
+    "layout": {
+      "type": "accordion",
+      "gap": "md",
+      "sectionVariant": "card",
+      "sectionBorderRadius": "sm",
+      "accordionConfig": {
+        "defaultExpanded": true,
+        "allowMultipleExpanded": true,
+        "expandIcon": "expand_more"
+      }
+    },
+    "designSystem": {
+      "colors": {
+        "primary": "#1565C0",
+        "primaryLight": "#1976D2",
+        "surface": "#F4F6F8",
+        "border": "#D5D8DC",
+        "text": "#1C2833",
+        "textSub": "#5D6D7E"
+      },
+      "typography": {
+        "fontFamily": "'DM Sans', sans-serif"
+      },
+      "spacing": {
+        "xs": 4,
+        "sm": 8,
+        "md": 12,
+        "lg": 16,
+        "xl": 24
+      },
+      "radius": {
+        "sm": 4,
+        "md": 6,
+        "lg": 8
+      },
+      "icons": {
+        "sectionDefault": "description",
+        "curing": "thermostat"
+      }
+    },
+    "meta": {
+      "title": "Casting Form",
+      "description": "Casting process details for single motor"
+    },
+    "context": {
+      "motorStage": 1,
+      "subDepartmentId": "{{subDepartmentId}}",
+      "motorId": "{{motorId}}"
+    },
+    "nodes": [
+      {
+        "id": "FINAL_ASSEMBLY_DETAILS",
+        "component": "section",
+        "label": "Section A: Final Assembly Details",
+        "style": {
+          "variant": "card",
+          "icon": "thermostat",
+          "iconColor": "primary",
+          "padding": "md",
+          "borderRadius": "sm"
+        },
+        "children": [
+          {
+            "id": "MANDREL_MEASUREMENTS",
+            "component": "table",
+            "label": "Distance between centering top to mandrel top (mm)",
+            "behavior": {
+              "table": {
+                "defaultRows": 3,
+                "allowAddRow": true,
+                "allowDeleteRow": true,
+                "autoIncrementKey": "srNo"
+              }
+            },
+            "children": [
+              {
+                "id": "srNo",
+                "component": "column",
+                "fieldType": "autoIncrement",
+                "label": "Sr No."
+              },
+              {
+                "id": "MANDREL_DOME_A",
+                "component": "columnGroup",
+                "label": "Mandrel rest on dome of motor (A)",
+                "children": [
+                  {
+                    "id": "A_MOCK",
+                    "component": "column",
+                    "fieldType": "number",
+                    "label": "Mock assy.",
+                    "unit": "mm"
+                  }
+                ]
+              },
+              {
+                "id": "BOTTOM_CUP_B",
+                "component": "columnGroup",
+                "label": "Mandrel rest on bottom cup with Teflon sleeve (B)",
+                "children": [
+                  {
+                    "id": "B_MOCK",
+                    "component": "column",
+                    "fieldType": "number",
+                    "label": "Mock assy.",
+                    "unit": "mm"
+                  },
+                  {
+                    "id": "B_FINAL",
+                    "component": "column",
+                    "fieldType": "number",
+                    "label": "Final assy.",
+                    "unit": "mm"
+                  }
+                ]
+              },
+              {
+                "id": "DIFFERENCE_C",
+                "component": "columnGroup",
+                "label": "Difference C=(A-B)",
+                "children": [
+                  {
+                    "id": "C_MOCK",
+                    "component": "column",
+                    "fieldType": "formula",
+                    "label": "Mock assy.",
+                    "behavior": {
+                      "formula": {
+                        "expression": "A_MOCK-B_MOCK",
+                        "dependencies": ["A_MOCK", "B_MOCK"]
+                      }
+                    }
+                  },
+                  {
+                    "id": "C_FINAL",
+                    "component": "column",
+                    "fieldType": "formula",
+                    "label": "Final assy.",
+                    "behavior": {
+                      "formula": {
+                        "expression": "A_MOCK-B_FINAL",
+                        "dependencies": ["A_MOCK", "B_FINAL"]
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "id": "BELLOWS_THICKNESS_D",
+                "component": "column",
+                "fieldType": "number",
+                "label": "Bellow thickness (D)",
+                "unit": "mm"
+              },
+              {
+                "id": "MANDREL_LIFT_E",
+                "component": "columnGroup",
+                "label": "Mandrel lift E=(C-D)",
+                "children": [
+                  {
+                    "id": "E_MOCK",
+                    "component": "column",
+                    "fieldType": "formula",
+                    "label": "Mock assy.",
+                    "behavior": {
+                      "formula": {
+                        "expression": "C_MOCK-BELLOWS_THICKNESS_D",
+                        "dependencies": ["C_MOCK", "BELLOWS_THICKNESS_D"]
+                      }
+                    }
+                  },
+                  {
+                    "id": "E_FINAL",
+                    "component": "column",
+                    "fieldType": "formula",
+                    "label": "Final assy.",
+                    "behavior": {
+                      "formula": {
+                        "expression": "C_FINAL-BELLOWS_THICKNESS_D",
+                        "dependencies": ["C_FINAL", "BELLOWS_THICKNESS_D"]
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "EMPTY_MOTOR_WEIGHT",
+            "component": "field",
+            "fieldType": "number",
+            "label": "Weight of assembled empty motor casing",
+            "unit": "kg"
+          }
+        ]
+      },
+      {
+        "id": "CASTING_PROCESS",
+        "component": "section",
+        "label": "Section B: Casting Process",
+        "children": [
+          {
+            "id": "FINAL_MIX_DETAILS",
+            "component": "repeatable",
+            "label": "Final Mix Details",
+            "behavior": {
+              "repeat": {
+                "enabled": true,
+                "mode": "mix",
+                "defaultCount": "{{finalMixCount}}",
+                "min": "{{finalMixCount}}",
+                "max": "{{finalMixCount}}",
+                "allowAdd": false,
+                "allowDelete": false,
+                "labelPattern": "Final Mix {index}"
+              }
+            },
+            "children": [
+              {
+                "id": "BOWL_DETAILS",
+                "component": "table",
+                "label": "Bowl Details",
+                "behavior": {
+                  "table": {
+                    "defaultRows": 1,
+                    "allowAddRow": true,
+                    "allowDeleteRow": true
+                  }
+                },
+                "children": [
+                  {
+                    "id": "BOWL_ID",
+                    "component": "column",
+                    "fieldType": "text",
+                    "label": "Bowl Id"
+                  },
+                  {
+                    "id": "BOWL_RECEIPT_TIME",
+                    "component": "column",
+                    "fieldType": "time",
+                    "label": "Bowl Receipt Time"
+                  },
+                  {
+                    "id": "INITIAL_WEIGHT",
+                    "component": "column",
+                    "fieldType": "number",
+                    "label": "Initial Weight"
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "CASTING_FROM_BOWL_DETAILS",
+            "component": "table",
+            "label": "Casting From Bowl Details",
+            "behavior": {
+              "table": {
+                "defaultRows": 1,
+                "allowAddRow": true,
+                "allowDeleteRow": true
+              }
+            },
+            "children": [
+              {
+                "id": "BOWL_ID",
+                "component": "column",
+                "fieldType": "text",
+                "label": "Bowl Id"
+              },
+              {
+                "id": "TIME_INTERVAL",
+                "component": "column",
+                "fieldType": "number",
+                "label": "Time Interval",
+                "unit": "hrs"
+              },
+              {
+                "id": "VISCOSITY",
+                "component": "column",
+                "fieldType": "number",
+                "label": "Viscosity",
+                "unit": "Poise"
+              },
+              {
+                "id": "MOTOR_ID",
+                "component": "column",
+                "fieldType": "text",
+                "label": "Motor Id No."
+              },
+              {
+                "id": "VACUUM_LEVEL",
+                "component": "column",
+                "fieldType": "number",
+                "label": "Vacuum Level",
+                "unit": "torr"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "SLURRY_CAST_MOTOR",
+        "component": "section",
+        "label": "Section C: Slurry Cast Into Motor",
+        "children": [
+          {
+            "id": "SLURRY_CAST_TABLE",
+            "component": "table",
+            "children": [
+              {
+                "id": "FM_BOWL_ID",
+                "component": "column",
+                "fieldType": "text",
+                "label": "FM/Bowl Id"
+              },
+              {
+                "id": "TOTAL_SLURRY_CAST",
+                "component": "column",
+                "fieldType": "number",
+                "label": "Total Slurry Cast",
+                "unit": "kg"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "POST_CAST_OPERATIONS",
+        "component": "section",
+        "label": "Section D: Post Cast Operations",
+        "children": [
+          {
+            "id": "POST_CAST_TABLE",
+            "component": "table",
+            "behavior": {
+              "table": {
+                "defaultRows": 6,
+                "allowAddRow": false,
+                "allowDeleteRow": false
+              }
+            },
+            "children": [
+              {
+                "id": "ACTIVITY",
+                "component": "column",
+                "fieldType": "static",
+                "label": "Activity",
+                "defaultValues": [
+                  "Soaking Time",
+                  "Time of removal from pit",
+                  "Fixtures assembled for curing",
+                  "Pressure sensor details (If applicable)",
+                  "Initial pressure reading (If applicable)",
+                  "Time of dispatch to curing station"
+                ]
+              },
+              {
+                "id": "MOTOR_ID_1",
+                "component": "column",
+                "fieldType": "text",
+                "label": "Motor Id. No."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

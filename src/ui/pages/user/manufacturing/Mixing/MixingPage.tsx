@@ -24,6 +24,7 @@ const MixingPage = () => {
     activeBatch,
     isEditMode,
     formData,
+    numberOfPremix,
     actionLoading,
     backConfirmOpen,
     setBackConfirmOpen,
@@ -60,7 +61,7 @@ const MixingPage = () => {
       />
       <MixingForm
         initialData={formData}
-        isEditMode={isEditMode}
+        numberOfPremix={numberOfPremix}
         onBlocksChange={handleFormChange}
       />
 

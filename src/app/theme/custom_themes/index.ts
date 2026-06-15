@@ -11,8 +11,8 @@ export { default as getLoginTheme } from "./auth/login_theme";
 
 // admin
 export { default as getDashboardTheme } from "./admin/dashboard_theme";
-export { default as getBatchManagementTheme } from "./admin/batchManagement_theme";
-export { default as getUserManagementTheme } from "./admin/userManagement_theme";
+export { default as getBatchManagementTheme } from "./admin/BatchManagement/batchManagement_theme";
+export { default as getUserManagementTheme } from "./admin/UserManagement/userManagement_theme";
 export { default as getProjectManagementTheme } from "./admin/projectManagement_theme";
 
 // system_manager

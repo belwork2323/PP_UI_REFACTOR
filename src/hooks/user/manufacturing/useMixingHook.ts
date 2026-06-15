@@ -44,7 +44,10 @@ export const useMixingHook = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
-  const [formData, setFormData] = useState<MixingFormState>(createDefaultMixingFormState());
+  const resolvePremixCount = (batch?: MixingBatch | null) =>
+    Number(batch?.numberOfPremix ?? batch?.identificationSheet?.numberOfPremix ?? 1) || 1;
+
+  const [formData, setFormData] = useState<MixingFormState>(() => createDefaultMixingFormState());
   const [initialSnapshot, setInitialSnapshot] = useState("{}");
 
   const formSnapshot = useMemo(() => JSON.stringify(formData), [formData]);
@@ -81,6 +84,7 @@ export const useMixingHook = () => {
         status === parseStatus(MX_STATUS.REJECTED);
 
       let nextBatch = batch;
+      const premixCount = resolvePremixCount(batch);
       let nextFormData = createDefaultMixingFormState();
 
       if (shouldFetchDetails) {
@@ -250,6 +254,7 @@ export const useMixingHook = () => {
     loading: listParams.loading || loadingFormDetails,
     view,
     activeBatch,
+    numberOfPremix: resolvePremixCount(activeBatch),
     isEditMode,
     formData,
     isFormDirty,

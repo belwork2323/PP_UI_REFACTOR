@@ -36,8 +36,9 @@ const SchemaApiDropdownField = ({
       JSON.stringify({
         dataSource: field.dataSource,
         subDepartmentId: apiContext?.subDepartmentId ?? null,
+        batchId: apiContext?.batchId ?? null,
       }),
-    [field.dataSource, apiContext?.subDepartmentId]
+    [field.dataSource, apiContext?.subDepartmentId, apiContext?.batchId]
   );
 
   const { displayKey, valueKey } = useMemo(

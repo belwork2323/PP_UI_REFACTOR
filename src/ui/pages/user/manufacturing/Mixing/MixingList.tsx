@@ -11,7 +11,7 @@ import { useThemeStore } from "../../../../../app/store/themeStore";
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import { getOperationStatusConfig, OPERATION_STATUS } from "../../../../../hooks/operationStatus";
 import { STRINGS } from "../../../../../app/config/strings";
-import { getMixTypeConfig, MIX_TYPE_OPTIONS } from "../../../../../hooks/user/manufacturing/mixingConfig";
+import { MIX_TYPE_OPTIONS } from "../../../../../hooks/user/manufacturing/mixingConfig";
 
 const {
   pending: HourglassEmptyRoundedIcon,
@@ -21,7 +21,6 @@ const {
   play: PlayCircleOutlineRoundedIcon,
   person: PersonRoundedIcon,
   calendar: CalendarMonthRoundedIcon,
-  blender: BlenderRoundedIcon,
 } = icons.user.manufacturing.mixing.list;
 
 export const MX_STATUS_CONFIG = getOperationStatusConfig({
@@ -69,28 +68,6 @@ const MixingList = ({ hookState, rowsPerPageOptions }: any) => {
         key: "batchId",
         label: S.BATCH_LIST.COL_BATCH_ID,
         render: (v: string) => <Typography sx={theme.batchList.batchIdText}>{v}</Typography>,
-      },
-      {
-        key: "mixType",
-        label: S.MIXING.COL_MIX_TYPE,
-        align: "center",
-        render: (v: string) => {
-          const cfg = getMixTypeConfig(v);
-          return (
-            <Chip
-              icon={<BlenderRoundedIcon sx={{ fontSize: "12px !important", color: `${cfg.color} !important` }} />}
-              label={v ?? "—"}
-              size="small"
-              sx={{
-                height: 22, fontSize: "0.68rem",
-                fontWeight: cfg.italic ? 500 : 700,
-                fontStyle: cfg.italic ? "italic" : "normal",
-                background: `${cfg.color}14`, color: cfg.color,
-                border: `1px solid ${cfg.color}33`, maxWidth: 160,
-              }}
-            />
-          );
-        },
       },
       {
         key: "motorId",

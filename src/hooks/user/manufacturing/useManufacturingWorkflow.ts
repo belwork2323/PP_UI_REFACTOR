@@ -6,7 +6,7 @@
 
 import { useCallback, useState } from "react";
 
-export type WorkflowView = "list" | "form";
+export type WorkflowView = "list" | "form" | "details";
 
 export interface ManufacturingBatch {
   id: number;

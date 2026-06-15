@@ -1,0 +1,426 @@
+{
+  "schemaVersion": "1.0",
+  "schemaType": "CASE_PREPARATION",
+  "functionality": "CREATE_CASE_PREPARATION_FORM",
+  "data": {
+    "layout": {
+      "type": "flat",
+      "gap": "md",
+      "sectionVariant": "card"
+    },
+    "designSystem": {
+      "colors": {
+        "primary": "#1565C0",
+        "primaryLight": "#1976D2",
+        "surface": "#F4F6F8",
+        "border": "#D5D8DC",
+        "text": "#1C2833",
+        "textSub": "#5D6D7E"
+      },
+      "typography": {
+        "fontFamily": "'DM Sans', sans-serif",
+        "scale": {
+          "xs": "0.68rem",
+          "sm": "0.78rem",
+          "md": "0.86rem",
+          "lg": "0.98rem"
+        },
+        "label": {
+          "size": "xs",
+          "weight": 700,
+          "transform": "uppercase",
+          "letterSpacing": "0.04em"
+        }
+      },
+      "spacing": {
+        "xs": 4,
+        "sm": 8,
+        "md": 12,
+        "lg": 16,
+        "xl": 24
+      },
+      "radius": {
+        "sm": 7,
+        "md": 11,
+        "lg": 16
+      },
+      "icons": {
+        "sectionDefault": "cleaning_services"
+      }
+    },
+    "meta": {
+      "title": "Case Preparation",
+      "description": "Schema for subscale batch when sections are not yet configured."
+    },
+    "context": {
+      "subDepartmentId": 111,
+      "batchType": "MAIN_BATCH"
+    },
+    "nodes": [
+      {
+        "id": "GENERAL_ACTIVITIES",
+        "component": "section",
+        "label": "General Activities",
+        "style": {
+          "variant": "card",
+          "icon": "cleaning_services",
+          "iconColor": "primary",
+          "padding": "md",
+          "gap": "sm"
+        },
+        "layout": {
+          "direction": "row",
+          "wrap": true,
+          "gap": "md",
+          "alignItems": "flex-end"
+        },
+        "children": [
+          {
+            "id": "INSPECTION_DATE",
+            "component": "field",
+            "fieldType": "date",
+            "label": "Inspection Date",
+            "required": true,
+            "style": {
+              "colSpan": {
+                "xs": 12,
+                "sm": 6,
+                "md": 4
+              },
+              "width": "200px"
+            }
+          },
+          {
+            "id": "INSPECTED_BY",
+            "component": "field",
+            "fieldType": "text",
+            "label": "Inspected By",
+            "style": {
+              "colSpan": {
+                "xs": 12,
+                "sm": 6,
+                "md": 4
+              },
+              "width": "200px"
+            }
+          },
+          {
+            "id": "CASE_CONDITION",
+            "component": "field",
+            "fieldType": "dropdown",
+            "label": "Case Condition",
+            "required": true,
+            "style": {
+              "colSpan": {
+                "xs": 12,
+                "sm": 6,
+                "md": 4
+              },
+              "width": "200px"
+            },
+            "dataSource": {
+              "type": "static",
+              "options": [
+                {
+                  "label": "Acceptable",
+                  "value": "ACCEPTABLE"
+                },
+                {
+                  "label": "Rework Required",
+                  "value": "REWORK"
+                },
+                {
+                  "label": "Rejected",
+                  "value": "REJECTED"
+                }
+              ]
+            }
+          },
+          {
+            "id": "REMARKS",
+            "component": "field",
+            "fieldType": "textarea",
+            "label": "Remarks",
+            "style": {
+              "colSpan": {
+                "xs": 12,
+                "sm": 12,
+                "md": 12
+              },
+              "flex": "1 1 100%"
+            }
+          }
+        ]
+      },
+      {
+        "id": "MATERIAL_LOT_ENTRIES",
+        "component": "section",
+        "label": "Material Lot Entries",
+        "style": {
+          "variant": "card",
+          "padding": "md"
+        },
+        "children": [
+          {
+            "id": "LOT_ROWS",
+            "component": "dynamicGroup",
+            "label": "Lot",
+            "behavior": {
+              "repeat": {
+                "enabled": true,
+                "mode": "group",
+                "min": 1,
+                "max": 10,
+                "defaultCount": 1,
+                "allowAdd": true,
+                "allowDelete": true,
+                "labelPattern": "Lot {index}",
+                "addLabel": "Add Lot",
+                "deleteLabel": "Remove"
+              }
+            },
+            "layout": {
+              "direction": "row",
+              "wrap": true,
+              "gap": "md",
+              "alignItems": "flex-end"
+            },
+            "children": [
+              {
+                "id": "LOT_ID",
+                "component": "field",
+                "fieldType": "dropdown",
+                "label": "Lot ID",
+                "required": true,
+                "style": {
+                  "colSpan": {
+                    "xs": 12,
+                    "sm": 6,
+                    "md": 4
+                  },
+                  "width": "220px"
+                },
+                "dataSource": {
+                  "type": "api",
+                  "api": {
+                    "endpoint": "material-lots",
+                    "method": "POST",
+                    "requestBody": {
+                      "subdepartmentId": "{{subDepartmentId}}",
+                      "batchId": "{{batchId}}"
+                    },
+                    "responsePath": "data.materials",
+                    "displayKey": "lotId",
+                    "valueKey": "lotId"
+                  }
+                }
+              },
+              {
+                "id": "QUANTITY_USED",
+                "component": "field",
+                "fieldType": "number",
+                "label": "Quantity Used",
+                "unit": "kg",
+                "validation": {
+                  "min": 0
+                },
+                "style": {
+                  "colSpan": {
+                    "xs": 12,
+                    "sm": 6,
+                    "md": 4
+                  },
+                  "width": "160px"
+                }
+              },
+              {
+                "id": "LOT_REMARKS",
+                "component": "field",
+                "fieldType": "text",
+                "label": "Remarks",
+                "style": {
+                  "colSpan": {
+                    "xs": 12,
+                    "sm": 6,
+                    "md": 4
+                  },
+                  "width": "200px"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "LINEAR_COATING",
+        "component": "section",
+        "label": "Linear Coating Operation",
+        "style": {
+          "variant": "card",
+          "padding": "md"
+        },
+        "visibility": {
+          "when": [
+            {
+              "field": "CASE_CONDITION",
+              "op": "NEQ",
+              "value": "REJECTED"
+            }
+          ],
+          "logic": "AND"
+        },
+        "children": [
+          {
+            "id": "COATING_PARAMETERS",
+            "component": "table",
+            "label": "Coating Parameters",
+            "behavior": {
+              "table": {
+                "defaultRows": 3,
+                "allowAddRow": true,
+                "allowDeleteRow": true,
+                "autoIncrementKey": "srNo"
+              }
+            },
+            "children": [
+              {
+                "id": "srNo",
+                "component": "column",
+                "fieldType": "autoIncrement",
+                "label": "Sr. No.",
+                "style": {
+                  "width": "60px"
+                },
+                "behavior": {
+                  "readonly": true
+                }
+              },
+              {
+                "id": "parameter",
+                "component": "column",
+                "fieldType": "text",
+                "label": "Parameter",
+                "style": {
+                  "width": "200px"
+                },
+                "behavior": {
+                  "readonly": true
+                }
+              },
+              {
+                "id": "setValue",
+                "component": "column",
+                "fieldType": "dynamic",
+                "label": "Set Value",
+                "style": {
+                  "width": "160px"
+                }
+              },
+              {
+                "id": "actualValue",
+                "component": "column",
+                "fieldType": "number",
+                "label": "Actual Value",
+                "style": {
+                  "width": "140px"
+                }
+              },
+              {
+                "id": "remarks",
+                "component": "column",
+                "fieldType": "text",
+                "label": "Remarks",
+                "style": {
+                  "width": "180px"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "DRUM_DETAILS",
+        "component": "section",
+        "label": "Drum Details",
+        "style": {
+          "variant": "card",
+          "padding": "md"
+        },
+        "children": [
+          {
+            "id": "DRUM_GROUPS",
+            "component": "nestedGroup",
+            "groupKey": "drums",
+            "label": "Drum",
+            "behavior": {
+              "repeat": {
+                "enabled": true,
+                "mode": "group",
+                "min": 1,
+                "max": 5,
+                "defaultCount": 1,
+                "allowAdd": true,
+                "allowDelete": true,
+                "labelPattern": "Drum {index}",
+                "addLabel": "Add Drum",
+                "deleteLabel": "Remove Drum"
+              }
+            },
+            "children": [
+              {
+                "id": "DRUM_NO",
+                "component": "field",
+                "fieldType": "text",
+                "label": "Drum No",
+                "style": {
+                  "width": "140px"
+                },
+                "group": "identification"
+              },
+              {
+                "id": "DRUM_WEIGHT",
+                "component": "field",
+                "fieldType": "number",
+                "label": "Weight",
+                "unit": "kg",
+                "style": {
+                  "width": "140px"
+                },
+                "group": "identification"
+              },
+              {
+                "id": "DRUM_MATERIAL",
+                "component": "field",
+                "fieldType": "dropdown",
+                "label": "Material",
+                "style": {
+                  "width": "180px"
+                },
+                "group": "identification",
+                "dataSource": {
+                  "type": "static",
+                  "options": [
+                    "HTPB",
+                    "AP",
+                    "Aluminum",
+                    "Other"
+                  ]
+                }
+              },
+              {
+                "id": "DRUM_NOTES",
+                "component": "field",
+                "fieldType": "textarea",
+                "label": "Notes",
+                "style": {
+                  "flex": "1 1 100%"
+                },
+                "group": "notes"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -14,6 +14,7 @@ type CasePrepMotorSchemaPanelProps = {
   schema: SchemaDocument | null;
   motor: CasePrepMotorSession;
   subDepartmentId?: number;
+  batchId?: string;
   onMotorChange: (next: CasePrepMotorSession) => void;
   loading?: boolean;
   error?: string | null;
@@ -23,6 +24,7 @@ const CasePrepMotorSchemaPanel = ({
   schema,
   motor,
   subDepartmentId,
+  batchId,
   onMotorChange,
   loading = false,
   error = null,
@@ -77,7 +79,7 @@ const CasePrepMotorSchemaPanel = ({
         loading={loading}
         error={error}
         themeTokens={themeTokens}
-        apiContext={{ subDepartmentId }}
+        apiContext={{ subDepartmentId, batchId }}
       />
     </Box>
   );

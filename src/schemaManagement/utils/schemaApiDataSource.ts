@@ -10,6 +10,10 @@ export const resolveSchemaApiEndpoint = (api: string): string => {
     return USER_OPERATIONS_ENDPOINTS.CASTING_STATION_LIST;
   }
 
+  if (raw.includes("material-lots")) {
+    return USER_OPERATIONS_ENDPOINTS.MATERIAL_LOTS;
+  }
+
   if (raw.startsWith("/api/v1")) return raw;
   if (raw.startsWith("api/v1")) return `/${raw}`;
   if (raw.startsWith("/user/")) return `/api/v1${raw}`;
@@ -17,27 +21,52 @@ export const resolveSchemaApiEndpoint = (api: string): string => {
   return raw.startsWith("/") ? raw : `/${raw}`;
 };
 
+const TEMPLATE_PATTERN = /\{\{(\w+)\}\}/g;
+
+const isUnsetParam = (value: unknown) =>
+  value === undefined ||
+  value === null ||
+  value === "" ||
+  value === 0 ||
+  (typeof value === "string" && value.includes("{{"));
+
+const resolveSchemaTemplateValue = (
+  value: unknown,
+  apiContext?: SchemaApiContext
+): unknown => {
+  if (typeof value !== "string" || !value.includes("{{")) return value;
+
+  return value.replace(TEMPLATE_PATTERN, (match, token: string) => {
+    const ctxValue = apiContext?.[token as keyof SchemaApiContext];
+    return ctxValue != null && ctxValue !== "" ? String(ctxValue) : match;
+  });
+};
+
 const mergeApiContextIntoParams = (
   requestBody: Record<string, unknown>,
   apiContext?: SchemaApiContext
 ): Record<string, unknown> => {
-  const params = { ...requestBody };
+  const params = Object.fromEntries(
+    Object.entries(requestBody).map(([key, value]) => [
+      key,
+      resolveSchemaTemplateValue(value, apiContext),
+    ])
+  );
+
   const subDeptId = apiContext?.subDepartmentId;
-  if (!subDeptId) return params;
+  if (subDeptId) {
+    if ("subdepartmentId" in requestBody && isUnsetParam(params.subdepartmentId)) {
+      params.subdepartmentId = subDeptId;
+    }
+    if ("subDepartmentId" in requestBody && isUnsetParam(params.subDepartmentId)) {
+      params.subDepartmentId = subDeptId;
+    }
+  }
 
-  const needsSubDept =
-    params.subdepartmentId === undefined ||
-    params.subdepartmentId === null ||
-    params.subdepartmentId === 0 ||
-    params.subdepartmentId === "";
-  const needsSubDeptCamel =
-    params.subDepartmentId === undefined ||
-    params.subDepartmentId === null ||
-    params.subDepartmentId === 0 ||
-    params.subDepartmentId === "";
-
-  if (needsSubDept) params.subdepartmentId = subDeptId;
-  if (needsSubDeptCamel) params.subDepartmentId = subDeptId;
+  const batchId = apiContext?.batchId?.trim();
+  if (batchId && "batchId" in requestBody && isUnsetParam(params.batchId)) {
+    params.batchId = batchId;
+  }
 
   return params;
 };
@@ -45,6 +74,71 @@ const mergeApiContextIntoParams = (
 const resolveHttpMethod = (dataSource: SchemaFieldDataSource): "GET" | "POST" => {
   const method = String(dataSource.method ?? "POST").trim().toUpperCase();
   return method === "GET" ? "GET" : "POST";
+};
+
+const NESTED_LIST_KEYS = [
+  "materials",
+  "items",
+  "list",
+  "records",
+  "lots",
+  "options",
+  "results",
+] as const;
+
+const resolveResponsePath = (root: Record<string, unknown>, path: string): unknown => {
+  return path
+    .split(".")
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .reduce<unknown>((current, segment) => {
+      if (!current || typeof current !== "object" || Array.isArray(current)) return undefined;
+      return (current as Record<string, unknown>)[segment];
+    }, root);
+};
+
+export const extractSchemaApiOptionsList = (
+  response: unknown,
+  responsePath?: string,
+): Record<string, unknown>[] => {
+  if (!response) return [];
+
+  if (Array.isArray(response)) {
+    return response as Record<string, unknown>[];
+  }
+
+  if (typeof response !== "object") return [];
+
+  const root = response as Record<string, unknown>;
+
+  if (responsePath?.trim()) {
+    const resolved = resolveResponsePath(root, responsePath.trim());
+    return Array.isArray(resolved) ? (resolved as Record<string, unknown>[]) : [];
+  }
+
+  const payload = root.data ?? root;
+  if (Array.isArray(payload)) {
+    return payload as Record<string, unknown>[];
+  }
+
+  if (payload && typeof payload === "object") {
+    const payloadRecord = payload as Record<string, unknown>;
+    for (const key of NESTED_LIST_KEYS) {
+      const candidate = payloadRecord[key];
+      if (Array.isArray(candidate)) {
+        return candidate as Record<string, unknown>[];
+      }
+    }
+  }
+
+  for (const key of NESTED_LIST_KEYS) {
+    const candidate = root[key];
+    if (Array.isArray(candidate)) {
+      return candidate as Record<string, unknown>[];
+    }
+  }
+
+  return [];
 };
 
 export const fetchSchemaApiOptions = async (
@@ -76,8 +170,8 @@ export const fetchSchemaApiOptions = async (
       };
     }
 
-    const list = Array.isArray(root?.data) ? root.data : Array.isArray(response) ? response : [];
-    return { options: list as Record<string, unknown>[], error: null };
+    const list = extractSchemaApiOptionsList(response, dataSource.responsePath);
+    return { options: list, error: null };
   } catch {
     return { options: [], error: "Unable to load options." };
   }
@@ -99,6 +193,21 @@ export const resolveSchemaOptionKeys = (
       valueKey: fieldValueKey ?? ("stationCode" in sample ? "stationCode" : "stationId"),
     };
   }
+
+  if (sample && "lotId" in sample) {
+    return {
+      displayKey: fieldDisplayKey ?? "lotId",
+      valueKey: fieldValueKey ?? "lotId",
+    };
+  }
+
+  if (sample && "materialCode" in sample && "materialName" in sample) {
+    return {
+      displayKey: fieldDisplayKey ?? "materialName",
+      valueKey: fieldValueKey ?? "materialCode",
+    };
+  }
+
   return {
     displayKey: fieldDisplayKey ?? "label",
     valueKey: fieldValueKey ?? "value",

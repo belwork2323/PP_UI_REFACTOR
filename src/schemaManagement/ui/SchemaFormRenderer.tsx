@@ -1,6 +1,13 @@
 import { Box, Stack, Typography, alpha } from "@mui/material";
 import type { SchemaApiContext, SchemaDocument, SchemaFormValues, SchemaThemeTokens } from "../models/schema.types";
-import SchemaSectionRenderer from "./SchemaSectionRenderer";
+import {
+  buildFlatVisibilityContext,
+  pruneHiddenSchemaValues,
+} from "../utils/schemaVisibility";
+import {
+  mergeSchemaTheme,
+} from "../utils/schemaStyle";
+import SchemaSectionsLayout from "./SchemaSectionsLayout";
 
 type SchemaFormRendererProps = {
   schema: SchemaDocument;
@@ -9,6 +16,7 @@ type SchemaFormRendererProps = {
   readOnly?: boolean;
   theme: SchemaThemeTokens;
   apiContext?: SchemaApiContext;
+  setupContext?: import("../utils/schemaSetupContext").SchemaSetupContext;
 };
 
 const SchemaFormRenderer = ({
@@ -16,16 +24,28 @@ const SchemaFormRenderer = ({
   values,
   onChange,
   readOnly = false,
-  theme,
+  theme: baseTheme,
   apiContext,
+  setupContext,
 }: SchemaFormRendererProps) => {
+  const theme = mergeSchemaTheme(baseTheme, schema.designSystem);
   const isMockTrial = schema.schemaType === "MOCK_TRIAL";
   const isCasePreparation = schema.schemaType === "CASE_PREPARATION";
-  const showFormDetails = isMockTrial || isCasePreparation;
+  const isCastingCuring =
+    schema.schemaType === "CASTING" || schema.schemaType === "CURING";
+  const meta = schema.meta ?? schema.formDetails;
+  const showMetaBanner =
+    (isMockTrial || isCasePreparation || isCastingCuring) &&
+    Boolean(meta?.title || meta?.description);
+  const visibilityContext = buildFlatVisibilityContext(values);
+
+  const handleChange = (next: SchemaFormValues) => {
+    onChange(pruneHiddenSchemaValues(schema.sections, next));
+  };
 
   return (
     <Stack spacing={2}>
-      {!showFormDetails ? (
+      {!showMetaBanner && !isMockTrial && !isCasePreparation ? (
         <Box sx={{ borderRadius: 2, border: `1px solid ${alpha(theme.border, 0.7)}`, p: 1.5 }}>
           <Typography sx={{ fontWeight: 700, fontSize: "0.9rem", mb: 0.5 }}>
             {schema.rawMaterialDetails.materialName} ({schema.rawMaterialDetails.materialCode})
@@ -36,34 +56,31 @@ const SchemaFormRenderer = ({
             </Typography>
           ) : null}
         </Box>
-      ) : schema.formDetails?.title || schema.formDetails?.description ? (
+      ) : showMetaBanner ? (
         <Box sx={{ borderRadius: 2, border: `1px solid ${alpha(theme.border, 0.7)}`, p: 1.5 }}>
-          {schema.formDetails?.title ? (
-            <Typography sx={{ fontWeight: 700, fontSize: "0.9rem" }}>{schema.formDetails.title}</Typography>
+          {meta?.title ? (
+            <Typography sx={{ fontWeight: 700, fontSize: "0.9rem" }}>{meta.title}</Typography>
           ) : null}
-          {schema.formDetails?.description ? (
+          {meta?.description ? (
             <Typography sx={{ fontSize: "0.72rem", color: theme.textSub, mt: 0.35 }}>
-              {schema.formDetails.description}
+              {meta.description}
             </Typography>
           ) : null}
         </Box>
       ) : null}
 
-      {schema.sections.map((section) => (
-        <Box
-          key={section.sectionId}
-          sx={{ borderRadius: 2, border: `1px solid ${alpha(theme.border, 0.7)}`, p: 1.5 }}
-        >
-          <SchemaSectionRenderer
-            section={section}
-            values={values}
-            onChange={onChange}
-            readOnly={readOnly}
-            theme={theme}
-            apiContext={apiContext}
-          />
-        </Box>
-      ))}
+      <SchemaSectionsLayout
+        sections={schema.sections}
+        layout={schema.layout}
+        designSystem={schema.designSystem}
+        values={values}
+        onChange={handleChange}
+        readOnly={readOnly}
+        theme={theme}
+        apiContext={apiContext}
+        setupContext={setupContext}
+        visibilityContext={visibilityContext}
+      />
     </Stack>
   );
 };

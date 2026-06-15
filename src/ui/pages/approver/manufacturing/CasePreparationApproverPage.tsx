@@ -29,7 +29,7 @@
 import React, { useState } from "react";
 import {
   Box, Stack, Typography, Chip, alpha, Card, Button,
-  Dialog, DialogContent, IconButton,
+  CircularProgress, Dialog, DialogContent, IconButton,
   Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
 } from "@mui/material";
 import { styled, keyframes } from "@mui/material/styles";
@@ -40,6 +40,7 @@ import ApproverActionDialog from "../../../components/custom/ApproverActionDialo
 import { icons } from "../../../../app/theme/icons";
 import { APPROVER_PRIORITY_META, APPROVER_STATUS_META, isApproverActionableStatus } from "../../../../app/theme/approver";
 import useApproverFormAction from "../../../../hooks/approver/useApproverFormAction";
+import { fetchCasePreparationFormDetailsApi } from "../../../../data/api/users/manufacturing/casePreparationFormApi";
 
 const {
   approved: CheckCircleRoundedIcon,
@@ -79,162 +80,6 @@ const slideUp = keyframes`from{opacity:0;transform:translateY(6px)}to{opacity:1;
 export const CP_STATUS_META = APPROVER_STATUS_META;
 
 const PRIORITY_META = APPROVER_PRIORITY_META;
-
-// ─── Mock data — exactly matches createCasePreparationData() ─────────────────
-const MOCK_CP_SUBMISSIONS = [
-  {
-    id: 1,
-    batchId:     "CP-2024-001",
-    motorId:     "MFG-ACEM-2024-011",
-    motorType:   "A",
-    status:      "Pending",
-    priority:    "High",
-    submittedBy: "ravi.shankar",
-    createdOn:   "2024-01-18T09:00:00",
-
-    motorCaseIds: { m1: "MC-001", m2: "MC-002" },
-    motorNos:     { m1: "MN-001", m2: "MN-002" },
-
-    ga: {
-      r1:  { m1: "ok",    m2: "ok"    },
-      r2:  { m1: "ok",    m2: "ok"    },
-      r3:  { m1: "ok",    m2: "notok" },
-      r4:  { m1: "",      m2: ""      },   // in data model but not rendered as a row
-      r4a: { m1: "15/01/2024",  m2: "15/01/2024"  },
-      r4b: { m1: "120×80 mm",   m2: "120×80 mm"   },
-      r4c: { m1: "16/01/2024",  m2: "16/01/2024"  },
-      r5:  { m1: "ok",    m2: "ok"    },
-      r6:  { m1: "60°C / 30 min", m2: "60°C / 30 min" },
-      r6b: { m1: "",      m2: ""      },   // in data model but not rendered
-    },
-
-    lco: {
-      r1:  { m1: "ok",          m2: "ok"          },
-      r2:  { m1: "28°C",        m2: "29°C"        },
-      r3a: { m1: "BATCH-LP-01", m2: "BATCH-LP-01" },
-      r3b: { m1: "0.07%",       m2: "0.08%"       },
-      r3c: { m1: "4.8 N/mm",    m2: "4.6 N/mm"    },
-      r3:  { m1: "",            m2: ""            },   // in data model but not rendered
-      r4a: { m1: "45 min",      m2: "47 min"      },
-      r4b: { m1: "240 g",       m2: "245 g"       },
-      r5:  { m1: "ok",          m2: "ok"          },
-    },
-  },
-  {
-    id: 2,
-    batchId:     "CP-2024-003",
-    motorId:     "MFG-ACEM-2024-013",
-    motorType:   "B",
-    status:      "Pending",
-    priority:    "Critical",
-    submittedBy: "meena.iyer",
-    createdOn:   "2024-02-10T08:00:00",
-
-    motorCaseIds: { m1: "MC-005", m2: "MC-006" },
-    motorNos:     { m1: "MN-005", m2: "MN-006" },
-
-    ga: {
-      r1:  { m1: "ok",    m2: "ok"    },
-      r2:  { m1: "ok",    m2: "ok"    },
-      r3:  { m1: "ok",    m2: "ok"    },
-      r4:  { m1: "",      m2: ""      },
-      r4a: { m1: "08/02/2024",  m2: "08/02/2024"  },
-      r4b: { m1: "115×75 mm",   m2: "115×75 mm"   },
-      r4c: { m1: "09/02/2024",  m2: "09/02/2024"  },
-      r5:  { m1: "ok",    m2: "ok"    },
-      r6:  { m1: "55°C / 25 min", m2: "55°C / 25 min" },
-      r6b: { m1: "",      m2: ""      },
-    },
-
-    lco: {
-      r1:  { m1: "ok",          m2: "ok"          },
-      r2:  { m1: "27°C",        m2: "27°C"        },
-      r3a: { m1: "BATCH-LP-03", m2: "BATCH-LP-03" },
-      r3b: { m1: "0.06%",       m2: "0.06%"       },
-      r3c: { m1: "5.0 N/mm",    m2: "4.9 N/mm"    },
-      r3:  { m1: "",            m2: ""            },
-      r4a: { m1: "50 min",      m2: "50 min"      },
-      r4b: { m1: "260 g",       m2: "255 g"       },
-      r5:  { m1: "ok",          m2: "ok"          },
-    },
-  },
-  {
-    id: 3,
-    batchId:     "CP-2024-007",
-    motorId:     "MFG-ACEM-2024-017",
-    motorType:   "C",
-    status:      "Approved",
-    priority:    "Medium",
-    submittedBy: "suresh.nair",
-    createdOn:   "2024-03-20T10:30:00",
-
-    motorCaseIds: { m1: "MC-010", m2: "MC-011" },
-    motorNos:     { m1: "MN-010", m2: "MN-011" },
-
-    ga: {
-      r1:  { m1: "ok", m2: "ok" },
-      r2:  { m1: "ok", m2: "ok" },
-      r3:  { m1: "ok", m2: "ok" },
-      r4:  { m1: "",   m2: ""   },
-      r4a: { m1: "18/03/2024",  m2: "18/03/2024"  },
-      r4b: { m1: "118×78 mm",   m2: "118×78 mm"   },
-      r4c: { m1: "19/03/2024",  m2: "19/03/2024"  },
-      r5:  { m1: "ok", m2: "ok" },
-      r6:  { m1: "60°C / 30 min", m2: "60°C / 30 min" },
-      r6b: { m1: "",   m2: ""   },
-    },
-
-    lco: {
-      r1:  { m1: "ok",          m2: "ok"          },
-      r2:  { m1: "28°C",        m2: "28°C"        },
-      r3a: { m1: "BATCH-LP-07", m2: "BATCH-LP-07" },
-      r3b: { m1: "0.07%",       m2: "0.07%"       },
-      r3c: { m1: "4.7 N/mm",    m2: "4.8 N/mm"    },
-      r3:  { m1: "",            m2: ""            },
-      r4a: { m1: "45 min",      m2: "46 min"      },
-      r4b: { m1: "248 g",       m2: "250 g"       },
-      r5:  { m1: "ok",          m2: "ok"          },
-    },
-  },
-  {
-    id: 4,
-    batchId:     "CP-2024-010",
-    motorId:     "MFG-ACEM-2024-020",
-    motorType:   "A",
-    status:      "Rejected",
-    priority:    "Low",
-    submittedBy: "kiran.rao",
-    createdOn:   "2024-04-05T11:00:00",
-
-    motorCaseIds: { m1: "MC-014", m2: "MC-015" },
-    motorNos:     { m1: "MN-014", m2: "MN-015" },
-
-    ga: {
-      r1:  { m1: "ok",    m2: "notok" },
-      r2:  { m1: "notok", m2: "notok" },
-      r3:  { m1: "notok", m2: "notok" },
-      r4:  { m1: "",      m2: ""      },
-      r4a: { m1: "02/04/2024",  m2: "02/04/2024"  },
-      r4b: { m1: "122×82 mm",   m2: "122×82 mm"   },
-      r4c: { m1: "03/04/2024",  m2: "03/04/2024"  },
-      r5:  { m1: "ok",    m2: "ok"    },
-      r6:  { m1: "58°C / 28 min", m2: "58°C / 28 min" },
-      r6b: { m1: "",      m2: ""      },
-    },
-
-    lco: {
-      r1:  { m1: "notok",       m2: "notok"       },
-      r2:  { m1: "30°C",        m2: "31°C"        },
-      r3a: { m1: "BATCH-LP-10", m2: "BATCH-LP-10" },
-      r3b: { m1: "0.12%",       m2: "0.13%"       },
-      r3c: { m1: "3.8 N/mm",    m2: "3.7 N/mm"    },
-      r3:  { m1: "",            m2: ""            },
-      r4a: { m1: "60 min",      m2: "62 min"      },
-      r4b: { m1: "270 g",       m2: "275 g"       },
-      r5:  { m1: "notok",       m2: "notok"       },
-    },
-  },
-];
 
 // ─── Shared styled atoms ──────────────────────────────────────────────────────
 // List table header cell
@@ -350,281 +195,128 @@ const SectionDivider = ({ icon: Icon, label }) => (
   </Stack>
 );
 
-// ─── Table 1: General Activities ─────────────────────────────────────────────
-const GeneralActivitiesTable = ({ motorCaseIds, ga }) => {
-  const m1id = motorCaseIds?.m1 || "Motor 1";
-  const m2id = motorCaseIds?.m2 || "Motor 2";
-
-  const actSx  = { fontWeight: 700, fontSize: "0.78rem", color: BRAND.text,    lineHeight: 1.4 };
-  const prmSx  = { fontWeight: 500, fontSize: "0.73rem", color: BRAND.textSub, lineHeight: 1.4, fontStyle: "italic" };
-
-  return (
-    <TableContainer sx={{ borderRadius: "8px", border: `1px solid ${BRAND.border}`, boxShadow: `0 1px 8px ${alpha(BRAND.cp, 0.06)}`, overflowX: "auto" }}>
-      <Table size="small" sx={{ minWidth: 700 }}>
-        <TableHead>
-          <TableRow>
-            <DTH sx={{ minWidth: 240 }}>Activity</DTH>
-            <DTH sx={{ minWidth: 210 }}>Parameter</DTH>
-            <DTH sx={{ minWidth: 160 }}><MotorIdHeader label="Motor Case ID" id={m1id} /></DTH>
-            <DTH sx={{ minWidth: 160 }}><MotorIdHeader label="Motor Case ID" id={m2id} /></DTH>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-
-          {/* Row 1 — Inspect Insulator Surface */}
-          <TableRow sx={{ background: rowBg(0), ...hov }}>
-            <DTD>
-              <Stack direction="row" alignItems="flex-start" gap={1.2}>
-                <StepBadge n={1} />
-                <Typography sx={actSx}>Inspect the Insulator Surface and Loose Flaps</Typography>
-              </Stack>
-            </DTD>
-            <DTD><Typography sx={prmSx}>Free from oily patches, scratches, cut marks</Typography></DTD>
-            <DTD><OkChip value={ga?.r1?.m1} /></DTD>
-            <DTD><OkChip value={ga?.r1?.m2} /></DTD>
-          </TableRow>
-
-          {/* Row 2 — Abrading */}
-          <TableRow sx={{ background: rowBg(1), ...hov }}>
-            <DTD>
-              <Stack direction="row" alignItems="flex-start" gap={1.2}>
-                <StepBadge n={2} />
-                <Typography sx={actSx}>Abrading</Typography>
-              </Stack>
-            </DTD>
-            <DTD><Typography sx={prmSx}>Abraded dust quantity (g)</Typography></DTD>
-            <DTD><OkChip value={ga?.r2?.m1} /></DTD>
-            <DTD><OkChip value={ga?.r2?.m2} /></DTD>
-          </TableRow>
-
-          {/* Row 3 — Inspect Surface for Proper Abrading */}
-          <TableRow sx={{ background: rowBg(0), ...hov }}>
-            <DTD>
-              <Stack direction="row" alignItems="flex-start" gap={1.2}>
-                <StepBadge n={3} />
-                <Typography sx={actSx}>Inspect the Surface for Proper Abrading</Typography>
-              </Stack>
-            </DTD>
-            <DTD><Typography sx={prmSx}>Uniform abrading, metal surface not exposed</Typography></DTD>
-            <DTD><OkChip value={ga?.r3?.m1} /></DTD>
-            <DTD><OkChip value={ga?.r3?.m2} /></DTD>
-          </TableRow>
-
-          {/* Row 4 — Bellow and Spacers: Activity cell rowSpan=3 */}
-          {/* 4a */}
-          <TableRow sx={{ background: rowBg(1), ...hov }}>
-            <DTD rowSpan={3} sx={{ verticalAlign: "top", pt: "13px", borderRight: `1px solid ${alpha(BRAND.border, 0.5)}` }}>
-              <Stack direction="row" alignItems="flex-start" gap={1.2}>
-                <StepBadge n={4} />
-                <Typography sx={actSx}>Bellow and Spacers Preparation and Bonding</Typography>
-              </Stack>
-            </DTD>
-            <DTD>
-              <Stack direction="row" alignItems="center" gap={0.8}>
-                <SubBadge label="a" />
-                <Typography sx={prmSx}>Date of Bellow &amp; Spacers preparation</Typography>
-              </Stack>
-            </DTD>
-            <DTD><Val accent>{ga?.r4a?.m1}</Val></DTD>
-            <DTD><Val accent>{ga?.r4a?.m2}</Val></DTD>
-          </TableRow>
-          {/* 4b */}
-          <TableRow sx={{ background: rowBg(0), ...hov }}>
-            <DTD>
-              <Stack direction="row" alignItems="center" gap={0.8}>
-                <SubBadge label="b" />
-                <Typography sx={prmSx}>Dimension of Bellow</Typography>
-              </Stack>
-            </DTD>
-            <DTD><Val accent>{ga?.r4b?.m1}</Val></DTD>
-            <DTD><Val accent>{ga?.r4b?.m2}</Val></DTD>
-          </TableRow>
-          {/* 4c */}
-          <TableRow sx={{ background: rowBg(1), ...hov }}>
-            <DTD>
-              <Stack direction="row" alignItems="center" gap={0.8}>
-                <SubBadge label="c" />
-                <Typography sx={prmSx}>Bellow Bonding date</Typography>
-              </Stack>
-            </DTD>
-            <DTD><Val accent>{ga?.r4c?.m1}</Val></DTD>
-            <DTD><Val accent>{ga?.r4c?.m2}</Val></DTD>
-          </TableRow>
-
-          {/* Row 5 — Surface Cleaning */}
-          <TableRow sx={{ background: rowBg(0), ...hov }}>
-            <DTD>
-              <Stack direction="row" alignItems="flex-start" gap={1.2}>
-                <StepBadge n={5} />
-                <Typography sx={actSx}>Surface Cleaning (Mopping)</Typography>
-              </Stack>
-            </DTD>
-            <DTD><Typography sx={prmSx}>Free from dust / foreign materials, excess solvent</Typography></DTD>
-            <DTD><OkChip value={ga?.r5?.m1} /></DTD>
-            <DTD><OkChip value={ga?.r5?.m2} /></DTD>
-          </TableRow>
-
-          {/* Row 6 — Preheating */}
-          <TableRow sx={{ background: rowBg(1), ...hov, ...lastTd }}>
-            <DTD>
-              <Stack direction="row" alignItems="flex-start" gap={1.2}>
-                <StepBadge n={6} />
-                <Typography sx={actSx}>Preheating</Typography>
-              </Stack>
-            </DTD>
-            <DTD><Typography sx={prmSx}>Temp and Duration</Typography></DTD>
-            <DTD><Val accent>{ga?.r6?.m1}</Val></DTD>
-            <DTD><Val accent>{ga?.r6?.m2}</Val></DTD>
-          </TableRow>
-
-        </TableBody>
-      </Table>
-    </TableContainer>
-  );
+// ─── Dynamic Section Renderer ─────────────────────────────────────────────────
+const SectionCell = ({ value }) => {
+  if (!value && value !== 0) return <span style={{ color: alpha(BRAND.textSub, 0.4), fontSize: "0.72rem", fontStyle: "italic" }}>—</span>;
+  const v = String(value).toLowerCase();
+  if (v === "ok") return <Chip label="OK" size="small" sx={{ height: 20, fontSize: "0.62rem", fontWeight: 700, background: alpha(BRAND.accent, 0.12), color: BRAND.accent, border: `1px solid ${alpha(BRAND.accent, 0.3)}` }} />;
+  if (v === "notok" || v === "not ok") return <Chip label="Not OK" size="small" sx={{ height: 20, fontSize: "0.62rem", fontWeight: 700, background: alpha(BRAND.danger, 0.1), color: BRAND.danger, border: `1px solid ${alpha(BRAND.danger, 0.2)}` }} />;
+  return <Typography sx={{ fontWeight: 600, fontSize: "0.78rem", color: BRAND.text }}>{value}</Typography>;
 };
 
-// ─── Table 2: Linear Coating Operation ───────────────────────────────────────
-const LinearCoatingTable = ({ motorNos, lco }) => {
-  const m1id = motorNos?.m1 || "Motor 1";
-  const m2id = motorNos?.m2 || "Motor 2";
+const formatSectionName = (id) =>
+  id
+    .replace(/__/g, "_")
+    .replace(/([A-Z])/g, " $1")
+    .replace(/^./, (s) => s.toUpperCase())
+    .replace(/_/g, " ")
+    .trim();
 
-  const actSx = { fontWeight: 700, fontSize: "0.78rem", color: BRAND.text,    lineHeight: 1.4 };
-  const prmSx = { fontWeight: 500, fontSize: "0.73rem", color: BRAND.textSub, lineHeight: 1.4, fontStyle: "italic" };
+const getMotorValue = (motor, sectionId, entryIndex, key) => {
+  const section = motor?.sections?.find((s) => s.sectionId === sectionId);
+  const entry = section?.sectionData?.[entryIndex];
+  return entry?.[key] ?? "";
+};
+
+const SectionsTable = ({ title, icon: Icon, motors, sectionIds }) => {
+  if (!motors?.length) return null;
+
+  const motorCount = motors.length;
+  const motorLabels = motors.map((m, i) => m.motorId || `Motor ${i + 1}`);
+
+  const visibleSections = sectionIds
+    .map((id) => {
+      const entries = motors[0].sections.find((s) => s.sectionId === id)?.sectionData ?? [];
+      const hasData = entries.length > 0 && !entries.every((e) => Object.keys(e).length === 1 && e.srNo != null);
+      return hasData ? { id, entries } : null;
+    })
+    .filter(Boolean);
+
+  if (visibleSections.length === 0) {
+    return (
+      <Box sx={{ p: 2, textAlign: "center" }}>
+        <Typography sx={{ fontSize: "0.78rem", color: alpha(BRAND.textSub, 0.5), fontStyle: "italic" }}>No data available</Typography>
+      </Box>
+    );
+  }
+
+  const rows = [];
+  let globalIdx = 0;
+
+  visibleSections.forEach(({ id, entries }) => {
+    const name = formatSectionName(id);
+    const dataEntries = entries.filter((e) => e.type !== "header");
+    const headerEntries = entries.filter((e) => e.type === "header");
+
+    headerEntries.forEach((h, hi) => {
+      rows.push(
+        <TableRow key={`${id}-hdr-${hi}`} sx={{ background: alpha(BRAND.cp, 0.04) }}>
+          <DTD colSpan={motorCount + 1} sx={{ py: 0.4, px: 2 }}>
+            <Typography sx={{ fontWeight: 700, fontSize: "0.68rem", color: BRAND.cp, textTransform: "uppercase", letterSpacing: "0.06em" }}>
+              {h.operation || h.parameter || ""}
+            </Typography>
+          </DTD>
+        </TableRow>
+      );
+    });
+
+    const isConfig = dataEntries.length === 1 && !dataEntries[0].parameter && !dataEntries[0].operation;
+    if (isConfig) {
+      const entry = dataEntries[0];
+      const keys = Object.keys(entry).filter((k) => k !== "srNo" && k !== "type" && k !== "fieldType");
+      keys.forEach((k, ki) => {
+        const label = k.replace(/([A-Z])/g, " $1").replace(/^./, (s) => s.toUpperCase());
+        rows.push(
+          <TableRow key={`${id}-kv-${ki}`} sx={{ background: rowBg(globalIdx++), ...hov }}>
+            {ki === 0 && <DTD rowSpan={keys.length} sx={{ verticalAlign: "top", pt: 1.2, fontWeight: 700, fontSize: "0.76rem", color: BRAND.text, borderRight: `1px solid ${alpha(BRAND.border, 0.5)}`, minWidth: 180 }}>{name}</DTD>}
+            <DTD><Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub }}>{label}</Typography></DTD>
+            {motors.map((m, mi) => (
+              <DTD key={mi}><SectionCell value={getMotorValue(m, id, 0, k)} /></DTD>
+            ))}
+          </TableRow>
+        );
+      });
+      return;
+    }
+
+    dataEntries.forEach((entry, ei) => {
+      const label = entry.operation || entry.parameter || "";
+      rows.push(
+        <TableRow key={`${id}-row-${ei}`} sx={{ background: rowBg(globalIdx++), ...hov }}>
+          {ei === 0 && <DTD rowSpan={dataEntries.length} sx={{ verticalAlign: "top", pt: 1.2, fontWeight: 700, fontSize: "0.76rem", color: BRAND.text, borderRight: `1px solid ${alpha(BRAND.border, 0.5)}`, minWidth: 180 }}>{name}</DTD>}
+          <DTD><Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub }}>{label}</Typography></DTD>
+          {motors.map((m, mi) => (
+            <DTD key={mi}><SectionCell value={getMotorValue(m, id, ei, entry.value != null ? "value" : "result")} /></DTD>
+          ))}
+        </TableRow>
+      );
+    });
+  });
 
   return (
     <TableContainer sx={{ borderRadius: "8px", border: `1px solid ${BRAND.border}`, boxShadow: `0 1px 8px ${alpha(BRAND.cp, 0.06)}`, overflowX: "auto" }}>
       <Table size="small" sx={{ minWidth: 700 }}>
         <TableHead>
           <TableRow>
-            <DTH sx={{ minWidth: 240 }}>Linear Coating Operation</DTH>
-            <DTH sx={{ minWidth: 200 }}>Parameter</DTH>
-            <DTH sx={{ minWidth: 160 }}><MotorIdHeader label="Motor No." id={m1id} /></DTH>
-            <DTH sx={{ minWidth: 160 }}><MotorIdHeader label="Motor No." id={m2id} /></DTH>
+            <DTH sx={{ minWidth: 180 }}>{title}</DTH>
+            <DTH sx={{ minWidth: 180 }}>Parameter</DTH>
+            {motorLabels.map((label, i) => (
+              <DTH key={i} sx={{ minWidth: 150 }}><MotorIdHeader label="Motor" id={label} /></DTH>
+            ))}
           </TableRow>
         </TableHead>
-        <TableBody>
-
-          {/* LCO Row 1 — Inspection */}
-          <TableRow sx={{ background: rowBg(0), ...hov }}>
-            <DTD>
-              <Stack direction="row" alignItems="flex-start" gap={1.2}>
-                <StepBadge n={1} />
-                <Typography sx={actSx}>Inspection</Typography>
-              </Stack>
-            </DTD>
-            <DTD><Typography sx={prmSx}>Surface clean, free from foreign materials</Typography></DTD>
-            <DTD><OkChip value={lco?.r1?.m1} /></DTD>
-            <DTD><OkChip value={lco?.r1?.m2} /></DTD>
-          </TableRow>
-
-          {/* LCO Row 2 — Insulation Temperature */}
-          <TableRow sx={{ background: rowBg(1), ...hov }}>
-            <DTD>
-              <Stack direction="row" alignItems="flex-start" gap={1.2}>
-                <StepBadge n={2} />
-                <Typography sx={actSx}>Insulation Temperature</Typography>
-              </Stack>
-            </DTD>
-            <DTD><Typography sx={prmSx}>Measured Temp</Typography></DTD>
-            <DTD><Val accent>{lco?.r2?.m1}</Val></DTD>
-            <DTD><Val accent>{lco?.r2?.m2}</Val></DTD>
-          </TableRow>
-
-          {/* LCO Row 3 — Linear Premix Qualification: rowSpan=3 */}
-          {/* 3a */}
-          <TableRow sx={{ background: rowBg(0), ...hov }}>
-            <DTD rowSpan={3} sx={{ verticalAlign: "top", pt: "13px", borderRight: `1px solid ${alpha(BRAND.border, 0.5)}` }}>
-              <Stack direction="row" alignItems="flex-start" gap={1.2}>
-                <StepBadge n={3} />
-                <Typography sx={actSx}>Linear Premix Qualification</Typography>
-              </Stack>
-            </DTD>
-            <DTD>
-              <Stack direction="row" alignItems="center" gap={0.8}>
-                <SubBadge label="a" />
-                <Typography sx={prmSx}>Linear Premix Batch No.</Typography>
-              </Stack>
-            </DTD>
-            <DTD><Val accent>{lco?.r3a?.m1}</Val></DTD>
-            <DTD><Val accent>{lco?.r3a?.m2}</Val></DTD>
-          </TableRow>
-          {/* 3b */}
-          <TableRow sx={{ background: rowBg(1), ...hov }}>
-            <DTD>
-              <Stack direction="row" alignItems="center" gap={0.8}>
-                <SubBadge label="b" />
-                <Typography sx={prmSx}>Measured Moisture</Typography>
-              </Stack>
-            </DTD>
-            <DTD><Val accent>{lco?.r3b?.m1}</Val></DTD>
-            <DTD><Val accent>{lco?.r3b?.m2}</Val></DTD>
-          </TableRow>
-          {/* 3c */}
-          <TableRow sx={{ background: rowBg(0), ...hov }}>
-            <DTD>
-              <Stack direction="row" alignItems="center" gap={0.8}>
-                <SubBadge label="c" />
-                <Typography sx={prmSx}>Qualified Peel Strength</Typography>
-              </Stack>
-            </DTD>
-            <DTD><Val accent>{lco?.r3c?.m1}</Val></DTD>
-            <DTD><Val accent>{lco?.r3c?.m2}</Val></DTD>
-          </TableRow>
-
-          {/* LCO Row 4 — Linear Coating Operation: rowSpan=2 */}
-          {/* 4a */}
-          <TableRow sx={{ background: rowBg(1), ...hov }}>
-            <DTD rowSpan={2} sx={{ verticalAlign: "top", pt: "13px", borderRight: `1px solid ${alpha(BRAND.border, 0.5)}` }}>
-              <Stack direction="row" alignItems="flex-start" gap={1.2}>
-                <StepBadge n={4} />
-                <Typography sx={actSx}>Linear Coating Operation</Typography>
-              </Stack>
-            </DTD>
-            <DTD>
-              <Stack direction="row" alignItems="center" gap={0.8}>
-                <SubBadge label="a" />
-                <Typography sx={prmSx}>Duration</Typography>
-              </Stack>
-            </DTD>
-            <DTD><Val accent>{lco?.r4a?.m1}</Val></DTD>
-            <DTD><Val accent>{lco?.r4a?.m2}</Val></DTD>
-          </TableRow>
-          {/* 4b */}
-          <TableRow sx={{ background: rowBg(0), ...hov }}>
-            <DTD>
-              <Stack direction="row" alignItems="center" gap={0.8}>
-                <SubBadge label="b" />
-                <Typography sx={prmSx}>Quantity</Typography>
-              </Stack>
-            </DTD>
-            <DTD><Val accent>{lco?.r4b?.m1}</Val></DTD>
-            <DTD><Val accent>{lco?.r4b?.m2}</Val></DTD>
-          </TableRow>
-
-          {/* LCO Row 5 — Visual Inspection */}
-          <TableRow sx={{ background: rowBg(1), ...hov, ...lastTd }}>
-            <DTD>
-              <Stack direction="row" alignItems="flex-start" gap={1.2}>
-                <StepBadge n={5} />
-                <Typography sx={actSx}>Visual Inspection</Typography>
-              </Stack>
-            </DTD>
-            <DTD><Typography sx={prmSx}>Uniform coating, free from any foreign material</Typography></DTD>
-            <DTD><OkChip value={lco?.r5?.m1} /></DTD>
-            <DTD><OkChip value={lco?.r5?.m2} /></DTD>
-          </TableRow>
-
-        </TableBody>
+        <TableBody>{rows}</TableBody>
       </Table>
     </TableContainer>
   );
 };
 
 // ─── Detail Dialog ────────────────────────────────────────────────────────────
-const CPDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
+const CPDetailDialog = ({ open, onClose, item, onApprove, onReject, detailsLoading, detailData }) => {
   const [pdfOpen, setPdfOpen] = useState(false);
   if (!item) return null;
 
+  const detail = detailData ?? item;
   const today = new Date().toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 
   return (
@@ -645,7 +337,8 @@ const CPDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
                 Case Preparation Submission
               </Typography>
               <Typography sx={{ color: alpha("#fff", 0.7), fontSize: "0.72rem" }}>
-                {item.batchId} · {item.motorId}
+                {item.batchId}
+                {detailsLoading ? " · loading…" : item.motorId ? ` · ${item.motorId}` : ""}
               </Typography>
             </Box>
           </Stack>
@@ -656,6 +349,7 @@ const CPDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
               color:      PRIORITY_META[item.priority]?.color,
               border: `1px solid ${PRIORITY_META[item.priority]?.border}`,
             }} />
+            {detailsLoading && <CircularProgress size={16} sx={{ color: alpha("#fff", 0.7) }} />}
             <Button size="small" variant="contained"
               startIcon={<PictureAsPdfRoundedIcon sx={{ fontSize: "14px !important" }} />}
               onClick={() => setPdfOpen(true)}
@@ -681,7 +375,7 @@ const CPDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
           <Stack direction="row" gap={3} alignItems="center" flexWrap="wrap">
             <Stack direction="row" gap={0.7} alignItems="center">
               <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: BRAND.textSub }}>Motor Case IDs:</Typography>
-              {[item.motorCaseIds?.m1, item.motorCaseIds?.m2].map((id, i) => (
+              {[detail.motorCaseIds?.m1, detail.motorCaseIds?.m2].map((id, i) => (
                 <Chip key={i} label={id || "—"} size="small" sx={{
                   height: 20, fontSize: "0.65rem", fontWeight: 700,
                   background: alpha(BRAND.cp, 0.08), color: BRAND.cp,
@@ -691,7 +385,7 @@ const CPDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
             </Stack>
             <Stack direction="row" gap={0.7} alignItems="center">
               <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: BRAND.textSub }}>Motor Nos:</Typography>
-              {[item.motorNos?.m1, item.motorNos?.m2].map((id, i) => (
+              {[detail.motorNos?.m1, detail.motorNos?.m2].map((id, i) => (
                 <Chip key={i} label={id || "—"} size="small" sx={{
                   height: 20, fontSize: "0.65rem", fontWeight: 700,
                   background: alpha(BRAND.cpLight, 0.1), color: BRAND.cpLight,
@@ -708,13 +402,23 @@ const CPDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
           {/* Table 1 */}
           <Box sx={{ mb: 3 }}>
             <SectionDivider icon={CleaningServicesRoundedIcon} label="General Activities" />
-            <GeneralActivitiesTable motorCaseIds={item.motorCaseIds} ga={item.ga} />
+            <SectionsTable
+              title="Activity"
+              icon={CleaningServicesRoundedIcon}
+              motors={detail.motors}
+              sectionIds={["abradingConfiguration","abradingDetails","heBellowDimension","neBellowDimension","spacerDetails","pastingDetails","tceCleaning","preHeatingConfiguration","preHeatingMonitoring"]}
+            />
           </Box>
 
           {/* Table 2 */}
           <Box>
             <SectionDivider icon={FormatPaintRoundedIcon} label="Linear Coating Operation" />
-            <LinearCoatingTable motorNos={item.motorNos} lco={item.lco} />
+            <SectionsTable
+              title="Operation"
+              icon={FormatPaintRoundedIcon}
+              motors={detail.motors}
+              sectionIds={["linerCoatingOperation__config","linerPreparationDetails","premixIngredients","finalMixIngredients","qualificationDetails__config","qualificationParameters","linerApplicationLog","dispatchToCasting"]}
+            />
           </Box>
 
         </DialogContent>
@@ -791,14 +495,33 @@ const CaseIdBadges = ({ motorCaseIds }) => (
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 const CasePreparationApproverPage = () => {
-  const [items, setItems]       = useState(MOCK_CP_SUBMISSIONS);
-  const [selected, setSelected] = useState(null);
+  const [items, setItems]       = useState<Record<string, unknown>[]>([]);
+  const [selected, setSelected] = useState<Record<string, unknown> | null>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailData, setDetailData] = useState<Record<string, unknown> | null>(null);
   const { dialogProps, requestApprove, requestReject } = useApproverFormAction({
     department: "manufacturing",
     setItems,
     setSelected,
     subDepartment: "case-preparation",
   });
+
+  const handleViewDetails = async (row) => {
+    setSelected(row);
+    setDetailData(null);
+    setDetailsLoading(true);
+    try {
+      const response = await fetchCasePreparationFormDetailsApi({ formId: row.formId } as any);
+      const prep = response?.data?.casePreparationDetails;
+      if (prep) {
+        setDetailData(prep);
+      }
+    } catch {
+      setDetailData(null);
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
 
   return (
     <ApproverList
@@ -835,7 +558,7 @@ const CasePreparationApproverPage = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filtered.map((row, idx) => (
+                  {filtered.map((row: any, idx) => (
                     <TableRow key={row.id} sx={{
                       background: idx % 2 === 0 ? "#fff" : alpha(BRAND.surface, 0.5),
                       "&:hover": { background: alpha(BRAND.primaryLight, 0.04) },
@@ -859,7 +582,7 @@ const CasePreparationApproverPage = () => {
                       <TD sx={{ textAlign: "center" }}>
                         <Button size="small" variant="outlined"
                           startIcon={<VisibilityRoundedIcon sx={{ fontSize: "13px !important" }} />}
-                          onClick={() => setSelected(row)}
+                          onClick={() => handleViewDetails(row)}
                           disabled={!isApproverActionableStatus(row.status)}
                           sx={{
                             borderRadius: 2, fontWeight: 700, fontSize: "0.72rem", textTransform: "none",
@@ -882,10 +605,12 @@ const CasePreparationApproverPage = () => {
 
           <CPDetailDialog
             open={!!selected}
-            onClose={() => setSelected(null)}
+            onClose={() => { setSelected(null); setDetailData(null); }}
             item={selected}
             onApprove={requestApprove}
             onReject={requestReject}
+            detailsLoading={detailsLoading}
+            detailData={detailData}
           />
 
           <ApproverActionDialog {...dialogProps} />

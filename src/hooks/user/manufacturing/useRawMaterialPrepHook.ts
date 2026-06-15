@@ -104,6 +104,9 @@ export const useRawMaterialPrepHook = () => {
   );
 
   const [view, setView] = useState<WorkflowView>("list");
+  const [detailsRow, setDetailsRow] = useState<any>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsData, setDetailsData] = useState<any>(null);
   const [activeBatch, setActiveBatch] = useState<RawMaterialPrepBatch | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [loadingFormDetails, setLoadingFormDetails] = useState(false);
@@ -535,6 +538,44 @@ export const useRawMaterialPrepHook = () => {
     [openFormWithResolvedData]
   );
 
+  const handleViewDetails = useCallback(
+    async (row: RawMaterialPrepBatch) => {
+      if (!row.formId) {
+        showAlert("Form ID missing", "error");
+        return;
+      }
+
+      setDetailsLoading(true);
+
+      const response =
+        await rawMaterialPreparationController.fetchFormDetails({
+          formId: row.formId,
+        });
+
+      setDetailsLoading(false);
+
+      if (!response?.success || !response?.data) {
+        showAlert(
+          response?.message ||
+          STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.DETAILS_FETCH_ERROR,
+          "error"
+        );
+        return;
+      }
+
+      setDetailsRow(row);
+      setDetailsData(response.data);
+      setView("details");
+    },
+    [showAlert]
+  );
+
+  const handleBackFromDetails = useCallback(() => {
+    setDetailsRow(null);
+    setDetailsData(null);
+    setView("list");
+  }, []);
+
   const handleBack = useCallback(() => {
     if (isFormDirty) {
       setBackConfirmOpen(true);
@@ -934,6 +975,12 @@ export const useRawMaterialPrepHook = () => {
     handleDiscardAndBack,
     handleSaveDraft,
     handleSubmit,
+    detailsRow,
+    detailsData,
+    detailsLoading,
+    handleViewDetails,
+    handleViewPreparationDetails: handleViewDetails,
+    handleBackFromDetails,
   };
 };
 

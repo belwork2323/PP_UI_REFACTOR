@@ -1,6 +1,17 @@
 import { Box, Button, Divider, Stack, Typography } from "@mui/material";
-import type { SchemaApiContext, SchemaField, SchemaSection, SchemaThemeTokens } from "../../models/schema.types";
+import type {
+  SchemaApiContext,
+  SchemaField,
+  SchemaFormValues,
+  SchemaSection,
+  SchemaThemeTokens,
+} from "../../models/schema.types";
 import { buildNestedFieldDefaults } from "../../models/schemaFormState";
+import {
+  buildFlatVisibilityContext,
+  isSchemaFieldVisible,
+  pruneHiddenFieldValues,
+} from "../../utils/schemaVisibility";
 import FieldRenderer from "../fields/FieldRenderer";
 import NestedTableField from "../fields/NestedTableField";
 
@@ -13,6 +24,7 @@ const getNestedFields = (section: SchemaSection): SchemaField[] | null => {
 type NestedGroupSectionProps = {
   section: SchemaSection;
   rows: Record<string, unknown>[];
+  allValues: SchemaFormValues;
   onRowsChange: (rows: Record<string, unknown>[]) => void;
   readOnly?: boolean;
   theme: SchemaThemeTokens;
@@ -22,6 +34,7 @@ type NestedGroupSectionProps = {
 const NestedGroupSection = ({
   section,
   rows,
+  allValues,
   onRowsChange,
   readOnly = false,
   theme,
@@ -35,7 +48,15 @@ const NestedGroupSection = ({
 
   const updateRow = (rowIdx: number, key: string, value: unknown) => {
     onRowsChange(
-      displayRows.map((row, idx) => (idx === rowIdx ? { ...(row ?? {}), [key]: value } : row))
+      displayRows.map((row, idx) => {
+        if (idx !== rowIdx) return row;
+        const updated = { ...(row ?? {}), [key]: value };
+        return pruneHiddenFieldValues(
+          nestedFields,
+          updated,
+          buildFlatVisibilityContext(allValues, updated)
+        );
+      })
     );
   };
 
@@ -54,7 +75,16 @@ const NestedGroupSection = ({
     return acc;
   }, {});
 
-  const renderField = (rowIdx: number, field: SchemaField, row: Record<string, unknown>) => {
+  const renderField = (
+    rowIdx: number,
+    field: SchemaField,
+    row: Record<string, unknown>,
+    visibilityContext: Record<string, unknown>
+  ) => {
+    if (!isSchemaFieldVisible(field, visibilityContext)) {
+      return null;
+    }
+
     if (field.type === "table") {
       const tableRows = Array.isArray(row[field.key])
         ? (row[field.key] as Record<string, unknown>[])
@@ -86,7 +116,10 @@ const NestedGroupSection = ({
 
   return (
     <Stack spacing={2}>
-      {displayRows.map((row, rowIdx) => (
+      {displayRows.map((row, rowIdx) => {
+        const visibilityContext = buildFlatVisibilityContext(allValues, row as Record<string, unknown>);
+
+        return (
         <Box
           key={`${section.sectionId}-group-${rowIdx}`}
           sx={{ border: `1px dashed ${theme.border}`, borderRadius: 2, p: 1.5 }}
@@ -95,7 +128,7 @@ const NestedGroupSection = ({
             <Typography sx={{ fontWeight: 700, fontSize: "0.82rem" }}>
               {groupLabel} {rowIdx + 1}
             </Typography>
-            {section.addRowAllowed && !readOnly && displayRows.length > 1 && (
+            {Boolean(section.addRowAllowed) && !readOnly && displayRows.length > 1 && (
               <Button size="small" color="error" onClick={() => removeGroup(rowIdx)}>
                 Remove
               </Button>
@@ -115,16 +148,17 @@ const NestedGroupSection = ({
               <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} flexWrap="wrap">
                 {fields
                   .filter((f) => f.type !== "table")
-                  .map((field) => renderField(rowIdx, field, row as Record<string, unknown>))}
+                  .map((field) => renderField(rowIdx, field, row as Record<string, unknown>, visibilityContext))}
               </Stack>
               {fields
                 .filter((f) => f.type === "table")
-                .map((field) => renderField(rowIdx, field, row as Record<string, unknown>))}
+                .map((field) => renderField(rowIdx, field, row as Record<string, unknown>, visibilityContext))}
             </Box>
           ))}
         </Box>
-      ))}
-      {section.addRowAllowed && !readOnly && (
+        );
+      })}
+      {Boolean(section.addRowAllowed) && !readOnly && (
         <Button size="small" variant="outlined" onClick={addGroup}>
           Add {groupLabel}
         </Button>

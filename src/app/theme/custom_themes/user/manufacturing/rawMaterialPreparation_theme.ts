@@ -350,6 +350,108 @@ export const getRawMaterialPreparationTheme = (baseTheme: any) => {
 			emptyStateTitle: { fontWeight: 700, color: palette.textSub, fontSize: "0.9rem" },
 			emptyStateSubtitle: { fontSize: "0.75rem", color: alpha(palette.textSub, 0.65), mt: 0.5 },
 		},
+		details: {
+			bannerStatusConfig: (() => {
+				const primary = palette.primary ?? "#1B4F72";
+				const primaryLight = palette.primaryLight ?? "#2E86C1";
+				const success = palette.accent ?? "#148F77";
+				const danger = palette.danger ?? "#C0392B";
+				const warnBase = palette.warn ?? "#D4AC0D";
+				return {
+					["Initiated"]: { color: "#334155", bg: "#F8FAFC", border: "#CBD5E1" },
+					["In Progress"]: { color: primary, bg: "#E8F4FC", border: alpha(primaryLight, 0.5) },
+					["Waiting for Approval"]: { color: "#7D6608", bg: "#FFF4D6", border: warnBase },
+					["Approved"]: { color: success, bg: "#E8F8F5", border: alpha(success, 0.5) },
+					["Rejected"]: { color: danger, bg: "#FDEDEC", border: alpha(danger, 0.5) },
+				} as Record<string, { color: string; bg: string; border: string }>;
+			})(),
+			page: { animation: "fadeIn 0.35s ease both" },
+			document: {
+				borderRadius: 3,
+				border: `1px solid ${palette.border ?? "#D5D8DC"}`,
+				boxShadow: `0 4px 24px ${alpha(palette.primary ?? "#1B4F72", 0.08)}`,
+				overflow: "hidden",
+				background: palette.pageBg ?? "#fff",
+			},
+			banner: {
+				p: "18px 24px",
+				background: `linear-gradient(135deg, ${palette.primary}, ${palette.primaryLight})`,
+				color: "#fff",
+			},
+			bannerIcon: { fontSize: 28, color: "#fff", opacity: 0.95 },
+			bannerTitle: { fontWeight: 800, fontSize: "1.05rem", color: "#fff" },
+			bannerSubtitle: { fontSize: "0.78rem", color: alpha("#fff", 0.78), mt: 0.35 },
+			body: { p: { xs: 2, sm: 3 }, background: palette.surface ?? palette.pageBg },
+			section: {
+				mb: 3,
+				p: 2,
+				borderRadius: 2,
+				border: `1px solid ${alpha(palette.border ?? "#D5D8DC", 0.65)}`,
+				background: palette.pageBg ?? "#fff",
+			},
+			sectionTitle: {
+				fontSize: "0.72rem",
+				fontWeight: 800,
+				letterSpacing: "0.08em",
+				textTransform: "uppercase",
+				color: palette.primaryLight,
+				mb: 1.5,
+				display: "flex",
+				alignItems: "center",
+				gap: 0.75,
+			},
+			metaGrid: {
+				display: "grid",
+				gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(3, 1fr)" },
+				gap: 1.5,
+			},
+			metaItem: {
+				p: 1.25,
+				borderRadius: 1.5,
+				background: alpha(palette.primaryLight ?? "#2E86C1", 0.04),
+				border: `1px solid ${alpha(palette.primaryLight ?? "#2E86C1", 0.12)}`,
+			},
+			metaLabel: { fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: palette.textSub },
+			metaValue: { fontSize: "0.88rem", fontWeight: 700, color: palette.text, mt: 0.35 },
+			blockWrapper: (isLast: boolean) => ({ mb: isLast ? 0 : 2.5 }),
+			blockMeta: { fontSize: "0.72rem", color: palette.textSub },
+			blockMetaStrong: { color: palette.text, fontWeight: 700 },
+			materialChip: {
+				height: 22,
+				fontSize: "0.68rem",
+				fontWeight: 800,
+				background: `linear-gradient(135deg, ${palette.primary}, ${palette.primaryLight})`,
+				color: "#fff",
+			},
+			tableContainer: {
+				borderRadius: 1.5,
+				border: `1px solid ${palette.border ?? "#D5D8DC"}`,
+				overflow: "hidden",
+			},
+			tableHeaderCell: (isLead: boolean) => ({
+				background: isLead
+					? `linear-gradient(135deg, ${palette.primary}, ${palette.primaryLight})`
+					: alpha(palette.primary ?? "#1B4F72", 0.06),
+				color: isLead ? "#fff" : palette.textSub,
+				fontWeight: 700,
+				fontSize: "0.63rem",
+				letterSpacing: "0.05em",
+				textTransform: "uppercase",
+				py: 1,
+				px: 1.5,
+				borderBottom: `1px solid ${palette.border}`,
+				whiteSpace: "nowrap",
+			}),
+			tableRow: (idx: number) => ({
+				background: idx % 2 === 0 ? palette.pageBg ?? "#fff" : alpha(palette.surface ?? "#F4F6F8", 0.5),
+			}),
+			tableCell: { fontSize: "0.82rem", py: 1.1, px: 1.5, color: palette.text },
+			specText: { fontWeight: 600 },
+			resultText: { fontWeight: 600, color: palette.text },
+			remarksText: { fontSize: "0.8rem", color: palette.textSub },
+			emptyText: { fontSize: "0.85rem", color: palette.textSub, textAlign: "center", py: 4 },
+			loadingBox: { minHeight: 320, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 1.5 },
+		},
 		solidPreparation: {
 			brand: {
 				primary: palette.primary ?? SOLID_PREP_BRAND.primary,

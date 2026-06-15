@@ -36,6 +36,58 @@ export const CC_STATUS_CONFIG = {
 
 const S = STRINGS.MANUFACTURING;
 
+/** Dev-only rows prepended to the batch list for local UI testing. */
+const USE_MOCK_CC_BATCH = import.meta.env.DEV;
+
+const MOCK_CC_BATCHES = [
+  {
+    id: "mock-cc-initiated",
+    batchId: "CC-MOCK-001",
+    stage: "Casting",
+    motorId: "MTR-A-001, MTR-A-002",
+    motorIds: ["MTR-A-001", "MTR-A-002"],
+    motorType: "A",
+    motorStage: 1,
+    projectName: "Project Alpha (Mock)",
+    assignedTo: { fullName: "Mock Operator" },
+    createdOn: "2026-06-01T09:00:00Z",
+    priority: "High",
+    ccStatus: CC_STATUS.INITIATED,
+    formId: null,
+  },
+  {
+    id: "mock-cc-in-progress",
+    batchId: "CC-MOCK-002",
+    stage: "Casting & Curing",
+    motorId: "MTR-B-101, MTR-B-102",
+    motorIds: ["MTR-B-101", "MTR-B-102"],
+    motorType: "B",
+    motorStage: 1,
+    projectName: "Project Beta (Mock)",
+    assignedTo: { fullName: "Mock Operator" },
+    createdOn: "2026-06-03T11:30:00Z",
+    priority: "Medium",
+    ccStatus: CC_STATUS.IN_PROGRESS,
+    formId: "mock-cc-form-002",
+  },
+  {
+    id: "mock-cc-rejected",
+    batchId: "CC-MOCK-003",
+    stage: "Curing",
+    motorId: "MTR-C-201",
+    motorIds: ["MTR-C-201"],
+    motorType: "C",
+    motorStage: 1,
+    projectName: "Project Gamma (Mock)",
+    assignedTo: { fullName: "Mock Operator" },
+    createdOn: "2026-05-28T14:15:00Z",
+    priority: "Critical",
+    ccStatus: CC_STATUS.REJECTED,
+    formId: "mock-cc-form-003",
+    rejectionReason: "Curing cycle temperature readings incomplete.",
+  },
+] as const;
+
 const CastingCuringList = ({ hookState, rowsPerPageOptions }: any) => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getManufacturingTheme(mode), [mode]);
@@ -56,6 +108,25 @@ const CastingCuringList = ({ hookState, rowsPerPageOptions }: any) => {
     handleFillForm,
     handleEditForm,
   } = hookState;
+
+  const displayRows = useMemo(
+    () => (USE_MOCK_CC_BATCH ? [...MOCK_CC_BATCHES, ...batches] : batches),
+    [batches],
+  );
+
+  const displayTotalRecords = USE_MOCK_CC_BATCH ? totalRecords + MOCK_CC_BATCHES.length : totalRecords;
+
+  const displayStatusCounts = useMemo(() => {
+    if (!USE_MOCK_CC_BATCH) return statusCounts;
+    const next = { ...statusCounts };
+    MOCK_CC_BATCHES.forEach((row) => {
+      const status = row.ccStatus;
+      next[status] = (next[status] ?? 0) + 1;
+      next[STRINGS.USER_BATCH_LIST.FILTER_ALL] =
+        (next[STRINGS.USER_BATCH_LIST.FILTER_ALL] ?? displayTotalRecords);
+    });
+    return next;
+  }, [statusCounts, displayTotalRecords]);
 
   const statusConfig = useMemo(
     () =>
@@ -156,7 +227,7 @@ const CastingCuringList = ({ hookState, rowsPerPageOptions }: any) => {
 
   return (
     <UserBatchList
-      rows={batches}
+      rows={displayRows}
       columns={COLUMNS}
       statusField="ccStatus"
       statusConfig={statusConfig}
@@ -170,8 +241,8 @@ const CastingCuringList = ({ hookState, rowsPerPageOptions }: any) => {
       rowsPerPageOptions={rowsPerPageOptions}
       tableLabel={S.CASTING_CURING.TABLE_LABEL}
       themeTokens={theme}
-      totalRecords={totalRecords}
-      statusCounts={statusCounts}
+      totalRecords={displayTotalRecords}
+      statusCounts={displayStatusCounts}
       page={page}
       rowsPerPage={rowsPerPage}
       search={search}

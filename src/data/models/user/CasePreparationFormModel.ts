@@ -4,6 +4,7 @@ import {
   buildCasePrepSectionPayload,
   createCasePrepInitialValues,
   hydrateCasePrepValuesFromSections,
+  type CasePrepMotorSubmission,
 } from "../../../schemaManagement";
 import { schemaValuesHaveUserData } from "../../../schemaManagement/models/schemaFormState";
 
@@ -19,6 +20,13 @@ export type CasePreparationFormState = {
   motors: CasePrepMotorSession[];
   subscaleFormValues: SchemaFormValues;
   subscaleSavedSections?: SchemaSectionSubmission[];
+};
+
+export type CasePreparationFormBody = {
+  schemaVersion?: string;
+  schemaType?: string;
+  motors: CasePrepMotorSubmission[];
+  sections?: SchemaSectionSubmission[];
 };
 
 export const createDefaultCasePreparationFormState = (): CasePreparationFormState => ({
@@ -38,21 +46,39 @@ export const createEmptyMotorSession = (
   savedSections: undefined,
 });
 
+const resolveCasePrepDetailsPayload = (details: any) =>
+  details?.casePreparationDetails ?? details?.preparationDetails ?? details ?? {};
+
 export const mapCasePreparationDetailsToFormState = (details: any): CasePreparationFormState => {
-  const motors = Array.isArray(details?.motors)
-    ? details.motors.map((motor: any) => ({
-        motorId: String(motor?.motorId ?? ""),
-        prrcClearanceDate: String(motor?.prrcClearanceDate ?? ""),
-        formValues: {},
-        savedSections: Array.isArray(motor?.sections) ? motor.sections : undefined,
-      }))
-    : [];
+  const payload = resolveCasePrepDetailsPayload(details);
+  const rawMotors = Array.isArray(payload?.motors) ? payload.motors : [];
+
+  const motors = rawMotors
+    .map((motor: any) => ({
+      motorId: String(motor?.motorId ?? "").trim(),
+      prrcClearanceDate: String(
+        motor?.prrcClearanceDate ?? motor?.prrcDate ?? motor?.prrcClearance ?? "",
+      ).trim(),
+      formValues: {},
+      savedSections: Array.isArray(motor?.sections)
+        ? motor.sections
+        : Array.isArray(motor?.motorSections)
+          ? motor.motorSections
+          : undefined,
+    }))
+    .filter((motor) => motor.motorId.length > 0);
+
+  const sections = Array.isArray(payload?.sections)
+    ? payload.sections
+    : Array.isArray(details?.sections)
+      ? details.sections
+      : undefined;
 
   return {
     schema: null,
     motors,
     subscaleFormValues: {},
-    subscaleSavedSections: Array.isArray(details?.sections) ? details.sections : undefined,
+    subscaleSavedSections: sections,
   };
 };
 
@@ -85,7 +111,9 @@ export const hydrateCasePreparationFormState = (
   };
 };
 
-export const mapCasePreparationFormStateToPayload = (form: CasePreparationFormState) => {
+export const mapCasePreparationFormStateToPayload = (
+  form: CasePreparationFormState
+): CasePreparationFormBody => {
   const schema = form.schema;
 
   if (!schema) {
@@ -120,27 +148,47 @@ export class CasePreparationSubmitResponseModel {
   status: string;
 
   constructor(data: any = {}) {
-    this.formId = String(data.formId ?? "");
-    this.batchId = String(data.batchId ?? "");
-    this.status = String(data.status ?? "");
+    const payload = data?.data ?? data;
+    this.formId = String(payload?.formId ?? "");
+    this.batchId = String(payload?.batchId ?? "");
+    this.status = String(payload?.status ?? "");
   }
 
   static fromApi(data: any) {
-    return new CasePreparationSubmitResponseModel(data);
+    const payload = data?.data ?? data ?? {};
+    return new CasePreparationSubmitResponseModel(payload);
   }
 }
 
 export class CasePreparationDetailsModel {
   static fromApi(data: any) {
+    const payload = data?.data ?? data ?? {};
+    const casePreparationDetails =
+      payload?.casePreparationDetails ?? payload?.preparationDetails ?? null;
+
     return {
-      formId: String(data?.formId ?? ""),
-      batchId: String(data?.batchId ?? ""),
-      subDepartmentId: Number(data?.subDepartmentId ?? 0),
-      formSubmissionType: String(data?.formSubmissionType ?? ""),
-      motors: data?.motors ?? [],
-      sections: data?.sections ?? [],
-      generalActivities: data?.generalActivities ?? {},
-      linearCoatingOperation: data?.linearCoatingOperation ?? {},
+      formId: String(payload?.formId ?? ""),
+      batchId: String(payload?.batchId ?? ""),
+      batchType: String(payload?.batchType ?? ""),
+      subDepartmentId: Number(payload?.subDepartmentId ?? 0),
+      formSubmissionType: String(payload?.formSubmissionType ?? ""),
+      casePreparationDetails,
+      motors:
+        casePreparationDetails?.motors ??
+        payload?.motors ??
+        [],
+      sections:
+        casePreparationDetails?.sections ??
+        payload?.sections ??
+        [],
+      generalActivities:
+        casePreparationDetails?.generalActivities ??
+        payload?.generalActivities ??
+        {},
+      linearCoatingOperation:
+        casePreparationDetails?.linearCoatingOperation ??
+        payload?.linearCoatingOperation ??
+        {},
     };
   }
 }

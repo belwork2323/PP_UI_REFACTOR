@@ -5,9 +5,10 @@ import { STRINGS } from "../../../../../app/config/strings";
 import { CASE_PREP_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/casePreparation_theme";
 import {
   CASE_PREP_FLOW_LABELS,
+  canAddCasePrepMotors,
   isMainMotorBatch,
   isSubscaleBatch,
-  MOCK_CASE_PREP_MOTOR_OPTIONS,
+  resolveCasePrepMotorOptions,
   supportsCasePrepSchemaFlow,
   type CasePrepAddedMotor,
 } from "../../../../../hooks/user/manufacturing/casePreparationFlowConfig";
@@ -22,7 +23,7 @@ const S = STRINGS.MANUFACTURING.CASE_PREP;
 const { cleaningServices: CleaningServicesRoundedIcon } = icons.user.manufacturing.casePreparation.form;
 
 type CasePreparationFormProps = {
-  batch?: { batchType?: string; motorId?: string } | null;
+  batch?: { batchId?: string; batchType?: string; motorId?: string; motorIds?: string[] } | null;
   formData: CasePreparationFormState;
   addedMotors: CasePrepAddedMotor[];
   motorCount: number | "";
@@ -84,30 +85,16 @@ const CasePreparationForm = ({
   }, [activeMotorEntry, formData.motors]);
 
   const usedMotorIds = motorCards.map((m) => m.motorId);
-  const count = motorCount === "" ? 0 : Number(motorCount);
-  const allDraftIdsSelected =
-    count > 0 && Array.from({ length: count }, (_, idx) => draftMotorIds[idx]?.trim()).every(Boolean);
-  const uniqueDraftIds = new Set(draftMotorIds.filter(Boolean));
-  const hasDuplicateDraftIds = uniqueDraftIds.size !== draftMotorIds.filter(Boolean).length;
-
-  const canAddMainMotors =
-    count > 0 &&
-    allDraftIdsSelected &&
-    !hasDuplicateDraftIds &&
-    prrcClearanceDate.trim().length > 0 &&
-    draftMotorIds.every((id) => !usedMotorIds.includes(id));
-
-  const canAddSubscale = isSubscaleBatch(batch?.batchType) && !schema;
-
-  const canAddMotors = isMainMotorBatch(batch?.batchType) ? canAddMainMotors : canAddSubscale;
-
-  const availableMotorOptions = useMemo(() => {
-    const batchMotorId = String(batch?.motorId ?? "").trim();
-    if (batchMotorId && !MOCK_CASE_PREP_MOTOR_OPTIONS.some((m) => m.value === batchMotorId)) {
-      return [{ value: batchMotorId, label: batchMotorId }, ...MOCK_CASE_PREP_MOTOR_OPTIONS];
-    }
-    return MOCK_CASE_PREP_MOTOR_OPTIONS;
-  }, [batch?.motorId]);
+  const availableMotorOptions = useMemo(() => resolveCasePrepMotorOptions(batch), [batch]);
+  const canAddMotors = canAddCasePrepMotors({
+    batchType: batch?.batchType,
+    motorCount,
+    draftMotorIds,
+    prrcClearanceDate,
+    usedMotorIds,
+    hasSchema: Boolean(schema),
+    availableMotorOptions,
+  });
 
   if (!supportsCasePrepSchemaFlow(batch?.batchType)) {
     return (
@@ -148,6 +135,7 @@ const CasePreparationForm = ({
         draftMotorIds={draftMotorIds}
         prrcClearanceDate={prrcClearanceDate}
         availableMotorOptions={availableMotorOptions}
+        hasSchema={Boolean(schema)}
         usedMotorIds={usedMotorIds}
         onMotorCountChange={onMotorCountChange}
         onDraftMotorIdChange={onDraftMotorIdChange}
@@ -177,6 +165,7 @@ const CasePreparationForm = ({
             formValues={formData.subscaleFormValues ?? {}}
             savedSections={formData.subscaleSavedSections}
             subDepartmentId={subDepartmentId}
+            batchId={batch?.batchId}
             onChange={onSubscaleValuesChange}
             loading={schemaLoading}
             error={schemaError}
@@ -282,6 +271,7 @@ const CasePreparationForm = ({
               schema={schema as SchemaDocument}
               motor={activeMotorSession}
               subDepartmentId={subDepartmentId}
+              batchId={batch?.batchId}
               onMotorChange={(next) => onMotorSessionChange(activeMotorEntry.motorId, next)}
               loading={schemaLoading}
               error={schemaError}

@@ -15,6 +15,7 @@ type CasePrepSubscaleSchemaPanelProps = {
   formValues: SchemaFormValues;
   savedSections?: SchemaSectionSubmission[];
   subDepartmentId?: number;
+  batchId?: string;
   onChange: (values: SchemaFormValues) => void;
   loading?: boolean;
   error?: string | null;
@@ -25,6 +26,7 @@ const CasePrepSubscaleSchemaPanel = ({
   formValues,
   savedSections,
   subDepartmentId,
+  batchId,
   onChange,
   loading = false,
   error = null,
@@ -70,7 +72,7 @@ const CasePrepSubscaleSchemaPanel = ({
         loading={loading}
         error={error}
         themeTokens={themeTokens}
-        apiContext={{ subDepartmentId }}
+        apiContext={{ subDepartmentId, batchId }}
       />
     </Box>
   );

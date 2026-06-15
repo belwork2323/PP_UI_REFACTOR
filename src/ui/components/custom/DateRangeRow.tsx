@@ -1,5 +1,5 @@
 import { Stack, Typography, TextField, Chip, SxProps, Theme } from '@mui/material';
-import { icons } from '@app/theme/icons';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 
 interface DateRangeRowProps {
   from: string;
@@ -26,7 +26,7 @@ const DateRangeRow = ({
   calendarIconSx, datePickerSx, separatorSx, thisMonthChipSx, dateInputProps,
 }: DateRangeRowProps) => (
   <Stack direction="row" gap={1.5} alignItems="center" flexWrap="wrap">
-    <icons.calendarMonth sx={calendarIconSx} />
+    <CalendarMonthIcon sx={calendarIconSx} />
     <TextField
       size="small" type="date" label={fromLabel}
       value={from}

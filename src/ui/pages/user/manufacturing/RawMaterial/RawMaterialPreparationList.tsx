@@ -1,7 +1,19 @@
 // src/ui/pages/user/manufacturing/RawMaterial/RawMaterialPreparationList.tsx
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { alpha, Button, Chip, MenuItem, Stack, TextField, Typography } from "@mui/material";
+import {
+  alpha,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  IconButton,
+  MenuItem,
+  Stack,
+  TextField,
+  Tooltip,
+  Typography,
+} from "@mui/material";
 import { icons } from "../../../../../app/theme/icons";
 import IconText from "../../../../components/common/IconText";
 import FilterPanelHeader from "../../../../components/custom/FilterPanelHeader";
@@ -13,9 +25,10 @@ import { useThemeStore } from "../../../../../app/store/themeStore";
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import { getOperationStatusConfig, OPERATION_STATUS } from "../../../../../hooks/operationStatus";
 import { STRINGS } from "../../../../../app/config/strings";
-import { motorStageLabel } from "../../../../../data/models/admin/BatchManagementModel";
+import { motorStageLabel } from "@data/models/admin/BatchManagement/BatchManagementModel";
 import { SUBDEPARTMENT_BATCH_SEARCH_FIELDS } from "../../../../../data/models/user/SubdepartmentBatchModel";
 import type { SubdepartmentBatchListAdvancedFilters } from "../../../../../hooks/user/useSubdepartmentBatches";
+import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 
 const {
   pending: HourglassEmptyRoundedIcon,
@@ -29,6 +42,8 @@ const {
 
 const FILTER_ALL = STRINGS.USER_BATCH_LIST.FILTER_ALL;
 const PRIORITY_OPTIONS = ["Critical", "High", "Medium", "Low"] as const;
+const canViewPreparationDetails = (status: string) =>
+  status === OPERATION_STATUS.WAITING_FOR_APPROVAL || status === OPERATION_STATUS.APPROVED;
 
 export const OPERATION_STATUS_CONFIG = getOperationStatusConfig({
   initiated: HourglassEmptyRoundedIcon,
@@ -69,6 +84,7 @@ const RawMaterialPrepList = ({ hookState, rowsPerPageOptions }: any) => {
     applyAdvancedFilters,
     clearAdvancedFilters,
     activeFilterCount,
+    handleViewPreparationDetails,
   } = hookState;
 
   const [filterOpen, setFilterOpen] = useState(false);
@@ -100,7 +116,10 @@ const RawMaterialPrepList = ({ hookState, rowsPerPageOptions }: any) => {
   const statusConfig = useMemo(
     () =>
       Object.fromEntries(
-        Object.entries(OPERATION_STATUS_CONFIG).map(([status, cfg]) => [status, { ...cfg, ...theme.batchList.statusConfig[status] }]),
+        Object.entries(OPERATION_STATUS_CONFIG).map(([status, cfg]) => [
+          status,
+          { ...cfg, ...theme.batchList.statusConfig[status] },
+        ]),
       ),
     [theme],
   );
@@ -339,7 +358,7 @@ const RawMaterialPrepList = ({ hookState, rowsPerPageOptions }: any) => {
         >
           {STATUS_DROPDOWN_VALUES.map((status) => (
             <MenuItem key={status} value={status}>
-              {status === FILTER_ALL ? FILTER_ALL : statusConfig[status]?.label ?? status}
+              {status === FILTER_ALL ? FILTER_ALL : (statusConfig[status]?.label ?? status)}
             </MenuItem>
           ))}
         </TextField>
@@ -364,10 +383,20 @@ const RawMaterialPrepList = ({ hookState, rowsPerPageOptions }: any) => {
       </Stack>
 
       <Stack direction="row" justifyContent="flex-end" spacing={1}>
-        <Button variant="outlined" size="small" onClick={() => setFilterOpen(false)} sx={{ textTransform: "none", fontWeight: 700 }}>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={() => setFilterOpen(false)}
+          sx={{ textTransform: "none", fontWeight: 700 }}
+        >
           {S.BATCH_LIST.FILTERS_CLOSE_PANEL}
         </Button>
-        <Button variant="contained" size="small" onClick={handleApplyPanelFilters} sx={{ ...theme.batchList.action.primary, textTransform: "none" }}>
+        <Button
+          variant="contained"
+          size="small"
+          onClick={handleApplyPanelFilters}
+          sx={{ ...theme.batchList.action.primary, textTransform: "none" }}
+        >
           {S.BATCH_LIST.FILTERS_APPLY}
         </Button>
       </Stack>
@@ -401,17 +430,38 @@ const RawMaterialPrepList = ({ hookState, rowsPerPageOptions }: any) => {
       searchBarEnd={searchBarEnd}
       filterExtension={filterExtension}
       renderAction={(row: any) => (
-        <UserWorkflowStatusAction
-          status={row.rmStatus}
-          row={row}
-          statusMap={OPERATION_STATUS}
-          onFillForm={handleFillForm}
-          onEditForm={handleEditForm}
-          theme={theme}
-          fillLabel={S.BATCH_LIST.FILL_ACTION}
-          continueLabel={S.BATCH_LIST.CONTINUE_ACTION}
-          editTooltip={S.BATCH_LIST.EDIT_ACTION_TOOLTIP}
-        />
+        <Stack direction="row" alignItems="center" spacing={0.75}>
+          {canViewPreparationDetails(row.rmStatus) ? (
+            <Tooltip title={S.RAW_MATERIAL_PREP.VIEW_DETAILS_TOOLTIP} arrow placement="top">
+              <IconButton
+                size="small"
+                onClick={() => handleViewPreparationDetails(row)}
+                sx={{
+                  color: theme.palette.primaryLight,
+                  border: `1px solid ${alpha(theme.palette.primaryLight, 0.35)}`,
+                  borderRadius: 1.5,
+                  "&:hover": {
+                    background: alpha(theme.palette.primaryLight, 0.08),
+                  },
+                }}
+              >
+                <VisibilityRoundedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          ) : (
+            <UserWorkflowStatusAction
+              status={row.rmStatus}
+              row={row}
+              statusMap={OPERATION_STATUS}
+              onFillForm={handleFillForm}
+              onEditForm={handleEditForm}
+              theme={theme}
+              fillLabel={S.BATCH_LIST.FILL_ACTION}
+              continueLabel={S.BATCH_LIST.CONTINUE_ACTION}
+              editTooltip={S.BATCH_LIST.EDIT_ACTION_TOOLTIP}
+            />
+          )}
+        </Stack>
       )}
     />
   );

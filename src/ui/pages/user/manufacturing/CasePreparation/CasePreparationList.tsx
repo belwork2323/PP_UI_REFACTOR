@@ -1,7 +1,7 @@
 // src/ui/pages/user/manufacturing/CasePreparation/CasePreparationList.tsx
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { alpha, Button, Chip, MenuItem, Stack, TextField, Typography } from "@mui/material";
+import { alpha, Button, Chip, IconButton, MenuItem, Stack, TextField, Tooltip, Typography } from "@mui/material";
 import { icons } from "../../../../../app/theme/icons";
 import IconText from "../../../../components/common/IconText";
 import FilterPanelHeader from "../../../../components/custom/FilterPanelHeader";
@@ -13,9 +13,10 @@ import { useThemeStore } from "../../../../../app/store/themeStore";
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import { getOperationStatusConfig, OPERATION_STATUS } from "../../../../../hooks/operationStatus";
 import { STRINGS } from "../../../../../app/config/strings";
-import { motorStageLabel } from "../../../../../data/models/admin/BatchManagementModel";
+import { motorStageLabel } from "@data/models/admin/BatchManagement/BatchManagementModel";
 import { SUBDEPARTMENT_BATCH_SEARCH_FIELDS } from "../../../../../data/models/user/SubdepartmentBatchModel";
 import type { SubdepartmentBatchListAdvancedFilters } from "../../../../../hooks/user/useSubdepartmentBatches";
+import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 
 const {
   pending: HourglassEmptyRoundedIcon,
@@ -45,6 +46,9 @@ const STATUS_DROPDOWN_VALUES = [
 
 const S = STRINGS.MANUFACTURING;
 
+const canViewCasePrepDetails = (status: string) =>
+  status === OPERATION_STATUS.WAITING_FOR_APPROVAL || status === OPERATION_STATUS.APPROVED;
+
 const CasePreparationList = ({ hookState, rowsPerPageOptions }: any) => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getManufacturingTheme(mode), [mode]);
@@ -64,6 +68,7 @@ const CasePreparationList = ({ hookState, rowsPerPageOptions }: any) => {
     loading,
     handleFillForm,
     handleEditForm,
+    handleViewCasePrepDetails,
     advancedFilters,
     applyAdvancedFilters,
     clearAdvancedFilters,
@@ -406,17 +411,36 @@ const CasePreparationList = ({ hookState, rowsPerPageOptions }: any) => {
       searchBarEnd={searchBarEnd}
       filterExtension={filterExtension}
       renderAction={(row: any) => (
-        <UserWorkflowStatusAction
-          status={row.cpStatus}
-          row={row}
-          statusMap={OPERATION_STATUS}
-          onFillForm={handleFillForm}
-          onEditForm={handleEditForm}
-          theme={theme}
-          fillLabel={S.BATCH_LIST.FILL_ACTION}
-          continueLabel={S.BATCH_LIST.CONTINUE_ACTION}
-          editTooltip={S.BATCH_LIST.EDIT_ACTION_TOOLTIP}
-        />
+        <Stack direction="row" alignItems="center" spacing={0.75}>
+          {canViewCasePrepDetails(row.cpStatus) ? (
+            <Tooltip title={S.BATCH_LIST.VIEW_DETAILS_TOOLTIP} arrow placement="top">
+              <IconButton
+                size="small"
+                onClick={() => handleViewCasePrepDetails(row)}
+                sx={{
+                  color: theme.palette.primaryLight,
+                  border: `1px solid ${alpha(theme.palette.primaryLight, 0.35)}`,
+                  borderRadius: 1.5,
+                  "&:hover": { background: alpha(theme.palette.primaryLight, 0.08) },
+                }}
+              >
+                <VisibilityRoundedIcon fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          ) : (
+            <UserWorkflowStatusAction
+              status={row.cpStatus}
+              row={row}
+              statusMap={OPERATION_STATUS}
+              onFillForm={handleFillForm}
+              onEditForm={handleEditForm}
+              theme={theme}
+              fillLabel={S.BATCH_LIST.FILL_ACTION}
+              continueLabel={S.BATCH_LIST.CONTINUE_ACTION}
+              editTooltip={S.BATCH_LIST.EDIT_ACTION_TOOLTIP}
+            />
+          )}
+        </Stack>
       )}
     />
   );

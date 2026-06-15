@@ -1,5 +1,5 @@
 import { Box, Typography, Chip, Stack, SxProps, Theme } from '@mui/material';
-import { icons } from '@app/theme/icons';
+import TuneIcon from '@mui/icons-material/Tune';
 
 interface FilterPanelHeaderProps {
   title: string;
@@ -21,7 +21,7 @@ const FilterPanelHeader = ({
 }: FilterPanelHeaderProps) => (
   <Stack direction="row" alignItems="center" justifyContent="space-between" sx={containerSx}>
     <Stack direction="row" alignItems="center" gap={0.8}>
-      <icons.filter.tune sx={iconSx} />
+      <TuneIcon sx={iconSx} />
       <Typography sx={labelSx}>{title}</Typography>
       {count > 0 && <Box sx={badgeSx}>{count}</Box>}
       {recordText && metaTextSx && (
