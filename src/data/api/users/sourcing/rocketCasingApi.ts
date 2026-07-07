@@ -1,5 +1,5 @@
-import { USER_SOURCING_ENDPOINTS } from "../endPoints";
-import { get, post } from "../httpClient";
+import { USER_SOURCING_ENDPOINTS } from "../../endPoints";
+import { get, post } from "../../httpClient";
 
 /**
  * Fetches all casing logs from the sourcing department

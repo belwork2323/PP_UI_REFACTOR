@@ -1,5 +1,5 @@
-import { get, post } from "../httpClient";
-import { QC_ENDPOINTS } from "../endPoints";
+import { get, post } from "../../httpClient";
+import { QC_ENDPOINTS } from "../../endPoints";
 
 /**
  * Fetch all batches available for QC

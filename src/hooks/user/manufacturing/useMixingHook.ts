@@ -125,6 +125,7 @@ export const useMixingHook = () => {
 
           const detailsResponse = await mixingController.fetchFormDetails({
             formId: batch.formId,
+            subDepartmentId,
           });
 
           if (!detailsResponse?.success || !detailsResponse?.data) {
@@ -164,10 +165,19 @@ export const useMixingHook = () => {
         return;
       }
 
+      if (!subDepartmentId) {
+        showAlert(
+          STRINGS.MANUFACTURING.MIXING.SUB_DEPARTMENT_MISSING,
+          "error"
+        );
+        return;
+      }
+
       setDetailsLoading(true);
 
       const response = await mixingController.fetchFormDetails({
         formId: row.formId,
+        subDepartmentId,
       });
 
       setDetailsLoading(false);
@@ -185,7 +195,7 @@ export const useMixingHook = () => {
       setDetailsData(response.data);
       setView("details");
     },
-    [showAlert]
+    [showAlert, subDepartmentId]
   );
   const handleBackFromDetails = useCallback(() => {
     setDetailsRow(null);

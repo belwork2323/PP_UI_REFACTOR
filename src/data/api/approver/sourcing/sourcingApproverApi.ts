@@ -1,5 +1,5 @@
-import { get, put } from "../httpClient";
-import { SOURCING_APPROVER_ENDPOINTS } from "../endPoints";
+import { get, put } from "../../httpClient";
+import { SOURCING_APPROVER_ENDPOINTS } from "../../endPoints";
 
 export const fetchPendingTasksApi = () => get(SOURCING_APPROVER_ENDPOINTS.PENDING_TASKS);
 

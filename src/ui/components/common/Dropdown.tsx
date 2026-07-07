@@ -5,7 +5,7 @@ type DropdownOption =
   | string
   | { label: string; value: string | number | boolean | null | undefined };
 
-type DropdownProps = Omit<InputProps, "select" | "children"> & {
+type DropdownProps = Omit<InputProps, "select" | "children" | "variant"> & {
   options?: DropdownOption[];
 };
 
@@ -41,10 +41,19 @@ const Dropdown = ({
             : String(option ?? "");
 
         // Prefer value as key, fallback to index (safe when value is unique)
-        const key = optValue != null ? optValue : `opt-${index}`;
+        const key = optValue != null ? String(optValue) : `opt-${index}`;
+
+        const menuItemValue =
+          optValue === null || optValue === undefined
+            ? ""
+            : typeof optValue === "boolean"
+              ? String(optValue)
+              : typeof optValue === "number" || typeof optValue === "string"
+                ? optValue
+                : String(optValue);
 
         return (
-          <MenuItem key={key} value={optValue}>
+          <MenuItem key={key} value={menuItemValue}>
             {optLabel}
           </MenuItem>
         );

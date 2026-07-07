@@ -11,7 +11,7 @@ import {
   UserListItemModel,
   CreateUserPayload,
 } from "@data/models/admin/UserManagement/UserManagementModel";
-import { ApiResponseModel } from "../../../data/models/common/ApiResponseModel";
+import { ApiResponseModel } from "@data/models/common/ApiResponseModel";
 
 export const userManagementController = {
   /* ─────────────────────────────

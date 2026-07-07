@@ -29,7 +29,7 @@ export type MixingUpdatePayload = MixingFormBody & {
 
 export type MixingDetailsPayload = {
   formId: string;
-  // subDepartmentId: number;
+  subDepartmentId: number;
 };
 
 export const mixingController = {

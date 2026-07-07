@@ -4,7 +4,7 @@ import { useAlertStore } from "../../app/store/alertStore";
 export const getBatches = async () => {
   const showAlert = useAlertStore.getState().showAlert;
   try {
-    return await batchApi.fetchAllBatches();
+    return await batchApi.fetchAllBatches({});
   } catch (err) {
     console.error(err);
     showAlert("Failed to fetch batches", "error");

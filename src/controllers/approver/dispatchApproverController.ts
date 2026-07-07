@@ -1,9 +1,9 @@
-import { 
-  fetchDraftDispatchesApi, 
-  fetchDispatchDetailsApi, 
-  updateDispatchStatusApi 
-} from "../../data/api/approver_dispatch/dispatchApproverApi";
-import { useAlertStore } from "../../app/store/alertStore";
+import {
+  fetchDraftDispatchesApi,
+  fetchDispatchDetailsApi,
+  updateDispatchStatusApi,
+} from "@data/api/approver/dispatch/dispatchApproverApi";
+import { useAlertStore } from "@app/store/alertStore";
 
 export const dispatchApproverController = {
   getPendingList: async (setBatches, setLoading) => {

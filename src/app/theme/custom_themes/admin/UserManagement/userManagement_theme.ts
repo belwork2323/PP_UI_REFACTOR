@@ -6,10 +6,11 @@ import spacing     from "../../../spacing";
 import layout      from "../../../layout";
 import general     from "../../common/common_css_theme";
 import { getSharedTheme } from "../../shared/shared_theme";
+import { getAdminCommonTheme } from "../admin_common_theme";
 
-const getUserManagementTheme = (mode = "light") => {
+const getUserManagementTheme = (mode: "light" | "dark" = "light") => {
   const shared  = getSharedTheme(mode);
-  const adminTheme = shared.adminManagement;
+  const adminTheme = getAdminCommonTheme(mode);
   const d = colors.dashboard[mode as "light" | "dark"];
 
   const isDark          = mode === "dark";
@@ -31,28 +32,6 @@ const getUserManagementTheme = (mode = "light") => {
     pageHeader: {
       ...adminTheme.pageHeader,
       newUserButton: adminTheme.primaryButton,
-    },
-
-    statPills: {
-      ...adminTheme.statPills,
-      colors: {
-        total: {
-          color: accentBlue,
-          bg:    accentBlueMuted,
-        },
-        active: {
-          color: colors.success.main,
-          bg:    alpha(colors.success.main, 0.10),
-        },
-        inactive: {
-          color: colors.error.main,
-          bg:    alpha(colors.error.main, 0.10),
-        },
-        showing: {
-          color: d.textSecondary,
-          bg:    isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)",
-        },
-      },
     },
 
     toolbar: adminTheme.toolbar,

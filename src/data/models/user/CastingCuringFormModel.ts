@@ -594,15 +594,15 @@ const walkCastingCuringValue = (
 
 export const parseCastingCuringSectionData = (
   sectionId: string,
-  sectionData: Record<string, unknown>[] | undefined,
+  sectionData: unknown,
 ): CasePrepDetailSection => {
   const fields: CasePrepDetailField[] = [];
   const tables: CasePrepDetailTable[] = [];
 
   if (isFlatCastingCuringTable(sectionData)) {
     pushCastingCuringTable(tables, sectionId, sectionData);
-  } else {
-    (sectionData ?? []).forEach((dataRow) => {
+  } else if (Array.isArray(sectionData)) {
+    sectionData.forEach((dataRow) => {
       walkCastingCuringValue(sectionId, dataRow, fields, tables);
     });
   }

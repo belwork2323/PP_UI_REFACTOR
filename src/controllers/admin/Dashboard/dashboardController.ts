@@ -12,7 +12,7 @@ export const dashboardController = {
     filterType = "week",
     startDate?: string,
     endDate?: string,
-    mode: "light" | "dark" = "light",
+    mode = "light",
   ) => {
     try {
       const response = await fetchDashboardStatsApi(filterType, startDate, endDate);

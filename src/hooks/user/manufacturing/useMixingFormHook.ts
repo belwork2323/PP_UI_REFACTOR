@@ -84,7 +84,7 @@ export const useMixingFormHook = (
   }, []);
 
   const handleAddStageCard = useCallback(() => {
-    if (!canAddStageCard || selectedStageNo === "") return;
+    if (!canAddStageCard) return;
 
     if (selectedMixingStage === "PREMIX") {
       if (premixCards.some((entry) => entry.premixNo === String(selectedStageNo))) return;

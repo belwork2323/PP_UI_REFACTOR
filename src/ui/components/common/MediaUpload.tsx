@@ -377,6 +377,29 @@ const ExistingFilePreview = ({
  *   description — optional helper text
  *   accept      — optional mime string (defaults to images + videos)
  */
+type ExistingMediaFile = {
+  fileUrl?: string;
+  mimeType?: string;
+  fileName?: string;
+};
+
+type MediaUploadProps = {
+  value: File | null;
+  onChange: (file: File | null) => void;
+  existingFile?: ExistingMediaFile | null;
+  onClearExisting?: () => void;
+  label?: string;
+  description?: string;
+  accept?: string;
+  variant?: string;
+  hideLabel?: boolean;
+  uploadedFileLabel?: string;
+  changeFileLabel?: string;
+  removeFileLabel?: string;
+  openFileLabel?: string;
+  pendingUploadHint?: string;
+};
+
 const MediaUpload = ({
   value,
   onChange,
@@ -392,7 +415,7 @@ const MediaUpload = ({
   removeFileLabel = "Remove",
   openFileLabel = "Open file",
   pendingUploadHint = "Saved with this form. Use Change file to upload a replacement.",
-}) => {
+}: MediaUploadProps) => {
   const isCompact = variant === "compact";
   const inputRef = useRef(null);
   const [isDragging, setIsDragging] = useState(false);

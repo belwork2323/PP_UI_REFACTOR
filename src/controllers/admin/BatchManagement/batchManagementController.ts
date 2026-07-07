@@ -13,9 +13,9 @@ import {
   CreateBatchPayload,
   UpdateBatchPayload,
 } from "@data/models/admin/BatchManagement/BatchManagementModel";
-import { useAlertStore } from "../../../app/store/alertStore";
-import { useAuthStore }  from "../../../app/store/authStore";
-import { parseApiError } from "../common/generalController";
+import { useAlertStore } from "@app/store/alertStore";
+import { useAuthStore } from "@app/store/authStore";
+import { parseApiError } from "@controllers/admin/common/generalController";
 
 export const batchManagementController = {
 

@@ -11,7 +11,7 @@ import {
   ProjectStatsModel,
   CreateProjectPayload,
 } from "@data/models/admin/ProjectManagement/ProjectManagementModel";
-import { ApiResponseModel } from "../../../data/models/common/ApiResponseModel";
+import { ApiResponseModel } from "@data/models/common/ApiResponseModel";
 
 export const projectManagementController = {
   /* ─────────────────────────────

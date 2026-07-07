@@ -155,7 +155,6 @@ const DispatchForm = ({
           <DispatchSchemaPanel
             schema={formData.dispatchSchema}
             formValues={formData.schemaFormValues}
-            savedSections={formData.savedSections}
             subDepartmentId={subDepartmentId}
             batchId={batch?.batchId}
             onChange={onFormValuesChange}

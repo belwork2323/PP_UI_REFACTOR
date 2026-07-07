@@ -1,4 +1,3 @@
-// src/pages/DashboardPage.jsx
 import React, { useState } from "react";
 import {
   Box,

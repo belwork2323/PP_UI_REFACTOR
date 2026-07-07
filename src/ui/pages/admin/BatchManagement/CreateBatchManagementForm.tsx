@@ -6,7 +6,7 @@ import {
   FormControl, InputLabel, Select, MenuItem, CircularProgress, Zoom,
 } from "@mui/material";
 
-import { icons } from "@app/theme";
+import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
 import Input from "@ui/components/common/Input";
 import AdminManagementFormHeader from "@ui/components/custom/admin/AdminManagementFormHeader";

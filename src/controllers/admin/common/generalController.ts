@@ -1,5 +1,5 @@
-import { fetchDepartments, fetchSubDepartments, fetchRoles } from "../../../data/api/common/generalAPI";
-import { ApiResponseModel } from "../../../data/models/common/ApiResponseModel";
+import { fetchDepartments, fetchSubDepartments, fetchRoles } from "@data/api/common/generalAPI";
+import { ApiResponseModel } from "@data/models/common/ApiResponseModel";
 
 /**
  * Utility to parse standard backend error responses into readable messages

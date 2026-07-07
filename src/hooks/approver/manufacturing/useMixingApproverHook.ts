@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 
 import { useAlertStore } from "../../../app/store/alertStore";
+import { useAuthStore } from "../../../app/store/authStore";
 import { STRINGS } from "../../../app/config/strings";
 import mixingController from "../../../controllers/user/manufacturing/mixingController";
 import {
@@ -24,10 +25,20 @@ type ApproverListRow = Record<string, unknown> & {
 
 export const useMixingApproverHook = () => {
   const showAlert = useAlertStore((state) => state.showAlert);
+  const user = useAuthStore((state) => state.user);
   const [items, setItems] = useState<ApproverListRow[]>([]);
   const [selected, setSelected] = useState<ApproverListRow | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailView, setDetailView] = useState<MixingDetailView | null>(null);
+
+  const subDepartmentId = useMemo(() => {
+    const match =
+      user?.allSubDepartments?.find(
+        (item) => item.slugs?.dept === "manufacturing" && item.slugs?.subDept === SUB_DEPARTMENT,
+      ) ??
+      user?.allSubDepartments?.find((item) => item.slugs?.subDept === SUB_DEPARTMENT);
+    return match?.subDepartmentId ?? null;
+  }, [user]);
 
   const { dialogProps, requestApprove, requestReject } = useApproverFormAction({
     department: DEPARTMENT,
@@ -50,7 +61,14 @@ export const useMixingApproverHook = () => {
       return;
     }
 
-    const response = await mixingController.fetchFormDetails({ formId });
+    if (!subDepartmentId) {
+      setDetailsLoading(false);
+      setSelected(null);
+      showAlert(S.SUB_DEPARTMENT_MISSING, "error", { autoCloseMs: 3000 });
+      return;
+    }
+
+    const response = await mixingController.fetchFormDetails({ formId, subDepartmentId });
 
     setDetailsLoading(false);
 

@@ -6,10 +6,11 @@ import spacing     from "../../../spacing";
 import layout      from "../../../layout";
 import general     from "../../common/common_css_theme";
 import { getSharedTheme } from "../../shared/shared_theme";
+import { getAdminCommonTheme } from "../admin_common_theme";
 
-const getBatchManagementTheme = (mode = "light") => {
+const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
   const shared  = getSharedTheme(mode);
-  const adminTheme = shared.adminManagement;
+  const adminTheme = getAdminCommonTheme(mode);
   const d = colors.dashboard[mode as "light" | "dark"];
 
   const isDark          = mode === "dark";
@@ -31,19 +32,6 @@ const getBatchManagementTheme = (mode = "light") => {
     pageHeader: {
       ...adminTheme.pageHeader,
       newBatchButton: adminTheme.primaryButton,
-    },
-
-    // ─── STAT PILLS (kept for StatPill component compatibility) ───────────────
-    statPills: {
-      ...adminTheme.statPills,
-      colors: {
-        total:      { color: accentBlue,            bg: accentBlueMuted },
-        inProgress: { color: "#0369a1",             bg: "rgba(3,105,161,0.10)" },
-        completed:  { color: colors.success.main,   bg: alpha(colors.success.main, 0.10) },
-        pending:    { color: "#6b7280",              bg: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" },
-        rejected:   { color: colors.error.main,     bg: alpha(colors.error.main, 0.10) },
-        showing:    { color: d.textSecondary,        bg: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.04)" },
-      },
     },
 
     toolbar: adminTheme.toolbar,

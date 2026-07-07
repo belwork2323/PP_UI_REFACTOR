@@ -1,5 +1,5 @@
-import { get, post } from "../httpClient";
-import { DISPATCH_APPROVER_ENDPOINTS } from "../endPoints";
+import { get, post } from "../../httpClient";
+import { DISPATCH_APPROVER_ENDPOINTS } from "../../endPoints";
 
 export const fetchDraftDispatchesApi = () => 
   get(DISPATCH_APPROVER_ENDPOINTS.PENDING_LIST);

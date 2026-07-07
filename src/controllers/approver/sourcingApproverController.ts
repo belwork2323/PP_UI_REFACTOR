@@ -1,5 +1,5 @@
-import { fetchPendingTasksApi, submitApprovalActionApi } from "../../data/api/approver_sourcing/sourcingApproverApi";
-import { useAlertStore } from "../../app/store/alertStore";
+import { fetchPendingTasksApi, submitApprovalActionApi } from "@data/api/approver/sourcing/sourcingApproverApi";
+import { useAlertStore } from "@app/store/alertStore";
 
 export const sourcingApproverController = {
   getPendingTasks: async () => {

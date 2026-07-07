@@ -1,4 +1,3 @@
-// src/data/api/admin/DashBoardAPI.ts
 import { post } from "../../httpClient";
 import { ADMIN_ENDPOINTS } from "../../endPoints";
 

@@ -2,10 +2,10 @@
 import { Navigate } from "react-router-dom";
 import LoginPage from "../../ui/pages/auth/LoginPage";
 
-import DashboardPage from "../../ui/pages/admin/Dashboard/DashboardPage";
-import UserManagementPage from "../../ui/pages/admin/UserManagement/UserManagementPage";
-import BatchManagementPage from "../../ui/pages/admin/BatchManagement/BatchManagementPage";
-import ProjectManagementPage from "../../ui/pages/admin/ProjectManagement/ProjectManagementPage";
+import DashboardPage from "@ui/pages/admin/Dashboard/DashboardPage";
+import UserManagementPage from "@ui/pages/admin/UserManagement/UserManagementPage";
+import BatchManagementPage from "@ui/pages/admin/BatchManagement/BatchManagementPage";
+import ProjectManagementPage from "@ui/pages/admin/ProjectManagement/ProjectManagementPage";
 import SystemManagerDashboard from "../../ui/pages/systemManager/SystemManagerDashboard";
 import SourcingDashboard from "../../ui/pages/user/sourcing/SourcingDashboard";
 import ManufacturingDashboard from "../../ui/pages/user/manufacturing/ManufacturingDashboard";
