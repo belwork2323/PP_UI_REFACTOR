@@ -11,7 +11,9 @@ import {
 import { LineChart, BarChart } from "@mui/x-charts";
 import Menu     from "@mui/material/Menu";
 
-import getDashboardTheme from "../../../app/theme/custom_themes/admin/dashboard_theme";
+import getDashboardWidgetsTheme from "../../../app/theme/custom_themes/shared/dashboard_widgets_theme";
+import getDashboardTableTheme from "../../../app/theme/custom_themes/shared/dashboard_table_theme";
+import { getSharedTheme } from "../../../app/theme/custom_themes/shared/shared_theme";
 import getSystemManagerTheme from "../../../app/theme/custom_themes/system_manager/sysDashboard_theme";
 import { icons } from "../../../app/theme/icons";
 import { STRINGS } from "../../../app/config/strings";
@@ -21,13 +23,13 @@ import useSMDashboard from "../../../hooks/system_manager/useSMDashboardHook";
 import useSMInProgressBatches from "../../../hooks/system_manager/useSMInProgressBatchesHook";
 import useSMNotificationMenu from "../../../hooks/system_manager/useSMNotificationMenuHook";
 import useSMBatchStatusDetails from "../../../hooks/system_manager/useSMBatchStatusDetailsHook";
-import DashboardChartCard  from "../../components/custom/DashboardChartCard";
-import { DashKPICard }      from "../../components/custom/DashKPICard";
-import DashboardDateFilter  from "../../components/custom/DashboardDateFilter";
-import InProgressBatchesTable from "../../components/custom/InProgressBatchesTable";
-import FilterToggleButton from "../../components/custom/FilterToggleButton";
+import DashboardChartCard from "../../components/custom/dashboard/DashboardChartCard";
+import { DashKPICard } from "../../components/custom/dashboard/DashKPICard";
+import DashboardDateFilter from "../../components/custom/dashboard/DashboardDateFilter";
+import InProgressBatchesTable from "../../components/custom/dashboard/InProgressBatchesTable";
+import FilterToggleButton from "../../components/common/FilterToggleButton";
 import FilterSelect from "../../components/common/FilterSelect";
-import FilterPanelHeader from "../../components/custom/FilterPanelHeader";
+import FilterPanelHeader from "../../components/custom/dashboard/FilterPanelHeader";
 import BatchDetailPopup from "./components/BatchDetails";
 import BatchStatusDetailsPanel from "./components/BatchStatusDetailsPanel";
 import StageStatusPanel from "./components/StageStatusPanel";
@@ -63,7 +65,18 @@ function resolveKpiIcon(iconKey)   { return KPI_ICON_MAP[iconKey]   ?? Inventory
 export default function SystemManagerDashboard() {
   const mode = useThemeStore((s) => s.mode);
   const t    = useMemo(() => getSystemManagerTheme(mode), [mode]);
-  const adminTh = useMemo(() => getDashboardTheme(mode), [mode]);
+  const widgetTh = useMemo(() => getDashboardWidgetsTheme(mode), [mode]);
+  const sharedTh = useMemo(() => getSharedTheme(mode), [mode]);
+  const adminTh = useMemo(
+    () => ({
+      ...widgetTh,
+      table: getDashboardTableTheme(mode),
+      card: sharedTh.card,
+      filterMenuProps: sharedTh.filterMenuProps,
+      filterMenuItemSx: sharedTh.filterMenuItemSx,
+    }),
+    [widgetTh, sharedTh, mode]
+  );
   const S    = STRINGS.SYSTEM_MANAGER_DASHBOARD;
 
   const {

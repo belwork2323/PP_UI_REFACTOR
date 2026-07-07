@@ -5,7 +5,7 @@ import { STRINGS } from "../../../app/config/strings";
 import type { getOperationsTheme } from "../../../app/theme/custom_themes/shared/operations_theme";
 import type { SubdepartmentBatchListAdvancedFilters } from "../../../hooks/user/useSubdepartmentBatches";
 import ManufacturingBatchListFilterPanel from "../../pages/user/manufacturing/components/ManufacturingBatchListFilterPanel";
-import FilterToggleButton from "./FilterToggleButton";
+import FilterToggleButton from "../common/FilterToggleButton";
 
 const FILTER_ALL = STRINGS.USER_BATCH_LIST.FILTER_ALL;
 

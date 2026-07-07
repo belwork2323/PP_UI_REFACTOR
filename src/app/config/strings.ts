@@ -2129,6 +2129,71 @@ export const STRINGS = {
     }
   },
 
+  /* -------- ADMIN PROJECT MANAGEMENT -------- */
+  PROJECT_MANAGEMENT: {
+    PAGE: {
+      TITLE: "Project Management",
+      SUBTITLE: "Manage all projects in the system",
+      NEW_PROJECT_BUTTON: "New Project",
+      LOADING_PLACEHOLDER: "…",
+    },
+    STATS: [
+      { label: "Total Projects", subLabel: "All projects", variant: "total" },
+      { label: "Created Today", subLabel: "Today", variant: "today" },
+      { label: "This Month", subLabel: "Current month", variant: "month" },
+      { label: "Active", subLabel: "Active projects", variant: "active" },
+      { label: "Idle", subLabel: "Idle projects", variant: "idle" },
+    ],
+    TOOLBAR: {
+      SEARCH_PLACEHOLDER: "Search projects…",
+      FILTERS_BUTTON: "Filters",
+      FILTERS_BUTTON_WITH_COUNT: (n: number) => `Filters (${n})`,
+      CLEAR_ALL: "Clear all",
+      FILTER_DATE_FROM_LABEL: "From Date",
+      FILTER_DATE_TO_LABEL: "To Date",
+    },
+    TABLE_COLS: ["Project ID", "Project Name", "Description", "Created On", "Actions"],
+    TABLE: {
+      EMPTY: "No projects found",
+    },
+    DELETE_DIALOG: {
+      TITLE: "Delete Project?",
+      BODY: (name: string) =>
+        `This will permanently remove "${name}" and all associated data. This action cannot be undone.`,
+      FALLBACK_MESSAGE: "Delete this project?",
+      CANCEL: "Cancel",
+      CONFIRM: "Delete Project",
+      DELETING: "Deleting…",
+    },
+    FORM: {
+      EDIT_TITLE: "Edit Project",
+      CREATE_TITLE: "Create New Project",
+      EDIT_SUBTITLE: (name: string) => `Updating: ${name}`,
+      CREATE_SUBTITLE: "Enter project details below. All fields are required.",
+      NAME_LABEL: "Project Name",
+      NAME_PLACEHOLDER: "e.g. Solid Propellant Development",
+      DESCRIPTION_LABEL: "Project Description",
+      DESCRIPTION_PLACEHOLDER: "e.g. Development of next-generation propellant",
+      CANCEL: "Cancel",
+      SAVE: "Save",
+      SAVING: "Saving…",
+    },
+    MESSAGES: {
+      NAME_REQUIRED: "Project name is required",
+      CREATING: "Creating project…",
+      UPDATING: "Updating project…",
+      CREATE_SUCCESS: "Project created successfully",
+      UPDATE_SUCCESS: "Project updated successfully",
+      DELETING: "Deleting project…",
+      DELETE_SUCCESS: "Project deleted successfully",
+      DELETE_ID_MISSING: "Project ID not found for deletion",
+    },
+    ERRORS: {
+      LOAD_STATS_FAILED: "Failed to load project stats",
+      OPERATION_FAILED: "An error occurred on server",
+    },
+  },
+
   /* -------- ADMIN BATCH MANAGEMENT -------- */
   BATCH_MANAGEMENT: {
     PAGE: {

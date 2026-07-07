@@ -2,7 +2,7 @@ import { useState, useCallback, useEffect } from "react";
 import { batchManagementController } from "@controllers/admin/BatchManagement/batchManagementController";
 import { generalController } from "@controllers/admin/common/generalController";
 import { userManagementController } from "@controllers/admin/UserManagement/userManagementController";
-import { projectManagementController } from "@controllers/admin/project_management/projectManagementController";
+import { projectManagementController } from "@controllers/admin/ProjectManagement/projectManagementController";
 import { operationsController } from "@controllers/user/operationsController";
 import rawMaterialProcurementController from "@controllers/user/sourcing/rawMaterialProcurementController";
 import { parseIdentificationSheetFromApi } from "@data/models/admin/BatchManagement/BatchManagementModel";

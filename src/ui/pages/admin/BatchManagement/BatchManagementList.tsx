@@ -4,8 +4,8 @@ import { Box, Typography, Chip, Button, Tooltip, IconButton } from "@mui/materia
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
 import UserActions from "@ui/components/common/UserActions";
-import AdminManagementDataTable from "@ui/components/custom/AdminManagementDataTable";
-import type { AdminManagementColumn } from "@ui/components/custom/AdminManagementDataTable";
+import AdminManagementDataTable from "@ui/components/custom/admin/AdminManagementDataTable";
+import type { AdminManagementColumn } from "@ui/components/custom/admin/AdminManagementDataTable";
 
 import {
   stageConfig,

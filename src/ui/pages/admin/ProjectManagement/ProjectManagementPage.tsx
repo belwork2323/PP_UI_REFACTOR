@@ -1,49 +1,49 @@
 import React from "react";
-import { Box, Button, Stack } from "@mui/material";
+import { Box, Button } from "@mui/material";
 import Input from "@ui/components/common/Input";
 import { icons } from "@app/theme/icons";
-import getUserManagementTheme from "@app/theme/custom_themes/admin/UserManagement/userManagement_theme";
+import getProjectManagementTheme from "@app/theme/custom_themes/admin/ProjectManagement/projectManagement_theme";
 import { STRINGS } from "@app/config/strings";
-import FilterSelect from "@ui/components/common/FilterSelect";
 import ConfirmAlertDialog from "@ui/components/common/ConfirmAlertDialog";
 import AdminManagementStatsGrid from "@ui/components/custom/admin/AdminManagementStatsGrid";
 import AdminManagementPageHeader from "@ui/components/custom/admin/AdminManagementPageHeader";
 import AdminManagementToolbar from "@ui/components/custom/admin/AdminManagementToolbar";
-import useUserManagementHook from "@hooks/admin/UserManagement/useUserManagementHook";
-import { getDisplayName, getUsername } from "@utils/userManagementUtils";
-import UserManagementList from "./UserManagementList";
-import CreateUserManagementForm from "./CreateUserManagementForm";
+import useProjectManagementHook from "@hooks/admin/ProjectManagement/useProjectManagementHook";
+import { getProjectName } from "@utils/projectManagementUtils";
+import ProjectManagementList from "./ProjectManagementList";
+import CreateProjectManagementForm from "./CreateProjectManagementForm";
 
-const S = STRINGS.USER_MANAGEMENT;
+const S = STRINGS.PROJECT_MANAGEMENT;
 
 const STAT_ICONS: Record<string, React.ReactNode> = {
   total: <icons.userMgmt.personOutline sx={{ fontSize: 22 }} />,
+  today: <icons.userMgmt.activeStatus sx={{ fontSize: 22 }} />,
+  month: <icons.userMgmt.activeStatus sx={{ fontSize: 22 }} />,
   active: <icons.userMgmt.activeStatus sx={{ fontSize: 22 }} />,
-  inactive: <icons.userMgmt.inactiveStatus sx={{ fontSize: 22 }} />,
-  reset: <icons.userMgmt.lockIcon sx={{ fontSize: 22 }} />,
+  idle: <icons.userMgmt.inactiveStatus sx={{ fontSize: 22 }} />,
 };
 
-type UserManagementPageProps = {
+const STAT_VALUE_KEYS: Record<string, "totalProjects" | "projectsCreatedToday" | "projectsCreatedThisMonth" | "activeProjects" | "idleProjects"> = {
+  total: "totalProjects",
+  today: "projectsCreatedToday",
+  month: "projectsCreatedThisMonth",
+  active: "activeProjects",
+  idle: "idleProjects",
+};
+
+type ProjectManagementPageProps = {
   mode?: "light" | "dark";
 };
 
-const UserManagementPage = ({ mode = "light" }: UserManagementPageProps) => {
-  const t = getUserManagementTheme(mode);
-  const { list, stats, lookups, form, delete: deleteSection } = useUserManagementHook();
+const ProjectManagementPage = ({ mode = "light" }: ProjectManagementPageProps) => {
+  const t = getProjectManagementTheme(mode);
+  const { list, stats, form, delete: deleteSection } = useProjectManagementHook();
 
   const statRows = S.STATS.map((s) => ({
     ...s,
     value: stats.loading
       ? S.PAGE.LOADING_PLACEHOLDER
-      : (stats.stats as Record<string, number>)[
-          s.variant === "total"
-            ? "totalUsers"
-            : s.variant === "active"
-              ? "activeUsers"
-              : s.variant === "inactive"
-                ? "inactiveUsers"
-                : "pendingResetRequests"
-        ],
+      : stats.stats[STAT_VALUE_KEYS[s.variant]],
     icon: STAT_ICONS[s.variant],
   }));
 
@@ -60,9 +60,9 @@ const UserManagementPage = ({ mode = "light" }: UserManagementPageProps) => {
             startIcon={<icons.userMgmt.add />}
             onClick={form.openCreate}
             disabled={list.loading}
-            sx={t.pageHeader.newUserButton}
+            sx={t.pageHeader.newProjectButton}
           >
-            {S.PAGE.NEW_USER_BUTTON}
+            {S.PAGE.NEW_PROJECT_BUTTON}
           </Button>
         }
         theme={t}
@@ -76,7 +76,7 @@ const UserManagementPage = ({ mode = "light" }: UserManagementPageProps) => {
         searchPlaceholder={S.TOOLBAR.SEARCH_PLACEHOLDER}
         searchIcon={<icons.userMgmt.search sx={t.toolbar.searchIcon} />}
         filterOpen={list.filterOpen}
-        onFilterToggle={() => list.setFilterOpen((prev: boolean) => !prev)}
+        onFilterToggle={() => list.setFilterOpen((prev) => !prev)}
         filtersButtonLabel={
           list.activeFilters > 0
             ? S.TOOLBAR.FILTERS_BUTTON_WITH_COUNT(list.activeFilters)
@@ -84,26 +84,23 @@ const UserManagementPage = ({ mode = "light" }: UserManagementPageProps) => {
         }
         filterContent={
           <>
-            <FilterSelect
-              label={S.TOOLBAR.FILTER_ROLE_LABEL}
-              value={list.filterRole}
-              onChange={(e) => { list.setFilterRole(e.target.value); list.setPage(0); }}
-              options={lookups.roleNames}
+            <Input
+              type="date"
+              label={S.TOOLBAR.FILTER_DATE_FROM_LABEL}
+              value={list.fromDate}
+              onChange={(e) => { list.setFromDate(e.target.value); list.setPage(0); }}
+              size="small"
               sx={t.toolbar.filterSelect}
+              InputLabelProps={{ shrink: true }}
             />
-            <FilterSelect
-              label={S.TOOLBAR.FILTER_DEPT_LABEL}
-              value={list.filterDept}
-              onChange={(e) => { list.setFilterDept(e.target.value); list.setPage(0); }}
-              options={lookups.deptNames}
+            <Input
+              type="date"
+              label={S.TOOLBAR.FILTER_DATE_TO_LABEL}
+              value={list.toDate}
+              onChange={(e) => { list.setToDate(e.target.value); list.setPage(0); }}
+              size="small"
               sx={t.toolbar.filterSelect}
-            />
-            <FilterSelect
-              label={S.TOOLBAR.FILTER_STATUS_LABEL}
-              value={list.filterStatus}
-              onChange={(e) => { list.setFilterStatus(e.target.value); list.setPage(0); }}
-              options={S.STATUSES}
-              sx={t.toolbar.filterSelect}
+              InputLabelProps={{ shrink: true }}
             />
             {list.activeFilters > 0 && (
               <Button size="small" onClick={list.handleClearFilters} sx={t.toolbar.clearButton}>
@@ -115,8 +112,8 @@ const UserManagementPage = ({ mode = "light" }: UserManagementPageProps) => {
         theme={t}
       />
 
-      <UserManagementList
-        paginated={list.users}
+      <ProjectManagementList
+        paginated={list.projects}
         loading={list.loading}
         page={list.page}
         totalCount={list.paginationData.totalRecords}
@@ -128,16 +125,13 @@ const UserManagementPage = ({ mode = "light" }: UserManagementPageProps) => {
         onRowsPerPageChange={(e) => { list.setRowsPerPage(+e.target.value); list.setPage(0); }}
       />
 
-      <CreateUserManagementForm
+      <CreateProjectManagementForm
         open={form.modalOpen}
         onClose={() => form.setModalOpen(false)}
         onSave={form.handleSave}
         editTarget={form.editTarget}
         form={form.form}
         onFormChange={form.handleFormChange}
-        onSubDeptsChange={form.handleSubDeptsChange}
-        availableRoles={lookups.roles}
-        availableSubDepts={lookups.allSubDepts}
         saving={form.saving}
         t={t}
       />
@@ -148,17 +142,17 @@ const UserManagementPage = ({ mode = "light" }: UserManagementPageProps) => {
         title={S.DELETE_DIALOG.TITLE}
         message={
           deleteTarget
-            ? S.DELETE_DIALOG.BODY(getDisplayName(deleteTarget), getUsername(deleteTarget))
+            ? S.DELETE_DIALOG.BODY(getProjectName(deleteTarget))
             : S.DELETE_DIALOG.FALLBACK_MESSAGE
         }
-        confirmLabel={deleteSection.deleting ? S.DELETE_DIALOG.DELETING : S.DELETE_DIALOG.CONFIRM}
         cancelLabel={S.DELETE_DIALOG.CANCEL}
-        confirmDisabled={deleteSection.deleting}
+        confirmLabel={deleteSection.deleting ? S.DELETE_DIALOG.DELETING : S.DELETE_DIALOG.CONFIRM}
+        onCancel={() => deleteSection.setDeleteOpen(false)}
         onConfirm={deleteSection.handleDelete}
-        onCancel={() => !deleteSection.deleting && deleteSection.setDeleteOpen(false)}
+        confirmDisabled={deleteSection.deleting}
       />
     </Box>
   );
 };
 
-export default UserManagementPage;
+export default ProjectManagementPage;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { projectManagementController } from "../../../controllers/admin/project_management/projectManagementController";
+import { projectManagementController } from "@controllers/admin/ProjectManagement/projectManagementController";
 import { operationsController } from "../../../controllers/user/operationsController";
 
 export type ProjectOption = { projectId: string; projectName: string };

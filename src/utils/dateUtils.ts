@@ -5,6 +5,38 @@ const toApiDate = (date: Date): string => {
   return `${day}-${month}-${year}`;
 };
 
+const toIsoDate = (date: Date): string => date.toISOString().split("T")[0];
+
+/** Convert YYYY-MM-DD to DD-MM-YYYY for API payloads. */
+export const formatIsoToApiDate = (iso: string): string => {
+  if (!iso) return "";
+  const [year, month, day] = iso.split("-");
+  return `${day}-${month}-${year}`;
+};
+
+/** Dashboard global date filter bounds (DD-MM-YYYY). */
+export const getDashboardFilterBounds = (filterType: string) => {
+  const now = new Date();
+  const endIso = toIsoDate(now);
+
+  if (filterType === "day") {
+    return { startDate: toApiDate(now), endDate: toApiDate(now) };
+  }
+
+  if (filterType === "week") {
+    const start = new Date(now.getTime() - 6 * 24 * 60 * 60 * 1000);
+    return { startDate: toApiDate(start), endDate: toApiDate(now) };
+  }
+
+  if (filterType === "month") {
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    return { startDate: toApiDate(monthStart), endDate: toApiDate(monthEnd) };
+  }
+
+  return { startDate: formatIsoToApiDate(endIso), endDate: formatIsoToApiDate(endIso) };
+};
+
 /** Returns DD-MM-YYYY bounds for batch/dashboard stats filters. */
 export const getDateRange = (filterType: string) => {
   const now = new Date();

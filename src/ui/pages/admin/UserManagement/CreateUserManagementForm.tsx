@@ -8,7 +8,7 @@ import {
 import { icons } from "@app/theme";
 import Input from "@ui/components/common/Input";
 import { roleConfig } from "@app/theme/roleConfig";
-import AdminManagementFormHeader from "@ui/components/custom/AdminManagementFormHeader";
+import AdminManagementFormHeader from "@ui/components/custom/admin/AdminManagementFormHeader";
 import { getDisplayName } from "@utils/userManagementUtils";
 import { STRINGS } from "@app/config/strings";
 

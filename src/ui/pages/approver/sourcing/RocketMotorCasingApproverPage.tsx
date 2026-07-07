@@ -36,8 +36,8 @@ import useRocketMotorCasingApproverHook, {
 import { formatMotorStageLabel } from "../../../../data/models/approver/RocketMotorCasingApproverModel";
 import ApproverList from "../components/ApproverList";
 import ApproverActionDialog from "../../../components/custom/ApproverActionDialog";
-import FilterPanelHeader from "../../../components/custom/FilterPanelHeader";
-import FilterToggleButton from "../../../components/custom/FilterToggleButton";
+import FilterPanelHeader from "../../../components/custom/dashboard/FilterPanelHeader";
+import FilterToggleButton from "../../../components/common/FilterToggleButton";
 import { ReportPreviewDialog } from "../components/ReportPdf";
 import { STRINGS } from "../../../../app/config/strings";
 import getSourcingTheme from "../../../../app/theme/custom_themes/user/sourcing/sourcing_theme";

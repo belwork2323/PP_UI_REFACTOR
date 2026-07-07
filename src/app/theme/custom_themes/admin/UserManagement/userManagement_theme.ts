@@ -398,36 +398,7 @@ const getUserManagementTheme = (mode = "light") => {
     statsGrid: {
       ...adminTheme.statsGrid,
 
-      colors: {
-        total: {
-          accent:      isDark ? "#3b82f6" : "#1d4ed8",
-          iconBg:      isDark ? "rgba(59,130,246,0.15)" : "rgba(29,78,216,0.08)",
-          iconBorder:  isDark ? "rgba(59,130,246,0.30)" : "rgba(29,78,216,0.18)",
-          iconColor:   isDark ? "#93c5fd" : "#1d4ed8",
-          value:       isDark ? "#93c5fd" : "#1d4ed8",
-        },
-        active: {
-          accent:      isDark ? "#22c55e" : "#15803d",
-          iconBg:      isDark ? "rgba(34,197,94,0.15)"  : "rgba(21,128,61,0.08)",
-          iconBorder:  isDark ? "rgba(34,197,94,0.30)"  : "rgba(21,128,61,0.18)",
-          iconColor:   isDark ? "#86efac" : "#15803d",
-          value:       isDark ? "#86efac" : "#15803d",
-        },
-        inactive: {
-          accent:      isDark ? "#f87171" : "#dc2626",
-          iconBg:      isDark ? "rgba(248,113,113,0.15)" : "rgba(220,38,38,0.08)",
-          iconBorder:  isDark ? "rgba(248,113,113,0.30)" : "rgba(220,38,38,0.18)",
-          iconColor:   isDark ? "#fca5a5" : "#dc2626",
-          value:       isDark ? "#fca5a5" : "#dc2626",
-        },
-        reset: {
-          accent:      isDark ? "#fb923c" : "#c2410c",
-          iconBg:      isDark ? "rgba(251,146,60,0.15)"  : "rgba(194,65,12,0.08)",
-          iconBorder:  isDark ? "rgba(251,146,60,0.30)"  : "rgba(194,65,12,0.18)",
-          iconColor:   isDark ? "#fdba74" : "#c2410c",
-          value:       isDark ? "#fdba74" : "#c2410c",
-        },
-      },
+      colors: colors.admin.userStats[mode as "light" | "dark"],
     },
 
   };

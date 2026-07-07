@@ -9,7 +9,7 @@ import {
 import { icons } from "@app/theme";
 import { STRINGS } from "@app/config/strings";
 import Input from "@ui/components/common/Input";
-import AdminManagementFormHeader from "@ui/components/custom/AdminManagementFormHeader";
+import AdminManagementFormHeader from "@ui/components/custom/admin/AdminManagementFormHeader";
 import { priorityConfig } from "@app/theme/roleConfig";
 
 const S = STRINGS.BATCH_MANAGEMENT.FORM;

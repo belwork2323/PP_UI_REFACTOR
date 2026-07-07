@@ -8,8 +8,8 @@ import RoleChip from "@ui/components/custom/RoleChip";
 import StatusChip from "@ui/components/common/StatusChip";
 import UserActions from "@ui/components/common/UserActions";
 import SubDeptChips from "@ui/components/custom/SubDeptChips";
-import AdminManagementDataTable from "@ui/components/custom/AdminManagementDataTable";
-import type { AdminManagementColumn } from "@ui/components/custom/AdminManagementDataTable";
+import AdminManagementDataTable from "@ui/components/custom/admin/AdminManagementDataTable";
+import type { AdminManagementColumn } from "@ui/components/custom/admin/AdminManagementDataTable";
 
 import {
   getDisplayName,

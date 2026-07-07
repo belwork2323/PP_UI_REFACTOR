@@ -35,8 +35,8 @@ import useRawMaterialApproverHook, {
 } from "../../../../hooks/approver/sourcing/useRawMaterialApproverHook";
 import ApproverList from "../components/ApproverList";
 import ApproverActionDialog from "../../../components/custom/ApproverActionDialog";
-import FilterPanelHeader from "../../../components/custom/FilterPanelHeader";
-import FilterToggleButton from "../../../components/custom/FilterToggleButton";
+import FilterPanelHeader from "../../../components/custom/dashboard/FilterPanelHeader";
+import FilterToggleButton from "../../../components/common/FilterToggleButton";
 import { ReportPreviewDialog } from "../components/ReportPdf";
 import { STRINGS } from "../../../../app/config/strings";
 

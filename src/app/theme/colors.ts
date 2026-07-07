@@ -13,6 +13,8 @@
 // and the sleek standard dark experience (dark).
 // ─────────────────────────────────────────────────────────────────────────────
 
+import adminPalette from "./palettes/adminPalette";
+
 const colors = {
   primary: {
     main:  "#1976d2",
@@ -343,6 +345,8 @@ const colors = {
       chartHeaderArea: "linear-gradient(135deg, #263238 0%, #37474f 45%, #455a64 100%)",
     },
   },
+
+  admin: adminPalette,
 };
 
 export default colors;

@@ -324,43 +324,7 @@ const getBatchManagementTheme = (mode = "light") => {
         minWidth: 900,
       },
 
-      colors: {
-        total: {
-          accent:     isDark ? "#3b82f6" : "#1d4ed8",
-          iconBg:     isDark ? "rgba(59,130,246,0.15)"  : "rgba(29,78,216,0.08)",
-          iconBorder: isDark ? "rgba(59,130,246,0.30)"  : "rgba(29,78,216,0.18)",
-          iconColor:  isDark ? "#93c5fd" : "#1d4ed8",
-          value:      isDark ? "#93c5fd" : "#1d4ed8",
-        },
-        inProgress: {
-          accent:     isDark ? "#38bdf8" : "#0369a1",
-          iconBg:     isDark ? "rgba(56,189,248,0.15)"  : "rgba(3,105,161,0.08)",
-          iconBorder: isDark ? "rgba(56,189,248,0.30)"  : "rgba(3,105,161,0.18)",
-          iconColor:  isDark ? "#7dd3fc" : "#0369a1",
-          value:      isDark ? "#7dd3fc" : "#0369a1",
-        },
-        completed: {
-          accent:     isDark ? "#22c55e" : "#15803d",
-          iconBg:     isDark ? "rgba(34,197,94,0.15)"   : "rgba(21,128,61,0.08)",
-          iconBorder: isDark ? "rgba(34,197,94,0.30)"   : "rgba(21,128,61,0.18)",
-          iconColor:  isDark ? "#86efac" : "#15803d",
-          value:      isDark ? "#86efac" : "#15803d",
-        },
-        pending: {
-          accent:     isDark ? "#a3a3a3" : "#4b5563",
-          iconBg:     isDark ? "rgba(163,163,163,0.15)" : "rgba(75,85,99,0.08)",
-          iconBorder: isDark ? "rgba(163,163,163,0.30)" : "rgba(75,85,99,0.18)",
-          iconColor:  isDark ? "#d4d4d4" : "#4b5563",
-          value:      isDark ? "#d4d4d4" : "#4b5563",
-        },
-        rejected: {
-          accent:     isDark ? "#f87171" : "#dc2626",
-          iconBg:     isDark ? "rgba(248,113,113,0.15)" : "rgba(220,38,38,0.08)",
-          iconBorder: isDark ? "rgba(248,113,113,0.30)" : "rgba(220,38,38,0.18)",
-          iconColor:  isDark ? "#fca5a5" : "#dc2626",
-          value:      isDark ? "#fca5a5" : "#dc2626",
-        },
-      },
+      colors: colors.admin.batchStats[mode as "light" | "dark"],
       bgDecor: {
         background:    isDark
           ? "radial-gradient(ellipse 70% 80% at 50% 50%, rgba(56,189,248,0.05) 0%, transparent 70%)"
