@@ -2,6 +2,7 @@ import { ApiResponseModel } from "../../../data/models/common/ApiResponseModel";
 import {
   PostCureDetailsModel,
   PostCureSubmitResponseModel,
+  type PostCureFormBody,
 } from "../../../data/models/user/PostCureFormModel";
 import {
   createPostCureFormApi,
@@ -13,45 +14,23 @@ export type PostCureCreatePayload = {
   batchId: string;
   subDepartmentId: number;
   formSubmissionType: "DRAFT" | "SUBMIT";
-  motorId: string;
-  decoring: {
-    decoringLoad: string;
-  };
-  trimming: {
-    trimmedZoneDimension: string;
-  };
-  lfFilling: {
-    inspection: string;
-    weight: {
-      heSideAndDate: string;
-      neSideAndDate: string;
-      total: string;
-    };
-  };
-  inhibitionResin: {
-    irType: string;
-    weight: {
-      heSideAndDate: string;
-      neSideAndDate: string;
-      total: string;
-    };
-  };
-};
+  operationType: "LOOSE_FLAP_FILLING" | "INHIBITION";
+  inhibitorType?: "IR1" | "HEMCOAT_3K" | "NOT_APPLICABLE";
+} & PostCureFormBody;
 
 export type PostCureUpdatePayload = {
   formId: string;
+  batchId: string;
   subDepartmentId: number;
-  formSubmissionType: "DRAFT" | "UPDATE";
-  motorId: string;
-  decoring: PostCureCreatePayload["decoring"];
-  trimming: PostCureCreatePayload["trimming"];
-  lfFilling: PostCureCreatePayload["lfFilling"];
-  inhibitionResin: PostCureCreatePayload["inhibitionResin"];
-};
+  formSubmissionType: "DRAFT" | "SUBMIT";
+  operationType: "LOOSE_FLAP_FILLING" | "INHIBITION";
+  inhibitorType?: "IR1" | "HEMCOAT_3K" | "NOT_APPLICABLE";
+} & PostCureFormBody;
+
 
 export type PostCureDetailsPayload = {
   formId: string;
-  subDepartmentId: number;
+  // subDepartmentId: number;
 };
 
 export const postCureController = {

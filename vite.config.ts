@@ -17,7 +17,7 @@ export default defineConfig({
       "@hooks": path.resolve(__dirname, "./src/hooks"),
       "@ui": path.resolve(__dirname, "./src/ui"),
       "@utils": path.resolve(__dirname, "./src/utils"),
-      "@schema": path.resolve(__dirname, "./src/schemaManagement"),
+      "@schema": path.resolve(__dirname, "./src/schema-engine"),
     },
   },
   server: {

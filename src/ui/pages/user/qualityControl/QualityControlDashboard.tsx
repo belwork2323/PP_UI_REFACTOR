@@ -8,7 +8,6 @@ import { useThemeStore } from "../../../../app/store/themeStore";
 import getQualityControlTheme from "../../../../app/theme/custom_themes/user/qualityControl/qualityControl_theme";
 import { STRINGS } from "../../../../app/config/strings";
 
-import RawMaterialRevalidationPage from "./RawMaterialRevalidation/RawMaterialRevalidationPage";
 import QCDivisionPage from "./QCDivision/QCDivisionPage";
 import NDTPage from "./NDT/NDTPage";
 import STFPage from "./StaticTestFacility/StaticTestFacilityPage";
@@ -18,7 +17,7 @@ import STFPage from "./StaticTestFacility/StaticTestFacilityPage";
 
 const SUB_DEPT_LABELS = {
   "raw-material-revalidation": "Raw Material Revalidation",
-  "qc-division":                "QC Division",
+  "qc-division":                "Quality Control",
   "ndt":                       "NDT",
   "static-test-facility":      "Static Test Facility",
 };
@@ -27,7 +26,7 @@ export default function QualityControlDashboard() {
   const { subDept } = useParams();
   const mode = useThemeStore((state) => state.mode);
   const theme = getQualityControlTheme(mode);
-  const { userName, userRole, stats } = useUserDepartmentHeaderHook({
+  const { userName, userRole, stats, statItems } = useUserDepartmentHeaderHook({
     deptSlug: "quality",
     subDeptSlug: subDept,
   });
@@ -40,11 +39,13 @@ export default function QualityControlDashboard() {
         userName={userName}
         userRole={userRole}
         stats={stats}
+        statItems={statItems}
       />
 
       <Box sx={theme.dashboard.content}>
-        {subDept === "raw-material-revalidation" && <RawMaterialRevalidationPage />}
-        {subDept === "qc-division" && <QCDivisionPage />}
+        {(subDept === "raw-material-revalidation" || subDept === "qc-division") && (
+          <QCDivisionPage />
+        )}
         {subDept === "ndt"        && <NDTPage />}
         {subDept === "static-test-facility"  && <STFPage />}
       </Box>

@@ -7,7 +7,7 @@ export const createPostCureFormApi = async (payload: any) => {
 
 export const fetchPostCureFormDetailsApi = async (payload: {
   formId: string;
-  subDepartmentId: number;
+  // subDepartmentId: number;
 }) => {
   return await post(USER_POST_CURE_FORM_ENDPOINTS.FORM_DETAILS, payload);
 };

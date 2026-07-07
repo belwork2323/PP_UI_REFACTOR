@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { systemManagerController } from "../../controllers/system_manager/systemManagerController";
 
 type ActiveBatchLike = Record<string, any>;
 
@@ -19,39 +20,118 @@ export type InProgressBatchUIRow = {
   color?: string;
 };
 
-export function useSMInProgressBatches(activeBatches: ActiveBatchLike[]) {
+const toStageKey = (stageName: string = "") => {
+  const normalized = stageName.toLowerCase();
+  if (normalized.includes("source")) return "sourcing";
+  if (normalized.includes("manufact")) return "manufacturing";
+  if (normalized.includes("quality") || normalized.includes("qc")) return "quality";
+  if (normalized.includes("dispatch")) return "dispatch";
+  return normalized || "sourcing";
+};
+
+const mapActiveBatchToRow = (
+  batch: ActiveBatchLike,
+  stageColors: Record<string, string>,
+): InProgressBatchUIRow => {
+  const stageKey = toStageKey(batch.department ?? batch.stage);
+  return {
+    id: batch.id || batch.batchId,
+    batchId: batch.batchId || "NA",
+    batchType: batch.priority || "NA",
+    motorId: batch.motorId || "NA",
+    motorType: batch.motorTypeName || "NA",
+    projectName: batch.projectName || "NA",
+    currentStage: batch.substage || batch.firstSubDept || "NA",
+    stageDept: batch.stage || batch.department || "",
+    managerName: "NA",
+    managerId: "NA",
+    status: batch.status || "NA",
+    createdOn: batch.createdDate || "",
+    completion: typeof batch.pct === "number" ? batch.pct : (batch.progressPercentage || 0),
+    color: batch.color || stageColors[stageKey] || stageColors.fallback || "#1976d2",
+  };
+};
+
+const resolveTotalRecords = (pagination: Record<string, unknown> | null | undefined, fallback: number) => {
+  const nested = pagination?.pagination as Record<string, unknown> | undefined;
+  const total = Number(
+    pagination?.totalRecords ??
+    pagination?.total ??
+    nested?.totalRecords ??
+    nested?.total ??
+    0,
+  );
+  return total > 0 ? total : fallback;
+};
+
+export function useSMInProgressBatches(stageColors: Record<string, string>) {
   const [batchFilterOpen, setBatchFilterOpen] = useState(false);
   const [batchSearch, setBatchSearch] = useState("");
   const [batchStage, setBatchStage] = useState("All");
   const [batchType, setBatchType] = useState("All");
   const [batchStatus, setBatchStatus] = useState("All");
   const [selectedBatch, setSelectedBatch] = useState<any>(null);
+  const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [batchesLoading, setBatchesLoading] = useState(false);
+  const [activeBatches, setActiveBatches] = useState<ActiveBatchLike[]>([]);
 
-  const inProgressRows = useMemo<InProgressBatchUIRow[]>(() => (
-    activeBatches.map((b: any) => ({
-      id: b.id || b.batchId,
-      batchId: b.batchId || "NA",
-      batchType: b.priority || "NA",
-      motorId: b.motorId || "NA",
-      motorType: b.motorTypeName || "NA",
-      projectName: b.projectName || "NA",
-      currentStage: b.substage || b.firstSubDept || "NA",
-      stageDept: b.stage || b.department || "",
-      managerName: "NA",
-      managerId: "NA",
-      status: b.status || "NA",
-      createdOn: b.createdDate || "",
-      completion: typeof b.pct === "number" ? b.pct : (b.progressPercentage || 0),
-      color: b.color || "#1976d2",
-    }))
-  ), [activeBatches]);
+  const fetchBatches = useCallback(async () => {
+    setBatchesLoading(true);
+    try {
+      const result = await systemManagerController.getActiveBatches({
+        page: page + 1,
+        limit: rowsPerPage,
+        search: batchSearch.trim() || undefined,
+        priority: batchType !== "All" ? batchType : undefined,
+        status: batchStatus !== "All" ? batchStatus : undefined,
+      });
+
+      if (!result.success) {
+        setActiveBatches([]);
+        setTotalRecords(0);
+        return;
+      }
+
+      const mappedBatches = (result.batches ?? []).map((batch: ActiveBatchLike) => {
+        const stageKey = toStageKey(batch.department);
+        return {
+          ...batch,
+          id: batch.batchId,
+          stage: batch.department || "Unassigned",
+          substage: batch.firstSubDept,
+          pct: batch.progressPercentage,
+          color: stageColors[stageKey] ?? stageColors.fallback ?? "#1976d2",
+        };
+      });
+
+      setActiveBatches(mappedBatches);
+      setTotalRecords(resolveTotalRecords(result.pagination, mappedBatches.length));
+    } finally {
+      setBatchesLoading(false);
+    }
+  }, [page, rowsPerPage, batchSearch, batchType, batchStatus, stageColors]);
+
+  useEffect(() => {
+    fetchBatches();
+  }, [fetchBatches]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [batchSearch, batchStage, batchType, batchStatus]);
+
+  const inProgressRows = useMemo<InProgressBatchUIRow[]>(
+    () => activeBatches.map((batch) => mapActiveBatchToRow(batch, stageColors)),
+    [activeBatches, stageColors],
+  );
 
   const stageOptions = useMemo(
     () => [
       "All",
       ...Array.from(new Set(inProgressRows.map((r) => (r.stageDept || r.currentStage || "").trim()).filter(Boolean))),
     ],
-    [inProgressRows]
+    [inProgressRows],
   );
 
   const typeOptions = useMemo(
@@ -59,7 +139,7 @@ export function useSMInProgressBatches(activeBatches: ActiveBatchLike[]) {
       "All",
       ...Array.from(new Set(inProgressRows.map((r) => (r.batchType || "").trim()).filter(Boolean))),
     ],
-    [inProgressRows]
+    [inProgressRows],
   );
 
   const statusOptions = useMemo(
@@ -67,34 +147,17 @@ export function useSMInProgressBatches(activeBatches: ActiveBatchLike[]) {
       "All",
       ...Array.from(new Set(inProgressRows.map((r) => (r.status || "").trim()).filter(Boolean))),
     ],
-    [inProgressRows]
+    [inProgressRows],
   );
 
   const filteredInProgressRows = useMemo(() => {
-    const q = batchSearch.trim().toLowerCase();
+    if (batchStage === "All") return inProgressRows;
 
     return inProgressRows.filter((row) => {
-      const matchesSearch = !q || [
-        row.batchId,
-        row.motorId,
-        row.projectName,
-        row.currentStage,
-        row.stageDept,
-        row.status,
-      ].some((v) => String(v || "").toLowerCase().includes(q));
-
       const rowStage = String(row.stageDept || row.currentStage || "").toLowerCase();
-      const matchesStage = batchStage === "All" || rowStage === batchStage.toLowerCase();
-
-      const rowType = String(row.batchType || "").toLowerCase();
-      const matchesType = batchType === "All" || rowType === batchType.toLowerCase();
-
-      const rowStatus = String(row.status || "").toLowerCase();
-      const matchesStatus = batchStatus === "All" || rowStatus === batchStatus.toLowerCase();
-
-      return matchesSearch && matchesStage && matchesType && matchesStatus;
+      return rowStage === batchStage.toLowerCase();
     });
-  }, [inProgressRows, batchSearch, batchStage, batchType, batchStatus]);
+  }, [inProgressRows, batchStage]);
 
   const activeBatchFilterCount = [
     batchSearch.trim().length > 0,
@@ -110,15 +173,24 @@ export function useSMInProgressBatches(activeBatches: ActiveBatchLike[]) {
     setBatchStatus("All");
   };
 
+  const handlePageChange = (_event: unknown, newPage: number) => {
+    setPage(newPage);
+  };
+
+  const handleRowsPerPageChange = (event: ChangeEvent<HTMLInputElement>) => {
+    setRowsPerPage(parseInt(event.target.value, 10));
+    setPage(0);
+  };
+
   const handleViewDetails = (row: InProgressBatchUIRow) => {
     setSelectedBatch({
-      id:       row.batchId,
-      motorId:  row.motorId  ?? "—",
-      stage:    row.stageDept ?? "—",
+      id: row.batchId,
+      motorId: row.motorId ?? "—",
+      stage: row.stageDept ?? "—",
       substage: row.currentStage ?? "—",
-      status:   row.status   ?? "Active",
-      pct:      row.completion ?? 0,
-      color:    row.color    ?? "#1976d2",
+      status: row.status ?? "Active",
+      pct: row.completion ?? 0,
+      color: row.color ?? "#1976d2",
     });
   };
 
@@ -145,6 +217,12 @@ export function useSMInProgressBatches(activeBatches: ActiveBatchLike[]) {
     selectedBatch,
     handleViewDetails,
     closeBatchDetails,
+    batchesLoading,
+    page,
+    rowsPerPage,
+    totalRecords,
+    handlePageChange,
+    handleRowsPerPageChange,
   };
 }
 

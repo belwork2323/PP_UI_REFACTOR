@@ -18,6 +18,7 @@ interface TableCardProps {
   contentSx?: SxProps<Theme> | object;
   noPadding?: boolean;
   filterPanel?: ReactNode;
+  footer?: ReactNode;
 }
 
 function TableCard({
@@ -32,6 +33,7 @@ function TableCard({
   contentSx,
   noPadding = false,
   filterPanel,
+  footer,
 }: TableCardProps) {
   return (
     <Card sx={cardSx} contentSx={contentSx} noContentPadding={noPadding}>
@@ -49,6 +51,8 @@ function TableCard({
         <Table size="small" {...tableProps}>
           {children}
         </Table>
+
+        {footer}
       </CardContent>
     </Card>
   );

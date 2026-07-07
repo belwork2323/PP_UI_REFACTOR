@@ -9,7 +9,7 @@ import {
 import { styled, keyframes } from "@mui/material/styles";
 
 import { ReportPreviewDialog }    from "../components/ReportPdf";
-import ApproverList from "../components/ApproverList";
+import ApproverSubdepartmentBatchListSection from "../components/ApproverSubdepartmentBatchListSection";
 import ApproverActionDialog from "../../../components/custom/ApproverActionDialog";
 import { icons } from "../../../../app/theme/icons";
 import { APPROVER_PRIORITY_META, APPROVER_STATUS_META, isApproverActionableStatus } from "../../../../app/theme/approver";
@@ -307,7 +307,6 @@ const RMRDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
           </Stack>
 
           <Stack direction="row" gap={1} alignItems="center">
-            <PriorityChip priority={item.priority} />
             <Button
               size="small" variant="contained"
               startIcon={<PictureAsPdfRoundedIcon sx={{ fontSize: "14px !important" }} />}
@@ -341,7 +340,6 @@ const RMRDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
               { label: "Batch ID",     value: item.batchId },
               { label: "Submitted By", value: item.submittedBy },
               { label: "Date",         value: new Date(item.createdOn).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) },
-              { label: "Priority",     value: item.priority },
             ].map(({ label, value }) => (
               <Box key={label}>
                 <Typography sx={{ fontSize: "0.62rem", fontWeight: 700, color: BRAND.textSub, textTransform: "uppercase", letterSpacing: "0.06em" }}>
@@ -420,127 +418,30 @@ const RawMaterialRevalidationApproverPage = () => {
   });
 
   return (
-    <ApproverList
+    <ApproverSubdepartmentBatchListSection
       department="qualityControl"
       subDepartment="raw-material-revalidation"
       items={items}
-      statusField="status"
       statusMeta={QC_STATUS_META}
-      searchKeys={["batchId", "submittedBy"]}
-      filterFields={[
-        { field: "priority", label: "Priority", options: ["Critical", "High", "Medium", "Low"] },
-      ]}
+      onViewDetails={setSelected}
+      tableTheme={{
+        accentMain: BRAND.qc,
+        accentLight: BRAND.qcLight,
+        borderColor: BRAND.border,
+        surfaceColor: BRAND.surface,
+        textSubColor: BRAND.textSub,
+        primaryColor: BRAND.primary,
+      }}
     >
-      {(filtered) => (
-        <>
-          <Card
-            elevation={0}
-            sx={{
-              borderRadius: 3,
-              border: `1px solid ${BRAND.border}`,
-              boxShadow: `0 2px 12px ${alpha(BRAND.primary, 0.06)}`,
-              overflow: "hidden",
-            }}
-          >
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TH>Batch ID</TH>
-                    <TH>Submitted By</TH>
-                    <TH>Ingredients</TH>
-                    <TH>Date</TH>
-                    <TH>Priority</TH>
-                    <TH>Status</TH>
-                    <TH sx={{ textAlign: "center" }}>Action</TH>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filtered.map((row, idx) => (
-                    <TableRow
-                      key={row.id}
-                      sx={{
-                        background: idx % 2 === 0 ? "#fff" : alpha(BRAND.surface, 0.5),
-                        "&:hover": { background: alpha(BRAND.qc, 0.03) },
-                        "&:last-child td": { borderBottom: "none" },
-                        animation: `${slideUp} 0.3s ease ${idx * 0.04}s both`,
-                      }}
-                    >
-                      <TD>
-                        <Typography sx={{ fontWeight: 800, fontSize: "0.82rem", color: BRAND.qc }}>
-                          {row.batchId}
-                        </Typography>
-                      </TD>
-
-                      <TD sx={{ fontSize: "0.78rem" }}>{row.submittedBy}</TD>
-
-                      {/* Ingredient chips */}
-                      <TD>
-                        <Stack direction="row" gap={0.5} flexWrap="wrap">
-                          {(row.blocks ?? []).map((b, i) => (
-                            <Chip
-                              key={i}
-                              label={b.ingredient}
-                              size="small"
-                              sx={{
-                                height: 20, fontSize: "0.62rem", fontWeight: 700,
-                                background: alpha(BRAND.qcLight, 0.12),
-                                color: BRAND.qc,
-                                border: `1px solid ${alpha(BRAND.qc, 0.2)}`,
-                              }}
-                            />
-                          ))}
-                        </Stack>
-                      </TD>
-
-                      <TD sx={{ color: BRAND.textSub, fontSize: "0.76rem" }}>
-                        {new Date(row.createdOn).toLocaleDateString("en-IN", {
-                          day: "2-digit", month: "short", year: "numeric",
-                        })}
-                      </TD>
-
-                      <TD><PriorityChip priority={row.priority} /></TD>
-                      <TD><StatusChip  status={row.status}   /></TD>
-
-                      <TD sx={{ textAlign: "center" }}>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<VisibilityRoundedIcon sx={{ fontSize: "13px !important" }} />}
-                          onClick={() => setSelected(row)}
-                          disabled={!isApproverActionableStatus(row.status)}
-                          sx={{
-                            borderRadius: 2, fontWeight: 700, fontSize: "0.72rem",
-                            textTransform: "none", px: 1.5,
-                            borderColor: isApproverActionableStatus(row.status) ? BRAND.qc : BRAND.border,
-                            color:       isApproverActionableStatus(row.status) ? BRAND.qc : alpha(BRAND.textSub, 0.4),
-                            "&:hover": isApproverActionableStatus(row.status)
-                              ? { background: alpha(BRAND.qc, 0.06), borderColor: BRAND.qc }
-                              : {},
-                          }}
-                        >
-                          View Details
-                        </Button>
-                      </TD>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Card>
-
-          <RMRDetailDialog
-            open={!!selected}
-            onClose={() => setSelected(null)}
-            item={selected}
-            onApprove={requestApprove}
-            onReject={requestReject}
-          />
-
-          <ApproverActionDialog {...dialogProps} />
-        </>
-      )}
-    </ApproverList>
+      <RMRDetailDialog
+        open={!!selected}
+        onClose={() => setSelected(null)}
+        item={selected}
+        onApprove={requestApprove}
+        onReject={requestReject}
+      />
+      <ApproverActionDialog {...dialogProps} />
+    </ApproverSubdepartmentBatchListSection>
   );
 };
 

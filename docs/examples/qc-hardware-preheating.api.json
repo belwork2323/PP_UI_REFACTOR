@@ -1,0 +1,53 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "QC",
+    "layout": { "type": "flat" },
+    "division": "HARDWARE",
+    "subType": "PREHEATING",
+    "subDepartmentId": 114,
+    "functionality": "CREATE_HARDWARE_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "QC",
+  "division": "HARDWARE",
+  "subType": "PREHEATING",
+  "functionality": "CREATE_HARDWARE_FORM",
+  "message": "Hardware schema fetched successfully",
+  "data": {
+    "layout": { "type": "flat" },
+    "meta": {
+      "title": "Preheating Process",
+      "description": "Hardware preheating details"
+    },
+    "sections": [
+      {
+        "id": "PREHEATING_DETAILS",
+        "title": "Preheating Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "PREHEATING_DETAILS",
+            "title": "Preheating Details",
+            "rows": {
+              "allowAdd": true,
+              "allowDelete": true,
+              "autoIncrementKey": "SR_NO"
+            },
+            "columns": [
+              { "type": "column", "id": "DATE", "fieldType": "date", "label": "Date" },
+              { "type": "column", "id": "START_TIME", "fieldType": "time", "label": "Start Time" },
+              { "type": "column", "id": "END_TIME", "fieldType": "time", "label": "End Time" },
+              { "type": "column", "id": "TEMPERATURE", "fieldType": "number", "label": "Temperature (°C)" },
+              { "type": "column", "id": "VACUUM_LEVEL", "fieldType": "number", "label": "Vacuum Level (Torr)" },
+              { "type": "column", "id": "OBSERVATIONS", "fieldType": "textarea", "label": "Observations" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

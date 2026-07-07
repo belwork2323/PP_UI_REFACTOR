@@ -1,0 +1,53 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "QC",
+    "layout": { "type": "flat" },
+    "division": "HARDWARE",
+    "subType": "DISPATCH",
+    "subDepartmentId": 114,
+    "functionality": "CREATE_HARDWARE_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "QC",
+  "division": "HARDWARE",
+  "subType": "DISPATCH",
+  "functionality": "CREATE_HARDWARE_FORM",
+  "message": "Hardware schema fetched successfully",
+  "data": {
+    "layout": { "type": "flat" },
+    "meta": {
+      "title": "Hardware Dispatch",
+      "description": "Motor dispatch details to casting division"
+    },
+    "sections": [
+      {
+        "id": "DISPATCH_DETAILS",
+        "title": "Dispatch Details",
+        "ui": { "variant": "card", "padding": "md", "direction": "row", "wrap": true, "gap": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "HE_PUNCTURES",
+            "fieldType": "number",
+            "label": "No of punctures in Loose Flap at HE"
+          },
+          {
+            "type": "field",
+            "id": "NE_PUNCTURES",
+            "fieldType": "number",
+            "label": "No of punctures in Loose Flap at NE"
+          },
+          {
+            "type": "field",
+            "id": "DISPATCH_DATE_TIME",
+            "fieldType": "datetime",
+            "label": "Date and Time of dispatch of motor to casting division"
+          }
+        ]
+      }
+    ]
+  }
+}

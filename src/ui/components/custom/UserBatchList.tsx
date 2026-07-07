@@ -524,7 +524,9 @@ const UserBatchList = ({
                       {/* Action cell */}
                       {showActionCol && (
                         <TableCell sx={{ ...tdSx, textAlign: "center" }}>
-                          {renderAction(row)}
+                          <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", width: "100%" }}>
+                            {renderAction(row)}
+                          </Box>
                         </TableCell>
                       )}
                     </TableRow>

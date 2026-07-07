@@ -10,6 +10,8 @@ export const SUB_DEPT_LABELS: Record<string, string> = {
   mixing: "Mixing",
   "casting-and-curing": "Casting and Curing",
   "post-cure-operations": "Post-Cure Operations",
+  subscale: "Subscale",
+  trimming: "Trimming",
 };
 
 /**
@@ -51,5 +53,17 @@ export const SUB_DEPT_CONFIG: Record<string, {
     statusLabel: "PC Status",
     tableLabel: "Post-cure operation batch list",
     emptyText: "No post-cure operation batches found",
+  },
+  subscale: {
+    statusField: "ssStatus",
+    statusLabel: "SS Status",
+    tableLabel: "Subscale batch list",
+    emptyText: "No subscale batches found",
+  },
+  trimming: {
+    statusField: "trStatus",
+    statusLabel: "TR Status",
+    tableLabel: "Trimming batch list",
+    emptyText: "No trimming batches found",
   },
 };

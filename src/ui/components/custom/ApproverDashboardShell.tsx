@@ -1,4 +1,4 @@
-import type { ElementType, ReactNode } from "react";
+import { useMemo, type ElementType, type ReactNode } from "react";
 
 import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
@@ -21,6 +21,7 @@ import {
   type ApproverDepartmentKey,
 } from "../../../app/theme/approver";
 import useApproverDepartmentHeaderHook from "../../../hooks/approver/useApproverDepartmentHeaderHook";
+import useApproverDepartmentOverviewStats from "../../../hooks/approver/useApproverDepartmentOverviewStats";
 import type { ApproverDashboardSubDepartment } from "../../../hooks/approver/useApproverDashboard";
 import { useApproverDashboard } from "../../../hooks/approver/useApproverDashboard";
 import Card from "../common/Card";
@@ -45,6 +46,8 @@ type ApproverDashboardShellProps = {
   >;
 };
 
+const OVERVIEW_STATS_SKIP_KEYS: string[] = [];
+
 const ApproverDashboardShell = ({
   department,
   departmentName,
@@ -57,8 +60,27 @@ const ApproverDashboardShell = ({
 }: ApproverDashboardShellProps) => {
   const brand = getApproverBrand(department);
   const navigate = useNavigate();
-  const { labels, totals } = useApproverDashboard(subDepartments);
-  const { stats, userName, userRole } = useApproverDepartmentHeaderHook({
+  const subDeptKeys = useMemo(() => subDepartments.map((item) => item.key), [subDepartments]);
+  const overviewStatsKeys = subDepartment ? OVERVIEW_STATS_SKIP_KEYS : subDeptKeys;
+  const statsByKey = useApproverDepartmentOverviewStats(department, overviewStatsKeys);
+
+  const enrichedSubDepartments = useMemo(
+    () =>
+      subDepartments.map((item) => {
+        const liveStats = statsByKey[item.key];
+        return {
+          ...item,
+          allocated: liveStats?.allocated ?? item.allocated ?? 0,
+          pending: liveStats?.pending ?? item.pending ?? 0,
+          approved: liveStats?.approved ?? item.approved ?? 0,
+          rejected: liveStats?.rejected ?? item.rejected ?? 0,
+        };
+      }),
+    [statsByKey, subDepartments],
+  );
+
+  const { labels, totals } = useApproverDashboard(enrichedSubDepartments);
+  const { statItems, userName, userRole } = useApproverDepartmentHeaderHook({
     department,
     subDeptSlug: subDepartment,
   });
@@ -66,6 +88,12 @@ const ApproverDashboardShell = ({
   const currentSubDepartment = subDepartment ? labels[subDepartment] ?? subDepartment : null;
 
   const kpis = [
+    {
+      label: STRINGS.APPROVER.DASHBOARD.KPI.TOTAL_ALLOCATED,
+      value: totals.allocated,
+      color: brand.primary,
+      background: alpha(brand.primary, 0.07),
+    },
     {
       label: STRINGS.APPROVER.DASHBOARD.KPI.TOTAL_PENDING,
       value: totals.pending,
@@ -84,12 +112,6 @@ const ApproverDashboardShell = ({
       color: "#922B21",
       background: alpha("#C0392B", 0.09),
     },
-    {
-      label: STRINGS.APPROVER.DASHBOARD.KPI.TOTAL_QUEUES,
-      value: subDepartments.length,
-      color: brand.primary,
-      background: alpha(brand.primary, 0.07),
-    },
   ];
 
   const validRoutes = subDepartments.map((item) => `${routeBase}/${item.key}`);
@@ -97,7 +119,7 @@ const ApproverDashboardShell = ({
   return (
     <Box
       sx={{
-        p: approverSpacing.pagePadding,
+        p: 3,
         background: brand.background,
         minHeight: "100vh",
       }}
@@ -107,7 +129,7 @@ const ApproverDashboardShell = ({
         subDeptName={currentSubDepartment ?? STRINGS.APPROVER.COMMON.OVERVIEW}
         userName={userName}
         userRole={userRole}
-        stats={stats}
+        statItems={statItems}
       />
 
       <Box sx={{ mt: approverSpacing.sectionGap }}>
@@ -169,9 +191,10 @@ const ApproverDashboardShell = ({
                 gridTemplateColumns: { xs: "1fr", md: "repeat(2, minmax(0, 1fr))" },
               }}
             >
-              {subDepartments.map((item) => {
+              {enrichedSubDepartments.map((item) => {
                 const Icon = item.icon;
-                const hasPending = item.pending > 0;
+                const pendingCount = item.pending ?? 0;
+                const hasPending = pendingCount > 0;
 
                 return (
                   <Card
@@ -229,7 +252,7 @@ const ApproverDashboardShell = ({
 
                         {hasPending && (
                           <Chip
-                            label={STRINGS.APPROVER.DASHBOARD.PENDING_BADGE(item.pending)}
+                            label={STRINGS.APPROVER.DASHBOARD.PENDING_BADGE(pendingCount)}
                             size="small"
                             icon={<HourglassEmptyRoundedIcon sx={{ fontSize: "11px !important" }} />}
                             sx={{
@@ -250,19 +273,19 @@ const ApproverDashboardShell = ({
                         {[
                           {
                             label: STRINGS.APPROVER.COMMON.STATUS_PENDING,
-                            value: item.pending,
+                            value: pendingCount,
                             color: "#7D6608",
                             IconComponent: HourglassEmptyRoundedIcon,
                           },
                           {
                             label: STRINGS.APPROVER.COMMON.STATUS_APPROVED,
-                            value: item.approved,
+                            value: item.approved ?? 0,
                             color: "#0E6655",
                             IconComponent: CheckCircleOutlineRoundedIcon,
                           },
                           {
                             label: STRINGS.APPROVER.COMMON.STATUS_REJECTED,
-                            value: item.rejected,
+                            value: item.rejected ?? 0,
                             color: "#922B21",
                             IconComponent: CancelOutlinedIcon,
                           },

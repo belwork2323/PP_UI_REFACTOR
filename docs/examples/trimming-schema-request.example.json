@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "1.0",
+  "schemaType": "TRIMMING",
+  "layout": {
+    "type": "flat"
+  },
+  "motorStage": 0,
+  "subDepartmentId": 113,
+  "functionality": "CREATE_TRIMMING_FORM"
+}

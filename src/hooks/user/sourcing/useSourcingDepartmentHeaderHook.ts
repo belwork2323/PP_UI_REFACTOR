@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useAuthStore } from "../../../app/store/authStore";
+import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshStore";
 import { rawMaterialProcurementController } from "../../../controllers/user/sourcing/rawMaterialProcurementController";
 import { rocketMotorCasingController } from "../../../controllers/user/sourcing/rocketMotorCasingController";
 import { UserSubDepartmentDashboardStatsModel } from "../../../data/models/user/UserSubDepartmentDashboardStatsModel";
@@ -11,6 +12,7 @@ import { RocketMotorCasingStatsModel } from "../../../data/models/user/RocketMot
 
 export const useSourcingDepartmentHeaderHook = (subDeptSlug: string) => {
   const user = useAuthStore((state) => state.user);
+  const refreshVersion = useUserBatchRefreshStore((state) => state.version);
   const subDepartmentId = user?.allSubDepartments.find(
     (sd) => sd.slugs?.subDept === subDeptSlug
   )?.subDepartmentId;
@@ -63,7 +65,7 @@ export const useSourcingDepartmentHeaderHook = (subDeptSlug: string) => {
     return () => {
       cancelled = true;
     };
-  }, [subDeptSlug, subDepartmentId]);
+  }, [subDeptSlug, subDepartmentId, refreshVersion]);
 
   const statItems: DepartmentHeaderStatItem[] | undefined = useMemo(() => {
     if (subDeptSlug === "raw-material") {

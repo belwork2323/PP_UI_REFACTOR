@@ -22,10 +22,10 @@ import { icons } from "../../../../../app/theme/icons";
 import { MIXING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/mixing_theme";
 import {
   BOWL_ID_OPTIONS,
+  buildStageNumberOptions,
   FINAL_MIX_CYCLE_OPTIONS,
   MIXER_BLDG_OPTIONS,
   MIXING_CYCLE_OPTIONS,
-  PREMIX_NO_OPTIONS,
   getFinalMixNoLabel,
   getPremixNoLabel,
 } from "../../../../../hooks/user/manufacturing/mixingConfig";
@@ -563,8 +563,8 @@ const MixingForm = ({
     if (premixCards.length > 0) {
       return premixCards.map((entry) => entry.premixNo);
     }
-    return PREMIX_NO_OPTIONS;
-  }, [premixCards]);
+    return buildStageNumberOptions(numberOfPremix).map(String);
+  }, [premixCards, numberOfPremix]);
 
   const sectionToggleSx = {
     width: "100%",

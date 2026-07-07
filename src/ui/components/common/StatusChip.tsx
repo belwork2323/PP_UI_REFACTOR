@@ -1,9 +1,11 @@
 import React from "react";
 import { Chip } from "@mui/material";
-import { statusConfig } from "@app/theme/roleConfig";
+import { batchStatusConfig, statusConfig } from "@app/theme/roleConfig";
+
+const chipStatusConfig = { ...statusConfig, ...batchStatusConfig };
 
 const StatusChip = ({ status, size = "small", sx = {} }: { status: string; size?: "small" | "medium"; sx?: any }) => {
-  const config = statusConfig[status] || statusConfig["Active"];
+  const config = chipStatusConfig[status] || statusConfig["Active"];
   return (
     <Chip
       icon={<config.Icon sx={{ fontSize: size === "small" ? 13 : 16 }} />}

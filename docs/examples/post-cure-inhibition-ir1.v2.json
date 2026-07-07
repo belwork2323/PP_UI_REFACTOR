@@ -1,0 +1,265 @@
+{
+  "schemaVersion": "1.0",
+  "schemaType": "POST_CURE",
+  "functionality": "CREATE_POST_CURE_FORM",
+  "operationType": "INHIBITION",
+  "inhibitorType": "IR1",
+  "meta": {
+    "title": "IR1 Preparation Details",
+    "description": "IR1 premix preparation, final mix preparation and qualification details"
+  },
+  "data": {
+    "ui": {
+      "layout": "accordion",
+      "gap": "md",
+      "sectionVariant": "card",
+      "accordion": {
+        "defaultExpanded": true,
+        "allowMultipleExpanded": true
+      }
+    },
+    "context": {
+      "subDepartmentId": "{{subDepartmentId}}",
+      "batchId": "{{batchId}}"
+    },
+    "sections": [
+      {
+        "id": "IR1_PREMIX",
+        "title": "IR-1 Premix",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "IR1_PREMIX_TABLE",
+            "rows": {
+              "defaultCount": 4,
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "srNo",
+              "presetRows": [
+                { "readonly": true, "INGREDIENT": "Castor Oil", "PARTS_BY_WEIGHT": "60.0±1.0" },
+                { "readonly": true, "INGREDIENT": "Asbestos Powder", "PARTS_BY_WEIGHT": "38.5±1.0" },
+                { "readonly": true, "INGREDIENT": "Nonox-D", "PARTS_BY_WEIGHT": "1.0±0.1" },
+                { "readonly": true, "INGREDIENT": "Ferric Oxide", "PARTS_BY_WEIGHT": "0.5±0.05" }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "srNo",
+                "fieldType": "serial",
+                "label": "Sr No.",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "BATCH_NO",
+                "fieldType": "text",
+                "label": "Batch No. with date"
+              },
+              {
+                "type": "column",
+                "id": "INGREDIENT",
+                "fieldType": "static",
+                "label": "Ingredient",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "MFG_LOT",
+                "fieldType": "dropdown",
+                "label": "Mfg. Lot",
+                "dataSource": {
+                  "type": "api",
+                  "api": {
+                    "endpoint": "MATERIAL_LOTS",
+                    "method": "POST",
+                    "requestField": "batchId",
+                    "requestBody": {
+                      "subDepartmentId": "{{subDepartmentId}}"
+                    },
+                    "responsePath": "data.materials",
+                    "displayKey": "lotId",
+                    "valueKey": "lotId"
+                  }
+                }
+              },
+              {
+                "type": "column",
+                "id": "PARTS_BY_WEIGHT",
+                "fieldType": "static",
+                "label": "Parts by Wt.",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "QTY_TAKEN",
+                "fieldType": "number",
+                "label": "Qty taken (g)"
+              },
+              {
+                "type": "column",
+                "id": "TOTAL_QUANTITY",
+                "fieldType": "number",
+                "label": "Total Quantity (g)"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "IR1_FINAL_MIX",
+        "title": "Final Mix",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "IR1_FINAL_MIX_TABLE",
+            "rows": {
+              "defaultCount": 3,
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "srNo",
+              "presetRows": [
+                { "readonly": true, "INGREDIENT": "IR-1 Premix", "PARTS_BY_WEIGHT": "100" },
+                { "readonly": true, "INGREDIENT": "TDI", "PARTS_BY_WEIGHT": "14.5" },
+                {
+                  "readonly": true,
+                  "INGREDIENT": "Catalyst (5% w/w FeAA in benzene)",
+                  "PARTS_BY_WEIGHT": "2 ml"
+                }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "srNo",
+                "fieldType": "serial",
+                "label": "Sr No.",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "BATCH_NO",
+                "fieldType": "text",
+                "label": "Batch No. with date"
+              },
+              {
+                "type": "column",
+                "id": "INGREDIENT",
+                "fieldType": "static",
+                "label": "Ingredient",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "MFG_LOT",
+                "fieldType": "dropdown",
+                "label": "Mfg. Lot",
+                "dataSource": {
+                  "type": "api",
+                  "api": {
+                    "endpoint": "MATERIAL_LOTS",
+                    "method": "POST",
+                    "requestField": "batchId",
+                    "requestBody": {
+                      "subDepartmentId": "{{subDepartmentId}}"
+                    },
+                    "responsePath": "data.materials",
+                    "displayKey": "lotId",
+                    "valueKey": "lotId"
+                  }
+                }
+              },
+              {
+                "type": "column",
+                "id": "PARTS_BY_WEIGHT",
+                "fieldType": "static",
+                "label": "Parts by Wt.",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "QTY_TAKEN",
+                "fieldType": "number",
+                "label": "Qty taken (g)"
+              },
+              {
+                "type": "column",
+                "id": "TOTAL_QUANTITY",
+                "fieldType": "number",
+                "label": "Total Qty (g)"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "IR1_QUALIFICATION",
+        "title": "Qualification Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "BATCH_PREPARATION_DATE",
+            "fieldType": "text",
+            "label": "Batch No. with date of preparation",
+            "ui": {
+              "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+              "maxWidth": "300px"
+            }
+          },
+          {
+            "type": "table",
+            "id": "QUALIFICATION_TABLE",
+            "rows": {
+              "defaultCount": 2,
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "srNo",
+              "presetRows": [
+                { "readonly": true, "PARAMETER": "Tensile Strength", "SPECIFICATION": ">=8 KSC" },
+                { "readonly": true, "PARAMETER": "% Elongation", "SPECIFICATION": ">=30" }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "srNo",
+                "fieldType": "serial",
+                "label": "Sr No.",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "PARAMETER",
+                "fieldType": "static",
+                "label": "Parameter",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "SPECIFICATION",
+                "fieldType": "static",
+                "label": "Specification",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "RESULT",
+                "fieldType": "text",
+                "label": "Result"
+              },
+              {
+                "type": "column",
+                "id": "QC_REPORT",
+                "fieldType": "file",
+                "label": "Upload QC Report"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

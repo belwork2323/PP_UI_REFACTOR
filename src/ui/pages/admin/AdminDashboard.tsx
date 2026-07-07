@@ -10,7 +10,7 @@ const AdminDashboard = () => {
 
   return (
     <Box sx={th.dashboard.adminWrapper}>
-      <DashboardPage mode={mode} />
+      <DashboardPage />
     </Box>
   );
 };

@@ -3,16 +3,12 @@ import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 
+import type { OperationStatusMap } from "../../../hooks/operationStatus";
+
 type UserWorkflowStatusActionProps = {
   status: string;
   row: any;
-  statusMap: {
-    INITIATED: string;
-    IN_PROGRESS: string;
-    WAITING_FOR_APPROVAL: string;
-    APPROVED: string;
-    REJECTED: string;
-  };
+  statusMap: OperationStatusMap;
   onFillForm: (row: any) => void;
   onEditForm: (row: any) => void;
   theme: any;

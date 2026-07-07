@@ -1,0 +1,394 @@
+{
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "DISPATCH",
+  "functionality": "CREATE_DISPATCH_FORM",
+  "subDepartmentId": 116,
+  "message": "Dispatch schema fetched successfully",
+  "meta": {
+    "title": "Dispatch Details",
+    "description": "Dispatch details, clearance and inspection information"
+  },
+  "data": {
+    "layout": {
+      "type": "flat"
+    },
+    "meta": {
+      "title": "Dispatch Details",
+      "description": "Dispatch details, clearance and inspection information"
+    },
+    "ui": {
+      "layout": "flat",
+      "gap": "md",
+      "sectionVariant": "card",
+      "sectionBorderRadius": "sm",
+      "designSystem": {
+        "colors": {
+          "primary": "#1B4F72",
+          "primaryLight": "#2E86C1",
+          "surface": "#F4F6F8",
+          "border": "#D5D8DC",
+          "text": "#1C2833",
+          "textSub": "#5D6D7E"
+        },
+        "typography": {},
+        "spacing": {
+          "xs": 4,
+          "sm": 8,
+          "md": 12,
+          "lg": 16,
+          "xl": 24
+        },
+        "radius": {
+          "sm": 4,
+          "md": 6,
+          "lg": 8
+        },
+        "icons": {
+          "sectionDefault": "description",
+          "dispatch": "local_shipping"
+        }
+      }
+    },
+    "context": {
+      "subDepartmentId": 116
+    },
+    "sections": [
+      {
+        "id": "PROPELLANT_PROPERTIES",
+        "title": "Propellant Properties Details",
+        "ui": {
+          "variant": "card",
+          "padding": "md"
+        },
+        "children": [
+          {
+            "type": "table",
+            "id": "PROPELLANT_PROPERTIES_TABLE",
+            "allowAddColumn": true,
+            "allowDeleteColumn": true,
+            "addColumnPrefix": "FM",
+            "initialExtraColumnCount": 1,
+            "columnActions": {
+              "position": "top-right",
+              "addLabel": "Add Column",
+              "ui": {
+                "justifyContent": "flex-end",
+                "gap": "sm",
+                "padding": "sm",
+                "sx": {
+                  "borderBottom": "1px solid #D5D8DC",
+                  "backgroundColor": "rgba(244, 246, 248, 0.6)"
+                }
+              }
+            },
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "srNo",
+              "presetRows": [
+                { "type": "header", "label": "1) Mechanical" },
+                { "readonly": true, "PROPERTY": "a) Tensile Strength" },
+                { "readonly": true, "PROPERTY": "b) Modulus" },
+                { "readonly": true, "PROPERTY": "c) Elongation" },
+                { "readonly": true, "PROPERTY": "d) Density" },
+                { "type": "header", "label": "2) Interfacial" },
+                { "readonly": true, "PROPERTY": "a) Peel Strength" },
+                { "readonly": true, "PROPERTY": "b) TBS" },
+                { "readonly": true, "PROPERTY": "c) SBS" },
+                { "type": "header", "label": "3) Ballistic" },
+                { "readonly": true, "PROPERTY": "a) Burn Rate" }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "srNo",
+                "fieldType": "serial",
+                "label": "S. No",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "PROPERTY",
+                "fieldType": "static",
+                "label": "Properties",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "SPECIFICATION",
+                "fieldType": "text",
+                "label": "Specs"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "WAIVER_DETAILS",
+        "title": "Waiver Details",
+        "ui": {
+          "variant": "card",
+          "padding": "md"
+        },
+        "children": [
+          {
+            "type": "field",
+            "id": "WAIVER_AVAILABLE",
+            "fieldType": "textarea",
+            "label": "Waiver Details, if any"
+          }
+        ]
+      },
+      {
+        "id": "ROCKET_MOTOR_INSPECTION",
+        "title": "Rocket Motor Inspection",
+        "ui": {
+          "variant": "card",
+          "padding": "md"
+        },
+        "children": [
+          {
+            "type": "table",
+            "id": "ROCKET_MOTOR_INSPECTION_TABLE",
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "srNo",
+              "presetRows": [
+                { "type": "header", "label": "a. External Surface" },
+                { "readonly": true, "PARAMETER": "i. Condition of Lugs" },
+                { "readonly": true, "PARAMETER": "ii. HE Polar Boss" },
+                { "readonly": true, "PARAMETER": "iii. NE Polar Boss" },
+                { "type": "header", "label": "b. Propellant Internal Surface" },
+                { "readonly": true, "PARAMETER": "i. Port" },
+                { "readonly": true, "PARAMETER": "ii. IR Bead" }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "srNo",
+                "fieldType": "serial",
+                "label": "S. No",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "PARAMETER",
+                "fieldType": "static",
+                "label": "Parameter",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "OBSERVATION",
+                "fieldType": "textarea",
+                "label": "Observations"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "VEHICLE_DETAILS",
+        "title": "Vehicle Details",
+        "ui": {
+          "variant": "card",
+          "padding": "md"
+        },
+        "children": [
+          {
+            "type": "table",
+            "id": "VEHICLE_DETAILS_TABLE",
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "srNo",
+              "presetRows": [
+                { "readonly": true, "CHECK_POINT": "Vehicle No." },
+                { "readonly": true, "CHECK_POINT": "Condition of Tyres" },
+                { "readonly": true, "CHECK_POINT": "Visual observation on article" },
+                { "readonly": true, "CHECK_POINT": "Firefighting Equipment availability" },
+                { "readonly": true, "CHECK_POINT": "Isolator conditions" },
+                { "readonly": true, "CHECK_POINT": "Shock log Ids" },
+                { "readonly": true, "CHECK_POINT": "Name of Convoy Commander" }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "srNo",
+                "fieldType": "serial",
+                "label": "SI No.",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "CHECK_POINT",
+                "fieldType": "static",
+                "label": "Check Point",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "OBSERVATION",
+                "fieldType": "textarea",
+                "label": "Observation"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "ROCKET_MOTOR_PACKING",
+        "title": "Rocket Motor Packing Details",
+        "ui": {
+          "variant": "card",
+          "padding": "md"
+        },
+        "children": [
+          {
+            "type": "table",
+            "id": "ROCKET_MOTOR_PACKING_TABLE",
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "srNo",
+              "presetRows": [
+                { "readonly": true, "NOMENCLATURE": "End Closures at HE" },
+                { "readonly": true, "NOMENCLATURE": "End Closures at NE" }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "srNo",
+                "fieldType": "serial",
+                "label": "S. No",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "NOMENCLATURE",
+                "fieldType": "static",
+                "label": "Nomenclature",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "OBSERVATION",
+                "fieldType": "textarea",
+                "label": "Observations"
+              }
+            ]
+          },
+          {
+            "type": "field",
+            "id": "NITROGEN_GAS_PURGING",
+            "fieldType": "dropdown",
+            "label": "Nitrogen gas purging",
+            "dataSource": {
+              "type": "static",
+              "options": [
+                { "label": "YES", "value": "YES" },
+                { "label": "NO", "value": "NO" }
+              ]
+            }
+          },
+          {
+            "type": "field",
+            "id": "NITROGEN_PURGING_PRESSURE",
+            "fieldType": "text",
+            "label": "If Yes — Enter Pressure",
+            "visibleWhen": {
+              "when": [{ "field": "NITROGEN_GAS_PURGING", "op": "EQ", "value": "YES" }],
+              "logic": "AND"
+            }
+          },
+          {
+            "type": "field",
+            "id": "LABELLING_OF_MOTOR",
+            "fieldType": "dropdown",
+            "label": "Labelling of motor",
+            "dataSource": {
+              "type": "static",
+              "options": [
+                { "label": "YES", "value": "YES" },
+                { "label": "NO", "value": "NO" }
+              ]
+            }
+          },
+          {
+            "type": "field",
+            "id": "DISPATCH_PHOTOS",
+            "fieldType": "file",
+            "label": "Upload Dispatch Photos"
+          }
+        ]
+      },
+      {
+        "id": "SAFETY_CLEARANCE",
+        "title": "Safety Clearance",
+        "ui": {
+          "variant": "card",
+          "padding": "md"
+        },
+        "children": [
+          {
+            "type": "field",
+            "id": "SAFETY_CLEARANCE_STATUS",
+            "fieldType": "dropdown",
+            "label": "Safety Clearance for Dispatch Accorded",
+            "dataSource": {
+              "type": "static",
+              "options": [
+                { "label": "YES", "value": "YES" },
+                { "label": "NO", "value": "NO" }
+              ]
+            }
+          },
+          {
+            "type": "field",
+            "id": "CLEARANCE_CERTIFICATE",
+            "fieldType": "file",
+            "label": "Upload Clearance Certificate"
+          }
+        ]
+      },
+      {
+        "id": "DISPATCH_TEAM",
+        "title": "Dispatch Team",
+        "ui": {
+          "variant": "card",
+          "padding": "md",
+          "direction": "row",
+          "wrap": true,
+          "gap": "md"
+        },
+        "children": [
+          {
+            "type": "field",
+            "id": "QA_REPRESENTATIVE",
+            "fieldType": "text",
+            "label": "QA Rep."
+          },
+          {
+            "type": "field",
+            "id": "SAFETY_REPRESENTATIVE",
+            "fieldType": "text",
+            "label": "Safety Rep."
+          },
+          {
+            "type": "field",
+            "id": "PROJECT_REPRESENTATIVE",
+            "fieldType": "text",
+            "label": "Project Rep."
+          }
+        ]
+      }
+    ]
+  }
+}

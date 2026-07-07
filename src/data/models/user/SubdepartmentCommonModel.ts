@@ -93,14 +93,25 @@ export class MotorsStageListModel {
   }
 
   static fromApi(apiResponse: any): MotorsStageListModel {
-    const raw = Array.isArray(apiResponse?.data) ? apiResponse.data : [];
+    const envelope = apiResponse?.data;
+    let raw: unknown[] = [];
+
+    if (Array.isArray(envelope)) {
+      raw = envelope;
+    } else if (envelope && typeof envelope === "object" && Array.isArray((envelope as { stages?: unknown[] }).stages)) {
+      raw = (envelope as { stages: unknown[] }).stages;
+    } else if (Array.isArray(apiResponse?.stages)) {
+      raw = apiResponse.stages;
+    }
+
     return new MotorsStageListModel(
-      raw.map((item: any, index: number) => new MotorStageListItemModel(item, index))
+      raw.map((item, index) => new MotorStageListItemModel(item, index)),
     );
   }
 }
 
 export type AvailableMotorOption = {
+
   motorCasingId: string;
   motorId: string;
   motorStage: string;
@@ -110,14 +121,15 @@ export type AvailableMotorOption = {
 };
 
 export class AvailableMotorModel implements AvailableMotorOption {
-  motorCasingId: string;
   motorId: string;
+  motorCasingId: string;
   motorStage: string;
   motorNo: string;
   projectId: string;
   status: string;
 
   constructor(payload: Record<string, unknown>) {
+    this.motorId = String(payload?.motorId ?? "").trim();
     this.motorCasingId = String(payload?.motorCasingId ?? "").trim();
     this.motorId = String(payload?.motorId ?? payload?.motorNo ?? "").trim();
     this.motorStage = String(payload?.motorStage ?? "").trim();
@@ -161,5 +173,52 @@ export class AvailableMotorsListModel {
         })
         .filter((m) => m.motorId || m.motorCasingId),
     );
+  }
+}
+
+export type MaterialLotItem = {
+  materialCode: string;
+  materialName: string;
+  lotId: string;
+  make: string;
+};
+
+export type MaterialLotsRequest = {
+  batchId: string;
+};
+
+export class MaterialLotItemModel implements MaterialLotItem {
+  materialCode: string;
+  materialName: string;
+  lotId: string;
+  make: string;
+
+  constructor(payload: Record<string, unknown>) {
+    this.materialCode = String(payload?.materialCode ?? "").trim();
+    this.materialName = String(payload?.materialName ?? "").trim();
+    this.lotId = String(payload?.lotId ?? "").trim();
+    this.make = String(payload?.make ?? "").trim();
+  }
+}
+
+export class MaterialLotsListModel {
+  batchId: string;
+  materials: MaterialLotItemModel[];
+
+  constructor(payload: { batchId?: string; materials?: MaterialLotItemModel[] }) {
+    this.batchId = payload?.batchId ?? "";
+    this.materials = payload?.materials ?? [];
+  }
+
+  static fromApi(apiResponse: { data?: unknown }): MaterialLotsListModel {
+    const data = (apiResponse?.data ?? {}) as Record<string, unknown>;
+    const materials = Array.isArray(data.materials)
+      ? data.materials.map((item) => new MaterialLotItemModel(item as Record<string, unknown>))
+      : [];
+
+    return new MaterialLotsListModel({
+      batchId: String(data.batchId ?? ""),
+      materials,
+    });
   }
 }

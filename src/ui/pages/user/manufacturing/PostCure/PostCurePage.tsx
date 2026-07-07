@@ -1,7 +1,7 @@
 // src/ui/pages/user/manufacturing/PostCure/PostCurePage.tsx
 
 import React, { useMemo, useState } from "react";
-import { Box, CircularProgress, Button, Stack } from "@mui/material";
+import { Box, CircularProgress, Button, Stack, IconButton  } from "@mui/material";
 import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog";
 import PostCureList from "./PostCureList";
 import PostCureForm from "./PostCureForm";
@@ -10,7 +10,7 @@ import { useThemeStore } from "../../../../../app/store/themeStore";
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import usePostCureHook from "../../../../../hooks/user/manufacturing/usePostCureHook";
 import { STRINGS } from "../../../../../app/config/strings";
-
+import PostCureDetailsView from "./PostCureDetailsView";
 const PostCurePage = () => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getManufacturingTheme(mode), [mode]);
@@ -26,14 +26,37 @@ const PostCurePage = () => {
     activeBatch,
     isEditMode,
     formData,
+    addedMotors,
+    draftMotorId,
+    draftMotorReceiptDate,
+    draftOperation,
+    draftInhibitorType,
+    usedMotorIds,
     actionLoading,
     backConfirmOpen,
     setBackConfirmOpen,
     handleBack,
     handleDiscardAndBack,
-    handleFormChange,
+    setDraftMotorId,
+    setDraftMotorReceiptDate,
+    handleDraftOperationChange,
+    handleDraftInhibitorTypeChange,
+    handleMotorSessionChange,
+    handleRemoveMotor,
     handleSaveDraft,
     handleSubmit,
+    schemaLoading,
+    schemaError,
+    handleLoadForm,
+    handleAddMotor,
+    canLoadForm,
+    canAddMotor,
+    subDepartmentId,
+    detailsRow,
+    detailsData,
+    detailsLoading,
+    handleViewPostCureDetails,
+    handleBackFromDetails,
   } = hookState;
 
   if (loading) {
@@ -43,7 +66,16 @@ const PostCurePage = () => {
       </Box>
     );
   }
-
+  if (view === "details") {
+    return (
+      <PostCureDetailsView
+        row={detailsRow}
+        data={detailsData}
+        loading={detailsLoading}
+        onBack={handleBackFromDetails}
+      />
+    );
+  }
   if (view === "list") {
     return (
       <Box sx={theme.workflow.animatedContainer}>
@@ -61,11 +93,31 @@ const PostCurePage = () => {
         theme={theme}
       />
       <PostCureForm
-        initialData={formData}
-        isEditMode={isEditMode}
-        onBlocksChange={handleFormChange}
+        batch={activeBatch}
+        formData={formData}
+        addedMotors={addedMotors}
+        draftMotorId={draftMotorId}
+        draftMotorReceiptDate={draftMotorReceiptDate}
+        draftOperation={draftOperation}
+        draftInhibitorType={draftInhibitorType}
+        usedMotorIds={usedMotorIds}
+        subDepartmentId={subDepartmentId}
+        schemaLoading={schemaLoading}
+        schemaError={schemaError}
+        canLoadForm={canLoadForm}
+        canAddMotor={canAddMotor}
+        onDraftMotorIdChange={setDraftMotorId}
+        onDraftMotorReceiptDateChange={setDraftMotorReceiptDate}
+        onDraftOperationChange={handleDraftOperationChange}
+        onDraftInhibitorTypeChange={handleDraftInhibitorTypeChange}
+        onLoadForm={handleLoadForm}
+        onAddMotor={handleAddMotor}
+        onRemoveMotor={handleRemoveMotor}
+        onMotorSessionChange={handleMotorSessionChange}
+        theme={theme}
       />
 
+      {formData.schemaFormLoaded && formData.motors.length > 0 ? (
       <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} mt={3} justifyContent="flex-end">
         <Button
           variant="outlined"
@@ -82,6 +134,7 @@ const PostCurePage = () => {
           {isEditMode ? actionStrings.RESUBMIT_APPROVAL : actionStrings.SUBMIT_APPROVAL}
         </Button>
       </Stack>
+      ) : null}
 
       <ConfirmAlertDialog
         open={backConfirmOpen}

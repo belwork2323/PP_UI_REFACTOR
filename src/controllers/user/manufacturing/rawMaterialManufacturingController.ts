@@ -4,12 +4,15 @@ import {
   fetchAllBatchesLiquid,
   SubmitLiquidBatch,
   SubmitSolidBatch,
-} from "../../../data/api/users/manufacturing/RawMaterial";
+} from "../../data/api/user_manufacturing/RawMaterial";
 
-import { useAlertStore } from "../../../app/store/alertStore";
-import { useAuthStore } from "../../../app/store/authStore";
-import { STRINGS } from "../../../app/config/strings";
-import { SolidPrepModel } from "../../../data/models/user/SolidPreparationModel";
+import { post } from "../../data/api/httpClient";
+import { USER_MANUFACTURING } from "../../data/api/endPoints";
+
+import { useAlertStore } from "../../app/store/alertStore";
+import { useAuthStore } from "../../app/store/authStore";
+import { STRINGS } from "../../app/config/strings";
+import { SolidPrepModel } from "../../data/models/SolidPreparationModel";
 
 export const rawMaterialManufacturingController = {
   /* =========================

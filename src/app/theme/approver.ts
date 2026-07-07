@@ -1,5 +1,6 @@
 import { alpha } from "@mui/material/styles";
 
+import { OPERATION_STATUS } from "../../hooks/operationStatus";
 import colors from "./colors";
 import fonts from "./fonts";
 import spacing from "./spacing";
@@ -195,7 +196,20 @@ export const isApproverActionableStatus = (status?: string | null) => {
   const normalized = String(status ?? "").trim();
   return (
     normalized === "Pending" ||
-    normalized === "Waiting for Approval" ||
+    normalized === OPERATION_STATUS.WAITING_FOR_APPROVAL ||
     normalized === "WAITING_FOR_APPROVAL"
   );
 };
+
+export const isApproverApprovedStatus = (status?: string | null) => {
+  const normalized = String(status ?? "").trim();
+  return normalized === OPERATION_STATUS.APPROVED || normalized === "APPROVED";
+};
+
+/** Whether the approver batch list should show a View Details action for this row. */
+export const canApproverViewBatchDetails = (
+  status?: string | null,
+  { allowWhenApproved = false } = {},
+) =>
+  isApproverActionableStatus(status) ||
+  (allowWhenApproved && isApproverApprovedStatus(status));

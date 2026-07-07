@@ -1,0 +1,68 @@
+{
+  "request": {
+    "subDepartmentId": 1,
+    "userId": "USR-014",
+    "page": 1,
+    "limit": 10,
+    "status": ["IN_PROGRESS", "APPROVED"],
+    "search": "BATCH-2024",
+    "batchIds": ["BATCH102"],
+    "batchTypes": ["MAIN"],
+    "motorStages": [0],
+    "motorIds": ["MTR-445"]
+  },
+  "success": true,
+  "statusCode": 200,
+  "message": "Batch list fetched successfully",
+  "timestamp": "2026-03-18T10:00:00Z",
+  "data": {
+    "statusCounts": {
+      "initiated": 5,
+      "approved": 18,
+      "inProgress": 12,
+      "waitingForApproval": 6,
+      "rejected": 3
+    },
+    "batches": [
+      {
+        "id": "BAT1001",
+        "batchId": "BATCH102",
+        "motorIds": ["MTR-445", "MTR-446"],
+        "motorStage": 0,
+        "lotIds": ["LOT-2026-0001", "LOT-2026-0002"],
+        "projectName": "Rocket Propulsion Project",
+        "batchType": "Main Batch",
+        "priority": "High",
+        "systemManager": {
+          "id": "EMP009",
+          "name": "Arjun Mehta"
+        },
+        "stage": {
+          "department": {
+            "departmentId": 2,
+            "departmentName": "Manufacturing",
+            "subDepartment": [
+              {
+                "subDepartmentId": 7,
+                "subDepartmentName": "CastingAndCuring"
+              }
+            ]
+          }
+        },
+        "status": "Active",
+        "identificationSheetStatus": "DRAFT",
+        "createdOn": "2026-03-10T10:20:00Z",
+        "createdBy": {
+          "id": "EMP001",
+          "name": "Admin"
+        }
+      }
+    ],
+    "pagination": {
+      "page": 1,
+      "limit": 10,
+      "totalRecords": 50,
+      "totalPages": 5
+    }
+  }
+}

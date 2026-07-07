@@ -1,0 +1,30 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "QC",
+    "layout": { "type": "flat" },
+    "division": "POST_CURE",
+    "subType": "INHIBITION",
+    "inhibitorType": "NOT_APPLICABLE",
+    "subDepartmentId": 114,
+    "functionality": "CREATE_POST_CURE_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "QC",
+  "division": "POST_CURE",
+  "subType": "INHIBITION",
+  "inhibitorType": "NOT_APPLICABLE",
+  "functionality": "CREATE_POST_CURE_FORM",
+  "message": "Inhibition not applicable",
+  "timestamp": "2026-06-10T10:00:00Z",
+  "data": {
+    "layout": { "type": "flat" },
+    "meta": {
+      "title": "Inhibition Details",
+      "description": "Inhibition skipped for selected motor"
+    },
+    "sections": []
+  }
+}

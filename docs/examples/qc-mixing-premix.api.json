@@ -1,0 +1,124 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "QC",
+    "layout": { "type": "flat" },
+    "division": "MIXING",
+    "subType": "PREMIX",
+    "subDepartmentId": 114,
+    "functionality": "CREATE_MIXING_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "QC",
+  "division": "MIXING",
+  "subType": "PREMIX",
+  "subDepartmentId": 114,
+  "functionality": "CREATE_MIXING_FORM",
+  "data": {
+    "layout": { "type": "flat" },
+    "meta": {
+      "title": "Premix Processing",
+      "description": "Select batch, stage Premix, and premix number on the picker row, then click Add to load the premix table."
+    },
+    "sections": [
+      {
+        "id": "PREMIX_DETAILS",
+        "title": "Premix Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "PREMIX_DETAILS",
+            "title": "Premix Details",
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "presetRows": [
+                { "readonly": true, "PARAMETER": "Homogeneity" },
+                { "readonly": true, "PARAMETER": "Moisture" }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "BOWL_NO",
+                "fieldType": "text",
+                "label": "Bowl No"
+              },
+              {
+                "type": "column",
+                "id": "DATE_OF_PREMIX",
+                "fieldType": "date",
+                "label": "Date of Premix"
+              },
+              {
+                "type": "column",
+                "id": "MIXER_BLDG_NO",
+                "fieldType": "text",
+                "label": "Mixer & Bldg No."
+              },
+              {
+                "type": "column",
+                "id": "PREMIX_QTY",
+                "fieldType": "number",
+                "label": "Premix Qty (kg)"
+              },
+              {
+                "type": "column",
+                "id": "PARAMETER",
+                "fieldType": "static",
+                "label": "Parameter",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "SPECIFICATION",
+                "fieldType": "text",
+                "label": "Specification"
+              },
+              {
+                "type": "group",
+                "id": "VALUE",
+                "label": "Value",
+                "columns": [
+                  {
+                    "type": "column",
+                    "id": "VALUE_1",
+                    "fieldType": "number",
+                    "label": ""
+                  },
+                  {
+                    "type": "column",
+                    "id": "VALUE_2",
+                    "fieldType": "number",
+                    "label": ""
+                  },
+                  {
+                    "type": "column",
+                    "id": "VALUE_3",
+                    "fieldType": "number",
+                    "label": ""
+                  },
+                  {
+                    "type": "column",
+                    "id": "VALUE_4",
+                    "fieldType": "number",
+                    "label": ""
+                  }
+                ]
+              },
+              {
+                "type": "column",
+                "id": "REMARKS",
+                "fieldType": "textarea",
+                "label": "Remarks"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

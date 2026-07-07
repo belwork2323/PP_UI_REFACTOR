@@ -38,6 +38,7 @@ const CasePreparationPage = () => {
     setBackConfirmOpen,
     detailsRow,
     detailsData,
+    detailsSchema,
     detailsLoading,
     handleViewCasePrepDetails,
     handleBackFromDetails,
@@ -70,6 +71,7 @@ const CasePreparationPage = () => {
         <CasePreparationDetailsView
           row={detailsRow}
           data={detailsData}
+          schema={detailsSchema}
           loading={detailsLoading}
           onBack={handleBackFromDetails}
         />

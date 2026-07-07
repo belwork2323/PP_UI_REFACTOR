@@ -1,0 +1,260 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "RAW_MATERIALS",
+    "layout": { "type": "flat" },
+    "materialId": 1,
+    "materialCode": "AP",
+    "gradeId": 103,
+    "gradeCode": "ULTRA_FINE",
+    "subdepartmentId": 111,
+    "functionality": "CREATE_RAW_MATERIAL_PREPARATION_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "RAW_MATERIALS",
+  "functionality": "CREATE_RAW_MATERIAL_PREPARATION_FORM",
+  "message": "Raw material preparation schema fetched successfully",
+  "timestamp": "2026-05-29T15:00:00Z",
+  "materialId": 1,
+  "materialCode": "AP",
+  "materialName": "Ammonium Perchlorate",
+  "materialType": "SOLID",
+  "grade": {
+    "gradeId": 103,
+    "gradeCode": "ULTRA_FINE",
+    "gradeName": "AP Ultra Fine"
+  },
+  "data": {
+    "meta": {
+      "title": "Raw Material Preparation",
+      "description": "AP Ultra Fine grinding, drying, sieving and dispatch"
+    },
+    "ui": {
+      "layout": "flat",
+      "gap": "md",
+      "sectionVariant": "card"
+    },
+    "context": {
+      "subDepartmentId": "{{subDepartmentId}}",
+      "materialId": "{{materialId}}",
+      "gradeId": "{{gradeId}}",
+      "materialCode": "AP",
+      "gradeCode": "ULTRA_FINE"
+    },
+    "sections": [
+      {
+        "id": "GRINDING",
+        "title": "Grinding",
+        "children": [
+          {
+            "type": "group",
+            "id": "GRINDING_LOTS",
+            "label": "Lot {index}",
+            "ui": { "direction": "row", "wrap": true, "gap": "md" },
+            "repeat": {
+              "defaultCount": 1,
+              "min": 1,
+              "max": 20,
+              "allowAdd": true,
+              "allowDelete": true,
+              "label": "Lot {index}"
+            },
+            "children": [
+              {
+                "type": "field",
+                "id": "LOT_NUMBER",
+                "fieldType": "dropdown",
+                "label": "Enter Lot No. of AP Coarse",
+                "validation": { "required": true },
+                "dataSource": {
+                  "type": "api",
+                  "api": {
+                    "endpoint": "raw-material-procurement-lot-list",
+                    "method": "POST",
+                    "requestBody": {
+                      "limit": 500,
+                      "page": 1,
+                      "status": ["APPROVED"],
+                      "subDepartmentId": 1,
+                      "materialCode": ["{{materialCode}}"]
+                    },
+                    "responsePath": "data.lots",
+                    "displayKey": "lotId",
+                    "valueKey": "lotId"
+                  }
+                }
+              },
+              {
+                "type": "field",
+                "id": "TOTAL_QUANTITY",
+                "fieldType": "number",
+                "label": "Total Qty of AP Coarse to be ground",
+                "unit": "kg",
+                "validation": { "required": true }
+              },
+              {
+                "type": "field",
+                "id": "EQUIPMENT_ID",
+                "fieldType": "text",
+                "label": "Enter Equipment Id."
+              },
+              {
+                "type": "field",
+                "id": "SCREW_FEEDER_RPM",
+                "fieldType": "number",
+                "label": "Set Screw Feeder RPM"
+              },
+              {
+                "type": "field",
+                "id": "FEED_PRESSURE",
+                "fieldType": "text",
+                "label": "Set Feed Pressure"
+              },
+              {
+                "type": "field",
+                "id": "GRINDING_PRESSURE",
+                "fieldType": "text",
+                "label": "Set Grinding Pressure"
+              },
+              {
+                "type": "field",
+                "id": "START_DATETIME",
+                "fieldType": "datetime",
+                "label": "Start Date/Time"
+              },
+              {
+                "type": "field",
+                "id": "END_DATETIME",
+                "fieldType": "datetime",
+                "label": "End Date/Time"
+              },
+              {
+                "type": "field",
+                "id": "OBSERVATION",
+                "fieldType": "textarea",
+                "label": "Any Other Observation"
+              },
+              {
+                "type": "field",
+                "id": "PARTICLE_SIZE",
+                "fieldType": "number",
+                "label": "Particle Size (≤1µm)"
+              },
+              {
+                "type": "field",
+                "id": "QUALIFIED_QUANTITY",
+                "fieldType": "number",
+                "label": "Qty. Qualified",
+                "unit": "kg"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "DRYING_TRAY_OVEN",
+        "title": "Drying in Tray Oven",
+        "ui": { "direction": "row", "wrap": true, "gap": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "OVEN_TYPE",
+            "fieldType": "dropdown",
+            "label": "Oven Type",
+            "dataSource": {
+              "type": "static",
+              "options": [
+                { "label": "Water Heated", "value": "WATER_HEATED" },
+                { "label": "Air Heated", "value": "AIR_HEATED" }
+              ]
+            }
+          },
+          {
+            "type": "field",
+            "id": "OVEN_NUMBER",
+            "fieldType": "text",
+            "label": "Oven No."
+          },
+          {
+            "type": "field",
+            "id": "OVEN_SET_TEMPERATURE",
+            "fieldType": "number",
+            "label": "Oven Set Temp",
+            "unit": "°C"
+          },
+          {
+            "type": "field",
+            "id": "START_DATETIME",
+            "fieldType": "datetime",
+            "label": "Start Date/Time"
+          },
+          {
+            "type": "field",
+            "id": "END_DATETIME",
+            "fieldType": "datetime",
+            "label": "End Date/Time"
+          },
+          {
+            "type": "field",
+            "id": "MOISTURE",
+            "fieldType": "number",
+            "label": "Moisture",
+            "unit": "%"
+          },
+          {
+            "type": "field",
+            "id": "OBSERVATION",
+            "fieldType": "textarea",
+            "label": "Any Other Observation"
+          }
+        ]
+      },
+      {
+        "id": "SIEVING",
+        "title": "Sieving",
+        "ui": { "direction": "row", "wrap": true, "gap": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "SIEVING_DISPATCH_DATETIME",
+            "fieldType": "datetime",
+            "label": "Date of Sieving/Dispatch"
+          },
+          {
+            "type": "field",
+            "id": "SIEVED_QUANTITY",
+            "fieldType": "number",
+            "label": "Sieved Quantity",
+            "unit": "kg"
+          },
+          {
+            "type": "field",
+            "id": "SIEVE_MESH_SIZE",
+            "fieldType": "text",
+            "label": "Sieve Mesh Size"
+          },
+          {
+            "type": "field",
+            "id": "OBSERVATION",
+            "fieldType": "textarea",
+            "label": "Any Observation"
+          }
+        ]
+      },
+      {
+        "id": "SHIFTING_TO_MIXING",
+        "title": "Shifting of Material to Mixing",
+        "children": [
+          {
+            "type": "field",
+            "id": "NUMBER_OF_DRUMS",
+            "fieldType": "number",
+            "label": "No. of Drums"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -2,18 +2,38 @@
 
 import React, { useState } from "react";
 import {
-  Box, Stack, Typography, Chip, alpha, Card, Button, Dialog,
-  DialogContent, IconButton, Table, TableBody, TableCell,
-  TableContainer, TableHead, TableRow,
+  Box,
+  Stack,
+  Typography,
+  Chip,
+  alpha,
+  Card,
+  Button,
+  Dialog,
+  DialogContent,
+  IconButton,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  CircularProgress,
 } from "@mui/material";
 import { styled, keyframes } from "@mui/material/styles";
 
-import { ReportPreviewDialog }    from "../components/ReportPdf";
-import ApproverList from "../components/ApproverList";
+import { ReportPreviewDialog } from "../components/ReportPdf";
+import ApproverSubdepartmentBatchListSection from "../components/ApproverSubdepartmentBatchListSection";
 import ApproverActionDialog from "../../../components/custom/ApproverActionDialog";
 import { icons } from "../../../../app/theme/icons";
-import { APPROVER_PRIORITY_META, APPROVER_STATUS_META, isApproverActionableStatus } from "../../../../app/theme/approver";
+import {
+  APPROVER_PRIORITY_META,
+  APPROVER_STATUS_META,
+  isApproverActionableStatus,
+} from "../../../../app/theme/approver";
 import useApproverFormAction from "../../../../hooks/approver/useApproverFormAction";
+import ndtController from "../../../../controllers/user/quality_control/ndtController";
+import type { NDTFormState } from "../../../../data/models/user/NDTFormModel";
 
 const {
   approved: CheckCircleRoundedIcon,
@@ -22,25 +42,22 @@ const {
   close: CloseRoundedIcon,
   pdf: PictureAsPdfRoundedIcon,
   radar: RadarRoundedIcon,
-  speed: SpeedRoundedIcon,
-  layers: LayersRoundedIcon,
-  localFireDepartment: LocalFireDepartmentRoundedIcon,
 } = icons.approver.qualityControl.ndt;
 
 // ─── Palette (PostCure blue) ──────────────────────────────────────────────────
 const BRAND = {
-  primary:      "#1B4F72",
+  primary: "#1B4F72",
   primaryLight: "#2E86C1",
-  accent:       "#148F77",
-  accentLight:  "#1ABC9C",
-  warn:         "#D4AC0D",
-  danger:       "#C0392B",
-  surface:      "#F4F6F8",
-  border:       "#D5D8DC",
-  text:         "#1C2833",
-  textSub:      "#5D6D7E",
-  qc:           "#1565C0",
-  qcLight:      "#1976D2",
+  accent: "#148F77",
+  accentLight: "#1ABC9C",
+  warn: "#D4AC0D",
+  danger: "#C0392B",
+  surface: "#F4F6F8",
+  border: "#D5D8DC",
+  text: "#1C2833",
+  textSub: "#5D6D7E",
+  qc: "#1565C0",
+  qcLight: "#1976D2",
 };
 
 const slideUp = keyframes`from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}`;
@@ -52,173 +69,104 @@ const PRIORITY_META = APPROVER_PRIORITY_META;
 
 // ─── Defect keys ──────────────────────────────────────────────────────────────
 const DEFECT_ROWS = [
-  { key: "cracks",       label: "Cracks"                   },
-  { key: "voids",        label: "Voids"                    },
-  { key: "debonds",      label: "De-bonds"                 },
-  { key: "delamination", label: "Delamination"             },
-  { key: "porosity",     label: "Porosity"                 },
-  { key: "other",        label: "Any other observation"    },
-];
-
-// ─── Mock data ────────────────────────────────────────────────────────────────
-const MOCK_NDT_SUBMISSIONS = [
-  {
-    id: 1,
-    batchId:     "NDT-2025-063",
-    motorId:     "MFG-SRM-2025-210",
-    submittedBy: "anand.krishna",
-    createdOn:   "2025-03-12T09:00:00",
-    status:      "Pending",
-    priority:    "High",
-    defects: {
-      cracks:       { observation: "No cracks observed" },
-      voids:        { observation: "Minor void at NE face, 2 mm dia" },
-      debonds:      { observation: "NIL" },
-      delamination: { observation: "NIL" },
-      porosity:     { observation: "Acceptable porosity level" },
-      other:        { observation: "NIL" },
-    },
-    mechRows:   [{ uts: "82.4", elongation: "38.2", eModulus: "12.1" }, { uts: "81.9", elongation: "37.8", eModulus: "11.9" }],
-    mechMean:   { uts: "82.15", elongation: "38.0", eModulus: "12.0" },
-    mechStdDev: { uts: "0.35",  elongation: "0.28", eModulus: "0.14" },
-    ifaceRows:   [{ peelStrength: "4.2", tbs: "18.5", sbs: "22.1" }],
-    ifaceAvg:    { peelStrength: "4.2",  tbs: "18.5", sbs: "22.1"  },
-    ifaceStdDev: { peelStrength: "—",    tbs: "—",    sbs: "—"     },
-    burnRows:   [{ burnRate: "8.4", density: "1.78" }, { burnRate: "8.6", density: "1.79" }],
-    burnAvg:    { burnRate: "8.5", density: "1.785" },
-  },
-  {
-    id: 2,
-    batchId:     "NDT-2025-059",
-    motorId:     "MFG-SRM-2025-205",
-    submittedBy: "meena.suresh",
-    createdOn:   "2025-03-10T11:30:00",
-    status:      "Approved",
-    priority:    "Medium",
-    defects: {
-      cracks:       { observation: "NIL" },
-      voids:        { observation: "NIL" },
-      debonds:      { observation: "NIL" },
-      delamination: { observation: "NIL" },
-      porosity:     { observation: "NIL" },
-      other:        { observation: "NIL" },
-    },
-    mechRows:   [{ uts: "83.1", elongation: "39.0", eModulus: "12.3" }],
-    mechMean:   { uts: "83.1",  elongation: "39.0", eModulus: "12.3" },
-    mechStdDev: { uts: "—",     elongation: "—",    eModulus: "—"    },
-    ifaceRows:   [{ peelStrength: "4.5", tbs: "19.0", sbs: "22.8" }],
-    ifaceAvg:    { peelStrength: "4.5",  tbs: "19.0", sbs: "22.8"  },
-    ifaceStdDev: { peelStrength: "—",    tbs: "—",    sbs: "—"     },
-    burnRows:   [{ burnRate: "8.3", density: "1.77" }],
-    burnAvg:    { burnRate: "8.3", density: "1.77" },
-  },
-  {
-    id: 3,
-    batchId:     "NDT-2025-054",
-    motorId:     "MFG-SRM-2025-199",
-    submittedBy: "sunil.das",
-    createdOn:   "2025-03-07T14:00:00",
-    status:      "Rejected",
-    priority:    "Critical",
-    defects: {
-      cracks:       { observation: "Multiple cracks at HE face" },
-      voids:        { observation: "Large void, 8 mm dia at NE core" },
-      debonds:      { observation: "De-bond at liner interface" },
-      delamination: { observation: "Delamination at aft dome" },
-      porosity:     { observation: "High porosity — out of spec" },
-      other:        { observation: "Surface irregularity noted" },
-    },
-    mechRows:   [{ uts: "71.2", elongation: "28.5", eModulus: "9.8" }],
-    mechMean:   { uts: "71.2",  elongation: "28.5", eModulus: "9.8" },
-    mechStdDev: { uts: "—",     elongation: "—",    eModulus: "—"   },
-    ifaceRows:   [{ peelStrength: "2.8", tbs: "13.2", sbs: "16.4" }],
-    ifaceAvg:    { peelStrength: "2.8",  tbs: "13.2", sbs: "16.4"  },
-    ifaceStdDev: { peelStrength: "—",    tbs: "—",    sbs: "—"     },
-    burnRows:   [{ burnRate: "9.8", density: "1.82" }],
-    burnAvg:    { burnRate: "9.8", density: "1.82" },
-  },
+  { key: "cracks", label: "Cracks" },
+  { key: "voids", label: "Voids" },
+  { key: "debonds", label: "De-bonds" },
+  { key: "delamination", label: "Delamination" },
+  { key: "porosity", label: "Porosity" },
+  { key: "other", label: "Any other observation" },
 ];
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
 const TH = styled(TableCell)({
   background: `linear-gradient(135deg, ${BRAND.qc}, ${BRAND.qcLight})`,
-  color: "#fff", fontWeight: 700, fontSize: "0.68rem",
-  letterSpacing: "0.07em", textTransform: "uppercase",
-  padding: "10px 14px", whiteSpace: "nowrap", borderBottom: "none",
+  color: "#fff",
+  fontWeight: 700,
+  fontSize: "0.68rem",
+  letterSpacing: "0.07em",
+  textTransform: "uppercase",
+  padding: "10px 14px",
+  whiteSpace: "nowrap",
+  borderBottom: "none",
 });
 
 const TD = styled(TableCell)({
-  padding: "10px 14px", fontSize: "0.82rem",
+  padding: "10px 14px",
+  fontSize: "0.82rem",
   borderBottom: `1px solid ${alpha(BRAND.border, 0.55)}`,
-  color: BRAND.text, verticalAlign: "middle",
+  color: BRAND.text,
+  verticalAlign: "middle",
 });
 
 const DTH = styled(TableCell)({
   background: `linear-gradient(135deg, ${BRAND.qc}, ${BRAND.qcLight})`,
-  color: "#fff", fontWeight: 700, fontSize: "0.65rem",
-  letterSpacing: "0.07em", textTransform: "uppercase",
-  padding: "10px 14px", whiteSpace: "nowrap", borderBottom: "none",
+  color: "#fff",
+  fontWeight: 700,
+  fontSize: "0.65rem",
+  letterSpacing: "0.07em",
+  textTransform: "uppercase",
+  padding: "10px 14px",
+  whiteSpace: "nowrap",
+  borderBottom: "none",
   verticalAlign: "middle",
 });
 
 const DTD = styled(TableCell)({
-  padding: "9px 13px", fontSize: "0.78rem",
+  padding: "9px 13px",
+  fontSize: "0.78rem",
   borderBottom: `1px solid ${alpha(BRAND.border, 0.5)}`,
-  color: BRAND.text, verticalAlign: "middle",
-});
-
-const StaticDTD = styled(DTD)({
-  background: `linear-gradient(135deg, ${alpha(BRAND.qc, 0.07)}, ${alpha(BRAND.qcLight, 0.04)})`,
-  fontWeight: 800,
-  color: BRAND.qc,
+  color: BRAND.text,
+  verticalAlign: "middle",
 });
 
 const rowBg = (i) => (i % 2 === 0 ? "#fff" : alpha(BRAND.surface, 0.6));
-const hov   = { "&:hover": { background: alpha(BRAND.qc, 0.025) } };
-
-type MechanicalStats = {
-  uts?: string;
-  elongation?: string;
-  eModulus?: string;
-};
-
-type InterfaceStats = {
-  peelStrength?: string;
-  tbs?: string;
-  sbs?: string;
-};
-
-type BurnStats = {
-  burnRate?: string;
-  density?: string;
-};
+const hov = { "&:hover": { background: alpha(BRAND.qc, 0.025) } };
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const StatusChip = ({ status }) => (
-  <Chip label={status} size="small" sx={{
-    height: 20, fontSize: "0.62rem", fontWeight: 700,
-    background: QC_STATUS_META[status]?.bg,
-    color:      QC_STATUS_META[status]?.color,
-    border:    `1px solid ${QC_STATUS_META[status]?.border}`,
-  }} />
+  <Chip
+    label={status}
+    size="small"
+    sx={{
+      height: 20,
+      fontSize: "0.62rem",
+      fontWeight: 700,
+      background: QC_STATUS_META[status]?.bg,
+      color: QC_STATUS_META[status]?.color,
+      border: `1px solid ${QC_STATUS_META[status]?.border}`,
+    }}
+  />
 );
 
 const PriorityChip = ({ priority }) => (
-  <Chip label={priority} size="small" sx={{
-    height: 20, fontSize: "0.62rem", fontWeight: 700,
-    background: PRIORITY_META[priority]?.bg,
-    color:      PRIORITY_META[priority]?.color,
-    border:    `1px solid ${PRIORITY_META[priority]?.border}`,
-  }} />
+  <Chip
+    label={priority}
+    size="small"
+    sx={{
+      height: 20,
+      fontSize: "0.62rem",
+      fontWeight: 700,
+      background: PRIORITY_META[priority]?.bg,
+      color: PRIORITY_META[priority]?.color,
+      border: `1px solid ${PRIORITY_META[priority]?.border}`,
+    }}
+  />
 );
 
 const SectionDivider = ({ icon: Icon, label }) => (
   <Stack direction="row" alignItems="center" gap={1} mb={1.5}>
-    <Box sx={{
-      width: 26, height: 26, borderRadius: "8px", flexShrink: 0,
-      background: `linear-gradient(135deg, ${BRAND.qc}, ${BRAND.qcLight})`,
-      display: "flex", alignItems: "center", justifyContent: "center",
-    }}>
+    <Box
+      sx={{
+        width: 26,
+        height: 26,
+        borderRadius: "8px",
+        flexShrink: 0,
+        background: `linear-gradient(135deg, ${BRAND.qc}, ${BRAND.qcLight})`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
       <Icon sx={{ color: "#fff", fontSize: 14 }} />
     </Box>
     <Typography sx={{ fontWeight: 800, fontSize: "0.78rem", color: BRAND.qc, letterSpacing: "0.04em" }}>
@@ -229,70 +177,106 @@ const SectionDivider = ({ icon: Icon, label }) => (
 );
 
 const SubCard = ({ children }) => (
-  <Box sx={{
-    borderRadius: "10px", border: `1px solid ${BRAND.border}`,
-    boxShadow: `0 1px 8px ${alpha(BRAND.qc, 0.06)}`, overflow: "hidden", mb: 2.5,
-  }}>
+  <Box
+    sx={{
+      borderRadius: "10px",
+      border: `1px solid ${BRAND.border}`,
+      boxShadow: `0 1px 8px ${alpha(BRAND.qc, 0.06)}`,
+      overflow: "hidden",
+      mb: 2.5,
+    }}
+  >
     {children}
   </Box>
 );
 
-const ValueChip = ({ value }) => {
-  const isNeg = value && (
-    value.toLowerCase().includes("crack") ||
-    value.toLowerCase().includes("void") ||
-    value.toLowerCase().includes("debond") ||
-    value.toLowerCase().includes("delamination") ||
-    value.toLowerCase().includes("out of spec") ||
-    value.toLowerCase().includes("high porosity")
-  );
-  const isNil = !value || value === "—" || value.toUpperCase() === "NIL";
+// ─── Detail sub-components ────────────────────────────────────────────────────
 
-  return (
-    <Chip
-      label={value || "—"}
-      size="small"
-      sx={{
-        height: 20, fontSize: "0.68rem", fontWeight: 600,
-        background: isNeg ? alpha(BRAND.danger, 0.1)
-          : isNil ? alpha(BRAND.border, 0.4)
-          : alpha(BRAND.qc, 0.08),
-        color: isNeg ? BRAND.danger
-          : isNil ? BRAND.textSub
-          : BRAND.qc,
-        border: `1px solid ${isNeg ? alpha(BRAND.danger, 0.25)
-          : isNil ? alpha(BRAND.border, 0.6)
-          : alpha(BRAND.qc, 0.2)}`,
-        maxWidth: 280, overflow: "hidden",
-        "& .MuiChip-label": { overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-      }}
-    />
-  );
-};
+const SetupSummaryCard = ({ form }: { form: NDTFormState }) => (
+  <SubCard>
+    <Box sx={{ p: 2 }}>
+      <Typography sx={{ fontWeight: 800, fontSize: "0.85rem", color: BRAND.qc, mb: 1.5 }}>
+        Setup Summary
+      </Typography>
+      <Stack direction="row" gap={4} flexWrap="wrap">
+        <Box>
+          <Typography sx={{ fontSize: "0.62rem", fontWeight: 700, color: BRAND.textSub, textTransform: "uppercase", letterSpacing: "0.06em", mb: 0.3 }}>
+            Equipment
+          </Typography>
+          <Typography sx={{ fontSize: "0.82rem", fontWeight: 600, color: BRAND.text }}>
+            {form.equipment || "—"}
+          </Typography>
+        </Box>
+        <Box>
+          <Typography sx={{ fontSize: "0.62rem", fontWeight: 700, color: BRAND.textSub, textTransform: "uppercase", letterSpacing: "0.06em", mb: 0.3 }}>
+            Beam Energies
+          </Typography>
+          <Typography sx={{ fontSize: "0.82rem", fontWeight: 600, color: BRAND.text }}>
+            {form.beamEnergies?.length ? form.beamEnergies.join(", ") : "—"}
+          </Typography>
+        </Box>
+        <Box>
+          <Typography sx={{ fontSize: "0.62rem", fontWeight: 700, color: BRAND.textSub, textTransform: "uppercase", letterSpacing: "0.06em", mb: 0.3 }}>
+            Radiography Plan
+          </Typography>
+          <Typography sx={{ fontSize: "0.82rem", fontWeight: 600, color: BRAND.text }}>
+            {form.radiographyPlan || "—"}
+          </Typography>
+        </Box>
+      </Stack>
+      {form.radiographyPlanRows?.length > 0 && (
+        <TableContainer sx={{ mt: 1.5 }}>
+          <Table size="small" sx={{ minWidth: 600 }}>
+            <TableHead>
+              <TableRow>
+                <DTH>Sr No</DTH>
+                <DTH>Sections</DTH>
+                <DTH>Orientations</DTH>
+                <DTH>SFD</DTH>
+                <DTH>Normal Exposures</DTH>
+                <DTH>Tangential Exposures</DTH>
+                <DTH>Detector Type</DTH>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {form.radiographyPlanRows.map((row, ri) => (
+                <TableRow key={ri} sx={{ background: rowBg(ri), ...hov, "&:last-child td": { borderBottom: "none" } }}>
+                  <DTD sx={{ fontWeight: 700, color: BRAND.textSub }}>{row.srNo}</DTD>
+                  <DTD>{row.sections}</DTD>
+                  <DTD>{row.orientations}</DTD>
+                  <DTD>{row.sfd}</DTD>
+                  <DTD>{row.normalExposures}</DTD>
+                  <DTD>{row.tangentialExposures}</DTD>
+                  <DTD>{row.detectorType}</DTD>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
+    </Box>
+  </SubCard>
+);
 
-// ─── Detail sub-tables ────────────────────────────────────────────────────────
-
-const DefectsTable = ({ defects }) => (
+const ExposureTable = ({ rows }: { rows: any[] }) => (
   <SubCard>
     <TableContainer>
-      <Table size="small">
+      <Table size="small" sx={{ minWidth: 420 }}>
         <TableHead>
           <TableRow>
-            <DTH sx={{ minWidth: 200 }}>Type of Defects</DTH>
-            <DTH sx={{ minWidth: 300 }}>Observation</DTH>
+            <DTH sx={{ minWidth: 80 }}>Sr No</DTH>
+            <DTH sx={{ minWidth: 140 }}>Section Number</DTH>
+            <DTH sx={{ minWidth: 120 }}>Orientation</DTH>
+            <DTH sx={{ minWidth: 120 }}>Exposure Count</DTH>
           </TableRow>
         </TableHead>
         <TableBody>
-          {DEFECT_ROWS.map(({ key, label }, ri) => (
-            <TableRow
-              key={key}
-              sx={{
-                background: rowBg(ri), ...hov,
-                ...(ri === DEFECT_ROWS.length - 1 ? { "& td": { borderBottom: "none" } } : {}),
-              }}
-            >
-              <DTD sx={{ fontWeight: 600 }}>{label}</DTD>
-              <DTD><ValueChip value={defects?.[key]?.observation} /></DTD>
+          {rows.map((row, ri) => (
+            <TableRow key={ri} sx={{ background: rowBg(ri), ...hov, "&:last-child td": { borderBottom: "none" } }}>
+              <DTD sx={{ fontWeight: 700, color: BRAND.textSub }}>{ri + 1}</DTD>
+              <DTD>{row.sectionNumber || "—"}</DTD>
+              <DTD>{row.orientation || "—"}</DTD>
+              <DTD>{row.exposureCount || "—"}</DTD>
             </TableRow>
           ))}
         </TableBody>
@@ -301,131 +285,66 @@ const DefectsTable = ({ defects }) => (
   </SubCard>
 );
 
-const MechTable = ({
-  mechRows = [],
-  mechMean = {},
-  mechStdDev = {},
-}: {
-  mechRows?: MechanicalStats[];
-  mechMean?: MechanicalStats;
-  mechStdDev?: MechanicalStats;
-}) => (
+const ObservationTable = ({ rows }: { rows: any[] }) => (
   <SubCard>
     <TableContainer>
-      <Table size="small" sx={{ minWidth: 560 }}>
+      <Table size="small" sx={{ minWidth: 500 }}>
         <TableHead>
           <TableRow>
-            <DTH sx={{ minWidth: 80 }}>Sample</DTH>
-            <DTH sx={{ minWidth: 160 }}>UTS (kgf/cm²)</DTH>
-            <DTH sx={{ minWidth: 180 }}>Elongation @ Fmax (%)</DTH>
-            <DTH sx={{ minWidth: 180 }}>E-Modulus (kgf/cm²)</DTH>
+            <DTH sx={{ minWidth: 80 }}>Sr No</DTH>
+            <DTH sx={{ minWidth: 120 }}>Section</DTH>
+            <DTH sx={{ minWidth: 120 }}>Orientation</DTH>
+            <DTH sx={{ minWidth: 200 }}>Observations</DTH>
+            <DTH sx={{ minWidth: 120 }}>Images</DTH>
           </TableRow>
         </TableHead>
         <TableBody>
-          {mechRows.map((row, ri) => (
-            <TableRow key={ri} sx={{ background: rowBg(ri), ...hov }}>
+          {rows.map((row, ri) => (
+            <TableRow key={ri} sx={{ background: rowBg(ri), ...hov, "&:last-child td": { borderBottom: "none" } }}>
               <DTD sx={{ fontWeight: 700, color: BRAND.textSub }}>{ri + 1}</DTD>
-              <DTD>{row.uts || "—"}</DTD>
-              <DTD>{row.elongation || "—"}</DTD>
-              <DTD>{row.eModulus || "—"}</DTD>
+              <DTD>{row.section || "—"}</DTD>
+              <DTD>{row.orientation || "—"}</DTD>
+              <DTD>{row.observations || "—"}</DTD>
+              <DTD>
+                {(row.files?.length ?? 0) > 0
+                  ? `${row.files.length} image${row.files.length !== 1 ? "s" : ""}`
+                  : "—"}
+              </DTD>
             </TableRow>
           ))}
-          <TableRow sx={{ background: alpha(BRAND.qc, 0.04), ...hov }}>
-            <StaticDTD>Mean</StaticDTD>
-            <DTD>{mechMean.uts || "—"}</DTD>
-            <DTD>{mechMean.elongation || "—"}</DTD>
-            <DTD>{mechMean.eModulus || "—"}</DTD>
-          </TableRow>
-          <TableRow sx={{ background: alpha(BRAND.qc, 0.07), ...hov, "& td": { borderBottom: "none" } }}>
-            <StaticDTD>Std Dev</StaticDTD>
-            <DTD>{mechStdDev.uts || "—"}</DTD>
-            <DTD>{mechStdDev.elongation || "—"}</DTD>
-            <DTD>{mechStdDev.eModulus || "—"}</DTD>
-          </TableRow>
         </TableBody>
       </Table>
     </TableContainer>
   </SubCard>
 );
 
-const IfaceTable = ({
-  ifaceRows = [],
-  ifaceAvg = {},
-  ifaceStdDev = {},
-}: {
-  ifaceRows?: InterfaceStats[];
-  ifaceAvg?: InterfaceStats;
-  ifaceStdDev?: InterfaceStats;
-}) => (
+const VisualInspectionTable = ({ rows }: { rows: any[] }) => (
   <SubCard>
     <TableContainer>
-      <Table size="small" sx={{ minWidth: 520 }}>
+      <Table size="small" sx={{ minWidth: 480 }}>
         <TableHead>
           <TableRow>
-            <DTH sx={{ minWidth: 80 }}>Sample</DTH>
-            <DTH sx={{ minWidth: 160 }}>Peel Strength</DTH>
-            <DTH sx={{ minWidth: 130 }}>TBS</DTH>
-            <DTH sx={{ minWidth: 160 }}>SBS (kgf/cm²)</DTH>
+            <DTH sx={{ minWidth: 80 }}>Sr No</DTH>
+            <DTH sx={{ minWidth: 180 }}>Observation</DTH>
+            <DTH sx={{ minWidth: 100 }}>Section</DTH>
+            <DTH sx={{ minWidth: 100 }}>Orientation</DTH>
+            <DTH sx={{ minWidth: 120 }}>Images</DTH>
           </TableRow>
         </TableHead>
         <TableBody>
-          {ifaceRows.map((row, ri) => (
-            <TableRow key={ri} sx={{ background: rowBg(ri), ...hov }}>
+          {rows.map((row, ri) => (
+            <TableRow key={ri} sx={{ background: rowBg(ri), ...hov, "&:last-child td": { borderBottom: "none" } }}>
               <DTD sx={{ fontWeight: 700, color: BRAND.textSub }}>{ri + 1}</DTD>
-              <DTD>{row.peelStrength || "—"}</DTD>
-              <DTD>{row.tbs || "—"}</DTD>
-              <DTD>{row.sbs || "—"}</DTD>
+              <DTD sx={{ fontWeight: 600 }}>{row.observation || "—"}</DTD>
+              <DTD>{row.section || "—"}</DTD>
+              <DTD>{row.orientation || "—"}</DTD>
+              <DTD>
+                {(row.files?.length ?? 0) > 0
+                  ? `${row.files.length} image${row.files.length !== 1 ? "s" : ""}`
+                  : "—"}
+              </DTD>
             </TableRow>
           ))}
-          <TableRow sx={{ background: alpha(BRAND.qc, 0.04), ...hov }}>
-            <StaticDTD>Avg</StaticDTD>
-            <DTD>{ifaceAvg.peelStrength || "—"}</DTD>
-            <DTD>{ifaceAvg.tbs || "—"}</DTD>
-            <DTD>{ifaceAvg.sbs || "—"}</DTD>
-          </TableRow>
-          <TableRow sx={{ background: alpha(BRAND.qc, 0.07), ...hov, "& td": { borderBottom: "none" } }}>
-            <StaticDTD>Std Dev</StaticDTD>
-            <DTD>{ifaceStdDev.peelStrength || "—"}</DTD>
-            <DTD>{ifaceStdDev.tbs || "—"}</DTD>
-            <DTD>{ifaceStdDev.sbs || "—"}</DTD>
-          </TableRow>
-        </TableBody>
-      </Table>
-    </TableContainer>
-  </SubCard>
-);
-
-// Table 4 — Burn Rate & Density
-const BurnTable = ({
-  burnRows = [],
-  burnAvg = {},
-}: {
-  burnRows?: BurnStats[];
-  burnAvg?: BurnStats;
-}) => (
-  <SubCard>
-    <TableContainer>
-      <Table size="small" sx={{ minWidth: 400 }}>
-        <TableHead>
-          <TableRow>
-            <DTH sx={{ minWidth: 80  }}>Sample</DTH>
-            <DTH sx={{ minWidth: 160 }}>Burn Rate (mm/s)</DTH>
-            <DTH sx={{ minWidth: 140 }}>Density</DTH>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {burnRows.map((row, ri) => (
-            <TableRow key={ri} sx={{ background: rowBg(ri), ...hov }}>
-              <DTD sx={{ fontWeight: 700, color: BRAND.textSub }}>{ri + 1}</DTD>
-              <DTD>{row.burnRate || "—"}</DTD>
-              <DTD>{row.density  || "—"}</DTD>
-            </TableRow>
-          ))}
-          <TableRow sx={{ background: alpha(BRAND.qc, 0.04), ...hov, "& td": { borderBottom: "none" } }}>
-            <StaticDTD>Avg</StaticDTD>
-            <DTD>{burnAvg.burnRate || "—"}</DTD>
-            <DTD>{burnAvg.density  || "—"}</DTD>
-          </TableRow>
         </TableBody>
       </Table>
     </TableContainer>
@@ -433,18 +352,19 @@ const BurnTable = ({
 );
 
 // ─── Detail Dialog ────────────────────────────────────────────────────────────
-const NDTDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
+const NDTDetailDialog = ({ open, onClose, item, detailData, detailsLoading, onApprove, onReject }: {
+  open: boolean;
+  onClose: () => void;
+  item: any;
+  detailData: NDTFormState | null;
+  detailsLoading: boolean;
+  onApprove: (item: any) => void;
+  onReject: (item: any) => void;
+}) => {
   const [pdfOpen, setPdfOpen] = useState(false);
   if (!item) return null;
 
-  const today = new Date().toLocaleDateString("en-IN", {
-    day: "2-digit", month: "short", year: "numeric",
-  });
-
-  const defectCount = DEFECT_ROWS.filter(
-    (d) => item.defects?.[d.key]?.observation &&
-           item.defects[d.key].observation.toUpperCase() !== "NIL"
-  ).length;
+  const motors = detailData?.motors ?? [];
 
   return (
     <>
@@ -475,13 +395,12 @@ const NDTDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
                 NDT Report
               </Typography>
               <Typography sx={{ color: alpha("#fff", 0.7), fontSize: "0.72rem" }}>
-                {item.batchId} · {item.motorId} · {defectCount} defect{defectCount !== 1 ? "s" : ""} noted
+                {item.batchId} · {motors.length} motor{motors.length !== 1 ? "s" : ""}
               </Typography>
             </Box>
           </Stack>
 
           <Stack direction="row" gap={1} alignItems="center">
-            <PriorityChip priority={item.priority} />
             <Button
               size="small" variant="contained"
               startIcon={<PictureAsPdfRoundedIcon sx={{ fontSize: "14px !important" }} />}
@@ -511,10 +430,9 @@ const NDTDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
           <Stack direction="row" gap={2} flexWrap="wrap" alignItems="center">
             {[
               { label: "Batch ID",     value: item.batchId },
-              { label: "Motor ID",     value: item.motorId },
+              { label: "Form ID",      value: item.formId },
               { label: "Submitted By", value: item.submittedBy },
               { label: "Date",         value: new Date(item.createdOn).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) },
-              { label: "Priority",     value: item.priority },
             ].map(({ label, value }) => (
               <Box key={label}>
                 <Typography sx={{ fontSize: "0.62rem", fontWeight: 700, color: BRAND.textSub, textTransform: "uppercase", letterSpacing: "0.06em" }}>
@@ -530,27 +448,111 @@ const NDTDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
 
         {/* Content */}
         <DialogContent sx={{ p: 2.8, overflowY: "auto", background: BRAND.surface }}>
+          {detailsLoading ? (
+            <Stack alignItems="center" py={4}>
+              <CircularProgress size={28} />
+            </Stack>
+          ) : detailData ? (
+            <>
+              <SectionDivider icon={RadarRoundedIcon} label="Setup Summary" />
+              <SetupSummaryCard form={detailData} />
 
-          <SectionDivider icon={RadarRoundedIcon} label="NDT — Defect Observations" />
-          <DefectsTable defects={item.defects} />
+              {motors.map((motor, mi) => (
+                <Box key={motor.motorId || mi} sx={{ mb: 3 }}>
+                  <Typography sx={{
+                    fontWeight: 800, fontSize: "0.85rem", color: BRAND.qc,
+                    mb: 1.5, mt: 2,
+                    display: "flex", alignItems: "center", gap: 1,
+                  }}>
+                    <Box sx={{
+                      width: 22, height: 22, borderRadius: "6px",
+                      background: `linear-gradient(135deg, ${BRAND.qc}, ${BRAND.qcLight})`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "0.65rem", color: "#fff", fontWeight: 700,
+                    }}>
+                      {mi + 1}
+                    </Box>
+                    Motor — {motor.motorId}
+                  </Typography>
 
-          <SectionDivider icon={SpeedRoundedIcon} label="Mechanical Properties" />
-          <MechTable
-            mechRows={item.mechRows}
-            mechMean={item.mechMean}
-            mechStdDev={item.mechStdDev}
-          />
+                  {motor.additionalExposureRows?.length > 0 && (
+                    <>
+                      <SectionDivider icon={RadarRoundedIcon} label="Additional Exposure Details" />
+                      <ExposureTable rows={motor.additionalExposureRows} />
+                    </>
+                  )}
 
-          <SectionDivider icon={LayersRoundedIcon} label="Interface Properties" />
-          <IfaceTable
-            ifaceRows={item.ifaceRows}
-            ifaceAvg={item.ifaceAvg}
-            ifaceStdDev={item.ifaceStdDev}
-          />
+                  {motor.radiographyObservationRows?.length > 0 && (
+                    <>
+                      <SectionDivider icon={RadarRoundedIcon} label="Radiography Observations" />
+                      <ObservationTable rows={motor.radiographyObservationRows} />
+                    </>
+                  )}
 
-          <SectionDivider icon={LocalFireDepartmentRoundedIcon} label="Burn Rate & Density" />
-          <BurnTable burnRows={item.burnRows} burnAvg={item.burnAvg} />
+                  {motor.visualInspectionRows?.length > 0 && (
+                    <>
+                      <SectionDivider icon={RadarRoundedIcon} label="Visual Inspection" />
+                      <VisualInspectionTable rows={motor.visualInspectionRows} />
+                    </>
+                  )}
 
+                  {motor.visualInspectionMedia?.length > 0 && (
+                    <SubCard>
+                      <Box sx={{ p: 2 }}>
+                        <Typography sx={{ fontWeight: 700, fontSize: "0.78rem", color: BRAND.text, mb: 1 }}>
+                          Visual Inspection Media (Videos)
+                        </Typography>
+                        <Stack direction="row" gap={1} flexWrap="wrap">
+                          {motor.visualInspectionMedia.map((file, fi) => (
+                            <Chip key={fi} label={String(file)} size="small" sx={{
+                              fontSize: "0.68rem", fontWeight: 600,
+                              background: alpha(BRAND.qc, 0.08), color: BRAND.qc,
+                            }} />
+                          ))}
+                        </Stack>
+                      </Box>
+                    </SubCard>
+                  )}
+
+                  {motor.additionalRemarks && (
+                    <SubCard>
+                      <Box sx={{ p: 2 }}>
+                        <Typography sx={{ fontWeight: 700, fontSize: "0.78rem", color: BRAND.text, mb: 0.5 }}>
+                          Additional Remarks
+                        </Typography>
+                        <Typography sx={{ fontSize: "0.78rem", color: BRAND.textSub }}>
+                          {motor.additionalRemarks}
+                        </Typography>
+                      </Box>
+                    </SubCard>
+                  )}
+
+                  {motor.signedReport && (
+                    <SubCard>
+                      <Box sx={{ p: 2 }}>
+                        <Typography sx={{ fontWeight: 700, fontSize: "0.78rem", color: BRAND.text, mb: 0.5 }}>
+                          Signed NDT Report
+                        </Typography>
+                        <Typography sx={{ fontSize: "0.78rem", color: BRAND.qc }}>
+                          {String(motor.signedReport)}
+                        </Typography>
+                      </Box>
+                    </SubCard>
+                  )}
+                </Box>
+              ))}
+
+              {motors.length === 0 && (
+                <Typography sx={{ textAlign: "center", py: 4, color: BRAND.textSub, fontSize: "0.85rem" }}>
+                  No saved NDT form details available for preview.
+                </Typography>
+              )}
+            </>
+          ) : (
+            <Typography sx={{ textAlign: "center", py: 4, color: BRAND.textSub, fontSize: "0.85rem" }}>
+              No saved NDT form details available for preview.
+            </Typography>
+          )}
         </DialogContent>
 
         {/* Footer */}
@@ -597,8 +599,10 @@ const NDTDetailDialog = ({ open, onClose, item, onApprove, onReject }) => {
 
 // ─── Main Page ────────────────────────────────────────────────────────────────
 const NDTApproverPage = () => {
-  const [items,    setItems]    = useState(MOCK_NDT_SUBMISSIONS);
+  const [items, setItems] = useState([]);
   const [selected, setSelected] = useState(null);
+  const [detailData, setDetailData] = useState<NDTFormState | null>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
   const { dialogProps, requestApprove, requestReject } = useApproverFormAction({
     department: "qualityControl",
     setItems,
@@ -606,152 +610,52 @@ const NDTApproverPage = () => {
     subDepartment: "ndt",
   });
 
+  const handleViewDetails = async (row: any) => {
+    setSelected(row);
+    setDetailData(null);
+    setDetailsLoading(true);
+
+    try {
+      const response = await ndtController.fetchFormDetails({ formId: row.formId, subDepartmentId: 0 } as any);
+      const prep = response?.data?.data ?? null;
+      if (prep) setDetailData(prep);
+    } catch {
+      setDetailData(null);
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
   return (
-    <ApproverList
+    <ApproverSubdepartmentBatchListSection
       department="qualityControl"
       subDepartment="ndt"
       items={items}
-      statusField="status"
       statusMeta={QC_STATUS_META}
-      searchKeys={["batchId", "motorId", "submittedBy"]}
-      filterFields={[
-        { field: "priority", label: "Priority", options: ["Critical", "High", "Medium", "Low"] },
-      ]}
+      onViewDetails={handleViewDetails}
+      tableTheme={{
+        accentMain: BRAND.qc,
+        accentLight: BRAND.qcLight,
+        borderColor: BRAND.border,
+        surfaceColor: BRAND.surface,
+        textSubColor: BRAND.textSub,
+        primaryColor: BRAND.primary,
+      }}
     >
-      {(filtered) => (
-        <>
-          <Card
-            elevation={0}
-            sx={{
-              borderRadius: 3,
-              border: `1px solid ${BRAND.border}`,
-              boxShadow: `0 2px 12px ${alpha(BRAND.primary, 0.06)}`,
-              overflow: "hidden",
-            }}
-          >
-            <TableContainer>
-              <Table>
-                <TableHead>
-                  <TableRow>
-                    <TH>Batch ID</TH>
-                    <TH>Motor ID</TH>
-                    <TH>Submitted By</TH>
-                    <TH>Defects Noted</TH>
-                    <TH>Mech Samples</TH>
-                    <TH>Date</TH>
-                    <TH>Priority</TH>
-                    <TH>Status</TH>
-                    <TH sx={{ textAlign: "center" }}>Action</TH>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {filtered.map((row, idx) => {
-                    const defectCount = DEFECT_ROWS.filter(
-                      (d) => row.defects?.[d.key]?.observation &&
-                             row.defects[d.key].observation.toUpperCase() !== "NIL"
-                    ).length;
-
-                    return (
-                      <TableRow
-                        key={row.id}
-                        sx={{
-                          background: idx % 2 === 0 ? "#fff" : alpha(BRAND.surface, 0.5),
-                          "&:hover": { background: alpha(BRAND.qc, 0.03) },
-                          "&:last-child td": { borderBottom: "none" },
-                          animation: `${slideUp} 0.3s ease ${idx * 0.04}s both`,
-                        }}
-                      >
-                        <TD>
-                          <Typography sx={{ fontWeight: 800, fontSize: "0.82rem", color: BRAND.qc }}>
-                            {row.batchId}
-                          </Typography>
-                        </TD>
-
-                        <TD sx={{ fontSize: "0.78rem", color: BRAND.textSub }}>{row.motorId}</TD>
-
-                        <TD sx={{ fontSize: "0.78rem" }}>{row.submittedBy}</TD>
-
-                        {/* Defects noted chip */}
-                        <TD>
-                          <Chip
-                            label={defectCount === 0 ? "None" : `${defectCount} defect${defectCount !== 1 ? "s" : ""}`}
-                            size="small"
-                            sx={{
-                              height: 20, fontSize: "0.62rem", fontWeight: 700,
-                              background: defectCount === 0
-                                ? alpha(BRAND.accent, 0.1)
-                                : alpha(BRAND.danger, 0.1),
-                              color: defectCount === 0 ? BRAND.accent : BRAND.danger,
-                              border: `1px solid ${defectCount === 0
-                                ? alpha(BRAND.accent, 0.25)
-                                : alpha(BRAND.danger, 0.25)}`,
-                            }}
-                          />
-                        </TD>
-
-                        {/* Mech samples count */}
-                        <TD>
-                          <Chip
-                            label={`${row.mechRows?.length ?? 0} sample${(row.mechRows?.length ?? 0) !== 1 ? "s" : ""}`}
-                            size="small"
-                            sx={{
-                              height: 20, fontSize: "0.62rem", fontWeight: 700,
-                              background: alpha(BRAND.qc, 0.08),
-                              color: BRAND.qc,
-                              border: `1px solid ${alpha(BRAND.qc, 0.2)}`,
-                            }}
-                          />
-                        </TD>
-
-                        <TD sx={{ color: BRAND.textSub, fontSize: "0.76rem" }}>
-                          {new Date(row.createdOn).toLocaleDateString("en-IN", {
-                            day: "2-digit", month: "short", year: "numeric",
-                          })}
-                        </TD>
-
-                        <TD><PriorityChip priority={row.priority} /></TD>
-                        <TD><StatusChip   status={row.status}    /></TD>
-
-                        <TD sx={{ textAlign: "center" }}>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            startIcon={<VisibilityRoundedIcon sx={{ fontSize: "13px !important" }} />}
-                            onClick={() => setSelected(row)}
-                            disabled={!isApproverActionableStatus(row.status)}
-                            sx={{
-                              borderRadius: 2, fontWeight: 700, fontSize: "0.72rem",
-                              textTransform: "none", px: 1.5,
-                              borderColor: isApproverActionableStatus(row.status) ? BRAND.qc : BRAND.border,
-                              color:       isApproverActionableStatus(row.status) ? BRAND.qc : alpha(BRAND.textSub, 0.4),
-                              "&:hover": isApproverActionableStatus(row.status)
-                                ? { background: alpha(BRAND.qc, 0.06), borderColor: BRAND.qc }
-                                : {},
-                            }}
-                          >
-                            View Details
-                          </Button>
-                        </TD>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Card>
-
-          <NDTDetailDialog
-            open={!!selected}
-            onClose={() => setSelected(null)}
-            item={selected}
-            onApprove={requestApprove}
-            onReject={requestReject}
-          />
-
-          <ApproverActionDialog {...dialogProps} />
-        </>
-      )}
-    </ApproverList>
+      <NDTDetailDialog
+        open={!!selected}
+        onClose={() => {
+          setSelected(null);
+          setDetailData(null);
+        }}
+        item={selected}
+        detailData={detailData}
+        detailsLoading={detailsLoading}
+        onApprove={requestApprove}
+        onReject={requestReject}
+      />
+      <ApproverActionDialog {...dialogProps} />
+    </ApproverSubdepartmentBatchListSection>
   );
 };
 

@@ -14,7 +14,7 @@ const SUB_DEPT_LABELS = {
 
 export default function DispatchDashboard() {
   const { subDept } = useParams();
-  const { userName, userRole, stats } = useUserDepartmentHeaderHook({
+  const { userName, userRole, stats, statItems } = useUserDepartmentHeaderHook({
     deptSlug: "dispatch",
     subDeptSlug: subDept,
   });
@@ -27,6 +27,7 @@ export default function DispatchDashboard() {
         userName={userName}
         userRole={userRole}
         stats={stats}
+        statItems={statItems}
       />
 
       <Box sx={{ mt: 2 }}>{subDept === "dispatch" && <DispatchPage />}</Box>

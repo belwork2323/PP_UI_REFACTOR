@@ -1,0 +1,173 @@
+{
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "TRIMMING",
+  "functionality": "CREATE_TRIMMING_FORM",
+  "motorStage": 1,
+  "message": "Trimming schema fetched successfully",
+  "meta": {
+    "title": "Trimming Form",
+    "description": "Motor trimming operations and dimensional verification for stage 1"
+  },
+  "data": {
+    "layout": {
+      "type": "flat"
+    },
+    "meta": {
+      "title": "Trimming Form",
+      "description": "Motor trimming operations and dimensional verification for stage 1"
+    },
+    "ui": {
+      "layout": "flat",
+      "gap": "md",
+      "sectionVariant": "card",
+      "sectionBorderRadius": "sm",
+      "designSystem": {
+        "colors": {
+          "primary": "#6A1B9A",
+          "primaryLight": "#8E24AA",
+          "surface": "#F4F6F8",
+          "border": "#D5D8DC",
+          "text": "#1C2833",
+          "textSub": "#5D6D7E"
+        },
+        "typography": {},
+        "spacing": {
+          "xs": 4,
+          "sm": 8,
+          "md": 12,
+          "lg": 16,
+          "xl": 24
+        },
+        "radius": {
+          "sm": 4,
+          "md": 6,
+          "lg": 8
+        },
+        "icons": {
+          "sectionDefault": "description",
+          "trimming": "content_cut"
+        }
+      }
+    },
+    "context": {
+      "motorStage": 1
+    },
+    "sections": [
+      {
+        "sectionId": "TRIMMING_DETAILS",
+        "sectionName": "Trimming Details",
+        "type": "table",
+        "addRowAllowed": true,
+        "columns": [
+          {
+            "fieldId": "MACHINE_DETAILS",
+            "label": "Machine Details",
+            "type": "text",
+            "required": true
+          },
+          {
+            "fieldId": "START_DATE",
+            "label": "Start Date",
+            "type": "date",
+            "required": true
+          },
+          {
+            "fieldId": "COMPLETION_DATE",
+            "label": "Completion Date",
+            "type": "date"
+          },
+          {
+            "fieldId": "ARBOR_SIZE",
+            "label": "Arbor Size",
+            "type": "number"
+          },
+          {
+            "fieldId": "CUTTER_SIZE",
+            "label": "Cutter Size",
+            "type": "number"
+          },
+          {
+            "fieldId": "MOTOR_AND_ARBOR_TRUING",
+            "label": "Motor And Arbor Truing",
+            "type": "text"
+          },
+          {
+            "fieldId": "REMARKS",
+            "label": "Remarks",
+            "type": "textarea"
+          }
+        ]
+      },
+      {
+        "sectionId": "DIMENSIONS_AFTER_TRIMMING",
+        "sectionName": "Dimensions After Trimming",
+        "type": "stageSpecific",
+        "motorStage": 1,
+        "tables": [
+          {
+            "tableId": "DIMENSION_TABLE",
+            "title": "Motor Stage 1",
+            "addRowAllowed": false,
+            "rowGenerationType": "fixed",
+            "rows": [
+              {
+                "rowId": "A_DEPTH_BEFORE",
+                "dimension": "A (Depth)",
+                "measurementType": "Before Trimming"
+              },
+              {
+                "rowId": "A_DEPTH_AFTER",
+                "dimension": "A (Depth)",
+                "measurementType": "After Trimming"
+              },
+              {
+                "rowId": "B_ID_BEFORE",
+                "dimension": "B (I.D)",
+                "measurementType": "Before Trimming"
+              },
+              {
+                "rowId": "B_ID_AFTER",
+                "dimension": "B (I.D)",
+                "measurementType": "After Trimming"
+              }
+            ],
+            "columns": [
+              {
+                "fieldId": "SPECIFIED",
+                "label": "Specified",
+                "type": "number",
+                "unit": "mm"
+              },
+              {
+                "fieldId": "R2T",
+                "label": "R2T",
+                "type": "number",
+                "unit": "mm"
+              },
+              {
+                "fieldId": "R2B",
+                "label": "R2B",
+                "type": "number",
+                "unit": "mm"
+              },
+              {
+                "fieldId": "R1L",
+                "label": "R1L",
+                "type": "number",
+                "unit": "mm"
+              },
+              {
+                "fieldId": "R1R",
+                "label": "R1R",
+                "type": "number",
+                "unit": "mm"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "QC",
+    "layout": { "type": "flat" },
+    "division": "TRIMMING",
+    "subType": "MAIN_BATCH",
+    "subDepartmentId": 114,
+    "functionality": "CREATE_TRIMMING_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "QC",
+  "division": "TRIMMING",
+  "subType": "MAIN_BATCH",
+  "functionality": "CREATE_TRIMMING_FORM",
+  "message": "Trimming schema fetched successfully",
+  "timestamp": "2026-06-10T10:00:00Z",
+  "data": {
+    "layout": { "type": "flat" },
+    "meta": {
+      "title": "Trimming Process",
+      "description": "Motor trimming measurement details"
+    },
+    "sections": [
+      {
+        "id": "TRIMMING_MEASUREMENT_DETAILS",
+        "title": "Trimming Measurement Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "TRIMMING_MEASUREMENT_DETAILS",
+            "title": "Trimming Measurement Details",
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "addLabel": "Add Row",
+              "autoIncrementKey": "SR_NO",
+              "min": 4,
+              "presetRows": [
+                {
+                  "readonly": true,
+                  "SR_NO": 1,
+                  "DIMENSION": "A (Depth)",
+                  "MEASUREMENT_STAGE": "Before Trimming"
+                },
+                {
+                  "readonly": true,
+                  "SR_NO": 2,
+                  "DIMENSION": "A (Depth)",
+                  "MEASUREMENT_STAGE": "After Trimming"
+                },
+                {
+                  "readonly": true,
+                  "SR_NO": 3,
+                  "DIMENSION": "B (I.D)",
+                  "MEASUREMENT_STAGE": "Before Trimming"
+                },
+                {
+                  "readonly": true,
+                  "SR_NO": 4,
+                  "DIMENSION": "B (I.D)",
+                  "MEASUREMENT_STAGE": "After Trimming"
+                }
+              ]
+            },
+            "columns": [
+              { "type": "column", "id": "SR_NO", "fieldType": "serial", "label": "Sr No", "readonly": true },
+              {
+                "type": "column",
+                "id": "DIMENSION",
+                "fieldType": "text",
+                "label": "Dimension"
+              },
+              { "type": "column", "id": "SPECIFIED", "fieldType": "text", "label": "Specified" },
+              {
+                "type": "column",
+                "id": "MEASUREMENT_STAGE",
+                "fieldType": "text",
+                "label": "Measurement Stage"
+              },
+              { "type": "column", "id": "R2T", "fieldType": "number", "label": "R2T" },
+              { "type": "column", "id": "R2B", "fieldType": "number", "label": "R2B" },
+              { "type": "column", "id": "R1L", "fieldType": "number", "label": "R1L" },
+              { "type": "column", "id": "R1R", "fieldType": "number", "label": "R1R" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

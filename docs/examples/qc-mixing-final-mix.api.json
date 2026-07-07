@@ -1,0 +1,166 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "QC",
+    "layout": { "type": "flat" },
+    "division": "MIXING",
+    "subType": "FINAL_MIX",
+    "subDepartmentId": 114,
+    "functionality": "CREATE_MIXING_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "QC",
+  "division": "MIXING",
+  "subType": "FINAL_MIX",
+  "subDepartmentId": 114,
+  "functionality": "CREATE_MIXING_FORM",
+  "data": {
+    "layout": { "type": "flat" },
+    "meta": {
+      "title": "Final Mix Processing",
+      "description": "First final mix loads shared Final Mix Details plus per-mix Viscosity Build-up. Additional final mixes only add a Viscosity Build-up entry."
+    },
+    "sections": [
+      {
+        "id": "FINAL_MIX_DETAILS",
+        "title": "Final Mix Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "FINAL_MIX_DETAILS",
+            "title": "Final Mix Details",
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "presetRows": [
+                { "readonly": true, "PARAMETER": "End of mix Viscosity (Poise)" },
+                { "readonly": true, "PARAMETER": "End of Mix Temp (°C)" }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "BOWL_NO",
+                "fieldType": "text",
+                "label": "Bowl No"
+              },
+              {
+                "type": "column",
+                "id": "DATE_OF_FINAL_MIX",
+                "fieldType": "date",
+                "label": "Date of Final Mix"
+              },
+              {
+                "type": "column",
+                "id": "MIXER_BLDG_NO",
+                "fieldType": "text",
+                "label": "Mixer & Bldg No."
+              },
+              {
+                "type": "column",
+                "id": "PREMIX_QTY",
+                "fieldType": "number",
+                "label": "Premix Qty (kg)"
+              },
+              {
+                "type": "column",
+                "id": "PARAMETER",
+                "fieldType": "static",
+                "label": "Parameter",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "SPECIFICATION",
+                "fieldType": "text",
+                "label": "Spec."
+              },
+              {
+                "type": "group",
+                "id": "VALUE",
+                "label": "Value",
+                "columns": [
+                  {
+                    "type": "column",
+                    "id": "VALUE_1",
+                    "fieldType": "number",
+                    "label": ""
+                  },
+                  {
+                    "type": "column",
+                    "id": "VALUE_2",
+                    "fieldType": "number",
+                    "label": ""
+                  },
+                  {
+                    "type": "column",
+                    "id": "VALUE_3",
+                    "fieldType": "number",
+                    "label": ""
+                  },
+                  {
+                    "type": "column",
+                    "id": "VALUE_4",
+                    "fieldType": "number",
+                    "label": ""
+                  }
+                ]
+              },
+              {
+                "type": "column",
+                "id": "REMARKS",
+                "fieldType": "textarea",
+                "label": "Remarks"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "VISCOSITY_BUILD_UP",
+        "title": "Viscosity Build-up (Value to be recorded at an interval of 30 mins)",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "VISCOSITY_BUILD_UP",
+            "title": "Viscosity Build-up (P @ 40°C)",
+            "rows": {
+              "allowAdd": true,
+              "allowDelete": true,
+              "min": 1,
+              "defaultCount": 1,
+              "autoIncrementKey": "SR_NO",
+              "addLabel": "Add Row"
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "SR_NO",
+                "fieldType": "serial",
+                "label": "S. No",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "TIME",
+                "fieldType": "number",
+                "label": "Time",
+                "unit": "min"
+              },
+              {
+                "type": "column",
+                "id": "VISCOSITY_VALUE",
+                "fieldType": "number",
+                "label": "Viscosity Value (P @ 40°C)"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

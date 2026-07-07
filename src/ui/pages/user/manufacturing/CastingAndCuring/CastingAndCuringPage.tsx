@@ -4,6 +4,7 @@ import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog
 import CastingCuringList from "./CastingAndCuringList";
 import CastingCuringForm from "./CastingAndCuringForm";
 import CastingAndCuringHeader from "./CastingAndCuringHeader";
+import CastingCuringDetailsView from "./CastingCuringDetailsView";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import { getManufacturingTheme } from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import useCastingAndCuringHook from "../../../../../hooks/user/manufacturing/useCastingAndCuringHook";
@@ -47,13 +48,23 @@ const CastingCuringPage = () => {
     setMotorReceivedAt,
     handleSetupDraftChange,
     handleLoadCastingForm,
+    handleAddMotors,
     handleRemoveLoadedCastingForm,
     handleLoadCuringForm,
     getCuringSetupDraft,
+    getMotorCuringFormValues,
     handleCuringSetupDraftChange,
+    handleMotorCuringValuesChange,
     handleMotorSessionChange,
+    handleRemoveMotor,
+    handleSaveCastingAndContinue,
     handleSaveDraft,
     handleSubmit,
+    detailsRow,
+    detailsData,
+    detailsLoading,
+    handleViewCastingCuringDetails,
+    handleBackFromDetails,
   } = hookState;
 
   if (loading) {
@@ -67,6 +78,21 @@ const CastingCuringPage = () => {
   return (
     <Box sx={theme.workflow.animatedContainer}>
       {view === "list" && <CastingCuringList hookState={hookState} />}
+
+      {view === "details" && (
+        detailsData ? (
+          <CastingCuringDetailsView
+            row={detailsRow ?? {}}
+            data={detailsData}
+            loading={detailsLoading}
+            onBack={handleBackFromDetails}
+          />
+        ) : (
+          <Box sx={{ display: "flex", justifyContent: "center", py: 8 }}>
+            <CircularProgress size={28} />
+          </Box>
+        )
+      )}
 
       {view === "form" && activeBatch && (
         <>
@@ -93,11 +119,17 @@ const CastingCuringPage = () => {
             onMotorReceivedAtChange={setMotorReceivedAt}
             onSetupDraftChange={handleSetupDraftChange}
             onLoadCastingForm={handleLoadCastingForm}
+            onAddMotors={handleAddMotors}
             onRemoveLoadedCastingForm={handleRemoveLoadedCastingForm}
             onLoadCuringForm={handleLoadCuringForm}
             getCuringSetupDraft={getCuringSetupDraft}
+            getMotorCuringFormValues={getMotorCuringFormValues}
             onCuringSetupDraftChange={handleCuringSetupDraftChange}
+            onMotorCuringValuesChange={handleMotorCuringValuesChange}
             onMotorSessionChange={handleMotorSessionChange}
+            onRemoveMotor={handleRemoveMotor}
+            onSaveCastingAndContinue={handleSaveCastingAndContinue}
+            actionLoading={actionLoading}
             theme={theme}
           />
 

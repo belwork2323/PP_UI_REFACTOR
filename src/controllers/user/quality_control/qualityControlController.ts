@@ -1,7 +1,7 @@
-import { fetchBatchListApi, fetchQCLogsApi, submitQCApi } from "../../data/api/user_quality_control/qualityControlApi";
-import { useAlertStore } from "../../app/store/alertStore";
-import { useAuthStore } from "../../app/store/authStore";
-import { STRINGS } from "../../app/config/strings";
+import { fetchBatchListApi, fetchQCLogsApi, submitQCApi } from "../../../data/api/users/quality_control/qualityControlApi";
+import { useAlertStore } from "../../../app/store/alertStore";
+import { useAuthStore } from "../../../app/store/authStore";
+import { STRINGS } from "../../../app/config/strings";
 
 export const SPECIFICATIONS = {
   rawMatPurity: { min: 99.5, max: 100, unit: "%" },
@@ -68,7 +68,6 @@ export const qcController = {
       };
 
       const response = await submitQCApi(payload, currentUser);
-      
       // Based on legacy logic: status 200/201 is success
       if (response) {
         showAlert("Final QC data approved and blockchain record created!", "success");

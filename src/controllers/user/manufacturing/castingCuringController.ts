@@ -14,14 +14,15 @@ export type CastingCuringCreatePayload = {
   batchId: string;
   subDepartmentId: number;
   formSubmissionType: "DRAFT" | "SUBMIT";
-  castingCuringDetails: CastingCuringFormBody;
+  motors: CastingCuringFormBody["motors"];
 };
 
 export type CastingCuringUpdatePayload = {
   formId: string;
+  batchId: string;
   subDepartmentId: number;
-  formSubmissionType: "DRAFT" | "UPDATE";
-  castingCuringDetails: CastingCuringFormBody;
+  formSubmissionType: "DRAFT" | "SUBMIT";
+  motors: CastingCuringFormBody["motors"];
 };
 
 export type CastingCuringDetailsPayload = {

@@ -69,14 +69,21 @@ const SpecificationCell = ({ value }: { value: string }) =>
 
 type MixingQualityChecksTableProps = {
   rows: QualityCheckRow[];
-  onChange: (
+  readOnly?: boolean;
+  onChange?: (
     parameter: string,
     field: "observed1" | "observed2" | "observed3" | "observed4",
     value: string,
   ) => void;
 };
 
-const MixingQualityChecksTable = ({ rows, onChange }: MixingQualityChecksTableProps) => (
+const ReadOnlyValue = ({ value }: { value: string }) => (
+  <Typography sx={{ fontSize: "0.78rem", fontWeight: 600, color: BRAND.text }}>
+    {value?.trim() ? value : "—"}
+  </Typography>
+);
+
+const MixingQualityChecksTable = ({ rows, readOnly = false, onChange }: MixingQualityChecksTableProps) => (
   <TableContainer sx={tableShellSx}>
     <Table size="small" sx={{ minWidth: 720, tableLayout: "fixed" }}>
       <colgroup>
@@ -119,11 +126,15 @@ const MixingQualityChecksTable = ({ rows, onChange }: MixingQualityChecksTablePr
                     background: alpha(BRAND.mx, 0.02),
                   }}
                 >
-                  <MixingTableInput
-                    value={row[field]}
-                    placeholder={S.PLACEHOLDER_OBSERVED_VALUE}
-                    onChange={(value) => onChange(row.parameter, field, value)}
-                  />
+                  {readOnly ? (
+                    <ReadOnlyValue value={row[field]} />
+                  ) : (
+                    <MixingTableInput
+                      value={row[field]}
+                      placeholder={S.PLACEHOLDER_OBSERVED_VALUE}
+                      onChange={(value) => onChange?.(row.parameter, field, value)}
+                    />
+                  )}
                 </TD>
               ))
             ) : (
@@ -131,11 +142,15 @@ const MixingQualityChecksTable = ({ rows, onChange }: MixingQualityChecksTablePr
                 colSpan={QUALITY_OBSERVED_COLS}
                 sx={{ borderLeft: observedGroupBorder, background: alpha(BRAND.mx, 0.02) }}
               >
-                <MixingTableInput
-                  value={row.observed1}
-                  placeholder={S.PLACEHOLDER_OBSERVED_VALUE}
-                  onChange={(value) => onChange(row.parameter, "observed1", value)}
-                />
+                {readOnly ? (
+                  <ReadOnlyValue value={row.observed1} />
+                ) : (
+                  <MixingTableInput
+                    value={row.observed1}
+                    placeholder={S.PLACEHOLDER_OBSERVED_VALUE}
+                    onChange={(value) => onChange?.(row.parameter, "observed1", value)}
+                  />
+                )}
               </TD>
             )}
           </TableRow>

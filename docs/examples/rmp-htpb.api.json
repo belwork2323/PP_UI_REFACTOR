@@ -1,0 +1,144 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "RAW_MATERIALS",
+    "layout": { "type": "flat" },
+    "materialId": 5,
+    "materialCode": "HTPB",
+    "gradeId": null,
+    "gradeCode": null,
+    "subdepartmentId": 111,
+    "functionality": "CREATE_RAW_MATERIAL_PREPARATION_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "RAW_MATERIALS",
+  "functionality": "CREATE_RAW_MATERIAL_PREPARATION_FORM",
+  "message": "Raw material preparation schema fetched successfully",
+  "timestamp": "2026-05-29T16:30:00Z",
+  "materialId": 5,
+  "materialCode": "HTPB",
+  "materialName": "Hydroxyl-Terminated Polybutadiene",
+  "materialType": "LIQUID",
+  "data": {
+    "meta": {
+      "title": "HTPB Blending",
+      "description": "HTPB lot blending, process recording and QC checks"
+    },
+    "ui": {
+      "layout": "flat",
+      "gap": "md",
+      "sectionVariant": "card"
+    },
+    "context": {
+      "subDepartmentId": "{{subDepartmentId}}",
+      "materialId": "{{materialId}}",
+      "gradeId": "{{gradeId}}",
+      "materialCode": "HTPB"
+    },
+    "sections": [
+      {
+        "id": "BLENDING",
+        "title": "Blending",
+        "children": [
+          {
+            "type": "group",
+            "id": "BLENDING_LOTS",
+            "label": "Lot {index}",
+            "ui": { "direction": "row", "wrap": true, "gap": "md" },
+            "repeat": {
+              "defaultCount": 1,
+              "min": 1,
+              "max": 20,
+              "allowAdd": true,
+              "allowDelete": true,
+              "label": "Lot {index}"
+            },
+            "children": [
+              {
+                "type": "field",
+                "id": "MFG_BATCH_LOT_NUMBER",
+                "fieldType": "text",
+                "label": "Enter Mfg/Batch Lot Nos",
+                "validation": { "required": true }
+              },
+              {
+                "type": "field",
+                "id": "TOTAL_QUANTITY",
+                "fieldType": "number",
+                "label": "Total Qty",
+                "unit": "kg",
+                "validation": { "required": true }
+              },
+              {
+                "type": "field",
+                "id": "EQUIPMENT_ID",
+                "fieldType": "text",
+                "label": "Enter Equipment Id."
+              },
+              {
+                "type": "field",
+                "id": "AGITATOR_RPM",
+                "fieldType": "number",
+                "label": "Agitator RPM"
+              },
+              {
+                "type": "field",
+                "id": "PROCESS_TEMPERATURE",
+                "fieldType": "number",
+                "label": "Process Temp",
+                "unit": "°C"
+              },
+              {
+                "type": "field",
+                "id": "JACKET_TEMPERATURE",
+                "fieldType": "number",
+                "label": "Jacket Temp",
+                "unit": "°C"
+              },
+              {
+                "type": "field",
+                "id": "START_DATETIME",
+                "fieldType": "datetime",
+                "label": "Start Date/Time"
+              },
+              {
+                "type": "field",
+                "id": "END_DATETIME",
+                "fieldType": "datetime",
+                "label": "End Date/Time"
+              },
+              {
+                "type": "field",
+                "id": "OBSERVATION",
+                "fieldType": "textarea",
+                "label": "Any Other Observation"
+              },
+              {
+                "type": "table",
+                "id": "QC_CHECKS",
+                "label": "QC Checks",
+                "rows": {
+                  "defaultCount": 3,
+                  "allowAdd": false,
+                  "allowDelete": false,
+                  "presetRows": [
+                    { "readonly": true, "PARAMETER": "OH Value", "SPECIFICATION": "40-50" },
+                    { "readonly": true, "PARAMETER": "Moisture %, max", "SPECIFICATION": "0.15" },
+                    { "readonly": true, "PARAMETER": "Viscosity at 30°C, cps", "SPECIFICATION": "4000-6500" }
+                  ]
+                },
+                "columns": [
+                  { "type": "column", "id": "PARAMETER", "fieldType": "static", "label": "Parameter" },
+                  { "type": "column", "id": "SPECIFICATION", "fieldType": "static", "label": "Specification" },
+                  { "type": "column", "id": "RESULT", "fieldType": "text", "label": "Result" }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

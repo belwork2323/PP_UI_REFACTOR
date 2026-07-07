@@ -1,0 +1,65 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "QC",
+    "layout": { "type": "flat" },
+    "division": "PROPELLANT_PROPERTIES",
+    "subType": "BALLISTIC_EVALUATION",
+    "subDepartmentId": 115,
+    "functionality": "CREATE_QC_PROPELLANT_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "QC",
+  "division": "PROPELLANT_PROPERTIES",
+  "subType": "BALLISTIC_EVALUATION",
+  "functionality": "CREATE_QC_PROPELLANT_FORM",
+  "message": "Ballistic Evaluation schema fetched successfully",
+  "timestamp": "2026-06-10T10:00:00Z",
+  "data": {
+    "layout": { "type": "flat" },
+    "meta": {
+      "title": "Ballistic Evaluation Motor Burn Rate",
+      "description": "Final mix ballistic evaluation details"
+    },
+    "sections": [
+      {
+        "id": "BALLISTIC_EVALUATION",
+        "title": "Ballistic Evaluation Motor Burn Rate",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "BALLISTIC_EVALUATION",
+            "allowAddColumn": true,
+            "addColumnPrefix": "FM_",
+            "columnActions": {
+              "position": "top-right",
+              "addLabel": "Add Column"
+            },
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "presetRows": [
+                { "readonly": true, "DETAILS": "Date of Test" },
+                { "readonly": true, "DETAILS": "Net propellant weight (kg)" },
+                { "readonly": true, "DETAILS": "Tb (s)" },
+                { "readonly": true, "DETAILS": "Pmax (ksc)" },
+                { "readonly": true, "DETAILS": "Pavg (ksc)" },
+                { "readonly": true, "DETAILS": "Burn rate (mm/s)" }
+              ]
+            },
+            "columns": [
+              { "type": "column", "id": "DETAILS", "fieldType": "static", "label": "Details / Mix", "readonly": true },
+              { "type": "column", "id": "SPECIFICATION", "fieldType": "text", "label": "Spec." },
+              { "type": "column", "id": "FM_1_BEM_NO", "fieldType": "text", "label": "FM-1 BEM No" },
+              { "type": "column", "id": "FM_2_BEM_NO", "fieldType": "text", "label": "FM-2 BEM No" },
+              { "type": "column", "id": "FM_3_BEM_NO", "fieldType": "text", "label": "FM-3 BEM No" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

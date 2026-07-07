@@ -32,7 +32,7 @@ import {
   type RawMaterialPrepProcessKey,
   type RawMaterialPrepSelectedProcesses,
 } from "./rawMaterialPrepFlowConfig";
-import { findGradeInMaterial } from "../../../schemaManagement/adapters/rawMaterialPreparation.adapter";
+import { findGradeInMaterial } from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
 
 const RM_STATUS = MANUFACTURING_STATUS;
 

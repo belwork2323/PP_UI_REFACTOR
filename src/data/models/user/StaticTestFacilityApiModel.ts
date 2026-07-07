@@ -1,23 +1,31 @@
-import type { StaticTestFacilityFormState } from "./StaticTestFacilityFormModel";
+import {
+  FORM_SECTIONS_KEY,
+  mapStaticTestFacilityDetailsToFormState,
+  mapStaticTestFacilityFormStateToPayload,
+  type StaticTestFacilityFormState,
+} from "./StaticTestFacilityFormModel";
+import type { SchemaSectionSubmission } from "../../../schema-engine";
 
 export type STFSubmissionType = "DRAFT" | "SUBMIT" | "UPDATE";
+
+export type STFMotorPayload = {
+  motorId: string;
+  staticTestingDetails: Record<string, unknown>;
+};
 
 export class STFSubmitResponseModel {
   formId: string;
   batchId: string;
   status: string;
-  propellantWeight: string;
 
   constructor(payload: {
     formId?: string;
     batchId?: string;
     status?: string;
-    propellantWeight?: string;
   }) {
     this.formId = payload.formId ?? "";
     this.batchId = payload.batchId ?? "";
     this.status = payload.status ?? "";
-    this.propellantWeight = payload.propellantWeight ?? "";
   }
 
   static fromApi(apiResponse: any): STFSubmitResponseModel {
@@ -30,15 +38,9 @@ export class STFDetailsModel {
   batchId: string;
   subDepartmentId: number;
   formSubmissionType: string;
-  motorNo: string;
-  emptyMotorWeight: string;
-  rubberDustWeight: string;
-  linearCoatingWeight: string;
-  looseFlapFillWeight: string;
-  extraRubberWeight: string;
-  inhibitionWeight: string;
-  finalMotorWeight: string;
-  propellantWeight: string;
+  subType: string;
+  motorIdNo: string;
+  sections: SchemaSectionSubmission[];
   workflowInsights: {
     currentStatus: string;
     rejectionReason: string | null;
@@ -49,15 +51,11 @@ export class STFDetailsModel {
     this.batchId = payload?.batchId ?? "";
     this.subDepartmentId = Number(payload?.subDepartmentId ?? 0);
     this.formSubmissionType = payload?.formSubmissionType ?? "";
-    this.motorNo = payload?.motorNo ?? "";
-    this.emptyMotorWeight = payload?.emptyMotorWeight ?? "";
-    this.rubberDustWeight = payload?.rubberDustWeight ?? "";
-    this.linearCoatingWeight = payload?.linearCoatingWeight ?? "";
-    this.looseFlapFillWeight = payload?.looseFlapFillWeight ?? "";
-    this.extraRubberWeight = payload?.extraRubberWeight ?? "";
-    this.inhibitionWeight = payload?.inhibitionWeight ?? "";
-    this.finalMotorWeight = payload?.finalMotorWeight ?? "";
-    this.propellantWeight = payload?.propellantWeight ?? "";
+    this.subType = payload?.subType ?? "";
+    this.motorIdNo = payload?.motorIdNo ?? "";
+
+    this.sections = extractSectionsFromPayload(payload);
+
     this.workflowInsights = {
       currentStatus: payload?.workflowInsights?.currentStatus ?? "",
       rejectionReason: payload?.workflowInsights?.rejectionReason ?? null,
@@ -68,29 +66,34 @@ export class STFDetailsModel {
     return new STFDetailsModel(apiResponse?.data ?? {});
   }
 
-  static toFormState(model: STFDetailsModel): StaticTestFacilityFormState {
-    return {
-      motorNo: model.motorNo ?? "",
-      a_emptyMotor: model.emptyMotorWeight ?? "",
-      b_rubberDust: model.rubberDustWeight ?? "",
-      c_linearCoating: model.linearCoatingWeight ?? "",
-      d_looseFlapFill: model.looseFlapFillWeight ?? "",
-      e_extraRubber: model.extraRubberWeight ?? "",
-      f_inhibition: model.inhibitionWeight ?? "",
-      g_finalWeight: model.finalMotorWeight ?? "",
-      h_propellent: model.propellantWeight ?? "",
-    };
+  static toFormState(model: STFDetailsModel) {
+    return mapStaticTestFacilityDetailsToFormState({
+      formId: model.formId,
+      batchId: model.batchId,
+      subDepartmentId: model.subDepartmentId,
+      formSubmissionType: model.formSubmissionType,
+      subType: model.subType,
+      motorIdNo: model.motorIdNo,
+      sections: model.sections,
+    });
   }
 }
 
-export const mapSTFPayload = (form: StaticTestFacilityFormState) => ({
-  motorNo: form?.motorNo ?? "",
-  emptyMotorWeight: form?.a_emptyMotor ?? "",
-  rubberDustWeight: form?.b_rubberDust ?? "",
-  linearCoatingWeight: form?.c_linearCoating ?? "",
-  looseFlapFillWeight: form?.d_looseFlapFill ?? "",
-  extraRubberWeight: form?.e_extraRubber ?? "",
-  inhibitionWeight: form?.f_inhibition ?? "",
-  finalMotorWeight: form?.g_finalWeight ?? "",
-  propellantWeight: form?.h_propellent ?? "",
-});
+const extractSectionsFromPayload = (payload: any): SchemaSectionSubmission[] => {
+  if (Array.isArray(payload?.sections) && payload.sections.length > 0) {
+    return payload.sections;
+  }
+
+  const motors = payload?.motors;
+  if (Array.isArray(motors) && motors.length > 0) {
+    const formSections = motors[0]?.staticTestingDetails?.[FORM_SECTIONS_KEY];
+    if (Array.isArray(formSections) && formSections.length > 0) {
+      return formSections as SchemaSectionSubmission[];
+    }
+  }
+
+  return [];
+};
+
+export const mapSTFPayload = (form: StaticTestFacilityFormState) =>
+  mapStaticTestFacilityFormStateToPayload(form);

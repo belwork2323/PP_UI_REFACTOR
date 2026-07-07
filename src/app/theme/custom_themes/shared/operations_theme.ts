@@ -117,6 +117,47 @@ export const getOperationsTheme = (mode = "light") => {
       tableHeaderText: "#fff",
       tableHeaderBorder: isDark ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.15)",
       filterInputBg: isDark ? "#121212" : "#f8fafc",
+      /** Compact inputs for "Refine lot/batch list" filter panels */
+      filterPanelField: {
+        "& .MuiOutlinedInput-root, & .MuiPickersOutlinedInput-root": {
+          height: 32,
+          minHeight: 32,
+          maxHeight: 32,
+          fontSize: "0.72rem",
+          borderRadius: "6px",
+          bgcolor: isDark ? "#121212" : "#f8fafc",
+          boxSizing: "border-box",
+          "& fieldset, & .MuiPickersOutlinedInput-notchedOutline": {
+            borderColor: alpha(palette.border, 0.65),
+          },
+          "&:hover fieldset, &:hover .MuiPickersOutlinedInput-notchedOutline": {
+            borderColor: palette.primaryLight,
+          },
+          "&.Mui-focused fieldset, &.Mui-focused .MuiPickersOutlinedInput-notchedOutline": {
+            borderColor: palette.primaryLight,
+          },
+        },
+        "& .MuiInputBase-input, & .MuiPickersSectionList-root, & .MuiSelect-select": {
+          fontSize: "0.72rem",
+          padding: "5px 8px",
+          minHeight: "unset !important",
+          "&::placeholder": {
+            fontSize: "0.68rem",
+            opacity: 0.65,
+          },
+        },
+        "& .MuiInputLabel-root": {
+          fontSize: "0.72rem",
+        },
+        "& .MuiInputAdornment-root .MuiIconButton-root": {
+          padding: 2,
+        },
+      },
+      filterPanelMenuItem: {
+        fontSize: "0.72rem",
+        py: 0.5,
+        minHeight: 32,
+      },
       stripedRowEven: isDark ? "#1e1e1e" : "#fff",
       stripedRowOdd: isDark ? alpha(palette.surface, 0.5) : alpha(palette.surface, 0.5),
 

@@ -2,19 +2,19 @@ import type { MaterialsListItem } from "./MaterialsListModel";
 import type {
   PreparationPremixEntry,
   PreparationProcessEntry,
-} from "../../../schemaManagement/adapters/rawMaterialPreparation.adapter";
+} from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
 import {
   buildProcessSubmission,
   derivePremixMaterialType,
   findGradeInMaterial,
   findMaterialInList,
-} from "../../../schemaManagement/adapters/rawMaterialPreparation.adapter";
+} from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
 import type {
-  SchemaDocument,
+  SchemaDocumentV2,
   SchemaFormValues,
   SchemaSectionSubmission,
-} from "../../../schemaManagement/models/schema.types";
-import { schemaValuesHaveUserData } from "../../../schemaManagement/models/schemaFormState";
+} from "../../../schema-engine";
+import { schemaValuesHaveUserData } from "../../../schema-engine/state/formState";
 
 export type RawMaterialPreparationSubmitResponse = {
   formId: string;
@@ -74,11 +74,21 @@ const formatDateTimeLocal = (value: unknown): string => {
   return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
 };
 
+const unwrapApiScalar = (value: unknown): unknown => {
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const obj = value as Record<string, unknown>;
+    if ("parsedValue" in obj && obj.parsedValue !== undefined) return obj.parsedValue;
+    if ("source" in obj && obj.source !== undefined && obj.source !== "") return obj.source;
+  }
+  return value;
+};
+
 const mapWeightmentDetailFromApi = (row: Record<string, unknown>): RawMaterialPrepWeightmentDetail => ({
   materialCode: String(row.materialCode ?? ""),
   materialName: String(row.materialName ?? row.materialCode ?? ""),
-  percentage: row.percentage != null ? String(row.percentage) : "",
-  weightTransferred: row.weightTransferred != null ? String(row.weightTransferred) : "",
+  percentage: unwrapApiScalar(row.percentage) != null ? String(unwrapApiScalar(row.percentage)) : "",
+  weightTransferred:
+    unwrapApiScalar(row.weightTransferred) != null ? String(unwrapApiScalar(row.weightTransferred)) : "",
   containerType: String(row.containerType ?? ""),
   containerNumber: String(row.containerNumber ?? ""),
   weighScaleNumber: String(row.weighScaleNumber ?? ""),
@@ -150,7 +160,7 @@ export type RawMaterialPrepPremixSelection = {
 };
 
 export type RawMaterialPrepMaterialSchemaSlot = {
-  schema: SchemaDocument | null;
+  schema: SchemaDocumentV2 | null;
   schemaLoading: boolean;
   schemaError: string | null;
   formValues: SchemaFormValues;
@@ -172,6 +182,9 @@ export type RawMaterialPreparationDetails = {
   batchId: string;
   subDepartmentId: number;
   formSubmissionType: string;
+  status?: string;
+  createdBy?: string | null;
+  createdAt?: string | null;
   preparationDetails?: {
     premixes?: Array<{
       premixNo: number;
@@ -199,8 +212,26 @@ export const createEmptyPremixSchemaSession = (): RawMaterialPrepPremixSession =
   liquid: emptySlot(),
 });
 
+const resolveMaterialNameFallback = (
+  schema: SchemaDocumentV2 | null,
+  material: MaterialsListItem | undefined,
+  materialCode: string,
+): string => {
+  const root = schema as (SchemaDocumentV2 & {
+    rawMaterialDetails?: { materialName?: string };
+    materialName?: string;
+  }) | null;
+
+  return (
+    root?.rawMaterialDetails?.materialName
+    ?? root?.materialName
+    ?? material?.materialName
+    ?? materialCode
+  );
+};
+
 const buildProcessForSlot = (
-  schema: SchemaDocument | null,
+  schema: SchemaDocumentV2 | null,
   values: SchemaFormValues,
   material: MaterialsListItem | undefined,
   gradeCode: string,
@@ -261,7 +292,11 @@ export const mapPreparationDetailsPayload = (params: {
         {
           materialId: entry.solidMaterialId,
           materialCode: entry.solidMaterialCode,
-          materialName: session.solid.schema?.rawMaterialDetails.materialName,
+          materialName: resolveMaterialNameFallback(
+            session.solid.schema,
+            solidMaterial,
+            entry.solidMaterialCode,
+          ),
           gradeId: entry.solidGradeId,
         }
       );
@@ -277,7 +312,11 @@ export const mapPreparationDetailsPayload = (params: {
         {
           materialId: entry.liquidMaterialId,
           materialCode: entry.liquidMaterialCode,
-          materialName: session.liquid.schema?.rawMaterialDetails.materialName,
+          materialName: resolveMaterialNameFallback(
+            session.liquid.schema,
+            liquidMaterial,
+            entry.liquidMaterialCode,
+          ),
         }
       );
       if (process) liquidProcess.push(process);
@@ -379,6 +418,16 @@ export class RawMaterialPreparationSubmitResponseModel {
   }
 }
 
+const mapPrepPersonFromApi = (value: unknown): string => {
+  if (value === null || value === undefined || value === "") return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "object") {
+    const person = value as { fullName?: string; name?: string; id?: string };
+    return String(person.fullName ?? person.name ?? person.id ?? "").trim();
+  }
+  return String(value).trim();
+};
+
 export class RawMaterialPreparationDetailsModel {
   static fromApi(apiResponse: any): RawMaterialPreparationDetails {
     const data = apiResponse?.data ?? apiResponse;
@@ -387,6 +436,9 @@ export class RawMaterialPreparationDetailsModel {
       batchId: String(data?.batchId ?? ""),
       subDepartmentId: Number(data?.subDepartmentId ?? 0),
       formSubmissionType: String(data?.formSubmissionType ?? ""),
+      status: data?.status != null ? String(data.status) : undefined,
+      createdBy: mapPrepPersonFromApi(data?.createdBy) || null,
+      createdAt: data?.createdAt != null ? String(data.createdAt) : null,
       preparationDetails: data?.preparationDetails ?? { premixes: [] },
     };
   }
@@ -415,8 +467,106 @@ export type RawMaterialPrepApproverDetailView = {
   formId: string;
   batchId: string;
   formSubmissionType: string;
+  createdBy?: string | null;
+  createdAt?: string | null;
   premixes: RawMaterialPrepApproverPremixView[];
   weightmentSheet: Record<string, unknown> | null;
+};
+
+const PREP_SECTION_ACRONYMS = new Set([
+  "AP",
+  "PSD",
+  "RVD",
+  "TDI",
+  "HTPB",
+  "DOA",
+  "IO",
+  "CC",
+  "NA",
+  "Kg",
+  "ID",
+]);
+
+const titleCasePrepToken = (token: string): string => {
+  const trimmed = token.trim();
+  if (!trimmed) return "";
+  const upper = trimmed.toUpperCase();
+  if (PREP_SECTION_ACRONYMS.has(upper)) return upper;
+  if (/^\d+$/.test(trimmed)) return trimmed;
+  return trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+};
+
+/** Human-readable label from schema section / field ids (FEED_MATERIAL_DETAILS → Feed Material Details). */
+export const formatPrepSectionLabel = (sectionId: string): string => {
+  const raw = String(sectionId ?? "").trim();
+  if (!raw) return "";
+
+  const knownLabels: Record<string, string> = {
+    srNo: "Sr No.",
+  };
+  if (knownLabels[raw]) return knownLabels[raw];
+
+  const words = raw
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/_/g, " ")
+    .split(/\s+/)
+    .filter(Boolean);
+
+  return words.map(titleCasePrepToken).join(" ");
+};
+
+export const formatPrepSectionCellValue = (value: unknown): string => {
+  const unwrapped = unwrapApiScalar(value);
+  if (unwrapped === null || unwrapped === undefined || unwrapped === "") return "—";
+  if (typeof unwrapped === "object") {
+    if (Array.isArray(unwrapped)) {
+      return unwrapped.length > 0
+        ? unwrapped.map((entry) => formatPrepSectionCellValue(entry)).join(", ")
+        : "—";
+    }
+    const entries = Object.entries(unwrapped as Record<string, unknown>).filter(
+      ([key, entryValue]) =>
+        !key.startsWith("_") &&
+        entryValue !== null &&
+        entryValue !== undefined &&
+        entryValue !== "",
+    );
+    if (entries.length === 0) return "—";
+    return entries
+      .map(([key, entryValue]) => `${formatPrepSectionLabel(key)}: ${formatPrepSectionCellValue(entryValue)}`)
+      .join("; ");
+  }
+  return String(unwrapped);
+};
+
+/** Expand nested repeat/table blocks (e.g. FEED_LOTS) into flat table rows for read-only views. */
+export const expandRawMaterialPrepSectionRows = (
+  sectionData: Record<string, unknown>[] | undefined,
+): Record<string, unknown>[] => {
+  if (!Array.isArray(sectionData)) return [];
+
+  const rows: Record<string, unknown>[] = [];
+
+  sectionData.forEach((dataRow) => {
+    if (!dataRow || typeof dataRow !== "object") return;
+
+    const entries = Object.entries(dataRow).filter(([key]) => !key.startsWith("_"));
+    const arrayEntries = entries.filter(([, value]) => Array.isArray(value));
+    const scalarEntries = entries.filter(([, value]) => !Array.isArray(value));
+
+    if (arrayEntries.length === 1 && scalarEntries.length === 0) {
+      (arrayEntries[0][1] as unknown[]).forEach((item) => {
+        if (item && typeof item === "object" && !Array.isArray(item)) {
+          rows.push(item as Record<string, unknown>);
+        }
+      });
+      return;
+    }
+
+    rows.push(dataRow);
+  });
+
+  return rows;
 };
 
 const mapProcessSections = (process: PreparationProcessEntry): RawMaterialPrepApproverProcessView => ({
@@ -437,6 +587,8 @@ export const mapRawMaterialPreparationApproverDetailView = (
   formId: details.formId,
   batchId: details.batchId,
   formSubmissionType: details.formSubmissionType,
+  createdBy: details.createdBy ?? null,
+  createdAt: details.createdAt ?? null,
   premixes: (details.preparationDetails?.premixes ?? []).map((premix) => ({
     premixNo: Number(premix.premixNo ?? 0),
     materialType: String(premix.materialType ?? ""),
@@ -449,3 +601,35 @@ export const mapRawMaterialPreparationApproverDetailView = (
       ? (details.preparationDetails.weightmentSheet as Record<string, unknown>)
       : null,
 });
+
+/** Preferred column order for schema-driven section tables (srNo, lot, operation, …). */
+export const orderPrepSectionColumns = (columns: string[]): string[] => {
+  const priority = ["srNo", "LOT_NUMBER", "OPERATION", "BIN_NUMBER", "PSD_REQUIREMENT"];
+  return [...columns].sort((a, b) => {
+    const ai = priority.indexOf(a);
+    const bi = priority.indexOf(b);
+    if (ai >= 0 && bi >= 0) return ai - bi;
+    if (ai >= 0) return -1;
+    if (bi >= 0) return 1;
+    return a.localeCompare(b);
+  });
+};
+
+/** Single entry point for user + approver detail views. */
+export const mapRawMaterialPreparationDetailsForDisplay = (
+  details: RawMaterialPreparationDetails | null | undefined,
+) => {
+  if (!details) {
+    return {
+      detailView: null as RawMaterialPrepApproverDetailView | null,
+      weightmentSheet: createEmptyWeightmentSheet(),
+    };
+  }
+
+  const detailView = mapRawMaterialPreparationApproverDetailView(details);
+  const weightmentSheet = mapWeightmentSheetFromApi(
+    detailView.weightmentSheet ?? details.preparationDetails?.weightmentSheet,
+  );
+
+  return { detailView, weightmentSheet };
+};

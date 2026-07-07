@@ -5,12 +5,16 @@ import {
   type RawMaterialProcurementApproverListPayload,
 } from "../../data/api/approver/rawMaterialProcurementApproverApi";
 import { ApiResponseModel } from "../../data/models/common/ApiResponseModel";
+import { normalizeListStatusFilter } from "../../hooks/operationStatus";
 import { RawMaterialProcurementApproverListModel } from "../../data/models/approver/RawMaterialProcurementApproverModel";
 
 const rawMaterialProcurementApproverController = {
   fetchLotList: async (payload: RawMaterialProcurementApproverListPayload) => {
     try {
-      const response = await fetchRawMaterialProcurementApproverListApi(payload);
+      const response = await fetchRawMaterialProcurementApproverListApi({
+        ...payload,
+        ...(payload.status ? { status: normalizeListStatusFilter(payload.status) } : {}),
+      });
       return new ApiResponseModel(response, (res) =>
         RawMaterialProcurementApproverListModel.fromApi(res),
       );

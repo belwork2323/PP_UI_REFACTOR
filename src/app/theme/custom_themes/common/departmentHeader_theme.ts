@@ -175,6 +175,8 @@ const getDepartmentHeaderTheme = (mode = "light") => {
         completed: d.accentCompleted,
         draft:     d.accentDraft,
         pending:   d.accentPending,
+        approved:  d.accentCompleted,
+        rejected:  d.accentPending,
         createdLots: d.accentAllocated,
         pendingLots: d.accentPending,
         waitingForApprovalLots: d.accentDraft,
@@ -188,6 +190,7 @@ const getDepartmentHeaderTheme = (mode = "light") => {
         gap:          "4px",
         px:           { xs: "12px", md: "16px" },
         py:           { xs: "10px", md: "12px" },
+        minHeight:    { xs: "68px", md: "84px" },
         borderRadius: "12px",
         bgcolor:      d.chipBg,
         border:       `1px solid ${d.chipBorder}`,
@@ -220,6 +223,8 @@ const getDepartmentHeaderTheme = (mode = "light") => {
       lineHeight:    fonts.lineHeight?.normal ?? 1.5,
       textTransform: "uppercase",
       letterSpacing: "0.04em",
+      minHeight:     "2.25em",
+      display:       "block",
     },
   };
 };

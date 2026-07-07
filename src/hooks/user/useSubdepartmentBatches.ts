@@ -1,8 +1,9 @@
-import { useState, useCallback, useEffect, useMemo } from "react";
+import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { STRINGS } from "../../app/config/strings";
 import { operationsController } from "../../controllers/user/operationsController";
 import { useAuthStore } from "../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../app/store/userBatchRefreshStore";
+import { useCuringMotorStages } from "./manufacturing/useCuringMotorStages";
 import {
   buildSubdepartmentBatchListPayload,
   emptySubdepartmentBatchAdvancedFilters,
@@ -20,6 +21,8 @@ export type { SubdepartmentBatchListAdvancedFilters };
 export const useSubdepartmentBatches = (targetSlug?: string) => {
   const user = useAuthStore((s) => s.user);
   const refreshVersion = useUserBatchRefreshStore((state) => state.version);
+  const bumpBatchRefresh = useUserBatchRefreshStore((state) => state.bumpVersion);
+  const suppressVersionFetchRef = useRef(false);
 
   const selectedSubDepartment = useMemo(
     () => user?.allSubDepartments.find((sd) => sd.slugs?.subDept === targetSlug) ?? null,
@@ -29,6 +32,8 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
   const [batches, setBatches] = useState<any[]>([]);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState<boolean>(true);
+  const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const hasLoadedOnceRef = useRef(false);
   const [page, setPage] = useState<number>(0);
   const [rowsPerPage, setRowsPerPage] = useState<number>(10);
   const [search, setSearch] = useState<string>("");
@@ -55,9 +60,11 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
   const applyAdvancedFilters = useCallback(
     (next: SubdepartmentBatchListAdvancedFilters & { status: string }) => {
       setAdvancedFilters({
-        priority: next.priority,
+        batchId: next.batchId,
+        batchTypes: [...next.batchTypes],
+        motorStages: [...next.motorStages],
         motorIds: [...next.motorIds],
-        lotIds: [...next.lotIds],
+        priorities: [...next.priorities],
       });
       setStatusFilterState(next.status);
       setPage(0);
@@ -73,12 +80,20 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
-    if (advancedFilters.priority) count += 1;
+    if (advancedFilters.batchId.trim()) count += 1;
+    if (advancedFilters.batchTypes.length) count += 1;
+    if (advancedFilters.motorStages.length) count += 1;
     if (advancedFilters.motorIds.length) count += 1;
-    if (advancedFilters.lotIds.length) count += 1;
+    if (advancedFilters.priorities.length) count += 1;
     if (statusFilter !== FILTER_ALL) count += 1;
     return count;
   }, [advancedFilters, statusFilter]);
+
+  const { stages: motorStages, loading: motorStagesLoading } = useCuringMotorStages();
+  const motorStageOptions = useMemo(
+    () => motorStages.map((stage) => ({ motorStage: String(stage.motorStage) })),
+    [motorStages],
+  );
 
   const fetchGlobalStatusCounts = useCallback(
     async (subDepartmentId: number, userId: string) => {
@@ -144,13 +159,19 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
 
     if (!subDepartmentId || !userId) {
       setLoading(false);
+      setIsRefreshing(false);
       setBatches([]);
       setTotalRecords(0);
       setStatusCounts({});
       return;
     }
 
-    setLoading(true);
+    const isInitialLoad = !hasLoadedOnceRef.current;
+    if (isInitialLoad) {
+      setLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
     try {
       const payload = buildSubdepartmentBatchListPayload({
         subDepartmentId,
@@ -168,6 +189,7 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
         const rows = (res.data.batches || []).map((batch: Record<string, unknown>) =>
           mapSubdepartmentBatchListRow(batch, targetSlug),
         );
+
         const pagination = res.data.pagination ?? {};
         const total = Number(
           pagination.totalRecords ?? pagination.total ?? rows.length,
@@ -190,6 +212,8 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
       setStatusCounts({});
     } finally {
       setLoading(false);
+      setIsRefreshing(false);
+      hasLoadedOnceRef.current = true;
     }
   }, [
     selectedSubDepartment,
@@ -199,7 +223,6 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
     debouncedSearch,
     statusFilter,
     advancedFilters,
-    refreshVersion,
     targetSlug,
     resolveStatusCounts,
   ]);
@@ -208,10 +231,26 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
     void fetchBatches();
   }, [fetchBatches]);
 
+  useEffect(() => {
+    if (suppressVersionFetchRef.current) {
+      suppressVersionFetchRef.current = false;
+      return;
+    }
+    if (refreshVersion === 0) return;
+    void fetchBatches();
+  }, [refreshVersion, fetchBatches]);
+
+  const refreshUserBatches = useCallback(async () => {
+    suppressVersionFetchRef.current = true;
+    await fetchBatches();
+    bumpBatchRefresh();
+  }, [fetchBatches, bumpBatchRefresh]);
+
   return {
     batches,
     statusCounts,
     loading,
+    isRefreshing,
     page,
     rowsPerPage,
     search,
@@ -221,10 +260,12 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
     setRowsPerPage,
     setSearch,
     setStatusFilter,
-    refreshUserBatches: fetchBatches,
+    refreshUserBatches,
     advancedFilters,
     applyAdvancedFilters,
     clearAdvancedFilters,
     activeFilterCount,
+    motorStageOptions,
+    motorStagesLoading,
   };
 };

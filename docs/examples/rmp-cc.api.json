@@ -1,0 +1,153 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "RAW_MATERIALS",
+    "layout": { "type": "flat" },
+    "materialId": 4,
+    "materialCode": "CC",
+    "gradeId": null,
+    "gradeCode": null,
+    "subdepartmentId": 111,
+    "functionality": "CREATE_RAW_MATERIAL_PREPARATION_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "RAW_MATERIALS",
+  "functionality": "CREATE_RAW_MATERIAL_PREPARATION_FORM",
+  "message": "Raw material preparation schema fetched successfully",
+  "timestamp": "2026-05-29T16:00:00Z",
+  "materialId": 4,
+  "materialCode": "CC",
+  "materialName": "Copper Chromite",
+  "materialType": "SOLID",
+  "data": {
+    "meta": {
+      "title": "Copper Chromite Preparation",
+      "description": "Copper chromite drying, sieving and dispatch to mixing"
+    },
+    "ui": {
+      "layout": "flat",
+      "gap": "md",
+      "sectionVariant": "card"
+    },
+    "context": {
+      "subDepartmentId": "{{subDepartmentId}}",
+      "materialId": "{{materialId}}",
+      "gradeId": "{{gradeId}}",
+      "materialCode": "CC"
+    },
+    "sections": [
+      {
+        "id": "DRYING_TRAY_OVEN",
+        "title": "Drying in Tray Oven",
+        "ui": { "direction": "row", "wrap": true, "gap": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "OVEN_TYPE",
+            "fieldType": "dropdown",
+            "label": "Oven Type",
+            "dataSource": {
+              "type": "static",
+              "options": [
+                { "label": "Water Heated", "value": "WATER_HEATED" },
+                { "label": "Air Heated", "value": "AIR_HEATED" }
+              ]
+            }
+          },
+          {
+            "type": "field",
+            "id": "OVEN_NUMBER",
+            "fieldType": "text",
+            "label": "Oven No."
+          },
+          {
+            "type": "field",
+            "id": "OVEN_SET_TEMPERATURE",
+            "fieldType": "number",
+            "label": "Oven Set Temp",
+            "unit": "°C"
+          },
+          {
+            "type": "field",
+            "id": "START_DATETIME",
+            "fieldType": "datetime",
+            "label": "Start Date/Time"
+          },
+          {
+            "type": "field",
+            "id": "END_DATETIME",
+            "fieldType": "datetime",
+            "label": "End Date/Time"
+          },
+          {
+            "type": "field",
+            "id": "MOISTURE",
+            "fieldType": "number",
+            "label": "Moisture",
+            "unit": "%"
+          },
+          {
+            "type": "field",
+            "id": "OBSERVATION",
+            "fieldType": "textarea",
+            "label": "Any Other Observation"
+          }
+        ]
+      },
+      {
+        "id": "SIEVING",
+        "title": "Sieving",
+        "ui": { "direction": "row", "wrap": true, "gap": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "SIEVING_DISPATCH_DATETIME",
+            "fieldType": "datetime",
+            "label": "Date of Sieving/Dispatch"
+          },
+          {
+            "type": "field",
+            "id": "SIEVED_QUANTITY",
+            "fieldType": "number",
+            "label": "Sieved Quantity",
+            "unit": "kg"
+          },
+          {
+            "type": "field",
+            "id": "SIEVE_MESH_SIZE",
+            "fieldType": "text",
+            "label": "Sieve Mesh Size"
+          },
+          {
+            "type": "field",
+            "id": "OBSERVATION",
+            "fieldType": "textarea",
+            "label": "Any Observation"
+          }
+        ]
+      },
+      {
+        "id": "SHIFTING_TO_MIXING",
+        "title": "Shifting of Material to Mixing",
+        "ui": { "direction": "row", "wrap": true, "gap": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "NUMBER_OF_DRUMS",
+            "fieldType": "number",
+            "label": "No. of Drums"
+          },
+          {
+            "type": "field",
+            "id": "AMOUNT_OF_MATERIAL",
+            "fieldType": "number",
+            "label": "Amount of Material",
+            "unit": "kg"
+          }
+        ]
+      }
+    ]
+  }
+}

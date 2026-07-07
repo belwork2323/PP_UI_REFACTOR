@@ -30,16 +30,23 @@ const resolveValue = (item: unknown, path: string) => {
   );
 };
 
+const EMPTY_FILTER_FIELDS: ApproverFilterField[] = [];
+
 export const useApproverList = <T,>({
   items = [],
   statusField = "status",
   searchKeys = [],
-  filterFields = [],
+  filterFields = EMPTY_FILTER_FIELDS,
   allLabel = "All",
 }: UseApproverListOptions<T>) => {
+  const filterFieldKeys = useMemo(
+    () => filterFields.map(({ field }) => field).join("\0"),
+    [filterFields],
+  );
+
   const initialFilters = useMemo(
     () => Object.fromEntries(filterFields.map(({ field }) => [field, allLabel])),
-    [filterFields, allLabel],
+    [filterFieldKeys, allLabel, filterFields],
   );
 
   const [activeStatus, setActiveStatus] = useState(allLabel);
@@ -48,17 +55,19 @@ export const useApproverList = <T,>({
 
   useEffect(() => {
     setFilters((current) => {
-      const nextFilters = { ...initialFilters };
+      const nextFilters = Object.fromEntries(
+        filterFields.map(({ field }) => [field, current[field] ?? allLabel]),
+      );
 
-      Object.keys(nextFilters).forEach((field) => {
-        if (current[field]) {
-          nextFilters[field] = current[field];
-        }
-      });
+      const currentKeys = Object.keys(current);
+      const nextKeys = Object.keys(nextFilters);
+      const isSame =
+        currentKeys.length === nextKeys.length &&
+        nextKeys.every((key) => nextFilters[key] === current[key]);
 
-      return nextFilters;
+      return isSame ? current : nextFilters;
     });
-  }, [initialFilters]);
+  }, [allLabel, filterFieldKeys, filterFields]);
 
   const statusValues = useMemo(() => {
     const values = new Set<string>();

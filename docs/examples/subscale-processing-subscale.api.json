@@ -1,0 +1,438 @@
+{
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "SUBSCALE_PROCESSING",
+  "functionality": "CREATE_SUBSCALE_PROCESSING_FORM",
+  "batchType": "SUBSCALE",
+  "message": "Subscale Processing schema fetched successfully",
+  "data": {
+    "layout": {
+      "type": "flat"
+    },
+    "meta": {
+      "title": "Subscale Processing",
+      "description": "Casting through mechanical interface properties"
+    },
+    "sections": [
+      {
+        "sectionId": "CASTING_DETAILS",
+        "sectionName": "Casting Details",
+        "fields": [
+          {
+            "fieldId": "DATE_OF_CASTING",
+            "label": "Date Of Casting",
+            "type": "date"
+          }
+        ],
+        "tables": [
+          {
+            "tableId": "CASTING_TABLE",
+            "dynamicRows": true,
+            "rowGenerationSource": "HARDWARE_PREPARATION",
+            "columns": [
+              {
+                "fieldId": "SR_NO",
+                "type": "autoIncrement"
+              },
+              {
+                "fieldId": "BEM_MOULD_NO",
+                "label": "BEM Mould No",
+                "type": "text"
+              },
+              {
+                "fieldId": "CASTING_PIT_NO",
+                "label": "Casting Pit No",
+                "type": "text"
+              },
+              {
+                "fieldId": "CASTING_START_TIME",
+                "label": "Casting Start Time",
+                "type": "time"
+              },
+              {
+                "fieldId": "CASTING_END_TIME",
+                "label": "Casting End Time",
+                "type": "time"
+              },
+              {
+                "fieldId": "VACUUM_LEVEL",
+                "label": "Vacuum Level",
+                "type": "number"
+              },
+              {
+                "fieldId": "REMARKS",
+                "label": "Remarks",
+                "type": "textarea"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "sectionId": "CURING_DETAILS",
+        "sectionName": "Curing Details",
+        "tables": [
+          {
+            "tableId": "CURING_TABLE",
+            "dynamicRows": true,
+            "rowGenerationSource": "CASTING_TABLE",
+            "columns": [
+              {
+                "fieldId": "SR_NO",
+                "type": "autoIncrement"
+              },
+              {
+                "fieldId": "BEM_MOULD_NO",
+                "label": "BEM Mould No",
+                "type": "readonly"
+              },
+              {
+                "fieldId": "CURING_START_DATE",
+                "label": "Curing Start Date",
+                "type": "date"
+              },
+              {
+                "fieldId": "CURING_END_DATE",
+                "label": "Curing End Date",
+                "type": "date"
+              },
+              {
+                "fieldId": "OVEN_NO",
+                "label": "Oven No",
+                "type": "text"
+              },
+              {
+                "fieldId": "TEMPERATURE",
+                "label": "Temperature (°C)",
+                "type": "number"
+              },
+              {
+                "fieldId": "HARDNESS",
+                "label": "Hardness",
+                "type": "number"
+              },
+              {
+                "fieldId": "DECORING_DATE",
+                "label": "Decoring Date",
+                "type": "date"
+              },
+              {
+                "fieldId": "DECORING_LOAD",
+                "label": "Decoring Load",
+                "type": "number"
+              },
+              {
+                "fieldId": "GRAIN_SURFACE_OBSERVATIONS",
+                "label": "Observations On Grain Surface",
+                "type": "textarea"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "sectionId": "NDT_DETAILS",
+        "sectionName": "NDT Details",
+        "tables": [
+          {
+            "tableId": "NDT_TABLE",
+            "dynamicRows": true,
+            "rowGenerationSource": "CASTING_TABLE",
+            "columns": [
+              {
+                "fieldId": "SR_NO",
+                "type": "autoIncrement"
+              },
+              {
+                "fieldId": "BEM_NO",
+                "label": "BEM No",
+                "type": "text"
+              },
+              {
+                "fieldId": "DATE_OF_NDT",
+                "label": "Date Of NDT",
+                "type": "date"
+              },
+              {
+                "fieldId": "OBSERVATIONS",
+                "label": "Observations",
+                "type": "textarea"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "sectionId": "TRIMMING_DETAILS",
+        "sectionName": "Trimming Details",
+        "tables": [
+          {
+            "tableId": "TRIMMING_TABLE",
+            "dynamicRows": true,
+            "rowGenerationSource": "CASTING_TABLE",
+            "columns": [
+              {
+                "fieldId": "SR_NO",
+                "type": "autoIncrement"
+              },
+              {
+                "fieldId": "BEM_NO",
+                "label": "BEM No",
+                "type": "text"
+              },
+              {
+                "fieldId": "HE_OD",
+                "label": "HE Side OD",
+                "type": "number"
+              },
+              {
+                "fieldId": "HE_PORT_INNER",
+                "label": "HE Port Inner",
+                "type": "number"
+              },
+              {
+                "fieldId": "HE_PORT_OUTER",
+                "label": "HE Port Outer",
+                "type": "number"
+              },
+              {
+                "fieldId": "HE_BEFORE_INHIBITION_INNER",
+                "label": "HE Before Inhibition Inner",
+                "type": "number"
+              },
+              {
+                "fieldId": "HE_BEFORE_INHIBITION_OUTER",
+                "label": "HE Before Inhibition Outer",
+                "type": "number"
+              },
+              {
+                "fieldId": "NE_OD",
+                "label": "NE Side OD",
+                "type": "number"
+              },
+              {
+                "fieldId": "NE_PORT_INNER",
+                "label": "NE Port Inner",
+                "type": "number"
+              },
+              {
+                "fieldId": "NE_PORT_OUTER",
+                "label": "NE Port Outer",
+                "type": "number"
+              },
+              {
+                "fieldId": "NE_WEB_INNER",
+                "label": "NE Web Inner",
+                "type": "number"
+              },
+              {
+                "fieldId": "NE_WEB_OUTER",
+                "label": "NE Web Outer",
+                "type": "number"
+              },
+              {
+                "fieldId": "LENGTH_BEFORE_INHIBITION",
+                "label": "Length Before Inhibition",
+                "type": "number"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "sectionId": "INHIBITION_DETAILS",
+        "sectionName": "Inhibition Details",
+        "fields": [
+          {
+            "fieldId": "IR_BATCH_NO",
+            "label": "IR Batch No",
+            "type": "text"
+          },
+          {
+            "fieldId": "DATE_OF_MFG",
+            "label": "Date Of Manufacturing",
+            "type": "date"
+          },
+          {
+            "fieldId": "DATE_OF_APPLICATION",
+            "label": "Date Of Application",
+            "type": "date"
+          }
+        ],
+        "tables": [
+          {
+            "tableId": "INHIBITION_TABLE",
+            "dynamicRows": true,
+            "rowGenerationSource": "CASTING_TABLE",
+            "columns": [
+              {
+                "fieldId": "SR_NO",
+                "type": "autoIncrement"
+              },
+              {
+                "fieldId": "BEM_NO",
+                "label": "BEM No",
+                "type": "text"
+              },
+              {
+                "fieldId": "LINER_COATED_SLEEVE_WEIGHT",
+                "label": "Weight Of Liner Coated Sleeve (A)",
+                "type": "number"
+              },
+              {
+                "fieldId": "WEIGHT_BEFORE_INHIBITION",
+                "label": "Wt Before Inhibition (B)",
+                "type": "number"
+              },
+              {
+                "fieldId": "WEIGHT_AFTER_INHIBITION",
+                "label": "Wt After Inhibition",
+                "type": "number"
+              },
+              {
+                "fieldId": "IR_APPLIED_WEIGHT",
+                "label": "Weight Of IR Applied",
+                "type": "number"
+              },
+              {
+                "fieldId": "PROPELLANT_WEIGHT",
+                "label": "Weight Of Propellant (C-B-A)",
+                "type": "number",
+                "readonly": true,
+                "formula": "WEIGHT_AFTER_INHIBITION - WEIGHT_BEFORE_INHIBITION - LINER_COATED_SLEEVE_WEIGHT"
+              },
+              {
+                "fieldId": "REMARKS",
+                "label": "Remarks",
+                "type": "textarea"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "sectionId": "STATIC_TESTING_DETAILS",
+        "sectionName": "Static Testing Of BEM",
+        "tables": [
+          {
+            "tableId": "STATIC_TESTING_TABLE",
+            "dynamicRows": true,
+            "columns": [
+              {
+                "fieldId": "SR_NO",
+                "type": "autoIncrement"
+              },
+              {
+                "fieldId": "BEM_NO",
+                "label": "BEM No",
+                "type": "text"
+              },
+              {
+                "fieldId": "PROPELLANT_MASS",
+                "label": "Prop Mass",
+                "type": "number"
+              },
+              {
+                "fieldId": "DT",
+                "label": "Dt",
+                "type": "number"
+              },
+              {
+                "fieldId": "WEB_THICKNESS",
+                "label": "Web Thk",
+                "type": "number"
+              },
+              {
+                "fieldId": "N_VALUE",
+                "label": "n Value",
+                "type": "number"
+              },
+              {
+                "fieldId": "PRESSURE_AVG",
+                "label": "Pr Avg",
+                "type": "number"
+              },
+              {
+                "fieldId": "THRUST_AVG",
+                "label": "Th Avg",
+                "type": "number"
+              },
+              {
+                "fieldId": "BURN_RATE",
+                "label": "Burn Rate",
+                "type": "number"
+              },
+              {
+                "fieldId": "GRAPH_UPLOAD",
+                "label": "Upload Graph",
+                "type": "file"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "sectionId": "MECHANICAL_INTERFACE_PROPERTIES",
+        "sectionName": "Mechanical Interface Properties",
+        "tables": [
+          {
+            "tableId": "MECHANICAL_PROPERTIES_TABLE",
+            "dynamicRows": true,
+            "columns": [
+              {
+                "fieldId": "SR_NO",
+                "type": "autoIncrement"
+              },
+              {
+                "fieldId": "BEM_NO",
+                "label": "BEM No",
+                "type": "text"
+              },
+              {
+                "fieldId": "TS",
+                "label": "TS",
+                "type": "number"
+              },
+              {
+                "fieldId": "ELONGATION",
+                "label": "Elong",
+                "type": "number"
+              },
+              {
+                "fieldId": "MODULUS",
+                "label": "Modulus",
+                "type": "number"
+              },
+              {
+                "fieldId": "SBS",
+                "label": "SBS",
+                "type": "number"
+              },
+              {
+                "fieldId": "TBS",
+                "label": "TBS",
+                "type": "number"
+              },
+              {
+                "fieldId": "PEEL_STRENGTH",
+                "label": "Peel Strength",
+                "type": "number"
+              },
+              {
+                "fieldId": "DENSITY",
+                "label": "Density",
+                "type": "number"
+              },
+              {
+                "fieldId": "ACTOR",
+                "label": "Actor",
+                "type": "text"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

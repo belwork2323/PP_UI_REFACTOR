@@ -8,6 +8,8 @@ import RawMaterialPreparationApproverPage from "./RawMaterialPreparationApprover
 import CasePreparationApproverPage from "./CasePreparationApproverPage";
 import CastingCuringApproverPage from "./CastingAndCuringApproverPage";
 import PostCureApproverPage from "./PostCureApproverPage";
+import SubscaleApproverPage from "./SubscaleApproverPage";
+import TrimmingApproverPage from "./TrimmingApproverPage";
 import MixingApproverPage from "./MixingApproverPage";
 
 const {
@@ -17,6 +19,8 @@ const {
   blender: BlenderRoundedIcon,
   localFireDepartment: LocalFireDepartmentRoundedIcon,
   build: BuildRoundedIcon,
+  scale: ScaleRoundedIcon,
+  straighten: StraightenRoundedIcon,
 } = icons.approver.manufacturing.dashboard;
 
 const S = STRINGS.APPROVER.DASHBOARD.MANUFACTURING;
@@ -29,9 +33,6 @@ const SUB_DEPARTMENTS = [
     icon: BuildRoundedIcon,
     color: "#117A65",
     description: S.RAW_MATERIAL_DESCRIPTION,
-    pending: 2,
-    approved: 1,
-    rejected: 1,
   },
   {
     key: "case-preparation",
@@ -40,9 +41,6 @@ const SUB_DEPARTMENTS = [
     icon: LayersRoundedIcon,
     color: "#1A5276",
     description: S.CASE_PREP_DESCRIPTION,
-    pending: 3,
-    approved: 5,
-    rejected: 0,
   },
   {
     key: "mixing",
@@ -51,9 +49,6 @@ const SUB_DEPARTMENTS = [
     icon: BlenderRoundedIcon,
     color: "#6C3483",
     description: S.MIXING_DESCRIPTION,
-    pending: 1,
-    approved: 4,
-    rejected: 1,
   },
   {
     key: "casting-and-curing",
@@ -62,9 +57,6 @@ const SUB_DEPARTMENTS = [
     icon: LocalFireDepartmentRoundedIcon,
     color: "#B7770D",
     description: S.CASTING_DESCRIPTION,
-    pending: 4,
-    approved: 2,
-    rejected: 0,
   },
   {
     key: "post-cure-operations",
@@ -73,9 +65,22 @@ const SUB_DEPARTMENTS = [
     icon: ScienceRoundedIcon,
     color: "#922B21",
     description: S.POST_CURE_DESCRIPTION,
-    pending: 0,
-    approved: 6,
-    rejected: 2,
+  },
+  {
+    key: "subscale",
+    label: S.SUBSCALE_LABEL,
+    sectionLabel: S.SUBSCALE_SECTION,
+    icon: ScaleRoundedIcon,
+    color: "#117A65",
+    description: S.SUBSCALE_DESCRIPTION,
+  },
+  {
+    key: "trimming",
+    label: S.TRIMMING_LABEL,
+    sectionLabel: S.TRIMMING_SECTION,
+    icon: StraightenRoundedIcon,
+    color: "#6A1B9A",
+    description: S.TRIMMING_DESCRIPTION,
   },
 ];
 const ManufacturingApproverDashboard = () => {
@@ -102,6 +107,10 @@ const ManufacturingApproverDashboard = () => {
             return <CastingCuringApproverPage />;
           case "post-cure-operations":
             return <PostCureApproverPage />;
+          case "subscale":
+            return <SubscaleApproverPage />;
+          case "trimming":
+            return <TrimmingApproverPage />;
           default:
             return null;
         }

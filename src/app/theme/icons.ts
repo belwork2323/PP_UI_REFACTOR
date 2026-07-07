@@ -416,6 +416,8 @@ export const icons = {
         blender: BlenderRoundedIcon,
         localFireDepartment: LocalFireDepartmentRoundedIcon,
         build: BuildRoundedIcon,
+        scale: ScaleRoundedIcon,
+        straighten: StraightenRoundedIcon,
       },
       rawMaterialPreparation: {
         approved: CheckCircleRoundedIcon,
@@ -461,6 +463,22 @@ export const icons = {
         visibility: VisibilityRoundedIcon,
         close: CloseRoundedIcon,
         handyman: HandymanRoundedIcon,
+        pdf: PictureAsPdfRoundedIcon,
+      },
+      subscale: {
+        approved: CheckCircleRoundedIcon,
+        rejected: CancelRoundedIcon,
+        visibility: VisibilityRoundedIcon,
+        close: CloseRoundedIcon,
+        scale: ScaleRoundedIcon,
+        pdf: PictureAsPdfRoundedIcon,
+      },
+      trimming: {
+        approved: CheckCircleRoundedIcon,
+        rejected: CancelRoundedIcon,
+        visibility: VisibilityRoundedIcon,
+        close: CloseRoundedIcon,
+        straighten: StraightenRoundedIcon,
         pdf: PictureAsPdfRoundedIcon,
       },
     },
@@ -717,6 +735,55 @@ export const icons = {
         },
       },
 
+      subscale: {
+        form: {
+          scale: ScaleRoundedIcon,
+          input: InputRoundedIcon,
+          straighten: StraightenRoundedIcon,
+        },
+        list: {
+          pending: HourglassEmptyRoundedIcon,
+          approved: CheckCircleRoundedIcon,
+          rejected: CancelRoundedIcon,
+          pendingAction: PendingActionsRoundedIcon,
+          play: PlayCircleOutlineRoundedIcon,
+          arrowForward: ArrowForwardRoundedIcon,
+          edit: EditRoundedIcon,
+          person: PersonRoundedIcon,
+          calendar: CalendarMonthRoundedIcon,
+          scale: ScaleRoundedIcon,
+        },
+        page: {
+          back: ArrowBackRoundedIcon,
+          edit: EditRoundedIcon,
+          scale: ScaleRoundedIcon,
+        },
+      },
+
+      trimming: {
+        form: {
+          straighten: StraightenRoundedIcon,
+          input: InputRoundedIcon,
+        },
+        list: {
+          pending: HourglassEmptyRoundedIcon,
+          approved: CheckCircleRoundedIcon,
+          rejected: CancelRoundedIcon,
+          pendingAction: PendingActionsRoundedIcon,
+          play: PlayCircleOutlineRoundedIcon,
+          arrowForward: ArrowForwardRoundedIcon,
+          edit: EditRoundedIcon,
+          person: PersonRoundedIcon,
+          calendar: CalendarMonthRoundedIcon,
+          straighten: StraightenRoundedIcon,
+        },
+        page: {
+          back: ArrowBackRoundedIcon,
+          edit: EditRoundedIcon,
+          straighten: StraightenRoundedIcon,
+        },
+      },
+
       rawMaterial: {
         builderPage: {
           back: ArrowBackRoundedIcon,
@@ -827,6 +894,7 @@ export const icons = {
       qcDivision: {
         form: {
           factCheck: FactCheckRoundedIcon,
+          science: ScienceRoundedIcon,
           save: SaveOutlinedIcon,
           send: SendRoundedIcon,
           warning: WarningAmberRoundedIcon,

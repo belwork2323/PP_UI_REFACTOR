@@ -1,0 +1,190 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "RAW_MATERIALS",
+    "layout": { "type": "flat" },
+    "materialId": 2,
+    "materialCode": "AL",
+    "gradeId": null,
+    "gradeCode": null,
+    "subdepartmentId": 111,
+    "functionality": "CREATE_RAW_MATERIAL_PREPARATION_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "RAW_MATERIALS",
+  "functionality": "CREATE_RAW_MATERIAL_PREPARATION_FORM",
+  "message": "Raw material preparation schema fetched successfully",
+  "timestamp": "2026-05-29T15:30:00Z",
+  "materialId": 2,
+  "materialCode": "AL",
+  "materialName": "Aluminum Powder",
+  "materialType": "SOLID",
+  "data": {
+    "meta": {
+      "title": "Aluminum Powder Processing",
+      "description": "Aluminum powder processing, qualification and dispatch to mixing"
+    },
+    "ui": {
+      "layout": "accordion",
+      "gap": "md",
+      "sectionVariant": "card"
+    },
+    "context": {
+      "subDepartmentId": "{{subDepartmentId}}",
+      "materialId": "{{materialId}}",
+      "gradeId": "{{gradeId}}",
+      "materialCode": "AL"
+    },
+    "sections": [
+      {
+        "id": "ALUMINUM_PROCESSING",
+        "title": "Aluminum Powder Processing",
+        "children": [
+          {
+            "type": "group",
+            "id": "PROCESSING_LOTS",
+            "label": "Material Lots",
+            "ui": { "direction": "row", "wrap": true, "gap": "md" },
+            "repeat": {
+              "defaultCount": 1,
+              "min": 1,
+              "max": 20,
+              "allowAdd": true,
+              "allowDelete": true,
+              "label": "Lot {index}"
+            },
+            "children": [
+              {
+                "type": "field",
+                "id": "LOT_NUMBER",
+                "fieldType": "dropdown",
+                "label": "Lot No. of Aluminium (as per ACEM)",
+                "validation": { "required": true },
+                "dataSource": {
+                  "type": "api",
+                  "api": {
+                    "endpoint": "raw-material-procurement-lot-list",
+                    "method": "POST",
+                    "requestBody": {
+                      "limit": 500,
+                      "page": 1,
+                      "status": ["APPROVED"],
+                      "subDepartmentId": 1,
+                      "materialCode": ["{{materialCode}}"]
+                    },
+                    "responsePath": "data.lots",
+                    "displayKey": "lotId",
+                    "valueKey": "lotId"
+                  }
+                },
+                "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 }, "maxWidth": "240px" }
+              },
+              {
+                "type": "field",
+                "id": "TOTAL_QUANTITY",
+                "fieldType": "number",
+                "label": "Total Quantity to be Processed",
+                "unit": "kg",
+                "validation": { "required": true },
+                "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 } }
+              },
+              {
+                "type": "field",
+                "id": "EQUIPMENT_ID",
+                "fieldType": "text",
+                "label": "Equipment Id",
+                "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 } }
+              },
+              {
+                "type": "field",
+                "id": "SET_RPM",
+                "fieldType": "number",
+                "label": "Set RPM",
+                "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 } }
+              },
+              {
+                "type": "field",
+                "id": "START_TIME",
+                "fieldType": "datetime",
+                "label": "Start Date/Time"
+              },
+              {
+                "type": "field",
+                "id": "END_TIME",
+                "fieldType": "datetime",
+                "label": "End Date/Time"
+              },
+              {
+                "type": "field",
+                "id": "OBSERVATION",
+                "fieldType": "textarea",
+                "label": "Any Other Observation"
+              },
+              {
+                "type": "field",
+                "id": "QUALIFIED_QUANTITY",
+                "fieldType": "number",
+                "label": "Qty. Qualified",
+                "unit": "kg"
+              },
+              {
+                "type": "field",
+                "id": "DISPATCH_TIME",
+                "fieldType": "datetime",
+                "label": "Date/Time of Dispatch"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "UNLOADING_DISPATCH",
+        "title": "Unloading Material & Dispatch to Mixing",
+        "children": [
+          {
+            "type": "group",
+            "id": "DISPATCH_BINS",
+            "label": "Bins",
+            "ui": { "direction": "row", "wrap": true, "gap": "md" },
+            "repeat": {
+              "defaultCount": 1,
+              "min": 1,
+              "max": 20,
+              "allowAdd": true,
+              "allowDelete": true,
+              "label": "Bin {index}"
+            },
+            "children": [
+              {
+                "type": "field",
+                "id": "BIN_NUMBER",
+                "fieldType": "text",
+                "label": "Bin Number",
+                "validation": { "required": true },
+                "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 } }
+              },
+              {
+                "type": "field",
+                "id": "BIN_CAPACITY",
+                "fieldType": "number",
+                "label": "Bin Capacity",
+                "unit": "kg",
+                "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 } }
+              },
+              {
+                "type": "field",
+                "id": "FILLED_QUANTITY",
+                "fieldType": "number",
+                "label": "Material Filled Quantity",
+                "unit": "kg",
+                "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 } }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

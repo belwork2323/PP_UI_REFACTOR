@@ -1,0 +1,156 @@
+{
+  "endpoint": "POST /api/v1/approver/subdepartment/batch-list",
+  "request": {
+    "subDepartmentId": 3,
+    "userId": "USR-014",
+    "page": 1,
+    "limit": 10,
+    "status": ["IN_PROGRESS", "WAITING_FOR_APPROVAL"],
+    "search": "BATCH-2024",
+    "batchIds": ["BATCH-2026-0008"],
+    "batchTypes": ["MAIN"],
+    "motorStages": [1],
+    "motorIds": ["Motor-076"],
+    "formSubmittedBy": ["user200"],
+    "fromDate": "2026-06-01",
+    "toDate": "2026-06-30"
+  },
+  "requestNotes": {
+    "status": "Request only — uppercase API enums: INITIATED, IN_PROGRESS, WAITING_FOR_APPROVAL, APPROVED, REJECTED",
+    "search": "Free-text search across batch ID, motor ID, form submitter name",
+    "batchIds": "From Batch ID filter",
+    "batchTypes": "MAIN or SUBSCALE",
+    "motorStages": "Numeric stage values e.g. 0, 1, 2",
+    "motorIds": "From Motor ID filter",
+    "formSubmittedBy": "Filter by the manufacturing user who logged in, entered form values, and submitted for approval. Matches response formSubmittedBy.fullName (or formSubmittedBy.id)",
+    "fromDate": "ISO date YYYY-MM-DD, filters createdOn",
+    "toDate": "ISO date YYYY-MM-DD, filters createdOn",
+    "priority": "Optional e.g. [\"High\", \"Critical\"] — not used by RMP approver UI"
+  },
+  "response": {
+    "success": true,
+    "code": 200,
+    "message": "Batch list fetched successfully",
+    "timestamp": "2026-06-27T15:46:02.142011",
+    "data": {
+      "statusCounts": {
+        "initiated": 1,
+        "approved": 5,
+        "inProgress": 1,
+        "waitingForApproval": 1,
+        "rejected": 0
+      },
+      "batches": [
+        {
+          "id": "BATCH-2026-0008",
+          "batchId": "BATCH-2026-0008",
+          "formId": "RMPF-2026-007",
+          "motorIds": ["RMC-A1-2026-26-02", "RMC-P1-2026-25-01"],
+          "motorStage": 1,
+          "lotIds": ["LOT-2026-26-001"],
+          "projectName": "Project_25_06",
+          "batchType": "MAIN",
+          "priority": "Medium",
+          "createdBy": {
+            "id": "EMP100",
+            "fullName": "admin100"
+          },
+          "formSubmittedBy": {
+            "id": "EMP150",
+            "fullName": "user200"
+          },
+          "systemManager": {
+            "id": "EMP200",
+            "fullName": "manager200"
+          },
+          "stage": {
+            "departmentId": 2,
+            "departmentName": "Manufacturing",
+            "subDepartments": [
+              {
+                "subDepartmentId": 3,
+                "subDepartmentName": "Raw Material Preparation"
+              }
+            ]
+          },
+          "status": "WAITING_FOR_APPROVAL",
+          "identificationSheetStatus": "COMPLETED",
+          "createdOn": "2026-06-27T11:57:31.499"
+        }
+      ],
+      "pagination": {
+        "page": 1,
+        "pageSize": 10,
+        "totalRecords": 8,
+        "totalPages": 1
+      }
+    }
+  },
+  "responseNotes": {
+    "statusCounts": "camelCase keys: initiated, approved, inProgress, waitingForApproval, rejected",
+    "batchStatus": "Uppercase enum per row e.g. WAITING_FOR_APPROVAL, IN_PROGRESS, APPROVED"
+  },
+  "userFields": {
+    "description": "Three distinct user objects appear in each batch row.",
+    "createdBy": {
+      "purpose": "Admin who created the batch record",
+      "mapsToUiColumn": null,
+      "mapsToUiField": "createdBy",
+      "example": {
+        "id": "EMP100",
+        "fullName": "admin100"
+      }
+    },
+    "formSubmittedBy": {
+      "purpose": "Manufacturing user who logged in, entered form values, and submitted the form for approval",
+      "mapsToUiColumn": "Submitted By",
+      "mapsToUiField": "submittedBy",
+      "example": {
+        "id": "EMP150",
+        "fullName": "user200"
+      }
+    },
+    "systemManager": {
+      "purpose": "Person assigned to monitor batch progress",
+      "mapsToUiColumn": null,
+      "mapsToUiField": "systemManager",
+      "example": {
+        "id": "EMP200",
+        "fullName": "manager200"
+      }
+    }
+  },
+  "uiMapping": {
+    "submittedBy": "formSubmittedBy.fullName",
+    "formSubmittedBy": "Full form submitter object preserved on mapped row: { id, fullName }",
+    "createdBy": "Batch admin who created the batch: { id, fullName }",
+    "systemManager": "Assigned manager who monitors batch progress: { id, fullName }",
+    "motorId": "motorIds joined with comma",
+    "motorStage": "motorStage numeric value",
+    "batchType": "batchType enum MAIN | SUBSCALE",
+    "status": "API enum e.g. IN_PROGRESS, APPROVED — normalized to UI label for display"
+  },
+  "mappedRowExample": {
+    "batchId": "BATCH-2026-0008",
+    "formId": "RMPF-2026-007",
+    "motorId": "RMC-A1-2026-26-02, RMC-P1-2026-25-01",
+    "motorStage": 1,
+    "batchType": "MAIN",
+    "submittedBy": "user200",
+    "formSubmittedBy": {
+      "id": "EMP150",
+      "fullName": "user200"
+    },
+    "createdBy": {
+      "id": "EMP100",
+      "fullName": "admin100"
+    },
+    "systemManager": {
+      "id": "EMP200",
+      "fullName": "manager200"
+    },
+    "createdOn": "2026-06-27T11:57:31.499",
+    "status": "Waiting for Approval",
+    "statusApi": "WAITING_FOR_APPROVAL"
+  }
+}

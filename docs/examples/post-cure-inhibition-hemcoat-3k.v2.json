@@ -1,0 +1,395 @@
+{
+  "schemaVersion": "1.0",
+  "schemaType": "POST_CURE",
+  "functionality": "CREATE_POST_CURE_FORM",
+  "operationType": "INHIBITION",
+  "inhibitorType": "HEMCOAT_3K",
+  "meta": {
+    "title": "Hemcoat-3K Inhibition",
+    "description": "Hemcoat-3K premix, final mix, qualification, batch, application and dispatch details"
+  },
+  "data": {
+    "ui": {
+      "layout": "accordion",
+      "gap": "md",
+      "sectionVariant": "card",
+      "accordion": {
+        "defaultExpanded": true,
+        "allowMultipleExpanded": true
+      }
+    },
+    "context": {
+      "subDepartmentId": "{{subDepartmentId}}",
+      "batchId": "{{batchId}}"
+    },
+    "sections": [
+      {
+        "id": "HEMCOAT_3K_PREPARATION",
+        "title": "Hemcoat-3K IR - Preparation Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "group",
+            "id": "PREMIX",
+            "label": "Premix",
+            "children": [
+              {
+                "type": "table",
+                "id": "PREMIX_PREPARATION_TABLE",
+                "label": "Premix Preparation Details",
+                "rows": {
+                  "defaultCount": 5,
+                  "allowAdd": false,
+                  "allowDelete": false,
+                  "autoIncrementKey": "srNo",
+                  "presetRows": [
+                    { "readonly": true, "INGREDIENT": "HTPB", "PARTS_BY_WEIGHT": "80.00" },
+                    { "readonly": true, "INGREDIENT": "NBD", "PARTS_BY_WEIGHT": "2.80" },
+                    { "readonly": true, "INGREDIENT": "HT", "PARTS_BY_WEIGHT": "2.15" },
+                    { "readonly": true, "INGREDIENT": "Kaolin", "PARTS_BY_WEIGHT": "15.00" },
+                    { "readonly": true, "INGREDIENT": "Nonox-D", "PARTS_BY_WEIGHT": "0.05" }
+                  ]
+                },
+                "columns": [
+                  {
+                    "type": "column",
+                    "id": "srNo",
+                    "fieldType": "serial",
+                    "label": "Sr. No",
+                    "readonly": true
+                  },
+                  {
+                    "type": "column",
+                    "id": "BATCH_NO_DATE",
+                    "fieldType": "text",
+                    "label": "Batch No With Date"
+                  },
+                  {
+                    "type": "column",
+                    "id": "INGREDIENT",
+                    "fieldType": "static",
+                    "label": "Ingredient",
+                    "readonly": true
+                  },
+                  {
+                    "type": "column",
+                    "id": "MFG_LOT",
+                    "fieldType": "dropdown",
+                    "label": "Mfg Lot",
+                    "dataSource": {
+                      "type": "api",
+                      "api": {
+                        "endpoint": "MATERIAL_LOTS",
+                        "method": "POST",
+                        "requestField": "batchId",
+                        "requestBody": {
+                          "subDepartmentId": "{{subDepartmentId}}"
+                        },
+                        "responsePath": "data.materials",
+                        "displayKey": "lotId",
+                        "valueKey": "lotId"
+                      }
+                    }
+                  },
+                  {
+                    "type": "column",
+                    "id": "PARTS_BY_WEIGHT",
+                    "fieldType": "static",
+                    "label": "Parts By Weight",
+                    "readonly": true
+                  },
+                  {
+                    "type": "column",
+                    "id": "QTY_TAKEN",
+                    "fieldType": "number",
+                    "label": "Qty Taken (g)"
+                  },
+                  {
+                    "type": "column",
+                    "id": "TOTAL_QTY",
+                    "fieldType": "number",
+                    "label": "Total Quantity (g)",
+                    "readonly": true
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "HEMCOAT_3K_FINAL_MIX",
+        "title": "Final Mix",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "FINAL_MIX_TABLE",
+            "label": "Hemcoat-3K Final Mix",
+            "rows": {
+              "defaultCount": 3,
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "srNo",
+              "presetRows": [
+                { "readonly": true, "INGREDIENT": "Hemcoat-3K Premix", "PARTS_BY_WEIGHT": "98" },
+                { "readonly": true, "INGREDIENT": "H12MDI", "PARTS_BY_WEIGHT": "2.3" },
+                {
+                  "readonly": true,
+                  "INGREDIENT": "Catalyst (2.5% w/w FeAA in HTPB)",
+                  "PARTS_BY_WEIGHT": "2 ml"
+                }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "srNo",
+                "fieldType": "serial",
+                "label": "Sr. No",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "BATCH_NO_DATE",
+                "fieldType": "text",
+                "label": "Batch No With Date"
+              },
+              {
+                "type": "column",
+                "id": "INGREDIENT",
+                "fieldType": "static",
+                "label": "Ingredient",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "MFG_LOT",
+                "fieldType": "dropdown",
+                "label": "Mfg Lot",
+                "dataSource": {
+                  "type": "api",
+                  "api": {
+                    "endpoint": "MATERIAL_LOTS",
+                    "method": "POST",
+                    "requestField": "batchId",
+                    "requestBody": {
+                      "subDepartmentId": "{{subDepartmentId}}"
+                    },
+                    "responsePath": "data.materials",
+                    "displayKey": "lotId",
+                    "valueKey": "lotId"
+                  }
+                }
+              },
+              {
+                "type": "column",
+                "id": "PARTS_BY_WEIGHT",
+                "fieldType": "static",
+                "label": "Parts By Weight",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "QTY_TAKEN",
+                "fieldType": "number",
+                "label": "Qty Taken (g)"
+              },
+              {
+                "type": "column",
+                "id": "TOTAL_QTY",
+                "fieldType": "number",
+                "label": "Total Quantity (g)",
+                "readonly": true
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "HEMCOAT_3K_QUALIFICATION",
+        "title": "Qualification Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "QUALIFICATION_BATCH_NO",
+            "fieldType": "text",
+            "label": "Batch No With Date Of Preparation",
+            "ui": {
+              "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+              "maxWidth": "300px"
+            }
+          },
+          {
+            "type": "table",
+            "id": "QUALIFICATION_TABLE",
+            "label": "Qualification Details",
+            "rows": {
+              "defaultCount": 2,
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "srNo",
+              "presetRows": [
+                { "readonly": true, "PARAMETER": "Tensile Strength", "SPECIFICATION": "≥25 KSC" },
+                { "readonly": true, "PARAMETER": "% Elongation", "SPECIFICATION": "≥100" }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "srNo",
+                "fieldType": "serial",
+                "label": "Sr. No",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "PARAMETER",
+                "fieldType": "static",
+                "label": "Parameter",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "SPECIFICATION",
+                "fieldType": "static",
+                "label": "Specification",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "RESULT",
+                "fieldType": "text",
+                "label": "Result"
+              },
+              {
+                "type": "column",
+                "id": "QC_REPORT",
+                "fieldType": "file",
+                "label": "Upload QC Report"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "INHIBITION_BATCH_DETAILS",
+        "title": "Inhibitor Batch Information",
+        "ui": {
+          "variant": "card",
+          "padding": "md",
+          "direction": "row",
+          "wrap": true,
+          "gap": "md"
+        },
+        "children": [
+          {
+            "type": "field",
+            "id": "INHIBITOR_BATCH_NO",
+            "fieldType": "text",
+            "label": "Batch No"
+          },
+          {
+            "type": "field",
+            "id": "INHIBITOR_BATCH_SIZE",
+            "fieldType": "number",
+            "label": "Batch Size",
+            "unit": "g"
+          }
+        ]
+      },
+      {
+        "id": "INHIBITION_APPLICATION_DETAILS",
+        "title": "Inhibition Application Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "INHIBITION_APPLICATION_TABLE",
+            "rows": {
+              "defaultCount": 2,
+              "allowAdd": false,
+              "allowDelete": false,
+              "presetRows": [
+                { "readonly": true, "LOCATION": "HE_SIDE" },
+                { "readonly": true, "LOCATION": "NE_SIDE" }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "LOCATION",
+                "fieldType": "static",
+                "label": "Location",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "FROM_DATE",
+                "fieldType": "date",
+                "label": "From Date"
+              },
+              {
+                "type": "column",
+                "id": "TO_DATE",
+                "fieldType": "date",
+                "label": "To Date"
+              },
+              {
+                "type": "column",
+                "id": "QTY_APPLIED",
+                "fieldType": "number",
+                "label": "Qty Applied (g)"
+              },
+              {
+                "type": "column",
+                "id": "OBSERVATIONS",
+                "fieldType": "textarea",
+                "label": "Observations"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "DISPATCH_DETAILS",
+        "title": "Dispatch Details",
+        "ui": {
+          "variant": "card",
+          "padding": "md",
+          "direction": "row",
+          "wrap": true,
+          "gap": "md"
+        },
+        "children": [
+          {
+            "type": "field",
+            "id": "DISPATCH_DATE",
+            "fieldType": "date",
+            "label": "Date Of Dispatch"
+          },
+          {
+            "type": "field",
+            "id": "DISPATCH_STATION",
+            "fieldType": "dropdown",
+            "label": "Dispatch Station",
+            "dataSource": {
+              "type": "api",
+              "api": {
+                "endpoint": "CASTING_STATION_LIST",
+                "method": "GET",
+                "requestBody": {
+                  "subDepartmentId": "{{subDepartmentId}}"
+                },
+                "responsePath": "data.materials",
+                "displayKey": "stationName",
+                "valueKey": "stationCode"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

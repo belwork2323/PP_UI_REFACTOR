@@ -1,0 +1,157 @@
+{
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "QC",
+  "division": "RAW_MATERIAL_REVALIDATION",
+  "subType": null,
+  "subDepartmentId": 115,
+  "functionality": "CREATE_QC_FORM",
+  "data": {
+    "layout": { "type": "flat" },
+    "meta": {
+      "title": "Raw Material QC",
+      "description": "Select a value on the picker row, then click Add to load grouped specification rows."
+    },
+    "sections": [
+      {
+        "id": "RAW_MATERIAL_DETAILS",
+        "title": "Raw Material Revalidation",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "RAW_MATERIAL_DETAILS",
+            "rows": {
+              "allowAdd": true,
+              "allowDelete": true,
+              "min": 1,
+              "defaultCount": 1,
+              "autoIncrementKey": "SR_NO",
+              "addLabel": "Add Ingredient",
+              "commitGroup": {
+                "pickerColumns": ["INGREDIENT"],
+                "expandFromColumn": "PARAMETER",
+                "carryColumns": ["LOT_BATCH_NUMBER"],
+                "mergeExpandedColumns": ["INGREDIENT"],
+                "readonlyExpandedColumns": ["INGREDIENT", "PARAMETER", "SPECIFICATION"],
+                "addLabel": "Add Ingredient",
+                "removeGroupLabel": "Remove Ingredient",
+                "fieldMappings": [
+                  {
+                    "sourceField": "specificationName",
+                    "targetColumn": "PARAMETER"
+                  },
+                  {
+                    "sourceField": "referenceRange",
+                    "targetColumn": "SPECIFICATION",
+                    "transform": "referenceRange"
+                  }
+                ]
+              }
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "SR_NO",
+                "fieldType": "serial",
+                "label": "Sr No",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "INGREDIENT",
+                "fieldType": "dropdown",
+                "label": "Ingredient",
+                "validation": { "required": true },
+                "ui": { "placeholder": "Select ingredient" },
+                "dataSource": {
+                  "type": "api",
+                  "api": {
+                    "endpoint": "/api/v1/user/subdepartment/materials-list",
+                    "method": "POST",
+                    "requestBody": { "materialType": "BOTH" },
+                    "displayKey": "materialName",
+                    "valueKey": "materialCode"
+                  }
+                }
+              },
+              {
+                "type": "column",
+                "id": "LOT_BATCH_NUMBER",
+                "fieldType": "dropdown",
+                "label": "Lot / Batch Number",
+                "validation": { "required": true },
+                "dataSource": {
+                  "type": "api",
+                  "api": {
+                    "endpoint": "/api/v1/user/post-cure/material-lots",
+                    "method": "POST",
+                    "requestBody": { "batchId": "${batchId}" },
+                    "displayKey": "lotId",
+                    "valueKey": "lotId"
+                  }
+                }
+              },
+              {
+                "type": "column",
+                "id": "PARAMETER",
+                "fieldType": "dropdown",
+                "label": "Parameter",
+                "validation": { "required": true },
+                "dataSource": {
+                  "type": "api",
+                  "api": {
+                    "endpoint": "/api/v1/user/subdepartment/materials/specification-list",
+                    "method": "POST",
+                    "requestBody": { "materialCode": "${INGREDIENT}" },
+                    "responsePath": "data.specifications",
+                    "displayKey": "specificationName",
+                    "valueKey": "specificationName"
+                  }
+                },
+                "derive": {
+                  "targetColumn": "SPECIFICATION",
+                  "sourceField": "referenceRange",
+                  "transform": "referenceRange",
+                  "matchFields": ["specificationName", "specificationCode"]
+                }
+              },
+              {
+                "type": "column",
+                "id": "SPECIFICATION",
+                "fieldType": "text",
+                "label": "Specs",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "RESULT",
+                "fieldType": "text",
+                "label": "Result"
+              },
+              {
+                "type": "column",
+                "id": "VALIDITY",
+                "fieldType": "date",
+                "label": "Validity"
+              },
+              {
+                "type": "column",
+                "id": "REMARKS",
+                "fieldType": "textarea",
+                "label": "Remarks"
+              },
+              {
+                "type": "column",
+                "id": "QC_CERTIFICATE",
+                "fieldType": "file",
+                "label": "Upload QC Certificate"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

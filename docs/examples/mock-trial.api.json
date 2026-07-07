@@ -1,0 +1,251 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "MOCK_TRIAL",
+    "layout": { "type": "flat" },
+    "motorStage": 1,
+    "subdepartmentId": 111,
+    "functionality": "CREATE_MOCK_TRIAL_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "MOCK_TRIAL",
+  "functionality": "CREATE_MOCK_TRIAL_FORM",
+  "message": "Mock trial schema fetched successfully",
+  "timestamp": "2026-05-27T16:00:00Z",
+  "data": {
+    "layout": { "type": "flat" },
+    "meta": {
+      "title": "Mock Trial",
+      "description": "Mock trial measurements and mandrel assembly details"
+    },
+    "context": {
+      "motorStage": 1,
+      "subDepartmentId": "{{subDepartmentId}}"
+    },
+    "sections": [
+      {
+        "id": "basicDetails",
+        "title": "Basic Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "castingStation",
+            "fieldType": "dropdown",
+            "label": "Casting Station",
+            "validation": { "required": true },
+            "dataSource": {
+              "type": "api",
+              "api": {
+                "endpoint": "api/v1/user/subdepartment/casting-station",
+                "method": "GET",
+                "displayKey": "stationName",
+                "valueKey": "stationCode"
+              }
+            }
+          },
+          {
+            "type": "field",
+            "id": "mandrelId",
+            "fieldType": "text",
+            "label": "Mandrel ID",
+            "validation": { "required": true }
+          },
+          {
+            "type": "field",
+            "id": "bottomCupId",
+            "fieldType": "text",
+            "label": "Bottom Cup ID",
+            "validation": { "required": true }
+          }
+        ]
+      },
+      {
+        "id": "mockAssyDetails",
+        "title": "Distance between centring top to mandrel top (mm)",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "mockAssyDetails",
+            "rows": {
+              "allowAdd": true,
+              "allowDelete": true,
+              "autoIncrementKey": "srNo"
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "srNo",
+                "fieldType": "serial",
+                "label": "Sr. No.",
+                "readonly": true,
+                "ui": { "width": "80px" }
+              },
+              {
+                "type": "column",
+                "id": "mandrelRestOnDomeA",
+                "fieldType": "decimal",
+                "label": "Mandrel rest on dome of motor (A)",
+                "unit": "mm"
+              },
+              {
+                "type": "column",
+                "id": "mandrelRestOnBottomCupB",
+                "fieldType": "decimal",
+                "label": "Mandrel rest on bottom cup (with Teflon sleeve) (B)",
+                "unit": "mm"
+              },
+              {
+                "type": "column",
+                "id": "differenceC",
+                "fieldType": "formula",
+                "label": "Difference C=(A-B)",
+                "readonly": true,
+                "unit": "mm",
+                "formula": {
+                  "expression": "mandrelRestOnDomeA - mandrelRestOnBottomCupB",
+                  "dependencies": ["mandrelRestOnDomeA", "mandrelRestOnBottomCupB"]
+                }
+              },
+              {
+                "type": "column",
+                "id": "bellowThicknessD",
+                "fieldType": "decimal",
+                "label": "Bellow Thickness (D)",
+                "unit": "mm"
+              },
+              {
+                "type": "column",
+                "id": "mandrelLiftE",
+                "fieldType": "formula",
+                "label": "Mandrel Lift E=(C-D)",
+                "readonly": true,
+                "unit": "mm",
+                "formula": {
+                  "expression": "differenceC - bellowThicknessD",
+                  "dependencies": ["differenceC", "bellowThicknessD"]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "motorLengthMeasurements",
+        "title": "Motor Length Measurements",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "motorLengthMeasurements",
+            "rows": {
+              "allowAdd": true,
+              "allowDelete": true,
+              "autoIncrementKey": "srNo"
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "srNo",
+                "fieldType": "serial",
+                "label": "Sr. No.",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "lfRubberThicknessHe",
+                "fieldType": "decimal",
+                "label": "Thickness of LF rubber at HE (mm)",
+                "unit": "mm"
+              },
+              {
+                "type": "column",
+                "id": "heBossWidthWithoutLfRubber",
+                "fieldType": "decimal",
+                "label": "HE Boss width (without LF Rubber) (mm)",
+                "unit": "mm"
+              },
+              {
+                "type": "column",
+                "id": "heDiaId",
+                "fieldType": "decimal",
+                "label": "HE Dia. (ID) (mm)",
+                "unit": "mm"
+              },
+              {
+                "type": "group",
+                "id": "motorLengthMm",
+                "label": "Motor length (mm)",
+                "columns": [
+                  {
+                    "type": "column",
+                    "id": "heOuterToNeOuter",
+                    "fieldType": "decimal",
+                    "label": "HE outer to NE outer (metal to metal)",
+                    "unit": "mm"
+                  },
+                  {
+                    "type": "column",
+                    "id": "heInnerToNeInner",
+                    "fieldType": "decimal",
+                    "label": "HE inner to NE inner (rubber to rubber)",
+                    "unit": "mm"
+                  },
+                  {
+                    "type": "column",
+                    "id": "neOuterToHeInner",
+                    "fieldType": "decimal",
+                    "label": "NE outer to HE inner (metal to rubber)",
+                    "unit": "mm"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "mandrelAssembly",
+        "title": "Mandrel Assembly",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "mandrelAssembly",
+            "rows": {
+              "allowAdd": true,
+              "allowDelete": true,
+              "autoIncrementKey": "srNo"
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "srNo",
+                "fieldType": "serial",
+                "label": "Sr. No.",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "readingWithoutCup",
+                "fieldType": "decimal",
+                "label": "Reading without cup (Mandrel resting on motor dome) (mm)",
+                "unit": "mm"
+              },
+              {
+                "type": "column",
+                "id": "readingWithBottomCupAndGasket",
+                "fieldType": "decimal",
+                "label": "Reading with bottom cup & gaskets (after tightening the bottom cup) (mm)",
+                "unit": "mm"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

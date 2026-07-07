@@ -27,9 +27,6 @@ const SUB_DEPARTMENTS = [
     icon: VerifiedRoundedIcon,
     color: "#117A65",
     description: S.RAW_MATERIAL_DESCRIPTION,
-    pending:  2,
-    approved: 1,
-    rejected: 1,
   },
   {
     key: "qc-division",
@@ -38,9 +35,6 @@ const SUB_DEPARTMENTS = [
     icon: MedicalServicesRoundedIcon,
     color: "#1A5276",
     description: S.QC_DIVISION_DESCRIPTION,
-    pending:  3,
-    approved: 7,
-    rejected: 0,
   },
   {
     key: "ndt",
@@ -49,9 +43,6 @@ const SUB_DEPARTMENTS = [
     icon: RadarRoundedIcon,
     color: "#6C3483",
     description: S.NDT_DESCRIPTION,
-    pending:  1,
-    approved: 4,
-    rejected: 2,
   },
   {
     key: "static-test-facility",
@@ -60,9 +51,6 @@ const SUB_DEPARTMENTS = [
     icon: SpeedRoundedIcon,
     color: "#922B21",
     description: S.STF_DESCRIPTION,
-    pending:  0,
-    approved: 5,
-    rejected: 1,
   },
 ];
 const QualityControlApproverDashboard = () => {

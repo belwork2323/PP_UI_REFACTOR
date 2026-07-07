@@ -1,10 +1,20 @@
-# PP-Schema UI Standard v1
+# PP-Schema UI Standard v2
 
-**Version:** 1.0  
-**Status:** Specification (renderer implementation pending)  
-**Audience:** Backend schema builders, frontend `schemaManagement` module
+**Version:** 2.0  
+**Status:** Specification (schema-engine implementation pending)  
+**Audience:** Backend schema builders, frontend `schema-engine` module  
+**TypeScript types:** [`src/schema-engine/types/schema.types.ts`](../src/schema-engine/types/schema.types.ts)
 
-This document defines the **single canonical format** for schema-driven manufacturing forms in PP-UI. All modules (raw material prep, case preparation, casting, curing, mock trial, etc.) should converge on this structure.
+This document defines the **single canonical format** for schema-driven manufacturing forms in PP-UI. All modules (raw material prep, case preparation, casting, curing, mock trial, etc.) use this structure.
+
+**v2 changes from v1:**
+
+- Nested `sections[]` with recursive `children[]` — no flat `data.nodes[]`
+- No `repeatable` block type — `repeat` is a property on nested `section` blocks
+- `ui`, `context`, and `sections` live inside root `data` (identification fields stay at root)
+- Four explicit layers: definition / UI / rules / submission
+- All UI maps to **one** component library: [`src/ui/components/common/`](../src/ui/components/common/)
+- **No v1 normalizer** — backend emits v2 JSON directly
 
 ---
 
@@ -12,20 +22,18 @@ This document defines the **single canonical format** for schema-driven manufact
 
 1. [Design principles](#1-design-principles)
 2. [Root document](#2-root-document)
-3. [SchemaNode (universal node)](#3-schemanode-universal-node)
-4. [Component catalog](#4-component-catalog)
-5. [Style block (CSS / design tokens)](#5-style-block-css--design-tokens)
-6. [Layout block](#6-layout-block)
-7. [Behavior block (dynamic rows, columns, cycles)](#7-behavior-block-dynamic-rows-columns-cycles)
-8. [DataSource (dropdowns)](#8-datasource-dropdowns)
-9. [Visibility rules](#9-visibility-rules)
-10. [Validation](#10-validation)
-11. [Runtime values & submission](#11-runtime-values--submission)
+3. [Four layers](#3-four-layers)
+4. [Section model](#4-section-model)
+5. [Child block types](#5-child-block-types)
+6. [Component catalog](#6-component-catalog)
+7. [UI metadata reference](#7-ui-metadata-reference)
+8. [Rules reference](#8-rules-reference)
+9. [Submission model](#9-submission-model)
+10. [Backend contract](#10-backend-contract)
+11. [TypeScript types](#11-typescript-types)
 12. [Naming conventions](#12-naming-conventions)
-13. [Schema fetch request envelope](#13-schema-fetch-request-envelope)
-14. [Examples](#14-examples)
-15. [Appendix A: Legacy → v1 mapping](#appendix-a-legacy--v1-mapping)
-16. [Appendix B: Future UI refactoring roadmap](#appendix-b-future-ui-refactoring-roadmap)
+13. [Examples](#13-examples)
+14. [Changelog](#14-changelog)
 
 ---
 
@@ -33,292 +41,241 @@ This document defines the **single canonical format** for schema-driven manufact
 
 | Principle | Description |
 |-----------|-------------|
-| **One node shape** | Sections, fields, columns, and repeatable blocks all use `SchemaNode`. The `component` property selects the renderer. |
-| **Semantic tokens** | Colors, spacing, icons, and typography use named tokens (`primary`, `md`, `thermostat`). Raw hex/px only when necessary via `style.sx`. |
-| **Declarative behavior** | Add/delete rows, cycles, and columns are configuration — not hardcoded per module. |
-| **Stable IDs** | `id` is the persistence key in saved form data. Labels may change freely. |
-| **Backward compatibility** | Legacy API shapes (`fieldId`, `sectionName`, `tables[]`) normalize into v1 via a future `normalizeToV1()` layer. |
+| **Nested sections** | Top-level `sections[]` contain `children[]`. Repeatable cycles are nested `section` blocks with a `repeat` property — not a separate component type. |
+| **Four layers** | Definition (`id`, `type`, structure), UI (`ui`, `meta`, `designSystem`), rules (`validation`, `visibleWhen`, `formula`, `dataSource`, `repeat`, `action`), submission (`data` — primitives only). |
+| **Single UI library** | Every block type maps to one component in `ui/components/common`. The schema engine registry imports from common only — no duplicate component tree. |
+| **Semantic tokens** | Colors, spacing, icons use named tokens from `ui.designSystem`. Raw hex/px only via `ui.sx`. |
+| **Stable IDs** | `id` is the persistence key in saved form data. Titles and labels may change freely. |
+| **Domain-neutral engine** | No `CastingForm`, `CuringForm`, `MixingForm`. Page shells fetch schema and pass `apiContext` / `setupContext`. |
+| **Declarative behavior** | Add/delete rows, cycles, and columns are JSON configuration — not hardcoded per module. |
 
 ```
-Backend Schema Builder
+Backend (MongoDB versioned schemas)
         │
         ▼
-   PP-Schema v1 (data.nodes[])
+   PP-Schema v2 JSON
         │
         ▼
-  normalizeToV1()  ◄── Legacy aliases (optional)
+  schema-engine/SchemaRenderer
         │
-        ▼
-  ComponentRegistry → SchemaNodeRenderer
-        ▲
-  resolveDesignTokens()
+        ├── registry/  (prop mapping only)
+        └── imports ui/components/common
 ```
 
 ---
 
 ## 2. Root document
 
-**All schema documents use the same envelope.** UI content lives inside `data`; identification fields stay at the root.
-
-### Schema envelope (required for every module)
+### Schema envelope
 
 ```json
 {
-  "schemaVersion": "1.0",
+  "schemaVersion": "2.0",
   "schemaType": "CURING",
   "functionality": "CREATE_CURING_FORM",
+  "meta": {
+    "title": "Curing Form",
+    "description": "Record curing cycles and post-curing observations."
+  },
   "data": {
-    "layout": {
-      "type": "flat",
+    "ui": {
+      "layout": "accordion",
       "gap": "md",
-      "sectionVariant": "card"
+      "sectionVariant": "card",
+      "sectionBorderRadius": "sm",
+      "designSystem": { },
+      "accordion": {
+        "defaultExpanded": true,
+        "allowMultipleExpanded": true,
+        "expandIcon": "expand_more"
+      }
     },
-    "designSystem": { },
-    "meta": { },
-    "context": { },
-    "nodes": [ ]
+    "context": {
+      "subDepartmentId": "{{subDepartmentId}}",
+      "motorId": "{{motorId}}",
+      "motorStage": 1
+    },
+    "sections": [ ]
   }
 }
 ```
 
 ### HTTP response wrapper (API fetch)
 
-When returned from a schema endpoint, the same envelope is nested inside the standard API response:
-
 ```json
 {
   "success": true,
   "statusCode": 200,
-  "schemaVersion": "1.0",
+  "schemaVersion": "2.0",
   "schemaType": "CURING",
   "functionality": "CREATE_CURING_FORM",
   "message": "Schema fetched successfully",
-  "timestamp": "2026-06-05T10:00:00Z",
+  "timestamp": "2026-06-13T10:00:00Z",
+  "meta": { "title": "Curing Form" },
   "data": {
-    "layout": { "type": "flat", "gap": "md", "sectionVariant": "card" },
-    "designSystem": { },
-    "meta": { },
-    "context": { },
-    "nodes": [ ]
+    "ui": { "layout": "accordion" },
+    "context": { "motorStage": 1 },
+    "sections": [ ]
   }
 }
 ```
 
-`schemaVersion`, `schemaType`, and `functionality` may appear at both the HTTP root and inside `data` for backward compatibility; the UI normalizer reads root first, then `data`.
+When nested in a standard API wrapper, identification fields (`schemaVersion`, `schemaType`, `functionality`, `meta`) may appear at the HTTP root alongside `data`. The engine reads `data.sections[]`, `data.ui`, and `data.context` after unwrapping the API response.
 
-### Root-level properties
+### Root properties
 
-| Property | Required | Description |
-|----------|----------|-------------|
-| `schemaVersion` | Yes | Spec version. Use `"1.0"` for PP-Schema v1. |
-| `schemaType` | Yes | Domain identifier: `RAW_MATERIALS`, `CASE_PREPARATION`, `CASTING`, `CURING`, `MOCK_TRIAL`, etc. |
-| `functionality` | Yes | Action key, e.g. `CREATE_CURING_FORM`. |
-| `data` | Yes | Payload object — see below. |
+| Property | Required | Layer | Description |
+|----------|----------|-------|-------------|
+| `schemaVersion` | Yes | Definition | Must be `"2.0"`. |
+| `schemaType` | Yes | Definition | Domain: `RAW_MATERIALS`, `CASE_PREPARATION`, `CASTING`, `CURING`, `MOCK_TRIAL`, etc. |
+| `functionality` | Yes | Definition | Action key, e.g. `CREATE_CURING_FORM`. |
+| `meta` | No | UI | Page title and description. |
+| `data` | Yes | — | Payload object — see below. |
 
 ### `data` payload properties
 
-| Property | Required | Description |
-|----------|----------|-------------|
-| `data.layout` | No | Page-level layout. Default: `{ "type": "flat" }`. |
-| `data.designSystem` | No | Document-level design tokens. Cascades to all nodes. |
-| `data.meta` | No | Title, description (shown when `data.nodes` is empty). |
-| `data.context` | No | Non-UI metadata (`motorStage`, `subDepartmentId`, `batchType`). |
-| `data.nodes` | Yes | Top-level array of `SchemaNode` trees. |
-
-All schema endpoints must return `data.nodes[]`. The UI normalizer accepts PP-Schema v1 only.
-
-### `data.designSystem`
-
-```json
-{
-  "colors": {
-    "primary": "#1565C0",
-    "primaryLight": "#1976D2",
-    "surface": "#F4F6F8",
-    "border": "#D5D8DC",
-    "text": "#1C2833",
-    "textSub": "#5D6D7E",
-    "danger": "#C62828",
-    "success": "#2E7D32",
-    "warn": "#D4AC0D"
-  },
-  "typography": {
-    "fontFamily": "'DM Sans', sans-serif",
-    "scale": {
-      "xs": "0.68rem",
-      "sm": "0.78rem",
-      "md": "0.86rem",
-      "lg": "0.98rem"
-    },
-    "label": {
-      "size": "xs",
-      "weight": 700,
-      "transform": "uppercase",
-      "letterSpacing": "0.04em"
-    }
-  },
-  "spacing": { "xs": 4, "sm": 8, "md": 12, "lg": 16, "xl": 24 },
-  "radius": { "sm": 7, "md": 11, "lg": 16 },
-  "icons": {
-    "sectionDefault": "description",
-    "casting": "precision_manufacturing",
-    "curing": "thermostat"
-  }
-}
-```
-
-Document-level `data.designSystem` overrides app defaults. Child nodes may override individual tokens in their `style` block.
-
-`designSystem.radius` defines pixel values for corner-radius tokens (`sm`, `md`, `lg`) used by section cards. See [§5](#5-style-block-css--design-tokens) and [§6](#6-layout-block) for how global and per-section radius settings combine.
-
-### `data.meta`
-
-```json
-{
-  "title": "Case Preparation",
-  "description": "Schema for this batch type is not yet configured."
-}
-```
-
-Use when `data.nodes` is empty to show a placeholder screen instead of a blank form.
-
-### `data.context`
-
-```json
-{
-  "motorStage": 1,
-  "subDepartmentId": 111,
-  "batchType": "MAIN_BATCH"
-}
-```
-
-Not rendered directly. Used for schema fetch requests and `{{token}}` injection in API dropdowns.
+| Property | Required | Layer | Description |
+|----------|----------|-------|-------------|
+| `data.ui` | No | UI | Layout, design tokens, accordion config. |
+| `data.context` | No | Rules | Non-UI metadata for `{{token}}` injection. |
+| `data.sections` | Yes | Definition | Top-level section array. |
 
 ---
 
-## 3. SchemaNode (universal node)
+## 3. Four layers
 
-Every UI element is a node:
+| Layer | Lives in schema JSON | Never in submitted `data` |
+|-------|----------------------|---------------------------|
+| **Definition** | `id`, `type`, `fieldType`, `columns`, `children`, `data.sections` | |
+| **UI metadata** | `ui`, `meta`, `data.ui.designSystem` | |
+| **Business rules** | `validation`, `visibleWhen`, `formula`, `dataSource`, `repeat`, `rows`, `action` | |
+| **Submission** | | `{ "TEMPERATURE": 120 }` — primitives only |
+
+---
+
+## 4. Section model
+
+Top-level and nested sections share the same shape. A section is a titled container with optional repeat behavior.
 
 ```json
 {
-  "id": "TEMPERATURE",
-  "component": "field",
-  "fieldType": "number",
-  "label": "Temperature",
-  "unit": "°C",
-  "required": true,
-  "style": { "colSpan": { "xs": 12, "sm": 6, "md": 4 } },
-  "layout": { "order": 2 },
-  "behavior": { },
-  "validation": { "min": 0, "max": 200 },
-  "visibility": { "when": [{ "field": "STATION", "op": "NOT_EMPTY" }], "logic": "AND" },
-  "dataSource": null,
-  "defaultValue": null,
-  "defaultValues": [],
-  "children": []
+  "id": "curingCycles",
+  "title": "Section A: Curing Cycle",
+  "ui": {
+    "variant": "card",
+    "icon": "thermostat",
+    "iconColor": "primary",
+    "padding": "md",
+    "expanded": true
+  },
+  "visibleWhen": {
+    "when": [{ "field": "STATION", "op": "NOT_EMPTY" }],
+    "logic": "AND"
+  },
+  "repeat": {
+    "defaultCount": 1,
+    "min": 1,
+    "max": 20,
+    "allowAdd": true,
+    "allowDelete": true,
+    "label": "Cycle {index}",
+    "addLabel": "Add Cycle",
+    "deleteLabel": "Remove Cycle"
+  },
+  "children": [ ]
 }
 ```
 
-**Static activity column example:**
+### Section properties
+
+| Property | Required | Layer | Description |
+|----------|----------|-------|-------------|
+| `id` | Yes | Definition | Stable persistence key. |
+| `title` | Yes | UI | Section heading. Supports `{index}` when `repeat` is set. |
+| `ui` | No | UI | Card variant, icon, padding, grid layout for field children. |
+| `repeat` | No | Rules | Makes this section repeatable (replaces v1 `repeatable` component). |
+| `visibleWhen` | No | Rules | Conditional show/hide for entire section. |
+| `children` | Yes | Definition | Array of child blocks ([§5](#5-child-block-types)). |
+
+### Repeatable pattern (replaces v1 `repeatable`)
+
+v1:
+```
+section → repeatable → table
+```
+
+v2:
+```
+section → section [repeat] → table
+```
+
+**Curing cycles example:**
 
 ```json
 {
-  "id": "ACTIVITY",
-  "component": "column",
-  "fieldType": "static",
-  "label": "Activity",
-  "defaultValues": [
-    "Soaking Time",
-    "Time of removal from pit",
-    "Fixtures assembled for curing",
-    "Pressure sensor details (If applicable)",
-    "Initial pressure reading (If applicable)",
-    "Time of dispatch to curing station"
+  "id": "curingCycles",
+  "title": "Curing Cycles",
+  "ui": { "variant": "card", "icon": "thermostat" },
+  "children": [
+    {
+      "type": "section",
+      "id": "cycle",
+      "title": "Cycle {index}",
+      "repeat": {
+        "defaultCount": 1,
+        "min": 1,
+        "max": 20,
+        "allowAdd": true,
+        "allowDelete": true,
+        "label": "Cycle {index}"
+      },
+      "children": [
+        {
+          "type": "table",
+          "id": "CURING_TABLE",
+          "rows": { "defaultCount": 10, "allowAdd": true, "allowDelete": true },
+          "columns": [ ]
+        }
+      ]
+    }
   ]
 }
 ```
 
-### Node properties
+**Fixed mix count from setup context:**
 
-| Property | Required | Description |
-|----------|----------|-------------|
-| `id` | Yes* | Stable persistence key. *Auto-increment columns use `srNo`. |
-| `component` | Yes | Renderer selector (see [§4](#4-component-catalog)). |
-| `fieldType` | When `component` is `field` or `column` | Input control type. |
-| `label` | Recommended | Visible title / column header. |
-| `unit` | No | Appended to label, e.g. `Temperature (°C)`. |
-| `required` | No | Shows required indicator; validated on submit. |
-| `style` | No | Visual and placement tokens ([§5](#5-style-block-css--design-tokens)). |
-| `layout` | No | Grid/flex placement within parent ([§6](#6-layout-block)). |
-| `behavior` | No | Dynamic rows/columns/cycles ([§7](#7-behavior-block-dynamic-rows-columns-cycles)). |
-| `validation` | No | Min, max, pattern ([§10](#10-validation)). |
-| `visibility` | No | Conditional show/hide ([§9](#9-visibility-rules)). |
-| `dataSource` | No | Static or API dropdown options ([§8](#8-datasource-dropdowns)). |
-| `defaultValue` | No | Single default for a `field` or `column`. Applied to all rows (tables) or the field value (forms). |
-| `defaultValues` | No | **Column only.** Array of per-row defaults. Index `i` seeds row `i` in the column. Length should match `behavior.table.defaultRows` or `presetRows` count. |
-| `children` | No | Nested nodes (sections, columns, groups). |
-| `groupKey` | No | For `nestedGroup`: `"lots"` or `"drums"`. |
+```json
+"repeat": {
+  "defaultCount": "{{finalMixCount}}",
+  "min": "{{finalMixCount}}",
+  "max": "{{finalMixCount}}",
+  "allowAdd": false,
+  "allowDelete": false,
+  "label": "Final Mix {index}"
+}
+```
+
+Supported context tokens: `finalMixCount`, `motorId`, `castingType`, `castingStation`, `subDepartmentId`, `batchId`.
+
+When resolved `min === max`, add/remove controls are hidden regardless of `allowAdd` / `allowDelete`.
 
 ---
 
-## 4. Component catalog
+## 5. Child block types
 
-### 4.1 Field primitives
+Child blocks appear in `section.children[]` (or nested `section.children[]` inside a repeat).
 
-`component: "field"` (or `component: "column"` inside tables).
+| `type` | Purpose |
+|--------|---------|
+| `section` | Nested titled container; may have `repeat`. |
+| `field` | Single input control. |
+| `table` | Editable data table with `columns[]`. |
+| `group` | Repeatable flat field rows (replaces v1 `dynamicGroup` / `nestedGroup`). |
+| `matrix` | Fixed row metadata + API-driven dynamic columns (curing project × stage). |
+| `button` | Action trigger. |
+| `display` | Read-only label, heading, badge, alert. |
 
-| `fieldType` | UI control | Stored value format |
-|-------------|------------|---------------------|
-| `text` | Single-line input | `string` |
-| `number` | Number input | `string` |
-| `decimal` | Number input | `string` |
-| `textarea` | Multiline input | `string` |
-| `date` | Date picker | `DD-MM-YYYY` |
-| `time` | Time picker | `HH:mm` |
-| `datetime` | Date-time picker | `DD-MM-YYYY HH:mm` |
-| `dropdown` | Select (static or API) | option `value` |
-| `radio` | Radio group | `string` (defaults: `yes` / `no` if no options) |
-| `file` | File input | comma-separated filenames |
-| `formula` | Read-only computed | auto-calculated `string` |
-| `autoIncrement` | Read-only serial number | number (key: `srNo`) |
-| `dynamic` | Type resolved per table row | see row `fieldType` |
-| `static` | Read-only display (no input) | preset string from `defaultValue` / `defaultValues[rowIndex]` |
-
-> **`fieldType: "static"`** renders a read-only label cell. This is unrelated to **`dataSource.type: "static"`** ([§8](#8-datasource-dropdowns)), which provides dropdown option lists only.
-
-### 4.2 Container primitives
-
-| `component` | Purpose |
-|-------------|---------|
-| `section` | Titled card wrapping `children` (fields, tables, groups). |
-| `group` | Bordered container with nested `children`. |
-| `stack` | Flex list of children (`layout.direction`: `row` \| `column`). *Renderer: future.* |
-| `grid` | Responsive grid of children. *Renderer: future.* |
-
-### 4.3 Data primitives
-
-| `component` | Purpose |
-|-------------|---------|
-| `table` | Editable data table. `children` are `column` and `columnGroup` nodes. |
-| `column` | Single table column definition. |
-| `columnGroup` | Grouped table header with nested `column` children. |
-| `repeatable` | Repeatable block (cycles). Contains one `table` child. `behavior.repeat.mode`: `cycle`, `mix`, etc. |
-| `dynamicGroup` | Repeatable flat field rows. `behavior.repeat.mode: "group"`. |
-| `nestedGroup` | Lots/drums-style grouped fields with `groupKey`. |
-
-### 4.4 Display primitives
-
-*Spec'd now; renderer may implement later.*
-
-| `component` | Purpose |
-|-------------|---------|
-| `header` | Non-editable title row inside a table. |
-| `divider` | Visual separator between sections. |
-| `alert` | Info/warning banner. |
-| `badge` | Read-only status chip. |
-
-### 4.5 Component tree patterns
+### Block tree patterns
 
 **Form section (flat fields):**
 ```
@@ -328,490 +285,549 @@ section
   └── field (date)
 ```
 
-**Table:**
+**Table with column groups:**
 ```
 section
   └── table
-        ├── column (autoIncrement → srNo)
-        ├── columnGroup
+        ├── column (serial)
+        ├── group
         │     ├── column (number)
         │     └── column (number)
-        ├── column (number)          ← standalone column between groups is allowed
-        └── columnGroup
+        ├── column (number)          ← standalone between groups preserves order
+        └── group
               └── column (formula)
-```
-
-`column` and `columnGroup` children render in **schema `children` order**. A standalone `column` between groups (e.g. Bellow thickness between Difference C and Mandrel lift E) appears at that position — not pulled before all groups.
-
-**Repeatable curing cycles:**
-```
-section
-  └── repeatable  [behavior.repeat.mode: "cycle"]
-        └── table
-              ├── column (autoIncrement)
-              ├── column (number)
-              └── column (date)
-```
-
-**Form + table in one section:**
-```
-section
-  ├── field (config fields)
-  └── table (measurement rows)
 ```
 
 **Repeatable + sibling table (Casting Section B):**
 ```
 section [CASTING_PROCESS]
-  ├── repeatable [FINAL_MIX_DETAILS]   behavior.repeat.mode: "mix"
+  ├── section [FINAL_MIX]  repeat
   │     └── table [BOWL_DETAILS]
   └── table [CASTING_FROM_BOWL_DETAILS]
 ```
 
-Both children render as separate sections inside the same accordion panel. The repeatable does **not** suppress sibling tables.
+**Project × stage matrix (curing):**
+```
+section [CURING_SETUP]
+  └── matrix [PROJECT_STAGE_MATRIX]
+```
 
-**Repeatable with mix count from context:**
+---
+
+## 6. Component catalog
+
+Each entry lists the **common component** the schema engine registry imports. Components marked *planned* are added to `ui/components/common/` during Phase 2 implementation.
+
+---
+
+### 6.1 Field blocks — `type: "field"`
+
+#### `fieldType: "text"`
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `id` | string | yes | Data key |
+| `type` | `"field"` | yes | |
+| `fieldType` | `"text"` | yes | |
+| `label` | string | yes | |
+| `validation.pattern` | string | no | Regex |
+| `ui.colSpan` | object | no | Grid span `{ xs, sm, md, lg }` |
+
+**JSON sample:**
 ```json
-"behavior": {
+{
+  "type": "field",
+  "id": "MOTOR_ID",
+  "fieldType": "text",
+  "label": "Motor Id No.",
+  "validation": { "required": true, "pattern": "^[A-Z0-9-]+$", "message": "Enter a valid motor ID" },
+  "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 }, "width": "200px" }
+}
+```
+
+**Maps to:** [`FormInput`](../src/ui/components/common/FormInput.tsx) (existing)
+
+---
+
+#### `fieldType: "number"` / `"decimal"`
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `unit` | string | no | Shown as suffix, e.g. `"°C"`, `"kg"` |
+| `validation.min` / `max` | number | no | |
+
+**JSON sample:**
+```json
+{
+  "type": "field",
+  "id": "TEMPERATURE",
+  "fieldType": "number",
+  "label": "Temperature",
+  "unit": "°C",
+  "validation": { "required": true, "min": 0, "max": 2000 }
+}
+```
+
+**Maps to:** [`FormInput`](../src/ui/components/common/FormInput.tsx) with `type="number"` (existing)
+
+---
+
+#### `fieldType: "textarea"`
+
+**JSON sample:**
+```json
+{
+  "type": "field",
+  "id": "OTHER_OBSERVATIONS",
+  "fieldType": "textarea",
+  "label": "Any Other Observations",
+  "ui": { "colSpan": { "xs": 12 }, "flex": "1 1 100%" }
+}
+```
+
+**Maps to:** [`FormInput`](../src/ui/components/common/FormInput.tsx) `multiline` (existing)
+
+---
+
+#### `fieldType: "password"`
+
+**Maps to:** [`FormInput`](../src/ui/components/common/FormInput.tsx) `type="password"` (existing)
+
+---
+
+#### `fieldType: "date"` / `"time"` / `"datetime"`
+
+| Stored format | Example |
+|---------------|---------|
+| date | `DD-MM-YYYY` |
+| time | `HH:mm` |
+| datetime | `DD-MM-YYYY HH:mm` |
+
+**JSON sample:**
+```json
+{
+  "type": "field",
+  "id": "DECORING_DATE",
+  "fieldType": "date",
+  "label": "Date Of De-Coring",
+  "validation": { "required": true }
+}
+```
+
+**Maps to:** `DateField`, `TimeField`, `DateTimeField` in common (*planned*)
+
+---
+
+#### `fieldType: "dropdown"`
+
+**Static options:**
+```json
+{
+  "type": "field",
+  "id": "CASE_CONDITION",
+  "fieldType": "dropdown",
+  "label": "Case Condition",
+  "dataSource": {
+    "type": "static",
+    "options": [
+      { "label": "Acceptable", "value": "ACCEPTABLE" },
+      { "label": "Rejected", "value": "REJECTED" }
+    ]
+  }
+}
+```
+
+**API options:**
+```json
+{
+  "type": "field",
+  "id": "BUILDING_NO",
+  "fieldType": "dropdown",
+  "label": "Building No",
+  "dataSource": {
+    "type": "api",
+    "api": {
+      "endpoint": "BUILDING_MASTER",
+      "method": "POST",
+      "requestBody": { "subDepartmentId": "{{subDepartmentId}}" },
+      "responsePath": "data.buildings",
+      "displayKey": "buildingName",
+      "valueKey": "buildingId"
+    }
+  }
+}
+```
+
+**Maps to:** [`Dropdown`](../src/ui/components/common/Dropdown.tsx) (existing)
+
+---
+
+#### `fieldType: "radio"` / `"checkbox"` / `"switch"`
+
+**Maps to:** `RadioGroupField`, `CheckboxField`, `SwitchField` in common (*planned*; may use MUI directly via registry glue)
+
+---
+
+#### `fieldType: "file"` / `"image"`
+
+**Maps to:** [`FileUploadButton`](../src/ui/components/common/FileUploadButton.tsx), [`MediaUpload`](../src/ui/components/common/MediaUpload.tsx) (existing)
+
+Stored value: comma-separated filenames.
+
+---
+
+#### `fieldType: "formula"` (field-level, rare)
+
+Read-only computed value outside a table.
+
+```json
+{
+  "type": "field",
+  "id": "TOTAL_WEIGHT",
+  "fieldType": "formula",
+  "label": "Total Weight",
+  "formula": { "expression": "INITIAL + ADDED", "dependencies": ["INITIAL", "ADDED"] },
+  "readonly": true
+}
+```
+
+**Maps to:** `FormulaCell` in common (*planned*)
+
+---
+
+### 6.2 Table block — `type: "table"`
+
+Editable grid with column definitions and row behavior.
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `id` | string | yes | Data key for row array |
+| `type` | `"table"` | yes | |
+| `label` | string | no | Table caption |
+| `rows` | object | no | Row count rules ([§8.3](#83-rows-config)) |
+| `columns` | array | yes | Column or group slots |
+
+**JSON sample:**
+```json
+{
+  "type": "table",
+  "id": "CURING_TABLE",
+  "label": "Curing Cycle Readings",
+  "rows": {
+    "defaultCount": 10,
+    "min": 1,
+    "max": 50,
+    "allowAdd": true,
+    "allowDelete": true,
+    "autoIncrementKey": "srNo"
+  },
+  "columns": [
+    {
+      "type": "column",
+      "id": "srNo",
+      "fieldType": "serial",
+      "label": "S.No",
+      "readonly": true,
+      "ui": { "width": "60px" }
+    },
+    {
+      "type": "column",
+      "id": "TEMPERATURE",
+      "fieldType": "number",
+      "label": "Temperature",
+      "unit": "°C",
+      "validation": { "min": 0, "max": 200 }
+    },
+    {
+      "type": "group",
+      "id": "PRESSURE_GROUP",
+      "label": "Pressure Readings",
+      "columns": [
+        { "type": "column", "id": "INITIAL", "fieldType": "number", "label": "Initial", "unit": "bar" },
+        { "type": "column", "id": "FINAL", "fieldType": "number", "label": "Final", "unit": "bar" }
+      ]
+    }
+  ]
+}
+```
+
+**Maps to:** `DynamicTable` in common (*planned*)
+
+#### Table column — `type: "column"`
+
+Same field types as field blocks. Additional column-only types:
+
+| `fieldType` | Purpose | Maps to |
+|-------------|---------|---------|
+| `serial` | Auto-increment row number (key: `srNo` or `rows.autoIncrementKey`) | inline in DynamicTable |
+| `static` | Read-only label from `defaultValues[rowIndex]` | typography cell in DynamicTable |
+| `formula` | Computed cell from row fields | `FormulaCell` |
+| `dynamic` | Type resolved per row (from `presetRows`) | cell renderer in DynamicTable |
+
+**Static activity column example:**
+```json
+{
+  "type": "column",
+  "id": "ACTIVITY",
+  "fieldType": "static",
+  "label": "Activity",
+  "defaultValues": [
+    "Soaking Time",
+    "Time of removal from pit",
+    "Fixtures assembled for curing"
+  ]
+}
+```
+
+**Formula column example:**
+```json
+{
+  "type": "column",
+  "id": "C_MOCK",
+  "fieldType": "formula",
+  "label": "Mock assy.",
+  "formula": { "expression": "A_MOCK-B_MOCK", "dependencies": ["A_MOCK", "B_MOCK"] },
+  "readonly": true
+}
+```
+
+---
+
+### 6.3 Matrix block — `type: "matrix"`
+
+Fixed row identity columns + dynamically loaded stage columns. Replaces the bespoke `CuringProjectStageMatrix` page component.
+
+| Property | Type | Required | Description |
+|----------|------|----------|-------------|
+| `id` | string | yes | Data key |
+| `type` | `"matrix"` | yes | |
+| `rowFields` | array | yes | Read-only or editable row metadata columns |
+| `columns` | dataSource | yes | API source for dynamic column headers |
+| `rows` | object | no | Row add/delete rules |
+| `allowAddColumn` | boolean | no | User can add custom stage columns |
+| `allowDeleteColumn` | boolean | no | User can remove custom columns |
+
+**JSON sample:**
+```json
+{
+  "type": "matrix",
+  "id": "PROJECT_STAGE_MATRIX",
+  "title": "Curing Time Per Stage (minutes)",
+  "rowFields": [
+    { "id": "projectName", "label": "Project", "readonly": true },
+    { "id": "batchId", "label": "Batch", "readonly": true },
+    { "id": "motorId", "label": "Motor", "readonly": true }
+  ],
+  "columns": {
+    "type": "api",
+    "api": {
+      "endpoint": "MOTORS_STAGE_LIST",
+      "method": "GET",
+      "requestBody": { "subDepartmentId": "{{subDepartmentId}}" },
+      "responsePath": "data",
+      "displayKey": "motorStage",
+      "valueKey": "motorStage"
+    }
+  },
+  "rows": { "defaultCount": 1, "allowAdd": true, "allowDelete": true },
+  "allowAddColumn": true,
+  "allowDeleteColumn": true
+}
+```
+
+**Runtime data shape:**
+```json
+{
+  "PROJECT_STAGE_MATRIX": {
+    "columns": [
+      { "columnKey": "stage-Stage_1-0", "stage": "Stage 1" },
+      { "columnKey": "stage-Stage_2-1", "stage": "Stage 2", "isCustom": true }
+    ],
+    "rows": [
+      {
+        "_rowKey": "row-1",
+        "projectName": "Project Alpha",
+        "batchId": "BATCH-123",
+        "motorId": "MTR-001",
+        "cells": { "stage-Stage_1-0": "60", "stage-Stage_2-1": "45" }
+      }
+    ]
+  }
+}
+```
+
+**Maps to:** `MatrixTable` in common (*planned*)
+
+---
+
+### 6.4 Group block — `type: "group"`
+
+Repeatable flat field rows. Replaces v1 `dynamicGroup` and `nestedGroup`.
+
+```json
+{
+  "type": "group",
+  "id": "LOT_ROWS",
+  "label": "Lot",
+  "groupKey": "lots",
   "repeat": {
-    "enabled": true,
-    "mode": "mix",
-    "defaultCount": "{{finalMixCount}}",
-    "min": "{{finalMixCount}}",
-    "max": "{{finalMixCount}}",
-    "allowAdd": false,
-    "allowDelete": false,
-    "labelPattern": "Final Mix {index}"
-  }
+    "defaultCount": 1,
+    "min": 1,
+    "max": 10,
+    "allowAdd": true,
+    "allowDelete": true,
+    "label": "Lot {index}"
+  },
+  "ui": { "direction": "row", "wrap": true, "gap": "md" },
+  "children": [
+    { "type": "field", "id": "LOT_ID", "fieldType": "dropdown", "label": "Lot ID", "dataSource": { "type": "api", "api": { "endpoint": "material-lots" } } },
+    { "type": "field", "id": "QUANTITY_USED", "fieldType": "number", "label": "Quantity Used", "unit": "kg" }
+  ]
 }
 ```
 
-`defaultCount`, `min`, and `max` accept `{{token}}` placeholders resolved from form setup context at load time. Supported tokens: `finalMixCount`, `motorId`, `castingType`, `castingStation`.
-
-**Fixed exact count:** set `min`, `max`, and `defaultCount` to the same token or number, and set `allowAdd` / `allowDelete` to `false`. The renderer hides add/remove controls when `min === max` after resolution.
-
-**Static activity column table (Casting Section D):**
-```
-section [POST_CAST_OPERATIONS]
-  └── table [POST_CAST_TABLE]
-        ├── column [ACTIVITY]     fieldType: static, defaultValues[]
-        └── column [MOTOR_ID_1]   fieldType: text (editable)
-```
-
-With table behavior:
-```json
-"behavior": {
-  "table": {
-    "defaultRows": 6,
-    "allowAddRow": false,
-    "allowDeleteRow": false
-  }
-}
-```
+**Maps to:** [`FormCard`](../src/ui/components/common/FormCard.tsx) + field children from common (existing)
 
 ---
 
-## 5. Style block (CSS / design tokens)
-
-Prefer semantic tokens. Use `style.sx` only for edge cases.
+### 6.5 Button block — `type: "button"`
 
 ```json
 {
-  "variant": "card",
-  "density": "comfortable",
-  "icon": "thermostat",
-  "iconPosition": "left",
-  "iconColor": "primary",
-  "color": "text",
-  "background": "surface",
-  "border": true,
-  "borderColor": "border",
-  "borderRadius": "md",
-  "shadow": "sm",
-  "padding": "md",
-  "gap": "sm",
-  "fontSize": "sm",
-  "fontWeight": 700,
-  "textAlign": "left",
-  "width": "180px",
-  "minWidth": "120px",
-  "maxWidth": "320px",
-  "colSpan": { "xs": 12, "sm": 6, "md": 4 },
-  "rowSpan": 1,
-  "flex": "1 1 180px",
-  "sx": { }
+  "type": "button",
+  "id": "SAVE_DRAFT",
+  "label": "Save Draft",
+  "variant": "secondary",
+  "action": { "type": "save_draft" }
 }
 ```
 
-### Style property reference
+**Action types:** `submit`, `save_draft`, `reset`, `cancel`, `api`, `navigate`, `custom`
 
-| Property | Values | Description |
-|----------|--------|-------------|
-| `variant` | `card`, `plain`, `outlined` | Section container style. |
-| `density` | `compact`, `comfortable` | Input/row padding scale. |
-| `icon` | Material icon name | e.g. `thermostat`, `precision_manufacturing`. |
-| `iconPosition` | `left`, `right` | Icon placement relative to label. |
-| `iconColor` | color token | e.g. `primary`, `textSub`. |
-| `color` | color token | Text color. |
-| `background` | color token | Background fill. |
-| `border` | `boolean` | Show border. |
-| `borderColor` | color token | Border color. |
-| `borderRadius` | `sm`, `md`, `lg` | Corner radius token for this section card. Overrides `layout.sectionBorderRadius`. Resolved via `designSystem.radius`. Use `sx.borderRadius` for raw px values. |
-| `shadow` | `none`, `sm` | Box shadow. |
-| `padding` | spacing token | Internal padding. |
-| `gap` | spacing token | Gap between children. |
-| `fontSize` | typography scale | `xs`, `sm`, `md`, `lg`. |
-| `fontWeight` | number | e.g. `400`, `700`. |
-| `textAlign` | `left`, `center`, `right` | Text alignment. |
-| `width` | CSS width | e.g. `100%`, `180px`, `auto`. |
-| `minWidth` | CSS width | Minimum width. |
-| `maxWidth` | CSS width | Maximum width. |
-| `colSpan` | `{ xs, sm, md, lg }` | Responsive grid columns (12-col grid). |
-| `rowSpan` | number | Grid row span. |
-| `flex` | CSS flex shorthand | e.g. `1 1 180px`. |
-| `sx` | object | MUI-compatible override (escape hatch). |
-
-### Schema builder rules
-
-1. Use color/spacing token names from `designSystem` — not raw hex unless branding requires it.
-2. Icons must be valid [Material Icons](https://mui.com/material-ui/material-icons/) names.
-3. Label styling inherits `designSystem.typography.label` unless overridden per node.
-4. Table column `style.width` sets column min-width in the table header.
-5. Set section card corner radius globally with `layout.sectionBorderRadius`; override on individual `section` nodes with `style.borderRadius` when needed.
+**Maps to:** [`Button`](../src/ui/components/common/Button.tsx) (existing)
 
 ---
 
-## 6. Layout block
-
-### Page-level (`layout` on root)
+### 6.6 Display block — `type: "display"`
 
 ```json
 {
-  "type": "flat",
-  "gap": "md",
-  "sectionVariant": "card",
-  "sectionBorderRadius": "sm"
+  "type": "display",
+  "id": "STATUS_BADGE",
+  "displayType": "badge",
+  "label": "Status",
+  "value": "In Progress"
 }
 ```
 
-Accordion example:
+| `displayType` | Maps to |
+|---------------|---------|
+| `badge` | [`StatusChip`](../src/ui/components/common/StatusChip.tsx) |
+| `alert` | [`GlobalAlert`](../src/ui/components/common/GlobalAlert.tsx) |
+| `label`, `heading`, `description` | MUI Typography via registry |
 
-```json
-{
-  "type": "accordion",
-  "gap": "md",
-  "sectionVariant": "card",
-  "sectionBorderRadius": "sm",
-  "accordionConfig": {
-    "defaultExpanded": true,
-    "allowMultipleExpanded": true,
-    "expandIcon": "expand_more"
-  }
-}
-```
+---
 
-### Page-level layout properties
+### 6.7 Layout components (common — used by schema-engine layout/)
+
+| Purpose | Common component | Status |
+|---------|------------------|--------|
+| Section card shell | [`FormCard`](../src/ui/components/common/FormCard.tsx), [`Card`](../src/ui/components/common/Card.tsx) | existing |
+| Section title | [`SectionHeader`](../src/ui/components/common/SectionHeader.tsx) | existing |
+| Accordion panel | `AccordionSection` | planned |
+| Responsive field grid | `GridFields` | planned |
+| Horizontal field row | [`StackRow`](../src/ui/components/common/StackRow.tsx) | existing |
+| Inline errors | [`ErrorMessage`](../src/ui/components/common/ErrorMessage.tsx) | existing |
+| Confirm dialog | [`ConfirmAlertDialog`](../src/ui/components/common/ConfirmAlertDialog.tsx) | existing |
+
+---
+
+### 6.8 Future types (spec now — add to common + registry when needed)
+
+Document in backend schema builder; one new common component + one registry line each:
+
+**Input:** `currency`, `multi_select`, `autocomplete`, `search`, `color`, `signature`  
+**Layout:** `tabs`, `stepper`, `wizard`, `divider`, `panel`, `row`, `column`  
+**Display:** `kpi`, `pdf_viewer`, `timeline`, `audit`  
+**Buttons:** `approve`, `reject`, `download`, `print`  
+**Table variants:** `paginated_table`, `master_detail`, `tree_table`  
+**Manufacturing:** `weightment`, `temperature`, `pressure`, `timer`, `process_step`, `machine_select`, `qc_result`, `accept_reject`, `sign_off`
+
+---
+
+## 7. UI metadata reference
+
+### Root `ui` (`data.ui`)
 
 | Property | Values | Default | Description |
 |----------|--------|---------|-------------|
-| `type` | `flat`, `tabs`, `accordion`, `wizard` | `flat` | Page layout mode (see [layout types](#layouttype-behavior) below). |
-| `gap` | spacing token | `md` | Vertical gap between section cards / accordion panels. |
-| `sectionVariant` | `card`, `plain`, `outlined` | `card` | Default container style for all section cards. Overridden by node `style.variant`. |
-| `sectionBorderRadius` | `sm`, `md`, `lg` | `md` | Default corner-radius token for all section cards. Overridden by node `style.borderRadius`. |
-| `accordionConfig` | object | — | Accordion behaviour when `type` is `accordion` ([§6](#layoutaccordionconfig-when-type-is-accordion)). |
+| `layout` | `flat`, `accordion`, `tabs`, `wizard` | `flat` | Page layout mode |
+| `gap` | spacing token | `md` | Gap between section cards |
+| `sectionVariant` | `card`, `plain`, `outlined` | `card` | Default section container style |
+| `sectionBorderRadius` | `sm`, `md`, `lg` | `md` | Default corner radius token |
+| `designSystem` | object | — | Document-level design tokens |
+| `accordion` | object | — | Accordion behaviour when `layout` is `accordion` |
 
-#### `layout.type` behavior
-
-| `layout.type` | Behavior |
-|---------------|----------|
-| `flat` | Vertical stack of section cards (current default). |
-| `tabs` | Each top-level `section` node becomes a tab. *Future.* |
-| `accordion` | Collapsible panels — one panel per top-level `section` node (children grouped inside). |
-| `wizard` | Step-by-step sections. *Future.* |
-
-### Section card corner radius
-
-Section cards (flat layout boxes and accordion panels) share one radius resolution chain:
-
-```
-style.borderRadius  →  layout.sectionBorderRadius  →  "md"
-```
-
-The winning token is then looked up in `designSystem.radius`. Built-in fallbacks when `designSystem.radius` is omitted: `sm` = 7px, `md` = 11px, `lg` = 16px.
-
-**Global default** — set once on `data.layout`:
-
-```json
-"layout": {
-  "type": "accordion",
-  "sectionVariant": "card",
-  "sectionBorderRadius": "sm"
-},
-"designSystem": {
-  "radius": { "sm": 4, "md": 6, "lg": 8 }
-}
-```
-
-All section cards render with the `sm` token (4px in this example).
-
-**Per-section override** — on a `section` node:
+### `ui.designSystem`
 
 ```json
 {
-  "id": "CASTING_PROCESS",
-  "component": "section",
-  "label": "Section B: Casting Process",
-  "style": {
-    "variant": "card",
-    "padding": "md",
-    "borderRadius": "lg"
+  "colors": {
+    "primary": "#1565C0",
+    "surface": "#F4F6F8",
+    "border": "#D5D8DC",
+    "text": "#1C2833",
+    "textSub": "#5D6D7E",
+    "danger": "#C62828",
+    "success": "#2E7D32"
   },
-  "children": [ ]
+  "typography": {
+    "fontFamily": "'DM Sans', sans-serif",
+    "scale": { "xs": "0.68rem", "sm": "0.78rem", "md": "0.86rem", "lg": "0.98rem" },
+    "label": { "size": "xs", "weight": 700, "transform": "uppercase", "letterSpacing": "0.04em" }
+  },
+  "spacing": { "xs": 4, "sm": 8, "md": 12, "lg": 16, "xl": 24 },
+  "radius": { "sm": 7, "md": 11, "lg": 16 },
+  "icons": { "sectionDefault": "description", "curing": "thermostat" }
 }
 ```
 
-Only this section uses `lg`; all others keep the layout default.
-
-**Accordion layout:** the outer accordion panel uses the parent `section` node's `style` (including `borderRadius`). When a `section` node is flattened into multiple child blocks inside one panel, the parent's `style` is preserved as the panel card style. Inner grouped sub-cards inside a panel also follow the same resolution chain.
-
-**Raw pixel override:** use `style.sx` on a section node (e.g. `"sx": { "borderRadius": 4 }`). `sx` wins over token resolution.
-
-### `layout.accordionConfig` (when `type` is `accordion`)
-
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `defaultExpanded` | boolean | `true` | Expand all panels on first render when `true`. |
-| `allowMultipleExpanded` | boolean | `true` | Allow more than one panel open at once. |
-| `expandIcon` | string | `expand_more` | Material icon name for the expand chevron. |
-| `collapseIcon` | string | — | Optional icon when expanded. *Future.* |
-
-### Node-level (`layout` on SchemaNode)
-
-```json
-{
-  "direction": "row",
-  "gap": "md",
-  "wrap": true,
-  "alignItems": "flex-end",
-  "justifyContent": "flex-start",
-  "columns": 12,
-  "order": 1,
-  "sticky": false
-}
-```
+### Section / block `ui`
 
 | Property | Values | Description |
 |----------|--------|-------------|
-| `direction` | `row`, `column` | Flex direction for `stack` / `section` children. |
-| `gap` | spacing token | Gap between child nodes. |
-| `wrap` | boolean | Allow flex wrap. |
-| `alignItems` | flex align value | Cross-axis alignment. |
-| `justifyContent` | flex justify value | Main-axis alignment. |
-| `columns` | number | Grid column count (default 12). |
-| `order` | number | Render order within parent. |
-| `sticky` | boolean | Sticky header/footer. *Future.* |
+| `variant` | `card`, `plain`, `outlined` | Container style |
+| `density` | `compact`, `comfortable` | Input/row padding |
+| `icon` | Material icon name | Section icon |
+| `iconColor` | color token | Icon color |
+| `borderRadius` | `sm`, `md`, `lg` | Overrides `ui.sectionBorderRadius` |
+| `colSpan` | `{ xs, sm, md, lg }` | 12-column grid span for fields |
+| `width` / `minWidth` / `maxWidth` | CSS width | Column or field width |
+| `direction` | `row`, `column` | Flex direction for child fields |
+| `wrap` | boolean | Flex wrap |
+| `expanded` | boolean | Initial accordion panel state |
+| `sx` | object | MUI sx escape hatch |
+
+**Border radius resolution chain:**
+```
+block.ui.borderRadius  →  ui.sectionBorderRadius  →  "md"  →  designSystem.radius[token]
+```
 
 ---
 
-## 7. Behavior block (dynamic rows, columns, cycles)
+## 8. Rules reference
+
+### 8.1 Validation
 
 ```json
 {
-  "repeat": {
-    "enabled": true,
-    "mode": "cycle",
-    "min": 1,
-    "max": 20,
-    "defaultCount": 1,
-    "allowAdd": true,
-    "allowDelete": true,
-    "labelPattern": "Cycle {index}",
-    "addLabel": "Add Cycle",
-    "deleteLabel": "Remove"
-  },
-  "table": {
-    "defaultRows": 10,
-    "minRows": 0,
-    "maxRows": 100,
-    "allowAddRow": true,
-    "allowDeleteRow": true,
-    "allowAddColumn": false,
-    "allowDeleteColumn": false,
-    "autoIncrementKey": "srNo"
-  },
-  "readonly": false,
-  "formula": {
-    "expression": "aMock - bMock",
-    "dependencies": ["aMock", "bMock"]
+  "validation": {
+    "required": true,
+    "min": 0,
+    "max": 200,
+    "pattern": "^[A-Z0-9-]+$",
+    "message": "Enter a valid motor ID"
   }
-}
-```
-
-### `behavior.repeat`
-
-| Property | Description |
-|----------|-------------|
-| `enabled` | Enable repeatable behavior. |
-| `mode` | `cycle` (repeatable-table), `row` (table add-row), `group` (dynamic-group), `mix` (repeatable final-mix / bowl cycles). |
-| `min` / `max` | Minimum / maximum instances. Accept numbers or `{{token}}` placeholders (e.g. `{{finalMixCount}}`). When resolved `min === max`, add/remove controls are hidden regardless of `allowAdd` / `allowDelete`. |
-| `defaultCount` | Initial instance count. Accepts numbers or `{{token}}` placeholders (e.g. `{{finalMixCount}}`). |
-| `allowAdd` / `allowDelete` | Show add/remove controls. |
-| `labelPattern` | Instance label. `{index}` is 1-based. |
-| `addLabel` / `deleteLabel` | Button labels. |
-
-### `behavior.table`
-
-| Property | Description |
-|----------|-------------|
-| `defaultRows` | Initial row count (pre-filled empty rows). |
-| `minRows` / `maxRows` | Row count limits. |
-| `allowAddRow` / `allowDeleteRow` | Row add/delete controls. |
-| `allowAddColumn` / `allowDeleteColumn` | Column add/delete. *Spec only; renderer future.* |
-| `autoIncrementKey` | Serial number field key (default `srNo`). |
-| `presetRows` | Row templates with preset cell values. Alternative to column `defaultValues` for complex multi-column preset rows. |
-
-**Column `defaultValues` vs `presetRows`:**
-
-| Approach | When to use |
-|----------|-------------|
-| `defaultValues` on a `static` column | Simple per-row labels in one column (e.g. Activity list) |
-| `behavior.table.presetRows` | Multi-column preset rows, header rows, or `readonly: true` row flags |
-
-### `behavior.formula`
-
-| Property | Description |
-|----------|-------------|
-| `expression` | Arithmetic expression using row field keys, e.g. `aMock - bMock`. |
-| `dependencies` | Field keys referenced (documentation / validation). |
-
-Formula columns are read-only. The UI recalculates on dependency change.
-
-### Preset table rows
-
-For read-only label rows inside tables, include in `behavior.table.presetRows`:
-
-```json
-{
-  "presetRows": [
-    { "type": "header", "label": "Important Measurements" },
-    { "readonly": true, "parameter": "Fixed label", "value": "preset text" }
-  ]
-}
-```
-
-| Row property | Effect |
-|--------------|--------|
-| `type: "header"` | Full-width section header row. |
-| `readonly: true` | Cells in columns with `fieldType: "static"` or `behavior.readonly: true` are display-only. |
-| `fieldType` on row | Used when column `fieldType` is `dynamic`. |
-| `fieldType: "static"` on column | Always display-only; value from `defaultValues[rowIndex]` or `defaultValue`. |
-
----
-
-## 8. DataSource (dropdowns)
-
-### Static options
-
-> **Note:** `dataSource.type: "static"` provides dropdown **options**. It is unrelated to `fieldType: "static"`, which renders a read-only label cell ([§4.1](#41-field-primitives)).
-
-```json
-{
-  "type": "static",
-  "options": [
-    "ON",
-    "OFF",
-    "NOT_APPLICABLE"
-  ]
-}
-```
-
-Or labeled options:
-
-```json
-{
-  "type": "static",
-  "options": [
-    { "label": "Single", "value": "Single" },
-    { "label": "Pair", "value": "Pair" }
-  ]
-}
-```
-
-### API options
-
-```json
-{
-  "type": "api",
-  "api": {
-    "endpoint": "BUILDING_MASTER",
-    "method": "POST",
-    "requestBody": {
-      "subDepartmentId": "{{subDepartmentId}}",
-      "batchId": "{{batchId}}"
-    },
-    "responsePath": "data.buildings",
-    "displayKey": "buildingName",
-    "valueKey": "buildingId"
-  }
-}
-```
-
-### Known endpoint aliases
-
-| Alias | Resolves to |
-|-------|-------------|
-| `casting-station` | Casting station list (GET) |
-| `material-lots` | Material lots (POST) |
-| `BUILDING_MASTER` | Building master (configure in `schemaApiDataSource`) |
-
-### Template injection
-
-`{{subDepartmentId}}` and `{{batchId}}` are replaced at runtime from form `apiContext`.
-
----
-
-## 9. Visibility rules
-
-```json
-{
-  "when": [
-    { "field": "CASTING_TYPE", "op": "EQ", "value": "Pair" },
-    { "field": "STATION", "op": "NOT_EMPTY" }
-  ],
-  "logic": "AND"
-}
-```
-
-### Operators
-
-| `op` | Aliases | True when |
-|------|---------|-----------|
-| `EQ` | `EQUAL`, `EQUALS` | Field value equals `value`. |
-| `NEQ` | `NOT_EQUAL`, `NOT_EQ` | Field value does not equal `value`. |
-| `EMPTY` | `IS_EMPTY` | Field value is blank. |
-| `NOT_EMPTY` | `IS_NOT_EMPTY` | Field value is not blank. |
-| `IN` | — | Field value is in `value` array. |
-
-### Logic
-
-| `logic` | Behavior |
-|---------|----------|
-| `AND` | All conditions must pass (default). |
-| `OR` | Any condition passes. |
-
-Visibility context is built from all form field values (flat merge across sections). Hidden field values are cleared on change.
-
----
-
-## 10. Validation
-
-```json
-{
-  "required": true,
-  "min": 0,
-  "max": 200,
-  "pattern": "^[A-Z0-9-]+$",
-  "message": "Enter a valid motor ID"
 }
 ```
 
@@ -822,73 +838,275 @@ Visibility context is built from all form field values (flat merge across sectio
 | `pattern` | `text` (regex) |
 | `message` | Custom error message |
 
-Node-level `required: true` is shorthand for `validation.required: true`.
-
----
-
-## 11. Runtime values & submission
-
-### Runtime form state
-
-Values are keyed by node `id`:
+### 8.2 Visibility — `visibleWhen`
 
 ```json
 {
-  "POST_CURING_DETAILS": [
-    {
-      "OTHER_OBSERVATIONS": "None",
-      "SHORE_A_HARDNESS": "72"
-    }
-  ],
-  "CURING_CYCLES": [
-    {
-      "_cycleKey": "cycle-1",
-      "rows": [
-        {
-          "srNo": 1,
-          "TEMPERATURE": "65",
-          "DURATION": "120",
-          "START_DATE": "05-06-2026",
-          "START_TIME": "09:00"
-        }
-      ]
-    }
-  ]
+  "visibleWhen": {
+    "when": [
+      { "field": "CASTING_TYPE", "op": "EQ", "value": "Pair" },
+      { "field": "STATION", "op": "NOT_EMPTY" }
+    ],
+    "logic": "AND"
+  }
 }
 ```
 
-### Value shape by component
+| `op` | Aliases | True when |
+|------|---------|-----------|
+| `EQ` | `EQUAL`, `EQUALS` | Field equals `value` |
+| `NEQ` | `NOT_EQUAL` | Field does not equal `value` |
+| `EMPTY` | `IS_EMPTY` | Field is blank |
+| `NOT_EMPTY` | `IS_NOT_EMPTY` | Field is not blank |
+| `IN` | — | Field value in `value` array |
 
-| Component | Runtime shape |
-|-----------|---------------|
-| `section` + `field` children | `{ [nodeId]: [ { fieldKey: value, ... } ] }` — single object in array |
-| `table` | `{ [nodeId]: [ row, row, ... ] }` |
-| `repeatable` | `{ [nodeId]: [ { _cycleKey, rows: [...] }, ... ] }` |
-| `dynamicGroup` | `{ [nodeId]: [ row, row, ... ] }` |
-| `nestedGroup` | `{ [nodeId]: [ groupRow, ... ] }` |
+Hidden field values are cleared when the condition becomes false.
 
-**Static column values:** `static` column values are stored in each row under the column `id` key (e.g. `ACTIVITY: "Soaking Time"`). Values are seeded from `defaultValues` on init and remain readonly in the UI. User-editable sibling columns (e.g. `MOTOR_ID_1`) are stored normally.
+### 8.3 Rows config — `rows` on tables and matrices
+
+| Property | Description |
+|----------|-------------|
+| `defaultCount` | Initial row count. When `presetRows` is present, the engine uses `max(defaultCount, presetRows.length)`. |
+| `min` / `max` | Row count limits |
+| `allowAdd` / `allowDelete` | Row add/delete controls |
+| `autoIncrementKey` | Serial column key (default `srNo`) |
+| `presetRows` | Seed one or more rows with column values and optional row metadata (see below) |
+
+#### `presetRows` — seeding and readonly rules
+
+Each entry in `presetRows` is a **partial row object**. Keys must match table **column `id`** values (e.g. `OPERATION`, `SET_PARAMETER`, `RESULT`). The following **metadata keys** are reserved and are not column ids:
+
+| Key | Purpose |
+|-----|---------|
+| `type: "header"` | Renders a full-width section header row (uses `label`) — not a data row |
+| `readonly: true` | Locks **only the columns listed in that preset object** (excluding metadata keys) |
+| `label` | Header text when `type` is `"header"` |
+
+**Initialization (engine):**
+
+1. Row count = `max(defaultCount, presetRows.length)`.
+2. For each row index, merge `presetRows[i]` into the row by column id.
+3. Columns not present in the preset fall back to `defaultValue` / `defaultValues[rowIndex]` on the column definition.
+4. `autoIncrementKey` (default `srNo`) is set to `rowIndex + 1` unless the preset provides it.
+5. When `readonly: true`, the engine stores runtime metadata on the row:
+   - `_readonly: true`
+   - `_readonlyColumns: ["OPERATION", "SET_PARAMETER", ...]` — column ids from the preset object only
+
+**UI rendering (engine):**
+
+| Condition | Rendered as |
+|-----------|-------------|
+| Column `fieldType` is `static`, `serial`, or `formula` | Read-only display text (`FormulaCell`) — always |
+| Column `readonly: true` on column definition | Read-only display text — always |
+| Column id is in `_readonlyColumns` for that row | Read-only display text — **not** a `TextField` |
+| All other columns | Normal editor for `fieldType` (`TextField`, `number`, `datetime`, etc.) |
+
+**Important:** `readonly: true` on a preset row does **not** lock the entire row. Columns omitted from the preset (e.g. `ACTUAL_PARAMETER`, `RESULT`) remain editable.
+
+**Row add/delete:**
+
+| Action | Behaviour |
+|--------|-----------|
+| User adds a row | New row starts empty; preset metadata is **not** copied |
+| User deletes a row | Allowed unless `allowDelete: false` or row count ≤ `min` |
+| Preset row with `readonly: true` | **Remove** button disabled for that row |
+
+**Multiline preset text:** newline characters in preset values (e.g. `"Temp:65±2°C\nDuration:90 min"`) are preserved and displayed with line breaks.
+
+**Blending table example (preset labels + editable actuals):**
+
+```json
+"rows": {
+  "defaultCount": 2,
+  "allowAdd": true,
+  "allowDelete": true,
+  "autoIncrementKey": "srNo",
+  "presetRows": [
+    {
+      "readonly": true,
+      "OPERATION": "Hot Water Circulation Temperature Set",
+      "SET_PARAMETER": "75±5°C"
+    },
+    {
+      "readonly": true,
+      "OPERATION": "Material Quantity",
+      "SET_PARAMETER": "Total Quantity from various lots"
+    }
+  ]
+},
+"columns": [
+  { "type": "column", "id": "srNo", "fieldType": "serial", "label": "Sr No." },
+  { "type": "column", "id": "OPERATION", "fieldType": "text", "label": "Operation" },
+  { "type": "column", "id": "SET_PARAMETER", "fieldType": "text", "label": "Set Parameter" },
+  { "type": "column", "id": "ACTUAL_PARAMETER", "fieldType": "text", "label": "Actual Parameter" }
+]
+```
+
+- `OPERATION` and `SET_PARAMETER` → read-only display (from preset, `readonly: true`)
+- `ACTUAL_PARAMETER` → editable `TextField` (not in preset)
+
+**PSD table example (static preset labels + editable result):**
+
+```json
+"presetRows": [
+  { "readonly": true, "PSD_REQUIREMENT": "Above 500 µm, % max", "SPECIFICATION": "5" },
+  { "readonly": true, "PSD_REQUIREMENT": "500-355 µm, %", "SPECIFICATION": "27±5" }
+],
+"columns": [
+  { "id": "PSD_REQUIREMENT", "fieldType": "static", "label": "PSD/PS Required" },
+  { "id": "SPECIFICATION", "fieldType": "static", "label": "Specification" },
+  { "id": "RESULT", "fieldType": "number", "label": "Result" }
+]
+```
+
+- `PSD_REQUIREMENT` / `SPECIFICATION` → read-only (static `fieldType` **and** preset `readonly`)
+- `RESULT` → editable number input (not listed in preset)
+
+**Header row example:**
+
+```json
+"presetRows": [
+  { "type": "header", "label": "Important Measurements" },
+  { "readonly": true, "OPERATION": "Drying", "SET_PARAMETER": "65±2°C" }
+]
+```
+
+#### `presetRows` vs column `defaultValues`
+
+| Mechanism | Use when |
+|-----------|----------|
+| `presetRows` | Multi-column row templates, optional per-row `readonly`, header rows |
+| Column `defaultValues[]` | Single-column static labels per row index (`fieldType: "static"`) |
+
+Both can coexist; `presetRows` values take precedence for columns present in the preset object.
+
+#### Runtime-only table row keys (not submitted)
+
+| Key | Purpose |
+|-----|---------|
+| `_rowType` | `"header"` for header rows |
+| `_headerLabel` | Header row display text |
+| `_readonly` | Row originated from a `readonly: true` preset |
+| `_readonlyColumns` | Column ids locked by preset `readonly` |
+
+These keys are stripped from submission payloads. Repeat-instance `_key` **is** submitted.
+
+### 8.4 Repeat config — `repeat` on sections and groups
+
+| Property | Description |
+|----------|-------------|
+| `defaultCount` | Initial instance count. Accepts numbers or `{{token}}`. |
+| `min` / `max` | Instance limits. Accepts numbers or `{{token}}`. |
+| `allowAdd` / `allowDelete` | Add/remove instance controls |
+| `label` | Instance label. `{index}` is 1-based. |
+| `addLabel` / `deleteLabel` | Button labels |
+
+### 8.5 Formula — `formula`
+
+```json
+{
+  "formula": {
+    "expression": "A_MOCK-B_MOCK",
+    "dependencies": ["A_MOCK", "B_MOCK"]
+  }
+}
+```
+
+Expression uses row field keys. Recalculated on dependency change. Read-only in UI.
+
+### 8.6 DataSource — `dataSource`
+
+**Static:**
+```json
+{ "type": "static", "options": ["ON", "OFF", "NOT_APPLICABLE"] }
+```
+
+**API:**
+```json
+{
+  "type": "api",
+  "api": {
+    "endpoint": "BUILDING_MASTER",
+    "method": "POST",
+    "requestBody": { "subDepartmentId": "{{subDepartmentId}}" },
+    "responsePath": "data.buildings",
+    "displayKey": "buildingName",
+    "valueKey": "buildingId"
+  }
+}
+```
+
+**Known endpoint aliases:**
+
+| Alias | Resolves to |
+|-------|-------------|
+| `casting-station` | Casting station list (GET) |
+| `material-lots` | Post-cure material lots (`POST /user/post-cure/material-lots`, body: `{ batchId }`) |
+| `BUILDING_MASTER` | Building master |
+| `MOTORS_STAGE_LIST` | Motor stage list for matrix columns (GET) |
+
+`{{subDepartmentId}}`, `{{batchId}}`, `{{motorId}}` replaced from form `apiContext`.
+
+---
+
+## 9. Submission model
+
+### Runtime form state
+
+Values keyed by block `id`:
+
+```json
+{
+  "OTHER_OBSERVATIONS": "None",
+  "SHORE_A_HARDNESS": "72",
+  "cycle": [
+    {
+      "_key": "cycle-1",
+      "CURING_TABLE": [
+        { "srNo": 1, "TEMPERATURE": "65", "DURATION": "120", "START_DATE": "05-06-2026" }
+      ]
+    }
+  ],
+  "PROJECT_STAGE_MATRIX": {
+    "columns": [ ],
+    "rows": [ ]
+  }
+}
+```
+
+### Value shape by block type
+
+| Block | Runtime shape |
+|-------|---------------|
+| `field` | `{ [fieldId]: primitive }` |
+| `table` | `{ [tableId]: [ row, row, ... ] }` |
+| `section` + `repeat` | `{ [sectionId]: [ { _key, ...childData }, ... ] }` |
+| `group` + `repeat` | `{ [groupId]: [ { _key, ...fields }, ... ] }` |
+| `matrix` | `{ [matrixId]: { columns: [...], rows: [...] } }` |
+
+**Static column values:** stored under column `id` in each row, seeded from `defaultValues` or `presetRows`, readonly in UI when `fieldType` is `static` or column is in `_readonlyColumns`.
+
+**Table row runtime metadata:** keys `_rowType`, `_headerLabel`, `_readonly`, `_readonlyColumns` may exist in form state but are stripped on submit (see §8.3).
 
 ### Submission payload
 
 ```json
+POST /submission
 {
-  "schemaVersion": "1.0",
-  "schemaType": "CURING",
-  "sections": [
-    {
-      "sectionId": "CURING_CYCLES",
-      "sectionData": [ ]
-    },
-    {
-      "sectionId": "POST_CURING_DETAILS",
-      "sectionData": [ ]
-    }
-  ]
+  "schemaId": "curing_001",
+  "schemaVersion": "2.0",
+  "batchId": "BATCH-123",
+  "motorId": "MTR-001",
+  "data": {
+    "OTHER_OBSERVATIONS": "None",
+    "cycle": [
+      { "_key": "cycle-1", "CURING_TABLE": [ { "srNo": 1, "TEMPERATURE": "65" } ] }
+    ]
+  }
 }
 ```
 
-`sectionId` in submissions equals node `id` for backward compatibility.
+Only **primitives** in `data` — no `ui`, `validation`, or `designSystem`.
 
 ### Per-motor wrapping (case preparation)
 
@@ -897,33 +1115,134 @@ Values are keyed by node `id`:
   "motors": [
     {
       "motorId": "MTR-A-001",
-      "prrcClearanceDate": "01-06-2026",
-      "sections": [
-        { "sectionId": "LINEAR_COATING", "sectionData": [ ] }
-      ]
+      "data": {
+        "LINEAR_COATING": [ { "srNo": 1, "actualValue": "12.5" } ]
+      }
     }
   ]
 }
 ```
 
-### Casting & curing combined payload
+---
+
+## 10. Backend contract
+
+### MongoDB `schemas` collection
 
 ```json
 {
-  "castingCuringDetails": {
-    "castingType": "Pair",
-    "castingStation": "15A",
-    "motors": [
-      {
-        "motorId": "MTR-001",
-        "motorReceivedAt": "05-06-2026 10:00",
-        "sections": [ ]
-      }
-    ],
-    "curingSections": [ ]
+  "_id": "curing_001",
+  "version": 3,
+  "status": "ACTIVE",
+  "schemaType": "CURING",
+  "functionality": "CREATE_CURING_FORM",
+  "schema": {
+    "schemaVersion": "2.0",
+    "schemaType": "CURING",
+    "functionality": "CREATE_CURING_FORM",
+    "meta": { "title": "Curing Form" },
+    "data": {
+      "ui": { "layout": "accordion" },
+      "context": { },
+      "sections": [ ]
+    }
   }
 }
 ```
+
+Never overwrite — append version, mark old `DEPRECATED`.
+
+### Schema fetch request
+
+```json
+{
+  "schemaVersion": "2.0",
+  "schemaType": "CURING",
+  "functionality": "CREATE_CURING_FORM",
+  "subdepartmentId": 111,
+  "motorStage": 1
+}
+```
+
+| Module | Extra request fields |
+|--------|---------------------|
+| Raw material | `materialId`, `gradeId`, `materialCode` |
+| Case preparation | `batchType` |
+| Casting / curing | `motorStage`, `subdepartmentId` |
+
+---
+
+## 11. TypeScript types
+
+Canonical types live in [`src/schema-engine/types/`](../src/schema-engine/types/). Key interfaces:
+
+```typescript
+export type SchemaPayload = {
+  ui?: SchemaRootUi;
+  context?: SchemaContext;
+  sections: SchemaSection[];
+};
+
+export type SchemaDocumentV2 = {
+  schemaVersion: "2.0";
+  schemaType: string;
+  functionality: string;
+  meta?: SchemaMeta;
+  data: SchemaPayload;
+};
+
+export type SchemaSection = {
+  id: string;
+  title: string;
+  ui?: SchemaUiConfig;
+  repeat?: SchemaRepeatConfig;
+  visibleWhen?: SchemaVisibleWhen;
+  children: SchemaBlock[];
+};
+
+export type SchemaBlock =
+  | SchemaFieldBlock
+  | SchemaTableBlock
+  | SchemaMatrixBlock
+  | SchemaButtonBlock
+  | SchemaDisplayBlock
+  | SchemaGroupBlock
+  | SchemaSectionBlock;
+
+export type SchemaFieldBlock = {
+  type: "field";
+  id: string;
+  fieldType: SchemaFieldType;
+  label: string;
+  unit?: string;
+  ui?: SchemaUiConfig;
+  validation?: SchemaValidation;
+  visibleWhen?: SchemaVisibleWhen;
+  dataSource?: SchemaDataSource;
+  formula?: SchemaFormula;
+  readonly?: boolean;
+};
+
+export type SchemaTableBlock = {
+  type: "table";
+  id: string;
+  label?: string;
+  rows?: SchemaRowsConfig;
+  columns: SchemaTableColumnSlot[];
+};
+
+export type SchemaMatrixBlock = {
+  type: "matrix";
+  id: string;
+  rowFields: SchemaMatrixRowField[];
+  columns: SchemaDataSource;
+  rows?: SchemaRowsConfig;
+  allowAddColumn?: boolean;
+  allowDeleteColumn?: boolean;
+};
+```
+
+Full definitions: [`schema.types.ts`](../src/schema-engine/types/schema.types.ts), submission shapes: [`formData.types.ts`](../src/schema-engine/types/formData.types.ts).
 
 ---
 
@@ -931,208 +1250,36 @@ Values are keyed by node `id`:
 
 | Rule | Example |
 |------|---------|
-| Node `id` | `SCREAMING_SNAKE_CASE` — `CURING_CYCLES`, `POST_CURING_DETAILS` |
-| Field keys inside rows | `SCREAMING_SNAKE_CASE` or consistent `camelCase` per module |
-| Serial number key | Always `srNo` (or set `behavior.table.autoIncrementKey`) |
-| Date values | `DD-MM-YYYY` |
-| Time values | `HH:mm` |
-| DateTime values | `DD-MM-YYYY HH:mm` |
+| Section / block `id` | `SCREAMING_SNAKE_CASE` — `CURING_CYCLES`, `POST_CURING_DETAILS` |
+| Nested repeat section `id` | Short camelCase OK — `cycle`, `finalMix` |
+| Field keys in table rows | `SCREAMING_SNAKE_CASE` |
+| Serial number key | `srNo` (or `rows.autoIncrementKey`) |
+| Date / time / datetime | `DD-MM-YYYY`, `HH:mm`, `DD-MM-YYYY HH:mm` |
 | Dropdown stored value | Option `value`, not display label |
 | `schemaType` | `SCREAMING_SNAKE_CASE` |
 | `functionality` | `CREATE_<MODULE>_FORM` |
 
 ---
 
-## 13. Schema fetch request envelope
+## 13. Examples
 
-```json
-{
-  "schemaVersion": "1.0",
-  "schemaType": "CURING",
-  "functionality": "CREATE_CURING_FORM",
-  "layout": { "type": "flat" },
-  "subdepartmentId": 111,
-  "motorStage": 1
-}
-```
-
-Include only fields relevant to the module:
-
-| Module | Extra request fields |
-|--------|---------------------|
-| Raw material | `materialId`, `gradeId`, `materialCode` |
-| Case preparation | `batchType` (`MAIN_BATCH`, `SUBSCALE_BATCH`) |
-| Casting / curing | `motorStage`, `subdepartmentId` |
-| Mock trial | `motorStage` |
-
-### Response envelope
-
-Same as [§2 HTTP response wrapper](#http-response-wrapper-api-fetch). Every schema fetch response must use:
-
-- Root: `success`, `statusCode`, `schemaVersion`, `schemaType`, `functionality`, `message`, `timestamp`
-- `data`: `layout`, `designSystem`, `meta`, `context`, `nodes`
-
-All responses must use `data.nodes[]` (see examples in `docs/examples/`).
-
----
-
-## 14. Examples
-
-Full JSON examples are in `docs/examples/`:
+Full v2 JSON examples in [`docs/examples/`](examples/):
 
 | File | Description |
 |------|-------------|
-| [`curing-schema.v1.json`](examples/curing-schema.v1.json) | Curing cycles (repeatable table), post-curing fields, de-coring with API dropdown |
-| [`casting-measurements.v1.json`](examples/casting-measurements.v1.json) | Grouped-column measurement table with formula columns |
-| [`casting-form.v1.json`](examples/casting-form.v1.json) | Full casting form: accordion layout, repeatable mix cycles + sibling bowl table, static activity column |
-| [`case-prep-form.v1.json`](examples/case-prep-form.v1.json) | Form section, dynamic group, nested group |
+| [`curing-schema.v2.json`](examples/curing-schema.v2.json) | Curing cycles (nested repeat section + table), post-curing fields, de-coring, project×stage matrix |
+| [`casting-form.v2.json`](examples/casting-form.v2.json) | Accordion layout, grouped measurement table with formulas, repeatable mix cycles + sibling bowl table, static activity column |
+| [`case-prep-form.v2.json`](examples/case-prep-form.v2.json) | Form fields, repeatable lot group, coating table, drum nested group |
+| [`rmp-schema.v2.json`](examples/rmp-schema.v2.json) | Raw material prep: premix repeat sections, solid/liquid process tables |
+
+The engine reads v2 only. All examples use the `data` wrapper for `ui`, `context`, and `sections`.
 
 ---
 
-## Appendix A: Legacy → v1 mapping
-
-Historical reference for backend migration. The UI normalizer no longer accepts legacy `data.sections[]` or casting/curing shorthand payloads.
-
-### Root document
-
-| Legacy | PP-Schema v1 |
-|--------|--------------|
-| `sections[]` at `data` root | `data.nodes[]` |
-| `data.sections[]` | `data.nodes[]` |
-| `data.formDetails` | `data.meta` |
-| `data.rawMaterialDetails` | `data.context` + `data.meta` (material name in title) |
-| `layout` at HTTP root | `data.layout` |
-| UI `themeTokens` prop | `data.designSystem.colors` |
-
-### Section mapping
-
-| Legacy `type` / shape | PP-Schema v1 |
-|-----------------------|--------------|
-| `sectionId` | `id` |
-| `sectionName` / `title` | `label` |
-| `type: "form"` | `component: "section"` with `field` children |
-| `type: "table"` | `component: "table"` with `column` children |
-| `type: "complex-table"` | `component: "table"` + `columnGroup` children |
-| `type: "repeatable-table"` | `component: "repeatable"` + `table` child |
-| `type: "dynamic-group"` | `component: "dynamicGroup"` |
-| `type: "group"` | `component: "group"` or `section` |
-| `fields[]` | `children[]` with `component: "field"` |
-| `columns[]` | `children[]` with `component: "column"` |
-| `groupedColumns[]` | `children[]` with `component: "columnGroup"` |
-| `columnLayout[]` | Ordered `column` / `columnGroup` slots preserving `children` order |
-| `lots` / `drums` | `component: "nestedGroup"`, `groupKey: "lots"` \| `"drums"` |
-| `table: { columns, defaultRows }` | `component: "table"` child on `section` |
-| `repeatable: true` + `tables[]` | `component: "repeatable"` |
-| `tables[]` (non-repeatable) | `component: "table"` |
-
-### Field / column mapping
-
-| Legacy | PP-Schema v1 |
-|--------|--------------|
-| `key` | `id` |
-| `fieldId` | `id` |
-| `type` (on field) | `fieldType` |
-| `options[]` | `dataSource: { type: "static", options }` |
-| `dataSource: "BUILDING_MASTER"` | `dataSource: { type: "api", api: { endpoint: "BUILDING_MASTER" } }` |
-| `visibleWhen` | `visibility.when` |
-| `addRowAllowed` | `behavior.table.allowAddRow` |
-| `defaultRowCount` | `behavior.table.defaultRows` or `behavior.repeat.defaultCount` |
-| `repeatConfig` | `behavior.repeat` |
-| `rowConfig.defaultRows` | `behavior.table.defaultRows` |
-| `rowConfig.allowAddRow` | `behavior.table.allowAddRow` |
-| `rowConfig.allowDeleteRow` | `behavior.table.allowDeleteRow` |
-| `repeatConfig.allowAddCycle` | `behavior.repeat.allowAdd` |
-| `repeatConfig.allowDeleteCycle` | `behavior.repeat.allowDelete` |
-| `repeatConfig.labelPattern` | `behavior.repeat.labelPattern` |
-| `formula` on column | `behavior.formula` |
-| `readonly` on column | `behavior.readonly: true` |
-| `autoIncrement` type | `fieldType: "autoIncrement"` → `id: "srNo"` |
-
-### Casting/curing API shorthand (Format B)
-
-This is the shape currently returned by `POST .../schema/curing`:
-
-```json
-{
-  "sectionId": "CURING_CYCLES",
-  "sectionName": "Curing Cycles",
-  "repeatable": true,
-  "repeatConfig": { "allowAddCycle": true, "labelPattern": "Cycle {index}" },
-  "tables": [{
-    "tableId": "CURING_CYCLE_TABLE",
-    "rowConfig": { "defaultRows": 10, "allowAddRow": true },
-    "columns": [{ "fieldId": "TEMPERATURE", "type": "number", "unit": "°C" }]
-  }]
-}
-```
-
-Normalizes to:
-
-```json
-{
-  "id": "CURING_CYCLES",
-  "component": "repeatable",
-  "label": "Curing Cycles",
-  "behavior": { "repeat": { "mode": "cycle", "labelPattern": "Cycle {index}" } },
-  "children": [{
-    "id": "CURING_CYCLE_TABLE",
-    "component": "table",
-    "behavior": { "table": { "defaultRows": 10, "allowAddRow": true } },
-    "children": [{
-      "id": "TEMPERATURE",
-      "component": "column",
-      "fieldType": "number",
-      "label": "Temperature",
-      "unit": "°C"
-    }]
-  }]
-}
-```
-
----
-
-## Appendix B: Future UI refactoring roadmap
-
-*Not implemented in v1 spec phase. For planning only.*
-
-| Phase | Work | Key files |
-|-------|------|-----------|
-| 1 | Add `SchemaNode` TypeScript types + `normalizeToV1()` | `schema.types.ts`, `normalizeSchemaV1.ts` |
-| 2 | `resolveStyleTokens()` + `resolveIcon()` | `utils/schemaStyle.ts` |
-| 3 | `ComponentRegistry` — map `component` → React | `ui/registry/` |
-| 4 | Replace `FieldRenderer` if-chain with registry | `SchemaNodeRenderer.tsx` |
-| 5 | Remove hardcoded `sx` from section components | `FormSection`, `TableSection`, `SchemaFormRenderer` |
-| 6 | Single normalizer entry; deprecate dual formats | `normalizeSchema.ts` |
-
-### Component registry (planned)
-
-```
-component     →  React component
-─────────────────────────────────
-field         →  FieldRenderer
-column        →  (table cell via SchemaTableCellInput)
-columnGroup   →  (table header group)
-table         →  TableSection
-repeatable    →  RepeatableTableSection
-dynamicGroup  →  DynamicGroupSection
-nestedGroup   →  NestedGroupSection
-section       →  SectionCard + children
-group         →  GroupSection
-stack         →  StackLayout (new)
-grid          →  GridLayout (new)
-header        →  TableHeaderRow (new)
-divider       →  Divider (new)
-alert         →  Alert (new)
-badge         →  Chip (new)
-```
-
----
-
-## Changelog
+## 14. Changelog
 
 | Version | Date | Changes |
 |---------|------|---------|
-| 1.0 | 2026-06-12 | Initial PP-Schema UI Standard specification |
-| 1.0.1 | 2026-06-12 | All schema payloads nested under `data` (`layout`, `designSystem`, `meta`, `context`, `nodes`) |
-| 1.0.2 | 2026-06-13 | `layout.sectionBorderRadius` global default; per-section `style.borderRadius` override; accordion panels inherit parent `section` style |
-| 1.0.3 | 2026-06-13 | `fieldType: static`, column `defaultValue`/`defaultValues`, sibling `repeatable`+`table` flattening, `behavior.repeat.mode: mix` |
+| 2.0.1 | 2026-06-13 | `ui`, `context`, `sections` wrapped in root `data`; v1 examples removed |
+| 2.0 | 2026-06-13 | Nested `sections[]`, four layers, single common component library, `matrix` block, no v1 normalizer |
+| 1.0 | 2026-06-12 | Initial PP-Schema v1 (`data.nodes[]`, `SchemaNode`, `repeatable` component) — **superseded** |

@@ -1,4 +1,47 @@
+import { OPERATION_STATUS, toOperationStatusApiValue } from "../../../hooks/operationStatus";
 import { normalizeRawMaterialStatus } from "../user/RawMaterialProcurementModel";
+
+/** Status tabs for approver raw material lot list (matches API status labels). */
+export const RAW_MATERIAL_APPROVER_STATUS_TABS = Object.values(OPERATION_STATUS);
+
+/** Map UI status tab label to API request value (e.g. Approved → APPROVED). */
+export function toRawMaterialApproverListApiStatus(status: string, allLabel: string): string | null {
+  return toOperationStatusApiValue(status, allLabel);
+}
+
+export function mapRawMaterialApproverStatusCountsForUi(
+  server: Record<string, number> | undefined,
+  allLabel: string,
+  totalRecords: number,
+): Record<string, number> {
+  const pick = (...keys: string[]) => {
+    for (const key of keys) {
+      const value = server?.[key];
+      if (typeof value === "number") return value;
+    }
+    return 0;
+  };
+
+  const byLabel: Record<string, number> = {
+    [OPERATION_STATUS.INITIATED]: pick("initiated", "Initiated", "INITIATED"),
+    [OPERATION_STATUS.IN_PROGRESS]: pick("inProgress", "In Progress", "IN_PROGRESS"),
+    [OPERATION_STATUS.WAITING_FOR_APPROVAL]: pick(
+      "waitingForApproval",
+      "waitingforApproval",
+      "Waiting for Approval",
+      "WAITING_FOR_APPROVAL",
+    ),
+    [OPERATION_STATUS.APPROVED]: pick("approved", "Approved", "APPROVED"),
+    [OPERATION_STATUS.REJECTED]: pick("rejected", "Rejected", "REJECTED"),
+  };
+
+  const sum = Object.values(byLabel).reduce((total, count) => total + count, 0);
+
+  return {
+    ...byLabel,
+    [allLabel]: sum > 0 ? sum : totalRecords,
+  };
+}
 
 export type RawMaterialProcurementApproverLotRow = {
   lotId: string;

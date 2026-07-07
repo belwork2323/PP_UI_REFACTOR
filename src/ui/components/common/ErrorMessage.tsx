@@ -1,5 +1,5 @@
 import Alert from "@mui/material/Alert";
-import { mapUiError } from "@utils/errorMapper";
+import { mapUiError } from "./uiErrorMapper";
 
 export default function ErrorMessage({ error }) {
   if (!error) return null;

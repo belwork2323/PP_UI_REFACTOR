@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { systemManagerController } from "../../controllers/system_manager/systemManagerController";
-import { BatchStagesModel } from "../../data/models/systemManager/SystemManagerModel";
+import { BatchStagesModel } from "../../data/models/SystemManagerModel";
 
 export const useBatchStages = () => {
   const [batchStages, setBatchStages] = useState<BatchStagesModel | null>(null);

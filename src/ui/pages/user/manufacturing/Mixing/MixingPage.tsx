@@ -8,7 +8,7 @@ import { useThemeStore } from "../../../../../app/store/themeStore";
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import useMixingHook from "../../../../../hooks/user/manufacturing/useMixingHook";
 import { STRINGS } from "../../../../../app/config/strings";
-
+import MixingDetailsView from "./MixingDetailsView";
 const MixingPage = () => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getManufacturingTheme(mode), [mode]);
@@ -33,6 +33,10 @@ const MixingPage = () => {
     handleFormChange,
     handleSaveDraft,
     handleSubmit,
+    detailsRow,
+    detailsData,
+    detailsLoading,
+    handleBackFromDetails,
   } = hookState;
 
   if (loading) {
@@ -42,7 +46,17 @@ const MixingPage = () => {
       </Box>
     );
   }
-
+  
+  if (view === "details") {
+    return (
+      <MixingDetailsView
+        row={detailsRow}
+        data={detailsData}
+        loading={detailsLoading}
+        onBack={handleBackFromDetails}
+      />
+    );
+  }
   if (view === "list") {
     return (
       <Box sx={theme.workflow.animatedContainer}>
@@ -50,7 +64,6 @@ const MixingPage = () => {
       </Box>
     );
   }
-
   return (
     <Box sx={theme.workflow.animatedContainer}>
       <MixingHeader

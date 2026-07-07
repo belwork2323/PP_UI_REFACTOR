@@ -56,8 +56,14 @@ const RocketMotorCasing = () => {
     handleDeleteCasingFromForm,
   } = hookState;
 
+  const headerMotorCasingId = String(casingForm.motorCasingId || activeBatch?.motorCasingId || "").trim();
+  const headerMotorId = String(casingForm.motorId || activeBatch?.motorId || "").trim();
+  const headerBatchId =
+    headerMotorCasingId ||
+    (activeBatch?.batchId && activeBatch.batchId !== "—" ? activeBatch.batchId : "");
+
   const createMotorCasingHeaderHeading =
-    !isEditMode && formEntryMode === "create"
+    !isEditMode && formEntryMode === "create" && !headerMotorCasingId
       ? {
           title: STRINGS.SOURCING.CASING.FORM_HEADER_CREATE_MOTOR_CASING_TITLE,
           subtitle: STRINGS.SOURCING.CASING.FORM_HEADER_CREATE_MOTOR_CASING_SUBTITLE,
@@ -91,9 +97,9 @@ const RocketMotorCasing = () => {
         <Box>
           <UserWorkflowFormHeader
             batch={{
-              lotId: activeBatch.batchId,
-              batchId: activeBatch.batchId,
-              motorId: activeBatch.motorId,
+              lotId: headerBatchId || "—",
+              batchId: headerBatchId || "—",
+              motorId: headerMotorId && headerMotorId !== "—" ? headerMotorId : "—",
               motorType: activeBatch.motorType || casingForm.motorStageApi,
               priority: activeBatch.priority,
               rejectionReason: activeBatch.rejectionReason,

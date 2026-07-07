@@ -76,7 +76,7 @@ export default function SystemManagerDashboard() {
 
   const {
     kpiData, stageMetrics, stageData,
-    activeBatches, blockEvents,
+    blockEvents,
     chartData, batchStatusList, stageConfig, chartUpdatedAt,
   } = dashboard;
   const chartTheme = t.sharedCharts;
@@ -108,7 +108,6 @@ export default function SystemManagerDashboard() {
     setBatchStatus,
     activeBatchFilterCount,
     clearBatchFilters,
-    inProgressRows,
     filteredInProgressRows,
     stageOptions,
     typeOptions,
@@ -116,7 +115,13 @@ export default function SystemManagerDashboard() {
     selectedBatch,
     handleViewDetails,
     closeBatchDetails,
-  } = useSMInProgressBatches(activeBatches);
+    batchesLoading,
+    page,
+    rowsPerPage,
+    totalRecords,
+    handlePageChange,
+    handleRowsPerPageChange,
+  } = useSMInProgressBatches(t.dashboardConfig.stageColors);
 
   const {
     notifAnchor,
@@ -379,13 +384,19 @@ export default function SystemManagerDashboard() {
       <Box sx={t.dashboardLayout.bottomGrid}>
         <InProgressBatchesTable
           rows={filteredInProgressRows}
-          loading={loading}
+          loading={batchesLoading}
           theme={adminTh}
           title={STRINGS.DASHBOARD_PAGE.BATCH_TABLE.SECTION_TITLE}
           emptyText={S.EMPTY_STATES.NO_BATCHES}
           cardSx={adminTh.card}
           hideManagerColumns
           onViewDetails={handleViewDetails}
+          page={page}
+          rowsPerPage={rowsPerPage}
+          totalCount={totalRecords}
+          onPageChange={handlePageChange}
+          onRowsPerPageChange={handleRowsPerPageChange}
+          rowsPerPageOptions={[5, 10, 25]}
           meta={
             <FilterToggleButton
               label={S.FILTERS.BUTTON}
@@ -407,7 +418,7 @@ export default function SystemManagerDashboard() {
                   count={activeBatchFilterCount}
                   onClear={clearBatchFilters}
                   clearLabel={S.FILTERS.CLEAR_ALL}
-                  recordText={`- ${filteredInProgressRows.length} / ${inProgressRows.length} records shown`}
+                  recordText={`- ${filteredInProgressRows.length} / ${totalRecords} records shown`}
                   containerSx={{ ...adminTh.table.filterPanelHeader, mb: 1.5 }}
                   iconSx={adminTh.table.filterBtnIcon}
                   labelSx={adminTh.table.filterLabel}

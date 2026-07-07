@@ -1,0 +1,57 @@
+{
+  "invalidMotorStage": {
+    "success": false,
+    "statusCode": 400,
+    "message": "Invalid motor stage",
+    "error": {
+      "code": "INVALID_MOTOR_STAGE",
+      "details": [
+        {
+          "field": "motorStage",
+          "message": "Motor stage S9 is not supported"
+        }
+      ]
+    },
+    "data": null
+  },
+  "subDepartmentNotFound": {
+    "success": false,
+    "statusCode": 404,
+    "message": "Sub department not found",
+    "error": {
+      "code": "SUB_DEPARTMENT_NOT_FOUND",
+      "details": [
+        {
+          "field": "subDepartmentId",
+          "message": "No sub department found for id 113"
+        }
+      ]
+    },
+    "data": null
+  },
+  "schemaNotConfigured": {
+    "success": false,
+    "statusCode": 404,
+    "message": "Trimming schema configuration not found",
+    "error": {
+      "code": "SCHEMA_NOT_FOUND",
+      "details": [
+        {
+          "field": "motorStage",
+          "message": "Schema is not configured for motor stage S0"
+        }
+      ]
+    },
+    "data": null
+  },
+  "internalServerError": {
+    "success": false,
+    "statusCode": 500,
+    "message": "An unexpected error occurred while fetching schema",
+    "error": {
+      "code": "INTERNAL_SERVER_ERROR",
+      "details": []
+    },
+    "data": null
+  }
+}

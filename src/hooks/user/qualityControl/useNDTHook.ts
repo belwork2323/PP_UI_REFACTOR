@@ -9,31 +9,35 @@ import {
   NDTDetailsModel,
 } from "../../../data/models/user/NDTApiModel";
 import {
+  buildNDTAddedMotors,
   createDefaultNDTFormState,
+  createEmptyNDTMotorSession,
   hasAnyNDTValue,
+  motorHasValue,
+  normalizeNDTFormState,
+  normalizeNDTMotorSession,
+  resolveRadiographyPlanRows,
   type NDTFormState,
+  type NDTMotorSession,
 } from "../../../data/models/user/NDTFormModel";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import { QUALITY_CONTROL_STATUS } from "./qualityControlWorkflowData";
+import {
+  getSelectedNDTDraftMotorIds,
+  resolveEffectiveNDTMotorCount,
+  resolveNDTMotorCountLimit,
+  resolveNDTMotorOptions,
+  type NDTAddedMotor,
+  type NDTBatch,
+} from "./ndtFlowConfig";
 
-type WorkflowView = "list" | "form";
+type WorkflowView = "list" | "form" | "details";
 
-export type NDTBatch = {
-  id: number | string;
-  batchId: string;
-  motorId: string;
-  motorType: string;
-  priority: string;
-  assignedTo: { fullName: string } | null;
-  createdOn: string;
-  ndtStatus: string;
-  formId?: string | null;
-  draftData?: NDTFormState | null;
-  rejectionReason?: string | null;
-};
+export type { NDTBatch };
 
 const normalizeBatch = (batch: any): NDTBatch => ({
   ...batch,
+  lotId: batch?.lotId ?? batch?.batchId ?? "",
   ndtStatus: batch?.ndtStatus ?? batch?.status ?? QUALITY_CONTROL_STATUS.INITIATED,
   formId: batch?.formId ?? null,
   draftData: batch?.draftData ?? null,
@@ -45,11 +49,20 @@ export const useNDTHook = () => {
   const [activeBatch, setActiveBatch] = useState<NDTBatch | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [formData, setFormData] = useState<NDTFormState>(createDefaultNDTFormState());
-  const [initialSnapshot, setInitialSnapshot] = useState(JSON.stringify(createDefaultNDTFormState()));
+  const [initialSnapshot, setInitialSnapshot] = useState(
+    () => JSON.stringify({ formData: createDefaultNDTFormState(), addedMotors: [] }),
+  );
   const [loadingFormDetails, setLoadingFormDetails] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
+  const [detailsRow, setDetailsRow] = useState<NDTBatch | null>(null);
+  const [detailsData, setDetailsData] = useState<any>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+
+  const [motorCount, setMotorCount] = useState<number | "">("");
+  const [draftMotorIds, setDraftMotorIds] = useState<string[]>([]);
+  const [addedMotors, setAddedMotors] = useState<NDTAddedMotor[]>([]);
 
   const listParams = useSubdepartmentBatches("ndt");
   const user = useAuthStore((state) => state.user);
@@ -64,23 +77,76 @@ export const useNDTHook = () => {
     [user],
   );
 
-  const batches = useMemo(() => (listParams.batches ?? []).map(normalizeBatch), [listParams.batches]);
-
-  const isFormDirty = useMemo(
-    () => JSON.stringify(formData) !== initialSnapshot,
-    [formData, initialSnapshot],
+  const batches = useMemo(
+    () => (listParams.batches ?? []).map(normalizeBatch),
+    [listParams.batches],
   );
 
+  const statusCounts = useMemo(
+    () => listParams.statusCounts,
+    [listParams.statusCounts],
+  );
+
+  const totalRecords = useMemo(
+    () => listParams.totalRecords,
+    [listParams.totalRecords],
+  );
+
+  const availableMotorOptions = useMemo(
+    () => resolveNDTMotorOptions(activeBatch),
+    [activeBatch],
+  );
+
+  const maxMotorCount = useMemo(
+    () =>
+      resolveNDTMotorCountLimit({
+        availableMotorOptions,
+        batchNumberOfMotors: Number((activeBatch as any)?.numberOfMotors ?? 0),
+      }),
+    [activeBatch, availableMotorOptions],
+  );
+
+  const formSnapshot = useMemo(
+    () => JSON.stringify({ formData, addedMotors }),
+    [formData, addedMotors],
+  );
+
+  const isFormDirty = useMemo(
+    () => formSnapshot !== initialSnapshot,
+    [formSnapshot, initialSnapshot],
+  );
+
+  const resetFlowDraft = useCallback(() => {
+    setMotorCount("");
+    setDraftMotorIds([]);
+  }, []);
+
+  const resetSetupDraft = useCallback(() => {
+    setFormData((prev) =>
+      normalizeNDTFormState({
+        ...prev,
+        equipment: "",
+        beamEnergies: [],
+        radiographyPlan: "",
+        radiographyPlanRows: [],
+      }),
+    );
+    resetFlowDraft();
+  }, [resetFlowDraft]);
+
   const resetFormContext = () => {
+    const defaults = createDefaultNDTFormState();
     setView("list");
     setActiveBatch(null);
     setIsEditMode(false);
-    setFormData(createDefaultNDTFormState());
-    setInitialSnapshot(JSON.stringify(createDefaultNDTFormState()));
+    setFormData(defaults);
+    setInitialSnapshot(JSON.stringify({ formData: defaults, addedMotors: [] }));
     setLoadingFormDetails(false);
     setActionLoading(false);
     setBackConfirmOpen(false);
     setHasSavedDraft(false);
+    setAddedMotors([]);
+    resetFlowDraft();
   };
 
   const getErrorMessage = (response: any, fallbackMessage: string) => {
@@ -89,13 +155,86 @@ export const useNDTHook = () => {
     return fallbackMessage;
   };
 
+  const appendMotorsToForm = useCallback(
+    (motorIds: string[]) => {
+      if (!activeBatch || motorIds.length === 0) return false;
+
+      setFormData((prev) => {
+        const existing = (prev.motors ?? []).map((motor) => normalizeNDTMotorSession(motor));
+        const nextMotors: NDTMotorSession[] = [
+          ...existing,
+          ...motorIds
+            .filter((motorId) => !existing.some((motor) => motor.motorId === motorId))
+            .map((motorId) => createEmptyNDTMotorSession(motorId)),
+        ];
+
+        return normalizeNDTFormState({
+          ...prev,
+          batchId: activeBatch.batchId ?? prev.batchId,
+          formLoaded: true,
+          radiographyPlanRows:
+            prev.radiographyPlanRows.length > 0
+              ? prev.radiographyPlanRows
+              : resolveRadiographyPlanRows(prev.radiographyPlan),
+          motors: nextMotors,
+          motorId: nextMotors[0]?.motorId ?? prev.motorId,
+        });
+      });
+
+      setAddedMotors((prev) => {
+        const existingIds = new Set(prev.map((motor) => motor.motorId));
+        return [...prev, ...motorIds.filter((id) => !existingIds.has(id)).map((motorId) => ({ motorId }))];
+      });
+
+      resetFlowDraft();
+      return true;
+    },
+    [activeBatch, resetFlowDraft],
+  );
+
+  const handleLoadNDTForm = useCallback(() => {
+    const count = resolveEffectiveNDTMotorCount(motorCount, draftMotorIds);
+    if (count <= 0) return false;
+
+    const selectedIds = getSelectedNDTDraftMotorIds(count, draftMotorIds);
+    if (selectedIds.length !== count) return false;
+
+    return appendMotorsToForm(selectedIds);
+  }, [appendMotorsToForm, draftMotorIds, motorCount]);
+
+  const handleAddMotors = useCallback(() => {
+    if (!formData.formLoaded) {
+      const loaded = handleLoadNDTForm();
+      return loaded;
+    }
+
+    const count = resolveEffectiveNDTMotorCount(motorCount, draftMotorIds);
+    if (count <= 0) return false;
+
+    const selectedIds = getSelectedNDTDraftMotorIds(count, draftMotorIds);
+    if (selectedIds.length !== count) return false;
+
+    const existingIds = new Set(addedMotors.map((motor) => motor.motorId));
+    const newIds = selectedIds.filter((id) => !existingIds.has(id));
+    if (newIds.length === 0) return false;
+
+    const added = appendMotorsToForm(newIds);
+    if (added) {
+      resetSetupDraft();
+    }
+    return added;
+  }, [addedMotors, appendMotorsToForm, draftMotorIds, formData.formLoaded, handleLoadNDTForm, motorCount, resetSetupDraft]);
+
   const openFormWithResolvedData = async (batch: NDTBatch, editMode: boolean) => {
     const shouldFetchDetails =
       editMode ||
       batch.ndtStatus === QUALITY_CONTROL_STATUS.IN_PROGRESS ||
-      batch.ndtStatus === QUALITY_CONTROL_STATUS.REJECTED;
+      batch.ndtStatus === QUALITY_CONTROL_STATUS.REJECTED ||
+      !!batch.formId;
 
-    let resolvedData = batch.draftData ?? createDefaultNDTFormState();
+    let resolvedData = normalizeNDTFormState(
+      batch.draftData ?? createDefaultNDTFormState(batch.batchId),
+    );
     let resolvedFormId = batch.formId ?? null;
     let rejectionReason = batch.rejectionReason ?? null;
 
@@ -123,10 +262,15 @@ export const useNDTHook = () => {
         return;
       }
 
-      resolvedData = NDTDetailsModel.toFormState(detailsResponse.data);
+      resolvedData = normalizeNDTFormState(NDTDetailsModel.toFormState(detailsResponse.data));
       resolvedFormId = detailsResponse.data.formId || resolvedFormId;
       rejectionReason = detailsResponse.data.workflowInsights?.rejectionReason ?? rejectionReason;
     }
+
+    resolvedData = normalizeNDTFormState({
+      ...resolvedData,
+      motors: resolvedData.motors.filter(motorHasValue),
+    });
 
     const openedBatch: NDTBatch = {
       ...batch,
@@ -135,11 +279,16 @@ export const useNDTHook = () => {
       rejectionReason,
     };
 
+    const motors = buildNDTAddedMotors(resolvedData);
+
     setActiveBatch(openedBatch);
     setFormData(resolvedData);
-    setInitialSnapshot(JSON.stringify(resolvedData));
+    setAddedMotors(motors);
+    setInitialSnapshot(JSON.stringify({ formData: resolvedData, addedMotors: motors }));
     setIsEditMode(editMode);
     setView("form");
+    setMotorCount("");
+    setDraftMotorIds([]);
   };
 
   const handleFillForm = async (batch: NDTBatch) => {
@@ -151,7 +300,46 @@ export const useNDTHook = () => {
   };
 
   const handleFormChange = useCallback((nextForm: NDTFormState) => {
-    setFormData(nextForm ?? createDefaultNDTFormState());
+    setFormData(normalizeNDTFormState(nextForm));
+  }, []);
+
+  const handleSetupChange = useCallback((patch: Partial<NDTFormState>) => {
+    setFormData((prev) => {
+      const merged = { ...prev, ...patch };
+      if (patch.radiographyPlan && patch.radiographyPlan !== prev.radiographyPlan) {
+        merged.radiographyPlanRows = resolveRadiographyPlanRows(patch.radiographyPlan);
+      }
+      return normalizeNDTFormState(merged);
+    });
+  }, []);
+
+  const handleMotorSessionChange = useCallback((motorId: string, patch: Partial<NDTMotorSession>) => {
+    setFormData((prev) =>
+      normalizeNDTFormState({
+        ...prev,
+        motors: (prev.motors ?? []).map((motor) =>
+          motor.motorId === motorId
+            ? normalizeNDTMotorSession({ ...motor, ...patch, motorId })
+            : normalizeNDTMotorSession(motor),
+        ),
+      }),
+    );
+  }, []);
+
+  const handleMotorCountChange = useCallback((count: number | "") => {
+    setMotorCount(count);
+    setDraftMotorIds((prev) => {
+      if (count === "") return [];
+      return Array.from({ length: Number(count) }, (_, idx) => prev[idx] ?? "");
+    });
+  }, []);
+
+  const handleDraftMotorIdChange = useCallback((index: number, motorId: string) => {
+    setDraftMotorIds((prev) => {
+      const next = [...prev];
+      next[index] = motorId;
+      return next;
+    });
   }, []);
 
   const handleBack = () => {
@@ -178,12 +366,13 @@ export const useNDTHook = () => {
       return false;
     }
 
-    if (!hasAnyNDTValue(payload)) {
+    const normalized = normalizeNDTFormState(payload);
+    if (!hasAnyNDTValue(normalized)) {
       showAlert(messages.EMPTY_FORM_ERROR, "warning");
       return false;
     }
 
-    const mapped = mapNDTPayload(payload);
+    const mapped = mapNDTPayload(normalized);
     const isCreateFlow = activeBatch.ndtStatus === QUALITY_CONTROL_STATUS.INITIATED && !activeBatch.formId;
 
     setActionLoading(true);
@@ -210,8 +399,9 @@ export const useNDTHook = () => {
 
         response = await ndtController.updateForm({
           formId: activeBatch.formId,
+          batchId: activeBatch.batchId,
           subDepartmentId,
-          formSubmissionType: intent === "draft" ? "DRAFT" : "UPDATE",
+          formSubmissionType: intent === "draft" ? "DRAFT" : "SUBMIT",
           ...mapped,
         });
       }
@@ -223,9 +413,9 @@ export const useNDTHook = () => {
       }
 
       const nextFormId = response.data?.formId ?? activeBatch.formId ?? null;
-      setActiveBatch((prev) => (prev ? { ...prev, formId: nextFormId, draftData: payload } : prev));
-      setFormData(payload);
-      setInitialSnapshot(JSON.stringify(payload));
+      setActiveBatch((prev) => (prev ? { ...prev, formId: nextFormId, draftData: normalized } : prev));
+      setFormData(normalized);
+      setInitialSnapshot(JSON.stringify({ formData: normalized, addedMotors }));
 
       if (intent === "draft") {
         showAlert(
@@ -251,12 +441,48 @@ export const useNDTHook = () => {
     }
   };
 
-  const handleSaveDraft = async (payload: NDTFormState) => {
-    return await submitForm(payload, "draft");
+  const handleSaveDraft = async (payload?: NDTFormState) => {
+    return await submitForm(payload ?? formData, "draft");
   };
 
-  const handleSubmit = async (payload: NDTFormState) => {
-    return await submitForm(payload, "submit");
+  const handleSubmit = async (payload?: NDTFormState) => {
+    return await submitForm(payload ?? formData, "submit");
+  };
+
+  const handleViewDetails = async (row: NDTBatch) => {
+    if (!row.formId) {
+      showAlert(messages.FORM_ID_MISSING, "error");
+      return;
+    }
+    if (!subDepartmentId) {
+      showAlert(messages.SUB_DEPARTMENT_MISSING, "error");
+      return;
+    }
+
+    setDetailsLoading(true);
+    const response = await ndtController.fetchFormDetails({
+      formId: row.formId,
+      subDepartmentId,
+    });
+    setDetailsLoading(false);
+
+    if (!response?.success || !response?.data) {
+      showAlert(
+        response?.message || messages.DETAILS_FETCH_ERROR,
+        "error",
+      );
+      return;
+    }
+
+    setDetailsRow(row);
+    setDetailsData(response.data);
+    setView("details");
+  };
+
+  const handleBackFromDetails = () => {
+    setDetailsRow(null);
+    setDetailsData(null);
+    setView("list");
   };
 
   return {
@@ -270,14 +496,32 @@ export const useNDTHook = () => {
     actionLoading,
     backConfirmOpen,
     batches,
+    statusCounts,
+    totalRecords,
+    detailsRow,
+    detailsData,
+    detailsLoading,
+    motorCount,
+    draftMotorIds,
+    addedMotors,
+    availableMotorOptions,
+    maxMotorCount,
     handleFillForm,
     handleEditForm,
     handleBack,
     handleFormChange,
+    handleSetupChange,
+    handleMotorSessionChange,
+    handleMotorCountChange,
+    handleDraftMotorIdChange,
+    handleLoadNDTForm,
+    handleAddMotors,
     handleDiscardAndBack,
     setBackConfirmOpen,
     handleSaveDraft,
     handleSubmit,
+    handleViewDetails,
+    handleBackFromDetails,
   };
 };
 

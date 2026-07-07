@@ -9,8 +9,8 @@ const S = STRINGS.DEPARTMENT_HEADER;
 
 type DepartmentHeaderStats = {
   allocated: number;
-  completed: number;
-  draft: number;
+  approved: number;
+  rejected: number;
   pending: number;
 };
 
@@ -42,7 +42,7 @@ type DepartmentHeaderProps = {
 //   subDeptName     string  — e.g. "Raw Material Procurement"
 //   userName        string  — logged-in user's display name
 //   userRole        string  — e.g. "Approver"
-//   stats           object  — { allocated, completed, draft, pending }
+//   stats           object  — { allocated, approved, rejected, pending }
 // ─────────────────────────────────────────────────────────────────────────────
 
 const DepartmentHeader = ({
@@ -51,7 +51,7 @@ const DepartmentHeader = ({
   subDeptName = S.DEFAULT_SUB_DEPT,
   userName    = S.DEFAULT_USER,
   userRole    = S.DEFAULT_ROLE,
-  stats       = { allocated: 0, completed: 0, draft: 0, pending: 0 },
+  stats       = { allocated: 0, approved: 0, rejected: 0, pending: 0 },
   statItems,
 }: DepartmentHeaderProps) => {
   const mode = useThemeStore((s) => s.mode);
@@ -60,9 +60,9 @@ const DepartmentHeader = ({
 
   const defaultStats: DepartmentHeaderStatItem[] = [
     { key: "allocated", label: S.STAT_ALLOCATED, value: stats.allocated },
-    { key: "completed", label: S.STAT_COMPLETED, value: stats.completed },
-    { key: "draft",     label: S.STAT_DRAFT,     value: stats.draft     },
-    { key: "pending",   label: S.STAT_PENDING,   value: stats.pending   },
+    { key: "approved", label: S.STAT_APPROVED, value: stats.approved },
+    { key: "rejected", label: S.STAT_REJECTED, value: stats.rejected },
+    { key: "pending", label: S.STAT_PENDING, value: stats.pending },
   ];
 
   const displayStats = statItems ?? defaultStats;

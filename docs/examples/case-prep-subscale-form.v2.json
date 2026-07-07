@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "1.0",
+  "schemaType": "CASE_PREPARATION",
+  "functionality": "CREATE_CASE_PREPARATION_FORM",
+  "batchType": "SUBSCALE_BATCH",
+  "data": {
+    "meta": {
+      "title": "Case Preparation",
+      "description": "SubScale Schema is Unavailable as of now !"
+    },
+    "ui": {
+      "layout": "flat",
+      "gap": "md",
+      "sectionVariant": "card"
+    },
+    "context": {
+      "batchType": "SUBSCALE_BATCH"
+    },
+    "sections": []
+  }
+}

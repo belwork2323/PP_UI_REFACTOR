@@ -1,0 +1,1012 @@
+{
+  "schemaVersion": "1.0",
+  "schemaType": "CASE_PREPARATION",
+  "functionality": "CREATE_CASE_PREPARATION_FORM",
+  "batchType": "MAIN_BATCH",
+  "data": {
+    "meta": {
+      "title": "Case Preparation",
+      "description": "Case preparation activities before casting operation"
+    },
+    "ui": {
+      "layout": "flat",
+      "gap": "md",
+      "sectionVariant": "card"
+    },
+    "context": {
+      "batchType": "MAIN_BATCH"
+    },
+    "sections": [
+      {
+        "id": "abradingOperation",
+        "title": "Abrading Operation",
+        "children": [
+          {
+            "type": "display",
+            "id": "abradingConfigurationHeading",
+            "displayType": "heading",
+            "label": "Abrading Configuration",
+            "value": "Abrading Configuration"
+          },
+          {
+            "type": "field",
+            "id": "typeOfCasing",
+            "fieldType": "dropdown",
+            "label": "Type of Casing",
+            "dataSource": {
+              "type": "static",
+              "options": [
+                {
+                  "label": "Metallic",
+                  "value": "METALLIC"
+                },
+                {
+                  "label": "Composite",
+                  "value": "COMPOSITE"
+                }
+              ]
+            }
+          },
+          {
+            "type": "field",
+            "id": "typeOfInsulation",
+            "fieldType": "dropdown",
+            "label": "Type of Insulation",
+            "dataSource": {
+              "type": "static",
+              "options": [
+                {
+                  "label": "Rocasin",
+                  "value": "ROCASIN"
+                },
+                {
+                  "label": "EPDM",
+                  "value": "EPDM"
+                }
+              ]
+            }
+          },
+          {
+            "type": "field",
+            "id": "abradingWheelType",
+            "fieldType": "dropdown",
+            "label": "Abrading Wheel Type",
+            "dataSource": {
+              "type": "static",
+              "options": [
+                {
+                  "label": "G60",
+                  "value": "G60"
+                },
+                {
+                  "label": "G36",
+                  "value": "G36"
+                }
+              ]
+            }
+          },
+          {
+            "type": "table",
+            "id": "abradingDetails",
+            "title": "Abrading Details",
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "SR_NO",
+              "defaultCount": 9,
+              "presetRows": [
+                {
+                  "type": "header",
+                  "label": "1st Cut"
+                },
+                {
+                  "readonly": true,
+                  "operation": "Start Date & Time",
+                  "value__fieldType": "datetime"
+                },
+                {
+                  "readonly": true,
+                  "operation": "End Date & Time",
+                  "value__fieldType": "datetime"
+                },
+                {
+                  "readonly": true,
+                  "operation": "Dust Weight (in gm) (A)",
+                  "value__fieldType": "number"
+                },
+                {
+                  "type": "header",
+                  "label": "2nd Cut"
+                },
+                {
+                  "readonly": true,
+                  "operation": "Start Date & Time",
+                  "value__fieldType": "datetime"
+                },
+                {
+                  "readonly": true,
+                  "operation": "End Date & Time",
+                  "value__fieldType": "datetime"
+                },
+                {
+                  "readonly": true,
+                  "operation": "Dust Weight (in gm) (B)",
+                  "value__fieldType": "number"
+                },
+                {
+                  "readonly": true,
+                  "operation": "Total Dust Weight (in gm) (A+B)",
+                  "value__fieldType": "number"
+                }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "operation",
+                "fieldType": "text",
+                "label": "Operation",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "value",
+                "fieldType": "dynamic",
+                "label": "Value"
+              },
+              {
+                "type": "column",
+                "id": "remarksObservations",
+                "fieldType": "textarea",
+                "label": "Remarks / Observations"
+              },
+              {
+                "type": "column",
+                "id": "attachments",
+                "fieldType": "image",
+                "label": "Photos / Videos"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "bellowBonding",
+        "title": "Bellow Bonding",
+        "children": [
+          {
+            "type": "group",
+            "id": "bellowBonding",
+            "ui": {
+              "direction": "column",
+              "wrap": false,
+              "gap": "md"
+            },
+            "children": [
+              {
+                "type": "display",
+                "id": "adhesiveDetails",
+                "displayType": "heading",
+                "label": "Adhesive Details",
+                "value": ""
+              },
+              {
+                "type": "group",
+                "id": "heBellowDimensionGroup",
+                "ui": {
+                  "direction": "column",
+                  "wrap": false,
+                  "gap": "sm"
+                },
+                "children": [
+                  {
+                    "type": "display",
+                    "id": "heBellowDimensionHeading",
+                    "displayType": "heading",
+                    "label": "HE Bellow Dimension",
+                    "value": ""
+                  },
+                  {
+                    "type": "field",
+                    "id": "heBellowDimension",
+                    "fieldType": "datetime",
+                    "label": "Motor Pasting Date & Time",
+                    "ui": {
+                      "maxWidth": "280px"
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "group",
+                "id": "neBellowDimensionGroup",
+                "ui": {
+                  "direction": "column",
+                  "wrap": false,
+                  "gap": "sm"
+                },
+                "children": [
+                  {
+                    "type": "display",
+                    "id": "neBellowDimensionHeading",
+                    "displayType": "heading",
+                    "label": "NE Bellow Dimension",
+                    "value": ""
+                  },
+                  {
+                    "type": "field",
+                    "id": "neBellowDimension",
+                    "fieldType": "datetime",
+                    "label": "Motor Pasting Date & Time",
+                    "ui": {
+                      "maxWidth": "280px"
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "group",
+                "id": "spacerDetails",
+                "ui": {
+                  "direction": "column",
+                  "wrap": false,
+                  "gap": "sm"
+                },
+                "children": [
+                  {
+                    "type": "display",
+                    "id": "spacerDetailsHeading",
+                    "displayType": "heading",
+                    "label": "Spacer Details",
+                    "value": ""
+                  },
+                  {
+                    "type": "field",
+                    "id": "numberOfSpacers",
+                    "fieldType": "number",
+                    "label": "No. of Spacers",
+                    "ui": {
+                      "maxWidth": "160px"
+                    }
+                  }
+                ]
+              },
+              {
+                "type": "group",
+                "id": "pastingDetails",
+                "ui": {
+                  "direction": "column",
+                  "wrap": false,
+                  "gap": "sm"
+                },
+                "children": [
+                  {
+                    "type": "display",
+                    "id": "pastingDetailsHeading",
+                    "displayType": "heading",
+                    "label": "Pasting Details",
+                    "value": ""
+                  },
+                  {
+                    "type": "field",
+                    "id": "remarks",
+                    "fieldType": "textarea",
+                    "label": "Remarks",
+                    "ui": {
+                      "colSpan": { "xs": 12 },
+                      "flex": "1 1 100%"
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "tceCleaning",
+        "title": "TCE Cleaning",
+        "children": [
+          {
+            "type": "table",
+            "id": "tceCleaning",
+            "title": "TCE Cleaning",
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "SR_NO",
+              "defaultCount": 3,
+              "presetRows": [
+                {
+                  "readonly": true,
+                  "parameter": "Start Time",
+                  "value__fieldType": "time"
+                },
+                {
+                  "readonly": true,
+                  "parameter": "End Time",
+                  "value__fieldType": "time"
+                },
+                {
+                  "readonly": true,
+                  "parameter": "Solvent Used",
+                  "value__fieldType": "text"
+                }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "parameter",
+                "fieldType": "text",
+                "label": "Parameter",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "value",
+                "fieldType": "dynamic",
+                "label": "Value"
+              },
+              {
+                "type": "column",
+                "id": "remarks",
+                "fieldType": "textarea",
+                "label": "Remarks"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "preHeating",
+        "title": "Pre-heating",
+        "children": [
+          {
+            "type": "display",
+            "id": "preHeatingConfigurationHeading",
+            "displayType": "heading",
+            "label": "Pre-heating Configuration",
+            "value": ""
+          },
+          {
+            "type": "group",
+            "id": "vacuumBaggingGroup",
+            "ui": {
+              "direction": "column",
+              "wrap": false,
+              "gap": "sm"
+            },
+            "children": [
+              {
+                "type": "field",
+                "id": "vacuumBaggingApplied",
+                "fieldType": "dropdown",
+                "label": "Vacuum Bagging Application",
+                "dataSource": {
+                  "type": "static",
+                  "options": [
+                    {
+                      "label": "YES",
+                      "value": "YES"
+                    },
+                    {
+                      "label": "NO",
+                      "value": "NO"
+                    }
+                  ]
+                },
+                "ui": {
+                  "maxWidth": "240px"
+                }
+              },
+              {
+                "type": "display",
+                "id": "vacuumAppliedHint",
+                "displayType": "description",
+                "label": "If YES, then vacuum applied",
+                "value": "",
+                "visibleWhen": {
+                  "when": [
+                    {
+                      "field": "vacuumBaggingApplied",
+                      "op": "EQUAL",
+                      "value": "YES"
+                    }
+                  ],
+                  "logic": "AND"
+                }
+              },
+              {
+                "type": "field",
+                "id": "vacuumApplied",
+                "fieldType": "number",
+                "label": "Enter vacuum value",
+                "visibleWhen": {
+                  "when": [
+                    {
+                      "field": "vacuumBaggingApplied",
+                      "op": "EQUAL",
+                      "value": "YES"
+                    }
+                  ],
+                  "logic": "AND"
+                },
+                "ui": {
+                  "maxWidth": "240px"
+                }
+              }
+            ]
+          },
+          {
+            "type": "field",
+            "id": "preHeatingRecipe",
+            "fieldType": "dropdown",
+            "label": "Pre-heating Recipe",
+            "dataSource": {
+              "type": "static",
+              "options": [
+                {
+                  "label": "85-90°C for 6 hrs with 10 hrs vacuum",
+                  "value": "85_90C_6HR_10HR_VACUUM"
+                },
+                {
+                  "label": "105°C for 8 hrs",
+                  "value": "105C_8HR"
+                },
+                {
+                  "label": "Others",
+                  "value": "OTHERS"
+                }
+              ]
+            }
+          },
+          {
+            "type": "field",
+            "id": "otherTemperature",
+            "fieldType": "number",
+            "label": "Other Temperature",
+            "unit": "°C",
+            "visibleWhen": {
+              "when": [
+                {
+                  "field": "preHeatingRecipe",
+                  "op": "EQUAL",
+                  "value": "OTHERS"
+                }
+              ],
+              "logic": "AND"
+            }
+          },
+          {
+            "type": "field",
+            "id": "otherDuration",
+            "fieldType": "number",
+            "label": "Other Duration",
+            "unit": "Hours",
+            "visibleWhen": {
+              "when": [
+                {
+                  "field": "preHeatingRecipe",
+                  "op": "EQUAL",
+                  "value": "OTHERS"
+                }
+              ],
+              "logic": "AND"
+            }
+          },
+          {
+            "type": "table",
+            "id": "preHeatingMonitoring",
+            "title": "Pre-heating Monitoring",
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "SR_NO",
+              "defaultCount": 7,
+              "presetRows": [
+                {
+                  "readonly": true,
+                  "parameter": "Oven Start Time",
+                  "value__fieldType": "time"
+                },
+                {
+                  "readonly": true,
+                  "parameter": "Cycle Start Time",
+                  "value__fieldType": "time"
+                },
+                {
+                  "readonly": true,
+                  "parameter": "Temperature @ 1 Hour",
+                  "value__fieldType": "number"
+                },
+                {
+                  "readonly": true,
+                  "parameter": "Temperature @ 2 Hour",
+                  "value__fieldType": "number"
+                },
+                {
+                  "readonly": true,
+                  "parameter": "Temperature @ 10 Hour",
+                  "value__fieldType": "number"
+                },
+                {
+                  "readonly": true,
+                  "parameter": "Cycle End Time",
+                  "value__fieldType": "time"
+                },
+                {
+                  "readonly": true,
+                  "parameter": "Visual Observation After Pre-heating",
+                  "value__fieldType": "textarea"
+                }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "parameter",
+                "fieldType": "text",
+                "label": "Parameter",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "value",
+                "fieldType": "dynamic",
+                "label": "Value"
+              },
+              {
+                "type": "column",
+                "id": "remarks",
+                "fieldType": "textarea",
+                "label": "Remarks"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "linerCoatingOperation",
+        "title": "Liner Coating Operation",
+        "children": [
+          {
+            "type": "group",
+            "id": "linerCoatingOperation",
+            "label": "Liner Coating Operation",
+            "children": [
+              {
+                "type": "field",
+                "id": "linerType",
+                "fieldType": "dropdown",
+                "label": "Select Liner Type",
+                "validation": {
+                  "required": true
+                },
+                "dataSource": {
+                  "type": "static",
+                  "options": [
+                    {
+                      "label": "PEDCOAT",
+                      "value": "PEDCOAT"
+                    },
+                    {
+                      "label": "HEMCOAT-3L",
+                      "value": "HEMCOAT_3L"
+                    },
+                    {
+                      "label": "HEMCOAT-3L-M",
+                      "value": "HEMCOAT_3L_M"
+                    }
+                  ]
+                }
+              },
+              {
+                "type": "group",
+                "id": "linerPreparationDetails",
+                "label": "Liner Preparation Details",
+                "children": [
+                  {
+                    "type": "field",
+                    "id": "batchNo",
+                    "fieldType": "text",
+                    "label": "Batch No."
+                  },
+                  {
+                    "type": "field",
+                    "id": "batchSize",
+                    "fieldType": "number",
+                    "label": "Batch Size"
+                  }
+                ]
+              },
+              {
+                "type": "table",
+                "id": "premixIngredients",
+                "title": "Premix",
+                "rows": {
+                  "allowAdd": true,
+                  "allowDelete": true,
+                  "autoIncrementKey": "srNo"
+                },
+                "columns": [
+                  {
+                    "type": "column",
+                    "id": "srNo",
+                    "fieldType": "serial",
+                    "label": "Sr. No.",
+                    "readonly": true
+                  },
+                  {
+                    "type": "column",
+                    "id": "ingredient",
+                    "fieldType": "dropdown",
+                    "label": "Ingredient",
+                    "dataSource": {
+                      "type": "api",
+                      "api": {
+                        "endpoint": "/api/v1/user/subdepartment/materials-list",
+                        "method": "POST",
+                        "requestBody": {
+                          "materialType": "BOTH"
+                        },
+                        "displayKey": "materialName",
+                        "valueKey": "materialCode"
+                      }
+                    }
+                  },
+                  {
+                    "type": "column",
+                    "id": "mfgLot",
+                    "fieldType": "dropdown",
+                    "label": "Mfg. Lot",
+                    "dataSource": {
+                      "type": "api",
+                      "api": {
+                        "endpoint": "/api/v1/user/subdepartment/material-lots",
+                        "method": "POST",
+                        "requestBody": {
+                          "batchId": "{{batchId}}"
+                        },
+                        "displayKey": "lotId",
+                        "valueKey": "lotId"
+                      }
+                    }
+                  },
+                  {
+                    "type": "column",
+                    "id": "partsByWeight",
+                    "fieldType": "decimal",
+                    "label": "Parts by Wt."
+                  },
+                  {
+                    "type": "column",
+                    "id": "quantityTaken",
+                    "fieldType": "decimal",
+                    "label": "Quantity Taken (g)"
+                  },
+                  {
+                    "type": "column",
+                    "id": "totalQuantity",
+                    "fieldType": "decimal",
+                    "label": "Total Quantity (g)"
+                  }
+                ]
+              },
+              {
+                "type": "table",
+                "id": "finalMixIngredients",
+                "title": "Final Mix",
+                "rows": {
+                  "allowAdd": true,
+                  "allowDelete": true,
+                  "autoIncrementKey": "srNo"
+                },
+                "columns": [
+                  {
+                    "type": "column",
+                    "id": "srNo",
+                    "fieldType": "serial",
+                    "label": "Sr. No.",
+                    "readonly": true
+                  },
+                  {
+                    "type": "column",
+                    "id": "ingredient",
+                    "fieldType": "dropdown",
+                    "label": "Ingredient",
+                    "dataSource": {
+                      "type": "api",
+                      "api": {
+                        "endpoint": "/api/v1/user/subdepartment/materials-list",
+                        "method": "POST",
+                        "requestBody": {
+                          "materialType": "BOTH"
+                        },
+                        "displayKey": "materialName",
+                        "valueKey": "materialCode"
+                      }
+                    }
+                  },
+                  {
+                    "type": "column",
+                    "id": "mfgLot",
+                    "fieldType": "dropdown",
+                    "label": "Mfg. Lot",
+                    "dataSource": {
+                      "type": "api",
+                      "api": {
+                        "endpoint": "/api/v1/user/subdepartment/material-lots",
+                        "method": "POST",
+                        "requestBody": {
+                          "batchId": "{{batchId}}"
+                        },
+                        "displayKey": "lotId",
+                        "valueKey": "lotId"
+                      }
+                    }
+                  },
+                  {
+                    "type": "column",
+                    "id": "partsByWeight",
+                    "fieldType": "decimal",
+                    "label": "Parts by Wt."
+                  },
+                  {
+                    "type": "column",
+                    "id": "quantity",
+                    "fieldType": "decimal",
+                    "label": "Quantity"
+                  }
+                ]
+              },
+              {
+                "type": "group",
+                "id": "qualificationDetails",
+                "label": "Qualification Details",
+                "children": [
+                  {
+                    "type": "field",
+                    "id": "qualifyingSubscaleBatchNo",
+                    "fieldType": "text",
+                    "label": "Qualifying Subscale Batch No."
+                  },
+                  {
+                    "type": "table",
+                    "id": "qualificationParameters",
+                    "title": "Qualification Parameters",
+                    "rows": {
+                      "allowAdd": true,
+                      "allowDelete": true,
+                      "autoIncrementKey": "srNo",
+                      "defaultCount": 4,
+                      "presetRows": [
+                        {
+                          "readonly": true,
+                          "srNo": 1,
+                          "parameter": "SBS",
+                          "specification": ">=5"
+                        },
+                        {
+                          "readonly": true,
+                          "srNo": 2,
+                          "parameter": "TBS",
+                          "specification": ">=5"
+                        },
+                        {
+                          "readonly": true,
+                          "srNo": 3,
+                          "parameter": "Peel Strength",
+                          "specification": ">=0.6"
+                        },
+                        {
+                          "readonly": true,
+                          "srNo": 4,
+                          "parameter": "Moisture",
+                          "specification": "<=0.25"
+                        }
+                      ]
+                    },
+                    "columns": [
+                      {
+                        "type": "column",
+                        "id": "srNo",
+                        "fieldType": "serial",
+                        "label": "Sr. No.",
+                        "readonly": true
+                      },
+                      {
+                        "type": "column",
+                        "id": "parameter",
+                        "fieldType": "text",
+                        "label": "Parameter",
+                        "readonly": true
+                      },
+                      {
+                        "type": "column",
+                        "id": "specification",
+                        "fieldType": "text",
+                        "label": "Specification",
+                        "readonly": true
+                      },
+                      {
+                        "type": "column",
+                        "id": "result",
+                        "fieldType": "text",
+                        "label": "Result"
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "table",
+                "id": "linerApplicationLog",
+                "title": "Liner Application Process Log",
+                "rows": {
+                  "allowAdd": false,
+                  "allowDelete": false,
+                  "autoIncrementKey": "SR_NO",
+                  "defaultCount": 12,
+                  "presetRows": [
+                    {
+                      "readonly": true,
+                      "parameter": "Oven Out Time",
+                      "value__fieldType": "time"
+                    },
+                {
+                  "readonly": true,
+                  "parameter": "Rocket Motor Insulation Temp",
+                  "value__fieldType": "number"
+                },
+                {
+                  "readonly": true,
+                  "parameter": "Rocket Motor RPM",
+                  "value__fieldType": "number"
+                },
+                {
+                  "readonly": true,
+                  "parameter": "Boom Speed",
+                  "value__fieldType": "number"
+                },
+                {
+                  "readonly": true,
+                  "parameter": "Start Temperature",
+                  "value__fieldType": "number"
+                },
+                    {
+                      "readonly": true,
+                      "parameter": "Start Time",
+                      "value__fieldType": "time"
+                    },
+                    {
+                      "readonly": true,
+                      "parameter": "End Time",
+                      "value__fieldType": "time"
+                    },
+                {
+                  "readonly": true,
+                  "parameter": "Number of Passes",
+                  "value__fieldType": "number"
+                },
+                {
+                  "readonly": true,
+                  "parameter": "Liner Applied (w/o DCM)",
+                  "value__fieldType": "text"
+                },
+                    {
+                      "readonly": true,
+                      "parameter": "Rotation Start Time",
+                      "value__fieldType": "time"
+                    },
+                    {
+                      "readonly": true,
+                      "parameter": "Rotation End Time",
+                      "value__fieldType": "time"
+                    },
+                {
+                  "readonly": true,
+                  "parameter": "Storage Temperature",
+                  "value__fieldType": "number"
+                }
+                  ]
+                },
+                "columns": [
+                  {
+                    "type": "column",
+                    "id": "parameter",
+                    "fieldType": "text",
+                    "label": "Operation",
+                    "readonly": true
+                  },
+                  {
+                    "type": "column",
+                    "id": "value",
+                    "fieldType": "dynamic",
+                    "label": "Value"
+                  },
+                  {
+                    "type": "column",
+                    "id": "remarks",
+                    "fieldType": "textarea",
+                    "label": "Remarks"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "dispatchToCasting",
+        "title": "Dispatch To Casting",
+        "children": [
+          {
+            "type": "table",
+            "id": "dispatchToCasting",
+            "title": "Dispatch To Casting",
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "SR_NO",
+              "defaultCount": 6,
+              "presetRows": [
+                {
+                  "readonly": true,
+                  "parameter": "Liner Coated Rubber Surface Visual Observation",
+                  "value__fieldType": "text"
+                },
+                {
+                  "readonly": true,
+                  "parameter": "Observations Over Loose Flap / Bellow Bonding",
+                  "value__fieldType": "text"
+                },
+                {
+                  "readonly": true,
+                  "parameter": "Puncturing at HE (Nos)",
+                  "value__fieldType": "number"
+                },
+                {
+                  "readonly": true,
+                  "parameter": "Puncturing at NE (Nos)",
+                  "value__fieldType": "number"
+                },
+                {
+                  "readonly": true,
+                  "parameter": "Puncturing at LF Extension (Nos)",
+                  "value__fieldType": "number"
+                },
+                {
+                  "readonly": true,
+                  "parameter": "Dispatch Time",
+                  "value__fieldType": "datetime"
+                }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "parameter",
+                "fieldType": "text",
+                "label": "Operation",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "value",
+                "fieldType": "dynamic",
+                "label": "Value"
+              },
+              {
+                "type": "column",
+                "id": "remarks",
+                "fieldType": "textarea",
+                "label": "Remarks"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

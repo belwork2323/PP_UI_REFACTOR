@@ -10,7 +10,6 @@ export type RawMaterialProcurementApproverListPayload = {
   search?: string;
   fromDate?: string;
   toDate?: string;
-  priority?: string[];
 };
 
 export type RawMaterialProcurementApproverChangeStatusPayload = {

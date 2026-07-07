@@ -1,0 +1,56 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "QC",
+    "layout": { "type": "flat" },
+    "division": "DE_CORING",
+    "subType": null,
+    "subDepartmentId": 118,
+    "functionality": "CREATE_DE_CORING_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "QC",
+  "division": "DE_CORING",
+  "subType": null,
+  "functionality": "CREATE_DE_CORING_FORM",
+  "message": "De-coring schema fetched successfully",
+  "timestamp": "2026-06-10T10:00:00Z",
+  "data": {
+    "layout": { "type": "flat" },
+    "meta": {
+      "title": "De-coring Process",
+      "description": "De-coring operation details"
+    },
+    "sections": [
+      {
+        "id": "DE_CORING_DETAILS",
+        "title": "De-coring Details",
+        "ui": { "variant": "card", "padding": "md", "direction": "column", "gap": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "DE_CORING_LOAD",
+            "fieldType": "number",
+            "label": "De-coring Load",
+            "validation": { "required": true }
+          },
+          {
+            "type": "field",
+            "id": "DE_CORING_DATE_TIME",
+            "fieldType": "datetime",
+            "label": "Date & Time of De-coring",
+            "validation": { "required": true }
+          },
+          {
+            "type": "field",
+            "id": "OBSERVATIONS",
+            "fieldType": "textarea",
+            "label": "Observations"
+          }
+        ]
+      }
+    ]
+  }
+}

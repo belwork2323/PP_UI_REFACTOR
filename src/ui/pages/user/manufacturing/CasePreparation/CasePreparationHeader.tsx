@@ -1,7 +1,7 @@
 import { Chip } from "@mui/material";
 import UserWorkflowFormHeader from "../../../../components/custom/UserWorkflowFormHeader";
 import { STRINGS } from "../../../../../app/config/strings";
-import { motorStageLabel } from "@data/models/admin/BatchManagement/BatchManagementModel";
+import { motorStageLabel } from "../../../../../data/models/admin/BatchManagement/BatchManagementModel";
 import { getBatchScaleLabel } from "../../../../../hooks/user/manufacturing/rawMaterialPrepFlowConfig";
 
 const S = STRINGS.MANUFACTURING;

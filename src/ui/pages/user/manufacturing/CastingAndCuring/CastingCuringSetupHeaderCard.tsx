@@ -7,7 +7,7 @@ import { CASTING_CURING_FLOW_LABELS } from "../../../../../hooks/user/manufactur
 type CastingCuringSetupHeaderCardProps = {
   castingType: string;
   castingStation: string;
-  motorIds: string[];
+  motorId: string;
   motorReceivedAt: string;
   setup: CastingProcessSetup;
   onRemove?: () => void;
@@ -28,7 +28,7 @@ const DetailItem = ({ label, value }: { label: string; value: string }) => (
 const CastingCuringSetupHeaderCard = ({
   castingType,
   castingStation,
-  motorIds,
+  motorId,
   motorReceivedAt,
   setup,
   onRemove,
@@ -85,7 +85,7 @@ const CastingCuringSetupHeaderCard = ({
       >
         <DetailItem label={L.castingType} value={castingType} />
         <DetailItem label={L.castingStation} value={castingStation} />
-        <DetailItem label={L.motorId} value={motorIds.join(", ")} />
+        <DetailItem label={L.motorId} value={motorId} />
         <DetailItem label={L.motorReceivedAt} value={motorReceivedAt} />
         <DetailItem label={L.initialVacuum} value={setup.initialVacuum} />
         <DetailItem label={L.castingVacuumPressure} value={setup.castingVacuumPressure} />

@@ -1,6 +1,6 @@
 import { useCallback, useState } from "react";
 import { systemManagerController } from "../../controllers/system_manager/systemManagerController";
-import { BatchSubDeptDetailsModel } from "../../data/models/systemManager/SystemManagerModel";
+import { BatchSubDeptDetailsModel } from "../../data/models/SystemManagerModel";
 
 export const useBatchSubDeptDetails = () => {
   const [details, setDetails] = useState<BatchSubDeptDetailsModel | null>(null);

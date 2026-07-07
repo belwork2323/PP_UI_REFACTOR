@@ -1,0 +1,325 @@
+{
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "TRIMMING",
+  "functionality": "CREATE_TRIMMING_FORM",
+  "motorStage": 2,
+  "message": "Trimming schema fetched successfully",
+  "meta": {
+    "title": "Trimming Form",
+    "description": "Motor trimming operations and dimensional verification for stage 2"
+  },
+  "data": {
+    "layout": {
+      "type": "flat"
+    },
+    "meta": {
+      "title": "Trimming Form",
+      "description": "Motor trimming operations and dimensional verification for stage 2"
+    },
+    "ui": {
+      "layout": "flat",
+      "gap": "md",
+      "sectionVariant": "card",
+      "sectionBorderRadius": "sm",
+      "designSystem": {
+        "colors": {
+          "primary": "#6A1B9A",
+          "primaryLight": "#8E24AA",
+          "surface": "#F4F6F8",
+          "border": "#D5D8DC",
+          "text": "#1C2833",
+          "textSub": "#5D6D7E"
+        },
+        "typography": {},
+        "spacing": {
+          "xs": 4,
+          "sm": 8,
+          "md": 12,
+          "lg": 16,
+          "xl": 24
+        },
+        "radius": {
+          "sm": 4,
+          "md": 6,
+          "lg": 8
+        },
+        "icons": {
+          "sectionDefault": "description",
+          "trimming": "content_cut"
+        }
+      }
+    },
+    "context": {
+      "motorStage": 2
+    },
+    "sections": [
+      {
+        "sectionId": "TRIMMING_DETAILS",
+        "sectionName": "Trimming Details",
+        "type": "table",
+        "addRowAllowed": true,
+        "columns": [
+          {
+            "fieldId": "MACHINE_DETAILS",
+            "label": "Machine Details",
+            "type": "text",
+            "required": true
+          },
+          {
+            "fieldId": "START_DATE",
+            "label": "Start Date",
+            "type": "date",
+            "required": true
+          },
+          {
+            "fieldId": "COMPLETION_DATE",
+            "label": "Completion Date",
+            "type": "date"
+          },
+          {
+            "fieldId": "ARBOR_SIZE",
+            "label": "Arbor Size",
+            "type": "number"
+          },
+          {
+            "fieldId": "CUTTER_SIZE",
+            "label": "Cutter Size",
+            "type": "number"
+          },
+          {
+            "fieldId": "MOTOR_AND_ARBOR_TRUING",
+            "label": "Motor And Arbor Truing",
+            "type": "text"
+          },
+          {
+            "fieldId": "REMARKS",
+            "label": "Remarks",
+            "type": "textarea"
+          }
+        ]
+      },
+      {
+        "sectionId": "DIMENSIONS_AFTER_TRIMMING",
+        "sectionName": "Dimensions After Trimming",
+        "type": "stageSpecific",
+        "motorStage": 2,
+        "tables": [
+          {
+            "tableId": "MAIN_DIMENSION_TABLE",
+            "title": "For Motor Stage 2",
+            "tableType": "MATRIX",
+            "addRowAllowed": false,
+            "rows": [
+              {
+                "rowId": "A_HEIGHT_BEFORE",
+                "dimension": "A (Height)",
+                "measurementType": "Before Trimming"
+              },
+              {
+                "rowId": "A_HEIGHT_AFTER",
+                "dimension": "A (Height)",
+                "measurementType": "After Trimming"
+              },
+              {
+                "rowId": "B_ID_BEFORE",
+                "dimension": "B (ID)",
+                "measurementType": "Before Trimming"
+              },
+              {
+                "rowId": "B_ID_AFTER",
+                "dimension": "B (ID)",
+                "measurementType": "After Trimming"
+              },
+              {
+                "rowId": "C_ARC",
+                "dimension": "C (ARC)",
+                "measurementType": "ARC_CHECK"
+              }
+            ],
+            "columns": [
+              {
+                "fieldId": "SPECIFIED",
+                "label": "Specified",
+                "type": "number",
+                "unit": "mm"
+              },
+              {
+                "fieldId": "R2T",
+                "label": "R2T",
+                "type": "number",
+                "unit": "mm"
+              },
+              {
+                "fieldId": "R2B",
+                "label": "R2B",
+                "type": "number",
+                "unit": "mm"
+              },
+              {
+                "fieldId": "R1L",
+                "label": "R1L",
+                "type": "number",
+                "unit": "mm"
+              },
+              {
+                "fieldId": "R1R",
+                "label": "R1R",
+                "type": "number",
+                "unit": "mm"
+              }
+            ],
+            "specialRows": [
+              {
+                "rowId": "C_ARC",
+                "type": "instruction",
+                "instruction": "ARC R80 measurement with template using chalk powder transfer."
+              }
+            ]
+          },
+          {
+            "tableId": "C2_ID_VARIATION_TABLE",
+            "title": "B (ID) Measurements",
+            "tableType": "MATRIX",
+            "addRowAllowed": false,
+            "rows": [
+              {
+                "rowId": "B_ID_BEFORE",
+                "dimension": "B (ID)",
+                "measurementType": "Before Trimming"
+              },
+              {
+                "rowId": "B_ID_AFTER",
+                "dimension": "B (ID)",
+                "measurementType": "After Trimming"
+              }
+            ],
+            "columns": [
+              {
+                "fieldId": "R2T_R2B",
+                "label": "R2T-R2B",
+                "type": "number",
+                "unit": "mm"
+              },
+              {
+                "fieldId": "BR_TL",
+                "label": "BR-TL",
+                "type": "number",
+                "unit": "mm"
+              },
+              {
+                "fieldId": "BL_TR",
+                "label": "BL-TR",
+                "type": "number",
+                "unit": "mm"
+              },
+              {
+                "fieldId": "R1L_R1R",
+                "label": "R1L-R1R",
+                "type": "number",
+                "unit": "mm"
+              }
+            ]
+          },
+          {
+            "tableId": "C2_DEPTH_MEASUREMENT_TABLE",
+            "title": "X (Depth)",
+            "tableType": "MATRIX",
+            "addRowAllowed": false,
+            "rows": [
+              {
+                "rowId": "X_DEPTH_AFTER",
+                "dimension": "X (Depth)",
+                "measurementType": "After Trimming"
+              }
+            ],
+            "columns": [
+              {
+                "fieldId": "SPECIFIED",
+                "label": "Specified",
+                "type": "number",
+                "unit": "mm"
+              },
+              {
+                "fieldId": "R2T",
+                "label": "R2T",
+                "type": "number"
+              },
+              {
+                "fieldId": "AB_1",
+                "label": "AB",
+                "type": "number"
+              },
+              {
+                "fieldId": "AB_2",
+                "label": "AB",
+                "type": "number"
+              },
+              {
+                "fieldId": "B1R",
+                "label": "B1R",
+                "type": "number"
+              },
+              {
+                "fieldId": "C1",
+                "label": "C1",
+                "type": "number"
+              },
+              {
+                "fieldId": "CD",
+                "label": "CD",
+                "type": "number"
+              },
+              {
+                "fieldId": "D",
+                "label": "D",
+                "type": "number"
+              },
+              {
+                "fieldId": "R2B",
+                "label": "R2B",
+                "type": "number"
+              },
+              {
+                "fieldId": "E",
+                "label": "E",
+                "type": "number"
+              },
+              {
+                "fieldId": "EF",
+                "label": "EF",
+                "type": "number"
+              },
+              {
+                "fieldId": "F",
+                "label": "F",
+                "type": "number"
+              },
+              {
+                "fieldId": "R1L",
+                "label": "R1L",
+                "type": "number"
+              },
+              {
+                "fieldId": "G",
+                "label": "G",
+                "type": "number"
+              },
+              {
+                "fieldId": "GH",
+                "label": "GH",
+                "type": "number"
+              },
+              {
+                "fieldId": "H",
+                "label": "H",
+                "type": "number"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

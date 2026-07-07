@@ -3,7 +3,9 @@ import { STRINGS } from "../../../app/config/strings";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshStore";
-import {mixingController} from "../../../controllers/user/manufacturing/mixingController";
+import { batchManagementController } from "../../../controllers/admin/BatchManagement/batchManagementController";
+import { mixingController } from "../../../controllers/user/manufacturing/mixingController";
+import type { IdentificationSheet } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
 import {
   createDefaultMixingFormState,
   hasAnyMixingValue,
@@ -14,7 +16,7 @@ import {
 import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 
-type WorkflowView = "list" | "form";
+type WorkflowView = "list" | "form" | "details";
 
 type MixingBatch = {
   batchId: string;
@@ -41,11 +43,22 @@ export const useMixingHook = () => {
   const [activeBatch, setActiveBatch] = useState<MixingBatch | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [loadingFormDetails, setLoadingFormDetails] = useState(false);
+  const [detailsRow, setDetailsRow] = useState<any>(null);
+  const [detailsData, setDetailsData] = useState<any>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
   const resolvePremixCount = (batch?: MixingBatch | null) =>
     Number(batch?.numberOfPremix ?? batch?.identificationSheet?.numberOfPremix ?? 1) || 1;
+
+  const loadBatchIdentificationSheet = useCallback(async (batchId: string) => {
+    const details = await batchManagementController.getBatchById(batchId);
+    const identificationSheet = (details?.identificationSheet ?? null) as IdentificationSheet | null;
+    const numberOfPremix = Number(identificationSheet?.numberOfPremix) || 1;
+
+    return { identificationSheet, numberOfPremix };
+  }, []);
 
   const [formData, setFormData] = useState<MixingFormState>(() => createDefaultMixingFormState());
   const [initialSnapshot, setInitialSnapshot] = useState("{}");
@@ -77,55 +90,108 @@ export const useMixingHook = () => {
 
   const openFormWithResolvedData = useCallback(
     async (batch: MixingBatch, editMode: boolean) => {
+      if (!batch.batchId) {
+        showAlert(STRINGS.MANUFACTURING.MIXING.BATCH_ID_MISSING, "error");
+        return;
+      }
+
       const status = parseStatus(batch.mxStatus);
       const shouldFetchDetails =
         editMode ||
         status === parseStatus(MX_STATUS.IN_PROGRESS) ||
         status === parseStatus(MX_STATUS.REJECTED);
 
-      let nextBatch = batch;
-      const premixCount = resolvePremixCount(batch);
-      let nextFormData = createDefaultMixingFormState();
+      setLoadingFormDetails(true);
 
-      if (shouldFetchDetails) {
-        if (!subDepartmentId) {
-          showAlert(STRINGS.MANUFACTURING.MIXING.SUB_DEPARTMENT_MISSING, "error");
-          return;
-        }
-        if (!batch.formId) {
-          showAlert(STRINGS.MANUFACTURING.MIXING.FORM_ID_MISSING, "error");
-          return;
+      try {
+        const { identificationSheet, numberOfPremix } = await loadBatchIdentificationSheet(batch.batchId);
+
+        let nextBatch: MixingBatch = {
+          ...batch,
+          identificationSheet,
+          numberOfPremix,
+        };
+        let nextFormData = createDefaultMixingFormState();
+
+        if (shouldFetchDetails) {
+          if (!subDepartmentId) {
+            showAlert(STRINGS.MANUFACTURING.MIXING.SUB_DEPARTMENT_MISSING, "error");
+            return;
+          }
+          if (!batch.formId) {
+            showAlert(STRINGS.MANUFACTURING.MIXING.FORM_ID_MISSING, "error");
+            return;
+          }
+
+          const detailsResponse = await mixingController.fetchFormDetails({
+            formId: batch.formId,
+          });
+
+          if (!detailsResponse?.success || !detailsResponse?.data) {
+            const fallback =
+              detailsResponse?.statusCode === 404
+                ? STRINGS.MANUFACTURING.MIXING.DETAILS_NOT_FOUND
+                : STRINGS.MANUFACTURING.MIXING.DETAILS_FETCH_ERROR;
+            showAlert(getErrorMessage(detailsResponse, fallback), "error");
+            return;
+          }
+
+          nextBatch = {
+            ...nextBatch,
+            formId: detailsResponse.data.formId || batch.formId,
+          };
+          nextFormData = mapMixingDetailsToFormState(detailsResponse.data);
         }
 
-        setLoadingFormDetails(true);
-        const detailsResponse = await mixingController.fetchFormDetails({
-          formId: batch.formId,
-          subDepartmentId,
-        });
+        setActiveBatch(nextBatch);
+        setIsEditMode(editMode);
+        setFormData(nextFormData);
+        setInitialSnapshot(JSON.stringify(nextFormData));
+        setView("form");
+      } finally {
         setLoadingFormDetails(false);
-
-        if (!detailsResponse?.success || !detailsResponse?.data) {
-          const fallback =
-            detailsResponse?.statusCode === 404
-              ? STRINGS.MANUFACTURING.MIXING.DETAILS_NOT_FOUND
-              : STRINGS.MANUFACTURING.MIXING.DETAILS_FETCH_ERROR;
-          showAlert(getErrorMessage(detailsResponse, fallback), "error");
-          return;
-        }
-
-        nextBatch = { ...batch, formId: detailsResponse.data.formId || batch.formId };
-        nextFormData = mapMixingDetailsToFormState(detailsResponse.data);
+      }
+    },
+    [loadBatchIdentificationSheet, showAlert, subDepartmentId],
+  );
+  const handleViewMixingDetails = useCallback(
+    async (row: MixingBatch) => {
+      if (!row.formId) {
+        showAlert(
+          STRINGS.MANUFACTURING.MIXING.FORM_ID_MISSING,
+          "error"
+        );
+        return;
       }
 
-      setActiveBatch(nextBatch);
-      setIsEditMode(editMode);
-      setFormData(nextFormData);
-      setInitialSnapshot(JSON.stringify(nextFormData));
-      setView("form");
-    },
-    [showAlert, subDepartmentId]
-  );
+      setDetailsLoading(true);
 
+      const response = await mixingController.fetchFormDetails({
+        formId: row.formId,
+      });
+
+      setDetailsLoading(false);
+
+      if (!response?.success || !response?.data) {
+        showAlert(
+          response?.message ??
+            STRINGS.MANUFACTURING.MIXING.DETAILS_FETCH_ERROR,
+          "error"
+        );
+        return;
+      }
+
+      setDetailsRow(row);
+      setDetailsData(response.data);
+      setView("details");
+    },
+    [showAlert]
+  );
+  const handleBackFromDetails = useCallback(() => {
+    setDetailsRow(null);
+    setDetailsData(null);
+    setView("list");
+  }, []);
   const handleFillForm = useCallback(
     async (batch: MixingBatch) => await openFormWithResolvedData(batch, false),
     [openFormWithResolvedData]
@@ -170,8 +236,8 @@ export const useMixingHook = () => {
 
       const status = parseStatus(activeBatch.mxStatus);
       const isCreateFlow = status === parseStatus(MX_STATUS.INITIATED) && !activeBatch.formId;
-      const payloadBody = mapMixingFormStateToPayload(formData);
-
+      // const payloadBody = mapMixingFormStateToPayload(formData);
+      const mixingDetails = mapMixingFormStateToPayload(formData);
       setActionLoading(true);
       try {
         let response: any;
@@ -185,7 +251,7 @@ export const useMixingHook = () => {
             batchId: activeBatch.batchId,
             subDepartmentId,
             formSubmissionType: intent === "draft" ? "DRAFT" : "SUBMIT",
-            ...payloadBody,
+            ...mixingDetails,
           });
         } else {
           if (!activeBatch.formId) {
@@ -193,11 +259,12 @@ export const useMixingHook = () => {
             return false;
           }
           response = await mixingController.updateForm({
-            formId: activeBatch.formId,
-            subDepartmentId,
-            formSubmissionType: intent === "draft" ? "DRAFT" : "UPDATE",
-            ...payloadBody,
-          });
+          formId: activeBatch.formId,
+          batchId: activeBatch.batchId,
+          subDepartmentId,
+          formSubmissionType: intent === "draft" ? "DRAFT" : "SUBMIT",
+          ...mixingDetails,
+        });
         }
 
         if (!response?.success) {
@@ -268,6 +335,11 @@ export const useMixingHook = () => {
     handleFormChange,
     handleSaveDraft,
     handleSubmit,
+    detailsRow,
+    detailsData,
+    detailsLoading,
+    handleViewMixingDetails,
+    handleBackFromDetails,
   };
 };
 

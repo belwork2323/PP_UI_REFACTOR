@@ -1,0 +1,67 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "QC",
+    "layout": { "type": "flat" },
+    "division": "PROPELLANT_PROPERTIES",
+    "subType": "INTERFACE_PROPERTIES",
+    "subDepartmentId": 115,
+    "functionality": "CREATE_QC_PROPELLANT_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "QC",
+  "division": "PROPELLANT_PROPERTIES",
+  "subType": "INTERFACE_PROPERTIES",
+  "functionality": "CREATE_QC_PROPELLANT_FORM",
+  "message": "Interface properties schema fetched successfully",
+  "timestamp": "2026-06-10T10:00:00Z",
+  "data": {
+    "layout": { "type": "flat" },
+    "meta": {
+      "title": "Interface Properties",
+      "description": "Propellant interface testing details"
+    },
+    "sections": [
+      {
+        "id": "INTERFACE_PROPERTIES",
+        "title": "Interface Properties",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "INTERFACE_PROPERTIES",
+            "allowAddColumn": true,
+            "addColumnPrefix": "FM_",
+            "columnActions": {
+              "position": "top-right",
+              "addLabel": "Add Column"
+            },
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "SAMPLE_NO",
+              "presetRows": [
+                { "readonly": true, "SAMPLE_NO": 1, "PROPERTY": "Peel Strength (kgf/cm)" },
+                { "readonly": true, "SAMPLE_NO": 2, "PROPERTY": "SBS (kgf/cm²)" },
+                { "readonly": true, "SAMPLE_NO": 3, "PROPERTY": "TBS (kgf/cm²)" },
+                { "readonly": true, "PROPERTY": "Avg." },
+                { "readonly": true, "PROPERTY": "Std." }
+              ]
+            },
+            "columns": [
+              { "type": "column", "id": "SAMPLE_NO", "fieldType": "serial", "label": "Sample No", "readonly": true },
+              { "type": "column", "id": "PROPERTY", "fieldType": "static", "label": "Property", "readonly": true },
+              { "type": "column", "id": "SPECIFICATION", "fieldType": "text", "label": "Specification" },
+              { "type": "column", "id": "FM_1", "fieldType": "number", "label": "FM-1" },
+              { "type": "column", "id": "FM_2", "fieldType": "number", "label": "FM-2" },
+              { "type": "column", "id": "FM_3", "fieldType": "number", "label": "FM-3" },
+              { "type": "column", "id": "REMARKS", "fieldType": "textarea", "label": "Remarks" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

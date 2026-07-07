@@ -7,7 +7,7 @@ export const createDispatchFormApi = async (payload: any) => {
 
 export const fetchDispatchFormDetailsApi = async (payload: {
   formId: string;
-  subDepartmentId: number;
+  // subDepartmentId: number;
 }) => {
   return await post(USER_DISPATCH_ENDPOINTS.FORM_DETAILS, payload);
 };

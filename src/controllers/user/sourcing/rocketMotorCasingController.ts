@@ -1,4 +1,5 @@
 import { ApiResponseModel } from "../../../data/models/common/ApiResponseModel";
+import { normalizeListStatusFilter } from "../../../hooks/operationStatus";
 import {
   RocketMotorCasingDetailsModel,
   RocketMotorCasingSubmitResponseModel,
@@ -28,7 +29,10 @@ export type RocketMotorCasingDetailsPayload = {
 export const rocketMotorCasingController = {
   fetchCasingList: async (payload: RocketMotorCasingListRequest) => {
     try {
-      const response = await fetchRocketMotorCasingListApi(payload);
+      const response = await fetchRocketMotorCasingListApi({
+        ...payload,
+        ...(payload.status ? { status: normalizeListStatusFilter(payload.status) } : {}),
+      });
       return new ApiResponseModel(response);
     } catch (error) {
       console.error("Failed to fetch rocket motor casing list:", error);

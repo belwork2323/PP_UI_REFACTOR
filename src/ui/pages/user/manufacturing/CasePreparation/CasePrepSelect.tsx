@@ -38,7 +38,7 @@ const CasePrepSelect = ({
   width = "100%",
   theme,
 }: CasePrepSelectProps) => {
-  const cpTheme = theme.manufacturing.casePreparation;
+  const cpTheme = theme.manufacturing?.casePreparation;
   const flowBar = cpTheme?.flowBar ?? {};
   const accentColor = theme.palette.primaryLight ?? theme.palette.primary;
   const hasValue = String(value ?? "").trim().length > 0;

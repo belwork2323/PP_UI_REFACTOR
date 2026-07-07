@@ -5,12 +5,16 @@ import {
   type RocketMotorCasingApproverListPayload,
 } from "../../data/api/approver/rocketMotorCasingApproverApi";
 import { ApiResponseModel } from "../../data/models/common/ApiResponseModel";
+import { normalizeListStatusFilter } from "../../hooks/operationStatus";
 import { RocketMotorCasingApproverListModel } from "../../data/models/approver/RocketMotorCasingApproverModel";
 
 const rocketMotorCasingApproverController = {
   fetchCasingList: async (payload: RocketMotorCasingApproverListPayload) => {
     try {
-      const response = await fetchRocketMotorCasingApproverListApi(payload);
+      const response = await fetchRocketMotorCasingApproverListApi({
+        ...payload,
+        ...(payload.status ? { status: normalizeListStatusFilter(payload.status) } : {}),
+      });
       return new ApiResponseModel(response, (res) =>
         RocketMotorCasingApproverListModel.fromApi(res),
       );

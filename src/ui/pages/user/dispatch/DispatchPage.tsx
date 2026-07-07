@@ -1,11 +1,13 @@
-import React from "react";
-import { Box, CircularProgress } from "@mui/material";
+import React, { useMemo, useState } from "react";
+import { Box, Button, CircularProgress, Stack } from "@mui/material";
 import ConfirmAlertDialog from "../../../components/common/ConfirmAlertDialog";
 import UserWorkflowFormHeader from "../../../components/custom/UserWorkflowFormHeader";
 import { STRINGS } from "../../../../app/config/strings";
 import DispatchList from "./DispatchList";
 import DispatchForm from "./DispatchForm";
 import useDispatchHook from "../../../../hooks/user/dispatch/useDispatchWorkflowHook";
+import getManufacturingTheme from "../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
+import DispatchDetailsView from "./DispatchDetailsView";
 
 const dispatchTheme = {
   palette: {
@@ -131,6 +133,11 @@ const dispatchTheme = {
 };
 
 const DispatchPage = () => {
+  const flowBarTheme = useMemo(() => getManufacturingTheme("light"), []);
+  const strings = STRINGS.DISPATCH;
+  const [draftConfirmOpen, setDraftConfirmOpen] = useState(false);
+  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+
   const hookState = useDispatchHook();
   const {
     loading,
@@ -138,65 +145,172 @@ const DispatchPage = () => {
     activeBatch,
     isEditMode,
     formData,
-    loadingFormDetails,
+    // loadingFormDetails,
+    schemaLoading,
+    schemaError,
     actionLoading,
     backConfirmOpen,
+    subDepartmentId,
     setBackConfirmOpen,
     handleBack,
-    handleFormChange,
     handleDiscardAndBack,
+    updateSetupField,
+    handleLoadDispatchForm,
+    handleFormValuesChange,
     handleSaveDraft,
     handleSubmit,
+    detailsRow,
+    detailsData,
+    detailsLoading,
+    handleBackFromDetails,
   } = hookState;
 
-  if (loading)
+  const canAct = formData.schemaFormLoaded;
+
+  if (loading) {
     return (
       <Box sx={dispatchTheme.workflow.loadingContainer}>
         <CircularProgress size={32} />
       </Box>
     );
+  }
 
-  if (view === "list")
+  if (view === "list") {
     return (
       <Box sx={dispatchTheme.workflow.animatedContainer}>
         <DispatchList hookState={hookState} />
       </Box>
     );
-
+  }
+  if (view === "details") {
+    return (
+      <DispatchDetailsView
+        row={detailsRow}
+        data={detailsData}
+        loading={detailsLoading}
+        onBack={handleBackFromDetails}
+      />
+    );
+  }
   return (
     <Box sx={dispatchTheme.workflow.animatedContainer}>
-      {activeBatch && (
-        <UserWorkflowFormHeader
-          batch={activeBatch}
-          isEdit={isEditMode}
-          onBack={handleBack}
-          newLabel={STRINGS.DISPATCH.NEW_LABEL}
-          includeMotorType
-          backLabel={STRINGS.QUALITY_CONTROL.FORM_HEADER.BACK_TO_LIST}
-          editLabel={STRINGS.QUALITY_CONTROL.FORM_HEADER.EDITING_REJECTED}
-          rejectionTitle={STRINGS.QUALITY_CONTROL.FORM_HEADER.REJECTION_REASON}
-          theme={dispatchTheme}
-        />
-      )}
+      {activeBatch ? (
+        <>
+          <UserWorkflowFormHeader
+            batch={{
+              ...activeBatch,
+              lotId: activeBatch.batchId,
+            }}
+            isEdit={isEditMode}
+            onBack={handleBack}
+            newLabel={strings.NEW_LABEL}
+            batchHeadingOverride={{
+              title: activeBatch.batchId,
+              subtitle: [activeBatch.projectName, activeBatch.projectId]
+                .filter(Boolean)
+                .join(" · "),
+            }}
+            backLabel={STRINGS.QUALITY_CONTROL.FORM_HEADER.BACK_TO_LIST}
+            editLabel={STRINGS.QUALITY_CONTROL.FORM_HEADER.EDITING_REJECTED}
+            rejectionTitle={STRINGS.QUALITY_CONTROL.FORM_HEADER.REJECTION_REASON}
+            theme={dispatchTheme}
+          />
 
-      {!loadingFormDetails && activeBatch && (
-        <DispatchForm
-          initialData={formData}
-          isEditMode={isEditMode}
-          onDataChange={handleFormChange}
-          onSaveDraft={handleSaveDraft}
-          onSubmit={handleSubmit}
-          actionLoading={actionLoading}
-        />
-      )}
+          {/* {!loadingFormDetails ? (
+            <DispatchForm
+              batch={activeBatch}
+              formData={formData}
+              subDepartmentId={subDepartmentId}
+              isEditMode={isEditMode}
+              schemaLoading={schemaLoading}
+              schemaError={schemaError}
+              flowBarTheme={flowBarTheme}
+              onSetupChange={updateSetupField}
+              onLoadDispatchForm={handleLoadDispatchForm}
+              onFormValuesChange={handleFormValuesChange}
+              theme={dispatchTheme}
+            />
+          ) : null} */}
+
+          {/* {!loadingFormDetails ? (
+            <>
+              <Box
+                sx={{
+                  mt: 2,
+                  p: "12px 16px",
+                  borderRadius: 2,
+                  background: "#fff",
+                  border: "1.5px solid #D5D8DC",
+                }}
+              >
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  alignItems={{ sm: "center" }}
+                  justifyContent="space-between"
+                  gap={1.5}
+                >
+                  <Box>
+                    <Box component="span" sx={{ fontSize: "0.76rem", fontWeight: 700, color: "#1C2833" }}>
+                      {canAct ? strings.READY_TO_SUBMIT : strings.NOT_READY_TO_SUBMIT}
+                    </Box>
+                  </Box>
+                  <Stack direction="row" gap={1}>
+                    <Button
+                      variant="outlined"
+                      disabled={!canAct || actionLoading}
+                      onClick={() => setDraftConfirmOpen(true)}
+                    >
+                      {strings.SAVE_DRAFT_LABEL}
+                    </Button>
+                    <Button
+                      variant="contained"
+                      disabled={!canAct || actionLoading}
+                      onClick={() => setSubmitConfirmOpen(true)}
+                    >
+                      {isEditMode ? strings.RESUBMIT_LABEL : strings.SUBMIT_LABEL}
+                    </Button>
+                  </Stack>
+                </Stack>
+              </Box>
+
+              <ConfirmAlertDialog
+                open={draftConfirmOpen}
+                severity="info"
+                title={strings.DRAFT_CONFIRM_TITLE}
+                message={strings.DRAFT_CONFIRM_MESSAGE}
+                confirmLabel={strings.DRAFT_CONFIRM_LABEL}
+                cancelLabel={strings.CONFIRM_CANCEL_LABEL}
+                onConfirm={async () => {
+                  setDraftConfirmOpen(false);
+                  await handleSaveDraft();
+                }}
+                onCancel={() => setDraftConfirmOpen(false)}
+              />
+              <ConfirmAlertDialog
+                open={submitConfirmOpen}
+                severity="warning"
+                title={isEditMode ? strings.RESUBMIT_CONFIRM_TITLE : strings.SUBMIT_CONFIRM_TITLE}
+                message={isEditMode ? strings.RESUBMIT_CONFIRM_MESSAGE : strings.SUBMIT_CONFIRM_MESSAGE}
+                confirmLabel={isEditMode ? strings.RESUBMIT_CONFIRM_LABEL : strings.SUBMIT_CONFIRM_LABEL}
+                cancelLabel={strings.CONFIRM_GO_BACK_LABEL}
+                onConfirm={async () => {
+                  setSubmitConfirmOpen(false);
+                  await handleSubmit();
+                }}
+                onCancel={() => setSubmitConfirmOpen(false)}
+              />
+            </>
+          ) : null} */}
+        </>
+      ) : null}
 
       <ConfirmAlertDialog
         open={backConfirmOpen}
         severity="warning"
-        title={STRINGS.DISPATCH.UNSAVED_BACK_TITLE}
-        message={STRINGS.DISPATCH.UNSAVED_BACK_MESSAGE}
-        confirmLabel={STRINGS.DISPATCH.UNSAVED_BACK_DISCARD}
-        cancelLabel={STRINGS.DISPATCH.UNSAVED_BACK_CONFIRM}
+        title={strings.UNSAVED_BACK_TITLE}
+        message={strings.UNSAVED_BACK_MESSAGE}
+        confirmLabel={strings.UNSAVED_BACK_DISCARD}
+        cancelLabel={strings.UNSAVED_BACK_CONFIRM}
         onConfirm={handleDiscardAndBack}
         onCancel={() => setBackConfirmOpen(false)}
       />

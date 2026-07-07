@@ -1,40 +1,53 @@
 // src/pages/DashboardPage.jsx
-import React, { useState } from 'react';
+import React, { useState } from "react";
 import {
-  Box, Typography, Stack, Avatar, Chip,
-  TextField, MenuItem, Select, FormControl, InputLabel,
-  InputAdornment, IconButton, Collapse, CircularProgress, Badge,
-} from '@mui/material';
-import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import { DatePicker } from '@mui/x-date-pickers/DatePicker';
-import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
-import dayjs from 'dayjs';
-import { LineChart, BarChart } from '@mui/x-charts';
-import SearchIcon        from '@mui/icons-material/Search';
-import ClearIcon         from '@mui/icons-material/Clear';
-import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
+  Box,
+  Typography,
+  Stack,
+  Avatar,
+  Chip,
+  TextField,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
+  InputAdornment,
+  IconButton,
+  Collapse,
+  CircularProgress,
+  Badge,
+} from "@mui/material";
+import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
+import { DatePicker } from "@mui/x-date-pickers/DatePicker";
+import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
+import dayjs from "dayjs";
+import { LineChart, BarChart } from "@mui/x-charts";
+import SearchIcon from "@mui/icons-material/Search";
+import ClearIcon from "@mui/icons-material/Clear";
+import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
 
-import { icons } from '../../../../app/theme';
-import { STRINGS } from '../../../../app/config/strings';
-import getDashboardTheme from '../../../../app/theme/custom_themes/admin/dashboard_theme';
-import { useDashboard } from '../../../../hooks/admin/dashboardHook';
+import { icons } from "../../../../app/theme";
+import { STRINGS } from "../../../../app/config/strings";
+import getDashboardTheme from "../../../../app/theme/custom_themes/admin/dashboard_theme";
+import { useDashboard } from "../../../../hooks/admin/dashboardHook";
 
-import Card from '../../../components/common/Card';
-import SectionHeader from '../../../components/common/SectionHeader';
-import StackRow from '../../../components/common/StackRow';
-import FilterSelect from '../../../components/common/FilterSelect';
-import FilterToggleButton from '../../../components/custom/FilterToggleButton';
-import FilterPanelHeader from '../../../components/custom/FilterPanelHeader';
-import DateRangeRow from '../../../components/custom/DateRangeRow';
-import DashboardChartCard from '../../../components/custom/DashboardChartCard';
-import DashboardDateFilter from '../../../components/custom/DashboardDateFilter';
-import InProgressBatchesTable from '../../../components/custom/InProgressBatchesTable';
-import { DashKPICard, DashKPICardSkeleton } from '../../../components/custom/DashKPICard';
-
-
+import Card from "../../../components/common/Card";
+import SectionHeader from "../../../components/common/SectionHeader";
+import StackRow from "../../../components/common/StackRow";
+import FilterSelect from "../../../components/common/FilterSelect";
+import FilterToggleButton from "../../../components/custom/FilterToggleButton";
+import FilterPanelHeader from "../../../components/custom/FilterPanelHeader";
+import DateRangeRow from "../../../components/custom/DateRangeRow";
+import DashboardChartCard from "../../../components/custom/DashboardChartCard";
+import DashboardDateFilter from "../../../components/custom/DashboardDateFilter";
+import InProgressBatchesTable from "../../../components/custom/InProgressBatchesTable";
+import { DashKPICard, DashKPICardSkeleton } from "../../../components/custom/DashKPICard";
+import { APPROVER_BATCH_STATUS } from "../../../../data/models/approver/ApproverBatchListModel";
+import { useThemeStore } from "../../../../app/store/themeStore";
 
 // ─────────────────────────────────────────────────────────────────────────────
-export default function DashboardPage({ mode = 'light' }) {
+export default function DashboardPage() {
+  const mode = useThemeStore((s) => s.mode);
   const th = getDashboardTheme(mode);
   const t = STRINGS.DASHBOARD_PAGE;
   const NotificationsIcon = icons.systemManager.Notifications;
@@ -78,14 +91,22 @@ export default function DashboardPage({ mode = 'light' }) {
     activeFilterCount,
     // Events
     eventsLoading,
-    eventsFilterOpen, setEventsFilterOpen,
-    eventsSearchQuery, setEventsSearchQuery,
-    eventsType, setEventsType,
-    eventsDepartment, setEventsDepartment,
-    eventsSubDepartment, setEventsSubDepartment,
-    eventsDateFrom, setEventsDateFrom,
-    eventsDateTo, setEventsDateTo,
-    eventsCurrentMonthOnly, setEventsCurrentMonthOnly,
+    eventsFilterOpen,
+    setEventsFilterOpen,
+    eventsSearchQuery,
+    setEventsSearchQuery,
+    eventsType,
+    setEventsType,
+    eventsDepartment,
+    setEventsDepartment,
+    eventsSubDepartment,
+    setEventsSubDepartment,
+    eventsDateFrom,
+    setEventsDateFrom,
+    eventsDateTo,
+    setEventsDateTo,
+    eventsCurrentMonthOnly,
+    setEventsCurrentMonthOnly,
     eventsActiveFilterCount,
     clearEventsFilters,
 
@@ -111,29 +132,29 @@ export default function DashboardPage({ mode = 'light' }) {
   const activeBarIdx = pinnedBarIdx ?? hoverBarIdx;
   const activeLineIdx = pinnedLineIdx ?? hoverLineIdx;
   const activeAreaIdx = pinnedAreaIdx ?? hoverAreaIdx;
-  const activeBarPoint = typeof activeBarIdx === 'number' ? weeklyActivity[activeBarIdx] : null;
-  const activeLinePoint = typeof activeLineIdx === 'number' ? motorsProcessed[activeLineIdx] : null;
-  const activeAreaPoint = typeof activeAreaIdx === 'number' ? qcPassRate[activeAreaIdx] : null;
+  const activeBarPoint = typeof activeBarIdx === "number" ? weeklyActivity[activeBarIdx] : null;
+  const activeLinePoint = typeof activeLineIdx === "number" ? motorsProcessed[activeLineIdx] : null;
+  const activeAreaPoint = typeof activeAreaIdx === "number" ? qcPassRate[activeAreaIdx] : null;
 
   // ── Date helpers: DD-MM-YYYY ↔ YYYY-MM-DD (for MUI DatePicker) ───────────
   const toYMD = (ddmmyyyy: string) => {
-    if (!ddmmyyyy || ddmmyyyy.length !== 10) return '';
-    const [dd, mm, yyyy] = ddmmyyyy.split('-');
+    if (!ddmmyyyy || ddmmyyyy.length !== 10) return "";
+    const [dd, mm, yyyy] = ddmmyyyy.split("-");
     return `${yyyy}-${mm}-${dd}`;
   };
   const toDMY = (yyyymmdd: string) => {
-    if (!yyyymmdd) return '';
-    const [yyyy, mm, dd] = yyyymmdd.split('-');
+    if (!yyyymmdd) return "";
+    const [yyyy, mm, dd] = yyyymmdd.split("-");
     return `${dd}-${mm}-${yyyy}`;
   };
 
   const chartTimestamp = (() => {
-    if (!chartUpdatedAt) return 'not yet loaded';
-    const timeStr = chartUpdatedAt.toLocaleTimeString('en-US', {
+    if (!chartUpdatedAt) return "not yet loaded";
+    const timeStr = chartUpdatedAt.toLocaleTimeString("en-US", {
       hour12: false,
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit'
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
     });
     return `just updated at ${timeStr}`;
   })();
@@ -150,18 +171,17 @@ export default function DashboardPage({ mode = 'light' }) {
   // ─────────────────────────────────────────────────────────────────────────
   return (
     <Box sx={th.page}>
-
       {/* ══ Page Header ═══════════════════════════════════════════════════ */}
       <Stack sx={th.dashboard.pageHeader.wrapper}>
         <Box>
-          <Typography sx={th.dashboard.pageHeader.eyebrow}>{t.HEADER.EYEBROW}</Typography>
+          {/* <Typography sx={th.dashboard.pageHeader.eyebrow}>{t.HEADER.EYEBROW}</Typography> */}
           <Typography sx={th.dashboard.pageHeader.title}>{t.HEADER.TITLE}</Typography>
         </Box>
-        <Badge badgeContent={recentEvents.length} color="error" max={99}>
+        {/* <Badge badgeContent={recentEvents.length} color="error" max={99}>
           <Box sx={th.dashboard.pageHeader.notifBox}>
             <NotificationsIcon sx={th.dashboard.pageHeader.notifIcon} />
           </Box>
-        </Badge>
+        </Badge> */}
       </Stack>
 
       {/* ══ KPI Stats Filter Controls ══════════════════════════════════════ */}
@@ -214,8 +234,8 @@ export default function DashboardPage({ mode = 'light' }) {
               <DashKPICard
                 key={label}
                 label={label}
-                value={value ?? '-'}
-                sub={sub ?? '-'}
+                value={value ?? "-"}
+                // sub={sub ?? '-'}
                 Icon={Icon}
                 bg={bg}
                 cardSx={th.kpi.card}
@@ -226,8 +246,7 @@ export default function DashboardPage({ mode = 'light' }) {
                 avatarSx={th.kpi.avatarSx}
                 iconSx={th.kpi.iconSx}
               />
-            ))
-        }
+            ))}
       </Box>
 
       {/* ══ Charts ═════════════════════════════════════════════════════════ */}
@@ -253,38 +272,42 @@ export default function DashboardPage({ mode = 'light' }) {
             borderRadius={6}
             grid={{ horizontal: true }}
             hideLegend
-            axisHighlight={{ x: 'band' }}
+            axisHighlight={{ x: "band" }}
             highlightedItem={
-              typeof pinnedBarIdx === 'number'
-                ? { seriesId: 'bar-series', dataIndex: pinnedBarIdx }
+              typeof pinnedBarIdx === "number"
+                ? { seriesId: "bar-series", dataIndex: pinnedBarIdx }
                 : undefined
             }
             onHighlightChange={(item: any) => {
-              if (typeof item?.dataIndex === 'number') setHoverBarIdx(item.dataIndex);
+              if (typeof item?.dataIndex === "number") setHoverBarIdx(item.dataIndex);
               else setHoverBarIdx(null);
             }}
             onAxisClick={(_: any, axisData: any) => {
               const idx = axisData?.dataIndex;
-              if (typeof idx === 'number') setPinnedBarIdx((prev) => (prev === idx ? null : idx));
+              if (typeof idx === "number") setPinnedBarIdx((prev) => (prev === idx ? null : idx));
             }}
             onItemClick={(_: any, item: any) => {
               const idx = item?.dataIndex;
-              if (typeof idx === 'number') setPinnedBarIdx((prev) => (prev === idx ? null : idx));
+              if (typeof idx === "number") setPinnedBarIdx((prev) => (prev === idx ? null : idx));
             }}
-            xAxis={[{
-              scaleType: 'band',
-              data: weeklyActivity.map((d: any) => d.day),
-              categoryGapRatio: 0.45,
-              barGapRatio: 0.18,
-              ...chartTheme.xAxis,
-            }]}
-            yAxis={[{ position: 'none' }]}
-            series={[{
-              id: 'bar-series',
-              data: weeklyActivity.map((d: any) => d.v),
-              valueFormatter: (value: number | null) => `${value ?? 0}`,
-              ...chartTheme.barSeries,
-            }]}
+            xAxis={[
+              {
+                scaleType: "band",
+                data: weeklyActivity.map((d: any) => d.day),
+                categoryGapRatio: 0.45,
+                barGapRatio: 0.18,
+                ...chartTheme.xAxis,
+              },
+            ]}
+            yAxis={[{ position: "none" }]}
+            series={[
+              {
+                id: "bar-series",
+                data: weeklyActivity.map((d: any) => d.v),
+                valueFormatter: (value: number | null) => `${value ?? 0}`,
+                ...chartTheme.barSeries,
+              },
+            ]}
             slotProps={chartTheme.tooltipSlotProps}
             sx={chartTheme.barChartSx}
           />
@@ -310,40 +333,44 @@ export default function DashboardPage({ mode = 'light' }) {
             margin={chartTheme.margin.line}
             grid={{ horizontal: true }}
             hideLegend
-            axisHighlight={{ x: 'line' }}
+            axisHighlight={{ x: "line" }}
             highlightedItem={
-              typeof pinnedLineIdx === 'number'
-                ? { seriesId: 'line-series', dataIndex: pinnedLineIdx }
+              typeof pinnedLineIdx === "number"
+                ? { seriesId: "line-series", dataIndex: pinnedLineIdx }
                 : undefined
             }
             onHighlightChange={(item: any) => {
-              if (typeof item?.dataIndex === 'number') setHoverLineIdx(item.dataIndex);
+              if (typeof item?.dataIndex === "number") setHoverLineIdx(item.dataIndex);
               else setHoverLineIdx(null);
             }}
             onAxisClick={(_: any, axisData: any) => {
               const idx = axisData?.dataIndex;
-              if (typeof idx === 'number') setPinnedLineIdx((prev) => (prev === idx ? null : idx));
+              if (typeof idx === "number") setPinnedLineIdx((prev) => (prev === idx ? null : idx));
             }}
             onLineClick={(_: any, item: any) => {
               const idx = item?.dataIndex;
-              if (typeof idx === 'number') setPinnedLineIdx((prev) => (prev === idx ? null : idx));
+              if (typeof idx === "number") setPinnedLineIdx((prev) => (prev === idx ? null : idx));
             }}
             onMarkClick={(_: any, item: any) => {
               const idx = item?.dataIndex;
-              if (typeof idx === 'number') setPinnedLineIdx((prev) => (prev === idx ? null : idx));
+              if (typeof idx === "number") setPinnedLineIdx((prev) => (prev === idx ? null : idx));
             }}
-            xAxis={[{
-              scaleType: 'point',
-              data: motorsProcessed.map((d: any) => d.m),
-              ...chartTheme.xAxis,
-            }]}
-            yAxis={[{ position: 'none' }]}
-            series={[{
-              id: 'line-series',
-              data: motorsProcessed.map((d: any) => d.v),
-              valueFormatter: (value: number | null) => `${value ?? 0}`,
-              ...chartTheme.lineSeries,
-            }]}
+            xAxis={[
+              {
+                scaleType: "point",
+                data: motorsProcessed.map((d: any) => d.m),
+                ...chartTheme.xAxis,
+              },
+            ]}
+            yAxis={[{ position: "none" }]}
+            series={[
+              {
+                id: "line-series",
+                data: motorsProcessed.map((d: any) => d.v),
+                valueFormatter: (value: number | null) => `${value ?? 0}`,
+                ...chartTheme.lineSeries,
+              },
+            ]}
             slotProps={chartTheme.tooltipSlotProps}
             sx={chartTheme.lineChartSx}
           />
@@ -369,40 +396,44 @@ export default function DashboardPage({ mode = 'light' }) {
             margin={chartTheme.margin.line}
             grid={{ horizontal: true }}
             hideLegend
-            axisHighlight={{ x: 'line' }}
+            axisHighlight={{ x: "line" }}
             highlightedItem={
-              typeof pinnedAreaIdx === 'number'
-                ? { seriesId: 'area-series', dataIndex: pinnedAreaIdx }
+              typeof pinnedAreaIdx === "number"
+                ? { seriesId: "area-series", dataIndex: pinnedAreaIdx }
                 : undefined
             }
             onHighlightChange={(item: any) => {
-              if (typeof item?.dataIndex === 'number') setHoverAreaIdx(item.dataIndex);
+              if (typeof item?.dataIndex === "number") setHoverAreaIdx(item.dataIndex);
               else setHoverAreaIdx(null);
             }}
             onAxisClick={(_: any, axisData: any) => {
               const idx = axisData?.dataIndex;
-              if (typeof idx === 'number') setPinnedAreaIdx((prev) => (prev === idx ? null : idx));
+              if (typeof idx === "number") setPinnedAreaIdx((prev) => (prev === idx ? null : idx));
             }}
             onLineClick={(_: any, item: any) => {
               const idx = item?.dataIndex;
-              if (typeof idx === 'number') setPinnedAreaIdx((prev) => (prev === idx ? null : idx));
+              if (typeof idx === "number") setPinnedAreaIdx((prev) => (prev === idx ? null : idx));
             }}
             onMarkClick={(_: any, item: any) => {
               const idx = item?.dataIndex;
-              if (typeof idx === 'number') setPinnedAreaIdx((prev) => (prev === idx ? null : idx));
+              if (typeof idx === "number") setPinnedAreaIdx((prev) => (prev === idx ? null : idx));
             }}
-            xAxis={[{
-              scaleType: 'point',
-              data: qcPassRate.map((d: any) => d.m),
-              ...chartTheme.xAxis,
-            }]}
-            yAxis={[{ position: 'none' }]}
-            series={[{
-              id: 'area-series',
-              data: qcPassRate.map((d: any) => d.v),
-              valueFormatter: (value: number | null) => `${value ?? 0}%`,
-              ...chartTheme.areaSeries,
-            }]}
+            xAxis={[
+              {
+                scaleType: "point",
+                data: qcPassRate.map((d: any) => d.m),
+                ...chartTheme.xAxis,
+              },
+            ]}
+            yAxis={[{ position: "none" }]}
+            series={[
+              {
+                id: "area-series",
+                data: qcPassRate.map((d: any) => d.v),
+                valueFormatter: (value: number | null) => `${value ?? 0}%`,
+                ...chartTheme.areaSeries,
+              },
+            ]}
             slotProps={chartTheme.tooltipSlotProps}
             sx={chartTheme.areaChartSx}
           />
@@ -431,11 +462,9 @@ export default function DashboardPage({ mode = 'light' }) {
               chevronSx={th.table.filterBtnChevron}
             />
           }
-
           filterPanel={
             <Collapse in={filterOpen} timeout={200} unmountOnExit>
               <Box sx={th.table.filterPanel}>
-
                 {/* sub-header — counts + Clear Filters button */}
                 <FilterPanelHeader
                   title={t.FILTERS.BUTTON}
@@ -466,7 +495,11 @@ export default function DashboardPage({ mode = 'light' }) {
                       ),
                       endAdornment: searchQuery ? (
                         <InputAdornment position="end">
-                          <IconButton size="small" onClick={() => setSearchQuery("")} sx={th.table.clearIconBtn}>
+                          <IconButton
+                            size="small"
+                            onClick={() => setSearchQuery("")}
+                            sx={th.table.clearIconBtn}
+                          >
                             <ClearIcon sx={th.table.clearIcon} />
                           </IconButton>
                         </InputAdornment>
@@ -478,7 +511,7 @@ export default function DashboardPage({ mode = 'light' }) {
                     label={t.FILTERS.STAGE}
                     value={filterStage}
                     onChange={(e) => setFilterStage(e.target.value)}
-                    options={['All', ...subDepartments]}
+                    options={["All", ...subDepartments]}
                     menuProps={filterMenuProps}
                     itemSx={filterMenuItemSx}
                     showAllOption={false}
@@ -498,7 +531,7 @@ export default function DashboardPage({ mode = 'light' }) {
                     label={t.FILTERS.STATUS}
                     value={filterStatus}
                     onChange={(e) => setFilterStatus(e.target.value)}
-                    options={t.BATCH_FILTERS.STATUSES}
+                    options={["All", ...Object.values(APPROVER_BATCH_STATUS)]}
                     menuProps={filterMenuProps}
                     itemSx={filterMenuItemSx}
                     showAllOption={false}
@@ -507,23 +540,49 @@ export default function DashboardPage({ mode = 'light' }) {
                 </Stack>
 
                 {/* row 2 — date pickers + This Month chip */}
-                <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
-                  <Stack direction="row" gap={1.5} alignItems="center" flexWrap="wrap">
+                {/* <LocalizationProvider
+                  dateAdapter={AdapterDayjs}
+                  adapterLocale="en-gb"
+                >
+                  <Stack
+                    direction="row"
+                    gap={1.5}
+                    alignItems="center"
+                    flexWrap="wrap"
+                  >
                     <CalendarMonthIcon sx={th.table.calendarIcon} />
                     <DatePicker
                       label={t.FILTERS.FROM}
                       format="DD/MM/YYYY"
                       value={dateFrom ? dayjs(toYMD(dateFrom)) : null}
-                      onChange={(val) => { setDateFrom(val ? toDMY(val.format('YYYY-MM-DD')) : ''); setCurrentMonthOnly(false); }}
-                      slotProps={{ textField: { size: 'small', sx: th.table.datePicker(false) } }}
+                      onChange={(val) => {
+                        setDateFrom(val ? toDMY(val.format("YYYY-MM-DD")) : "");
+                        setCurrentMonthOnly(false);
+                      }}
+                      slotProps={{
+                        textField: {
+                          size: "small",
+                          sx: th.table.datePicker(false),
+                        },
+                      }}
                     />
-                    <Typography sx={th.table.filterDateSeparator}>{t.FILTERS.DATE_SEPARATOR}</Typography>
+                    <Typography sx={th.table.filterDateSeparator}>
+                      {t.FILTERS.DATE_SEPARATOR}
+                    </Typography>
                     <DatePicker
                       label={t.FILTERS.TO}
                       format="DD/MM/YYYY"
                       value={dateTo ? dayjs(toYMD(dateTo)) : null}
-                      onChange={(val) => { setDateTo(val ? toDMY(val.format('YYYY-MM-DD')) : ''); setCurrentMonthOnly(false); }}
-                      slotProps={{ textField: { size: 'small', sx: th.table.datePicker(false) } }}
+                      onChange={(val) => {
+                        setDateTo(val ? toDMY(val.format("YYYY-MM-DD")) : "");
+                        setCurrentMonthOnly(false);
+                      }}
+                      slotProps={{
+                        textField: {
+                          size: "small",
+                          sx: th.table.datePicker(false),
+                        },
+                      }}
                     />
                     <Chip
                       label={t.FILTERS.THIS_MONTH_CHIP}
@@ -533,7 +592,29 @@ export default function DashboardPage({ mode = 'light' }) {
                       sx={th.table.thisMonthChip(currentMonthOnly)}
                     />
                   </Stack>
-                </LocalizationProvider>
+                </LocalizationProvider> */}
+                <DateRangeRow
+                  from={dateFrom}
+                  to={dateTo}
+                  onFromChange={(v) => {
+                    setDateFrom(v);
+                    setCurrentMonthOnly(false);
+                  }}
+                  onToChange={(v) => {
+                    setDateTo(v);
+                    setCurrentMonthOnly(false);
+                  }}
+                  currentMonthOnly={currentMonthOnly}
+                  onToggleMonth={toggleCurrentMonth}
+                  fromLabel={t.FILTERS.FROM}
+                  toLabel={t.FILTERS.TO}
+                  separatorLabel={t.FILTERS.DATE_SEPARATOR}
+                  thisMonthLabel={t.FILTERS.THIS_MONTH_CHIP}
+                  calendarIconSx={th.table.calendarIcon}
+                  datePickerSx={th.table.datePicker(false)}
+                  separatorSx={th.table.filterDateSeparator}
+                  thisMonthChipSx={th.table.thisMonthChip}
+                />
               </Box>
             </Collapse>
           }
@@ -581,10 +662,18 @@ export default function DashboardPage({ mode = 'light' }) {
                 value={eventsSearchQuery}
                 onChange={(e) => setEventsSearchQuery(e.target.value)}
                 InputProps={{
-                  startAdornment: (<InputAdornment position="start"><SearchIcon sx={th.table.searchIcon} /></InputAdornment>),
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon sx={th.table.searchIcon} />
+                    </InputAdornment>
+                  ),
                   endAdornment: eventsSearchQuery ? (
                     <InputAdornment position="end">
-                      <IconButton size="small" onClick={() => setEventsSearchQuery('')} sx={th.table.clearIconBtn}>
+                      <IconButton
+                        size="small"
+                        onClick={() => setEventsSearchQuery("")}
+                        sx={th.table.clearIconBtn}
+                      >
                         <ClearIcon sx={th.table.clearIcon} />
                       </IconButton>
                     </InputAdornment>
@@ -617,8 +706,14 @@ export default function DashboardPage({ mode = 'light' }) {
             <DateRangeRow
               from={eventsDateFrom}
               to={eventsDateTo}
-              onFromChange={(v) => { setEventsDateFrom(v); setEventsCurrentMonthOnly(false); }}
-              onToChange={(v) => { setEventsDateTo(v); setEventsCurrentMonthOnly(false); }}
+              onFromChange={(v) => {
+                setEventsDateFrom(v);
+                setEventsCurrentMonthOnly(false);
+              }}
+              onToChange={(v) => {
+                setEventsDateTo(v);
+                setEventsCurrentMonthOnly(false);
+              }}
               currentMonthOnly={eventsCurrentMonthOnly}
               fromLabel={t.FILTERS.FROM}
               toLabel={t.FILTERS.TO}
@@ -626,36 +721,51 @@ export default function DashboardPage({ mode = 'light' }) {
               calendarIconSx={th.table.calendarIcon}
               datePickerSx={th.table.datePicker}
               separatorSx={th.table.filterDateSeparator}
-              dateInputProps={th.table.dateInputProps}
+              textFieldProps={th.table.dateInputProps}
             />
           </Box>
         </Collapse>
 
-        <Stack sx={{ ...th.timeline.container, position: 'relative', minHeight: 120 }}>
+        <Stack
+          sx={{
+            ...th.timeline.container,
+            position: "relative",
+            minHeight: 120,
+          }}
+        >
           {eventsLoading && (
             <Box sx={th.timeline.loadingOverlay}>
               <CircularProgress size={32} />
             </Box>
           )}
           {recentEvents.length === 0 && !eventsLoading ? (
-             <Box sx={{ p: 4, textAlign: 'center' }}>
-               <Typography color="text.secondary">{t.EMPTY_STATES.NO_EVENTS}</Typography>
-             </Box>
+            <Box sx={{ p: 4, textAlign: "center" }}>
+              <Typography color="text.secondary">{t.EMPTY_STATES.NO_EVENTS}</Typography>
+            </Box>
           ) : (
             recentEvents.map((o: any, i: number) => (
-              <Stack key={i} direction="row" spacing={1.5} alignItems="flex-start"
-                sx={th.timeline.item(i < recentEvents.length - 1)}>
+              <Stack
+                key={i}
+                direction="row"
+                spacing={1.5}
+                alignItems="flex-start"
+                sx={th.timeline.item(i < recentEvents.length - 1)}
+              >
                 <Avatar sx={th.timeline.avatarSx(o.color)}>{o.icon}</Avatar>
                 <Box>
                   <Typography {...th.timeline.batchId}>
-                    {o.batchId} 
-                    {o.eventType && <Chip label={o.eventType} size="small" sx={th.timeline.eventChip} />}
+                    {o.batchId}
+                    {o.eventType && (
+                      <Chip label={o.eventType} size="small" sx={th.timeline.eventChip} />
+                    )}
                   </Typography>
                   <Typography {...th.timeline.label}>{o.eventStatusMessage}</Typography>
                   <StackRow spacing={1.5} mt={0.5}>
                     <StackRow spacing={0.3}>
                       <icons.clock sx={th.timeline.clockIcon} />
-                      <Typography {...th.timeline.timestamp}>{new Date(o.timestamp).toLocaleString()}</Typography>
+                      <Typography {...th.timeline.timestamp}>
+                        {new Date(o.timestamp).toLocaleString()}
+                      </Typography>
                     </StackRow>
                     {o.department && (
                       <Typography sx={th.timeline.deptLabel}>• {o.department}</Typography>

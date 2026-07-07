@@ -25,6 +25,7 @@ import type {
   RocketMotorCasingDetailsContext,
 } from "../../../../../data/models/user/RocketMotorCasingProcurementModel";
 import DimensionalInspectionDetailTable from "./DimensionalInspectionDetailTable";
+import MockTrialDetailTables from "./MockTrialDetailTables";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const FH = STRINGS.MANUFACTURING.FORM_HEADER;
@@ -180,6 +181,34 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
                         </Stack>
                         {block.dimensionalTable?.length ? (
                           <DimensionalInspectionDetailTable rows={block.dimensionalTable} dt={dt} />
+                        ) : block.mockTrialTables?.length ? (
+                          <>
+                            {block.rows.length > 0 ? (
+                              <TableContainer sx={dt.tableContainer}>
+                                <Table size="small">
+                                  <TableHead>
+                                    <TableRow>
+                                      <TableCell sx={dt.tableHeaderCell(true)}>Field</TableCell>
+                                      <TableCell sx={dt.tableHeaderCell(false)}>Value</TableCell>
+                                    </TableRow>
+                                  </TableHead>
+                                  <TableBody>
+                                    {block.rows.map((specRow, ri) => (
+                                      <TableRow key={`${specRow.specification}-${ri}`} sx={dt.tableRow(ri)}>
+                                        <TableCell sx={{ ...dt.tableCell, ...dt.specText }}>
+                                          {specRow.specification}
+                                        </TableCell>
+                                        <TableCell sx={{ ...dt.tableCell, ...dt.resultText }}>
+                                          {specRow.analysedResult || "—"}
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+                              </TableContainer>
+                            ) : null}
+                            <MockTrialDetailTables tables={block.mockTrialTables} dt={dt} />
+                          </>
                         ) : (
                           <TableContainer sx={dt.tableContainer}>
                             <Table size="small">
@@ -202,7 +231,9 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
                                       {specRow.analysedResult || "—"}
                                     </TableCell>
                                     <TableCell sx={dt.tableCell}>
-                                      <Typography sx={dt.remarksText}>{specRow.remarks || "—"}</Typography>
+                                      <Typography sx={dt.remarksText}>
+                                        {specRow.remarks?.trim() ? specRow.remarks : "—"}
+                                      </Typography>
                                     </TableCell>
                                   </TableRow>
                                 ))}

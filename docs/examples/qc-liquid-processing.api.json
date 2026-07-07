@@ -1,0 +1,148 @@
+{
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "QC",
+  "division": "RAW_MATERIAL_PROCESSING",
+  "subType": "LIQUID_PROCESSING",
+  "subDepartmentId": 115,
+  "functionality": "CREATE_QC_FORM",
+  "data": {
+    "layout": { "type": "flat" },
+    "meta": {
+      "title": "Raw Material Liquid Processing QC",
+      "description": "Select raw material on the picker row, then click Add to load specification rows."
+    },
+    "sections": [
+      {
+        "id": "LIQUID_PROCESSING_DETAILS",
+        "title": "Liquid Processing",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "LIQUID_PROCESSING_DETAILS",
+            "rows": {
+              "allowAdd": true,
+              "allowDelete": true,
+              "min": 1,
+              "defaultCount": 1,
+              "autoIncrementKey": "SR_NO",
+              "addLabel": "Add Raw Material",
+              "commitGroup": {
+                "pickerColumns": ["RAW_MATERIAL"],
+                "expandFromColumn": "PARAMETER",
+                "mergeExpandedColumns": ["RAW_MATERIAL"],
+                "readonlyExpandedColumns": ["RAW_MATERIAL", "PARAMETER", "SPECIFICATION", "OPERATION"],
+                "addLabel": "Add Raw Material",
+                "removeGroupLabel": "Remove Raw Material",
+                "fieldMappings": [
+                  {
+                    "sourceField": "specificationName",
+                    "targetColumn": "PARAMETER"
+                  },
+                  {
+                    "sourceField": "referenceRange",
+                    "targetColumn": "SPECIFICATION",
+                    "transform": "referenceRange"
+                  }
+                ]
+              }
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "SR_NO",
+                "fieldType": "serial",
+                "label": "Sr No",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "RAW_MATERIAL",
+                "fieldType": "dropdown",
+                "label": "Raw Material",
+                "validation": { "required": true },
+                "ui": { "placeholder": "Select raw material" },
+                "dataSource": {
+                  "type": "api",
+                  "api": {
+                    "endpoint": "/api/v1/user/subdepartment/materials-list",
+                    "method": "POST",
+                    "requestBody": { "materialType": "LIQUID" },
+                    "displayKey": "materialName",
+                    "valueKey": "materialCode"
+                  }
+                }
+              },
+              {
+                "type": "column",
+                "id": "ACEM_BATCH_NO",
+                "fieldType": "dropdown",
+                "label": "ACEM Batch No",
+                "ui": { "placeholder": "Select batch number" }
+              },
+              {
+                "type": "column",
+                "id": "OPERATION",
+                "fieldType": "static",
+                "label": "Operation",
+                "readonly": true,
+                "defaultValue": "Blending"
+              },
+              {
+                "type": "column",
+                "id": "PARAMETER",
+                "fieldType": "dropdown",
+                "label": "Parameters",
+                "validation": { "required": true },
+                "dataSource": {
+                  "type": "api",
+                  "api": {
+                    "endpoint": "/api/v1/user/subdepartment/materials/specification-list",
+                    "method": "POST",
+                    "requestBody": { "materialCode": "${RAW_MATERIAL}" },
+                    "responsePath": "data.specifications",
+                    "displayKey": "specificationName",
+                    "valueKey": "specificationName"
+                  }
+                },
+                "derive": {
+                  "targetColumn": "SPECIFICATION",
+                  "sourceField": "referenceRange",
+                  "transform": "referenceRange",
+                  "matchFields": ["specificationName", "specificationCode"]
+                }
+              },
+              {
+                "type": "column",
+                "id": "SPECIFICATION",
+                "fieldType": "text",
+                "label": "Specs",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "ACTUAL_VALUE",
+                "fieldType": "text",
+                "label": "Actual Value"
+              },
+              {
+                "type": "column",
+                "id": "REMARKS",
+                "fieldType": "textarea",
+                "label": "Remarks"
+              },
+              {
+                "type": "column",
+                "id": "QC_CERTIFICATE",
+                "fieldType": "file",
+                "label": "Upload QC Certificate"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

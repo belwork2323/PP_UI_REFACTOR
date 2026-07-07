@@ -63,7 +63,7 @@ const DimensionalInspectionDetailTable = ({ rows, dt }: DimensionalInspectionDet
                 ))
               )}
               <TableCell sx={dt.tableCell}>
-                <Typography sx={dt.remarksText}>{row.remarks}</Typography>
+                <Typography sx={dt.remarksText}>{row.remarks?.trim() ? row.remarks : "—"}</Typography>
               </TableCell>
             </TableRow>
           ))}

@@ -7,7 +7,7 @@ import { refreshQueue } from "./tokenRefreshQueue";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const axios: any = (axiosNS as any).default ?? axiosNS;
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://172.16.69.74:8080/";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://172.16.69.207:8080/";
 
 const api: any = axios.create({
   baseURL: BASE_URL,
@@ -86,12 +86,12 @@ api.interceptors.response.use(
 
       try {
         // Dynamically import to avoid circular dependency
-        const { authLoginController } = await import(
-          "@controllers/auth/login/loginController"
+        const { refreshAuthToken } = await import(
+          "../../controllers/auth/authController"
         );
 
-        // refreshToken returns ApiResponseModel<UserModel> on success, null on failure
-        const refreshResult = await authLoginController.refreshToken();
+        // ✅ refreshAuthToken now returns ApiResponseModel on success, null on failure
+        const refreshResult = await refreshAuthToken();
 
         // ✅ Check success explicitly — refreshResult is null on any failure
         if (refreshResult?.success && refreshResult?.data) {

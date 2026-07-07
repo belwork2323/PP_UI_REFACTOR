@@ -1,0 +1,249 @@
+{
+  "schemaVersion": "1.0",
+  "schemaType": "POST_CURE",
+  "functionality": "CREATE_POST_CURE_FORM",
+  "operationType": "LOOSE_FLAP_FILLING",
+  "meta": {
+    "title": "Loose Flap Filling",
+    "description": "Bellow removal, epoxy preparation, qualification and loose flap epoxy filling details"
+  },
+  "data": {
+    "ui": {
+      "layout": "accordion",
+      "gap": "md",
+      "sectionVariant": "card",
+      "accordion": {
+        "defaultExpanded": true,
+        "allowMultipleExpanded": true
+      }
+    },
+    "context": {
+      "subDepartmentId": "{{subDepartmentId}}",
+      "batchId": "{{batchId}}"
+    },
+    "sections": [
+      {
+        "id": "BELLOW_REMOVAL_DETAILS",
+        "title": "Bellow Removal Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "BELLOW_REMOVAL_TABLE",
+            "rows": {
+              "defaultCount": 2,
+              "allowAdd": false,
+              "allowDelete": false,
+              "presetRows": [
+                { "readonly": true, "LOCATION": "HE_SIDE" },
+                { "readonly": true, "LOCATION": "NE_SIDE" }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "LOCATION",
+                "fieldType": "static",
+                "label": "Location",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "FROM_DATE",
+                "fieldType": "date",
+                "label": "From Date"
+              },
+              {
+                "type": "column",
+                "id": "TO_DATE",
+                "fieldType": "date",
+                "label": "To Date"
+              },
+              {
+                "type": "column",
+                "id": "OBSERVATIONS",
+                "fieldType": "textarea",
+                "label": "Observations"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "LOOSE_FLAP_EPOXY_PREPARATION",
+        "title": "Loose Flap Epoxy Preparation Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "PREPARATION_DETAILS",
+            "rows": {
+              "defaultCount": 4,
+              "allowAdd": false,
+              "allowDelete": false,
+              "presetRows": [
+                { "readonly": true, "INGREDIENT": "A-125 Hardener", "PARTS_BY_WEIGHT": "60 ±1" },
+                { "readonly": true, "INGREDIENT": "GX-257 Resin", "PARTS_BY_WEIGHT": "40 ±1" },
+                { "readonly": true, "INGREDIENT": "HY-960 Accelerator", "PARTS_BY_WEIGHT": "6 ±0.5" },
+                { "readonly": true, "INGREDIENT": "DY-026 Diluent", "PARTS_BY_WEIGHT": "10 ±0.5" }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "INGREDIENT",
+                "fieldType": "static",
+                "label": "Ingredient",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "MFG_LOT",
+                "fieldType": "dropdown",
+                "label": "Mfg Lot",
+                "dataSource": {
+                  "type": "api",
+                  "api": {
+                    "endpoint": "MATERIAL_LOTS",
+                    "method": "POST",
+                    "requestField": "batchId",
+                    "requestBody": {
+                      "subDepartmentId": "{{subDepartmentId}}"
+                    },
+                    "responsePath": "data.materials",
+                    "displayKey": "lotId",
+                    "valueKey": "lotId"
+                  }
+                }
+              },
+              {
+                "type": "column",
+                "id": "PARTS_BY_WEIGHT",
+                "fieldType": "static",
+                "label": "Parts By Weight",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "QUANTITY",
+                "fieldType": "number",
+                "label": "Quantity (g)"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "QUALIFICATION_DETAILS",
+        "title": "Qualification Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "QUALIFICATION_BATCH_NO",
+            "fieldType": "text",
+            "label": "Batch No With Date Of Preparation",
+            "ui": {
+              "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+              "maxWidth": "300px"
+            }
+          },
+          {
+            "type": "table",
+            "id": "QUALIFICATION_TABLE",
+            "rows": {
+              "defaultCount": 2,
+              "allowAdd": false,
+              "allowDelete": false,
+              "presetRows": [
+                { "readonly": true, "PARAMETER": "Tensile Strength", "SPECIFICATION": ">=40 KSC" },
+                { "readonly": true, "PARAMETER": "% Elongation", "SPECIFICATION": ">=25" }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "PARAMETER",
+                "fieldType": "static",
+                "label": "Parameter",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "SPECIFICATION",
+                "fieldType": "static",
+                "label": "Specification",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "RESULT",
+                "fieldType": "text",
+                "label": "Result"
+              },
+              {
+                "type": "column",
+                "id": "QC_REPORT",
+                "fieldType": "file",
+                "label": "QC Report"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "LF_EPOXY_FILLING_DETAILS",
+        "title": "LF Epoxy Filling Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "LF_FILLING_TABLE",
+            "rows": {
+              "defaultCount": 2,
+              "allowAdd": false,
+              "allowDelete": false,
+              "presetRows": [
+                { "readonly": true, "LOCATION": "HE_SIDE" },
+                { "readonly": true, "LOCATION": "NE_SIDE" }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "LOCATION",
+                "fieldType": "static",
+                "label": "Location",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "FROM_DATE",
+                "fieldType": "date",
+                "label": "From Date"
+              },
+              {
+                "type": "column",
+                "id": "TO_DATE",
+                "fieldType": "date",
+                "label": "To Date"
+              },
+              {
+                "type": "column",
+                "id": "QTY_FILLED",
+                "fieldType": "number",
+                "label": "Quantity Filled"
+              },
+              {
+                "type": "column",
+                "id": "OBSERVATIONS",
+                "fieldType": "textarea",
+                "label": "Observations"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

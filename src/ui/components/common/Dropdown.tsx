@@ -1,6 +1,13 @@
-import React from "react";
 import { MenuItem } from "@mui/material";
-import Input from "./Input";
+import Input, { type InputProps } from "./Input";
+
+type DropdownOption =
+  | string
+  | { label: string; value: string | number | boolean | null | undefined };
+
+type DropdownProps = Omit<InputProps, "select" | "children"> & {
+  options?: DropdownOption[];
+};
 
 const Dropdown = ({
   label,
@@ -10,7 +17,7 @@ const Dropdown = ({
   fullWidth = true,
   sx,
   ...rest
-}) => {
+}: DropdownProps) => {
   return (
     <Input
       select

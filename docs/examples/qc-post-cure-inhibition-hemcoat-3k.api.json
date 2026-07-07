@@ -1,0 +1,110 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "QC",
+    "layout": { "type": "flat" },
+    "division": "POST_CURE",
+    "subType": "INHIBITION",
+    "inhibitorType": "HEMCOAT-3K",
+    "subDepartmentId": 114,
+    "functionality": "CREATE_POST_CURE_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "QC",
+  "division": "POST_CURE",
+  "subType": "INHIBITION",
+  "inhibitorType": "HEMCOAT-3K",
+  "functionality": "CREATE_POST_CURE_FORM",
+  "message": "Inhibition schema fetched successfully",
+  "timestamp": "2026-06-10T10:00:00Z",
+  "data": {
+    "layout": { "type": "flat" },
+    "meta": {
+      "title": "Inhibition Details",
+      "description": "HEMCOAT-3K inhibition qualification and application details"
+    },
+    "sections": [
+      {
+        "id": "HEMCOAT_3K_QUALIFICATION",
+        "title": "HEMCOAT-3K Qualification Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "HEMCOAT_3K_BATCH_PREPARATION",
+            "fieldType": "text",
+            "label": "Batch No. with date of preparation",
+            "ui": { "colSpan": { "xs": 12, "sm": 8, "md": 6 } }
+          },
+          {
+            "type": "table",
+            "id": "HEMCOAT_3K_QUALIFICATION",
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "SR_NO",
+              "presetRows": [
+                {
+                  "readonly": true,
+                  "SR_NO": 1,
+                  "PARAMETER": "Tensile Strength, ksc",
+                  "SPECIFICATION": ">25"
+                },
+                {
+                  "readonly": true,
+                  "SR_NO": 2,
+                  "PARAMETER": "% Elongation",
+                  "SPECIFICATION": ">100"
+                }
+              ]
+            },
+            "columns": [
+              { "type": "column", "id": "SR_NO", "fieldType": "serial", "label": "Sr No", "readonly": true },
+              { "type": "column", "id": "PARAMETER", "fieldType": "static", "label": "Parameter", "readonly": true },
+              { "type": "column", "id": "SPECIFICATION", "fieldType": "static", "label": "Specification", "readonly": true },
+              { "type": "column", "id": "RESULT", "fieldType": "text", "label": "Result" },
+              { "type": "column", "id": "QC_REPORT", "fieldType": "file", "label": "Upload QC Report" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "INHIBITION_APPLICATION_DETAILS",
+        "title": "Inhibition Application Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "INHIBITION_APPLICATION_DETAILS",
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "SR_NO",
+              "presetRows": [
+                { "readonly": true, "SR_NO": 1, "LOCATION": "HE Side" },
+                { "readonly": true, "SR_NO": 2, "LOCATION": "NE Side" }
+              ]
+            },
+            "columns": [
+              { "type": "column", "id": "SR_NO", "fieldType": "serial", "label": "Sr No", "readonly": true },
+              { "type": "column", "id": "LOCATION", "fieldType": "static", "label": "Location", "readonly": true },
+              { "type": "column", "id": "FROM_DATE", "fieldType": "date", "label": "From Date" },
+              { "type": "column", "id": "TO_DATE", "fieldType": "date", "label": "To Date" },
+              { "type": "column", "id": "QTY_APPLIED", "fieldType": "number", "label": "Qty Applied (g)" },
+              { "type": "column", "id": "OBSERVATIONS", "fieldType": "textarea", "label": "Observations" }
+            ]
+          },
+          {
+            "type": "field",
+            "id": "DISPATCH_DATE_STATION",
+            "fieldType": "text",
+            "label": "Date of Dispatch and station",
+            "ui": { "colSpan": { "xs": 12, "sm": 8, "md": 6 } }
+          }
+        ]
+      }
+    ]
+  }
+}

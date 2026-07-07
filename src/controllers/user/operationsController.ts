@@ -6,8 +6,10 @@ import {
   fetchSolidProcessesListApi,
   fetchMotorsStageListApi,
   fetchApprovedMotorsListApi,
+  fetchMaterialLotsApi,
 } from "../../data/api/users/operationsApi";
 import { ApiResponseModel } from "../../data/models/common/ApiResponseModel";
+import { normalizeListStatusFilter } from "../../hooks/operationStatus";
 import {
   normalizeMaterialsListResponse,
   type MaterialsListItem,
@@ -19,6 +21,7 @@ import {
   MotorsStageListModel,
   AvailableMotorsListModel,
   SolidProcessesListModel,
+  MaterialLotsListModel,
 } from "../../data/models/user/SubdepartmentCommonModel";
 import type { SubdepartmentBatchListRequest } from "../../data/models/user/SubdepartmentBatchModel";
 
@@ -36,13 +39,20 @@ export type SolidProcessesPayload = {
   materialType: string;
 };
 
+export type MaterialLotsPayload = {
+  batchId: string;
+};
+
 export const operationsController = {
   /**
    * Common API to fetch paginated batches dynamically based on subDepartmentId.
    */
   fetchSubdepartmentBatches: async (payload: SubdepartmentBatchListRequest) => {
     try {
-      const response = await fetchSubdepartmentBatchesApi(payload);
+      const response = await fetchSubdepartmentBatchesApi({
+        ...payload,
+        ...(payload.status ? { status: normalizeListStatusFilter(payload.status) } : {}),
+      });
       return new ApiResponseModel(response);
     } catch (error) {
       console.error("Failed to fetch subdepartment batches:", error);
@@ -149,6 +159,19 @@ export const operationsController = {
       );
     } catch (error) {
       console.error("Failed to fetch approved motors list:", error);
+      return new ApiResponseModel(error);
+    }
+  },
+
+  /** Material lots for a batch (post-cure material-lots API). */
+  fetchMaterialLots: async (payload: MaterialLotsPayload) => {
+    try {
+      const response = await fetchMaterialLotsApi(payload);
+      return new ApiResponseModel<MaterialLotsListModel>(response, (res) =>
+        MaterialLotsListModel.fromApi(res)
+      );
+    } catch (error) {
+      console.error("Failed to fetch material lots:", error);
       return new ApiResponseModel(error);
     }
   },

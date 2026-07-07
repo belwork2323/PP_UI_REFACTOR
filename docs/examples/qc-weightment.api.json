@@ -1,0 +1,118 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "QC",
+    "layout": { "type": "flat" },
+    "division": "WEIGHTMENT",
+    "subType": null,
+    "subDepartmentId": 114,
+    "functionality": "CREATE_WEIGHTMENT_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "QC",
+  "division": "WEIGHTMENT",
+  "subType": null,
+  "functionality": "CREATE_WEIGHTMENT_FORM",
+  "message": "Weightment schema fetched successfully",
+  "timestamp": "2026-06-10T10:00:00Z",
+  "data": {
+    "layout": { "type": "flat" },
+    "meta": {
+      "title": "Weightment Details",
+      "description": "Motor weight measurement details"
+    },
+    "sections": [
+      {
+        "id": "WEIGHTSCALE_DETAILS",
+        "title": "Weighscale Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "WEIGHSCALE_NO",
+            "fieldType": "text",
+            "label": "Weighscale No.",
+            "validation": { "required": true }
+          },
+          {
+            "type": "field",
+            "id": "CALIBRATION_DUE_DATE",
+            "fieldType": "date",
+            "label": "Calibration Due Date",
+            "validation": { "required": true }
+          }
+        ]
+      },
+      {
+        "id": "MOTOR_WEIGHT_DETAILS",
+        "title": "Motor Weight Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "MOTOR_WEIGHT_DETAILS",
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "presetRows": [
+                {
+                  "readonly": true,
+                  "SR_NO": "A",
+                  "WEIGHT_PARAMETER": "Weight of empty motor with insulation and without harness"
+                },
+                {
+                  "readonly": true,
+                  "SR_NO": "B",
+                  "WEIGHT_PARAMETER": "Weight of rubber dust after abrading"
+                },
+                {
+                  "readonly": true,
+                  "SR_NO": "C",
+                  "WEIGHT_PARAMETER": "Weight of liner coating material"
+                },
+                {
+                  "readonly": true,
+                  "SR_NO": "D",
+                  "WEIGHT_PARAMETER": "Weight of loose flap filling material"
+                },
+                {
+                  "readonly": true,
+                  "SR_NO": "E",
+                  "WEIGHT_PARAMETER": "Weight of Extra rubber trimmed"
+                },
+                {
+                  "readonly": true,
+                  "SR_NO": "F",
+                  "WEIGHT_PARAMETER": "Weight of Inhibition material applied"
+                },
+                {
+                  "readonly": true,
+                  "SR_NO": "G",
+                  "WEIGHT_PARAMETER": "Final Weight of finished motor without harness"
+                },
+                {
+                  "readonly": true,
+                  "SR_NO": "H",
+                  "WEIGHT_PARAMETER": "Weight of propellant, kg (H = G - (A - B + C + D - E + F); shall be calculated automatically)"
+                }
+              ]
+            },
+            "columns": [
+              { "type": "column", "id": "SR_NO", "fieldType": "static", "label": "Sr. No.", "readonly": true },
+              {
+                "type": "column",
+                "id": "WEIGHT_PARAMETER",
+                "fieldType": "static",
+                "label": "Rocket Motor Id. No.",
+                "readonly": true
+              },
+              { "type": "column", "id": "WEIGHT_KG", "fieldType": "number", "label": "Weight (kg)" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

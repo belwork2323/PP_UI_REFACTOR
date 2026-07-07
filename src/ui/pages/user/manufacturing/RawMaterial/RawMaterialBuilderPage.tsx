@@ -218,6 +218,7 @@ const RawMaterialBuilderForm = ({
                   gradeId={activePremixEntry.solidGradeId}
                   materials={availableSolidMaterials as MaterialsListItem[]}
                   subDepartmentId={subDepartmentId}
+                  batchId={activeBatch?.batchId}
                   slotState={activeSession.solid}
                   savedSections={activeSession.pendingSolidSections}
                   onSlotChange={(next) =>
@@ -235,6 +236,7 @@ const RawMaterialBuilderForm = ({
                   materialId={activePremixEntry.liquidMaterialId}
                   materials={availableLiquidMaterials as MaterialsListItem[]}
                   subDepartmentId={subDepartmentId}
+                  batchId={activeBatch?.batchId}
                   slotState={activeSession.liquid}
                   savedSections={activeSession.pendingLiquidSections}
                   onSlotChange={(next) =>

@@ -1,0 +1,336 @@
+{
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "STATIC_TESTING_FACILITY",
+  "functionality": "CREATE_STATIC_TESTING_FORM",
+  "subType": "MAIN_MOTOR",
+  "subDepartmentId": 115,
+  "message": "Main Motor static testing schema fetched successfully",
+  "meta": {
+    "title": "Static Testing Facility - Main Motor",
+    "description": "Main Motor static testing parameters and evaluation details"
+  },
+  "data": {
+    "layout": {
+      "type": "flat"
+    },
+    "meta": {
+      "title": "Static Testing Facility - Main Motor",
+      "description": "Main Motor static testing parameters and evaluation details"
+    },
+    "ui": {
+      "layout": "flat",
+      "gap": "md",
+      "sectionVariant": "card",
+      "sectionBorderRadius": "sm",
+      "designSystem": {
+        "colors": {
+          "primary": "#1B4F72",
+          "primaryLight": "#2E86C1",
+          "surface": "#F4F6F8",
+          "border": "#D5D8DC",
+          "text": "#1C2833",
+          "textSub": "#5D6D7E"
+        },
+        "typography": {},
+        "spacing": {
+          "xs": 4,
+          "sm": 8,
+          "md": 12,
+          "lg": 16,
+          "xl": 24
+        },
+        "radius": {
+          "sm": 4,
+          "md": 6,
+          "lg": 8
+        },
+        "icons": {
+          "sectionDefault": "description",
+          "staticTestFacility": "rocket_launch"
+        }
+      }
+    },
+    "context": {
+      "subDepartmentId": 115,
+      "subType": "MAIN_MOTOR"
+    },
+    "sections": [
+      {
+        "sectionId": "IGNITER_DETAILS",
+        "sectionName": "Igniter Details",
+        "type": "table",
+        "addRowAllowed": false,
+        "columns": [
+          {
+            "fieldId": "CONTAINER_TYPE",
+            "label": "Container Type",
+            "type": "text"
+          },
+          {
+            "fieldId": "COMPOSITION",
+            "label": "Composition",
+            "type": "text"
+          },
+          {
+            "fieldId": "WEIGHT_OF_COMPOSITION",
+            "label": "Weight of Composition (g)",
+            "type": "number"
+          },
+          {
+            "fieldId": "SQUIB_RESISTANCE",
+            "label": "Squib Resistance (Ω)",
+            "type": "number"
+          },
+          {
+            "fieldId": "REMARKS",
+            "label": "Remarks",
+            "type": "textarea"
+          }
+        ]
+      },
+      {
+        "sectionId": "NOZZLE_DETAILS",
+        "sectionName": "Nozzle Details",
+        "type": "table",
+        "addRowAllowed": false,
+        "columns": [
+          {
+            "fieldId": "NOZZLE_CLOSURE_MATERIAL",
+            "label": "Nozzle Closure Material",
+            "type": "text"
+          },
+          {
+            "fieldId": "NOZZLE_MATERIAL",
+            "label": "Nozzle Material",
+            "type": "group",
+            "fields": [
+              {
+                "fieldId": "MOTHER_GRAPHITE",
+                "label": "Mother Graphite",
+                "type": "text"
+              },
+              {
+                "fieldId": "NOZZLE_INSERT",
+                "label": "Nozzle Insert",
+                "type": "text"
+              }
+            ]
+          },
+          {
+            "fieldId": "BEFORE_FIRING",
+            "label": "Before Firing",
+            "type": "group",
+            "fields": [
+              {
+                "fieldId": "DT_BEFORE",
+                "label": "Dt (mm)",
+                "type": "number"
+              },
+              {
+                "fieldId": "DE_BEFORE",
+                "label": "De (mm)",
+                "type": "number"
+              }
+            ]
+          },
+          {
+            "fieldId": "AFTER_FIRING",
+            "label": "After Firing",
+            "type": "group",
+            "fields": [
+              {
+                "fieldId": "DT_AFTER",
+                "label": "Dt (mm)",
+                "type": "number"
+              },
+              {
+                "fieldId": "DE_AFTER",
+                "label": "De (mm)",
+                "type": "number"
+              }
+            ]
+          },
+          {
+            "fieldId": "REMARKS",
+            "label": "Remarks",
+            "type": "textarea"
+          }
+        ]
+      },
+      {
+        "sectionId": "TESTING_DETAILS",
+        "sectionName": "Testing Details",
+        "type": "form",
+        "fields": [
+          {
+            "fieldId": "THROAT_DIAMETER",
+            "label": "Throat Diameter",
+            "type": "number"
+          },
+          {
+            "fieldId": "PROPELLANT_WEIGHT",
+            "label": "Wt. of Propellant",
+            "type": "number"
+          },
+          {
+            "fieldId": "WEB_THICKNESS",
+            "label": "Web Thickness",
+            "type": "number"
+          },
+          {
+            "fieldId": "N_VALUE",
+            "label": "n Value",
+            "type": "number"
+          },
+          {
+            "fieldId": "CONDITIONING_TEMPERATURE",
+            "label": "Conditioning Temp",
+            "type": "number"
+          },
+          {
+            "fieldId": "AMBIENT_TEMPERATURE",
+            "label": "Ambient Temp",
+            "type": "number"
+          },
+          {
+            "fieldId": "RH_PERCENT",
+            "label": "RH (%)",
+            "type": "number"
+          }
+        ]
+      },
+      {
+        "sectionId": "SENSOR_CONFIGURATION",
+        "sectionName": "Sensor Configuration",
+        "type": "table",
+        "addRowAllowed": false,
+        "predefinedRows": [
+          {
+            "channel": "PR1"
+          },
+          {
+            "channel": "PR2"
+          },
+          {
+            "channel": "TH1"
+          },
+          {
+            "channel": "TH2"
+          },
+          {
+            "channel": "FP"
+          }
+        ],
+        "columns": [
+          {
+            "fieldId": "CHANNEL",
+            "label": "Channel",
+            "type": "text",
+            "readonly": true
+          },
+          {
+            "fieldId": "SENSOR",
+            "label": "Sensor",
+            "type": "text"
+          },
+          {
+            "fieldId": "SENSITIVITY",
+            "label": "Sensitivity",
+            "type": "number"
+          },
+          {
+            "fieldId": "MAX_EXPECTED",
+            "label": "Range Max Exp.",
+            "type": "number"
+          },
+          {
+            "fieldId": "SENSOR_RANGE",
+            "label": "Range Sensor",
+            "type": "number"
+          },
+          {
+            "fieldId": "FILTER_HZ",
+            "label": "Filter (Hz)",
+            "type": "number"
+          },
+          {
+            "fieldId": "IA_NO",
+            "label": "IA No.",
+            "type": "text"
+          },
+          {
+            "fieldId": "IA_GAIN",
+            "label": "IA Gain",
+            "type": "number"
+          },
+          {
+            "fieldId": "EXT_VOLTAGE",
+            "label": "Ext. (V)",
+            "type": "number"
+          },
+          {
+            "fieldId": "OFFSET_VALUE",
+            "label": "Offset Value",
+            "type": "number"
+          },
+          {
+            "fieldId": "PRELOADING",
+            "label": "Preloading",
+            "type": "number"
+          }
+        ]
+      },
+      {
+        "sectionId": "STATIC_TEST_RESULT",
+        "sectionName": "Result",
+        "type": "form",
+        "fields": [
+          {
+            "fieldId": "AVERAGE_PRESSURE",
+            "label": "Avg. Pressure (ksc)",
+            "type": "number"
+          },
+          {
+            "fieldId": "PEAK_PRESSURE",
+            "label": "Peak Pressure (ksc)",
+            "type": "number"
+          },
+          {
+            "fieldId": "TB",
+            "label": "Tb (s)",
+            "type": "number"
+          },
+          {
+            "fieldId": "BURN_RATE",
+            "label": "Burn Rate (mm/s)",
+            "type": "number"
+          },
+          {
+            "fieldId": "C_STAR",
+            "label": "C star (m/s)",
+            "type": "number"
+          },
+          {
+            "fieldId": "ISP",
+            "label": "Isp (s)",
+            "type": "number"
+          }
+        ]
+      },
+      {
+        "sectionId": "UPLOAD_PT_CURVE",
+        "sectionName": "Upload P-T Curve",
+        "type": "form",
+        "fields": [
+          {
+            "fieldId": "PT_CURVE_FILE",
+            "label": "Upload P-T Curve",
+            "type": "file"
+          }
+        ]
+      }
+    ]
+  }
+}

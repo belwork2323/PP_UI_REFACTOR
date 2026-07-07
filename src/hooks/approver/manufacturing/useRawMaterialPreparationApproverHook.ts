@@ -4,14 +4,18 @@ import { STRINGS } from "../../../app/config/strings";
 import { useAlertStore } from "../../../app/store/alertStore";
 import rawMaterialPreparationController from "../../../controllers/user/manufacturing/rawMaterialPreparationController";
 import {
-  mapRawMaterialPreparationApproverDetailView,
+  mapRawMaterialPreparationDetailsForDisplay,
   type RawMaterialPreparationDetails,
 } from "../../../data/models/user/RawMaterialPreparationModel";
 import useApproverFormAction from "../useApproverFormAction";
+import { applyApproverSubdepartmentBatchListClientFilters } from "../useApproverSubdepartmentBatchListFilters";
 
 const DEPARTMENT = "manufacturing" as const;
 const SUB_DEPARTMENT = "raw-material-prep";
 const S = STRINGS.MANUFACTURING.RAW_MATERIAL_PREP;
+
+export type RawMaterialPrepApproverAppliedFilters =
+  import("../useApproverSubdepartmentBatchListFilters").ApproverSubdepartmentBatchListAppliedFilters;
 
 type ApproverListRow = Record<string, unknown> & {
   id?: number | string;
@@ -19,6 +23,8 @@ type ApproverListRow = Record<string, unknown> & {
   batchId?: string | null;
   status?: string | null;
 };
+
+export const applyRawMaterialPrepApproverClientFilters = applyApproverSubdepartmentBatchListClientFilters;
 
 export const useRawMaterialPreparationApproverHook = () => {
   const showAlert = useAlertStore((state) => state.showAlert);
@@ -58,15 +64,16 @@ export const useRawMaterialPreparationApproverHook = () => {
       return;
     }
 
-    const detailView = mapRawMaterialPreparationApproverDetailView(
+    const { detailView, weightmentSheet } = mapRawMaterialPreparationDetailsForDisplay(
       response.data as RawMaterialPreparationDetails,
     );
 
     setSelected({
       ...row,
-      formId: detailView.formId || formId,
-      batchId: detailView.batchId || row.batchId,
-      ...detailView,
+      formId: detailView?.formId || formId,
+      batchId: detailView?.batchId || row.batchId,
+      detailView,
+      weightmentSheet,
     });
   };
 

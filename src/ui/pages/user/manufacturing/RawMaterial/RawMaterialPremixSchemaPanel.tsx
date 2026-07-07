@@ -10,11 +10,11 @@ import {
   useSchemaFetch,
   type SchemaFormValues,
   type SchemaSectionSubmission,
-} from "../../../../../schemaManagement";
+} from "../../../../../schema-engine";
 import {
   findGradeInMaterial,
   findMaterialInList,
-} from "../../../../../schemaManagement/adapters/rawMaterialPreparation.adapter";
+} from "../../../../../schema-engine/adapters/rawMaterialPreparation.adapter";
 import type { MaterialsListItem } from "../../../../../data/models/user/MaterialsListModel";
 import type { RawMaterialPrepMaterialSchemaSlot } from "../../../../../data/models/user/RawMaterialPreparationModel";
 import { SOLID_PREP_BRAND, LIQUID_PREP_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/rawMaterialPreparation_theme";
@@ -27,6 +27,7 @@ type RawMaterialPremixSchemaPanelProps = {
   gradeId?: number;
   materials: MaterialsListItem[];
   subDepartmentId: number;
+  batchId?: string;
   slotState: RawMaterialPrepMaterialSchemaSlot;
   savedSections?: SchemaSectionSubmission[];
   onSlotChange: (next: RawMaterialPrepMaterialSchemaSlot) => void;
@@ -40,6 +41,7 @@ const RawMaterialPremixSchemaPanel = ({
   gradeId,
   materials,
   subDepartmentId,
+  batchId,
   slotState,
   savedSections,
   onSlotChange,
@@ -92,7 +94,17 @@ const RawMaterialPremixSchemaPanel = ({
   }, [materialCode, gradeCode, slot, savedSections]);
 
   useEffect(() => {
-    if (!schema) return;
+    if (loading) return;
+
+    if (error || !schema) {
+      onSlotChange({
+        schema: null,
+        schemaLoading: false,
+        schemaError: error,
+        formValues: slotState.formValues,
+      });
+      return;
+    }
 
     let nextValues: SchemaFormValues = slotState.formValues;
     if (!hydratedRef.current) {
@@ -106,15 +118,15 @@ const RawMaterialPremixSchemaPanel = ({
 
     onSlotChange({
       schema,
-      schemaLoading: loading,
-      schemaError: error,
+      schemaLoading: false,
+      schemaError: null,
       formValues: nextValues,
     });
   }, [schema, loading, error, savedSections]);
 
   const handleValuesChange = (values: SchemaFormValues) => {
     onSlotChange({
-      schema: schema ?? slotState.schema,
+      schema: error || loading ? null : schema,
       schemaLoading: loading,
       schemaError: error,
       formValues: values,
@@ -122,7 +134,6 @@ const RawMaterialPremixSchemaPanel = ({
   };
 
   const themeTokens = slot === "solid" ? SOLID_PREP_BRAND : LIQUID_PREP_BRAND;
-  const activeSchema = slotState.schema ?? schema;
 
   if (!materialCode) {
     return (
@@ -143,13 +154,19 @@ const RawMaterialPremixSchemaPanel = ({
   return (
     <Box>
       <SchemaUI
-        schema={activeSchema}
+        schema={schema}
         value={slotState.formValues}
         onChange={handleValuesChange}
         loading={loading}
         error={error}
         themeTokens={themeTokens}
-        apiContext={{ subDepartmentId }}
+        apiContext={{
+          subDepartmentId,
+          batchId,
+          materialCode,
+          materialId: resolvedMaterialId,
+          gradeId: resolvedGradeId ?? undefined,
+        }}
       />
     </Box>
   );

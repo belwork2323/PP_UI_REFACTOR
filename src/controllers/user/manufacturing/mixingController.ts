@@ -10,10 +10,10 @@ import {
 } from "../../../data/api/users/manufacturing/mixingFormApi";
 
 export type MixingFormBody = {
-  premixes: Array<Record<string, unknown>>;
-  finalMixes: Array<Record<string, unknown>>;
+  mixingDetails: {
+    stages: Array<Record<string, unknown>>;
+  };
 };
-
 export type MixingCreatePayload = MixingFormBody & {
   batchId: string;
   subDepartmentId: number;
@@ -22,13 +22,14 @@ export type MixingCreatePayload = MixingFormBody & {
 
 export type MixingUpdatePayload = MixingFormBody & {
   formId: string;
+  batchId: string;
   subDepartmentId: number;
-  formSubmissionType: "DRAFT" | "UPDATE";
+  formSubmissionType: "DRAFT" | "SUBMIT";
 };
 
 export type MixingDetailsPayload = {
   formId: string;
-  subDepartmentId: number;
+  // subDepartmentId: number;
 };
 
 export const mixingController = {

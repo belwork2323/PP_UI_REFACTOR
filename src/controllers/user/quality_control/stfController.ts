@@ -1,6 +1,7 @@
 import { ApiResponseModel } from "../../../data/models/common/ApiResponseModel";
 import {
   STFDetailsModel,
+  STFMotorPayload,
   STFSubmitResponseModel,
 } from "../../../data/models/user/StaticTestFacilityApiModel";
 import {
@@ -13,30 +14,17 @@ export type STFCreatePayload = {
   batchId: string;
   subDepartmentId: number;
   formSubmissionType: "DRAFT" | "SUBMIT";
-  motorNo: string;
-  emptyMotorWeight: string;
-  rubberDustWeight: string;
-  linearCoatingWeight: string;
-  looseFlapFillWeight: string;
-  extraRubberWeight: string;
-  inhibitionWeight: string;
-  finalMotorWeight: string;
-  propellantWeight: string;
+  subType: string;
+  motors: STFMotorPayload[];
 };
 
 export type STFUpdatePayload = {
   formId: string;
+  batchId: string;
   subDepartmentId: number;
-  formSubmissionType: "DRAFT" | "UPDATE";
-  motorNo: string;
-  emptyMotorWeight: string;
-  rubberDustWeight: string;
-  linearCoatingWeight: string;
-  looseFlapFillWeight: string;
-  extraRubberWeight: string;
-  inhibitionWeight: string;
-  finalMotorWeight: string;
-  propellantWeight: string;
+  formSubmissionType: "DRAFT" | "SUBMIT";
+  subType: string;
+  motors: STFMotorPayload[];
 };
 
 export type STFDetailsPayload = {

@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "1.0",
+  "schemaType": "DISPATCH",
+  "layout": { "type": "flat" },
+  "subDepartmentId": 116,
+  "functionality": "CREATE_DISPATCH_FORM"
+}

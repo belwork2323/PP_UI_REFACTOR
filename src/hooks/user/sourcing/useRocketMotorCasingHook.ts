@@ -11,6 +11,7 @@ import {
   normalizeDimensionalRow,
   mapCasingFormDataToDetailBlocks,
   normalizeRocketCasingListStatus,
+  resolveMotorCasingIdFromSubmitData,
   INITIAL_ROCKET_MOTOR_CASING_FORM,
   RocketMotorCasingDetailsModel,
   type CasingDetailBlock,
@@ -23,6 +24,7 @@ import {
 import useDimensionalParametersHook from "../useDimensionalParametersHook";
 import {
   createEmptyRocketMotorBatch,
+  applyRocketMotorCasingIdentity,
   RocketMotorBatch,
   SOURCING_STATUS,
 } from "./sourcingWorkflowData";
@@ -132,18 +134,17 @@ export const useRocketMotorCasingHook = () => {
 
       setActiveBatch((prev) =>
         prev
-          ? {
-              ...prev,
+          ? applyRocketMotorCasingIdentity(prev, {
               formId: detailsModel.formId || prev.formId,
               procurementId: detailsModel.formId || prev.procurementId,
               motorCasingId: detailsModel.motorCasingId || prev.motorCasingId,
+              motorId: detailsModel.motorId || prev.motorId,
               motorStage: detailsModel.motorStage || prev.motorStage,
               motorNo: detailsModel.motorId || prev.motorNo,
-              motorId: detailsModel.motorId || prev.motorId,
               motorType: detailsModel.motorStage || prev.motorType,
               rmStatus: normalizeRocketCasingListStatus(detailsModel.status),
-            }
-          : prev
+            })
+          : prev,
       );
       setCasingForm(resolvedForm);
       setInitialSnapshot(serializeCasingForm(resolvedForm));
@@ -502,21 +503,24 @@ export const useRocketMotorCasingHook = () => {
             : STRINGS.SOURCING.CASING_FORM.UPDATE_SUBMIT_SUCCESS);
 
       if (intent === "draft") {
-        const motorCasingId = String(
-          data?.motorCasingId || casingForm.motorCasingId || activeBatch.motorCasingId || ""
-        ).trim();
+        const motorCasingId =
+          resolveMotorCasingIdFromSubmitData(data) ||
+          String(casingForm.motorCasingId || activeBatch.motorCasingId || "").trim();
         if (motorCasingId) {
+          setCasingForm((prev) => ({ ...prev, motorCasingId }));
+          setFormEntryMode((mode) => (mode === "create" ? "fill" : mode));
           setActiveBatch((prev) =>
             prev
-              ? {
-                  ...prev,
-                  formId: data?.formId ?? prev.formId,
-                  procurementId: data?.procurementId ?? data?.formId ?? prev.procurementId,
-                  motorCasingId: motorCasingId || prev.motorCasingId,
+              ? applyRocketMotorCasingIdentity(prev, {
+                  formId: data?.formId ?? motorCasingId ?? prev.formId,
+                  procurementId: data?.procurementId ?? data?.formId ?? motorCasingId ?? prev.procurementId,
+                  motorCasingId,
                   motorId: casingForm.motorId || prev.motorId,
-                  rmStatus: data?.status ? (data.status as typeof prev.rmStatus) : prev.rmStatus,
-                }
-              : prev
+                  rmStatus: data?.status
+                    ? normalizeRocketCasingListStatus(String(data.status))
+                    : prev.rmStatus,
+                })
+              : prev,
           );
           const reloaded = await reloadCasingFormDetails(motorCasingId);
           if (reloaded) stayOnFormWithDraftSuccess(successMessage);

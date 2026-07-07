@@ -1,0 +1,245 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "QC",
+    "layout": { "type": "flat" },
+    "division": "CURING",
+    "subType": "NORMAL",
+    "subDepartmentId": 117,
+    "functionality": "CREATE_CURING_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "QC",
+  "division": "CURING",
+  "subType": "NORMAL",
+  "functionality": "CREATE_CURING_FORM",
+  "message": "Curing schema fetched successfully",
+  "data": {
+    "layout": { "type": "flat" },
+    "meta": {
+      "title": "Curing Process",
+      "description": "Motor curing cycle parameters and post curing details"
+    },
+    "sections": [
+      {
+        "id": "CURING_MOTOR_SETUP",
+        "title": "Curing Motor Setup",
+        "ui": { "variant": "card", "padding": "md", "direction": "row", "wrap": true, "gap": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "CURING_CONFIGURATION",
+            "fieldType": "dropdown",
+            "label": "Select type of Curing",
+            "dataSource": {
+              "type": "static",
+              "options": [
+                { "label": "Single", "value": "SINGLE" },
+                { "label": "Pair", "value": "PAIR" },
+                { "label": "Triple", "value": "TRIPLE" }
+              ]
+            }
+          },
+          {
+            "type": "field",
+            "id": "OVEN_NUMBER",
+            "fieldType": "text",
+            "label": "Enter the Oven Number"
+          },
+          {
+            "type": "field",
+            "id": "CURING_CYCLE",
+            "fieldType": "dropdown",
+            "label": "Select the Curing Cycle",
+            "dataSource": {
+              "type": "static",
+              "options": [
+                { "label": "Standard Cycle", "value": "STANDARD" },
+                { "label": "Modified Cycle", "value": "MODIFIED" }
+              ]
+            }
+          },
+          {
+            "type": "field",
+            "id": "MOTOR_POSITIONING_DATE_TIME",
+            "fieldType": "datetime",
+            "label": "Date & Time of positioning of rocket motor in Oven"
+          }
+        ]
+      },
+      {
+        "id": "CURING_CYCLE_DETAILS",
+        "title": "Curing Cycle Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "CURING_CYCLE_DETAILS",
+            "title": "Curing Cycle Details",
+            "rows": {
+              "defaultCount": 10,
+              "allowAdd": true,
+              "allowDelete": true,
+              "autoIncrementKey": "SR_NO",
+              "presetRows": [
+                { "SR_NO": 1, "TEMPERATURE": "Amb-40", "DURATION": 120 },
+                { "SR_NO": 2, "TEMPERATURE": "40", "DURATION": 720 },
+                { "SR_NO": 3, "TEMPERATURE": "40-45", "DURATION": 120 },
+                { "SR_NO": 4, "TEMPERATURE": "45", "DURATION": 2880 },
+                { "SR_NO": 5, "TEMPERATURE": "45-50", "DURATION": 120 },
+                { "SR_NO": 6, "TEMPERATURE": "50", "DURATION": 4320 },
+                { "SR_NO": 7, "TEMPERATURE": "50-45", "DURATION": 240 },
+                { "SR_NO": 8, "TEMPERATURE": "45", "DURATION": 2880 },
+                { "SR_NO": 9, "TEMPERATURE": "45-40", "DURATION": 240 },
+                { "SR_NO": 10, "TEMPERATURE": "40", "DURATION": 720 }
+              ]
+            },
+            "columns": [
+              { "type": "column", "id": "SR_NO", "fieldType": "serial", "label": "S.No", "readonly": true },
+              { "type": "column", "id": "TEMPERATURE", "fieldType": "text", "label": "Temp (°C)" },
+              { "type": "column", "id": "DURATION", "fieldType": "number", "label": "Duration (Min.)" },
+              { "type": "column", "id": "START_DATE", "fieldType": "date", "label": "Start Date" },
+              { "type": "column", "id": "START_TIME", "fieldType": "time", "label": "Start Time" },
+              { "type": "column", "id": "END_DATE", "fieldType": "date", "label": "End Date" },
+              { "type": "column", "id": "END_TIME", "fieldType": "time", "label": "End Time" },
+              { "type": "column", "id": "ACTUAL_DURATION", "fieldType": "number", "label": "Actual Duration (Min.)" },
+              { "type": "column", "id": "PEAK_PRESSURE_TIME", "fieldType": "text", "label": "Peak Pressure & Time" },
+              { "type": "column", "id": "REMARKS", "fieldType": "textarea", "label": "Remarks" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "POST_CURING_DETAILS",
+        "title": "Post Curing Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "VISUAL_OBSERVATIONS",
+            "fieldType": "textarea",
+            "label": "Visual Observations of cured motor"
+          },
+          {
+            "type": "field",
+            "id": "PRESSURE_PLATE_REMOVAL_DATE_TIME",
+            "fieldType": "datetime",
+            "label": "Date/Time for removal of pressure plate"
+          },
+          {
+            "type": "field",
+            "id": "SHORE_A_HARDNESS",
+            "fieldType": "number",
+            "label": "Shore A Hardness"
+          },
+          {
+            "type": "field",
+            "id": "DISPATCH_DATE_TIME",
+            "fieldType": "datetime",
+            "label": "Date/Time of Dispatch of motor for De-coring"
+          }
+        ]
+      },
+      {
+        "id": "SUBSCALE_ARTICLES_CURING",
+        "title": "Subscale Articles Curing",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "group",
+            "id": "SUBSCALE_CURING_SELECTION",
+            "label": "Subscale Selection",
+            "ui": { "direction": "row", "wrap": true, "gap": "md" },
+            "children": [
+              {
+                "type": "field",
+                "id": "SUBSCALE_BATCH_ID",
+                "fieldType": "text",
+                "label": "Select the Batch ID"
+              },
+              {
+                "type": "group",
+                "id": "SUBSCALE_OVEN_SELECTION",
+                "label": "Select Oven no.",
+                "ui": { "direction": "row", "wrap": true, "gap": "sm" },
+                "children": [
+                  { "type": "field", "id": "OVEN_1", "fieldType": "checkbox", "label": "1" },
+                  { "type": "field", "id": "OVEN_2", "fieldType": "checkbox", "label": "2" },
+                  { "type": "field", "id": "OVEN_3", "fieldType": "checkbox", "label": "3" },
+                  { "type": "field", "id": "OVEN_4", "fieldType": "checkbox", "label": "4" }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "table",
+            "id": "CURING_PARAMETER_TABLE",
+            "title": "Curing Parameters",
+            "rows": {
+              "defaultCount": 6,
+              "allowAdd": true,
+              "allowDelete": true,
+              "autoIncrementKey": "SR_NO",
+              "presetRows": [
+                { "SR_NO": 1, "PARAMETER": "Enter Oven Set Temperature (°C)" },
+                { "SR_NO": 2 },
+                { "SR_NO": 3 },
+                { "SR_NO": 4 },
+                { "SR_NO": 5 },
+                { "SR_NO": 6 }
+              ]
+            },
+            "columns": [
+              { "type": "column", "id": "SR_NO", "fieldType": "serial", "label": "S.No", "readonly": true },
+              { "type": "column", "id": "PARAMETER", "fieldType": "text", "label": "Parameter" },
+              { "type": "column", "id": "BEM_NO", "fieldType": "number", "label": "BEM No." },
+              { "type": "column", "id": "WHEEL_PEEL_NO", "fieldType": "number", "label": "Wheel Peel No." },
+              { "type": "column", "id": "CARTON_NO", "fieldType": "number", "label": "Carton No." },
+              { "type": "column", "id": "CONTROL_GRAIN_NO", "fieldType": "number", "label": "Control Grain No." }
+            ]
+          },
+          {
+            "type": "group",
+            "id": "SUBSCALE_CURING_DETAILS",
+            "label": "Curing Details",
+            "ui": { "direction": "row", "wrap": true, "gap": "md" },
+            "children": [
+              { "type": "field", "id": "CURING_START_DATE", "fieldType": "date", "label": "Curing Start Date" },
+              { "type": "field", "id": "CYCLE_START_TIME", "fieldType": "time", "label": "Cycle Start Time" },
+              { "type": "field", "id": "CURING_COMPLETE_DATE", "fieldType": "date", "label": "Curing Complete Date" },
+              { "type": "field", "id": "CYCLE_END_TIME", "fieldType": "time", "label": "Cycle End Time" }
+            ]
+          },
+          {
+            "type": "group",
+            "id": "SUBSCALE_POST_CURING_DETAILS",
+            "label": "Post Curing Details",
+            "ui": { "direction": "column", "gap": "md" },
+            "children": [
+              {
+                "type": "field",
+                "id": "BEM_AVERAGE_SHORE_A_HARDNESS",
+                "fieldType": "number",
+                "label": "All BEM Average Shore A Hardness"
+              },
+              {
+                "type": "field",
+                "id": "CARTON_AVERAGE_SHORE_A_HARDNESS",
+                "fieldType": "number",
+                "label": "All Carton Average Shore A Hardness"
+              },
+              {
+                "type": "field",
+                "id": "SUBSCALE_VISUAL_OBSERVATIONS",
+                "fieldType": "textarea",
+                "label": "Visual Observations (if any)"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

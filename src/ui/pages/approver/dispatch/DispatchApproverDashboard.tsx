@@ -21,9 +21,6 @@ const SUB_DEPARTMENTS = [
     icon: LocalShippingRoundedIcon,
     color: "#A04000",
     description: S.DESCRIPTION,
-    pending: 1,
-    approved: 1,
-    rejected: 1,
   },
 ];
 const DispatchApproverDashboard = () => {

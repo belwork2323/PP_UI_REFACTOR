@@ -1,0 +1,221 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "QC",
+    "layout": { "type": "flat" },
+    "division": "CASTING",
+    "subType": null,
+    "subDepartmentId": 116,
+    "functionality": "CREATE_CASTING_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "QC",
+  "division": "CASTING",
+  "subType": null,
+  "functionality": "CREATE_CASTING_FORM",
+  "message": "Casting schema fetched successfully",
+  "data": {
+    "layout": { "type": "flat" },
+    "meta": {
+      "title": "Casting Process",
+      "description": "Casting operation details"
+    },
+    "sections": [
+      {
+        "id": "CASTING_SELECTION",
+        "title": "Casting Selection",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "CASTING_TYPE",
+            "fieldType": "dropdown",
+            "label": "Type of Casting",
+            "validation": { "required": true },
+            "dataSource": {
+              "type": "static",
+              "options": [
+                { "label": "Single", "value": "SINGLE" },
+                { "label": "Pair", "value": "PAIR" },
+                { "label": "Triple", "value": "TRIPLE" }
+              ]
+            }
+          }
+        ]
+      },
+      {
+        "id": "FINAL_ASSEMBLY",
+        "title": "Final Assembly",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "ASSEMBLY_DATE",
+            "fieldType": "date",
+            "label": "Date",
+            "validation": { "required": true }
+          },
+          {
+            "type": "table",
+            "id": "MANDREL_ASSEMBLY",
+            "title": "Mandrel Assembly",
+            "rows": {
+              "allowAdd": true,
+              "allowDelete": true,
+              "autoIncrementKey": "SR_NO"
+            },
+            "columns": [
+              { "type": "column", "id": "SR_NO", "fieldType": "serial", "label": "Sr No", "readonly": true },
+              {
+                "type": "column",
+                "id": "READING_WITHOUT_CUP",
+                "fieldType": "number",
+                "label": "Reading without cup (Mandrel resting on motor dome) mm"
+              },
+              {
+                "type": "column",
+                "id": "READING_WITH_BOTTOM_CUP",
+                "fieldType": "number",
+                "label": "Reading with bottom cup & gasket after tightening bottom cup mm"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "PROPELLANT_CASTING",
+        "title": "Propellant Casting",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "group",
+            "id": "CASTING_DETAILS",
+            "label": "Casting Details",
+            "ui": { "direction": "row", "wrap": true, "gap": "md" },
+            "children": [
+              {
+                "type": "field",
+                "id": "DATE_OF_CASTING",
+                "fieldType": "date",
+                "label": "Date of Casting",
+                "validation": { "required": true }
+              },
+              { "type": "field", "id": "RH_PERCENT", "fieldType": "number", "label": "RH %" },
+              { "type": "field", "id": "VACUUM_MAINTAINED", "fieldType": "number", "label": "Vacuum Maintained" }
+            ]
+          },
+          {
+            "type": "table",
+            "id": "CASTING_TABLE",
+            "title": "Casting Details",
+            "rows": {
+              "allowAdd": true,
+              "allowDelete": true,
+              "autoIncrementKey": "SR_NO"
+            },
+            "columns": [
+              { "type": "column", "id": "FINAL_MIX_BOWL_NO", "fieldType": "dropdown", "label": "Final Mix Bowl No" },
+              { "type": "column", "id": "PROPELLANT_QTY", "fieldType": "number", "label": "Qty of Propellant (Kg)" },
+              {
+                "type": "column",
+                "id": "INITIAL_UNLOADING_VISCOSITY",
+                "fieldType": "number",
+                "label": "Initial unloading viscosity P@°C"
+              },
+              { "type": "column", "id": "CASTING_START_TIME", "fieldType": "time", "label": "Time of start of casting" },
+              {
+                "type": "column",
+                "id": "CASTING_COMPLETION_TIME",
+                "fieldType": "time",
+                "label": "Time of completion of casting"
+              },
+              {
+                "type": "column",
+                "id": "SLURRY_CAST_FROM_EACH_BOWL",
+                "fieldType": "number",
+                "label": "Slurry cast from Each Bowl (kg)"
+              },
+              { "type": "column", "id": "REMARKS", "fieldType": "textarea", "label": "Remarks" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "WEIGHTMENT_DETAILS",
+        "title": "Weightment Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "WEIGHTMENT_DETAILS",
+            "title": "Weightment Details",
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "defaultCount": 1
+            },
+            "columns": [
+              { "type": "column", "id": "LOAD_CELL_INITIAL", "fieldType": "number", "label": "Load Cell Reading Initial" },
+              { "type": "column", "id": "LOAD_CELL_FINAL", "fieldType": "number", "label": "Load Cell Reading Final" },
+              { "type": "column", "id": "TOTAL_WEIGHT", "fieldType": "number", "label": "Total Weight (Kg)" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "POST_CAST_OPERATION",
+        "title": "Post Cast Operations",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "SOAKING_DURATION",
+            "fieldType": "number",
+            "label": "Soaking Duration"
+          },
+          {
+            "type": "field",
+            "id": "PRESSURE_PLATE_ASSEMBLY_REQUIRED",
+            "fieldType": "dropdown",
+            "label": "Pressure Plate Assembly Applicable",
+            "dataSource": {
+              "type": "static",
+              "options": [
+                { "label": "Yes", "value": "YES" },
+                { "label": "No", "value": "NO" }
+              ]
+            }
+          },
+          {
+            "type": "table",
+            "id": "PRESSURE_PLATE_DETAILS",
+            "title": "Pressure Plate Assembly Details",
+            "visibleWhen": {
+              "when": [{ "field": "PRESSURE_PLATE_ASSEMBLY_REQUIRED", "op": "EQ", "value": "YES" }],
+              "logic": "AND"
+            },
+            "rows": {
+              "allowAdd": true,
+              "allowDelete": true,
+              "autoIncrementKey": "SR_NO"
+            },
+            "columns": [
+              { "type": "column", "id": "START_TIME", "fieldType": "time", "label": "Start Time" },
+              { "type": "column", "id": "END_TIME", "fieldType": "time", "label": "End Time" },
+              { "type": "column", "id": "PRESSURE_SENSOR_USED", "fieldType": "text", "label": "Pressure Sensor Used" },
+              {
+                "type": "column",
+                "id": "INITIAL_PRESSURE_READING",
+                "fieldType": "number",
+                "label": "Initial Pressure Reading"
+              },
+              { "type": "column", "id": "OBSERVATIONS", "fieldType": "textarea", "label": "Observations" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

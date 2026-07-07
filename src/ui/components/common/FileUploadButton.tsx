@@ -1,15 +1,21 @@
-import React from "react";
-import { Button } from "@mui/material";
+import type { ChangeEventHandler, ElementType } from "react";
+import { Button, type ButtonProps } from "@mui/material";
+
+type FileUploadButtonProps = Omit<ButtonProps<"label">, "onChange" | "component"> & {
+  label?: string;
+  icon?: ElementType;
+  accept?: string;
+  onChange?: ChangeEventHandler<HTMLInputElement>;
+};
 
 /**
  * Modernized FileUploadButton
  * Handles missing icons gracefully and adds better UI feedback
  */
-const FileUploadButton = ({ label, icon: Icon, onChange, accept, ...props }) => {
+const FileUploadButton = ({ label, icon: Icon, onChange, accept, ...props }: FileUploadButtonProps) => {
   return (
     <Button
       variant="outlined"
-      component="label"
       fullWidth
       // Defensive check: only render Icon if it is a valid component
       startIcon={Icon ? <Icon /> : null}
@@ -25,6 +31,7 @@ const FileUploadButton = ({ label, icon: Icon, onChange, accept, ...props }) => 
         },
       }}
       {...props}
+      component="label"
     >
       {label || "Choose File"}
       <input
@@ -33,7 +40,9 @@ const FileUploadButton = ({ label, icon: Icon, onChange, accept, ...props }) => 
         accept={accept}
         onChange={onChange}
         // Reset value on click so selecting the same file triggers onChange
-        onClick={(e) => (e.target.value = null)}
+        onClick={(e) => {
+          (e.target as HTMLInputElement).value = "";
+        }}
       />
     </Button>
   );

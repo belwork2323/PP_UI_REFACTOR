@@ -8,36 +8,19 @@ import {
   fetchNDTFormDetailsApi,
   updateNDTFormApi,
 } from "../../../data/api/users/quality_control/ndtApi";
-import type { NDTFormState } from "../../../data/models/user/NDTFormModel";
-
 export type NDTCreatePayload = {
   batchId: string;
   subDepartmentId: number;
   formSubmissionType: "DRAFT" | "SUBMIT";
-  defects: any;
-  mechRows: any[];
-  mechMean: any;
-  mechStdDev: any;
-  ifaceRows: any[];
-  ifaceAvg: any;
-  ifaceStdDev: any;
-  burnRows: any[];
-  burnAvg: any;
+  motors: Record<string, any>[];
 };
 
 export type NDTUpdatePayload = {
   formId: string;
+  batchId: string;
   subDepartmentId: number;
-  formSubmissionType: "DRAFT" | "UPDATE";
-  defects: any;
-  mechRows: any[];
-  mechMean: any;
-  mechStdDev: any;
-  ifaceRows: any[];
-  ifaceAvg: any;
-  ifaceStdDev: any;
-  burnRows: any[];
-  burnAvg: any;
+  formSubmissionType: "DRAFT" | "SUBMIT";
+  motors: Record<string, any>[];
 };
 
 export type NDTDetailsPayload = {

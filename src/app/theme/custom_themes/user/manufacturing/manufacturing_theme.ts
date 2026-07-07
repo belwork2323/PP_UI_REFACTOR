@@ -4,6 +4,8 @@ import { getMixingTheme } from "./mixing_theme";
 import { getRawMaterialPreparationTheme } from "./rawMaterialPreparation_theme";
 import { getCastingAndCuringTheme } from "./castingAndCuring_theme";
 import { getPostCureTheme } from "./postCure_theme";
+import { getSubscaleTheme } from "./subscale_theme";
+import { getTrimmingTheme } from "./trimming_theme";
 
 export const getManufacturingTheme = (mode = "light") => {
 	const baseTheme = getOperationsTheme(mode);
@@ -19,6 +21,8 @@ export const getManufacturingTheme = (mode = "light") => {
 			mixing: getMixingTheme(baseTheme),
 			rawMaterialPrep: getRawMaterialPreparationTheme(baseTheme),
 			postCure: getPostCureTheme(baseTheme),
+			subscale: getSubscaleTheme(baseTheme),
+			trimming: getTrimmingTheme(baseTheme),
 		},
 	};
 };

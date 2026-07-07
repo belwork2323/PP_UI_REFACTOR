@@ -1,15 +1,14 @@
-import { TextField } from "@mui/material";
-import { spacing } from "../../../app/theme";
+import { TextField, type SxProps, type TextFieldProps, type Theme } from "@mui/material";
+import { schemaFieldInputProps, schemaFieldLabelProps, schemaFieldSx } from "./fieldStyles";
 
-const FormInput = ({ label, value, onChange, ...props }) => (
+const FormInput = ({ sx, InputLabelProps, inputProps, ...props }: TextFieldProps) => (
   <TextField
     fullWidth
     size="small"
-    label={label}
-    value={value}
-    onChange={onChange}
     variant="outlined"
-    sx={{ mb: spacing.sm }}
+    InputLabelProps={{ ...schemaFieldLabelProps, ...InputLabelProps }}
+    inputProps={{ ...schemaFieldInputProps, ...inputProps }}
+    sx={[schemaFieldSx, sx] as SxProps<Theme>}
     {...props}
   />
 );

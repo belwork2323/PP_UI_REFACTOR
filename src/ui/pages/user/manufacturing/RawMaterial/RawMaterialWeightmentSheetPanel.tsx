@@ -12,13 +12,14 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  TextField,
   Typography,
 } from "@mui/material";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 
 import { STRINGS } from "../../../../../app/config/strings";
+import FormInput from "../../../../components/common/FormInput";
+import { schemaFieldSx } from "../../../../components/common/fieldStyles";
 import {
   createEmptyWeightmentDetail,
   type RawMaterialPrepWeightmentDetail,
@@ -27,6 +28,20 @@ import {
 
 const RM = STRINGS.MANUFACTURING.RAW_MATERIAL_PREP;
 const CONTAINER_TYPES = ["Drum", "Bin", "Bag", "Other"];
+
+const checkboxLabelSx = {
+  m: 0,
+  "& .MuiFormControlLabel-label": {
+    fontSize: "0.78rem",
+    lineHeight: 1.35,
+  },
+};
+
+const tableFieldSx = {
+  ...schemaFieldSx,
+  mb: 0,
+  minWidth: 0,
+};
 
 type RawMaterialWeightmentSheetPanelProps = {
   value: RawMaterialPrepWeightmentSheet;
@@ -73,15 +88,14 @@ const RawMaterialWeightmentSheetPanel = ({
         mt: 2,
       }}
     >
-      <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: theme.palette.primary, mb: 0.25 }}>
+      <Typography sx={{ fontWeight: 700, fontSize: "0.9rem", color: theme.palette.text, mb: 0.25 }}>
         {RM.WEIGHTMENT_SHEET_TITLE}
       </Typography>
       <Typography sx={{ fontSize: "0.72rem", color: theme.palette.textSub, mb: 1.5 }}>
         {RM.WEIGHTMENT_SHEET_SUBTITLE}
       </Typography>
 
-      <TextField
-        size="small"
+      <FormInput
         fullWidth
         label={RM.WEIGHTMENT_MIXER_BUILDING}
         value={value.mixerBuildingNumber}
@@ -147,42 +161,42 @@ const RawMaterialWeightmentSheetPanel = ({
             <TableBody>
               {value.weightmentDetails.map((row, index) => (
                 <TableRow key={index}>
-                  <TableCell sx={{ minWidth: 120 }}>
-                    <TextField
-                      size="small"
+                  <TableCell sx={{ minWidth: 120, py: 0.75 }}>
+                    <FormInput
                       value={row.materialCode}
                       onChange={(event) => updateRow(index, { materialCode: event.target.value })}
+                      sx={tableFieldSx}
                     />
                   </TableCell>
-                  <TableCell sx={{ minWidth: 160 }}>
-                    <TextField
-                      size="small"
+                  <TableCell sx={{ minWidth: 160, py: 0.75 }}>
+                    <FormInput
                       value={row.materialName}
                       onChange={(event) => updateRow(index, { materialName: event.target.value })}
+                      sx={tableFieldSx}
                     />
                   </TableCell>
-                  <TableCell sx={{ minWidth: 100 }}>
-                    <TextField
-                      size="small"
+                  <TableCell sx={{ minWidth: 100, py: 0.75 }}>
+                    <FormInput
                       type="number"
                       value={row.percentage}
                       onChange={(event) => updateRow(index, { percentage: event.target.value })}
+                      sx={tableFieldSx}
                     />
                   </TableCell>
-                  <TableCell sx={{ minWidth: 130 }}>
-                    <TextField
-                      size="small"
+                  <TableCell sx={{ minWidth: 130, py: 0.75 }}>
+                    <FormInput
                       type="number"
                       value={row.weightTransferred}
                       onChange={(event) => updateRow(index, { weightTransferred: event.target.value })}
+                      sx={tableFieldSx}
                     />
                   </TableCell>
-                  <TableCell sx={{ minWidth: 130 }}>
-                    <TextField
+                  <TableCell sx={{ minWidth: 130, py: 0.75 }}>
+                    <FormInput
                       select
-                      size="small"
                       value={row.containerType}
                       onChange={(event) => updateRow(index, { containerType: event.target.value })}
+                      sx={tableFieldSx}
                     >
                       <MenuItem value="">—</MenuItem>
                       {CONTAINER_TYPES.map((type) => (
@@ -190,29 +204,29 @@ const RawMaterialWeightmentSheetPanel = ({
                           {type}
                         </MenuItem>
                       ))}
-                    </TextField>
+                    </FormInput>
                   </TableCell>
-                  <TableCell sx={{ minWidth: 120 }}>
-                    <TextField
-                      size="small"
+                  <TableCell sx={{ minWidth: 120, py: 0.75 }}>
+                    <FormInput
                       value={row.containerNumber}
                       onChange={(event) => updateRow(index, { containerNumber: event.target.value })}
+                      sx={tableFieldSx}
                     />
                   </TableCell>
-                  <TableCell sx={{ minWidth: 120 }}>
-                    <TextField
-                      size="small"
+                  <TableCell sx={{ minWidth: 120, py: 0.75 }}>
+                    <FormInput
                       value={row.weighScaleNumber}
                       onChange={(event) => updateRow(index, { weighScaleNumber: event.target.value })}
+                      sx={tableFieldSx}
                     />
                   </TableCell>
-                  <TableCell sx={{ minWidth: 190 }}>
-                    <TextField
-                      size="small"
+                  <TableCell sx={{ minWidth: 190, py: 0.75 }}>
+                    <FormInput
                       type="datetime-local"
                       value={row.weighingDateTime}
                       onChange={(event) => updateRow(index, { weighingDateTime: event.target.value })}
                       InputLabelProps={{ shrink: true }}
+                      sx={tableFieldSx}
                     />
                   </TableCell>
                   <TableCell align="center">
@@ -230,17 +244,19 @@ const RawMaterialWeightmentSheetPanel = ({
       <Button
         size="small"
         variant="outlined"
-        startIcon={<AddRoundedIcon />}
+        startIcon={<AddRoundedIcon fontSize="small" />}
         onClick={addRow}
-        sx={{ mb: 1.5, textTransform: "none", fontWeight: 700 }}
+        sx={{ mb: 1.5, textTransform: "none", fontWeight: 700, fontSize: "0.78rem" }}
       >
         {RM.WEIGHTMENT_ADD_ROW}
       </Button>
 
       <Stack spacing={0.5}>
         <FormControlLabel
+          sx={checkboxLabelSx}
           control={
             <Checkbox
+              size="small"
               checked={value.validation.compareWithIdentificationSheet}
               onChange={(event) =>
                 updateSheet({
@@ -255,8 +271,10 @@ const RawMaterialWeightmentSheetPanel = ({
           label={RM.WEIGHTMENT_COMPARE_LABEL}
         />
         <FormControlLabel
+          sx={checkboxLabelSx}
           control={
             <Checkbox
+              size="small"
               checked={value.validation.deviationFound}
               onChange={(event) =>
                 updateSheet({
@@ -271,8 +289,7 @@ const RawMaterialWeightmentSheetPanel = ({
           label={RM.WEIGHTMENT_DEVIATION_FOUND}
         />
         {value.validation.deviationFound ? (
-          <TextField
-            size="small"
+          <FormInput
             fullWidth
             label={RM.WEIGHTMENT_DEVIATION_MESSAGE}
             value={value.validation.deviationMessage}

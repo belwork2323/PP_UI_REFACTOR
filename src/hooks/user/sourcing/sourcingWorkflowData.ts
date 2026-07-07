@@ -93,6 +93,37 @@ export function createEmptyRocketMotorBatch(): RocketMotorBatch {
   };
 }
 
+/** Keep list/form header IDs aligned once the server assigns a motor casing ID */
+export function applyRocketMotorCasingIdentity(
+  batch: RocketMotorBatch,
+  updates: Partial<
+    Pick<
+      RocketMotorBatch,
+      | "motorCasingId"
+      | "motorId"
+      | "formId"
+      | "procurementId"
+      | "rmStatus"
+      | "motorStage"
+      | "motorNo"
+      | "motorType"
+    >
+  >,
+): RocketMotorBatch {
+  const motorCasingId = String(updates.motorCasingId ?? batch.motorCasingId ?? "").trim();
+  const motorIdRaw = String(updates.motorId ?? batch.motorId ?? "").trim();
+  const motorId = motorIdRaw && motorIdRaw !== "—" ? motorIdRaw : batch.motorId;
+
+  return {
+    ...batch,
+    ...updates,
+    motorCasingId,
+    motorId,
+    motorNo: motorId !== "—" ? motorId : batch.motorNo,
+    batchId: motorCasingId || batch.batchId,
+  };
+}
+
 export const INITIAL_ROCKET_FORM: RocketFormData = {
   motorCasingId: "",
   motorStageApi: "",

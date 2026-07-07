@@ -1,0 +1,105 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "RAW_MATERIALS",
+    "layout": { "type": "flat" },
+    "materialId": 9,
+    "materialCode": "NONOX_D",
+    "gradeId": null,
+    "gradeCode": null,
+    "subdepartmentId": 111,
+    "functionality": "CREATE_RAW_MATERIAL_PREPARATION_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "RAW_MATERIALS",
+  "functionality": "CREATE_RAW_MATERIAL_PREPARATION_FORM",
+  "message": "Raw material preparation schema fetched successfully",
+  "timestamp": "2026-05-29T17:45:00Z",
+  "materialId": 9,
+  "materialCode": "NONOX_D",
+  "materialName": "NONOX-D",
+  "materialType": "SOLID",
+  "data": {
+    "meta": {
+      "title": "NONOX-D Processing",
+      "description": "NONOX-D lot recording, sieving, dispatch and premix quantity"
+    },
+    "ui": {
+      "layout": "flat",
+      "gap": "md",
+      "sectionVariant": "card"
+    },
+    "context": {
+      "subDepartmentId": "{{subDepartmentId}}",
+      "materialId": "{{materialId}}",
+      "gradeId": "{{gradeId}}",
+      "materialCode": "NONOX_D"
+    },
+    "sections": [
+      {
+        "id": "NONOX_D_PROCESSING",
+        "title": "NONOX-D Processing",
+        "children": [
+          {
+            "type": "group",
+            "id": "PROCESSING_LOTS",
+            "label": "Lot {index}",
+            "ui": { "direction": "row", "wrap": true, "gap": "md" },
+            "repeat": {
+              "defaultCount": 1,
+              "min": 1,
+              "max": 20,
+              "allowAdd": true,
+              "allowDelete": true,
+              "label": "Lot {index}"
+            },
+            "children": [
+              {
+                "type": "field",
+                "id": "MFG_BATCH_LOT_NUMBER",
+                "fieldType": "text",
+                "label": "Enter Mfg/Batch Lot Nos",
+                "validation": { "required": true }
+              },
+              {
+                "type": "field",
+                "id": "QUANTITY_SIEVED",
+                "fieldType": "number",
+                "label": "Quantity Sieved",
+                "unit": "kg",
+                "validation": { "required": true }
+              },
+              {
+                "type": "field",
+                "id": "SIEVE_MESH_SIZE",
+                "fieldType": "text",
+                "label": "Sieve Mesh Size"
+              },
+              {
+                "type": "field",
+                "id": "DISPATCH_DATETIME",
+                "fieldType": "datetime",
+                "label": "Date/Time of Dispatch"
+              },
+              {
+                "type": "field",
+                "id": "OBSERVATION",
+                "fieldType": "textarea",
+                "label": "Any Other Observation"
+              },
+              {
+                "type": "field",
+                "id": "TOTAL_QUANTITY_SENT_FOR_PREMIX",
+                "fieldType": "number",
+                "label": "Total Quantity sent for premix",
+                "unit": "kg"
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

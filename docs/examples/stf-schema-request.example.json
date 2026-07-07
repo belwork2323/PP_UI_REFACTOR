@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1.0",
+  "schemaType": "STATIC_TESTING_FACILITY",
+  "layout": { "type": "flat" },
+  "subType": "BEM",
+  "subDepartmentId": 115,
+  "functionality": "CREATE_STATIC_TESTING_FORM"
+}

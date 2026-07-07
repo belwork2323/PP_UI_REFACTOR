@@ -4,14 +4,14 @@ import {
   SchemaUI,
   createCasePrepInitialValues,
   hydrateCasePrepValuesFromSections,
-  type SchemaDocument,
+  type SchemaDocumentV2,
   type SchemaFormValues,
-} from "../../../../../schemaManagement";
+} from "../../../../../schema-engine";
 import { CASE_PREP_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/casePreparation_theme";
 import type { CasePrepMotorSession } from "../../../../../data/models/user/CasePreparationFormModel";
 
 type CasePrepMotorSchemaPanelProps = {
-  schema: SchemaDocument | null;
+  schema: SchemaDocumentV2 | null;
   motor: CasePrepMotorSession;
   subDepartmentId?: number;
   batchId?: string;

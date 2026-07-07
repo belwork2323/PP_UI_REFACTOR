@@ -1,9 +1,11 @@
-import type {
-  DispatchFormState,
-  DispatchSupportingFile,
+import {
+  mapDispatchDetailsToFormState,
+  mapDispatchFormStateToPayload,
+  type DispatchFormState,
 } from "./DispatchFormModel";
+import type { SchemaSectionSubmission } from "../../../schema-engine";
 
-export type DispatchSubmissionType = "DRAFT" | "SUBMIT" | "UPDATE";
+export type DispatchSubmissionType = "DRAFT" | "SUBMIT";
 
 export class DispatchSubmitResponseModel {
   formId: string;
@@ -26,15 +28,16 @@ export class DispatchDetailsModel {
   batchId: string;
   subDepartmentId: number;
   formSubmissionType: string;
+  motorStage: string;
+  motorId: string;
   castingDate: string;
-  finalWeight: string;
-  waiversIfAny: string;
-  ndtCommitteeMomNumber: string;
-  finalAcceptanceMomNumber: string;
-  deviationDetails: string;
   dispatchDate: string;
   dispatchLocation: string;
-  supportingFiles: Array<{ name: string; filePath: string; fileType: string }>;
+  ndtClearance: string;
+  ndtMomNo: string;
+  finalAcceptanceClearance: string;
+  finalAcceptanceMomNo: string;
+  schemaValues: Record<string, any>;
   workflowInsights: {
     currentStatus: string;
     rejectionReason: string | null;
@@ -44,23 +47,40 @@ export class DispatchDetailsModel {
     this.formId = payload?.formId ?? "";
     this.batchId = payload?.batchId ?? "";
     this.subDepartmentId = Number(payload?.subDepartmentId ?? 0);
-    this.formSubmissionType = payload?.formSubmissionType ?? "";
-    this.castingDate = payload?.castingDate ?? "";
-    this.finalWeight = payload?.finalWeight ?? "";
-    this.waiversIfAny = payload?.waiversIfAny ?? "";
-    this.ndtCommitteeMomNumber = payload?.ndtCommitteeMomNumber ?? "";
-    this.finalAcceptanceMomNumber = payload?.finalAcceptanceMomNumber ?? "";
-    this.deviationDetails = payload?.deviationDetails ?? "";
-    this.dispatchDate = payload?.dispatchDate ?? "";
-    this.dispatchLocation = payload?.dispatchLocation ?? "";
-    this.supportingFiles = (payload?.supportingFiles ?? []).map((file: any) => ({
-      name: file?.name ?? "",
-      filePath: file?.filePath ?? "",
-      fileType: file?.fileType ?? "",
-    }));
+    this.formSubmissionType = payload?.formSubmissionType ?? payload?.formStatus ?? "";
+    
+    // Safely extract the first motor's nested dispatch details from backend schema
+    const motorObj = Array.isArray(payload?.motors) ? payload.motors[0] : null;
+    const details = motorObj?.dispatchDetails ?? {};
+
+    this.motorId = motorObj?.motorId ?? "";
+    this.motorStage = details?.stage ? details.stage.replace("STAGE_", "") : "";
+    this.castingDate = details?.castingDate ?? "";
+    this.dispatchDate = details?.dispatchDate ?? "";
+    this.dispatchLocation = details?.dispatchLocation ?? "";
+    
+    this.ndtClearance = details?.ndtClearance?.accorded ?? "NO";
+    this.ndtMomNo = details?.ndtClearance?.momNo ?? "";
+    
+    this.finalAcceptanceClearance = details?.finalAcceptanceCommitteeClearance?.accorded ?? "NO";
+    this.finalAcceptanceMomNo = details?.finalAcceptanceCommitteeClearance?.momNo ?? "";
+    
+    // Package nested JSON arrays up for the dynamic form state engine
+    this.schemaValues = {
+      projectName: details?.projectName ?? "",
+      propellantProperties: details?.propellantProperties ?? [],
+      waiverDetails: details?.waiverDetails ?? null,
+      rocketMotorInspection: details?.rocketMotorInspection ?? [],
+      vehicleDetails: details?.vehicleDetails ?? [],
+      rocketMotorPackingDetails: details?.rocketMotorPackingDetails ?? [],
+      uploadDispatchPhotos: details?.uploadDispatchPhotos ?? [],
+      safetyClearance: details?.safetyClearance ?? null,
+      dispatchTeam: details?.dispatchTeam ?? null,
+    };
+
     this.workflowInsights = {
-      currentStatus: payload?.workflowInsights?.currentStatus ?? "",
-      rejectionReason: payload?.workflowInsights?.rejectionReason ?? null,
+      currentStatus: payload?.formStatus ?? "",
+      rejectionReason: payload?.rejectionReason ?? null,
     };
   }
 
@@ -69,40 +89,24 @@ export class DispatchDetailsModel {
   }
 
   static toFormState(model: DispatchDetailsModel): DispatchFormState {
-    return {
-      castingDate: model.castingDate ?? "",
-      finalWeight: model.finalWeight ?? "",
-      waiversIfAny: model.waiversIfAny ?? "",
-      ndtCommitteeMomNumber: model.ndtCommitteeMomNumber ?? "",
-      finalAcceptanceMomNumber: model.finalAcceptanceMomNumber ?? "",
-      deviationDetails: model.deviationDetails ?? "",
-      dispatchDate: model.dispatchDate ?? "",
-      dispatchLocation: model.dispatchLocation ?? "",
-      supportingFiles: (model.supportingFiles ?? []).map((file) => ({
-        name: file.name,
-        filePath: file.filePath,
-        fileType: file.fileType,
-        type: file.fileType,
-      })),
-    };
+    return mapDispatchDetailsToFormState({
+      formId: model.formId,
+      batchId: model.batchId,
+      subDepartmentId: model.subDepartmentId,
+      formSubmissionType: model.formSubmissionType,
+      motorStage: model.motorStage,
+      motorId: model.motorId,
+      castingDate: model.castingDate,
+      dispatchDate: model.dispatchDate,
+      dispatchLocation: model.dispatchLocation,
+      ndtClearance: model.ndtClearance,
+      ndtMomNo: model.ndtMomNo,
+      finalAcceptanceClearance: model.finalAcceptanceClearance,
+      finalAcceptanceMomNo: model.finalAcceptanceMomNo,
+      schemaValues: model.schemaValues,
+    });
   }
 }
 
-const normalizeSupportingFiles = (files: DispatchSupportingFile[] = []) =>
-  files.map((file) => ({
-    name: file?.name ?? "",
-    filePath: file?.filePath ?? file?.name ?? "",
-    fileType: file?.fileType ?? file?.type ?? file?.file?.type ?? "",
-  }));
-
-export const mapDispatchPayload = (form: DispatchFormState) => ({
-  castingDate: form?.castingDate ?? "",
-  finalWeight: form?.finalWeight ?? "",
-  waiversIfAny: form?.waiversIfAny ?? "",
-  ndtCommitteeMomNumber: form?.ndtCommitteeMomNumber ?? "",
-  finalAcceptanceMomNumber: form?.finalAcceptanceMomNumber ?? "",
-  deviationDetails: form?.deviationDetails ?? "",
-  dispatchDate: form?.dispatchDate ?? "",
-  dispatchLocation: form?.dispatchLocation ?? "",
-  supportingFiles: normalizeSupportingFiles(form?.supportingFiles ?? []),
-});
+export const mapDispatchPayload = (form: DispatchFormState) =>
+  mapDispatchFormStateToPayload(form);

@@ -24,7 +24,7 @@ import {
   SMBlockchainEventModel,
   BatchStagesModel,
   BatchSubDeptDetailsModel,
-} from "../../data/models/systemManager/SystemManagerModel";
+} from "../../data/models/SystemManagerModel";
 
 import { useAlertStore } from "../../app/store/alertStore";
 import { STRINGS }      from "../../app/config/strings";

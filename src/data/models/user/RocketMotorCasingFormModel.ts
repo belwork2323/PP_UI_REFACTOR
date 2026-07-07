@@ -1,11 +1,11 @@
 import type { DimensionalParameterModel } from "./SubdepartmentCommonModel";
-import type { SchemaDocument, SchemaFormValues, SchemaSectionSubmission } from "../../../schemaManagement/models/schema.types";
+import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
 import {
   buildMockTrialSectionPayload,
   createMockTrialInitialValues,
   hydrateMockTrialValuesFromSections,
   parseMockTrialSavedSections,
-} from "../../../schemaManagement/adapters/rocketMotorCasingMockTrial.adapter";
+} from "../../../schema-engine/adapters/rocketMotorCasingMockTrial.adapter";
 
 export type ReceiptStatus = "RECEIVED" | "NOT_RECEIVED";
 export type CasingType = "COMPOSITE" | "METALLIC";
@@ -148,7 +148,7 @@ export type RocketMotorCasingFormData = {
 };
 
 export type RocketMotorCasingMockTrialSlot = {
-  schema: SchemaDocument | null;
+  schema: SchemaDocumentV2 | null;
   schemaLoading: boolean;
   schemaError: string | null;
   formValues: SchemaFormValues;

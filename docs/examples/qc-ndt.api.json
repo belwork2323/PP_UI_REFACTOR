@@ -1,0 +1,128 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "QC",
+    "layout": { "type": "flat" },
+    "division": "NDT",
+    "subType": null,
+    "subDepartmentId": 114,
+    "functionality": "CREATE_NDT_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "QC",
+  "division": "NDT",
+  "subType": null,
+  "functionality": "CREATE_NDT_FORM",
+  "message": "NDT details schema fetched successfully",
+  "timestamp": "2026-06-10T10:00:00Z",
+  "data": {
+    "layout": { "type": "flat" },
+    "meta": {
+      "title": "NDT Radiography",
+      "description": "Radiography testing details"
+    },
+    "sections": [
+      {
+        "id": "RADIOGRAPHY_DETAILS",
+        "title": "Radiography Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "RADIOGRAPHY_DETAILS",
+            "rows": {
+              "allowAdd": true,
+              "allowDelete": true
+            },
+            "columns": [
+              { "type": "column", "id": "MACHINE_NO", "fieldType": "text", "label": "Machine No." },
+              { "type": "column", "id": "FROM_DATE", "fieldType": "date", "label": "From Date" },
+              { "type": "column", "id": "TO_DATE", "fieldType": "date", "label": "To Date" },
+              { "type": "column", "id": "NO_OF_SECTIONS", "fieldType": "number", "label": "No. of Sections" },
+              { "type": "column", "id": "NO_OF_ORIENTATIONS", "fieldType": "number", "label": "No. of Orientations" },
+              { "type": "column", "id": "NORMAL_EXPOSURES", "fieldType": "number", "label": "No. of Normal Exposures" },
+              { "type": "column", "id": "TANGENTIAL_EXPOSURES", "fieldType": "number", "label": "No. of Tangential Exposures" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "RADIOGRAPHY_OBSERVATIONS",
+        "title": "Radiography Observations",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "RADIOGRAPHY_OBSERVATIONS",
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "SR_NO",
+              "presetRows": [
+                { "readonly": true, "SR_NO": 1, "TYPE_OF_DEFECT": "Cracks" },
+                { "readonly": true, "SR_NO": 2, "TYPE_OF_DEFECT": "Voids" },
+                { "readonly": true, "SR_NO": 3, "TYPE_OF_DEFECT": "De-bonds" },
+                { "readonly": true, "SR_NO": 4, "TYPE_OF_DEFECT": "Delamination" },
+                { "readonly": true, "SR_NO": 5, "TYPE_OF_DEFECT": "Porosity" },
+                { "readonly": true, "SR_NO": 6, "TYPE_OF_DEFECT": "Any Other Observation" }
+              ]
+            },
+            "columns": [
+              { "type": "column", "id": "SR_NO", "fieldType": "serial", "label": "Sr. No.", "readonly": true },
+              { "type": "column", "id": "TYPE_OF_DEFECT", "fieldType": "static", "label": "Type of Defect", "readonly": true },
+              { "type": "column", "id": "OBSERVATION_LOCATION", "fieldType": "textarea", "label": "Observation and Location" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "VISUAL_INSPECTION",
+        "title": "Visual Inspection",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "VISUAL_INSPECTION",
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "SR_NO",
+              "presetRows": [
+                { "readonly": true, "SR_NO": 1, "OBSERVATION_TYPE": "Surface Paint / Finish" },
+                { "readonly": true, "SR_NO": 2, "OBSERVATION_TYPE": "Dents/scratch/abnormalities on motor case" },
+                { "readonly": true, "SR_NO": 3, "OBSERVATION_TYPE": "Dents/scratch/abnormalities on propellant" },
+                { "readonly": true, "SR_NO": 4, "OBSERVATION_TYPE": "Nut & bolt grooves cleanliness" },
+                { "readonly": true, "SR_NO": 5, "OBSERVATION_TYPE": "Observation on nozzle end flange" },
+                { "readonly": true, "SR_NO": 6, "OBSERVATION_TYPE": "Observation on Head End Flange" },
+                { "readonly": true, "SR_NO": 7, "OBSERVATION_TYPE": "Port cleanliness" },
+                { "readonly": true, "SR_NO": 8, "OBSERVATION_TYPE": "Beading condition" }
+              ]
+            },
+            "columns": [
+              { "type": "column", "id": "SR_NO", "fieldType": "serial", "label": "Sr. No.", "readonly": true },
+              { "type": "column", "id": "OBSERVATION_TYPE", "fieldType": "static", "label": "Observations", "readonly": true },
+              { "type": "column", "id": "OBSERVATION", "fieldType": "textarea", "label": "Observation" },
+              { "type": "column", "id": "LOCATION", "fieldType": "text", "label": "Location" },
+              { "type": "column", "id": "UPLOAD_IMAGE", "fieldType": "file", "label": "Upload Image" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "UPLOAD_MEDIA",
+        "title": "Upload Videos / Photos",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "UPLOAD_VIDEO_PHOTO",
+            "fieldType": "file",
+            "label": "Upload Videos / Photos"
+          }
+        ]
+      }
+    ]
+  }
+}

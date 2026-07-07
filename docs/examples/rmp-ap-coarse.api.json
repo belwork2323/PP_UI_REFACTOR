@@ -1,0 +1,243 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "RAW_MATERIALS",
+    "layout": { "type": "flat" },
+    "materialId": 1,
+    "materialCode": "AP",
+    "gradeId": 101,
+    "gradeCode": "COARSE",
+    "subdepartmentId": 111,
+    "functionality": "CREATE_RAW_MATERIAL_PREPARATION_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "RAW_MATERIALS",
+  "functionality": "CREATE_RAW_MATERIAL_PREPARATION_FORM",
+  "message": "Raw material preparation schema fetched successfully",
+  "timestamp": "2026-05-27T16:00:00Z",
+  "materialId": 1,
+  "materialCode": "AP",
+  "materialName": "Ammonium Perchlorate",
+  "materialType": "SOLID",
+  "grade": {
+    "gradeId": 101,
+    "gradeCode": "COARSE",
+    "gradeName": "AP Coarse"
+  },
+  "data": {
+    "meta": {
+      "title": "Raw Material Preparation",
+      "description": "Raw material drying, unloading and PSD recording"
+    },
+    "ui": {
+      "layout": "flat",
+      "gap": "md",
+      "sectionVariant": "card"
+    },
+    "context": {
+      "subDepartmentId": "{{subDepartmentId}}",
+      "materialId": "{{materialId}}",
+      "gradeId": "{{gradeId}}",
+      "materialCode": "AP",
+      "gradeCode": "COARSE"
+    },
+    "sections": [
+      {
+        "id": "FEED_MATERIAL_DETAILS",
+        "title": "Feed Material Details",
+        "children": [
+          {
+            "type": "group",
+            "id": "FEED_LOTS",
+            "label": "Material Lots",
+            "ui": { "direction": "row", "wrap": true, "gap": "md" },
+            "repeat": {
+              "defaultCount": 1,
+              "min": 1,
+              "max": 20,
+              "allowAdd": true,
+              "allowDelete": true,
+              "label": "Lot {index}"
+            },
+            "children": [
+              {
+                "type": "field",
+                "id": "LOT_NUMBER",
+                "fieldType": "dropdown",
+                "label": "Lot Number",
+                "dataSource": {
+                  "type": "api",
+                  "api": {
+                    "endpoint": "raw-material-procurement-lot-list",
+                    "method": "POST",
+                    "requestBody": {
+                      "limit": 500,
+                      "page": 1,
+                      "status": ["APPROVED"],
+                      "subDepartmentId": 1,
+                      "materialCode": ["{{materialCode}}"]
+                    },
+                    "responsePath": "data.lots",
+                    "displayKey": "lotId",
+                    "valueKey": "lotId"
+                  }
+                },
+                "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 }, "maxWidth": "240px" }
+              },
+              {
+                "type": "field",
+                "id": "QUANTITY",
+                "fieldType": "number",
+                "label": "Quantity",
+                "unit": "kg",
+                "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 }, "maxWidth": "200px" }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "BLENDING_DRYING_PARAMETERS",
+        "title": "Blending cum Drying Parameters",
+        "children": [
+          {
+            "type": "table",
+            "id": "BLENDING_TABLE",
+            "rows": {
+              "defaultCount": 2,
+              "allowAdd": true,
+              "allowDelete": true,
+              "autoIncrementKey": "srNo",
+              "presetRows": [
+                {
+                  "readonly": true,
+                  "OPERATION": "Hot Water Circulation Temperature Set",
+                  "SET_PARAMETER": "75±5°C"
+                },
+                {
+                  "readonly": true,
+                  "OPERATION": "Material Quantity",
+                  "SET_PARAMETER": "Total Quantity from various lots"
+                }
+              ]
+            },
+            "columns": [
+              { "type": "column", "id": "srNo", "fieldType": "serial", "label": "Sr No." },
+              { "type": "column", "id": "OPERATION", "fieldType": "text", "label": "Operation", "readonly": true },
+              { "type": "column", "id": "SET_PARAMETER", "fieldType": "text", "label": "Set Parameter", "readonly": true },
+              { "type": "column", "id": "ACTUAL_PARAMETER", "fieldType": "text", "label": "Actual Parameter" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "DRYING_OPERATION_RVD",
+        "title": "Drying Operation in RVD",
+        "children": [
+          {
+            "type": "table",
+            "id": "RVD_DRYING_TABLE",
+            "rows": {
+              "defaultCount": 2,
+              "allowAdd": true,
+              "allowDelete": true,
+              "autoIncrementKey": "srNo",
+              "presetRows": [
+                {
+                  "readonly": true,
+                  "OPERATION": "Drying",
+                  "SET_PARAMETER": "Temp:65±2°C\nDuration:90 min"
+                },
+                {
+                  "readonly": true,
+                  "OPERATION": "Vacuum Application",
+                  "SET_PARAMETER": "Vacuum:150 torr\nTime:25 min"
+                }
+              ]
+            },
+            "columns": [
+              { "type": "column", "id": "srNo", "fieldType": "serial", "label": "Sr No." },
+              { "type": "column", "id": "OPERATION", "fieldType": "text", "label": "Operation", "readonly": true },
+              { "type": "column", "id": "SET_PARAMETER", "fieldType": "text", "label": "Set Parameter", "readonly": true },
+              { "type": "column", "id": "ACTUAL_PARAMETER", "fieldType": "text", "label": "Actual Parameter" },
+              { "type": "column", "id": "START_TIME", "fieldType": "datetime", "label": "Start Time" },
+              { "type": "column", "id": "END_TIME", "fieldType": "datetime", "label": "End Time" }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "UNLOADING_DISPATCH",
+        "title": "Unloading Material & Dispatch to Mixing",
+        "children": [
+          {
+            "type": "group",
+            "id": "DISPATCH_BINS",
+            "ui": { "direction": "row", "wrap": true, "gap": "md" },
+            "repeat": {
+              "defaultCount": 1,
+              "min": 1,
+              "max": 20,
+              "allowAdd": true,
+              "allowDelete": true
+            },
+            "children": [
+              {
+                "type": "field",
+                "id": "BIN_NUMBER",
+                "fieldType": "text",
+                "label": "Bin Number",
+                "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 }, "maxWidth": "200px" }
+              },
+              {
+                "type": "field",
+                "id": "BIN_CAPACITY",
+                "fieldType": "number",
+                "label": "Bin Capacity",
+                "unit": "kg",
+                "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 }, "maxWidth": "200px" }
+              },
+              {
+                "type": "field",
+                "id": "FILLED_QUANTITY",
+                "fieldType": "number",
+                "label": "Material Filled Quantity",
+                "unit": "kg",
+                "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 }, "maxWidth": "200px" }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "PARTICLE_SIZE_DISTRIBUTION",
+        "title": "Particle Size Distribution",
+        "children": [
+          {
+            "type": "table",
+            "id": "PSD_TABLE",
+            "rows": {
+              "defaultCount": 5,
+              "allowAdd": false,
+              "allowDelete": false,
+              "presetRows": [
+                { "readonly": true, "PSD_REQUIREMENT": "Above 500 µm, % max", "SPECIFICATION": "5" },
+                { "readonly": true, "PSD_REQUIREMENT": "500-355 µm, %", "SPECIFICATION": "27±5" },
+                { "readonly": true, "PSD_REQUIREMENT": "355-300 µm, %", "SPECIFICATION": "32±5" },
+                { "readonly": true, "PSD_REQUIREMENT": "300-45 µm, %", "SPECIFICATION": "33±5" },
+                { "readonly": true, "PSD_REQUIREMENT": "Less than 45 µm, %", "SPECIFICATION": "1" }
+              ]
+            },
+            "columns": [
+              { "type": "column", "id": "PSD_REQUIREMENT", "fieldType": "static", "label": "PSD/PS Required" },
+              { "type": "column", "id": "SPECIFICATION", "fieldType": "static", "label": "Specification" },
+              { "type": "column", "id": "RESULT", "fieldType": "number", "label": "Result" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

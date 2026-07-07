@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { STRINGS } from "../../../app/config/strings";
 import { useAlertStore } from "../../../app/store/alertStore";
@@ -6,23 +6,57 @@ import { useAuthStore } from "../../../app/store/authStore";
 import { useApproverListRefreshStore } from "../../../app/store/approverListRefreshStore";
 import {
   APPROVER_STATUS_META,
-  APPROVER_PRIORITY_META,
   isApproverActionableStatus,
 } from "../../../app/theme/approver";
+import { operationsController } from "../../../controllers/user/operationsController";
 import rocketMotorCasingController from "../../../controllers/user/sourcing/rocketMotorCasingController";
-import rocketMotorCasingApproverController from "../../../controllers/approver/rocketMotorCasingApproverController";
 import type { ApproverFormActionType } from "../../../data/api/approver/approverApi";
+import { ROCKET_MOTOR_CASING_APPROVER_STATUS_TABS } from "../../../data/models/approver/RocketMotorCasingApproverModel";
 import { RocketMotorCasingDetailsModel } from "../../../data/models/user/RocketMotorCasingProcurementModel";
 import { submitApproverFormStatusChange } from "../../../controllers/approver/approverController";
+import type { MotorStageOption } from "../../user/sourcing/useRocketMotorCasingList";
+import { OPERATION_STATUS } from "../../operationStatus";
+import { alpha } from "@mui/material";
 
 const DEPARTMENT_SLUG = "sourcing";
 const SUB_DEPARTMENT_SLUG = "rocket-motor";
+const FILTER_ALL = STRINGS.APPROVER.COMMON.STATUS_ALL;
+
+export type RocketMotorCasingApproverAppliedFilters = {
+  motorStage: string;
+  casingType: string;
+  insulationType: string;
+  fromDate: string;
+  toDate: string;
+};
+
+const emptyAppliedFilters: RocketMotorCasingApproverAppliedFilters = {
+  motorStage: "",
+  casingType: "",
+  insulationType: "",
+  fromDate: "",
+  toDate: "",
+};
 
 const S = STRINGS.SOURCING.CASING_FORM;
 const A = STRINGS.APPROVER.ACTION;
 
 const getResponseMessage = (response: { message?: string; errorCode?: string | null }) =>
   response.message || response.errorCode || A.FAILED;
+
+const ROCKET_MOTOR_CASING_APPROVER_STATUS_META = {
+  ...APPROVER_STATUS_META,
+  [OPERATION_STATUS.INITIATED]: {
+    bg: alpha("#5D6D7E", 0.08),
+    color: "#2E4053",
+    border: alpha("#5D6D7E", 0.2),
+  },
+  [OPERATION_STATUS.IN_PROGRESS]: {
+    bg: alpha("#2E86C1", 0.1),
+    color: "#1A5276",
+    border: alpha("#2E86C1", 0.3),
+  },
+};
 
 export const useRocketMotorCasingApproverHook = () => {
   const user = useAuthStore((state) => state.user);
@@ -37,12 +71,103 @@ export const useRocketMotorCasingApproverHook = () => {
   const [dialogError, setDialogError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  const [appliedFilters, setAppliedFilters] =
+    useState<RocketMotorCasingApproverAppliedFilters>(emptyAppliedFilters);
+  const [statusFilter, setStatusFilter] = useState(FILTER_ALL);
+  const [motorStageOptions, setMotorStageOptions] = useState<MotorStageOption[]>([]);
+  const [motorStagesLoading, setMotorStagesLoading] = useState(false);
+
   const subDepartmentId = useMemo(
     () =>
       user?.allSubDepartments.find(
         (sd) => sd.slugs?.dept === DEPARTMENT_SLUG && sd.slugs?.subDept === SUB_DEPARTMENT_SLUG,
       )?.subDepartmentId ?? null,
     [user],
+  );
+
+  useEffect(() => {
+    let active = true;
+
+    const loadStages = async () => {
+      if (!subDepartmentId) {
+        setMotorStageOptions([]);
+        return;
+      }
+
+      setMotorStagesLoading(true);
+      try {
+        const response = await operationsController.fetchMotorsStageList();
+        if (!active) return;
+        if (response?.success && response.data) {
+          const stages = response.data.stages ?? [];
+          setMotorStageOptions(
+            stages.map((stage) => ({
+              motorStage: String(stage.motorStage ?? "").trim(),
+              noOfmotors: Number(stage.noOfmotors ?? 0),
+            })),
+          );
+        } else {
+          setMotorStageOptions([]);
+        }
+      } catch {
+        if (active) setMotorStageOptions([]);
+      } finally {
+        if (active) setMotorStagesLoading(false);
+      }
+    };
+
+    void loadStages();
+
+    return () => {
+      active = false;
+    };
+  }, [subDepartmentId]);
+
+  const listFiltersRecord = useMemo(
+    () => ({
+      motorStage: appliedFilters.motorStage || FILTER_ALL,
+      casingType: appliedFilters.casingType || FILTER_ALL,
+      insulationType: appliedFilters.insulationType || FILTER_ALL,
+      fromDate: appliedFilters.fromDate,
+      toDate: appliedFilters.toDate,
+    }),
+    [appliedFilters],
+  );
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (appliedFilters.motorStage) count += 1;
+    if (appliedFilters.casingType) count += 1;
+    if (appliedFilters.insulationType) count += 1;
+    if (appliedFilters.fromDate) count += 1;
+    if (appliedFilters.toDate) count += 1;
+    if (statusFilter !== FILTER_ALL) count += 1;
+    return count;
+  }, [appliedFilters, statusFilter]);
+
+  const applyPanelFilters = (
+    next: RocketMotorCasingApproverAppliedFilters & { status: string },
+  ) => {
+    setAppliedFilters({
+      motorStage: next.motorStage,
+      casingType: next.casingType,
+      insulationType: next.insulationType,
+      fromDate: next.fromDate,
+      toDate: next.toDate,
+    });
+    setStatusFilter(next.status || FILTER_ALL);
+  };
+
+  const clearListFilters = () => {
+    setAppliedFilters(emptyAppliedFilters);
+    setStatusFilter(FILTER_ALL);
+  };
+
+  const statusTabs = useMemo(() => [FILTER_ALL, ...ROCKET_MOTOR_CASING_APPROVER_STATUS_TABS], []);
+
+  const statusDropdownValues = useMemo(
+    () => [FILTER_ALL, ...ROCKET_MOTOR_CASING_APPROVER_STATUS_TABS],
+    [],
   );
 
   const closeDialog = () => {
@@ -54,11 +179,6 @@ export const useRocketMotorCasingApproverHook = () => {
   };
 
   const requestAction = (item: any, nextActionType: ApproverFormActionType) => {
-
-    console.log("ITEM", item);
-    console.log("motorCasingId", item?.motorCasingId);
-    console.log("procurementId", item?.procurementId);
-    console.log("formId", item?.formId);
     if (!subDepartmentId) {
       showAlert(A.SUBDEPARTMENT_MISSING, "error", { autoCloseMs: 3000 });
       return;
@@ -86,23 +206,23 @@ export const useRocketMotorCasingApproverHook = () => {
 
   const handleConfirm = async () => {
     if (!dialogItem || !actionType || !subDepartmentId) return;
-    
+
     const trimmedValue = dialogValue.trim();
     const motorCasingId = String(dialogItem?.motorCasingId ?? dialogItem?.batchId ?? "").trim();
-    
+
     if (actionType === "REJECTED" && !trimmedValue) {
       setDialogError(A.REJECTION_REASON_REQUIRED);
       return;
     }
-    
+
     if (!motorCasingId) {
       showAlert(A.FORM_ID_MISSING, "error", { autoCloseMs: 3000 });
       return;
     }
-    
+
     setSubmitting(true);
     showAlert(actionType === "APPROVED" ? A.APPROVING : A.REJECTING, "info", { loading: true });
-    
+
     const response = await submitApproverFormStatusChange({
       formId: motorCasingId,
       subDepartmentId,
@@ -110,7 +230,7 @@ export const useRocketMotorCasingApproverHook = () => {
       remarks: actionType === "APPROVED" ? trimmedValue || null : null,
       rejectionReason: actionType === "REJECTED" ? trimmedValue : null,
     });
-    
+
     setSubmitting(false);
 
     if (response.success) {
@@ -154,7 +274,6 @@ export const useRocketMotorCasingApproverHook = () => {
     setSelected({
       ...row,
       motorCasingId,
-      procurementId: row.procurementId ?? "",
       batchId: motorCasingId,
       formId: motorCasingId,
       casingBlocks: RocketMotorCasingDetailsModel.toDetailBlocks(model),
@@ -189,8 +308,19 @@ export const useRocketMotorCasingApproverHook = () => {
     requestReject: (item: any) => requestAction(item, "REJECTED"),
     handleViewDetails,
     handleCloseDetail,
-    statusMeta: APPROVER_STATUS_META,
-    priorityMeta: APPROVER_PRIORITY_META,
+    statusMeta: ROCKET_MOTOR_CASING_APPROVER_STATUS_META,
+    appliedFilters,
+    applyPanelFilters,
+    clearListFilters,
+    activeFilterCount,
+    listFiltersRecord,
+    motorStageOptions,
+    motorStagesLoading,
+    statusFilter,
+    setStatusFilter,
+    statusTabs,
+    statusDropdownValues,
+    filterAllLabel: FILTER_ALL,
   };
 };
 

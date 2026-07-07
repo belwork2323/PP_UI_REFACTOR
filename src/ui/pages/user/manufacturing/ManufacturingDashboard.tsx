@@ -14,6 +14,8 @@ import CasePreparationPage from "./CasePreparation/CasePreparationPage";
 import MixingPage from "./Mixing/MixingPage";
 import CastingCuringPage from "./CastingAndCuring/CastingAndCuringPage";
 import PostCurePage from "./PostCure/PostCurePage";
+import SubscalePage from "./Subscale/SubscalePage";
+import TrimmingPage from "./Trimming/TrimmingPage";
 
 export default function ManufacturingDashboard() {
   const mode = useThemeStore((state) => state.mode);
@@ -27,9 +29,11 @@ export default function ManufacturingDashboard() {
     isMixingFlow,
     isCastingAndCuringFlow,
     isPostCureFlow,
+    isSubscaleFlow,
+    isTrimmingFlow,
   } = useManufacturingDashboardHook();
 
-  const { userName, userRole, stats } = useUserDepartmentHeaderHook({
+  const { userName, userRole, stats, statItems } = useUserDepartmentHeaderHook({
     deptSlug: "manufacturing",
     subDeptSlug: subDept,
   });
@@ -43,6 +47,7 @@ export default function ManufacturingDashboard() {
         userName={userName}
         userRole={userRole}
         stats={stats}
+        statItems={statItems}
       />
       <Box sx={theme.dashboard.content}>
         {isRawMaterialPrepFlow && <RawMaterialPreparationPage />}
@@ -50,6 +55,8 @@ export default function ManufacturingDashboard() {
         {isMixingFlow && <MixingPage />}
         {isCastingAndCuringFlow && <CastingCuringPage />}
         {isPostCureFlow && <PostCurePage />}
+        {isSubscaleFlow && <SubscalePage />}
+        {isTrimmingFlow && <TrimmingPage />}
       </Box>
     </Box>
   );

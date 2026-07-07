@@ -1,42 +1,121 @@
-export type StaticTestFacilityFormState = {
-  motorNo: string;
-  a_emptyMotor: string;
-  b_rubberDust: string;
-  c_linearCoating: string;
-  d_looseFlapFill: string;
-  e_extraRubber: string;
-  f_inhibition: string;
-  g_finalWeight: string;
-  h_propellent?: string;
-};
+import {
+  createStfInitialValues,
+  hydrateStfValuesFromSections,
+  mapStfSubType,
+  schemaValuesHaveUserData,
+  toSectionSubmissions,
+  type StfSubType,
+  type SchemaDocumentV2,
+  type SchemaFormValues,
+  type SchemaSectionSubmission,
+} from "../../../schema-engine";
 
-export const createDefaultStaticTestFacilityFormState = (): StaticTestFacilityFormState => ({
-  motorNo: "",
-  a_emptyMotor: "",
-  b_rubberDust: "",
-  c_linearCoating: "",
-  d_looseFlapFill: "",
-  e_extraRubber: "",
-  f_inhibition: "",
-  g_finalWeight: "",
+export type { StfSubType };
+
+export const createStfData = () => ({
+  schemaFormLoaded: false,
+  subType: null as StfSubType | null,
+  motorIdNo: "",
+  stfSchema: null as SchemaDocumentV2 | null,
+  schemasBySubType: {} as Partial<Record<StfSubType, SchemaDocumentV2>>,
+  schemaFormValues: {} as SchemaFormValues,
+  savedSections: undefined as SchemaSectionSubmission[] | undefined,
 });
 
-export const calculateStaticTestFacilityPropellant = (
-  form: Partial<StaticTestFacilityFormState>
-) => {
-  const toNumber = (value: string | undefined) => parseFloat(value ?? "") || 0;
-  const a = toNumber(form.a_emptyMotor);
-  const b = toNumber(form.b_rubberDust);
-  const c = toNumber(form.c_linearCoating);
-  const d = toNumber(form.d_looseFlapFill);
-  const e = toNumber(form.e_extraRubber);
-  const f = toNumber(form.f_inhibition);
-  const g = toNumber(form.g_finalWeight);
-  const result = g - (a - b + c + d - e + f);
+export type StaticTestFacilityFormState = ReturnType<typeof createStfData>;
 
-  if (!a && !b && !c && !d && !e && !f && !g) return "";
-  return Number.isNaN(result) ? "" : result.toFixed(4).replace(/\.?0+$/, "");
+export type StaticTestFacilityDetails = {
+  formId: string;
+  batchId: string;
+  subDepartmentId: number;
+  formSubmissionType: string;
+  subType?: StfSubType | string | null;
+  motorIdNo?: string | null;
+  sections?: SchemaSectionSubmission[];
+};
+
+export type StaticTestFacilityMotor = {
+  motorId: string;
+  staticTestingDetails: Record<string, unknown>;
+};
+
+export type StaticTestFacilityFormBody = {
+  motors: StaticTestFacilityMotor[];
+};
+
+export const createDefaultStaticTestFacilityFormState = (): StaticTestFacilityFormState =>
+  createStfData();
+
+export const hydrateStaticTestFacilityFormState = (
+  state: StaticTestFacilityFormState,
+  schema: SchemaDocumentV2,
+  subType: StfSubType,
+): StaticTestFacilityFormState => ({
+  ...state,
+  subType,
+  stfSchema: schema,
+  schemasBySubType: {
+    ...(state.schemasBySubType ?? {}),
+    [subType]: schema,
+  },
+  schemaFormValues: state.savedSections?.length
+    ? hydrateStfValuesFromSections(schema, state.savedSections)
+    : Object.keys(state.schemaFormValues ?? {}).length > 0
+      ? state.schemaFormValues
+      : createStfInitialValues(schema),
+  schemaFormLoaded: true,
+});
+
+const extractSections = (
+  details: Partial<StaticTestFacilityDetails>,
+): SchemaSectionSubmission[] | undefined => {
+  if (Array.isArray(details?.sections) && details.sections.length > 0) {
+    return details.sections;
+  }
+  return undefined;
+};
+
+export const mapStaticTestFacilityDetailsToFormState = (
+  details: Partial<StaticTestFacilityDetails>,
+): StaticTestFacilityFormState => {
+  const defaults = createDefaultStaticTestFacilityFormState();
+  const savedSections = extractSections(details);
+  const subType = details?.subType ? mapStfSubType(details.subType) : null;
+
+  return {
+    ...defaults,
+    subType,
+    motorIdNo: String(details?.motorIdNo ?? ""),
+    schemaFormLoaded: Boolean(savedSections?.length),
+    savedSections,
+  };
+};
+
+const FORM_SECTIONS_KEY = "formSections";
+
+export const mapStaticTestFacilityFormStateToPayload = (
+  form: StaticTestFacilityFormState,
+): StaticTestFacilityFormBody => {
+  const schema = form.stfSchema;
+  const motorId = form.motorIdNo?.trim() || "MOTOR-001";
+
+  if (!schema) {
+    return { motors: [{ motorId, staticTestingDetails: {} }] };
+  }
+
+  const sections = toSectionSubmissions(schema, form.schemaFormValues);
+
+  return {
+    motors: [
+      {
+        motorId,
+        staticTestingDetails: { [FORM_SECTIONS_KEY]: sections },
+      },
+    ],
+  };
 };
 
 export const hasAnyStaticTestFacilityValue = (form: StaticTestFacilityFormState) =>
-  Object.values(form).some((value) => String(value ?? "").trim().length > 0);
+  schemaValuesHaveUserData(form.schemaFormValues ?? {});
+
+export { FORM_SECTIONS_KEY };

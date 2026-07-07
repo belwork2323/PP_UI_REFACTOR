@@ -4,14 +4,14 @@ import {
   SchemaUI,
   createCasePrepInitialValues,
   hydrateCasePrepValuesFromSections,
-  type SchemaDocument,
+  type SchemaDocumentV2,
   type SchemaFormValues,
   type SchemaSectionSubmission,
-} from "../../../../../schemaManagement";
+} from "../../../../../schema-engine";
 import { CASE_PREP_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/casePreparation_theme";
 
 type CasePrepSubscaleSchemaPanelProps = {
-  schema: SchemaDocument | null;
+  schema: SchemaDocumentV2 | null;
   formValues: SchemaFormValues;
   savedSections?: SchemaSectionSubmission[];
   subDepartmentId?: number;

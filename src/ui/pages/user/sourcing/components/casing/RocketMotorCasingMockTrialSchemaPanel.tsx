@@ -8,7 +8,7 @@ import {
   rocketMotorCasingMockTrialSchemaFetchConfig,
   useSchemaFetch,
   type SchemaFormValues,
-} from "../../../../../../schemaManagement";
+} from "../../../../../../schema-engine";
 import type { RocketMotorCasingMockTrialSlot } from "../../../../../../data/models/user/RocketMotorCasingFormModel";
 
 type RocketMotorCasingMockTrialSchemaPanelProps = {
@@ -48,7 +48,18 @@ const RocketMotorCasingMockTrialSchemaPanel = ({
   }, [motorStage, subDepartmentId]);
 
   useEffect(() => {
-    if (!schema) return;
+    if (loading) return;
+
+    if (error || !schema) {
+      onSlotChange({
+        schema: null,
+        schemaLoading: false,
+        schemaError: error,
+        formValues: slot.formValues,
+        savedSections: slot.savedSections,
+      });
+      return;
+    }
 
     let nextValues: SchemaFormValues = slot.formValues;
     if (!hydratedRef.current) {
@@ -62,8 +73,8 @@ const RocketMotorCasingMockTrialSchemaPanel = ({
 
     onSlotChange({
       schema,
-      schemaLoading: loading,
-      schemaError: error,
+      schemaLoading: false,
+      schemaError: null,
       formValues: nextValues,
       savedSections: slot.savedSections,
     });
@@ -71,7 +82,7 @@ const RocketMotorCasingMockTrialSchemaPanel = ({
 
   const handleValuesChange = (values: SchemaFormValues) => {
     onSlotChange({
-      schema: schema ?? slot.schema,
+      schema: error || loading ? null : schema,
       schemaLoading: loading,
       schemaError: error,
       formValues: values,
@@ -93,8 +104,6 @@ const RocketMotorCasingMockTrialSchemaPanel = ({
     [palette]
   );
 
-  const activeSchema = slot.schema ?? schema;
-
   if (!String(motorStage ?? "").trim()) {
     return (
       <Typography sx={{ fontSize: "0.8rem", color: palette.textSub }}>
@@ -114,11 +123,11 @@ const RocketMotorCasingMockTrialSchemaPanel = ({
   return (
     <Box>
       <SchemaUI
-        schema={activeSchema}
+        schema={schema}
         value={slot.formValues}
         onChange={handleValuesChange}
-        loading={loading || slot.schemaLoading}
-        error={error ?? slot.schemaError}
+        loading={loading}
+        error={error}
         themeTokens={schemaThemeTokens}
         apiContext={{ subDepartmentId }}
       />

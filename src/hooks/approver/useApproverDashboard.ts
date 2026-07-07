@@ -4,9 +4,10 @@ export type ApproverDashboardSubDepartment = {
   key: string;
   label: string;
   description: string;
-  pending: number;
-  approved: number;
-  rejected: number;
+  pending?: number;
+  approved?: number;
+  rejected?: number;
+  allocated?: number;
 };
 
 export const useApproverDashboard = (
@@ -15,16 +16,12 @@ export const useApproverDashboard = (
   useMemo(() => {
     const totals = subDepartments.reduce(
       (summary, subDepartment) => ({
-        pending: summary.pending + subDepartment.pending,
-        approved: summary.approved + subDepartment.approved,
-        rejected: summary.rejected + subDepartment.rejected,
-        allocated:
-          summary.allocated +
-          subDepartment.pending +
-          subDepartment.approved +
-          subDepartment.rejected,
+        allocated: summary.allocated + (subDepartment.allocated ?? 0),
+        pending: summary.pending + (subDepartment.pending ?? 0),
+        approved: summary.approved + (subDepartment.approved ?? 0),
+        rejected: summary.rejected + (subDepartment.rejected ?? 0),
       }),
-      { pending: 0, approved: 0, rejected: 0, allocated: 0 },
+      { allocated: 0, pending: 0, approved: 0, rejected: 0 },
     );
 
     return {

@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "1.0",
+  "schemaType": "POST_CURE",
+  "functionality": "CREATE_POST_CURE_FORM",
+  "operationType": "INHIBITION",
+  "inhibitorType": "NOT_APPLICABLE",
+  "meta": {
+    "title": "Inhibition Not Applicable",
+    "description": "Remarks when inhibition is not applicable"
+  },
+  "data": {
+    "ui": {
+      "layout": "accordion",
+      "gap": "md",
+      "sectionVariant": "card",
+      "accordion": {
+        "defaultExpanded": true,
+        "allowMultipleExpanded": true
+      }
+    },
+    "context": {
+      "subDepartmentId": "{{subDepartmentId}}",
+      "batchId": "{{batchId}}"
+    },
+    "sections": [
+      {
+        "id": "INHIBITION_NOT_APPLICABLE",
+        "title": "Inhibition",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "REMARKS",
+            "fieldType": "textarea",
+            "label": "Remarks",
+            "ui": { "colSpan": { "xs": 12 } }
+          }
+        ]
+      }
+    ]
+  }
+}

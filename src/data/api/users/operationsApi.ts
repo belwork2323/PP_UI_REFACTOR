@@ -37,3 +37,7 @@ export const fetchApprovedMotorsListApi = async (payload: {
 export const fetchCastingStationsApi = async () => {
   return await get(USER_OPERATIONS_ENDPOINTS.CASTING_STATION_LIST);
 };
+
+export const fetchMaterialLotsApi = async (payload: { batchId: string }) => {
+  return await post(USER_OPERATIONS_ENDPOINTS.MATERIAL_LOTS, payload);
+};

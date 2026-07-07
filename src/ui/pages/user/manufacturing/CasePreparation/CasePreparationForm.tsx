@@ -13,7 +13,7 @@ import {
   type CasePrepAddedMotor,
 } from "../../../../../hooks/user/manufacturing/casePreparationFlowConfig";
 import type { CasePrepMotorSession, CasePreparationFormState } from "../../../../../data/models/user/CasePreparationFormModel";
-import type { SchemaDocument, SchemaFormValues } from "../../../../../schemaManagement";
+import type { SchemaDocumentV2, SchemaFormValues } from "../../../../../schema-engine";
 import RemoveProcessButton from "../../../../components/common/RemoveProcessButton";
 import CasePrepFlowBar from "./CasePrepFlowBar";
 import CasePrepMotorSchemaPanel from "./CasePrepMotorSchemaPanel";
@@ -268,7 +268,7 @@ const CasePreparationForm = ({
             </Stack>
 
             <CasePrepMotorSchemaPanel
-              schema={schema as SchemaDocument}
+              schema={schema as SchemaDocumentV2}
               motor={activeMotorSession}
               subDepartmentId={subDepartmentId}
               batchId={batch?.batchId}

@@ -1,10 +1,10 @@
 // app/config/routes.jsx
 import { Navigate } from "react-router-dom";
-import LoginPage from "@ui/pages/auth/login/LoginPage";
+import LoginPage from "../../ui/pages/auth/LoginPage";
 
 import AdminDashboard from "../../ui/pages/admin/AdminDashboard";
-import UserManagementPage from "@ui/pages/admin/UserManagement/UserManagementPage";
-import BatchManagementPage from "@ui/pages/admin/BatchManagement/BatchManagementPage";
+import UserManagementPage from "../../ui/pages/admin/UserManagement/UserManagementPage";
+import BatchManagementPage from "../../ui/pages/admin/BatchManagement/BatchManagementPage";
 import ProjectManagementPage from "../../ui/pages/admin/project_management/ProjectManagementPage";
 import SystemManagerDashboard from "../../ui/pages/systemManager/SystemManagerDashboard";
 import SourcingDashboard from "../../ui/pages/user/sourcing/SourcingDashboard";
@@ -91,12 +91,6 @@ export const routes = [
   {
     path: "/approver/sourcing/:subDept",
     element: <SourcingApproverDashboard />,
-    isProtected: true,
-    roles: ["APPROVER"],
-  },
-  {
-    path: "/approver/manufacturing/:subDept",
-    element: <ManufacturingApproverDashboard />,
     isProtected: true,
     roles: ["APPROVER"],
   },

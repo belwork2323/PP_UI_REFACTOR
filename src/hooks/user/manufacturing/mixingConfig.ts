@@ -86,15 +86,28 @@ export const FINAL_MIX_CYCLE_OPTIONS = [
 
 export type QualityObservedLayout = "quad" | "single";
 
+/** Canonical QC parameter labels — must match mapQualityChecksToApi / mapApiQualityChecksToRows */
+export const QUALITY_CHECK_PARAMETERS = {
+  homogeneity: "Homogeneity",
+  moisture: "Moisture %",
+  eomViscosity: "EOM Viscosity",
+  eomTemperature: "EOM Temperature",
+} as const;
+
+export const normalizeQualityCheckParameterKey = (parameter: string) =>
+  String(parameter ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "");
+
 export const DEFAULT_QUALITY_CHECK_ROWS: Array<{
   parameter: string;
   specification: string;
   observedLayout: QualityObservedLayout;
 }> = [
-  { parameter: "Homogeneity", specification: "", observedLayout: "quad" },
-  { parameter: "Moisture%", specification: "0.08", observedLayout: "quad" },
-  { parameter: "EoM Viscosity", specification: "", observedLayout: "single" },
-  { parameter: "EoM Temperature", specification: "", observedLayout: "single" },
+  { parameter: QUALITY_CHECK_PARAMETERS.homogeneity, specification: "", observedLayout: "quad" },
+  { parameter: QUALITY_CHECK_PARAMETERS.moisture, specification: "0.08", observedLayout: "quad" },
+  { parameter: QUALITY_CHECK_PARAMETERS.eomViscosity, specification: "", observedLayout: "single" },
+  { parameter: QUALITY_CHECK_PARAMETERS.eomTemperature, specification: "", observedLayout: "single" },
 ];
 
 export const isQuadObservedLayout = (layout: QualityObservedLayout) => layout === "quad";

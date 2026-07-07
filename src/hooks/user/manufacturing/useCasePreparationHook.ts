@@ -18,10 +18,11 @@ import {
   buildCasePreparationSchemaRequest,
   casePreparationSchemaFetchConfig,
   createCasePrepInitialValues,
-  type SchemaDocument,
+  mapCasePrepBatchTypeToSchema,
+  schemaEngineController,
+  type SchemaDocumentV2,
   type SchemaFormValues,
-} from "../../../schemaManagement";
-import schemaManagementController from "../../../schemaManagement/controllers/schemaManagementController";
+} from "../../../schema-engine";
 import {
   getSelectedCasePrepDraftMotorIds,
   isMainMotorBatch,
@@ -75,6 +76,7 @@ export const useCasePreparationHook = () => {
   const [loadingFormDetails, setLoadingFormDetails] = useState(false);
   const [detailsRow, setDetailsRow] = useState<any>(null);
   const [detailsData, setDetailsData] = useState<any>(null);
+  const [detailsSchema, setDetailsSchema] = useState<SchemaDocumentV2 | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [schemaLoading, setSchemaLoading] = useState(false);
   const [schemaError, setSchemaError] = useState<string | null>(null);
@@ -117,6 +119,10 @@ export const useCasePreparationHook = () => {
     const defaults = createDefaultCasePreparationFormState();
     setView("list");
     setActiveBatch(null);
+    setDetailsRow(null);
+    setDetailsData(null);
+    setDetailsSchema(null);
+    setDetailsLoading(false);
     setIsEditMode(false);
     setLoadingFormDetails(false);
     setSchemaLoading(false);
@@ -141,7 +147,7 @@ export const useCasePreparationHook = () => {
   };
 
   const fetchCasePrepSchema = useCallback(
-    async (batchType: string | undefined): Promise<SchemaDocument | null> => {
+    async (batchType: string | undefined): Promise<SchemaDocumentV2 | null> => {
       if (!subDepartmentId) {
         showAlert(STRINGS.MANUFACTURING.CASE_PREP.SUB_DEPARTMENT_MISSING, "error");
         return null;
@@ -150,7 +156,7 @@ export const useCasePreparationHook = () => {
       setSchemaLoading(true);
       setSchemaError(null);
 
-      const response = await schemaManagementController.fetchSchema(
+      const response = await schemaEngineController.fetchSchema(
         casePreparationSchemaFetchConfig,
         buildCasePreparationSchemaRequest({
           subDepartmentId,
@@ -174,7 +180,7 @@ export const useCasePreparationHook = () => {
 
   const openFormWithResolvedData = useCallback(
     async (batch: CasePrepBatch, editMode: boolean) => {
-      const status = parseStatus(batch.cpStatus);
+      const status = parseStatus(batch.cpStatus ?? batch.status);
       const shouldFetchDetails =
         editMode || status === parseStatus(OPERATION_STATUS.IN_PROGRESS);
 
@@ -256,10 +262,20 @@ export const useCasePreparationHook = () => {
       }
 
       setDetailsLoading(true);
-      const response = await casePreparationController.fetchFormDetails({
-        formId: row.formId,
-        subDepartmentId,
-      });
+      const batchType = mapCasePrepBatchTypeToSchema(row.batchType ?? "MAIN_BATCH");
+      const [response, schemaResponse] = await Promise.all([
+        casePreparationController.fetchFormDetails({
+          formId: row.formId,
+          subDepartmentId,
+        }),
+        schemaEngineController.fetchSchema(
+          casePreparationSchemaFetchConfig,
+          buildCasePreparationSchemaRequest({
+            subDepartmentId,
+            batchType,
+          }),
+        ),
+      ]);
       setDetailsLoading(false);
 
       if (!response?.success || !response?.data) {
@@ -272,6 +288,7 @@ export const useCasePreparationHook = () => {
 
       setDetailsRow(row);
       setDetailsData(response.data);
+      setDetailsSchema(schemaResponse?.success ? schemaResponse.data ?? null : null);
       setView("details");
     },
     [showAlert, subDepartmentId]
@@ -280,6 +297,7 @@ export const useCasePreparationHook = () => {
   const handleBackFromDetails = useCallback(() => {
     setDetailsRow(null);
     setDetailsData(null);
+    setDetailsSchema(null);
     setView("list");
   }, []);
 
@@ -586,6 +604,7 @@ export const useCasePreparationHook = () => {
     setBackConfirmOpen,
     detailsRow,
     detailsData,
+    detailsSchema,
     detailsLoading,
     handleViewCasePrepDetails,
     handleBackFromDetails,

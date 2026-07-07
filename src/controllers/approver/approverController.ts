@@ -1,6 +1,6 @@
 import { ApiResponseModel } from "../../data/models/common/ApiResponseModel";
 import { useAlertStore } from "../../app/store/alertStore";
-import { UserSubDepartmentDashboardStatsModel } from "../../data/models/user/UserSubDepartmentDashboardStatsModel";
+import { ApproverSubDepartmentDashboardStatsModel } from "../../data/models/approver/ApproverSubDepartmentDashboardStatsModel";
 import {
   changeApproverFormStatus,
   fetchApproverFormPdf,
@@ -20,7 +20,7 @@ export const getApproverSubDepartmentDashboardStats = async (subDepartmentId: nu
     if (response?.success && response?.data) {
       return {
         success: true,
-        stats: UserSubDepartmentDashboardStatsModel.fromApi(response.data),
+        stats: ApproverSubDepartmentDashboardStatsModel.fromApi(response.data),
         message: response.message,
       };
     }
@@ -28,14 +28,14 @@ export const getApproverSubDepartmentDashboardStats = async (subDepartmentId: nu
     showAlert(response?.message || "Failed to fetch approver dashboard stats", "error", { autoCloseMs: 2500 });
     return {
       success: false,
-      stats: UserSubDepartmentDashboardStatsModel.empty(),
+      stats: ApproverSubDepartmentDashboardStatsModel.empty(),
       message: response?.message || "Failed to fetch approver dashboard stats",
     };
   } catch (error: any) {
     showAlert(error?.message || "Failed to fetch approver dashboard stats", "error", { autoCloseMs: 2500 });
     return {
       success: false,
-      stats: UserSubDepartmentDashboardStatsModel.empty(),
+      stats: ApproverSubDepartmentDashboardStatsModel.empty(),
       message: error?.message || "Failed to fetch approver dashboard stats",
     };
   }

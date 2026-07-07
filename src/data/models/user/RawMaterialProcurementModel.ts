@@ -1,4 +1,9 @@
-import { OPERATION_STATUS, type OperationStatus } from "../../../hooks/operationStatus";
+import {
+  OPERATION_STATUS,
+  OPERATION_STATUS_UI_TO_API,
+  toOperationStatusApiValue,
+  type OperationStatus,
+} from "../../../hooks/operationStatus";
 
 /** Re-export for sourcing pages that previously imported from sourcingWorkflowData */
 export const SOURCING_STATUS = OPERATION_STATUS;
@@ -26,23 +31,11 @@ export function normalizeRawMaterialLotListStatus(status: string): OperationStat
 }
 
 /** UI status labels → API status enum for list filters */
-export const RAW_MATERIAL_UI_STATUS_TO_API: Record<string, string> = {
-  [OPERATION_STATUS.INITIATED]: "INITIATED",
-  [OPERATION_STATUS.IN_PROGRESS]: "IN_PROGRESS",
-  [OPERATION_STATUS.WAITING_FOR_APPROVAL]: "WAITING_FOR_APPROVAL",
-  [OPERATION_STATUS.APPROVED]: "APPROVED",
-  [OPERATION_STATUS.REJECTED]: "REJECTED",
-};
+export const RAW_MATERIAL_UI_STATUS_TO_API = OPERATION_STATUS_UI_TO_API;
 
 /** Map UI / display status labels to uppercase API enum values for lot-list requests */
 export function toRawMaterialLotListApiStatus(status: string): string {
-  const mapped = RAW_MATERIAL_UI_STATUS_TO_API[status];
-  if (mapped) return mapped;
-
-  return String(status ?? "")
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "_");
+  return toOperationStatusApiValue(status) ?? "";
 }
 
 /** Soft-delete is allowed only while the lot is still in progress */

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useAuthStore } from "../../app/store/authStore";
 import { systemManagerController } from "../../controllers/system_manager/systemManagerController";
-import { SMChartDataModel } from "../../data/models/systemManager/SystemManagerModel";
+import { SMChartDataModel } from "../../data/models/SystemManagerModel";
 
 const createEmptyDashboard = (stageConfig: any[]) => ({
 	kpiData: [], stageMetrics: [],
@@ -83,10 +83,9 @@ export const useSMDashboard = (config: {
 		setLoading(true);
 		setStatsLoading(true);
 
-		const [statsResult, chartResult, activeBatchesResult, batchStatusResult, blockchainResult] = await Promise.all([
+		const [statsResult, chartResult, batchStatusResult, blockchainResult] = await Promise.all([
 			systemManagerController.getStats(apiFilter, startDate, endDate),
 			systemManagerController.getChartData(apiFilter, startDate, endDate),
-			systemManagerController.getActiveBatches({ page: 1, limit: 10 }),
 			systemManagerController.getBatchStatusList({ page: 1, limit: 10 }),
 			systemManagerController.getBlockchainEvents({
 				systemManagerId,
@@ -106,7 +105,6 @@ export const useSMDashboard = (config: {
 		const chartUpdatedAt = chartResult.success && chartResult.timestamp
 			? new Date(chartResult.timestamp)
 			: new Date();
-		const activeBatches = activeBatchesResult.success ? activeBatchesResult.batches : [];
 		const statusList = batchStatusResult.success ? batchStatusResult.batches : [];
 		const blockchainEvents = blockchainResult.success ? blockchainResult.events : [];
 		const stageConfig = config.stageConfig;
@@ -149,18 +147,7 @@ export const useSMDashboard = (config: {
 				color: config.stageColors[toStageKey(item.stage)] ?? fallbackStageColor,
 				pct: item.percentage ?? 0,
 			})),
-			activeBatches: activeBatches.map((batch: any) => {
-				const stageKey = toStageKey(batch.department);
-				return {
-					...batch,
-					id: batch.batchId,
-					stage: batch.department || "Unassigned",
-					substage: batch.firstSubDept,
-					pct: batch.progressPercentage,
-					color: config.stageColors[stageKey] ?? fallbackStageColor,
-					lastUpdated: batch.formattedLastUpdated,
-				};
-			}),
+			activeBatches: [],
 			blockEvents: blockchainEvents.map((event: any) => ({
 				motorId: event.batchId || event.transactionId,
 				label: event.eventStatusMessage,

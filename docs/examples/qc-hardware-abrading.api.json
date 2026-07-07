@@ -1,0 +1,69 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "QC",
+    "layout": { "type": "flat" },
+    "division": "HARDWARE",
+    "subType": "ABRADING",
+    "subDepartmentId": 114,
+    "functionality": "CREATE_HARDWARE_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "QC",
+  "division": "HARDWARE",
+  "subType": "ABRADING",
+  "functionality": "CREATE_HARDWARE_FORM",
+  "message": "Hardware schema fetched successfully",
+  "data": {
+    "layout": { "type": "flat" },
+    "meta": {
+      "title": "Abrading Process",
+      "description": "Hardware abrading operation details"
+    },
+    "sections": [
+      {
+        "id": "ABRADING_DETAILS",
+        "title": "Abrading Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "FIRST_CUT",
+            "title": "First Cut",
+            "rows": {
+              "allowAdd": true,
+              "allowDelete": true,
+              "autoIncrementKey": "SR_NO"
+            },
+            "columns": [
+              { "type": "column", "id": "DATE", "fieldType": "date", "label": "Date" },
+              { "type": "column", "id": "START_TIME", "fieldType": "time", "label": "Start Time" },
+              { "type": "column", "id": "END_TIME", "fieldType": "time", "label": "End Time" },
+              { "type": "column", "id": "DUST_QTY", "fieldType": "number", "label": "Qty of Dust (g)" },
+              { "type": "column", "id": "OBSERVATIONS", "fieldType": "textarea", "label": "Observations" }
+            ]
+          },
+          {
+            "type": "table",
+            "id": "SECOND_CUT",
+            "title": "Second Cut",
+            "rows": {
+              "allowAdd": true,
+              "allowDelete": true,
+              "autoIncrementKey": "SR_NO"
+            },
+            "columns": [
+              { "type": "column", "id": "DATE", "fieldType": "date", "label": "Date" },
+              { "type": "column", "id": "START_TIME", "fieldType": "time", "label": "Start Time" },
+              { "type": "column", "id": "END_TIME", "fieldType": "time", "label": "End Time" },
+              { "type": "column", "id": "DUST_QTY", "fieldType": "number", "label": "Qty of Dust (g)" },
+              { "type": "column", "id": "OBSERVATIONS", "fieldType": "textarea", "label": "Observations" }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

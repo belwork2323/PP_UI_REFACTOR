@@ -27,7 +27,7 @@ import UserWorkflowStatusAction from "../../../../components/custom/UserWorkflow
 import UserWorkflowStatusCell from "../../../../components/custom/UserWorkflowStatusCell";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import getSourcingTheme from "../../../../../app/theme/custom_themes/user/sourcing/sourcing_theme";
-import { getOperationStatusConfig, OPERATION_STATUS } from "../../../../../hooks/operationStatus";
+import { getOperationStatusConfig, OPERATION_STATUS, OPERATION_STATUS_FILTER_VALUES } from "../../../../../hooks/operationStatus";
 import {
   canDeleteRawMaterialLot,
   RAW_MATERIAL_LOT_SEARCH_FIELDS,
@@ -55,10 +55,7 @@ export const OPERATION_STATUS_CONFIG = getOperationStatusConfig({
   rejected: CancelRoundedIcon,
 });
 
-const STATUS_DROPDOWN_VALUES = [
-  FILTER_ALL,
-  ...Object.values(OPERATION_STATUS).filter((status) => status !== OPERATION_STATUS.INITIATED),
-] as const;
+const STATUS_DROPDOWN_VALUES = [FILTER_ALL, ...OPERATION_STATUS_FILTER_VALUES] as const;
 
 /** Lot metadata edit — only for drafts not yet in workflow filling */
 const canShowEditLotButton = (status: string) => status === OPERATION_STATUS.INITIATED;
@@ -85,6 +82,7 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
     setSearch,
     setStatusFilter,
     loading,
+    isRefreshing = false,
     handleFillForm,
     handleEditLot,
     handleDeleteLotFromList,
@@ -129,11 +127,12 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
   const statusConfig = useMemo(
     () =>
       Object.fromEntries(
-        Object.entries(OPERATION_STATUS_CONFIG)
-          .filter(([status]) => status !== OPERATION_STATUS.INITIATED)
-          .map(([status, cfg]) => [status, { ...cfg, ...theme.batchList.statusConfig[status] }])
+        Object.entries(OPERATION_STATUS_CONFIG).map(([status, cfg]) => [
+          status,
+          { ...cfg, ...theme.batchList.statusConfig[status] },
+        ]),
       ),
-    [theme]
+    [theme],
   );
 
   const filterToggleSx = useMemo(() => {
@@ -381,8 +380,8 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         clearChipSx={filterPanelHeaderSx.clearChipSx}
       />
 
-      <Stack direction={{ xs: "column", lg: "row" }} spacing={1.5} flexWrap="wrap" useFlexGap>
-        <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ minWidth: { xs: "100%", sm: 220 }, flex: { lg: "0 0 auto" } }}>
+      <Stack direction={{ xs: "column", lg: "row" }} spacing={1.25} flexWrap="wrap" useFlexGap>
+        <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ minWidth: { xs: "100%", sm: 180 }, flex: { lg: "0 0 auto" } }}>
           <TextField
             select
             size="small"
@@ -391,6 +390,14 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
             onChange={(e) => setDraftMaterial(e.target.value)}
             disabled={materialsLoading}
             fullWidth
+            sx={theme.batchList.filterPanelField}
+            SelectProps={{
+              MenuProps: {
+                PaperProps: {
+                  sx: { "& .MuiMenuItem-root": theme.batchList.filterPanelMenuItem },
+                },
+              },
+            }}
           >
             <MenuItem value={FILTER_ALL}>{STRINGS.SOURCING.BATCH_LIST.FILTERS_ALL_MATERIALS}</MenuItem>
             {!materialsLoading &&
@@ -400,7 +407,7 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
                 </MenuItem>
               ))}
           </TextField>
-          {materialsLoading ? <CircularProgress size={22} sx={{ mt: 1.25, color: theme.palette.primaryLight }} /> : null}
+          {materialsLoading ? <CircularProgress size={18} sx={{ mt: 0.75, color: theme.palette.primaryLight }} /> : null}
         </Stack>
 
         <TextField
@@ -409,7 +416,7 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
           value={draftManufacturer}
           onChange={(e) => setDraftManufacturer(e.target.value)}
           placeholder="e.g. Prefiled"
-          sx={{ minWidth: { xs: "100%", sm: 200 }, flex: { lg: 1 } }}
+          sx={{ ...theme.batchList.filterPanelField, minWidth: { xs: "100%", sm: 160 }, flex: { lg: 1 } }}
         />
 
         <TextField
@@ -418,7 +425,14 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
           label={STRINGS.SOURCING.BATCH_LIST.FILTERS_STATUS}
           value={draftStatus}
           onChange={(e) => setDraftStatus(e.target.value)}
-          sx={{ minWidth: { xs: "100%", sm: 200 } }}
+          sx={{ ...theme.batchList.filterPanelField, minWidth: { xs: "100%", sm: 160 } }}
+          SelectProps={{
+            MenuProps: {
+              PaperProps: {
+                sx: { "& .MuiMenuItem-root": theme.batchList.filterPanelMenuItem },
+              },
+            },
+          }}
         >
           {STATUS_DROPDOWN_VALUES.map((s) => (
             <MenuItem key={s} value={s}>
@@ -436,7 +450,7 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
             slotProps={{
               textField: {
                 size: "small",
-                sx: { minWidth: { xs: "100%", sm: 160 } },
+                sx: { ...theme.batchList.filterPanelField, minWidth: { xs: "100%", sm: 140 } },
               },
             }}
           />
@@ -448,7 +462,7 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
             slotProps={{
               textField: {
                 size: "small",
-                sx: { minWidth: { xs: "100%", sm: 160 } },
+                sx: { ...theme.batchList.filterPanelField, minWidth: { xs: "100%", sm: 140 } },
               },
             }}
           />
@@ -490,7 +504,7 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         onRowsPerPageChange={setRowsPerPage}
         onSearchChange={setSearch}
         onStatusFilterChange={setStatusFilter}
-        isLoading={loading}
+        isLoading={loading || isRefreshing}
         searchBarEnd={searchBarEnd}
         filterExtension={filterExtension}
         statusToolbarEnd={

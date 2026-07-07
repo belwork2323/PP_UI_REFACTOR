@@ -1,5 +1,4 @@
 // src/ui/components/common/ConfirmDialog.jsx
-import React from "react";
 import {
   Dialog, DialogTitle, DialogContent, DialogContentText,
   DialogActions, Button, Box, Typography,
@@ -47,21 +46,8 @@ const ConfirmAlertDialog = ({
   confirmLabel = "Confirm",
   cancelLabel  = "Cancel",
   severity     = "warning",
-  children,
-  confirmDisabled = false,
   onConfirm,
   onCancel,
-}: {
-  open: boolean;
-  title?: string;
-  message?: string;
-  confirmLabel?: string;
-  cancelLabel?: string;
-  severity?: "warning" | "error" | "info";
-  children?: React.ReactNode;
-  confirmDisabled?: boolean;
-  onConfirm: () => void;
-  onCancel: () => void;
 }) => {
   const config = SEVERITY_CONFIG[severity] ?? SEVERITY_CONFIG.warning;
 
@@ -109,10 +95,9 @@ const ConfirmAlertDialog = ({
       </DialogTitle>
 
       <DialogContent sx={{ pt: 0.5, pb: 1 }}>
-        <DialogContentText sx={{ fontSize: "0.875rem", color: "text.secondary", pl: children ? 0 : "52px" }}>
+        <DialogContentText sx={{ fontSize: "0.875rem", color: "text.secondary", pl: "52px" }}>
           {message}
         </DialogContentText>
-        {children}
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
@@ -132,7 +117,6 @@ const ConfirmAlertDialog = ({
         <Button
           variant="contained"
           onClick={onConfirm}
-          disabled={confirmDisabled}
           size="small"
           sx={{
             borderRadius:    "8px",

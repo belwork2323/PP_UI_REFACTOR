@@ -1,5 +1,20 @@
 import React, { useMemo, useState } from "react";
-import { Chip, IconButton, ListItemIcon, ListItemText, Menu, MenuItem, Stack as MuiStack, TableBody, TableCell, TableHead, TableRow, Typography } from "@mui/material";
+import {
+  Chip,
+  Divider,
+  IconButton,
+  ListItemIcon,
+  ListItemText,
+  Menu,
+  MenuItem,
+  Stack as MuiStack,
+  TableBody,
+  TableCell,
+  TableHead,
+  TablePagination,
+  TableRow,
+  Typography,
+} from "@mui/material";
 import UnfoldMoreIcon from "@mui/icons-material/UnfoldMore";
 import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
 import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
@@ -39,13 +54,19 @@ type Props = {
   cardSx?: any;
   hideManagerColumns?: boolean;
   onViewDetails?: (row: InProgressBatchRow) => void;
+  page?: number;
+  rowsPerPage?: number;
+  totalCount?: number;
+  onPageChange?: (event: unknown, newPage: number) => void;
+  onRowsPerPageChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  rowsPerPageOptions?: number[];
 };
 
 const BATCH_COLUMNS = [
   { label: "Batch ID", sortKey: "batchId" },
   { label: "Type", sortKey: "batchType" },
   { label: "Motor ID", sortKey: "motorId" },
-  { label: "Motor Type", sortKey: "motorType" },
+  // { label: "Motor Type", sortKey: "motorType" },
   { label: "Project Name", sortKey: "projectName" },
   { label: "Current Stage", sortKey: "currentStage" },
   { label: "Manager Name", sortKey: "managerName" },
@@ -66,13 +87,23 @@ export default function InProgressBatchesTable({
   cardSx,
   hideManagerColumns = false,
   onViewDetails,
+  page,
+  rowsPerPage,
+  totalCount,
+  onPageChange,
+  onRowsPerPageChange,
+  rowsPerPageOptions = [5, 10, 25],
 }: Props) {
   const role = useAuthStore((s) => s.user?.role ?? "");
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [menuRow, setMenuRow] = useState<InProgressBatchRow | null>(null);
-  const normalizedRole = String(role).trim().replace(/[^a-zA-Z0-9]+/g, "_").replace(/^_+|_+$/g, "").toUpperCase();
+  const normalizedRole = String(role)
+    .trim()
+    .replace(/[^a-zA-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .toUpperCase();
   const canViewDetails = normalizedRole === "SYSTEM_MANAGER" && Boolean(onViewDetails);
 
   const handleMenuOpen = (e: React.MouseEvent<HTMLElement>, row: InProgressBatchRow) => {
@@ -125,6 +156,12 @@ export default function InProgressBatchesTable({
 
   const th = theme;
   const { typeChip, stageChip } = th;
+  const showPagination =
+    typeof page === "number" &&
+    typeof rowsPerPage === "number" &&
+    typeof totalCount === "number" &&
+    Boolean(onPageChange) &&
+    Boolean(onRowsPerPageChange);
 
   return (
     <TableCard
@@ -133,13 +170,35 @@ export default function InProgressBatchesTable({
       cardSx={cardSx ?? th.card}
       meta={meta}
       filterPanel={filterPanel}
+      footer={
+        showPagination ? (
+          <>
+            <Divider sx={th.table.divider ?? { borderColor: "divider" }} />
+            <TablePagination
+              component="div"
+              count={totalCount}
+              page={page}
+              rowsPerPage={rowsPerPage}
+              onPageChange={onPageChange}
+              onRowsPerPageChange={onRowsPerPageChange}
+              rowsPerPageOptions={rowsPerPageOptions}
+              sx={th.table.pagination}
+            />
+          </>
+        ) : null
+      }
     >
       <TableHead>
         <TableRow sx={th.table.headerRow}>
-          {BATCH_COLUMNS.filter(({ sortKey }) => !hideManagerColumns || (sortKey !== "managerName" && sortKey !== "managerId")).map(({ label, sortKey }) => {
+          {BATCH_COLUMNS.filter(
+            ({ sortKey }) =>
+              !hideManagerColumns || (sortKey !== "managerName" && sortKey !== "managerId"),
+          ).map(({ label, sortKey }) => {
             const isActive = sortField === sortKey;
             const SortIcon = isActive
-              ? (sortDir === "asc" ? ArrowUpwardIcon : ArrowDownwardIcon)
+              ? sortDir === "asc"
+                ? ArrowUpwardIcon
+                : ArrowDownwardIcon
               : UnfoldMoreIcon;
 
             return (
@@ -150,9 +209,8 @@ export default function InProgressBatchesTable({
                 </MuiStack>
               </TableCell>
             );
-          })}          {canViewDetails && (
-            <TableCell sx={{ ...th.table.header, width: 48 }} />
-          )}
+          })}
+          {canViewDetails && <TableCell sx={{ ...th.table.header, width: 48 }} />}
         </TableRow>
       </TableHead>
 
@@ -165,7 +223,11 @@ export default function InProgressBatchesTable({
           </>
         ) : sortedRows.length === 0 ? (
           <TableRow>
-            <TableCell colSpan={(hideManagerColumns ? 9 : 11) + (canViewDetails ? 1 : 0)} align="center" sx={th.table.emptyCell}>
+            <TableCell
+              colSpan={(hideManagerColumns ? 9 : 11) + (canViewDetails ? 1 : 0)}
+              align="center"
+              sx={th.table.emptyCell}
+            >
               {emptyText}
             </TableCell>
           </TableRow>
@@ -176,7 +238,9 @@ export default function InProgressBatchesTable({
                 <Typography
                   sx={{
                     ...th.table.textBatchId("#1565c0"),
-                    ...(canViewDetails ? { cursor: "pointer", "&:hover": { textDecoration: "underline" } } : {}),
+                    ...(canViewDetails
+                      ? { cursor: "pointer", "&:hover": { textDecoration: "underline" } }
+                      : {}),
                   }}
                   onClick={canViewDetails ? () => onViewDetails?.(p) : undefined}
                 >
@@ -189,7 +253,10 @@ export default function InProgressBatchesTable({
                 <Chip
                   label={p.batchType || "NA"}
                   size="small"
-                  sx={th.table.chipSx(typeChip[p.batchType || ""]?.bg, typeChip[p.batchType || ""]?.color)}
+                  sx={th.table.chipSx(
+                    typeChip[p.batchType || ""]?.bg,
+                    typeChip[p.batchType || ""]?.color,
+                  )}
                 />
               </TableCell>
 
@@ -197,9 +264,9 @@ export default function InProgressBatchesTable({
                 <Typography sx={th.table.textBase}>{p.motorId || "NA"}</Typography>
               </TableCell>
 
-              <TableCell sx={th.table.cellNarrow}>
+              {/* <TableCell sx={th.table.cellNarrow}>
                 <Typography sx={th.table.textSmall}>{p.motorType || "NA"}</Typography>
-              </TableCell>
+              </TableCell> */}
 
               <TableCell sx={th.table.cellTruncated}>
                 <Typography sx={th.table.textTruncated}>{p.projectName || "NA"}</Typography>
@@ -208,9 +275,12 @@ export default function InProgressBatchesTable({
               <TableCell sx={th.table.cell}>
                 {p.currentStage && p.currentStage !== "NA" ? (
                   <Chip
-                    label={p.currentStage}
+                    label={p.stageDept}
                     size="small"
-                    sx={th.table.chipSx(stageChip[p.stageDept || ""]?.bg, stageChip[p.stageDept || ""]?.color)}
+                    sx={th.table.chipSx(
+                      stageChip[p.stageDept || ""]?.bg,
+                      stageChip[p.stageDept || ""]?.color,
+                    )}
                   />
                 ) : (
                   <Typography sx={th.table.textSmall}>NA</Typography>
@@ -236,7 +306,11 @@ export default function InProgressBatchesTable({
               <TableCell sx={th.table.cellDate}>
                 <Typography sx={th.table.textMuted}>
                   {p.createdOn
-                    ? new Date(p.createdOn).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })
+                    ? new Date(p.createdOn).toLocaleDateString("en-IN", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })
                     : "NA"}
                 </Typography>
               </TableCell>

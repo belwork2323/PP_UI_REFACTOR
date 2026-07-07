@@ -29,7 +29,7 @@
       "@hooks/*": ["src/hooks/*"],
       "@ui/*": ["src/ui/*"],
       "@utils/*": ["src/utils/*"],
-      "@schema/*": ["src/schemaManagement/*"]
+      "@schema/*": ["src/schema-engine/*"]
     }
   },
   "include": ["src"]

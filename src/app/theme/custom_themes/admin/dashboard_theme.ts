@@ -381,6 +381,9 @@ const getDashboardTheme = (mode = "light") => {
       progressTrack:      shared.progressTrack,
       progressValueColor: shared.progressValueColor,
 
+      pagination: shared.adminManagement.table.pagination,
+      divider:    shared.adminManagement.table.divider,
+
       // ── Section header — delegate to shared ──
       sectionTitle:     shared.sectionTitle,
       sectionMetaRow:   { spacing: 0.5 },

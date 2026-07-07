@@ -8,7 +8,7 @@ import {
   THERMAL_PROP_KEYS,
   type RocketMotorCasingFormData,
 } from "./RocketMotorCasingFormModel";
-import type { SchemaSectionSubmission } from "../../../schemaManagement/models/schema.types";
+import type { SchemaSectionSubmission } from "../../../schema-engine";
 
 /** Soft-delete is allowed only while the casing form is still in progress (draft). */
 export const canDeleteRocketMotorCasing = (status: string | null | undefined) =>
@@ -65,6 +65,7 @@ const OPERATION_STATUS_VALUES = Object.values(OPERATION_STATUS) as OperationStat
 export function normalizeRocketCasingListStatus(status: string): OperationStatus {
   const u = String(status ?? "").toUpperCase();
   const map: Record<string, OperationStatus> = {
+    DRAFT: OPERATION_STATUS.IN_PROGRESS,
     INITIATED: OPERATION_STATUS.INITIATED,
     IN_PROGRESS: OPERATION_STATUS.IN_PROGRESS,
     WAITING_FOR_APPROVAL: OPERATION_STATUS.WAITING_FOR_APPROVAL,
@@ -127,6 +128,13 @@ export function rocketMotorCasingMatchesSearch(row: RocketMotorBatch, query: str
   return parts.some((part) => String(part).toLowerCase().includes(q));
 }
 
+/** Draft/create responses may return the casing ID as `motorCasingId`, `formId`, or `procurementId` */
+export function resolveMotorCasingIdFromSubmitData(
+  data: { motorCasingId?: string; formId?: string; procurementId?: string } | null | undefined,
+): string {
+  return String(data?.motorCasingId ?? data?.formId ?? data?.procurementId ?? "").trim();
+}
+
 export class RocketMotorCasingSubmitResponseModel {
   formId: string;
   procurementId: string;
@@ -143,12 +151,13 @@ export class RocketMotorCasingSubmitResponseModel {
     status?: string;
     nextStep?: string;
   }) {
-    this.formId = payload?.formId ?? "";
-    this.procurementId = payload?.procurementId ?? "";
-    this.motorCasingId = payload?.motorCasingId ?? "";
+    const resolvedMotorCasingId = resolveMotorCasingIdFromSubmitData(payload);
+    this.motorCasingId = resolvedMotorCasingId;
+    this.formId = String(payload?.formId ?? resolvedMotorCasingId);
+    this.procurementId = String(payload?.procurementId ?? payload?.formId ?? resolvedMotorCasingId);
     this.status = payload?.status ?? "";
     this.nextStep = payload?.nextStep ?? "";
-    this.batchId = payload?.procurementId || payload?.formId || "";
+    this.batchId = this.procurementId || this.formId || resolvedMotorCasingId;
   }
 
   static fromApi(apiResponse: any): RocketMotorCasingSubmitResponseModel {
@@ -487,6 +496,12 @@ export type CasingDimensionalTableRow = {
   isLooseFlap: boolean;
 };
 
+export type MockTrialDetailTable = {
+  title: string;
+  columns: Array<{ key: string; label: string }>;
+  rows: Array<Record<string, string>>;
+};
+
 export type CasingDetailBlock = {
   material: string;
   lotNo?: string;
@@ -494,6 +509,8 @@ export type CasingDetailBlock = {
   _columns?: CasingDetailColumn[];
   /** When set, UI renders a multi-column dimensional readings table */
   dimensionalTable?: CasingDimensionalTableRow[];
+  /** Mock trial measurement tables (assy, motor length, mandrel assembly) */
+  mockTrialTables?: MockTrialDetailTable[];
 };
 
 export type RocketMotorCasingDetailsContext = {
@@ -518,11 +535,24 @@ const CASING_DETAIL_COLS: CasingDetailColumn[] = [
   { key: "remarks", label: "Remarks", width: "30%" },
 ];
 
-const detailRow = (specification: string, analysedResult: string, remarks = "—") => ({
+const detailRow = (specification: string, analysedResult: string, remarks = "") => ({
   specification,
   analysedResult: analysedResult?.trim() ? analysedResult : "—",
-  remarks: remarks?.trim() ? remarks : "—",
+  remarks: remarks?.trim() ?? "",
 });
+
+const formatMeasuredValue = (value: unknown, unit?: string) => {
+  if (value === null || value === undefined || String(value).trim() === "") return "";
+  const text = String(value).trim();
+  return unit ? `${text} ${unit}`.trim() : text;
+};
+
+const formatReportedWithAcem = (reported: string, acem: string, unit: string) => {
+  const parts: string[] = [];
+  if (reported) parts.push(`Reported: ${reported}${unit ? ` ${unit}` : ""}`.trim());
+  if (acem) parts.push(`ACEM spec: ${acem}${unit ? ` ${unit}` : ""}`.trim());
+  return parts.join(" · ");
+};
 
 const formatSpecRange = (ref: RocketMotorCasingFormData["dimensionalData"][0]["referenceRange"]) => {
   const { minValue, maxValue, unit, source } = ref;
@@ -542,74 +572,129 @@ const mapDimensionalTableRows = (form: RocketMotorCasingFormData): CasingDimensi
     specRange: formatSpecRange(d.referenceRange),
     readings: { ...d.readings },
     looseFlap: { ...d.looseFlap },
-    remarks: d.remarks?.trim() || "—",
+    remarks: d.remarks?.trim() ?? "",
     isLooseFlap: isLooseFlapDimensionalParam(d),
   }));
 
-/**
- * Builds detail rows from mock trial saved sections.
- * Expands all section data for comprehensive display.
- */
-const buildMockTrialDetailRows = (
-  sections: SchemaSectionSubmission[] | undefined
-): CasingDetailBlock["rows"] => {
+const MOCK_TRIAL_TABLE_SPECS: Record<
+  string,
+  { title: string; columns: Array<{ key: string; label: string; unit?: string }> }
+> = {
+  mockassydetails: {
+    title: "Distance between centring top to mandrel top (mm)",
+    columns: [
+      { key: "srNo", label: "Sr. No." },
+      { key: "mandrelRestOnDomeA", label: "Mandrel rest on dome of motor (A)", unit: "mm" },
+      { key: "mandrelRestOnBottomCupB", label: "Mandrel rest on bottom cup (with Teflon sleeve) (B)", unit: "mm" },
+      { key: "differenceC", label: "Difference C=(A-B)", unit: "mm" },
+      { key: "bellowThicknessD", label: "Bellow Thickness (D)", unit: "mm" },
+      { key: "mandrelLiftE", label: "Mandrel Lift E=(C-D)", unit: "mm" },
+    ],
+  },
+  motorlengthmeasurements: {
+    title: "Motor Length Measurements",
+    columns: [
+      { key: "srNo", label: "Sr. No." },
+      { key: "lfRubberThicknessHe", label: "Thickness of LF rubber at HE", unit: "mm" },
+      { key: "heBossWidthWithoutLfRubber", label: "HE Boss width (without LF Rubber)", unit: "mm" },
+      { key: "heDiaId", label: "HE Dia. (ID)", unit: "mm" },
+      { key: "heOuterToNeOuter", label: "HE outer to NE outer (metal to metal)", unit: "mm" },
+      { key: "heInnerToNeInner", label: "HE inner to NE inner (rubber to rubber)", unit: "mm" },
+      { key: "neOuterToHeInner", label: "NE outer to HE inner (metal to rubber)", unit: "mm" },
+    ],
+  },
+  mandrelassembly: {
+    title: "Mandrel Assembly",
+    columns: [
+      { key: "srNo", label: "Sr. No." },
+      { key: "readingWithoutCup", label: "Reading without cup (Mandrel resting on motor dome)", unit: "mm" },
+      {
+        key: "readingWithBottomCupAndGasket",
+        label: "Reading with bottom cup & gaskets (after tightening the bottom cup)",
+        unit: "mm",
+      },
+    ],
+  },
+};
+
+const extractMockTrialSectionPayload = (section: SchemaSectionSubmission): Record<string, unknown> => {
+  const sectionData = Array.isArray(section.sectionData) ? section.sectionData : [];
+  const first = sectionData[0];
+  return first && typeof first === "object" ? (first as Record<string, unknown>) : {};
+};
+
+const extractMockTrialTableRows = (section: SchemaSectionSubmission): Record<string, unknown>[] => {
+  const sectionId = String(section.sectionId ?? "");
+  const payload = extractMockTrialSectionPayload(section);
+  const nested = payload[sectionId];
+  if (Array.isArray(nested)) return nested as Record<string, unknown>[];
+
+  const camelKey = sectionId ? `${sectionId.charAt(0).toLowerCase()}${sectionId.slice(1)}` : "";
+  const nestedCamel = camelKey ? payload[camelKey] : undefined;
+  if (Array.isArray(nestedCamel)) return nestedCamel as Record<string, unknown>[];
+
+  const sectionData = Array.isArray(section.sectionData) ? section.sectionData : [];
+  if (
+    sectionData.length > 0 &&
+    sectionData.every(
+      (row) => row && typeof row === "object" && !("castingStation" in (row as Record<string, unknown>)),
+    )
+  ) {
+    return sectionData as Record<string, unknown>[];
+  }
+
+  return [];
+};
+
+const mapMockTrialTableRows = (
+  rawRows: Record<string, unknown>[],
+  columns: Array<{ key: string; label: string; unit?: string }>,
+): Array<Record<string, string>> =>
+  rawRows.map((row) =>
+    Object.fromEntries(
+      columns.map((col) => [col.key, formatMeasuredValue(row[col.key], col.unit) || "—"]),
+    ),
+  );
+
+const buildMockTrialDetailContent = (
+  sections: SchemaSectionSubmission[] | undefined,
+): Pick<CasingDetailBlock, "rows" | "mockTrialTables"> => {
   if (!Array.isArray(sections) || sections.length === 0) {
-    return [detailRow("No mock trial data recorded", "—")];
+    return { rows: [detailRow("No mock trial data recorded", "—")] };
   }
 
   const rows: CasingDetailBlock["rows"] = [];
+  const mockTrialTables: MockTrialDetailTable[] = [];
 
   for (const section of sections) {
     const sectionId = String(section.sectionId ?? "").toLowerCase();
-    const sectionData = Array.isArray(section.sectionData) ? section.sectionData : [];
-
-    if (sectionData.length === 0) continue;
 
     if (sectionId === "basicdetails") {
-      const data = sectionData[0] as Record<string, unknown> | undefined;
-      if (data) {
-        rows.push(detailRow("Basic details — Casting station", String(data.castingStation ?? "—")));
-        rows.push(detailRow("Basic details — Mandrel ID", String(data.mandrelId ?? "—")));
-        rows.push(detailRow("Basic details — Bottom cup ID", String(data.bottomCupId ?? "—")));
-      }
-    } else if (sectionId === "mockassydetails") {
-      for (let i = 0; i < sectionData.length; i++) {
-        const data = sectionData[i] as Record<string, unknown> | undefined;
-        if (!data) continue;
-        const prefix = `Mock assy details (row ${i + 1})`;
-        rows.push(detailRow(`${prefix} — Sr. No.`, String(data.srNo ?? "—")));
-        rows.push(detailRow(`${prefix} — Mandrel rest on dome (A)`, String(data.mandrelRestOnDomeA ?? "—")));
-        rows.push(detailRow(`${prefix} — Mandrel rest on bottom cup (B)`, String(data.mandrelRestOnBottomCupB ?? "—")));
-        rows.push(detailRow(`${prefix} — Difference (C)`, String(data.differenceC ?? "—")));
-        rows.push(detailRow(`${prefix} — Bellow thickness (D)`, String(data.bellowThicknessD ?? "—")));
-        rows.push(detailRow(`${prefix} — Mandrel lift (E)`, String(data.mandrelLiftE ?? "—")));
-      }
-    } else if (sectionId === "motorlengthmeasurements") {
-      for (let i = 0; i < sectionData.length; i++) {
-        const data = sectionData[i] as Record<string, unknown> | undefined;
-        if (!data) continue;
-        const prefix = `Motor length measurements (row ${i + 1})`;
-        rows.push(detailRow(`${prefix} — Sr. No.`, String(data.srNo ?? "—")));
-        rows.push(detailRow(`${prefix} — LF rubber thickness (HE)`, String(data.lfRubberThicknessHe ?? "—")));
-        rows.push(detailRow(`${prefix} — HE boss width without LF rubber`, String(data.heBossWidthWithoutLfRubber ?? "—")));
-        rows.push(detailRow(`${prefix} — HE dia ID`, String(data.heDiaId ?? "—")));
-        rows.push(detailRow(`${prefix} — HE outer to NE outer`, String(data.heOuterToNeOuter ?? "—")));
-        rows.push(detailRow(`${prefix} — HE inner to NE inner`, String(data.heInnerToNeInner ?? "—")));
-        rows.push(detailRow(`${prefix} — NE outer to HE inner`, String(data.neOuterToHeInner ?? "—")));
-      }
-    } else if (sectionId === "mandrelassembly") {
-      for (let i = 0; i < sectionData.length; i++) {
-        const data = sectionData[i] as Record<string, unknown> | undefined;
-        if (!data) continue;
-        const prefix = `Mandrel assembly (row ${i + 1})`;
-        rows.push(detailRow(`${prefix} — Sr. No.`, String(data.srNo ?? "—")));
-        rows.push(detailRow(`${prefix} — Reading without cup`, String(data.readingWithoutCup ?? "—")));
-        rows.push(detailRow(`${prefix} — Reading with bottom cup & gasket`, String(data.readingWithBottomCupAndGasket ?? "—")));
-      }
+      const data = extractMockTrialSectionPayload(section);
+      rows.push(detailRow("Casting station", String(data.castingStation ?? "—")));
+      rows.push(detailRow("Mandrel ID", String(data.mandrelId ?? "—")));
+      rows.push(detailRow("Bottom cup ID", String(data.bottomCupId ?? "—")));
+      continue;
     }
+
+    const spec = MOCK_TRIAL_TABLE_SPECS[sectionId];
+    if (!spec) continue;
+
+    const tableRows = extractMockTrialTableRows(section);
+    if (!tableRows.length) continue;
+
+    mockTrialTables.push({
+      title: spec.title,
+      columns: spec.columns.map(({ key, label }) => ({ key, label })),
+      rows: mapMockTrialTableRows(tableRows, spec.columns),
+    });
   }
 
-  return rows.length > 0 ? rows : [detailRow("No mock trial data recorded", "—")];
+  if (!rows.length && !mockTrialTables.length) {
+    return { rows: [detailRow("No mock trial data recorded", "—")] };
+  }
+
+  return { rows, mockTrialTables: mockTrialTables.length ? mockTrialTables : undefined };
 };
 
 /** Read-only document blocks from parsed API form data (v2 sections) */
@@ -624,8 +709,7 @@ export function mapCasingFormDataToDetailBlocks(form: RocketMotorCasingFormData)
       if (!reported && !acem) return null;
       return detailRow(
         r.paramName || def.paramName,
-        reported ? `${reported} ${r.unit || def.unit}`.trim() : "—",
-        acem ? `ACEM spec: ${acem} ${r.unit || def.unit}`.trim() : "—"
+        formatReportedWithAcem(reported, acem, r.unit || def.unit) || "—",
       );
     })
     .filter((r): r is NonNullable<typeof r> => r != null);
@@ -638,8 +722,7 @@ export function mapCasingFormDataToDetailBlocks(form: RocketMotorCasingFormData)
     if (!reported && !acem) return null;
     return detailRow(
       def.label,
-      reported ? `${reported} ${r.unit || def.unit}`.trim() : "—",
-      acem ? `ACEM spec: ${acem} ${r.unit || def.unit}`.trim() : "—"
+      formatReportedWithAcem(reported, acem, r.unit || def.unit) || "—",
     );
   }).filter((r): r is NonNullable<typeof r> => r != null);
 
@@ -649,13 +732,7 @@ export function mapCasingFormDataToDetailBlocks(form: RocketMotorCasingFormData)
     detailRow("Report no.", form.insulationReportNo),
     detailRow("Receipt status", form.insulationReceiptStatus),
     ...(form.insulationReportExisting
-      ? [
-        detailRow(
-          "Report upload",
-          form.insulationReportExisting.fileName,
-          form.insulationReportExisting.fileUrl
-        ),
-      ]
+      ? [detailRow("Report upload", form.insulationReportExisting.fileName)]
       : []),
     ...mechRows,
     ...thermalRows,
@@ -664,13 +741,9 @@ export function mapCasingFormDataToDetailBlocks(form: RocketMotorCasingFormData)
   const visualRows =
     form.visualInspection?.length > 0
       ? form.visualInspection.flatMap((v) => {
-        const base = detailRow(
-          v.description || v.itemKey,
-          v.observations,
-          v.remark || (v.mediaExisting?.fileUrl ? v.mediaExisting.fileUrl : "—")
-        );
+        const base = detailRow(v.description || v.itemKey, v.observations, v.remark);
         const mediaRow = v.mediaExisting
-          ? detailRow("Attached media", v.mediaExisting.fileName, v.mediaExisting.fileUrl)
+          ? detailRow("Attached media", v.mediaExisting.fileName)
           : null;
         const subRows =
           v.subItems?.map((s) =>
@@ -755,7 +828,7 @@ export function mapCasingFormDataToDetailBlocks(form: RocketMotorCasingFormData)
       ? [
         {
           material: "Mock trial",
-          rows: buildMockTrialDetailRows(form.mockTrial.savedSections),
+          ...buildMockTrialDetailContent(form.mockTrial.savedSections),
           _columns: CASING_DETAIL_COLS,
         },
       ]

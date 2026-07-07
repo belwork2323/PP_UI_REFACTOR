@@ -1,14 +1,14 @@
 // src/data/models/dashboard/DashboardModel.js
-import { icons }         from '../../../app/theme';
+import { icons } from '../../../app/theme';
 import getDashboardTheme from '../../../app/theme/custom_themes/admin/dashboard_theme';
-import { STRINGS }       from '../../../app/config/strings';
+import { STRINGS } from '../../../app/config/strings';
 
 // Maps the KPI `type` string from the API to icon + avatar-bg color.
 // Mirrors the old buildKPI() that lived in DashboardPage.
 const KPI_META = (th) => ({
-  users:     { Icon: icons.users,    bg: th.kpi.avatarColors.users     },
-  batches:   { Icon: icons.chart,    bg: th.kpi.avatarColors.batches   },
-  dispatch:  { Icon: icons.Store,    bg: th.kpi.avatarColors.dispatch  },
+  users: { Icon: icons.users, bg: th.kpi.avatarColors.users },
+  batches: { Icon: icons.chart, bg: th.kpi.avatarColors.batches },
+  dispatch: { Icon: icons.Store, bg: th.kpi.avatarColors.dispatch },
   approvals: { Icon: icons.approval, bg: th.kpi.avatarColors.approvals },
 });
 
@@ -16,9 +16,9 @@ const KPI_META = (th) => ({
 const KPI_LABELS = () => {
   const t = STRINGS.DASHBOARD_PAGE;
   return {
-    users:     { label: t.KPI.ACTIVE_USERS,      sub_default: t.KPI.SUB_USERS     },
-    batches:   { label: t.KPI.OPEN_BATCHES,      sub_default: t.KPI.SUB_BATCHES   },
-    dispatch:  { label: t.KPI.MOTORS_DISPATCHED, sub_default: t.KPI.SUB_DISPATCH  },
+    users: { label: t.KPI.ACTIVE_USERS, sub_default: t.KPI.SUB_USERS },
+    batches: { label: t.KPI.OPEN_BATCHES, sub_default: t.KPI.SUB_BATCHES },
+    dispatch: { label: t.KPI.MOTORS_DISPATCHED, sub_default: t.KPI.SUB_DISPATCH },
     approvals: { label: t.KPI.PENDING_APPROVALS, sub_default: t.KPI.SUB_APPROVALS },
   };
 };
@@ -42,10 +42,10 @@ export class DashboardModel {
     activeBatches: unknown;
     recentEvents: unknown;
   }) {
-    this.kpis          = kpis;
-    this.charts        = charts;
+    this.kpis = kpis;
+    this.charts = charts;
     this.activeBatches = activeBatches;
-    this.recentEvents  = recentEvents;
+    this.recentEvents = recentEvents;
   }
 
   /**
@@ -57,32 +57,32 @@ export class DashboardModel {
    * @param {string} [mode]       - 'light' | 'dark' — needed to resolve theme colours
    */
   static fromApi(apiResponse, mode = 'light') {
-    const data      = getApiData(apiResponse);
-    const th        = getDashboardTheme(mode);
-    const metaMap   = KPI_META(th);
-    const labelMap  = KPI_LABELS();
+    const data = getApiData(apiResponse);
+    const th = getDashboardTheme(mode);
+    const metaMap = KPI_META(th);
+    const labelMap = KPI_LABELS();
 
     const kpis = (data.kpis || []).map(({ type, value, sub }) => {
-      const meta  = metaMap[type]  ?? { Icon: icons.chart, bg: '#607d8b' };
-      const lbl   = labelMap[type] ?? { label: type, sub_default: '' };
+      const meta = metaMap[type] ?? { Icon: icons.chart, bg: '#607d8b' };
+      const lbl = labelMap[type] ?? { label: type, sub_default: '' };
       return {
         label: lbl.label,
         value,
-        sub:   sub ?? lbl.sub_default,
-        Icon:  meta.Icon,
-        bg:    meta.bg,
+        sub: sub ?? lbl.sub_default,
+        Icon: meta.Icon,
+        bg: meta.bg,
       };
     });
 
     return new DashboardModel({
       kpis,
       charts: {
-        weeklyActivity:  data.charts?.weeklyActivity  ?? [],
+        weeklyActivity: data.charts?.weeklyActivity ?? [],
         motorsProcessed: data.charts?.motorsProcessed ?? [],
-        qcPassRate:      data.charts?.qcPassRate      ?? [],
+        qcPassRate: data.charts?.qcPassRate ?? [],
       },
       activeBatches: data.activeBatches ?? [],
-      recentEvents:  data.recentEvents  ?? [],
+      recentEvents: data.recentEvents ?? [],
     });
   }
 
@@ -102,7 +102,7 @@ export class DashboardModel {
       completedBatches: { type: 'batches', label: 'Completed Batches' },
       openBatches: { type: 'batches', label: 'Open Batches' },
       motorsDispatched: { type: 'dispatch', label: 'Motors Dispatched' },
-      pendingApprovals: { type: 'approvals', label: 'Pending Approvals' },
+      // pendingApprovals: { type: 'approvals', label: 'Pending Approvals' },
     };
 
     const metaMap = KPI_META(th);
@@ -111,11 +111,11 @@ export class DashboardModel {
       const statData = (data as any)[key] ?? { count: 0, subValue: 0 };
       const count = statData.count ?? 0;
       const subValue = statData.subValue ?? 0;
-      
+
       const meta = metaMap[mapping.type] ?? { Icon: icons.chart, bg: '#607d8b' };
-      
+
       // Format the sub value
-      const sub = subValue !== 0 
+      const sub = subValue !== 0
         ? (subValue > 0 ? `+${subValue}` : `${subValue}`)
         : '—';
 
@@ -159,7 +159,7 @@ export class DashboardModel {
   static fromActiveBatchesApi(apiResponse) {
     const data = getApiData(apiResponse);
     const batches = data?.batches || [];
-    
+
     const activeBatches = batches.map((b: any) => ({
       id: b.id ?? '',
       batchId: b.batchId ?? '',
@@ -168,10 +168,10 @@ export class DashboardModel {
       motorType: b.motorType?.motorTypeName ?? b.motorType?.typeName ?? b.motorType ?? 'NA',
       projectName: b.projectName ?? '',
       stage: b.stage ?? 'NA',
-      currentStage: b.stage?.department?.subDepartments?.[0]?.subDepartmentName ?? 'NA',
-      stageDept: b.stage?.department?.departmentName ?? '',
+      currentStage: b.stage?.department ?? 'NA',
+      stageDept: b.stage?.subDepartment ?? 'NA',
       managerId: b.systemManager?.id ?? b.systemManagerId ?? 'NA',
-      managerName: b.systemManager?.name ?? 'NA',
+      managerName: b.systemManager?.name ?? b.systemManagerName ?? 'NA',
       status: b.status ?? 'NA',
       createdOn: b.createdOn ?? b.date ?? '',
       completion: typeof b.completion === 'number' ? b.completion : 0,
@@ -190,11 +190,11 @@ export class DashboardModel {
   static fromBlockchainEventsApi(apiResponse: any) {
     const data = getApiData(apiResponse);
     const events = data?.events || [];
-    
+
     const formattedEvents = events.map((e: any) => {
       let color = '#2196f3';
       let icon = 'Tx';
-      
+
       if (e.eventType === 'APPROVAL_COMPLETED') { color = '#4caf50'; icon = '✓'; }
       if (e.eventType === 'STAGE_UPDATED') { color = '#ff9800'; icon = '↻'; }
 
@@ -202,7 +202,7 @@ export class DashboardModel {
         transactionId: e.transactionId ?? '',
         batchId: e.batchId ?? '',
         eventType: e.eventType ?? '',
-        eventStatusMessage: e.eventStatusMessage ?? e.label ?? '', 
+        eventStatusMessage: e.eventStatusMessage ?? e.label ?? '',
         department: e.department ?? '',
         subDepartment: e.subDepartment ?? '',
         performedBy: e.performedBy ?? '',
