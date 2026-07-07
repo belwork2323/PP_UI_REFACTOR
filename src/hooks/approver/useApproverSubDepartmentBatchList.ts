@@ -10,6 +10,7 @@ import {
   buildApproverBatchListPayload,
   mapApproverBatchListRow,
   mapApproverBatchStatusCounts,
+  mirrorApproverSubdepartmentStatusFields,
   normalizeApproverBatchStatus,
   resolveSubdepartmentBatchPagination,
 } from "../../data/models/approver/ApproverBatchListModel";
@@ -455,6 +456,8 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
           return null;
         }
 
+        const workflowStatus = normalizeApproverBatchStatus(remote.status ?? item.status);
+
         return {
           ...item,
           ...remote,
@@ -468,7 +471,8 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
           projectId: remote.projectId ?? item.projectId,
           priority: remote.priority ?? item.priority,
           createdOn: remote.createdOn ?? item.createdOn,
-          status: normalizeApproverBatchStatus(remote.status ?? item.status),
+          status: workflowStatus,
+          ...mirrorApproverSubdepartmentStatusFields(workflowStatus),
           rejectionReason: remote.rejectionReason ?? item.rejectionReason,
           assignedTo: remote.assignedTo ?? item.assignedTo,
           submittedBy: (remote as { submittedBy?: string }).submittedBy ?? item.submittedBy,

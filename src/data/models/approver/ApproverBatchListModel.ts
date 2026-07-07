@@ -1,6 +1,6 @@
 import { OPERATION_STATUS, toOperationStatusApiValue, type OperationStatus } from "../../../hooks/operationStatus";
 import { motorStageForApi, normalizeMotorStage } from "../admin/BatchManagement/BatchManagementModel";
-import { batchTypeFilterToApiValue } from "../user/SubdepartmentBatchModel";
+import { batchTypeFilterToApiValue, SUBDEPT_STATUS_FIELD } from "../user/SubdepartmentBatchModel";
 
 /** API status values returned by POST /approver/subdepartment/batch-list */
 export const APPROVER_BATCH_STATUS = {
@@ -340,6 +340,39 @@ export function approverRowMatchesSearchQuery(
   });
 }
 
+const resolveRawBatchStatus = (batch: Record<string, unknown>) => {
+  const direct = batch.status;
+  if (direct != null && String(direct).trim()) {
+    return direct;
+  }
+
+  for (const field of Object.values(SUBDEPT_STATUS_FIELD)) {
+    const value = batch[field];
+    if (value != null && String(value).trim()) {
+      return value;
+    }
+  }
+
+  return direct;
+};
+
+const buildSubdepartmentStatusMirrors = (workflowStatus: string) =>
+  Object.fromEntries(
+    [...new Set(Object.values(SUBDEPT_STATUS_FIELD))].map((field) => [field, workflowStatus]),
+  );
+
+export const mirrorApproverSubdepartmentStatusFields = buildSubdepartmentStatusMirrors;
+
+/** Resolve list/approver status using subdepartment field with fallback to normalized `status`. */
+export function resolveApproverRowStatus(
+  row: Record<string, unknown>,
+  statusField = "status",
+): string {
+  const fieldValue = String(row[statusField] ?? "").trim();
+  if (fieldValue) return fieldValue;
+  return String(row.status ?? "").trim();
+}
+
 export function mapApproverBatchListRow(batch: Record<string, unknown>) {
   const assignedTo = resolveAssignedTo(batch);
   const createdBy = resolveCreatedBy(batch);
@@ -348,11 +381,13 @@ export function mapApproverBatchListRow(batch: Record<string, unknown>) {
   const submittedBy = String(
     batch.submittedBy ?? formSubmittedBy?.fullName ?? formSubmittedBy?.id ?? "",
   ).trim();
-  const workflowStatus = normalizeApproverBatchStatus(batch.status);
+  const workflowStatus = normalizeApproverBatchStatus(resolveRawBatchStatus(batch));
   const motorStage = normalizeMotorStage(batch.motorStage ?? batch.motorType);
+  const statusMirrors = buildSubdepartmentStatusMirrors(workflowStatus);
 
   return {
     ...batch,
+    ...statusMirrors,
     id: batch.id ?? batch.formId ?? batch.batchId,
     batchId: batch.batchId,
     formId: batch.formId ?? null,

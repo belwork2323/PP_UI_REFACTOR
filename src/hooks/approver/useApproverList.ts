@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 
+import { resolveApproverRowStatus } from "../../data/models/approver/ApproverBatchListModel";
+
 export type ApproverFilterField = {
   field: string;
   label: string;
@@ -73,10 +75,10 @@ export const useApproverList = <T,>({
     const values = new Set<string>();
 
     items.forEach((item) => {
-      const value = resolveValue(item, statusField);
+      const value = resolveApproverRowStatus(item as Record<string, unknown>, statusField);
 
       if (value) {
-        values.add(String(value));
+        values.add(value);
       }
     });
 
@@ -93,7 +95,7 @@ export const useApproverList = <T,>({
 
     statusValues.forEach((status) => {
       map[status] = items.filter(
-        (item) => String(resolveValue(item, statusField)) === status,
+        (item) => resolveApproverRowStatus(item as Record<string, unknown>, statusField) === status,
       ).length;
     });
 
@@ -104,9 +106,10 @@ export const useApproverList = <T,>({
     const query = searchText.trim().toLowerCase();
 
     return items.filter((item) => {
+      const row = item as Record<string, unknown>;
       if (
         activeStatus !== allLabel &&
-        String(resolveValue(item, statusField)) !== activeStatus
+        resolveApproverRowStatus(row, statusField) !== activeStatus
       ) {
         return false;
       }

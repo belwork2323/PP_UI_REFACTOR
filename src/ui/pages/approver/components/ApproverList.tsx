@@ -14,6 +14,7 @@ import useApproverSubDepartmentBatchList from "../../../../hooks/approver/useApp
 import {
   APPROVER_BATCH_STATUS_TABS,
   approverRowMatchesSearchQuery,
+  resolveApproverRowStatus,
 } from "../../../../data/models/approver/ApproverBatchListModel";
 import BatchListShell from "../../../components/custom/BatchListShell";
 import Pagination from "../../../components/common/Pagination";
@@ -116,9 +117,10 @@ const ApproverList = <T extends Record<string, unknown>,>({
     const query = searchText.trim();
 
     return sourceItems.filter((item) => {
+      const row = item as Record<string, unknown>;
       if (
         activeStatus !== allLabel &&
-        String((item as Record<string, unknown>)[statusField]) !== activeStatus
+        resolveApproverRowStatus(row, statusField) !== activeStatus
       ) {
         return false;
       }

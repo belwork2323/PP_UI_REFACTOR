@@ -2,12 +2,23 @@ import {
   buildTrimmingSectionPayload,
   createTrimmingInitialValues,
   hydrateTrimmingValuesFromSections,
+  mapTrimmingMotorStage,
   resolveTrimmingMotorStageNumber,
   schemaValuesHaveUserData,
   type SchemaDocumentV2,
   type SchemaFormValues,
   type SchemaSectionSubmission,
 } from "../../../schema-engine";
+import type { CasePrepDetailSection } from "./CasePreparationFormModel";
+import {
+  mapCastingCuringPersonLabel,
+  parseCastingCuringSectionData,
+} from "./CastingCuringFormModel";
+
+const TRIMMING_SECTION_LABELS: Record<string, string> = {
+  TRIMMING_DETAILS: "Trimming Details",
+  DIMENSIONS_AFTER_TRIMMING: "Dimensions After Trimming",
+};
 
 export type TrimmingMotorSession = {
   motorId: string;
@@ -35,6 +46,15 @@ export type TrimmingDetails = {
   batchId: string;
   subDepartmentId: number;
   formSubmissionType: string;
+  status?: string;
+  batchType?: string;
+  motorReceivedDate?: string | null;
+  createdBy?: string | null;
+  createdAt?: string | null;
+  submittedBy?: string | null;
+  submittedAt?: string | null;
+  lastUpdatedBy?: string | null;
+  lastUpdatedAt?: string | null;
   motorStage?: number | string;
   motors?: Array<{
     motorId?: string;
@@ -190,6 +210,100 @@ export const hasAnyTrimmingValue = (form: TrimmingFormState) => {
   return schemaValuesHaveUserData(form.schemaFormValues ?? {});
 };
 
+export type TrimmingMotorDetailView = {
+  motorId: string;
+  motorStageLabel: string;
+  motorReceivedAt: string;
+  sections: CasePrepDetailSection[];
+};
+
+export type TrimmingDetailView = {
+  formId: string;
+  batchId: string;
+  batchType: string;
+  formSubmissionType: string;
+  status?: string;
+  createdBy: string | null;
+  createdAt: string | null;
+  submittedBy: string | null;
+  submittedAt: string | null;
+  lastUpdatedBy: string | null;
+  lastUpdatedAt: string | null;
+  motors: TrimmingMotorDetailView[];
+};
+
+const parseTrimmingDisplaySections = (sections: unknown[] | undefined): CasePrepDetailSection[] =>
+  (sections ?? [])
+    .map((section) => {
+      const block = section as { sectionId?: string; sectionData?: Record<string, unknown>[] };
+      const parsed = parseCastingCuringSectionData(
+        String(block.sectionId ?? ""),
+        block.sectionData as Record<string, unknown>[] | undefined,
+      );
+      return {
+        ...parsed,
+        label: TRIMMING_SECTION_LABELS[parsed.sectionId] ?? parsed.label,
+      };
+    })
+    .filter((section) => section.fields.length > 0 || section.tables.length > 0);
+
+const resolveTrimmingMotorSections = (motor: Record<string, unknown>): CasePrepDetailSection[] => {
+  if (Array.isArray(motor.sections)) {
+    return parseTrimmingDisplaySections(motor.sections as unknown[]);
+  }
+
+  const details = (motor.details ?? motor) as Record<string, unknown>;
+  if (Array.isArray(details.sections)) {
+    return parseTrimmingDisplaySections(details.sections as unknown[]);
+  }
+
+  return [];
+};
+
+export const mapTrimmingDetailsForDisplay = (
+  data: Record<string, unknown> | null | undefined,
+): TrimmingDetailView | null => {
+  if (!data) return null;
+
+  const details = (data.trimmingDetails ?? data) as Record<string, unknown>;
+  const rawMotors = Array.isArray(details.motors) ? details.motors : [];
+
+  const motors: TrimmingMotorDetailView[] = rawMotors
+    .map((motor) => {
+      const entry = motor as Record<string, unknown>;
+      const src = (entry.details ?? entry) as Record<string, unknown>;
+      const motorStage = src.motorStage ?? entry.motorStage;
+
+      return {
+        motorId: String(entry.motorId ?? src.motorId ?? "").trim(),
+        motorStageLabel: mapTrimmingMotorStage(motorStage),
+        motorReceivedAt: String(src.motorReceivedAt ?? entry.motorReceivedAt ?? "").trim(),
+        sections: resolveTrimmingMotorSections(entry),
+      };
+    })
+    .filter((motor) => motor.motorId.length > 0);
+
+  return {
+    formId: String(details.formId ?? ""),
+    batchId: String(details.batchId ?? ""),
+    batchType: details.batchType != null ? String(details.batchType) : "",
+    formSubmissionType: String(details.formSubmissionType ?? ""),
+    status: details.status != null ? String(details.status) : undefined,
+    createdBy: mapCastingCuringPersonLabel(details.createdBy),
+    createdAt: details.createdAt != null ? String(details.createdAt) : null,
+    submittedBy: mapCastingCuringPersonLabel(details.submittedBy),
+    submittedAt: details.submittedAt != null ? String(details.submittedAt) : null,
+    lastUpdatedBy: mapCastingCuringPersonLabel(details.lastUpdatedBy ?? details.updatedBy),
+    lastUpdatedAt:
+      details.lastUpdatedAt != null
+        ? String(details.lastUpdatedAt)
+        : details.updatedAt != null
+          ? String(details.updatedAt)
+          : null,
+    motors,
+  };
+};
+
 export class TrimmingSubmitResponseModel {
   formId: string;
   batchId: string;
@@ -210,14 +324,30 @@ export class TrimmingSubmitResponseModel {
 export class TrimmingDetailsModel {
   static fromApi(data: any): TrimmingDetails {
     const payload = data?.data ?? data ?? {};
+    const rawMotors = Array.isArray(payload?.motors) ? payload.motors : [];
 
     return {
       formId: String(payload?.formId ?? ""),
       batchId: String(payload?.batchId ?? ""),
       subDepartmentId: Number(payload?.subDepartmentId ?? 0),
       formSubmissionType: String(payload?.formSubmissionType ?? ""),
+      status: payload?.status != null ? String(payload.status) : undefined,
+      batchType: payload?.batchType != null ? String(payload.batchType) : undefined,
+      motorReceivedDate:
+        payload?.motorReceivedDate != null ? String(payload.motorReceivedDate) : null,
+      createdBy: mapCastingCuringPersonLabel(payload?.createdBy),
+      createdAt: payload?.createdAt != null ? String(payload.createdAt) : null,
+      submittedBy: mapCastingCuringPersonLabel(payload?.submittedBy),
+      submittedAt: payload?.submittedAt != null ? String(payload.submittedAt) : null,
+      lastUpdatedBy: mapCastingCuringPersonLabel(payload?.lastUpdatedBy ?? payload?.updatedBy),
+      lastUpdatedAt:
+        payload?.lastUpdatedAt != null
+          ? String(payload.lastUpdatedAt)
+          : payload?.updatedAt != null
+            ? String(payload.updatedAt)
+            : null,
       motorStage: payload?.motorStage,
-      motors: Array.isArray(payload?.motors) ? payload.motors : undefined,
+      motors: rawMotors.length > 0 ? rawMotors : undefined,
       sections: Array.isArray(payload?.sections) ? payload.sections : undefined,
     };
   }

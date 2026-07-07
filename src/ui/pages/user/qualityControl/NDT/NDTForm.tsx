@@ -1,22 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Box,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Typography,
-  alpha,
-} from "@mui/material";
-import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
+import { Box, Stack, Typography, alpha } from "@mui/material";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
+import getQualityControlTheme from "../../../../../app/theme/custom_themes/user/qualityControl/qualityControl_theme";
+import RemoveProcessButton from "../../../../components/common/RemoveProcessButton";
 import {
   canAddNDTMotors,
   canLoadNDTForm,
+  NDT_FLOW_LABELS,
   type NDTAddedMotor,
   type NDTMotorOption,
 } from "../../../../../hooks/user/qualityControl/ndtFlowConfig";
@@ -29,15 +20,6 @@ import NDTMotorTables from "./NDTMotorTables";
 
 const { warning: WarningAmberRoundedIcon, biotech: BiotechRoundedIcon } = icons.user.qualityControl.ndt.form;
 
-const BRAND = {
-  primary: "#1B4F72",
-  primaryLight: "#2E86C1",
-  text: "#1C2833",
-  textSub: "#5D6D7E",
-  danger: "#C0392B",
-  border: "#D5D8DC",
-};
-
 type Props = {
   activeBatch?: NDTBatch | null;
   formData: NDTFormState;
@@ -47,13 +29,14 @@ type Props = {
   availableMotorOptions: NDTMotorOption[];
   maxMotorCount: number;
   isEditMode?: boolean;
-  flowBarTheme: any;
+  theme: ReturnType<typeof getQualityControlTheme>;
   onSetupChange: (patch: Partial<NDTFormState>) => void;
   onMotorSessionChange: (motorId: string, patch: Partial<NDTMotorSession>) => void;
   onMotorCountChange: (count: number | "") => void;
   onDraftMotorIdChange: (index: number, motorId: string) => void;
   onLoadNDTForm: () => void;
   onAddMotors: () => void;
+  onRemoveMotor: (motorId: string) => void;
 };
 
 const NDTForm = ({
@@ -65,23 +48,25 @@ const NDTForm = ({
   availableMotorOptions,
   maxMotorCount,
   isEditMode = false,
-  flowBarTheme,
+  theme,
   onSetupChange,
   onMotorSessionChange,
   onMotorCountChange,
   onDraftMotorIdChange,
   onLoadNDTForm,
   onAddMotors,
+  onRemoveMotor,
 }: Props) => {
   const strings = STRINGS.QUALITY_CONTROL.NDT;
+  const ndtTheme = theme.qualityControl.ndt;
+  const brand = ndtTheme.brand;
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
   const prevMotorCountRef = useRef(0);
+  const formSessionKey = `${activeBatch?.batchId ?? ""}:${activeBatch?.formId ?? "new"}`;
 
   const motorCards = Array.isArray(addedMotors) ? addedMotors : [];
   const usedMotorIds = motorCards.map((motor) => motor.motorId);
-
   const safeBeamEnergies = Array.isArray(formData.beamEnergies) ? formData.beamEnergies : [];
-  const safePlanRows = Array.isArray(formData.radiographyPlanRows) ? formData.radiographyPlanRows : [];
 
   const canLoad = canLoadNDTForm({
     equipment: formData.equipment ?? "",
@@ -108,16 +93,27 @@ const NDTForm = ({
   });
 
   useEffect(() => {
+    setActiveMotorIndex(0);
+    prevMotorCountRef.current = 0;
+  }, [formSessionKey]);
+
+  useEffect(() => {
     if (motorCards.length === 0) {
       setActiveMotorIndex(0);
       prevMotorCountRef.current = 0;
       return;
     }
-    if (motorCards.length > prevMotorCountRef.current) {
+
+    const prevCount = prevMotorCountRef.current;
+
+    if (prevCount === 0) {
+      setActiveMotorIndex(0);
+    } else if (motorCards.length > prevCount) {
       setActiveMotorIndex(motorCards.length - 1);
     } else {
       setActiveMotorIndex((prev) => Math.min(prev, motorCards.length - 1));
     }
+
     prevMotorCountRef.current = motorCards.length;
   }, [motorCards.length]);
 
@@ -135,148 +131,88 @@ const NDTForm = ({
   const navTabs = motorCards.map((motor) => ({ id: motor.motorId, label: motor.motorId }));
 
   return (
-    <Box sx={{ fontFamily: "'DM Sans',sans-serif" }}>
+    <Box sx={{ fontFamily: "'DM Sans', sans-serif" }}>
       {isEditMode ? (
         <Box
           sx={{
-            mb: 1.5,
-            px: 1.5,
-            py: 1,
+            mb: 2,
+            px: 1.75,
+            py: 1.1,
             borderRadius: 2,
-            background: alpha(BRAND.danger, 0.05),
-            border: `1.5px solid ${alpha(BRAND.danger, 0.2)}`,
+            background: alpha(brand.danger, 0.05),
+            border: `1.5px solid ${alpha(brand.danger, 0.2)}`,
             display: "flex",
             alignItems: "center",
             gap: 1,
           }}
         >
-          <WarningAmberRoundedIcon sx={{ fontSize: 16, color: BRAND.danger }} />
-          <Typography sx={{ fontSize: "0.76rem", color: BRAND.danger, fontWeight: 600 }}>
+          <WarningAmberRoundedIcon sx={{ fontSize: 18, color: brand.danger }} />
+          <Typography sx={{ fontSize: "0.8rem", color: brand.danger, fontWeight: 600 }}>
             {strings.EDIT_MODE_BANNER}
           </Typography>
         </Box>
       ) : null}
 
-      <Box
-        sx={{
-          borderRadius: 2,
-          border: `1px solid ${alpha(BRAND.primary, 0.14)}`,
-          background: "#fff",
-          px: 1.5,
-          py: 1.25,
-          mb: 1.5,
-        }}
-      >
-        <Stack direction="row" alignItems="center" gap={1} mb={1}>
-          <BiotechRoundedIcon sx={{ color: BRAND.primaryLight, fontSize: 18 }} />
-          <Box>
-            <Typography sx={{ fontWeight: 800, fontSize: "0.88rem", color: BRAND.text }}>
-              NDT setup
-            </Typography>
-            <Typography sx={{ fontSize: "0.68rem", color: BRAND.textSub }}>
-              {activeBatch?.batchId ? `Batch ${activeBatch.batchId}` : "Select radiography details and motors"}
-            </Typography>
-          </Box>
+      <Box sx={ndtTheme.panel.header}>
+        <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} gap={1.5}>
+          <Stack direction="row" alignItems="center" gap={1.5} flex={1}>
+            <Box sx={ndtTheme.panel.headerIcon}>
+              <BiotechRoundedIcon sx={{ color: "#fff", fontSize: 20 }} />
+            </Box>
+            <Box>
+              <Typography sx={ndtTheme.panel.headerTitle}>{strings.TITLE}</Typography>
+              <Typography sx={ndtTheme.panel.headerSubtitle}>
+                {strings.SUBTITLE}
+                {activeBatch?.batchId ? ` · ${activeBatch.batchId}` : ""}
+              </Typography>
+            </Box>
+          </Stack>
         </Stack>
-
-        <NDTFlowBar
-          equipment={formData.equipment ?? ""}
-          beamEnergies={safeBeamEnergies}
-          radiographyPlan={formData.radiographyPlan ?? ""}
-          motorCount={motorCount}
-          draftMotorIds={draftMotorIds}
-          availableMotorOptions={availableMotorOptions}
-          usedMotorIds={usedMotorIds}
-          ndtFormLoaded={formData.formLoaded}
-          maxMotorCount={maxMotorCount}
-          onEquipmentChange={(equipment) => onSetupChange({ equipment })}
-          onBeamEnergiesChange={(beamEnergies) => onSetupChange({ beamEnergies })}
-          onRadiographyPlanChange={(radiographyPlan) => onSetupChange({ radiographyPlan })}
-          onMotorCountChange={onMotorCountChange}
-          onDraftMotorIdChange={onDraftMotorIdChange}
-          onLoadNDTForm={onLoadNDTForm}
-          onAddMotors={onAddMotors}
-          canLoad={canLoad}
-          canAdd={canAdd}
-          theme={flowBarTheme}
-        />
       </Box>
 
-      {formData.formLoaded && safePlanRows.length > 0 ? (
-        <Box
-          sx={{
-            borderRadius: 2,
-            border: `1px solid ${alpha(BRAND.primary, 0.14)}`,
-            background: "#fff",
-            overflow: "hidden",
-            mb: 1.5,
-          }}
-        >
-          <Stack direction="row" alignItems="center" gap={0.75} sx={{ px: 1, py: 0.75, borderBottom: `1px solid ${alpha(BRAND.primary, 0.1)}` }}>
-            <DescriptionRoundedIcon sx={{ fontSize: 15, color: BRAND.primaryLight }} />
-            <Typography sx={{ fontWeight: 700, fontSize: "0.78rem", color: BRAND.text }}>
-              Radiography plan details
-            </Typography>
-          </Stack>
-          <TableContainer sx={{ overflowX: "auto" }}>
-            <Table size="small" sx={{ minWidth: 640 }}>
-              <TableHead>
-                <TableRow>
-                  {["Sr.", "Sections", "Orientations", "SFD", "Normal", "Tangential", "Detector"].map((label) => (
-                    <TableCell
-                      key={label}
-                      sx={{
-                        background: "linear-gradient(135deg,#1B4F72,#2E86C1)",
-                        color: "#fff",
-                        fontWeight: 700,
-                        fontSize: "0.6rem",
-                        padding: "5px 8px",
-                        borderBottom: "none",
-                      }}
-                    >
-                      {label}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {safePlanRows.map((row, index) => (
-                  <TableRow key={row.srNo} sx={{ background: index % 2 === 0 ? "#fff" : "rgba(244,246,248,0.55)" }}>
-                    <TableCell sx={{ fontSize: "0.72rem", py: 0.5, px: 1 }}>{row.srNo}</TableCell>
-                    <TableCell sx={{ fontSize: "0.72rem", py: 0.5, px: 1 }}>{row.sections}</TableCell>
-                    <TableCell sx={{ fontSize: "0.72rem", py: 0.5, px: 1 }}>{row.orientations}</TableCell>
-                    <TableCell sx={{ fontSize: "0.72rem", py: 0.5, px: 1 }}>{row.sfd}</TableCell>
-                    <TableCell sx={{ fontSize: "0.72rem", py: 0.5, px: 1 }}>{row.normalExposures}</TableCell>
-                    <TableCell sx={{ fontSize: "0.72rem", py: 0.5, px: 1 }}>{row.tangentialExposures}</TableCell>
-                    <TableCell sx={{ fontSize: "0.72rem", py: 0.5, px: 1 }}>{row.detectorType}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Box>
-      ) : null}
+      <NDTFlowBar
+        equipment={formData.equipment ?? ""}
+        beamEnergies={safeBeamEnergies}
+        radiographyPlan={formData.radiographyPlan ?? ""}
+        motorCount={motorCount}
+        draftMotorIds={draftMotorIds}
+        availableMotorOptions={availableMotorOptions}
+        usedMotorIds={usedMotorIds}
+        ndtFormLoaded={formData.formLoaded}
+        maxMotorCount={maxMotorCount}
+        onEquipmentChange={(equipment) => onSetupChange({ equipment })}
+        onBeamEnergiesChange={(beamEnergies) => onSetupChange({ beamEnergies })}
+        onRadiographyPlanChange={(radiographyPlan) => onSetupChange({ radiographyPlan })}
+        onMotorCountChange={onMotorCountChange}
+        onDraftMotorIdChange={onDraftMotorIdChange}
+        onLoadNDTForm={onLoadNDTForm}
+        onAddMotors={onAddMotors}
+        canLoad={canLoad}
+        canAdd={canAdd}
+        theme={theme}
+      />
 
       {formData.formLoaded && activeMotorEntry && activeMotorSession ? (
         <NDTMotorNavigation
           tabs={navTabs}
           activeIndex={activeMotorIndex}
           onActiveIndexChange={setActiveMotorIndex}
+          theme={theme}
         >
-          <Box
-            sx={{
-              borderRadius: 2,
-              border: `1px solid ${BRAND.border}`,
-              background: "#fff",
-              px: 1,
-              py: 0.75,
-            }}
-          >
-            <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: BRAND.primary, mb: 0.75 }}>
-              Motor {activeMotorEntry.motorId}
-            </Typography>
+          <Box sx={ndtTheme.panel.motorCard}>
+            <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.25}>
+              <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: brand.primary }}>
+                {NDT_FLOW_LABELS.motorCardTitle} — {activeMotorEntry.motorId}
+              </Typography>
+              <RemoveProcessButton
+                onClick={() => onRemoveMotor(activeMotorEntry.motorId)}
+                dangerColor={brand.danger}
+                tooltip={strings.DELETE_MOTOR_TOOLTIP}
+              />
+            </Stack>
             <NDTMotorTables
               motor={activeMotorSession}
+              theme={theme}
               onChange={(patch) => onMotorSessionChange(activeMotorEntry.motorId, patch)}
             />
           </Box>

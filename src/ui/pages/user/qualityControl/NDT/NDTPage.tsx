@@ -13,8 +13,11 @@ import useNDTHook from "../../../../../hooks/user/qualityControl/useNDTHook";
 
 const NDTPage = () => {
   const mode = useThemeStore((state) => state.mode);
-  const theme = useMemo(() => getQualityControlTheme(mode), [mode]);
-  const flowBarTheme = useMemo(() => getManufacturingTheme(mode), [mode]);
+  const theme = useMemo(() => {
+    const qc = getQualityControlTheme(mode);
+    const mfg = getManufacturingTheme(mode);
+    return { ...qc, manufacturing: mfg.manufacturing };
+  }, [mode]);
   const strings = STRINGS.QUALITY_CONTROL.NDT;
   const [draftConfirm, setDraftConfirm] = useState(false);
   const [submitConfirm, setSubmitConfirm] = useState(false);
@@ -48,9 +51,10 @@ const NDTPage = () => {
     handleDraftMotorIdChange,
     handleLoadNDTForm,
     handleAddMotors,
+    handleRemoveMotor,
   } = hookState;
 
-  const canAct = addedMotors.length > 0;
+  const canAct = formData.formLoaded;
 
   if (view === "list") {
     return (
@@ -95,57 +99,38 @@ const NDTPage = () => {
               availableMotorOptions={availableMotorOptions}
               maxMotorCount={maxMotorCount}
               isEditMode={isEditMode}
-              flowBarTheme={flowBarTheme}
+              theme={theme}
               onSetupChange={handleSetupChange}
               onMotorSessionChange={handleMotorSessionChange}
               onMotorCountChange={handleMotorCountChange}
               onDraftMotorIdChange={handleDraftMotorIdChange}
               onLoadNDTForm={handleLoadNDTForm}
               onAddMotors={handleAddMotors}
+              onRemoveMotor={handleRemoveMotor}
             />
           )}
 
-          {!loadingFormDetails ? (
-            <>
-              <Box
-                sx={{
-                  mt: 2,
-                  p: "12px 16px",
-                  borderRadius: 2,
-                  background: "#fff",
-                  border: "1.5px solid #D5D8DC",
-                }}
+          {!loadingFormDetails && canAct ? (
+            <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} mt={3} justifyContent="flex-end">
+              <Button
+                variant="outlined"
+                disabled={actionLoading}
+                onClick={() => setDraftConfirm(true)}
               >
-                <Stack
-                  direction={{ xs: "column", sm: "row" }}
-                  alignItems={{ sm: "center" }}
-                  justifyContent="space-between"
-                  gap={1.5}
-                >
-                  <Box>
-                    <Box component="span" sx={{ fontSize: "0.76rem", fontWeight: 700, color: "#1C2833" }}>
-                      {canAct ? strings.READY_TO_SUBMIT : strings.NOT_READY_TO_SUBMIT}
-                    </Box>
-                  </Box>
-                  <Stack direction="row" gap={1}>
-                    <Button
-                      variant="outlined"
-                      disabled={!canAct || actionLoading}
-                      onClick={() => setDraftConfirm(true)}
-                    >
-                      {strings.SAVE_DRAFT_LABEL}
-                    </Button>
-                    <Button
-                      variant="contained"
-                      disabled={!canAct || actionLoading}
-                      onClick={() => setSubmitConfirm(true)}
-                    >
-                      {isEditMode ? strings.RESUBMIT_LABEL : strings.SUBMIT_LABEL}
-                    </Button>
-                  </Stack>
-                </Stack>
-              </Box>
+                {strings.SAVE_DRAFT_LABEL}
+              </Button>
+              <Button
+                variant="contained"
+                disabled={actionLoading}
+                onClick={() => setSubmitConfirm(true)}
+              >
+                {isEditMode ? strings.RESUBMIT_LABEL : strings.SUBMIT_LABEL}
+              </Button>
+            </Stack>
+          ) : null}
 
+          {!loadingFormDetails && canAct ? (
+            <>
               <ConfirmAlertDialog
                 open={draftConfirm}
                 severity="info"

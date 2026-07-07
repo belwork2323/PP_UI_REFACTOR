@@ -16,9 +16,9 @@ export const TRIMMING_BRAND = {
 	border: "#D5D8DC",
 	text: "#1C2833",
 	textSub: "#5D6D7E",
-  tr: "#6A1B9A",
-  trLight: "#8E24AA",
-  
+	tr: "#1565C0",
+	trLight: "#1976D2",
+
 } as const;
 
 export const getTrimmingTheme = (baseTheme: any) => {

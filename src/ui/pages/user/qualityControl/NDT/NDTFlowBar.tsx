@@ -7,8 +7,14 @@ import {
   getNDTMotorCountOptions,
   type NDTMotorOption,
 } from "../../../../../hooks/user/qualityControl/ndtFlowConfig";
+import getQualityControlTheme from "../../../../../app/theme/custom_themes/user/qualityControl/qualityControl_theme";
+import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import CasePrepSelect from "../../manufacturing/CasePreparation/CasePrepSelect";
 import CasePrepMultiSelect from "../../manufacturing/CasePreparation/CasePrepMultiSelect";
+
+type NDTFlowBarTheme = ReturnType<typeof getQualityControlTheme> & {
+  manufacturing?: ReturnType<typeof getManufacturingTheme>["manufacturing"];
+};
 
 type NDTFlowBarProps = {
   equipment: string;
@@ -29,7 +35,7 @@ type NDTFlowBarProps = {
   onAddMotors: () => void;
   canLoad: boolean;
   canAdd: boolean;
-  theme: any;
+  theme: NDTFlowBarTheme;
 };
 
 const L = NDT_FLOW_LABELS;
@@ -55,12 +61,15 @@ const NDTFlowBar = ({
   canAdd,
   theme,
 }: NDTFlowBarProps) => {
-  const flowBar = theme.manufacturing?.casePreparation?.flowBar ?? {};
+  const ndtTheme = theme.qualityControl.ndt;
+  const flowBar = ndtTheme.flowBar;
+  const casePrepFlowBar = theme.manufacturing?.casePreparation?.flowBar ?? {};
   const safeBeamEnergies = Array.isArray(beamEnergies) ? beamEnergies : [];
   const count = motorCount === "" ? 0 : Number(motorCount);
   const countSelected = count > 0;
   const motorSlotCount = countSelected ? count : 1;
   const motorCountOptions = getNDTMotorCountOptions(maxMotorCount);
+  const selectTheme = { ...theme, manufacturing: theme.manufacturing ?? { casePreparation: { flowBar: casePrepFlowBar } } };
 
   const equipmentOptions = NDT_EQUIPMENT_OPTIONS.map((option) => ({ value: option, label: option }));
   const planOptions = Object.entries(NDT_RADIOGRAPHY_PLANS).map(([key, plan]) => ({
@@ -79,19 +88,17 @@ const NDTFlowBar = ({
 
   return (
     <Box sx={flowBar.container}>
-      <Typography sx={{ fontSize: "0.74rem", color: theme.palette.textSub, mb: 1.5 }}>
-        {L.setupHint}
-      </Typography>
+      <Typography sx={flowBar.setupHint}>{ndtFormLoaded ? L.setupHintLoaded : L.setupHint}</Typography>
 
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <Box sx={{ ...flowBar.topRow, alignItems: "flex-end" }}>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 2.25 }}>
+        <Box sx={flowBar.topRow}>
           <CasePrepSelect
             label={L.equipment}
             value={equipment}
             placeholder={L.equipmentPlaceholder}
             options={equipmentOptions}
-            width={240}
-            theme={theme}
+            width={260}
+            theme={selectTheme}
             onChange={onEquipmentChange}
           />
 
@@ -100,8 +107,8 @@ const NDTFlowBar = ({
             value={safeBeamEnergies}
             placeholder={L.beamEnergiesPlaceholder}
             options={beamOptions}
-            width={260}
-            theme={theme}
+            width={280}
+            theme={selectTheme}
             onChange={onBeamEnergiesChange}
           />
 
@@ -110,18 +117,20 @@ const NDTFlowBar = ({
             value={radiographyPlan}
             placeholder={L.radiographyPlanPlaceholder}
             options={planOptions}
-            width={240}
-            theme={theme}
+            width={280}
+            theme={selectTheme}
             onChange={onRadiographyPlanChange}
           />
+        </Box>
 
+        <Box sx={flowBar.topRow}>
           <CasePrepSelect
             label={L.motorCount}
             value={countSelected ? String(motorCount) : ""}
             placeholder={L.motorCountPlaceholder}
             options={motorCountOptions}
-            width={160}
-            theme={theme}
+            width={180}
+            theme={selectTheme}
             disabled={motorCountOptions.length === 0}
             onChange={(v) => onMotorCountChange(v === "" ? "" : Number(v))}
           />
@@ -133,24 +142,36 @@ const NDTFlowBar = ({
               value={draftMotorIds[idx] ?? ""}
               placeholder={L.motorIdPlaceholder}
               options={getMotorOptionsForSlot(idx)}
-              width={220}
-              theme={theme}
+              width={260}
+              theme={selectTheme}
               disabled={availableMotorOptions.length === 0}
               onChange={(v) => onDraftMotorIdChange(idx, v)}
             />
           ))}
-        </Box>
 
-        <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-          {!ndtFormLoaded ? (
-            <Button variant="contained" size="small" onClick={onLoadNDTForm} disabled={!canLoad}>
-              {L.loadForm}
-            </Button>
-          ) : (
-            <Button variant="contained" size="small" onClick={onAddMotors} disabled={!canAdd}>
-              {L.addMotors}
-            </Button>
-          )}
+          <Box sx={{ ...flowBar.actionRow, ml: { sm: "auto" }, width: { xs: "100%", sm: "auto" } }}>
+            {!ndtFormLoaded ? (
+              <Button
+                variant="contained"
+                size="medium"
+                onClick={onLoadNDTForm}
+                disabled={!canLoad}
+                sx={flowBar.primaryAction}
+              >
+                {L.loadForm}
+              </Button>
+            ) : (
+              <Button
+                variant="contained"
+                size="medium"
+                onClick={onAddMotors}
+                disabled={!canAdd}
+                sx={flowBar.primaryAction}
+              >
+                {L.addMotors}
+              </Button>
+            )}
+          </Box>
         </Box>
       </Box>
     </Box>

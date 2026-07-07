@@ -130,6 +130,7 @@ export const NDT_FLOW_LABELS = {
   loadForm: "Load Form",
   addMotors: "Add Motors",
   setupHint: "Select radiography setup details and motor IDs, then load the form.",
+  setupHintLoaded: "Radiography setup is locked per motor. Select setup below to add more motors.",
   motorNavTitle: "Motor navigation",
   motorNavHint: "Switch between motors to fill inspection details.",
   motorCardTitle: "Motor",
@@ -157,11 +158,30 @@ export const getCastedMotorsForBatch = (_batchId?: string | null): string[] => {
 };
 
 export const resolveNDTMotorOptions = (batch?: { batchId?: string; motorId?: string; motorIds?: string[] } | null) => {
-  const ids = Array.isArray(batch?.motorIds) ? batch.motorIds : [];
-  const casted = getCastedMotorsForBatch(batch?.batchId);
-  const merged = [...ids, ...casted, batch?.motorId ?? ""].map((id) => String(id ?? "").trim()).filter(Boolean);
-  const unique = Array.from(new Set(merged));
-  return unique.map((value) => ({ value, label: value }));
+  const ids = Array.isArray(batch?.motorIds)
+    ? batch.motorIds.map((id) => String(id).trim()).filter(Boolean)
+    : [];
+
+  const casted = getCastedMotorsForBatch(batch?.batchId).map((id) => String(id).trim()).filter(Boolean);
+
+  if (ids.length > 0 || casted.length > 0) {
+    const unique = Array.from(new Set([...ids, ...casted]));
+    return unique.map((value) => ({ value, label: value }));
+  }
+
+  const singleId = String(batch?.motorId ?? "").trim();
+  if (!singleId) return [];
+
+  const parsed = singleId
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+  if (parsed.length > 1) {
+    return parsed.map((value) => ({ value, label: value }));
+  }
+
+  return [{ value: singleId, label: singleId }];
 };
 
 export const resolveNDTMotorCountLimit = ({
