@@ -23,6 +23,7 @@ import getAppHeaderTheme from "../../../app/theme/custom_themes/common/appHeader
 import { icons } from "../../../app/theme/icons";
 import { useThemeStore } from "../../../app/store/themeStore";
 import { STRINGS } from "../../../app/config/strings";
+import { images } from "@app/assets/images";
 import { useAuthStore } from "../../../app/store/authStore";
 import AdminDrawer from "./AppDrawer";
 import ConfirmAlertDialog from "../common/ConfirmAlertDialog";
@@ -158,7 +159,7 @@ const AppHeader = ({ title = S.DEFAULT_TITLE, onLogout, onNavSelect }) => {
               </Tooltip>
             )}
             <Box sx={t.leftSection.logoCircle}>
-              <Box component="img" src="/src/assets/images/DRDO-logo.png" alt={S.DRDO_ALT} sx={t.leftSection.logoImg} />
+              <Box component="img" src={images.drdoLogo} alt={S.DRDO_ALT} sx={t.leftSection.logoImg} />
             </Box>
             <Box sx={t.leftSection.orgWrapper}>
               <Typography sx={t.leftSection.orgName}>{S.ORG_NAME}</Typography>

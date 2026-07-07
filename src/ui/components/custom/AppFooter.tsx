@@ -4,6 +4,7 @@ import { AppBar, Toolbar, Box, Typography } from "@mui/material";
 import getAppFooterTheme from "../../../app/theme/custom_themes/common/appFooter_theme";
 import { useThemeStore } from "../../../app/store/themeStore";
 import { STRINGS }       from "../../../app/config/strings";
+import { images } from "@app/assets/images";
 
 const S = STRINGS.APP_FOOTER; // shorthand
 
@@ -40,11 +41,7 @@ const AppFooter = () => {
           {/* ── Right: BEL Logo ── */}
           <Box sx={t.belLogo.wrapper}>
             <img
-              src={
-                mode === "dark"
-                  ? "/src/assets/images/bel_logo_dark.png"
-                  : "/src/assets/images/bel_logo_dark.png"
-              }
+              src={mode === "dark" ? images.belLogoDark : images.belLogoLight}
               alt={S.BEL_ALT}
               style={t.belLogo.img as React.CSSProperties}
             />

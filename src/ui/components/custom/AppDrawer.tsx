@@ -10,6 +10,7 @@ import { icons }            from "../../../app/theme/icons";
 import getDrawerTheme, {
   DRAWER_NAV,
 }                           from "../../../app/theme/custom_themes/common/drawer_theme";
+import { images } from "@app/assets/images";
 
 const S = STRINGS.APP_HEADER;
 
@@ -78,7 +79,7 @@ const AdminDrawer = ({ open, onClose, onLogout }) => {
         <Box sx={t.header.logoCircle}>
           <Box
             component="img"
-            src="/src/assets/images/DRDO-logo.png"
+            src={images.drdoLogo}
             alt={S.DRDO_ALT}
             sx={t.header.logoImg}
           />

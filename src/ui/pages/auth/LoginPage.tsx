@@ -18,6 +18,7 @@ import GlobalAlert from "../../components/common/GlobalAlertSnackBar";
 import ResetPasswordForm from "./components/ResetPasswordForm";
 import { useResetPasswordForm } from "../../../hooks/auth/resetPasswordHook";
 import { useLoginForm } from "../../../hooks/auth/loginHook";
+import { images } from "@app/assets/images";
 
 const LoginPage = () => {
   const navigate = useNavigate();
@@ -57,7 +58,7 @@ const LoginPage = () => {
 
       <Box sx={t.belLogo.wrapper}>
         <img
-          src="/src/assets/images/bel_logo_dark.png"
+          src={images.belLogoDark}
           alt="BEL Logo"
           style={t.belLogo.img as React.CSSProperties}
         />
@@ -67,7 +68,7 @@ const LoginPage = () => {
         <Box sx={t.leftPanel.inner}>
           <Box sx={t.drdoLogo.wrapper}>
             <Box sx={t.drdoLogo.badge}>
-              <img src="src/assets/images/DRDO-logo.png" alt="DRDO Logo" style={t.drdoLogo.img as React.CSSProperties} />
+              <img src={images.drdoLogo} alt="DRDO Logo" style={t.drdoLogo.img as React.CSSProperties} />
             </Box>
           </Box>
           <Typography sx={t.intro_details}>{STRINGS.LOGIN_DETAILS.CLIENT_DETAILS.DEPARTMENT_NAME}</Typography>
