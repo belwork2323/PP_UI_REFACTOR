@@ -290,6 +290,7 @@ export const icons = {
     search:         SearchIcon,
     filter:         FilterListIcon,
     close:          CloseIcon,
+    refresh:        RefreshIcon,
     personOutline:  PersonOutlineIcon, 
     info:    InfoOutlinedIcon,      // empty-state + modal header
 
@@ -350,6 +351,21 @@ export const icons = {
       error:   ErrorOutlineRoundedIcon,
       info:    InfoOutlinedIcon,
     },
+  },
+
+  // ─── Project Management ─────────────────────────────────────────────────────
+  projectMgmt: {
+    add:            AddIcon,
+    search:         SearchIcon,
+    filter:         FilterListIcon,
+    close:          CloseIcon,
+    refresh:        RefreshIcon,
+    projectIcon:    AssignmentRoundedIcon,
+    emptyProject:   AssignmentRoundedIcon,
+    info:           InfoOutlinedIcon,
+    activeStatus:   CheckCircleOutlineIcon,
+    idleStatus:     BlockOutlinedIcon,
+    deleteWarn:     WarningAmberRoundedIcon,
   },
 
   approver: {

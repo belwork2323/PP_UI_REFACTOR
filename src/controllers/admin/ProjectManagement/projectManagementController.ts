@@ -1,7 +1,6 @@
 import {
   fetchAllProjects,
   fetchProjectStats,
-  fetchProjectDetails,
   createProject,
   updateProject,
   deleteProject,
@@ -40,24 +39,6 @@ export const projectManagementController = {
     try {
       const resp = await fetchProjectStats();
       return new ApiResponseModel(resp, (res) => ProjectStatsModel.fromApi(res?.data));
-    } catch (error) {
-      return new ApiResponseModel<null>(error);
-    }
-  },
-
-  /* ─────────────────────────────
-     Fetch project details with batches
-  ───────────────────────────── */
-  getProjectDetails: async (payload: any) => {
-    try {
-      const resp = await fetchProjectDetails(payload);
-      return new ApiResponseModel(resp, (res) => {
-        return {
-          project: res?.data?.project || {},
-          batches: res?.data?.batches || [],
-          pagination: res?.data?.pagination || { page: 1, limit: 10, totalRecords: 0, totalPages: 0 },
-        };
-      });
     } catch (error) {
       return new ApiResponseModel<null>(error);
     }

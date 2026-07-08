@@ -135,3 +135,55 @@ export class UpdateUserPayload {
     this.updatedBy      = updatedBy;   // { userId, username, role }
   }
 }
+
+export type UserFormState = {
+  username: string;
+  userId: string;
+  role: string;
+  subDepts: any[];
+};
+
+const UUID_REGEX =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const asUuid = (value: unknown) => {
+  const v = String(value ?? "").trim();
+  return UUID_REGEX.test(v) ? v : "";
+};
+
+export const resolveUserUuid = (user: any): string =>
+  asUuid(user?.userUUID) ||
+  asUuid(user?.user_uuid) ||
+  asUuid(user?.uuid) ||
+  asUuid(user?.id) ||
+  "";
+
+export const normalizeSubDepartmentIds = (values: any[]): number[] =>
+  Array.from(
+    new Set(
+      (values || [])
+        .map((value: any) => Number(value))
+        .filter((id: number) => Number.isFinite(id))
+    )
+  ).sort((a, b) => a - b);
+
+export const createEmptyUserFormState = (): UserFormState => ({
+  username: "",
+  userId: "",
+  role: "",
+  subDepts: [],
+});
+
+export const mapUserToFormState = (user: any): UserFormState => ({
+  username: user?.username || "",
+  userId: user?.userId || "",
+  role: user?.role?.roleName || user?.role || "",
+  subDepts: Array.isArray(user?.subDepartments) ? user.subDepartments : [],
+});
+
+export const mapUserDetailsToFormState = (details: any, fallbackUser?: any): UserFormState => ({
+  username: details?.username || "",
+  userId: (details?.userId || fallbackUser?.userId || "") as string,
+  role: details?.role || "",
+  subDepts: Array.isArray(details?.subDepartments) ? details.subDepartments : [],
+});

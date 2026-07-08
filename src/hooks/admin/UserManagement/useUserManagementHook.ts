@@ -3,35 +3,17 @@ import { userManagementController } from "@controllers/admin/UserManagement/user
 import { generalController } from "@controllers/admin/common/generalController";
 import { useAlertStore } from "@app/store/alertStore";
 import { STRINGS } from "@app/config/strings";
+import {
+  createEmptyUserFormState,
+  mapUserToFormState,
+  mapUserDetailsToFormState,
+  normalizeSubDepartmentIds,
+  resolveUserUuid,
+} from "@data/models/admin/UserManagement/UserManagementModel";
 
-const EMPTY_FORM = { username: "", userId: "", role: "", subDepts: [] };
+const S = STRINGS.USER_MANAGEMENT;
 
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-
-const asUuid = (value: any) => {
-  const v = String(value ?? "").trim();
-  return UUID_REGEX.test(v) ? v : "";
-};
-
-const getUserUUID = (user: any) =>
-  asUuid(user?.userUUID) ||
-  asUuid(user?.user_uuid) ||
-  asUuid(user?.uuid) ||
-  asUuid(user?.id) ||
-  "";
-
-const normalizeIds = (values: any[]) =>
-  Array.from(
-    new Set(
-      (values || [])
-        .map((value: any) => Number(value))
-        .filter((id: number) => Number.isFinite(id))
-    )
-  ).sort((a, b) => a - b);
-
-export default function useUserManagementHook() {
-  /* ── Lookups ──────────────────────────────────────────────────────────── */
+function useUserLookupsSection() {
   const [departments, setDepartments] = useState<any[]>([]);
   const [allSubDepts, setAllSubDepts] = useState<any[]>([]);
   const [roles, setRoles] = useState<any[]>([]);
@@ -47,7 +29,7 @@ export default function useUserManagementHook() {
       setAllSubDepts(s?.data || []);
       setRoles(r?.data || []);
     } catch (err) {
-      console.error(STRINGS.USER_MANAGEMENT.ERRORS.LOAD_LOOKUPS_FAILED, err);
+      console.error(S.ERRORS.LOAD_LOOKUPS_FAILED, err);
     }
   }, []);
 
@@ -58,13 +40,21 @@ export default function useUserManagementHook() {
   const deptNames = departments.map((d: any) => d.departmentName);
   const roleNames = roles.map((r: any) => r.roleName);
 
-  /* ── List ─────────────────────────────────────────────────────────────── */
+  return { departments, allSubDepts, roles, deptNames, roleNames };
+}
+
+const DEFAULT_USER_FILTERS = {
+  role: "All",
+  dept: "All",
+  status: "All",
+};
+
+function useUserListSection() {
   const [users, setUsers] = useState<any[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filterRole, setFilterRole] = useState("All");
-  const [filterDept, setFilterDept] = useState("All");
-  const [filterStatus, setFilterStatus] = useState("All");
+  const [appliedFilters, setAppliedFilters] = useState(DEFAULT_USER_FILTERS);
+  const [draftFilters, setDraftFilters] = useState(DEFAULT_USER_FILTERS);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -75,9 +65,9 @@ export default function useUserManagementHook() {
     try {
       const payload = {
         search: search.trim(),
-        role: filterRole,
-        department: filterDept,
-        status: filterStatus,
+        role: appliedFilters.role,
+        department: appliedFilters.dept,
+        status: appliedFilters.status,
         page: page + 1,
         pageSize: rowsPerPage,
       };
@@ -94,26 +84,65 @@ export default function useUserManagementHook() {
         setPaginationData({ totalRecords: 0, totalPages: 0 });
       }
     } catch (err) {
-      console.error(STRINGS.USER_MANAGEMENT.ERRORS.LOAD_LIST_FAILED, err);
+      console.error(S.ERRORS.LOAD_LIST_FAILED, err);
     } finally {
       setListLoading(false);
     }
-  }, [search, filterRole, filterDept, filterStatus, page, rowsPerPage]);
+  }, [search, appliedFilters, page, rowsPerPage]);
 
   useEffect(() => {
     void loadUsersList();
   }, [loadUsersList]);
 
-  const activeFilters = [filterRole, filterDept, filterStatus].filter((v) => v !== "All").length;
+  const activeFilterCount = Object.values(appliedFilters).filter((v) => v !== "All").length;
 
-  const handleClearFilters = () => {
-    setFilterRole("All");
-    setFilterDept("All");
-    setFilterStatus("All");
+  const setDraftFilter = (field: keyof typeof DEFAULT_USER_FILTERS, value: string) => {
+    setDraftFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const toggleFilterOpen = () => {
+    setFilterOpen((prev) => {
+      if (!prev) setDraftFilters({ ...appliedFilters });
+      return !prev;
+    });
+  };
+
+  const applyFilters = () => {
+    setAppliedFilters({ ...draftFilters });
+    setFilterOpen(false);
     setPage(0);
   };
 
-  /* ── Stats ────────────────────────────────────────────────────────────── */
+  const clearFilters = () => {
+    setDraftFilters(DEFAULT_USER_FILTERS);
+    setAppliedFilters(DEFAULT_USER_FILTERS);
+    setPage(0);
+  };
+
+  return {
+    users,
+    loading: listLoading,
+    search,
+    setSearch,
+    appliedFilters,
+    draftFilters,
+    setDraftFilter,
+    page,
+    setPage,
+    rowsPerPage,
+    setRowsPerPage,
+    filterOpen,
+    setFilterOpen,
+    toggleFilterOpen,
+    applyFilters,
+    activeFilterCount,
+    clearFilters,
+    paginationData,
+    loadUsersList,
+  };
+}
+
+function useUserStatsSection() {
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
@@ -135,7 +164,7 @@ export default function useUserManagementHook() {
         });
       }
     } catch (err) {
-      console.error(STRINGS.USER_MANAGEMENT.ERRORS.LOAD_STATS_FAILED, err);
+      console.error(S.ERRORS.LOAD_STATS_FAILED, err);
     } finally {
       setStatsLoading(false);
     }
@@ -145,56 +174,41 @@ export default function useUserManagementHook() {
     void loadStats();
   }, [loadStats]);
 
-  const refreshAll = useCallback(() => {
-    void loadUsersList();
-    void loadStats();
-  }, [loadUsersList, loadStats]);
+  return { stats, loading: statsLoading, loadStats };
+}
 
-  /* ── Form / delete actions ────────────────────────────────────────────── */
+function useUserFormSection(roles: any[], onRefresh: () => void) {
   const [modalOpen, setModalOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<any>(null);
-  const [deleteTarget, setDeleteTarget] = useState<any>(null);
-  const [form, setForm] = useState(EMPTY_FORM);
+  const [form, setForm] = useState(createEmptyUserFormState());
   const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
 
   const openCreate = () => {
     setEditTarget(null);
-    setForm(EMPTY_FORM);
+    setForm(createEmptyUserFormState());
     setModalOpen(true);
   };
 
   const openEdit = async (user: any) => {
-    const userUUID = getUserUUID(user);
+    const userUUID = resolveUserUuid(user);
 
     setSaving(true);
     setModalOpen(true);
-    setForm({
-      username: user.username || "",
-      userId: user.userId || "",
-      role: user.role?.roleName || user.role || "",
-      subDepts: Array.isArray(user.subDepartments) ? user.subDepartments : [],
-    });
+    setForm(mapUserToFormState(user));
 
     try {
       const resp = await userManagementController.getUserById(userUUID);
       if (resp?.success && resp.data) {
-        const resolvedUUID = getUserUUID(resp.data) || userUUID;
+        const resolvedUUID = resolveUserUuid(resp.data) || userUUID;
         setEditTarget({
           ...resp.data,
           userUUID: resolvedUUID,
           user_uuid: resolvedUUID,
         });
-        setForm({
-          username: resp.data.username || "",
-          userId: (resp.data.userId || user.userId || "") as string,
-          role: resp.data.role || "",
-          subDepts: Array.isArray(resp.data.subDepartments) ? resp.data.subDepartments : [],
-        });
+        setForm(mapUserDetailsToFormState(resp.data, user));
       } else {
         useAlertStore.getState().showAlert(
-          resp?.message || STRINGS.USER_MANAGEMENT.MESSAGES.LOAD_USER_FAILED,
+          resp?.message || S.MESSAGES.LOAD_USER_FAILED,
           "error"
         );
         setModalOpen(false);
@@ -204,42 +218,33 @@ export default function useUserManagementHook() {
     }
   };
 
-  const openDelete = (user: any) => {
-    setDeleteTarget(user);
-    setDeleteOpen(true);
-  };
-
   const handleSave = async () => {
     const trimmedUsername = form.username?.trim() || "";
     if (!editTarget && (!trimmedUsername || !form.role || !form.userId?.trim())) return;
 
     setSaving(true);
-    useAlertStore.getState().showAlert(STRINGS.USER_MANAGEMENT.MESSAGES.SAVING_USER, "info", { loading: true });
+    useAlertStore.getState().showAlert(S.MESSAGES.SAVING_USER, "info", { loading: true });
 
     const selectedRoleObj = roles.find((r) => r.roleName === form.role);
     if (!editTarget && !selectedRoleObj?.roleId) {
-      useAlertStore.getState().showAlert(STRINGS.USER_MANAGEMENT.MESSAGES.OPERATION_FAILED, "error", {
-        autoCloseMs: 3000,
-      });
+      useAlertStore.getState().showAlert(S.MESSAGES.OPERATION_FAILED, "error", { autoCloseMs: 3000 });
       setSaving(false);
       return;
     }
 
-    const subDepartmentIds = normalizeIds(form.subDepts.map((sd: any) => sd?.subDepartmentId));
+    const subDepartmentIds = normalizeSubDepartmentIds(form.subDepts.map((sd: any) => sd?.subDepartmentId));
     let resp;
 
     if (editTarget) {
-      const updatePayload: any = { user_uuid: getUserUUID(editTarget) };
+      const updatePayload: any = { user_uuid: resolveUserUuid(editTarget) };
       if (!updatePayload.user_uuid) {
-        useAlertStore.getState().showAlert(STRINGS.USER_MANAGEMENT.MESSAGES.UUID_RESOLVE_FAILED, "error", {
-          autoCloseMs: 3000,
-        });
+        useAlertStore.getState().showAlert(S.MESSAGES.UUID_RESOLVE_FAILED, "error", { autoCloseMs: 3000 });
         setSaving(false);
         return;
       }
 
       const originalUsername = String(editTarget?.username || "").trim();
-      const originalSubDepartmentIds = normalizeIds(
+      const originalSubDepartmentIds = normalizeSubDepartmentIds(
         Array.isArray(editTarget?.subDepartments)
           ? editTarget.subDepartments.map((sd: any) => sd?.subDepartmentId)
           : []
@@ -255,7 +260,7 @@ export default function useUserManagementHook() {
         updatePayload.subDepartmentIds = subDepartmentIds;
       }
       if (!updatePayload.username && !updatePayload.subDepartmentIds) {
-        useAlertStore.getState().showAlert(STRINGS.USER_MANAGEMENT.MESSAGES.NO_CHANGES, "info", { autoCloseMs: 2000 });
+        useAlertStore.getState().showAlert(S.MESSAGES.NO_CHANGES, "info", { autoCloseMs: 2000 });
         setSaving(false);
         return;
       }
@@ -270,52 +275,15 @@ export default function useUserManagementHook() {
     }
 
     if (resp?.success) {
-      useAlertStore.getState().showAlert(
-        resp.message || STRINGS.USER_MANAGEMENT.MESSAGES.SAVE_SUCCESS,
-        "success",
-        { autoCloseMs: 2000 }
-      );
+      useAlertStore.getState().showAlert(resp.message || S.MESSAGES.SAVE_SUCCESS, "success", { autoCloseMs: 2000 });
       setTimeout(() => {
-        refreshAll();
+        onRefresh();
         setModalOpen(false);
         setSaving(false);
       }, 1000);
     } else {
-      useAlertStore.getState().showAlert(
-        resp?.message || STRINGS.USER_MANAGEMENT.MESSAGES.OPERATION_FAILED,
-        "error",
-        { autoCloseMs: 3000 }
-      );
+      useAlertStore.getState().showAlert(resp?.message || S.MESSAGES.OPERATION_FAILED, "error", { autoCloseMs: 3000 });
       setSaving(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!deleteTarget) return;
-
-    setDeleting(true);
-    useAlertStore.getState().showAlert(STRINGS.USER_MANAGEMENT.MESSAGES.DELETING_USER, "info", { loading: true });
-
-    const resp = await userManagementController.deleteUser(getUserUUID(deleteTarget));
-    if (resp?.success) {
-      useAlertStore.getState().showAlert(
-        resp.message || STRINGS.USER_MANAGEMENT.MESSAGES.DELETE_SUCCESS,
-        "success",
-        { autoCloseMs: 2000 }
-      );
-      setTimeout(() => {
-        refreshAll();
-        setDeleteOpen(false);
-        setDeleteTarget(null);
-        setDeleting(false);
-      }, 1000);
-    } else {
-      useAlertStore.getState().showAlert(
-        resp?.message || STRINGS.USER_MANAGEMENT.MESSAGES.DELETE_FAILED,
-        "error",
-        { autoCloseMs: 3000 }
-      );
-      setDeleting(false);
     }
   };
 
@@ -328,60 +296,79 @@ export default function useUserManagementHook() {
   };
 
   return {
-    list: {
-      users,
-      loading: listLoading,
-      search,
-      setSearch,
-      filterRole,
-      setFilterRole,
-      filterDept,
-      setFilterDept,
-      filterStatus,
-      setFilterStatus,
-      page,
-      setPage,
-      rowsPerPage,
-      setRowsPerPage,
-      filterOpen,
-      setFilterOpen,
-      activeFilters,
-      handleClearFilters,
-      paginationData,
-      loadUsersList,
-    },
-    stats: {
-      stats,
-      loading: statsLoading,
-      loadStats,
-    },
-    lookups: {
-      departments,
-      allSubDepts,
-      roles,
-      deptNames,
-      roleNames,
-    },
-    form: {
-      modalOpen,
-      setModalOpen,
-      editTarget,
-      form,
-      saving,
-      openCreate,
-      openEdit,
-      handleSave,
-      handleFormChange,
-      handleSubDeptsChange,
-    },
-    delete: {
-      deleteOpen,
-      setDeleteOpen,
-      deleteTarget,
-      deleting,
-      openDelete,
-      handleDelete,
-    },
+    modalOpen,
+    setModalOpen,
+    editTarget,
+    form,
+    saving,
+    openCreate,
+    openEdit,
+    handleSave,
+    handleFormChange,
+    handleSubDeptsChange,
+  };
+}
+
+function useUserDeleteSection(onRefresh: () => void) {
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const openDelete = (user: any) => {
+    setDeleteTarget(user);
+    setDeleteOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+
+    setDeleting(true);
+    useAlertStore.getState().showAlert(S.MESSAGES.DELETING_USER, "info", { loading: true });
+
+    const resp = await userManagementController.deleteUser(resolveUserUuid(deleteTarget));
+    if (resp?.success) {
+      useAlertStore.getState().showAlert(resp.message || S.MESSAGES.DELETE_SUCCESS, "success", { autoCloseMs: 2000 });
+      setTimeout(() => {
+        onRefresh();
+        setDeleteOpen(false);
+        setDeleteTarget(null);
+        setDeleting(false);
+      }, 1000);
+    } else {
+      useAlertStore.getState().showAlert(resp?.message || S.MESSAGES.DELETE_FAILED, "error", { autoCloseMs: 3000 });
+      setDeleting(false);
+    }
+  };
+
+  return {
+    deleteOpen,
+    setDeleteOpen,
+    deleteTarget,
+    deleting,
+    openDelete,
+    handleDelete,
+  };
+}
+
+export default function useUserManagementHook() {
+  const lookups = useUserLookupsSection();
+  const list = useUserListSection();
+  const stats = useUserStatsSection();
+
+  const refreshAll = useCallback(() => {
+    void list.loadUsersList();
+    void stats.loadStats();
+  }, [list.loadUsersList, stats.loadStats]);
+
+  const form = useUserFormSection(lookups.roles, refreshAll);
+  const deleteSection = useUserDeleteSection(refreshAll);
+
+  return {
+    list,
+    stats,
+    lookups,
+    form,
+    delete: deleteSection,
     refresh: refreshAll,
   };
 }

@@ -29,7 +29,7 @@ import DashboardDateFilter from "../../components/custom/dashboard/DashboardDate
 import InProgressBatchesTable from "../../components/custom/dashboard/InProgressBatchesTable";
 import FilterToggleButton from "../../components/common/FilterToggleButton";
 import FilterSelect from "../../components/common/FilterSelect";
-import FilterPanelHeader from "../../components/custom/dashboard/FilterPanelHeader";
+import FilterPanelHeader from "@ui/components/common/FilterPanelHeader";
 import BatchDetailPopup from "./components/BatchDetails";
 import BatchStatusDetailsPanel from "./components/BatchStatusDetailsPanel";
 import StageStatusPanel from "./components/StageStatusPanel";

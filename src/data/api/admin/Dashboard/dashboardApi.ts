@@ -1,5 +1,5 @@
-import { post } from "../../httpClient";
-import { ADMIN_ENDPOINTS } from "../../endPoints";
+import { post } from "@data/api/httpClient";
+import { ADMIN_ENDPOINTS } from "@data/api/endPoints";
 
 /**
  * Fetch dashboard statistics with optional date filters

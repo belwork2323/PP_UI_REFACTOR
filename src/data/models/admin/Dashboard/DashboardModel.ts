@@ -1,6 +1,9 @@
 /* ─────────────────────────────────────────────────────────────────────────────
-   DASHBOARD MODELS — admin analytics API mapping (no UI/theme imports)
+   DASHBOARD MODELS — admin analytics API mapping
 ───────────────────────────────────────────────────────────────────────────── */
+
+import colors from "@app/theme/colors";
+import { icons } from "@app/theme/icons";
 
 const getApiData = (apiResponse: any) => apiResponse?.data ?? apiResponse ?? {};
 
@@ -166,3 +169,49 @@ export class DashboardModel {
     };
   }
 }
+
+const KPI_VISUALS: Record<string, { Icon: typeof icons.users }> = {
+  users: { Icon: icons.users },
+  batches: { Icon: icons.chart },
+  dispatch: { Icon: icons.Store },
+  approvals: { Icon: icons.approval },
+};
+
+export const enrichDashboardKpis = (raw: DashboardKpiStat[] = []) => {
+  const palette = colors.admin.kpiAvatar;
+  return raw.map((kpi) => {
+    const vis = KPI_VISUALS[kpi.type] ?? { Icon: icons.chart };
+    const bg = palette[kpi.type as keyof typeof palette] ?? palette.users;
+    return { ...kpi, Icon: vis.Icon, bg };
+  });
+};
+
+export type ActiveBatchesFilterInput = {
+  searchQuery: string;
+  filterStage: string;
+  filterBatchType: string;
+  filterStatus: string;
+  dateFrom: string;
+  dateTo: string;
+  currentMonthOnly: boolean;
+};
+
+export const buildActiveBatchesFilterPayload = ({
+  searchQuery,
+  filterStage,
+  filterBatchType,
+  filterStatus,
+  dateFrom,
+  dateTo,
+  currentMonthOnly,
+}: ActiveBatchesFilterInput) => ({
+  search: searchQuery.trim(),
+  stage: filterStage,
+  type: filterBatchType,
+  status: filterStatus,
+  startDate: dateFrom || null,
+  endDate: dateTo || null,
+  currentMonth: currentMonthOnly,
+  page: 1,
+  pageSize: 10,
+});

@@ -2,29 +2,122 @@ import { useState, useCallback, useEffect } from "react";
 import { projectManagementController } from "@controllers/admin/ProjectManagement/projectManagementController";
 import { useAlertStore } from "@app/store/alertStore";
 import { STRINGS } from "@app/config/strings";
+import {
+  createEmptyProjectFormState,
+  mapProjectToFormState,
+  getProjectManagementErrorMessage,
+} from "@data/models/admin/ProjectManagement/ProjectManagementModel";
 
 const S = STRINGS.PROJECT_MANAGEMENT;
-const EMPTY_FORM = { projectName: "", projectDescription: "" };
 
-const getErrorMessage = (response: any): string => {
-  if (response?.error?.details) return response.error.details;
-  if (response?.message) return response.message;
-  return S.ERRORS.OPERATION_FAILED;
+const DEFAULT_PROJECT_FILTERS = {
+  fromDate: "",
+  toDate: "",
 };
 
-export default function useProjectManagementHook() {
+function useProjectListSection() {
   const [projects, setProjects] = useState<any[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [sortBy, setSortBy] = useState("createdOn");
-  const [sortOrder, setSortOrder] = useState("desc");
+  const [appliedFilters, setAppliedFilters] = useState(DEFAULT_PROJECT_FILTERS);
+  const [draftFilters, setDraftFilters] = useState(DEFAULT_PROJECT_FILTERS);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [filterOpen, setFilterOpen] = useState(false);
   const [paginationData, setPaginationData] = useState({ totalRecords: 0, totalPages: 0 });
 
+  const loadProjectsList = useCallback(async () => {
+    setListLoading(true);
+    try {
+      const payload = {
+        search: search.trim() || undefined,
+        fromDate: appliedFilters.fromDate || undefined,
+        toDate: appliedFilters.toDate || undefined,
+        sortBy: "createdOn",
+        sortOrder: "desc",
+        page: page + 1,
+        limit: rowsPerPage,
+      };
+      const resp = await projectManagementController.getAllProjects(payload);
+      if (resp?.success) {
+        setProjects(resp.data?.projects || []);
+        setPaginationData({
+          totalRecords: resp.data?.pagination?.totalRecords || 0,
+          totalPages: resp.data?.pagination?.totalPages || 0,
+        });
+      } else {
+        setProjects([]);
+        setPaginationData({ totalRecords: 0, totalPages: 0 });
+        useAlertStore.getState().showAlert(
+          getProjectManagementErrorMessage(resp, S.ERRORS.OPERATION_FAILED),
+          "error"
+        );
+      }
+    } catch (err: any) {
+      setProjects([]);
+      setPaginationData({ totalRecords: 0, totalPages: 0 });
+      useAlertStore.getState().showAlert(
+        getProjectManagementErrorMessage(err?.response?.data, S.ERRORS.OPERATION_FAILED),
+        "error"
+      );
+    } finally {
+      setListLoading(false);
+    }
+  }, [search, appliedFilters, page, rowsPerPage]);
+
+  useEffect(() => {
+    void loadProjectsList();
+  }, [loadProjectsList]);
+
+  const activeFilterCount = [appliedFilters.fromDate, appliedFilters.toDate].filter((v) => v && v.trim()).length;
+
+  const setDraftFilter = (field: keyof typeof DEFAULT_PROJECT_FILTERS, value: string) => {
+    setDraftFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const toggleFilterOpen = () => {
+    setFilterOpen((prev) => {
+      if (!prev) setDraftFilters({ ...appliedFilters });
+      return !prev;
+    });
+  };
+
+  const applyFilters = () => {
+    setAppliedFilters({ ...draftFilters });
+    setFilterOpen(false);
+    setPage(0);
+  };
+
+  const clearFilters = () => {
+    setDraftFilters(DEFAULT_PROJECT_FILTERS);
+    setAppliedFilters(DEFAULT_PROJECT_FILTERS);
+    setPage(0);
+  };
+
+  return {
+    projects,
+    loading: listLoading,
+    search,
+    setSearch,
+    appliedFilters,
+    draftFilters,
+    setDraftFilter,
+    page,
+    setPage,
+    rowsPerPage,
+    setRowsPerPage,
+    filterOpen,
+    setFilterOpen,
+    toggleFilterOpen,
+    applyFilters,
+    activeFilterCount,
+    clearFilters,
+    paginationData,
+    loadProjectsList,
+  };
+}
+
+function useProjectStatsSection() {
   const [stats, setStats] = useState({
     totalProjects: 0,
     projectsCreatedToday: 0,
@@ -33,14 +126,6 @@ export default function useProjectManagementHook() {
     idleProjects: 0,
   });
   const [statsLoading, setStatsLoading] = useState(true);
-
-  const [modalOpen, setModalOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
-  const [editTarget, setEditTarget] = useState<any>(null);
-  const [deleteTarget, setDeleteTarget] = useState<any>(null);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [form, setForm] = useState(EMPTY_FORM);
 
   const loadStats = useCallback(async () => {
     setStatsLoading(true);
@@ -62,65 +147,21 @@ export default function useProjectManagementHook() {
     }
   }, []);
 
-  const loadProjectsList = useCallback(async () => {
-    setListLoading(true);
-    try {
-      const payload = {
-        search: search.trim() || undefined,
-        fromDate: fromDate || undefined,
-        toDate: toDate || undefined,
-        sortBy,
-        sortOrder,
-        page: page + 1,
-        limit: rowsPerPage,
-      };
-      const resp = await projectManagementController.getAllProjects(payload);
-      if (resp?.success) {
-        setProjects(resp.data?.projects || []);
-        setPaginationData({
-          totalRecords: resp.data?.pagination?.totalRecords || 0,
-          totalPages: resp.data?.pagination?.totalPages || 0,
-        });
-      } else {
-        setProjects([]);
-        setPaginationData({ totalRecords: 0, totalPages: 0 });
-        useAlertStore.getState().showAlert(getErrorMessage(resp), "error");
-      }
-    } catch (err: any) {
-      setProjects([]);
-      setPaginationData({ totalRecords: 0, totalPages: 0 });
-      useAlertStore.getState().showAlert(getErrorMessage(err?.response?.data), "error");
-    } finally {
-      setListLoading(false);
-    }
-  }, [search, fromDate, toDate, sortBy, sortOrder, page, rowsPerPage]);
-
-  const refresh = useCallback(() => {
-    void loadProjectsList();
-    void loadStats();
-  }, [loadProjectsList, loadStats]);
-
   useEffect(() => {
     void loadStats();
   }, [loadStats]);
 
-  useEffect(() => {
-    void loadProjectsList();
-  }, [loadProjectsList]);
+  return { stats, loading: statsLoading, loadStats };
+}
 
-  const activeFilters = [search, fromDate, toDate].filter((v) => v && v.trim()).length;
-
-  const handleClearFilters = useCallback(() => {
-    setSearch("");
-    setFromDate("");
-    setToDate("");
-    setSortBy("createdOn");
-    setSortOrder("desc");
-    setPage(0);
-  }, []);
+function useProjectFormSection(onRefresh: () => void) {
+  const [modalOpen, setModalOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<any>(null);
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState(createEmptyProjectFormState());
 
   const resetForm = useCallback(() => {
-    setForm(EMPTY_FORM);
+    setForm(createEmptyProjectFormState());
     setEditTarget(null);
   }, []);
 
@@ -131,16 +172,8 @@ export default function useProjectManagementHook() {
 
   const openEdit = useCallback((project: any) => {
     setEditTarget(project);
-    setForm({
-      projectName: project.projectName || "",
-      projectDescription: project.projectDescription || "",
-    });
+    setForm(mapProjectToFormState(project));
     setModalOpen(true);
-  }, []);
-
-  const openDelete = useCallback((project: any) => {
-    setDeleteTarget(project);
-    setDeleteOpen(true);
   }, []);
 
   const handleFormChange = useCallback((field: string, value: any) => {
@@ -173,16 +206,48 @@ export default function useProjectManagementHook() {
         );
         setModalOpen(false);
         resetForm();
-        refresh();
+        onRefresh();
       } else {
-        useAlertStore.getState().showAlert(getErrorMessage(resp), "error", { autoCloseMs: 3000 });
+        useAlertStore.getState().showAlert(
+          getProjectManagementErrorMessage(resp, S.ERRORS.OPERATION_FAILED),
+          "error",
+          { autoCloseMs: 3000 }
+        );
       }
     } catch (error: any) {
-      useAlertStore.getState().showAlert(getErrorMessage(error?.response?.data), "error", { autoCloseMs: 3000 });
+      useAlertStore.getState().showAlert(
+        getProjectManagementErrorMessage(error?.response?.data, S.ERRORS.OPERATION_FAILED),
+        "error",
+        { autoCloseMs: 3000 }
+      );
     } finally {
       setSaving(false);
     }
-  }, [editTarget, form, refresh, resetForm]);
+  }, [editTarget, form, onRefresh, resetForm]);
+
+  return {
+    modalOpen,
+    setModalOpen,
+    editTarget,
+    form,
+    saving,
+    openCreate,
+    openEdit,
+    handleFormChange,
+    handleSave,
+    resetForm,
+  };
+}
+
+function useProjectDeleteSection(onRefresh: () => void) {
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const openDelete = useCallback((project: any) => {
+    setDeleteTarget(project);
+    setDeleteOpen(true);
+  }, []);
 
   const handleDelete = useCallback(async () => {
     const projectId = String(deleteTarget?.projectId ?? "").trim();
@@ -200,63 +265,52 @@ export default function useProjectManagementHook() {
         useAlertStore.getState().showAlert(resp.message || S.MESSAGES.DELETE_SUCCESS, "success", { autoCloseMs: 2000 });
         setDeleteOpen(false);
         setDeleteTarget(null);
-        refresh();
+        onRefresh();
       } else {
-        useAlertStore.getState().showAlert(getErrorMessage(resp), "error", { autoCloseMs: 3000 });
+        useAlertStore.getState().showAlert(
+          getProjectManagementErrorMessage(resp, S.ERRORS.OPERATION_FAILED),
+          "error",
+          { autoCloseMs: 3000 }
+        );
       }
     } catch (error: any) {
-      useAlertStore.getState().showAlert(getErrorMessage(error?.response?.data), "error", { autoCloseMs: 3000 });
+      useAlertStore.getState().showAlert(
+        getProjectManagementErrorMessage(error?.response?.data, S.ERRORS.OPERATION_FAILED),
+        "error",
+        { autoCloseMs: 3000 }
+      );
     } finally {
       setDeleting(false);
     }
-  }, [deleteTarget, refresh]);
+  }, [deleteTarget, onRefresh]);
 
   return {
-    list: {
-      projects,
-      loading: listLoading,
-      search,
-      setSearch,
-      fromDate,
-      setFromDate,
-      toDate,
-      setToDate,
-      sortBy,
-      setSortBy,
-      sortOrder,
-      setSortOrder,
-      page,
-      setPage,
-      rowsPerPage,
-      setRowsPerPage,
-      filterOpen,
-      setFilterOpen,
-      activeFilters,
-      handleClearFilters,
-      paginationData,
-      loadProjectsList,
-    },
-    stats: { stats, loading: statsLoading, loadStats },
-    form: {
-      modalOpen,
-      setModalOpen,
-      editTarget,
-      form,
-      saving,
-      openCreate,
-      openEdit,
-      handleFormChange,
-      handleSave,
-      resetForm,
-    },
-    delete: {
-      deleteOpen,
-      setDeleteOpen,
-      deleteTarget,
-      deleting,
-      openDelete,
-      handleDelete,
-    },
+    deleteOpen,
+    setDeleteOpen,
+    deleteTarget,
+    deleting,
+    openDelete,
+    handleDelete,
+  };
+}
+
+export default function useProjectManagementHook() {
+  const list = useProjectListSection();
+  const stats = useProjectStatsSection();
+
+  const refresh = useCallback(() => {
+    void list.loadProjectsList();
+    void stats.loadStats();
+  }, [list.loadProjectsList, stats.loadStats]);
+
+  const form = useProjectFormSection(refresh);
+  const deleteSection = useProjectDeleteSection(refresh);
+
+  return {
+    list,
+    stats,
+    form,
+    delete: deleteSection,
     refresh,
   };
 }

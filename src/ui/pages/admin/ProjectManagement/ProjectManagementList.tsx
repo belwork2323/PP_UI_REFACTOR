@@ -106,7 +106,7 @@ const ProjectManagementList = ({
       onPageChange={onPageChange}
       onRowsPerPageChange={onRowsPerPageChange}
       emptyState={{
-        icon: <icons.userMgmt.personOutline sx={t.table.emptyIcon} />,
+        icon: <icons.projectMgmt.emptyProject sx={t.table.emptyIcon} />,
         message: S.TABLE.EMPTY,
       }}
       theme={t}

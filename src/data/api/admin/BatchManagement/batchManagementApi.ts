@@ -1,5 +1,5 @@
-import { post, put, del } from "../../httpClient";
-import { BATCH_MANAGEMENT } from "../../endPoints";
+import { post, put, del } from "@data/api/httpClient";
+import { BATCH_MANAGEMENT } from "@data/api/endPoints";
 
 /* ─────────────────────────────────────────────────────────────────────────────
    BATCH STATS

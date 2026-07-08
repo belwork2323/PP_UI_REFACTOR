@@ -1,20 +1,23 @@
 import React from "react";
 import { Box, Button, Stack } from "@mui/material";
-import Input from "@ui/components/common/Input";
 import { icons } from "@app/theme/icons";
 import getUserManagementTheme from "@app/theme/custom_themes/admin/UserManagement/userManagement_theme";
 import { STRINGS } from "@app/config/strings";
+import { useThemeStore } from "@app/store/themeStore";
 import FilterSelect from "@ui/components/common/FilterSelect";
 import ConfirmAlertDialog from "@ui/components/common/ConfirmAlertDialog";
+import RefreshIconButton from "@ui/components/common/RefreshIconButton";
 import AdminManagementStatsGrid from "@ui/components/custom/admin/AdminManagementStatsGrid";
 import AdminManagementPageHeader from "@ui/components/custom/admin/AdminManagementPageHeader";
-import AdminManagementToolbar from "@ui/components/custom/admin/AdminManagementToolbar";
+import AdminListShell from "@ui/components/custom/admin/AdminListShell";
+import AdminFilterPanel from "@ui/components/custom/admin/AdminFilterPanel";
 import useUserManagementHook from "@hooks/admin/UserManagement/useUserManagementHook";
 import { getDisplayName, getUsername } from "@utils/userManagementUtils";
 import UserManagementList from "./UserManagementList";
 import CreateUserManagementForm from "./CreateUserManagementForm";
 
 const S = STRINGS.USER_MANAGEMENT;
+const AC = STRINGS.ADMIN_COMMON;
 
 const STAT_ICONS: Record<string, React.ReactNode> = {
   total: <icons.userMgmt.personOutline sx={{ fontSize: 22 }} />,
@@ -23,13 +26,10 @@ const STAT_ICONS: Record<string, React.ReactNode> = {
   reset: <icons.userMgmt.lockIcon sx={{ fontSize: 22 }} />,
 };
 
-type UserManagementPageProps = {
-  mode?: "light" | "dark";
-};
-
-const UserManagementPage = ({ mode = "light" }: UserManagementPageProps) => {
+const UserManagementPage = () => {
+  const mode = useThemeStore((s) => s.mode);
   const t = getUserManagementTheme(mode);
-  const { list, stats, lookups, form, delete: deleteSection } = useUserManagementHook();
+  const { list, stats, lookups, form, delete: deleteSection, refresh } = useUserManagementHook();
 
   const statRows = S.STATS.map((s) => ({
     ...s,
@@ -48,6 +48,9 @@ const UserManagementPage = ({ mode = "light" }: UserManagementPageProps) => {
   }));
 
   const deleteTarget = deleteSection.deleteTarget;
+  const { draftFilters } = list;
+  const total = list.paginationData.totalRecords;
+  const shown = list.users.length;
 
   return (
     <Box sx={t.page}>
@@ -70,63 +73,82 @@ const UserManagementPage = ({ mode = "light" }: UserManagementPageProps) => {
 
       <AdminManagementStatsGrid stats={statRows} theme={t} />
 
-      <AdminManagementToolbar
+      <AdminListShell
         search={list.search}
         onSearchChange={(value) => { list.setSearch(value); list.setPage(0); }}
         searchPlaceholder={S.TOOLBAR.SEARCH_PLACEHOLDER}
-        searchIcon={<icons.userMgmt.search sx={t.toolbar.searchIcon} />}
         filterOpen={list.filterOpen}
-        onFilterToggle={() => list.setFilterOpen((prev: boolean) => !prev)}
-        filtersButtonLabel={
-          list.activeFilters > 0
-            ? S.TOOLBAR.FILTERS_BUTTON_WITH_COUNT(list.activeFilters)
+        onFilterToggle={list.toggleFilterOpen}
+        activeFilterCount={list.activeFilterCount}
+        filtersToggleLabel={
+          list.activeFilterCount > 0
+            ? S.TOOLBAR.FILTERS_BUTTON_WITH_COUNT(list.activeFilterCount)
             : S.TOOLBAR.FILTERS_BUTTON
         }
-        filterContent={
-          <>
-            <FilterSelect
-              label={S.TOOLBAR.FILTER_ROLE_LABEL}
-              value={list.filterRole}
-              onChange={(e) => { list.setFilterRole(e.target.value); list.setPage(0); }}
-              options={lookups.roleNames}
-              sx={t.toolbar.filterSelect}
-            />
-            <FilterSelect
-              label={S.TOOLBAR.FILTER_DEPT_LABEL}
-              value={list.filterDept}
-              onChange={(e) => { list.setFilterDept(e.target.value); list.setPage(0); }}
-              options={lookups.deptNames}
-              sx={t.toolbar.filterSelect}
-            />
-            <FilterSelect
-              label={S.TOOLBAR.FILTER_STATUS_LABEL}
-              value={list.filterStatus}
-              onChange={(e) => { list.setFilterStatus(e.target.value); list.setPage(0); }}
-              options={S.STATUSES}
-              sx={t.toolbar.filterSelect}
-            />
-            {list.activeFilters > 0 && (
-              <Button size="small" onClick={list.handleClearFilters} sx={t.toolbar.clearButton}>
-                {S.TOOLBAR.CLEAR_ALL}
-              </Button>
-            )}
-          </>
+        resultText={AC.SHOWING_RECORDS(shown, total)}
+        loading={list.loading}
+        hasItems={list.users.length > 0}
+        emptyTitle={S.TABLE.EMPTY}
+        toolbarEnd={
+          <RefreshIconButton
+            onClick={refresh}
+            disabled={list.loading}
+            tooltip={AC.REFRESH_TOOLTIP}
+            icon={<icons.userMgmt.refresh />}
+          />
+        }
+        filterExtension={
+          <AdminFilterPanel
+            title={AC.FILTERS_TITLE}
+            activeFilterCount={list.activeFilterCount}
+            onClear={list.clearFilters}
+            clearLabel={S.TOOLBAR.CLEAR_ALL}
+            onClose={() => list.setFilterOpen(false)}
+            onApply={list.applyFilters}
+            closeLabel={AC.FILTERS_CLOSE}
+            applyLabel={AC.FILTERS_APPLY}
+            theme={t}
+          >
+            <Stack direction="row" gap={1.5} flexWrap="wrap">
+              <FilterSelect
+                label={S.TOOLBAR.FILTER_ROLE_LABEL}
+                value={draftFilters.role}
+                onChange={(e) => list.setDraftFilter("role", e.target.value)}
+                options={lookups.roleNames}
+                sx={t.filterPanel.field}
+              />
+              <FilterSelect
+                label={S.TOOLBAR.FILTER_DEPT_LABEL}
+                value={draftFilters.dept}
+                onChange={(e) => list.setDraftFilter("dept", e.target.value)}
+                options={lookups.deptNames}
+                sx={t.filterPanel.field}
+              />
+              <FilterSelect
+                label={S.TOOLBAR.FILTER_STATUS_LABEL}
+                value={draftFilters.status}
+                onChange={(e) => list.setDraftFilter("status", e.target.value)}
+                options={S.STATUSES}
+                sx={t.filterPanel.field}
+              />
+            </Stack>
+          </AdminFilterPanel>
         }
         theme={t}
-      />
-
-      <UserManagementList
-        paginated={list.users}
-        loading={list.loading}
-        page={list.page}
-        totalCount={list.paginationData.totalRecords}
-        rowsPerPage={list.rowsPerPage}
-        t={t}
-        onEdit={form.openEdit}
-        onDelete={deleteSection.openDelete}
-        onPageChange={(_, p) => list.setPage(p)}
-        onRowsPerPageChange={(e) => { list.setRowsPerPage(+e.target.value); list.setPage(0); }}
-      />
+      >
+        <UserManagementList
+          paginated={list.users}
+          loading={list.loading}
+          page={list.page}
+          totalCount={list.paginationData.totalRecords}
+          rowsPerPage={list.rowsPerPage}
+          t={t}
+          onEdit={form.openEdit}
+          onDelete={deleteSection.openDelete}
+          onPageChange={(_, p) => list.setPage(p)}
+          onRowsPerPageChange={(e) => { list.setRowsPerPage(+e.target.value); list.setPage(0); }}
+        />
+      </AdminListShell>
 
       <CreateUserManagementForm
         open={form.modalOpen}
@@ -137,6 +159,7 @@ const UserManagementPage = ({ mode = "light" }: UserManagementPageProps) => {
         onFormChange={form.handleFormChange}
         onSubDeptsChange={form.handleSubDeptsChange}
         availableRoles={lookups.roles}
+        availableDepartments={lookups.departments}
         availableSubDepts={lookups.allSubDepts}
         saving={form.saving}
         t={t}
@@ -151,11 +174,11 @@ const UserManagementPage = ({ mode = "light" }: UserManagementPageProps) => {
             ? S.DELETE_DIALOG.BODY(getDisplayName(deleteTarget), getUsername(deleteTarget))
             : S.DELETE_DIALOG.FALLBACK_MESSAGE
         }
-        confirmLabel={deleteSection.deleting ? S.DELETE_DIALOG.DELETING : S.DELETE_DIALOG.CONFIRM}
         cancelLabel={S.DELETE_DIALOG.CANCEL}
-        confirmDisabled={deleteSection.deleting}
+        confirmLabel={deleteSection.deleting ? S.DELETE_DIALOG.DELETING : S.DELETE_DIALOG.CONFIRM}
+        onCancel={() => deleteSection.setDeleteOpen(false)}
         onConfirm={deleteSection.handleDelete}
-        onCancel={() => !deleteSection.deleting && deleteSection.setDeleteOpen(false)}
+        confirmDisabled={deleteSection.deleting}
       />
     </Box>
   );

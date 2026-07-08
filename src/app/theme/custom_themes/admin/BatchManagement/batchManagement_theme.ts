@@ -1,17 +1,18 @@
 import { alpha }  from "@mui/material";
-import { icons }  from "../../../icons";
-import colors      from "../../../colors";
-import fonts       from "../../../fonts";
-import spacing     from "../../../spacing";
-import layout      from "../../../layout";
-import general     from "../../common/common_css_theme";
-import { getSharedTheme } from "../../shared/shared_theme";
-import { getAdminCommonTheme } from "../admin_common_theme";
+import { icons }  from "@app/theme/icons";
+import colors      from "@app/theme/colors";
+import fonts       from "@app/theme/fonts";
+import spacing     from "@app/theme/spacing";
+import layout      from "@app/theme/layout";
+import general     from "@app/theme/custom_themes/common/common_css_theme";
+import { getSharedTheme } from "@app/theme/custom_themes/shared/shared_theme";
+import { getAdminCommonTheme } from "@app/theme/custom_themes/admin/admin_common_theme";
 
 const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
   const shared  = getSharedTheme(mode);
   const adminTheme = getAdminCommonTheme(mode);
   const d = colors.dashboard[mode as "light" | "dark"];
+  const semantic = adminTheme.semantic;
 
   const isDark          = mode === "dark";
   const accentBlue      = adminTheme.accentBlue;
@@ -31,8 +32,14 @@ const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
 
     pageHeader: {
       ...adminTheme.pageHeader,
+      title: { ...adminTheme.pageHeader.title, ...fonts.typography.display },
+      subtitle: { ...adminTheme.pageHeader.subtitle, ...fonts.typography.subtitle },
       newBatchButton: adminTheme.primaryButton,
     },
+
+    batchListShell: adminTheme.batchListShell,
+    filterToggle: adminTheme.filterToggle,
+    filterPanel: adminTheme.filterPanel,
 
     toolbar: adminTheme.toolbar,
 
@@ -64,7 +71,7 @@ const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
       },
       motorIdIcon: { fontSize: 13, color: d.textDisabled },
       motorIdText: {
-        fontSize:   "0.8rem",
+        fontSize:   fonts.size.base,
         fontWeight: fonts.weight.semibold,
         color:      d.textSecondary,
         fontFamily: fonts.family.monospace,
@@ -75,51 +82,51 @@ const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
         bgcolor:    sc?.bg    ?? accentBlueMuted,
         color:      sc?.color ?? accentBlue,
         fontWeight: fonts.weight.semibold,
-        fontSize:   "0.72rem",
+        fontSize:   fonts.typography.chip.fontSize,
         border:     `1px solid ${alpha(sc?.color ?? accentBlue, 0.25)}`,
         "& .MuiChip-icon": { color: sc?.color ?? accentBlue },
         height: 24,
       }),
       statusChip: (sc) => ({
-        bgcolor:    sc?.bg    ?? "rgba(107,114,128,0.10)",
-        color:      sc?.color ?? "#6b7280",
-        fontWeight: fonts.weight.semibold,
-        fontSize:   "0.72rem",
-        border:     `1px solid ${alpha(sc?.color ?? "#6b7280", 0.25)}`,
-        "& .MuiChip-icon": { color: sc?.color ?? "#6b7280" },
+        bgcolor:    sc?.bg    ?? semantic.chipFallbackBg,
+        color:      sc?.color ?? semantic.chipFallbackColor,
+        fontWeight: fonts.typography.chip.fontWeight,
+        fontSize:   fonts.typography.chip.fontSize,
+        border:     `1px solid ${alpha(sc?.color ?? semantic.chipFallbackColor, 0.25)}`,
+        "& .MuiChip-icon": { color: sc?.color ?? semantic.chipFallbackColor },
         height: 24,
       }),
       priorityChip: (pc) => ({
-        bgcolor:    pc?.bg    ?? "rgba(180,83,9,0.10)",
-        color:      pc?.color ?? "#b45309",
+        bgcolor:    pc?.bg    ?? semantic.chipFallbackBg,
+        color:      pc?.color ?? semantic.chipFallbackColor,
         fontWeight: fonts.weight.bold,
-        fontSize:   "0.70rem",
-        border:     `1px solid ${alpha(pc?.color ?? "#b45309", 0.30)}`,
+        fontSize:   fonts.typography.chipSm.fontSize,
+        border:     `1px solid ${alpha(pc?.color ?? semantic.chipFallbackColor, 0.30)}`,
         height:     22,
       }),
       deptChip: (dc) => ({
         bgcolor:    dc.bg,
         color:      dc.color,
         fontWeight: fonts.weight.semibold,
-        fontSize:   "0.72rem",
+        fontSize:   fonts.typography.chip.fontSize,
         border:     `1px solid ${alpha(dc.color, 0.25)}`,
         height:     24,
       }),
 
-      assignedAvatar: { width: 28, height: 28, fontSize: "0.7rem", fontWeight: fonts.weight.bold, flexShrink: 0 },
+      assignedAvatar: { width: 28, height: 28, fontSize: fonts.size.tight, fontWeight: fonts.weight.bold, flexShrink: 0 },
       assignedName:   { fontSize: fonts.size.sm, fontWeight: fonts.weight.semibold, color: d.textPrimary, ...general.noWrap },
       assignedEmpty:  { fontSize: fonts.size.sm, color: d.textDisabled },
 
-      notesText: { fontSize: "0.78rem", color: d.textSecondary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 180 },
-      notesEmpty: { fontSize: "0.78rem", color: d.textDisabled },
+      notesText: { ...fonts.typography.bodyMuted, color: d.textSecondary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 180 },
+      notesEmpty: { ...fonts.typography.bodyMuted, color: d.textDisabled },
 
-      createdOnDate:  { fontSize: "0.78rem", color: d.textSecondary, ...general.noWrap },
-      createdOnTime:  { fontSize: "0.7rem",  color: d.textDisabled,  ...general.noWrap, mt: 0.2 },
-      createdOnEmpty: { fontSize: "0.78rem", color: d.textDisabled },
+      createdOnDate:  { ...fonts.typography.bodyMuted, color: d.textSecondary, ...general.noWrap },
+      createdOnTime:  { fontSize: fonts.size.tight, color: d.textDisabled, ...general.noWrap, mt: 0.2 },
+      createdOnEmpty: { ...fonts.typography.bodyMuted, color: d.textDisabled },
 
       createdByIcon:     { fontSize: 12, color: d.textDisabled },
-      createdByUsername: { fontSize: "0.75rem", fontWeight: fonts.weight.semibold, color: accentBlue, fontFamily: fonts.family.monospace, ...general.noWrap },
-      createdByEmpty:    { fontSize: "0.78rem", color: d.textDisabled },
+      createdByUsername: { fontSize: fonts.size.xs, fontWeight: fonts.weight.semibold, color: accentBlue, fontFamily: fonts.family.monospace, ...general.noWrap },
+      createdByEmpty:    { ...fonts.typography.bodyMuted, color: d.textDisabled },
 
       editButton: {
         color:        accentBlue,
@@ -142,50 +149,7 @@ const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
     },
 
     modal: {
-      maxWidth: false,
-      paper: {
-        bgcolor:       d.cardBg,
-        borderRadius:  layout.cardBorderRadius,
-        border:        `1px solid ${d.cardBorder}`,
-        boxShadow:     isDark ? "0 24px 80px rgba(0,0,0,0.70)" : colors.shadow.card,
-        width:         "75vw",
-        maxWidth:      "75vw",
-        height:        "80vh",
-        maxHeight:     "80vh",
-        display:       "flex",
-        flexDirection: "column",
-      },
-      header: {
-        wrapper: {
-          ...general.flexRow,
-          alignItems:     "center",
-          justifyContent: "space-between",
-          px:             spacing.lg,
-          py:             2.5,
-          background:     `linear-gradient(135deg, ${accentBlueDark} 0%, ${accentBlue} 100%)`,
-          borderRadius:   `${layout.cardBorderRadius} ${layout.cardBorderRadius} 0 0`,
-        },
-        titleRow:  { display: "flex", alignItems: "center", gap: 1.5 },
-        iconBadge: { width: 36, height: 36, borderRadius: general.borderRadius.md, bgcolor: colors.overlay.light, ...general.flexCenter },
-        icon:      { color: colors.white.text, fontSize: 20 },
-        title:     { color: colors.white.text, fontWeight: fonts.weight.bold, fontSize: fonts.size.md, lineHeight: fonts.lineHeight.tight },
-        subtitle:  { color: colors.white.textMuted, fontSize: fonts.size.xs },
-        closeButton: { color: colors.white.textMuted, "&:hover": { bgcolor: colors.overlay.lightHover } },
-      },
-      content:         { px: 6, pt: 5, pb: 3, flex: 1, overflowY: "auto" },
-      actions:         { px: 6, py: 3.5, gap: spacing.sm },
-      stackSpacing:    3,
-      fieldRowSpacing: 3,
-      headerGap:       { mt: 1, mb: 3, borderBottom: `1px solid ${d.dividerColor}`, pb: 3 },
-      fieldLabel: {
-        fontSize:      fonts.size.xs,
-        fontWeight:    fonts.weight.bold,
-        color:         d.textSecondary,
-        letterSpacing: "0.07em",
-        textTransform: "uppercase",
-        mb:            1,
-      },
-      menuItemRow:   { display: "flex", alignItems: "center", gap: 1 },
+      ...adminTheme.modal,
       projectOption: {
         display:       "flex",
         flexDirection: "column",
@@ -234,70 +198,9 @@ const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
         letterSpacing: "0.03em",
         lineHeight:    1.2,
       },
-      cancelButton:  { textTransform: "none", color: d.textSecondary, borderRadius: general.borderRadius.md, px: 2.5 },
-      saveButton: {
-        textTransform: "none",
-        fontWeight:    fonts.weight.bold,
-        borderRadius:  general.borderRadius.md,
-        px:            spacing.lg,
-        bgcolor:       accentBlue,
-        boxShadow:     `0 4px 14px ${alpha(accentBlue, 0.35)}`,
-        "&:hover":     { bgcolor: accentBlueDark },
-        "&.Mui-disabled": { bgcolor: alpha(accentBlue, 0.4), color: colors.white.text },
-      },
-      savingSpinner: { color: "inherit", mr: 1 },
     },
 
-    deleteDialog: {
-      paper: {
-        bgcolor:       d.cardBg,
-        borderRadius:  layout.cardBorderRadius,
-        border:        `1px solid ${d.cardBorder}`,
-        boxShadow:     isDark ? "0 24px 80px rgba(0,0,0,0.70)" : colors.shadow.card,
-        width:         "420px",
-        maxWidth:      "90vw",
-        display:       "flex",
-        flexDirection: "column",
-      },
-      content:   { px: spacing.lg, pt: 3.5, pb: spacing.sm, textAlign: "center" },
-      iconBadge: { width: 56, height: 56, ...general.borderCircle, bgcolor: alpha(colors.error.main, 0.12), ...general.flexCenter, mx: "auto", mb: spacing.md },
-      warnIcon:  { color: colors.error.main, fontSize: 28 },
-      title:     { fontSize: "1.05rem", fontWeight: fonts.weight.bold, color: d.textPrimary, mb: spacing.sm },
-      body:      { fontSize: fonts.size.sm, color: d.textSecondary, lineHeight: fonts.lineHeight.normal },
-      boldName:  { fontWeight: fonts.weight.bold, color: d.textPrimary },
-      actions:   { px: spacing.lg, py: 2.5, gap: spacing.sm, justifyContent: "center" },
-      cancelButton: {
-        textTransform: "none",
-        borderRadius:  general.borderRadius.md,
-        px:            spacing.lg,
-        borderColor:   inputBorder,
-        color:         d.textSecondary,
-        "&:hover":     { borderColor: d.textSecondary },
-      },
-      deleteButton: {
-        textTransform: "none",
-        fontWeight:    fonts.weight.bold,
-        borderRadius:  general.borderRadius.md,
-        px:            spacing.lg,
-        bgcolor:       colors.error.main,
-        boxShadow:     `0 4px 14px ${alpha(colors.error.main, 0.30)}`,
-        "&:hover":     { bgcolor: "#b91c1c" },
-        "&.Mui-disabled": { bgcolor: alpha(colors.error.main, 0.4), color: colors.white.text },
-      },
-      deletingSpinner: { color: "inherit", mr: 1 },
-      deleteReasonInput: {
-        mt: 2,
-        "& .MuiOutlinedInput-root": {
-          borderRadius: general.borderRadius.md,
-          "& fieldset":             { borderColor: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)" },
-          "&:hover fieldset":       { borderColor: colors.error.main },
-          "&.Mui-focused fieldset": { borderColor: colors.error.main },
-        },
-        "& .MuiInputLabel-root":             { color: d.textSecondary },
-        "& .MuiInputLabel-root.Mui-focused": { color: colors.error.main },
-        "& .MuiInputBase-input":             { color: d.textPrimary, fontSize: "0.88rem" },
-      },
-    },
+    deleteDialog: adminTheme.deleteDialog,
 
     // ─── RICH STATS GRID ─────────────────────────────────────────────────────
     statsGrid: {

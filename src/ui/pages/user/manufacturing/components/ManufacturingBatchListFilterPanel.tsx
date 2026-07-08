@@ -1,5 +1,5 @@
 import { alpha, Button, CircularProgress, MenuItem, Stack, TextField } from "@mui/material";
-import FilterPanelHeader from "../../../../components/custom/dashboard/FilterPanelHeader";
+import FilterPanelHeader from "@ui/components/common/FilterPanelHeader";
 import { STRINGS } from "../../../../../app/config/strings";
 import {
   MANUFACTURING_BATCH_TYPE_OPTIONS,

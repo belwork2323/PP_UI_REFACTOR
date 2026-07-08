@@ -1,5 +1,5 @@
-import { get, post, del } from "../../httpClient";
-import { ADMIN_ENDPOINTS } from "../../endPoints";
+import { get, post, del } from "@data/api/httpClient";
+import { ADMIN_ENDPOINTS } from "@data/api/endPoints";
 
 /**
  * Fetch all projects with pagination and filters
@@ -13,13 +13,6 @@ export const fetchAllProjects = (payload: any) =>
  */
 export const fetchProjectStats = () =>
   get(ADMIN_ENDPOINTS.PROJECT.STATS);
-
-/**
- * Fetch single project by ID with batch details and pagination
- * @param payload - { projectId, page, limit }
- */
-export const fetchProjectDetails = (payload: any) =>
-  post(ADMIN_ENDPOINTS.PROJECT.DETAILS, payload);
 
 /**
  * Create new project

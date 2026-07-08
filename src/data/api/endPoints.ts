@@ -37,7 +37,6 @@ export const ADMIN_ENDPOINTS = {
   PROJECT: {
     LIST: `${API_BASE}/admin/project/list`,
     STATS: `${API_BASE}/admin/project/stats`,
-    DETAILS: `${API_BASE}/admin/project/details`,
     CREATE: `${API_BASE}/admin/project/create`,
     UPDATE: `${API_BASE}/admin/project/update`,
     DELETE: `${API_BASE}/admin/project/delete`,

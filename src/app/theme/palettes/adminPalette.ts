@@ -3,7 +3,92 @@
  * Custom theme files must reference colors.admin.*, never define literals here.
  */
 
+const STATUS_COLORS_LIGHT: Record<string, { bg: string; color: string }> = {
+  Completed:        { bg: "rgba(34,197,94,0.12)",  color: "#16a34a" },
+  "In Progress":    { bg: "rgba(59,130,246,0.12)", color: "#2563eb" },
+  "Pending Approval": { bg: "rgba(245,158,11,0.12)", color: "#d97706" },
+  Rejected:         { bg: "rgba(239,68,68,0.10)",  color: "#dc2626" },
+  Pending:          { bg: "rgba(245,158,11,0.10)", color: "#d97706" },
+  Active:           { bg: "rgba(34,197,94,0.10)",  color: "#16a34a" },
+  Inactive:         { bg: "rgba(239,68,68,0.10)",  color: "#dc2626" },
+  Suspended:        { bg: "rgba(245,158,11,0.12)", color: "#d97706" },
+  MainScale:        { bg: "rgba(59,130,246,0.10)", color: "#2563eb" },
+  SubScale:         { bg: "rgba(167,139,250,0.12)", color: "#7c3aed" },
+  Approved:         { bg: "rgba(34,197,94,0.12)",  color: "#16a34a" },
+  Dispatched:       { bg: "rgba(59,130,246,0.12)", color: "#2563eb" },
+};
+
+const STATUS_COLORS_DARK: Record<string, { bg: string; color: string }> = {
+  Completed:        { bg: "rgba(34,197,94,0.15)",  color: "#22c55e" },
+  "In Progress":    { bg: "rgba(59,130,246,0.15)", color: "#3b82f6" },
+  "Pending Approval": { bg: "rgba(245,158,11,0.15)", color: "#f59e0b" },
+  Rejected:         { bg: "rgba(239,68,68,0.12)",  color: "#ef4444" },
+  Pending:          { bg: "rgba(245,158,11,0.12)", color: "#f59e0b" },
+  Active:           { bg: "rgba(34,197,94,0.12)",  color: "#22c55e" },
+  Inactive:         { bg: "rgba(239,68,68,0.12)",  color: "#ef4444" },
+  Suspended:        { bg: "rgba(245,158,11,0.15)", color: "#f59e0b" },
+  MainScale:        { bg: "rgba(59,130,246,0.15)", color: "#3b82f6" },
+  SubScale:         { bg: "rgba(167,139,250,0.15)", color: "#a78bfa" },
+  Approved:         { bg: "rgba(34,197,94,0.15)",  color: "#22c55e" },
+  Dispatched:       { bg: "rgba(59,130,246,0.15)", color: "#3b82f6" },
+};
+
+const PRIORITY_COLORS_LIGHT: Record<string, { bg: string; color: string }> = {
+  High:     { bg: "rgba(239,68,68,0.10)",  color: "#dc2626" },
+  Medium:   { bg: "rgba(245,158,11,0.10)", color: "#d97706" },
+  Low:      { bg: "rgba(34,197,94,0.10)",  color: "#16a34a" },
+  Critical: { bg: "rgba(220,38,38,0.12)", color: "#b91c1c" },
+};
+
+const PRIORITY_COLORS_DARK: Record<string, { bg: string; color: string }> = {
+  High:     { bg: "rgba(239,68,68,0.12)",  color: "#ef4444" },
+  Medium:   { bg: "rgba(245,158,11,0.12)", color: "#f59e0b" },
+  Low:      { bg: "rgba(34,197,94,0.12)",  color: "#22c55e" },
+  Critical: { bg: "rgba(220,38,38,0.15)", color: "#f87171" },
+};
+
 const adminPalette = {
+  statusColors: {
+    light: STATUS_COLORS_LIGHT,
+    dark: STATUS_COLORS_DARK,
+  },
+
+  priorityColors: {
+    light: PRIORITY_COLORS_LIGHT,
+    dark: PRIORITY_COLORS_DARK,
+  },
+
+  semantic: {
+    light: {
+      chipFallbackBg: "rgba(107,114,128,0.10)",
+      chipFallbackColor: "#6b7280",
+      subDeptChipBg: "rgba(71,85,105,0.08)",
+      subDeptChipColor: "#475569",
+      subDeptChipBorder: "rgba(71,85,105,0.25)",
+      filterInputBg: "#f8fafc",
+    },
+    dark: {
+      chipFallbackBg: "rgba(255,255,255,0.08)",
+      chipFallbackColor: "rgba(240,242,248,0.75)",
+      subDeptChipBg: "rgba(255,255,255,0.07)",
+      subDeptChipColor: "rgba(240,242,248,0.75)",
+      subDeptChipBorder: "rgba(255,255,255,0.12)",
+      filterInputBg: "#121212",
+    },
+  },
+
+  table: {
+    light: {
+      stripedEven: "#ffffff",
+      stripedOdd: "rgba(0,0,0,0.015)",
+      rowHover: "rgba(0,0,0,0.03)",
+    },
+    dark: {
+      stripedEven: "#1e1e1e",
+      stripedOdd: "rgba(255,255,255,0.02)",
+      rowHover: "rgba(255,255,255,0.04)",
+    },
+  },
   kpiAvatar: {
     users: "#212121",
     batches: "#1565c0",

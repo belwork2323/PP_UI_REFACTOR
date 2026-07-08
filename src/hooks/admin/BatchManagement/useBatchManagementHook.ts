@@ -5,11 +5,17 @@ import { userManagementController } from "@controllers/admin/UserManagement/user
 import { projectManagementController } from "@controllers/admin/ProjectManagement/projectManagementController";
 import { operationsController } from "@controllers/user/operationsController";
 import rawMaterialProcurementController from "@controllers/user/sourcing/rawMaterialProcurementController";
-import { parseIdentificationSheetFromApi } from "@data/models/admin/BatchManagement/BatchManagementModel";
 import {
-  toMaterialCodeNameOptions,
-  type MaterialsListItem,
-} from "@data/models/user/MaterialsListModel";
+  ADMIN_RAW_MATERIAL_SUB_DEPARTMENT_ID,
+  createEmptyBatchFormState,
+  createEmptyImplementationFormState,
+  mapBatchToFormState,
+  mapBatchToImplementationFormState,
+  normalizeMaterialCodeKey,
+  groupLotsByMaterialCode,
+  toBatchMaterialOptions,
+  type BatchMaterialOption,
+} from "@data/models/admin/BatchManagement/BatchManagementModel";
 import {
   mapLotListApiRow,
   toRawMaterialLotListApiStatus,
@@ -22,70 +28,19 @@ import { OPERATION_STATUS } from "@hooks/operationStatus";
 
 const S = STRINGS.BATCH_MANAGEMENT;
 
-export const ADMIN_RAW_MATERIAL_SUB_DEPARTMENT_ID = 1;
-
-export type BatchMaterialOption = {
-  materialCode: string;
-  materialName: string;
+const DEFAULT_BATCH_FILTERS = {
+  stage: "All",
+  status: "All",
+  priority: "All",
+  dept: "All",
 };
 
-const EMPTY_IDENTIFICATION_SHEET = {
-  date: "",
-  batchSize: 0,
-  bondingSheetNo: "",
-  mixerType: "",
-  BldgNo: "",
-  numberOfPremix: 1,
-  remarks: "",
-  materials: [] as any[],
-};
-
-const EMPTY_BATCH_FORM = {
-  batchType: "",
-  subBatchType: "",
-  projectId: "",
-  motorStage: "",
-  numberOfMotors: 1,
-  motorIds: [""],
-  priority: "Medium",
-  systemManagerId: "",
-  objective: "",
-  articles: [],
-  identificationSheet: { ...EMPTY_IDENTIFICATION_SHEET },
-};
-
-const EMPTY_IMPL_FORM = {
-  identificationSheet: { ...EMPTY_IDENTIFICATION_SHEET },
-  objective: "",
-  articles: [],
-};
-
-const normalizeMaterialsList = (items: MaterialsListItem[]): BatchMaterialOption[] =>
-  toMaterialCodeNameOptions(items);
-
-export const normalizeMaterialCodeKey = (code: string | undefined | null): string =>
-  String(code ?? "").trim().toUpperCase();
-
-const groupLotsByMaterialCode = (lots: RawMaterialLotListRow[]) => {
-  const grouped: Record<string, RawMaterialLotListRow[]> = {};
-  for (const lot of lots) {
-    const code = normalizeMaterialCodeKey(lot.materialCode);
-    if (!code) continue;
-    if (!grouped[code]) grouped[code] = [];
-    grouped[code].push(lot);
-  }
-  return grouped;
-};
-
-export default function useBatchManagementHook() {
-  /* ── List ─────────────────────────────────────────────────────────────── */
+function useBatchListSection() {
   const [batches, setBatches] = useState<any[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [filterStage, setFilterStage] = useState("All");
-  const [filterStatus, setFilterStatus] = useState("All");
-  const [filterPriority, setFilterPriority] = useState("All");
-  const [filterDept, setFilterDept] = useState("All");
+  const [appliedFilters, setAppliedFilters] = useState(DEFAULT_BATCH_FILTERS);
+  const [draftFilters, setDraftFilters] = useState(DEFAULT_BATCH_FILTERS);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(8);
   const [filterOpen, setFilterOpen] = useState(false);
@@ -96,9 +51,9 @@ export default function useBatchManagementHook() {
     try {
       const filters: Record<string, string> = {};
       if (search.trim()) filters.search = search.trim();
-      if (filterStatus !== "All") filters.status = filterStatus;
-      if (filterPriority !== "All") filters.priority = filterPriority;
-      if (filterDept !== "All") filters.department = filterDept;
+      if (appliedFilters.status !== "All") filters.status = appliedFilters.status;
+      if (appliedFilters.priority !== "All") filters.priority = appliedFilters.priority;
+      if (appliedFilters.dept !== "All") filters.department = appliedFilters.dept;
 
       const resp = await batchManagementController.getAllBatches(page + 1, rowsPerPage, filters);
       if (resp) {
@@ -113,24 +68,64 @@ export default function useBatchManagementHook() {
     } finally {
       setListLoading(false);
     }
-  }, [search, filterStatus, filterPriority, filterDept, page, rowsPerPage]);
+  }, [search, appliedFilters, page, rowsPerPage]);
 
   useEffect(() => {
     void loadBatchList();
   }, [loadBatchList]);
 
-  const activeFilters = [filterStage, filterStatus, filterPriority, filterDept]
-    .filter((v) => v !== "All").length;
+  const activeFilterCount = Object.values(appliedFilters).filter((v) => v !== "All").length;
 
-  const handleClearFilters = () => {
-    setFilterStage("All");
-    setFilterStatus("All");
-    setFilterPriority("All");
-    setFilterDept("All");
+  const setDraftFilter = (field: keyof typeof DEFAULT_BATCH_FILTERS, value: string) => {
+    setDraftFilters((prev) => ({ ...prev, [field]: value }));
+  };
+
+  const toggleFilterOpen = () => {
+    setFilterOpen((prev) => {
+      if (!prev) setDraftFilters({ ...appliedFilters });
+      return !prev;
+    });
+  };
+
+  const applyFilters = () => {
+    setAppliedFilters({ ...draftFilters });
+    setFilterOpen(false);
     setPage(0);
   };
 
-  /* ── Stats ────────────────────────────────────────────────────────────── */
+  const clearFilters = () => {
+    setDraftFilters(DEFAULT_BATCH_FILTERS);
+    setAppliedFilters(DEFAULT_BATCH_FILTERS);
+    setPage(0);
+  };
+
+  return {
+    batches,
+    loading: listLoading,
+    search,
+    setSearch: (val: string) => {
+      setSearch(val);
+      setPage(0);
+    },
+    appliedFilters,
+    draftFilters,
+    setDraftFilter,
+    page,
+    setPage,
+    rowsPerPage,
+    setRowsPerPage,
+    filterOpen,
+    setFilterOpen,
+    toggleFilterOpen,
+    applyFilters,
+    paginationData,
+    activeFilterCount,
+    clearFilters,
+    loadBatchList,
+  };
+}
+
+function useBatchStatsSection() {
   const [stats, setStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [filterType, setFilterType] = useState("month");
@@ -159,7 +154,16 @@ export default function useBatchManagementHook() {
     void fetchStats(filterType, startDate, endDate);
   };
 
-  /* ── Lookups ──────────────────────────────────────────────────────────── */
+  return {
+    stats,
+    loading: statsLoading,
+    filterType,
+    handleStatsFilterChange,
+    refreshStats,
+  };
+}
+
+function useBatchLookupsSection() {
   const [departments, setDepartments] = useState<any[]>([]);
   const [subDepts, setSubDepts] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -282,66 +286,39 @@ export default function useBatchManagementHook() {
     status: motor.status ?? "",
   }));
 
-  /* ── Form / implementation / delete actions ───────────────────────────── */
+  return {
+    departments,
+    subDepts,
+    users,
+    projects,
+    motorStages,
+    userOptions,
+    projectOptions,
+    motorStageOptions,
+    availableMotorOptions,
+    availableMotorsLoading,
+    fetchApprovedMotors,
+    clearApprovedMotors,
+    deptNames,
+    loading: lookupsLoading,
+    loadLookups,
+  };
+}
+
+function useBatchFormSection(onRefresh: () => void) {
   const [modalOpen, setModalOpen] = useState(false);
   const [implModalOpen, setImplModalOpen] = useState(false);
-  const [deleteOpen, setDeleteOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<any>(null);
   const [editImplTarget, setEditImplTarget] = useState<any>(null);
-  const [deleteTarget, setDeleteTarget] = useState<any>(null);
-  const [deleteReason, setDeleteReason] = useState("");
-  const [batchForm, setBatchForm] = useState({ ...EMPTY_BATCH_FORM });
-  const [implForm, setImplForm] = useState({ ...EMPTY_IMPL_FORM });
+  const [batchForm, setBatchForm] = useState(createEmptyBatchFormState());
+  const [implForm, setImplForm] = useState(createEmptyImplementationFormState());
   const [saving, setSaving] = useState(false);
   const [implSaving, setImplSaving] = useState(false);
   const [implViewOnly, setImplViewOnly] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
-  const refreshAll = useCallback(() => {
-    void loadBatchList();
-    const { startDate, endDate } = getDateRange(filterType);
-    void fetchStats(filterType, startDate, endDate);
-  }, [loadBatchList, filterType, fetchStats]);
-
-  const batchModelToForm = (b: any) => {
-    const motorStageRaw = b.motorStage ?? b.motorType;
-    const motorStage =
-      motorStageRaw != null && motorStageRaw !== ""
-        ? String(
-            typeof motorStageRaw === "object"
-              ? motorStageRaw.motorTypeName ?? motorStageRaw.motorStage ?? ""
-              : motorStageRaw
-          )
-        : "";
-
-    return {
-      batchType: b.batchType ?? "MAIN",
-      subBatchType: b.subBatchType ?? "",
-      projectId: b.projectId ?? "",
-      motorStage,
-      numberOfMotors: b.numberOfMotors ?? 1,
-      motorIds: Array.isArray(b.motorIds) && b.motorIds.length > 0 ? b.motorIds : [""],
-      priority: b.priority ?? "Medium",
-      systemManagerId: b.systemManager?.id ?? b.systemManagerId ?? "",
-      objective: b.objective ?? "",
-      articles: Array.isArray(b.articles) ? b.articles : [],
-      identificationSheet: b.identificationSheet
-        ? parseIdentificationSheetFromApi(b.identificationSheet)
-        : { ...EMPTY_IDENTIFICATION_SHEET },
-    };
-  };
-
-  const implModelToForm = (b: any) => ({
-    identificationSheet: b.identificationSheet
-      ? parseIdentificationSheetFromApi(b.identificationSheet)
-      : { ...EMPTY_IDENTIFICATION_SHEET },
-    objective: b.objective ?? "",
-    articles: Array.isArray(b.articles) ? b.articles : [],
-  });
 
   const openCreate = () => {
     setEditTarget(null);
-    setBatchForm({ ...EMPTY_BATCH_FORM });
+    setBatchForm(createEmptyBatchFormState());
     setModalOpen(true);
   };
 
@@ -349,13 +326,13 @@ export default function useBatchManagementHook() {
     setSaving(true);
     setModalOpen(true);
     setEditTarget(batch);
-    setBatchForm(batchModelToForm(batch));
+    setBatchForm(mapBatchToFormState(batch));
 
     try {
       const resp = await batchManagementController.getBatchById(batch.batchId);
       if (resp) {
         setEditTarget(resp);
-        setBatchForm(batchModelToForm(resp));
+        setBatchForm(mapBatchToFormState(resp));
       } else {
         useAlertStore.getState().showAlert(S.MESSAGES.LOAD_BATCH_FAILED, "error");
         setModalOpen(false);
@@ -370,13 +347,13 @@ export default function useBatchManagementHook() {
     setImplSaving(true);
     setImplModalOpen(true);
     setEditImplTarget(batch);
-    setImplForm(implModelToForm(batch));
+    setImplForm(mapBatchToImplementationFormState(batch));
 
     try {
       const resp = await batchManagementController.getBatchById(batch.batchId);
       if (resp) {
         setEditImplTarget(resp);
-        setImplForm(implModelToForm(resp));
+        setImplForm(mapBatchToImplementationFormState(resp));
       } else {
         useAlertStore.getState().showAlert(S.MESSAGES.LOAD_BATCH_FAILED, "error");
         setImplModalOpen(false);
@@ -399,17 +376,11 @@ export default function useBatchManagementHook() {
     setImplViewOnly(false);
     setEditImplTarget(null);
     setImplForm({
-      identificationSheet: batchForm.identificationSheet ?? { ...EMPTY_IMPL_FORM.identificationSheet },
+      identificationSheet: batchForm.identificationSheet ?? createEmptyImplementationFormState().identificationSheet,
       objective: batchForm.objective ?? "",
       articles: Array.isArray(batchForm.articles) ? batchForm.articles : [],
     });
     setImplModalOpen(true);
-  };
-
-  const openDelete = (batch: any) => {
-    setDeleteTarget(batch);
-    setDeleteReason("");
-    setDeleteOpen(true);
   };
 
   const handleSaveBatch = async () => {
@@ -458,7 +429,7 @@ export default function useBatchManagementHook() {
 
     if (ok) {
       setTimeout(() => {
-        refreshAll();
+        onRefresh();
         setModalOpen(false);
         setSaving(false);
       }, 1000);
@@ -480,46 +451,25 @@ export default function useBatchManagementHook() {
       }));
       setImplModalOpen(false);
       setEditImplTarget(null);
-      setImplForm({ ...EMPTY_IMPL_FORM });
+      setImplForm(createEmptyImplementationFormState());
       setImplSaving(false);
       useAlertStore.getState().showAlert(S.MESSAGES.IMPLEMENTATION_SAVED_FOR_CREATE, "success");
       return;
     }
 
-    const fullForm = { ...batchModelToForm(editImplTarget), ...implForm };
+    const fullForm = { ...mapBatchToFormState(editImplTarget), ...implForm };
     const ok = await batchManagementController.updateBatch(editImplTarget.batchId, fullForm);
 
     if (ok) {
       setTimeout(() => {
-        refreshAll();
+        onRefresh();
         setImplModalOpen(false);
         setEditImplTarget(null);
-        setImplForm({ ...EMPTY_IMPL_FORM });
+        setImplForm(createEmptyImplementationFormState());
         setImplSaving(false);
       }, 1000);
     } else {
       setImplSaving(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!deleteTarget || !deleteReason.trim()) return;
-
-    setDeleting(true);
-    useAlertStore.getState().showAlert(S.MESSAGES.DELETING_BATCH, "info", { loading: true });
-
-    const ok = await batchManagementController.deleteBatch(deleteTarget.batchId, deleteReason.trim());
-
-    if (ok) {
-      setTimeout(() => {
-        refreshAll();
-        setDeleteOpen(false);
-        setDeleteTarget(null);
-        setDeleteReason("");
-        setDeleting(false);
-      }, 1000);
-    } else {
-      setDeleting(false);
     }
   };
 
@@ -587,7 +537,35 @@ export default function useBatchManagementHook() {
       identificationSheet: { ...prev.identificationSheet, materials },
     }));
 
-  /* ── Implementation lots ──────────────────────────────────────────────── */
+  return {
+    modalOpen,
+    setModalOpen,
+    editTarget,
+    batchForm,
+    saving,
+    openCreate,
+    openEdit,
+    handleSaveBatch,
+    handleBatchFormChange,
+    handleMotorIdsChange,
+    handleBatchMaterialsChange,
+    implModalOpen,
+    setImplModalOpen,
+    editImplTarget,
+    implForm,
+    implSaving,
+    implViewOnly,
+    setImplViewOnly,
+    openCompleteImplementation,
+    openViewImplementation,
+    openImplementationFromCreate,
+    handleSaveImplementation,
+    handleImplFormChange,
+    handleMaterialsChange,
+  };
+}
+
+function useBatchImplementationSection(implModalOpen: boolean) {
   const [materialOptions, setMaterialOptions] = useState<BatchMaterialOption[]>([]);
   const [lotsByMaterialCode, setLotsByMaterialCode] = useState<Record<string, RawMaterialLotListRow[]>>({});
   const [loadingMaterials, setLoadingMaterials] = useState(false);
@@ -598,7 +576,7 @@ export default function useBatchManagementHook() {
     try {
       const res = await operationsController.fetchAllMaterialsList();
       if (res?.success && res.data != null) {
-        setMaterialOptions(normalizeMaterialsList(res.data));
+        setMaterialOptions(toBatchMaterialOptions(res.data));
       } else {
         setMaterialOptions([]);
       }
@@ -691,102 +669,82 @@ export default function useBatchManagementHook() {
   };
 
   return {
-    list: {
-      batches,
-      loading: listLoading,
-      search,
-      setSearch: (val: string) => {
-        setSearch(val);
-        setPage(0);
-      },
-      filterStage,
-      setFilterStage,
-      filterStatus,
-      setFilterStatus,
-      filterPriority,
-      setFilterPriority,
-      filterDept,
-      setFilterDept,
-      page,
-      setPage,
-      rowsPerPage,
-      setRowsPerPage,
-      filterOpen,
-      setFilterOpen,
-      paginationData,
-      activeFilters,
-      handleClearFilters,
-      loadBatchList,
-    },
-    stats: {
-      stats,
-      loading: statsLoading,
-      filterType,
-      handleStatsFilterChange,
-      refreshStats,
-    },
-    lookups: {
-      departments,
-      subDepts,
-      users,
-      projects,
-      motorStages,
-      userOptions,
-      projectOptions,
-      motorStageOptions,
-      availableMotorOptions,
-      availableMotorsLoading,
-      fetchApprovedMotors,
-      clearApprovedMotors,
-      deptNames,
-      loading: lookupsLoading,
-      loadLookups,
-    },
-    form: {
-      modalOpen,
-      setModalOpen,
-      editTarget,
-      batchForm,
-      saving,
-      openCreate,
-      openEdit,
-      handleSaveBatch,
-      handleBatchFormChange,
-      handleMotorIdsChange,
-      handleBatchMaterialsChange,
-      implModalOpen,
-      setImplModalOpen,
-      editImplTarget,
-      implForm,
-      implSaving,
-      implViewOnly,
-      setImplViewOnly,
-      openCompleteImplementation,
-      openViewImplementation,
-      openImplementationFromCreate,
-      handleSaveImplementation,
-      handleImplFormChange,
-      handleMaterialsChange,
-    },
-    implementation: {
-      materialOptions,
-      lotsByMaterialCode,
-      loadingMaterials,
-      loadingLots,
-      getLotsForMaterial,
-      getLotByMaterialAndId,
-      getLotOptionsForRow,
-    },
-    delete: {
-      deleteOpen,
-      setDeleteOpen,
-      deleteTarget,
-      deleteReason,
-      setDeleteReason,
-      deleting,
-      openDelete,
-      handleDelete,
-    },
+    materialOptions,
+    lotsByMaterialCode,
+    loadingMaterials,
+    loadingLots,
+    getLotsForMaterial,
+    getLotByMaterialAndId,
+    getLotOptionsForRow,
+  };
+}
+
+function useBatchDeleteSection(onRefresh: () => void) {
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [deleteReason, setDeleteReason] = useState("");
+  const [deleting, setDeleting] = useState(false);
+
+  const openDelete = (batch: any) => {
+    setDeleteTarget(batch);
+    setDeleteReason("");
+    setDeleteOpen(true);
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget || !deleteReason.trim()) return;
+
+    setDeleting(true);
+    useAlertStore.getState().showAlert(S.MESSAGES.DELETING_BATCH, "info", { loading: true });
+
+    const ok = await batchManagementController.deleteBatch(deleteTarget.batchId, deleteReason.trim());
+
+    if (ok) {
+      setTimeout(() => {
+        onRefresh();
+        setDeleteOpen(false);
+        setDeleteTarget(null);
+        setDeleteReason("");
+        setDeleting(false);
+      }, 1000);
+    } else {
+      setDeleting(false);
+    }
+  };
+
+  return {
+    deleteOpen,
+    setDeleteOpen,
+    deleteTarget,
+    deleteReason,
+    setDeleteReason,
+    deleting,
+    openDelete,
+    handleDelete,
+  };
+}
+
+export default function useBatchManagementHook() {
+  const list = useBatchListSection();
+  const stats = useBatchStatsSection();
+  const lookups = useBatchLookupsSection();
+
+  const refreshAll = useCallback(() => {
+    void list.loadBatchList();
+    stats.refreshStats();
+  }, [list.loadBatchList, stats.refreshStats]);
+
+  const deleteSection = useBatchDeleteSection(refreshAll);
+  const form = useBatchFormSection(refreshAll);
+  const implementation = useBatchImplementationSection(form.implModalOpen);
+
+  return {
+    list,
+    stats,
+    lookups,
+    form,
+    implementation,
+    delete: deleteSection,
     refresh: refreshAll,
   };
 }

@@ -2078,6 +2078,16 @@ export const STRINGS = {
     },
   },
 
+  /* -------- ADMIN COMMON -------- */
+  ADMIN_COMMON: {
+    FILTERS_TITLE: "Refine list",
+    FILTERS_APPLY: "Apply filters",
+    FILTERS_CLOSE: "Close",
+    FILTERS_TOGGLE: "Filters",
+    SHOWING_RECORDS: (shown: number, total: number) => `Showing ${shown} of ${total} records`,
+    REFRESH_TOOLTIP: "Refresh Data",
+  },
+
   /* -------- ADMIN USER MANAGEMENT -------- */
   USER_MANAGEMENT: {
     PAGE: {

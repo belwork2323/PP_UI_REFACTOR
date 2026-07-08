@@ -40,7 +40,7 @@ const CreateProjectManagementForm = ({
               ? S.FORM.EDIT_SUBTITLE(form.projectName)
               : S.FORM.CREATE_SUBTITLE
           }
-          icon={<icons.userMgmt.info sx={modal.header.icon} />}
+          icon={<icons.projectMgmt.info sx={modal.header.icon} />}
           onClose={() => !saving && onClose()}
           closeDisabled={saving}
           theme={t}

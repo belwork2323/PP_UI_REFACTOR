@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Box, Typography, IconButton } from "@mui/material";
-import { icons } from "@app/theme";
+import { icons } from "@app/theme/icons";
 
 type AdminManagementFormHeaderProps = {
   icon: ReactNode;

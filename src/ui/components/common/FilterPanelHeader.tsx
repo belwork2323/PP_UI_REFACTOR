@@ -1,5 +1,5 @@
-import { Box, Typography, Chip, Stack, SxProps, Theme } from '@mui/material';
-import TuneIcon from '@mui/icons-material/Tune';
+import { Box, Typography, Chip, Stack, SxProps, Theme } from "@mui/material";
+import TuneIcon from "@mui/icons-material/Tune";
 
 interface FilterPanelHeaderProps {
   title: string;

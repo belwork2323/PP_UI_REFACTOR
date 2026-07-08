@@ -1,5 +1,5 @@
-import { get, post, put, del } from "../../httpClient";
-import { USER_MANAGEMENT } from "../../endPoints";
+import { get, post, put, del } from "@data/api/httpClient";
+import { USER_MANAGEMENT } from "@data/api/endPoints";
 
 /* ─────────────────────────────────────────
    API FUNCTIONS

@@ -42,3 +42,27 @@ export class CreateProjectPayload {
 export class UpdateProjectPayload extends CreateProjectPayload {
   projectId: string = "";
 }
+
+export type ProjectFormState = {
+  projectName: string;
+  projectDescription: string;
+};
+
+export const createEmptyProjectFormState = (): ProjectFormState => ({
+  projectName: "",
+  projectDescription: "",
+});
+
+export const mapProjectToFormState = (project: any): ProjectFormState => ({
+  projectName: project?.projectName || "",
+  projectDescription: project?.projectDescription || "",
+});
+
+export const getProjectManagementErrorMessage = (
+  response: any,
+  fallback: string
+): string => {
+  if (response?.error?.details) return response.error.details;
+  if (response?.message) return response.message;
+  return fallback;
+};

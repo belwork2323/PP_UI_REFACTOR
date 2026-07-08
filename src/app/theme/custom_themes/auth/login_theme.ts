@@ -21,7 +21,7 @@ const getLoginTheme = (mode = "light") => {
     bgcolor:      m.cardBg,
     borderRadius: layout.cardBorderRadius,
     "& .MuiInputLabel-root": {
-      fontSize:   "clamp(0.8rem, 1.6vh, 0.9rem)",
+      fontSize:   fonts.responsive.inputLabel,
       fontWeight: fonts.weight.medium,
       ...(inputLabelColor ? { color: inputLabelColor } : {}),
       "&.Mui-focused": { color: focusBorderColor },
@@ -44,7 +44,7 @@ const getLoginTheme = (mode = "light") => {
       justifyContent: "flex-start",
       height:         "100%",
       padding:        "0 14px",
-      fontSize:       "clamp(0.8rem, 1.6vh, 0.9rem)",
+      fontSize:       fonts.responsive.inputLabel,
       ...(inputTextColor ? { color: inputTextColor } : {}),
       ...general.boxSizingBorder,
     },
@@ -162,10 +162,10 @@ const getLoginTheme = (mode = "light") => {
     // ─── INTRO DETAIL LINES ───────────────────────────────────────────────────
     intro_details: {
       fontSize: {
-        xs: "clamp(0.55rem, 1.2vw, 0.65rem)",
-        sm: "clamp(0.6rem,  1.4vw, 0.7rem)",
-        md: "clamp(0.65rem, 1.6vw, 0.75rem)",
-        lg: "clamp(0.7rem,  1.8vw, 0.85rem)",
+        xs: fonts.responsive.caption,
+        sm: `clamp(0.6rem, 1.4vw, ${fonts.size.tight})`,
+        md: `clamp(0.65rem, 1.6vw, ${fonts.size.xs})`,
+        lg: `clamp(0.7rem, 1.8vw, ${fonts.size.base})`,
       },
       color:  m.textSecondary,
       mb:     { xs: spacing.xs, md: spacing.xs },
@@ -190,7 +190,7 @@ const getLoginTheme = (mode = "light") => {
     // ─── SUBTITLE ─────────────────────────────────────────────────────────────
     subtitle: {
       fontSize: {
-        xs: "0.95rem",
+        xs: fonts.size.input,
         sm: fonts.size.md,
         md: "1.1rem",
         lg: fonts.size.lg,
@@ -217,7 +217,7 @@ const getLoginTheme = (mode = "light") => {
       title: {
         fontWeight: fonts.weight.medium,
         fontSize: {
-          xs: "0.95rem",
+          xs: fonts.size.input,
           sm: fonts.size.md,
           md: "1.05rem",
           lg: fonts.size.md,
@@ -226,7 +226,7 @@ const getLoginTheme = (mode = "light") => {
         mb:    spacing.xs,
       },
       description: {
-        fontSize:   { xs: "0.85rem", sm: "0.9rem", md: "0.95rem" },
+        fontSize:   { xs: fonts.size.base, sm: fonts.size.input, md: fonts.size.input },
         color:      m.textSecondary,
         lineHeight: fonts.lineHeight.normal,
       },
@@ -302,8 +302,8 @@ const getLoginTheme = (mode = "light") => {
       },
       title: {
         fontSize: {
-          xs: `clamp(1rem,   2vh,   ${fonts.size.md})`,
-          md: `clamp(1.5rem, 2.2vh, 1.2rem)`,
+          xs: fonts.responsive.cardTitle,
+          md: `clamp(1.5rem, 2.2vh, ${fonts.size.lg})`,
         },
         fontWeight: fonts.weight.bold,
         color:      focusBorderColor,
@@ -311,7 +311,7 @@ const getLoginTheme = (mode = "light") => {
         ...general.textCenter,
       },
       subtitle: {
-        fontSize: `clamp(1rem, 1.5vh, ${fonts.size.sm})`,
+        fontSize: fonts.responsive.cardSubtitle,
         color:    m.cardAccent,
         ...general.textCenter,
       },
@@ -344,11 +344,11 @@ const getLoginTheme = (mode = "light") => {
       sx: {
         "& .MuiInputBase-root": {
           height:   "clamp(40px, 6vh, 52px)",
-          fontSize: "clamp(0.8rem, 1.6vh, 0.9rem)",
+          fontSize: fonts.responsive.inputLabel,
           ...(inputTextColor ? { color: inputTextColor } : {}),
         },
         "& .MuiInputLabel-root": {
-          fontSize: "clamp(0.8rem, 1.6vh, 0.9rem)",
+          fontSize: fonts.responsive.inputLabel,
           ...(inputLabelColor ? { color: inputLabelColor } : {}),
           "&.Mui-focused": { color: focusBorderColor },
         },
@@ -367,13 +367,13 @@ const getLoginTheme = (mode = "light") => {
     loginButton: {
       sx: {
         height:   "clamp(44px, 6.5vh, 56px)",
-        fontSize: "clamp(0.85rem, 1.6vh, 0.95rem)",
+        fontSize: fonts.responsive.button,
       },
     },
 
     // ─── FORGOT PASSWORD ──────────────────────────────────────────────────────
     forgotPassword: {
-      fontSize:  `clamp(0.78rem, 1.5vh, ${fonts.size.sm})`,
+      fontSize:  fonts.responsive.link,
       color:     focusBorderColor,
       ...general.textCenter,
       ...general.pointer,
@@ -409,7 +409,7 @@ const getLoginTheme = (mode = "light") => {
       requestButton: {
         sx: {
           height:   "clamp(44px, 6.5vh, 56px)",
-          fontSize: "clamp(0.85rem, 1.6vh, 0.95rem)",
+          fontSize: fonts.responsive.button,
           "&.Mui-disabled": { opacity: 0.55 },
         },
       },
@@ -450,7 +450,7 @@ const getLoginTheme = (mode = "light") => {
       },
       imageErrorText: {
         px:         0.5,
-        fontSize:   "clamp(0.55rem, 1vh, 0.65rem)",
+        fontSize:   fonts.responsive.captchaError,
         lineHeight: 1.3,
         ...general.textCenter,
         ...(mode === "dark" ? { color: "rgba(240,242,248,0.70)" } : {}),
@@ -477,7 +477,7 @@ const getLoginTheme = (mode = "light") => {
         },
       },
       reloadText: {
-        fontSize:   `clamp(0.62rem, 1.2vh, 0.75rem)`,
+        fontSize:   fonts.responsive.reload,
         lineHeight: 1,
         fontWeight: fonts.weight.medium,
       },
@@ -489,7 +489,7 @@ const getLoginTheme = (mode = "light") => {
           ...(inputTextColor ? { color: inputTextColor } : {}),
           "& .MuiInputBase-input": {
             height:        "clamp(40px, 6vh, 52px)",
-            fontSize:      "clamp(0.8rem, 1.6vh, 0.9rem)",
+            fontSize:      fonts.responsive.inputLabel,
             ...general.boxSizingBorder,
             letterSpacing: "0.15em",
             fontFamily:    fonts.family.monospace,
@@ -504,7 +504,7 @@ const getLoginTheme = (mode = "light") => {
         top:       "50%",
         left:      "14px",
         transform: "translateY(-50%)",
-        fontSize:  "clamp(0.8rem, 1.6vh, 0.9rem)",
+        fontSize:  fonts.responsive.inputLabel,
         ...(inputLabelColor ? { color: inputLabelColor } : {}),
         "&.MuiInputLabel-shrink": {
           top:       0,
@@ -517,7 +517,7 @@ const getLoginTheme = (mode = "light") => {
       helperText: {
         mt:         `clamp(2px, 0.4vh, 4px)`,
         pl:         "2px",
-        fontSize:   `clamp(0.65rem, 1.2vh, ${fonts.size.xs})`,
+        fontSize: fonts.responsive.caption,
         lineHeight: fonts.lineHeight.normal,
         minHeight:  "1.1em",
         ...(mode === "dark" ? { color: "rgba(240,242,248,0.55)" } : {}),

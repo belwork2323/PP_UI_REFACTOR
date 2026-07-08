@@ -3,8 +3,11 @@
    Aligned to admin batch API request / response contracts (list, details, create, update).
 ───────────────────────────────────────────────────────────────────────────── */
 
-import { icons } from "@app/theme";
+import { icons } from "@app/theme/icons";
 import { normalizeSubdepartmentBatchStatus } from "../../user/SubdepartmentBatchModel";
+import type { MaterialsListItem } from "../../user/MaterialsListModel";
+import { toMaterialCodeNameOptions } from "../../user/MaterialsListModel";
+import type { RawMaterialLotListRow } from "../../user/RawMaterialProcurementModel";
 
 /** Map display / list labels to form/API enum values */
 function normalizeBatchTypeForForm(raw: string | undefined | null): string {
@@ -454,3 +457,118 @@ export class BatchStatsModel {
     return num.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",");
   }
 }
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   FORM STATE — hooks consume these; no mapper logic in hook files
+───────────────────────────────────────────────────────────────────────────── */
+
+export const ADMIN_RAW_MATERIAL_SUB_DEPARTMENT_ID = 1;
+
+export type BatchMaterialOption = {
+  materialCode: string;
+  materialName: string;
+};
+
+export type BatchFormState = {
+  batchType: string;
+  subBatchType: string;
+  projectId: string;
+  motorStage: string;
+  numberOfMotors: number;
+  motorIds: string[];
+  priority: string;
+  systemManagerId: string;
+  objective: string;
+  articles: any[];
+  identificationSheet: IdentificationSheet;
+};
+
+export type ImplementationFormState = {
+  identificationSheet: IdentificationSheet;
+  objective: string;
+  articles: any[];
+};
+
+const emptyIdentificationSheet = (): IdentificationSheet => ({
+  date: "",
+  batchSize: 0,
+  bondingSheetNo: "",
+  mixerType: "",
+  BldgNo: "",
+  numberOfPremix: 1,
+  remarks: "",
+  materials: [],
+});
+
+export const createEmptyBatchFormState = (): BatchFormState => ({
+  batchType: "",
+  subBatchType: "",
+  projectId: "",
+  motorStage: "",
+  numberOfMotors: 1,
+  motorIds: [""],
+  priority: "Medium",
+  systemManagerId: "",
+  objective: "",
+  articles: [],
+  identificationSheet: emptyIdentificationSheet(),
+});
+
+export const createEmptyImplementationFormState = (): ImplementationFormState => ({
+  identificationSheet: emptyIdentificationSheet(),
+  objective: "",
+  articles: [],
+});
+
+export const normalizeMaterialCodeKey = (code: string | undefined | null): string =>
+  String(code ?? "").trim().toUpperCase();
+
+export const groupLotsByMaterialCode = (lots: RawMaterialLotListRow[]) => {
+  const grouped: Record<string, RawMaterialLotListRow[]> = {};
+  for (const lot of lots) {
+    const code = normalizeMaterialCodeKey(lot.materialCode);
+    if (!code) continue;
+    if (!grouped[code]) grouped[code] = [];
+    grouped[code].push(lot);
+  }
+  return grouped;
+};
+
+export const toBatchMaterialOptions = (items: MaterialsListItem[]): BatchMaterialOption[] =>
+  toMaterialCodeNameOptions(items);
+
+export const mapBatchToFormState = (batch: any): BatchFormState => {
+  const motorStageRaw = batch?.motorStage ?? batch?.motorType;
+  const motorStage =
+    motorStageRaw != null && motorStageRaw !== ""
+      ? String(
+          typeof motorStageRaw === "object"
+            ? motorStageRaw.motorTypeName ?? motorStageRaw.motorStage ?? ""
+            : motorStageRaw
+        )
+      : "";
+
+  return {
+    batchType: batch?.batchType ?? "MAIN",
+    subBatchType: batch?.subBatchType ?? "",
+    projectId: batch?.projectId ?? "",
+    motorStage,
+    numberOfMotors: batch?.numberOfMotors ?? 1,
+    motorIds: Array.isArray(batch?.motorIds) && batch.motorIds.length > 0 ? batch.motorIds : [""],
+    priority: batch?.priority ?? "Medium",
+    systemManagerId: batch?.systemManager?.id ?? batch?.systemManagerId ?? "",
+    objective: batch?.objective ?? "",
+    articles: Array.isArray(batch?.articles) ? batch.articles : [],
+    identificationSheet: batch?.identificationSheet
+      ? parseIdentificationSheetFromApi(batch.identificationSheet)
+      : emptyIdentificationSheet(),
+  };
+};
+
+export const mapBatchToImplementationFormState = (batch: any): ImplementationFormState => ({
+  identificationSheet: batch?.identificationSheet
+    ? parseIdentificationSheetFromApi(batch.identificationSheet)
+    : emptyIdentificationSheet(),
+  objective: batch?.objective ?? "",
+  articles: Array.isArray(batch?.articles) ? batch.articles : [],
+});

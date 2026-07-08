@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { Box, Typography } from "@mui/material";
+import { Box } from "@mui/material";
+import AdminStatCard from "@ui/components/custom/admin/AdminStatCard";
 
 export type AdminManagementStatItem = {
   label: string;
@@ -45,24 +46,19 @@ const AdminManagementStatsGrid = ({ stats, theme }: AdminManagementStatsGridProp
         {stats.map((stat) => {
           const sc = statsGrid.colors[stat.variant];
           return (
-            <Box key={stat.label} sx={statsGrid.card}>
-              <Box sx={{ ...statsGrid.accentBar, background: sc?.accent }} />
-              <Box
-                sx={{
-                  ...statsGrid.iconWrap,
-                  bgcolor: sc?.iconBg,
-                  boxShadow: sc?.iconBorder ? `0 0 0 1px ${sc.iconBorder}` : undefined,
-                }}
-              >
-                <Box sx={{ color: sc?.iconColor }}>{stat.icon}</Box>
-              </Box>
-              <Box sx={statsGrid.textWrap}>
-                <Typography sx={{ ...statsGrid.value, color: sc?.value }}>{stat.value}</Typography>
-                <Typography sx={statsGrid.label}>{stat.label}</Typography>
-                <Typography sx={statsGrid.subLabel}>{stat.subLabel}</Typography>
-              </Box>
-              <Box sx={{ ...statsGrid.cornerDot, background: sc?.accent }} />
-            </Box>
+            <AdminStatCard
+              key={stat.label}
+              label={stat.label}
+              subLabel={stat.subLabel}
+              value={stat.value}
+              icon={stat.icon}
+              accent={sc?.accent ?? ""}
+              iconBg={sc?.iconBg ?? ""}
+              iconBorder={sc?.iconBorder}
+              iconColor={sc?.iconColor ?? ""}
+              valueColor={sc?.value ?? ""}
+              theme={statsGrid}
+            />
           );
         })}
       </Box>

@@ -4,15 +4,17 @@
 // Only defines tokens that are dashboard-specific: KPI cards, charts,
 // timeline, layout grids, and the dashboard-unique active-batch table styles.
 
-import colors  from "../../../colors";
-import fonts   from "../../../fonts";
-import general from "../../common/common_css_theme";
-import { getSharedTheme } from "../../shared/shared_theme";
-import getDashboardWidgetsTheme from "../../shared/dashboard_widgets_theme";
+import colors  from "@app/theme/colors";
+import fonts   from "@app/theme/fonts";
+import general from "@app/theme/custom_themes/common/common_css_theme";
+import { getSharedTheme } from "@app/theme/custom_themes/shared/shared_theme";
+import getDashboardWidgetsTheme from "@app/theme/custom_themes/shared/dashboard_widgets_theme";
+import { getAdminCommonTheme } from "@app/theme/custom_themes/admin/admin_common_theme";
 
 const getDashboardTheme = (mode: "light" | "dark" = "light") => {
   const shared  = getSharedTheme(mode);
   const widgets = getDashboardWidgetsTheme(mode);
+  const adminCommon = getAdminCommonTheme(mode);
   const s       = shared.tokens;
   const d       = colors.dashboard[mode];
   const f       = colors.admin.filters[mode];
@@ -95,6 +97,10 @@ const getDashboardTheme = (mode: "light" | "dark" = "light") => {
 
     card: cardBase,
 
+    batchListShell: adminCommon.batchListShell,
+    filterToggle: adminCommon.filterToggle,
+    filterPanel: adminCommon.filterPanel,
+
     // ── KPI card ─────────────────────────────────────────────────────────────
     kpi: widgets.kpi,
 
@@ -133,7 +139,7 @@ const getDashboardTheme = (mode: "light" | "dark" = "light") => {
           color:       raw.inputFocus,
         },
       }),
-      filterBtnText:    { fontSize: "0.72rem", fontWeight: 700, lineHeight: 1 },
+      filterBtnText:    { ...fonts.typography.label },
       filterBtnIcon:    { fontSize: 14 },
       filterBtnChevron: { fontSize: 14, ml: 0.2 },
 
@@ -145,8 +151,7 @@ const getDashboardTheme = (mode: "light" | "dark" = "light") => {
         borderRadius: "50%",
         width:        16,
         height:       16,
-        fontSize:     "0.58rem",
-        fontWeight:   700,
+        ...fonts.typography.badge,
       },
       filterBadge: {
         ...general.flexCenter,
@@ -155,10 +160,10 @@ const getDashboardTheme = (mode: "light" | "dark" = "light") => {
         borderRadius: "50%",
         width:        18,
         height:       18,
-        fontSize:     "0.6rem",
-        fontWeight:   700,
+        fontSize:     fonts.size["2xs"],
+        fontWeight:   fonts.weight.bold,
       },
-      filterBadgeSmall: { width: 16, height: 16, fontSize: "0.58rem" },
+      filterBadgeSmall: { width: 16, height: 16, fontSize: fonts.size["3xs"] },
 
       // ── Filter panel (dashboard has a gradient header bg, not the shared surfaceEl) ──
       filterPanel: {
@@ -171,10 +176,10 @@ const getDashboardTheme = (mode: "light" | "dark" = "light") => {
 
       // ── Reuse from shared ──
       filterLabel:   shared.filterLabel,
-      filterMetaText: { fontSize: "0.72rem", color: s.textDisabled, ml: 0.5 },
+      filterMetaText: { ...fonts.typography.label, color: s.textDisabled, ml: 0.5 },
       filterRow:      { direction: "row", gap: 1.5, flexWrap: "wrap", mb: 2 },
       filterDateRow:  { direction: "row", gap: 1.5, alignItems: "center", flexWrap: "wrap" },
-      filterDateSeparator: { fontSize: "0.75rem", color: s.textDisabled },
+      filterDateSeparator: { fontSize: fonts.size.xs, color: s.textDisabled },
       calendarIcon:   { fontSize: 15, color: s.textDisabled },
       searchIcon:     { fontSize: 15, color: s.textDisabled },
       clearIconBtn:   { p: 0.2,       color: s.textDisabled },
@@ -193,17 +198,22 @@ const getDashboardTheme = (mode: "light" | "dark" = "light") => {
           filter: raw.datePicker,
         },
       }),
-      dateInputProps: { style: { fontSize: "0.78rem", color: s.textPrimary } },
+      dateInputProps: { style: { fontSize: fonts.size.dense, color: s.textPrimary } },
 
       // ── Action chips ──
       clearChip: {
-        fontSize: "0.72rem", fontWeight: 600, height: 26, borderRadius: "8px",
+        ...fonts.typography.label,
+        fontWeight: fonts.weight.semibold,
+        height: 26,
+        borderRadius: "8px",
         bgcolor:  raw.clearBg,
         color:    raw.clearColor,
         border:   `1px solid ${raw.clearBorder}`,
       },
       thisMonthChip: (active) => ({
-        fontSize: "0.72rem", fontWeight: 700, height: 28, borderRadius: "8px",
+        ...fonts.typography.label,
+        height: 28,
+        borderRadius: "8px",
         bgcolor:  active ? raw.thisMonthActiveBg    : raw.chipDefaultBg,
         color:    active ? raw.thisMonthActiveColor : raw.chipDefaultColor,
         border:   `1px solid ${active ? raw.thisMonthActiveBorder : raw.border}`,
@@ -215,10 +225,7 @@ const getDashboardTheme = (mode: "light" | "dark" = "light") => {
         "& th":     { py: 1.4 },
       },
       header: {
-        fontSize:      "0.67rem",
-        fontWeight:    800,
-        letterSpacing: "0.07em",
-        textTransform: "uppercase",
+        ...fonts.typography.tableHeader,
         color:         raw.tableHeaderText,
         borderBottom:  `2px solid ${raw.border}`,
         whiteSpace:    "nowrap",
@@ -249,20 +256,20 @@ const getDashboardTheme = (mode: "light" | "dark" = "light") => {
       cellProgress:  { py: 1.2, minWidth: 130 },
 
       // ── Cell text variants ──
-      textBatchId: (color) => ({ fontWeight: 700, fontSize: "0.78rem", letterSpacing: "0.01em", color }),
-      textBase:          { fontSize: "0.76rem", color: s.textSecondary },
-      textTruncated:     { fontSize: "0.76rem", color: s.textSecondary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
-      textSmall:         { fontSize: "0.74rem", color: s.textSecondary },
-      textMuted:         { fontSize: "0.72rem", color: s.textDisabled },
-      textPrimaryStrong: { fontSize: "0.76rem", color: s.textPrimary, fontWeight: 700 },
-      subTextMuted:      { fontSize: "0.68rem", color: s.textDisabled, mt: 0.35 },
+      textBatchId: (color) => ({ fontWeight: fonts.weight.bold, fontSize: fonts.size.dense, letterSpacing: "0.01em", color }),
+      textBase:          { ...fonts.typography.table, color: s.textSecondary },
+      textTruncated:     { ...fonts.typography.table, color: s.textSecondary, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" },
+      textSmall:         { ...fonts.typography.tableMuted, color: s.textSecondary },
+      textMuted:         { fontSize: fonts.size.compact, color: s.textDisabled },
+      textPrimaryStrong: { ...fonts.typography.table, color: s.textPrimary, fontWeight: fonts.weight.bold },
+      subTextMuted:      { fontSize: fonts.size.micro, color: s.textDisabled, mt: 0.35 },
 
       // ── Chip factories — delegate to shared where possible ──
       chipSx:       shared.chip,
       statusChipSx: (status) => {
         const isActive = String(status).toLowerCase() === "active";
         return {
-          fontSize: "0.62rem", height: 22, borderRadius: "999px", fontWeight: 800,
+          fontSize: fonts.size["2xs"], height: 22, borderRadius: "999px", fontWeight: fonts.weight.extrabold,
           bgcolor:  isActive ? raw.statusActiveBg    : raw.statusDefaultBg,
           color:    isActive ? raw.statusActiveColor : raw.statusDefaultColor,
           border:   `1px solid ${isActive ? raw.statusActiveColor : raw.border}`,
@@ -306,12 +313,12 @@ const getDashboardTheme = (mode: "light" | "dark" = "light") => {
       sectionMetaBold:  shared.sectionMetaBold,
       sectionMetaMuted: shared.sectionMeta,
       avatarSx: (color) => ({
-        width: 32, height: 32, fontSize: "0.75rem", fontWeight: 700,
+        width: 32, height: 32, fontSize: fonts.size.xs, fontWeight: fonts.weight.bold,
         flexShrink: 0, zIndex: 1, bgcolor: color,
       }),
       loadingOverlay: widgets.loadingOverlay,
-      eventChip: { ml: 1, fontSize: "0.65rem", height: 20 },
-      deptLabel: { fontSize: "0.7rem", color: s.textSecondary },
+      eventChip: { ml: 1, fontSize: fonts.size.micro, height: 20 },
+      deptLabel: { fontSize: fonts.size.tight, color: s.textSecondary },
     },
 
     // ── Dashboard layout grids ────────────────────────────────────────────────
@@ -326,7 +333,7 @@ const getDashboardTheme = (mode: "light" | "dark" = "light") => {
         },
         eyebrow: {
           fontFamily: fonts.family.monospace,
-          fontSize: "0.7rem",
+          fontSize: fonts.size.tight,
           letterSpacing: "0.15em",
           color: s.textSecondary,
           textTransform: "uppercase",

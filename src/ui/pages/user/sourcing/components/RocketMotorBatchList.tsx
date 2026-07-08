@@ -8,7 +8,7 @@ import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
 import dayjs from "dayjs";
 import { icons } from "../../../../../app/theme/icons";
 import IconText from "../../../../components/common/IconText";
-import FilterPanelHeader from "../../../../components/custom/dashboard/FilterPanelHeader";
+import FilterPanelHeader from "@ui/components/common/FilterPanelHeader";
 import FilterToggleButton from "../../../../components/common/FilterToggleButton";
 import UserBatchList from "../../../../components/custom/UserBatchList";
 import UserWorkflowStatusAction from "../../../../components/custom/UserWorkflowStatusAction";

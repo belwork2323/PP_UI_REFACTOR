@@ -5,6 +5,9 @@ const toApiDate = (date: Date): string => {
   return `${day}-${month}-${year}`;
 };
 
+/** Format a Date as DD-MM-YYYY for API payloads. */
+export const formatDateToApiDate = (date: Date): string => toApiDate(date);
+
 const toIsoDate = (date: Date): string => date.toISOString().split("T")[0];
 
 /** Convert YYYY-MM-DD to DD-MM-YYYY for API payloads. */

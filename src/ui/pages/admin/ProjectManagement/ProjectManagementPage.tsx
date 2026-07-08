@@ -1,26 +1,30 @@
 import React from "react";
 import { Box, Button } from "@mui/material";
-import Input from "@ui/components/common/Input";
 import { icons } from "@app/theme/icons";
 import getProjectManagementTheme from "@app/theme/custom_themes/admin/ProjectManagement/projectManagement_theme";
 import { STRINGS } from "@app/config/strings";
+import { useThemeStore } from "@app/store/themeStore";
 import ConfirmAlertDialog from "@ui/components/common/ConfirmAlertDialog";
+import DateRangeRow from "@ui/components/common/DateRangeRow";
+import RefreshIconButton from "@ui/components/common/RefreshIconButton";
 import AdminManagementStatsGrid from "@ui/components/custom/admin/AdminManagementStatsGrid";
 import AdminManagementPageHeader from "@ui/components/custom/admin/AdminManagementPageHeader";
-import AdminManagementToolbar from "@ui/components/custom/admin/AdminManagementToolbar";
+import AdminListShell from "@ui/components/custom/admin/AdminListShell";
+import AdminFilterPanel from "@ui/components/custom/admin/AdminFilterPanel";
 import useProjectManagementHook from "@hooks/admin/ProjectManagement/useProjectManagementHook";
 import { getProjectName } from "@utils/projectManagementUtils";
 import ProjectManagementList from "./ProjectManagementList";
 import CreateProjectManagementForm from "./CreateProjectManagementForm";
 
 const S = STRINGS.PROJECT_MANAGEMENT;
+const AC = STRINGS.ADMIN_COMMON;
 
 const STAT_ICONS: Record<string, React.ReactNode> = {
-  total: <icons.userMgmt.personOutline sx={{ fontSize: 22 }} />,
-  today: <icons.userMgmt.activeStatus sx={{ fontSize: 22 }} />,
-  month: <icons.userMgmt.activeStatus sx={{ fontSize: 22 }} />,
-  active: <icons.userMgmt.activeStatus sx={{ fontSize: 22 }} />,
-  idle: <icons.userMgmt.inactiveStatus sx={{ fontSize: 22 }} />,
+  total: <icons.projectMgmt.projectIcon sx={{ fontSize: 22 }} />,
+  today: <icons.projectMgmt.activeStatus sx={{ fontSize: 22 }} />,
+  month: <icons.projectMgmt.activeStatus sx={{ fontSize: 22 }} />,
+  active: <icons.projectMgmt.activeStatus sx={{ fontSize: 22 }} />,
+  idle: <icons.projectMgmt.idleStatus sx={{ fontSize: 22 }} />,
 };
 
 const STAT_VALUE_KEYS: Record<string, "totalProjects" | "projectsCreatedToday" | "projectsCreatedThisMonth" | "activeProjects" | "idleProjects"> = {
@@ -31,13 +35,10 @@ const STAT_VALUE_KEYS: Record<string, "totalProjects" | "projectsCreatedToday" |
   idle: "idleProjects",
 };
 
-type ProjectManagementPageProps = {
-  mode?: "light" | "dark";
-};
-
-const ProjectManagementPage = ({ mode = "light" }: ProjectManagementPageProps) => {
+const ProjectManagementPage = () => {
+  const mode = useThemeStore((s) => s.mode);
   const t = getProjectManagementTheme(mode);
-  const { list, stats, form, delete: deleteSection } = useProjectManagementHook();
+  const { list, stats, form, delete: deleteSection, refresh } = useProjectManagementHook();
 
   const statRows = S.STATS.map((s) => ({
     ...s,
@@ -48,6 +49,9 @@ const ProjectManagementPage = ({ mode = "light" }: ProjectManagementPageProps) =
   }));
 
   const deleteTarget = deleteSection.deleteTarget;
+  const { draftFilters } = list;
+  const total = list.paginationData.totalRecords;
+  const shown = list.projects.length;
 
   return (
     <Box sx={t.page}>
@@ -57,7 +61,7 @@ const ProjectManagementPage = ({ mode = "light" }: ProjectManagementPageProps) =
         primaryAction={
           <Button
             variant="contained"
-            startIcon={<icons.userMgmt.add />}
+            startIcon={<icons.projectMgmt.add />}
             onClick={form.openCreate}
             disabled={list.loading}
             sx={t.pageHeader.newProjectButton}
@@ -70,60 +74,68 @@ const ProjectManagementPage = ({ mode = "light" }: ProjectManagementPageProps) =
 
       <AdminManagementStatsGrid stats={statRows} theme={t} />
 
-      <AdminManagementToolbar
+      <AdminListShell
         search={list.search}
         onSearchChange={(value) => { list.setSearch(value); list.setPage(0); }}
         searchPlaceholder={S.TOOLBAR.SEARCH_PLACEHOLDER}
-        searchIcon={<icons.userMgmt.search sx={t.toolbar.searchIcon} />}
         filterOpen={list.filterOpen}
-        onFilterToggle={() => list.setFilterOpen((prev) => !prev)}
-        filtersButtonLabel={
-          list.activeFilters > 0
-            ? S.TOOLBAR.FILTERS_BUTTON_WITH_COUNT(list.activeFilters)
+        onFilterToggle={list.toggleFilterOpen}
+        activeFilterCount={list.activeFilterCount}
+        filtersToggleLabel={
+          list.activeFilterCount > 0
+            ? S.TOOLBAR.FILTERS_BUTTON_WITH_COUNT(list.activeFilterCount)
             : S.TOOLBAR.FILTERS_BUTTON
         }
-        filterContent={
-          <>
-            <Input
-              type="date"
-              label={S.TOOLBAR.FILTER_DATE_FROM_LABEL}
-              value={list.fromDate}
-              onChange={(e) => { list.setFromDate(e.target.value); list.setPage(0); }}
-              size="small"
-              sx={t.toolbar.filterSelect}
-              InputLabelProps={{ shrink: true }}
+        resultText={AC.SHOWING_RECORDS(shown, total)}
+        loading={list.loading}
+        hasItems={list.projects.length > 0}
+        emptyTitle={S.TABLE.EMPTY}
+        toolbarEnd={
+          <RefreshIconButton
+            onClick={refresh}
+            disabled={list.loading}
+            tooltip={AC.REFRESH_TOOLTIP}
+            icon={<icons.projectMgmt.refresh />}
+          />
+        }
+        filterExtension={
+          <AdminFilterPanel
+            title={AC.FILTERS_TITLE}
+            activeFilterCount={list.activeFilterCount}
+            onClear={list.clearFilters}
+            clearLabel={S.TOOLBAR.CLEAR_ALL}
+            onClose={() => list.setFilterOpen(false)}
+            onApply={list.applyFilters}
+            closeLabel={AC.FILTERS_CLOSE}
+            applyLabel={AC.FILTERS_APPLY}
+            theme={t}
+          >
+            <DateRangeRow
+              from={draftFilters.fromDate}
+              to={draftFilters.toDate}
+              onFromChange={(value) => list.setDraftFilter("fromDate", value)}
+              onToChange={(value) => list.setDraftFilter("toDate", value)}
+              fromLabel={S.TOOLBAR.FILTER_DATE_FROM_LABEL}
+              toLabel={S.TOOLBAR.FILTER_DATE_TO_LABEL}
+              datePickerSx={t.filterPanel.field}
             />
-            <Input
-              type="date"
-              label={S.TOOLBAR.FILTER_DATE_TO_LABEL}
-              value={list.toDate}
-              onChange={(e) => { list.setToDate(e.target.value); list.setPage(0); }}
-              size="small"
-              sx={t.toolbar.filterSelect}
-              InputLabelProps={{ shrink: true }}
-            />
-            {list.activeFilters > 0 && (
-              <Button size="small" onClick={list.handleClearFilters} sx={t.toolbar.clearButton}>
-                {S.TOOLBAR.CLEAR_ALL}
-              </Button>
-            )}
-          </>
+          </AdminFilterPanel>
         }
         theme={t}
-      />
-
-      <ProjectManagementList
-        paginated={list.projects}
-        loading={list.loading}
-        page={list.page}
-        totalCount={list.paginationData.totalRecords}
-        rowsPerPage={list.rowsPerPage}
-        t={t}
-        onEdit={form.openEdit}
-        onDelete={deleteSection.openDelete}
-        onPageChange={(_, p) => list.setPage(p)}
-        onRowsPerPageChange={(e) => { list.setRowsPerPage(+e.target.value); list.setPage(0); }}
-      />
+      >
+        <ProjectManagementList
+          paginated={list.projects}
+          loading={list.loading}
+          page={list.page}
+          totalCount={list.paginationData.totalRecords}
+          rowsPerPage={list.rowsPerPage}
+          t={t}
+          onEdit={form.openEdit}
+          onDelete={deleteSection.openDelete}
+          onPageChange={(_, p) => list.setPage(p)}
+          onRowsPerPageChange={(e) => { list.setRowsPerPage(+e.target.value); list.setPage(0); }}
+        />
+      </AdminListShell>
 
       <CreateProjectManagementForm
         open={form.modalOpen}

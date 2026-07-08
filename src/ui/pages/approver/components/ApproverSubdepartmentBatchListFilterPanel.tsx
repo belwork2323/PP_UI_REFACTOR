@@ -11,7 +11,7 @@ import {
   useApproverSubdepartmentBatchListFilters,
 } from "../../../../hooks/approver/useApproverSubdepartmentBatchListFilters";
 import { MANUFACTURING_BATCH_TYPE_OPTIONS } from "../../../../data/models/user/SubdepartmentBatchModel";
-import FilterPanelHeader from "../../../components/custom/dashboard/FilterPanelHeader";
+import FilterPanelHeader from "@ui/components/common/FilterPanelHeader";
 import FilterToggleButton from "../../../components/common/FilterToggleButton";
 import getApproverManufacturingFilterStyles from "../manufacturing/approverManufacturingFilterStyles";
 

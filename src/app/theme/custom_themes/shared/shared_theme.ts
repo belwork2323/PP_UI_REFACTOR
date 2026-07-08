@@ -15,8 +15,7 @@ import fonts     from "../../fonts";
 import spacing   from "../../spacing";
 import general   from "../common/common_css_theme";
 import { getTokens } from "../../tokens/semantics";
-
-// ─── Internal helpers ─────────────────────────────────────────────────────────
+import adminPalette from "../../palettes/adminPalette";
 
 const mkInputStyle = (inputBg: string, inputBorder: string, inputBorderHover: string, inputFocus: string, textPrimary: string, textSecondary: string) => ({
   "& .MuiOutlinedInput-root": {
@@ -36,49 +35,14 @@ const mkInputStyle = (inputBg: string, inputBorder: string, inputBorderHover: st
   "& .MuiSvgIcon-root": { color: textSecondary },
 });
 
-// ─── Status/priority chip colour maps ────────────────────────────────────────
+// ─── Status/priority chip colour maps (sourced from adminPalette) ─────────────
 
-const STATUS_COLORS: Record<string, { bg: string; color: string }> = {
-  // Batch / workflow statuses
-  "Completed":        { bg: "rgba(34,197,94,0.12)",   color: "#16a34a" },
-  "In Progress":      { bg: "rgba(59,130,246,0.12)",   color: "#2563eb" },
-  "Pending Approval": { bg: "rgba(245,158,11,0.12)",   color: "#d97706" },
-  "Rejected":         { bg: "rgba(239,68,68,0.10)",    color: "#dc2626" },
-  "Pending":          { bg: "rgba(245,158,11,0.10)",   color: "#d97706" },
-  // User statuses
-  "Active":           { bg: "rgba(34,197,94,0.10)",    color: "#16a34a" },
-  "Inactive":         { bg: "rgba(239,68,68,0.10)",    color: "#dc2626" },
-  "Suspended":        { bg: "rgba(245,158,11,0.12)",   color: "#d97706" },
-  // Batch types
-  "MainScale":        { bg: "rgba(59,130,246,0.10)",   color: "#2563eb" },
-  "SubScale":         { bg: "rgba(167,139,250,0.12)",  color: "#7c3aed" },
-};
+const STATUS_COLORS = adminPalette.statusColors.light;
+const STATUS_COLORS_DARK = adminPalette.statusColors.dark;
+const PRIORITY_COLORS = adminPalette.priorityColors.light;
+const PRIORITY_COLORS_DARK = adminPalette.priorityColors.dark;
 
-const STATUS_COLORS_DARK: Record<string, { bg: string; color: string }> = {
-  "Completed":        { bg: "rgba(34,197,94,0.15)",   color: "#22c55e" },
-  "In Progress":      { bg: "rgba(59,130,246,0.15)",   color: "#3b82f6" },
-  "Pending Approval": { bg: "rgba(245,158,11,0.15)",   color: "#f59e0b" },
-  "Rejected":         { bg: "rgba(239,68,68,0.12)",    color: "#ef4444" },
-  "Pending":          { bg: "rgba(245,158,11,0.12)",   color: "#f59e0b" },
-  "Active":           { bg: "rgba(34,197,94,0.12)",    color: "#22c55e" },
-  "Inactive":         { bg: "rgba(239,68,68,0.12)",    color: "#ef4444" },
-  "Suspended":        { bg: "rgba(245,158,11,0.15)",   color: "#f59e0b" },
-  "MainScale":        { bg: "rgba(59,130,246,0.15)",   color: "#3b82f6" },
-  "SubScale":         { bg: "rgba(167,139,250,0.15)",  color: "#a78bfa" },
-};
-
-const PRIORITY_COLORS: Record<string, { bg: string; color: string }> = {
-  "High":   { bg: "rgba(239,68,68,0.10)",   color: "#dc2626" },
-  "Medium": { bg: "rgba(245,158,11,0.10)",  color: "#d97706" },
-  "Low":    { bg: "rgba(34,197,94,0.10)",   color: "#16a34a" },
-};
-const PRIORITY_COLORS_DARK: Record<string, { bg: string; color: string }> = {
-  "High":   { bg: "rgba(239,68,68,0.12)",   color: "#ef4444" },
-  "Medium": { bg: "rgba(245,158,11,0.12)",  color: "#f59e0b" },
-  "Low":    { bg: "rgba(34,197,94,0.12)",   color: "#22c55e" },
-};
-
-// ─── Main export ──────────────────────────────────────────────────────────────
+// ─── Internal helpers ─────────────────────────────────────────────────────────
 
 export const getSharedTheme = (mode = "light") => {
   const s      = getTokens(mode as "light" | "dark");

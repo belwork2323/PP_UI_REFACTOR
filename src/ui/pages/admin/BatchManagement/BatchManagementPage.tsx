@@ -1,17 +1,17 @@
 import React from "react";
-import {
-  Box, Button, Stack,
-  FormControl, InputLabel, Select, MenuItem, IconButton, Tooltip,
-} from "@mui/material";
+import { Box, Button, Stack, FormControl, InputLabel, Select, MenuItem } from "@mui/material";
 import { icons } from "@app/theme/icons";
 import getBatchManagementTheme from "@app/theme/custom_themes/admin/BatchManagement/batchManagement_theme";
 import { STRINGS } from "@app/config/strings";
-import Input from "@ui/components/common/Input";
+import { useThemeStore } from "@app/store/themeStore";
 import FilterSelect from "@ui/components/common/FilterSelect";
 import ConfirmAlertDialog from "@ui/components/common/ConfirmAlertDialog";
+import RefreshIconButton from "@ui/components/common/RefreshIconButton";
+import Input from "@ui/components/common/Input";
 import AdminManagementStatsGrid from "@ui/components/custom/admin/AdminManagementStatsGrid";
 import AdminManagementPageHeader from "@ui/components/custom/admin/AdminManagementPageHeader";
-import AdminManagementToolbar from "@ui/components/custom/admin/AdminManagementToolbar";
+import AdminListShell from "@ui/components/custom/admin/AdminListShell";
+import AdminFilterPanel from "@ui/components/custom/admin/AdminFilterPanel";
 import useBatchManagementHook from "@hooks/admin/BatchManagement/useBatchManagementHook";
 import { getBatchId, getMotorId } from "@utils/batchManagementUtils";
 import BatchManagementList from "./BatchManagementList";
@@ -19,6 +19,7 @@ import CreateBatchManagementForm from "./CreateBatchManagementForm";
 import BatchImplementationForm from "./BatchImplementationForm";
 
 const S = STRINGS.BATCH_MANAGEMENT;
+const AC = STRINGS.ADMIN_COMMON;
 
 const STAT_ICONS: Record<string, React.ReactNode> = {
   total: <icons.batchMgmt.batchIcon sx={{ fontSize: 22 }} />,
@@ -28,11 +29,8 @@ const STAT_ICONS: Record<string, React.ReactNode> = {
   rejected: <icons.batchMgmt.rejectedStatus sx={{ fontSize: 22 }} />,
 };
 
-type BatchManagementPageProps = {
-  mode?: "light" | "dark";
-};
-
-const BatchManagementPage = ({ mode = "light" }: BatchManagementPageProps) => {
+const BatchManagementPage = () => {
+  const mode = useThemeStore((s) => s.mode);
   const t = getBatchManagementTheme(mode);
   const { list, stats, lookups, form, implementation, delete: deleteSection } = useBatchManagementHook();
 
@@ -51,6 +49,9 @@ const BatchManagementPage = ({ mode = "light" }: BatchManagementPageProps) => {
   const batchId = deleteTarget ? getBatchId(deleteTarget) : "";
   const motorId = deleteTarget ? getMotorId(deleteTarget) : "";
   const canDelete = !!deleteSection.deleteReason?.trim();
+  const { draftFilters } = list;
+  const total = list.paginationData.totalRecords;
+  const shown = list.batches.length;
 
   return (
     <Box sx={t.page}>
@@ -89,84 +90,91 @@ const BatchManagementPage = ({ mode = "light" }: BatchManagementPageProps) => {
 
       <AdminManagementStatsGrid stats={statRows} theme={t} />
 
-      <AdminManagementToolbar
+      <AdminListShell
         search={list.search}
         onSearchChange={(value) => list.setSearch(value)}
         searchPlaceholder={S.TOOLBAR.SEARCH_PLACEHOLDER}
-        searchIcon={<icons.batchMgmt.search sx={t.toolbar.searchIcon} />}
-        filterStartIcon={<icons.batchMgmt.filter />}
         filterOpen={list.filterOpen}
-        onFilterToggle={() => list.setFilterOpen(!list.filterOpen)}
-        filtersButtonLabel={
-          list.activeFilters > 0
-            ? S.TOOLBAR.FILTERS_BUTTON_WITH_COUNT(list.activeFilters)
+        onFilterToggle={list.toggleFilterOpen}
+        activeFilterCount={list.activeFilterCount}
+        filtersToggleLabel={
+          list.activeFilterCount > 0
+            ? S.TOOLBAR.FILTERS_BUTTON_WITH_COUNT(list.activeFilterCount)
             : S.TOOLBAR.FILTERS_BUTTON
         }
+        resultText={AC.SHOWING_RECORDS(shown, total)}
+        loading={list.loading}
+        hasItems={list.batches.length > 0}
+        emptyTitle={S.TABLE.EMPTY}
         toolbarEnd={
-          <Tooltip title={S.PAGE.REFRESH_TOOLTIP}>
-            <IconButton
-              onClick={list.loadBatchList}
-              disabled={list.loading}
-              sx={{ color: list.loading ? "action.disabled" : "text.secondary" }}
-            >
-              <icons.batchMgmt.refresh />
-            </IconButton>
-          </Tooltip>
+          <RefreshIconButton
+            onClick={list.loadBatchList}
+            disabled={list.loading}
+            tooltip={S.PAGE.REFRESH_TOOLTIP}
+            icon={<icons.batchMgmt.refresh />}
+          />
         }
-        filterContent={
-          <>
-            <FilterSelect
-              label={S.TOOLBAR.FILTER_STAGE_LABEL}
-              value={list.filterStage}
-              onChange={(e) => { list.setFilterStage(e.target.value); list.setPage(0); }}
-              options={S.FILTER_OPTIONS.STAGES}
-              sx={t.toolbar.filterSelect}
-            />
-            <FilterSelect
-              label={S.TOOLBAR.FILTER_STATUS_LABEL}
-              value={list.filterStatus}
-              onChange={(e) => { list.setFilterStatus(e.target.value); list.setPage(0); }}
-              options={S.FILTER_OPTIONS.STATUSES}
-              sx={t.toolbar.filterSelect}
-            />
-            <FilterSelect
-              label={S.TOOLBAR.FILTER_PRIORITY_LABEL}
-              value={list.filterPriority}
-              onChange={(e) => { list.setFilterPriority(e.target.value); list.setPage(0); }}
-              options={S.FILTER_OPTIONS.PRIORITIES}
-              sx={t.toolbar.filterSelect}
-            />
-            <FilterSelect
-              label={S.TOOLBAR.FILTER_DEPT_LABEL}
-              value={list.filterDept}
-              onChange={(e) => { list.setFilterDept(e.target.value); list.setPage(0); }}
-              options={["All", ...lookups.deptNames]}
-              sx={t.toolbar.filterSelect}
-            />
-            {list.activeFilters > 0 && (
-              <Button size="small" onClick={list.handleClearFilters} sx={t.toolbar.clearButton}>
-                {S.TOOLBAR.CLEAR_ALL}
-              </Button>
-            )}
-          </>
+        filterExtension={
+          <AdminFilterPanel
+            title={AC.FILTERS_TITLE}
+            activeFilterCount={list.activeFilterCount}
+            onClear={list.clearFilters}
+            clearLabel={S.TOOLBAR.CLEAR_ALL}
+            onClose={() => list.setFilterOpen(false)}
+            onApply={list.applyFilters}
+            closeLabel={AC.FILTERS_CLOSE}
+            applyLabel={AC.FILTERS_APPLY}
+            theme={t}
+          >
+            <Stack direction="row" gap={1.5} flexWrap="wrap">
+              <FilterSelect
+                label={S.TOOLBAR.FILTER_STAGE_LABEL}
+                value={draftFilters.stage}
+                onChange={(e) => list.setDraftFilter("stage", e.target.value)}
+                options={S.FILTER_OPTIONS.STAGES}
+                sx={t.filterPanel.field}
+              />
+              <FilterSelect
+                label={S.TOOLBAR.FILTER_STATUS_LABEL}
+                value={draftFilters.status}
+                onChange={(e) => list.setDraftFilter("status", e.target.value)}
+                options={S.FILTER_OPTIONS.STATUSES}
+                sx={t.filterPanel.field}
+              />
+              <FilterSelect
+                label={S.TOOLBAR.FILTER_PRIORITY_LABEL}
+                value={draftFilters.priority}
+                onChange={(e) => list.setDraftFilter("priority", e.target.value)}
+                options={S.FILTER_OPTIONS.PRIORITIES}
+                sx={t.filterPanel.field}
+              />
+              <FilterSelect
+                label={S.TOOLBAR.FILTER_DEPT_LABEL}
+                value={draftFilters.dept}
+                onChange={(e) => list.setDraftFilter("dept", e.target.value)}
+                options={["All", ...lookups.deptNames]}
+                sx={t.filterPanel.field}
+              />
+            </Stack>
+          </AdminFilterPanel>
         }
         theme={t}
-      />
-
-      <BatchManagementList
-        paginated={list.batches}
-        loading={list.loading}
-        t={t}
-        page={list.page}
-        totalCount={list.paginationData.totalRecords}
-        rowsPerPage={list.rowsPerPage}
-        onEdit={form.openEdit}
-        onDelete={deleteSection.openDelete}
-        onCompleteImplementation={form.openCompleteImplementation}
-        onViewImplementation={form.openViewImplementation}
-        onPageChange={(_, p) => list.setPage(p)}
-        onRowsPerPageChange={(e) => { list.setRowsPerPage(+e.target.value); list.setPage(0); }}
-      />
+      >
+        <BatchManagementList
+          paginated={list.batches}
+          loading={list.loading}
+          t={t}
+          page={list.page}
+          totalCount={list.paginationData.totalRecords}
+          rowsPerPage={list.rowsPerPage}
+          onEdit={form.openEdit}
+          onDelete={deleteSection.openDelete}
+          onCompleteImplementation={form.openCompleteImplementation}
+          onViewImplementation={form.openViewImplementation}
+          onPageChange={(_, p) => list.setPage(p)}
+          onRowsPerPageChange={(e) => { list.setRowsPerPage(+e.target.value); list.setPage(0); }}
+        />
+      </AdminListShell>
 
       <CreateBatchManagementForm
         open={form.modalOpen}
