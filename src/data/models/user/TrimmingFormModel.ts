@@ -221,7 +221,6 @@ export type TrimmingDetailView = {
   formId: string;
   batchId: string;
   batchType: string;
-  formSubmissionType: string;
   status?: string;
   createdBy: string | null;
   createdAt: string | null;
@@ -287,7 +286,6 @@ export const mapTrimmingDetailsForDisplay = (
     formId: String(details.formId ?? ""),
     batchId: String(details.batchId ?? ""),
     batchType: details.batchType != null ? String(details.batchType) : "",
-    formSubmissionType: String(details.formSubmissionType ?? ""),
     status: details.status != null ? String(details.status) : undefined,
     createdBy: mapCastingCuringPersonLabel(details.createdBy),
     createdAt: details.createdAt != null ? String(details.createdAt) : null,

@@ -466,7 +466,6 @@ export type RawMaterialPrepApproverPremixView = {
 export type RawMaterialPrepApproverDetailView = {
   formId: string;
   batchId: string;
-  formSubmissionType: string;
   createdBy?: string | null;
   createdAt?: string | null;
   premixes: RawMaterialPrepApproverPremixView[];
@@ -586,7 +585,6 @@ export const mapRawMaterialPreparationApproverDetailView = (
 ): RawMaterialPrepApproverDetailView => ({
   formId: details.formId,
   batchId: details.batchId,
-  formSubmissionType: details.formSubmissionType,
   createdBy: details.createdBy ?? null,
   createdAt: details.createdAt ?? null,
   premixes: (details.preparationDetails?.premixes ?? []).map((premix) => ({

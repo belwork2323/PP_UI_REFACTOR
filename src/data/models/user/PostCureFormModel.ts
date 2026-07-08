@@ -217,7 +217,6 @@ export type PostCureDetailView = {
   formId: string;
   batchId: string;
   batchType: string;
-  formSubmissionType: string;
   status?: string;
   createdBy: string | null;
   createdAt: string | null;
@@ -281,7 +280,6 @@ export const mapPostCureDetailsForDisplay = (
     formId: String(data.formId ?? details.formId ?? ""),
     batchId: String(data.batchId ?? details.batchId ?? ""),
     batchType: String(data.batchType ?? details.batchType ?? ""),
-    formSubmissionType: String(data.formSubmissionType ?? details.formSubmissionType ?? ""),
     status: data.status != null ? String(data.status) : details.status != null ? String(details.status) : undefined,
     createdBy: mapCastingCuringPersonLabel(data.createdBy ?? details.createdBy),
     createdAt:

@@ -28,18 +28,30 @@ const singleLineInputRootSx = {
 export const schemaFieldSx = {
   mb: spacing.sm,
   "& .MuiInputBase-root:not(.MuiInputBase-multiline)": singleLineInputRootSx,
-  "& .MuiInputBase-input:not(textarea)": {
+  "& .MuiInputBase-input:not(textarea):not(.MuiSelect-select)": {
     py: 0,
     fontSize: "0.78rem",
     height: "1.4375em",
     boxSizing: "border-box",
   },
   "& .MuiSelect-select": {
-    py: 0,
+    py: "9px",
     minHeight: "unset",
+    height: "auto !important",
     display: "flex",
     alignItems: "center",
     fontSize: "0.78rem",
+    lineHeight: 1.4,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    paddingRight: "32px !important",
+    boxSizing: "border-box",
+  },
+  "& .MuiSelect-icon": {
+    right: 8,
+    top: "50%",
+    transform: "translateY(-50%)",
   },
   "& .MuiInputAdornment-root": {
     height: "auto",

@@ -32,7 +32,6 @@ export type SubscaleDetailView = {
   formId: string;
   batchId: string;
   batchType: string;
-  formSubmissionType: string;
   status?: string;
   createdBy: string | null;
   createdAt: string | null;
@@ -74,7 +73,6 @@ export const mapSubscaleDetailsForDisplay = (
     formId: String(data.subscaleProcessingId ?? data.formId ?? ""),
     batchId: String(data.batchId ?? ""),
     batchType: String(data.batchType ?? ""),
-    formSubmissionType: String(data.formSubmissionType ?? data.formStatus ?? data.status ?? ""),
     status: data.status != null ? String(data.status) : undefined,
     createdBy: mapCastingCuringPersonLabel(data.createdBy),
     createdAt: data.createdAt != null ? String(data.createdAt) : null,

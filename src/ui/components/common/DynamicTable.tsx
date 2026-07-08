@@ -53,6 +53,7 @@ import SchemaApiDropdown from "./SchemaApiDropdown";
 import { DateField, DateTimeField, TimeField } from "./DateField";
 import FormulaCell from "./FormulaCell";
 import SchemaFileField from "./SchemaFileField";
+import SchemaReadonlyDisplay from "./SchemaReadonlyDisplay";
 
 type DynamicTableProps = {
   config: SchemaTableBlock;
@@ -79,6 +80,12 @@ const parseCssLength = (value: string | undefined, fallback: number) => {
 const resolveColumnMinWidth = (col: SchemaTableColumn): number => {
   if (col.ui?.minWidth) return parseCssLength(col.ui.minWidth, 100);
   if (col.ui?.width) return parseCssLength(col.ui.width, 100);
+
+  if (col.id === "PARAMETER") return 220;
+  if (col.id === "INGREDIENT") return 180;
+  if (col.id === "SPECIFICATION") return 120;
+  if (col.id === "LOT_BATCH_NUMBER") return 190;
+  if (col.id === "REMARKS") return 160;
 
   switch (col.fieldType) {
     case "serial":
@@ -311,6 +318,8 @@ const renderGroupHeaderRow = (columns: SchemaTableColumnSlot[], allowDelete: boo
 );
 
 
+const isCompactWrapDropdown = (col: SchemaTableColumn) => col.id === "INGREDIENT";
+
 const renderCellEditor = (
   col: SchemaTableColumn,
   value: string,
@@ -327,6 +336,8 @@ const renderCellEditor = (
         dataSource={col.dataSource}
         apiContext={apiContext}
         disabled
+        compact
+        compactWrap={isCompactWrapDropdown(col)}
         placeholder={col.ui?.placeholder}
         onOptionsCountChange={onOptionsCountChange}
       />
@@ -348,6 +359,8 @@ const renderCellEditor = (
           dataSource={col.dataSource}
           apiContext={apiContext}
           disabled={cellDisabled}
+          compact
+          compactWrap={isCompactWrapDropdown(col)}
           placeholder={col.ui?.placeholder}
           onOptionsCountChange={onOptionsCountChange}
         />
@@ -586,9 +599,9 @@ const DynamicTable = ({
       }}
     >
       {toolbarTop && showColumnToolbar ? renderColumnToolbar() : null}
-      {config.label ? (
+      {config.label ?? config.title ? (
         <Typography sx={{ fontSize: "0.84rem", fontWeight: 700, color: theme?.primary, p: 1 }}>
-          {config.label}
+          {config.label ?? config.title}
         </Typography>
       ) : null}
       <Table
@@ -749,6 +762,12 @@ const DynamicTable = ({
                     rowGroupId &&
                     mergeSpan &&
                     mergeExpandedColumns.includes(col.id);
+                  const isReadonlyExpandedDisplay =
+                    isExpanded &&
+                    commitGroup &&
+                    isExpandedColumnReadonly(commitGroup, col.id);
+                  const isMergedPrimaryColumn =
+                    mergeExpandedColumns.length > 0 && mergeExpandedColumns[0] === col.id;
 
                   return (
                     <TableCell
@@ -757,18 +776,27 @@ const DynamicTable = ({
                       sx={cellSx(resolvedCol)}
                     >
                       <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
-                        {renderCellEditor(
-                          resolvedCol,
-                          cellValue,
-                          (v) => updateCell(rowIndex, col.id, v),
-                          cellReadOnly,
-                          rowApiContext,
-                          trackPickerOptionCount
-                            ? (count) => {
-                                if (!nestedParentSelected) return;
-                                handlePickerOptionCountChange(col.id, count);
-                              }
-                            : undefined,
+                        {isReadonlyExpandedDisplay ? (
+                          <SchemaReadonlyDisplay
+                            value={cellValue}
+                            dataSource={resolvedCol.dataSource}
+                            apiContext={rowApiContext}
+                            emphasis={isMergedPrimaryColumn}
+                          />
+                        ) : (
+                          renderCellEditor(
+                            resolvedCol,
+                            cellValue,
+                            (v) => updateCell(rowIndex, col.id, v),
+                            cellReadOnly,
+                            rowApiContext,
+                            trackPickerOptionCount
+                              ? (count) => {
+                                  if (!nestedParentSelected) return;
+                                  handlePickerOptionCountChange(col.id, count);
+                                }
+                              : undefined,
+                          )
                         )}
                         {showGroupRemove ? (
                           <Button

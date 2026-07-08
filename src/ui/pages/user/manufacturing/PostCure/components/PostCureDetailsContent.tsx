@@ -229,7 +229,6 @@ const PostCureDetailsContent = ({
     { label: BL.COL_BATCH_ID, value: detailView?.batchId || row?.batchId || "—" },
     { label: "Form ID", value: detailView?.formId || row?.formId || "—" },
     { label: "Batch Type", value: detailView?.batchType || row?.batchType || "—" },
-    { label: "Submission Type", value: detailView?.formSubmissionType || "—" },
     { label: "Status", value: formatStatusLabel(detailView?.status || String(row?.pcStatus ?? row?.status ?? "")) },
     { label: BL.COL_CREATED_BY, value: detailView?.createdBy || "—" },
     { label: BL.COL_CREATED_ON, value: formatDateTime(detailView?.createdAt) },

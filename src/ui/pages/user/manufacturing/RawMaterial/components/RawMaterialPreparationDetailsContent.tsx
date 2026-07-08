@@ -320,7 +320,6 @@ const RawMaterialPreparationDetailsContent = ({
   const metaFields = [
     { label: BL.COL_BATCH_ID, value: detailView?.batchId || row?.batchId || "—" },
     { label: "Form ID", value: detailView?.formId || row?.formId || "—" },
-    { label: "Submission Type", value: detailView?.formSubmissionType || "—" },
     { label: "Motor ID", value: row?.motorId || "—" },
     {
       label: "Material Type",

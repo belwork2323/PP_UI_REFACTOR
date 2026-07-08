@@ -8,6 +8,7 @@ import {
   type NDTRadiographyPlanRow,
   type NDTVisualInspectionRow,
 } from "./NDTFormModel";
+import { mapCastingCuringPersonLabel } from "./CastingCuringFormModel";
 import { NDT_VISUAL_INSPECTION_PRESETS } from "../../../hooks/user/qualityControl/ndtFlowConfig";
 import {
   NDT_CUSTOM_OBSERVATION_TYPE,
@@ -280,8 +281,16 @@ export class NDTSubmitResponseModel {
 export class NDTDetailsModel {
   formId: string;
   batchId: string;
+  batchType: string | null;
   subDepartmentId: number;
   formSubmissionType: string;
+  formStatus: string;
+  createdBy: string | null;
+  createdAt: string | null;
+  submittedBy: string | null;
+  submittedAt: string | null;
+  lastUpdatedBy: string | null;
+  lastUpdatedAt: string | null;
   data: NDTFormState;
   workflowInsights: {
     currentStatus: string;
@@ -291,12 +300,39 @@ export class NDTDetailsModel {
   constructor(payload: any) {
     this.formId = payload?.formId ?? "";
     this.batchId = payload?.batchId ?? "";
+    this.batchType = payload?.batchType != null ? String(payload.batchType) : null;
     this.subDepartmentId = Number(payload?.subDepartmentId ?? 0);
     this.formSubmissionType = payload?.formSubmissionType ?? "";
+    this.formStatus = String(payload?.formStatus ?? payload?.status ?? "");
+    this.createdBy = mapCastingCuringPersonLabel(payload?.createdBy);
+    this.createdAt =
+      payload?.createdAt != null
+        ? String(payload.createdAt)
+        : payload?.createdOn != null
+          ? String(payload.createdOn)
+          : null;
+    this.submittedBy = mapCastingCuringPersonLabel(payload?.submittedBy);
+    this.submittedAt =
+      payload?.submittedAt != null
+        ? String(payload.submittedAt)
+        : payload?.submittedOn != null
+          ? String(payload.submittedOn)
+          : null;
+    this.lastUpdatedBy = mapCastingCuringPersonLabel(payload?.lastUpdatedBy ?? payload?.updatedBy);
+    this.lastUpdatedAt =
+      payload?.lastUpdatedAt != null
+        ? String(payload.lastUpdatedAt)
+        : payload?.updatedAt != null
+          ? String(payload.updatedAt)
+          : payload?.updatedOn != null
+            ? String(payload.updatedOn)
+            : null;
     this.data = hydrateFormState(payload);
     this.workflowInsights = {
-      currentStatus: payload?.workflowInsights?.currentStatus ?? "",
-      rejectionReason: payload?.workflowInsights?.rejectionReason ?? null,
+      currentStatus:
+        payload?.workflowInsights?.currentStatus ?? this.formStatus ?? "",
+      rejectionReason:
+        payload?.workflowInsights?.rejectionReason ?? payload?.rejectionReason ?? null,
     };
   }
 

@@ -329,7 +329,6 @@ export type NDTDetailView = {
   formId: string;
   batchId: string;
   batchType: string;
-  formSubmissionType: string;
   status?: string;
   createdBy?: string | null;
   createdAt?: string | null;
@@ -346,7 +345,10 @@ export const mapNDTDetailsForDisplay = (
   if (!data) return null;
 
   const root = data as Record<string, unknown>;
-  const formState = normalizeNDTFormState((root.data as Partial<NDTFormState> | undefined) ?? root);
+  const nestedFormState = root.data as Partial<NDTFormState> | undefined;
+  const formState = normalizeNDTFormState(
+    nestedFormState?.motors ? nestedFormState : root,
+  );
   const motors: NDTMotorDetailView[] = (formState.motors ?? [])
     .map((motor) => {
       const normalized = normalizeNDTMotorSession(motor);
@@ -362,15 +364,20 @@ export const mapNDTDetailsForDisplay = (
     .filter((motor) => motor.motorId.trim().length > 0);
 
   const workflowInsights = root.workflowInsights as Record<string, unknown> | undefined;
+  const formStatus = String(root.formStatus ?? workflowInsights?.currentStatus ?? root.status ?? "");
 
   return {
     formId: String(root.formId ?? ""),
     batchId: String(root.batchId ?? formState.batchId ?? ""),
     batchType: root.batchType != null ? String(root.batchType) : "",
-    formSubmissionType: String(root.formSubmissionType ?? ""),
-    status: String(workflowInsights?.currentStatus ?? root.formStatus ?? root.status ?? ""),
+    status: formStatus,
     createdBy: mapCastingCuringPersonLabel(root.createdBy),
-    createdAt: root.createdAt != null ? String(root.createdAt) : root.createdOn != null ? String(root.createdOn) : null,
+    createdAt:
+      root.createdAt != null
+        ? String(root.createdAt)
+        : root.createdOn != null
+          ? String(root.createdOn)
+          : null,
     submittedBy: mapCastingCuringPersonLabel(root.submittedBy),
     submittedAt:
       root.submittedAt != null

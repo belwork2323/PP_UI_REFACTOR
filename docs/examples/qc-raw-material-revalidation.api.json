@@ -64,7 +64,7 @@
                 "fieldType": "dropdown",
                 "label": "Ingredient",
                 "validation": { "required": true },
-                "ui": { "placeholder": "Select ingredient" },
+                "ui": { "placeholder": "Select ingredient", "minWidth": "180px" },
                 "dataSource": {
                   "type": "api",
                   "api": {
@@ -82,6 +82,7 @@
                 "fieldType": "dropdown",
                 "label": "Lot / Batch Number",
                 "validation": { "required": true },
+                "ui": { "minWidth": "190px" },
                 "dataSource": {
                   "type": "api",
                   "api": {
@@ -99,6 +100,7 @@
                 "fieldType": "dropdown",
                 "label": "Parameter",
                 "validation": { "required": true },
+                "ui": { "minWidth": "220px" },
                 "dataSource": {
                   "type": "api",
                   "api": {

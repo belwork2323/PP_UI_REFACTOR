@@ -48,7 +48,10 @@ import {
   buildDivisionNavGroups,
   resolveNavIndicesForEntry,
 } from "./qcDivisionNav";
-import { getPendingHardwareProcesses } from "./qcHardwareConfig";
+import {
+  getHardwareSectionIdForSubType,
+  getPendingHardwareProcesses,
+} from "./qcHardwareConfig";
 import {
   isQcPropellantProcessSubType,
   mapQcPropellantProcessToApi,
@@ -61,7 +64,12 @@ import {
   createMixingFinalMixDetailsValues,
   createMixingFinalMixViscosityValues,
   getMixingFinalMixEntries,
+  groupMixingDetailSections,
+  hydrateMixingFinalMixDetailsValues,
   isQcMixingStage,
+  QC_MIXING_PREMIX_SECTION_ID,
+  QC_MIXING_VISCOSITY_SECTION_ID,
+  sliceMixingFinalMixSchema,
 } from "./qcMixingConfig";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import { QUALITY_CONTROL_STATUS } from "./qualityControlWorkflowData";
@@ -1214,8 +1222,11 @@ export const useQCDivisionHook = () => {
           const entryValues: Record<string, QcDivisionEntryValues> = {};
           const schemasByKey: Record<string, SchemaDocumentV2> = {};
           const schemaFetchQueue = new Map<string, { division: QcApiDivision; subType: QcApiSubType }>();
+          const mixingFinalMixDetailSections: SchemaSectionSubmission[] = [];
 
           const enqueueSchema = (division: QcApiDivision, subType: QcApiSubType) => {
+            // MIXING schemas require PREMIX/FINAL_MIX; other divisions may legitimately use null subType.
+            if (division === "MIXING" && subType == null) return "";
             const key = getQcSchemaCacheKey(division, subType);
             if (!schemaFetchQueue.has(key)) {
               schemaFetchQueue.set(key, { division, subType });
@@ -1229,7 +1240,12 @@ export const useQCDivisionHook = () => {
               const kind = subType === "SOLID_PROCESSING" ? "SOLID_PREMIX" : subType === "LIQUID_PROCESSING" ? "LIQUID_PREMIX" : "BOTH_PREMIX";
               return { flowKey: "RAW_MATERIAL", kind };
             }
-            if (division === "MIXING") return { flowKey: "MIXING", kind: "MIXING_PREMIX" };
+            if (division === "MIXING") {
+              return {
+                flowKey: "MIXING",
+                kind: subType === "FINAL_MIX" ? "MIXING_FINAL_MIX" : "MIXING_PREMIX",
+              };
+            }
             if (division === "HARDWARE") return { flowKey: "HARDWARE", kind: "HARDWARE_PROCESS" };
             if (division === "CASTING") return { flowKey: "CASTING", kind: "CASTING_MOTOR" };
             if (division === "CURING") return { flowKey: "CURING", kind: "CURING_MOTOR" };
@@ -1255,30 +1271,6 @@ export const useQCDivisionHook = () => {
             const division = detail.division as QcApiDivision;
             const detailSubType = detail.subType as QcApiSubType;
             const sections: SchemaSectionSubmission[] = detail.data?.sections ?? [];
-
-            const sectionsByPremix = new Map<string, SchemaSectionSubmission[]>();
-            const sectionsByMotor = new Map<string, SchemaSectionSubmission[]>();
-            const simpleSections: SchemaSectionSubmission[] = [];
-
-            for (const section of sections) {
-              if (section.premixNo != null) {
-                const sectionSubType = (section.subType ?? detailSubType) as QcApiSubType;
-                enqueueSchema(division, sectionSubType);
-                const groupKey = `${section.premixNo}:${sectionSubType}`;
-                const list = sectionsByPremix.get(groupKey) ?? [];
-                list.push(section);
-                sectionsByPremix.set(groupKey, list);
-              } else if ((section as any).motorId) {
-                enqueueSchema(division, detailSubType);
-                const mId = (section as any).motorId as string;
-                const list = sectionsByMotor.get(mId) ?? [];
-                list.push(section);
-                sectionsByMotor.set(mId, list);
-              } else {
-                enqueueSchema(division, detailSubType);
-                simpleSections.push(section);
-              }
-            }
 
             const makeEntry = (
               entryKind: QcDivisionEntry["kind"],
@@ -1311,6 +1303,52 @@ export const useQCDivisionHook = () => {
               return { entryId, entry, entrySections };
             };
 
+            if (division === "MIXING") {
+              const grouped = groupMixingDetailSections(sections, detailSubType);
+              grouped.schemaSubTypes.forEach((subType) => enqueueSchema(division, subType));
+
+              grouped.premixEntries.forEach(({ premixNo, sections: preSections }) => {
+                const { entryId } = makeEntry("MIXING_PREMIX", "PREMIX", preSections, premixNo);
+                entryValues[entryId] = { schemaValues: {} };
+              });
+
+              grouped.finalMixEntries.forEach(({ premixNo, sections: visSections }) => {
+                const { entryId } = makeEntry("MIXING_FINAL_MIX", "FINAL_MIX", visSections, premixNo);
+                entryValues[entryId] = { schemaValues: {} };
+              });
+
+              if (grouped.finalMixDetailSections.length) {
+                mixingFinalMixDetailSections.push(...grouped.finalMixDetailSections);
+              }
+              continue;
+            }
+
+            const sectionsByPremix = new Map<string, SchemaSectionSubmission[]>();
+            const sectionsByMotor = new Map<string, SchemaSectionSubmission[]>();
+            const simpleSections: SchemaSectionSubmission[] = [];
+
+            for (const section of sections) {
+              if (section.premixNo != null) {
+                const sectionSubType = (section.subType ?? detailSubType) as QcApiSubType;
+                enqueueSchema(division, sectionSubType);
+                const groupKey = `${section.premixNo}:${sectionSubType}`;
+                const list = sectionsByPremix.get(groupKey) ?? [];
+                list.push(section);
+                sectionsByPremix.set(groupKey, list);
+              } else if ((section as any).motorId) {
+                const sectionSubType = (section.subType ?? detailSubType) as QcApiSubType;
+                enqueueSchema(division, sectionSubType);
+                const motorId = String((section as any).motorId);
+                const groupKey = sectionSubType ? `${motorId}:${sectionSubType}` : motorId;
+                const list = sectionsByMotor.get(groupKey) ?? [];
+                list.push(section);
+                sectionsByMotor.set(groupKey, list);
+              } else {
+                enqueueSchema(division, detailSubType);
+                simpleSections.push(section);
+              }
+            }
+
             if (sectionsByPremix.size > 0) {
               for (const [groupKey, preSections] of sectionsByPremix) {
                 const colonIdx = groupKey.lastIndexOf(":");
@@ -1321,12 +1359,19 @@ export const useQCDivisionHook = () => {
                 entryValues[entryId] = { schemaValues: {} };
               }
             } else if (sectionsByMotor.size > 0) {
-              for (const [motorId, motSections] of sectionsByMotor) {
-                const { kind } = getEntryKind(division, detailSubType);
-                const { entryId } = makeEntry(kind, detailSubType, motSections, undefined, motorId);
+              for (const [groupKey, motSections] of sectionsByMotor) {
+                let motorId = groupKey;
+                let entrySubType = detailSubType;
+                const colonIdx = groupKey.lastIndexOf(":");
+                if (colonIdx > 0) {
+                  motorId = groupKey.slice(0, colonIdx);
+                  entrySubType = groupKey.slice(colonIdx + 1) as QcApiSubType;
+                }
+                const { kind } = getEntryKind(division, entrySubType);
+                const { entryId } = makeEntry(kind, entrySubType, motSections, undefined, motorId);
                 entryValues[entryId] = { schemaValues: {} };
               }
-            } else {
+            } else if (simpleSections.length > 0) {
               const { kind } = getEntryKind(division, detailSubType);
               const { entryId } = makeEntry(kind, detailSubType, simpleSections);
               entryValues[entryId] = { schemaValues: {} };
@@ -1351,6 +1396,13 @@ export const useQCDivisionHook = () => {
             if (!schema) continue;
 
             const matchingSections = (resolvedData.savedSections ?? []).filter((s) => {
+              if (entry.kind === "REVALIDATION" && s.sectionId !== "RAW_MATERIAL_DETAILS") return false;
+              if (entry.kind === "MIXING_PREMIX" && s.sectionId !== QC_MIXING_PREMIX_SECTION_ID) return false;
+              if (entry.kind === "MIXING_FINAL_MIX" && s.sectionId !== QC_MIXING_VISCOSITY_SECTION_ID) return false;
+              if (entry.kind === "HARDWARE_PROCESS" && entry.subType) {
+                const expectedSectionId = getHardwareSectionIdForSubType(String(entry.subType));
+                if (expectedSectionId && s.sectionId !== expectedSectionId) return false;
+              }
               if (entry.premixNo != null) {
                 if (s.premixNo !== entry.premixNo) return false;
                 if (entry.subType && (s as any).subType && (s as any).subType !== entry.subType) return false;
@@ -1365,17 +1417,28 @@ export const useQCDivisionHook = () => {
             });
 
             if (matchingSections.length > 0) {
+              const hydrationSchema =
+                entry.kind === "MIXING_FINAL_MIX"
+                  ? sliceMixingFinalMixSchema(schema, "viscosity") ?? schema
+                  : schema;
               entryValues[entry.entryId] = {
-                schemaValues: hydrateQcValuesFromSections(schema, matchingSections),
+                schemaValues: hydrateQcValuesFromSections(hydrationSchema, matchingSections),
               };
             }
           }
+
+          const finalMixSchema = schemasByKey[getQcSchemaCacheKey("MIXING", "FINAL_MIX")];
+          const mixingFinalMixDetailsValues =
+            finalMixSchema && mixingFinalMixDetailSections.length
+              ? hydrateMixingFinalMixDetailsValues(finalMixSchema, mixingFinalMixDetailSections)
+              : undefined;
 
           resolvedData = {
             ...resolvedData,
             divisionEntries: entries,
             divisionEntryValues: entryValues,
             schemasByKey,
+            ...(mixingFinalMixDetailsValues && { mixingFinalMixDetailsValues }),
           };
         } else {
           const resolvedFlow = resolveBatchFlowSelection(resolvedData.division, resolvedData.subType);

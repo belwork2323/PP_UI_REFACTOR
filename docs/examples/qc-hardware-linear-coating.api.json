@@ -31,7 +31,7 @@
           {
             "type": "table",
             "id": "LINEAR_COATING_DETAILS",
-            "title": "Linear Coating Details",
+            "label": "Linear Coating Details",
             "rows": {
               "allowAdd": true,
               "allowDelete": true,

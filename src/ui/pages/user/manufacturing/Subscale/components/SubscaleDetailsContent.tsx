@@ -179,7 +179,6 @@ const SubscaleDetailsContent = ({
     { label: BL.COL_BATCH_ID, value: detailView?.batchId || row?.batchId || "—" },
     { label: "Form ID", value: detailView?.formId || row?.formId || "—" },
     { label: "Batch Type", value: detailView?.batchType || row?.batchType || "—" },
-    { label: "Submission Type", value: detailView?.formSubmissionType || "—" },
     {
       label: "Status",
       value: formatStatusLabel(detailView?.status || String(row?.ssStatus ?? row?.status ?? "")),

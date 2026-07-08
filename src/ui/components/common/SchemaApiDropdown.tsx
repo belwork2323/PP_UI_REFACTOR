@@ -21,7 +21,46 @@ type SchemaApiDropdownProps = {
   required?: boolean;
   placeholder?: string;
   onOptionsCountChange?: (count: number) => void;
+  compact?: boolean;
+  compactWrap?: boolean;
 };
+
+const buildCompactSelectSx = (wrap: boolean) => ({
+  mb: 0,
+  width: "100%",
+  maxWidth: "100%",
+  "& .MuiInputBase-root:not(.MuiInputBase-multiline)": {
+    minHeight: 40,
+    height: wrap ? "auto" : 40,
+    alignItems: "center",
+  },
+  "& .MuiSelect-select": {
+    lineHeight: 1.4,
+    py: "9px",
+    minHeight: wrap ? 22 : "unset",
+    height: wrap ? "auto !important" : "100%",
+    display: "flex",
+    alignItems: "center",
+    paddingRight: "32px !important",
+    boxSizing: "border-box",
+    overflow: "hidden",
+    ...(wrap
+      ? {
+          whiteSpace: "normal",
+          wordBreak: "break-word",
+          textOverflow: "unset",
+        }
+      : {
+          whiteSpace: "nowrap",
+          textOverflow: "ellipsis",
+        }),
+  },
+  "& .MuiSelect-icon": {
+    right: 8,
+    top: "50%",
+    transform: "translateY(-50%)",
+  },
+});
 
 const SchemaApiDropdown = ({
   label,
@@ -33,6 +72,8 @@ const SchemaApiDropdown = ({
   required,
   placeholder,
   onOptionsCountChange,
+  compact = false,
+  compactWrap = false,
 }: SchemaApiDropdownProps) => {
   const [options, setOptions] = useState<Array<{ label: string; value: string }>>([]);
   const [loading, setLoading] = useState(false);
@@ -101,6 +142,8 @@ const SchemaApiDropdown = ({
   }, [dataSource, apiContextKey, resolvedApi]);
 
   const selectedLabel = options.find((option) => option.value === value)?.label;
+  const resolvedLabel = selectedLabel ?? (value ? String(value) : "");
+  const compactSelectSx = useMemo(() => buildCompactSelectSx(compactWrap), [compactWrap]);
 
   return (
     <FormInput
@@ -111,18 +154,41 @@ const SchemaApiDropdown = ({
       disabled={disabled || loading}
       required={required}
       helperText={error ?? undefined}
+      sx={compact ? compactSelectSx : undefined}
       SelectProps={{
         MenuProps: schemaSelectMenuProps,
         displayEmpty: Boolean(placeholder),
         renderValue: (selected) => {
           if (!selected) {
             return (
-              <Box component="span" sx={{ color: "text.secondary", fontSize: "0.78rem" }}>
+              <Box
+                component="span"
+                sx={{ color: "text.secondary", fontSize: "0.78rem", lineHeight: 1.4 }}
+              >
                 {placeholder}
               </Box>
             );
           }
-          return selectedLabel ?? String(selected);
+          return (
+            <Box
+              component="span"
+              title={resolvedLabel}
+              sx={{
+                width: "100%",
+                fontSize: "0.78rem",
+                lineHeight: 1.4,
+                ...(compact && compactWrap
+                  ? { whiteSpace: "normal", wordBreak: "break-word" }
+                  : {
+                      overflow: "hidden",
+                      whiteSpace: "nowrap",
+                      textOverflow: "ellipsis",
+                    }),
+              }}
+            >
+              {resolvedLabel}
+            </Box>
+          );
         },
       }}
     >

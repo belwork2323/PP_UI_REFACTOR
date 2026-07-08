@@ -5,6 +5,7 @@ import type {
   SchemaTableColumn,
   SchemaTableCommitGroupConfig,
 } from "../types";
+import { flattenTableColumns } from "../utils/schemaUtils";
 import { applyFormulaColumns } from "./formulaEval";
 import {
   buildRowApiContext,
@@ -172,6 +173,73 @@ export const buildEmptyPickerRow = (
     if (col.fieldType !== "serial") row[col.id] = "";
   });
   return row;
+};
+
+const isPersistedDataRow = (
+  row: Record<string, unknown>,
+  flatColumns: SchemaTableColumn[],
+) => {
+  if (row._rowType === "header" || isPickerRow(row)) return false;
+  return flatColumns.some((col) => {
+    if (col.fieldType === "serial") return false;
+    const value = row[col.id];
+    return value != null && String(value).trim() !== "";
+  });
+};
+
+/** Restore commit-group row metadata after loading plain API rows (edit/details). */
+export const rehydrateCommitGroupTableRows = (
+  table: SchemaTableBlock,
+  rows: Record<string, unknown>[],
+): Record<string, unknown>[] => {
+  const commitGroup = getTableCommitGroup(table);
+  if (!commitGroup) return rows;
+
+  const flatColumns = flattenTableColumns(table.columns);
+  const autoKey = table.rows?.autoIncrementKey ?? "srNo";
+  const primaryColumn = commitGroup.pickerColumns[0];
+  if (!primaryColumn) return rows;
+
+  const dataRows = rows.filter((row) => isPersistedDataRow(row, flatColumns));
+  if (!dataRows.length) {
+    return renumberTableRows([buildEmptyPickerRow(flatColumns, autoKey)], autoKey);
+  }
+
+  const grouped: Array<{ key: string; rows: Record<string, unknown>[] }> = [];
+  dataRows.forEach((row) => {
+    const groupKey = String(row[primaryColumn] ?? "").trim();
+    if (!groupKey) return;
+
+    const lastGroup = grouped[grouped.length - 1];
+    if (lastGroup?.key === groupKey) {
+      lastGroup.rows.push(row);
+      return;
+    }
+
+    grouped.push({ key: groupKey, rows: [row] });
+  });
+
+  const nextRows: Record<string, unknown>[] = [];
+  grouped.forEach((group, groupIndex) => {
+    const groupId = `${group.key}-group-${groupIndex}`;
+    group.rows.forEach((row) => {
+      const {
+        _rowRole: _role,
+        _groupId: _group,
+        _rowType: _type,
+        _headerLabel: _header,
+        ...rest
+      } = row;
+      nextRows.push({
+        ...rest,
+        _rowRole: TABLE_EXPANDED_ROLE,
+        _groupId: groupId,
+      });
+    });
+  });
+
+  nextRows.push(buildEmptyPickerRow(flatColumns, autoKey));
+  return renumberTableRows(nextRows, autoKey);
 };
 
 export const createGroupHeaderRow = (

@@ -322,7 +322,6 @@ const MixingDetailsContent = ({
     { label: "Form ID", value: detailView?.formId || String(row?.formId ?? "") },
     { label: "Batch Type", value: detailView?.batchType || String(row?.batchType ?? "") },
     { label: "Status", value: detailView?.status || String(row?.mxStatus ?? row?.status ?? "") },
-    { label: "Submission Type", value: detailView?.formSubmissionType || "—" },
     { label: BL.COL_CREATED_BY, value: detailView?.createdBy || BL.UNASSIGNED },
     { label: BL.COL_CREATED_ON, value: formatDate(detailView?.createdAt ?? (row?.createdOn as string | undefined)) },
     { label: "Submitted By", value: detailView?.submittedBy || "—" },

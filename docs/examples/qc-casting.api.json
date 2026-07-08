@@ -116,7 +116,38 @@
               "autoIncrementKey": "SR_NO"
             },
             "columns": [
-              { "type": "column", "id": "FINAL_MIX_BOWL_NO", "fieldType": "dropdown", "label": "Final Mix Bowl No" },
+              {
+                "type": "column",
+                "id": "FINAL_MIX_BOWL_NO",
+                "fieldType": "dropdown",
+                "label": "Final Mix Bowl No",
+                "ui": { "placeholder": "Select bowl no" },
+                "dataSource": {
+                  "type": "static",
+                  "options": [
+                    { "label": "Bowl No.1", "value": "Bowl No.1" },
+                    { "label": "Bowl No.2", "value": "Bowl No.2" },
+                    { "label": "Bowl No.3", "value": "Bowl No.3" },
+                    { "label": "Bowl No.4", "value": "Bowl No.4" },
+                    { "label": "Bowl No.5", "value": "Bowl No.5" },
+                    { "label": "Bowl No.6", "value": "Bowl No.6" },
+                    { "label": "Bowl No.7", "value": "Bowl No.7" },
+                    { "label": "Bowl No.8", "value": "Bowl No.8" },
+                    { "label": "Bowl No.9", "value": "Bowl No.9" },
+                    { "label": "Bowl No.10", "value": "Bowl No.10" },
+                    { "label": "Bowl No.11", "value": "Bowl No.11" },
+                    { "label": "Bowl No.12", "value": "Bowl No.12" },
+                    { "label": "Bowl No.13", "value": "Bowl No.13" },
+                    { "label": "Bowl No.14", "value": "Bowl No.14" },
+                    { "label": "Bowl No.15", "value": "Bowl No.15" },
+                    { "label": "Bowl No.16", "value": "Bowl No.16" },
+                    { "label": "Bowl No.17", "value": "Bowl No.17" },
+                    { "label": "Bowl No.18", "value": "Bowl No.18" },
+                    { "label": "Bowl No.19", "value": "Bowl No.19" },
+                    { "label": "Bowl No.20", "value": "Bowl No.20" }
+                  ]
+                }
+              },
               { "type": "column", "id": "PROPELLANT_QTY", "fieldType": "number", "label": "Qty of Propellant (Kg)" },
               {
                 "type": "column",

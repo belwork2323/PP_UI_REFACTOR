@@ -233,10 +233,6 @@ const TrimmingDetailsContent = ({
     { label: "Form ID", value: detailView?.formId || row?.formId || "—" },
     { label: "Batch Type", value: detailView?.batchType || row?.batchType || "—" },
     {
-      label: "Submission Type",
-      value: detailView?.formSubmissionType || row?.formSubmissionType || "—",
-    },
-    {
       label: "Status",
       value: formatStatusLabel(detailView?.status || String(row?.trStatus ?? row?.status ?? "")),
     },

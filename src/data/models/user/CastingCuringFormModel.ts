@@ -641,7 +641,6 @@ export type CastingCuringDetailView = {
   formId: string;
   batchId: string;
   batchType: string;
-  formSubmissionType: string;
   status?: string;
   projectId: string;
   projectName: string;
@@ -718,7 +717,6 @@ export const mapCastingCuringDetailsForDisplay = (
     formId: String(data.formId ?? details.formId ?? ""),
     batchId: String(data.batchId ?? details.batchId ?? ""),
     batchType: String(data.batchType ?? details.batchType ?? ""),
-    formSubmissionType: String(data.formSubmissionType ?? details.formSubmissionType ?? ""),
     status: data.status != null ? String(data.status) : details.status != null ? String(details.status) : undefined,
     projectId: String(project.projectId ?? ""),
     projectName: String(project.projectName ?? ""),

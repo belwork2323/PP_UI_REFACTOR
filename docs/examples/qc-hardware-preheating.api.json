@@ -31,7 +31,7 @@
           {
             "type": "table",
             "id": "PREHEATING_DETAILS",
-            "title": "Preheating Details",
+            "label": "Preheating Details",
             "rows": {
               "allowAdd": true,
               "allowDelete": true,

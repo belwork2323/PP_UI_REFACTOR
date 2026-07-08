@@ -75,6 +75,7 @@ export {
   findLastPickerRow,
   resolveDerivedColumnValue,
   formatReferenceRangeValue,
+  rehydrateCommitGroupTableRows,
 } from "./rules/tableCommitGroup";
 
 export { evaluateRowFormula, applyFormulaColumns } from "./rules/formulaEval";

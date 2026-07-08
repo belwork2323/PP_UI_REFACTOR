@@ -324,7 +324,6 @@ export type CasePreparationDetailView = {
   formId: string;
   batchId: string;
   batchType: string;
-  formSubmissionType: string;
   status?: string;
   createdBy: string | null;
   createdAt: string | null;
@@ -635,7 +634,6 @@ export const mapCasePreparationDetailsForDisplay = (
     formId: String(data.formId ?? ""),
     batchId: String(data.batchId ?? ""),
     batchType: String(data.batchType ?? ""),
-    formSubmissionType: String(data.formSubmissionType ?? ""),
     status: data.status != null ? String(data.status) : undefined,
     createdBy: mapPersonLabel(data.createdBy),
     createdAt: data.createdAt != null ? String(data.createdAt) : null,

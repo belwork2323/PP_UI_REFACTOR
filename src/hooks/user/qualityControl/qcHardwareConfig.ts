@@ -20,17 +20,41 @@ export const isQcHardwareProcessSubType = (value: string): value is QcHardwarePr
 export const getQcHardwareProcessLabel = (subType: string) =>
   QC_HARDWARE_PROCESS_OPTIONS.find((option) => option.value === subType)?.label ?? subType;
 
+export const QC_HARDWARE_SECTION_IDS: Record<QcHardwareProcessSubType, string> = {
+  ABRADING: "ABRADING_DETAILS",
+  PREHEATING: "PREHEATING_DETAILS",
+  LINEAR_COATING: "LINEAR_COATING_DETAILS",
+  DISPATCH: "DISPATCH_DETAILS",
+};
+
+export const getHardwareSectionIdForSubType = (subType: string) =>
+  isQcHardwareProcessSubType(subType) ? QC_HARDWARE_SECTION_IDS[subType] : undefined;
+
 export const resolveQcHardwareMotorOptions = (
-  batch?: { motorId?: string; motorIds?: string[] } | null,
+  batch?: { motorId?: string; motorIds?: Array<string | number> } | null,
 ) => {
-  const ids = [
-    ...(Array.isArray(batch?.motorIds) ? batch.motorIds : []),
-    batch?.motorId ?? "",
-  ]
-    .map((id) => String(id ?? "").trim())
+  const fromArray = Array.isArray(batch?.motorIds)
+    ? batch.motorIds.map((id) => String(id).trim()).filter(Boolean)
+    : [];
+
+  if (fromArray.length > 0) {
+    const unique = Array.from(new Set(fromArray.filter((id) => !id.includes(","))));
+    return unique.map((value) => ({ value, label: value }));
+  }
+
+  const singleId = String(batch?.motorId ?? "").trim();
+  if (!singleId) return [];
+
+  const parsed = singleId
+    .split(",")
+    .map((id) => id.trim())
     .filter(Boolean);
 
-  return Array.from(new Set(ids)).map((value) => ({ value, label: value }));
+  if (parsed.length > 1) {
+    return parsed.map((value) => ({ value, label: value }));
+  }
+
+  return [{ value: singleId, label: singleId }];
 };
 
 export const resolveQcMotorIdOptions = resolveQcHardwareMotorOptions;

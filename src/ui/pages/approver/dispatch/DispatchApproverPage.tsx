@@ -395,10 +395,6 @@ const DispatchDetailDialog = ({ open, onClose, item, onApprove, onReject, detail
                 value: detail?.status,
               },
               {
-                label: "Submission Type",
-                value: detail?.formSubmissionType,
-              },
-              {
                 label: "Date",
                 value: detail?.createdAt
                   ? new Date(detail.createdAt).toLocaleDateString("en-IN")

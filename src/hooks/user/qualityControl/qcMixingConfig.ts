@@ -1,12 +1,13 @@
 import { STRINGS } from "../../../app/config/strings";
 import type { QcApiSubType } from "../../../schema-engine/adapters/qc.adapter";
-import { createQcInitialValues } from "../../../schema-engine/adapters/qc.adapter";
-import type { SchemaDocumentV2 } from "../../../schema-engine";
+import { createQcInitialValues, hydrateQcValuesFromSections } from "../../../schema-engine/adapters/qc.adapter";
+import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
 import type { QcDivisionEntry } from "./qcDivisionEntryTypes";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 
 export const QC_MIXING_FINAL_MIX_DETAILS_SECTION_ID = "FINAL_MIX_DETAILS";
+export const QC_MIXING_PREMIX_SECTION_ID = "PREMIX_DETAILS";
 export const QC_MIXING_VISCOSITY_SECTION_ID = "VISCOSITY_BUILD_UP";
 
 export type QcMixingFinalMixSchemaSlice = "details" | "viscosity";
@@ -83,4 +84,87 @@ export const createMixingFinalMixViscosityValues = (schema: SchemaDocumentV2) =>
 export const createMixingFinalMixDetailsValues = (schema: SchemaDocumentV2) => {
   const detailsSchema = sliceMixingFinalMixSchema(schema, "details");
   return detailsSchema ? createQcInitialValues(detailsSchema) : {};
+};
+
+export const resolveMixingSchemaSubType = (
+  section: SchemaSectionSubmission,
+  detailSubType: QcApiSubType,
+): QcApiSubType => {
+  const sectionSubType = section.subType as QcApiSubType | undefined;
+  if (sectionSubType === "PREMIX" || sectionSubType === "FINAL_MIX") return sectionSubType;
+  if (
+    section.sectionId === QC_MIXING_FINAL_MIX_DETAILS_SECTION_ID ||
+    section.sectionId === QC_MIXING_VISCOSITY_SECTION_ID
+  ) {
+    return "FINAL_MIX";
+  }
+  if (section.sectionId === QC_MIXING_PREMIX_SECTION_ID) return "PREMIX";
+  return detailSubType;
+};
+
+export const isMixingSharedFinalMixDetailsSection = (sectionId: string) =>
+  sectionId === QC_MIXING_FINAL_MIX_DETAILS_SECTION_ID;
+
+export type MixingDivisionRestoreResult = {
+  finalMixDetailSections: SchemaSectionSubmission[];
+  premixEntries: Array<{ premixNo: number; sections: SchemaSectionSubmission[] }>;
+  finalMixEntries: Array<{ premixNo: number; sections: SchemaSectionSubmission[] }>;
+  schemaSubTypes: QcApiSubType[];
+};
+
+export const groupMixingDetailSections = (
+  sections: SchemaSectionSubmission[],
+  detailSubType: QcApiSubType,
+): MixingDivisionRestoreResult => {
+  const result: MixingDivisionRestoreResult = {
+    finalMixDetailSections: [],
+    premixEntries: [],
+    finalMixEntries: [],
+    schemaSubTypes: [],
+  };
+  const premixByNo = new Map<number, SchemaSectionSubmission[]>();
+  const finalMixByNo = new Map<number, SchemaSectionSubmission[]>();
+  const subTypes = new Set<QcApiSubType>();
+
+  sections.forEach((section) => {
+    const subType = resolveMixingSchemaSubType(section, detailSubType);
+    if (subType) subTypes.add(subType);
+
+    if (isMixingSharedFinalMixDetailsSection(section.sectionId)) {
+      result.finalMixDetailSections.push(section);
+      return;
+    }
+
+    if (section.sectionId === QC_MIXING_VISCOSITY_SECTION_ID && section.premixNo != null) {
+      const list = finalMixByNo.get(section.premixNo) ?? [];
+      list.push(section);
+      finalMixByNo.set(section.premixNo, list);
+      return;
+    }
+
+    if (section.sectionId === QC_MIXING_PREMIX_SECTION_ID && section.premixNo != null) {
+      const list = premixByNo.get(section.premixNo) ?? [];
+      list.push(section);
+      premixByNo.set(section.premixNo, list);
+    }
+  });
+
+  result.premixEntries = Array.from(premixByNo.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([premixNo, sectionList]) => ({ premixNo, sections: sectionList }));
+  result.finalMixEntries = Array.from(finalMixByNo.entries())
+    .sort(([a], [b]) => a - b)
+    .map(([premixNo, sectionList]) => ({ premixNo, sections: sectionList }));
+  result.schemaSubTypes = Array.from(subTypes);
+
+  return result;
+};
+
+export const hydrateMixingFinalMixDetailsValues = (
+  schema: SchemaDocumentV2,
+  sections: SchemaSectionSubmission[],
+): SchemaFormValues | undefined => {
+  const detailsSchema = sliceMixingFinalMixSchema(schema, "details");
+  if (!detailsSchema || !sections.length) return undefined;
+  return hydrateQcValuesFromSections(detailsSchema, sections);
 };

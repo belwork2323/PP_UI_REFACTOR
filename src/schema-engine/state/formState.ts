@@ -12,8 +12,9 @@ import {
   TABLE_VALUE_META_KEYS,
   wrapTableValue,
   isFieldTypeHintKey,
+  isPickerRow,
 } from "../utils/tableRowUtils";
-import { buildEmptyPickerRow } from "../rules/tableCommitGroup";
+import { buildEmptyPickerRow, rehydrateCommitGroupTableRows } from "../rules/tableCommitGroup";
 
 export type SchemaFormValues = Record<string, unknown>;
 
@@ -198,12 +199,49 @@ export const buildInitialFormValues = (
   return values;
 };
 
+const hydrateTableValue = (table: SchemaTableBlock, value: unknown): unknown => {
+  if (!hasTableCommitGroup(table)) return value;
+
+  if (isWrappedTableValue(value)) {
+    const rows = value.rows as Record<string, unknown>[];
+    if (!rows.length || rows.some(isPickerRow)) return value;
+    return {
+      ...value,
+      rows: rehydrateCommitGroupTableRows(table, rows),
+    };
+  }
+
+  if (!Array.isArray(value) || !value.length || (value as Record<string, unknown>[]).some(isPickerRow)) {
+    return value;
+  }
+
+  return rehydrateCommitGroupTableRows(table, value as Record<string, unknown>[]);
+};
+
+const isEmptySubmissionRow = (row: unknown): boolean => {
+  if (!row || typeof row !== "object" || Array.isArray(row)) return false;
+
+  return Object.entries(row as Record<string, unknown>).every(([key, value]) => {
+    if (TABLE_ROW_RUNTIME_KEYS.has(key) || key.endsWith("__fieldType")) return true;
+    if (/^(sr[_-]?no|serial)$/i.test(key)) return true;
+    if (value === null || value === undefined) return true;
+    if (typeof value === "string") return value.trim() === "";
+    if (typeof value === "number") return false;
+    if (typeof value === "boolean") return false;
+    if (Array.isArray(value)) return value.length === 0;
+    if (typeof value === "object") return Object.keys(value as Record<string, unknown>).length === 0;
+    return false;
+  });
+};
+
 const sanitizeSubmissionValue = (value: unknown): unknown => {
   if (isWrappedTableValue(value)) {
     return sanitizeSubmissionValue(value.rows);
   }
   if (Array.isArray(value)) {
-    return value.map(sanitizeSubmissionValue);
+    return value
+      .map(sanitizeSubmissionValue)
+      .filter((item) => !isEmptySubmissionRow(item));
   }
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
@@ -296,7 +334,9 @@ export const mergeSectionDataIntoValues = (
       }
       if (block.type === "field" || block.type === "table" || block.type === "matrix") {
         if (block.id in (savedRow as Record<string, unknown>)) {
-          initial[scopedFormKey(scope, block.id)] = cloneValue((savedRow as Record<string, unknown>)[block.id]);
+          const savedValue = cloneValue((savedRow as Record<string, unknown>)[block.id]);
+          initial[scopedFormKey(scope, block.id)] =
+            block.type === "table" ? hydrateTableValue(block, savedValue) : savedValue;
         }
       }
     };

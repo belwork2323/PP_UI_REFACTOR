@@ -396,6 +396,7 @@ const normalizeApiTable = (table: ApiTable): SchemaTableBlock => {
   return {
     type: "table",
     id: String(table.tableId ?? table.id ?? ""),
+    label: table.title ? String(table.title) : undefined,
     title: table.title ? String(table.title) : undefined,
     ...(table.addColumnsAllowed ? { allowAddColumn: true } : {}),
     rows: {

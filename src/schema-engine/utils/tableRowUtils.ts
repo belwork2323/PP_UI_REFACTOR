@@ -1,5 +1,5 @@
 import type { SchemaFieldType, SchemaTableBlock, SchemaTableColumn, SchemaTableStoredValue } from "../types";
-import { TABLE_EXPANDED_ROLE, TABLE_PICKER_ROLE } from "../rules/tableCommitGroup";
+import { TABLE_EXPANDED_ROLE, TABLE_PICKER_ROLE, rehydrateCommitGroupTableRows } from "../rules/tableCommitGroup";
 import { flattenTableColumns } from "./schemaUtils";
 
 /** Metadata keys on preset row objects — not column ids */
@@ -16,11 +16,19 @@ export const resolveTableRows = (
   table: SchemaTableBlock,
   buildRows: (table: SchemaTableBlock) => Record<string, unknown>[],
 ): Record<string, unknown>[] => {
+  const maybeRehydrate = (rows: Record<string, unknown>[]) => {
+    const withPresets = applyPresetRowMetadata(rows, table);
+    if (hasTableCommitGroup(table) && withPresets.length > 0 && !withPresets.some(isPickerRow)) {
+      return rehydrateCommitGroupTableRows(table, withPresets);
+    }
+    return withPresets;
+  };
+
   if (isWrappedTableValue(value) && value.rows.length > 0) {
-    return applyPresetRowMetadata(value.rows, table);
+    return maybeRehydrate(value.rows);
   }
   if (Array.isArray(value) && value.length > 0) {
-    return applyPresetRowMetadata(value as Record<string, unknown>[], table);
+    return maybeRehydrate(value as Record<string, unknown>[]);
   }
   return buildRows(table);
 };

@@ -78,9 +78,9 @@
               {
                 "type": "column",
                 "id": "ACEM_BATCH_NO",
-                "fieldType": "dropdown",
+                "fieldType": "text",
                 "label": "ACEM Batch No",
-                "ui": { "placeholder": "Select batch number" }
+                "ui": { "placeholder": "Enter ACEM batch number" }
               },
               {
                 "type": "column",

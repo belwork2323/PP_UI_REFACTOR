@@ -31,7 +31,7 @@
           {
             "type": "table",
             "id": "FIRST_CUT",
-            "title": "First Cut",
+            "label": "First Cut",
             "rows": {
               "allowAdd": true,
               "allowDelete": true,
@@ -48,7 +48,7 @@
           {
             "type": "table",
             "id": "SECOND_CUT",
-            "title": "Second Cut",
+            "label": "Second Cut",
             "rows": {
               "allowAdd": true,
               "allowDelete": true,

@@ -620,7 +620,6 @@ export type MixingDetailView = {
   formId: string;
   batchId: string;
   batchType: string;
-  formSubmissionType: string;
   status: string;
   submittedBy: string;
   submittedAt: string;
@@ -646,14 +645,6 @@ export const formatMixingPersonDisplay = (value: unknown): string => {
   return "—";
 };
 
-const formatMixingSubmissionType = (value: unknown) => {
-  const raw = String(value ?? "").trim();
-  if (!raw) return "—";
-  if (raw === "DRAFT") return "Draft";
-  if (raw === "SUBMIT") return "Submitted";
-  return raw.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
-};
-
 export const mapMixingDetailsForDisplay = (
   data: Record<string, unknown> | null | undefined,
 ): MixingDetailView | null => {
@@ -665,7 +656,6 @@ export const mapMixingDetailsForDisplay = (
     formId: String(data.formId ?? ""),
     batchId: String(data.batchId ?? ""),
     batchType: formatSubdepartmentBatchTypeLabel(String(data.batchType ?? "")),
-    formSubmissionType: formatMixingSubmissionType(data.formSubmissionType),
     status: normalizeApproverBatchStatus(data.status),
     submittedBy: formatMixingPersonDisplay(data.submittedBy),
     submittedAt: String(data.submittedAt ?? ""),

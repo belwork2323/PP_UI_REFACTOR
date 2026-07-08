@@ -308,7 +308,6 @@ const CastingCuringDetailsContent = ({
     { label: BL.COL_BATCH_ID, value: detailView?.batchId || row?.batchId || "—" },
     { label: "Form ID", value: detailView?.formId || row?.formId || "—" },
     { label: "Batch Type", value: detailView?.batchType || row?.batchType || "—" },
-    { label: "Submission Type", value: detailView?.formSubmissionType || "—" },
     { label: "Status", value: detailView?.status || row?.ccStatus || row?.status || "—" },
     { label: "Project ID", value: detailView?.projectId || "—" },
     { label: "Project Name", value: detailView?.projectName || "—" },

@@ -211,7 +211,6 @@ const CasePreparationDetailsContent = ({
     { label: BL.COL_BATCH_ID, value: detailView?.batchId || row?.batchId || "—" },
     { label: "Form ID", value: detailView?.formId || row?.formId || "—" },
     { label: "Batch Type", value: detailView?.batchType || row?.batchType || "—" },
-    { label: "Submission Type", value: detailView?.formSubmissionType || "—" },
     {
       label: BL.COL_CREATED_BY,
       value: detailView?.createdBy || (row?.assignedTo as { fullName?: string } | undefined)?.fullName || BL.UNASSIGNED,
