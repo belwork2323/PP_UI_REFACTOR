@@ -12,11 +12,12 @@ import {
   TextField,
   Typography,
 } from "@mui/material";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import type { SxProps, Theme } from "@mui/material";
 import type { SchemaTableBlock, SchemaTableColumn, SchemaTableColumnSlot, SchemaDataSource } from "../../../schema-engine/types";
 import { applyFormulaColumns } from "../../../schema-engine/rules/formulaEval";
+import { applyRowComputations, isRowComputationTarget } from "../../../schema-engine/rules/tableRowComputations";
 import { flattenTableColumns, isColumnGroup } from "../../../schema-engine/utils/schemaUtils";
 import {
   buildRowApiContext,
@@ -446,10 +447,20 @@ const DynamicTable = ({
   const commitGroup = getTableCommitGroup(config);
   const isCommitGroupMode = hasTableCommitGroup(config);
   const mergeExpandedColumns = commitGroup ? getMergeExpandedColumns(commitGroup) : [];
-  const expandedGroupCellSpans =
-    isCommitGroupMode && mergeExpandedColumns.length
-      ? computeExpandedGroupCellSpans(rows, mergeExpandedColumns)
-      : new Map();
+  const expandedGroupCellSpans = useMemo(
+    () =>
+      isCommitGroupMode && mergeExpandedColumns.length
+        ? computeExpandedGroupCellSpans(rows, mergeExpandedColumns)
+        : new Map(),
+    [isCommitGroupMode, mergeExpandedColumns, rows],
+  );
+  const commitGroupRowMeta = useMemo(() => {
+    if (!isCommitGroupMode) return [];
+    return rows.map((_, rowIndex) => ({
+      showGroupDivider:
+        isCommitGroupDividerBefore(rows, rowIndex) || isPickerRowAfterGroups(rows, rowIndex),
+    }));
+  }, [isCommitGroupMode, rows]);
   const [pickerOptionCounts, setPickerOptionCounts] = useState<Record<string, number>>({});
   const pickerRow = findLastPickerRow(rows);
   const primaryPickerColumn = commitGroup?.pickerColumns[0];
@@ -505,18 +516,21 @@ const DynamicTable = ({
   const updateCell = (rowIndex: number, colId: string, value: string) => {
     const changedColumn = flatColumns.find((col) => col.id === colId);
     const dependentColumnIds = getDependentColumnIds(flatColumns, colId);
-    const nextRows = rows.map((row, idx) => {
-      if (idx !== rowIndex) return row;
-      const updated: Record<string, unknown> = { ...row, [colId]: value };
-      dependentColumnIds.forEach((dependentId) => {
-        updated[dependentId] = "";
-      });
-      if (changedColumn?.derive?.sourceField) {
-        const targetColumn = changedColumn.derive.targetColumn;
-        if (targetColumn) updated[targetColumn] = "";
-      }
-      return applyFormulaColumns(updated, flatColumns);
-    });
+    const nextRows = applyRowComputations(
+      rows.map((row, idx) => {
+        if (idx !== rowIndex) return row;
+        const updated: Record<string, unknown> = { ...row, [colId]: value };
+        dependentColumnIds.forEach((dependentId) => {
+          updated[dependentId] = "";
+        });
+        if (changedColumn?.derive?.sourceField) {
+          const targetColumn = changedColumn.derive.targetColumn;
+          if (targetColumn) updated[targetColumn] = "";
+        }
+        return applyFormulaColumns(updated, flatColumns, colId);
+      }),
+      config,
+    );
     onChange(nextRows);
 
     if (changedColumn?.derive && value) {
@@ -688,9 +702,7 @@ const DynamicTable = ({
             const isPicker = isCommitGroupMode && isPickerRow(row);
             const isExpanded = isCommitGroupMode && isExpandedRow(row);
             const rowGroupId = row._groupId ? String(row._groupId) : "";
-            const showGroupDivider =
-              isCommitGroupMode &&
-              (isCommitGroupDividerBefore(rows, rowIndex) || isPickerRowAfterGroups(rows, rowIndex));
+            const showGroupDivider = isCommitGroupMode && commitGroupRowMeta[rowIndex]?.showGroupDivider;
 
             return (
               <TableRow
@@ -747,9 +759,11 @@ const DynamicTable = ({
                     config.rows?.presetRows,
                   );
                   const cellValue = String(row[col.id] ?? "");
+                  const isComputedCell = isRowComputationTarget(config, row, col.id, autoKey);
                   const cellReadOnly =
                     readOnly ||
                     isReadonlyCol(resolvedCol) ||
+                    isComputedCell ||
                     isPresetLockedCell(row, col.id, rowIndex, config.rows?.presetRows, autoKey) ||
                     (isExpanded && commitGroup
                       ? isExpandedColumnReadonly(commitGroup, col.id)
@@ -783,6 +797,8 @@ const DynamicTable = ({
                             apiContext={rowApiContext}
                             emphasis={isMergedPrimaryColumn}
                           />
+                        ) : isComputedCell ? (
+                          <FormulaCell value={cellValue} unit={resolvedCol.unit} />
                         ) : (
                           renderCellEditor(
                             resolvedCol,

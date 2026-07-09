@@ -15,6 +15,9 @@ import useUserManagementHook from "@hooks/admin/UserManagement/useUserManagement
 import { getDisplayName, getUsername } from "@utils/userManagementUtils";
 import UserManagementList from "./UserManagementList";
 import CreateUserManagementForm from "./CreateUserManagementForm";
+import FilterToggleButton from "@/ui/components/common/FilterToggleButton";
+import DashboardDateFilter from "@/ui/components/custom/dashboard/DashboardDateFilter";
+import getDashboardTheme from "@/app/theme/custom_themes/admin/Dashboard/dashboard_theme";
 
 const S = STRINGS.USER_MANAGEMENT;
 const AC = STRINGS.ADMIN_COMMON;
@@ -30,7 +33,8 @@ const UserManagementPage = () => {
   const mode = useThemeStore((s) => s.mode);
   const t = getUserManagementTheme(mode);
   const { list, stats, lookups, form, delete: deleteSection, refresh } = useUserManagementHook();
-
+  const th = getDashboardTheme(mode);
+  const S1 = STRINGS.DASHBOARD_PAGE;
   const statRows = S.STATS.map((s) => ({
     ...s,
     value: stats.loading
@@ -70,12 +74,45 @@ const UserManagementPage = () => {
         }
         theme={t}
       />
-
+      <Box sx={{ mb: 2 }}>
+        <FilterToggleButton
+          label="Date Filter"
+          count={0}
+          isOpen={stats.dateFilterOpen}
+          onClick={stats.toggleDateFilter}
+          sx={th.table.filterBtn(stats.dateFilterOpen)}
+          iconSx={th.table.filterBtnIcon}
+          textSx={th.table.filterBtnText}
+          badgeSx={th.table.filterBadgePill}
+          chevronSx={th.table.filterBtnChevron}
+          selectedValue={stats.filterType}
+        />
+        {stats.dateFilterOpen && (
+          <DashboardDateFilter
+            filterType={stats.filterType}
+            onFilterChange={stats.handleFilterTypeChange}
+            customStartDate={stats.customStartDate}
+            customEndDate={stats.customEndDate}
+            onStartChange={stats.setCustomStartDate}
+            onEndChange={stats.setCustomEndDate}
+            loading={stats.loading}
+            strings={S1.DATE_FILTER}
+            containerSx={th.dashboard.dateRangeBar}
+            selectSx={{ minWidth: 150, ...th.filterInputSx }}
+            menuProps={th.filterMenuProps}
+            menuItemSx={th.filterMenuItemSx}
+            textFieldSx={th.filterInputSx}
+          />
+        )}
+      </Box>
       <AdminManagementStatsGrid stats={statRows} theme={t} />
 
       <AdminListShell
         search={list.search}
-        onSearchChange={(value) => { list.setSearch(value); list.setPage(0); }}
+        onSearchChange={(value) => {
+          list.setSearch(value);
+          list.setPage(0);
+        }}
         searchPlaceholder={S.TOOLBAR.SEARCH_PLACEHOLDER}
         filterOpen={list.filterOpen}
         onFilterToggle={list.toggleFilterOpen}
@@ -146,7 +183,10 @@ const UserManagementPage = () => {
           onEdit={form.openEdit}
           onDelete={deleteSection.openDelete}
           onPageChange={(_, p) => list.setPage(p)}
-          onRowsPerPageChange={(e) => { list.setRowsPerPage(+e.target.value); list.setPage(0); }}
+          onRowsPerPageChange={(e) => {
+            list.setRowsPerPage(+e.target.value);
+            list.setPage(0);
+          }}
         />
       </AdminListShell>
 

@@ -89,9 +89,9 @@ function DashboardDateFilter({
           <MenuItem value={s.VALUES.DAY} sx={menuItemSx}>
             {s.TODAY}
           </MenuItem>
-          <MenuItem value={s.VALUES.WEEK} sx={menuItemSx}>
+          {/* <MenuItem value={s.VALUES.WEEK} sx={menuItemSx}>
             {s.THIS_WEEK}
-          </MenuItem>
+          </MenuItem> */}
           <MenuItem value={s.VALUES.MONTH} sx={menuItemSx}>
             {s.THIS_MONTH}
           </MenuItem>

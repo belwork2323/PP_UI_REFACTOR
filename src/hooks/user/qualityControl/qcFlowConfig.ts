@@ -14,6 +14,7 @@ import {
 export type QcDivisionOption = {
   value: string;
   label: string;
+  disabled?: boolean;
 };
 
 export type QcRawMaterialTypeOption = {
@@ -57,7 +58,7 @@ export const QC_DIVISION_OPTIONS: QcDivisionOption[] = [
   { value: "NDT", label: "NDT" },
   { value: "QC", label: "QC" },
   { value: "WEIGHTMENT", label: "Weightment" },
-  { value: "STATIC_TEST_FACILITY", label: "Static Test Facility" },
+  { value: "STATIC_TEST_FACILITY", label: "Static Test Facility", disabled: true },
 ];
 
 export const QC_RAW_MATERIAL_TYPE_OPTIONS: QcRawMaterialTypeOption[] = [

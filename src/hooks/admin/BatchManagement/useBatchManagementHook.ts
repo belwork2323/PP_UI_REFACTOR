@@ -29,10 +29,20 @@ import { OPERATION_STATUS } from "@hooks/operationStatus";
 const S = STRINGS.BATCH_MANAGEMENT;
 
 const DEFAULT_BATCH_FILTERS = {
+  search: "",
+  motorIds: [] as string[],
   stage: "All",
   status: "All",
   priority: "All",
-  dept: "All",
+  subDept: "All",
+};
+type BatchFilters = {
+  search?: string;
+  motorIds?: string[];
+  motorStage?: string;
+  status?: string;
+  priority?: string;
+  subDepartment?: string;
 };
 
 function useBatchListSection() {
@@ -49,11 +59,19 @@ function useBatchListSection() {
   const loadBatchList = useCallback(async () => {
     setListLoading(true);
     try {
-      const filters: Record<string, string> = {};
+      const filters: BatchFilters = {};
       if (search.trim()) filters.search = search.trim();
-      if (appliedFilters.status !== "All") filters.status = appliedFilters.status;
+      if (appliedFilters.stage !== "All") filters.motorStage = appliedFilters.stage;
+      if (appliedFilters.motorIds?.length) {
+        filters.motorIds = Array.isArray(appliedFilters.motorIds)
+          ? appliedFilters.motorIds
+          : [appliedFilters.motorIds];
+      }
+      if (appliedFilters.status !== "All") {
+        filters.status = appliedFilters.status.toUpperCase().replace(/\s+/g, "_");
+      }
       if (appliedFilters.priority !== "All") filters.priority = appliedFilters.priority;
-      if (appliedFilters.dept !== "All") filters.department = appliedFilters.dept;
+      if (appliedFilters.subDept !== "All") filters.subDepartment = appliedFilters.subDept;
 
       const resp = await batchManagementController.getAllBatches(page + 1, rowsPerPage, filters);
       if (resp) {
@@ -74,10 +92,22 @@ function useBatchListSection() {
     void loadBatchList();
   }, [loadBatchList]);
 
-  const activeFilterCount = Object.values(appliedFilters).filter((v) => v !== "All").length;
+  const activeFilterCount = Object.entries(appliedFilters).filter(([_, value]) => {
+    if (Array.isArray(value)) {
+      return value.length > 0;
+    }
 
-  const setDraftFilter = (field: keyof typeof DEFAULT_BATCH_FILTERS, value: string) => {
-    setDraftFilters((prev) => ({ ...prev, [field]: value }));
+    if (typeof value === "string") {
+      return value !== "" && value !== "All";
+    }
+
+    return false;
+  }).length;
+  const setDraftFilter = (field: keyof typeof DEFAULT_BATCH_FILTERS, value: string | string[]) => {
+    setDraftFilters((prev) => ({
+      ...prev,
+      [field]: value,
+    }));
   };
 
   const toggleFilterOpen = () => {
@@ -129,37 +159,83 @@ function useBatchStatsSection() {
   const [stats, setStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [filterType, setFilterType] = useState("month");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const [dateFilterOpen, setDateFilterOpen] = useState(true);
+  const getStatsPayload = useCallback(() => {
+    if (filterType === "custom") {
+      return {
+        filterType,
+        startDate: customStartDate,
+        endDate: customEndDate,
+      };
+    }
 
-  const fetchStats = useCallback(async (type: string, start?: string, end?: string) => {
+    const { startDate, endDate } = getDateRange(filterType);
+
+    return {
+      filterType,
+      startDate,
+      endDate,
+    };
+  }, [filterType, customStartDate, customEndDate]);
+  const fetchStats = useCallback(async () => {
     setStatsLoading(true);
-    const data = await batchManagementController.getBatchStats(type, start, end);
-    if (data) setStats(data);
-    setStatsLoading(false);
-  }, []);
 
-  const handleStatsFilterChange = async (e: any) => {
-    const newType = e.target.value;
-    setFilterType(newType);
-    const { startDate, endDate } = getDateRange(newType);
-    await fetchStats(newType, startDate, endDate);
+    try {
+      const payload = getStatsPayload();
+      const data = await batchManagementController.getBatchStats(payload);
+
+      if (data) {
+        setStats(data);
+      }
+    } finally {
+      setStatsLoading(false);
+    }
+  }, [getStatsPayload]);
+  const handleFilterTypeChange = (value: string) => {
+    setFilterType(value);
+
+    if (value !== "custom") {
+      setCustomStartDate("");
+      setCustomEndDate("");
+    }
   };
-
-  useEffect(() => {
-    const { startDate, endDate } = getDateRange("month");
-    void fetchStats("month", startDate, endDate);
+  const toggleDateFilter = () => {
+    setDateFilterOpen((prev) => !prev);
+  };
+  const refreshDashboard = useCallback(() => {
+    void fetchStats();
   }, [fetchStats]);
 
-  const refreshStats = () => {
-    const { startDate, endDate } = getDateRange(filterType);
-    void fetchStats(filterType, startDate, endDate);
-  };
+  useEffect(() => {
+    if (filterType !== "custom") {
+      refreshDashboard();
+      return;
+    }
+
+    if (customStartDate && customEndDate) {
+      refreshDashboard();
+    }
+  }, [filterType, customStartDate, customEndDate, refreshDashboard]);
 
   return {
     stats,
     loading: statsLoading,
+
     filterType,
-    handleStatsFilterChange,
-    refreshStats,
+    customStartDate,
+    customEndDate,
+    dateFilterOpen,
+
+    setFilterType,
+    setCustomStartDate,
+    setCustomEndDate,
+    setDateFilterOpen,
+
+    handleFilterTypeChange,
+    refreshDashboard,
+    toggleDateFilter,
   };
 }
 
@@ -238,7 +314,10 @@ function useBatchLookupsSection() {
 
     setAvailableMotorsLoading(true);
     try {
-      const resp = await operationsController.fetchApprovedMotorsList({ projectId: pid, motorStage: stage });
+      const resp = await operationsController.fetchApprovedMotorsList({
+        projectId: pid,
+        motorStage: stage,
+      });
       if (resp?.success && resp.data) {
         setAvailableMotors(resp.data.motors ?? []);
       } else {
@@ -261,6 +340,8 @@ function useBatchLookupsSection() {
   }, [loadLookups]);
 
   const deptNames = departments.map((d: any) => d.departmentName || d.name).filter(Boolean);
+  const subDeptNames = subDepts.map((d: any) => d.subDepartmentName || d.name).filter(Boolean);
+
   const userOptions = users.map((u: any) => ({
     id: u.userId || u.userUUID || u.id,
     userUUID: u.userUUID || u.id || "",
@@ -300,6 +381,7 @@ function useBatchLookupsSection() {
     fetchApprovedMotors,
     clearApprovedMotors,
     deptNames,
+    subDeptNames,
     loading: lookupsLoading,
     loadLookups,
   };
@@ -376,7 +458,8 @@ function useBatchFormSection(onRefresh: () => void) {
     setImplViewOnly(false);
     setEditImplTarget(null);
     setImplForm({
-      identificationSheet: batchForm.identificationSheet ?? createEmptyImplementationFormState().identificationSheet,
+      identificationSheet:
+        batchForm.identificationSheet ?? createEmptyImplementationFormState().identificationSheet,
       objective: batchForm.objective ?? "",
       articles: Array.isArray(batchForm.articles) ? batchForm.articles : [],
     });
@@ -476,7 +559,10 @@ function useBatchFormSection(onRefresh: () => void) {
   const handleBatchFormChange = (field: string) => (e: any) => {
     if (field === "numberOfMotors") {
       const numberOfMotors = Number(e.target.value) || 1;
-      const motorIds = Array.from({ length: numberOfMotors }, (_, idx) => batchForm.motorIds[idx] || "");
+      const motorIds = Array.from(
+        { length: numberOfMotors },
+        (_, idx) => batchForm.motorIds[idx] || "",
+      );
       setBatchForm((prev) => ({ ...prev, numberOfMotors, motorIds }));
       return;
     }
@@ -567,7 +653,9 @@ function useBatchFormSection(onRefresh: () => void) {
 
 function useBatchImplementationSection(implModalOpen: boolean) {
   const [materialOptions, setMaterialOptions] = useState<BatchMaterialOption[]>([]);
-  const [lotsByMaterialCode, setLotsByMaterialCode] = useState<Record<string, RawMaterialLotListRow[]>>({});
+  const [lotsByMaterialCode, setLotsByMaterialCode] = useState<
+    Record<string, RawMaterialLotListRow[]>
+  >({});
   const [loadingMaterials, setLoadingMaterials] = useState(false);
   const [loadingLots, setLoadingLots] = useState(false);
 
@@ -622,7 +710,7 @@ function useBatchImplementationSection(implModalOpen: boolean) {
       const key = normalizeMaterialCodeKey(materialCode);
       return key ? (lotsByMaterialCode[key] ?? []) : [];
     },
-    [lotsByMaterialCode]
+    [lotsByMaterialCode],
   );
 
   const getLotByMaterialAndId = useCallback(
@@ -631,13 +719,13 @@ function useBatchImplementationSection(implModalOpen: boolean) {
       if (!trimmed) return undefined;
       return getLotsForMaterial(materialCode).find((lot) => lot.lotId === trimmed);
     },
-    [getLotsForMaterial]
+    [getLotsForMaterial],
   );
 
   const getLotOptionsForRow = (
     materialCode: string,
     currentLotId: string,
-    selectedElsewhere: Set<string>
+    selectedElsewhere: Set<string>,
   ): RawMaterialLotListRow[] => {
     const base = getLotsForMaterial(materialCode);
     const filtered = base.filter((lot) => {
@@ -697,7 +785,10 @@ function useBatchDeleteSection(onRefresh: () => void) {
     setDeleting(true);
     useAlertStore.getState().showAlert(S.MESSAGES.DELETING_BATCH, "info", { loading: true });
 
-    const ok = await batchManagementController.deleteBatch(deleteTarget.batchId, deleteReason.trim());
+    const ok = await batchManagementController.deleteBatch(
+      deleteTarget.batchId,
+      deleteReason.trim(),
+    );
 
     if (ok) {
       setTimeout(() => {
@@ -731,8 +822,8 @@ export default function useBatchManagementHook() {
 
   const refreshAll = useCallback(() => {
     void list.loadBatchList();
-    stats.refreshStats();
-  }, [list.loadBatchList, stats.refreshStats]);
+    stats.refreshDashboard();
+  }, [list.loadBatchList, stats.refreshDashboard]);
 
   const deleteSection = useBatchDeleteSection(refreshAll);
   const form = useBatchFormSection(refreshAll);

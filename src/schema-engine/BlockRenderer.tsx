@@ -2,15 +2,20 @@ import { Box, Button, Typography } from "@mui/material";
 import type { SchemaBlock, SchemaFieldBlock, SchemaGroupBlock, SchemaSectionBlock } from "./types";
 import type { SchemaApiContext } from "./rules/apiDependency";
 import type { SchemaThemeTokens } from "./utils/schemaUtils";
-import type { SchemaFormValues } from "./state/formState";
+import type { SchemaFormValues, SchemaChangeMeta } from "./state/formState";
 import { setBlockValue, buildRepeatInstanceChildValues, buildTableRows, scopedFormKey } from "./state/formState";
 import { isBlockVisible } from "./rules/visibility";
 import { resolveSchemaCountToken, type SchemaSetupContext } from "./utils/setupContext";
 import { resolveBlockLayoutSx, resolveFullWidthBlockLayoutSx, resolveGridGap } from "./utils/blockLayout";
 import {
   createNextPrefixedTableColumn,
+  isDeletablePrefixedColumn,
+  resolveDeletableColumnIds,
+  resolveTableDeletedColumnIds,
   resolveTableExtraColumns,
   resolveTableRows,
+  resolveVisibleTableColumns,
+  shouldWrapTableValue,
   wrapTableValue,
 } from "./utils/tableRowUtils";
 import FormInput from "../ui/components/common/FormInput";
@@ -25,7 +30,7 @@ import { buildDefaultCuringProjectStageMatrix } from "../data/models/user/curing
 
 export type BlockRenderContext = {
   values: SchemaFormValues;
-  onChange: (values: SchemaFormValues) => void;
+  onChange: (values: SchemaFormValues, meta?: SchemaChangeMeta) => void;
   readOnly?: boolean;
   theme?: SchemaThemeTokens;
   apiContext?: SchemaApiContext;
@@ -40,7 +45,10 @@ export type BlockRenderContext = {
 const renderField = (block: SchemaFieldBlock, ctx: BlockRenderContext) => {
   const value = String(ctx.values[scopedFormKey(ctx.valueScope, block.id)] ?? "");
   const onFieldChange = (next: string) =>
-    ctx.onChange(setBlockValue(ctx.values, block.id, next, ctx.valueScope));
+    ctx.onChange(setBlockValue(ctx.values, block.id, next, ctx.valueScope), {
+      changedBlockId: block.id,
+      changedScope: ctx.valueScope,
+    });
   const disabled = ctx.readOnly || block.readonly;
 
   switch (block.fieldType) {
@@ -93,7 +101,8 @@ const renderField = (block: SchemaFieldBlock, ctx: BlockRenderContext) => {
         <FormInput
           label={block.label ? `${block.label}${block.unit ? ` (${block.unit})` : ""}` : undefined}
           value={value}
-          type="number"
+          type="text"
+          inputMode="decimal"
           onChange={(e) => onFieldChange(e.target.value)}
           disabled={disabled}
           required={block.validation?.required}
@@ -266,33 +275,74 @@ export const BlockRenderer = ({ block, ctx }: { block: SchemaBlock; ctx: BlockRe
     case "table": {
       const storedValue = ctx.values[scopedFormKey(ctx.valueScope, block.id)];
       const extraColumns = resolveTableExtraColumns(storedValue);
+      const deletedColumnIds = resolveTableDeletedColumnIds(storedValue);
+      const visibleColumns = resolveVisibleTableColumns(block.columns, deletedColumnIds);
+      const mergedColumns = [...visibleColumns, ...extraColumns];
       const rows = resolveTableRows(storedValue, block, buildTableRows);
-      const mergedColumns = [...block.columns, ...extraColumns];
+      const deletableColumnIds = resolveDeletableColumnIds(block, extraColumns, deletedColumnIds);
 
       const handleTableChange = (nextRows: Record<string, unknown>[]) => {
-        const nextValue =
-          block.allowAddColumn || block.allowDeleteColumn || extraColumns.length > 0
-            ? wrapTableValue(nextRows, extraColumns)
-            : nextRows;
-        ctx.onChange(setBlockValue(ctx.values, block.id, nextValue, ctx.valueScope));
+        const nextValue = shouldWrapTableValue(block, extraColumns, deletedColumnIds)
+          ? wrapTableValue(nextRows, extraColumns, deletedColumnIds)
+          : nextRows;
+        ctx.onChange(setBlockValue(ctx.values, block.id, nextValue, ctx.valueScope), {
+          changedBlockId: block.id,
+          changedScope: ctx.valueScope,
+        });
       };
 
       const handleAddColumn = () => {
         if (!block.allowAddColumn) return;
-        const column = createNextPrefixedTableColumn(block, extraColumns);
+        const column = createNextPrefixedTableColumn(block, extraColumns, deletedColumnIds);
         const nextExtraColumns = [...extraColumns, column];
         const nextRows = rows.map((row) => ({ ...row, [column.id]: row[column.id] ?? "" }));
-        ctx.onChange(setBlockValue(ctx.values, block.id, wrapTableValue(nextRows, nextExtraColumns), ctx.valueScope));
+        ctx.onChange(
+          setBlockValue(
+            ctx.values,
+            block.id,
+            wrapTableValue(nextRows, nextExtraColumns, deletedColumnIds),
+            ctx.valueScope,
+          ),
+          {
+            changedBlockId: block.id,
+            changedScope: ctx.valueScope,
+          },
+        );
       };
 
       const handleDeleteColumn = (columnId: string) => {
         if (!block.allowDeleteColumn) return;
-        const nextExtraColumns = extraColumns.filter((col) => col.id !== columnId);
+
+        const isExtra = extraColumns.some((col) => col.id === columnId);
+        let nextExtraColumns = extraColumns;
+        let nextDeletedColumnIds = deletedColumnIds;
+
+        if (isExtra) {
+          nextExtraColumns = extraColumns.filter((col) => col.id !== columnId);
+        } else if (isDeletablePrefixedColumn(block, columnId)) {
+          nextDeletedColumnIds = deletedColumnIds.includes(columnId)
+            ? deletedColumnIds
+            : [...deletedColumnIds, columnId];
+        } else {
+          return;
+        }
+
         const nextRows = rows.map((row) => {
           const { [columnId]: _removed, ...rest } = row;
           return rest;
         });
-        ctx.onChange(setBlockValue(ctx.values, block.id, wrapTableValue(nextRows, nextExtraColumns), ctx.valueScope));
+        ctx.onChange(
+          setBlockValue(
+            ctx.values,
+            block.id,
+            wrapTableValue(nextRows, nextExtraColumns, nextDeletedColumnIds),
+            ctx.valueScope,
+          ),
+          {
+            changedBlockId: block.id,
+            changedScope: ctx.valueScope,
+          },
+        );
       };
 
       return (
@@ -307,7 +357,7 @@ export const BlockRenderer = ({ block, ctx }: { block: SchemaBlock; ctx: BlockRe
             allowAddColumn={block.allowAddColumn}
             onAddColumn={block.allowAddColumn ? handleAddColumn : undefined}
             allowDeleteColumn={block.allowDeleteColumn}
-            deletableColumnIds={extraColumns.map((col) => col.id)}
+            deletableColumnIds={deletableColumnIds}
             onDeleteColumn={block.allowDeleteColumn ? handleDeleteColumn : undefined}
           />
         </Box>
@@ -324,7 +374,12 @@ export const BlockRenderer = ({ block, ctx }: { block: SchemaBlock; ctx: BlockRe
           <MatrixTable
             config={block}
             value={resolved}
-            onChange={(next) => ctx.onChange(setBlockValue(ctx.values, block.id, next, ctx.valueScope))}
+            onChange={(next) =>
+              ctx.onChange(setBlockValue(ctx.values, block.id, next, ctx.valueScope), {
+                changedBlockId: block.id,
+                changedScope: ctx.valueScope,
+              })
+            }
             readOnly={ctx.readOnly}
             theme={ctx.theme}
             apiContext={ctx.apiContext}

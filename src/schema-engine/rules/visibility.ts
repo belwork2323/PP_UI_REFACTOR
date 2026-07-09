@@ -144,3 +144,34 @@ export const pruneHiddenFormValues = (
 
   return next;
 };
+
+export const collectVisibilityTriggerFields = (sections: SchemaSection[]): Set<string> => {
+  const fields = new Set<string>();
+
+  const walkTarget = (target: SchemaVisibilityTarget | null | undefined) => {
+    target?.visibleWhen?.when?.forEach((rule) => {
+      if (rule.field) fields.add(rule.field);
+    });
+  };
+
+  const walkBlocks = (blocks: SchemaBlock[]) => {
+    blocks.forEach((block) => {
+      walkTarget(block);
+      if (block.type === "section" || block.type === "group") {
+        walkBlocks(block.children ?? []);
+      }
+      if (block.type === "table") {
+        block.columns.forEach((column) => {
+          if (column.type === "column") walkTarget(column);
+        });
+      }
+    });
+  };
+
+  sections.forEach((section) => {
+    walkTarget(section);
+    walkBlocks(section.children ?? []);
+  });
+
+  return fields;
+};

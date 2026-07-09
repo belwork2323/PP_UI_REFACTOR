@@ -29,7 +29,7 @@ type AdminListShellProps = {
   emptySubtitle?: string;
   filterExtension?: ReactNode;
   toolbarEnd?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   theme: AdminListShellTheme;
 };
 

@@ -46,6 +46,7 @@ type ApiTable = {
   dynamicRows?: boolean;
   addRowAllowed?: boolean;
   addColumnsAllowed?: boolean;
+  deleteColumnsAllowed?: boolean;
   rowGenerationType?: string;
   rowGenerationSource?: string;
   rowHeaders?: string[];
@@ -86,6 +87,7 @@ const toApiTableFromSection = (section: ApiFlatTableSection): ApiTable => ({
   predefinedRows: section.predefinedRows,
   addRowAllowed: section.addRowAllowed,
   addColumnsAllowed: section.addColumnsAllowed,
+  deleteColumnsAllowed: section.deleteColumnsAllowed,
   dynamicRows: section.addRowAllowed !== false,
   rows: section.rows,
   rowHeaders: section.rowHeaders,
@@ -399,6 +401,7 @@ const normalizeApiTable = (table: ApiTable): SchemaTableBlock => {
     label: table.title ? String(table.title) : undefined,
     title: table.title ? String(table.title) : undefined,
     ...(table.addColumnsAllowed ? { allowAddColumn: true } : {}),
+    ...(table.deleteColumnsAllowed ? { allowDeleteColumn: true } : {}),
     rows: {
       allowAdd,
       allowDelete: allowAdd,

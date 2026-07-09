@@ -56,6 +56,14 @@
             "rows": {
               "allowAdd": false,
               "allowDelete": false,
+              "autoIncrementKey": "SR_NO",
+              "rowComputations": [
+                {
+                  "rowKey": "H",
+                  "targetColumn": "WEIGHT_KG",
+                  "expression": "G - (A - B + C + D - E + F)"
+                }
+              ],
               "presetRows": [
                 {
                   "readonly": true,

@@ -64,7 +64,10 @@ type BatchListShellTheme = {
   };
   statusTab: {
     button: (isActive: boolean, meta?: BatchListShellStatusMeta[string]) => Record<string, unknown>;
-    countChip: (isActive: boolean, meta?: BatchListShellStatusMeta[string]) => Record<string, unknown>;
+    countChip: (
+      isActive: boolean,
+      meta?: BatchListShellStatusMeta[string],
+    ) => Record<string, unknown>;
   };
 };
 
@@ -153,14 +156,28 @@ const BatchListShell = ({
             })}
           </Stack>
           {statusToolbarEnd ? (
-            <Box sx={{ flexShrink: 0, display: "flex", alignItems: "center", ml: { xs: 0, sm: "auto" } }}>{statusToolbarEnd}</Box>
+            <Box
+              sx={{
+                flexShrink: 0,
+                display: "flex",
+                alignItems: "center",
+                ml: { xs: 0, sm: "auto" },
+              }}
+            >
+              {statusToolbarEnd}
+            </Box>
           ) : null}
         </Stack>
       ) : null}
 
       <Box sx={theme.sections.filterContainer}>
         <Stack {...theme.sections.filterStack}>
-          <Stack direction="row" spacing={1} alignItems="center" sx={{ flex: { sm: 1 }, minWidth: { xs: "100%", sm: 260 } }}>
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            sx={{ flex: { sm: 1 }, minWidth: { xs: "100%", sm: 260 } }}
+          >
             <TextField
               size="small"
               placeholder={searchPlaceholder}

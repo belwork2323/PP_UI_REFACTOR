@@ -4,6 +4,7 @@ import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog
 import UserWorkflowFormHeader from "../../../../components/custom/UserWorkflowFormHeader";
 import QCDivisionList from "./QCDivisionList";
 import QCForm from "./QCForm";
+import QCDivisionDetailsView from "./QCDivisionDetailsView";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import getQualityControlTheme from "../../../../../app/theme/custom_themes/user/qualityControl/qualityControl_theme";
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
@@ -80,6 +81,10 @@ const QualityControlPage = () => {
     readOnly,
     handleSaveDraft,
     handleSubmit,
+    handleBackFromDetails,
+    detailsRow,
+    detailsData,
+    detailsLoading,
   } = hookState;
 
   const canAct =
@@ -100,6 +105,27 @@ const QualityControlPage = () => {
     return (
       <Box sx={theme.workflow.animatedContainer}>
         <QCDivisionList hookState={hookState} />
+      </Box>
+    );
+  }
+
+  if (view === "details" && detailsRow) {
+    return (
+      <Box sx={theme.workflow.animatedContainer}>
+        <QCDivisionDetailsView
+          row={detailsRow}
+          data={detailsData}
+          formData={formData}
+          subDepartmentId={subDepartmentId}
+          loading={detailsLoading || loadingFormDetails}
+          schemaLoading={schemaLoading}
+          schemaError={schemaError}
+          activeDivisionGroupIndex={activeDivisionGroupIndex}
+          activeDivisionSubIndex={activeDivisionSubIndex}
+          onActiveDivisionGroupIndexChange={setActiveDivisionGroupIndex}
+          onActiveDivisionSubIndexChange={setActiveDivisionSubIndex}
+          onBack={handleBackFromDetails}
+        />
       </Box>
     );
   }

@@ -1,10 +1,10 @@
 // src/components/custom/TableCard.jsx
-import { ReactNode } from 'react';
-import { CardContent, Table, SxProps, Theme } from '@mui/material';
-import PropTypes from 'prop-types';
+import { ReactNode } from "react";
+import { CardContent, Table, SxProps, Theme } from "@mui/material";
+import PropTypes from "prop-types";
 
-import Card from '../common/Card';
-import SectionHeader from '../common/SectionHeader';
+import Card from "../common/Card";
+import SectionHeader from "../common/SectionHeader";
 
 interface TableCardProps {
   title: ReactNode;
@@ -19,6 +19,7 @@ interface TableCardProps {
   noPadding?: boolean;
   filterPanel?: ReactNode;
   footer?: ReactNode;
+  tabs?: React.ReactNode;
 }
 
 function TableCard({
@@ -34,10 +35,11 @@ function TableCard({
   noPadding = false,
   filterPanel,
   footer,
+  tabs,
 }: TableCardProps) {
   return (
     <Card sx={cardSx} contentSx={contentSx} noContentPadding={noPadding}>
-      <CardContent sx={{ p: noPadding ? 0 : '20px !important' }}>
+      <CardContent sx={{ p: noPadding ? 0 : "20px !important" }}>
         <SectionHeader
           title={title}
           titleSx={titleSx}
@@ -45,6 +47,7 @@ function TableCard({
           showMore={showMore}
           onMoreClick={onMoreClick}
         />
+        {tabs}
 
         {filterPanel}
 

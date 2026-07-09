@@ -10,6 +10,7 @@ import {
   normalizeSubDepartmentIds,
   resolveUserUuid,
 } from "@data/models/admin/UserManagement/UserManagementModel";
+import { getDateRange } from "@/utils/dateUtils";
 
 const S = STRINGS.USER_MANAGEMENT;
 
@@ -150,11 +151,36 @@ function useUserStatsSection() {
     pendingResetRequests: 0,
   });
   const [statsLoading, setStatsLoading] = useState(true);
+  const [filterType, setFilterType] = useState("month");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const [dateFilterOpen, setDateFilterOpen] = useState(true);
+  const getStatsPayload = useCallback(() => {
+    if (filterType === "custom") {
+      return {
+        filterType,
+        startDate: customStartDate,
+        endDate: customEndDate,
+      };
+    }
+
+    const { startDate, endDate } = getDateRange(filterType);
+
+    return {
+      filterType,
+      startDate,
+      endDate,
+    };
+  }, [filterType, customStartDate, customEndDate]);
 
   const loadStats = useCallback(async () => {
     setStatsLoading(true);
+
     try {
-      const resp = await userManagementController.getUserStats();
+      const payload = getStatsPayload();
+
+      const resp = await userManagementController.getUserStats(payload);
+
       if (resp?.success && resp.data) {
         setStats({
           totalUsers: resp.data.totalUsers || 0,
@@ -163,18 +189,57 @@ function useUserStatsSection() {
           pendingResetRequests: resp.data.pendingResetRequests || 0,
         });
       }
-    } catch (err) {
-      console.error(S.ERRORS.LOAD_STATS_FAILED, err);
     } finally {
       setStatsLoading(false);
     }
-  }, []);
+  }, [getStatsPayload]);
 
+  const handleFilterTypeChange = (value: string) => {
+    setFilterType(value);
+
+    if (value !== "custom") {
+      setCustomStartDate("");
+      setCustomEndDate("");
+    }
+  };
+  const refreshDashboard = useCallback(() => {
+    void loadStats();
+  }, [loadStats]);
+  useEffect(() => {
+    if (filterType !== "custom") {
+      refreshDashboard();
+      return;
+    }
+
+    if (customStartDate && customEndDate) {
+      refreshDashboard();
+    }
+  }, [filterType, customStartDate, customEndDate, refreshDashboard]);
+  const toggleDateFilter = () => {
+    setDateFilterOpen((prev) => !prev);
+  };
   useEffect(() => {
     void loadStats();
   }, [loadStats]);
+  return {
+    stats,
+    loading: statsLoading,
 
-  return { stats, loading: statsLoading, loadStats };
+    filterType,
+    customStartDate,
+    customEndDate,
+    dateFilterOpen,
+
+    setFilterType,
+    setCustomStartDate,
+    setCustomEndDate,
+    setDateFilterOpen,
+
+    handleFilterTypeChange,
+    refreshDashboard,
+    toggleDateFilter,
+    loadStats,
+  };
 }
 
 function useUserFormSection(roles: any[], onRefresh: () => void) {
@@ -207,10 +272,7 @@ function useUserFormSection(roles: any[], onRefresh: () => void) {
         });
         setForm(mapUserDetailsToFormState(resp.data, user));
       } else {
-        useAlertStore.getState().showAlert(
-          resp?.message || S.MESSAGES.LOAD_USER_FAILED,
-          "error"
-        );
+        useAlertStore.getState().showAlert(resp?.message || S.MESSAGES.LOAD_USER_FAILED, "error");
         setModalOpen(false);
       }
     } finally {
@@ -227,18 +289,24 @@ function useUserFormSection(roles: any[], onRefresh: () => void) {
 
     const selectedRoleObj = roles.find((r) => r.roleName === form.role);
     if (!editTarget && !selectedRoleObj?.roleId) {
-      useAlertStore.getState().showAlert(S.MESSAGES.OPERATION_FAILED, "error", { autoCloseMs: 3000 });
+      useAlertStore
+        .getState()
+        .showAlert(S.MESSAGES.OPERATION_FAILED, "error", { autoCloseMs: 3000 });
       setSaving(false);
       return;
     }
 
-    const subDepartmentIds = normalizeSubDepartmentIds(form.subDepts.map((sd: any) => sd?.subDepartmentId));
+    const subDepartmentIds = normalizeSubDepartmentIds(
+      form.subDepts.map((sd: any) => sd?.subDepartmentId),
+    );
     let resp;
 
     if (editTarget) {
       const updatePayload: any = { user_uuid: resolveUserUuid(editTarget) };
       if (!updatePayload.user_uuid) {
-        useAlertStore.getState().showAlert(S.MESSAGES.UUID_RESOLVE_FAILED, "error", { autoCloseMs: 3000 });
+        useAlertStore
+          .getState()
+          .showAlert(S.MESSAGES.UUID_RESOLVE_FAILED, "error", { autoCloseMs: 3000 });
         setSaving(false);
         return;
       }
@@ -247,7 +315,7 @@ function useUserFormSection(roles: any[], onRefresh: () => void) {
       const originalSubDepartmentIds = normalizeSubDepartmentIds(
         Array.isArray(editTarget?.subDepartments)
           ? editTarget.subDepartments.map((sd: any) => sd?.subDepartmentId)
-          : []
+          : [],
       );
       const subDepartmentsChanged =
         subDepartmentIds.length !== originalSubDepartmentIds.length ||
@@ -275,14 +343,18 @@ function useUserFormSection(roles: any[], onRefresh: () => void) {
     }
 
     if (resp?.success) {
-      useAlertStore.getState().showAlert(resp.message || S.MESSAGES.SAVE_SUCCESS, "success", { autoCloseMs: 2000 });
+      useAlertStore
+        .getState()
+        .showAlert(resp.message || S.MESSAGES.SAVE_SUCCESS, "success", { autoCloseMs: 2000 });
       setTimeout(() => {
         onRefresh();
         setModalOpen(false);
         setSaving(false);
       }, 1000);
     } else {
-      useAlertStore.getState().showAlert(resp?.message || S.MESSAGES.OPERATION_FAILED, "error", { autoCloseMs: 3000 });
+      useAlertStore
+        .getState()
+        .showAlert(resp?.message || S.MESSAGES.OPERATION_FAILED, "error", { autoCloseMs: 3000 });
       setSaving(false);
     }
   };
@@ -327,7 +399,9 @@ function useUserDeleteSection(onRefresh: () => void) {
 
     const resp = await userManagementController.deleteUser(resolveUserUuid(deleteTarget));
     if (resp?.success) {
-      useAlertStore.getState().showAlert(resp.message || S.MESSAGES.DELETE_SUCCESS, "success", { autoCloseMs: 2000 });
+      useAlertStore
+        .getState()
+        .showAlert(resp.message || S.MESSAGES.DELETE_SUCCESS, "success", { autoCloseMs: 2000 });
       setTimeout(() => {
         onRefresh();
         setDeleteOpen(false);
@@ -335,7 +409,9 @@ function useUserDeleteSection(onRefresh: () => void) {
         setDeleting(false);
       }, 1000);
     } else {
-      useAlertStore.getState().showAlert(resp?.message || S.MESSAGES.DELETE_FAILED, "error", { autoCloseMs: 3000 });
+      useAlertStore
+        .getState()
+        .showAlert(resp?.message || S.MESSAGES.DELETE_FAILED, "error", { autoCloseMs: 3000 });
       setDeleting(false);
     }
   };
@@ -357,8 +433,8 @@ export default function useUserManagementHook() {
 
   const refreshAll = useCallback(() => {
     void list.loadUsersList();
-    void stats.loadStats();
-  }, [list.loadUsersList, stats.loadStats]);
+    void stats.refreshDashboard();
+  }, [list.loadUsersList, stats.refreshDashboard]);
 
   const form = useUserFormSection(lookups.roles, refreshAll);
   const deleteSection = useUserDeleteSection(refreshAll);

@@ -25,6 +25,7 @@ type UseApproverFormActionArgs<T extends ActionableApproverItem> = {
   setItems: React.Dispatch<React.SetStateAction<T[]>>;
   setSelected: React.Dispatch<React.SetStateAction<T | null>>;
   subDepartment: string;
+  statusField?: string;
 };
 
 const DEPARTMENT_SLUGS: Record<ApproverDepartmentKey, string> = {
@@ -42,6 +43,7 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
   setItems,
   setSelected,
   subDepartment,
+  statusField = "status",
 }: UseApproverFormActionArgs<T>) => {
   const user = useAuthStore((state) => state.user);
   const showAlert = useAlertStore((state) => state.showAlert);
@@ -59,9 +61,16 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
     return (
       user?.allSubDepartments.find(
         (item) => item.slugs?.dept === deptSlug && item.slugs?.subDept === subDepartment,
-      ) ?? null
+      ) ??
+      user?.allSubDepartments.find((item) => item.slugs?.subDept === subDepartment) ??
+      null
     );
   }, [department, subDepartment, user]);
+
+  const resolveItemStatus = (item: T) => {
+    const fieldValue = String(item[statusField] ?? "").trim();
+    return fieldValue || String(item.status ?? "").trim();
+  };
 
   const closeDialog = () => {
     if (submitting) {
@@ -85,7 +94,7 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
       return;
     }
 
-    if (!isApproverActionableStatus(item.status)) {
+    if (!isApproverActionableStatus(resolveItemStatus(item))) {
       showAlert(STRINGS.APPROVER.ACTION.INVALID_STATUS, "warning", { autoCloseMs: 3000 });
       return;
     }

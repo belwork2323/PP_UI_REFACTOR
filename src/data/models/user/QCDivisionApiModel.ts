@@ -25,6 +25,11 @@ export class QCDivisionDetailsModel {
   batchId: string;
   subDepartmentId: number;
   formSubmissionType: string;
+  status: string;
+  submittedBy?: { id?: string; fullName?: string } | string | null;
+  submittedAt?: string | null;
+  createdBy?: string | null;
+  createdAt?: string | null;
   division?: string | null;
   subType?: string | null;
   sections?: SchemaSectionSubmission[];
@@ -39,6 +44,11 @@ export class QCDivisionDetailsModel {
     this.batchId = payload?.batchId ?? "";
     this.subDepartmentId = Number(payload?.subDepartmentId ?? 0);
     this.formSubmissionType = payload?.formSubmissionType ?? "";
+    this.status = payload?.status ?? payload?.workflowInsights?.currentStatus ?? "";
+    this.submittedBy = payload?.submittedBy ?? null;
+    this.submittedAt = payload?.submittedAt ?? null;
+    this.createdBy = payload?.createdBy ?? null;
+    this.createdAt = payload?.createdAt ?? null;
 
     this.workflowInsights = {
       currentStatus: payload?.workflowInsights?.currentStatus ?? payload?.status ?? "",
@@ -68,6 +78,23 @@ export class QCDivisionDetailsModel {
 
   static fromApi(apiResponse: any): QCDivisionDetailsModel {
     return new QCDivisionDetailsModel(apiResponse?.data ?? {});
+  }
+
+  static toPlainRecord(model: QCDivisionDetailsModel | null | undefined): Record<string, unknown> | null {
+    if (!model) return null;
+    return {
+      formId: model.formId,
+      batchId: model.batchId,
+      subDepartmentId: model.subDepartmentId,
+      formSubmissionType: model.formSubmissionType,
+      status: model.status,
+      submittedBy: model.submittedBy,
+      submittedAt: model.submittedAt,
+      createdBy: model.createdBy,
+      createdAt: model.createdAt,
+      divisionDetails: model.divisionDetails,
+      workflowInsights: model.workflowInsights,
+    };
   }
 
   static toFormState(model: QCDivisionDetailsModel): QualityControlFormState {

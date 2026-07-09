@@ -14,6 +14,8 @@ import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/q
 type QCSchemaPanelProps = {
   schema: SchemaDocumentV2 | null;
   formValues: SchemaFormValues;
+  /** Parent-owned values used to decide whether API sections still need hydration. */
+  persistedValues?: SchemaFormValues;
   savedSections?: SchemaSectionSubmission[];
   /** Resets one-time hydration when switching between division entries. */
   hydrationKey?: string;
@@ -28,6 +30,7 @@ type QCSchemaPanelProps = {
 const QCSchemaPanel = ({
   schema,
   formValues,
+  persistedValues,
   savedSections,
   hydrationKey,
   subDepartmentId,
@@ -47,21 +50,29 @@ const QCSchemaPanel = ({
     if (!schema) return;
     if (hydratedRef.current) return;
 
-    const hasExistingValues =
-      schemaValuesHaveUserData(formValues ?? {}) || Object.keys(formValues ?? {}).length > 0;
+    const hasPersistedUserData = schemaValuesHaveUserData(persistedValues ?? {});
 
-    if (hasExistingValues) {
+    if (savedSections?.length && !hasPersistedUserData) {
+      onChange(hydrateQcValuesFromSections(schema, savedSections));
       hydratedRef.current = true;
       return;
     }
 
-    if (savedSections?.length) {
-      onChange(hydrateQcValuesFromSections(schema, savedSections));
-    } else {
+    if (hasPersistedUserData || schemaValuesHaveUserData(formValues ?? {})) {
+      hydratedRef.current = true;
+      return;
+    }
+
+    if (Object.keys(formValues ?? {}).length === 0) {
       onChange(createQcInitialValues(schema));
     }
     hydratedRef.current = true;
-  }, [schema, savedSections, formValues, onChange]);
+  }, [schema, savedSections, onChange, hydrationKey, formValues, persistedValues]);
+
+  const apiContext = useMemo(
+    () => ({ subDepartmentId, batchId }),
+    [batchId, subDepartmentId],
+  );
 
   const themeTokens = useMemo(
     () => ({
@@ -87,7 +98,7 @@ const QCSchemaPanel = ({
         loading={loading}
         error={error}
         themeTokens={themeTokens}
-        apiContext={{ subDepartmentId, batchId }}
+        apiContext={apiContext}
       />
     </Box>
   );

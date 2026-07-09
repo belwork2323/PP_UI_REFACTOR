@@ -3,7 +3,9 @@ import type { SchemaBlock, SchemaDocumentV2, SchemaTableBlock, SchemaTableColumn
 import { flattenTableColumns } from "./schemaUtils";
 import {
   isWrappedTableValue,
+  resolveTableDeletedColumnIds,
   resolveTableExtraColumns,
+  shouldWrapTableValue,
   wrapTableValue,
 } from "./tableRowUtils";
 
@@ -56,18 +58,29 @@ const readTableRows = (
 ): {
   rows: Record<string, unknown>[];
   extraColumns: SchemaTableColumn[];
+  deletedColumnIds: string[];
   preserveWrapper: boolean;
 } => {
   const raw = values[entry.formKey];
   const extraColumns = resolveTableExtraColumns(raw);
+  const deletedColumnIds = resolveTableDeletedColumnIds(raw);
   const preserveWrapper =
-    isWrappedTableValue(raw) || extraColumns.length > 0 || Boolean(entry.block.allowAddColumn);
+    isWrappedTableValue(raw) ||
+    extraColumns.length > 0 ||
+    deletedColumnIds.length > 0 ||
+    Boolean(entry.block.allowAddColumn) ||
+    Boolean(entry.block.allowDeleteColumn);
 
   if (isWrappedTableValue(raw)) {
-    return { rows: raw.rows.map((row) => ({ ...row })), extraColumns, preserveWrapper };
+    return { rows: raw.rows.map((row) => ({ ...row })), extraColumns, deletedColumnIds, preserveWrapper };
   }
   if (Array.isArray(raw) && raw.length > 0) {
-    return { rows: (raw as Record<string, unknown>[]).map((row) => ({ ...row })), extraColumns, preserveWrapper };
+    return {
+      rows: (raw as Record<string, unknown>[]).map((row) => ({ ...row })),
+      extraColumns,
+      deletedColumnIds,
+      preserveWrapper,
+    };
   }
 
   // Hardware article rows are stored unscoped in the subscale UI panel.
@@ -77,12 +90,13 @@ const readTableRows = (
       return {
         rows: (unscoped as Record<string, unknown>[]).map((row) => ({ ...row })),
         extraColumns: [],
+        deletedColumnIds: [],
         preserveWrapper: false,
       };
     }
   }
 
-  return { rows: [], extraColumns, preserveWrapper };
+  return { rows: [], extraColumns, deletedColumnIds, preserveWrapper };
 };
 
 const writeTableRows = (
@@ -90,10 +104,11 @@ const writeTableRows = (
   entry: IndexedTable,
   rows: Record<string, unknown>[],
   extraColumns: SchemaTableColumn[],
+  deletedColumnIds: string[],
   preserveWrapper: boolean,
 ): SchemaFormValues => ({
   ...values,
-  [entry.formKey]: preserveWrapper ? wrapTableValue(rows, extraColumns) : rows,
+  [entry.formKey]: preserveWrapper ? wrapTableValue(rows, extraColumns, deletedColumnIds) : rows,
 });
 
 const resolveParentColumnId = (
@@ -181,7 +196,14 @@ const syncChildFromParent = (
     ),
   );
 
-  return writeTableRows(values, child, nextRows, childState.extraColumns, childState.preserveWrapper);
+  return writeTableRows(
+    values,
+    child,
+    nextRows,
+    childState.extraColumns,
+    childState.deletedColumnIds,
+    childState.preserveWrapper,
+  );
 };
 
 /**
@@ -220,4 +242,31 @@ export const syncRowGenerationTables = (
   }
 
   return next;
+};
+
+export const schemaHasRowGenerationTables = (schema: SchemaDocumentV2 | null | undefined): boolean => {
+  const sections = schema?.data?.sections;
+  if (!sections?.length) return false;
+  return collectTables(sections).some((entry) => Boolean(entry.block.rows?.rowGenerationSource));
+};
+
+export const getRowGenerationTableIds = (schema: SchemaDocumentV2 | null | undefined): Set<string> => {
+  const sections = schema?.data?.sections;
+  if (!sections?.length) return new Set();
+  return new Set(
+    collectTables(sections)
+      .filter((entry) => Boolean(entry.block.rows?.rowGenerationSource))
+      .map((entry) => entry.tableId),
+  );
+};
+
+export const getRowGenerationParentSourceIds = (schema: SchemaDocumentV2 | null | undefined): Set<string> => {
+  const sections = schema?.data?.sections;
+  if (!sections?.length) return new Set();
+  const ids = new Set<string>();
+  collectTables(sections).forEach((entry) => {
+    const sourceId = entry.block.rows?.rowGenerationSource;
+    if (sourceId) ids.add(sourceId);
+  });
+  return ids;
 };

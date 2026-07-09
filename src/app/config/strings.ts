@@ -26,25 +26,30 @@ export const STRINGS = {
     FEATURES: [
       {
         title: "Blockchain Security",
-        description: "Every transaction is recorded as an immutable block, ensuring complete data integrity and traceability.",
+        description:
+          "Every transaction is recorded as an immutable block, ensuring complete data integrity and traceability.",
       },
       {
         title: "Real-Time Monitoring",
-        description: "Track all processing activities from raw material receipt to final dispatch with live updates.",
+        description:
+          "Track all processing activities from raw material receipt to final dispatch with live updates.",
       },
       {
         title: "Complete Transparency",
-        description: "Access comprehensive audit trails and maintain full visibility across the entire propellant lifecycle.",
+        description:
+          "Access comprehensive audit trails and maintain full visibility across the entire propellant lifecycle.",
       },
     ],
 
     // FOOTER_NOTE: "Secured with blockchain technology • All rights reserved",
-    FOOTER_TEXT: "Designed and Developed by Bharat Electronics Limited © 2026 . All rights reserved.",
+    FOOTER_TEXT:
+      "Designed and Developed by Bharat Electronics Limited © 2026 . All rights reserved.",
     // POLICY: "Privacy Policy",
 
     /* Reset Password (request from login) */
     RESET_TITLE: "Request password reset",
-    RESET_SUBTITLE: "Enter your user ID and reason. Your request will be reviewed by an administrator.",
+    RESET_SUBTITLE:
+      "Enter your user ID and reason. Your request will be reviewed by an administrator.",
     USER_ID_LABEL: "User ID",
     REASON_LABEL: "Reason for password reset request",
     REQUEST_RESET_BUTTON: "Request Password Reset",
@@ -57,7 +62,8 @@ export const STRINGS = {
     /* Reset Password API Error Messages */
     RESET_INVALID_INPUT: "Invalid request. Please ensure all fields are properly filled.",
     RESET_USER_NOT_FOUND: "User not found. Please check your user ID and try again.",
-    RESET_ALREADY_EXISTS: "A password reset request is already pending for your account. Please wait for the previous request to be processed or contact support.",
+    RESET_ALREADY_EXISTS:
+      "A password reset request is already pending for your account. Please wait for the previous request to be processed or contact support.",
     RESET_RATE_LIMITED: "Too many reset requests made. Please try again after some time.",
 
     /* Logout */
@@ -77,8 +83,7 @@ export const STRINGS = {
       CAPTCHA_INVALID: "Captcha does not match. Please try again.",
     },
     LOADING_LOOKUPS: "Loading roles and departments…",
-    NO_ROLES_AVAILABLE:
-      "No roles are available right now. Refresh the page or try again later.",
+    NO_ROLES_AVAILABLE: "No roles are available right now. Refresh the page or try again later.",
     NO_SUBDEPARTMENTS_FOR_LOGIN:
       "No sub-departments could be loaded. You may be unable to complete sign-in for User or Approver roles.",
     ACCESS_DENIED_DEPT: "Access Denied for this department.",
@@ -98,9 +103,10 @@ export const STRINGS = {
       FETCH_SUB_FOR: "[LoginPage]   fetchSubDepartments for:",
       SUB_DEPTS_IDX: "[LoginPage]   sub-departments for department index ",
       SUB_DEPTS_FAIL_IDX: "[LoginPage]   sub-departments fetch failed for department index ",
-      FB_FETCH_ALL: "[LoginPage] No sub-departments via per-department fetch; trying fetchSubDepartments() (no departmentId) ...",
+      FB_FETCH_ALL:
+        "[LoginPage] No sub-departments via per-department fetch; trying fetchSubDepartments() (no departmentId) ...",
       SUB_ALL_LOADED: "[LoginPage] sub-departments loaded (all):",
-    }
+    },
   },
 
   /* -------- SYSTEM / API -------- */
@@ -134,7 +140,7 @@ export const STRINGS = {
     CLIENT_DETAILS: {
       DEPARTMENT_NAME: "Advanced Centre for Energetic Materials (ACEM)",
       RESEARCH_DETAILS: "DEFENCE RESEARCH & DEVELOPMENT ORGANISATION (DRDO)",
-      ORG_NAME: "GOVT. OF INDIA, MINISTRY OF DEFENCE "
+      ORG_NAME: "GOVT. OF INDIA, MINISTRY OF DEFENCE ",
     },
     SYSTEM_OVERVIEW: {
       HEADING: "System Overview : End-to-End Propellant Lifecycle Management",
@@ -175,7 +181,8 @@ export const STRINGS = {
 
   /* -------- APP FOOTER -------- */
   APP_FOOTER: {
-    COPYRIGHT: "Copyright © 2026 Defence Research & Development Organisation (DRDO). All rights reserved.",
+    COPYRIGHT:
+      "Copyright © 2026 Defence Research & Development Organisation (DRDO). All rights reserved.",
     CREDITS: "Content & Maintenance - DRDO  |  Design & Development - Bharat Electronics Ltd.",
     BEL_LABEL: "BEL",
     BEL_ALT: "Bharat Electronics Limited",
@@ -290,7 +297,8 @@ export const STRINGS = {
         NO_REWORK_REQUIRED: "No Rework Required",
         RESUBMISSIONS: "Resubmissions",
         NO_RISK_FACTORS: "No risk factors reported.",
-        EMPTY_NOTICE: "Showing the full panel layout with placeholders until detail data is available.",
+        EMPTY_NOTICE:
+          "Showing the full panel layout with placeholders until detail data is available.",
         ERROR_NOTICE: "Live detail data could not be loaded. Placeholder values are shown below.",
         REQUEST_RETRY: "Retry",
       },
@@ -430,7 +438,8 @@ export const STRINGS = {
     COMMON_PROCESSES_FETCH_ERROR: "Unable to fetch process list. Please try again.",
     // New Approver Strings
     APPROVER_TITLE: "Sourcing Approval Authority",
-    APPROVER_SUBTITLE: "Review and authenticate procurement records before Blockchain block creation.",
+    APPROVER_SUBTITLE:
+      "Review and authenticate procurement records before Blockchain block creation.",
 
     // Specific Approval Messages
     APPROVE_SUCCESS: (type: string) => `${type.toUpperCase()} approved successfully`,
@@ -455,7 +464,8 @@ export const STRINGS = {
       EMPTY_ADDED_TITLE: "No materials added yet",
       EMPTY_ADDED_SUBTITLE: "Select a raw material above and click 'Add to Form' to begin",
       READY_TITLE: "Ready to submit for approval",
-      READY_SUBTITLE: "Fill all analyzed results before submitting for approval. You can save as draft at any point and continue later.",
+      READY_SUBTITLE:
+        "Fill all analyzed results before submitting for approval. You can save as draft at any point and continue later.",
       NOT_READY_TITLE: "No materials added yet",
       NOT_READY_SUBTITLE: "Add at least one material and fill in some results to submit",
       SAVE_DRAFT: "Save as Draft",
@@ -480,7 +490,8 @@ export const STRINGS = {
       CREATE_SUBMIT_SUCCESS: "Raw material procurement submitted for approval successfully.",
       UPDATE_DRAFT_SUCCESS: "Raw material procurement draft updated successfully.",
       UPDATE_SUBMIT_SUCCESS: "Raw material procurement updated for approval successfully.",
-      EDIT_MODE_BANNER: "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
+      EDIT_MODE_BANNER:
+        "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
       SPEC_STATUS_OUT_OF_RANGE: "Out of Range",
       BLOCK_LABEL: "Block",
       SPECIFICATION_LABEL: "specification",
@@ -494,7 +505,8 @@ export const STRINGS = {
       LOT_SUFFIX: "lot",
       LOT_SUFFIX_PLURAL: "lots",
       SAVE_DISABLED_TOOLTIP: "Add at least one material to save",
-      SUBMIT_DISABLED_TOOLTIP: "Complete all required fields and analyzed results before saving or submitting",
+      SUBMIT_DISABLED_TOOLTIP:
+        "Complete all required fields and analyzed results before saving or submitting",
       ADDING_TO_FORM: "Adding...",
       REMOVE_BLOCK_TOOLTIP: "Remove this block",
       LOT_PLACEHOLDER: "e.g. LOT-2024-01",
@@ -531,7 +543,8 @@ export const STRINGS = {
         REMARKS: "Remarks",
       },
       CONFIRM_DRAFT_TITLE: "Save as Draft?",
-      CONFIRM_DRAFT_MESSAGE: "Your progress will be saved. You can return and continue filling the form later. The batch status will be marked as 'In Progress'.",
+      CONFIRM_DRAFT_MESSAGE:
+        "Your progress will be saved. You can return and continue filling the form later. The batch status will be marked as 'In Progress'.",
       CONFIRM_DRAFT_ACTION: "Save Draft",
       CONFIRM_DRAFT_CANCEL_ACTION: "Cancel",
       DELETE_LOT: "Delete Lot",
@@ -545,8 +558,10 @@ export const STRINGS = {
       DELETE_NOT_ALLOWED: "Only lots with an 'In Progress' status can be deleted.",
       CONFIRM_SUBMIT_TITLE: "Submit for Approval?",
       CONFIRM_RESUBMIT_TITLE: "Resubmit for Approval?",
-      CONFIRM_SUBMIT_MESSAGE: "Once submitted, you will not be able to edit this form until the approver takes action. Make sure all data is accurate.",
-      CONFIRM_RESUBMIT_MESSAGE: "You are resubmitting a previously rejected entry. Ensure all corrections have been made. This will be sent to the approver for review.",
+      CONFIRM_SUBMIT_MESSAGE:
+        "Once submitted, you will not be able to edit this form until the approver takes action. Make sure all data is accurate.",
+      CONFIRM_RESUBMIT_MESSAGE:
+        "You are resubmitting a previously rejected entry. Ensure all corrections have been made. This will be sent to the approver for review.",
       CONFIRM_RESUBMIT_ACTION: "Resubmit",
       CONFIRM_SUBMIT_ACTION: "Submit",
       CONFIRM_CANCEL_ACTION: "Go Back",
@@ -558,14 +573,15 @@ export const STRINGS = {
       PARAMETER: "Parameter",
       RANGE: "Range",
       RESULT: "Result",
-      REMARKS: "Remarks"
+      REMARKS: "Remarks",
     },
     CASING_FORM: {
       TITLE: "Casing Verification Overview",
       SUBTITLE: "Review casing dimensional data and material proofing",
       READY_TO_SUBMIT: "Ready to submit for approval",
       NOT_READY_TO_SUBMIT: "Select project, motor stage, and enter motor ID to save or submit.",
-      ACTION_HELPER: "Save or submit once identification is complete. Other sections can be filled in later.",
+      ACTION_HELPER:
+        "Save or submit once identification is complete. Other sections can be filled in later.",
       SAVE_TOOLTIP: "Save progress and continue later",
       SAVE_DRAFT: "Save as Draft",
       SUBMIT_APPROVAL: "Submit for Approval",
@@ -594,11 +610,14 @@ export const STRINGS = {
       WAIVERS: "Waivers if Any",
       WAIVERS_PH: "Enter waiver reference or description (if applicable)…",
       VISUAL_OBS: "Visual Observation",
-      VISUAL_OBS_DESC: "Upload images or video of the visual observation (JPG, PNG, WEBP, MP4, WEBM · max 50MB)",
+      VISUAL_OBS_DESC:
+        "Upload images or video of the visual observation (JPG, PNG, WEBP, MP4, WEBM · max 50MB)",
       MEDIA_ON_FILE_PREFIX: "Media reference on file:",
       DIMENSIONAL_REPORT: "Dimensional Inspection Report",
-      EDIT_MODE_WARNING: "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct all fields before resubmitting.",
-      FOOTER_NOTE: "All clearance report fields must be completed before submission. Dimensional inspection values are auto-loaded based on motor type. Waivers are optional.",
+      EDIT_MODE_WARNING:
+        "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct all fields before resubmitting.",
+      FOOTER_NOTE:
+        "All clearance report fields must be completed before submission. Dimensional inspection values are auto-loaded based on motor type. Waivers are optional.",
       DETAILS_LABEL: "Details",
       DETAILS_PH: "Enter details…",
       REMARKS_LABEL: "Remarks",
@@ -621,7 +640,8 @@ export const STRINGS = {
       SUB_DEPARTMENT_MISSING: "Unable to proceed. Sub-department context is missing.",
       CREATE_FAILED: "Failed to create rocket motor casing form.",
       UPDATE_FAILED: "Failed to update rocket motor casing form.",
-      FORM_ALREADY_EXISTS: "A casing form already exists for this batch. Please continue from existing form.",
+      FORM_ALREADY_EXISTS:
+        "A casing form already exists for this batch. Please continue from existing form.",
       INVALID_STATE_UPDATE: "Form cannot be updated in current status.",
       INVALID_PARAM_ID: "One or more dimensional parameter IDs are invalid for this motor type.",
       INVALID_MOTOR_TYPE: "Invalid motor type. Please choose A, B, C or D.",
@@ -634,13 +654,16 @@ export const STRINGS = {
       UPDATE_DRAFT_SUCCESS: "Rocket motor casing draft updated successfully.",
       UPDATE_SUBMIT_SUCCESS: "Rocket motor casing updated for approval successfully.",
       CONFIRM_DRAFT_TITLE: "Save as Draft?",
-      CONFIRM_DRAFT_MESSAGE: "Your casing form progress will be saved. You can return and continue later. The batch will be marked as 'In Progress'.",
+      CONFIRM_DRAFT_MESSAGE:
+        "Your casing form progress will be saved. You can return and continue later. The batch will be marked as 'In Progress'.",
       CONFIRM_DRAFT_ACTION: "Save Draft",
       CONFIRM_DRAFT_CANCEL_ACTION: "Cancel",
       CONFIRM_SUBMIT_TITLE: "Submit for Approval?",
       CONFIRM_RESUBMIT_TITLE: "Resubmit for Approval?",
-      CONFIRM_SUBMIT_MESSAGE: "Once submitted, you cannot edit this form until the approver takes action. Confirm all data is accurate.",
-      CONFIRM_RESUBMIT_MESSAGE: "You are resubmitting a rejected entry. Ensure all corrections are made. This will be forwarded to the approver.",
+      CONFIRM_SUBMIT_MESSAGE:
+        "Once submitted, you cannot edit this form until the approver takes action. Confirm all data is accurate.",
+      CONFIRM_RESUBMIT_MESSAGE:
+        "You are resubmitting a rejected entry. Ensure all corrections are made. This will be forwarded to the approver.",
       CONFIRM_SUBMIT_ACTION: "Submit",
       CONFIRM_RESUBMIT_ACTION: "Resubmit",
       CONFIRM_CANCEL_ACTION: "Go Back",
@@ -656,7 +679,7 @@ export const STRINGS = {
       CONFIRM_DELETE_ACTION: "Delete Casing",
       DELETE_SUCCESS: "Rocket motor casing record deleted successfully",
       DELETE_FAILED: "Failed to delete casing form. Please try again.",
-      DELETE_NOT_ALLOWED: "Only casing forms with an 'In Progress' status can be deleted."
+      DELETE_NOT_ALLOWED: "Only casing forms with an 'In Progress' status can be deleted.",
     },
     CASING_CREATE: {
       TITLE: "Motor Casing Receipt",
@@ -758,7 +781,7 @@ export const STRINGS = {
       BACK: "Back",
       NEXT: "Next",
       COMPLETE_ALL_STEPS: "Complete all steps to enable Save as Draft and Submit.",
-    }
+    },
   },
 
   USER_BATCH_LIST: {
@@ -783,7 +806,8 @@ export const STRINGS = {
   MANUFACTURING: {
     TITLE: "Propellant Manufacturing",
     DEPARTMENT_NAME: "Manufacturing Department",
-    HEADER_SUBTITLE: "Select a process below to view detailed information and manage its operations.",
+    HEADER_SUBTITLE:
+      "Select a process below to view detailed information and manage its operations.",
 
     // ── Shared Batch List Strings ────────────────────────────────────────────
     BATCH_LIST: {
@@ -843,7 +867,8 @@ export const STRINGS = {
       TABLE_LABEL: "Raw material preparation batch list",
       EMPTY_TEXT: "No raw material preparation batches found",
       NEW_LABEL: "New Submission",
-      EDIT_MODE_BANNER: "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
+      EDIT_MODE_BANNER:
+        "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
       BATCH_SCALE_LABEL: "Process for",
       PREMIX_LABEL: "Select Premix",
       PREMIX_PLACEHOLDER: "Choose premix",
@@ -884,11 +909,13 @@ export const STRINGS = {
         "All premix forms must load their schema successfully before saving or submitting.",
       DELETE_PREMIX_TOOLTIP: "Remove this premix",
       WEIGHTMENT_SHEET_TITLE: "Weightment Sheet for Dispatch of Material to Mixing Station",
-      WEIGHTMENT_SHEET_SUBTITLE: "Common for all premixes — record transferred weights before dispatch",
+      WEIGHTMENT_SHEET_SUBTITLE:
+        "Common for all premixes — record transferred weights before dispatch",
       WEIGHTMENT_MIXER_BUILDING: "Mixer Building Number",
       WEIGHTMENT_ADD_ROW: "Add Row",
       WEIGHTMENT_EMPTY_TITLE: "No weightment entries yet",
-      WEIGHTMENT_EMPTY_SUBTITLE: "Add a row to record material weights transferred to the mixing station",
+      WEIGHTMENT_EMPTY_SUBTITLE:
+        "Add a row to record material weights transferred to the mixing station",
       WEIGHTMENT_COMPARE_LABEL: "Compare with identification sheet",
       WEIGHTMENT_DEVIATION_FOUND: "Deviation found",
       WEIGHTMENT_DEVIATION_MESSAGE: "Deviation message",
@@ -899,7 +926,8 @@ export const STRINGS = {
       UPDATE_DRAFT_SUCCESS: "Raw material preparation draft updated successfully.",
       UPDATE_SUBMIT_SUCCESS: "Raw material preparation updated successfully.",
       UNSAVED_BACK_TITLE: "Unsaved changes detected",
-      UNSAVED_BACK_MESSAGE: "You have unsaved raw material preparation changes. Save as draft to avoid losing your data.",
+      UNSAVED_BACK_MESSAGE:
+        "You have unsaved raw material preparation changes. Save as draft to avoid losing your data.",
       UNSAVED_BACK_CONFIRM: "Go back to Form",
       UNSAVED_BACK_DISCARD: "Discard Changes",
     },
@@ -911,7 +939,8 @@ export const STRINGS = {
       TABLE_LABEL: "Case preparation batch list",
       EMPTY_TEXT: "No case preparation batches found",
       NEW_LABEL: "New Submission",
-      EDIT_MODE_BANNER: "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
+      EDIT_MODE_BANNER:
+        "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
       FORM_TITLE: "Case Preparation",
       FORM_SUBTITLE: "General activities and linear coating operation records",
       SECTION_GA_TITLE: "General Activities",
@@ -920,7 +949,8 @@ export const STRINGS = {
       SECTION_LCO_SUBTITLE: "Coating inspection, temperature, premix and application parameters",
       ALL_FILLED: "All filled",
       FILLED_SUFFIX: "filled",
-      DETAILS_FETCH_ERROR: "Unable to load existing case preparation form details. Please try again.",
+      DETAILS_FETCH_ERROR:
+        "Unable to load existing case preparation form details. Please try again.",
       DETAILS_NOT_FOUND: "No saved case preparation form data found for this submission.",
       FORM_ID_MISSING: "Unable to continue. Form ID is missing for this batch.",
       BATCH_ID_MISSING: "Unable to create form. Batch ID is missing.",
@@ -933,7 +963,8 @@ export const STRINGS = {
       UPDATE_DRAFT_SUCCESS: "Case preparation form saved as draft successfully.",
       UPDATE_SUBMIT_SUCCESS: "Case preparation form resubmitted for approval successfully.",
       UNSAVED_BACK_TITLE: "Unsaved changes detected",
-      UNSAVED_BACK_MESSAGE: "You have unsaved case preparation changes. Save as draft to avoid losing your data.",
+      UNSAVED_BACK_MESSAGE:
+        "You have unsaved case preparation changes. Save as draft to avoid losing your data.",
       UNSAVED_BACK_CONFIRM: "Go back to Form",
       UNSAVED_BACK_DISCARD: "Discard Changes",
       TREATMENT_CLEANING: "Cleaning",
@@ -954,7 +985,8 @@ export const STRINGS = {
       ADD_MOTORS_ACTION: "Add",
       NON_MAIN_BATCH_MESSAGE: "Case preparation form for this batch type is not available yet.",
       MOTOR_NAV_TITLE: "Motor Navigation",
-      MOTOR_NAV_HINT: "Click a motor tab below to open its processing log and continue filling details.",
+      MOTOR_NAV_HINT:
+        "Click a motor tab below to open its processing log and continue filling details.",
       MOTOR_CARD_TITLE: "Motor",
       DELETE_MOTOR_TOOLTIP: "Remove motor",
       SCHEMA_LOADING: "Loading case preparation schema...",
@@ -995,12 +1027,16 @@ export const STRINGS = {
       VIEW_DETAILS_TOOLTIP: "View completed details",
       PREMIX_NAV_TITLE: "Premix Navigation",
       FINAL_MIX_NAV_TITLE: "Final Mix Navigation",
-      PREMIX_NAV_HINT: "Click any premix tab below to open that premix card and continue filling its details.",
-      FINAL_MIX_NAV_HINT: "Click any final mix tab below to open that card and continue filling its details.",
+      PREMIX_NAV_HINT:
+        "Click any premix tab below to open that premix card and continue filling its details.",
+      FINAL_MIX_NAV_HINT:
+        "Click any final mix tab below to open that card and continue filling its details.",
       PREMIX_COUNTER: "Premix {current} of {total}",
       FINAL_MIX_COUNTER: "Final Mix {current} of {total}",
-      NO_PREMIX_CARDS: "No premix cards added yet. Select mixing stage and premix number above, then click Add.",
-      NO_FINAL_MIX_CARDS: "No final mix cards added yet. Select mixing stage and final mix number above, then click Add.",
+      NO_PREMIX_CARDS:
+        "No premix cards added yet. Select mixing stage and premix number above, then click Add.",
+      NO_FINAL_MIX_CARDS:
+        "No final mix cards added yet. Select mixing stage and final mix number above, then click Add.",
       REMOVE_CARD_TOOLTIP: "Remove this card",
       SECTION_PREMIX_STAGE: "Premix Stage",
       LABEL_PREMIX_NO: "Select Premix No.",
@@ -1015,7 +1051,8 @@ export const STRINGS = {
       PLACEHOLDER_FINAL_MIX_CYCLE: "Choose final mix cycle",
       SECTION_FINAL_MIX_STAGE: "Final Mix Stage",
       SECTION_PROCESS_PARTICULARS: "Process Particulars",
-      SECTION_PROCESS_PARTICULARS_HINT: "Fields are loaded from the selected mixing cycle (refer annexure).",
+      SECTION_PROCESS_PARTICULARS_HINT:
+        "Fields are loaded from the selected mixing cycle (refer annexure).",
       PROCESS_PARTICULARS_EMPTY: "Choose a mixing cycle above to load process particulars.",
       SECTION_QUALITY_CHECKS: "Quality Checks",
       COL_PARAMETER: "Parameter",
@@ -1072,7 +1109,8 @@ export const STRINGS = {
       UPDATE_DRAFT_SUCCESS: "Mixing form saved as draft successfully.",
       UPDATE_SUBMIT_SUCCESS: "Mixing form resubmitted for approval successfully.",
       UNSAVED_BACK_TITLE: "Unsaved changes detected",
-      UNSAVED_BACK_MESSAGE: "You have unsaved mixing changes. Save as draft to avoid losing your data.",
+      UNSAVED_BACK_MESSAGE:
+        "You have unsaved mixing changes. Save as draft to avoid losing your data.",
       UNSAVED_BACK_CONFIRM: "Go back to Form",
       UNSAVED_BACK_DISCARD: "Discard Changes",
     },
@@ -1086,13 +1124,17 @@ export const STRINGS = {
       FORM_TITLE: "Casting and Curing",
       FORM_SUBTITLE: "Bowl details and curing operation parameters",
       SECTION_BOWL_TITLE: "Bowl Details",
-      SECTION_BOWL_SUBTITLE: "Per-bowl propellant quantity, viscosity, arrival time and slurry cast data",
+      SECTION_BOWL_SUBTITLE:
+        "Per-bowl propellant quantity, viscosity, arrival time and slurry cast data",
       SECTION_CASTING_TITLE: "Casting Details",
-      SECTION_CASTING_SUBTITLE: "Vacuum build-up, casting progression, load cell readings and weight records",
+      SECTION_CASTING_SUBTITLE:
+        "Vacuum build-up, casting progression, load cell readings and weight records",
       SECTION_CURING_TITLE: "Curing Details",
-      SECTION_CURING_SUBTITLE: "Temperature achievement, curing cycle, soaking and hardness verification",
+      SECTION_CURING_SUBTITLE:
+        "Temperature achievement, curing cycle, soaking and hardness verification",
       ADD_BOWL_ROW: "Add Bowl Row",
-      DETAILS_FETCH_ERROR: "Unable to load existing casting and curing form details. Please try again.",
+      DETAILS_FETCH_ERROR:
+        "Unable to load existing casting and curing form details. Please try again.",
       DETAILS_NOT_FOUND: "No saved casting and curing form data found for this submission.",
       FORM_ID_MISSING: "Unable to continue. Form ID is missing for this batch.",
       BATCH_ID_MISSING: "Unable to create form. Batch ID is missing.",
@@ -1105,7 +1147,8 @@ export const STRINGS = {
       UPDATE_DRAFT_SUCCESS: "Casting and curing form saved as draft successfully.",
       UPDATE_SUBMIT_SUCCESS: "Casting and curing form resubmitted for approval successfully.",
       UNSAVED_BACK_TITLE: "Unsaved changes detected",
-      UNSAVED_BACK_MESSAGE: "You have unsaved casting and curing changes. Save as draft to avoid losing your data.",
+      UNSAVED_BACK_MESSAGE:
+        "You have unsaved casting and curing changes. Save as draft to avoid losing your data.",
       UNSAVED_BACK_CONFIRM: "Go back to Form",
       UNSAVED_BACK_DISCARD: "Discard Changes",
       SCHEMA_LOADING: "Loading schema…",
@@ -1143,9 +1186,9 @@ export const STRINGS = {
       CURING_SECTION_TITLE: "Curing",
       CURING_LOCKED_HINT:
         "Save casting details for motor {motorId} using the button below to unlock curing.",
-      CASTING_INCOMPLETE_FOR_CURING:
-        "Complete all casting sections before continuing to curing.",
-      CURING_NEXT_STEP_HINT: "Casting details saved. Curing selection will be available in the next step.",
+      CASTING_INCOMPLETE_FOR_CURING: "Complete all casting sections before continuing to curing.",
+      CURING_NEXT_STEP_HINT:
+        "Casting details saved. Curing selection will be available in the next step.",
       SECTION_TAB_CASTING: "Casting",
       SECTION_TAB_CURING: "Curing",
       CURING_PROCESS_TITLE: "Curing Process",
@@ -1159,7 +1202,8 @@ export const STRINGS = {
       CURING_MOTORS_TO_CURE_PLACEHOLDER: "Select count",
       CURING_OVENS_UTILIZED: "Select Nos. of Ovens Utilized",
       CURING_OVENS_UTILIZED_PLACEHOLDER: "One or Multiple",
-      CURING_OVENS_MATCH_HINT: "When multiple ovens are used, the count should match the number of motors selected for curing.",
+      CURING_OVENS_MATCH_HINT:
+        "When multiple ovens are used, the count should match the number of motors selected for curing.",
       CURING_CYCLE_MATRIX_TITLE: "Curing cycle by motor stage",
       CURING_MATRIX_PROJECT_NAME: "Project Name",
       CURING_MATRIX_PROJECT_ID: "Project ID",
@@ -1169,14 +1213,16 @@ export const STRINGS = {
       CURING_MATRIX_ADD_ROW: "Add Row",
       CURING_MATRIX_ADD_COLUMN: "Add Column",
       CURING_MATRIX_ADD_COLUMN_PLACEHOLDER: "Custom stage label",
-      CURING_MATRIX_NO_STAGES: "No motor stages returned. Add a custom column or retry after selecting a project.",
+      CURING_MATRIX_NO_STAGES:
+        "No motor stages returned. Add a custom column or retry after selecting a project.",
       CURING_STAGES_LOADING: "Loading motor stages…",
       ADD_MOTORS_ACTION: "Add",
       MOTOR_CARD_TITLE: "Motor",
       DETAILS_BATCH_SECTION: "Batch information",
       DETAILS_FORM_SECTION: "Casting and curing form details",
       MOTOR_NAV_TITLE: "Motor Navigation",
-      MOTOR_NAV_HINT: "Click a motor tab below to switch between motors and continue filling details.",
+      MOTOR_NAV_HINT:
+        "Click a motor tab below to switch between motors and continue filling details.",
       DELETE_MOTOR_TOOLTIP: "Remove motor",
       DETAILS_MOTOR_NAV_HINT: "Click a motor tab below to view its casting and curing details.",
       DETAILS_NO_CASTING: "No casting data recorded for this motor.",
@@ -1216,7 +1262,8 @@ export const STRINGS = {
       LOAD_FORM: "Load Form",
       ADD_MOTOR_ACTION: "Add Motor",
       MOTOR_NAV_TITLE: "Motor Navigation",
-      MOTOR_NAV_HINT: "Click a motor tab below to switch between motors and continue filling details.",
+      MOTOR_NAV_HINT:
+        "Click a motor tab below to switch between motors and continue filling details.",
       MOTOR_CARD_TITLE: "Motor",
       DELETE_MOTOR_TOOLTIP: "Remove motor",
       SCHEMA_LOADING: "Loading form...",
@@ -1242,7 +1289,8 @@ export const STRINGS = {
       UPDATE_DRAFT_SUCCESS: "Post-cure form saved as draft successfully.",
       UPDATE_SUBMIT_SUCCESS: "Post-cure form resubmitted for approval successfully.",
       UNSAVED_BACK_TITLE: "Unsaved changes detected",
-      UNSAVED_BACK_MESSAGE: "You have unsaved post-cure changes. Save as draft to avoid losing your data.",
+      UNSAVED_BACK_MESSAGE:
+        "You have unsaved post-cure changes. Save as draft to avoid losing your data.",
       UNSAVED_BACK_CONFIRM: "Go back to Form",
       UNSAVED_BACK_DISCARD: "Discard Changes",
     },
@@ -1290,7 +1338,8 @@ export const STRINGS = {
       UPDATE_DRAFT_SUCCESS: "Trimming form saved as draft successfully.",
       UPDATE_SUBMIT_SUCCESS: "Trimming form resubmitted for approval successfully.",
       UNSAVED_BACK_TITLE: "Unsaved changes detected",
-      UNSAVED_BACK_MESSAGE: "You have unsaved trimming changes. Save as draft to avoid losing your data.",
+      UNSAVED_BACK_MESSAGE:
+        "You have unsaved trimming changes. Save as draft to avoid losing your data.",
       UNSAVED_BACK_CONFIRM: "Go back to Form",
       UNSAVED_BACK_DISCARD: "Discard Changes",
       DETAILS_BATCH_SECTION: "Batch information",
@@ -1328,7 +1377,8 @@ export const STRINGS = {
       UPDATE_DRAFT_SUCCESS: "Subscale form saved as draft successfully.",
       UPDATE_SUBMIT_SUCCESS: "Subscale form resubmitted for approval successfully.",
       UNSAVED_BACK_TITLE: "Unsaved changes detected",
-      UNSAVED_BACK_MESSAGE: "You have unsaved subscale changes. Save as draft to avoid losing your data.",
+      UNSAVED_BACK_MESSAGE:
+        "You have unsaved subscale changes. Save as draft to avoid losing your data.",
       UNSAVED_BACK_CONFIRM: "Go back to Form",
       UNSAVED_BACK_DISCARD: "Discard Changes",
       DETAILS_BATCH_SECTION: "Batch information",
@@ -1353,7 +1403,8 @@ export const STRINGS = {
         COL_OBSERVATIONS: "Observations",
         MAIN_SCALE_PANEL_HINT:
           "Load the main scale processing form. Hardware preparation details are captured first.",
-        HARDWARE_LOCKED: "Complete the general batch information above to enable hardware preparation.",
+        HARDWARE_LOCKED:
+          "Complete the general batch information above to enable hardware preparation.",
       },
       BATCH_SETUP: {
         GENERAL_TITLE: "General Batch Information",
@@ -1405,7 +1456,8 @@ export const STRINGS = {
       SUB_DEPARTMENT_MISSING: "Unable to proceed. Sub-department context is missing.",
       TITLE: "Raw Material Revalidation",
       SUBTITLE: "Add ingredients, record test results and validity status",
-      EDIT_MODE_BANNER: "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
+      EDIT_MODE_BANNER:
+        "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
       SELECT_INGREDIENT_LABEL: "Select Ingredient",
       SELECT_INGREDIENT_PLACEHOLDER: "Choose ingredient",
       ADD_TO_FORM: "Add to Form",
@@ -1413,8 +1465,9 @@ export const STRINGS = {
       PARAMETER_LABEL: "Parameter",
       PARAMETERS_SUFFIX: "params",
       NO_INGREDIENTS_TITLE: "No ingredient added yet",
-      NO_INGREDIENTS_SUBTITLE: "Select an ingredient above and click \"Add to Form\" to begin",
-      INFO_NOTE: "Fill all results and set validity status before submitting. You can save as draft and continue later.",
+      NO_INGREDIENTS_SUBTITLE: 'Select an ingredient above and click "Add to Form" to begin',
+      INFO_NOTE:
+        "Fill all results and set validity status before submitting. You can save as draft and continue later.",
       REMOVE_BLOCK_TOOLTIP: "Remove this block",
       LOT_PLACEHOLDER: "e.g. LOT-2024-01",
       RESULT_PLACEHOLDER: "Enter value",
@@ -1430,12 +1483,15 @@ export const STRINGS = {
       EMPTY_STATE_ACTION: "No ingredients added yet",
       EMPTY_STATE_PROGRESS: "ingredient",
       DRAFT_CONFIRM_TITLE: "Save as Draft?",
-      DRAFT_CONFIRM_MESSAGE: "Your progress will be saved. You can return and continue filling the form later. The batch status will be marked as 'In Progress'.",
+      DRAFT_CONFIRM_MESSAGE:
+        "Your progress will be saved. You can return and continue filling the form later. The batch status will be marked as 'In Progress'.",
       DRAFT_CONFIRM_LABEL: "Save Draft",
       SUBMIT_CONFIRM_TITLE: "Submit for Approval?",
       RESUBMIT_CONFIRM_TITLE: "Resubmit for Approval?",
-      SUBMIT_CONFIRM_MESSAGE: "Once submitted, you will not be able to edit this form until the approver takes action. Make sure all data is accurate.",
-      RESUBMIT_CONFIRM_MESSAGE: "You are resubmitting a previously rejected entry. Ensure all corrections have been made before sending for review.",
+      SUBMIT_CONFIRM_MESSAGE:
+        "Once submitted, you will not be able to edit this form until the approver takes action. Make sure all data is accurate.",
+      RESUBMIT_CONFIRM_MESSAGE:
+        "You are resubmitting a previously rejected entry. Ensure all corrections have been made before sending for review.",
       SUBMIT_CONFIRM_LABEL: "Submit",
       RESUBMIT_CONFIRM_LABEL: "Resubmit",
       CONFIRM_CANCEL_LABEL: "Cancel",
@@ -1448,7 +1504,8 @@ export const STRINGS = {
       CREATE_SUBMIT_SUCCESS: "Revalidation submitted for approval successfully.",
       UPDATE_SUBMIT_SUCCESS: "Revalidation resubmitted for approval successfully.",
       UNSAVED_BACK_TITLE: "Unsaved changes detected",
-      UNSAVED_BACK_MESSAGE: "You have unsaved revalidation changes. Save as draft to avoid losing your data.",
+      UNSAVED_BACK_MESSAGE:
+        "You have unsaved revalidation changes. Save as draft to avoid losing your data.",
       UNSAVED_BACK_CONFIRM: "Go back to Form",
       UNSAVED_BACK_DISCARD: "Discard Changes",
     },
@@ -1468,7 +1525,8 @@ export const STRINGS = {
       PROCESSING_SLOT_LIQUID: "Liquid",
       LOAD_FORM_LABEL: "Load Form",
       SCHEMA_FETCH_ERROR: "Unable to load QC schema. Please try again.",
-      EDIT_MODE_BANNER: "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
+      EDIT_MODE_BANNER:
+        "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
       DETAILS_FETCH_ERROR: "Unable to load existing QC form details. Please try again.",
       DETAILS_NOT_FOUND: "No saved QC form data found for this submission.",
       FORM_ID_MISSING: "Unable to continue. Form ID is missing for this batch.",
@@ -1482,18 +1540,22 @@ export const STRINGS = {
       SUBMIT_LABEL: "Submit for Approval",
       RESUBMIT_LABEL: "Resubmit for Approval",
       DRAFT_CONFIRM_TITLE: "Save as Draft?",
-      DRAFT_CONFIRM_MESSAGE: "Your progress will be saved. You can return and continue filling the form later.",
+      DRAFT_CONFIRM_MESSAGE:
+        "Your progress will be saved. You can return and continue filling the form later.",
       DRAFT_CONFIRM_LABEL: "Save Draft",
       SUBMIT_CONFIRM_TITLE: "Submit for Approval?",
       RESUBMIT_CONFIRM_TITLE: "Resubmit for Approval?",
-      SUBMIT_CONFIRM_MESSAGE: "Once submitted, you will not be able to edit this form until the approver takes action.",
-      RESUBMIT_CONFIRM_MESSAGE: "You are resubmitting a previously rejected entry. Ensure all corrections have been made.",
+      SUBMIT_CONFIRM_MESSAGE:
+        "Once submitted, you will not be able to edit this form until the approver takes action.",
+      RESUBMIT_CONFIRM_MESSAGE:
+        "You are resubmitting a previously rejected entry. Ensure all corrections have been made.",
       SUBMIT_CONFIRM_LABEL: "Submit",
       RESUBMIT_CONFIRM_LABEL: "Resubmit",
       CONFIRM_CANCEL_LABEL: "Cancel",
       CONFIRM_GO_BACK_LABEL: "Go Back",
       UNSAVED_BACK_TITLE: "Unsaved changes detected",
-      UNSAVED_BACK_MESSAGE: "You have unsaved Quality Control changes. Save as draft to avoid losing your data.",
+      UNSAVED_BACK_MESSAGE:
+        "You have unsaved Quality Control changes. Save as draft to avoid losing your data.",
       UNSAVED_BACK_CONFIRM: "Go back to Form",
       UNSAVED_BACK_DISCARD: "Discard Changes",
       EMPTY_FORM_ERROR: "Add at least one QC value before saving or submitting.",
@@ -1506,7 +1568,8 @@ export const STRINGS = {
       ADD_PREMIX_LABEL: "Load Form",
       PREMIX_ALREADY_ADDED: "This premix is already added.",
       SOLID_SECTION_TITLE: "Solid Processing",
-      SOLID_NO_PREMIX_MESSAGE: "Select a premix number and click Load Form to add a solid processing card.",
+      SOLID_NO_PREMIX_MESSAGE:
+        "Select a premix number and click Load Form to add a solid processing card.",
       SOLID_PREMIX_NAV_TITLE: "Premix Navigation",
       SOLID_PREMIX_NAV_HINT:
         "Click any premix tab below to open that premix card and continue filling solid processing details.",
@@ -1515,7 +1578,8 @@ export const STRINGS = {
       SOLID_PREMIX_COUNTER: "Premix {current} of {total}",
       SOLID_REMOVE_PREMIX_TOOLTIP: "Remove this solid premix card",
       LIQUID_SECTION_TITLE: "Liquid Processing",
-      LIQUID_NO_PREMIX_MESSAGE: "Select a premix number and click Load Form to add a liquid processing card.",
+      LIQUID_NO_PREMIX_MESSAGE:
+        "Select a premix number and click Load Form to add a liquid processing card.",
       LIQUID_PREMIX_NAV_TITLE: "Premix Navigation",
       LIQUID_PREMIX_NAV_HINT:
         "Click any premix tab below to open that premix card and continue filling liquid processing details.",
@@ -1617,6 +1681,9 @@ export const STRINGS = {
         "Fill weightment details for the selected motor. Add another motor from the picker row to create a new motor tab.",
       MOTOR_NAV_TITLE: "Motor Navigation",
       MOTOR_NAV_COUNTER: "Motor {current} of {total}",
+      DETAILS_BATCH_SECTION: "Batch information",
+      DETAILS_FORM_SECTION: "Quality Control form details",
+      DETAILS_NO_DATA: "No form data recorded",
       DIVISION_SECTION_TITLE: "QC Divisions",
       DIVISION_NO_ENTRIES_MESSAGE:
         "Select a division, configure the fields above, and click Add Division to start filling QC details.",
@@ -1639,7 +1706,8 @@ export const STRINGS = {
       COL_STATUS: "NDT Status",
       TITLE: "NDT",
       SUBTITLE: "Non-destructive testing - defect observations",
-      EDIT_MODE_BANNER: "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
+      EDIT_MODE_BANNER:
+        "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
       DETAILS_FETCH_ERROR: "Unable to load existing NDT report details. Please try again.",
       DETAILS_NOT_FOUND: "No saved NDT report data found for this submission.",
       FORM_ID_MISSING: "Unable to continue. Form ID is missing for this batch.",
@@ -1666,7 +1734,8 @@ export const STRINGS = {
       CONFIRM_CANCEL_LABEL: "Cancel",
       CONFIRM_GO_BACK_LABEL: "Go Back",
       UNSAVED_BACK_TITLE: "Unsaved changes detected",
-      UNSAVED_BACK_MESSAGE: "You have unsaved NDT changes. Save as draft to avoid losing your data.",
+      UNSAVED_BACK_MESSAGE:
+        "You have unsaved NDT changes. Save as draft to avoid losing your data.",
       UNSAVED_BACK_CONFIRM: "Go back to Form",
       UNSAVED_BACK_DISCARD: "Discard Changes",
       EMPTY_FORM_ERROR: "Add at least one NDT observation or result before saving or submitting.",
@@ -1689,7 +1758,8 @@ export const STRINGS = {
       SUBTITLE: "Record static testing process parameters and evaluation details",
       SCHEMA_FETCH_ERROR: "Unable to load static testing schema. Please try again.",
       SCHEMA_NOT_LOADED: "Select a motor type and load the form before saving.",
-      EDIT_MODE_BANNER: "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
+      EDIT_MODE_BANNER:
+        "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
       DETAILS_FETCH_ERROR: "Unable to load existing STF details. Please try again.",
       DETAILS_NOT_FOUND: "No saved STF data found for this submission.",
       FORM_ID_MISSING: "Unable to continue. Form ID is missing for this batch.",
@@ -1714,7 +1784,8 @@ export const STRINGS = {
       CONFIRM_CANCEL_LABEL: "Cancel",
       CONFIRM_GO_BACK_LABEL: "Go Back",
       UNSAVED_BACK_TITLE: "Unsaved changes detected",
-      UNSAVED_BACK_MESSAGE: "You have unsaved STF changes. Save as draft to avoid losing your data.",
+      UNSAVED_BACK_MESSAGE:
+        "You have unsaved STF changes. Save as draft to avoid losing your data.",
       UNSAVED_BACK_CONFIRM: "Go back to Form",
       UNSAVED_BACK_DISCARD: "Discard Changes",
       EMPTY_FORM_ERROR: "Add at least one STF value before saving or submitting.",
@@ -1786,7 +1857,8 @@ export const STRINGS = {
     RESUBMIT_CONFIRM_LABEL: "Resubmit",
     CONFIRM_CANCEL_LABEL: "Cancel",
     CONFIRM_GO_BACK_LABEL: "Go Back",
-    EDIT_MODE_BANNER: "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
+    EDIT_MODE_BANNER:
+      "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
     DETAILS_FETCH_ERROR: "Unable to load existing dispatch details. Please try again.",
     DETAILS_NOT_FOUND: "No saved dispatch data found for this submission.",
     FORM_ID_MISSING: "Unable to continue. Form ID is missing for this batch.",
@@ -1800,7 +1872,8 @@ export const STRINGS = {
     CREATE_SUBMIT_SUCCESS: "Dispatch record submitted for approval successfully.",
     UPDATE_SUBMIT_SUCCESS: "Dispatch record resubmitted for approval successfully.",
     UNSAVED_BACK_TITLE: "Unsaved changes detected",
-    UNSAVED_BACK_MESSAGE: "You have unsaved dispatch changes. Save as draft to avoid losing your data.",
+    UNSAVED_BACK_MESSAGE:
+      "You have unsaved dispatch changes. Save as draft to avoid losing your data.",
     UNSAVED_BACK_CONFIRM: "Go back to Form",
     UNSAVED_BACK_DISCARD: "Discard Changes",
   },
@@ -1830,7 +1903,8 @@ export const STRINGS = {
     ACTION: {
       APPROVE_TITLE: "Approve Submission?",
       REJECT_TITLE: "Reject Submission?",
-      APPROVE_MESSAGE: "This submission will be marked as approved and moved out of the approver queue.",
+      APPROVE_MESSAGE:
+        "This submission will be marked as approved and moved out of the approver queue.",
       REJECT_MESSAGE: "This submission will be marked as rejected and sent back for correction.",
       APPROVE_LABEL: "Approve",
       REJECT_LABEL: "Reject",
@@ -1844,7 +1918,8 @@ export const STRINGS = {
       LOT_ID_LABEL: "Lot ID",
       MOTOR_CASING_ID_LABEL: "Motor casing ID",
       FORM_ID_MISSING: "Unable to process this request because the form ID is missing.",
-      SUBDEPARTMENT_MISSING: "Unable to process this request because the approver sub-department could not be resolved.",
+      SUBDEPARTMENT_MISSING:
+        "Unable to process this request because the approver sub-department could not be resolved.",
       INVALID_STATUS: "This submission cannot be actioned in its current state.",
       APPROVING: "Approving submission...",
       REJECTING: "Rejecting submission...",
@@ -1858,7 +1933,8 @@ export const STRINGS = {
       EMPTY_TITLE: "PDF preview unavailable",
       EMPTY_SUBTITLE: "Try again after the form data has been loaded.",
       FORM_ID_MISSING: "Unable to generate the PDF because the form ID is missing.",
-      SUBDEPARTMENT_MISSING: "Unable to generate the PDF because the approver sub-department could not be resolved.",
+      SUBDEPARTMENT_MISSING:
+        "Unable to generate the PDF because the approver sub-department could not be resolved.",
       FAILED: "Failed to generate PDF.",
     },
     DASHBOARD: {
@@ -1893,8 +1969,7 @@ export const STRINGS = {
           "Motor case lining, mandrel assembly and dimensional approval checks",
         CASE_PREP_SECTION: "Case Preparation Submissions",
         MIXING_LABEL: "Mixing",
-        MIXING_DESCRIPTION:
-          "Propellant slurry mixing, viscosity review and cure-rate QC approvals",
+        MIXING_DESCRIPTION: "Propellant slurry mixing, viscosity review and cure-rate QC approvals",
         MIXING_SECTION: "Mixing Submissions",
         CASTING_LABEL: "Casting & Curing",
         CASTING_DESCRIPTION:
@@ -1916,27 +1991,23 @@ export const STRINGS = {
       DISPATCH: {
         DEPARTMENT_NAME: "Dispatch Department",
         LABEL: "Dispatch",
-        DESCRIPTION:
-          "Motor dispatch clearance, transport documentation and consignment approvals",
+        DESCRIPTION: "Motor dispatch clearance, transport documentation and consignment approvals",
         SECTION: "Dispatch Submissions",
       },
       QUALITY_CONTROL: {
         DEPARTMENT_NAME: "Quality Control Department",
         RAW_MATERIAL_LABEL: "Raw Material Revalidation",
-        RAW_MATERIAL_DESCRIPTION:
-          "HTPB, DOA, AP, Al and binder revalidation test result approvals",
+        RAW_MATERIAL_DESCRIPTION: "HTPB, DOA, AP, Al and binder revalidation test result approvals",
         RAW_MATERIAL_SECTION: "Raw Material Revalidation Submissions",
         QC_DIVISION_LABEL: "Quality Control",
         QC_DIVISION_DESCRIPTION:
           "Division-based quality checks, raw material validation and processing inspections",
         QC_DIVISION_SECTION: "Quality Control Submissions",
         NDT_LABEL: "NDT",
-        NDT_DESCRIPTION:
-          "X-ray, ultrasonic and dye-penetrant inspection report approvals",
+        NDT_DESCRIPTION: "X-ray, ultrasonic and dye-penetrant inspection report approvals",
         NDT_SECTION: "NDT Submissions",
         STF_LABEL: "Static Test Facility",
-        STF_DESCRIPTION:
-          "Ballistic test data, burn rate and performance verification approvals",
+        STF_DESCRIPTION: "Ballistic test data, burn rate and performance verification approvals",
         STF_SECTION: "Static Test Facility Submissions",
       },
     },
@@ -2004,8 +2075,21 @@ export const STRINGS = {
 
     // ── Active Batches Table ─────────────────────────────────────
     BATCH_TABLE: {
-      SECTION_TITLE: "In Progress Batches",
-      COLUMN_HEADERS: ["Batch ID", "Type", "Motor ID", "Motor Type", "Project Name", "Manager Name", "Manager ID", "Status", "Created Date", "Progress"],
+      SECTION_INPOROGRESS_TITLE: "In Progress Batches",
+      SECTION_COMPLETED_BATCHES: "Completed Batches",
+      SECTION_COMPLETED_TITLE: "Complated Batched",
+      COLUMN_HEADERS: [
+        "Batch ID",
+        "Type",
+        "Motor ID",
+        "Motor Type",
+        "Project Name",
+        "Manager Name",
+        "Manager ID",
+        "Status",
+        "Created Date",
+        "Progress",
+      ],
       HEADERS: {
         BATCH_ID: "BATCH ID",
         BATCH_TYPE: "BATCH TYPE",
@@ -2147,7 +2231,7 @@ export const STRINGS = {
       LOAD_LIST_FAILED: "Failed to load user list:",
       LOAD_STATS_FAILED: "Failed to load user stats",
       LOAD_LOOKUPS_FAILED: "Failed to load user management lookups",
-    }
+    },
   },
 
   /* -------- ADMIN PROJECT MANAGEMENT -------- */
@@ -2157,6 +2241,16 @@ export const STRINGS = {
       SUBTITLE: "Manage all projects in the system",
       NEW_PROJECT_BUTTON: "New Project",
       LOADING_PLACEHOLDER: "…",
+    },
+    DATE_FILTER: {
+      LABEL: "Date Filter",
+      TODAY: "Today",
+      THIS_WEEK: "This Week",
+      THIS_MONTH: "This Month",
+      CUSTOM: "Custom Range",
+      START_DATE: "Start Date",
+      END_DATE: "End Date",
+      VALUES: { DAY: "day", WEEK: "week", MONTH: "month", CUSTOM: "custom" },
     },
     STATS: [
       { label: "Total Projects", subLabel: "All projects", variant: "total" },
@@ -2236,21 +2330,31 @@ export const STRINGS = {
       FILTERS_BUTTON: "Filters",
       FILTERS_BUTTON_WITH_COUNT: (n: number) => `Filters (${n})`,
       CLEAR_ALL: "Clear all",
-      FILTER_STAGE_LABEL: "Stage",
+      FILTER_STAGE_LABEL: "Motor Stage",
+      SEARCH_MOTOR_PLACEHOLDER: "Search motors",
       FILTER_STATUS_LABEL: "Status",
       FILTER_PRIORITY_LABEL: "Priority",
-      FILTER_DEPT_LABEL: "Department",
+      FILTER_SUB_DEPT_LABEL: "Stage",
       TIMEFRAME_LABEL: "Timeframe",
       TODAY: "Today",
       THIS_WEEK: "This Week",
       THIS_MONTH: "This Month",
     },
     FILTER_OPTIONS: {
-      STAGES: ["All", "Sourcing", "Manufacturing", "Quality Control", "Dispatch"],
-      STATUSES: ["All", "Pending", "In Progress", "Completed", "Approved", "Dispatched", "Rejected"],
-      PRIORITIES: ["All", "Low", "Medium", "High", "Critical"],
+      STAGES: ["Sourcing", "Manufacturing", "Quality Control", "Dispatch"],
+      STATUSES: ["In Progress", "Waiting for Approval", "Approved", "Rejected"],
+      PRIORITIES: ["Low", "Medium", "High", "Critical"],
     },
-    TABLE_COLS: ["Batch ID", "Motor ID", "Motor Stage", "Stage", "Status", "Priority", "System Manager", "Actions"],
+    TABLE_COLS: [
+      "Batch ID",
+      "Motor ID",
+      "Motor Stage",
+      "Stage",
+      "Status",
+      "Priority",
+      "System Manager",
+      "Actions",
+    ],
     TABLE: {
       EMPTY: "No batches found",
     },
@@ -2382,7 +2486,17 @@ export const STRINGS = {
     ],
     ACTIVE_BATCHES: {
       SECTION_TITLE: "Active Batches",
-      COLUMNS: ["Batch ID", "Motor ID", "Project", "Stage", "Sub-Stage", "Priority", "Status", "Progress", "Last Updated"],
+      COLUMNS: [
+        "Batch ID",
+        "Motor ID",
+        "Project",
+        "Stage",
+        "Sub-Stage",
+        "Priority",
+        "Status",
+        "Progress",
+        "Last Updated",
+      ],
       EMPTY: "No active batches found.",
     },
     STAGE_STATUS: {
@@ -2399,7 +2513,10 @@ export const STRINGS = {
       },
     },
     CHARTS: {
-      MOTORS_PROCESSED: { TITLE: "Motors Processed", SUBTITLE: "Rocket motors processed & dispatched" },
+      MOTORS_PROCESSED: {
+        TITLE: "Motors Processed",
+        SUBTITLE: "Rocket motors processed & dispatched",
+      },
       WEEKLY_ACTIVITY: { TITLE: "Weekly Activity", SUBTITLE: "Stage transitions this period" },
       STAGE_BREAKDOWN: { TITLE: "Stage Distribution", SUBTITLE: "Batch count by processing stage" },
     },
@@ -2445,12 +2562,14 @@ export const STRINGS = {
       CLEAR_ALL: "Clear all",
       EMPTY: "No data available.",
       EVENT_TYPES: [
-        "All", "STAGE_UPDATED", "APPROVAL_COMPLETED",
-        "BATCH_CREATED", "BATCH_REJECTED", "DISPATCH_COMPLETED",
+        "All",
+        "STAGE_UPDATED",
+        "APPROVAL_COMPLETED",
+        "BATCH_CREATED",
+        "BATCH_REJECTED",
+        "DISPATCH_COMPLETED",
       ],
-      DEPARTMENTS: [
-        "All", "Sourcing", "Manufacturing", "Quality Control", "Dispatch",
-      ],
+      DEPARTMENTS: ["All", "Sourcing", "Manufacturing", "Quality Control", "Dispatch"],
     },
     FILTERS: {
       BUTTON: "Filters",
@@ -2461,7 +2580,18 @@ export const STRINGS = {
       DEPARTMENT: "Department",
       PRIORITIES: ["All", "Low", "Medium", "High", "Critical"],
       STATUSES: ["All", "in progress", "waiting for approval", "completed", "rejected"],
+      FROM: "From",
+      TO: "To",
     },
+    COMMON: {
+      FILTERS_TITLE: "Refine list",
+      FILTERS_APPLY: "Apply filters",
+      FILTERS_CLOSE: "Close",
+      FILTERS_TOGGLE: "Filters",
+      SHOWING_RECORDS: (shown: number, total: number) => `Showing ${shown} of ${total} records`,
+      REFRESH_TOOLTIP: "Refresh Data",
+    },
+
     ERRORS: {
       LOAD_STATS_FAILED: "Failed to load dashboard statistics.",
       LOAD_CHART_FAILED: "Failed to load chart data.",

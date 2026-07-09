@@ -21,7 +21,12 @@ export const projectManagementController = {
       const resp = await fetchAllProjects(payload);
       return new ApiResponseModel(resp, (res) => {
         const rawProjects = res?.data?.projects || [];
-        const pagination = res?.data?.pagination || { page: 1, limit: 10, totalRecords: 0, totalPages: 0 };
+        const pagination = res?.data?.pagination || {
+          page: 1,
+          limit: 10,
+          totalRecords: 0,
+          totalPages: 0,
+        };
         return {
           projects: rawProjects.map((p: any) => ProjectListItemModel.fromApi(p)),
           pagination,
@@ -35,9 +40,9 @@ export const projectManagementController = {
   /* ─────────────────────────────
      Fetch stats
   ───────────────────────────── */
-  getProjectStats: async () => {
+  getProjectStats: async (payload) => {
     try {
-      const resp = await fetchProjectStats();
+      const resp = await fetchProjectStats(payload);
       return new ApiResponseModel(resp, (res) => ProjectStatsModel.fromApi(res?.data));
     } catch (error) {
       return new ApiResponseModel<null>(error);

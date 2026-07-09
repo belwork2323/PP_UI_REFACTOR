@@ -11,14 +11,13 @@ import { BATCH_MANAGEMENT } from "@data/api/endPoints";
  * @param startDate  - "DD-MM-YYYY"
  * @param endDate    - "DD-MM-YYYY"
  */
-export const fetchBatchStatsApi = (
-  filterType: string,
-  startDate?: string,
-  endDate?  : string
-) => {
-  const payload: Record<string, string> = { filterType };
-  if (startDate) payload.startDate = startDate;
-  if (endDate)   payload.endDate   = endDate;
+export type BatchStatsPayload = {
+  filterType: string;
+  startDate?: string;
+  endDate?: string;
+};
+
+export const fetchBatchStatsApi = (payload: BatchStatsPayload) => {
   return post(BATCH_MANAGEMENT.GET_STATS, payload);
 };
 
@@ -27,15 +26,15 @@ export const fetchBatchStatsApi = (
 ───────────────────────────────────────────────────────────────────────────── */
 
 export interface BatchFilters {
-  search?         : string;
-  status?         : string;
-  priority?       : string;
-  department?     : string;
-  subDepartment?  : string;
+  search?: string;
+  status?: string;
+  priority?: string;
+  department?: string;
+  subDepartment?: string;
   /** Filter by one or more motor IDs (POST body filters.motorIds) */
-  motorIds?       : string[];
+  motorIds?: string[];
   /** Filter by one or more lot IDs (POST body filters.lotIds) */
-  lotIds?         : string[];
+  lotIds?: string[];
 }
 
 export interface BatchSort {
@@ -51,10 +50,10 @@ export interface BatchSort {
  * @param sort    - Optional sort config (defaults to createdOn desc)
  */
 export const fetchAllBatches = (
-  page   : number       = 1,
-  limit  : number       = 10,
+  page: number = 1,
+  limit: number = 10,
   filters: BatchFilters = {},
-  sort   : BatchSort    = { field: "createdOn", order: "desc" }
+  sort: BatchSort = { field: "createdOn", order: "desc" },
 ) => {
   // Strip undefined / empty — server expects {} for "no filters"
   const cleanFilters: Record<string, string | string[]> = {};
@@ -67,8 +66,8 @@ export const fetchAllBatches = (
 
   const payload = {
     pagination: { page, limit },
-    filters   : cleanFilters,
-    sort      : {
+    filters: cleanFilters,
+    sort: {
       field: sort.field ?? "createdOn",
       order: sort.order ?? "desc",
     },
@@ -98,17 +97,17 @@ export const fetchBatchById = (batchId: string) =>
 ───────────────────────────────────────────────────────────────────────────── */
 
 export interface CreateBatchPayloadAPI {
-  batchType           : string;
-  subBatchType?       : string;
-  projectId?          : string | null;
-  motorStage?         : string | number;
-  numberOfMotors?     : number;
-  motorIds?           : string[];
-  priority            : string;
-  systemManagerId     : string;
+  batchType: string;
+  subBatchType?: string;
+  projectId?: string | null;
+  motorStage?: string | number;
+  numberOfMotors?: number;
+  motorIds?: string[];
+  priority: string;
+  systemManagerId: string;
   identificationSheet?: Record<string, unknown>;
-  objective?          : string;
-  articles?           : string[];
+  objective?: string;
+  articles?: string[];
 }
 
 /**
@@ -125,18 +124,18 @@ export const createBatch = (payload: CreateBatchPayloadAPI) =>
 ───────────────────────────────────────────────────────────────────────────── */
 
 export interface UpdateBatchPayloadAPI {
-  batchId             : string;
-  batchType           : string;
-  subBatchType?       : string;
-  projectId?          : string | null;
-  motorStage?         : string | number;
-  numberOfMotors?     : number;
-  motorIds?           : string[];
-  priority            : string;
-  systemManagerId     : string;
+  batchId: string;
+  batchType: string;
+  subBatchType?: string;
+  projectId?: string | null;
+  motorStage?: string | number;
+  numberOfMotors?: number;
+  motorIds?: string[];
+  priority: string;
+  systemManagerId: string;
   identificationSheet?: Record<string, unknown>;
-  objective?          : string;
-  articles?           : string[];
+  objective?: string;
+  articles?: string[];
 }
 
 /**

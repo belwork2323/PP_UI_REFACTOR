@@ -33,6 +33,7 @@
             "type": "table",
             "id": "MECHANICAL_PROPERTIES",
             "allowAddColumn": true,
+            "allowDeleteColumn": true,
             "addColumnPrefix": "FM_",
             "columnActions": {
               "position": "top-right",

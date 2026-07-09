@@ -6,7 +6,12 @@ import {
   updateBatch,
   deleteBatch,
 } from "@data/api/admin/BatchManagement/batchManagementApi";
-import type { BatchFilters, BatchSort, UpdateBatchPayloadAPI } from "@data/api/admin/BatchManagement/batchManagementApi";
+import type {
+  BatchFilters,
+  BatchSort,
+  BatchStatsPayload,
+  UpdateBatchPayloadAPI,
+} from "@data/api/admin/BatchManagement/batchManagementApi";
 import {
   BatchListItemModel,
   BatchStatsModel,
@@ -18,17 +23,12 @@ import { useAuthStore } from "@app/store/authStore";
 import { parseApiError } from "@controllers/admin/common/generalController";
 
 export const batchManagementController = {
-
   /* ─────────────────────────────────────────────────────────────────────────
      BATCH STATS
   ───────────────────────────────────────────────────────────────────────── */
-  getBatchStats: async (
-    filterType: string = "month",
-    startDate?: string,
-    endDate?  : string
-  ) => {
+  getBatchStats: async (payload: BatchStatsPayload) => {
     try {
-      const response = await fetchBatchStatsApi(filterType, startDate, endDate);
+      const response = await fetchBatchStatsApi(payload);
       if (response?.success === false) throw response;
       return BatchStatsModel.fromStatsApi(response);
     } catch (error) {
@@ -43,10 +43,10 @@ export const batchManagementController = {
      FETCH ALL BATCHES  (paginated + filtered)
   ───────────────────────────────────────────────────────────────────────── */
   getAllBatches: async (
-    page   : number       = 1,
-    limit  : number       = 10,
+    page: number = 1,
+    limit: number = 10,
     filters: BatchFilters = {},
-    sort   : BatchSort    = { field: "createdOn", order: "desc" }
+    sort: BatchSort = { field: "createdOn", order: "desc" },
   ) => {
     try {
       const response = await fetchAllBatches(page, limit, filters, sort);
@@ -54,11 +54,14 @@ export const batchManagementController = {
 
       const rawBatches = response?.data?.batches || [];
       const pagination = response?.data?.pagination || {
-        page, limit, totalRecords: 0, totalPages: 0,
+        page,
+        limit,
+        totalRecords: 0,
+        totalPages: 0,
       };
 
       return {
-        batches   : rawBatches.map((b: any) => BatchListItemModel.fromApi(b)),
+        batches: rawBatches.map((b: any) => BatchListItemModel.fromApi(b)),
         pagination,
       };
     } catch (error) {
@@ -90,7 +93,7 @@ export const batchManagementController = {
   ───────────────────────────────────────────────────────────────────────── */
   createBatch: async (form: any) => {
     const showAlert = useAlertStore.getState().showAlert;
-    const authUser  = useAuthStore.getState().user;
+    const authUser = useAuthStore.getState().user;
 
     if (!authUser?.username) {
       showAlert("Authentication error. Please login again.", "error");
@@ -99,22 +102,18 @@ export const batchManagementController = {
 
     try {
       // Model constructor accepts only (form) — createdBy is derived server-side
-      const payload  = new CreateBatchPayload(form);
+      const payload = new CreateBatchPayload(form);
       const response = await createBatch(payload);
       if (response?.success === false) throw response;
 
-      showAlert(
-        response?.message || "Batch created successfully.",
-        "success",
-        { autoCloseMs: 2000 }
-      );
+      showAlert(response?.message || "Batch created successfully.", "success", {
+        autoCloseMs: 2000,
+      });
       return true;
     } catch (error) {
-      showAlert(
-        parseApiError(error, "Failed to create batch. Please try again."),
-        "error",
-        { autoCloseMs: 3000 }
-      );
+      showAlert(parseApiError(error, "Failed to create batch. Please try again."), "error", {
+        autoCloseMs: 3000,
+      });
       return false;
     }
   },
@@ -124,7 +123,7 @@ export const batchManagementController = {
   ───────────────────────────────────────────────────────────────────────── */
   updateBatch: async (batchId: string, form: any) => {
     const showAlert = useAlertStore.getState().showAlert;
-    const authUser  = useAuthStore.getState().user;
+    const authUser = useAuthStore.getState().user;
 
     if (!authUser?.username) {
       showAlert("Authentication error. Please login again.", "error");
@@ -133,22 +132,18 @@ export const batchManagementController = {
 
     try {
       // Model constructor accepts only (form) — updatedBy is derived server-side
-      const payload  = new UpdateBatchPayload(batchId, form);
+      const payload = new UpdateBatchPayload(batchId, form);
       const response = await updateBatch(payload as unknown as UpdateBatchPayloadAPI);
       if (response?.success === false) throw response;
 
-      showAlert(
-        response?.message || "Batch updated successfully.",
-        "success",
-        { autoCloseMs: 2000 }
-      );
+      showAlert(response?.message || "Batch updated successfully.", "success", {
+        autoCloseMs: 2000,
+      });
       return true;
     } catch (error) {
-      showAlert(
-        parseApiError(error, "Failed to update batch. Please try again."),
-        "error",
-        { autoCloseMs: 3000 }
-      );
+      showAlert(parseApiError(error, "Failed to update batch. Please try again."), "error", {
+        autoCloseMs: 3000,
+      });
       return false;
     }
   },
@@ -163,18 +158,14 @@ export const batchManagementController = {
       const response = await deleteBatch(batchId, reason);
       if (response?.success === false) throw response;
 
-      showAlert(
-        response?.message || "Batch deleted successfully.",
-        "success",
-        { autoCloseMs: 2000 }
-      );
+      showAlert(response?.message || "Batch deleted successfully.", "success", {
+        autoCloseMs: 2000,
+      });
       return true;
     } catch (error) {
-      showAlert(
-        parseApiError(error, "Failed to delete batch. Please try again."),
-        "error",
-        { autoCloseMs: 3000 }
-      );
+      showAlert(parseApiError(error, "Failed to delete batch. Please try again."), "error", {
+        autoCloseMs: 3000,
+      });
       return false;
     }
   },

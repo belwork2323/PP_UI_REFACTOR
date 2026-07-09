@@ -76,6 +76,21 @@ export const mapQcInhibitorTypeToApi = (value: string): QcInhibitorType | null =
   return null;
 };
 
+export const resolveQcSectionInhibitorType = (
+  division: QcApiDivision,
+  sectionSubType: QcApiSubType,
+  inhibitorType?: string | null,
+): QcInhibitorType | undefined => {
+  if (
+    division !== QC_POST_CURE_API_DIVISION ||
+    sectionSubType !== QC_POST_CURE_SUB_TYPE_INHIBITION ||
+    !inhibitorType
+  ) {
+    return undefined;
+  }
+  return mapQcInhibitorTypeToApi(inhibitorType) ?? undefined;
+};
+
 export const getQcInhibitorTypeLabel = (value: string) =>
   QC_INHIBITOR_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? value;
 

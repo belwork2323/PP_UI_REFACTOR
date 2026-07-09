@@ -7,6 +7,7 @@ import {
   mapProjectToFormState,
   getProjectManagementErrorMessage,
 } from "@data/models/admin/ProjectManagement/ProjectManagementModel";
+import { getDateRange } from "@/utils/dateUtils";
 
 const S = STRINGS.PROJECT_MANAGEMENT;
 
@@ -48,18 +49,19 @@ function useProjectListSection() {
       } else {
         setProjects([]);
         setPaginationData({ totalRecords: 0, totalPages: 0 });
-        useAlertStore.getState().showAlert(
-          getProjectManagementErrorMessage(resp, S.ERRORS.OPERATION_FAILED),
-          "error"
-        );
+        useAlertStore
+          .getState()
+          .showAlert(getProjectManagementErrorMessage(resp, S.ERRORS.OPERATION_FAILED), "error");
       }
     } catch (err: any) {
       setProjects([]);
       setPaginationData({ totalRecords: 0, totalPages: 0 });
-      useAlertStore.getState().showAlert(
-        getProjectManagementErrorMessage(err?.response?.data, S.ERRORS.OPERATION_FAILED),
-        "error"
-      );
+      useAlertStore
+        .getState()
+        .showAlert(
+          getProjectManagementErrorMessage(err?.response?.data, S.ERRORS.OPERATION_FAILED),
+          "error",
+        );
     } finally {
       setListLoading(false);
     }
@@ -69,7 +71,9 @@ function useProjectListSection() {
     void loadProjectsList();
   }, [loadProjectsList]);
 
-  const activeFilterCount = [appliedFilters.fromDate, appliedFilters.toDate].filter((v) => v && v.trim()).length;
+  const activeFilterCount = [appliedFilters.fromDate, appliedFilters.toDate].filter(
+    (v) => v && v.trim(),
+  ).length;
 
   const setDraftFilter = (field: keyof typeof DEFAULT_PROJECT_FILTERS, value: string) => {
     setDraftFilters((prev) => ({ ...prev, [field]: value }));
@@ -126,11 +130,33 @@ function useProjectStatsSection() {
     idleProjects: 0,
   });
   const [statsLoading, setStatsLoading] = useState(true);
+  const [filterType, setFilterType] = useState("month");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const [dateFilterOpen, setDateFilterOpen] = useState(true);
+  const getStatsPayload = useCallback(() => {
+    if (filterType === "custom") {
+      return {
+        filterType,
+        startDate: customStartDate,
+        endDate: customEndDate,
+      };
+    }
 
+    const { startDate, endDate } = getDateRange(filterType);
+
+    return {
+      filterType,
+      startDate,
+      endDate,
+    };
+  }, [filterType, customStartDate, customEndDate]);
   const loadStats = useCallback(async () => {
     setStatsLoading(true);
     try {
-      const resp = await projectManagementController.getProjectStats();
+      const payload = getStatsPayload();
+
+      const resp = await projectManagementController.getProjectStats(payload);
       if (resp?.success && resp.data) {
         setStats({
           totalProjects: resp.data.totalProjects || 0,
@@ -145,13 +171,53 @@ function useProjectStatsSection() {
     } finally {
       setStatsLoading(false);
     }
-  }, []);
+  }, [getStatsPayload]);
+  const handleFilterTypeChange = (value: string) => {
+    setFilterType(value);
 
+    if (value !== "custom") {
+      setCustomStartDate("");
+      setCustomEndDate("");
+    }
+  };
+  const refreshDashboard = useCallback(() => {
+    void loadStats();
+  }, [loadStats]);
+  useEffect(() => {
+    if (filterType !== "custom") {
+      refreshDashboard();
+      return;
+    }
+
+    if (customStartDate && customEndDate) {
+      refreshDashboard();
+    }
+  }, [filterType, customStartDate, customEndDate, refreshDashboard]);
+  const toggleDateFilter = () => {
+    setDateFilterOpen((prev) => !prev);
+  };
   useEffect(() => {
     void loadStats();
   }, [loadStats]);
 
-  return { stats, loading: statsLoading, loadStats };
+  return {
+    stats,
+    loading: statsLoading,
+    loadStats,
+    filterType,
+    customStartDate,
+    customEndDate,
+    dateFilterOpen,
+
+    setFilterType,
+    setCustomStartDate,
+    setCustomEndDate,
+    setDateFilterOpen,
+
+    handleFilterTypeChange,
+    refreshDashboard,
+    toggleDateFilter,
+  };
 }
 
 function useProjectFormSection(onRefresh: () => void) {
@@ -187,39 +253,44 @@ function useProjectFormSection(onRefresh: () => void) {
     }
 
     setSaving(true);
-    useAlertStore.getState().showAlert(
-      editTarget ? S.MESSAGES.UPDATING : S.MESSAGES.CREATING,
-      "info",
-      { loading: true }
-    );
+    useAlertStore
+      .getState()
+      .showAlert(editTarget ? S.MESSAGES.UPDATING : S.MESSAGES.CREATING, "info", { loading: true });
 
     try {
       const resp = editTarget
-        ? await projectManagementController.updateProject({ projectId: editTarget.projectId, ...form })
+        ? await projectManagementController.updateProject({
+            projectId: editTarget.projectId,
+            ...form,
+          })
         : await projectManagementController.createProject(form);
 
       if (resp?.success) {
-        useAlertStore.getState().showAlert(
-          resp.message || (editTarget ? S.MESSAGES.UPDATE_SUCCESS : S.MESSAGES.CREATE_SUCCESS),
-          "success",
-          { autoCloseMs: 2000 }
-        );
+        useAlertStore
+          .getState()
+          .showAlert(
+            resp.message || (editTarget ? S.MESSAGES.UPDATE_SUCCESS : S.MESSAGES.CREATE_SUCCESS),
+            "success",
+            { autoCloseMs: 2000 },
+          );
         setModalOpen(false);
         resetForm();
         onRefresh();
       } else {
-        useAlertStore.getState().showAlert(
-          getProjectManagementErrorMessage(resp, S.ERRORS.OPERATION_FAILED),
-          "error",
-          { autoCloseMs: 3000 }
-        );
+        useAlertStore
+          .getState()
+          .showAlert(getProjectManagementErrorMessage(resp, S.ERRORS.OPERATION_FAILED), "error", {
+            autoCloseMs: 3000,
+          });
       }
     } catch (error: any) {
-      useAlertStore.getState().showAlert(
-        getProjectManagementErrorMessage(error?.response?.data, S.ERRORS.OPERATION_FAILED),
-        "error",
-        { autoCloseMs: 3000 }
-      );
+      useAlertStore
+        .getState()
+        .showAlert(
+          getProjectManagementErrorMessage(error?.response?.data, S.ERRORS.OPERATION_FAILED),
+          "error",
+          { autoCloseMs: 3000 },
+        );
     } finally {
       setSaving(false);
     }
@@ -262,23 +333,27 @@ function useProjectDeleteSection(onRefresh: () => void) {
     try {
       const resp = await projectManagementController.deleteProject(projectId);
       if (resp?.success) {
-        useAlertStore.getState().showAlert(resp.message || S.MESSAGES.DELETE_SUCCESS, "success", { autoCloseMs: 2000 });
+        useAlertStore
+          .getState()
+          .showAlert(resp.message || S.MESSAGES.DELETE_SUCCESS, "success", { autoCloseMs: 2000 });
         setDeleteOpen(false);
         setDeleteTarget(null);
         onRefresh();
       } else {
-        useAlertStore.getState().showAlert(
-          getProjectManagementErrorMessage(resp, S.ERRORS.OPERATION_FAILED),
-          "error",
-          { autoCloseMs: 3000 }
-        );
+        useAlertStore
+          .getState()
+          .showAlert(getProjectManagementErrorMessage(resp, S.ERRORS.OPERATION_FAILED), "error", {
+            autoCloseMs: 3000,
+          });
       }
     } catch (error: any) {
-      useAlertStore.getState().showAlert(
-        getProjectManagementErrorMessage(error?.response?.data, S.ERRORS.OPERATION_FAILED),
-        "error",
-        { autoCloseMs: 3000 }
-      );
+      useAlertStore
+        .getState()
+        .showAlert(
+          getProjectManagementErrorMessage(error?.response?.data, S.ERRORS.OPERATION_FAILED),
+          "error",
+          { autoCloseMs: 3000 },
+        );
     } finally {
       setDeleting(false);
     }

@@ -1,12 +1,23 @@
-import { useMemo, useState, type SyntheticEvent } from "react";
+import { useCallback, useMemo, useState, type SyntheticEvent } from "react";
 import { Box, Stack, Typography } from "@mui/material";
 import type { SchemaDocumentV2, SchemaSection } from "./types";
-import type { SchemaFormValues } from "./state/formState";
+import type { SchemaChangeMeta, SchemaFormValues } from "./state/formState";
+import { scopedFormKey } from "./state/formState";
 import type { SchemaApiContext } from "./rules/apiDependency";
 import type { SchemaThemeTokens } from "./utils/schemaUtils";
-import { buildFlatVisibilityContext, isSectionVisible, pruneHiddenFormValues } from "./rules/visibility";
+import {
+  buildFlatVisibilityContext,
+  collectVisibilityTriggerFields,
+  isSectionVisible,
+  pruneHiddenFormValues,
+} from "./rules/visibility";
 import type { SchemaSetupContext } from "./utils/setupContext";
-import { syncRowGenerationTables } from "./utils/rowGenerationSync";
+import {
+  getRowGenerationParentSourceIds,
+  getRowGenerationTableIds,
+  schemaHasRowGenerationTables,
+  syncRowGenerationTables,
+} from "./utils/rowGenerationSync";
 import BlockRenderer from "./BlockRenderer";
 import AccordionSection from "../ui/components/common/AccordionSection";
 import GridFields from "../ui/components/common/GridFields";
@@ -22,6 +33,42 @@ type SchemaRendererProps = {
   setupContext?: SchemaSetupContext;
   batch?: { batchId?: string; projectName?: string; projectId?: string };
   motorId?: string;
+};
+
+const shouldSyncRowGeneration = (
+  schema: SchemaDocumentV2,
+  meta?: SchemaChangeMeta,
+): boolean => {
+  if (!schemaHasRowGenerationTables(schema)) return false;
+  if (!meta?.changedBlockId) return true;
+
+  const rowGenTableIds = getRowGenerationTableIds(schema);
+  const parentSourceIds = getRowGenerationParentSourceIds(schema);
+  const scopedId = meta.changedScope
+    ? scopedFormKey(meta.changedScope, meta.changedBlockId)
+    : meta.changedBlockId;
+
+  return (
+    rowGenTableIds.has(meta.changedBlockId) ||
+    parentSourceIds.has(meta.changedBlockId) ||
+    rowGenTableIds.has(scopedId) ||
+    parentSourceIds.has(scopedId)
+  );
+};
+
+const shouldPruneHiddenValues = (
+  sections: SchemaSection[],
+  meta?: SchemaChangeMeta,
+): boolean => {
+  const triggerFields = collectVisibilityTriggerFields(sections);
+  if (!triggerFields.size) return false;
+  if (!meta?.changedBlockId) return true;
+
+  const scopedId = meta.changedScope
+    ? scopedFormKey(meta.changedScope, meta.changedBlockId)
+    : meta.changedBlockId;
+
+  return triggerFields.has(meta.changedBlockId) || triggerFields.has(scopedId);
 };
 
 const SectionContent = ({
@@ -61,22 +108,34 @@ const SchemaRenderer = ({
   const layout = schema.data.ui?.layout ?? "flat";
   const sections = schema.data.sections ?? [];
 
-  const handleChange = (next: SchemaFormValues) => {
-    const synced = syncRowGenerationTables(schema, next);
-    onChange(pruneHiddenFormValues(sections, synced));
-  };
+  const handleChange = useCallback(
+    (next: SchemaFormValues, meta?: SchemaChangeMeta) => {
+      let result = next;
+      if (shouldSyncRowGeneration(schema, meta)) {
+        result = syncRowGenerationTables(schema, result);
+      }
+      if (shouldPruneHiddenValues(sections, meta)) {
+        result = pruneHiddenFormValues(sections, result);
+      }
+      onChange(result);
+    },
+    [onChange, schema, sections],
+  );
 
-  const ctx = {
-    values,
-    onChange: handleChange,
-    readOnly,
-    theme,
-    apiContext,
-    setupContext,
-    visibilityContext,
-    batch,
-    motorId,
-  };
+  const ctx = useMemo(
+    () => ({
+      values,
+      onChange: handleChange,
+      readOnly,
+      theme,
+      apiContext,
+      setupContext,
+      visibilityContext,
+      batch,
+      motorId,
+    }),
+    [values, handleChange, readOnly, theme, apiContext, setupContext, visibilityContext, batch, motorId],
+  );
 
   const [expandedPanels, setExpandedPanels] = useState<string[]>(() =>
     schema.data.ui?.accordion?.defaultExpanded !== false ? sections.map((s) => s.id) : [],

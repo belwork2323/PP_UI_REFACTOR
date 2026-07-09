@@ -1,5 +1,5 @@
 import { Typography } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   fetchSchemaDataSourceOptions,
   resolveDataSourceApi,
@@ -22,6 +22,7 @@ const SchemaReadonlyDisplay = ({
   emphasis = false,
 }: SchemaReadonlyDisplayProps) => {
   const [label, setLabel] = useState(value);
+  const apiContextKey = useMemo(() => JSON.stringify(apiContext ?? {}), [apiContext]);
 
   useEffect(() => {
     const trimmed = value.trim();
@@ -47,7 +48,7 @@ const SchemaReadonlyDisplay = ({
     return () => {
       cancelled = true;
     };
-  }, [value, dataSource, apiContext]);
+  }, [value, dataSource, apiContextKey]);
 
   return (
     <Typography

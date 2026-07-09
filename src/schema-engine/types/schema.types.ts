@@ -113,6 +113,21 @@ export type SchemaRowsConfig = {
   /** Picker row committed via Add Row expands API options into grouped rows. */
   commitGroup?: SchemaTableCommitGroupConfig;
   addLabel?: string;
+  /** Cross-row formulas keyed by row identifier (e.g. SR_NO = H). */
+  rowComputations?: SchemaRowComputation[];
+};
+
+export type SchemaRowComputation = {
+  /** Row identifier value in `rowKeyColumn` (e.g. "H"). */
+  rowKey: string;
+  /** Column to write the computed value into. */
+  targetColumn: string;
+  /** Expression using other row keys as variables (e.g. `G - (A - B + C + D - E + F)`). */
+  expression: string;
+  /** Column to read values from on reference rows (defaults to `targetColumn`). */
+  sourceColumn?: string;
+  /** Column holding row identifiers (defaults to `rows.autoIncrementKey`). */
+  rowKeyColumn?: string;
 };
 
 export type SchemaColSpan = {
@@ -248,6 +263,8 @@ export type SchemaTableExtraColumn = SchemaTableColumn;
 export type SchemaTableStoredValue = {
   rows: Record<string, unknown>[];
   extraColumns?: SchemaTableExtraColumn[];
+  /** Schema-defined prefixed columns hidden by the user (e.g. FM_1). */
+  deletedColumnIds?: string[];
 };
 
 export type SchemaTableColumnActions = {

@@ -33,6 +33,7 @@
             "type": "table",
             "id": "SSBR_UBR_BURN_RATE",
             "allowAddColumn": true,
+            "allowDeleteColumn": true,
             "addColumnPrefix": "FM_",
             "columnActions": {
               "position": "top-right",

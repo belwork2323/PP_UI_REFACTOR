@@ -25,13 +25,16 @@ type AdminManagementStatsGridProps = {
       label: object;
       subLabel: object;
       cornerDot: object;
-      colors: Record<string, {
-        accent: string;
-        iconBg: string;
-        iconBorder: string;
-        iconColor: string;
-        value: string;
-      }>;
+      colors: Record<
+        string,
+        {
+          accent: string;
+          iconBg: string;
+          iconBorder: string;
+          iconColor: string;
+          value: string;
+        }
+      >;
     };
   };
 };
@@ -49,7 +52,7 @@ const AdminManagementStatsGrid = ({ stats, theme }: AdminManagementStatsGridProp
             <AdminStatCard
               key={stat.label}
               label={stat.label}
-              subLabel={stat.subLabel}
+              // subLabel={stat.subLabel}
               value={stat.value}
               icon={stat.icon}
               accent={sc?.accent ?? ""}

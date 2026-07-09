@@ -22,7 +22,12 @@ export const userManagementController = {
       const resp = await fetchAllUsers(payload);
       return new ApiResponseModel(resp, (res) => {
         const rawUsers = res?.data?.users || [];
-        const pagination = res?.data?.pagination || { page: 1, pageSize: 10, totalRecords: 0, totalPages: 0 };
+        const pagination = res?.data?.pagination || {
+          page: 1,
+          pageSize: 10,
+          totalRecords: 0,
+          totalPages: 0,
+        };
         return {
           users: rawUsers.map((u: any) => UserListItemModel.fromApi(u)),
           pagination,
@@ -36,9 +41,9 @@ export const userManagementController = {
   /* ─────────────────────────────
      Fetch stats
   ───────────────────────────── */
-  getUserStats: async () => {
+  getUserStats: async (payload) => {
     try {
-      const resp = await fetchUserStats();
+      const resp = await fetchUserStats(payload);
       return new ApiResponseModel(resp); // default handles res.data
     } catch (error) {
       return new ApiResponseModel<null>(error);

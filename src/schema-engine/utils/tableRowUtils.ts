@@ -1,12 +1,22 @@
-import type { SchemaFieldType, SchemaTableBlock, SchemaTableColumn, SchemaTableStoredValue } from "../types";
+import type { SchemaFieldType, SchemaTableBlock, SchemaTableColumn, SchemaTableColumnSlot, SchemaTableStoredValue } from "../types";
 import { TABLE_EXPANDED_ROLE, TABLE_PICKER_ROLE, rehydrateCommitGroupTableRows } from "../rules/tableCommitGroup";
-import { flattenTableColumns } from "./schemaUtils";
+import { flattenTableColumns, isColumnGroup } from "./schemaUtils";
 
 /** Metadata keys on preset row objects — not column ids */
 export const PRESET_ROW_META_KEYS = new Set(["type", "readonly", "label"]);
 
 /** Wrapper keys on table form values — not submitted as row data */
-export const TABLE_VALUE_META_KEYS = new Set(["extraColumns"]);
+export const TABLE_VALUE_META_KEYS = new Set(["extraColumns", "deletedColumnIds"]);
+
+/** Persisted alongside table row data in section submissions */
+export const TABLE_COLUMN_STATE_SUFFIX = "__tableColumns";
+
+export const getTableColumnStateKey = (blockId: string) => `${blockId}${TABLE_COLUMN_STATE_SUFFIX}`;
+
+export type SchemaTableColumnState = {
+  extraColumns?: SchemaTableColumn[];
+  deletedColumnIds?: string[];
+};
 
 export const isWrappedTableValue = (value: unknown): value is SchemaTableStoredValue =>
   Boolean(value && typeof value === "object" && !Array.isArray(value) && Array.isArray((value as SchemaTableStoredValue).rows));
@@ -36,10 +46,167 @@ export const resolveTableRows = (
 export const resolveTableExtraColumns = (value: unknown): SchemaTableColumn[] =>
   isWrappedTableValue(value) ? (value.extraColumns ?? []) : [];
 
+export const resolveTableDeletedColumnIds = (value: unknown): string[] =>
+  isWrappedTableValue(value) ? (value.deletedColumnIds ?? []) : [];
+
 export const wrapTableValue = (
   rows: Record<string, unknown>[],
+  extraColumns: SchemaTableColumn[] = [],
+  deletedColumnIds: string[] = [],
+): SchemaTableStoredValue => ({
+  rows,
+  ...(extraColumns.length > 0 ? { extraColumns } : {}),
+  ...(deletedColumnIds.length > 0 ? { deletedColumnIds } : {}),
+});
+
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+export const isDeletablePrefixedColumn = (table: SchemaTableBlock, columnId: string): boolean => {
+  const prefix = String(table.addColumnPrefix ?? "").trim();
+  if (!prefix) return false;
+  return new RegExp(`^${escapeRegExp(prefix)}\\d+$`, "i").test(columnId);
+};
+
+export const resolveVisibleTableColumns = (
+  columns: SchemaTableColumnSlot[],
+  deletedColumnIds: string[] = [],
+): SchemaTableColumnSlot[] => {
+  const deleted = new Set(deletedColumnIds);
+  const result: SchemaTableColumnSlot[] = [];
+
+  columns.forEach((slot) => {
+    if (isColumnGroup(slot)) {
+      const visible = slot.columns.filter((col) => !deleted.has(col.id));
+      if (visible.length > 0) {
+        result.push({ ...slot, columns: visible });
+      }
+      return;
+    }
+    if (!deleted.has(slot.id)) {
+      result.push(slot);
+    }
+  });
+
+  return result;
+};
+
+export const resolveDeletableColumnIds = (
+  table: SchemaTableBlock,
   extraColumns: SchemaTableColumn[],
-): SchemaTableStoredValue => ({ rows, extraColumns });
+  deletedColumnIds: string[] = [],
+): string[] => {
+  if (!table.allowDeleteColumn) {
+    return extraColumns.map((col) => col.id);
+  }
+
+  const deleted = new Set(deletedColumnIds);
+  const prefixedFromSchema = flattenTableColumns(table.columns)
+    .filter((col) => isDeletablePrefixedColumn(table, col.id) && !deleted.has(col.id))
+    .map((col) => col.id);
+
+  return [...prefixedFromSchema, ...extraColumns.map((col) => col.id)];
+};
+
+export const shouldWrapTableValue = (
+  table: SchemaTableBlock,
+  extraColumns: SchemaTableColumn[],
+  deletedColumnIds: string[] = [],
+): boolean =>
+  Boolean(table.allowAddColumn) ||
+  Boolean(table.allowDeleteColumn) ||
+  extraColumns.length > 0 ||
+  deletedColumnIds.length > 0;
+
+const uniqueStrings = (values: string[]) => values.filter((value, index) => values.indexOf(value) === index);
+
+const uniqueColumns = (columns: SchemaTableColumn[]) =>
+  columns.filter((column, index) => columns.findIndex((item) => item.id === column.id) === index);
+
+const collectSavedDynamicColumnIds = (
+  table: SchemaTableBlock,
+  rows: Record<string, unknown>[],
+): Set<string> => {
+  const ids = new Set<string>();
+  rows.forEach((row) => {
+    Object.keys(row).forEach((key) => {
+      if (TABLE_ROW_RUNTIME_KEYS.has(key) || isFieldTypeHintKey(key)) return;
+      if (isDeletablePrefixedColumn(table, key)) {
+        ids.add(key);
+      }
+    });
+  });
+  return ids;
+};
+
+const buildRehydratedExtraColumn = (table: SchemaTableBlock, columnId: string): SchemaTableColumn => {
+  const template = flattenTableColumns(table.columns).find((col) => isDeletablePrefixedColumn(table, col.id));
+  return {
+    type: "column",
+    id: columnId,
+    fieldType: template?.fieldType ?? "text",
+    label: columnId.replace(/_/g, "-"),
+  };
+};
+
+/** Restore dynamic column add/delete state after API round-trip (metadata is not persisted). */
+export const rehydrateDynamicTableColumnState = (
+  table: SchemaTableBlock,
+  value: unknown,
+  columnState?: SchemaTableColumnState,
+): unknown => {
+  if (!table.allowAddColumn && !table.allowDeleteColumn) {
+    return value;
+  }
+
+  const explicitExtra = columnState?.extraColumns ?? [];
+  const explicitDeleted = columnState?.deletedColumnIds ?? [];
+  if (explicitDeleted.length > 0 || explicitExtra.length > 0) {
+    const rows = resolveTableRows(value, table, () => []);
+    if (!rows.length) return value;
+    const extraColumns = uniqueColumns([
+      ...explicitExtra,
+      ...resolveTableExtraColumns(value),
+    ]);
+    const deletedColumnIds = uniqueStrings([
+      ...explicitDeleted,
+      ...resolveTableDeletedColumnIds(value),
+    ]);
+    return wrapTableValue(applyExtraColumnCellsToRows(rows, extraColumns), extraColumns, deletedColumnIds);
+  }
+
+  const existingExtra = resolveTableExtraColumns(value);
+  const existingDeleted = resolveTableDeletedColumnIds(value);
+  if (isWrappedTableValue(value) && existingDeleted.length > 0) {
+    return value;
+  }
+
+  const rows = resolveTableRows(value, table, () => []);
+  if (!rows.length) return value;
+
+  const savedDynamicIds = collectSavedDynamicColumnIds(table, rows);
+  const schemaColumns = flattenTableColumns(table.columns);
+  const schemaColumnIds = new Set(schemaColumns.map((col) => col.id));
+
+  const deletedColumnIds = uniqueStrings([
+    ...existingDeleted,
+    ...schemaColumns
+      .filter((col) => isDeletablePrefixedColumn(table, col.id) && !savedDynamicIds.has(col.id))
+      .map((col) => col.id),
+  ]);
+
+  const extraColumns = uniqueColumns([
+    ...existingExtra,
+    ...[...savedDynamicIds]
+      .filter((id) => !schemaColumnIds.has(id))
+      .map((id) => buildRehydratedExtraColumn(table, id)),
+  ]);
+
+  if (!shouldWrapTableValue(table, extraColumns, deletedColumnIds)) {
+    return rows;
+  }
+
+  return wrapTableValue(applyExtraColumnCellsToRows(rows, extraColumns), extraColumns, deletedColumnIds);
+};
 
 /** Re-apply preset row metadata stripped during save/load (header rows, field-type hints, etc.). */
 export const applyPresetRowMetadata = (
@@ -84,16 +251,26 @@ export const applyPresetRowMetadata = (
 export const createNextPrefixedTableColumn = (
   table: SchemaTableBlock,
   extraColumns: SchemaTableColumn[],
+  deletedColumnIds: string[] = [],
 ): SchemaTableColumn => {
   const prefix = String(table.addColumnPrefix ?? "FM").trim() || "FM";
-  const pattern = new RegExp(`^${prefix}(\\d+)$`, "i");
-  const numbers = flattenTableColumns([...table.columns, ...extraColumns])
+  const pattern = new RegExp(`^${escapeRegExp(prefix)}(\\d+)$`, "i");
+  const visibleSchemaColumns = resolveVisibleTableColumns(table.columns, deletedColumnIds);
+  const numbers = flattenTableColumns([...visibleSchemaColumns, ...extraColumns])
     .map((col) => col.id.match(pattern))
     .filter((match): match is RegExpMatchArray => Boolean(match))
     .map((match) => Number.parseInt(match[1], 10));
   const next = numbers.length ? Math.max(...numbers) + 1 : 1;
   const id = `${prefix}${next}`;
-  return { type: "column", id, fieldType: "text", label: id };
+  const templateColumn = flattenTableColumns([...visibleSchemaColumns, ...extraColumns]).find((col) =>
+    isDeletablePrefixedColumn(table, col.id),
+  );
+  return {
+    type: "column",
+    id,
+    fieldType: templateColumn?.fieldType ?? "text",
+    label: id,
+  };
 };
 
 export const buildInitialExtraColumns = (table: SchemaTableBlock): SchemaTableColumn[] => {

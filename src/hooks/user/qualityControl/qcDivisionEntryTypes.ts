@@ -1,5 +1,5 @@
 import type { QcApiDivision, QcApiSubType } from "../../../schema-engine/adapters/qc.adapter";
-import type { SchemaFormValues } from "../../../schema-engine";
+import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
 
 export type QcDivisionEntryKind =
   | "SIMPLE"
@@ -34,6 +34,8 @@ export type QcDivisionEntry = {
   inhibitorType?: string;
   weighscaleNo?: string;
   calibrationDueDate?: string;
+  /** Sections from the details API grouped into this entry (used for hydration). */
+  savedSections?: SchemaSectionSubmission[];
 };
 
 export type QcDivisionEntryValues = {

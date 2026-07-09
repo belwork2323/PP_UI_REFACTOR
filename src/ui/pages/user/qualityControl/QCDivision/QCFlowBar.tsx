@@ -202,77 +202,78 @@ const QCFlowBar = ({
         }),
       ),
   }));
+  const isMotorAlreadyAdded = (motorId: string): boolean =>
+    (isCastingFlow &&
+      addedDivisionEntryKeys.includes(
+        buildDivisionEntryDedupKey({
+          flowKey: selectedDivision,
+          kind: "CASTING_MOTOR",
+          motorId,
+        }),
+      )) ||
+    (isCuringFlow &&
+      addedDivisionEntryKeys.includes(
+        buildDivisionEntryDedupKey({
+          flowKey: selectedDivision,
+          kind: "CURING_MOTOR",
+          motorId,
+        }),
+      )) ||
+    (isTrimmingFlow &&
+      addedDivisionEntryKeys.includes(
+        buildDivisionEntryDedupKey({
+          flowKey: selectedDivision,
+          kind: "TRIMMING_MOTOR",
+          motorId,
+        }),
+      )) ||
+    (isDeCoringFlow &&
+      addedDivisionEntryKeys.includes(
+        buildDivisionEntryDedupKey({
+          flowKey: selectedDivision,
+          kind: "DE_CORING_MOTOR",
+          motorId,
+        }),
+      )) ||
+    (isNdtFlow &&
+      addedDivisionEntryKeys.includes(
+        buildDivisionEntryDedupKey({
+          flowKey: selectedDivision,
+          kind: "NDT_MOTOR",
+          motorId,
+        }),
+      )) ||
+    (isWeightmentFlow &&
+      addedDivisionEntryKeys.includes(
+        buildDivisionEntryDedupKey({
+          flowKey: selectedDivision,
+          kind: "WEIGHTMENT_MOTOR",
+          motorId,
+        }),
+      )) ||
+    (isPostCureFlow &&
+      (() => {
+        const selection = resolveQcPostCureSchemaSelection(
+          selectedPostCureOperation,
+          selectedInhibitorType,
+        );
+        return (
+          Boolean(selection) &&
+          addedDivisionEntryKeys.includes(
+            buildDivisionEntryDedupKey({
+              flowKey: selectedDivision,
+              kind: "POST_CURE_MOTOR",
+              motorId,
+              subType: selection.subType,
+              inhibitorType: selection.inhibitorType,
+            }),
+          )
+        );
+      })());
+
   const motorIdOptions = resolveQcMotorIdOptions(batch).map((option) => ({
     ...option,
-    disabled: isPropellantFlow || isWeightmentFlow
-      ? false
-      : (isCastingFlow &&
-          addedDivisionEntryKeys.includes(
-            buildDivisionEntryDedupKey({
-              flowKey: selectedDivision,
-              kind: "CASTING_MOTOR",
-              motorId: option.value,
-            }),
-          )) ||
-        (isCuringFlow &&
-          addedDivisionEntryKeys.includes(
-            buildDivisionEntryDedupKey({
-              flowKey: selectedDivision,
-              kind: "CURING_MOTOR",
-              motorId: option.value,
-            }),
-          )) ||
-        (isTrimmingFlow &&
-          addedDivisionEntryKeys.includes(
-            buildDivisionEntryDedupKey({
-              flowKey: selectedDivision,
-              kind: "TRIMMING_MOTOR",
-              motorId: option.value,
-            }),
-          )) ||
-        (isDeCoringFlow &&
-          addedDivisionEntryKeys.includes(
-            buildDivisionEntryDedupKey({
-              flowKey: selectedDivision,
-              kind: "DE_CORING_MOTOR",
-              motorId: option.value,
-            }),
-          )) ||
-        (isNdtFlow &&
-          addedDivisionEntryKeys.includes(
-            buildDivisionEntryDedupKey({
-              flowKey: selectedDivision,
-              kind: "NDT_MOTOR",
-              motorId: option.value,
-            }),
-          )) ||
-        (isWeightmentFlow &&
-          addedDivisionEntryKeys.includes(
-            buildDivisionEntryDedupKey({
-              flowKey: selectedDivision,
-              kind: "WEIGHTMENT_MOTOR",
-              motorId: option.value,
-            }),
-          )) ||
-        (isPostCureFlow &&
-          (() => {
-            const selection = resolveQcPostCureSchemaSelection(
-              selectedPostCureOperation,
-              selectedInhibitorType,
-            );
-            return (
-              selection &&
-              addedDivisionEntryKeys.includes(
-                buildDivisionEntryDedupKey({
-                  flowKey: selectedDivision,
-                  kind: "POST_CURE_MOTOR",
-                  motorId: option.value,
-                  subType: selection.subType,
-                  inhibitorType: selection.inhibitorType,
-                }),
-              )
-            );
-          })()),
+    disabled: isPropellantFlow ? false : isMotorAlreadyAdded(option.value),
   }));
   const hardwareProcessOptions = QC_HARDWARE_PROCESS_OPTIONS.map((option) => ({
     ...option,
@@ -363,6 +364,7 @@ const QCFlowBar = ({
             options={QC_DIVISION_OPTIONS.map((option) => ({
               value: option.value,
               label: option.label,
+              disabled: option.disabled,
             }))}
             width={240}
             theme={theme}

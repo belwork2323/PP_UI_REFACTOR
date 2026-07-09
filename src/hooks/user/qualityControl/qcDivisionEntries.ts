@@ -14,6 +14,10 @@ import {
 } from "./qcHardwareConfig";
 import { getQcPropellantProcessLabel } from "./qcPropellantConfig";
 import {
+  QC_POST_CURE_API_DIVISION,
+  QC_POST_CURE_SUB_TYPE_INHIBITION,
+} from "./qcPostCureConfig";
+import {
   getQcMixingNumberLabel,
   getQcMixingStageLabel,
   isQcMixingStage,
@@ -70,7 +74,7 @@ export const buildDivisionEntryDedupKey = (params: {
     return `CASTING:${params.motorId ?? "NONE"}`;
   }
   if (params.kind === "CURING_MOTOR") {
-    return `CURING:${params.motorId ?? "NONE"}`;
+    return `CURING:${params.motorId ?? "NONE"}:${params.subType ?? "NONE"}`;
   }
   if (params.kind === "TRIMMING_MOTOR") {
     return `TRIMMING:${params.motorId ?? "NONE"}`;
@@ -91,6 +95,42 @@ export const buildDivisionEntryDedupKey = (params: {
     return `WEIGHTMENT:${params.motorId ?? "NONE"}`;
   }
   return params.flowKey;
+};
+
+export const buildMotorDivisionGroupKey = (
+  motorId: string,
+  subType: QcApiSubType,
+  options?: { division?: QcApiDivision; inhibitorType?: string | null },
+): string => {
+  if (
+    options?.division === QC_POST_CURE_API_DIVISION &&
+    subType === QC_POST_CURE_SUB_TYPE_INHIBITION &&
+    options.inhibitorType
+  ) {
+    return `${motorId}:${subType}:${options.inhibitorType}`;
+  }
+  if (subType) return `${motorId}:${subType}`;
+  return motorId;
+};
+
+export const parseMotorDivisionGroupKey = (
+  groupKey: string,
+): { motorId: string; subType: QcApiSubType; inhibitorType?: string } => {
+  const parts = groupKey.split(":");
+  if (parts.length >= 3 && parts[parts.length - 2] === QC_POST_CURE_SUB_TYPE_INHIBITION) {
+    return {
+      motorId: parts.slice(0, -2).join(":"),
+      subType: parts[parts.length - 2] as QcApiSubType,
+      inhibitorType: parts[parts.length - 1],
+    };
+  }
+  if (parts.length >= 2) {
+    return {
+      motorId: parts.slice(0, -1).join(":"),
+      subType: parts[parts.length - 1] as QcApiSubType,
+    };
+  }
+  return { motorId: groupKey, subType: null };
 };
 
 export const getDivisionEntryDedupKey = (entry: QcDivisionEntry) =>

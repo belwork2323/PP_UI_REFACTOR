@@ -26,6 +26,7 @@ export type {
   SchemaRepeatConfig,
   SchemaRootUi,
   SchemaRowsConfig,
+  SchemaRowComputation,
   SchemaSection,
   SchemaSectionBlock,
   SchemaSpacingToken,

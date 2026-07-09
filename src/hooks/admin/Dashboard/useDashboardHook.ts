@@ -6,7 +6,13 @@ import {
   enrichDashboardKpis,
   buildActiveBatchesFilterPayload,
 } from "@data/models/admin/Dashboard/DashboardModel";
+import { ToggleTabOption } from "@/ui/components/common/ToggleTabs";
+export type BatchTab = "IN_PROGRESS" | "COMPLETED";
 
+export const batchTabOptions: ToggleTabOption[] = [
+  { value: "IN_PROGRESS", label: "In Progress" },
+  { value: "COMPLETED", label: "Completed" },
+];
 function useDashboardGlobalFilterSection(mode: string) {
   const modeRef = useRef(mode);
   modeRef.current = mode;
@@ -17,7 +23,7 @@ function useDashboardGlobalFilterSection(mode: string) {
   const [chartData, setChartData] = useState<any>(null);
   const [chartUpdatedAt, setChartUpdatedAt] = useState<Date | null>(null);
 
-  const [filterType, setFilterTypeState] = useState("week");
+  const [filterType, setFilterTypeState] = useState("month");
   const [customStartDate, setCustomStartDateState] = useState("");
   const [customEndDate, setCustomEndDateState] = useState("");
 
@@ -27,20 +33,29 @@ function useDashboardGlobalFilterSection(mode: string) {
     clearTableFiltersRef.current?.();
   }, []);
 
-  const setFilterType = useCallback((val: string) => {
-    setFilterTypeState(val);
-    clearFilters();
-  }, [clearFilters]);
+  const setFilterType = useCallback(
+    (val: string) => {
+      setFilterTypeState(val);
+      clearFilters();
+    },
+    [clearFilters],
+  );
 
-  const setCustomStartDate = useCallback((val: string) => {
-    setCustomStartDateState(val);
-    clearFilters();
-  }, [clearFilters]);
+  const setCustomStartDate = useCallback(
+    (val: string) => {
+      setCustomStartDateState(val);
+      clearFilters();
+    },
+    [clearFilters],
+  );
 
-  const setCustomEndDate = useCallback((val: string) => {
-    setCustomEndDateState(val);
-    clearFilters();
-  }, [clearFilters]);
+  const setCustomEndDate = useCallback(
+    (val: string) => {
+      setCustomEndDateState(val);
+      clearFilters();
+    },
+    [clearFilters],
+  );
 
   const globalDateBounds = useMemo(() => {
     if (filterType === "custom") {
@@ -50,20 +65,33 @@ function useDashboardGlobalFilterSection(mode: string) {
   }, [filterType, customStartDate, customEndDate]);
 
   const fetchDashboardData = useCallback(async () => {
-    if (filterType === "custom" && (customStartDate.length !== 10 || customEndDate.length !== 10)) return;
+    if (filterType === "custom" && (customStartDate.length !== 10 || customEndDate.length !== 10))
+      return;
     setStatsLoading(true);
     try {
       const [fetchedStats, fetchedCharts] = await Promise.all([
-        dashboardController.getStats(filterType, globalDateBounds.startDate, globalDateBounds.endDate, modeRef.current),
-        dashboardController.getChartData(filterType, globalDateBounds.startDate, globalDateBounds.endDate),
+        dashboardController.getStats(
+          filterType,
+          globalDateBounds.startDate,
+          globalDateBounds.endDate,
+          modeRef.current,
+        ),
+        dashboardController.getChartData(
+          filterType,
+          globalDateBounds.startDate,
+          globalDateBounds.endDate,
+        ),
       ]);
 
       setStats({ kpis: enrichDashboardKpis(fetchedStats?.data?.kpis ?? []) });
-      setChartData(fetchedCharts?.data?.charts ?? fetchedCharts?.data ?? {
-        weeklyActivity: [],
-        motorsProcessed: [],
-        qcPassRate: [],
-      });
+      setChartData(
+        fetchedCharts?.data?.charts ??
+          fetchedCharts?.data ?? {
+            weeklyActivity: [],
+            motorsProcessed: [],
+            qcPassRate: [],
+          },
+      );
       setChartUpdatedAt(fetchedCharts?.timestamp ? new Date(fetchedCharts.timestamp) : new Date());
     } finally {
       setStatsLoading(false);
@@ -119,10 +147,10 @@ function useDashboardActiveBatchesSection() {
   const [searchQuery, setSearchQuery] = useState("");
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_PANEL_FILTERS);
   const [draftFilters, setDraftFilters] = useState(DEFAULT_PANEL_FILTERS);
-
+  const [activeTab, setActiveTab] = useState<BatchTab>("IN_PROGRESS");
   const setDraftFilter = <K extends keyof typeof DEFAULT_PANEL_FILTERS>(
     field: K,
-    value: (typeof DEFAULT_PANEL_FILTERS)[K]
+    value: (typeof DEFAULT_PANEL_FILTERS)[K],
   ) => {
     setDraftFilters((prev) => ({ ...prev, [field]: value }));
   };
@@ -172,6 +200,7 @@ function useDashboardActiveBatchesSection() {
         dateFrom: appliedFilters.dateFrom,
         dateTo: appliedFilters.dateTo,
         currentMonthOnly: appliedFilters.currentMonthOnly,
+        status: activeTab, // <-- new
       });
       const batchesResponse = await dashboardController.getActiveBatches(payload);
       setActiveBatches(batchesResponse?.data?.activeBatches ?? []);
@@ -179,7 +208,7 @@ function useDashboardActiveBatchesSection() {
     } finally {
       setActiveBatchesLoading(false);
     }
-  }, [searchQuery, appliedFilters]);
+  }, [searchQuery, appliedFilters, activeTab]);
 
   useEffect(() => {
     void fetchBatches();
@@ -211,6 +240,8 @@ function useDashboardActiveBatchesSection() {
     activeFilterCount,
     clearBatchesFilters,
     toggleCurrentMonth,
+    batchStatusTab: activeTab,
+    setBatchStatusTab: setActiveTab,
   };
 }
 
@@ -234,7 +265,7 @@ function useDashboardEventsSection(globalDateBounds: { startDate: string; endDat
 
   const setDraftFilter = <K extends keyof typeof DEFAULT_PANEL_FILTERS>(
     field: K,
-    value: (typeof DEFAULT_PANEL_FILTERS)[K]
+    value: (typeof DEFAULT_PANEL_FILTERS)[K],
   ) => {
     setDraftFilters((prev) => ({ ...prev, [field]: value }));
   };
@@ -264,7 +295,8 @@ function useDashboardEventsSection(globalDateBounds: { startDate: string; endDat
         search: eventsSearchQuery.trim() || undefined,
         eventType: appliedFilters.type !== "All" ? appliedFilters.type : undefined,
         department: appliedFilters.department !== "All" ? appliedFilters.department : undefined,
-        subDepartment: appliedFilters.subDepartment !== "All" ? appliedFilters.subDepartment : undefined,
+        subDepartment:
+          appliedFilters.subDepartment !== "All" ? appliedFilters.subDepartment : undefined,
         startDate: appliedFilters.dateFrom || globalDateBounds.startDate,
         endDate: appliedFilters.dateTo || globalDateBounds.endDate,
         currentMonth: appliedFilters.currentMonthOnly,
@@ -317,7 +349,7 @@ function useDashboardLookupsSection() {
     generalController.getSubDepartments().then((resp) => {
       if (resp?.data) {
         setSubDepartments(
-          (resp.data as any[]).map((sd: any) => sd.subDepartmentName).filter(Boolean)
+          (resp.data as any[]).map((sd: any) => sd.subDepartmentName).filter(Boolean),
         );
       }
     });
@@ -381,5 +413,8 @@ export default function useDashboardHook(mode: string) {
     clearBatchesFilters: batches.clearBatchesFilters,
     subDepartments: lookups.subDepartments,
     toggleCurrentMonth: batches.toggleCurrentMonth,
+    batchStatusTab: batches.batchStatusTab,
+    setBatchStatusTab: batches.setBatchStatusTab,
+    batchTabOptions: batchTabOptions,
   };
 }

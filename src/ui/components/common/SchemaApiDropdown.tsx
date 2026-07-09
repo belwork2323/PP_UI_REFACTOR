@@ -78,6 +78,7 @@ const SchemaApiDropdown = ({
   const [options, setOptions] = useState<Array<{ label: string; value: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [shouldFetchOptions, setShouldFetchOptions] = useState(dataSource?.type === "static");
 
   const resolvedApi = useMemo(
     () => (dataSource?.type === "api" ? resolveDataSourceApi(dataSource as SchemaDataSource & Record<string, unknown>) : null),
@@ -98,6 +99,7 @@ const SchemaApiDropdown = ({
 
   useEffect(() => {
     lastReportedCountRef.current = null;
+    setShouldFetchOptions(dataSource?.type === "static");
   }, [dataSource, apiContextKey, resolvedApi]);
 
   useEffect(() => {
@@ -111,6 +113,10 @@ const SchemaApiDropdown = ({
       const staticOptions = staticDataSourceOptions(dataSource);
       setOptions(staticOptions);
       reportOptionsCount(staticOptions.length);
+      return;
+    }
+
+    if (!shouldFetchOptions) {
       return;
     }
 
@@ -139,7 +145,7 @@ const SchemaApiDropdown = ({
     return () => {
       cancelled = true;
     };
-  }, [dataSource, apiContextKey, resolvedApi]);
+  }, [dataSource, apiContextKey, resolvedApi, shouldFetchOptions]);
 
   const selectedLabel = options.find((option) => option.value === value)?.label;
   const resolvedLabel = selectedLabel ?? (value ? String(value) : "");
@@ -158,6 +164,11 @@ const SchemaApiDropdown = ({
       SelectProps={{
         MenuProps: schemaSelectMenuProps,
         displayEmpty: Boolean(placeholder),
+        onOpen: () => {
+          if (dataSource?.type === "api") {
+            setShouldFetchOptions(true);
+          }
+        },
         renderValue: (selected) => {
           if (!selected) {
             return (

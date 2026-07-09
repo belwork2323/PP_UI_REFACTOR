@@ -5,11 +5,21 @@
 
 import React, { useMemo, useState } from "react";
 import {
-  Box, Typography, Stack, Avatar, Chip, Divider,
-  Badge, CircularProgress, Collapse, TextField, InputAdornment, IconButton,
+  Box,
+  Typography,
+  Stack,
+  Avatar,
+  Chip,
+  Divider,
+  Badge,
+  CircularProgress,
+  Collapse,
+  TextField,
+  InputAdornment,
+  IconButton,
 } from "@mui/material";
 import { LineChart, BarChart } from "@mui/x-charts";
-import Menu     from "@mui/material/Menu";
+import Menu from "@mui/material/Menu";
 
 import getDashboardWidgetsTheme from "../../../app/theme/custom_themes/shared/dashboard_widgets_theme";
 import getDashboardTableTheme from "../../../app/theme/custom_themes/shared/dashboard_table_theme";
@@ -18,7 +28,7 @@ import getSystemManagerTheme from "../../../app/theme/custom_themes/system_manag
 import { icons } from "../../../app/theme/icons";
 import { STRINGS } from "../../../app/config/strings";
 import { Panel, PanelHeader, AlertIcon } from "./components/SystemManagerWidgets";
-import { useThemeStore }     from "../../../app/store/themeStore";
+import { useThemeStore } from "../../../app/store/themeStore";
 import useSMDashboard from "../../../hooks/system_manager/useSMDashboardHook";
 import useSMInProgressBatches from "../../../hooks/system_manager/useSMInProgressBatchesHook";
 import useSMNotificationMenu from "../../../hooks/system_manager/useSMNotificationMenuHook";
@@ -33,6 +43,12 @@ import FilterPanelHeader from "@ui/components/common/FilterPanelHeader";
 import BatchDetailPopup from "./components/BatchDetails";
 import BatchStatusDetailsPanel from "./components/BatchStatusDetailsPanel";
 import StageStatusPanel from "./components/StageStatusPanel";
+import ToggleTabs from "@/ui/components/common/ToggleTabs";
+import { BatchTab, batchTabOptions } from "@/hooks/admin/Dashboard/useDashboardHook";
+import AdminListShell from "@/ui/components/custom/admin/AdminListShell";
+import AdminFilterPanel from "@/ui/components/custom/admin/AdminFilterPanel";
+import DateRangeRow from "@/ui/components/common/DateRangeRow";
+import getDashboardTheme from "@/app/theme/custom_themes/admin/Dashboard/dashboard_theme";
 
 const {
   CheckCircle,
@@ -55,16 +71,24 @@ const {
 
 // ── Icon resolution maps ──────────────────────────────────────────────────────
 const KPI_ICON_MAP = {
-  Inventory2, TrendingUp, CheckCircle, Warning,
-  Schedule, AssignmentTurnedIn, Block, Error: ErrorIconMUI,
+  Inventory2,
+  TrendingUp,
+  CheckCircle,
+  Warning,
+  Schedule,
+  AssignmentTurnedIn,
+  Block,
+  Error: ErrorIconMUI,
 };
 
-function resolveKpiIcon(iconKey)   { return KPI_ICON_MAP[iconKey]   ?? Inventory2; }
+function resolveKpiIcon(iconKey) {
+  return KPI_ICON_MAP[iconKey] ?? Inventory2;
+}
 
 // ── Main Dashboard ────────────────────────────────────────────────────────────
 export default function SystemManagerDashboard() {
   const mode = useThemeStore((s) => s.mode);
-  const t    = useMemo(() => getSystemManagerTheme(mode), [mode]);
+  const t = useMemo(() => getSystemManagerTheme(mode), [mode]);
   const widgetTh = useMemo(() => getDashboardWidgetsTheme(mode), [mode]);
   const sharedTh = useMemo(() => getSharedTheme(mode), [mode]);
   const adminTh = useMemo(
@@ -75,22 +99,38 @@ export default function SystemManagerDashboard() {
       filterMenuProps: sharedTh.filterMenuProps,
       filterMenuItemSx: sharedTh.filterMenuItemSx,
     }),
-    [widgetTh, sharedTh, mode]
+    [widgetTh, sharedTh, mode],
   );
-  const S    = STRINGS.SYSTEM_MANAGER_DASHBOARD;
-
+  const S = STRINGS.SYSTEM_MANAGER_DASHBOARD;
+  const th = getDashboardTheme(mode);
+  const shellTheme = {
+    batchListShell: th.batchListShell,
+    filterToggle: th.filterToggle,
+  };
   const {
-    dashboard, alerts, alertsLoading, loading, statsLoading,
-    filterType, setFilterType,
-    customStartDate, setCustomStartDate,
-    customEndDate, setCustomEndDate,
+    dashboard,
+    alerts,
+    alertsLoading,
+    loading,
+    statsLoading,
+    filterType,
+    setFilterType,
+    customStartDate,
+    setCustomStartDate,
+    customEndDate,
+    setCustomEndDate,
     loadAlerts,
   } = useSMDashboard(t.dashboardConfig);
 
   const {
-    kpiData, stageMetrics, stageData,
+    kpiData,
+    stageMetrics,
+    stageData,
     blockEvents,
-    chartData, batchStatusList, stageConfig, chartUpdatedAt,
+    chartData,
+    batchStatusList,
+    stageConfig,
+    chartUpdatedAt,
   } = dashboard;
   const chartTheme = t.sharedCharts;
 
@@ -111,42 +151,56 @@ export default function SystemManagerDashboard() {
   const {
     batchFilterOpen,
     setBatchFilterOpen,
+
     batchSearch,
     setBatchSearch,
+
     batchStage,
     setBatchStage,
+
     batchType,
     setBatchType,
+
     batchStatus,
     setBatchStatus,
+
+    batchDateFrom,
+    setBatchDateFrom,
+
+    batchDateTo,
+    setBatchDateTo,
+
     activeBatchFilterCount,
     clearBatchFilters,
+
     filteredInProgressRows,
+
     stageOptions,
     typeOptions,
     statusOptions,
+
     selectedBatch,
     handleViewDetails,
     closeBatchDetails,
+
     batchesLoading,
+
     page,
     rowsPerPage,
     totalRecords,
+
     handlePageChange,
     handleRowsPerPageChange,
+
+    activeTab,
+    setActiveTab,
+    applyBatchFilters,
   } = useSMInProgressBatches(t.dashboardConfig.stageColors);
 
-  const {
-    notifAnchor,
-    handleNotifOpen,
-    handleNotifClose,
-  } = useSMNotificationMenu(loadAlerts);
+  const { notifAnchor, handleNotifOpen, handleNotifClose } = useSMNotificationMenu(loadAlerts);
 
-  const {
-    expandedBatchId,
-    toggleExpanded,
-    totalPending,
-  } = useSMBatchStatusDetails(batchStatusList);
+  const { expandedBatchId, toggleExpanded, totalPending } =
+    useSMBatchStatusDetails(batchStatusList);
 
   const [hoverLineIdx, setHoverLineIdx] = useState<number | null>(null);
   const [pinnedLineIdx, setPinnedLineIdx] = useState<number | null>(null);
@@ -155,7 +209,8 @@ export default function SystemManagerDashboard() {
 
   const activeLineIdx = pinnedLineIdx ?? hoverLineIdx;
   const activeBarIdx = pinnedBarIdx ?? hoverBarIdx;
-  const activeLinePoint = typeof activeLineIdx === "number" ? chartData.areaData[activeLineIdx] : null;
+  const activeLinePoint =
+    typeof activeLineIdx === "number" ? chartData.areaData[activeLineIdx] : null;
   const activeBarPoint = typeof activeBarIdx === "number" ? chartData.barData[activeBarIdx] : null;
 
   if (loading) {
@@ -168,7 +223,6 @@ export default function SystemManagerDashboard() {
 
   return (
     <Box sx={t.page}>
-
       {/* ── Page Header ── */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
         <Box>
@@ -243,18 +297,17 @@ export default function SystemManagerDashboard() {
 
       {/* ── Middle Row: Stage Status + Charts ── */}
       <Box sx={t.dashboardLayout.middleGrid}>
-
         <Panel t={t}>
           <PanelHeader
             title={S.STAGE_STATUS.TITLE}
-            meta={<Typography sx={t.dashboardLayout.stageMetaText}>{stageData.totalBatches} batches</Typography>}
+            meta={
+              <Typography sx={t.dashboardLayout.stageMetaText}>
+                {stageData.totalBatches} batches
+              </Typography>
+            }
             t={t}
           />
-          <StageStatusPanel
-            stageData={stageData}
-            t={t}
-            strings={S.STAGE_STATUS}
-          />
+          <StageStatusPanel stageData={stageData} t={t} strings={S.STAGE_STATUS} />
         </Panel>
 
         <DashboardChartCard
@@ -399,7 +452,11 @@ export default function SystemManagerDashboard() {
           rows={filteredInProgressRows}
           loading={batchesLoading}
           theme={adminTh}
-          title={STRINGS.DASHBOARD_PAGE.BATCH_TABLE.SECTION_TITLE}
+          title={
+            activeTab === "COMPLETED"
+              ? STRINGS.DASHBOARD_PAGE.BATCH_TABLE.SECTION_COMPLETED_BATCHES
+              : STRINGS.DASHBOARD_PAGE.BATCH_TABLE.SECTION_INPOROGRESS_TITLE
+          }
           emptyText={S.EMPTY_STATES.NO_BATCHES}
           cardSx={adminTh.card}
           hideManagerColumns
@@ -410,105 +467,184 @@ export default function SystemManagerDashboard() {
           onPageChange={handlePageChange}
           onRowsPerPageChange={handleRowsPerPageChange}
           rowsPerPageOptions={[5, 10, 25]}
-          meta={
-            <FilterToggleButton
-              label={S.FILTERS.BUTTON}
-              count={activeBatchFilterCount}
-              isOpen={batchFilterOpen}
-              onClick={() => setBatchFilterOpen((v) => !v)}
-              sx={adminTh.table.filterBtn(batchFilterOpen || activeBatchFilterCount > 0)}
-              iconSx={adminTh.table.filterBtnIcon}
-              textSx={adminTh.table.filterBtnText}
-              badgeSx={adminTh.table.filterBadgePill}
-              chevronSx={adminTh.table.filterBtnChevron}
+          headerContent={
+            <ToggleTabs
+              value={activeTab}
+              onChange={(value) => setActiveTab(value as BatchTab)}
+              options={batchTabOptions}
             />
           }
           filterPanel={
-            <Collapse in={batchFilterOpen} timeout={200} unmountOnExit>
-              <Box sx={adminTh.table.filterPanel}>
-                <FilterPanelHeader
-                  title={S.FILTERS.BUTTON}
-                  count={activeBatchFilterCount}
+            <AdminListShell
+              search={batchSearch}
+              onSearchChange={setBatchSearch}
+              searchPlaceholder={S.FILTERS.SEARCH_BATCHES}
+              filterOpen={batchFilterOpen}
+              onFilterToggle={() => setBatchFilterOpen((v) => !v)}
+              activeFilterCount={activeBatchFilterCount}
+              filtersToggleLabel={S.FILTERS.BUTTON}
+              resultText={`${filteredInProgressRows.length} / ${totalRecords} records shown`}
+              loading={batchesLoading}
+              hasItems={filteredInProgressRows.length > 0}
+              emptyTitle={S.EMPTY_STATES.NO_BATCHES}
+              filterExtension={
+                <AdminFilterPanel
+                  title={S.COMMON.FILTERS_TITLE}
+                  activeFilterCount={activeBatchFilterCount}
                   onClear={clearBatchFilters}
                   clearLabel={S.FILTERS.CLEAR_ALL}
-                  recordText={`- ${filteredInProgressRows.length} / ${totalRecords} records shown`}
-                  containerSx={{ ...adminTh.table.filterPanelHeader, mb: 1.5 }}
-                  iconSx={adminTh.table.filterBtnIcon}
-                  labelSx={adminTh.table.filterLabel}
-                  badgeSx={adminTh.table.filterBadge}
-                  metaTextSx={adminTh.table.filterMetaText}
-                  clearChipSx={adminTh.table.clearChip}
-                />
+                  onClose={() => setBatchFilterOpen(false)}
+                  onApply={applyBatchFilters}
+                  closeLabel={S.COMMON.FILTERS_CLOSE}
+                  applyLabel={S.COMMON.FILTERS_APPLY}
+                  theme={th}
+                >
+                  <Stack direction="row" gap={1.5} flexWrap="wrap" mb={2}>
+                    <FilterSelect
+                      label="Stage"
+                      value={batchStage}
+                      onChange={(e) => setBatchStage(e.target.value)}
+                      options={stageOptions}
+                      menuProps={filterMenuProps}
+                      itemSx={filterMenuItemSx}
+                      showAllOption={false}
+                      sx={adminTh.table.stageSelect}
+                    />
 
-                <Stack direction="row" gap={1.5} flexWrap="wrap" mb={1}>
-                  <TextField
-                    size="small"
-                    placeholder={S.FILTERS.SEARCH_BATCHES}
-                    value={batchSearch}
-                    onChange={(e) => setBatchSearch(e.target.value)}
-                    InputProps={{
-                      startAdornment: (
-                        <InputAdornment position="start">
-                          <Search sx={adminTh.table.searchIcon} />
-                        </InputAdornment>
-                      ),
-                      endAdornment: batchSearch ? (
-                        <InputAdornment position="end">
-                          <IconButton size="small" onClick={() => setBatchSearch("")} sx={adminTh.table.clearIconBtn}>
-                            <Close sx={adminTh.table.clearIcon} />
-                          </IconButton>
-                        </InputAdornment>
-                      ) : null,
-                    }}
-                    sx={adminTh.table.searchInput}
-                  />
+                    <FilterSelect
+                      label="Type"
+                      value={batchType}
+                      onChange={(e) => setBatchType(e.target.value)}
+                      options={typeOptions}
+                      menuProps={filterMenuProps}
+                      itemSx={filterMenuItemSx}
+                      showAllOption={false}
+                      sx={adminTh.table.typeSelect}
+                    />
 
-                  <FilterSelect
-                    label="Stage"
-                    value={batchStage}
-                    onChange={(e) => setBatchStage(e.target.value)}
-                    options={stageOptions}
-                    menuProps={filterMenuProps}
-                    itemSx={filterMenuItemSx}
-                    showAllOption={false}
-                    sx={adminTh.table.stageSelect}
+                    <FilterSelect
+                      label={S.FILTERS.STATUS}
+                      value={batchStatus}
+                      onChange={(e) => setBatchStatus(e.target.value)}
+                      options={statusOptions}
+                      menuProps={filterMenuProps}
+                      itemSx={filterMenuItemSx}
+                      showAllOption={false}
+                      sx={adminTh.table.statusSelect}
+                    />
+                  </Stack>
+                  <DateRangeRow
+                    from={batchDateFrom}
+                    to={batchDateTo}
+                    onFromChange={setBatchDateFrom}
+                    onToChange={setBatchDateTo}
+                    fromLabel={S.FILTERS.FROM}
+                    toLabel={S.FILTERS.TO}
+                    separatorLabel="-"
+                    calendarIconSx={adminTh.table.calendarIcon}
+                    datePickerSx={adminTh.table.datePicker(false)}
+                    separatorSx={adminTh.table.filterDateSeparator}
                   />
-
-                  <FilterSelect
-                    label="Type"
-                    value={batchType}
-                    onChange={(e) => setBatchType(e.target.value)}
-                    options={typeOptions}
-                    menuProps={filterMenuProps}
-                    itemSx={filterMenuItemSx}
-                    showAllOption={false}
-                    sx={adminTh.table.typeSelect}
-                  />
-
-                  <FilterSelect
-                    label={S.FILTERS.STATUS}
-                    value={batchStatus}
-                    onChange={(e) => setBatchStatus(e.target.value)}
-                    options={statusOptions}
-                    menuProps={filterMenuProps}
-                    itemSx={filterMenuItemSx}
-                    showAllOption={false}
-                    sx={adminTh.table.statusSelect}
-                  />
-                </Stack>
-              </Box>
-            </Collapse>
+                </AdminFilterPanel>
+              }
+              theme={shellTheme}
+            />
           }
+          // filterPanel={
+          //   <Collapse in={batchFilterOpen} timeout={200} unmountOnExit>
+          //     <Box sx={adminTh.table.filterPanel}>
+          //       <FilterPanelHeader
+          //         title={S.FILTERS.BUTTON}
+          //         count={activeBatchFilterCount}
+          //         onClear={clearBatchFilters}
+          //         clearLabel={S.FILTERS.CLEAR_ALL}
+          //         recordText={`- ${filteredInProgressRows.length} / ${totalRecords} records shown`}
+          //         containerSx={{ ...adminTh.table.filterPanelHeader, mb: 1.5 }}
+          //         iconSx={adminTh.table.filterBtnIcon}
+          //         labelSx={adminTh.table.filterLabel}
+          //         badgeSx={adminTh.table.filterBadge}
+          //         metaTextSx={adminTh.table.filterMetaText}
+          //         clearChipSx={adminTh.table.clearChip}
+          //       />
+
+          //       <Stack direction="row" gap={1.5} flexWrap="wrap" mb={1}>
+          //         <TextField
+          //           size="small"
+          //           placeholder={S.FILTERS.SEARCH_BATCHES}
+          //           value={batchSearch}
+          //           onChange={(e) => setBatchSearch(e.target.value)}
+          //           InputProps={{
+          //             startAdornment: (
+          //               <InputAdornment position="start">
+          //                 <Search sx={adminTh.table.searchIcon} />
+          //               </InputAdornment>
+          //             ),
+          //             endAdornment: batchSearch ? (
+          //               <InputAdornment position="end">
+          //                 <IconButton
+          //                   size="small"
+          //                   onClick={() => setBatchSearch("")}
+          //                   sx={adminTh.table.clearIconBtn}
+          //                 >
+          //                   <Close sx={adminTh.table.clearIcon} />
+          //                 </IconButton>
+          //               </InputAdornment>
+          //             ) : null,
+          //           }}
+          //           sx={adminTh.table.searchInput}
+          //         />
+
+          //         <FilterSelect
+          //           label="Stage"
+          //           value={batchStage}
+          //           onChange={(e) => setBatchStage(e.target.value)}
+          //           options={stageOptions}
+          //           menuProps={filterMenuProps}
+          //           itemSx={filterMenuItemSx}
+          //           showAllOption={false}
+          //           sx={adminTh.table.stageSelect}
+          //         />
+
+          //         <FilterSelect
+          //           label="Type"
+          //           value={batchType}
+          //           onChange={(e) => setBatchType(e.target.value)}
+          //           options={typeOptions}
+          //           menuProps={filterMenuProps}
+          //           itemSx={filterMenuItemSx}
+          //           showAllOption={false}
+          //           sx={adminTh.table.typeSelect}
+          //         />
+
+          //         <FilterSelect
+          //           label={S.FILTERS.STATUS}
+          //           value={batchStatus}
+          //           onChange={(e) => setBatchStatus(e.target.value)}
+          //           options={statusOptions}
+          //           menuProps={filterMenuProps}
+          //           itemSx={filterMenuItemSx}
+          //           showAllOption={false}
+          //           sx={adminTh.table.statusSelect}
+          //         />
+          //       </Stack>
+          //     </Box>
+          //   </Collapse>
+          // }
         />
       </Box>
 
       {/* ── Blockchain Timeline + Batch Status Details ── */}
       <Box sx={t.dashboardLayout.lowerGrid}>
-
         <Panel t={t}>
           <PanelHeader
             title={S.BLOCKCHAIN_EVENTS.SECTION_TITLE}
-            meta={<Chip label={S.BLOCKCHAIN_EVENTS.IMMUTABLE_BADGE} size="small" sx={t.blockTimeline.immutableChip} />}
+            meta={
+              <Chip
+                label={S.BLOCKCHAIN_EVENTS.IMMUTABLE_BADGE}
+                size="small"
+                sx={t.blockTimeline.immutableChip}
+              />
+            }
             t={t}
           />
           <Box sx={t.blockTimeline.inner}>
@@ -517,8 +653,13 @@ export default function SystemManagerDashboard() {
             ) : (
               <Stack spacing={0}>
                 {blockEvents.map((e, i) => (
-                  <Stack key={i} direction="row" gap={2} alignItems="flex-start"
-                    sx={{ pb: i < blockEvents.length - 1 ? 2.5 : 0, position: "relative" }}>
+                  <Stack
+                    key={i}
+                    direction="row"
+                    gap={2}
+                    alignItems="flex-start"
+                    sx={{ pb: i < blockEvents.length - 1 ? 2.5 : 0, position: "relative" }}
+                  >
                     {i < blockEvents.length - 1 && <Box sx={t.blockTimeline.connector(false)} />}
                     <Avatar sx={t.blockTimeline.avatar(e.color)}>{e.icon}</Avatar>
                     <Box>
@@ -539,11 +680,7 @@ export default function SystemManagerDashboard() {
         <Panel t={t}>
           <PanelHeader
             title={S.BATCH_STATUS.DETAILS_SECTION_TITLE}
-            meta={
-              <Typography sx={t.approvalMatrix.pendingMeta}>
-                {totalPending} pending
-              </Typography>
-            }
+            meta={<Typography sx={t.approvalMatrix.pendingMeta}>{totalPending} pending</Typography>}
             t={t}
           />
           <Box sx={t.approvalMatrix.inner}>
@@ -585,9 +722,22 @@ export default function SystemManagerDashboard() {
                   <AlertIcon type={a.type} t={t} />
                   <Box flex={1}>
                     <Typography sx={t.alerts.msg}>{a.msg}</Typography>
-                    <Stack direction="row" gap={1.5} flexWrap="wrap" sx={t.notificationMenu.metaRow}>
-                      {a.batchId ? <Typography sx={t.notificationMenu.metaText}>{S.ALERTS.BATCH_LABEL}: {a.batchId}</Typography> : null}
-                      {a.stage ? <Typography sx={t.notificationMenu.metaText}>{S.ALERTS.STAGE_LABEL}: {a.stage}</Typography> : null}
+                    <Stack
+                      direction="row"
+                      gap={1.5}
+                      flexWrap="wrap"
+                      sx={t.notificationMenu.metaRow}
+                    >
+                      {a.batchId ? (
+                        <Typography sx={t.notificationMenu.metaText}>
+                          {S.ALERTS.BATCH_LABEL}: {a.batchId}
+                        </Typography>
+                      ) : null}
+                      {a.stage ? (
+                        <Typography sx={t.notificationMenu.metaText}>
+                          {S.ALERTS.STAGE_LABEL}: {a.stage}
+                        </Typography>
+                      ) : null}
                     </Stack>
                     <Typography sx={t.alerts.time}>{a.time}</Typography>
                   </Box>
@@ -606,7 +756,6 @@ export default function SystemManagerDashboard() {
           t={t}
         />
       )}
-
     </Box>
   );
 }

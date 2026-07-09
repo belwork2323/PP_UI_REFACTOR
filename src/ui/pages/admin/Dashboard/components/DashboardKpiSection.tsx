@@ -30,7 +30,7 @@ export default function DashboardKpiSection({
   customEndDate,
   setCustomEndDate,
 }: DashboardKpiSectionProps) {
-  const [dateFilterOpen, setDateFilterOpen] = useState(false);
+  const [dateFilterOpen, setDateFilterOpen] = useState(true);
   const dateFilterCount = filterType !== t.DATE_FILTER.VALUES.MONTH ? 1 : 0;
 
   return (
@@ -46,6 +46,7 @@ export default function DashboardKpiSection({
           textSx={th.table.filterBtnText}
           badgeSx={th.table.filterBadgePill}
           chevronSx={th.table.filterBtnChevron}
+          selectedValue={filterType}
         />
 
         {dateFilterOpen && (

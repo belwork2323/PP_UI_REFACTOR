@@ -31,18 +31,18 @@ export class UserListItemModel {
     createdOn,
     createdBy,
   }: Record<string, unknown>) {
-    this.id             = id;
-    this.userUUID       = (userUUID as string) || (id as string) || "";
-    this.userId         = userId as string;
-    this.username       = username as string;
-    this.fullName       = fullName as string;
-    this.email          = email as string;
-    this.role           = role as string;
-    this.department     = department;
+    this.id = id;
+    this.userUUID = (userUUID as string) || (id as string) || "";
+    this.userId = userId as string;
+    this.username = username as string;
+    this.fullName = fullName as string;
+    this.email = email as string;
+    this.role = role as string;
+    this.department = department;
     this.subDepartments = Array.isArray(subDepartments) ? subDepartments : [];
-    this.isActive       = (isActive as boolean) ?? true;
-    this.createdOn      = createdOn ?? null;
-    this.createdBy      = createdBy ?? null;   // { userId, username, role }
+    this.isActive = (isActive as boolean) ?? true;
+    this.createdOn = createdOn ?? null;
+    this.createdBy = createdBy ?? null; // { userId, username, role }
   }
 
   static fromApi(data: any) {
@@ -64,7 +64,11 @@ export class UserListItemModel {
         if (Array.isArray(dept.subDepartments)) {
           dept.subDepartments.forEach((sd: any) => {
             // Include department references just in case hooks need them
-            extractedSubDepts.push({ ...sd, departmentId: dept.departmentId, departmentName: dept.departmentName });
+            extractedSubDepts.push({
+              ...sd,
+              departmentId: dept.departmentId,
+              departmentName: dept.departmentName,
+            });
           });
         }
       });
@@ -72,18 +76,18 @@ export class UserListItemModel {
     }
 
     return new UserListItemModel({
-      id:             data.userUUID || data.user_uuid || data.userId || data.id,
-      userUUID:       data.userUUID || data.user_uuid || data.id || "",
-      userId:         data.userId,
-      username:       data.username,
-      fullName:       data.fullName || data.username,
-      email:          data.email || "",
-      role:           data.role?.roleName || data.role || "",
-      department:     extractedDept,
+      id: data.userUUID || data.user_uuid || data.userId || data.id,
+      userUUID: data.userUUID || data.user_uuid || data.id || "",
+      userId: data.userId,
+      username: data.username,
+      fullName: data.fullName || data.username,
+      email: data.email || "",
+      role: data.role?.roleName || data.role || "",
+      department: extractedDept,
       subDepartments: extractedSubDepts,
-      isActive:       data.status === "Active" || data.isActive,
-      createdOn:      data.createdOn,
-      createdBy:      data.createdBy,
+      isActive: data.status === "ACTIVE",
+      createdOn: data.createdOn,
+      createdBy: data.createdBy,
     });
   }
 }
@@ -104,15 +108,15 @@ export class CreateUserPayload {
   createdBy: unknown;
 
   constructor(form: Record<string, unknown>, createdBy: unknown) {
-    this.username       = form.username as string;
-    this.fullName       = form.fullName as string;
-    this.email          = (form.email as string) ?? "";
-    this.role           = form.role;
-    this.department     = form.department;
+    this.username = form.username as string;
+    this.fullName = form.fullName as string;
+    this.email = (form.email as string) ?? "";
+    this.role = form.role;
+    this.department = form.department;
     this.subDepartments = Array.isArray(form.subDepartments) ? form.subDepartments : [];
-    this.isActive       = (form.isActive as boolean) ?? true;
-    this.createdOn      = new Date().toISOString();
-    this.createdBy      = createdBy;   // { userId, username, role }
+    this.isActive = (form.isActive as boolean) ?? true;
+    this.createdOn = new Date().toISOString();
+    this.createdBy = createdBy; // { userId, username, role }
   }
 }
 
@@ -126,13 +130,13 @@ export class UpdateUserPayload {
   updatedBy: unknown;
 
   constructor(form: Record<string, unknown>, updatedBy: unknown) {
-    this.fullName       = form.fullName as string;
-    this.email          = form.email as string;
-    this.role           = form.role;
-    this.department     = form.department;
+    this.fullName = form.fullName as string;
+    this.email = form.email as string;
+    this.role = form.role;
+    this.department = form.department;
     this.subDepartments = Array.isArray(form.subDepartments) ? form.subDepartments : [];
-    this.isActive       = form.isActive;
-    this.updatedBy      = updatedBy;   // { userId, username, role }
+    this.isActive = form.isActive;
+    this.updatedBy = updatedBy; // { userId, username, role }
   }
 }
 
@@ -143,8 +147,7 @@ export type UserFormState = {
   subDepts: any[];
 };
 
-const UUID_REGEX =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const asUuid = (value: unknown) => {
   const v = String(value ?? "").trim();
@@ -152,19 +155,13 @@ const asUuid = (value: unknown) => {
 };
 
 export const resolveUserUuid = (user: any): string =>
-  asUuid(user?.userUUID) ||
-  asUuid(user?.user_uuid) ||
-  asUuid(user?.uuid) ||
-  asUuid(user?.id) ||
-  "";
+  asUuid(user?.userUUID) || asUuid(user?.user_uuid) || asUuid(user?.uuid) || asUuid(user?.id) || "";
 
 export const normalizeSubDepartmentIds = (values: any[]): number[] =>
   Array.from(
     new Set(
-      (values || [])
-        .map((value: any) => Number(value))
-        .filter((id: number) => Number.isFinite(id))
-    )
+      (values || []).map((value: any) => Number(value)).filter((id: number) => Number.isFinite(id)),
+    ),
   ).sort((a, b) => a - b);
 
 export const createEmptyUserFormState = (): UserFormState => ({

@@ -17,8 +17,8 @@ export const fetchAllUsers = async (payload) => {
  * Fetch User statistics.
  * GET: /admin/user/stats
  */
-export const fetchUserStats = async () => {
-  return get(USER_MANAGEMENT.GET_STATS);
+export const fetchUserStats = async (payload) => {
+  return post(USER_MANAGEMENT.GET_STATS, payload);
 };
 
 /**

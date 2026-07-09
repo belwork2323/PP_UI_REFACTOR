@@ -15,6 +15,9 @@ import useProjectManagementHook from "@hooks/admin/ProjectManagement/useProjectM
 import { getProjectName } from "@utils/projectManagementUtils";
 import ProjectManagementList from "./ProjectManagementList";
 import CreateProjectManagementForm from "./CreateProjectManagementForm";
+import FilterToggleButton from "@/ui/components/common/FilterToggleButton";
+import DashboardDateFilter from "@/ui/components/custom/dashboard/DashboardDateFilter";
+import getDashboardTheme from "@/app/theme/custom_themes/admin/Dashboard/dashboard_theme";
 
 const S = STRINGS.PROJECT_MANAGEMENT;
 const AC = STRINGS.ADMIN_COMMON;
@@ -27,7 +30,14 @@ const STAT_ICONS: Record<string, React.ReactNode> = {
   idle: <icons.projectMgmt.idleStatus sx={{ fontSize: 22 }} />,
 };
 
-const STAT_VALUE_KEYS: Record<string, "totalProjects" | "projectsCreatedToday" | "projectsCreatedThisMonth" | "activeProjects" | "idleProjects"> = {
+const STAT_VALUE_KEYS: Record<
+  string,
+  | "totalProjects"
+  | "projectsCreatedToday"
+  | "projectsCreatedThisMonth"
+  | "activeProjects"
+  | "idleProjects"
+> = {
   total: "totalProjects",
   today: "projectsCreatedToday",
   month: "projectsCreatedThisMonth",
@@ -39,12 +49,11 @@ const ProjectManagementPage = () => {
   const mode = useThemeStore((s) => s.mode);
   const t = getProjectManagementTheme(mode);
   const { list, stats, form, delete: deleteSection, refresh } = useProjectManagementHook();
+  const th = getDashboardTheme(mode);
 
   const statRows = S.STATS.map((s) => ({
     ...s,
-    value: stats.loading
-      ? S.PAGE.LOADING_PLACEHOLDER
-      : stats.stats[STAT_VALUE_KEYS[s.variant]],
+    value: stats.loading ? S.PAGE.LOADING_PLACEHOLDER : stats.stats[STAT_VALUE_KEYS[s.variant]],
     icon: STAT_ICONS[s.variant],
   }));
 
@@ -71,12 +80,45 @@ const ProjectManagementPage = () => {
         }
         theme={t}
       />
-
+      <Box sx={{ mb: 2 }}>
+        <FilterToggleButton
+          label="Date Filter"
+          count={0}
+          isOpen={stats.dateFilterOpen}
+          onClick={stats.toggleDateFilter}
+          sx={th.table.filterBtn(stats.dateFilterOpen)}
+          iconSx={th.table.filterBtnIcon}
+          textSx={th.table.filterBtnText}
+          badgeSx={th.table.filterBadgePill}
+          chevronSx={th.table.filterBtnChevron}
+          selectedValue={stats.filterType}
+        />
+        {stats.dateFilterOpen && (
+          <DashboardDateFilter
+            filterType={stats.filterType}
+            onFilterChange={stats.handleFilterTypeChange}
+            customStartDate={stats.customStartDate}
+            customEndDate={stats.customEndDate}
+            onStartChange={stats.setCustomStartDate}
+            onEndChange={stats.setCustomEndDate}
+            loading={stats.loading}
+            strings={S.DATE_FILTER}
+            containerSx={th.dashboard.dateRangeBar}
+            selectSx={{ minWidth: 150, ...th.filterInputSx }}
+            menuProps={th.filterMenuProps}
+            menuItemSx={th.filterMenuItemSx}
+            textFieldSx={th.filterInputSx}
+          />
+        )}
+      </Box>
       <AdminManagementStatsGrid stats={statRows} theme={t} />
 
       <AdminListShell
         search={list.search}
-        onSearchChange={(value) => { list.setSearch(value); list.setPage(0); }}
+        onSearchChange={(value) => {
+          list.setSearch(value);
+          list.setPage(0);
+        }}
         searchPlaceholder={S.TOOLBAR.SEARCH_PLACEHOLDER}
         filterOpen={list.filterOpen}
         onFilterToggle={list.toggleFilterOpen}
@@ -133,7 +175,10 @@ const ProjectManagementPage = () => {
           onEdit={form.openEdit}
           onDelete={deleteSection.openDelete}
           onPageChange={(_, p) => list.setPage(p)}
-          onRowsPerPageChange={(e) => { list.setRowsPerPage(+e.target.value); list.setPage(0); }}
+          onRowsPerPageChange={(e) => {
+            list.setRowsPerPage(+e.target.value);
+            list.setPage(0);
+          }}
         />
       </AdminListShell>
 

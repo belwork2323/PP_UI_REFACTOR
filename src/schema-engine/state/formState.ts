@@ -1,5 +1,6 @@
 import type { SchemaBlock, SchemaDocumentV2, SchemaFieldBlock, SchemaRepeatConfig, SchemaSection, SchemaTableBlock } from "../types";
 import { applyFormulaColumns } from "../rules/formulaEval";
+import { applyRowComputations, getTableRowComputations } from "../rules/tableRowComputations";
 import { resolveSchemaCountToken, type SchemaSetupContext } from "../utils/setupContext";
 import { flattenTableColumns } from "../utils/schemaUtils";
 import {
@@ -8,8 +9,12 @@ import {
   hasTableCommitGroup,
   isWrappedTableValue,
   PRESET_ROW_META_KEYS,
+  rehydrateDynamicTableColumnState,
   TABLE_ROW_RUNTIME_KEYS,
   TABLE_VALUE_META_KEYS,
+  getTableColumnStateKey,
+  type SchemaTableColumnState,
+  shouldWrapTableValue,
   wrapTableValue,
   isFieldTypeHintKey,
   isPickerRow,
@@ -17,6 +22,11 @@ import {
 import { buildEmptyPickerRow, rehydrateCommitGroupTableRows } from "../rules/tableCommitGroup";
 
 export type SchemaFormValues = Record<string, unknown>;
+
+export type SchemaChangeMeta = {
+  changedBlockId?: string;
+  changedScope?: string;
+};
 
 const SCOPED_FORM_KEY_SEP = "::";
 
@@ -61,7 +71,7 @@ export const buildTableRows = (table: SchemaTableBlock): Record<string, unknown>
 
   const count = Math.max(table.rows?.defaultCount ?? 1, presetRows.length);
 
-  return Array.from({ length: count }, (_, rowIndex) => {
+  const built = Array.from({ length: count }, (_, rowIndex) => {
     const preset = presetRows[rowIndex] ?? {};
     const row: Record<string, unknown> = {};
 
@@ -95,6 +105,8 @@ export const buildTableRows = (table: SchemaTableBlock): Record<string, unknown>
 
     return applyFormulaColumns(row, columns);
   });
+
+  return applyRowComputations(built, table);
 };
 
 const initRepeatChildValues = (
@@ -133,7 +145,7 @@ const initBlockValue = (
     case "table": {
       const extraColumns = buildInitialExtraColumns(block);
       const rows = applyExtraColumnCellsToRows(buildTableRows(block), extraColumns);
-      if (block.allowAddColumn || extraColumns.length > 0) {
+      if (shouldWrapTableValue(block, extraColumns)) {
         return wrapTableValue(rows, extraColumns);
       }
       return buildTableRows(block);
@@ -199,23 +211,43 @@ export const buildInitialFormValues = (
   return values;
 };
 
-const hydrateTableValue = (table: SchemaTableBlock, value: unknown): unknown => {
-  if (!hasTableCommitGroup(table)) return value;
+const hydrateTableValue = (
+  table: SchemaTableBlock,
+  value: unknown,
+  columnState?: SchemaTableColumnState,
+): unknown => {
+  let hydrated = rehydrateDynamicTableColumnState(table, value, columnState);
+
+  if (hasTableCommitGroup(table)) {
+    if (isWrappedTableValue(hydrated)) {
+      const rows = hydrated.rows as Record<string, unknown>[];
+      if (rows.length && !rows.some(isPickerRow)) {
+        hydrated = { ...hydrated, rows: rehydrateCommitGroupTableRows(table, rows) };
+      }
+    } else if (
+      Array.isArray(hydrated) &&
+      hydrated.length &&
+      !(hydrated as Record<string, unknown>[]).some(isPickerRow)
+    ) {
+      hydrated = rehydrateCommitGroupTableRows(table, hydrated as Record<string, unknown>[]);
+    }
+  }
+
+  return applyTableRowComputationsToValue(table, hydrated);
+};
+
+const applyTableRowComputationsToValue = (table: SchemaTableBlock, value: unknown): unknown => {
+  if (!getTableRowComputations(table).length) return value;
 
   if (isWrappedTableValue(value)) {
-    const rows = value.rows as Record<string, unknown>[];
-    if (!rows.length || rows.some(isPickerRow)) return value;
-    return {
-      ...value,
-      rows: rehydrateCommitGroupTableRows(table, rows),
-    };
+    return { ...value, rows: applyRowComputations(value.rows, table) };
   }
 
-  if (!Array.isArray(value) || !value.length || (value as Record<string, unknown>[]).some(isPickerRow)) {
-    return value;
+  if (Array.isArray(value)) {
+    return applyRowComputations(value as Record<string, unknown>[], table);
   }
 
-  return rehydrateCommitGroupTableRows(table, value as Record<string, unknown>[]);
+  return value;
 };
 
 const isEmptySubmissionRow = (row: unknown): boolean => {
@@ -276,7 +308,22 @@ const collectSectionRow = (
     if (block.type === "field" || block.type === "table" || block.type === "matrix") {
       const key = scopedFormKey(scope, block.id);
       if (values[key] !== undefined) {
-        row[block.id] = sanitizeSubmissionValue(cloneValue(values[key]));
+        const rawValue = cloneValue(values[key]);
+        row[block.id] = sanitizeSubmissionValue(rawValue);
+        if (
+          block.type === "table" &&
+          isWrappedTableValue(rawValue) &&
+          shouldWrapTableValue(
+            block,
+            rawValue.extraColumns ?? [],
+            rawValue.deletedColumnIds ?? [],
+          )
+        ) {
+          row[getTableColumnStateKey(block.id)] = {
+            extraColumns: rawValue.extraColumns ?? [],
+            deletedColumnIds: rawValue.deletedColumnIds ?? [],
+          };
+        }
       }
     }
     if (block.type === "section" && block.repeat) {
@@ -335,8 +382,17 @@ export const mergeSectionDataIntoValues = (
       if (block.type === "field" || block.type === "table" || block.type === "matrix") {
         if (block.id in (savedRow as Record<string, unknown>)) {
           const savedValue = cloneValue((savedRow as Record<string, unknown>)[block.id]);
+          const columnState = (savedRow as Record<string, unknown>)[getTableColumnStateKey(block.id)];
           initial[scopedFormKey(scope, block.id)] =
-            block.type === "table" ? hydrateTableValue(block, savedValue) : savedValue;
+            block.type === "table"
+              ? hydrateTableValue(
+                  block,
+                  savedValue,
+                  columnState && typeof columnState === "object"
+                    ? (columnState as SchemaTableColumnState)
+                    : undefined,
+                )
+              : savedValue;
         }
       }
     };

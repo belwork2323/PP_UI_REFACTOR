@@ -194,6 +194,7 @@ export type ActiveBatchesFilterInput = {
   dateFrom: string;
   dateTo: string;
   currentMonthOnly: boolean;
+  status: string;
 };
 
 export const buildActiveBatchesFilterPayload = ({
@@ -204,12 +205,14 @@ export const buildActiveBatchesFilterPayload = ({
   dateFrom,
   dateTo,
   currentMonthOnly,
+  status,
 }: ActiveBatchesFilterInput) => ({
   search: searchQuery.trim(),
   stage: filterStage,
   type: filterBatchType,
   status: filterStatus,
   startDate: dateFrom || null,
+  listType: status,
   endDate: dateTo || null,
   currentMonth: currentMonthOnly,
   page: 1,

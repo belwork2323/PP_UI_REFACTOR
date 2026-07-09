@@ -506,3 +506,42 @@ export const mapQualityControlPayload = (
     ],
   };
 };
+
+export type QCDivisionDetailView = {
+  formId: string;
+  batchId: string;
+  status: string;
+  formSubmissionType: string;
+  submittedBy: string;
+  submittedAt: string;
+  createdBy: string;
+  createdAt: string;
+  divisionCount: number;
+};
+
+export const mapQCDivisionDetailsForDisplay = (
+  data: Record<string, unknown> | null | undefined,
+): QCDivisionDetailView | null => {
+  if (!data) return null;
+
+  const submittedByRaw = data.submittedBy;
+  const submittedBy =
+    typeof submittedByRaw === "object" && submittedByRaw !== null && "fullName" in submittedByRaw
+      ? String((submittedByRaw as { fullName?: string }).fullName ?? "")
+      : String(submittedByRaw ?? "");
+
+  const workflowInsights = data.workflowInsights as { currentStatus?: string } | undefined;
+  const divisionDetails = data.divisionDetails;
+
+  return {
+    formId: String(data.formId ?? ""),
+    batchId: String(data.batchId ?? ""),
+    status: String(data.status ?? workflowInsights?.currentStatus ?? ""),
+    formSubmissionType: String(data.formSubmissionType ?? ""),
+    submittedBy,
+    submittedAt: String(data.submittedAt ?? ""),
+    createdBy: String(data.createdBy ?? ""),
+    createdAt: String(data.createdAt ?? ""),
+    divisionCount: Array.isArray(divisionDetails) ? divisionDetails.length : 0,
+  };
+};

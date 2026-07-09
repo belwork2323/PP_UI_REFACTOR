@@ -56,6 +56,9 @@ export default function DashboardPage() {
     clearBatchesFilters,
     subDepartments,
     toggleCurrentMonth,
+    batchStatusTab,
+    setBatchStatusTab,
+    batchTabOptions,
   } = useDashboardHook(mode);
 
   if (loading) {
@@ -118,6 +121,9 @@ export default function DashboardPage() {
           clearBatchesFilters={clearBatchesFilters}
           subDepartments={subDepartments}
           toggleCurrentMonth={toggleCurrentMonth}
+          batchStatusTab={batchStatusTab}
+          setBatchStatusTab={setBatchStatusTab}
+          batchTabOptions={batchTabOptions}
         />
 
         <DashboardBlockchainSection

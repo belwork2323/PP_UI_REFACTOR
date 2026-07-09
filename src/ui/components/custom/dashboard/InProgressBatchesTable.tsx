@@ -1,5 +1,6 @@
 import React, { useMemo, useState } from "react";
 import {
+  Box,
   Chip,
   Divider,
   IconButton,
@@ -25,6 +26,7 @@ import ProgressBar from "../../common/ProgressBar";
 import TableCard from "../TableCard";
 import SkeletonRow from "../../common/SkeletonRow";
 import { useAuthStore } from "@app/store/authStore";
+import ToggleTabs from "../../common/ToggleTabs";
 
 export type InProgressBatchRow = {
   id?: string;
@@ -60,6 +62,7 @@ type Props = {
   onPageChange?: (event: unknown, newPage: number) => void;
   onRowsPerPageChange?: (event: React.ChangeEvent<HTMLInputElement>) => void;
   rowsPerPageOptions?: number[];
+  headerContent?: React.ReactNode;
 };
 
 const BATCH_COLUMNS = [
@@ -93,6 +96,7 @@ export default function InProgressBatchesTable({
   onPageChange,
   onRowsPerPageChange,
   rowsPerPageOptions = [5, 10, 25],
+  headerContent,
 }: Props) {
   const role = useAuthStore((s) => s.user?.role ?? "");
   const [sortField, setSortField] = useState<string | null>(null);
@@ -170,6 +174,7 @@ export default function InProgressBatchesTable({
       cardSx={cardSx ?? th.card}
       meta={meta}
       filterPanel={filterPanel}
+      tabs={headerContent}
       footer={
         showPagination ? (
           <>

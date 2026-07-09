@@ -24,6 +24,10 @@ import {
 } from "./qcPostCureConfig";
 import { getPendingHardwareProcesses } from "./qcHardwareConfig";
 import {
+  isQcCuringSubType,
+  mapQcCuringTypeToSubType,
+} from "./qcCuringConfig";
+import {
   isQcPropellantProcessSubType,
   mapQcPropellantProcessToApi,
 } from "./qcPropellantConfig";
@@ -324,11 +328,14 @@ export const canLoadDivisionSchema = (
   }
 
   if (panelType === "CURING") {
-    if (!state.selectedMotorId || !state.selectedCuringType) return false;
+    if (!state.selectedMotorId || !state.selectedCuringType || !isQcCuringSubType(state.selectedCuringType)) {
+      return false;
+    }
     const dedupKey = buildDivisionEntryDedupKey({
       flowKey: divisionFlowKey,
       kind: "CURING_MOTOR",
       motorId: state.selectedMotorId,
+      subType: mapQcCuringTypeToSubType(state.selectedCuringType),
     });
     return !state.addedDivisionEntryKeys.includes(dedupKey);
   }
