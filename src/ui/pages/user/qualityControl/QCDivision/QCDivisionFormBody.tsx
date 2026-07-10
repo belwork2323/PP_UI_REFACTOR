@@ -19,6 +19,8 @@ import type { SchemaFormValues } from "../../../../../schema-engine";
 import QCDivisionEntryPanel from "./QCDivisionEntryPanel";
 import QCDivisionNavPanel from "./QCDivisionNavPanel";
 import QCSchemaPanel from "./QCSchemaPanel";
+import QCDivisionSavedSectionsDisplay from "./components/QCDivisionSavedSectionsDisplay";
+import { QC_MIXING_FINAL_MIX_DETAILS_SECTION_ID } from "../../../../../hooks/user/qualityControl/qcMixingConfig";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 
@@ -85,6 +87,14 @@ const QCDivisionFormBody = ({
       formData.mixingFinalMixDetailsValues ??
       (finalMixDetailsSchema ? createQcInitialValues(finalMixDetailsSchema) : {}),
     [finalMixDetailsSchema, formData.mixingFinalMixDetailsValues],
+  );
+
+  const finalMixDetailSections = useMemo(
+    () =>
+      (formData.savedSections ?? []).filter(
+        (section) => section.sectionId === QC_MIXING_FINAL_MIX_DETAILS_SECTION_ID,
+      ),
+    [formData.savedSections],
   );
 
   const navGroups = useMemo(() => buildDivisionNavGroups(divisionEntries), [divisionEntries]);
@@ -155,7 +165,7 @@ const QCDivisionFormBody = ({
         onActiveSubIndexChange={onActiveDivisionSubIndexChange}
       />
       <Box sx={{ mt: 1.25 }}>
-        {activeContent?.type === "final-mix-details" && finalMixDetailsSchema ? (
+        {activeContent?.type === "final-mix-details" ? (
           <Box
             sx={{
               borderRadius: 2.5,
@@ -165,17 +175,29 @@ const QCDivisionFormBody = ({
               py: 1.25,
             }}
           >
-            <QCSchemaPanel
-              schema={finalMixDetailsSchema}
-              formValues={finalMixDetailsValues}
-              savedSections={formData.savedSections}
-              subDepartmentId={subDepartmentId}
-              batchId={batch?.batchId}
-              onChange={onMixingFinalMixDetailsChange}
-              readOnly={readOnly}
-              loading={schemaLoading}
-              error={schemaError}
-            />
+            {finalMixDetailsSchema ? (
+              <QCSchemaPanel
+                schema={finalMixDetailsSchema}
+                formValues={finalMixDetailsValues}
+                savedSections={formData.savedSections}
+                subDepartmentId={subDepartmentId}
+                batchId={batch?.batchId}
+                onChange={onMixingFinalMixDetailsChange}
+                readOnly={readOnly}
+                loading={schemaLoading}
+                error={schemaError}
+              />
+            ) : readOnly && finalMixDetailSections.length > 0 ? (
+              <QCDivisionSavedSectionsDisplay sections={finalMixDetailSections} />
+            ) : schemaLoading ? (
+              <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
+                <CircularProgress size={24} />
+              </Box>
+            ) : (
+              <Typography sx={{ fontSize: "0.76rem", color: BRAND.textSub }}>
+                {schemaError || S.SCHEMA_FETCH_ERROR}
+              </Typography>
+            )}
           </Box>
         ) : null}
 

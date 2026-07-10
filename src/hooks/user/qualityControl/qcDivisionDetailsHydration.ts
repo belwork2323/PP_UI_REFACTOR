@@ -30,7 +30,7 @@ import {
   QC_MIXING_VISCOSITY_SECTION_ID,
   sliceMixingFinalMixSchema,
 } from "./qcMixingConfig";
-import { fetchQcSchemaWithInflightDedup, mapWithConcurrency } from "./qcSchemaFetchCache";
+import { fetchQcSchemaWithInflightDedup, getCachedQcSchema, mapWithConcurrency } from "./qcSchemaFetchCache";
 
 const getEntryKind = (
   division: QcApiDivision,
@@ -236,7 +236,20 @@ export async function hydrateQcDivisionFormFromDetails(
   }
 
   const schemaRequests = Array.from(schemaFetchQueue.values());
-  await mapWithConcurrency(schemaRequests, 4, async (request) => {
+  for (const request of schemaRequests) {
+    const cacheKey = getQcSchemaCacheKey(request.division, request.subType, request.inhibitorType);
+    const cached = getCachedQcSchema(cacheKey);
+    if (cached) {
+      schemasByKey[cacheKey] = cached;
+    }
+  }
+
+  const pendingSchemaRequests = schemaRequests.filter((request) => {
+    const cacheKey = getQcSchemaCacheKey(request.division, request.subType, request.inhibitorType);
+    return !schemasByKey[cacheKey];
+  });
+
+  await mapWithConcurrency(pendingSchemaRequests, 4, async (request) => {
     const cacheKey = getQcSchemaCacheKey(request.division, request.subType, request.inhibitorType);
     try {
       const schema = await fetchQcSchemaWithInflightDedup(cacheKey, async () => {

@@ -27,7 +27,13 @@ const STFPage = () => {
     isEditMode,
     formData,
     selectedMotorType,
-    motorIdNo,
+    motorCount,
+    draftMotorIds,
+    draftBemNo,
+    addedMotors,
+    availableMotorOptions,
+    maxMotorCount,
+    approvedMotorsLoading,
     loadingFormDetails,
     schemaLoading,
     schemaError,
@@ -38,8 +44,12 @@ const STFPage = () => {
     handleBack,
     handleDiscardAndBack,
     handleMotorTypeChange,
-    handleMotorIdNoChange,
+    handleMotorCountChange,
+    handleDraftMotorIdChange,
+    handleDraftBemNoChange,
     handleLoadStfForm,
+    handleAddMotors,
+    handleRemoveMotor,
     handleFormValuesChange,
     handleSaveDraft,
     handleSubmit,
@@ -49,7 +59,7 @@ const STFPage = () => {
     handleBackFromDetails,
   } = hookState;
 
-  const canAct = formData.schemaFormLoaded;
+  const canAct = (formData.motors ?? []).length > 0 && formData.schemaFormLoaded;
 
   if (loading) {
     return (
@@ -93,14 +103,24 @@ const STFPage = () => {
               formData={formData}
               subDepartmentId={subDepartmentId}
               selectedMotorType={selectedMotorType}
-              motorIdNo={motorIdNo}
+              motorCount={motorCount}
+              draftMotorIds={draftMotorIds}
+              draftBemNo={draftBemNo}
+              addedMotors={addedMotors}
+              availableMotorOptions={availableMotorOptions}
+              maxMotorCount={maxMotorCount}
+              approvedMotorsLoading={approvedMotorsLoading}
               isEditMode={isEditMode}
               schemaLoading={schemaLoading}
               schemaError={schemaError}
               flowBarTheme={flowBarTheme}
               onMotorTypeChange={handleMotorTypeChange}
-              onMotorIdNoChange={handleMotorIdNoChange}
+              onMotorCountChange={handleMotorCountChange}
+              onDraftMotorIdChange={handleDraftMotorIdChange}
+              onDraftBemNoChange={handleDraftBemNoChange}
               onLoadStfForm={handleLoadStfForm}
+              onAddMotors={handleAddMotors}
+              onRemoveMotor={handleRemoveMotor}
               onFormValuesChange={handleFormValuesChange}
               theme={theme}
             />

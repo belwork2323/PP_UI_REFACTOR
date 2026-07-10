@@ -102,8 +102,6 @@ export const useQCDivisionApproverHook = () => {
         return;
       }
 
-      setDetailsLoading(false);
-
       const effectiveSubDepartmentId = Number(response.data.subDepartmentId || rowSubDepartmentId);
       setResolvedSubDepartmentId(effectiveSubDepartmentId);
       setSchemaLoading(true);

@@ -76,7 +76,7 @@ import {
 } from "./qcMixingConfig";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import { QUALITY_CONTROL_STATUS } from "./qualityControlWorkflowData";
-import { fetchQcSchemaWithInflightDedup, mapWithConcurrency } from "./qcSchemaFetchCache";
+import { fetchQcSchemaWithInflightDedup, getCachedQcSchema, mapWithConcurrency } from "./qcSchemaFetchCache";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -309,7 +309,7 @@ export const useQCDivisionHook = () => {
       }
 
       const cacheKey = getQcSchemaCacheKey(division, subType, inhibitorType);
-      const cached = schemasByKeyRef.current?.[cacheKey];
+      const cached = schemasByKeyRef.current?.[cacheKey] ?? getCachedQcSchema(cacheKey);
       if (cached) return { schema: cached, division, subType, inhibitorType };
 
       const schema = await fetchQcSchemaWithInflightDedup(cacheKey, async () => {

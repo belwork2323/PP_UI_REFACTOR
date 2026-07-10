@@ -1,10 +1,15 @@
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Chip, CircularProgress, Stack, Typography } from "@mui/material";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import { STATIC_TEST_FACILITY_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { StaticTestFacilityFormState } from "../../../../../data/models/user/StaticTestFacilityFormModel";
+import { normalizeStfMotorSession } from "../../../../../data/models/user/StaticTestFacilityFormModel";
 import type { StfSubType } from "../../../../../schema-engine";
+import type { StfAddedMotor, StfMotorOption } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
+import RemoveProcessButton from "../../../../components/common/RemoveProcessButton";
 import STFFlowBar from "./STFFlowBar";
+import STFMotorNavigation from "./STFMotorNavigation";
 import STFSchemaPanel from "./STFSchemaPanel";
 
 const S = STRINGS.QUALITY_CONTROL.STATIC_TEST_FACILITY;
@@ -15,15 +20,25 @@ type StaticTestFacilityFormProps = {
   formData: StaticTestFacilityFormState;
   subDepartmentId?: number;
   selectedMotorType: StfSubType | "";
-  motorIdNo: string;
+  motorCount: number | "";
+  draftMotorIds: string[];
+  draftBemNo: string;
+  addedMotors: StfAddedMotor[];
+  availableMotorOptions: StfMotorOption[];
+  maxMotorCount: number;
+  approvedMotorsLoading?: boolean;
   isEditMode?: boolean;
   schemaLoading?: boolean;
   schemaError?: string | null;
   flowBarTheme: any;
   onMotorTypeChange: (value: string) => void;
-  onMotorIdNoChange: (value: string) => void;
+  onMotorCountChange: (count: number | "") => void;
+  onDraftMotorIdChange: (index: number, motorId: string) => void;
+  onDraftBemNoChange: (value: string) => void;
   onLoadStfForm: () => void;
-  onFormValuesChange: (values: import("../../../../../schema-engine").SchemaFormValues) => void;
+  onAddMotors: () => void;
+  onRemoveMotor: (motorId: string) => void;
+  onFormValuesChange: (motorId: string, values: import("../../../../../schema-engine").SchemaFormValues) => void;
   theme: any;
 };
 
@@ -32,25 +47,94 @@ const StaticTestFacilityForm = ({
   formData,
   subDepartmentId,
   selectedMotorType,
-  motorIdNo,
+  motorCount,
+  draftMotorIds,
+  draftBemNo,
+  addedMotors,
+  availableMotorOptions,
+  maxMotorCount,
+  approvedMotorsLoading = false,
   isEditMode = false,
   schemaLoading = false,
   schemaError = null,
   flowBarTheme,
   onMotorTypeChange,
-  onMotorIdNoChange,
+  onMotorCountChange,
+  onDraftMotorIdChange,
+  onDraftBemNoChange,
   onLoadStfForm,
+  onAddMotors,
+  onRemoveMotor,
   onFormValuesChange,
   theme,
 }: StaticTestFacilityFormProps) => {
   const BRAND = STATIC_TEST_FACILITY_BRAND;
-  const isReady = formData.schemaFormLoaded && formData.stfSchema;
+  const motorCards = Array.isArray(addedMotors) ? addedMotors : [];
+  const hasMotors = motorCards.length > 0;
+  const [activeMotorIndex, setActiveMotorIndex] = useState(0);
+  const prevMotorCountRef = useRef(0);
+  const formSessionKey = `${batch?.batchId ?? ""}`;
+
+  const activeMotorTypes = useMemo(() => {
+    const types = new Set(motorCards.map((motor) => motor.subType));
+    return Array.from(types);
+  }, [motorCards]);
+
   const motorTypeLabel =
-    selectedMotorType === "MAIN_MOTOR"
-      ? "Main Motor"
-      : selectedMotorType === "BEM"
-        ? "BEM"
-        : "";
+    activeMotorTypes.length > 1
+      ? "Main Motor + BEM"
+      : activeMotorTypes[0] === "MAIN_MOTOR"
+        ? "Main Motor"
+        : activeMotorTypes[0] === "BEM"
+          ? "BEM"
+          : selectedMotorType === "MAIN_MOTOR"
+            ? "Main Motor"
+            : selectedMotorType === "BEM"
+              ? "BEM"
+              : "";
+
+  useEffect(() => {
+    setActiveMotorIndex(0);
+    prevMotorCountRef.current = 0;
+  }, [formSessionKey]);
+
+  useEffect(() => {
+    if (motorCards.length === 0) {
+      setActiveMotorIndex(0);
+      prevMotorCountRef.current = 0;
+      return;
+    }
+
+    const prevCount = prevMotorCountRef.current;
+
+    if (prevCount === 0) {
+      setActiveMotorIndex(0);
+    } else if (motorCards.length > prevCount) {
+      setActiveMotorIndex(motorCards.length - 1);
+    } else {
+      setActiveMotorIndex((prev) => Math.min(prev, motorCards.length - 1));
+    }
+
+    prevMotorCountRef.current = motorCards.length;
+  }, [motorCards.length]);
+
+  const activeMotorEntry = useMemo(
+    () => (motorCards.length > 0 ? motorCards[activeMotorIndex] : null),
+    [motorCards, activeMotorIndex],
+  );
+
+  const activeMotorSession = useMemo(() => {
+    if (!activeMotorEntry) return null;
+    const found = (formData.motors ?? []).find((motor) => motor.motorId === activeMotorEntry.motorId);
+    return found ? normalizeStfMotorSession(found) : null;
+  }, [activeMotorEntry, formData.motors]);
+
+  const activeMotorSchema = useMemo(() => {
+    if (!activeMotorSession) return null;
+    return formData.schemasBySubType?.[activeMotorSession.subType] ?? formData.stfSchema ?? null;
+  }, [activeMotorSession, formData.schemasBySubType, formData.stfSchema]);
+
+  const navTabs = motorCards.map((motor) => ({ id: motor.motorId, label: motor.motorId }));
 
   return (
     <Box sx={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -130,16 +214,24 @@ const StaticTestFacilityForm = ({
 
       <STFFlowBar
         selectedMotorType={selectedMotorType}
-        motorIdNo={motorIdNo}
-        formLoaded={Boolean(isReady)}
+        motorCount={motorCount}
+        draftMotorIds={draftMotorIds}
+        draftBemNo={draftBemNo}
+        addedMotors={addedMotors}
+        availableMotorOptions={availableMotorOptions}
+        maxMotorCount={maxMotorCount}
+        approvedMotorsLoading={approvedMotorsLoading}
         schemaLoading={schemaLoading}
         onMotorTypeChange={onMotorTypeChange}
-        onMotorIdNoChange={onMotorIdNoChange}
+        onMotorCountChange={onMotorCountChange}
+        onDraftMotorIdChange={onDraftMotorIdChange}
+        onDraftBemNoChange={onDraftBemNoChange}
         onLoadForm={onLoadStfForm}
+        onAddMotors={onAddMotors}
         theme={flowBarTheme}
       />
 
-      {schemaLoading && !isReady ? (
+      {schemaLoading && !hasMotors ? (
         <Box
           sx={{
             borderRadius: 2.5,
@@ -155,17 +247,39 @@ const StaticTestFacilityForm = ({
         </Box>
       ) : null}
 
-      {isReady ? (
-        <STFSchemaPanel
-          schema={formData.stfSchema}
-          formValues={formData.schemaFormValues}
-          savedSections={formData.savedSections}
-          subDepartmentId={subDepartmentId}
-          batchId={batch?.batchId}
-          onChange={onFormValuesChange}
-          loading={schemaLoading}
-          error={schemaError}
-        />
+      {hasMotors && activeMotorSession && activeMotorSchema ? (
+        <STFMotorNavigation
+          tabs={navTabs}
+          activeIndex={activeMotorIndex}
+          onActiveIndexChange={setActiveMotorIndex}
+          motorType={activeMotorSession.subType}
+          theme={theme}
+        >
+          <Box sx={{ position: "relative" }}>
+            {motorCards.length > 1 ? (
+              <Box sx={{ position: "absolute", top: 8, right: 8, zIndex: 1 }}>
+                <RemoveProcessButton
+                  onClick={() => onRemoveMotor(activeMotorSession.motorId)}
+                  dangerColor={BRAND.danger}
+                  tooltip={
+                    activeMotorSession.subType === "BEM" ? "Remove BEM motor" : "Remove motor"
+                  }
+                />
+              </Box>
+            ) : null}
+
+            <STFSchemaPanel
+              schema={activeMotorSchema}
+              formValues={activeMotorSession.schemaFormValues}
+              savedSections={activeMotorSession.savedSections}
+              subDepartmentId={subDepartmentId}
+              batchId={batch?.batchId}
+              onChange={(values) => onFormValuesChange(activeMotorSession.motorId, values)}
+              loading={schemaLoading}
+              error={schemaError}
+            />
+          </Box>
+        </STFMotorNavigation>
       ) : null}
     </Box>
   );

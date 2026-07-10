@@ -1,17 +1,30 @@
 import type { SchemaDocumentV2 } from "../../../schema-engine";
 
 const inflightSchemaFetches = new Map<string, Promise<SchemaDocumentV2 | null>>();
+const resolvedSchemaCache = new Map<string, SchemaDocumentV2>();
+
+export const getCachedQcSchema = (cacheKey: string) => resolvedSchemaCache.get(cacheKey) ?? null;
 
 export const fetchQcSchemaWithInflightDedup = (
   cacheKey: string,
   fetcher: () => Promise<SchemaDocumentV2 | null>,
 ): Promise<SchemaDocumentV2 | null> => {
+  const cached = resolvedSchemaCache.get(cacheKey);
+  if (cached) return Promise.resolve(cached);
+
   const existing = inflightSchemaFetches.get(cacheKey);
   if (existing) return existing;
 
-  const promise = fetcher().finally(() => {
-    inflightSchemaFetches.delete(cacheKey);
-  });
+  const promise = fetcher()
+    .then((schema) => {
+      if (schema) {
+        resolvedSchemaCache.set(cacheKey, schema);
+      }
+      return schema;
+    })
+    .finally(() => {
+      inflightSchemaFetches.delete(cacheKey);
+    });
   inflightSchemaFetches.set(cacheKey, promise);
   return promise;
 };

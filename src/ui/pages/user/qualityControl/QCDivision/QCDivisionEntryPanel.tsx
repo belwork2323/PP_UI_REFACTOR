@@ -8,6 +8,7 @@ import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/q
 import { STRINGS } from "../../../../../app/config/strings";
 import RemoveProcessButton from "../../../../components/common/RemoveProcessButton";
 import QCSchemaPanel from "./QCSchemaPanel";
+import QCDivisionSavedSectionsDisplay from "./components/QCDivisionSavedSectionsDisplay";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 
@@ -103,6 +104,25 @@ const QCDivisionEntryPanel = ({
       );
     }
 
+    if (readOnly && (entry.savedSections?.length ?? 0) > 0) {
+      return (
+        <Box
+          sx={{
+            borderRadius: 2.5,
+            border: `1px solid ${BRAND.border}`,
+            background: BRAND.surface,
+            px: 1.5,
+            py: 1.25,
+          }}
+        >
+          <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: BRAND.primary, mb: 1 }}>
+            {entry.label}
+          </Typography>
+          <QCDivisionSavedSectionsDisplay sections={entry.savedSections ?? []} />
+        </Box>
+      );
+    }
+
     if (readOnly) {
       return (
         <Box
@@ -147,6 +167,25 @@ const QCDivisionEntryPanel = ({
     }
 
     if (!solidSchema || !liquidSchema) {
+      if (readOnly && (entry.savedSections?.length ?? 0) > 0) {
+        return (
+          <Box
+            sx={{
+              borderRadius: 2.5,
+              border: `1px solid ${BRAND.border}`,
+              background: BRAND.surface,
+              px: 1.5,
+              py: 1.25,
+            }}
+          >
+            <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: BRAND.primary, mb: 1 }}>
+              {entry.label}
+            </Typography>
+            <QCDivisionSavedSectionsDisplay sections={entry.savedSections ?? []} />
+          </Box>
+        );
+      }
+
       if (readOnly) {
         return (
           <Box

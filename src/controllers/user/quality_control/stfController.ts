@@ -14,7 +14,6 @@ export type STFCreatePayload = {
   batchId: string;
   subDepartmentId: number;
   formSubmissionType: "DRAFT" | "SUBMIT";
-  subType: string;
   motors: STFMotorPayload[];
 };
 
@@ -23,7 +22,6 @@ export type STFUpdatePayload = {
   batchId: string;
   subDepartmentId: number;
   formSubmissionType: "DRAFT" | "SUBMIT";
-  subType: string;
   motors: STFMotorPayload[];
 };
 

@@ -1793,6 +1793,13 @@ export const STRINGS = {
       UPDATE_DRAFT_SUCCESS: "STF draft updated successfully.",
       CREATE_SUBMIT_SUCCESS: "STF record submitted for approval successfully.",
       UPDATE_SUBMIT_SUCCESS: "STF record resubmitted for approval successfully.",
+      DETAILS_BATCH_SECTION: "Batch information",
+      DETAILS_FORM_SECTION: "Static testing form details",
+      DETAILS_MOTOR_NAV_HINT: "Click a motor tab below to view its static testing details.",
+      DETAILS_NO_MOTOR_DATA: "No form data recorded for this motor.",
+      MOTOR_NAV_TITLE: "Motor navigation",
+      MOTOR_CARD_TITLE: "Motor",
+      BEM_CARD_TITLE: "BEM",
     },
   },
   DISPATCH: {
