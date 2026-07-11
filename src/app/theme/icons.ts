@@ -55,54 +55,54 @@ import AccessTimeIcon from "@mui/icons-material/AccessTime";
 import LightModeIcon from "@mui/icons-material/LightMode";
 import DarkModeIcon from "@mui/icons-material/DarkMode";
 
-import RefreshIcon            from "@mui/icons-material/Refresh";
+import RefreshIcon from "@mui/icons-material/Refresh";
 import CheckCircleOutlineIcon from "@mui/icons-material/CheckCircleOutline";
-import ErrorOutlineIcon       from "@mui/icons-material/ErrorOutline";
+import ErrorOutlineIcon from "@mui/icons-material/ErrorOutline";
 
-import KeyboardArrowDownIcon        from "@mui/icons-material/KeyboardArrowDown";
-import AccountCircleOutlinedIcon    from "@mui/icons-material/AccountCircleOutlined";
-import LogoutIcon                   from "@mui/icons-material/Logout";
-import MenuOpenIcon                 from "@mui/icons-material/MenuOpen";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
+import AccountCircleOutlinedIcon from "@mui/icons-material/AccountCircleOutlined";
+import LogoutIcon from "@mui/icons-material/Logout";
+import MenuOpenIcon from "@mui/icons-material/MenuOpen";
 
 // Drawer nav icons
 import BatchPredictionIcon from "@mui/icons-material/BatchPrediction";
 
-import TrendingUpIcon   from "@mui/icons-material/TrendingUp";
+import TrendingUpIcon from "@mui/icons-material/TrendingUp";
 import TrendingDownIcon from "@mui/icons-material/TrendingDown";
-import MoreVertIcon     from "@mui/icons-material/MoreVert";
-import Inventory2Icon   from "@mui/icons-material/Inventory2";
+import MoreVertIcon from "@mui/icons-material/MoreVert";
+import Inventory2Icon from "@mui/icons-material/Inventory2";
 
 // ─── User Management ──────────────────────────────────────────────────────────
-import PersonOutlineIcon               from "@mui/icons-material/PersonOutline";
-import AddIcon                         from "@mui/icons-material/Add";
-import SearchIcon                      from "@mui/icons-material/Search";
-import FilterListIcon                  from "@mui/icons-material/FilterList";
-import CloseIcon                       from "@mui/icons-material/Close";
-import BlockOutlinedIcon               from "@mui/icons-material/BlockOutlined";
-import AdminPanelSettingsOutlinedIcon  from "@mui/icons-material/AdminPanelSettingsOutlined";
-import SupervisorAccountOutlinedIcon   from "@mui/icons-material/SupervisorAccountOutlined";
-import PersonOutlinedIcon              from "@mui/icons-material/PersonOutlined";
-import VerifiedUserOutlinedIcon        from "@mui/icons-material/VerifiedUserOutlined";
-import WarningAmberRoundedIcon         from "@mui/icons-material/WarningAmberRounded";
+import PersonOutlineIcon from "@mui/icons-material/PersonOutline";
+import AddIcon from "@mui/icons-material/Add";
+import SearchIcon from "@mui/icons-material/Search";
+import FilterListIcon from "@mui/icons-material/FilterList";
+import CloseIcon from "@mui/icons-material/Close";
+import BlockOutlinedIcon from "@mui/icons-material/BlockOutlined";
+import AdminPanelSettingsOutlinedIcon from "@mui/icons-material/AdminPanelSettingsOutlined";
+import SupervisorAccountOutlinedIcon from "@mui/icons-material/SupervisorAccountOutlined";
+import PersonOutlinedIcon from "@mui/icons-material/PersonOutlined";
+import VerifiedUserOutlinedIcon from "@mui/icons-material/VerifiedUserOutlined";
+import WarningAmberRoundedIcon from "@mui/icons-material/WarningAmberRounded";
 
 // ─── Batch Management ─────────────────────────────────────────────────────────
-import Inventory2OutlinedIcon          from "@mui/icons-material/Inventory2Outlined";   // Sourcing stage
-import PrecisionManufacturingIcon      from "@mui/icons-material/PrecisionManufacturing"; // Manufacturing stage
-import BiotechIcon                     from "@mui/icons-material/Biotech";               // Quality Control stage
-import LocalShippingOutlinedIcon       from "@mui/icons-material/LocalShippingOutlined"; // Dispatch stage
-import LocalShippingIcon               from "@mui/icons-material/LocalShipping";
-import HourglassEmptyIcon              from "@mui/icons-material/HourglassEmpty";        // Pending status
-import AutorenewIcon                   from "@mui/icons-material/Autorenew";             // In Progress status
-import TaskAltIcon                     from "@mui/icons-material/TaskAlt";               // Completed status
-import VerifiedIcon                    from "@mui/icons-material/Verified";              // Approved status
-import FlightTakeoffIcon               from "@mui/icons-material/FlightTakeoff";         // Dispatched status
-import CancelOutlinedIcon              from "@mui/icons-material/CancelOutlined";        // Rejected status
-import QrCodeIcon                      from "@mui/icons-material/QrCode";               // Batch ID
-import RocketIcon                      from "@mui/icons-material/Rocket";               // Motor ID
-import LayersOutlinedIcon              from "@mui/icons-material/LayersOutlined";
+import Inventory2OutlinedIcon from "@mui/icons-material/Inventory2Outlined"; // Sourcing stage
+import PrecisionManufacturingIcon from "@mui/icons-material/PrecisionManufacturing"; // Manufacturing stage
+import BiotechIcon from "@mui/icons-material/Biotech"; // Quality Control stage
+import LocalShippingOutlinedIcon from "@mui/icons-material/LocalShippingOutlined"; // Dispatch stage
+import LocalShippingIcon from "@mui/icons-material/LocalShipping";
+import HourglassEmptyIcon from "@mui/icons-material/HourglassEmpty"; // Pending status
+import AutorenewIcon from "@mui/icons-material/Autorenew"; // In Progress status
+import TaskAltIcon from "@mui/icons-material/TaskAlt"; // Completed status
+import VerifiedIcon from "@mui/icons-material/Verified"; // Approved status
+import FlightTakeoffIcon from "@mui/icons-material/FlightTakeoff"; // Dispatched status
+import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined"; // Rejected status
+import QrCodeIcon from "@mui/icons-material/QrCode"; // Batch ID
+import RocketIcon from "@mui/icons-material/Rocket"; // Motor ID
+import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
 
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
-import InfoOutlinedIcon        from "@mui/icons-material/InfoOutlined";
+import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import AirRoundedIcon from "@mui/icons-material/AirRounded";
 import AssignmentRoundedIcon from "@mui/icons-material/AssignmentRounded";
@@ -183,7 +183,6 @@ import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import WaterRoundedIcon from "@mui/icons-material/WaterRounded";
 import Project from "@mui/icons-material/AccountTreeRounded";
 
-
 export const icons = {
   dashboard: DashboardIcon,
   users: PeopleIcon,
@@ -238,30 +237,30 @@ export const icons = {
   clock: AccessTimeIcon,
 
   lightModeToggleIcon: LightModeIcon,
-  darkModeToggleIcon:  DarkModeIcon,
+  darkModeToggleIcon: DarkModeIcon,
 
   // Captcha
-  captchaReload:   RefreshIcon,
-  captchaSuccess:  CheckCircleOutlineIcon,
-  captchaError:    ErrorOutlineIcon,
+  captchaReload: RefreshIcon,
+  captchaSuccess: CheckCircleOutlineIcon,
+  captchaError: ErrorOutlineIcon,
 
   // App Header
   headerDeptArrow: KeyboardArrowDownIcon,
-  headerUser:      AccountCircleOutlinedIcon,
-  headerLogout:    LogoutIcon,
-  menuIcon:        MenuOpenIcon,
+  headerUser: AccountCircleOutlinedIcon,
+  headerLogout: LogoutIcon,
+  menuIcon: MenuOpenIcon,
 
   // Drawer nav
-  drawerDashboard:   DashboardIcon,
-  drawerUsers:       PeopleIcon,
-  drawerBatch:       BatchPredictionIcon,
+  drawerDashboard: DashboardIcon,
+  drawerUsers: PeopleIcon,
+  drawerBatch: BatchPredictionIcon,
   drawerDepartments: Project,
-  drawerLogout:      LogoutIcon,
+  drawerLogout: LogoutIcon,
 
   // Dashboard
-  trendingUp:   TrendingUpIcon,
+  trendingUp: TrendingUpIcon,
   trendingDown: TrendingDownIcon,
-  moreVert:     MoreVertIcon,
+  moreVert: MoreVertIcon,
 
   systemManager: {
     Notifications: NotificationsIcon,
@@ -286,86 +285,86 @@ export const icons = {
   // ─── User Management ──────────────────────────────────────────────────────
   userMgmt: {
     // Page actions
-    add:            AddIcon,
-    search:         SearchIcon,
-    filter:         FilterListIcon,
-    close:          CloseIcon,
-    refresh:        RefreshIcon,
-    personOutline:  PersonOutlineIcon, 
-    info:    InfoOutlinedIcon,      // empty-state + modal header
+    add: AddIcon,
+    search: SearchIcon,
+    filter: FilterListIcon,
+    close: CloseIcon,
+    refresh: RefreshIcon,
+    personOutline: PersonOutlineIcon,
+    info: InfoOutlinedIcon, // empty-state + modal header
 
     // Status chips
-    activeStatus:   CheckCircleOutlineIcon,
+    activeStatus: CheckCircleOutlineIcon,
     inactiveStatus: BlockOutlinedIcon,
 
     // Role chips
-    adminRole:      AdminPanelSettingsOutlinedIcon,
-    managerRole:    SupervisorAccountOutlinedIcon,
-    userRole:       PersonOutlinedIcon,
-    approverRole:   VerifiedUserOutlinedIcon,
+    adminRole: AdminPanelSettingsOutlinedIcon,
+    managerRole: SupervisorAccountOutlinedIcon,
+    userRole: PersonOutlinedIcon,
+    approverRole: VerifiedUserOutlinedIcon,
 
     // Delete dialog
-    deleteWarn:     WarningAmberRoundedIcon,
+    deleteWarn: WarningAmberRoundedIcon,
 
     // Username / createdBy prefix
-    userId:         AccountCircleOutlinedIcon,
+    userId: AccountCircleOutlinedIcon,
     lockIcon: LockIcon,
   },
 
   // ─── Batch Management ────────────────────────────────────────────────────────
   batchMgmt: {
     // Page actions
-    add:            AddIcon,
-    search:         SearchIcon,
-    filter:         FilterListIcon,
-    close:          CloseIcon,
-    refresh:        RefreshIcon,
-    batchIcon:      LayersOutlinedIcon,      // modal header + empty-state
-    emptyBatch:     LayersOutlinedIcon,      // empty table state
+    add: AddIcon,
+    search: SearchIcon,
+    filter: FilterListIcon,
+    close: CloseIcon,
+    refresh: RefreshIcon,
+    batchIcon: LayersOutlinedIcon, // modal header + empty-state
+    emptyBatch: LayersOutlinedIcon, // empty table state
 
     // Identifiers
-    batchId:        QrCodeIcon,
-    motorId:        RocketIcon,
-    userId:         AccountCircleOutlinedIcon,
-
+    batchId: QrCodeIcon,
+    motorId: RocketIcon,
+    userId: AccountCircleOutlinedIcon,
+    projectId: AssignmentRoundedIcon,
     // Stage chips
-    sourcingStage:      Inventory2OutlinedIcon,
+    sourcingStage: Inventory2OutlinedIcon,
     manufacturingStage: PrecisionManufacturingIcon,
-    qcStage:            BiotechIcon,
-    dispatchStage:      LocalShippingOutlinedIcon,
+    qcStage: BiotechIcon,
+    dispatchStage: LocalShippingOutlinedIcon,
 
     // Status chips
-    pendingStatus:    HourglassEmptyIcon,
+    pendingStatus: HourglassEmptyIcon,
     waitingForApprovalStatus: PendingActionsRoundedIcon,
     inProgressStatus: AutorenewIcon,
-    completedStatus:  TaskAltIcon,
-    approvedStatus:   VerifiedIcon,
+    completedStatus: TaskAltIcon,
+    approvedStatus: VerifiedIcon,
     dispatchedStatus: FlightTakeoffIcon,
-    rejectedStatus:   CancelOutlinedIcon,
+    rejectedStatus: CancelOutlinedIcon,
 
     // Delete dialog
-    deleteWarn:     WarningAmberRoundedIcon,
+    deleteWarn: WarningAmberRoundedIcon,
 
-    SEVERITY_ICON : {
+    SEVERITY_ICON: {
       warning: WarningAmberRoundedIcon,
-      error:   ErrorOutlineRoundedIcon,
-      info:    InfoOutlinedIcon,
+      error: ErrorOutlineRoundedIcon,
+      info: InfoOutlinedIcon,
     },
   },
 
   // ─── Project Management ─────────────────────────────────────────────────────
   projectMgmt: {
-    add:            AddIcon,
-    search:         SearchIcon,
-    filter:         FilterListIcon,
-    close:          CloseIcon,
-    refresh:        RefreshIcon,
-    projectIcon:    AssignmentRoundedIcon,
-    emptyProject:   AssignmentRoundedIcon,
-    info:           InfoOutlinedIcon,
-    activeStatus:   CheckCircleOutlineIcon,
-    idleStatus:     BlockOutlinedIcon,
-    deleteWarn:     WarningAmberRoundedIcon,
+    add: AddIcon,
+    search: SearchIcon,
+    filter: FilterListIcon,
+    close: CloseIcon,
+    refresh: RefreshIcon,
+    projectIcon: AssignmentRoundedIcon,
+    emptyProject: AssignmentRoundedIcon,
+    info: InfoOutlinedIcon,
+    activeStatus: CheckCircleOutlineIcon,
+    idleStatus: BlockOutlinedIcon,
+    deleteWarn: WarningAmberRoundedIcon,
   },
 
   approver: {

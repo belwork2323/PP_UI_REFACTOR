@@ -107,7 +107,7 @@ const mergeFormState = (
 const normalizeBatch = (batch: any): QCBatch => ({
   ...batch,
   lotId: batch?.lotId ?? batch?.batchId ?? "",
-  qcStatus: batch?.qcStatus ?? batch?.qcDivStatus ?? batch?.status ?? QUALITY_CONTROL_STATUS.INITIATED,
+  qcStatus: batch?.qcStatus ?? batch?.qcDivStatus ?? batch?.status ?? QUALITY_CONTROL_STATUS.TO_BE_INITIATED,
   formId: batch?.formId ?? null,
   rejectionReason: batch?.rejectionReason ?? null,
 });
@@ -1626,7 +1626,7 @@ export const useQCDivisionHook = () => {
 
     const payload = mapQualityControlPayload(formDataRef.current);
     const isCreateFlow =
-      activeBatch.qcStatus === QUALITY_CONTROL_STATUS.INITIATED && !activeBatch.formId;
+      activeBatch.qcStatus === QUALITY_CONTROL_STATUS.TO_BE_INITIATED && !activeBatch.formId;
 
     setActionLoading(true);
     try {

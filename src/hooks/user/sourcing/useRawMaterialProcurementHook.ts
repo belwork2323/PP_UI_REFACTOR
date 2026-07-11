@@ -51,12 +51,12 @@ export const useRawMaterialProcurementHook = () => {
   const subDepartmentId = useMemo(
     () =>
       user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "raw-material")?.subDepartmentId,
-    [user]
+    [user],
   );
 
   const isFormDirty = useMemo(
     () => serializeMaterialBlocks(formBlocks) !== initialSnapshot,
-    [formBlocks, initialSnapshot]
+    [formBlocks, initialSnapshot],
   );
 
   const resetFormContext = () => {
@@ -135,7 +135,7 @@ export const useRawMaterialProcurementHook = () => {
               rmStatus: normalizeRawMaterialLotListStatus(wf?.currentStatus || prev.rmStatus),
               rejectionReason: wf?.rejectionReason ?? null,
             }
-          : prev
+          : prev,
       );
       return true;
     } finally {
@@ -159,7 +159,9 @@ export const useRawMaterialProcurementHook = () => {
     }
 
     setLoadingFormDetails(true);
-    const detailsResponse = await rawMaterialProcurementController.fetchLotDetails({ lotId: row.lotId });
+    const detailsResponse = await rawMaterialProcurementController.fetchLotDetails({
+      lotId: row.lotId,
+    });
     setLoadingFormDetails(false);
 
     let blocks: MaterialBlock[] = [];
@@ -220,7 +222,7 @@ export const useRawMaterialProcurementHook = () => {
 
     setDetailsRow({
       lotId,
-      procurementId: row.procurementId,
+      sourcingId: row.sourcingId,
       materialCode: row.materialCode,
       materialName: row.materialName,
       supplyOrderNo: row.supplyOrderNo,
@@ -255,7 +257,7 @@ export const useRawMaterialProcurementHook = () => {
       setDetailsBlocks(blocks);
       setDetailsRow({
         lotId: model.lotId || lotId,
-        procurementId: row.procurementId,
+        sourcingId: row.sourcingId,
         materialCode: model.materialCode || row.materialCode,
         materialName: row.materialName,
         supplyOrderNo: model.supplyOrderNo || row.supplyOrderNo,
@@ -278,19 +280,22 @@ export const useRawMaterialProcurementHook = () => {
     setView("list");
   };
 
-  const handleBlocksChange = useCallback((blocks: MaterialBlock[]) => {
-    rmCertDebug("6.parent.handleBlocksChange", {
-      formEntryMode,
-      blockCount: (blocks ?? []).length,
-      blocks: summarizeBlocks(blocks ?? []),
-    });
-    startTransition(() => {
-      setFormBlocks(blocks ?? []);
-      rmCertDebug("6.parent.setFormBlocks.done", {
+  const handleBlocksChange = useCallback(
+    (blocks: MaterialBlock[]) => {
+      rmCertDebug("6.parent.handleBlocksChange", {
+        formEntryMode,
         blockCount: (blocks ?? []).length,
+        blocks: summarizeBlocks(blocks ?? []),
       });
-    });
-  }, [formEntryMode]);
+      startTransition(() => {
+        setFormBlocks(blocks ?? []);
+        rmCertDebug("6.parent.setFormBlocks.done", {
+          blockCount: (blocks ?? []).length,
+        });
+      });
+    },
+    [formEntryMode],
+  );
 
   const handleBack = () => {
     if (view === "form" && isFormDirty) {
@@ -323,7 +328,7 @@ export const useRawMaterialProcurementHook = () => {
       if ((block?.manufacturerName ?? "").trim().length > 0) return true;
       if (
         (block?.certificates ?? []).some(
-          (c) => String(c.fileName ?? "").trim().length > 0 || Boolean(c.file)
+          (c) => String(c.fileName ?? "").trim().length > 0 || Boolean(c.file),
         )
       ) {
         return true;
@@ -399,7 +404,10 @@ export const useRawMaterialProcurementHook = () => {
         });
 
         if (!response?.success) {
-          showAlert(getErrorMessage(response, STRINGS.SOURCING.SPECIFICATION_FORM.CREATE_FAILED), "error");
+          showAlert(
+            getErrorMessage(response, STRINGS.SOURCING.SPECIFICATION_FORM.CREATE_FAILED),
+            "error",
+          );
           return false;
         }
 
@@ -409,11 +417,11 @@ export const useRawMaterialProcurementHook = () => {
           prev
             ? {
                 ...prev,
-                procurementId: response.data?.procurementId ?? prev.procurementId,
-                batchId: response.data?.procurementId || prev.batchId,
+                sourcingId: response.data?.sourcingId ?? prev.sourcingId,
+                batchId: response.data?.sourcingId || prev.batchId,
                 rmStatus: normalizeRawMaterialLotListStatus(response.data?.status || prev.rmStatus),
               }
-            : prev
+            : prev,
         );
 
         if (intent === "draft") {
@@ -441,7 +449,7 @@ export const useRawMaterialProcurementHook = () => {
 
     if (intent === "submit") {
       const hasSpec = head.rows.some(
-        (r) => (r.specificationCode ?? "").trim() && String(r.analysedResult ?? "").trim()
+        (r) => (r.specificationCode ?? "").trim() && String(r.analysedResult ?? "").trim(),
       );
       if (!hasSpec) {
         showAlert(STRINGS.SOURCING.SPECIFICATION_FORM.SUBMIT_DISABLED_TOOLTIP, "warning");
@@ -452,14 +460,26 @@ export const useRawMaterialProcurementHook = () => {
     setActionLoading(true);
     try {
       const submissionType: "DRAFT" | "UPDATE" =
-        intent === "draft" ? "DRAFT" : activeBatch.rmStatus === SOURCING_STATUS.REJECTED ? "UPDATE" : "UPDATE";
+        intent === "draft"
+          ? "DRAFT"
+          : activeBatch.rmStatus === SOURCING_STATUS.REJECTED
+            ? "UPDATE"
+            : "UPDATE";
 
-      const updatePayload = mapFirstBlockToLotUpdatePayload(head, lotId, subDepartmentId, submissionType);
+      const updatePayload = mapFirstBlockToLotUpdatePayload(
+        head,
+        lotId,
+        subDepartmentId,
+        submissionType,
+      );
 
       const response = await rawMaterialProcurementController.updateForm(updatePayload);
 
       if (!response?.success) {
-        showAlert(getErrorMessage(response, STRINGS.SOURCING.SPECIFICATION_FORM.UPDATE_FAILED), "error");
+        showAlert(
+          getErrorMessage(response, STRINGS.SOURCING.SPECIFICATION_FORM.UPDATE_FAILED),
+          "error",
+        );
         return false;
       }
 
@@ -480,7 +500,7 @@ export const useRawMaterialProcurementHook = () => {
                 batchId: resolvedLotId,
                 rmStatus: normalizeRawMaterialLotListStatus(response.data?.status || prev.rmStatus),
               }
-            : prev
+            : prev,
         );
         const reloaded = await reloadLotFormDetails(resolvedLotId);
         if (reloaded) stayOnFormWithDraftSuccess(successMessage);
@@ -521,7 +541,7 @@ export const useRawMaterialProcurementHook = () => {
       }
       openDeleteLotConfirm(row.lotId);
     },
-    [openDeleteLotConfirm, showAlert]
+    [openDeleteLotConfirm, showAlert],
   );
 
   const handleDeleteLotFromForm = useCallback(() => {
@@ -544,7 +564,7 @@ export const useRawMaterialProcurementHook = () => {
       if (!response?.success) {
         showAlert(
           getErrorMessage(response, STRINGS.SOURCING.SPECIFICATION_FORM.DELETE_FAILED),
-          "error"
+          "error",
         );
         return;
       }
@@ -555,16 +575,12 @@ export const useRawMaterialProcurementHook = () => {
       const wasOnForm = view === "form";
       if (wasOnForm) resetFormContext();
 
-      showAlert(
-        response.message || STRINGS.SOURCING.SPECIFICATION_FORM.DELETE_SUCCESS,
-        "success",
-        {
-          autoCloseMs: SUCCESS_ALERT_MS,
-          onCloseAction: () => {
-            void listParams.refreshUserBatches();
-          },
-        }
-      );
+      showAlert(response.message || STRINGS.SOURCING.SPECIFICATION_FORM.DELETE_SUCCESS, "success", {
+        autoCloseMs: SUCCESS_ALERT_MS,
+        onCloseAction: () => {
+          void listParams.refreshUserBatches();
+        },
+      });
 
       if (!wasOnForm) {
         void listParams.refreshUserBatches();

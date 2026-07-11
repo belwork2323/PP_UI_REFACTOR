@@ -63,13 +63,27 @@ type DetailDialogProps = {
   theme: ReturnType<typeof getRawMaterialApproverTheme>;
 };
 
-const RawMaterialDetailDialog = ({ open, onClose, item, loading, onApprove, onReject, theme }: DetailDialogProps) => {
+const RawMaterialDetailDialog = ({
+  open,
+  onClose,
+  item,
+  loading,
+  onApprove,
+  onReject,
+  theme,
+}: DetailDialogProps) => {
   const [pdfOpen, setPdfOpen] = useState(false);
   if (!item) return null;
 
   return (
     <>
-      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: theme.dialog.paper }}>
+      <Dialog
+        open={open}
+        onClose={onClose}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ sx: theme.dialog.paper }}
+      >
         <Box sx={theme.dialog.header}>
           <Stack direction="row" alignItems="center" gap={1.5}>
             <InventoryRoundedIcon sx={theme.dialog.headerIcon} />
@@ -118,28 +132,45 @@ const RawMaterialDetailDialog = ({ open, onClose, item, loading, onApprove, onRe
                   <Table size="small">
                     <TableHead>
                       <TableRow>
-                        {["Material", "Man. Lot/Batch No.", "Specification", "Ref. Range", "Analyzed Result", "Remarks"].map(
-                          (h, i) => (
-                            <TableCell key={h} sx={theme.dialog.innerHeaderCell(i === 0)}>
-                              {h}
-                            </TableCell>
-                          ),
-                        )}
+                        {[
+                          "Material",
+                          "Man. Lot/Batch No.",
+                          "Specification",
+                          "Ref. Range",
+                          "Analyzed Result",
+                          "Remarks",
+                        ].map((h, i) => (
+                          <TableCell key={h} sx={theme.dialog.innerHeaderCell(i === 0)}>
+                            {h}
+                          </TableCell>
+                        ))}
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {block.rows.map((row: any, ri: number) => (
                         <TableRow key={ri} sx={theme.dialog.innerRow(ri)}>
                           <TableCell sx={theme.dialog.innerCell}>
-                            {ri === 0 && <Chip label={block.material} size="small" sx={theme.chips.inlineMaterial} />}
+                            {ri === 0 && (
+                              <Chip
+                                label={block.material}
+                                size="small"
+                                sx={theme.chips.inlineMaterial}
+                              />
+                            )}
                           </TableCell>
-                          <TableCell sx={theme.dialog.innerLotText}>{ri === 0 ? block.lotNo || "—" : ""}</TableCell>
+                          <TableCell sx={theme.dialog.innerLotText}>
+                            {ri === 0 ? block.lotNo || "—" : ""}
+                          </TableCell>
                           <TableCell sx={theme.dialog.innerSpecText}>{row.specification}</TableCell>
                           <TableCell sx={theme.dialog.innerCell}>
                             <Chip label={row.refRange} size="small" sx={theme.chips.refRange} />
                           </TableCell>
-                          <TableCell sx={theme.dialog.innerResultText}>{row.analysedResult || "—"}</TableCell>
-                          <TableCell sx={theme.dialog.innerRemarksText}>{row.remarks || "—"}</TableCell>
+                          <TableCell sx={theme.dialog.innerResultText}>
+                            {row.analysedResult || "—"}
+                          </TableCell>
+                          <TableCell sx={theme.dialog.innerRemarksText}>
+                            {row.remarks || "—"}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -148,7 +179,9 @@ const RawMaterialDetailDialog = ({ open, onClose, item, loading, onApprove, onRe
               </Box>
             ))
           ) : (
-            <Typography sx={theme.dialog.emptyText}>No raw material details available for this form.</Typography>
+            <Typography sx={theme.dialog.emptyText}>
+              No raw material details available for this form.
+            </Typography>
           )}
         </DialogContent>
 
@@ -156,10 +189,22 @@ const RawMaterialDetailDialog = ({ open, onClose, item, loading, onApprove, onRe
           <Button variant="outlined" onClick={onClose} sx={theme.dialog.closeAction}>
             Close
           </Button>
-          <Button variant="contained" startIcon={<CancelRoundedIcon />} onClick={() => onReject(item)} disabled={loading} sx={theme.dialog.rejectAction}>
+          <Button
+            variant="contained"
+            startIcon={<CancelRoundedIcon />}
+            onClick={() => onReject(item)}
+            disabled={loading}
+            sx={theme.dialog.rejectAction}
+          >
             Reject
           </Button>
-          <Button variant="contained" startIcon={<CheckCircleRoundedIcon />} onClick={() => onApprove(item)} disabled={loading} sx={theme.dialog.approveAction}>
+          <Button
+            variant="contained"
+            startIcon={<CheckCircleRoundedIcon />}
+            onClick={() => onApprove(item)}
+            disabled={loading}
+            sx={theme.dialog.approveAction}
+          >
             Approve
           </Button>
         </Box>
@@ -304,9 +349,7 @@ const RawMaterialApproverPage = () => {
   const formatReceiptDate = (value?: string) => {
     if (!value) return "—";
     const parsed = dayjs(value);
-    return parsed.isValid()
-      ? parsed.format("DD MMM YYYY")
-      : value;
+    return parsed.isValid() ? parsed.format("DD MMM YYYY") : value;
   };
 
   const searchBarEnd = (
@@ -381,7 +424,9 @@ const RawMaterialApproverPage = () => {
             sx={filterStyles.field}
             SelectProps={filterStyles.selectProps}
           >
-            <MenuItem value={filterAllLabel}>{STRINGS.SOURCING.BATCH_LIST.FILTERS_ALL_MATERIALS}</MenuItem>
+            <MenuItem value={filterAllLabel}>
+              {STRINGS.SOURCING.BATCH_LIST.FILTERS_ALL_MATERIALS}
+            </MenuItem>
             {!materialsLoading &&
               materialOptions.map((material) => (
                 <MenuItem key={material.materialCode} value={material.materialCode}>
@@ -415,7 +460,9 @@ const RawMaterialApproverPage = () => {
             label={STRINGS.SOURCING.BATCH_LIST.FILTERS_FROM_DATE}
             format="YYYY-MM-DD"
             value={draftFrom ? dayjs(draftFrom) : null}
-            onChange={(value) => setDraftFrom(value && value.isValid() ? value.format("YYYY-MM-DD") : "")}
+            onChange={(value) =>
+              setDraftFrom(value && value.isValid() ? value.format("YYYY-MM-DD") : "")
+            }
             slotProps={{
               textField: {
                 size: "small",
@@ -427,7 +474,9 @@ const RawMaterialApproverPage = () => {
             label={STRINGS.SOURCING.BATCH_LIST.FILTERS_TO_DATE}
             format="YYYY-MM-DD"
             value={draftTo ? dayjs(draftTo) : null}
-            onChange={(value) => setDraftTo(value && value.isValid() ? value.format("YYYY-MM-DD") : "")}
+            onChange={(value) =>
+              setDraftTo(value && value.isValid() ? value.format("YYYY-MM-DD") : "")
+            }
             slotProps={{
               textField: {
                 size: "small",
@@ -476,10 +525,18 @@ const RawMaterialApproverPage = () => {
       listFilters={listFiltersRecord}
       searchBarEnd={searchBarEnd}
       filterExtension={filterExtension}
-      searchKeys={["lotId", "procurementId", "materialCode", "materialName", "supplyOrderNo", "manufacturerName", "submittedBy"]}
+      searchKeys={[
+        "lotId",
+        "sourcingId",
+        "materialCode",
+        "materialName",
+        "supplyOrderNo",
+        "manufacturerName",
+        "submittedBy",
+      ]}
       searchPlaceholder={STRINGS.APPROVER.LIST.SEARCH_PLACEHOLDER([
         "lot ID",
-        "procurement ID",
+        "sourcing ID",
         "material code",
         "manufacturer",
       ])}
@@ -493,7 +550,7 @@ const RawMaterialApproverPage = () => {
                   <TableRow>
                     {[
                       BL.COL_LOT_ID,
-                      BL.COL_PROCUREMENT_ID,
+                      BL.COL_SOURCING_ID,
                       BL.COL_MATERIAL_CODE,
                       BL.COL_MATERIAL_NAME,
                       BL.COL_SUPPLY_ORDER,
@@ -503,25 +560,40 @@ const RawMaterialApproverPage = () => {
                       BL.COL_CREATED_ON,
                       BL.COL_RM_STATUS,
                     ].map((h) => (
-                      <TableCell key={h} sx={theme.table.headerCell}>{h}</TableCell>
+                      <TableCell key={h} sx={theme.table.headerCell}>
+                        {h}
+                      </TableCell>
                     ))}
-                    <TableCell sx={{ ...theme.table.headerCell, textAlign: "center" }}>Action</TableCell>
+                    <TableCell sx={{ ...theme.table.headerCell, textAlign: "center" }}>
+                      Action
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {filtered.map((row: any, idx: number) => (
-                    <TableRow key={row.lotId ?? row.id ?? row.formId ?? idx} sx={theme.table.row(idx)}>
+                    <TableRow
+                      key={row.lotId ?? row.id ?? row.formId ?? idx}
+                      sx={theme.table.row(idx)}
+                    >
                       <TableCell sx={theme.table.bodyCell}>
-                        <Typography sx={theme.table.batchIdText}>{row.lotId ?? row.batchId}</Typography>
+                        <Typography sx={theme.table.batchIdText}>
+                          {row.lotId ?? row.batchId}
+                        </Typography>
                       </TableCell>
                       <TableCell sx={theme.table.bodyCell}>
-                        <Typography sx={theme.table.subtleText}>{row.procurementId ?? "—"}</Typography>
+                        <Typography sx={theme.table.subtleText}>{row.sourcingId ?? "—"}</Typography>
                       </TableCell>
                       <TableCell sx={theme.table.bodyCell}>
-                        <Chip label={row.materialCode ?? row.batchType} size="small" sx={theme.chips.type} />
+                        <Chip
+                          label={row.materialCode ?? row.batchType}
+                          size="small"
+                          sx={theme.chips.type}
+                        />
                       </TableCell>
                       <TableCell sx={theme.table.bodyCell}>
-                        <Typography sx={{ fontSize: "0.82rem" }}>{row.materialName ?? "—"}</Typography>
+                        <Typography sx={{ fontSize: "0.82rem" }}>
+                          {row.materialName ?? "—"}
+                        </Typography>
                       </TableCell>
                       <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.subtleText }}>
                         {row.supplyOrderNo ?? "—"}
@@ -534,10 +606,18 @@ const RawMaterialApproverPage = () => {
                       </TableCell>
                       <TableCell sx={theme.table.bodyCell}>{row.submittedBy}</TableCell>
                       <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.dateText }}>
-                        {new Date(row.createdOn).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                        {new Date(row.createdOn).toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })}
                       </TableCell>
                       <TableCell sx={theme.table.bodyCell}>
-                        <Chip label={row.status} size="small" sx={theme.chips.status(statusMeta[row.status])} />
+                        <Chip
+                          label={row.status}
+                          size="small"
+                          sx={theme.chips.status(statusMeta[row.status])}
+                        />
                       </TableCell>
                       <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.actionCell }}>
                         <Button

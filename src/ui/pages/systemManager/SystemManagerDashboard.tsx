@@ -144,7 +144,7 @@ export default function SystemManagerDashboard() {
     })}`;
   })();
 
-  const [dateFilterOpen, setDateFilterOpen] = useState(false);
+  const [dateFilterOpen, setDateFilterOpen] = useState(true);
   const dateFilterCount = filterType ? 1 : 0;
   const { filterMenuProps, filterMenuItemSx } = adminTh;
 
@@ -229,13 +229,13 @@ export default function SystemManagerDashboard() {
           <Typography sx={t.pageHeader.eyebrow}>{S.PAGE.EYEBROW}</Typography>
           <Typography sx={t.pageHeader.title}>{S.PAGE.TITLE}</Typography>
         </Box>
-        <Stack direction="row" gap={1} alignItems="center">
+        {/* <Stack direction="row" gap={1} alignItems="center">
           <Badge badgeContent={alerts.length} color="error" invisible={alerts.length === 0}>
             <Box sx={t.pageHeader.notifBox} onClick={handleNotifOpen}>
               <Notifications sx={t.pageHeader.notifIcon} />
             </Box>
           </Badge>
-        </Stack>
+        </Stack> */}
       </Stack>
 
       {/* ── Date Range Selector ── */}
@@ -250,6 +250,7 @@ export default function SystemManagerDashboard() {
           textSx={adminTh.table.filterBtnText}
           badgeSx={adminTh.table.filterBadgePill}
           chevronSx={adminTh.table.filterBtnChevron}
+          selectedValue={filterType}
         />
 
         {dateFilterOpen && (
@@ -280,7 +281,7 @@ export default function SystemManagerDashboard() {
               key={label}
               label={label}
               value={value}
-              sub={sub}
+              // sub={sub}
               Icon={Icon}
               bg={color}
               cardSx={t.sharedDashboard.kpiCard.cardSx}
@@ -550,86 +551,6 @@ export default function SystemManagerDashboard() {
               theme={shellTheme}
             />
           }
-          // filterPanel={
-          //   <Collapse in={batchFilterOpen} timeout={200} unmountOnExit>
-          //     <Box sx={adminTh.table.filterPanel}>
-          //       <FilterPanelHeader
-          //         title={S.FILTERS.BUTTON}
-          //         count={activeBatchFilterCount}
-          //         onClear={clearBatchFilters}
-          //         clearLabel={S.FILTERS.CLEAR_ALL}
-          //         recordText={`- ${filteredInProgressRows.length} / ${totalRecords} records shown`}
-          //         containerSx={{ ...adminTh.table.filterPanelHeader, mb: 1.5 }}
-          //         iconSx={adminTh.table.filterBtnIcon}
-          //         labelSx={adminTh.table.filterLabel}
-          //         badgeSx={adminTh.table.filterBadge}
-          //         metaTextSx={adminTh.table.filterMetaText}
-          //         clearChipSx={adminTh.table.clearChip}
-          //       />
-
-          //       <Stack direction="row" gap={1.5} flexWrap="wrap" mb={1}>
-          //         <TextField
-          //           size="small"
-          //           placeholder={S.FILTERS.SEARCH_BATCHES}
-          //           value={batchSearch}
-          //           onChange={(e) => setBatchSearch(e.target.value)}
-          //           InputProps={{
-          //             startAdornment: (
-          //               <InputAdornment position="start">
-          //                 <Search sx={adminTh.table.searchIcon} />
-          //               </InputAdornment>
-          //             ),
-          //             endAdornment: batchSearch ? (
-          //               <InputAdornment position="end">
-          //                 <IconButton
-          //                   size="small"
-          //                   onClick={() => setBatchSearch("")}
-          //                   sx={adminTh.table.clearIconBtn}
-          //                 >
-          //                   <Close sx={adminTh.table.clearIcon} />
-          //                 </IconButton>
-          //               </InputAdornment>
-          //             ) : null,
-          //           }}
-          //           sx={adminTh.table.searchInput}
-          //         />
-
-          //         <FilterSelect
-          //           label="Stage"
-          //           value={batchStage}
-          //           onChange={(e) => setBatchStage(e.target.value)}
-          //           options={stageOptions}
-          //           menuProps={filterMenuProps}
-          //           itemSx={filterMenuItemSx}
-          //           showAllOption={false}
-          //           sx={adminTh.table.stageSelect}
-          //         />
-
-          //         <FilterSelect
-          //           label="Type"
-          //           value={batchType}
-          //           onChange={(e) => setBatchType(e.target.value)}
-          //           options={typeOptions}
-          //           menuProps={filterMenuProps}
-          //           itemSx={filterMenuItemSx}
-          //           showAllOption={false}
-          //           sx={adminTh.table.typeSelect}
-          //         />
-
-          //         <FilterSelect
-          //           label={S.FILTERS.STATUS}
-          //           value={batchStatus}
-          //           onChange={(e) => setBatchStatus(e.target.value)}
-          //           options={statusOptions}
-          //           menuProps={filterMenuProps}
-          //           itemSx={filterMenuItemSx}
-          //           showAllOption={false}
-          //           sx={adminTh.table.statusSelect}
-          //         />
-          //       </Stack>
-          //     </Box>
-          //   </Collapse>
-          // }
         />
       </Box>
 
@@ -754,6 +675,7 @@ export default function SystemManagerDashboard() {
           stageConfig={stageConfig}
           onClose={closeBatchDetails}
           t={t}
+          // batchStatusList={batchStatusList}
         />
       )}
     </Box>

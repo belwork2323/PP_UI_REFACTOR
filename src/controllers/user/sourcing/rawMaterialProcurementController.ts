@@ -18,9 +18,7 @@ import {
   updateRawMaterialProcurementFormApi,
   fetchRawMaterialProcurementStatsApi,
 } from "../../../data/api/users/sourcing/rawMaterialProcurementApi";
-import {
-  RawMaterialProcurementStatsModel,
-} from "../../../data/models/user/RawMaterialProcurementStatsModel";
+import { RawMaterialProcurementStatsModel } from "../../../data/models/user/RawMaterialProcurementStatsModel";
 
 export type RawMaterialDetailsPayload = {
   formId: string;
@@ -46,12 +44,14 @@ export const rawMaterialProcurementController = {
 
   createForm: async (payload: RawMaterialCreateFormPayload) => {
     try {
-      const response = await createRawMaterialProcurementFormApi(payload as unknown as Record<string, unknown>);
+      const response = await createRawMaterialProcurementFormApi(
+        payload as unknown as Record<string, unknown>,
+      );
       return new ApiResponseModel<RawMaterialProcurementSubmitResponseModel>(response, (res) =>
-        RawMaterialProcurementSubmitResponseModel.fromApi(res)
+        RawMaterialProcurementSubmitResponseModel.fromApi(res),
       );
     } catch (error) {
-      console.error("Failed to create raw material procurement form:", error);
+      console.error("Failed to create raw material sourcing form:", error);
       return new ApiResponseModel(error);
     }
   },
@@ -60,7 +60,7 @@ export const rawMaterialProcurementController = {
     try {
       const response = await fetchRawMaterialProcurementFormDetailsApi({ lotId: payload.lotId });
       return new ApiResponseModel<RawMaterialLotDetailsModel>(response, (res) =>
-        RawMaterialLotDetailsModel.fromApi(res)
+        RawMaterialLotDetailsModel.fromApi(res),
       );
     } catch (error) {
       console.error("Failed to fetch raw material lot details:", error);
@@ -73,22 +73,24 @@ export const rawMaterialProcurementController = {
     try {
       const response = await fetchRawMaterialProcurementFormDetailsApi(payload);
       return new ApiResponseModel<RawMaterialProcurementDetailsModel>(response, (res) =>
-        RawMaterialProcurementDetailsModel.fromApi(res)
+        RawMaterialProcurementDetailsModel.fromApi(res),
       );
     } catch (error) {
-      console.error("Failed to fetch raw material procurement form details:", error);
+      console.error("Failed to fetch raw material sourcing form details:", error);
       return new ApiResponseModel(error);
     }
   },
 
   updateForm: async (payload: RawMaterialLotUpdatePayload) => {
     try {
-      const response = await updateRawMaterialProcurementFormApi(payload as unknown as Record<string, unknown>);
+      const response = await updateRawMaterialProcurementFormApi(
+        payload as unknown as Record<string, unknown>,
+      );
       return new ApiResponseModel<RawMaterialProcurementSubmitResponseModel>(response, (res) =>
-        RawMaterialProcurementSubmitResponseModel.fromApi(res)
+        RawMaterialProcurementSubmitResponseModel.fromApi(res),
       );
     } catch (error) {
-      console.error("Failed to update raw material procurement form:", error);
+      console.error("Failed to update raw material sourcing form:", error);
       return new ApiResponseModel(error);
     }
   },
@@ -107,10 +109,10 @@ export const rawMaterialProcurementController = {
     try {
       const response = await fetchRawMaterialProcurementStatsApi({ subDepartmentId });
       return new ApiResponseModel(response, (res) =>
-        RawMaterialProcurementStatsModel.fromApi(res?.data)
+        RawMaterialProcurementStatsModel.fromApi(res?.data),
       );
     } catch (error) {
-      console.error("Failed to fetch raw material procurement stats:", error);
+      console.error("Failed to fetch raw material sourcing stats:", error);
       return new ApiResponseModel(error);
     }
   },

@@ -1,4 +1,8 @@
-import { INITIAL_ROCKET_FORM, RocketFormData, type RocketMotorBatch } from "../../../hooks/user/sourcing/sourcingWorkflowData";
+import {
+  INITIAL_ROCKET_FORM,
+  RocketFormData,
+  type RocketMotorBatch,
+} from "../../../hooks/user/sourcing/sourcingWorkflowData";
 import { OPERATION_STATUS, type OperationStatus } from "../../../hooks/operationStatus";
 import {
   EPDM_MECH_KEYS,
@@ -23,7 +27,10 @@ export type RocketMotorCasingDeleteResponse = {
   status: string;
 };
 
-export type { RocketMotorCasingFormData, RocketMotorCasingFormPayload } from "./RocketMotorCasingFormModel";
+export type {
+  RocketMotorCasingFormData,
+  RocketMotorCasingFormPayload,
+} from "./RocketMotorCasingFormModel";
 export {
   buildCasingFormPayload,
   parseSectionsToFormData,
@@ -66,7 +73,8 @@ export function normalizeRocketCasingListStatus(status: string): OperationStatus
   const u = String(status ?? "").toUpperCase();
   const map: Record<string, OperationStatus> = {
     DRAFT: OPERATION_STATUS.IN_PROGRESS,
-    INITIATED: OPERATION_STATUS.INITIATED,
+    TO_BE_INITIATED: OPERATION_STATUS.TO_BE_INITIATED,
+    INITIATED: OPERATION_STATUS.TO_BE_INITIATED,
     IN_PROGRESS: OPERATION_STATUS.IN_PROGRESS,
     WAITING_FOR_APPROVAL: OPERATION_STATUS.WAITING_FOR_APPROVAL,
     APPROVED: OPERATION_STATUS.APPROVED,
@@ -78,7 +86,7 @@ export function normalizeRocketCasingListStatus(status: string): OperationStatus
   if (OPERATION_STATUS_VALUES.includes(trimmed as OperationStatus)) {
     return trimmed as OperationStatus;
   }
-  return OPERATION_STATUS.INITIATED;
+  return OPERATION_STATUS.TO_BE_INITIATED;
 }
 
 /** Column keys searched by the rocket motor casing list search bar */
@@ -120,7 +128,7 @@ export function rocketMotorCasingMatchesSearch(row: RocketMotorBatch, query: str
     if (!Number.isNaN(d.getTime())) {
       parts.push(
         d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
-        d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+        d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }),
       );
     }
   }
@@ -130,14 +138,14 @@ export function rocketMotorCasingMatchesSearch(row: RocketMotorBatch, query: str
 
 /** Draft/create responses may return the casing ID as `motorCasingId`, `formId`, or `procurementId` */
 export function resolveMotorCasingIdFromSubmitData(
-  data: { motorCasingId?: string; formId?: string; procurementId?: string } | null | undefined,
+  data: { motorCasingId?: string; formId?: string; sourcingId?: string } | null | undefined,
 ): string {
-  return String(data?.motorCasingId ?? data?.formId ?? data?.procurementId ?? "").trim();
+  return String(data?.motorCasingId ?? data?.formId ?? data?.sourcingId ?? "").trim();
 }
 
 export class RocketMotorCasingSubmitResponseModel {
   formId: string;
-  procurementId: string;
+  sourcingId: string;
   motorCasingId: string;
   status: string;
   nextStep: string;
@@ -146,7 +154,7 @@ export class RocketMotorCasingSubmitResponseModel {
 
   constructor(payload: {
     formId?: string;
-    procurementId?: string;
+    sourcingId?: string;
     motorCasingId?: string;
     status?: string;
     nextStep?: string;
@@ -154,10 +162,10 @@ export class RocketMotorCasingSubmitResponseModel {
     const resolvedMotorCasingId = resolveMotorCasingIdFromSubmitData(payload);
     this.motorCasingId = resolvedMotorCasingId;
     this.formId = String(payload?.formId ?? resolvedMotorCasingId);
-    this.procurementId = String(payload?.procurementId ?? payload?.formId ?? resolvedMotorCasingId);
+    this.sourcingId = String(payload?.sourcingId ?? payload?.formId ?? resolvedMotorCasingId);
     this.status = payload?.status ?? "";
     this.nextStep = payload?.nextStep ?? "";
-    this.batchId = this.procurementId || this.formId || resolvedMotorCasingId;
+    this.batchId = this.sourcingId || this.formId || resolvedMotorCasingId;
   }
 
   static fromApi(apiResponse: any): RocketMotorCasingSubmitResponseModel {
@@ -186,10 +194,9 @@ export class RocketMotorCasingDetailsModel {
     this.motorNo = this.motorId;
     this.motorCasingId = String(payload?.motorCasingId ?? "");
     this.status = String(payload?.status ?? "");
-    this.sections = (payload?.sections && typeof payload.sections === "object" ? payload.sections : {}) as Record<
-      string,
-      unknown
-    >;
+    this.sections = (
+      payload?.sections && typeof payload.sections === "object" ? payload.sections : {}
+    ) as Record<string, unknown>;
   }
 
   static fromApi(apiResponse: any): RocketMotorCasingDetailsModel {
@@ -228,13 +235,17 @@ const firstMech = (sections: Record<string, unknown>, name: string) => {
   const mr = sections.motorReceipt as Record<string, unknown> | undefined;
   const ins = mr?.insulation as Record<string, unknown> | undefined;
   const arr = ins?.mechanicalProperties as Array<Record<string, unknown>> | undefined;
-  const row = (arr ?? []).find((r) => String(r?.paramName ?? "").toLowerCase().includes(name.toLowerCase()));
+  const row = (arr ?? []).find((r) =>
+    String(r?.paramName ?? "")
+      .toLowerCase()
+      .includes(name.toLowerCase()),
+  );
   return row;
 };
 
 export function mergeApiSectionsIntoFormData(
   sections: Record<string, unknown>,
-  ids: { motorStage?: string; motorId?: string; motorCasingId?: string }
+  ids: { motorStage?: string; motorId?: string; motorCasingId?: string },
 ): RocketFormData {
   const mr = (sections.motorReceipt ?? {}) as Record<string, unknown>;
   const items = (mr.itemsReceived ?? {}) as Record<string, unknown>;
@@ -247,7 +258,9 @@ export function mergeApiSectionsIntoFormData(
   const ts = firstMech(sections, "tensile");
   const el = firstMech(sections, "elongation");
 
-  const dimApi = Array.isArray(sections.dimensionalInspection) ? sections.dimensionalInspection : [];
+  const dimApi = Array.isArray(sections.dimensionalInspection)
+    ? sections.dimensionalInspection
+    : [];
   const dimensionalData: DimensionalRow[] = dimApi.map((d: any) => ({
     paramId: String(d?.paramId ?? ""),
     paramName: "",
@@ -289,24 +302,35 @@ export function mergeApiSectionsIntoFormData(
     motorIdRemarks: INITIAL_ROCKET_FORM.motorIdRemarks,
     motorClearanceDetails: String(clear.greenCardNo ?? INITIAL_ROCKET_FORM.motorClearanceDetails),
     motorClearanceRemarks: INITIAL_ROCKET_FORM.motorClearanceRemarks,
-    tensileStrengthDetails: ts?.reported != null ? String(ts.reported) : INITIAL_ROCKET_FORM.tensileStrengthDetails,
-    tensileStrengthRemarks: ts?.acem != null ? String(ts.acem) : INITIAL_ROCKET_FORM.tensileStrengthRemarks,
-    elongationDetails: el?.reported != null ? String(el.reported) : INITIAL_ROCKET_FORM.elongationDetails,
+    tensileStrengthDetails:
+      ts?.reported != null ? String(ts.reported) : INITIAL_ROCKET_FORM.tensileStrengthDetails,
+    tensileStrengthRemarks:
+      ts?.acem != null ? String(ts.acem) : INITIAL_ROCKET_FORM.tensileStrengthRemarks,
+    elongationDetails:
+      el?.reported != null ? String(el.reported) : INITIAL_ROCKET_FORM.elongationDetails,
     elongationRemarks: el?.acem != null ? String(el.acem) : INITIAL_ROCKET_FORM.elongationRemarks,
-    erosionRateDetails: ar.value != null ? String(ar.value) : INITIAL_ROCKET_FORM.erosionRateDetails,
+    erosionRateDetails:
+      ar.value != null ? String(ar.value) : INITIAL_ROCKET_FORM.erosionRateDetails,
     erosionRateRemarks: String(ar.unit ?? INITIAL_ROCKET_FORM.erosionRateRemarks),
-    thermalConductivityDetails: tc.value != null ? String(tc.value) : INITIAL_ROCKET_FORM.thermalConductivityDetails,
+    thermalConductivityDetails:
+      tc.value != null ? String(tc.value) : INITIAL_ROCKET_FORM.thermalConductivityDetails,
     thermalConductivityRemarks: String(tc.unit ?? INITIAL_ROCKET_FORM.thermalConductivityRemarks),
     utNdtDetails: INITIAL_ROCKET_FORM.utNdtDetails,
     utNdtRemarks: INITIAL_ROCKET_FORM.utNdtRemarks,
-    waiversDetails: firstVis?.observation != null ? String(firstVis.observation) : INITIAL_ROCKET_FORM.waiversDetails,
-    waiversRemarks: firstVis?.desc != null ? String(firstVis.desc) : INITIAL_ROCKET_FORM.waiversRemarks,
+    waiversDetails:
+      firstVis?.observation != null
+        ? String(firstVis.observation)
+        : INITIAL_ROCKET_FORM.waiversDetails,
+    waiversRemarks:
+      firstVis?.desc != null ? String(firstVis.desc) : INITIAL_ROCKET_FORM.waiversRemarks,
     mediaFilePath: mediaRef ?? INITIAL_ROCKET_FORM.mediaFilePath,
     dimensionalData,
   };
 }
 
-function mechanicalRowsFromForm(form: RocketFormData): Array<{ paramName: string; reported: number; acem: number; unit: string }> {
+function mechanicalRowsFromForm(
+  form: RocketFormData,
+): Array<{ paramName: string; reported: number; acem: number; unit: string }> {
   const rows: Array<{ paramName: string; reported: number; acem: number; unit: string }> = [];
   const ts = parseNum(form.tensileStrengthDetails);
   const tsA = parseNum(form.tensileStrengthRemarks);
@@ -333,13 +357,18 @@ function mechanicalRowsFromForm(form: RocketFormData): Array<{ paramName: string
 
 export function buildRocketMotorCasingSectionsPayload(
   formData: RocketFormData,
-  dimensionalParameters: Array<{ paramId?: string; paramName?: string; referenceRange?: { unit?: string | null } }>,
-  options?: { includeVisualInspection?: boolean }
+  dimensionalParameters: Array<{
+    paramId?: string;
+    paramName?: string;
+    referenceRange?: { unit?: string | null };
+  }>,
+  options?: { includeVisualInspection?: boolean },
 ): Record<string, unknown> {
   const casingType = (formData.casingType || "COMPOSITE").toUpperCase();
   const receivingDate =
     (formData.receivingDate || "").trim() || new Date().toISOString().slice(0, 10);
-  const itemsDescription = (formData.itemsDescription || formData.motorIdDetails || "").trim() || "—";
+  const itemsDescription =
+    (formData.itemsDescription || formData.motorIdDetails || "").trim() || "—";
   const itemsDimension = (formData.itemsDimension || "—").trim();
   const itemsUnit = (formData.itemsUnit || "mm").trim();
 
@@ -361,9 +390,12 @@ export function buildRocketMotorCasingSectionsPayload(
   const dimensionalInspection = (formData.dimensionalData ?? []).map((row: any, idx: number) => {
     const param = dimensionalParameters[idx];
     const paramId = String(row?.paramId || param?.paramId || `DIM-${idx + 1}`);
-    const vals = [parseNum(row?.tb), parseNum(row?.rl), parseNum(row?.tlbr), parseNum(row?.trbl)].filter(
-      (n): n is number => n != null
-    );
+    const vals = [
+      parseNum(row?.tb),
+      parseNum(row?.rl),
+      parseNum(row?.tlbr),
+      parseNum(row?.trbl),
+    ].filter((n): n is number => n != null);
     const recordedValue = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
     const unit = String(row?.referenceRange?.unit || param?.referenceRange?.unit || "mm");
     return {
@@ -419,7 +451,9 @@ export function buildRocketMotorCasingSectionsPayload(
     const media =
       typeof formData.mediaFilePath === "string" && formData.mediaFilePath.trim()
         ? formData.mediaFilePath.trim()
-        : formData.mediaFilePath && typeof formData.mediaFilePath === "object" && "name" in formData.mediaFilePath
+        : formData.mediaFilePath &&
+            typeof formData.mediaFilePath === "object" &&
+            "name" in formData.mediaFilePath
           ? (formData.mediaFilePath as File).name
           : "pending-media-upload";
     sections.visualInspection = [{ desc, observation: obs, media }];
@@ -472,7 +506,7 @@ export const mapRocketFormToCasingPayload = (formData: RocketFormData, motorType
     mediaFilePath:
       formData.mediaFilePath && typeof formData.mediaFilePath !== "string"
         ? formData.mediaFilePath.name
-        : formData.mediaFilePath ?? null,
+        : (formData.mediaFilePath ?? null),
     dimensionalData,
   };
 };
@@ -517,7 +551,7 @@ export type RocketMotorCasingDetailsContext = {
   formId: string;
   projectId: string;
   motorCasingId: string;
-  procurementId: string;
+  sourcingId: string;
   motorStage: string;
   motorNo: string;
   casingType: string;
@@ -554,7 +588,9 @@ const formatReportedWithAcem = (reported: string, acem: string, unit: string) =>
   return parts.join(" · ");
 };
 
-const formatSpecRange = (ref: RocketMotorCasingFormData["dimensionalData"][0]["referenceRange"]) => {
+const formatSpecRange = (
+  ref: RocketMotorCasingFormData["dimensionalData"][0]["referenceRange"],
+) => {
   const { minValue, maxValue, unit, source } = ref;
   const range =
     minValue != null || maxValue != null
@@ -585,7 +621,11 @@ const MOCK_TRIAL_TABLE_SPECS: Record<
     columns: [
       { key: "srNo", label: "Sr. No." },
       { key: "mandrelRestOnDomeA", label: "Mandrel rest on dome of motor (A)", unit: "mm" },
-      { key: "mandrelRestOnBottomCupB", label: "Mandrel rest on bottom cup (with Teflon sleeve) (B)", unit: "mm" },
+      {
+        key: "mandrelRestOnBottomCupB",
+        label: "Mandrel rest on bottom cup (with Teflon sleeve) (B)",
+        unit: "mm",
+      },
       { key: "differenceC", label: "Difference C=(A-B)", unit: "mm" },
       { key: "bellowThicknessD", label: "Bellow Thickness (D)", unit: "mm" },
       { key: "mandrelLiftE", label: "Mandrel Lift E=(C-D)", unit: "mm" },
@@ -607,7 +647,11 @@ const MOCK_TRIAL_TABLE_SPECS: Record<
     title: "Mandrel Assembly",
     columns: [
       { key: "srNo", label: "Sr. No." },
-      { key: "readingWithoutCup", label: "Reading without cup (Mandrel resting on motor dome)", unit: "mm" },
+      {
+        key: "readingWithoutCup",
+        label: "Reading without cup (Mandrel resting on motor dome)",
+        unit: "mm",
+      },
       {
         key: "readingWithBottomCupAndGasket",
         label: "Reading with bottom cup & gaskets (after tightening the bottom cup)",
@@ -617,7 +661,9 @@ const MOCK_TRIAL_TABLE_SPECS: Record<
   },
 };
 
-const extractMockTrialSectionPayload = (section: SchemaSectionSubmission): Record<string, unknown> => {
+const extractMockTrialSectionPayload = (
+  section: SchemaSectionSubmission,
+): Record<string, unknown> => {
   const sectionData = Array.isArray(section.sectionData) ? section.sectionData : [];
   const first = sectionData[0];
   return first && typeof first === "object" ? (first as Record<string, unknown>) : {};
@@ -637,7 +683,8 @@ const extractMockTrialTableRows = (section: SchemaSectionSubmission): Record<str
   if (
     sectionData.length > 0 &&
     sectionData.every(
-      (row) => row && typeof row === "object" && !("castingStation" in (row as Record<string, unknown>)),
+      (row) =>
+        row && typeof row === "object" && !("castingStation" in (row as Record<string, unknown>)),
     )
   ) {
     return sectionData as Record<string, unknown>[];
@@ -698,7 +745,9 @@ const buildMockTrialDetailContent = (
 };
 
 /** Read-only document blocks from parsed API form data (v2 sections) */
-export function mapCasingFormDataToDetailBlocks(form: RocketMotorCasingFormData): CasingDetailBlock[] {
+export function mapCasingFormDataToDetailBlocks(
+  form: RocketMotorCasingFormData,
+): CasingDetailBlock[] {
   const mechKeyDefs = form.insulationType === "EPDM" ? EPDM_MECH_KEYS : ROCASIN_MECH_KEYS;
   const mechRows = mechKeyDefs
     .map((def) => {
@@ -720,10 +769,7 @@ export function mapCasingFormDataToDetailBlocks(form: RocketMotorCasingFormData)
     const reported = (r.reported ?? "").trim();
     const acem = (r.acemSpec ?? "").trim();
     if (!reported && !acem) return null;
-    return detailRow(
-      def.label,
-      formatReportedWithAcem(reported, acem, r.unit || def.unit) || "—",
-    );
+    return detailRow(def.label, formatReportedWithAcem(reported, acem, r.unit || def.unit) || "—");
   }).filter((r): r is NonNullable<typeof r> => r != null);
 
   const insulationRows: CasingDetailBlock["rows"] = [
@@ -741,16 +787,16 @@ export function mapCasingFormDataToDetailBlocks(form: RocketMotorCasingFormData)
   const visualRows =
     form.visualInspection?.length > 0
       ? form.visualInspection.flatMap((v) => {
-        const base = detailRow(v.description || v.itemKey, v.observations, v.remark);
-        const mediaRow = v.mediaExisting
-          ? detailRow("Attached media", v.mediaExisting.fileName)
-          : null;
-        const subRows =
-          v.subItems?.map((s) =>
-            detailRow(s.description || s.itemKey, s.observations, s.remark)
-          ) ?? [];
-        return [base, ...(mediaRow ? [mediaRow] : []), ...subRows];
-      })
+          const base = detailRow(v.description || v.itemKey, v.observations, v.remark);
+          const mediaRow = v.mediaExisting
+            ? detailRow("Attached media", v.mediaExisting.fileName)
+            : null;
+          const subRows =
+            v.subItems?.map((s) =>
+              detailRow(s.description || s.itemKey, s.observations, s.remark),
+            ) ?? [];
+          return [base, ...(mediaRow ? [mediaRow] : []), ...subRows];
+        })
       : [detailRow("No visual inspection recorded", "—")];
 
   const dimensionalTable = mapDimensionalTableRows(form);
@@ -763,9 +809,7 @@ export function mapCasingFormDataToDetailBlocks(form: RocketMotorCasingFormData)
         detailRow("Project ID", form.projectId),
         detailRow("Motor stage", form.motorStageApi),
         detailRow("Motor ID", form.motorId),
-        ...(form.motorCasingId
-          ? [detailRow("Motor casing ID", form.motorCasingId)]
-          : []),
+        ...(form.motorCasingId ? [detailRow("Motor casing ID", form.motorCasingId)] : []),
         detailRow("Casing type", form.casingType),
         detailRow("Receiving date", form.receivingDate),
         detailRow("Item type / description", form.itemsDescription),
@@ -812,8 +856,14 @@ export function mapCasingFormDataToDetailBlocks(form: RocketMotorCasingFormData)
     {
       material: "Weighment",
       rows: [
-        detailRow("Weight without harness", form.weightWithoutHarness ? `${form.weightWithoutHarness} kg` : "—"),
-        detailRow("Weight with harness", form.weightWithHarness ? `${form.weightWithHarness} kg` : "—"),
+        detailRow(
+          "Weight without harness",
+          form.weightWithoutHarness ? `${form.weightWithoutHarness} kg` : "—",
+        ),
+        detailRow(
+          "Weight with harness",
+          form.weightWithHarness ? `${form.weightWithHarness} kg` : "—",
+        ),
         detailRow("Weighscale equipment", form.weighscaleEquipment),
         detailRow("Calibration due date", form.calibrationDueDate),
       ],
@@ -826,12 +876,12 @@ export function mapCasingFormDataToDetailBlocks(form: RocketMotorCasingFormData)
     },
     ...(form.mockTrial?.savedSections && form.mockTrial.savedSections.length > 0
       ? [
-        {
-          material: "Mock trial",
-          ...buildMockTrialDetailContent(form.mockTrial.savedSections),
-          _columns: CASING_DETAIL_COLS,
-        },
-      ]
+          {
+            material: "Mock trial",
+            ...buildMockTrialDetailContent(form.mockTrial.savedSections),
+            _columns: CASING_DETAIL_COLS,
+          },
+        ]
       : []),
   ];
 

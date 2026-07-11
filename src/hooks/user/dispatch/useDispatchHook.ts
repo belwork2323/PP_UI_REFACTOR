@@ -8,32 +8,42 @@ import {
   DispatchDetailsModel,
 } from "../../../data/models/user/DispatchApiModel";
 import {
+  appendDispatchMotorToState,
   createDefaultDispatchFormState,
   hasAnyDispatchValue,
-  hydrateDispatchFormState,
   mapDispatchFormStateToBackendPayload,
   mapDispatchFormStateToUpdatePayload,
   type DispatchFormState,
 } from "../../../data/models/user/DispatchFormModel";
 import { fetchDispatchSchema, type SchemaFormValues } from "../../../schema-engine";
 import {
-  canLoadDispatchForm,
+  type DispatchAddedMotor,
   type DispatchBatch,
+  normalizeDispatchMotorStage,
+  parseDispatchMotorIds,
 } from "./dispatchFlowConfig";
 import { OPERATION_STATUS } from "../../operationStatus";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 
 type WorkflowView = "list" | "form" | "details";
 
-const normalizeBatch = (batch: any): DispatchBatch => ({
-  ...batch,
-  projectId: batch?.projectId ?? batch?.projectName ?? "",
-  projectName: batch?.projectName ?? batch?.projectId ?? "",
-  dispatchStatus: batch?.dispatchStatus ?? batch?.status ?? OPERATION_STATUS.INITIATED,
-  formId: batch?.formId ?? null,
-  motorStage: batch?.motorStage ?? batch?.motorType ?? "",
-  rejectionReason: batch?.rejectionReason ?? null,
-});
+const normalizeBatch = (batch: any): DispatchBatch => {
+  const motorIds = Array.isArray(batch?.motorIds)
+    ? batch.motorIds.map((id: unknown) => String(id).trim()).filter(Boolean)
+    : parseDispatchMotorIds(batch?.motorId);
+
+  return {
+    ...batch,
+    projectId: batch?.projectId ?? batch?.projectName ?? "",
+    projectName: batch?.projectName ?? batch?.projectId ?? "",
+    dispatchStatus: batch?.dispatchStatus ?? batch?.status ?? OPERATION_STATUS.TO_BE_INITIATED,
+    formId: batch?.formId ?? null,
+    motorIds,
+    motorId: motorIds.length > 0 ? motorIds.join(", ") : String(batch?.motorId ?? "").trim(),
+    motorStage: normalizeDispatchMotorStage(batch?.motorStage ?? batch?.motorType),
+    rejectionReason: batch?.rejectionReason ?? null,
+  };
+};
 
 export const useDispatchHook = () => {
   const listParams = useSubdepartmentBatches("dispatch");
@@ -66,6 +76,17 @@ export const useDispatchHook = () => {
 
   const [formData, setFormData] = useState<DispatchFormState>(() => createDefaultDispatchFormState());
   const [initialSnapshot, setInitialSnapshot] = useState("{}");
+  const [draftMotorId, setDraftMotorId] = useState("");
+
+  const addedMotors = useMemo<DispatchAddedMotor[]>(
+    () => (formData.motors ?? []).map((motor) => ({ motorId: motor.motorId })),
+    [formData.motors],
+  );
+
+  const resetFlowDraft = useCallback(() => {
+    setDraftMotorId("");
+    setSchemaError(null);
+  }, []);
 
   const batches = useMemo(
     () => (listParams.batches ?? []).map(normalizeBatch),
@@ -77,6 +98,27 @@ export const useDispatchHook = () => {
   const isFormDirty = useMemo(
     () => view === "form" && formSnapshot !== initialSnapshot,
     [view, formSnapshot, initialSnapshot],
+  );
+
+  const isUpdateMode = useMemo(() => Boolean(activeBatch?.formId), [activeBatch?.formId]);
+
+  const canSaveDraft = useMemo(() => {
+    if (isUpdateMode) return true;
+    return (
+      formData.schemaFormLoaded &&
+      Boolean(formData.dispatchSchema) &&
+      (formData.motors ?? []).length > 0 &&
+      hasAnyDispatchValue(formData)
+    );
+  }, [formData, isUpdateMode]);
+
+  const canSubmit = useMemo(
+    () =>
+      formData.schemaFormLoaded &&
+      Boolean(formData.dispatchSchema) &&
+      (formData.motors ?? []).length > 0 &&
+      hasAnyDispatchValue(formData),
+    [formData],
   );
 
   const resetFormContext = useCallback(() => {
@@ -94,7 +136,8 @@ export const useDispatchHook = () => {
     setHasSavedDraft(false);
     setDetailsRow(null);
     setDetailsData(null);
-  }, []);
+    resetFlowDraft();
+  }, [resetFlowDraft]);
 
   const getErrorMessage = (response: any, fallbackMessage: string) => {
     if (response?.error?.details) return response.error.details;
@@ -128,11 +171,12 @@ export const useDispatchHook = () => {
     <K extends keyof DispatchFormState>(field: K, value: DispatchFormState[K]) => {
       setFormData((prev) => {
         const next = { ...prev, [field]: value };
-        if (field === "motorStage") {
-          next.motorId = "";
+        const hasMotors = (prev.motors ?? []).length > 0;
+
+        if (field === "motorStage" && !hasMotors) {
+          next.motors = [];
           next.schemaFormLoaded = false;
           next.dispatchSchema = null;
-          next.schemaFormValues = {};
         }
         if (field === "ndtClearance" && value !== "YES") {
           next.ndtMomNo = "";
@@ -140,41 +184,68 @@ export const useDispatchHook = () => {
         if (field === "finalAcceptanceClearance" && value !== "YES") {
           next.finalAcceptanceMomNo = "";
         }
-        if (
-          [
-            "motorStage",
-            "motorId",
-            "castingDate",
-            "dispatchDate",
-            "dispatchLocation",
-            "ndtClearance",
-            "ndtMomNo",
-            "finalAcceptanceClearance",
-            "finalAcceptanceMomNo",
-          ].includes(field as string)
-        ) {
-          next.schemaFormLoaded = false;
-          next.dispatchSchema = null;
-          next.schemaFormValues = {};
-        }
         return next;
       });
+
+      if (field === "motorStage") {
+        setDraftMotorId("");
+      }
     },
     [],
   );
 
+  const appendMotorToForm = useCallback(
+    async (motorId: string, savedSchemaValues?: Record<string, unknown>) => {
+      const trimmedId = String(motorId ?? "").trim();
+      if (!trimmedId) return false;
+
+      const schema = formData.dispatchSchema ?? (await fetchDispatchSchemaDocument());
+      if (!schema) return false;
+
+      setFormData((prev) => appendDispatchMotorToState(prev, schema, trimmedId, savedSchemaValues));
+      resetFlowDraft();
+      return true;
+    },
+    [fetchDispatchSchemaDocument, formData.dispatchSchema, resetFlowDraft],
+  );
+
   const handleLoadDispatchForm = useCallback(async () => {
-    if (!canLoadDispatchForm(formData)) return;
+    if (addedMotors.length > 0) return false;
+    return appendMotorToForm(draftMotorId);
+  }, [addedMotors.length, appendMotorToForm, draftMotorId]);
 
-    const schema = await fetchDispatchSchemaDocument();
-    if (!schema) return;
+  const handleAddDispatchMotor = useCallback(async () => {
+    if (addedMotors.length === 0) return false;
+    return appendMotorToForm(draftMotorId);
+  }, [addedMotors.length, appendMotorToForm, draftMotorId]);
 
-    setFormData((prev) => hydrateDispatchFormState(prev, schema));
-  }, [fetchDispatchSchemaDocument, formData]);
-
-  const handleFormValuesChange = useCallback((values: SchemaFormValues) => {
-    setFormData((prev) => ({ ...prev, schemaFormValues: values }));
+  const handleDraftMotorIdChange = useCallback((value: string) => {
+    setDraftMotorId(value);
   }, []);
+
+  const handleFormValuesChange = useCallback((motorId: string, values: SchemaFormValues) => {
+    setFormData((prev) => ({
+      ...prev,
+      motors: (prev.motors ?? []).map((motor) =>
+        motor.motorId === motorId ? { ...motor, schemaFormValues: values } : motor,
+      ),
+    }));
+  }, []);
+
+  const handleRemoveMotor = useCallback(
+    (motorId: string) => {
+      setFormData((prev) => {
+        const nextMotors = (prev.motors ?? []).filter((motor) => motor.motorId !== motorId);
+        return {
+          ...prev,
+          motors: nextMotors,
+          schemaFormLoaded: nextMotors.length > 0,
+        };
+      });
+      resetFlowDraft();
+    },
+    [resetFlowDraft],
+  );
 
   const openFormWithResolvedData = useCallback(
     async (batch: DispatchBatch, editMode: boolean) => {
@@ -220,8 +291,7 @@ export const useDispatchHook = () => {
       } else {
         resolvedData = {
           ...resolvedData,
-          motorStage: String(batch.motorStage ?? batch.motorType ?? ""),
-          motorId: String(batch.motorId ?? ""),
+          motorStage: normalizeDispatchMotorStage(batch.motorStage ?? batch.motorType),
         };
       }
 
@@ -233,11 +303,26 @@ export const useDispatchHook = () => {
       setFormData(resolvedData);
       setIsEditMode(editMode);
       setView("form");
+      resetFlowDraft();
 
-      if (resolvedData.savedSchemaValues || shouldFetchDetails) {
+      if (resolvedData.motors.length > 0) {
         const schema = await fetchDispatchSchemaDocument();
         if (schema) {
-          const hydrated = hydrateDispatchFormState(resolvedData, schema);
+          let hydrated: DispatchFormState = {
+            ...resolvedData,
+            motors: [],
+            dispatchSchema: schema,
+            schemaFormLoaded: false,
+          };
+          for (const motor of resolvedData.motors) {
+            hydrated = appendDispatchMotorToState(
+              hydrated,
+              schema,
+              motor.motorId,
+              motor.savedSchemaValues,
+              motor.setup,
+            );
+          }
           setFormData(hydrated);
           setInitialSnapshot(JSON.stringify(hydrated));
           return;
@@ -246,7 +331,7 @@ export const useDispatchHook = () => {
 
       setInitialSnapshot(JSON.stringify(resolvedData));
     },
-    [fetchDispatchSchemaDocument, messages.DETAILS_FETCH_ERROR, messages.DETAILS_NOT_FOUND, messages.FORM_ID_MISSING, messages.SUB_DEPARTMENT_MISSING, showAlert, subDepartmentId],
+    [fetchDispatchSchemaDocument, messages.DETAILS_FETCH_ERROR, messages.DETAILS_NOT_FOUND, messages.FORM_ID_MISSING, messages.SUB_DEPARTMENT_MISSING, resetFlowDraft, showAlert, subDepartmentId],
   );
 
   const handleViewDispatchDetails = useCallback(
@@ -320,21 +405,31 @@ export const useDispatchHook = () => {
         return false;
       }
 
-      if (!formData.schemaFormLoaded || !formData.dispatchSchema) {
-        showAlert(messages.SCHEMA_NOT_LOADED, "warning");
-        return false;
+      if (intent === "submit") {
+        if (!formData.schemaFormLoaded || !formData.dispatchSchema || (formData.motors ?? []).length === 0) {
+          showAlert(messages.SCHEMA_NOT_LOADED, "warning");
+          return false;
+        }
+        if (!hasAnyDispatchValue(formData)) {
+          showAlert(messages.EMPTY_FORM_ERROR, "warning");
+          return false;
+        }
+      } else if (!isUpdateMode) {
+        if (!formData.schemaFormLoaded || !formData.dispatchSchema || (formData.motors ?? []).length === 0) {
+          showAlert(messages.SCHEMA_NOT_LOADED, "warning");
+          return false;
+        }
+        if (!hasAnyDispatchValue(formData)) {
+          showAlert(messages.EMPTY_FORM_ERROR, "warning");
+          return false;
+        }
       }
 
-      if (!hasAnyDispatchValue(formData)) {
-        showAlert(messages.EMPTY_FORM_ERROR, "warning");
-        return false;
-      }
-
-      const submissionMode: "DRAFT" | "SUBMIT" = 
+      const submissionMode: "DRAFT" | "SUBMIT" =
         intent === "draft" ? "DRAFT" : "SUBMIT";
 
       const isCreateFlow =
-        activeBatch.dispatchStatus === OPERATION_STATUS.INITIATED && !activeBatch.formId;
+        activeBatch.dispatchStatus === OPERATION_STATUS.TO_BE_INITIATED && !activeBatch.formId;
 
       // Conditional payload assembly logic matching mapping architecture
       let mappedPayload;
@@ -405,7 +500,7 @@ export const useDispatchHook = () => {
         setActionLoading(false);
       }
     },
-    [activeBatch, subDepartmentId, formData, messages, formSnapshot, showAlert, listParams, resetFormContext],
+    [activeBatch, subDepartmentId, formData, isUpdateMode, messages, formSnapshot, showAlert, listParams, resetFormContext],
   );
 
   const handleSaveDraft = useCallback(async () => submitForm("draft"), [submitForm]);
@@ -413,13 +508,19 @@ export const useDispatchHook = () => {
 
   return {
     ...listParams,
-    loading: listParams.loading || loadingFormDetails,
+    loading: listParams.loading,
+    loadingFormDetails,
     batches,
     view,
     activeBatch,
     isEditMode,
     formData,
     isFormDirty,
+    isUpdateMode,
+    canSaveDraft,
+    canSubmit,
+    draftMotorId,
+    addedMotors,
     schemaLoading,
     schemaError,
     actionLoading,
@@ -431,8 +532,11 @@ export const useDispatchHook = () => {
     handleDiscardAndBack,
     setBackConfirmOpen,
     updateSetupField,
+    handleDraftMotorIdChange,
     handleLoadDispatchForm,
+    handleAddDispatchMotor,
     handleFormValuesChange,
+    handleRemoveMotor,
     handleSaveDraft,
     handleSubmit,
     detailsRow,

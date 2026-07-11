@@ -5,7 +5,10 @@ import { normalizeRawMaterialStatus } from "../user/RawMaterialProcurementModel"
 export const RAW_MATERIAL_APPROVER_STATUS_TABS = Object.values(OPERATION_STATUS);
 
 /** Map UI status tab label to API request value (e.g. Approved → APPROVED). */
-export function toRawMaterialApproverListApiStatus(status: string, allLabel: string): string | null {
+export function toRawMaterialApproverListApiStatus(
+  status: string,
+  allLabel: string,
+): string | null {
   return toOperationStatusApiValue(status, allLabel);
 }
 
@@ -23,7 +26,14 @@ export function mapRawMaterialApproverStatusCountsForUi(
   };
 
   const byLabel: Record<string, number> = {
-    [OPERATION_STATUS.INITIATED]: pick("initiated", "Initiated", "INITIATED"),
+    [OPERATION_STATUS.TO_BE_INITIATED]: pick(
+      "toBeInitiated",
+      "TO_BE_INITIATED",
+      "To Be Initiated",
+      "initiated",
+      "Initiated",
+      "INITIATED",
+    ),
     [OPERATION_STATUS.IN_PROGRESS]: pick("inProgress", "In Progress", "IN_PROGRESS"),
     [OPERATION_STATUS.WAITING_FOR_APPROVAL]: pick(
       "waitingForApproval",
@@ -45,7 +55,7 @@ export function mapRawMaterialApproverStatusCountsForUi(
 
 export type RawMaterialProcurementApproverLotRow = {
   lotId: string;
-  procurementId: string;
+  sourcingId: string;
   materialCode: string;
   materialName: string;
   supplyOrderNo: string;
@@ -83,13 +93,13 @@ export const mapRawMaterialProcurementApproverLotRow = (
   lot: Record<string, unknown>,
 ): RawMaterialProcurementApproverLotRow => {
   const lotId = String(lot.lotId ?? "").trim();
-  const procurementId = String(lot.procurementId ?? "").trim();
+  const sourcingId = String(lot.sourcingId ?? "").trim();
   const materialCode = String(lot.materialCode ?? "").trim();
   const materialName = String(lot.materialName ?? materialCode).trim();
 
   return {
     lotId,
-    procurementId,
+    sourcingId,
     materialCode,
     materialName,
     supplyOrderNo: String(lot.supplyOrderNo ?? "").trim(),
@@ -114,7 +124,7 @@ export const mapRawMaterialProcurementApproverListItem = (
 ) => ({
   id: lot.lotId || index + 1,
   lotId: lot.lotId,
-  procurementId: lot.procurementId,
+  sourcingId: lot.sourcingId,
   batchId: lot.lotId,
   formId: lot.lotId,
   materialCode: lot.materialCode,
@@ -151,7 +161,9 @@ export const RawMaterialProcurementApproverListModel = {
       pagination: {
         page: Number((data.pagination as Record<string, unknown>)?.page ?? 1),
         limit: Number((data.pagination as Record<string, unknown>)?.limit ?? 10),
-        totalRecords: Number((data.pagination as Record<string, unknown>)?.totalRecords ?? lots.length),
+        totalRecords: Number(
+          (data.pagination as Record<string, unknown>)?.totalRecords ?? lots.length,
+        ),
         totalPages: Number((data.pagination as Record<string, unknown>)?.totalPages ?? 1),
       },
     };

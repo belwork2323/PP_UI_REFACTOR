@@ -174,7 +174,7 @@ export const STRINGS = {
 
     // Sub-department dropdown options
     DEPARTMENTS: [
-      { value: "raw-material", label: "Raw Material Procurement" },
+      { value: "raw-material", label: "Raw Material Sourcing" },
       { value: "rocket-motor", label: "Rocket Motor Casing" },
     ],
   },
@@ -218,6 +218,7 @@ export const STRINGS = {
     },
 
     BATCH_DETAILS: {
+      BATCH_STATUS: "Batch Status",
       MOTOR_ID: "Motor ID",
       MOTOR_TYPE: "Motor Type",
       BATCH_TYPE: "Batch Type",
@@ -325,7 +326,7 @@ export const STRINGS = {
       MEDIA: "Media",
     },
     RAW_MATERIAL: {
-      TITLE: "Raw Material Procurement",
+      TITLE: "Raw Material Sourcing",
       SHORT_DESCRIPTION: "Register new material lots, update partner details.",
       NEW_SUBMISSION: "New Submission",
       FORM_HEADER_CREATE_LOT_TITLE: "Create Lot",
@@ -375,7 +376,7 @@ export const STRINGS = {
       COL_RM_STATUS: "RM Status",
       COL_STAGE_STATUS: "Stage Status",
       COL_LOT_ID: "Lot ID",
-      COL_PROCUREMENT_ID: "Procurement ID",
+      COL_SOURCING_ID: "Sourcing ID",
       COL_MATERIAL_CODE: "Material",
       COL_MATERIAL_NAME: "Material name",
       COL_SUPPLY_ORDER: "Supply order",
@@ -396,10 +397,10 @@ export const STRINGS = {
       VIEW_LOT_DETAILS: "View lot details",
       VIEW_LOT_DETAILS_TOOLTIP: "View submitted lot specifications",
       LOT_DETAILS_TITLE: "Lot submission record",
-      LOT_DETAILS_SUBTITLE: "Read-only view of submitted procurement and quality data",
+      LOT_DETAILS_SUBTITLE: "Read-only view of submitted sourcing and quality data",
       LOT_DETAILS_LOADING: "Loading lot details…",
       LOT_DETAILS_EMPTY: "No specification data recorded for this lot.",
-      LOT_DETAILS_PROCUREMENT_SECTION: "Procurement details",
+      LOT_DETAILS_PROCUREMENT_SECTION: "Sourcing details",
       LOT_DETAILS_SPEC_SECTION: "Quality specifications",
       LOT_DETAILS_CERTIFICATES_SECTION: "Certificates & attachments",
       LOT_DETAILS_NO_CERTIFICATES: "No certificates attached.",
@@ -483,13 +484,13 @@ export const STRINGS = {
       BATCH_ID_MISSING: "Unable to create form. Batch ID is missing.",
       SUB_DEPARTMENT_MISSING: "Unable to proceed. Sub-department context is missing.",
       EMPTY_FORM_ERROR: "Add at least one material and specification before saving.",
-      CREATE_FAILED: "Failed to create raw material procurement form.",
-      UPDATE_FAILED: "Failed to update raw material procurement form.",
+      CREATE_FAILED: "Failed to create raw material sourcing form.",
+      UPDATE_FAILED: "Failed to update raw material sourcing form.",
       DETAILS_NOT_FOUND: "No saved form data found for this submission.",
-      CREATE_DRAFT_SUCCESS: "Raw material procurement draft created successfully.",
-      CREATE_SUBMIT_SUCCESS: "Raw material procurement submitted for approval successfully.",
-      UPDATE_DRAFT_SUCCESS: "Raw material procurement draft updated successfully.",
-      UPDATE_SUBMIT_SUCCESS: "Raw material procurement updated for approval successfully.",
+      CREATE_DRAFT_SUCCESS: "Raw material sourcing draft created successfully.",
+      CREATE_SUBMIT_SUCCESS: "Raw material sourcing submitted for approval successfully.",
+      UPDATE_DRAFT_SUCCESS: "Raw material sourcing draft updated successfully.",
+      UPDATE_SUBMIT_SUCCESS: "Raw material sourcing updated for approval successfully.",
       EDIT_MODE_BANNER:
         "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
       SPEC_STATUS_OUT_OF_RANGE: "Out of Range",
@@ -1883,6 +1884,13 @@ export const STRINGS = {
       "You have unsaved dispatch changes. Save as draft to avoid losing your data.",
     UNSAVED_BACK_CONFIRM: "Go back to Form",
     UNSAVED_BACK_DISCARD: "Discard Changes",
+    DELETE_MOTOR_TOOLTIP: "Remove motor",
+    MOTOR_CARD_TITLE: "Motor",
+    DETAILS_BATCH_SECTION: "Batch information",
+    DETAILS_FORM_SECTION: "Dispatch form details",
+    DETAILS_MOTOR_NAV_HINT: "Click a motor tab below to view its dispatch details.",
+    DETAILS_NO_MOTOR_DATA: "No form data recorded for this motor.",
+    DETAILS_NO_FORM_DATA: "No form data recorded",
   },
   APPROVER: {
     COMMON: {
@@ -1956,7 +1964,7 @@ export const STRINGS = {
       SECTION_TITLE: "Sub-Department Queues",
       SOURCING: {
         DEPARTMENT_NAME: "Sourcing Department",
-        RAW_MATERIAL_LABEL: "Raw Material Procurement",
+        RAW_MATERIAL_LABEL: "Raw Material Sourcing",
         RAW_MATERIAL_DESCRIPTION:
           "Procurement approvals, material traceability and vendor clearance records",
         RAW_MATERIAL_SECTION: "Raw Material Submissions",
@@ -2354,9 +2362,10 @@ export const STRINGS = {
     },
     TABLE_COLS: [
       "Batch ID",
-      "Motor ID",
+      "Project ID",
       "Motor Stage",
-      "Stage",
+      "Motor ID",
+      "Processing Stage",
       "Status",
       "Priority",
       "System Manager",

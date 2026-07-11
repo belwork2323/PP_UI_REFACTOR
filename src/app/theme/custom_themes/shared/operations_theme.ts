@@ -249,11 +249,11 @@ export const getOperationsTheme = (mode = "light") => {
         Low: { color: isDark ? "#b0bec5" : "#2E4053", bg: alpha(isDark ? "#b0bec5" : "#5D6D7E", 0.08), border: alpha(isDark ? "#b0bec5" : "#5D6D7E", 0.2) },
       } as Record<string, { color: string; bg: string; border: string }>,
       statusConfig: {
-        ["Initiated"]: {
+        ["To Be Initiated"]: {
           color: isDark ? "#b0bec5" : "#475569",
           bg: alpha(isDark ? "#b0bec5" : "#475569", 0.08),
           border: alpha(isDark ? "#b0bec5" : "#475569", 0.2),
-          label: "Initiated",
+          label: "To Be Initiated",
         },
         ["In Progress"]: {
           color: palette.primaryLight,

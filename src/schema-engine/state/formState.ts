@@ -109,6 +109,74 @@ export const buildTableRows = (table: SchemaTableBlock): Record<string, unknown>
   return applyRowComputations(built, table);
 };
 
+const findStaticDataColumnId = (table: SchemaTableBlock): string | null => {
+  const autoKey = table.rows?.autoIncrementKey ?? "srNo";
+  const col = flattenTableColumns(table.columns).find(
+    (column) => column.fieldType === "static" && column.id !== autoKey,
+  );
+  return col?.id ?? null;
+};
+
+const isHeaderTableRow = (row: Record<string, unknown>) => row._rowType === "header";
+
+const mergeSavedRowValuesIntoPreset = (
+  target: Record<string, unknown>,
+  source: Record<string, unknown>,
+) => {
+  Object.entries(source).forEach(([key, value]) => {
+    if (TABLE_ROW_RUNTIME_KEYS.has(key) || key.endsWith("__fieldType")) return;
+    if (/^(sr[_-]?no|serial)$/i.test(key)) return;
+    target[key] = value;
+  });
+};
+
+/** Merge API/submission row data into the server schema preset table structure. */
+export const mergeSavedRowsIntoPresetTable = (
+  table: SchemaTableBlock,
+  savedRows: unknown,
+): Record<string, unknown>[] => {
+  const saved = (Array.isArray(savedRows) ? savedRows : []) as Record<string, unknown>[];
+  const presetBuilt = buildTableRows(table);
+  if (!table.rows?.presetRows?.length || !saved.length) {
+    return presetBuilt;
+  }
+
+  const staticCol = findStaticDataColumnId(table);
+  const autoKey = table.rows?.autoIncrementKey ?? "srNo";
+  const byStatic = new Map<string, Record<string, unknown>>();
+  const bySrNo = new Map<string, Record<string, unknown>>();
+
+  saved.forEach((row) => {
+    if (isHeaderTableRow(row)) return;
+    if (staticCol) {
+      const key = String(row[staticCol] ?? "").trim();
+      if (key) byStatic.set(key, row);
+    }
+    const srNo = row[autoKey];
+    if (srNo != null && String(srNo).trim() !== "") {
+      bySrNo.set(String(srNo), row);
+    }
+  });
+
+  return presetBuilt.map((presetRow) => {
+    if (isHeaderTableRow(presetRow)) return presetRow;
+
+    let savedRow: Record<string, unknown> | undefined;
+    if (staticCol) {
+      const key = String(presetRow[staticCol] ?? "").trim();
+      if (key) savedRow = byStatic.get(key);
+    }
+    if (!savedRow) {
+      savedRow = bySrNo.get(String(presetRow[autoKey] ?? ""));
+    }
+    if (!savedRow) return presetRow;
+
+    const next = { ...presetRow };
+    mergeSavedRowValuesIntoPreset(next, savedRow);
+    return next;
+  });
+};
+
 const initRepeatChildValues = (
   children: SchemaBlock[],
   setupContext?: SchemaSetupContext,
@@ -216,7 +284,12 @@ const hydrateTableValue = (
   value: unknown,
   columnState?: SchemaTableColumnState,
 ): unknown => {
-  let hydrated = rehydrateDynamicTableColumnState(table, value, columnState);
+  let input = value;
+  if (table.rows?.presetRows?.length && Array.isArray(value) && !isWrappedTableValue(value)) {
+    input = mergeSavedRowsIntoPresetTable(table, value);
+  }
+
+  let hydrated = rehydrateDynamicTableColumnState(table, input, columnState);
 
   if (hasTableCommitGroup(table)) {
     if (isWrappedTableValue(hydrated)) {

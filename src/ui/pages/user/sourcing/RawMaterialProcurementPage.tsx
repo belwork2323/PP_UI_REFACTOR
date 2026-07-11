@@ -52,9 +52,7 @@ const RawMaterialProcurement = () => {
 
   return (
     <Box sx={theme.workflow.animatedContainer}>
-      {view === "list" && (
-        <RawMaterialBatchList hookState={hookState} />
-      )}
+      {view === "list" && <RawMaterialBatchList hookState={hookState} />}
 
       {view === "details" && detailsRow && (
         <RawMaterialLotDetailsView
@@ -78,7 +76,7 @@ const RawMaterialProcurement = () => {
 
           {!loadingFormDetails && (
             <SpecificationFormBuilder
-              key={`rm-spec-${formEntryMode}-${activeBatch.lotId || activeBatch.procurementId || "new"}`}
+              key={`rm-spec-${formEntryMode}-${activeBatch.lotId || activeBatch.sourcingId || "new"}`}
               initialBlocks={formEntryMode === "create" ? [] : formBlocks}
               isEditMode={isEditMode}
               createLotMode={formEntryMode === "create"}

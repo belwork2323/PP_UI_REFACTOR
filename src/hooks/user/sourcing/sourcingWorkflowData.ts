@@ -47,7 +47,7 @@ export type RocketFormData = {
 export type RocketMotorBatch = {
   id: number | string;
   formId?: string | null;
-  procurementId?: string | null;
+  sourcingId?: string | null;
   motorCasingId?: string;
   projectId?: string;
   motorStage?: string;
@@ -75,7 +75,7 @@ export function createEmptyRocketMotorBatch(): RocketMotorBatch {
   return {
     id: "new",
     formId: null,
-    procurementId: null,
+    sourcingId: null,
     motorCasingId: "",
     projectId: "",
     motorStage: "",
@@ -87,7 +87,7 @@ export function createEmptyRocketMotorBatch(): RocketMotorBatch {
     priority: "Medium",
     assignedTo: null,
     createdOn: new Date().toISOString(),
-    rmStatus: SOURCING_STATUS.INITIATED,
+    rmStatus: SOURCING_STATUS.TO_BE_INITIATED,
     draftData: null,
     rejectionReason: null,
   };
@@ -102,7 +102,7 @@ export function applyRocketMotorCasingIdentity(
       | "motorCasingId"
       | "motorId"
       | "formId"
-      | "procurementId"
+      | "sourcingId"
       | "rmStatus"
       | "motorStage"
       | "motorNo"
@@ -162,6 +162,6 @@ export const INITIAL_ROCKET_FORM: RocketFormData = {
 };
 
 export const SUB_DEPT_LABELS: Record<string, string> = {
-  "raw-material": "Raw Material Procurement",
+  "raw-material": "Raw Material Sourcing",
   "rocket-motor": "Rocket Motor Casing",
 };

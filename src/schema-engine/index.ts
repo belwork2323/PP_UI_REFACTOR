@@ -18,6 +18,7 @@ export * from "./types";
 export type { SchemaFormValues, SchemaSectionSubmission } from "./state/formState";
 export {
   buildInitialFormValues,
+  mergeSavedRowsIntoPresetTable,
   mergeSectionDataIntoValues,
   toSectionSubmissions,
   schemaValuesHaveUserData,
@@ -219,6 +220,8 @@ export {
   createDispatchInitialValues,
   hydrateDispatchValuesFromSections,
   buildDispatchSectionPayload,
+  mapDispatchDetailsToSchemaValues,
+  mapDispatchSchemaValuesToDispatchDetails,
 } from "./adapters/dispatch.adapter";
 
 export {

@@ -46,10 +46,11 @@ export const batchManagementController = {
     page: number = 1,
     limit: number = 10,
     filters: BatchFilters = {},
+    dateFilter: {},
     sort: BatchSort = { field: "createdOn", order: "desc" },
   ) => {
     try {
-      const response = await fetchAllBatches(page, limit, filters, sort);
+      const response = await fetchAllBatches(page, limit, filters, sort, dateFilter);
       if (response?.success === false) throw response;
 
       const rawBatches = response?.data?.batches || [];

@@ -43,12 +43,19 @@ export class STFSubmitResponseModel {
 export class STFDetailsModel {
   formId: string;
   batchId: string;
+  batchType: string;
   subDepartmentId: number;
   formSubmissionType: string;
   subType: string;
   motorIdNo: string;
   sections: SchemaSectionSubmission[];
   motors: Array<{ motorId: string; subType?: string; staticTestingDetails?: Record<string, unknown> }>;
+  createdBy: unknown;
+  createdAt: string | null;
+  submittedBy: unknown;
+  submittedAt: string | null;
+  lastUpdatedBy: unknown;
+  lastUpdatedAt: string | null;
   workflowInsights: {
     currentStatus: string;
     rejectionReason: string | null;
@@ -57,12 +64,20 @@ export class STFDetailsModel {
   constructor(payload: any) {
     this.formId = payload?.formId ?? "";
     this.batchId = payload?.batchId ?? "";
+    this.batchType = payload?.batchType ?? "";
     this.subDepartmentId = Number(payload?.subDepartmentId ?? 0);
     this.formSubmissionType = payload?.formSubmissionType ?? "";
     this.subType = payload?.subType ?? "";
     this.motorIdNo = payload?.motorIdNo ?? "";
     this.motors = extractMotorsFromPayload(payload);
     this.sections = extractSectionsFromPayload(payload);
+    this.createdBy = payload?.createdBy ?? null;
+    this.createdAt = payload?.createdAt ?? payload?.createdOn ?? null;
+    this.submittedBy = payload?.submittedBy ?? null;
+    this.submittedAt = payload?.submittedAt ?? payload?.submittedOn ?? null;
+    this.lastUpdatedBy = payload?.lastUpdatedBy ?? payload?.updatedBy ?? null;
+    this.lastUpdatedAt =
+      payload?.lastUpdatedAt ?? payload?.updatedAt ?? payload?.updatedOn ?? null;
 
     this.workflowInsights = {
       currentStatus: payload?.workflowInsights?.currentStatus ?? "",

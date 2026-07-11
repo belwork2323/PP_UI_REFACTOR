@@ -67,7 +67,12 @@ const formatDate = (value?: string) => {
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 };
 
-const RawMaterialLotDetailsView = ({ row, blocks, loading, onBack }: RawMaterialLotDetailsViewProps) => {
+const RawMaterialLotDetailsView = ({
+  row,
+  blocks,
+  loading,
+  onBack,
+}: RawMaterialLotDetailsViewProps) => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getSourcingTheme(mode), [mode]);
   const rmTheme = theme.sourcing.rawMaterial.lotDetails;
@@ -78,15 +83,15 @@ const RawMaterialLotDetailsView = ({ row, blocks, loading, onBack }: RawMaterial
         Object.entries(STATUS_CONFIG).map(([status, cfg]) => [
           status,
           { ...cfg, ...theme.batchList.statusConfig[status] },
-        ])
+        ]),
       ),
-    [theme]
+    [theme],
   );
 
   const block = blocks[0];
   const metaFields = [
     { label: BL.COL_LOT_ID, value: row.lotId },
-    { label: BL.COL_PROCUREMENT_ID, value: row.procurementId || "—" },
+    { label: BL.COL_SOURCING_ID, value: row.sourcingId || "—" },
     { label: BL.COL_MATERIAL_CODE, value: row.materialCode || block?.material || "—" },
     { label: BL.COL_MATERIAL_NAME, value: row.materialName || "—" },
     { label: BL.COL_SUPPLY_ORDER, value: block?.supplyOrderNo || row.supplyOrderNo || "—" },
@@ -115,14 +120,21 @@ const RawMaterialLotDetailsView = ({ row, blocks, loading, onBack }: RawMaterial
 
       <Box sx={rmTheme.document}>
         <Box sx={rmTheme.banner}>
-          <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} justifyContent="space-between" gap={2}>
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            alignItems={{ sm: "center" }}
+            justifyContent="space-between"
+            gap={2}
+          >
             <Stack direction="row" alignItems="flex-start" gap={1.5}>
               <InventoryRoundedIcon sx={rmTheme.bannerIcon} />
               <Box>
                 <Typography sx={rmTheme.bannerTitle}>{BL.LOT_DETAILS_TITLE}</Typography>
                 <Typography sx={rmTheme.bannerSubtitle}>
                   {row.lotId}
-                  {row.materialName || row.materialCode ? ` · ${row.materialName || row.materialCode}` : ""}
+                  {row.materialName || row.materialCode
+                    ? ` · ${row.materialName || row.materialCode}`
+                    : ""}
                 </Typography>
               </Box>
             </Stack>
@@ -169,7 +181,13 @@ const RawMaterialLotDetailsView = ({ row, blocks, loading, onBack }: RawMaterial
                     <Table size="small">
                       <TableHead>
                         <TableRow>
-                          {["Specification", "Reference range", "Analyzed result", "Remarks", "Status"].map((h) => (
+                          {[
+                            "Specification",
+                            "Reference range",
+                            "Analyzed result",
+                            "Remarks",
+                            "Status",
+                          ].map((h) => (
                             <TableCell key={h} sx={rmTheme.tableHeaderCell}>
                               {h}
                             </TableCell>
@@ -179,14 +197,24 @@ const RawMaterialLotDetailsView = ({ row, blocks, loading, onBack }: RawMaterial
                       <TableBody>
                         {block.rows.map((specRow, ri) => {
                           const failed = Boolean(specRow.isOutOfRange);
-                          const statusLabel = formatSpecStatusDisplayLabel(specRow.status, specRow.isOutOfRange);
+                          const statusLabel = formatSpecStatusDisplayLabel(
+                            specRow.status,
+                            specRow.isOutOfRange,
+                          );
                           return (
-                            <TableRow key={`${specRow.specificationCode ?? ri}`} sx={rmTheme.tableRow(ri, failed)}>
+                            <TableRow
+                              key={`${specRow.specificationCode ?? ri}`}
+                              sx={rmTheme.tableRow(ri, failed)}
+                            >
                               <TableCell sx={{ ...rmTheme.tableCell, ...rmTheme.specText }}>
                                 {specRow.specification || specRow.specificationName || "—"}
                               </TableCell>
                               <TableCell sx={rmTheme.tableCell}>
-                                <Chip label={specRow.refRange || "—"} size="small" sx={rmTheme.refChip} />
+                                <Chip
+                                  label={specRow.refRange || "—"}
+                                  size="small"
+                                  sx={rmTheme.refChip}
+                                />
                               </TableCell>
                               <TableCell sx={rmTheme.tableCell}>
                                 <Typography sx={failed ? rmTheme.failedResult : rmTheme.resultText}>
@@ -194,7 +222,9 @@ const RawMaterialLotDetailsView = ({ row, blocks, loading, onBack }: RawMaterial
                                 </Typography>
                               </TableCell>
                               <TableCell sx={rmTheme.tableCell}>
-                                <Typography sx={rmTheme.remarksText}>{specRow.remarks || "—"}</Typography>
+                                <Typography sx={rmTheme.remarksText}>
+                                  {specRow.remarks || "—"}
+                                </Typography>
                               </TableCell>
                               <TableCell sx={rmTheme.tableCell}>
                                 {statusLabel ? (
@@ -235,9 +265,13 @@ const RawMaterialLotDetailsView = ({ row, blocks, loading, onBack }: RawMaterial
                   <Stack spacing={1}>
                     {block.certificates.map((cert, ci) => (
                       <Box key={`${cert.fileName}-${ci}`} sx={rmTheme.certRow}>
-                        <InsertDriveFileOutlinedIcon sx={{ fontSize: 20, color: theme.palette.primaryLight }} />
+                        <InsertDriveFileOutlinedIcon
+                          sx={{ fontSize: 20, color: theme.palette.primaryLight }}
+                        />
                         <Box flex={1} minWidth={0}>
-                          <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: theme.palette.text }}>
+                          <Typography
+                            sx={{ fontSize: "0.82rem", fontWeight: 700, color: theme.palette.text }}
+                          >
                             {cert.fileName || "Document"}
                           </Typography>
                           {cert.certificateType ? (
@@ -254,7 +288,9 @@ const RawMaterialLotDetailsView = ({ row, blocks, loading, onBack }: RawMaterial
                             sx={rmTheme.certLink}
                           >
                             Open
-                            <OpenInNewRoundedIcon sx={{ fontSize: 14, ml: 0.3, verticalAlign: "middle" }} />
+                            <OpenInNewRoundedIcon
+                              sx={{ fontSize: 14, ml: 0.3, verticalAlign: "middle" }}
+                            />
                           </Link>
                         ) : null}
                       </Box>

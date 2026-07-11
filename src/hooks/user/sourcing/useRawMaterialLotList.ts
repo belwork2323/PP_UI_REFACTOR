@@ -23,7 +23,7 @@ const CLIENT_SEARCH_FETCH_LIMIT = 5000;
 const buildStatusCountsFromLots = (lots: RawMaterialLotListRow[], totalRecords: number) => {
   const S = OPERATION_STATUS;
   const counts: Record<string, number> = {
-    [S.INITIATED]: 0,
+    [S.TO_BE_INITIATED]: 0,
     [S.IN_PROGRESS]: 0,
     [S.WAITING_FOR_APPROVAL]: 0,
     [S.APPROVED]: 0,
@@ -75,7 +75,14 @@ const mapLotListStatusCountsForUi = (
   };
 
   const byLabel: Record<string, number> = {
-    [S.INITIATED]: pick("initiated", "Initiated", "INITIATED"),
+    [S.TO_BE_INITIATED]: pick(
+      "toBeInitiated",
+      "TO_BE_INITIATED",
+      "To Be Initiated",
+      "initiated",
+      "Initiated",
+      "INITIATED",
+    ),
     [S.IN_PROGRESS]: pick("inProgress", "inProgress", "In Progress", "IN_PROGRESS"),
     [S.WAITING_FOR_APPROVAL]: pick("waitingForApproval", "waitingforApproval", "Waiting for Approval", "WAITING_FOR_APPROVAL"),
     [S.APPROVED]: pick("approved", "Approved", "APPROVED"),

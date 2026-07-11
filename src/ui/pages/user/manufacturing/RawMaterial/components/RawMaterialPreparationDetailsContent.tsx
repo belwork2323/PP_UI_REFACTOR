@@ -35,8 +35,9 @@ import {
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const RM = STRINGS.MANUFACTURING.RAW_MATERIAL_PREP;
 
-export type RawMaterialPrepDetailsTheme =
-  ReturnType<typeof getManufacturingTheme>["manufacturing"]["rawMaterialPrep"]["details"];
+export type RawMaterialPrepDetailsTheme = ReturnType<
+  typeof getManufacturingTheme
+>["manufacturing"]["rawMaterialPrep"]["details"];
 
 const formatDate = (value?: unknown) => {
   if (!value) return "—";
@@ -81,7 +82,15 @@ export const SchemaSectionTable = ({
 
   return (
     <Box sx={{ mb: 2 }}>
-      <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: "text.secondary", mb: 0.75, letterSpacing: "normal" }}>
+      <Typography
+        sx={{
+          fontSize: "0.78rem",
+          fontWeight: 700,
+          color: "text.secondary",
+          mb: 0.75,
+          letterSpacing: "normal",
+        }}
+      >
         {formatPrepSectionLabel(section.sectionId)}
       </Typography>
       <TableContainer sx={dt.tableContainer}>
@@ -307,7 +316,8 @@ const RawMaterialPreparationDetailsContent = ({
   const [activePremixIndex, setActivePremixIndex] = useState(0);
 
   const premixes = detailView?.premixes ?? [];
-  const activePremixIndexSafe = premixes.length > 0 ? Math.min(activePremixIndex, premixes.length - 1) : 0;
+  const activePremixIndexSafe =
+    premixes.length > 0 ? Math.min(activePremixIndex, premixes.length - 1) : 0;
   const activePremix = premixes[activePremixIndexSafe] ?? null;
 
   const hasWeightment =
@@ -381,7 +391,14 @@ const RawMaterialPreparationDetailsContent = ({
                 background: theme.palette.surface,
               }}
             >
-              <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: theme.palette.primary, mb: 0.75 }}>
+              <Typography
+                sx={{
+                  fontSize: "0.76rem",
+                  fontWeight: 700,
+                  color: theme.palette.primary,
+                  mb: 0.75,
+                }}
+              >
                 Premix Navigation
               </Typography>
               <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
@@ -391,7 +408,12 @@ const RawMaterialPreparationDetailsContent = ({
                     size="small"
                     variant={index === activePremixIndexSafe ? "contained" : "outlined"}
                     onClick={() => setActivePremixIndex(index)}
-                    sx={{ whiteSpace: "nowrap", flexShrink: 0, textTransform: "none", fontWeight: 700 }}
+                    sx={{
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                      textTransform: "none",
+                      fontWeight: 700,
+                    }}
                   >
                     Premix {premix.premixNo}
                   </Button>
@@ -406,7 +428,11 @@ const RawMaterialPreparationDetailsContent = ({
         </Box>
       )}
 
-      <WeightmentSheetDetailBlock weightmentSheet={weightmentSheet} dt={dt} palette={theme.palette} />
+      <WeightmentSheetDetailBlock
+        weightmentSheet={weightmentSheet}
+        dt={dt}
+        palette={theme.palette}
+      />
 
       {premixes.length === 0 && !hasWeightment && (
         <Typography sx={dt.emptyText}>No form data recorded</Typography>

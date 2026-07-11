@@ -1,5 +1,8 @@
 import { USER_RAW_MATERIAL_PREPARATION_ENDPOINTS } from "../../data/api/endPoints";
-import type { MaterialsListGrade, MaterialsListItem } from "../../data/models/user/MaterialsListModel";
+import type {
+  MaterialsListGrade,
+  MaterialsListItem,
+} from "../../data/models/user/MaterialsListModel";
 import type { SchemaFetchConfig } from "../controller/schemaEngineController";
 import {
   buildInitialFormValues,
@@ -16,7 +19,7 @@ export const RMP_SCHEMA_VERSION = "1.0";
 export const RAW_MATERIAL_PROCUREMENT_LOT_DATASOURCE = {
   type: "api" as const,
   api: {
-    endpoint: "raw-material-procurement-lot-list",
+    endpoint: "raw-material-sourcing-lot-list",
     method: "POST" as const,
     requestBody: {
       limit: 500,

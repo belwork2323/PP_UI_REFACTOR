@@ -1,4 +1,5 @@
 import { OPERATION_STATUS } from "../../operationStatus";
+import { normalizeMotorStage } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
 
 export type DispatchBatch = {
   id: number | string;
@@ -6,6 +7,7 @@ export type DispatchBatch = {
   projectId?: string;
   projectName?: string;
   motorId: string;
+  motorIds?: string[];
   motorType: string;
   motorStage?: string;
   priority: string;
@@ -19,6 +21,15 @@ export type DispatchBatch = {
 export type DispatchStageOption = {
   value: string;
   label: string;
+};
+
+export type DispatchMotorOption = {
+  motorId: string;
+  motorStage?: string;
+};
+
+export type DispatchAddedMotor = {
+  motorId: string;
 };
 
 export const DISPATCH_STAGE_OPTIONS: DispatchStageOption[] = [
@@ -43,15 +54,74 @@ export const DISPATCH_FLOW_LABELS = {
   dispatchLocation: "Dispatch Location",
   dispatchLocationPlaceholder: "Enter dispatch location",
   ndtClearance: "NDT Clearance Accorded",
-  ndtMomNo: "Enter MOM No.",
+  ndtMomNo: "NDT MOM No.",
   ndtMomNoPlaceholder: "Enter NDT MOM number",
   finalAcceptanceClearance: "Final Acceptance Committee Clearance Accorded",
-  finalAcceptanceMomNo: "Enter MOM No.",
+  finalAcceptanceMomNo: "Final Acceptance MOM No.",
   finalAcceptanceMomNoPlaceholder: "Enter final acceptance MOM number",
   loadForm: "Load Form",
+  addMotor: "Add Motor",
   loadingSchema: "Loading schema...",
+  setupHint: "Select a motor ID, then load the dispatch form.",
+  setupHintLoaded: "Select another motor ID below to add more motors.",
+  motorNavTitle: "Motor navigation",
+  motorNavHint: "Switch between motors to fill dispatch details.",
+  motorCardTitle: "Dispatch details",
+  detailsFormSection: "Dispatch form details",
+  navBack: "Back",
+  navNext: "Next",
 };
 
+export const parseDispatchMotorIds = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry).trim()).filter(Boolean);
+  }
+
+  const raw = String(value ?? "").trim();
+  if (!raw) return [];
+
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean);
+};
+
+/** Normalize batch/API motor stage to dispatch stage select values (0, 1, 2, 3). */
+export const normalizeDispatchMotorStage = (raw: unknown): string => {
+  const normalized = normalizeMotorStage(raw);
+  if (normalized === null) return "";
+
+  let value = String(normalized).trim();
+  if (!value) return "";
+
+  value = value.replace(/^STAGE[_\s-]*/i, "");
+  const asNumber = Number(value);
+  if (Number.isFinite(asNumber) && value !== "") {
+    return String(asNumber);
+  }
+
+  return value;
+};
+
+export const dispatchMotorStagesMatch = (optionStage: unknown, selectedStage: unknown) => {
+  const normalizedOption = normalizeDispatchMotorStage(optionStage);
+  const normalizedSelected = normalizeDispatchMotorStage(selectedStage);
+
+  if (!normalizedOption || !normalizedSelected) return true;
+  return normalizedOption === normalizedSelected;
+};
+
+export const resolveDispatchMotorOptions = (
+  batch?: Pick<DispatchBatch, "motorId" | "motorIds" | "motorStage" | "motorType"> | null,
+): DispatchMotorOption[] => {
+  const ids =
+    Array.isArray(batch?.motorIds) && batch.motorIds.length > 0
+      ? batch.motorIds.map((id) => String(id).trim()).filter(Boolean)
+      : parseDispatchMotorIds(batch?.motorId);
+
+  const motorStage = normalizeDispatchMotorStage(batch?.motorStage ?? batch?.motorType);
+  return ids.map((motorId) => ({ motorId, motorStage }));
+};
 
 export const getDispatchMotorOptions = (
   motors: string[] = [],
@@ -61,10 +131,8 @@ export const getDispatchMotorOptions = (
     label: motorId,
   }));
 
-
-export const canLoadDispatchForm = (setup: {
+export type DispatchSharedSetup = {
   motorStage: string;
-  motorId: string;
   castingDate: string;
   dispatchDate: string;
   dispatchLocation: string;
@@ -72,8 +140,10 @@ export const canLoadDispatchForm = (setup: {
   ndtMomNo: string;
   finalAcceptanceClearance: string;
   finalAcceptanceMomNo: string;
-}) => {
-  if (!setup.motorStage.trim() || !setup.motorId.trim()) return false;
+};
+
+export const canCompleteDispatchSetup = (setup: DispatchSharedSetup) => {
+  if (!setup.motorStage.trim()) return false;
   if (!setup.castingDate.trim() || !setup.dispatchDate.trim()) return false;
   if (!setup.dispatchLocation.trim()) return false;
   if (!setup.ndtClearance.trim() || !setup.finalAcceptanceClearance.trim()) return false;
@@ -81,3 +151,49 @@ export const canLoadDispatchForm = (setup: {
   if (setup.finalAcceptanceClearance === "YES" && !setup.finalAcceptanceMomNo.trim()) return false;
   return true;
 };
+
+export const canLoadDispatchMotor = ({
+  setup,
+  draftMotorId,
+  usedMotorIds,
+  hasMotors,
+}: {
+  setup: DispatchSharedSetup;
+  draftMotorId: string;
+  usedMotorIds: string[];
+  hasMotors: boolean;
+}) => {
+  if (hasMotors) return false;
+  if (!canCompleteDispatchSetup(setup)) return false;
+
+  const motorId = String(draftMotorId ?? "").trim();
+  if (!motorId || usedMotorIds.includes(motorId)) return false;
+  return true;
+};
+
+export const canAddDispatchMotor = ({
+  setup,
+  draftMotorId,
+  usedMotorIds,
+  hasMotors,
+}: {
+  setup: DispatchSharedSetup;
+  draftMotorId: string;
+  usedMotorIds: string[];
+  hasMotors: boolean;
+}) => {
+  if (!hasMotors) return false;
+  if (!canCompleteDispatchSetup(setup)) return false;
+
+  const motorId = String(draftMotorId ?? "").trim();
+  if (!motorId || usedMotorIds.includes(motorId)) return false;
+  return true;
+};
+
+/** @deprecated Use canCompleteDispatchSetup + canLoadDispatchMotor */
+export const canLoadDispatchForm = (setup: DispatchSharedSetup & { motorId: string }) => {
+  if (!setup.motorId.trim()) return false;
+  return canCompleteDispatchSetup(setup);
+};
+
+export { OPERATION_STATUS };

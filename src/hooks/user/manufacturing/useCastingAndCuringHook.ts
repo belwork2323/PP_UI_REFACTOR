@@ -819,7 +819,7 @@ export const useCastingAndCuringHook = () => {
 
       const payloadForm = applyMotorCuringValuesMap(formData, motorCuringValuesById);
       const status = parseStatus(activeBatch.ccStatus);
-      const isCreateFlow = status === parseStatus(CC_STATUS.INITIATED) && !activeBatch.formId;
+      const isCreateFlow = status === parseStatus(CC_STATUS.TO_BE_INITIATED) && !activeBatch.formId;
       const motors = mapCastingCuringFormStateToPayload(payloadForm).motors;
 
       setActionLoading(true);

@@ -1,9 +1,9 @@
 import { Box, Typography } from "@mui/material";
 import type { ElementType } from "react";
 import getDepartmentHeaderTheme from "../../../app/theme/custom_themes/common/departmentHeader_theme";
-import { icons }               from "../../../app/theme/icons";
-import { useThemeStore }       from "../../../app/store/themeStore";
-import { STRINGS }             from "../../../app/config/strings";
+import { icons } from "../../../app/theme/icons";
+import { useThemeStore } from "../../../app/store/themeStore";
+import { STRINGS } from "../../../app/config/strings";
 
 const S = STRINGS.DEPARTMENT_HEADER;
 
@@ -39,7 +39,7 @@ type DepartmentHeaderProps = {
 //
 // Props:
 //   deptName        string  — e.g. "Sourcing Department"
-//   subDeptName     string  — e.g. "Raw Material Procurement"
+//   subDeptName     string  — e.g. "Raw Material Sourcing"
 //   userName        string  — logged-in user's display name
 //   userRole        string  — e.g. "Approver"
 //   stats           object  — { allocated, approved, rejected, pending }
@@ -47,15 +47,15 @@ type DepartmentHeaderProps = {
 
 const DepartmentHeader = ({
   icon,
-  deptName    = S.DEFAULT_DEPT,
+  deptName = S.DEFAULT_DEPT,
   subDeptName = S.DEFAULT_SUB_DEPT,
-  userName    = S.DEFAULT_USER,
-  userRole    = S.DEFAULT_ROLE,
-  stats       = { allocated: 0, approved: 0, rejected: 0, pending: 0 },
+  userName = S.DEFAULT_USER,
+  userRole = S.DEFAULT_ROLE,
+  stats = { allocated: 0, approved: 0, rejected: 0, pending: 0 },
   statItems,
 }: DepartmentHeaderProps) => {
   const mode = useThemeStore((s) => s.mode);
-  const t    = getDepartmentHeaderTheme(mode);
+  const t = getDepartmentHeaderTheme(mode);
   const HeaderIcon = (icon ?? icons.apartment) as typeof icons.apartment;
 
   const defaultStats: DepartmentHeaderStatItem[] = [
@@ -71,17 +71,14 @@ const DepartmentHeader = ({
   return (
     <Box sx={t.wrapper}>
       <Box sx={t.card}>
-
         {/* ── Decorative accent circles ── */}
         <Box sx={t.decorCircle} />
         <Box sx={t.decorCircleSmall} />
 
         {/* ── Main content row ── */}
         <Box sx={t.topRow}>
-
           {/* ── LEFT: Identity ── */}
           <Box sx={t.identityBlock}>
-
             {/* Icon badge */}
             <Box sx={t.iconBadge}>
               <HeaderIcon fontSize="medium" />
@@ -89,18 +86,12 @@ const DepartmentHeader = ({
 
             {/* Dept name + sub-dept + user chips */}
             <Box sx={t.identityText}>
+              <Typography sx={t.subDeptName}>{subDeptName}</Typography>
 
-              <Typography sx={t.subDeptName}>
-                {subDeptName}
-              </Typography>
-
-              <Typography sx={t.deptName}>
-                {deptName}
-              </Typography>
+              <Typography sx={t.deptName}>{deptName}</Typography>
 
               {/* User + Role chips */}
               <Box sx={t.userRow}>
-
                 {/* Username chip */}
                 <Box sx={t.userChip}>
                   <icons.person sx={t.userIcon} />
@@ -114,20 +105,21 @@ const DepartmentHeader = ({
                   <Typography sx={t.userChipLabel}>{S.LABEL_ROLE}</Typography>
                   <Typography sx={t.userChipValue}>{userRole}</Typography>
                 </Box>
-
               </Box>
             </Box>
           </Box>
 
           {/* ── RIGHT: Batch stats ── */}
-          <Box sx={{
-            ...t.statsGrid,
-            gridTemplateColumns: {
-              xs: "repeat(2, 1fr)",
-              sm: statsColumnCount <= 4 ? "repeat(2, 1fr)" : "repeat(3, 1fr)",
-              md: `repeat(${Math.min(statsColumnCount, 5)}, 1fr)`,
-            },
-          }}>
+          <Box
+            sx={{
+              ...t.statsGrid,
+              gridTemplateColumns: {
+                xs: "repeat(2, 1fr)",
+                sm: statsColumnCount <= 4 ? "repeat(2, 1fr)" : "repeat(3, 1fr)",
+                md: `repeat(${Math.min(statsColumnCount, 5)}, 1fr)`,
+              },
+            }}
+          >
             {displayStats.map(({ key, label, value }) => (
               <Box key={key} sx={t.statTile(key)}>
                 <Typography sx={t.statTileValue}>{value}</Typography>
@@ -135,12 +127,10 @@ const DepartmentHeader = ({
               </Box>
             ))}
           </Box>
-
         </Box>
 
         {/* ── Thin divider ── */}
         <Box sx={t.divider} />
-
       </Box>
     </Box>
   );

@@ -139,7 +139,7 @@ export const getNdtTheme = (baseTheme: any) => {
         const danger = palette.danger ?? NDT_BRAND.danger;
         const warnBase = palette.warn ?? NDT_BRAND.warn;
         return {
-          ["Initiated"]: { color: "#334155", bg: "#F8FAFC", border: "#CBD5E1" },
+          ["To Be Initiated"]: { color: "#334155", bg: "#F8FAFC", border: "#CBD5E1" },
           ["In Progress"]: { color: primary, bg: "#E8F4FC", border: alpha(primaryLight, 0.5) },
           ["Waiting for Approval"]: { color: "#7D6608", bg: "#FFF4D6", border: warnBase },
           ["Approved"]: { color: success, bg: "#E8F8F5", border: alpha(success, 0.5) },

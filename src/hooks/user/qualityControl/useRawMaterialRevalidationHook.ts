@@ -34,7 +34,7 @@ export type RawMaterialRevalidationBatch = {
 
 const normalizeBatch = (batch: any): RawMaterialRevalidationBatch => ({
   ...batch,
-  qcRmStatus: batch?.qcRmStatus ?? batch?.status ?? QUALITY_CONTROL_STATUS.INITIATED,
+  qcRmStatus: batch?.qcRmStatus ?? batch?.status ?? QUALITY_CONTROL_STATUS.TO_BE_INITIATED,
   formId: batch?.formId ?? null,
   draftData: Array.isArray(batch?.draftData) ? batch.draftData : createDefaultRawMaterialRevalidationState(),
   rejectionReason: batch?.rejectionReason ?? null,
@@ -196,7 +196,7 @@ export const useRawMaterialRevalidationHook = () => {
       return false;
     }
 
-    const isCreateFlow = activeBatch.qcRmStatus === QUALITY_CONTROL_STATUS.INITIATED && !activeBatch.formId;
+    const isCreateFlow = activeBatch.qcRmStatus === QUALITY_CONTROL_STATUS.TO_BE_INITIATED && !activeBatch.formId;
 
     setActionLoading(true);
     try {

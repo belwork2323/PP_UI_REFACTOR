@@ -38,7 +38,7 @@ const UserWorkflowStatusAction = ({
   continueUsesPrimaryStyle = false,
 }: UserWorkflowStatusActionProps) => {
   switch (status) {
-    case statusMap.INITIATED:
+    case statusMap.TO_BE_INITIATED:
       return (
         <Button
           variant="contained"
@@ -58,7 +58,11 @@ const UserWorkflowStatusAction = ({
           size="small"
           endIcon={<ArrowForwardRoundedIcon sx={{ fontSize: "14px !important" }} />}
           onClick={() => onFillForm(row)}
-          sx={continueUsesPrimaryStyle ? theme.batchList.action.primary : theme.batchList.action.secondary}
+          sx={
+            continueUsesPrimaryStyle
+              ? theme.batchList.action.primary
+              : theme.batchList.action.secondary
+          }
         >
           {continueLabel}
         </Button>
@@ -85,7 +89,11 @@ const UserWorkflowStatusAction = ({
     case statusMap.APPROVED:
       return (
         <Chip
-          icon={<CheckCircleRoundedIcon sx={{ fontSize: "13px !important", color: `${theme.palette.success} !important` }} />}
+          icon={
+            <CheckCircleRoundedIcon
+              sx={{ fontSize: "13px !important", color: `${theme.palette.success} !important` }}
+            />
+          }
           label={approvedLabel}
           size="small"
           sx={theme.batchList.chips.approved}

@@ -467,7 +467,7 @@ export const getRocketMotorCasingTheme = (baseTheme: any) => {
 				const success = palette.success ?? "#148F77";
 				const danger = palette.danger ?? "#C0392B";
 				return {
-					["Initiated"]: {
+					["To Be Initiated"]: {
 						color: "#334155",
 						bg: "#F8FAFC",
 						border: "#CBD5E1",

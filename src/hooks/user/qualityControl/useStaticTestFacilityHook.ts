@@ -47,7 +47,7 @@ type WorkflowView = "list" | "form" | "details";
 const normalizeBatch = (batch: any): STFBatch => ({
   ...batch,
   lotId: batch?.lotId ?? "",
-  stfStatus: batch?.stfStatus ?? batch?.status ?? QUALITY_CONTROL_STATUS.INITIATED,
+  stfStatus: batch?.stfStatus ?? batch?.status ?? QUALITY_CONTROL_STATUS.TO_BE_INITIATED,
   formId: batch?.formId ?? null,
   subType: batch?.subType ?? null,
   motorIdNo: batch?.motorIdNo ?? null,
@@ -142,6 +142,7 @@ export const useStaticTestFacilityHook = () => {
 
   const resetFlowBarDraft = useCallback(() => {
     resetFlowDraft();
+    setSchemaError(null);
   }, [resetFlowDraft]);
 
   const resetFormContext = useCallback(() => {
@@ -565,7 +566,7 @@ export const useStaticTestFacilityHook = () => {
 
     const mapped = mapStaticTestFacilityFormStateToPayload(formData);
     const isCreateFlow =
-      activeBatch.stfStatus === QUALITY_CONTROL_STATUS.INITIATED && !activeBatch.formId;
+      activeBatch.stfStatus === QUALITY_CONTROL_STATUS.TO_BE_INITIATED && !activeBatch.formId;
 
     setActionLoading(true);
     try {

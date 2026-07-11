@@ -436,7 +436,7 @@ export const usePostCureHook = () => {
       }
 
       const status = parseStatus(activeBatch.pcStatus);
-      const isCreateFlow = status === parseStatus(PC_STATUS.INITIATED) && !activeBatch.formId;
+      const isCreateFlow = status === parseStatus(PC_STATUS.TO_BE_INITIATED) && !activeBatch.formId;
       const payloadBody = mapPostCureFormStateToPayload(formData);
       const firstMotor = formData.motors[0];
 

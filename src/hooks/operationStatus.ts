@@ -1,5 +1,5 @@
 export const OPERATION_STATUS = {
-  INITIATED: "Initiated",
+  TO_BE_INITIATED: "To Be Initiated",
   IN_PROGRESS: "In Progress",
   WAITING_FOR_APPROVAL: "Waiting for Approval",
   APPROVED: "Approved",
@@ -11,9 +11,9 @@ export type OperationStatus = (typeof OPERATION_STATUS)[keyof typeof OPERATION_S
 /** UI label map for each workflow stage (used by row action buttons). */
 export type OperationStatusMap = typeof OPERATION_STATUS;
 
-/** Ordered status values for list filter dropdowns (includes Initiated). */
+/** Ordered status values for list filter dropdowns (includes To Be Initiated). */
 export const OPERATION_STATUS_FILTER_VALUES: OperationStatus[] = [
-  OPERATION_STATUS.INITIATED,
+  OPERATION_STATUS.TO_BE_INITIATED,
   OPERATION_STATUS.IN_PROGRESS,
   OPERATION_STATUS.WAITING_FOR_APPROVAL,
   OPERATION_STATUS.APPROVED,
@@ -22,7 +22,7 @@ export const OPERATION_STATUS_FILTER_VALUES: OperationStatus[] = [
 
 /** UI status labels → uppercase API enum values for list filters */
 export const OPERATION_STATUS_UI_TO_API: Record<string, string> = {
-  [OPERATION_STATUS.INITIATED]: "INITIATED",
+  [OPERATION_STATUS.TO_BE_INITIATED]: "TO_BE_INITIATED",
   [OPERATION_STATUS.IN_PROGRESS]: "IN_PROGRESS",
   [OPERATION_STATUS.WAITING_FOR_APPROVAL]: "WAITING_FOR_APPROVAL",
   [OPERATION_STATUS.APPROVED]: "APPROVED",
@@ -48,6 +48,7 @@ export function toOperationStatusApiValue(
   if (mapped) return mapped;
 
   const upper = trimmed.toUpperCase().replace(/\s+/g, "_");
+  if (upper === "INITIATED") return "TO_BE_INITIATED";
   if (OPERATION_STATUS_API_VALUES.has(upper)) return upper;
 
   return upper;
@@ -73,9 +74,9 @@ type OperationStatusIconMap = {
 };
 
 export const getOperationStatusConfig = (icons: OperationStatusIconMap) => ({
-  [OPERATION_STATUS.INITIATED]: {
+  [OPERATION_STATUS.TO_BE_INITIATED]: {
     Icon: icons.initiated,
-    label: OPERATION_STATUS.INITIATED,
+    label: OPERATION_STATUS.TO_BE_INITIATED,
   },
   [OPERATION_STATUS.IN_PROGRESS]: {
     Icon: icons.inProgress,

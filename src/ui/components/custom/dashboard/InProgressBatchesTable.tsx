@@ -27,6 +27,7 @@ import TableCard from "../TableCard";
 import SkeletonRow from "../../common/SkeletonRow";
 import { useAuthStore } from "@app/store/authStore";
 import ToggleTabs from "../../common/ToggleTabs";
+import { batchStatusConfig } from "@/app/theme/roleConfig";
 
 export type InProgressBatchRow = {
   id?: string;
@@ -237,111 +238,112 @@ export default function InProgressBatchesTable({
             </TableCell>
           </TableRow>
         ) : (
-          sortedRows.map((p: InProgressBatchRow, i: number) => (
-            <TableRow key={`${p.batchId}-${i}`} sx={th.table.tableRow(i % 2 === 1)}>
-              <TableCell sx={th.table.cell}>
-                <Typography
-                  sx={{
-                    ...th.table.textBatchId("#1565c0"),
-                    ...(canViewDetails
-                      ? { cursor: "pointer", "&:hover": { textDecoration: "underline" } }
-                      : {}),
-                  }}
-                  onClick={canViewDetails ? () => onViewDetails?.(p) : undefined}
-                >
-                  {p.batchId}
-                </Typography>
-                <Typography sx={th.table.subTextMuted}>{p.id || ""}</Typography>
-              </TableCell>
+          sortedRows.map((p: InProgressBatchRow, i: number) => {
+            const config = batchStatusConfig(p.status);
 
-              <TableCell sx={th.table.cell}>
-                <Chip
-                  label={p.batchType || "NA"}
-                  size="small"
-                  sx={th.table.chipSx(
-                    typeChip[p.batchType || ""]?.bg,
-                    typeChip[p.batchType || ""]?.color,
-                  )}
-                />
-              </TableCell>
-
-              <TableCell sx={th.table.cell}>
-                <Typography sx={th.table.textBase}>{p.motorId || "NA"}</Typography>
-              </TableCell>
-
-              {/* <TableCell sx={th.table.cellNarrow}>
-                <Typography sx={th.table.textSmall}>{p.motorType || "NA"}</Typography>
-              </TableCell> */}
-
-              <TableCell sx={th.table.cellTruncated}>
-                <Typography sx={th.table.textTruncated}>{p.projectName || "NA"}</Typography>
-              </TableCell>
-
-              <TableCell sx={th.table.cell}>
-                {p.currentStage && p.currentStage !== "NA" ? (
+            return (
+              <TableRow key={`${p.batchId}-${i}`} sx={th.table.tableRow(i % 2 === 1)}>
+                <TableCell sx={th.table.cell}>
+                  <Typography
+                    sx={{
+                      ...th.table.textBatchId("#1565c0"),
+                      ...(canViewDetails
+                        ? { cursor: "pointer", "&:hover": { textDecoration: "underline" } }
+                        : {}),
+                    }}
+                    onClick={canViewDetails ? () => onViewDetails?.(p) : undefined}
+                  >
+                    {p.batchId}
+                  </Typography>
+                  <Typography sx={th.table.subTextMuted}>{p.id || ""}</Typography>
+                </TableCell>
+                <TableCell sx={th.table.cell}>
                   <Chip
-                    label={p.stageDept}
+                    label={p.batchType || "NA"}
                     size="small"
                     sx={th.table.chipSx(
-                      stageChip[p.stageDept || ""]?.bg,
-                      stageChip[p.stageDept || ""]?.color,
+                      typeChip[p.batchType || ""]?.bg,
+                      typeChip[p.batchType || ""]?.color,
                     )}
                   />
-                ) : (
-                  <Typography sx={th.table.textSmall}>NA</Typography>
-                )}
-              </TableCell>
-
-              {!hideManagerColumns && (
+                </TableCell>
                 <TableCell sx={th.table.cell}>
-                  <Typography sx={th.table.textPrimaryStrong}>{p.managerName || "NA"}</Typography>
+                  <Typography sx={th.table.textBase}>{p.motorId || "NA"}</Typography>
                 </TableCell>
-              )}
-
-              {!hideManagerColumns && (
-                <TableCell sx={th.table.cellNarrow}>
-                  <Typography sx={th.table.textSmall}>{p.managerId || "NA"}</Typography>
+                {/* <TableCell sx={th.table.cellNarrow}>
+                <Typography sx={th.table.textSmall}>{p.motorType || "NA"}</Typography>
+              </TableCell> */}
+                <TableCell sx={th.table.cellTruncated}>
+                  <Typography sx={th.table.textTruncated}>{p.projectName || "NA"}</Typography>
                 </TableCell>
-              )}
-
-              <TableCell sx={th.table.cell}>
-                <Chip label={p.status || "NA"} size="small" sx={th.table.statusChipSx(p.status)} />
-              </TableCell>
-
-              <TableCell sx={th.table.cellDate}>
-                <Typography sx={th.table.textMuted}>
-                  {p.createdOn
-                    ? new Date(p.createdOn).toLocaleDateString("en-IN", {
-                        day: "2-digit",
-                        month: "short",
-                        year: "numeric",
-                      })
-                    : "NA"}
-                </Typography>
-              </TableCell>
-
-              <TableCell sx={th.table.cellProgress}>
-                <ProgressBar
-                  value={p.completion || 0}
-                  color={p.color || "#1976d2"}
-                  trackColor={th.table.progressTrack}
-                  valueColor={th.table.progressValueColor}
-                />
-              </TableCell>
-
-              {canViewDetails && (
-                <TableCell sx={{ ...th.table.cell, width: 48, p: 0.5 }}>
-                  <IconButton
+                <TableCell sx={th.table.cell}>
+                  {p.currentStage && p.currentStage !== "NA" ? (
+                    <Chip
+                      label={p.stageDept}
+                      size="small"
+                      sx={th.table.chipSx(
+                        stageChip[p.stageDept || ""]?.bg,
+                        stageChip[p.stageDept || ""]?.color,
+                      )}
+                    />
+                  ) : (
+                    <Typography sx={th.table.textSmall}>NA</Typography>
+                  )}
+                </TableCell>
+                {!hideManagerColumns && (
+                  <TableCell sx={th.table.cell}>
+                    <Typography sx={th.table.textPrimaryStrong}>{p.managerName || "NA"}</Typography>
+                  </TableCell>
+                )}
+                {!hideManagerColumns && (
+                  <TableCell sx={th.table.cellNarrow}>
+                    <Typography sx={th.table.textSmall}>{p.managerId || "NA"}</Typography>
+                  </TableCell>
+                )}
+                <TableCell sx={th.table.cell}>
+                  <Chip
+                    icon={config?.Icon ? <config.Icon /> : undefined}
+                    label={p.status.replace(/_/g, " ")}
                     size="small"
-                    onClick={(e) => handleMenuOpen(e, p)}
-                    sx={{ color: "text.secondary" }}
-                  >
-                    <MoreVertIcon fontSize="small" />
-                  </IconButton>
+                    sx={th.table.statusChip(config)}
+                  />
                 </TableCell>
-              )}
-            </TableRow>
-          ))
+                {/* <TableCell sx={th.table.cell}>
+                <Chip label={p.status || "NA"} size="small" sx={th.table.statusChipSx(p.status)} />
+              </TableCell> */}
+                <TableCell sx={th.table.cellDate}>
+                  <Typography sx={th.table.textMuted}>
+                    {p.createdOn
+                      ? new Date(p.createdOn).toLocaleDateString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                        })
+                      : "NA"}
+                  </Typography>
+                </TableCell>
+                <TableCell sx={th.table.cellProgress}>
+                  <ProgressBar
+                    value={p.completion || 0}
+                    color={p.color || "#1976d2"}
+                    trackColor={th.table.progressTrack}
+                    valueColor={th.table.progressValueColor}
+                  />
+                </TableCell>
+                {canViewDetails && (
+                  <TableCell sx={{ ...th.table.cell, width: 48, p: 0.5 }}>
+                    <IconButton
+                      size="small"
+                      onClick={(e) => handleMenuOpen(e, p)}
+                      sx={{ color: "text.secondary" }}
+                    >
+                      <MoreVertIcon fontSize="small" />
+                    </IconButton>
+                  </TableCell>
+                )}
+              </TableRow>
+            );
+          })
         )}
       </TableBody>
 

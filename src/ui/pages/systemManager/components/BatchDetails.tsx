@@ -8,9 +8,7 @@
 //   • t           — theme tokens
 
 import React, { useState, useEffect } from "react";
-import {
-  Box, Stack, Typography, IconButton, CircularProgress, Collapse,
-} from "@mui/material";
+import { Box, Stack, Typography, IconButton, CircularProgress, Collapse } from "@mui/material";
 import Modal from "@mui/material/Modal";
 import { icons } from "../../../../app/theme/icons";
 import { STRINGS } from "../../../../app/config/strings";
@@ -21,11 +19,7 @@ import ProgressBar from "../../../components/common/ProgressBar";
 import SectionHeader from "../../../components/common/SectionHeader";
 import SubDeptDetails from "./SubDeptDetails";
 
-const {
-  Close,
-  FiberManualRecord,
-  Inventory2,
-} = icons.systemManager;
+const { Close, FiberManualRecord, Inventory2 } = icons.systemManager;
 
 // ── Stage status badge ────────────────────────────────────────────────────────
 function StageStatusBadge({ status, t }) {
@@ -41,7 +35,13 @@ function StageStatusBadge({ status, t }) {
 // ── Main popup ────────────────────────────────────────────────────────────────
 export default function BatchDetailPopup({ batch, stageConfig, onClose, t }) {
   const { batchStages, loading, fetchBatchStages } = useBatchStages();
-  const { details: subDeptDetails, loading: subDeptLoading, error: subDeptError, fetchDetails, reset: resetSubDept } = useBatchSubDeptDetails();
+  const {
+    details: subDeptDetails,
+    loading: subDeptLoading,
+    error: subDeptError,
+    fetchDetails,
+    reset: resetSubDept,
+  } = useBatchSubDeptDetails();
   const [activeStageIdx, setActiveStageIdx] = useState(0);
   const [expandedSubDeptId, setExpandedSubDeptId] = useState<number | null>(null);
 
@@ -100,24 +100,40 @@ export default function BatchDetailPopup({ batch, stageConfig, onClose, t }) {
                 <StatusChip status={data.status} size="small" />
               </Stack>
               <Stack direction="row" alignItems="center" flexWrap="wrap" gap={1} mt={0.3}>
-                <Typography sx={ph.motorLabel}>{STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.MOTOR_ID}: {data.motorId}</Typography>
+                <Typography sx={ph.motorLabel}>
+                  {STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.MOTOR_ID}: {data.motorId}
+                </Typography>
                 <Typography sx={ph.bullet}>•</Typography>
-                <Typography sx={ph.motorTypeLabel}>{STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.MOTOR_TYPE}: {data.batchType || "—"}</Typography>
+                <Typography sx={ph.motorTypeLabel}>
+                  {STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.MOTOR_TYPE}: {data.batchType || "—"}
+                </Typography>
                 <Typography sx={ph.bullet}>•</Typography>
-                <Typography sx={ph.batchTypeLabel}>{STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.BATCH_TYPE}: {data.batchType || "—"}</Typography>
+                <Typography sx={ph.batchTypeLabel}>
+                  {STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.BATCH_TYPE}: {data.batchType || "—"}
+                </Typography>
                 <Typography sx={ph.bullet}>•</Typography>
-                <Typography sx={ph.assignedToLabel}>{STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.ASSIGNED_TO}: {data.assignedTo?.name || data.assignedTo?.username || "—"}</Typography>
+                <Typography sx={ph.assignedToLabel}>
+                  {STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.ASSIGNED_TO}:{" "}
+                  {data.assignedTo?.name || data.assignedTo?.username || "—"}
+                </Typography>
                 <Typography sx={ph.bullet}>•</Typography>
-                <Typography sx={ph.createdOnLabel}>{STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.CREATED_ON}: {data.createdOn ? new Date(data.createdOn).toLocaleDateString() : "—"}</Typography>
+                <Typography sx={ph.createdOnLabel}>
+                  {STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.CREATED_ON}:{" "}
+                  {data.createdOn ? new Date(data.createdOn).toLocaleDateString() : "—"}
+                </Typography>
                 <Typography sx={ph.bullet}>•</Typography>
-                <Typography sx={ph.batchAgeLabel}>{STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.BATCH_AGE}: {data.ageInDays || 0} days</Typography>
+                <Typography sx={ph.batchAgeLabel}>
+                  {STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.BATCH_AGE}: {data.ageInDays || 0} days
+                </Typography>
               </Stack>
             </Box>
           </Stack>
 
           <Stack direction="row" alignItems="center" gap={2}>
             <Stack direction="row" alignItems="center" gap={1}>
-              <Typography sx={ph.progressLabel}>{STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.OVERALL_PROGRESS}</Typography>
+              <Typography sx={ph.progressLabel}>
+                {STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.OVERALL_PROGRESS}
+              </Typography>
               <Typography sx={ph.progressValue}>{Math.round(data.overallProgress)}%</Typography>
             </Stack>
             <Box sx={ph.progressTrack}>
@@ -140,14 +156,20 @@ export default function BatchDetailPopup({ batch, stageConfig, onClose, t }) {
         <Box sx={t.popup.body}>
           {/* ── Department Sidebar ── */}
           <Box sx={ps.wrapper}>
-            <Typography sx={ps.sectionLabel}>{STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.DEPARTMENTS}</Typography>
+            <Typography sx={ps.sectionLabel}>
+              {STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.DEPARTMENTS}
+            </Typography>
 
             {stages.map((stage, idx) => {
               const isActive = activeStageIdx === idx;
               const stageColor = getStatusColor(stage.status);
 
               return (
-                <Box key={stage.departmentId} onClick={() => setActiveStageIdx(idx)} sx={ps.item(isActive, stageColor)}>
+                <Box
+                  key={stage.departmentId}
+                  onClick={() => setActiveStageIdx(idx)}
+                  sx={ps.item(isActive, stageColor)}
+                >
                   <Stack direction="row" alignItems="center" gap={1.5} mb={0.8}>
                     <Box sx={ps.iconBox(stageColor)}>
                       <Inventory2 sx={ps.icon(isActive, stageColor)} />
@@ -174,7 +196,10 @@ export default function BatchDetailPopup({ batch, stageConfig, onClose, t }) {
                     </Box>
                     <Box>
                       <Typography sx={pd.stageTitle}>{activeStageMeta.departmentName}</Typography>
-                      <Typography sx={pd.stageDate}>{activeStageMeta.completionPercentage}{STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.COMPLETE}</Typography>
+                      <Typography sx={pd.stageDate}>
+                        {activeStageMeta.completionPercentage}
+                        {STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.COMPLETE}
+                      </Typography>
                     </Box>
                   </Stack>
                   <StageStatusBadge status={activeStageMeta.status} t={t} />
@@ -183,7 +208,9 @@ export default function BatchDetailPopup({ batch, stageConfig, onClose, t }) {
                 {/* Risk Level & Status */}
                 <Stack direction="row" gap={2} mb={2.5}>
                   <Box sx={pd.riskLevelBox}>
-                    <Typography sx={pd.riskLevelLabel}>{STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.RISK_LEVEL}</Typography>
+                    <Typography sx={pd.riskLevelLabel}>
+                      {STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.RISK_LEVEL}
+                    </Typography>
                     <Stack direction="row" alignItems="center" gap={1}>
                       <Box sx={pd.riskLevelDot(getStatusColor(activeStageMeta.riskLevel))} />
                       <Typography sx={pd.riskLevelValue}>{activeStageMeta.riskLevel}</Typography>
@@ -192,7 +219,10 @@ export default function BatchDetailPopup({ batch, stageConfig, onClose, t }) {
                 </Stack>
 
                 {/* Sub-Departments */}
-                <SectionHeader title={STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.SUB_STAGES} titleSx={pd.subSectionHeader} />
+                <SectionHeader
+                  title={STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.SUB_STAGES}
+                  titleSx={pd.subSectionHeader}
+                />
                 <Stack spacing={1}>
                   {activeStageMeta.subDepartments.map((subDept) => (
                     <Box key={subDept.subDepartmentId}>
@@ -206,8 +236,14 @@ export default function BatchDetailPopup({ batch, stageConfig, onClose, t }) {
                             <Typography sx={pd.subDeptItemName}>{subDept.name}</Typography>
                           </Stack>
                           <Stack direction="row" alignItems="center" gap={1}>
-                            <Typography sx={pd.subDeptItemPercentage}>{subDept.completionPercentage}%</Typography>
-                            <Typography sx={pd.subDeptItemToggle(expandedSubDeptId === subDept.subDepartmentId)}>
+                            <Typography sx={pd.subDeptItemPercentage}>
+                              {subDept.completionPercentage}%
+                            </Typography>
+                            <Typography
+                              sx={pd.subDeptItemToggle(
+                                expandedSubDeptId === subDept.subDepartmentId,
+                              )}
+                            >
                               {expandedSubDeptId === subDept.subDepartmentId ? "−" : "+"}
                             </Typography>
                           </Stack>
@@ -234,7 +270,9 @@ export default function BatchDetailPopup({ batch, stageConfig, onClose, t }) {
                 </Stack>
               </>
             ) : (
-              <Typography sx={pd.noStageDataText}>{STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.NO_STAGE_DATA}</Typography>
+              <Typography sx={pd.noStageDataText}>
+                {STRINGS.SYSTEM_MANAGER.BATCH_DETAILS.NO_STAGE_DATA}
+              </Typography>
             )}
           </Box>
         </Box>

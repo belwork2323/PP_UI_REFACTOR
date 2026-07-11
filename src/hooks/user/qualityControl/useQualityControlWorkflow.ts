@@ -121,7 +121,7 @@ export const useQualityControlWorkflow = <
       }
 
       const currentStatus = activeBatch[statusField] as string | undefined;
-      const isCreateFlow = currentStatus === QUALITY_CONTROL_STATUS.INITIATED;
+      const isCreateFlow = currentStatus === QUALITY_CONTROL_STATUS.TO_BE_INITIATED;
 
       setActionLoading(true);
       try {
@@ -213,7 +213,7 @@ export const useQualityControlWorkflow = <
       );
 
       showAlert(
-        activeBatch[statusField] === QUALITY_CONTROL_STATUS.INITIATED
+        activeBatch[statusField] === QUALITY_CONTROL_STATUS.TO_BE_INITIATED
           ? messages.CREATE_DRAFT_SUCCESS
           : messages.UPDATE_DRAFT_SUCCESS,
         "success",
@@ -242,7 +242,7 @@ export const useQualityControlWorkflow = <
       );
 
       showAlert(
-        activeBatch[statusField] === QUALITY_CONTROL_STATUS.INITIATED
+        activeBatch[statusField] === QUALITY_CONTROL_STATUS.TO_BE_INITIATED
           ? messages.CREATE_SUBMIT_SUCCESS
           : messages.UPDATE_SUBMIT_SUCCESS,
         "success",

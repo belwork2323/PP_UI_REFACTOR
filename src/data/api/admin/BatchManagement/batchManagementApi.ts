@@ -53,6 +53,7 @@ export const fetchAllBatches = (
   page: number = 1,
   limit: number = 10,
   filters: BatchFilters = {},
+  dateFilter: {},
   sort: BatchSort = { field: "createdOn", order: "desc" },
 ) => {
   // Strip undefined / empty — server expects {} for "no filters"

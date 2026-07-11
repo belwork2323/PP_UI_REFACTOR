@@ -15,7 +15,8 @@ const OPERATION_STATUS_VALUES = Object.values(OPERATION_STATUS) as OperationStat
 export function normalizeRawMaterialLotListStatus(status: string): OperationStatus {
   const u = String(status ?? "").toUpperCase();
   const map: Record<string, OperationStatus> = {
-    INITIATED: OPERATION_STATUS.INITIATED,
+    TO_BE_INITIATED: OPERATION_STATUS.TO_BE_INITIATED,
+    INITIATED: OPERATION_STATUS.TO_BE_INITIATED,
     IN_PROGRESS: OPERATION_STATUS.IN_PROGRESS,
     WAITING_FOR_APPROVAL: OPERATION_STATUS.WAITING_FOR_APPROVAL,
     APPROVED: OPERATION_STATUS.APPROVED,
@@ -27,7 +28,7 @@ export function normalizeRawMaterialLotListStatus(status: string): OperationStat
   if (OPERATION_STATUS_VALUES.includes(trimmed as OperationStatus)) {
     return trimmed as OperationStatus;
   }
-  return OPERATION_STATUS.INITIATED;
+  return OPERATION_STATUS.TO_BE_INITIATED;
 }
 
 /** UI status labels → API status enum for list filters */
@@ -121,7 +122,7 @@ export function parseApiReferenceRange(
         unit?: string | null;
       }
     | null
-    | undefined
+    | undefined,
 ): ReferenceRangeShape {
   return {
     minValue: parseApiNumericValue(ref?.minValue ?? null),
@@ -145,16 +146,26 @@ export function formatReferenceRangeLabel(ref: ReferenceRangeShape): string {
 }
 
 export function isSpecRowFailed(row: Pick<SpecRow, "status" | "isOutOfRange">): boolean {
-  if (String(row.status ?? "").trim().toLowerCase() === "failed") return true;
+  if (
+    String(row.status ?? "")
+      .trim()
+      .toLowerCase() === "failed"
+  )
+    return true;
   return Boolean(row.isOutOfRange);
 }
 
 /** UI label for specification row status (API may return "failed" for out-of-range values). */
 export function formatSpecStatusDisplayLabel(
   status: string | null | undefined,
-  isOutOfRange?: boolean
+  isOutOfRange?: boolean,
 ): string | null {
-  if (isOutOfRange || String(status ?? "").trim().toLowerCase() === "failed") {
+  if (
+    isOutOfRange ||
+    String(status ?? "")
+      .trim()
+      .toLowerCase() === "failed"
+  ) {
     return "Out of Range";
   }
   const trimmed = String(status ?? "").trim();
@@ -193,7 +204,7 @@ export type ReferenceRangeShape = {
 
 export function computeIsOutOfRange(
   analysedResult: string,
-  referenceRange?: ReferenceRangeShape
+  referenceRange?: ReferenceRangeShape,
 ): boolean {
   const trimmed = String(analysedResult ?? "").trim();
   if (!trimmed || !referenceRange) return false;
@@ -223,7 +234,7 @@ export function flattenMaterialGroups(groups: MaterialFormGroup[]): MaterialBloc
       manufacturerName: group.manufacturerName,
       certificates: lot.certificates ?? [],
       rows: lot.rows ?? [],
-    }))
+    })),
   );
 }
 
@@ -255,7 +266,7 @@ export function groupBlocksToMaterialGroups(blocks: MaterialBlock[]): MaterialFo
 /** Column keys searched by the raw material lot list search bar */
 export const RAW_MATERIAL_LOT_SEARCH_FIELDS = [
   "lotId",
-  "procurementId",
+  "sourcingId",
   "materialCode",
   "materialName",
   "supplyOrderNo",
@@ -275,7 +286,7 @@ export function rawMaterialLotMatchesSearch(row: RawMaterialLotListRow, query: s
 
   const parts: string[] = [
     row.lotId,
-    row.procurementId,
+    row.sourcingId,
     row.materialCode,
     row.materialName,
     row.supplyOrderNo,
@@ -293,7 +304,7 @@ export function rawMaterialLotMatchesSearch(row: RawMaterialLotListRow, query: s
     if (!Number.isNaN(d.getTime())) {
       parts.push(
         d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
-        d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })
+        d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }),
       );
     }
   }
@@ -305,7 +316,7 @@ export function rawMaterialLotMatchesSearch(row: RawMaterialLotListRow, query: s
 export type RawMaterialLotListRow = {
   id: string | number;
   lotId: string;
-  procurementId: string;
+  sourcingId: string;
   materialCode: string;
   materialName: string;
   supplyOrderNo: string;
@@ -321,7 +332,7 @@ export type RawMaterialLotListRow = {
 /** Read-only lot details page context (from list row + details API) */
 export type RawMaterialLotDetailsContext = {
   lotId: string;
-  procurementId: string;
+  sourcingId: string;
   materialCode: string;
   materialName: string;
   supplyOrderNo: string;
@@ -337,7 +348,7 @@ export type RawMaterialLotDetailsContext = {
 export type RawMaterialFormBatch = {
   id: string | number;
   lotId: string | null;
-  procurementId: string | null;
+  sourcingId: string | null;
   formId?: string | null;
   batchId: string;
   batchType: string;
@@ -444,13 +455,18 @@ export type RawMaterialLotListData = {
 export class RawMaterialProcurementSubmitResponseModel {
   formId: string;
   batchId: string;
-  procurementId: string;
+  sourcingId: string;
   status: string;
 
-  constructor(payload: { formId?: string; batchId?: string; procurementId?: string; status?: string }) {
+  constructor(payload: {
+    formId?: string;
+    batchId?: string;
+    sourcingId?: string;
+    status?: string;
+  }) {
     this.formId = payload.formId ?? "";
     this.batchId = payload.batchId ?? "";
-    this.procurementId = payload.procurementId ?? "";
+    this.sourcingId = payload.sourcingId ?? "";
     this.status = payload.status ?? "";
   }
 
@@ -462,7 +478,8 @@ export function normalizeRawMaterialStatus(status: string): OperationStatus {
   const u = String(status ?? "").toUpperCase();
 
   const map: Record<string, OperationStatus> = {
-    INITIATED: OPERATION_STATUS.INITIATED,
+    TO_BE_INITIATED: OPERATION_STATUS.TO_BE_INITIATED,
+    INITIATED: OPERATION_STATUS.TO_BE_INITIATED,
     IN_PROGRESS: OPERATION_STATUS.IN_PROGRESS,
     WAITING_FOR_APPROVAL: OPERATION_STATUS.WAITING_FOR_APPROVAL,
     APPROVED: OPERATION_STATUS.APPROVED,
@@ -478,7 +495,7 @@ export function normalizeRawMaterialStatus(status: string): OperationStatus {
     return trimmed as OperationStatus;
   }
 
-  return OPERATION_STATUS.INITIATED;
+  return OPERATION_STATUS.TO_BE_INITIATED;
 }
 /** Legacy batch-style details (multi-material) — kept for approver until migrated */
 export class RawMaterialProcurementDetailsModel {
@@ -519,7 +536,9 @@ export class RawMaterialProcurementDetailsModel {
       lotNo: material.lotNo ?? "",
       rows: (material.specifications ?? []).map((spec) => {
         const referenceRange = parseApiReferenceRange(spec.referenceRange);
-        const analysedResult = parseApiAnalysedResultDisplay(spec.analysedResult as ApiNumericValue);
+        const analysedResult = parseApiAnalysedResultDisplay(
+          spec.analysedResult as ApiNumericValue,
+        );
         const status = spec.status ?? null;
         return {
           specificationCode: spec.specificationCode,
@@ -530,8 +549,9 @@ export class RawMaterialProcurementDetailsModel {
           remarks: spec.remarks ?? "",
           status,
           isOutOfRange:
-            String(status ?? "").trim().toLowerCase() === "failed" ||
-            computeIsOutOfRange(analysedResult, referenceRange),
+            String(status ?? "")
+              .trim()
+              .toLowerCase() === "failed" || computeIsOutOfRange(analysedResult, referenceRange),
           referenceRange,
         };
       }),
@@ -601,7 +621,9 @@ export class RawMaterialLotDetailsModel {
         certificates: [...(model.certificates ?? [])],
         rows: (model.specifications ?? []).map((spec) => {
           const referenceRange = parseApiReferenceRange(spec.referenceRange);
-          const analysedResult = parseApiAnalysedResultDisplay(spec.analysedResult as ApiNumericValue);
+          const analysedResult = parseApiAnalysedResultDisplay(
+            spec.analysedResult as ApiNumericValue,
+          );
           const status = spec.status ?? null;
           return {
             specificationCode: spec.specificationCode,
@@ -612,8 +634,9 @@ export class RawMaterialLotDetailsModel {
             remarks: spec.remarks ?? "",
             status,
             isOutOfRange:
-              String(status ?? "").trim().toLowerCase() === "failed" ||
-              computeIsOutOfRange(analysedResult, referenceRange),
+              String(status ?? "")
+                .trim()
+                .toLowerCase() === "failed" || computeIsOutOfRange(analysedResult, referenceRange),
             referenceRange,
           };
         }),
@@ -630,7 +653,7 @@ export function mapLotListApiRow(lot: any, index: number): RawMaterialLotListRow
   return {
     id,
     lotId,
-    procurementId: String(lot?.procurementId ?? ""),
+    sourcingId: String(lot?.sourcingId ?? ""),
     materialCode: String(lot?.materialCode ?? lot?.material ?? "").trim(),
     materialName: String(lot?.materialName ?? ""),
     supplyOrderNo: String(lot?.supplyOrderNo ?? ""),
@@ -652,13 +675,16 @@ function simpleHash(s: string): number {
   return Math.abs(h);
 }
 
-export function lotListRowToFormBatch(row: RawMaterialLotListRow, draftData: MaterialBlock[]): RawMaterialFormBatch {
+export function lotListRowToFormBatch(
+  row: RawMaterialLotListRow,
+  draftData: MaterialBlock[],
+): RawMaterialFormBatch {
   return {
     id: row.id,
     lotId: row.lotId,
-    procurementId: row.procurementId,
+    sourcingId: row.sourcingId,
     formId: row.formId ?? null,
-    batchId: row.procurementId || row.lotId,
+    batchId: row.sourcingId || row.lotId,
     batchType: row.materialName || row.materialCode,
     motorId: row.materialCode,
     motorType: row.materialName,
@@ -675,7 +701,7 @@ export function createEmptyFormBatch(): RawMaterialFormBatch {
   return {
     id: "new",
     lotId: null,
-    procurementId: null,
+    sourcingId: null,
     formId: null,
     batchId: "—",
     batchType: "",
@@ -684,7 +710,7 @@ export function createEmptyFormBatch(): RawMaterialFormBatch {
     priority: "Medium",
     assignedTo: null,
     createdOn: new Date().toISOString(),
-    rmStatus: OPERATION_STATUS.INITIATED,
+    rmStatus: OPERATION_STATUS.TO_BE_INITIATED,
     draftData: [],
     rejectionReason: null,
   };
@@ -722,7 +748,9 @@ function mapLotBlockToCreatePayload(lot: MaterialLotBlock): RawMaterialLotCreate
       .map((row) => ({
         specificationCode: (row.specificationCode ?? "").trim(),
         analysedResult:
-          row.analysedResult === "" || row.analysedResult === null || row.analysedResult === undefined
+          row.analysedResult === "" ||
+          row.analysedResult === null ||
+          row.analysedResult === undefined
             ? null
             : Number(row.analysedResult),
         isOutOfRange: Boolean(row.isOutOfRange),
@@ -733,7 +761,7 @@ function mapLotBlockToCreatePayload(lot: MaterialLotBlock): RawMaterialLotCreate
         (c) =>
           String(c.fileUrl ?? "").trim().length > 0 ||
           String(c.fileName ?? "").trim().length > 0 ||
-          String(c.certificateType ?? "").trim().length > 0
+          String(c.certificateType ?? "").trim().length > 0,
       )
       .map((c) => ({
         fileName: String(c.fileName ?? "").trim(),
@@ -744,7 +772,7 @@ function mapLotBlockToCreatePayload(lot: MaterialLotBlock): RawMaterialLotCreate
 }
 
 export function mapMaterialGroupsToCreateMaterials(
-  groups: MaterialFormGroup[]
+  groups: MaterialFormGroup[],
 ): RawMaterialMaterialCreatePayload[] {
   return (groups ?? [])
     .filter((g) => (g.material ?? "").trim())
@@ -757,7 +785,9 @@ export function mapMaterialGroupsToCreateMaterials(
     }));
 }
 
-export function mapBlocksToCreateMaterials(blocks: MaterialBlock[]): RawMaterialMaterialCreatePayload[] {
+export function mapBlocksToCreateMaterials(
+  blocks: MaterialBlock[],
+): RawMaterialMaterialCreatePayload[] {
   return mapMaterialGroupsToCreateMaterials(groupBlocksToMaterialGroups(blocks));
 }
 
@@ -765,7 +795,7 @@ export function mapFirstBlockToLotUpdatePayload(
   block: MaterialBlock,
   lotId: string,
   subDepartmentId: number,
-  submissionType: "DRAFT" | "UPDATE"
+  submissionType: "DRAFT" | "UPDATE",
 ): RawMaterialLotUpdatePayload {
   return {
     lotId,
@@ -786,7 +816,9 @@ export function mapFirstBlockToLotUpdatePayload(
           unit: row.referenceRange?.unit ?? null,
         },
         analysedResult:
-          row.analysedResult === "" || row.analysedResult === null || row.analysedResult === undefined
+          row.analysedResult === "" ||
+          row.analysedResult === null ||
+          row.analysedResult === undefined
             ? null
             : Number(row.analysedResult),
         remarks: row.remarks ?? "",
@@ -797,7 +829,7 @@ export function mapFirstBlockToLotUpdatePayload(
         (c) =>
           String(c.fileUrl ?? "").trim().length > 0 ||
           String(c.fileName ?? "").trim().length > 0 ||
-          String(c.certificateType ?? "").trim().length > 0
+          String(c.certificateType ?? "").trim().length > 0,
       )
       .map((c) => ({
         fileName: String(c.fileName ?? "").trim(),

@@ -4,7 +4,7 @@ import { normalizeSubdepartmentBatchStatus } from "@data/models/user/Subdepartme
 export { motorStageLabel };
 
 export const getBatchId = (b: any): string => b.batchId || b.id || "—";
-
+export const getProjectId = (b: any): string => b.projectId || b.id || "—";
 export const getMotorId = (b: any): string => {
   if (Array.isArray(b.motorIds) && b.motorIds.length > 0) {
     return b.motorIds.join(", ");
@@ -40,10 +40,7 @@ export const getSubDept = (b: any): string => {
 };
 
 export const getSystemManagerLabel = (b: any): string =>
-  b.systemManager?.name?.trim() ||
-  b.systemManager?.id ||
-  b.systemManagerId ||
-  "—";
+  b.systemManager?.name?.trim() || b.systemManager?.id || b.systemManagerId || "—";
 
 /** @deprecated Use getSystemManagerLabel */
 export const getSystemManagerId = (b: any) => getSystemManagerLabel(b);

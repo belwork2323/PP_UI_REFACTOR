@@ -42,7 +42,7 @@ const DEPT_NAME_SLUG_MAP = {
 
 const SUBDEPT_NAME_SLUG_MAP = {
   sourcing: {
-    "raw-material-procurement": "raw-material",
+    "raw-material-sourcing": "raw-material",
     "rocket-motor-casing": "rocket-motor",
   },
   manufacturing: {
@@ -85,7 +85,7 @@ export const getSlugsFromNames = (departmentName, subDepartmentName) => {
 
   if (!dept || !subDept) return null;
 
-  return { dept, subDept }; 
+  return { dept, subDept };
 };
 
 /* ─────────────────────────────────────────────────────────────────────────────

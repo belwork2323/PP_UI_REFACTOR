@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { batchManagementController } from "@controllers/admin/BatchManagement/batchManagementController";
 import { generalController } from "@controllers/admin/common/generalController";
 import { userManagementController } from "@controllers/admin/UserManagement/userManagementController";
@@ -43,9 +43,16 @@ type BatchFilters = {
   status?: string;
   priority?: string;
   subDepartment?: string;
+  filterType?: string;
+  endDate?: string;
+  startDate?: string;
 };
 
-function useBatchListSection() {
+function useBatchListSection(dateFilter: {
+  filterType: string;
+  startDate: string;
+  endDate: string;
+}) {
   const [batches, setBatches] = useState<any[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -59,7 +66,11 @@ function useBatchListSection() {
   const loadBatchList = useCallback(async () => {
     setListLoading(true);
     try {
-      const filters: BatchFilters = {};
+      const filters: BatchFilters = {
+        filterType: dateFilter.filterType,
+        startDate: dateFilter.startDate,
+        endDate: dateFilter.endDate,
+      };
       if (search.trim()) filters.search = search.trim();
       if (appliedFilters.stage !== "All") filters.motorStage = appliedFilters.stage;
       if (appliedFilters.motorIds?.length) {
@@ -73,7 +84,12 @@ function useBatchListSection() {
       if (appliedFilters.priority !== "All") filters.priority = appliedFilters.priority;
       if (appliedFilters.subDept !== "All") filters.subDepartment = appliedFilters.subDept;
 
-      const resp = await batchManagementController.getAllBatches(page + 1, rowsPerPage, filters);
+      const resp = await batchManagementController.getAllBatches(
+        page + 1,
+        rowsPerPage,
+        filters,
+        dateFilter,
+      );
       if (resp) {
         setBatches(resp.batches || []);
         setPaginationData({
@@ -86,12 +102,11 @@ function useBatchListSection() {
     } finally {
       setListLoading(false);
     }
-  }, [search, appliedFilters, page, rowsPerPage]);
+  }, [search, appliedFilters, page, rowsPerPage, dateFilter]);
 
-  useEffect(() => {
+  const refreshList = useCallback(() => {
     void loadBatchList();
   }, [loadBatchList]);
-
   const activeFilterCount = Object.entries(appliedFilters).filter(([_, value]) => {
     if (Array.isArray(value)) {
       return value.length > 0;
@@ -152,39 +167,25 @@ function useBatchListSection() {
     activeFilterCount,
     clearFilters,
     loadBatchList,
+    refreshList,
   };
 }
 
-function useBatchStatsSection() {
+function useBatchStatsSection(dateFilter: {
+  filterType: string;
+  startDate: string;
+  endDate: string;
+}) {
   const [stats, setStats] = useState(null);
   const [statsLoading, setStatsLoading] = useState(true);
-  const [filterType, setFilterType] = useState("month");
-  const [customStartDate, setCustomStartDate] = useState("");
-  const [customEndDate, setCustomEndDate] = useState("");
+
   const [dateFilterOpen, setDateFilterOpen] = useState(true);
-  const getStatsPayload = useCallback(() => {
-    if (filterType === "custom") {
-      return {
-        filterType,
-        startDate: customStartDate,
-        endDate: customEndDate,
-      };
-    }
 
-    const { startDate, endDate } = getDateRange(filterType);
-
-    return {
-      filterType,
-      startDate,
-      endDate,
-    };
-  }, [filterType, customStartDate, customEndDate]);
   const fetchStats = useCallback(async () => {
     setStatsLoading(true);
 
     try {
-      const payload = getStatsPayload();
-      const data = await batchManagementController.getBatchStats(payload);
+      const data = await batchManagementController.getBatchStats(dateFilter);
 
       if (data) {
         setStats(data);
@@ -192,48 +193,24 @@ function useBatchStatsSection() {
     } finally {
       setStatsLoading(false);
     }
-  }, [getStatsPayload]);
-  const handleFilterTypeChange = (value: string) => {
-    setFilterType(value);
+  }, [dateFilter]);
 
-    if (value !== "custom") {
-      setCustomStartDate("");
-      setCustomEndDate("");
-    }
-  };
-  const toggleDateFilter = () => {
-    setDateFilterOpen((prev) => !prev);
-  };
   const refreshDashboard = useCallback(() => {
     void fetchStats();
   }, [fetchStats]);
 
-  useEffect(() => {
-    if (filterType !== "custom") {
-      refreshDashboard();
-      return;
-    }
-
-    if (customStartDate && customEndDate) {
-      refreshDashboard();
-    }
-  }, [filterType, customStartDate, customEndDate, refreshDashboard]);
+  const toggleDateFilter = () => {
+    setDateFilterOpen((prev) => !prev);
+  };
 
   return {
     stats,
     loading: statsLoading,
 
-    filterType,
-    customStartDate,
-    customEndDate,
     dateFilterOpen,
 
-    setFilterType,
-    setCustomStartDate,
-    setCustomEndDate,
     setDateFilterOpen,
 
-    handleFilterTypeChange,
     refreshDashboard,
     toggleDateFilter,
   };
@@ -739,7 +716,7 @@ function useBatchImplementationSection(implModalOpen: boolean) {
         {
           id: trimmed,
           lotId: trimmed,
-          procurementId: "",
+          sourcingId: "",
           materialCode,
           materialName: "",
           supplyOrderNo: "",
@@ -816,8 +793,37 @@ function useBatchDeleteSection(onRefresh: () => void) {
 }
 
 export default function useBatchManagementHook() {
-  const list = useBatchListSection();
-  const stats = useBatchStatsSection();
+  const [filterType, setFilterType] = useState("month");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
+  const handleFilterTypeChange = (value: string) => {
+    setFilterType(value);
+
+    if (value !== "custom") {
+      setCustomStartDate("");
+      setCustomEndDate("");
+    }
+  };
+
+  const dateFilterPayload = useMemo(() => {
+    if (filterType === "custom") {
+      return {
+        filterType,
+        startDate: customStartDate,
+        endDate: customEndDate,
+      };
+    }
+
+    const { startDate, endDate } = getDateRange(filterType);
+
+    return {
+      filterType,
+      startDate,
+      endDate,
+    };
+  }, [filterType, customStartDate, customEndDate]);
+  const list = useBatchListSection(dateFilterPayload);
+  const stats = useBatchStatsSection(dateFilterPayload);
   const lookups = useBatchLookupsSection();
 
   const refreshAll = useCallback(() => {
@@ -828,6 +834,18 @@ export default function useBatchManagementHook() {
   const deleteSection = useBatchDeleteSection(refreshAll);
   const form = useBatchFormSection(refreshAll);
   const implementation = useBatchImplementationSection(form.implModalOpen);
+  useEffect(() => {
+    if (filterType !== "custom") {
+      refreshAll();
+      return;
+    }
+
+    if (!customStartDate || !customEndDate) {
+      return;
+    }
+
+    refreshAll();
+  }, [filterType, customStartDate, customEndDate, refreshAll]);
 
   return {
     list,
@@ -837,5 +855,14 @@ export default function useBatchManagementHook() {
     implementation,
     delete: deleteSection,
     refresh: refreshAll,
+    filter: {
+      handleFilterTypeChange,
+      setFilterType,
+      setCustomStartDate,
+      setCustomEndDate,
+      filterType,
+      customStartDate,
+      customEndDate,
+    },
   };
 }

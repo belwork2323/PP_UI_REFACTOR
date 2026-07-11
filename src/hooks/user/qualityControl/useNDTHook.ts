@@ -39,7 +39,7 @@ export type { NDTBatch };
 const normalizeBatch = (batch: any): NDTBatch => ({
   ...batch,
   lotId: batch?.lotId ?? batch?.batchId ?? "",
-  ndtStatus: batch?.ndtStatus ?? batch?.status ?? QUALITY_CONTROL_STATUS.INITIATED,
+  ndtStatus: batch?.ndtStatus ?? batch?.status ?? QUALITY_CONTROL_STATUS.TO_BE_INITIATED,
   formId: batch?.formId ?? null,
   draftData: batch?.draftData ?? null,
   rejectionReason: batch?.rejectionReason ?? null,
@@ -417,7 +417,7 @@ export const useNDTHook = () => {
     }
 
     const mapped = mapNDTPayload(normalized);
-    const isCreateFlow = activeBatch.ndtStatus === QUALITY_CONTROL_STATUS.INITIATED && !activeBatch.formId;
+    const isCreateFlow = activeBatch.ndtStatus === QUALITY_CONTROL_STATUS.TO_BE_INITIATED && !activeBatch.formId;
 
     setActionLoading(true);
     try {

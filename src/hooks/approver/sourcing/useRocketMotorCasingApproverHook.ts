@@ -46,7 +46,7 @@ const getResponseMessage = (response: { message?: string; errorCode?: string | n
 
 const ROCKET_MOTOR_CASING_APPROVER_STATUS_META = {
   ...APPROVER_STATUS_META,
-  [OPERATION_STATUS.INITIATED]: {
+  [OPERATION_STATUS.TO_BE_INITIATED]: {
     bg: alpha("#5D6D7E", 0.08),
     color: "#2E4053",
     border: alpha("#5D6D7E", 0.2),

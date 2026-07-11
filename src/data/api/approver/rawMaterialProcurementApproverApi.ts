@@ -13,7 +13,7 @@ export type RawMaterialProcurementApproverListPayload = {
 };
 
 export type RawMaterialProcurementApproverChangeStatusPayload = {
-  procurementId: string;
+  sourcingId: string;
   lotId: string;
   subDepartmentId: number;
   actionType: "APPROVED" | "REJECTED";

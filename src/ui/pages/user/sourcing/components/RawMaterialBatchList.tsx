@@ -27,7 +27,11 @@ import UserWorkflowStatusAction from "../../../../components/custom/UserWorkflow
 import UserWorkflowStatusCell from "../../../../components/custom/UserWorkflowStatusCell";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import getSourcingTheme from "../../../../../app/theme/custom_themes/user/sourcing/sourcing_theme";
-import { getOperationStatusConfig, OPERATION_STATUS, OPERATION_STATUS_FILTER_VALUES } from "../../../../../hooks/operationStatus";
+import {
+  getOperationStatusConfig,
+  OPERATION_STATUS,
+  OPERATION_STATUS_FILTER_VALUES,
+} from "../../../../../hooks/operationStatus";
 import {
   canDeleteRawMaterialLot,
   RAW_MATERIAL_LOT_SEARCH_FIELDS,
@@ -58,7 +62,7 @@ export const OPERATION_STATUS_CONFIG = getOperationStatusConfig({
 const STATUS_DROPDOWN_VALUES = [FILTER_ALL, ...OPERATION_STATUS_FILTER_VALUES] as const;
 
 /** Lot metadata edit — only for drafts not yet in workflow filling */
-const canShowEditLotButton = (status: string) => status === OPERATION_STATUS.INITIATED;
+const canShowEditLotButton = (status: string) => status === OPERATION_STATUS.TO_BE_INITIATED;
 
 const canViewLotDetails = (status: string) =>
   status === OPERATION_STATUS.WAITING_FOR_APPROVAL || status === OPERATION_STATUS.APPROVED;
@@ -104,7 +108,9 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
   const [draftStatus, setDraftStatus] = useState(FILTER_ALL);
 
   const syncDraftsFromApplied = useCallback(() => {
-    setDraftMaterial(advancedFilters.materialCodes.length === 1 ? advancedFilters.materialCodes[0]! : FILTER_ALL);
+    setDraftMaterial(
+      advancedFilters.materialCodes.length === 1 ? advancedFilters.materialCodes[0]! : FILTER_ALL,
+    );
     setDraftManufacturer(advancedFilters.manufacturer);
     setDraftFrom(advancedFilters.fromDate);
     setDraftTo(advancedFilters.toDate);
@@ -197,16 +203,16 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
       clearChipSx: {
         fontWeight: 700,
         fontSize: "0.75rem", // Increased from 0.62rem
-        height: "28px",      // Standard "small" is 24px, "medium" is 32px. 28px is a nice middle ground.
-        px: 0.5,             // Adds a bit of horizontal padding
+        height: "28px", // Standard "small" is 24px, "medium" is 32px. 28px is a nice middle ground.
+        px: 0.5, // Adds a bit of horizontal padding
         borderColor: alpha(theme.palette.danger, 0.35),
         color: theme.palette.danger,
-        '& .MuiChip-label': {
-          px: 1.5,           // Specifically increases padding around the text label
+        "& .MuiChip-label": {
+          px: 1.5, // Specifically increases padding around the text label
         },
       },
     }),
-    [theme.palette]
+    [theme.palette],
   );
 
   const COLUMNS = useMemo(
@@ -217,8 +223,8 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         render: (v: string) => <Typography sx={theme.batchList.batchIdText}>{v}</Typography>,
       },
       {
-        key: "procurementId",
-        label: STRINGS.SOURCING.BATCH_LIST.COL_PROCUREMENT_ID,
+        key: "sourcingId",
+        label: STRINGS.SOURCING.BATCH_LIST.COL_SOURCING_ID,
         render: (v: string) => <Typography sx={theme.batchList.normalText}>{v}</Typography>,
       },
       {
@@ -270,7 +276,15 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         render: (v: string) => (
           <IconText
             icon={<CalendarMonthRoundedIcon sx={theme.batchList.icon} />}
-            text={v ? new Date(v).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—"}
+            text={
+              v
+                ? new Date(v).toLocaleDateString("en-IN", {
+                    day: "2-digit",
+                    month: "short",
+                    year: "numeric",
+                  })
+                : "—"
+            }
             textSx={theme.batchList.subtleText}
           />
         ),
@@ -290,7 +304,7 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         ),
       },
     ],
-    [statusConfig, theme]
+    [statusConfig, theme],
   );
 
   const createLotSx = useMemo(() => {
@@ -381,7 +395,12 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
       />
 
       <Stack direction={{ xs: "column", lg: "row" }} spacing={1.25} flexWrap="wrap" useFlexGap>
-        <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ minWidth: { xs: "100%", sm: 180 }, flex: { lg: "0 0 auto" } }}>
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="flex-start"
+          sx={{ minWidth: { xs: "100%", sm: 180 }, flex: { lg: "0 0 auto" } }}
+        >
           <TextField
             select
             size="small"
@@ -399,7 +418,9 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
               },
             }}
           >
-            <MenuItem value={FILTER_ALL}>{STRINGS.SOURCING.BATCH_LIST.FILTERS_ALL_MATERIALS}</MenuItem>
+            <MenuItem value={FILTER_ALL}>
+              {STRINGS.SOURCING.BATCH_LIST.FILTERS_ALL_MATERIALS}
+            </MenuItem>
             {!materialsLoading &&
               materialOptions.map((m: { materialCode: string; materialName: string }) => (
                 <MenuItem key={m.materialCode} value={m.materialCode}>
@@ -407,7 +428,9 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
                 </MenuItem>
               ))}
           </TextField>
-          {materialsLoading ? <CircularProgress size={18} sx={{ mt: 0.75, color: theme.palette.primaryLight }} /> : null}
+          {materialsLoading ? (
+            <CircularProgress size={18} sx={{ mt: 0.75, color: theme.palette.primaryLight }} />
+          ) : null}
         </Stack>
 
         <TextField
@@ -416,7 +439,11 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
           value={draftManufacturer}
           onChange={(e) => setDraftManufacturer(e.target.value)}
           placeholder="e.g. Prefiled"
-          sx={{ ...theme.batchList.filterPanelField, minWidth: { xs: "100%", sm: 160 }, flex: { lg: 1 } }}
+          sx={{
+            ...theme.batchList.filterPanelField,
+            minWidth: { xs: "100%", sm: 160 },
+            flex: { lg: 1 },
+          }}
         />
 
         <TextField
@@ -436,7 +463,7 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         >
           {STATUS_DROPDOWN_VALUES.map((s) => (
             <MenuItem key={s} value={s}>
-              {s === FILTER_ALL ? FILTER_ALL : statusConfig[s]?.label ?? s}
+              {s === FILTER_ALL ? FILTER_ALL : (statusConfig[s]?.label ?? s)}
             </MenuItem>
           ))}
         </TextField>
@@ -470,10 +497,20 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
       </Stack>
 
       <Stack direction="row" justifyContent="flex-end" spacing={1}>
-        <Button variant="outlined" size="small" onClick={() => setFilterOpen(false)} sx={{ textTransform: "none", fontWeight: 700 }}>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={() => setFilterOpen(false)}
+          sx={{ textTransform: "none", fontWeight: 700 }}
+        >
           {STRINGS.SOURCING.BATCH_LIST.FILTERS_CLOSE_PANEL}
         </Button>
-        <Button variant="contained" size="small" onClick={handleApplyPanelFilters} sx={{ ...theme.batchList.action.primary, textTransform: "none" }}>
+        <Button
+          variant="contained"
+          size="small"
+          onClick={handleApplyPanelFilters}
+          sx={{ ...theme.batchList.action.primary, textTransform: "none" }}
+        >
           {STRINGS.SOURCING.BATCH_LIST.FILTERS_APPLY}
         </Button>
       </Stack>
@@ -508,14 +545,30 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         searchBarEnd={searchBarEnd}
         filterExtension={filterExtension}
         statusToolbarEnd={
-          <Button variant="contained" size="small" startIcon={<AddRoundedIcon />} onClick={handleCreateLot} sx={createLotSx}>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<AddRoundedIcon />}
+            onClick={handleCreateLot}
+            sx={createLotSx}
+          >
             {STRINGS.SOURCING.BATCH_LIST.CREATE_LOT}
           </Button>
         }
         renderAction={(row: any) => (
-          <Stack direction="row" spacing={1} alignItems="center" justifyContent="center" flexWrap="wrap">
+          <Stack
+            direction="row"
+            spacing={1}
+            alignItems="center"
+            justifyContent="center"
+            flexWrap="wrap"
+          >
             {canViewLotDetails(row.rmStatus) ? (
-              <Tooltip title={STRINGS.SOURCING.BATCH_LIST.VIEW_LOT_DETAILS_TOOLTIP} arrow placement="top">
+              <Tooltip
+                title={STRINGS.SOURCING.BATCH_LIST.VIEW_LOT_DETAILS_TOOLTIP}
+                arrow
+                placement="top"
+              >
                 <IconButton
                   size="small"
                   onClick={() => handleViewLotDetails(row)}
@@ -546,7 +599,12 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
               />
             )}
             {canShowEditLotButton(row.rmStatus) && (
-              <Button variant="outlined" size="small" onClick={() => handleEditLot(row)} sx={theme.batchList.action.secondary}>
+              <Button
+                variant="outlined"
+                size="small"
+                onClick={() => handleEditLot(row)}
+                sx={theme.batchList.action.secondary}
+              >
                 {STRINGS.SOURCING.BATCH_LIST.EDIT_LOT}
               </Button>
             )}

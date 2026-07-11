@@ -95,13 +95,15 @@ const DEPARTMENT_SLUGS: Record<ApproverDepartmentKey, string> = {
 };
 
 const STATUS_LABELS: Record<string, string> = {
-  initiated: "Initiated",
+  toBeInitiated: "To Be Initiated",
+  initiated: "To Be Initiated",
   approved: "Approved",
   inProgress: "In Progress",
   waitingForApproval: "Waiting for Approval",
   rejected: "Rejected",
 
-  INITIATED: "Initiated",
+  TO_BE_INITIATED: "To Be Initiated",
+  INITIATED: "To Be Initiated",
   APPROVED: "Approved",
   IN_PROGRESS: "In Progress",
   WAITING_FOR_APPROVAL: "Waiting for Approval",

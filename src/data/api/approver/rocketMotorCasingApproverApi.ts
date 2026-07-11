@@ -15,7 +15,7 @@ export type RocketMotorCasingApproverListPayload = {
 };
 
 export type RocketMotorCasingApproverChangeStatusPayload = {
-  procurementId: string;
+  sourcingId: string;
   motorCasingId: string;
   subDepartmentId: number;
   actionType: "APPROVED" | "REJECTED";

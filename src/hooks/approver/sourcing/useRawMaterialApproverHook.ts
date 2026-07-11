@@ -5,12 +5,14 @@ import { STRINGS } from "../../../app/config/strings";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
 import { useApproverListRefreshStore } from "../../../app/store/approverListRefreshStore";
-import { APPROVER_STATUS_META, APPROVER_PRIORITY_META, isApproverActionableStatus } from "../../../app/theme/approver";
+import {
+  APPROVER_STATUS_META,
+  APPROVER_PRIORITY_META,
+  isApproverActionableStatus,
+} from "../../../app/theme/approver";
 import rawMaterialProcurementController from "../../../controllers/user/sourcing/rawMaterialProcurementController";
 import type { ApproverFormActionType } from "../../../data/api/approver/approverApi";
-import {
-  RawMaterialLotDetailsModel,
-} from "../../../data/models/user/RawMaterialProcurementModel";
+import { RawMaterialLotDetailsModel } from "../../../data/models/user/RawMaterialProcurementModel";
 import {
   toMaterialCodeNameOptions,
   type MaterialsListItem,
@@ -46,7 +48,7 @@ const normalizeMaterialsList = (items: MaterialsListItem[]): SubdeptMaterialOpti
 
 const RAW_MATERIAL_APPROVER_STATUS_META = {
   ...APPROVER_STATUS_META,
-  [OPERATION_STATUS.INITIATED]: {
+  [OPERATION_STATUS.TO_BE_INITIATED]: {
     bg: alpha("#5D6D7E", 0.08),
     color: "#2E4053",
     border: alpha("#5D6D7E", 0.2),
@@ -76,7 +78,8 @@ export const useRawMaterialApproverHook = () => {
   const [dialogValue, setDialogValue] = useState("");
   const [dialogError, setDialogError] = useState("");
   const [submitting, setSubmitting] = useState(false);
-  const [appliedFilters, setAppliedFilters] = useState<RawMaterialApproverAppliedFilters>(emptyAppliedFilters);
+  const [appliedFilters, setAppliedFilters] =
+    useState<RawMaterialApproverAppliedFilters>(emptyAppliedFilters);
   const [materialOptions, setMaterialOptions] = useState<SubdeptMaterialOption[]>([]);
   const [materialsLoading, setMaterialsLoading] = useState(false);
 
@@ -84,8 +87,7 @@ export const useRawMaterialApproverHook = () => {
     const match =
       user?.allSubDepartments.find(
         (sd) => sd.slugs?.dept === DEPARTMENT_SLUG && sd.slugs?.subDept === SUB_DEPARTMENT_SLUG,
-      ) ??
-      user?.allSubDepartments.find((sd) => sd.slugs?.subDept === SUB_DEPARTMENT_SLUG);
+      ) ?? user?.allSubDepartments.find((sd) => sd.slugs?.subDept === SUB_DEPARTMENT_SLUG);
 
     return match?.subDepartmentId ?? null;
   }, [user]);
@@ -191,25 +193,26 @@ export const useRawMaterialApproverHook = () => {
     setActionType(nextActionType);
     setDialogItem(item);
     setDialogValue(
-      nextActionType === "REJECTED" ? String(item.rejectionReason ?? "") : String(item.remarks ?? ""),
+      nextActionType === "REJECTED"
+        ? String(item.rejectionReason ?? "")
+        : String(item.remarks ?? ""),
     );
     setDialogError("");
   };
 
   const handleConfirm = async () => {
-
     if (!dialogItem || !actionType || !subDepartmentId) return;
 
     const trimmedValue = dialogValue.trim();
     const lotId = String(dialogItem?.lotId ?? dialogItem?.batchId ?? "").trim();
-    const procurementId = String(dialogItem?.procurementId ?? dialogItem?.formId ?? "").trim();
+    const sourcingId = String(dialogItem?.sourcingId ?? dialogItem?.formId ?? "").trim();
 
     if (actionType === "REJECTED" && !trimmedValue) {
       setDialogError(A.REJECTION_REASON_REQUIRED);
       return;
     }
 
-    if (!lotId || !procurementId) {
+    if (!lotId || !sourcingId) {
       showAlert(A.FORM_ID_MISSING, "error", { autoCloseMs: 3000 });
       return;
     }
@@ -228,8 +231,9 @@ export const useRawMaterialApproverHook = () => {
     setSubmitting(false);
 
     if (response.success) {
-      const nextStatus = (response.data as { status?: string })?.status
-        ?? (actionType === "APPROVED" ? "Approved" : "Rejected");
+      const nextStatus =
+        (response.data as { status?: string })?.status ??
+        (actionType === "APPROVED" ? "Approved" : "Rejected");
 
       setSelected(null);
       closeDialog();
@@ -274,7 +278,7 @@ export const useRawMaterialApproverHook = () => {
     setSelected({
       ...row,
       lotId: model.lotId || lotId,
-      procurementId: row.procurementId ?? "",
+      sourcingId: row.sourcingId ?? "",
       batchId: lotId,
       formId: row.lotId,
       materialCode: model.materialCode || row.materialCode,

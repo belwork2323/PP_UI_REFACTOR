@@ -16,7 +16,7 @@
     "toDate": "2026-06-30"
   },
   "requestNotes": {
-    "status": "Request only — uppercase API enums: INITIATED, IN_PROGRESS, WAITING_FOR_APPROVAL, APPROVED, REJECTED",
+    "status": "Request only — uppercase API enums: TO_BE_INITIATED, IN_PROGRESS, WAITING_FOR_APPROVAL, APPROVED, REJECTED",
     "search": "Free-text search across batch ID, motor ID, form submitter name",
     "batchIds": "From Batch ID filter",
     "batchTypes": "MAIN or SUBSCALE",
@@ -34,7 +34,7 @@
     "timestamp": "2026-06-27T15:46:02.142011",
     "data": {
       "statusCounts": {
-        "initiated": 1,
+        "toBeInitiated": 1,
         "approved": 5,
         "inProgress": 1,
         "waitingForApproval": 1,
@@ -87,7 +87,7 @@
     }
   },
   "responseNotes": {
-    "statusCounts": "camelCase keys: initiated, approved, inProgress, waitingForApproval, rejected",
+    "statusCounts": "camelCase keys: toBeInitiated, approved, inProgress, waitingForApproval, rejected (legacy initiated still accepted)",
     "batchStatus": "Uppercase enum per row e.g. WAITING_FOR_APPROVAL, IN_PROGRESS, APPROVED"
   },
   "userFields": {

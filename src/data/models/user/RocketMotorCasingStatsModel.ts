@@ -32,12 +32,16 @@ export class RocketMotorCasingStatsModel {
     };
   }
 
-  /** Accent keys match raw material procurement so DepartmentHeader uses the same tile colors */
+  /** Accent keys match raw material Sourcing so DepartmentHeader uses the same tile colors */
   static toStatItems(stats: RocketMotorCasingStats): DepartmentHeaderStatItem[] {
     return [
       { key: "createdLots", label: S.CREATED_MOTORS, value: stats.createdMotors },
       { key: "pendingLots", label: S.PENDING_MOTORS, value: stats.pendingMotors },
-      { key: "waitingForApprovalLots", label: S.WAITING_FOR_APPROVAL, value: stats.waitingForApprovalMotors },
+      {
+        key: "waitingForApprovalLots",
+        label: S.WAITING_FOR_APPROVAL,
+        value: stats.waitingForApprovalMotors,
+      },
       { key: "approvedLots", label: S.APPROVED_MOTORS, value: stats.approvedMotors },
       { key: "rejectedLots", label: S.REJECTED_MOTORS, value: stats.rejectedMotors },
     ];

@@ -18,7 +18,7 @@ export const APPROVER_ENDPOINTS = {
   BATCH_LIST: `${API_BASE}/approver/subdepartment/batch-list`,
   CHANGE_STATUS: `${API_BASE}/approver/form/change-status`,
   FORM_PDF: `${API_BASE}/approver/form/pdf`,
-  RAW_MATERIAL_PROCUREMENT_LIST: `${API_BASE}/approver/raw-material-procurement/list`,
+  RAW_MATERIAL_PROCUREMENT_LIST: `${API_BASE}/approver/raw-material-sourcing/list`,
   RAW_MATERIAL_PROCUREMENT_CHANGE_STATUS: `${API_BASE}/approver/form/change-status`,
   ROCKET_MOTOR_CASING_LIST: `${API_BASE}/approver/rocket-motor-casing/list`,
   ROCKET_MOTOR_CASING_CHANGE_STATUS: `${API_BASE}/approver/rocket-motor-casing/change-status`,
@@ -45,11 +45,9 @@ export const ADMIN_ENDPOINTS = {
 
 export const USER_SOURCING_ENDPOINTS = {
   ROCKET_CASING_LIST: `${API_BASE}/sourcing/rocket-casing/all`,
-  ROCKET_CASING_SUBMIT: (username) =>
-    `${API_BASE}/sourcing/rocket-casing/submit?user=${username}`,
+  ROCKET_CASING_SUBMIT: (username) => `${API_BASE}/sourcing/rocket-casing/submit?user=${username}`,
   RAW_MATERIAL_LIST: `${API_BASE}/sourcing/raw-material/all`,
-  RAW_MATERIAL_SUBMIT: (username) =>
-    `${API_BASE}/sourcing/raw-material/submit?user=${username}`,
+  RAW_MATERIAL_SUBMIT: (username) => `${API_BASE}/sourcing/raw-material/submit?user=${username}`,
 };
 
 export const DISPATCH_ENDPOINTS = {
@@ -69,7 +67,7 @@ export const USER_MANUFACTURING = {
     SOLID_LIST: `${API_BASE}/solid/all`,
     LIQUID_LIST: `${API_BASE}/liquid/all`,
     SUBMIT_LIQUID: `${API_BASE}/liquid`,
-    SUBMIT_SOLID: `${API_BASE}/solid`
+    SUBMIT_SOLID: `${API_BASE}/solid`,
   },
   CASEPREPARATION: {
     CASE_PREP_ALL: `${API_BASE}/solid/approved`,
@@ -101,30 +99,26 @@ export const USER_MANUFACTURING_APPROVER = {
     LIQUID_BATCH: (batchId) => `${API_BASE}/liquid/${batchId}`,
     UPDATE_SOLID_BATCH: (batchId) => `${API_BASE}/solid/update/${batchId}`,
     UPDATE_LIQUID_BATCH: (batchId) => `${API_BASE}/liquid/update/${batchId}`,
-    DOWNLOAD_SOLID_BATCH: (batchId) =>
-      `${API_BASE}/reports/solid/download/${batchId}`,
-    DOWNLOAD_LIQUID_BATCH: (batchId) =>
-      `${API_BASE}/reports/liquid/download/${batchId}`,
+    DOWNLOAD_SOLID_BATCH: (batchId) => `${API_BASE}/reports/solid/download/${batchId}`,
+    DOWNLOAD_LIQUID_BATCH: (batchId) => `${API_BASE}/reports/liquid/download/${batchId}`,
   },
   CASE_PREP: {
     CASE_PREP_BATCH: (batchId) => `${API_BASE}/case-prep/${batchId}`,
     UPDATE_CASE_PREP: (batchId) => `${API_BASE}/case-prep/update/${batchId}`,
-    DOWNLOAD_CASE_PREP_BATCH: (batchId) =>
-      `${API_BASE}/reports/caseprep/download/${batchId}`,
+    DOWNLOAD_CASE_PREP_BATCH: (batchId) => `${API_BASE}/reports/caseprep/download/${batchId}`,
   },
   MIXING: {
     MIXING_BATCH: (batchId) => `${API_BASE}/mixing-data/${batchId}`,
     UPDATE_MIXING: (batchId) => `${API_BASE}/mixing-data/update/${batchId}`,
-    DOWNLOAD_MIXING_BATCH: (batchId) =>
-      `${API_BASE}/reports/mixing-data/download/${batchId}`,
+    DOWNLOAD_MIXING_BATCH: (batchId) => `${API_BASE}/reports/mixing-data/download/${batchId}`,
   },
   APPROVER: {
     SOLID_PREP_LIST: `${API_BASE}/solid/draft`,
     CASE_PREP_LIST: `${API_BASE}/case-prep/draft`,
     MIXING_DATA_LIST: `${API_BASE}/mixing-data/draft`,
     CASTING_CURING_LIST: `${API_BASE}/casting-curing/draft`,
-    POST_CURE_LIST: `${API_BASE}/post-cure/draft`
-  }
+    POST_CURE_LIST: `${API_BASE}/post-cure/draft`,
+  },
 };
 
 // Add to your existing endPoints.js
@@ -194,7 +188,7 @@ export const SYSTEM_MANAGER = {
 // =============================
 export const USER_OPERATIONS_ENDPOINTS = {
   BATCH_LIST: `${API_BASE}/user/subdepartment/batch-list`,
-  LOT_LIST: `${API_BASE}/user/raw-material-procurement/form/lot-list`,
+  LOT_LIST: `${API_BASE}/user/raw-material-sourcing/form/lot-list`,
   MATERIALS_LIST: `${API_BASE}/user/subdepartment/materials-list`,
   MATERIAL_SPECIFICATION_LIST: `${API_BASE}/user/subdepartment/materials/specification-list`,
   DIMENSIONAL_PARAMETERS_LIST: `${API_BASE}/user/subdepartment/dimensional/parameters-list`,
@@ -206,11 +200,11 @@ export const USER_OPERATIONS_ENDPOINTS = {
 };
 
 export const USER_RAW_MATERIAL_PROCUREMENT_ENDPOINTS = {
-  CREATE_FORM: `${API_BASE}/user/raw-material-procurement/form/create`,
-  FORM_DETAILS: `${API_BASE}/user/raw-material-procurement/form/details`,
-  UPDATE_FORM: `${API_BASE}/user/raw-material-procurement/form/update`,
-  DELETE_FORM: `${API_BASE}/user/raw-material-procurement/form/delete`,
-  STATS: `${API_BASE}/user/raw-material-procurement/stats`,
+  CREATE_FORM: `${API_BASE}/user/raw-material-sourcing/form/create`,
+  FORM_DETAILS: `${API_BASE}/user/raw-material-sourcing/form/details`,
+  UPDATE_FORM: `${API_BASE}/user/raw-material-sourcing/form/update`,
+  DELETE_FORM: `${API_BASE}/user/raw-material-sourcing/form/delete`,
+  STATS: `${API_BASE}/user/raw-material-sourcing/stats`,
 };
 
 export const USER_ROCKET_MOTOR_CASING_ENDPOINTS = {

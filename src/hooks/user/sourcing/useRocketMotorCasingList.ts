@@ -18,7 +18,7 @@ const CLIENT_SEARCH_FETCH_LIMIT = 5000;
 const buildStatusCountsFromBatches = (batches: RocketMotorBatch[], totalRecords: number) => {
   const S = OPERATION_STATUS;
   const counts: Record<string, number> = {
-    [S.INITIATED]: 0,
+    [S.TO_BE_INITIATED]: 0,
     [S.IN_PROGRESS]: 0,
     [S.WAITING_FOR_APPROVAL]: 0,
     [S.APPROVED]: 0,
@@ -74,7 +74,7 @@ export function mapRocketMotorCasingListRow(row: Record<string, unknown>): Rocke
   return {
     id: motorCasingId || motorId,
     formId: null,
-    procurementId: null,
+    sourcingId: null,
     motorCasingId,
     projectId,
     motorStage,
@@ -108,9 +108,21 @@ const mapStatusCountsForUi = (server: Record<string, number> | undefined, totalR
   };
 
   const byLabel: Record<string, number> = {
-    [S.INITIATED]: pick("initiated", "Initiated", "INITIATED"),
+    [S.TO_BE_INITIATED]: pick(
+      "toBeInitiated",
+      "TO_BE_INITIATED",
+      "To Be Initiated",
+      "initiated",
+      "Initiated",
+      "INITIATED",
+    ),
     [S.IN_PROGRESS]: pick("inProgress", "inProgress", "In Progress", "IN_PROGRESS"),
-    [S.WAITING_FOR_APPROVAL]: pick("waitingForApproval", "waitingforApproval", "Waiting for Approval", "WAITING_FOR_APPROVAL"),
+    [S.WAITING_FOR_APPROVAL]: pick(
+      "waitingForApproval",
+      "waitingforApproval",
+      "Waiting for Approval",
+      "WAITING_FOR_APPROVAL",
+    ),
     [S.APPROVED]: pick("approved", "Approved", "APPROVED"),
     [S.REJECTED]: pick("rejected", "Rejected", "REJECTED"),
   };
@@ -129,8 +141,9 @@ export const useRocketMotorCasingList = () => {
   const suppressVersionFetchRef = useRef(false);
 
   const subDepartmentId = useMemo(
-    () => user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "rocket-motor")?.subDepartmentId,
-    [user]
+    () =>
+      user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "rocket-motor")?.subDepartmentId,
+    [user],
   );
 
   const [batches, setBatches] = useState<RocketMotorBatch[]>([]);
@@ -144,7 +157,8 @@ export const useRocketMotorCasingList = () => {
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [statusFilter, setStatusFilterState] = useState<string>(FILTER_ALL);
   const [totalRecords, setTotalRecords] = useState(0);
-  const [advancedFilters, setAdvancedFilters] = useState<RocketMotorCasingListAdvancedFilters>(emptyAdvanced);
+  const [advancedFilters, setAdvancedFilters] =
+    useState<RocketMotorCasingListAdvancedFilters>(emptyAdvanced);
   const [motorStageOptions, setMotorStageOptions] = useState<MotorStageOption[]>([]);
   const [motorStagesLoading, setMotorStagesLoading] = useState(false);
 
@@ -177,7 +191,7 @@ export const useRocketMotorCasingList = () => {
             (res.data.stages ?? []).map((s: { motorStage?: string; noOfmotors?: number }) => ({
               motorStage: String(s.motorStage ?? ""),
               noOfmotors: Number(s.noOfmotors ?? 0),
-            }))
+            })),
           );
         } else {
           setMotorStageOptions([]);
@@ -194,17 +208,20 @@ export const useRocketMotorCasingList = () => {
     };
   }, [subDepartmentId]);
 
-  const applyAdvancedFilters = useCallback((next: RocketMotorCasingListAdvancedFilters & { status: string }) => {
-    setAdvancedFilters({
-      motorStages: [...next.motorStages],
-      casingTypes: [...next.casingTypes],
-      insulationTypes: [...next.insulationTypes],
-      fromDate: next.fromDate,
-      toDate: next.toDate,
-    });
-    setStatusFilterState(next.status);
-    setPage(0);
-  }, []);
+  const applyAdvancedFilters = useCallback(
+    (next: RocketMotorCasingListAdvancedFilters & { status: string }) => {
+      setAdvancedFilters({
+        motorStages: [...next.motorStages],
+        casingTypes: [...next.casingTypes],
+        insulationTypes: [...next.insulationTypes],
+        fromDate: next.fromDate,
+        toDate: next.toDate,
+      });
+      setStatusFilterState(next.status);
+      setPage(0);
+    },
+    [],
+  );
 
   const clearAdvancedFilters = useCallback(() => {
     setAdvancedFilters(emptyAdvanced);
@@ -286,7 +303,9 @@ export const useRocketMotorCasingList = () => {
         const mapped = rows.map((r) => mapRocketMotorCasingListRow(r as Record<string, unknown>));
 
         if (isClientSearch) {
-          const matched = mapped.filter((batch) => rocketMotorCasingMatchesSearch(batch, debouncedSearch));
+          const matched = mapped.filter((batch) =>
+            rocketMotorCasingMatchesSearch(batch, debouncedSearch),
+          );
           const paged = matched.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
           setBatches(paged);
           setTotalRecords(matched.length);

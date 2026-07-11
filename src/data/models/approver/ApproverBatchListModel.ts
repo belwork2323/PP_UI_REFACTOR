@@ -4,7 +4,7 @@ import { batchTypeFilterToApiValue, SUBDEPT_STATUS_FIELD } from "../user/Subdepa
 
 /** API status values returned by POST /approver/subdepartment/batch-list */
 export const APPROVER_BATCH_STATUS = {
-  INITIATED: "INITIATED",
+  TO_BE_INITIATED: "TO_BE_INITIATED",
   IN_PROGRESS: "IN_PROGRESS",
   WAITING_FOR_APPROVAL: "WAITING_FOR_APPROVAL",
   APPROVED: "APPROVED",
@@ -15,7 +15,7 @@ export type ApproverBatchStatus =
   (typeof APPROVER_BATCH_STATUS)[keyof typeof APPROVER_BATCH_STATUS];
 
 export const APPROVER_BATCH_STATUS_LABEL: Record<ApproverBatchStatus, string> = {
-  INITIATED: OPERATION_STATUS.INITIATED,
+  TO_BE_INITIATED: OPERATION_STATUS.TO_BE_INITIATED,
   IN_PROGRESS: OPERATION_STATUS.IN_PROGRESS,
   WAITING_FOR_APPROVAL: OPERATION_STATUS.WAITING_FOR_APPROVAL,
   APPROVED: OPERATION_STATUS.APPROVED,
@@ -26,7 +26,8 @@ export const APPROVER_BATCH_STATUS_LABEL: Record<ApproverBatchStatus, string> = 
 export const APPROVER_BATCH_STATUS_TABS = Object.values(APPROVER_BATCH_STATUS_LABEL);
 
 const CAMEL_CASE_STATUS_TO_API: Record<string, ApproverBatchStatus> = {
-  initiated: APPROVER_BATCH_STATUS.INITIATED,
+  initiated: APPROVER_BATCH_STATUS.TO_BE_INITIATED,
+  toBeInitiated: APPROVER_BATCH_STATUS.TO_BE_INITIATED,
   inProgress: APPROVER_BATCH_STATUS.IN_PROGRESS,
   waitingForApproval: APPROVER_BATCH_STATUS.WAITING_FOR_APPROVAL,
   waitingforApproval: APPROVER_BATCH_STATUS.WAITING_FOR_APPROVAL,
@@ -58,6 +59,10 @@ export function normalizeApproverBatchStatus(status: unknown): string {
 
   if (upper === "PENDING") {
     return APPROVER_BATCH_STATUS_LABEL.WAITING_FOR_APPROVAL;
+  }
+
+  if (upper === "INITIATED") {
+    return APPROVER_BATCH_STATUS_LABEL.TO_BE_INITIATED;
   }
 
   return raw;
@@ -422,7 +427,14 @@ export function mapApproverBatchStatusCounts(
     return 0;
   };
 
-  const initiated = pick("initiated", "INITIATED", "Initiated");
+  const initiated = pick(
+    "toBeInitiated",
+    "TO_BE_INITIATED",
+    "To Be Initiated",
+    "initiated",
+    "INITIATED",
+    "Initiated",
+  );
   const inProgress = pick("inProgress", "IN_PROGRESS", "In Progress");
   const waiting = pick("waitingForApproval", "WAITING_FOR_APPROVAL", "Waiting for Approval");
   const approved = pick("approved", "APPROVED", "Approved");
@@ -431,7 +443,7 @@ export function mapApproverBatchStatusCounts(
   const countedTotal = pendingTotal + approved + rejected;
 
   return {
-    [APPROVER_BATCH_STATUS_LABEL.INITIATED]: initiated,
+    [APPROVER_BATCH_STATUS_LABEL.TO_BE_INITIATED]: initiated,
     [APPROVER_BATCH_STATUS_LABEL.IN_PROGRESS]: inProgress,
     [APPROVER_BATCH_STATUS_LABEL.WAITING_FOR_APPROVAL]: waiting,
     [APPROVER_BATCH_STATUS_LABEL.APPROVED]: approved,

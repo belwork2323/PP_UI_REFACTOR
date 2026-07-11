@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Box, Typography, Chip, Button, Tooltip, IconButton } from "@mui/material";
+import { Box, Typography, Chip, Button, Tooltip, IconButton, colors } from "@mui/material";
 
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
@@ -7,11 +7,7 @@ import UserActions from "@ui/components/common/UserActions";
 import AdminManagementDataTable from "@ui/components/custom/admin/AdminManagementDataTable";
 import type { AdminManagementColumn } from "@ui/components/custom/admin/AdminManagementDataTable";
 
-import {
-  stageConfig,
-  batchStatusConfig,
-  priorityConfig,
-} from "@app/theme/roleConfig";
+import { stageConfig, batchStatusConfig, priorityConfig } from "@app/theme/roleConfig";
 import {
   getBatchId,
   getMotorId,
@@ -23,6 +19,7 @@ import {
   getSystemManagerLabel,
   isIdentificationSheetDraft,
   isIdentificationSheetCompleted,
+  getProjectId,
 } from "@utils/batchManagementUtils";
 
 const S = STRINGS.BATCH_MANAGEMENT;
@@ -72,12 +69,19 @@ const BatchListTable = ({
         ),
       },
       {
-        id: "motorId",
+        id: "project",
         label: S.TABLE_COLS[1],
         render: (batch) => (
-          <Box sx={tableCell.motorIdBox}>
-            <icons.batchMgmt.motorId sx={tableCell.motorIdIcon} />
-            <Typography sx={tableCell.motorIdText}>{getMotorId(batch)}</Typography>
+          <Box sx={tableCell.batchIdBox}>
+            <icons.batchMgmt.projectId
+              sx={{ ...tableCell.batchIdIcon, ...tableCell.projectIdIcon }}
+            />
+
+            <Box sx={tableCell.projectInfo}>
+              <Typography sx={tableCell.projectName}>{batch.projectName}</Typography>
+
+              <Typography sx={tableCell.projectId}>{getProjectId(batch)}</Typography>
+            </Box>
           </Box>
         ),
       },
@@ -92,8 +96,19 @@ const BatchListTable = ({
         ),
       },
       {
-        id: "stage",
+        id: "motorId",
         label: S.TABLE_COLS[3],
+        render: (batch) => (
+          <Box sx={tableCell.motorIdBox}>
+            <icons.batchMgmt.motorId sx={tableCell.motorIdIcon} />
+            <Typography sx={tableCell.motorIdText}>{getMotorId(batch)}</Typography>
+          </Box>
+        ),
+      },
+
+      {
+        id: "stage",
+        label: S.TABLE_COLS[4],
         render: (batch) => {
           const stage = getStage(batch);
           const scStage = stageConfig[stage];
@@ -109,10 +124,10 @@ const BatchListTable = ({
       },
       {
         id: "status",
-        label: S.TABLE_COLS[4],
+        label: S.TABLE_COLS[5],
         render: (batch) => {
           const status = getStatus(batch);
-          const scStatus = batchStatusConfig[status];
+          const scStatus = batchStatusConfig(status);
           return (
             <Chip
               icon={scStatus ? <scStatus.Icon /> : undefined}
@@ -125,31 +140,37 @@ const BatchListTable = ({
       },
       {
         id: "priority",
-        label: S.TABLE_COLS[5],
+        label: S.TABLE_COLS[6],
         render: (batch) => {
           const priority = getPriority(batch);
           const pc = priorityConfig[priority];
-          return (
-            <Chip label={priority} size="small" sx={tableCell.priorityChip(pc)} />
-          );
+          return <Chip label={priority} size="small" sx={tableCell.priorityChip(pc)} />;
         },
       },
       {
         id: "systemManager",
-        label: S.TABLE_COLS[6],
+        label: S.TABLE_COLS[7],
         render: (batch) => (
           <Typography sx={tableCell.motorIdText}>{getSystemManagerLabel(batch)}</Typography>
         ),
       },
       {
         id: "actions",
-        label: S.TABLE_COLS[7],
+        label: S.TABLE_COLS[8],
         isActions: true,
         render: (batch) => {
           const sheetDraft = isIdentificationSheetDraft(batch);
           const sheetCompleted = isIdentificationSheetCompleted(batch);
           return (
-            <Box sx={{ display: "flex", gap: 0.5, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <Box
+              sx={{
+                display: "flex",
+                gap: 0.5,
+                alignItems: "center",
+                flexWrap: "wrap",
+                justifyContent: "flex-end",
+              }}
+            >
               {sheetDraft && onCompleteImplementation && (
                 <Tooltip title={TA.COMPLETE_IMPLEMENTATION_TOOLTIP}>
                   <Button
@@ -190,7 +211,7 @@ const BatchListTable = ({
         },
       },
     ],
-    [tableCell, onEdit, onDelete, onCompleteImplementation, onViewImplementation]
+    [tableCell, onEdit, onDelete, onCompleteImplementation, onViewImplementation],
   );
 
   return (

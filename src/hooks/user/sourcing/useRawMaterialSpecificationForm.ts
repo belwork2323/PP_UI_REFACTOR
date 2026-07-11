@@ -1,4 +1,12 @@
-import { startTransition, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import {
+  startTransition,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { STRINGS } from "../../../app/config/strings";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useThemeStore } from "../../../app/store/themeStore";
@@ -37,7 +45,7 @@ type MaterialOption = Pick<MaterialsListItem, "materialCode" | "materialName" | 
 type UseRawMaterialSpecificationFormParams = {
   initialBlocks?: SpecificationBlock[];
   isEditMode?: boolean;
-  /** Raw material procurement: Create Lot flow — API-oriented copy and labels */
+  /** Raw material Sourcing: Create Lot flow — API-oriented copy and labels */
   createLotMode?: boolean;
   onSaveDraft?: (blocks: SpecificationBlock[]) => Promise<boolean | void> | boolean | void;
   onSubmit?: (blocks: SpecificationBlock[]) => Promise<boolean | void> | boolean | void;
@@ -71,7 +79,10 @@ function createLotFromSpecs(targetSpecs: MaterialSpecificationItemModel[] = []):
   };
 }
 
-function createBlock(material: string, targetSpecs: MaterialSpecificationItemModel[] = []): SpecificationBlock {
+function createBlock(
+  material: string,
+  targetSpecs: MaterialSpecificationItemModel[] = [],
+): SpecificationBlock {
   const lot = createLotFromSpecs(targetSpecs);
   return {
     material,
@@ -84,7 +95,10 @@ function createBlock(material: string, targetSpecs: MaterialSpecificationItemMod
   };
 }
 
-function createMaterialGroup(material: string, targetSpecs: MaterialSpecificationItemModel[] = []): MaterialFormGroup {
+function createMaterialGroup(
+  material: string,
+  targetSpecs: MaterialSpecificationItemModel[] = [],
+): MaterialFormGroup {
   return {
     material,
     supplyOrderNo: "",
@@ -107,7 +121,6 @@ function cloneLotTemplate(templateRows: SpecRow[]): MaterialLotBlock {
     })),
   };
 }
-
 
 type SpecificationCacheMap = Record<string, MaterialSpecificationItemModel[]>;
 type LoadingMap = Record<string, boolean>;
@@ -146,16 +159,18 @@ export const useRawMaterialSpecificationForm = ({
   const lastSyncedBlocksSigRef = useRef("");
 
   const headerTitle = createLotMode ? formStrings.CREATE_LOT_BUILDER_TITLE : formStrings.TITLE;
-  const headerSubtitle = createLotMode ? formStrings.CREATE_LOT_BUILDER_SUBTITLE : formStrings.SUBTITLE;
+  const headerSubtitle = createLotMode
+    ? formStrings.CREATE_LOT_BUILDER_SUBTITLE
+    : formStrings.SUBTITLE;
 
   const blocks = useMemo(
     () => (createLotMode ? flattenMaterialGroups(materialGroups) : flatBlocks),
-    [createLotMode, flatBlocks, materialGroups]
+    [createLotMode, flatBlocks, materialGroups],
   );
 
   const isMaterialLoading = useCallback(
     (materialCode: string) => Boolean(loadingByMaterial[materialCode]),
-    [loadingByMaterial]
+    [loadingByMaterial],
   );
 
   const fetchMaterialSpecifications = useCallback(
@@ -169,7 +184,9 @@ export const useRawMaterialSpecificationForm = ({
       setLoadingByMaterial((prev) => ({ ...prev, [code]: true }));
 
       try {
-        const response = await operationsController.fetchMaterialSpecificationList({ materialCode: code });
+        const response = await operationsController.fetchMaterialSpecificationList({
+          materialCode: code,
+        });
 
         if (!response?.success || !response.data) {
           const msg =
@@ -190,7 +207,7 @@ export const useRawMaterialSpecificationForm = ({
         setLoadingByMaterial((prev) => ({ ...prev, [code]: false }));
       }
     },
-    [showAlert, specificationCache]
+    [showAlert, specificationCache],
   );
 
   useEffect(() => {
@@ -214,7 +231,7 @@ export const useRawMaterialSpecificationForm = ({
               materialCode,
               materialName,
               specCount,
-            }))
+            })),
           );
           return;
         }
@@ -265,26 +282,23 @@ export const useRawMaterialSpecificationForm = ({
   const blocksRef = useRef<SpecificationBlock[]>([]);
   blocksRef.current = blocks;
 
-  const syncBlocksToParent = useCallback(
-    (nextBlocks: SpecificationBlock[], source: string) => {
-      const sig = blocksSignature(nextBlocks);
-      const skip = sig === lastSyncedBlocksSigRef.current;
-      rmCertDebug("5.syncBlocksToParent", {
-        source,
-        createLotMode,
-        skip,
-        sigLen: sig.length,
-        blocks: summarizeBlocks(nextBlocks),
-      });
-      if (skip) return;
-      lastSyncedBlocksSigRef.current = sig;
-      startTransition(() => {
-        rmCertDebug("6.onBlocksChange.invoke", { source, blockCount: nextBlocks.length });
-        onBlocksChangeRef.current?.(nextBlocks);
-      });
-    },
-    []
-  );
+  const syncBlocksToParent = useCallback((nextBlocks: SpecificationBlock[], source: string) => {
+    const sig = blocksSignature(nextBlocks);
+    const skip = sig === lastSyncedBlocksSigRef.current;
+    rmCertDebug("5.syncBlocksToParent", {
+      source,
+      createLotMode,
+      skip,
+      sigLen: sig.length,
+      blocks: summarizeBlocks(nextBlocks),
+    });
+    if (skip) return;
+    lastSyncedBlocksSigRef.current = sig;
+    startTransition(() => {
+      rmCertDebug("6.onBlocksChange.invoke", { source, blockCount: nextBlocks.length });
+      onBlocksChangeRef.current?.(nextBlocks);
+    });
+  }, []);
 
   useEffect(() => {
     if (!onBlocksChangeRef.current) return;
@@ -300,24 +314,24 @@ export const useRawMaterialSpecificationForm = ({
   const updateMaterialGroups = useCallback(
     (updater: MaterialFormGroup[] | ((previous: MaterialFormGroup[]) => MaterialFormGroup[])) => {
       setMaterialGroups((previous) =>
-        typeof updater === "function" ? updater(previous) : updater
+        typeof updater === "function" ? updater(previous) : updater,
       );
     },
-    []
+    [],
   );
 
   const updateBlocks = useCallback(
-    (updater: SpecificationBlock[] | ((previous: SpecificationBlock[]) => SpecificationBlock[])) => {
-      setFlatBlocks((previous) =>
-        typeof updater === "function" ? updater(previous) : updater
-      );
+    (
+      updater: SpecificationBlock[] | ((previous: SpecificationBlock[]) => SpecificationBlock[]),
+    ) => {
+      setFlatBlocks((previous) => (typeof updater === "function" ? updater(previous) : updater));
     },
-    []
+    [],
   );
 
   const usedMaterialCodes = useMemo(
     () => new Set(materialGroups.map((g) => g.material)),
-    [materialGroups]
+    [materialGroups],
   );
 
   const selectableMaterials = useMemo(
@@ -325,7 +339,7 @@ export const useRawMaterialSpecificationForm = ({
       createLotMode
         ? availableMaterials.filter((m) => !usedMaterialCodes.has(m.materialCode))
         : availableMaterials,
-    [availableMaterials, createLotMode, usedMaterialCodes]
+    [availableMaterials, createLotMode, usedMaterialCodes],
   );
 
   const materialCount = createLotMode ? materialGroups.length : blocks.length;
@@ -335,26 +349,34 @@ export const useRawMaterialSpecificationForm = ({
 
   const totalRows = useMemo(() => blocks.flatMap((block) => block.rows).length, [blocks]);
   const filledRows = useMemo(
-    () => blocks.flatMap((block) => block.rows).filter((row) => row.analysedResult.trim() !== "").length,
-    [blocks]
+    () =>
+      blocks.flatMap((block) => block.rows).filter((row) => row.analysedResult.trim() !== "")
+        .length,
+    [blocks],
   );
   const hasBlocks = createLotMode ? materialGroups.length > 0 : blocks.length > 0;
 
   const mandatoryComplete = useMemo(
     () =>
-      createLotMode ? areMaterialGroupsMandatoryComplete(materialGroups) : areBlocksMandatoryComplete(blocks),
-    [blocks, createLotMode, materialGroups]
+      createLotMode
+        ? areMaterialGroupsMandatoryComplete(materialGroups)
+        : areBlocksMandatoryComplete(blocks),
+    [blocks, createLotMode, materialGroups],
   );
 
   const allAnalyzedFilled = useMemo(() => areAllAnalyzedResultsFilled(blocks), [blocks]);
 
   const canSaveDraft = useMemo(
     () => hasBlocks && mandatoryComplete && allAnalyzedFilled,
-    [allAnalyzedFilled, hasBlocks, mandatoryComplete]
+    [allAnalyzedFilled, hasBlocks, mandatoryComplete],
   );
 
   const canSubmit = canSaveDraft;
-  const allMaterialsAdded = createLotMode && !loadingMaterials && selectableMaterials.length === 0 && availableMaterials.length > 0;
+  const allMaterialsAdded =
+    createLotMode &&
+    !loadingMaterials &&
+    selectableMaterials.length === 0 &&
+    availableMaterials.length > 0;
 
   const actionHelperText = useMemo(() => {
     if (!hasBlocks) {
@@ -400,7 +422,10 @@ export const useRawMaterialSpecificationForm = ({
       if (!specifications.length) return;
 
       if (createLotMode) {
-        updateMaterialGroups((previous) => [...previous, createMaterialGroup(selectedMaterial, specifications)]);
+        updateMaterialGroups((previous) => [
+          ...previous,
+          createMaterialGroup(selectedMaterial, specifications),
+        ]);
       } else {
         updateBlocks((previous) => [...previous, createBlock(selectedMaterial, specifications)]);
       }
@@ -408,7 +433,14 @@ export const useRawMaterialSpecificationForm = ({
     } finally {
       setAddingMaterial(false);
     }
-  }, [addingMaterial, createLotMode, fetchMaterialSpecifications, selectedMaterial, updateBlocks, updateMaterialGroups]);
+  }, [
+    addingMaterial,
+    createLotMode,
+    fetchMaterialSpecifications,
+    selectedMaterial,
+    updateBlocks,
+    updateMaterialGroups,
+  ]);
 
   const handleAddLot = useCallback(
     (materialIndex: number) => {
@@ -417,19 +449,24 @@ export const useRawMaterialSpecificationForm = ({
           if (idx !== materialIndex) return group;
           const template = group.lots[0]?.rows ?? [];
           return { ...group, lots: [...group.lots, cloneLotTemplate(template)] };
-        })
+        }),
       );
     },
-    [updateMaterialGroups]
+    [updateMaterialGroups],
   );
 
   const handleUpdateMaterial = useCallback(
-    (materialIndex: number, partial: Partial<Pick<MaterialFormGroup, "supplyOrderNo" | "receiptDate" | "manufacturerName">>) => {
+    (
+      materialIndex: number,
+      partial: Partial<
+        Pick<MaterialFormGroup, "supplyOrderNo" | "receiptDate" | "manufacturerName">
+      >,
+    ) => {
       updateMaterialGroups((previous) =>
-        previous.map((group, idx) => (idx === materialIndex ? { ...group, ...partial } : group))
+        previous.map((group, idx) => (idx === materialIndex ? { ...group, ...partial } : group)),
       );
     },
-    [updateMaterialGroups]
+    [updateMaterialGroups],
   );
 
   const handleUpdateLot = useCallback(
@@ -453,20 +490,20 @@ export const useRawMaterialSpecificationForm = ({
         });
         if (createLotMode) {
           queueMicrotask(() =>
-            syncBlocksToParent(flattenMaterialGroups(nextGroups), "microtask:handleUpdateLot")
+            syncBlocksToParent(flattenMaterialGroups(nextGroups), "microtask:handleUpdateLot"),
           );
         }
         return nextGroups;
       });
     },
-    [createLotMode, syncBlocksToParent, updateMaterialGroups]
+    [createLotMode, syncBlocksToParent, updateMaterialGroups],
   );
 
   const handleRemoveMaterial = useCallback(
     (materialIndex: number) => {
       updateMaterialGroups((previous) => previous.filter((_, idx) => idx !== materialIndex));
     },
-    [updateMaterialGroups]
+    [updateMaterialGroups],
   );
 
   const handleRemoveLot = useCallback(
@@ -475,10 +512,10 @@ export const useRawMaterialSpecificationForm = ({
         previous.map((group, gIdx) => {
           if (gIdx !== materialIndex || group.lots.length <= 1) return group;
           return { ...group, lots: group.lots.filter((_, lIdx) => lIdx !== lotIndex) };
-        })
+        }),
       );
     },
-    [updateMaterialGroups]
+    [updateMaterialGroups],
   );
 
   const handleUpdateBlock = useCallback(
@@ -492,18 +529,18 @@ export const useRawMaterialSpecificationForm = ({
       });
       updateBlocks((previous) =>
         previous.map((block, currentIndex) =>
-          currentIndex === index ? { ...updatedBlock, rows: rowsWithRange } : block
-        )
+          currentIndex === index ? { ...updatedBlock, rows: rowsWithRange } : block,
+        ),
       );
     },
-    [updateBlocks]
+    [updateBlocks],
   );
 
   const handleRemoveBlock = useCallback(
     (index: number) => {
       updateBlocks((previous) => previous.filter((_, currentIndex) => currentIndex !== index));
     },
-    [updateBlocks]
+    [updateBlocks],
   );
 
   const openDraftConfirm = useCallback(() => {

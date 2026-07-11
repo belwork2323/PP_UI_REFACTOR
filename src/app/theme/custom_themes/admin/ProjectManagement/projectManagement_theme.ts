@@ -33,6 +33,14 @@ const getProjectManagementTheme = (mode: "light" | "dark" = "light") => {
     statsGrid: {
       ...adminTheme.statsGrid,
       colors: colors.admin.projectStats[mode as "light" | "dark"],
+
+      innerGrid: {
+        ...adminTheme.statsGrid.innerGrid,
+        display: "grid",
+        gridTemplateColumns: "repeat(5, minmax(0, 1fr))", // one row
+        // gap: 2,
+        width: "100%",
+      },
     },
 
     toolbar: adminTheme.toolbar,

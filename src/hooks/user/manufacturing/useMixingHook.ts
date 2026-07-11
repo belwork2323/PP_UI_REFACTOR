@@ -245,7 +245,7 @@ export const useMixingHook = () => {
       }
 
       const status = parseStatus(activeBatch.mxStatus);
-      const isCreateFlow = status === parseStatus(MX_STATUS.INITIATED) && !activeBatch.formId;
+      const isCreateFlow = status === parseStatus(MX_STATUS.TO_BE_INITIATED) && !activeBatch.formId;
       // const payloadBody = mapMixingFormStateToPayload(formData);
       const mixingDetails = mapMixingFormStateToPayload(formData);
       setActionLoading(true);

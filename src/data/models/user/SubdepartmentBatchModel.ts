@@ -185,17 +185,18 @@ export const SUBDEPT_STATUS_FIELD: Record<string, string> = {
 const compactStatusKey = (value: string) => value.replace(/[\s_-]/g, "").toLowerCase();
 
 const STATUS_KEY_ALIASES: Record<string, OperationStatus> = {
-  initiated: OPERATION_STATUS.INITIATED,
+  initiated: OPERATION_STATUS.TO_BE_INITIATED,
+  tobeinitiated: OPERATION_STATUS.TO_BE_INITIATED,
   inprogress: OPERATION_STATUS.IN_PROGRESS,
   waitingforapproval: OPERATION_STATUS.WAITING_FOR_APPROVAL,
   approved: OPERATION_STATUS.APPROVED,
   rejected: OPERATION_STATUS.REJECTED,
-  active: OPERATION_STATUS.INITIATED,
+  active: OPERATION_STATUS.TO_BE_INITIATED,
 };
 
 export function normalizeSubdepartmentBatchStatus(status: unknown): OperationStatus {
   const trimmed = String(status ?? "").trim();
-  if (!trimmed) return OPERATION_STATUS.INITIATED;
+  if (!trimmed) return OPERATION_STATUS.TO_BE_INITIATED;
 
   if (OPERATION_STATUS_VALUES.includes(trimmed as OperationStatus)) {
     return trimmed as OperationStatus;
@@ -206,17 +207,18 @@ export function normalizeSubdepartmentBatchStatus(status: unknown): OperationSta
 
   const u = trimmed.toUpperCase();
   const map: Record<string, OperationStatus> = {
-    INITIATED: OPERATION_STATUS.INITIATED,
+    TO_BE_INITIATED: OPERATION_STATUS.TO_BE_INITIATED,
+    INITIATED: OPERATION_STATUS.TO_BE_INITIATED,
     IN_PROGRESS: OPERATION_STATUS.IN_PROGRESS,
     INPROGRESS: OPERATION_STATUS.IN_PROGRESS,
     WAITING_FOR_APPROVAL: OPERATION_STATUS.WAITING_FOR_APPROVAL,
     WAITINGFORAPPROVAL: OPERATION_STATUS.WAITING_FOR_APPROVAL,
     APPROVED: OPERATION_STATUS.APPROVED,
     REJECTED: OPERATION_STATUS.REJECTED,
-    ACTIVE: OPERATION_STATUS.INITIATED,
+    ACTIVE: OPERATION_STATUS.TO_BE_INITIATED,
   };
 
-  return map[u] ?? OPERATION_STATUS.INITIATED;
+  return map[u] ?? OPERATION_STATUS.TO_BE_INITIATED;
 }
 
 const resolveMotorType = (batch: Record<string, unknown>) => {
@@ -354,7 +356,7 @@ export function mapSubdepartmentBatchListRow(
 }
 
 const emptyStatusCountLabels = (): Record<string, number> => ({
-  [OPERATION_STATUS.INITIATED]: 0,
+  [OPERATION_STATUS.TO_BE_INITIATED]: 0,
   [OPERATION_STATUS.IN_PROGRESS]: 0,
   [OPERATION_STATUS.WAITING_FOR_APPROVAL]: 0,
   [OPERATION_STATUS.APPROVED]: 0,
@@ -416,7 +418,14 @@ export function mapSubdepartmentBatchStatusCounts(
 
   // Fallback to legacy camelCase / label keys when present
   if (Object.values(byLabel).every((count) => count === 0)) {
-    byLabel[OPERATION_STATUS.INITIATED] = pick("initiated", "Initiated", "INITIATED");
+    byLabel[OPERATION_STATUS.TO_BE_INITIATED] = pick(
+      "toBeInitiated",
+      "TO_BE_INITIATED",
+      "To Be Initiated",
+      "initiated",
+      "Initiated",
+      "INITIATED",
+    );
     byLabel[OPERATION_STATUS.IN_PROGRESS] = pick("inProgress", "In Progress", "IN_PROGRESS");
     byLabel[OPERATION_STATUS.WAITING_FOR_APPROVAL] = pick(
       "waitingForApproval",

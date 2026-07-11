@@ -213,6 +213,7 @@ const StaticTestFacilityForm = ({
       </Box>
 
       <STFFlowBar
+        key={`${motorCards.map((motor) => motor.motorId).join("|")}-${selectedMotorType}`}
         selectedMotorType={selectedMotorType}
         motorCount={motorCount}
         draftMotorIds={draftMotorIds}

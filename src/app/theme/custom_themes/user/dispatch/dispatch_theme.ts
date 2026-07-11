@@ -42,8 +42,8 @@ export const getDispatchTheme = (baseTheme: any) => {
 
     flowBar: {
       container: {
-        mb: 2,
-        p: 1.5,
+        mb: 2.5,
+        p: { xs: 1.5, sm: 2 },
         borderRadius: 3,
         border: `1px solid ${alpha(
           palette.border ?? DISPATCH_BRAND.border,
@@ -51,7 +51,7 @@ export const getDispatchTheme = (baseTheme: any) => {
         )}`,
         background: alpha(
           palette.surface ?? DISPATCH_BRAND.surface,
-          0.6
+          0.55
         ),
         ...baseTheme.workflow?.animatedContainer,
       },
@@ -165,8 +165,98 @@ export const getDispatchTheme = (baseTheme: any) => {
       topRow: {
         display: "flex",
         flexWrap: "wrap",
-        alignItems: "flex-start",
+        alignItems: "flex-end",
         gap: 2,
+      },
+
+      setupHint: {
+        fontSize: "0.76rem",
+        color: palette.textSub ?? DISPATCH_BRAND.textSub,
+        mb: 1.75,
+        lineHeight: 1.45,
+      },
+
+      actionRow: {
+        display: "flex",
+        justifyContent: "flex-end",
+        pt: 0.5,
+      },
+
+      primaryAction: {
+        textTransform: "none" as const,
+        fontWeight: 700,
+        borderRadius: 2,
+        px: 2.5,
+        background: `linear-gradient(135deg, ${DISPATCH_BRAND.primary}, ${accentColor})`,
+        "&:hover": {
+          background: `linear-gradient(135deg, ${DISPATCH_BRAND.primary}, ${accentColor})`,
+          filter: "brightness(1.05)",
+        },
+      },
+    },
+
+    panel: {
+      header: {
+        borderRadius: 2.5,
+        border: `1px solid ${palette.border ?? DISPATCH_BRAND.border}`,
+        background: `linear-gradient(135deg, ${alpha(DISPATCH_BRAND.surface, 0.95)} 0%, ${palette.pageBg ?? "#fff"} 100%)`,
+        px: { xs: 1.75, sm: 2 },
+        py: 1.75,
+        mb: 2.5,
+      },
+      headerIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: "12px",
+        background: `linear-gradient(135deg, ${DISPATCH_BRAND.primary}, ${DISPATCH_BRAND.primaryLight})`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        boxShadow: `0 4px 14px ${alpha(DISPATCH_BRAND.primary, 0.28)}`,
+      },
+      headerTitle: {
+        fontWeight: 800,
+        fontSize: "1rem",
+        color: palette.text ?? DISPATCH_BRAND.text,
+      },
+      headerSubtitle: {
+        fontSize: "0.76rem",
+        color: palette.textSub ?? DISPATCH_BRAND.textSub,
+        mt: 0.25,
+      },
+      motorCard: {
+        borderRadius: 2.5,
+        border: `1px solid ${palette.border ?? DISPATCH_BRAND.border}`,
+        background: palette.surface ?? DISPATCH_BRAND.surface,
+        px: { xs: 1.5, sm: 2 },
+        py: 1.5,
+      },
+      setupSummary: {
+        mb: 2,
+        p: 1.5,
+        borderRadius: 2,
+        border: `1px solid ${alpha(palette.border ?? DISPATCH_BRAND.border, 0.75)}`,
+        background: palette.pageBg ?? "#fff",
+      },
+      setupLabel: {
+        fontSize: "0.68rem",
+        fontWeight: 700,
+        color: palette.textSub ?? DISPATCH_BRAND.textSub,
+        letterSpacing: "0.03em",
+        mb: 0.25,
+      },
+      setupValue: {
+        fontSize: "0.82rem",
+        fontWeight: 600,
+        color: palette.text ?? DISPATCH_BRAND.text,
+      },
+      detailsSectionTitle: {
+        fontSize: "0.72rem",
+        fontWeight: 800,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase" as const,
+        color: palette.primaryLight ?? DISPATCH_BRAND.primaryLight,
+        mb: 1.25,
       },
     },
 
@@ -189,7 +279,7 @@ export const getDispatchTheme = (baseTheme: any) => {
           palette.warn ?? DISPATCH_BRAND.warn;
 
         return {
-          Initiated: {
+          "To Be Initiated": {
             color: "#334155",
             bg: "#F8FAFC",
             border: "#CBD5E1",
@@ -295,6 +385,77 @@ export const getDispatchTheme = (baseTheme: any) => {
           palette.primaryLight ??
           DISPATCH_BRAND.primaryLight,
         mb: 1.5,
+        display: "flex",
+        alignItems: "center",
+        gap: 0.75,
+      },
+
+      metaGrid: {
+        display: "grid",
+        gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(3, 1fr)" },
+        gap: 1.5,
+      },
+      metaItem: {
+        p: 1.25,
+        borderRadius: 1.5,
+        background: alpha(palette.primaryLight ?? DISPATCH_BRAND.primaryLight, 0.04),
+        border: `1px solid ${alpha(palette.primaryLight ?? DISPATCH_BRAND.primaryLight, 0.12)}`,
+      },
+      metaLabel: {
+        fontSize: "0.62rem",
+        fontWeight: 700,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        color: palette.textSub ?? DISPATCH_BRAND.textSub,
+      },
+      metaValue: {
+        fontSize: "0.88rem",
+        fontWeight: 700,
+        color: palette.text ?? DISPATCH_BRAND.text,
+        mt: 0.35,
+      },
+      materialChip: {
+        height: 22,
+        fontSize: "0.68rem",
+        fontWeight: 800,
+        background: `linear-gradient(135deg, ${palette.primary ?? DISPATCH_BRAND.primary}, ${palette.primaryLight ?? DISPATCH_BRAND.primaryLight})`,
+        color: "#fff",
+      },
+      tableContainer: {
+        borderRadius: 1.5,
+        border: `1px solid ${palette.border ?? DISPATCH_BRAND.border}`,
+        overflow: "hidden",
+      },
+      tableHeaderCell: (isLead: boolean) => ({
+        background: isLead
+          ? `linear-gradient(135deg, ${palette.primary ?? DISPATCH_BRAND.primary}, ${palette.primaryLight ?? DISPATCH_BRAND.primaryLight})`
+          : alpha(palette.primary ?? DISPATCH_BRAND.primary, 0.06),
+        color: isLead ? "#fff" : palette.textSub ?? DISPATCH_BRAND.textSub,
+        fontWeight: 700,
+        fontSize: "0.63rem",
+        letterSpacing: "0.05em",
+        textTransform: "uppercase",
+        py: 1,
+        px: 1.5,
+        borderBottom: `1px solid ${palette.border ?? DISPATCH_BRAND.border}`,
+        whiteSpace: "nowrap",
+      }),
+      tableRow: (idx: number) => ({
+        background:
+          idx % 2 === 0 ? palette.pageBg ?? "#fff" : alpha(palette.surface ?? DISPATCH_BRAND.surface, 0.5),
+      }),
+      tableCell: {
+        fontSize: "0.82rem",
+        py: 1.1,
+        px: 1.5,
+        color: palette.text ?? DISPATCH_BRAND.text,
+      },
+      specText: { fontWeight: 600 },
+      resultText: { fontWeight: 600, color: palette.text ?? DISPATCH_BRAND.text },
+      remarksText: {
+        fontSize: "0.82rem",
+        color: palette.text ?? DISPATCH_BRAND.text,
+        whiteSpace: "pre-wrap",
       },
 
       emptyText: {

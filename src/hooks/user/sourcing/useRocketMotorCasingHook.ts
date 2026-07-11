@@ -39,9 +39,9 @@ const shouldUseCreateEndpoint = (batch: RocketMotorBatch | null) => {
   if (!batch) return false;
   const noPersistedCasing =
     !String(batch.motorCasingId ?? "").trim() &&
-    !String(batch.procurementId ?? "").trim() &&
+    !String(batch.sourcingId ?? "").trim() &&
     !String(batch.formId ?? "").trim();
-  return batch.rmStatus === OPERATION_STATUS.INITIATED && noPersistedCasing;
+  return batch.rmStatus === OPERATION_STATUS.TO_BE_INITIATED && noPersistedCasing;
 };
 
 export const useRocketMotorCasingHook = () => {
@@ -49,8 +49,12 @@ export const useRocketMotorCasingHook = () => {
   const [formEntryMode, setFormEntryMode] = useState<FormEntryMode>("create");
   const [activeBatch, setActiveBatch] = useState<RocketMotorBatch | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
-  const [casingForm, setCasingForm] = useState<RocketMotorCasingFormData>(INITIAL_ROCKET_MOTOR_CASING_FORM);
-  const [initialSnapshot, setInitialSnapshot] = useState(serializeCasingForm(INITIAL_ROCKET_MOTOR_CASING_FORM));
+  const [casingForm, setCasingForm] = useState<RocketMotorCasingFormData>(
+    INITIAL_ROCKET_MOTOR_CASING_FORM,
+  );
+  const [initialSnapshot, setInitialSnapshot] = useState(
+    serializeCasingForm(INITIAL_ROCKET_MOTOR_CASING_FORM),
+  );
   const [loadingFormDetails, setLoadingFormDetails] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
@@ -74,19 +78,22 @@ export const useRocketMotorCasingHook = () => {
   const showAlert = useAlertStore.getState().showAlert;
   const user = useAuthStore((s) => s.user);
   const bumpBatchRefresh = useUserBatchRefreshStore((s) => s.bumpVersion);
-  const { fetchDimensionalParameters, isLoading: isDimensionalParamsLoading } = useDimensionalParametersHook();
+  const { fetchDimensionalParameters, isLoading: isDimensionalParamsLoading } =
+    useDimensionalParametersHook();
 
   const subDepartmentId = useMemo(
-    () => user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "rocket-motor")?.subDepartmentId,
-    [user]
+    () =>
+      user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "rocket-motor")?.subDepartmentId,
+    [user],
   );
 
   const isFormDirty = useMemo(
     () => serializeCasingForm(casingForm) !== initialSnapshot,
-    [casingForm, initialSnapshot]
+    [casingForm, initialSnapshot],
   );
 
-  const resolvedMotorStage = String(casingForm.motorStageApi ?? "").trim() || activeBatch?.motorType || "";
+  const resolvedMotorStage =
+    String(casingForm.motorStageApi ?? "").trim() || activeBatch?.motorType || "";
 
   const SUCCESS_ALERT_MS = 2200;
 
@@ -116,7 +123,9 @@ export const useRocketMotorCasingHook = () => {
 
     setLoadingFormDetails(true);
     try {
-      const detailsResponse = await rocketMotorCasingController.fetchFormDetails({ motorCasingId: id });
+      const detailsResponse = await rocketMotorCasingController.fetchFormDetails({
+        motorCasingId: id,
+      });
       if (!detailsResponse?.success || !detailsResponse.data) {
         const fallback =
           detailsResponse?.statusCode === 404
@@ -136,7 +145,7 @@ export const useRocketMotorCasingHook = () => {
         prev
           ? applyRocketMotorCasingIdentity(prev, {
               formId: detailsModel.formId || prev.formId,
-              procurementId: detailsModel.formId || prev.procurementId,
+              sourcingId: detailsModel.formId || prev.sourcingId,
               motorCasingId: detailsModel.motorCasingId || prev.motorCasingId,
               motorId: detailsModel.motorId || prev.motorId,
               motorStage: detailsModel.motorStage || prev.motorStage,
@@ -176,7 +185,10 @@ export const useRocketMotorCasingHook = () => {
     setLoadingDetails(false);
   };
 
-  const alignDimensionalRows = (params: any[], current: RocketMotorCasingFormData["dimensionalData"]) => {
+  const alignDimensionalRows = (
+    params: any[],
+    current: RocketMotorCasingFormData["dimensionalData"],
+  ) => {
     if (!params.length) return [];
     const byId = new Map(current.filter((r) => r.paramId).map((r) => [r.paramId, r]));
     return params.map((p, idx) => {
@@ -186,15 +198,19 @@ export const useRocketMotorCasingHook = () => {
   };
 
   const resolveCasingErrorMessage = (response: any, fallback: string) => {
-    const apiErr = response?.error as { details?: string; code?: string } | string | null | undefined;
+    const apiErr = response?.error as
+      { details?: string; code?: string } | string | null | undefined;
     const fromDetails =
-      apiErr && typeof apiErr === "object" && apiErr.details != null ? String(apiErr.details) : null;
+      apiErr && typeof apiErr === "object" && apiErr.details != null
+        ? String(apiErr.details)
+        : null;
     const code =
-      (apiErr && typeof apiErr === "object" ? apiErr.code : null) ||
-      response?.errorCode ||
-      null;
+      (apiErr && typeof apiErr === "object" ? apiErr.code : null) || response?.errorCode || null;
 
-    if (response?.statusCode === 409 && (code === "FORM_ALREADY_EXISTS" || response?.errorCode === "FORM_ALREADY_EXISTS")) {
+    if (
+      response?.statusCode === 409 &&
+      (code === "FORM_ALREADY_EXISTS" || response?.errorCode === "FORM_ALREADY_EXISTS")
+    ) {
       return STRINGS.SOURCING.CASING_FORM.FORM_ALREADY_EXISTS;
     }
     if (response?.statusCode === 409 && code === "INVALID_STATE_UPDATE") {
@@ -225,7 +241,10 @@ export const useRocketMotorCasingHook = () => {
     return fromDetails || response?.message || fallback;
   };
 
-  const loadDimensionalForStage = async (stage: string, currentRows: RocketMotorCasingFormData["dimensionalData"]) => {
+  const loadDimensionalForStage = async (
+    stage: string,
+    currentRows: RocketMotorCasingFormData["dimensionalData"],
+  ) => {
     if (!stage) {
       setDimensionalParameters([]);
       setDimensionalParametersErrorMessage("");
@@ -304,17 +323,19 @@ export const useRocketMotorCasingHook = () => {
   };
 
   const batchToDetailsContext = (batch: RocketMotorBatch): RocketMotorCasingDetailsContext => ({
-    formId: String(batch.formId ?? batch.procurementId ?? ""),
+    formId: String(batch.formId ?? batch.sourcingId ?? ""),
     projectId: String(batch.projectId ?? ""),
     motorCasingId: String(batch.motorCasingId ?? batch.batchId ?? ""),
-    procurementId: String(batch.procurementId ?? batch.formId ?? ""),
+    sourcingId: String(batch.sourcingId ?? batch.formId ?? ""),
     motorStage: String(batch.motorStage ?? batch.motorType ?? ""),
     motorNo: String(batch.motorNo ?? batch.motorId ?? ""),
     casingType: String(batch.casingType ?? batch.batchType ?? ""),
     insulationType: String(batch.insulationType ?? ""),
     receivingDate: String(batch.receivingDate ?? ""),
     rmStatus: batch.rmStatus,
-    createdBy: batch.createdBy ?? (batch.assignedTo ? { id: "", fullName: batch.assignedTo.fullName } : null),
+    createdBy:
+      batch.createdBy ??
+      (batch.assignedTo ? { id: "", fullName: batch.assignedTo.fullName } : null),
     createdOn: batch.createdOn,
     rejectionReason: batch.rejectionReason,
   });
@@ -353,9 +374,10 @@ export const useRocketMotorCasingHook = () => {
         formId: detailsModel.formId || String(batch.formId ?? ""),
         projectId: detailsModel.projectId || "",
         motorCasingId: detailsModel.motorCasingId || motorCasingId,
-        procurementId: String(batch.procurementId ?? detailsModel.formId ?? ""),
+        sourcingId: String(batch.sourcingId ?? detailsModel.formId ?? ""),
         motorStage: detailsModel.motorStage || batch.motorStage || "",
-        motorNo: detailsModel.motorId || detailsModel.motorNo || batch.motorNo || batch.motorId || "",
+        motorNo:
+          detailsModel.motorId || detailsModel.motorNo || batch.motorNo || batch.motorId || "",
         casingType: formData.casingType || String(batch.casingType ?? batch.batchType ?? ""),
         insulationType: formData.insulationType || String(batch.insulationType ?? ""),
         receivingDate: formData.receivingDate || String(batch.receivingDate ?? ""),
@@ -461,7 +483,7 @@ export const useRocketMotorCasingHook = () => {
     }
 
     const resolvedMotorCasingId = String(
-      casingForm.motorCasingId || activeBatch.motorCasingId || ""
+      casingForm.motorCasingId || activeBatch.motorCasingId || "",
     ).trim();
 
     if (!isCreateFlow && !resolvedMotorCasingId) {
@@ -513,7 +535,7 @@ export const useRocketMotorCasingHook = () => {
             prev
               ? applyRocketMotorCasingIdentity(prev, {
                   formId: data?.formId ?? motorCasingId ?? prev.formId,
-                  procurementId: data?.procurementId ?? data?.formId ?? motorCasingId ?? prev.procurementId,
+                  sourcingId: data?.sourcingId ?? data?.formId ?? motorCasingId ?? prev.sourcingId,
                   motorCasingId,
                   motorId: casingForm.motorId || prev.motorId,
                   rmStatus: data?.status
@@ -569,11 +591,13 @@ export const useRocketMotorCasingHook = () => {
       }
       openDeleteCasingConfirm(motorCasingId);
     },
-    [openDeleteCasingConfirm, showAlert]
+    [openDeleteCasingConfirm, showAlert],
   );
 
   const handleDeleteCasingFromForm = useCallback(() => {
-    const motorCasingId = String(activeBatch?.motorCasingId ?? casingForm.motorCasingId ?? "").trim();
+    const motorCasingId = String(
+      activeBatch?.motorCasingId ?? casingForm.motorCasingId ?? "",
+    ).trim();
     if (!motorCasingId || !canDeleteRocketMotorCasing(activeBatch?.rmStatus)) {
       showAlert(STRINGS.SOURCING.CASING_FORM.DELETE_NOT_ALLOWED, "warning");
       return;
@@ -590,7 +614,10 @@ export const useRocketMotorCasingHook = () => {
       const response = await rocketMotorCasingController.deleteForm({ motorCasingId });
 
       if (!response?.success) {
-        showAlert(resolveCasingErrorMessage(response, STRINGS.SOURCING.CASING_FORM.DELETE_FAILED), "error");
+        showAlert(
+          resolveCasingErrorMessage(response, STRINGS.SOURCING.CASING_FORM.DELETE_FAILED),
+          "error",
+        );
         return;
       }
 
@@ -601,16 +628,12 @@ export const useRocketMotorCasingHook = () => {
       if (wasOnForm) resetFormContext();
 
       const SUCCESS_ALERT_MS = 2200;
-      showAlert(
-        response.message || STRINGS.SOURCING.CASING_FORM.DELETE_SUCCESS,
-        "success",
-        {
-          autoCloseMs: SUCCESS_ALERT_MS,
-          onCloseAction: () => {
-            void listParams.refreshUserBatches();
-          },
-        }
-      );
+      showAlert(response.message || STRINGS.SOURCING.CASING_FORM.DELETE_SUCCESS, "success", {
+        autoCloseMs: SUCCESS_ALERT_MS,
+        onCloseAction: () => {
+          void listParams.refreshUserBatches();
+        },
+      });
 
       if (!wasOnForm) {
         void listParams.refreshUserBatches();
@@ -618,7 +641,14 @@ export const useRocketMotorCasingHook = () => {
     } finally {
       setDeleteLoading(false);
     }
-  }, [deleteTargetMotorCasingId, deleteLoading, listParams, resolveCasingErrorMessage, showAlert, view]);
+  }, [
+    deleteTargetMotorCasingId,
+    deleteLoading,
+    listParams,
+    resolveCasingErrorMessage,
+    showAlert,
+    view,
+  ]);
 
   const canSaveDraft = useMemo(() => canSaveCasingDraft(casingForm), [casingForm]);
   const canSubmit = canSaveDraft;

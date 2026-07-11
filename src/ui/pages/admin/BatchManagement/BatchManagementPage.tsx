@@ -53,6 +53,7 @@ const BatchManagementPage = () => {
     form,
     implementation,
     delete: deleteSection,
+    filter,
   } = useBatchManagementHook();
   const th = getDashboardTheme(mode);
   const loadedStats = Array.isArray(stats.stats) ? stats.stats : [];
@@ -121,16 +122,16 @@ const BatchManagementPage = () => {
           textSx={th.table.filterBtnText}
           badgeSx={th.table.filterBadgePill}
           chevronSx={th.table.filterBtnChevron}
-          selectedValue={stats.filterType}
+          selectedValue={filter.filterType}
         />
         {stats.dateFilterOpen && (
           <DashboardDateFilter
-            filterType={stats.filterType}
-            onFilterChange={stats.handleFilterTypeChange}
-            customStartDate={stats.customStartDate}
-            customEndDate={stats.customEndDate}
-            onStartChange={stats.setCustomStartDate}
-            onEndChange={stats.setCustomEndDate}
+            filterType={filter.filterType}
+            onFilterChange={filter.handleFilterTypeChange}
+            customStartDate={filter.customStartDate}
+            customEndDate={filter.customEndDate}
+            onStartChange={filter.setCustomStartDate}
+            onEndChange={filter.setCustomEndDate}
             loading={stats.loading}
             strings={S1.DATE_FILTER}
             containerSx={th.dashboard.dateRangeBar}

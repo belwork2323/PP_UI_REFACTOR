@@ -7,6 +7,7 @@ import DispatchList from "./DispatchList";
 import DispatchForm from "./DispatchForm";
 import useDispatchHook from "../../../../hooks/user/dispatch/useDispatchWorkflowHook";
 import getManufacturingTheme from "../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
+import { resolveDispatchMotorOptions } from "../../../../hooks/user/dispatch/dispatchFlowConfig";
 import DispatchDetailsView from "./DispatchDetailsView";
 
 const dispatchTheme = {
@@ -141,11 +142,15 @@ const DispatchPage = () => {
   const hookState = useDispatchHook();
   const {
     loading,
+    loadingFormDetails,
     view,
     activeBatch,
     isEditMode,
     formData,
-    // loadingFormDetails,
+    canSaveDraft,
+    canSubmit,
+    draftMotorId,
+    addedMotors,
     schemaLoading,
     schemaError,
     actionLoading,
@@ -155,8 +160,11 @@ const DispatchPage = () => {
     handleBack,
     handleDiscardAndBack,
     updateSetupField,
+    handleDraftMotorIdChange,
     handleLoadDispatchForm,
+    handleAddDispatchMotor,
     handleFormValuesChange,
+    handleRemoveMotor,
     handleSaveDraft,
     handleSubmit,
     detailsRow,
@@ -165,9 +173,13 @@ const DispatchPage = () => {
     handleBackFromDetails,
   } = hookState;
 
-  const canAct = formData.schemaFormLoaded;
+  const canAct = canSubmit;
+  const availableMotors = useMemo(
+    () => resolveDispatchMotorOptions(activeBatch),
+    [activeBatch],
+  );
 
-  if (loading) {
+  if (view === "list" && loading) {
     return (
       <Box sx={dispatchTheme.workflow.loadingContainer}>
         <CircularProgress size={32} />
@@ -216,23 +228,29 @@ const DispatchPage = () => {
             theme={dispatchTheme}
           />
 
-          {/* {!loadingFormDetails ? (
+          {!loadingFormDetails ? (
             <DispatchForm
               batch={activeBatch}
               formData={formData}
+              draftMotorId={draftMotorId}
+              addedMotors={addedMotors}
               subDepartmentId={subDepartmentId}
               isEditMode={isEditMode}
               schemaLoading={schemaLoading}
               schemaError={schemaError}
               flowBarTheme={flowBarTheme}
+              availableMotors={availableMotors}
               onSetupChange={updateSetupField}
+              onDraftMotorIdChange={handleDraftMotorIdChange}
               onLoadDispatchForm={handleLoadDispatchForm}
+              onAddDispatchMotor={handleAddDispatchMotor}
+              onRemoveMotor={handleRemoveMotor}
               onFormValuesChange={handleFormValuesChange}
               theme={dispatchTheme}
             />
-          ) : null} */}
+          ) : null}
 
-          {/* {!loadingFormDetails ? (
+          {!loadingFormDetails ? (
             <>
               <Box
                 sx={{
@@ -257,14 +275,14 @@ const DispatchPage = () => {
                   <Stack direction="row" gap={1}>
                     <Button
                       variant="outlined"
-                      disabled={!canAct || actionLoading}
+                      disabled={!canSaveDraft || actionLoading}
                       onClick={() => setDraftConfirmOpen(true)}
                     >
                       {strings.SAVE_DRAFT_LABEL}
                     </Button>
                     <Button
                       variant="contained"
-                      disabled={!canAct || actionLoading}
+                      disabled={!canSubmit || actionLoading}
                       onClick={() => setSubmitConfirmOpen(true)}
                     >
                       {isEditMode ? strings.RESUBMIT_LABEL : strings.SUBMIT_LABEL}
@@ -300,7 +318,7 @@ const DispatchPage = () => {
                 onCancel={() => setSubmitConfirmOpen(false)}
               />
             </>
-          ) : null} */}
+          ) : null}
         </>
       ) : null}
 
