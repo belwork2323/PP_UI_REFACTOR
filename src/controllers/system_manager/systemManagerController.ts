@@ -8,9 +8,9 @@ import {
   fetchSMChartData,
   fetchSMActiveBatches,
   fetchSMAlerts,
-  fetchSMBatchStatusList,
   fetchSMBlockchainEvents,
-  fetchSMBatchStages,
+  fetchSMBatchDeptStages,
+  fetchSMBatchSubDeptStages,
   fetchSMBatchSubDeptDetails,
 } from "../../data/api/system_manager/systemManagerAPI";
 
@@ -20,9 +20,9 @@ import {
   SMActiveBatchModel,
   SMAlertModel,
   SMAlertSummaryModel,
-  SMBatchStatusModel,
   SMBlockchainEventModel,
   BatchStagesModel,
+  BatchSubDeptStagesModel,
   BatchSubDeptDetailsModel,
 } from "../../data/models/SystemManagerModel";
 
@@ -156,30 +156,6 @@ export const systemManagerController = {
   },
 
   /* ──────────────────────────────────────────────────────────────────────────
-     API 5: Batch Status List
-  ─────────────────────────────────────────────────────────────────────────── */
-  getBatchStatusList: async (payload: { page: number; limit: number; search?: string }) => {
-    try {
-      const resp = await fetchSMBatchStatusList(payload);
-      if (resp?.success && resp.data) {
-        return {
-          success: true,
-          batches: (resp.data.batches ?? []).map(SMBatchStatusModel.fromApi),
-        };
-      }
-      useAlertStore
-        .getState()
-        .showAlert(resp?.message || S.ERRORS.LOAD_STATUS_FAILED, "error", { autoCloseMs: 4000 });
-      return { success: false, batches: [] };
-    } catch {
-      useAlertStore
-        .getState()
-        .showAlert(S.ERRORS.LOAD_STATUS_FAILED, "error", { autoCloseMs: 4000 });
-      return { success: false, batches: [] };
-    }
-  },
-
-  /* ──────────────────────────────────────────────────────────────────────────
      API 6: Blockchain Events
   ─────────────────────────────────────────────────────────────────────────── */
   getBlockchainEvents: async (payload: {
@@ -215,11 +191,11 @@ export const systemManagerController = {
   },
 
   /* ──────────────────────────────────────────────────────────────────────────
-     API 7: Batch Stages
+     API 7: Batch Department Stages
   ─────────────────────────────────────────────────────────────────────────── */
   getBatchStages: async (payload: { batchId: string }) => {
     try {
-      const resp = await fetchSMBatchStages(payload);
+      const resp = await fetchSMBatchDeptStages(payload);
       if (resp?.success && resp.data) {
         return {
           success: true,
@@ -229,12 +205,52 @@ export const systemManagerController = {
       useAlertStore
         .getState()
         .showAlert(resp?.message || S.ERRORS.LOAD_BATCHES_FAILED, "error", { autoCloseMs: 4000 });
-      return { success: false, batchStages: null };
+      return { success: false, batchStages: null, message: resp?.message };
     } catch {
       useAlertStore
         .getState()
         .showAlert(S.ERRORS.LOAD_BATCHES_FAILED, "error", { autoCloseMs: 4000 });
       return { success: false, batchStages: null };
+    }
+  },
+
+  /* ──────────────────────────────────────────────────────────────────────────
+     API 7b: Batch Sub-Department Stages
+  ─────────────────────────────────────────────────────────────────────────── */
+  getBatchSubDeptStages: async (payload: { batchId: string; departmentId: number }) => {
+    try {
+      const resp = await fetchSMBatchSubDeptStages(payload);
+      if (resp?.success && resp.data) {
+        return {
+          success: true,
+          subDeptStages: BatchSubDeptStagesModel.fromApi(resp.data),
+          message: resp.message,
+          statusCode: resp.statusCode ?? resp.code ?? 200,
+        };
+      }
+      useAlertStore
+        .getState()
+        .showAlert(resp?.message || S.ERRORS.LOAD_SUBDEPT_STAGES_FAILED, "error", {
+          autoCloseMs: 4000,
+        });
+      return {
+        success: false,
+        subDeptStages: null,
+        message: resp?.message || S.ERRORS.LOAD_SUBDEPT_STAGES_FAILED,
+        statusCode: resp?.statusCode ?? resp?.code ?? 0,
+      };
+    } catch (err: any) {
+      useAlertStore
+        .getState()
+        .showAlert(err?.message || S.ERRORS.LOAD_SUBDEPT_STAGES_FAILED, "error", {
+          autoCloseMs: 4000,
+        });
+      return {
+        success: false,
+        subDeptStages: null,
+        message: err?.message || S.ERRORS.LOAD_SUBDEPT_STAGES_FAILED,
+        statusCode: err?.status ?? 0,
+      };
     }
   },
 

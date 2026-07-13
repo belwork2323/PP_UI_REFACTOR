@@ -41,7 +41,7 @@ const AdminManagementFormHeader = ({
         <Box sx={header.iconBadge}>{icon}</Box>
         <Box>
           <Typography sx={header.title}>{title}</Typography>
-          <Typography sx={header.subtitle}>{subtitle}</Typography>
+          {subtitle && <Typography sx={header.subtitle}>{subtitle}</Typography>}
         </Box>
       </Box>
       <IconButton onClick={onClose} disabled={closeDisabled} sx={header.closeButton}>

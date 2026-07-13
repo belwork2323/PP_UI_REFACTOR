@@ -239,7 +239,7 @@ export default function InProgressBatchesTable({
           </TableRow>
         ) : (
           sortedRows.map((p: InProgressBatchRow, i: number) => {
-            const config = batchStatusConfig(p.status);
+            const config = batchStatusConfig[p.status];
 
             return (
               <TableRow key={`${p.batchId}-${i}`} sx={th.table.tableRow(i % 2 === 1)}>

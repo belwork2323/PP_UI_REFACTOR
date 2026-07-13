@@ -1,19 +1,17 @@
 // src/ui/pages/systemManager/components/StageStatusPanel.tsx
 //
-// Renders the stageProcessed payload as a rich per-department card list.
+// Renders stageProcessed as a vertical pipeline of horizontal stage rows.
 // • Logic-free — all data comes from the hook via props.
 // • Styles from t.stagePanel, strings from the strings prop.
 
 import React from "react";
 import { Box, Typography, Avatar } from "@mui/material";
-import ProgressBar from "../../../components/common/ProgressBar";
 import { icons } from "../../../../app/theme/icons";
 
 type StageEntry = {
   stage: string;
   batchCount: number;
   percentage: number;
-  pending: number;
   color: string;
   iconKey: string;
 };
@@ -31,10 +29,10 @@ type Props = {
 };
 
 const STAGE_ICON_MAP: Record<string, React.ElementType> = {
-  Inventory2:     icons.systemManager.Inventory2,
-  Science:        icons.systemManager.Science,
-  Verified:       icons.systemManager.Verified,
-  LocalShipping:  icons.systemManager.LocalShipping,
+  Inventory2: icons.systemManager.Inventory2,
+  Science: icons.systemManager.Science,
+  Verified: icons.systemManager.Verified,
+  LocalShipping: icons.systemManager.LocalShipping,
 };
 
 function resolveIcon(iconKey: string): React.ElementType {
@@ -48,7 +46,6 @@ export default function StageStatusPanel({ stageData, t, strings }: Props) {
 
   return (
     <Box sx={sp.inner}>
-      {/* ── Summary header ── */}
       <Box sx={sp.summaryRow}>
         <Box>
           <Typography sx={sp.summarySubLabel}>{strings.TOTAL_BATCHES}</Typography>
@@ -59,46 +56,50 @@ export default function StageStatusPanel({ stageData, t, strings }: Props) {
         </Box>
       </Box>
 
-      {/* ── Horizontal carousel ── */}
+      {stages.length > 0 && strings.DISTRIBUTION_LABEL && (
+        <Typography sx={sp.distributionLabel}>{strings.DISTRIBUTION_LABEL}</Typography>
+      )}
+
       {stages.length === 0 ? (
         <Typography sx={sp.emptyText}>{strings.EMPTY}</Typography>
       ) : (
-        <Box sx={sp.carouselWrap}>
-          {stages.map(({ stage, batchCount, percentage, pending, color, iconKey }) => {
+        <Box sx={sp.pipelineWrap}>
+          {stages.map(({ stage, batchCount, percentage, color, iconKey }, index) => {
             const Icon = resolveIcon(iconKey);
+            const nextStage = stages[index + 1];
+            const showConnector = index < stages.length - 1;
+
             return (
-              <Box key={stage} sx={sp.card(color)}>
-                {/* Row: avatar + pct badge */}
-                <Box sx={sp.cardHeader}>
-                  <Avatar sx={sp.avatar(color)}>
-                    <Icon sx={sp.avatarIcon(color)} />
-                  </Avatar>
-                  <Box component="span" sx={sp.pctBadge(color)}>
-                    {percentage}%
+              <Box key={stage} sx={sp.stageBlock}>
+                <Box sx={sp.stageRow(color)}>
+                  <Box sx={sp.stageRowLeft}>
+                    <Avatar sx={sp.avatar(color)}>
+                      <Icon sx={sp.avatarIcon(color)} />
+                    </Avatar>
+                  </Box>
+
+                  <Box sx={sp.stageRowCenter}>
+                    <Typography sx={sp.stageName}>{stage}</Typography>
+                    <Box sx={sp.progressTrack(color)}>
+                      <Box sx={sp.progressFill(color, percentage)} />
+                    </Box>
+                  </Box>
+
+                  <Box sx={sp.stageRowRight}>
+                    <Typography sx={sp.batchPill(color)}>{batchCount}</Typography>
+                    <Typography sx={sp.batchLabel}>{strings.BATCHES}</Typography>
+                    <Box component="span" sx={sp.pctPill(color)}>
+                      {percentage}%
+                    </Box>
                   </Box>
                 </Box>
-                {/* Stage name */}
-                <Typography sx={sp.stageName}>{stage}</Typography>
-                {/* Counts row */}
-                <Box sx={sp.statsRow}>
-                  <Box>
-                    <Typography sx={sp.batchCount(color)}>{batchCount}</Typography>
-                    <Typography sx={sp.countLabel}>{strings.COMPLETED}</Typography>
+
+                {showConnector && nextStage && (
+                  <Box sx={sp.connector(color, nextStage.color)}>
+                    <Box sx={sp.connectorLine(color, nextStage.color)} />
+                    <Typography sx={sp.connectorArrow(nextStage.color)}>↓</Typography>
                   </Box>
-                  <Box>
-                    <Typography sx={sp.pendingCount}>{pending}</Typography>
-                    <Typography sx={sp.countLabel}>{strings.PENDING}</Typography>
-                  </Box>
-                </Box>
-                {/* Progress bar */}
-                <ProgressBar
-                  value={percentage}
-                  color={color}
-                  trackColor={sp.progressTrackColor}
-                  valueColor={sp.progressValueColor}
-                  height={5}
-                  showValue={false}
-                />
+                )}
               </Box>
             );
           })}

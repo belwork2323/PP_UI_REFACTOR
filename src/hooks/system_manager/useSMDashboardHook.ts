@@ -10,8 +10,6 @@ const createEmptyDashboard = (stageConfig: any[]) => ({
   activeBatches: [],
   blockEvents: [],
   chartData: { areaData: [], barData: [] },
-  batchStatusList: [],
-  approvalMatrix: [],
   stageConfig,
   chartUpdatedAt: null,
 });
@@ -87,10 +85,9 @@ export const useSMDashboard = (config: {
       setLoading(true);
       setStatsLoading(true);
 
-      const [statsResult, chartResult, batchStatusResult, blockchainResult] = await Promise.all([
+      const [statsResult, chartResult, blockchainResult] = await Promise.all([
         systemManagerController.getStats(apiFilter, startDate, endDate),
         systemManagerController.getChartData(apiFilter, startDate, endDate),
-        systemManagerController.getBatchStatusList({ page: 1, limit: 10 }),
         systemManagerController.getBlockchainEvents({
           systemManagerId,
           search: "",
@@ -108,7 +105,6 @@ export const useSMDashboard = (config: {
       const chartData = chartResult.success ? chartResult.chartData : SMChartDataModel.empty();
       const chartUpdatedAt =
         chartResult.success && chartResult.timestamp ? new Date(chartResult.timestamp) : new Date();
-      const statusList = batchStatusResult.success ? batchStatusResult.batches : [];
       const blockchainEvents = blockchainResult.success ? blockchainResult.events : [];
       const stageConfig = config.stageConfig;
       const fallbackStageColor = config.stageColors.fallback;
@@ -128,7 +124,7 @@ export const useSMDashboard = (config: {
           };
         }),
         stageData: {
-          totalBatches: chartData.stageTotalBatches ?? 0,
+          totalBatches: chartData.totalActiveBatches ?? chartData.stageTotalBatches ?? 0,
           filterType: apiFilter,
           stages: (chartData.stageProcessed ?? []).map((item: any) => {
             const key = toStageKey(item.stage);
@@ -137,11 +133,6 @@ export const useSMDashboard = (config: {
               stage: item.stage,
               batchCount: item.batchCount,
               percentage: item.percentage ?? 0,
-              pending: Math.max(
-                0,
-                (chartData.stageTotalBatches || chartData.totalActiveBatches || 0) -
-                  item.batchCount,
-              ),
               color: config.stageColors[key] ?? fallbackStageColor,
               iconKey: stageCfg?.iconKey ?? "Inventory2",
             };
@@ -150,10 +141,6 @@ export const useSMDashboard = (config: {
         stageMetrics: (chartData.stageProcessed ?? []).map((item: any) => ({
           stage: item.stage,
           completed: item.batchCount,
-          pending: Math.max(
-            0,
-            (chartData.stageTotalBatches || chartData.totalActiveBatches || 0) - item.batchCount,
-          ),
           color: config.stageColors[toStageKey(item.stage)] ?? fallbackStageColor,
           pct: item.percentage ?? 0,
         })),
@@ -170,32 +157,6 @@ export const useSMDashboard = (config: {
           barData: chartData.barChartData,
         },
         chartUpdatedAt,
-        batchStatusList: statusList,
-        approvalMatrix: statusList.map((batch: any) => {
-          const approvals = stageConfig.reduce((acc: Record<string, boolean>, stage) => {
-            const currentStage = Array.isArray(batch.currentStage)
-              ? batch.currentStage.find(
-                  (item: any) => toStageKey(item?.subDepartmentName || "") === stage.key,
-                )
-              : null;
-            const historyStage = Array.isArray(batch.stageHistory)
-              ? batch.stageHistory.find(
-                  (item: any) => toStageKey(item?.subDepartmentName || "") === stage.key,
-                )
-              : null;
-            const stageEntry = currentStage || historyStage;
-
-            acc[stage.key] = Boolean(
-              stageEntry?.approvedOn || stageEntry?.approvedBy || stageEntry?.status === "Approved",
-            );
-            return acc;
-          }, {});
-
-          return {
-            approver: batch.batchId || batch.projectName || "Unknown",
-            approvals,
-          };
-        }),
         stageConfig,
       });
 

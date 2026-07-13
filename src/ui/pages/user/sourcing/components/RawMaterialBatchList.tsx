@@ -223,8 +223,8 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         render: (v: string) => <Typography sx={theme.batchList.batchIdText}>{v}</Typography>,
       },
       {
-        key: "sourcingId",
-        label: STRINGS.SOURCING.BATCH_LIST.COL_SOURCING_ID,
+        key: "procurementId",
+        label: STRINGS.SOURCING.BATCH_LIST.COL_PROCUREMENT_ID,
         render: (v: string) => <Typography sx={theme.batchList.normalText}>{v}</Typography>,
       },
       {
@@ -232,6 +232,15 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         label: STRINGS.SOURCING.BATCH_LIST.COL_MATERIAL_CODE,
         align: "center",
         render: (v: string) => <Chip label={v} size="small" sx={theme.batchList.batchTypeChip} />,
+      },
+      {
+        key: "grade.gradeName",
+        label: STRINGS.SOURCING.BATCH_LIST.COL_GRADE,
+        render: (_v: string, row: { grade?: { gradeName?: string; gradeCode?: string } | null }) => (
+          <Typography sx={theme.batchList.subtleText}>
+            {row.grade?.gradeName || row.grade?.gradeCode || "—"}
+          </Typography>
+        ),
       },
       {
         key: "materialName",

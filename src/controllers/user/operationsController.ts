@@ -29,6 +29,7 @@ export type BatchListPayload = SubdepartmentBatchListRequest;
 
 export type MaterialSpecificationPayload = {
   materialCode: string;
+  gradeCode: string | null;
 };
 
 export type DimensionalParametersPayload = {

@@ -21,6 +21,8 @@ import {
   TableRow,
   CircularProgress,
   Zoom,
+  Grid,
+  Divider,
 } from "@mui/material";
 
 import { icons } from "@app/theme/icons";
@@ -73,6 +75,8 @@ export default function BatchImplementationForm({
   loadingLots = false,
   getLotByMaterialAndId,
   getLotOptionsForRow,
+  onCompositionChange,
+  setConfirmOpen,
 }: any) {
   const { modal, input } = t;
   const [selectedMaterialCode, setSelectedMaterialCode] = useState<string>("");
@@ -183,6 +187,45 @@ export default function BatchImplementationForm({
     };
     onMaterialsChange(newMaterials);
   };
+  const totalComposition =
+    form.identificationSheet?.materials?.reduce(
+      (sum, material) => sum + (Number(material.requiredComposition) || 0),
+      0,
+    ) ?? 0;
+  const roundedTotal = Number(totalComposition.toFixed(2));
+
+  useEffect(() => {
+    onCompositionChange?.(roundedTotal);
+  }, [roundedTotal, onCompositionChange]);
+  const handleMaterialValuesChange = (index: number, composition: number) => {
+    const batchSize = Number(form.identificationSheet?.batchSize) || 0;
+    const qty = Number(((batchSize * composition) / 100).toFixed(3));
+
+    const newMaterials = [...(form.identificationSheet?.materials ?? [])];
+    newMaterials[index] = {
+      ...newMaterials[index],
+      requiredComposition: composition,
+      quantityPerPremix: qty,
+    };
+
+    onMaterialsChange(newMaterials);
+    const total = newMaterials.reduce(
+      (sum, item) => sum + (Number(item.requiredComposition) || 0),
+      0,
+    );
+
+    onCompositionChange?.(Number(total.toFixed(2)));
+  };
+
+  const recalculateMaterialQuantities = (batchSize: number) => {
+    const newMaterials = (form.identificationSheet?.materials ?? []).map((material) => ({
+      ...material,
+      requiredComposition: 0,
+      quantityPerPremix: 0,
+    }));
+
+    onMaterialsChange(newMaterials);
+  };
 
   return (
     <Dialog
@@ -191,14 +234,25 @@ export default function BatchImplementationForm({
       TransitionComponent={Zoom}
       maxWidth={false}
       fullWidth
-      PaperProps={{ sx: modal.paper }}
+      PaperProps={{
+        sx: {
+          borderRadius: "20px",
+          width: "95vw",
+          maxWidth: "1800px", // or any value you want
+          height: "90vh",
+        },
+      }}
     >
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <DialogTitle sx={{ p: 0 }}>
         <AdminManagementFormHeader
           icon={<icons.batchMgmt.batchIcon sx={modal.header.icon} />}
           title={readOnly ? S.IMPLEMENTATION_VIEW_TITLE : S.IMPLEMENTATION_EDIT_TITLE}
-          subtitle={S.IMPLEMENTATION_SUBTITLE(editTarget?.batchId || editTarget?.id || "—")}
+          subtitle={
+            editTarget?.batchId
+              ? S.IMPLEMENTATION_SUBTITLE(editTarget?.batchId || editTarget?.id || "—")
+              : ""
+          }
           onClose={() => !saving && onClose()}
           closeDisabled={saving}
           closeIcon={<icons.batchMgmt.close fontSize="small" />}
@@ -239,7 +293,9 @@ export default function BatchImplementationForm({
                     batchSize: parseIntField(e.target.value),
                   };
                   onFormChange("identificationSheet", newIdent);
+                  recalculateMaterialQuantities(newIdent);
                 }}
+                required
                 size="small"
                 sx={input}
                 inputProps={{ min: 1 }}
@@ -299,13 +355,27 @@ export default function BatchImplementationForm({
                 fullWidth
                 label="Number of Premix"
                 type="number"
-                value={form.identificationSheet?.numberOfPremix ?? 1}
+                value={form.identificationSheet?.numberOfPremix ?? ""}
                 onChange={(e) => {
+                  const value = e.target.value;
+
                   const newIdent = {
                     ...form.identificationSheet,
-                    numberOfPremix: parseInt(e.target.value) || 1,
+                    numberOfPremix: value === "" ? "" : Math.max(1, Number(value)),
                   };
+
                   onFormChange("identificationSheet", newIdent);
+                }}
+                onBlur={() => {
+                  if (
+                    !form.identificationSheet?.numberOfPremix ||
+                    Number(form.identificationSheet.numberOfPremix) < 1
+                  ) {
+                    onFormChange("identificationSheet", {
+                      ...form.identificationSheet,
+                      numberOfPremix: 1,
+                    });
+                  }
                 }}
                 size="small"
                 sx={input}
@@ -448,12 +518,8 @@ export default function BatchImplementationForm({
                               type="number"
                               value={displayNumberValue(material.requiredComposition)}
                               onChange={(e) => {
-                                const raw = e.target.value;
-                                handleMaterialChange(
-                                  idx,
-                                  "requiredComposition",
-                                  raw === "" ? 0 : Number.parseFloat(raw) || 0,
-                                );
+                                const composition = Number.parseFloat(e.target.value) || 0;
+                                handleMaterialValuesChange(idx, composition);
                               }}
                               size="small"
                               sx={input}
@@ -461,22 +527,14 @@ export default function BatchImplementationForm({
                               disabled={fieldDisabled}
                             />
                           </TableCell>
+
                           <TableCell>
                             <Input
                               type="number"
                               value={displayNumberValue(material.quantityPerPremix)}
-                              onChange={(e) => {
-                                const raw = e.target.value;
-                                handleMaterialChange(
-                                  idx,
-                                  "quantityPerPremix",
-                                  raw === "" ? 0 : Number.parseFloat(raw) || 0,
-                                );
-                              }}
                               size="small"
                               sx={input}
-                              inputProps={{ step: 0.1 }}
-                              disabled={fieldDisabled}
+                              disabled
                             />
                           </TableCell>
                           <TableCell>
@@ -521,6 +579,51 @@ export default function BatchImplementationForm({
                     })}
                   </TableBody>
                 </Table>
+                <Box sx={{ my: 2 }}>
+                  {roundedTotal < 100 && (
+                    <Typography color="error.main" variant="body2" fontWeight={800}>
+                      Total composition is {roundedTotal.toFixed(2)}%. Please add{" "}
+                      {(100 - roundedTotal).toFixed(2)}% more.
+                    </Typography>
+                  )}
+
+                  {roundedTotal > 100 && (
+                    <Typography color="error.main" variant="body2" fontWeight={800}>
+                      Total composition is {roundedTotal.toFixed(2)}%. It exceeds the limit by{" "}
+                      {(roundedTotal - 100).toFixed(2)}%.
+                    </Typography>
+                  )}
+
+                  {roundedTotal === 100 && (
+                    <Typography color="success.main" variant="body2" fontWeight={800}>
+                      Total composition is 100.00%.
+                    </Typography>
+                  )}
+                </Box>
+
+                <Divider />
+                <Grid container spacing={2} sx={{ mt: 2 }}>
+                  <Grid size={{ xs: 12, md: 6 }}>
+                    <Input
+                      fullWidth
+                      label="Composition Approved as per PRC dated"
+                      type="datetime-local"
+                      value={form.identificationSheet?.prcApprovalDate ?? ""}
+                      onChange={(e) => {
+                        const newIdent = {
+                          ...form.identificationSheet,
+                          prcApprovalDate: e.target.value,
+                        };
+
+                        onFormChange("identificationSheet", newIdent);
+                      }}
+                      size="small"
+                      sx={input}
+                      InputLabelProps={{ shrink: true }}
+                      disabled={fieldDisabled}
+                    />
+                  </Grid>
+                </Grid>
               </TableContainer>
             ) : (
               <Typography color="textSecondary">No materials added yet</Typography>
@@ -535,7 +638,19 @@ export default function BatchImplementationForm({
           {readOnly ? "Close" : "Cancel"}
         </Button>
         {!readOnly && (
-          <Button variant="contained" onClick={onSave} disabled={saving} sx={modal.saveButton}>
+          <Button
+            variant="contained"
+            onClick={() => {
+              if (roundedTotal !== 100) {
+                setConfirmOpen(true);
+                return;
+              }
+
+              onSave();
+            }}
+            disabled={saving}
+            sx={modal.saveButton}
+          >
             {saving ? (
               <>
                 <CircularProgress size={14} sx={modal.savingSpinner} />

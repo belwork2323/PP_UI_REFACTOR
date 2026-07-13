@@ -76,7 +76,11 @@ const BatchManagementPage = () => {
   const { draftFilters } = list;
   const total = list.paginationData.totalRecords;
   const shown = list.batches.length;
-
+  const compositionTotal =
+    form.implForm.identificationSheet?.materials?.reduce(
+      (sum, m) => sum + (Number(m.requiredComposition) || 0),
+      0,
+    ) ?? 0;
   return (
     <Box sx={t.page}>
       <AdminManagementPageHeader
@@ -314,6 +318,7 @@ const BatchManagementPage = () => {
         loadingLots={implementation.loadingLots}
         getLotByMaterialAndId={implementation.getLotByMaterialAndId}
         getLotOptionsForRow={implementation.getLotOptionsForRow}
+        setConfirmOpen={form.setConfirmOpen}
       />
 
       <ConfirmAlertDialog
@@ -338,6 +343,41 @@ const BatchManagementPage = () => {
           sx={{ ...t.deleteDialog.deleteReasonInput, mt: 2 }}
           helperText={!canDelete ? S.DELETE_DIALOG.REASON_HELPER : undefined}
         />
+      </ConfirmAlertDialog>
+      <ConfirmAlertDialog
+        open={form.confirmOpen}
+        severity="warning"
+        title="Composition Percentage Warning"
+        message={
+          compositionTotal < 100
+            ? `The total composition is ${compositionTotal.toFixed(2)}%. ${(
+                100 - compositionTotal
+              ).toFixed(2)}% is still remaining. Do you want to continue?`
+            : `The total composition is ${compositionTotal.toFixed(2)}%. It exceeds the limit by ${(
+                compositionTotal - 100
+              ).toFixed(2)}%. Do you want to continue?`
+        }
+        confirmLabel="Yes"
+        cancelLabel="No"
+        onCancel={() => form.setConfirmOpen(false)}
+        onConfirm={() => {
+          form.setConfirmOpen(false);
+          form.handleSaveImplementation();
+        }}
+      >
+        <Box
+          sx={{
+            mt: 2,
+            ml: "52px",
+            p: 1.5,
+            borderRadius: 1,
+            fontWeight: 500,
+            fontSize: "0.875rem",
+          }}
+        >
+          You can still continue, but please verify the material composition before completing the
+          implementation.
+        </Box>
       </ConfirmAlertDialog>
     </Box>
   );

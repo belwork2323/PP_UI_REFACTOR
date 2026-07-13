@@ -76,10 +76,8 @@ const BatchListTable = ({
             <icons.batchMgmt.projectId
               sx={{ ...tableCell.batchIdIcon, ...tableCell.projectIdIcon }}
             />
-
             <Box sx={tableCell.projectInfo}>
-              <Typography sx={tableCell.projectName}>{batch.projectName}</Typography>
-
+              <Typography sx={tableCell.projectName}>{batch?.projectName}</Typography>
               <Typography sx={tableCell.projectId}>{getProjectId(batch)}</Typography>
             </Box>
           </Box>
@@ -127,11 +125,11 @@ const BatchListTable = ({
         label: S.TABLE_COLS[5],
         render: (batch) => {
           const status = getStatus(batch);
-          const scStatus = batchStatusConfig(status);
+          const scStatus = batchStatusConfig[status];
           return (
             <Chip
               icon={scStatus ? <scStatus.Icon /> : undefined}
-              label={status}
+              label={status.replace(/_/g, " ")}
               size="small"
               sx={tableCell.statusChip(scStatus)}
             />

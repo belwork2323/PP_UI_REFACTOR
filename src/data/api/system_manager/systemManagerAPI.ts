@@ -39,13 +39,6 @@ export const fetchSMAlerts = (payload: {
   dateRange?: { from?: string; to?: string };
 }) => post(SYSTEM_MANAGER.ALERTS, payload);
 
-/* ─── API 5: Batch Status List ───────────────────────────────────────────── */
-export const fetchSMBatchStatusList = (payload: {
-  page: number;
-  limit: number;
-  search?: string;
-}) => post(SYSTEM_MANAGER.BATCH_STATUS_LIST, payload);
-
 /* ─── API 6: Blockchain Events ───────────────────────────────────────────── */
 export const fetchSMBlockchainEvents = (payload: {
   systemManagerId: string;
@@ -58,10 +51,16 @@ export const fetchSMBlockchainEvents = (payload: {
   page: number;
   pageSize: number;
 }) => post(SYSTEM_MANAGER.BLOCKCHAIN_EVENTS, payload);
-/* ─── API 7: Batch Stages ───────────────────────────────────────────────────── */
-export const fetchSMBatchStages = (payload: {
+/* ─── API 7: Batch Department Stages ───────────────────────────────────────── */
+export const fetchSMBatchDeptStages = (payload: {
   batchId: string;
-}) => post(SYSTEM_MANAGER.BATCH_STAGES, payload);
+}) => post(SYSTEM_MANAGER.BATCH_DEPT_STAGES, payload);
+
+/* ─── API 7b: Batch Sub-Department Stages ──────────────────────────────────── */
+export const fetchSMBatchSubDeptStages = (payload: {
+  batchId: string;
+  departmentId: number;
+}) => post(SYSTEM_MANAGER.BATCH_SUBDEPT_STAGES, payload);
 
 /* ─── API 8: Sub-Department Batch Details ─────────────────────────────────── */
 export const fetchSMBatchSubDeptDetails = (payload: {

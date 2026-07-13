@@ -73,6 +73,10 @@ export const batchStatusConfig: Record<string, RoleChipConfig> = {
   },
   Approved: { Icon: icons.batchMgmt.approvedStatus, color: "#148F77", bg: "rgba(20,143,119,0.10)" },
   Rejected: { Icon: icons.batchMgmt.rejectedStatus, color: "#C0392B", bg: "rgba(192,57,43,0.10)" },
+  Draft: { Icon: icons.batchMgmt.pendingStatus, color: "#64748b", bg: "rgba(100,116,139,0.10)" },
+  Submitted: { Icon: icons.batchMgmt.inProgressStatus, color: "#2563eb", bg: "rgba(37,99,235,0.10)" },
+  Completed: { Icon: icons.batchMgmt.approvedStatus, color: "#148F77", bg: "rgba(20,143,119,0.10)" },
+  "Not Started": { Icon: icons.batchMgmt.pendingStatus, color: "#475569", bg: "rgba(71,85,105,0.08)" },
 };
 
 export const priorityConfig: Record<string, { color: string; bg: string }> = {

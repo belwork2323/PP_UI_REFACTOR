@@ -178,49 +178,6 @@ export class SMAlertSummaryModel {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   API 5: Batch Status List Model
-───────────────────────────────────────────────────────────────────────────── */
-
-export interface StageEntry {
-  subDepartmentId:   number;
-  subDepartmentName: string;
-  status:            string;
-  approvedBy:        string | null;
-  approvedOn:        string | null;
-  remarks:           string | null;
-}
-
-export class SMBatchStatusModel {
-  batchId:            string;
-  motorId:            string;
-  projectName:        string;
-  lastUpdatedStage:   StageEntry | null;
-  currentStage:       StageEntry[];
-  stageHistory:       StageEntry[];
-  progressPercentage: number;
-  createdDate:        string;
-  lastUpdatedOn:      string;
-
-  constructor(data: Record<string, any>) {
-    this.batchId       = data.batchId      ?? "";
-    this.motorId       = data.motorId      ?? "";
-    this.projectName   = data.projectName  ?? "";
-    this.progressPercentage = data.progressPercentage ?? 0;
-    this.createdDate   = data.createdDate  ?? "";
-    this.lastUpdatedOn = data.lastUpdatedOn ?? "";
-
-    const stageData          = data.stage ?? {};
-    this.lastUpdatedStage    = stageData.lastUpdatedStage ?? null;
-    this.currentStage        = Array.isArray(stageData.currentStage)  ? stageData.currentStage  : [];
-    this.stageHistory        = Array.isArray(stageData.stageHistory)  ? stageData.stageHistory  : [];
-  }
-
-  static fromApi(data: Record<string, any>) {
-    return new SMBatchStatusModel(data);
-  }
-}
-
-/* ─────────────────────────────────────────────────────────────────────────────
    API 6: Blockchain Event Model
 ───────────────────────────────────────────────────────────────────────────── */
 
@@ -277,8 +234,23 @@ export class SMBlockchainEventModel {
 }
 
 /* ─────────────────────────────────────────────────────────────────────────────
-   API 7: Batch Stages Model
+   API 7: Batch Department Stages Model
 ───────────────────────────────────────────────────────────────────────────── */
+
+export function normalizeDeptStageStatus(status: unknown): string {
+  const raw = String(status ?? "").trim();
+  if (!raw) return "Not Started";
+
+  const upper = raw.toUpperCase().replace(/\s+/g, "_");
+  const map: Record<string, string> = {
+    NOT_STARTED: "Not Started",
+    IN_PROGRESS: "In Progress",
+    COMPLETED: "Completed",
+  };
+  if (map[upper]) return map[upper];
+
+  return raw;
+}
 
 export class SubDepartmentStageModel {
   subDepartmentId: number;
@@ -318,7 +290,7 @@ export class DepartmentStageModel {
   constructor(data: Record<string, any>) {
     this.departmentId = data.departmentId ?? 0;
     this.departmentName = data.departmentName ?? "";
-    this.status = data.status ?? "Not Started";
+    this.status = normalizeDeptStageStatus(data.status);
     this.completionPercentage = data.completionPercentage ?? 0;
     this.riskLevel = data.riskLevel ?? "Low";
     this.isActive = Boolean(data.isActive);
@@ -357,13 +329,229 @@ export class BatchStagesModel {
     this.createdOn = batch.createdOn ?? "";
     this.ageInDays = batch.ageInDays ?? 0;
     this.overallProgress = batch.overallProgress ?? 0;
-    this.stages = Array.isArray(data.stages)
-      ? data.stages.map((s: any) => new DepartmentStageModel(s))
+    this.stages = Array.isArray(batch.stages)
+      ? batch.stages.map((s: any) => DepartmentStageModel.fromApi(s))
       : [];
   }
 
   static fromApi(data: Record<string, any>) {
     return new BatchStagesModel(data);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────────────────
+   API 7b: Batch Sub-Department Stages Model
+───────────────────────────────────────────────────────────────────────────── */
+
+export function normalizeWorkflowStatus(status: unknown): string {
+  const raw = String(status ?? "").trim();
+  if (!raw) return "—";
+
+  const upper = raw.toUpperCase().replace(/\s+/g, "_");
+  const map: Record<string, string> = {
+    TO_BE_INITIATED: "To Be Initiated",
+    INITIATED: "To Be Initiated",
+    IN_PROGRESS: "In Progress",
+    WAITING_FOR_APPROVAL: "Waiting for Approval",
+    APPROVED: "Approved",
+    REJECTED: "Rejected",
+    NOT_STARTED: "Not Started",
+    COMPLETED: "Completed",
+    DRAFT: "Draft",
+    SUBMIT: "Submitted",
+    SUBMITTED: "Submitted",
+  };
+  if (map[upper]) return map[upper];
+
+  return raw;
+}
+
+export function isApprovedStageStatus(status: unknown): boolean {
+  const normalized = normalizeWorkflowStatus(status);
+  return normalized === "Approved" || normalized === "Completed";
+}
+
+export class AuditActorModel {
+  id: string;
+  name: string;
+
+  constructor(data: Record<string, any> | string | null | undefined) {
+    if (typeof data === "string") {
+      this.id = "";
+      this.name = data.trim();
+      return;
+    }
+    this.id = data?.id ?? "";
+    this.name = data?.name ?? data?.fullName ?? data?.username ?? "";
+  }
+
+  get displayName(): string {
+    if (this.name && this.id) return `${this.name} (${this.id})`;
+    return this.name || this.id || "—";
+  }
+}
+
+function parseActor(value: unknown): AuditActorModel | null {
+  if (value == null || value === "") return null;
+  return new AuditActorModel(value as Record<string, any> | string);
+}
+
+function progressFromStatus(status: string): number {
+  switch (status) {
+    case "Approved":
+    case "Completed":
+      return 100;
+    case "Waiting for Approval":
+    case "In Progress":
+    case "Submitted":
+      return 50;
+    default:
+      return 0;
+  }
+}
+
+export class SubDeptStageItemModel {
+  subDepartmentId: number;
+  subDepartmentName: string;
+  status: string;
+  formId: string;
+  formStatus: string;
+  completionPercentage: number;
+  submittedBy: AuditActorModel | null;
+  submittedOn: string | null;
+  approvedBy: AuditActorModel | null;
+  approvedOn: string | null;
+  remarks: string | null;
+
+  constructor(data: Record<string, any>) {
+    this.subDepartmentId = data.subDepartmentId ?? 0;
+    this.subDepartmentName = data.subDepartmentName ?? "";
+
+    const audit = data.auditDetails ?? {};
+    const userAudit = audit.user ?? {};
+    const approverAudit = audit.approver ?? {};
+
+    this.status = normalizeWorkflowStatus(
+      data.status ?? userAudit.status ?? approverAudit.status,
+    );
+    this.formId = data.formId ?? "";
+    this.formStatus = data.formStatus ? normalizeWorkflowStatus(data.formStatus) : "";
+    this.completionPercentage = data.completionPercentage ?? 0;
+
+    this.submittedBy = parseActor(data.submittedBy ?? userAudit.submittedBy);
+    this.submittedOn = data.submittedOn ?? userAudit.submittedOn ?? null;
+    this.approvedBy = parseActor(data.approvedBy ?? approverAudit.approvedBy);
+    this.approvedOn = data.approvedOn ?? approverAudit.approvedOn ?? null;
+    const remarks = data.remarks ?? userAudit.remarks ?? approverAudit.remarks ?? null;
+    this.remarks =
+      remarks ??
+      data.rejectionReason ??
+      approverAudit.rejectionReason ??
+      null;
+  }
+
+  get displayProgress(): number {
+    if (this.completionPercentage > 0) return this.completionPercentage;
+    return progressFromStatus(this.status);
+  }
+
+  static fromApi(data: Record<string, any>) {
+    return new SubDeptStageItemModel(data);
+  }
+}
+
+/** @deprecated Use SubDeptStageItemModel — kept for batch status list typings */
+export type StageEntry = SubDeptStageItemModel;
+
+export type SubDeptTimelineEntry = {
+  key: string;
+  name: string;
+  variant: "done" | "active" | "lastUpdated";
+  item: SubDeptStageItemModel;
+};
+
+export class BatchSubDeptStagesModel {
+  batchId: string;
+  departmentId: number;
+  departmentName: string;
+  progressPercentage: number;
+  createdOn: string;
+  lastUpdatedOn: string;
+  lastUpdatedStage: SubDeptStageItemModel | null;
+  currentStage: SubDeptStageItemModel[];
+  stageHistory: SubDeptStageItemModel[];
+
+  constructor(data: Record<string, any>) {
+    const dept = data.department ?? data.dept ?? {};
+    const stage = data.stage ?? {};
+
+    this.batchId = data.batchId ?? "";
+    this.departmentId = dept.departmentId ?? dept.deptId ?? 0;
+    this.departmentName = dept.departmentName ?? dept.deptName ?? "";
+    this.progressPercentage = data.progressPercentage ?? 0;
+    this.createdOn = data.createdOn ?? "";
+    this.lastUpdatedOn = data.lastUpdatedOn ?? "";
+    this.lastUpdatedStage = stage.lastUpdatedStage
+      ? SubDeptStageItemModel.fromApi(stage.lastUpdatedStage)
+      : null;
+    this.currentStage = Array.isArray(stage.currentStage)
+      ? stage.currentStage.map((s: any) => SubDeptStageItemModel.fromApi(s))
+      : [];
+    this.stageHistory = Array.isArray(stage.stageHistory)
+      ? stage.stageHistory.map((s: any) => SubDeptStageItemModel.fromApi(s))
+      : [];
+  }
+
+  static fromApi(data: Record<string, any>) {
+    return new BatchSubDeptStagesModel(data);
+  }
+
+  static empty(): BatchSubDeptStagesModel {
+    return new BatchSubDeptStagesModel({});
+  }
+
+  get timelineEntries(): SubDeptTimelineEntry[] {
+    const currentIds = new Set(this.currentStage.map((s) => s.subDepartmentId));
+    const currentById = new Map(
+      this.currentStage.map((s) => [s.subDepartmentId, s] as const),
+    );
+
+    const ordered =
+      this.stageHistory.length > 0 ? this.stageHistory : this.currentStage;
+
+    const entries: SubDeptTimelineEntry[] = [];
+    const seen = new Set<number>();
+
+    ordered.forEach((item) => {
+      if (!item.subDepartmentId || seen.has(item.subDepartmentId)) return;
+      seen.add(item.subDepartmentId);
+
+      const isCurrent = currentIds.has(item.subDepartmentId);
+      const activeItem = isCurrent
+        ? (currentById.get(item.subDepartmentId) ?? item)
+        : item;
+      const variant: SubDeptTimelineEntry["variant"] = isCurrent ? "active" : "done";
+
+      entries.push({
+        key: `${variant}-${item.subDepartmentId}`,
+        name: activeItem.subDepartmentName,
+        variant,
+        item: activeItem,
+      });
+    });
+
+    this.currentStage.forEach((item) => {
+      if (!item.subDepartmentId || seen.has(item.subDepartmentId)) return;
+      seen.add(item.subDepartmentId);
+      entries.push({
+        key: `active-${item.subDepartmentId}`,
+        name: item.subDepartmentName,
+        variant: "active",
+        item,
+      });
+    });
+
+    return entries;
   }
 }
 

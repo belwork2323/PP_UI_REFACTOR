@@ -4,7 +4,7 @@ import { normalizeSubdepartmentBatchStatus } from "@data/models/user/Subdepartme
 export { motorStageLabel };
 
 export const getBatchId = (b: any): string => b.batchId || b.id || "—";
-export const getProjectId = (b: any): string => b.projectId || b.id || "—";
+export const getProjectId = (b: any): string => b?.projectId || b?.projectName || "—";
 export const getMotorId = (b: any): string => {
   if (Array.isArray(b.motorIds) && b.motorIds.length > 0) {
     return b.motorIds.join(", ");

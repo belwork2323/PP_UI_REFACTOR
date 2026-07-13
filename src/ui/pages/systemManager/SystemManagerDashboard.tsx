@@ -32,7 +32,6 @@ import { useThemeStore } from "../../../app/store/themeStore";
 import useSMDashboard from "../../../hooks/system_manager/useSMDashboardHook";
 import useSMInProgressBatches from "../../../hooks/system_manager/useSMInProgressBatchesHook";
 import useSMNotificationMenu from "../../../hooks/system_manager/useSMNotificationMenuHook";
-import useSMBatchStatusDetails from "../../../hooks/system_manager/useSMBatchStatusDetailsHook";
 import DashboardChartCard from "../../components/custom/dashboard/DashboardChartCard";
 import { DashKPICard } from "../../components/custom/dashboard/DashKPICard";
 import DashboardDateFilter from "../../components/custom/dashboard/DashboardDateFilter";
@@ -41,7 +40,6 @@ import FilterToggleButton from "../../components/common/FilterToggleButton";
 import FilterSelect from "../../components/common/FilterSelect";
 import FilterPanelHeader from "@ui/components/common/FilterPanelHeader";
 import BatchDetailPopup from "./components/BatchDetails";
-import BatchStatusDetailsPanel from "./components/BatchStatusDetailsPanel";
 import StageStatusPanel from "./components/StageStatusPanel";
 import ToggleTabs from "@/ui/components/common/ToggleTabs";
 import { BatchTab, batchTabOptions } from "@/hooks/admin/Dashboard/useDashboardHook";
@@ -128,7 +126,6 @@ export default function SystemManagerDashboard() {
     stageData,
     blockEvents,
     chartData,
-    batchStatusList,
     stageConfig,
     chartUpdatedAt,
   } = dashboard;
@@ -198,9 +195,6 @@ export default function SystemManagerDashboard() {
   } = useSMInProgressBatches(t.dashboardConfig.stageColors);
 
   const { notifAnchor, handleNotifOpen, handleNotifClose } = useSMNotificationMenu(loadAlerts);
-
-  const { expandedBatchId, toggleExpanded, totalPending } =
-    useSMBatchStatusDetails(batchStatusList);
 
   const [hoverLineIdx, setHoverLineIdx] = useState<number | null>(null);
   const [pinnedLineIdx, setPinnedLineIdx] = useState<number | null>(null);
@@ -554,7 +548,7 @@ export default function SystemManagerDashboard() {
         />
       </Box>
 
-      {/* ── Blockchain Timeline + Batch Status Details ── */}
+      {/* ── Block Traceability ── */}
       <Box sx={t.dashboardLayout.lowerGrid}>
         <Panel t={t}>
           <PanelHeader
@@ -595,23 +589,6 @@ export default function SystemManagerDashboard() {
                 ))}
               </Stack>
             )}
-          </Box>
-        </Panel>
-
-        <Panel t={t}>
-          <PanelHeader
-            title={S.BATCH_STATUS.DETAILS_SECTION_TITLE}
-            meta={<Typography sx={t.approvalMatrix.pendingMeta}>{totalPending} pending</Typography>}
-            t={t}
-          />
-          <Box sx={t.approvalMatrix.inner}>
-            <BatchStatusDetailsPanel
-              rows={batchStatusList}
-              t={t}
-              strings={S.BATCH_STATUS}
-              expandedBatchId={expandedBatchId}
-              onToggle={toggleExpanded}
-            />
           </Box>
         </Panel>
       </Box>
@@ -675,7 +652,6 @@ export default function SystemManagerDashboard() {
           stageConfig={stageConfig}
           onClose={closeBatchDetails}
           t={t}
-          // batchStatusList={batchStatusList}
         />
       )}
     </Box>

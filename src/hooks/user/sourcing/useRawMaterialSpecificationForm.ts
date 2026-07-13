@@ -12,7 +12,16 @@ import { useAlertStore } from "../../../app/store/alertStore";
 import { useThemeStore } from "../../../app/store/themeStore";
 import getSourcingTheme from "../../../app/theme/custom_themes/user/sourcing/sourcing_theme";
 import { operationsController } from "../../../controllers/user/operationsController";
-import type { MaterialsListItem } from "../../../data/models/user/MaterialsListModel";
+import type {
+  MaterialsListGrade,
+  MaterialsListItem,
+} from "../../../data/models/user/MaterialsListModel";
+import {
+  getMaterialGrades,
+  isMaterialSelectionUsed,
+  materialRequiresGradeSelection,
+  materialSelectionKey,
+} from "../../../data/models/user/MaterialsListModel";
 import { MaterialSpecificationItemModel } from "../../../data/models/user/MaterialSpecificationModel";
 import type {
   MaterialBlock,
@@ -40,7 +49,7 @@ import {
 export type SpecificationRow = SpecRow;
 export type SpecificationBlock = MaterialBlock;
 
-type MaterialOption = Pick<MaterialsListItem, "materialCode" | "materialName" | "specCount">;
+type MaterialOption = MaterialsListItem;
 
 type UseRawMaterialSpecificationFormParams = {
   initialBlocks?: SpecificationBlock[];
@@ -98,9 +107,13 @@ function createBlock(
 function createMaterialGroup(
   material: string,
   targetSpecs: MaterialSpecificationItemModel[] = [],
+  grade?: MaterialsListGrade | null,
 ): MaterialFormGroup {
   return {
     material,
+    gradeCode: grade?.gradeCode,
+    gradeId: grade?.gradeId,
+    gradeName: grade?.gradeName,
     supplyOrderNo: "",
     receiptDate: "",
     manufacturerName: "",
@@ -141,6 +154,7 @@ export const useRawMaterialSpecificationForm = ({
   const [flatBlocks, setFlatBlocks] = useState<SpecificationBlock[]>([]);
   const [materialGroups, setMaterialGroups] = useState<MaterialFormGroup[]>([]);
   const [selectedMaterial, setSelectedMaterial] = useState("");
+  const [selectedGrade, setSelectedGrade] = useState("");
   const [submitConfirm, setSubmitConfirm] = useState(false);
   const [draftConfirm, setDraftConfirm] = useState(false);
   const [showFieldErrors, setShowFieldErrors] = useState(false);
@@ -174,18 +188,23 @@ export const useRawMaterialSpecificationForm = ({
   );
 
   const fetchMaterialSpecifications = useCallback(
-    async (materialCode: string): Promise<MaterialSpecificationItemModel[]> => {
+    async (
+      materialCode: string,
+      gradeCode?: string,
+    ): Promise<MaterialSpecificationItemModel[]> => {
       const code = materialCode.trim();
       if (!code) return [];
 
-      const cached = specificationCache[code];
+      const cacheKey = materialSelectionKey(code, gradeCode);
+      const cached = specificationCache[cacheKey];
       if (cached) return cached;
 
-      setLoadingByMaterial((prev) => ({ ...prev, [code]: true }));
+      setLoadingByMaterial((prev) => ({ ...prev, [cacheKey]: true }));
 
       try {
         const response = await operationsController.fetchMaterialSpecificationList({
           materialCode: code,
+          gradeCode: gradeCode?.trim() || null,
         });
 
         if (!response?.success || !response.data) {
@@ -198,13 +217,13 @@ export const useRawMaterialSpecificationForm = ({
         }
 
         const specifications = response.data.specifications ?? [];
-        setSpecificationCache((prev) => ({ ...prev, [code]: specifications }));
+        setSpecificationCache((prev) => ({ ...prev, [cacheKey]: specifications }));
         return specifications;
       } catch (error) {
         showAlert(STRINGS.SOURCING.SPECIFICATION_FORM.SPECIFICATIONS_FETCH_ERROR, "error");
         return [];
       } finally {
-        setLoadingByMaterial((prev) => ({ ...prev, [code]: false }));
+        setLoadingByMaterial((prev) => ({ ...prev, [cacheKey]: false }));
       }
     },
     [showAlert, specificationCache],
@@ -226,13 +245,7 @@ export const useRawMaterialSpecificationForm = ({
         if (!isActive) return;
 
         if (response?.success && response?.data) {
-          setAvailableMaterials(
-            response.data.map(({ materialCode, materialName, specCount }) => ({
-              materialCode,
-              materialName,
-              specCount,
-            })),
-          );
+          setAvailableMaterials(response.data);
           return;
         }
 
@@ -329,18 +342,39 @@ export const useRawMaterialSpecificationForm = ({
     [],
   );
 
-  const usedMaterialCodes = useMemo(
-    () => new Set(materialGroups.map((g) => g.material)),
+  const usedMaterialKeys = useMemo(
+    () =>
+      new Set(
+        materialGroups.map((group) => materialSelectionKey(group.material, group.gradeCode)),
+      ),
     [materialGroups],
   );
 
   const selectableMaterials = useMemo(
     () =>
       createLotMode
-        ? availableMaterials.filter((m) => !usedMaterialCodes.has(m.materialCode))
+        ? availableMaterials.filter(
+            (material) => !isMaterialSelectionUsed(availableMaterials, material.materialCode, usedMaterialKeys),
+          )
         : availableMaterials,
-    [availableMaterials, createLotMode, usedMaterialCodes],
+    [availableMaterials, createLotMode, usedMaterialKeys],
   );
+
+  const showGradeSelect = Boolean(
+    createLotMode && selectedMaterial && materialRequiresGradeSelection(availableMaterials, selectedMaterial),
+  );
+
+  const selectableGrades = useMemo(() => {
+    if (!showGradeSelect || !selectedMaterial) return [];
+    return getMaterialGrades(availableMaterials, selectedMaterial).filter(
+      (grade) => !usedMaterialKeys.has(materialSelectionKey(selectedMaterial, grade.gradeCode)),
+    );
+  }, [availableMaterials, selectedMaterial, showGradeSelect, usedMaterialKeys]);
+
+  const handleMaterialChange = useCallback((materialCode: string) => {
+    setSelectedMaterial(materialCode);
+    setSelectedGrade("");
+  }, []);
 
   const materialCount = createLotMode ? materialGroups.length : blocks.length;
   const lotCount = createLotMode
@@ -378,6 +412,12 @@ export const useRawMaterialSpecificationForm = ({
     selectableMaterials.length === 0 &&
     availableMaterials.length > 0;
 
+  const canAddSelection =
+    Boolean(selectedMaterial) &&
+    (!showGradeSelect || Boolean(selectedGrade)) &&
+    !addingMaterial &&
+    !isMaterialLoading(materialSelectionKey(selectedMaterial, selectedGrade || undefined));
+
   const actionHelperText = useMemo(() => {
     if (!hasBlocks) {
       return formStrings.NOT_READY_TITLE;
@@ -414,30 +454,45 @@ export const useRawMaterialSpecificationForm = ({
 
   const handleAdd = useCallback(async () => {
     if (!selectedMaterial || addingMaterial) return;
+    if (showGradeSelect && !selectedGrade) return;
 
     setAddingMaterial(true);
 
     try {
-      const specifications = await fetchMaterialSpecifications(selectedMaterial);
+      const grade = showGradeSelect
+        ? selectableGrades.find((item) => item.gradeCode === selectedGrade) ??
+          getMaterialGrades(availableMaterials, selectedMaterial).find(
+            (item) => item.gradeCode === selectedGrade,
+          )
+        : null;
+      const specifications = await fetchMaterialSpecifications(
+        selectedMaterial,
+        grade?.gradeCode,
+      );
       if (!specifications.length) return;
 
       if (createLotMode) {
         updateMaterialGroups((previous) => [
           ...previous,
-          createMaterialGroup(selectedMaterial, specifications),
+          createMaterialGroup(selectedMaterial, specifications, grade),
         ]);
       } else {
         updateBlocks((previous) => [...previous, createBlock(selectedMaterial, specifications)]);
       }
       setSelectedMaterial("");
+      setSelectedGrade("");
     } finally {
       setAddingMaterial(false);
     }
   }, [
     addingMaterial,
+    availableMaterials,
     createLotMode,
     fetchMaterialSpecifications,
+    selectableGrades,
+    selectedGrade,
     selectedMaterial,
+    showGradeSelect,
     updateBlocks,
     updateMaterialGroups,
   ]);
@@ -621,8 +676,13 @@ export const useRawMaterialSpecificationForm = ({
     openDraftConfirm,
     openSubmitConfirm,
     selectableMaterials,
+    selectableGrades,
+    showGradeSelect,
+    canAddSelection,
     selectedMaterial,
-    setSelectedMaterial,
+    selectedGrade,
+    setSelectedMaterial: handleMaterialChange,
+    setSelectedGrade,
     specStyles,
     submitConfirm,
     theme,

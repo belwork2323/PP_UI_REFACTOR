@@ -1,11 +1,11 @@
 import { alpha } from "@mui/material";
-import colors  from "../../colors";
-import fonts   from "../../fonts";
+import colors from "../../colors";
+import fonts from "../../fonts";
 import spacing from "../../spacing";
-import layout  from "../../layout";
+import layout from "../../layout";
 import general from "../common/common_css_theme";
-import { getAccents }    from "../../tokens/accents";
-import { getSharedTheme }      from "../shared/shared_theme";
+import { getAccents } from "../../tokens/accents";
+import { getSharedTheme } from "../shared/shared_theme";
 import { getBatchDetailsTheme } from "./batchDetails_theme";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -21,21 +21,21 @@ import { getBatchDetailsTheme } from "./batchDetails_theme";
 // ─────────────────────────────────────────────────────────────────────────────
 
 const getSystemManagerTheme = (mode = "dark") => {
-  const isDark  = mode === "dark";
-  const d       = colors.dashboard[mode as "light" | "dark"];
-  const shared  = getSharedTheme(mode);
-  const s       = shared.tokens;           // semantic tokens
-  const accent  = getAccents(mode as "light" | "dark");  // vivid accent palette
+  const isDark = mode === "dark";
+  const d = colors.dashboard[mode as "light" | "dark"];
+  const shared = getSharedTheme(mode);
+  const s = shared.tokens; // semantic tokens
+  const accent = getAccents(mode as "light" | "dark"); // vivid accent palette
 
   // ── Backward-compat surface aliases (used throughout this file as `surface.*`) ──
   const surface = {
-    bg:        s.pageBg,
-    surface:   s.cardBg,
+    bg: s.pageBg,
+    surface: s.cardBg,
     surfaceEl: s.surfaceEl,
-    border:    s.cardBorder,
+    border: s.cardBorder,
     borderHov: s.borderStrong,
-    text:      s.textPrimary,
-    textSub:   s.textSecondary,
+    text: s.textPrimary,
+    textSub: s.textSecondary,
     textMuted: s.textDisabled,
     mono: "'IBM Plex Mono', monospace",
     sans: "'IBM Plex Sans', sans-serif",
@@ -47,14 +47,13 @@ const getSystemManagerTheme = (mode = "dark") => {
   const skeletonBase = shared.skeletonBase;
 
   // ── Shared input style (popup fields) ───────────────────────────────────────
-  const inputBg     = isDark ? "rgba(255,255,255,0.05)" : "#f8fafc";
+  const inputBg = isDark ? "rgba(255,255,255,0.05)" : "#f8fafc";
   const inputBorder = isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)";
 
   // ── "Not Started" badge bg — alpha("#fff",0.05) is invisible in light ───────
   const notStartedBg = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)";
 
   return {
-
     // ── Re-exports ─────────────────────────────────────────────────────────────
     general,
     tokens,
@@ -108,7 +107,7 @@ const getSystemManagerTheme = (mode = "dark") => {
       },
       lowerGrid: {
         display: "grid",
-        gridTemplateColumns: "1fr 1fr",
+        gridTemplateColumns: "1fr",
         gap: 2,
       },
       stageMetaText: {
@@ -356,14 +355,14 @@ const getSystemManagerTheme = (mode = "dark") => {
         fontFamily: surface.mono,
         letterSpacing: "0.08em",
         textTransform: "uppercase",
-        color: d.textSecondary,       // 🔄 aligned with dashboard_theme kpi.label
+        color: d.textSecondary, // 🔄 aligned with dashboard_theme kpi.label
         mb: 1.5,
       },
       value: {
         fontSize: "2.2rem",
         fontWeight: fonts.weight.extrabold,
         lineHeight: 1,
-        color: d.textPrimary,         // 🔄 aligned with dashboard_theme kpi.value
+        color: d.textPrimary, // 🔄 aligned with dashboard_theme kpi.value
         letterSpacing: "-0.02em",
       },
       trendText: (color) => ({ fontSize: "0.7rem", color, fontWeight: fonts.weight.medium }),
@@ -394,7 +393,8 @@ const getSystemManagerTheme = (mode = "dark") => {
       },
       fill: (color, pct) => ({
         position: "absolute",
-        left: 0, top: 0,
+        left: 0,
+        top: 0,
         height: "100%",
         width: `${pct}%`,
         bgcolor: color,
@@ -404,15 +404,14 @@ const getSystemManagerTheme = (mode = "dark") => {
       pctLabel: { fontSize: "0.65rem", color: d.textSecondary, mt: 0.4 },
     },
 
-    // ─── STAGE STATUS PANEL (new) ──────────────────────────────────────────────
-    // ─── STAGE STATUS PANEL (carousel) ────────────────────────────────────────
+    // ─── STAGE STATUS PANEL (pipeline) ────────────────────────────────────────
     stagePanel: {
       inner: { p: 2 },
       summaryRow: {
         display: "flex",
         alignItems: "flex-start",
         justifyContent: "space-between",
-        mb: 1.5,
+        mb: 1,
       },
       summarySubLabel: {
         fontSize: "0.6rem",
@@ -429,6 +428,12 @@ const getSystemManagerTheme = (mode = "dark") => {
         fontFamily: surface.mono,
         lineHeight: 1.1,
       },
+      distributionLabel: {
+        fontSize: "0.65rem",
+        color: d.textSecondary,
+        mb: 1.5,
+        letterSpacing: "0.02em",
+      },
       periodBadge: {
         px: "10px",
         py: "3px",
@@ -444,102 +449,126 @@ const getSystemManagerTheme = (mode = "dark") => {
         letterSpacing: "0.08em",
         color: d.textSecondary,
       },
-      // ── Horizontal scroll carousel ─────────────────────────────────────────
-      carouselWrap: {
-        display: "flex",
-        gap: 1,
-        overflowX: "auto",
-        pb: 0.5,
-        scrollSnapType: "x mandatory",
-        scrollBehavior: "smooth",
-        "&::-webkit-scrollbar": { height: 4, borderRadius: 2 },
-        "&::-webkit-scrollbar-track": { bgcolor: "transparent" },
-        "&::-webkit-scrollbar-thumb": {
-          bgcolor: isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)",
-          borderRadius: 2,
-        },
-      },
-      card: (color: string) => ({
-        flexShrink: 0,
-        width: 132,
-        scrollSnapAlign: "start",
-        border: `1px solid ${alpha(color, 0.22)}`,
-        borderRadius: "12px",
-        p: 1.25,
-        bgcolor: isDark ? alpha(color, 0.07) : alpha(color, 0.04),
+      pipelineWrap: {
         display: "flex",
         flexDirection: "column" as const,
-        gap: 0.7,
-        transition: "border-color .2s, background .2s, transform .2s, box-shadow .2s",
-        cursor: "default",
-        "&:hover": {
-          borderColor: alpha(color, 0.5),
-          bgcolor: isDark ? alpha(color, 0.13) : alpha(color, 0.09),
-          transform: "translateY(-2px)",
-          boxShadow: `0 6px 20px ${alpha(color, isDark ? 0.25 : 0.15)}`,
-        },
-      }),
-      cardHeader: {
+        gap: 0,
+      },
+      stageBlock: {
+        display: "flex",
+        flexDirection: "column" as const,
+      },
+      stageRow: (color: string) => ({
         display: "flex",
         alignItems: "center",
-        justifyContent: "space-between",
+        gap: 1.25,
+        border: `1px solid ${alpha(color, 0.2)}`,
+        borderRadius: "12px",
+        p: 1.25,
+        bgcolor: isDark ? alpha(color, 0.08) : alpha(color, 0.04),
+        transition: "border-color .2s, background .2s, transform .2s, box-shadow .2s",
+        "&:hover": {
+          borderColor: alpha(color, 0.45),
+          bgcolor: isDark ? alpha(color, 0.14) : alpha(color, 0.08),
+          transform: "translateX(2px)",
+          boxShadow: `0 4px 16px ${alpha(color, isDark ? 0.2 : 0.12)}`,
+        },
+      }),
+      stageRowLeft: {
+        flexShrink: 0,
+      },
+      stageRowCenter: {
+        flex: 1,
+        minWidth: 0,
+      },
+      stageRowRight: {
+        flexShrink: 0,
+        display: "flex",
+        flexDirection: "column" as const,
+        alignItems: "flex-end",
+        gap: 0.35,
       },
       avatar: (color: string) => ({
-        width: 26,
-        height: 26,
-        bgcolor: alpha(color, isDark ? 0.18 : 0.12),
+        width: 34,
+        height: 34,
+        bgcolor: alpha(color, isDark ? 0.22 : 0.14),
+        border: `1px solid ${alpha(color, 0.3)}`,
       }),
       avatarIcon: (color: string) => ({
-        fontSize: 14,
+        fontSize: 17,
         color,
-      }),
-      pctBadge: (color: string) => ({
-        fontSize: "0.6rem",
-        fontFamily: surface.mono,
-        fontWeight: 700,
-        color,
-        px: "5px",
-        py: "2px",
-        borderRadius: "5px",
-        bgcolor: alpha(color, isDark ? 0.18 : 0.1),
       }),
       stageName: {
-        fontSize: "0.7rem",
+        fontSize: "0.78rem",
         fontWeight: fonts.weight.semibold,
         color: d.textPrimary,
         lineHeight: 1.2,
-        mt: 0.25,
+        mb: 0.6,
+        whiteSpace: "nowrap" as const,
+        overflow: "hidden",
+        textOverflow: "ellipsis",
       },
-      statsRow: {
-        display: "flex",
-        gap: 1.5,
-        alignItems: "flex-end",
-        mt: 0.25,
-      },
-      batchCount: (color: string) => ({
-        fontSize: "1.15rem",
+      progressTrack: (color: string) => ({
+        position: "relative" as const,
+        height: 6,
+        borderRadius: 99,
+        bgcolor: isDark ? alpha(color, 0.12) : alpha(color, 0.08),
+        overflow: "hidden",
+      }),
+      progressFill: (color: string, percentage: number) => ({
+        position: "absolute" as const,
+        left: 0,
+        top: 0,
+        bottom: 0,
+        width: `${Math.min(100, Math.max(0, percentage))}%`,
+        borderRadius: 99,
+        background: `linear-gradient(90deg, ${alpha(color, 0.55)}, ${color})`,
+        transition: "width .6s cubic-bezier(.4,0,.2,1)",
+      }),
+      batchPill: (color: string) => ({
+        fontSize: "1.05rem",
         fontWeight: fonts.weight.bold,
         color,
         lineHeight: 1,
         fontFamily: surface.mono,
       }),
-      pendingCount: {
-        fontSize: "1.15rem",
-        fontWeight: fonts.weight.bold,
-        color: d.textSecondary,
-        lineHeight: 1,
-        fontFamily: surface.mono,
-      },
-      countLabel: {
-        fontSize: "0.53rem",
+      batchLabel: {
+        fontSize: "0.5rem",
         color: d.textDisabled,
         textTransform: "uppercase" as const,
         letterSpacing: "0.09em",
         fontFamily: surface.mono,
-        mt: 0.2,
       },
-      progressTrackColor: d.progressTrack,
-      progressValueColor: d.textSecondary,
+      pctPill: (color: string) => ({
+        fontSize: "0.62rem",
+        fontFamily: surface.mono,
+        fontWeight: 700,
+        color,
+        px: "6px",
+        py: "2px",
+        borderRadius: "6px",
+        bgcolor: alpha(color, isDark ? 0.2 : 0.12),
+        border: `1px solid ${alpha(color, 0.25)}`,
+      }),
+      connector: (fromColor: string, toColor: string) => ({
+        display: "flex",
+        flexDirection: "column" as const,
+        alignItems: "center",
+        py: 0.5,
+        gap: 0,
+      }),
+      connectorLine: (fromColor: string, toColor: string) => ({
+        width: 2,
+        height: 14,
+        borderRadius: 1,
+        background: `linear-gradient(180deg, ${alpha(fromColor, 0.5)}, ${alpha(toColor, 0.5)})`,
+      }),
+      connectorArrow: (toColor: string) => ({
+        fontSize: 14,
+        color: alpha(toColor, 0.7),
+        lineHeight: 1,
+        mt: -0.25,
+      }),
       emptyText: {
         fontSize: "0.76rem",
         color: d.textSecondary,
@@ -583,7 +612,7 @@ const getSystemManagerTheme = (mode = "dark") => {
         boxShadow: "0 8px 24px rgba(0,0,0,.55)",
       },
       tooltipLabelStyleOnColor: { color: "rgba(255,255,255,0.62)", fontSize: 11, marginBottom: 2 },
-      tooltipItemStyleOnColor:  { color: "#fff", fontWeight: 600 },
+      tooltipItemStyleOnColor: { color: "#fff", fontWeight: 600 },
       axisTickFill: d.textSecondary,
       axisTickFillOnColor: "rgba(255,255,255,0.7)",
       gridColor: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.06)",
@@ -594,7 +623,7 @@ const getSystemManagerTheme = (mode = "dark") => {
       // Area chart
       areaGradient: {
         start: { color: "rgba(255,255,255,0.55)", opacity: 1 },
-        end:   { color: "rgba(255,255,255,0)",    opacity: 1 },
+        end: { color: "rgba(255,255,255,0)", opacity: 1 },
       },
       areaStroke: "rgba(255,255,255,0.92)",
       areaStrokeWidth: 2.5,
@@ -603,7 +632,7 @@ const getSystemManagerTheme = (mode = "dark") => {
       // Bar chart
       barGradient: {
         start: { color: "rgba(255,255,255,0.88)", opacity: 1 },
-        end:   { color: "rgba(255,255,255,0.4)",  opacity: 1 },
+        end: { color: "rgba(255,255,255,0.4)", opacity: 1 },
       },
       barFill: "rgba(255,255,255,0.75)",
       barRadius: [4, 4, 0, 0] as [number, number, number, number],
@@ -632,7 +661,13 @@ const getSystemManagerTheme = (mode = "dark") => {
       },
       headerBoxSx: { px: 1, pt: 2, pb: 1 },
       contentSx: { px: 2.5, pb: 2.5 },
-      titleProps: { sx: { fontSize: "0.78rem", fontWeight: fonts.weight.semibold, color: "rgba(255,255,255,0.95)" } },
+      titleProps: {
+        sx: {
+          fontSize: "0.78rem",
+          fontWeight: fonts.weight.semibold,
+          color: "rgba(255,255,255,0.95)",
+        },
+      },
       subtitleProps: { sx: { fontSize: "0.7rem", color: "rgba(255,255,255,0.55)", mt: 0.3 } },
       dividerProps: { sx: { borderColor: "rgba(255,255,255,0.12)", my: 1.5 } },
       clockIconSx: { fontSize: 12, color: "rgba(255,255,255,0.45)" },
@@ -660,7 +695,13 @@ const getSystemManagerTheme = (mode = "dark") => {
       },
       headerBoxSx: { px: 1, pt: 2, pb: 1 },
       contentSx: { px: 2.5, pb: 2.5 },
-      titleProps: { sx: { fontSize: "0.78rem", fontWeight: fonts.weight.semibold, color: "rgba(255,255,255,0.95)" } },
+      titleProps: {
+        sx: {
+          fontSize: "0.78rem",
+          fontWeight: fonts.weight.semibold,
+          color: "rgba(255,255,255,0.95)",
+        },
+      },
       subtitleProps: { sx: { fontSize: "0.7rem", color: "rgba(255,255,255,0.55)", mt: 0.3 } },
       dividerProps: { sx: { borderColor: "rgba(255,255,255,0.12)", my: 1.5 } },
       clockIconSx: { fontSize: 12, color: "rgba(255,255,255,0.45)" },
@@ -676,7 +717,7 @@ const getSystemManagerTheme = (mode = "dark") => {
         letterSpacing: "0.1em",
         textTransform: "uppercase",
         color: d.tableHeaderText,
-        borderBottom: `2px solid ${d.tableHeaderBorder}`,   // 🔄 aligned with dashboard_theme table.header
+        borderBottom: `2px solid ${d.tableHeaderBorder}`, // 🔄 aligned with dashboard_theme table.header
         bgcolor: isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.015)",
         py: 1.2,
       },
@@ -704,9 +745,9 @@ const getSystemManagerTheme = (mode = "dark") => {
         color,
         fontWeight: fonts.weight.semibold,
       }),
-      motorId: { fontSize: "0.65rem", color: d.textSecondary },   // 🔄
-      stageName: { fontSize: "0.73rem", color: d.textPrimary },     // 🔄
-      substage: { fontSize: "0.73rem", color: d.textSecondary },   // 🔄
+      motorId: { fontSize: "0.65rem", color: d.textSecondary }, // 🔄
+      stageName: { fontSize: "0.73rem", color: d.textPrimary }, // 🔄
+      substage: { fontSize: "0.73rem", color: d.textSecondary }, // 🔄
       progressTrack: {
         flex: 1,
         height: 4,
@@ -723,14 +764,17 @@ const getSystemManagerTheme = (mode = "dark") => {
       progressLabel: {
         fontSize: "0.65rem",
         fontFamily: surface.mono,
-        color: d.textSecondary,    // 🔄
+        color: d.textSecondary, // 🔄
         minWidth: 28,
       },
-      updatedIcon: { fontSize: 11, color: d.textSecondary },   // 🔄
-      updatedText: { fontSize: "0.65rem", color: d.textSecondary },  // 🔄
+      updatedIcon: { fontSize: 11, color: d.textSecondary }, // 🔄
+      updatedText: { fontSize: "0.65rem", color: d.textSecondary }, // 🔄
       moreButton: {
         color: d.textSecondary,
-        "&:hover": { color: d.textPrimary, bgcolor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)" },
+        "&:hover": {
+          color: d.textPrimary,
+          bgcolor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
+        },
         borderRadius: "6px",
         p: 0.5,
       },
@@ -741,7 +785,7 @@ const getSystemManagerTheme = (mode = "dark") => {
         px: 3,
         py: 2,
       },
-      expandedStageLabel: { fontSize: "0.7rem", color: d.textSecondary },  // 🔄
+      expandedStageLabel: { fontSize: "0.7rem", color: d.textSecondary }, // 🔄
       skeleton: { ...skeletonBase, width: "80%" },
     },
 
@@ -764,8 +808,8 @@ const getSystemManagerTheme = (mode = "dark") => {
         "&:hover": { bgcolor: d.tableRowHover },
         transition: "background .15s",
       }),
-      msg: { fontSize: "0.73rem", color: d.textPrimary, lineHeight: fonts.lineHeight.normal },   // 🔄
-      time: { fontSize: "0.65rem", color: d.textSecondary, mt: 0.3 },                             // 🔄
+      msg: { fontSize: "0.73rem", color: d.textPrimary, lineHeight: fonts.lineHeight.normal }, // 🔄
+      time: { fontSize: "0.65rem", color: d.textSecondary, mt: 0.3 }, // 🔄
       iconColor: { error: accent.red, warning: accent.amber, info: accent.green },
     },
 
@@ -844,16 +888,20 @@ const getSystemManagerTheme = (mode = "dark") => {
         letterSpacing: "0.1em",
         height: 20,
       },
-      connector: (isLast) => isLast ? null : {
-        position: "absolute",
-        left: 14, top: 28,
-        width: 2,
-        height: "calc(100% - 14px)",
-        bgcolor: d.dividerColor,
-        zIndex: 0,
-        borderRadius: 1,
-        background: `linear-gradient(180deg, ${d.dividerColor} 0%, transparent 100%)`,
-      },
+      connector: (isLast) =>
+        isLast
+          ? null
+          : {
+              position: "absolute",
+              left: 14,
+              top: 28,
+              width: 2,
+              height: "calc(100% - 14px)",
+              bgcolor: d.dividerColor,
+              zIndex: 0,
+              borderRadius: 1,
+              background: `linear-gradient(180deg, ${d.dividerColor} 0%, transparent 100%)`,
+            },
       avatar: (color) => ({
         width: 30,
         height: 30,
@@ -864,11 +912,11 @@ const getSystemManagerTheme = (mode = "dark") => {
         zIndex: 1,
         flexShrink: 0,
         fontFamily: surface.mono,
-        boxShadow: `0 2px 8px ${alpha(color, 0.20)}`,
+        boxShadow: `0 2px 8px ${alpha(color, 0.2)}`,
         transition: "transform .2s ease, box-shadow .2s ease",
         "&:hover": {
           transform: "scale(1.1)",
-          boxShadow: `0 4px 14px ${alpha(color, 0.30)}`,
+          boxShadow: `0 4px 14px ${alpha(color, 0.3)}`,
         },
       }),
       motorId: (color) => ({
@@ -877,9 +925,9 @@ const getSystemManagerTheme = (mode = "dark") => {
         color,
         fontWeight: fonts.weight.semibold,
       }),
-      label: { fontSize: "0.73rem", color: d.textPrimary },       // 🔄
-      timeIcon: { fontSize: 10, color: d.textSecondary },            // 🔄
-      timeText: { fontSize: "0.65rem", color: d.textSecondary },     // 🔄
+      label: { fontSize: "0.73rem", color: d.textPrimary }, // 🔄
+      timeIcon: { fontSize: 10, color: d.textSecondary }, // 🔄
+      timeText: { fontSize: "0.65rem", color: d.textSecondary }, // 🔄
     },
 
     // ─── APPROVAL MATRIX ──────────────────────────────────────────────────────
@@ -894,12 +942,12 @@ const getSystemManagerTheme = (mode = "dark") => {
         letterSpacing: "0.08em",
         textTransform: "uppercase",
       }),
-      approverLabel: { fontSize: "0.68rem", color: d.textSecondary, whiteSpace: "nowrap" },  // 🔄
+      approverLabel: { fontSize: "0.68rem", color: d.textSecondary, whiteSpace: "nowrap" }, // 🔄
       approvedIcon: { fontSize: 16, color: accent.green },
       pendingIcon: { fontSize: 16, color: accent.amber },
       divider: { borderColor: d.dividerColor, my: 2 },
-      legendApproved: { fontSize: "0.68rem", color: d.textSecondary },  // 🔄
-      legendPending: { fontSize: "0.68rem", color: d.textSecondary },  // 🔄
+      legendApproved: { fontSize: "0.68rem", color: d.textSecondary }, // 🔄
+      legendPending: { fontSize: "0.68rem", color: d.textSecondary }, // 🔄
     },
 
     batchStatusDetails: {
@@ -1015,9 +1063,7 @@ const getSystemManagerTheme = (mode = "dark") => {
         mt: "3px",
         mb: "3px",
         borderRadius: 4,
-        bgcolor: variant === "done"
-          ? alpha(accent.green, 0.35)
-          : alpha(accent.blue, 0.18),
+        bgcolor: variant === "done" ? alpha(accent.green, 0.35) : alpha(accent.blue, 0.18),
       }),
       timelineContent: (isLast: boolean) => ({
         flex: 1,
@@ -1090,7 +1136,7 @@ const getSystemManagerTheme = (mode = "dark") => {
           fontWeight: fonts.weight.semibold,
           fontSize: "0.78rem",
           letterSpacing: "0.08em",
-          color: d.textPrimary,   // 🔄 was d.tableHeaderText → matches dashboard_theme card titles
+          color: d.textPrimary, // 🔄 was d.tableHeaderText → matches dashboard_theme card titles
           textTransform: "uppercase",
         },
         metaStack: { display: "flex", flexDirection: "row", alignItems: "center", gap: 1 },
@@ -1100,21 +1146,25 @@ const getSystemManagerTheme = (mode = "dark") => {
     // ─── STATUS CHIP ──────────────────────────────────────────────────────────
     statusChip: {
       dot: (status) => {
-        const c = {
-          "In Progress": accent.blue,
-          "Pending Approval": accent.amber,
-          "Completed": accent.green,
-          "Delayed": accent.red,
-        }[status] ?? d.textSecondary;
+        const c =
+          {
+            "In Progress": accent.blue,
+            "Pending Approval": accent.amber,
+            Completed: accent.green,
+            Delayed: accent.red,
+          }[status] ?? d.textSecondary;
         return { fontSize: 7, color: c };
       },
       box: (status) => {
         const map = {
           "In Progress": { bg: accent.blueDim, color: accent.blue },
           "Pending Approval": { bg: accent.amberDim, color: accent.amber },
-          "Completed": { bg: accent.greenDim, color: accent.green },
-          "Delayed": { bg: accent.redDim, color: accent.red },
-        }[status] ?? { bg: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)", color: d.textSecondary };
+          Completed: { bg: accent.greenDim, color: accent.green },
+          Delayed: { bg: accent.redDim, color: accent.red },
+        }[status] ?? {
+          bg: isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)",
+          color: d.textSecondary,
+        };
         return {
           display: "inline-flex",
           alignItems: "center",
@@ -1127,12 +1177,13 @@ const getSystemManagerTheme = (mode = "dark") => {
         };
       },
       text: (status) => {
-        const color = {
-          "In Progress": accent.blue,
-          "Pending Approval": accent.amber,
-          "Completed": accent.green,
-          "Delayed": accent.red,
-        }[status] ?? d.textSecondary;
+        const color =
+          {
+            "In Progress": accent.blue,
+            "Pending Approval": accent.amber,
+            Completed: accent.green,
+            Delayed: accent.red,
+          }[status] ?? d.textSecondary;
         return {
           fontSize: "0.68rem",
           fontWeight: fonts.weight.semibold,
@@ -1149,7 +1200,8 @@ const getSystemManagerTheme = (mode = "dark") => {
         width: 18,
         height: 18,
         borderRadius: "50%",
-        bgcolor: i < active ? accent.green : i === active ? accent.blue : (isDark ? "#1a2235" : d.pageBg),
+        bgcolor:
+          i < active ? accent.green : i === active ? accent.blue : isDark ? "#1a2235" : d.pageBg,
         border: `2px solid ${i < active ? accent.green : i === active ? accent.blue : d.cardBorder}`,
         display: "flex",
         alignItems: "center",
@@ -1188,25 +1240,32 @@ const getSystemManagerTheme = (mode = "dark") => {
     // ─── BATCH DETAIL POPUP ───────────────────────────────────────────────────
     popup: {
       statusColor: (status) => {
-        switch (String(status ?? "").toLowerCase()) {
+        switch (
+          String(status ?? "")
+            .toLowerCase()
+            .replace(/\s+/g, "_")
+        ) {
           case "approved":
           case "completed":
             return accent.green;
           case "rejected":
           case "failed":
             return accent.red;
-          case "waiting for approval":
-          case "in progress":
-          case "pending approval":
+          case "waiting_for_approval":
+          case "in_progress":
+          case "pending_approval":
             return accent.blue;
-          case "not started":
+          case "not_started":
             return d.textSecondary;
           default:
             return accent.blue;
         }
       },
       modal: {
-        display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1400,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1400,
       },
       body: {
         display: "flex",
@@ -1225,6 +1284,9 @@ const getSystemManagerTheme = (mode = "dark") => {
         flexDirection: "column",
         overflow: "hidden",
         boxShadow: isDark ? "0 40px 100px rgba(0,0,0,0.7)" : "0 24px 60px rgba(0,0,0,0.18)",
+        outline: "none",
+        "&:focus": { outline: "none" },
+        "&:focus-visible": { outline: "none" },
       },
 
       header: {
@@ -1247,12 +1309,61 @@ const getSystemManagerTheme = (mode = "dark") => {
         },
         icon: { fontSize: 20, color: accent.blue },
         batchId: { fontSize: "1.1rem", fontWeight: fonts.weight.bold, color: d.textPrimary },
-        motorLabel:      { fontSize: "0.72rem", fontWeight: 600, color: accent.blue,   bgcolor: accent.blueDim,   px: 0.8, py: 0.25, borderRadius: "4px", fontFamily: surface.mono },
-        motorTypeLabel:  { fontSize: "0.72rem", fontWeight: 600, color: accent.cyan,   bgcolor: accent.cyanDim,   px: 0.8, py: 0.25, borderRadius: "4px" },
-        batchTypeLabel:  { fontSize: "0.72rem", fontWeight: 600, color: accent.purple, bgcolor: accent.purpleDim, px: 0.8, py: 0.25, borderRadius: "4px" },
-        assignedToLabel: { fontSize: "0.72rem", fontWeight: 600, color: accent.green,  bgcolor: accent.greenDim,  px: 0.8, py: 0.25, borderRadius: "4px" },
-        createdOnLabel:  { fontSize: "0.72rem", fontWeight: 600, color: accent.amber,  bgcolor: accent.amberDim,  px: 0.8, py: 0.25, borderRadius: "4px" },
-        batchAgeLabel:   { fontSize: "0.72rem", fontWeight: 600, color: accent.red,    bgcolor: accent.redDim,    px: 0.8, py: 0.25, borderRadius: "4px" },
+        motorLabel: {
+          fontSize: "0.72rem",
+          fontWeight: 600,
+          color: accent.blue,
+          bgcolor: accent.blueDim,
+          px: 0.8,
+          py: 0.25,
+          borderRadius: "4px",
+          fontFamily: surface.mono,
+        },
+        motorTypeLabel: {
+          fontSize: "0.72rem",
+          fontWeight: 600,
+          color: accent.cyan,
+          bgcolor: accent.cyanDim,
+          px: 0.8,
+          py: 0.25,
+          borderRadius: "4px",
+        },
+        batchTypeLabel: {
+          fontSize: "0.72rem",
+          fontWeight: 600,
+          color: accent.purple,
+          bgcolor: accent.purpleDim,
+          px: 0.8,
+          py: 0.25,
+          borderRadius: "4px",
+        },
+        assignedToLabel: {
+          fontSize: "0.72rem",
+          fontWeight: 600,
+          color: accent.green,
+          bgcolor: accent.greenDim,
+          px: 0.8,
+          py: 0.25,
+          borderRadius: "4px",
+        },
+        createdOnLabel: {
+          fontSize: "0.72rem",
+          fontWeight: 600,
+          color: accent.amber,
+          bgcolor: accent.amberDim,
+          px: 0.8,
+          py: 0.25,
+          borderRadius: "4px",
+        },
+        batchAgeLabel: {
+          fontSize: "0.72rem",
+          fontWeight: 600,
+          color: accent.red,
+          bgcolor: accent.redDim,
+          px: 0.8,
+          py: 0.25,
+          borderRadius: "4px",
+        },
         bullet: { fontSize: "0.72rem", color: d.textSecondary },
         progressLabel: { fontSize: "0.72rem", color: d.textSecondary },
         progressValue: {
@@ -1275,7 +1386,10 @@ const getSystemManagerTheme = (mode = "dark") => {
         },
         closeButton: {
           color: d.textSecondary,
-          "&:hover": { color: d.textPrimary, bgcolor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)" },
+          "&:hover": {
+            color: d.textPrimary,
+            bgcolor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.05)",
+          },
         },
         closeIcon: { fontSize: 18 },
       },
@@ -1307,7 +1421,7 @@ const getSystemManagerTheme = (mode = "dark") => {
           py: 1.5,
           borderRadius: "10px",
           cursor: "pointer",
-          bgcolor: isActive ? alpha(color, 0.10) : "transparent",
+          bgcolor: isActive ? alpha(color, 0.1) : "transparent",
           border: `1px solid ${isActive ? alpha(color, 0.25) : "transparent"}`,
           "&:hover": { bgcolor: alpha(color, 0.06), borderColor: alpha(color, 0.18) },
           transition: "all .15s",
@@ -1371,7 +1485,11 @@ const getSystemManagerTheme = (mode = "dark") => {
         // Sub-Department Item
         subDeptItemBox: (isExpanded) => ({
           p: 1.5,
-          bgcolor: isExpanded ? alpha(accent.blue, 0.08) : isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)",
+          bgcolor: isExpanded
+            ? alpha(accent.blue, 0.08)
+            : isDark
+              ? "rgba(255,255,255,0.03)"
+              : "rgba(0,0,0,0.02)",
           border: `1px solid ${isDark ? "rgba(255,255,255,0.08)" : "rgba(0,0,0,0.08)"}`,
           borderRadius: "8px",
           cursor: "pointer",
@@ -1442,6 +1560,250 @@ const getSystemManagerTheme = (mode = "dark") => {
           alignItems: "center",
           minHeight: 400,
         },
+
+        subDeptTimeline: {
+          metaRow: {
+            display: "flex",
+            gap: 2,
+            flexWrap: "wrap",
+            mb: 2,
+          },
+          metaText: {
+            fontSize: "0.72rem",
+            color: d.textSecondary,
+          },
+          lastUpdatedBanner: {
+            mb: 2,
+            p: 1.25,
+            borderRadius: "10px",
+            border: `1px solid ${alpha(accent.amber, 0.25)}`,
+            bgcolor: alpha(accent.amber, isDark ? 0.1 : 0.06),
+          },
+          lastUpdatedLabel: {
+            fontSize: "0.62rem",
+            textTransform: "uppercase" as const,
+            letterSpacing: "0.1em",
+            fontFamily: surface.mono,
+            color: accent.amber,
+            mb: 0.5,
+          },
+          currentStageBanner: {
+            mb: 2,
+            p: 1.25,
+            borderRadius: "10px",
+            border: `1px solid ${alpha(accent.blue, 0.28)}`,
+            bgcolor: alpha(accent.blue, isDark ? 0.12 : 0.06),
+          },
+          currentStageLabel: {
+            fontSize: "0.62rem",
+            textTransform: "uppercase" as const,
+            letterSpacing: "0.1em",
+            fontFamily: surface.mono,
+            color: accent.blue,
+            mb: 0.75,
+          },
+          currentStageItem: {
+            "& + &": { mt: 1.25, pt: 1.25, borderTop: `1px solid ${alpha(accent.blue, 0.15)}` },
+          },
+          timelineWrap: {
+            border: `1px solid ${d.cardBorder}`,
+            borderRadius: "12px",
+            bgcolor: isDark ? "rgba(255,255,255,0.02)" : "rgba(255,255,255,0.6)",
+            p: 1.5,
+          },
+          timelineHeader: {
+            fontSize: "0.62rem",
+            letterSpacing: "0.1em",
+            textTransform: "uppercase" as const,
+            fontFamily: surface.mono,
+            color: d.textSecondary,
+            mb: 1.5,
+          },
+          timelineItem: {
+            display: "flex",
+            gap: 1.25,
+            alignItems: "stretch",
+          },
+          timelineRail: {
+            display: "flex",
+            flexDirection: "column" as const,
+            alignItems: "center",
+            flexShrink: 0,
+            pt: 0.5,
+          },
+          timelineDotDone: {
+            width: 18,
+            height: 18,
+            borderRadius: "50%",
+            bgcolor: accent.green,
+            border: `2px solid ${alpha(accent.green, 0.35)}`,
+            flexShrink: 0,
+          },
+          timelineDotActive: {
+            width: 18,
+            height: 18,
+            borderRadius: "50%",
+            border: `2px solid ${accent.blue}`,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            flexShrink: 0,
+          },
+          timelineDotActiveInner: {
+            width: 8,
+            height: 8,
+            borderRadius: "50%",
+            bgcolor: accent.blue,
+          },
+          timelineDotLastUpdated: {
+            width: 18,
+            height: 18,
+            borderRadius: "50%",
+            bgcolor: accent.amber,
+            border: `2px solid ${alpha(accent.amber, 0.35)}`,
+            flexShrink: 0,
+          },
+          timelineConnector: (variant: "done" | "active" | "lastUpdated") => ({
+            width: 2,
+            flex: 1,
+            minHeight: 24,
+            my: 0.5,
+            borderRadius: 1,
+            bgcolor:
+              variant === "done"
+                ? alpha(accent.green, 0.35)
+                : variant === "lastUpdated"
+                  ? alpha(accent.amber, 0.35)
+                  : alpha(accent.blue, 0.35),
+          }),
+          entryCard: (variant: "done" | "active" | "lastUpdated") => ({
+            flex: 1,
+            mb: 1.5,
+            p: 1.5,
+            borderRadius: "10px",
+            border: `1px solid ${
+              variant === "done"
+                ? alpha(accent.green, 0.2)
+                : variant === "lastUpdated"
+                  ? alpha(accent.amber, 0.25)
+                  : alpha(accent.blue, 0.22)
+            }`,
+            bgcolor:
+              variant === "done"
+                ? alpha(accent.green, isDark ? 0.06 : 0.03)
+                : variant === "lastUpdated"
+                  ? alpha(accent.amber, isDark ? 0.08 : 0.04)
+                  : alpha(accent.blue, isDark ? 0.08 : 0.04),
+          }),
+          entryHeader: {
+            display: "flex",
+            alignItems: "flex-start",
+            justifyContent: "space-between",
+            gap: 1,
+            mb: 1,
+          },
+          entryTitle: {
+            fontSize: "0.88rem",
+            fontWeight: fonts.weight.semibold,
+            color: d.textPrimary,
+          },
+          entryPct: {
+            fontSize: "0.78rem",
+            fontFamily: surface.mono,
+            fontWeight: fonts.weight.bold,
+            color: d.textPrimary,
+            flexShrink: 0,
+          },
+          entryProgressTrack: {
+            mb: 1.25,
+          },
+          metaChipsRow: {
+            display: "flex",
+            flexWrap: "wrap" as const,
+            gap: 0.75,
+            mb: 1.25,
+          },
+          metaChip: {
+            fontSize: "0.65rem",
+            fontFamily: surface.mono,
+            color: d.textSecondary,
+            px: 0.75,
+            py: 0.25,
+            borderRadius: "6px",
+            bgcolor: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.04)",
+            border: `1px solid ${d.cardBorder}`,
+          },
+          auditGrid: {
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+            gap: 1,
+          },
+          auditPanel: {
+            mt: 0.5,
+            borderRadius: "8px",
+            bgcolor: isDark ? "rgba(255,255,255,0.03)" : "rgba(0,0,0,0.02)",
+            border: `1px solid ${d.cardBorder}`,
+            overflow: "hidden",
+          },
+          auditToggle: {
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 1,
+            px: 1,
+            py: 0.75,
+            cursor: "pointer",
+            userSelect: "none",
+            "&:hover": {
+              bgcolor: isDark ? "rgba(255,255,255,0.04)" : "rgba(0,0,0,0.03)",
+            },
+          },
+          auditPanelTitle: {
+            fontSize: "0.62rem",
+            textTransform: "uppercase" as const,
+            letterSpacing: "0.08em",
+            fontFamily: surface.mono,
+            color: d.textSecondary,
+            fontWeight: fonts.weight.semibold,
+          },
+          auditExpandIcon: (open: boolean) => ({
+            fontSize: 18,
+            color: d.textSecondary,
+            transform: open ? "rotate(180deg)" : "rotate(0deg)",
+            transition: "transform .2s",
+          }),
+          auditBody: {
+            px: 1,
+            pb: 1,
+            pt: 0.25,
+            borderTop: `1px solid ${d.cardBorder}`,
+          },
+          auditRow: {
+            display: "flex",
+            flexWrap: "wrap",
+            alignItems: "baseline",
+            gap: 0.5,
+            mb: 0.55,
+            "&:last-of-type": { mb: 0 },
+          },
+          auditLabel: {
+            fontSize: "0.68rem",
+            color: d.textSecondary,
+            flexShrink: 0,
+          },
+          auditValue: {
+            fontSize: "0.68rem",
+            fontWeight: fonts.weight.semibold,
+            color: d.textPrimary,
+            wordBreak: "break-word",
+          },
+          rejectionText: {
+            fontSize: "0.68rem",
+            color: accent.red,
+            mt: 0.5,
+            fontStyle: "italic" as const,
+          },
+        },
       },
 
       subProcess: {
@@ -1463,17 +1825,30 @@ const getSystemManagerTheme = (mode = "dark") => {
         name: { fontSize: "0.75rem", color: d.textSecondary, fontWeight: fonts.weight.medium },
         pct: (color) => ({ fontSize: "0.68rem", fontFamily: surface.mono, color }),
         track: {
-          mt: 1, height: 5,
+          mt: 1,
+          height: 5,
           bgcolor: d.progressTrack,
           borderRadius: 3,
           overflow: "hidden",
         },
-        fill: (color, pct) => ({ height: "100%", width: `${pct}%`, bgcolor: color, borderRadius: 3 }),
-        status: (color) => ({ fontSize: "0.62rem", color, mt: 0.6, fontWeight: fonts.weight.medium }),
+        fill: (color, pct) => ({
+          height: "100%",
+          width: `${pct}%`,
+          bgcolor: color,
+          borderRadius: 3,
+        }),
+        status: (color) => ({
+          fontSize: "0.62rem",
+          color,
+          mt: 0.6,
+          fontWeight: fonts.weight.medium,
+        }),
         spColor: (status) =>
-          status === "Completed" ? accent.green :
-            status === "In Progress" ? accent.blue :
-              d.textDisabled,
+          status === "Completed"
+            ? accent.green
+            : status === "In Progress"
+              ? accent.blue
+              : d.textDisabled,
       },
 
       params: {
@@ -1487,7 +1862,7 @@ const getSystemManagerTheme = (mode = "dark") => {
         },
         row: (ok) => ({
           bgcolor: isDark ? "#1a2235" : d.pageBg,
-          border: `1px solid ${ok ? alpha(accent.green, 0.20) : alpha(accent.red, 0.15)}`,
+          border: `1px solid ${ok ? alpha(accent.green, 0.2) : alpha(accent.red, 0.15)}`,
           borderRadius: "10px",
           px: 2,
           py: 1.5,
@@ -1510,7 +1885,7 @@ const getSystemManagerTheme = (mode = "dark") => {
     stageBadge: {
       box: (status) => {
         const map = {
-          "Completed": { bg: alpha(accent.green, 0.12), color: accent.green },
+          Completed: { bg: alpha(accent.green, 0.12), color: accent.green },
           "In Progress": { bg: alpha(accent.blue, 0.15), color: accent.blue },
           "Pending Approval": { bg: alpha(accent.amber, 0.15), color: accent.amber },
           "Not Started": { bg: notStartedBg, color: d.textSecondary },
@@ -1520,28 +1895,30 @@ const getSystemManagerTheme = (mode = "dark") => {
           alignItems: "center",
           gap: 0.5,
           bgcolor: map.bg,
-          border: `1px solid ${alpha(map.color, 0.20)}`,
+          border: `1px solid ${alpha(map.color, 0.2)}`,
           borderRadius: "6px",
           px: 1,
           py: 0.3,
         };
       },
       dot: (status) => {
-        const color = {
-          "Completed": accent.green,
-          "In Progress": accent.blue,
-          "Pending Approval": accent.amber,
-          "Not Started": d.textSecondary,
-        }[status] ?? d.textSecondary;
+        const color =
+          {
+            Completed: accent.green,
+            "In Progress": accent.blue,
+            "Pending Approval": accent.amber,
+            "Not Started": d.textSecondary,
+          }[status] ?? d.textSecondary;
         return { fontSize: 7, color };
       },
       text: (status) => {
-        const color = {
-          "Completed": accent.green,
-          "In Progress": accent.blue,
-          "Pending Approval": accent.amber,
-          "Not Started": d.textSecondary,
-        }[status] ?? d.textSecondary;
+        const color =
+          {
+            Completed: accent.green,
+            "In Progress": accent.blue,
+            "Pending Approval": accent.amber,
+            "Not Started": d.textSecondary,
+          }[status] ?? d.textSecondary;
         return {
           fontSize: "0.67rem",
           fontWeight: fonts.weight.semibold,

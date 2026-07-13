@@ -11,7 +11,10 @@ export const fetchMaterialsListApi = async (payload: MaterialsListRequest) => {
   return await post(USER_OPERATIONS_ENDPOINTS.MATERIALS_LIST, payload);
 };
 
-export const fetchMaterialSpecificationListApi = async (payload: { materialCode: string }) => {
+export const fetchMaterialSpecificationListApi = async (payload: {
+  materialCode: string;
+  gradeCode: string | null;
+}) => {
   return await post(USER_OPERATIONS_ENDPOINTS.MATERIAL_SPECIFICATION_LIST, payload);
 };
 

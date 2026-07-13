@@ -16,7 +16,7 @@ const DEFAULT_PROJECT_FILTERS = {
   toDate: "",
 };
 
-function useProjectListSection() {
+function useProjectListSection(dashboardDateFilter) {
   const [projects, setProjects] = useState<any[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -32,8 +32,8 @@ function useProjectListSection() {
     try {
       const payload = {
         search: search.trim() || undefined,
-        fromDate: appliedFilters.fromDate || undefined,
-        toDate: appliedFilters.toDate || undefined,
+        startDate: appliedFilters.fromDate || dashboardDateFilter.fromDate,
+        endDate: appliedFilters.toDate || dashboardDateFilter.endDate,
         sortBy: "createdOn",
         sortOrder: "desc",
         page: page + 1,
@@ -65,7 +65,14 @@ function useProjectListSection() {
     } finally {
       setListLoading(false);
     }
-  }, [search, appliedFilters, page, rowsPerPage]);
+  }, [
+    search,
+    appliedFilters,
+    dashboardDateFilter.startDate,
+    dashboardDateFilter.endDate,
+    page,
+    rowsPerPage,
+  ]);
 
   useEffect(() => {
     void loadProjectsList();
@@ -121,7 +128,12 @@ function useProjectListSection() {
   };
 }
 
-function useProjectStatsSection() {
+function useProjectStatsSection(
+  loadList: () => void,
+  setDashboardDateFilter: React.Dispatch<
+    React.SetStateAction<{ startDate: string; endDate: string }>
+  >,
+) {
   const [stats, setStats] = useState({
     totalProjects: 0,
     projectsCreatedToday: 0,
@@ -178,10 +190,18 @@ function useProjectStatsSection() {
     if (value !== "custom") {
       setCustomStartDate("");
       setCustomEndDate("");
+
+      const { startDate, endDate } = getDateRange(value);
+
+      setDashboardDateFilter({
+        startDate,
+        endDate,
+      });
     }
   };
   const refreshDashboard = useCallback(() => {
     void loadStats();
+    void loadList();
   }, [loadStats]);
   useEffect(() => {
     if (filterType !== "custom") {
@@ -190,15 +210,17 @@ function useProjectStatsSection() {
     }
 
     if (customStartDate && customEndDate) {
+      setDashboardDateFilter({
+        startDate: customStartDate,
+        endDate: customEndDate,
+      });
+
       refreshDashboard();
     }
-  }, [filterType, customStartDate, customEndDate, refreshDashboard]);
+  }, [filterType, customStartDate, customEndDate, refreshDashboard, setDashboardDateFilter]);
   const toggleDateFilter = () => {
     setDateFilterOpen((prev) => !prev);
   };
-  useEffect(() => {
-    void loadStats();
-  }, [loadStats]);
 
   return {
     stats,
@@ -370,9 +392,14 @@ function useProjectDeleteSection(onRefresh: () => void) {
 }
 
 export default function useProjectManagementHook() {
-  const list = useProjectListSection();
-  const stats = useProjectStatsSection();
+  // const stats = useProjectStatsSection(list.loadProjectsList);
+  const [dashboardDateFilter, setDashboardDateFilter] = useState({
+    startDate: "",
+    endDate: "",
+  });
+  const list = useProjectListSection(dashboardDateFilter);
 
+  const stats = useProjectStatsSection(list.loadProjectsList, setDashboardDateFilter);
   const refresh = useCallback(() => {
     void list.loadProjectsList();
     void stats.loadStats();

@@ -8,36 +8,14 @@ import {
   type MaterialsListItem,
 } from "../../../data/models/user/MaterialsListModel";
 import rawMaterialProcurementController from "../../../controllers/user/sourcing/rawMaterialProcurementController";
-import { OPERATION_STATUS, toOperationStatusApiValue } from "../../operationStatus";
+import { OPERATION_STATUS } from "../../operationStatus";
 import {
   mapLotListApiRow,
-  rawMaterialLotMatchesSearch,
   type RawMaterialLotListRow,
   RawMaterialLotListRequest,
 } from "../../../data/models/user/RawMaterialProcurementModel";
 
 const FILTER_ALL = STRINGS.USER_BATCH_LIST.FILTER_ALL;
-/** Fetch up to this many rows when filtering search client-side across all columns */
-const CLIENT_SEARCH_FETCH_LIMIT = 5000;
-
-const buildStatusCountsFromLots = (lots: RawMaterialLotListRow[], totalRecords: number) => {
-  const S = OPERATION_STATUS;
-  const counts: Record<string, number> = {
-    [S.TO_BE_INITIATED]: 0,
-    [S.IN_PROGRESS]: 0,
-    [S.WAITING_FOR_APPROVAL]: 0,
-    [S.APPROVED]: 0,
-    [S.REJECTED]: 0,
-  };
-  lots.forEach((lot) => {
-    const status = lot.rmStatus;
-    if (status in counts) counts[status] += 1;
-  });
-  return {
-    ...counts,
-    [FILTER_ALL]: totalRecords,
-  };
-};
 
 export type SubdeptMaterialOption = {
   materialCode: string;
@@ -201,17 +179,13 @@ export const useRawMaterialLotList = () => {
       setIsRefreshing(true);
     }
     try {
-      const isClientSearch = Boolean(debouncedSearch.trim());
       const payload: RawMaterialLotListRequest = {
         subDepartmentId,
-        page: isClientSearch ? 1 : page + 1,
-        limit: isClientSearch ? CLIENT_SEARCH_FETCH_LIMIT : rowsPerPage,
+        page: page + 1,
+        limit: rowsPerPage,
       };
       if (statusFilter !== FILTER_ALL) {
-        const apiStatus = toOperationStatusApiValue(statusFilter, FILTER_ALL);
-        if (apiStatus) {
-          payload.status = [apiStatus];
-        }
+        payload.status = [statusFilter];
       }
 
       if (advancedFilters.materialCodes.length) {
@@ -219,6 +193,9 @@ export const useRawMaterialLotList = () => {
       }
       if (advancedFilters.manufacturer.trim()) {
         payload.manufacturerName = advancedFilters.manufacturer.trim();
+      }
+      if (debouncedSearch.trim()) {
+        payload.search = debouncedSearch.trim();
       }
       let from = advancedFilters.fromDate;
       let to = advancedFilters.toDate;
@@ -229,9 +206,7 @@ export const useRawMaterialLotList = () => {
       }
       if (from) payload.fromDate = from;
       if (to) payload.toDate = to;
-      
 
-      console.log("LOT LIST PAYLOAD", payload);
       const res = await rawMaterialProcurementController.fetchLotList(payload);
 
       if (res?.success && res.data) {
@@ -242,17 +217,9 @@ export const useRawMaterialLotList = () => {
         };
         const lots = (data.lots ?? []).map((lot, idx) => mapLotListApiRow(lot, idx));
 
-        if (isClientSearch) {
-          const matched = lots.filter((lot) => rawMaterialLotMatchesSearch(lot, debouncedSearch));
-          const paged = matched.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage);
-          setBatches(paged);
-          setTotalRecords(matched.length);
-          setStatusCounts(buildStatusCountsFromLots(matched, matched.length));
-        } else {
-          setBatches(lots);
-          setStatusCounts(mapLotListStatusCountsForUi(data.statusCounts, data.pagination?.totalRecords ?? 0));
-          setTotalRecords(data.pagination?.totalRecords ?? 0);
-        }
+        setBatches(lots);
+        setStatusCounts(mapLotListStatusCountsForUi(data.statusCounts, data.pagination?.totalRecords ?? 0));
+        setTotalRecords(data.pagination?.totalRecords ?? 0);
       } else {
         setBatches([]);
         setTotalRecords(0);

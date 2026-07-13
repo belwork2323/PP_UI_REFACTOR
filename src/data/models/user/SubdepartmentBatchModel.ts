@@ -4,7 +4,10 @@ import {
   toOperationStatusApiValue,
   type OperationStatus,
 } from "../../../hooks/operationStatus";
-import { motorStageForApi, normalizeMotorStage } from "../admin/BatchManagement/BatchManagementModel";
+import {
+  motorStageForApi,
+  normalizeMotorStage,
+} from "../admin/BatchManagement/BatchManagementModel";
 
 const FILTER_ALL = STRINGS.USER_BATCH_LIST.FILTER_ALL;
 const OPERATION_STATUS_VALUES = Object.values(OPERATION_STATUS) as OperationStatus[];
@@ -21,7 +24,9 @@ export const MANUFACTURING_BATCH_TYPE_OPTIONS = ["MAIN", "SUBSCALE"] as const;
 export const MANUFACTURING_PRIORITY_OPTIONS = ["Critical", "High", "Medium", "Low"] as const;
 
 export const normalizeBatchTypeCode = (raw: string | undefined | null): string => {
-  const s = String(raw ?? "").trim().toUpperCase();
+  const s = String(raw ?? "")
+    .trim()
+    .toUpperCase();
   if (!s) return "";
   if (s === "MAIN" || s.includes("MAIN")) return "MAIN";
   if (s === "SUBSCALE" || s.includes("SUBSCALE") || s.includes("SUB")) return "SUBSCALE";
@@ -54,10 +59,10 @@ export const hasSubdepartmentBatchAdvancedFilters = (
 ): boolean =>
   Boolean(
     filters.batchId?.trim() ||
-      filters.batchTypes.length > 0 ||
-      filters.motorStages.length > 0 ||
-      filters.motorIds.length > 0 ||
-      filters.priorities.length > 0,
+    filters.batchTypes.length > 0 ||
+    filters.motorStages.length > 0 ||
+    filters.motorIds.length > 0 ||
+    filters.priorities.length > 0,
   );
 
 export const subdepartmentBatchMatchesAdvancedFilters = (
@@ -88,7 +93,9 @@ export const subdepartmentBatchMatchesAdvancedFilters = (
     const rowMotorIds = Array.isArray(batch.motorIds)
       ? batch.motorIds.map((id) => String(id).trim().toLowerCase())
       : [];
-    const rowMotorId = String(batch.motorId ?? "").trim().toLowerCase();
+    const rowMotorId = String(batch.motorId ?? "")
+      .trim()
+      .toLowerCase();
     const matches = filters.motorIds.some((id) => {
       const query = id.trim().toLowerCase();
       if (!query) return false;
@@ -108,13 +115,14 @@ export const subdepartmentBatchMatchesAdvancedFilters = (
   return true;
 };
 
-export const emptySubdepartmentBatchAdvancedFilters = (): SubdepartmentBatchListAdvancedFilters => ({
-  batchId: "",
-  batchTypes: [],
-  motorStages: [],
-  motorIds: [],
-  priorities: [],
-});
+export const emptySubdepartmentBatchAdvancedFilters =
+  (): SubdepartmentBatchListAdvancedFilters => ({
+    batchId: "",
+    batchTypes: [],
+    motorStages: [],
+    motorIds: [],
+    priorities: [],
+  });
 
 export const SUBDEPARTMENT_BATCH_SEARCH_FIELDS = [
   "batchId",
@@ -283,8 +291,7 @@ const resolvePerson = (person: unknown) => {
   };
 };
 
-const resolveSystemManager = (batch: Record<string, unknown>) =>
-  resolvePerson(batch.systemManager);
+const resolveSystemManager = (batch: Record<string, unknown>) => resolvePerson(batch.systemManager);
 
 const resolveCreatedBy = (batch: Record<string, unknown>) => resolvePerson(batch.createdBy);
 
@@ -297,10 +304,7 @@ const resolveAssignedTo = (batch: Record<string, unknown>) => {
   return resolveSystemManager(batch);
 };
 
-export function mapSubdepartmentBatchListRow(
-  batch: Record<string, unknown>,
-  targetSlug?: string,
-) {
+export function mapSubdepartmentBatchListRow(batch: Record<string, unknown>, targetSlug?: string) {
   const statusField = (targetSlug && SUBDEPT_STATUS_FIELD[targetSlug]) || "rmStatus";
   const workflowStatus = normalizeSubdepartmentBatchStatus(
     batch[statusField] ??
@@ -316,9 +320,7 @@ export function mapSubdepartmentBatchListRow(
   const createdBy = resolveCreatedBy(batch);
   const formSubmittedBy = resolveFormSubmittedBy(batch);
   const motorStage = normalizeMotorStage(batch.motorStage ?? batch.motorType);
-  const submittedBy = String(
-    batch.submittedBy ?? formSubmittedBy?.fullName ?? "",
-  ).trim();
+  const submittedBy = String(batch.submittedBy ?? formSubmittedBy?.fullName ?? "").trim();
 
   const mapped = {
     ...batch,
@@ -385,7 +387,7 @@ export function buildSubdepartmentBatchStatusCountsFromRows(
     ...byLabel,
     [FILTER_ALL]: totalRecords > 0 ? totalRecords : countedTotal,
   };
-};
+}
 
 const isIgnorableStatusCountKey = (key: string) => {
   const normalized = key.trim().toLowerCase();
@@ -501,9 +503,7 @@ export function buildSubdepartmentBatchListPayload({
   }
 
   if (advanced.batchTypes.length > 0) {
-    payload.batchTypes = advanced.batchTypes
-      .map(batchTypeFilterToApiValue)
-      .filter(Boolean);
+    payload.batchTypes = advanced.batchTypes.map(batchTypeFilterToApiValue).filter(Boolean);
   }
 
   if (advanced.motorStages.length > 0) {

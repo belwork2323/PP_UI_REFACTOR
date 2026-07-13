@@ -85,8 +85,13 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
     openDraftConfirm,
     openSubmitConfirm,
     selectableMaterials,
+    selectableGrades,
+    showGradeSelect,
+    canAddSelection,
     selectedMaterial,
+    selectedGrade,
     setSelectedMaterial,
+    setSelectedGrade,
     specStyles,
     submitConfirm,
     theme,
@@ -94,6 +99,7 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
   } = useRawMaterialSpecificationForm(formProps);
 
   const materialsForDropdown = selectableMaterials;
+  const addSelectionKey = `${selectedMaterial}${selectedGrade ? `::${selectedGrade}` : ""}`;
   /** Bulk material picker only for create-lot flow; fill/edit open a single existing lot. */
   const showMaterialSelector = createLotMode && !allMaterialsAdded;
 
@@ -211,26 +217,69 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
                   >
                     {material.materialCode} - {material.materialName}
                     <Typography component="span" sx={specStyles.materialOptionMeta}>
-                      ({material.specCount} {formStrings.SPEC_COUNT_SUFFIX})
+                      ({material.specCount} {formStrings.SPEC_COUNT_SUFFIX}
+                      {material.grades.length > 0
+                        ? ` · ${material.grades.length} grade${material.grades.length > 1 ? "s" : ""}`
+                        : ""}
+                      )
                     </Typography>
                   </MenuItem>
                 ))}
               </TextField>
             </Box>
 
+            {showGradeSelect ? (
+              <Box flex={1}>
+                <Typography sx={theme.workflow.formElements.fieldLabel}>
+                  {formStrings.SELECT_GRADE_LABEL}
+                </Typography>
+                <TextField
+                  fullWidth
+                  select
+                  size="small"
+                  value={selectedGrade}
+                  onChange={(event) => setSelectedGrade(event.target.value)}
+                  sx={theme.workflow.formElements.textField}
+                  SelectProps={{
+                    displayEmpty: true,
+                    IconComponent: ExpandMoreRoundedIcon,
+                    MenuProps: {
+                      PaperProps: {
+                        sx: {
+                          borderRadius: 2,
+                          mt: 0.5,
+                          boxShadow: `0 8px 24px ${mode === "dark" ? "rgba(0,0,0,0.45)" : "rgba(27,79,114,0.12)"}`,
+                        },
+                      },
+                    },
+                  }}
+                  disabled={loadingMaterials || selectableGrades.length === 0}
+                >
+                  <MenuItem value="" disabled>
+                    <Typography color="text.disabled" fontSize="0.85rem">
+                      {formStrings.SELECT_GRADE_PLACEHOLDER}
+                    </Typography>
+                  </MenuItem>
+                  {selectableGrades.map((grade) => (
+                    <MenuItem key={grade.gradeCode} value={grade.gradeCode}>
+                      {grade.gradeName || grade.gradeCode}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              </Box>
+            ) : null}
+
             <Button
               variant="contained"
               onClick={handleAdd}
               disabled={
-                !selectedMaterial ||
-                addingMaterial ||
-                isMaterialLoading(selectedMaterial) ||
+                !canAddSelection ||
                 (createLotMode && materialsForDropdown.length === 0)
               }
               startIcon={<AddRoundedIcon />}
               sx={specStyles.addButton}
             >
-              {addingMaterial || isMaterialLoading(selectedMaterial)
+              {addingMaterial || isMaterialLoading(addSelectionKey)
                 ? formStrings.ADDING_TO_FORM
                 : formStrings.ADD_TO_FORM}
             </Button>

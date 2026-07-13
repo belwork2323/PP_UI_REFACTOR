@@ -82,7 +82,10 @@ const MaterialFormGroupCard = ({
             <ScienceRoundedIcon sx={{ ...specStyles.whiteIcon, ...specStyles.blockScienceIcon }} />
           </Box>
           <Box>
-            <Typography sx={specStyles.blockTitle}>{group.material}</Typography>
+            <Typography sx={specStyles.blockTitle}>
+              {group.material}
+              {group.gradeName ? ` · ${group.gradeName}` : group.gradeCode ? ` · ${group.gradeCode}` : ""}
+            </Typography>
             <Typography sx={specStyles.blockMeta}>
               {specCount}{" "}
               {specCount === 1 ? formStrings.SPECIFICATION_LABEL : formStrings.SPECIFICATION_LABEL_PLURAL} ·{" "}

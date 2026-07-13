@@ -18,7 +18,6 @@ import {
 } from "@data/models/admin/BatchManagement/BatchManagementModel";
 import {
   mapLotListApiRow,
-  toRawMaterialLotListApiStatus,
   type RawMaterialLotListRow,
 } from "@data/models/user/RawMaterialProcurementModel";
 import { useAlertStore } from "@app/store/alertStore";
@@ -374,7 +373,8 @@ function useBatchFormSection(onRefresh: () => void) {
   const [saving, setSaving] = useState(false);
   const [implSaving, setImplSaving] = useState(false);
   const [implViewOnly, setImplViewOnly] = useState(false);
-
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [compositionTotal, setCompositionTotal] = useState(0);
   const openCreate = () => {
     setEditTarget(null);
     setBatchForm(createEmptyBatchFormState());
@@ -410,6 +410,7 @@ function useBatchFormSection(onRefresh: () => void) {
 
     try {
       const resp = await batchManagementController.getBatchById(batch.batchId);
+
       if (resp) {
         setEditImplTarget(resp);
         setImplForm(mapBatchToImplementationFormState(resp));
@@ -501,7 +502,6 @@ function useBatchFormSection(onRefresh: () => void) {
   const handleSaveImplementation = async () => {
     setImplSaving(true);
     useAlertStore.getState().showAlert(S.MESSAGES.SAVING_IMPLEMENTATION, "info", { loading: true });
-
     if (!editImplTarget) {
       setBatchForm((prev) => ({
         ...prev,
@@ -516,7 +516,6 @@ function useBatchFormSection(onRefresh: () => void) {
       useAlertStore.getState().showAlert(S.MESSAGES.IMPLEMENTATION_SAVED_FOR_CREATE, "success");
       return;
     }
-
     const fullForm = { ...mapBatchToFormState(editImplTarget), ...implForm };
     const ok = await batchManagementController.updateBatch(editImplTarget.batchId, fullForm);
 
@@ -625,6 +624,10 @@ function useBatchFormSection(onRefresh: () => void) {
     handleSaveImplementation,
     handleImplFormChange,
     handleMaterialsChange,
+    confirmOpen,
+    setConfirmOpen,
+    compositionTotal,
+    setCompositionTotal,
   };
 }
 
@@ -659,7 +662,7 @@ function useBatchImplementationSection(implModalOpen: boolean) {
         subDepartmentId: ADMIN_RAW_MATERIAL_SUB_DEPARTMENT_ID,
         page: 1,
         limit: 500,
-        status: [toRawMaterialLotListApiStatus(OPERATION_STATUS.APPROVED)],
+        status: [OPERATION_STATUS.APPROVED],
       });
 
       if (res?.success && res.data) {
@@ -716,9 +719,11 @@ function useBatchImplementationSection(implModalOpen: boolean) {
         {
           id: trimmed,
           lotId: trimmed,
+          procurementId: "",
           sourcingId: "",
           materialCode,
           materialName: "",
+          grade: null,
           supplyOrderNo: "",
           receiptDate: "",
           manufacturerName: "",

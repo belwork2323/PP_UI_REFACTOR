@@ -21,7 +21,7 @@ export const useBatchStages = () => {
       if (result.success && result.batchStages) {
         setBatchStages(result.batchStages);
       } else {
-        setError("Failed to fetch batch stages");
+        setError(result.message || "Failed to fetch batch department stages");
         setBatchStages(null);
       }
     } catch (err) {

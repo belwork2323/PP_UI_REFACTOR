@@ -177,6 +177,7 @@ export const useRawMaterialProcurementHook = () => {
       blocks = [
         {
           material: row.materialCode,
+          ...(row.grade?.gradeCode ? { gradeCode: row.grade.gradeCode } : {}),
           lotNo: row.lotId,
           supplyOrderNo: row.supplyOrderNo,
           receiptDate: row.receiptDate,
@@ -222,9 +223,11 @@ export const useRawMaterialProcurementHook = () => {
 
     setDetailsRow({
       lotId,
-      sourcingId: row.sourcingId,
+      procurementId: row.procurementId || row.sourcingId,
+      sourcingId: row.procurementId || row.sourcingId,
       materialCode: row.materialCode,
       materialName: row.materialName,
+      grade: row.grade ?? null,
       supplyOrderNo: row.supplyOrderNo,
       receiptDate: row.receiptDate,
       manufacturerName: row.manufacturerName,
@@ -257,9 +260,13 @@ export const useRawMaterialProcurementHook = () => {
       setDetailsBlocks(blocks);
       setDetailsRow({
         lotId: model.lotId || lotId,
-        sourcingId: row.sourcingId,
+        procurementId: row.procurementId || row.sourcingId,
+        sourcingId: row.procurementId || row.sourcingId,
         materialCode: model.materialCode || row.materialCode,
         materialName: row.materialName,
+        grade:
+          row.grade ??
+          (model.grade ? { gradeId: 0, gradeCode: model.grade, gradeName: model.grade } : null),
         supplyOrderNo: model.supplyOrderNo || row.supplyOrderNo,
         receiptDate: model.receiptDate || row.receiptDate,
         manufacturerName: model.manufacturerName || row.manufacturerName,

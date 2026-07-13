@@ -143,7 +143,7 @@ function useUserListSection() {
   };
 }
 
-function useUserStatsSection() {
+function useUserStatsSection(loadUsersList) {
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
@@ -204,6 +204,7 @@ function useUserStatsSection() {
   };
   const refreshDashboard = useCallback(() => {
     void loadStats();
+    void loadUsersList();
   }, [loadStats]);
   useEffect(() => {
     if (filterType !== "custom") {
@@ -215,12 +216,11 @@ function useUserStatsSection() {
       refreshDashboard();
     }
   }, [filterType, customStartDate, customEndDate, refreshDashboard]);
+
   const toggleDateFilter = () => {
     setDateFilterOpen((prev) => !prev);
   };
-  useEffect(() => {
-    void loadStats();
-  }, [loadStats]);
+
   return {
     stats,
     loading: statsLoading,
@@ -429,7 +429,7 @@ function useUserDeleteSection(onRefresh: () => void) {
 export default function useUserManagementHook() {
   const lookups = useUserLookupsSection();
   const list = useUserListSection();
-  const stats = useUserStatsSection();
+  const stats = useUserStatsSection(list.loadUsersList);
 
   const refreshAll = useCallback(() => {
     void list.loadUsersList();

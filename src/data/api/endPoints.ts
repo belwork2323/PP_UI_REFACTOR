@@ -177,9 +177,9 @@ export const SYSTEM_MANAGER = {
   CHART_DATA: `${API_BASE}/system-manager/dashboard/chartData`,
   ACTIVE_BATCHES: `${API_BASE}/system-manager/dashboard/active-batches`,
   ALERTS: `${API_BASE}/system-manager/dashboard/alerts`,
-  BATCH_STATUS_LIST: `${API_BASE}/system-manager/dashboard/batchStatusList`,
   BLOCKCHAIN_EVENTS: `${API_BASE}/system-manager/dashboard/blockchain-events`,
-  BATCH_STAGES: `${API_BASE}/system-manager/dashboard/batch-stages`,
+  BATCH_DEPT_STAGES: `${API_BASE}/system-manager/dashboard/batch-dept-stages`,
+  BATCH_SUBDEPT_STAGES: `${API_BASE}/system-manager/dashboard/batch-subdept-stages`,
   BATCH_DETAILS: `${API_BASE}/system-manager/dashboard/batch/details`,
 };
 
