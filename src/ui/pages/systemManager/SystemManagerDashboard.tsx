@@ -21,10 +21,8 @@ import {
 import { LineChart, BarChart } from "@mui/x-charts";
 import Menu from "@mui/material/Menu";
 
-import getDashboardWidgetsTheme from "../../../app/theme/custom_themes/shared/dashboard_widgets_theme";
-import getDashboardTableTheme from "../../../app/theme/custom_themes/shared/dashboard_table_theme";
-import { getSharedTheme } from "../../../app/theme/custom_themes/shared/shared_theme";
 import getSystemManagerTheme from "../../../app/theme/custom_themes/system_manager/sysDashboard_theme";
+import { getSharedTheme } from "../../../app/theme/custom_themes/shared/shared_theme";
 import { icons } from "../../../app/theme/icons";
 import { STRINGS } from "../../../app/config/strings";
 import { Panel, PanelHeader, AlertIcon } from "./components/SystemManagerWidgets";
@@ -38,14 +36,12 @@ import DashboardDateFilter from "../../components/custom/dashboard/DashboardDate
 import InProgressBatchesTable from "../../components/custom/dashboard/InProgressBatchesTable";
 import FilterToggleButton from "../../components/common/FilterToggleButton";
 import FilterSelect from "../../components/common/FilterSelect";
-import FilterPanelHeader from "@ui/components/common/FilterPanelHeader";
 import BatchDetailPopup from "./components/BatchDetails";
 import StageStatusPanel from "./components/StageStatusPanel";
 import ToggleTabs from "@/ui/components/common/ToggleTabs";
 import { BatchTab, batchTabOptions } from "@/hooks/admin/Dashboard/useDashboardHook";
 import AdminListShell from "@/ui/components/custom/admin/AdminListShell";
 import AdminFilterPanel from "@/ui/components/custom/admin/AdminFilterPanel";
-import DateRangeRow from "@/ui/components/common/DateRangeRow";
 import getDashboardTheme from "@/app/theme/custom_themes/admin/Dashboard/dashboard_theme";
 
 const {
@@ -87,23 +83,13 @@ function resolveKpiIcon(iconKey) {
 export default function SystemManagerDashboard() {
   const mode = useThemeStore((s) => s.mode);
   const t = useMemo(() => getSystemManagerTheme(mode), [mode]);
-  const widgetTh = useMemo(() => getDashboardWidgetsTheme(mode), [mode]);
   const sharedTh = useMemo(() => getSharedTheme(mode), [mode]);
-  const adminTh = useMemo(
-    () => ({
-      ...widgetTh,
-      table: getDashboardTableTheme(mode),
-      card: sharedTh.card,
-      filterMenuProps: sharedTh.filterMenuProps,
-      filterMenuItemSx: sharedTh.filterMenuItemSx,
-    }),
-    [widgetTh, sharedTh, mode],
-  );
+  const adminTh = useMemo(() => getDashboardTheme(mode), [mode]);
   const S = STRINGS.SYSTEM_MANAGER_DASHBOARD;
-  const th = getDashboardTheme(mode);
+  const DP = STRINGS.DASHBOARD_PAGE;
   const shellTheme = {
-    batchListShell: th.batchListShell,
-    filterToggle: th.filterToggle,
+    batchListShell: adminTh.batchListShell,
+    filterToggle: adminTh.filterToggle,
   };
   const {
     dashboard,
@@ -117,18 +103,13 @@ export default function SystemManagerDashboard() {
     setCustomStartDate,
     customEndDate,
     setCustomEndDate,
+    applyCustomDateFilter,
+    dateBounds,
     loadAlerts,
   } = useSMDashboard(t.dashboardConfig);
 
-  const {
-    kpiData,
-    stageMetrics,
-    stageData,
-    blockEvents,
-    chartData,
-    stageConfig,
-    chartUpdatedAt,
-  } = dashboard;
+  const { kpiData, stageMetrics, stageData, blockEvents, chartData, stageConfig, chartUpdatedAt } =
+    dashboard;
   const chartTheme = t.sharedCharts;
 
   const chartTimestamp = (() => {
@@ -143,29 +124,18 @@ export default function SystemManagerDashboard() {
 
   const [dateFilterOpen, setDateFilterOpen] = useState(true);
   const dateFilterCount = filterType ? 1 : 0;
-  const { filterMenuProps, filterMenuItemSx } = adminTh;
+  const { filterMenuProps, filterMenuItemSx } = sharedTh;
 
   const {
     batchFilterOpen,
     setBatchFilterOpen,
+    toggleBatchFilterOpen,
 
     batchSearch,
     setBatchSearch,
 
-    batchStage,
-    setBatchStage,
-
-    batchType,
-    setBatchType,
-
-    batchStatus,
-    setBatchStatus,
-
-    batchDateFrom,
-    setBatchDateFrom,
-
-    batchDateTo,
-    setBatchDateTo,
+    batchDraftFilters,
+    setBatchDraftFilter,
 
     activeBatchFilterCount,
     clearBatchFilters,
@@ -192,7 +162,11 @@ export default function SystemManagerDashboard() {
     activeTab,
     setActiveTab,
     applyBatchFilters,
-  } = useSMInProgressBatches(t.dashboardConfig.stageColors);
+  } = useSMInProgressBatches(t.dashboardConfig.stageColors, {
+    filterType: dateBounds.apiFilter,
+    startDate: dateBounds.startDate,
+    endDate: dateBounds.endDate,
+  });
 
   const { notifAnchor, handleNotifOpen, handleNotifClose } = useSMNotificationMenu(loadAlerts);
 
@@ -215,12 +189,23 @@ export default function SystemManagerDashboard() {
     );
   }
 
+  const isRefreshing = statsLoading || batchesLoading;
+
   return (
-    <Box sx={t.page}>
+    <Box sx={{ ...t.page, ...t.dashboardLayout.pageRelative }}>
+      {isRefreshing && (
+        <Box
+          sx={{
+            ...t.dashboardLayout.refreshOverlay,
+            bgcolor: mode === "dark" ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.55)",
+          }}
+        >
+          <CircularProgress size={44} />
+        </Box>
+      )}
       {/* ── Page Header ── */}
       <Stack direction="row" alignItems="center" justifyContent="space-between" mb={3}>
         <Box>
-          <Typography sx={t.pageHeader.eyebrow}>{S.PAGE.EYEBROW}</Typography>
           <Typography sx={t.pageHeader.title}>{S.PAGE.TITLE}</Typography>
         </Box>
         {/* <Stack direction="row" gap={1} alignItems="center">
@@ -255,6 +240,7 @@ export default function SystemManagerDashboard() {
             onStartChange={setCustomStartDate}
             customEndDate={customEndDate}
             onEndChange={setCustomEndDate}
+            onApplyCustom={applyCustomDateFilter}
             strings={S.DATE_FILTER}
             loading={statsLoading}
             containerSx={t.dashboardLayout.dateRangeBar}
@@ -475,7 +461,7 @@ export default function SystemManagerDashboard() {
               onSearchChange={setBatchSearch}
               searchPlaceholder={S.FILTERS.SEARCH_BATCHES}
               filterOpen={batchFilterOpen}
-              onFilterToggle={() => setBatchFilterOpen((v) => !v)}
+              onFilterToggle={toggleBatchFilterOpen}
               activeFilterCount={activeBatchFilterCount}
               filtersToggleLabel={S.FILTERS.BUTTON}
               resultText={`${filteredInProgressRows.length} / ${totalRecords} records shown`}
@@ -492,54 +478,42 @@ export default function SystemManagerDashboard() {
                   onApply={applyBatchFilters}
                   closeLabel={S.COMMON.FILTERS_CLOSE}
                   applyLabel={S.COMMON.FILTERS_APPLY}
-                  theme={th}
+                  theme={adminTh}
                 >
                   <Stack direction="row" gap={1.5} flexWrap="wrap" mb={2}>
                     <FilterSelect
-                      label="Stage"
-                      value={batchStage}
-                      onChange={(e) => setBatchStage(e.target.value)}
+                      label={DP.FILTERS.STAGE}
+                      value={batchDraftFilters.stage}
+                      onChange={(e) => setBatchDraftFilter("stage", e.target.value)}
                       options={stageOptions}
                       menuProps={filterMenuProps}
                       itemSx={filterMenuItemSx}
                       showAllOption={false}
-                      sx={adminTh.table.stageSelect}
+                      sx={adminTh.filterPanel.field}
                     />
 
                     <FilterSelect
-                      label="Type"
-                      value={batchType}
-                      onChange={(e) => setBatchType(e.target.value)}
+                      label={DP.FILTERS.TYPE}
+                      value={batchDraftFilters.batchType}
+                      onChange={(e) => setBatchDraftFilter("batchType", e.target.value)}
                       options={typeOptions}
                       menuProps={filterMenuProps}
                       itemSx={filterMenuItemSx}
                       showAllOption={false}
-                      sx={adminTh.table.typeSelect}
+                      sx={adminTh.filterPanel.field}
                     />
 
                     <FilterSelect
-                      label={S.FILTERS.STATUS}
-                      value={batchStatus}
-                      onChange={(e) => setBatchStatus(e.target.value)}
+                      label={DP.FILTERS.STATUS}
+                      value={batchDraftFilters.status}
+                      onChange={(e) => setBatchDraftFilter("status", e.target.value)}
                       options={statusOptions}
                       menuProps={filterMenuProps}
                       itemSx={filterMenuItemSx}
                       showAllOption={false}
-                      sx={adminTh.table.statusSelect}
+                      sx={adminTh.filterPanel.field}
                     />
                   </Stack>
-                  <DateRangeRow
-                    from={batchDateFrom}
-                    to={batchDateTo}
-                    onFromChange={setBatchDateFrom}
-                    onToChange={setBatchDateTo}
-                    fromLabel={S.FILTERS.FROM}
-                    toLabel={S.FILTERS.TO}
-                    separatorLabel="-"
-                    calendarIconSx={adminTh.table.calendarIcon}
-                    datePickerSx={adminTh.table.datePicker(false)}
-                    separatorSx={adminTh.table.filterDateSeparator}
-                  />
                 </AdminFilterPanel>
               }
               theme={shellTheme}

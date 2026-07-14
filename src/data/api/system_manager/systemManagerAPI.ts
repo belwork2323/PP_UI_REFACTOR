@@ -5,11 +5,8 @@ import { post } from "../httpClient";
 import { SYSTEM_MANAGER } from "../endPoints";
 
 /* ─── API 1: Dashboard Stats ─────────────────────────────────────────────── */
-export const fetchSMStats = (payload: {
-  filterType: string;
-  startDate: string;
-  endDate: string;
-}) => post(SYSTEM_MANAGER.STATS, payload);
+export const fetchSMStats = (payload: { filterType: string; startDate: string; endDate: string }) =>
+  post(SYSTEM_MANAGER.STATS, payload);
 
 /* ─── API 2: Chart Data ──────────────────────────────────────────────────── */
 export const fetchSMChartData = (payload: {
@@ -22,11 +19,17 @@ export const fetchSMChartData = (payload: {
 export const fetchSMActiveBatches = (payload: {
   page: number;
   limit: number;
+  filterType?: string;
+  startDate?: string;
+  endDate?: string;
   search?: string;
   departmentId?: number;
   subDepartmentId?: number;
   priority?: string;
   status?: string;
+  listType?: string;
+  stage?: string;
+  type?: string;
 }) => post(SYSTEM_MANAGER.ACTIVE_BATCHES, payload);
 
 /* ─── API 4: Alerts ──────────────────────────────────────────────────────── */
@@ -52,18 +55,13 @@ export const fetchSMBlockchainEvents = (payload: {
   pageSize: number;
 }) => post(SYSTEM_MANAGER.BLOCKCHAIN_EVENTS, payload);
 /* ─── API 7: Batch Department Stages ───────────────────────────────────────── */
-export const fetchSMBatchDeptStages = (payload: {
-  batchId: string;
-}) => post(SYSTEM_MANAGER.BATCH_DEPT_STAGES, payload);
+export const fetchSMBatchDeptStages = (payload: { batchId: string }) =>
+  post(SYSTEM_MANAGER.BATCH_DEPT_STAGES, payload);
 
 /* ─── API 7b: Batch Sub-Department Stages ──────────────────────────────────── */
-export const fetchSMBatchSubDeptStages = (payload: {
-  batchId: string;
-  departmentId: number;
-}) => post(SYSTEM_MANAGER.BATCH_SUBDEPT_STAGES, payload);
+export const fetchSMBatchSubDeptStages = (payload: { batchId: string; departmentId: number }) =>
+  post(SYSTEM_MANAGER.BATCH_SUBDEPT_STAGES, payload);
 
 /* ─── API 8: Sub-Department Batch Details ─────────────────────────────────── */
-export const fetchSMBatchSubDeptDetails = (payload: {
-  batchId: string;
-  subDepartmentId: number;
-}) => post(SYSTEM_MANAGER.BATCH_DETAILS, payload);
+export const fetchSMBatchSubDeptDetails = (payload: { batchId: string; subDepartmentId: number }) =>
+  post(SYSTEM_MANAGER.BATCH_DETAILS, payload);

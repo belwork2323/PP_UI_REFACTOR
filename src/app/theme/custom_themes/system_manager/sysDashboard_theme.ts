@@ -87,6 +87,19 @@ const getSystemManagerTheme = (mode = "dark") => {
         ...general.flexCenter,
         minHeight: 400,
       },
+      refreshOverlay: {
+        position: "absolute",
+        inset: 0,
+        zIndex: 20,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        bgcolor: "rgba(255,255,255,0.55)",
+        backdropFilter: "blur(1px)",
+      },
+      pageRelative: {
+        position: "relative",
+      },
       kpiGrid: {
         display: "grid",
         gridTemplateColumns: { xs: "repeat(2,1fr)", sm: "repeat(3,1fr)", md: "repeat(5,1fr)" },
@@ -312,14 +325,6 @@ const getSystemManagerTheme = (mode = "dark") => {
         alignItems: "center",
         justifyContent: "space-between",
         mb: 3,
-      },
-      eyebrow: {
-        fontFamily: surface.mono,
-        fontSize: "0.7rem",
-        letterSpacing: "0.15em",
-        color: d.textSecondary,
-        textTransform: "uppercase",
-        mb: 0.5,
       },
       title: {
         fontSize: "1.6rem",

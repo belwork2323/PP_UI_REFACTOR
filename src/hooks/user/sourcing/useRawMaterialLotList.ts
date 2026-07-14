@@ -8,7 +8,7 @@ import {
   type MaterialsListItem,
 } from "../../../data/models/user/MaterialsListModel";
 import rawMaterialProcurementController from "../../../controllers/user/sourcing/rawMaterialProcurementController";
-import { OPERATION_STATUS } from "../../operationStatus";
+import { OPERATION_STATUS, toOperationStatusApiValue } from "../../operationStatus";
 import {
   mapLotListApiRow,
   type RawMaterialLotListRow,
@@ -185,7 +185,10 @@ export const useRawMaterialLotList = () => {
         limit: rowsPerPage,
       };
       if (statusFilter !== FILTER_ALL) {
-        payload.status = [statusFilter];
+        const apiStatus = toOperationStatusApiValue(statusFilter, FILTER_ALL);
+        if (apiStatus) {
+          payload.status = [apiStatus];
+        }
       }
 
       if (advancedFilters.materialCodes.length) {

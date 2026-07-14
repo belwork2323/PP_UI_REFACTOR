@@ -305,7 +305,7 @@ const MaterialSpecificationBlock = ({
           overflow: "hidden",
         }}
       >
-        <Table size="small" sx={{ tableLayout: "fixed" }}>
+        <Table size="small" sx={{ tableLayout: "fixed", width: "100%" }}>
           <TableHead>
             <TableRow>
               <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.material }}>
@@ -321,7 +321,10 @@ const MaterialSpecificationBlock = ({
               <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.specification }}>
                 {formStrings.TABLE_HEADERS.SPECIFICATION}
               </TableCell>
-              <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.refRange }}>
+              <TableCell
+                align="center"
+                sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.refRange }}
+              >
                 {formStrings.TABLE_HEADERS.REF_RANGE}
               </TableCell>
               <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.analysedResult }}>
@@ -342,13 +345,13 @@ const MaterialSpecificationBlock = ({
               const analyzedMissing = isAnalyzedResultMissing(row, showFieldErrors);
               return (
               <TableRow key={rowIndex} sx={specStyles.dataRow(rowIndex, rowFailed)}>
-                <TableCell sx={theme.workflow.formElements.tableCell}>
+                <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.specCell }}>
                   {rowIndex === 0 && (
                     <Chip label={block.material} size="small" sx={theme.workflow.formElements.primaryGradientChip} />
                   )}
                 </TableCell>
 
-                <TableCell sx={{ ...theme.workflow.formElements.tableCell, verticalAlign: "top" }}>
+                <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.inputCell, verticalAlign: "top" }}>
                   {rowIndex === 0 && (
                     <Box>
                       <TextField
@@ -393,7 +396,7 @@ const MaterialSpecificationBlock = ({
                   )}
                 </TableCell>
 
-                <TableCell sx={theme.workflow.formElements.tableCell}>
+                <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.specCell }}>
                   <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
                     <Typography sx={specStyles.specText}>{row.specification}</Typography>
                     {rowFailed && (
@@ -402,11 +405,11 @@ const MaterialSpecificationBlock = ({
                   </Stack>
                 </TableCell>
 
-                <TableCell sx={theme.workflow.formElements.tableCell}>
+                <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.refRangeCell }}>
                   <Chip label={row.refRange} size="small" sx={specStyles.refRangeChip} />
                 </TableCell>
 
-                <TableCell sx={theme.workflow.formElements.tableCell}>
+                <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.inputCell }}>
                   <TextField
                     size="small"
                     fullWidth
@@ -426,17 +429,17 @@ const MaterialSpecificationBlock = ({
                   />
                 </TableCell>
 
-                <TableCell sx={theme.workflow.formElements.tableCell}>
+                <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.inputCell }}>
                   <TextField
                     size="small"
                     fullWidth
-                    multiline
-                    minRows={1}
-                    maxRows={3}
                     value={row.remarks || ""}
                     onChange={(event) => handleCellChange(rowIndex, "remarks", event.target.value)}
                     placeholder={formStrings.REMARKS_PLACEHOLDER}
-                    sx={{ ...theme.workflow.formElements.multilineField, ...specStyles.remarksField }}
+                    sx={{
+                      ...theme.workflow.formElements.cellField,
+                      ...specStyles.remarksField,
+                    }}
                   />
                 </TableCell>
               </TableRow>

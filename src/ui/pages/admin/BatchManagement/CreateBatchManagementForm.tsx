@@ -23,6 +23,7 @@ import { STRINGS } from "@app/config/strings";
 import Input from "@ui/components/common/Input";
 import AdminManagementFormHeader from "@ui/components/custom/admin/AdminManagementFormHeader";
 import { priorityConfig } from "@app/theme/roleConfig";
+import MultiSelect from "@/ui/components/common/MultiSelectCheckbox";
 
 const S = STRINGS.BATCH_MANAGEMENT.FORM;
 
@@ -63,17 +64,19 @@ const BatchFormModal = ({
   const isSubscale = form.batchType === "SUBSCALE";
   const isQualification = form.subBatchType === "QUALIFICATION";
   const isExperimental = form.subBatchType === "EXPERIMENTAL";
-
+  const motorDetailsValid = isExperimental
+    ? true
+    : form.numberOfMotors > 0 &&
+      form.motorIds.length === form.numberOfMotors &&
+      form.motorIds.every((id: string) => id?.trim());
   const basicFormValid =
-    form.batchType &&
-    form.numberOfMotors > 0 &&
-    form.motorIds.length === form.numberOfMotors &&
-    form.motorIds.every((id: string) => id && id.trim()) &&
-    form.priority &&
-    form.systemManagerId &&
-    (isMain || isQualification ? !!form.projectId : true) &&
-    (!isSubscale || isQualification ? !!form.motorStage : true) &&
-    (!isExperimental || !!form.objective?.trim());
+    !!form.batchType &&
+    motorDetailsValid &&
+    !!form.priority &&
+    !!form.systemManagerId &&
+    (isMain || isSubscale ? !!form.projectId : true) &&
+    (isQualification ? !!form.motorStage : true) &&
+    (isExperimental ? !!form.objective?.trim() && form.articles.length > 0 : true);
 
   const formValid = basicFormValid;
 
@@ -199,11 +202,14 @@ const BatchFormModal = ({
     return "Select motor";
   }, [motorIdsPrerequisitesMet, availableMotorsLoading, availableMotorOptions.length]);
 
-  const handleNumberOfMotorsChange = (value: number) => {
-    const nextValue = Math.min(3, Math.max(1, value));
-    const nextMotorIds = Array.from({ length: nextValue }, (_, idx) => form.motorIds[idx] || "");
-    onFormChange("numberOfMotors")({ target: { value: nextValue } });
-    onMotorIdsChange(nextMotorIds);
+  const handleNumberOfMotorsChange = (count: number) => {
+    const motorIds = Array.from({ length: count }, (_, index) => form.motorIds[index] || "");
+
+    onFormChange("numberOfMotors")({
+      target: { value: count },
+    });
+
+    onMotorIdsChange(motorIds);
   };
 
   const removeMotorIdField = (index: number) => {
@@ -297,66 +303,31 @@ const BatchFormModal = ({
               <Box>
                 <Typography sx={modal.fieldLabel}>Batch Details</Typography>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={modal.fieldRowSpacing}>
-                  {isMain || isQualification ? (
-                    <FormControl fullWidth size="small" sx={input}>
-                      <InputLabel>Project Name</InputLabel>
-                      <Select
-                        value={form.projectId}
-                        label="Project Name"
-                        onChange={(e) => handleProjectChange(e.target.value)}
-                        MenuProps={t.menuPaper}
-                        disabled={projectsLoading}
-                        renderValue={renderProjectValue}
-                      >
-                        <MenuItem value="">
-                          <em>{projectsLoading ? "Loading projects..." : "Select project"}</em>
-                        </MenuItem>
-                        {projectOptions.map(
-                          (project: { projectId: string; projectName: string }) => (
-                            <MenuItem key={project.projectId} value={project.projectId}>
-                              <Box sx={modal.projectOption}>
-                                <Typography sx={modal.projectOptionName}>
-                                  {project.projectName}
-                                </Typography>
-                                <Typography sx={modal.projectOptionId}>
-                                  {project.projectId}
-                                </Typography>
-                              </Box>
-                            </MenuItem>
-                          ),
-                        )}
-                      </Select>
-                    </FormControl>
-                  ) : isExperimental ? (
-                    <Input
-                      fullWidth
-                      label="Project Name (if applicable)"
+                  <FormControl fullWidth size="small" sx={input}>
+                    <InputLabel>Project Name</InputLabel>
+                    <Select
                       value={form.projectId}
-                      onChange={onFormChange("projectId")}
-                      placeholder="Optional"
-                      size="small"
-                      sx={input}
-                    />
-                  ) : null}
-
-                  {isSubscale && (
-                    <FormControl fullWidth size="small" sx={input}>
-                      <InputLabel>Purpose</InputLabel>
-                      <Select
-                        value={form.subBatchType}
-                        label="Purpose"
-                        onChange={onFormChange("subBatchType")}
-                        MenuProps={t.menuPaper}
-                        disabled={!!editTarget}
-                      >
-                        {SUB_BATCH_TYPE_OPTIONS.map((sbt: string) => (
-                          <MenuItem key={sbt} value={sbt}>
-                            {sbt}
-                          </MenuItem>
-                        ))}
-                      </Select>
-                    </FormControl>
-                  )}
+                      label="Project Name"
+                      onChange={(e) => handleProjectChange(e.target.value)}
+                      MenuProps={t.menuPaper}
+                      disabled={projectsLoading}
+                      renderValue={renderProjectValue}
+                    >
+                      <MenuItem value="">
+                        <em>{projectsLoading ? "Loading projects..." : "Select project"}</em>
+                      </MenuItem>
+                      {projectOptions.map((project: { projectId: string; projectName: string }) => (
+                        <MenuItem key={project.projectId} value={project.projectId}>
+                          <Box sx={modal.projectOption}>
+                            <Typography sx={modal.projectOptionName}>
+                              {project.projectName}
+                            </Typography>
+                            <Typography sx={modal.projectOptionId}>{project.projectId}</Typography>
+                          </Box>
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
 
                   {(!isSubscale || isQualification) && (
                     <FormControl fullWidth size="small" sx={input}>
@@ -412,22 +383,14 @@ const BatchFormModal = ({
               {isExperimental && (
                 <Box>
                   <Typography sx={modal.fieldLabel}>Subscale Articles</Typography>
-                  <FormControl fullWidth size="small" sx={input}>
-                    <InputLabel>Articles</InputLabel>
-                    <Select
-                      multiple
-                      value={form.articles}
-                      label="Articles"
-                      onChange={(e: any) => handleArticleChange(e.target.value)}
-                      MenuProps={t.menuPaper}
-                    >
-                      {ARTICLE_OPTIONS.map((article: string) => (
-                        <MenuItem key={article} value={article}>
-                          {article}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
+                  <MultiSelect
+                    label="Articles"
+                    placeholder="Articles"
+                    options={ARTICLE_OPTIONS}
+                    value={form.articles}
+                    onChange={handleArticleChange}
+                    sx={input}
+                  />
                 </Box>
               )}
 
@@ -436,23 +399,37 @@ const BatchFormModal = ({
                   <Box>
                     <Typography sx={modal.fieldLabel}>No. of Motors to Process</Typography>
                     <FormControl fullWidth size="small" sx={input}>
-                      <InputLabel>Number of Motors</InputLabel>
-                      <Select
-                        value={form.numberOfMotors}
+                      <Input
+                        fullWidth
                         label="Number of Motors"
-                        onChange={(e: any) => handleNumberOfMotorsChange(Number(e.target.value))}
-                      >
-                        {MOTOR_COUNT_OPTIONS.map((count) => (
-                          <MenuItem key={count} value={count}>
-                            {count}
-                          </MenuItem>
-                        ))}
-                      </Select>
+                        type="number"
+                        value={form.numberOfMotors ?? ""}
+                        onChange={(e) => {
+                          const value = e.target.value;
+
+                          onFormChange("numberOfMotors")({
+                            target: {
+                              value: value === "" ? "" : Math.max(1, Number(value)),
+                            },
+                          });
+
+                          if (value !== "") {
+                            handleNumberOfMotorsChange(Math.max(1, Number(value)));
+                          }
+                        }}
+                        onBlur={() => {
+                          if (!form.numberOfMotors || Number(form.numberOfMotors) < 1) {
+                            handleNumberOfMotorsChange(1);
+                          }
+                        }}
+                        size="small"
+                        sx={input}
+                      />
                     </FormControl>
                   </Box>
 
                   <Box>
-                    <Box
+                    {/* <Box
                       sx={{
                         display: "flex",
                         justifyContent: "space-between",
@@ -468,61 +445,62 @@ const BatchFormModal = ({
                       >
                         + Add Motor ID
                       </Button>
-                    </Box>
+                    </Box> */}
                     <Stack spacing={1}>
-                      {form.motorIds.map((motorId: string, index: number) => {
-                        const slotOptions = getMotorOptionsForSlot(index);
-                        return (
-                          <Box
-                            key={index}
-                            sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}
-                          >
-                            <FormControl fullWidth size="small" sx={input}>
-                              <InputLabel>{`Motor ID ${index + 1}`}</InputLabel>
-                              <Select
-                                value={motorId}
-                                label={`Motor ID ${index + 1}`}
-                                onChange={(e) => handleMotorIdChange(index, e.target.value)}
-                                MenuProps={t.menuPaper}
-                                disabled={!motorIdsPrerequisitesMet || availableMotorsLoading}
-                                renderValue={(value) => {
-                                  if (!value) {
-                                    return <em>{motorsEmptyHint}</em>;
-                                  }
-                                  const match = availableMotorOptions.find(
-                                    (m: { motorId: string }) => m.motorId === value,
-                                  );
-                                  return match ? renderMotorOptionLabel(match) : value;
-                                }}
-                              >
-                                <MenuItem value="">
-                                  <em>{motorsEmptyHint}</em>
-                                </MenuItem>
-                                {slotOptions.map(
-                                  (motor: { motorId: string; motorCasingId: string }) => (
-                                    <MenuItem
-                                      key={motor.motorCasingId || motor.motorId}
-                                      value={motor.motorId}
-                                    >
-                                      {renderMotorOptionLabel(motor)}
-                                    </MenuItem>
-                                  ),
-                                )}
-                              </Select>
-                            </FormControl>
-                            {form.motorIds.length > 1 && (
-                              <Button
-                                size="small"
-                                color="error"
-                                onClick={() => removeMotorIdField(index)}
-                                sx={{ mt: 0.5, flexShrink: 0 }}
-                              >
-                                Remove
-                              </Button>
-                            )}
-                          </Box>
-                        );
-                      })}
+                      {form.numberOfMotors > 0 &&
+                        form.motorIds.map((motorId: string, index: number) => {
+                          const slotOptions = getMotorOptionsForSlot(index);
+                          return (
+                            <Box
+                              key={index}
+                              sx={{ display: "flex", gap: 1, alignItems: "flex-start" }}
+                            >
+                              <FormControl fullWidth size="small" sx={input}>
+                                <InputLabel>{`Motor ID ${index + 1}`}</InputLabel>
+                                <Select
+                                  value={motorId}
+                                  label={`Motor ID ${index + 1}`}
+                                  onChange={(e) => handleMotorIdChange(index, e.target.value)}
+                                  MenuProps={t.menuPaper}
+                                  disabled={!motorIdsPrerequisitesMet || availableMotorsLoading}
+                                  renderValue={(value) => {
+                                    if (!value) {
+                                      return <em>{motorsEmptyHint}</em>;
+                                    }
+                                    const match = availableMotorOptions.find(
+                                      (m: { motorId: string }) => m.motorId === value,
+                                    );
+                                    return match ? renderMotorOptionLabel(match) : value;
+                                  }}
+                                >
+                                  <MenuItem value="">
+                                    <em>{motorsEmptyHint}</em>
+                                  </MenuItem>
+                                  {slotOptions.map(
+                                    (motor: { motorId: string; motorCasingId: string }) => (
+                                      <MenuItem
+                                        key={motor.motorCasingId || motor.motorId}
+                                        value={motor.motorId}
+                                      >
+                                        {renderMotorOptionLabel(motor)}
+                                      </MenuItem>
+                                    ),
+                                  )}
+                                </Select>
+                              </FormControl>
+                              {form.motorIds.length > 1 && (
+                                <Button
+                                  size="small"
+                                  color="error"
+                                  onClick={() => removeMotorIdField(index)}
+                                  sx={{ mt: 0.5, flexShrink: 0 }}
+                                >
+                                  Remove
+                                </Button>
+                              )}
+                            </Box>
+                          );
+                        })}
                     </Stack>
                   </Box>
 
@@ -558,7 +536,7 @@ const BatchFormModal = ({
                         onClick={onOpenImplementation}
                         disabled={!basicFormValid}
                       >
-                        Complete implementation sheet now
+                        Complete Identification sheet now
                       </Button>
                     </Box>
                   </Box>

@@ -27,7 +27,11 @@ import TableCard from "../TableCard";
 import SkeletonRow from "../../common/SkeletonRow";
 import { useAuthStore } from "@app/store/authStore";
 import ToggleTabs from "../../common/ToggleTabs";
-import { batchStatusConfig } from "@/app/theme/roleConfig";
+import { batchStatusConfig, stageConfig, getSubDeptChipConfig } from "@/app/theme/roleConfig";
+import { getStatus } from "@/utils/batchManagementUtils";
+import { normalizeSubdepartmentBatchStatus } from "@/data/models/user/SubdepartmentBatchModel";
+
+const BATCH_ID_COLOR = "#1565c0";
 
 export type InProgressBatchRow = {
   id?: string;
@@ -160,7 +164,7 @@ export default function InProgressBatchesTable({
   }, [rows, sortField, sortDir]);
 
   const th = theme;
-  const { typeChip, stageChip } = th;
+  const { typeChip } = th;
   const showPagination =
     typeof page === "number" &&
     typeof rowsPerPage === "number" &&
@@ -239,14 +243,22 @@ export default function InProgressBatchesTable({
           </TableRow>
         ) : (
           sortedRows.map((p: InProgressBatchRow, i: number) => {
-            const config = batchStatusConfig[p.status];
+            const statusLabel = normalizeSubdepartmentBatchStatus(p.status);
+            const statusCfg =
+              batchStatusConfig[statusLabel] ?? batchStatusConfig[getStatus({ status: p.status })];
+            const stageLabel = String(p.stageDept || p.currentStage || "").trim();
+            const deptKey = String(p.currentStage || "").trim();
+            const stageCfg = stageConfig[deptKey];
+            const subDeptCfg = getSubDeptChipConfig(stageLabel);
+            const typeBg = typeChip?.[p.batchType || ""]?.bg;
+            const typeColor = typeChip?.[p.batchType || ""]?.color;
 
             return (
               <TableRow key={`${p.batchId}-${i}`} sx={th.table.tableRow(i % 2 === 1)}>
                 <TableCell sx={th.table.cell}>
                   <Typography
                     sx={{
-                      ...th.table.textBatchId("#1565c0"),
+                      ...th.table.textBatchId(BATCH_ID_COLOR),
                       ...(canViewDetails
                         ? { cursor: "pointer", "&:hover": { textDecoration: "underline" } }
                         : {}),
@@ -261,30 +273,26 @@ export default function InProgressBatchesTable({
                   <Chip
                     label={p.batchType || "NA"}
                     size="small"
-                    sx={th.table.chipSx(
-                      typeChip[p.batchType || ""]?.bg,
-                      typeChip[p.batchType || ""]?.color,
-                    )}
+                    sx={th.table.chipSx(typeBg, typeColor)}
                   />
                 </TableCell>
                 <TableCell sx={th.table.cell}>
                   <Typography sx={th.table.textBase}>{p.motorId || "NA"}</Typography>
                 </TableCell>
-                {/* <TableCell sx={th.table.cellNarrow}>
-                <Typography sx={th.table.textSmall}>{p.motorType || "NA"}</Typography>
-              </TableCell> */}
                 <TableCell sx={th.table.cellTruncated}>
                   <Typography sx={th.table.textTruncated}>{p.projectName || "NA"}</Typography>
                 </TableCell>
                 <TableCell sx={th.table.cell}>
-                  {p.currentStage && p.currentStage !== "NA" ? (
+                  {stageLabel && stageLabel !== "NA" ? (
                     <Chip
-                      label={p.stageDept}
+                      icon={stageCfg?.Icon ? <stageCfg.Icon /> : undefined}
+                      label={stageLabel}
                       size="small"
-                      sx={th.table.chipSx(
-                        stageChip[p.stageDept || ""]?.bg,
-                        stageChip[p.stageDept || ""]?.color,
-                      )}
+                      sx={
+                        th.table.stageChip
+                          ? th.table.stageChip(subDeptCfg)
+                          : th.table.chipSx(subDeptCfg.bg, subDeptCfg.color)
+                      }
                     />
                   ) : (
                     <Typography sx={th.table.textSmall}>NA</Typography>
@@ -302,15 +310,14 @@ export default function InProgressBatchesTable({
                 )}
                 <TableCell sx={th.table.cell}>
                   <Chip
-                    icon={config?.Icon ? <config.Icon /> : undefined}
-                    label={p.status.replace(/_/g, " ")}
+                    icon={statusCfg?.Icon ? <statusCfg.Icon /> : undefined}
+                    label={String(p.status || statusLabel)
+                      .replace(/_/g, " ")
+                      .toUpperCase()}
                     size="small"
-                    sx={th.table.statusChip(config)}
+                    sx={th.table.statusChip(statusCfg)}
                   />
                 </TableCell>
-                {/* <TableCell sx={th.table.cell}>
-                <Chip label={p.status || "NA"} size="small" sx={th.table.statusChipSx(p.status)} />
-              </TableCell> */}
                 <TableCell sx={th.table.cellDate}>
                   <Typography sx={th.table.textMuted}>
                     {p.createdOn
@@ -325,7 +332,7 @@ export default function InProgressBatchesTable({
                 <TableCell sx={th.table.cellProgress}>
                   <ProgressBar
                     value={p.completion || 0}
-                    color={p.color || "#1976d2"}
+                    color={p.color || subDeptCfg.color || "#1976d2"}
                     trackColor={th.table.progressTrack}
                     valueColor={th.table.progressValueColor}
                   />

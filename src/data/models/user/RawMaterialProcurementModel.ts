@@ -1,6 +1,7 @@
 import {
   OPERATION_STATUS,
   OPERATION_STATUS_UI_TO_API,
+  toOperationStatusApiValue,
   type OperationStatus,
 } from "../../../hooks/operationStatus";
 import { materialSelectionKey } from "./MaterialsListModel";
@@ -34,14 +35,9 @@ export function normalizeRawMaterialLotListStatus(status: string): OperationStat
 /** UI status labels → API status enum for list filters */
 export const RAW_MATERIAL_UI_STATUS_TO_API = OPERATION_STATUS_UI_TO_API;
 
-/** Map request status values to UI labels expected by lot-list API */
-export function toRawMaterialLotListRequestStatus(status: string): string {
-  return normalizeRawMaterialLotListStatus(status);
-}
-
-/** @deprecated Use toRawMaterialLotListRequestStatus — lot-list API expects UI labels, not enums */
+/** Map UI / display status labels to uppercase API enum values for lot-list requests */
 export function toRawMaterialLotListApiStatus(status: string): string {
-  return toRawMaterialLotListRequestStatus(status);
+  return toOperationStatusApiValue(status) ?? "";
 }
 
 /** Soft-delete is allowed only while the lot is still in progress */
@@ -279,7 +275,6 @@ export function groupBlocksToMaterialGroups(blocks: MaterialBlock[]): MaterialFo
 /** Column keys searched by the raw material lot list search bar */
 export const RAW_MATERIAL_LOT_SEARCH_FIELDS = [
   "lotId",
-  "procurementId",
   "sourcingId",
   "materialCode",
   "materialName",
@@ -302,7 +297,6 @@ export function rawMaterialLotMatchesSearch(row: RawMaterialLotListRow, query: s
 
   const parts: string[] = [
     row.lotId,
-    row.procurementId,
     row.sourcingId,
     row.materialCode,
     row.materialName,
@@ -342,8 +336,6 @@ export type RawMaterialLotListGrade = {
 export type RawMaterialLotListRow = {
   id: string | number;
   lotId: string;
-  procurementId: string;
-  /** @deprecated Use procurementId — kept for internal form batch compatibility */
   sourcingId: string;
   materialCode: string;
   materialName: string;
@@ -361,7 +353,6 @@ export type RawMaterialLotListRow = {
 /** Read-only lot details page context (from list row + details API) */
 export type RawMaterialLotDetailsContext = {
   lotId: string;
-  procurementId: string;
   sourcingId: string;
   materialCode: string;
   materialName: string;
@@ -468,7 +459,7 @@ export function normalizeRawMaterialLotListRequest(
 
   return {
     ...payload,
-    status: payload.status.map(toRawMaterialLotListRequestStatus),
+    status: payload.status.map(toRawMaterialLotListApiStatus),
   };
 }
 
@@ -489,18 +480,22 @@ export class RawMaterialProcurementSubmitResponseModel {
   formId: string;
   batchId: string;
   sourcingId: string;
+  lotId: string;
   status: string;
 
   constructor(payload: {
     formId?: string;
     batchId?: string;
     sourcingId?: string;
+    lotId?: string;
     status?: string;
   }) {
-    this.formId = payload.formId ?? "";
-    this.batchId = payload.batchId ?? "";
-    this.sourcingId = payload.sourcingId ?? "";
-    this.status = payload.status ?? "";
+    this.formId = String(payload.formId ?? "").trim();
+    this.lotId = String(payload.lotId ?? "").trim();
+    // Create/update may return formId as the sourcing id; accept either field.
+    this.sourcingId = String(payload.sourcingId ?? payload.formId ?? "").trim();
+    this.batchId = String(payload.batchId ?? payload.lotId ?? "").trim();
+    this.status = String(payload.status ?? "").trim();
   }
 
   static fromApi(apiResponse: any): RawMaterialProcurementSubmitResponseModel {
@@ -633,7 +628,7 @@ export class RawMaterialLotDetailsModel {
     this.receiptDate = payload?.receiptDate ?? "";
     this.manufacturerName = payload?.manufacturerName ?? "";
     this.materialCode = payload?.materialCode ?? "";
-    this.grade = payload?.grade != null ? String(payload.grade).trim() || null : null;
+    this.grade = resolveGradeCode(payload?.grade);
     this.specifications = Array.isArray(payload?.specifications) ? payload.specifications : [];
     this.certificates = Array.isArray(payload?.certificates) ? payload.certificates : [];
     this.progressInsights = payload?.progressInsights;
@@ -693,18 +688,33 @@ function parseLotListGrade(raw: unknown): RawMaterialLotListGrade | null {
   };
 }
 
+/** Normalize API grade field (`"COARSE"` | `{ gradeCode }` | null) to a grade code string. */
+export function resolveGradeCode(raw: unknown): string | null {
+  if (raw == null) return null;
+  if (typeof raw === "string") {
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed === "[object Object]") return null;
+    return trimmed;
+  }
+  if (typeof raw === "object") {
+    const parsed = parseLotListGrade(raw);
+    return parsed?.gradeCode ?? null;
+  }
+  return null;
+}
+
 export function mapLotListApiRow(lot: any, index: number): RawMaterialLotListRow {
   const lotId = String(lot?.lotId ?? "");
   const id = lotId ? simpleHash(lotId) : index;
   const statusRaw = String(lot?.status ?? "");
   const rmStatus = normalizeRawMaterialLotListStatus(statusRaw);
-  const procurementId = String(lot?.procurementId ?? lot?.sourcingId ?? "").trim();
+  // Live API returns sourcingId (nullable); keep procurementId as a legacy fallback.
+  const sourcingId = String(lot?.sourcingId ?? lot?.procurementId ?? "").trim();
   const grade = parseLotListGrade(lot?.grade);
   return {
     id,
     lotId,
-    procurementId,
-    sourcingId: procurementId,
+    sourcingId,
     materialCode: String(lot?.materialCode ?? lot?.material ?? "").trim(),
     materialName: String(lot?.materialName ?? grade?.gradeName ?? "").trim(),
     grade,
@@ -734,9 +744,9 @@ export function lotListRowToFormBatch(
   return {
     id: row.id,
     lotId: row.lotId,
-    sourcingId: row.procurementId || row.sourcingId,
+    sourcingId: row.sourcingId || null,
     formId: row.formId ?? null,
-    batchId: row.procurementId || row.sourcingId || row.lotId,
+    batchId: row.sourcingId || row.lotId,
     batchType: row.materialName || row.materialCode,
     motorId: row.materialCode,
     motorType: row.materialName,
@@ -830,7 +840,7 @@ export function mapMaterialGroupsToCreateMaterials(
     .filter((g) => (g.material ?? "").trim())
     .map((group) => ({
       materialCode: group.material.trim(),
-      grade: group.gradeCode?.trim() || null,
+      grade: resolveGradeCode(group.gradeCode),
       supplyOrderNo: (group.supplyOrderNo ?? "").trim(),
       receiptDate: (group.receiptDate ?? "").trim(),
       manufacturerName: (group.manufacturerName ?? "").trim(),
@@ -858,7 +868,7 @@ export function mapFirstBlockToLotUpdatePayload(
     receiptDate: (block.receiptDate ?? "").trim(),
     manufacturerName: (block.manufacturerName ?? "").trim(),
     materialCode: (block.material ?? "").trim(),
-    grade: block.gradeCode?.trim() || null,
+    grade: resolveGradeCode(block.gradeCode),
     specifications: (block.rows ?? [])
       .filter((row) => (row.specificationCode ?? "").trim())
       .map((row) => ({

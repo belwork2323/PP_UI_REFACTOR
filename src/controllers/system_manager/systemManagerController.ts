@@ -88,17 +88,17 @@ export const systemManagerController = {
   getActiveBatches: async (payload: {
     page: number;
     limit: number;
+    filterType?: string;
+    startDate?: string;
+    endDate?: string;
     search?: string;
     departmentId?: number;
     subDepartmentId?: number;
     priority?: string;
     status?: string;
     listType?: string;
-
-    // New filters
-    fromDate?: string;
-    toDate?: string;
     stage?: string;
+    type?: string;
   }) => {
     try {
       const resp = await fetchSMActiveBatches(payload);

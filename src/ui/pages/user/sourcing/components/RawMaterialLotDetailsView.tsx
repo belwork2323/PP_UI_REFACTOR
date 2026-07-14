@@ -91,7 +91,7 @@ const RawMaterialLotDetailsView = ({
   const block = blocks[0];
   const metaFields = [
     { label: BL.COL_LOT_ID, value: row.lotId },
-    { label: BL.COL_PROCUREMENT_ID, value: row.procurementId || row.sourcingId || "—" },
+    { label: BL.COL_SOURCING_ID, value: row.sourcingId || "—" },
     { label: BL.COL_MATERIAL_CODE, value: row.materialCode || block?.material || "—" },
     {
       label: BL.COL_GRADE,
@@ -186,10 +186,10 @@ const RawMaterialLotDetailsView = ({
                       <TableHead>
                         <TableRow>
                           {[
+                            "Qualification Parameter",
                             "Specification",
-                            "Reference range",
-                            "Analyzed result",
-                            "Remarks",
+                            "Analyze Result @ Source",
+                            "ACEM QC Result",
                             "Status",
                           ].map((h) => (
                             <TableCell key={h} sx={rmTheme.tableHeaderCell}>

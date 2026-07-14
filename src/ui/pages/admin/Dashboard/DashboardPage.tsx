@@ -32,6 +32,7 @@ export default function DashboardPage() {
     setCustomStartDate,
     customEndDate,
     setCustomEndDate,
+    applyCustomDateFilter,
     filterOpen,
     setFilterOpen,
     toggleFilterOpen,
@@ -71,9 +72,16 @@ export default function DashboardPage() {
     );
   }
 
+  const isRefreshing = statsLoading || eventsLoading;
+
   return (
     <Box sx={th.dashboard.adminWrapper}>
       <Box sx={th.page}>
+        {isRefreshing && (
+          <Box sx={th.refreshOverlay}>
+            <CircularProgress size={44} />
+          </Box>
+        )}
         <Stack sx={th.dashboard.pageHeader.wrapper}>
           <Box>
             <Typography sx={th.dashboard.pageHeader.title}>{t.HEADER.TITLE}</Typography>
@@ -90,6 +98,7 @@ export default function DashboardPage() {
           setCustomStartDate={setCustomStartDate}
           customEndDate={customEndDate}
           setCustomEndDate={setCustomEndDate}
+          applyCustomDateFilter={applyCustomDateFilter}
         />
 
         <DashboardChartsSection

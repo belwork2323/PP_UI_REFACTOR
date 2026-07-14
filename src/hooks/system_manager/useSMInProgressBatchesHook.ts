@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
 import { systemManagerController } from "../../controllers/system_manager/systemManagerController";
+import { generalController } from "../../controllers/admin/common/generalController";
+import { APPROVER_BATCH_STATUS } from "../../data/models/approver/ApproverBatchListModel";
+import { STRINGS } from "../../app/config/strings";
 import { BatchTab } from "../admin/Dashboard/useDashboardHook";
 
 type ActiveBatchLike = Record<string, any>;
@@ -11,7 +14,9 @@ export type InProgressBatchUIRow = {
   motorId?: string;
   motorType?: string;
   projectName?: string;
+  /** Department name — used for stage chip color/icon */
   currentStage?: string;
+  /** Sub-department name — shown as Current Stage chip label */
   stageDept?: string;
   managerName?: string;
   managerId?: string;
@@ -19,7 +24,23 @@ export type InProgressBatchUIRow = {
   createdOn?: string;
   completion?: number;
   color?: string;
+  priority?: string;
 };
+
+type BatchPanelFilters = {
+  stage: string;
+  batchType: string;
+  status: string;
+};
+
+const DEFAULT_PANEL_FILTERS: BatchPanelFilters = {
+  stage: "All",
+  batchType: "All",
+  status: "All",
+};
+
+const TYPE_OPTIONS = STRINGS.DASHBOARD_PAGE.BATCH_FILTERS.TYPES;
+const STATUS_OPTIONS = ["All", ...Object.values(APPROVER_BATCH_STATUS)];
 
 const toStageKey = (stageName: string = "") => {
   const normalized = stageName.toLowerCase();
@@ -34,22 +55,31 @@ const mapActiveBatchToRow = (
   batch: ActiveBatchLike,
   stageColors: Record<string, string>,
 ): InProgressBatchUIRow => {
-  const stageKey = toStageKey(batch.department ?? batch.stage);
+  const department = String(batch.department ?? "").trim();
+  const stageKey = toStageKey(department);
+  const subDeptName = String(
+    batch.firstSubDept ||
+      (Array.isArray(batch.subDepartments) && batch.subDepartments[0]?.subDepartmentName) ||
+      "",
+  ).trim();
+
   return {
     id: batch.id || batch.batchId,
     batchId: batch.batchId || "NA",
-    batchType: batch.priority || "NA",
+    batchType: batch.batchType || batch.type || batch.priority || "NA",
     motorId: batch.motorId || "NA",
     motorType: batch.motorTypeName || "NA",
     projectName: batch.projectName || "NA",
-    currentStage: batch.substage || batch.firstSubDept || "NA",
-    stageDept: batch.stage || batch.department || "",
-    managerName: "NA",
-    managerId: "NA",
+    // Department drives chip color/icon; sub-department is the Current Stage label.
+    currentStage: department || "NA",
+    stageDept: subDeptName || department || "NA",
+    managerName: batch.systemManager?.name || "NA",
+    managerId: batch.systemManager?.id || "NA",
     status: batch.status || "NA",
-    createdOn: batch.createdDate || "",
+    createdOn: batch.createdDate || batch.createdOn || "",
     completion: typeof batch.pct === "number" ? batch.pct : batch.progressPercentage || 0,
     color: batch.color || stageColors[stageKey] || stageColors.fallback || "#1976d2",
+    priority: batch.priority || "Medium",
   };
 };
 
@@ -64,12 +94,14 @@ const resolveTotalRecords = (
   return total > 0 ? total : fallback;
 };
 
-export function useSMInProgressBatches(stageColors: Record<string, string>) {
+export function useSMInProgressBatches(
+  stageColors: Record<string, string>,
+  globalDateBounds: { filterType: string; startDate: string; endDate: string },
+) {
   const [batchFilterOpen, setBatchFilterOpen] = useState(false);
   const [batchSearch, setBatchSearch] = useState("");
-  const [batchStage, setBatchStage] = useState("All");
-  const [batchType, setBatchType] = useState("All");
-  const [batchStatus, setBatchStatus] = useState("All");
+  const [draftFilters, setDraftFilters] = useState<BatchPanelFilters>(DEFAULT_PANEL_FILTERS);
+  const [appliedFilters, setAppliedFilters] = useState<BatchPanelFilters>(DEFAULT_PANEL_FILTERS);
   const [selectedBatch, setSelectedBatch] = useState<any>(null);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -77,28 +109,45 @@ export function useSMInProgressBatches(stageColors: Record<string, string>) {
   const [batchesLoading, setBatchesLoading] = useState(false);
   const [activeBatches, setActiveBatches] = useState<ActiveBatchLike[]>([]);
   const [activeTab, setActiveTab] = useState<BatchTab>("IN_PROGRESS");
-  const [batchDateFrom, setBatchDateFrom] = useState("");
-  const [batchDateTo, setBatchDateTo] = useState("");
-  const [batchDraftFilters, setBatchDraftFilters] = useState({
-    search: "",
-    stage: "All",
-    type: "All",
-    status: "All",
-    from: null,
-    to: null,
-  });
+  const [subDepartments, setSubDepartments] = useState<string[]>([]);
+
+  const filterType = String(globalDateBounds?.filterType ?? "").trim();
+  const startDate = String(globalDateBounds?.startDate ?? "").trim();
+  const endDate = String(globalDateBounds?.endDate ?? "").trim();
+  const dateBoundsReady = Boolean(filterType && startDate && endDate);
+
+  useEffect(() => {
+    generalController.getSubDepartments().then((resp) => {
+      if (resp?.data) {
+        setSubDepartments(
+          (resp.data as any[]).map((sd: any) => sd.subDepartmentName).filter(Boolean),
+        );
+      }
+    });
+  }, []);
+
+  const setBatchDraftFilter = useCallback(
+    <K extends keyof BatchPanelFilters>(field: K, value: BatchPanelFilters[K]) => {
+      setDraftFilters((prev) => ({ ...prev, [field]: value }));
+    },
+    [],
+  );
+
   const fetchBatches = useCallback(async () => {
+    if (!dateBoundsReady) return;
+
     setBatchesLoading(true);
     try {
       const result = await systemManagerController.getActiveBatches({
         page: page + 1,
         limit: rowsPerPage,
+        filterType,
+        startDate,
+        endDate,
         search: batchSearch.trim() || undefined,
-        stage: batchStage !== "All" ? batchStage : undefined,
-        priority: batchType !== "All" ? batchType : undefined,
-        status: batchStatus !== "All" ? batchStatus : undefined,
-        fromDate: batchDateFrom || undefined,
-        toDate: batchDateTo || undefined,
+        stage: appliedFilters.stage !== "All" ? appliedFilters.stage : undefined,
+        type: appliedFilters.batchType !== "All" ? appliedFilters.batchType : undefined,
+        status: appliedFilters.status !== "All" ? appliedFilters.status : undefined,
         listType: activeTab,
       });
 
@@ -129,89 +178,55 @@ export function useSMInProgressBatches(stageColors: Record<string, string>) {
     page,
     rowsPerPage,
     batchSearch,
-    batchStage,
-    batchType,
-    batchStatus,
-    batchDateFrom,
-    batchDateTo,
+    appliedFilters,
+    filterType,
+    startDate,
+    endDate,
+    dateBoundsReady,
     stageColors,
     activeTab,
   ]);
 
   useEffect(() => {
-    fetchBatches();
+    void fetchBatches();
   }, [fetchBatches]);
 
   useEffect(() => {
     setPage(0);
-  }, [batchSearch, batchStage, batchType, batchStatus]);
+  }, [batchSearch, appliedFilters, filterType, startDate, endDate, activeTab]);
 
   const inProgressRows = useMemo<InProgressBatchUIRow[]>(
     () => activeBatches.map((batch) => mapActiveBatchToRow(batch, stageColors)),
     [activeBatches, stageColors],
   );
 
-  const stageOptions = useMemo(
-    () => [
-      "All",
-      ...Array.from(
-        new Set(
-          inProgressRows.map((r) => (r.stageDept || r.currentStage || "").trim()).filter(Boolean),
-        ),
-      ),
-    ],
-    [inProgressRows],
-  );
-
-  const typeOptions = useMemo(
-    () => [
-      "All",
-      ...Array.from(new Set(inProgressRows.map((r) => (r.batchType || "").trim()).filter(Boolean))),
-    ],
-    [inProgressRows],
-  );
-
-  const statusOptions = useMemo(
-    () => [
-      "All",
-      ...Array.from(new Set(inProgressRows.map((r) => (r.status || "").trim()).filter(Boolean))),
-    ],
-    [inProgressRows],
-  );
-
-  const filteredInProgressRows = useMemo(() => {
-    if (batchStage === "All") return inProgressRows;
-
-    return inProgressRows.filter((row) => {
-      const rowStage = String(row.stageDept || row.currentStage || "").toLowerCase();
-      return rowStage === batchStage.toLowerCase();
-    });
-  }, [inProgressRows, batchStage]);
+  const stageOptions = useMemo(() => ["All", ...subDepartments], [subDepartments]);
 
   const activeBatchFilterCount = [
     batchSearch.trim().length > 0,
-    batchStage !== "All",
-    batchType !== "All",
-    batchStatus !== "All",
-    !!batchDateFrom,
-    !!batchDateTo,
+    appliedFilters.stage !== "All",
+    appliedFilters.batchType !== "All",
+    appliedFilters.status !== "All",
   ].filter(Boolean).length;
+
   const clearBatchFilters = () => {
     setBatchSearch("");
-    setBatchStage("All");
-    setBatchType("All");
-    setBatchStatus("All");
-    setBatchDateFrom("");
-    setBatchDateTo("");
+    setDraftFilters(DEFAULT_PANEL_FILTERS);
+    setAppliedFilters(DEFAULT_PANEL_FILTERS);
   };
+
+  const toggleBatchFilterOpen = () => {
+    setBatchFilterOpen((prev) => {
+      if (!prev) setDraftFilters({ ...appliedFilters });
+      return !prev;
+    });
+  };
+
   const applyBatchFilters = () => {
-    setBatchSearch(batchDraftFilters.search);
-    setBatchStage(batchDraftFilters.stage);
-    setBatchType(batchDraftFilters.type);
-    setBatchStatus(batchDraftFilters.status);
-    setBatchDateFrom(batchDraftFilters.from);
-    setBatchDateTo(batchDraftFilters.to);
+    setAppliedFilters({ ...draftFilters });
+    setBatchFilterOpen(false);
   };
+
   const handlePageChange = (_event: unknown, newPage: number) => {
     setPage(newPage);
   };
@@ -225,8 +240,8 @@ export function useSMInProgressBatches(stageColors: Record<string, string>) {
     setSelectedBatch({
       id: row.batchId,
       motorId: row.motorId ?? "—",
-      stage: row.stageDept ?? "—",
-      substage: row.currentStage ?? "—",
+      stage: row.currentStage ?? "—",
+      substage: row.stageDept ?? "—",
       status: row.status ?? "Active",
       pct: row.completion ?? 0,
       color: row.color ?? "#1976d2",
@@ -234,40 +249,34 @@ export function useSMInProgressBatches(stageColors: Record<string, string>) {
   };
 
   const closeBatchDetails = () => setSelectedBatch(null);
-  useEffect(() => {
-    setPage(0);
-  }, [batchSearch, batchStage, batchType, batchStatus, batchDateFrom, batchDateTo]);
+
   return {
     batchFilterOpen,
     setBatchFilterOpen,
+    toggleBatchFilterOpen,
 
     batchSearch,
     setBatchSearch,
 
-    batchStage,
-    setBatchStage,
+    batchDraftFilters: draftFilters,
+    setBatchDraftFilter,
 
-    batchType,
-    setBatchType,
-
-    batchStatus,
-    setBatchStatus,
-
-    batchDateFrom,
-    setBatchDateFrom,
-
-    batchDateTo,
-    setBatchDateTo,
+    /** Applied values kept for display compatibility */
+    batchStage: appliedFilters.stage,
+    batchType: appliedFilters.batchType,
+    batchStatus: appliedFilters.status,
 
     activeBatchFilterCount,
     clearBatchFilters,
+    applyBatchFilters,
 
     inProgressRows,
-    filteredInProgressRows,
+    filteredInProgressRows: inProgressRows,
 
     stageOptions,
-    typeOptions,
-    statusOptions,
+    typeOptions: TYPE_OPTIONS,
+    statusOptions: STATUS_OPTIONS,
+    subDepartments,
 
     selectedBatch,
     handleViewDetails,
@@ -284,7 +293,6 @@ export function useSMInProgressBatches(stageColors: Record<string, string>) {
 
     activeTab,
     setActiveTab,
-    applyBatchFilters,
   };
 }
 

@@ -522,7 +522,7 @@ export const createEmptyBatchFormState = (): BatchFormState => ({
   subBatchType: "",
   projectId: "",
   motorStage: "",
-  numberOfMotors: 1,
+  numberOfMotors: 0,
   motorIds: [""],
   priority: "Medium",
   systemManagerId: "",

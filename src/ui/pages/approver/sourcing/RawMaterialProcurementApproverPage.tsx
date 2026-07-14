@@ -135,10 +135,10 @@ const RawMaterialDetailDialog = ({
                         {[
                           "Material",
                           "Man. Lot/Batch No.",
+                          "Qualification Parameter",
                           "Specification",
-                          "Ref. Range",
-                          "Analyzed Result",
-                          "Remarks",
+                          "Analyze Result @ Source",
+                          "ACEM QC Result",
                         ].map((h, i) => (
                           <TableCell key={h} sx={theme.dialog.innerHeaderCell(i === 0)}>
                             {h}

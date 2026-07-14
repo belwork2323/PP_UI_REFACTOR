@@ -80,12 +80,23 @@ const getDashboardTheme = (mode: "light" | "dark" = "light") => {
       minHeight: "100vh",
       overflowX: "hidden",
       ...general.boxSizingBorder,
+      position: "relative",
     },
 
     // ── Loading states ────────────────────────────────────────────────────────
     loadingWrapper: {
       ...general.flexCenter,
       minHeight: 400,
+    },
+    refreshOverlay: {
+      position: "absolute",
+      inset: 0,
+      zIndex: 20,
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      bgcolor: mode === "dark" ? "rgba(0,0,0,0.45)" : "rgba(255,255,255,0.55)",
+      backdropFilter: "blur(1px)",
     },
     loadingPage: {
       ...general.fullWidth,
@@ -130,6 +141,23 @@ const getDashboardTheme = (mode: "light" | "dark" = "light") => {
         border: `1px solid ${alpha(sc?.color ?? semantic.chipFallbackColor, 0.25)}`,
         "& .MuiChip-icon": { color: sc?.color ?? semantic.chipFallbackColor },
         height: 24,
+      }),
+      stageChip: (sc) => ({
+        bgcolor: sc?.bg ?? semantic.chipFallbackBg,
+        color: sc?.color ?? semantic.chipFallbackColor,
+        fontWeight: fonts.weight.semibold,
+        fontSize: fonts.typography.chip.fontSize,
+        border: `1px solid ${alpha(sc?.color ?? semantic.chipFallbackColor, 0.25)}`,
+        "& .MuiChip-icon": { color: sc?.color ?? semantic.chipFallbackColor },
+        height: 24,
+      }),
+      priorityChip: (pc) => ({
+        bgcolor: pc?.bg ?? semantic.chipFallbackBg,
+        color: pc?.color ?? semantic.chipFallbackColor,
+        fontWeight: fonts.weight.bold,
+        fontSize: fonts.typography.chipSm.fontSize,
+        border: `1px solid ${alpha(pc?.color ?? semantic.chipFallbackColor, 0.3)}`,
+        height: 22,
       }),
 
       // ── Filter bar widgets ──
@@ -375,14 +403,6 @@ const getDashboardTheme = (mode: "light" | "dark" = "light") => {
           alignItems: "center",
           justifyContent: "space-between",
           mb: 2.5,
-        },
-        eyebrow: {
-          fontFamily: fonts.family.monospace,
-          fontSize: fonts.size.tight,
-          letterSpacing: "0.15em",
-          color: s.textSecondary,
-          textTransform: "uppercase",
-          mb: 0.5,
         },
         title: {
           fontSize: "1.45rem",

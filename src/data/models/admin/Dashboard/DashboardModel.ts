@@ -191,10 +191,13 @@ export type ActiveBatchesFilterInput = {
   filterStage: string;
   filterBatchType: string;
   filterStatus: string;
+  filterType: string;
   dateFrom: string;
   dateTo: string;
   currentMonthOnly: boolean;
   status: string;
+  page?: number;
+  pageSize?: number;
 };
 
 export const buildActiveBatchesFilterPayload = ({
@@ -202,19 +205,23 @@ export const buildActiveBatchesFilterPayload = ({
   filterStage,
   filterBatchType,
   filterStatus,
+  filterType,
   dateFrom,
   dateTo,
   currentMonthOnly,
   status,
+  page = 1,
+  pageSize = 10,
 }: ActiveBatchesFilterInput) => ({
   search: searchQuery.trim(),
   stage: filterStage,
   type: filterBatchType,
   status: filterStatus,
+  filterType,
   startDate: dateFrom || null,
   listType: status,
   endDate: dateTo || null,
   currentMonth: currentMonthOnly,
-  page: 1,
-  pageSize: 10,
+  page,
+  pageSize,
 });

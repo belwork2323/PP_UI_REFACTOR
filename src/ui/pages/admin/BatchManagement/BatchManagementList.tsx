@@ -7,7 +7,7 @@ import UserActions from "@ui/components/common/UserActions";
 import AdminManagementDataTable from "@ui/components/custom/admin/AdminManagementDataTable";
 import type { AdminManagementColumn } from "@ui/components/custom/admin/AdminManagementDataTable";
 
-import { stageConfig, batchStatusConfig, priorityConfig } from "@app/theme/roleConfig";
+import { stageConfig, batchStatusConfig, priorityConfig, getSubDeptChipConfig } from "@app/theme/roleConfig";
 import {
   getBatchId,
   getMotorId,
@@ -109,13 +109,15 @@ const BatchListTable = ({
         label: S.TABLE_COLS[4],
         render: (batch) => {
           const stage = getStage(batch);
+          const subDept = getSubDept(batch);
           const scStage = stageConfig[stage];
+          const subDeptCfg = getSubDeptChipConfig(subDept);
           return (
             <Chip
               icon={scStage ? <scStage.Icon /> : undefined}
-              label={getSubDept(batch)}
+              label={subDept}
               size="small"
-              sx={tableCell.stageChip(scStage)}
+              sx={tableCell.stageChip(subDeptCfg)}
             />
           );
         },
@@ -128,8 +130,8 @@ const BatchListTable = ({
           const scStatus = batchStatusConfig[status];
           return (
             <Chip
-              icon={scStatus ? <scStatus.Icon /> : undefined}
-              label={status.replace(/_/g, " ")}
+              icon={scStatus?.Icon ? <scStatus.Icon /> : undefined}
+              label={status.replace(/_/g, " ").toUpperCase()}
               size="small"
               sx={tableCell.statusChip(scStatus)}
             />

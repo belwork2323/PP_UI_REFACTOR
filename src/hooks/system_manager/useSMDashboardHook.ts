@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuthStore } from "../../app/store/authStore";
 import { systemManagerController } from "../../controllers/system_manager/systemManagerController";
 import { SMChartDataModel } from "../../data/models/SystemManagerModel";
@@ -30,7 +30,11 @@ const toApiDate = (date: Date) => {
   return `${day}-${month}-${year}`;
 };
 
-const getDateRange = (filterType: string, customStartDate: string, customEndDate: string) => {
+export const getSMDateRange = (
+  filterType: string,
+  customStartDate: string,
+  customEndDate: string,
+) => {
   const now = new Date();
   if (filterType === "day") {
     const today = toApiDate(now);
@@ -43,11 +47,12 @@ const getDateRange = (filterType: string, customStartDate: string, customEndDate
     end.setDate(start.getDate() + 6);
     return { apiFilter: "week", startDate: toApiDate(start), endDate: toApiDate(end) };
   }
-  if (filterType === "custom" && customStartDate.length === 10 && customEndDate.length === 10) {
-    // dates arrive as DD-MM-YYYY from DashboardDateFilter — use directly
-    return { apiFilter: "custom", startDate: customStartDate, endDate: customEndDate };
+  if (filterType === "custom") {
+    if (customStartDate.length === 10 && customEndDate.length === 10) {
+      return { apiFilter: "custom", startDate: customStartDate, endDate: customEndDate };
+    }
+    return { apiFilter: "custom", startDate: "", endDate: "" };
   }
-  // default: month
   return {
     apiFilter: "month",
     startDate: toApiDate(new Date(now.getFullYear(), now.getMonth(), 1)),
@@ -73,16 +78,39 @@ export const useSMDashboard = (config: {
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(false);
   const [alertsLoading, setAlertsLoading] = useState(false);
-  const [filterType, setFilterType] = useState("month");
+  const [filterType, setFilterTypeState] = useState("month");
+  /** Draft custom dates (picker) — applied only on Apply Filter */
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+  /** Applied custom dates used for API calls */
+  const [appliedCustomStart, setAppliedCustomStart] = useState("");
+  const [appliedCustomEnd, setAppliedCustomEnd] = useState("");
+  const hasLoadedOnceRef = useRef(false);
+  const lastValidBoundsRef = useRef(getSMDateRange("month", "", ""));
+  const [customApplyToken, setCustomApplyToken] = useState(0);
+
+  const { stageConfig, stageColors, kpiVariants } = config;
+
+  /** Keep last valid range while Custom is selected but not yet applied. */
+  const dateBounds = useMemo(() => {
+    const next = getSMDateRange(filterType, appliedCustomStart, appliedCustomEnd);
+    if (next.startDate && next.endDate) {
+      lastValidBoundsRef.current = next;
+      return next;
+    }
+    return lastValidBoundsRef.current;
+  }, [filterType, appliedCustomStart, appliedCustomEnd]);
 
   const loadDashboard = useCallback(
     async (ft: string, csd: string, ced: string) => {
-      const { apiFilter, startDate, endDate } = getDateRange(ft, csd, ced);
+      const { apiFilter, startDate, endDate } = getSMDateRange(ft, csd, ced);
+      if (apiFilter === "custom" && (!startDate || !endDate)) return;
+
       const systemManagerId = resolveSystemManagerId();
 
-      setLoading(true);
+      if (!hasLoadedOnceRef.current) {
+        setLoading(true);
+      }
       setStatsLoading(true);
 
       const [statsResult, chartResult, blockchainResult] = await Promise.all([
@@ -94,8 +122,8 @@ export const useSMDashboard = (config: {
           eventType: "All",
           department: "All",
           subDepartment: "All",
-          startDate: null,
-          endDate: null,
+          startDate,
+          endDate,
           page: 1,
           pageSize: 5,
         }),
@@ -106,13 +134,12 @@ export const useSMDashboard = (config: {
       const chartUpdatedAt =
         chartResult.success && chartResult.timestamp ? new Date(chartResult.timestamp) : new Date();
       const blockchainEvents = blockchainResult.success ? blockchainResult.events : [];
-      const stageConfig = config.stageConfig;
-      const fallbackStageColor = config.stageColors.fallback;
-      const fallbackKpiVariant = config.kpiVariants.fallback;
+      const fallbackStageColor = stageColors.fallback;
+      const fallbackKpiVariant = kpiVariants.fallback;
 
       setDashboard({
         kpiData: stats.map((item: any) => {
-          const variantConfig = config.kpiVariants[item.variant] ?? fallbackKpiVariant;
+          const variantConfig = kpiVariants[item.variant] ?? fallbackKpiVariant;
 
           return {
             label: item.label,
@@ -133,7 +160,7 @@ export const useSMDashboard = (config: {
               stage: item.stage,
               batchCount: item.batchCount,
               percentage: item.percentage ?? 0,
-              color: config.stageColors[key] ?? fallbackStageColor,
+              color: stageColors[key] ?? fallbackStageColor,
               iconKey: stageCfg?.iconKey ?? "Inventory2",
             };
           }),
@@ -141,7 +168,7 @@ export const useSMDashboard = (config: {
         stageMetrics: (chartData.stageProcessed ?? []).map((item: any) => ({
           stage: item.stage,
           completed: item.batchCount,
-          color: config.stageColors[toStageKey(item.stage)] ?? fallbackStageColor,
+          color: stageColors[toStageKey(item.stage)] ?? fallbackStageColor,
           pct: item.percentage ?? 0,
         })),
         activeBatches: [],
@@ -160,20 +187,24 @@ export const useSMDashboard = (config: {
         stageConfig,
       });
 
+      hasLoadedOnceRef.current = true;
       setLoading(false);
       setStatsLoading(false);
     },
-    [config],
+    [stageConfig, stageColors, kpiVariants],
   );
 
   const loadAlerts = useCallback(async () => {
     const systemManagerId = resolveSystemManagerId();
+    const { startDate, endDate } = getSMDateRange(filterType, appliedCustomStart, appliedCustomEnd);
+    if (!startDate || !endDate) return;
 
     setAlertsLoading(true);
     const alertsResult = await systemManagerController.getAlerts({
       systemManagerId,
       page: 1,
       limit: 5,
+      dateRange: { from: startDate, to: endDate },
     });
     setAlerts(
       alertsResult.success
@@ -188,13 +219,27 @@ export const useSMDashboard = (config: {
         : [],
     );
     setAlertsLoading(false);
+  }, [filterType, appliedCustomStart, appliedCustomEnd]);
+
+  const setFilterType = useCallback((next: string) => {
+    setFilterTypeState(next);
   }, []);
 
+  const applyCustomDateFilter = useCallback(() => {
+    if (customStartDate.length !== 10 || customEndDate.length !== 10) return;
+    setAppliedCustomStart(customStartDate);
+    setAppliedCustomEnd(customEndDate);
+    setCustomApplyToken((token) => token + 1);
+  }, [customStartDate, customEndDate]);
+
   useEffect(() => {
-    if (filterType === "custom" && (customStartDate.length !== 10 || customEndDate.length !== 10))
+    if (filterType === "custom") {
+      if (appliedCustomStart.length !== 10 || appliedCustomEnd.length !== 10) return;
+      void loadDashboard(filterType, appliedCustomStart, appliedCustomEnd);
       return;
-    loadDashboard(filterType, customStartDate, customEndDate);
-  }, [loadDashboard, filterType, customStartDate, customEndDate]);
+    }
+    void loadDashboard(filterType, "", "");
+  }, [loadDashboard, filterType, appliedCustomStart, appliedCustomEnd, customApplyToken]);
 
   return {
     dashboard,
@@ -208,6 +253,8 @@ export const useSMDashboard = (config: {
     setCustomStartDate,
     customEndDate,
     setCustomEndDate,
+    applyCustomDateFilter,
+    dateBounds,
     loadAlerts,
     loadDashboard,
   };

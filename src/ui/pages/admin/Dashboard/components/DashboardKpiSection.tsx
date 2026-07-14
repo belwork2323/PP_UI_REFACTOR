@@ -15,6 +15,7 @@ type DashboardKpiSectionProps = {
   setCustomStartDate: (val: string) => void;
   customEndDate: string;
   setCustomEndDate: (val: string) => void;
+  applyCustomDateFilter: () => void;
 };
 
 const t = STRINGS.DASHBOARD_PAGE;
@@ -29,6 +30,7 @@ export default function DashboardKpiSection({
   setCustomStartDate,
   customEndDate,
   setCustomEndDate,
+  applyCustomDateFilter,
 }: DashboardKpiSectionProps) {
   const [dateFilterOpen, setDateFilterOpen] = useState(true);
   const dateFilterCount = filterType !== t.DATE_FILTER.VALUES.MONTH ? 1 : 0;
@@ -57,6 +59,7 @@ export default function DashboardKpiSection({
             onStartChange={setCustomStartDate}
             customEndDate={customEndDate}
             onEndChange={setCustomEndDate}
+            onApplyCustom={applyCustomDateFilter}
             strings={t.DATE_FILTER}
             loading={statsLoading}
             containerSx={th.dashboard.dateRangeBar}

@@ -2,19 +2,48 @@
 import { Navigate } from "react-router-dom";
 import LoginPage from "../../ui/pages/auth/LoginPage";
 
-import DashboardPage from "@ui/pages/admin/Dashboard/DashboardPage";
-import UserManagementPage from "@ui/pages/admin/UserManagement/UserManagementPage";
-import BatchManagementPage from "@ui/pages/admin/BatchManagement/BatchManagementPage";
-import ProjectManagementPage from "@ui/pages/admin/ProjectManagement/ProjectManagementPage";
-import SystemManagerDashboard from "../../ui/pages/systemManager/SystemManagerDashboard";
-import SourcingDashboard from "../../ui/pages/user/sourcing/SourcingDashboard";
-import ManufacturingDashboard from "../../ui/pages/user/manufacturing/ManufacturingDashboard";
-import QualityControlDashboard from "../../ui/pages/user/qualityControl/QualityControlDashboard";
-import DispatchDashboard from "../../ui/pages/user/dispatch/DispatchDashboard";
-import SourcingApproverDashboard from "../../ui/pages/approver/sourcing/SourcingApproverDashboard";
-import ManufacturingApproverDashboard from "../../ui/pages/approver/manufacturing/ManufacturingApproverDashboard";
-import QualityControlApproverDashboard from "../../ui/pages/approver/qualityControl/QualityControlApproverDashboard";
-import DispatchApproverDashboard from "../../ui/pages/approver/dispatch/DispatchApproverDashboard";
+import { lazy } from "react";
+
+const DashboardPage = lazy(() => import("@ui/pages/admin/Dashboard/DashboardPage"));
+const UserManagementPage = lazy(() => import("@ui/pages/admin/UserManagement/UserManagementPage"));
+const BatchManagementPage = lazy(
+  () => import("@ui/pages/admin/BatchManagement/BatchManagementPage"),
+);
+const ProjectManagementPage = lazy(
+  () => import("@ui/pages/admin/ProjectManagement/ProjectManagementPage"),
+);
+
+const SystemManagerDashboard = lazy(
+  () => import("../../ui/pages/systemManager/SystemManagerDashboard"),
+);
+
+const SourcingDashboard = lazy(() => import("../../ui/pages/user/sourcing/SourcingDashboard"));
+
+const ManufacturingDashboard = lazy(
+  () => import("../../ui/pages/user/manufacturing/ManufacturingDashboard"),
+);
+
+const QualityControlDashboard = lazy(
+  () => import("../../ui/pages/user/qualityControl/QualityControlDashboard"),
+);
+
+const DispatchDashboard = lazy(() => import("../../ui/pages/user/dispatch/DispatchDashboard"));
+
+const SourcingApproverDashboard = lazy(
+  () => import("../../ui/pages/approver/sourcing/SourcingApproverDashboard"),
+);
+
+const ManufacturingApproverDashboard = lazy(
+  () => import("../../ui/pages/approver/manufacturing/ManufacturingApproverDashboard"),
+);
+
+const QualityControlApproverDashboard = lazy(
+  () => import("../../ui/pages/approver/qualityControl/QualityControlApproverDashboard"),
+);
+
+const DispatchApproverDashboard = lazy(
+  () => import("../../ui/pages/approver/dispatch/DispatchApproverDashboard"),
+);
 
 export const routes = [
   /* ---------- AUTH (PUBLIC) ---------- */
@@ -105,7 +134,8 @@ export const routes = [
     element: <QualityControlApproverDashboard />,
     isProtected: true,
     roles: ["APPROVER"],
-  },{
+  },
+  {
     path: "/approver/dispatch/:subDept",
     element: <DispatchApproverDashboard />,
     isProtected: true,

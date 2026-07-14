@@ -10,26 +10,33 @@
 //   return { ...shared, /* feature-only additions */ };
 
 import { alpha } from "@mui/material";
-import colors    from "../../colors";
-import fonts     from "../../fonts";
-import spacing   from "../../spacing";
-import general   from "../common/common_css_theme";
+import colors from "../../colors";
+import fonts from "../../fonts";
+import spacing from "../../spacing";
+import general from "../common/common_css_theme";
 import { getTokens } from "../../tokens/semantics";
 import adminPalette from "../../palettes/adminPalette";
 
-const mkInputStyle = (inputBg: string, inputBorder: string, inputBorderHover: string, inputFocus: string, textPrimary: string, textSecondary: string) => ({
+const mkInputStyle = (
+  inputBg: string,
+  inputBorder: string,
+  inputBorderHover: string,
+  inputFocus: string,
+  textPrimary: string,
+  textSecondary: string,
+) => ({
   "& .MuiOutlinedInput-root": {
-    fontSize:     "0.78rem",
-    bgcolor:      inputBg,
+    fontSize: "0.78rem",
+    bgcolor: inputBg,
     borderRadius: "8px",
-    color:        textPrimary,
-    "& fieldset":             { borderColor: inputBorder },
-    "&:hover fieldset":       { borderColor: inputBorderHover },
+    color: textPrimary,
+    "& fieldset": { borderColor: inputBorder },
+    "&:hover fieldset": { borderColor: inputBorderHover },
     "&.Mui-focused fieldset": { borderColor: inputFocus },
   },
   "& .MuiInputLabel-root": {
     fontSize: "0.78rem",
-    color:    textSecondary,
+    color: textSecondary,
     "&.Mui-focused": { color: inputFocus },
   },
   "& .MuiSvgIcon-root": { color: textSecondary },
@@ -45,87 +52,94 @@ const PRIORITY_COLORS_DARK = adminPalette.priorityColors.dark;
 // ─── Internal helpers ─────────────────────────────────────────────────────────
 
 export const getSharedTheme = (mode = "light") => {
-  const s      = getTokens(mode as "light" | "dark");
+  const s = getTokens(mode as "light" | "dark");
   const isDark = mode === "dark";
-  const d      = colors.dashboard[mode as "light" | "dark"];
-  const p      = colors.primary;
+  const d = colors.dashboard[mode as "light" | "dark"];
+  const p = colors.primary;
 
-  const accentBlue       = p.main;
-  const accentBlueDark   = p.dark;
-  const accentBlueMuted  = isDark ? "rgba(25,118,210,0.18)" : "rgba(25,118,210,0.08)";
-  const inputBg          = isDark ? "rgba(255,255,255,0.05)" : "#f8fafc";
-  const inputBorder      = isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)";
+  const accentBlue = p.main;
+  const accentBlueDark = p.dark;
+  const accentBlueMuted = isDark ? "rgba(25,118,210,0.18)" : "rgba(25,118,210,0.08)";
+  const inputBg = isDark ? "rgba(255,255,255,0.05)" : "#f8fafc";
+  const inputBorder = isDark ? "rgba(255,255,255,0.12)" : "rgba(0,0,0,0.12)";
   const inputBorderHover = isDark ? "rgba(255,255,255,0.25)" : "rgba(0,0,0,0.28)";
-  const inputFocus       = isDark ? "#90caf9" : p.main;
-  const menuBg           = isDark ? "#1e2435" : colors.paper;
-  const menuItemHover    = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)";
+  const inputFocus = isDark ? "#90caf9" : p.main;
+  const menuBg = isDark ? "#1e2435" : colors.paper;
+  const menuItemHover = isDark ? "rgba(255,255,255,0.05)" : "rgba(0,0,0,0.04)";
 
-  const statusColorMap  = isDark ? STATUS_COLORS_DARK : STATUS_COLORS;
+  const statusColorMap = isDark ? STATUS_COLORS_DARK : STATUS_COLORS;
   const priorityColorMap = isDark ? PRIORITY_COLORS_DARK : PRIORITY_COLORS;
 
-  const filterInputSx = mkInputStyle(inputBg, inputBorder, inputBorderHover, inputFocus, s.textPrimary, s.textSecondary);
+  const filterInputSx = mkInputStyle(
+    inputBg,
+    inputBorder,
+    inputBorderHover,
+    inputFocus,
+    s.textPrimary,
+    s.textSecondary,
+  );
   const managementPageHeader = {
     wrapper: {
       ...general.flexRow,
-      alignItems:     "flex-start",
+      alignItems: "flex-start",
       justifyContent: "space-between",
-      mb:             spacing.lg,
+      mb: spacing.lg,
       ...general.flexWrap,
-      gap:            spacing.md,
+      gap: spacing.md,
     },
     title: {
-      fontSize:      { xs: fonts.size.xl, md: fonts.size["2xl"] },
-      fontWeight:    fonts.weight.extrabold,
-      color:         d.textPrimary,
+      fontSize: { xs: fonts.size.xl, md: fonts.size["2xl"] },
+      fontWeight: fonts.weight.extrabold,
+      color: d.textPrimary,
       letterSpacing: "-0.02em",
-      lineHeight:    fonts.lineHeight.tight,
+      lineHeight: fonts.lineHeight.tight,
     },
     subtitle: {
       fontSize: fonts.size.sm,
-      color:    d.textSecondary,
-      mt:       spacing.xs,
+      color: d.textSecondary,
+      mt: spacing.xs,
     },
   };
 
   const managementPrimaryButton = {
     textTransform: "none",
-    fontWeight:    fonts.weight.bold,
-    borderRadius:  general.borderRadius.md,
-    px:            spacing.lg,
-    bgcolor:       accentBlue,
-    boxShadow:     `0 4px 14px ${alpha(accentBlue, 0.35)}`,
-    "&:hover":    { bgcolor: accentBlueDark },
+    fontWeight: fonts.weight.bold,
+    borderRadius: general.borderRadius.md,
+    px: spacing.lg,
+    bgcolor: accentBlue,
+    boxShadow: `0 4px 14px ${alpha(accentBlue, 0.35)}`,
+    "&:hover": { bgcolor: accentBlueDark },
     "&.Mui-disabled": {
       bgcolor: alpha(accentBlue, 0.4),
-      color:   colors.white.text,
+      color: colors.white.text,
     },
   };
 
   const managementStatPills = {
     row: {
-      mb:  spacing.lg,
+      mb: spacing.lg,
       ...general.flexWrap,
       gap: 1.5,
     },
     pill: (color: string, bg: string) => ({
-      px:           spacing.md,
-      py:           spacing.sm,
+      px: spacing.md,
+      py: spacing.sm,
       borderRadius: general.borderRadius.md,
-      bgcolor:      bg,
-      border:       `1px solid ${alpha(color, 0.2)}`,
+      bgcolor: bg,
+      border: `1px solid ${alpha(color, 0.2)}`,
       ...general.flexRow,
-      alignItems:   "center",
-      gap:          spacing.sm,
+      alignItems: "center",
+      gap: spacing.sm,
     }),
     pillValue: (color: string) => ({
-      fontSize:   fonts.size.xl,
+      fontSize: fonts.size.xl,
       fontWeight: fonts.weight.extrabold,
       color,
       lineHeight: fonts.lineHeight.tight,
     }),
     pillLabel: {
-      fontSize:   fonts.size.xs,
-      color:      d.textSecondary,
+      fontSize: fonts.size.xs,
+      color: d.textSecondary,
       fontWeight: fonts.weight.medium,
     },
   };
@@ -133,18 +147,18 @@ export const getSharedTheme = (mode = "light") => {
   const managementToolbar = {
     wrapper: {
       ...general.flexRow,
-      gap:          1.5,
-      mb:           2.5,
+      gap: 1.5,
+      mb: 2.5,
       ...general.flexWrap,
-      alignItems:   "center",
-      p:            spacing.md,
-      bgcolor:      d.cardBg,
+      alignItems: "center",
+      p: spacing.md,
+      bgcolor: d.cardBg,
       borderRadius: general.borderRadius.lg,
-      border:       `1px solid ${isDark ? "rgba(255,255,255,0.12)" : inputBorder}`,
-      boxShadow:    d.cardShadow,
+      border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : inputBorder}`,
+      boxShadow: d.cardShadow,
     },
     searchField: {
-      flex:     1,
+      flex: 1,
       minWidth: 220,
       "& .MuiInputBase-input": { color: d.textPrimary },
       "& .MuiOutlinedInput-notchedOutline": {
@@ -158,32 +172,32 @@ export const getSharedTheme = (mode = "light") => {
     },
     searchIcon: {
       fontSize: 18,
-      color:    d.textSecondary,
+      color: d.textSecondary,
     },
     filterButtonActive: {
-      borderRadius:  general.borderRadius.md,
+      borderRadius: general.borderRadius.md,
       textTransform: "none",
-      fontWeight:    fonts.weight.semibold,
-      fontSize:      fonts.size.xs,
-      px:            1.8,
-      py:            0.9,
-      bgcolor:       accentBlue,
-      color:         colors.white.text,
-      "&:hover":    { bgcolor: accentBlueDark },
+      fontWeight: fonts.weight.semibold,
+      fontSize: fonts.size.xs,
+      px: 1.8,
+      py: 0.9,
+      bgcolor: accentBlue,
+      color: colors.white.text,
+      "&:hover": { bgcolor: accentBlueDark },
     },
     filterButtonInactive: {
-      borderRadius:  general.borderRadius.md,
+      borderRadius: general.borderRadius.md,
       textTransform: "none",
-      fontWeight:    fonts.weight.semibold,
-      fontSize:      fonts.size.xs,
-      px:            1.8,
-      py:            0.9,
-      borderColor:   isDark ? "rgba(255,255,255,0.23)" : inputBorder,
-      color:         isDark ? d.textPrimary : d.textSecondary,
+      fontWeight: fonts.weight.semibold,
+      fontSize: fonts.size.xs,
+      px: 1.8,
+      py: 0.9,
+      borderColor: isDark ? "rgba(255,255,255,0.23)" : inputBorder,
+      color: isDark ? d.textPrimary : d.textSecondary,
       "&:hover": {
         borderColor: accentBlue,
-        color:       accentBlue,
-        bgcolor:     isDark ? "rgba(25,118,210,0.08)" : "rgba(25,118,210,0.04)",
+        color: accentBlue,
+        bgcolor: isDark ? "rgba(25,118,210,0.08)" : "rgba(25,118,210,0.04)",
       },
     },
     filterRow: {
@@ -208,49 +222,51 @@ export const getSharedTheme = (mode = "light") => {
       "& .MuiSelect-icon": { color: d.textSecondary },
     },
     clearButton: {
-      color:         colors.error.main,
+      color: colors.error.main,
       textTransform: "none",
-      fontSize:      fonts.size.xs,
-      px:            spacing.sm,
-      "&:hover":    { bgcolor: alpha(colors.error.main, isDark ? 0.12 : 0.08) },
+      fontSize: fonts.size.xs,
+      px: spacing.sm,
+      "&:hover": { bgcolor: alpha(colors.error.main, isDark ? 0.12 : 0.08) },
     },
   };
 
   const managementInput = {
     "& .MuiOutlinedInput-root": {
-      bgcolor:      inputBg,
+      bgcolor: inputBg,
       borderRadius: general.borderRadius.md,
-      "& fieldset":             { borderColor: inputBorder },
-      "&:hover fieldset":       { borderColor: accentBlue },
+      "& fieldset": { borderColor: inputBorder },
+      "&:hover fieldset": { borderColor: accentBlue },
       "&.Mui-focused fieldset": { borderColor: accentBlue },
     },
     "& .MuiInputLabel-root": {
       color: d.textSecondary,
       "&.Mui-focused": { color: accentBlue },
       "&.MuiInputLabel-shrink": {
-        color:      isDark ? d.textPrimary : accentBlue,
+        color: isDark ? d.textPrimary : accentBlue,
         fontWeight: isDark ? fonts.weight.semibold : fonts.weight.medium,
       },
     },
-    "& .MuiInputBase-input":              { color: d.textPrimary },
-    "& .MuiSelect-icon":                  { color: d.textSecondary },
-    "& .MuiOutlinedInput-notchedOutline": { borderColor: isDark ? "rgba(255,255,255,0.23)" : inputBorder },
+    "& .MuiInputBase-input": { color: d.textPrimary },
+    "& .MuiSelect-icon": { color: d.textSecondary },
+    "& .MuiOutlinedInput-notchedOutline": {
+      borderColor: isDark ? "rgba(255,255,255,0.23)" : inputBorder,
+    },
   };
 
   const managementMenuPaper = {
     PaperProps: {
       sx: {
-        bgcolor:      menuBg,
-        border:       `1px solid ${d.cardBorder}`,
+        bgcolor: menuBg,
+        border: `1px solid ${d.cardBorder}`,
         borderRadius: general.borderRadius.md,
-        boxShadow:    isDark ? "0 8px 32px rgba(0,0,0,0.5)" : "0 8px 24px rgba(0,0,0,0.12)",
+        boxShadow: isDark ? "0 8px 32px rgba(0,0,0,0.5)" : "0 8px 24px rgba(0,0,0,0.12)",
         "& .MuiMenuItem-root": {
-          color:    d.textPrimary,
+          color: d.textPrimary,
           fontSize: fonts.size.sm,
-          "&:hover":        { bgcolor: menuItemHover },
+          "&:hover": { bgcolor: menuItemHover },
           "&.Mui-selected": { bgcolor: accentBlueMuted },
         },
-        "& .MuiCheckbox-root":             { color: d.textSecondary },
+        "& .MuiCheckbox-root": { color: d.textSecondary },
         "& .MuiCheckbox-root.Mui-checked": { color: accentBlue },
       },
     },
@@ -258,194 +274,193 @@ export const getSharedTheme = (mode = "light") => {
 
   const managementTable = {
     paper: {
-      bgcolor:      d.cardBg,
-      border:       `1px solid ${d.cardBorder}`,
+      bgcolor: d.cardBg,
+      border: `1px solid ${d.cardBorder}`,
       borderRadius: general.borderRadius.lg,
-      boxShadow:    d.cardShadow,
-      overflow:     "hidden" as const,
+      boxShadow: d.cardShadow,
+      overflow: "hidden" as const,
     },
     headerCell: {
-      fontSize:      fonts.size.xs,
-      fontWeight:    fonts.weight.bold,
-      color:         d.tableHeaderText,
+      fontSize: fonts.size.xs,
+      fontWeight: fonts.weight.bold,
+      color: d.tableHeaderText,
       letterSpacing: "0.06em",
       textTransform: "uppercase" as const,
-      borderBottom:  `2px solid ${d.tableHeaderBorder}`,
-      bgcolor:       isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.015)",
-      py:            1.5,
+      borderBottom: `2px solid ${d.tableHeaderBorder}`,
+      bgcolor: isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.015)",
+      py: 1.5,
       ...general.noWrap,
     },
     headerCellActions: {
       textAlign: "right" as const,
-      pr:        spacing.md,
+      pr: spacing.md,
     },
     row: {
-      "&:hover":         { bgcolor: d.tableRowHover },
+      "&:hover": { bgcolor: d.tableRowHover },
       "&:last-child td": { border: 0 },
-      transition:         "background 0.15s",
+      transition: "background 0.15s",
     },
     cell: {
       borderBottom: `1px solid ${d.dividerColor}`,
-      py:           1.5,
+      py: 1.5,
     },
     cellActionsWrapper: {
       borderBottom: `1px solid ${d.dividerColor}`,
-      py:           1.5,
-      textAlign:    "right" as const,
-      pr:           spacing.md,
+      py: 1.5,
+      textAlign: "right" as const,
+      pr: spacing.md,
     },
     emptyCell: {
       textAlign: "center" as const,
-      py:        6,
+      py: 6,
     },
     emptyText: {
       fontSize: fonts.size.sm,
-      color:    d.textDisabled,
+      color: d.textDisabled,
     },
     emptyIcon: {
       fontSize: 40,
-      mb:       spacing.sm,
-      display:  "block",
-      mx:       "auto",
-      opacity:  0.3,
-      color:    d.textDisabled,
+      mb: spacing.sm,
+      display: "block",
+      mx: "auto",
+      opacity: 0.3,
+      color: d.textDisabled,
     },
     pagination: {
       color: d.textSecondary,
       "& .MuiTablePagination-select": { color: d.textPrimary },
-      "& .MuiSvgIcon-root":           { color: d.textSecondary },
+      "& .MuiSvgIcon-root": { color: d.textSecondary },
     },
     divider: { borderColor: d.dividerColor },
   };
 
   const managementStatsGrid = {
     outerWrap: {
-      mb:           spacing.xl,
+      mb: spacing.xl,
       borderRadius: general.borderRadius.xl,
-      border:       `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)"}`,
-      overflow:     "hidden",
-      position:     "relative" as const,
-      bgcolor:      isDark ? "rgba(255,255,255,0.02)" : "rgba(248,250,252,0.8)",
-      boxShadow:    isDark ? "0 2px 24px rgba(0,0,0,0.40)" : "0 2px 16px rgba(0,0,0,0.06)",
+      border: `1px solid ${isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)"}`,
+      overflow: "hidden",
+      position: "relative" as const,
+      bgcolor: isDark ? "rgba(255,255,255,0.02)" : "rgba(248,250,252,0.8)",
+      boxShadow: isDark ? "0 2px 24px rgba(0,0,0,0.40)" : "0 2px 16px rgba(0,0,0,0.06)",
     },
     bgDecor: {
-      position:      "absolute" as const,
-      inset:         0,
+      position: "absolute" as const,
+      inset: 0,
       pointerEvents: "none" as const,
-      background:    isDark
+      background: isDark
         ? "radial-gradient(ellipse 70% 80% at 50% 50%, rgba(59,130,246,0.06) 0%, transparent 70%)"
         : "radial-gradient(ellipse 70% 80% at 50% 50%, rgba(29,78,216,0.04) 0%, transparent 70%)",
     },
     innerGrid: {
-      position:            "relative" as const,
-      zIndex:              1,
-      display:             "grid",
+      position: "relative" as const,
+      zIndex: 1,
+      display: "grid",
       gridTemplateColumns: { xs: "repeat(2,1fr)", md: "repeat(4,1fr)" },
-      gap:                 "1px",
-      bgcolor:             isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)",
+      gap: "1px",
+      bgcolor: isDark ? "rgba(255,255,255,0.07)" : "rgba(0,0,0,0.06)",
     },
     card: {
-      position:   "relative" as const,
-      display:    "flex",
+      position: "relative" as const,
+      display: "flex",
       alignItems: "center",
-      gap:        2,
-      px:         3,
-      py:         2.8,
-      overflow:   "hidden",
-      bgcolor:    isDark ? "#141824" : "#ffffff",
+      gap: 2,
+      px: 3,
+      py: 2.8,
+      overflow: "hidden",
+      bgcolor: isDark ? "#141824" : "#ffffff",
       transition: "background 0.2s ease, transform 0.2s ease",
       "&:hover": {
         bgcolor: isDark ? "#1a2030" : "#f0f6ff",
       },
     },
     accentBar: {
-      position:     "absolute" as const,
-      left:         0,
-      top:          "20%",
-      bottom:       "20%",
-      width:        3,
+      position: "absolute" as const,
+      left: 0,
+      top: "20%",
+      bottom: "20%",
+      width: 3,
       borderRadius: "0 3px 3px 0",
     },
     iconWrap: {
-      flexShrink:     0,
-      width:          46,
-      height:         46,
-      borderRadius:   "12px",
-      display:        "flex",
-      alignItems:     "center",
+      flexShrink: 0,
+      width: 46,
+      height: 46,
+      borderRadius: "12px",
+      display: "flex",
+      alignItems: "center",
       justifyContent: "center",
-      transition:     "transform 0.2s ease",
-      "&:hover":    { transform: "scale(1.08)" },
+      transition: "transform 0.2s ease",
+      "&:hover": { transform: "scale(1.08)" },
     },
     textWrap: {
-      flex:     1,
+      flex: 1,
       minWidth: 0,
     },
     value: {
-      fontSize:      { xs: "1.6rem", md: "2rem" },
-      fontWeight:    800,
-      lineHeight:    1,
+      fontSize: { xs: "1.6rem", md: "2rem" },
+      fontWeight: 800,
+      lineHeight: 1,
       letterSpacing: "-0.03em",
-      mb:            0.3,
+      mb: 0.3,
     },
     label: {
-      fontSize:   "0.78rem",
+      fontSize: "0.78rem",
       fontWeight: 700,
-      color:      d.textPrimary,
+      color: d.textPrimary,
       lineHeight: 1.2,
-      mb:         0.25,
+      mb: 0.25,
     },
     subLabel: {
-      fontSize:      "0.68rem",
-      fontWeight:    500,
-      color:         d.textSecondary,
+      fontSize: "0.68rem",
+      fontWeight: 500,
+      color: d.textSecondary,
       letterSpacing: "0.01em",
     },
     cornerDot: {
-      position:      "absolute" as const,
-      right:         -14,
-      bottom:        -14,
-      width:         52,
-      height:        52,
-      borderRadius:  "50%",
-      opacity:       isDark ? 0.08 : 0.06,
+      position: "absolute" as const,
+      right: -14,
+      bottom: -14,
+      width: 52,
+      height: 52,
+      borderRadius: "50%",
+      opacity: isDark ? 0.08 : 0.06,
       pointerEvents: "none" as const,
     },
   };
 
   return {
-
     // ── Re-expose semantic tokens for direct access ──────────────────────────
     tokens: s,
 
     // ─── PAGE wrapper ────────────────────────────────────────────────────────
     page: {
-      bgcolor:   s.pageBg,
+      bgcolor: s.pageBg,
       minHeight: "100vh",
-      p:         { xs: spacing.md, md: spacing.lg },
+      p: { xs: spacing.md, md: spacing.lg },
       ...general.boxSizingBorder,
     },
 
     // ─── CARD ─────────────────────────────────────────────────────────────────
     // Standard bordered card; spread into any feature card token
     card: {
-      bgcolor:      s.cardBg,
-      border:       `1px solid ${s.cardBorder}`,
+      bgcolor: s.cardBg,
+      border: `1px solid ${s.cardBorder}`,
       borderRadius: "14px",
-      boxShadow:    s.cardShadow,
-      overflow:     "hidden" as const,
-      "&:hover":    { borderColor: s.borderStrong },
+      boxShadow: s.cardShadow,
+      overflow: "hidden" as const,
+      "&:hover": { borderColor: s.borderStrong },
     },
 
     // ─── SKELETON ─────────────────────────────────────────────────────────────
     skeletonBase: {
-      height:       14,
+      height: 14,
       borderRadius: general.borderRadius.sm,
-      bgcolor:      isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)",
-      animation:    "pulse 1.4s ease-in-out infinite",
+      bgcolor: isDark ? "rgba(255,255,255,0.06)" : "rgba(0,0,0,0.06)",
+      animation: "pulse 1.4s ease-in-out infinite",
       "@keyframes pulse": {
         "0%, 100%": { opacity: 1 },
-        "50%":      { opacity: 0.4 },
+        "50%": { opacity: 0.4 },
       },
     },
 
@@ -455,15 +470,15 @@ export const getSharedTheme = (mode = "light") => {
       PaperProps: {
         sx: {
           bgcolor: menuBg,
-          color:   s.textPrimary,
-          border:  `1px solid ${s.borderDefault}`,
+          color: s.textPrimary,
+          border: `1px solid ${s.borderDefault}`,
         },
       },
     },
     filterMenuItemSx: {
       fontSize: "0.78rem",
-      color:    s.textPrimary,
-      "&:hover":        { bgcolor: menuItemHover },
+      color: s.textPrimary,
+      "&:hover": { bgcolor: menuItemHover },
       "&.Mui-selected": { bgcolor: isDark ? "rgba(33,150,243,0.15)" : "#e3f2fd" },
     },
 
@@ -488,48 +503,48 @@ export const getSharedTheme = (mode = "light") => {
 
     // ─── TABLE ────────────────────────────────────────────────────────────────
     tableHeaderCell: {
-      fontSize:      "0.67rem",
-      fontWeight:    800,
+      fontSize: "0.67rem",
+      fontWeight: 800,
       letterSpacing: "0.07em",
       textTransform: "uppercase" as const,
-      color:         s.textSecondary,
-      borderBottom:  `2px solid ${s.borderDefault}`,
-      whiteSpace:    "nowrap" as const,
-      bgcolor:       "transparent",
+      color: s.textSecondary,
+      borderBottom: `2px solid ${s.borderDefault}`,
+      whiteSpace: "nowrap" as const,
+      bgcolor: "transparent",
     },
     tableHeaderRow: {
       bgcolor: isDark ? "rgba(255,255,255,0.02)" : "rgba(0,0,0,0.015)",
       "& th": { py: 1.4 },
     },
     tableRow: (isAlt = false) => ({
-      "&:hover":        { bgcolor: s.rowHover },
-      "&:last-child td":{ border: 0 },
-      transition:       "background 0.12s",
-      bgcolor:          isAlt ? (isDark ? "rgba(255,255,255,0.012)" : "rgba(0,0,0,0.01)") : "transparent",
+      "&:hover": { bgcolor: s.rowHover },
+      "&:last-child td": { border: 0 },
+      transition: "background 0.12s",
+      bgcolor: isAlt ? (isDark ? "rgba(255,255,255,0.012)" : "rgba(0,0,0,0.01)") : "transparent",
     }),
     tableCell: {
-      py:           1.2,
-      fontSize:     "0.76rem",
-      color:        s.textPrimary,
+      py: 1.2,
+      fontSize: "0.76rem",
+      color: s.textPrimary,
       borderBottom: `1px solid ${s.borderSubtle}`,
     },
     tableCellMuted: {
-      py:       1.2,
+      py: 1.2,
       fontSize: "0.74rem",
-      color:    s.textSecondary,
+      color: s.textSecondary,
     },
     tableCellDate: {
-      py:        1.2,
-      fontSize:  "0.74rem",
-      color:     s.textSecondary,
-      whiteSpace:"nowrap" as const,
+      py: 1.2,
+      fontSize: "0.74rem",
+      color: s.textSecondary,
+      whiteSpace: "nowrap" as const,
     },
     tableEmptyCell: {
-      py:        5,
-      fontSize:  "0.82rem",
+      py: 5,
+      fontSize: "0.82rem",
       textAlign: "center" as const,
-      border:    0,
-      color:     s.textSecondary,
+      border: 0,
+      color: s.textSecondary,
     },
 
     // ─── CHIP FACTORIES ───────────────────────────────────────────────────────
@@ -537,13 +552,13 @@ export const getSharedTheme = (mode = "light") => {
     statusChip: (status: string) => {
       const m = statusColorMap[status] ?? { bg: s.borderSubtle, color: s.textSecondary };
       return {
-        fontSize:     "0.63rem",
-        fontWeight:   700,
-        height:       22,
+        fontSize: "0.63rem",
+        fontWeight: 700,
+        height: 22,
         borderRadius: "6px",
-        bgcolor:      m.bg,
-        color:        m.color,
-        border:       `1px solid ${alpha(m.color, 0.22)}`,
+        bgcolor: m.bg,
+        color: m.color,
+        border: `1px solid ${alpha(m.color, 0.22)}`,
         "& .MuiChip-label": { px: 1 },
       };
     },
@@ -552,38 +567,40 @@ export const getSharedTheme = (mode = "light") => {
     priorityChip: (priority: string) => {
       const m = priorityColorMap[priority] ?? { bg: s.borderSubtle, color: s.textSecondary };
       return {
-        fontSize:     "0.63rem",
-        fontWeight:   700,
-        height:       22,
+        fontSize: "0.63rem",
+        fontWeight: 700,
+        height: 22,
         borderRadius: "6px",
-        bgcolor:      m.bg,
-        color:        m.color,
+        bgcolor: m.bg,
+        color: m.color,
       };
     },
 
     /** Generic chip sx factory */
     chip: (bg?: string, color?: string) => ({
-      fontSize:     "0.62rem",
-      height:       20,
+      fontSize: "0.62rem",
+      height: 20,
       borderRadius: "5px",
-      fontWeight:   700,
-      bgcolor:      bg    ?? (isDark ? "rgba(255,255,255,0.07)"  : "#f0f0f0"),
-      color:        color ?? (isDark ? "rgba(255,255,255,0.55)"  : "rgba(0,0,0,0.5)"),
+      fontWeight: 700,
+      bgcolor: bg ?? (isDark ? "rgba(255,255,255,0.07)" : "#f0f0f0"),
+      color: color ?? (isDark ? "rgba(255,255,255,0.55)" : "rgba(0,0,0,0.5)"),
     }),
 
     // ─── FILTER PANEL BACKDROP ────────────────────────────────────────────────
     filterPanel: {
-      borderTop:    `1px solid ${s.borderDefault}`,
+      borderTop: `1px solid ${s.borderDefault}`,
       borderBottom: `1px solid ${s.borderDefault}`,
-      bgcolor:      s.surfaceEl,
-      px: 2.5, pt: 2, pb: 2.5,
+      bgcolor: s.surfaceEl,
+      px: 2.5,
+      pt: 2,
+      pb: 2.5,
     },
 
     // ─── FILTER PANEL HEADER sub-tokens ───────────────────────────────────────
     filterLabel: {
-      fontSize:      "0.75rem",
-      fontWeight:    700,
-      color:         s.textSecondary,
+      fontSize: "0.75rem",
+      fontWeight: 700,
+      color: s.textSecondary,
       letterSpacing: "0.04em",
       textTransform: "uppercase" as const,
     },
@@ -681,7 +698,11 @@ export const getSharedTheme = (mode = "light") => {
       },
       timestampProps: {
         variant: "caption" as const,
-        sx: { color: s.textDisabled, fontFamily: "'IBM Plex Mono', monospace", fontSize: "0.68rem" },
+        sx: {
+          color: s.textDisabled,
+          fontFamily: "'IBM Plex Mono', monospace",
+          fontSize: "0.68rem",
+        },
       },
       plotHeight: 180,
       margin: {
@@ -769,7 +790,7 @@ export const getSharedTheme = (mode = "light") => {
         },
         "& .MuiAreaElement-root": {
           fill: "url(#areaFillGradient)",
-          opacity: 0.30,
+          opacity: 0.3,
           transition: "opacity .3s ease",
         },
         "& .MuiAreaElement-faded": {
@@ -881,17 +902,17 @@ export const getSharedTheme = (mode = "light") => {
     menuPaper: {
       PaperProps: {
         sx: {
-          bgcolor:      menuBg,
-          color:        s.textPrimary,
-          border:       `1px solid ${s.borderDefault}`,
+          bgcolor: menuBg,
+          color: s.textPrimary,
+          border: `1px solid ${s.borderDefault}`,
           borderRadius: "10px",
-          boxShadow:    s.cardShadow,
+          boxShadow: s.cardShadow,
         },
       },
     },
 
     // ─── PROGRESS BAR ────────────────────────────────────────────────────────
-    progressTrack:      s.progressTrack,
+    progressTrack: s.progressTrack,
     progressValueColor: s.textSecondary,
 
     // ─── DIVIDER ─────────────────────────────────────────────────────────────

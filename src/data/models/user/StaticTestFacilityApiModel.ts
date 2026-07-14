@@ -25,11 +25,7 @@ export class STFSubmitResponseModel {
   batchId: string;
   status: string;
 
-  constructor(payload: {
-    formId?: string;
-    batchId?: string;
-    status?: string;
-  }) {
+  constructor(payload: { formId?: string; batchId?: string; status?: string }) {
     this.formId = payload.formId ?? "";
     this.batchId = payload.batchId ?? "";
     this.status = payload.status ?? "";
@@ -49,7 +45,11 @@ export class STFDetailsModel {
   subType: string;
   motorIdNo: string;
   sections: SchemaSectionSubmission[];
-  motors: Array<{ motorId: string; subType?: string; staticTestingDetails?: Record<string, unknown> }>;
+  motors: Array<{
+    motorId: string;
+    subType?: string;
+    staticTestingDetails?: Record<string, unknown>;
+  }>;
   createdBy: unknown;
   createdAt: string | null;
   submittedBy: unknown;
@@ -76,8 +76,7 @@ export class STFDetailsModel {
     this.submittedBy = payload?.submittedBy ?? null;
     this.submittedAt = payload?.submittedAt ?? payload?.submittedOn ?? null;
     this.lastUpdatedBy = payload?.lastUpdatedBy ?? payload?.updatedBy ?? null;
-    this.lastUpdatedAt =
-      payload?.lastUpdatedAt ?? payload?.updatedAt ?? payload?.updatedOn ?? null;
+    this.lastUpdatedAt = payload?.lastUpdatedAt ?? payload?.updatedAt ?? payload?.updatedOn ?? null;
 
     this.workflowInsights = {
       currentStatus: payload?.workflowInsights?.currentStatus ?? "",
@@ -120,8 +119,13 @@ const extractMotorsFromPayload = (
       };
     })
     .filter(
-      (motor): motor is { motorId: string; subType?: string; staticTestingDetails?: Record<string, unknown> } =>
-        Boolean(motor),
+      (
+        motor,
+      ): motor is {
+        motorId: string;
+        subType?: string;
+        staticTestingDetails?: Record<string, unknown>;
+      } => Boolean(motor),
     );
 };
 
@@ -236,10 +240,7 @@ export const mapStfDetailsForDisplay = (
       if (!motorId) return null;
 
       const subType = String(entry.subType ?? root.subType ?? "").trim();
-      const sections = resolveStfMotorSections(
-        entry,
-        index === 0 ? legacySections : undefined,
-      );
+      const sections = resolveStfMotorSections(entry, index === 0 ? legacySections : undefined);
 
       return {
         motorId,
@@ -264,9 +265,7 @@ export const mapStfDetailsForDisplay = (
     formId: String(root.formId ?? ""),
     batchId: String(root.batchId ?? ""),
     batchType: root.batchType != null ? String(root.batchType) : "",
-    status: String(
-      root.formStatus ?? workflowInsights?.currentStatus ?? root.status ?? "",
-    ),
+    status: String(root.formStatus ?? workflowInsights?.currentStatus ?? root.status ?? ""),
     createdBy: mapCastingCuringPersonLabel(root.createdBy),
     createdAt:
       root.createdAt != null

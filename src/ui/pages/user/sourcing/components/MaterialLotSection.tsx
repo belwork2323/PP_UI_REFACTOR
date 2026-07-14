@@ -266,23 +266,30 @@ const MaterialLotSection = ({
           overflow: "hidden",
         }}
       >
-        <Table size="small" sx={{ tableLayout: "fixed" }}>
+        <Table size="small" sx={{ tableLayout: "fixed", width: "100%" }}>
           <TableHead>
             <TableRow>
-              <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.specification }}>
+              <TableCell
+                sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.lotTableHeader.specification }}
+              >
                 {formStrings.TABLE_HEADERS.SPECIFICATION}
               </TableCell>
-              <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.refRange }}>
+              <TableCell
+                align="center"
+                sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.lotTableHeader.refRange }}
+              >
                 {formStrings.TABLE_HEADERS.REF_RANGE}
               </TableCell>
-              <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.analysedResult }}>
+              <TableCell
+                sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.lotTableHeader.analysedResult }}
+              >
                 {formStrings.TABLE_HEADERS.ANALYZED_RESULT}
                 <Box component="span" sx={mandatoryAsteriskSx(theme)}>
                   {" "}
                   *
                 </Box>
               </TableCell>
-              <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.remarks }}>
+              <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.lotTableHeader.remarks }}>
                 {formStrings.TABLE_HEADERS.REMARKS}
               </TableCell>
             </TableRow>
@@ -293,18 +300,22 @@ const MaterialLotSection = ({
               const analyzedMissing = isAnalyzedResultMissing(row, showFieldErrors);
               return (
                 <TableRow key={rowIndex} sx={specStyles.dataRow(rowIndex, rowFailed)}>
-                  <TableCell sx={theme.workflow.formElements.tableCell}>
+                  <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.specCell }}>
                     <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
                       <Typography sx={specStyles.specText}>{row.specification}</Typography>
                       {rowFailed && (
-                        <Chip label={formStrings.SPEC_STATUS_OUT_OF_RANGE} size="small" sx={specStyles.failedSpecChip} />
+                        <Chip
+                          label={formStrings.SPEC_STATUS_OUT_OF_RANGE}
+                          size="small"
+                          sx={specStyles.failedSpecChip}
+                        />
                       )}
                     </Stack>
                   </TableCell>
-                  <TableCell sx={theme.workflow.formElements.tableCell}>
+                  <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.refRangeCell }}>
                     <Chip label={row.refRange} size="small" sx={specStyles.refRangeChip} />
                   </TableCell>
-                  <TableCell sx={theme.workflow.formElements.tableCell}>
+                  <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.inputCell }}>
                     <TextField
                       size="small"
                       fullWidth
@@ -323,17 +334,17 @@ const MaterialLotSection = ({
                       }}
                     />
                   </TableCell>
-                  <TableCell sx={theme.workflow.formElements.tableCell}>
+                  <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.inputCell }}>
                     <TextField
                       size="small"
                       fullWidth
-                      multiline
-                      minRows={1}
-                      maxRows={3}
                       value={row.remarks || ""}
                       onChange={(event) => handleCellChange(rowIndex, "remarks", event.target.value)}
                       placeholder={formStrings.REMARKS_PLACEHOLDER}
-                      sx={{ ...theme.workflow.formElements.multilineField, ...specStyles.remarksField }}
+                      sx={{
+                        ...theme.workflow.formElements.cellField,
+                        ...specStyles.remarksField,
+                      }}
                     />
                   </TableCell>
                 </TableRow>

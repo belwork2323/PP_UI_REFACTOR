@@ -235,7 +235,8 @@ export const STRINGS = {
       HAS_FAILURES: "✕ Has Failures",
       PENDING_APPROVAL: "⧖ Pending Approval",
       NO_STAGE_DATA: "No stage data available.",
-      DEPT_STAGE_SUMMARY: "Department-level progress from batch pipeline. Sub-department details are not available for this stage.",
+      DEPT_STAGE_SUMMARY:
+        "Department-level progress from batch pipeline. Sub-department details are not available for this stage.",
       STAGE_TIMELINE: "Sub-Department Timeline",
       LAST_UPDATED_STAGE: "Last Updated Stage",
       CURRENT_STAGE: "Current Stage",
@@ -394,7 +395,6 @@ export const STRINGS = {
       COL_STAGE_STATUS: "Stage Status",
       COL_LOT_ID: "Lot ID",
       COL_SOURCING_ID: "Sourcing ID",
-      COL_PROCUREMENT_ID: "Procurement ID",
       COL_GRADE: "Grade",
       COL_MATERIAL_CODE: "Material",
       COL_MATERIAL_NAME: "Material name",
@@ -534,7 +534,7 @@ export const STRINGS = {
       LOT_PLACEHOLDER: "e.g. LOT-2024-01",
       LOT_ID_LOCKED_HINT: "Lot ID cannot be changed when updating an existing lot",
       ANALYZED_RESULT_PLACEHOLDER: "Enter value",
-      REMARKS_PLACEHOLDER: "Add remarks...",
+      REMARKS_PLACEHOLDER: "Enter value",
       SPEC_COUNT_SUFFIX: "specs",
       SUPPLY_ORDER_LABEL: "Supply order no.",
       RECEIPT_DATE_LABEL: "Receipt date",
@@ -545,7 +545,7 @@ export const STRINGS = {
       FIELD_REQUIRED_LOT_ID: "Lot ID is required",
       MANDATORY_FIELDS_PENDING:
         "Complete all required fields (supply order, receipt date, manufacturer, lot ID) and fill every analyzed result before saving or submitting.",
-      FIELD_REQUIRED_ANALYZED_RESULT: "Analyzed result is required",
+      FIELD_REQUIRED_ANALYZED_RESULT: "Analyze Result @ Source is required",
       CERTIFICATES_TITLE: "Certificates",
       CERTIFICATES_SUBTITLE: "Upload PDF, Office, images, or ZIP. Multiple files allowed.",
       CERT_FILE_NAME: "File name",
@@ -559,10 +559,10 @@ export const STRINGS = {
         MATERIAL: "Material",
         LOT_ID: "Lot ID",
         LOT_BATCH_NO: "Man. Lot/Batch No.",
-        SPECIFICATION: "Specification",
-        REF_RANGE: "Ref. Range",
-        ANALYZED_RESULT: "Analyzed Result",
-        REMARKS: "Remarks",
+        SPECIFICATION: "Qualification Parameter",
+        REF_RANGE: "Specification",
+        ANALYZED_RESULT: "Analyze Result @ Source",
+        REMARKS: "ACEM QC Result",
       },
       CONFIRM_DRAFT_TITLE: "Save as Draft?",
       CONFIRM_DRAFT_MESSAGE:
@@ -2076,7 +2076,6 @@ export const STRINGS = {
   /* -------- DASHBOARD PAGE -------- */
   DASHBOARD_PAGE: {
     HEADER: {
-      EYEBROW: "System Supervisor Console",
       TITLE: "Admin Dashboard",
     },
 
@@ -2154,6 +2153,7 @@ export const STRINGS = {
       CUSTOM: "Custom Range",
       START_DATE: "Start Date",
       END_DATE: "End Date",
+      APPLY: "Apply Filter",
       VALUES: { DAY: "day", WEEK: "week", MONTH: "month", CUSTOM: "custom" },
     },
 
@@ -2286,6 +2286,7 @@ export const STRINGS = {
       CUSTOM: "Custom Range",
       START_DATE: "Start Date",
       END_DATE: "End Date",
+      APPLY: "Apply Filter",
       VALUES: { DAY: "day", WEEK: "week", MONTH: "month", CUSTOM: "custom" },
     },
     STATS: [
@@ -2396,10 +2397,10 @@ export const STRINGS = {
       EMPTY: "No batches found",
     },
     TABLE_ACTIONS: {
-      COMPLETE_IMPLEMENTATION: "Complete Implementation Sheet",
+      COMPLETE_IMPLEMENTATION: "Complete Identification Sheet",
       COMPLETE_IMPLEMENTATION_TOOLTIP: "Fill identification sheet and material details",
       VIEW_DETAILS: "View Details",
-      VIEW_DETAILS_TOOLTIP: "View completed implementation sheet",
+      VIEW_DETAILS_TOOLTIP: "View completed Identification sheet",
       EDIT_BATCH: "Edit batch",
       DELETE_BATCH: "Delete batch",
     },
@@ -2425,8 +2426,8 @@ export const STRINGS = {
       CREATE_SUBTITLE_BASIC: "Fill in the basic batch information",
       EDIT_BATCH_DETAILS: "Edit Batch Details",
       CREATE_NEW_BATCH: "Create New Batch",
-      IMPLEMENTATION_VIEW_TITLE: "Implementation Sheet Details",
-      IMPLEMENTATION_EDIT_TITLE: "Complete Implementation Details",
+      IMPLEMENTATION_VIEW_TITLE: "Identification Sheet Details",
+      IMPLEMENTATION_EDIT_TITLE: "Complete Identification Details",
       IMPLEMENTATION_SUBTITLE: (batchId: string) => `Batch: ${batchId}`,
       CANCEL: "Cancel",
       SAVE_CHANGES: "Save Changes",
@@ -2451,14 +2452,14 @@ export const STRINGS = {
       TITLE: "Batch Details",
       LOADING: "Loading batch details...",
       BATCH_INFO_SECTION: "Batch Information",
-      IMPLEMENTATION_SECTION: "Implementation Sheet",
+      IMPLEMENTATION_SECTION: "Identification Sheet",
       MATERIALS_SECTION: "Materials",
-      NO_IMPLEMENTATION: "Implementation sheet has not been completed for this batch.",
+      NO_IDENTIFICATION: "Identification sheet has not been completed for this batch.",
       NO_MATERIALS: "No materials added to the implementation sheet.",
       CLOSE: "Close",
       STATUS: "Status",
       WORKFLOW_SECTION: "Current Workflow",
-      IMPLEMENTATION_STATUS: "Implementation Status",
+      IDENTIFICATION_STATUS: "Identification Status",
       BATCH_TYPE: "Batch Type",
       SUB_BATCH_TYPE: "Sub Batch Type",
       PROJECT: "Project",
@@ -2480,7 +2481,7 @@ export const STRINGS = {
       DELETE_SUCCESS: "Batch deleted successfully.",
       DELETE_FAILED: "Failed to delete batch.",
       LOAD_BATCH_FAILED: "Failed to load batch details.",
-      SAVING_IMPLEMENTATION: "Saving implementation details...",
+      SAVING_IDENTIFICATION: "Saving identification details...",
       IMPLEMENTATION_SAVED_FOR_CREATE: "Implementation sheet saved for batch creation.",
     },
     VALIDATION: {
@@ -2499,7 +2500,6 @@ export const STRINGS = {
   /* -------- SYSTEM MANAGER DASHBOARD -------- */
   SYSTEM_MANAGER_DASHBOARD: {
     PAGE: {
-      EYEBROW: "Batch Supervisor Console",
       TITLE: "System Manager Dashboard",
       SUBTITLE: "Monitor your assigned batches and production pipeline",
       REFRESH: "Refresh",
@@ -2512,6 +2512,7 @@ export const STRINGS = {
       CUSTOM: "Custom Range",
       START_DATE: "Start Date",
       END_DATE: "End Date",
+      APPLY: "Apply Filter",
       VALUES: { DAY: "day", WEEK: "week", MONTH: "month", CUSTOM: "custom" },
     },
     STATS: [

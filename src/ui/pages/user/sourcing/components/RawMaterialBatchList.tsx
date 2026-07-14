@@ -223,9 +223,9 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         render: (v: string) => <Typography sx={theme.batchList.batchIdText}>{v}</Typography>,
       },
       {
-        key: "procurementId",
-        label: STRINGS.SOURCING.BATCH_LIST.COL_PROCUREMENT_ID,
-        render: (v: string) => <Typography sx={theme.batchList.normalText}>{v}</Typography>,
+        key: "sourcingId",
+        label: STRINGS.SOURCING.BATCH_LIST.COL_SOURCING_ID,
+        render: (v: string) => <Typography sx={theme.batchList.normalText}>{v || "—"}</Typography>,
       },
       {
         key: "materialCode",

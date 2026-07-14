@@ -56,6 +56,34 @@ export const stageConfig: Record<string, RoleChipConfig> = {
 
 /** Batch workflow statuses (subdepartment batch lists) */
 export const batchStatusConfig: Record<string, RoleChipConfig> = {
+  // Backend values
+  INITIATED: {
+    Icon: icons.batchMgmt.pendingStatus,
+    color: "#475569",
+    bg: "rgba(71,85,105,0.08)",
+  },
+  IN_PROGRESS: {
+    Icon: icons.batchMgmt.inProgressStatus,
+    color: "#2E86C1",
+    bg: "rgba(46,134,193,0.10)",
+  },
+  WAITING_FOR_APPROVAL: {
+    Icon: icons.batchMgmt.waitingForApprovalStatus,
+    color: "#D4AC0D",
+    bg: "rgba(212,172,13,0.10)",
+  },
+  APPROVED: {
+    Icon: icons.batchMgmt.approvedStatus,
+    color: "#148F77",
+    bg: "rgba(20,143,119,0.10)",
+  },
+  REJECTED: {
+    Icon: icons.batchMgmt.rejectedStatus,
+    color: "#C0392B",
+    bg: "rgba(192,57,43,0.10)",
+  },
+
+  // UI values (aliases)
   "To Be Initiated": {
     Icon: icons.batchMgmt.pendingStatus,
     color: "#475569",
@@ -74,9 +102,21 @@ export const batchStatusConfig: Record<string, RoleChipConfig> = {
   Approved: { Icon: icons.batchMgmt.approvedStatus, color: "#148F77", bg: "rgba(20,143,119,0.10)" },
   Rejected: { Icon: icons.batchMgmt.rejectedStatus, color: "#C0392B", bg: "rgba(192,57,43,0.10)" },
   Draft: { Icon: icons.batchMgmt.pendingStatus, color: "#64748b", bg: "rgba(100,116,139,0.10)" },
-  Submitted: { Icon: icons.batchMgmt.inProgressStatus, color: "#2563eb", bg: "rgba(37,99,235,0.10)" },
-  Completed: { Icon: icons.batchMgmt.approvedStatus, color: "#148F77", bg: "rgba(20,143,119,0.10)" },
-  "Not Started": { Icon: icons.batchMgmt.pendingStatus, color: "#475569", bg: "rgba(71,85,105,0.08)" },
+  Submitted: {
+    Icon: icons.batchMgmt.inProgressStatus,
+    color: "#2563eb",
+    bg: "rgba(37,99,235,0.10)",
+  },
+  Completed: {
+    Icon: icons.batchMgmt.approvedStatus,
+    color: "#148F77",
+    bg: "rgba(20,143,119,0.10)",
+  },
+  "Not Started": {
+    Icon: icons.batchMgmt.pendingStatus,
+    color: "#475569",
+    bg: "rgba(71,85,105,0.08)",
+  },
 };
 
 export const priorityConfig: Record<string, { color: string; bg: string }> = {
@@ -93,6 +133,55 @@ const deptColorMap = [
   { color: "#047857", bg: "rgba(4,120,87,0.10)" },
   { color: "#9d174d", bg: "rgba(157,23,77,0.10)" },
 ];
+
+/** Named sub-department chip colors — keep in sync across dashboard / batch tables */
+export const subDeptConfig: Record<string, { color: string; bg: string }> = {
+  // Sourcing
+  "Raw Material": { color: "#0369a1", bg: "rgba(3,105,161,0.10)" },
+  "Raw Material Sourcing": { color: "#0369a1", bg: "rgba(3,105,161,0.10)" },
+  "Rocket Motor Casing": { color: "#0e7490", bg: "rgba(14,116,144,0.10)" },
+  // Manufacturing
+  "Raw Material Preparation": { color: "#1d4ed8", bg: "rgba(29,78,216,0.10)" },
+  "Case Preparation": { color: "#7c3aed", bg: "rgba(124,58,237,0.10)" },
+  Mixing: { color: "#c026d3", bg: "rgba(192,38,211,0.10)" },
+  "Casting and Curing": { color: "#b45309", bg: "rgba(180,83,9,0.10)" },
+  "Post-Cure Operations": { color: "#ea580c", bg: "rgba(234,88,12,0.10)" },
+  Subscale: { color: "#047857", bg: "rgba(4,120,87,0.10)" },
+  Trimming: { color: "#0f766e", bg: "rgba(15,118,110,0.10)" },
+  // Quality
+  "Quality Control": { color: "#b45309", bg: "rgba(180,83,9,0.10)" },
+  "Raw Material Revalidation": { color: "#a16207", bg: "rgba(161,98,7,0.10)" },
+  "QC Division": { color: "#ca8a04", bg: "rgba(202,138,4,0.10)" },
+  NDT: { color: "#d97706", bg: "rgba(217,119,6,0.10)" },
+  "Static Test Facility": { color: "#c2410c", bg: "rgba(194,65,12,0.10)" },
+  // Dispatch
+  Dispatch: { color: "#047857", bg: "rgba(4,120,87,0.10)" },
+};
+
+const hashString = (value: string) => {
+  let hash = 0;
+  for (let i = 0; i < value.length; i += 1) {
+    hash = (Math.imul(31, hash) + value.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash);
+};
+
+/** Stable chip color for a sub-department name (named map first, then hash fallback). */
+export const getSubDeptChipConfig = (subDeptName: string | null | undefined) => {
+  const name = String(subDeptName ?? "").trim();
+  if (!name || name === "NA" || name === "—") {
+    return deptColorMap[0];
+  }
+  if (subDeptConfig[name]) return subDeptConfig[name];
+
+  const normalized = name.toLowerCase();
+  const namedHit = Object.entries(subDeptConfig).find(
+    ([key]) => key.toLowerCase() === normalized,
+  );
+  if (namedHit) return namedHit[1];
+
+  return deptColorMap[hashString(normalized) % deptColorMap.length];
+};
 
 export const getDeptConfig = (deptName: string, departments: { departmentName?: string }[]) => {
   const idx = departments.findIndex((d) => d.departmentName === deptName);

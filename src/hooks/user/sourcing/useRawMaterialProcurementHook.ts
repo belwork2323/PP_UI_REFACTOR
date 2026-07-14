@@ -223,8 +223,7 @@ export const useRawMaterialProcurementHook = () => {
 
     setDetailsRow({
       lotId,
-      procurementId: row.procurementId || row.sourcingId,
-      sourcingId: row.procurementId || row.sourcingId,
+      sourcingId: row.sourcingId,
       materialCode: row.materialCode,
       materialName: row.materialName,
       grade: row.grade ?? null,
@@ -260,8 +259,7 @@ export const useRawMaterialProcurementHook = () => {
       setDetailsBlocks(blocks);
       setDetailsRow({
         lotId: model.lotId || lotId,
-        procurementId: row.procurementId || row.sourcingId,
-        sourcingId: row.procurementId || row.sourcingId,
+        sourcingId: row.sourcingId,
         materialCode: model.materialCode || row.materialCode,
         materialName: row.materialName,
         grade:
@@ -420,12 +418,20 @@ export const useRawMaterialProcurementHook = () => {
 
         setInitialSnapshot(serializeMaterialBlocks(blocks));
         setFormBlocks(blocks);
+        const createdLotId = String(
+          response.data?.lotId || response.data?.batchId || blocks[0]?.lotNo || "",
+        ).trim();
+        const createdFormId = String(
+          response.data?.formId || response.data?.sourcingId || "",
+        ).trim();
         setActiveBatch((prev) =>
           prev
             ? {
                 ...prev,
-                sourcingId: response.data?.sourcingId ?? prev.sourcingId,
-                batchId: response.data?.sourcingId || prev.batchId,
+                formId: createdFormId || prev.formId,
+                lotId: createdLotId || prev.lotId,
+                sourcingId: createdFormId || prev.sourcingId,
+                batchId: createdLotId || createdFormId || prev.batchId,
                 rmStatus: normalizeRawMaterialLotListStatus(response.data?.status || prev.rmStatus),
               }
             : prev,
@@ -497,14 +503,17 @@ export const useRawMaterialProcurementHook = () => {
           : STRINGS.SOURCING.SPECIFICATION_FORM.UPDATE_SUBMIT_SUCCESS);
 
       if (intent === "draft") {
-        const resolvedLotId = String(response.data?.batchId ?? lotId).trim();
+        const resolvedLotId = String(
+          response.data?.lotId || response.data?.batchId || lotId || "",
+        ).trim();
         setActiveBatch((prev) =>
           prev
             ? {
                 ...prev,
-                formId: response.data?.formId ?? prev.formId,
-                lotId: resolvedLotId,
-                batchId: resolvedLotId,
+                formId: response.data?.formId || response.data?.sourcingId || prev.formId,
+                lotId: resolvedLotId || prev.lotId,
+                sourcingId: response.data?.formId || response.data?.sourcingId || prev.sourcingId,
+                batchId: resolvedLotId || prev.batchId,
                 rmStatus: normalizeRawMaterialLotListStatus(response.data?.status || prev.rmStatus),
               }
             : prev,

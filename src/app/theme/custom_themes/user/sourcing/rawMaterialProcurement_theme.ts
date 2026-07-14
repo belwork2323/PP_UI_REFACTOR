@@ -64,16 +64,24 @@ export const getRawMaterialProcurementTheme = (baseTheme: any) => {
 			}),
 			removeIconButton: { color: palette.danger, "&:hover": { background: alpha(palette.danger, 0.08) } },
 			lotField: { minWidth: 0 },
-			specText: { fontSize: "0.8rem", color: palette.text, fontWeight: 500 },
+			specText: { fontSize: "0.8rem", color: palette.text, fontWeight: 500, lineHeight: 1.35 },
 			refRangeChip: {
-				mt: { xs: 1.5, md: 0 },
-				minWidth: 150,
+				display: "inline-flex",
+				maxWidth: "100%",
+				height: 26,
 				fontSize: fonts.size.xs,
 				fontWeight: fonts.weight.bold,
 				...amberChipSx,
+				"& .MuiChip-label": {
+					px: 1,
+					overflow: "hidden",
+					textOverflow: "ellipsis",
+					whiteSpace: "nowrap",
+				},
 			},
 			analyzedField: {
-				maxWidth: 160,
+				width: "100%",
+				"& .MuiOutlinedInput-root": { minHeight: 36 },
 				"& input[type=number]": {
 					MozAppearance: "textfield",
 				},
@@ -98,7 +106,27 @@ export const getRawMaterialProcurementTheme = (baseTheme: any) => {
 				color: palette.danger,
 				border: `1px solid ${alpha(palette.danger, 0.28)}`,
 			},
-			remarksField: { minWidth: 0 },
+			remarksField: {
+				width: "100%",
+				"& .MuiOutlinedInput-root": { minHeight: 36 },
+			},
+			tableCellCompact: {
+				padding: "8px 12px",
+				verticalAlign: "middle",
+			},
+			specCell: {
+				padding: "8px 12px",
+				verticalAlign: "middle",
+			},
+			refRangeCell: {
+				padding: "8px 12px",
+				verticalAlign: "middle",
+				textAlign: "center",
+			},
+			inputCell: {
+				padding: "8px 12px",
+				verticalAlign: "middle",
+			},
 			editModeBanner: {
 				mb: 2.5,
 				px: 2,
@@ -158,13 +186,63 @@ export const getRawMaterialProcurementTheme = (baseTheme: any) => {
 			footerInfoContainer: { mt: 2.5, px: 2, py: 1.2 },
 			footerInfoIcon: { fontSize: 15, color: palette.primaryLight, flexShrink: 0 },
 			footerInfoText: { fontSize: "0.72rem", color: palette.textSub, lineHeight: 1.5 },
+			/** Percent widths for the 4-col lot specs table (table-layout: fixed). */
 			tableHeader: {
-				material: { minWidth: 80 },
-				lotBatch: { minWidth: 150 },
-				specification: { minWidth: 200 },
-				refRange: { minWidth: 130 },
-				analysedResult: { minWidth: 140 },
-				remarks: { minWidth: 200 },
+				material: { width: "12%", minWidth: 88 },
+				lotBatch: { width: "14%", minWidth: 120 },
+				specification: {
+					width: "24%",
+					minWidth: 140,
+					whiteSpace: "normal",
+					lineHeight: 1.3,
+				},
+				refRange: {
+					width: "14%",
+					minWidth: 110,
+					textAlign: "center",
+					whiteSpace: "normal",
+					lineHeight: 1.3,
+				},
+				analysedResult: {
+					width: "18%",
+					minWidth: 130,
+					whiteSpace: "normal",
+					lineHeight: 1.3,
+				},
+				remarks: {
+					width: "18%",
+					minWidth: 130,
+					whiteSpace: "normal",
+					lineHeight: 1.3,
+				},
+			},
+			/** 4-column lot table (no material/lot columns). */
+			lotTableHeader: {
+				specification: {
+					width: "32%",
+					minWidth: 180,
+					whiteSpace: "normal",
+					lineHeight: 1.3,
+				},
+				refRange: {
+					width: "18%",
+					minWidth: 120,
+					textAlign: "center",
+					whiteSpace: "normal",
+					lineHeight: 1.3,
+				},
+				analysedResult: {
+					width: "25%",
+					minWidth: 150,
+					whiteSpace: "normal",
+					lineHeight: 1.3,
+				},
+				remarks: {
+					width: "25%",
+					minWidth: 150,
+					whiteSpace: "normal",
+					lineHeight: 1.3,
+				},
 			},
 			dataRow: (rowIndex: number, isFailed = false) => ({
 				"&:hover": {

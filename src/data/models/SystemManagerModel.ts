@@ -91,38 +91,66 @@ export class SMChartDataModel {
 ───────────────────────────────────────────────────────────────────────────── */
 
 export class SMActiveBatchModel {
-  batchId:            string;
-  projectName:        string;
-  motorId:            string;
-  motorTypeName:      string;
-  department:         string;
-  subDepartments:     { subDepartmentId: number; subDepartmentName: string }[];
-  priority:           string;
-  status:             string;
+  batchId: string;
+  projectName: string;
+  motorId: string;
+  motorTypeName: string;
+  batchType: string;
+  department: string;
+  subDepartments: { subDepartmentId: number; subDepartmentName: string }[];
+  priority: string;
+  status: string;
   progressPercentage: number;
-  createdDate:        string;
-  lastUpdatedOn:      string;
+  createdDate: string;
+  lastUpdatedOn: string;
 
   constructor(data: Record<string, any>) {
-    this.batchId       = data.batchId      ?? "";
-    this.projectName   = data.projectName  ?? "";
-    this.motorId       = data.motorId      ?? "";
-    this.motorTypeName = data.motorType?.motorTypeName ?? "";
-    this.priority      = data.priority     ?? "Medium";
-    this.status        = data.status       ?? "Pending";
+    this.batchId = data.batchId ?? "";
+    this.projectName = data.projectName ?? "";
+    this.motorId = data.motorId ?? "";
+    this.motorTypeName = data.motorType?.motorTypeName ?? data.motorType?.typeName ?? "";
+    this.batchType = data.type ?? data.batchType ?? "NA";
+    this.priority = data.priority ?? "Medium";
+    this.status = data.status ?? "Pending";
     this.progressPercentage = data.progressPercentage ?? 0;
-    this.createdDate   = data.createdDate  ?? "";
+    this.createdDate = data.createdDate ?? data.createdOn ?? "";
     this.lastUpdatedOn = data.lastUpdatedOn ?? "";
 
-    const dept              = data.stage?.department ?? null;
-    this.department         = dept?.departmentName   ?? "";
-    this.subDepartments     = Array.isArray(dept?.subDepartments)
-      ? dept.subDepartments
-      : [];
+    const dept = data.stage?.department ?? null;
+    // Support both nested object (`departmentName`) and plain string department values.
+    this.department =
+      (typeof dept === "string" ? dept : dept?.departmentName) || data.department || "";
+
+    const rawSubDepts =
+      (Array.isArray(dept?.subDepartment) && dept.subDepartment) ||
+      (Array.isArray(dept?.subDepartments) && dept.subDepartments) ||
+      (Array.isArray(data.stage?.subDepartment) && data.stage.subDepartment) ||
+      null;
+    const stageSubDept = data.stage?.subDepartment;
+
+    if (rawSubDepts) {
+      this.subDepartments = rawSubDepts
+        .map((sd: any) => ({
+          subDepartmentId: Number(sd?.subDepartmentId ?? 0),
+          subDepartmentName: String(sd?.subDepartmentName ?? "").trim(),
+        }))
+        .filter((sd: { subDepartmentName: string }) => sd.subDepartmentName.length > 0);
+    } else if (typeof stageSubDept === "string" && stageSubDept.trim()) {
+      this.subDepartments = [{ subDepartmentId: 0, subDepartmentName: stageSubDept.trim() }];
+    } else if (stageSubDept?.subDepartmentName) {
+      this.subDepartments = [
+        {
+          subDepartmentId: Number(stageSubDept.subDepartmentId ?? 0),
+          subDepartmentName: String(stageSubDept.subDepartmentName),
+        },
+      ];
+    } else {
+      this.subDepartments = [];
+    }
   }
 
   get firstSubDept() {
-    return this.subDepartments[0]?.subDepartmentName ?? "—";
+    return this.subDepartments[0]?.subDepartmentName ?? "";
   }
 
   get formattedLastUpdated() {

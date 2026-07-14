@@ -24,8 +24,16 @@ function useDashboardGlobalFilterSection(mode: string) {
   const [chartUpdatedAt, setChartUpdatedAt] = useState<Date | null>(null);
 
   const [filterType, setFilterTypeState] = useState("month");
+  /** Draft custom dates (pickers) — applied only on Apply Filter */
   const [customStartDate, setCustomStartDateState] = useState("");
   const [customEndDate, setCustomEndDateState] = useState("");
+  const [appliedCustomStart, setAppliedCustomStart] = useState("");
+  const [appliedCustomEnd, setAppliedCustomEnd] = useState("");
+  const [customApplyToken, setCustomApplyToken] = useState(0);
+  const lastValidBoundsRef = useRef({
+    filterType: "month",
+    ...getDashboardFilterBounds("month"),
+  });
 
   const clearTableFiltersRef = useRef<(() => void) | null>(null);
 
@@ -41,31 +49,42 @@ function useDashboardGlobalFilterSection(mode: string) {
     [clearFilters],
   );
 
-  const setCustomStartDate = useCallback(
-    (val: string) => {
-      setCustomStartDateState(val);
-      clearFilters();
-    },
-    [clearFilters],
-  );
+  const setCustomStartDate = useCallback((val: string) => {
+    setCustomStartDateState(val);
+  }, []);
 
-  const setCustomEndDate = useCallback(
-    (val: string) => {
-      setCustomEndDateState(val);
-      clearFilters();
-    },
-    [clearFilters],
-  );
+  const setCustomEndDate = useCallback((val: string) => {
+    setCustomEndDateState(val);
+  }, []);
+
+  const applyCustomDateFilter = useCallback(() => {
+    if (customStartDate.length !== 10 || customEndDate.length !== 10) return;
+    setAppliedCustomStart(customStartDate);
+    setAppliedCustomEnd(customEndDate);
+    setCustomApplyToken((token) => token + 1);
+    clearFilters();
+  }, [customStartDate, customEndDate, clearFilters]);
 
   const globalDateBounds = useMemo(() => {
     if (filterType === "custom") {
-      return { startDate: customStartDate, endDate: customEndDate };
+      if (appliedCustomStart.length === 10 && appliedCustomEnd.length === 10) {
+        const next = {
+          filterType: "custom",
+          startDate: appliedCustomStart,
+          endDate: appliedCustomEnd,
+        };
+        lastValidBoundsRef.current = next;
+        return next;
+      }
+      return lastValidBoundsRef.current;
     }
-    return getDashboardFilterBounds(filterType);
-  }, [filterType, customStartDate, customEndDate]);
+    const next = { filterType, ...getDashboardFilterBounds(filterType) };
+    lastValidBoundsRef.current = next;
+    return next;
+  }, [filterType, appliedCustomStart, appliedCustomEnd]);
 
   const fetchDashboardData = useCallback(async () => {
-    if (filterType === "custom" && (customStartDate.length !== 10 || customEndDate.length !== 10))
+    if (filterType === "custom" && (appliedCustomStart.length !== 10 || appliedCustomEnd.length !== 10))
       return;
     setStatsLoading(true);
     try {
@@ -97,7 +116,7 @@ function useDashboardGlobalFilterSection(mode: string) {
       setStatsLoading(false);
       setLoading(false);
     }
-  }, [filterType, customStartDate, customEndDate, globalDateBounds]);
+  }, [filterType, appliedCustomStart, appliedCustomEnd, globalDateBounds, customApplyToken]);
 
   useEffect(() => {
     void fetchDashboardData();
@@ -122,6 +141,7 @@ function useDashboardGlobalFilterSection(mode: string) {
     setCustomStartDate,
     customEndDate,
     setCustomEndDate,
+    applyCustomDateFilter,
     globalDateBounds,
     clearFilters,
     registerTableFilterClear: (fn: () => void) => {
@@ -130,7 +150,11 @@ function useDashboardGlobalFilterSection(mode: string) {
   };
 }
 
-function useDashboardActiveBatchesSection() {
+function useDashboardActiveBatchesSection(globalDateBounds: {
+  filterType: string;
+  startDate: string;
+  endDate: string;
+}) {
   const DEFAULT_PANEL_FILTERS = {
     stage: "All",
     batchType: "All",
@@ -190,6 +214,8 @@ function useDashboardActiveBatchesSection() {
   }, []);
 
   const fetchBatches = useCallback(async () => {
+    if (!globalDateBounds.startDate || !globalDateBounds.endDate) return;
+
     setActiveBatchesLoading(true);
     try {
       const payload = buildActiveBatchesFilterPayload({
@@ -197,10 +223,11 @@ function useDashboardActiveBatchesSection() {
         filterStage: appliedFilters.stage,
         filterBatchType: appliedFilters.batchType,
         filterStatus: appliedFilters.status,
-        dateFrom: appliedFilters.dateFrom,
-        dateTo: appliedFilters.dateTo,
+        filterType: globalDateBounds.filterType,
+        dateFrom: appliedFilters.dateFrom || globalDateBounds.startDate,
+        dateTo: appliedFilters.dateTo || globalDateBounds.endDate,
         currentMonthOnly: appliedFilters.currentMonthOnly,
-        status: activeTab, // <-- new
+        status: activeTab,
       });
       const batchesResponse = await dashboardController.getActiveBatches(payload);
       setActiveBatches(batchesResponse?.data?.activeBatches ?? []);
@@ -208,7 +235,7 @@ function useDashboardActiveBatchesSection() {
     } finally {
       setActiveBatchesLoading(false);
     }
-  }, [searchQuery, appliedFilters, activeTab]);
+  }, [searchQuery, appliedFilters, activeTab, globalDateBounds]);
 
   useEffect(() => {
     void fetchBatches();
@@ -360,7 +387,7 @@ function useDashboardLookupsSection() {
 
 export default function useDashboardHook(mode: string) {
   const global = useDashboardGlobalFilterSection(mode);
-  const batches = useDashboardActiveBatchesSection();
+  const batches = useDashboardActiveBatchesSection(global.globalDateBounds);
   const events = useDashboardEventsSection(global.globalDateBounds);
   const lookups = useDashboardLookupsSection();
 
@@ -390,6 +417,7 @@ export default function useDashboardHook(mode: string) {
     setCustomStartDate: global.setCustomStartDate,
     customEndDate: global.customEndDate,
     setCustomEndDate: global.setCustomEndDate,
+    applyCustomDateFilter: global.applyCustomDateFilter,
     filterOpen: batches.filterOpen,
     setFilterOpen: batches.setFilterOpen,
     toggleFilterOpen: batches.toggleFilterOpen,

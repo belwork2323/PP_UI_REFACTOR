@@ -18,6 +18,7 @@ import {
 } from "@data/models/admin/BatchManagement/BatchManagementModel";
 import {
   mapLotListApiRow,
+  toRawMaterialLotListApiStatus,
   type RawMaterialLotListRow,
 } from "@data/models/user/RawMaterialProcurementModel";
 import { useAlertStore } from "@app/store/alertStore";
@@ -662,7 +663,7 @@ function useBatchImplementationSection(implModalOpen: boolean) {
         subDepartmentId: ADMIN_RAW_MATERIAL_SUB_DEPARTMENT_ID,
         page: 1,
         limit: 500,
-        status: [OPERATION_STATUS.APPROVED],
+        status: [toRawMaterialLotListApiStatus(OPERATION_STATUS.APPROVED)],
       });
 
       if (res?.success && res.data) {
@@ -719,7 +720,6 @@ function useBatchImplementationSection(implModalOpen: boolean) {
         {
           id: trimmed,
           lotId: trimmed,
-          procurementId: "",
           sourcingId: "",
           materialCode,
           materialName: "",
