@@ -33,6 +33,7 @@ export default function DashboardPage() {
     customEndDate,
     setCustomEndDate,
     applyCustomDateFilter,
+    clearDateFilter,
     filterOpen,
     setFilterOpen,
     toggleFilterOpen,
@@ -99,6 +100,7 @@ export default function DashboardPage() {
           customEndDate={customEndDate}
           setCustomEndDate={setCustomEndDate}
           applyCustomDateFilter={applyCustomDateFilter}
+          clearDateFilter={clearDateFilter}
         />
 
         <DashboardChartsSection

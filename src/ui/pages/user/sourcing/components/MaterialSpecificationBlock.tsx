@@ -296,49 +296,47 @@ const MaterialSpecificationBlock = ({
         </MandatoryFormField>
       </Stack>
 
-      <TableContainer
-        sx={{
-          mx: 2,
-          mb: 1.5,
-          borderRadius: 1.5,
-          border: `1px solid ${alpha(theme.palette?.border || "#ccc", 0.45)}`,
-          overflow: "hidden",
-        }}
-      >
-        <Table size="small" sx={{ tableLayout: "fixed", width: "100%" }}>
-          <TableHead>
-            <TableRow>
-              <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.material }}>
-                {formStrings.TABLE_HEADERS.MATERIAL}
-              </TableCell>
-              <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.lotBatch }}>
-                {createLotMode ? formStrings.TABLE_HEADERS.LOT_ID : formStrings.TABLE_HEADERS.LOT_BATCH_NO}
-                <Box component="span" sx={mandatoryAsteriskSx(theme)}>
-                  {" "}
-                  *
-                </Box>
-              </TableCell>
-              <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.specification }}>
-                {formStrings.TABLE_HEADERS.SPECIFICATION}
-              </TableCell>
-              <TableCell
-                align="center"
-                sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.refRange }}
-              >
-                {formStrings.TABLE_HEADERS.REF_RANGE}
-              </TableCell>
-              <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.analysedResult }}>
-                {formStrings.TABLE_HEADERS.ANALYZED_RESULT}
-                <Box component="span" sx={mandatoryAsteriskSx(theme)}>
-                  {" "}
-                  *
-                </Box>
-              </TableCell>
-              <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.remarks }}>
-                {formStrings.TABLE_HEADERS.REMARKS}
-              </TableCell>
-            </TableRow>
-          </TableHead>
+      <Box sx={specStyles.specsTableWrap}>
+        <TableContainer
+          sx={{
+            ...specStyles.specsTableContainer,
+            border: `1px solid ${alpha(theme.palette?.border || "#ccc", 0.45)}`,
+          }}
+        >
+          <Table size="small" sx={specStyles.specsTable}>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.material }}>
+                  {formStrings.TABLE_HEADERS.MATERIAL}
+                </TableCell>
+                <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.lotBatch }}>
+                  {createLotMode ? formStrings.TABLE_HEADERS.LOT_ID : formStrings.TABLE_HEADERS.LOT_BATCH_NO}
+                  <Box component="span" sx={mandatoryAsteriskSx(theme)}>
+                    {" "}
+                    *
+                  </Box>
+                </TableCell>
+                <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.specification }}>
+                  {formStrings.TABLE_HEADERS.SPECIFICATION}
+                </TableCell>
+                <TableCell
+                  align="center"
+                  sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.refRange }}
+                >
+                  {formStrings.TABLE_HEADERS.REF_RANGE}
+                </TableCell>
+                <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.analysedResult }}>
+                  {formStrings.TABLE_HEADERS.ANALYZED_RESULT}
+                  <Box component="span" sx={mandatoryAsteriskSx(theme)}>
+                    {" "}
+                    *
+                  </Box>
+                </TableCell>
+                <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.tableHeader.remarks }}>
+                  {formStrings.TABLE_HEADERS.REMARKS}
+                </TableCell>
+              </TableRow>
+            </TableHead>
           <TableBody>
             {block.rows.map((row, rowIndex) => {
               const rowFailed = isSpecRowFailed(row);
@@ -448,6 +446,7 @@ const MaterialSpecificationBlock = ({
           </TableBody>
         </Table>
       </TableContainer>
+      </Box>
 
       <CertificateUploadSection
         certificates={block.certificates ?? []}

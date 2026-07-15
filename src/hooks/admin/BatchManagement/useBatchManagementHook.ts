@@ -33,7 +33,6 @@ const DEFAULT_BATCH_FILTERS = {
   motorIds: [] as string[],
   stage: "All",
   status: "All",
-  priority: "All",
   subDept: "All",
 };
 type BatchFilters = {
@@ -81,7 +80,6 @@ function useBatchListSection(dateFilter: {
       if (appliedFilters.status !== "All") {
         filters.status = appliedFilters.status.toUpperCase().replace(/\s+/g, "_");
       }
-      if (appliedFilters.priority !== "All") filters.priority = appliedFilters.priority;
       if (appliedFilters.subDept !== "All") filters.subDepartment = appliedFilters.subDept;
 
       const resp = await batchManagementController.getAllBatches(
@@ -376,6 +374,9 @@ function useBatchFormSection(onRefresh: () => void) {
   const [implViewOnly, setImplViewOnly] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [compositionTotal, setCompositionTotal] = useState(0);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsBatch, setDetailsBatch] = useState<any>(null);
+  const [detailsLoading, setDetailsLoading] = useState(false);
   const openCreate = () => {
     setEditTarget(null);
     setBatchForm(createEmptyBatchFormState());
@@ -429,8 +430,33 @@ function useBatchFormSection(onRefresh: () => void) {
     await loadImplementationForm(batch, false);
   };
 
-  const openViewImplementation = async (batch: any) => {
-    await loadImplementationForm(batch, true);
+  const openViewDetails = async (batch: any) => {
+    setDetailsOpen(true);
+    setDetailsLoading(true);
+    setDetailsBatch(batch);
+
+    try {
+      const resp = await batchManagementController.getBatchById(batch.batchId);
+      if (resp) {
+        setDetailsBatch(resp);
+      } else {
+        useAlertStore.getState().showAlert(S.MESSAGES.LOAD_BATCH_FAILED, "error");
+        setDetailsOpen(false);
+        setDetailsBatch(null);
+      }
+    } catch {
+      useAlertStore.getState().showAlert(S.MESSAGES.LOAD_BATCH_FAILED, "error");
+      setDetailsOpen(false);
+      setDetailsBatch(null);
+    } finally {
+      setDetailsLoading(false);
+    }
+  };
+
+  const closeViewDetails = () => {
+    setDetailsOpen(false);
+    setDetailsBatch(null);
+    setDetailsLoading(false);
   };
 
   const openImplementationFromCreate = () => {
@@ -502,7 +528,7 @@ function useBatchFormSection(onRefresh: () => void) {
 
   const handleSaveImplementation = async () => {
     setImplSaving(true);
-    useAlertStore.getState().showAlert(S.MESSAGES.SAVING_IMPLEMENTATION, "info", { loading: true });
+    useAlertStore.getState().showAlert(S.MESSAGES.SAVING_IDENTIFICATION, "info", { loading: true });
     if (!editImplTarget) {
       setBatchForm((prev) => ({
         ...prev,
@@ -535,11 +561,17 @@ function useBatchFormSection(onRefresh: () => void) {
 
   const handleBatchFormChange = (field: string) => (e: any) => {
     if (field === "numberOfMotors") {
-      const numberOfMotors = Number(e.target.value) || 1;
-      const motorIds = Array.from(
-        { length: numberOfMotors },
-        (_, idx) => batchForm.motorIds[idx] || "",
-      );
+      const raw = e.target.value;
+      if (raw === "" || raw === null || raw === undefined) {
+        setBatchForm((prev) => ({ ...prev, numberOfMotors: 0, motorIds: [] }));
+        return;
+      }
+      const numberOfMotors = Math.floor(Number(raw));
+      if (!Number.isFinite(numberOfMotors) || numberOfMotors < 0) return;
+      const motorIds =
+        numberOfMotors > 0
+          ? Array.from({ length: numberOfMotors }, (_, idx) => batchForm.motorIds[idx] || "")
+          : [];
       setBatchForm((prev) => ({ ...prev, numberOfMotors, motorIds }));
       return;
     }
@@ -620,7 +652,11 @@ function useBatchFormSection(onRefresh: () => void) {
     implViewOnly,
     setImplViewOnly,
     openCompleteImplementation,
-    openViewImplementation,
+    openViewDetails,
+    detailsOpen,
+    detailsBatch,
+    detailsLoading,
+    closeViewDetails,
     openImplementationFromCreate,
     handleSaveImplementation,
     handleImplFormChange,
@@ -707,9 +743,15 @@ function useBatchImplementationSection(implModalOpen: boolean) {
     materialCode: string,
     currentLotId: string,
     selectedElsewhere: Set<string>,
+    gradeCode?: string | null,
   ): RawMaterialLotListRow[] => {
     const base = getLotsForMaterial(materialCode);
+    const gradeKey = String(gradeCode ?? "").trim();
     const filtered = base.filter((lot) => {
+      if (gradeKey) {
+        const lotGrade = String(lot.grade?.gradeCode ?? "").trim();
+        if (lotGrade && lotGrade !== gradeKey) return false;
+      }
       if (lot.lotId === currentLotId) return true;
       return !selectedElsewhere.has(lot.lotId);
     });
@@ -723,7 +765,9 @@ function useBatchImplementationSection(implModalOpen: boolean) {
           sourcingId: "",
           materialCode,
           materialName: "",
-          grade: null,
+          grade: gradeKey
+            ? { gradeId: 0, gradeCode: gradeKey, gradeName: gradeKey }
+            : null,
           supplyOrderNo: "",
           receiptDate: "",
           manufacturerName: "",
@@ -801,21 +845,40 @@ export default function useBatchManagementHook() {
   const [filterType, setFilterType] = useState("month");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+  const [appliedCustomStart, setAppliedCustomStart] = useState("");
+  const [appliedCustomEnd, setAppliedCustomEnd] = useState("");
+
   const handleFilterTypeChange = (value: string) => {
     setFilterType(value);
 
     if (value !== "custom") {
       setCustomStartDate("");
       setCustomEndDate("");
+      setAppliedCustomStart("");
+      setAppliedCustomEnd("");
     }
   };
+
+  const applyCustomDateFilter = useCallback(() => {
+    if (customStartDate.length !== 10 || customEndDate.length !== 10) return;
+    setAppliedCustomStart(customStartDate);
+    setAppliedCustomEnd(customEndDate);
+  }, [customStartDate, customEndDate]);
+
+  const clearDateFilter = useCallback(() => {
+    setFilterType("month");
+    setCustomStartDate("");
+    setCustomEndDate("");
+    setAppliedCustomStart("");
+    setAppliedCustomEnd("");
+  }, []);
 
   const dateFilterPayload = useMemo(() => {
     if (filterType === "custom") {
       return {
         filterType,
-        startDate: customStartDate,
-        endDate: customEndDate,
+        startDate: appliedCustomStart,
+        endDate: appliedCustomEnd,
       };
     }
 
@@ -826,7 +889,7 @@ export default function useBatchManagementHook() {
       startDate,
       endDate,
     };
-  }, [filterType, customStartDate, customEndDate]);
+  }, [filterType, appliedCustomStart, appliedCustomEnd]);
   const list = useBatchListSection(dateFilterPayload);
   const stats = useBatchStatsSection(dateFilterPayload);
   const lookups = useBatchLookupsSection();
@@ -840,17 +903,12 @@ export default function useBatchManagementHook() {
   const form = useBatchFormSection(refreshAll);
   const implementation = useBatchImplementationSection(form.implModalOpen);
   useEffect(() => {
-    if (filterType !== "custom") {
-      refreshAll();
-      return;
-    }
-
-    if (!customStartDate || !customEndDate) {
+    if (filterType === "custom" && (!appliedCustomStart || !appliedCustomEnd)) {
       return;
     }
 
     refreshAll();
-  }, [filterType, customStartDate, customEndDate, refreshAll]);
+  }, [filterType, appliedCustomStart, appliedCustomEnd, refreshAll]);
 
   return {
     list,
@@ -862,6 +920,8 @@ export default function useBatchManagementHook() {
     refresh: refreshAll,
     filter: {
       handleFilterTypeChange,
+      applyCustomDateFilter,
+      clearDateFilter,
       setFilterType,
       setCustomStartDate,
       setCustomEndDate,

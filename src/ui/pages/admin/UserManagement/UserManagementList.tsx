@@ -13,7 +13,7 @@ import type { AdminManagementColumn } from "@ui/components/custom/admin/AdminMan
 
 import {
   getDisplayName,
-  getUsername,
+  getUserId,
   getSubDepts,
   getStatus,
 } from "@utils/userManagementUtils";
@@ -63,12 +63,12 @@ const UserListTable = ({
         },
       },
       {
-        id: "username",
+        id: "userId",
         label: S.TABLE_COLS[1],
         render: (user) => (
           <Box sx={tableCell.usernameBox}>
             <icons.userMgmt.userId sx={tableCell.usernameIcon} />
-            <Typography sx={tableCell.usernameText}>{getUsername(user)}</Typography>
+            <Typography sx={tableCell.usernameText}>{getUserId(user)}</Typography>
           </Box>
         ),
       },

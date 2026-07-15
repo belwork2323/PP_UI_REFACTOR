@@ -2,8 +2,6 @@ import { alpha } from "@mui/material";
 import { icons } from "@app/theme/icons";
 import colors from "@app/theme/colors";
 import fonts from "@app/theme/fonts";
-import spacing from "@app/theme/spacing";
-import layout from "@app/theme/layout";
 import general from "@app/theme/custom_themes/common/common_css_theme";
 import { getSharedTheme } from "@app/theme/custom_themes/shared/shared_theme";
 import { getAdminCommonTheme } from "@app/theme/custom_themes/admin/admin_common_theme";
@@ -18,8 +16,6 @@ const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
   const accentBlue = adminTheme.accentBlue;
   const accentBlueDark = adminTheme.accentBlueDark;
   const accentBlueMuted = adminTheme.accentBlueMuted;
-  const inputBg = adminTheme.inputBg;
-  const inputBorder = adminTheme.inputBorder;
 
   const skeletonBase = shared.skeletonBase;
 
@@ -196,6 +192,140 @@ const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
         "&:hover": { bgcolor: alpha(colors.error.main, 0.18) },
       },
       deleteIcon: { fontSize: 14 },
+    },
+
+    details: {
+      dialogPaper: {
+        borderRadius: "20px",
+        width: "95vw",
+        maxWidth: "1800px",
+        height: "90vh",
+        overflow: "hidden",
+        background: d.cardBg,
+        display: "flex",
+        flexDirection: "column",
+      },
+      document: {
+        borderRadius: 3,
+        border: `1px solid ${d.cardBorder}`,
+        boxShadow: `0 4px 24px ${alpha(accentBlue, 0.08)}`,
+        overflow: "hidden",
+        background: d.cardBg,
+      },
+      banner: {
+        p: "18px 24px",
+        background: `linear-gradient(135deg, ${accentBlueDark}, ${accentBlue})`,
+        color: "#fff",
+      },
+      bannerIcon: { fontSize: 28, color: "#fff", opacity: 0.95 },
+      bannerTitle: { fontWeight: 800, fontSize: "1.05rem", color: "#fff" },
+      bannerSubtitle: { fontSize: "0.78rem", color: alpha("#fff", 0.78), mt: 0.35 },
+      body: {
+        p: { xs: 2, sm: 3 },
+        background: isDark ? d.pageBg : alpha(accentBlue, 0.03),
+        overflowY: "auto",
+        maxHeight: "calc(90vh - 140px)",
+      },
+      section: {
+        mb: 3,
+        p: 2,
+        borderRadius: 2,
+        border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`,
+        background: d.cardBg,
+      },
+      sectionTitle: {
+        fontSize: "0.72rem",
+        fontWeight: 800,
+        letterSpacing: "0.08em",
+        textTransform: "uppercase",
+        color: accentBlue,
+        mb: 1.5,
+        display: "flex",
+        alignItems: "center",
+        gap: 0.75,
+      },
+      metaGrid: {
+        display: "grid",
+        gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", md: "repeat(3, 1fr)" },
+        gap: 1.5,
+      },
+      metaItem: {
+        p: 1.25,
+        borderRadius: 1.5,
+        background: alpha(accentBlue, isDark ? 0.08 : 0.04),
+        border: `1px solid ${alpha(accentBlue, isDark ? 0.2 : 0.12)}`,
+      },
+      metaLabel: {
+        fontSize: "0.62rem",
+        fontWeight: 700,
+        letterSpacing: "0.06em",
+        textTransform: "uppercase",
+        color: d.textSecondary,
+      },
+      metaValue: {
+        fontSize: "0.88rem",
+        fontWeight: 700,
+        color: d.textPrimary,
+        mt: 0.35,
+        wordBreak: "break-word",
+      },
+      tableContainer: {
+        borderRadius: 1.5,
+        border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`,
+        overflow: "auto",
+      },
+      tableHeaderCell: (isLead = false) => ({
+        background: isLead
+          ? `linear-gradient(135deg, ${accentBlueDark}, ${accentBlue})`
+          : alpha(accentBlue, isDark ? 0.16 : 0.06),
+        color: isLead ? "#fff" : d.textSecondary,
+        fontWeight: 700,
+        fontSize: "0.72rem",
+        letterSpacing: "0.01em",
+        textTransform: "none",
+        py: 1,
+        px: 1.5,
+        borderBottom: `1px solid ${d.dividerColor}`,
+        whiteSpace: "nowrap",
+      }),
+      tableRow: (idx: number) => ({
+        background: idx % 2 === 0 ? d.cardBg : alpha(accentBlue, isDark ? 0.06 : 0.03),
+      }),
+      tableCell: {
+        fontSize: "0.82rem",
+        py: 1.1,
+        px: 1.5,
+        color: d.textPrimary,
+        whiteSpace: "nowrap",
+      },
+      emptyText: {
+        fontSize: "0.85rem",
+        color: d.textSecondary,
+        textAlign: "center",
+        py: 3,
+      },
+      loadingBox: {
+        minHeight: 280,
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 1.5,
+      },
+      statusChip: {
+        fontWeight: 700,
+        letterSpacing: "0.04em",
+        textTransform: "uppercase",
+        bgcolor: alpha("#fff", 0.18),
+        color: "#fff",
+        border: `1px solid ${alpha("#fff", 0.35)}`,
+      },
+      actions: {
+        px: 3,
+        py: 2,
+        borderTop: `1px solid ${d.dividerColor}`,
+        background: d.cardBg,
+      },
     },
 
     modal: {

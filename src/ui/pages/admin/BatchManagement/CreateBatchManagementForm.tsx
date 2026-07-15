@@ -35,8 +35,6 @@ const BATCH_TYPE_OPTIONS = [
 const SUB_BATCH_TYPE_OPTIONS = ["QUALIFICATION", "EXPERIMENTAL"];
 const ARTICLE_OPTIONS = ["Ballistic Evaluation Motor", "Wheel peels", "Cartons", "Control grains"];
 
-const MOTOR_COUNT_OPTIONS = [1, 2, 3];
-
 const BatchFormModal = ({
   open,
   onClose,
@@ -105,8 +103,8 @@ const BatchFormModal = ({
   };
 
   const resetMotorIdSlots = () => {
-    const count = Math.max(1, form.numberOfMotors || 1);
-    onMotorIdsChange(Array.from({ length: count }, () => ""));
+    const count = Math.max(0, Number(form.numberOfMotors) || 0);
+    onMotorIdsChange(count > 0 ? Array.from({ length: count }, () => "") : []);
   };
 
   const handleProjectChange = (projectId: string) => {
@@ -203,10 +201,14 @@ const BatchFormModal = ({
   }, [motorIdsPrerequisitesMet, availableMotorsLoading, availableMotorOptions.length]);
 
   const handleNumberOfMotorsChange = (count: number) => {
-    const motorIds = Array.from({ length: count }, (_, index) => form.motorIds[index] || "");
+    const safeCount = Math.max(0, Math.floor(count));
+    const motorIds =
+      safeCount > 0
+        ? Array.from({ length: safeCount }, (_, index) => form.motorIds[index] || "")
+        : [];
 
     onFormChange("numberOfMotors")({
-      target: { value: count },
+      target: { value: safeCount === 0 ? "" : safeCount },
     });
 
     onMotorIdsChange(motorIds);
@@ -398,34 +400,30 @@ const BatchFormModal = ({
                 <>
                   <Box>
                     <Typography sx={modal.fieldLabel}>No. of Motors to Process</Typography>
-                    <FormControl fullWidth size="small" sx={input}>
-                      <Input
-                        fullWidth
-                        label="Number of Motors"
-                        type="number"
-                        value={form.numberOfMotors ?? ""}
-                        onChange={(e) => {
-                          const value = e.target.value;
-
-                          onFormChange("numberOfMotors")({
-                            target: {
-                              value: value === "" ? "" : Math.max(1, Number(value)),
-                            },
-                          });
-
-                          if (value !== "") {
-                            handleNumberOfMotorsChange(Math.max(1, Number(value)));
-                          }
-                        }}
-                        onBlur={() => {
-                          if (!form.numberOfMotors || Number(form.numberOfMotors) < 1) {
-                            handleNumberOfMotorsChange(1);
-                          }
-                        }}
-                        size="small"
-                        sx={input}
-                      />
-                    </FormControl>
+                    <Input
+                      fullWidth
+                      label="Number of Motors"
+                      type="number"
+                      value={form.numberOfMotors > 0 ? form.numberOfMotors : ""}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === "") {
+                          handleNumberOfMotorsChange(0);
+                          return;
+                        }
+                        const next = Number(value);
+                        if (!Number.isFinite(next) || next < 0) return;
+                        handleNumberOfMotorsChange(Math.floor(next));
+                      }}
+                      onKeyDown={(e) => {
+                        if (["e", "E", "+", "-", "."].includes(e.key)) {
+                          e.preventDefault();
+                        }
+                      }}
+                      size="small"
+                      sx={input}
+                      inputProps={{ min: 1, step: 1 }}
+                    />
                   </Box>
 
                   <Box>

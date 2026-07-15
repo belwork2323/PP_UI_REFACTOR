@@ -1,7 +1,9 @@
 import React, { useState } from "react";
 import { Box } from "@mui/material";
 import FilterToggleButton from "@ui/components/common/FilterToggleButton";
-import DashboardDateFilter from "@ui/components/custom/dashboard/DashboardDateFilter";
+import DashboardDateFilter, {
+  getDateFilterDisplayLabel,
+} from "@ui/components/custom/dashboard/DashboardDateFilter";
 import { DashKPICard, DashKPICardSkeleton } from "@ui/components/custom/dashboard/DashKPICard";
 import { STRINGS } from "@app/config/strings";
 
@@ -16,6 +18,7 @@ type DashboardKpiSectionProps = {
   customEndDate: string;
   setCustomEndDate: (val: string) => void;
   applyCustomDateFilter: () => void;
+  clearDateFilter: () => void;
 };
 
 const t = STRINGS.DASHBOARD_PAGE;
@@ -31,6 +34,7 @@ export default function DashboardKpiSection({
   customEndDate,
   setCustomEndDate,
   applyCustomDateFilter,
+  clearDateFilter,
 }: DashboardKpiSectionProps) {
   const [dateFilterOpen, setDateFilterOpen] = useState(true);
   const dateFilterCount = filterType !== t.DATE_FILTER.VALUES.MONTH ? 1 : 0;
@@ -48,7 +52,7 @@ export default function DashboardKpiSection({
           textSx={th.table.filterBtnText}
           badgeSx={th.table.filterBadgePill}
           chevronSx={th.table.filterBtnChevron}
-          selectedValue={filterType}
+          selectedValue={getDateFilterDisplayLabel(filterType, t.DATE_FILTER)}
         />
 
         {dateFilterOpen && (
@@ -60,6 +64,7 @@ export default function DashboardKpiSection({
             customEndDate={customEndDate}
             onEndChange={setCustomEndDate}
             onApplyCustom={applyCustomDateFilter}
+            onClearFilter={clearDateFilter}
             strings={t.DATE_FILTER}
             loading={statsLoading}
             containerSx={th.dashboard.dateRangeBar}

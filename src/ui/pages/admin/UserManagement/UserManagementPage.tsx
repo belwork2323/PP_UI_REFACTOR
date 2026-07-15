@@ -16,7 +16,9 @@ import { getDisplayName, getUsername } from "@utils/userManagementUtils";
 import UserManagementList from "./UserManagementList";
 import CreateUserManagementForm from "./CreateUserManagementForm";
 import FilterToggleButton from "@/ui/components/common/FilterToggleButton";
-import DashboardDateFilter from "@/ui/components/custom/dashboard/DashboardDateFilter";
+import DashboardDateFilter, {
+  getDateFilterDisplayLabel,
+} from "@/ui/components/custom/dashboard/DashboardDateFilter";
 import getDashboardTheme from "@/app/theme/custom_themes/admin/Dashboard/dashboard_theme";
 
 const S = STRINGS.USER_MANAGEMENT;
@@ -77,15 +79,17 @@ const UserManagementPage = () => {
       <Box sx={{ mb: 2 }}>
         <FilterToggleButton
           label="Date Filter"
-          count={0}
+          count={stats.filterType !== S1.DATE_FILTER.VALUES.MONTH ? 1 : 0}
           isOpen={stats.dateFilterOpen}
           onClick={stats.toggleDateFilter}
-          sx={th.table.filterBtn(stats.dateFilterOpen)}
+          sx={th.table.filterBtn(
+            stats.dateFilterOpen || stats.filterType !== S1.DATE_FILTER.VALUES.MONTH,
+          )}
           iconSx={th.table.filterBtnIcon}
           textSx={th.table.filterBtnText}
           badgeSx={th.table.filterBadgePill}
           chevronSx={th.table.filterBtnChevron}
-          selectedValue={stats.filterType}
+          selectedValue={getDateFilterDisplayLabel(stats.filterType, S1.DATE_FILTER)}
         />
         {stats.dateFilterOpen && (
           <DashboardDateFilter
@@ -95,7 +99,9 @@ const UserManagementPage = () => {
             customEndDate={stats.customEndDate}
             onStartChange={stats.setCustomStartDate}
             onEndChange={stats.setCustomEndDate}
-            loading={stats.loading}
+            onApplyCustom={stats.applyCustomDateFilter}
+            onClearFilter={stats.clearDateFilter}
+            loading={stats.loading || list.loading}
             strings={S1.DATE_FILTER}
             containerSx={th.dashboard.dateRangeBar}
             selectSx={{ minWidth: 150, ...th.filterInputSx }}
@@ -162,10 +168,17 @@ const UserManagementPage = () => {
                 sx={t.filterPanel.field}
               />
               <FilterSelect
+                label={S.TOOLBAR.FILTER_SUB_DEPT_LABEL}
+                value={draftFilters.subDept}
+                onChange={(e) => list.setDraftFilter("subDept", e.target.value)}
+                optionItems={lookups.subDeptOptions}
+                sx={t.filterPanel.field}
+              />
+              <FilterSelect
                 label={S.TOOLBAR.FILTER_STATUS_LABEL}
                 value={draftFilters.status}
                 onChange={(e) => list.setDraftFilter("status", e.target.value)}
-                options={S.STATUSES}
+                options={S.STATUS}
                 sx={t.filterPanel.field}
               />
             </Stack>

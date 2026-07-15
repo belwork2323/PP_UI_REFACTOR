@@ -35,7 +35,7 @@ type BatchListTableProps = {
   onEdit: (batch: any) => void;
   onDelete: (batch: any) => void;
   onCompleteImplementation?: (batch: any) => void;
-  onViewImplementation?: (batch: any) => void;
+  onViewDetails?: (batch: any) => void;
   onPageChange: (event: unknown, page: number) => void;
   onRowsPerPageChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
 };
@@ -50,7 +50,7 @@ const BatchListTable = ({
   onEdit,
   onDelete,
   onCompleteImplementation,
-  onViewImplementation,
+  onViewDetails,
   onPageChange,
   onRowsPerPageChange,
 }: BatchListTableProps) => {
@@ -184,12 +184,12 @@ const BatchListTable = ({
                   </Button>
                 </Tooltip>
               )}
-              {sheetCompleted && onViewImplementation && (
+              {sheetCompleted && onViewDetails && (
                 <Tooltip title={TA.VIEW_DETAILS_TOOLTIP}>
                   <Button
                     size="small"
                     variant="outlined"
-                    onClick={() => onViewImplementation(batch)}
+                    onClick={() => onViewDetails(batch)}
                     sx={{ whiteSpace: "nowrap", fontSize: "0.72rem" }}
                   >
                     {TA.VIEW_DETAILS}
@@ -211,7 +211,7 @@ const BatchListTable = ({
         },
       },
     ],
-    [tableCell, onEdit, onDelete, onCompleteImplementation, onViewImplementation],
+    [tableCell, onEdit, onDelete, onCompleteImplementation, onViewDetails],
   );
 
   return (

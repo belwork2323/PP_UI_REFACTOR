@@ -19,11 +19,15 @@ interface DateRangeRowProps {
   separatorLabel?: string;
   thisMonthLabel?: string;
 
+  /** Hide the leading decorative calendar icon (pickers already have one). */
+  showLeadingIcon?: boolean;
   calendarIconSx?: SxProps<Theme>;
   datePickerSx?: SxProps<Theme>;
   separatorSx?: SxProps<Theme>;
   thisMonthChipSx?: (active: boolean) => SxProps<Theme>;
   textFieldProps?: Partial<TextFieldProps>;
+  /** Compact height / font to match adjacent filter controls. */
+  controlHeight?: number;
 }
 
 /** DD-MM-YYYY -> YYYY-MM-DD */
@@ -59,16 +63,70 @@ const DateRangeRow = ({
   separatorLabel = "to",
   thisMonthLabel = "This Month",
 
+  showLeadingIcon = true,
   calendarIconSx,
   datePickerSx,
   separatorSx,
   thisMonthChipSx,
   textFieldProps,
+  controlHeight = 36,
 }: DateRangeRowProps) => {
+  const compactFieldSx = {
+    width: 152,
+    minWidth: 152,
+    ...(datePickerSx as object),
+    "& .MuiOutlinedInput-root": {
+      ...((datePickerSx as any)?.["& .MuiOutlinedInput-root"] || {}),
+      height: controlHeight,
+      minHeight: controlHeight,
+      fontSize: "0.8125rem",
+      pr: 0.5,
+    },
+    "& .MuiOutlinedInput-input": {
+      py: 0,
+      px: 1.25,
+      fontSize: "0.8125rem",
+      letterSpacing: "0.01em",
+    },
+    "& .MuiInputLabel-root": {
+      ...((datePickerSx as any)?.["& .MuiInputLabel-root"] || {}),
+      fontSize: "0.8125rem",
+    },
+    "& .MuiInputLabel-root:not(.MuiInputLabel-shrink)": {
+      transform: "translate(12px, 8px) scale(1)",
+    },
+    "& .MuiInputAdornment-root": {
+      ml: 0,
+    },
+    "& .MuiIconButton-root": {
+      padding: "4px",
+    },
+    "& .MuiSvgIcon-root": {
+      fontSize: 18,
+    },
+  };
+
+  const sharedSlotProps = {
+    textField: {
+      size: "small" as const,
+      sx: compactFieldSx as SxProps<Theme>,
+      ...textFieldProps,
+    },
+    openPickerButton: {
+      size: "small" as const,
+      sx: { p: 0.5 },
+    },
+    openPickerIcon: {
+      sx: { fontSize: 18 },
+    },
+  };
+
   return (
     <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
-      <Stack direction="row" gap={1.5} alignItems="center" flexWrap="wrap">
-        <CalendarMonthIcon sx={calendarIconSx} />
+      <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
+        {showLeadingIcon && (
+          <CalendarMonthIcon sx={{ fontSize: 18, opacity: 0.7, ...((calendarIconSx as object) || {}) }} />
+        )}
 
         <DatePicker
           label={fromLabel}
@@ -84,16 +142,12 @@ const DateRangeRow = ({
               onToChange("");
             }
           }}
-          slotProps={{
-            textField: {
-              size: "small",
-              sx: datePickerSx,
-              ...textFieldProps,
-            },
-          }}
+          slotProps={sharedSlotProps}
         />
 
-        <Typography sx={separatorSx}>{separatorLabel}</Typography>
+        <Typography sx={{ fontSize: "0.85rem", color: "text.secondary", px: 0.25, ...((separatorSx as object) || {}) }}>
+          {separatorLabel}
+        </Typography>
 
         <DatePicker
           label={toLabel}
@@ -102,13 +156,7 @@ const DateRangeRow = ({
           value={toDayjsValue(to)}
           minDate={toDayjsValue(from) ?? undefined}
           onChange={(value) => onToChange(value ? toApiDate(value.format("YYYY-MM-DD")) : "")}
-          slotProps={{
-            textField: {
-              size: "small",
-              sx: datePickerSx,
-              ...textFieldProps,
-            },
-          }}
+          slotProps={sharedSlotProps}
         />
 
         {onToggleMonth && thisMonthChipSx && (

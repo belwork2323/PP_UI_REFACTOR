@@ -40,10 +40,18 @@ const CasingFormStepNav = ({
   cf,
 }: CasingFormStepNavProps) => (
   <Box sx={cf.stepNav.root}>
-    <Stack direction={{ xs: "column", sm: "row" }} alignItems={{ sm: "center" }} justifyContent="space-between" gap={1.5}>
+    <Stack
+      direction={{ xs: "column", sm: "row" }}
+      alignItems={{ sm: "center" }}
+      justifyContent="space-between"
+      gap={1.5}
+    >
       <Box>
         <Typography sx={cf.stepNav.stepCounter}>
-          {S.STEP_OF.replace("{current}", String(currentStep + 1)).replace("{total}", String(totalSteps))}
+          {S.STEP_OF.replace("{current}", String(currentStep + 1)).replace(
+            "{total}",
+            String(totalSteps),
+          )}
         </Typography>
         <Stack direction="row" gap={0.75} flexWrap="wrap" mt={0.75}>
           {stepLabels.map((label, idx) => {

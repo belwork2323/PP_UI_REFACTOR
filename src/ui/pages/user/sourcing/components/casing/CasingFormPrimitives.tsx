@@ -68,7 +68,11 @@ export const TextFieldField = ({
       placeholder={placeholder}
       label={undefined}
       disabled={disabled}
-      sx={multiline ? theme.workflow.formElements.multilineField : theme.workflow.formElements.textField}
+      sx={
+        multiline
+          ? theme.workflow.formElements.multilineField
+          : theme.workflow.formElements.textField
+      }
     />
   </Field>
 );
@@ -121,7 +125,10 @@ export const ProjectSelectField = ({
   const renderProjectValue = (projectId: string) => {
     if (!projectId) {
       return (
-        <Typography component="em" sx={{ color: theme.palette.textSub, fontSize: "0.84rem", fontStyle: "italic" }}>
+        <Typography
+          component="em"
+          sx={{ color: theme.palette.textSub, fontSize: "0.84rem", fontStyle: "italic" }}
+        >
           {loading ? "Loading projects..." : placeholder}
         </Typography>
       );
@@ -142,7 +149,12 @@ export const ProjectSelectField = ({
 
   return (
     <Field label={label} theme={theme}>
-      <FormControl fullWidth size="small" disabled={loading} sx={theme.workflow.formElements.metaRowTextField}>
+      <FormControl
+        fullWidth
+        size="small"
+        disabled={loading}
+        sx={theme.workflow.formElements.metaRowTextField}
+      >
         <Select
           value={value}
           onChange={(e) => onChange(e.target.value)}
@@ -184,14 +196,23 @@ export const SelectField = ({
   theme: any;
 }) => (
   <Field label={label} theme={theme}>
-    <FormControl fullWidth size="small" disabled={disabled} sx={theme.workflow.formElements.metaRowTextField}>
+    <FormControl
+      fullWidth
+      size="small"
+      disabled={disabled}
+      sx={theme.workflow.formElements.metaRowTextField}
+    >
       <Select
         value={value}
         onChange={(e) => onChange(e.target.value)}
         displayEmpty
         renderValue={(selected) => {
           if (!selected) {
-            return <Typography sx={{ color: theme.palette.textSub, fontSize: "0.84rem" }}>{placeholder}</Typography>;
+            return (
+              <Typography sx={{ color: theme.palette.textSub, fontSize: "0.84rem" }}>
+                {placeholder}
+              </Typography>
+            );
           }
           const opt = options.find((o) => o.value === selected);
           return opt?.label ?? selected;
@@ -204,7 +225,10 @@ export const SelectField = ({
           <MenuItem key={opt.value} value={opt.value}>
             {opt.label}
             {opt.meta ? (
-              <Typography component="span" sx={{ ml: 1, fontSize: "0.72rem", color: theme.palette.textSub }}>
+              <Typography
+                component="span"
+                sx={{ ml: 1, fontSize: "0.72rem", color: theme.palette.textSub }}
+              >
                 {opt.meta}
               </Typography>
             ) : null}
@@ -274,7 +298,9 @@ export const SectionCard = ({
         </Box>
       </Stack>
     </Box>
-    <Box sx={{ ...cf.sectionCardBody, ...(disabled ? cf.sectionCardBodyDisabled : {}) }}>{children}</Box>
+    <Box sx={{ ...cf.sectionCardBody, ...(disabled ? cf.sectionCardBodyDisabled : {}) }}>
+      {children}
+    </Box>
   </Box>
 );
 
@@ -292,9 +318,7 @@ export const FieldGrid = ({
   wide?: boolean;
   theme: any;
   cf: any;
-}) => (
-  <Box sx={wide ? cf.fieldGridWide : cf.fieldGrid}>{children}</Box>
-);
+}) => <Box sx={wide ? cf.fieldGridWide : cf.fieldGrid}>{children}</Box>;
 
 export const PropertiesTable = ({
   columns,
@@ -329,7 +353,20 @@ export const PropertiesTable = ({
   </Box>
 );
 
-export const SpecRangeChip = ({ min, max, unit, theme, cf }: { min: number | null; max: number | null; unit: string | null; theme: any; cf: any }) => {
-  if (min == null || max == null) return <Typography sx={{ fontSize: "0.75rem", color: theme.palette.textSub }}>—</Typography>;
+export const SpecRangeChip = ({
+  min,
+  max,
+  unit,
+  theme,
+  cf,
+}: {
+  min: number | null;
+  max: number | null;
+  unit: string | null;
+  theme: any;
+  cf: any;
+}) => {
+  if (min == null || max == null)
+    return <Typography sx={{ fontSize: "0.75rem", color: theme.palette.textSub }}>—</Typography>;
   return <Chip label={`${min}–${max} ${unit ?? "mm"}`} size="small" sx={cf.specChip} />;
 };

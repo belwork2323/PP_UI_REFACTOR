@@ -27,8 +27,11 @@ import { getBatchId, getMotorId } from "@utils/batchManagementUtils";
 import BatchManagementList from "./BatchManagementList";
 import CreateBatchManagementForm from "./CreateBatchManagementForm";
 import BatchImplementationForm from "./BatchImplementationForm";
+import BatchDetailsView from "./BatchDetailsView";
 import FilterToggleButton from "@/ui/components/common/FilterToggleButton";
-import DashboardDateFilter from "@/ui/components/custom/dashboard/DashboardDateFilter";
+import DashboardDateFilter, {
+  getDateFilterDisplayLabel,
+} from "@/ui/components/custom/dashboard/DashboardDateFilter";
 import getDashboardTheme from "@/app/theme/custom_themes/admin/Dashboard/dashboard_theme";
 
 const S = STRINGS.BATCH_MANAGEMENT;
@@ -118,15 +121,17 @@ const BatchManagementPage = () => {
       <Box sx={{ mb: 2 }}>
         <FilterToggleButton
           label="Date Filter"
-          count={0}
+          count={filter.filterType !== S1.DATE_FILTER.VALUES.MONTH ? 1 : 0}
           isOpen={stats.dateFilterOpen}
           onClick={stats.toggleDateFilter}
-          sx={th.table.filterBtn(stats.dateFilterOpen)}
+          sx={th.table.filterBtn(
+            stats.dateFilterOpen || filter.filterType !== S1.DATE_FILTER.VALUES.MONTH,
+          )}
           iconSx={th.table.filterBtnIcon}
           textSx={th.table.filterBtnText}
           badgeSx={th.table.filterBadgePill}
           chevronSx={th.table.filterBtnChevron}
-          selectedValue={filter.filterType}
+          selectedValue={getDateFilterDisplayLabel(filter.filterType, S1.DATE_FILTER)}
         />
         {stats.dateFilterOpen && (
           <DashboardDateFilter
@@ -136,6 +141,8 @@ const BatchManagementPage = () => {
             customEndDate={filter.customEndDate}
             onStartChange={filter.setCustomStartDate}
             onEndChange={filter.setCustomEndDate}
+            onApplyCustom={filter.applyCustomDateFilter}
+            onClearFilter={filter.clearDateFilter}
             loading={stats.loading}
             strings={S1.DATE_FILTER}
             containerSx={th.dashboard.dateRangeBar}
@@ -233,14 +240,7 @@ const BatchManagementPage = () => {
                 label={S.TOOLBAR.FILTER_STATUS_LABEL}
                 value={draftFilters.status}
                 onChange={(e) => list.setDraftFilter("status", e.target.value)}
-                options={S.FILTER_OPTIONS.STATUSES}
-                sx={t.filterPanel.field}
-              />
-              <FilterSelect
-                label={S.TOOLBAR.FILTER_PRIORITY_LABEL}
-                value={draftFilters.priority}
-                onChange={(e) => list.setDraftFilter("priority", e.target.value)}
-                options={S.FILTER_OPTIONS.PRIORITIES}
+                options={S.FILTER_OPTIONS.STATUS}
                 sx={t.filterPanel.field}
               />
               <FilterSelect
@@ -265,7 +265,7 @@ const BatchManagementPage = () => {
           onEdit={form.openEdit}
           onDelete={deleteSection.openDelete}
           onCompleteImplementation={form.openCompleteImplementation}
-          onViewImplementation={form.openViewImplementation}
+          onViewDetails={form.openViewDetails}
           onPageChange={(_, p) => list.setPage(p)}
           onRowsPerPageChange={(e) => {
             list.setRowsPerPage(+e.target.value);
@@ -319,6 +319,14 @@ const BatchManagementPage = () => {
         getLotByMaterialAndId={implementation.getLotByMaterialAndId}
         getLotOptionsForRow={implementation.getLotOptionsForRow}
         setConfirmOpen={form.setConfirmOpen}
+      />
+
+      <BatchDetailsView
+        open={form.detailsOpen}
+        loading={form.detailsLoading}
+        batch={form.detailsBatch}
+        onClose={form.closeViewDetails}
+        t={t}
       />
 
       <ConfirmAlertDialog

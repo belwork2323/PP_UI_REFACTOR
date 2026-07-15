@@ -223,6 +223,12 @@ export const useSMDashboard = (config: {
 
   const setFilterType = useCallback((next: string) => {
     setFilterTypeState(next);
+    if (next !== "custom") {
+      setCustomStartDate("");
+      setCustomEndDate("");
+      setAppliedCustomStart("");
+      setAppliedCustomEnd("");
+    }
   }, []);
 
   const applyCustomDateFilter = useCallback(() => {
@@ -231,6 +237,14 @@ export const useSMDashboard = (config: {
     setAppliedCustomEnd(customEndDate);
     setCustomApplyToken((token) => token + 1);
   }, [customStartDate, customEndDate]);
+
+  const clearDateFilter = useCallback(() => {
+    setFilterTypeState("month");
+    setCustomStartDate("");
+    setCustomEndDate("");
+    setAppliedCustomStart("");
+    setAppliedCustomEnd("");
+  }, []);
 
   useEffect(() => {
     if (filterType === "custom") {
@@ -254,6 +268,7 @@ export const useSMDashboard = (config: {
     customEndDate,
     setCustomEndDate,
     applyCustomDateFilter,
+    clearDateFilter,
     dateBounds,
     loadAlerts,
     loadDashboard,

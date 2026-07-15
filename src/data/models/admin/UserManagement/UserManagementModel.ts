@@ -78,14 +78,14 @@ export class UserListItemModel {
     return new UserListItemModel({
       id: data.userUUID || data.user_uuid || data.userId || data.id,
       userUUID: data.userUUID || data.user_uuid || data.id || "",
-      userId: data.userId,
-      username: data.username,
-      fullName: data.fullName || data.username,
+      userId: data.userId ?? "",
+      username: data.username ?? "",
+      fullName: data.fullName || data.username || "",
       email: data.email || "",
       role: data.role?.roleName || data.role || "",
       department: extractedDept,
       subDepartments: extractedSubDepts,
-      isActive: data.status === "ACTIVE",
+      isActive: data.status === "ACTIVE" || data.isActive === true,
       createdOn: data.createdOn,
       createdBy: data.createdBy,
     });

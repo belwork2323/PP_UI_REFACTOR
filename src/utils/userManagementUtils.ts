@@ -1,5 +1,6 @@
-export const getDisplayName = (u: any): string => u.fullName || u.name || "—";
-export const getUsername = (u: any): string => u.username || u.userId || "—";
+export const getDisplayName = (u: any): string => u.fullName || u.username || u.name || "—";
+export const getUsername = (u: any): string => u.username || "—";
+export const getUserId = (u: any): string => u.userId || "—";
 export const getDept = (u: any): string => u.department || u.dept || "—";
 export const getSubDepts = (u: any): any[] => (Array.isArray(u.subDepartments) ? u.subDepartments : []);
 export const getStatus = (u: any): string =>

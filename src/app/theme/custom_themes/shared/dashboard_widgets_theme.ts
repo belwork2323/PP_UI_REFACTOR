@@ -93,10 +93,12 @@ export const getDashboardWidgetsTheme = (mode: "light" | "dark" = "light") => {
     dateFilter: {
       containerSx: {
         display: "flex",
-        gap: 1.5,
+        gap: 1.25,
         alignItems: "center",
-        mb: 3,
-        p: 1.5,
+        mb: 1.5,
+        mt: 1,
+        px: 1.25,
+        py: 1,
         bgcolor: s.cardBg,
         border: `1px solid ${s.cardBorder}`,
         borderRadius: general.borderRadius.lg,

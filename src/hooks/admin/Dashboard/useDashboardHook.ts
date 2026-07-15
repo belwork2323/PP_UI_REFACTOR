@@ -44,6 +44,12 @@ function useDashboardGlobalFilterSection(mode: string) {
   const setFilterType = useCallback(
     (val: string) => {
       setFilterTypeState(val);
+      if (val !== "custom") {
+        setCustomStartDateState("");
+        setCustomEndDateState("");
+        setAppliedCustomStart("");
+        setAppliedCustomEnd("");
+      }
       clearFilters();
     },
     [clearFilters],
@@ -64,6 +70,15 @@ function useDashboardGlobalFilterSection(mode: string) {
     setCustomApplyToken((token) => token + 1);
     clearFilters();
   }, [customStartDate, customEndDate, clearFilters]);
+
+  const clearDateFilter = useCallback(() => {
+    setFilterTypeState("month");
+    setCustomStartDateState("");
+    setCustomEndDateState("");
+    setAppliedCustomStart("");
+    setAppliedCustomEnd("");
+    clearFilters();
+  }, [clearFilters]);
 
   const globalDateBounds = useMemo(() => {
     if (filterType === "custom") {
@@ -142,6 +157,7 @@ function useDashboardGlobalFilterSection(mode: string) {
     customEndDate,
     setCustomEndDate,
     applyCustomDateFilter,
+    clearDateFilter,
     globalDateBounds,
     clearFilters,
     registerTableFilterClear: (fn: () => void) => {
@@ -418,6 +434,7 @@ export default function useDashboardHook(mode: string) {
     customEndDate: global.customEndDate,
     setCustomEndDate: global.setCustomEndDate,
     applyCustomDateFilter: global.applyCustomDateFilter,
+    clearDateFilter: global.clearDateFilter,
     filterOpen: batches.filterOpen,
     setFilterOpen: batches.setFilterOpen,
     toggleFilterOpen: batches.toggleFilterOpen,

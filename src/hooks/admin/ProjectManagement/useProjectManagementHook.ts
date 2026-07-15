@@ -32,7 +32,7 @@ function useProjectListSection(dashboardDateFilter) {
     try {
       const payload = {
         search: search.trim() || undefined,
-        startDate: appliedFilters.fromDate || dashboardDateFilter.fromDate,
+        startDate: appliedFilters.fromDate || dashboardDateFilter.startDate,
         endDate: appliedFilters.toDate || dashboardDateFilter.endDate,
         sortBy: "createdOn",
         sortOrder: "desc",
@@ -145,13 +145,15 @@ function useProjectStatsSection(
   const [filterType, setFilterType] = useState("month");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+  const [appliedCustomStart, setAppliedCustomStart] = useState("");
+  const [appliedCustomEnd, setAppliedCustomEnd] = useState("");
   const [dateFilterOpen, setDateFilterOpen] = useState(true);
   const getStatsPayload = useCallback(() => {
     if (filterType === "custom") {
       return {
         filterType,
-        startDate: customStartDate,
-        endDate: customEndDate,
+        startDate: appliedCustomStart,
+        endDate: appliedCustomEnd,
       };
     }
 
@@ -162,8 +164,15 @@ function useProjectStatsSection(
       startDate,
       endDate,
     };
-  }, [filterType, customStartDate, customEndDate]);
+  }, [filterType, appliedCustomStart, appliedCustomEnd]);
   const loadStats = useCallback(async () => {
+    if (
+      filterType === "custom" &&
+      (appliedCustomStart.length !== 10 || appliedCustomEnd.length !== 10)
+    ) {
+      return;
+    }
+
     setStatsLoading(true);
     try {
       const payload = getStatsPayload();
@@ -183,13 +192,15 @@ function useProjectStatsSection(
     } finally {
       setStatsLoading(false);
     }
-  }, [getStatsPayload]);
+  }, [getStatsPayload, filterType, appliedCustomStart, appliedCustomEnd]);
   const handleFilterTypeChange = (value: string) => {
     setFilterType(value);
 
     if (value !== "custom") {
       setCustomStartDate("");
       setCustomEndDate("");
+      setAppliedCustomStart("");
+      setAppliedCustomEnd("");
 
       const { startDate, endDate } = getDateRange(value);
 
@@ -199,25 +210,38 @@ function useProjectStatsSection(
       });
     }
   };
+
+  const applyCustomDateFilter = useCallback(() => {
+    if (customStartDate.length !== 10 || customEndDate.length !== 10) return;
+    setAppliedCustomStart(customStartDate);
+    setAppliedCustomEnd(customEndDate);
+    setDashboardDateFilter({
+      startDate: customStartDate,
+      endDate: customEndDate,
+    });
+  }, [customStartDate, customEndDate, setDashboardDateFilter]);
+
+  const clearDateFilter = useCallback(() => {
+    setFilterType("month");
+    setCustomStartDate("");
+    setCustomEndDate("");
+    setAppliedCustomStart("");
+    setAppliedCustomEnd("");
+    const { startDate, endDate } = getDateRange("month");
+    setDashboardDateFilter({ startDate, endDate });
+  }, [setDashboardDateFilter]);
+
   const refreshDashboard = useCallback(() => {
     void loadStats();
     void loadList();
-  }, [loadStats]);
+  }, [loadStats, loadList]);
   useEffect(() => {
-    if (filterType !== "custom") {
-      refreshDashboard();
+    if (filterType === "custom" && (!appliedCustomStart || !appliedCustomEnd)) {
       return;
     }
 
-    if (customStartDate && customEndDate) {
-      setDashboardDateFilter({
-        startDate: customStartDate,
-        endDate: customEndDate,
-      });
-
-      refreshDashboard();
-    }
-  }, [filterType, customStartDate, customEndDate, refreshDashboard, setDashboardDateFilter]);
+    refreshDashboard();
+  }, [filterType, appliedCustomStart, appliedCustomEnd, refreshDashboard]);
   const toggleDateFilter = () => {
     setDateFilterOpen((prev) => !prev);
   };
@@ -237,6 +261,8 @@ function useProjectStatsSection(
     setDateFilterOpen,
 
     handleFilterTypeChange,
+    applyCustomDateFilter,
+    clearDateFilter,
     refreshDashboard,
     toggleDateFilter,
   };

@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { userManagementController } from "@controllers/admin/UserManagement/userManagementController";
 import { generalController } from "@controllers/admin/common/generalController";
 import { useAlertStore } from "@app/store/alertStore";
@@ -40,17 +40,30 @@ function useUserLookupsSection() {
 
   const deptNames = departments.map((d: any) => d.departmentName);
   const roleNames = roles.map((r: any) => r.roleName);
+  const subDeptOptions = allSubDepts
+    .map((sd: any) => ({
+      value: String(sd.subDepartmentId ?? ""),
+      label: String(sd.subDepartmentName ?? "").trim(),
+    }))
+    .filter((item) => item.value && item.label);
 
-  return { departments, allSubDepts, roles, deptNames, roleNames };
+  return { departments, allSubDepts, roles, deptNames, roleNames, subDeptOptions };
 }
 
 const DEFAULT_USER_FILTERS = {
   role: "All",
   dept: "All",
+  subDept: "All",
   status: "All",
 };
 
-function useUserListSection() {
+type UserDateBounds = {
+  filterType: string;
+  startDate: string;
+  endDate: string;
+};
+
+function useUserListSection(dateBounds: UserDateBounds) {
   const [users, setUsers] = useState<any[]>([]);
   const [listLoading, setListLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -62,13 +75,25 @@ function useUserListSection() {
   const [paginationData, setPaginationData] = useState({ totalRecords: 0, totalPages: 0 });
 
   const loadUsersList = useCallback(async () => {
+    if (
+      dateBounds.filterType === "custom" &&
+      (dateBounds.startDate.length !== 10 || dateBounds.endDate.length !== 10)
+    ) {
+      return;
+    }
+
     setListLoading(true);
     try {
       const payload = {
         search: search.trim(),
         role: appliedFilters.role,
         department: appliedFilters.dept,
+        subDepartmentId:
+          appliedFilters.subDept === "All" ? null : Number(appliedFilters.subDept),
         status: appliedFilters.status,
+        filterType: dateBounds.filterType,
+        startDate: dateBounds.startDate,
+        endDate: dateBounds.endDate,
         page: page + 1,
         pageSize: rowsPerPage,
       };
@@ -89,11 +114,15 @@ function useUserListSection() {
     } finally {
       setListLoading(false);
     }
-  }, [search, appliedFilters, page, rowsPerPage]);
+  }, [search, appliedFilters, page, rowsPerPage, dateBounds]);
 
   useEffect(() => {
     void loadUsersList();
   }, [loadUsersList]);
+
+  useEffect(() => {
+    setPage(0);
+  }, [dateBounds.filterType, dateBounds.startDate, dateBounds.endDate]);
 
   const activeFilterCount = Object.values(appliedFilters).filter((v) => v !== "All").length;
 
@@ -143,7 +172,7 @@ function useUserListSection() {
   };
 }
 
-function useUserStatsSection(loadUsersList) {
+function useUserStatsSection() {
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
@@ -151,35 +180,43 @@ function useUserStatsSection(loadUsersList) {
     pendingResetRequests: 0,
   });
   const [statsLoading, setStatsLoading] = useState(true);
-  const [filterType, setFilterType] = useState("month");
+  const [filterType, setFilterTypeState] = useState("month");
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
+  const [appliedCustomStart, setAppliedCustomStart] = useState("");
+  const [appliedCustomEnd, setAppliedCustomEnd] = useState("");
   const [dateFilterOpen, setDateFilterOpen] = useState(true);
-  const getStatsPayload = useCallback(() => {
+
+  const dateBounds = useMemo((): UserDateBounds => {
     if (filterType === "custom") {
-      return {
-        filterType,
-        startDate: customStartDate,
-        endDate: customEndDate,
-      };
+      if (appliedCustomStart.length === 10 && appliedCustomEnd.length === 10) {
+        return {
+          filterType: "custom",
+          startDate: appliedCustomStart,
+          endDate: appliedCustomEnd,
+        };
+      }
+      return { filterType: "custom", startDate: "", endDate: "" };
     }
-
     const { startDate, endDate } = getDateRange(filterType);
-
-    return {
-      filterType,
-      startDate,
-      endDate,
-    };
-  }, [filterType, customStartDate, customEndDate]);
+    return { filterType, startDate, endDate };
+  }, [filterType, appliedCustomStart, appliedCustomEnd]);
 
   const loadStats = useCallback(async () => {
+    if (
+      dateBounds.filterType === "custom" &&
+      (dateBounds.startDate.length !== 10 || dateBounds.endDate.length !== 10)
+    ) {
+      return;
+    }
+
     setStatsLoading(true);
-
     try {
-      const payload = getStatsPayload();
-
-      const resp = await userManagementController.getUserStats(payload);
+      const resp = await userManagementController.getUserStats({
+        filterType: dateBounds.filterType,
+        startDate: dateBounds.startDate,
+        endDate: dateBounds.endDate,
+      });
 
       if (resp?.success && resp.data) {
         setStats({
@@ -192,30 +229,39 @@ function useUserStatsSection(loadUsersList) {
     } finally {
       setStatsLoading(false);
     }
-  }, [getStatsPayload]);
+  }, [dateBounds]);
 
   const handleFilterTypeChange = (value: string) => {
-    setFilterType(value);
-
+    setFilterTypeState(value);
     if (value !== "custom") {
       setCustomStartDate("");
       setCustomEndDate("");
+      setAppliedCustomStart("");
+      setAppliedCustomEnd("");
     }
   };
+
+  const applyCustomDateFilter = useCallback(() => {
+    if (customStartDate.length !== 10 || customEndDate.length !== 10) return;
+    setAppliedCustomStart(customStartDate);
+    setAppliedCustomEnd(customEndDate);
+  }, [customStartDate, customEndDate]);
+
+  const clearDateFilter = useCallback(() => {
+    setFilterTypeState("month");
+    setCustomStartDate("");
+    setCustomEndDate("");
+    setAppliedCustomStart("");
+    setAppliedCustomEnd("");
+  }, []);
+
   const refreshDashboard = useCallback(() => {
     void loadStats();
-    void loadUsersList();
   }, [loadStats]);
-  useEffect(() => {
-    if (filterType !== "custom") {
-      refreshDashboard();
-      return;
-    }
 
-    if (customStartDate && customEndDate) {
-      refreshDashboard();
-    }
-  }, [filterType, customStartDate, customEndDate, refreshDashboard]);
+  useEffect(() => {
+    void loadStats();
+  }, [loadStats]);
 
   const toggleDateFilter = () => {
     setDateFilterOpen((prev) => !prev);
@@ -224,18 +270,20 @@ function useUserStatsSection(loadUsersList) {
   return {
     stats,
     loading: statsLoading,
+    dateBounds,
 
     filterType,
     customStartDate,
     customEndDate,
     dateFilterOpen,
 
-    setFilterType,
     setCustomStartDate,
     setCustomEndDate,
     setDateFilterOpen,
 
     handleFilterTypeChange,
+    applyCustomDateFilter,
+    clearDateFilter,
     refreshDashboard,
     toggleDateFilter,
     loadStats,
@@ -428,13 +476,13 @@ function useUserDeleteSection(onRefresh: () => void) {
 
 export default function useUserManagementHook() {
   const lookups = useUserLookupsSection();
-  const list = useUserListSection();
-  const stats = useUserStatsSection(list.loadUsersList);
+  const stats = useUserStatsSection();
+  const list = useUserListSection(stats.dateBounds);
 
   const refreshAll = useCallback(() => {
     void list.loadUsersList();
-    void stats.refreshDashboard();
-  }, [list.loadUsersList, stats.refreshDashboard]);
+    void stats.loadStats();
+  }, [list.loadUsersList, stats.loadStats]);
 
   const form = useUserFormSection(lookups.roles, refreshAll);
   const deleteSection = useUserDeleteSection(refreshAll);

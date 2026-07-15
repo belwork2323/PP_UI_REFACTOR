@@ -581,10 +581,16 @@ const formatMeasuredValue = (value: unknown, unit?: string) => {
   return unit ? `${text} ${unit}`.trim() : text;
 };
 
-const formatReportedWithAcem = (reported: string, acem: string, unit: string) => {
+const formatMechDetail = (
+  specification: string,
+  reported: string,
+  acem: string,
+  unit: string,
+) => {
   const parts: string[] = [];
+  if (specification) parts.push(`Specification: ${specification}${unit ? ` ${unit}` : ""}`.trim());
   if (reported) parts.push(`Reported: ${reported}${unit ? ` ${unit}` : ""}`.trim());
-  if (acem) parts.push(`ACEM spec: ${acem}${unit ? ` ${unit}` : ""}`.trim());
+  if (acem) parts.push(`Test Result @ ACEM: ${acem}${unit ? ` ${unit}` : ""}`.trim());
   return parts.join(" · ");
 };
 
@@ -753,12 +759,13 @@ export function mapCasingFormDataToDetailBlocks(
     .map((def) => {
       const r = form.mechanicalProperties[def.paramKey];
       if (!r) return null;
+      const specification = (r.specification ?? "").trim();
       const reported = (r.reported ?? "").trim();
       const acem = (r.acemSpec ?? "").trim();
-      if (!reported && !acem) return null;
+      if (!specification && !reported && !acem) return null;
       return detailRow(
         r.paramName || def.paramName,
-        formatReportedWithAcem(reported, acem, r.unit || def.unit) || "—",
+        formatMechDetail(specification, reported, acem, r.unit || def.unit) || "—",
       );
     })
     .filter((r): r is NonNullable<typeof r> => r != null);
@@ -766,10 +773,14 @@ export function mapCasingFormDataToDetailBlocks(
   const thermalRows = THERMAL_PROP_KEYS.map((def) => {
     const r = form.thermalProperties[def.key];
     if (!r) return null;
+    const specification = (r.specification ?? "").trim();
     const reported = (r.reported ?? "").trim();
     const acem = (r.acemSpec ?? "").trim();
-    if (!reported && !acem) return null;
-    return detailRow(def.label, formatReportedWithAcem(reported, acem, r.unit || def.unit) || "—");
+    if (!specification && !reported && !acem) return null;
+    return detailRow(
+      def.label,
+      formatMechDetail(specification, reported, acem, r.unit || def.unit) || "—",
+    );
   }).filter((r): r is NonNullable<typeof r> => r != null);
 
   const insulationRows: CasingDetailBlock["rows"] = [

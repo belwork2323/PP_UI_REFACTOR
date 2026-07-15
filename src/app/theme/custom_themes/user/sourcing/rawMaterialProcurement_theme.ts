@@ -81,7 +81,8 @@ export const getRawMaterialProcurementTheme = (baseTheme: any) => {
 			},
 			analyzedField: {
 				width: "100%",
-				"& .MuiOutlinedInput-root": { minHeight: 36 },
+				minWidth: 0,
+				"& .MuiOutlinedInput-root": { minHeight: 36, minWidth: 0 },
 				"& input[type=number]": {
 					MozAppearance: "textfield",
 				},
@@ -108,24 +109,29 @@ export const getRawMaterialProcurementTheme = (baseTheme: any) => {
 			},
 			remarksField: {
 				width: "100%",
-				"& .MuiOutlinedInput-root": { minHeight: 36 },
+				minWidth: 0,
+				"& .MuiOutlinedInput-root": { minHeight: 36, minWidth: 0 },
 			},
 			tableCellCompact: {
-				padding: "8px 12px",
+				padding: "8px 10px",
 				verticalAlign: "middle",
 			},
 			specCell: {
-				padding: "8px 12px",
+				padding: "8px 10px",
 				verticalAlign: "middle",
+				minWidth: 0,
+				overflowWrap: "anywhere",
 			},
 			refRangeCell: {
-				padding: "8px 12px",
+				padding: "8px 10px",
 				verticalAlign: "middle",
 				textAlign: "center",
+				minWidth: 0,
 			},
 			inputCell: {
-				padding: "8px 12px",
+				padding: "8px 10px",
 				verticalAlign: "middle",
+				minWidth: 0,
 			},
 			editModeBanner: {
 				mb: 2.5,
@@ -186,32 +192,32 @@ export const getRawMaterialProcurementTheme = (baseTheme: any) => {
 			footerInfoContainer: { mt: 2.5, px: 2, py: 1.2 },
 			footerInfoIcon: { fontSize: 15, color: palette.primaryLight, flexShrink: 0 },
 			footerInfoText: { fontSize: "0.72rem", color: palette.textSub, lineHeight: 1.5 },
-			/** Percent widths for the 4-col lot specs table (table-layout: fixed). */
+			/** Percent widths for the 6-col specs table (table-layout: fixed). */
 			tableHeader: {
-				material: { width: "12%", minWidth: 88 },
-				lotBatch: { width: "14%", minWidth: 120 },
+				material: { width: "12%", minWidth: 0 },
+				lotBatch: { width: "14%", minWidth: 0 },
 				specification: {
 					width: "24%",
-					minWidth: 140,
+					minWidth: 0,
 					whiteSpace: "normal",
 					lineHeight: 1.3,
 				},
 				refRange: {
 					width: "14%",
-					minWidth: 110,
+					minWidth: 0,
 					textAlign: "center",
 					whiteSpace: "normal",
 					lineHeight: 1.3,
 				},
 				analysedResult: {
 					width: "18%",
-					minWidth: 130,
+					minWidth: 0,
 					whiteSpace: "normal",
 					lineHeight: 1.3,
 				},
 				remarks: {
 					width: "18%",
-					minWidth: 130,
+					minWidth: 0,
 					whiteSpace: "normal",
 					lineHeight: 1.3,
 				},
@@ -219,30 +225,50 @@ export const getRawMaterialProcurementTheme = (baseTheme: any) => {
 			/** 4-column lot table (no material/lot columns). */
 			lotTableHeader: {
 				specification: {
-					width: "32%",
-					minWidth: 180,
+					width: "34%",
+					minWidth: 0,
 					whiteSpace: "normal",
 					lineHeight: 1.3,
 				},
 				refRange: {
 					width: "18%",
-					minWidth: 120,
+					minWidth: 0,
 					textAlign: "center",
 					whiteSpace: "normal",
 					lineHeight: 1.3,
 				},
 				analysedResult: {
-					width: "25%",
-					minWidth: 150,
+					width: "24%",
+					minWidth: 0,
 					whiteSpace: "normal",
 					lineHeight: 1.3,
 				},
 				remarks: {
-					width: "25%",
-					minWidth: 150,
+					width: "24%",
+					minWidth: 0,
 					whiteSpace: "normal",
 					lineHeight: 1.3,
 				},
+			},
+			/** Shared outer wrap so the table stays inside the card (avoids width 100% + mx overflow). */
+			specsTableWrap: {
+				px: 2,
+				mb: 1.5,
+				minWidth: 0,
+				maxWidth: "100%",
+				boxSizing: "border-box",
+			},
+			specsTableContainer: {
+				width: "100%",
+				maxWidth: "100%",
+				borderRadius: 1.5,
+				overflowX: "auto",
+				boxSizing: "border-box",
+			},
+			specsTable: {
+				tableLayout: "fixed",
+				width: "100%",
+				minWidth: 0,
 			},
 			dataRow: (rowIndex: number, isFailed = false) => ({
 				"&:hover": {

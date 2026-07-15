@@ -17,6 +17,63 @@ export const formatIsoToApiDate = (iso: string): string => {
   return `${day}-${month}-${year}`;
 };
 
+const pad2 = (value: string | number) => String(value).padStart(2, "0");
+
+/**
+ * Normalize a date string to MM/DD/YYYY for APIs that expect US slash format
+ * (e.g. batch identification `prcApprovalDate`).
+ * Accepts YYYY-MM-DD, datetime-local, MM/DD/YYYY, and DD-MM-YYYY.
+ */
+export const formatToUsSlashDate = (value: string | null | undefined): string => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+
+  const datePart = raw.split("T")[0].split(" ")[0];
+
+  const slash = datePart.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slash) {
+    return `${pad2(slash[1])}/${pad2(slash[2])}/${slash[3]}`;
+  }
+
+  const iso = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) {
+    return `${iso[2]}/${iso[3]}/${iso[1]}`;
+  }
+
+  const dmy = datePart.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (dmy) {
+    return `${dmy[2]}/${dmy[1]}/${dmy[3]}`;
+  }
+
+  return datePart;
+};
+
+/**
+ * Convert API/date strings to YYYY-MM-DD for HTML `type="date"` inputs.
+ * Accepts MM/DD/YYYY, DD-MM-YYYY, YYYY-MM-DD, and datetime values.
+ */
+export const formatToIsoDateInput = (value: string | null | undefined): string => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+
+  const datePart = raw.split("T")[0].split(" ")[0];
+
+  const iso = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
+
+  const slash = datePart.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (slash) {
+    return `${slash[3]}-${pad2(slash[1])}-${pad2(slash[2])}`;
+  }
+
+  const dmy = datePart.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  if (dmy) {
+    return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
+  }
+
+  return "";
+};
+
 /** Dashboard global date filter bounds (DD-MM-YYYY). */
 export const getDashboardFilterBounds = (filterType: string) => {
   const now = new Date();

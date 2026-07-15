@@ -5,9 +5,9 @@
 
 import { icons } from "@app/theme/icons";
 import { normalizeSubdepartmentBatchStatus } from "../../user/SubdepartmentBatchModel";
-import type { MaterialsListItem } from "../../user/MaterialsListModel";
-import { toMaterialCodeNameOptions } from "../../user/MaterialsListModel";
+import type { MaterialsListGrade, MaterialsListItem } from "../../user/MaterialsListModel";
 import type { RawMaterialLotListRow } from "../../user/RawMaterialProcurementModel";
+import { formatToIsoDateInput } from "../../../../utils/dateUtils";
 
 /** Map display / list labels to form/API enum values */
 function normalizeBatchTypeForForm(raw: string | undefined | null): string {
@@ -139,9 +139,11 @@ export class BatchListItemModel {
 
     const nestedSubDepartments = Array.isArray(dept?.subDepartments)
       ? dept.subDepartments
-      : Array.isArray(dept?.subDepartment)
-        ? dept.subDepartment
-        : [];
+      : Array.isArray(stageRoot?.subDepartments)
+        ? stageRoot.subDepartments
+        : Array.isArray(dept?.subDepartment)
+          ? dept.subDepartment
+          : [];
 
     this.subDepartments =
       nestedSubDepartments.length > 0
@@ -160,7 +162,10 @@ export class BatchListItemModel {
     // updatedOn / updatedBy only present in the detail endpoint response
     this.updatedOn = data.updatedOn ?? null;
     this.updatedBy = data.updatedBy
-      ? { id: data.updatedBy.id ?? "", name: data.updatedBy.name ?? "" }
+      ? {
+          id: data.updatedBy.id ?? "",
+          name: data.updatedBy.name ?? data.updatedBy.fullName ?? "",
+        }
       : null;
 
     // Implementation details (optional)
@@ -185,6 +190,8 @@ export interface MaterialItem {
   srNo: number;
   materialCode: string;
   materialName?: string;
+  gradeCode?: string;
+  gradeName?: string;
   lotId: string;
   make: string;
   manufacturerName?: string;
@@ -223,6 +230,9 @@ function serializeMaterialForApi(material: Record<string, any>): Record<string, 
     quantityPerPremix: material.quantityPerPremix ?? 0,
     revalidationFromDate: fromDate,
     revalidationToDate: toDate,
+    ...(String(material.gradeCode ?? "").trim()
+      ? { gradeCode: String(material.gradeCode).trim() }
+      : {}),
   };
 }
 
@@ -255,7 +265,7 @@ export function serializeIdentificationSheetForApi(
     BldgNo: String(sheet.BldgNo ?? sheet.bldgNo ?? "").trim(),
     numberOfPremix: sheet.numberOfPremix ?? 0,
     remarks: sheet.remarks ?? "",
-    prcApprovalDate: sheet.prcApprovalDate ?? "",
+    prcApprovalDate: formatToIsoDateInput(sheet.prcApprovalDate),
   };
 
   if (Array.isArray(sheet.materials)) {
@@ -289,6 +299,8 @@ export function parseIdentificationSheetFromApi(
         srNo: m.srNo ?? 0,
         materialCode: m.materialCode ?? "",
         materialName: m.materialName ?? "",
+        gradeCode: String(m.gradeCode ?? m.grade?.gradeCode ?? "").trim() || undefined,
+        gradeName: String(m.gradeName ?? m.grade?.gradeName ?? "").trim() || undefined,
         lotId: m.lotId ?? "",
         make: m.make ?? m.manufacturerName ?? "",
         manufacturerName: m.manufacturerName ?? m.make ?? "",
@@ -308,7 +320,7 @@ export function parseIdentificationSheetFromApi(
     numberOfPremix: sheet.numberOfPremix ?? 1,
     remarks: sheet.remarks ?? "",
     materials,
-    prcApprovalDate: sheet.prcApprovalDate ?? "",
+    prcApprovalDate: formatToIsoDateInput(sheet.prcApprovalDate),
   };
 }
 
@@ -483,6 +495,7 @@ export const ADMIN_RAW_MATERIAL_SUB_DEPARTMENT_ID = 1;
 export type BatchMaterialOption = {
   materialCode: string;
   materialName: string;
+  grades: MaterialsListGrade[];
 };
 
 export type BatchFormState = {
@@ -523,7 +536,7 @@ export const createEmptyBatchFormState = (): BatchFormState => ({
   projectId: "",
   motorStage: "",
   numberOfMotors: 0,
-  motorIds: [""],
+  motorIds: [],
   priority: "Medium",
   systemManagerId: "",
   objective: "",
@@ -554,7 +567,11 @@ export const groupLotsByMaterialCode = (lots: RawMaterialLotListRow[]) => {
 };
 
 export const toBatchMaterialOptions = (items: MaterialsListItem[]): BatchMaterialOption[] =>
-  toMaterialCodeNameOptions(items);
+  items.map(({ materialCode, materialName, grades }) => ({
+    materialCode,
+    materialName,
+    grades: Array.isArray(grades) ? grades : [],
+  }));
 
 export const mapBatchToFormState = (batch: any): BatchFormState => {
   const motorStageRaw = batch?.motorStage ?? batch?.motorType;

@@ -1,5 +1,9 @@
 import type { DimensionalParameterModel } from "./SubdepartmentCommonModel";
-import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import type {
+  SchemaDocumentV2,
+  SchemaFormValues,
+  SchemaSectionSubmission,
+} from "../../../schema-engine";
 import {
   buildMockTrialSectionPayload,
   createMockTrialInitialValues,
@@ -15,12 +19,14 @@ export type FormSubmissionType = "DRAFT" | "SUBMIT";
 export type MechPropFormRow = {
   paramKey: string;
   paramName: string;
+  specification: string;
   reported: string;
   acemSpec: string;
   unit: string;
 };
 
 export type ThermalPropFormRow = {
+  specification: string;
   reported: string;
   acemSpec: string;
   unit: string;
@@ -100,7 +106,9 @@ export const EMPTY_LOOSE_FLAP = (): DimensionalReadingFormRow["looseFlap"] => ({
 });
 
 export function isLooseFlapDimensionalParam(row: { paramName?: string }): boolean {
-  return String(row.paramName ?? "").toLowerCase().includes("loose flap");
+  return String(row.paramName ?? "")
+    .toLowerCase()
+    .includes("loose flap");
 }
 
 export type RocketMotorCasingFormData = {
@@ -145,6 +153,23 @@ export type RocketMotorCasingFormData = {
   calibrationDueDate: string;
   dimensionalData: DimensionalReadingFormRow[];
   mockTrial: RocketMotorCasingMockTrialSlot;
+  ndtUtReportFiles: File[];
+  ndtUtReportExisting: UploadedFileRef[];
+
+  visualInspectionReportFiles: File[];
+  visualInspectionReportExisting: UploadedFileRef[];
+
+  weighmentReportFiles: File[];
+  weighmentReportExisting: UploadedFileRef[];
+
+  dimensionalInspectionReportFiles: File[];
+  dimensionalInspectionReportExisting: UploadedFileRef[];
+
+  mockTrialReportFiles: File[];
+  mockTrialReportExisting: UploadedFileRef[];
+
+  insulationLiningReportFiles: File[];
+  insulationLiningReportExisting: UploadedFileRef[];
 };
 
 export type RocketMotorCasingMockTrialSlot = {
@@ -221,6 +246,15 @@ export const parseUploadedFileRef = (value: unknown): UploadedFileRef | null => 
   };
 };
 
+/** Normalize a single ref or an array of refs from the API. */
+export const parseUploadedFileRefs = (value: unknown): UploadedFileRef[] => {
+  if (Array.isArray(value)) {
+    return value.map(parseUploadedFileRef).filter((r): r is UploadedFileRef => Boolean(r));
+  }
+  const single = parseUploadedFileRef(value);
+  return single ? [single] : [];
+};
+
 const fileToMediaRef = (file: File | null, existing?: UploadedFileRef | null) => {
   if (file) {
     return {
@@ -269,13 +303,31 @@ export const THERMAL_PROP_KEYS = [
   { key: "ablationRate", label: "Ablation rate", unit: "mm/s @ 300W/cm2" },
 ] as const;
 
-export const VISUAL_INSPECTION_TEMPLATE: Omit<VisualInspectionFormRow, "observations" | "remark" | "mediaFile">[] = [
-  { srNo: 1, itemKey: "MOTOR_OUTER_SURFACE", description: "Motor Outer Surface condition", requiresMedia: true },
-  { srNo: 2, itemKey: "LUGS_CONDITION", description: "Nos. of Lugs & Condition", requiresMedia: true },
+export const VISUAL_INSPECTION_TEMPLATE: Omit<
+  VisualInspectionFormRow,
+  "observations" | "remark" | "mediaFile"
+>[] = [
+  {
+    srNo: 1,
+    itemKey: "MOTOR_OUTER_SURFACE",
+    description: "Motor Outer Surface condition",
+    requiresMedia: true,
+  },
+  {
+    srNo: 2,
+    itemKey: "LUGS_CONDITION",
+    description: "Nos. of Lugs & Condition",
+    requiresMedia: true,
+  },
   { srNo: 3, itemKey: "TAPPED_HOLE_HE", description: "Condition of tapped hole at HE side" },
   { srNo: 4, itemKey: "TAPPED_HOLE_NE", description: "Condition of tapped hole at NE side" },
   { srNo: 5, itemKey: "POLAR_BOSS_HE", description: "Condition of Polar boss at HE side" },
-  { srNo: 6, itemKey: "POLAR_BOSS_NE", description: "Condition of Polar boss at NE side", requiresMedia: true },
+  {
+    srNo: 6,
+    itemKey: "POLAR_BOSS_NE",
+    description: "Condition of Polar boss at NE side",
+    requiresMedia: true,
+  },
   {
     srNo: 7,
     itemKey: "INSULATION_LINING_SURFACE",
@@ -285,7 +337,12 @@ export const VISUAL_INSPECTION_TEMPLATE: Omit<VisualInspectionFormRow, "observat
       { itemKey: "INSULATION_COLOR", description: "Color", observations: "", remark: "" },
       { itemKey: "INSULATION_PATCHES", description: "Patches", observations: "", remark: "" },
       { itemKey: "INSULATION_PINHOLES", description: "Pinholes", observations: "", remark: "" },
-      { itemKey: "INSULATION_DEPRESSION", description: "Depression if any", observations: "", remark: "" },
+      {
+        itemKey: "INSULATION_DEPRESSION",
+        description: "Depression if any",
+        observations: "",
+        remark: "",
+      },
       {
         itemKey: "INSULATION_FOREIGN_MATERIAL",
         description: "Foreign materials on rubber surface",
@@ -295,25 +352,32 @@ export const VISUAL_INSPECTION_TEMPLATE: Omit<VisualInspectionFormRow, "observat
     ],
   },
   { srNo: 8, itemKey: "LOOSE_FLAP", description: "Loose Flap Condition" },
-  { srNo: 9, itemKey: "BONDING_HE", description: "Bonding of rubber with HE polar boss", requiresMedia: true },
+  {
+    srNo: 9,
+    itemKey: "BONDING_HE",
+    description: "Bonding of rubber with HE polar boss",
+    requiresMedia: true,
+  },
   { srNo: 10, itemKey: "BONDING_NE", description: "Bonding of rubber with NE polar boss" },
   { srNo: 11, itemKey: "JOINTS_PATCHWORK", description: "Observation on Joints/Patch work" },
   { srNo: 12, itemKey: "OTHER", description: "Other observation if any" },
 ];
 
-export function createInitialMechanicalProperties(type: InsulationType): Record<string, MechPropFormRow> {
+export function createInitialMechanicalProperties(
+  type: InsulationType,
+): Record<string, MechPropFormRow> {
   const keys = type === "EPDM" ? EPDM_MECH_KEYS : ROCASIN_MECH_KEYS;
   return Object.fromEntries(
     keys.map((k) => [
       k.paramKey,
-      { paramKey: k.paramKey, paramName: k.paramName, reported: "", acemSpec: "", unit: k.unit },
-    ])
+      { paramKey: k.paramKey, paramName: k.paramName, specification: "", reported: "", acemSpec: "", unit: k.unit },
+    ]),
   );
 }
 
 export function createInitialThermalProperties(): Record<string, ThermalPropFormRow> {
   return Object.fromEntries(
-    THERMAL_PROP_KEYS.map((k) => [k.key, { reported: "", acemSpec: "", unit: k.unit }])
+    THERMAL_PROP_KEYS.map((k) => [k.key, { specification: "", reported: "", acemSpec: "", unit: k.unit }]),
   );
 }
 
@@ -328,12 +392,16 @@ export function createInitialVisualInspection(): VisualInspectionFormRow[] {
   }));
 }
 
-export function dimensionalRowFromParameter(param: DimensionalParameterModel, index: number): DimensionalReadingFormRow {
+export function dimensionalRowFromParameter(
+  param: DimensionalParameterModel,
+  index: number,
+): DimensionalReadingFormRow {
   const name = String(param.paramName ?? "").toLowerCase();
   return {
     paramId: param.paramId,
     paramName: param.paramName,
-    side: name.includes("he") && !name.includes("ne") ? "HE" : name.includes("ne") ? "NE" : "COMMON",
+    side:
+      name.includes("he") && !name.includes("ne") ? "HE" : name.includes("ne") ? "NE" : "COMMON",
     sequenceNo: index + 1,
     referenceRange: {
       minValue: param.referenceRange?.minValue ?? null,
@@ -384,7 +452,7 @@ const legacyPairToScalar = (r: Record<string, unknown>, a: string, b: string): n
 
 export function parseDimReadingsFromApi(
   readings: Record<string, unknown>,
-  legacyRecorded?: unknown
+  legacyRecorded?: unknown,
 ): DimensionalReadingFormRow["readings"] {
   const out = EMPTY_DIM_READINGS();
   const r = readings ?? {};
@@ -415,7 +483,10 @@ export function parseDimReadingsFromApi(
 }
 
 export function parseLooseFlapFromApi(looseFlap: unknown): DimensionalReadingFormRow["looseFlap"] {
-  const lf = (looseFlap && typeof looseFlap === "object" ? looseFlap : {}) as Record<string, unknown>;
+  const lf = (looseFlap && typeof looseFlap === "object" ? looseFlap : {}) as Record<
+    string,
+    unknown
+  >;
   const arc = parseApiNumeric(lf.arcLength);
   const axial = parseApiNumeric(lf.axialLength);
   return {
@@ -426,7 +497,7 @@ export function parseLooseFlapFromApi(looseFlap: unknown): DimensionalReadingFor
 
 /** API v2 readings: `{ r2tR2b: 144.2, r1rR1l: 144.0, tlBr: 144.1, trBl: 144.3 }` */
 export function buildApiDimReadings(
-  readings: DimensionalReadingFormRow["readings"]
+  readings: DimensionalReadingFormRow["readings"],
 ): Record<DimApiPairKey, number | null> {
   const out = {} as Record<DimApiPairKey, number | null>;
   for (const key of DIM_READING_KEYS) {
@@ -487,22 +558,43 @@ export const INITIAL_ROCKET_MOTOR_CASING_FORM: RocketMotorCasingFormData = {
   calibrationDueDate: "",
   dimensionalData: [],
   mockTrial: createEmptyMockTrialSlot(),
+  ndtUtReportFiles: [],
+  ndtUtReportExisting: [],
+
+  visualInspectionReportFiles: [],
+  visualInspectionReportExisting: [],
+
+  weighmentReportFiles: [],
+  weighmentReportExisting: [],
+
+  dimensionalInspectionReportFiles: [],
+  dimensionalInspectionReportExisting: [],
+
+  mockTrialReportFiles: [],
+  mockTrialReportExisting: [],
+
+  insulationLiningReportFiles: [],
+  insulationLiningReportExisting: [],
 };
 
 function buildMechRows(
   form: RocketMotorCasingFormData,
-  keys: readonly { paramKey: string; paramName: string; unit: string }[]
+  keys: readonly { paramKey: string; paramName: string; unit: string }[],
 ) {
   return keys
     .map((def) => {
       const row = form.mechanicalProperties[def.paramKey];
       const reported = parseNum(row?.reported ?? "");
       const acemSpec = parseNum(row?.acemSpec ?? "");
+      const specificationRaw = String(row?.specification ?? "").trim();
+      const specificationNum = parseNum(specificationRaw);
       if (reported == null) return null;
       return {
         paramKey: def.paramKey,
         paramName: def.paramName,
         reported,
+        specification:
+          specificationNum != null ? specificationNum : specificationRaw || null,
         acemSpec: acemSpec ?? reported,
         unit: def.unit,
       };
@@ -511,14 +603,20 @@ function buildMechRows(
 }
 
 function buildThermalProperties(form: RocketMotorCasingFormData) {
-  const out: Record<string, { reported: number; acemSpec: number; unit: string }> = {};
+  const out: Record<
+    string,
+    { specification: number | string | null; reported: number; acemSpec: number; unit: string }
+  > = {};
   for (const def of THERMAL_PROP_KEYS) {
     const row = form.thermalProperties[def.key];
     const reported = parseNum(row?.reported ?? "");
     const acemSpec = parseNum(row?.acemSpec ?? "");
+    const specificationRaw = String(row?.specification ?? "").trim();
+    const specificationNum = parseNum(specificationRaw);
     if (reported == null) continue;
     out[def.key] = {
       reported,
+      specification: specificationNum != null ? specificationNum : specificationRaw || null,
       acemSpec: acemSpec ?? reported,
       unit: (row?.unit || def.unit).trim() || def.unit,
     };
@@ -530,7 +628,7 @@ export function buildCasingFormPayload(
   form: RocketMotorCasingFormData,
   subDepartmentId: number,
   formSubmissionType: FormSubmissionType,
-  options?: { includeMotorCasingId?: boolean; motorCasingId?: string }
+  options?: { includeMotorCasingId?: boolean; motorCasingId?: string },
 ): RocketMotorCasingFormPayload {
   const mechKeys = form.insulationType === "EPDM" ? EPDM_MECH_KEYS : ROCASIN_MECH_KEYS;
   const mechanicalProperties = buildMechRows(form, mechKeys);
@@ -613,7 +711,10 @@ export function buildCasingFormPayload(
           type: form.insulationType,
           reportNo: form.insulationReportNo.trim() || "—",
           receiptStatus: form.insulationReceiptStatus,
-          reportUpload: fileToMediaRef(form.insulationReportFile, form.insulationReportExisting ?? null),
+          reportUpload: fileToMediaRef(
+            form.insulationReportFile,
+            form.insulationReportExisting ?? null,
+          ),
           mechanicalProperties,
           thermalProperties,
         },
@@ -638,7 +739,10 @@ export function buildCasingFormPayload(
       dimensionalInspection,
       ...(form.mockTrial.schema
         ? {
-            mockTrial: buildMockTrialSectionPayload(form.mockTrial.schema, form.mockTrial.formValues),
+            mockTrial: buildMockTrialSectionPayload(
+              form.mockTrial.schema,
+              form.mockTrial.formValues,
+            ),
           }
         : {}),
     },
@@ -656,23 +760,25 @@ function mechRowFromApi(row: Record<string, unknown>): MechPropFormRow {
   return {
     paramKey: String(row.paramKey ?? ""),
     paramName: String(row.paramName ?? ""),
+    specification: valueFromApiField(row.specification ?? row.spec),
     reported: valueFromApiField(row.reported),
-    acemSpec: valueFromApiField(row.acemSpec ?? row.acem),
+    acemSpec: valueFromApiField(row.acemSpec ?? row.acem ?? row.testResultAcem),
     unit: String(row.unit ?? ""),
   };
 }
 
 function thermalRowFromApi(row: Record<string, unknown>, defaultUnit: string): ThermalPropFormRow {
   return {
+    specification: valueFromApiField(row.specification ?? row.spec),
     reported: valueFromApiField(row.reported ?? row.value),
-    acemSpec: valueFromApiField(row.acemSpec),
+    acemSpec: valueFromApiField(row.acemSpec ?? row.acem ?? row.testResultAcem),
     unit: String(row.unit ?? defaultUnit),
   };
 }
 
 export function parseSectionsToFormData(
   sections: Record<string, unknown>,
-  ids: { projectId?: string; motorStage?: string; motorId?: string; motorCasingId?: string }
+  ids: { projectId?: string; motorStage?: string; motorId?: string; motorCasingId?: string },
 ): RocketMotorCasingFormData {
   const mr = (sections.motorReceipt ?? {}) as Record<string, unknown>;
   const items = (mr.itemsReceived ?? {}) as Record<string, unknown>;
@@ -682,7 +788,8 @@ export function parseSectionsToFormData(
   const ndt = (mr.ndtUtReport ?? {}) as Record<string, unknown>;
   const reportUpload = ins.reportUpload as Record<string, unknown> | null | undefined;
 
-  const insulationType = (String(ins.type ?? "ROCASIN").toUpperCase() as InsulationType) || "ROCASIN";
+  const insulationType =
+    (String(ins.type ?? "ROCASIN").toUpperCase() as InsulationType) || "ROCASIN";
   const mechApi = Array.isArray(ins.mechanicalProperties) ? ins.mechanicalProperties : [];
   const mechanicalProperties = createInitialMechanicalProperties(insulationType);
   for (const row of mechApi) {
@@ -724,7 +831,9 @@ export function parseSectionsToFormData(
 
   const mockTrialSaved = parseMockTrialSavedSections(sections.mockTrial);
 
-  const dimApi = Array.isArray(sections.dimensionalInspection) ? sections.dimensionalInspection : [];
+  const dimApi = Array.isArray(sections.dimensionalInspection)
+    ? sections.dimensionalInspection
+    : [];
   const dimensionalData: DimensionalReadingFormRow[] = dimApi.map((d: any, idx: number) => {
     const spec = d.specifiedDimension ?? d.referenceRange ?? {};
     const name = String(d.paramName ?? "").toLowerCase();
@@ -761,9 +870,11 @@ export function parseSectionsToFormData(
     itemsDescription: str(items.description) || "Rubber Sheet",
     itemsDimension: str(items.dimension),
     itemsUnit: str(items.unit) || "mm",
-    itemsReceiptStatus: (str(items.receiptStatus || clear.status).toUpperCase() as ReceiptStatus) || "RECEIVED",
+    itemsReceiptStatus:
+      (str(items.receiptStatus || clear.status).toUpperCase() as ReceiptStatus) || "RECEIVED",
     itemsObservations: str(items.observations),
-    greenCardStatus: (str(clear.greenCardStatus || clear.status).toUpperCase() as ReceiptStatus) || "RECEIVED",
+    greenCardStatus:
+      (str(clear.greenCardStatus || clear.status).toUpperCase() as ReceiptStatus) || "RECEIVED",
     greenCardNo: str(clear.greenCardNo),
     clearanceDate: str(clear.clearanceDate).slice(0, 10),
     clearanceAuthority: str(clear.authority),
@@ -785,9 +896,17 @@ export function parseSectionsToFormData(
     otherDetails: str(mr.otherDetails),
     visualInspection,
     weightWithoutHarness:
-      parseApiNumeric(wwh.value) != null ? String(parseApiNumeric(wwh.value)) : wwh.value != null ? String(wwh.value) : "",
+      parseApiNumeric(wwh.value) != null
+        ? String(parseApiNumeric(wwh.value))
+        : wwh.value != null
+          ? String(wwh.value)
+          : "",
     weightWithHarness:
-      parseApiNumeric(wwh2.value) != null ? String(parseApiNumeric(wwh2.value)) : wwh2.value != null ? String(wwh2.value) : "",
+      parseApiNumeric(wwh2.value) != null
+        ? String(parseApiNumeric(wwh2.value))
+        : wwh2.value != null
+          ? String(wwh2.value)
+          : "",
     weighscaleEquipment: str(cal.equipmentDetails),
     calibrationDueDate: str(cal.calibrationDueDate).slice(0, 10),
     dimensionalData,
@@ -795,10 +914,22 @@ export function parseSectionsToFormData(
       ...createEmptyMockTrialSlot(),
       savedSections: mockTrialSaved,
     },
+    ndtUtReportFiles: [],
+    ndtUtReportExisting: [],
+    visualInspectionReportFiles: [],
+    visualInspectionReportExisting: [],
+    weighmentReportFiles: [],
+    weighmentReportExisting: [],
+    dimensionalInspectionReportFiles: [],
+    dimensionalInspectionReportExisting: [],
+    mockTrialReportFiles: [],
+    mockTrialReportExisting: [],
+    insulationLiningReportFiles: [],
+    insulationLiningReportExisting: [],
   };
 }
 
-export const CASING_FORM_STEP_COUNT = 5;
+export const CASING_FORM_STEP_COUNT = 6;
 
 const validateIdentification = (form: RocketMotorCasingFormData): string | null => {
   if (!form.projectId.trim()) return "Project is required.";
@@ -823,7 +954,10 @@ const validateReceiptAndInsulation = (form: RocketMotorCasingFormData): string |
 };
 
 /** Validates the current wizard step before moving forward (steps 0–4). */
-export function validateCasingFormStep(form: RocketMotorCasingFormData, step: number): string | null {
+export function validateCasingFormStep(
+  form: RocketMotorCasingFormData,
+  step: number,
+): string | null {
   switch (step) {
     case 0:
       return validateIdentification(form);
@@ -856,7 +990,7 @@ export function isCasingFormComplete(form: RocketMotorCasingFormData): boolean {
 
 export function validateCasingFormForSubmit(
   form: RocketMotorCasingFormData,
-  intent: FormSubmissionType
+  intent: FormSubmissionType,
 ): string | null {
   const identificationErr = validateIdentification(form);
   if (identificationErr) return identificationErr;
@@ -879,6 +1013,20 @@ export function serializeCasingForm(form: RocketMotorCasingFormData): string {
     ...form,
     insulationReportFile: form.insulationReportFile?.name ?? null,
     insulationReportExisting: form.insulationReportExisting?.fileName ?? null,
+    ndtUtReportFiles: form.ndtUtReportFiles.map((f) => f.name),
+    ndtUtReportExisting: form.ndtUtReportExisting.map((f) => f.fileName),
+    visualInspectionReportFiles: form.visualInspectionReportFiles.map((f) => f.name),
+    visualInspectionReportExisting: form.visualInspectionReportExisting.map((f) => f.fileName),
+    weighmentReportFiles: form.weighmentReportFiles.map((f) => f.name),
+    weighmentReportExisting: form.weighmentReportExisting.map((f) => f.fileName),
+    dimensionalInspectionReportFiles: form.dimensionalInspectionReportFiles.map((f) => f.name),
+    dimensionalInspectionReportExisting: form.dimensionalInspectionReportExisting.map(
+      (f) => f.fileName,
+    ),
+    mockTrialReportFiles: form.mockTrialReportFiles.map((f) => f.name),
+    mockTrialReportExisting: form.mockTrialReportExisting.map((f) => f.fileName),
+    insulationLiningReportFiles: form.insulationLiningReportFiles.map((f) => f.name),
+    insulationLiningReportExisting: form.insulationLiningReportExisting.map((f) => f.fileName),
     visualInspection: form.visualInspection.map((v) => ({
       ...v,
       mediaFile: v.mediaFile?.name ?? null,
@@ -893,3 +1041,42 @@ export function serializeCasingForm(form: RocketMotorCasingFormData): string {
     },
   });
 }
+
+export const REPORT_UPLOADS = [
+  {
+    key: "ndtUtReport",
+    filesField: "ndtUtReportFiles",
+    existingField: "ndtUtReportExisting",
+    label: "NDT / UT Report",
+  },
+  {
+    key: "visualInspectionReport",
+    filesField: "visualInspectionReportFiles",
+    existingField: "visualInspectionReportExisting",
+    label: "Visual Inspection Report",
+  },
+  {
+    key: "weighmentReport",
+    filesField: "weighmentReportFiles",
+    existingField: "weighmentReportExisting",
+    label: "Weighment Details Report",
+  },
+  {
+    key: "dimensionalInspectionReport",
+    filesField: "dimensionalInspectionReportFiles",
+    existingField: "dimensionalInspectionReportExisting",
+    label: "Dimensional Inspection Report",
+  },
+  {
+    key: "mockTrialReport",
+    filesField: "mockTrialReportFiles",
+    existingField: "mockTrialReportExisting",
+    label: "Mock Trial Report",
+  },
+  {
+    key: "insulationLiningReport",
+    filesField: "insulationLiningReportFiles",
+    existingField: "insulationLiningReportExisting",
+    label: "Insulation Lining Report",
+  },
+] as const;

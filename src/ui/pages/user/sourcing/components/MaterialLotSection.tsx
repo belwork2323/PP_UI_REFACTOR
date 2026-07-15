@@ -257,102 +257,101 @@ const MaterialLotSection = ({
         </MandatoryFormField>
       </Box>
 
-      <TableContainer
-        sx={{
-          mx: 2,
-          mb: 1.5,
-          borderRadius: 1.5,
-          border: `1px solid ${alpha(theme.palette?.border || "#ccc", 0.45)}`,
-          overflow: "hidden",
-        }}
-      >
-        <Table size="small" sx={{ tableLayout: "fixed", width: "100%" }}>
-          <TableHead>
-            <TableRow>
-              <TableCell
-                sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.lotTableHeader.specification }}
-              >
-                {formStrings.TABLE_HEADERS.SPECIFICATION}
-              </TableCell>
-              <TableCell
-                align="center"
-                sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.lotTableHeader.refRange }}
-              >
-                {formStrings.TABLE_HEADERS.REF_RANGE}
-              </TableCell>
-              <TableCell
-                sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.lotTableHeader.analysedResult }}
-              >
-                {formStrings.TABLE_HEADERS.ANALYZED_RESULT}
-                <Box component="span" sx={mandatoryAsteriskSx(theme)}>
-                  {" "}
-                  *
-                </Box>
-              </TableCell>
-              <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.lotTableHeader.remarks }}>
-                {formStrings.TABLE_HEADERS.REMARKS}
-              </TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {lot.rows.map((row, rowIndex) => {
-              const rowFailed = isSpecRowFailed(row);
-              const analyzedMissing = isAnalyzedResultMissing(row, showFieldErrors);
-              return (
-                <TableRow key={rowIndex} sx={specStyles.dataRow(rowIndex, rowFailed)}>
-                  <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.specCell }}>
-                    <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
-                      <Typography sx={specStyles.specText}>{row.specification}</Typography>
-                      {rowFailed && (
-                        <Chip
-                          label={formStrings.SPEC_STATUS_OUT_OF_RANGE}
-                          size="small"
-                          sx={specStyles.failedSpecChip}
-                        />
-                      )}
-                    </Stack>
-                  </TableCell>
-                  <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.refRangeCell }}>
-                    <Chip label={row.refRange} size="small" sx={specStyles.refRangeChip} />
-                  </TableCell>
-                  <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.inputCell }}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      value={row.analysedResult || ""}
-                      onChange={(event) => handleCellChange(rowIndex, "analysedResult", event.target.value)}
-                      placeholder={formStrings.ANALYZED_RESULT_PLACEHOLDER}
-                      type="number"
-                      inputProps={{ step: "any" }}
-                      error={analyzedMissing}
-                      helperText={analyzedMissing ? formStrings.FIELD_REQUIRED_ANALYZED_RESULT : undefined}
-                      FormHelperTextProps={{ sx: { mx: 0, fontSize: "0.65rem" } }}
-                      sx={{
-                        ...theme.workflow.formElements.cellField,
-                        ...specStyles.analyzedField,
-                        ...(rowFailed || analyzedMissing ? specStyles.failedAnalyzedField : {}),
-                      }}
-                    />
-                  </TableCell>
-                  <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.inputCell }}>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      value={row.remarks || ""}
-                      onChange={(event) => handleCellChange(rowIndex, "remarks", event.target.value)}
-                      placeholder={formStrings.REMARKS_PLACEHOLDER}
-                      sx={{
-                        ...theme.workflow.formElements.cellField,
-                        ...specStyles.remarksField,
-                      }}
-                    />
-                  </TableCell>
-                </TableRow>
-              );
-            })}
-          </TableBody>
-        </Table>
-      </TableContainer>
+      <Box sx={specStyles.specsTableWrap}>
+        <TableContainer
+          sx={{
+            ...specStyles.specsTableContainer,
+            border: `1px solid ${alpha(theme.palette?.border || "#ccc", 0.45)}`,
+          }}
+        >
+          <Table size="small" sx={specStyles.specsTable}>
+            <TableHead>
+              <TableRow>
+                <TableCell
+                  sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.lotTableHeader.specification }}
+                >
+                  {formStrings.TABLE_HEADERS.SPECIFICATION}
+                </TableCell>
+                <TableCell
+                  align="center"
+                  sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.lotTableHeader.refRange }}
+                >
+                  {formStrings.TABLE_HEADERS.REF_RANGE}
+                </TableCell>
+                <TableCell
+                  sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.lotTableHeader.analysedResult }}
+                >
+                  {formStrings.TABLE_HEADERS.ANALYZED_RESULT}
+                  <Box component="span" sx={mandatoryAsteriskSx(theme)}>
+                    {" "}
+                    *
+                  </Box>
+                </TableCell>
+                <TableCell sx={{ ...theme.workflow.formElements.tableHeader, ...specStyles.lotTableHeader.remarks }}>
+                  {formStrings.TABLE_HEADERS.REMARKS}
+                </TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {lot.rows.map((row, rowIndex) => {
+                const rowFailed = isSpecRowFailed(row);
+                const analyzedMissing = isAnalyzedResultMissing(row, showFieldErrors);
+                return (
+                  <TableRow key={rowIndex} sx={specStyles.dataRow(rowIndex, rowFailed)}>
+                    <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.specCell }}>
+                      <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap">
+                        <Typography sx={specStyles.specText}>{row.specification}</Typography>
+                        {rowFailed && (
+                          <Chip
+                            label={formStrings.SPEC_STATUS_OUT_OF_RANGE}
+                            size="small"
+                            sx={specStyles.failedSpecChip}
+                          />
+                        )}
+                      </Stack>
+                    </TableCell>
+                    <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.refRangeCell }}>
+                      <Chip label={row.refRange} size="small" sx={specStyles.refRangeChip} />
+                    </TableCell>
+                    <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.inputCell }}>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        value={row.analysedResult || ""}
+                        onChange={(event) => handleCellChange(rowIndex, "analysedResult", event.target.value)}
+                        placeholder={formStrings.ANALYZED_RESULT_PLACEHOLDER}
+                        type="number"
+                        inputProps={{ step: "any" }}
+                        error={analyzedMissing}
+                        helperText={analyzedMissing ? formStrings.FIELD_REQUIRED_ANALYZED_RESULT : undefined}
+                        FormHelperTextProps={{ sx: { mx: 0, fontSize: "0.65rem" } }}
+                        sx={{
+                          ...theme.workflow.formElements.cellField,
+                          ...specStyles.analyzedField,
+                          ...(rowFailed || analyzedMissing ? specStyles.failedAnalyzedField : {}),
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.inputCell }}>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        value={row.remarks || ""}
+                        onChange={(event) => handleCellChange(rowIndex, "remarks", event.target.value)}
+                        placeholder={formStrings.REMARKS_PLACEHOLDER}
+                        sx={{
+                          ...theme.workflow.formElements.cellField,
+                          ...specStyles.remarksField,
+                        }}
+                      />
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      </Box>
 
       <CertificateUploadSection
         certificates={lot.certificates ?? []}

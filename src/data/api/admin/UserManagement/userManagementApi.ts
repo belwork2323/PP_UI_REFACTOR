@@ -8,8 +8,20 @@ import { USER_MANAGEMENT } from "@data/api/endPoints";
 /**
  * Fetch all users via filtering payload.
  * POST: /admin/user/list
+ * payload: { search, role, department, subDepartmentId, status, filterType, startDate, endDate, page, pageSize }
  */
-export const fetchAllUsers = async (payload) => {
+export const fetchAllUsers = async (payload: {
+  search?: string;
+  role?: string;
+  department?: string;
+  subDepartmentId?: number | null;
+  status?: string;
+  filterType?: string;
+  startDate?: string;
+  endDate?: string;
+  page: number;
+  pageSize: number;
+}) => {
   return post(USER_MANAGEMENT.GET_ALL_USERS, payload);
 };
 

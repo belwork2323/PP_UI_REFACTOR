@@ -54,7 +54,7 @@ export const stageConfig: Record<string, RoleChipConfig> = {
   Dispatch: { Icon: icons.batchMgmt.dispatchStage, color: "#047857", bg: "rgba(4,120,87,0.10)" },
 };
 
-/** Batch workflow statuses (subdepartment batch lists) */
+/** Batch workflow status (subdepartment batch lists) */
 export const batchStatusConfig: Record<string, RoleChipConfig> = {
   // Backend values
   INITIATED: {
@@ -175,9 +175,7 @@ export const getSubDeptChipConfig = (subDeptName: string | null | undefined) => 
   if (subDeptConfig[name]) return subDeptConfig[name];
 
   const normalized = name.toLowerCase();
-  const namedHit = Object.entries(subDeptConfig).find(
-    ([key]) => key.toLowerCase() === normalized,
-  );
+  const namedHit = Object.entries(subDeptConfig).find(([key]) => key.toLowerCase() === normalized);
   if (namedHit) return namedHit[1];
 
   return deptColorMap[hashString(normalized) % deptColorMap.length];

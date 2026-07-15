@@ -28,7 +28,7 @@ import dayjs from "dayjs";
 import { useThemeStore } from "../../../../app/store/themeStore";
 import { getRawMaterialApproverTheme } from "../../../../app/theme/custom_themes/approver/sourcing/rawMaterialApprover_theme";
 import getApproverSourcingFilterStyles from "./approverSourcingFilterStyles";
-import { isApproverActionableStatus } from "../../../../app/theme/approver";
+import { canApproverViewBatchDetails, isApproverActionableStatus } from "../../../../app/theme/approver";
 import { icons } from "../../../../app/theme/icons";
 import useRawMaterialApproverHook, {
   type RawMaterialApproverAppliedFilters,
@@ -74,6 +74,8 @@ const RawMaterialDetailDialog = ({
 }: DetailDialogProps) => {
   const [pdfOpen, setPdfOpen] = useState(false);
   if (!item) return null;
+
+  const canApproveOrReject = isApproverActionableStatus(item.status);
 
   return (
     <>
@@ -189,24 +191,28 @@ const RawMaterialDetailDialog = ({
           <Button variant="outlined" onClick={onClose} sx={theme.dialog.closeAction}>
             Close
           </Button>
-          <Button
-            variant="contained"
-            startIcon={<CancelRoundedIcon />}
-            onClick={() => onReject(item)}
-            disabled={loading}
-            sx={theme.dialog.rejectAction}
-          >
-            Reject
-          </Button>
-          <Button
-            variant="contained"
-            startIcon={<CheckCircleRoundedIcon />}
-            onClick={() => onApprove(item)}
-            disabled={loading}
-            sx={theme.dialog.approveAction}
-          >
-            Approve
-          </Button>
+          {canApproveOrReject ? (
+            <>
+              <Button
+                variant="contained"
+                startIcon={<CancelRoundedIcon />}
+                onClick={() => onReject(item)}
+                disabled={loading}
+                sx={theme.dialog.rejectAction}
+              >
+                Reject
+              </Button>
+              <Button
+                variant="contained"
+                startIcon={<CheckCircleRoundedIcon />}
+                onClick={() => onApprove(item)}
+                disabled={loading}
+                sx={theme.dialog.approveAction}
+              >
+                Approve
+              </Button>
+            </>
+          ) : null}
         </Box>
       </Dialog>
 
@@ -570,7 +576,11 @@ const RawMaterialApproverPage = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {filtered.map((row: any, idx: number) => (
+                  {filtered.map((row: any, idx: number) => {
+                    const canViewDetails = canApproverViewBatchDetails(row.status, {
+                      allowWhenApproved: true,
+                    });
+                    return (
                     <TableRow
                       key={row.lotId ?? row.id ?? row.formId ?? idx}
                       sx={theme.table.row(idx)}
@@ -623,16 +633,19 @@ const RawMaterialApproverPage = () => {
                         <Button
                           size="small"
                           variant="outlined"
-                          startIcon={<VisibilityRoundedIcon sx={{ fontSize: "13px !important" }} />}
+                          startIcon={
+                            <VisibilityRoundedIcon sx={{ fontSize: "13px !important" }} />
+                          }
                           onClick={() => handleViewDetails(row)}
-                          disabled={!isApproverActionableStatus(row.status)}
-                          sx={theme.table.actionButton(isApproverActionableStatus(row.status))}
+                          disabled={!canViewDetails}
+                          sx={theme.table.actionButton(canViewDetails)}
                         >
                           View Details
                         </Button>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </TableContainer>

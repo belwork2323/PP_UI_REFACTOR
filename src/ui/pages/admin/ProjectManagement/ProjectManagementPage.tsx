@@ -16,7 +16,9 @@ import { getProjectName } from "@utils/projectManagementUtils";
 import ProjectManagementList from "./ProjectManagementList";
 import CreateProjectManagementForm from "./CreateProjectManagementForm";
 import FilterToggleButton from "@/ui/components/common/FilterToggleButton";
-import DashboardDateFilter from "@/ui/components/custom/dashboard/DashboardDateFilter";
+import DashboardDateFilter, {
+  getDateFilterDisplayLabel,
+} from "@/ui/components/custom/dashboard/DashboardDateFilter";
 import getDashboardTheme from "@/app/theme/custom_themes/admin/Dashboard/dashboard_theme";
 
 const S = STRINGS.PROJECT_MANAGEMENT;
@@ -83,15 +85,17 @@ const ProjectManagementPage = () => {
       <Box sx={{ mb: 2 }}>
         <FilterToggleButton
           label="Date Filter"
-          count={0}
+          count={stats.filterType !== S.DATE_FILTER.VALUES.MONTH ? 1 : 0}
           isOpen={stats.dateFilterOpen}
           onClick={stats.toggleDateFilter}
-          sx={th.table.filterBtn(stats.dateFilterOpen)}
+          sx={th.table.filterBtn(
+            stats.dateFilterOpen || stats.filterType !== S.DATE_FILTER.VALUES.MONTH,
+          )}
           iconSx={th.table.filterBtnIcon}
           textSx={th.table.filterBtnText}
           badgeSx={th.table.filterBadgePill}
           chevronSx={th.table.filterBtnChevron}
-          selectedValue={stats.filterType}
+          selectedValue={getDateFilterDisplayLabel(stats.filterType, S.DATE_FILTER)}
         />
         {stats.dateFilterOpen && (
           <DashboardDateFilter
@@ -101,6 +105,8 @@ const ProjectManagementPage = () => {
             customEndDate={stats.customEndDate}
             onStartChange={stats.setCustomStartDate}
             onEndChange={stats.setCustomEndDate}
+            onApplyCustom={stats.applyCustomDateFilter}
+            onClearFilter={stats.clearDateFilter}
             loading={stats.loading}
             strings={S.DATE_FILTER}
             containerSx={th.dashboard.dateRangeBar}

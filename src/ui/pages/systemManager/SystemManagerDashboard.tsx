@@ -32,7 +32,9 @@ import useSMInProgressBatches from "../../../hooks/system_manager/useSMInProgres
 import useSMNotificationMenu from "../../../hooks/system_manager/useSMNotificationMenuHook";
 import DashboardChartCard from "../../components/custom/dashboard/DashboardChartCard";
 import { DashKPICard } from "../../components/custom/dashboard/DashKPICard";
-import DashboardDateFilter from "../../components/custom/dashboard/DashboardDateFilter";
+import DashboardDateFilter, {
+  getDateFilterDisplayLabel,
+} from "../../components/custom/dashboard/DashboardDateFilter";
 import InProgressBatchesTable from "../../components/custom/dashboard/InProgressBatchesTable";
 import FilterToggleButton from "../../components/common/FilterToggleButton";
 import FilterSelect from "../../components/common/FilterSelect";
@@ -104,6 +106,7 @@ export default function SystemManagerDashboard() {
     customEndDate,
     setCustomEndDate,
     applyCustomDateFilter,
+    clearDateFilter,
     dateBounds,
     loadAlerts,
   } = useSMDashboard(t.dashboardConfig);
@@ -123,7 +126,7 @@ export default function SystemManagerDashboard() {
   })();
 
   const [dateFilterOpen, setDateFilterOpen] = useState(true);
-  const dateFilterCount = filterType ? 1 : 0;
+  const dateFilterCount = filterType !== S.DATE_FILTER.VALUES.MONTH ? 1 : 0;
   const { filterMenuProps, filterMenuItemSx } = sharedTh;
 
   const {
@@ -229,7 +232,7 @@ export default function SystemManagerDashboard() {
           textSx={adminTh.table.filterBtnText}
           badgeSx={adminTh.table.filterBadgePill}
           chevronSx={adminTh.table.filterBtnChevron}
-          selectedValue={filterType}
+          selectedValue={getDateFilterDisplayLabel(filterType, S.DATE_FILTER)}
         />
 
         {dateFilterOpen && (
@@ -241,6 +244,7 @@ export default function SystemManagerDashboard() {
             customEndDate={customEndDate}
             onEndChange={setCustomEndDate}
             onApplyCustom={applyCustomDateFilter}
+            onClearFilter={clearDateFilter}
             strings={S.DATE_FILTER}
             loading={statsLoading}
             containerSx={t.dashboardLayout.dateRangeBar}
