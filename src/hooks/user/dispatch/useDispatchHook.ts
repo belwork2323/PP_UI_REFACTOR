@@ -364,7 +364,8 @@ export const useDispatchHook = () => {
     setDetailsRow(null);
     setDetailsData(null);
     setView("list");
-  }, []);
+    bumpBatchRefresh();
+  }, [bumpBatchRefresh]);
 
   const handleFillForm = useCallback(
     async (batch: DispatchBatch) => {
@@ -386,15 +387,15 @@ export const useDispatchHook = () => {
       return;
     }
 
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
-  }, [view, isFormDirty, hasSavedDraft, bumpBatchRefresh, resetFormContext]);
+  }, [view, isFormDirty, bumpBatchRefresh, resetFormContext]);
 
   const handleDiscardAndBack = useCallback(() => {
     setBackConfirmOpen(false);
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
-  }, [hasSavedDraft, bumpBatchRefresh, resetFormContext]);
+  }, [bumpBatchRefresh, resetFormContext]);
 
   const submitForm = useCallback(
     async (intent: "draft" | "submit") => {

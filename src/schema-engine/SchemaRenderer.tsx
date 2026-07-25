@@ -13,11 +13,13 @@ import {
 } from "./rules/visibility";
 import type { SchemaSetupContext } from "./utils/setupContext";
 import {
+  getRowGenerationCountTriggerFields,
   getRowGenerationParentSourceIds,
   getRowGenerationTableIds,
   schemaHasRowGenerationTables,
   syncRowGenerationTables,
 } from "./utils/rowGenerationSync";
+import { useSchemaApiPopulation } from "./hooks/useSchemaApiPopulation";
 import BlockRenderer from "./BlockRenderer";
 import AccordionSection from "../ui/components/common/AccordionSection";
 import GridFields from "../ui/components/common/GridFields";
@@ -44,6 +46,7 @@ const shouldSyncRowGeneration = (
 
   const rowGenTableIds = getRowGenerationTableIds(schema);
   const parentSourceIds = getRowGenerationParentSourceIds(schema);
+  const countTriggerFields = getRowGenerationCountTriggerFields(schema);
   const scopedId = meta.changedScope
     ? scopedFormKey(meta.changedScope, meta.changedBlockId)
     : meta.changedBlockId;
@@ -51,8 +54,10 @@ const shouldSyncRowGeneration = (
   return (
     rowGenTableIds.has(meta.changedBlockId) ||
     parentSourceIds.has(meta.changedBlockId) ||
+    countTriggerFields.has(meta.changedBlockId) ||
     rowGenTableIds.has(scopedId) ||
-    parentSourceIds.has(scopedId)
+    parentSourceIds.has(scopedId) ||
+    countTriggerFields.has(scopedId)
   );
 };
 
@@ -121,6 +126,8 @@ const SchemaRenderer = ({
     },
     [onChange, schema, sections],
   );
+
+  useSchemaApiPopulation(schema, values, handleChange, apiContext, readOnly);
 
   const ctx = useMemo(
     () => ({

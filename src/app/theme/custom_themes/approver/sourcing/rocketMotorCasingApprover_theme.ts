@@ -60,7 +60,12 @@ export const getRocketMotorCasingApproverTheme = (mode = "light") => {
         verticalAlign: "middle",
       },
       row: (index: number) => ({
-        background: index % 2 === 0 ? (isDark ? alpha(palette.white, 0.02) : "#fff") : alpha(palette.surface, 0.5),
+        background:
+          index % 2 === 0
+            ? isDark
+              ? alpha(palette.white, 0.02)
+              : "#fff"
+            : alpha(palette.surface, 0.5),
         "&:hover": { background: alpha(palette.primaryLight, 0.04) },
         "&:last-child td": { borderBottom: "none" },
         animation: `${slideUp} 0.3s ease ${index * 0.04}s both`,
@@ -196,6 +201,10 @@ export const getRocketMotorCasingApproverTheme = (mode = "light") => {
         color: palette.textSub,
         textAlign: "center",
         py: 6,
+      },
+      sectionTitle: {
+        fontSize: "0.72rem",
+        color: palette.textSub,
       },
       blockWrapper: (isLast: boolean) => ({
         mb: isLast ? 0 : 2.5,

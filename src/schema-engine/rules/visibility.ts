@@ -1,4 +1,10 @@
-import type { SchemaBlock, SchemaSection, SchemaVisibleWhen } from "../types";
+import type {
+  SchemaBlock,
+  SchemaSection,
+  SchemaVisibilityCondition,
+  SchemaVisibilityRule,
+  SchemaVisibleWhen,
+} from "../types";
 import { scopedFormKey } from "../state/formState";
 
 export type SchemaVisibilityTarget = {
@@ -57,6 +63,7 @@ export const buildFlatVisibilityContext = (
       return;
     }
     walk(val);
+    // Keep table/object values addressable by key for prune clearing, but scalars only in context.
   });
 
   return merged;
@@ -95,13 +102,20 @@ const evaluateCondition = (
   }
 };
 
+const isNestedVisibilityGroup = (rule: SchemaVisibilityRule): rule is SchemaVisibleWhen =>
+  Boolean(rule && typeof rule === "object" && Array.isArray((rule as SchemaVisibleWhen).when));
+
 export const isSchemaVisible = (
   target: SchemaVisibilityTarget | null | undefined,
   context: Record<string, unknown>,
 ): boolean => {
   if (!target?.visibleWhen?.when?.length) return true;
   const logic = target.visibleWhen.logic ?? "AND";
-  const results = target.visibleWhen.when.map((rule) => evaluateCondition(rule, context));
+  const results = target.visibleWhen.when.map((rule) =>
+    isNestedVisibilityGroup(rule)
+      ? isSchemaVisible({ visibleWhen: rule }, context)
+      : evaluateCondition(rule as SchemaVisibilityCondition, context),
+  );
   return logic === "OR" ? results.some(Boolean) : results.every(Boolean);
 };
 
@@ -124,7 +138,12 @@ export const pruneHiddenFormValues = (
 
   const clearBlock = (block: SchemaBlock, scope: string) => {
     if (!isBlockVisible(block, context)) {
-      if (block.type === "field") next[scopedFormKey(scope, block.id)] = "";
+      if (block.type === "field") {
+        next[scopedFormKey(scope, block.id)] = "";
+      } else if (block.type === "table" || block.type === "matrix") {
+        next[scopedFormKey(scope, block.id)] = [];
+      }
+      return;
     }
     if (block.type === "section") {
       if (block.repeat) return;
@@ -138,7 +157,19 @@ export const pruneHiddenFormValues = (
   };
 
   sections.forEach((section) => {
-    if (!isSectionVisible(section, context)) return;
+    if (!isSectionVisible(section, context)) {
+      section.children.forEach((block) => {
+        // Section hidden: clear all descendant fields/tables in this section scope.
+        const wipe = (b: SchemaBlock, scope: string) => {
+          if (b.type === "field") next[scopedFormKey(scope, b.id)] = "";
+          if (b.type === "table" || b.type === "matrix") next[scopedFormKey(scope, b.id)] = [];
+          if (b.type === "section" && !b.repeat) b.children.forEach((c) => wipe(c, b.id));
+          if (b.type === "group" && !b.repeat) b.children.forEach((c) => wipe(c, scope));
+        };
+        wipe(block, section.id);
+      });
+      return;
+    }
     section.children.forEach((block) => clearBlock(block, section.id));
   });
 
@@ -149,9 +180,16 @@ export const collectVisibilityTriggerFields = (sections: SchemaSection[]): Set<s
   const fields = new Set<string>();
 
   const walkTarget = (target: SchemaVisibilityTarget | null | undefined) => {
-    target?.visibleWhen?.when?.forEach((rule) => {
-      if (rule.field) fields.add(rule.field);
-    });
+    const walkRules = (rules: SchemaVisibilityRule[] | undefined) => {
+      rules?.forEach((rule) => {
+        if (isNestedVisibilityGroup(rule)) {
+          walkRules(rule.when);
+          return;
+        }
+        if (rule.field) fields.add(rule.field);
+      });
+    };
+    walkRules(target?.visibleWhen?.when);
   };
 
   const walkBlocks = (blocks: SchemaBlock[]) => {

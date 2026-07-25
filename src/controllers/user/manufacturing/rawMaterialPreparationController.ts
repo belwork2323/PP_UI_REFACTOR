@@ -16,6 +16,7 @@ export type RawMaterialPreparationCreatePayload = {
   preparationDetails: {
     premixes: Array<{
       premixNo: number;
+      premixDate: string;
       materialType: "SOLID" | "LIQUID" | "BOTH";
       solidProcess: Array<Record<string, unknown>>;
       liquidProcess: Array<Record<string, unknown>>;
@@ -24,12 +25,10 @@ export type RawMaterialPreparationCreatePayload = {
   };
 };
 
-export type RawMaterialPreparationUpdatePayload = Omit<
-  RawMaterialPreparationCreatePayload,
-  "batchId" | "formSubmissionType"
-> & {
+export type RawMaterialPreparationUpdatePayload = {
   formId: string;
   formSubmissionType: "DRAFT" | "SUBMIT";
+  preparationDetails: RawMaterialPreparationCreatePayload["preparationDetails"];
 };
 
 export type RawMaterialPreparationDetailsPayload = {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   alpha,
   Box,
@@ -21,16 +21,22 @@ import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import getManufacturingTheme from "../../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import { STRINGS } from "../../../../../../app/config/strings";
 import {
+  collectPrepSectionNestedTableRows,
   expandRawMaterialPrepSectionRows,
+  extractPrepSectionNestedTableKeys,
   formatPrepSectionCellValue,
   formatPrepSectionLabel,
   orderPrepSectionColumns,
+  type PremixCounts,
+  type PremixSubmissionStatus,
   type RawMaterialPrepApproverDetailView,
   type RawMaterialPrepApproverPremixView,
   type RawMaterialPrepApproverProcessView,
   type RawMaterialPrepApproverSectionView,
   type RawMaterialPrepWeightmentSheet,
 } from "../../../../../../data/models/user/RawMaterialPreparationModel";
+import PremixStatusChip, { PremixCountsSummary } from "./PremixStatusChip";
+import { formatToIsoDateInput } from "../../../../../../utils/dateUtils";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const RM = STRINGS.MANUFACTURING.RAW_MATERIAL_PREP;
@@ -41,8 +47,10 @@ export type RawMaterialPrepDetailsTheme = ReturnType<
 
 const formatDate = (value?: unknown) => {
   if (!value) return "—";
-  const d = new Date(String(value));
-  if (Number.isNaN(d.getTime())) return String(value);
+  const raw = String(value).trim();
+  const iso = formatToIsoDateInput(raw) || raw;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return raw;
   return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 };
 
@@ -69,16 +77,57 @@ export const SchemaSectionTable = ({
   const rows = expandRawMaterialPrepSectionRows(section.sectionData);
   if (rows.length === 0) return null;
 
-  const columns = orderPrepSectionColumns(
-    Array.from(
-      rows.reduce((keys, row) => {
-        Object.keys(row ?? {}).forEach((key) => {
-          if (!key.startsWith("_")) keys.add(key);
-        });
-        return keys;
-      }, new Set<string>()),
-    ),
-  );
+  const nestedTableKeys = extractPrepSectionNestedTableKeys(rows);
+  const nestedKeySet = new Set(nestedTableKeys);
+
+  const collectColumns = (tableRows: Record<string, unknown>[]) =>
+    orderPrepSectionColumns(
+      Array.from(
+        tableRows.reduce((keys, row) => {
+          Object.keys(row ?? {}).forEach((key) => {
+            if (!key.startsWith("_") && !nestedKeySet.has(key)) keys.add(key);
+          });
+          return keys;
+        }, new Set<string>()),
+      ),
+    );
+
+  const mainColumns = collectColumns(rows);
+
+  const renderDataTable = (
+    tableRows: Record<string, unknown>[],
+    tableColumns: string[],
+    { nested = false }: { nested?: boolean } = {},
+  ) => {
+    if (tableColumns.length === 0 || tableRows.length === 0) return null;
+
+    return (
+      <TableContainer sx={dt.tableContainer}>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              {tableColumns.map((column, columnIndex) => (
+                <TableCell key={column} sx={dt.tableHeaderCell(columnIndex === 0)}>
+                  {formatPrepSectionLabel(column)}
+                </TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {tableRows.map((row, rowIndex) => (
+              <TableRow key={rowIndex} sx={dt.tableRow(rowIndex)}>
+                {tableColumns.map((column) => (
+                  <TableCell key={column} sx={dt.tableCell}>
+                    {formatPrepSectionCellValue(row?.[column])}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    );
+  };
 
   return (
     <Box sx={{ mb: 2 }}>
@@ -93,30 +142,40 @@ export const SchemaSectionTable = ({
       >
         {formatPrepSectionLabel(section.sectionId)}
       </Typography>
-      <TableContainer sx={dt.tableContainer}>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              {columns.map((column, columnIndex) => (
-                <TableCell key={column} sx={dt.tableHeaderCell(columnIndex === 0)}>
-                  {formatPrepSectionLabel(column)}
-                </TableCell>
-              ))}
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.map((row, rowIndex) => (
-              <TableRow key={rowIndex} sx={dt.tableRow(rowIndex)}>
-                {columns.map((column) => (
-                  <TableCell key={column} sx={dt.tableCell}>
-                    {formatPrepSectionCellValue(row?.[column])}
-                  </TableCell>
-                ))}
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
+
+      {renderDataTable(rows, mainColumns)}
+
+      {nestedTableKeys.map((nestedKey) => {
+        const nestedRows = collectPrepSectionNestedTableRows(rows, nestedKey);
+        const nestedColumns = orderPrepSectionColumns(
+          Array.from(
+            nestedRows.reduce((keys, row) => {
+              Object.keys(row ?? {}).forEach((key) => {
+                if (!key.startsWith("_")) keys.add(key);
+              });
+              return keys;
+            }, new Set<string>()),
+          ),
+        );
+
+        if (nestedRows.length === 0 || nestedColumns.length === 0) return null;
+
+        return (
+          <Box key={nestedKey} sx={{ mt: 1.25 }}>
+            <Typography
+              sx={{
+                fontSize: "0.74rem",
+                fontWeight: 700,
+                color: "text.secondary",
+                mb: 0.75,
+              }}
+            >
+              {formatPrepSectionLabel(nestedKey)}
+            </Typography>
+            {renderDataTable(nestedRows, nestedColumns, { nested: true })}
+          </Box>
+        );
+      })}
     </Box>
   );
 };
@@ -164,18 +223,35 @@ export const PremixDetailPanel = ({
   premix,
   dt,
   palette,
+  statusConfig,
 }: {
   premix: RawMaterialPrepApproverPremixView;
   dt: RawMaterialPrepDetailsTheme;
   palette: ReturnType<typeof getManufacturingTheme>["palette"];
+  statusConfig?: Record<string, { color: string; bg: string; border: string }>;
 }) => (
   <Box>
     <Stack direction="row" alignItems="center" gap={1} mb={1.5} flexWrap="wrap">
       <Chip label={`Premix ${premix.premixNo}`} size="small" sx={dt.materialChip} />
+      {statusConfig ? (
+        <PremixStatusChip
+          status={premix.premixSubmissionStatus}
+          statusConfig={statusConfig}
+        />
+      ) : null}
       <Typography sx={{ fontSize: "0.72rem", color: palette.textSub, fontWeight: 700 }}>
         {premix.materialType}
       </Typography>
+      <Typography sx={{ fontSize: "0.72rem", color: palette.textSub }}>
+        {RM.PREMIX_DATE}: {formatDate(premix.premixDate)}
+      </Typography>
     </Stack>
+
+    {premix.premixSubmissionStatus === "REJECTED" && premix.rejectionReason ? (
+      <Typography sx={{ fontSize: "0.72rem", color: palette.danger ?? "#C0392B", mb: 1.5 }}>
+        Rejection reason: {premix.rejectionReason}
+      </Typography>
+    ) : null}
 
     {premix.solidProcesses.length === 0 && premix.liquidProcesses.length === 0 ? (
       <Typography sx={dt.emptyText}>No process data recorded for this premix.</Typography>
@@ -300,6 +376,10 @@ export type RawMaterialPreparationDetailsContentProps = {
   showMeta?: boolean;
   showPremixTabs?: boolean;
   resetPremixOnFormId?: string | null;
+  premixCounts?: PremixCounts;
+  approverMode?: boolean;
+  filterPremixStatus?: PremixSubmissionStatus;
+  onActivePremixChange?: (premixNo: number) => void;
 };
 
 const RawMaterialPreparationDetailsContent = ({
@@ -311,11 +391,23 @@ const RawMaterialPreparationDetailsContent = ({
   showMeta = true,
   showPremixTabs = true,
   resetPremixOnFormId,
+  premixCounts,
+  approverMode = false,
+  filterPremixStatus,
+  onActivePremixChange,
 }: RawMaterialPreparationDetailsContentProps) => {
   const dt = theme.manufacturing.rawMaterialPrep.details;
+  const statusConfig = dt.bannerStatusConfig as Record<
+    string,
+    { color: string; bg: string; border: string }
+  >;
   const [activePremixIndex, setActivePremixIndex] = useState(0);
 
-  const premixes = detailView?.premixes ?? [];
+  const allPremixes = detailView?.premixes ?? [];
+  const premixes = useMemo(() => {
+    if (!filterPremixStatus) return allPremixes;
+    return allPremixes.filter((premix) => premix.premixSubmissionStatus === filterPremixStatus);
+  }, [allPremixes, filterPremixStatus]);
   const activePremixIndexSafe =
     premixes.length > 0 ? Math.min(activePremixIndex, premixes.length - 1) : 0;
   const activePremix = premixes[activePremixIndexSafe] ?? null;
@@ -325,7 +417,16 @@ const RawMaterialPreparationDetailsContent = ({
 
   useEffect(() => {
     setActivePremixIndex(0);
-  }, [resetPremixOnFormId]);
+  }, [resetPremixOnFormId, filterPremixStatus]);
+
+  useEffect(() => {
+    const activePremix = premixes[activePremixIndexSafe];
+    if (activePremix?.premixNo) {
+      onActivePremixChange?.(activePremix.premixNo);
+    }
+  }, [activePremixIndexSafe, premixes, onActivePremixChange]);
+
+  const resolvedPremixCounts = premixCounts ?? detailView?.premixCounts;
 
   const metaFields = [
     { label: BL.COL_BATCH_ID, value: detailView?.batchId || row?.batchId || "—" },
@@ -374,6 +475,23 @@ const RawMaterialPreparationDetailsContent = ({
         </Box>
       )}
 
+      {resolvedPremixCounts && (
+        <Box sx={{ ...dt.section, mb: 3 }}>
+          <Typography sx={dt.sectionTitle}>
+            <VisibilityRoundedIcon sx={{ fontSize: 18 }} />
+            Premix Summary
+          </Typography>
+          <PremixCountsSummary
+            pending={resolvedPremixCounts.pendingPremixCount}
+            approved={resolvedPremixCounts.approvedPremixCount}
+            rejected={resolvedPremixCounts.rejectedPremixCount}
+            inProgress={resolvedPremixCounts.inProgressPremixCount}
+            total={resolvedPremixCounts.totalPremixCount}
+            statusConfig={statusConfig}
+          />
+        </Box>
+      )}
+
       {premixes.length > 0 && (
         <Box sx={{ ...dt.section, mb: hasWeightment ? 3 : 0 }}>
           <Typography sx={dt.sectionTitle}>
@@ -415,7 +533,16 @@ const RawMaterialPreparationDetailsContent = ({
                       fontWeight: 700,
                     }}
                   >
-                    Premix {premix.premixNo}
+                    <Stack direction="row" alignItems="center" gap={0.75}>
+                      Premix {premix.premixNo}
+                      <PremixStatusChip
+                        status={premix.premixSubmissionStatus}
+                        statusConfig={statusConfig}
+                        variant="embedded"
+                        onAccent={index === activePremixIndexSafe}
+                        showIcon={false}
+                      />
+                    </Stack>
                   </Button>
                 ))}
               </Stack>
@@ -423,19 +550,30 @@ const RawMaterialPreparationDetailsContent = ({
           ) : null}
 
           {activePremix ? (
-            <PremixDetailPanel premix={activePremix} dt={dt} palette={theme.palette} />
+            <PremixDetailPanel
+              premix={activePremix}
+              dt={dt}
+              palette={theme.palette}
+              statusConfig={statusConfig}
+            />
           ) : null}
         </Box>
       )}
 
-      <WeightmentSheetDetailBlock
-        weightmentSheet={weightmentSheet}
-        dt={dt}
-        palette={theme.palette}
-      />
+      {!approverMode && (
+        <WeightmentSheetDetailBlock
+          weightmentSheet={weightmentSheet}
+          dt={dt}
+          palette={theme.palette}
+        />
+      )}
 
       {premixes.length === 0 && !hasWeightment && (
-        <Typography sx={dt.emptyText}>No form data recorded</Typography>
+        <Typography sx={dt.emptyText}>
+          {approverMode && filterPremixStatus
+            ? "No premixes are waiting for approval."
+            : "No form data recorded"}
+        </Typography>
       )}
     </>
   );

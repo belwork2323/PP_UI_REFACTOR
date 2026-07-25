@@ -18,15 +18,18 @@ export const SUB_DEPT_LABELS: Record<string, string> = {
  * Per-sub-department metadata used to configure batch lists and pages.
  * Each entry maps a route slug to its status field name and display labels.
  */
-export const SUB_DEPT_CONFIG: Record<string, {
-  statusField: string;
-  statusLabel: string;
-  tableLabel: string;
-  emptyText: string;
-}> = {
+export const SUB_DEPT_CONFIG: Record<
+  string,
+  {
+    statusField: string;
+    statusLabel: string;
+    tableLabel: string;
+    emptyText: string;
+  }
+> = {
   "raw-material-prep": {
     statusField: "rmStatus",
-    statusLabel: "RM Status",
+    statusLabel: "Status",
     tableLabel: "Raw material preparation batch list",
     emptyText: "No raw material preparation batches found",
   },

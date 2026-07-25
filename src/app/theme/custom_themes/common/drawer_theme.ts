@@ -1,7 +1,7 @@
-import colors  from "../../colors";
-import fonts   from "../../fonts";
+import colors from "../../colors";
+import fonts from "../../fonts";
 import spacing from "../../spacing";
-import layout  from "../../layout";
+import layout from "../../layout";
 import general from "./common_css_theme";
 import { icons } from "../../icons";
 
@@ -11,10 +11,34 @@ import { icons } from "../../icons";
 // then reference them here via icons.drawerXxx
 // ─────────────────────────────────────────────────────────────────────────────
 export const DRAWER_NAV = [
-  { key: "dashboard",   label: "Dashboard",         path: "/admin",          Icon: icons.drawerDashboard   },
-  { key: "users",       label: "User Management",   path: "/admin/users",    Icon: icons.drawerUsers       },
-  { key: "batch",       label: "Batch Management",  path: "/admin/batch",    Icon: icons.drawerBatch       },
-  { key: "projects",    label: "Project Management",path: "/admin/projects", Icon: icons.drawerDepartments },
+  {
+    key: "dashboard",
+    label: "Dashboard",
+    route: "", // Base route path
+    Icon: icons.drawerDashboard,
+    allowedRoles: ["ADMIN", "CENTRE_HEAD"],
+  },
+  {
+    key: "users",
+    label: "User Management",
+    route: "/users",
+    Icon: icons.drawerUsers,
+    allowedRoles: ["ADMIN", "CENTRE_HEAD"],
+  },
+  {
+    key: "batch",
+    label: "Batch Management",
+    route: "/batch",
+    Icon: icons.drawerBatch,
+    allowedRoles: ["ADMIN", "CENTRE_HEAD"],
+  },
+  {
+    key: "projects",
+    label: "Project Management",
+    route: "/projects",
+    Icon: icons.drawerDepartments,
+    allowedRoles: ["ADMIN", "CENTRE_HEAD"],
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -38,13 +62,12 @@ const getDrawerTheme = (mode = "light") => {
   const d = colors.drawer?.[mode] ?? colors.drawer.light;
 
   return {
-
     // ── Drawer paper ─────────────────────────────────────────────
     paper: {
-      width:       DRAWER_WIDTH,
-      background:  d.paperBg,
+      width: DRAWER_WIDTH,
+      background: d.paperBg,
       borderRight: `1px solid ${d.borderColor}`,
-      boxShadow:   d.boxShadow,
+      boxShadow: d.boxShadow,
       ...general.flexColumn,
     },
 
@@ -53,21 +76,21 @@ const getDrawerTheme = (mode = "light") => {
       wrapper: {
         ...general.flexRow,
         ...general.alignCenter,
-        gap:          1.5,
-        px:           2.5,
-        py:           2,
+        gap: 1.5,
+        px: 2.5,
+        py: 2,
         borderBottom: `1px solid ${d.borderColor}`,
-        background:   d.headerBg,
+        background: d.headerBg,
         ...general.noShrink,
       },
 
       logoCircle: {
-        width:        40,
-        height:       40,
+        width: 40,
+        height: 40,
         ...general.borderCircle,
         ...general.overflowHidden,
         ...general.noShrink,
-        border:       `2px solid ${d.logoBorder}`,
+        border: `2px solid ${d.logoBorder}`,
       },
 
       logoImg: {
@@ -76,49 +99,49 @@ const getDrawerTheme = (mode = "light") => {
       },
 
       orgName: {
-        fontSize:      fonts.size?.sm     ?? "0.8rem",
-        fontWeight:    fonts.weight?.bold ?? 700,
-        color:         d.textPrimary,
+        fontSize: fonts.size?.sm ?? "0.8rem",
+        fontWeight: fonts.weight?.bold ?? 700,
+        color: d.textPrimary,
         letterSpacing: "0.06em",
         textTransform: "uppercase",
-        lineHeight:    fonts.lineHeight?.tight ?? 1.3,
+        lineHeight: fonts.lineHeight?.tight ?? 1.3,
       },
 
       roleBadge: {
-        fontSize:   fonts.size?.xs         ?? "0.7rem",
-        color:      d.textMuted,
-        fontWeight: fonts.weight?.medium   ?? 500,
-        mt:         "2px",
+        fontSize: fonts.size?.xs ?? "0.7rem",
+        color: d.textMuted,
+        fontWeight: fonts.weight?.medium ?? 500,
+        mt: "2px",
       },
     },
 
     // ── Nav list ──────────────────────────────────────────────────
     nav: {
       list: {
-        pt:        1.5,
+        pt: 1.5,
         ...general.flex1,
         overflowY: "auto",
       },
 
       item: {
         borderRadius: `${layout.cardBorderRadius ?? 10}px`,
-        mx:           1,
-        mb:           0.5,
-        color:        d.navText,
-        "&:hover":  { background: d.hoverBg,  color: d.textPrimary },
+        mx: 1,
+        mb: 0.5,
+        color: d.navText,
+        "&:hover": { background: d.hoverBg, color: d.textPrimary },
         "&.active": { background: d.activeBg, color: d.textPrimary },
         transition: layout.glass?.transition ?? "all 0.18s ease",
       },
 
       icon: {
         minWidth: 36,
-        color:    "inherit",
+        color: "inherit",
       },
 
       labelProps: {
-        fontSize:   fonts.size?.sm         ?? "0.875rem",
-        fontWeight: fonts.weight?.medium   ?? 500,
-        color:      "inherit",
+        fontSize: fonts.size?.sm ?? "0.875rem",
+        fontWeight: fonts.weight?.medium ?? 500,
+        color: "inherit",
       },
     },
 
@@ -245,25 +268,25 @@ const getDrawerTheme = (mode = "light") => {
 
       item: {
         borderRadius: `${layout.cardBorderRadius ?? 10}px`,
-        mx:           1,
-        mb:           0.5,
-        color:        colors.error.main,
+        mx: 1,
+        mb: 0.5,
+        color: colors.error.main,
         "&:hover": {
           background: d.logoutHoverBg,
-          color:      colors.error.main,
+          color: colors.error.main,
         },
         transition: layout.glass?.transition ?? "all 0.18s ease",
       },
 
       icon: {
         minWidth: 36,
-        color:    "inherit",
+        color: "inherit",
       },
 
       labelProps: {
-        fontSize:   fonts.size?.sm         ?? "0.875rem",
-        fontWeight: fonts.weight?.medium   ?? 500,
-        color:      "inherit",
+        fontSize: fonts.size?.sm ?? "0.875rem",
+        fontWeight: fonts.weight?.medium ?? 500,
+        color: "inherit",
       },
     },
   };

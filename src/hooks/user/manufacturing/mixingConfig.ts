@@ -1,3 +1,4 @@
+import { ProcessParticularRow, QualityCheckRow } from "@/data/models/user/MixingFormModel";
 import { STRINGS } from "../../../app/config/strings";
 
 const S = STRINGS.MANUFACTURING.MIXING;
@@ -47,35 +48,8 @@ export const getFinalMixNoLabel = (mixNo: number) => `Final Mix ${mixNo}`;
 export type MixingCycleOption = {
   value: string;
   label: string;
-  operations: string[];
+  operations: MixingOperation[];
 };
-
-export const MIXING_CYCLE_OPTIONS: MixingCycleOption[] = [
-  {
-    value: "PROJECT_A_B1",
-    label: "Project A - B1",
-    operations: [
-      S.PRE_ROW_1,
-      S.PRE_ROW_2,
-      S.PRE_ROW_3,
-      S.PRE_ROW_4,
-      S.PRE_SAMPLING_ROW,
-    ],
-  },
-  {
-    value: "PROJECT_A_B2",
-    label: "Project A - B2",
-    operations: [S.PRE_ROW_1, S.PRE_ROW_2, S.PRE_ROW_3, S.PRE_SAMPLING_ROW],
-  },
-  {
-    value: "PROJECT_A_B3",
-    label: "Project A - B3",
-    operations: [S.PRE_ROW_1, S.PRE_ROW_2, S.PRE_SAMPLING_ROW],
-  },
-];
-
-export const getMixingCycleByValue = (value: string) =>
-  MIXING_CYCLE_OPTIONS.find((cycle) => cycle.value === value) ?? null;
 
 export const FINAL_MIX_CYCLE_OPTIONS = [
   { value: "PROJECT_A_B1", label: "Project A - B1" },
@@ -87,46 +61,102 @@ export const FINAL_MIX_CYCLE_OPTIONS = [
 export type QualityObservedLayout = "quad" | "single";
 
 /** Canonical QC parameter labels — must match mapQualityChecksToApi / mapApiQualityChecksToRows */
-export const QUALITY_CHECK_PARAMETERS = {
-  homogeneity: "Homogeneity",
-  moisture: "Moisture %",
-  eomViscosity: "EOM Viscosity",
-  eomTemperature: "EOM Temperature",
-} as const;
+// export const QUALITY_CHECK_PARAMETERS = {
+//   homogeneity: "Homogeneity",
+//   moisture: "Moisture %",
+//   eomViscosity: "EOM Viscosity",
+//   eomTemperature: "EOM Temperature",
+// } as const;
 
 export const normalizeQualityCheckParameterKey = (parameter: string) =>
   String(parameter ?? "")
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "");
 
-export const DEFAULT_QUALITY_CHECK_ROWS: Array<{
-  parameter: string;
-  specification: string;
-  observedLayout: QualityObservedLayout;
-}> = [
-  { parameter: QUALITY_CHECK_PARAMETERS.homogeneity, specification: "", observedLayout: "quad" },
-  { parameter: QUALITY_CHECK_PARAMETERS.moisture, specification: "0.08", observedLayout: "quad" },
-  { parameter: QUALITY_CHECK_PARAMETERS.eomViscosity, specification: "", observedLayout: "single" },
-  { parameter: QUALITY_CHECK_PARAMETERS.eomTemperature, specification: "", observedLayout: "single" },
-];
+// export const DEFAULT_QUALITY_CHECK_ROWS: Array<{
+//   parameterId: string;
+//   parameter: string;
+//   specification: string;
+//   observedLayout: QualityObservedLayout;
+//   sampleCount: number;
+// }> = [
+//   {
+//     parameterId: "",
+//     parameter: QUALITY_CHECK_PARAMETERS.homogeneity,
+//     specification: "",
+//     observedLayout: "quad",
+//     sampleCount: 4,
+//   },
+//   {
+//     parameterId: "",
+//     parameter: QUALITY_CHECK_PARAMETERS.moisture,
+//     specification: "0.08",
+//     observedLayout: "quad",
+//     sampleCount: 4,
+//   },
+//   {
+//     parameterId: "",
+//     parameter: QUALITY_CHECK_PARAMETERS.eomViscosity,
+//     specification: "",
+//     observedLayout: "single",
+//     sampleCount: 1,
+//   },
+//   {
+//     parameterId: "",
+//     parameter: QUALITY_CHECK_PARAMETERS.eomTemperature,
+//     specification: "",
+//     observedLayout: "single",
+//     sampleCount: 1,
+//   },
+// ];
 
 export const isQuadObservedLayout = (layout: QualityObservedLayout) => layout === "quad";
 
-export const createProcessParticularRows = (operations: string[]) =>
-  operations.map((operation, index) => ({
-    id: index + 1,
-    operation,
+export type MixingOperation = {
+  operationId: number;
+  operationName: string;
+};
+
+export const createProcessParticularRows = (
+  operations: MixingOperation[],
+): ProcessParticularRow[] =>
+  operations.map((operation) => ({
+    operationId: operation.operationId,
+    operation: operation.operationName,
     rpm: "",
     time: "",
     temp: "",
     vacuum: "",
   }));
 
-export const createQualityCheckRows = () =>
-  DEFAULT_QUALITY_CHECK_ROWS.map((row) => ({
-    ...row,
-    observed1: "",
-    observed2: "",
-    observed3: "",
-    observed4: "",
-  }));
+export const createQualityCheckRows = (qualityChecks: QualityCheckRow[]): QualityCheckRow[] => {
+  return qualityChecks.map((q) => {
+    const parsed = Number(q.sampleCount);
+    const sampleCount =
+      Number.isFinite(parsed) && parsed > 0
+        ? Math.max(1, Math.min(4, Math.floor(parsed)))
+        : q.observedLayout === "quad"
+          ? 4
+          : 1;
+    return {
+      parameterId: q.parameterId,
+      parameter: q.parameter,
+      specification: q.specification,
+      observedLayout: sampleCount > 1 ? "quad" : "single",
+      sampleCount,
+      observed1: "",
+      observed2: "",
+      observed3: "",
+      observed4: "",
+    };
+  });
+};
+
+// export const createQualityCheckRows = () =>
+//   DEFAULT_QUALITY_CHECK_ROWS.map((row) => ({
+//     ...row,
+//     observed1: "",
+//     observed2: "",
+//     observed3: "",
+//     observed4: "",
+//   }));

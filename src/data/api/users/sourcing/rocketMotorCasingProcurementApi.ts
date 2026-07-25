@@ -1,5 +1,5 @@
-import { del, patch, post } from "../../httpClient";
-import { USER_ROCKET_MOTOR_CASING_ENDPOINTS } from "../../endPoints";
+import { del, patch, post, put } from "../../httpClient";
+import { USER_OPERATIONS_ENDPOINTS, USER_ROCKET_MOTOR_CASING_ENDPOINTS } from "../../endPoints";
 import type { RocketMotorCasingFormPayload } from "../../../models/user/RocketMotorCasingFormModel";
 
 export type RocketMotorCasingListRequest = {
@@ -7,6 +7,7 @@ export type RocketMotorCasingListRequest = {
   page: number;
   limit: number;
   status?: string[];
+  projectId?: string;
   motorStage?: string[];
   casingType?: string[];
   insulationType?: string[];
@@ -24,9 +25,9 @@ export const fetchRocketMotorCasingFormDetailsApi = async (payload: { motorCasin
 };
 
 export const updateRocketMotorCasingFormApi = async (
-  payload: RocketMotorCasingFormPayload & { motorCasingId: string }
+  payload: RocketMotorCasingFormPayload & { motorCasingId: string },
 ) => {
-  return await patch(USER_ROCKET_MOTOR_CASING_ENDPOINTS.UPDATE_FORM, payload);
+  return await put(USER_ROCKET_MOTOR_CASING_ENDPOINTS.UPDATE_FORM, payload);
 };
 
 export const fetchRocketMotorCasingListApi = async (payload: RocketMotorCasingListRequest) => {
@@ -39,4 +40,8 @@ export const deleteRocketMotorCasingFormApi = async (payload: { motorCasingId: s
 
 export const fetchRocketMotorCasingStatsApi = async (payload: { subDepartmentId: number }) => {
   return await post(USER_ROCKET_MOTOR_CASING_ENDPOINTS.STATS, payload);
+};
+
+export const fetchSpecificationForSubdepartment = async (payload: { insulationType: string }) => {
+  return await post(USER_OPERATIONS_ENDPOINTS.FETCH_SPECIFICATION, payload);
 };

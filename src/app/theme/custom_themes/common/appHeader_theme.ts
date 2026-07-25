@@ -169,11 +169,11 @@ const getAppHeaderTheme = (mode = "light") => {
       roleBadge: {
         display: "inline-flex",
         alignItems: "center",
-        gap: 0.5,
+        gap: "6px",
         width: "fit-content",
         maxWidth: "100%",
-        px: 0.75,
-        py: 0.35,
+        px: "12px",
+        py: "5px",
         borderRadius: "999px",
         backgroundColor: mode === "dark" ? "rgba(255,255,255,0.08)" : "rgba(255,255,255,0.22)",
         border: `1px solid ${h.glassBorder}`,
@@ -183,8 +183,16 @@ const getAppHeaderTheme = (mode = "light") => {
       roleIcon: {
         fontSize: 14,
         color: h.barText,
-        opacity: 0.9,
+        opacity: 0.85,
         flexShrink: 0,
+      },
+
+      roleLabel: {
+        fontSize: fonts.size?.xs ?? "0.75rem",
+        color: h.barMuted,
+        fontWeight: fonts.weight?.medium ?? 500,
+        lineHeight: 1,
+        whiteSpace: "nowrap",
       },
 
       userRole: {
@@ -193,12 +201,11 @@ const getAppHeaderTheme = (mode = "light") => {
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap",
-        fontSize: "0.68rem",
-        fontWeight: 700,
+        fontSize: fonts.size?.sm ?? "0.875rem",
+        fontWeight: fonts.weight?.bold ?? 700,
         color: h.barText,
         lineHeight: 1,
-        textTransform: "uppercase",
-        letterSpacing: "0.08em",
+        letterSpacing: "0.02em",
       },
 
       select: {

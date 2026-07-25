@@ -10,6 +10,8 @@ const ROLE_MAP = {
   manager: "SYSTEM_MANAGER",
   approver: "APPROVER",
   user: "USER",
+  centre_head: "CENTRE_HEAD",
+  "centre head": "CENTRE_HEAD",
 };
 
 /**
@@ -94,6 +96,7 @@ export const getSlugsFromNames = (departmentName, subDepartmentName) => {
 const ROLE_ROUTES = {
   ADMIN: () => "/admin",
   SYSTEM_MANAGER: () => "/system-manager",
+  CENTRE_HEAD: () => "/centre-head",
   USER: (dept, subDept) => `/user/${dept}/${subDept}`,
   APPROVER: (dept, subDept) => `/approver/${dept}/${subDept}`,
 };
@@ -110,7 +113,7 @@ export const getRouteByRole = (role, subDeptId = null, subDeptMeta = null) => {
     return "/login";
   }
 
-  if (role === "ADMIN" || role === "SYSTEM_MANAGER") return routeFn();
+  if (role === "ADMIN" || role === "SYSTEM_MANAGER" || role === "CENTRE_HEAD") return routeFn();
 
   const mapping =
     subDeptMeta?.slugs ??

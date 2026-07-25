@@ -15,8 +15,17 @@ import {
   type PostCureMotorSession,
 } from "../../../data/models/user/PostCureFormModel";
 import { fetchPostCureSchema as fetchPostCureSchemaFromEngine } from "../../../schema-engine";
-import { isPostCureInhibitionOperation, mapPostCureInhibitorTypeToApi, mapPostCureOperationToApi, resolvePostCureMotorOptions } from "./postCureConfig";
-import { canAddPostCureMotor, canLoadPostCureForm, type PostCureAddedMotor } from "./postCureFlowConfig";
+import {
+  isPostCureInhibitionOperation,
+  mapPostCureInhibitorTypeToApi,
+  mapPostCureOperationToApi,
+  resolvePostCureMotorOptions,
+} from "./postCureConfig";
+import {
+  canAddPostCureMotor,
+  canLoadPostCureForm,
+  type PostCureAddedMotor,
+} from "./postCureFlowConfig";
 import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 
@@ -143,7 +152,10 @@ export const usePostCureHook = () => {
           ...(operationType === "INHIBITION" && inhibitorType ? { inhibitorType } : {}),
         });
         if (!response?.success || !response?.data) {
-          const message = getErrorMessage(response, STRINGS.MANUFACTURING.POST_CURE.SCHEMA_FETCH_ERROR);
+          const message = getErrorMessage(
+            response,
+            STRINGS.MANUFACTURING.POST_CURE.SCHEMA_FETCH_ERROR,
+          );
           setSchemaError(message);
           showAlert(message, "error");
           return null;
@@ -235,34 +247,31 @@ export const usePostCureHook = () => {
     },
     [showAlert, subDepartmentId, hydrateMotorsWithSchemas, clearSetupDrafts],
   );
-  const handleViewPostCureDetails = useCallback(
-    async (row: any) => {
-      if (!row?.formId) return;
+  const handleViewPostCureDetails = useCallback(async (row: any) => {
+    if (!row?.formId) return;
 
-      setDetailsLoading(true);
+    setDetailsLoading(true);
 
-      try {
-        const response =
-          await postCureController.fetchFormDetails({
-            formId: row.formId,
-          });
+    try {
+      const response = await postCureController.fetchFormDetails({
+        formId: row.formId,
+      });
 
-        if (response?.success) {
-          setDetailsRow(row);
-          setDetailsData(response.data);
-          setView("details");
-        }
-      } finally {
-        setDetailsLoading(false);
+      if (response?.success) {
+        setDetailsRow(row);
+        setDetailsData(response.data);
+        setView("details");
       }
-    },
-    [],
-  );
+    } finally {
+      setDetailsLoading(false);
+    }
+  }, []);
   const handleBackFromDetails = useCallback(() => {
-  setDetailsRow(null);
-  setDetailsData(null);
-  setView("list");
-}, []);
+    setDetailsRow(null);
+    setDetailsData(null);
+    setView("list");
+    bumpBatchRefresh();
+  }, [bumpBatchRefresh]);
   const handleFillForm = useCallback(
     async (batch: PostCureBatch) => await openFormWithResolvedData(batch, false),
     [openFormWithResolvedData],
@@ -278,14 +287,14 @@ export const usePostCureHook = () => {
       setBackConfirmOpen(true);
       return;
     }
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
-  }, [isFormDirty, resetFormContext, bumpBatchRefresh, hasSavedDraft]);
+  }, [isFormDirty, resetFormContext, bumpBatchRefresh]);
 
   const handleDiscardAndBack = useCallback(() => {
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
-  }, [resetFormContext, bumpBatchRefresh, hasSavedDraft]);
+  }, [resetFormContext, bumpBatchRefresh]);
 
   const handleDraftOperationChange = useCallback((operation: string) => {
     setDraftOperation(operation);
@@ -305,18 +314,50 @@ export const usePostCureHook = () => {
     }));
   }, []);
 
-  const handleRemoveMotor = useCallback((motorId: string) => {
-    setFormData((prev) => {
-      const nextMotors = (prev.motors ?? []).filter((motor) => motor.motorId !== motorId);
-      return {
-        ...prev,
-        motors: nextMotors,
-        schemaFormLoaded: nextMotors.length > 0,
-      };
-    });
-    setAddedMotors((prev) => prev.filter((motor) => motor.motorId !== motorId));
-    clearSetupDrafts();
-  }, [clearSetupDrafts]);
+  const handleRemoveMotor = useCallback(
+    (motorIdToRemove: string) => {
+      setFormData((prev) => {
+        const remainingMotors = (prev.motors ?? []).filter(
+          (motor) => motor.motorId !== motorIdToRemove,
+        );
+
+        const hasMotorsRemaining = remainingMotors.length > 0;
+
+        // If motors still remain after removal
+        if (hasMotorsRemaining) {
+          // Find index of the removed item to determine fallback target
+          const removedIndex = (prev.motors ?? []).findIndex((m) => m.motorId === motorIdToRemove);
+
+          // Pick adjacent motor (either at same index or previous index)
+          const nextActiveIndex = Math.max(0, Math.min(removedIndex, remainingMotors.length - 1));
+          const nextActiveMotor = remainingMotors[nextActiveIndex];
+
+          // Update active draft parameters to reflect the newly active motor tab
+          setDraftMotorId(nextActiveMotor.motorId);
+          setDraftMotorReceiptDate(nextActiveMotor.motorReceiptDate || "");
+          setDraftOperation(nextActiveMotor.operation || "");
+          setDraftInhibitorType(nextActiveMotor.inhibitorType || "");
+
+          return {
+            ...prev,
+            motors: remainingMotors,
+            schemaFormLoaded: true,
+          };
+        } else {
+          // No motors left: Clear form setup and return to initial setup state
+          clearSetupDrafts();
+          return {
+            ...prev,
+            motors: [],
+            schemaFormLoaded: false,
+          };
+        }
+      });
+
+      setAddedMotors((prev) => prev.filter((motor) => motor.motorId !== motorIdToRemove));
+    },
+    [clearSetupDrafts],
+  );
 
   const handleLoadForm = useCallback(async () => {
     const inhibitorType = resolveInhibitorType(draftOperation, draftInhibitorType);
@@ -348,7 +389,9 @@ export const usePostCureHook = () => {
       schemaFormLoaded: true,
       motors: [motorSession],
     });
-    setAddedMotors([{ motorId: motorSession.motorId, motorReceiptDate: motorSession.motorReceiptDate }]);
+    setAddedMotors([
+      { motorId: motorSession.motorId, motorReceiptDate: motorSession.motorReceiptDate },
+    ]);
     clearSetupDrafts();
     setSchemaError(null);
   }, [
@@ -389,14 +432,14 @@ export const usePostCureHook = () => {
       inhibitorType,
       schema,
     );
-
+    const newMotorId = draftMotorId; // Grab current selected motor ID
     setFormData((prev) => ({
       schemaFormLoaded: true,
       motors: [...(prev.motors ?? []), motorSession],
     }));
     setAddedMotors((prev) => [
       ...prev,
-      { motorId: motorSession.motorId, motorReceiptDate: motorSession.motorReceiptDate },
+      { motorId: newMotorId, motorReceiptDate: motorSession.motorReceiptDate },
     ]);
     clearSetupDrafts();
     setSchemaError(null);
@@ -440,16 +483,12 @@ export const usePostCureHook = () => {
       const payloadBody = mapPostCureFormStateToPayload(formData);
       const firstMotor = formData.motors[0];
 
-      const operationType = mapPostCureOperationToApi(
-        firstMotor.operation
-      );
+      const operationType = mapPostCureOperationToApi(firstMotor.operation);
 
-      const inhibitorType =
-        isPostCureInhibitionOperation(firstMotor.operation)
-          ? mapPostCureInhibitorTypeToApi(firstMotor.inhibitorType)
-          : undefined;
+      const inhibitorType = isPostCureInhibitionOperation(firstMotor.operation)
+        ? mapPostCureInhibitorTypeToApi(firstMotor.inhibitorType)
+        : undefined;
 
-          
       setActionLoading(true);
       try {
         let response: any;
@@ -474,20 +513,19 @@ export const usePostCureHook = () => {
             return false;
           }
           response = await postCureController.updateForm({
-          formId: activeBatch.formId,
-          batchId: activeBatch.batchId,
+            formId: activeBatch.formId,
+            batchId: activeBatch.batchId,
 
-          subDepartmentId,
+            subDepartmentId,
 
-          formSubmissionType:
-            intent === "draft" ? "DRAFT" : "SUBMIT",
+            formSubmissionType: intent === "draft" ? "DRAFT" : "SUBMIT",
 
-          operationType,
+            operationType,
 
-          ...(inhibitorType ? { inhibitorType } : {}),
+            ...(inhibitorType ? { inhibitorType } : {}),
 
-          ...payloadBody,
-        });
+            ...payloadBody,
+          });
         }
 
         if (!response?.success) {
@@ -544,27 +582,60 @@ export const usePostCureHook = () => {
 
   const canLoadForm = useMemo(
     () =>
-      canLoadPostCureForm({
-        motorId: draftMotorId,
-        motorReceiptDate: draftMotorReceiptDate,
-        operation: draftOperation,
-        inhibitorType: draftInhibitor,
-        schemaFormLoaded: formData.schemaFormLoaded,
-      }),
-    [draftMotorId, draftMotorReceiptDate, draftOperation, draftInhibitor, formData.schemaFormLoaded],
+      Boolean(
+        !formData.schemaFormLoaded &&
+        draftMotorId &&
+        draftMotorReceiptDate &&
+        draftOperation &&
+        (!isPostCureInhibitionOperation(draftOperation) || draftInhibitor),
+      ),
+    [
+      draftMotorId,
+      draftMotorReceiptDate,
+      draftOperation,
+      draftInhibitor,
+      formData.schemaFormLoaded,
+    ],
   );
 
   const canAddMotor = useMemo(
     () =>
-      canAddPostCureMotor({
-        motorId: draftMotorId,
-        motorReceiptDate: draftMotorReceiptDate,
-        operation: draftOperation,
-        inhibitorType: draftInhibitor,
-        usedMotorIds,
-        availableMotorOptions: resolvePostCureMotorOptions(activeBatch),
-      }),
-    [draftMotorId, draftMotorReceiptDate, draftOperation, draftInhibitor, usedMotorIds, activeBatch],
+      Boolean(
+        formData.schemaFormLoaded &&
+        draftMotorId &&
+        draftMotorReceiptDate &&
+        draftOperation &&
+        (!isPostCureInhibitionOperation(draftOperation) || draftInhibitor) &&
+        !usedMotorIds.includes(draftMotorId),
+      ),
+    [
+      formData.schemaFormLoaded,
+      draftMotorId,
+      draftMotorReceiptDate,
+      draftOperation,
+      draftInhibitor,
+      usedMotorIds,
+    ],
+  );
+  const handleSelectMotorTab = useCallback(
+    (selectedMotorId: string) => {
+      setDraftMotorId(selectedMotorId);
+
+      const existingSession = formData.motors.find((m) => m.motorId === selectedMotorId);
+
+      if (existingSession) {
+        // Sync draft form state with selected motor's data
+        setDraftMotorReceiptDate(existingSession.motorReceiptDate || "");
+        setDraftOperation(existingSession.operation || "");
+        setDraftInhibitorType(existingSession.inhibitorType || "");
+      } else {
+        // New motor selected for addition: Reset draft inputs for fresh setup
+        setDraftMotorReceiptDate("");
+        setDraftOperation("");
+        setDraftInhibitorType("");
+      }
+    },
+    [formData.motors],
   );
 
   return {
@@ -608,6 +679,7 @@ export const usePostCureHook = () => {
     detailsLoading,
     handleViewPostCureDetails,
     handleBackFromDetails,
+    handleSelectMotorTab,
   };
 };
 

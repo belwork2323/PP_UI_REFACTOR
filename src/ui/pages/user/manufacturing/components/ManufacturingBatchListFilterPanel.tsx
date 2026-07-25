@@ -1,16 +1,18 @@
 import { alpha, Button, CircularProgress, MenuItem, Stack, TextField } from "@mui/material";
 import FilterPanelHeader from "@ui/components/common/FilterPanelHeader";
 import { STRINGS } from "../../../../../app/config/strings";
-import {
-  MANUFACTURING_BATCH_TYPE_OPTIONS,
-  MANUFACTURING_PRIORITY_OPTIONS,
-} from "../../../../../data/models/user/SubdepartmentBatchModel";
+import { MANUFACTURING_BATCH_TYPE_OPTIONS } from "../../../../../data/models/user/SubdepartmentBatchModel";
 import type { getOperationsTheme } from "../../../../../app/theme/custom_themes/shared/operations_theme";
 
 const FILTER_ALL = STRINGS.USER_BATCH_LIST.FILTER_ALL;
 const S = STRINGS.MANUFACTURING;
 
 type OperationsTheme = ReturnType<typeof getOperationsTheme>;
+
+type ProjectFilterOption = {
+  projectId: string;
+  projectName: string;
+};
 
 type ManufacturingBatchListFilterPanelProps = {
   theme: OperationsTheme;
@@ -19,18 +21,20 @@ type ManufacturingBatchListFilterPanelProps = {
   draftBatchType: string;
   draftMotorId: string;
   draftMotorStage: string;
-  draftPriority: string;
+  draftProjectId: string;
   draftStatus: string;
   statusDropdownValues: readonly string[];
   statusConfig: Record<string, { label?: string }>;
   motorStageOptions: Array<{ motorStage: string }>;
   motorStagesLoading: boolean;
+  projectOptions: ProjectFilterOption[];
+  projectsLoading: boolean;
   filterPanelHeaderSx: Record<string, unknown>;
   onDraftBatchIdChange: (value: string) => void;
   onDraftBatchTypeChange: (value: string) => void;
   onDraftMotorIdChange: (value: string) => void;
   onDraftMotorStageChange: (value: string) => void;
-  onDraftPriorityChange: (value: string) => void;
+  onDraftProjectIdChange: (value: string) => void;
   onDraftStatusChange: (value: string) => void;
   onApply: () => void;
   onClear: () => void;
@@ -44,18 +48,20 @@ const ManufacturingBatchListFilterPanel = ({
   draftBatchType,
   draftMotorId,
   draftMotorStage,
-  draftPriority,
+  draftProjectId,
   draftStatus,
   statusDropdownValues,
   statusConfig,
   motorStageOptions,
   motorStagesLoading,
+  projectOptions,
+  projectsLoading,
   filterPanelHeaderSx,
   onDraftBatchIdChange,
   onDraftBatchTypeChange,
   onDraftMotorIdChange,
   onDraftMotorStageChange,
-  onDraftPriorityChange,
+  onDraftProjectIdChange,
   onDraftStatusChange,
   onApply,
   onClear,
@@ -88,7 +94,11 @@ const ManufacturingBatchListFilterPanel = ({
         value={draftBatchId}
         onChange={(e) => onDraftBatchIdChange(e.target.value)}
         placeholder="e.g. BATCH-2026-001"
-        sx={{ ...theme.batchList.filterPanelField, minWidth: { xs: "100%", sm: 160 }, flex: { lg: 1 } }}
+        sx={{
+          ...theme.batchList.filterPanelField,
+          minWidth: { xs: "100%", sm: 160 },
+          flex: { lg: 1 },
+        }}
       />
 
       <TextField
@@ -123,7 +133,12 @@ const ManufacturingBatchListFilterPanel = ({
         sx={{ ...theme.batchList.filterPanelField, minWidth: { xs: "100%", sm: 160 } }}
       />
 
-      <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ minWidth: { xs: "100%", sm: 160 }, flex: { lg: "0 0 auto" } }}>
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="flex-start"
+        sx={{ minWidth: { xs: "100%", sm: 160 }, flex: { lg: "0 0 auto" } }}
+      >
         <TextField
           select
           size="small"
@@ -154,28 +169,43 @@ const ManufacturingBatchListFilterPanel = ({
         ) : null}
       </Stack>
 
-      <TextField
-        select
-        size="small"
-        label={S.BATCH_LIST.COL_PRIORITY}
-        value={draftPriority}
-        onChange={(e) => onDraftPriorityChange(e.target.value)}
-        sx={{ ...theme.batchList.filterPanelField, minWidth: { xs: "100%", sm: 160 } }}
-        SelectProps={{
-          MenuProps: {
-            PaperProps: {
-              sx: { "& .MuiMenuItem-root": theme.batchList.filterPanelMenuItem },
-            },
-          },
-        }}
+      <Stack
+        direction="row"
+        spacing={1}
+        alignItems="flex-start"
+        sx={{ minWidth: { xs: "100%", sm: 200 }, flex: { lg: "0 0 auto" }, position: "relative" }}
       >
-        <MenuItem value={FILTER_ALL}>{S.BATCH_LIST.FILTERS_ALL_PRIORITIES}</MenuItem>
-        {MANUFACTURING_PRIORITY_OPTIONS.map((priority) => (
-          <MenuItem key={priority} value={priority}>
-            {priority}
-          </MenuItem>
-        ))}
-      </TextField>
+        <TextField
+          select
+          size="small"
+          label={S.BATCH_LIST.FILTERS_PROJECT}
+          value={draftProjectId}
+          onChange={(e) => onDraftProjectIdChange(e.target.value)}
+          disabled={projectsLoading}
+          fullWidth
+          InputLabelProps={{ shrink: true }}
+          sx={theme.batchList.filterPanelField}
+          SelectProps={{
+            displayEmpty: true,
+            MenuProps: {
+              PaperProps: {
+                sx: { "& .MuiMenuItem-root": theme.batchList.filterPanelMenuItem },
+              },
+            },
+          }}
+        >
+          <MenuItem value={FILTER_ALL}>{S.BATCH_LIST.FILTERS_ALL_PROJECTS}</MenuItem>
+          {!projectsLoading &&
+            projectOptions.map((project) => (
+              <MenuItem key={project.projectId} value={project.projectId}>
+                {project.projectName} ({project.projectId})
+              </MenuItem>
+            ))}
+        </TextField>
+        {projectsLoading ? (
+          <CircularProgress size={18} sx={{ mt: 0.75, color: theme.palette.primaryLight }} />
+        ) : null}
+      </Stack>
 
       <TextField
         select
@@ -194,14 +224,19 @@ const ManufacturingBatchListFilterPanel = ({
       >
         {statusDropdownValues.map((status) => (
           <MenuItem key={status} value={status}>
-            {status === FILTER_ALL ? FILTER_ALL : statusConfig[status]?.label ?? status}
+            {status === FILTER_ALL ? FILTER_ALL : (statusConfig[status]?.label ?? status)}
           </MenuItem>
         ))}
       </TextField>
     </Stack>
 
     <Stack direction="row" justifyContent="flex-end" spacing={1}>
-      <Button variant="outlined" size="small" onClick={onClose} sx={{ textTransform: "none", fontWeight: 700 }}>
+      <Button
+        variant="outlined"
+        size="small"
+        onClick={onClose}
+        sx={{ textTransform: "none", fontWeight: 700 }}
+      >
         {S.BATCH_LIST.FILTERS_CLOSE_PANEL}
       </Button>
       <Button

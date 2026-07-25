@@ -14,14 +14,12 @@ import {
 } from "@mui/material";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import dayjs from "dayjs";
 import { icons } from "../../../../../app/theme/icons";
 import IconText from "../../../../components/common/IconText";
 import FilterPanelHeader from "@ui/components/common/FilterPanelHeader";
 import FilterToggleButton from "../../../../components/common/FilterToggleButton";
+import DateField from "../../../../components/common/DateField";
+import { formatToIsoDateInput, formatToUiDate } from "../../../../../utils/dateUtils";
 import UserBatchList from "../../../../components/custom/UserBatchList";
 import UserWorkflowStatusAction from "../../../../components/custom/UserWorkflowStatusAction";
 import UserWorkflowStatusCell from "../../../../components/custom/UserWorkflowStatusCell";
@@ -30,7 +28,7 @@ import getSourcingTheme from "../../../../../app/theme/custom_themes/user/sourci
 import {
   getOperationStatusConfig,
   OPERATION_STATUS,
-  OPERATION_STATUS_FILTER_VALUES,
+  SOURCING_LOT_STATUS_FILTER_VALUES,
 } from "../../../../../hooks/operationStatus";
 import {
   canDeleteRawMaterialLot,
@@ -59,7 +57,7 @@ export const OPERATION_STATUS_CONFIG = getOperationStatusConfig({
   rejected: CancelRoundedIcon,
 });
 
-const STATUS_DROPDOWN_VALUES = [FILTER_ALL, ...OPERATION_STATUS_FILTER_VALUES] as const;
+const STATUS_DROPDOWN_VALUES = [FILTER_ALL, ...SOURCING_LOT_STATUS_FILTER_VALUES] as const;
 
 /** Lot metadata edit — only for drafts not yet in workflow filling */
 const canShowEditLotButton = (status: string) => status === OPERATION_STATUS.TO_BE_INITIATED;
@@ -139,6 +137,11 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         ]),
       ),
     [theme],
+  );
+
+  const statusTabs = useMemo(
+    () => [FILTER_ALL, ...SOURCING_LOT_STATUS_FILTER_VALUES],
+    [],
   );
 
   const filterToggleSx = useMemo(() => {
@@ -403,13 +406,15 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         clearChipSx={filterPanelHeaderSx.clearChipSx}
       />
 
-      <Stack direction={{ xs: "column", lg: "row" }} spacing={1.25} flexWrap="wrap" useFlexGap>
-        <Stack
-          direction="row"
-          spacing={1}
-          alignItems="flex-start"
-          sx={{ minWidth: { xs: "100%", sm: 180 }, flex: { lg: "0 0 auto" } }}
-        >
+      <Stack
+        direction="row"
+        spacing={1.25}
+        alignItems="flex-end"
+        flexWrap={{ xs: "wrap", lg: "nowrap" }}
+        useFlexGap
+        sx={{ width: "100%" }}
+      >
+        <Box sx={{ flex: "1 1 160px", minWidth: { xs: "100%", sm: 160 }, position: "relative" }}>
           <TextField
             select
             size="small"
@@ -418,8 +423,10 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
             onChange={(e) => setDraftMaterial(e.target.value)}
             disabled={materialsLoading}
             fullWidth
+            InputLabelProps={{ shrink: true }}
             sx={theme.batchList.filterPanelField}
             SelectProps={{
+              displayEmpty: true,
               MenuProps: {
                 PaperProps: {
                   sx: { "& .MuiMenuItem-root": theme.batchList.filterPanelMenuItem },
@@ -438,9 +445,17 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
               ))}
           </TextField>
           {materialsLoading ? (
-            <CircularProgress size={18} sx={{ mt: 0.75, color: theme.palette.primaryLight }} />
+            <CircularProgress
+              size={16}
+              sx={{
+                position: "absolute",
+                right: 28,
+                bottom: 8,
+                color: theme.palette.primaryLight,
+              }}
+            />
           ) : null}
-        </Stack>
+        </Box>
 
         <TextField
           size="small"
@@ -448,10 +463,11 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
           value={draftManufacturer}
           onChange={(e) => setDraftManufacturer(e.target.value)}
           placeholder="e.g. Prefiled"
+          InputLabelProps={{ shrink: true }}
           sx={{
             ...theme.batchList.filterPanelField,
+            flex: "1 1 160px",
             minWidth: { xs: "100%", sm: 160 },
-            flex: { lg: 1 },
           }}
         />
 
@@ -461,8 +477,14 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
           label={STRINGS.SOURCING.BATCH_LIST.FILTERS_STATUS}
           value={draftStatus}
           onChange={(e) => setDraftStatus(e.target.value)}
-          sx={{ ...theme.batchList.filterPanelField, minWidth: { xs: "100%", sm: 160 } }}
+          InputLabelProps={{ shrink: true }}
+          sx={{
+            ...theme.batchList.filterPanelField,
+            flex: "1 1 140px",
+            minWidth: { xs: "100%", sm: 140 },
+          }}
           SelectProps={{
+            displayEmpty: true,
             MenuProps: {
               PaperProps: {
                 sx: { "& .MuiMenuItem-root": theme.batchList.filterPanelMenuItem },
@@ -477,32 +499,24 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
           ))}
         </TextField>
 
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <DatePicker
+        <Box sx={{ flex: "1 1 140px", minWidth: { xs: "100%", sm: 140 } }}>
+          <DateField
             label={STRINGS.SOURCING.BATCH_LIST.FILTERS_FROM_DATE}
-            format="YYYY-MM-DD"
-            value={draftFrom ? dayjs(draftFrom) : null}
-            onChange={(v) => setDraftFrom(v && v.isValid() ? v.format("YYYY-MM-DD") : "")}
-            slotProps={{
-              textField: {
-                size: "small",
-                sx: { ...theme.batchList.filterPanelField, minWidth: { xs: "100%", sm: 140 } },
-              },
-            }}
+            value={formatToUiDate(draftFrom)}
+            onChange={(v) => setDraftFrom(formatToIsoDateInput(v))}
+            compact
+            sx={{ ...theme.batchList.filterPanelField, mb: 0, width: "100%" }}
           />
-          <DatePicker
+        </Box>
+        <Box sx={{ flex: "1 1 140px", minWidth: { xs: "100%", sm: 140 } }}>
+          <DateField
             label={STRINGS.SOURCING.BATCH_LIST.FILTERS_TO_DATE}
-            format="YYYY-MM-DD"
-            value={draftTo ? dayjs(draftTo) : null}
-            onChange={(v) => setDraftTo(v && v.isValid() ? v.format("YYYY-MM-DD") : "")}
-            slotProps={{
-              textField: {
-                size: "small",
-                sx: { ...theme.batchList.filterPanelField, minWidth: { xs: "100%", sm: 140 } },
-              },
-            }}
+            value={formatToUiDate(draftTo)}
+            onChange={(v) => setDraftTo(formatToIsoDateInput(v))}
+            compact
+            sx={{ ...theme.batchList.filterPanelField, mb: 0, width: "100%" }}
           />
-        </LocalizationProvider>
+        </Box>
       </Stack>
 
       <Stack direction="row" justifyContent="flex-end" spacing={1}>
@@ -533,6 +547,7 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         columns={COLUMNS}
         statusField="rmStatus"
         statusConfig={statusConfig}
+        statusTabs={statusTabs}
         filters={[]}
         searchFields={[...RAW_MATERIAL_LOT_SEARCH_FIELDS]}
         highlightRow={(row: any) => row.rmStatus === OPERATION_STATUS.REJECTED}

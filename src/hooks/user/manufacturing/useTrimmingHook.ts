@@ -3,35 +3,30 @@ import { STRINGS } from "../../../app/config/strings";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshStore";
+import { batchManagementController } from "../../../controllers/admin/BatchManagement/batchManagementController";
 import { operationsController } from "../../../controllers/user/operationsController";
 import trimmingController from "../../../controllers/user/manufacturing/trimmingController";
 import {
   createDefaultTrimmingFormState,
   createEmptyTrimmingMotorSession,
   hasAnyTrimmingValue,
-  hydrateTrimmingFormState,
-    hydrateTrimmingMotorSession,
   mapTrimmingDetailsToFormState,
   mapTrimmingFormStateToPayload,
   type TrimmingFormState,
   type TrimmingMotorSession,
 } from "../../../data/models/user/TrimmingFormModel";
-import { fetchTrimmingSchema, mapTrimmingMotorStage, resolveTrimmingMotorStageNumber } from "../../../schema-engine";
 import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
 import {
-  getSelectedTrimmingDraftMotorIds,
   mapApprovedMotorsToOptions,
   mergeTrimmingMotorOptions,
-  resolveEffectiveTrimmingMotorCount,
   resolveTrimmingMotorCountLimit,
   resolveTrimmingMotorOptions,
-  resolveTrimmingSchemaMotorStage,
   type TrimmingAddedMotor,
   type TrimmingMotorStageOption,
 } from "./trimmingFlowConfig";
 import { useCuringMotorStages } from "./useCuringMotorStages";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
-import type { SchemaDocumentV2, SchemaFormValues } from "../../../schema-engine";
+import type { SchemaFormValues } from "../../../schema-engine";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -72,6 +67,65 @@ const buildAddedMotorsFromForm = (formData: TrimmingFormState): TrimmingAddedMot
       motorReceivedAt: motor.motorReceivedAt,
     }));
 
+const resolveBatchMotorEntries = (
+  batch: TrimmingBatch | null,
+  batchDetails: any,
+): TrimmingAddedMotor[] => {
+  const batchDetailsRecord = (batchDetails ?? {}) as Record<string, any>;
+  const collectIds = (source: any): string[] => {
+    const ids: string[] = [];
+    const push = (value: unknown) => {
+      const normalized = String(value ?? "").trim();
+      if (normalized) ids.push(normalized);
+    };
+
+    if (Array.isArray(source?.motorIds)) {
+      source.motorIds.forEach((value: unknown) => push(value));
+    }
+
+    if (Array.isArray(source?.motors)) {
+      source.motors.forEach((motor: any) => {
+        push(motor?.motorId ?? motor?.motorNo ?? motor?.motorNumber ?? motor?.id);
+      });
+    }
+
+    if (source?.motorId != null) {
+      push(source.motorId);
+    }
+
+    return ids.filter((id, index, arr) => arr.indexOf(id) === index);
+  };
+
+  const motorIds = collectIds(batchDetails ?? batch ?? {});
+  if (motorIds.length === 0) {
+    const directMotorId = String(batch?.motorId ?? "").trim();
+    return directMotorId ? [{ motorId: directMotorId, motorStage: "", motorReceivedAt: "" }] : [];
+  }
+
+  const fallbackStage = String(
+    batch?.motorStage ??
+      batch?.motorType ??
+      batchDetailsRecord?.motorStage ??
+      batchDetailsRecord?.motorType ??
+      "",
+  ).trim();
+
+  const fallbackReceivedAt = String(
+    batchDetailsRecord?.motorReceivedAt ??
+      batchDetailsRecord?.motorReceiptDate ??
+      batchDetailsRecord?.receivedAt ??
+      batch?.motorReceivedAt ??
+      batch?.receivedAt ??
+      "",
+  ).trim();
+
+  return motorIds.map((motorId) => ({
+    motorId,
+    motorStage: fallbackStage,
+    motorReceivedAt: fallbackReceivedAt,
+  }));
+};
+
 export const useTrimmingHook = () => {
   const listParams = useSubdepartmentBatches("trimming");
   const user = useAuthStore((s) => s.user);
@@ -87,21 +141,19 @@ export const useTrimmingHook = () => {
   const [activeBatch, setActiveBatch] = useState<TrimmingBatch | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [loadingFormDetails, setLoadingFormDetails] = useState(false);
-  const [schemaLoading, setSchemaLoading] = useState(false);
-  const [schemaError, setSchemaError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
   const [formData, setFormData] = useState<TrimmingFormState>(createDefaultTrimmingFormState());
   const [initialSnapshot, setInitialSnapshot] = useState("{}");
- const [detailsRow, setDetailsRow] = useState<any>(null);
+  const [detailsRow, setDetailsRow] = useState<any>(null);
   const [detailsData, setDetailsData] = useState<any>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [selectedMotorStage, setSelectedMotorStage] = useState("");
   const [motorCount, setMotorCount] = useState<number | "">("");
-  const [draftMotorIds, setDraftMotorIds] = useState<string[]>([]);
   const [motorReceivedAt, setMotorReceivedAt] = useState("");
   const [addedMotors, setAddedMotors] = useState<TrimmingAddedMotor[]>([]);
+  const [batchMotorEntries, setBatchMotorEntries] = useState<TrimmingAddedMotor[]>([]);
   const [approvedMotorOptions, setApprovedMotorOptions] = useState<
     ReturnType<typeof mapApprovedMotorsToOptions>
   >([]);
@@ -125,10 +177,7 @@ export const useTrimmingHook = () => {
     [motorStageOptions, selectedMotorStage],
   );
 
-  const batchMotorOptions = useMemo(
-    () => resolveTrimmingMotorOptions(activeBatch),
-    [activeBatch],
-  );
+  const batchMotorOptions = useMemo(() => resolveTrimmingMotorOptions(activeBatch), [activeBatch]);
 
   const availableMotorOptions = useMemo(
     () => mergeTrimmingMotorOptions(approvedMotorOptions, batchMotorOptions),
@@ -163,15 +212,14 @@ export const useTrimmingHook = () => {
   const clearFlowBarDrafts = useCallback(() => {
     setSelectedMotorStage("");
     setMotorCount("");
-    setDraftMotorIds([]);
     setMotorReceivedAt("");
   }, []);
 
   const resetFlowDraft = useCallback(() => {
     clearFlowBarDrafts();
     setAddedMotors([]);
+    setBatchMotorEntries([]);
     setApprovedMotorOptions([]);
-    setSchemaError(null);
   }, [clearFlowBarDrafts]);
 
   const resetFormContext = useCallback(() => {
@@ -180,8 +228,6 @@ export const useTrimmingHook = () => {
     setActiveBatch(null);
     setIsEditMode(false);
     setLoadingFormDetails(false);
-    setSchemaLoading(false);
-    setSchemaError(null);
     setActionLoading(false);
     setBackConfirmOpen(false);
     setHasSavedDraft(false);
@@ -231,146 +277,6 @@ export const useTrimmingHook = () => {
     };
   }, [activeBatch, selectedMotorStage]);
 
-  const fetchTrimmingSchemaDocument = useCallback(
-    async (motorStage: string | number, options?: { silent?: boolean }) => {
-      if (!subDepartmentId) {
-        showAlert(STRINGS.MANUFACTURING.TRIMMING.SUB_DEPARTMENT_MISSING, "error");
-        return null;
-      }
-
-      const silent = options?.silent ?? false;
-      if (!silent) {
-        setSchemaLoading(true);
-        setSchemaError(null);
-      }
-      try {
-        const response = await fetchTrimmingSchema({
-          subDepartmentId,
-          motorStage: resolveTrimmingSchemaMotorStage(motorStage),
-        });
-        if (!response?.success || !response?.data) {
-          const message = getErrorMessage(
-            response,
-            STRINGS.MANUFACTURING.TRIMMING.SCHEMA_FETCH_ERROR,
-          );
-          setSchemaError(message);
-          if (!silent) showAlert(message, "error");
-          return null;
-        }
-        return response.data;
-      } finally {
-        if (!silent) setSchemaLoading(false);
-      }
-    },
-    [showAlert, subDepartmentId],
-  );
-
-  const appendMotorsToForm = useCallback(
-    async (entries: TrimmingAddedMotor[]) => {
-      if (!activeBatch || entries.length === 0) return false;
-
-      const stageNum = resolveTrimmingMotorStageNumber({ motorStage: selectedMotorStage });
-      const schemasByStage = { ...(formData.schemasByStage ?? {}) };
-      let schema = schemasByStage[stageNum] ?? null;
-
-      if (!schema) {
-        schema = await fetchTrimmingSchemaDocument(selectedMotorStage);
-        if (!schema) return false;
-        schemasByStage[stageNum] = schema;
-      }
-
-      const existingSessions = formData.motors ?? [];
-      const nextSessions: TrimmingMotorSession[] = [
-        ...existingSessions,
-        ...entries
-          .filter((entry) => !existingSessions.some((motor) => motor.motorId === entry.motorId))
-          .map((entry) =>
-            createEmptyTrimmingMotorSession(
-              entry.motorId,
-              entry.motorStage,
-              entry.motorReceivedAt,
-              schema,
-            ),
-          ),
-      ];
-
-      setAddedMotors((prev) => {
-        const existingIds = new Set(prev.map((motor) => motor.motorId));
-        return [...prev, ...entries.filter((entry) => !existingIds.has(entry.motorId))];
-      });
-      setFormData({
-        ...formData,
-        schemaFormLoaded: true,
-        trimmingSchema: schema,
-        schemasByStage,
-        selectedMotorStage: String(stageNum),
-        motors: nextSessions,
-      });
-      clearFlowBarDrafts();
-      return true;
-    },
-    [activeBatch, clearFlowBarDrafts, fetchTrimmingSchemaDocument, formData, selectedMotorStage],
-  );
-
-  const handleLoadTrimmingForm = useCallback(async () => {
-    if (!activeBatch) return;
-
-    const count = resolveEffectiveTrimmingMotorCount(motorCount, draftMotorIds);
-    if (count <= 0 || !selectedMotorStage.trim() || !motorReceivedAt.trim()) return;
-
-    const selectedIds = getSelectedTrimmingDraftMotorIds(count, draftMotorIds);
-    if (selectedIds.length !== count) return;
-
-    const entries: TrimmingAddedMotor[] = selectedIds.map((motorId) => ({
-      motorId,
-      motorStage: selectedMotorStage,
-      motorReceivedAt: motorReceivedAt.trim(),
-    }));
-
-    await appendMotorsToForm(entries);
-  }, [
-    activeBatch,
-    appendMotorsToForm,
-    draftMotorIds,
-    motorCount,
-    motorReceivedAt,
-    selectedMotorStage,
-  ]);
-
-  const handleAddMotors = useCallback(async () => {
-    if (!formData.schemaFormLoaded) {
-      await handleLoadTrimmingForm();
-      return;
-    }
-
-    const count = resolveEffectiveTrimmingMotorCount(motorCount, draftMotorIds);
-    if (count <= 0 || !selectedMotorStage.trim() || !motorReceivedAt.trim()) return;
-
-    const selectedIds = getSelectedTrimmingDraftMotorIds(count, draftMotorIds);
-    if (selectedIds.length !== count) return;
-
-    const existingIds = new Set(addedMotors.map((motor) => motor.motorId));
-    const entries: TrimmingAddedMotor[] = selectedIds
-      .filter((motorId) => !existingIds.has(motorId))
-      .map((motorId) => ({
-        motorId,
-        motorStage: selectedMotorStage,
-        motorReceivedAt: motorReceivedAt.trim(),
-      }));
-
-    if (entries.length === 0) return;
-    await appendMotorsToForm(entries);
-  }, [
-    addedMotors,
-    appendMotorsToForm,
-    draftMotorIds,
-    formData.schemaFormLoaded,
-    handleLoadTrimmingForm,
-    motorCount,
-    motorReceivedAt,
-    selectedMotorStage,
-  ]);
-
   const openFormWithResolvedData = useCallback(
     async (batch: TrimmingBatch, editMode: boolean) => {
       const status = parseStatus(batch.trStatus);
@@ -382,9 +288,19 @@ export const useTrimmingHook = () => {
       let nextBatch = batch;
       let nextFormData = createDefaultTrimmingFormState();
       const initialStage = resolveInitialMotorStage(batch);
+      let autoMotorEntries: TrimmingAddedMotor[] = [];
 
       setLoadingFormDetails(true);
       try {
+        if (batch.batchId) {
+          try {
+            const batchDetails = await batchManagementController.getBatchById(batch.batchId);
+            autoMotorEntries = resolveBatchMotorEntries(batch, batchDetails);
+          } catch (error) {
+            console.error("Unable to resolve batch motor details", error);
+          }
+        }
+
         if (shouldFetchDetails) {
           if (!subDepartmentId) {
             showAlert(STRINGS.MANUFACTURING.TRIMMING.SUB_DEPARTMENT_MISSING, "error");
@@ -397,7 +313,6 @@ export const useTrimmingHook = () => {
 
           const detailsResponse = await trimmingController.fetchFormDetails({
             formId: batch.formId,
-            // subDepartmentId,
           });
 
           if (!detailsResponse?.success || !detailsResponse?.data) {
@@ -411,55 +326,34 @@ export const useTrimmingHook = () => {
 
           nextBatch = { ...batch, formId: detailsResponse.data.formId || batch.formId };
           nextFormData = mapTrimmingDetailsToFormState(detailsResponse.data);
-
-          const motors = nextFormData.motors ?? [];
-          const hasSavedData =
-            nextFormData.schemaFormLoaded || motors.some((motor) => motor.savedSections?.length);
-
-          if (hasSavedData && motors.length > 0) {
-            const schemasByStage: Record<number, SchemaDocumentV2> = {
-              ...(nextFormData.schemasByStage ?? {}),
-            };
-            const uniqueStages = [...new Set(motors.map((motor) => motor.motorStage))];
-            const stagesToFetch = uniqueStages.filter((stage) => !schemasByStage[stage]);
-
-            const fetchedSchemas = await Promise.all(
-              stagesToFetch.map(async (stage) => ({
-                stage,
-                schema: await fetchTrimmingSchemaDocument(String(stage), { silent: true }),
-              })),
-            );
-
-            if (fetchedSchemas.some(({ schema }) => !schema)) return;
-
-            fetchedSchemas.forEach(({ stage, schema }) => {
-              if (schema) schemasByStage[stage] = schema;
-            });
-
-            const hydratedMotors = motors.map((motor) =>
-              hydrateTrimmingMotorSession(motor, schemasByStage[motor.motorStage] ?? null),
-            );
-            const firstStage = uniqueStages[0];
-
-            nextFormData = {
-              ...nextFormData,
-              schemaFormLoaded: true,
-              schemasByStage,
-              trimmingSchema: firstStage != null ? schemasByStage[firstStage] ?? null : null,
-              motors: hydratedMotors,
-            };
-          } else if (hasSavedData) {
-            const stageForSchema =
-              nextFormData.selectedMotorStage ??
-              initialStage ??
-              String(resolveTrimmingMotorStageNumber({ motorStage: batch }));
-            const schema = await fetchTrimmingSchemaDocument(stageForSchema);
-            if (!schema) return;
-            nextFormData = hydrateTrimmingFormState(nextFormData, schema, stageForSchema);
-          }
         }
       } finally {
         setLoadingFormDetails(false);
+      }
+
+      const existingMotorIds = new Set((nextFormData.motors ?? []).map((motor) => motor.motorId));
+      const motorEntriesToUse = autoMotorEntries.filter(
+        (entry) => Boolean(entry.motorId) && !existingMotorIds.has(entry.motorId),
+      );
+
+      if (motorEntriesToUse.length > 0 && (nextFormData.motors ?? []).length === 0) {
+        nextFormData = {
+          ...nextFormData,
+          schemaFormLoaded: true,
+          motors: motorEntriesToUse.map((entry) =>
+            createEmptyTrimmingMotorSession(
+              entry.motorId,
+              entry.motorStage || initialStage || "",
+              entry.motorReceivedAt || "",
+              null,
+            ),
+          ),
+        };
+      } else if ((nextFormData.motors ?? []).length > 0) {
+        nextFormData = {
+          ...nextFormData,
+          schemaFormLoaded: true,
+        };
       }
 
       const nextAddedMotors = buildAddedMotorsFromForm(nextFormData);
@@ -468,6 +362,7 @@ export const useTrimmingHook = () => {
       setIsEditMode(editMode);
       setFormData(nextFormData);
       setAddedMotors(nextAddedMotors);
+      setBatchMotorEntries(autoMotorEntries);
       clearFlowBarDrafts();
       setInitialSnapshot(
         JSON.stringify({
@@ -478,36 +373,35 @@ export const useTrimmingHook = () => {
       );
       setView("form");
     },
-    [clearFlowBarDrafts, fetchTrimmingSchemaDocument, showAlert, subDepartmentId],
+    [clearFlowBarDrafts, showAlert, subDepartmentId],
   );
-  const handleViewTrimmingDetails = useCallback(
-    async (row: any) => {
-      if (!row?.formId) return;
 
-      setDetailsLoading(true);
+  const handleViewTrimmingDetails = useCallback(async (row: any) => {
+    if (!row?.formId) return;
 
-      try {
-        const response =
-          await trimmingController.fetchFormDetails({
-            formId: row.formId,
-          });
+    setDetailsLoading(true);
+    try {
+      const response = await trimmingController.fetchFormDetails({
+        formId: row.formId,
+      });
 
-        if (response?.success) {
-          setDetailsRow(row);
-          setDetailsData(response.data);
-          setView("details");
-        }
-      } finally {
-        setDetailsLoading(false);
+      if (response?.success) {
+        setDetailsRow(row);
+        setDetailsData(response.data);
+        setView("details");
       }
-    },
-    [],
-  );
+    } finally {
+      setDetailsLoading(false);
+    }
+  }, []);
+
   const handleBackFromDetails = useCallback(() => {
     setDetailsRow(null);
     setDetailsData(null);
     setView("list");
-  }, []);
+    bumpBatchRefresh();
+  }, [bumpBatchRefresh]);
+
   const handleFillForm = useCallback(
     async (batch: TrimmingBatch) => await openFormWithResolvedData(batch, false),
     [openFormWithResolvedData],
@@ -523,54 +417,24 @@ export const useTrimmingHook = () => {
       setBackConfirmOpen(true);
       return;
     }
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
-  }, [isFormDirty, resetFormContext, bumpBatchRefresh, hasSavedDraft]);
+  }, [isFormDirty, resetFormContext, bumpBatchRefresh]);
 
   const handleDiscardAndBack = useCallback(() => {
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
-  }, [resetFormContext, bumpBatchRefresh, hasSavedDraft]);
+  }, [resetFormContext, bumpBatchRefresh]);
 
-  const handleMotorStageChange = useCallback(
-    (value: string) => {
-      setSelectedMotorStage(value);
-      setMotorCount("");
-      setDraftMotorIds([]);
-      setMotorReceivedAt("");
-    },
-    [],
-  );
+  const handleMotorStageChange = useCallback((value: string) => {
+    setSelectedMotorStage(value);
+    setMotorCount("");
+    setMotorReceivedAt("");
+  }, []);
 
   const handleMotorCountChange = useCallback((count: number | "") => {
     setMotorCount(count);
-    if (count === "") {
-      setDraftMotorIds([]);
-      return;
-    }
-    setDraftMotorIds((prev) => Array.from({ length: Number(count) }, (_, idx) => prev[idx] ?? ""));
   }, []);
-
-  const handleDraftMotorIdChange = useCallback((index: number, motorId: string) => {
-    setDraftMotorIds((prev) => {
-      const next = [...prev];
-      next[index] = motorId;
-      return next;
-    });
-  }, []);
-
-  useEffect(() => {
-    if (view !== "form") return;
-    if (String(selectedMotorStage ?? "").trim()) return;
-
-    const count = motorCount === "" ? 0 : Number(motorCount);
-    if (count !== 1 || availableMotorOptions.length !== 1) return;
-
-    const onlyMotorId = availableMotorOptions[0]?.value ?? "";
-    if (!onlyMotorId) return;
-
-    setDraftMotorIds((prev) => (prev[0] === onlyMotorId ? prev : [onlyMotorId]));
-  }, [view, motorCount, availableMotorOptions, selectedMotorStage]);
 
   const handleMotorSessionChange = useCallback((motorId: string, next: TrimmingMotorSession) => {
     setFormData((prev) => ({
@@ -579,25 +443,26 @@ export const useTrimmingHook = () => {
     }));
   }, []);
 
-  const handleFormValuesChange = useCallback(
-    (motorId: string, values: SchemaFormValues) => {
-      setFormData((prev) => ({
-        ...prev,
-        motors: (prev.motors ?? []).map((motor) =>
-          motor.motorId === motorId ? { ...motor, formValues: values } : motor,
-        ),
-        schemaFormValues: values,
-      }));
-    },
-    [],
-  );
+  const handleFormValuesChange = useCallback((motorId: string, values: SchemaFormValues) => {
+    setFormData((prev) => ({
+      ...prev,
+      motors: (prev.motors ?? []).map((motor) =>
+        motor.motorId === motorId ? { ...motor, formValues: values } : motor,
+      ),
+      schemaFormValues: values,
+    }));
+  }, []);
 
   const submitForm = useCallback(
     async (intent: "draft" | "submit") => {
       if (!activeBatch) return false;
 
-      if (!formData.schemaFormLoaded || !formData.trimmingSchema) {
-        showAlert(STRINGS.MANUFACTURING.TRIMMING.SCHEMA_NOT_LOADED, "warning");
+      if ((formData.motors ?? []).length === 0) {
+        showAlert(
+          STRINGS.MANUFACTURING.TRIMMING.EMPTY_FORM_ERROR ||
+            "Please add at least one motor before submitting.",
+          "warning",
+        );
         return false;
       }
 
@@ -696,8 +561,6 @@ export const useTrimmingHook = () => {
     isEditMode,
     formData,
     isFormDirty,
-    schemaLoading,
-    schemaError,
     actionLoading,
     backConfirmOpen,
     setBackConfirmOpen,
@@ -706,22 +569,19 @@ export const useTrimmingHook = () => {
     motorStageOptions,
     motorStagesLoading,
     motorCount,
-    draftMotorIds,
     motorReceivedAt,
     addedMotors,
     availableMotorOptions,
     approvedMotorsLoading,
     maxMotorCount,
+    batchMotorEntries,
     handleFillForm,
     handleEditForm,
     handleBack,
     handleDiscardAndBack,
     handleMotorStageChange,
     handleMotorCountChange,
-    handleDraftMotorIdChange,
     handleMotorReceivedAtChange: setMotorReceivedAt,
-    handleLoadTrimmingForm,
-    handleAddMotors,
     handleMotorSessionChange,
     handleFormValuesChange,
     handleSaveDraft,

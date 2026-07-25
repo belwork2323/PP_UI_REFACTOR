@@ -59,15 +59,14 @@ export const getRawMaterialPreparationTheme = (baseTheme: any) => {
 			loadingSpinnerSize: 32,
 		},
 		header: {
-			contentPadding: { p: "14px 18px" },
 			scaleChip: (color: string) => ({
 				height: 22,
-				fontSize: "calc(0.65rem + 2px)",
+				fontSize: "0.65rem",
 				fontWeight: 700,
 				background: alpha(color, 0.1),
 				color,
 				border: `1px solid ${alpha(color, 0.28)}`,
-				"& .MuiChip-label": { px: 1.2 },
+				"& .MuiChip-label": { px: 1 },
 			}),
 			typeChip: (color: string) => ({
 				height: 20,
@@ -358,11 +357,21 @@ export const getRawMaterialPreparationTheme = (baseTheme: any) => {
 				const danger = palette.danger ?? "#C0392B";
 				const warnBase = palette.warn ?? "#D4AC0D";
 				return {
-					["To Be Initiated"]: { color: "#334155", bg: "#F8FAFC", border: "#CBD5E1" },
-					["In Progress"]: { color: primary, bg: "#E8F4FC", border: alpha(primaryLight, 0.5) },
-					["Waiting for Approval"]: { color: "#7D6608", bg: "#FFF4D6", border: warnBase },
-					["Approved"]: { color: success, bg: "#E8F8F5", border: alpha(success, 0.5) },
-					["Rejected"]: { color: danger, bg: "#FDEDEC", border: alpha(danger, 0.5) },
+					["To Be Initiated"]: {
+						color: primary,
+						bg: alpha(primary, 0.1),
+						border: alpha(primaryLight, 0.35),
+					},
+					["In Progress"]: { color: primary, bg: alpha(primaryLight, 0.12), border: alpha(primaryLight, 0.45) },
+					["Waiting for Partial Approval"]: {
+						color: primary,
+						bg: alpha(primaryLight, 0.12),
+						border: alpha(primaryLight, 0.45),
+					},
+					["Waiting for Approval"]: { color: "#7D6608", bg: alpha(warnBase, 0.14), border: alpha(warnBase, 0.55) },
+					["Approved"]: { color: success, bg: alpha(success, 0.1), border: alpha(success, 0.45) },
+					["Rejected"]: { color: danger, bg: alpha(danger, 0.1), border: alpha(danger, 0.45) },
+					["Final Approval Completed"]: { color: success, bg: alpha(success, 0.1), border: alpha(success, 0.45) },
 				} as Record<string, { color: string; bg: string; border: string }>;
 			})(),
 			page: { animation: "fadeIn 0.35s ease both" },

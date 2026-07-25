@@ -25,29 +25,29 @@ const getDepartmentHeaderTheme = (mode = "light") => {
     // ─── OUTER WRAPPER ───────────────────────────────────────────
     wrapper: {
       px: { xs: spacing.sm, md: spacing.md },
-      pt: { xs: spacing.sm, md: spacing.md },
-      pb: { xs: spacing.sm, md: spacing.md },
+      pt: { xs: 0.75, md: 1 },
+      pb: { xs: 0.75, md: 1 },
     },
 
-    // ─── CARD ────────────────────────────────────────────────────
+    // ─── CARD (compact — shared across all user subdepartments) ──
     card: {
       ...general.positionRelative,
-      borderRadius:   `${(layout.cardBorderRadius ?? 4) * 3}px`,
+      borderRadius:   `${(layout.cardBorderRadius ?? 4) * 2.5}px`,
       background:     d.cardBg,
       border:         `1px solid ${d.cardBorder}`,
       boxShadow:      d.cardShadow,
       backdropFilter: d.backdropFilter,
       ...general.overflowHidden,
-      p: { xs: spacing.sm, sm: spacing.md, md: spacing.md },
+      p: { xs: "8px 10px", sm: "8px 12px", md: "9px 14px" },
     },
 
     // ─── DECORATIVE CIRCLES ──────────────────────────────────────
     decorCircle: {
       ...general.positionAbsolute,
-      top:           -40,
-      right:         -40,
-      width:         160,
-      height:        160,
+      top:           -36,
+      right:         -36,
+      width:         120,
+      height:        120,
       ...general.borderCircle,
       background:    d.decorBg,
       pointerEvents: "none",
@@ -55,10 +55,10 @@ const getDepartmentHeaderTheme = (mode = "light") => {
 
     decorCircleSmall: {
       ...general.positionAbsolute,
-      bottom:        -20,
+      bottom:        -16,
       left:          "30%",
-      width:         80,
-      height:        80,
+      width:         64,
+      height:        64,
       ...general.borderCircle,
       background:    d.decorBgSmall,
       pointerEvents: "none",
@@ -68,104 +68,58 @@ const getDepartmentHeaderTheme = (mode = "light") => {
     topRow: {
       display:        "flex",
       flexWrap:       "wrap",
-      alignItems:     "flex-start",
+      alignItems:     "center",
       justifyContent: "space-between",
-      gap:            { xs: spacing.md, md: spacing.lg },
+      gap:            { xs: 1, md: 1.5 },
     },
 
     // ─── LEFT: identity block ─────────────────────────────────────
     identityBlock: {
       ...general.flexRow,
-      alignItems: "flex-start",
-      gap:        spacing.md ?? 2,
+      alignItems: "center",
+      gap:        1.25,
       ...general.noShrink,
     },
 
     iconBadge: {
-      width:        52,
-      height:       52,
-      borderRadius: "14px",
+      width:        34,
+      height:       34,
+      borderRadius: "9px",
       bgcolor:      d.iconBadgeBg,
-      border:       `1.5px solid ${d.cardBorder}`,
+      border:       `1px solid ${d.cardBorder}`,
       ...general.flexCenter,
       ...general.noShrink,
       color:        d.iconColor,
+      "& .MuiSvgIcon-root": { fontSize: 20 },
     },
 
     identityText: {
       ...general.flexColumn,
-      gap: "4px",
+      gap: 0,
     },
 
     subDeptName: {
-      fontSize:      fonts.size?.lg     ?? "1.25rem",
+      fontSize:      { xs: "0.95rem", md: "1.05rem" },
       fontWeight:    fonts.weight?.bold ?? 700,
       color:         d.valueColor,
-      lineHeight:    fonts.lineHeight?.tight ?? 1.2,
+      lineHeight:    1.2,
       letterSpacing: "-0.01em",
     },
 
     deptName: {
-      fontSize:   fonts.size?.sm         ?? "0.875rem",
+      fontSize:   "0.72rem",
       color:      d.labelColor,
-      fontWeight: fonts.weight?.medium   ?? 500,
-      lineHeight: fonts.lineHeight?.normal ?? 1.5,
-    },
-
-    divider: {
-      ...general.fullWidth,
-      height: "1px",
-      bgcolor: d.dividerColor,
-      my:     { xs: spacing.xs, md: spacing.sm },
-    },
-
-    // ─── USER ROW ────────────────────────────────────────────────
-    userRow: {
-      ...general.flexRow,
-      ...general.alignCenter,
-      flexWrap: "wrap",
-      gap:      { xs: spacing.sm, md: spacing.md },
-      mt:       "2px",
-    },
-
-    userChip: {
-      ...general.flexRow,
-      ...general.alignCenter,
-      gap:          "6px",
-      px:           "12px",
-      py:           "5px",
-      borderRadius: "999px",
-      bgcolor:      d.chipBg,
-      border:       `1px solid ${d.chipBorder}`,
-    },
-
-    userChipLabel: {
-      fontSize:   fonts.size?.xs         ?? "0.75rem",
-      color:      d.labelColor,
-      fontWeight: fonts.weight?.medium   ?? 500,
-      lineHeight: 1,
-    },
-
-    userChipValue: {
-      fontSize:   fonts.size?.sm         ?? "0.875rem",
-      color:      d.chipText,
-      fontWeight: fonts.weight?.bold     ?? 700,
-      lineHeight: 1,
-    },
-
-    userIcon: {
-      fontSize: 14,
-      color:    d.iconColor,
-      opacity:  0.7,
+      fontWeight: fonts.weight?.medium ?? 500,
+      lineHeight: 1.35,
     },
 
     // ─── RIGHT: BATCH STATS GRID ──────────────────────────────────
     statsGrid: {
       display:             "grid",
       gridTemplateColumns: { xs: "repeat(2, 1fr)", sm: "repeat(4, 1fr)" },
-      gap:                 { xs: spacing.sm, md: spacing.md },
+      gap:                 { xs: 0.75, md: 0.75 },
       ...general.noShrink,
-      minWidth:            { sm: 420 },
+      minWidth:            { sm: 360 },
     },
 
     // Individual stat tile — receives accentKey string
@@ -187,11 +141,12 @@ const getDepartmentHeaderTheme = (mode = "light") => {
       return {
         ...general.positionRelative,
         ...general.flexColumn,
-        gap:          "4px",
-        px:           { xs: "12px", md: "16px" },
-        py:           { xs: "10px", md: "12px" },
-        minHeight:    { xs: "68px", md: "84px" },
-        borderRadius: "12px",
+        justifyContent: "center",
+        gap:          "1px",
+        px:           { xs: "8px", md: "10px" },
+        py:           { xs: "5px", md: "5px" },
+        minHeight:    { xs: "40px", md: "42px" },
+        borderRadius: "8px",
         bgcolor:      d.chipBg,
         border:       `1px solid ${d.chipBorder}`,
         ...general.overflowHidden,
@@ -200,8 +155,8 @@ const getDepartmentHeaderTheme = (mode = "light") => {
           content:      '""',
           ...general.positionAbsolute,
           left:         0,
-          top:          "20%",
-          height:       "60%",
+          top:          "22%",
+          height:       "56%",
           width:        "3px",
           borderRadius: "0 3px 3px 0",
           background:   accentMap[accentKey] ?? d.chipText,
@@ -210,20 +165,20 @@ const getDepartmentHeaderTheme = (mode = "light") => {
     },
 
     statTileValue: {
-      fontSize:   { xs: fonts.size?.xl ?? "1.5rem", md: fonts.size?.["2xl"] ?? "1.8rem" },
+      fontSize:   { xs: "1rem", md: "1.1rem" },
       fontWeight: fonts.weight?.bold ?? 700,
       color:      d.valueColor,
       lineHeight: 1,
     },
 
     statTileLabel: {
-      fontSize:      fonts.size?.xs         ?? "0.72rem",
+      fontSize:      "0.62rem",
       color:         d.labelColor,
-      fontWeight:    fonts.weight?.medium   ?? 500,
-      lineHeight:    fonts.lineHeight?.normal ?? 1.5,
+      fontWeight:    fonts.weight?.medium ?? 500,
+      lineHeight:    1.25,
       textTransform: "uppercase",
       letterSpacing: "0.04em",
-      minHeight:     "2.25em",
+      minHeight:     "unset",
       display:       "block",
     },
   };

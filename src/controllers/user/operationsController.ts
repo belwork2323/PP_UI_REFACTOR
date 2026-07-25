@@ -68,7 +68,7 @@ export const operationsController = {
     try {
       const response = await fetchMaterialsListApi(payload);
       return new ApiResponseModel<MaterialsListItem[]>(response, (res) =>
-        normalizeMaterialsListResponse(res?.data)
+        normalizeMaterialsListResponse(res?.data),
       );
     } catch (error) {
       console.error("Failed to fetch materials list:", error);
@@ -83,7 +83,7 @@ export const operationsController = {
     try {
       const response = await fetchMaterialsListApi({ materialType: "BOTH" });
       return new ApiResponseModel<MaterialsListItem[]>(response, (res) =>
-        normalizeMaterialsListResponse(res?.data)
+        normalizeMaterialsListResponse(res?.data),
       );
     } catch (error) {
       console.error("Failed to fetch all materials list:", error);
@@ -98,7 +98,7 @@ export const operationsController = {
     try {
       const response = await fetchMaterialSpecificationListApi(payload);
       return new ApiResponseModel<MaterialSpecificationListModel>(response, (res) =>
-        MaterialSpecificationListModel.fromApi(res)
+        MaterialSpecificationListModel.fromApi(res),
       );
     } catch (error) {
       console.error("Failed to fetch material specification list:", error);
@@ -113,7 +113,7 @@ export const operationsController = {
     try {
       const response = await fetchDimensionalParametersListApi(payload);
       return new ApiResponseModel<DimensionalParametersListModel>(response, (res) =>
-        DimensionalParametersListModel.fromApi(res)
+        DimensionalParametersListModel.fromApi(res),
       );
     } catch (error) {
       console.error("Failed to fetch dimensional parameters:", error);
@@ -128,7 +128,7 @@ export const operationsController = {
     try {
       const response = await fetchSolidProcessesListApi(payload);
       return new ApiResponseModel<SolidProcessesListModel>(response, (res) =>
-        SolidProcessesListModel.fromApi(res)
+        SolidProcessesListModel.fromApi(res),
       );
     } catch (error) {
       console.error("Failed to fetch solid processes list:", error);
@@ -143,7 +143,7 @@ export const operationsController = {
     try {
       const response = await fetchMotorsStageListApi(params);
       return new ApiResponseModel<MotorsStageListModel>(response, (res) =>
-        MotorsStageListModel.fromApi(res)
+        MotorsStageListModel.fromApi(res),
       );
     } catch (error) {
       console.error("Failed to fetch motors stage list:", error);
@@ -156,7 +156,7 @@ export const operationsController = {
     try {
       const response = await fetchApprovedMotorsListApi(payload);
       return new ApiResponseModel<AvailableMotorsListModel>(response, (res) =>
-        AvailableMotorsListModel.fromApi(res)
+        AvailableMotorsListModel.fromApi(res),
       );
     } catch (error) {
       console.error("Failed to fetch approved motors list:", error);
@@ -164,12 +164,12 @@ export const operationsController = {
     }
   },
 
-  /** Material lots for a batch (post-cure material-lots API). */
+  /** Material lots for a batch (subdepartment material-lots API). */
   fetchMaterialLots: async (payload: MaterialLotsPayload) => {
     try {
       const response = await fetchMaterialLotsApi(payload);
       return new ApiResponseModel<MaterialLotsListModel>(response, (res) =>
-        MaterialLotsListModel.fromApi(res)
+        MaterialLotsListModel.fromApi(res),
       );
     } catch (error) {
       console.error("Failed to fetch material lots:", error);
@@ -177,4 +177,3 @@ export const operationsController = {
     }
   },
 };
-

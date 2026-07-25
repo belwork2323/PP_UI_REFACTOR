@@ -1,9 +1,11 @@
-import { Box, CircularProgress } from "@mui/material";
+import { Box } from "@mui/material";
 import { useMemo, useState } from "react";
 import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog";
+import WorkflowFormOpeningLoader from "../../../../components/common/WorkflowFormOpeningLoader";
 import { STRINGS } from "../../../../../app/config/strings";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
+import { SOLID_PREP_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/rawMaterialPreparation_theme";
 import useRawMaterialPrepHook from "../../../../../hooks/user/manufacturing/useRawMaterialPrepHook";
 import RawMaterialBuilderForm from "./RawMaterialBuilderPage";
 import RawMaterialPreparationDetailsView from "./RawMaterialPreparationDetailsView";
@@ -13,62 +15,68 @@ import RawMaterialPreparationList from "./RawMaterialPreparationList";
 const RawMaterialPreparationPage = () => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getManufacturingTheme(mode), [mode]);
-  const actionStrings = STRINGS.SOURCING.SPECIFICATION_FORM;
+  const actionStrings = STRINGS.MANUFACTURING.RAW_MATERIAL_PREP;
   const [draftConfirmOpen, setDraftConfirmOpen] = useState(false);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const [pendingPremixNo, setPendingPremixNo] = useState<number | null>(null);
 
   const hookState = useRawMaterialPrepHook();
   const {
     loading,
+    loadingFormDetails,
     view,
     activeBatch,
     isEditMode,
     backConfirmOpen,
     setBackConfirmOpen,
-    materialTypesArray,
     subDepartmentId,
-    premixCardsHaveData,
-    allPremixSchemasReady,
     actionLoading,
-    selectedTypes,
-    selectedPremix,
-    selectedProcesses,
-    solidMaterialCode,
-    solidGradeCode,
-    liquidMaterialCode,
+    numberOfPremix,
+    premixGroups,
+    identificationSheet,
+    allMaterials,
     availableSolidMaterials,
     availableLiquidMaterials,
-    loadingMaterials,
-    availablePremixOptions,
+    premixStatusByNo,
+    isPremixEditable,
     detailsRow,
     detailsData,
     detailsLoading,
     handleBackFromDetails,
-    handlePremixChange,
-    handleProcessToggle,
-    handleSolidMaterialChange,
-    handleSolidGradeChange,
-    handleLiquidMaterialChange,
-    handleAddPremixSelection,
+    handlePremixDateChange,
     addedPremixSelections,
     premixSessions,
     weightmentSheet,
     handleWeightmentSheetChange,
     handlePremixSlotChange,
-    handleDeletePremixSelection,
     handleBack,
     handleDiscardAndBack,
-    handleSaveDraft,
-    handleSubmit,
+    handleSavePremixDraft,
+    handleSubmitPremix,
+    handleSubmitForFinalApproval,
   } = hookState;
 
-  if (loading) {
-    return <Box sx={theme.workflow.loadingContainer}><CircularProgress size={theme.manufacturing.rawMaterialPrep.page.loadingSpinnerSize} /></Box>;
-  }
+  const listLoading = loading && !loadingFormDetails && view === "list";
 
   return (
     <Box sx={theme.workflow.animatedContainer}>
-      {view === "list" && <RawMaterialPreparationList hookState={hookState} />}
+      <WorkflowFormOpeningLoader
+        open={listLoading || Boolean(loadingFormDetails)}
+        title={
+          loadingFormDetails
+            ? actionStrings.FORM_OPENING_TITLE
+            : actionStrings.TITLE
+        }
+        message={
+          loadingFormDetails
+            ? actionStrings.FORM_OPENING_MESSAGE
+            : "Loading raw material preparation batches…"
+        }
+        color={SOLID_PREP_BRAND.solid}
+        accentColor={SOLID_PREP_BRAND.solidLight}
+      />
+
+      {view === "list" && !listLoading && <RawMaterialPreparationList hookState={hookState} />}
 
       {view === "details" && detailsRow && (
         <RawMaterialPreparationDetailsView
@@ -79,7 +87,7 @@ const RawMaterialPreparationPage = () => {
         />
       )}
 
-      {view === "form" && activeBatch && (
+      {view === "form" && activeBatch && !loadingFormDetails && (
         <Box>
           <RawMaterialPreparationHeader
             batch={activeBatch}
@@ -91,37 +99,32 @@ const RawMaterialPreparationPage = () => {
           <RawMaterialBuilderForm
             activeBatch={activeBatch}
             isEditMode={isEditMode}
-            selectedTypes={selectedTypes}
-            selectedPremix={selectedPremix}
-            selectedProcesses={selectedProcesses}
-            solidMaterialCode={solidMaterialCode}
-            solidGradeCode={solidGradeCode}
-            liquidMaterialCode={liquidMaterialCode}
-            availableSolidMaterials={availableSolidMaterials}
-            availableLiquidMaterials={availableLiquidMaterials}
-            loadingMaterials={loadingMaterials}
-            availablePremixOptions={availablePremixOptions}
-            onPremixChange={handlePremixChange}
-            onProcessToggle={handleProcessToggle}
-            onSolidMaterialChange={handleSolidMaterialChange}
-            onSolidGradeChange={handleSolidGradeChange}
-            onLiquidMaterialChange={handleLiquidMaterialChange}
-            onAddPremixSelection={handleAddPremixSelection}
+            numberOfPremix={numberOfPremix}
+            premixGroups={premixGroups}
+            identificationSheet={identificationSheet}
+            allMaterials={allMaterials}
+            onPremixDateChange={handlePremixDateChange}
             addedPremixSelections={addedPremixSelections}
             premixSessions={premixSessions}
+            availableSolidMaterials={availableSolidMaterials}
+            availableLiquidMaterials={availableLiquidMaterials}
             weightmentSheet={weightmentSheet}
             onWeightmentSheetChange={handleWeightmentSheetChange}
             onPremixSlotChange={handlePremixSlotChange}
-            onDeletePremixSelection={handleDeletePremixSelection}
             subDepartmentId={subDepartmentId}
             theme={theme}
-            handleBack={handleBack}
-            onSaveDraft={() => setDraftConfirmOpen(true)}
-            onSubmit={() => setSubmitConfirmOpen(true)}
+            premixStatusByNo={premixStatusByNo}
+            isPremixEditable={isPremixEditable}
+            onSavePremixDraft={(premixNo: number) => {
+              setPendingPremixNo(premixNo);
+              setDraftConfirmOpen(true);
+            }}
+            onSubmitPremix={(premixNo: number) => {
+              setPendingPremixNo(premixNo);
+              setSubmitConfirmOpen(true);
+            }}
+            onSubmitForFinalApproval={handleSubmitForFinalApproval}
             actionLoading={actionLoading}
-            disableActions={
-              !premixCardsHaveData || !allPremixSchemasReady
-            }
           />
         </Box>
       )}
@@ -140,29 +143,47 @@ const RawMaterialPreparationPage = () => {
       <ConfirmAlertDialog
         open={draftConfirmOpen}
         severity="warning"
-        title={actionStrings.CONFIRM_DRAFT_TITLE}
-        message={actionStrings.CONFIRM_DRAFT_MESSAGE}
-        confirmLabel={actionStrings.CONFIRM_DRAFT_ACTION}
-        cancelLabel={actionStrings.CONFIRM_DRAFT_CANCEL_ACTION}
+        title={actionStrings.PREMIX_DRAFT_CONFIRM_TITLE}
+        message={
+          pendingPremixNo != null
+            ? actionStrings.PREMIX_DRAFT_CONFIRM_MESSAGE(pendingPremixNo)
+            : actionStrings.PREMIX_DRAFT_CONFIRM_TITLE
+        }
+        confirmLabel={actionStrings.SAVE_PREMIX_DRAFT}
+        cancelLabel={STRINGS.SOURCING.SPECIFICATION_FORM.CONFIRM_DRAFT_CANCEL_ACTION}
         onConfirm={async () => {
+          const premixNo = pendingPremixNo;
           setDraftConfirmOpen(false);
-          await handleSaveDraft();
+          setPendingPremixNo(null);
+          if (premixNo != null) await handleSavePremixDraft(premixNo);
         }}
-        onCancel={() => setDraftConfirmOpen(false)}
+        onCancel={() => {
+          setDraftConfirmOpen(false);
+          setPendingPremixNo(null);
+        }}
       />
 
       <ConfirmAlertDialog
         open={submitConfirmOpen}
         severity="warning"
-        title={isEditMode ? actionStrings.CONFIRM_RESUBMIT_TITLE : actionStrings.CONFIRM_SUBMIT_TITLE}
-        message={isEditMode ? actionStrings.CONFIRM_RESUBMIT_MESSAGE : actionStrings.CONFIRM_SUBMIT_MESSAGE}
-        confirmLabel={isEditMode ? actionStrings.CONFIRM_RESUBMIT_ACTION : actionStrings.CONFIRM_SUBMIT_ACTION}
-        cancelLabel={actionStrings.CONFIRM_CANCEL_ACTION}
+        title={actionStrings.PREMIX_SUBMIT_CONFIRM_TITLE}
+        message={
+          pendingPremixNo != null
+            ? actionStrings.PREMIX_SUBMIT_CONFIRM_MESSAGE(pendingPremixNo)
+            : actionStrings.PREMIX_SUBMIT_CONFIRM_TITLE
+        }
+        confirmLabel={actionStrings.SUBMIT_PREMIX}
+        cancelLabel={STRINGS.SOURCING.SPECIFICATION_FORM.CONFIRM_CANCEL_ACTION}
         onConfirm={async () => {
+          const premixNo = pendingPremixNo;
           setSubmitConfirmOpen(false);
-          await handleSubmit();
+          setPendingPremixNo(null);
+          if (premixNo != null) await handleSubmitPremix(premixNo);
         }}
-        onCancel={() => setSubmitConfirmOpen(false)}
+        onCancel={() => {
+          setSubmitConfirmOpen(false);
+          setPendingPremixNo(null);
+        }}
       />
     </Box>
   );

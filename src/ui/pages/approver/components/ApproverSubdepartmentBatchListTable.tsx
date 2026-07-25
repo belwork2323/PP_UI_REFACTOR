@@ -17,6 +17,7 @@ import { STRINGS } from "../../../../app/config/strings";
 import { motorStageLabel } from "../../../../data/models/admin/BatchManagement/BatchManagementModel";
 import { formatSubdepartmentBatchTypeLabel } from "../../../../data/models/user/SubdepartmentBatchModel";
 import { canApproverViewBatchDetails, type ApproverStatusMeta } from "../../../../app/theme/approver";
+import { normalizeApproverBatchStatus, getApproverBatchStatusDisplayLabel } from "../../../../data/models/approver/ApproverBatchListModel";
 
 const BL = STRINGS.MANUFACTURING.BATCH_LIST;
 
@@ -117,7 +118,7 @@ const ApproverSubdepartmentBatchListTable = ({
           </TableHead>
           <TableBody>
             {rows.map((row, idx) => {
-              const status = String(row.status ?? "");
+              const status = normalizeApproverBatchStatus(row.status);
               const canViewDetails = canApproverViewBatchDetails(status, {
                 allowWhenApproved: allowViewDetailsWhenApproved,
               });
@@ -177,7 +178,7 @@ const ApproverSubdepartmentBatchListTable = ({
                   </TableCell>
                   <TableCell sx={tdSx}>
                     <Chip
-                      label={status || "—"}
+                      label={getApproverBatchStatusDisplayLabel(status) || "—"}
                       size="small"
                       sx={{
                         height: 20,

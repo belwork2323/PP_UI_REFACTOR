@@ -10,7 +10,16 @@ import {
   hydrateMockTrialValuesFromSections,
   parseMockTrialSavedSections,
 } from "../../../schema-engine/adapters/rocketMotorCasingMockTrial.adapter";
+import { formatToIsoDateInput } from "../../../utils/dateUtils";
 
+/** API payload dates stay YYYY-MM-DD regardless of UI display format. */
+const toPayloadDate = (value: string | null | undefined): string =>
+  formatToIsoDateInput(value) || "";
+
+const toPayloadDateOrNull = (value: string | null | undefined): string | null => {
+  const iso = formatToIsoDateInput(value);
+  return iso || null;
+};
 export type ReceiptStatus = "RECEIVED" | "NOT_RECEIVED";
 export type CasingType = "COMPOSITE" | "METALLIC";
 export type InsulationType = "ROCASIN" | "EPDM";
@@ -36,6 +45,8 @@ export type UploadedFileRef = {
   fileName: string;
   fileUrl: string;
   mimeType: string;
+  storedFileName?: string;
+  originalFileName?: string;
 };
 
 export type VisualInspectionFormRow = {
@@ -111,29 +122,38 @@ export function isLooseFlapDimensionalParam(row: { paramName?: string }): boolea
     .includes("loose flap");
 }
 
+export interface ReportUploadSection {
+  ndtUtReport?: UploadedFileRef[];
+  visualInspectionReport?: UploadedFileRef[];
+  weighmentReport?: UploadedFileRef[];
+  dimensionalInspectionReport?: UploadedFileRef[];
+  mockTrialReport?: UploadedFileRef[];
+  insulationLiningReport?: UploadedFileRef[];
+}
 export type RocketMotorCasingFormData = {
   projectId: string;
+  projectName: string;
   motorStageApi: string;
   /** User-entered motor ID (API `motorId`); casing ID is assigned by the server */
   motorId: string;
   /** Populated after first save; read-only in the form */
   motorCasingId: string;
-  casingType: CasingType;
+  casingType: CasingType | "";
   receivingDate: string;
   itemsDescription: string;
   itemsDimension: string;
   itemsUnit: string;
-  itemsReceiptStatus: ReceiptStatus;
+  itemsReceiptStatus: ReceiptStatus | "";
   itemsObservations: string;
-  greenCardStatus: ReceiptStatus;
+  greenCardStatus: ReceiptStatus | "";
   greenCardNo: string;
   clearanceDate: string;
   clearanceAuthority: string;
   clearanceDetails: string;
   insulationCuringDate: string;
-  insulationType: InsulationType;
+  insulationType: InsulationType | "";
   insulationReportNo: string;
-  insulationReceiptStatus: ReceiptStatus;
+  insulationReceiptStatus: ReceiptStatus | "";
   insulationReportFile: File | null;
   /** @deprecated use insulationReportExisting */
   insulationReportUrl?: string | null;
@@ -170,6 +190,8 @@ export type RocketMotorCasingFormData = {
 
   insulationLiningReportFiles: File[];
   insulationLiningReportExisting: UploadedFileRef[];
+  insulationSpecifications: InsulationSpecificationModel | null;
+  reportUpload: ReportUploadSection | null;
 };
 
 export type RocketMotorCasingMockTrialSlot = {
@@ -273,6 +295,28 @@ const fileToMediaRef = (file: File | null, existing?: UploadedFileRef | null) =>
   return null;
 };
 
+const buildReportUpload = (documentType: string, files: File[], existing: UploadedFileRef[]) => {
+  const existingDocs = existing.map((file) => ({
+    documentType,
+    originalFileName: file.fileName,
+    filePath: file.fileUrl,
+    storedFileName: file.fileUrl,
+    mimeType: file.mimeType,
+    fileSize: 0,
+  }));
+
+  const newDocs = files.map((file) => ({
+    documentType,
+    originalFileName: file.name,
+    filePath: file.name,
+    storedFileName: file.name,
+    mimeType: file.type || "application/octet-stream",
+    fileSize: file.size,
+  }));
+
+  return [...existingDocs, ...newDocs];
+};
+
 const isWithinRange = (value: number | null, min: number | null, max: number | null): boolean => {
   if (value == null) return false;
   if (min != null && value < min) return false;
@@ -364,20 +408,44 @@ export const VISUAL_INSPECTION_TEMPLATE: Omit<
 ];
 
 export function createInitialMechanicalProperties(
-  type: InsulationType,
+  specificationModel: InsulationSpecificationModel,
 ): Record<string, MechPropFormRow> {
-  const keys = type === "EPDM" ? EPDM_MECH_KEYS : ROCASIN_MECH_KEYS;
+  const mechanicalCategory = specificationModel.specifications.find(
+    (x) => x.category === "Rubber Mechanical Properties",
+  );
+
   return Object.fromEntries(
-    keys.map((k) => [
-      k.paramKey,
-      { paramKey: k.paramKey, paramName: k.paramName, specification: "", reported: "", acemSpec: "", unit: k.unit },
+    (mechanicalCategory?.parameters ?? []).map((spec) => [
+      spec.specificationCode,
+      {
+        paramKey: spec.specificationCode,
+        paramName: spec.specificationName,
+        specification: `${spec.referenceRange.minValue} - ${spec.referenceRange.maxValue}`,
+        reported: "",
+        acemSpec: "",
+        unit: spec.referenceRange.unit ?? "",
+      },
     ]),
   );
 }
 
-export function createInitialThermalProperties(): Record<string, ThermalPropFormRow> {
+export function createInitialThermalProperties(
+  specificationModel: InsulationSpecificationModel,
+): Record<string, ThermalPropFormRow> {
+  const thermalCategory = specificationModel.specifications.find(
+    (x) => x.category === "Rubber Thermal Properties",
+  );
+
   return Object.fromEntries(
-    THERMAL_PROP_KEYS.map((k) => [k.key, { specification: "", reported: "", acemSpec: "", unit: k.unit }]),
+    (thermalCategory?.parameters ?? []).map((spec) => [
+      spec.specificationCode,
+      {
+        specification: `${spec.referenceRange.minValue} - ${spec.referenceRange.maxValue}`,
+        reported: "",
+        acemSpec: "",
+        unit: spec.referenceRange.unit ?? "",
+      },
+    ]),
   );
 }
 
@@ -522,29 +590,30 @@ const computeDimensionalRowWithinRange = (row: DimensionalReadingFormRow): boole
 
 export const INITIAL_ROCKET_MOTOR_CASING_FORM: RocketMotorCasingFormData = {
   projectId: "",
+  projectName: "",
   motorStageApi: "",
   motorId: "",
   motorCasingId: "",
-  casingType: "COMPOSITE",
+  casingType: "",
   receivingDate: "",
   itemsDescription: "Rubber Sheet",
   itemsDimension: "",
   itemsUnit: "mm",
-  itemsReceiptStatus: "RECEIVED",
+  itemsReceiptStatus: "",
   itemsObservations: "",
-  greenCardStatus: "RECEIVED",
+  greenCardStatus: "",
   greenCardNo: "",
   clearanceDate: "",
   clearanceAuthority: "",
   clearanceDetails: "",
   insulationCuringDate: "",
-  insulationType: "ROCASIN",
+  insulationType: "",
   insulationReportNo: "",
-  insulationReceiptStatus: "RECEIVED",
+  insulationReceiptStatus: "",
   insulationReportFile: null,
   insulationReportExisting: null,
-  mechanicalProperties: createInitialMechanicalProperties("ROCASIN"),
-  thermalProperties: createInitialThermalProperties(),
+  mechanicalProperties: {},
+  thermalProperties: {},
   postPptUtDate: "",
   ndtDate: "",
   ndtObservations: "",
@@ -575,6 +644,8 @@ export const INITIAL_ROCKET_MOTOR_CASING_FORM: RocketMotorCasingFormData = {
 
   insulationLiningReportFiles: [],
   insulationLiningReportExisting: [],
+  insulationSpecifications: null,
+  reportUpload: null,
 };
 
 function buildMechRows(
@@ -593,8 +664,7 @@ function buildMechRows(
         paramKey: def.paramKey,
         paramName: def.paramName,
         reported,
-        specification:
-          specificationNum != null ? specificationNum : specificationRaw || null,
+        specification: specificationNum != null ? specificationNum : specificationRaw || null,
         acemSpec: acemSpec ?? reported,
         unit: def.unit,
       };
@@ -690,7 +760,8 @@ export function buildCasingFormPayload(
     sections: {
       motorReceipt: {
         casingType: form.casingType,
-        receivingDate: form.receivingDate || new Date().toISOString().slice(0, 10),
+        receivingDate:
+          toPayloadDate(form.receivingDate) || new Date().toISOString().slice(0, 10),
         itemsReceived: {
           itemType: "RUBBER_SHEET",
           description: form.itemsDescription.trim() || "Rubber Sheet",
@@ -702,12 +773,12 @@ export function buildCasingFormPayload(
         clearances: {
           greenCardStatus: form.greenCardStatus,
           greenCardNo: form.greenCardNo.trim() || "—",
-          clearanceDate: form.clearanceDate || null,
+          clearanceDate: toPayloadDateOrNull(form.clearanceDate),
           authority: form.clearanceAuthority.trim() || "—",
           detailsAndObservations: form.clearanceDetails.trim(),
         },
         insulation: {
-          insulationCuringDate: form.insulationCuringDate || null,
+          insulationCuringDate: toPayloadDateOrNull(form.insulationCuringDate),
           type: form.insulationType,
           reportNo: form.insulationReportNo.trim() || "—",
           receiptStatus: form.insulationReceiptStatus,
@@ -715,12 +786,12 @@ export function buildCasingFormPayload(
             form.insulationReportFile,
             form.insulationReportExisting ?? null,
           ),
-          mechanicalProperties,
-          thermalProperties,
+          insulationSpecification: buildInsulationSpecifications(form),
         },
+
         ndtUtReport: {
-          postPptUtDate: form.postPptUtDate || null,
-          ndtDate: form.ndtDate || null,
+          postPptUtDate: toPayloadDateOrNull(form.postPptUtDate),
+          ndtDate: toPayloadDateOrNull(form.ndtDate),
           observations: form.ndtObservations.trim(),
         },
         acemNdtObservations: form.acemNdtObservations.trim(),
@@ -733,7 +804,7 @@ export function buildCasingFormPayload(
         weightWithHarness: { value: w2, unit: "kg" },
         weighscaleCalibration: {
           equipmentDetails: form.weighscaleEquipment.trim(),
-          calibrationDueDate: form.calibrationDueDate || null,
+          calibrationDueDate: toPayloadDateOrNull(form.calibrationDueDate),
         },
       },
       dimensionalInspection,
@@ -745,6 +816,38 @@ export function buildCasingFormPayload(
             ),
           }
         : {}),
+      reportUpload: {
+        ndtUtReport: buildReportUpload(
+          "NDT_UT_REPORT",
+          form.ndtUtReportFiles,
+          form.ndtUtReportExisting,
+        ),
+        visualInspectionReport: buildReportUpload(
+          "VISUAL_INSPECTION_REPORT",
+          form.visualInspectionReportFiles,
+          form.visualInspectionReportExisting,
+        ),
+        weighmentReport: buildReportUpload(
+          "WEIGHMENT_REPORT",
+          form.weighmentReportFiles,
+          form.weighmentReportExisting,
+        ),
+        dimensionalInspectionReport: buildReportUpload(
+          "DIMENSIONAL_INSPECTION_REPORT",
+          form.dimensionalInspectionReportFiles,
+          form.dimensionalInspectionReportExisting,
+        ),
+        mockTrialReport: buildReportUpload(
+          "MOCK_TRIAL_REPORT",
+          form.mockTrialReportFiles,
+          form.mockTrialReportExisting,
+        ),
+        insulationLiningReport: buildReportUpload(
+          "INSULATION_LINING_REPORT",
+          form.insulationLiningReportFiles,
+          form.insulationLiningReportExisting,
+        ),
+      },
     },
   };
 
@@ -778,7 +881,13 @@ function thermalRowFromApi(row: Record<string, unknown>, defaultUnit: string): T
 
 export function parseSectionsToFormData(
   sections: Record<string, unknown>,
-  ids: { projectId?: string; motorStage?: string; motorId?: string; motorCasingId?: string },
+  ids: {
+    projectId?: string;
+    projectName?: string;
+    motorStage?: string;
+    motorId?: string;
+    motorCasingId?: string;
+  },
 ): RocketMotorCasingFormData {
   const mr = (sections.motorReceipt ?? {}) as Record<string, unknown>;
   const items = (mr.itemsReceived ?? {}) as Record<string, unknown>;
@@ -786,23 +895,71 @@ export function parseSectionsToFormData(
   const ins = (mr.insulation ?? {}) as Record<string, unknown>;
   const thermal = (ins.thermalProperties ?? {}) as Record<string, unknown>;
   const ndt = (mr.ndtUtReport ?? {}) as Record<string, unknown>;
-  const reportUpload = ins.reportUpload as Record<string, unknown> | null | undefined;
+  const insReport = ins.reportUpload as Record<string, unknown> | null | undefined;
+  const reportUpload = (sections.reportUpload ?? {}) as Record<string, unknown>;
+  const mapReportFiles = (docs: unknown): UploadedFileRef[] => {
+    if (!Array.isArray(docs)) return [];
 
-  const insulationType =
-    (String(ins.type ?? "ROCASIN").toUpperCase() as InsulationType) || "ROCASIN";
-  const mechApi = Array.isArray(ins.mechanicalProperties) ? ins.mechanicalProperties : [];
-  const mechanicalProperties = createInitialMechanicalProperties(insulationType);
-  for (const row of mechApi) {
-    const parsed = mechRowFromApi(row as Record<string, unknown>);
-    if (parsed.paramKey) mechanicalProperties[parsed.paramKey] = parsed;
-  }
+    return docs.map((doc: any) => ({
+      fileName: doc.originalFileName,
+      fileUrl: doc.filePath, // or downloadUrl if your API returns one
+      mimeType: doc.mimeType,
+      storedFileName: doc.storedFileName,
+    }));
+  };
+  const parseCasingType = (raw: unknown): CasingType | "" => {
+    const v = String(raw ?? "")
+      .trim()
+      .toUpperCase();
+    return v === "COMPOSITE" || v === "METALLIC" ? v : "";
+  };
+  const parseReceiptStatus = (raw: unknown): ReceiptStatus | "" => {
+    const v = String(raw ?? "")
+      .trim()
+      .toUpperCase();
+    return v === "RECEIVED" || v === "NOT_RECEIVED" ? v : "";
+  };
+  const parseInsulationType = (raw: unknown): InsulationType | "" => {
+    const v = String(raw ?? "")
+      .trim()
+      .toUpperCase();
+    return v === "ROCASIN" || v === "EPDM" ? v : "";
+  };
+  const insulationType = parseInsulationType(ins.type);
 
-  const thermalProperties = createInitialThermalProperties();
-  for (const def of THERMAL_PROP_KEYS) {
-    const row = thermal[def.key] as Record<string, unknown> | undefined;
-    if (row) thermalProperties[def.key] = thermalRowFromApi(row, def.unit);
-  }
+  // Specifications are loaded separately from the specification API.
+  const mechanicalProperties: Record<string, MechPropFormRow> = {};
+  const thermalProperties: Record<string, ThermalPropFormRow> = {};
+  const insulationSpecification = (ins.insulationSpecification ?? {}) as Record<string, unknown>;
 
+  const specificationCategories = Array.isArray(insulationSpecification.specifications)
+    ? insulationSpecification.specifications
+    : [];
+
+  specificationCategories.forEach((category: any) => {
+    const categoryName = String(category.category ?? "").toLowerCase();
+
+    (category.parameters ?? []).forEach((param: any) => {
+      const row = {
+        specification: "",
+        reported: valueFromApiField(param.reported),
+        acemSpec: valueFromApiField(param.acemSpec),
+        unit: "",
+      };
+
+      if (categoryName.includes("mechanical")) {
+        mechanicalProperties[param.specificationCode] = {
+          paramKey: param.specificationCode,
+          paramName: param.specificationCode,
+          ...row,
+        };
+      } else if (categoryName.includes("thermal")) {
+        thermalProperties[param.specificationCode] = {
+          ...row,
+        };
+      }
+    });
+  });
   const visualApi = Array.isArray(sections.visualInspection) ? sections.visualInspection : [];
   const visualInspection =
     visualApi.length > 0
@@ -862,19 +1019,18 @@ export function parseSectionsToFormData(
   return {
     ...INITIAL_ROCKET_MOTOR_CASING_FORM,
     projectId: ids.projectId ?? "",
+    projectName: ids.projectName ?? "",
     motorStageApi: ids.motorStage ?? "",
     motorId: ids.motorId ?? "",
     motorCasingId: ids.motorCasingId ?? "",
-    casingType: (String(mr.casingType ?? "COMPOSITE").toUpperCase() as CasingType) || "COMPOSITE",
+    casingType: parseCasingType(mr.casingType),
     receivingDate: str(mr.receivingDate).slice(0, 10),
     itemsDescription: str(items.description) || "Rubber Sheet",
     itemsDimension: str(items.dimension),
     itemsUnit: str(items.unit) || "mm",
-    itemsReceiptStatus:
-      (str(items.receiptStatus || clear.status).toUpperCase() as ReceiptStatus) || "RECEIVED",
+    itemsReceiptStatus: parseReceiptStatus(items.receiptStatus || clear.status),
     itemsObservations: str(items.observations),
-    greenCardStatus:
-      (str(clear.greenCardStatus || clear.status).toUpperCase() as ReceiptStatus) || "RECEIVED",
+    greenCardStatus: parseReceiptStatus(clear.greenCardStatus || clear.status),
     greenCardNo: str(clear.greenCardNo),
     clearanceDate: str(clear.clearanceDate).slice(0, 10),
     clearanceAuthority: str(clear.authority),
@@ -882,10 +1038,10 @@ export function parseSectionsToFormData(
     insulationCuringDate: str(ins.insulationCuringDate).slice(0, 10),
     insulationType,
     insulationReportNo: str(ins.reportNo),
-    insulationReceiptStatus: (str(ins.receiptStatus).toUpperCase() as ReceiptStatus) || "RECEIVED",
+    insulationReceiptStatus: parseReceiptStatus(ins.receiptStatus),
     insulationReportFile: null,
-    insulationReportExisting: parseUploadedFileRef(reportUpload),
-    insulationReportUrl: parseUploadedFileRef(reportUpload)?.fileUrl ?? null,
+    insulationReportExisting: parseUploadedFileRef(insReport),
+    insulationReportUrl: parseUploadedFileRef(insReport)?.fileUrl ?? null,
     mechanicalProperties,
     thermalProperties,
     postPptUtDate: str(ndt.postPptUtDate).slice(0, 10),
@@ -915,17 +1071,65 @@ export function parseSectionsToFormData(
       savedSections: mockTrialSaved,
     },
     ndtUtReportFiles: [],
-    ndtUtReportExisting: [],
+    ndtUtReportExisting: mapReportFiles(reportUpload.ndtUtReport),
+
     visualInspectionReportFiles: [],
-    visualInspectionReportExisting: [],
+    visualInspectionReportExisting: mapReportFiles(reportUpload.visualInspectionReport),
+
     weighmentReportFiles: [],
-    weighmentReportExisting: [],
+    weighmentReportExisting: mapReportFiles(reportUpload.weighmentReport),
+
     dimensionalInspectionReportFiles: [],
-    dimensionalInspectionReportExisting: [],
+    dimensionalInspectionReportExisting: mapReportFiles(reportUpload.dimensionalInspectionReport),
+
     mockTrialReportFiles: [],
-    mockTrialReportExisting: [],
+    mockTrialReportExisting: mapReportFiles(reportUpload.mockTrialReport),
+
     insulationLiningReportFiles: [],
-    insulationLiningReportExisting: [],
+    insulationLiningReportExisting: mapReportFiles(reportUpload.insulationLiningReport),
+    reportUpload: {
+      ndtUtReport: Array.isArray(reportUpload.ndtUtReport)
+        ? reportUpload.ndtUtReport.map((f: any) => ({
+            ...f,
+            fileName: f.originalFileName,
+          }))
+        : [],
+
+      visualInspectionReport: Array.isArray(reportUpload.visualInspectionReport)
+        ? reportUpload.visualInspectionReport.map((f: any) => ({
+            ...f,
+            fileName: f.originalFileName,
+          }))
+        : [],
+
+      weighmentReport: Array.isArray(reportUpload.weighmentReport)
+        ? reportUpload.weighmentReport.map((f: any) => ({
+            ...f,
+            fileName: f.originalFileName,
+          }))
+        : [],
+
+      dimensionalInspectionReport: Array.isArray(reportUpload.dimensionalInspectionReport)
+        ? reportUpload.dimensionalInspectionReport.map((f: any) => ({
+            ...f,
+            fileName: f.originalFileName,
+          }))
+        : [],
+
+      mockTrialReport: Array.isArray(reportUpload.mockTrialReport)
+        ? reportUpload.mockTrialReport.map((f: any) => ({
+            ...f,
+            fileName: f.originalFileName,
+          }))
+        : [],
+
+      insulationLiningReport: Array.isArray(reportUpload.insulationLiningReport)
+        ? reportUpload.insulationLiningReport.map((f: any) => ({
+            ...f,
+            fileName: f.originalFileName,
+          }))
+        : [],
+    },
   };
 }
 
@@ -939,9 +1143,14 @@ const validateIdentification = (form: RocketMotorCasingFormData): string | null 
 };
 
 const validateReceiptAndInsulation = (form: RocketMotorCasingFormData): string | null => {
+  if (!form.casingType) return "Casing type is required.";
   if (!form.receivingDate.trim()) return "Receiving date is required.";
   if (!form.itemsDimension.trim()) return "Rubber sheet dimension is required.";
+  if (!form.itemsReceiptStatus) return "Rubber sheet receipt status is required.";
+  if (!form.greenCardStatus) return "Green card status is required.";
   if (!form.greenCardNo.trim()) return "Green card no. is required.";
+  if (!form.insulationType) return "Insulation type is required.";
+  if (!form.insulationReceiptStatus) return "Insulation receipt status is required.";
   if (!form.insulationReportNo.trim()) return "Insulation report no. is required.";
 
   const mechKeys = form.insulationType === "EPDM" ? EPDM_MECH_KEYS : ROCASIN_MECH_KEYS;
@@ -1080,3 +1289,77 @@ export const REPORT_UPLOADS = [
     label: "Insulation Lining Report",
   },
 ] as const;
+
+export interface InsulationSpecificationRequest {
+  insulationType: "ROCASIN" | "EPDM";
+}
+
+export interface ReferenceRange {
+  minValue: number;
+  maxValue: number;
+  unit: string;
+}
+
+export interface SpecificationParameter {
+  specificationCode: string;
+  specificationName: string;
+  referenceRange: ReferenceRange;
+}
+
+export interface SpecificationCategory {
+  category: string;
+  parameters: SpecificationParameter[];
+}
+
+export interface InsulationSpecificationModel {
+  insulationType: "ROCASIN" | "EPDM";
+  specifications: SpecificationCategory[];
+}
+
+export class InsulationSpecificationModel {
+  insulationType: "ROCASIN" | "EPDM" = "ROCASIN";
+  specifications: SpecificationCategory[] = [];
+
+  static fromApi(data: any): InsulationSpecificationModel {
+    return {
+      insulationType: data?.insulationType ?? "ROCASIN",
+      specifications:
+        data?.specifications?.map((category: any) => ({
+          category: category.category,
+          parameters:
+            category.parameters?.map((param: any) => ({
+              specificationCode: param.specificationCode,
+              specificationName: param.specificationName,
+              referenceRange: {
+                minValue: param.referenceRange?.minValue,
+                maxValue: param.referenceRange?.maxValue,
+                unit: param.referenceRange?.unit,
+              },
+            })) ?? [],
+        })) ?? [],
+    };
+  }
+}
+
+export function buildInsulationSpecifications(form: RocketMotorCasingFormData) {
+  const specModel = form.insulationSpecifications;
+
+  if (!specModel) return null;
+
+  return {
+    insulationType: specModel.insulationType,
+    specifications: specModel.specifications.map((category) => ({
+      category: category.category,
+      parameters: category.parameters.map((param) => {
+        const mech = form.mechanicalProperties[param.specificationCode];
+        const thermal = form.thermalProperties[param.specificationCode];
+
+        return {
+          specificationCode: param.specificationCode,
+          reported: parseNum(mech?.reported ?? thermal?.reported),
+          acemSpec: parseNum(mech?.acemSpec ?? thermal?.acemSpec),
+        };
+      }),
+    })),
+  };
+}

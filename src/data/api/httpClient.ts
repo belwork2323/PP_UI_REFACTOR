@@ -7,7 +7,7 @@ import { refreshQueue } from "./tokenRefreshQueue";
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const axios: any = (axiosNS as any).default ?? axiosNS;
 
-const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://172.16.69.207:8080/";
+const BASE_URL = import.meta.env.VITE_API_BASE_URL || "http://172.16.69.76:8080/";
 
 const api: any = axios.create({
   baseURL: BASE_URL,
@@ -42,7 +42,7 @@ api.interceptors.request.use(
   },
   (error: unknown) => {
     return Promise.reject(error);
-  }
+  },
 );
 
 /* ===========================
@@ -86,9 +86,7 @@ api.interceptors.response.use(
 
       try {
         // Dynamically import to avoid circular dependency
-        const { refreshAuthToken } = await import(
-          "../../controllers/auth/authController"
-        );
+        const { refreshAuthToken } = await import("../../controllers/auth/authController");
 
         // ✅ refreshAuthToken now returns ApiResponseModel on success, null on failure
         const refreshResult = await refreshAuthToken();
@@ -125,7 +123,7 @@ api.interceptors.response.use(
 
     // For all other errors or already-retried requests, map to AppError format
     throw mapToAppError(error);
-  }
+  },
 );
 
 /* ===========================
@@ -135,11 +133,7 @@ api.interceptors.response.use(
 /**
  * POST
  */
-export const post = async (
-  url: string,
-  payload = {},
-  options: object = {}
-) => {
+export const post = async (url: string, payload = {}, options: object = {}) => {
   const response = await api.post(url, payload, options);
   return response.data;
 };
@@ -147,11 +141,7 @@ export const post = async (
 /**
  * GET
  */
-export const get = async (
-  url: string,
-  params = {},
-  options: object = {}
-) => {
+export const get = async (url: string, params = {}, options: object = {}) => {
   const response = await api.get(url, {
     params,
     ...options,
@@ -162,11 +152,7 @@ export const get = async (
 /**
  * PUT
  */
-export const put = async (
-  url: string,
-  payload = {},
-  options: object = {}
-) => {
+export const put = async (url: string, payload = {}, options: object = {}) => {
   const response = await api.put(url, payload, options);
   return response.data;
 };
@@ -174,11 +160,7 @@ export const put = async (
 /**
  * PATCH
  */
-export const patch = async (
-  url: string,
-  payload = {},
-  options: object = {}
-) => {
+export const patch = async (url: string, payload = {}, options: object = {}) => {
   const response = await api.request({
     method: "PATCH",
     url,

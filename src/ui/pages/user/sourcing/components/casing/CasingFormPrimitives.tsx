@@ -11,6 +11,8 @@ import {
   Typography,
 } from "@mui/material";
 import FormInput from "../../../../../components/common/FormInput";
+import AppDateField from "../../../../../components/common/DateField";
+import { formatToIsoDateInput, formatToUiDate } from "../../../../../../utils/dateUtils";
 
 export const FieldLabel = ({ children, theme }: { children: React.ReactNode; theme: any }) => (
   <Typography sx={theme.workflow.formElements.fieldLabel}>{children}</Typography>
@@ -31,6 +33,44 @@ export const Field = ({
     <FieldLabel theme={theme}>{label}</FieldLabel>
     {children}
   </Box>
+);
+
+export const ReadOnlyValue = ({
+  label,
+  value,
+  secondary,
+  theme,
+}: {
+  label: string;
+  value: string;
+  secondary?: string;
+  theme: any;
+}) => (
+  <Field label={label} theme={theme}>
+    <Box
+      sx={{
+        px: 1.25,
+        py: 1,
+        minHeight: 40,
+        borderRadius: 1,
+        border: `1px solid ${theme.palette.border}`,
+        bgcolor: theme.palette.surface,
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        boxSizing: "border-box",
+      }}
+    >
+      <Typography sx={{ fontSize: "0.84rem", fontWeight: 600, color: theme.palette.text }}>
+        {value?.trim() || "—"}
+      </Typography>
+      {secondary ? (
+        <Typography sx={{ fontSize: "0.72rem", color: theme.palette.textSub, mt: 0.15 }}>
+          {secondary}
+        </Typography>
+      ) : null}
+    </Box>
+  </Field>
 );
 
 export const TextFieldField = ({
@@ -82,21 +122,25 @@ export const DateField = ({
   value,
   onChange,
   theme,
+  disabled,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   theme: any;
+  disabled?: boolean;
 }) => (
   <Field label={label} theme={theme}>
-    <TextField
-      type="date"
-      size="small"
-      fullWidth
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      sx={theme.workflow.formElements.metaRowTextField}
-      InputLabelProps={{ shrink: true }}
+    <AppDateField
+      value={formatToUiDate(value)}
+      onChange={(next) => onChange(formatToIsoDateInput(next))}
+      disabled={disabled}
+      placeholder="DD-MM-YYYY"
+      sx={{
+        mb: 0,
+        width: "100%",
+        ...theme.workflow.formElements.metaRowTextField,
+      }}
     />
   </Field>
 );
@@ -108,6 +152,7 @@ export const ProjectSelectField = ({
   projects,
   loading = false,
   placeholder,
+  disabled = false,
   theme,
   cf,
 }: {
@@ -117,6 +162,7 @@ export const ProjectSelectField = ({
   projects: Array<{ projectId: string; projectName: string }>;
   loading?: boolean;
   placeholder?: string;
+  disabled?: boolean;
   theme: any;
   cf: any;
 }) => {
@@ -152,7 +198,7 @@ export const ProjectSelectField = ({
       <FormControl
         fullWidth
         size="small"
-        disabled={loading}
+        disabled={disabled || loading}
         sx={theme.workflow.formElements.metaRowTextField}
       >
         <Select
@@ -246,19 +292,21 @@ export const ReceiptStatusField = ({
   theme,
   receivedLabel,
   notReceivedLabel,
+  placeholder = "Select",
 }: {
   label: string;
-  value: "RECEIVED" | "NOT_RECEIVED";
-  onChange: (value: "RECEIVED" | "NOT_RECEIVED") => void;
+  value: "" | "RECEIVED" | "NOT_RECEIVED";
+  onChange: (value: "" | "RECEIVED" | "NOT_RECEIVED") => void;
   theme: any;
   receivedLabel: string;
   notReceivedLabel: string;
+  placeholder?: string;
 }) => (
   <SelectField
     label={label}
     value={value}
-    onChange={(v) => onChange(v as "RECEIVED" | "NOT_RECEIVED")}
-    placeholder={label}
+    onChange={(v) => onChange(v as "" | "RECEIVED" | "NOT_RECEIVED")}
+    placeholder={placeholder}
     theme={theme}
     options={[
       { value: "RECEIVED", label: receivedLabel },

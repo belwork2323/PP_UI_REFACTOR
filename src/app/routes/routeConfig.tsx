@@ -3,6 +3,10 @@ import { Navigate } from "react-router-dom";
 import LoginPage from "../../ui/pages/auth/LoginPage";
 
 import { lazy } from "react";
+import CHUserManagementPage from "@/ui/pages/centrehead/UserManagement/UserManagementPage";
+import CHBatchManagementPage from "@/ui/pages/centrehead/BatchManagement/BatchManagementPage";
+import CHProjectManagementPage from "@/ui/pages/centrehead/ProjectManagement/ProjectManagementPage";
+import CHDashboard from "@/ui/pages/centrehead/Dashboard/CentreheadDashboardPage";
 
 const DashboardPage = lazy(() => import("@ui/pages/admin/Dashboard/DashboardPage"));
 const UserManagementPage = lazy(() => import("@ui/pages/admin/UserManagement/UserManagementPage"));
@@ -82,6 +86,31 @@ export const routes = [
     element: <ProjectManagementPage />,
     isProtected: true,
     roles: ["ADMIN"],
+  },
+  {
+    path: "/centre-head",
+    element: <CHDashboard />,
+    isProtected: true,
+    roles: ["CENTRE_HEAD"],
+  },
+  {
+    path: "/centre-head/users",
+    element: <CHUserManagementPage />,
+    isProtected: true,
+    roles: ["CENTRE_HEAD"],
+  },
+  {
+    path: "/centre-head/batch",
+    element: <CHBatchManagementPage />,
+    isProtected: true,
+    roles: ["CENTRE_HEAD"],
+  },
+
+  {
+    path: "/centre-head/projects",
+    element: <CHProjectManagementPage />,
+    isProtected: true,
+    roles: ["CENTRE_HEAD"],
   },
   {
     path: "/system-manager",

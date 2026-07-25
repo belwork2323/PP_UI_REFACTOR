@@ -13,6 +13,31 @@ export type CasePrepAddedMotor = {
   prrcClearanceDate: string;
 };
 
+export type CasePrepBatchMotorContext = {
+  motorId?: string;
+  motorIds?: Array<string | number>;
+  numberOfMotors?: number | string;
+  identificationSheet?: { prcApprovalDate?: string } | null;
+  prrcClearanceDate?: string;
+};
+
+export const resolveCasePrepPrrcClearanceDate = (
+  batch?: CasePrepBatchMotorContext | null,
+): string => String(batch?.prrcClearanceDate ?? "").trim();
+
+/** Build motor tabs from batch details (PRRC date is user-entered per motor). */
+export const resolveCasePrepMotorsFromBatch = (
+  batch?: CasePrepBatchMotorContext | null,
+): CasePrepAddedMotor[] => {
+  const motorOptions = resolveCasePrepMotorOptions(batch);
+  if (!motorOptions.length) return [];
+
+  return motorOptions.map((option) => ({
+    motorId: option.value,
+    prrcClearanceDate: "",
+  }));
+};
+
 export const getCasePrepMotorLabel = (motorId: string) => motorId;
 
 export const getCasePrepMotorCountOptions = (motorOptions: CasePrepMotorOption[]) => {
@@ -32,6 +57,7 @@ export const isSubscaleBatch = (batchType: string | undefined | null) =>
 export const resolveCasePrepMotorOptions = (batch?: {
   motorId?: string;
   motorIds?: Array<string | number>;
+  numberOfMotors?: number | string;
 } | null): CasePrepMotorOption[] => {
   const ids = Array.isArray(batch?.motorIds)
     ? batch.motorIds.map((id) => String(id).trim()).filter(Boolean)
@@ -54,6 +80,25 @@ export const resolveCasePrepMotorOptions = (batch?: {
   }
 
   return [{ value: singleId, label: singleId }];
+};
+
+/** Motor count from batch details (`numberOfMotors`) with fallback to motor IDs. */
+export const resolveCasePrepBatchMotorCount = (
+  batch?: {
+    numberOfMotors?: number | string;
+    motorIds?: Array<string | number>;
+  } | null,
+  fallbackCount = 1,
+): number => {
+  const fromBatch = Number(batch?.numberOfMotors ?? 0);
+  if (Number.isFinite(fromBatch) && fromBatch > 0) return fromBatch;
+
+  const ids = Array.isArray(batch?.motorIds)
+    ? batch.motorIds.map((id) => String(id).trim()).filter(Boolean)
+    : [];
+  if (ids.length > 0) return ids.length;
+
+  return fallbackCount > 0 ? fallbackCount : 1;
 };
 
 export const getSelectedCasePrepDraftMotorIds = (

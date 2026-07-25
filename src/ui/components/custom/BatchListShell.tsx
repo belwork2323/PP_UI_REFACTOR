@@ -192,7 +192,7 @@ const BatchListShell = ({
               }}
               sx={{ ...theme.inputs.search, flex: 1, minWidth: 0 }}
             />
-            {searchBarEnd}
+            {searchBarEnd ?? null}
           </Stack>
 
           {filterFields.map(({ field, label, minWidth, options }) => (

@@ -10,8 +10,6 @@ import {
   TableContainer,
   TableHead,
   TableRow,
-  ToggleButton,
-  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
@@ -20,9 +18,7 @@ import { icons } from "../../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../../app/config/strings";
 import { MIXING_BRAND } from "../../../../../../app/theme/custom_themes/user/manufacturing/mixing_theme";
 import {
-  FINAL_MIX_CYCLE_OPTIONS,
   getFinalMixNoLabel,
-  getMixingCycleByValue,
   getPremixNoLabel,
 } from "../../../../../../hooks/user/manufacturing/mixingConfig";
 import type {
@@ -42,12 +38,16 @@ const BRAND = MIXING_BRAND;
 const { blender: BlenderRoundedIcon, checklist: ChecklistRoundedIcon } =
   icons.user.manufacturing.mixing.form;
 
-type MixingSectionTab = "PREMIX" | "FINAL_MIX";
+type CombinedStageKind = "PREMIX" | "FINAL_MIX";
+
+type CombinedNavItem = {
+  kind: CombinedStageKind;
+  id: string;
+  label: string;
+  cardIndex: number;
+};
 
 export type MixingDetailsTheme = ReturnType<typeof getMixingTheme>["details"];
-
-const formatCounter = (template: string, current: number, total: number) =>
-  template.replace("{current}", String(current)).replace("{total}", String(total));
 
 const formatDate = (value?: string | null) => {
   if (!value) return "—";
@@ -59,16 +59,6 @@ const formatDate = (value?: string | null) => {
 const displayValue = (value?: string | null) => {
   const trimmed = String(value ?? "").trim();
   return trimmed || "—";
-};
-
-const resolveMixingCycleLabel = (value: string) => {
-  const cycle = getMixingCycleByValue(value);
-  return cycle?.label ?? displayValue(value);
-};
-
-const resolveFinalMixCycleLabel = (value: string) => {
-  const match = FINAL_MIX_CYCLE_OPTIONS.find((cycle) => cycle.value === value);
-  return match?.label ?? displayValue(value);
 };
 
 const DetailField = ({
@@ -132,7 +122,9 @@ const SectionCard = ({
       >
         <Icon sx={{ color: "#fff", fontSize: 17 }} />
       </Box>
-      <Typography sx={{ fontWeight: 800, fontSize: "0.9rem", color: BRAND.text }}>{title}</Typography>
+      <Typography sx={{ fontWeight: 800, fontSize: "0.9rem", color: BRAND.text }}>
+        {title}
+      </Typography>
     </Box>
     <Box sx={{ p: 2 }}>{children}</Box>
   </Box>
@@ -160,13 +152,17 @@ const ProcessParticularsTable = ({
         {rows.length === 0 ? (
           <TableRow>
             <TableCell colSpan={5} sx={dt.tableCell}>
-              <Typography sx={{ fontSize: "0.78rem", color: BRAND.textSub }}>{S.PROCESS_PARTICULARS_EMPTY}</Typography>
+              <Typography sx={{ fontSize: "0.78rem", color: BRAND.textSub }}>
+                {S.PROCESS_PARTICULARS_EMPTY}
+              </Typography>
             </TableCell>
           </TableRow>
         ) : (
           rows.map((row, rowIdx) => (
-            <TableRow key={row.id} sx={dt.tableRow(rowIdx)}>
-              <TableCell sx={{ ...dt.tableCell, fontWeight: 700 }}>{row.operation}</TableCell>
+            <TableRow key={`${row.operationId}-${rowIdx}`} sx={dt.tableRow(rowIdx)}>
+              <TableCell sx={{ ...dt.tableCell, fontWeight: 700 }}>
+                {displayValue(row.operation || `Operation ${row.operationId}`)}
+              </TableCell>
               <TableCell sx={dt.tableCell}>{displayValue(row.rpm)}</TableCell>
               <TableCell sx={dt.tableCell}>{displayValue(row.time)}</TableCell>
               <TableCell sx={dt.tableCell}>{displayValue(row.temp)}</TableCell>
@@ -179,7 +175,7 @@ const ProcessParticularsTable = ({
   </TableContainer>
 );
 
-const PremixDetailPanel = ({ premix, dt }: { premix: PremixEntry; dt: MixingDetailsTheme }) => (
+export const PremixDetailPanel = ({ premix, dt }: { premix: PremixEntry; dt: MixingDetailsTheme }) => (
   <SectionCard
     title={`${S.SECTION_PREMIX_STAGE} — ${getPremixNoLabel(Number(premix.premixNo))}`}
     icon={ChecklistRoundedIcon}
@@ -193,19 +189,29 @@ const PremixDetailPanel = ({ premix, dt }: { premix: PremixEntry; dt: MixingDeta
       }}
     >
       <DetailField label={S.DETAIL_LABEL_PREMIX_NO} value={premix.premixNo} dt={dt} />
-      <DetailField label={S.DETAIL_LABEL_MIXER_BLDG} value={premix.mixerBldgNo} dt={dt} />
+      <DetailField label={S.DETAIL_LABEL_MIXER} value={premix.mixerType} dt={dt} />
+      <DetailField label={S.DETAIL_LABEL_MIXER_BLDG} value={premix.bldgNo} dt={dt} />
       <DetailField label={S.DETAIL_LABEL_BOWL_ID} value={premix.bowlId} dt={dt} />
       <DetailField label={S.LABEL_BOWL_TRIAL_DATE} value={premix.bowlTrialDate} dt={dt} />
-      <DetailField label={S.LABEL_BOWL_TRIAL_OBS} value={premix.bowlTrialObservations} dt={dt} span />
+      <DetailField
+        label={S.LABEL_BOWL_TRIAL_OBS}
+        value={premix.bowlTrialObservations}
+        dt={dt}
+        span
+      />
       <DetailField label={S.LABEL_PREMIX_DATE} value={premix.premixDate} dt={dt} />
       <DetailField label={S.LABEL_PREMIX_QTY} value={premix.premixQuantity} dt={dt} />
-      <DetailField label={S.DETAIL_LABEL_MIXING_CYCLE} value={resolveMixingCycleLabel(premix.mixingCycle)} dt={dt} />
+      <DetailField
+        label={S.DETAIL_LABEL_MIXING_CYCLE}
+        value={premix.mixingCycle || premix.mixingCycleName || ""}
+        dt={dt}
+      />
     </Box>
 
     <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: BRAND.text, mb: 0.4 }}>
       {S.SECTION_PROCESS_PARTICULARS}
     </Typography>
-    <ProcessParticularsTable rows={premix.processParticulars} dt={dt} />
+    <ProcessParticularsTable rows={premix.processParticulars ?? []} dt={dt} />
 
     <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: BRAND.text, mb: 1 }}>
       {S.SECTION_QUALITY_CHECKS}
@@ -214,7 +220,7 @@ const PremixDetailPanel = ({ premix, dt }: { premix: PremixEntry; dt: MixingDeta
   </SectionCard>
 );
 
-const FinalMixDetailPanel = ({ entry, dt }: { entry: FinalMixEntry; dt: MixingDetailsTheme }) => (
+export const FinalMixDetailPanel = ({ entry, dt }: { entry: FinalMixEntry; dt: MixingDetailsTheme }) => (
   <SectionCard
     title={`${S.SECTION_FINAL_MIX_STAGE} — ${getFinalMixNoLabel(Number(entry.mixNo))}`}
     icon={BlenderRoundedIcon}
@@ -229,38 +235,32 @@ const FinalMixDetailPanel = ({ entry, dt }: { entry: FinalMixEntry; dt: MixingDe
     >
       <DetailField label={S.DETAIL_LABEL_FINAL_MIX_NO} value={entry.mixNo} dt={dt} />
       <DetailField label={S.DETAIL_LABEL_PREMIX_NO} value={entry.linkedPremixNo} dt={dt} />
-      <DetailField label={S.DETAIL_LABEL_MIXER_BLDG} value={entry.mixerBldgNo} dt={dt} />
+      <DetailField label={S.DETAIL_LABEL_MIXER} value={entry.mixerType} dt={dt} />
+      <DetailField label={S.DETAIL_LABEL_MIXER_BLDG} value={entry.bldgNo} dt={dt} />
       <DetailField label={S.DETAIL_LABEL_BOWL_ID} value={entry.bowlId} dt={dt} />
+
       <DetailField
         label={S.DETAIL_LABEL_FINAL_MIX_CYCLE}
-        value={resolveFinalMixCycleLabel(entry.finalMixCycle)}
+        value={entry.mixingCycle || entry.mixingCycleName || ""}
         dt={dt}
       />
     </Box>
 
-    <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: BRAND.text, mb: 1 }}>
-      {S.SECTION_QUALITY_CHECKS}
+    <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: BRAND.text, mb: 0.4 }}>
+      {S.SECTION_PROCESS_PARTICULARS}
     </Typography>
-    <MixingQualityChecksTable rows={entry.qualityChecks} readOnly />
+    <ProcessParticularsTable rows={entry.processParticulars ?? []} dt={dt} />
+
+    {entry.qualityChecks && (
+      <>
+        <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: BRAND.text, mb: 1 }}>
+          {S.SECTION_QUALITY_CHECKS}
+        </Typography>
+        <MixingQualityChecksTable rows={entry.qualityChecks} readOnly />
+      </>
+    )}
   </SectionCard>
 );
-
-const sectionToggleSx = {
-  mb: 2,
-  "& .MuiToggleButton-root": {
-    textTransform: "none",
-    fontWeight: 700,
-    fontSize: "0.78rem",
-    color: BRAND.textSub,
-    borderColor: alpha(BRAND.border, 0.85),
-    "&.Mui-selected": {
-      color: "#fff",
-      background: `linear-gradient(135deg, ${BRAND.mx}, ${BRAND.mxLight})`,
-      borderColor: BRAND.mx,
-      "&:hover": { background: `linear-gradient(135deg, ${BRAND.mx}, ${BRAND.mxLight})` },
-    },
-  },
-};
 
 export type MixingDetailsContentProps = {
   detailView: MixingDetailView | null;
@@ -278,43 +278,44 @@ const MixingDetailsContent = ({
   resetOnFormId,
 }: MixingDetailsContentProps) => {
   const dt = useMemo(() => getMixingTheme(manufacturingTheme).details, [manufacturingTheme]);
-  const [activeSectionTab, setActiveSectionTab] = useState<MixingSectionTab>("PREMIX");
-  const [activePremixIndex, setActivePremixIndex] = useState(0);
-  const [activeFinalMixIndex, setActiveFinalMixIndex] = useState(0);
+  const [activeCardIndex, setActiveCardIndex] = useState(0);
 
   const premixCards = detailView?.premixCards ?? [];
   const finalMixCards = detailView?.finalMixCards ?? [];
 
-  const activePremixIndexSafe =
-    premixCards.length > 0 ? Math.min(activePremixIndex, premixCards.length - 1) : 0;
-  const activeFinalMixIndexSafe =
-    finalMixCards.length > 0 ? Math.min(activeFinalMixIndex, finalMixCards.length - 1) : 0;
+  const combinedNavItems = useMemo<CombinedNavItem[]>(() => {
+    const premixItems = premixCards.map((premix, cardIndex) => ({
+      kind: "PREMIX" as const,
+      id: `premix-${premix.premixNo}`,
+      label: getPremixNoLabel(Number(premix.premixNo)),
+      cardIndex,
+    }));
+    const finalMixItems = finalMixCards.map((entry, cardIndex) => ({
+      kind: "FINAL_MIX" as const,
+      id: `final-mix-${entry.mixNo}`,
+      label: getFinalMixNoLabel(Number(entry.mixNo)),
+      cardIndex,
+    }));
+    return [...premixItems, ...finalMixItems];
+  }, [premixCards, finalMixCards]);
 
-  const activePremix = premixCards[activePremixIndexSafe] ?? null;
-  const activeFinalMix = finalMixCards[activeFinalMixIndexSafe] ?? null;
+  const activeCardIndexSafe =
+    combinedNavItems.length > 0
+      ? Math.min(activeCardIndex, combinedNavItems.length - 1)
+      : 0;
+  const activeNavItem = combinedNavItems[activeCardIndexSafe] ?? null;
+  const activePremix =
+    activeNavItem?.kind === "PREMIX" ? premixCards[activeNavItem.cardIndex] ?? null : null;
+  const activeFinalMix =
+    activeNavItem?.kind === "FINAL_MIX" ? finalMixCards[activeNavItem.cardIndex] ?? null : null;
 
-  const premixNavTabs = useMemo(
-    () =>
-      premixCards.map((premix) => ({
-        id: `premix-${premix.premixNo}`,
-        label: getPremixNoLabel(Number(premix.premixNo)),
-      })),
-    [premixCards],
-  );
-
-  const finalMixNavTabs = useMemo(
-    () =>
-      finalMixCards.map((entry) => ({
-        id: `final-mix-${entry.mixNo}`,
-        label: getFinalMixNoLabel(Number(entry.mixNo)),
-      })),
-    [finalMixCards],
+  const combinedNavTabs = useMemo(
+    () => combinedNavItems.map((item) => ({ id: item.id, label: item.label })),
+    [combinedNavItems],
   );
 
   useEffect(() => {
-    setActiveSectionTab("PREMIX");
-    setActivePremixIndex(0);
-    setActiveFinalMixIndex(0);
+    setActiveCardIndex(0);
   }, [resetOnFormId]);
 
   const metaFields = [
@@ -323,7 +324,10 @@ const MixingDetailsContent = ({
     { label: "Batch Type", value: detailView?.batchType || String(row?.batchType ?? "") },
     { label: "Status", value: detailView?.status || String(row?.mxStatus ?? row?.status ?? "") },
     { label: BL.COL_CREATED_BY, value: detailView?.createdBy || BL.UNASSIGNED },
-    { label: BL.COL_CREATED_ON, value: formatDate(detailView?.createdAt ?? (row?.createdOn as string | undefined)) },
+    {
+      label: BL.COL_CREATED_ON,
+      value: formatDate(detailView?.createdAt ?? (row?.createdOn as string | undefined)),
+    },
     { label: "Submitted By", value: detailView?.submittedBy || "—" },
     { label: "Submitted On", value: formatDate(detailView?.submittedAt) },
   ];
@@ -337,7 +341,7 @@ const MixingDetailsContent = ({
     );
   }
 
-  const hasStageData = premixCards.length > 0 || finalMixCards.length > 0;
+  const hasStageData = combinedNavItems.length > 0;
 
   return (
     <>
@@ -363,68 +367,22 @@ const MixingDetailsContent = ({
             {S.DETAILS_FORM_SECTION}
           </Typography>
 
-          <ToggleButtonGroup
-            exclusive
-            fullWidth
-            size="small"
-            value={activeSectionTab}
-            onChange={(_, value: MixingSectionTab | null) => value && setActiveSectionTab(value)}
-            sx={sectionToggleSx}
-          >
-            <ToggleButton value="PREMIX">
-              {S.SECTION_TAB_PREMIX}
-              {premixCards.length > 0 ? ` (${premixCards.length})` : ""}
-            </ToggleButton>
-            <ToggleButton value="FINAL_MIX">
-              {S.SECTION_TAB_FINAL_MIX}
-              {finalMixCards.length > 0 ? ` (${finalMixCards.length})` : ""}
-            </ToggleButton>
-          </ToggleButtonGroup>
-
-          {activeSectionTab === "PREMIX" && (
-            <>
-              {premixCards.length === 0 || !activePremix ? (
-                <Typography sx={dt.emptyText}>{S.NO_PREMIX_CARDS}</Typography>
-              ) : premixCards.length === 1 ? (
+          {!activePremix && !activeFinalMix ? (
+            <Typography sx={dt.emptyText}>{S.NO_STAGE_CARDS}</Typography>
+          ) : (
+            <MixingCardNavigation
+              sectionTitle={S.STAGE_NAV_TITLE}
+              sectionHint={S.STAGE_NAV_HINT}
+              tabs={combinedNavTabs}
+              activeIndex={activeCardIndexSafe}
+              onActiveIndexChange={setActiveCardIndex}
+            >
+              {activePremix ? (
                 <PremixDetailPanel premix={activePremix} dt={dt} />
-              ) : (
-                <MixingCardNavigation
-                  sectionTitle={S.PREMIX_NAV_TITLE}
-                  sectionHint={S.PREMIX_NAV_HINT}
-                  counterLabel={formatCounter(S.PREMIX_COUNTER, activePremixIndexSafe + 1, premixCards.length)}
-                  tabs={premixNavTabs}
-                  activeIndex={activePremixIndexSafe}
-                  onActiveIndexChange={setActivePremixIndex}
-                >
-                  <PremixDetailPanel premix={activePremix} dt={dt} />
-                </MixingCardNavigation>
-              )}
-            </>
-          )}
-
-          {activeSectionTab === "FINAL_MIX" && (
-            <>
-              {finalMixCards.length === 0 || !activeFinalMix ? (
-                <Typography sx={dt.emptyText}>{S.NO_FINAL_MIX_CARDS}</Typography>
-              ) : finalMixCards.length === 1 ? (
+              ) : activeFinalMix ? (
                 <FinalMixDetailPanel entry={activeFinalMix} dt={dt} />
-              ) : (
-                <MixingCardNavigation
-                  sectionTitle={S.FINAL_MIX_NAV_TITLE}
-                  sectionHint={S.FINAL_MIX_NAV_HINT}
-                  counterLabel={formatCounter(
-                    S.FINAL_MIX_COUNTER,
-                    activeFinalMixIndexSafe + 1,
-                    finalMixCards.length,
-                  )}
-                  tabs={finalMixNavTabs}
-                  activeIndex={activeFinalMixIndexSafe}
-                  onActiveIndexChange={setActiveFinalMixIndex}
-                >
-                  <FinalMixDetailPanel entry={activeFinalMix} dt={dt} />
-                </MixingCardNavigation>
-              )}
-            </>
+              ) : null}
+            </MixingCardNavigation>
           )}
         </Box>
       ) : (

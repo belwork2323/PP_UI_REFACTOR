@@ -1,5 +1,6 @@
 export type SchemaSetupContext = {
   finalMixCount?: number | string;
+  numberOfMotors?: number | string;
   motorId?: string;
   castingType?: string;
   castingStation?: string;

@@ -3,18 +3,15 @@ import {
   Box,
   Button,
   Stack,
-  FormControl,
-  InputLabel,
-  Select,
   MenuItem,
-  Typography,
-  TextField,
 } from "@mui/material";
 import { icons } from "@app/theme/icons";
 import getBatchManagementTheme from "@app/theme/custom_themes/admin/BatchManagement/batchManagement_theme";
 import { STRINGS } from "@app/config/strings";
 import { useThemeStore } from "@app/store/themeStore";
 import FilterSelect from "@ui/components/common/FilterSelect";
+import AppDropdown from "@ui/components/common/AppDropdown";
+import FormInput from "@ui/components/common/FormInput";
 import ConfirmAlertDialog from "@ui/components/common/ConfirmAlertDialog";
 import RefreshIconButton from "@ui/components/common/RefreshIconButton";
 import Input from "@ui/components/common/Input";
@@ -180,7 +177,7 @@ const BatchManagementPage = () => {
         }
         filterExtension={
           <AdminFilterPanel
-            title={AC.FILTERS_TITLE}
+            title={S.TOOLBAR.FILTERS_TITLE}
             activeFilterCount={list.activeFilterCount}
             onClear={list.clearFilters}
             clearLabel={S.TOOLBAR.CLEAR_ALL}
@@ -190,9 +187,19 @@ const BatchManagementPage = () => {
             applyLabel={AC.FILTERS_APPLY}
             theme={t}
           >
-            <Stack direction="row" gap={1.5} flexWrap="wrap">
-              <TextField
-                size="small"
+            <Box
+              sx={{
+                display: "grid",
+                gridTemplateColumns: {
+                  xs: "1fr",
+                  md: "repeat(2, minmax(0, 1fr))",
+                  lg: "repeat(4, minmax(0, 1fr))",
+                },
+                gap: 1.25,
+                alignItems: "start",
+              }}
+            >
+              <FormInput
                 label={S.TOOLBAR.SEARCH_MOTOR_PLACEHOLDER}
                 value={draftFilters.motorIds.join(", ")}
                 onChange={(e) =>
@@ -205,52 +212,51 @@ const BatchManagementPage = () => {
                   )
                 }
                 placeholder="e.g. MTR-445, MTR-446"
-                sx={{ ...t.filterPanel.field, minWidth: 240 }}
+                sx={{ mb: 0, ...t.filterPanel.field }}
               />
-              <FormControl size="small" sx={t.filterPanel.field}>
-                <InputLabel>{S.TOOLBAR.FILTER_STAGE_LABEL}</InputLabel>
 
-                <Select
-                  value={draftFilters.stage}
-                  label={S.TOOLBAR.FILTER_STAGE_LABEL}
-                  onChange={(e) => list.setDraftFilter("stage", e.target.value)}
-                  MenuProps={t.menuPaper}
-                  disabled={lookups.loading}
-                  sx={{ minWidth: 140 }}
-                >
-                  <MenuItem value="All">
-                    <em>{lookups.loading ? "Loading motor stages..." : "All"}</em>
+              <AppDropdown
+                label={S.TOOLBAR.FILTER_STAGE_LABEL}
+                value={draftFilters.stage}
+                onChange={(value) => list.setDraftFilter("stage", value)}
+                loading={lookups.loading}
+                loadingPlaceholder="Loading motor stages..."
+                disabled={lookups.loading}
+                compact
+                sx={{ mb: 0, ...t.filterPanel.field }}
+                MenuProps={t.menuPaper}
+                itemSx={t.filterPanel.menuItem}
+              >
+                <MenuItem value="All">All</MenuItem>
+                {lookups.motorStageOptions.map((stage) => (
+                  <MenuItem key={stage.motorStage} value={String(stage.motorStage)}>
+                    Stage {stage.motorStage}
                   </MenuItem>
+                ))}
+              </AppDropdown>
 
-                  {lookups.motorStageOptions.map((stage) => (
-                    <MenuItem key={stage.motorStage} value={String(stage.motorStage)}>
-                      <Box
-                        display="flex"
-                        justifyContent="space-between"
-                        alignItems="center"
-                        width="100%"
-                      >
-                        <Typography>Stage {stage.motorStage}</Typography>
-                      </Box>
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
               <FilterSelect
                 label={S.TOOLBAR.FILTER_STATUS_LABEL}
                 value={draftFilters.status}
                 onChange={(e) => list.setDraftFilter("status", e.target.value)}
                 options={S.FILTER_OPTIONS.STATUS}
-                sx={t.filterPanel.field}
+                compact
+                sx={{ mb: 0, ...t.filterPanel.field }}
+                menuProps={t.menuPaper}
+                itemSx={t.filterPanel.menuItem}
               />
+
               <FilterSelect
                 label={S.TOOLBAR.FILTER_SUB_DEPT_LABEL}
                 value={draftFilters.subDept}
                 onChange={(e) => list.setDraftFilter("subDept", e.target.value)}
                 options={[...lookups.subDeptNames]}
-                sx={t.filterPanel.field}
+                compact
+                sx={{ mb: 0, ...t.filterPanel.field }}
+                menuProps={t.menuPaper}
+                itemSx={t.filterPanel.menuItem}
               />
-            </Stack>
+            </Box>
           </AdminFilterPanel>
         }
         theme={t}
@@ -276,10 +282,7 @@ const BatchManagementPage = () => {
 
       <CreateBatchManagementForm
         open={form.modalOpen}
-        onClose={() => {
-          form.setModalOpen(false);
-          lookups.clearApprovedMotors();
-        }}
+        onClose={() => form.requestCloseBatchModal(() => lookups.clearApprovedMotors())}
         onSave={form.handleSaveBatch}
         onOpenImplementation={form.openImplementationFromCreate}
         editTarget={form.editTarget}
@@ -295,27 +298,35 @@ const BatchManagementPage = () => {
         availableMotorsLoading={lookups.availableMotorsLoading}
         onFetchApprovedMotors={lookups.fetchApprovedMotors}
         onClearApprovedMotors={lookups.clearApprovedMotors}
+        mixingCycleOptions={lookups.mixingCycleOptions}
+        mixingCyclesLoading={lookups.mixingCyclesLoading}
+        onFetchMixingCycles={lookups.fetchMixingCycles}
+        onClearMixingCycles={lookups.clearMixingCycles}
+        articleOptions={lookups.articleOptions}
+        articlesLoading={lookups.subscaleArticlesLoading}
         saving={form.saving}
+        canSaveBatchChanges={form.canSaveBatchChanges}
         t={t}
       />
 
       <BatchImplementationForm
         open={form.implModalOpen}
-        onClose={() => {
-          form.setImplModalOpen(false);
-          form.setImplViewOnly(false);
-        }}
+        onClose={form.requestCloseImplModal}
         onSave={form.handleSaveImplementation}
         editTarget={form.editImplTarget}
         form={form.implForm}
         onFormChange={form.handleImplFormChange}
         onMaterialsChange={form.handleMaterialsChange}
         readOnly={form.implViewOnly}
+        isBatchEditMode={form.implFromBatchEdit}
         saving={form.implSaving}
         t={t}
         materialOptions={implementation.materialOptions}
+        mixerOptions={implementation.mixerOptions}
+        buildingOptions={implementation.buildingOptions}
         loadingMaterials={implementation.loadingMaterials}
         loadingLots={implementation.loadingLots}
+        loadingMasterLookups={implementation.loadingMasterLookups}
         getLotByMaterialAndId={implementation.getLotByMaterialAndId}
         getLotOptionsForRow={implementation.getLotOptionsForRow}
         setConfirmOpen={form.setConfirmOpen}
@@ -387,6 +398,28 @@ const BatchManagementPage = () => {
           implementation.
         </Box>
       </ConfirmAlertDialog>
+
+      <ConfirmAlertDialog
+        open={form.closeBatchConfirmOpen}
+        severity="warning"
+        title={S.FORM.UNSAVED_CLOSE_TITLE}
+        message={S.FORM.UNSAVED_CLOSE_MESSAGE}
+        confirmLabel={S.FORM.UNSAVED_CLOSE_DISCARD}
+        cancelLabel={S.FORM.UNSAVED_CLOSE_STAY}
+        onConfirm={() => form.confirmDiscardBatchModal()}
+        onCancel={form.cancelDiscardBatchModal}
+      />
+
+      <ConfirmAlertDialog
+        open={form.closeImplConfirmOpen}
+        severity="warning"
+        title={S.FORM.UNSAVED_CLOSE_TITLE}
+        message={S.FORM.UNSAVED_CLOSE_MESSAGE}
+        confirmLabel={S.FORM.UNSAVED_CLOSE_DISCARD}
+        cancelLabel={S.FORM.UNSAVED_CLOSE_STAY}
+        onConfirm={form.confirmDiscardImplModal}
+        onCancel={() => form.setCloseImplConfirmOpen(false)}
+      />
     </Box>
   );
 };

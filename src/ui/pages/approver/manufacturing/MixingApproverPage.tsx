@@ -6,7 +6,9 @@ import { APPROVER_STATUS_META } from "../../../../app/theme/approver";
 import useMixingApproverHook from "../../../../hooks/approver/manufacturing/useMixingApproverHook";
 import ApproverSubdepartmentBatchListSection from "../components/ApproverSubdepartmentBatchListSection";
 import ApproverActionDialog from "../../../components/custom/ApproverActionDialog";
-import MixingApproverDetailDialog from "./MixingApproverDetailDialog";
+import MixingApproverDetailDialog, {
+  type MixingApproverDetailItem,
+} from "./MixingApproverDetailDialog";
 
 const BRAND = {
   primary: "#1B4F72",
@@ -27,12 +29,17 @@ const MixingApproverPage = () => {
     items,
     selected,
     detailsLoading,
-    detailView,
+    activeMixCardId,
     dialogProps,
+    formDialogProps,
+    actionLoading,
     requestApprove,
     requestReject,
+    requestFormApprove,
+    requestFormReject,
     handleViewDetails,
     handleCloseDetail,
+    handleActiveMixCardChange,
   } = useMixingApproverHook();
 
   return (
@@ -55,14 +62,19 @@ const MixingApproverPage = () => {
       <MixingApproverDetailDialog
         open={!!selected}
         onClose={handleCloseDetail}
-        item={selected}
-        detailView={detailView}
+        item={selected as MixingApproverDetailItem | null}
         loading={detailsLoading}
+        activeMixCardId={activeMixCardId}
+        onActiveMixCardChange={handleActiveMixCardChange}
         onApprove={requestApprove}
         onReject={requestReject}
+        onApproveForm={requestFormApprove}
+        onRejectForm={requestFormReject}
+        actionLoading={actionLoading}
         theme={approverTheme}
       />
       <ApproverActionDialog {...dialogProps} />
+      <ApproverActionDialog {...formDialogProps} />
     </ApproverSubdepartmentBatchListSection>
   );
 };

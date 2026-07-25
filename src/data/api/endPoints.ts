@@ -17,6 +17,9 @@ export const APPROVER_ENDPOINTS = {
   SUBDEPT_DASHBOARD_STATS: `${API_BASE}/approver/subdepartment/dashboard/stats`,
   BATCH_LIST: `${API_BASE}/approver/subdepartment/batch-list`,
   CHANGE_STATUS: `${API_BASE}/approver/form/change-status`,
+  PREMIX_CHANGE_STATUS: `${API_BASE}/approver/form/premix/change-status`,
+  MOTOR_CHANGE_STATUS: `${API_BASE}/approver/form/motor/change-status`,
+  MIX_CARD_CHANGE_STATUS: `${API_BASE}/approver/form/mix-card/change-status`,
   FORM_PDF: `${API_BASE}/approver/form/pdf`,
   RAW_MATERIAL_PROCUREMENT_LIST: `${API_BASE}/approver/raw-material-sourcing/list`,
   RAW_MATERIAL_PROCUREMENT_CHANGE_STATUS: `${API_BASE}/approver/form/change-status`,
@@ -144,6 +147,14 @@ export const SYSTEM = {
   DEPARTMENTS: `${API_BASE}/system/departments`,
   /** Optional ?departmentId= — omit or null for all */
   SUB_DEPARTMENTS: `${API_BASE}/system/sub-departments`,
+  MIXERS: `${API_BASE}/system/mixers`,
+  BUILDINGS: `${API_BASE}/system/buildings`,
+  MIXING_CYCLES: `${API_BASE}/system/mixing-cycles`,
+  /** POST body: `{ motorStage: "0" | "1" | "2" | "3" | "ALL" }` (string) */
+  MIXING_CYCLE_LIST: `${API_BASE}/system/mixing-cycle-list`,
+  /** GET — optional ?subBatchType= */
+  SUBSCALE_ARTICLES: `${API_BASE}/system/subscale-articles`,
+  GET_QUALITY_CHECKS: `${API_BASE}/user/subdepartment/mixing/quality-checks`,
 };
 
 // =============================
@@ -197,6 +208,7 @@ export const USER_OPERATIONS_ENDPOINTS = {
   APPROVED_MOTORS_LIST: `${API_BASE}/user/subdepartment/approved-motors-list`,
   CASTING_STATION_LIST: `${API_BASE}/user/subdepartment/casting-station`,
   MATERIAL_LOTS: `${API_BASE}/user/subdepartment/material-lots`,
+  FETCH_SPECIFICATION: `${API_BASE}/user/subdepartment/insulation/specification-list`,
 };
 
 export const USER_RAW_MATERIAL_PROCUREMENT_ENDPOINTS = {
@@ -290,6 +302,10 @@ export const USER_STF_ENDPOINTS = {
   CREATE_FORM: `${API_BASE}/user/stf/form/create`,
   FORM_DETAILS: `${API_BASE}/user/stf/form/details`,
   UPDATE_FORM: `${API_BASE}/user/stf/form/update`,
+  LIST_BEM_MOTORS: `${API_BASE}/user/stf/bem-motor/list`,
+  CREATE_BEM_MOTORS: `${API_BASE}/user/stf/bem-motor/create`,
+  BEM_MOTOR_DETAILS: `${API_BASE}/user/stf/bem-motor/details`,
+  UPDATE_BEM_MOTOR: `${API_BASE}/user/stf/bem-motor/update`,
 };
 
 export const USER_DISPATCH_ENDPOINTS = {

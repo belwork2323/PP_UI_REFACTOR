@@ -13,15 +13,12 @@ import {
 import { useThemeStore } from "../../../../app/store/themeStore";
 import getManufacturingTheme from "../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import getRawMaterialPreparationApproverTheme from "../../../../app/theme/custom_themes/approver/manufacturing/rawMaterialPreparationApprover_theme";
-import { isApproverActionableStatus } from "../../../../app/theme/approver";
 import { icons } from "../../../../app/theme/icons";
 import type { MixingDetailView } from "../../../../data/models/user/MixingFormModel";
 import { ReportPreviewDialog } from "../components/ReportPdf";
-import MixingDetailsContent from "../../user/manufacturing/Mixing/components/MixingDetailsContent";
+import MixingApproverReviewContent from "./MixingApproverReviewContent";
 
 const {
-  approved: CheckCircleRoundedIcon,
-  rejected: CancelRoundedIcon,
   close: CloseRoundedIcon,
   blender: BlenderRoundedIcon,
   pdf: PictureAsPdfRoundedIcon,
@@ -30,19 +27,23 @@ const {
 export type MixingApproverDetailItem = Record<string, unknown> & {
   formId?: string | null;
   batchId?: string | null;
-  motorId?: string | null;
   status?: string | null;
   mxStatus?: string | null;
+  detailView?: MixingDetailView | null;
 };
 
 type MixingApproverDetailDialogProps = {
   open: boolean;
   onClose: () => void;
   item: MixingApproverDetailItem | null;
-  detailView: MixingDetailView | null;
   loading: boolean;
+  activeMixCardId?: string | null;
+  onActiveMixCardChange?: (mixCardId: string) => void;
   onApprove: (item: MixingApproverDetailItem) => void;
   onReject: (item: MixingApproverDetailItem) => void;
+  onApproveForm?: (item: MixingApproverDetailItem) => void;
+  onRejectForm?: (item: MixingApproverDetailItem) => void;
+  actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
 
@@ -50,10 +51,14 @@ const MixingApproverDetailDialog = ({
   open,
   onClose,
   item,
-  detailView,
   loading,
+  activeMixCardId = null,
+  onActiveMixCardChange,
   onApprove,
   onReject,
+  onApproveForm,
+  onRejectForm,
+  actionLoading = false,
   theme,
 }: MixingApproverDetailDialogProps) => {
   const [pdfOpen, setPdfOpen] = useState(false);
@@ -62,11 +67,11 @@ const MixingApproverDetailDialog = ({
 
   if (!item) return null;
 
-  const canApproveOrReject = isApproverActionableStatus(item.status ?? item.mxStatus);
+  const detailView = item.detailView ?? null;
 
   return (
     <>
-      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: theme.dialog.paper }}>
+      <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth PaperProps={{ sx: theme.dialog.paper }}>
         <Box sx={theme.dialog.header}>
           <Stack direction="row" alignItems="center" gap={1.5}>
             <BlenderRoundedIcon sx={theme.dialog.headerIcon} />
@@ -74,18 +79,20 @@ const MixingApproverDetailDialog = ({
               <Typography sx={theme.dialog.headerTitle}>Mixing Submission</Typography>
               <Typography sx={theme.dialog.headerSubtitle}>
                 {item.batchId}
-                {loading ? " · loading…" : item.motorId ? ` · ${item.motorId}` : ""}
+                {loading ? " · loading…" : activeMixCardId ? ` · ${activeMixCardId}` : ""}
               </Typography>
             </Box>
           </Stack>
           <Stack direction="row" gap={1} alignItems="center">
-            {loading ? <CircularProgress size={16} sx={{ color: theme.dialog.headerIcon.color }} /> : null}
+            {loading ? (
+              <CircularProgress size={16} sx={{ color: theme.dialog.headerIcon.color }} />
+            ) : null}
             <Button
               size="small"
               variant="contained"
               startIcon={<PictureAsPdfRoundedIcon sx={{ fontSize: "14px !important" }} />}
               onClick={() => setPdfOpen(true)}
-              disabled={loading || !item.formId}
+              disabled={loading || !item.formId || actionLoading}
               sx={theme.dialog.pdfButton}
             >
               View as PDF
@@ -97,41 +104,30 @@ const MixingApproverDetailDialog = ({
         </Box>
 
         <DialogContent sx={theme.dialog.content}>
-          <MixingDetailsContent
+          <MixingApproverReviewContent
             detailView={detailView}
-            row={item}
             loading={loading}
+            activeMixCardId={activeMixCardId}
+            onActiveMixCardChange={onActiveMixCardChange ?? (() => undefined)}
+            onApprove={() => onApprove(item)}
+            onReject={() => onReject(item)}
+            onApproveForm={onApproveForm ? () => onApproveForm(item) : undefined}
+            onRejectForm={onRejectForm ? () => onRejectForm(item) : undefined}
+            actionLoading={actionLoading}
             manufacturingTheme={manufacturingTheme}
-            resetOnFormId={detailView?.formId ?? item.formId ?? null}
+            approverTheme={theme}
           />
         </DialogContent>
 
         <Box sx={theme.dialog.footer}>
-          <Button variant="outlined" onClick={onClose} disabled={loading} sx={theme.dialog.closeAction}>
+          <Button
+            variant="outlined"
+            onClick={onClose}
+            disabled={loading || actionLoading}
+            sx={theme.dialog.closeAction}
+          >
             Close
           </Button>
-          {canApproveOrReject ? (
-            <>
-              <Button
-                variant="contained"
-                startIcon={<CancelRoundedIcon />}
-                onClick={() => onReject(item)}
-                disabled={loading}
-                sx={theme.dialog.rejectAction}
-              >
-                Reject
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<CheckCircleRoundedIcon />}
-                onClick={() => onApprove(item)}
-                disabled={loading}
-                sx={theme.dialog.approveAction}
-              >
-                Approve
-              </Button>
-            </>
-          ) : null}
         </Box>
       </Dialog>
 

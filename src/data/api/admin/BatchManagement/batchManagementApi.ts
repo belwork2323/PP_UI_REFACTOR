@@ -107,8 +107,9 @@ export interface CreateBatchPayloadAPI {
   priority: string;
   systemManagerId: string;
   identificationSheet?: Record<string, unknown>;
+  identificationSheetStatus?: string;
   objective?: string;
-  articles?: string[];
+  articles?: Array<{ subscaleArticleId: number; subscaleArticleCode: string }>;
 }
 
 /**
@@ -135,8 +136,9 @@ export interface UpdateBatchPayloadAPI {
   priority: string;
   systemManagerId: string;
   identificationSheet?: Record<string, unknown>;
+  identificationSheetStatus?: string;
   objective?: string;
-  articles?: string[];
+  articles?: Array<{ subscaleArticleId: number; subscaleArticleCode: string }>;
 }
 
 /**

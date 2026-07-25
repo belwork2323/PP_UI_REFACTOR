@@ -1,6 +1,11 @@
 import type { SchemaBlock, SchemaDocumentV2, SchemaFieldBlock, SchemaRepeatConfig, SchemaSection, SchemaTableBlock } from "../types";
 import { applyFormulaColumns } from "../rules/formulaEval";
 import { applyRowComputations, getTableRowComputations } from "../rules/tableRowComputations";
+import {
+  buildFlatVisibilityContext,
+  isBlockVisible,
+  isSectionVisible,
+} from "../rules/visibility";
 import { resolveSchemaCountToken, type SchemaSetupContext } from "../utils/setupContext";
 import { flattenTableColumns } from "../utils/schemaUtils";
 import {
@@ -69,6 +74,15 @@ export const buildTableRows = (table: SchemaTableBlock): Record<string, unknown>
     ).map((row, rowIndex) => ({ ...row, [autoKey]: rowIndex + 1 }));
   }
 
+  if (table.rows?.populateFromApi) {
+    return [];
+  }
+
+  // Count-driven tables start empty; syncRowGenerationTables fills them from fields.
+  if (table.rows?.rowGenerationCount && !(table.rows?.presetRows?.length)) {
+    return [];
+  }
+
   const count = Math.max(table.rows?.defaultCount ?? 1, presetRows.length);
 
   const built = Array.from({ length: count }, (_, rowIndex) => {
@@ -111,10 +125,23 @@ export const buildTableRows = (table: SchemaTableBlock): Record<string, unknown>
 
 const findStaticDataColumnId = (table: SchemaTableBlock): string | null => {
   const autoKey = table.rows?.autoIncrementKey ?? "srNo";
-  const col = flattenTableColumns(table.columns).find(
+  const columns = flattenTableColumns(table.columns);
+
+  const staticCol = columns.find(
     (column) => column.fieldType === "static" && column.id !== autoKey,
   );
-  return col?.id ?? null;
+  if (staticCol) return staticCol.id;
+
+  const presetRows = table.rows?.presetRows ?? [];
+  if (!presetRows.length) return null;
+
+  const presetIdentityCol = columns.find((column) => {
+    if (column.id === autoKey || column.fieldType === "serial") return false;
+    return presetRows.some(
+      (preset) => preset[column.id] !== undefined && String(preset[column.id]).trim() !== "",
+    );
+  });
+  return presetIdentityCol?.id ?? null;
 };
 
 const isHeaderTableRow = (row: Record<string, unknown>) => row._rowType === "header";
@@ -158,7 +185,7 @@ export const mergeSavedRowsIntoPresetTable = (
     }
   });
 
-  return presetBuilt.map((presetRow) => {
+  return presetBuilt.map((presetRow, rowIndex) => {
     if (isHeaderTableRow(presetRow)) return presetRow;
 
     let savedRow: Record<string, unknown> | undefined;
@@ -168,6 +195,9 @@ export const mergeSavedRowsIntoPresetTable = (
     }
     if (!savedRow) {
       savedRow = bySrNo.get(String(presetRow[autoKey] ?? ""));
+    }
+    if (!savedRow && saved[rowIndex]) {
+      savedRow = saved[rowIndex];
     }
     if (!savedRow) return presetRow;
 
@@ -216,7 +246,7 @@ const initBlockValue = (
       if (shouldWrapTableValue(block, extraColumns)) {
         return wrapTableValue(rows, extraColumns);
       }
-      return buildTableRows(block);
+      return rows;
     }
     case "matrix":
       return { columns: [], rows: [] };
@@ -365,16 +395,19 @@ const collectSectionRow = (
   blocks: SchemaBlock[],
   values: SchemaFormValues,
   scope: string,
+  visibilityContext: Record<string, unknown>,
 ): Record<string, unknown> => {
   const row: Record<string, unknown> = {};
   blocks.forEach((block) => {
+    if (!isBlockVisible(block, visibilityContext)) return;
+
     if (block.type === "group") {
       if (block.repeat) {
         if (values[block.id] !== undefined) {
           row[block.id] = sanitizeSubmissionValue(cloneValue(values[block.id]));
         }
       } else {
-        Object.assign(row, collectSectionRow(block.children ?? [], values, scope));
+        Object.assign(row, collectSectionRow(block.children ?? [], values, scope, visibilityContext));
       }
       return;
     }
@@ -402,7 +435,10 @@ const collectSectionRow = (
     if (block.type === "section" && block.repeat) {
       row[block.id] = sanitizeSubmissionValue(cloneValue(values[block.id] ?? []));
     } else if (block.type === "section") {
-      Object.assign(row, collectSectionRow(block.children ?? [], values, block.id));
+      Object.assign(
+        row,
+        collectSectionRow(block.children ?? [], values, block.id, visibilityContext),
+      );
     }
   });
   return row;
@@ -411,11 +447,27 @@ const collectSectionRow = (
 export const toSectionSubmissions = (
   schema: SchemaDocumentV2,
   values: SchemaFormValues,
-): SchemaSectionSubmission[] =>
-  schema.data.sections.map((section) => ({
-    sectionId: section.id,
-    sectionData: [collectSectionRow(section.children ?? [], values, section.id)],
-  }));
+): SchemaSectionSubmission[] => {
+  const visibilityContext = buildFlatVisibilityContext(values);
+  return schema.data.sections
+    .filter((section) => isSectionVisible(section, visibilityContext))
+    .map((section) => ({
+      sectionId: section.id,
+      sectionData: [collectSectionRow(section.children ?? [], values, section.id, visibilityContext)],
+    }));
+};
+
+const normalizeRepeatInstances = (blockId: string, value: unknown): unknown => {
+  if (!Array.isArray(value)) return value;
+  return value.map((instance, index) => {
+    if (!instance || typeof instance !== "object" || Array.isArray(instance)) return instance;
+    const row = instance as Record<string, unknown>;
+    return {
+      ...row,
+      _key: row._key ?? `${blockId}-${index + 1}`,
+    };
+  });
+};
 
 export const mergeSectionDataIntoValues = (
   schema: SchemaDocumentV2,
@@ -434,7 +486,10 @@ export const mergeSectionDataIntoValues = (
     const applySavedBlock = (block: SchemaBlock, scope: string) => {
       if (block.type === "section" && block.repeat) {
         if (block.id in (savedRow as Record<string, unknown>)) {
-          initial[block.id] = cloneValue((savedRow as Record<string, unknown>)[block.id]);
+          initial[block.id] = normalizeRepeatInstances(
+            block.id,
+            cloneValue((savedRow as Record<string, unknown>)[block.id]),
+          );
         }
         return;
       }
@@ -445,7 +500,10 @@ export const mergeSectionDataIntoValues = (
       if (block.type === "group") {
         if (block.repeat) {
           if (block.id in (savedRow as Record<string, unknown>)) {
-            initial[block.id] = cloneValue((savedRow as Record<string, unknown>)[block.id]);
+            initial[block.id] = normalizeRepeatInstances(
+              block.id,
+              cloneValue((savedRow as Record<string, unknown>)[block.id]),
+            );
           }
           return;
         }

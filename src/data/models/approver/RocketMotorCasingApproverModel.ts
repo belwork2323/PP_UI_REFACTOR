@@ -13,6 +13,7 @@ export const formatMotorStageLabel = (motorStage: string | number | null | undef
 
 export type RocketMotorCasingApproverRow = {
   projectId: string;
+  projectName: string;
   motorCasingId: string;
   motorStage: string;
   motorId: string;
@@ -56,8 +57,23 @@ const resolveListPayload = (apiResponse: Record<string, unknown> | null | undefi
   return apiResponse;
 };
 
-const readProjectId = (casing: Record<string, unknown>) =>
-  String(casing.projectId ?? casing.projectID ?? casing.project_id ?? "").trim();
+const readProjectId = (casing: Record<string, unknown>) => {
+  const nested =
+    casing.project && typeof casing.project === "object"
+      ? (casing.project as { projectId?: string | null })
+      : null;
+  return String(
+    nested?.projectId ?? casing.projectId ?? casing.projectID ?? casing.project_id ?? "",
+  ).trim();
+};
+
+const readProjectName = (casing: Record<string, unknown>) => {
+  const nested =
+    casing.project && typeof casing.project === "object"
+      ? (casing.project as { projectName?: string | null })
+      : null;
+  return String(nested?.projectName ?? casing.projectName ?? "").trim();
+};
 
 const mapPerson = (value: unknown) => {
   if (!value || typeof value !== "object") return null;
@@ -80,6 +96,7 @@ export const mapRocketMotorCasingApproverRow = (
 
   return {
     projectId: readProjectId(casing),
+    projectName: readProjectName(casing),
     motorCasingId,
     motorStage,
     motorId,
@@ -106,6 +123,7 @@ export const mapRocketMotorCasingApproverListItem = (
 ) => ({
   id: casing.motorCasingId || index + 1,
   projectId: casing.projectId,
+  projectName: casing.projectName,
   motorCasingId: casing.motorCasingId,
   motorStage: casing.motorStage,
   motorStageLabel: formatMotorStageLabel(casing.motorStage),

@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { Box, Typography, Chip, Button, Tooltip, IconButton, colors } from "@mui/material";
+import { Box, Typography, Chip, Button, Tooltip, IconButton } from "@mui/material";
 
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
@@ -7,18 +7,20 @@ import UserActions from "@ui/components/common/UserActions";
 import AdminManagementDataTable from "@ui/components/custom/admin/AdminManagementDataTable";
 import type { AdminManagementColumn } from "@ui/components/custom/admin/AdminManagementDataTable";
 
-import { stageConfig, batchStatusConfig, priorityConfig, getSubDeptChipConfig } from "@app/theme/roleConfig";
+import { stageConfig, batchStatusConfig, getSubDeptChipConfig, getBatchTypeChipConfig } from "@app/theme/roleConfig";
 import {
   getBatchId,
+  getBatchTypeChipLabel,
   getMotorId,
   getMotorStage,
   getStage,
   getStatus,
-  getPriority,
   getSubDept,
-  getSystemManagerLabel,
+  getSystemManagerName,
+  getSystemManagerId,
   isIdentificationSheetDraft,
   isIdentificationSheetCompleted,
+  canDeleteAdminBatch,
   getProjectId,
 } from "@utils/batchManagementUtils";
 
@@ -69,8 +71,24 @@ const BatchListTable = ({
         ),
       },
       {
-        id: "project",
+        id: "batchType",
         label: S.TABLE_COLS[1],
+        render: (batch) => {
+          const typeLabel = getBatchTypeChipLabel(batch);
+          const typeCfg = getBatchTypeChipConfig(batch);
+          return (
+            <Chip
+              icon={typeCfg?.Icon ? <typeCfg.Icon /> : undefined}
+              label={typeLabel}
+              size="small"
+              sx={tableCell.stageChip(typeCfg)}
+            />
+          );
+        },
+      },
+      {
+        id: "project",
+        label: S.TABLE_COLS[2],
         render: (batch) => (
           <Box sx={tableCell.batchIdBox}>
             <icons.batchMgmt.projectId
@@ -85,7 +103,7 @@ const BatchListTable = ({
       },
       {
         id: "motorStage",
-        label: S.TABLE_COLS[2],
+        label: S.TABLE_COLS[3],
         render: (batch) => (
           <Box sx={tableCell.motorIdBox}>
             <icons.batchMgmt.motorId sx={tableCell.motorIdIcon} />
@@ -95,27 +113,30 @@ const BatchListTable = ({
       },
       {
         id: "motorId",
-        label: S.TABLE_COLS[3],
+        label: S.TABLE_COLS[4],
+        headerSx: { minWidth: 220 },
+        cellSx: { minWidth: 220 },
         render: (batch) => (
           <Box sx={tableCell.motorIdBox}>
             <icons.batchMgmt.motorId sx={tableCell.motorIdIcon} />
-            <Typography sx={tableCell.motorIdText}>{getMotorId(batch)}</Typography>
+            <Typography sx={tableCell.motorIdCellText}>{getMotorId(batch)}</Typography>
           </Box>
         ),
       },
 
       {
         id: "stage",
-        label: S.TABLE_COLS[4],
+        label: S.TABLE_COLS[5],
         render: (batch) => {
           const stage = getStage(batch);
           const subDept = getSubDept(batch);
-          const scStage = stageConfig[stage];
-          const subDeptCfg = getSubDeptChipConfig(subDept);
+          const stageLabel = subDept !== "—" ? subDept : stage;
+          const scStage = stageConfig[stage] ?? stageConfig[stageLabel];
+          const subDeptCfg = getSubDeptChipConfig(stageLabel);
           return (
             <Chip
               icon={scStage ? <scStage.Icon /> : undefined}
-              label={subDept}
+              label={stageLabel}
               size="small"
               sx={tableCell.stageChip(subDeptCfg)}
             />
@@ -124,7 +145,7 @@ const BatchListTable = ({
       },
       {
         id: "status",
-        label: S.TABLE_COLS[5],
+        label: S.TABLE_COLS[6],
         render: (batch) => {
           const status = getStatus(batch);
           const scStatus = batchStatusConfig[status];
@@ -139,19 +160,20 @@ const BatchListTable = ({
         },
       },
       {
-        id: "priority",
-        label: S.TABLE_COLS[6],
-        render: (batch) => {
-          const priority = getPriority(batch);
-          const pc = priorityConfig[priority];
-          return <Chip label={priority} size="small" sx={tableCell.priorityChip(pc)} />;
-        },
-      },
-      {
         id: "systemManager",
         label: S.TABLE_COLS[7],
+        headerSx: { minWidth: 180 },
+        cellSx: { minWidth: 180 },
         render: (batch) => (
-          <Typography sx={tableCell.motorIdText}>{getSystemManagerLabel(batch)}</Typography>
+          <Box sx={tableCell.batchIdBox}>
+            <icons.batchMgmt.userId
+              sx={{ ...tableCell.batchIdIcon, ...tableCell.projectIdIcon }}
+            />
+            <Box sx={tableCell.projectInfo}>
+              <Typography sx={tableCell.projectName}>{getSystemManagerName(batch)}</Typography>
+              <Typography sx={tableCell.projectId}>{getSystemManagerId(batch)}</Typography>
+            </Box>
+          </Box>
         ),
       },
       {
@@ -161,6 +183,7 @@ const BatchListTable = ({
         render: (batch) => {
           const sheetDraft = isIdentificationSheetDraft(batch);
           const sheetCompleted = isIdentificationSheetCompleted(batch);
+          const canDelete = canDeleteAdminBatch(batch);
           return (
             <Box
               sx={{
@@ -197,9 +220,15 @@ const BatchListTable = ({
                 </Tooltip>
               )}
               {sheetCompleted && (
-                <UserActions onEdit={() => onEdit(batch)} onDelete={() => onDelete(batch)} />
+                <UserActions
+                  onEdit={() => onEdit(batch)}
+                  onDelete={() => onDelete(batch)}
+                  editTooltip={TA.EDIT_BATCH}
+                  deleteTooltip={TA.DELETE_BATCH}
+                  showDelete={canDelete}
+                />
               )}
-              {sheetDraft && (
+              {sheetDraft && canDelete && (
                 <Tooltip title={TA.DELETE_BATCH}>
                   <IconButton size="small" onClick={() => onDelete(batch)} color="error">
                     <icons.Delete fontSize="small" />

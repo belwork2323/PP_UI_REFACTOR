@@ -1,4 +1,5 @@
 import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission, SchemaTableBlock } from "../../../schema-engine";
+import type { SchemaSetupContext } from "../../../schema-engine/utils/setupContext";
 import {
   buildCasePrepMotorSubmission,
   buildCasePrepSectionPayload,
@@ -9,16 +10,168 @@ import {
 import { flattenTableColumns, walkBlocks } from "../../../schema-engine/utils/schemaUtils";
 import { isWrappedTableValue } from "../../../schema-engine/utils/tableRowUtils";
 import { schemaValuesHaveUserData } from "../../../schema-engine/state/formState";
+import { formatToIsoDateInput } from "../../../utils/dateUtils";
+import { OPERATION_STATUS } from "../../../hooks/operationStatus";
+import { normalizeSubdepartmentBatchStatus } from "./SubdepartmentBatchModel";
 import {
   formatPrepSectionCellValue,
   formatPrepSectionLabel,
+  getPremixStatusLabel,
 } from "./RawMaterialPreparationModel";
+import { formatDateTimeForApi } from "./rawMaterialPreparationApiMapper";
 
 export {
   formatPrepSectionLabel as formatCasePrepSectionLabel,
   formatPrepSectionCellValue as formatCasePrepCellValue,
   orderPrepSectionColumns as orderCasePrepSectionColumns,
 } from "./RawMaterialPreparationModel";
+
+/** UI date is DD-MM-YYYY; create/update API expects YYYY-MM-DD (same as RMP). */
+const toCasePrepPayloadDate = (value: unknown): string => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  return formatToIsoDateInput(raw) || raw;
+};
+
+/** Convert UI date/datetime strings for Case Prep API payloads. */
+const toCasePrepPayloadDateValue = (value: unknown): unknown => {
+  if (typeof value !== "string") return value;
+  const raw = value.trim();
+  if (!raw) return value;
+
+  // UI datetime (DD-MM-YYYY HH:mm) → ISO, matching RMP weighingDateTime
+  if (/^\d{1,2}-\d{1,2}-\d{4}[ T]\d{2}:\d{2}/.test(raw)) {
+    return formatDateTimeForApi(raw) ?? raw;
+  }
+
+  // UI date (DD-MM-YYYY) → YYYY-MM-DD
+  const datePart = raw.split(/[T ]/)[0];
+  if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(datePart)) {
+    return formatToIsoDateInput(raw) || raw;
+  }
+
+  return value;
+};
+
+const convertCasePrepDatesDeep = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map(convertCasePrepDatesDeep);
+  }
+  if (value && typeof value === "object") {
+    const out: Record<string, unknown> = {};
+    Object.entries(value as Record<string, unknown>).forEach(([key, entry]) => {
+      out[key] = convertCasePrepDatesDeep(entry);
+    });
+    return out;
+  }
+  return toCasePrepPayloadDateValue(value);
+};
+
+const convertCasePrepSectionsDatesForApi = (
+  sections: SchemaSectionSubmission[] | undefined,
+): SchemaSectionSubmission[] | undefined => {
+  if (!sections) return sections;
+  return convertCasePrepDatesDeep(sections) as SchemaSectionSubmission[];
+};
+
+const convertCasePrepMotorDatesForApi = (
+  motor: CasePrepMotorSubmission,
+): CasePrepMotorSubmission => ({
+  ...motor,
+  prrcClearanceDate: toCasePrepPayloadDate(motor.prrcClearanceDate),
+  sections: convertCasePrepSectionsDatesForApi(motor.sections) ?? [],
+});
+
+export type MotorSubmissionType = "DRAFT" | "SUBMIT";
+export type MotorSubmissionStatus =
+  | "TO_BE_INITIATED"
+  | "IN_PROGRESS"
+  | "WAITING_FOR_APPROVAL"
+  | "APPROVED"
+  | "REJECTED";
+
+export type MotorStatusMeta = {
+  motorSubmissionType?: MotorSubmissionType;
+  motorSubmissionStatus: MotorSubmissionStatus;
+  submittedAt?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  remarks?: string | null;
+  rejectionReason?: string | null;
+};
+
+export const isMotorLocked = (status?: MotorSubmissionStatus | string | null) => {
+  const normalized = String(status ?? "").toUpperCase();
+  return normalized === "WAITING_FOR_APPROVAL" || normalized === "APPROVED";
+};
+
+export const isMotorEditable = (status?: MotorSubmissionStatus | string | null) =>
+  !status ||
+  status === "TO_BE_INITIATED" ||
+  status === "IN_PROGRESS" ||
+  status === "REJECTED";
+
+export const isMotorApproverTabDisabled = (
+  status?: MotorSubmissionStatus | string | null,
+): boolean =>
+  !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS";
+
+export const isMotorApproverActionable = (
+  status?: MotorSubmissionStatus | string | null,
+): boolean => status === "WAITING_FOR_APPROVAL";
+
+/** Entire form can be approved/rejected once submitted and every motor is approved. */
+export const canApproverActionEntireCasePrepForm = (params: {
+  formSubmissionType?: string | null;
+  status?: string | null;
+  motors?: Array<{ motorSubmissionStatus?: MotorSubmissionStatus | string | null }>;
+}): boolean => {
+  const formType = String(params.formSubmissionType ?? "").trim().toUpperCase();
+  if (formType !== "SUBMIT") return false;
+
+  const motors = params.motors ?? [];
+  if (motors.length === 0) return false;
+  const allMotorsApproved = motors.every(
+    (motor) => String(motor.motorSubmissionStatus ?? "").toUpperCase() === "APPROVED",
+  );
+  if (!allMotorsApproved) return false;
+
+  const status = String(params.status ?? "").trim();
+  const statusUpper = status.toUpperCase().replace(/\s+/g, "_");
+
+  if (
+    statusUpper === "APPROVED" ||
+    statusUpper === "REJECTED" ||
+    statusUpper === "FINAL_APPROVAL_COMPLETED" ||
+    status === OPERATION_STATUS.APPROVED ||
+    status === OPERATION_STATUS.REJECTED ||
+    status === OPERATION_STATUS.FINAL_APPROVAL_COMPLETED
+  ) {
+    return false;
+  }
+
+  return (
+    statusUpper === "WAITING_FOR_COMPLETE_APPROVAL" ||
+    status === OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL ||
+    status === OPERATION_STATUS.WAITING_FOR_APPROVAL ||
+    statusUpper === "WAITING_FOR_APPROVAL"
+  );
+};
+
+export const getMotorStatusLabel = (status?: MotorSubmissionStatus | string | null) =>
+  getPremixStatusLabel(status as any);
+
+/** Batch-level workflow status from details/list APIs (includes partial approval). */
+export const getCasePrepBatchStatusLabel = (status: unknown): string =>
+  String(normalizeSubdepartmentBatchStatus(status));
+
+export type MotorCounts = {
+  pendingMotorCount: number;
+  approvedMotorCount: number;
+  rejectedMotorCount: number;
+  inProgressMotorCount: number;
+  totalMotorCount: number;
+};
 
 export type CasePrepMotorSession = {
   motorId: string;
@@ -35,8 +188,6 @@ export type CasePreparationFormState = {
 };
 
 export type CasePreparationFormBody = {
-  schemaVersion?: string;
-  schemaType?: string;
   motors: CasePrepMotorSubmission[];
   sections?: SchemaSectionSubmission[];
 };
@@ -50,16 +201,97 @@ export const createDefaultCasePreparationFormState = (): CasePreparationFormStat
 export const createEmptyMotorSession = (
   motorId: string,
   prrcClearanceDate: string,
-  schema: SchemaDocumentV2 | null
+  _schema?: SchemaDocumentV2 | null,
+  _setupContext?: SchemaSetupContext,
 ): CasePrepMotorSession => ({
   motorId,
   prrcClearanceDate,
-  formValues: schema ? createCasePrepInitialValues(schema) : {},
+  formValues: {},
   savedSections: undefined,
 });
 
 const resolveCasePrepDetailsPayload = (details: any) =>
   details?.casePreparationDetails ?? details?.preparationDetails ?? details ?? {};
+
+const normalizeMotorStatus = (value: unknown): MotorSubmissionStatus => {
+  const normalized = String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+  if (
+    normalized === "IN_PROGRESS" ||
+    normalized === "WAITING_FOR_APPROVAL" ||
+    normalized === "APPROVED" ||
+    normalized === "REJECTED"
+  ) {
+    return normalized;
+  }
+  return "TO_BE_INITIATED";
+};
+
+const normalizeMotorSubmissionType = (value: unknown): MotorSubmissionType | undefined => {
+  const normalized = String(value ?? "").trim().toUpperCase();
+  if (normalized === "DRAFT" || normalized === "SUBMIT") return normalized;
+  return undefined;
+};
+
+/** Build motorStatusById from details root motorStatuses + motors[]. */
+export const mapCasePreparationMotorStatusesFromApi = (
+  details: any,
+  fallbackMotorIds: string[] = [],
+): Record<string, MotorStatusMeta> => {
+  const payload = resolveCasePrepDetailsPayload(details);
+  const root = details?.data ?? details ?? {};
+  const statusById: Record<string, MotorStatusMeta> = {};
+
+  const rootStatuses = Array.isArray(root?.motorStatuses)
+    ? root.motorStatuses
+    : Array.isArray(details?.motorStatuses)
+      ? details.motorStatuses
+      : [];
+
+  rootStatuses.forEach((entry: any) => {
+    const motorId = String(entry?.motorId ?? "").trim();
+    if (!motorId) return;
+    statusById[motorId] = {
+      motorSubmissionType: normalizeMotorSubmissionType(entry?.motorSubmissionType),
+      motorSubmissionStatus: normalizeMotorStatus(entry?.motorSubmissionStatus),
+      submittedAt: entry?.submittedAt ?? null,
+      reviewedBy: entry?.reviewedBy ?? entry?.actionBy ?? null,
+      reviewedAt: entry?.reviewedAt ?? entry?.actionAt ?? null,
+      remarks: entry?.remarks ?? null,
+      rejectionReason: entry?.rejectionReason ?? null,
+    };
+  });
+
+  const rawMotors = Array.isArray(payload?.motors) ? payload.motors : [];
+  rawMotors.forEach((motor: any) => {
+    const motorId = String(motor?.motorId ?? "").trim();
+    if (!motorId) return;
+    const existing = statusById[motorId];
+    statusById[motorId] = {
+      motorSubmissionType:
+        normalizeMotorSubmissionType(motor?.motorSubmissionType) ??
+        existing?.motorSubmissionType,
+      motorSubmissionStatus: normalizeMotorStatus(
+        motor?.motorSubmissionStatus ?? existing?.motorSubmissionStatus,
+      ),
+      submittedAt: motor?.submittedAt ?? existing?.submittedAt ?? null,
+      reviewedBy: motor?.actionBy ?? motor?.reviewedBy ?? existing?.reviewedBy ?? null,
+      reviewedAt: motor?.actionAt ?? motor?.reviewedAt ?? existing?.reviewedAt ?? null,
+      remarks: motor?.remarks ?? existing?.remarks ?? null,
+      rejectionReason: motor?.rejectionReason ?? existing?.rejectionReason ?? null,
+    };
+  });
+
+  fallbackMotorIds.forEach((motorId) => {
+    const id = String(motorId ?? "").trim();
+    if (!id || statusById[id]) return;
+    statusById[id] = { motorSubmissionStatus: "TO_BE_INITIATED" };
+  });
+
+  return statusById;
+};
 
 export const mapCasePreparationDetailsToFormState = (details: any): CasePreparationFormState => {
   const payload = resolveCasePrepDetailsPayload(details);
@@ -94,37 +326,77 @@ export const mapCasePreparationDetailsToFormState = (details: any): CasePreparat
   };
 };
 
+/**
+ * Attach schema only. Motor form values are hydrated lazily in the active panel
+ * so opening Fill Details stays O(1) instead of O(motors × schema walk).
+ * Optionally hydrate a single motor (e.g. first tab) for immediate paint.
+ */
 export const hydrateCasePreparationFormState = (
   state: CasePreparationFormState,
-  schema: SchemaDocumentV2 | null
+  schema: SchemaDocumentV2 | null,
+  setupContext?: SchemaSetupContext,
+  options?: { hydrateMotorIds?: string[] },
 ): CasePreparationFormState => {
   if (!schema) return state;
 
-  const motors = (state.motors ?? []).map((motor) => ({
-    ...motor,
-    formValues: motor.savedSections?.length
-      ? hydrateCasePrepValuesFromSections(schema, motor.savedSections)
-      : Object.keys(motor.formValues ?? {}).length > 0
-        ? motor.formValues
-        : createCasePrepInitialValues(schema),
-  }));
+  const hydrateIds = options?.hydrateMotorIds?.length
+    ? new Set(options.hydrateMotorIds)
+    : null;
+
+  const motors = (state.motors ?? []).map((motor) => {
+    if (Object.keys(motor.formValues ?? {}).length > 0) {
+      return motor;
+    }
+    if (!hydrateIds?.has(motor.motorId)) {
+      return motor;
+    }
+    if (motor.savedSections?.length) {
+      return {
+        ...motor,
+        formValues: hydrateCasePrepValuesFromSections(
+          schema,
+          motor.savedSections,
+          setupContext,
+        ),
+        savedSections: undefined,
+      };
+    }
+    return {
+      ...motor,
+      formValues: createCasePrepInitialValues(schema, setupContext),
+    };
+  });
 
   const subscaleFormValues = state.subscaleSavedSections?.length
-    ? hydrateCasePrepValuesFromSections(schema, state.subscaleSavedSections)
+    ? hydrateCasePrepValuesFromSections(schema, state.subscaleSavedSections, setupContext)
     : Object.keys(state.subscaleFormValues ?? {}).length > 0
       ? state.subscaleFormValues
-      : createCasePrepInitialValues(schema);
+      : isSubscaleNeedsInitial(state)
+        ? createCasePrepInitialValues(schema, setupContext)
+        : state.subscaleFormValues ?? {};
 
   return {
     ...state,
     schema,
     motors,
     subscaleFormValues,
+    subscaleSavedSections: state.subscaleSavedSections?.length
+      ? undefined
+      : state.subscaleSavedSections,
   };
 };
 
+const isSubscaleNeedsInitial = (state: CasePreparationFormState) =>
+  (state.motors?.length ?? 0) === 0 &&
+  Object.keys(state.subscaleFormValues ?? {}).length === 0 &&
+  !(state.subscaleSavedSections?.length);
+
 export const mapCasePreparationFormStateToPayload = (
-  form: CasePreparationFormState
+  form: CasePreparationFormState,
+  options?: {
+    targetMotorIds?: string[];
+    motorSubmissionType?: MotorSubmissionType;
+  },
 ): CasePreparationFormBody => {
   const schema = form.schema;
 
@@ -135,23 +407,107 @@ export const mapCasePreparationFormStateToPayload = (
     };
   }
 
-  const motors = (form.motors ?? []).map((motor) =>
-    buildCasePrepMotorSubmission(motor.motorId, motor.prrcClearanceDate, schema, motor.formValues)
-  );
+  const targetIds = options?.targetMotorIds?.length
+    ? new Set(options.targetMotorIds.map((id) => String(id).trim()).filter(Boolean))
+    : null;
+
+  const motors = (form.motors ?? [])
+    .filter((motor) => !targetIds || targetIds.has(motor.motorId))
+    .map((motor) => {
+      if (
+        Object.keys(motor.formValues ?? {}).length === 0 &&
+        motor.savedSections?.length
+      ) {
+        return {
+          motorId: motor.motorId,
+          prrcClearanceDate: motor.prrcClearanceDate,
+          ...(options?.motorSubmissionType
+            ? { motorSubmissionType: options.motorSubmissionType }
+            : {}),
+          sections: motor.savedSections,
+        };
+      }
+      return buildCasePrepMotorSubmission(
+        motor.motorId,
+        motor.prrcClearanceDate,
+        schema,
+        motor.formValues,
+        options?.motorSubmissionType,
+      );
+    });
 
   return {
-    schemaVersion: schema.schemaVersion,
-    schemaType: schema.schemaType,
-    motors,
-    sections: motors.length === 0 ? buildCasePrepSectionPayload(schema, form.subscaleFormValues) : undefined,
+    motors: motors.map(convertCasePrepMotorDatesForApi),
+    sections: convertCasePrepSectionsDatesForApi(
+      motors.length === 0
+        ? form.subscaleSavedSections?.length &&
+          Object.keys(form.subscaleFormValues ?? {}).length === 0
+          ? form.subscaleSavedSections
+          : buildCasePrepSectionPayload(schema, form.subscaleFormValues)
+        : undefined,
+    ),
+  };
+};
+
+/** Rebuild payload from saved details for final form SUBMIT (RMP mirror). */
+export const mapCasePreparationDetailsFromSavedForm = (
+  details: any,
+  options?: { motorStatusById?: Record<string, MotorStatusMeta> },
+): CasePreparationFormBody => {
+  const payload = resolveCasePrepDetailsPayload(details);
+  const rawMotors = Array.isArray(payload?.motors) ? payload.motors : [];
+  const statusById = options?.motorStatusById ?? mapCasePreparationMotorStatusesFromApi(details);
+
+  const motors = rawMotors
+    .map((motor: any) => {
+      const motorId = String(motor?.motorId ?? "").trim();
+      if (!motorId) return null;
+      const statusMeta = statusById[motorId];
+      return {
+        motorId,
+        prrcClearanceDate: String(motor?.prrcClearanceDate ?? "").trim(),
+        motorSubmissionType:
+          statusMeta?.motorSubmissionType ??
+          normalizeMotorSubmissionType(motor?.motorSubmissionType) ??
+          "SUBMIT",
+        sections: Array.isArray(motor?.sections) ? motor.sections : [],
+      } as CasePrepMotorSubmission;
+    })
+    .filter(Boolean) as CasePrepMotorSubmission[];
+
+  return {
+    motors: motors.map(convertCasePrepMotorDatesForApi),
+    sections: convertCasePrepSectionsDatesForApi(
+      Array.isArray(payload?.sections) ? payload.sections : undefined,
+    ),
   };
 };
 
 export const hasAnyCasePreparationValue = (form: CasePreparationFormState) => {
-  if ((form.motors ?? []).some((motor) => schemaValuesHaveUserData(motor.formValues ?? {}))) {
+  if (
+    (form.motors ?? []).some(
+      (motor) =>
+        schemaValuesHaveUserData(motor.formValues ?? {}) ||
+        Boolean(motor.savedSections?.length),
+    )
+  ) {
     return true;
   }
-  return schemaValuesHaveUserData(form.subscaleFormValues ?? {});
+  return (
+    schemaValuesHaveUserData(form.subscaleFormValues ?? {}) ||
+    Boolean(form.subscaleSavedSections?.length)
+  );
+};
+
+export const hasMotorCasePreparationValue = (
+  form: CasePreparationFormState,
+  motorId: string,
+) => {
+  const motor = (form.motors ?? []).find((entry) => entry.motorId === motorId);
+  if (!motor) return false;
+  return (
+    schemaValuesHaveUserData(motor.formValues ?? {}) || Boolean(motor.savedSections?.length)
+  );
 };
 
 export class CasePreparationSubmitResponseModel {
@@ -317,6 +673,13 @@ export type CasePrepDetailSection = {
 export type CasePrepMotorDetailView = {
   motorId: string;
   prrcClearanceDate: string;
+  motorSubmissionType?: MotorSubmissionType;
+  motorSubmissionStatus?: MotorSubmissionStatus;
+  submittedAt?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  remarks?: string | null;
+  rejectionReason?: string | null;
   sections: CasePrepDetailSection[];
 };
 
@@ -325,10 +688,12 @@ export type CasePreparationDetailView = {
   batchId: string;
   batchType: string;
   status?: string;
+  formSubmissionType?: string;
   createdBy: string | null;
   createdAt: string | null;
   submittedBy: string | null;
   submittedAt: string | null;
+  motorCounts?: MotorCounts;
   motors: CasePrepMotorDetailView[];
 };
 
@@ -366,6 +731,7 @@ const CASE_PREP_COLUMN_PRIORITY = [
   "SPECIFICATION",
   "remarks",
   "remarksObservations",
+  "observations",
   "REMARKS",
   "attachments",
   "mfgLot",
@@ -603,10 +969,13 @@ export const mapCasePreparationDetailsForDisplay = (
   const labelIndex = buildCasePrepSchemaLabelIndex(schema);
   const details = (data.casePreparationDetails ?? data) as Record<string, unknown>;
   const rawMotors = Array.isArray(details.motors) ? details.motors : [];
+  const statusById = mapCasePreparationMotorStatusesFromApi(data);
 
   const motors: CasePrepMotorDetailView[] = rawMotors
     .map((motor) => {
       const entry = motor as Record<string, unknown>;
+      const motorId = String(entry.motorId ?? "").trim();
+      const statusMeta = statusById[motorId];
       const sections = sortCasePrepSections(
         (Array.isArray(entry.sections) ? entry.sections : [])
           .map((section) => {
@@ -621,24 +990,82 @@ export const mapCasePreparationDetailsForDisplay = (
       );
 
       return {
-        motorId: String(entry.motorId ?? "").trim(),
+        motorId,
         prrcClearanceDate: String(
           entry.prrcClearanceDate ?? entry.prrcDate ?? entry.prrcClearance ?? "",
         ).trim(),
+        motorSubmissionType:
+          statusMeta?.motorSubmissionType ??
+          normalizeMotorSubmissionType(entry.motorSubmissionType),
+        motorSubmissionStatus:
+          statusMeta?.motorSubmissionStatus ??
+          normalizeMotorStatus(entry.motorSubmissionStatus),
+        submittedAt: statusMeta?.submittedAt ?? (entry.submittedAt as string | null | undefined) ?? null,
+        reviewedBy: statusMeta?.reviewedBy ?? (entry.reviewedBy as string | null | undefined) ?? null,
+        reviewedAt: statusMeta?.reviewedAt ?? (entry.reviewedAt as string | null | undefined) ?? null,
+        remarks: statusMeta?.remarks ?? (entry.remarks as string | null | undefined) ?? null,
+        rejectionReason:
+          statusMeta?.rejectionReason ??
+          (entry.rejectionReason as string | null | undefined) ??
+          null,
         sections,
       };
     })
     .filter((motor) => motor.motorId.length > 0);
 
+  const motorCountsFromApi = (data.motorCounts ?? details.motorCounts) as
+    | Partial<MotorCounts>
+    | undefined;
+  const derivedCounts: MotorCounts = {
+    pendingMotorCount: 0,
+    approvedMotorCount: 0,
+    rejectedMotorCount: 0,
+    inProgressMotorCount: 0,
+    totalMotorCount: motors.length,
+  };
+  motors.forEach((motor) => {
+    const status = String(motor.motorSubmissionStatus ?? "TO_BE_INITIATED").toUpperCase();
+    if (status === "WAITING_FOR_APPROVAL") derivedCounts.pendingMotorCount += 1;
+    else if (status === "APPROVED") derivedCounts.approvedMotorCount += 1;
+    else if (status === "REJECTED") derivedCounts.rejectedMotorCount += 1;
+    else if (status === "IN_PROGRESS") derivedCounts.inProgressMotorCount += 1;
+  });
+
   return {
     formId: String(data.formId ?? ""),
     batchId: String(data.batchId ?? ""),
     batchType: String(data.batchType ?? ""),
-    status: data.status != null ? String(data.status) : undefined,
+    status:
+      data.status != null
+        ? getCasePrepBatchStatusLabel(data.status)
+        : details.status != null
+          ? getCasePrepBatchStatusLabel(details.status)
+          : undefined,
+    formSubmissionType: String(
+      data.formSubmissionType ?? details.formSubmissionType ?? "",
+    ).trim() || undefined,
     createdBy: mapPersonLabel(data.createdBy),
     createdAt: data.createdAt != null ? String(data.createdAt) : null,
     submittedBy: mapPersonLabel(data.submittedBy),
     submittedAt: data.submittedAt != null ? String(data.submittedAt) : null,
+    motorCounts: {
+      pendingMotorCount: Number(
+        motorCountsFromApi?.pendingMotorCount ?? derivedCounts.pendingMotorCount,
+      ),
+      approvedMotorCount: Number(
+        motorCountsFromApi?.approvedMotorCount ?? derivedCounts.approvedMotorCount,
+      ),
+      rejectedMotorCount: Number(
+        motorCountsFromApi?.rejectedMotorCount ?? derivedCounts.rejectedMotorCount,
+      ),
+      inProgressMotorCount: Number(
+        motorCountsFromApi?.inProgressMotorCount ?? derivedCounts.inProgressMotorCount,
+      ),
+      totalMotorCount: Math.max(
+        Number(motorCountsFromApi?.totalMotorCount ?? 0),
+        derivedCounts.totalMotorCount,
+      ),
+    },
     motors,
   };
 };

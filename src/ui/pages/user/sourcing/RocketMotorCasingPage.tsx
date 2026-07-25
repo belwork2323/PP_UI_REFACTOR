@@ -6,10 +6,14 @@ import getSourcingTheme from "../../../../app/theme/custom_themes/user/sourcing/
 import useRocketMotorCasingHook from "../../../../hooks/user/sourcing/useRocketMotorCasingHook";
 import UserWorkflowActionBar from "../../../components/custom/UserWorkflowActionBar";
 import UserWorkflowFormHeader from "../../../components/custom/UserWorkflowFormHeader";
+import UserWorkflowStatusCell from "../../../components/custom/UserWorkflowStatusCell";
 import MotorCasingCreateForm from "./components/casing/MotorCasingCreateForm";
-import RocketMotorBatchList from "./components/RocketMotorBatchList";
+import RocketMotorBatchList, {
+  OPERATION_STATUS_CONFIG,
+} from "./components/RocketMotorBatchList";
 import RocketMotorCasingDetailsView from "./components/RocketMotorCasingDetailsView";
 import { STRINGS } from "../../../../app/config/strings";
+import { OPERATION_STATUS } from "../../../../hooks/operationStatus";
 
 const RocketMotorCasing = () => {
   const mode = useThemeStore((state) => state.mode);
@@ -78,6 +82,24 @@ const RocketMotorCasing = () => {
     formEntryMode === "edit" ||
     (formEntryMode === "fill" && Boolean(String(casingForm.projectId ?? "").trim()));
 
+  const formStatusConfig = useMemo(
+    () =>
+      Object.fromEntries(
+        Object.entries(OPERATION_STATUS_CONFIG).map(([status, cfg]) => [
+          status,
+          { ...cfg, ...theme.batchList.statusConfig[status] },
+        ]),
+      ),
+    [theme],
+  );
+
+  const projectCaption = [
+    String(activeBatch?.projectName ?? casingForm.projectName ?? "").trim(),
+    String(activeBatch?.projectId ?? casingForm.projectId ?? "").trim(),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <Box sx={theme.workflow.animatedContainer}>
       {view === "list" && (
@@ -96,23 +118,32 @@ const RocketMotorCasing = () => {
       {view === "form" && activeBatch && (
         <Box>
           <UserWorkflowFormHeader
-            batch={{
-              lotId: headerBatchId || "—",
-              batchId: headerBatchId || "—",
-              motorId: headerMotorId && headerMotorId !== "—" ? headerMotorId : "—",
-              motorType: activeBatch.motorType || casingForm.motorStageApi,
-              priority: activeBatch.priority,
+            mode={createMotorCasingHeaderHeading ? "create" : "update"}
+            data={{
+              title: createMotorCasingHeaderHeading
+                ? createMotorCasingHeaderHeading.title
+                : headerMotorCasingId || headerBatchId || "—",
+              subtitle: createMotorCasingHeaderHeading
+                ? createMotorCasingHeaderHeading.subtitle
+                : `${STRINGS.SOURCING.CASING_CREATE.MOTOR_ID}: ${headerMotorId || "—"}`,
+              caption: createMotorCasingHeaderHeading ? undefined : projectCaption || undefined,
+              statusLabel: isEditMode
+                ? "Editing Rejected Submission"
+                : STRINGS.SOURCING.CASING.NEW_SUBMISSION,
+              statusVariant: isEditMode ? "edit" : "new",
+              statusNode: createMotorCasingHeaderHeading ? undefined : (
+                <UserWorkflowStatusCell
+                  status={activeBatch.rmStatus}
+                  statusConfig={formStatusConfig}
+                  rejectedStatus={OPERATION_STATUS.REJECTED}
+                  rejectionReason={activeBatch.rejectionReason}
+                  theme={theme}
+                />
+              ),
               rejectionReason: activeBatch.rejectionReason,
             }}
             isEdit={isEditMode}
             onBack={handleBack}
-            newLabel={
-              activeBatch.rmStatus === "In Progress"
-                ? STRINGS.SOURCING.CASING.CONTINUING_DRAFT
-                : STRINGS.SOURCING.CASING.NEW_SUBMISSION
-            }
-            batchHeadingOverride={createMotorCasingHeaderHeading}
-            includeMotorType
             theme={theme}
           />
 

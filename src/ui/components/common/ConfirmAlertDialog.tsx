@@ -13,6 +13,7 @@ type ConfirmAlertDialogProps = {
   cancelLabel?: string;
   severity?: "warning" | "error" | "info";
   confirmDisabled?: boolean;
+  maxWidth?: "xs" | "sm" | "md" | "lg" | "xl" | false;
   onConfirm: () => void;
   onCancel: () => void;
   children?: React.ReactNode;
@@ -47,6 +48,7 @@ const ConfirmAlertDialog = ({
   cancelLabel  = "Cancel",
   severity     = "warning",
   confirmDisabled = false,
+  maxWidth     = "xs",
   onConfirm,
   onCancel,
   children,
@@ -62,7 +64,7 @@ const ConfirmAlertDialog = ({
     <Dialog
       open={open}
       onClose={onCancel}
-      maxWidth="xs"
+      maxWidth={maxWidth}
       fullWidth
       PaperProps={{
         sx: {

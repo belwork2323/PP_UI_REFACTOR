@@ -57,11 +57,21 @@ export type { SchemaApiContext } from "./rules/apiDependency";
 export {
   fetchSchemaApiOptions,
   fetchSchemaDataSourceOptions,
+  fetchSchemaApiResolvedValue,
+  resolveSchemaApiResponseValue,
   resolveSchemaApiEndpoint,
   staticDataSourceOptions,
   buildRowApiContext,
   getDependentColumnIds,
+  seedBatchDetailsSchemaCache,
+  seedSchemaApiResponseCache,
 } from "./rules/apiDependency";
+
+export {
+  populateSchemaValuesFromApi,
+  schemaHasPopulateFromApi,
+  collectPopulateFromApiTargets,
+} from "./rules/populateFromApi";
 
 export {
   hasTableCommitGroup,
@@ -121,6 +131,7 @@ export {
   hydrateCasePrepValuesFromSections,
   buildCasePrepSectionPayload,
   buildCasePrepMotorSubmission,
+  filterCasePrepSchemaForMotor,
   isCasePrepSchemaDocument,
 } from "./adapters/casePreparation.adapter";
 

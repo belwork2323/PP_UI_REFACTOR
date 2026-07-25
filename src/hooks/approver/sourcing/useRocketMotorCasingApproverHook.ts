@@ -4,10 +4,7 @@ import { STRINGS } from "../../../app/config/strings";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
 import { useApproverListRefreshStore } from "../../../app/store/approverListRefreshStore";
-import {
-  APPROVER_STATUS_META,
-  isApproverActionableStatus,
-} from "../../../app/theme/approver";
+import { APPROVER_STATUS_META, isApproverActionableStatus } from "../../../app/theme/approver";
 import { operationsController } from "../../../controllers/user/operationsController";
 import rocketMotorCasingController from "../../../controllers/user/sourcing/rocketMotorCasingController";
 import type { ApproverFormActionType } from "../../../data/api/approver/approverApi";
@@ -199,7 +196,9 @@ export const useRocketMotorCasingApproverHook = () => {
     setActionType(nextActionType);
     setDialogItem(item);
     setDialogValue(
-      nextActionType === "REJECTED" ? String(item.rejectionReason ?? "") : String(item.remarks ?? ""),
+      nextActionType === "REJECTED"
+        ? String(item.rejectionReason ?? "")
+        : String(item.remarks ?? ""),
     );
     setDialogError("");
   };
@@ -264,7 +263,9 @@ export const useRocketMotorCasingApproverHook = () => {
 
     if (!response?.success || !response?.data) {
       const err = response?.error as { details?: string } | undefined;
-      showAlert(err?.details || response?.message || S.DETAILS_FETCH_ERROR, "error", { autoCloseMs: 3500 });
+      showAlert(err?.details || response?.message || S.DETAILS_FETCH_ERROR, "error", {
+        autoCloseMs: 3500,
+      });
       setSelected(null);
       return;
     }

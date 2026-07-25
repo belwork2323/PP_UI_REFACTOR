@@ -1,4 +1,14 @@
-import { fetchDepartments, fetchSubDepartments, fetchRoles } from "@data/api/common/generalAPI";
+import {
+  fetchDepartments,
+  fetchSubDepartments,
+  fetchRoles,
+  fetchMixers,
+  fetchBuildings,
+  fetchMixingCycles,
+  fetchSubscaleArticles,
+  type MixingCycleMotorStage,
+  type FetchSubscaleArticlesParams,
+} from "@data/api/common/generalAPI";
 import { ApiResponseModel } from "@data/models/common/ApiResponseModel";
 
 /**
@@ -8,7 +18,7 @@ export const parseApiError = (error: any, defaultMessage: string): string => {
   if (error?.error?.details) {
     return error.error.details;
   }
-  if (error?.message && typeof error.message === 'string') {
+  if (error?.message && typeof error.message === "string") {
     return error.message;
   }
   return defaultMessage;
@@ -21,7 +31,12 @@ export const generalController = {
   getDepartments: async () => {
     try {
       const data = await fetchDepartments();
-      return new ApiResponseModel({ success: true, statusCode: 200, message: "Success", data: Array.isArray(data) ? data : [] });
+      return new ApiResponseModel({
+        success: true,
+        statusCode: 200,
+        message: "Success",
+        data: Array.isArray(data) ? data : [],
+      });
     } catch (error) {
       return new ApiResponseModel<null>(error);
     }
@@ -35,7 +50,12 @@ export const generalController = {
   getSubDepartments: async (departmentId = null) => {
     try {
       const data = await fetchSubDepartments(departmentId);
-      return new ApiResponseModel({ success: true, statusCode: 200, message: "Success", data: Array.isArray(data) ? data : [] });
+      return new ApiResponseModel({
+        success: true,
+        statusCode: 200,
+        message: "Success",
+        data: Array.isArray(data) ? data : [],
+      });
     } catch (error) {
       return new ApiResponseModel<null>(error);
     }
@@ -47,7 +67,81 @@ export const generalController = {
   getRoles: async () => {
     try {
       const data = await fetchRoles();
-      return new ApiResponseModel({ success: true, statusCode: 200, message: "Success", data: Array.isArray(data) ? data : [] });
+      return new ApiResponseModel({
+        success: true,
+        statusCode: 200,
+        message: "Success",
+        data: Array.isArray(data) ? data : [],
+      });
+    } catch (error) {
+      return new ApiResponseModel<null>(error);
+    }
+  },
+
+  /* ─────────────────────────────
+     Mixer master (batch identification sheet)
+  ───────────────────────────── */
+  getMixers: async () => {
+    try {
+      const data = await fetchMixers();
+      return new ApiResponseModel({
+        success: true,
+        statusCode: 200,
+        message: "Success",
+        data: Array.isArray(data) ? data : [],
+      });
+    } catch (error) {
+      return new ApiResponseModel<null>(error);
+    }
+  },
+
+  /* ─────────────────────────────
+     Building master (batch identification sheet)
+  ───────────────────────────── */
+  getBuildings: async () => {
+    try {
+      const data = await fetchBuildings();
+      return new ApiResponseModel({
+        success: true,
+        statusCode: 200,
+        message: "Success",
+        data: Array.isArray(data) ? data : [],
+      });
+    } catch (error) {
+      return new ApiResponseModel<null>(error);
+    }
+  },
+
+  /* ─────────────────────────────
+     Mixing cycle master (create batch — filter by motorStage)
+     motorStage: 0 | 1 | 2 | 3 | "ALL"
+  ───────────────────────────── */
+  getMixingCycles: async (motorStage: MixingCycleMotorStage = "ALL") => {
+    try {
+      const data = await fetchMixingCycles(motorStage);
+      return new ApiResponseModel({
+        success: true,
+        statusCode: 200,
+        message: "Success",
+        data: Array.isArray(data) ? data : [],
+      });
+    } catch (error) {
+      return new ApiResponseModel<null>(error);
+    }
+  },
+
+  /* ─────────────────────────────
+     Subscale article master (experimental batch articles multi-select)
+  ───────────────────────────── */
+  getSubscaleArticles: async (params: FetchSubscaleArticlesParams = {}) => {
+    try {
+      const data = await fetchSubscaleArticles(params);
+      return new ApiResponseModel({
+        success: true,
+        statusCode: 200,
+        message: "Success",
+        data: Array.isArray(data) ? data : [],
+      });
     } catch (error) {
       return new ApiResponseModel<null>(error);
     }

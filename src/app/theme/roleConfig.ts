@@ -28,6 +28,11 @@ export const roleConfig: Record<string, RoleChipConfig> = {
     color: "#047857",
     bg: "rgba(4,120,87,0.10)",
   },
+  "Centre Head": {
+    Icon: icons.userMgmt.centreHeadRole,
+    color: "#1edd18",
+    bg: "rgba(3,105,161,0.10)",
+  },
 };
 
 export const statusConfig: Record<string, RoleChipConfig> = {
@@ -44,6 +49,11 @@ export const statusConfig: Record<string, RoleChipConfig> = {
 };
 
 export const stageConfig: Record<string, RoleChipConfig> = {
+  "Yet to Assign": {
+    Icon: icons.batchMgmt.pendingStatus,
+    color: "#64748b",
+    bg: "rgba(100,116,139,0.10)",
+  },
   Sourcing: { Icon: icons.batchMgmt.sourcingStage, color: "#0369a1", bg: "rgba(3,105,161,0.10)" },
   Manufacturing: {
     Icon: icons.batchMgmt.manufacturingStage,
@@ -54,9 +64,47 @@ export const stageConfig: Record<string, RoleChipConfig> = {
   Dispatch: { Icon: icons.batchMgmt.dispatchStage, color: "#047857", bg: "rgba(4,120,87,0.10)" },
 };
 
+export const batchTypeChipConfig: Record<string, RoleChipConfig> = {
+  Main: { Icon: icons.batchMgmt.batchIcon, color: "#1565c0", bg: "#e3f2fd" },
+  Subscale: { Icon: icons.batchMgmt.batchIcon, color: "#6a1b9a", bg: "#f3e5f5" },
+  Qualification: { Icon: icons.batchMgmt.batchIcon, color: "#6a1b9a", bg: "#f3e5f5" },
+  Experimental: { Icon: icons.batchMgmt.batchIcon, color: "#6a1b9a", bg: "#f3e5f5" },
+};
+
+/** Chip colors for admin batch list type column */
+export const getBatchTypeChipConfig = (batch: {
+  batchType?: string | null;
+  subBatchType?: string | null;
+}) => {
+  const type = String(batch?.batchType ?? "")
+    .trim()
+    .toUpperCase();
+  if (type === "MAIN") return batchTypeChipConfig.Main;
+
+  const subType = String(batch?.subBatchType ?? "")
+    .trim()
+    .toLowerCase()
+    .split(/[\s_]+/)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join("");
+  if (subType && batchTypeChipConfig[subType]) return batchTypeChipConfig[subType];
+
+  return batchTypeChipConfig.Subscale;
+};
+
 /** Batch workflow status (subdepartment batch lists) */
 export const batchStatusConfig: Record<string, RoleChipConfig> = {
   // Backend values
+  YET_TO_START: {
+    Icon: icons.batchMgmt.pendingStatus,
+    color: "#64748b",
+    bg: "rgba(100,116,139,0.10)",
+  },
+  TO_BE_INITIATED: {
+    Icon: icons.batchMgmt.pendingStatus,
+    color: "#475569",
+    bg: "rgba(71,85,105,0.08)",
+  },
   INITIATED: {
     Icon: icons.batchMgmt.pendingStatus,
     color: "#475569",
@@ -84,6 +132,11 @@ export const batchStatusConfig: Record<string, RoleChipConfig> = {
   },
 
   // UI values (aliases)
+  "Yet To Start": {
+    Icon: icons.batchMgmt.pendingStatus,
+    color: "#64748b",
+    bg: "rgba(100,116,139,0.10)",
+  },
   "To Be Initiated": {
     Icon: icons.batchMgmt.pendingStatus,
     color: "#475569",
@@ -136,6 +189,7 @@ const deptColorMap = [
 
 /** Named sub-department chip colors — keep in sync across dashboard / batch tables */
 export const subDeptConfig: Record<string, { color: string; bg: string }> = {
+  "Yet to Assign": { color: "#64748b", bg: "rgba(100,116,139,0.10)" },
   // Sourcing
   "Raw Material": { color: "#0369a1", bg: "rgba(3,105,161,0.10)" },
   "Raw Material Sourcing": { color: "#0369a1", bg: "rgba(3,105,161,0.10)" },

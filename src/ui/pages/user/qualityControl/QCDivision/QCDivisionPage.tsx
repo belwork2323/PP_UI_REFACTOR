@@ -135,12 +135,23 @@ const QualityControlPage = () => {
       {activeBatch ? (
         <>
           <UserWorkflowFormHeader
-            batch={activeBatch}
+            mode="update"
+            data={{
+              title: String(activeBatch.batchId ?? activeBatch.lotId ?? "—"),
+              subtitle:
+                String(activeBatch.motorId ?? "").trim() &&
+                String(activeBatch.motorId).trim() !== "—"
+                  ? String(activeBatch.motorId).trim()
+                  : undefined,
+              statusLabel: isEditMode
+                ? STRINGS.QUALITY_CONTROL.FORM_HEADER.EDITING_REJECTED
+                : strings.NEW_LABEL,
+              statusVariant: isEditMode ? "edit" : "new",
+              rejectionReason: activeBatch.rejectionReason,
+            }}
             isEdit={isEditMode}
             onBack={handleBack}
-            newLabel={strings.NEW_LABEL}
             backLabel={STRINGS.QUALITY_CONTROL.FORM_HEADER.BACK_TO_LIST}
-            editLabel={STRINGS.QUALITY_CONTROL.FORM_HEADER.EDITING_REJECTED}
             rejectionTitle={STRINGS.QUALITY_CONTROL.FORM_HEADER.REJECTION_REASON}
             theme={theme}
           />

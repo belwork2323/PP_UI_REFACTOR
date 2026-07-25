@@ -182,7 +182,7 @@ import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import WaterRoundedIcon from "@mui/icons-material/WaterRounded";
 import Project from "@mui/icons-material/AccountTreeRounded";
-
+import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
 export const icons = {
   dashboard: DashboardIcon,
   users: PeopleIcon,
@@ -302,7 +302,7 @@ export const icons = {
     managerRole: SupervisorAccountOutlinedIcon,
     userRole: PersonOutlinedIcon,
     approverRole: VerifiedUserOutlinedIcon,
-
+    centreHeadRole: AccountBalanceIcon,
     // Delete dialog
     deleteWarn: WarningAmberRoundedIcon,
 

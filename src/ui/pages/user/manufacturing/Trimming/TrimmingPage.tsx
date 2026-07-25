@@ -29,32 +29,14 @@ const TrimmingPage = () => {
     setBackConfirmOpen,
     handleBack,
     handleDiscardAndBack,
-    handleFormValuesChange,
     handleSaveDraft,
     handleSubmit,
-    schemaLoading,
-    schemaError,
-    subDepartmentId,
-    selectedMotorStage,
-    motorStageOptions,
-    motorStagesLoading,
-    motorCount,
-    draftMotorIds,
-    motorReceivedAt,
     addedMotors,
-    availableMotorOptions,
-    approvedMotorsLoading,
-    maxMotorCount,
+    batchMotorEntries,
     detailsRow,
     detailsData,
     detailsLoading,
     handleBackFromDetails,
-    handleMotorStageChange,
-    handleMotorCountChange,
-    handleDraftMotorIdChange,
-    handleMotorReceivedAtChange,
-    handleLoadTrimmingForm,
-    handleAddMotors,
     handleMotorSessionChange,
   } = hookState;
 
@@ -86,36 +68,13 @@ const TrimmingPage = () => {
 
   return (
     <Box sx={theme.workflow.animatedContainer}>
-      <TrimmingHeader
-        batch={activeBatch}
-        isEdit={isEditMode}
-        onBack={handleBack}
-        theme={theme}
-      />
+      <TrimmingHeader batch={activeBatch} isEdit={isEditMode} onBack={handleBack} theme={theme} />
       <TrimmingForm
         batch={activeBatch}
         formData={formData}
-        subDepartmentId={subDepartmentId}
-        selectedMotorStage={selectedMotorStage}
-        motorStageOptions={motorStageOptions}
-        motorStagesLoading={motorStagesLoading}
-        motorCount={motorCount}
-        draftMotorIds={draftMotorIds}
-        motorReceivedAt={motorReceivedAt}
         addedMotors={addedMotors}
-        availableMotorOptions={availableMotorOptions}
-        approvedMotorsLoading={approvedMotorsLoading}
-        maxMotorCount={maxMotorCount}
-        schemaLoading={schemaLoading}
-        schemaError={schemaError}
-        onMotorStageChange={handleMotorStageChange}
-        onMotorCountChange={handleMotorCountChange}
-        onDraftMotorIdChange={handleDraftMotorIdChange}
-        onMotorReceivedAtChange={handleMotorReceivedAtChange}
-        onLoadTrimmingForm={handleLoadTrimmingForm}
-        onAddMotors={handleAddMotors}
+        autoMotorEntries={batchMotorEntries}
         onMotorSessionChange={handleMotorSessionChange}
-        onFormValuesChange={handleFormValuesChange}
         theme={theme}
       />
 
@@ -164,9 +123,15 @@ const TrimmingPage = () => {
       <ConfirmAlertDialog
         open={submitConfirmOpen}
         severity="warning"
-        title={isEditMode ? actionStrings.CONFIRM_RESUBMIT_TITLE : actionStrings.CONFIRM_SUBMIT_TITLE}
-        message={isEditMode ? actionStrings.CONFIRM_RESUBMIT_MESSAGE : actionStrings.CONFIRM_SUBMIT_MESSAGE}
-        confirmLabel={isEditMode ? actionStrings.CONFIRM_RESUBMIT_ACTION : actionStrings.CONFIRM_SUBMIT_ACTION}
+        title={
+          isEditMode ? actionStrings.CONFIRM_RESUBMIT_TITLE : actionStrings.CONFIRM_SUBMIT_TITLE
+        }
+        message={
+          isEditMode ? actionStrings.CONFIRM_RESUBMIT_MESSAGE : actionStrings.CONFIRM_SUBMIT_MESSAGE
+        }
+        confirmLabel={
+          isEditMode ? actionStrings.CONFIRM_RESUBMIT_ACTION : actionStrings.CONFIRM_SUBMIT_ACTION
+        }
         cancelLabel={actionStrings.CONFIRM_CANCEL_ACTION}
         onConfirm={async () => {
           setSubmitConfirmOpen(false);

@@ -28,7 +28,7 @@ export const STF_STATUS_CONFIG = getOperationStatusConfig({
 
 const S = STRINGS.QUALITY_CONTROL;
 
-const STFList = ({ hookState, rowsPerPageOptions }: any) => {
+const STFList = ({ hookState, activeTab, rowsPerPageOptions }: any) => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getQualityControlTheme(mode), [mode]);
 

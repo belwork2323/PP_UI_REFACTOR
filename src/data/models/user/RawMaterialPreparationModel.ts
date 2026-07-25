@@ -1,13 +1,14 @@
-import type { MaterialsListItem } from "./MaterialsListModel";
+import { materialSelectionKey, type MaterialsListItem } from "./MaterialsListModel";
 import type {
   PreparationPremixEntry,
   PreparationProcessEntry,
 } from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
 import {
   buildProcessSubmission,
-  derivePremixMaterialType,
   findGradeInMaterial,
   findMaterialInList,
+  RMP_SCHEMA_TYPE,
+  RMP_SCHEMA_VERSION,
 } from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
 import type {
   SchemaDocumentV2,
@@ -15,11 +16,137 @@ import type {
   SchemaSectionSubmission,
 } from "../../../schema-engine";
 import { schemaValuesHaveUserData } from "../../../schema-engine/state/formState";
+import { formatToIsoDateInput } from "../../../utils/dateUtils";
+import { OPERATION_STATUS } from "../../../hooks/operationStatus";
+import { normalizeSubdepartmentBatchStatus } from "./SubdepartmentBatchModel";
+import {
+  formatDateTimeForApi,
+  normalizeProcessSubmissionFromApi,
+  serializeProcessSubmissionForApi,
+  toCamelCaseKey,
+} from "./rawMaterialPreparationApiMapper";
+
+export type PremixSubmissionType = "DRAFT" | "SUBMIT";
+export type PremixSubmissionStatus =
+  | "TO_BE_INITIATED"
+  | "IN_PROGRESS"
+  | "WAITING_FOR_APPROVAL"
+  | "APPROVED"
+  | "REJECTED";
+
+export type PremixStatusMeta = {
+  premixSubmissionType?: PremixSubmissionType;
+  premixSubmissionStatus: PremixSubmissionStatus;
+  submittedAt?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  remarks?: string | null;
+  rejectionReason?: string | null;
+};
+
+export const isPremixLocked = (status: PremixSubmissionStatus | undefined): boolean =>
+  status === "WAITING_FOR_APPROVAL" || status === "APPROVED";
+
+export const isPremixEditable = (status: PremixSubmissionStatus | undefined): boolean =>
+  !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED";
+
+export const isPremixApproverTabDisabled = (status: PremixSubmissionStatus | undefined): boolean =>
+  !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS";
+
+export const isPremixApproverActionable = (status: PremixSubmissionStatus | undefined): boolean =>
+  status === "WAITING_FOR_APPROVAL";
+
+/** Entire form can be approved/rejected once submitted and every premix is approved. */
+export const canApproverActionEntireRawMaterialPrepForm = (params: {
+  formSubmissionType?: string | null;
+  status?: string | null;
+  premixes?: Array<{ premixSubmissionStatus?: PremixSubmissionStatus | string | null }>;
+}): boolean => {
+  const formType = String(params.formSubmissionType ?? "").trim().toUpperCase();
+  if (formType !== "SUBMIT") return false;
+
+  const premixes = params.premixes ?? [];
+  if (premixes.length === 0) return false;
+  const allPremixesApproved = premixes.every(
+    (premix) => String(premix.premixSubmissionStatus ?? "").toUpperCase() === "APPROVED",
+  );
+  if (!allPremixesApproved) return false;
+
+  const status = String(params.status ?? "").trim();
+  const statusUpper = status.toUpperCase().replace(/\s+/g, "_");
+
+  // Already decided — do not show Approve / Reject Form again.
+  if (
+    statusUpper === "APPROVED" ||
+    statusUpper === "REJECTED" ||
+    statusUpper === "FINAL_APPROVAL_COMPLETED" ||
+    status === OPERATION_STATUS.APPROVED ||
+    status === OPERATION_STATUS.REJECTED ||
+    status === OPERATION_STATUS.FINAL_APPROVAL_COMPLETED
+  ) {
+    return false;
+  }
+
+  return (
+    statusUpper === "WAITING_FOR_COMPLETE_APPROVAL" ||
+    status === OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL ||
+    status === OPERATION_STATUS.WAITING_FOR_APPROVAL ||
+    statusUpper === "WAITING_FOR_APPROVAL"
+  );
+};
+
+export const getPremixStatusLabel = (
+  status: PremixSubmissionStatus | string | undefined,
+): string => {
+  const normalized = String(status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+  const labels: Record<string, string> = {
+    TO_BE_INITIATED: "To Be Initiated",
+    IN_PROGRESS: "In Progress",
+    WAITING_FOR_APPROVAL: "Waiting for Approval",
+    APPROVED: "Approved",
+    REJECTED: "Rejected",
+    FINAL_APPROVAL_COMPLETED: "Final Approval Completed",
+  };
+  return labels[normalized] ?? "To Be Initiated";
+};
+
+/** Batch-level workflow status from details/list APIs (includes partial approval). */
+export const getRawMaterialPrepBatchStatusLabel = (status: unknown): string =>
+  String(normalizeSubdepartmentBatchStatus(status));
+
+export type PremixCounts = {
+  pendingPremixCount: number;
+  approvedPremixCount: number;
+  rejectedPremixCount: number;
+  inProgressPremixCount: number;
+  totalPremixCount: number;
+};
 
 export type RawMaterialPreparationSubmitResponse = {
   formId: string;
   batchId: string;
   status: string;
+  formSubmissionType?: string;
+  premixCount?: number;
+  totalSolidMaterials?: number;
+  totalLiquidMaterials?: number;
+  weightmentSheetIncluded?: boolean;
+  submittedBy?: string;
+  submittedAt?: string;
+  batchStatus?: string;
+  allPremixesApproved?: boolean;
+  premixStatuses?: Array<{
+    premixNo: number;
+    premixSubmissionStatus: PremixSubmissionStatus;
+  }>;
+  pendingPremixCount?: number;
+  approvedPremixCount?: number;
+  rejectedPremixCount?: number;
+  inProgressPremixCount?: number;
+  totalPremixCount?: number;
 };
 
 export type RawMaterialPrepWeightmentDetail = {
@@ -67,11 +194,20 @@ export const createEmptyWeightmentSheet = (): RawMaterialPrepWeightmentSheet => 
 const formatDateTimeLocal = (value: unknown): string => {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(raw)) return raw;
-  const date = new Date(raw);
-  if (Number.isNaN(date.getTime())) return raw.slice(0, 16);
+  if (/^\d{2}-\d{2}-\d{4} \d{2}:\d{2}$/.test(raw)) return raw;
+
   const pad = (part: number) => String(part).padStart(2, "0");
-  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  const toUiFormat = (date: Date) =>
+    `${pad(date.getDate())}-${pad(date.getMonth() + 1)}-${date.getFullYear()} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(raw)) {
+    const date = new Date(raw.length === 16 ? `${raw}:00` : raw);
+    if (!Number.isNaN(date.getTime())) return toUiFormat(date);
+  }
+
+  const date = new Date(raw);
+  if (!Number.isNaN(date.getTime())) return toUiFormat(date);
+  return raw;
 };
 
 const unwrapApiScalar = (value: unknown): unknown => {
@@ -114,7 +250,7 @@ export const mapWeightmentSheetFromApi = (value: unknown): RawMaterialPrepWeight
 };
 
 export const mapWeightmentSheetToApi = (sheet: RawMaterialPrepWeightmentSheet | null | undefined) => {
-  if (!sheet) return null;
+  if (!sheet) return {};
 
   const rows = (sheet.weightmentDetails ?? []).filter(
     (row) =>
@@ -125,7 +261,7 @@ export const mapWeightmentSheetToApi = (sheet: RawMaterialPrepWeightmentSheet | 
   );
 
   if (!sheet.mixerBuildingNumber.trim() && rows.length === 0) {
-    return null;
+    return {};
   }
 
   return {
@@ -138,7 +274,7 @@ export const mapWeightmentSheetToApi = (sheet: RawMaterialPrepWeightmentSheet | 
       containerType: row.containerType.trim() || null,
       containerNumber: row.containerNumber.trim() || null,
       weighScaleNumber: row.weighScaleNumber.trim() || null,
-      weighingDateTime: row.weighingDateTime.trim() || null,
+      weighingDateTime: formatDateTimeForApi(row.weighingDateTime),
     })),
     validation: {
       compareWithIdentificationSheet: sheet.validation.compareWithIdentificationSheet,
@@ -150,6 +286,14 @@ export const mapWeightmentSheetToApi = (sheet: RawMaterialPrepWeightmentSheet | 
 
 export type RawMaterialPrepPremixSelection = {
   premix: number;
+  premixDate: string;
+  materialKey: string;
+  sheetSrNo: number;
+  materialName: string;
+  lotId: string;
+  make: string;
+  quantityPerPremix: number;
+  requiredComposition: number;
   selectedProcesses: { solid: boolean; liquid: boolean };
   solidMaterialCode: string;
   solidGradeCode: string;
@@ -185,10 +329,33 @@ export type RawMaterialPreparationDetails = {
   status?: string;
   createdBy?: string | null;
   createdAt?: string | null;
+  pendingPremixCount?: number;
+  approvedPremixCount?: number;
+  rejectedPremixCount?: number;
+  inProgressPremixCount?: number;
+  totalPremixCount?: number;
+  premixStatuses?: Array<{
+    premixNo: number;
+    premixSubmissionType?: PremixSubmissionType;
+    premixSubmissionStatus?: PremixSubmissionStatus;
+    submittedAt?: string | null;
+    reviewedBy?: string | null;
+    reviewedAt?: string | null;
+    remarks?: string | null;
+    rejectionReason?: string | null;
+  }>;
   preparationDetails?: {
     premixes?: Array<{
       premixNo: number;
+      premixDate?: string;
       materialType: string;
+      premixSubmissionType?: PremixSubmissionType;
+      premixSubmissionStatus?: PremixSubmissionStatus;
+      submittedAt?: string | null;
+      reviewedBy?: string | null;
+      reviewedAt?: string | null;
+      remarks?: string | null;
+      rejectionReason?: string | null;
       solidProcess?: PreparationProcessEntry[];
       liquidProcess?: PreparationProcessEntry[];
     }>;
@@ -235,9 +402,11 @@ const buildProcessForSlot = (
   values: SchemaFormValues,
   material: MaterialsListItem | undefined,
   gradeCode: string,
-  fallback?: { materialId?: number; materialCode?: string; materialName?: string; gradeId?: number }
+  fallback?: { materialId?: number; materialCode?: string; materialName?: string; gradeId?: number },
+  options?: { allowEmptyValues?: boolean },
 ): PreparationProcessEntry | null => {
-  if (!schema || !schemaValuesHaveUserData(values)) return null;
+  if (!schema) return null;
+  if (!options?.allowEmptyValues && !schemaValuesHaveUserData(values)) return null;
 
   const resolvedMaterial: MaterialsListItem | undefined =
     material ??
@@ -266,67 +435,202 @@ const buildProcessForSlot = (
   return buildProcessSubmission(schema, values, resolvedMaterial, grade ?? null);
 };
 
+/** Prefer saved API sections when local schema/formValues were never hydrated (locked premixes). */
+const buildProcessFromPendingSections = (
+  sections: SchemaSectionSubmission[] | undefined,
+  fallback: {
+    materialId?: number;
+    materialCode?: string;
+    materialName?: string;
+    gradeId?: number;
+    gradeCode?: string;
+  },
+): PreparationProcessEntry | null => {
+  if (!sections?.length) return null;
+  const materialCode = String(fallback.materialCode ?? "").trim();
+  if (!materialCode) return null;
+
+  return {
+    materialId: Number(fallback.materialId ?? 0),
+    materialCode,
+    materialName: String(fallback.materialName ?? materialCode).trim() || materialCode,
+    gradeId: fallback.gradeId ?? null,
+    gradeCode: fallback.gradeCode?.trim() ? fallback.gradeCode : null,
+    schemaVersion: RMP_SCHEMA_VERSION,
+    schemaType: RMP_SCHEMA_TYPE,
+    sections,
+  };
+};
+
+/**
+ * Rebuild update/create preparationDetails from a fetched form-details response.
+ * Used for final approval so we do not drop solid/liquid data that was never hydrated in local sessions.
+ */
+export const mapPreparationDetailsFromSavedForm = (
+  details: RawMaterialPreparationDetails,
+  options?: {
+    premixStatusByNo?: Record<number, PremixStatusMeta>;
+  },
+) => {
+  const statuses = options?.premixStatusByNo ?? {};
+  const premixes = (details.preparationDetails?.premixes ?? []).map((premix) => {
+    const premixNo = Number(premix.premixNo ?? 0);
+    const statusMeta = statuses[premixNo];
+    const solidProcess = Array.isArray(premix.solidProcess) ? premix.solidProcess : [];
+    const liquidProcess = Array.isArray(premix.liquidProcess) ? premix.liquidProcess : [];
+    const hasSolid = solidProcess.length > 0;
+    const hasLiquid = liquidProcess.length > 0;
+    const materialTypeRaw = String(premix.materialType ?? "").trim().toUpperCase();
+    const materialType =
+      materialTypeRaw === "SOLID" || materialTypeRaw === "LIQUID" || materialTypeRaw === "BOTH"
+        ? materialTypeRaw
+        : hasSolid && hasLiquid
+          ? "BOTH"
+          : hasSolid
+            ? "SOLID"
+            : hasLiquid
+              ? "LIQUID"
+              : "BOTH";
+
+    return {
+      premixNo,
+      premixDate: formatToIsoDateInput(String(premix.premixDate ?? "").trim()) || String(premix.premixDate ?? ""),
+      materialType: materialType as "SOLID" | "LIQUID" | "BOTH",
+      premixSubmissionType:
+        statusMeta?.premixSubmissionType ??
+        premix.premixSubmissionType ??
+        ("SUBMIT" as PremixSubmissionType),
+      solidProcess,
+      liquidProcess,
+    };
+  });
+
+  return {
+    preparationDetails: {
+      premixes,
+      weightmentSheet: mapWeightmentSheetToApi(
+        mapWeightmentSheetFromApi(details.preparationDetails?.weightmentSheet),
+      ),
+    },
+  };
+};
+
 export const mapPreparationDetailsPayload = (params: {
   addedPremixSelections: RawMaterialPrepPremixSelection[];
-  premixSessions: Record<number, RawMaterialPrepPremixSession>;
+  premixSessions: Record<string, RawMaterialPrepPremixSession>;
   solidMaterials: MaterialsListItem[];
   liquidMaterials: MaterialsListItem[];
   weightmentSheet?: RawMaterialPrepWeightmentSheet | null;
+  targetPremixNos?: number[];
+  premixSubmissionType?: PremixSubmissionType;
+  includeEmptyPremixes?: boolean;
+  allowPartialProcesses?: boolean;
 }) => {
   const premixes: PreparationPremixEntry[] = [];
+  const grouped = new Map<number, RawMaterialPrepPremixSelection[]>();
 
   params.addedPremixSelections.forEach((entry) => {
-    const session = params.premixSessions[entry.premix] ?? createEmptyPremixSchemaSession();
-    const solidMaterial = findMaterialInList(params.solidMaterials, entry.solidMaterialCode);
-    const liquidMaterial = findMaterialInList(params.liquidMaterials, entry.liquidMaterialCode);
+    const list = grouped.get(entry.premix) ?? [];
+    list.push(entry);
+    grouped.set(entry.premix, list);
+  });
 
+  grouped.forEach((entries, premixNo) => {
+    if (params.targetPremixNos?.length && !params.targetPremixNos.includes(premixNo)) return;
     const solidProcess: PreparationProcessEntry[] = [];
     const liquidProcess: PreparationProcessEntry[] = [];
 
-    if (entry.selectedProcesses.solid) {
-      const process = buildProcessForSlot(
-        session.solid.schema,
-        session.solid.formValues,
-        solidMaterial,
-        entry.solidGradeCode,
-        {
-          materialId: entry.solidMaterialId,
-          materialCode: entry.solidMaterialCode,
-          materialName: resolveMaterialNameFallback(
+    entries.forEach((entry) => {
+      const sessionKey = `${entry.premix}:${entry.materialKey}`;
+      const session = params.premixSessions[sessionKey] ?? createEmptyPremixSchemaSession();
+      const solidMaterial = findMaterialInList(params.solidMaterials, entry.solidMaterialCode);
+      const liquidMaterial = findMaterialInList(params.liquidMaterials, entry.liquidMaterialCode);
+
+      if (entry.selectedProcesses.solid) {
+        const process =
+          buildProcessForSlot(
             session.solid.schema,
+            session.solid.formValues,
             solidMaterial,
-            entry.solidMaterialCode,
-          ),
-          gradeId: entry.solidGradeId,
-        }
-      );
-      if (process) solidProcess.push(process);
-    }
+            entry.solidGradeCode,
+            {
+              materialId: entry.solidMaterialId,
+              materialCode: entry.solidMaterialCode,
+              materialName: resolveMaterialNameFallback(
+                session.solid.schema,
+                solidMaterial,
+                entry.solidMaterialCode,
+              ),
+              gradeId: entry.solidGradeId,
+            },
+            { allowEmptyValues: params.allowPartialProcesses },
+          ) ??
+          buildProcessFromPendingSections(session.pendingSolidSections, {
+            materialId: entry.solidMaterialId ?? solidMaterial?.materialId,
+            materialCode: entry.solidMaterialCode,
+            materialName: solidMaterial?.materialName ?? entry.materialName,
+            gradeId: entry.solidGradeId,
+            gradeCode: entry.solidGradeCode,
+          });
 
-    if (entry.selectedProcesses.liquid) {
-      const process = buildProcessForSlot(
-        session.liquid.schema,
-        session.liquid.formValues,
-        liquidMaterial,
-        "",
-        {
-          materialId: entry.liquidMaterialId,
-          materialCode: entry.liquidMaterialCode,
-          materialName: resolveMaterialNameFallback(
+        if (process) {
+          solidProcess.push(
+            session.solid.schema
+              ? serializeProcessSubmissionForApi(process, session.solid.schema)
+              : process,
+          );
+        }
+      }
+
+      if (entry.selectedProcesses.liquid) {
+        const process =
+          buildProcessForSlot(
             session.liquid.schema,
+            session.liquid.formValues,
             liquidMaterial,
-            entry.liquidMaterialCode,
-          ),
-        }
-      );
-      if (process) liquidProcess.push(process);
-    }
+            "",
+            {
+              materialId: entry.liquidMaterialId,
+              materialCode: entry.liquidMaterialCode,
+              materialName: resolveMaterialNameFallback(
+                session.liquid.schema,
+                liquidMaterial,
+                entry.liquidMaterialCode,
+              ),
+            },
+            { allowEmptyValues: params.allowPartialProcesses },
+          ) ??
+          buildProcessFromPendingSections(session.pendingLiquidSections, {
+            materialId: entry.liquidMaterialId ?? liquidMaterial?.materialId,
+            materialCode: entry.liquidMaterialCode,
+            materialName: liquidMaterial?.materialName ?? entry.materialName,
+          });
 
-    if (solidProcess.length === 0 && liquidProcess.length === 0) return;
+        if (process) {
+          liquidProcess.push(
+            session.liquid.schema
+              ? serializeProcessSubmissionForApi(process, session.liquid.schema)
+              : process,
+          );
+        }
+      }
+    });
+
+    if (solidProcess.length === 0 && liquidProcess.length === 0 && !params.includeEmptyPremixes) return;
+
+    const premixDate = String(entries[0]?.premixDate ?? "").trim();
+    const hasSolid = entries.some((entry) => entry.selectedProcesses.solid);
+    const hasLiquid = entries.some((entry) => entry.selectedProcesses.liquid);
+    const materialType =
+      hasSolid && hasLiquid ? "BOTH" : hasSolid ? "SOLID" : hasLiquid ? "LIQUID" : "BOTH";
 
     premixes.push({
-      premixNo: entry.premix,
-      materialType: derivePremixMaterialType(entry),
+      premixNo,
+      premixDate: formatToIsoDateInput(premixDate) || premixDate,
+      materialType,
+      ...(params.premixSubmissionType
+        ? { premixSubmissionType: params.premixSubmissionType }
+        : {}),
       solidProcess,
       liquidProcess,
     });
@@ -341,51 +645,216 @@ export const mapPreparationDetailsPayload = (params: {
 };
 
 export const mapPreparationDetailsFromApi = (
-  details: RawMaterialPreparationDetails
+  details: RawMaterialPreparationDetails,
+  sheet?: { materials?: Array<{
+    srNo: number;
+    materialCode: string;
+    materialName?: string;
+    gradeCode?: string;
+    gradeName?: string;
+    lotId: string;
+    make: string;
+    requiredComposition: number;
+    quantityPerPremix: number;
+  }> } | null,
+  premixCount = 0,
+  solidMaterials: MaterialsListItem[] = [],
+  liquidMaterials: MaterialsListItem[] = [],
 ): {
   addedPremixSelections: RawMaterialPrepPremixSelection[];
-  premixSessions: Record<number, RawMaterialPrepPremixSession>;
+  premixSessions: Record<string, RawMaterialPrepPremixSession>;
   weightmentSheet: RawMaterialPrepWeightmentSheet;
+  premixStatusByNo: Record<number, PremixStatusMeta>;
 } => {
-  const premixes = details.preparationDetails?.premixes ?? [];
+  const apiPremixes = details.preparationDetails?.premixes ?? [];
   const addedPremixSelections: RawMaterialPrepPremixSelection[] = [];
-  const premixSessions: Record<number, RawMaterialPrepPremixSession> = {};
+  const premixSessions: Record<string, RawMaterialPrepPremixSession> = {};
 
-  premixes.forEach((premix) => {
-    const premixNo = Number(premix.premixNo ?? 0);
-    if (!premixNo) return;
+  const matchProcessToSelection = (
+    process: PreparationProcessEntry | undefined,
+    selection: RawMaterialPrepPremixSelection,
+    slot: "solid" | "liquid",
+  ) => {
+    if (!process) return false;
+    const code = String(process.materialCode ?? "").trim().toUpperCase();
+    const selectionCode = String(
+      slot === "solid" ? selection.solidMaterialCode : selection.liquidMaterialCode,
+    )
+      .trim()
+      .toUpperCase();
+    if (!code || code !== selectionCode) return false;
 
-    const solidEntry = premix.solidProcess?.[0];
-    const liquidEntry = premix.liquidProcess?.[0];
-    const hasSolid = (premix.solidProcess?.length ?? 0) > 0;
-    const hasLiquid = (premix.liquidProcess?.length ?? 0) > 0;
+    if (slot === "solid" && selection.solidGradeCode) {
+      const processGrade = String(process.gradeCode ?? "").trim().toUpperCase();
+      const selectionGrade = selection.solidGradeCode.trim().toUpperCase();
+      if (processGrade && selectionGrade && processGrade !== selectionGrade) return false;
+    }
 
-    addedPremixSelections.push({
-      premix: premixNo,
-      selectedProcesses: { solid: hasSolid, liquid: hasLiquid },
-      solidMaterialCode: solidEntry?.materialCode ?? "",
-      solidGradeCode: solidEntry?.gradeCode ?? "",
-      solidMaterialId: solidEntry?.materialId,
-      solidGradeId: solidEntry?.gradeId ?? undefined,
-      liquidMaterialCode: liquidEntry?.materialCode ?? "",
-      liquidMaterialId: liquidEntry?.materialId,
+    return true;
+  };
+
+  const buildSelectionsForPremix = (premixNo: number, premixDate: string) => {
+    const sheetMaterials = Array.isArray(sheet?.materials) ? sheet.materials : [];
+    return sheetMaterials.map((row) => {
+      const materialCode = String(row.materialCode ?? "").trim();
+      const gradeRaw = String(row.gradeCode ?? row.gradeName ?? "").trim();
+      const materialKey =
+        materialSelectionKey(materialCode, gradeRaw || undefined) || `sr-${row.srNo}`;
+      const inSolid = solidMaterials.some(
+        (material) => material.materialCode.toUpperCase() === materialCode.toUpperCase(),
+      );
+      const inLiquid = liquidMaterials.some(
+        (material) => material.materialCode.toUpperCase() === materialCode.toUpperCase(),
+      );
+      const selectedProcesses = {
+        solid: inSolid,
+        liquid: inLiquid,
+      };
+
+      const solidMaterial = inSolid ? findMaterialInList(solidMaterials, materialCode) : undefined;
+      const liquidMaterial = inLiquid ? findMaterialInList(liquidMaterials, materialCode) : undefined;
+      const gradeMatch = solidMaterial?.grades?.find(
+        (grade) =>
+          grade.gradeCode.toUpperCase() === gradeRaw.toUpperCase() ||
+          grade.gradeName.toUpperCase() === gradeRaw.toUpperCase(),
+      );
+
+      return {
+        premix: premixNo,
+        premixDate,
+        materialKey,
+        sheetSrNo: Number(row.srNo ?? 0),
+        materialName: String(row.materialName ?? materialCode).trim(),
+        lotId: String(row.lotId ?? "").trim(),
+        make: String(row.make ?? "").trim(),
+        quantityPerPremix: Number(row.quantityPerPremix ?? 0),
+        requiredComposition: Number(row.requiredComposition ?? 0),
+        selectedProcesses,
+        solidMaterialCode: selectedProcesses.solid ? materialCode : "",
+        solidGradeCode: selectedProcesses.solid ? gradeMatch?.gradeCode ?? gradeRaw : "",
+        solidMaterialId: solidMaterial?.materialId,
+        solidGradeId: gradeMatch?.gradeId,
+        liquidMaterialCode: selectedProcesses.liquid ? materialCode : "",
+        liquidMaterialId: liquidMaterial?.materialId,
+      } satisfies RawMaterialPrepPremixSelection;
+    });
+  };
+
+  const premixNumbers = premixCount > 0
+    ? Array.from({ length: premixCount }, (_, index) => index + 1)
+    : apiPremixes.map((premix) => Number(premix.premixNo ?? 0)).filter(Boolean);
+
+  premixNumbers.forEach((premixNo) => {
+    const apiPremix = apiPremixes.find((premix) => Number(premix.premixNo ?? 0) === premixNo);
+    const premixDate = String(apiPremix?.premixDate ?? "").trim();
+    const selections = buildSelectionsForPremix(premixNo, premixDate);
+
+    selections.forEach((selection) => {
+      if (!selection.solidMaterialCode && !selection.liquidMaterialCode) return;
+
+      addedPremixSelections.push(selection);
+
+      const solidEntry = apiPremix?.solidProcess?.find((process) =>
+        matchProcessToSelection(process, selection, "solid"),
+      );
+      const liquidEntry = apiPremix?.liquidProcess?.find((process) =>
+        matchProcessToSelection(process, selection, "liquid"),
+      );
+
+      premixSessions[`${premixNo}:${selection.materialKey}`] = {
+        ...createEmptyPremixSchemaSession(),
+        selectedProcesses: selection.selectedProcesses,
+        solidMaterialCode: selection.solidMaterialCode,
+        solidGradeCode: selection.solidGradeCode,
+        liquidMaterialCode: selection.liquidMaterialCode,
+        pendingSolidSections: solidEntry?.sections,
+        pendingLiquidSections: liquidEntry?.sections,
+      };
     });
 
-    premixSessions[premixNo] = {
-      ...createEmptyPremixSchemaSession(),
-      selectedProcesses: { solid: hasSolid, liquid: hasLiquid },
-      solidMaterialCode: solidEntry?.materialCode ?? "",
-      solidGradeCode: solidEntry?.gradeCode ?? "",
-      liquidMaterialCode: liquidEntry?.materialCode ?? "",
-      pendingSolidSections: solidEntry?.sections,
-      pendingLiquidSections: liquidEntry?.sections,
+    (apiPremix?.solidProcess ?? []).forEach((process) => {
+      const code = String(process.materialCode ?? "").trim();
+      if (!code || !process.sections?.length) return;
+      const grade = String(process.gradeCode ?? "").trim();
+      const sessionKey = `${premixNo}:${materialSelectionKey(code, grade || undefined)}`;
+      premixSessions[sessionKey] = {
+        ...(premixSessions[sessionKey] ?? {
+          ...createEmptyPremixSchemaSession(),
+          selectedProcesses: { solid: true, liquid: false },
+          solidMaterialCode: code,
+          solidGradeCode: grade,
+          liquidMaterialCode: "",
+        }),
+        pendingSolidSections: process.sections,
+      };
+    });
+
+    (apiPremix?.liquidProcess ?? []).forEach((process) => {
+      const code = String(process.materialCode ?? "").trim();
+      if (!code || !process.sections?.length) return;
+      const sessionKey = `${premixNo}:${materialSelectionKey(code)}`;
+      premixSessions[sessionKey] = {
+        ...(premixSessions[sessionKey] ?? {
+          ...createEmptyPremixSchemaSession(),
+          selectedProcesses: { solid: false, liquid: true },
+          solidMaterialCode: "",
+          solidGradeCode: "",
+          liquidMaterialCode: code,
+        }),
+        pendingLiquidSections: process.sections,
+      };
+    });
+  });
+
+  const premixStatusByNo: Record<number, PremixStatusMeta> = {};
+  const rootPremixStatuses = details.premixStatuses ?? [];
+
+  rootPremixStatuses.forEach((entry) => {
+    if (!entry?.premixNo) return;
+    premixStatusByNo[entry.premixNo] = {
+      premixSubmissionType: entry.premixSubmissionType,
+      premixSubmissionStatus: entry.premixSubmissionStatus ?? "TO_BE_INITIATED",
+      submittedAt: entry.submittedAt ?? null,
+      reviewedBy: typeof entry.reviewedBy === "string" ? entry.reviewedBy : null,
+      reviewedAt: entry.reviewedAt ?? null,
+      remarks: entry.remarks ?? null,
+      rejectionReason: entry.rejectionReason ?? null,
     };
   });
+
+  apiPremixes.forEach((premix) => {
+    const premixNo = Number(premix.premixNo ?? 0);
+    if (!premixNo) return;
+    premixStatusByNo[premixNo] = {
+      ...premixStatusByNo[premixNo],
+      premixSubmissionType:
+        premix.premixSubmissionType ?? premixStatusByNo[premixNo]?.premixSubmissionType,
+      premixSubmissionStatus:
+        premix.premixSubmissionStatus ??
+        premixStatusByNo[premixNo]?.premixSubmissionStatus ??
+        "TO_BE_INITIATED",
+      submittedAt: premix.submittedAt ?? premixStatusByNo[premixNo]?.submittedAt ?? null,
+      reviewedBy:
+        typeof premix.reviewedBy === "string"
+          ? premix.reviewedBy
+          : premixStatusByNo[premixNo]?.reviewedBy ?? null,
+      reviewedAt: premix.reviewedAt ?? premixStatusByNo[premixNo]?.reviewedAt ?? null,
+      remarks: premix.remarks ?? premixStatusByNo[premixNo]?.remarks ?? null,
+      rejectionReason:
+        premix.rejectionReason ?? premixStatusByNo[premixNo]?.rejectionReason ?? null,
+    };
+  });
+  for (let i = 1; i <= premixCount; i++) {
+    if (!premixStatusByNo[i]) {
+      premixStatusByNo[i] = { premixSubmissionStatus: "TO_BE_INITIATED" };
+    }
+  }
 
   return {
     addedPremixSelections,
     premixSessions,
     weightmentSheet: mapWeightmentSheetFromApi(details.preparationDetails?.weightmentSheet),
+    premixStatusByNo,
   };
 };
 
@@ -401,11 +870,31 @@ export class RawMaterialPreparationSubmitResponseModel {
   formId: string;
   batchId: string;
   status: string;
+  formSubmissionType: string;
+  premixCount: number;
+  totalSolidMaterials: number;
+  totalLiquidMaterials: number;
+  weightmentSheetIncluded: boolean;
+  submittedBy: string;
+  submittedAt: string;
+  batchStatus: string;
+  allPremixesApproved: boolean;
+  premixStatuses: Array<{ premixNo: number; premixSubmissionStatus: string }>;
 
   constructor(data: Partial<RawMaterialPreparationSubmitResponse> = {}) {
     this.formId = data.formId ?? "";
     this.batchId = data.batchId ?? "";
     this.status = data.status ?? "";
+    this.formSubmissionType = data.formSubmissionType ?? "";
+    this.premixCount = Number(data.premixCount ?? 0);
+    this.totalSolidMaterials = Number(data.totalSolidMaterials ?? 0);
+    this.totalLiquidMaterials = Number(data.totalLiquidMaterials ?? 0);
+    this.weightmentSheetIncluded = Boolean(data.weightmentSheetIncluded);
+    this.submittedBy = data.submittedBy ?? "";
+    this.submittedAt = data.submittedAt ?? "";
+    this.batchStatus = data.batchStatus ?? "";
+    this.allPremixesApproved = Boolean(data.allPremixesApproved);
+    this.premixStatuses = Array.isArray(data.premixStatuses) ? data.premixStatuses : [];
   }
 
   static fromApi(apiResponse: any) {
@@ -414,6 +903,16 @@ export class RawMaterialPreparationSubmitResponseModel {
       formId: data?.formId,
       batchId: data?.batchId,
       status: data?.status,
+      formSubmissionType: data?.formSubmissionType,
+      premixCount: data?.premixCount,
+      totalSolidMaterials: data?.totalSolidMaterials,
+      totalLiquidMaterials: data?.totalLiquidMaterials,
+      weightmentSheetIncluded: data?.weightmentSheetIncluded,
+      submittedBy: data?.submittedBy,
+      submittedAt: data?.submittedAt,
+      batchStatus: data?.batchStatus,
+      allPremixesApproved: data?.allPremixesApproved,
+      premixStatuses: data?.premixStatuses,
     });
   }
 }
@@ -428,18 +927,138 @@ const mapPrepPersonFromApi = (value: unknown): string => {
   return String(value).trim();
 };
 
+const mergePremixStatusesOntoDetails = (
+  premixes: Array<{
+    premixNo: number;
+    premixDate?: string;
+    materialType?: string;
+    premixSubmissionType?: PremixSubmissionType;
+    premixSubmissionStatus?: PremixSubmissionStatus;
+    submittedAt?: string | null;
+    reviewedBy?: string | null;
+    reviewedAt?: string | null;
+    remarks?: string | null;
+    rejectionReason?: string | null;
+    solidProcess?: PreparationProcessEntry[];
+    liquidProcess?: PreparationProcessEntry[];
+    [key: string]: unknown;
+  }> = [],
+  premixStatuses: RawMaterialPreparationDetails["premixStatuses"] = [],
+  totalPremixCount = 0,
+) => {
+  const premixByNo = new Map(
+    (premixes ?? []).map((premix) => [Number(premix.premixNo ?? 0), premix]),
+  );
+  const statusByNo = new Map(
+    (premixStatuses ?? []).map((entry) => [Number(entry.premixNo ?? 0), entry]),
+  );
+
+  const allPremixNos = new Set<number>();
+  premixByNo.forEach((_, premixNo) => {
+    if (premixNo > 0) allPremixNos.add(premixNo);
+  });
+  statusByNo.forEach((_, premixNo) => {
+    if (premixNo > 0) allPremixNos.add(premixNo);
+  });
+  if (totalPremixCount > 0) {
+    for (let i = 1; i <= totalPremixCount; i += 1) {
+      allPremixNos.add(i);
+    }
+  }
+
+  const sortedPremixNos = [...allPremixNos].sort((a, b) => a - b);
+  if (sortedPremixNos.length === 0) {
+    return (premixes ?? []).map((premix) => {
+      const statusEntry = statusByNo.get(Number(premix.premixNo ?? 0));
+      return {
+        ...premix,
+        materialType: String(premix.materialType ?? ""),
+        premixSubmissionType: premix.premixSubmissionType ?? statusEntry?.premixSubmissionType,
+        premixSubmissionStatus:
+          premix.premixSubmissionStatus ?? statusEntry?.premixSubmissionStatus ?? "TO_BE_INITIATED",
+        submittedAt: premix.submittedAt ?? statusEntry?.submittedAt ?? null,
+        reviewedBy:
+          typeof premix.reviewedBy === "string"
+            ? premix.reviewedBy
+            : typeof statusEntry?.reviewedBy === "string"
+              ? statusEntry.reviewedBy
+              : null,
+        reviewedAt: premix.reviewedAt ?? statusEntry?.reviewedAt ?? null,
+        remarks: premix.remarks ?? statusEntry?.remarks ?? null,
+        rejectionReason: premix.rejectionReason ?? statusEntry?.rejectionReason ?? null,
+      };
+    });
+  }
+
+  return sortedPremixNos.map((premixNo) => {
+    const premix = premixByNo.get(premixNo);
+    const statusEntry = statusByNo.get(premixNo);
+
+    return {
+      premixNo,
+      premixDate: String(premix?.premixDate ?? ""),
+      materialType: String(premix?.materialType ?? ""),
+      solidProcess: premix?.solidProcess ?? [],
+      liquidProcess: premix?.liquidProcess ?? [],
+      premixSubmissionType: premix?.premixSubmissionType ?? statusEntry?.premixSubmissionType,
+      premixSubmissionStatus:
+        premix?.premixSubmissionStatus ??
+        statusEntry?.premixSubmissionStatus ??
+        "TO_BE_INITIATED",
+      submittedAt: premix?.submittedAt ?? statusEntry?.submittedAt ?? null,
+      reviewedBy:
+        typeof premix?.reviewedBy === "string"
+          ? premix.reviewedBy
+          : typeof statusEntry?.reviewedBy === "string"
+            ? statusEntry.reviewedBy
+            : null,
+      reviewedAt: premix?.reviewedAt ?? statusEntry?.reviewedAt ?? null,
+      remarks: premix?.remarks ?? statusEntry?.remarks ?? null,
+      rejectionReason: premix?.rejectionReason ?? statusEntry?.rejectionReason ?? null,
+    };
+  });
+};
+
 export class RawMaterialPreparationDetailsModel {
   static fromApi(apiResponse: any): RawMaterialPreparationDetails {
     const data = apiResponse?.data ?? apiResponse;
+    const root = data?.form && typeof data.form === "object" ? data.form : data;
+    const premixStatuses = Array.isArray(root?.premixStatuses ?? data?.premixStatuses)
+      ? (root?.premixStatuses ?? data?.premixStatuses)
+      : [];
+    const preparationDetails =
+      root?.preparationDetails ??
+      data?.preparationDetails ??
+      { premixes: [] };
+    const mergedPremixes = mergePremixStatusesOntoDetails(
+      preparationDetails?.premixes,
+      premixStatuses,
+      Number(root?.totalPremixCount ?? data?.totalPremixCount ?? 0),
+    );
+
     return {
-      formId: String(data?.formId ?? ""),
-      batchId: String(data?.batchId ?? ""),
-      subDepartmentId: Number(data?.subDepartmentId ?? 0),
-      formSubmissionType: String(data?.formSubmissionType ?? ""),
-      status: data?.status != null ? String(data.status) : undefined,
-      createdBy: mapPrepPersonFromApi(data?.createdBy) || null,
-      createdAt: data?.createdAt != null ? String(data.createdAt) : null,
-      preparationDetails: data?.preparationDetails ?? { premixes: [] },
+      formId: String(root?.formId ?? data?.formId ?? ""),
+      batchId: String(root?.batchId ?? data?.batchId ?? ""),
+      subDepartmentId: Number(root?.subDepartmentId ?? data?.subDepartmentId ?? 0),
+      formSubmissionType: String(root?.formSubmissionType ?? data?.formSubmissionType ?? ""),
+      status: root?.status != null ? String(root.status) : data?.status != null ? String(data.status) : undefined,
+      createdBy: mapPrepPersonFromApi(root?.createdBy ?? data?.createdBy) || null,
+      createdAt:
+        root?.createdAt != null
+          ? String(root.createdAt)
+          : data?.createdAt != null
+            ? String(data.createdAt)
+            : null,
+      pendingPremixCount: Number(root?.pendingPremixCount ?? data?.pendingPremixCount ?? 0),
+      approvedPremixCount: Number(root?.approvedPremixCount ?? data?.approvedPremixCount ?? 0),
+      rejectedPremixCount: Number(root?.rejectedPremixCount ?? data?.rejectedPremixCount ?? 0),
+      inProgressPremixCount: Number(root?.inProgressPremixCount ?? data?.inProgressPremixCount ?? 0),
+      totalPremixCount: Number(root?.totalPremixCount ?? data?.totalPremixCount ?? 0),
+      premixStatuses,
+      preparationDetails: {
+        ...preparationDetails,
+        premixes: mergedPremixes,
+      },
     };
   }
 }
@@ -458,7 +1077,15 @@ export type RawMaterialPrepApproverProcessView = {
 
 export type RawMaterialPrepApproverPremixView = {
   premixNo: number;
+  premixDate: string;
   materialType: string;
+  premixSubmissionType?: PremixSubmissionType;
+  premixSubmissionStatus?: PremixSubmissionStatus;
+  submittedAt?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  remarks?: string | null;
+  rejectionReason?: string | null;
   solidProcesses: RawMaterialPrepApproverProcessView[];
   liquidProcesses: RawMaterialPrepApproverProcessView[];
 };
@@ -466,8 +1093,11 @@ export type RawMaterialPrepApproverPremixView = {
 export type RawMaterialPrepApproverDetailView = {
   formId: string;
   batchId: string;
+  status?: string;
+  formSubmissionType?: string;
   createdBy?: string | null;
   createdAt?: string | null;
+  premixCounts?: PremixCounts;
   premixes: RawMaterialPrepApproverPremixView[];
   weightmentSheet: Record<string, unknown> | null;
 };
@@ -539,6 +1169,16 @@ export const formatPrepSectionCellValue = (value: unknown): string => {
 };
 
 /** Expand nested repeat/table blocks (e.g. FEED_LOTS) into flat table rows for read-only views. */
+const prepSectionRowHasContent = (row: Record<string, unknown>): boolean =>
+  Object.entries(row).some(
+    ([key, value]) =>
+      !key.startsWith("_") &&
+      value !== null &&
+      value !== undefined &&
+      value !== "" &&
+      !(typeof value === "object" && !Array.isArray(value) && Object.keys(value as object).length === 0),
+  );
+
 export const expandRawMaterialPrepSectionRows = (
   sectionData: Record<string, unknown>[] | undefined,
 ): Record<string, unknown>[] => {
@@ -556,28 +1196,64 @@ export const expandRawMaterialPrepSectionRows = (
     if (arrayEntries.length === 1 && scalarEntries.length === 0) {
       (arrayEntries[0][1] as unknown[]).forEach((item) => {
         if (item && typeof item === "object" && !Array.isArray(item)) {
-          rows.push(item as Record<string, unknown>);
+          const row = item as Record<string, unknown>;
+          if (prepSectionRowHasContent(row)) rows.push(row);
         }
       });
       return;
     }
 
-    rows.push(dataRow);
+    if (prepSectionRowHasContent(dataRow)) {
+      rows.push(dataRow);
+    }
   });
 
   return rows;
 };
 
+export const isPrepSectionNestedTableValue = (
+  value: unknown,
+): value is Record<string, unknown>[] =>
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.every((entry) => entry && typeof entry === "object" && !Array.isArray(entry));
+
+/** Nested table blocks embedded in a section row (e.g. qcChecks inside blending). */
+export const extractPrepSectionNestedTableKeys = (
+  rows: Record<string, unknown>[],
+): string[] => {
+  const keys = new Set<string>();
+  rows.forEach((row) => {
+    Object.entries(row).forEach(([key, value]) => {
+      if (!key.startsWith("_") && isPrepSectionNestedTableValue(value)) {
+        keys.add(key);
+      }
+    });
+  });
+  return [...keys];
+};
+
+export const collectPrepSectionNestedTableRows = (
+  rows: Record<string, unknown>[],
+  nestedKey: string,
+): Record<string, unknown>[] =>
+  rows.flatMap((row) => {
+    const nested = row[nestedKey];
+    return isPrepSectionNestedTableValue(nested) ? nested : [];
+  });
+
 const mapProcessSections = (process: PreparationProcessEntry): RawMaterialPrepApproverProcessView => ({
   materialCode: String(process.materialCode ?? ""),
   materialName: String(process.materialName ?? process.materialCode ?? ""),
   gradeCode: process.gradeCode ?? null,
-  sections: (process.sections ?? []).map((section) => ({
-    sectionId: String(section.sectionId ?? ""),
-    sectionData: Array.isArray(section.sectionData)
-      ? (section.sectionData as Record<string, unknown>[])
-      : [],
-  })),
+  sections: (process.sections ?? [])
+    .map((section) => ({
+      sectionId: String(section.sectionId ?? ""),
+      sectionData: Array.isArray(section.sectionData)
+        ? (section.sectionData as Record<string, unknown>[])
+        : [],
+    }))
+    .filter((section) => expandRawMaterialPrepSectionRows(section.sectionData).length > 0),
 });
 
 export const mapRawMaterialPreparationApproverDetailView = (
@@ -585,11 +1261,28 @@ export const mapRawMaterialPreparationApproverDetailView = (
 ): RawMaterialPrepApproverDetailView => ({
   formId: details.formId,
   batchId: details.batchId,
+  status: getRawMaterialPrepBatchStatusLabel(details.status),
+  formSubmissionType: String(details.formSubmissionType ?? "").trim() || undefined,
   createdBy: details.createdBy ?? null,
   createdAt: details.createdAt ?? null,
+  premixCounts: {
+    pendingPremixCount: details.pendingPremixCount ?? 0,
+    approvedPremixCount: details.approvedPremixCount ?? 0,
+    rejectedPremixCount: details.rejectedPremixCount ?? 0,
+    inProgressPremixCount: details.inProgressPremixCount ?? 0,
+    totalPremixCount: details.totalPremixCount ?? 0,
+  },
   premixes: (details.preparationDetails?.premixes ?? []).map((premix) => ({
     premixNo: Number(premix.premixNo ?? 0),
+    premixDate: String(premix.premixDate ?? "").trim(),
     materialType: String(premix.materialType ?? ""),
+    premixSubmissionType: premix.premixSubmissionType,
+    premixSubmissionStatus: premix.premixSubmissionStatus,
+    submittedAt: premix.submittedAt ?? null,
+    reviewedBy: typeof premix.reviewedBy === "string" ? premix.reviewedBy : null,
+    reviewedAt: premix.reviewedAt ?? null,
+    remarks: premix.remarks ?? null,
+    rejectionReason: premix.rejectionReason ?? null,
     solidProcesses: (premix.solidProcess ?? []).map(mapProcessSections),
     liquidProcesses: (premix.liquidProcess ?? []).map(mapProcessSections),
   })),
@@ -600,16 +1293,82 @@ export const mapRawMaterialPreparationApproverDetailView = (
       : null,
 });
 
-/** Preferred column order for schema-driven section tables (srNo, lot, operation, …). */
+/** Preferred column order for schema-driven section tables (matches RMP schema field order). */
 export const orderPrepSectionColumns = (columns: string[]): string[] => {
-  const priority = ["srNo", "LOT_NUMBER", "OPERATION", "BIN_NUMBER", "PSD_REQUIREMENT"];
+  const priority = [
+    // Common / identity
+    "srNo",
+    "lotNumber",
+    "mfgBatchLotNumber",
+    "quantity",
+    "totalQuantity",
+    "quantitySieved",
+
+    // Process / set vs actual
+    "operation",
+    "parameter",
+    "setParameter",
+    "actualParameter",
+    "value",
+    "equipmentId",
+    "setRpm",
+    "agitatorRpm",
+    "screwFeederRpm",
+    "processTemperature",
+    "jacketTemperature",
+    "setPressure",
+    "feedPressure",
+    "grindingPressure",
+
+    // Oven / drying (schema order)
+    "ovenType",
+    "ovenNumber",
+    "ovenSetTemperature",
+
+    // Time fields — start before end
+    "startTime",
+    "startDatetime",
+    "endTime",
+    "endDatetime",
+    "sievingDatetime",
+    "sievingDispatchDatetime",
+    "dispatchDatetime",
+    "dispatchTime",
+
+    // Sieving / PSD / results
+    "sievedQuantity",
+    "sieveMeshSize",
+    "oversizeQuantity",
+    "undersizeQuantity",
+    "sizeRange",
+    "particleSize",
+    "psdRequirement",
+    "specification",
+    "result",
+    "moisture",
+    "observation",
+    "qualifiedQuantity",
+    "totalQuantitySentForPremix",
+
+    // Unload / dispatch / mixing
+    "binNumber",
+    "binCapacity",
+    "filledQuantity",
+    "numberOfDrums",
+    "drumNumber",
+    "amountOfMaterial",
+  ];
+  const normalize = (column: string) => toCamelCaseKey(column);
+  const originalIndex = new Map(columns.map((column, index) => [column, index]));
+
   return [...columns].sort((a, b) => {
-    const ai = priority.indexOf(a);
-    const bi = priority.indexOf(b);
+    const ai = priority.indexOf(normalize(a));
+    const bi = priority.indexOf(normalize(b));
     if (ai >= 0 && bi >= 0) return ai - bi;
     if (ai >= 0) return -1;
     if (bi >= 0) return 1;
-    return a.localeCompare(b);
+    // Preserve API/schema insertion order for unknown fields (avoid A–Z reordering).
+    return (originalIndex.get(a) ?? 0) - (originalIndex.get(b) ?? 0);
   });
 };
 

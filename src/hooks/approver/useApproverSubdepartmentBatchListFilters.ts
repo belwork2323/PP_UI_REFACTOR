@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { STRINGS } from "../../app/config/strings";
 import { operationsController } from "../../controllers/user/operationsController";
+import { projectManagementController } from "../../controllers/admin/ProjectManagement/projectManagementController";
 import {
   approverRowMatchesSubmittedByFilter,
   APPROVER_BATCH_STATUS_TABS,
@@ -16,6 +17,7 @@ export type ApproverSubdepartmentBatchListAppliedFilters = {
   batchType: string;
   motorId: string;
   motorStage: string;
+  projectId: string;
   submittedBy: string;
   fromDate: string;
   toDate: string;
@@ -26,6 +28,7 @@ const emptyAppliedFilters = (): ApproverSubdepartmentBatchListAppliedFilters => 
   batchType: "",
   motorId: "",
   motorStage: "",
+  projectId: "",
   submittedBy: "",
   fromDate: "",
   toDate: "",
@@ -33,6 +36,11 @@ const emptyAppliedFilters = (): ApproverSubdepartmentBatchListAppliedFilters => 
 
 type MotorStageOption = {
   motorStage: string;
+};
+
+type ProjectFilterOption = {
+  projectId: string;
+  projectName: string;
 };
 
 const parseRowDate = (value: unknown) => {
@@ -51,6 +59,7 @@ export const applyApproverSubdepartmentBatchListClientFilters = <T extends Recor
   const batchTypeFilter = filters.batchType.trim();
   const motorIdQuery = filters.motorId.trim().toLowerCase();
   const motorStageFilter = filters.motorStage.trim();
+  const projectIdFilter = filters.projectId.trim().toLowerCase();
   const submittedByQuery = filters.submittedBy.trim().toLowerCase();
   let fromDate = filters.fromDate.trim();
   let toDate = filters.toDate.trim();
@@ -80,6 +89,17 @@ export const applyApproverSubdepartmentBatchListClientFilters = <T extends Recor
       if (rowStage !== String(normalizeMotorStage(motorStageFilter))) return false;
     }
 
+    if (projectIdFilter) {
+      const nested =
+        row.project && typeof row.project === "object"
+          ? (row.project as { projectId?: string })
+          : null;
+      const rowProjectId = String(nested?.projectId ?? row.projectId ?? "")
+        .trim()
+        .toLowerCase();
+      if (rowProjectId !== projectIdFilter) return false;
+    }
+
     if (submittedByQuery && !approverRowMatchesSubmittedByFilter(row, submittedByQuery)) {
       return false;
     }
@@ -102,6 +122,9 @@ export const useApproverSubdepartmentBatchListFilters = () => {
   const [statusFilter, setStatusFilter] = useState(FILTER_ALL);
   const [motorStageOptions, setMotorStageOptions] = useState<MotorStageOption[]>([]);
   const [motorStagesLoading, setMotorStagesLoading] = useState(false);
+  const [projectOptions, setProjectOptions] = useState<ProjectFilterOption[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -138,12 +161,42 @@ export const useApproverSubdepartmentBatchListFilters = () => {
     };
   }, []);
 
+  const ensureProjectOptions = useCallback(async () => {
+    if (projectsLoaded || projectsLoading) return;
+    setProjectsLoading(true);
+    try {
+      const res = await projectManagementController.getAllProjects({
+        page: 1,
+        limit: 1000,
+        sortBy: "createdOn",
+        sortOrder: "desc",
+      });
+      if (res?.success && res.data) {
+        const raw = (res.data as { projects?: unknown[] }).projects ?? [];
+        setProjectOptions(
+          raw.map((p: any) => ({
+            projectId: String(p.projectId ?? ""),
+            projectName: String(p.projectName ?? p.projectId ?? ""),
+          })),
+        );
+      } else {
+        setProjectOptions([]);
+      }
+      setProjectsLoaded(true);
+    } catch {
+      setProjectOptions([]);
+    } finally {
+      setProjectsLoading(false);
+    }
+  }, [projectsLoaded, projectsLoading]);
+
   const listFiltersRecord = useMemo(
     () => ({
       batchId: appliedFilters.batchId,
       batchType: appliedFilters.batchType || FILTER_ALL,
       motorId: appliedFilters.motorId,
       motorStage: appliedFilters.motorStage || FILTER_ALL,
+      projectId: appliedFilters.projectId || FILTER_ALL,
       submittedBy: appliedFilters.submittedBy,
       fromDate: appliedFilters.fromDate,
       toDate: appliedFilters.toDate,
@@ -157,6 +210,7 @@ export const useApproverSubdepartmentBatchListFilters = () => {
     if (appliedFilters.batchType.trim()) count += 1;
     if (appliedFilters.motorId.trim()) count += 1;
     if (appliedFilters.motorStage.trim()) count += 1;
+    if (appliedFilters.projectId.trim()) count += 1;
     if (appliedFilters.submittedBy.trim()) count += 1;
     if (appliedFilters.fromDate.trim()) count += 1;
     if (appliedFilters.toDate.trim()) count += 1;
@@ -172,6 +226,7 @@ export const useApproverSubdepartmentBatchListFilters = () => {
       batchType: next.batchType,
       motorId: next.motorId,
       motorStage: next.motorStage,
+      projectId: next.projectId,
       submittedBy: next.submittedBy,
       fromDate: next.fromDate,
       toDate: next.toDate,
@@ -201,6 +256,9 @@ export const useApproverSubdepartmentBatchListFilters = () => {
     filterAllLabel: FILTER_ALL,
     motorStageOptions,
     motorStagesLoading,
+    projectOptions,
+    projectsLoading,
+    ensureProjectOptions,
     applyClientFilters: applyApproverSubdepartmentBatchListClientFilters,
   };
 };

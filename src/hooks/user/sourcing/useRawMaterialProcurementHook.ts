@@ -307,13 +307,13 @@ export const useRawMaterialProcurementHook = () => {
       setBackConfirmOpen(true);
       return;
     }
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
   };
 
   const handleDiscardAndBack = () => {
     setBackConfirmOpen(false);
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
   };
 

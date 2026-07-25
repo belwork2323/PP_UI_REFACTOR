@@ -19,10 +19,51 @@ export const formatIsoToApiDate = (iso: string): string => {
 
 const pad2 = (value: string | number) => String(value).padStart(2, "0");
 
+/** Canonical UI date format — independent of OS locale. */
+export const UI_DATE_FORMAT = "DD-MM-YYYY";
+export const UI_DATE_PLACEHOLDER = "DD-MM-YYYY";
+export const UI_DATETIME_FORMAT = "DD-MM-YYYY HH:mm";
+export const UI_DATE_PARSE_FORMATS = [
+  "DD-MM-YYYY",
+  "DD-MM-YYYY HH:mm",
+  "YYYY-MM-DD",
+  "YYYY-MM-DDTHH:mm",
+  "MM/DD/YYYY",
+  "MM/DD/YYYY HH:mm",
+  "DD/MM/YYYY",
+] as const;
+
 /**
- * Normalize a date string to MM/DD/YYYY for APIs that expect US slash format
- * (e.g. batch identification `prcApprovalDate`).
- * Accepts YYYY-MM-DD, datetime-local, MM/DD/YYYY, and DD-MM-YYYY.
+ * Normalize any supported date string to DD-MM-YYYY for UI inputs and display.
+ * Accepts YYYY-MM-DD, DD-MM-YYYY, MM/DD/YYYY, and datetime values.
+ */
+export const formatToUiDate = (value: string | null | undefined): string => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+
+  const datePart = raw.split("T")[0].split(" ")[0];
+
+  const dmyDash = datePart.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (dmyDash) {
+    return `${pad2(dmyDash[1])}-${pad2(dmyDash[2])}-${dmyDash[3]}`;
+  }
+
+  const iso = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (iso) {
+    return `${iso[3]}-${iso[2]}-${iso[1]}`;
+  }
+
+  // Legacy US slash MM/DD/YYYY → DD-MM-YYYY
+  const usSlash = datePart.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (usSlash) {
+    return `${pad2(usSlash[2])}-${pad2(usSlash[1])}-${usSlash[3]}`;
+  }
+
+  return datePart;
+};
+
+/**
+ * Normalize a date string to MM/DD/YYYY for rare APIs that still expect US slash format.
  */
 export const formatToUsSlashDate = (value: string | null | undefined): string => {
   const raw = String(value ?? "").trim();
@@ -40,17 +81,23 @@ export const formatToUsSlashDate = (value: string | null | undefined): string =>
     return `${iso[2]}/${iso[3]}/${iso[1]}`;
   }
 
-  const dmy = datePart.match(/^(\d{2})-(\d{2})-(\d{4})$/);
+  const dmy = datePart.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
   if (dmy) {
-    return `${dmy[2]}/${dmy[1]}/${dmy[3]}`;
+    return `${pad2(dmy[2])}/${pad2(dmy[1])}/${dmy[3]}`;
   }
 
   return datePart;
 };
 
+/** Read-only date display — always DD-MM-YYYY regardless of OS locale. */
+export const formatDisplayDate = (value: string | null | undefined, fallback = "—"): string => {
+  const normalized = formatToUiDate(value);
+  return normalized || fallback;
+};
+
 /**
- * Convert API/date strings to YYYY-MM-DD for HTML `type="date"` inputs.
- * Accepts MM/DD/YYYY, DD-MM-YYYY, YYYY-MM-DD, and datetime values.
+ * Convert API/date strings to YYYY-MM-DD for HTML `type="date"` inputs / ISO APIs.
+ * Accepts DD-MM-YYYY, MM/DD/YYYY, YYYY-MM-DD, and datetime values.
  */
 export const formatToIsoDateInput = (value: string | null | undefined): string => {
   const raw = String(value ?? "").trim();
@@ -61,14 +108,15 @@ export const formatToIsoDateInput = (value: string | null | undefined): string =
   const iso = datePart.match(/^(\d{4})-(\d{2})-(\d{2})$/);
   if (iso) return `${iso[1]}-${iso[2]}-${iso[3]}`;
 
+  const dmy = datePart.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (dmy) {
+    return `${dmy[3]}-${pad2(dmy[2])}-${pad2(dmy[1])}`;
+  }
+
+  // Legacy US slash MM/DD/YYYY
   const slash = datePart.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
   if (slash) {
     return `${slash[3]}-${pad2(slash[1])}-${pad2(slash[2])}`;
-  }
-
-  const dmy = datePart.match(/^(\d{2})-(\d{2})-(\d{4})$/);
-  if (dmy) {
-    return `${dmy[3]}-${dmy[2]}-${dmy[1]}`;
   }
 
   return "";

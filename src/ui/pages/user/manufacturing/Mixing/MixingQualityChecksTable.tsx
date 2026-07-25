@@ -12,14 +12,13 @@ import {
 import { styled } from "@mui/material/styles";
 import { STRINGS } from "../../../../../app/config/strings";
 import { MIXING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/mixing_theme";
-import { isQuadObservedLayout } from "../../../../../hooks/user/manufacturing/mixingConfig";
 import type { QualityCheckRow } from "../../../../../data/models/user/MixingFormModel";
 import { MixingTableInput } from "./MixingFormFields";
 
 const S = STRINGS.MANUFACTURING.MIXING;
 const BRAND = MIXING_BRAND;
 const observedGroupBorder = `2px solid ${alpha(BRAND.mx, 0.22)}`;
-const QUALITY_OBSERVED_COLS = 4;
+const OBSERVED_FIELDS = ["observed1", "observed2", "observed3", "observed4"] as const;
 
 const TH = styled(TableCell)({
   background: "linear-gradient(135deg, #1565C0, #1976D2)",
@@ -59,7 +58,9 @@ const SpecificationCell = ({ value }: { value: string }) =>
         border: `1px solid ${alpha(BRAND.mx, 0.22)}`,
       }}
     >
-      <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: BRAND.mx }}>{value}</Typography>
+      <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: BRAND.mx }}>
+        {value}
+      </Typography>
     </Box>
   ) : (
     <Typography sx={{ fontSize: "0.76rem", color: BRAND.textSub, fontStyle: "italic" }}>
@@ -67,14 +68,20 @@ const SpecificationCell = ({ value }: { value: string }) =>
     </Typography>
   );
 
+type QualityCheckObservedField = (typeof OBSERVED_FIELDS)[number];
+
 type MixingQualityChecksTableProps = {
   rows: QualityCheckRow[];
   readOnly?: boolean;
-  onChange?: (
-    parameter: string,
-    field: "observed1" | "observed2" | "observed3" | "observed4",
-    value: string,
-  ) => void;
+  onChange?: (parameterId: string, field: QualityCheckObservedField, value: string) => void;
+};
+
+const resolveRowSampleCount = (row: QualityCheckRow): number => {
+  const parsed = Number(row.sampleCount);
+  if (Number.isFinite(parsed) && parsed > 0) {
+    return Math.max(1, Math.min(4, Math.floor(parsed)));
+  }
+  return row.observedLayout === "quad" ? 4 : 1;
 };
 
 const ReadOnlyValue = ({ value }: { value: string }) => (
@@ -83,81 +90,107 @@ const ReadOnlyValue = ({ value }: { value: string }) => (
   </Typography>
 );
 
-const MixingQualityChecksTable = ({ rows, readOnly = false, onChange }: MixingQualityChecksTableProps) => (
-  <TableContainer sx={tableShellSx}>
-    <Table size="small" sx={{ minWidth: 720, tableLayout: "fixed" }}>
-      <colgroup>
-        <col style={{ width: "22%" }} />
-        <col style={{ width: "16%" }} />
-        <col style={{ width: "15.5%" }} />
-        <col style={{ width: "15.5%" }} />
-        <col style={{ width: "15.5%" }} />
-        <col style={{ width: "15.5%" }} />
-      </colgroup>
-      <TableHead>
-        <TableRow>
-          <TH sx={{ minWidth: 140 }}>{S.COL_PARAMETER}</TH>
-          <TH sx={{ minWidth: 120 }}>{S.COL_SPECIFICATION}</TH>
-          <TH colSpan={QUALITY_OBSERVED_COLS} align="center" sx={{ borderLeft: observedGroupBorder }}>
-            {S.COL_OBSERVED_VALUES}
-          </TH>
-        </TableRow>
-      </TableHead>
-      <TableBody>
-        {rows.map((row, rowIdx) => (
-          <TableRow
-            key={row.parameter}
-            sx={{ background: rowIdx % 2 === 0 ? "#fff" : alpha(BRAND.surface, 0.55) }}
-          >
-            <TD>
-              <Typography sx={{ fontWeight: 700, fontSize: "0.78rem", color: BRAND.text }}>
-                {row.parameter}
-              </Typography>
-            </TD>
-            <TD>
-              <SpecificationCell value={row.specification} />
-            </TD>
-            {isQuadObservedLayout(row.observedLayout) ? (
-              (["observed1", "observed2", "observed3", "observed4"] as const).map((field, index) => (
-                <TD
+const MixingQualityChecksTable = ({
+  rows,
+  readOnly = false,
+  onChange,
+}: MixingQualityChecksTableProps) => {
+  const columnCount = Math.max(1, ...rows.map(resolveRowSampleCount), 1);
+  const observedFields = OBSERVED_FIELDS.slice(0, columnCount);
+
+  return (
+    <TableContainer sx={tableShellSx}>
+      <Table size="small" sx={{ minWidth: 720, tableLayout: "fixed" }}>
+        <colgroup>
+          <col style={{ width: "22%" }} />
+          <col style={{ width: "16%" }} />
+          {observedFields.map((field) => (
+            <col key={field} style={{ width: `${62 / columnCount}%` }} />
+          ))}
+        </colgroup>
+        <TableHead>
+          <TableRow>
+            <TH rowSpan={columnCount > 1 ? 2 : 1} sx={{ minWidth: 140 }}>
+              {S.COL_PARAMETER}
+            </TH>
+            <TH rowSpan={columnCount > 1 ? 2 : 1} sx={{ minWidth: 120 }}>
+              {S.COL_SPECIFICATION}
+            </TH>
+            <TH colSpan={columnCount} align="center" sx={{ borderLeft: observedGroupBorder }}>
+              {S.COL_OBSERVED_VALUES}
+            </TH>
+          </TableRow>
+          {columnCount > 1 ? (
+            <TableRow>
+              {observedFields.map((field, index) => (
+                <TH
                   key={field}
+                  align="center"
                   sx={{
-                    borderLeft: index === 0 ? observedGroupBorder : `1px solid ${alpha(BRAND.border, 0.45)}`,
-                    background: alpha(BRAND.mx, 0.02),
+                    borderLeft:
+                      index === 0 ? observedGroupBorder : `1px solid ${alpha("#fff", 0.25)}`,
+                    fontSize: "0.65rem",
+                    letterSpacing: "0.04em",
                   }}
                 >
-                  {readOnly ? (
-                    <ReadOnlyValue value={row[field]} />
-                  ) : (
-                    <MixingTableInput
-                      value={row[field]}
-                      placeholder={S.PLACEHOLDER_OBSERVED_VALUE}
-                      onChange={(value) => onChange?.(row.parameter, field, value)}
-                    />
-                  )}
-                </TD>
-              ))
-            ) : (
-              <TD
-                colSpan={QUALITY_OBSERVED_COLS}
-                sx={{ borderLeft: observedGroupBorder, background: alpha(BRAND.mx, 0.02) }}
+                  {index + 1}
+                </TH>
+              ))}
+            </TableRow>
+          ) : null}
+        </TableHead>
+        <TableBody>
+          {rows.map((row, rowIdx) => {
+            const rowObservedFieldCount = resolveRowSampleCount(row);
+
+            return (
+              <TableRow
+                key={row.parameterId || `${row.parameter}-${rowIdx}`}
+                sx={{ background: rowIdx % 2 === 0 ? "#fff" : alpha(BRAND.surface, 0.55) }}
               >
-                {readOnly ? (
-                  <ReadOnlyValue value={row.observed1} />
-                ) : (
-                  <MixingTableInput
-                    value={row.observed1}
-                    placeholder={S.PLACEHOLDER_OBSERVED_VALUE}
-                    onChange={(value) => onChange?.(row.parameter, "observed1", value)}
-                  />
-                )}
-              </TD>
-            )}
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
-  </TableContainer>
-);
+                <TD>
+                  <Typography sx={{ fontWeight: 700, fontSize: "0.78rem", color: BRAND.text }}>
+                    {row.parameter}
+                  </Typography>
+                </TD>
+                <TD>
+                  <SpecificationCell value={row.specification} />
+                </TD>
+                {observedFields.map((field, index) => {
+                  const shouldRenderValue = index < rowObservedFieldCount;
+
+                  return (
+                    <TD
+                      key={field}
+                      sx={{
+                        borderLeft:
+                          index === 0
+                            ? observedGroupBorder
+                            : `1px solid ${alpha(BRAND.border, 0.45)}`,
+                        background: alpha(BRAND.mx, 0.02),
+                      }}
+                    >
+                      {shouldRenderValue ? (
+                        readOnly ? (
+                          <ReadOnlyValue value={row[field]} />
+                        ) : (
+                          <MixingTableInput
+                            value={row[field]}
+                            placeholder={S.PLACEHOLDER_OBSERVED_VALUE}
+                            onChange={(value) => onChange?.(row.parameterId, field, value)}
+                          />
+                        )
+                      ) : null}
+                    </TD>
+                  );
+                })}
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+};
 
 export default MixingQualityChecksTable;

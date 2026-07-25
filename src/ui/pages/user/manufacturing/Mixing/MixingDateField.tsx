@@ -1,8 +1,4 @@
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import dayjs from "dayjs";
-import { Box, Typography } from "@mui/material";
+import FlowBarDateField from "../../../../components/common/FlowBarDateField";
 import { MIXING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/mixing_theme";
 import { mixingFieldSx } from "./MixingFormFields";
 
@@ -12,6 +8,7 @@ type MixingDateFieldProps = {
   onChange: (value: string) => void;
   disabled?: boolean;
   placeholder?: string;
+  fullWidth?: string;
 };
 
 const MixingDateField = ({
@@ -20,30 +17,34 @@ const MixingDateField = ({
   onChange,
   disabled = false,
   placeholder = "DD-MM-YYYY",
+  fullWidth,
 }: MixingDateFieldProps) => (
-  <Box>
-    <Typography sx={{ fontWeight: 700, fontSize: "0.72rem", color: MIXING_BRAND.textSub, mb: 0.6 }}>
-      {label}
-    </Typography>
-    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
-      <DatePicker
-        enableAccessibleFieldDOMStructure={false}
-        format="DD-MM-YYYY"
-        disabled={disabled}
-        value={value ? dayjs(value, "DD-MM-YYYY") : null}
-        onChange={(picked) => onChange(picked?.format("DD-MM-YYYY") || "")}
-        slotProps={{
-          textField: {
-            size: "small",
-            fullWidth: true,
-            variant: "outlined",
-            placeholder,
-            sx: mixingFieldSx,
-          },
-        }}
-      />
-    </LocalizationProvider>
-  </Box>
+  <FlowBarDateField
+    label={label}
+    value={value}
+    onChange={onChange}
+    disabled={disabled}
+    placeholder={placeholder}
+    accentColor={MIXING_BRAND.primaryLight}
+    width={fullWidth ?? 220}
+    inputSx={{
+      ...mixingFieldSx,
+      "& .MuiFormLabel-root": {
+        fontWeight: 700,
+        fontSize: "0.72rem",
+        color: MIXING_BRAND.textSub,
+        mb: 0.6,
+      },
+    }}
+    flowBar={{
+      selectLabel: {
+        fontWeight: 700,
+        fontSize: "0.72rem",
+        color: MIXING_BRAND.textSub,
+        mb: 0.6,
+      },
+    }}
+  />
 );
 
 export default MixingDateField;

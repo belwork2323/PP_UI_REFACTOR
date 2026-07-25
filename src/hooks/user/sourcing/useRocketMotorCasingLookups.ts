@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { projectManagementController } from "@controllers/admin/ProjectManagement/projectManagementController";
 import { operationsController } from "../../../controllers/user/operationsController";
 
@@ -8,7 +8,8 @@ export type MotorStageOption = { motorStage: string; noOfmotors: number };
 export const useRocketMotorCasingLookups = () => {
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [motorStages, setMotorStages] = useState<MotorStageOption[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
 
   const loadLookups = useCallback(async () => {
     setLoading(true);
@@ -29,7 +30,7 @@ export const useRocketMotorCasingLookups = () => {
           raw.map((p: any) => ({
             projectId: String(p.projectId ?? ""),
             projectName: String(p.projectName ?? p.projectId ?? ""),
-          }))
+          })),
         );
       } else {
         setProjects([]);
@@ -40,19 +41,22 @@ export const useRocketMotorCasingLookups = () => {
           (motorStageResp.data.stages ?? []).map((s: any) => ({
             motorStage: String(s.motorStage ?? ""),
             noOfmotors: Number(s.noOfmotors ?? 0),
-          }))
+          })),
         );
       } else {
         setMotorStages([]);
       }
+      setHasLoaded(true);
     } finally {
       setLoading(false);
     }
   }, []);
 
-  useEffect(() => {
-    void loadLookups();
-  }, [loadLookups]);
+  /** Load once when opening Create Motor (or refresh if already loaded). */
+  const ensureLoaded = useCallback(async () => {
+    if (hasLoaded || loading) return;
+    await loadLookups();
+  }, [hasLoaded, loading, loadLookups]);
 
   const motorNoOptions = useCallback(
     (motorStage: string) => {
@@ -60,7 +64,7 @@ export const useRocketMotorCasingLookups = () => {
       const count = stage?.noOfmotors ?? 0;
       return Array.from({ length: count }, (_, i) => String(i + 1));
     },
-    [motorStages]
+    [motorStages],
   );
 
   return useMemo(
@@ -68,10 +72,12 @@ export const useRocketMotorCasingLookups = () => {
       projects,
       motorStages,
       loading,
+      hasLoaded,
       motorNoOptions,
       reload: loadLookups,
+      ensureLoaded,
     }),
-    [projects, motorStages, loading, motorNoOptions, loadLookups]
+    [projects, motorStages, loading, hasLoaded, motorNoOptions, loadLookups, ensureLoaded],
   );
 };
 

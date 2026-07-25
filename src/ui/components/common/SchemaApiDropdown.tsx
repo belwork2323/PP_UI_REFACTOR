@@ -1,7 +1,6 @@
 import { Box, MenuItem } from "@mui/material";
 import { useEffect, useMemo, useRef, useState } from "react";
-import FormInput from "./FormInput";
-import { schemaSelectMenuProps } from "./fieldStyles";
+import AppDropdown from "./AppDropdown";
 import {
   fetchSchemaDataSourceOptions,
   resolveDataSourceApi,
@@ -55,11 +54,6 @@ const buildCompactSelectSx = (wrap: boolean) => ({
           textOverflow: "ellipsis",
         }),
   },
-  "& .MuiSelect-icon": {
-    right: 8,
-    top: "50%",
-    transform: "translateY(-50%)",
-  },
 });
 
 const SchemaApiDropdown = ({
@@ -81,7 +75,10 @@ const SchemaApiDropdown = ({
   const [shouldFetchOptions, setShouldFetchOptions] = useState(dataSource?.type === "static");
 
   const resolvedApi = useMemo(
-    () => (dataSource?.type === "api" ? resolveDataSourceApi(dataSource as SchemaDataSource & Record<string, unknown>) : null),
+    () =>
+      dataSource?.type === "api"
+        ? resolveDataSourceApi(dataSource as SchemaDataSource & Record<string, unknown>)
+        : null,
     [dataSource],
   );
 
@@ -152,68 +149,58 @@ const SchemaApiDropdown = ({
   const compactSelectSx = useMemo(() => buildCompactSelectSx(compactWrap), [compactWrap]);
 
   return (
-    <FormInput
-      select
+    <AppDropdown
       label={label}
       value={value}
-      onChange={(e) => onChange(String(e.target.value))}
-      disabled={disabled || loading}
+      onChange={onChange}
+      placeholder={placeholder}
+      loading={loading}
+      disabled={disabled}
       required={required}
       helperText={error ?? undefined}
+      error={Boolean(error)}
       sx={compact ? compactSelectSx : undefined}
-      SelectProps={{
-        MenuProps: schemaSelectMenuProps,
-        displayEmpty: Boolean(placeholder),
-        onOpen: () => {
-          if (dataSource?.type === "api") {
-            setShouldFetchOptions(true);
-          }
-        },
-        renderValue: (selected) => {
-          if (!selected) {
-            return (
-              <Box
-                component="span"
-                sx={{ color: "text.secondary", fontSize: "0.78rem", lineHeight: 1.4 }}
-              >
-                {placeholder}
-              </Box>
-            );
-          }
+      onOpen={() => {
+        if (dataSource?.type === "api") {
+          setShouldFetchOptions(true);
+        }
+      }}
+      renderValue={(selected) => {
+        if (!selected) {
           return (
-            <Box
-              component="span"
-              title={resolvedLabel}
-              sx={{
-                width: "100%",
-                fontSize: "0.78rem",
-                lineHeight: 1.4,
-                ...(compact && compactWrap
-                  ? { whiteSpace: "normal", wordBreak: "break-word" }
-                  : {
-                      overflow: "hidden",
-                      whiteSpace: "nowrap",
-                      textOverflow: "ellipsis",
-                    }),
-              }}
-            >
-              {resolvedLabel}
+            <Box component="span" sx={{ color: "text.secondary", fontSize: "0.78rem", lineHeight: 1.4 }}>
+              {placeholder}
             </Box>
           );
-        },
+        }
+        return (
+          <Box
+            component="span"
+            title={resolvedLabel}
+            sx={{
+              width: "100%",
+              fontSize: "0.78rem",
+              lineHeight: 1.4,
+              ...(compact && compactWrap
+                ? { whiteSpace: "normal", wordBreak: "break-word" }
+                : {
+                    overflow: "hidden",
+                    whiteSpace: "nowrap",
+                    textOverflow: "ellipsis",
+                  }),
+            }}
+          >
+            {resolvedLabel}
+          </Box>
+        );
       }}
     >
-      {placeholder ? (
-        <MenuItem value="">
-          <em>{placeholder}</em>
-        </MenuItem>
-      ) : null}
       {options.map((option) => (
         <MenuItem key={option.value} value={option.value}>
           {option.label}
         </MenuItem>
       ))}
-    </FormInput>
+    </AppDropdown>
   );
 };
 

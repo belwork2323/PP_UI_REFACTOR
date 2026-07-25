@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { Box, MenuItem, TextField, Typography } from "@mui/material";
+import { Box, TextField, Typography } from "@mui/material";
+import AppDropdown from "../../../../components/common/AppDropdown";
 import { MIXING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/mixing_theme";
 
 const BRAND = MIXING_BRAND;
@@ -45,18 +46,12 @@ export const mixingTableInputSx = {
 
 const renderSelectValue = (
   selected: unknown,
-  placeholder: string,
+  _placeholder: string,
   options: { value: string; label: string }[],
 ) => {
   const value = String(selected ?? "");
-  if (!value) {
-    return (
-      <Typography component="span" sx={mixingPlaceholderSx}>
-        {placeholder}
-      </Typography>
-    );
-  }
-  return options.find((option) => option.value === value)?.label ?? value;
+  const match = options.find((option) => option.value === value);
+  return match?.label ?? value;
 };
 
 export const MixingFieldLabel = ({ children }: { children: ReactNode }) => (
@@ -89,25 +84,15 @@ export const MixingSelectField = ({
   return (
     <Box>
       {label ? <MixingFieldLabel>{label}</MixingFieldLabel> : null}
-      <TextField
-        select
-        size="small"
-        fullWidth
-        disabled={disabled}
+      <AppDropdown
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        sx={mixingFieldSx}
-        SelectProps={{
-          displayEmpty: true,
-          renderValue: (selected) => renderSelectValue(selected, placeholder, normalized),
-        }}
-      >
-        {normalized.map((option) => (
-          <MenuItem key={option.value} value={option.value}>
-            {option.label}
-          </MenuItem>
-        ))}
-      </TextField>
+        onChange={onChange}
+        placeholder={placeholder}
+        disabled={disabled}
+        options={normalized}
+        renderValue={(selected) => renderSelectValue(selected, placeholder, normalized)}
+        sx={{ mb: 0, ...mixingFieldSx }}
+      />
     </Box>
   );
 };
@@ -154,16 +139,19 @@ export const MixingTableInput = ({
   value,
   onChange,
   placeholder,
+  disabled = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
+  disabled?: boolean;
 }) => (
   <TextField
     size="small"
     fullWidth
     value={value}
     placeholder={placeholder}
+    disabled={disabled}
     onChange={(event) => onChange(event.target.value)}
     sx={mixingTableInputSx}
   />

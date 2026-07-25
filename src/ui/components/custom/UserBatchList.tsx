@@ -47,12 +47,20 @@
 
 import React, { useState, useMemo } from "react";
 import {
-  Box, Typography, alpha,
-  Table, TableBody, TableCell, TableContainer,
-  TableHead, TableRow, TablePagination, Paper,
+  Box,
+  Typography,
+  alpha,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TablePagination,
+  Paper,
 } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
-import LayersRoundedIcon            from "@mui/icons-material/LayersRounded";
+import LayersRoundedIcon from "@mui/icons-material/LayersRounded";
 
 import { STRINGS } from "../../../app/config/strings";
 import fonts from "../../../app/theme/fonts";
@@ -67,8 +75,7 @@ const fadeUp = keyframes`
 
 // ─── Helper: dot-notation field accessor ─────────────────────────────────────
 // e.g. getVal(row, "assignedTo.fullName") → row.assignedTo.fullName
-const getVal = (obj, key) =>
-  key.split(".").reduce((acc, k) => acc?.[k], obj);
+const getVal = (obj, key) => key.split(".").reduce((acc, k) => acc?.[k], obj);
 
 const getFilterLabel = (field: string, label?: string) => {
   if (label) {
@@ -92,32 +99,29 @@ const toStatusKeyVariants = (label: string) => {
     .replace(/[\s-]+/g, "_")
     .toLowerCase();
 
-  return [
-    label,
-    camel,
-    pascal,
-    snake,
-    snake.replace(/_/g, ""),
-    label.toLowerCase(),
-  ].filter(Boolean);
+  return [label, camel, pascal, snake, snake.replace(/_/g, ""), label.toLowerCase()].filter(
+    Boolean,
+  );
 };
 
 // ─── UserBatchList ────────────────────────────────────────────────────────────
 const UserBatchList = ({
-  rows               = [],
-  columns            = [],
-  statusField        = "status",
+  rows = [],
+  columns = [],
+  statusField = "status",
   statusConfig,
-  filters            = [],
+  /** Optional override for top status filter tabs (defaults to statusConfig keys). */
+  statusTabs: statusTabsOverride,
+  filters = [],
   searchFields,
   highlightRow,
   highlightColor,
   renderAction,
   rowsPerPageOptions = [5, 10, 25],
-  emptyText          = STRINGS.USER_BATCH_LIST.NO_RECORDS,
-  tableLabel         = STRINGS.USER_BATCH_LIST.DEFAULT_LABEL,
+  emptyText = STRINGS.USER_BATCH_LIST.NO_RECORDS,
+  tableLabel = STRINGS.USER_BATCH_LIST.DEFAULT_LABEL,
   themeTokens,
-  
+
   // Controlled Server-Side properties (Bypasses internal filter/pagination when present)
   totalRecords,
   page,
@@ -134,12 +138,12 @@ const UserBatchList = ({
   searchBarEnd,
   filterExtension,
 }: any) => {
-  const [localSearch,       setLocalSearch]       = useState("");
+  const [localSearch, setLocalSearch] = useState("");
   const [localStatusFilter, setLocalStatusFilter] = useState(STRINGS.USER_BATCH_LIST.FILTER_ALL);
-  const [localFilterState,  setLocalFilterState]  = useState(
-    () => Object.fromEntries(filters.map((f: any) => [f.field, STRINGS.USER_BATCH_LIST.FILTER_ALL])),
+  const [localFilterState, setLocalFilterState] = useState(() =>
+    Object.fromEntries(filters.map((f: any) => [f.field, STRINGS.USER_BATCH_LIST.FILTER_ALL])),
   );
-  const [localPage,        setLocalPage]        = useState(0);
+  const [localPage, setLocalPage] = useState(0);
   const [localRowsPerPage, setLocalRowsPerPage] = useState(rowsPerPageOptions[0]);
 
   const activeSearch = search ?? localSearch;
@@ -155,25 +159,31 @@ const UserBatchList = ({
 
   const hlColor = highlightColor || p.primary;
 
-  const thSx = useMemo(() => ({
-    background: t.tableHeaderBg || p.primary,
-    color: t.tableHeaderText || "#fff",
-    fontWeight: fonts.weight.bold,
-    fontSize: fonts.size.xs,
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
-    padding: "11px 14px",
-    whiteSpace: "nowrap",
-    borderBottom: `2px solid ${t.tableHeaderBorder || "transparent"}`,
-  }), [t, p]);
+  const thSx = useMemo(
+    () => ({
+      background: t.tableHeaderBg || p.primary,
+      color: t.tableHeaderText || "#fff",
+      fontWeight: fonts.weight.bold,
+      fontSize: fonts.size.xs,
+      letterSpacing: "0.08em",
+      textTransform: "uppercase",
+      padding: "11px 14px",
+      whiteSpace: "nowrap",
+      borderBottom: `2px solid ${t.tableHeaderBorder || "transparent"}`,
+    }),
+    [t, p],
+  );
 
-  const tdSx = useMemo(() => ({
-    padding: "10px 14px",
-    fontSize: fonts.size.sm,
-    borderBottom: `1px solid ${alpha(p.border || "#000", 0.6)}`,
-    color: p.text || "#000",
-    verticalAlign: "middle",
-  }), [p]);
+  const tdSx = useMemo(
+    () => ({
+      padding: "10px 14px",
+      fontSize: fonts.size.sm,
+      borderBottom: `1px solid ${alpha(p.border || "#000", 0.6)}`,
+      color: p.text || "#000",
+      verticalAlign: "middle",
+    }),
+    [p],
+  );
 
   const listShellTheme = useMemo(
     () =>
@@ -187,16 +197,15 @@ const UserBatchList = ({
           surface: p.surface,
         },
         { filterInputBg: t.filterInputBg },
-        { fadeAnimation: `${fadeUp} 0.3s ease` }
+        { fadeAnimation: `${fadeUp} 0.3s ease` },
       ),
-    [p, t]
+    [p, t],
   );
-
 
   // ── Filtering ──────────────────────────────────────────────────────────────
   const filtered = useMemo(() => {
     if (isControlled) return rows; // Data is already prepared logically by parent
-    
+
     const q = activeSearch.trim().toLowerCase();
     return rows.filter((row: any) => {
       if (q) {
@@ -209,55 +218,85 @@ const UserBatchList = ({
         if (getVal(row, statusField) !== activeStatusFilter) return false;
       }
       for (const { field } of filters) {
-        if (localFilterState[field] !== STRINGS.USER_BATCH_LIST.FILTER_ALL && getVal(row, field) !== localFilterState[field])
+        if (
+          localFilterState[field] !== STRINGS.USER_BATCH_LIST.FILTER_ALL &&
+          getVal(row, field) !== localFilterState[field]
+        )
           return false;
       }
       return true;
     });
-  }, [isControlled, rows, activeSearch, activeStatusFilter, localFilterState, statusField, statusConfig, filters, searchFields]);
+  }, [
+    isControlled,
+    rows,
+    activeSearch,
+    activeStatusFilter,
+    localFilterState,
+    statusField,
+    statusConfig,
+    filters,
+    searchFields,
+  ]);
 
-  const paginated = isControlled ? rows : filtered.slice(activePage * activeRowsPerPage, activePage * activeRowsPerPage + activeRowsPerPage);
+  const paginated = isControlled
+    ? rows
+    : filtered.slice(
+        activePage * activeRowsPerPage,
+        activePage * activeRowsPerPage + activeRowsPerPage,
+      );
   const displayTotal = totalRecords ?? filtered.length;
-  const statusTabs = statusConfig ? [STRINGS.USER_BATCH_LIST.FILTER_ALL, ...Object.keys(statusConfig)] : [];
+  const statusTabs = statusTabsOverride?.length
+    ? statusTabsOverride
+    : statusConfig
+      ? [STRINGS.USER_BATCH_LIST.FILTER_ALL, ...Object.keys(statusConfig)]
+      : [];
   const statusCounts = useMemo(() => {
     if (!statusConfig) {
       return {};
     }
 
     if (serverStatusCounts && typeof serverStatusCounts === "object") {
-      const resolvedByUiStatus = Object.keys(statusConfig).reduce((accumulator, statusLabel) => {
-        const count = toStatusKeyVariants(statusLabel).reduce<number | undefined>((found, key) => {
-          if (found !== undefined) {
-            return found;
-          }
+      const resolvedByUiStatus = Object.keys(statusConfig).reduce(
+        (accumulator, statusLabel) => {
+          const count = toStatusKeyVariants(statusLabel).reduce<number | undefined>(
+            (found, key) => {
+              if (found !== undefined) {
+                return found;
+              }
 
-          const value = (serverStatusCounts as Record<string, unknown>)[key];
-          if (typeof value === "number") {
-            return value;
-          }
+              const value = (serverStatusCounts as Record<string, unknown>)[key];
+              if (typeof value === "number") {
+                return value;
+              }
 
-          return undefined;
-        }, undefined);
+              return undefined;
+            },
+            undefined,
+          );
 
-        accumulator[statusLabel] = Number(count ?? 0);
-        return accumulator;
-      }, {} as Record<string, number>);
+          accumulator[statusLabel] = Number(count ?? 0);
+          return accumulator;
+        },
+        {} as Record<string, number>,
+      );
 
       return {
         ...resolvedByUiStatus,
-        [STRINGS.USER_BATCH_LIST.FILTER_ALL]:
-          Number(
-            (serverStatusCounts as Record<string, unknown>)[STRINGS.USER_BATCH_LIST.FILTER_ALL] ??
-              Object.values(resolvedByUiStatus).reduce((sum, value) => sum + value, 0) ??
-              totalRecords,
-          ),
+        // All = sum of every status tab; do not use filtered pagination totalRecords.
+        [STRINGS.USER_BATCH_LIST.FILTER_ALL]: Object.values(resolvedByUiStatus).reduce(
+          (sum, value) => sum + value,
+          0,
+        ),
       };
     }
 
-    const nextCounts = Object.keys(statusConfig).reduce((accumulator, key) => {
-      accumulator[key] = rows.filter((row: any) => getVal(row, statusField) === key).length;
-      return accumulator;
-    }, {} as Record<string, number>);
+    const nextCounts = Object.keys(statusConfig).reduce(
+      (accumulator, key) => {
+        accumulator[key] = rows.filter((row: any) => getVal(row, statusField) === key).length;
+        return accumulator;
+      },
+      {} as Record<string, number>,
+    );
 
     nextCounts[STRINGS.USER_BATCH_LIST.FILTER_ALL] = rows.length;
 
@@ -286,13 +325,19 @@ const UserBatchList = ({
   }));
 
   // ── Handlers ───────────────────────────────────────────────────────────────
-  const handleSearch = (e: any) => { 
+  const handleSearch = (e: any) => {
     if (onSearchChange) onSearchChange(e.target.value);
-    else { setLocalSearch(e.target.value); setLocalPage(0); }
+    else {
+      setLocalSearch(e.target.value);
+      setLocalPage(0);
+    }
   };
-  const handleStatusToggle = (val: string) => { 
+  const handleStatusToggle = (val: string) => {
     if (onStatusFilterChange) onStatusFilterChange(val);
-    else { setLocalStatusFilter(val); setLocalPage(0); }
+    else {
+      setLocalStatusFilter(val);
+      setLocalPage(0);
+    }
   };
   const handleDropdownChange = (field: string) => (e: any) => {
     setLocalFilterState((prev) => ({ ...prev, [field]: e.target.value }));
@@ -328,115 +373,147 @@ const UserBatchList = ({
       statusToolbarEnd={statusToolbarEnd}
       theme={listShellTheme}
     >
-      <Paper elevation={0} sx={{
-          borderRadius: 3, overflow: "hidden", background: p.surface,
+      <Paper
+        elevation={0}
+        sx={{
+          borderRadius: 3,
+          overflow: "hidden",
+          background: p.surface,
           border: `1.5px solid ${p.border}`,
           boxShadow: `0 2px 16px ${alpha(p.primary || "#000", 0.07)}`,
-        }}>
-          <TableContainer>
-            <Table aria-label={tableLabel}>
+        }}
+      >
+        <TableContainer>
+          <Table aria-label={tableLabel}>
+            <TableHead>
+              <TableRow>
+                <TableCell sx={{ ...thSx, width: 40, textAlign: "center" }}>
+                  {STRINGS.USER_BATCH_LIST.COL_HASH}
+                </TableCell>
+                {columns.map((col: any) => (
+                  <TableCell
+                    key={col.key}
+                    sx={{ ...thSx, textAlign: col.align ?? "left", width: col.width }}
+                  >
+                    {col.label}
+                  </TableCell>
+                ))}
+                {showActionCol && (
+                  <TableCell sx={{ ...thSx, textAlign: "center" }}>
+                    {STRINGS.USER_BATCH_LIST.COL_ACTION}
+                  </TableCell>
+                )}
+              </TableRow>
+            </TableHead>
 
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ ...thSx, width: 40, textAlign: "center" }}>{STRINGS.USER_BATCH_LIST.COL_HASH}</TableCell>
-                  {columns.map((col: any) => (
-                    <TableCell key={col.key} sx={{ ...thSx, textAlign: col.align ?? "left", width: col.width }}>
-                      {col.label}
+            <TableBody>
+              {paginated.map((row: any, idx: number) => {
+                const isHighlighted = highlightRow?.(row) ?? false;
+                const globalIdx = activePage * activeRowsPerPage + idx + 1;
+
+                return (
+                  <TableRow
+                    key={row.id ?? idx}
+                    sx={{
+                      background: isHighlighted
+                        ? alpha(hlColor, 0.02)
+                        : idx % 2 === 0
+                          ? t.stripedRowEven
+                          : t.stripedRowOdd,
+                      borderLeft: isHighlighted ? `3px solid ${hlColor}` : "3px solid transparent",
+                      "&:hover": { background: alpha(p.primaryLight || "#000", 0.04) },
+                      "&:last-child td": { borderBottom: "none" },
+                      animation: `${fadeUp} 0.25s ease both`,
+                      animationDelay: `${idx * 0.03}s`,
+                      transition: "background 0.15s",
+                    }}
+                  >
+                    {/* Row number */}
+                    <TableCell sx={{ ...tdSx, textAlign: "center" }}>
+                      <Typography
+                        sx={{
+                          fontSize: fonts.size.xs,
+                          fontWeight: fonts.weight.bold,
+                          color: p.textSub,
+                        }}
+                      >
+                        {globalIdx}
+                      </Typography>
                     </TableCell>
-                  ))}
-                  {showActionCol && <TableCell sx={{ ...thSx, textAlign: "center" }}>{STRINGS.USER_BATCH_LIST.COL_ACTION}</TableCell>}
-                </TableRow>
-              </TableHead>
 
-              <TableBody>
-                {paginated.map((row: any, idx: number) => {
-                  const isHighlighted = highlightRow?.(row) ?? false;
-                  const globalIdx     = activePage * activeRowsPerPage + idx + 1;
-
-                  return (
-                    <TableRow
-                      key={row.id ?? idx}
-                      sx={{
-                        background: isHighlighted
-                          ? alpha(hlColor, 0.02)
-                          : idx % 2 === 0 ? t.stripedRowEven : t.stripedRowOdd,
-                        borderLeft: isHighlighted
-                          ? `3px solid ${hlColor}`
-                          : "3px solid transparent",
-                        "&:hover": { background: alpha(p.primaryLight || "#000", 0.04) },
-                        "&:last-child td": { borderBottom: "none" },
-                        animation: `${fadeUp} 0.25s ease both`,
-                        animationDelay: `${idx * 0.03}s`,
-                        transition: "background 0.15s",
-                      }}
-                    >
-                      {/* Row number */}
-                      <TableCell sx={{ ...tdSx, textAlign: "center" }}>
-                        <Typography sx={{ fontSize: fonts.size.xs, fontWeight: fonts.weight.bold, color: p.textSub }}>
-                          {globalIdx}
-                        </Typography>
-                      </TableCell>
-
-                      {/* Data cells */}
-                      {columns.map((col) => {
-                        const rawValue = getVal(row, col.key);
-                        return (
-                          <TableCell key={col.key} sx={{ ...tdSx, textAlign: col.align ?? "left" }}>
-                            {col.render
-                              ? col.render(rawValue, row)
-                              : (
-                                <Typography sx={{ fontSize: fonts.size.sm }}>
-                                  {rawValue ?? "—"}
-                                </Typography>
-                              )}
-                          </TableCell>
-                        );
-                      })}
-
-                      {/* Action cell */}
-                      {showActionCol && (
-                        <TableCell sx={{ ...tdSx, textAlign: "center" }}>
-                          <Box sx={{ display: "flex", justifyContent: "center", alignItems: "center", width: "100%" }}>
-                            {renderAction(row)}
-                          </Box>
+                    {/* Data cells */}
+                    {columns.map((col) => {
+                      const rawValue = getVal(row, col.key);
+                      return (
+                        <TableCell key={col.key} sx={{ ...tdSx, textAlign: col.align ?? "left" }}>
+                          {col.render ? (
+                            col.render(rawValue, row)
+                          ) : (
+                            <Typography sx={{ fontSize: fonts.size.sm }}>
+                              {rawValue ?? "—"}
+                            </Typography>
+                          )}
                         </TableCell>
-                      )}
-                    </TableRow>
-                  );
-                })}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                      );
+                    })}
 
-          {/* Pagination */}
-          <Box sx={{
+                    {/* Action cell */}
+                    {showActionCol && (
+                      <TableCell sx={{ ...tdSx, textAlign: "center" }}>
+                        <Box
+                          sx={{
+                            display: "flex",
+                            justifyContent: "center",
+                            alignItems: "center",
+                            width: "100%",
+                          }}
+                        >
+                          {renderAction(row)}
+                        </Box>
+                      </TableCell>
+                    )}
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+
+        {/* Pagination */}
+        <Box
+          sx={{
             borderTop: `1px solid ${alpha(p.border || "#000", 0.6)}`,
             background: alpha(p.surface || "#fff", 0.4),
-          }}>
-            <TablePagination
-              component="div"
-              count={displayTotal}
-              page={activePage}
-              onPageChange={(_, p) => onPageChange ? onPageChange(p) : setLocalPage(p)}
-              rowsPerPage={activeRowsPerPage}
-              onRowsPerPageChange={(e) => { 
-                const newRows = parseInt(e.target.value, 10);
-                if (onRowsPerPageChange) onRowsPerPageChange(newRows);
-                else { setLocalRowsPerPage(newRows); setLocalPage(0); }
-              }}
-              rowsPerPageOptions={rowsPerPageOptions}
-              sx={{
-                color: p.text,
-                "& .MuiTablePagination-toolbar": { fontSize: fonts.size.xs },
-                "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": {
-                  fontSize: fonts.size.xs, color: p.textSub,
-                },
-                "& .MuiTablePagination-select": { fontSize: fonts.size.xs },
-                "& .MuiTablePagination-selectIcon": { color: p.textSub },
-              }}
-            />
-          </Box>
-        </Paper>
+          }}
+        >
+          <TablePagination
+            component="div"
+            count={displayTotal}
+            page={activePage}
+            onPageChange={(_, p) => (onPageChange ? onPageChange(p) : setLocalPage(p))}
+            rowsPerPage={activeRowsPerPage}
+            onRowsPerPageChange={(e) => {
+              const newRows = parseInt(e.target.value, 10);
+              if (onRowsPerPageChange) onRowsPerPageChange(newRows);
+              else {
+                setLocalRowsPerPage(newRows);
+                setLocalPage(0);
+              }
+            }}
+            rowsPerPageOptions={rowsPerPageOptions}
+            sx={{
+              color: p.text,
+              "& .MuiTablePagination-toolbar": { fontSize: fonts.size.xs },
+              "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": {
+                fontSize: fonts.size.xs,
+                color: p.textSub,
+              },
+              "& .MuiTablePagination-select": { fontSize: fonts.size.xs },
+              "& .MuiTablePagination-selectIcon": { color: p.textSub },
+            }}
+          />
+        </Box>
+      </Paper>
     </BatchListShell>
   );
 };

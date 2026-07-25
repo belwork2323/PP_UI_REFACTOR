@@ -23,23 +23,32 @@ const UserWorkflowStatusCell = ({
   rejectionReason,
   theme,
 }: UserWorkflowStatusCellProps) => {
-  const cfg = statusConfig[status] ?? statusConfig[Object.keys(statusConfig)[0]];
-  const Icon = cfg.Icon;
+  const themeStatus = theme?.batchList?.statusConfig?.[status];
+  const cfg = statusConfig[status]
+    ? { ...themeStatus, ...statusConfig[status] }
+    : themeStatus;
+  const Icon = cfg?.Icon ?? statusConfig[status]?.Icon;
+  const label = cfg?.label ?? status;
+  const color = cfg?.color ?? theme?.palette?.textSub ?? "#5D6D7E";
+  const bg = cfg?.bg ?? "transparent";
+  const border = cfg?.border ?? color;
 
   return (
     <>
       <Chip
-        icon={<Icon sx={{ fontSize: "13px !important", color: `${cfg.color} !important` }} />}
-        label={cfg.label}
+        {...(Icon
+          ? { icon: <Icon sx={{ fontSize: "13px !important", color: `${color} !important` }} /> }
+          : {})}
+        label={label}
         size="small"
         sx={{
           height: 24,
           fontSize: "0.68rem",
           fontWeight: 700,
-          background: cfg.bg,
-          color: cfg.color,
-          border: `1px solid ${cfg.border}`,
-          maxWidth: 175,
+          background: bg,
+          color,
+          border: `1px solid ${border}`,
+          maxWidth: 220,
         }}
       />
       {status === rejectedStatus && rejectionReason && (

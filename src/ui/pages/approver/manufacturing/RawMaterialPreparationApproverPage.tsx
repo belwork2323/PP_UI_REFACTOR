@@ -6,7 +6,9 @@ import { APPROVER_STATUS_META } from "../../../../app/theme/approver";
 import useRawMaterialPreparationApproverHook from "../../../../hooks/approver/manufacturing/useRawMaterialPreparationApproverHook";
 import ApproverSubdepartmentBatchListSection from "../components/ApproverSubdepartmentBatchListSection";
 import ApproverActionDialog from "../../../components/custom/ApproverActionDialog";
-import RawMaterialPreparationApproverDetailDialog from "./RawMaterialPreparationApproverDetailDialog";
+import RawMaterialPreparationApproverDetailDialog, {
+  type RawMaterialPreparationApproverDetailItem,
+} from "./RawMaterialPreparationApproverDetailDialog";
 
 const BRAND = {
   primary: "#1B4F72",
@@ -26,11 +28,17 @@ const RawMaterialPreparationApproverPage = () => {
     items,
     selected,
     detailsLoading,
+    activePremixNo,
     dialogProps,
+    formDialogProps,
+    actionLoading,
     requestApprove,
     requestReject,
+    requestFormApprove,
+    requestFormReject,
     handleViewDetails,
     handleCloseDetail,
+    handleActivePremixChange,
   } = useRawMaterialPreparationApproverHook();
 
   return (
@@ -53,13 +61,19 @@ const RawMaterialPreparationApproverPage = () => {
       <RawMaterialPreparationApproverDetailDialog
         open={!!selected}
         onClose={handleCloseDetail}
-        item={selected}
+        item={selected as RawMaterialPreparationApproverDetailItem | null}
         loading={detailsLoading}
+        activePremixNo={activePremixNo}
+        onActivePremixChange={handleActivePremixChange}
         onApprove={requestApprove}
         onReject={requestReject}
+        onApproveForm={requestFormApprove}
+        onRejectForm={requestFormReject}
+        actionLoading={actionLoading}
         theme={approverTheme}
       />
       <ApproverActionDialog {...dialogProps} />
+      <ApproverActionDialog {...formDialogProps} />
     </ApproverSubdepartmentBatchListSection>
   );
 };

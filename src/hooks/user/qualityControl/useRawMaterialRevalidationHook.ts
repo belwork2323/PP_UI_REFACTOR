@@ -161,13 +161,13 @@ export const useRawMaterialRevalidationHook = () => {
       return;
     }
 
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
   };
 
   const handleDiscardAndBack = () => {
     setBackConfirmOpen(false);
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
   };
 

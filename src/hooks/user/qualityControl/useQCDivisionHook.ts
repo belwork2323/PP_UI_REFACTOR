@@ -1582,9 +1582,9 @@ export const useQCDivisionHook = () => {
   };
 
   const handleBackFromDetails = useCallback(() => {
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
-  }, [bumpBatchRefresh, hasSavedDraft, resetFormContext]);
+  }, [bumpBatchRefresh, resetFormContext]);
 
   const handleBack = () => {
     if (view === "details") {
@@ -1596,13 +1596,13 @@ export const useQCDivisionHook = () => {
       return;
     }
 
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
   };
 
   const handleDiscardAndBack = () => {
     setBackConfirmOpen(false);
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
   };
 

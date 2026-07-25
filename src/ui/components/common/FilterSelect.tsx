@@ -1,22 +1,24 @@
 import React from "react";
-import { FormControl, InputLabel, Select, MenuItem, SxProps, Theme } from "@mui/material";
+import { SxProps, Theme } from "@mui/material";
+import AppDropdown, { type AppDropdownOption } from "./AppDropdown";
 
 export type FilterSelectOption = { value: string; label: string };
 
 interface FilterSelectProps {
   label: string;
   value: string;
-  onChange: (e: any) => void;
+  onChange: (e: { target: { value: string } }) => void;
   /** Simple string options (value and label are the same). */
   options?: string[];
   /** Value/label options — preferred when the API needs an id. */
   optionItems?: FilterSelectOption[];
   sx?: SxProps<Theme>;
-  menuProps?: React.ComponentProps<typeof Select>["MenuProps"];
+  menuProps?: React.ComponentProps<typeof AppDropdown>["MenuProps"];
   itemSx?: SxProps<Theme>;
   showAllOption?: boolean;
   /** Override for the “All …” menu item text. */
   allOptionLabel?: string;
+  compact?: boolean;
 }
 
 function defaultAllOptionLabel(label: string): string {
@@ -42,24 +44,29 @@ const FilterSelect = ({
   itemSx,
   showAllOption = true,
   allOptionLabel,
+  compact = false,
 }: FilterSelectProps) => {
   const items: FilterSelectOption[] =
     optionItems ?? options.map((option) => ({ value: option, label: option }));
 
+  const dropdownOptions: AppDropdownOption[] = [
+    ...(showAllOption
+      ? [{ value: "All", label: allOptionLabel ?? defaultAllOptionLabel(label) }]
+      : []),
+    ...items.map((item) => ({ value: item.value, label: item.label })),
+  ];
+
   return (
-    <FormControl size="small" sx={{ minWidth: 140, ...sx }}>
-      <InputLabel>{label}</InputLabel>
-      <Select value={value} label={label} onChange={onChange} MenuProps={menuProps}>
-        {showAllOption && (
-          <MenuItem value="All">{allOptionLabel ?? defaultAllOptionLabel(label)}</MenuItem>
-        )}
-        {items.map((item) => (
-          <MenuItem key={item.value} value={item.value} sx={itemSx}>
-            {item.label}
-          </MenuItem>
-        ))}
-      </Select>
-    </FormControl>
+    <AppDropdown
+      label={label}
+      value={value}
+      onChange={(nextValue) => onChange({ target: { value: nextValue } })}
+      options={dropdownOptions}
+      compact={compact}
+      sx={{ minWidth: 140, ...sx }}
+      MenuProps={menuProps}
+      itemSx={itemSx}
+    />
   );
 };
 

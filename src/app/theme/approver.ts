@@ -17,6 +17,7 @@ export type ApproverStatusMeta = Record<
     bg: string;
     color: string;
     border: string;
+    label?: string;
   }
 >;
 
@@ -37,7 +38,20 @@ export type ApproverDepartmentBrand = {
   background: string;
 };
 
-const WAITING_FOR_APPROVAL_META = {
+const TO_BE_INITIATED_META = {
+  bg: alpha("#475569", 0.08),
+  color: "#475569",
+  border: alpha("#475569", 0.2),
+};
+
+const IN_PROGRESS_META = {
+  bg: alpha("#2E86C1", 0.1),
+  color: "#1A5276",
+  border: alpha("#2E86C1", 0.3),
+};
+
+/** Same warn treatment as user batch list for partial + complete approval. */
+const WAITING_APPROVAL_META = {
   bg: alpha("#D4AC0D", 0.1),
   color: "#7D6608",
   border: alpha("#D4AC0D", 0.35),
@@ -56,12 +70,28 @@ const REJECTED_META = {
 };
 
 export const APPROVER_STATUS_META: ApproverStatusMeta = {
-  Pending: WAITING_FOR_APPROVAL_META,
-  "Waiting for Approval": WAITING_FOR_APPROVAL_META,
-  WAITING_FOR_APPROVAL: WAITING_FOR_APPROVAL_META,
-  Approved: APPROVED_META,
+  [OPERATION_STATUS.TO_BE_INITIATED]: TO_BE_INITIATED_META,
+  TO_BE_INITIATED: TO_BE_INITIATED_META,
+  [OPERATION_STATUS.IN_PROGRESS]: IN_PROGRESS_META,
+  IN_PROGRESS: IN_PROGRESS_META,
+  [OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL]: WAITING_APPROVAL_META,
+  WAITING_FOR_PARTIAL_APPROVAL: WAITING_APPROVAL_META,
+  Pending: WAITING_APPROVAL_META,
+  [OPERATION_STATUS.WAITING_FOR_APPROVAL]: {
+    ...WAITING_APPROVAL_META,
+    label: OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL,
+  },
+  WAITING_FOR_APPROVAL: {
+    ...WAITING_APPROVAL_META,
+    label: OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL,
+  },
+  [OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL]: WAITING_APPROVAL_META,
+  WAITING_FOR_COMPLETE_APPROVAL: WAITING_APPROVAL_META,
+  [OPERATION_STATUS.APPROVED]: APPROVED_META,
   APPROVED: APPROVED_META,
-  Rejected: REJECTED_META,
+  [OPERATION_STATUS.FINAL_APPROVAL_COMPLETED]: APPROVED_META,
+  FINAL_APPROVAL_COMPLETED: APPROVED_META,
+  [OPERATION_STATUS.REJECTED]: REJECTED_META,
   REJECTED: REJECTED_META,
 };
 
@@ -197,13 +227,22 @@ export const isApproverActionableStatus = (status?: string | null) => {
   return (
     normalized === "Pending" ||
     normalized === OPERATION_STATUS.WAITING_FOR_APPROVAL ||
-    normalized === "WAITING_FOR_APPROVAL"
+    normalized === OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL ||
+    normalized === OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL ||
+    normalized === "WAITING_FOR_APPROVAL" ||
+    normalized === "WAITING_FOR_PARTIAL_APPROVAL" ||
+    normalized === "WAITING_FOR_COMPLETE_APPROVAL"
   );
 };
 
 export const isApproverApprovedStatus = (status?: string | null) => {
   const normalized = String(status ?? "").trim();
-  return normalized === OPERATION_STATUS.APPROVED || normalized === "APPROVED";
+  return (
+    normalized === OPERATION_STATUS.APPROVED ||
+    normalized === "APPROVED" ||
+    normalized === OPERATION_STATUS.FINAL_APPROVAL_COMPLETED ||
+    normalized === "FINAL_APPROVAL_COMPLETED"
+  );
 };
 
 /** Whether the approver batch list should show a View Details action for this row. */

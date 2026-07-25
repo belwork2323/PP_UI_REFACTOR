@@ -1,24 +1,36 @@
 import {
   FORM_SECTIONS_KEY,
+  mapFormStateToCreateBemPayload,
+  mapFormStateToCreateStfBatchPayload,
+  mapFormStateToUpdateBemPayload,
+  mapFormStateToUpdateStfBatchPayload,
   mapStaticTestFacilityDetailsToFormState,
-  mapStaticTestFacilityFormStateToPayload,
+  type BemMotorDetailsResponse,
+  type CreateBemMotorPayload,
+  type CreateStfBatchFormPayload,
   type StaticTestFacilityFormState,
+  type UpdateBemMotorPayload,
+  type UpdateStfBatchFormPayload,
 } from "./StaticTestFacilityFormModel";
-import type { SchemaSectionSubmission } from "../../../schema-engine";
+import type { SchemaDocumentV2, SchemaSectionSubmission } from "../../../schema-engine";
+import { mapStfSubType } from "../../../schema-engine";
 import {
   mapCastingCuringPersonLabel,
   parseCastingCuringSectionData,
 } from "./CastingCuringFormModel";
 import type { CasePrepDetailSection } from "./CasePreparationFormModel";
-import { mapStfSubType } from "../../../schema-engine";
 
 export type STFSubmissionType = "DRAFT" | "SUBMIT" | "UPDATE";
 
 export type STFMotorPayload = {
   motorId: string;
   subType: string;
-  staticTestingDetails: Record<string, unknown>;
+  staticTestingDetails: any;
 };
+
+// ============================================================================
+// Response & Details Models
+// ============================================================================
 
 export class STFSubmitResponseModel {
   formId: string;
@@ -33,6 +45,22 @@ export class STFSubmitResponseModel {
 
   static fromApi(apiResponse: any): STFSubmitResponseModel {
     return new STFSubmitResponseModel(apiResponse?.data ?? {});
+  }
+}
+
+export class BEMSubmitResponseModel {
+  bemMotorId: string;
+  bemNo: string;
+  status: string;
+
+  constructor(payload: { bemMotorId?: string; bemNo?: string; status?: string }) {
+    this.bemMotorId = payload.bemMotorId ?? "";
+    this.bemNo = payload.bemNo ?? "";
+    this.status = payload.status ?? "";
+  }
+
+  static fromApi(apiResponse: any): BEMSubmitResponseModel {
+    return new BEMSubmitResponseModel(apiResponse?.data ?? {});
   }
 }
 
@@ -102,9 +130,63 @@ export class STFDetailsModel {
   }
 }
 
+export class BEMMotorDetailsModel implements BemMotorDetailsResponse {
+  bemMotorId: string;
+  bemNo: string;
+  motorCode?: string;
+  subDepartmentId: number;
+  subType: string;
+  status: string;
+  sections: SchemaSectionSubmission[];
+  staticTestingDetails?: {
+    [FORM_SECTIONS_KEY]?: SchemaSectionSubmission[];
+    [key: string]: unknown;
+  };
+  createdBy: unknown;
+  createdAt: string | null;
+  submittedBy: unknown;
+  submittedAt: string | null;
+  lastUpdatedBy: unknown;
+  lastUpdatedAt: string | null;
+  workflowInsights: {
+    currentStatus: string;
+    rejectionReason: string | null;
+  };
+
+  constructor(payload: any) {
+    this.bemMotorId = payload?.bemMotorId ?? payload?.id ?? "";
+    this.bemNo = payload?.bemNo ?? payload?.motorCode ?? "";
+    this.motorCode = payload?.motorCode;
+    this.subDepartmentId = Number(payload?.subDepartmentId ?? 0);
+    this.subType = payload?.subType ?? "BEM";
+    this.status = payload?.status ?? payload?.formStatus ?? "";
+    this.sections = extractSectionsFromPayload(payload);
+    this.staticTestingDetails = payload?.staticTestingDetails;
+    this.createdBy = payload?.createdBy ?? null;
+    this.createdAt = payload?.createdAt ?? payload?.createdOn ?? null;
+    this.submittedBy = payload?.submittedBy ?? null;
+    this.submittedAt = payload?.submittedAt ?? payload?.submittedOn ?? null;
+    this.lastUpdatedBy = payload?.lastUpdatedBy ?? payload?.updatedBy ?? null;
+    this.lastUpdatedAt = payload?.lastUpdatedAt ?? payload?.updatedAt ?? payload?.updatedOn ?? null;
+
+    this.workflowInsights = {
+      currentStatus: payload?.workflowInsights?.currentStatus ?? this.status,
+      rejectionReason: payload?.workflowInsights?.rejectionReason ?? null,
+    };
+  }
+
+  static fromApi(apiResponse: any): BEMMotorDetailsModel {
+    return new BEMMotorDetailsModel(apiResponse?.data ?? {});
+  }
+}
+
+// ============================================================================
+// Payload Extraction & API Transformation Helpers
+// ============================================================================
+
 const extractMotorsFromPayload = (
   payload: any,
-): Array<{ motorId: string; subType?: string; staticTestingDetails?: Record<string, unknown> }> => {
+): Array<{ motorId: string; subType: string; staticTestingDetails: Record<string, unknown> }> => {
   const motors = payload?.motors;
   if (!Array.isArray(motors)) return [];
 
@@ -114,7 +196,7 @@ const extractMotorsFromPayload = (
       if (!motorId) return null;
       return {
         motorId,
-        subType: motor?.subType ? String(motor.subType) : undefined,
+        subType: String(motor?.subType ?? ""),
         staticTestingDetails: motor?.staticTestingDetails ?? {},
       };
     })
@@ -123,8 +205,8 @@ const extractMotorsFromPayload = (
         motor,
       ): motor is {
         motorId: string;
-        subType?: string;
-        staticTestingDetails?: Record<string, unknown>;
+        subType: string;
+        staticTestingDetails: Record<string, unknown>;
       } => Boolean(motor),
     );
 };
@@ -132,6 +214,10 @@ const extractMotorsFromPayload = (
 const extractSectionsFromPayload = (payload: any): SchemaSectionSubmission[] => {
   if (Array.isArray(payload?.sections) && payload.sections.length > 0) {
     return payload.sections;
+  }
+
+  if (Array.isArray(payload?.staticTestingDetails?.formSections)) {
+    return payload.staticTestingDetails.formSections;
   }
 
   const motors = extractMotorsFromPayload(payload);
@@ -145,8 +231,79 @@ const extractSectionsFromPayload = (payload: any): SchemaSectionSubmission[] => 
   return [];
 };
 
-export const mapSTFPayload = (form: StaticTestFacilityFormState) =>
-  mapStaticTestFacilityFormStateToPayload(form);
+/**
+ * Creates payload for POST /api/v1/user/stf/create
+ */
+export const mapCreateSTFBatchPayload = (params: {
+  batchId: string;
+  subDepartmentId: number;
+  formSubmissionType?: STFSubmissionType;
+  formState: StaticTestFacilityFormState;
+}): CreateStfBatchFormPayload =>
+  mapFormStateToCreateStfBatchPayload({
+    batchId: params.batchId,
+    subDepartmentId: params.subDepartmentId,
+    formSubmissionType: params.formSubmissionType === "DRAFT" ? "DRAFT" : "SUBMIT",
+    formState: params.formState,
+  });
+
+/**
+ * Creates payload for PUT /api/v1/user/stf/update/{formId}
+ */
+export const mapUpdateSTFBatchPayload = (params: {
+  formId: string;
+  batchId: string;
+  subDepartmentId: number;
+  formSubmissionType?: STFSubmissionType;
+  formState: StaticTestFacilityFormState;
+}): UpdateStfBatchFormPayload =>
+  mapFormStateToUpdateStfBatchPayload({
+    formId: params.formId,
+    batchId: params.batchId,
+    subDepartmentId: params.subDepartmentId,
+    formSubmissionType: params.formSubmissionType === "DRAFT" ? "DRAFT" : "SUBMIT",
+    formState: params.formState,
+  });
+
+/**
+ * Creates payload for POST /api/v1/user/stf/bem-motor/create
+ */
+export const mapCreateBEMPayload = (params: {
+  subDepartmentId: number;
+  bemNo: string;
+  schema: SchemaDocumentV2;
+  formValues: Record<string, unknown>;
+}): CreateBemMotorPayload =>
+  mapFormStateToCreateBemPayload({
+    subDepartmentId: params.subDepartmentId,
+    bemNo: params.bemNo,
+    schema: params.schema,
+    formValues: params.formValues,
+  });
+
+/**
+ * Creates payload for PUT /api/v1/user/stf/bem-motor/update/{bemMotorId}
+ */
+export const mapUpdateBEMPayload = (params: {
+  bemMotorId: string;
+  subDepartmentId: number;
+  bemNo: string;
+  schema: SchemaDocumentV2;
+  formValues: Record<string, unknown>;
+  formSubmissionType?: STFSubmissionType;
+}): UpdateBemMotorPayload =>
+  mapFormStateToUpdateBemPayload({
+    bemMotorId: params.bemMotorId,
+    subDepartmentId: params.subDepartmentId,
+    bemNo: params.bemNo,
+    schema: params.schema,
+    formValues: params.formValues,
+    formSubmissionType: params.formSubmissionType === "DRAFT" ? "DRAFT" : "SUBMIT",
+  });
+
+// ============================================================================
+// STF & BEM Display Transformation Helpers
+// ============================================================================
 
 export type StfMotorDetailView = {
   motorId: string;
@@ -290,5 +447,61 @@ export const mapStfDetailsForDisplay = (
             ? String(root.updatedOn)
             : null,
     motors,
+  };
+};
+
+export const mapBemDetailsForDisplay = (
+  data: Record<string, unknown> | BEMMotorDetailsModel | null | undefined,
+): StfDetailView | null => {
+  if (!data) return null;
+
+  const root = data as Record<string, unknown>;
+  const bemNo = String(root.bemNo ?? root.motorCode ?? "BEM Motor").trim();
+  const rawSections = Array.isArray(root.sections)
+    ? root.sections
+    : (root.staticTestingDetails as Record<string, unknown> | undefined)?.formSections;
+
+  const displaySections = parseStfDisplaySections(Array.isArray(rawSections) ? rawSections : []);
+
+  return {
+    formId: String(root.bemMotorId ?? root.id ?? ""),
+    batchId: "",
+    batchType: "BEM",
+    status: String(
+      root.status ??
+        (root.workflowInsights as Record<string, unknown> | undefined)?.currentStatus ??
+        "",
+    ),
+    createdBy: mapCastingCuringPersonLabel(root.createdBy),
+    createdAt:
+      root.createdAt != null
+        ? String(root.createdAt)
+        : root.createdOn != null
+          ? String(root.createdOn)
+          : null,
+    submittedBy: mapCastingCuringPersonLabel(root.submittedBy),
+    submittedAt:
+      root.submittedAt != null
+        ? String(root.submittedAt)
+        : root.submittedOn != null
+          ? String(root.submittedOn)
+          : null,
+    lastUpdatedBy: mapCastingCuringPersonLabel(root.lastUpdatedBy ?? root.updatedBy),
+    lastUpdatedAt:
+      root.lastUpdatedAt != null
+        ? String(root.lastUpdatedAt)
+        : root.updatedAt != null
+          ? String(root.updatedAt)
+          : root.updatedOn != null
+            ? String(root.updatedOn)
+            : null,
+    motors: [
+      {
+        motorId: bemNo,
+        subType: "BEM",
+        subTypeLabel: "BEM",
+        sections: displaySections,
+      },
+    ],
   };
 };

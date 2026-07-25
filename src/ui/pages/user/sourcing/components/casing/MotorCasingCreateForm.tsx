@@ -21,10 +21,6 @@ import VisualInspectionMediaField from "./VisualInspectionMediaField";
 import StackRow from "../../../../../components/common/StackRow";
 import { STRINGS } from "../../../../../../app/config/strings";
 import {
-  createInitialMechanicalProperties,
-  EPDM_MECH_KEYS,
-  ROCASIN_MECH_KEYS,
-  THERMAL_PROP_KEYS,
   type InsulationType,
   DIM_READING_KEYS,
   type RocketMotorCasingFormData,
@@ -34,13 +30,14 @@ import {
   validateCasingFormStep,
   isCasingIdentificationComplete,
   createEmptyMockTrialSlot,
+  createInitialThermalProperties,
+  createInitialMechanicalProperties,
 } from "../../../../../../data/models/user/RocketMotorCasingFormModel";
 import CasingFormStepNav from "./CasingFormStepNav";
 import RocketMotorCasingMockTrialSchemaPanel from "./RocketMotorCasingMockTrialSchemaPanel";
 import type { useRocketMotorCasingLookups } from "../../../../../../hooks/user/sourcing/useRocketMotorCasingLookups";
 import {
   DateField,
-  Field,
   FieldGrid,
   PropertiesTable,
   ReceiptStatusField,
@@ -52,6 +49,7 @@ import {
   TextFieldField,
 } from "./CasingFormPrimitives";
 import CasingReportUpload from "./CasingReportUpload";
+import rocketMotorCasingController from "@/controllers/user/sourcing/rocketMotorCasingController";
 
 const S = STRINGS.SOURCING.CASING_CREATE;
 const SF = STRINGS.SOURCING.CASING_FORM;
@@ -68,8 +66,7 @@ const DIM_COLUMNS = DIM_READING_KEYS.map((key) => ({
           : S.COL_TR,
 }));
 
-const { rocketLaunch: RocketLaunchRoundedIcon, errorOutline: ErrorOutlineRoundedIcon } =
-  icons.user.sourcing.casingDetailsForm;
+const { rocketLaunch: RocketLaunchRoundedIcon } = icons.user.sourcing.casingDetailsForm;
 
 type Lookups = ReturnType<typeof useRocketMotorCasingLookups>;
 
@@ -114,14 +111,46 @@ const MotorCasingCreateForm = ({
   const patch = (partial: Partial<RocketMotorCasingFormData>) =>
     setForm((prev) => ({ ...prev, ...partial }));
 
-  const onInsulationTypeChange = (type: InsulationType) => {
+  const onInsulationTypeChange = (type: string) => {
+    const next =
+      type === "ROCASIN" || type === "EPDM" ? (type as InsulationType) : ("" as const);
     setForm((prev) => ({
       ...prev,
-      insulationType: type,
-      mechanicalProperties: createInitialMechanicalProperties(type),
+      insulationType: next,
+      ...(next ? {} : { mechanicalProperties: {}, thermalProperties: {}, insulationSpecifications: null }),
     }));
   };
+  useEffect(() => {
+    if (!form.insulationType) return;
 
+    const loadSpecifications = async () => {
+      const response = await rocketMotorCasingController.fetchSpecification(form.insulationType);
+
+      if (response.success) {
+        setForm((prev) => {
+          const spec = response.data;
+          // If the form already has saved mechanical/thermal values, preserve them.
+          const hasMech =
+            prev.mechanicalProperties && Object.keys(prev.mechanicalProperties).length > 0;
+          const hasThermal =
+            prev.thermalProperties && Object.keys(prev.thermalProperties).length > 0;
+
+          return {
+            ...prev,
+            insulationSpecifications: spec,
+            mechanicalProperties: hasMech
+              ? prev.mechanicalProperties
+              : createInitialMechanicalProperties(spec),
+            thermalProperties: hasThermal
+              ? prev.thermalProperties
+              : createInitialThermalProperties(spec),
+          };
+        });
+      }
+    };
+
+    loadSpecifications();
+  }, [form.insulationType]);
   const updateMech = (
     paramKey: string,
     field: "specification" | "reported" | "acemSpec",
@@ -150,7 +179,6 @@ const MotorCasingCreateForm = ({
     }));
   };
 
-  const mechKeys = form.insulationType === "EPDM" ? EPDM_MECH_KEYS : ROCASIN_MECH_KEYS;
   const receiptLabels = { received: S.RECEIVED, notReceived: S.NOT_RECEIVED };
 
   const stageOptions = lookups.motorStages.map((s) => ({
@@ -158,14 +186,25 @@ const MotorCasingCreateForm = ({
     label: `Stage ${s.motorStage}`,
     meta: s.noOfmotors ? `${s.noOfmotors} motors` : undefined,
   }));
-  const resolvedProjectName = useMemo(() => {
-    const match = lookups.projects.find((p) => p.projectId === form.projectId);
-    return match?.projectName || form.projectId;
-  }, [lookups.projects, form.projectId]);
+  const identificationProjects = useMemo(() => {
+    const list = [...lookups.projects];
+    const id = String(form.projectId ?? "").trim();
+    if (id && !list.some((p) => p.projectId === id)) {
+      list.unshift({
+        projectId: id,
+        projectName: String(form.projectName ?? "").trim() || id,
+      });
+    }
+    return list;
+  }, [lookups.projects, form.projectId, form.projectName]);
 
-  const resolvedMotorStageLabel = useMemo(() => {
-    const match = stageOptions.find((s) => s.value === form.motorStageApi);
-    return match?.label || (form.motorStageApi ? `Stage ${form.motorStageApi}` : "");
+  const identificationStageOptions = useMemo(() => {
+    const opts = [...stageOptions];
+    const stage = String(form.motorStageApi ?? "").trim();
+    if (stage && !opts.some((o) => o.value === stage)) {
+      opts.unshift({ value: stage, label: `Stage ${stage}` });
+    }
+    return opts;
   }, [stageOptions, form.motorStageApi]);
 
   const [step, setStep] = useState(0);
@@ -186,7 +225,13 @@ const MotorCasingCreateForm = ({
   const isLastStep = step === CASING_FORM_STEP_COUNT - 1;
   const identificationComplete = isCasingIdentificationComplete(form);
   const canAdvanceFromStep = step !== 0 || identificationComplete;
+  const specifications = form.insulationSpecifications?.specifications ?? [];
 
+  const mechanicalSpec =
+    specifications.find((x) => x.category === "Rubber Mechanical Properties")?.parameters ?? [];
+
+  const thermalSpec =
+    specifications.find((x) => x.category === "Rubber Thermal Properties")?.parameters ?? [];
   const handleStepBack = () => {
     setStepError(null);
     setStep((s) => Math.max(0, s - 1));
@@ -250,14 +295,25 @@ const MotorCasingCreateForm = ({
               {SF.DELETE_CASING}
             </Button>
           ) : null}
-          <Chip
-            icon={<ErrorOutlineRoundedIcon sx={casingTheme.mandatoryChipIcon} />}
-            label={SF.MANDATORY}
-            size="small"
-            sx={casingTheme.mandatoryChip}
-          />
         </Stack>
       </Box>
+
+      <CasingFormStepNav
+        currentStep={step}
+        totalSteps={CASING_FORM_STEP_COUNT}
+        stepLabels={stepLabels}
+        canGoBack={step > 0}
+        canGoNext={!isLastStep && canAdvanceFromStep}
+        isLastStep={isLastStep}
+        stepError={stepError}
+        nextDisabledHint={!canAdvanceFromStep && !isLastStep ? S.IDENTIFICATION_GATE_HINT : null}
+        canNavigateToStep={canNavigateToStep}
+        onStepClick={handleStepClick}
+        onBack={handleStepBack}
+        onNext={handleStepNext}
+        theme={theme}
+        cf={cf}
+      />
 
       {step === 0 && (
         <>
@@ -270,96 +326,62 @@ const MotorCasingCreateForm = ({
             cf={cf}
           >
             <FieldGrid theme={theme} cf={cf}>
-              {lockIdentification ? (
-                <>
-                  <Field label={S.PROJECT} theme={theme}>
-                    <Box
-                      sx={{
-                        px: 1.25,
-                        py: 1,
-                        borderRadius: 1,
-                        border: `1px solid ${theme.palette.border}`,
-                        bgcolor: theme.palette.surface,
-                        opacity: 0.85,
-                      }}
-                    >
-                      <Typography sx={cf.projectOptionName}>
-                        {resolvedProjectName || "—"}
-                      </Typography>
-                      <Typography sx={{ ...cf.projectOptionId, mt: 0.25 }}>
-                        {form.projectId?.trim() || "—"}
-                      </Typography>
-                    </Box>
-                  </Field>
-                  <TextFieldField
-                    label={S.MOTOR_STAGE}
-                    value={resolvedMotorStageLabel}
-                    onChange={() => undefined}
-                    disabled
-                    theme={theme}
-                  />
-                  <TextFieldField
-                    label={S.MOTOR_ID}
-                    value={form.motorId}
-                    onChange={() => undefined}
-                    disabled
-                    theme={theme}
-                  />
-                  {form.motorCasingId ? (
-                    <TextFieldField
-                      label={S.MOTOR_CASING_ID}
-                      value={form.motorCasingId}
-                      onChange={() => undefined}
-                      disabled
-                      theme={theme}
-                    />
-                  ) : null}
-                </>
-              ) : (
-                <>
-                  <ProjectSelectField
-                    label={S.PROJECT}
-                    value={form.projectId}
-                    onChange={(v) => patch({ projectId: v })}
-                    projects={lookups.projects}
-                    loading={lookups.loading}
-                    placeholder={S.SELECT_PROJECT}
-                    theme={theme}
-                    cf={cf}
-                  />
-                  <SelectField
-                    label={S.MOTOR_STAGE}
-                    value={form.motorStageApi}
-                    onChange={(v) =>
-                      patch({
-                        motorStageApi: v,
-                        mockTrial: createEmptyMockTrialSlot(),
-                        dimensionalData: [],
-                      })
-                    }
-                    options={stageOptions}
-                    placeholder={S.SELECT_STAGE}
-                    disabled={lookups.loading || loadingDimensionalParams}
-                    theme={theme}
-                  />
-                  <TextFieldField
-                    label={S.MOTOR_ID}
-                    value={form.motorId}
-                    onChange={(v) => patch({ motorId: v })}
-                    placeholder={S.MOTOR_ID_PH}
-                    theme={theme}
-                  />
-                  {form.motorCasingId ? (
-                    <TextFieldField
-                      label={S.MOTOR_CASING_ID}
-                      value={form.motorCasingId}
-                      onChange={() => undefined}
-                      disabled
-                      theme={theme}
-                    />
-                  ) : null}
-                </>
-              )}
+              <ProjectSelectField
+                label={S.PROJECT}
+                value={form.projectId}
+                onChange={(v) => {
+                  if (lockIdentification) return;
+                  const match = identificationProjects.find((p) => p.projectId === v);
+                  patch({
+                    projectId: v,
+                    projectName: match?.projectName ?? "",
+                  });
+                }}
+                projects={identificationProjects}
+                loading={lookups.loading && !lockIdentification}
+                placeholder={S.SELECT_PROJECT}
+                disabled={lockIdentification}
+                theme={theme}
+                cf={cf}
+              />
+              <SelectField
+                label={S.MOTOR_STAGE}
+                value={form.motorStageApi}
+                onChange={(v) => {
+                  if (lockIdentification) return;
+                  patch({
+                    motorStageApi: v,
+                    mockTrial: createEmptyMockTrialSlot(),
+                    dimensionalData: [],
+                  });
+                }}
+                options={identificationStageOptions}
+                placeholder={S.SELECT_STAGE}
+                disabled={
+                  lockIdentification || lookups.loading || loadingDimensionalParams
+                }
+                theme={theme}
+              />
+              <TextFieldField
+                label={S.MOTOR_ID}
+                value={form.motorId}
+                onChange={(v) => {
+                  if (lockIdentification) return;
+                  patch({ motorId: v });
+                }}
+                placeholder={S.MOTOR_ID_PH}
+                disabled={lockIdentification}
+                theme={theme}
+              />
+              {form.motorCasingId || lockIdentification ? (
+                <TextFieldField
+                  label={S.MOTOR_CASING_ID}
+                  value={form.motorCasingId || "—"}
+                  onChange={() => undefined}
+                  disabled
+                  theme={theme}
+                />
+              ) : null}
             </FieldGrid>
             {loadingDimensionalParams && (
               <Stack direction="row" alignItems="center" spacing={1.5} sx={{ mt: 1.5, py: 0.25 }}>
@@ -397,12 +419,17 @@ const MotorCasingCreateForm = ({
               <SelectField
                 label={S.CASING_TYPE}
                 value={form.casingType}
-                onChange={(v) => patch({ casingType: v as "COMPOSITE" | "METALLIC" })}
+                onChange={(v) =>
+                  patch({
+                    casingType:
+                      v === "COMPOSITE" || v === "METALLIC" ? (v as "COMPOSITE" | "METALLIC") : "",
+                  })
+                }
                 options={[
                   { value: "COMPOSITE", label: S.COMPOSITE },
                   { value: "METALLIC", label: S.METALLIC },
                 ]}
-                placeholder={S.CASING_TYPE}
+                placeholder={S.SELECT_CASING_TYPE}
                 theme={theme}
               />
               <DateField
@@ -437,6 +464,7 @@ const MotorCasingCreateForm = ({
                 theme={theme}
                 receivedLabel={receiptLabels.received}
                 notReceivedLabel={receiptLabels.notReceived}
+                placeholder={S.SELECT_RECEIPT_STATUS}
               />
               <TextFieldField
                 label={S.OBSERVATIONS}
@@ -456,6 +484,7 @@ const MotorCasingCreateForm = ({
                 theme={theme}
                 receivedLabel={receiptLabels.received}
                 notReceivedLabel={receiptLabels.notReceived}
+                placeholder={S.SELECT_GREEN_CARD}
               />
               <TextFieldField
                 label={S.GREEN_CARD_NO}
@@ -498,12 +527,12 @@ const MotorCasingCreateForm = ({
               <SelectField
                 label={S.INSULATION_TYPE}
                 value={form.insulationType}
-                onChange={(v) => onInsulationTypeChange(v as InsulationType)}
+                onChange={onInsulationTypeChange}
                 options={[
                   { value: "ROCASIN", label: S.ROCASIN },
                   { value: "EPDM", label: S.EPDM },
                 ]}
-                placeholder={S.INSULATION_TYPE}
+                placeholder={S.SELECT_INSULATION_TYPE}
                 theme={theme}
               />
               <TextFieldField
@@ -519,6 +548,7 @@ const MotorCasingCreateForm = ({
                 theme={theme}
                 receivedLabel={receiptLabels.received}
                 notReceivedLabel={receiptLabels.notReceived}
+                placeholder={S.SELECT_INSULATION_RECEIPT}
               />
             </FieldGrid>
             <Box sx={{ mt: 1.5, ...cf.compactMediaWrap }}>
@@ -539,90 +569,103 @@ const MotorCasingCreateForm = ({
                 pendingUploadHint={S.PENDING_UPLOAD_HINT}
               />
             </Box>
+            {mechanicalSpec.length > 0 && (
+              <>
+                <Box sx={cf.divider} />
+                <SubsectionTitle cf={cf}>{S.MECH_PROPERTIES}</SubsectionTitle>
+                <PropertiesTable
+                  theme={theme}
+                  columns={[S.COL_PARAMETER, S.COL_SPECIFICATION, S.REPORTED, S.TEST_RESULT_ACEM]}
+                  rows={mechanicalSpec.map((item) => (
+                    <tr key={item.specificationCode}>
+                      <td>{`${item.specificationName} (${item.referenceRange.unit})`}</td>
+                      <td>
+                        <Chip
+                          size="small"
+                          label={`${item.referenceRange.minValue} - ${item.referenceRange.maxValue}`}
+                          sx={theme.workflow.formElements.cellField}
+                        />
+                      </td>
 
-            <Box sx={cf.divider} />
-            <SubsectionTitle cf={cf}>{S.MECH_PROPERTIES}</SubsectionTitle>
-            <PropertiesTable
-              theme={theme}
-              columns={[S.COL_PARAMETER, S.COL_SPECIFICATION, S.REPORTED, S.TEST_RESULT_ACEM]}
-              rows={mechKeys.map((k) => (
-                <tr key={k.paramKey}>
-                  <td>{k.paramName}</td>
-                  <td>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      type="number"
-                      value={form.mechanicalProperties[k.paramKey]?.specification ?? ""}
-                      onChange={(e) => updateMech(k.paramKey, "specification", e.target.value)}
-                      sx={theme.workflow.formElements.cellField}
-                    />
-                  </td>
-                  <td>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      type="number"
-                      value={form.mechanicalProperties[k.paramKey]?.reported ?? ""}
-                      onChange={(e) => updateMech(k.paramKey, "reported", e.target.value)}
-                      sx={theme.workflow.formElements.cellField}
-                    />
-                  </td>
-                  <td>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      type="number"
-                      value={form.mechanicalProperties[k.paramKey]?.acemSpec ?? ""}
-                      onChange={(e) => updateMech(k.paramKey, "acemSpec", e.target.value)}
-                      sx={theme.workflow.formElements.cellField}
-                    />
-                  </td>
-                </tr>
-              ))}
-            />
+                      <td>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          type="number"
+                          value={form.mechanicalProperties[item.specificationCode]?.reported ?? ""}
+                          onChange={(e) =>
+                            updateMech(item.specificationCode, "reported", e.target.value)
+                          }
+                          sx={theme.workflow.formElements.cellField}
+                        />
+                      </td>
 
-            <Box sx={{ mt: 2 }} />
-            <SubsectionTitle cf={cf}>{S.THERMAL_PROPERTIES}</SubsectionTitle>
-            <PropertiesTable
-              theme={theme}
-              columns={[S.COL_PARAMETER, S.COL_SPECIFICATION, S.REPORTED, S.TEST_RESULT_ACEM]}
-              rows={THERMAL_PROP_KEYS.map((k) => (
-                <tr key={k.key}>
-                  <td>{k.label}</td>
-                  <td>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      type="number"
-                      value={form.thermalProperties[k.key]?.specification ?? ""}
-                      onChange={(e) => updateThermal(k.key, "specification", e.target.value)}
-                      sx={theme.workflow.formElements.cellField}
-                    />
-                  </td>
-                  <td>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      type="number"
-                      value={form.thermalProperties[k.key]?.reported ?? ""}
-                      onChange={(e) => updateThermal(k.key, "reported", e.target.value)}
-                      sx={theme.workflow.formElements.cellField}
-                    />
-                  </td>
-                  <td>
-                    <TextField
-                      size="small"
-                      fullWidth
-                      type="number"
-                      value={form.thermalProperties[k.key]?.acemSpec ?? ""}
-                      onChange={(e) => updateThermal(k.key, "acemSpec", e.target.value)}
-                      sx={theme.workflow.formElements.cellField}
-                    />
-                  </td>
-                </tr>
-              ))}
-            />
+                      <td>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          type="number"
+                          value={form.mechanicalProperties[item.specificationCode]?.acemSpec ?? ""}
+                          onChange={(e) =>
+                            updateMech(item.specificationCode, "acemSpec", e.target.value)
+                          }
+                          sx={theme.workflow.formElements.cellField}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                />
+              </>
+            )}
+            {thermalSpec.length > 0 && (
+              <>
+                <Box sx={{ mt: 2 }} />
+                <SubsectionTitle cf={cf}>{S.THERMAL_PROPERTIES}</SubsectionTitle>
+                <PropertiesTable
+                  theme={theme}
+                  columns={[S.COL_PARAMETER, S.COL_SPECIFICATION, S.REPORTED, S.TEST_RESULT_ACEM]}
+                  rows={thermalSpec.map((item) => (
+                    <tr key={item.specificationCode}>
+                      <td>{`${item.specificationName} (${item.referenceRange.unit})`}</td>
+
+                      <td>
+                        <Chip
+                          size="small"
+                          label={`${item.referenceRange.minValue} - ${item.referenceRange.maxValue}`}
+                          sx={theme.workflow.formElements.cellField}
+                        />
+                      </td>
+
+                      <td>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          type="number"
+                          value={form.thermalProperties[item.specificationCode]?.reported ?? ""}
+                          onChange={(e) =>
+                            updateThermal(item.specificationCode, "reported", e.target.value)
+                          }
+                          sx={theme.workflow.formElements.cellField}
+                        />
+                      </td>
+
+                      <td>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          type="number"
+                          value={form.thermalProperties[item.specificationCode]?.acemSpec ?? ""}
+                          onChange={(e) =>
+                            updateThermal(item.specificationCode, "acemSpec", e.target.value)
+                          }
+                          sx={theme.workflow.formElements.cellField}
+                        />
+                      </td>
+                    </tr>
+                  ))}
+                />
+              </>
+            )}
 
             <Box sx={cf.divider} />
             <Box sx={cf.ndtSection}>
@@ -1018,22 +1061,6 @@ const MotorCasingCreateForm = ({
           <CasingReportUpload form={form} patch={patch} theme={theme} />
         </SectionCard>
       )}
-      <CasingFormStepNav
-        currentStep={step}
-        totalSteps={CASING_FORM_STEP_COUNT}
-        stepLabels={stepLabels}
-        canGoBack={step > 0}
-        canGoNext={!isLastStep && canAdvanceFromStep}
-        isLastStep={isLastStep}
-        stepError={stepError}
-        nextDisabledHint={!canAdvanceFromStep && !isLastStep ? S.IDENTIFICATION_GATE_HINT : null}
-        canNavigateToStep={canNavigateToStep}
-        onStepClick={handleStepClick}
-        onBack={handleStepBack}
-        onNext={handleStepNext}
-        theme={theme}
-        cf={cf}
-      />
     </Box>
   );
 };

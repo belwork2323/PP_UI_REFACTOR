@@ -35,8 +35,7 @@ export const useStfApproverHook = () => {
     const match =
       user?.allSubDepartments?.find(
         (item) => item.slugs?.dept === "quality" && item.slugs?.subDept === SUB_DEPARTMENT,
-      ) ??
-      user?.allSubDepartments?.find((item) => item.slugs?.subDept === SUB_DEPARTMENT);
+      ) ?? user?.allSubDepartments?.find((item) => item.slugs?.subDept === SUB_DEPARTMENT);
     return match?.subDepartmentId ?? null;
   }, [user]);
 
@@ -80,9 +79,7 @@ export const useStfApproverHook = () => {
       return;
     }
 
-    setDetailView(
-      mapStfDetailsForDisplay(response.data as unknown as Record<string, unknown>),
-    );
+    setDetailView(mapStfDetailsForDisplay(response.data as unknown as Record<string, unknown>));
   };
 
   const handleCloseDetail = () => {

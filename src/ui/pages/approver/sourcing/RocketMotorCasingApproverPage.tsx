@@ -20,14 +20,13 @@ import {
   TableRow,
   TextField,
 } from "@mui/material";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import dayjs from "dayjs";
 
 import { useThemeStore } from "../../../../app/store/themeStore";
 import { getRocketMotorCasingApproverTheme } from "../../../../app/theme/custom_themes/approver/sourcing/rocketMotorCasingApprover_theme";
 import getApproverSourcingFilterStyles from "./approverSourcingFilterStyles";
+import DateField from "../../../components/common/DateField";
+import { formatToIsoDateInput, formatToUiDate } from "../../../../utils/dateUtils";
+import dayjs from "dayjs";
 import { isApproverActionableStatus } from "../../../../app/theme/approver";
 import { icons } from "../../../../app/theme/icons";
 import useRocketMotorCasingApproverHook, {
@@ -68,7 +67,15 @@ type DetailDialogProps = {
   theme: ReturnType<typeof getRocketMotorCasingApproverTheme>;
 };
 
-const RocketCasingDetailDialog = ({ open, onClose, item, loading, onApprove, onReject, theme }: DetailDialogProps) => {
+const RocketCasingDetailDialog = ({
+  open,
+  onClose,
+  item,
+  loading,
+  onApprove,
+  onReject,
+  theme,
+}: DetailDialogProps) => {
   const [pdfOpen, setPdfOpen] = useState(false);
   const mode = useThemeStore((state) => state.mode);
   const sourcingTheme = useMemo(() => getSourcingTheme(mode), [mode]);
@@ -135,7 +142,10 @@ const RocketCasingDetailDialog = ({ open, onClose, item, loading, onApprove, onR
                   ) : null}
                 </Stack>
                 {block.dimensionalTable?.length ? (
-                  <DimensionalInspectionDetailTable rows={block.dimensionalTable} dt={dimTableTheme} />
+                  <DimensionalInspectionDetailTable
+                    rows={block.dimensionalTable}
+                    dt={dimTableTheme}
+                  />
                 ) : block.mockTrialTables?.length ? (
                   <>
                     {block.rows?.length > 0 ? (
@@ -150,8 +160,12 @@ const RocketCasingDetailDialog = ({ open, onClose, item, loading, onApprove, onR
                           <TableBody>
                             {block.rows.map((row: any, ri: number) => (
                               <TableRow key={ri} sx={theme.dialog.innerRow(ri)}>
-                                <TableCell sx={theme.dialog.innerSpecText}>{row.specification}</TableCell>
-                                <TableCell sx={theme.dialog.innerResultText}>{row.analysedResult || "—"}</TableCell>
+                                <TableCell sx={theme.dialog.innerSpecText}>
+                                  {row.specification}
+                                </TableCell>
+                                <TableCell sx={theme.dialog.innerResultText}>
+                                  {row.analysedResult || "—"}
+                                </TableCell>
                               </TableRow>
                             ))}
                           </TableBody>
@@ -165,11 +179,13 @@ const RocketCasingDetailDialog = ({ open, onClose, item, loading, onApprove, onR
                     <Table size="small">
                       <TableHead>
                         <TableRow>
-                          {(block._columns ?? [
-                            { label: "Section / Parameter" },
-                            { label: "Details" },
-                            { label: "Remarks" },
-                          ]).map((col: any, i: number) => (
+                          {(
+                            block._columns ?? [
+                              { label: "Section / Parameter" },
+                              { label: "Details" },
+                              { label: "Remarks" },
+                            ]
+                          ).map((col: any, i: number) => (
                             <TableCell key={col.label} sx={theme.dialog.innerHeaderCell(i === 0)}>
                               {col.label}
                             </TableCell>
@@ -179,11 +195,17 @@ const RocketCasingDetailDialog = ({ open, onClose, item, loading, onApprove, onR
                       <TableBody>
                         {block.rows.map((row: any, ri: number) => (
                           <TableRow key={ri} sx={theme.dialog.innerRow(ri)}>
-                            <TableCell sx={theme.dialog.innerSpecText}>{row.specification}</TableCell>
-                            <TableCell sx={theme.dialog.innerResultText}>{row.analysedResult || "—"}</TableCell>
-                            <TableCell sx={theme.dialog.innerRemarksText}>
-                              {row.remarks?.trim() ? row.remarks : "—"}
+                            <TableCell sx={theme.dialog.innerSpecText}>
+                              {row.specification}
                             </TableCell>
+                            <TableCell sx={theme.dialog.innerResultText}>
+                              {row.analysedResult || "—"}
+                            </TableCell>
+                            {row.remarks && (
+                              <TableCell sx={theme.dialog.innerRemarksText}>
+                                {row.remarks?.trim() ? row.remarks : "—"}
+                              </TableCell>
+                            )}
                           </TableRow>
                         ))}
                       </TableBody>
@@ -195,7 +217,9 @@ const RocketCasingDetailDialog = ({ open, onClose, item, loading, onApprove, onR
               </Box>
             ))
           ) : (
-            <Typography sx={theme.dialog.emptyText}>No casing details available for this form.</Typography>
+            <Typography sx={theme.dialog.emptyText}>
+              No casing details available for this form.
+            </Typography>
           )}
         </DialogContent>
 
@@ -496,32 +520,20 @@ const RocketMotorApproverPage = () => {
           ))}
         </TextField>
 
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <DatePicker
-            label={BL.FILTERS_FROM_DATE}
-            format="YYYY-MM-DD"
-            value={draftFrom ? dayjs(draftFrom) : null}
-            onChange={(value) => setDraftFrom(value && value.isValid() ? value.format("YYYY-MM-DD") : "")}
-            slotProps={{
-              textField: {
-                size: "small",
-                sx: filterStyles.fieldDate,
-              },
-            }}
-          />
-          <DatePicker
-            label={BL.FILTERS_TO_DATE}
-            format="YYYY-MM-DD"
-            value={draftTo ? dayjs(draftTo) : null}
-            onChange={(value) => setDraftTo(value && value.isValid() ? value.format("YYYY-MM-DD") : "")}
-            slotProps={{
-              textField: {
-                size: "small",
-                sx: filterStyles.fieldDate,
-              },
-            }}
-          />
-        </LocalizationProvider>
+        <DateField
+          label={BL.FILTERS_FROM_DATE}
+          value={formatToUiDate(draftFrom)}
+          onChange={(value) => setDraftFrom(formatToIsoDateInput(value))}
+          compact
+          sx={filterStyles.fieldDate}
+        />
+        <DateField
+          label={BL.FILTERS_TO_DATE}
+          value={formatToUiDate(draftTo)}
+          onChange={(value) => setDraftTo(formatToIsoDateInput(value))}
+          compact
+          sx={filterStyles.fieldDate}
+        />
       </Stack>
 
       <Stack direction="row" justifyContent="flex-end" spacing={1}>
@@ -603,21 +615,31 @@ const RocketMotorApproverPage = () => {
                         {header}
                       </TableCell>
                     ))}
-                    <TableCell sx={{ ...theme.table.headerCell, textAlign: "center" }}>Action</TableCell>
+                    <TableCell sx={{ ...theme.table.headerCell, textAlign: "center" }}>
+                      Action
+                    </TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {filtered.map((row: any, idx: number) => (
-                    <TableRow key={row.motorCasingId ?? row.id ?? row.formId ?? idx} sx={theme.table.row(idx)}>
+                    <TableRow
+                      key={row.motorCasingId ?? row.id ?? row.formId ?? idx}
+                      sx={theme.table.row(idx)}
+                    >
                       <TableCell sx={theme.table.bodyCell}>
-                        <Typography sx={theme.table.batchIdText}>{row.motorCasingId ?? row.batchId}</Typography>
+                        <Typography sx={theme.table.batchIdText}>
+                          {row.motorCasingId ?? row.batchId}
+                        </Typography>
                       </TableCell>
                       <TableCell sx={theme.table.bodyCell}>
                         <Typography sx={theme.table.subtleText}>{row.projectId ?? "—"}</Typography>
                       </TableCell>
                       <TableCell sx={theme.table.bodyCell}>
                         <Chip
-                          label={row.motorStageLabel ?? formatMotorStageLabel(row.motorStage ?? row.motorType)}
+                          label={
+                            row.motorStageLabel ??
+                            formatMotorStageLabel(row.motorStage ?? row.motorType)
+                          }
                           size="small"
                           sx={theme.chips.type}
                         />
@@ -629,7 +651,11 @@ const RocketMotorApproverPage = () => {
                         <Chip label={row.casingType ?? "—"} size="small" sx={theme.chips.type} />
                       </TableCell>
                       <TableCell sx={theme.table.bodyCell}>
-                        <Chip label={row.insulationType ?? "—"} size="small" sx={theme.chips.type} />
+                        <Chip
+                          label={row.insulationType ?? "—"}
+                          size="small"
+                          sx={theme.chips.type}
+                        />
                       </TableCell>
                       <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.dateText }}>
                         {formatListDate(row.receivingDate)}
@@ -639,7 +665,11 @@ const RocketMotorApproverPage = () => {
                         {formatListDate(row.createdOn)}
                       </TableCell>
                       <TableCell sx={theme.table.bodyCell}>
-                        <Chip label={row.status} size="small" sx={theme.chips.status(statusMeta[row.status])} />
+                        <Chip
+                          label={row.status}
+                          size="small"
+                          sx={theme.chips.status(statusMeta[row.status])}
+                        />
                       </TableCell>
                       <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.actionCell }}>
                         <Button

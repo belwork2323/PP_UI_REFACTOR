@@ -6,7 +6,7 @@
   "data": {
     "meta": {
       "title": "Case Preparation",
-      "description": "Case preparation activities before casting operation"
+      "description": "Case preparation activities for a single motor before casting operation"
     },
     "ui": {
       "layout": "flat",
@@ -14,7 +14,10 @@
       "sectionVariant": "card"
     },
     "context": {
-      "batchType": "MAIN_BATCH"
+      "batchType": "MAIN_BATCH",
+      "batchId": "{{batchId}}",
+      "motorId": "{{motorId}}",
+      "subDepartmentId": "{{subDepartmentId}}"
     },
     "sections": [
       {
@@ -176,7 +179,7 @@
         "children": [
           {
             "type": "group",
-            "id": "bellowBonding",
+            "id": "bellowBondingDetails",
             "ui": {
               "direction": "column",
               "wrap": false,
@@ -185,119 +188,73 @@
             "children": [
               {
                 "type": "display",
-                "id": "adhesiveDetails",
+                "id": "adhesiveDetailsHeading",
                 "displayType": "heading",
                 "label": "Adhesive Details",
                 "value": ""
               },
               {
-                "type": "group",
-                "id": "heBellowDimensionGroup",
-                "ui": {
-                  "direction": "column",
-                  "wrap": false,
-                  "gap": "sm"
-                },
-                "children": [
-                  {
-                    "type": "display",
-                    "id": "heBellowDimensionHeading",
-                    "displayType": "heading",
-                    "label": "HE Bellow Dimension",
-                    "value": ""
-                  },
-                  {
-                    "type": "field",
-                    "id": "heBellowDimension",
-                    "fieldType": "datetime",
-                    "label": "Motor Pasting Date & Time",
-                    "ui": {
-                      "maxWidth": "280px"
-                    }
-                  }
-                ]
+                "type": "field",
+                "id": "adhesiveDetails",
+                "fieldType": "text",
+                "label": "Adhesive Details"
               },
               {
-                "type": "group",
-                "id": "neBellowDimensionGroup",
-                "ui": {
-                  "direction": "column",
-                  "wrap": false,
-                  "gap": "sm"
-                },
-                "children": [
-                  {
-                    "type": "display",
-                    "id": "neBellowDimensionHeading",
-                    "displayType": "heading",
-                    "label": "NE Bellow Dimension",
-                    "value": ""
-                  },
-                  {
-                    "type": "field",
-                    "id": "neBellowDimension",
-                    "fieldType": "datetime",
-                    "label": "Motor Pasting Date & Time",
-                    "ui": {
-                      "maxWidth": "280px"
-                    }
-                  }
-                ]
+                "type": "field",
+                "id": "heBellowDimension",
+                "fieldType": "text",
+                "label": "HE Bellow Dimension"
               },
               {
-                "type": "group",
-                "id": "spacerDetails",
+                "type": "field",
+                "id": "heMotorPastingDateTime",
+                "fieldType": "datetime",
+                "label": "HE Pasting Date & Time",
                 "ui": {
-                  "direction": "column",
-                  "wrap": false,
-                  "gap": "sm"
-                },
-                "children": [
-                  {
-                    "type": "display",
-                    "id": "spacerDetailsHeading",
-                    "displayType": "heading",
-                    "label": "Spacer Details",
-                    "value": ""
-                  },
-                  {
-                    "type": "field",
-                    "id": "numberOfSpacers",
-                    "fieldType": "number",
-                    "label": "No. of Spacers",
-                    "ui": {
-                      "maxWidth": "160px"
-                    }
-                  }
-                ]
+                  "maxWidth": "300px"
+                }
               },
               {
-                "type": "group",
+                "type": "field",
+                "id": "neBellowDimension",
+                "fieldType": "text",
+                "label": "NE Bellow Dimension"
+              },
+              {
+                "type": "field",
+                "id": "neMotorPastingDateTime",
+                "fieldType": "datetime",
+                "label": "NE Pasting Date & Time",
+                "ui": {
+                  "maxWidth": "300px"
+                }
+              },
+              {
+                "type": "field",
+                "id": "numberOfSpacers",
+                "fieldType": "number",
+                "label": "No. of Spacers",
+                "ui": {
+                  "maxWidth": "200px"
+                }
+              },
+              {
+                "type": "field",
                 "id": "pastingDetails",
+                "fieldType": "text",
+                "label": "Pasting Details"
+              },
+              {
+                "type": "field",
+                "id": "remarks",
+                "fieldType": "textarea",
+                "label": "Remarks",
                 "ui": {
-                  "direction": "column",
-                  "wrap": false,
-                  "gap": "sm"
-                },
-                "children": [
-                  {
-                    "type": "display",
-                    "id": "pastingDetailsHeading",
-                    "displayType": "heading",
-                    "label": "Pasting Details",
-                    "value": ""
+                  "colSpan": {
+                    "xs": 12
                   },
-                  {
-                    "type": "field",
-                    "id": "remarks",
-                    "fieldType": "textarea",
-                    "label": "Remarks",
-                    "ui": {
-                      "colSpan": { "xs": 12 },
-                      "flex": "1 1 100%"
-                    }
-                  }
-                ]
+                  "flex": "1 1 100%"
+                }
               }
             ]
           }
@@ -308,51 +265,49 @@
         "title": "TCE Cleaning",
         "children": [
           {
-            "type": "table",
-            "id": "tceCleaning",
-            "title": "TCE Cleaning",
-            "rows": {
-              "allowAdd": false,
-              "allowDelete": false,
-              "autoIncrementKey": "SR_NO",
-              "defaultCount": 3,
-              "presetRows": [
-                {
-                  "readonly": true,
-                  "parameter": "Start Time",
-                  "value__fieldType": "time"
-                },
-                {
-                  "readonly": true,
-                  "parameter": "End Time",
-                  "value__fieldType": "time"
-                },
-                {
-                  "readonly": true,
-                  "parameter": "Solvent Used",
-                  "value__fieldType": "text"
-                }
-              ]
+            "type": "group",
+            "id": "tceCleaningDetails",
+            "ui": {
+              "direction": "column",
+              "wrap": false,
+              "gap": "md"
             },
-            "columns": [
+            "children": [
               {
-                "type": "column",
-                "id": "parameter",
-                "fieldType": "text",
-                "label": "Parameter",
-                "readonly": true
+                "type": "field",
+                "id": "tceCleaningDateTime",
+                "fieldType": "datetime",
+                "label": "TCE Cleaning Date & Time",
+                "ui": {
+                  "maxWidth": "300px"
+                }
               },
               {
-                "type": "column",
-                "id": "value",
-                "fieldType": "dynamic",
-                "label": "Value"
+                "type": "field",
+                "id": "solventUsedQtyKg",
+                "fieldType": "number",
+                "label": "Solvent Used Qty (KG)",
+                "ui": {
+                  "maxWidth": "200px"
+                }
               },
               {
-                "type": "column",
-                "id": "remarks",
+                "type": "field",
+                "id": "observation",
                 "fieldType": "textarea",
-                "label": "Remarks"
+                "label": "Observation",
+                "ui": {
+                  "colSpan": {
+                    "xs": 12
+                  },
+                  "flex": "1 1 100%"
+                }
+              },
+              {
+                "type": "field",
+                "id": "testReport",
+                "fieldType": "file",
+                "label": "Upload Test Report"
               }
             ]
           }
@@ -496,6 +451,99 @@
             }
           },
           {
+            "type": "display",
+            "id": "temperatureDurationHeading",
+            "displayType": "heading",
+            "label": "Temperature Duration",
+            "value": "",
+            "visibleWhen": {
+              "when": [
+                {
+                  "field": "preHeatingRecipe",
+                  "op": "NOT_EMPTY"
+                }
+              ],
+              "logic": "AND"
+            }
+          },
+          {
+            "type": "table",
+            "id": "temperatureDuration",
+            "title": "Temperature Duration",
+            "visibleWhen": {
+              "logic": "OR",
+              "when": [
+                {
+                  "field": "preHeatingRecipe",
+                  "op": "IN",
+                  "value": [
+                    "85_90C_6HR_10HR_VACUUM",
+                    "105C_8HR"
+                  ]
+                },
+                {
+                  "logic": "AND",
+                  "when": [
+                    {
+                      "field": "preHeatingRecipe",
+                      "op": "EQUAL",
+                      "value": "OTHERS"
+                    },
+                    {
+                      "field": "otherDuration",
+                      "op": "NOT_EMPTY"
+                    }
+                  ]
+                }
+              ]
+            },
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "SR_NO",
+              "defaultCount": 0,
+              "max": 12,
+              "rowGenerationCount": {
+                "countField": "otherDuration",
+                "countByFieldValue": {
+                  "field": "preHeatingRecipe",
+                  "values": {
+                    "85_90C_6HR_10HR_VACUUM": 6,
+                    "105C_8HR": 8
+                  }
+                },
+                "labelTemplate": "Temperature @ {n} Hour",
+                "labelColumn": "parameter",
+                "rowDefaults": {
+                  "value__fieldType": "number"
+                },
+                "min": 0,
+                "max": 12
+              }
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "parameter",
+                "fieldType": "text",
+                "label": "Parameter",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "value",
+                "fieldType": "dynamic",
+                "label": "Value"
+              },
+              {
+                "type": "column",
+                "id": "remarks",
+                "fieldType": "textarea",
+                "label": "Remarks"
+              }
+            ]
+          },
+          {
             "type": "table",
             "id": "preHeatingMonitoring",
             "title": "Pre-heating Monitoring",
@@ -503,7 +551,7 @@
               "allowAdd": false,
               "allowDelete": false,
               "autoIncrementKey": "SR_NO",
-              "defaultCount": 7,
+              "defaultCount": 4,
               "presetRows": [
                 {
                   "readonly": true,
@@ -514,21 +562,6 @@
                   "readonly": true,
                   "parameter": "Cycle Start Time",
                   "value__fieldType": "time"
-                },
-                {
-                  "readonly": true,
-                  "parameter": "Temperature @ 1 Hour",
-                  "value__fieldType": "number"
-                },
-                {
-                  "readonly": true,
-                  "parameter": "Temperature @ 2 Hour",
-                  "value__fieldType": "number"
-                },
-                {
-                  "readonly": true,
-                  "parameter": "Temperature @ 10 Hour",
-                  "value__fieldType": "number"
                 },
                 {
                   "readonly": true,
@@ -597,8 +630,28 @@
                     {
                       "label": "HEMCOAT-3L-M",
                       "value": "HEMCOAT_3L_M"
+                    },
+                    {
+                      "label": "Others",
+                      "value": "OTHERS"
                     }
                   ]
+                }
+              },
+              {
+                "type": "field",
+                "id": "otherLinerType",
+                "fieldType": "text",
+                "label": "Other Liner Type",
+                "visibleWhen": {
+                  "when": [
+                    {
+                      "field": "linerType",
+                      "op": "EQUAL",
+                      "value": "OTHERS"
+                    }
+                  ],
+                  "logic": "AND"
                 }
               },
               {
@@ -616,7 +669,21 @@
                     "type": "field",
                     "id": "batchSize",
                     "fieldType": "number",
-                    "label": "Batch Size"
+                    "label": "Batch Size",
+                    "readonly": true,
+                    "populateFromApi": {
+                      "dataSource": {
+                        "type": "api",
+                        "api": {
+                          "endpoint": "/api/v1/admin/batch/details",
+                          "method": "POST",
+                          "requestBody": {
+                            "batchId": "{{batchId}}"
+                          },
+                          "responsePath": "data.batch.identificationSheet.batchSize"
+                        }
+                      }
+                    }
                   }
                 ]
               },
@@ -625,9 +692,49 @@
                 "id": "premixIngredients",
                 "title": "Premix",
                 "rows": {
-                  "allowAdd": true,
-                  "allowDelete": true,
-                  "autoIncrementKey": "srNo"
+                  "allowAdd": false,
+                  "allowDelete": false,
+                  "autoIncrementKey": "srNo",
+                  "populateFromApi": {
+                    "dataSource": {
+                      "type": "api",
+                      "api": {
+                        "endpoint": "/api/v1/admin/batch/details",
+                        "method": "POST",
+                        "requestBody": {
+                          "batchId": "{{batchId}}"
+                        },
+                        "responsePath": "data.batch.identificationSheet.materials"
+                      }
+                    },
+                    "fieldMappings": [
+                      {
+                        "sourceField": "materialCode",
+                        "targetColumn": "ingredient"
+                      },
+                      {
+                        "sourceField": "materialName",
+                        "targetColumn": "materialName"
+                      },
+                      {
+                        "sourceField": "requiredComposition",
+                        "targetColumn": "partsByWeight"
+                      },
+                      {
+                        "sourceField": "lotId",
+                        "targetColumn": "mfgLot"
+                      },
+                      {
+                        "sourceField": "quantityPerPremix",
+                        "targetColumn": "quantityTaken"
+                      }
+                    ],
+                    "readonlyColumns": [
+                      "ingredient",
+                      "materialName",
+                      "mfgLot"
+                    ]
+                  }
                 },
                 "columns": [
                   {
@@ -639,39 +746,24 @@
                   },
                   {
                     "type": "column",
+                    "id": "materialName",
+                    "fieldType": "text",
+                    "label": "Material Name",
+                    "readonly": true
+                  },
+                  {
+                    "type": "column",
                     "id": "ingredient",
-                    "fieldType": "dropdown",
-                    "label": "Ingredient",
-                    "dataSource": {
-                      "type": "api",
-                      "api": {
-                        "endpoint": "/api/v1/user/subdepartment/materials-list",
-                        "method": "POST",
-                        "requestBody": {
-                          "materialType": "BOTH"
-                        },
-                        "displayKey": "materialName",
-                        "valueKey": "materialCode"
-                      }
-                    }
+                    "fieldType": "text",
+                    "label": "Material Code",
+                    "readonly": true
                   },
                   {
                     "type": "column",
                     "id": "mfgLot",
-                    "fieldType": "dropdown",
+                    "fieldType": "text",
                     "label": "Mfg. Lot",
-                    "dataSource": {
-                      "type": "api",
-                      "api": {
-                        "endpoint": "/api/v1/user/subdepartment/material-lots",
-                        "method": "POST",
-                        "requestBody": {
-                          "batchId": "{{batchId}}"
-                        },
-                        "displayKey": "lotId",
-                        "valueKey": "lotId"
-                      }
-                    }
+                    "readonly": true
                   },
                   {
                     "type": "column",
@@ -698,9 +790,49 @@
                 "id": "finalMixIngredients",
                 "title": "Final Mix",
                 "rows": {
-                  "allowAdd": true,
-                  "allowDelete": true,
-                  "autoIncrementKey": "srNo"
+                  "allowAdd": false,
+                  "allowDelete": false,
+                  "autoIncrementKey": "srNo",
+                  "populateFromApi": {
+                    "dataSource": {
+                      "type": "api",
+                      "api": {
+                        "endpoint": "/api/v1/admin/batch/details",
+                        "method": "POST",
+                        "requestBody": {
+                          "batchId": "{{batchId}}"
+                        },
+                        "responsePath": "data.batch.identificationSheet.materials"
+                      }
+                    },
+                    "fieldMappings": [
+                      {
+                        "sourceField": "materialCode",
+                        "targetColumn": "ingredient"
+                      },
+                      {
+                        "sourceField": "materialName",
+                        "targetColumn": "materialName"
+                      },
+                      {
+                        "sourceField": "requiredComposition",
+                        "targetColumn": "partsByWeight"
+                      },
+                      {
+                        "sourceField": "lotId",
+                        "targetColumn": "mfgLot"
+                      },
+                      {
+                        "sourceField": "quantityPerPremix",
+                        "targetColumn": "quantityTaken"
+                      }
+                    ],
+                    "readonlyColumns": [
+                      "ingredient",
+                      "materialName",
+                      "mfgLot"
+                    ]
+                  }
                 },
                 "columns": [
                   {
@@ -712,39 +844,24 @@
                   },
                   {
                     "type": "column",
+                    "id": "materialName",
+                    "fieldType": "text",
+                    "label": "Material Name",
+                    "readonly": true
+                  },
+                  {
+                    "type": "column",
                     "id": "ingredient",
-                    "fieldType": "dropdown",
-                    "label": "Ingredient",
-                    "dataSource": {
-                      "type": "api",
-                      "api": {
-                        "endpoint": "/api/v1/user/subdepartment/materials-list",
-                        "method": "POST",
-                        "requestBody": {
-                          "materialType": "BOTH"
-                        },
-                        "displayKey": "materialName",
-                        "valueKey": "materialCode"
-                      }
-                    }
+                    "fieldType": "text",
+                    "label": "Material Code",
+                    "readonly": true
                   },
                   {
                     "type": "column",
                     "id": "mfgLot",
-                    "fieldType": "dropdown",
+                    "fieldType": "text",
                     "label": "Mfg. Lot",
-                    "dataSource": {
-                      "type": "api",
-                      "api": {
-                        "endpoint": "/api/v1/user/subdepartment/material-lots",
-                        "method": "POST",
-                        "requestBody": {
-                          "batchId": "{{batchId}}"
-                        },
-                        "displayKey": "lotId",
-                        "valueKey": "lotId"
-                      }
-                    }
+                    "readonly": true
                   },
                   {
                     "type": "column",
@@ -754,9 +871,15 @@
                   },
                   {
                     "type": "column",
-                    "id": "quantity",
+                    "id": "quantityTaken",
                     "fieldType": "decimal",
-                    "label": "Quantity"
+                    "label": "Quantity Taken (g)"
+                  },
+                  {
+                    "type": "column",
+                    "id": "totalQuantity",
+                    "fieldType": "decimal",
+                    "label": "Total Quantity (g)"
                   }
                 ]
               },
@@ -854,26 +977,26 @@
                       "parameter": "Oven Out Time",
                       "value__fieldType": "time"
                     },
-                {
-                  "readonly": true,
-                  "parameter": "Rocket Motor Insulation Temp",
-                  "value__fieldType": "number"
-                },
-                {
-                  "readonly": true,
-                  "parameter": "Rocket Motor RPM",
-                  "value__fieldType": "number"
-                },
-                {
-                  "readonly": true,
-                  "parameter": "Boom Speed",
-                  "value__fieldType": "number"
-                },
-                {
-                  "readonly": true,
-                  "parameter": "Start Temperature",
-                  "value__fieldType": "number"
-                },
+                    {
+                      "readonly": true,
+                      "parameter": "Rocket Motor Insulation Temp",
+                      "value__fieldType": "number"
+                    },
+                    {
+                      "readonly": true,
+                      "parameter": "Rocket Motor RPM",
+                      "value__fieldType": "number"
+                    },
+                    {
+                      "readonly": true,
+                      "parameter": "Boom Speed",
+                      "value__fieldType": "number"
+                    },
+                    {
+                      "readonly": true,
+                      "parameter": "Start Temperature",
+                      "value__fieldType": "number"
+                    },
                     {
                       "readonly": true,
                       "parameter": "Start Time",
@@ -884,16 +1007,16 @@
                       "parameter": "End Time",
                       "value__fieldType": "time"
                     },
-                {
-                  "readonly": true,
-                  "parameter": "Number of Passes",
-                  "value__fieldType": "number"
-                },
-                {
-                  "readonly": true,
-                  "parameter": "Liner Applied (w/o DCM)",
-                  "value__fieldType": "text"
-                },
+                    {
+                      "readonly": true,
+                      "parameter": "Number of Passes",
+                      "value__fieldType": "number"
+                    },
+                    {
+                      "readonly": true,
+                      "parameter": "Liner Applied (w/o DCM)",
+                      "value__fieldType": "text"
+                    },
                     {
                       "readonly": true,
                       "parameter": "Rotation Start Time",
@@ -904,11 +1027,11 @@
                       "parameter": "Rotation End Time",
                       "value__fieldType": "time"
                     },
-                {
-                  "readonly": true,
-                  "parameter": "Storage Temperature",
-                  "value__fieldType": "number"
-                }
+                    {
+                      "readonly": true,
+                      "parameter": "Storage Temperature",
+                      "value__fieldType": "number"
+                    }
                   ]
                 },
                 "columns": [
@@ -943,24 +1066,48 @@
         "children": [
           {
             "type": "table",
-            "id": "dispatchToCasting",
-            "title": "Dispatch To Casting",
+            "id": "dispatchVisualObservations",
             "rows": {
               "allowAdd": false,
               "allowDelete": false,
               "autoIncrementKey": "SR_NO",
-              "defaultCount": 6,
+              "defaultCount": 2,
               "presetRows": [
                 {
                   "readonly": true,
-                  "parameter": "Liner Coated Rubber Surface Visual Observation",
-                  "value__fieldType": "text"
+                  "parameter": "Liner Coated Rubber Surface Visual Observation"
                 },
                 {
                   "readonly": true,
-                  "parameter": "Observations Over Loose Flap / Bellow Bonding",
-                  "value__fieldType": "text"
-                },
+                  "parameter": "Observations Over Loose Flap / Bellow Bonding"
+                }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "parameter",
+                "fieldType": "text",
+                "label": "Operation",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "observations",
+                "fieldType": "textarea",
+                "label": "Observations"
+              }
+            ]
+          },
+          {
+            "type": "table",
+            "id": "dispatchToCastingDetails",
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "SR_NO",
+              "defaultCount": 4,
+              "presetRows": [
                 {
                   "readonly": true,
                   "parameter": "Puncturing at HE (Nos)",

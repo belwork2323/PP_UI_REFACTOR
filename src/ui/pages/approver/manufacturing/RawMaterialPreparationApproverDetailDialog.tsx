@@ -3,20 +3,16 @@ import { Box, Button, Dialog, DialogContent, IconButton, Stack, Typography } fro
 import { useThemeStore } from "../../../../app/store/themeStore";
 import getManufacturingTheme from "../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import getRawMaterialPreparationApproverTheme from "../../../../app/theme/custom_themes/approver/manufacturing/rawMaterialPreparationApprover_theme";
-import { isApproverActionableStatus } from "../../../../app/theme/approver";
 import { icons } from "../../../../app/theme/icons";
 import { ReportPreviewDialog } from "../components/ReportPdf";
-import RawMaterialPreparationDetailsContent from "../../user/manufacturing/RawMaterial/components/RawMaterialPreparationDetailsContent";
+import RawMaterialPreparationApproverReviewContent from "./RawMaterialPreparationApproverReviewContent";
 import type {
   RawMaterialPrepApproverDetailView,
   RawMaterialPrepWeightmentSheet,
 } from "../../../../data/models/user/RawMaterialPreparationModel";
 
 const {
-  approved: CheckCircleRoundedIcon,
-  rejected: CancelRoundedIcon,
   close: CloseRoundedIcon,
-  build: BuildRoundedIcon,
   pdf: PictureAsPdfRoundedIcon,
 } = icons.approver.manufacturing.rawMaterialPreparation;
 
@@ -34,8 +30,13 @@ type RawMaterialPreparationApproverDetailDialogProps = {
   onClose: () => void;
   item: RawMaterialPreparationApproverDetailItem | null;
   loading: boolean;
+  activePremixNo?: number | null;
+  onActivePremixChange?: (premixNo: number) => void;
   onApprove: (item: RawMaterialPreparationApproverDetailItem) => void;
   onReject: (item: RawMaterialPreparationApproverDetailItem) => void;
+  onApproveForm?: (item: RawMaterialPreparationApproverDetailItem) => void;
+  onRejectForm?: (item: RawMaterialPreparationApproverDetailItem) => void;
+  actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
 
@@ -44,8 +45,13 @@ const RawMaterialPreparationApproverDetailDialog = ({
   onClose,
   item,
   loading,
+  activePremixNo = null,
+  onActivePremixChange,
   onApprove,
   onReject,
+  onApproveForm,
+  onRejectForm,
+  actionLoading = false,
   theme,
 }: RawMaterialPreparationApproverDetailDialogProps) => {
   const [pdfOpen, setPdfOpen] = useState(false);
@@ -54,7 +60,6 @@ const RawMaterialPreparationApproverDetailDialog = ({
 
   if (!item) return null;
 
-  const canApproveOrReject = isApproverActionableStatus(item.status);
   const detailView = item.detailView ?? null;
   const weightmentSheet = item.weightmentSheet ?? {
     mixerBuildingNumber: "",
@@ -68,18 +73,21 @@ const RawMaterialPreparationApproverDetailDialog = ({
 
   return (
     <>
-      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: theme.dialog.paper }}>
+      <Dialog
+        open={open}
+        onClose={onClose}
+        maxWidth="lg"
+        fullWidth
+        PaperProps={{ sx: theme.dialog.paper }}
+      >
         <Box sx={theme.dialog.header}>
-          <Stack direction="row" alignItems="center" gap={1.5}>
-            <BuildRoundedIcon sx={theme.dialog.headerIcon} />
-            <Box>
-              <Typography sx={theme.dialog.headerTitle}>Raw Material Preparation Submission</Typography>
-              <Typography sx={theme.dialog.headerSubtitle}>
-                {item.batchId}
-                {item.motorId ? ` · ${item.motorId}` : ""}
-              </Typography>
-            </Box>
-          </Stack>
+          <Box>
+            <Typography sx={theme.dialog.headerTitle}>Raw Material Preparation Submission</Typography>
+            <Typography sx={theme.dialog.headerSubtitle}>
+              {item.batchId}
+              {item.motorId ? ` · ${item.motorId}` : ""}
+            </Typography>
+          </Box>
           <Stack direction="row" gap={1} alignItems="center">
             <Button
               size="small"
@@ -97,42 +105,31 @@ const RawMaterialPreparationApproverDetailDialog = ({
         </Box>
 
         <DialogContent sx={theme.dialog.content}>
-          <RawMaterialPreparationDetailsContent
+          <RawMaterialPreparationApproverReviewContent
             detailView={detailView}
             weightmentSheet={weightmentSheet}
-            row={item}
             loading={loading}
-            theme={manufacturingTheme}
-            resetPremixOnFormId={item.formId ?? null}
+            activePremixNo={activePremixNo}
+            onActivePremixChange={onActivePremixChange ?? (() => undefined)}
+            onApprove={() => onApprove(item)}
+            onReject={() => onReject(item)}
+            onApproveForm={onApproveForm ? () => onApproveForm(item) : undefined}
+            onRejectForm={onRejectForm ? () => onRejectForm(item) : undefined}
+            actionLoading={actionLoading}
+            manufacturingTheme={manufacturingTheme}
+            approverTheme={theme}
           />
         </DialogContent>
 
         <Box sx={theme.dialog.footer}>
-          <Button variant="outlined" onClick={onClose} disabled={loading} sx={theme.dialog.closeAction}>
+          <Button
+            variant="outlined"
+            onClick={onClose}
+            disabled={loading || actionLoading}
+            sx={theme.dialog.closeAction}
+          >
             Close
           </Button>
-          {canApproveOrReject ? (
-            <>
-              <Button
-                variant="contained"
-                startIcon={<CancelRoundedIcon />}
-                onClick={() => onReject(item)}
-                disabled={loading}
-                sx={theme.dialog.rejectAction}
-              >
-                Reject
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<CheckCircleRoundedIcon />}
-                onClick={() => onApprove(item)}
-                disabled={loading}
-                sx={theme.dialog.approveAction}
-              >
-                Approve
-              </Button>
-            </>
-          ) : null}
         </Box>
       </Dialog>
 

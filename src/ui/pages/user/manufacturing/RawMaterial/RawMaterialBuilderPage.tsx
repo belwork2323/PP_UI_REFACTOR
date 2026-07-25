@@ -1,181 +1,236 @@
 // src/ui/pages/user/manufacturing/RawMaterial/RawMaterialBuilderPage.tsx
 
 import React, { useEffect, useMemo, useState } from "react";
-import { Box, Button, Stack, Typography } from "@mui/material";
-import RawMaterialPrepFlowBar from "./RawMaterialPrepFlowBar";
+import { Box, Button, Chip, Stack, Typography } from "@mui/material";
 import RawMaterialPremixSchemaPanel from "./RawMaterialPremixSchemaPanel";
 import RawMaterialWeightmentSheetPanel from "./RawMaterialWeightmentSheetPanel";
-import RemoveProcessButton from "../../../../components/common/RemoveProcessButton";
+import FlowBarDateField from "../../../../components/common/FlowBarDateField";
+import UserWorkflowStepPager, {
+  UserWorkflowNavPanel,
+  UserWorkflowTabNav,
+  type UserWorkflowNavTab,
+} from "../../../../components/custom/UserWorkflowStepPager";
 import { STRINGS } from "../../../../../app/config/strings";
 import { icons } from "../../../../../app/theme/icons";
-import { DEFAULT_SELECTED_PROCESSES, materialRequiresGradeSelection } from "../../../../../hooks/user/manufacturing/rawMaterialPrepFlowConfig";
-import { SOLID_PREP_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/rawMaterialPreparation_theme";
-import type { RawMaterialPrepPremixSession } from "../../../../../data/models/user/RawMaterialPreparationModel";
+import { createEmptyPremixSchemaSession, type PremixStatusMeta } from "../../../../../data/models/user/RawMaterialPreparationModel";
+import PremixStatusChip from "./components/PremixStatusChip";
+import FinalApprovalPremixDialog, {
+  areAllPremixesApproved,
+  buildFinalApprovalPremixRows,
+} from "./components/FinalApprovalPremixDialog";
+import type {
+  RawMaterialPrepPremixSelection,
+  RawMaterialPrepPremixSession,
+} from "../../../../../data/models/user/RawMaterialPreparationModel";
 import type { MaterialsListItem } from "../../../../../data/models/user/MaterialsListModel";
+import { getPremixMaterialSessionKey } from "../../../../../hooks/user/manufacturing/rawMaterialPrepFlowConfig";
 
 const RM = STRINGS.MANUFACTURING.RAW_MATERIAL_PREP;
 const { info: InfoOutlinedIcon } = icons.user.manufacturing.rawMaterial.builderPage;
 
+const formatSheetNumber = (value: unknown) => {
+  if (value == null || value === "") return "—";
+  if (typeof value === "object" && value !== null && "parsedValue" in (value as object)) {
+    const parsed = (value as { parsedValue?: unknown }).parsedValue;
+    if (parsed != null && parsed !== "") return String(parsed);
+  }
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? String(numeric) : String(value);
+};
+
 const RawMaterialBuilderForm = ({
   activeBatch,
   isEditMode,
-  selectedPremix,
-  selectedProcesses,
-  solidMaterialCode,
-  solidGradeCode,
-  liquidMaterialCode,
-  availableSolidMaterials,
-  availableLiquidMaterials,
-  loadingMaterials,
-  availablePremixOptions,
-  onPremixChange,
-  onProcessToggle,
-  onSolidMaterialChange,
-  onSolidGradeChange,
-  onLiquidMaterialChange,
-  onAddPremixSelection,
+  numberOfPremix,
+  premixGroups,
+  identificationSheet,
+  onPremixDateChange,
   addedPremixSelections,
   premixSessions,
   onPremixSlotChange,
-  onDeletePremixSelection,
+  allMaterials,
+  availableSolidMaterials,
+  availableLiquidMaterials,
   weightmentSheet,
   onWeightmentSheetChange,
   subDepartmentId,
   theme,
-  handleBack,
-  onSaveDraft,
-  onSubmit,
+  onSavePremixDraft,
+  onSubmitPremix,
+  onSubmitForFinalApproval,
+  premixStatusByNo,
+  isPremixEditable,
   actionLoading,
-  disableActions,
 }: any) => {
   const rmTheme = theme.manufacturing.rawMaterialPrep;
-  const labels = STRINGS.SOURCING.SPECIFICATION_FORM;
-  const isResubmission = Boolean(isEditMode);
-  const processes = { ...DEFAULT_SELECTED_PROCESSES, ...(selectedProcesses ?? {}) };
-
-  const solidNeedsGrade =
-    processes.solid &&
-    Boolean(solidMaterialCode) &&
-    materialRequiresGradeSelection(availableSolidMaterials ?? [], solidMaterialCode);
-
-  const canAddPremixSelection =
-    selectedPremix !== "" &&
-    (processes.solid || processes.liquid) &&
-    (!processes.solid || Boolean(solidMaterialCode)) &&
-    (!solidNeedsGrade || Boolean(solidGradeCode)) &&
-    (!processes.liquid || Boolean(liquidMaterialCode));
-
-  const premixCards = Array.isArray(addedPremixSelections) ? addedPremixSelections : [];
+  const groups = Array.isArray(premixGroups) ? premixGroups : [];
   const [activePremixIndex, setActivePremixIndex] = useState(0);
+  const [activeMaterialIndex, setActiveMaterialIndex] = useState(0);
+  const [finalApprovalOpen, setFinalApprovalOpen] = useState(false);
 
   useEffect(() => {
-    if (premixCards.length === 0) {
+    if (groups.length === 0) {
       setActivePremixIndex(0);
+      setActiveMaterialIndex(0);
       return;
     }
-    setActivePremixIndex((prev) => Math.min(prev, premixCards.length - 1));
-  }, [premixCards.length]);
+    setActivePremixIndex((prev) => Math.min(prev, groups.length - 1));
+  }, [groups.length]);
 
-  const activePremixEntry = useMemo(
-    () => (premixCards.length > 0 ? premixCards[activePremixIndex] : null),
-    [premixCards, activePremixIndex]
+  const activePremixGroup = useMemo(
+    () => (groups.length > 0 ? groups[activePremixIndex] : null),
+    [groups, activePremixIndex],
   );
 
-  const activeSession: RawMaterialPrepPremixSession | null = activePremixEntry
-    ? premixSessions?.[activePremixEntry.premix] ?? null
-    : null;
+  const activePremixMaterials = useMemo(
+    () => (activePremixGroup?.materials ?? []) as RawMaterialPrepPremixSelection[],
+    [activePremixGroup],
+  );
+
+  useEffect(() => {
+    if (activePremixMaterials.length === 0) {
+      setActiveMaterialIndex(0);
+      return;
+    }
+    setActiveMaterialIndex((prev) => Math.min(prev, activePremixMaterials.length - 1));
+  }, [activePremixMaterials.length, activePremixIndex]);
+
+  const activeMaterialEntry = useMemo(
+    () =>
+      activePremixMaterials.length > 0 ? activePremixMaterials[activeMaterialIndex] : null,
+    [activePremixMaterials, activeMaterialIndex],
+  );
+
+  const activeSession: RawMaterialPrepPremixSession = activeMaterialEntry
+    ? premixSessions?.[
+        getPremixMaterialSessionKey(activeMaterialEntry.premix, activeMaterialEntry.materialKey)
+      ] ?? createEmptyPremixSchemaSession()
+    : createEmptyPremixSchemaSession();
+
+  const schemaMaterials = (Array.isArray(allMaterials) && allMaterials.length > 0
+    ? allMaterials
+    : [
+        ...(Array.isArray(availableSolidMaterials) ? availableSolidMaterials : []),
+        ...(Array.isArray(availableLiquidMaterials) ? availableLiquidMaterials : []),
+      ]) as MaterialsListItem[];
+
+  const sheetMaterialCount = identificationSheet?.materials?.length ?? 0;
+  const statusConfig = rmTheme.details.bannerStatusConfig as Record<
+    string,
+    { color: string; bg: string; border: string }
+  >;
+
+  const navPalette = {
+    primary: theme.palette.primary,
+    primaryLight: theme.palette.primaryLight,
+    border: theme.palette.border,
+    surface: theme.palette.surface,
+    textSub: theme.palette.textSub,
+    text: theme.palette.text,
+  };
+
+  const premixTotal = numberOfPremix || groups.length;
+
+  const premixTabs: UserWorkflowNavTab[] = useMemo(
+    () =>
+      groups.map((group: { premix: number }) => {
+        const statusMeta = (premixStatusByNo as Record<number, PremixStatusMeta>)?.[group.premix];
+        const active = groups[activePremixIndex]?.premix === group.premix;
+        return {
+          id: `premix-${group.premix}`,
+          label: `${RM.PREMIX_STEP_LABEL} ${group.premix}`,
+          endAdornment: (
+            <PremixStatusChip
+              status={statusMeta?.premixSubmissionStatus}
+              statusConfig={statusConfig}
+              variant="embedded"
+              onAccent={active}
+            />
+          ),
+        };
+      }),
+    [groups, premixStatusByNo, statusConfig, activePremixIndex],
+  );
+
+  const materialTabs: UserWorkflowNavTab[] = useMemo(
+    () =>
+      activePremixMaterials.map((entry) => ({
+        id: `premix-material-${entry.premix}-${entry.materialKey}`,
+        label: `Premix-${entry.premix} ${entry.solidMaterialCode || entry.liquidMaterialCode}`,
+      })),
+    [activePremixMaterials],
+  );
+
+  const activePremixNo = activePremixGroup?.premix ?? 0;
+  const activePremixLocked = activePremixNo > 0 && !isPremixEditable(activePremixNo);
+  const activePremixStatus = (premixStatusByNo as Record<number, PremixStatusMeta>)?.[activePremixNo]
+    ?.premixSubmissionStatus;
+
+  const finalApprovalRows = useMemo(
+    () => buildFinalApprovalPremixRows(premixStatusByNo, premixTotal),
+    [premixStatusByNo, premixTotal],
+  );
+  const allPremixesApproved = useMemo(
+    () => areAllPremixesApproved(finalApprovalRows),
+    [finalApprovalRows],
+  );
+  const canOpenFinalApproval = Boolean(String(activeBatch?.formId ?? "").trim());
 
   return (
     <>
-      <RawMaterialPrepFlowBar
-        selectedPremix={selectedPremix}
-        selectedProcesses={selectedProcesses}
-        solidMaterialCode={solidMaterialCode}
-        solidGradeCode={solidGradeCode}
-        liquidMaterialCode={liquidMaterialCode}
-        availableSolidMaterials={availableSolidMaterials}
-        availableLiquidMaterials={availableLiquidMaterials}
-        loadingMaterials={loadingMaterials}
-        availablePremixOptions={availablePremixOptions}
-        onPremixChange={onPremixChange}
-        onProcessToggle={onProcessToggle}
-        onSolidMaterialChange={onSolidMaterialChange}
-        onSolidGradeChange={onSolidGradeChange}
-        onLiquidMaterialChange={onLiquidMaterialChange}
-        onAddPremixSelection={onAddPremixSelection}
-        canAddPremixSelection={canAddPremixSelection}
-        theme={theme}
-      />
-
-      {premixCards.length > 0 && activePremixEntry && activeSession && (
+      {groups.length > 0 && activePremixGroup && activeMaterialEntry && (
         <Stack spacing={1.25} mb={2}>
-          <Box
-            sx={{
-              border: `1px solid ${theme.palette.border}`,
-              borderRadius: 2,
-              px: 1.2,
-              py: 1,
-              background: theme.palette.surface,
-            }}
-          >
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Button
-                variant="outlined"
-                size="small"
-                disabled={activePremixIndex === 0}
-                onClick={() => setActivePremixIndex((prev) => Math.max(0, prev - 1))}
-              >
-                Back
-              </Button>
-              <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: theme.palette.primary }}>
-                Premix {activePremixIndex + 1} of {premixCards.length}
-              </Typography>
-              <Button
-                variant="outlined"
-                size="small"
-                disabled={activePremixIndex >= premixCards.length - 1}
-                onClick={() => setActivePremixIndex((prev) => Math.min(premixCards.length - 1, prev + 1))}
-              >
-                Next
-              </Button>
-            </Stack>
-          </Box>
+          <UserWorkflowStepPager
+            current={activePremixIndex + 1}
+            total={premixTotal}
+            entityLabel={RM.PREMIX_STEP_LABEL}
+            backLabel={RM.NAV_BACK}
+            nextLabel={RM.NAV_NEXT}
+            onBack={() => setActivePremixIndex((prev) => Math.max(0, prev - 1))}
+            onNext={() =>
+              setActivePremixIndex((prev) => Math.min(groups.length - 1, prev + 1))
+            }
+            disableBack={activePremixIndex === 0}
+            disableNext={activePremixIndex >= groups.length - 1}
+            palette={navPalette}
+          />
+
+          <UserWorkflowNavPanel palette={navPalette}>
+            <UserWorkflowTabNav
+              title={RM.PREMIX_NAV_TITLE}
+              hint={RM.PREMIX_NAV_HINT}
+              tabs={premixTabs}
+              activeIndex={activePremixIndex}
+              onActiveIndexChange={(index) => {
+                setActivePremixIndex(index);
+                setActiveMaterialIndex(0);
+              }}
+              palette={navPalette}
+              mb={1}
+            />
+            <UserWorkflowTabNav
+              title={RM.MATERIAL_NAV_TITLE}
+              tabs={materialTabs}
+              activeIndex={activeMaterialIndex}
+              onActiveIndexChange={setActiveMaterialIndex}
+              palette={navPalette}
+            />
+          </UserWorkflowNavPanel>
+
+          <Stack direction="row" justifyContent="flex-end">
+            <Button
+              variant="contained"
+              size="small"
+              disabled={actionLoading || !canOpenFinalApproval}
+              onClick={() => setFinalApprovalOpen(true)}
+              sx={{ textTransform: "none", fontWeight: 700 }}
+            >
+              {RM.SUBMIT_FOR_FINAL_APPROVAL}
+            </Button>
+          </Stack>
 
           <Box
-            sx={{
-              border: `1px solid ${theme.palette.border}`,
-              borderRadius: 2,
-              px: 1,
-              py: 1,
-              background: theme.palette.surface,
-            }}
-          >
-            <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: theme.palette.primary, mb: 0.4 }}>
-              Premix Navigation
-            </Typography>
-            <Typography sx={{ fontSize: "0.72rem", color: theme.palette.textSub, mb: 0.9 }}>
-              Click any premix tab below to open that premix card and continue filling its process details.
-            </Typography>
-            <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
-              {premixCards.map((entry: any, idx: number) => {
-                const active = idx === activePremixIndex;
-                return (
-                  <Button
-                    key={`premix-tab-${entry.premix}`}
-                    size="small"
-                    variant={active ? "contained" : "outlined"}
-                    onClick={() => setActivePremixIndex(idx)}
-                    sx={{ whiteSpace: "nowrap", flexShrink: 0, textTransform: "none" }}
-                  >
-                    Premix {entry.premix}
-                  </Button>
-                );
-              })}
-            </Stack>
-          </Box>
-
-          <Box
-            key={activePremixEntry.premix}
+            key={`${activeMaterialEntry.premix}-${activeMaterialEntry.materialKey}`}
             sx={{
               borderRadius: 2.5,
               border: `1px solid ${theme.palette.border}`,
@@ -184,96 +239,286 @@ const RawMaterialBuilderForm = ({
               py: 1.25,
             }}
           >
-            <Stack direction="row" justifyContent="space-between" alignItems="center">
-              <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: theme.palette.primary }}>
-                Premix - {activePremixEntry.premix}
-              </Typography>
-              <RemoveProcessButton
-                onClick={() => onDeletePremixSelection(activePremixEntry.premix)}
-                dangerColor={rmTheme.solidPreparation?.brand?.danger ?? SOLID_PREP_BRAND.danger}
-                tooltip={RM.DELETE_PREMIX_TOOLTIP}
-              />
-            </Stack>
-            <Stack spacing={0.4} mt={0.75}>
-              {activePremixEntry.selectedProcesses?.solid && (
-                <Typography sx={{ fontSize: "0.78rem", color: theme.palette.text }}>
-                  Solid: {activePremixEntry.solidMaterialCode || "Not selected"}
-                  {activePremixEntry.solidGradeCode ? ` (${activePremixEntry.solidGradeCode})` : ""}
+            <Stack
+              direction="row"
+              alignItems="center"
+              justifyContent="space-between"
+              flexWrap="wrap"
+              gap={1}
+              mb={1}
+            >
+              <Stack direction="row" alignItems="center" gap={0.85} minWidth={0} flexWrap="wrap">
+                <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: theme.palette.primary }}>
+                  Premix {activeMaterialEntry.premix} ·{" "}
+                  {activeMaterialEntry.solidMaterialCode || activeMaterialEntry.liquidMaterialCode}
                 </Typography>
-              )}
-              {activePremixEntry.selectedProcesses?.liquid && (
-                <Typography sx={{ fontSize: "0.78rem", color: theme.palette.text }}>
-                  Liquid: {activePremixEntry.liquidMaterialCode || "Not selected"}
-                </Typography>
-              )}
+                {activeMaterialEntry.selectedProcesses?.solid ? (
+                  <Chip
+                    size="small"
+                    label="Solid"
+                    color="primary"
+                    variant="outlined"
+                    sx={{ height: 22, fontSize: "0.65rem", fontWeight: 700 }}
+                  />
+                ) : null}
+                {activeMaterialEntry.selectedProcesses?.liquid ? (
+                  <Chip
+                    size="small"
+                    label="Liquid"
+                    color="secondary"
+                    variant="outlined"
+                    sx={{ height: 22, fontSize: "0.65rem", fontWeight: 700 }}
+                  />
+                ) : null}
+                {activePremixNo > 0 ? (
+                  <PremixStatusChip
+                    status={activePremixStatus}
+                    statusConfig={statusConfig}
+                    variant="embedded"
+                  />
+                ) : null}
+              </Stack>
+
+              <Stack direction="row" gap={1} flexShrink={0}>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={actionLoading || activePremixLocked}
+                  onClick={() => onSavePremixDraft(activeMaterialEntry.premix)}
+                >
+                  {RM.SAVE_PREMIX_DRAFT}
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  disabled={actionLoading || activePremixLocked}
+                  onClick={() => onSubmitPremix(activeMaterialEntry.premix)}
+                >
+                  {RM.SUBMIT_PREMIX}
+                </Button>
+              </Stack>
             </Stack>
 
-            {activePremixEntry.selectedProcesses?.solid && (
+            {activePremixLocked ? (
+              <Box
+                sx={{
+                  mb: 1,
+                  px: 1.25,
+                  py: 0.75,
+                  borderRadius: 1.5,
+                  border: `1px solid ${theme.palette.border}`,
+                  bgcolor: theme.palette.background,
+                }}
+              >
+                <Typography sx={{ fontSize: "0.72rem", color: theme.palette.textSub, fontWeight: 600 }}>
+                  {activePremixStatus === "APPROVED"
+                    ? RM.PREMIX_LOCKED_APPROVED
+                    : RM.PREMIX_LOCKED_WAITING}
+                </Typography>
+              </Box>
+            ) : null}
+
+            <Box
+              sx={{
+                border: `1px solid ${theme.palette.border}`,
+                borderRadius: 1.5,
+                px: 1.25,
+                py: 0.85,
+                mb: 1.25,
+                background: theme.palette.background,
+              }}
+            >
+              <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: theme.palette.primary, mb: 0.65 }}>
+                Material Details (Identification Sheet)
+              </Typography>
+              <Box
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: {
+                    xs: "1fr 1fr",
+                    sm: "repeat(4, minmax(0, 1fr))",
+                  },
+                  columnGap: 1.25,
+                  rowGap: 0.65,
+                }}
+              >
+                {(
+                  [
+                    [
+                      "Material Code",
+                      activeMaterialEntry.solidMaterialCode ||
+                        activeMaterialEntry.liquidMaterialCode ||
+                        "—",
+                    ],
+                    ["Material Name", activeMaterialEntry.materialName || "—"],
+                    ["Grade", activeMaterialEntry.solidGradeCode || "—"],
+                    ["Lot ID", activeMaterialEntry.lotId || "—"],
+                    ["Make", activeMaterialEntry.make || "—"],
+                    [
+                      "Qty / Premix",
+                      `${formatSheetNumber(activeMaterialEntry.quantityPerPremix)} kg`,
+                    ],
+                    [
+                      "Required Composition",
+                      `${formatSheetNumber(activeMaterialEntry.requiredComposition)}%`,
+                    ],
+                  ] as const
+                ).map(([label, value]) => (
+                  <Box key={label} minWidth={0}>
+                    <Typography
+                      sx={{
+                        fontSize: "0.62rem",
+                        fontWeight: 600,
+                        color: theme.palette.textSub,
+                        lineHeight: 1.2,
+                        mb: 0.15,
+                      }}
+                    >
+                      {label}
+                    </Typography>
+                    <Typography
+                      sx={{
+                        fontSize: "0.74rem",
+                        fontWeight: 600,
+                        lineHeight: 1.25,
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                      title={String(value)}
+                    >
+                      {value}
+                    </Typography>
+                  </Box>
+                ))}
+              </Box>
+            </Box>
+
+            {activeMaterialEntry.selectedProcesses?.solid &&
+              activeMaterialEntry.solidMaterialCode &&
+              Boolean(activeMaterialEntry.solidGradeCode || !activeMaterialEntry.solidGradeCode) && (
               <Box mt={1.2} sx={rmTheme.builder.sectionContainer}>
+                <Typography sx={{ fontSize: "0.78rem", fontWeight: 600, mb: 0.75 }}>
+                  Solid: {activeMaterialEntry.solidMaterialCode}
+                  {activeMaterialEntry.solidGradeCode ? ` (${activeMaterialEntry.solidGradeCode})` : ""}
+                </Typography>
+                <Box sx={{ mb: 1, maxWidth: 240 }}>
+                  <FlowBarDateField
+                    label={RM.SELECT_PREMIX_DATE_LABEL}
+                    value={activeMaterialEntry.premixDate ?? activePremixGroup.premixDate ?? ""}
+                    placeholder={RM.SELECT_PREMIX_DATE_PLACEHOLDER}
+                    width={220}
+                    flowBar={rmTheme.flowBar}
+                    accentColor={theme.palette.primaryLight ?? theme.palette.primary}
+                    disabled={activePremixLocked}
+                    onChange={(value) => onPremixDateChange(activeMaterialEntry.premix, value)}
+                  />
+                </Box>
                 <RawMaterialPremixSchemaPanel
+                  key={`schema-solid-${activeMaterialEntry.premix}-${activeMaterialEntry.materialKey}`}
                   slot="solid"
-                  materialCode={activePremixEntry.solidMaterialCode}
-                  materialId={activePremixEntry.solidMaterialId}
-                  gradeCode={activePremixEntry.solidGradeCode}
-                  gradeId={activePremixEntry.solidGradeId}
-                  materials={availableSolidMaterials as MaterialsListItem[]}
+                  materialCode={activeMaterialEntry.solidMaterialCode}
+                  materialId={activeMaterialEntry.solidMaterialId}
+                  gradeCode={activeMaterialEntry.solidGradeCode}
+                  gradeId={activeMaterialEntry.solidGradeId}
+                  materials={schemaMaterials}
                   subDepartmentId={subDepartmentId}
                   batchId={activeBatch?.batchId}
                   slotState={activeSession.solid}
                   savedSections={activeSession.pendingSolidSections}
                   onSlotChange={(next) =>
-                    onPremixSlotChange(activePremixEntry.premix, "solid", next)
+                    onPremixSlotChange(
+                      activeMaterialEntry.premix,
+                      activeMaterialEntry.materialKey,
+                      "solid",
+                      next,
+                    )
                   }
+                  readOnly={activePremixLocked}
                 />
               </Box>
-            )}
+              )}
 
-            {activePremixEntry.selectedProcesses?.liquid && (
+            {activeMaterialEntry.selectedProcesses?.liquid && activeMaterialEntry.liquidMaterialCode && (
               <Box mt={1.2} sx={rmTheme.builder.sectionContainer}>
+                <Typography sx={{ fontSize: "0.78rem", fontWeight: 600, mb: 0.75 }}>
+                  Liquid: {activeMaterialEntry.liquidMaterialCode}
+                </Typography>
+                {!activeMaterialEntry.selectedProcesses?.solid ? (
+                  <Box sx={{ mb: 1, maxWidth: 240 }}>
+                    <FlowBarDateField
+                      label={RM.SELECT_PREMIX_DATE_LABEL}
+                      value={activeMaterialEntry.premixDate ?? activePremixGroup.premixDate ?? ""}
+                      placeholder={RM.SELECT_PREMIX_DATE_PLACEHOLDER}
+                      width={220}
+                      flowBar={rmTheme.flowBar}
+                      accentColor={theme.palette.primaryLight ?? theme.palette.primary}
+                      disabled={activePremixLocked}
+                      onChange={(value) => onPremixDateChange(activeMaterialEntry.premix, value)}
+                    />
+                  </Box>
+                ) : null}
                 <RawMaterialPremixSchemaPanel
+                  key={`schema-liquid-${activeMaterialEntry.premix}-${activeMaterialEntry.materialKey}`}
                   slot="liquid"
-                  materialCode={activePremixEntry.liquidMaterialCode}
-                  materialId={activePremixEntry.liquidMaterialId}
-                  materials={availableLiquidMaterials as MaterialsListItem[]}
+                  materialCode={activeMaterialEntry.liquidMaterialCode}
+                  materialId={activeMaterialEntry.liquidMaterialId}
+                  materials={schemaMaterials}
                   subDepartmentId={subDepartmentId}
                   batchId={activeBatch?.batchId}
                   slotState={activeSession.liquid}
                   savedSections={activeSession.pendingLiquidSections}
                   onSlotChange={(next) =>
-                    onPremixSlotChange(activePremixEntry.premix, "liquid", next)
+                    onPremixSlotChange(
+                      activeMaterialEntry.premix,
+                      activeMaterialEntry.materialKey,
+                      "liquid",
+                      next,
+                    )
                   }
+                  readOnly={activePremixLocked}
                 />
               </Box>
             )}
           </Box>
-
         </Stack>
       )}
 
-      {premixCards.length > 0 && (
+      {groups.length > 0 && (
         <RawMaterialWeightmentSheetPanel
           value={weightmentSheet}
           onChange={onWeightmentSheetChange}
           theme={theme}
+          batchId={activeBatch?.batchId ?? ""}
+          identificationSheet={identificationSheet}
         />
       )}
 
-      {premixCards.length === 0 && (
+      {groups.length === 0 && (
         <Box sx={rmTheme.builder.emptyStateBox}>
           <InfoOutlinedIcon sx={rmTheme.builder.emptyStateIcon} />
           <Typography sx={rmTheme.builder.emptyStateTitle}>{RM.NO_PROCESS_SELECTED_TITLE}</Typography>
-          <Typography sx={rmTheme.builder.emptyStateSubtitle}>{RM.NO_PROCESS_SELECTED_SUBTITLE}</Typography>
+          <Typography sx={rmTheme.builder.emptyStateSubtitle}>
+            {sheetMaterialCount > 0
+              ? "Batch identification sheet premix details are required to load this form."
+              : "No materials found in the batch identification sheet."}
+          </Typography>
         </Box>
       )}
 
-      <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} mt={3} justifyContent="flex-end">
-        <Button variant="outlined" disabled={actionLoading || disableActions} onClick={onSaveDraft}>
-          {labels.SAVE_DRAFT}
-        </Button>
-        <Button variant="contained" disabled={actionLoading || disableActions} onClick={onSubmit}>
-          {isResubmission ? labels.RESUBMIT_APPROVAL : labels.SUBMIT_APPROVAL}
-        </Button>
-      </Stack>
+      <FinalApprovalPremixDialog
+        open={finalApprovalOpen}
+        rows={finalApprovalRows}
+        statusConfig={statusConfig}
+        allPremixesApproved={allPremixesApproved}
+        confirmDisabled={actionLoading}
+        onClose={() => setFinalApprovalOpen(false)}
+        onProceed={async () => {
+          if (!allPremixesApproved || typeof onSubmitForFinalApproval !== "function") return;
+          const ok = await onSubmitForFinalApproval();
+          if (ok) setFinalApprovalOpen(false);
+        }}
+      />
     </>
   );
 };

@@ -176,11 +176,19 @@ export class AvailableMotorsListModel {
   }
 }
 
+export type MaterialLotGrade = {
+  gradeId: string | number;
+  gradeCode: string;
+  gradeName: string;
+  specifications?: unknown[];
+};
+
 export type MaterialLotItem = {
   materialCode: string;
   materialName: string;
   lotId: string;
   make: string;
+  grade?: MaterialLotGrade | null;
 };
 
 export type MaterialLotsRequest = {
@@ -192,12 +200,30 @@ export class MaterialLotItemModel implements MaterialLotItem {
   materialName: string;
   lotId: string;
   make: string;
+  grade: MaterialLotGrade | null;
 
   constructor(payload: Record<string, unknown>) {
     this.materialCode = String(payload?.materialCode ?? "").trim();
     this.materialName = String(payload?.materialName ?? "").trim();
     this.lotId = String(payload?.lotId ?? "").trim();
     this.make = String(payload?.make ?? "").trim();
+    const gradeRaw = payload?.grade;
+    if (gradeRaw && typeof gradeRaw === "object" && !Array.isArray(gradeRaw)) {
+      const grade = gradeRaw as Record<string, unknown>;
+      const gradeCode = String(grade.gradeCode ?? "").trim();
+      this.grade = gradeCode
+        ? {
+            gradeId: (grade.gradeId as string | number) ?? "",
+            gradeCode,
+            gradeName: String(grade.gradeName ?? gradeCode).trim(),
+            specifications: Array.isArray(grade.specifications)
+              ? grade.specifications
+              : undefined,
+          }
+        : null;
+    } else {
+      this.grade = null;
+    }
   }
 }
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useLayoutEffect, useMemo, useRef } from "react";
 import { Box } from "@mui/material";
 import {
   SchemaUI,
@@ -6,6 +6,7 @@ import {
   hydrateCasePrepValuesFromSections,
   type SchemaDocumentV2,
   type SchemaFormValues,
+  type SchemaSetupContext,
 } from "../../../../../schema-engine";
 import { CASE_PREP_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/casePreparation_theme";
 import type { CasePrepMotorSession } from "../../../../../data/models/user/CasePreparationFormModel";
@@ -13,44 +14,57 @@ import type { CasePrepMotorSession } from "../../../../../data/models/user/CaseP
 type CasePrepMotorSchemaPanelProps = {
   schema: SchemaDocumentV2 | null;
   motor: CasePrepMotorSession;
+  motorIndex?: number;
+  setupContext?: SchemaSetupContext;
   subDepartmentId?: number;
   batchId?: string;
-  onMotorChange: (next: CasePrepMotorSession) => void;
+  onMotorChange: (next: CasePrepMotorSession, meta?: { hydrate?: boolean }) => void;
   loading?: boolean;
   error?: string | null;
+  readOnly?: boolean;
 };
 
 const CasePrepMotorSchemaPanel = ({
   schema,
   motor,
+  setupContext,
   subDepartmentId,
   batchId,
   onMotorChange,
   loading = false,
   error = null,
+  readOnly = false,
 }: CasePrepMotorSchemaPanelProps) => {
-  const hydratedRef = useRef(false);
+  const lastHydratedMotorIdRef = useRef<string | null>(null);
+  const onMotorChangeRef = useRef(onMotorChange);
+  onMotorChangeRef.current = onMotorChange;
+  const motorRef = useRef(motor);
+  motorRef.current = motor;
 
-  useEffect(() => {
-    hydratedRef.current = false;
-  }, [motor.motorId, motor.savedSections, schema?.schemaVersion]);
-
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!schema) return;
 
-    let nextValues: SchemaFormValues = motor.formValues;
-    if (!hydratedRef.current) {
-      if (motor.savedSections?.length) {
-        nextValues = hydrateCasePrepValuesFromSections(schema, motor.savedSections);
-      } else if (Object.keys(motor.formValues ?? {}).length === 0) {
-        nextValues = createCasePrepInitialValues(schema);
-      }
-      hydratedRef.current = true;
-      if (nextValues !== motor.formValues) {
-        onMotorChange({ ...motor, formValues: nextValues });
-      }
+    const hasValues = Object.keys(motor.formValues ?? {}).length > 0;
+    if (hasValues) {
+      lastHydratedMotorIdRef.current = motor.motorId;
+      return;
     }
-  }, [schema, motor.motorId, motor.savedSections]);
+    if (lastHydratedMotorIdRef.current === motor.motorId) return;
+
+    const nextValues = motor.savedSections?.length
+      ? hydrateCasePrepValuesFromSections(schema, motor.savedSections, setupContext)
+      : createCasePrepInitialValues(schema, setupContext);
+
+    lastHydratedMotorIdRef.current = motor.motorId;
+    onMotorChangeRef.current(
+      {
+        ...motor,
+        formValues: nextValues,
+        savedSections: undefined,
+      },
+      { hydrate: true },
+    );
+  }, [schema, motor.motorId, motor.formValues, motor.savedSections, setupContext]);
 
   const themeTokens = useMemo(
     () => ({
@@ -63,12 +77,24 @@ const CasePrepMotorSchemaPanel = ({
       surface: CASE_PREP_BRAND.surface,
       warn: CASE_PREP_BRAND.warn,
     }),
-    []
+    [],
   );
 
-  const handleValuesChange = (values: SchemaFormValues) => {
-    onMotorChange({ ...motor, formValues: values });
-  };
+  const apiContext = useMemo(
+    () => ({ subDepartmentId, batchId, motorId: motor.motorId }),
+    [subDepartmentId, batchId, motor.motorId],
+  );
+
+  const handleValuesChange = useMemo(
+    () => (values: SchemaFormValues) => {
+      onMotorChangeRef.current({
+        ...motorRef.current,
+        formValues: values,
+        savedSections: undefined,
+      });
+    },
+    [],
+  );
 
   return (
     <Box>
@@ -76,10 +102,13 @@ const CasePrepMotorSchemaPanel = ({
         schema={schema}
         value={motor.formValues}
         onChange={handleValuesChange}
-        loading={loading}
+        loading={loading || Object.keys(motor.formValues ?? {}).length === 0}
         error={error}
+        readOnly={readOnly}
         themeTokens={themeTokens}
-        apiContext={{ subDepartmentId, batchId }}
+        apiContext={apiContext}
+        setupContext={setupContext}
+        motorId={motor.motorId}
       />
     </Box>
   );

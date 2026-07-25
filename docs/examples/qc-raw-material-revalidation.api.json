@@ -86,7 +86,7 @@
                 "dataSource": {
                   "type": "api",
                   "api": {
-                    "endpoint": "/api/v1/user/post-cure/material-lots",
+                    "endpoint": "/api/v1/user/subdepartment/material-lots",
                     "method": "POST",
                     "requestBody": { "batchId": "${batchId}" },
                     "displayKey": "lotId",

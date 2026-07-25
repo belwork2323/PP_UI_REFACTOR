@@ -5,7 +5,9 @@ import {
 } from "../../../data/models/user/MixingFormModel";
 import {
   createMixingFormApi,
+  fetchMixingCycleDetailsApi,
   fetchMixingFormDetailsApi,
+  fetchQualityCheck,
   updateMixingFormApi,
 } from "../../../data/api/users/manufacturing/mixingFormApi";
 
@@ -32,12 +34,15 @@ export type MixingDetailsPayload = {
   subDepartmentId: number;
 };
 
+/** Dedupe in-flight quality-check requests (Strict Mode / remounts). */
+const qualityChecksInflight = new Map<string, Promise<unknown>>();
+
 export const mixingController = {
   createForm: async (payload: MixingCreatePayload) => {
     try {
       const response = await createMixingFormApi(payload);
       return new ApiResponseModel<MixingSubmitResponseModel>(response, (res) =>
-        MixingSubmitResponseModel.fromApi(res)
+        MixingSubmitResponseModel.fromApi(res),
       );
     } catch (error) {
       console.error("Failed to create mixing form:", error);
@@ -59,12 +64,41 @@ export const mixingController = {
     try {
       const response = await updateMixingFormApi(payload);
       return new ApiResponseModel<MixingSubmitResponseModel>(response, (res) =>
-        MixingSubmitResponseModel.fromApi(res)
+        MixingSubmitResponseModel.fromApi(res),
       );
     } catch (error) {
       console.error("Failed to update mixing form:", error);
       return new ApiResponseModel(error);
     }
+  },
+
+  fetchMixingCycleDetails: async (mixingCycleCode: string) => {
+    try {
+      const response = await fetchMixingCycleDetailsApi(mixingCycleCode);
+      return response;
+    } catch (error) {
+      console.error("Failed to fetch mixing cycle details:", error);
+      return new ApiResponseModel(error);
+    }
+  },
+
+  fetchQualityChecks: async (mixType: string, motorStage: number) => {
+    const cacheKey = `${String(mixType).toUpperCase()}:${Number(motorStage) || 0}`;
+    const existing = qualityChecksInflight.get(cacheKey);
+    if (existing) return existing;
+
+    const request = (async () => {
+      try {
+        return await fetchQualityCheck(mixType, motorStage);
+      } catch (error) {
+        console.error("Failed to fetch quality checks:", error);
+        qualityChecksInflight.delete(cacheKey);
+        return new ApiResponseModel(error);
+      }
+    })();
+
+    qualityChecksInflight.set(cacheKey, request);
+    return request;
   },
 };
 

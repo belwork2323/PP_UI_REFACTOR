@@ -304,10 +304,15 @@ export const useRocketMotorCasingHook = () => {
       resolvedBatch = {
         ...resolvedBatch,
         motorCasingId: detailsModel.motorCasingId || resolvedBatch.motorCasingId,
+        projectId: detailsModel.projectId || resolvedBatch.projectId,
+        projectName: detailsModel.projectName || resolvedBatch.projectName,
         motorStage: detailsModel.motorStage || resolvedBatch.motorStage,
         motorNo: detailsModel.motorId || resolvedBatch.motorNo,
         motorId: detailsModel.motorId || resolvedBatch.motorId,
         motorType: detailsModel.motorStage || resolvedBatch.motorType,
+        rmStatus: detailsModel.status
+          ? normalizeRocketCasingListStatus(detailsModel.status)
+          : resolvedBatch.rmStatus,
       };
     }
 
@@ -410,6 +415,7 @@ export const useRocketMotorCasingHook = () => {
     setDimensionalParametersErrorMessage("");
     setFetchingMotorParams(false);
     setView("form");
+    void lookups.ensureLoaded();
   };
 
   useEffect(() => {
@@ -455,13 +461,13 @@ export const useRocketMotorCasingHook = () => {
       setBackConfirmOpen(true);
       return;
     }
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
   };
 
   const handleDiscardAndBack = () => {
     setBackConfirmOpen(false);
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
   };
 

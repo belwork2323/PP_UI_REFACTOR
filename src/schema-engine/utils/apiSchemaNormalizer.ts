@@ -96,8 +96,7 @@ const toApiTableFromSection = (section: ApiFlatTableSection): ApiTable => ({
   rowGenerationType: section.rowGenerationType,
 });
 
-const resolveApiColumnId = (column: ApiTableColumn) =>
-  String(column.fieldId ?? column.id ?? "");
+const resolveApiColumnId = (column: ApiTableColumn) => String(column.fieldId ?? column.id ?? "");
 
 const mapPredefinedRowToPreset = (
   row: ApiPredefinedRow,
@@ -155,9 +154,7 @@ const mapDataSource = (dataSource?: string): SchemaDataSource | undefined => {
   return { type: "api", api: { endpoint: key } };
 };
 
-const normalizeApiDataSource = (
-  field: ApiField,
-): SchemaDataSource | undefined => {
+const normalizeApiDataSource = (field: ApiField): SchemaDataSource | undefined => {
   const raw = field.dataSource;
   if (!raw) return undefined;
 
@@ -180,9 +177,7 @@ const normalizeApiDataSource = (
     const nested =
       apiValue && typeof apiValue === "object" ? (apiValue as Record<string, unknown>) : {};
     const endpoint =
-      typeof apiValue === "string"
-        ? apiValue
-        : String(nested.endpoint ?? ds.endpoint ?? "");
+      typeof apiValue === "string" ? apiValue : String(nested.endpoint ?? ds.endpoint ?? "");
 
     const resolveString = (nestedKey: string, flatKey: string) => {
       const nestedValue = nested[nestedKey];
@@ -388,7 +383,7 @@ const normalizeApiTable = (table: ApiTable): SchemaTableBlock => {
       ? true
       : table.addRowAllowed === false
         ? false
-        : !hasFixedRows && (table.dynamicRows !== false);
+        : !hasFixedRows && table.dynamicRows !== false;
   const columns = injectLeadingColumns(
     (table.columns ?? []).map(normalizeApiTableColumn),
     presetRows,
@@ -422,10 +417,10 @@ export const isApiStyleSection = (section: unknown): section is ApiSection => {
   if (Array.isArray(row.children)) return false;
   return Boolean(
     row.sectionId ||
-      row.fields?.length ||
-      row.tables?.length ||
-      isFlatTableSection(row) ||
-      (row.type === "stageSpecific" && row.tables?.length),
+    row.fields?.length ||
+    row.tables?.length ||
+    isFlatTableSection(row) ||
+    (row.type === "stageSpecific" && row.tables?.length),
   );
 };
 

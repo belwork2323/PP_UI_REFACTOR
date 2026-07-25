@@ -199,7 +199,9 @@ const STFFlowBar = ({
                 size="small"
                 disabled={schemaLoading}
                 onClick={onLoadForm}
-                startIcon={schemaLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
+                startIcon={
+                  schemaLoading ? <CircularProgress size={14} color="inherit" /> : undefined
+                }
               >
                 {schemaLoading ? L.loadingSchema : L.loadForm}
               </Button>
@@ -210,7 +212,9 @@ const STFFlowBar = ({
                 size="small"
                 disabled={schemaLoading}
                 onClick={onAddMotors}
-                startIcon={schemaLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
+                startIcon={
+                  schemaLoading ? <CircularProgress size={14} color="inherit" /> : undefined
+                }
               >
                 {isBem ? L.addBem : L.addMotors}
               </Button>

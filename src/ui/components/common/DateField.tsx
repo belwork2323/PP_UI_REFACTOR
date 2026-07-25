@@ -1,11 +1,16 @@
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker, DateTimePicker, TimePicker } from "@mui/x-date-pickers";
-import dayjs, { type Dayjs } from "dayjs";
-import type { ReactNode } from "react";
-import FormInput from "./FormInput";
+import dayjs from "dayjs";
+import type { SxProps, Theme } from "@mui/material";
+import {
+  AppDatePickerProvider,
+  appDatePickerFieldSlots,
+  buildAppDatePickerSlotProps,
+  parseUiDate,
+  UI_DATE_FORMAT,
+} from "./datePickerShared";
+import { UI_DATETIME_FORMAT } from "../../../utils/dateUtils";
 
-type DateFieldProps = {
+export type DateFieldProps = {
   label?: string;
   value: string;
   onChange: (value: string) => void;
@@ -14,49 +19,11 @@ type DateFieldProps = {
   error?: boolean;
   helperText?: string;
   compact?: boolean;
-};
-
-const pickerTextFieldProps = (
-  props: Pick<DateFieldProps, "required" | "error" | "helperText" | "compact">,
-) => ({
-  required: props.required,
-  error: props.error,
-  helperText: props.helperText,
-  sx: props.compact
-    ? {
-        mb: 0,
-        width: "100%",
-        minWidth: 0,
-        "& .MuiInputBase-root:not(.MuiInputBase-multiline)": {
-          minHeight: 36,
-          height: 36,
-        },
-        "& .MuiInputBase-input:not(textarea)": {
-          px: 0.75,
-          fontSize: "0.72rem",
-        },
-        "& .MuiInputAdornment-root .MuiIconButton-root": {
-          p: 0.25,
-        },
-      }
-    : undefined,
-});
-
-const pickerFieldProps = {
-  enableAccessibleFieldDOMStructure: false as const,
-  slots: { textField: FormInput },
-};
-
-const PickerProvider = ({ children }: { children: ReactNode }) => (
-  <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
-    {children}
-  </LocalizationProvider>
-);
-
-const parseDate = (value: string): Dayjs | null => {
-  if (!value) return null;
-  const parsed = dayjs(value, ["DD-MM-YYYY", "DD-MM-YYYY HH:mm", "YYYY-MM-DD"], true);
-  return parsed.isValid() ? parsed : null;
+  placeholder?: string;
+  /** Extra CSS merged onto the date text field. */
+  sx?: SxProps<Theme>;
+  /** Alias for additional field CSS (merged after `sx`). */
+  inputSx?: SxProps<Theme>;
 };
 
 export const DateField = ({
@@ -68,19 +35,30 @@ export const DateField = ({
   error,
   helperText,
   compact,
+  placeholder,
+  sx,
+  inputSx,
 }: DateFieldProps) => (
-  <PickerProvider>
+  <AppDatePickerProvider>
     <DatePicker
-      {...pickerFieldProps}
+      {...appDatePickerFieldSlots}
       label={label}
-      value={parseDate(value)}
+      format={UI_DATE_FORMAT}
+      value={parseUiDate(value)}
       disabled={disabled}
-      onChange={(next) => onChange(next ? next.format("DD-MM-YYYY") : "")}
-      slotProps={{
-        textField: pickerTextFieldProps({ required, error, helperText, compact }),
-      }}
+      onChange={(next) => onChange(next ? next.format(UI_DATE_FORMAT) : "")}
+      slotProps={buildAppDatePickerSlotProps({
+        required,
+        error,
+        helperText,
+        compact,
+        placeholder,
+        sx,
+        inputSx,
+      })}
+      sx={{ width: "100%" }}
     />
-  </PickerProvider>
+  </AppDatePickerProvider>
 );
 
 export const TimeField = ({
@@ -92,19 +70,29 @@ export const TimeField = ({
   error,
   helperText,
   compact,
+  placeholder,
+  sx,
+  inputSx,
 }: DateFieldProps) => (
-  <PickerProvider>
+  <AppDatePickerProvider>
     <TimePicker
-      {...pickerFieldProps}
+      {...appDatePickerFieldSlots}
       label={label}
       value={value ? dayjs(value, "HH:mm") : null}
       disabled={disabled}
       onChange={(next) => onChange(next ? next.format("HH:mm") : "")}
-      slotProps={{
-        textField: pickerTextFieldProps({ required, error, helperText, compact }),
-      }}
+      slotProps={buildAppDatePickerSlotProps({
+        required,
+        error,
+        helperText,
+        compact,
+        placeholder,
+        sx,
+        inputSx,
+      })}
+      sx={{ width: "100%" }}
     />
-  </PickerProvider>
+  </AppDatePickerProvider>
 );
 
 export const DateTimeField = ({
@@ -116,19 +104,33 @@ export const DateTimeField = ({
   error,
   helperText,
   compact,
+  placeholder,
+  sx,
+  inputSx,
 }: DateFieldProps) => (
-  <PickerProvider>
+  <AppDatePickerProvider>
     <DateTimePicker
-      {...pickerFieldProps}
+      {...appDatePickerFieldSlots}
       label={label}
-      value={parseDate(value)}
+      format={UI_DATETIME_FORMAT}
+      value={parseUiDate(value)}
       disabled={disabled}
-      onChange={(next) => onChange(next ? next.format("DD-MM-YYYY HH:mm") : "")}
-      slotProps={{
-        textField: pickerTextFieldProps({ required, error, helperText, compact }),
-      }}
+      onChange={(next) => onChange(next ? next.format(UI_DATETIME_FORMAT) : "")}
+      slotProps={buildAppDatePickerSlotProps({
+        required,
+        error,
+        helperText,
+        compact,
+        placeholder,
+        sx,
+        inputSx,
+      })}
+      sx={{ width: "100%" }}
     />
-  </PickerProvider>
+  </AppDatePickerProvider>
 );
+
+export { default as FlowBarDateField } from "./FlowBarDateField";
+export type { FlowBarDateFieldProps, FlowBarDateFieldTheme } from "./FlowBarDateField";
 
 export default DateField;

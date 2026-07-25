@@ -50,6 +50,7 @@ export type RocketMotorBatch = {
   sourcingId?: string | null;
   motorCasingId?: string;
   projectId?: string;
+  projectName?: string;
   motorStage?: string;
   /** API list field `motorId`; kept as motorNo alias for form flows */
   motorNo?: string;
@@ -78,6 +79,7 @@ export function createEmptyRocketMotorBatch(): RocketMotorBatch {
     sourcingId: null,
     motorCasingId: "",
     projectId: "",
+    projectName: "",
     motorStage: "",
     motorNo: "",
     batchId: "—",

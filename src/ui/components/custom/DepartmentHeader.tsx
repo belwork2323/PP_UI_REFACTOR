@@ -34,14 +34,12 @@ type DepartmentHeaderProps = {
 // DepartmentHeader
 //
 // Details card rendered immediately below AppHeader.
-// Displays identity info (dept / sub-dept / user) on the left and
+// Displays identity info (dept / sub-dept) on the left and
 // batch-count stats on the right.
 //
 // Props:
 //   deptName        string  — e.g. "Sourcing Department"
 //   subDeptName     string  — e.g. "Raw Material Sourcing"
-//   userName        string  — logged-in user's display name
-//   userRole        string  — e.g. "Approver"
 //   stats           object  — { allocated, approved, rejected, pending }
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -49,8 +47,6 @@ const DepartmentHeader = ({
   icon,
   deptName = S.DEFAULT_DEPT,
   subDeptName = S.DEFAULT_SUB_DEPT,
-  userName = S.DEFAULT_USER,
-  userRole = S.DEFAULT_ROLE,
   stats = { allocated: 0, approved: 0, rejected: 0, pending: 0 },
   statItems,
 }: DepartmentHeaderProps) => {
@@ -81,31 +77,13 @@ const DepartmentHeader = ({
           <Box sx={t.identityBlock}>
             {/* Icon badge */}
             <Box sx={t.iconBadge}>
-              <HeaderIcon fontSize="medium" />
+              <HeaderIcon fontSize="small" />
             </Box>
 
-            {/* Dept name + sub-dept + user chips */}
+            {/* Dept name + sub-dept */}
             <Box sx={t.identityText}>
               <Typography sx={t.subDeptName}>{subDeptName}</Typography>
-
               <Typography sx={t.deptName}>{deptName}</Typography>
-
-              {/* User + Role chips */}
-              <Box sx={t.userRow}>
-                {/* Username chip */}
-                <Box sx={t.userChip}>
-                  <icons.person sx={t.userIcon} />
-                  <Typography sx={t.userChipLabel}>{S.LABEL_USER}</Typography>
-                  <Typography sx={t.userChipValue}>{userName}</Typography>
-                </Box>
-
-                {/* Role chip */}
-                <Box sx={t.userChip}>
-                  <icons.security sx={t.userIcon} />
-                  <Typography sx={t.userChipLabel}>{S.LABEL_ROLE}</Typography>
-                  <Typography sx={t.userChipValue}>{userRole}</Typography>
-                </Box>
-              </Box>
             </Box>
           </Box>
 
@@ -128,9 +106,6 @@ const DepartmentHeader = ({
             ))}
           </Box>
         </Box>
-
-        {/* ── Thin divider ── */}
-        <Box sx={t.divider} />
       </Box>
     </Box>
   );

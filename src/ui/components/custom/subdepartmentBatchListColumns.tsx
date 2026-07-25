@@ -1,6 +1,7 @@
 import type { ElementType } from "react";
-import { Chip, Typography } from "@mui/material";
+import { Box, Chip, Typography } from "@mui/material";
 import { STRINGS } from "../../../app/config/strings";
+import { icons } from "../../../app/theme/icons";
 import { motorStageLabel } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
 import { formatSubdepartmentBatchTypeLabel } from "../../../data/models/user/SubdepartmentBatchModel";
 import { OPERATION_STATUS } from "../../../hooks/operationStatus";
@@ -9,12 +10,12 @@ import UserWorkflowStatusCell from "./UserWorkflowStatusCell";
 
 export type SubdepartmentBatchListColumnLabels = {
   batchId?: string;
+  project?: string;
   batchType?: string;
   motorId?: string;
   stage?: string;
   manager?: string;
   createdOn?: string;
-  priority?: string;
   operationStatus?: string;
   unassigned?: string;
 };
@@ -34,12 +35,12 @@ const defaultLabels = (): SubdepartmentBatchListColumnLabels => {
   const batch = STRINGS.MANUFACTURING.BATCH_LIST;
   return {
     batchId: batch.COL_BATCH_ID,
+    project: batch.COL_PROJECT,
     batchType: batch.COL_BATCH_TYPE,
     motorId: batch.COL_MOTOR_ID,
     stage: batch.COL_STAGE,
     manager: batch.COL_MANAGER,
     createdOn: batch.COL_CREATED_ON,
-    priority: batch.COL_PRIORITY,
     unassigned: batch.UNASSIGNED,
   };
 };
@@ -48,12 +49,12 @@ export const qualityControlBatchListLabels = (): SubdepartmentBatchListColumnLab
   const batch = STRINGS.QUALITY_CONTROL.BATCH_LIST;
   return {
     batchId: batch.COL_BATCH_ID,
+    project: batch.COL_PROJECT,
     batchType: batch.COL_BATCH_TYPE,
     motorId: batch.COL_MOTOR_ID,
     stage: batch.COL_STAGE,
     manager: batch.COL_MANAGER,
     createdOn: batch.COL_CREATED_ON,
-    priority: batch.COL_PRIORITY,
     unassigned: batch.UNASSIGNED,
   };
 };
@@ -62,12 +63,12 @@ export const dispatchBatchListLabels = (): SubdepartmentBatchListColumnLabels =>
   const batch = STRINGS.DISPATCH.BATCH_LIST;
   return {
     batchId: batch.COL_BATCH_ID,
+    project: batch.COL_PROJECT,
     batchType: batch.COL_BATCH_TYPE,
     motorId: batch.COL_MOTOR_ID,
     stage: batch.COL_STAGE,
     manager: batch.COL_MANAGER,
     createdOn: batch.COL_CREATED_ON,
-    priority: batch.COL_PRIORITY,
     unassigned: batch.UNASSIGNED,
   };
 };
@@ -84,24 +85,6 @@ export const buildSubdepartmentBatchListColumns = ({
 }: BuildSubdepartmentBatchListColumnsArgs) => {
   const L = { ...defaultLabels(), ...labels, operationStatus: labels.operationStatus ?? statusLabel };
 
-  const renderPriority = (v: string) => {
-    const cfg = theme.batchList.priorityConfig[v] ?? theme.batchList.priorityConfig.Medium;
-    return (
-      <Chip
-        label={v}
-        size="small"
-        sx={{
-          height: 22,
-          fontSize: "0.68rem",
-          fontWeight: 700,
-          background: cfg.bg,
-          color: cfg.color,
-          border: `1px solid ${cfg.border}`,
-        }}
-      />
-    );
-  };
-
   const formatDate = (v: string) =>
     new Date(v).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 
@@ -110,6 +93,26 @@ export const buildSubdepartmentBatchListColumns = ({
       key: "batchId",
       label: L.batchId,
       render: (v: string) => <Typography sx={theme.batchList.batchIdText}>{v}</Typography>,
+    },
+    {
+      key: "projectId",
+      label: L.project,
+      render: (_v: string, row: { projectName?: string; projectId?: string }) => {
+        const projectName = String(row?.projectName ?? "").trim();
+        const projectId = String(row?.projectId ?? "").trim();
+        if (!projectName && !projectId) {
+          return <Typography sx={theme.batchList.normalText}>—</Typography>;
+        }
+        return (
+          <Box sx={theme.batchList.projectCell}>
+            <icons.batchMgmt.projectId sx={theme.batchList.projectIcon} />
+            <Box sx={theme.batchList.projectInfo}>
+              <Typography sx={theme.batchList.projectName}>{projectName || "—"}</Typography>
+              <Typography sx={theme.batchList.projectId}>{projectId || "—"}</Typography>
+            </Box>
+          </Box>
+        );
+      },
     },
     {
       key: "batchType",
@@ -157,12 +160,6 @@ export const buildSubdepartmentBatchListColumns = ({
           textSx={theme.batchList.subtleText}
         />
       ),
-    },
-    {
-      key: "priority",
-      label: L.priority,
-      align: "center" as const,
-      render: renderPriority,
     },
     {
       key: statusField,

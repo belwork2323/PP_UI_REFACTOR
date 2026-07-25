@@ -1,14 +1,11 @@
 import { Box, Button, CircularProgress, Typography } from "@mui/material";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
-import dayjs from "dayjs";
 import {
   TRIMMING_FLOW_LABELS,
   getTrimmingMotorCountOptions,
   type TrimmingMotorOption,
   type TrimmingMotorStageOption,
 } from "../../../../../hooks/user/manufacturing/trimmingFlowConfig";
+import { DateTimeField } from "../../../../components/common/DateField";
 import CasePrepSelect from "../CasePreparation/CasePrepSelect";
 
 type TrimmingFlowBarProps = {
@@ -132,26 +129,16 @@ const TrimmingFlowBar = ({
             <Typography component="label" sx={flowBar.selectLabel}>
               {L.motorReceivedAt}
             </Typography>
-            <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
-              <DateTimePicker
-                enableAccessibleFieldDOMStructure={false}
-                format="DD-MM-YYYY HH:mm"
-                disabled={!setupFieldsEnabled}
-                value={motorReceivedAt ? dayjs(motorReceivedAt, "DD-MM-YYYY HH:mm") : null}
-                onChange={(picked) =>
-                  onMotorReceivedAtChange(picked?.format("DD-MM-YYYY HH:mm") || "")
-                }
-                slotProps={{
-                  textField: {
-                    size: "small",
-                    fullWidth: true,
-                    variant: "outlined",
-                    placeholder: L.motorReceivedAtPlaceholder,
-                    sx: flowBar.selectInput?.(Boolean(motorReceivedAt.trim())),
-                  },
-                }}
-              />
-            </LocalizationProvider>
+            <DateTimeField
+              value={motorReceivedAt}
+              onChange={onMotorReceivedAtChange}
+              disabled={!setupFieldsEnabled}
+              placeholder={L.motorReceivedAtPlaceholder}
+              sx={{
+                mb: 0,
+                ...(flowBar.selectInput?.(Boolean(motorReceivedAt.trim())) as object),
+              }}
+            />
           </Box>
         </Box>
 

@@ -1,4 +1,10 @@
-import { OPERATION_STATUS, toOperationStatusApiValue, type OperationStatus } from "../../../hooks/operationStatus";
+import {
+  OPERATION_STATUS,
+  OPERATION_STATUS_FILTER_VALUES,
+  getOperationStatusFilterLabel,
+  toOperationStatusApiValue,
+  type OperationStatus,
+} from "../../../hooks/operationStatus";
 import { motorStageForApi, normalizeMotorStage } from "../admin/BatchManagement/BatchManagementModel";
 import { batchTypeFilterToApiValue, SUBDEPT_STATUS_FIELD } from "../user/SubdepartmentBatchModel";
 
@@ -6,8 +12,11 @@ import { batchTypeFilterToApiValue, SUBDEPT_STATUS_FIELD } from "../user/Subdepa
 export const APPROVER_BATCH_STATUS = {
   TO_BE_INITIATED: "TO_BE_INITIATED",
   IN_PROGRESS: "IN_PROGRESS",
+  WAITING_FOR_PARTIAL_APPROVAL: "WAITING_FOR_PARTIAL_APPROVAL",
   WAITING_FOR_APPROVAL: "WAITING_FOR_APPROVAL",
+  WAITING_FOR_COMPLETE_APPROVAL: "WAITING_FOR_COMPLETE_APPROVAL",
   APPROVED: "APPROVED",
+  FINAL_APPROVAL_COMPLETED: "FINAL_APPROVAL_COMPLETED",
   REJECTED: "REJECTED",
 } as const;
 
@@ -17,21 +26,31 @@ export type ApproverBatchStatus =
 export const APPROVER_BATCH_STATUS_LABEL: Record<ApproverBatchStatus, string> = {
   TO_BE_INITIATED: OPERATION_STATUS.TO_BE_INITIATED,
   IN_PROGRESS: OPERATION_STATUS.IN_PROGRESS,
+  WAITING_FOR_PARTIAL_APPROVAL: OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL,
   WAITING_FOR_APPROVAL: OPERATION_STATUS.WAITING_FOR_APPROVAL,
+  WAITING_FOR_COMPLETE_APPROVAL: OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL,
   APPROVED: OPERATION_STATUS.APPROVED,
+  FINAL_APPROVAL_COMPLETED: OPERATION_STATUS.FINAL_APPROVAL_COMPLETED,
   REJECTED: OPERATION_STATUS.REJECTED,
 };
 
-/** Fixed status filter tabs for approver subdepartment batch lists */
-export const APPROVER_BATCH_STATUS_TABS = Object.values(APPROVER_BATCH_STATUS_LABEL);
+/**
+ * Status filter tabs — same set/order as the user batch list.
+ * Batch-level UI does not show a separate "Waiting for Approval" label;
+ * that filter value is displayed as "Waiting for Complete Approval".
+ */
+export const APPROVER_BATCH_STATUS_TABS: OperationStatus[] = [...OPERATION_STATUS_FILTER_VALUES];
 
 const CAMEL_CASE_STATUS_TO_API: Record<string, ApproverBatchStatus> = {
   initiated: APPROVER_BATCH_STATUS.TO_BE_INITIATED,
   toBeInitiated: APPROVER_BATCH_STATUS.TO_BE_INITIATED,
   inProgress: APPROVER_BATCH_STATUS.IN_PROGRESS,
+  waitingForPartialApproval: APPROVER_BATCH_STATUS.WAITING_FOR_PARTIAL_APPROVAL,
   waitingForApproval: APPROVER_BATCH_STATUS.WAITING_FOR_APPROVAL,
   waitingforApproval: APPROVER_BATCH_STATUS.WAITING_FOR_APPROVAL,
+  waitingForCompleteApproval: APPROVER_BATCH_STATUS.WAITING_FOR_COMPLETE_APPROVAL,
   approved: APPROVER_BATCH_STATUS.APPROVED,
+  finalApprovalCompleted: APPROVER_BATCH_STATUS.FINAL_APPROVAL_COMPLETED,
   rejected: APPROVER_BATCH_STATUS.REJECTED,
 };
 
@@ -41,32 +60,46 @@ const LABEL_TO_API = Object.fromEntries(
 
 export function normalizeApproverBatchStatus(status: unknown): string {
   const raw = String(status ?? "").trim();
-  if (!raw) return APPROVER_BATCH_STATUS_LABEL.WAITING_FOR_APPROVAL;
+  if (!raw) return OPERATION_STATUS.TO_BE_INITIATED;
 
   if (raw in LABEL_TO_API) {
+    // Batch lists do not use a distinct WAITING_FOR_APPROVAL stage — fold complete-approval alias.
+    if (raw === OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL) {
+      return OPERATION_STATUS.WAITING_FOR_APPROVAL;
+    }
     return raw;
   }
 
   const fromCamelCase = CAMEL_CASE_STATUS_TO_API[raw];
   if (fromCamelCase) {
+    if (fromCamelCase === APPROVER_BATCH_STATUS.WAITING_FOR_COMPLETE_APPROVAL) {
+      return OPERATION_STATUS.WAITING_FOR_APPROVAL;
+    }
     return APPROVER_BATCH_STATUS_LABEL[fromCamelCase];
   }
 
   const upper = raw.toUpperCase().replace(/\s+/g, "_");
+  if (upper === "WAITING_FOR_COMPLETE_APPROVAL") {
+    return OPERATION_STATUS.WAITING_FOR_APPROVAL;
+  }
   if (upper in APPROVER_BATCH_STATUS_LABEL) {
     return APPROVER_BATCH_STATUS_LABEL[upper as ApproverBatchStatus];
   }
 
   if (upper === "PENDING") {
-    return APPROVER_BATCH_STATUS_LABEL.WAITING_FOR_APPROVAL;
+    return OPERATION_STATUS.WAITING_FOR_APPROVAL;
   }
 
   if (upper === "INITIATED") {
-    return APPROVER_BATCH_STATUS_LABEL.TO_BE_INITIATED;
+    return OPERATION_STATUS.TO_BE_INITIATED;
   }
 
   return raw;
 }
+
+/** Display label for approver status tabs / chips (matches user batch list). */
+export const getApproverBatchStatusDisplayLabel = (status: string): string =>
+  getOperationStatusFilterLabel(status, { isSourcingLotSubdepartment: false });
 
 export function toApproverBatchListApiStatus(
   uiStatus: string,
@@ -117,6 +150,7 @@ export type ApproverBatchListRequest = {
   formSubmittedBy?: string[];
   fromDate?: string;
   toDate?: string;
+  projectId?: string;
 };
 
 export type ApproverBatchListAdvancedFilters = {
@@ -127,6 +161,7 @@ export type ApproverBatchListAdvancedFilters = {
   submittedBy?: string;
   fromDate?: string;
   toDate?: string;
+  projectId?: string;
 };
 
 type BuildApproverPayloadArgs = {
@@ -180,6 +215,7 @@ export function buildApproverBatchListPayload({
   const motorId = String(advanced.motorId ?? "").trim();
   const motorStage = String(advanced.motorStage ?? "").trim();
   const submittedBy = String(advanced.submittedBy ?? "").trim();
+  const projectId = String(advanced.projectId ?? "").trim();
   let fromDate = String(advanced.fromDate ?? "").trim();
   let toDate = String(advanced.toDate ?? "").trim();
 
@@ -213,6 +249,10 @@ export function buildApproverBatchListPayload({
 
   if (submittedBy) {
     payload.formSubmittedBy = [submittedBy];
+  }
+
+  if (projectId && projectId !== allLabel) {
+    payload.projectId = projectId;
   }
 
   if (fromDate) {
@@ -436,19 +476,39 @@ export function mapApproverBatchStatusCounts(
     "Initiated",
   );
   const inProgress = pick("inProgress", "IN_PROGRESS", "In Progress");
-  const waiting = pick("waitingForApproval", "WAITING_FOR_APPROVAL", "Waiting for Approval");
+  const waitingPartial = pick(
+    "waitingForPartialApproval",
+    "WAITING_FOR_PARTIAL_APPROVAL",
+    "Waiting for Partial Approval",
+  );
+  const waiting = pick(
+    "waitingForApproval",
+    "WAITING_FOR_APPROVAL",
+    "Waiting for Approval",
+    "waitingForCompleteApproval",
+    "WAITING_FOR_COMPLETE_APPROVAL",
+    "Waiting for Complete Approval",
+  );
   const approved = pick("approved", "APPROVED", "Approved");
+  const finalApprovalCompleted = pick(
+    "finalApprovalCompleted",
+    "FINAL_APPROVAL_COMPLETED",
+    "Final Approval Completed",
+  );
   const rejected = pick("rejected", "REJECTED", "Rejected");
-  const pendingTotal = initiated + inProgress + waiting;
-  const countedTotal = pendingTotal + approved + rejected;
+  const countedTotal =
+    initiated + inProgress + waitingPartial + waiting + approved + finalApprovalCompleted + rejected;
 
   return {
-    [APPROVER_BATCH_STATUS_LABEL.TO_BE_INITIATED]: initiated,
-    [APPROVER_BATCH_STATUS_LABEL.IN_PROGRESS]: inProgress,
-    [APPROVER_BATCH_STATUS_LABEL.WAITING_FOR_APPROVAL]: waiting,
-    [APPROVER_BATCH_STATUS_LABEL.APPROVED]: approved,
-    [APPROVER_BATCH_STATUS_LABEL.REJECTED]: rejected,
-    [allLabel]: pick(allLabel, "all", "total") || totalRecords || countedTotal,
+    [OPERATION_STATUS.TO_BE_INITIATED]: initiated,
+    [OPERATION_STATUS.IN_PROGRESS]: inProgress,
+    [OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL]: waitingPartial,
+    [OPERATION_STATUS.WAITING_FOR_APPROVAL]: waiting,
+    [OPERATION_STATUS.APPROVED]: approved,
+    [OPERATION_STATUS.FINAL_APPROVAL_COMPLETED]: finalApprovalCompleted,
+    [OPERATION_STATUS.REJECTED]: rejected,
+    // Always sum status buckets for All — pagination totalRecords follows the active filter.
+    [allLabel]: countedTotal,
   };
 }
 

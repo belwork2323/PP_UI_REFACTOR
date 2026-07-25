@@ -1,18 +1,24 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { STRINGS } from "../../../app/config/strings";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshStore";
+import { batchManagementController } from "../../../controllers/admin/BatchManagement/batchManagementController";
 import casePreparationController from "../../../controllers/user/manufacturing/casePreparationController";
 import {
   createDefaultCasePreparationFormState,
   createEmptyMotorSession,
-  hasAnyCasePreparationValue,
+  hasMotorCasePreparationValue,
   hydrateCasePreparationFormState,
+  isMotorEditable,
+  mapCasePreparationDetailsFromSavedForm,
   mapCasePreparationDetailsToFormState,
   mapCasePreparationFormStateToPayload,
+  mapCasePreparationMotorStatusesFromApi,
   type CasePrepMotorSession,
   type CasePreparationFormState,
+  type MotorStatusMeta,
+  type MotorSubmissionStatus,
 } from "../../../data/models/user/CasePreparationFormModel";
 import {
   buildCasePreparationSchemaRequest,
@@ -24,13 +30,13 @@ import {
   type SchemaFormValues,
 } from "../../../schema-engine";
 import {
-  getSelectedCasePrepDraftMotorIds,
   isMainMotorBatch,
   isSubscaleBatch,
-  resolveCasePrepMotorOptions,
+  resolveCasePrepBatchMotorCount,
+  resolveCasePrepMotorsFromBatch,
   type CasePrepAddedMotor,
 } from "./casePreparationFlowConfig";
-import { OPERATION_STATUS } from "../../operationStatus";
+import { isManufacturingContinueFillingStatus } from "../../operationStatus";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 
 type WorkflowView = "list" | "form" | "details";
@@ -41,10 +47,12 @@ type CasePrepBatch = {
   formId?: string | null;
   batchType?: string;
   motorId?: string;
+  motorIds?: Array<string | number>;
+  numberOfMotors?: number | string;
+  identificationSheet?: { prcApprovalDate?: string } | null;
+  prrcClearanceDate?: string;
   [key: string]: any;
 };
-
-const parseStatus = (status: string | undefined) => String(status ?? "").toLowerCase();
 
 const resolveFormId = (batch: CasePrepBatch | null | undefined) => {
   const formId = String(batch?.formId ?? "").trim();
@@ -57,6 +65,125 @@ const buildAddedMotorsFromForm = (formData: CasePreparationFormState): CasePrepA
     prrcClearanceDate: motor.prrcClearanceDate,
   }));
 
+/**
+ * Always show every batch motor as a tab. Overlay saved form data when present
+ * so a partial draft (1 of N motors submitted) still lists the remaining motors.
+ */
+const mergeMotorsFromBatchAndForm = (
+  batch: CasePrepBatch,
+  formData: CasePreparationFormState,
+): { formData: CasePreparationFormState; addedMotors: CasePrepAddedMotor[] } => {
+  const fromBatch = resolveCasePrepMotorsFromBatch(batch);
+  if (!fromBatch.length) {
+    return {
+      formData,
+      addedMotors: buildAddedMotorsFromForm(formData),
+    };
+  }
+
+  const fromFormById = new Map((formData.motors ?? []).map((motor) => [motor.motorId, motor]));
+  const batchIds = new Set(fromBatch.map((entry) => entry.motorId));
+
+  const motors: CasePrepMotorSession[] = fromBatch.map((entry) => {
+    const existing = fromFormById.get(entry.motorId);
+    if (existing) {
+      return {
+        ...existing,
+        prrcClearanceDate: existing.prrcClearanceDate || entry.prrcClearanceDate,
+      };
+    }
+    return createEmptyMotorSession(entry.motorId, entry.prrcClearanceDate);
+  });
+
+  (formData.motors ?? []).forEach((motor) => {
+    if (!batchIds.has(motor.motorId)) {
+      motors.push(motor);
+    }
+  });
+
+  return {
+    formData: { ...formData, motors },
+    addedMotors: motors.map((motor) => ({
+      motorId: motor.motorId,
+      prrcClearanceDate: motor.prrcClearanceDate,
+    })),
+  };
+};
+
+const buildCasePrepSetupContext = (
+  batch: CasePrepBatch | null | undefined,
+  fallbackCount = 1,
+) => ({
+  numberOfMotors: resolveCasePrepBatchMotorCount(batch, fallbackCount),
+});
+
+const enrichBatchFromDetails = (
+  batch: CasePrepBatch,
+  batchDetails: Awaited<ReturnType<typeof batchManagementController.getBatchById>>,
+): CasePrepBatch | null => {
+  if (!batchDetails) return null;
+
+  return {
+    ...batch,
+    batchType: batch.batchType ?? batchDetails.batchType ?? batch.batchType,
+    motorIds: batchDetails.motorIds?.length ? batchDetails.motorIds : batch.motorIds,
+    numberOfMotors: batchDetails.numberOfMotors ?? batch.numberOfMotors,
+    motorId:
+      batchDetails.motorIds?.length > 0
+        ? batchDetails.motorIds.join(", ")
+        : batch.motorId,
+    identificationSheet: batchDetails.identificationSheet,
+  };
+};
+
+/** Create motor shells only — no schema walks. First motor is hydrated below. */
+const initializeCasePrepFormFromBatch = (
+  batch: CasePrepBatch,
+  schema: SchemaDocumentV2,
+  baseFormData: CasePreparationFormState = createDefaultCasePreparationFormState(),
+): { formData: CasePreparationFormState; addedMotors: CasePrepAddedMotor[] } => {
+  const motorsFromBatch = resolveCasePrepMotorsFromBatch(batch);
+  const setupContext = buildCasePrepSetupContext(
+    batch,
+    Math.max(motorsFromBatch.length, 1),
+  );
+
+  if (isSubscaleBatch(batch.batchType)) {
+    return {
+      formData: hydrateCasePreparationFormState(
+        {
+          ...baseFormData,
+          schema,
+          motors: [],
+          subscaleFormValues: createCasePrepInitialValues(schema, setupContext),
+        },
+        schema,
+        setupContext,
+      ),
+      addedMotors: [],
+    };
+  }
+
+  const sessions: CasePrepMotorSession[] = motorsFromBatch.map((entry) =>
+    createEmptyMotorSession(entry.motorId, entry.prrcClearanceDate),
+  );
+
+  const firstMotorId = sessions[0]?.motorId;
+  return {
+    formData: hydrateCasePreparationFormState(
+      {
+        ...baseFormData,
+        schema,
+        motors: sessions,
+      },
+      schema,
+      setupContext,
+      firstMotorId ? { hydrateMotorIds: [firstMotorId] } : undefined,
+    ),
+    addedMotors: motorsFromBatch,
+  };
+};
+
 export const useCasePreparationHook = () => {
   const listParams = useSubdepartmentBatches("case-preparation");
   const user = useAuthStore((s) => s.user);
@@ -67,8 +194,10 @@ export const useCasePreparationHook = () => {
     () =>
       user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "case-preparation")
         ?.subDepartmentId,
-    [user]
+    [user],
   );
+
+  const schemaCacheRef = useRef<Map<string, SchemaDocumentV2>>(new Map());
 
   const [view, setView] = useState<WorkflowView>("list");
   const [activeBatch, setActiveBatch] = useState<CasePrepBatch | null>(null);
@@ -83,36 +212,18 @@ export const useCasePreparationHook = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
+  const [isFormDirty, setIsFormDirty] = useState(false);
   const [formData, setFormData] = useState<CasePreparationFormState>(
-    createDefaultCasePreparationFormState()
+    createDefaultCasePreparationFormState(),
   );
-  const [initialSnapshot, setInitialSnapshot] = useState("{}");
 
-  const [motorCount, setMotorCount] = useState<number | "">("");
-  const [draftMotorIds, setDraftMotorIds] = useState<string[]>([]);
-  const [prrcClearanceDate, setPrrcClearanceDate] = useState("");
   const [addedMotors, setAddedMotors] = useState<CasePrepAddedMotor[]>([]);
-
-  const formSnapshot = useMemo(
-    () =>
-      JSON.stringify({
-        formData,
-        addedMotors,
-      }),
-    [formData, addedMotors]
-  );
-
-  const isFormDirty = useMemo(
-    () => view === "form" && formSnapshot !== initialSnapshot,
-    [view, formSnapshot, initialSnapshot]
-  );
+  const [motorStatusById, setMotorStatusById] = useState<Record<string, MotorStatusMeta>>({});
 
   const resetFlowDraft = useCallback(() => {
-    setMotorCount("");
-    setDraftMotorIds([]);
-    setPrrcClearanceDate("");
     setAddedMotors([]);
     setSchemaError(null);
+    setMotorStatusById({});
   }, []);
 
   const resetFormContext = useCallback(() => {
@@ -130,14 +241,9 @@ export const useCasePreparationHook = () => {
     setActionLoading(false);
     setBackConfirmOpen(false);
     setHasSavedDraft(false);
+    setIsFormDirty(false);
     setFormData(defaults);
     resetFlowDraft();
-    setInitialSnapshot(
-      JSON.stringify({
-        formData: defaults,
-        addedMotors: [],
-      })
-    );
   }, [resetFlowDraft]);
 
   const getErrorMessage = (response: any, fallbackMessage: string) => {
@@ -153,6 +259,13 @@ export const useCasePreparationHook = () => {
         return null;
       }
 
+      const cacheKey = `${subDepartmentId}:${mapCasePrepBatchTypeToSchema(batchType ?? "")}`;
+      const cached = schemaCacheRef.current.get(cacheKey);
+      if (cached) {
+        setSchemaError(null);
+        return cached;
+      }
+
       setSchemaLoading(true);
       setSchemaError(null);
 
@@ -161,7 +274,7 @@ export const useCasePreparationHook = () => {
         buildCasePreparationSchemaRequest({
           subDepartmentId,
           batchType: batchType ?? "",
-        })
+        }),
       );
 
       setSchemaLoading(false);
@@ -173,37 +286,59 @@ export const useCasePreparationHook = () => {
         return null;
       }
 
+      schemaCacheRef.current.set(cacheKey, response.data);
       return response.data;
     },
-    [showAlert, subDepartmentId]
+    [showAlert, subDepartmentId],
   );
 
   const openFormWithResolvedData = useCallback(
     async (batch: CasePrepBatch, editMode: boolean) => {
-      const status = parseStatus(batch.cpStatus ?? batch.status);
-      const shouldFetchDetails =
-        editMode || status === parseStatus(OPERATION_STATUS.IN_PROGRESS);
+      if (!batch.batchId) {
+        showAlert(STRINGS.MANUFACTURING.CASE_PREP.BATCH_ID_MISSING, "error");
+        return;
+      }
 
-      let nextBatch = batch;
-      let nextFormData = createDefaultCasePreparationFormState();
+      setLoadingFormDetails(true);
+      try {
+        const status = batch.cpStatus ?? batch.status;
+        const shouldFetchDetails =
+          editMode || isManufacturingContinueFillingStatus(String(status ?? ""));
+        const knownBatchType = batch.batchType;
 
-      if (shouldFetchDetails) {
-        const formId = resolveFormId(batch);
-        if (!subDepartmentId) {
-          showAlert(STRINGS.MANUFACTURING.CASE_PREP.SUB_DEPARTMENT_MISSING, "error");
-          return;
-        }
-        if (!formId) {
-          showAlert(STRINGS.MANUFACTURING.CASE_PREP.FORM_ID_MISSING, "error");
-          return;
-        }
+        // Parallelize: batch details + schema (when batchType known) start together.
+        const batchDetailsPromise = batchManagementController.getBatchById(batch.batchId);
+        const schemaPromise = knownBatchType
+          ? fetchCasePrepSchema(knownBatchType)
+          : Promise.resolve(null);
 
-        setLoadingFormDetails(true);
-        try {
-          const detailsResponse = await casePreparationController.fetchFormDetails({
+        const batchDetails = await batchDetailsPromise;
+        const nextBatch = enrichBatchFromDetails(batch, batchDetails);
+        if (!nextBatch) return;
+
+        let nextFormData = createDefaultCasePreparationFormState();
+        let nextAddedMotors: CasePrepAddedMotor[] = [];
+        let nextMotorStatuses: Record<string, MotorStatusMeta> = {};
+
+        if (shouldFetchDetails) {
+          const formId = resolveFormId(batch);
+          if (!subDepartmentId) {
+            showAlert(STRINGS.MANUFACTURING.CASE_PREP.SUB_DEPARTMENT_MISSING, "error");
+            return;
+          }
+          if (!formId) {
+            showAlert(STRINGS.MANUFACTURING.CASE_PREP.FORM_ID_MISSING, "error");
+            return;
+          }
+
+          const detailsPromise = casePreparationController.fetchFormDetails({
             formId,
             subDepartmentId,
           });
+          const [detailsResponse, schemaFromKnown] = await Promise.all([
+            detailsPromise,
+            schemaPromise,
+          ]);
 
           if (!detailsResponse?.success || !detailsResponse?.data) {
             const fallback =
@@ -214,40 +349,80 @@ export const useCasePreparationHook = () => {
             return;
           }
 
-          nextBatch = {
-            ...batch,
-            formId: detailsResponse.data.formId || formId,
-            batchType: batch.batchType ?? detailsResponse.data.batchType ?? batch.batchType,
-          };
+          nextBatch.formId = detailsResponse.data.formId || formId;
+          nextBatch.batchType =
+            batch.batchType ?? detailsResponse.data.batchType ?? nextBatch.batchType;
           nextFormData = mapCasePreparationDetailsToFormState(detailsResponse.data);
 
-          const schema = await fetchCasePrepSchema(nextBatch.batchType);
+          const schema =
+            schemaFromKnown &&
+            mapCasePrepBatchTypeToSchema(knownBatchType) ===
+              mapCasePrepBatchTypeToSchema(nextBatch.batchType)
+              ? schemaFromKnown
+              : await fetchCasePrepSchema(nextBatch.batchType);
+
+          const merged = mergeMotorsFromBatchAndForm(nextBatch, nextFormData);
+          nextFormData = merged.formData;
+          nextAddedMotors = merged.addedMotors;
+
           if (schema) {
-            nextFormData = hydrateCasePreparationFormState(nextFormData, schema);
+            const firstMotorId = nextFormData.motors[0]?.motorId;
+            nextFormData = hydrateCasePreparationFormState(
+              nextFormData,
+              schema,
+              buildCasePrepSetupContext(nextBatch, nextFormData.motors.length),
+              firstMotorId ? { hydrateMotorIds: [firstMotorId] } : undefined,
+            );
           }
-        } finally {
-          setLoadingFormDetails(false);
+
+          if (isMainMotorBatch(nextBatch.batchType) && nextAddedMotors.length === 0) {
+            if (!schema) return;
+            const initialized = initializeCasePrepFormFromBatch(nextBatch, schema, nextFormData);
+            nextFormData = initialized.formData;
+            nextAddedMotors = initialized.addedMotors;
+          }
+
+          nextMotorStatuses = mapCasePreparationMotorStatusesFromApi(
+            detailsResponse.data,
+            nextAddedMotors.map((m) => m.motorId),
+          );
+        } else {
+          const schemaFromKnown = await schemaPromise;
+          const schema =
+            schemaFromKnown ?? (await fetchCasePrepSchema(nextBatch.batchType));
+          if (!schema) return;
+
+          if (isMainMotorBatch(nextBatch.batchType)) {
+            const motorsFromBatch = resolveCasePrepMotorsFromBatch(nextBatch);
+            if (!motorsFromBatch.length) {
+              showAlert(STRINGS.MANUFACTURING.CASE_PREP.BATCH_MOTOR_DETAILS_MISSING, "error");
+              return;
+            }
+          }
+
+          const initialized = initializeCasePrepFormFromBatch(nextBatch, schema);
+          nextFormData = initialized.formData;
+          nextAddedMotors = initialized.addedMotors;
+          nextMotorStatuses = Object.fromEntries(
+            nextAddedMotors.map((motor) => [
+              motor.motorId,
+              { motorSubmissionStatus: "TO_BE_INITIATED" as MotorSubmissionStatus },
+            ]),
+          );
         }
+
+        setActiveBatch(nextBatch);
+        setIsEditMode(editMode);
+        setFormData(nextFormData);
+        setAddedMotors(nextAddedMotors);
+        setMotorStatusById(nextMotorStatuses);
+        setIsFormDirty(false);
+        setView("form");
+      } finally {
+        setLoadingFormDetails(false);
       }
-
-      const nextAddedMotors = buildAddedMotorsFromForm(nextFormData);
-
-      setActiveBatch(nextBatch);
-      setIsEditMode(editMode);
-      setFormData(nextFormData);
-      setAddedMotors(nextAddedMotors);
-      setMotorCount(nextAddedMotors.length > 0 ? nextAddedMotors.length : "");
-      setDraftMotorIds([]);
-      setPrrcClearanceDate("");
-      setInitialSnapshot(
-        JSON.stringify({
-          formData: nextFormData,
-          addedMotors: nextAddedMotors,
-        })
-      );
-      setView("form");
     },
-    [fetchCasePrepSchema, showAlert, subDepartmentId]
+    [fetchCasePrepSchema, showAlert, subDepartmentId],
   );
 
   const handleViewCasePrepDetails = useCallback(
@@ -281,7 +456,7 @@ export const useCasePreparationHook = () => {
       if (!response?.success || !response?.data) {
         showAlert(
           response?.message || STRINGS.MANUFACTURING.CASE_PREP.DETAILS_FETCH_ERROR,
-          "error"
+          "error",
         );
         return;
       }
@@ -291,7 +466,7 @@ export const useCasePreparationHook = () => {
       setDetailsSchema(schemaResponse?.success ? schemaResponse.data ?? null : null);
       setView("details");
     },
-    [showAlert, subDepartmentId]
+    [showAlert, subDepartmentId],
   );
 
   const handleBackFromDetails = useCallback(() => {
@@ -299,16 +474,17 @@ export const useCasePreparationHook = () => {
     setDetailsData(null);
     setDetailsSchema(null);
     setView("list");
-  }, []);
+    bumpBatchRefresh();
+  }, [bumpBatchRefresh]);
 
   const handleFillForm = useCallback(
     async (batch: CasePrepBatch) => await openFormWithResolvedData(batch, false),
-    [openFormWithResolvedData]
+    [openFormWithResolvedData],
   );
 
   const handleEditForm = useCallback(
     async (batch: CasePrepBatch) => await openFormWithResolvedData(batch, true),
-    [openFormWithResolvedData]
+    [openFormWithResolvedData],
   );
 
   const handleBack = useCallback(() => {
@@ -316,176 +492,287 @@ export const useCasePreparationHook = () => {
       setBackConfirmOpen(true);
       return;
     }
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
-  }, [isFormDirty, resetFormContext, bumpBatchRefresh, hasSavedDraft]);
+  }, [isFormDirty, resetFormContext, bumpBatchRefresh]);
 
   const handleDiscardAndBack = useCallback(() => {
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
-  }, [resetFormContext, bumpBatchRefresh, hasSavedDraft]);
+  }, [resetFormContext, bumpBatchRefresh]);
 
-  const handleMotorCountChange = useCallback((count: number | "") => {
-    setMotorCount(count);
-    if (count === "") {
-      setDraftMotorIds([]);
-      return;
-    }
-    setDraftMotorIds((prev) => Array.from({ length: Number(count) }, (_, idx) => prev[idx] ?? ""));
+  const handleMotorSessionChange = useCallback(
+    (motorId: string, nextMotor: CasePrepMotorSession, meta?: { hydrate?: boolean }) => {
+      setFormData((prev) => ({
+        ...prev,
+        motors: (prev.motors ?? []).map((motor) =>
+          motor.motorId === motorId ? nextMotor : motor,
+        ),
+      }));
+      setAddedMotors((prev) =>
+        prev.map((motor) =>
+          motor.motorId === motorId
+            ? { ...motor, prrcClearanceDate: nextMotor.prrcClearanceDate }
+            : motor,
+        ),
+      );
+      if (!meta?.hydrate) {
+        setIsFormDirty(true);
+      }
+    },
+    [],
+  );
+
+  const handleSubscaleValuesChange = useCallback((values: SchemaFormValues) => {
+    setFormData((prev) => ({ ...prev, subscaleFormValues: values }));
+    setIsFormDirty(true);
   }, []);
 
-  const handleDraftMotorIdChange = useCallback((index: number, motorId: string) => {
-    setDraftMotorIds((prev) => {
-      const next = [...prev];
-      next[index] = motorId;
-      return next;
-    });
-  }, []);
+  const getMotorStatus = useCallback(
+    (motorId: string): MotorSubmissionStatus =>
+      motorStatusById[motorId]?.motorSubmissionStatus ?? "TO_BE_INITIATED",
+    [motorStatusById],
+  );
 
-  useEffect(() => {
-    if (view !== "form" || !activeBatch) return;
+  const checkMotorEditable = useCallback(
+    (motorId: string) => isMotorEditable(getMotorStatus(motorId)),
+    [getMotorStatus],
+  );
 
-    const motorOptions = resolveCasePrepMotorOptions(activeBatch);
-    const count = motorCount === "" ? 0 : Number(motorCount);
-    if (count !== 1 || motorOptions.length !== 1) return;
+  const submitMotor = useCallback(
+    async (motorId: string, intent: "draft" | "submit") => {
+      if (!activeBatch) return false;
+      const S = STRINGS.MANUFACTURING.CASE_PREP;
 
-    const onlyMotorId = motorOptions[0]?.value ?? "";
-    if (!onlyMotorId) return;
-
-    setDraftMotorIds((prev) => (prev[0] === onlyMotorId ? prev : [onlyMotorId]));
-  }, [view, activeBatch, motorCount]);
-
-  const handleAddMotors = useCallback(async () => {
-    if (!activeBatch) return;
-
-    const schema =
-      formData.schema ?? (await fetchCasePrepSchema(activeBatch.batchType));
-    if (!schema) return;
-
-    if (isSubscaleBatch(activeBatch.batchType)) {
-      const motorOptions = resolveCasePrepMotorOptions(activeBatch);
-
-      if (motorOptions.length > 0) {
-        const count = motorCount === "" ? 0 : Number(motorCount);
-        if (count <= 0) return;
-
-        const selectedIds = getSelectedCasePrepDraftMotorIds(count, draftMotorIds);
-        if (selectedIds.length !== count || !prrcClearanceDate.trim()) return;
+      if (!subDepartmentId) {
+        showAlert(S.SUB_DEPARTMENT_MISSING, "error");
+        return false;
+      }
+      if (!formData.schema) {
+        showAlert(S.SCHEMA_LOAD_ERROR, "warning");
+        return false;
+      }
+      if (!checkMotorEditable(motorId)) {
+        showAlert(
+          getMotorStatus(motorId) === "APPROVED" ? S.MOTOR_LOCKED_APPROVED : S.MOTOR_LOCKED_WAITING,
+          "warning",
+        );
+        return false;
       }
 
-      const nextFormData = hydrateCasePreparationFormState(
-        {
-          ...formData,
-          schema,
-          motors: [],
-          subscaleFormValues: createCasePrepInitialValues(schema),
-        },
-        schema,
-      );
-      setFormData(nextFormData);
-      setDraftMotorIds([]);
-      setMotorCount("");
-      setPrrcClearanceDate("");
-      return;
+      const motor = (formData.motors ?? []).find((entry) => entry.motorId === motorId);
+      if (!motor) return false;
+
+      if (intent === "submit") {
+        if (!String(motor.prrcClearanceDate ?? "").trim()) {
+          showAlert(S.MOTOR_PRRC_REQUIRED, "warning");
+          return false;
+        }
+        if (!hasMotorCasePreparationValue(formData, motorId)) {
+          showAlert(S.MOTOR_EMPTY_ERROR, "warning");
+          return false;
+        }
+      }
+
+      const isDraft = intent === "draft";
+      const motorSubmissionType = isDraft ? "DRAFT" : "SUBMIT";
+      const formSubmissionType = "DRAFT" as const;
+      const isCreateFlow = !resolveFormId(activeBatch);
+      const payloadBody = mapCasePreparationFormStateToPayload(formData, {
+        targetMotorIds: [motorId],
+        motorSubmissionType,
+      });
+
+      if (!payloadBody.motors.length) {
+        showAlert(S.MOTOR_EMPTY_ERROR, "warning");
+        return false;
+      }
+
+      setActionLoading(true);
+      try {
+        let response: any;
+        if (isCreateFlow) {
+          if (!activeBatch.batchId) {
+            showAlert(S.BATCH_ID_MISSING, "error");
+            return false;
+          }
+          response = await casePreparationController.createForm({
+            batchId: activeBatch.batchId,
+            batchType: mapCasePrepBatchTypeToSchema(activeBatch.batchType),
+            subDepartmentId,
+            formSubmissionType,
+            casePreparationDetails: payloadBody,
+          });
+        } else {
+          const formId = resolveFormId(activeBatch);
+          if (!formId) {
+            showAlert(S.FORM_ID_MISSING, "error");
+            return false;
+          }
+          response = await casePreparationController.updateForm({
+            batchId: activeBatch.batchId,
+            formId,
+            batchType: mapCasePrepBatchTypeToSchema(activeBatch.batchType),
+            subDepartmentId,
+            formSubmissionType,
+            casePreparationDetails: payloadBody,
+          });
+        }
+
+        if (!response?.success) {
+          showAlert(
+            getErrorMessage(response, isCreateFlow ? S.CREATE_FAILED : S.UPDATE_FAILED),
+            "error",
+          );
+          return false;
+        }
+
+        const nextFormId = response.data?.formId ?? activeBatch.formId ?? null;
+        setActiveBatch((prev) => (prev ? { ...prev, formId: nextFormId } : prev));
+        setIsFormDirty(false);
+        setHasSavedDraft(true);
+
+        const nextStatus: MotorSubmissionStatus =
+          intent === "draft" ? "IN_PROGRESS" : "WAITING_FOR_APPROVAL";
+
+        setMotorStatusById((prev) => {
+          const updated: Record<string, MotorStatusMeta> = {
+            ...prev,
+            [motorId]: {
+              ...prev[motorId],
+              motorSubmissionType,
+              motorSubmissionStatus: nextStatus,
+            },
+          };
+
+          if (Array.isArray(response.data?.motorStatuses)) {
+            response.data.motorStatuses.forEach((entry: any) => {
+              const id = String(entry?.motorId ?? "").trim();
+              if (!id) return;
+              updated[id] = {
+                ...updated[id],
+                motorSubmissionType: entry.motorSubmissionType ?? updated[id]?.motorSubmissionType,
+                motorSubmissionStatus:
+                  (String(entry.motorSubmissionStatus ?? "").toUpperCase() as MotorSubmissionStatus) ||
+                  updated[id]?.motorSubmissionStatus ||
+                  "TO_BE_INITIATED",
+              };
+            });
+          }
+          return updated;
+        });
+
+        showAlert(
+          intent === "draft" ? S.MOTOR_SAVE_DRAFT_SUCCESS(motorId) : S.MOTOR_SUBMIT_SUCCESS(motorId),
+          "success",
+          { autoCloseMs: 2200 },
+        );
+        return true;
+      } finally {
+        setActionLoading(false);
+      }
+    },
+    [
+      activeBatch,
+      checkMotorEditable,
+      formData,
+      getMotorStatus,
+      showAlert,
+      subDepartmentId,
+    ],
+  );
+
+  const handleSaveMotorDraft = useCallback(
+    async (motorId: string) => submitMotor(motorId, "draft"),
+    [submitMotor],
+  );
+
+  const handleSubmitMotor = useCallback(
+    async (motorId: string) => submitMotor(motorId, "submit"),
+    [submitMotor],
+  );
+
+  const handleSubmitForFinalApproval = useCallback(async () => {
+    const S = STRINGS.MANUFACTURING.CASE_PREP;
+    if (!activeBatch?.formId) {
+      showAlert(S.FORM_ID_MISSING, "error");
+      return false;
+    }
+    if (!subDepartmentId) {
+      showAlert(S.SUB_DEPARTMENT_MISSING, "error");
+      return false;
     }
 
-    if (!isMainMotorBatch(activeBatch.batchType)) return;
+    const motorIds = addedMotors.map((m) => m.motorId);
+    const allApproved =
+      motorIds.length > 0 &&
+      motorIds.every(
+        (id) => String(motorStatusById[id]?.motorSubmissionStatus ?? "").toUpperCase() === "APPROVED",
+      );
+    if (!allApproved) {
+      showAlert(S.FINAL_APPROVAL_NOT_READY, "warning");
+      return false;
+    }
 
-    const count = motorCount === "" ? 0 : Number(motorCount);
-    if (count <= 0) return;
+    setActionLoading(true);
+    try {
+      const detailsResponse = await casePreparationController.fetchFormDetails({
+        formId: activeBatch.formId,
+        subDepartmentId,
+      });
+      if (!detailsResponse?.success || !detailsResponse?.data) {
+        showAlert(getErrorMessage(detailsResponse, S.DETAILS_FETCH_ERROR), "error");
+        return false;
+      }
 
-    const selectedIds = Array.from({ length: count }, (_, idx) => draftMotorIds[idx]?.trim()).filter(
-      Boolean
-    ) as string[];
-    if (selectedIds.length !== count || !prrcClearanceDate.trim()) return;
+      const payloadBody = mapCasePreparationDetailsFromSavedForm(detailsResponse.data, {
+        motorStatusById,
+      });
 
-    const existingIds = new Set(addedMotors.map((m) => m.motorId));
-    const newEntries: CasePrepAddedMotor[] = selectedIds
-      .filter((id) => !existingIds.has(id))
-      .map((motorId) => ({
-        motorId,
-        prrcClearanceDate: prrcClearanceDate.trim(),
-      }));
+      const response = await casePreparationController.updateForm({
+        batchId: activeBatch.batchId,
+        formId: activeBatch.formId,
+        batchType: mapCasePrepBatchTypeToSchema(activeBatch.batchType),
+        subDepartmentId,
+        formSubmissionType: "SUBMIT",
+        casePreparationDetails: payloadBody,
+      });
 
-    if (newEntries.length === 0) return;
+      if (!response?.success) {
+        showAlert(getErrorMessage(response, S.FINAL_APPROVAL_FAILED), "error");
+        return false;
+      }
 
-    const nextAdded = [...addedMotors, ...newEntries];
-    const existingSessions = formData.motors ?? [];
-    const nextSessions: CasePrepMotorSession[] = [
-      ...existingSessions,
-      ...newEntries.map((entry) => {
-        const existing = existingSessions.find((m) => m.motorId === entry.motorId);
-        return existing ?? createEmptyMotorSession(entry.motorId, entry.prrcClearanceDate, schema);
-      }),
-    ];
-
-    const nextFormData = hydrateCasePreparationFormState(
-      {
-        ...formData,
-        schema,
-        motors: nextSessions,
-      },
-      schema
-    );
-
-    setAddedMotors(nextAdded);
-    setFormData(nextFormData);
-    setDraftMotorIds([]);
-    setMotorCount("");
-    setPrrcClearanceDate("");
+      showAlert(S.FINAL_APPROVAL_SUCCESS, "success", { autoCloseMs: 2200 });
+      await listParams.refreshUserBatches();
+      bumpBatchRefresh();
+      resetFormContext();
+      return true;
+    } finally {
+      setActionLoading(false);
+    }
   }, [
     activeBatch,
     addedMotors,
-    draftMotorIds,
-    fetchCasePrepSchema,
-    formData,
-    motorCount,
-    prrcClearanceDate,
+    bumpBatchRefresh,
+    listParams,
+    motorStatusById,
+    resetFormContext,
+    showAlert,
+    subDepartmentId,
   ]);
 
-  const handleRemoveMotor = useCallback(
-    (motorId: string) => {
-      const nextAdded = addedMotors.filter((m) => m.motorId !== motorId);
-      const nextSessions = (formData.motors ?? []).filter((m) => m.motorId !== motorId);
-      setAddedMotors(nextAdded);
-      setFormData({ ...formData, motors: nextSessions });
-    },
-    [addedMotors, formData]
-  );
-
-  const handleMotorSessionChange = useCallback(
-    (motorId: string, nextMotor: CasePrepMotorSession) => {
-      const nextSessions = (formData.motors ?? []).map((motor) =>
-        motor.motorId === motorId ? nextMotor : motor
-      );
-      setFormData({ ...formData, motors: nextSessions });
-    },
-    [formData]
-  );
-
-  const handleSubscaleValuesChange = useCallback(
-    (values: SchemaFormValues) => {
-      setFormData({ ...formData, subscaleFormValues: values });
-    },
-    [formData]
-  );
-
+  // Subscale still uses whole-form draft/submit.
   const submitForm = useCallback(
     async (intent: "draft" | "submit") => {
       if (!activeBatch) return false;
-
+      const S = STRINGS.MANUFACTURING.CASE_PREP;
       if (!subDepartmentId) {
-        showAlert(STRINGS.MANUFACTURING.CASE_PREP.SUB_DEPARTMENT_MISSING, "error");
+        showAlert(S.SUB_DEPARTMENT_MISSING, "error");
         return false;
       }
-
       if (!formData.schema) {
-        showAlert(STRINGS.MANUFACTURING.CASE_PREP.SCHEMA_LOAD_ERROR, "warning");
-        return false;
-      }
-
-      if (!hasAnyCasePreparationValue(formData)) {
-        showAlert(STRINGS.MANUFACTURING.CASE_PREP.EMPTY_FORM_ERROR, "warning");
+        showAlert(S.SCHEMA_LOAD_ERROR, "warning");
         return false;
       }
 
@@ -495,31 +782,19 @@ export const useCasePreparationHook = () => {
       setActionLoading(true);
       try {
         let response: any;
-
         if (isCreateFlow) {
-          if (!activeBatch.batchId) {
-            showAlert(STRINGS.MANUFACTURING.CASE_PREP.BATCH_ID_MISSING, "error");
-            return false;
-          }
-
           response = await casePreparationController.createForm({
             batchId: activeBatch.batchId,
-            batchType: activeBatch.batchType ?? "",
+            batchType: mapCasePrepBatchTypeToSchema(activeBatch.batchType),
             subDepartmentId,
             formSubmissionType: intent === "draft" ? "DRAFT" : "SUBMIT",
             casePreparationDetails: payloadBody,
           });
         } else {
-          const formId = resolveFormId(activeBatch);
-          if (!formId) {
-            showAlert(STRINGS.MANUFACTURING.CASE_PREP.FORM_ID_MISSING, "error");
-            return false;
-          }
-
           response = await casePreparationController.updateForm({
             batchId: activeBatch.batchId,
             formId: activeBatch.formId,
-            batchType: activeBatch.batchType ?? "",
+            batchType: mapCasePrepBatchTypeToSchema(activeBatch.batchType),
             subDepartmentId,
             formSubmissionType: intent === "draft" ? "DRAFT" : "SUBMIT",
             casePreparationDetails: payloadBody,
@@ -527,62 +802,43 @@ export const useCasePreparationHook = () => {
         }
 
         if (!response?.success) {
-          const fallback = isCreateFlow
-            ? STRINGS.MANUFACTURING.CASE_PREP.CREATE_FAILED
-            : STRINGS.MANUFACTURING.CASE_PREP.UPDATE_FAILED;
-          showAlert(getErrorMessage(response, fallback), "error");
+          showAlert(
+            getErrorMessage(response, isCreateFlow ? S.CREATE_FAILED : S.UPDATE_FAILED),
+            "error",
+          );
           return false;
         }
 
         const nextFormId = response.data?.formId ?? activeBatch.formId ?? null;
         setActiveBatch((prev) => (prev ? { ...prev, formId: nextFormId } : prev));
-        setInitialSnapshot(formSnapshot);
+        setIsFormDirty(false);
 
         if (intent === "draft") {
           showAlert(
-            isCreateFlow
-              ? STRINGS.MANUFACTURING.CASE_PREP.CREATE_DRAFT_SUCCESS
-              : STRINGS.MANUFACTURING.CASE_PREP.UPDATE_DRAFT_SUCCESS,
+            isCreateFlow ? S.CREATE_DRAFT_SUCCESS : S.UPDATE_DRAFT_SUCCESS,
             "success",
-            { autoCloseMs: 2200 }
+            { autoCloseMs: 2200 },
           );
           setHasSavedDraft(true);
         } else {
           showAlert(
-            isCreateFlow
-              ? STRINGS.MANUFACTURING.CASE_PREP.CREATE_SUBMIT_SUCCESS
-              : STRINGS.MANUFACTURING.CASE_PREP.UPDATE_SUBMIT_SUCCESS,
+            isCreateFlow ? S.CREATE_SUBMIT_SUCCESS : S.UPDATE_SUBMIT_SUCCESS,
             "success",
-            { autoCloseMs: 2200 }
+            { autoCloseMs: 2200 },
           );
-
           await listParams.refreshUserBatches();
           resetFormContext();
         }
-
         return true;
       } finally {
         setActionLoading(false);
       }
     },
-    [
-      activeBatch,
-      subDepartmentId,
-      formData,
-      formSnapshot,
-      showAlert,
-      listParams,
-      resetFormContext,
-    ]
+    [activeBatch, formData, listParams, resetFormContext, showAlert, subDepartmentId],
   );
 
-  const handleSaveDraft = useCallback(async () => {
-    return await submitForm("draft");
-  }, [submitForm]);
-
-  const handleSubmit = useCallback(async () => {
-    return await submitForm("submit");
-  }, [submitForm]);
+  const handleSaveDraft = useCallback(async () => submitForm("draft"), [submitForm]);
+  const handleSubmit = useCallback(async () => submitForm("submit"), [submitForm]);
 
   return {
     ...listParams,
@@ -592,13 +848,18 @@ export const useCasePreparationHook = () => {
     isEditMode,
     formData,
     addedMotors,
-    motorCount,
-    draftMotorIds,
-    prrcClearanceDate,
+    motorStatusById,
+    getMotorStatus,
+    isMotorEditable: checkMotorEditable,
     schemaLoading,
     schemaError,
     subDepartmentId,
+    batchMotorCount: resolveCasePrepBatchMotorCount(
+      activeBatch,
+      addedMotors.length > 0 ? addedMotors.length : 1,
+    ),
     isFormDirty,
+    loadingFormDetails,
     actionLoading,
     backConfirmOpen,
     setBackConfirmOpen,
@@ -612,13 +873,11 @@ export const useCasePreparationHook = () => {
     handleEditForm,
     handleBack,
     handleDiscardAndBack,
-    handleMotorCountChange,
-    handleDraftMotorIdChange,
-    setPrrcClearanceDate,
-    handleAddMotors,
-    handleRemoveMotor,
     handleMotorSessionChange,
     handleSubscaleValuesChange,
+    handleSaveMotorDraft,
+    handleSubmitMotor,
+    handleSubmitForFinalApproval,
     handleSaveDraft,
     handleSubmit,
   };

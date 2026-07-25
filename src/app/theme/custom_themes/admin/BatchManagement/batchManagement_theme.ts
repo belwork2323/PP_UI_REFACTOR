@@ -94,6 +94,14 @@ const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
         fontFamily: fonts.family.monospace,
         ...general.noWrap,
       },
+      motorIdCellText: {
+        fontSize: fonts.size.base,
+        fontWeight: fonts.weight.semibold,
+        color: d.textSecondary,
+        fontFamily: fonts.family.monospace,
+        lineHeight: 1.35,
+        wordBreak: "break-word",
+      },
 
       stageChip: (sc) => ({
         bgcolor: sc?.bg ?? accentBlueMuted,
@@ -325,6 +333,72 @@ const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
         py: 2,
         borderTop: `1px solid ${d.dividerColor}`,
         background: d.cardBg,
+      },
+    },
+
+    /** Select material — same theme as other fields (subtle focus blue). */
+    materialSelectField: {
+      ...adminTheme.input,
+      mb: 0,
+    },
+
+    materialsTable: {
+      container: {
+        borderRadius: 2,
+        border: `1px solid ${isDark ? "rgba(255,255,255,0.12)" : "#E5E7EB"}`,
+        overflow: "auto",
+        bgcolor: d.cardBg,
+        boxShadow: isDark ? "none" : "0 1px 3px rgba(15,23,42,0.06)",
+      },
+      headerRow: {
+        bgcolor: isDark ? alpha(accentBlue, 0.12) : alpha(accentBlue, 0.06),
+      },
+      headerCell: {
+        bgcolor: isDark ? alpha(accentBlue, 0.12) : alpha(accentBlue, 0.06),
+        color: d.textSecondary,
+        fontWeight: 700,
+        fontSize: "0.72rem",
+        letterSpacing: "0.02em",
+        textTransform: "none" as const,
+        py: 1.1,
+        px: 1.25,
+        borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "#E5E7EB"}`,
+        whiteSpace: "nowrap" as const,
+        lineHeight: 1.3,
+      },
+      bodyCell: {
+        fontSize: "0.8rem",
+        py: 0.85,
+        px: 1.25,
+        color: d.textPrimary,
+        borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9"}`,
+        verticalAlign: "middle" as const,
+      },
+      textCell: {
+        fontSize: "0.8rem",
+        fontWeight: 500,
+        color: d.textPrimary,
+        lineHeight: 1.35,
+      },
+      dateControl: {
+        mb: 0,
+        width: "100%",
+        minWidth: 138,
+      },
+      compositionControl: {
+        mb: 0,
+        width: 120,
+        minWidth: 120,
+      },
+      lotControl: {
+        mb: 0,
+        minWidth: 130,
+        width: 140,
+      },
+      prcDateField: {
+        mb: 0,
+        maxWidth: 280,
+        ...adminTheme.input,
       },
     },
 

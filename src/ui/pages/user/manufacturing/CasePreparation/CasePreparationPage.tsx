@@ -1,35 +1,44 @@
 // src/ui/pages/user/manufacturing/CasePreparation/CasePreparationPage.tsx
 
 import React, { useMemo, useState } from "react";
-import { Box, CircularProgress, Button, Stack } from "@mui/material";
+import { Box, Button, Stack } from "@mui/material";
 import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog";
+import WorkflowFormOpeningLoader from "../../../../components/common/WorkflowFormOpeningLoader";
 import CasePrepList from "./CasePreparationList";
 import CasePreparationForm from "./CasePreparationForm";
 import CasePreparationHeader from "./CasePreparationHeader";
 import CasePreparationDetailsView from "./CasePreparationDetailsView";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
+import { CASE_PREP_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/casePreparation_theme";
 import useCasePreparationHook from "../../../../../hooks/user/manufacturing/useCasePreparationWorkflowHook";
+import { isSubscaleBatch } from "../../../../../hooks/user/manufacturing/casePreparationFlowConfig";
 import { STRINGS } from "../../../../../app/config/strings";
 
 const CasePreparationPage = () => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getManufacturingTheme(mode), [mode]);
   const actionStrings = STRINGS.SOURCING.SPECIFICATION_FORM;
+  const S = STRINGS.MANUFACTURING.CASE_PREP;
   const [draftConfirmOpen, setDraftConfirmOpen] = useState(false);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const [motorDraftConfirmOpen, setMotorDraftConfirmOpen] = useState(false);
+  const [motorSubmitConfirmOpen, setMotorSubmitConfirmOpen] = useState(false);
+  const [pendingMotorId, setPendingMotorId] = useState<string | null>(null);
 
   const hookState = useCasePreparationHook();
   const {
     loading,
+    loadingFormDetails,
     view,
     activeBatch,
     isEditMode,
     formData,
     addedMotors,
-    motorCount,
-    draftMotorIds,
-    prrcClearanceDate,
+    batchMotorCount,
+    motorStatusById,
+    getMotorStatus,
+    isMotorEditable,
     schemaLoading,
     schemaError,
     subDepartmentId,
@@ -44,28 +53,33 @@ const CasePreparationPage = () => {
     handleBackFromDetails,
     handleBack,
     handleDiscardAndBack,
-    handleMotorCountChange,
-    handleDraftMotorIdChange,
-    setPrrcClearanceDate,
-    handleAddMotors,
-    handleRemoveMotor,
     handleMotorSessionChange,
     handleSubscaleValuesChange,
+    handleSaveMotorDraft,
+    handleSubmitMotor,
+    handleSubmitForFinalApproval,
     handleSaveDraft,
     handleSubmit,
   } = hookState;
 
-  if (loading) {
-    return (
-      <Box sx={theme.workflow.loadingContainer}>
-        <CircularProgress size={32} />
-      </Box>
-    );
-  }
+  const listLoading = loading && !loadingFormDetails && view === "list";
+  const isSubscale = isSubscaleBatch(activeBatch?.batchType);
 
   return (
     <Box sx={theme.workflow.animatedContainer}>
-      {view === "list" && <CasePrepList hookState={hookState} />}
+      <WorkflowFormOpeningLoader
+        open={listLoading || Boolean(loadingFormDetails)}
+        title={loadingFormDetails ? S.FORM_OPENING_TITLE : S.TITLE}
+        message={
+          loadingFormDetails
+            ? S.FORM_OPENING_MESSAGE
+            : "Loading case preparation batches…"
+        }
+        color={CASE_PREP_BRAND.cp}
+        accentColor={CASE_PREP_BRAND.cpLight}
+      />
+
+      {view === "list" && !listLoading && <CasePrepList hookState={hookState} />}
 
       {view === "details" && detailsRow && (
         <CasePreparationDetailsView
@@ -77,7 +91,7 @@ const CasePreparationPage = () => {
         />
       )}
 
-      {view === "form" && activeBatch && (
+      {view === "form" && activeBatch && !loadingFormDetails && (
         <>
           <CasePreparationHeader
             batch={activeBatch}
@@ -89,50 +103,104 @@ const CasePreparationPage = () => {
             batch={activeBatch}
             formData={formData}
             addedMotors={addedMotors}
-            motorCount={motorCount}
-            draftMotorIds={draftMotorIds}
-            prrcClearanceDate={prrcClearanceDate}
+            batchMotorCount={batchMotorCount}
+            motorStatusById={motorStatusById}
+            getMotorStatus={getMotorStatus}
+            isMotorEditable={isMotorEditable}
             schemaLoading={schemaLoading}
             schemaError={schemaError}
             subDepartmentId={subDepartmentId}
-            onMotorCountChange={handleMotorCountChange}
-            onDraftMotorIdChange={handleDraftMotorIdChange}
-            onPrrcDateChange={setPrrcClearanceDate}
-            onAddMotors={handleAddMotors}
-            onRemoveMotor={handleRemoveMotor}
+            actionLoading={actionLoading}
             onMotorSessionChange={handleMotorSessionChange}
             onSubscaleValuesChange={handleSubscaleValuesChange}
+            onSaveMotorDraft={(motorId) => {
+              setPendingMotorId(motorId);
+              setMotorDraftConfirmOpen(true);
+            }}
+            onSubmitMotor={(motorId) => {
+              setPendingMotorId(motorId);
+              setMotorSubmitConfirmOpen(true);
+            }}
+            onSubmitForFinalApproval={handleSubmitForFinalApproval}
             theme={theme}
           />
 
-          <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} mt={3} justifyContent="flex-end">
-            <Button
-              variant="outlined"
-              disabled={actionLoading}
-              onClick={() => setDraftConfirmOpen(true)}
-            >
-              {actionStrings.SAVE_DRAFT}
-            </Button>
-            <Button
-              variant="contained"
-              disabled={actionLoading}
-              onClick={() => setSubmitConfirmOpen(true)}
-            >
-              {isEditMode ? actionStrings.RESUBMIT_APPROVAL : actionStrings.SUBMIT_APPROVAL}
-            </Button>
-          </Stack>
+          {isSubscale ? (
+            <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} mt={3} justifyContent="flex-end">
+              <Button
+                variant="outlined"
+                disabled={actionLoading}
+                onClick={() => setDraftConfirmOpen(true)}
+              >
+                {actionStrings.SAVE_DRAFT}
+              </Button>
+              <Button
+                variant="contained"
+                disabled={actionLoading}
+                onClick={() => setSubmitConfirmOpen(true)}
+              >
+                {isEditMode ? actionStrings.RESUBMIT_APPROVAL : actionStrings.SUBMIT_APPROVAL}
+              </Button>
+            </Stack>
+          ) : null}
         </>
       )}
 
       <ConfirmAlertDialog
         open={backConfirmOpen}
         severity="warning"
-        title={STRINGS.MANUFACTURING.CASE_PREP.UNSAVED_BACK_TITLE}
-        message={STRINGS.MANUFACTURING.CASE_PREP.UNSAVED_BACK_MESSAGE}
-        confirmLabel={STRINGS.MANUFACTURING.CASE_PREP.UNSAVED_BACK_DISCARD}
-        cancelLabel={STRINGS.MANUFACTURING.CASE_PREP.UNSAVED_BACK_CONFIRM}
+        title={S.UNSAVED_BACK_TITLE}
+        message={S.UNSAVED_BACK_MESSAGE}
+        confirmLabel={S.UNSAVED_BACK_DISCARD}
+        cancelLabel={S.UNSAVED_BACK_CONFIRM}
         onConfirm={handleDiscardAndBack}
         onCancel={() => setBackConfirmOpen(false)}
+      />
+
+      <ConfirmAlertDialog
+        open={motorDraftConfirmOpen}
+        severity="warning"
+        title={S.MOTOR_DRAFT_CONFIRM_TITLE}
+        message={
+          pendingMotorId
+            ? S.MOTOR_DRAFT_CONFIRM_MESSAGE(pendingMotorId)
+            : S.MOTOR_DRAFT_CONFIRM_TITLE
+        }
+        confirmLabel={S.SAVE_MOTOR_DRAFT}
+        cancelLabel={actionStrings.CONFIRM_DRAFT_CANCEL_ACTION}
+        onConfirm={async () => {
+          const motorId = pendingMotorId;
+          setMotorDraftConfirmOpen(false);
+          setPendingMotorId(null);
+          if (motorId) await handleSaveMotorDraft(motorId);
+        }}
+        onCancel={() => {
+          setMotorDraftConfirmOpen(false);
+          setPendingMotorId(null);
+        }}
+      />
+
+      <ConfirmAlertDialog
+        open={motorSubmitConfirmOpen}
+        severity="warning"
+        title={S.MOTOR_SUBMIT_CONFIRM_TITLE}
+        message={
+          pendingMotorId
+            ? S.MOTOR_SUBMIT_CONFIRM_MESSAGE(pendingMotorId)
+            : S.MOTOR_SUBMIT_CONFIRM_TITLE
+        }
+        confirmLabel={S.SUBMIT_MOTOR}
+        cancelLabel={actionStrings.CONFIRM_CANCEL_ACTION}
+        onConfirm={async () => {
+          const motorId = pendingMotorId;
+          setMotorSubmitConfirmOpen(false);
+          setPendingMotorId(null);
+          if (motorId) await handleSubmitMotor(motorId);
+        }}
+        onCancel={() => {
+          setMotorSubmitConfirmOpen(false);
+          setPendingMotorId(null);
+        }}
       />
 
       <ConfirmAlertDialog

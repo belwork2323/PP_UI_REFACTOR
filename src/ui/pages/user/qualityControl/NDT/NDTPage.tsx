@@ -67,7 +67,12 @@ const NDTPage = () => {
   if (view === "details" && detailsRow) {
     return (
       <Box sx={theme.workflow.animatedContainer}>
-        <NDTDetailsView row={detailsRow} data={detailsData} loading={detailsLoading} onBack={handleBackFromDetails} />
+        <NDTDetailsView
+          row={detailsRow}
+          data={detailsData}
+          loading={detailsLoading}
+          onBack={handleBackFromDetails}
+        />
       </Box>
     );
   }
@@ -77,15 +82,23 @@ const NDTPage = () => {
       {activeBatch && (
         <>
           <UserWorkflowFormHeader
-            batch={{
-              ...activeBatch,
-              lotId: activeBatch.lotId ?? activeBatch.batchId,
+            mode="update"
+            data={{
+              title: String(activeBatch.lotId ?? activeBatch.batchId ?? "—"),
+              subtitle:
+                String(activeBatch.motorId ?? "").trim() &&
+                String(activeBatch.motorId).trim() !== "—"
+                  ? String(activeBatch.motorId).trim()
+                  : undefined,
+              statusLabel: isEditMode
+                ? STRINGS.QUALITY_CONTROL.FORM_HEADER.EDITING_REJECTED
+                : strings.NEW_LABEL,
+              statusVariant: isEditMode ? "edit" : "new",
+              rejectionReason: activeBatch.rejectionReason,
             }}
             isEdit={isEditMode}
             onBack={handleBack}
-            newLabel={strings.NEW_LABEL}
             backLabel={STRINGS.QUALITY_CONTROL.FORM_HEADER.BACK_TO_LIST}
-            editLabel={STRINGS.QUALITY_CONTROL.FORM_HEADER.EDITING_REJECTED}
             rejectionTitle={STRINGS.QUALITY_CONTROL.FORM_HEADER.REJECTION_REASON}
             theme={theme}
           />
@@ -111,7 +124,12 @@ const NDTPage = () => {
           )}
 
           {!loadingFormDetails && canAct ? (
-            <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} mt={3} justifyContent="flex-end">
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              gap={1.5}
+              mt={3}
+              justifyContent="flex-end"
+            >
               <Button
                 variant="outlined"
                 disabled={actionLoading}
@@ -148,8 +166,12 @@ const NDTPage = () => {
                 open={submitConfirm}
                 severity="warning"
                 title={isEditMode ? strings.RESUBMIT_CONFIRM_TITLE : strings.SUBMIT_CONFIRM_TITLE}
-                message={isEditMode ? strings.RESUBMIT_CONFIRM_MESSAGE : strings.SUBMIT_CONFIRM_MESSAGE}
-                confirmLabel={isEditMode ? strings.RESUBMIT_CONFIRM_LABEL : strings.SUBMIT_CONFIRM_LABEL}
+                message={
+                  isEditMode ? strings.RESUBMIT_CONFIRM_MESSAGE : strings.SUBMIT_CONFIRM_MESSAGE
+                }
+                confirmLabel={
+                  isEditMode ? strings.RESUBMIT_CONFIRM_LABEL : strings.SUBMIT_CONFIRM_LABEL
+                }
                 cancelLabel={strings.CONFIRM_GO_BACK_LABEL}
                 onConfirm={async () => {
                   setSubmitConfirm(false);

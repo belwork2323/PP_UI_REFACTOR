@@ -37,72 +37,88 @@ const UserWorkflowStatusAction = ({
   approvedLabel = "Approved",
   continueUsesPrimaryStyle = false,
 }: UserWorkflowStatusActionProps) => {
-  switch (status) {
-    case statusMap.TO_BE_INITIATED:
-      return (
-        <Button
-          variant="contained"
-          size="small"
-          endIcon={<ArrowForwardRoundedIcon sx={{ fontSize: "14px !important" }} />}
-          onClick={() => onFillForm(row)}
-          sx={theme.batchList.action.primary}
-        >
-          {fillLabel}
-        </Button>
-      );
+  const isToBeInitiated = status === statusMap?.TO_BE_INITIATED || status === "TO_BE_INITIATED";
 
-    case statusMap.IN_PROGRESS:
-      return (
-        <Button
-          variant={continueUsesPrimaryStyle ? "contained" : "outlined"}
-          size="small"
-          endIcon={<ArrowForwardRoundedIcon sx={{ fontSize: "14px !important" }} />}
-          onClick={() => onFillForm(row)}
-          sx={
-            continueUsesPrimaryStyle
-              ? theme.batchList.action.primary
-              : theme.batchList.action.secondary
-          }
-        >
-          {continueLabel}
-        </Button>
-      );
+  const isInProgress = status === statusMap?.IN_PROGRESS || status === "IN_PROGRESS";
 
-    case statusMap.REJECTED:
-      return (
-        <Tooltip title={editTooltip} arrow placement="top">
-          <Button
-            variant="outlined"
-            size="small"
-            startIcon={<EditRoundedIcon sx={{ fontSize: "14px !important" }} />}
-            onClick={() => onEditForm(row)}
-            sx={theme.batchList.action.danger}
-          >
-            {editLabel}
-          </Button>
-        </Tooltip>
-      );
+  const isRejected = status === statusMap?.REJECTED || status === "REJECTED";
+
+  const isWaitingForApproval =
+    status === statusMap?.WAITING_FOR_APPROVAL || status === "WAITING_FOR_APPROVAL";
+
+  const isApproved = status === statusMap?.APPROVED || status === "APPROVED";
+
+  if (isToBeInitiated) {
+    return (
+      <Button
+        variant="contained"
+        size="small"
+        endIcon={<ArrowForwardRoundedIcon sx={{ fontSize: "14px !important" }} />}
+        onClick={() => onFillForm(row)}
+        sx={theme.batchList.action.primary}
+      >
+        {fillLabel}
+      </Button>
+    );
+  }
+
+  if (isInProgress) {
+    return (
+      <Button
+        variant={continueUsesPrimaryStyle ? "contained" : "outlined"}
+        size="small"
+        endIcon={<ArrowForwardRoundedIcon sx={{ fontSize: "14px !important" }} />}
+        onClick={() => onFillForm(row)}
+        sx={
+          continueUsesPrimaryStyle
+            ? theme.batchList.action.primary
+            : theme.batchList.action.secondary
+        }
+      >
+        {continueLabel}
+      </Button>
+    );
+  }
+
+  if (isRejected) {
+    return (
+      <Tooltip title={editTooltip} arrow placement="top">
+        <Button
+          variant="outlined"
+          size="small"
+          startIcon={<EditRoundedIcon sx={{ fontSize: "14px !important" }} />}
+          onClick={() => onEditForm(row)}
+          sx={theme.batchList.action.danger}
+        >
+          {editLabel}
+        </Button>
+      </Tooltip>
+    );
+  }
 
     case statusMap.WAITING_FOR_APPROVAL:
+    case statusMap.WAITING_FOR_COMPLETE_APPROVAL:
       return <Chip label={waitingLabel} size="small" sx={theme.batchList.chips.waiting} />;
 
-    case statusMap.APPROVED:
-      return (
-        <Chip
-          icon={
-            <CheckCircleRoundedIcon
-              sx={{ fontSize: "13px !important", color: `${theme.palette.success} !important` }}
-            />
-          }
-          label={approvedLabel}
-          size="small"
-          sx={theme.batchList.chips.approved}
-        />
-      );
-
-    default:
-      return null;
+  if (isApproved) {
+    return (
+      <Chip
+        icon={
+          <CheckCircleRoundedIcon
+            sx={{
+              fontSize: "13px !important",
+              color: `${theme.palette.success?.main || theme.palette.success} !important`,
+            }}
+          />
+        }
+        label={approvedLabel}
+        size="small"
+        sx={theme.batchList.chips.approved}
+      />
+    );
   }
+
+  return null;
 };
 
 export default UserWorkflowStatusAction;

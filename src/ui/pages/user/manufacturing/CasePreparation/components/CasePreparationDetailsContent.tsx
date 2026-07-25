@@ -149,7 +149,7 @@ const CasePrepSectionPanel = ({
   </Box>
 );
 
-const MotorDetailPanel = ({
+export const MotorDetailPanel = ({
   motor,
   dt,
   palette,

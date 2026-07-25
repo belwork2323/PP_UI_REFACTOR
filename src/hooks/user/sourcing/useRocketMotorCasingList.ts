@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuthStore } from "../../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshStore";
 import { STRINGS } from "../../../app/config/strings";
+import { projectManagementController } from "@controllers/admin/ProjectManagement/projectManagementController";
 import { operationsController } from "../../../controllers/user/operationsController";
 import rocketMotorCasingController from "../../../controllers/user/sourcing/rocketMotorCasingController";
 import {
@@ -35,8 +36,10 @@ const buildStatusCountsFromBatches = (batches: RocketMotorBatch[], totalRecords:
 };
 
 export type MotorStageOption = { motorStage: string; noOfmotors: number };
+export type ProjectFilterOption = { projectId: string; projectName: string };
 
 export type RocketMotorCasingListAdvancedFilters = {
+  projectIds: string[];
   motorStages: string[];
   casingTypes: string[];
   insulationTypes: string[];
@@ -45,6 +48,7 @@ export type RocketMotorCasingListAdvancedFilters = {
 };
 
 const emptyAdvanced: RocketMotorCasingListAdvancedFilters = {
+  projectIds: [],
   motorStages: [],
   casingTypes: [],
   insulationTypes: [],
@@ -55,7 +59,12 @@ const emptyAdvanced: RocketMotorCasingListAdvancedFilters = {
 /** Map list API row → batch shape used by RocketMotorBatchList / form hook */
 export function mapRocketMotorCasingListRow(row: Record<string, unknown>): RocketMotorBatch {
   const motorCasingId = String(row?.motorCasingId ?? "").trim();
-  const projectId = String(row?.projectId ?? "").trim();
+  const project =
+    row?.project && typeof row.project === "object"
+      ? (row.project as { projectId?: string | null; projectName?: string | null })
+      : null;
+  const projectId = String(project?.projectId ?? row?.projectId ?? "").trim();
+  const projectName = String(project?.projectName ?? row?.projectName ?? "").trim();
   const motorStage =
     row?.motorStage != null && String(row.motorStage).trim() !== "" ? String(row.motorStage) : "";
   const motorId = String(row?.motorId ?? row?.motorNo ?? "").trim();
@@ -77,6 +86,7 @@ export function mapRocketMotorCasingListRow(row: Record<string, unknown>): Rocke
     sourcingId: null,
     motorCasingId,
     projectId,
+    projectName,
     motorStage,
     motorNo: motorId,
     motorId: motorId || "—",
@@ -161,6 +171,10 @@ export const useRocketMotorCasingList = () => {
     useState<RocketMotorCasingListAdvancedFilters>(emptyAdvanced);
   const [motorStageOptions, setMotorStageOptions] = useState<MotorStageOption[]>([]);
   const [motorStagesLoading, setMotorStagesLoading] = useState(false);
+  const [motorStagesLoaded, setMotorStagesLoaded] = useState(false);
+  const [projectOptions, setProjectOptions] = useState<ProjectFilterOption[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
 
   const setStatusFilter = useCallback((value: string) => {
     setStatusFilterState(value);
@@ -175,42 +189,73 @@ export const useRocketMotorCasingList = () => {
     return () => clearTimeout(t);
   }, [search]);
 
-  useEffect(() => {
-    let active = true;
-    const loadStages = async () => {
-      if (!subDepartmentId) {
+  /** Load motor stages only when Filters panel opens (not on list mount). */
+  const ensureMotorStageOptions = useCallback(async () => {
+    if (!subDepartmentId) {
+      setMotorStageOptions([]);
+      return;
+    }
+    if (motorStagesLoaded || motorStagesLoading) return;
+    setMotorStagesLoading(true);
+    try {
+      const res = await operationsController.fetchMotorsStageList();
+      if (res?.success && res.data) {
+        setMotorStageOptions(
+          (res.data.stages ?? []).map((s: { motorStage?: string; noOfmotors?: number }) => ({
+            motorStage: String(s.motorStage ?? ""),
+            noOfmotors: Number(s.noOfmotors ?? 0),
+          })),
+        );
+      } else {
         setMotorStageOptions([]);
-        return;
       }
-      setMotorStagesLoading(true);
-      try {
-        const res = await operationsController.fetchMotorsStageList();
-        if (!active) return;
-        if (res?.success && res.data) {
-          setMotorStageOptions(
-            (res.data.stages ?? []).map((s: { motorStage?: string; noOfmotors?: number }) => ({
-              motorStage: String(s.motorStage ?? ""),
-              noOfmotors: Number(s.noOfmotors ?? 0),
-            })),
-          );
-        } else {
-          setMotorStageOptions([]);
-        }
-      } catch {
-        if (active) setMotorStageOptions([]);
-      } finally {
-        if (active) setMotorStagesLoading(false);
+      setMotorStagesLoaded(true);
+    } catch {
+      setMotorStageOptions([]);
+    } finally {
+      setMotorStagesLoading(false);
+    }
+  }, [subDepartmentId, motorStagesLoaded, motorStagesLoading]);
+
+  /** Load projects only when Filters panel opens (not on list mount). */
+  const ensureProjectOptions = useCallback(async () => {
+    if (projectsLoaded || projectsLoading) return;
+    setProjectsLoading(true);
+    try {
+      const res = await projectManagementController.getAllProjects({
+        page: 1,
+        limit: 1000,
+        sortBy: "createdOn",
+        sortOrder: "desc",
+      });
+      if (res?.success && res.data) {
+        const raw = (res.data as { projects?: unknown[] }).projects ?? [];
+        setProjectOptions(
+          raw.map((p: any) => ({
+            projectId: String(p.projectId ?? ""),
+            projectName: String(p.projectName ?? p.projectId ?? ""),
+          })),
+        );
+      } else {
+        setProjectOptions([]);
       }
-    };
-    void loadStages();
-    return () => {
-      active = false;
-    };
+      setProjectsLoaded(true);
+    } catch {
+      setProjectOptions([]);
+    } finally {
+      setProjectsLoading(false);
+    }
+  }, [projectsLoaded, projectsLoading]);
+
+  useEffect(() => {
+    setMotorStagesLoaded(false);
+    setMotorStageOptions([]);
   }, [subDepartmentId]);
 
   const applyAdvancedFilters = useCallback(
     (next: RocketMotorCasingListAdvancedFilters & { status: string }) => {
       setAdvancedFilters({
+        projectIds: [...next.projectIds],
         motorStages: [...next.motorStages],
         casingTypes: [...next.casingTypes],
         insulationTypes: [...next.insulationTypes],
@@ -231,6 +276,7 @@ export const useRocketMotorCasingList = () => {
 
   const activeFilterCount = useMemo(() => {
     let n = 0;
+    if (advancedFilters.projectIds.length) n += 1;
     if (advancedFilters.motorStages.length) n += 1;
     if (advancedFilters.casingTypes.length) n += 1;
     if (advancedFilters.insulationTypes.length) n += 1;
@@ -271,6 +317,9 @@ export const useRocketMotorCasingList = () => {
         }
       }
 
+      if (advancedFilters.projectIds.length) {
+        payload.projectId = advancedFilters.projectIds[0];
+      }
       if (advancedFilters.motorStages.length) {
         payload.motorStage = advancedFilters.motorStages;
       }
@@ -369,6 +418,10 @@ export const useRocketMotorCasingList = () => {
     refreshUserBatches,
     motorStageOptions,
     motorStagesLoading,
+    ensureMotorStageOptions,
+    projectOptions,
+    projectsLoading,
+    ensureProjectOptions,
     advancedFilters,
     applyAdvancedFilters,
     clearAdvancedFilters,

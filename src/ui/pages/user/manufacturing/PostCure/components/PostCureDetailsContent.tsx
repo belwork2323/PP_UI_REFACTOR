@@ -25,7 +25,10 @@ import {
   type CasePrepDetailTable,
 } from "../../../../../../data/models/user/CasePreparationFormModel";
 import { orderCastingCuringDisplayColumns } from "../../../../../../data/models/user/CastingCuringFormModel";
-import type { PostCureDetailView, PostCureMotorDetailView } from "../../../../../../data/models/user/PostCureFormModel";
+import type {
+  PostCureDetailView,
+  PostCureMotorDetailView,
+} from "../../../../../../data/models/user/PostCureFormModel";
 import { OPERATION_STATUS_UI_TO_API } from "../../../../../../hooks/operationStatus";
 
 const API_OPERATION_STATUS_LABELS = Object.fromEntries(
@@ -90,13 +93,7 @@ const FieldsTable = ({
   );
 };
 
-const DataTable = ({
-  table,
-  dt,
-}: {
-  table: CasePrepDetailTable;
-  dt: PostCureDetailsTheme;
-}) => {
+const DataTable = ({ table, dt }: { table: CasePrepDetailTable; dt: PostCureDetailsTheme }) => {
   const columns = orderCastingCuringDisplayColumns(Object.keys(table.columnLabels));
   if (!columns.length || !table.rows.length) return null;
 
@@ -122,7 +119,10 @@ const DataTable = ({
               if (row.type === "header" && headerLabel) {
                 return (
                   <TableRow key={rowIndex} sx={{ background: "rgba(21,101,192,0.06)" }}>
-                    <TableCell colSpan={columns.length} sx={{ ...dt.tableCell, fontWeight: 700, fontSize: "0.72rem" }}>
+                    <TableCell
+                      colSpan={columns.length}
+                      sx={{ ...dt.tableCell, fontWeight: 700, fontSize: "0.72rem" }}
+                    >
                       {headerLabel}
                     </TableCell>
                   </TableRow>
@@ -194,7 +194,9 @@ const MotorDetailPanel = ({
     {motor.sections.length === 0 ? (
       <Typography sx={dt.emptyText}>{PC.DETAILS_NO_MOTOR_DATA}</Typography>
     ) : (
-      motor.sections.map((section) => <SectionPanel key={section.sectionId} section={section} dt={dt} />)
+      motor.sections.map((section) => (
+        <SectionPanel key={section.sectionId} section={section} dt={dt} />
+      ))
     )}
   </Box>
 );
@@ -218,7 +220,8 @@ const PostCureDetailsContent = ({
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
 
   const motors = detailView?.motors ?? [];
-  const activeMotorIndexSafe = motors.length > 0 ? Math.min(activeMotorIndex, motors.length - 1) : 0;
+  const activeMotorIndexSafe =
+    motors.length > 0 ? Math.min(activeMotorIndex, motors.length - 1) : 0;
   const activeMotor = motors[activeMotorIndexSafe] ?? null;
 
   useEffect(() => {
@@ -229,7 +232,10 @@ const PostCureDetailsContent = ({
     { label: BL.COL_BATCH_ID, value: detailView?.batchId || row?.batchId || "—" },
     { label: "Form ID", value: detailView?.formId || row?.formId || "—" },
     { label: "Batch Type", value: detailView?.batchType || row?.batchType || "—" },
-    { label: "Status", value: formatStatusLabel(detailView?.status || String(row?.pcStatus ?? row?.status ?? "")) },
+    {
+      label: "Status",
+      value: formatStatusLabel(detailView?.status || String(row?.pcStatus ?? row?.status ?? "")),
+    },
     { label: BL.COL_CREATED_BY, value: detailView?.createdBy || "—" },
     { label: BL.COL_CREATED_ON, value: formatDateTime(detailView?.createdAt) },
     { label: "Submitted By", value: detailView?.submittedBy || "—" },
@@ -283,7 +289,14 @@ const PostCureDetailsContent = ({
                 background: theme.palette.surface,
               }}
             >
-              <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: theme.palette.primary, mb: 0.75 }}>
+              <Typography
+                sx={{
+                  fontSize: "0.76rem",
+                  fontWeight: 700,
+                  color: theme.palette.primary,
+                  mb: 0.75,
+                }}
+              >
                 {PC.MOTOR_NAV_TITLE}
               </Typography>
               <Typography sx={{ fontSize: "0.72rem", color: theme.palette.textSub, mb: 1 }}>
@@ -296,7 +309,12 @@ const PostCureDetailsContent = ({
                     size="small"
                     variant={index === activeMotorIndexSafe ? "contained" : "outlined"}
                     onClick={() => setActiveMotorIndex(index)}
-                    sx={{ whiteSpace: "nowrap", flexShrink: 0, textTransform: "none", fontWeight: 700 }}
+                    sx={{
+                      whiteSpace: "nowrap",
+                      flexShrink: 0,
+                      textTransform: "none",
+                      fontWeight: 700,
+                    }}
                   >
                     {motor.motorId}
                   </Button>

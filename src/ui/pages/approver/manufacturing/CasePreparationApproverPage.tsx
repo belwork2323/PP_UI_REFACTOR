@@ -6,7 +6,9 @@ import { APPROVER_STATUS_META } from "../../../../app/theme/approver";
 import useCasePreparationApproverHook from "../../../../hooks/approver/manufacturing/useCasePreparationApproverHook";
 import ApproverSubdepartmentBatchListSection from "../components/ApproverSubdepartmentBatchListSection";
 import ApproverActionDialog from "../../../components/custom/ApproverActionDialog";
-import CasePreparationApproverDetailDialog from "./CasePreparationApproverDetailDialog";
+import CasePreparationApproverDetailDialog, {
+  type CasePreparationApproverDetailItem,
+} from "./CasePreparationApproverDetailDialog";
 
 const BRAND = {
   primary: "#1B4F72",
@@ -27,12 +29,17 @@ const CasePreparationApproverPage = () => {
     items,
     selected,
     detailsLoading,
-    detailView,
+    activeMotorId,
     dialogProps,
+    formDialogProps,
+    actionLoading,
     requestApprove,
     requestReject,
+    requestFormApprove,
+    requestFormReject,
     handleViewDetails,
     handleCloseDetail,
+    handleActiveMotorChange,
   } = useCasePreparationApproverHook();
 
   return (
@@ -55,14 +62,19 @@ const CasePreparationApproverPage = () => {
       <CasePreparationApproverDetailDialog
         open={!!selected}
         onClose={handleCloseDetail}
-        item={selected}
-        detailView={detailView}
+        item={selected as CasePreparationApproverDetailItem | null}
         loading={detailsLoading}
+        activeMotorId={activeMotorId}
+        onActiveMotorChange={handleActiveMotorChange}
         onApprove={requestApprove}
         onReject={requestReject}
+        onApproveForm={requestFormApprove}
+        onRejectForm={requestFormReject}
+        actionLoading={actionLoading}
         theme={approverTheme}
       />
       <ApproverActionDialog {...dialogProps} />
+      <ApproverActionDialog {...formDialogProps} />
     </ApproverSubdepartmentBatchListSection>
   );
 };

@@ -9,26 +9,24 @@ const S = STRINGS.MANUFACTURING;
 const RawMaterialPreparationHeader = ({ batch, isEdit, onBack, theme }: any) => {
   const rmTheme = theme.manufacturing.rawMaterialPrep;
   const scaleLabel = getBatchScaleLabel(batch.batchType);
+  const motorId = String(batch.motorId ?? "").trim();
 
   return (
     <UserWorkflowFormHeader
-      batch={batch}
-      isEdit={isEdit}
-      onBack={onBack}
-      newLabel={RM.NEW_LABEL}
-      backLabel={S.FORM_HEADER.BACK_TO_LIST}
-      editLabel={S.FORM_HEADER.EDITING_REJECTED}
-      rejectionTitle={S.FORM_HEADER.REJECTION_REASON}
-      batchHeadingOverride={{
-        title: batch.batchId ?? batch.lotId,
-        subtitle: `${batch.motorId}${batch.motorType ? ` · Type ${batch.motorType}` : ""}`,
-      }}
-      additionalChips={
-        batch.batchType ? (
+      mode="update"
+      data={{
+        title: String(batch.batchId ?? batch.lotId ?? "—"),
+        subtitle: motorId && motorId !== "—" ? motorId : undefined,
+        statusLabel: isEdit ? S.FORM_HEADER.EDITING_REJECTED : RM.NEW_LABEL,
+        statusVariant: isEdit ? "edit" : "new",
+        rejectionReason: batch.rejectionReason,
+        extraChips: batch.batchType ? (
           <Chip label={scaleLabel} size="small" sx={rmTheme.header.scaleChip(theme.palette.primary)} />
-        ) : null
-      }
-      headerContentSx={rmTheme.header.contentPadding}
+        ) : null,
+      }}
+      onBack={onBack}
+      backLabel={S.FORM_HEADER.BACK_TO_LIST}
+      rejectionTitle={S.FORM_HEADER.REJECTION_REASON}
       theme={theme}
     />
   );

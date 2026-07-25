@@ -113,7 +113,9 @@ export default function InProgressBatchesTable({
     .replace(/[^a-zA-Z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .toUpperCase();
-  const canViewDetails = normalizedRole === "SYSTEM_MANAGER" && Boolean(onViewDetails);
+  const canViewDetails =
+    (normalizedRole === "SYSTEM_MANAGER" || normalizedRole === "CENTRE_HEAD") &&
+    Boolean(onViewDetails);
 
   const handleMenuOpen = (e: React.MouseEvent<HTMLElement>, row: InProgressBatchRow) => {
     e.stopPropagation();

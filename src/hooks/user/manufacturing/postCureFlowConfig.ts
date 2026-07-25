@@ -34,12 +34,12 @@ export const canLoadPostCureForm = ({
   inhibitorType: string;
   schemaFormLoaded: boolean;
 }) => {
+  // Allow initial load only when schema isn't loaded yet
   if (schemaFormLoaded) return false;
   if (!String(motorId ?? "").trim()) return false;
   if (!String(motorReceiptDate ?? "").trim()) return false;
   return hasValidSetup(operation, inhibitorType);
 };
-
 export const canAddPostCureMotor = ({
   motorId,
   motorReceiptDate,
@@ -59,13 +59,11 @@ export const canAddPostCureMotor = ({
   if (!id || !String(motorReceiptDate ?? "").trim()) return false;
   if (!hasValidSetup(operation, inhibitorType)) return false;
   if (usedMotorIds.includes(id)) return false;
-  if (availableMotorOptions.length > 0 && !availableMotorOptions.some((option) => option.value === id)) {
+  if (
+    availableMotorOptions.length > 0 &&
+    !availableMotorOptions.some((option) => option.value === id)
+  ) {
     return false;
   }
   return true;
-};
-
-export const POST_CURE_FLOW_LABELS = {
-  addMotor: S.ADD_MOTOR_ACTION,
-  schemaLoading: S.SCHEMA_LOADING,
 };

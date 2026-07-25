@@ -1,9 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { alpha, Button, CircularProgress, MenuItem, Stack, TextField } from "@mui/material";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import dayjs from "dayjs";
 
 import { STRINGS } from "../../../../app/config/strings";
 import {
@@ -11,8 +7,11 @@ import {
   useApproverSubdepartmentBatchListFilters,
 } from "../../../../hooks/approver/useApproverSubdepartmentBatchListFilters";
 import { MANUFACTURING_BATCH_TYPE_OPTIONS } from "../../../../data/models/user/SubdepartmentBatchModel";
+import { getApproverBatchStatusDisplayLabel } from "../../../../data/models/approver/ApproverBatchListModel";
 import FilterPanelHeader from "@ui/components/common/FilterPanelHeader";
 import FilterToggleButton from "../../../components/common/FilterToggleButton";
+import DateField from "../../../components/common/DateField";
+import { formatToIsoDateInput, formatToUiDate } from "../../../../utils/dateUtils";
 import getApproverManufacturingFilterStyles from "../manufacturing/approverManufacturingFilterStyles";
 
 const BL = STRINGS.MANUFACTURING.BATCH_LIST;
@@ -55,6 +54,9 @@ export const useApproverSubdepartmentBatchListFilterBar = ({
     filterAllLabel,
     motorStageOptions,
     motorStagesLoading,
+    projectOptions,
+    projectsLoading,
+    ensureProjectOptions,
     applyClientFilters,
   } = useApproverSubdepartmentBatchListFilters();
 
@@ -63,6 +65,7 @@ export const useApproverSubdepartmentBatchListFilterBar = ({
   const [draftBatchType, setDraftBatchType] = useState(filterAllLabel);
   const [draftMotorId, setDraftMotorId] = useState("");
   const [draftMotorStage, setDraftMotorStage] = useState(filterAllLabel);
+  const [draftProjectId, setDraftProjectId] = useState(filterAllLabel);
   const [draftSubmittedBy, setDraftSubmittedBy] = useState("");
   const [draftFrom, setDraftFrom] = useState("");
   const [draftTo, setDraftTo] = useState("");
@@ -73,6 +76,7 @@ export const useApproverSubdepartmentBatchListFilterBar = ({
     setDraftBatchType(appliedFilters.batchType || filterAllLabel);
     setDraftMotorId(appliedFilters.motorId);
     setDraftMotorStage(appliedFilters.motorStage || filterAllLabel);
+    setDraftProjectId(appliedFilters.projectId || filterAllLabel);
     setDraftSubmittedBy(appliedFilters.submittedBy);
     setDraftFrom(appliedFilters.fromDate);
     setDraftTo(appliedFilters.toDate);
@@ -83,9 +87,10 @@ export const useApproverSubdepartmentBatchListFilterBar = ({
   useEffect(() => {
     if (filterOpen && !filterWasOpen.current) {
       syncDraftsFromApplied();
+      void ensureProjectOptions();
     }
     filterWasOpen.current = filterOpen;
-  }, [filterOpen, syncDraftsFromApplied]);
+  }, [filterOpen, syncDraftsFromApplied, ensureProjectOptions]);
 
   useEffect(() => {
     if (!filterOpen) return;
@@ -147,6 +152,7 @@ export const useApproverSubdepartmentBatchListFilterBar = ({
       batchType: draftBatchType === filterAllLabel ? "" : draftBatchType,
       motorId: draftMotorId.trim(),
       motorStage: draftMotorStage === filterAllLabel ? "" : draftMotorStage,
+      projectId: draftProjectId === filterAllLabel ? "" : draftProjectId,
       submittedBy: draftSubmittedBy.trim(),
       fromDate: from,
       toDate: to,
@@ -162,6 +168,7 @@ export const useApproverSubdepartmentBatchListFilterBar = ({
     setDraftBatchType(filterAllLabel);
     setDraftMotorId("");
     setDraftMotorStage(filterAllLabel);
+    setDraftProjectId(filterAllLabel);
     setDraftSubmittedBy("");
     setDraftFrom("");
     setDraftTo("");
@@ -288,6 +295,40 @@ export const useApproverSubdepartmentBatchListFilterBar = ({
           ) : null}
         </Stack>
 
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="flex-start"
+          sx={{ minWidth: { xs: "100%", sm: 200 }, flex: { lg: "0 0 auto" } }}
+        >
+          <TextField
+            select
+            size="small"
+            label={BL.FILTERS_PROJECT}
+            value={draftProjectId}
+            onChange={(event) => setDraftProjectId(event.target.value)}
+            disabled={projectsLoading}
+            fullWidth
+            InputLabelProps={{ shrink: true }}
+            sx={filterStyles.field}
+            SelectProps={{
+              ...filterStyles.selectProps,
+              displayEmpty: true,
+            }}
+          >
+            <MenuItem value={filterAllLabel}>{BL.FILTERS_ALL_PROJECTS}</MenuItem>
+            {!projectsLoading &&
+              projectOptions.map((project) => (
+                <MenuItem key={project.projectId} value={project.projectId}>
+                  {project.projectName} ({project.projectId})
+                </MenuItem>
+              ))}
+          </TextField>
+          {projectsLoading ? (
+            <CircularProgress size={18} sx={{ mt: 0.75, color: theme.palette.primaryLight }} />
+          ) : null}
+        </Stack>
+
         <TextField
           size="small"
           label={BL.COL_SUBMITTED_BY}
@@ -308,37 +349,25 @@ export const useApproverSubdepartmentBatchListFilterBar = ({
         >
           {statusDropdownValues.map((status) => (
             <MenuItem key={status} value={status}>
-              {status}
+              {status === filterAllLabel ? status : getApproverBatchStatusDisplayLabel(status)}
             </MenuItem>
           ))}
         </TextField>
 
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <DatePicker
-            label={BL.FILTERS_FROM_DATE}
-            format="YYYY-MM-DD"
-            value={draftFrom ? dayjs(draftFrom) : null}
-            onChange={(value) => setDraftFrom(value && value.isValid() ? value.format("YYYY-MM-DD") : "")}
-            slotProps={{
-              textField: {
-                size: "small",
-                sx: filterStyles.fieldDate,
-              },
-            }}
-          />
-          <DatePicker
-            label={BL.FILTERS_TO_DATE}
-            format="YYYY-MM-DD"
-            value={draftTo ? dayjs(draftTo) : null}
-            onChange={(value) => setDraftTo(value && value.isValid() ? value.format("YYYY-MM-DD") : "")}
-            slotProps={{
-              textField: {
-                size: "small",
-                sx: filterStyles.fieldDate,
-              },
-            }}
-          />
-        </LocalizationProvider>
+        <DateField
+          label={BL.FILTERS_FROM_DATE}
+          value={formatToUiDate(draftFrom)}
+          onChange={(value) => setDraftFrom(formatToIsoDateInput(value))}
+          compact
+          sx={filterStyles.fieldDate}
+        />
+        <DateField
+          label={BL.FILTERS_TO_DATE}
+          value={formatToUiDate(draftTo)}
+          onChange={(value) => setDraftTo(formatToIsoDateInput(value))}
+          compact
+          sx={filterStyles.fieldDate}
+        />
       </Stack>
 
       <Stack direction="row" justifyContent="flex-end" spacing={1}>

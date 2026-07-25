@@ -222,7 +222,7 @@ export const getRocketMotorCasingTheme = (baseTheme: any) => {
 			},
 			stepNav: {
 				root: {
-					mt: 2,
+					mb: 2,
 					p: "14px 16px",
 					borderRadius: 2.5,
 					border: `1px solid ${palette.border}`,

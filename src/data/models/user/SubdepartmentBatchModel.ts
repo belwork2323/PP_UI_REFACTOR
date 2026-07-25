@@ -17,11 +17,10 @@ export type SubdepartmentBatchListAdvancedFilters = {
   batchTypes: string[];
   motorStages: string[];
   motorIds: string[];
-  priorities: string[];
+  projectIds: string[];
 };
 
 export const MANUFACTURING_BATCH_TYPE_OPTIONS = ["MAIN", "SUBSCALE"] as const;
-export const MANUFACTURING_PRIORITY_OPTIONS = ["Critical", "High", "Medium", "Low"] as const;
 
 export const normalizeBatchTypeCode = (raw: string | undefined | null): string => {
   const s = String(raw ?? "")
@@ -62,7 +61,7 @@ export const hasSubdepartmentBatchAdvancedFilters = (
     filters.batchTypes.length > 0 ||
     filters.motorStages.length > 0 ||
     filters.motorIds.length > 0 ||
-    filters.priorities.length > 0,
+    filters.projectIds.length > 0,
   );
 
 export const subdepartmentBatchMatchesAdvancedFilters = (
@@ -104,11 +103,15 @@ export const subdepartmentBatchMatchesAdvancedFilters = (
     if (!matches) return false;
   }
 
-  if (filters.priorities.length > 0) {
-    const rowPriority = String(batch.priority ?? "").trim();
-    const matches = filters.priorities.some(
-      (priority) => priority.trim().toLowerCase() === rowPriority.toLowerCase(),
-    );
+  if (filters.projectIds.length > 0) {
+    const nested =
+      batch.project && typeof batch.project === "object"
+        ? (batch.project as { projectId?: string })
+        : null;
+    const rowProjectId = String(nested?.projectId ?? batch.projectId ?? "")
+      .trim()
+      .toLowerCase();
+    const matches = filters.projectIds.some((id) => id.trim().toLowerCase() === rowProjectId);
     if (!matches) return false;
   }
 
@@ -121,7 +124,7 @@ export const emptySubdepartmentBatchAdvancedFilters =
     batchTypes: [],
     motorStages: [],
     motorIds: [],
-    priorities: [],
+    projectIds: [],
   });
 
 export const SUBDEPARTMENT_BATCH_SEARCH_FIELDS = [
@@ -132,6 +135,7 @@ export const SUBDEPARTMENT_BATCH_SEARCH_FIELDS = [
   "batchType",
   "priority",
   "projectName",
+  "projectId",
   "material",
   "stage",
   "assignedTo.fullName",
@@ -171,7 +175,7 @@ export type SubdepartmentBatchListRequest = {
   batchIds?: string[];
   batchTypes?: string[];
   motorStages?: number[];
-  priority?: string[];
+  projectId?: string;
 };
 
 /** Per route slug → row status field used by list components */
@@ -196,13 +200,16 @@ const STATUS_KEY_ALIASES: Record<string, OperationStatus> = {
   initiated: OPERATION_STATUS.TO_BE_INITIATED,
   tobeinitiated: OPERATION_STATUS.TO_BE_INITIATED,
   inprogress: OPERATION_STATUS.IN_PROGRESS,
+  waitingforpartialapproval: OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL,
   waitingforapproval: OPERATION_STATUS.WAITING_FOR_APPROVAL,
+  waitingforcompleteapproval: OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL,
   approved: OPERATION_STATUS.APPROVED,
+  finalapprovalcompleted: OPERATION_STATUS.FINAL_APPROVAL_COMPLETED,
   rejected: OPERATION_STATUS.REJECTED,
   active: OPERATION_STATUS.TO_BE_INITIATED,
 };
 
-export function normalizeSubdepartmentBatchStatus(status: unknown): OperationStatus {
+export function normalizeSubdepartmentBatchStatus(status: unknown): OperationStatus | string {
   const trimmed = String(status ?? "").trim();
   if (!trimmed) return OPERATION_STATUS.TO_BE_INITIATED;
 
@@ -213,20 +220,32 @@ export function normalizeSubdepartmentBatchStatus(status: unknown): OperationSta
   const fromAlias = STATUS_KEY_ALIASES[compactStatusKey(trimmed)];
   if (fromAlias) return fromAlias;
 
-  const u = trimmed.toUpperCase();
+  const u = trimmed.toUpperCase().replace(/\s+/g, "_");
   const map: Record<string, OperationStatus> = {
     TO_BE_INITIATED: OPERATION_STATUS.TO_BE_INITIATED,
     INITIATED: OPERATION_STATUS.TO_BE_INITIATED,
     IN_PROGRESS: OPERATION_STATUS.IN_PROGRESS,
     INPROGRESS: OPERATION_STATUS.IN_PROGRESS,
+    WAITING_FOR_PARTIAL_APPROVAL: OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL,
+    WAITINGFORPARTIALAPPROVAL: OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL,
     WAITING_FOR_APPROVAL: OPERATION_STATUS.WAITING_FOR_APPROVAL,
     WAITINGFORAPPROVAL: OPERATION_STATUS.WAITING_FOR_APPROVAL,
+    WAITING_FOR_COMPLETE_APPROVAL: OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL,
+    WAITINGFORCOMPLETEAPPROVAL: OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL,
     APPROVED: OPERATION_STATUS.APPROVED,
+    FINAL_APPROVAL_COMPLETED: OPERATION_STATUS.FINAL_APPROVAL_COMPLETED,
+    FINALAPPROVALCOMPLETED: OPERATION_STATUS.FINAL_APPROVAL_COMPLETED,
     REJECTED: OPERATION_STATUS.REJECTED,
     ACTIVE: OPERATION_STATUS.TO_BE_INITIATED,
   };
 
-  return map[u] ?? OPERATION_STATUS.TO_BE_INITIATED;
+  if (map[u]) return map[u];
+
+  // Preserve API status text — do not fall back to another workflow status.
+  return trimmed
+    .replace(/_/g, " ")
+    .toLowerCase()
+    .replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 const resolveMotorType = (batch: Record<string, unknown>) => {
@@ -306,14 +325,15 @@ const resolveAssignedTo = (batch: Record<string, unknown>) => {
 
 export function mapSubdepartmentBatchListRow(batch: Record<string, unknown>, targetSlug?: string) {
   const statusField = (targetSlug && SUBDEPT_STATUS_FIELD[targetSlug]) || "rmStatus";
+  // Prefer API `status` when the sub-department status field is absent (RMP list returns `status`).
   const workflowStatus = normalizeSubdepartmentBatchStatus(
     batch[statusField] ??
+      batch.status ??
       batch.rmStatus ??
       batch.workflowStatus ??
       batch.subDepartmentStatus ??
       batch.formStatus ??
-      batch.currentStatus ??
-      batch.status,
+      batch.currentStatus,
   );
 
   const systemManager = resolveSystemManager(batch);
@@ -321,6 +341,13 @@ export function mapSubdepartmentBatchListRow(batch: Record<string, unknown>, tar
   const formSubmittedBy = resolveFormSubmittedBy(batch);
   const motorStage = normalizeMotorStage(batch.motorStage ?? batch.motorType);
   const submittedBy = String(batch.submittedBy ?? formSubmittedBy?.fullName ?? "").trim();
+
+  const nestedProject =
+    batch.project && typeof batch.project === "object"
+      ? (batch.project as { projectId?: string | null; projectName?: string | null })
+      : null;
+  const projectId = String(nestedProject?.projectId ?? batch.projectId ?? "").trim();
+  const projectName = String(nestedProject?.projectName ?? batch.projectName ?? "").trim();
 
   const mapped = {
     ...batch,
@@ -347,7 +374,8 @@ export function mapSubdepartmentBatchListRow(batch: Record<string, unknown>, tar
       null,
     rejectionReason: batch.rejectionReason ?? null,
     material: batch.material ?? batch.materialType ?? null,
-    projectName: batch.projectName,
+    projectId,
+    projectName,
     stage: resolveBatchListStage(batch),
     lotIds: Array.isArray(batch.lotIds) ? batch.lotIds.map((id) => String(id)) : [],
     rmStatus: workflowStatus,
@@ -360,8 +388,10 @@ export function mapSubdepartmentBatchListRow(batch: Record<string, unknown>, tar
 const emptyStatusCountLabels = (): Record<string, number> => ({
   [OPERATION_STATUS.TO_BE_INITIATED]: 0,
   [OPERATION_STATUS.IN_PROGRESS]: 0,
+  [OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL]: 0,
   [OPERATION_STATUS.WAITING_FOR_APPROVAL]: 0,
   [OPERATION_STATUS.APPROVED]: 0,
+  [OPERATION_STATUS.FINAL_APPROVAL_COMPLETED]: 0,
   [OPERATION_STATUS.REJECTED]: 0,
 });
 
@@ -376,8 +406,12 @@ export function buildSubdepartmentBatchStatusCountsFromRows(
     const status = normalizeSubdepartmentBatchStatus(
       batch.rmStatus ?? batch.status ?? batch.workflowStatus,
     );
-    if (status in byLabel) {
-      byLabel[status] += 1;
+    const bucket =
+      status === OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL
+        ? OPERATION_STATUS.WAITING_FOR_APPROVAL
+        : status;
+    if (bucket in byLabel) {
+      byLabel[bucket] += 1;
     }
   });
 
@@ -385,7 +419,8 @@ export function buildSubdepartmentBatchStatusCountsFromRows(
 
   return {
     ...byLabel,
-    [FILTER_ALL]: totalRecords > 0 ? totalRecords : countedTotal,
+    // Prefer status-bucket sum; pagination totalRecords changes with the active status filter.
+    [FILTER_ALL]: countedTotal > 0 ? countedTotal : totalRecords,
   };
 }
 
@@ -393,6 +428,11 @@ const isIgnorableStatusCountKey = (key: string) => {
   const normalized = key.trim().toLowerCase();
   return normalized === "all" || normalized === "total" || key === FILTER_ALL;
 };
+
+const toStatusCountBucket = (status: string): string =>
+  status === OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL
+    ? OPERATION_STATUS.WAITING_FOR_APPROVAL
+    : status;
 
 export function mapSubdepartmentBatchStatusCounts(
   server: Record<string, number> | undefined,
@@ -412,9 +452,9 @@ export function mapSubdepartmentBatchStatusCounts(
   Object.entries(server ?? {}).forEach(([key, value]) => {
     if (typeof value !== "number" || isIgnorableStatusCountKey(key)) return;
 
-    const label = normalizeSubdepartmentBatchStatus(key);
-    if (label in byLabel) {
-      byLabel[label] = value;
+    const bucket = toStatusCountBucket(normalizeSubdepartmentBatchStatus(key));
+    if (bucket in byLabel) {
+      byLabel[bucket] += value;
     }
   });
 
@@ -429,27 +469,51 @@ export function mapSubdepartmentBatchStatusCounts(
       "INITIATED",
     );
     byLabel[OPERATION_STATUS.IN_PROGRESS] = pick("inProgress", "In Progress", "IN_PROGRESS");
-    byLabel[OPERATION_STATUS.WAITING_FOR_APPROVAL] = pick(
-      "waitingForApproval",
-      "waitingforApproval",
-      "Waiting for Approval",
-      "WAITING_FOR_APPROVAL",
+    byLabel[OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL] = pick(
+      "waitingForPartialApproval",
+      "Waiting for Partial Approval",
+      "WAITING_FOR_PARTIAL_APPROVAL",
     );
+    byLabel[OPERATION_STATUS.WAITING_FOR_APPROVAL] =
+      pick(
+        "waitingForApproval",
+        "waitingforApproval",
+        "Waiting for Approval",
+        "WAITING_FOR_APPROVAL",
+      ) +
+      pick(
+        "waitingForCompleteApproval",
+        "Waiting for Complete Approval",
+        "WAITING_FOR_COMPLETE_APPROVAL",
+      );
     byLabel[OPERATION_STATUS.APPROVED] = pick("approved", "Approved", "APPROVED");
+    byLabel[OPERATION_STATUS.FINAL_APPROVAL_COMPLETED] = pick(
+      "finalApprovalCompleted",
+      "Final Approval Completed",
+      "FINAL_APPROVAL_COMPLETED",
+    );
     byLabel[OPERATION_STATUS.REJECTED] = pick("rejected", "Rejected", "REJECTED");
   }
 
-  const serverTotal = pick(FILTER_ALL, "all", "total");
-  const countedTotal = Object.values(byLabel).reduce((sum, value) => sum + value, 0);
-  const hasServerCounts = countedTotal > 0 || serverTotal > 0;
+  let countedTotal = Object.values(byLabel).reduce((sum, value) => sum + value, 0);
+  const hasServerCounts = countedTotal > 0 || Object.keys(server ?? {}).length > 0;
 
   if (!hasServerCounts && batches.length > 0) {
     return buildSubdepartmentBatchStatusCountsFromRows(batches, totalRecords);
   }
 
+  // API statusCounts may omit WAITING_FOR_PARTIAL_APPROVAL — derive it from mapped rows.
+  if (batches.length > 0 && byLabel[OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL] === 0) {
+    const fromRows = buildSubdepartmentBatchStatusCountsFromRows(batches, totalRecords);
+    byLabel[OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL] =
+      fromRows[OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL] ?? 0;
+    countedTotal = Object.values(byLabel).reduce((sum, value) => sum + value, 0);
+  }
+
   return {
     ...byLabel,
-    [FILTER_ALL]: serverTotal || totalRecords || countedTotal,
+    // Always sum status buckets for All — pagination totalRecords follows the active filter.
+    [FILTER_ALL]: countedTotal,
   };
 }
 
@@ -512,8 +576,9 @@ export function buildSubdepartmentBatchListPayload({
       .filter((stage): stage is number => typeof stage === "number");
   }
 
-  if (advanced.priorities.length > 0) {
-    payload.priority = advanced.priorities;
+  if (advanced.projectIds.length > 0) {
+    const projectId = String(advanced.projectIds[0] ?? "").trim();
+    if (projectId) payload.projectId = projectId;
   }
 
   return payload;

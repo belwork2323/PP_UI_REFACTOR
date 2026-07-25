@@ -1,6 +1,7 @@
 import { useState, useCallback, useEffect, useMemo, useRef } from "react";
 import { STRINGS } from "../../app/config/strings";
 import { operationsController } from "../../controllers/user/operationsController";
+import { projectManagementController } from "../../controllers/admin/ProjectManagement/projectManagementController";
 import { useAuthStore } from "../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../app/store/userBatchRefreshStore";
 import { useCuringMotorStages } from "./manufacturing/useCuringMotorStages";
@@ -15,6 +16,11 @@ import {
 const FILTER_ALL = STRINGS.USER_BATCH_LIST.FILTER_ALL;
 /** Fetch up to this many rows when filtering search client-side across all columns */
 const CLIENT_SEARCH_FETCH_LIMIT = 5000;
+
+type ProjectFilterOption = {
+  projectId: string;
+  projectName: string;
+};
 
 export type { SubdepartmentBatchListAdvancedFilters };
 
@@ -64,7 +70,7 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
         batchTypes: [...next.batchTypes],
         motorStages: [...next.motorStages],
         motorIds: [...next.motorIds],
-        priorities: [...next.priorities],
+        projectIds: [...next.projectIds],
       });
       setStatusFilterState(next.status);
       setPage(0);
@@ -84,7 +90,7 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
     if (advancedFilters.batchTypes.length) count += 1;
     if (advancedFilters.motorStages.length) count += 1;
     if (advancedFilters.motorIds.length) count += 1;
-    if (advancedFilters.priorities.length) count += 1;
+    if (advancedFilters.projectIds.length) count += 1;
     if (statusFilter !== FILTER_ALL) count += 1;
     return count;
   }, [advancedFilters, statusFilter]);
@@ -94,6 +100,40 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
     () => motorStages.map((stage) => ({ motorStage: String(stage.motorStage) })),
     [motorStages],
   );
+
+  const [projectOptions, setProjectOptions] = useState<ProjectFilterOption[]>([]);
+  const [projectsLoading, setProjectsLoading] = useState(false);
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
+
+  /** Load projects only when Filters panel opens (not on list mount). */
+  const ensureProjectOptions = useCallback(async () => {
+    if (projectsLoaded || projectsLoading) return;
+    setProjectsLoading(true);
+    try {
+      const res = await projectManagementController.getAllProjects({
+        page: 1,
+        limit: 1000,
+        sortBy: "createdOn",
+        sortOrder: "desc",
+      });
+      if (res?.success && res.data) {
+        const raw = (res.data as { projects?: unknown[] }).projects ?? [];
+        setProjectOptions(
+          raw.map((p: any) => ({
+            projectId: String(p.projectId ?? ""),
+            projectName: String(p.projectName ?? p.projectId ?? ""),
+          })),
+        );
+      } else {
+        setProjectOptions([]);
+      }
+      setProjectsLoaded(true);
+    } catch {
+      setProjectOptions([]);
+    } finally {
+      setProjectsLoading(false);
+    }
+  }, [projectsLoaded, projectsLoading]);
 
   const fetchGlobalStatusCounts = useCallback(
     async (subDepartmentId: number, userId: string) => {
@@ -267,5 +307,8 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
     activeFilterCount,
     motorStageOptions,
     motorStagesLoading,
+    projectOptions,
+    projectsLoading,
+    ensureProjectOptions,
   };
 };

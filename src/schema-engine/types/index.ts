@@ -39,8 +39,10 @@ export type {
   SchemaTableStoredValue,
   SchemaUiConfig,
   SchemaValidation,
+  SchemaRowGenerationCountConfig,
   SchemaVisibilityCondition,
   SchemaVisibilityOperator,
+  SchemaVisibilityRule,
   SchemaVisibleWhen,
 } from "./schema.types";
 

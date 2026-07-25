@@ -1,5 +1,12 @@
 import { scopedFormKey, type SchemaFormValues } from "../state/formState";
-import type { SchemaBlock, SchemaDocumentV2, SchemaTableBlock, SchemaTableColumn } from "../types";
+import { buildFlatVisibilityContext } from "../rules/visibility";
+import type {
+  SchemaBlock,
+  SchemaDocumentV2,
+  SchemaRowGenerationCountConfig,
+  SchemaTableBlock,
+  SchemaTableColumn,
+} from "../types";
 import { flattenTableColumns } from "./schemaUtils";
 import {
   isWrappedTableValue,
@@ -206,9 +213,120 @@ const syncChildFromParent = (
   );
 };
 
+const clampCount = (n: number, min: number, max: number) =>
+  Math.max(min, Math.min(max, Math.floor(n)));
+
+export const resolveRowGenerationCount = (
+  config: SchemaRowGenerationCountConfig,
+  values: SchemaFormValues,
+  rowsMax?: number,
+): number => {
+  const ctx = buildFlatVisibilityContext(values);
+  const min = config.min ?? 0;
+  const max = config.max ?? rowsMax ?? 24;
+
+  const byValue = config.countByFieldValue;
+  if (byValue?.field) {
+    const key = String(ctx[byValue.field] ?? "").trim();
+    if (key && byValue.values[key] != null) {
+      const mapped = Number(byValue.values[key]);
+      if (Number.isFinite(mapped) && mapped > 0) {
+        return clampCount(mapped, Math.max(min, 1), max);
+      }
+    }
+  }
+
+  if (config.countField) {
+    const raw = Number(ctx[config.countField]);
+    if (Number.isFinite(raw) && raw > 0) {
+      return clampCount(raw, Math.max(min, 1), max);
+    }
+  }
+
+  return Math.max(min, 0) === 0 ? 0 : clampCount(min, min, max);
+};
+
+const buildCountGeneratedRows = (
+  block: SchemaTableBlock,
+  count: number,
+  existing: Record<string, unknown>[],
+): Record<string, unknown>[] => {
+  const config = block.rows?.rowGenerationCount;
+  if (!config || count <= 0) return [];
+
+  const columns = flattenTableColumns(block.columns);
+  const autoKey = block.rows?.autoIncrementKey ?? "SR_NO";
+  const labelCol = config.labelColumn ?? "parameter";
+  const template = config.labelTemplate ?? "Temperature @ {n} Hour";
+  const defaults = config.rowDefaults ?? {};
+
+  return Array.from({ length: count }, (_, index) => {
+    const n = index + 1;
+    const prev = existing[index] ?? {};
+    const row: Record<string, unknown> = { ...prev };
+
+    columns.forEach((col) => {
+      if (col.fieldType === "serial") return;
+      if (row[col.id] === undefined) {
+        row[col.id] = col.defaultValue ?? "";
+      }
+    });
+
+    row[autoKey] = n;
+    row[labelCol] = template.replace(/\{n\}/g, String(n));
+    Object.entries(defaults).forEach(([key, val]) => {
+      if (typeof val === "string") {
+        row[key] = val.replace(/\{n\}/g, String(n));
+      } else if (key.endsWith("__fieldType") || row[key] === undefined) {
+        row[key] = val;
+      }
+    });
+    // Keep parameter label locked; user edits value/remarks.
+    row._readonly = true;
+    row._readonlyColumns = Array.from(
+      new Set([...(Array.isArray(row._readonlyColumns) ? (row._readonlyColumns as string[]) : []), labelCol]),
+    );
+
+    return row;
+  });
+};
+
+const syncCountBasedTable = (entry: IndexedTable, values: SchemaFormValues): SchemaFormValues => {
+  const config = entry.block.rows?.rowGenerationCount;
+  if (!config) return values;
+
+  const count = resolveRowGenerationCount(config, values, entry.block.rows?.max);
+  const state = readTableRows(values, entry);
+  const nextRows = buildCountGeneratedRows(entry.block, count, state.rows);
+
+  const labelCol = config.labelColumn ?? "parameter";
+  const autoKey = entry.block.rows?.autoIncrementKey ?? "SR_NO";
+  const unchanged =
+    state.rows.length === nextRows.length &&
+    nextRows.every((row, index) => {
+      const prev = state.rows[index];
+      if (!prev) return false;
+      if (String(prev[labelCol] ?? "") !== String(row[labelCol] ?? "")) return false;
+      if (Number(prev[autoKey]) !== Number(row[autoKey])) return false;
+      const hintKeys = Object.keys(config.rowDefaults ?? {}).filter((k) => k.endsWith("__fieldType"));
+      return hintKeys.every((key) => prev[key] === row[key]);
+    });
+  if (unchanged) return values;
+
+  return writeTableRows(
+    values,
+    entry,
+    nextRows,
+    state.extraColumns,
+    state.deletedColumnIds,
+    state.preserveWrapper,
+  );
+};
+
 /**
  * Keeps tables with `rowGenerationSource` aligned to their parent table row count
  * and copies readonly column values from the parent row (e.g. curing BEM mould no ← casting).
+ * Also regenerates tables driven by `rowGenerationCount` (field / recipe map).
  */
 export const syncRowGenerationTables = (
   schema: SchemaDocumentV2 | null | undefined,
@@ -241,23 +359,27 @@ export const syncRowGenerationTables = (
     });
   }
 
+  tables.forEach((entry) => {
+    if (!entry.block.rows?.rowGenerationCount) return;
+    next = syncCountBasedTable(entry, next);
+  });
+
   return next;
 };
+
+const tableUsesRowGeneration = (entry: IndexedTable) =>
+  Boolean(entry.block.rows?.rowGenerationSource || entry.block.rows?.rowGenerationCount);
 
 export const schemaHasRowGenerationTables = (schema: SchemaDocumentV2 | null | undefined): boolean => {
   const sections = schema?.data?.sections;
   if (!sections?.length) return false;
-  return collectTables(sections).some((entry) => Boolean(entry.block.rows?.rowGenerationSource));
+  return collectTables(sections).some(tableUsesRowGeneration);
 };
 
 export const getRowGenerationTableIds = (schema: SchemaDocumentV2 | null | undefined): Set<string> => {
   const sections = schema?.data?.sections;
   if (!sections?.length) return new Set();
-  return new Set(
-    collectTables(sections)
-      .filter((entry) => Boolean(entry.block.rows?.rowGenerationSource))
-      .map((entry) => entry.tableId),
-  );
+  return new Set(collectTables(sections).filter(tableUsesRowGeneration).map((entry) => entry.tableId));
 };
 
 export const getRowGenerationParentSourceIds = (schema: SchemaDocumentV2 | null | undefined): Set<string> => {
@@ -267,6 +389,22 @@ export const getRowGenerationParentSourceIds = (schema: SchemaDocumentV2 | null 
   collectTables(sections).forEach((entry) => {
     const sourceId = entry.block.rows?.rowGenerationSource;
     if (sourceId) ids.add(sourceId);
+  });
+  return ids;
+};
+
+/** Field ids that should trigger count-based row regeneration when changed. */
+export const getRowGenerationCountTriggerFields = (
+  schema: SchemaDocumentV2 | null | undefined,
+): Set<string> => {
+  const sections = schema?.data?.sections;
+  if (!sections?.length) return new Set();
+  const ids = new Set<string>();
+  collectTables(sections).forEach((entry) => {
+    const config = entry.block.rows?.rowGenerationCount;
+    if (!config) return;
+    if (config.countField) ids.add(config.countField);
+    if (config.countByFieldValue?.field) ids.add(config.countByFieldValue.field);
   });
   return ids;
 };

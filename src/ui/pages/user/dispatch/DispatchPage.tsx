@@ -209,21 +209,21 @@ const DispatchPage = () => {
       {activeBatch ? (
         <>
           <UserWorkflowFormHeader
-            batch={{
-              ...activeBatch,
-              lotId: activeBatch.batchId,
+            mode="update"
+            data={{
+              title: String(activeBatch.batchId ?? "—"),
+              subtitle: [activeBatch.projectName, activeBatch.projectId]
+                .filter(Boolean)
+                .join(" · ") || undefined,
+              statusLabel: isEditMode
+                ? STRINGS.QUALITY_CONTROL.FORM_HEADER.EDITING_REJECTED
+                : strings.NEW_LABEL,
+              statusVariant: isEditMode ? "edit" : "new",
+              rejectionReason: activeBatch.rejectionReason,
             }}
             isEdit={isEditMode}
             onBack={handleBack}
-            newLabel={strings.NEW_LABEL}
-            batchHeadingOverride={{
-              title: activeBatch.batchId,
-              subtitle: [activeBatch.projectName, activeBatch.projectId]
-                .filter(Boolean)
-                .join(" · "),
-            }}
             backLabel={STRINGS.QUALITY_CONTROL.FORM_HEADER.BACK_TO_LIST}
-            editLabel={STRINGS.QUALITY_CONTROL.FORM_HEADER.EDITING_REJECTED}
             rejectionTitle={STRINGS.QUALITY_CONTROL.FORM_HEADER.REJECTION_REASON}
             theme={dispatchTheme}
           />

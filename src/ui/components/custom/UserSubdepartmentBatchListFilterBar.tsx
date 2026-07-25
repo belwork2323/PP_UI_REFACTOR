@@ -11,6 +11,11 @@ const FILTER_ALL = STRINGS.USER_BATCH_LIST.FILTER_ALL;
 
 type OperationsTheme = ReturnType<typeof getOperationsTheme>;
 
+type ProjectFilterOption = {
+  projectId: string;
+  projectName: string;
+};
+
 export type UserSubdepartmentBatchListFilterBarResult = {
   searchBarEnd: ReactNode;
   filterExtension: ReactNode;
@@ -21,12 +26,17 @@ export type UserSubdepartmentBatchListFilterBarArgs = {
   statusConfig: Record<string, { label?: string }>;
   statusDropdownValues: readonly string[];
   advancedFilters: SubdepartmentBatchListAdvancedFilters;
-  applyAdvancedFilters: (filters: SubdepartmentBatchListAdvancedFilters & { status: string }) => void;
+  applyAdvancedFilters: (
+    filters: SubdepartmentBatchListAdvancedFilters & { status: string },
+  ) => void;
   clearAdvancedFilters: () => void;
   activeFilterCount: number;
   statusFilter: string;
   motorStageOptions: Array<{ motorStage: string }>;
   motorStagesLoading: boolean;
+  projectOptions: ProjectFilterOption[];
+  projectsLoading: boolean;
+  ensureProjectOptions: () => void;
 };
 
 export const useUserSubdepartmentBatchListFilterBar = ({
@@ -40,21 +50,33 @@ export const useUserSubdepartmentBatchListFilterBar = ({
   statusFilter,
   motorStageOptions,
   motorStagesLoading,
+  projectOptions,
+  projectsLoading,
+  ensureProjectOptions,
 }: UserSubdepartmentBatchListFilterBarArgs): UserSubdepartmentBatchListFilterBarResult => {
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftBatchId, setDraftBatchId] = useState("");
   const [draftBatchType, setDraftBatchType] = useState(FILTER_ALL);
   const [draftMotorStage, setDraftMotorStage] = useState(FILTER_ALL);
   const [draftMotorId, setDraftMotorId] = useState("");
-  const [draftPriority, setDraftPriority] = useState(FILTER_ALL);
+  const [draftProjectId, setDraftProjectId] = useState(FILTER_ALL);
   const [draftStatus, setDraftStatus] = useState(FILTER_ALL);
 
   const syncDraftsFromApplied = useCallback(() => {
     setDraftBatchId(advancedFilters.batchId);
-    setDraftBatchType(advancedFilters.batchTypes.length === 1 ? advancedFilters.batchTypes[0]! : FILTER_ALL);
-    setDraftMotorStage(advancedFilters.motorStages.length === 1 ? advancedFilters.motorStages[0]! : FILTER_ALL);
+    setDraftBatchType(
+      advancedFilters.batchTypes.length === 1 ? advancedFilters.batchTypes[0]! : FILTER_ALL,
+    );
+    setDraftMotorStage(
+      advancedFilters.motorStages.length === 1 ? advancedFilters.motorStages[0]! : FILTER_ALL,
+    );
     setDraftMotorId(advancedFilters.motorIds[0] ?? "");
-    setDraftPriority(advancedFilters.priorities.length === 1 ? advancedFilters.priorities[0]! : FILTER_ALL);
+    // setDraftPriority(
+    //   advancedFilters.priorities.length === 1 ? advancedFilters.priorities[0]! : FILTER_ALL,
+    // );
+    setDraftProjectId(
+      advancedFilters.projectIds.length === 1 ? advancedFilters.projectIds[0]! : FILTER_ALL,
+    );
     setDraftStatus(statusFilter);
   }, [advancedFilters, statusFilter]);
 
@@ -62,9 +84,10 @@ export const useUserSubdepartmentBatchListFilterBar = ({
   useEffect(() => {
     if (filterOpen && !filterWasOpen.current) {
       syncDraftsFromApplied();
+      ensureProjectOptions();
     }
     filterWasOpen.current = filterOpen;
-  }, [filterOpen, syncDraftsFromApplied]);
+  }, [filterOpen, syncDraftsFromApplied, ensureProjectOptions]);
 
   useEffect(() => {
     if (!filterOpen) return;
@@ -150,7 +173,7 @@ export const useUserSubdepartmentBatchListFilterBar = ({
       batchTypes: draftBatchType === FILTER_ALL ? [] : [draftBatchType],
       motorStages: draftMotorStage === FILTER_ALL ? [] : [draftMotorStage],
       motorIds: motorId ? [motorId] : [],
-      priorities: draftPriority === FILTER_ALL ? [] : [draftPriority],
+      projectIds: draftProjectId === FILTER_ALL ? [] : [draftProjectId],
       status: draftStatus,
     };
     applyAdvancedFilters(next);
@@ -163,7 +186,7 @@ export const useUserSubdepartmentBatchListFilterBar = ({
     setDraftBatchType(FILTER_ALL);
     setDraftMotorStage(FILTER_ALL);
     setDraftMotorId("");
-    setDraftPriority(FILTER_ALL);
+    setDraftProjectId(FILTER_ALL);
     setDraftStatus(FILTER_ALL);
   };
 
@@ -189,18 +212,20 @@ export const useUserSubdepartmentBatchListFilterBar = ({
       draftBatchType={draftBatchType}
       draftMotorStage={draftMotorStage}
       draftMotorId={draftMotorId}
-      draftPriority={draftPriority}
+      draftProjectId={draftProjectId}
       draftStatus={draftStatus}
       statusDropdownValues={statusDropdownValues}
       statusConfig={statusConfig}
       motorStageOptions={motorStageOptions}
       motorStagesLoading={motorStagesLoading}
+      projectOptions={projectOptions}
+      projectsLoading={projectsLoading}
       filterPanelHeaderSx={filterPanelHeaderSx}
       onDraftBatchIdChange={setDraftBatchId}
       onDraftBatchTypeChange={setDraftBatchType}
       onDraftMotorStageChange={setDraftMotorStage}
       onDraftMotorIdChange={setDraftMotorId}
-      onDraftPriorityChange={setDraftPriority}
+      onDraftProjectIdChange={setDraftProjectId}
       onDraftStatusChange={setDraftStatus}
       onApply={handleApplyPanelFilters}
       onClear={handleClearAllFilters}

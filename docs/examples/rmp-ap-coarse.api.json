@@ -70,18 +70,18 @@
                 "dataSource": {
                   "type": "api",
                   "api": {
-                    "endpoint": "raw-material-procurement-lot-list",
+                    "endpoint": "/api/v1/user/subdepartment/material-lots",
                     "method": "POST",
                     "requestBody": {
-                      "limit": 500,
-                      "page": 1,
-                      "status": ["APPROVED"],
-                      "subDepartmentId": 1,
-                      "materialCode": ["{{materialCode}}"]
+                      "batchId": "{{batchId}}"
                     },
-                    "responsePath": "data.lots",
+                    "responsePath": "data.materials",
                     "displayKey": "lotId",
-                    "valueKey": "lotId"
+                    "valueKey": "lotId",
+                    "filterByContext": {
+                      "materialCode": "materialCode",
+                      "grade.gradeCode": "gradeCode"
+                    }
                   }
                 },
                 "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 }, "maxWidth": "240px" }
@@ -125,9 +125,26 @@
             },
             "columns": [
               { "type": "column", "id": "srNo", "fieldType": "serial", "label": "Sr No." },
-              { "type": "column", "id": "OPERATION", "fieldType": "text", "label": "Operation", "readonly": true },
-              { "type": "column", "id": "SET_PARAMETER", "fieldType": "text", "label": "Set Parameter", "readonly": true },
-              { "type": "column", "id": "ACTUAL_PARAMETER", "fieldType": "text", "label": "Actual Parameter" }
+              {
+                "type": "column",
+                "id": "OPERATION",
+                "fieldType": "text",
+                "label": "Operation",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "SET_PARAMETER",
+                "fieldType": "text",
+                "label": "Set Parameter",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "ACTUAL_PARAMETER",
+                "fieldType": "text",
+                "label": "Actual Parameter"
+              }
             ]
           }
         ]
@@ -159,10 +176,32 @@
             },
             "columns": [
               { "type": "column", "id": "srNo", "fieldType": "serial", "label": "Sr No." },
-              { "type": "column", "id": "OPERATION", "fieldType": "text", "label": "Operation", "readonly": true },
-              { "type": "column", "id": "SET_PARAMETER", "fieldType": "text", "label": "Set Parameter", "readonly": true },
-              { "type": "column", "id": "ACTUAL_PARAMETER", "fieldType": "text", "label": "Actual Parameter" },
-              { "type": "column", "id": "START_TIME", "fieldType": "datetime", "label": "Start Time" },
+              {
+                "type": "column",
+                "id": "OPERATION",
+                "fieldType": "text",
+                "label": "Operation",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "SET_PARAMETER",
+                "fieldType": "text",
+                "label": "Set Parameter",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "ACTUAL_PARAMETER",
+                "fieldType": "text",
+                "label": "Actual Parameter"
+              },
+              {
+                "type": "column",
+                "id": "START_TIME",
+                "fieldType": "datetime",
+                "label": "Start Time"
+              },
               { "type": "column", "id": "END_TIME", "fieldType": "datetime", "label": "End Time" }
             ]
           }
@@ -223,7 +262,11 @@
               "allowAdd": false,
               "allowDelete": false,
               "presetRows": [
-                { "readonly": true, "PSD_REQUIREMENT": "Above 500 µm, % max", "SPECIFICATION": "5" },
+                {
+                  "readonly": true,
+                  "PSD_REQUIREMENT": "Above 500 µm, % max",
+                  "SPECIFICATION": "5"
+                },
                 { "readonly": true, "PSD_REQUIREMENT": "500-355 µm, %", "SPECIFICATION": "27±5" },
                 { "readonly": true, "PSD_REQUIREMENT": "355-300 µm, %", "SPECIFICATION": "32±5" },
                 { "readonly": true, "PSD_REQUIREMENT": "300-45 µm, %", "SPECIFICATION": "33±5" },
@@ -231,8 +274,18 @@
               ]
             },
             "columns": [
-              { "type": "column", "id": "PSD_REQUIREMENT", "fieldType": "static", "label": "PSD/PS Required" },
-              { "type": "column", "id": "SPECIFICATION", "fieldType": "static", "label": "Specification" },
+              {
+                "type": "column",
+                "id": "PSD_REQUIREMENT",
+                "fieldType": "static",
+                "label": "PSD/PS Required"
+              },
+              {
+                "type": "column",
+                "id": "SPECIFICATION",
+                "fieldType": "static",
+                "label": "Specification"
+              },
               { "type": "column", "id": "RESULT", "fieldType": "number", "label": "Result" }
             ]
           }

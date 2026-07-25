@@ -33,6 +33,7 @@ import {
   getStatus,
   getSystemManagerLabel,
 } from "@utils/batchManagementUtils";
+import { mixingCycleLabel, formatArticlesForDisplay } from "@data/models/admin/BatchManagement/BatchManagementModel";
 
 const S = STRINGS.BATCH_MANAGEMENT.DETAILS;
 
@@ -134,6 +135,7 @@ const BatchDetailsView = ({ open, loading, batch, onClose, t }: BatchDetailsView
           : []),
         { label: S.PROJECT, value: projectLabel },
         { label: S.MOTOR_STAGE, value: displayValue(getMotorStage(batch)) },
+        { label: S.MIXING_CYCLE, value: mixingCycleLabel(batch.mixingCycle) },
         { label: S.MOTOR_COUNT, value: displayValue(batch.numberOfMotors) },
         { label: S.MOTOR_IDS, value: displayValue(getMotorId(batch) || batch.motorIds?.join(", ")) },
         { label: S.PRIORITY, value: displayValue(getPriority(batch)) },
@@ -143,7 +145,7 @@ const BatchDetailsView = ({ open, loading, batch, onClose, t }: BatchDetailsView
               { label: S.OBJECTIVE, value: displayValue(batch.objective) },
               {
                 label: S.ARTICLES,
-                value: batch.articles?.length ? batch.articles.join(", ") : "—",
+                value: formatArticlesForDisplay(batch.articles) || "—",
               },
             ]
           : []),
@@ -169,7 +171,7 @@ const BatchDetailsView = ({ open, loading, batch, onClose, t }: BatchDetailsView
         { label: S.SHEET_DATE, value: formatDate(sheet.date) },
         { label: S.BATCH_SIZE, value: displayValue(sheet.batchSize) },
         { label: S.BONDING_SHEET_NO, value: displayValue(sheet.bondingSheetNo) },
-        { label: S.MIXER_TYPE, value: displayValue(sheet.mixerType) },
+        { label: S.MIXER_TYPE, value: displayValue(sheet.mixerType ?? sheet.mixerDetails) },
         { label: S.BUILDING_NO, value: displayValue(sheet.BldgNo) },
         { label: S.NUMBER_OF_PREMIX, value: displayValue(sheet.numberOfPremix) },
         { label: S.PRC_APPROVAL_DATE, value: formatDate(sheet.prcApprovalDate) },

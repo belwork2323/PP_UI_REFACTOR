@@ -4,21 +4,21 @@ import { STRINGS } from "../../../../../app/config/strings";
 const S = STRINGS.MANUFACTURING;
 
 const MixingHeader = ({ batch, isEdit, onBack, theme }: any) => {
+  const motorId = String(batch?.motorId ?? "").trim();
+
   return (
     <UserWorkflowFormHeader
-      batch={batch}
-      isEdit={isEdit}
-      onBack={onBack}
-      newLabel={S.MIXING.NEW_LABEL}
-      backLabel={S.FORM_HEADER.BACK_TO_LIST}
-      editLabel={S.FORM_HEADER.EDITING_REJECTED}
-      rejectionTitle={S.FORM_HEADER.REJECTION_REASON}
-      batchHeadingOverride={{
-        title: batch?.batchId ?? batch?.lotId ?? "—",
-        subtitle: [batch?.motorId, batch?.motorType ? `Type ${batch.motorType}` : null]
-          .filter(Boolean)
-          .join(" · "),
+      mode="update"
+      data={{
+        title: String(batch?.batchId ?? batch?.lotId ?? "—"),
+        subtitle: motorId && motorId !== "—" ? motorId : undefined,
+        statusLabel: isEdit ? S.FORM_HEADER.EDITING_REJECTED : S.MIXING.NEW_LABEL,
+        statusVariant: isEdit ? "edit" : "new",
+        rejectionReason: batch?.rejectionReason,
       }}
+      onBack={onBack}
+      backLabel={S.FORM_HEADER.BACK_TO_LIST}
+      rejectionTitle={S.FORM_HEADER.REJECTION_REASON}
       theme={theme}
     />
   );

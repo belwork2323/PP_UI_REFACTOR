@@ -93,6 +93,7 @@ export function normalizeRocketCasingListStatus(status: string): OperationStatus
 export const ROCKET_MOTOR_CASING_SEARCH_FIELDS = [
   "motorCasingId",
   "projectId",
+  "projectName",
   "motorId",
   "motorStage",
   "casingType",
@@ -111,6 +112,7 @@ export function rocketMotorCasingMatchesSearch(row: RocketMotorBatch, query: str
   const parts: string[] = [
     row.motorCasingId ?? "",
     row.projectId ?? "",
+    row.projectName ?? "",
     row.motorId,
     row.motorNo ?? "",
     row.motorStage ?? "",
@@ -176,6 +178,7 @@ export class RocketMotorCasingSubmitResponseModel {
 export class RocketMotorCasingDetailsModel {
   formId: string;
   projectId: string;
+  projectName: string;
   subDepartmentId: number;
   motorStage: string;
   motorId: string;
@@ -186,8 +189,13 @@ export class RocketMotorCasingDetailsModel {
   sections: Record<string, unknown>;
 
   constructor(payload: any) {
+    const project =
+      payload?.project && typeof payload.project === "object"
+        ? (payload.project as { projectId?: string; projectName?: string | null })
+        : null;
     this.formId = String(payload?.formId ?? "");
-    this.projectId = String(payload?.projectId ?? "");
+    this.projectId = String(project?.projectId ?? payload?.projectId ?? "").trim();
+    this.projectName = String(project?.projectName ?? payload?.projectName ?? "").trim();
     this.subDepartmentId = Number(payload?.subDepartmentId ?? 0);
     this.motorStage = String(payload?.motorStage ?? "");
     this.motorId = String(payload?.motorId ?? payload?.motorNo ?? "");
@@ -214,6 +222,7 @@ export class RocketMotorCasingDetailsModel {
   static toCasingFormData(model: RocketMotorCasingDetailsModel): RocketMotorCasingFormData {
     return parseSectionsToFormData(model.sections, {
       projectId: model.projectId,
+      projectName: model.projectName,
       motorStage: model.motorStage,
       motorId: model.motorId,
       motorCasingId: model.motorCasingId,
@@ -568,7 +577,10 @@ const CASING_DETAIL_COLS: CasingDetailColumn[] = [
   { key: "analysedResult", label: "Details", width: "35%" },
   { key: "remarks", label: "Remarks", width: "30%" },
 ];
-
+const REPORT_COLUMNS: CasingDetailColumn[] = [
+  { key: "reportType", label: "Section ", width: "35%" },
+  { key: "files", label: "File", width: "35%" },
+];
 const detailRow = (specification: string, analysedResult: string, remarks = "") => ({
   specification,
   analysedResult: analysedResult?.trim() ? analysedResult : "—",
@@ -581,12 +593,7 @@ const formatMeasuredValue = (value: unknown, unit?: string) => {
   return unit ? `${text} ${unit}`.trim() : text;
 };
 
-const formatMechDetail = (
-  specification: string,
-  reported: string,
-  acem: string,
-  unit: string,
-) => {
+const formatMechDetail = (specification: string, reported: string, acem: string, unit: string) => {
   const parts: string[] = [];
   if (specification) parts.push(`Specification: ${specification}${unit ? ` ${unit}` : ""}`.trim());
   if (reported) parts.push(`Reported: ${reported}${unit ? ` ${unit}` : ""}`.trim());
@@ -618,53 +625,15 @@ const mapDimensionalTableRows = (form: RocketMotorCasingFormData): CasingDimensi
     isLooseFlap: isLooseFlapDimensionalParam(d),
   }));
 
-const MOCK_TRIAL_TABLE_SPECS: Record<
-  string,
-  { title: string; columns: Array<{ key: string; label: string; unit?: string }> }
-> = {
-  mockassydetails: {
-    title: "Distance between centring top to mandrel top (mm)",
-    columns: [
-      { key: "srNo", label: "Sr. No." },
-      { key: "mandrelRestOnDomeA", label: "Mandrel rest on dome of motor (A)", unit: "mm" },
-      {
-        key: "mandrelRestOnBottomCupB",
-        label: "Mandrel rest on bottom cup (with Teflon sleeve) (B)",
-        unit: "mm",
-      },
-      { key: "differenceC", label: "Difference C=(A-B)", unit: "mm" },
-      { key: "bellowThicknessD", label: "Bellow Thickness (D)", unit: "mm" },
-      { key: "mandrelLiftE", label: "Mandrel Lift E=(C-D)", unit: "mm" },
-    ],
-  },
-  motorlengthmeasurements: {
-    title: "Motor Length Measurements",
-    columns: [
-      { key: "srNo", label: "Sr. No." },
-      { key: "lfRubberThicknessHe", label: "Thickness of LF rubber at HE", unit: "mm" },
-      { key: "heBossWidthWithoutLfRubber", label: "HE Boss width (without LF Rubber)", unit: "mm" },
-      { key: "heDiaId", label: "HE Dia. (ID)", unit: "mm" },
-      { key: "heOuterToNeOuter", label: "HE outer to NE outer (metal to metal)", unit: "mm" },
-      { key: "heInnerToNeInner", label: "HE inner to NE inner (rubber to rubber)", unit: "mm" },
-      { key: "neOuterToHeInner", label: "NE outer to HE inner (metal to rubber)", unit: "mm" },
-    ],
-  },
-  mandrelassembly: {
-    title: "Mandrel Assembly",
-    columns: [
-      { key: "srNo", label: "Sr. No." },
-      {
-        key: "readingWithoutCup",
-        label: "Reading without cup (Mandrel resting on motor dome)",
-        unit: "mm",
-      },
-      {
-        key: "readingWithBottomCupAndGasket",
-        label: "Reading with bottom cup & gaskets (after tightening the bottom cup)",
-        unit: "mm",
-      },
-    ],
-  },
+const humanizeMockTrialKey = (key: string): string => {
+  const trimmed = String(key ?? "").trim();
+  if (!trimmed) return "—";
+  if (trimmed === "srNo") return "Sr. No.";
+  return trimmed
+    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+    .replace(/[_-]+/g, " ")
+    .replace(/\b\w/g, (ch) => ch.toUpperCase())
+    .trim();
 };
 
 const extractMockTrialSectionPayload = (
@@ -685,6 +654,13 @@ const extractMockTrialTableRows = (section: SchemaSectionSubmission): Record<str
   const nestedCamel = camelKey ? payload[camelKey] : undefined;
   if (Array.isArray(nestedCamel)) return nestedCamel as Record<string, unknown>[];
 
+  // Any nested array under the section payload is treated as table rows.
+  for (const value of Object.values(payload)) {
+    if (Array.isArray(value) && value.every((row) => row && typeof row === "object")) {
+      return value as Record<string, unknown>[];
+    }
+  }
+
   const sectionData = Array.isArray(section.sectionData) ? section.sectionData : [];
   if (
     sectionData.length > 0 &&
@@ -699,6 +675,29 @@ const extractMockTrialTableRows = (section: SchemaSectionSubmission): Record<str
   return [];
 };
 
+const deriveMockTrialColumnsFromRows = (
+  rows: Record<string, unknown>[],
+): Array<{ key: string; label: string }> => {
+  const keys: string[] = [];
+  const seen = new Set<string>();
+
+  rows.forEach((row) => {
+    Object.keys(row).forEach((key) => {
+      if (!key || key.startsWith("_") || seen.has(key)) return;
+      seen.add(key);
+      keys.push(key);
+    });
+  });
+
+  keys.sort((a, b) => {
+    if (a === "srNo") return -1;
+    if (b === "srNo") return 1;
+    return 0;
+  });
+
+  return keys.map((key) => ({ key, label: humanizeMockTrialKey(key) }));
+};
+
 const mapMockTrialTableRows = (
   rawRows: Record<string, unknown>[],
   columns: Array<{ key: string; label: string; unit?: string }>,
@@ -709,6 +708,7 @@ const mapMockTrialTableRows = (
     ),
   );
 
+/** Build mock-trial detail rows/tables from server-saved section payloads only (no local schema). */
 const buildMockTrialDetailContent = (
   sections: SchemaSectionSubmission[] | undefined,
 ): Pick<CasingDetailBlock, "rows" | "mockTrialTables"> => {
@@ -720,27 +720,35 @@ const buildMockTrialDetailContent = (
   const mockTrialTables: MockTrialDetailTable[] = [];
 
   for (const section of sections) {
-    const sectionId = String(section.sectionId ?? "").toLowerCase();
+    const sectionId = String(section.sectionId ?? "");
+    const sectionIdLower = sectionId.toLowerCase();
+    const tableRows = extractMockTrialTableRows(section);
 
-    if (sectionId === "basicdetails") {
-      const data = extractMockTrialSectionPayload(section);
-      rows.push(detailRow("Casting station", String(data.castingStation ?? "—")));
-      rows.push(detailRow("Mandrel ID", String(data.mandrelId ?? "—")));
-      rows.push(detailRow("Bottom cup ID", String(data.bottomCupId ?? "—")));
+    if (tableRows.length > 0) {
+      const columns = deriveMockTrialColumnsFromRows(tableRows);
+      if (!columns.length) continue;
+
+      mockTrialTables.push({
+        title: humanizeMockTrialKey(sectionId),
+        columns,
+        rows: mapMockTrialTableRows(tableRows, columns),
+      });
       continue;
     }
 
-    const spec = MOCK_TRIAL_TABLE_SPECS[sectionId];
-    if (!spec) continue;
+    const data = extractMockTrialSectionPayload(section);
+    const fieldEntries = Object.entries(data).filter(
+      ([key, value]) => key && !key.startsWith("_") && !Array.isArray(value),
+    );
 
-    const tableRows = extractMockTrialTableRows(section);
-    if (!tableRows.length) continue;
+    if (!fieldEntries.length) continue;
 
-    mockTrialTables.push({
-      title: spec.title,
-      columns: spec.columns.map(({ key, label }) => ({ key, label })),
-      rows: mapMockTrialTableRows(tableRows, spec.columns),
-    });
+    // Prefer basic-details style key/value rows for non-table sections.
+    if (sectionIdLower === "basicdetails" || fieldEntries.length <= 8) {
+      fieldEntries.forEach(([key, value]) => {
+        rows.push(detailRow(humanizeMockTrialKey(key), String(value ?? "—")));
+      });
+    }
   }
 
   if (!rows.length && !mockTrialTables.length) {
@@ -811,6 +819,30 @@ export function mapCasingFormDataToDetailBlocks(
       : [detailRow("No visual inspection recorded", "—")];
 
   const dimensionalTable = mapDimensionalTableRows(form);
+
+  const reportConfigs = [
+    { label: "NDT / UT Report", files: form.reportUpload?.ndtUtReport },
+    {
+      label: "Visual Inspection Report",
+      files: form.reportUpload?.visualInspectionReport,
+    },
+    { label: "Weighment Report", files: form.reportUpload?.weighmentReport },
+    {
+      label: "Dimensional Inspection Report",
+      files: form.reportUpload?.dimensionalInspectionReport,
+    },
+    { label: "Mock Trial Report", files: form.reportUpload?.mockTrialReport },
+    {
+      label: "Insulation Lining Report",
+      files: form.reportUpload?.insulationLiningReport,
+    },
+  ];
+
+  const reportUploadRows: CasingDetailBlock["rows"] = reportConfigs.flatMap(({ label, files }) =>
+    (files ?? []).map((file) =>
+      detailRow(label, file.originalFileName ?? file.storedFileName ?? file.fileName ?? "—"),
+    ),
+  );
 
   const blocks: CasingDetailBlock[] = [
     {
@@ -891,6 +923,15 @@ export function mapCasingFormDataToDetailBlocks(
             material: "Mock trial",
             ...buildMockTrialDetailContent(form.mockTrial.savedSections),
             _columns: CASING_DETAIL_COLS,
+          },
+        ]
+      : []),
+    ...(reportUploadRows.length
+      ? [
+          {
+            material: "Uploaded Reports",
+            rows: reportUploadRows,
+            _columns: REPORT_COLUMNS,
           },
         ]
       : []),

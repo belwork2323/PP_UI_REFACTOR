@@ -51,7 +51,8 @@ export const STF_FLOW_LABELS = {
   addBem: "Add BEM",
   loadingSchema: "Loading schema...",
   approvedMotorsLoading: "Loading approved motors...",
-  setupHint: "Add main motors and BEM motors to the same batch. Switch motor type to add each kind.",
+  setupHint:
+    "Add main motors and BEM motors to the same batch. Switch motor type to add each kind.",
   setupHintMainMotor: "Select approved motor ID(s), then load or add main motors.",
   setupHintMainMotorLoaded: "Select more main motor IDs below to add additional motors.",
   setupHintBem: "Enter a BEM number, then load or add BEM motors.",
@@ -125,9 +126,14 @@ export const getStfMotorCountOptions = (maxCount: number) =>
   }));
 
 export const getSelectedStfDraftMotorIds = (count: number, draftMotorIds: string[]): string[] =>
-  Array.from({ length: count }, (_, idx) => String(draftMotorIds[idx] ?? "").trim()).filter(Boolean);
+  Array.from({ length: count }, (_, idx) => String(draftMotorIds[idx] ?? "").trim()).filter(
+    Boolean,
+  );
 
-export const resolveEffectiveStfMotorCount = (motorCount: number | "", draftMotorIds: string[]): number => {
+export const resolveEffectiveStfMotorCount = (
+  motorCount: number | "",
+  draftMotorIds: string[],
+): number => {
   const count = motorCount === "" ? 0 : Number(motorCount);
   if (count > 0) return count;
   return draftMotorIds.some((id) => String(id ?? "").trim().length > 0) ? 1 : 0;
@@ -230,3 +236,15 @@ export const canLoadStfForm = (subType: string, motorIdNo: string) => {
   }
   return true;
 };
+
+export interface BemMotor {
+  motorId: string;
+  bemNo?: string;
+  motorCode: string;
+  status: string;
+  createdBy: string;
+  createdOn: string;
+  formId?: string | null;
+  subType?: StfSubType | null;
+  rejectionReason?: string | null;
+}

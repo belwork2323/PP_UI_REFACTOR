@@ -59,8 +59,7 @@ const validateFile = (file: File): string | null => {
   if (file.size / (1024 * 1024) > MAX_SIZE_MB) {
     return `File exceeds ${MAX_SIZE_MB}MB limit`;
   }
-  const ok =
-    ALLOWED_IMAGE.includes(file.type) || ALLOWED_VIDEO.includes(file.type) || isPdf(file);
+  const ok = ALLOWED_IMAGE.includes(file.type) || ALLOWED_VIDEO.includes(file.type) || isPdf(file);
   if (!ok) return "Invalid format. Use PDF, JPG, PNG, WEBP, MP4, or WEBM.";
   return null;
 };
@@ -255,10 +254,7 @@ const CasingReportUpload = ({ form, patch, theme }: CasingReportUploadProps) => 
                                 item.kind === "pending" ? primary : accent,
                                 0.28,
                               )}`,
-                              background: alpha(
-                                item.kind === "pending" ? primary : accent,
-                                0.06,
-                              ),
+                              background: alpha(item.kind === "pending" ? primary : accent, 0.06),
                             }}
                           >
                             <InsertDriveFileOutlinedIcon

@@ -1,9 +1,25 @@
 import React, { useState, useMemo, useCallback, useEffect } from "react";
 import {
-  Dialog, DialogTitle, DialogContent, DialogActions,
-  Box, Typography, Button, IconButton, Stack,
-  FormControl, InputLabel, Select, MenuItem, CircularProgress,
-  Zoom, Checkbox, Card, Divider, Collapse, Chip,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Box,
+  Typography,
+  Button,
+  IconButton,
+  Stack,
+  FormControl,
+  InputLabel,
+  Select,
+  MenuItem,
+  CircularProgress,
+  Zoom,
+  Checkbox,
+  Card,
+  Divider,
+  Collapse,
+  Chip,
 } from "@mui/material";
 import { icons } from "@app/theme/icons";
 import Input from "@ui/components/common/Input";
@@ -14,7 +30,7 @@ import { STRINGS } from "@app/config/strings";
 
 const S = STRINGS.USER_MANAGEMENT;
 
-const SUBDEPT_RESTRICTED_ROLES = ["Admin", "System Manager"];
+const SUBDEPT_RESTRICTED_ROLES = ["Admin", "System Manager", "Centre Head"];
 const SUBDEPT_MANDATORY_ROLES = ["User", "Approver"];
 
 const normalizeSubDeptIds = (subDepts: any[]) =>
@@ -24,8 +40,17 @@ const normalizeSubDeptIds = (subDepts: any[]) =>
     .sort((a, b) => a - b);
 
 const CreateUserManagementForm = ({
-  open, onClose, onSave, editTarget, form, onFormChange,
-  onSubDeptsChange, availableRoles, availableSubDepts, saving, t,
+  open,
+  onClose,
+  onSave,
+  editTarget,
+  form,
+  onFormChange,
+  onSubDeptsChange,
+  availableRoles,
+  availableSubDepts,
+  saving,
+  t,
 }: any) => {
   const { modal, input } = t;
 
@@ -43,33 +68,28 @@ const CreateUserManagementForm = ({
 
   const subDeptsRestricted = useMemo(
     () => SUBDEPT_RESTRICTED_ROLES.includes(form.role),
-    [form.role]
+    [form.role],
   );
 
-  const subDeptsMandatory = useMemo(
-    () => SUBDEPT_MANDATORY_ROLES.includes(form.role),
-    [form.role]
-  );
+  const subDeptsMandatory = useMemo(() => SUBDEPT_MANDATORY_ROLES.includes(form.role), [form.role]);
 
   const createFormValid = useMemo(
     () =>
       Boolean(
         form.username?.trim() &&
-          form.userId?.trim() &&
-          form.role &&
-          (subDeptsMandatory ? form.subDepts.length > 0 : true)
+        form.userId?.trim() &&
+        form.role &&
+        (subDeptsMandatory ? form.subDepts.length > 0 : true),
       ),
-    [form.username, form.userId, form.role, form.subDepts, subDeptsMandatory]
+    [form.username, form.userId, form.role, form.subDepts, subDeptsMandatory],
   );
 
   const updateFormValid = useMemo(
     () =>
       Boolean(
-        form.username?.trim() &&
-          form.role &&
-          (subDeptsMandatory ? form.subDepts.length > 0 : true)
+        form.username?.trim() && form.role && (subDeptsMandatory ? form.subDepts.length > 0 : true),
       ),
-    [form.username, form.role, form.subDepts, subDeptsMandatory]
+    [form.username, form.role, form.subDepts, subDeptsMandatory],
   );
 
   const hasCommittedChanges = useMemo(() => {
@@ -89,18 +109,18 @@ const CreateUserManagementForm = ({
 
   const canSubmit = useMemo(
     () => (editTarget ? updateFormValid && hasCommittedChanges : createFormValid),
-    [editTarget, updateFormValid, hasCommittedChanges, createFormValid]
+    [editTarget, updateFormValid, hasCommittedChanges, createFormValid],
   );
 
   const pendingSubDeptIds = useMemo(
     () => pendingSubDepts.map((sd: any) => sd.subDepartmentId),
-    [pendingSubDepts]
+    [pendingSubDepts],
   );
 
   const filteredDepts = useMemo(() => {
     if (!search.trim()) return availableSubDepts || [];
     return (availableSubDepts || []).filter((sd: any) =>
-      sd.subDepartmentName.toLowerCase().includes(search.toLowerCase())
+      sd.subDepartmentName.toLowerCase().includes(search.toLowerCase()),
     );
   }, [availableSubDepts, search]);
 
@@ -135,7 +155,7 @@ const CreateUserManagementForm = ({
     (id: number) => {
       onSubDeptsChange(form.subDepts.filter((sd: any) => sd.subDepartmentId !== id));
     },
-    [form.subDepts, onSubDeptsChange]
+    [form.subDepts, onSubDeptsChange],
   );
 
   const handleClearPending = useCallback(() => {
@@ -144,8 +164,11 @@ const CreateUserManagementForm = ({
 
   return (
     <Dialog
-      open={open} onClose={() => !saving && onClose()}
-      TransitionComponent={Zoom} maxWidth="md" fullWidth
+      open={open}
+      onClose={() => !saving && onClose()}
+      TransitionComponent={Zoom}
+      maxWidth="md"
+      fullWidth
       PaperProps={{ sx: modal.paper }}
     >
       <DialogTitle sx={{ p: 0 }}>
@@ -153,9 +176,7 @@ const CreateUserManagementForm = ({
           icon={<icons.userMgmt.personOutline sx={modal.header.icon} />}
           title={editTarget ? S.FORM.EDIT_TITLE : S.FORM.CREATE_TITLE}
           subtitle={
-            editTarget
-              ? S.FORM.EDIT_SUBTITLE(getDisplayName(editTarget))
-              : S.FORM.CREATE_SUBTITLE
+            editTarget ? S.FORM.EDIT_SUBTITLE(getDisplayName(editTarget)) : S.FORM.CREATE_SUBTITLE
           }
           onClose={() => !saving && onClose()}
           closeDisabled={saving}
@@ -166,17 +187,31 @@ const CreateUserManagementForm = ({
       <DialogContent sx={modal.content}>
         <Box sx={modal.headerGap} />
         <Stack spacing={modal.stackSpacing}>
-
           {/* Credentials */}
           <Box>
             <Typography sx={modal.fieldLabel}>Credentials *</Typography>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={modal.fieldRowSpacing}>
-              <Input fullWidth label="Username" value={form.username}
-                onChange={onFormChange("username")} placeholder="e.g. arjun.sharma"
-                size="small" sx={input} required />
-              <Input fullWidth label="User ID" value={form.userId}
-                onChange={onFormChange("userId")} placeholder="e.g. EMP12345"
-                size="small" sx={input} required disabled={Boolean(editTarget)} />
+              <Input
+                fullWidth
+                label="Username"
+                value={form.username}
+                onChange={onFormChange("username")}
+                placeholder="e.g. arjun.sharma"
+                size="small"
+                sx={input}
+                required
+              />
+              <Input
+                fullWidth
+                label="User ID"
+                value={form.userId}
+                onChange={onFormChange("userId")}
+                placeholder="e.g. EMP12345"
+                size="small"
+                sx={input}
+                required
+                disabled={Boolean(editTarget)}
+              />
             </Stack>
           </Box>
 
@@ -185,7 +220,12 @@ const CreateUserManagementForm = ({
             <Typography sx={modal.fieldLabel}>Role *</Typography>
             <FormControl fullWidth size="small" sx={input} required disabled={Boolean(editTarget)}>
               <InputLabel>Role</InputLabel>
-              <Select value={form.role} label="Role" onChange={onFormChange("role")} MenuProps={t.menuPaper}>
+              <Select
+                value={form.role}
+                label="Role"
+                onChange={onFormChange("role")}
+                MenuProps={t.menuPaper}
+              >
                 {(availableRoles || []).map((r: any) => {
                   const rc = roleConfig[r.roleName];
                   return (
@@ -228,12 +268,14 @@ const CreateUserManagementForm = ({
                   startIcon={<icons.userMgmt.add sx={{ fontSize: "14px !important" }} />}
                   sx={{
                     ...modal.selectorToggleBase,
-                    ...(selectorOpen
-                      ? modal.selectorToggleOpen
-                      : modal.selectorToggleClosed),
+                    ...(selectorOpen ? modal.selectorToggleOpen : modal.selectorToggleClosed),
                   }}
                 >
-                  {selectorOpen ? "Add" : (form.subDepts.length > 0 ? "Add More" : "Select Sub-departments")}
+                  {selectorOpen
+                    ? "Add"
+                    : form.subDepts.length > 0
+                      ? "Add More"
+                      : "Select Sub-departments"}
                 </Button>
               )}
             </Box>
@@ -243,7 +285,6 @@ const CreateUserManagementForm = ({
               <Box sx={modal.selectorWrapper}>
                 <Collapse in={selectorOpen} unmountOnExit sx={modal.selectorCollapse}>
                   <Card variant="outlined" sx={modal.selectorCard}>
-
                     {/* Header: Selection Status, Clear All & Close List */}
                     <Box sx={modal.selectorHeader}>
                       <Typography sx={modal.selectorHeaderCount}>
@@ -251,11 +292,19 @@ const CreateUserManagementForm = ({
                       </Typography>
                       <Box display="flex" alignItems="center" gap={1.5}>
                         {pendingSubDepts.length > 0 && (
-                          <Button size="small" onClick={handleClearPending} sx={modal.clearAllButton}>
+                          <Button
+                            size="small"
+                            onClick={handleClearPending}
+                            sx={modal.clearAllButton}
+                          >
                             Clear all
                           </Button>
                         )}
-                        <IconButton size="small" onClick={handleCancelSelector} sx={modal.selectorCloseIcon}>
+                        <IconButton
+                          size="small"
+                          onClick={handleCancelSelector}
+                          sx={modal.selectorCloseIcon}
+                        >
                           <icons.userMgmt.close sx={{ fontSize: 16 }} />
                         </IconButton>
                       </Box>
@@ -264,8 +313,12 @@ const CreateUserManagementForm = ({
                     {/* Search */}
                     <Box sx={modal.selectorSearchBox}>
                       <Input
-                        fullWidth size="small" placeholder="Search sub-departments…"
-                        value={search} onChange={(e) => setSearch(e.target.value)} autoFocus
+                        fullWidth
+                        size="small"
+                        placeholder="Search sub-departments…"
+                        value={search}
+                        onChange={(e) => setSearch(e.target.value)}
+                        autoFocus
                         icon={<icons.userMgmt.search sx={modal.selectorSearchIcon} />}
                         InputProps={{ sx: modal.selectorSearchInput }}
                       />
@@ -276,9 +329,7 @@ const CreateUserManagementForm = ({
                     {/* List */}
                     <Box sx={modal.selectorListBox}>
                       {filteredDepts.length === 0 ? (
-                        <Typography sx={modal.selectorEmptyText}>
-                          No results found
-                        </Typography>
+                        <Typography sx={modal.selectorEmptyText}>No results found</Typography>
                       ) : (
                         filteredDepts.map((sd: any) => {
                           const checked = pendingSubDeptIds.includes(sd.subDepartmentId);
@@ -289,7 +340,9 @@ const CreateUserManagementForm = ({
                               sx={(theme) => modal.selectorListItem(checked, theme)}
                             >
                               <Checkbox
-                                checked={checked} size="small" disableRipple
+                                checked={checked}
+                                size="small"
+                                disableRipple
                                 sx={modal.selectorCheckbox}
                               />
                               <Typography sx={modal.selectorItemText(checked)}>
@@ -328,12 +381,13 @@ const CreateUserManagementForm = ({
                   <Card key={sd.subDepartmentId} sx={(theme) => modal.selectedCard(theme)}>
                     <Box display="flex" alignItems="center" gap={1}>
                       <Box sx={modal.selectedCardDot} />
-                      <Typography sx={modal.selectedCardText}>
-                        {sd.subDepartmentName}
-                      </Typography>
+                      <Typography sx={modal.selectedCardText}>{sd.subDepartmentName}</Typography>
                     </Box>
-                    <IconButton size="small" onClick={() => handleRemoveSubDept(sd.subDepartmentId)}
-                      sx={(theme) => modal.selectedCardRemove(theme)}>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleRemoveSubDept(sd.subDepartmentId)}
+                      sx={(theme) => modal.selectedCardRemove(theme)}
+                    >
                       <icons.userMgmt.close sx={modal.selectedCardRemoveIcon} />
                     </IconButton>
                   </Card>
@@ -341,16 +395,29 @@ const CreateUserManagementForm = ({
               </Stack>
             )}
           </Box>
-
         </Stack>
       </DialogContent>
 
       <DialogActions sx={modal.actions}>
-        <Button onClick={() => !saving && onClose()} sx={modal.cancelButton}>Cancel</Button>
-        <Button variant="contained" onClick={onSave} disabled={!canSubmit || saving} sx={modal.saveButton}>
-          {saving
-            ? <><CircularProgress size={14} sx={modal.savingSpinner} />Saving…</>
-            : editTarget ? "Update Changes" : "Create User"}
+        <Button onClick={() => !saving && onClose()} sx={modal.cancelButton}>
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          onClick={onSave}
+          disabled={!canSubmit || saving}
+          sx={modal.saveButton}
+        >
+          {saving ? (
+            <>
+              <CircularProgress size={14} sx={modal.savingSpinner} />
+              Saving…
+            </>
+          ) : editTarget ? (
+            "Update Changes"
+          ) : (
+            "Create User"
+          )}
         </Button>
       </DialogActions>
     </Dialog>

@@ -1,11 +1,13 @@
 // src/hooks/user/manufacturing/useRawMaterialPrepHook.ts
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { batchManagementController } from "../../../controllers/admin/BatchManagement/batchManagementController";
 import { operationsController } from "../../../controllers/user/operationsController";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshStore";
 import { STRINGS } from "../../../app/config/strings";
+import type { IdentificationSheet } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
 import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
 import { ManufacturingBatch, WorkflowView } from "./useManufacturingWorkflow";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
@@ -13,26 +15,45 @@ import rawMaterialPreparationController from "../../../controllers/user/manufact
 import {
   createEmptyPremixSchemaSession,
   createEmptyWeightmentSheet,
+  isPremixEditable,
   mapPreparationDetailsFromApi,
+  mapPreparationDetailsFromSavedForm,
   mapPreparationDetailsPayload,
   premixSessionHasData,
+  type PremixStatusMeta,
+  type PremixSubmissionStatus,
+  type PremixSubmissionType,
   type RawMaterialPrepPremixSession,
   type RawMaterialPrepPremixSelection,
   type RawMaterialPrepWeightmentSheet,
 } from "../../../data/models/user/RawMaterialPreparationModel";
+import { validateWeightmentSheetAgainstIdentification } from "../../../data/models/user/rawMaterialWeightmentValidation";
 import type { MaterialsListItem } from "../../../data/models/user/MaterialsListModel";
 import {
-  DEFAULT_SELECTED_PROCESSES,
-  PREMIX_OPTIONS,
-  getPrepMaterialGrades,
+  buildPremixMaterialOptions,
+  buildPremixMaterialSelectionsFromSheet,
+  buildPremixMaterialSessionsFromSelections,
+  normalizePremixSessionKeys,
+  getPremixMaterialSessionKey,
+  groupPremixSelectionsByPremix,
   materialRequiresGradeSelection,
-  findPrepMaterialByCode,
+  mergeMaterialsLists,
+  mergePremixMaterialSelections,
   normalizeMaterialsList,
+  type PremixMaterialOption,
   type RawMaterialPrepMaterialOption,
-  type RawMaterialPrepProcessKey,
-  type RawMaterialPrepSelectedProcesses,
 } from "./rawMaterialPrepFlowConfig";
-import { findGradeInMaterial } from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
+import schemaEngineController from "../../../schema-engine/controller/schemaEngineController";
+import {
+  buildRawMaterialSchemaRequest,
+  buildRawMaterialSchemaRequestFromCodes,
+  findGradeInMaterial,
+  findMaterialInList,
+  rawMaterialPrepSchemaFetchConfig,
+} from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
+import type { SchemaDocumentV2 } from "../../../schema-engine";
+import { isSchemaDocumentReady } from "../../../schema-engine/utils/schemaMessages";
+import { isManufacturingContinueFillingStatus } from "../../operationStatus";
 
 const RM_STATUS = MANUFACTURING_STATUS;
 
@@ -60,16 +81,6 @@ export type RawMaterialPrepBatch = ManufacturingBatch & {
   formId?: string | null;
 };
 
-const createEmptyPremixSession = (): PremixSession => createEmptyPremixSchemaSession();
-
-const createDefaultFormState = () => ({
-  selectedPremix: "" as number | "",
-  selectedProcesses: { ...DEFAULT_SELECTED_PROCESSES },
-  solidMaterialCode: "",
-  solidGradeCode: "",
-  liquidMaterialCode: "",
-});
-
 const normalizePremixSession = (session?: Partial<PremixSession> | null): PremixSession => {
   const base = createEmptyPremixSchemaSession();
   if (!session) return base;
@@ -88,6 +99,97 @@ const normalizePremixSession = (session?: Partial<PremixSession> | null): Premix
 
 const isSessionFilled = (session: PremixSession) => premixSessionHasData(normalizePremixSession(session));
 
+const fetchPremixSlotSchema = async (
+  entry: RawMaterialPrepPremixSelection,
+  slot: "solid" | "liquid",
+  materials: MaterialsListItem[],
+  subDepartmentId: number,
+): Promise<SchemaDocumentV2 | null> => {
+  const materialCode = slot === "solid" ? entry.solidMaterialCode : entry.liquidMaterialCode;
+  if (!materialCode) return null;
+
+  const material = findMaterialInList(materials, materialCode);
+  const materialId =
+    material?.materialId ?? (slot === "solid" ? entry.solidMaterialId : entry.liquidMaterialId);
+  if (!materialId || subDepartmentId <= 0) return null;
+
+  const requestBody = material
+    ? buildRawMaterialSchemaRequest({
+        subDepartmentId,
+        material,
+        grade: slot === "solid" ? findGradeInMaterial(material, entry.solidGradeCode) : null,
+      })
+    : buildRawMaterialSchemaRequestFromCodes({
+        subDepartmentId,
+        materialId,
+        materialCode,
+        gradeId: slot === "solid" ? entry.solidGradeId : null,
+        gradeCode: slot === "solid" ? entry.solidGradeCode || null : null,
+      });
+
+  const response = await schemaEngineController.fetchSchema(
+    rawMaterialPrepSchemaFetchConfig,
+    requestBody,
+  );
+  if (!response?.success || !isSchemaDocumentReady(response.data)) return null;
+  return response.data;
+};
+
+const ensurePremixSchemasLoaded = async (
+  premixNo: number,
+  selections: RawMaterialPrepPremixSelection[],
+  sessions: Record<string, PremixSession>,
+  solidMaterials: MaterialsListItem[],
+  liquidMaterials: MaterialsListItem[],
+  subDepartmentId: number,
+): Promise<Record<string, PremixSession>> => {
+  const premixSelections = selections.filter((entry) => entry.premix === premixNo);
+  if (premixSelections.length === 0) return sessions;
+
+  const nextSessions = { ...sessions };
+  const allMaterials = mergeMaterialsLists(solidMaterials, liquidMaterials) as MaterialsListItem[];
+
+  for (const entry of premixSelections) {
+    const sessionKey = getPremixMaterialSessionKey(entry.premix, entry.materialKey);
+    const current = normalizePremixSession(nextSessions[sessionKey]);
+    let nextSession = current;
+
+    if (entry.selectedProcesses.solid && entry.solidMaterialCode && !current.solid.schema) {
+      const schema = await fetchPremixSlotSchema(entry, "solid", allMaterials, subDepartmentId);
+      if (schema) {
+        nextSession = {
+          ...nextSession,
+          solid: {
+            ...current.solid,
+            schema,
+            schemaLoading: false,
+            schemaError: null,
+          },
+        };
+      }
+    }
+
+    if (entry.selectedProcesses.liquid && entry.liquidMaterialCode && !nextSession.liquid.schema) {
+      const schema = await fetchPremixSlotSchema(entry, "liquid", allMaterials, subDepartmentId);
+      if (schema) {
+        nextSession = {
+          ...nextSession,
+          liquid: {
+            ...nextSession.liquid,
+            schema,
+            schemaLoading: false,
+            schemaError: null,
+          },
+        };
+      }
+    }
+
+    nextSessions[sessionKey] = nextSession;
+  }
+
+  return nextSessions;
+};
+
 const parseStatus = (status: string | undefined) => String(status ?? "").toLowerCase();
 
 export const useRawMaterialPrepHook = () => {
@@ -96,12 +198,16 @@ export const useRawMaterialPrepHook = () => {
   const user = useAuthStore((s) => s.user);
   const bumpBatchRefresh = useUserBatchRefreshStore((state) => state.bumpVersion);
 
-  const subDepartmentId = useMemo(
-    () =>
-      user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "raw-material-prep")
-        ?.subDepartmentId,
-    [user]
-  );
+  const subDepartmentId = useMemo(() => {
+    const subDepartments = user?.allSubDepartments ?? [];
+    const match =
+      subDepartments.find((sd) => sd.slugs?.subDept === "raw-material-prep") ??
+      subDepartments.find((sd) => sd.slugs?.subDept === "raw-material-preparation") ??
+      subDepartments.find(
+        (sd) => sd.slugs?.dept === "manufacturing" && sd.slugs?.subDept === "raw-material-prep",
+      );
+    return match?.subDepartmentId ?? null;
+  }, [user]);
 
   const [view, setView] = useState<WorkflowView>("list");
   const [detailsRow, setDetailsRow] = useState<any>(null);
@@ -113,14 +219,9 @@ export const useRawMaterialPrepHook = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
+  const [numberOfPremix, setNumberOfPremix] = useState(0);
+  const [identificationSheet, setIdentificationSheet] = useState<IdentificationSheet | null>(null);
 
-  const [selectedPremix, setSelectedPremix] = useState<number | "">("");
-  const [selectedProcesses, setSelectedProcesses] = useState<RawMaterialPrepSelectedProcesses>(
-    () => ({ ...DEFAULT_SELECTED_PROCESSES })
-  );
-  const [solidMaterialCode, setSolidMaterialCode] = useState("");
-  const [solidGradeCode, setSolidGradeCode] = useState("");
-  const [liquidMaterialCode, setLiquidMaterialCode] = useState("");
   const [availableSolidMaterials, setAvailableSolidMaterials] = useState<RawMaterialPrepMaterialOption[]>([]);
   const [availableLiquidMaterials, setAvailableLiquidMaterials] = useState<RawMaterialPrepMaterialOption[]>([]);
   const [solidMaterialsCacheByBatchKey, setSolidMaterialsCacheByBatchKey] = useState<
@@ -132,7 +233,7 @@ export const useRawMaterialPrepHook = () => {
   const [loadingMaterials, setLoadingMaterials] = useState(false);
   const [completedPremixesByBatch, setCompletedPremixesByBatch] = useState<Record<string, number[]>>({});
   const [premixSessionsByBatch, setPremixSessionsByBatch] = useState<
-    Record<string, Record<number, PremixSession>>
+    Record<string, Record<string, PremixSession>>
   >({});
   const [addedPremixSelectionsByBatch, setAddedPremixSelectionsByBatch] = useState<
     Record<string, AddedPremixSelection[]>
@@ -140,25 +241,33 @@ export const useRawMaterialPrepHook = () => {
   const [weightmentSheetByBatch, setWeightmentSheetByBatch] = useState<
     Record<string, RawMaterialPrepWeightmentSheet>
   >({});
+  const [premixStatusByNoByBatch, setPremixStatusByNoByBatch] = useState<
+    Record<string, Record<number, PremixStatusMeta>>
+  >({});
 
   const [initialSnapshot, setInitialSnapshot] = useState("{}");
 
-  const safeSelectedProcesses = useMemo(
-    () => ({
-      ...DEFAULT_SELECTED_PROCESSES,
-      ...(selectedProcesses ?? {}),
-    }),
-    [selectedProcesses]
+  const premixMaterialOptions = useMemo<PremixMaterialOption[]>(
+    () =>
+      buildPremixMaterialOptions(
+        identificationSheet?.materials ?? [],
+        availableSolidMaterials,
+        availableLiquidMaterials,
+      ),
+    [identificationSheet, availableSolidMaterials, availableLiquidMaterials],
   );
 
-  const selectedTypes = useMemo<MaterialTypes>(
-    () => ({
-      solid: safeSelectedProcesses.solid,
-      liquid: safeSelectedProcesses.liquid,
-      linear: false,
-    }),
-    [safeSelectedProcesses]
+  const allMaterials = useMemo(
+    () => mergeMaterialsLists(availableSolidMaterials, availableLiquidMaterials),
+    [availableSolidMaterials, availableLiquidMaterials],
   );
+
+  const loadBatchIdentificationSheet = useCallback(async (batchId: string) => {
+    const details = await batchManagementController.getBatchById(batchId);
+    const sheet = (details?.identificationSheet ?? null) as IdentificationSheet | null;
+    const premixCount = Number(sheet?.numberOfPremix) || 0;
+    return { identificationSheet: sheet, numberOfPremix: premixCount };
+  }, []);
 
   const loadMaterialsByType = useCallback(
     async (materialType: "SOLID" | "LIQUID", options?: { silent?: boolean }) => {
@@ -198,20 +307,6 @@ export const useRawMaterialPrepHook = () => {
     [addedPremixSelectionsByBatch, activeFormBatchKey]
   );
 
-  const needsSolidMaterialsList = useMemo(
-    () =>
-      safeSelectedProcesses.solid ||
-      activeAddedPremixSelections.some((entry) => entry.selectedProcesses.solid),
-    [safeSelectedProcesses.solid, activeAddedPremixSelections]
-  );
-
-  const needsLiquidMaterialsList = useMemo(
-    () =>
-      safeSelectedProcesses.liquid ||
-      activeAddedPremixSelections.some((entry) => entry.selectedProcesses.liquid),
-    [safeSelectedProcesses.liquid, activeAddedPremixSelections]
-  );
-
   const clearMaterialsCacheForKey = useCallback((batchKey: string) => {
     if (!batchKey) return;
     setSolidMaterialsCacheByBatchKey((prev) => {
@@ -229,7 +324,7 @@ export const useRawMaterialPrepHook = () => {
   }, []);
 
   useEffect(() => {
-    if (view !== "form" || !needsSolidMaterialsList) {
+    if (view !== "form") {
       setAvailableSolidMaterials([]);
       return;
     }
@@ -247,9 +342,6 @@ export const useRawMaterialPrepHook = () => {
         if (!cancelled) {
           setAvailableSolidMaterials(list);
           setSolidMaterialsCacheByBatchKey((prev) => ({ ...prev, [activeFormBatchKey]: list }));
-          if (list.length === 0) {
-            showAlert(STRINGS.SOURCING.SPECIFICATION_FORM.MATERIALS_LOAD_FAILED, "error");
-          }
         }
       } catch {
         if (!cancelled) {
@@ -267,7 +359,6 @@ export const useRawMaterialPrepHook = () => {
     };
   }, [
     view,
-    needsSolidMaterialsList,
     loadMaterialsByType,
     showAlert,
     beginMaterialsLoad,
@@ -277,7 +368,7 @@ export const useRawMaterialPrepHook = () => {
   ]);
 
   useEffect(() => {
-    if (view !== "form" || !needsLiquidMaterialsList) {
+    if (view !== "form") {
       setAvailableLiquidMaterials([]);
       return;
     }
@@ -295,9 +386,6 @@ export const useRawMaterialPrepHook = () => {
         if (!cancelled) {
           setAvailableLiquidMaterials(list);
           setLiquidMaterialsCacheByBatchKey((prev) => ({ ...prev, [activeFormBatchKey]: list }));
-          if (list.length === 0) {
-            showAlert(STRINGS.SOURCING.SPECIFICATION_FORM.MATERIALS_LOAD_FAILED, "error");
-          }
         }
       } catch {
         if (!cancelled) {
@@ -315,7 +403,6 @@ export const useRawMaterialPrepHook = () => {
     };
   }, [
     view,
-    needsLiquidMaterialsList,
     loadMaterialsByType,
     showAlert,
     beginMaterialsLoad,
@@ -324,12 +411,55 @@ export const useRawMaterialPrepHook = () => {
     activeFormBatchKey,
   ]);
 
-  const materialTypesArray = useMemo(() => {
-    const types: Array<"solid" | "liquid"> = [];
-    if (selectedTypes.solid) types.push("solid");
-    if (selectedTypes.liquid) types.push("liquid");
-    return types;
-  }, [selectedTypes]);
+  useEffect(() => {
+    if (view !== "form" || !identificationSheet || numberOfPremix < 1) return;
+    if (availableSolidMaterials.length === 0 && availableLiquidMaterials.length === 0) return;
+
+    setAddedPremixSelectionsByBatch((prev) => {
+      const current = prev[activeFormBatchKey] ?? [];
+      const next = mergePremixMaterialSelections(
+        current,
+        identificationSheet,
+        numberOfPremix,
+        availableSolidMaterials,
+        availableLiquidMaterials,
+      );
+      if (JSON.stringify(current) === JSON.stringify(next)) return prev;
+      return { ...prev, [activeFormBatchKey]: next };
+    });
+  }, [
+    view,
+    activeFormBatchKey,
+    identificationSheet,
+    numberOfPremix,
+    availableSolidMaterials,
+    availableLiquidMaterials,
+  ]);
+
+  useEffect(() => {
+    if (view !== "form") return;
+
+    const selections = addedPremixSelectionsByBatch[activeFormBatchKey] ?? [];
+    if (selections.length === 0) return;
+
+    setPremixSessionsByBatch((prev) => {
+      const current = normalizePremixSessionKeys(prev[activeFormBatchKey] ?? {});
+      const next = normalizePremixSessionKeys(
+        buildPremixMaterialSessionsFromSelections(
+          selections,
+          availableSolidMaterials,
+          current,
+        ),
+      );
+      if (JSON.stringify(current) === JSON.stringify(next)) return prev;
+      return { ...prev, [activeFormBatchKey]: next };
+    });
+  }, [
+    view,
+    activeFormBatchKey,
+    addedPremixSelectionsByBatch,
+    availableSolidMaterials,
+  ]);
 
   const completedPremixes = useMemo(
     () => completedPremixesByBatch[activeBatchId] ?? [],
@@ -348,19 +478,46 @@ export const useRawMaterialPrepHook = () => {
     () => weightmentSheetByBatch[activeFormBatchKey] ?? createEmptyWeightmentSheet(),
     [weightmentSheetByBatch, activeFormBatchKey]
   );
+  const premixStatusByNo = useMemo(
+    () => premixStatusByNoByBatch[activeFormBatchKey] ?? {},
+    [premixStatusByNoByBatch, activeFormBatchKey]
+  );
 
-  const availablePremixOptions = useMemo(() => {
-    const used = new Set(addedPremixSelections.map((entry) => entry.premix));
-    return PREMIX_OPTIONS.filter((n) => !used.has(n));
-  }, [addedPremixSelections]);
+  const getPremixStatus = useCallback(
+    (premixNo: number): PremixSubmissionStatus =>
+      premixStatusByNo[premixNo]?.premixSubmissionStatus ?? "TO_BE_INITIATED",
+    [premixStatusByNo],
+  );
 
-  const applyPremixSession = useCallback((session?: Partial<PremixSession> | null) => {
-    const normalized = normalizePremixSession(session);
-    setSelectedProcesses(normalized.selectedProcesses);
-    setSolidMaterialCode(normalized.solidMaterialCode);
-    setSolidGradeCode(normalized.solidGradeCode);
-    setLiquidMaterialCode(normalized.liquidMaterialCode);
-  }, []);
+  const checkPremixEditable = useCallback(
+    (premixNo: number): boolean => isPremixEditable(getPremixStatus(premixNo)),
+    [getPremixStatus],
+  );
+
+  const premixGroups = useMemo(
+    () => groupPremixSelectionsByPremix(addedPremixSelections),
+    [addedPremixSelections],
+  );
+
+  const allPremixesHaveMaterial = useMemo(
+    () =>
+      addedPremixSelections.length > 0 &&
+      addedPremixSelections.every((entry) => {
+        const hasMaterial =
+          Boolean(entry.solidMaterialCode) || Boolean(entry.liquidMaterialCode);
+        if (!hasMaterial) return false;
+
+        if (
+          entry.solidMaterialCode &&
+          materialRequiresGradeSelection(availableSolidMaterials, entry.solidMaterialCode)
+        ) {
+          return Boolean(entry.solidGradeCode);
+        }
+
+        return true;
+      }),
+    [addedPremixSelections, availableSolidMaterials],
+  );
 
   const markPremixComplete = useCallback(
     (batchId: string, premix: number) => {
@@ -387,17 +544,21 @@ export const useRawMaterialPrepHook = () => {
   const premixCardsHaveData = useMemo(
     () =>
       addedPremixSelections.some((entry) => {
-        const session = premixSessions[entry.premix];
+        const session = premixSessions[getPremixMaterialSessionKey(entry.premix, entry.materialKey)];
         return session ? isSessionFilled(session) : false;
       }),
-    [addedPremixSelections, premixSessions]
+    [addedPremixSelections, premixSessions],
   );
 
   const allPremixSchemasReady = useMemo(
     () =>
       addedPremixSelections.length > 0 &&
       addedPremixSelections.every((entry) => {
-        const session = premixSessions[entry.premix];
+        const hasMaterial =
+          Boolean(entry.solidMaterialCode) || Boolean(entry.liquidMaterialCode);
+        if (!hasMaterial) return false;
+
+        const session = premixSessions[getPremixMaterialSessionKey(entry.premix, entry.materialKey)];
         if (!session) return false;
         if (entry.selectedProcesses.solid) {
           if (session.solid.schemaLoading || session.solid.schemaError || !session.solid.schema) {
@@ -411,7 +572,7 @@ export const useRawMaterialPrepHook = () => {
         }
         return true;
       }),
-    [addedPremixSelections, premixSessions]
+    [addedPremixSelections, premixSessions],
   );
 
   const isFormDirty = useMemo(
@@ -420,7 +581,6 @@ export const useRawMaterialPrepHook = () => {
   );
 
   const resetFormContext = useCallback(() => {
-    const defaults = createDefaultFormState();
     setView("list");
     setActiveBatch(null);
     setIsEditMode(false);
@@ -428,11 +588,8 @@ export const useRawMaterialPrepHook = () => {
     setActionLoading(false);
     setBackConfirmOpen(false);
     setHasSavedDraft(false);
-    setSelectedPremix(defaults.selectedPremix);
-    setSelectedProcesses(defaults.selectedProcesses);
-    setSolidMaterialCode(defaults.solidMaterialCode);
-    setSolidGradeCode(defaults.solidGradeCode);
-    setLiquidMaterialCode(defaults.liquidMaterialCode);
+    setNumberOfPremix(0);
+    setIdentificationSheet(null);
     setAvailableSolidMaterials([]);
     setAvailableLiquidMaterials([]);
     setSolidMaterialsCacheByBatchKey({});
@@ -443,6 +600,7 @@ export const useRawMaterialPrepHook = () => {
     setPremixSessionsByBatch({});
     setCompletedPremixesByBatch({});
     setWeightmentSheetByBatch({});
+    setPremixStatusByNoByBatch({});
     setInitialSnapshot(
       JSON.stringify({
         addedPremixSelections: [],
@@ -458,75 +616,159 @@ export const useRawMaterialPrepHook = () => {
     return fallbackMessage;
   };
 
+  const mergePremixSelectionsWithSheet = (
+    selections: AddedPremixSelection[],
+    sheet: IdentificationSheet,
+    premixCount: number,
+    solidMaterials: RawMaterialPrepMaterialOption[],
+    liquidMaterials: RawMaterialPrepMaterialOption[],
+  ) =>
+    mergePremixMaterialSelections(
+      selections,
+      sheet,
+      premixCount,
+      solidMaterials,
+      liquidMaterials,
+    );
+
   const openFormWithResolvedData = useCallback(async (batch: RawMaterialPrepBatch, editMode: boolean) => {
-    const shouldFetchDetails = Boolean(batch.formId);
-
-    let nextBatch = batch;
-    let nextAddedPremixSelections: AddedPremixSelection[] = [];
-    let nextPremixSessions: Record<number, PremixSession> = {};
-    let nextWeightmentSheet = createEmptyWeightmentSheet();
-
-    if (shouldFetchDetails) {
-      if (!batch.formId) {
-        showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.FORM_ID_MISSING, "error");
-        return;
-      }
-
-      setLoadingFormDetails(true);
-      const detailsResponse = await rawMaterialPreparationController.fetchFormDetails({
-        formId: batch.formId,
-      });
-      setLoadingFormDetails(false);
-
-      if (!detailsResponse?.success || !detailsResponse?.data) {
-        const fallback =
-          detailsResponse?.statusCode === 404
-            ? STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.DETAILS_NOT_FOUND
-            : STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.DETAILS_FETCH_ERROR;
-        showAlert(getErrorMessage(detailsResponse, fallback), "error");
-        return;
-      }
-
-      const details = detailsResponse.data;
-      nextBatch = {
-        ...batch,
-        formId: details.formId || batch.formId,
-      };
-      const mapped = mapPreparationDetailsFromApi(details);
-      nextAddedPremixSelections = mapped.addedPremixSelections;
-      nextPremixSessions = mapped.premixSessions;
-      nextWeightmentSheet = mapped.weightmentSheet;
+    if (!batch.batchId) {
+      showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.BATCH_ID_MISSING, "error");
+      return;
     }
 
-    const snapshot = JSON.stringify({
-      addedPremixSelections: nextAddedPremixSelections,
-      premixSessions: nextPremixSessions,
-      weightmentSheet: nextWeightmentSheet,
-    });
+    setLoadingFormDetails(true);
 
-    setActiveBatch(nextBatch);
-    setIsEditMode(editMode);
-    setSelectedPremix("");
-    setSelectedProcesses({ ...DEFAULT_SELECTED_PROCESSES });
-    setSolidMaterialCode("");
-    setSolidGradeCode("");
-    setLiquidMaterialCode("");
-    const batchKey = nextBatch.batchId || "__form__";
-    setAddedPremixSelectionsByBatch((prev) => ({
-      ...prev,
-      [batchKey]: nextAddedPremixSelections,
-    }));
-    setPremixSessionsByBatch((prev) => ({
-      ...prev,
-      [batchKey]: nextPremixSessions,
-    }));
-    setWeightmentSheetByBatch((prev) => ({
-      ...prev,
-      [batchKey]: nextWeightmentSheet,
-    }));
-    setInitialSnapshot(snapshot);
-    setView("form");
-  }, [showAlert]);
+    try {
+      const { identificationSheet: sheet, numberOfPremix: premixCount } =
+        await loadBatchIdentificationSheet(batch.batchId);
+
+      if (!sheet || premixCount < 1) {
+        showAlert(
+          "Identification sheet is missing or has no premix count for this batch.",
+          "error",
+        );
+        return;
+      }
+
+      const batchKey = batch.batchId || "__form__";
+      const [resolvedSolidMaterials, resolvedLiquidMaterials] = await Promise.all([
+        loadMaterialsByType("SOLID", { silent: true }),
+        loadMaterialsByType("LIQUID", { silent: true }),
+      ]);
+
+      let nextBatch = batch;
+      let nextAddedPremixSelections: AddedPremixSelection[] = [];
+      let nextPremixSessions: Record<string, PremixSession> = {};
+      let nextWeightmentSheet = createEmptyWeightmentSheet();
+      let nextPremixStatusByNo: Record<number, PremixStatusMeta> = {};
+      for (let i = 1; i <= premixCount; i++) {
+        nextPremixStatusByNo[i] = { premixSubmissionStatus: "TO_BE_INITIATED" };
+      }
+
+      const shouldFetchFormDetails =
+        editMode ||
+        isManufacturingContinueFillingStatus(String(batch.rmStatus ?? batch.status ?? ""));
+
+      if (shouldFetchFormDetails && batch.formId) {
+        const detailsResponse = await rawMaterialPreparationController.fetchFormDetails({
+          formId: batch.formId,
+        });
+
+        if (!detailsResponse?.success || !detailsResponse?.data) {
+          const fallback =
+            detailsResponse?.statusCode === 404
+              ? STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.DETAILS_NOT_FOUND
+              : STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.DETAILS_FETCH_ERROR;
+          showAlert(getErrorMessage(detailsResponse, fallback), "error");
+          return;
+        }
+
+        const details = detailsResponse.data;
+        nextBatch = {
+          ...batch,
+          formId: details.formId || batch.formId,
+        };
+        const mapped = mapPreparationDetailsFromApi(
+          details,
+          sheet,
+          premixCount,
+          resolvedSolidMaterials as MaterialsListItem[],
+          resolvedLiquidMaterials as MaterialsListItem[],
+        );
+        nextAddedPremixSelections = mergePremixSelectionsWithSheet(
+          mapped.addedPremixSelections,
+          sheet,
+          premixCount,
+          resolvedSolidMaterials,
+          resolvedLiquidMaterials,
+        );
+        nextPremixSessions = mapped.premixSessions;
+        nextWeightmentSheet = mapped.weightmentSheet;
+        nextPremixStatusByNo = mapped.premixStatusByNo;
+      } else {
+        nextAddedPremixSelections = buildPremixMaterialSelectionsFromSheet(
+          sheet,
+          premixCount,
+          resolvedSolidMaterials,
+          resolvedLiquidMaterials,
+        );
+      }
+
+      nextPremixSessions = normalizePremixSessionKeys(
+        buildPremixMaterialSessionsFromSelections(
+          nextAddedPremixSelections,
+          resolvedSolidMaterials,
+          normalizePremixSessionKeys(nextPremixSessions),
+        ),
+      );
+
+      const snapshot = JSON.stringify({
+        addedPremixSelections: nextAddedPremixSelections,
+        premixSessions: nextPremixSessions,
+        weightmentSheet: nextWeightmentSheet,
+      });
+
+      setActiveBatch(nextBatch);
+      setIsEditMode(editMode);
+      setNumberOfPremix(premixCount);
+      setIdentificationSheet(sheet);
+      setAvailableSolidMaterials(resolvedSolidMaterials);
+      setAvailableLiquidMaterials(resolvedLiquidMaterials);
+      setSolidMaterialsCacheByBatchKey((prev) => ({
+        ...prev,
+        [batchKey]: resolvedSolidMaterials,
+      }));
+      setLiquidMaterialsCacheByBatchKey((prev) => ({
+        ...prev,
+        [batchKey]: resolvedLiquidMaterials,
+      }));
+      setAddedPremixSelectionsByBatch((prev) => ({
+        ...prev,
+        [batchKey]: nextAddedPremixSelections,
+      }));
+      setPremixSessionsByBatch((prev) => ({
+        ...prev,
+        [batchKey]: nextPremixSessions,
+      }));
+      setWeightmentSheetByBatch((prev) => ({
+        ...prev,
+        [batchKey]: nextWeightmentSheet,
+      }));
+      setPremixStatusByNoByBatch((prev) => ({
+        ...prev,
+        [batchKey]: nextPremixStatusByNo,
+      }));
+      setInitialSnapshot(snapshot);
+      setView("form");
+    } finally {
+      setLoadingFormDetails(false);
+    }
+  }, [
+    loadBatchIdentificationSheet,
+    loadMaterialsByType,
+    showAlert,
+  ]);
 
   const handleFillForm = useCallback(
     async (batch: RawMaterialPrepBatch) => await openFormWithResolvedData(batch, false),
@@ -574,163 +816,62 @@ export const useRawMaterialPrepHook = () => {
     setDetailsRow(null);
     setDetailsData(null);
     setView("list");
-  }, []);
+    bumpBatchRefresh();
+  }, [bumpBatchRefresh]);
 
   const handleBack = useCallback(() => {
     if (isFormDirty) {
       setBackConfirmOpen(true);
       return;
     }
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
-  }, [isFormDirty, resetFormContext, bumpBatchRefresh, hasSavedDraft]);
+  }, [isFormDirty, resetFormContext, bumpBatchRefresh]);
 
   const handleDiscardAndBack = useCallback(() => {
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
-  }, [resetFormContext, bumpBatchRefresh, hasSavedDraft]);
+  }, [resetFormContext, bumpBatchRefresh]);
 
-  const handlePremixChange = useCallback((premix: number | "") => {
-    setSelectedPremix(premix);
-    if (premix === "") {
-      applyPremixSession(createEmptyPremixSession());
-    }
-  }, [applyPremixSession]);
+  const handlePremixDateChange = useCallback(
+    (premix: number, premixDate: string) => {
+      if (!premix) return;
+      if (!checkPremixEditable(premix)) return;
 
-  const handleProcessToggle = useCallback(
-    (process: RawMaterialPrepProcessKey, checked: boolean) => {
-      setSelectedProcesses((prev) => ({
-        ...DEFAULT_SELECTED_PROCESSES,
-        ...(prev ?? {}),
-        [process]: checked,
-      }));
-      if (!checked) {
-        if (process === "solid") {
-          setSolidMaterialCode("");
-          setSolidGradeCode("");
-          setAvailableSolidMaterials([]);
-        } else {
-          setLiquidMaterialCode("");
-          setAvailableLiquidMaterials([]);
-        }
-      }
+      setAddedPremixSelectionsByBatch((prev) => {
+        const list = prev[activeFormBatchKey] ?? [];
+        const nextList = list.map((entry) =>
+          entry.premix === premix ? { ...entry, premixDate } : entry,
+        );
+        return {
+          ...prev,
+          [activeFormBatchKey]: nextList,
+        };
+      });
     },
-    []
+    [activeFormBatchKey, checkPremixEditable],
   );
 
-  const handleSolidMaterialChange = useCallback((materialCode: string) => {
-    setSolidMaterialCode(materialCode);
-    setSolidGradeCode("");
-  }, []);
-
-  const handleSolidGradeChange = useCallback((gradeCode: string) => {
-    setSolidGradeCode(gradeCode);
-  }, []);
-
-  const handleLiquidMaterialChange = useCallback((materialCode: string) => {
-    setLiquidMaterialCode(materialCode);
-  }, []);
-
-  const handleAddPremixSelection = useCallback(() => {
-    if (selectedPremix === "") return;
-
-    const hasSolid = Boolean(selectedProcesses.solid);
-    const hasLiquid = Boolean(selectedProcesses.liquid);
-    if (!hasSolid && !hasLiquid) return;
-    if (hasSolid && !solidMaterialCode) return;
-    if (
-      hasSolid &&
-      materialRequiresGradeSelection(availableSolidMaterials, solidMaterialCode) &&
-      !solidGradeCode
-    ) {
-      return;
-    }
-    if (hasLiquid && !liquidMaterialCode) return;
-
-    const solidMaterial = hasSolid
-      ? findPrepMaterialByCode(availableSolidMaterials, solidMaterialCode)
-      : undefined;
-    const liquidMaterial = hasLiquid
-      ? findPrepMaterialByCode(availableLiquidMaterials, liquidMaterialCode)
-      : undefined;
-    const solidGrade = solidMaterial
-      ? findGradeInMaterial(solidMaterial, solidGradeCode)
-      : undefined;
-
-    const nextEntry: AddedPremixSelection = {
-      premix: selectedPremix,
-      selectedProcesses: {
-        solid: hasSolid,
-        liquid: hasLiquid,
-      },
-      solidMaterialCode,
-      solidGradeCode: hasSolid ? solidGradeCode : "",
-      solidMaterialId: solidMaterial?.materialId,
-      solidGradeId: solidGrade?.gradeId,
-      liquidMaterialCode,
-      liquidMaterialId: liquidMaterial?.materialId,
-    };
-    const nextSession: PremixSession = {
-      ...createEmptyPremixSchemaSession(),
-      selectedProcesses: {
-        solid: hasSolid,
-        liquid: hasLiquid,
-      },
-      solidMaterialCode,
-      solidGradeCode: hasSolid ? solidGradeCode : "",
-      liquidMaterialCode,
-    };
-
-    setAddedPremixSelectionsByBatch((prev) => {
-      const list = prev[activeFormBatchKey] ?? [];
-      const withoutCurrent = list.filter((entry) => entry.premix !== selectedPremix);
-      const nextList = [...withoutCurrent, nextEntry].sort((a, b) => a.premix - b.premix);
-      return {
-        ...prev,
-        [activeFormBatchKey]: nextList,
-      };
-    });
-    setPremixSessionsByBatch((prev) => ({
-      ...prev,
-      [activeFormBatchKey]: {
-        ...(prev[activeFormBatchKey] ?? {}),
-        [selectedPremix]: nextSession,
-      },
-    }));
-
-    if (activeBatchId) {
-      markPremixComplete(activeBatchId, selectedPremix);
-    }
-
-    setSelectedPremix("");
-    setSelectedProcesses({ ...DEFAULT_SELECTED_PROCESSES });
-    setSolidMaterialCode("");
-    setSolidGradeCode("");
-    setLiquidMaterialCode("");
-  }, [
-    selectedPremix,
-    selectedProcesses,
-    solidMaterialCode,
-    solidGradeCode,
-    liquidMaterialCode,
-    activeFormBatchKey,
-    activeBatchId,
-    markPremixComplete,
-    applyPremixSession,
-    availableSolidMaterials,
-  ]);
-
   const handlePremixSlotChange = useCallback(
-    (premix: number, slot: "solid" | "liquid", nextSlot: PremixSession["solid"]) => {
-      if (!premix) return;
+    (
+      premix: number,
+      materialKey: string,
+      slot: "solid" | "liquid",
+      nextSlot: PremixSession["solid"],
+    ) => {
+      if (!premix || !materialKey) return;
+      // Always allow slot updates (schema load + hydrate from API).
+      // User edits are blocked in SchemaPanel via readOnly when premix is locked.
+      const sessionKey = getPremixMaterialSessionKey(premix, materialKey);
+
       setPremixSessionsByBatch((prev) => {
         const batchSessions = prev[activeFormBatchKey] ?? {};
-        const current = normalizePremixSession(batchSessions[premix]);
+        const current = normalizePremixSession(batchSessions[sessionKey]);
         return {
           ...prev,
           [activeFormBatchKey]: {
             ...batchSessions,
-            [premix]: {
+            [sessionKey]: {
               ...current,
               [slot]: nextSlot,
             },
@@ -738,52 +879,14 @@ export const useRawMaterialPrepHook = () => {
         };
       });
 
-      const session = premixSessions[premix];
+      if (!checkPremixEditable(premix)) return;
+
+      const session = premixSessions[sessionKey];
       if (session && isSessionFilled({ ...session, [slot]: nextSlot })) {
         markPremixComplete(activeBatchId, premix);
       }
     },
-    [activeFormBatchKey, activeBatchId, markPremixComplete, premixSessions]
-  );
-
-  const handleDeletePremixSelection = useCallback(
-    (premix: number) => {
-      if (!premix) return;
-
-      setAddedPremixSelectionsByBatch((prev) => {
-        const list = prev[activeFormBatchKey] ?? [];
-        return {
-          ...prev,
-          [activeFormBatchKey]: list.filter((entry) => entry.premix !== premix),
-        };
-      });
-
-      setPremixSessionsByBatch((prev) => {
-        const batchSessions = { ...(prev[activeFormBatchKey] ?? {}) };
-        delete batchSessions[premix];
-        return { ...prev, [activeFormBatchKey]: batchSessions };
-      });
-
-      if (activeBatchId) {
-        setCompletedPremixesByBatch((prev) => {
-          const existing = prev[activeBatchId] ?? [];
-          if (!existing.includes(premix)) return prev;
-          return {
-            ...prev,
-            [activeBatchId]: existing.filter((n) => n !== premix),
-          };
-        });
-      }
-
-      if (selectedPremix === premix) {
-        setSelectedPremix("");
-      }
-      setSelectedProcesses({ ...DEFAULT_SELECTED_PROCESSES });
-      setSolidMaterialCode("");
-      setSolidGradeCode("");
-      setLiquidMaterialCode("");
-    },
-    [activeFormBatchKey, activeBatchId, selectedPremix]
+    [activeFormBatchKey, activeBatchId, markPremixComplete, premixSessions, checkPremixEditable],
   );
 
   const handleWeightmentSheetChange = useCallback(
@@ -796,7 +899,7 @@ export const useRawMaterialPrepHook = () => {
     [activeFormBatchKey]
   );
 
-  const submitForm = useCallback(async (intent: "draft" | "submit") => {
+  const submitPremix = useCallback(async (premixNo: number, intent: "draft" | "submit") => {
     if (!activeBatch) return false;
 
     if (!subDepartmentId) {
@@ -804,32 +907,127 @@ export const useRawMaterialPrepHook = () => {
       return false;
     }
 
-    if (addedPremixSelections.length === 0) {
-      showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.SELECT_AT_LEAST_ONE, "warning");
+    if (!checkPremixEditable(premixNo)) {
       return false;
     }
 
-    if (!allPremixSchemasReady) {
-      showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.SCHEMA_LOAD_REQUIRED, "warning");
-      return false;
+    const isDraft = intent === "draft";
+    let sessionsForPayload = premixSessions;
+
+    setActionLoading(true);
+    try {
+      sessionsForPayload = await ensurePremixSchemasLoaded(
+        premixNo,
+        addedPremixSelections,
+        premixSessions,
+        availableSolidMaterials as MaterialsListItem[],
+        availableLiquidMaterials as MaterialsListItem[],
+        subDepartmentId,
+      );
+      setPremixSessionsByBatch((prev) => ({
+        ...prev,
+        [activeFormBatchKey]: sessionsForPayload,
+      }));
+    } finally {
+      setActionLoading(false);
     }
 
-    if (!premixCardsHaveData) {
-      showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.EMPTY_FORM_ERROR, "warning");
-      return false;
+    if (!isDraft) {
+      const premixSelections = addedPremixSelections.filter((entry) => entry.premix === premixNo);
+
+      if (premixSelections.length === 0) {
+        showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.SELECT_AT_LEAST_ONE, "warning");
+        return false;
+      }
+
+      const premixHasMaterial = premixSelections.every((entry) => {
+        const hasMaterial = Boolean(entry.solidMaterialCode) || Boolean(entry.liquidMaterialCode);
+        if (!hasMaterial) return false;
+        if (
+          entry.solidMaterialCode &&
+          materialRequiresGradeSelection(availableSolidMaterials, entry.solidMaterialCode)
+        ) {
+          return Boolean(entry.solidGradeCode);
+        }
+        return true;
+      });
+
+      if (!premixHasMaterial) {
+        showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.SELECT_AT_LEAST_ONE, "warning");
+        return false;
+      }
+
+      const premixSchemasReady = premixSelections.every((entry) => {
+        const session = sessionsForPayload[getPremixMaterialSessionKey(entry.premix, entry.materialKey)];
+        if (!session) return false;
+        if (entry.selectedProcesses.solid) {
+          if (session.solid.schemaLoading || session.solid.schemaError || !session.solid.schema) {
+            return false;
+          }
+        }
+        if (entry.selectedProcesses.liquid) {
+          if (session.liquid.schemaLoading || session.liquid.schemaError || !session.liquid.schema) {
+            return false;
+          }
+        }
+        return true;
+      });
+
+      if (!premixSchemasReady) {
+        showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.SCHEMA_LOAD_REQUIRED, "warning");
+        return false;
+      }
+
+      const premixHasData = premixSelections.some((entry) => {
+        const session = sessionsForPayload[getPremixMaterialSessionKey(entry.premix, entry.materialKey)];
+        return session ? isSessionFilled(session) : false;
+      });
+
+      if (!premixHasData) {
+        showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.EMPTY_FORM_ERROR, "warning");
+        return false;
+      }
+
+      const RM = STRINGS.MANUFACTURING.RAW_MATERIAL_PREP;
+      const weightmentValidationError = validateWeightmentSheetAgainstIdentification(
+        weightmentSheet.weightmentDetails,
+        identificationSheet?.materials ?? [],
+        weightmentSheet.validation.compareWithIdentificationSheet,
+        {
+          materialNotInSheet: RM.WEIGHTMENT_MATERIAL_NOT_IN_SHEET,
+          percentageMismatch: RM.WEIGHTMENT_PERCENTAGE_MISMATCH,
+          weightMismatch: RM.WEIGHTMENT_WEIGHT_MISMATCH,
+          deviationMessageRequired: RM.WEIGHTMENT_DEVIATION_MESSAGE_REQUIRED,
+          incompleteRow: RM.WEIGHTMENT_INCOMPLETE_ROW,
+        },
+        weightmentSheet.validation,
+      );
+
+      if (weightmentValidationError) {
+        showAlert(weightmentValidationError, "warning");
+        return false;
+      }
     }
 
     const isCreateFlow = !activeBatch.formId;
+    // Premix type follows Save Draft / Submit Premix.
+    // Form stays DRAFT until "Proceed for Approval" (final approval).
+    const premixSubmissionType = isDraft ? "DRAFT" : "SUBMIT";
+    const formSubmissionType = "DRAFT" as const;
 
     const payloadBody = mapPreparationDetailsPayload({
       addedPremixSelections,
-      premixSessions,
+      premixSessions: sessionsForPayload,
       solidMaterials: availableSolidMaterials as MaterialsListItem[],
       liquidMaterials: availableLiquidMaterials as MaterialsListItem[],
       weightmentSheet,
+      targetPremixNos: [premixNo],
+      premixSubmissionType,
+      includeEmptyPremixes: isDraft,
+      allowPartialProcesses: isDraft,
     });
 
-    if (!payloadBody.preparationDetails.premixes.length) {
+    if (!isDraft && !payloadBody.preparationDetails.premixes.length) {
       showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.EMPTY_FORM_ERROR, "warning");
       return false;
     }
@@ -847,7 +1045,7 @@ export const useRawMaterialPrepHook = () => {
         response = await rawMaterialPreparationController.createForm({
           batchId: activeBatch.batchId,
           subDepartmentId,
-          formSubmissionType: intent === "draft" ? "DRAFT" : "SUBMIT",
+          formSubmissionType,
           ...payloadBody,
         });
       } else {
@@ -858,8 +1056,7 @@ export const useRawMaterialPrepHook = () => {
 
         response = await rawMaterialPreparationController.updateForm({
           formId: activeBatch.formId,
-          subDepartmentId,
-          formSubmissionType: intent === "draft" ? "DRAFT" : "SUBMIT",
+          formSubmissionType,
           ...payloadBody,
         });
       }
@@ -876,29 +1073,52 @@ export const useRawMaterialPrepHook = () => {
       setActiveBatch((prev) => (prev ? { ...prev, formId: nextFormId } : prev));
       setInitialSnapshot(formSnapshot);
 
-      if (intent === "draft") {
-        showAlert(
-          isCreateFlow
-            ? STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.CREATE_DRAFT_SUCCESS
-            : STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.UPDATE_DRAFT_SUCCESS,
-          "success",
-          { autoCloseMs: 2200 }
-        );
+      const nextStatus: PremixSubmissionStatus =
+        intent === "draft" ? "IN_PROGRESS" : "WAITING_FOR_APPROVAL";
+
+      setPremixStatusByNoByBatch((prev) => {
+        const current = prev[activeFormBatchKey] ?? {};
+        const updated: Record<number, PremixStatusMeta> = {
+          ...current,
+          [premixNo]: {
+            ...current[premixNo],
+            premixSubmissionType,
+            premixSubmissionStatus: nextStatus,
+          },
+        };
+
+        if (Array.isArray(response.data?.premixStatuses)) {
+          response.data.premixStatuses.forEach(
+            (entry: {
+              premixNo: number;
+              premixSubmissionStatus: PremixSubmissionStatus;
+              premixSubmissionType?: PremixSubmissionType;
+            }) => {
+              if (!entry?.premixNo) return;
+              updated[entry.premixNo] = {
+                ...updated[entry.premixNo],
+                premixSubmissionStatus: entry.premixSubmissionStatus,
+                premixSubmissionType:
+                  entry.premixSubmissionType ??
+                  (entry.premixNo === premixNo
+                    ? premixSubmissionType
+                    : updated[entry.premixNo]?.premixSubmissionType),
+              };
+            },
+          );
+        }
+
+        return { ...prev, [activeFormBatchKey]: updated };
+      });
+
+      if (isDraft) {
+        showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.PREMIX_SAVE_DRAFT_SUCCESS(premixNo), "success", { autoCloseMs: 2200 });
         setHasSavedDraft(true);
         clearMaterialsCacheForKey(activeFormBatchKey);
         setAvailableSolidMaterials([]);
         setAvailableLiquidMaterials([]);
       } else {
-        showAlert(
-          isCreateFlow
-            ? STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.CREATE_SUBMIT_SUCCESS
-            : STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.UPDATE_SUBMIT_SUCCESS,
-          "success",
-          { autoCloseMs: 2200 }
-        );
-
-        await listParams.refreshUserBatches();
-        resetFormContext();
+        showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.PREMIX_SUBMIT_SUCCESS(premixNo), "success", { autoCloseMs: 2200 });
       }
 
       return true;
@@ -912,24 +1132,107 @@ export const useRawMaterialPrepHook = () => {
     premixSessions,
     availableSolidMaterials,
     availableLiquidMaterials,
-    allPremixSchemasReady,
-    premixCardsHaveData,
     showAlert,
     formSnapshot,
-    listParams,
-    resetFormContext,
     weightmentSheet,
     clearMaterialsCacheForKey,
     activeFormBatchKey,
+    identificationSheet,
+    numberOfPremix,
+    checkPremixEditable,
+    getPremixStatus,
   ]);
 
-  const handleSaveDraft = useCallback(async () => {
-    return await submitForm("draft");
-  }, [submitForm]);
+  const handleSavePremixDraft = useCallback(
+    async (premixNo: number) => submitPremix(premixNo, "draft"),
+    [submitPremix],
+  );
 
-  const handleSubmit = useCallback(async () => {
-    return await submitForm("submit");
-  }, [submitForm]);
+  const handleSubmitPremix = useCallback(
+    async (premixNo: number) => submitPremix(premixNo, "submit"),
+    [submitPremix],
+  );
+
+  const handleSubmitForFinalApproval = useCallback(async () => {
+    if (!activeBatch?.formId) {
+      showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.FORM_ID_MISSING, "error");
+      return false;
+    }
+
+    const statuses = premixStatusByNoByBatch[activeFormBatchKey] ?? {};
+    const total = Math.max(numberOfPremix, Object.keys(statuses).length);
+    const allApproved =
+      total > 0 &&
+      Array.from({ length: total }, (_, index) => index + 1).every(
+        (premixNo) =>
+          String(statuses[premixNo]?.premixSubmissionStatus ?? "").toUpperCase() === "APPROVED",
+      );
+
+    if (!allApproved) {
+      showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.FINAL_APPROVAL_NOT_READY, "warning");
+      return false;
+    }
+
+    setActionLoading(true);
+    try {
+      // Rebuild from saved form details so solid/liquid processes are not dropped
+      // when local sessions never hydrated schemas for locked/unvisited materials.
+      const detailsResponse = await rawMaterialPreparationController.fetchFormDetails({
+        formId: activeBatch.formId,
+      });
+
+      if (!detailsResponse?.success || !detailsResponse?.data) {
+        showAlert(
+          getErrorMessage(
+            detailsResponse,
+            STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.DETAILS_FETCH_ERROR,
+          ),
+          "error",
+        );
+        return false;
+      }
+
+      const payloadBody = mapPreparationDetailsFromSavedForm(detailsResponse.data, {
+        premixStatusByNo: statuses,
+      });
+
+      if (!payloadBody.preparationDetails.premixes.length) {
+        showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.EMPTY_FORM_ERROR, "warning");
+        return false;
+      }
+
+      const response = await rawMaterialPreparationController.updateForm({
+        formId: activeBatch.formId,
+        formSubmissionType: "SUBMIT",
+        ...payloadBody,
+      });
+
+      if (!response?.success) {
+        showAlert(
+          getErrorMessage(response, STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.FINAL_APPROVAL_FAILED),
+          "error",
+        );
+        return false;
+      }
+
+      showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.FINAL_APPROVAL_SUCCESS, "success", {
+        autoCloseMs: 2200,
+      });
+      bumpBatchRefresh();
+      resetFormContext();
+      return true;
+    } finally {
+      setActionLoading(false);
+    }
+  }, [
+    activeBatch,
+    activeFormBatchKey,
+    premixStatusByNoByBatch,
+    numberOfPremix,
+    showAlert,
+    bumpBatchRefresh,
+    resetFormContext,
+  ]);
 
   return {
     ...listParams,
@@ -941,40 +1244,34 @@ export const useRawMaterialPrepHook = () => {
     isFormDirty,
     loadingFormDetails,
     actionLoading,
-    selectedTypes,
-    selectedPremix,
-    selectedProcesses: safeSelectedProcesses,
-    solidMaterialCode,
-    solidGradeCode,
-    liquidMaterialCode,
+    numberOfPremix,
+    identificationSheet,
+    premixGroups,
     availableSolidMaterials: Array.isArray(availableSolidMaterials) ? availableSolidMaterials : [],
     availableLiquidMaterials: Array.isArray(availableLiquidMaterials) ? availableLiquidMaterials : [],
+    allMaterials,
     loadingMaterials,
-    availablePremixOptions,
     completedPremixes,
-    materialTypesArray,
     subDepartmentId,
     premixCardsHaveData,
     allPremixSchemasReady,
+    allPremixesHaveMaterial,
     setBackConfirmOpen,
-    handlePremixChange,
-    handleProcessToggle,
-    handleSolidMaterialChange,
-    handleSolidGradeChange,
-    handleLiquidMaterialChange,
-    handleAddPremixSelection,
+    handlePremixDateChange,
     handlePremixSlotChange,
-    handleDeletePremixSelection,
     addedPremixSelections,
     premixSessions,
     weightmentSheet,
     handleWeightmentSheetChange,
+    premixStatusByNo,
+    isPremixEditable: checkPremixEditable,
     handleFillForm,
     handleEditForm,
     handleBack,
     handleDiscardAndBack,
-    handleSaveDraft,
-    handleSubmit,
+    handleSavePremixDraft,
+    handleSubmitPremix,
+    handleSubmitForFinalApproval,
     detailsRow,
     detailsData,
     detailsLoading,

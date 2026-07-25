@@ -425,14 +425,14 @@ export const useCastingAndCuringHook = () => {
       setBackConfirmOpen(true);
       return;
     }
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
-  }, [isFormDirty, resetFormContext, bumpBatchRefresh, hasSavedDraft]);
+  }, [isFormDirty, resetFormContext, bumpBatchRefresh]);
 
   const handleDiscardAndBack = useCallback(() => {
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
-  }, [resetFormContext, bumpBatchRefresh, hasSavedDraft]);
+  }, [resetFormContext, bumpBatchRefresh]);
 
   const handleMotorCountChange = useCallback((count: number | "") => {
     setMotorCount(count);
@@ -987,7 +987,8 @@ export const useCastingAndCuringHook = () => {
     setDetailsRow(null);
     setDetailsData(null);
     setView("list");
-  }, []);
+    bumpBatchRefresh();
+  }, [bumpBatchRefresh]);
 
   return {
     ...listParams,

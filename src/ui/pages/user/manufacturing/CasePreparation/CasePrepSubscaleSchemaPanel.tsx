@@ -32,22 +32,27 @@ const CasePrepSubscaleSchemaPanel = ({
   error = null,
 }: CasePrepSubscaleSchemaPanelProps) => {
   const hydratedRef = useRef(false);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
   useEffect(() => {
     hydratedRef.current = false;
-  }, [savedSections, schema?.schemaVersion]);
+  }, [schema?.schemaVersion, schema?.schemaType]);
 
   useEffect(() => {
-    if (!schema) return;
-    if (hydratedRef.current) return;
+    if (!schema || hydratedRef.current) return;
+    if (Object.keys(formValues ?? {}).length > 0) {
+      hydratedRef.current = true;
+      return;
+    }
 
     if (savedSections?.length) {
-      onChange(hydrateCasePrepValuesFromSections(schema, savedSections));
-    } else if (Object.keys(formValues ?? {}).length === 0) {
-      onChange(createCasePrepInitialValues(schema));
+      onChangeRef.current(hydrateCasePrepValuesFromSections(schema, savedSections));
+    } else {
+      onChangeRef.current(createCasePrepInitialValues(schema));
     }
     hydratedRef.current = true;
-  }, [schema, savedSections]);
+  }, [schema, savedSections, formValues]);
 
   const themeTokens = useMemo(
     () => ({
@@ -60,7 +65,7 @@ const CasePrepSubscaleSchemaPanel = ({
       surface: CASE_PREP_BRAND.surface,
       warn: CASE_PREP_BRAND.warn,
     }),
-    []
+    [],
   );
 
   return (

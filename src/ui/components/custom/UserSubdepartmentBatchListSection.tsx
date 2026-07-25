@@ -10,6 +10,8 @@ import type { SubdepartmentBatchListAdvancedFilters } from "../../../hooks/user/
 import {
   OPERATION_STATUS,
   OPERATION_STATUS_FILTER_VALUES,
+  getOperationStatusFilterLabel,
+  isManufacturingViewOnlyStatus,
   type OperationStatusMap,
 } from "../../../hooks/operationStatus";
 import { SUBDEPARTMENT_BATCH_SEARCH_FIELDS } from "../../../data/models/user/SubdepartmentBatchModel";
@@ -57,6 +59,9 @@ export type UserSubdepartmentBatchListHookState = {
   activeFilterCount: number;
   motorStageOptions: Array<{ motorStage: string }>;
   motorStagesLoading: boolean;
+  projectOptions: Array<{ projectId: string; projectName: string }>;
+  projectsLoading: boolean;
+  ensureProjectOptions: () => void;
 };
 
 export type UserSubdepartmentBatchListSectionProps = {
@@ -79,10 +84,11 @@ export type UserSubdepartmentBatchListSectionProps = {
   extraSearchFields?: string[];
   rejectedStatus?: string;
   emptyText?: string;
+  hideAdvancedFilter?: boolean;
+  headerActions?: React.ReactNode;
 };
 
-const defaultCanViewDetails = (status: string) =>
-  status === OPERATION_STATUS.WAITING_FOR_APPROVAL || status === OPERATION_STATUS.APPROVED;
+const defaultCanViewDetails = (status: string) => isManufacturingViewOnlyStatus(status);
 
 const UserSubdepartmentBatchListSection = ({
   hookState,
@@ -104,6 +110,8 @@ const UserSubdepartmentBatchListSection = ({
   extraSearchFields = [],
   rejectedStatus = OPERATION_STATUS.REJECTED,
   emptyText,
+  hideAdvancedFilter = false,
+  headerActions = null,
 }: UserSubdepartmentBatchListSectionProps) => {
   const {
     batches,
@@ -127,6 +135,9 @@ const UserSubdepartmentBatchListSection = ({
     activeFilterCount,
     motorStageOptions,
     motorStagesLoading,
+    projectOptions,
+    projectsLoading,
+    ensureProjectOptions,
   } = hookState;
 
   const statusConfig = useMemo(
@@ -134,7 +145,11 @@ const UserSubdepartmentBatchListSection = ({
       Object.fromEntries(
         Object.entries(rawStatusConfig).map(([status, cfg]) => [
           status,
-          { ...cfg, ...(theme.batchList.statusConfig[status] ?? {}) },
+          {
+            ...cfg,
+            ...(theme.batchList.statusConfig[status] ?? {}),
+            label: getOperationStatusFilterLabel(status, { isSourcingLotSubdepartment: false }),
+          },
         ]),
       ),
     [rawStatusConfig, theme],
@@ -152,7 +167,16 @@ const UserSubdepartmentBatchListSection = ({
         labels: columnLabels,
         rejectedStatus,
       }),
-    [CalendarIcon, PersonIcon, columnLabels, rejectedStatus, statusConfig, statusField, statusLabel, theme],
+    [
+      CalendarIcon,
+      PersonIcon,
+      columnLabels,
+      rejectedStatus,
+      statusConfig,
+      statusField,
+      statusLabel,
+      theme,
+    ],
   );
 
   const { searchBarEnd, filterExtension } = useUserSubdepartmentBatchListFilterBar({
@@ -166,6 +190,9 @@ const UserSubdepartmentBatchListSection = ({
     statusFilter,
     motorStageOptions,
     motorStagesLoading,
+    projectOptions,
+    projectsLoading,
+    ensureProjectOptions,
   });
 
   const displayRows = Array.isArray(batches) ? batches : [];
@@ -195,10 +222,16 @@ const UserSubdepartmentBatchListSection = ({
       onStatusFilterChange={setStatusFilter}
       isLoading={loading || isRefreshing}
       emptyText={emptyText}
-      searchBarEnd={searchBarEnd}
-      filterExtension={filterExtension}
+      searchBarEnd={
+        <Stack direction="row" spacing={1} alignItems="center">
+          {!hideAdvancedFilter && searchBarEnd}
+          {headerActions}
+        </Stack>
+      }
+      filterExtension={hideAdvancedFilter ? null : filterExtension}
       renderAction={(row: Record<string, unknown>) => {
         const status = String(row[statusField] ?? "");
+        console.log(status);
         return (
           <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.75}>
             {canViewDetails(status) ? (

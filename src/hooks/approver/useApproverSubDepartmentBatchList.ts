@@ -99,14 +99,20 @@ const STATUS_LABELS: Record<string, string> = {
   initiated: "To Be Initiated",
   approved: "Approved",
   inProgress: "In Progress",
+  waitingForPartialApproval: "Waiting for Partial Approval",
   waitingForApproval: "Waiting for Approval",
+  waitingForCompleteApproval: "Waiting for Approval",
+  finalApprovalCompleted: "Final Approval Completed",
   rejected: "Rejected",
 
   TO_BE_INITIATED: "To Be Initiated",
   INITIATED: "To Be Initiated",
   APPROVED: "Approved",
   IN_PROGRESS: "In Progress",
+  WAITING_FOR_PARTIAL_APPROVAL: "Waiting for Partial Approval",
   WAITING_FOR_APPROVAL: "Waiting for Approval",
+  WAITING_FOR_COMPLETE_APPROVAL: "Waiting for Approval",
+  FINAL_APPROVAL_COMPLETED: "Final Approval Completed",
   REJECTED: "Rejected",
 };
 
@@ -189,6 +195,7 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
     extraFilters.batchType,
     extraFilters.motorId,
     extraFilters.motorStage,
+    extraFilters.projectId,
     extraFilters.submittedBy,
     extraFilters.casingType,
     extraFilters.insulationType,
@@ -383,6 +390,7 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
           submittedBy: extraFilters.submittedBy,
           fromDate: extraFilters.fromDate,
           toDate: extraFilters.toDate,
+          projectId: extraFilters.projectId,
         },
         allLabel,
       });
@@ -429,7 +437,7 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
     return () => {
       cancelled = true;
     };
-  }, [allLabel, debouncedSearchText, extraFilters.batchId, extraFilters.batchType, extraFilters.casingType, extraFilters.fromDate, extraFilters.insulationType, extraFilters.materialCode, extraFilters.motorId, extraFilters.motorStage, extraFilters.motorType, extraFilters.priority, extraFilters.submittedBy, extraFilters.toDate, items.length, page, refreshVersion, selectedSubDepartment?.subDepartmentId, status, subDepartment, userId]);
+  }, [allLabel, debouncedSearchText, extraFilters.batchId, extraFilters.batchType, extraFilters.casingType, extraFilters.fromDate, extraFilters.insulationType, extraFilters.materialCode, extraFilters.motorId, extraFilters.motorStage, extraFilters.motorType, extraFilters.priority, extraFilters.projectId, extraFilters.submittedBy, extraFilters.toDate, items.length, page, refreshVersion, selectedSubDepartment?.subDepartmentId, status, subDepartment, userId]);
 
   const mergedItems = useMemo(() => {
     if (remoteBatches.length === 0) {

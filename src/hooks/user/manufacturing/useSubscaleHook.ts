@@ -182,14 +182,14 @@ export const useSubscaleHook = () => {
       setBackConfirmOpen(true);
       return;
     }
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
-  }, [isFormDirty, resetFormContext, bumpBatchRefresh, hasSavedDraft]);
+  }, [isFormDirty, resetFormContext, bumpBatchRefresh]);
 
   const handleDiscardAndBack = useCallback(() => {
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
-  }, [resetFormContext, bumpBatchRefresh, hasSavedDraft]);
+  }, [resetFormContext, bumpBatchRefresh]);
 
   const handleFormValuesChange = useCallback((values: SchemaFormValues) => {
     setFormData((prev) => ({ ...prev, schemaFormValues: values }));
@@ -331,7 +331,8 @@ export const useSubscaleHook = () => {
     setDetailsRow(null);
     setDetailsData(null);
     setView("list");
-  }, []);
+    bumpBatchRefresh();
+  }, [bumpBatchRefresh]);
 
   return {
     ...listParams,

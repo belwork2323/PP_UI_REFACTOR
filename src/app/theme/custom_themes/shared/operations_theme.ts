@@ -42,44 +42,47 @@ export const getOperationsTheme = (mode = "light") => {
       animatedContainer: { animation: `${fadeIn} 0.3s ease` },
       loadingContainer: { display: "flex", justifyContent: "center", py: 8 },
       formHeader: {
+        /** Compact single-row card — same density for RMC and all subdepartments */
         container: (isEdit: boolean) => ({
-          mb: 3,
-          p: "14px 18px",
-          borderRadius: 3,
+          mb: 1.5,
+          py: 0.65,
+          px: 1.25,
+          borderRadius: 2,
           background: isEdit
             ? `linear-gradient(135deg, ${alpha(palette.danger, 0.06)}, ${alpha(palette.danger, 0.02)})`
             : `linear-gradient(135deg, ${alpha(palette.primary, 0.06)}, ${alpha(palette.primaryLight, 0.03)})`,
-          border: `1.5px solid ${isEdit ? alpha(palette.danger, 0.2) : alpha(palette.primaryLight, 0.25)}`,
+          border: `1px solid ${isEdit ? alpha(palette.danger, 0.2) : alpha(palette.primaryLight, 0.25)}`,
           animation: `${fadeIn} 0.3s ease`,
         }),
         backButton: {
           fontWeight: 700,
-          fontSize: "0.78rem",
+          fontSize: "0.72rem",
           textTransform: "none",
           color: palette.textSub,
-          px: 1.5,
-          py: 0.8,
-          borderRadius: 2,
+          px: 1,
+          py: 0.35,
+          minHeight: 0,
+          borderRadius: 1.5,
           flexShrink: 0,
           "&:hover": { background: alpha(palette.border, 0.5), color: palette.text },
         },
         divider: { borderColor: alpha(palette.border, 0.6) },
-        batchId: { fontWeight: 800, fontSize: "0.9rem", color: palette.text },
-        bullet: { fontSize: "0.78rem", color: palette.textSub },
-        motorId: { fontSize: "0.78rem", color: palette.textSub },
+        batchId: { fontWeight: 800, fontSize: "0.82rem", color: palette.text, lineHeight: 1.25 },
+        bullet: { fontSize: "0.72rem", color: palette.textSub },
+        motorId: { fontSize: "0.7rem", color: palette.textSub, lineHeight: 1.25 },
         rejectionBox: {
-          px: 2,
-          py: 1,
-          borderRadius: 2,
+          px: 1.25,
+          py: 0.65,
+          borderRadius: 1.5,
           background: alpha(palette.danger, 0.05),
           border: `1px solid ${alpha(palette.danger, 0.15)}`,
-          maxWidth: 340,
+          maxWidth: 300,
         },
-        rejectionTitle: { fontSize: "0.7rem", fontWeight: 700, color: palette.danger, mb: 0.2 },
-        rejectionText: { fontSize: "0.75rem", color: palette.danger, lineHeight: 1.5 },
+        rejectionTitle: { fontSize: "0.65rem", fontWeight: 700, color: palette.danger, mb: 0.15 },
+        rejectionText: { fontSize: "0.7rem", color: palette.danger, lineHeight: 1.4 },
         chips: {
           edit: {
-            height: 20,
+            height: 22,
             fontSize: "0.65rem",
             fontWeight: 700,
             background: alpha(palette.danger, 0.08),
@@ -87,7 +90,7 @@ export const getOperationsTheme = (mode = "light") => {
             border: `1px solid ${alpha(palette.danger, 0.22)}`,
           },
           new: {
-            height: 20,
+            height: 22,
             fontSize: "0.65rem",
             fontWeight: 700,
             background: alpha(palette.primary, 0.08),
@@ -95,14 +98,14 @@ export const getOperationsTheme = (mode = "light") => {
             border: `1px solid ${alpha(palette.primary, 0.2)}`,
           },
           motorType: {
-            height: 20,
+            height: 22,
             fontSize: "0.65rem",
             fontWeight: 600,
             background: alpha(palette.primaryLight, 0.1),
             color: palette.primaryLight,
           },
           priority: {
-            height: 20,
+            height: 22,
             fontSize: "0.65rem",
             fontWeight: 600,
             background: alpha(palette.warn, 0.1),
@@ -119,6 +122,7 @@ export const getOperationsTheme = (mode = "light") => {
       filterInputBg: isDark ? "#121212" : "#f8fafc",
       /** Compact inputs for "Refine lot/batch list" filter panels */
       filterPanelField: {
+        mt: 0,
         "& .MuiOutlinedInput-root, & .MuiPickersOutlinedInput-root": {
           height: 32,
           minHeight: 32,
@@ -149,6 +153,9 @@ export const getOperationsTheme = (mode = "light") => {
         "& .MuiInputLabel-root": {
           fontSize: "0.72rem",
         },
+        "& .MuiInputLabel-shrink": {
+          transform: "translate(14px, -8px) scale(0.85)",
+        },
         "& .MuiInputAdornment-root .MuiIconButton-root": {
           padding: 2,
         },
@@ -165,6 +172,36 @@ export const getOperationsTheme = (mode = "light") => {
       normalText: { fontSize: "0.8rem", fontWeight: 500, color: palette.textSub },
       subtleText: { fontSize: "0.78rem", color: palette.text },
       icon: { fontSize: 13, color: palette.textSub },
+      projectCell: {
+        display: "flex",
+        alignItems: "center",
+        gap: 0.8,
+      },
+      projectIcon: {
+        fontSize: 14,
+        color: palette.textSub,
+        opacity: 0.75,
+        flexShrink: 0,
+      },
+      projectInfo: {
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "center",
+        minWidth: 0,
+      },
+      projectName: {
+        fontSize: "0.85rem",
+        fontWeight: 500,
+        color: palette.text,
+        lineHeight: 1.2,
+      },
+      projectId: {
+        fontSize: "0.65rem",
+        fontWeight: 400,
+        color: palette.textSub,
+        lineHeight: 1.2,
+        mt: 0.25,
+      },
       batchTypeChip: {
         height: 20,
         fontSize: "0.62rem",
@@ -261,17 +298,35 @@ export const getOperationsTheme = (mode = "light") => {
           border: alpha(palette.primaryLight, 0.25),
           label: "In Progress",
         },
+        ["Waiting for Partial Approval"]: {
+          color: palette.warn,
+          bg: alpha(palette.warn, 0.1),
+          border: alpha(palette.warn, 0.3),
+          label: "Waiting for Partial Approval",
+        },
         ["Waiting for Approval"]: {
           color: palette.warn,
           bg: alpha(palette.warn, 0.1),
           border: alpha(palette.warn, 0.3),
           label: "Waiting for Approval",
         },
+        ["Waiting for Complete Approval"]: {
+          color: palette.warn,
+          bg: alpha(palette.warn, 0.1),
+          border: alpha(palette.warn, 0.3),
+          label: "Waiting for Complete Approval",
+        },
         ["Approved"]: {
           color: palette.success,
           bg: alpha(palette.success, 0.1),
           border: alpha(palette.success, 0.25),
           label: "Approved",
+        },
+        ["Final Approval Completed"]: {
+          color: palette.success,
+          bg: alpha(palette.success, 0.1),
+          border: alpha(palette.success, 0.25),
+          label: "Final Approval Completed",
         },
         ["Rejected"]: {
           color: palette.danger,

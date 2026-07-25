@@ -2,25 +2,24 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { alpha, Box, Button, Chip, CircularProgress, IconButton, MenuItem, Stack, TextField, Tooltip, Typography } from "@mui/material";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import dayjs from "dayjs";
 import { icons } from "../../../../../app/theme/icons";
 import IconText from "../../../../components/common/IconText";
 import FilterPanelHeader from "@ui/components/common/FilterPanelHeader";
 import FilterToggleButton from "../../../../components/common/FilterToggleButton";
+import DateField from "../../../../components/common/DateField";
+import { formatToIsoDateInput, formatToUiDate } from "../../../../../utils/dateUtils";
 import UserBatchList from "../../../../components/custom/UserBatchList";
 import UserWorkflowStatusAction from "../../../../components/custom/UserWorkflowStatusAction";
 import UserWorkflowStatusCell from "../../../../components/custom/UserWorkflowStatusCell";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import getSourcingTheme from "../../../../../app/theme/custom_themes/user/sourcing/sourcing_theme";
-import { getOperationStatusConfig, OPERATION_STATUS, OPERATION_STATUS_FILTER_VALUES } from "../../../../../hooks/operationStatus";
+import { getOperationStatusConfig, OPERATION_STATUS, SOURCING_LOT_STATUS_FILTER_VALUES } from "../../../../../hooks/operationStatus";
 import { STRINGS } from "../../../../../app/config/strings";
 import {
   canDeleteRocketMotorCasing,
   ROCKET_MOTOR_CASING_SEARCH_FIELDS,
 } from "../../../../../data/models/user/RocketMotorCasingProcurementModel";
+import { formatMotorStageLabel } from "../../../../../data/models/approver/RocketMotorCasingApproverModel";
 import type { RocketMotorCasingListAdvancedFilters } from "../../../../../hooks/user/sourcing/useRocketMotorCasingList";
 
 const {
@@ -45,7 +44,7 @@ export const OPERATION_STATUS_CONFIG = getOperationStatusConfig({
   rejected: CancelRoundedIcon,
 });
 
-const STATUS_DROPDOWN_VALUES = [FILTER_ALL, ...OPERATION_STATUS_FILTER_VALUES] as const;
+const STATUS_DROPDOWN_VALUES = [FILTER_ALL, ...SOURCING_LOT_STATUS_FILTER_VALUES] as const;
 
 const canViewCasingDetails = (status: string) =>
   status === OPERATION_STATUS.WAITING_FOR_APPROVAL || status === OPERATION_STATUS.APPROVED;
@@ -77,6 +76,10 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
     handleCreateMotorCasing,
     motorStageOptions,
     motorStagesLoading,
+    ensureMotorStageOptions,
+    projectOptions = [],
+    projectsLoading = false,
+    ensureProjectOptions,
     advancedFilters,
     applyAdvancedFilters,
     clearAdvancedFilters,
@@ -84,6 +87,7 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
   } = hookState;
 
   const [filterOpen, setFilterOpen] = useState(false);
+  const [draftProjectId, setDraftProjectId] = useState(FILTER_ALL);
   const [draftMotorStage, setDraftMotorStage] = useState(FILTER_ALL);
   const [draftCasingType, setDraftCasingType] = useState(FILTER_ALL);
   const [draftInsulationType, setDraftInsulationType] = useState(FILTER_ALL);
@@ -92,6 +96,7 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
   const [draftStatus, setDraftStatus] = useState(FILTER_ALL);
 
   const syncDraftsFromApplied = useCallback(() => {
+    setDraftProjectId(advancedFilters.projectIds.length === 1 ? advancedFilters.projectIds[0]! : FILTER_ALL);
     setDraftMotorStage(advancedFilters.motorStages.length === 1 ? advancedFilters.motorStages[0]! : FILTER_ALL);
     setDraftCasingType(advancedFilters.casingTypes.length === 1 ? advancedFilters.casingTypes[0]! : FILTER_ALL);
     setDraftInsulationType(
@@ -106,9 +111,11 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
   useEffect(() => {
     if (filterOpen && !filterWasOpen.current) {
       syncDraftsFromApplied();
+      void ensureMotorStageOptions?.();
+      void ensureProjectOptions?.();
     }
     filterWasOpen.current = filterOpen;
-  }, [filterOpen, syncDraftsFromApplied]);
+  }, [filterOpen, syncDraftsFromApplied, ensureMotorStageOptions, ensureProjectOptions]);
 
   useEffect(() => {
     if (!filterOpen) return;
@@ -124,6 +131,11 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         ]),
       ),
     [theme],
+  );
+
+  const statusTabs = useMemo(
+    () => [FILTER_ALL, ...SOURCING_LOT_STATUS_FILTER_VALUES],
+    [],
   );
 
   const filterToggleSx = useMemo(() => {
@@ -214,8 +226,25 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
       },
       {
         key: "projectId",
-        label: STRINGS.SOURCING.BATCH_LIST.COL_PROJECT_ID,
-        render: (v: string) => <Typography sx={theme.batchList.normalText}>{v || "—"}</Typography>,
+        label: STRINGS.SOURCING.BATCH_LIST.COL_PROJECT,
+        render: (_v: string, row: any) => {
+          const projectName = String(row?.projectName ?? "").trim();
+          const projectId = String(row?.projectId ?? "").trim();
+          if (!projectName && !projectId) {
+            return <Typography sx={theme.batchList.normalText}>—</Typography>;
+          }
+          return (
+            <Box sx={theme.batchList.projectCell}>
+              <icons.batchMgmt.projectId sx={theme.batchList.projectIcon} />
+              <Box sx={theme.batchList.projectInfo}>
+                <Typography sx={theme.batchList.projectName}>
+                  {projectName || "—"}
+                </Typography>
+                <Typography sx={theme.batchList.projectId}>{projectId || "—"}</Typography>
+              </Box>
+            </Box>
+          );
+        },
       },
       {
         key: "motorId",
@@ -227,7 +256,7 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         label: STRINGS.SOURCING.BATCH_LIST.COL_MOTOR_STAGE,
         align: "center",
         render: (v: string) => (
-          <Chip label={v || "—"} size="small" sx={theme.batchList.batchTypeChip} />
+          <Chip label={formatMotorStageLabel(v)} size="small" sx={theme.batchList.batchTypeChip} />
         ),
       },
       {
@@ -315,6 +344,7 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
       to = swap;
     }
     const next: RocketMotorCasingListAdvancedFilters & { status: string } = {
+      projectIds: draftProjectId === FILTER_ALL ? [] : [draftProjectId],
       motorStages: draftMotorStage === FILTER_ALL ? [] : [draftMotorStage],
       casingTypes: draftCasingType === FILTER_ALL ? [] : [draftCasingType],
       insulationTypes: draftInsulationType === FILTER_ALL ? [] : [draftInsulationType],
@@ -328,6 +358,7 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
 
   const handleClearAllFilters = () => {
     clearAdvancedFilters();
+    setDraftProjectId(FILTER_ALL);
     setDraftMotorStage(FILTER_ALL);
     setDraftCasingType(FILTER_ALL);
     setDraftInsulationType(FILTER_ALL);
@@ -371,8 +402,56 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         clearChipSx={filterPanelHeaderSx.clearChipSx}
       />
 
-      <Stack direction={{ xs: "column", lg: "row" }} spacing={1.25} flexWrap="wrap" useFlexGap>
-        <Stack direction="row" spacing={1} alignItems="flex-start" sx={{ minWidth: { xs: "100%", sm: 180 }, flex: { lg: "0 0 auto" } }}>
+      <Stack
+        direction="row"
+        spacing={1.25}
+        alignItems="flex-end"
+        flexWrap={{ xs: "wrap", xl: "nowrap" }}
+        useFlexGap
+        sx={{ width: "100%" }}
+      >
+        <Box sx={{ flex: "1 1 160px", minWidth: { xs: "100%", sm: 160 }, position: "relative" }}>
+          <TextField
+            select
+            size="small"
+            label={STRINGS.SOURCING.BATCH_LIST.FILTERS_PROJECT}
+            value={draftProjectId}
+            onChange={(e) => setDraftProjectId(e.target.value)}
+            disabled={projectsLoading}
+            fullWidth
+            InputLabelProps={{ shrink: true }}
+            sx={theme.batchList.filterPanelField}
+            SelectProps={{
+              displayEmpty: true,
+              MenuProps: {
+                PaperProps: {
+                  sx: { "& .MuiMenuItem-root": theme.batchList.filterPanelMenuItem },
+                },
+              },
+            }}
+          >
+            <MenuItem value={FILTER_ALL}>{STRINGS.SOURCING.BATCH_LIST.FILTERS_ALL_PROJECTS}</MenuItem>
+            {!projectsLoading &&
+              projectOptions.map((p: { projectId: string; projectName: string }) => (
+                <MenuItem key={p.projectId} value={p.projectId}>
+                  {p.projectName} ({p.projectId})
+                </MenuItem>
+              ))}
+          </TextField>
+          {projectsLoading ? (
+            <CircularProgress
+              size={16}
+              sx={{
+                position: "absolute",
+                right: 28,
+                bottom: 8,
+                color: theme.palette.primaryLight,
+              }}
+            />
+          ) : null}
+        </Box>
+
+        <Box sx={{ flex: "1 1 140px", minWidth: { xs: "100%", sm: 140 }, position: "relative" }}>
           <TextField
             select
             size="small"
@@ -381,8 +460,10 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
             onChange={(e) => setDraftMotorStage(e.target.value)}
             disabled={motorStagesLoading}
             fullWidth
+            InputLabelProps={{ shrink: true }}
             sx={theme.batchList.filterPanelField}
             SelectProps={{
+              displayEmpty: true,
               MenuProps: {
                 PaperProps: {
                   sx: { "& .MuiMenuItem-root": theme.batchList.filterPanelMenuItem },
@@ -398,8 +479,18 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
                 </MenuItem>
               ))}
           </TextField>
-          {motorStagesLoading ? <CircularProgress size={18} sx={{ mt: 0.75, color: theme.palette.primaryLight }} /> : null}
-        </Stack>
+          {motorStagesLoading ? (
+            <CircularProgress
+              size={16}
+              sx={{
+                position: "absolute",
+                right: 28,
+                bottom: 8,
+                color: theme.palette.primaryLight,
+              }}
+            />
+          ) : null}
+        </Box>
 
         <TextField
           select
@@ -407,8 +498,14 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
           label={STRINGS.SOURCING.BATCH_LIST.FILTERS_CASING_TYPE}
           value={draftCasingType}
           onChange={(e) => setDraftCasingType(e.target.value)}
-          sx={{ ...theme.batchList.filterPanelField, minWidth: { xs: "100%", sm: 160 } }}
+          InputLabelProps={{ shrink: true }}
+          sx={{
+            ...theme.batchList.filterPanelField,
+            flex: "1 1 140px",
+            minWidth: { xs: "100%", sm: 140 },
+          }}
           SelectProps={{
+            displayEmpty: true,
             MenuProps: {
               PaperProps: {
                 sx: { "& .MuiMenuItem-root": theme.batchList.filterPanelMenuItem },
@@ -430,8 +527,14 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
           label={STRINGS.SOURCING.BATCH_LIST.FILTERS_INSULATION_TYPE}
           value={draftInsulationType}
           onChange={(e) => setDraftInsulationType(e.target.value)}
-          sx={{ ...theme.batchList.filterPanelField, minWidth: { xs: "100%", sm: 160 } }}
+          InputLabelProps={{ shrink: true }}
+          sx={{
+            ...theme.batchList.filterPanelField,
+            flex: "1 1 140px",
+            minWidth: { xs: "100%", sm: 140 },
+          }}
           SelectProps={{
+            displayEmpty: true,
             MenuProps: {
               PaperProps: {
                 sx: { "& .MuiMenuItem-root": theme.batchList.filterPanelMenuItem },
@@ -453,8 +556,14 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
           label={STRINGS.SOURCING.BATCH_LIST.FILTERS_STATUS}
           value={draftStatus}
           onChange={(e) => setDraftStatus(e.target.value)}
-          sx={{ ...theme.batchList.filterPanelField, minWidth: { xs: "100%", sm: 160 } }}
+          InputLabelProps={{ shrink: true }}
+          sx={{
+            ...theme.batchList.filterPanelField,
+            flex: "1 1 130px",
+            minWidth: { xs: "100%", sm: 130 },
+          }}
           SelectProps={{
+            displayEmpty: true,
             MenuProps: {
               PaperProps: {
                 sx: { "& .MuiMenuItem-root": theme.batchList.filterPanelMenuItem },
@@ -469,32 +578,24 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
           ))}
         </TextField>
 
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <DatePicker
+        <Box sx={{ flex: "1 1 130px", minWidth: { xs: "100%", sm: 130 } }}>
+          <DateField
             label={STRINGS.SOURCING.BATCH_LIST.FILTERS_FROM_DATE}
-            format="YYYY-MM-DD"
-            value={draftFrom ? dayjs(draftFrom) : null}
-            onChange={(v) => setDraftFrom(v && v.isValid() ? v.format("YYYY-MM-DD") : "")}
-            slotProps={{
-              textField: {
-                size: "small",
-                sx: { ...theme.batchList.filterPanelField, minWidth: { xs: "100%", sm: 140 } },
-              },
-            }}
+            value={formatToUiDate(draftFrom)}
+            onChange={(v) => setDraftFrom(formatToIsoDateInput(v))}
+            compact
+            sx={{ ...theme.batchList.filterPanelField, mb: 0, width: "100%" }}
           />
-          <DatePicker
+        </Box>
+        <Box sx={{ flex: "1 1 130px", minWidth: { xs: "100%", sm: 130 } }}>
+          <DateField
             label={STRINGS.SOURCING.BATCH_LIST.FILTERS_TO_DATE}
-            format="YYYY-MM-DD"
-            value={draftTo ? dayjs(draftTo) : null}
-            onChange={(v) => setDraftTo(v && v.isValid() ? v.format("YYYY-MM-DD") : "")}
-            slotProps={{
-              textField: {
-                size: "small",
-                sx: { ...theme.batchList.filterPanelField, minWidth: { xs: "100%", sm: 140 } },
-              },
-            }}
+            value={formatToUiDate(draftTo)}
+            onChange={(v) => setDraftTo(formatToIsoDateInput(v))}
+            compact
+            sx={{ ...theme.batchList.filterPanelField, mb: 0, width: "100%" }}
           />
-        </LocalizationProvider>
+        </Box>
       </Stack>
 
       <Stack direction="row" justifyContent="flex-end" spacing={1}>
@@ -515,6 +616,7 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         columns={COLUMNS}
         statusField="rmStatus"
         statusConfig={statusConfig}
+        statusTabs={statusTabs}
         filters={[]}
         searchFields={[...ROCKET_MOTOR_CASING_SEARCH_FIELDS]}
         highlightRow={(row: any) => row.rmStatus === OPERATION_STATUS.REJECTED}

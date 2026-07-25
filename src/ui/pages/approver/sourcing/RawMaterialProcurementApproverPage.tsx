@@ -20,14 +20,13 @@ import {
   TableRow,
   TextField,
 } from "@mui/material";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import dayjs from "dayjs";
 
 import { useThemeStore } from "../../../../app/store/themeStore";
 import { getRawMaterialApproverTheme } from "../../../../app/theme/custom_themes/approver/sourcing/rawMaterialApprover_theme";
 import getApproverSourcingFilterStyles from "./approverSourcingFilterStyles";
+import DateField from "../../../components/common/DateField";
+import { formatToIsoDateInput, formatToUiDate } from "../../../../utils/dateUtils";
+import dayjs from "dayjs";
 import { canApproverViewBatchDetails, isApproverActionableStatus } from "../../../../app/theme/approver";
 import { icons } from "../../../../app/theme/icons";
 import useRawMaterialApproverHook, {
@@ -461,36 +460,20 @@ const RawMaterialApproverPage = () => {
           ))}
         </TextField>
 
-        <LocalizationProvider dateAdapter={AdapterDayjs}>
-          <DatePicker
-            label={STRINGS.SOURCING.BATCH_LIST.FILTERS_FROM_DATE}
-            format="YYYY-MM-DD"
-            value={draftFrom ? dayjs(draftFrom) : null}
-            onChange={(value) =>
-              setDraftFrom(value && value.isValid() ? value.format("YYYY-MM-DD") : "")
-            }
-            slotProps={{
-              textField: {
-                size: "small",
-                sx: filterStyles.fieldDate,
-              },
-            }}
-          />
-          <DatePicker
-            label={STRINGS.SOURCING.BATCH_LIST.FILTERS_TO_DATE}
-            format="YYYY-MM-DD"
-            value={draftTo ? dayjs(draftTo) : null}
-            onChange={(value) =>
-              setDraftTo(value && value.isValid() ? value.format("YYYY-MM-DD") : "")
-            }
-            slotProps={{
-              textField: {
-                size: "small",
-                sx: filterStyles.fieldDate,
-              },
-            }}
-          />
-        </LocalizationProvider>
+        <DateField
+          label={STRINGS.SOURCING.BATCH_LIST.FILTERS_FROM_DATE}
+          value={formatToUiDate(draftFrom)}
+          onChange={(value) => setDraftFrom(formatToIsoDateInput(value))}
+          compact
+          sx={filterStyles.fieldDate}
+        />
+        <DateField
+          label={STRINGS.SOURCING.BATCH_LIST.FILTERS_TO_DATE}
+          value={formatToUiDate(draftTo)}
+          onChange={(value) => setDraftTo(formatToIsoDateInput(value))}
+          compact
+          sx={filterStyles.fieldDate}
+        />
       </Stack>
 
       <Stack direction="row" justifyContent="flex-end" spacing={1}>

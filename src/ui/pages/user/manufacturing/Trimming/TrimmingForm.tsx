@@ -1,18 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Box, Button, Chip, CircularProgress, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  Paper,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  TextField,
+  Typography,
+} from "@mui/material";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import { TRIMMING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/trimming_theme";
-import type { TrimmingFormState, TrimmingMotorSession } from "../../../../../data/models/user/TrimmingFormModel";
-import {
-  canAddTrimmingMotors,
-  canLoadTrimmingForm,
-  type TrimmingAddedMotor,
-  type TrimmingMotorStageOption,
-} from "../../../../../hooks/user/manufacturing/trimmingFlowConfig";
-import { mapTrimmingMotorStage, resolveTrimmingMotorStage } from "../../../../../schema-engine";
-import TrimmingFlowBar from "./TrimmingFlowBar";
-import TrimmingSchemaPanel from "./TrimmingSchemaPanel";
+import type {
+  TrimmingFormState,
+  TrimmingMotorSession,
+} from "../../../../../data/models/user/TrimmingFormModel";
+import type { TrimmingAddedMotor } from "../../../../../hooks/user/manufacturing/trimmingFlowConfig";
+import FormInput from "@/ui/components/common/FormInput";
+import SchemaFileField from "@/ui/components/common/SchemaFileField";
+import DateField from "@/ui/components/common/DateField";
+import { TrimmingCommonTable } from "./TrimmingCommonTable";
 
 const S = STRINGS.MANUFACTURING.TRIMMING;
 const { straighten: StraightenRoundedIcon } = icons.user.manufacturing.trimming.form;
@@ -26,66 +38,30 @@ type TrimmingFormProps = {
     motorType?: unknown;
   } | null;
   formData: TrimmingFormState;
-  subDepartmentId?: number;
-  selectedMotorStage: string;
-  motorStageOptions: TrimmingMotorStageOption[];
-  motorStagesLoading?: boolean;
-  motorCount: number | "";
-  draftMotorIds: string[];
-  motorReceivedAt: string;
   addedMotors: TrimmingAddedMotor[];
-  availableMotorOptions: Array<{ value: string; label: string }>;
-  approvedMotorsLoading?: boolean;
-  maxMotorCount: number;
-  schemaLoading?: boolean;
-  schemaError?: string | null;
-  onMotorStageChange: (value: string) => void;
-  onMotorCountChange: (count: number | "") => void;
-  onDraftMotorIdChange: (index: number, motorId: string) => void;
-  onMotorReceivedAtChange: (value: string) => void;
-  onLoadTrimmingForm: () => void;
-  onAddMotors: () => void;
+  autoMotorEntries?: TrimmingAddedMotor[];
   onMotorSessionChange: (motorId: string, next: TrimmingMotorSession) => void;
-  onFormValuesChange: (motorId: string, values: import("../../../../../schema-engine").SchemaFormValues) => void;
   theme: any;
 };
 
 const TrimmingForm = ({
   batch,
   formData,
-  subDepartmentId,
-  selectedMotorStage,
-  motorStageOptions,
-  motorStagesLoading = false,
-  motorCount,
-  draftMotorIds,
-  motorReceivedAt,
   addedMotors,
-  availableMotorOptions,
-  approvedMotorsLoading = false,
-  maxMotorCount,
-  schemaLoading = false,
-  schemaError = null,
-  onMotorStageChange,
-  onMotorCountChange,
-  onDraftMotorIdChange,
-  onMotorReceivedAtChange,
-  onLoadTrimmingForm,
-  onAddMotors,
+  autoMotorEntries,
   onMotorSessionChange,
-  onFormValuesChange,
   theme,
 }: TrimmingFormProps) => {
   const BRAND = TRIMMING_BRAND;
   const primaryColor = theme.palette.primary;
-  const motorStageLabel = selectedMotorStage
-    ? mapTrimmingMotorStage(selectedMotorStage)
-    : resolveTrimmingMotorStage(batch);
-  const schema = formData.trimmingSchema;
-  const trimmingFormLoaded = Boolean(
-    formData.schemaFormLoaded && (formData.motors?.length || schema),
-  );
-  const motorCards = Array.isArray(addedMotors) ? addedMotors : [];
+
+  const motorCards = useMemo(() => {
+    const autoCards = Array.isArray(autoMotorEntries)
+      ? autoMotorEntries.filter((entry) => Boolean(entry?.motorId))
+      : [];
+    return autoCards.length > 0 ? autoCards : Array.isArray(addedMotors) ? addedMotors : [];
+  }, [addedMotors, autoMotorEntries]);
+
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
   const prevMotorCountRef = useRef(0);
   const formSessionKey = `${batch?.batchId ?? ""}:${batch?.formId ?? "new"}`;
@@ -122,39 +98,10 @@ const TrimmingForm = ({
 
   const activeMotorSession = useMemo(() => {
     if (!activeMotorEntry) return null;
-    return (formData.motors ?? []).find((motor) => motor.motorId === activeMotorEntry.motorId) ?? null;
-  }, [activeMotorEntry, formData.motors]);
-
-  const activeSchema = useMemo(() => {
-    if (!activeMotorSession) return null;
     return (
-      activeMotorSession.schema ??
-      formData.schemasByStage?.[activeMotorSession.motorStage] ??
-      formData.trimmingSchema
+      (formData.motors ?? []).find((motor) => motor.motorId === activeMotorEntry.motorId) ?? null
     );
-  }, [activeMotorSession, formData.schemasByStage, formData.trimmingSchema]);
-
-  const usedMotorIds = motorCards.map((motor) => motor.motorId);
-  const canLoad = canLoadTrimmingForm({
-    selectedMotorStage,
-    motorCount,
-    draftMotorIds,
-    motorReceivedAt,
-    usedMotorIds,
-    trimmingFormLoaded,
-    availableMotorOptions,
-    maxMotorCount,
-  });
-  const canAdd = canAddTrimmingMotors({
-    selectedMotorStage,
-    motorCount,
-    draftMotorIds,
-    motorReceivedAt,
-    usedMotorIds,
-    trimmingFormLoaded,
-    availableMotorOptions,
-    maxMotorCount,
-  });
+  }, [activeMotorEntry, formData.motors]);
 
   return (
     <Box sx={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -194,75 +141,10 @@ const TrimmingForm = ({
               </Typography>
             </Box>
           </Stack>
-          <Chip
-            label={`${S.MOTOR_STAGE_LABEL}: ${motorStageLabel}`}
-            size="small"
-            sx={{
-              height: 26,
-              fontWeight: 700,
-              fontSize: "0.7rem",
-              alignSelf: { xs: "flex-start", sm: "center" },
-              background: "rgba(106,27,154,0.1)",
-              color: BRAND.tr,
-              border: `1px solid ${BRAND.tr}44`,
-            }}
-          />
         </Stack>
       </Box>
 
-      <TrimmingFlowBar
-        selectedMotorStage={selectedMotorStage}
-        motorStageOptions={motorStageOptions}
-        motorStagesLoading={motorStagesLoading}
-        motorCount={motorCount}
-        draftMotorIds={draftMotorIds}
-        motorReceivedAt={motorReceivedAt}
-        availableMotorOptions={availableMotorOptions}
-        approvedMotorsLoading={approvedMotorsLoading}
-        usedMotorIds={usedMotorIds}
-        trimmingFormLoaded={trimmingFormLoaded}
-        maxMotorCount={maxMotorCount}
-        onMotorStageChange={onMotorStageChange}
-        onMotorCountChange={onMotorCountChange}
-        onDraftMotorIdChange={onDraftMotorIdChange}
-        onMotorReceivedAtChange={onMotorReceivedAtChange}
-        onLoadTrimmingForm={onLoadTrimmingForm}
-        onAddMotors={onAddMotors}
-        canLoad={canLoad}
-        canAdd={canAdd}
-        schemaLoading={schemaLoading}
-        theme={theme}
-      />
-
-      {schemaLoading && !schema ? (
-        <Box
-          sx={{
-            borderRadius: 2.5,
-            border: `1px solid ${theme.palette.border}`,
-            background: theme.palette.surface,
-            px: 2,
-            py: 5,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 1.5,
-          }}
-        >
-          <CircularProgress size={28} sx={{ color: BRAND.tr }} />
-          <Typography sx={{ fontWeight: 600, fontSize: "0.85rem", color: BRAND.text }}>
-            {S.SCHEMA_LOADING}
-          </Typography>
-          <Typography sx={{ fontSize: "0.75rem", color: BRAND.textSub, textAlign: "center" }}>
-            {S.SCHEMA_LOADING_HINT}
-          </Typography>
-        </Box>
-      ) : null}
-
-      {schemaError && !schemaLoading ? (
-        <Typography sx={{ fontSize: "0.82rem", color: BRAND.danger, mb: 2 }}>{schemaError}</Typography>
-      ) : null}
-
-      {motorCards.length > 0 && activeMotorEntry && activeMotorSession && activeSchema ? (
+      {motorCards.length > 0 && activeMotorEntry && activeMotorSession ? (
         <Stack spacing={1.25}>
           {motorCards.length > 1 ? (
             <>
@@ -309,7 +191,9 @@ const TrimmingForm = ({
                   background: theme.palette.surface,
                 }}
               >
-                <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: primaryColor, mb: 0.4 }}>
+                <Typography
+                  sx={{ fontSize: "0.76rem", fontWeight: 700, color: primaryColor, mb: 0.4 }}
+                >
                   {S.MOTOR_NAV_TITLE}
                 </Typography>
                 <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub, mb: 0.9 }}>
@@ -346,30 +230,17 @@ const TrimmingForm = ({
               <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: primaryColor }}>
                 {S.MOTOR_CARD_TITLE} — {activeMotorEntry.motorId}
               </Typography>
-              <Typography sx={{ fontSize: "0.74rem", color: BRAND.textSub, mt: 0.25 }}>
+              {/* <Typography sx={{ fontSize: "0.74rem", color: BRAND.textSub, mt: 0.25 }}>
                 {S.MOTOR_RECEIVED_AT_LABEL}: {activeMotorEntry.motorReceivedAt || "—"}
-              </Typography>
+              </Typography> */}
               <Typography sx={{ fontSize: "0.74rem", color: BRAND.textSub, mt: 0.25 }}>
-                {S.MOTOR_STAGE_LABEL}: {mapTrimmingMotorStage(activeMotorEntry.motorStage)}
+                {S.MOTOR_STAGE_LABEL}: {activeMotorEntry.motorStage}
               </Typography>
             </Box>
-
-            <TrimmingSchemaPanel
-              schema={activeSchema}
-              formValues={activeMotorSession.formValues ?? {}}
-              savedSections={activeMotorSession.savedSections}
-              subDepartmentId={subDepartmentId}
-              batchId={batch?.batchId}
-              onChange={(values) => {
-                onFormValuesChange(activeMotorEntry.motorId, values);
-                onMotorSessionChange(activeMotorEntry.motorId, {
-                  ...activeMotorSession,
-                  schema: activeSchema,
-                  formValues: values,
-                });
-              }}
-              loading={schemaLoading}
-              error={schemaError}
+            <TrimmingCommonTable
+              activeMotorSession={activeMotorSession}
+              activeMotorEntry={activeMotorEntry}
+              onMotorSessionChange={onMotorSessionChange}
             />
           </Box>
         </Stack>

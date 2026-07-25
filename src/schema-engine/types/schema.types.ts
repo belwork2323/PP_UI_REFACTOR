@@ -21,9 +21,30 @@ export type SchemaVisibilityCondition = {
   value?: unknown;
 };
 
+/** Nested `when` groups are allowed so OR/AND can be composed (e.g. recipe A OR (OTHERS AND duration)). */
+export type SchemaVisibilityRule = SchemaVisibilityCondition | SchemaVisibleWhen;
+
 export type SchemaVisibleWhen = {
-  when: SchemaVisibilityCondition[];
+  when: SchemaVisibilityRule[];
   logic?: "AND" | "OR";
+};
+
+export type SchemaRowGenerationCountConfig = {
+  /** Field that provides the dynamic row count (e.g. `otherDuration`). */
+  countField?: string;
+  /** Fixed counts keyed by another field's value (e.g. recipe → 6 / 8 hours). */
+  countByFieldValue?: {
+    field: string;
+    values: Record<string, number>;
+  };
+  /** Label template; `{n}` is replaced with 1-based row index. */
+  labelTemplate?: string;
+  /** Column that receives `labelTemplate` (default `parameter`). */
+  labelColumn?: string;
+  /** Extra cells applied to each generated row (e.g. `value__fieldType`). */
+  rowDefaults?: Record<string, unknown>;
+  min?: number;
+  max?: number;
 };
 
 export type SchemaValidation = {
@@ -53,6 +74,8 @@ export type SchemaApiDataSource = {
   /** Parent row field matched against apiContext (e.g. `materialCode` vs `RAW_MATERIAL`). */
   parentMatchField?: string;
   parentMatchContextKey?: string;
+  /** Filter API rows where item[field] matches apiContext[contextKey] (skipped when context is empty). */
+  filterByContext?: Record<string, string>;
 };
 
 export type SchemaDataSource =
@@ -72,6 +95,15 @@ export type SchemaColumnValueDerive = {
   sourceField: string;
   transform?: SchemaFieldValueTransform;
   matchFields?: string[];
+};
+
+/** Auto-load table rows or field values from an API on form init (no picker / Add button). */
+export type SchemaPopulateFromApiConfig = {
+  dataSource: SchemaDataSource;
+  fieldMappings?: SchemaCommitFieldMapping[];
+  readonlyColumns?: string[];
+  /** When the resolved API value is an object, read this property for scalar fields. */
+  sourceField?: string;
 };
 
 export type SchemaTableCommitGroupConfig = {
@@ -110,8 +142,15 @@ export type SchemaRowsConfig = {
   presetRows?: Record<string, unknown>[];
   /** Backend table row source (e.g. CASTING_TABLE, HARDWARE_PREPARATION). */
   rowGenerationSource?: string;
+  /**
+   * Generate N labeled rows from a count field and/or a field→count map
+   * (e.g. pre-heating temperature duration from recipe / otherDuration).
+   */
+  rowGenerationCount?: SchemaRowGenerationCountConfig;
   /** Picker row committed via Add Row expands API options into grouped rows. */
   commitGroup?: SchemaTableCommitGroupConfig;
+  /** Auto-populate all table rows from API when the table has no saved data. */
+  populateFromApi?: SchemaPopulateFromApiConfig;
   addLabel?: string;
   /** Cross-row formulas keyed by row identifier (e.g. SR_NO = H). */
   rowComputations?: SchemaRowComputation[];
@@ -236,6 +275,8 @@ export type SchemaFieldBlock = SchemaBlockBase & {
   dataSource?: SchemaDataSource;
   formula?: SchemaFormula;
   readonly?: boolean;
+  /** Auto-populate field value from API when empty. */
+  populateFromApi?: SchemaPopulateFromApiConfig;
 };
 
 export type SchemaTableColumn = SchemaBlockBase & {

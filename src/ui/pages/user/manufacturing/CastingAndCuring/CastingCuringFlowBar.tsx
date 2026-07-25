@@ -1,9 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import { Box, Button, CircularProgress, TextField, Typography } from "@mui/material";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { DateTimePicker } from "@mui/x-date-pickers/DateTimePicker";
-import dayjs from "dayjs";
 import { fetchCastingStationsApi } from "../../../../../data/api/users/operationsApi";
 import {
   CASTING_CURING_FLOW_LABELS,
@@ -17,6 +13,7 @@ import {
   type CastingCuringMotorOption,
   type CastingProcessSetupDraft,
 } from "../../../../../hooks/user/manufacturing/castingCuringFlowConfig";
+import { DateTimeField } from "../../../../components/common/DateField";
 import CasePrepSelect from "../CasePreparation/CasePrepSelect";
 
 type CastingCuringFlowBarProps = {
@@ -185,23 +182,16 @@ const CastingCuringFlowBar = ({
       <Typography component="label" sx={flowBar.selectLabel}>
         {L.motorReceivedAt}
       </Typography>
-      <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
-        <DateTimePicker
-          enableAccessibleFieldDOMStructure={false}
-          format="DD-MM-YYYY HH:mm"
-          disabled={disabled}
-          value={motorReceivedAt ? dayjs(motorReceivedAt, "DD-MM-YYYY HH:mm") : null}
-          onChange={(picked) => onMotorReceivedAtChange(picked?.format("DD-MM-YYYY HH:mm") || "")}
-          slotProps={{
-            textField: {
-              size: "small",
-              fullWidth: true,
-              placeholder: L.motorReceivedAtPlaceholder,
-              sx: flowBar.selectInput?.(Boolean(motorReceivedAt)),
-            },
-          }}
-        />
-      </LocalizationProvider>
+      <DateTimeField
+        value={motorReceivedAt}
+        onChange={onMotorReceivedAtChange}
+        disabled={disabled}
+        placeholder={L.motorReceivedAtPlaceholder}
+        sx={{
+          mb: 0,
+          ...(flowBar.selectInput?.(Boolean(motorReceivedAt)) as object),
+        }}
+      />
     </Box>
   );
 

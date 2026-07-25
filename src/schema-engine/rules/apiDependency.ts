@@ -41,6 +41,8 @@ export const resolveSchemaApiEndpoint = (endpoint: string): string => {
   if (raw.includes("casting-station")) return USER_OPERATIONS_ENDPOINTS.CASTING_STATION_LIST;
   if (raw.includes("motors-stage-list")) return USER_OPERATIONS_ENDPOINTS.MOTORS_STAGE_LIST;
   if (raw.includes("approved-motors-list")) return USER_OPERATIONS_ENDPOINTS.APPROVED_MOTORS_LIST;
+  if (raw.includes("post-cure/material-lots")) return USER_OPERATIONS_ENDPOINTS.MATERIAL_LOTS;
+  if (raw.includes("subdepartment/material-lots")) return USER_OPERATIONS_ENDPOINTS.MATERIAL_LOTS;
   if (raw.includes("material-lots")) return USER_OPERATIONS_ENDPOINTS.MATERIAL_LOTS;
   if (raw.includes("raw-material-sourcing/form/lot-list"))
     return USER_OPERATIONS_ENDPOINTS.LOT_LIST;
@@ -178,6 +180,10 @@ export const resolveDataSourceApi = (
     parentMatchField: typeof api.parentMatchField === "string" ? api.parentMatchField : undefined,
     parentMatchContextKey:
       typeof api.parentMatchContextKey === "string" ? api.parentMatchContextKey : undefined,
+    filterByContext:
+      api.filterByContext && typeof api.filterByContext === "object"
+        ? (api.filterByContext as Record<string, string>)
+        : undefined,
   };
 };
 
@@ -296,6 +302,37 @@ const normalizeMatchValue = (value: unknown) =>
     .trim()
     .toLowerCase();
 
+/** Resolve dotted paths (`grade.gradeCode`) and nested grade objects from lot rows. */
+const resolveFilterFieldValue = (
+  item: Record<string, unknown>,
+  itemField: string,
+): unknown => {
+  const parts = String(itemField ?? "")
+    .split(".")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+  let current: unknown = item;
+  for (const part of parts) {
+    if (current == null || typeof current !== "object" || Array.isArray(current)) {
+      return undefined;
+    }
+    current = (current as Record<string, unknown>)[part];
+  }
+
+  // material-lots API returns `grade: { gradeCode, gradeName, ... }`
+  if (
+    current != null &&
+    typeof current === "object" &&
+    !Array.isArray(current) &&
+    "gradeCode" in (current as Record<string, unknown>)
+  ) {
+    return (current as Record<string, unknown>).gradeCode;
+  }
+
+  return current;
+};
+
 const extractNestedOptionsList = (
   options: Record<string, unknown>[],
   api: SchemaApiDataSource,
@@ -319,7 +356,82 @@ const extractNestedOptionsList = (
   return Array.isArray(nested) ? (nested as Record<string, unknown>[]) : [];
 };
 
+const applyContextFilter = (
+  options: Record<string, unknown>[],
+  api: SchemaApiDataSource,
+  apiContext?: SchemaApiContext,
+): Record<string, unknown>[] => {
+  const filters = api.filterByContext;
+  if (!filters || !apiContext) return options;
+
+  return options.filter((item) =>
+    Object.entries(filters).every(([itemField, contextKey]) => {
+      const expected = apiContext[contextKey];
+      if (expected == null || String(expected).trim() === "") return true;
+      const actual = resolveFilterFieldValue(item, itemField);
+      if (actual == null || String(actual).trim() === "") return false;
+      return normalizeMatchValue(actual) === normalizeMatchValue(expected);
+    }),
+  );
+};
+
 const schemaApiListCache = new Map<string, Promise<Record<string, unknown>[]>>();
+/** Shared raw HTTP response cache — one network call per endpoint+payload. */
+const schemaApiResponseCache = new Map<string, Promise<unknown>>();
+
+const fetchSchemaApiRawResponse = async (
+  endpoint: string,
+  method: "GET" | "POST",
+  payload: Record<string, unknown>,
+): Promise<unknown> => {
+  const cacheKey = buildSchemaApiCacheKey(endpoint, method, payload);
+  let responsePromise = schemaApiResponseCache.get(cacheKey);
+  if (!responsePromise) {
+    responsePromise = (async () => {
+      const response =
+        method === "GET"
+          ? await get(endpoint, Object.keys(payload).length ? payload : undefined)
+          : await post(endpoint, payload);
+
+      const root = response as Record<string, unknown>;
+      if (root?.success === false) {
+        throw new Error(String(root.message ?? "Unable to load options."));
+      }
+      return response;
+    })();
+
+    schemaApiResponseCache.set(cacheKey, responsePromise);
+    responsePromise.catch(() => {
+      schemaApiResponseCache.delete(cacheKey);
+    });
+  }
+  return responsePromise;
+};
+
+/**
+ * Seed the schema API cache with an already-fetched batch/details response
+ * so populateFromApi fields reuse it instead of re-calling the network.
+ */
+export const seedSchemaApiResponseCache = (
+  endpoint: string,
+  method: "GET" | "POST",
+  payload: Record<string, unknown>,
+  response: unknown,
+) => {
+  const cacheKey = buildSchemaApiCacheKey(endpoint, method, payload);
+  schemaApiResponseCache.set(cacheKey, Promise.resolve(response));
+};
+
+export const seedBatchDetailsSchemaCache = (batchId: string, response: unknown) => {
+  const id = String(batchId ?? "").trim();
+  if (!id || response == null) return;
+  seedSchemaApiResponseCache(
+    resolveSchemaApiEndpoint("/api/v1/admin/batch/details"),
+    "POST",
+    { batchId: id },
+    response,
+  );
+};
 
 const buildSchemaApiCacheKey = (
   endpoint: string,
@@ -358,16 +470,7 @@ const fetchSchemaApiOptionsList = async (
   let listPromise = schemaApiListCache.get(cacheKey);
   if (!listPromise) {
     listPromise = (async () => {
-      const response =
-        method === "GET"
-          ? await get(endpoint, isCastingStation ? undefined : payload)
-          : await post(endpoint, payload);
-
-      const root = response as Record<string, unknown>;
-      if (root?.success === false) {
-        throw new Error(String(root.message ?? "Unable to load options."));
-      }
-
+      const response = await fetchSchemaApiRawResponse(endpoint, method, payload);
       const list = extractSchemaApiOptionsList(response, api.responsePath);
       if (list.length === 0) {
         schemaApiListCache.delete(cacheKey);
@@ -405,7 +508,8 @@ export const fetchSchemaApiOptions = async (
   const { list, error } = await fetchSchemaApiOptionsList(api, apiContext);
   if (error) return { options: [], error };
 
-  return { options: extractNestedOptionsList(list, api, apiContext), error: null };
+  const nested = extractNestedOptionsList(list, api, apiContext);
+  return { options: applyContextFilter(nested, api, apiContext), error: null };
 };
 
 export const fetchSchemaDataSourceOptions = async (
@@ -469,4 +573,71 @@ export const staticDataSourceOptions = (dataSource: SchemaDataSource) => {
     if (typeof opt === "string") return { label: opt, value: opt };
     return opt;
   });
+};
+
+export const resolveSchemaApiResponseValue = (
+  response: unknown,
+  responsePath?: string,
+  sourceField?: string,
+): unknown => {
+  if (response == null) return undefined;
+
+  let resolved: unknown = response;
+  if (typeof response === "object" && !Array.isArray(response)) {
+    const root = response as Record<string, unknown>;
+    if (responsePath?.trim()) {
+      resolved = resolveResponsePath(root, responsePath.trim());
+    } else {
+      resolved = root.data ?? root;
+    }
+  }
+
+  const field = sourceField?.trim();
+  if (field && resolved != null && typeof resolved === "object" && !Array.isArray(resolved)) {
+    return (resolved as Record<string, unknown>)[field];
+  }
+
+  return resolved;
+};
+
+export const fetchSchemaApiResolvedValue = async (
+  dataSource: SchemaDataSource,
+  apiContext?: SchemaApiContext,
+  sourceField?: string,
+): Promise<unknown> => {
+  if (dataSource.type !== "api") return undefined;
+
+  const api = resolveDataSourceApi(dataSource as SchemaDataSource & Record<string, unknown>);
+  if (!api?.endpoint) return undefined;
+
+  const endpoint = resolveSchemaApiEndpoint(api.endpoint ?? "");
+  if (!endpoint) return undefined;
+
+  const isCastingStation = endpoint.includes("casting-station");
+  const payload = isCastingStation ? {} : buildSchemaApiPayload(api, apiContext);
+  const requestField = String(api.requestField ?? "").trim();
+  if (
+    !isCastingStation &&
+    requestField &&
+    (payload[requestField] == null || String(payload[requestField]).trim() === "")
+  ) {
+    return undefined;
+  }
+  if (!isCastingStation && hasUnresolvedTemplateTokens(payload)) {
+    return undefined;
+  }
+
+  const method =
+    String(api.method ?? "POST")
+      .trim()
+      .toUpperCase() === "GET"
+      ? "GET"
+      : "POST";
+
+  try {
+    const response = await fetchSchemaApiRawResponse(endpoint, method, payload);
+    return resolveSchemaApiResponseValue(response, api.responsePath, sourceField);
+  } catch {
+    return undefined;
+  }
 };

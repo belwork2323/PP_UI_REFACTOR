@@ -1041,7 +1041,7 @@ Expression uses row field keys. Recalculated on dependency change. Read-only in 
 | Alias | Resolves to |
 |-------|-------------|
 | `casting-station` | Casting station list (GET) |
-| `material-lots` | Post-cure material lots (`POST /user/post-cure/material-lots`, body: `{ batchId }`) |
+| `material-lots` | Subdepartment material lots (`POST /user/subdepartment/material-lots`, body: `{ batchId }`) |
 | `BUILDING_MASTER` | Building master |
 | `MOTORS_STAGE_LIST` | Motor stage list for matrix columns (GET) |
 

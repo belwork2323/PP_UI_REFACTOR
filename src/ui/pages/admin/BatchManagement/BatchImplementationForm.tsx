@@ -7,11 +7,7 @@ import {
   Box,
   Typography,
   Button,
-  IconButton,
   Stack,
-  FormControl,
-  InputLabel,
-  Select,
   MenuItem,
   Table,
   TableBody,
@@ -21,21 +17,21 @@ import {
   TableRow,
   CircularProgress,
   Zoom,
-  TextField,
-  InputAdornment,
-  Grid,
   Divider,
 } from "@mui/material";
-import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
-import ScienceRoundedIcon from "@mui/icons-material/ScienceRounded";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
-import Input from "@ui/components/common/Input";
+import FormInput from "@ui/components/common/FormInput";
+import AppTextField from "@ui/components/common/AppTextField";
+import AppDropdown from "@ui/components/common/AppDropdown";
 import AdminManagementFormHeader from "@ui/components/custom/admin/AdminManagementFormHeader";
-import { materialSelectionKey } from "@data/models/user/MaterialsListModel";
 import type { BatchMaterialOption } from "@data/models/admin/BatchManagement/BatchManagementModel";
+import type { SystemMasterOption } from "@data/api/common/generalAPI";
+import DateField from "@ui/components/common/DateField";
+import { formatToUiDate } from "@utils/dateUtils";
+import { appDenseControlSx } from "@ui/components/common/fieldStyles";
 
 const S = STRINGS.BATCH_MANAGEMENT.FORM;
 
@@ -54,19 +50,49 @@ interface Material {
   revalidationToDate: string;
 }
 
-const displayNumberValue = (value: number | undefined | null, emptyWhenZero = true): string => {
-  if (value == null || (emptyWhenZero && value === 0)) return "";
+const displayNumberValue = (value: number | string | undefined | null, emptyWhenZero = true): string => {
+  if (value == null || value === "") return "";
+  if (emptyWhenZero && Number(value) === 0) return "";
   return String(value);
 };
 
-const parseIntField = (raw: string): number => {
-  if (raw === "") return 0;
-  const parsed = Number.parseInt(raw, 10);
-  return Number.isFinite(parsed) ? parsed : 0;
+/** Parse a non-negative float; empty input stays clearable (returns ""). */
+const parseClearableNonNegativeFloat = (raw: string): number | "" => {
+  const trimmed = raw.trim();
+  if (trimmed === "" || trimmed === ".") return "";
+  const parsed = Number.parseFloat(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0) return "";
+  return parsed;
+};
+
+const compositionMaterialKey = (material: Material, index: number) =>
+  `${material.materialCode}-${material.srNo ?? index}`;
+
+const parseCompositionFloat = (raw: string): number | null => {
+  const trimmed = raw.trim();
+  if (trimmed === "" || trimmed === ".") return null;
+  const parsed = Number.parseFloat(trimmed);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const toBatchSizeNumber = (value: number | string | undefined | null): number => {
+  if (value === "" || value == null) return 0;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : 0;
 };
 
 const materialManufacturer = (material: Material): string =>
   String(material.manufacturerName ?? material.make ?? "").trim();
+
+const withCurrentMasterOption = (
+  options: SystemMasterOption[],
+  currentValue: string,
+): SystemMasterOption[] => {
+  const trimmed = String(currentValue ?? "").trim();
+  if (!trimmed) return options;
+  if (options.some((opt) => opt.code === trimmed || opt.name === trimmed)) return options;
+  return [{ id: 0, code: trimmed, name: trimmed }, ...options];
+};
 
 export default function BatchImplementationForm({
   open,
@@ -77,26 +103,46 @@ export default function BatchImplementationForm({
   onFormChange,
   onMaterialsChange,
   readOnly = false,
+  isBatchEditMode = false,
   saving,
   t,
   materialOptions = [],
+  mixerOptions = [],
+  buildingOptions = [],
   loadingMaterials = false,
   loadingLots = false,
+  loadingMasterLookups = false,
   getLotByMaterialAndId,
   getLotOptionsForRow,
   onCompositionChange,
   setConfirmOpen,
 }: any) {
-  const { modal, input } = t;
+  const { modal, input, materialSelectField, materialsTable } = t;
   const [selectedMaterialCode, setSelectedMaterialCode] = useState("");
   const [selectedGradeCode, setSelectedGradeCode] = useState("");
+  const [compositionDrafts, setCompositionDrafts] = useState<Record<string, string>>({});
 
   const fieldDisabled = readOnly || saving;
+
+  const currentMixerValue = String(
+    form.identificationSheet?.mixerType ?? form.identificationSheet?.mixerDetails ?? "",
+  ).trim();
+  const currentBuildingValue = String(form.identificationSheet?.BldgNo ?? "").trim();
+
+  const mixerSelectOptions = useMemo(
+    () => withCurrentMasterOption(mixerOptions as SystemMasterOption[], currentMixerValue),
+    [mixerOptions, currentMixerValue],
+  );
+  const buildingSelectOptions = useMemo(
+    () => withCurrentMasterOption(buildingOptions as SystemMasterOption[], currentBuildingValue),
+    [buildingOptions, currentBuildingValue],
+  );
 
   useEffect(() => {
     if (!open) {
       setSelectedMaterialCode("");
       setSelectedGradeCode("");
+      setCompositionDrafts({});
     }
   }, [open]);
 
@@ -109,14 +155,6 @@ export default function BatchImplementationForm({
     return ids;
   }, [form.identificationSheet?.materials]);
 
-  const usedMaterialKeys = useMemo(() => {
-    const keys = new Set<string>();
-    for (const material of form.identificationSheet?.materials ?? []) {
-      keys.add(materialSelectionKey(material.materialCode, material.gradeCode));
-    }
-    return keys;
-  }, [form.identificationSheet?.materials]);
-
   const selectedMaterialOption = useMemo(
     () =>
       (materialOptions as BatchMaterialOption[]).find(
@@ -126,17 +164,8 @@ export default function BatchImplementationForm({
   );
 
   const selectableMaterials = useMemo(() => {
-    return (materialOptions as BatchMaterialOption[]).filter((material) => {
-      const grades = material.grades ?? [];
-      if (grades.length > 0) {
-        return grades.some(
-          (grade) =>
-            !usedMaterialKeys.has(materialSelectionKey(material.materialCode, grade.gradeCode)),
-        );
-      }
-      return !usedMaterialKeys.has(material.materialCode);
-    });
-  }, [materialOptions, usedMaterialKeys]);
+    return materialOptions as BatchMaterialOption[];
+  }, [materialOptions]);
 
   const showGradeSelect = Boolean(
     selectedMaterialOption && (selectedMaterialOption.grades?.length ?? 0) > 0,
@@ -144,13 +173,8 @@ export default function BatchImplementationForm({
 
   const selectableGrades = useMemo(() => {
     if (!showGradeSelect || !selectedMaterialOption) return [];
-    return (selectedMaterialOption.grades ?? []).filter(
-      (grade) =>
-        !usedMaterialKeys.has(
-          materialSelectionKey(selectedMaterialOption.materialCode, grade.gradeCode),
-        ),
-    );
-  }, [selectedMaterialOption, showGradeSelect, usedMaterialKeys]);
+    return selectedMaterialOption.grades ?? [];
+  }, [selectedMaterialOption, showGradeSelect]);
 
   const canAddMaterial =
     Boolean(selectedMaterialCode) && (!showGradeSelect || Boolean(selectedGradeCode));
@@ -208,12 +232,6 @@ export default function BatchImplementationForm({
       showGradeSelect
         ? selectableGrades.find((item) => item.gradeCode === selectedGradeCode)
         : undefined;
-
-    const selectionKey = materialSelectionKey(
-      selectedMaterialOption.materialCode,
-      grade?.gradeCode,
-    );
-    if (usedMaterialKeys.has(selectionKey)) return;
 
     const newMaterial: Material = {
       srNo: (form.identificationSheet?.materials?.length ?? 0) + 1,
@@ -276,7 +294,7 @@ export default function BatchImplementationForm({
     onCompositionChange?.(roundedTotal);
   }, [roundedTotal, onCompositionChange]);
   const handleMaterialValuesChange = (index: number, composition: number) => {
-    const batchSize = Number(form.identificationSheet?.batchSize) || 0;
+    const batchSize = toBatchSizeNumber(form.identificationSheet?.batchSize);
     const qty = Number(((batchSize * composition) / 100).toFixed(3));
 
     const newMaterials = [...(form.identificationSheet?.materials ?? [])];
@@ -293,6 +311,36 @@ export default function BatchImplementationForm({
     );
 
     onCompositionChange?.(Number(total.toFixed(2)));
+  };
+
+  const getCompositionDisplayValue = (material: Material, index: number) => {
+    const key = compositionMaterialKey(material, index);
+    if (compositionDrafts[key] !== undefined) return compositionDrafts[key];
+    return displayNumberValue(material.requiredComposition);
+  };
+
+  const handleCompositionInputChange = (index: number, material: Material, raw: string) => {
+    const key = compositionMaterialKey(material, index);
+    setCompositionDrafts((prev) => ({ ...prev, [key]: raw }));
+
+    if (raw === "" || raw.endsWith(".")) return;
+
+    const composition = parseCompositionFloat(raw);
+    if (composition === null) return;
+    handleMaterialValuesChange(index, composition);
+  };
+
+  const commitCompositionInput = (index: number, material: Material) => {
+    const key = compositionMaterialKey(material, index);
+    const raw =
+      compositionDrafts[key] ?? displayNumberValue(material.requiredComposition);
+    const composition = parseCompositionFloat(raw);
+    handleMaterialValuesChange(index, composition ?? 0);
+    setCompositionDrafts((prev) => {
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
   };
 
   const recalculateMaterialQuantities = (batchSize: number) => {
@@ -325,7 +373,13 @@ export default function BatchImplementationForm({
       <DialogTitle sx={{ p: 0 }}>
         <AdminManagementFormHeader
           icon={<icons.batchMgmt.batchIcon sx={modal.header.icon} />}
-          title={readOnly ? S.IMPLEMENTATION_VIEW_TITLE : S.IMPLEMENTATION_EDIT_TITLE}
+          title={
+            readOnly
+              ? S.IMPLEMENTATION_VIEW_TITLE
+              : isBatchEditMode
+                ? S.IMPLEMENTATION_BATCH_EDIT_TITLE
+                : S.IMPLEMENTATION_EDIT_TITLE
+          }
           subtitle={
             editTarget?.batchId
               ? S.IMPLEMENTATION_SUBTITLE(editTarget?.batchId || editTarget?.id || "—")
@@ -344,47 +398,56 @@ export default function BatchImplementationForm({
         <Stack spacing={modal.stackSpacing}>
           {/* Identification Sheet Details */}
           <Box>
-            <Typography sx={modal.fieldLabel}>{S.IDENTIFICATION_LABEL}</Typography>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={modal.fieldRowSpacing}>
-              <Input
-                fullWidth
+              <DateField
                 label="Date"
-                type="date"
-                value={form.identificationSheet?.date ?? ""}
-                onChange={(e) => {
-                  const newIdent = { ...form.identificationSheet, date: e.target.value };
+                value={formatToUiDate(form.identificationSheet?.date ?? "")}
+                onChange={(date) => {
+                  const newIdent = { ...form.identificationSheet, date };
                   onFormChange("identificationSheet", newIdent);
                 }}
-                size="small"
-                sx={input}
-                InputLabelProps={{ shrink: true }}
                 disabled={readOnly}
+                sx={{ mb: 0, ...input }}
               />
-              <Input
+              <FormInput
                 fullWidth
                 label="Batch Size (KG)"
                 type="number"
-                value={displayNumberValue(form.identificationSheet?.batchSize)}
+                value={displayNumberValue(form.identificationSheet?.batchSize, true)}
                 onChange={(e) => {
+                  const batchSize = parseClearableNonNegativeFloat(e.target.value);
                   const newIdent = {
                     ...form.identificationSheet,
-                    batchSize: parseIntField(e.target.value),
+                    batchSize,
                   };
                   onFormChange("identificationSheet", newIdent);
-                  recalculateMaterialQuantities(newIdent);
+                  recalculateMaterialQuantities(toBatchSizeNumber(batchSize));
+                }}
+                onKeyDown={(e) => {
+                  if (["-", "e", "E", "+"].includes(e.key)) {
+                    e.preventDefault();
+                  }
                 }}
                 required
-                size="small"
-                sx={input}
-                inputProps={{ min: 1 }}
+                inputProps={{ min: 0, step: "any" }}
                 disabled={readOnly}
+                sx={{
+                  mb: 0,
+                  ...input,
+                  "& input[type=number]": { MozAppearance: "textfield" },
+                  "& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button":
+                    {
+                      WebkitAppearance: "none",
+                      margin: 0,
+                    },
+                }}
               />
             </Stack>
           </Box>
 
           <Box>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={modal.fieldRowSpacing}>
-              <Input
+              <FormInput
                 fullWidth
                 label="Bonding Sheet No"
                 value={form.identificationSheet?.bondingSheetNo ?? ""}
@@ -392,44 +455,75 @@ export default function BatchImplementationForm({
                   const newIdent = { ...form.identificationSheet, bondingSheetNo: e.target.value };
                   onFormChange("identificationSheet", newIdent);
                 }}
-                size="small"
-                sx={input}
                 disabled={fieldDisabled}
+                sx={{ mb: 0, ...input }}
               />
-              <Input
-                fullWidth
-                label="Mixer Type"
-                value={
-                  form.identificationSheet?.mixerType ??
-                  form.identificationSheet?.mixerDetails ??
-                  ""
-                }
-                onChange={(e) => {
-                  const newIdent = { ...form.identificationSheet, mixerType: e.target.value };
-                  onFormChange("identificationSheet", newIdent);
+              <AppDropdown
+                label={S.MIXER_TYPE}
+                value={currentMixerValue}
+                onChange={(value) => {
+                  onFormChange("identificationSheet", {
+                    ...form.identificationSheet,
+                    mixerType: value,
+                  });
                 }}
-                size="small"
-                sx={input}
-                disabled={fieldDisabled}
+                disabled={fieldDisabled || loadingMasterLookups}
+                placeholder={
+                  loadingMasterLookups
+                    ? "Loading mixers..."
+                    : mixerSelectOptions.length
+                      ? "Select mixer"
+                      : "No mixers available"
+                }
+                options={mixerSelectOptions.map((opt) => ({
+                  value: opt.code,
+                  label: opt.name || opt.code,
+                }))}
+                renderValue={(selected) => {
+                  const value = String(selected ?? "").trim();
+                  if (!value) return null;
+                  const opt = mixerSelectOptions.find((o) => o.code === value);
+                  return opt?.name || opt?.code || value;
+                }}
+                sx={{ mb: 0, ...input }}
+                MenuProps={t.menuPaper}
               />
             </Stack>
           </Box>
 
           <Box>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={modal.fieldRowSpacing}>
-              <Input
-                fullWidth
-                label="Building No"
-                value={form.identificationSheet?.BldgNo ?? ""}
-                onChange={(e) => {
-                  const newIdent = { ...form.identificationSheet, BldgNo: e.target.value };
-                  onFormChange("identificationSheet", newIdent);
+              <AppDropdown
+                label={S.BUILDING_NO}
+                value={currentBuildingValue}
+                onChange={(value) => {
+                  onFormChange("identificationSheet", {
+                    ...form.identificationSheet,
+                    BldgNo: value,
+                  });
                 }}
-                size="small"
-                sx={input}
-                disabled={fieldDisabled}
+                disabled={fieldDisabled || loadingMasterLookups}
+                placeholder={
+                  loadingMasterLookups
+                    ? "Loading buildings..."
+                    : buildingSelectOptions.length
+                      ? "Select building"
+                      : "No buildings available"
+                }
+                options={buildingSelectOptions.map((opt) => ({
+                  value: opt.code,
+                  label: opt.name || opt.code,
+                }))}
+                renderValue={(selected) => {
+                  const value = String(selected ?? "").trim();
+                  if (!value) return null;
+                  const opt = buildingSelectOptions.find((o) => o.code === value);
+                  return opt?.name || opt?.code || value;
+                }}
+                sx={{ mb: 0, ...input }}
+                MenuProps={t.menuPaper}
               />
-              <Input
+              <FormInput
                 fullWidth
                 label="Number of Premix"
                 type="number"
@@ -455,12 +549,11 @@ export default function BatchImplementationForm({
                     });
                   }
                 }}
-                size="small"
-                sx={input}
                 inputProps={{ min: 1 }}
                 disabled={fieldDisabled}
+                sx={{ mb: 0, ...input }}
               />
-              <Input
+              <FormInput
                 fullWidth
                 label="Remarks"
                 value={form.identificationSheet?.remarks ?? ""}
@@ -468,9 +561,8 @@ export default function BatchImplementationForm({
                   const newIdent = { ...form.identificationSheet, remarks: e.target.value };
                   onFormChange("identificationSheet", newIdent);
                 }}
-                size="small"
-                sx={input}
                 disabled={fieldDisabled}
+                sx={{ mb: 0, ...input }}
               />
             </Stack>
           </Box>
@@ -478,7 +570,14 @@ export default function BatchImplementationForm({
           {/* Materials Table */}
           <Box>
             <Box
-              sx={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", mb: 2, gap: 2, flexWrap: "wrap" }}
+              sx={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-end",
+                mb: 1.5,
+                gap: 2,
+                flexWrap: "wrap",
+              }}
             >
               <Box>
                 <Typography sx={modal.fieldLabel}>Materials</Typography>
@@ -489,45 +588,46 @@ export default function BatchImplementationForm({
               {!readOnly && (
                 <Stack
                   direction={{ xs: "column", sm: "row" }}
-                  spacing={1.5}
+                  spacing={1.25}
                   alignItems={{ xs: "stretch", sm: "flex-end" }}
-                  sx={{ flex: 1, minWidth: 280, maxWidth: 720 }}
+                  sx={{ flex: 1, minWidth: 280, maxWidth: 640 }}
                 >
                   <Box sx={{ flex: 1, minWidth: 200 }}>
-                    <Typography sx={modal.fieldLabel}>{S.SELECT_MATERIAL_LABEL}</Typography>
-                    <TextField
-                      fullWidth
-                      select
-                      size="small"
+                    <AppDropdown
+                      label={S.SELECT_MATERIAL_LABEL}
                       value={selectedMaterialCode}
-                      onChange={(e) => handleMaterialSelectChange(e.target.value)}
+                      onChange={handleMaterialSelectChange}
                       disabled={loadingMaterials || selectableMaterials.length === 0}
-                      sx={input}
-                      SelectProps={{
-                        displayEmpty: true,
-                        IconComponent: ExpandMoreRoundedIcon,
-                        MenuProps: t.menuPaper,
+                      loading={loadingMaterials}
+                      placeholder={S.SELECT_MATERIAL_PLACEHOLDER}
+                      options={selectableMaterials.map((item) => ({
+                        value: item.materialCode,
+                        label: item.materialName || item.materialCode,
+                      }))}
+                      renderValue={(selected) => {
+                        const item = selectableMaterials.find(
+                          (m) => m.materialCode === selected,
+                        );
+                        if (!item) return selected;
+                        return (
+                          <Box
+                            component="span"
+                            sx={{
+                              display: "block",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              maxWidth: "100%",
+                            }}
+                            title={item.materialName || item.materialCode}
+                          >
+                            {item.materialName || item.materialCode}
+                          </Box>
+                        );
                       }}
-                      InputProps={{
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <ScienceRoundedIcon
-                              sx={{
-                                fontSize: 16,
-                                color: selectedMaterialCode ? "primary.main" : "text.disabled",
-                              }}
-                            />
-                          </InputAdornment>
-                        ),
-                      }}
+                      MenuProps={t.menuPaper}
+                      sx={{ mb: 0, ...(materialSelectField ?? input) }}
                     >
-                      <MenuItem value="" disabled>
-                        <Typography color="text.disabled" fontSize="0.85rem">
-                          {loadingMaterials
-                            ? S.LOADING_MATERIALS
-                            : S.SELECT_MATERIAL_PLACEHOLDER}
-                        </Typography>
-                      </MenuItem>
                       {selectableMaterials.map((item) => {
                         const gradeCount = item.grades?.length ?? 0;
                         return (
@@ -544,37 +644,24 @@ export default function BatchImplementationForm({
                           </MenuItem>
                         );
                       })}
-                    </TextField>
+                    </AppDropdown>
                   </Box>
 
                   {showGradeSelect ? (
-                    <Box sx={{ flex: 1, minWidth: 180 }}>
-                      <Typography sx={modal.fieldLabel}>{S.SELECT_GRADE_LABEL}</Typography>
-                      <TextField
-                        fullWidth
-                        select
-                        size="small"
+                    <Box sx={{ flex: 1, minWidth: 160 }}>
+                      <AppDropdown
+                        label={S.SELECT_GRADE_LABEL}
                         value={selectedGradeCode}
-                        onChange={(e) => setSelectedGradeCode(e.target.value)}
+                        onChange={setSelectedGradeCode}
                         disabled={loadingMaterials || selectableGrades.length === 0}
-                        sx={input}
-                        SelectProps={{
-                          displayEmpty: true,
-                          IconComponent: ExpandMoreRoundedIcon,
-                          MenuProps: t.menuPaper,
-                        }}
-                      >
-                        <MenuItem value="" disabled>
-                          <Typography color="text.disabled" fontSize="0.85rem">
-                            {S.SELECT_GRADE_PLACEHOLDER}
-                          </Typography>
-                        </MenuItem>
-                        {selectableGrades.map((grade) => (
-                          <MenuItem key={grade.gradeCode} value={grade.gradeCode}>
-                            {grade.gradeName || grade.gradeCode}
-                          </MenuItem>
-                        ))}
-                      </TextField>
+                        placeholder={S.SELECT_GRADE_PLACEHOLDER}
+                        options={selectableGrades.map((grade) => ({
+                          value: grade.gradeCode,
+                          label: grade.gradeName || grade.gradeCode,
+                        }))}
+                        MenuProps={t.menuPaper}
+                        sx={{ mb: 0, ...(materialSelectField ?? input) }}
+                      />
                     </Box>
                   ) : null}
 
@@ -584,7 +671,7 @@ export default function BatchImplementationForm({
                     onClick={handleAddMaterial}
                     disabled={!canAddMaterial}
                     startIcon={<AddRoundedIcon />}
-                    sx={{ height: 40, whiteSpace: "nowrap" }}
+                    sx={{ height: 40, whiteSpace: "nowrap", px: 1.5 }}
                   >
                     {S.ADD_MATERIAL}
                   </Button>
@@ -593,21 +680,28 @@ export default function BatchImplementationForm({
             </Box>
 
             {(form.identificationSheet?.materials?.length ?? 0) > 0 ? (
-              <TableContainer>
-                <Table size="small">
+              <>
+              <TableContainer sx={materialsTable?.container}>
+                <Table size="small" sx={{ minWidth: 980 }}>
                   <TableHead>
-                    <TableRow>
-                      <TableCell>Sr. No</TableCell>
-                      <TableCell>Material Code</TableCell>
-                      <TableCell>Material Name</TableCell>
-                      <TableCell>Grade</TableCell>
-                      <TableCell>Lot ID</TableCell>
-                      <TableCell>Manufacturer</TableCell>
-                      <TableCell>Required Composition %</TableCell>
-                      <TableCell>Qty/Premix</TableCell>
-                      <TableCell>Revalidation From</TableCell>
-                      <TableCell>Revalidation To</TableCell>
-                      {!readOnly && <TableCell>Action</TableCell>}
+                    <TableRow sx={materialsTable?.headerRow}>
+                      {[
+                        "Sr. No",
+                        "Material Code",
+                        "Material Name",
+                        "Grade",
+                        "Lot ID",
+                        "Manufacturer",
+                        "Composition %",
+                        "Qty/Premix",
+                        "Revalidation From",
+                        "Revalidation To",
+                        ...(!readOnly ? ["Action"] : []),
+                      ].map((header) => (
+                        <TableCell key={header} sx={materialsTable?.headerCell}>
+                          {header}
+                        </TableCell>
+                      ))}
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -622,118 +716,118 @@ export default function BatchImplementationForm({
                         material.materialCode,
                         lotOptionsForRow.length,
                       );
+                      const cellSx = materialsTable?.bodyCell;
+                      const textSx = materialsTable?.textCell;
 
                       return (
-                        <TableRow key={`${material.materialCode}-${material.gradeCode ?? ""}-${idx}`}>
-                          <TableCell>{material.srNo}</TableCell>
-                          <TableCell>
-                            <Input value={material.materialCode} disabled size="small" sx={input} />
+                        <TableRow
+                          key={`${material.materialCode}-${material.gradeCode ?? ""}-${idx}`}
+                          hover
+                        >
+                          <TableCell sx={{ ...cellSx, width: 56 }}>{material.srNo}</TableCell>
+                          <TableCell sx={cellSx}>
+                            <Typography sx={{ ...textSx, fontWeight: 700 }} noWrap>
+                              {material.materialCode || "—"}
+                            </Typography>
                           </TableCell>
-                          <TableCell>
-                            <Input value={material.materialName} disabled size="small" sx={input} />
+                          <TableCell sx={{ ...cellSx, minWidth: 160, maxWidth: 220 }}>
+                            <Typography sx={textSx} noWrap title={material.materialName}>
+                              {material.materialName || "—"}
+                            </Typography>
                           </TableCell>
-                          <TableCell>
-                            <Input
-                              value={material.gradeName || material.gradeCode || "—"}
-                              disabled
-                              size="small"
-                              sx={input}
+                          <TableCell sx={cellSx}>
+                            <Typography sx={textSx} noWrap>
+                              {material.gradeName || material.gradeCode || "—"}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ ...cellSx, width: 150 }}>
+                            <AppDropdown
+                              value={material.lotId ?? ""}
+                              onChange={(value) => handleLotIdChange(idx, value)}
+                              disabled={fieldDisabled || loadingLots || !material.materialCode}
+                              loading={loadingLots}
+                              placeholder={lotPlaceholder}
+                              compact
+                              options={lotOptionsForRow.map((lot) => ({
+                                value: lot.lotId,
+                                label:
+                                  lot.grade?.gradeName || lot.grade?.gradeCode
+                                    ? `${lot.lotId} · ${lot.grade?.gradeName || lot.grade?.gradeCode}`
+                                    : lot.lotId,
+                              }))}
+                              MenuProps={t.menuPaper}
+                              sx={[appDenseControlSx, materialsTable?.lotControl]}
                             />
                           </TableCell>
-                          <TableCell>
-                            <FormControl fullWidth size="small" sx={input}>
-                              <Select
-                                value={material.lotId}
-                                displayEmpty
-                                onChange={(e) => handleLotIdChange(idx, e.target.value)}
-                                disabled={fieldDisabled || loadingLots || !material.materialCode}
-                                MenuProps={t.menuPaper}
-                                renderValue={(value) => {
-                                  if (!value) {
-                                    return <em>{lotPlaceholder}</em>;
-                                  }
-                                  return value;
-                                }}
-                              >
-                                <MenuItem value="">
-                                  <em>{lotPlaceholder}</em>
-                                </MenuItem>
-                                {lotOptionsForRow.map((lot) => (
-                                  <MenuItem key={lot.lotId} value={lot.lotId}>
-                                    {lot.lotId}
-                                    {lot.grade?.gradeName || lot.grade?.gradeCode
-                                      ? ` · ${lot.grade?.gradeName || lot.grade?.gradeCode}`
-                                      : ""}
-                                  </MenuItem>
-                                ))}
-                              </Select>
-                            </FormControl>
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              value={materialManufacturer(material)}
-                              placeholder="Select a lot"
-                              disabled
-                              size="small"
-                              sx={input}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="number"
-                              value={displayNumberValue(material.requiredComposition)}
-                              onChange={(e) => {
-                                const composition = Number.parseFloat(e.target.value) || 0;
-                                handleMaterialValuesChange(idx, composition);
+                          <TableCell sx={{ ...cellSx, minWidth: 110 }}>
+                            <Typography
+                              sx={{
+                                ...textSx,
+                                color: materialManufacturer(material)
+                                  ? undefined
+                                  : "text.secondary",
                               }}
-                              size="small"
-                              sx={input}
-                              inputProps={{ step: 0.1 }}
-                              disabled={fieldDisabled}
-                            />
+                              noWrap
+                            >
+                              {materialManufacturer(material) || "—"}
+                            </Typography>
                           </TableCell>
-
-                          <TableCell>
-                            <Input
-                              type="number"
-                              value={displayNumberValue(material.quantityPerPremix)}
-                              size="small"
-                              sx={input}
-                              disabled
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <Input
-                              type="date"
-                              value={material.revalidationFromDate ?? ""}
+                          <TableCell sx={{ ...cellSx, width: 130, minWidth: 130 }}>
+                            <AppTextField
+                              type="text"
+                              inputMode="decimal"
+                              value={getCompositionDisplayValue(material, idx)}
                               onChange={(e) =>
-                                handleMaterialChange(idx, "revalidationFromDate", e.target.value)
+                                handleCompositionInputChange(idx, material, e.target.value)
                               }
-                              size="small"
-                              sx={input}
-                              InputLabelProps={{ shrink: true }}
+                              onBlur={() => commitCompositionInput(idx, material)}
                               disabled={fieldDisabled}
+                              compact
+                              sx={materialsTable?.compositionControl}
                             />
                           </TableCell>
-                          <TableCell>
-                            <Input
-                              type="date"
-                              value={material.revalidationToDate ?? ""}
-                              onChange={(e) =>
-                                handleMaterialChange(idx, "revalidationToDate", e.target.value)
+                          <TableCell sx={{ ...cellSx, width: 90 }}>
+                            <Typography sx={textSx} noWrap>
+                              {displayNumberValue(material.quantityPerPremix) || "—"}
+                            </Typography>
+                          </TableCell>
+                          <TableCell sx={{ ...cellSx, width: 150, minWidth: 150 }}>
+                            <DateField
+                              value={formatToUiDate(material.revalidationFromDate ?? "")}
+                              onChange={(date) =>
+                                handleMaterialChange(idx, "revalidationFromDate", date)
                               }
-                              size="small"
-                              sx={input}
-                              InputLabelProps={{ shrink: true }}
                               disabled={fieldDisabled}
+                              compact
+                              placeholder="DD-MM-YYYY"
+                              sx={materialsTable?.dateControl}
+                            />
+                          </TableCell>
+                          <TableCell sx={{ ...cellSx, width: 150, minWidth: 150 }}>
+                            <DateField
+                              value={formatToUiDate(material.revalidationToDate ?? "")}
+                              onChange={(date) =>
+                                handleMaterialChange(idx, "revalidationToDate", date)
+                              }
+                              disabled={fieldDisabled}
+                              compact
+                              placeholder="DD-MM-YYYY"
+                              sx={materialsTable?.dateControl}
                             />
                           </TableCell>
                           {!readOnly && (
-                            <TableCell>
+                            <TableCell sx={{ ...cellSx, width: 80 }}>
                               <Button
                                 size="small"
                                 color="error"
                                 onClick={() => handleRemoveMaterial(idx)}
+                                sx={{
+                                  textTransform: "none",
+                                  fontWeight: 700,
+                                  minWidth: 0,
+                                  px: 1,
+                                  fontSize: "0.75rem",
+                                }}
                               >
                                 Remove
                               </Button>
@@ -744,6 +838,7 @@ export default function BatchImplementationForm({
                     })}
                   </TableBody>
                 </Table>
+              </TableContainer>
                 <Box sx={{ my: 2 }}>
                   {roundedTotal < 100 && (
                     <Typography color="error.main" variant="body2" fontWeight={800}>
@@ -767,29 +862,23 @@ export default function BatchImplementationForm({
                 </Box>
 
                 <Divider />
-                <Grid container spacing={2} sx={{ mt: 2 }}>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <Input
-                      fullWidth
-                      label="Composition Approved as per PRC dated"
-                      type="date"
-                      value={form.identificationSheet?.prcApprovalDate ?? ""}
-                      onChange={(e) => {
-                        const newIdent = {
-                          ...form.identificationSheet,
-                          prcApprovalDate: e.target.value,
-                        };
+                <Box sx={{ mt: 2, maxWidth: 320 }}>
+                  <DateField
+                    label="Composition Approved as per PRC dated"
+                    value={formatToUiDate(form.identificationSheet?.prcApprovalDate ?? "")}
+                    onChange={(date) => {
+                      const newIdent = {
+                        ...form.identificationSheet,
+                        prcApprovalDate: date,
+                      };
 
-                        onFormChange("identificationSheet", newIdent);
-                      }}
-                      size="small"
-                      sx={input}
-                      InputLabelProps={{ shrink: true }}
-                      disabled={fieldDisabled}
-                    />
-                  </Grid>
-                </Grid>
-              </TableContainer>
+                      onFormChange("identificationSheet", newIdent);
+                    }}
+                    disabled={fieldDisabled}
+                    sx={materialsTable?.prcDateField ?? { mb: 0, maxWidth: 280, ...input }}
+                  />
+                </Box>
+              </>
             ) : (
               <Typography color="textSecondary">{S.NO_MATERIALS_ADDED}</Typography>
             )}
@@ -821,8 +910,10 @@ export default function BatchImplementationForm({
                 <CircularProgress size={14} sx={modal.savingSpinner} />
                 Saving
               </>
+            ) : isBatchEditMode ? (
+              S.SAVE_IDENTIFICATION_DETAILS
             ) : (
-              "Complete Identification"
+              S.IMPLEMENTATION_EDIT_TITLE
             )}
           </Button>
         )}

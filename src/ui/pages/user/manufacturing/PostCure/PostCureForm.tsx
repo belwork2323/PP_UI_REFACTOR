@@ -1,9 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
-import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import dayjs from "dayjs";
 import { STRINGS } from "../../../../../app/config/strings";
 import { POST_CURE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/postCure_theme";
 import {
@@ -13,10 +9,13 @@ import {
   formatPostCureMotorOperationLabel,
   resolvePostCureMotorOptions,
 } from "../../../../../hooks/user/manufacturing/postCureConfig";
-import type { PostCureFormState, PostCureMotorSession } from "../../../../../data/models/user/PostCureFormModel";
+import type {
+  PostCureFormState,
+  PostCureMotorSession,
+} from "../../../../../data/models/user/PostCureFormModel";
 import type { PostCureAddedMotor } from "../../../../../hooks/user/manufacturing/postCureFlowConfig";
-import { POST_CURE_FLOW_LABELS } from "../../../../../hooks/user/manufacturing/postCureFlowConfig";
 import RemoveProcessButton from "../../../../components/common/RemoveProcessButton";
+import FlowBarDateField from "../../../../components/common/FlowBarDateField";
 import CasePrepSelect from "../CasePreparation/CasePrepSelect";
 import PostCureSchemaPanel from "./PostCureSchemaPanel";
 
@@ -76,251 +75,297 @@ const PostCureForm = ({
   theme,
 }: PostCureFormProps) => {
   const flowBar = theme.manufacturing?.casePreparation?.flowBar ?? {};
-  const schemaFormLoaded = Boolean(formData.schemaFormLoaded);
   const showInhibitionFields = isPostCureInhibitionOperation(draftOperation);
   const motorCards = Array.isArray(addedMotors) ? addedMotors : [];
-  const [activeMotorIndex, setActiveMotorIndex] = useState(0);
-  const prevMotorCountRef = useRef(0);
 
   const motorOptions = useMemo(() => {
-    const options = resolvePostCureMotorOptions(batch);
-    return options.map((option) => ({
-      ...option,
-      disabled: option.value !== draftMotorId && usedMotorIds.includes(option.value),
-    }));
-  }, [batch, draftMotorId, usedMotorIds]);
+    return resolvePostCureMotorOptions(batch);
+  }, [batch]);
 
+  const [activeMotorIndex, setActiveMotorIndex] = useState(0);
+
+  // Sync activeMotorIndex with draftMotorId automatically without resetting to Motor 1 on re-renders
   useEffect(() => {
-    if (motorCards.length === 0) {
-      setActiveMotorIndex(0);
-      prevMotorCountRef.current = 0;
-      return;
+    if (motorOptions.length === 0) return;
+
+    if (draftMotorId) {
+      const matchedIdx = motorOptions.findIndex((opt) => opt.value === draftMotorId);
+      if (matchedIdx !== -1) {
+        setActiveMotorIndex(matchedIdx);
+        return;
+      }
     }
 
-    const prevCount = prevMotorCountRef.current;
-
-    if (prevCount === 0) {
-      // Initial load (e.g. continue filling) — always start on the first motor.
+    // Only set default if no motor is selected initially
+    const defaultId = motorOptions[0]?.value;
+    if (defaultId && defaultId !== draftMotorId) {
       setActiveMotorIndex(0);
-    } else if (motorCards.length > prevCount) {
-      // User added a motor — focus the newly added one.
-      setActiveMotorIndex(motorCards.length - 1);
-    } else {
-      setActiveMotorIndex((prev) => Math.min(prev, motorCards.length - 1));
+      onDraftMotorIdChange(defaultId);
     }
+  }, [draftMotorId, motorOptions, onDraftMotorIdChange]);
 
-    prevMotorCountRef.current = motorCards.length;
-  }, [motorCards.length]);
+  // Check if the SPECIFIC currently selected motor has a loaded session with schema
+  const currentMotorSession = useMemo(() => {
+    return (formData.motors ?? []).find((motor) => motor.motorId === draftMotorId) ?? null;
+  }, [formData.motors, draftMotorId]);
 
-  const activeMotorEntry = useMemo(
-    () => (motorCards.length > 0 ? motorCards[activeMotorIndex] : null),
-    [motorCards, activeMotorIndex],
-  );
+  const activeMotorEntry = useMemo(() => {
+    return motorCards.find((card) => card.motorId === draftMotorId) ?? null;
+  }, [motorCards, draftMotorId]);
 
-  const activeMotorSession = useMemo(() => {
-    if (!activeMotorEntry) return null;
-    return (formData.motors ?? []).find((motor) => motor.motorId === activeMotorEntry.motorId) ?? null;
-  }, [activeMotorEntry, formData.motors]);
+  const isCurrentMotorLoaded = Boolean(currentMotorSession && currentMotorSession.postCureSchema);
 
   return (
     <Box sx={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <Box
-        sx={{
-          borderRadius: 2.5,
-          border: `1px solid ${theme.palette.border}`,
-          background: theme.palette.surface,
-          px: { xs: 1.25, sm: 1.5 },
-          py: 1.25,
-          mb: 1.25,
-        }}
-      >
-        <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: theme.palette.primary, mb: 1.5 }}>
-          {S.PANEL_TITLE}
-        </Typography>
-
-        <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: { xs: "column", md: "row" },
-              flexWrap: "wrap",
-              gap: 2,
-              alignItems: { md: "flex-end" },
-            }}
-          >
-            <CasePrepSelect
-              label={S.MOTOR_ID_LABEL}
-              value={draftMotorId}
-              placeholder={S.MOTOR_ID_PLACEHOLDER}
-              options={motorOptions}
-              width={260}
-              theme={theme}
-              onChange={onDraftMotorIdChange}
-            />
-
-            <Box sx={flowBar.selectField?.(260)}>
-              <Typography component="label" sx={flowBar.selectLabel}>
-                {S.MOTOR_RECEIPT_DATE_LABEL}
-              </Typography>
-              <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
-                <DatePicker
-                  enableAccessibleFieldDOMStructure={false}
-                  format="DD-MM-YYYY"
-                  value={draftMotorReceiptDate ? dayjs(draftMotorReceiptDate, "DD-MM-YYYY") : null}
-                  onChange={(picked) => onDraftMotorReceiptDateChange(picked?.format("DD-MM-YYYY") || "")}
-                  slotProps={{
-                    textField: {
-                      size: "small",
-                      fullWidth: true,
-                      placeholder: S.MOTOR_RECEIPT_DATE_PLACEHOLDER,
-                      sx: flowBar.selectInput?.(Boolean(draftMotorReceiptDate)),
-                    },
-                  }}
-                />
-              </LocalizationProvider>
-            </Box>
-
-            <CasePrepSelect
-              label={S.OPERATION_LABEL}
-              value={draftOperation}
-              placeholder={S.OPERATION_PLACEHOLDER}
-              options={POST_CURE_OPERATION_OPTIONS}
-              width={260}
-              theme={theme}
-              onChange={onDraftOperationChange}
-            />
-          </Box>
-
-          {showInhibitionFields ? (
-            <Box
-              sx={{
-                borderRadius: 2,
-                border: `1px solid ${theme.palette.border}`,
-                background: "rgba(21,101,192,0.03)",
-                px: 1.25,
-                py: 1.25,
+      {/* 1. TOP MOTOR SELECTION TABS & CONTROLS */}
+      <Stack spacing={1.25} sx={{ mb: 2 }}>
+        {/* Back / Next Navigation Controls */}
+        <Box
+          sx={{
+            border: `1px solid ${theme.palette.border}`,
+            borderRadius: 2,
+            px: 1.2,
+            py: 1,
+            background: theme.palette.surface,
+          }}
+        >
+          <Stack direction="row" justifyContent="space-between" alignItems="center">
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={activeMotorIndex === 0}
+              onClick={() => {
+                const nextIdx = Math.max(0, activeMotorIndex - 1);
+                const nextMotorId = motorOptions[nextIdx]?.value;
+                if (nextMotorId) {
+                  setActiveMotorIndex(nextIdx);
+                  onDraftMotorIdChange(nextMotorId);
+                }
               }}
             >
-              <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: theme.palette.primary, mb: 1.25 }}>
-                {S.INHIBITION_SECTION_TITLE}
-              </Typography>
+              Back
+            </Button>
 
+            <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: theme.palette.primary }}>
+              {S.MOTOR_CARD_TITLE} {motorOptions.length > 0 ? activeMotorIndex + 1 : 0} of{" "}
+              {motorOptions.length}
+            </Typography>
+
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={activeMotorIndex >= motorOptions.length - 1}
+              onClick={() => {
+                const nextIdx = Math.min(motorOptions.length - 1, activeMotorIndex + 1);
+                const nextMotorId = motorOptions[nextIdx]?.value;
+                if (nextMotorId) {
+                  setActiveMotorIndex(nextIdx);
+                  onDraftMotorIdChange(nextMotorId);
+                }
+              }}
+            >
+              Next
+            </Button>
+          </Stack>
+        </Box>
+
+        {/* Scrollable Motor Buttons */}
+        <Box
+          sx={{
+            border: `1px solid ${theme.palette.border}`,
+            borderRadius: 2,
+            px: 1,
+            py: 1,
+            background: theme.palette.surface,
+          }}
+        >
+          <Typography
+            sx={{
+              fontSize: "0.76rem",
+              fontWeight: 700,
+              color: theme.palette.primary,
+              mb: 0.4,
+            }}
+          >
+            {S.MOTOR_NAV_TITLE}
+          </Typography>
+
+          <Typography sx={{ fontSize: "0.72rem", color: theme.palette.textSub, mb: 0.9 }}>
+            {S.MOTOR_NAV_HINT}
+          </Typography>
+
+          <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
+            {motorOptions.map((option, idx) => {
+              const isSelected = draftMotorId === option.value;
+
+              return (
+                <Button
+                  key={`motor-tab-${option.value}`}
+                  size="small"
+                  variant={isSelected ? "contained" : "outlined"}
+                  onClick={() => {
+                    setActiveMotorIndex(idx);
+                    onDraftMotorIdChange(option.value);
+                  }}
+                  sx={{ whiteSpace: "nowrap", flexShrink: 0, textTransform: "none" }}
+                >
+                  {option.label || option.value}
+                </Button>
+              );
+            })}
+          </Stack>
+        </Box>
+      </Stack>
+
+      {/* 2. MOTOR SETUP FORM (Receipt Date, Operation & Load Form Button) */}
+      {!isCurrentMotorLoaded && (
+        <Box
+          sx={{
+            borderRadius: 2.5,
+            border: `1px solid ${theme.palette.border}`,
+            background: theme.palette.surface,
+            px: { xs: 1.25, sm: 1.5 },
+            py: 1.25,
+            mb: 1.25,
+          }}
+        >
+          <Typography
+            sx={{
+              fontSize: "0.84rem",
+              fontWeight: 800,
+              color: theme.palette.primary,
+              mb: 1.5,
+            }}
+          >
+            {S.PANEL_TITLE} — {draftMotorId || "Select Motor"}
+          </Typography>
+
+          <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+            <Box
+              sx={{
+                display: "flex",
+                flexDirection: { xs: "column", md: "row" },
+                flexWrap: "wrap",
+                gap: 2,
+                alignItems: { md: "flex-end" },
+              }}
+            >
+              {/* MOTOR RECEIPT DATE */}
+              <Box sx={flowBar.selectField?.(260)}>
+                <Typography component="label" sx={flowBar.selectLabel}>
+                  {S.MOTOR_RECEIPT_DATE_LABEL}
+                </Typography>
+                <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
+                  <DatePicker
+                    enableAccessibleFieldDOMStructure={false}
+                    format="DD-MM-YYYY"
+                    value={
+                      draftMotorReceiptDate ? dayjs(draftMotorReceiptDate, "DD-MM-YYYY") : null
+                    }
+                    onChange={(picked) =>
+                      onDraftMotorReceiptDateChange(picked?.format("DD-MM-YYYY") || "")
+                    }
+                    slotProps={{
+                      textField: {
+                        size: "small",
+                        fullWidth: true,
+                        placeholder: S.MOTOR_RECEIPT_DATE_PLACEHOLDER,
+                        sx: flowBar.selectInput?.(Boolean(draftMotorReceiptDate)),
+                      },
+                    }}
+                  />
+                </LocalizationProvider>
+              </Box>
+
+              {/* OPERATION SELECT */}
               <CasePrepSelect
-                label={S.INHIBITOR_TYPE_LABEL}
-                value={draftInhibitorType}
-                placeholder={S.INHIBITOR_TYPE_PLACEHOLDER}
-                options={POST_CURE_INHIBITOR_TYPE_OPTIONS}
+                label={S.OPERATION_LABEL}
+                value={draftOperation}
+                placeholder={S.OPERATION_PLACEHOLDER}
+                options={POST_CURE_OPERATION_OPTIONS}
                 width={260}
                 theme={theme}
-                onChange={onDraftInhibitorTypeChange}
+                onChange={onDraftOperationChange}
               />
             </Box>
-          ) : null}
 
-          {schemaFormLoaded ? (
-            canAddMotor ? (
-              <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+            {/* INHIBITION CONDITIONAL FIELDS */}
+            {showInhibitionFields ? (
+              <Box
+                sx={{
+                  borderRadius: 2,
+                  border: `1px solid ${theme.palette.border}`,
+                  background: "rgba(21,101,192,0.03)",
+                  px: 1.25,
+                  py: 1.25,
+                }}
+              >
+                <Typography
+                  sx={{
+                    fontSize: "0.78rem",
+                    fontWeight: 700,
+                    color: theme.palette.primary,
+                    mb: 1.25,
+                  }}
+                >
+                  {S.INHIBITION_SECTION_TITLE}
+                </Typography>
+
+                <CasePrepSelect
+                  label={S.INHIBITOR_TYPE_LABEL}
+                  value={draftInhibitorType}
+                  placeholder={S.INHIBITOR_TYPE_PLACEHOLDER}
+                  options={POST_CURE_INHIBITOR_TYPE_OPTIONS}
+                  width={260}
+                  theme={theme}
+                  onChange={onDraftInhibitorTypeChange}
+                />
+              </Box>
+            ) : null}
+
+            {/* FORM ACTION BUTTONS (Load Form / Add Motor) */}
+            <Box sx={{ display: "flex", justifyContent: "flex-end", mt: 2 }}>
+              {formData.schemaFormLoaded ? (
                 <Button
                   variant="contained"
                   size="small"
                   onClick={onAddMotor}
-                  disabled={schemaLoading}
-                  startIcon={schemaLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
+                  disabled={!canAddMotor || schemaLoading}
+                  startIcon={
+                    schemaLoading ? <CircularProgress size={14} color="inherit" /> : undefined
+                  }
                 >
-                  {schemaLoading ? POST_CURE_FLOW_LABELS.schemaLoading : POST_CURE_FLOW_LABELS.addMotor}
+                  {schemaLoading ? S.SCHEMA_LOADING : "Add Motor"}
                 </Button>
-              </Box>
-            ) : null
-          ) : canLoadForm ? (
-            <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-              <Button
-                variant="contained"
-                size="small"
-                onClick={onLoadForm}
-                disabled={schemaLoading}
-                startIcon={schemaLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
-              >
-                {schemaLoading ? S.SCHEMA_LOADING : S.LOAD_FORM}
-              </Button>
+              ) : (
+                <Button
+                  variant="contained"
+                  size="small"
+                  onClick={onLoadForm}
+                  disabled={!canLoadForm || schemaLoading}
+                  startIcon={
+                    schemaLoading ? <CircularProgress size={14} color="inherit" /> : undefined
+                  }
+                >
+                  {schemaLoading ? S.SCHEMA_LOADING : S.LOAD_FORM}
+                </Button>
+              )}
             </Box>
-          ) : null}
+          </Box>
         </Box>
-      </Box>
+      )}
 
       {schemaError ? (
-        <Typography sx={{ fontSize: "0.82rem", color: POST_CURE_BRAND.danger, mb: 2 }}>{schemaError}</Typography>
+        <Typography sx={{ fontSize: "0.82rem", color: POST_CURE_BRAND.danger, mb: 2 }}>
+          {schemaError}
+        </Typography>
       ) : null}
 
-      {schemaFormLoaded && activeMotorEntry && activeMotorSession?.postCureSchema ? (
+      {/* 3. DYNAMIC CURED MOTOR SCHEMA DISPLAY */}
+      {isCurrentMotorLoaded && activeMotorEntry && currentMotorSession?.postCureSchema ? (
         <Stack spacing={1.25}>
-          {motorCards.length > 1 ? (
-            <>
-              <Box
-                sx={{
-                  border: `1px solid ${theme.palette.border}`,
-                  borderRadius: 2,
-                  px: 1.2,
-                  py: 1,
-                  background: theme.palette.surface,
-                }}
-              >
-                <Stack direction="row" justifyContent="space-between" alignItems="center">
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    disabled={activeMotorIndex === 0}
-                    onClick={() => setActiveMotorIndex((prev) => Math.max(0, prev - 1))}
-                  >
-                    Back
-                  </Button>
-                  <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: theme.palette.primary }}>
-                    {S.MOTOR_CARD_TITLE} {activeMotorIndex + 1} of {motorCards.length}
-                  </Typography>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    disabled={activeMotorIndex >= motorCards.length - 1}
-                    onClick={() => setActiveMotorIndex((prev) => Math.min(motorCards.length - 1, prev + 1))}
-                  >
-                    Next
-                  </Button>
-                </Stack>
-              </Box>
-
-              <Box
-                sx={{
-                  border: `1px solid ${theme.palette.border}`,
-                  borderRadius: 2,
-                  px: 1,
-                  py: 1,
-                  background: theme.palette.surface,
-                }}
-              >
-                <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: theme.palette.primary, mb: 0.4 }}>
-                  {S.MOTOR_NAV_TITLE}
-                </Typography>
-                <Typography sx={{ fontSize: "0.72rem", color: theme.palette.textSub, mb: 0.9 }}>
-                  {S.MOTOR_NAV_HINT}
-                </Typography>
-                <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
-                  {motorCards.map((entry, idx) => (
-                    <Button
-                      key={`motor-tab-${entry.motorId}`}
-                      size="small"
-                      variant={idx === activeMotorIndex ? "contained" : "outlined"}
-                      onClick={() => setActiveMotorIndex(idx)}
-                      sx={{ whiteSpace: "nowrap", flexShrink: 0, textTransform: "none" }}
-                    >
-                      {entry.motorId}
-                    </Button>
-                  ))}
-                </Stack>
-              </Box>
-            </>
-          ) : null}
-
           <Box
-            key={`${activeMotorEntry.motorId}-${activeMotorSession.operation}-${activeMotorSession.inhibitorType}`}
+            key={`${activeMotorEntry.motorId}-${currentMotorSession.operation}-${currentMotorSession.inhibitorType}`}
             sx={{
               borderRadius: 2.5,
               border: `1px solid ${theme.palette.border}`,
@@ -331,7 +376,9 @@ const PostCureForm = ({
           >
             <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.25}>
               <Box>
-                <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: theme.palette.primary }}>
+                <Typography
+                  sx={{ fontSize: "0.8rem", fontWeight: 700, color: theme.palette.primary }}
+                >
                   {S.MOTOR_CARD_TITLE} — {activeMotorEntry.motorId}
                 </Typography>
                 <Typography sx={{ fontSize: "0.74rem", color: theme.palette.textSub, mt: 0.25 }}>
@@ -339,7 +386,10 @@ const PostCureForm = ({
                 </Typography>
                 <Typography sx={{ fontSize: "0.74rem", color: theme.palette.textSub, mt: 0.25 }}>
                   {S.OPERATION_LABEL}:{" "}
-                  {formatPostCureMotorOperationLabel(activeMotorSession.operation, activeMotorSession.inhibitorType)}
+                  {formatPostCureMotorOperationLabel(
+                    currentMotorSession.operation,
+                    currentMotorSession.inhibitorType,
+                  )}
                 </Typography>
               </Box>
               <RemoveProcessButton
@@ -348,17 +398,16 @@ const PostCureForm = ({
                 tooltip={S.DELETE_MOTOR_TOOLTIP}
               />
             </Stack>
-
             <PostCureSchemaPanel
-              schema={activeMotorSession.postCureSchema}
-              formValues={activeMotorSession.schemaFormValues}
-              savedSections={activeMotorSession.savedSections}
+              schema={currentMotorSession.postCureSchema}
+              formValues={currentMotorSession.schemaFormValues}
+              savedSections={currentMotorSession.savedSections}
               subDepartmentId={subDepartmentId}
               batchId={batch?.batchId}
               motorId={activeMotorEntry.motorId}
               onChange={(values) =>
                 onMotorSessionChange(activeMotorEntry.motorId, {
-                  ...activeMotorSession,
+                  ...currentMotorSession,
                   schemaFormValues: values,
                 })
               }

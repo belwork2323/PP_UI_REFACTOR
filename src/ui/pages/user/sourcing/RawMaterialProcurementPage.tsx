@@ -66,11 +66,22 @@ const RawMaterialProcurement = () => {
       {view === "form" && activeBatch && (
         <Box>
           <UserWorkflowFormHeader
-            batch={activeBatch}
+            mode={createLotHeaderHeading ? "create" : "update"}
+            data={{
+              title: createLotHeaderHeading
+                ? createLotHeaderHeading.title
+                : String(activeBatch.lotId || activeBatch.batchId || "—"),
+              subtitle: createLotHeaderHeading
+                ? createLotHeaderHeading.subtitle
+                : undefined,
+              statusLabel: isEditMode
+                ? "Editing Rejected Submission"
+                : STRINGS.SOURCING.RAW_MATERIAL.NEW_SUBMISSION,
+              statusVariant: isEditMode ? "edit" : "new",
+              rejectionReason: activeBatch.rejectionReason,
+            }}
             isEdit={isEditMode}
             onBack={handleBack}
-            newLabel={STRINGS.SOURCING.RAW_MATERIAL.NEW_SUBMISSION}
-            batchHeadingOverride={createLotHeaderHeading}
             theme={theme}
           />
 

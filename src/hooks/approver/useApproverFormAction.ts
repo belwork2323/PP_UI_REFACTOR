@@ -7,8 +7,9 @@ import type { ApproverDepartmentKey } from "../../app/theme/approver";
 import { isApproverActionableStatus } from "../../app/theme/approver";
 import { normalizeApproverBatchStatus } from "../../data/models/approver/ApproverBatchListModel";
 import { useAlertStore } from "../../app/store/alertStore";
-import type { ApproverFormActionType } from "../../data/api/approver/approverApi";
+import type { ApproverChangeStatusPayload, ApproverFormActionType } from "../../data/api/approver/approverApi";
 import { submitApproverFormStatusChange } from "../../controllers/approver/approverController";
+import type { ApiResponseModel } from "../../data/models/common/ApiResponseModel";
 
 type ActionableApproverItem = {
   id?: number | string;
@@ -20,12 +21,20 @@ type ActionableApproverItem = {
   [key: string]: unknown;
 };
 
+type ApproverChangeStatusRequest = ApproverChangeStatusPayload & Record<string, unknown>;
+
 type UseApproverFormActionArgs<T extends ActionableApproverItem> = {
   department: ApproverDepartmentKey;
   setItems: React.Dispatch<React.SetStateAction<T[]>>;
   setSelected: React.Dispatch<React.SetStateAction<T | null>>;
   subDepartment: string;
   statusField?: string;
+  buildChangeStatusPayload?: (item: T) => Partial<ApproverChangeStatusRequest>;
+  submitChangeStatus?: (
+    payload: ApproverChangeStatusRequest,
+  ) => Promise<ApiResponseModel<unknown>>;
+  onStatusChangeSuccess?: (item: T, response: ApiResponseModel<unknown>) => void;
+  closeSelectedOnSuccess?: boolean;
 };
 
 const DEPARTMENT_SLUGS: Record<ApproverDepartmentKey, string> = {
@@ -44,6 +53,10 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
   setSelected,
   subDepartment,
   statusField = "status",
+  buildChangeStatusPayload,
+  submitChangeStatus,
+  onStatusChangeSuccess,
+  closeSelectedOnSuccess = true,
 }: UseApproverFormActionArgs<T>) => {
   const user = useAuthStore((state) => state.user);
   const showAlert = useAlertStore((state) => state.showAlert);
@@ -134,13 +147,18 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
       { loading: true },
     );
 
-    const response = await submitApproverFormStatusChange({
+    const payload: ApproverChangeStatusRequest = {
       actionType,
       formId: dialogItem.formId,
       subDepartmentId: selectedSubDepartment.subDepartmentId,
       remarks: actionType === "APPROVED" ? (trimmedValue || null) : null,
       rejectionReason: actionType === "REJECTED" ? trimmedValue : null,
-    });
+      ...(buildChangeStatusPayload?.(dialogItem) ?? {}),
+    };
+
+    const response = submitChangeStatus
+      ? await submitChangeStatus(payload)
+      : await submitApproverFormStatusChange(payload);
 
     setSubmitting(false);
 
@@ -162,7 +180,9 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
           return {
             ...item,
             status: normalizeApproverBatchStatus(
-              (response.data as { status?: string })?.status ?? nextStatus,
+              (response.data as { status?: string; batchStatus?: string })?.batchStatus ??
+                (response.data as { status?: string })?.status ??
+                nextStatus,
             ),
             remarks: actionType === "APPROVED" ? (trimmedValue || null) : item.remarks ?? null,
             rejectionReason: actionType === "REJECTED" ? trimmedValue : null,
@@ -170,7 +190,10 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
         }),
       );
 
-      setSelected(null);
+      onStatusChangeSuccess?.(dialogItem, response);
+      if (closeSelectedOnSuccess) {
+        setSelected(null);
+      }
       closeDialog();
       bumpListVersion();
       showAlert(getResponseMessage(response), "success", { autoCloseMs: 2000 });

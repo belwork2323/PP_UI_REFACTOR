@@ -1,7 +1,7 @@
 // src/ui/pages/user/manufacturing/PostCure/PostCurePage.tsx
 
 import React, { useMemo, useState } from "react";
-import { Box, CircularProgress, Button, Stack, IconButton  } from "@mui/material";
+import { Box, CircularProgress, Button, Stack, IconButton } from "@mui/material";
 import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog";
 import PostCureList from "./PostCureList";
 import PostCureForm from "./PostCureForm";
@@ -57,6 +57,7 @@ const PostCurePage = () => {
     detailsLoading,
     handleViewPostCureDetails,
     handleBackFromDetails,
+    handleSelectMotorTab,
   } = hookState;
 
   if (loading) {
@@ -86,12 +87,7 @@ const PostCurePage = () => {
 
   return (
     <Box sx={theme.workflow.animatedContainer}>
-      <PostCureHeader
-        batch={activeBatch}
-        isEdit={isEditMode}
-        onBack={handleBack}
-        theme={theme}
-      />
+      <PostCureHeader batch={activeBatch} isEdit={isEditMode} onBack={handleBack} theme={theme} />
       <PostCureForm
         batch={activeBatch}
         formData={formData}
@@ -106,7 +102,7 @@ const PostCurePage = () => {
         schemaError={schemaError}
         canLoadForm={canLoadForm}
         canAddMotor={canAddMotor}
-        onDraftMotorIdChange={setDraftMotorId}
+        onDraftMotorIdChange={handleSelectMotorTab}
         onDraftMotorReceiptDateChange={setDraftMotorReceiptDate}
         onDraftOperationChange={handleDraftOperationChange}
         onDraftInhibitorTypeChange={handleDraftInhibitorTypeChange}
@@ -118,22 +114,22 @@ const PostCurePage = () => {
       />
 
       {formData.schemaFormLoaded && formData.motors.length > 0 ? (
-      <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} mt={3} justifyContent="flex-end">
-        <Button
-          variant="outlined"
-          disabled={actionLoading}
-          onClick={() => setDraftConfirmOpen(true)}
-        >
-          {actionStrings.SAVE_DRAFT}
-        </Button>
-        <Button
-          variant="contained"
-          disabled={actionLoading}
-          onClick={() => setSubmitConfirmOpen(true)}
-        >
-          {isEditMode ? actionStrings.RESUBMIT_APPROVAL : actionStrings.SUBMIT_APPROVAL}
-        </Button>
-      </Stack>
+        <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} mt={3} justifyContent="flex-end">
+          <Button
+            variant="outlined"
+            disabled={actionLoading}
+            onClick={() => setDraftConfirmOpen(true)}
+          >
+            {actionStrings.SAVE_DRAFT}
+          </Button>
+          <Button
+            variant="contained"
+            disabled={actionLoading}
+            onClick={() => setSubmitConfirmOpen(true)}
+          >
+            {isEditMode ? actionStrings.RESUBMIT_APPROVAL : actionStrings.SUBMIT_APPROVAL}
+          </Button>
+        </Stack>
       ) : null}
 
       <ConfirmAlertDialog
@@ -164,9 +160,15 @@ const PostCurePage = () => {
       <ConfirmAlertDialog
         open={submitConfirmOpen}
         severity="warning"
-        title={isEditMode ? actionStrings.CONFIRM_RESUBMIT_TITLE : actionStrings.CONFIRM_SUBMIT_TITLE}
-        message={isEditMode ? actionStrings.CONFIRM_RESUBMIT_MESSAGE : actionStrings.CONFIRM_SUBMIT_MESSAGE}
-        confirmLabel={isEditMode ? actionStrings.CONFIRM_RESUBMIT_ACTION : actionStrings.CONFIRM_SUBMIT_ACTION}
+        title={
+          isEditMode ? actionStrings.CONFIRM_RESUBMIT_TITLE : actionStrings.CONFIRM_SUBMIT_TITLE
+        }
+        message={
+          isEditMode ? actionStrings.CONFIRM_RESUBMIT_MESSAGE : actionStrings.CONFIRM_SUBMIT_MESSAGE
+        }
+        confirmLabel={
+          isEditMode ? actionStrings.CONFIRM_RESUBMIT_ACTION : actionStrings.CONFIRM_SUBMIT_ACTION
+        }
         cancelLabel={actionStrings.CONFIRM_CANCEL_ACTION}
         onConfirm={async () => {
           setSubmitConfirmOpen(false);

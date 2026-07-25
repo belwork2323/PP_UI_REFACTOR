@@ -15,22 +15,22 @@ export const RMP_SCHEMA_FUNCTIONALITY = "CREATE_RAW_MATERIAL_PREPARATION_FORM";
 export const RMP_SCHEMA_TYPE = "RAW_MATERIALS";
 export const RMP_SCHEMA_VERSION = "1.0";
 
-/** Approved procurement lots for Feed Material Details lot dropdowns */
+/** Batch material lots for Feed Material Details lot dropdowns (subdepartment material-lots API). */
 export const RAW_MATERIAL_PROCUREMENT_LOT_DATASOURCE = {
   type: "api" as const,
   api: {
-    endpoint: "raw-material-sourcing-lot-list",
+    endpoint: "/api/v1/user/subdepartment/material-lots",
     method: "POST" as const,
     requestBody: {
-      limit: 500,
-      page: 1,
-      status: ["APPROVED"],
-      subDepartmentId: 1,
-      materialCode: ["{{materialCode}}"],
+      batchId: "{{batchId}}",
     },
-    responsePath: "data.lots",
+    responsePath: "data.materials",
     displayKey: "lotId",
     valueKey: "lotId",
+    filterByContext: {
+      materialCode: "materialCode",
+      "grade.gradeCode": "gradeCode",
+    },
   },
 };
 
@@ -118,13 +118,27 @@ export const findMaterialInList = (
 export const findGradeInMaterial = (
   material: MaterialsListItem | undefined,
   gradeCode: string,
-): MaterialsListGrade | undefined => material?.grades?.find((g) => g.gradeCode === gradeCode);
+): MaterialsListGrade | undefined => {
+  const raw = String(gradeCode ?? "").trim();
+  if (!raw || !material?.grades?.length) return undefined;
+
+  return material.grades.find((grade) => {
+    const code = String(grade.gradeCode ?? "").trim();
+    const name = String(grade.gradeName ?? "").trim();
+    return (
+      code.toUpperCase() === raw.toUpperCase() ||
+      name.toUpperCase() === raw.toUpperCase()
+    );
+  });
+};
 
 export type PreparationProcessEntry = SchemaProcessSubmission;
 
 export type PreparationPremixEntry = {
   premixNo: number;
+  premixDate: string;
   materialType: "SOLID" | "LIQUID" | "BOTH";
+  premixSubmissionType?: "DRAFT" | "SUBMIT";
   solidProcess: PreparationProcessEntry[];
   liquidProcess: PreparationProcessEntry[];
 };

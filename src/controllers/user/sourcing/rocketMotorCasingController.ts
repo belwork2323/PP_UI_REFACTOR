@@ -5,13 +5,17 @@ import {
   RocketMotorCasingSubmitResponseModel,
 } from "../../../data/models/user/RocketMotorCasingProcurementModel";
 import type { RocketMotorCasingDeletePayload } from "../../../data/models/user/RocketMotorCasingProcurementModel";
-import type { RocketMotorCasingFormPayload } from "../../../data/models/user/RocketMotorCasingFormModel";
+import {
+  InsulationSpecificationModel,
+  type RocketMotorCasingFormPayload,
+} from "../../../data/models/user/RocketMotorCasingFormModel";
 import {
   createRocketMotorCasingFormApi,
   deleteRocketMotorCasingFormApi,
   fetchRocketMotorCasingFormDetailsApi,
   fetchRocketMotorCasingListApi,
   fetchRocketMotorCasingStatsApi,
+  fetchSpecificationForSubdepartment,
   type RocketMotorCasingListRequest,
   updateRocketMotorCasingFormApi,
 } from "../../../data/api/users/sourcing/rocketMotorCasingProcurementApi";
@@ -42,9 +46,11 @@ export const rocketMotorCasingController = {
 
   createForm: async (payload: RocketMotorCasingCreatePayload) => {
     try {
-      const response = await createRocketMotorCasingFormApi(payload as unknown as Record<string, unknown>);
+      const response = await createRocketMotorCasingFormApi(
+        payload as unknown as Record<string, unknown>,
+      );
       return new ApiResponseModel<RocketMotorCasingSubmitResponseModel>(response, (res) =>
-        RocketMotorCasingSubmitResponseModel.fromApi(res)
+        RocketMotorCasingSubmitResponseModel.fromApi(res),
       );
     } catch (error) {
       console.error("Failed to create rocket motor casing form:", error);
@@ -56,7 +62,7 @@ export const rocketMotorCasingController = {
     try {
       const response = await fetchRocketMotorCasingFormDetailsApi(payload);
       return new ApiResponseModel<RocketMotorCasingDetailsModel>(response, (res) =>
-        RocketMotorCasingDetailsModel.fromApi(res)
+        RocketMotorCasingDetailsModel.fromApi(res),
       );
     } catch (error) {
       console.error("Failed to fetch rocket motor casing form details:", error);
@@ -68,7 +74,7 @@ export const rocketMotorCasingController = {
     try {
       const response = await updateRocketMotorCasingFormApi(payload);
       return new ApiResponseModel<RocketMotorCasingSubmitResponseModel>(response, (res) =>
-        RocketMotorCasingSubmitResponseModel.fromApi(res)
+        RocketMotorCasingSubmitResponseModel.fromApi(res),
       );
     } catch (error) {
       console.error("Failed to update rocket motor casing form:", error);
@@ -90,10 +96,24 @@ export const rocketMotorCasingController = {
     try {
       const response = await fetchRocketMotorCasingStatsApi({ subDepartmentId });
       return new ApiResponseModel(response, (res) =>
-        RocketMotorCasingStatsModel.fromApi(res?.data)
+        RocketMotorCasingStatsModel.fromApi(res?.data),
       );
     } catch (error) {
       console.error("Failed to fetch rocket motor casing stats:", error);
+      return new ApiResponseModel(error);
+    }
+  },
+  fetchSpecification: async (insulationType: "ROCASIN" | "EPDM") => {
+    try {
+      const response = await fetchSpecificationForSubdepartment({
+        insulationType,
+      });
+
+      return new ApiResponseModel(response, (res) =>
+        InsulationSpecificationModel.fromApi(res?.data),
+      );
+    } catch (error) {
+      console.error("Failed to fetch insulation specifications:", error);
       return new ApiResponseModel(error);
     }
   },

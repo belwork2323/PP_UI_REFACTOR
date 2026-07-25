@@ -7,6 +7,7 @@ import { useThemeStore } from "../../../../../app/store/themeStore";
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import { STRINGS } from "../../../../../app/config/strings";
 import { getOperationStatusConfig, OPERATION_STATUS } from "../../../../../hooks/operationStatus";
+import { getRawMaterialPrepBatchStatusLabel } from "../../../../../data/models/user/RawMaterialPreparationModel";
 import UserWorkflowStatusCell from "../../../../components/custom/UserWorkflowStatusCell";
 import {
   mapRawMaterialPreparationDetailsForDisplay,
@@ -94,8 +95,18 @@ const RawMaterialPreparationDetailsView = ({ row, data, loading, onBack }: RawMa
               </Box>
             </Stack>
             <UserWorkflowStatusCell
-              status={row?.rmStatus as string | undefined}
-              statusConfig={statusConfig}
+              status={
+                detailView?.status ??
+                getRawMaterialPrepBatchStatusLabel(data?.status ?? row?.rmStatus)
+              }
+              statusConfig={{
+                ...statusConfig,
+                [RM.PREMIX_STATUS_FINAL_APPROVAL_COMPLETED]: {
+                  Icon: CheckCircleRoundedIcon,
+                  label: RM.PREMIX_STATUS_FINAL_APPROVAL_COMPLETED,
+                  ...dt.bannerStatusConfig["Approved"],
+                },
+              }}
               rejectedStatus={OPERATION_STATUS.REJECTED}
               rejectionReason={(row?.rejectionReason as string | null) ?? null}
               theme={theme}
@@ -111,6 +122,7 @@ const RawMaterialPreparationDetailsView = ({ row, data, loading, onBack }: RawMa
             loading={loading}
             theme={theme}
             resetPremixOnFormId={data?.formId ?? null}
+            premixCounts={detailView?.premixCounts}
           />
         </Box>
       </Box>

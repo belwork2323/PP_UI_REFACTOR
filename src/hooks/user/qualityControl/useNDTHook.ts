@@ -382,13 +382,13 @@ export const useNDTHook = () => {
       return;
     }
 
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
   };
 
   const handleDiscardAndBack = () => {
     setBackConfirmOpen(false);
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
   };
 
@@ -529,6 +529,7 @@ export const useNDTHook = () => {
     setDetailsRow(null);
     setDetailsData(null);
     setView("list");
+    bumpBatchRefresh();
   };
 
   return {

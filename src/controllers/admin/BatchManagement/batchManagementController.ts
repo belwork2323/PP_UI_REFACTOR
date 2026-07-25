@@ -21,6 +21,7 @@ import {
 import { useAlertStore } from "@app/store/alertStore";
 import { useAuthStore } from "@app/store/authStore";
 import { parseApiError } from "@controllers/admin/common/generalController";
+import { seedBatchDetailsSchemaCache } from "../../../schema-engine/rules/apiDependency";
 
 export const batchManagementController = {
   /* ─────────────────────────────────────────────────────────────────────────
@@ -80,6 +81,8 @@ export const batchManagementController = {
     try {
       const response = await fetchBatchById(batchId);
       if (response?.success === false) throw response;
+      // Reuse this response for schema populateFromApi (same endpoint + payload).
+      seedBatchDetailsSchemaCache(batchId, response);
       return BatchListItemModel.fromApi(response?.data?.batch);
     } catch (error) {
       useAlertStore

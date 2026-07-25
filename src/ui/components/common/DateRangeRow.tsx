@@ -1,9 +1,14 @@
 import { Stack, Typography, Chip, SxProps, Theme, TextFieldProps } from "@mui/material";
 import CalendarMonthIcon from "@mui/icons-material/CalendarMonth";
-import { LocalizationProvider } from "@mui/x-date-pickers/LocalizationProvider";
-import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import { DatePicker } from "@mui/x-date-pickers/DatePicker";
-import dayjs from "dayjs";
+import {
+  AppDatePickerProvider,
+  appDatePickerFieldSlots,
+  buildAppDatePickerSlotProps,
+  parseUiDate,
+  UI_DATE_FORMAT,
+} from "./datePickerShared";
+import { formatDateToApiDate, formatToUiDate } from "../../../utils/dateUtils";
 
 interface DateRangeRowProps {
   from: string;
@@ -30,24 +35,15 @@ interface DateRangeRowProps {
   controlHeight?: number;
 }
 
-/** DD-MM-YYYY -> YYYY-MM-DD */
-const toInputValue = (ddmmyyyy: string) => {
-  if (!ddmmyyyy || ddmmyyyy.length !== 10) return "";
-  const [dd, mm, yyyy] = ddmmyyyy.split("-");
-  return `${yyyy}-${mm}-${dd}`;
-};
-
-/** YYYY-MM-DD -> DD-MM-YYYY */
-const toApiDate = (yyyymmdd: string) => {
-  if (!yyyymmdd) return "";
-  const [yyyy, mm, dd] = yyyymmdd.split("-");
-  return `${dd}-${mm}-${yyyy}`;
-};
-
+/** Parse filter value (DD-MM-YYYY or YYYY-MM-DD) to dayjs. */
 const toDayjsValue = (date: string) => {
-  const input = toInputValue(date);
-  return input ? dayjs(input) : null;
+  const normalized = formatToUiDate(date);
+  return normalized ? parseUiDate(normalized) : null;
 };
+
+/** Emit DD-MM-YYYY for filter/API consumers. */
+const toFilterDate = (value: ReturnType<typeof parseUiDate>) =>
+  value?.isValid() ? formatDateToApiDate(value.toDate()) : "";
 
 const DateRangeRow = ({
   from,
@@ -72,69 +68,45 @@ const DateRangeRow = ({
   controlHeight = 36,
 }: DateRangeRowProps) => {
   const compactFieldSx = {
+    mb: 0,
     width: 152,
     minWidth: 152,
     ...(datePickerSx as object),
-    "& .MuiOutlinedInput-root": {
-      ...((datePickerSx as any)?.["& .MuiOutlinedInput-root"] || {}),
-      height: controlHeight,
+    "& .MuiInputBase-root:not(.MuiInputBase-multiline)": {
       minHeight: controlHeight,
-      fontSize: "0.8125rem",
-      pr: 0.5,
+      height: controlHeight,
     },
-    "& .MuiOutlinedInput-input": {
+    "& .MuiInputBase-input:not(textarea)": {
       py: 0,
       px: 1.25,
       fontSize: "0.8125rem",
       letterSpacing: "0.01em",
     },
-    "& .MuiInputLabel-root": {
-      ...((datePickerSx as any)?.["& .MuiInputLabel-root"] || {}),
-      fontSize: "0.8125rem",
-    },
-    "& .MuiInputLabel-root:not(.MuiInputLabel-shrink)": {
-      transform: "translate(12px, 8px) scale(1)",
-    },
-    "& .MuiInputAdornment-root": {
-      ml: 0,
-    },
-    "& .MuiIconButton-root": {
-      padding: "4px",
-    },
-    "& .MuiSvgIcon-root": {
-      fontSize: 18,
-    },
   };
 
   const sharedSlotProps = {
+    ...buildAppDatePickerSlotProps({ sx: compactFieldSx as SxProps<Theme> }),
     textField: {
-      size: "small" as const,
-      sx: compactFieldSx as SxProps<Theme>,
+      ...buildAppDatePickerSlotProps({ sx: compactFieldSx as SxProps<Theme> }).textField,
       ...textFieldProps,
-    },
-    openPickerButton: {
-      size: "small" as const,
-      sx: { p: 0.5 },
-    },
-    openPickerIcon: {
-      sx: { fontSize: 18 },
     },
   };
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
+    <AppDatePickerProvider>
       <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
         {showLeadingIcon && (
           <CalendarMonthIcon sx={{ fontSize: 18, opacity: 0.7, ...((calendarIconSx as object) || {}) }} />
         )}
 
         <DatePicker
+          {...appDatePickerFieldSlots}
           label={fromLabel}
-          format="DD/MM/YYYY"
+          format={UI_DATE_FORMAT}
           disabled={currentMonthOnly}
           value={toDayjsValue(from)}
           onChange={(value) => {
-            const start = value ? toApiDate(value.format("YYYY-MM-DD")) : "";
+            const start = toFilterDate(value);
 
             onFromChange(start);
 
@@ -150,12 +122,13 @@ const DateRangeRow = ({
         </Typography>
 
         <DatePicker
+          {...appDatePickerFieldSlots}
           label={toLabel}
-          format="DD/MM/YYYY"
+          format={UI_DATE_FORMAT}
           disabled={currentMonthOnly}
           value={toDayjsValue(to)}
           minDate={toDayjsValue(from) ?? undefined}
-          onChange={(value) => onToChange(value ? toApiDate(value.format("YYYY-MM-DD")) : "")}
+          onChange={(value) => onToChange(toFilterDate(value))}
           slotProps={sharedSlotProps}
         />
 
@@ -169,7 +142,7 @@ const DateRangeRow = ({
           />
         )}
       </Stack>
-    </LocalizationProvider>
+    </AppDatePickerProvider>
   );
 };
 

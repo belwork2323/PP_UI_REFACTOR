@@ -35,6 +35,7 @@ const ROLE_ICON_MAP = {
   SYSTEM_MANAGER: icons.userMgmt.managerRole,
   APPROVER: icons.userMgmt.approverRole,
   USER: icons.userMgmt.userRole,
+  CENTRE_HEAD: icons.userMgmt.centreHeadRole,
 };
 
 const getInitials = (name = "") =>
@@ -55,11 +56,7 @@ const formatRoleLabel = (role = "") =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(" ");
 
-const normalizeRoleKey = (role = "") =>
-  String(role)
-    .trim()
-    .replace(/\s+/g, "_")
-    .toUpperCase();
+const normalizeRoleKey = (role = "") => String(role).trim().replace(/\s+/g, "_").toUpperCase();
 
 const AppHeader = ({ title = S.DEFAULT_TITLE, onLogout, onNavSelect }) => {
   const mode = useThemeStore((s) => s.mode);
@@ -79,7 +76,7 @@ const AppHeader = ({ title = S.DEFAULT_TITLE, onLogout, onNavSelect }) => {
   const headerDeptOptions = user?.headerDeptOptions ?? []; // computed getter on UserModel
 
   const showDeptDropdown = roleKey === "USER" || roleKey === "APPROVER";
-  const showDrawer = roleKey === "ADMIN";
+  const showDrawer = roleKey === "ADMIN" || roleKey === "CENTRE_HEAD";
   const showProfileMenu =
     roleKey === "USER" || roleKey === "APPROVER" || roleKey === "SYSTEM_MANAGER";
 
@@ -153,13 +150,22 @@ const AppHeader = ({ title = S.DEFAULT_TITLE, onLogout, onNavSelect }) => {
           <Box sx={t.leftSection.wrapper}>
             {showDrawer && (
               <Tooltip title="Menu" arrow>
-                <IconButton onClick={() => setDrawerOpen(true)} size="small" sx={t.rightSection.themeToggle}>
+                <IconButton
+                  onClick={() => setDrawerOpen(true)}
+                  size="small"
+                  sx={t.rightSection.themeToggle}
+                >
                   <icons.menuIcon fontSize="small" />
                 </IconButton>
               </Tooltip>
             )}
             <Box sx={t.leftSection.logoCircle}>
-              <Box component="img" src={images.drdoLogo} alt={S.DRDO_ALT} sx={t.leftSection.logoImg} />
+              <Box
+                component="img"
+                src={images.drdoLogo}
+                alt={S.DRDO_ALT}
+                sx={t.leftSection.logoImg}
+              />
             </Box>
             <Box sx={t.leftSection.orgWrapper}>
               <Typography sx={t.leftSection.orgName}>{S.ORG_NAME}</Typography>
@@ -182,11 +188,7 @@ const AppHeader = ({ title = S.DEFAULT_TITLE, onLogout, onNavSelect }) => {
                 }}
                 onClick={handleProfileMenuOpen}
               >
-                <Avatar
-                  sx={t.rightSection.userAvatar}
-                  alt={displayName}
-                  src={user?.avatarUrl}
-                >
+                <Avatar sx={t.rightSection.userAvatar} alt={displayName} src={user?.avatarUrl}>
                   {getInitials(displayName)}
                 </Avatar>
 
@@ -194,7 +196,10 @@ const AppHeader = ({ title = S.DEFAULT_TITLE, onLogout, onNavSelect }) => {
                   <Typography sx={t.rightSection.userName}>{displayName}</Typography>
 
                   <Box sx={t.rightSection.roleBadge}>
-                    <RoleIcon sx={t.rightSection.roleIcon} />
+                    <icons.security sx={t.rightSection.roleIcon} />
+                    <Typography component="span" sx={t.rightSection.roleLabel}>
+                      {S.ROLE_LABEL}
+                    </Typography>
                     <Typography component="span" sx={t.rightSection.userRole}>
                       {displayRole}
                     </Typography>
@@ -268,16 +273,15 @@ const AppHeader = ({ title = S.DEFAULT_TITLE, onLogout, onNavSelect }) => {
           <ListItemIcon sx={t.profileMenu.logoutIcon}>
             <icons.headerLogout fontSize="small" />
           </ListItemIcon>
-          <ListItemText primary={S.LOGOUT_LABEL} primaryTypographyProps={t.profileMenu.logoutLabelProps} />
+          <ListItemText
+            primary={S.LOGOUT_LABEL}
+            primaryTypographyProps={t.profileMenu.logoutLabelProps}
+          />
         </MenuItem>
       </Menu>
 
       {showDrawer && (
-        <AdminDrawer
-          open={drawerOpen}
-          onClose={() => setDrawerOpen(false)}
-          onLogout={onLogout}
-        />
+        <AdminDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} onLogout={onLogout} />
       )}
 
       <ConfirmAlertDialog
