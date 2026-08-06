@@ -156,18 +156,19 @@ export const canLoadDispatchMotor = ({
   setup,
   draftMotorId,
   usedMotorIds,
-  hasMotors,
 }: {
   setup: DispatchSharedSetup;
   draftMotorId: string;
   usedMotorIds: string[];
-  hasMotors: boolean;
+  hasMotors?: boolean;
 }) => {
-  if (hasMotors) return false;
+  // 1. Verify shared setup completion
   if (!canCompleteDispatchSetup(setup)) return false;
 
+  // 2. Check if active motor ID is valid and NOT already loaded
   const motorId = String(draftMotorId ?? "").trim();
   if (!motorId || usedMotorIds.includes(motorId)) return false;
+
   return true;
 };
 
@@ -175,18 +176,17 @@ export const canAddDispatchMotor = ({
   setup,
   draftMotorId,
   usedMotorIds,
-  hasMotors,
 }: {
   setup: DispatchSharedSetup;
   draftMotorId: string;
   usedMotorIds: string[];
-  hasMotors: boolean;
+  hasMotors?: boolean;
 }) => {
-  if (!hasMotors) return false;
   if (!canCompleteDispatchSetup(setup)) return false;
 
   const motorId = String(draftMotorId ?? "").trim();
   if (!motorId || usedMotorIds.includes(motorId)) return false;
+
   return true;
 };
 

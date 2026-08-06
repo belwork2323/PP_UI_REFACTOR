@@ -66,6 +66,184 @@ export const QC_RAW_MATERIAL_TYPE_OPTIONS: QcRawMaterialTypeOption[] = [
   { value: "RAW_MATERIAL_PROCESSING", label: "Raw Material Processing" },
 ];
 
+/** Known flow-key aliases from API divisionName / type names. */
+const QC_DIVISION_NAME_TO_FLOW_KEY: Record<string, string> = {
+  rawmaterial: "RAW_MATERIAL",
+  mixing: "MIXING",
+  hardware: "HARDWARE",
+  casting: "CASTING",
+  curing: "CURING",
+  decorating: "DE_CORING",
+  decoring: "DE_CORING",
+  trimming: "TRIMMING",
+  postcure: "POST_CURE",
+  ndt: "NDT",
+  qc: "QC",
+  weightment: "WEIGHTMENT",
+  statictestfacility: "STATIC_TEST_FACILITY",
+};
+
+const QC_TYPE_NAME_TO_VALUE: Record<string, string> = {
+  rawmaterialrevalidation: "RAW_MATERIAL_REVALIDATION",
+  rawmaterialprocessing: "RAW_MATERIAL_PROCESSING",
+};
+
+const normalizeQcNameKey = (value: unknown) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+
+export type QcDivisionCatalogType = {
+  divisionId: number;
+  divisionName: string;
+  disabled: boolean;
+  value: string;
+  label: string;
+};
+
+export type QcDivisionCatalogItem = {
+  divisionId: number;
+  divisionName: string;
+  disabled: boolean;
+  value: string;
+  label: string;
+  types: QcDivisionCatalogType[];
+};
+
+const resolveDivisionFlowKey = (divisionName: string): string => {
+  const normalized = normalizeQcNameKey(divisionName);
+  if (QC_DIVISION_NAME_TO_FLOW_KEY[normalized]) {
+    return QC_DIVISION_NAME_TO_FLOW_KEY[normalized];
+  }
+  const byLabel = QC_DIVISION_OPTIONS.find(
+    (option) => normalizeQcNameKey(option.label) === normalized,
+  );
+  if (byLabel) return byLabel.value;
+  return String(divisionName ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^A-Z0-9_]/g, "");
+};
+
+const resolveTypeValue = (typeName: string): string => {
+  const normalized = normalizeQcNameKey(typeName);
+  if (QC_TYPE_NAME_TO_VALUE[normalized]) return QC_TYPE_NAME_TO_VALUE[normalized];
+  const byLabel = QC_RAW_MATERIAL_TYPE_OPTIONS.find(
+    (option) => normalizeQcNameKey(option.label) === normalized,
+  );
+  if (byLabel) return byLabel.value;
+  return String(typeName ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_")
+    .replace(/[^A-Z0-9_]/g, "");
+};
+
+/** Map GET /user/qc-division/divisions into UI dropdown catalog. */
+export const mapQcDivisionsFromApi = (payload: unknown): QcDivisionCatalogItem[] => {
+  const rows = Array.isArray(payload)
+    ? payload
+    : Array.isArray((payload as { data?: unknown })?.data)
+      ? ((payload as { data: unknown[] }).data)
+      : [];
+
+  return rows
+    .map((row) => {
+      const entry = row as {
+        divisionId?: number;
+        divisionName?: string;
+        disabled?: boolean;
+        types?: Array<{
+          divisionId?: number;
+          divisionName?: string;
+          disabled?: boolean;
+        }>;
+      };
+      const divisionName = String(entry.divisionName ?? "").trim();
+      if (!divisionName) return null;
+
+      const value = resolveDivisionFlowKey(divisionName);
+      if (!value) return null;
+
+      const types = (Array.isArray(entry.types) ? entry.types : [])
+        .map((typeRow) => {
+          const typeName = String(typeRow?.divisionName ?? "").trim();
+          if (!typeName) return null;
+          const typeValue = resolveTypeValue(typeName);
+          if (!typeValue) return null;
+          return {
+            divisionId: Number(typeRow?.divisionId ?? 0),
+            divisionName: typeName,
+            disabled: Boolean(typeRow?.disabled),
+            value: typeValue,
+            label: typeName,
+          } satisfies QcDivisionCatalogType;
+        })
+        .filter((type): type is QcDivisionCatalogType => Boolean(type));
+
+      return {
+        divisionId: Number(entry.divisionId ?? 0),
+        divisionName,
+        disabled: Boolean(entry.disabled),
+        value,
+        label: divisionName,
+        types,
+      } satisfies QcDivisionCatalogItem;
+    })
+    .filter((item): item is QcDivisionCatalogItem => Boolean(item));
+};
+
+export const toQcDivisionSelectOptions = (
+  catalog: QcDivisionCatalogItem[] | undefined,
+): QcDivisionOption[] =>
+  (catalog ?? []).map((item) => ({
+    value: item.value,
+    label: item.label,
+    disabled: item.disabled,
+  }));
+
+export const resolveQcRawMaterialTypeOptions = (
+  catalog: QcDivisionCatalogItem[] | undefined,
+  selectedDivision: string,
+): QcRawMaterialTypeOption[] => {
+  const selected = (catalog ?? []).find((item) => item.value === selectedDivision);
+  if (selected?.types?.length) {
+    return selected.types
+      .filter((type) => !type.disabled)
+      .map((type) => ({ value: type.value, label: type.label }));
+  }
+  if (selectedDivision === "RAW_MATERIAL") return QC_RAW_MATERIAL_TYPE_OPTIONS;
+  return [];
+};
+
+/**
+ * Resolve the numeric divisionId for division-details auto-populate.
+ * - Division with `types`: use the selected type's divisionId (e.g. 101 / 102).
+ * - Division without types: use the parent divisionId (e.g. Mixing → 2).
+ * Returns null when a typed division is selected but no type is chosen yet.
+ */
+export const resolveQcDivisionIdForSelection = (
+  catalog: QcDivisionCatalogItem[] | undefined,
+  selectedDivision: string,
+  selectedTypeValue?: string | null,
+): number | null => {
+  const division = (catalog ?? []).find((item) => item.value === selectedDivision);
+  if (!division) return null;
+
+  if (division.types.length > 0) {
+    const typeValue = String(selectedTypeValue ?? "").trim();
+    if (!typeValue) return null;
+    const type = division.types.find((entry) => entry.value === typeValue);
+    const typeId = Number(type?.divisionId ?? 0);
+    return typeId > 0 ? typeId : null;
+  }
+
+  const parentId = Number(division.divisionId ?? 0);
+  return parentId > 0 ? parentId : null;
+};
+
 export const QC_PROCESSING_TYPE_OPTIONS: QcProcessingTypeOption[] = [
   {
     value: "SOLID_PROCESSING",

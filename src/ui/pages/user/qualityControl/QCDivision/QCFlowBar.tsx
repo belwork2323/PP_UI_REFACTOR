@@ -1,9 +1,9 @@
 import CasePrepSelect from "../../manufacturing/CasePreparation/CasePrepSelect";
 import {
-  QC_DIVISION_OPTIONS,
   QC_FLOW_LABELS,
   QC_PROCESSING_TYPE_OPTIONS,
-  QC_RAW_MATERIAL_TYPE_OPTIONS,
+  type QcDivisionOption,
+  type QcRawMaterialTypeOption,
 } from "../../../../../hooks/user/qualityControl/qcFlowConfig";
 import {
   canLoadDivisionSchema,
@@ -63,7 +63,10 @@ const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 type QCFlowBarProps = {
   batch?: { batchId?: string; motorId?: string; motorIds?: string[] } | null;
   selectedDivision: string;
+  divisionOptions?: QcDivisionOption[];
+  divisionsLoading?: boolean;
   selectedRawMaterialType: string;
+  rawMaterialTypeOptions?: QcRawMaterialTypeOption[];
   selectedProcessingType: string;
   selectedPremix: number | "";
   selectedMixingStage: string;
@@ -82,6 +85,8 @@ type QCFlowBarProps = {
   addedDivisionEntryKeys: string[];
   hasDivisionEntries: boolean;
   schemaLoading?: boolean;
+  /** When division-details seeded motor/premix nav, hide redundant pickers for auto-loaded flows. */
+  partialNavActive?: boolean;
   onDivisionChange: (value: string) => void;
   onRawMaterialTypeChange: (value: string) => void;
   onProcessingTypeChange: (value: string) => void;
@@ -105,7 +110,10 @@ type QCFlowBarProps = {
 const QCFlowBar = ({
   batch,
   selectedDivision,
+  divisionOptions = [],
+  divisionsLoading = false,
   selectedRawMaterialType,
+  rawMaterialTypeOptions = [],
   selectedProcessingType,
   selectedPremix,
   selectedMixingStage,
@@ -124,6 +132,7 @@ const QCFlowBar = ({
   addedDivisionEntryKeys,
   hasDivisionEntries,
   schemaLoading = false,
+  partialNavActive = false,
   onDivisionChange,
   onRawMaterialTypeChange,
   onProcessingTypeChange,
@@ -147,8 +156,12 @@ const QCFlowBar = ({
   const L = QC_FLOW_LABELS;
   const panelType = getQcDivisionPanelType(selectedDivision);
   const showRawMaterialType = panelType === "RAW_MATERIAL";
-  const showProcessingType = showRawMaterialType && isRawMaterialProcessingType(selectedRawMaterialType);
-  const isRawMaterialPremixFlow = isPremixProcessingFlow(selectedRawMaterialType, selectedProcessingType);
+  const hideRawMaterialProcessingPickers = isRawMaterialProcessingType(selectedRawMaterialType);
+  const showProcessingType =
+    showRawMaterialType && isRawMaterialProcessingType(selectedRawMaterialType) && !hideRawMaterialProcessingPickers;
+  const isRawMaterialPremixFlow =
+    isPremixProcessingFlow(selectedRawMaterialType, selectedProcessingType) &&
+    !hideRawMaterialProcessingPickers;
   const isMixingFlow = isMixingDivisionFlow(selectedDivision);
   const isHardwareFlow = isHardwareDivisionFlow(selectedDivision);
   const isCastingFlow = isCastingDivisionFlow(selectedDivision);
@@ -159,19 +172,29 @@ const QCFlowBar = ({
   const isNdtFlow = isNdtDivisionFlow(selectedDivision);
   const isPropellantFlow = isPropellantDivisionFlow(selectedDivision);
   const isWeightmentFlow = isWeightmentDivisionFlow(selectedDivision);
-  const showMixingStage = isMixingFlow;
-  const showMixingNumber = isMixingFlow && isQcMixingStage(selectedMixingStage);
-  const showPremixSelect = isRawMaterialPremixFlow;
+  const autoSeededPartialFlow =
+    hideRawMaterialProcessingPickers ||
+    (partialNavActive &&
+      (isCastingFlow ||
+        isDeCoringFlow ||
+        isNdtFlow ||
+        isMixingFlow ||
+        isRawMaterialPremixFlow));
+  const showMixingStage = isMixingFlow && !autoSeededPartialFlow;
+  const showMixingNumber =
+    isMixingFlow && isQcMixingStage(selectedMixingStage) && !autoSeededPartialFlow;
+  const showPremixSelect = isRawMaterialPremixFlow && !autoSeededPartialFlow;
   const showStfMotorType = panelType === "STF";
   const showMotorIdSelect =
-    isHardwareFlow ||
-    isCastingFlow ||
-    isCuringFlow ||
-    isDeCoringFlow ||
-    isNdtFlow ||
-    isPropellantFlow ||
-    isWeightmentFlow ||
-    isTrimmingFlow;
+    !autoSeededPartialFlow &&
+    (isHardwareFlow ||
+      isCastingFlow ||
+      isCuringFlow ||
+      isDeCoringFlow ||
+      isNdtFlow ||
+      isPropellantFlow ||
+      isWeightmentFlow ||
+      isTrimmingFlow);
   const showPropellantProcess = isPropellantFlow && Boolean(selectedMotorId);
   const showWeightmentWeighscale = isWeightmentFlow && Boolean(selectedMotorId);
   const showWeightmentCalibrationDate = isWeightmentFlow && Boolean(selectedMotorId);
@@ -319,6 +342,7 @@ const QCFlowBar = ({
   );
 
   const showLoadAction =
+    !autoSeededPartialFlow &&
     Boolean(selectedDivision) &&
     (panelType === "SIMPLE" ||
       panelType === "STF" ||
@@ -360,8 +384,8 @@ const QCFlowBar = ({
           <CasePrepSelect
             label={L.division}
             value={selectedDivision}
-            placeholder={L.divisionPlaceholder}
-            options={QC_DIVISION_OPTIONS.map((option) => ({
+            placeholder={divisionsLoading ? "Loading divisions…" : L.divisionPlaceholder}
+            options={divisionOptions.map((option) => ({
               value: option.value,
               label: option.label,
               disabled: option.disabled,
@@ -369,6 +393,7 @@ const QCFlowBar = ({
             width={240}
             theme={theme}
             onChange={onDivisionChange}
+            disabled={divisionsLoading}
           />
 
           {showRawMaterialType ? (
@@ -376,7 +401,7 @@ const QCFlowBar = ({
               label={L.rawMaterialType}
               value={selectedRawMaterialType}
               placeholder={L.rawMaterialTypePlaceholder}
-              options={QC_RAW_MATERIAL_TYPE_OPTIONS.map((option) => ({
+              options={rawMaterialTypeOptions.map((option) => ({
                 value: option.value,
                 label: option.label,
               }))}

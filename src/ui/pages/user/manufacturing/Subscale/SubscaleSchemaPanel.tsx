@@ -30,6 +30,11 @@ type SubscaleSchemaPanelProps = {
   onChange: (values: SchemaFormValues) => void;
   loading?: boolean;
   error?: string | null;
+  batchDetails;
+  actionLoading?: boolean;
+  isEditMode?: boolean;
+  onRequestSaveDraft?: () => void;
+  onRequestSubmit?: () => void;
 };
 
 const mergeFormValuesForBatchType = (
@@ -51,6 +56,11 @@ const SubscaleSchemaPanel = ({
   onChange,
   loading = false,
   error = null,
+  batchDetails,
+  actionLoading,
+  isEditMode,
+  onRequestSaveDraft,
+  onRequestSubmit,
 }: SubscaleSchemaPanelProps) => {
   const hydratedRef = useRef(false);
   const showMainScaleSetup = isMainScaleSubscaleBatch(batchType);
@@ -111,7 +121,15 @@ const SubscaleSchemaPanel = ({
       emitChange(initial);
     }
     hydratedRef.current = true;
-  }, [schema, savedSections, batchType, showMainScaleSetup, showSubscaleBatchSetup, emitChange, formValues]);
+  }, [
+    schema,
+    savedSections,
+    batchType,
+    showMainScaleSetup,
+    showSubscaleBatchSetup,
+    emitChange,
+    formValues,
+  ]);
 
   const themeTokens = useMemo(
     () => ({
@@ -126,20 +144,35 @@ const SubscaleSchemaPanel = ({
     }),
     [],
   );
-
   return (
     <Box>
       {showMainScaleSetup ? (
         <Box sx={{ mb: 3 }}>
-          <SubscaleMainScaleHardwarePanel values={formValues} onChange={handleHardwareChange} />
+          <SubscaleMainScaleHardwarePanel
+            values={formValues}
+            onChange={handleHardwareChange}
+            batchType={batchType}
+            actionLoading={actionLoading}
+            isEditMode={isEditMode}
+            onRequestSaveDraft={onRequestSaveDraft}
+            onRequestSubmit={onRequestSubmit}
+          />
         </Box>
       ) : null}
 
       {showSubscaleBatchSetup ? (
-        <SubscaleSubscaleBatchPanel values={formValues} onChange={handleBatchSetupChange} />
+        <SubscaleSubscaleBatchPanel
+          values={formValues}
+          onChange={handleBatchSetupChange}
+          batchDetails={batchDetails}
+          actionLoading={actionLoading}
+          isEditMode={isEditMode}
+          onRequestSaveDraft={onRequestSaveDraft}
+          onRequestSubmit={onRequestSubmit}
+        />
       ) : null}
-
-      <SchemaUI
+      {/* <SubscaleProcessingUIForm /> */}
+      {/* <SchemaUI
         schema={processingSchema}
         value={formValues}
         onChange={emitChange}
@@ -147,7 +180,7 @@ const SubscaleSchemaPanel = ({
         error={error}
         themeTokens={themeTokens}
         apiContext={{ subDepartmentId, batchId }}
-      />
+      /> */}
     </Box>
   );
 };

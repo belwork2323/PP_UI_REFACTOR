@@ -25,7 +25,7 @@ export type FinalApprovalMixCardRow = {
   label: string;
   stageType: string;
   mixCardSubmissionStatus: MixCardSubmissionStatus | string;
-  mixCardSubmissionType?: string | null;
+  premixSubmissionType?: string | null;
 };
 
 type FinalApprovalMixCardDialogProps = {
@@ -70,7 +70,7 @@ export const buildFinalApprovalMixCardRows = (
     label: card.label,
     stageType: card.stageType === "FINAL_MIX" ? "Final Mix" : "Premix",
     mixCardSubmissionStatus: card.mixCardSubmissionStatus,
-    mixCardSubmissionType: mixCardStatusById?.[card.mixCardId]?.mixCardSubmissionType ?? null,
+    premixSubmissionType: mixCardStatusById?.[card.mixCardId]?.premixSubmissionType ?? null,
   }));
 };
 

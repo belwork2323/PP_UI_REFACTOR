@@ -1,7 +1,4 @@
-import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import { Box, IconButton, Stack, Tooltip, Typography } from "@mui/material";
-import type { CastingProcessSetup } from "../../../../../data/models/user/CastingCuringFormModel";
-import { CASTING_CURING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/castingAndCuring_theme";
+import { Box, Stack, Typography } from "@mui/material";
 import { CASTING_CURING_FLOW_LABELS } from "../../../../../hooks/user/manufacturing/castingCuringFlowConfig";
 
 type CastingCuringSetupHeaderCardProps = {
@@ -9,8 +6,6 @@ type CastingCuringSetupHeaderCardProps = {
   castingStation: string;
   motorId: string;
   motorReceivedAt: string;
-  setup: CastingProcessSetup;
-  onRemove?: () => void;
   theme: any;
 };
 
@@ -30,12 +25,9 @@ const CastingCuringSetupHeaderCard = ({
   castingStation,
   motorId,
   motorReceivedAt,
-  setup,
-  onRemove,
   theme,
 }: CastingCuringSetupHeaderCardProps) => {
   const L = CASTING_CURING_FLOW_LABELS;
-  const dangerColor = CASTING_CURING_BRAND.danger;
 
   return (
     <Box
@@ -48,28 +40,9 @@ const CastingCuringSetupHeaderCard = ({
         mb: 1.25,
       }}
     >
-      <Stack direction="row" alignItems="flex-start" justifyContent="space-between" gap={1} mb={1}>
-        <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: theme.palette.primary }}>
-          {L.castingProcessTitle}
-        </Typography>
-        {onRemove ? (
-          <Tooltip title={L.removeCastingCardHint}>
-            <IconButton
-              size="small"
-              aria-label={L.removeCastingCard}
-              onClick={onRemove}
-              sx={{
-                mt: -0.25,
-                mr: -0.5,
-                color: dangerColor,
-                "&:hover": { color: dangerColor, background: "rgba(192,57,43,0.08)" },
-              }}
-            >
-              <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
-            </IconButton>
-          </Tooltip>
-        ) : null}
-      </Stack>
+      <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: theme.palette.primary, mb: 1 }}>
+        {L.castingProcessTitle}
+      </Typography>
       <Stack
         direction="row"
         useFlexGap
@@ -87,10 +60,6 @@ const CastingCuringSetupHeaderCard = ({
         <DetailItem label={L.castingStation} value={castingStation} />
         <DetailItem label={L.motorId} value={motorId} />
         <DetailItem label={L.motorReceivedAt} value={motorReceivedAt} />
-        <DetailItem label={L.initialVacuum} value={setup.initialVacuum} />
-        <DetailItem label={L.castingVacuumPressure} value={setup.castingVacuumPressure} />
-        <DetailItem label={L.soakingVacuumPressure} value={setup.soakingVacuumPressure} />
-        <DetailItem label={L.finalMixCount} value={setup.finalMixCount} />
       </Stack>
     </Box>
   );

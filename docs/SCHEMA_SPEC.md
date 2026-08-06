@@ -209,34 +209,26 @@ v2:
 section → section [repeat] → table
 ```
 
-**Curing cycles example:**
+**Curing cycles example (single table, API-driven rows):**
 
 ```json
 {
-  "id": "curingCycles",
+  "id": "CURING_CYCLES",
   "title": "Curing Cycles",
   "ui": { "variant": "card", "icon": "thermostat" },
   "children": [
     {
-      "type": "section",
-      "id": "cycle",
-      "title": "Cycle {index}",
-      "repeat": {
-        "defaultCount": 1,
+      "type": "table",
+      "id": "CURING_TABLE",
+      "rows": {
+        "defaultCount": 3,
         "min": 1,
         "max": 20,
-        "allowAdd": true,
-        "allowDelete": true,
-        "label": "Cycle {index}"
+        "allowAdd": false,
+        "allowDelete": false,
+        "autoIncrementKey": "srNo"
       },
-      "children": [
-        {
-          "type": "table",
-          "id": "CURING_TABLE",
-          "rows": { "defaultCount": 10, "allowAdd": true, "allowDelete": true },
-          "columns": [ ]
-        }
-      ]
+      "columns": [ ]
     }
   ]
 }
@@ -1059,13 +1051,9 @@ Values keyed by block `id`:
 {
   "OTHER_OBSERVATIONS": "None",
   "SHORE_A_HARDNESS": "72",
-  "cycle": [
-    {
-      "_key": "cycle-1",
-      "CURING_TABLE": [
-        { "srNo": 1, "TEMPERATURE": "65", "DURATION": "120", "START_DATE": "05-06-2026" }
-      ]
-    }
+  "CURING_CYCLES::CURING_TABLE": [
+    { "srNo": 1, "TEMPERATURE": "65", "TIME": "120", "START_DATE": "05-06-2026" },
+    { "srNo": 2, "TEMPERATURE": "70", "TIME": "180", "START_DATE": "05-06-2026" }
   ],
   "PROJECT_STAGE_MATRIX": {
     "columns": [ ],
@@ -1267,7 +1255,7 @@ Full v2 JSON examples in [`docs/examples/`](examples/):
 
 | File | Description |
 |------|-------------|
-| [`curing-schema.v2.json`](examples/curing-schema.v2.json) | Curing cycles (nested repeat section + table), post-curing fields, de-coring, project×stage matrix |
+| [`curing-schema.v2.json`](examples/curing-schema.v2.json) | Curing cycles (single table, no row add/delete), post-curing fields, de-coring |
 | [`casting-form.v2.json`](examples/casting-form.v2.json) | Accordion layout, grouped measurement table with formulas, repeatable mix cycles + sibling bowl table, static activity column |
 | [`case-prep-form.v2.json`](examples/case-prep-form.v2.json) | Form fields, repeatable lot group, coating table, drum nested group |
 | [`rmp-schema.v2.json`](examples/rmp-schema.v2.json) | Raw material prep: premix repeat sections, solid/liquid process tables |

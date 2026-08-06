@@ -5,7 +5,7 @@ import { Box, Button, Chip, Stack, Typography } from "@mui/material";
 import RawMaterialPremixSchemaPanel from "./RawMaterialPremixSchemaPanel";
 import RawMaterialWeightmentSheetPanel from "./RawMaterialWeightmentSheetPanel";
 import FlowBarDateField from "../../../../components/common/FlowBarDateField";
-import UserWorkflowStepPager, {
+import {
   UserWorkflowNavPanel,
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
@@ -180,21 +180,6 @@ const RawMaterialBuilderForm = ({
     <>
       {groups.length > 0 && activePremixGroup && activeMaterialEntry && (
         <Stack spacing={1.25} mb={2}>
-          <UserWorkflowStepPager
-            current={activePremixIndex + 1}
-            total={premixTotal}
-            entityLabel={RM.PREMIX_STEP_LABEL}
-            backLabel={RM.NAV_BACK}
-            nextLabel={RM.NAV_NEXT}
-            onBack={() => setActivePremixIndex((prev) => Math.max(0, prev - 1))}
-            onNext={() =>
-              setActivePremixIndex((prev) => Math.min(groups.length - 1, prev + 1))
-            }
-            disableBack={activePremixIndex === 0}
-            disableNext={activePremixIndex >= groups.length - 1}
-            palette={navPalette}
-          />
-
           <UserWorkflowNavPanel palette={navPalette}>
             <UserWorkflowTabNav
               title={RM.PREMIX_NAV_TITLE}
@@ -206,6 +191,7 @@ const RawMaterialBuilderForm = ({
                 setActiveMaterialIndex(0);
               }}
               palette={navPalette}
+              showStepArrows
               mb={1}
             />
             <UserWorkflowTabNav
@@ -214,6 +200,7 @@ const RawMaterialBuilderForm = ({
               activeIndex={activeMaterialIndex}
               onActiveIndexChange={setActiveMaterialIndex}
               palette={navPalette}
+              showStepArrows
             />
           </UserWorkflowNavPanel>
 

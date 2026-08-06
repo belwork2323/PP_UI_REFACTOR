@@ -29,10 +29,20 @@ import {
   orderCastingCuringDisplayColumns,
   type CastingCuringDetailView,
   type CastingCuringMotorDetailView,
+  type CastingCuringMotorSubmissionStatus,
 } from "../../../../../../data/models/user/CastingCuringFormModel";
+import { alpha } from "@mui/material";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const CC = STRINGS.MANUFACTURING.CASTING_CURING;
+
+const MOTOR_STATUS_CHIP_COLORS: Record<string, { bg: string; color: string }> = {
+  TO_BE_INITIATED: { bg: "rgba(120,120,120,0.1)", color: "#757575" },
+  IN_PROGRESS: { bg: "rgba(25,118,210,0.1)", color: "#1565C0" },
+  WAITING_FOR_APPROVAL: { bg: "rgba(212,172,13,0.1)", color: "#7D6608" },
+  APPROVED: { bg: "rgba(20,143,119,0.1)", color: "#0E6655" },
+  REJECTED: { bg: "rgba(192,57,43,0.1)", color: "#922B21" },
+};
 
 type MotorProcessTab = "CASTING" | "CURING";
 
@@ -211,7 +221,7 @@ const SetupGrid = ({
   );
 };
 
-const MotorDetailPanel = ({
+export const MotorDetailPanel = ({
   motor,
   processTab,
   dt,
@@ -231,6 +241,24 @@ const MotorDetailPanel = ({
         <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: palette.text }}>
           {motor.motorId}
         </Typography>
+        {motor.motorSubmissionStatus ? (() => {
+          const chipStyle = MOTOR_STATUS_CHIP_COLORS[motor.motorSubmissionStatus];
+          return (
+            <Chip
+              label={motor.motorSubmissionStatus.replace(/_/g, " ")}
+              size="small"
+              sx={{
+                fontWeight: 700,
+                fontSize: "0.62rem",
+                height: 22,
+                textTransform: "uppercase",
+                letterSpacing: 0.3,
+                background: chipStyle?.bg,
+                color: chipStyle?.color,
+              }}
+            />
+          );
+        })() : null}
         {motor.motorReceivedAt ? (
           <Typography sx={{ fontSize: "0.72rem", color: palette.textSub }}>
             {CC.FLOW_MOTOR_RECEIVED_AT}: {motor.motorReceivedAt}
@@ -245,10 +273,6 @@ const MotorDetailPanel = ({
           fields={[
             { label: CC.FLOW_CASTING_TYPE, value: motor.setup.castingType },
             { label: CC.FLOW_CASTING_STATION, value: motor.setup.castingStation },
-            { label: CC.FLOW_INITIAL_VACUUM, value: motor.setup.initialVacuum },
-            { label: CC.FLOW_CASTING_VACUUM_PRESSURE, value: motor.setup.castingVacuumPressure },
-            { label: CC.FLOW_SOAKING_VACUUM_PRESSURE, value: motor.setup.soakingVacuumPressure },
-            { label: CC.FLOW_FINAL_MIX_COUNT, value: motor.setup.finalMixCount },
           ]}
         />
       ) : (
@@ -257,10 +281,14 @@ const MotorDetailPanel = ({
           dt={dt}
           fields={[
             { label: CC.CURING_SELECT_OVEN, value: motor.curingSetup.oven },
-            { label: CC.CURING_TYPE, value: motor.curingSetup.curingType },
-            { label: CC.CURING_CONFIGURATION, value: motor.curingSetup.configuration },
-            { label: CC.CURING_MOTORS_TO_CURE, value: motor.curingSetup.motorsToCureCount },
-            { label: CC.CURING_OVENS_UTILIZED, value: motor.curingSetup.ovensUtilized },
+            {
+              label: CC.CURING_SELECT_OVEN_NO,
+              value: (() => {
+                const n = Number(motor.curingSetup.ovenNo);
+                if (Number.isFinite(n) && n > 0) return CC.CURING_OVEN_NO_OPTION(n);
+                return motor.curingSetup.ovenNo || "";
+              })(),
+            },
           ]}
         />
       )}
@@ -373,17 +401,37 @@ const CastingCuringDetailsContent = ({
                 {CC.DETAILS_MOTOR_NAV_HINT}
               </Typography>
               <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
-                {motors.map((motor, index) => (
-                  <Button
-                    key={motor.motorId}
-                    size="small"
-                    variant={index === activeMotorIndexSafe ? "contained" : "outlined"}
-                    onClick={() => setActiveMotorIndex(index)}
-                    sx={{ whiteSpace: "nowrap", flexShrink: 0, textTransform: "none", fontWeight: 700 }}
-                  >
-                    {motor.motorId}
-                  </Button>
-                ))}
+                {motors.map((motor, index) => {
+                  const statusKey = motor.motorSubmissionStatus;
+                  const chipStyle = statusKey ? MOTOR_STATUS_CHIP_COLORS[statusKey] : undefined;
+                  return (
+                    <Stack key={motor.motorId} direction="row" alignItems="center" spacing={0.5} sx={{ flexShrink: 0 }}>
+                      <Button
+                        size="small"
+                        variant={index === activeMotorIndexSafe ? "contained" : "outlined"}
+                        onClick={() => setActiveMotorIndex(index)}
+                        sx={{ whiteSpace: "nowrap", textTransform: "none", fontWeight: 700 }}
+                      >
+                        {motor.motorId}
+                      </Button>
+                      {statusKey ? (
+                        <Chip
+                          label={statusKey.replace(/_/g, " ")}
+                          size="small"
+                          sx={{
+                            fontWeight: 700,
+                            fontSize: "0.58rem",
+                            height: 20,
+                            textTransform: "uppercase",
+                            letterSpacing: 0.3,
+                            background: chipStyle?.bg,
+                            color: chipStyle?.color,
+                          }}
+                        />
+                      ) : null}
+                    </Stack>
+                  );
+                })}
               </Stack>
             </Box>
           ) : null}

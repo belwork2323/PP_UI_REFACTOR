@@ -8,7 +8,7 @@ import { getStfTheme } from "../../../../../app/theme/custom_themes/user/quality
 import { STRINGS } from "../../../../../app/config/strings";
 import { getOperationStatusConfig, OPERATION_STATUS } from "../../../../../hooks/operationStatus";
 import UserWorkflowStatusCell from "../../../../components/custom/UserWorkflowStatusCell";
-import { mapStfDetailsForDisplay } from "../../../../../data/models/user/StaticTestFacilityApiModel";
+import { mapBemDetailsForDisplay, mapStfDetailsForDisplay } from "../../../../../data/models/user/StaticTestFacilityApiModel";
 import { STF_STATUS_CONFIG } from "./StaticTestFacilityList";
 import STFDetailsContent from "./components/STFDetailsContent";
 
@@ -40,7 +40,15 @@ const StaticTestFacilityDetailsView = ({ row, data, loading, onBack }: STFDetail
     [dt],
   );
 
-  const detailView = useMemo(() => mapStfDetailsForDisplay(data), [data]);
+  const detailView = useMemo(() => {
+    if (!data) return null;
+    const root = data as Record<string, unknown>;
+    const isBemMotor =
+      String(root.subType ?? "").toUpperCase() === "BEM" &&
+      !Array.isArray(root.motors) &&
+      Boolean(root.staticTestingDetails ?? root.motorId);
+    return isBemMotor ? mapBemDetailsForDisplay(root) : mapStfDetailsForDisplay(data);
+  }, [data]);
 
   return (
     <Box sx={dt.page}>
@@ -69,9 +77,20 @@ const StaticTestFacilityDetailsView = ({ row, data, loading, onBack }: STFDetail
               <Box>
                 <Typography sx={dt.bannerTitle}>{STF.TITLE}</Typography>
                 <Typography sx={dt.bannerSubtitle}>
-                  {detailView?.batchId || String(row?.batchId ?? "")}
-                  {detailView?.formId ? ` · ${detailView.formId}` : ""}
-                  {row?.batchType ? ` · ${String(row.batchType)}` : ""}
+                  {detailView?.batchType === "BEM"
+                    ? [
+                        detailView.bemNo ? `BEM No: ${detailView.bemNo}` : null,
+                        detailView.stfTestNo ? `${STF.STF_TEST_NO_LABEL}: ${detailView.stfTestNo}` : null,
+                      ]
+                        .filter(Boolean)
+                        .join("   ·   ") || "BEM Motor Details"
+                    : [
+                        detailView?.batchId || String(row?.batchId ?? ""),
+                        detailView?.formId || null,
+                        row?.batchType ? String(row.batchType) : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
                 </Typography>
               </Box>
             </Stack>

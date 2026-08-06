@@ -13,11 +13,11 @@ import {
   Typography,
 } from "@mui/material";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import { icons } from "../../../../../app/theme/icons";
 import IconText from "../../../../components/common/IconText";
 import FilterPanelHeader from "@ui/components/common/FilterPanelHeader";
 import FilterToggleButton from "../../../../components/common/FilterToggleButton";
+import WorkflowCreateButton from "../../../../components/common/WorkflowCreateButton";
 import DateField from "../../../../components/common/DateField";
 import { formatToIsoDateInput, formatToUiDate } from "../../../../../utils/dateUtils";
 import UserBatchList from "../../../../components/custom/UserBatchList";
@@ -319,30 +319,6 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
     [statusConfig, theme],
   );
 
-  const createLotSx = useMemo(() => {
-    const primary = theme.palette.primary;
-    const shadowAlpha = mode === "dark" ? 0.35 : 0.25;
-    const hoverShadowAlpha = mode === "dark" ? 0.45 : 0.32;
-    return {
-      ...theme.batchList.action.primary,
-      textTransform: "none" as const,
-      fontWeight: 800,
-      fontSize: "0.8rem",
-      px: 2,
-      py: 0.75,
-      minHeight: 34,
-      borderRadius: 2,
-      gap: 0.75,
-      "& .MuiButton-startIcon": { ml: -0.25, mr: 0.25 },
-      "& .MuiSvgIcon-root": { fontSize: 18 },
-      boxShadow: `0 2px 10px ${alpha(primary, shadowAlpha)}`,
-      "&:hover": {
-        ...((theme.batchList.action.primary as Record<string, unknown>)["&:hover"] as object),
-        boxShadow: `0 4px 16px ${alpha(primary, hoverShadowAlpha)}`,
-      },
-    };
-  }, [theme, mode]);
-
   const handleApplyPanelFilters = () => {
     let from = draftFrom;
     let to = draftTo;
@@ -569,15 +545,11 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         searchBarEnd={searchBarEnd}
         filterExtension={filterExtension}
         statusToolbarEnd={
-          <Button
-            variant="contained"
-            size="small"
-            startIcon={<AddRoundedIcon />}
+          <WorkflowCreateButton
+            label={STRINGS.SOURCING.BATCH_LIST.CREATE_LOT}
+            themeTokens={theme}
             onClick={handleCreateLot}
-            sx={createLotSx}
-          >
-            {STRINGS.SOURCING.BATCH_LIST.CREATE_LOT}
-          </Button>
+          />
         }
         renderAction={(row: any) => (
           <Stack

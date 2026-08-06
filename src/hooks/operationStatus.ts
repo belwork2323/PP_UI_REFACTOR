@@ -25,6 +25,21 @@ export const OPERATION_STATUS_FILTER_VALUES: OperationStatus[] = [
   OPERATION_STATUS.REJECTED,
 ];
 
+/**
+ * Manufacturing / QC / Dispatch list tabs — matches user batch-list `statusCounts` keys:
+ * initiated, inProgress, waitingForPartialApproval, waitingForCompleteApproval,
+ * finalApprovalCompleted, rejected.
+ * (No `approved` in this API contract.)
+ */
+export const MANUFACTURING_STATUS_FILTER_VALUES: OperationStatus[] = [
+  OPERATION_STATUS.TO_BE_INITIATED,
+  OPERATION_STATUS.IN_PROGRESS,
+  OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL,
+  OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL,
+  OPERATION_STATUS.FINAL_APPROVAL_COMPLETED,
+  OPERATION_STATUS.REJECTED,
+];
+
 /** Raw Material Sourcing + Rocket Motor Casing — hide these from top status tabs. */
 export const SOURCING_LOT_HIDDEN_STATUS_FILTERS: OperationStatus[] = [
   OPERATION_STATUS.TO_BE_INITIATED,
@@ -45,8 +60,7 @@ export const SOURCING_LOT_STATUS_FILTER_VALUES: OperationStatus[] =
 
 /**
  * Display label for status filter tabs.
- * Non-sourcing subdepartments show "Waiting for Complete Approval" instead of
- * "Waiting for Approval" (filter value / API key stays WAITING_FOR_APPROVAL).
+ * Kept for callers that still pass WAITING_FOR_APPROVAL on non-sourcing lists.
  */
 export const getOperationStatusFilterLabel = (
   status: string,
@@ -173,5 +187,9 @@ export const getOperationStatusConfig = (icons: OperationStatusIconMap) => ({
   [OPERATION_STATUS.REJECTED]: {
     Icon: icons.rejected,
     label: OPERATION_STATUS.REJECTED,
+  },
+  "Status Unavailable": {
+    Icon: icons.initiated,
+    label: "Status Unavailable",
   },
 });

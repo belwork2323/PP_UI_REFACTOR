@@ -13,6 +13,7 @@ export type SubdepartmentBatchListColumnLabels = {
   project?: string;
   batchType?: string;
   motorId?: string;
+  bemMotorIds?: string;
   stage?: string;
   manager?: string;
   createdOn?: string;
@@ -29,6 +30,21 @@ export type BuildSubdepartmentBatchListColumnsArgs = {
   CalendarIcon: ElementType;
   labels?: SubdepartmentBatchListColumnLabels;
   rejectedStatus?: string;
+  showBemMotorIds?: boolean;
+};
+
+const resolveBemMotorIdDisplay = (row: Record<string, unknown>): string => {
+  const bemMotorId = row.bemMotorId;
+  if (Array.isArray(bemMotorId)) {
+    return bemMotorId.map((id) => String(id).trim()).filter(Boolean).join(", ");
+  }
+  const single = String(bemMotorId ?? "").trim();
+  if (single) return single;
+
+  if (Array.isArray(row.bemMotorIds)) {
+    return row.bemMotorIds.map((id) => String(id).trim()).filter(Boolean).join(", ");
+  }
+  return "";
 };
 
 const defaultLabels = (): SubdepartmentBatchListColumnLabels => {
@@ -59,6 +75,11 @@ export const qualityControlBatchListLabels = (): SubdepartmentBatchListColumnLab
   };
 };
 
+export const staticTestFacilityBatchListLabels = (): SubdepartmentBatchListColumnLabels => ({
+  ...qualityControlBatchListLabels(),
+  bemMotorIds: STRINGS.QUALITY_CONTROL.STATIC_TEST_FACILITY.COL_BEM_MOTOR_IDS,
+});
+
 export const dispatchBatchListLabels = (): SubdepartmentBatchListColumnLabels => {
   const batch = STRINGS.DISPATCH.BATCH_LIST;
   return {
@@ -82,6 +103,7 @@ export const buildSubdepartmentBatchListColumns = ({
   CalendarIcon,
   labels = {},
   rejectedStatus = OPERATION_STATUS.REJECTED,
+  showBemMotorIds = false,
 }: BuildSubdepartmentBatchListColumnsArgs) => {
   const L = { ...defaultLabels(), ...labels, operationStatus: labels.operationStatus ?? statusLabel };
 
@@ -125,7 +147,26 @@ export const buildSubdepartmentBatchListColumns = ({
     {
       key: "motorId",
       label: L.motorId,
-      render: (v: string) => <Typography sx={theme.batchList.normalText}>{v}</Typography>,
+      render: (v: string, row: Record<string, unknown>) => {
+        const bemMotorIds = showBemMotorIds ? resolveBemMotorIdDisplay(row) : "";
+        if (!bemMotorIds) {
+          return <Typography sx={theme.batchList.normalText}>{v || "—"}</Typography>;
+        }
+        return (
+          <Box sx={theme.batchList.projectInfo}>
+            <Typography sx={theme.batchList.normalText}>{v || "—"}</Typography>
+            <Typography
+              sx={{
+                ...theme.batchList.projectId,
+                color: theme.palette?.text ?? theme.batchList.subtleText?.color,
+                fontWeight: 500,
+              }}
+            >
+              {L.bemMotorIds ?? "BEM IDs"}: {bemMotorIds}
+            </Typography>
+          </Box>
+        );
+      },
     },
     {
       key: "motorStage",

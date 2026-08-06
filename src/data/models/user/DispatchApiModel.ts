@@ -1,8 +1,12 @@
 import {
   mapDispatchDetailsToFormState,
   mapDispatchFormStateToPayload,
+  mapDispatchMotorStatusesFromApi,
   type DispatchFormState,
   type DispatchMotorSetup,
+  type DispatchMotorStatusMeta,
+  type DispatchMotorSubmissionStatus,
+  type DispatchMotorSubmissionType,
 } from "./DispatchFormModel";
 import type { SchemaSectionSubmission } from "../../../schema-engine";
 import { mapCastingCuringPersonLabel } from "./CastingCuringFormModel";
@@ -81,6 +85,7 @@ export class DispatchDetailsModel {
     schemaValues: Record<string, unknown>;
     setup: import("./DispatchFormModel").DispatchMotorSetup;
   }>;
+  motorStatuses: Record<string, DispatchMotorStatusMeta>;
   createdBy: unknown;
   createdAt: string | null;
   submittedBy: unknown;
@@ -130,6 +135,8 @@ export class DispatchDetailsModel {
         };
       })
       .filter((motor) => motor.motorId.length > 0);
+
+    this.motorStatuses = mapDispatchMotorStatusesFromApi(payload);
 
     this.createdBy = payload?.createdBy ?? null;
     this.createdAt = payload?.createdAt ?? payload?.createdOn ?? null;
@@ -185,6 +192,17 @@ export type DispatchMotorDetailView = {
   setup: DispatchMotorSetup;
   setupFields: CasePrepDetailSection["fields"];
   sections: CasePrepDetailSection[];
+  motorSubmissionType?: DispatchMotorSubmissionType;
+  motorSubmissionStatus?: DispatchMotorSubmissionStatus;
+  rejectionReason?: string | null;
+};
+
+export type DispatchMotorCounts = {
+  pendingMotorCount: number;
+  approvedMotorCount: number;
+  rejectedMotorCount: number;
+  inProgressMotorCount: number;
+  totalMotorCount: number;
 };
 
 export type DispatchDetailView = {
@@ -192,6 +210,7 @@ export type DispatchDetailView = {
   batchId: string;
   batchType: string;
   status?: string;
+  formSubmissionType?: string;
   createdBy?: string | null;
   createdAt?: string | null;
   submittedBy?: string | null;
@@ -199,7 +218,11 @@ export type DispatchDetailView = {
   lastUpdatedBy?: string | null;
   lastUpdatedAt?: string | null;
   motors: DispatchMotorDetailView[];
+  motorCounts?: DispatchMotorCounts;
 };
+
+export const getDispatchBatchStatusLabel = (status: unknown): string =>
+  String(status ?? "").trim();
 
 const formatDispatchStageLabel = (stage: string) => {
   const trimmed = String(stage ?? "").trim();
@@ -452,6 +475,7 @@ export const mapDispatchDetailsForDisplay = (
     const setup = motor.setup;
     const setupFields = buildDispatchSetupFields(setup);
     const sections = buildDispatchMotorSections(motorDetails);
+    const statusMeta = model.motorStatuses[motor.motorId];
 
     if (setupFields.length) {
       sections.unshift({
@@ -467,14 +491,33 @@ export const mapDispatchDetailsForDisplay = (
       setup,
       setupFields,
       sections,
+      motorSubmissionType: statusMeta?.motorSubmissionType,
+      motorSubmissionStatus: statusMeta?.motorSubmissionStatus,
+      rejectionReason: statusMeta?.rejectionReason ?? null,
     };
   });
+
+  const root = data as Record<string, unknown>;
+  const countsFromApi = root.motorCounts as Partial<DispatchMotorCounts> | undefined;
+  const derivedCounts: DispatchMotorCounts = {
+    pendingMotorCount: motors.filter(
+      (m) =>
+        !m.motorSubmissionStatus ||
+        m.motorSubmissionStatus === "TO_BE_INITIATED" ||
+        m.motorSubmissionStatus === "WAITING_FOR_APPROVAL",
+    ).length,
+    approvedMotorCount: motors.filter((m) => m.motorSubmissionStatus === "APPROVED").length,
+    rejectedMotorCount: motors.filter((m) => m.motorSubmissionStatus === "REJECTED").length,
+    inProgressMotorCount: motors.filter((m) => m.motorSubmissionStatus === "IN_PROGRESS").length,
+    totalMotorCount: motors.length,
+  };
 
   return {
     formId: model.formId,
     batchId: model.batchId,
     batchType: model.batchType,
     status: model.workflowInsights.currentStatus || model.formSubmissionType,
+    formSubmissionType: model.formSubmissionType || undefined,
     createdBy: mapCastingCuringPersonLabel(model.createdBy),
     createdAt: model.createdAt,
     submittedBy: mapCastingCuringPersonLabel(model.submittedBy),
@@ -482,5 +525,18 @@ export const mapDispatchDetailsForDisplay = (
     lastUpdatedBy: mapCastingCuringPersonLabel(model.lastUpdatedBy),
     lastUpdatedAt: model.lastUpdatedAt,
     motors,
+    motorCounts: {
+      pendingMotorCount: Number(countsFromApi?.pendingMotorCount ?? derivedCounts.pendingMotorCount),
+      approvedMotorCount: Number(
+        countsFromApi?.approvedMotorCount ?? derivedCounts.approvedMotorCount,
+      ),
+      rejectedMotorCount: Number(
+        countsFromApi?.rejectedMotorCount ?? derivedCounts.rejectedMotorCount,
+      ),
+      inProgressMotorCount: Number(
+        countsFromApi?.inProgressMotorCount ?? derivedCounts.inProgressMotorCount,
+      ),
+      totalMotorCount: Number(countsFromApi?.totalMotorCount ?? derivedCounts.totalMotorCount),
+    },
   };
 };

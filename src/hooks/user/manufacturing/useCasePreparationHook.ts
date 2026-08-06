@@ -133,6 +133,10 @@ const enrichBatchFromDetails = (
         ? batchDetails.motorIds.join(", ")
         : batch.motorId,
     identificationSheet: batchDetails.identificationSheet,
+    stageProgress:
+      (batchDetails as { stageProgress?: unknown }).stageProgress ?? batch.stageProgress,
+    currentStage:
+      (batchDetails as { currentStage?: unknown }).currentStage ?? batch.currentStage,
   };
 };
 
@@ -503,19 +507,27 @@ export const useCasePreparationHook = () => {
 
   const handleMotorSessionChange = useCallback(
     (motorId: string, nextMotor: CasePrepMotorSession, meta?: { hydrate?: boolean }) => {
-      setFormData((prev) => ({
-        ...prev,
-        motors: (prev.motors ?? []).map((motor) =>
-          motor.motorId === motorId ? nextMotor : motor,
-        ),
-      }));
-      setAddedMotors((prev) =>
-        prev.map((motor) =>
-          motor.motorId === motorId
-            ? { ...motor, prrcClearanceDate: nextMotor.prrcClearanceDate }
-            : motor,
-        ),
-      );
+      setFormData((prev) => {
+        const motors = prev.motors ?? [];
+        let changed = false;
+        const nextMotors = motors.map((motor) => {
+          if (motor.motorId !== motorId) return motor;
+          if (motor === nextMotor) return motor;
+          changed = true;
+          return nextMotor;
+        });
+        return changed ? { ...prev, motors: nextMotors } : prev;
+      });
+      setAddedMotors((prev) => {
+        let changed = false;
+        const next = prev.map((motor) => {
+          if (motor.motorId !== motorId) return motor;
+          if (motor.prrcClearanceDate === nextMotor.prrcClearanceDate) return motor;
+          changed = true;
+          return { ...motor, prrcClearanceDate: nextMotor.prrcClearanceDate };
+        });
+        return changed ? next : prev;
+      });
       if (!meta?.hydrate) {
         setIsFormDirty(true);
       }

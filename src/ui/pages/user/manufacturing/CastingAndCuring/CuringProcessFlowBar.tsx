@@ -1,29 +1,56 @@
 import { useMemo } from "react";
-import { Box, Button, CircularProgress, Typography } from "@mui/material";
+import { Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
+import type { CuringCycleConfig } from "../../../../../data/models/user/CuringCycleConfigModel";
 import type { CuringProcessSetup } from "../../../../../data/models/user/CastingCuringFormModel";
 import {
   CASTING_CURING_FLOW_LABELS,
-  CURING_CONFIGURATION_OPTIONS,
-  CURING_MOTORS_TO_CURE_OPTIONS,
-  CURING_OVEN_OPTIONS,
-  CURING_OVENS_UTILIZED_OPTIONS,
-  CURING_TYPE_OPTIONS,
+  buildCuringOvenNoOptions,
   canLoadCuringForm,
+  formatCuringTypeLabel,
+  formatMotorStageLabel,
+  type CastingCuringBatchMotorSource,
 } from "../../../../../hooks/user/manufacturing/castingCuringFlowConfig";
 import CasePrepSelect from "../CasePreparation/CasePrepSelect";
+
+export type OvenSelectOption = {
+  value: string;
+  label: string;
+  noOfOvenAvailable?: number;
+};
 
 type CuringProcessFlowBarProps = {
   setup: CuringProcessSetup;
   curingFormLoaded: boolean;
+  curingCycleConfig?: CuringCycleConfig | null;
+  batch?: CastingCuringBatchMotorSource | null;
+  curingCyclesLoading?: boolean;
+  ovenOptions: OvenSelectOption[];
+  ovensLoading?: boolean;
   onChange: (field: keyof CuringProcessSetup, value: string | number | "") => void;
   onLoadCuringForm: () => void;
   schemaLoading?: boolean;
   theme: any;
 };
 
+const DetailItem = ({ label, value }: { label: string; value: string }) => (
+  <Box sx={{ minWidth: 0 }}>
+    <Typography sx={{ fontSize: "0.65rem", fontWeight: 700, color: "text.secondary", mb: 0.25 }}>
+      {label}
+    </Typography>
+    <Typography sx={{ fontSize: "0.82rem", fontWeight: 600, color: "text.primary", wordBreak: "break-word" }}>
+      {value || "—"}
+    </Typography>
+  </Box>
+);
+
 const CuringProcessFlowBar = ({
   setup,
   curingFormLoaded,
+  curingCycleConfig = null,
+  batch = null,
+  curingCyclesLoading = false,
+  ovenOptions,
+  ovensLoading = false,
   onChange,
   onLoadCuringForm,
   schemaLoading = false,
@@ -31,15 +58,29 @@ const CuringProcessFlowBar = ({
 }: CuringProcessFlowBarProps) => {
   const flowBar = theme.manufacturing?.casePreparation?.flowBar ?? {};
   const L = CASTING_CURING_FLOW_LABELS;
-  const showMotorsToCure = String(setup.configuration).toLowerCase() === "multiple";
-  const showOvensMatchHint =
-    showMotorsToCure &&
-    String(setup.ovensUtilized).toLowerCase() === "multiple" &&
-    setup.motorsToCureCount !== "";
+
+  const selectedOven = useMemo(
+    () => ovenOptions.find((option) => option.value === setup.oven) ?? null,
+    [ovenOptions, setup.oven],
+  );
+
+  const ovenNoOptions = useMemo(
+    () => buildCuringOvenNoOptions(selectedOven?.noOfOvenAvailable),
+    [selectedOven?.noOfOvenAvailable],
+  );
 
   const canLoad = useMemo(
     () => canLoadCuringForm({ setup, curingFormLoaded }),
     [curingFormLoaded, setup],
+  );
+
+  const curingTypeLabel = useMemo(
+    () => formatCuringTypeLabel(curingCycleConfig?.curingType ?? setup.curingType),
+    [curingCycleConfig?.curingType, setup.curingType],
+  );
+  const motorStageLabel = useMemo(
+    () => formatMotorStageLabel(curingCycleConfig, batch),
+    [batch, curingCycleConfig],
   );
 
   if (curingFormLoaded) return null;
@@ -49,78 +90,50 @@ const CuringProcessFlowBar = ({
       <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: theme.palette.primary, mb: 1.5 }}>
         {L.curingProcessTitle}
       </Typography>
+      <Stack direction="row" useFlexGap flexWrap="wrap" gap={2} sx={{ mb: 1.5 }}>
+        <DetailItem
+          label={L.curingMotorStage}
+          value={curingCyclesLoading ? L.curingCyclesLoading : motorStageLabel}
+        />
+        <DetailItem
+          label={L.curingType}
+          value={curingCyclesLoading ? L.curingCyclesLoading : curingTypeLabel}
+        />
+      </Stack>
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <Box sx={flowBar.topRow}>
           <CasePrepSelect
             label={L.curingSelectOven}
             value={setup.oven}
-            placeholder={L.curingSelectOvenPlaceholder}
-            options={[...CURING_OVEN_OPTIONS]}
-            width={200}
-            theme={theme}
-            onChange={(value) => onChange("oven", value)}
-          />
-
-          <CasePrepSelect
-            label={L.curingType}
-            value={setup.curingType}
-            placeholder={L.curingTypePlaceholder}
-            options={[...CURING_TYPE_OPTIONS]}
-            width={240}
-            theme={theme}
-            onChange={(value) => onChange("curingType", value)}
-          />
-
-          <CasePrepSelect
-            label={L.curingConfiguration}
-            value={setup.configuration}
-            placeholder={L.curingConfigurationPlaceholder}
-            options={[...CURING_CONFIGURATION_OPTIONS]}
+            placeholder={ovensLoading ? L.schemaLoading : L.curingSelectOvenPlaceholder}
+            options={ovenOptions}
             width={200}
             theme={theme}
             onChange={(value) => {
-              onChange("configuration", value);
-              if (String(value).toLowerCase() !== "multiple") {
-                onChange("motorsToCureCount", "");
-              }
+              onChange("oven", value);
+              onChange("ovenNo", "");
             }}
           />
 
-          {showMotorsToCure ? (
+          {setup.oven ? (
             <CasePrepSelect
-              label={L.curingMotorsToCure}
-              value={setup.motorsToCureCount === "" ? "" : String(setup.motorsToCureCount)}
-              placeholder={L.curingMotorsToCurePlaceholder}
-              options={CURING_MOTORS_TO_CURE_OPTIONS}
-              width={260}
+              label={L.curingSelectOvenNo}
+              value={setup.ovenNo}
+              placeholder={L.curingSelectOvenNoPlaceholder}
+              options={ovenNoOptions}
+              width={220}
               theme={theme}
-              onChange={(value) => onChange("motorsToCureCount", value === "" ? "" : Number(value))}
+              onChange={(value) => onChange("ovenNo", value)}
             />
           ) : null}
-
-          <CasePrepSelect
-            label={L.curingOvensUtilized}
-            value={setup.ovensUtilized}
-            placeholder={L.curingOvensUtilizedPlaceholder}
-            options={[...CURING_OVENS_UTILIZED_OPTIONS]}
-            width={240}
-            theme={theme}
-            onChange={(value) => onChange("ovensUtilized", value)}
-          />
         </Box>
-
-        {showOvensMatchHint ? (
-          <Typography sx={{ fontSize: "0.74rem", color: theme.palette.textSub }}>
-            {L.curingOvensMatchHint}
-          </Typography>
-        ) : null}
 
         <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
           <Button
             variant="contained"
             size="small"
             onClick={onLoadCuringForm}
-            disabled={!canLoad || schemaLoading}
+            disabled={!canLoad || schemaLoading || ovensLoading || curingCyclesLoading}
             startIcon={schemaLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
           >
             {schemaLoading ? L.schemaLoading : L.loadCuringForm}

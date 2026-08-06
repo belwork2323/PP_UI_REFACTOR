@@ -5,11 +5,11 @@ import {
 } from "../../../data/models/user/MixingFormModel";
 import {
   createMixingFormApi,
-  fetchMixingCycleDetailsApi,
   fetchMixingFormDetailsApi,
   fetchQualityCheck,
   updateMixingFormApi,
 } from "../../../data/api/users/manufacturing/mixingFormApi";
+import { fetchMixingCycleDetailsApi } from "@/data/api/common/generalAPI";
 
 export type MixingFormBody = {
   mixingDetails: {

@@ -6,6 +6,7 @@ export type NDTBatch = {
   lotId?: string;
   batchId: string;
   motorId: string;
+  motorIds?: string[];
   motorType: string;
   priority: string;
   assignedTo: { fullName: string } | null;
@@ -22,6 +23,7 @@ export const NDT_EQUIPMENT_OPTIONS = [
   "6/9 MeV LINAC",
   "9/15 MeV LINAC",
   "450 KeV X ray Machine",
+  "Mag NDT",
 ] as const;
 
 export const NDT_BEAM_ENERGY_OPTIONS = [
@@ -31,6 +33,7 @@ export const NDT_BEAM_ENERGY_OPTIONS = [
   "9 MeV",
   "15 MeV",
   "450 KeV",
+  "Co 60",
 ] as const;
 
 export type RadiographyPlanKey = "PLAN_STANDARD" | "PLAN_EXTENDED" | "PLAN_TANGENTIAL";
@@ -102,7 +105,7 @@ export const NDT_RADIOGRAPHY_PLANS: Record<
 };
 
 export const NDT_VISUAL_INSPECTION_PRESETS = [
-  "Surface Paint/ Finish",
+  "Rocket motor external surface",
   "Dents/scratch/abnormalities on motor case",
   "Dents/scratch/abnormalities on propellant",
   "Nut & bolt groves cleanliness",
@@ -145,9 +148,14 @@ export const getNDTMotorCountOptions = (maxCount: number) =>
   }));
 
 export const getSelectedNDTDraftMotorIds = (count: number, draftMotorIds: string[]): string[] =>
-  Array.from({ length: count }, (_, idx) => String(draftMotorIds[idx] ?? "").trim()).filter(Boolean);
+  Array.from({ length: count }, (_, idx) => String(draftMotorIds[idx] ?? "").trim()).filter(
+    Boolean,
+  );
 
-export const resolveEffectiveNDTMotorCount = (motorCount: number | "", draftMotorIds: string[]): number => {
+export const resolveEffectiveNDTMotorCount = (
+  motorCount: number | "",
+  draftMotorIds: string[],
+): number => {
   const count = motorCount === "" ? 0 : Number(motorCount);
   if (count > 0) return count;
   return draftMotorIds.some((id) => String(id ?? "").trim().length > 0) ? 1 : 0;
@@ -157,12 +165,16 @@ export const getCastedMotorsForBatch = (_batchId?: string | null): string[] => {
   return [];
 };
 
-export const resolveNDTMotorOptions = (batch?: { batchId?: string; motorId?: string; motorIds?: string[] } | null) => {
+export const resolveNDTMotorOptions = (
+  batch?: { batchId?: string; motorId?: string; motorIds?: string[] } | null,
+) => {
   const ids = Array.isArray(batch?.motorIds)
     ? batch.motorIds.map((id) => String(id).trim()).filter(Boolean)
     : [];
 
-  const casted = getCastedMotorsForBatch(batch?.batchId).map((id) => String(id).trim()).filter(Boolean);
+  const casted = getCastedMotorsForBatch(batch?.batchId)
+    .map((id) => String(id).trim())
+    .filter(Boolean);
 
   if (ids.length > 0 || casted.length > 0) {
     const unique = Array.from(new Set([...ids, ...casted]));
@@ -201,35 +213,25 @@ export const resolveNDTMotorCountLimit = ({
 export const canLoadNDTForm = ({
   equipment,
   beamEnergies,
-  radiographyPlan,
-  motorCount,
-  draftMotorIds,
-  usedMotorIds,
+  // radiographyPlan,
   ndtFormLoaded,
-  availableMotorOptions,
-  maxMotorCount,
 }: {
-  equipment: string;
+  equipment: string[] | string;
   beamEnergies: string[];
-  radiographyPlan: string;
-  motorCount: number | "";
-  draftMotorIds: string[];
-  usedMotorIds: string[];
+  // radiographyPlan: string;
   ndtFormLoaded: boolean;
-  availableMotorOptions: NDTMotorOption[];
-  maxMotorCount: number;
-}) => {
+  availableMotorOptions?: any[];
+}): boolean => {
   if (ndtFormLoaded) return false;
-  if (!equipment.trim() || beamEnergies.length === 0 || !radiographyPlan.trim()) return false;
-  if (availableMotorOptions.length === 0 || maxMotorCount <= 0) return false;
 
-  const count = resolveEffectiveNDTMotorCount(motorCount, draftMotorIds);
-  if (count <= 0 || count > maxMotorCount) return false;
+  const hasEquipment = Array.isArray(equipment)
+    ? equipment.length > 0
+    : Boolean(equipment && String(equipment).trim());
 
-  const selectedIds = getSelectedNDTDraftMotorIds(count, draftMotorIds);
-  if (selectedIds.length !== count) return false;
-  if (new Set(selectedIds).size !== selectedIds.length) return false;
-  return !selectedIds.some((id) => usedMotorIds.includes(id));
+  const hasBeamEnergies = Array.isArray(beamEnergies) && beamEnergies.length > 0;
+  // const hasPlan = Boolean(radiographyPlan && radiographyPlan.trim());
+
+  return hasEquipment && hasBeamEnergies;
 };
 
 export const canAddNDTMotors = ({

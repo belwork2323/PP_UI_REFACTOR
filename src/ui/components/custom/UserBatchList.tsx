@@ -255,42 +255,46 @@ const UserBatchList = ({
       return {};
     }
 
+    const tabKeys = statusTabs.filter((tab) => tab !== STRINGS.USER_BATCH_LIST.FILTER_ALL);
+
     if (serverStatusCounts && typeof serverStatusCounts === "object") {
-      const resolvedByUiStatus = Object.keys(statusConfig).reduce(
+      const resolveCount = (statusLabel: string): number => {
+        // Prefer already-mapped UI labels from mapSubdepartmentBatchStatusCounts.
+        const direct = (serverStatusCounts as Record<string, unknown>)[statusLabel];
+        if (typeof direct === "number") return direct;
+
+        const count = toStatusKeyVariants(statusLabel).reduce<number | undefined>((found, key) => {
+          if (found !== undefined) return found;
+          const value = (serverStatusCounts as Record<string, unknown>)[key];
+          return typeof value === "number" ? value : undefined;
+        }, undefined);
+        return Number(count ?? 0);
+      };
+
+      const resolvedByUiStatus = tabKeys.reduce(
         (accumulator, statusLabel) => {
-          const count = toStatusKeyVariants(statusLabel).reduce<number | undefined>(
-            (found, key) => {
-              if (found !== undefined) {
-                return found;
-              }
-
-              const value = (serverStatusCounts as Record<string, unknown>)[key];
-              if (typeof value === "number") {
-                return value;
-              }
-
-              return undefined;
-            },
-            undefined,
-          );
-
-          accumulator[statusLabel] = Number(count ?? 0);
+          accumulator[statusLabel] = resolveCount(statusLabel);
           return accumulator;
         },
         {} as Record<string, number>,
       );
 
+      const allDirect = (serverStatusCounts as Record<string, unknown>)[
+        STRINGS.USER_BATCH_LIST.FILTER_ALL
+      ];
+      const allFromTabs = Object.values(resolvedByUiStatus).reduce(
+        (sum: number, value: number) => sum + value,
+        0,
+      );
+
       return {
         ...resolvedByUiStatus,
-        // All = sum of every status tab; do not use filtered pagination totalRecords.
-        [STRINGS.USER_BATCH_LIST.FILTER_ALL]: Object.values(resolvedByUiStatus).reduce(
-          (sum, value) => sum + value,
-          0,
-        ),
+        [STRINGS.USER_BATCH_LIST.FILTER_ALL]:
+          typeof allDirect === "number" && allDirect > 0 ? allDirect : allFromTabs,
       };
     }
 
-    const nextCounts = Object.keys(statusConfig).reduce(
+    const nextCounts = tabKeys.reduce(
       (accumulator, key) => {
         accumulator[key] = rows.filter((row: any) => getVal(row, statusField) === key).length;
         return accumulator;
@@ -298,10 +302,13 @@ const UserBatchList = ({
       {} as Record<string, number>,
     );
 
-    nextCounts[STRINGS.USER_BATCH_LIST.FILTER_ALL] = rows.length;
+    nextCounts[STRINGS.USER_BATCH_LIST.FILTER_ALL] = Object.values(nextCounts).reduce(
+      (sum: number, value: number) => sum + value,
+      0,
+    );
 
     return nextCounts;
-  }, [rows, serverStatusCounts, statusConfig, statusField, totalRecords]);
+  }, [rows, serverStatusCounts, statusConfig, statusField, statusTabs]);
   const statusMeta = useMemo(() => {
     if (!statusConfig) {
       return {};

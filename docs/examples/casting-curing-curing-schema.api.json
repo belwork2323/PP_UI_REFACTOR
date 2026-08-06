@@ -1,0 +1,71 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "CURING",
+    "motorStage": 1,
+    "subdepartmentId": 6,
+    "functionality": "CREATE_CURING_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "CURING",
+  "functionality": "CREATE_CURING_FORM",
+  "motorStage": 1,
+  "message": "Curing schema fetched successfully",
+  "meta": {
+    "title": "Curing Form",
+    "description": "Motor curing cycle and post curing details"
+  },
+  "data": {
+    "ui": {
+      "layout": "accordion",
+      "gap": "md",
+      "sectionVariant": "card",
+      "sectionBorderRadius": "sm"
+    },
+    "context": {
+      "motorStage": 1,
+      "subDepartmentId": "{{subDepartmentId}}",
+      "motorId": "{{motorId}}"
+    },
+    "sections": [
+      {
+        "id": "CURING_CYCLES",
+        "title": "Curing Cycles",
+        "ui": { "variant": "card", "icon": "thermostat", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "CURING_TABLE",
+            "rows": {
+              "defaultCount": 3,
+              "min": 1,
+              "max": 20,
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "srNo"
+            },
+            "columns": [
+              { "type": "column", "id": "srNo", "fieldType": "serial", "label": "S.No", "readonly": true },
+              { "type": "column", "id": "TEMPERATURE", "fieldType": "number", "label": "Temperature", "unit": "°C" },
+              { "type": "column", "id": "TIME", "fieldType": "number", "label": "Time", "unit": "min" },
+              { "type": "column", "id": "START_DATE", "fieldType": "date", "label": "Start Date" },
+              { "type": "column", "id": "START_TIME", "fieldType": "time", "label": "Start Time" },
+              { "type": "column", "id": "END_DATE", "fieldType": "date", "label": "End Date" },
+              { "type": "column", "id": "END_TIME", "fieldType": "time", "label": "End Time" },
+              { "type": "column", "id": "PROPELLANT_PRESSURE", "fieldType": "number", "label": "Propellant Pressure", "unit": "bar" },
+              {
+                "type": "column",
+                "id": "HOT_WATER_STATUS",
+                "fieldType": "dropdown",
+                "label": "Status Of Hot Water Circulation",
+                "dataSource": { "type": "static", "options": ["ON", "OFF", "NA"] }
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

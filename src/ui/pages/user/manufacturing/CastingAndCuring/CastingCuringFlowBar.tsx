@@ -1,38 +1,36 @@
 import { useEffect, useMemo, useState } from "react";
-import { Box, Button, CircularProgress, TextField, Typography } from "@mui/material";
+import { alpha, Box, Button, Chip, CircularProgress, Stack, Typography } from "@mui/material";
 import { fetchCastingStationsApi } from "../../../../../data/api/users/operationsApi";
 import {
   CASTING_CURING_FLOW_LABELS,
-  CASTING_TYPE_OPTIONS,
   canAddCastingCuringMotors,
   canLoadCastingForm,
   filterUnusedCastingCuringMotorOptions,
   getCastingMotorCountOptions,
   resolveCastingCuringMotorOptionsForSlot,
   resolveCastingMotorCount,
+  resolveCastingTypeOptionsForBatch,
+  shouldShowMotorsToProcessField,
   type CastingCuringMotorOption,
-  type CastingProcessSetupDraft,
+  type CastingMotorDraftEntry,
 } from "../../../../../hooks/user/manufacturing/castingCuringFlowConfig";
 import { DateTimeField } from "../../../../components/common/DateField";
 import CasePrepSelect from "../CasePreparation/CasePrepSelect";
 
+type CastingMotorDraftField = keyof CastingMotorDraftEntry;
+
 type CastingCuringFlowBarProps = {
+  batchMotorCount: number;
   castingType: string;
-  castingStation: string;
   motorCount: number | "";
-  draftMotorIds: string[];
-  motorReceivedAt: string;
-  setup: CastingProcessSetupDraft;
+  castingMotorDrafts: CastingMotorDraftEntry[];
   availableMotorOptions: CastingCuringMotorOption[];
   usedMotorIds: string[];
   maxMotorCount: number;
   castingFormLoaded: boolean;
   onCastingTypeChange: (value: string) => void;
-  onCastingStationChange: (value: string) => void;
   onMotorCountChange: (count: number | "") => void;
-  onDraftMotorIdChange: (index: number, motorId: string) => void;
-  onMotorReceivedAtChange: (value: string) => void;
-  onSetupChange: (field: keyof CastingProcessSetupDraft, value: string) => void;
+  onCastingMotorDraftChange: (index: number, field: CastingMotorDraftField, value: string) => void;
   onLoadCastingForm: () => void;
   onAddMotors: () => void;
   canAddMotors: boolean;
@@ -41,22 +39,17 @@ type CastingCuringFlowBarProps = {
 };
 
 const CastingCuringFlowBar = ({
+  batchMotorCount,
   castingType,
-  castingStation,
   motorCount,
-  draftMotorIds,
-  motorReceivedAt,
-  setup,
+  castingMotorDrafts,
   availableMotorOptions,
   usedMotorIds,
   maxMotorCount,
   castingFormLoaded,
   onCastingTypeChange,
-  onCastingStationChange,
   onMotorCountChange,
-  onDraftMotorIdChange,
-  onMotorReceivedAtChange,
-  onSetupChange,
+  onCastingMotorDraftChange,
   onLoadCastingForm,
   onAddMotors,
   canAddMotors,
@@ -65,6 +58,7 @@ const CastingCuringFlowBar = ({
 }: CastingCuringFlowBarProps) => {
   const flowBar = theme.manufacturing?.casePreparation?.flowBar ?? {};
   const L = CASTING_CURING_FLOW_LABELS;
+  const primary = theme.palette.primary;
   const [stationOptions, setStationOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [stationLoadError, setStationLoadError] = useState<string | null>(null);
 
@@ -103,37 +97,26 @@ const CastingCuringFlowBar = ({
   );
   const showAddSection =
     !castingFormLoaded || availableMotorOptions.length === 0 || unusedMotorOptions.length > 0;
+  const castingTypeOptions = useMemo(
+    () => resolveCastingTypeOptionsForBatch(batchMotorCount),
+    [batchMotorCount],
+  );
   const resolvedMotorCount = resolveCastingMotorCount(castingType, motorCount);
-  const showCustomMotorCount = String(castingType).toLowerCase() === "others";
-  const showMotorFields =
+  const showMotorsToProcessField = shouldShowMotorsToProcessField(batchMotorCount, castingType);
+  const showMotorRows =
     resolvedMotorCount > 0 && (availableMotorOptions.length === 0 || unusedMotorOptions.length > 0);
   const motorCountOptions = getCastingMotorCountOptions(maxMotorCount);
-  const setupFieldsEnabled = Boolean(castingType && castingStation);
-  const motorFieldsEnabled = setupFieldsEnabled;
 
   const draftParams = useMemo(
     () => ({
       castingType,
-      castingStation,
       motorCount,
-      draftMotorIds,
-      motorReceivedAt,
+      castingMotorDrafts,
       usedMotorIds,
       availableMotorOptions,
-      setup,
       maxMotorCount,
     }),
-    [
-      availableMotorOptions,
-      castingStation,
-      castingType,
-      draftMotorIds,
-      maxMotorCount,
-      motorCount,
-      motorReceivedAt,
-      setup,
-      usedMotorIds,
-    ],
+    [availableMotorOptions, castingMotorDrafts, castingType, maxMotorCount, motorCount, usedMotorIds],
   );
 
   const canLoad = useMemo(
@@ -149,147 +132,132 @@ const CastingCuringFlowBar = ({
     resolveCastingCuringMotorOptionsForSlot(
       availableMotorOptions,
       usedMotorIds,
-      draftMotorIds,
+      castingMotorDrafts,
       slotIndex,
     );
 
-  const renderSetupInput = (
-    label: string,
-    placeholder: string,
-    value: string,
-    field: keyof CastingProcessSetupDraft,
-    width: number | string = 220,
-  ) => (
-    <Box sx={flowBar.selectField?.(width)}>
-      <Typography component="label" sx={flowBar.selectLabel}>
-        {label}
-      </Typography>
-      <TextField
-        size="small"
-        fullWidth
-        value={value}
-        disabled={!setupFieldsEnabled}
-        placeholder={placeholder}
-        onChange={(event) => onSetupChange(field, event.target.value)}
-        sx={flowBar.selectInput?.(Boolean(String(value ?? "").trim()))}
-        inputProps={{ inputMode: "decimal" }}
-      />
-    </Box>
-  );
+  const renderMotorRow = (row: CastingMotorDraftEntry, idx: number) => {
+    const rowEnabled = Boolean(castingType);
+    const rowLabel = resolvedMotorCount > 1 ? `${L.motorRowTitle} ${idx + 1}` : L.motorRowTitle;
 
-  const renderMotorReceivedAt = (disabled: boolean) => (
-    <Box sx={flowBar.selectField?.(260)}>
-      <Typography component="label" sx={flowBar.selectLabel}>
-        {L.motorReceivedAt}
-      </Typography>
-      <DateTimeField
-        value={motorReceivedAt}
-        onChange={onMotorReceivedAtChange}
-        disabled={disabled}
-        placeholder={L.motorReceivedAtPlaceholder}
+    return (
+      <Box
+        key={`cc-motor-row-${idx}`}
         sx={{
-          mb: 0,
-          ...(flowBar.selectInput?.(Boolean(motorReceivedAt)) as object),
+          border: `1px solid ${theme.palette.border ?? alpha(primary, 0.14)}`,
+          borderRadius: 2,
+          px: 1.25,
+          py: 1.1,
+          background: theme.palette.surface ?? "#fff",
         }}
-      />
-    </Box>
-  );
-
-  const renderMotorIdSlots = () =>
-    Array.from({ length: resolvedMotorCount }, (_, idx) => (
-      <CasePrepSelect
-        key={`cc-motor-slot-${idx}`}
-        label={`${L.motorId} ${resolvedMotorCount > 1 ? idx + 1 : ""}`.trim()}
-        value={draftMotorIds[idx] ?? ""}
-        placeholder={L.motorIdPlaceholder}
-        options={getMotorOptionsForSlot(idx)}
-        width={220}
-        theme={theme}
-        disabled={!motorFieldsEnabled}
-        onChange={(value) => onDraftMotorIdChange(idx, value)}
-      />
-    ));
-
-  if (!showAddSection) return null;
-
-  return (
-    <Box sx={flowBar.container}>
-      <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: theme.palette.primary, mb: 1.5 }}>
-        {L.castingProcessTitle}
-      </Typography>
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
-        <Box sx={flowBar.topRow}>
+      >
+        <Typography sx={{ fontSize: "0.76rem", fontWeight: 800, color: primary, mb: 1 }}>
+          {rowLabel}
+        </Typography>
+        <Box sx={{ ...flowBar.topRow, alignItems: "flex-start" }}>
           <CasePrepSelect
-            label={L.castingType}
-            value={castingType}
-            placeholder={L.castingTypePlaceholder}
-            options={CASTING_TYPE_OPTIONS.map((option) => ({ value: option.value, label: option.label }))}
-            width={200}
+            label={`${L.motorId}${resolvedMotorCount > 1 ? ` ${idx + 1}` : ""}`}
+            value={row.motorId}
+            placeholder={L.motorIdPlaceholder}
+            options={getMotorOptionsForSlot(idx)}
+            width={220}
             theme={theme}
-            onChange={onCastingTypeChange}
+            disabled={!rowEnabled}
+            onChange={(value) => onCastingMotorDraftChange(idx, "motorId", value)}
           />
 
           <Box>
             <CasePrepSelect
               label={L.castingStation}
-              value={castingStation}
+              value={row.castingStation}
               placeholder={L.castingStationPlaceholder}
               options={stationOptions}
-              width={200}
+              width={220}
               theme={theme}
-              onChange={onCastingStationChange}
+              disabled={!rowEnabled}
+              onChange={(value) => onCastingMotorDraftChange(idx, "castingStation", value)}
             />
-            {stationLoadError ? (
+            {idx === 0 && stationLoadError ? (
               <Typography sx={{ fontSize: "0.72rem", color: theme.palette?.danger ?? "#C0392B", mt: 0.5 }}>
                 {stationLoadError}
               </Typography>
             ) : null}
           </Box>
 
-          {showCustomMotorCount && maxMotorCount > 0 ? (
+          <Box sx={flowBar.selectField?.(260)}>
+            <Typography component="label" sx={flowBar.selectLabel}>
+              {L.motorReceivedAt}
+            </Typography>
+            <DateTimeField
+              value={row.motorReceivedAt}
+              onChange={(value) => onCastingMotorDraftChange(idx, "motorReceivedAt", value)}
+              disabled={!rowEnabled}
+              placeholder={L.motorReceivedAtPlaceholder}
+              sx={{
+                mb: 0,
+                ...(flowBar.selectInput?.(Boolean(row.motorReceivedAt)) as object),
+              }}
+            />
+          </Box>
+        </Box>
+      </Box>
+    );
+  };
+
+  if (!showAddSection) return null;
+
+  return (
+    <Box sx={flowBar.container}>
+      <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" mb={1.5}>
+        <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: primary }}>
+          {L.castingProcessTitle}
+        </Typography>
+        <Chip
+          size="small"
+          label={`${L.batchMotorsAvailable}: ${batchMotorCount}`}
+          sx={{
+            height: 24,
+            fontWeight: 700,
+            fontSize: "0.72rem",
+            color: primary,
+            background: alpha(primary, 0.08),
+            border: `1px solid ${alpha(primary, 0.18)}`,
+          }}
+        />
+      </Stack>
+
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        <Box sx={flowBar.topRow}>
+          <CasePrepSelect
+            label={L.castingType}
+            value={castingType}
+            placeholder={L.castingTypePlaceholder}
+            options={castingTypeOptions}
+            width={220}
+            theme={theme}
+            disabled={batchMotorCount <= 0}
+            onChange={onCastingTypeChange}
+          />
+
+          {showMotorsToProcessField && maxMotorCount > 0 ? (
             <CasePrepSelect
-              label={L.motorCount}
+              label={L.motorsToProcess}
               value={motorCount === "" ? "" : String(motorCount)}
-              placeholder={L.motorCountPlaceholder}
+              placeholder={L.motorsToProcessPlaceholder}
               options={motorCountOptions}
-              width={200}
+              width={220}
               theme={theme}
-              disabled={!setupFieldsEnabled}
+              disabled={!castingType}
               onChange={(value) => onMotorCountChange(value === "" ? "" : Number(value))}
             />
           ) : null}
-
-          {showMotorFields ? renderMotorIdSlots() : null}
-
-          {renderMotorReceivedAt(!setupFieldsEnabled)}
         </Box>
 
-        <Box sx={flowBar.topRow}>
-          {renderSetupInput(
-            L.initialVacuum,
-            L.initialVacuumPlaceholder,
-            setup.initialVacuum,
-            "initialVacuum",
-          )}
-          {renderSetupInput(
-            L.castingVacuumPressure,
-            L.castingVacuumPressurePlaceholder,
-            setup.castingVacuumPressure,
-            "castingVacuumPressure",
-          )}
-          {renderSetupInput(
-            L.soakingVacuumPressure,
-            L.soakingVacuumPressurePlaceholder,
-            setup.soakingVacuumPressure,
-            "soakingVacuumPressure",
-          )}
-          {renderSetupInput(
-            L.finalMixCount,
-            L.finalMixCountPlaceholder,
-            setup.finalMixCount,
-            "finalMixCount",
-          )}
-        </Box>
+        {showMotorRows ? (
+          <Stack spacing={1.25}>
+            {castingMotorDrafts.map((row, idx) => renderMotorRow(row, idx))}
+          </Stack>
+        ) : null}
 
         <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
           {castingFormLoaded ? (

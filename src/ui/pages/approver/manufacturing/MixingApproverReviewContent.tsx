@@ -4,7 +4,6 @@ import {
   Button,
   CircularProgress,
   Stack,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import getManufacturingTheme from "../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
@@ -27,6 +26,11 @@ import {
   FinalMixDetailPanel,
   PremixDetailPanel,
 } from "../../user/manufacturing/Mixing/components/MixingDetailsContent";
+import {
+  UserWorkflowNavPanel,
+  UserWorkflowTabNav,
+  type UserWorkflowNavTab,
+} from "../../../components/custom/UserWorkflowStepPager";
 
 const MX = STRINGS.MANUFACTURING.MIXING;
 const {
@@ -121,6 +125,33 @@ const MixingApproverReviewContent = ({
     mixCards,
   });
 
+  const navPalette = {
+    primary: palette.primary,
+    primaryLight: palette.primaryLight,
+    border: palette.border,
+    surface: palette.surface,
+    textSub: palette.textSub,
+    text: palette.text,
+  };
+
+  const mixCardNavTabs = useMemo<UserWorkflowNavTab[]>(
+    () =>
+      mixCards.map((card) => ({
+        id: card.mixCardId,
+        label: card.label,
+        endAdornment: (
+          <PremixStatusChip
+            status={card.mixCardSubmissionStatus as PremixSubmissionStatus}
+            statusConfig={statusConfig}
+            showIcon={false}
+            variant="embedded"
+            onAccent={card.mixCardId === activeMixCardId}
+          />
+        ),
+      })),
+    [activeMixCardId, mixCards, statusConfig],
+  );
+
   const goToEnabledMixCard = (direction: -1 | 1) => {
     if (enabledMixCards.length === 0) return;
     const currentIndex = Math.max(
@@ -214,95 +245,31 @@ const MixingApproverReviewContent = ({
         </Box>
       ) : null}
 
-      <Box
-        sx={{
-          border: `1px solid ${palette.border}`,
-          borderRadius: 2,
-          px: 1.2,
-          py: 1,
-          background: palette.surface,
-        }}
-      >
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Button
-            variant="outlined"
-            size="small"
-            disabled={enabledMixCardIndex <= 0}
-            onClick={() => goToEnabledMixCard(-1)}
-          >
-            Back
-          </Button>
-          <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: palette.primary }}>
-            Card {activeMixCardIndex >= 0 ? activeMixCardIndex + 1 : "—"} of{" "}
-            {totalMixCardCount || mixCards.length}
-          </Typography>
-          <Button
-            variant="outlined"
-            size="small"
-            disabled={
-              enabledMixCardIndex < 0 || enabledMixCardIndex >= enabledMixCards.length - 1
-            }
-            onClick={() => goToEnabledMixCard(1)}
-          >
-            Next
-          </Button>
-        </Stack>
-      </Box>
-
-      <Box
-        sx={{
-          border: `1px solid ${palette.border}`,
-          borderRadius: 2,
-          px: 1,
-          py: 1,
-          background: palette.surface,
-        }}
-      >
-        <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: palette.primary, mb: 0.4 }}>
-          {MX.MIX_CARD_NAV_TITLE}
-        </Typography>
-        <Typography sx={{ fontSize: "0.72rem", color: palette.textSub, mb: 0.9 }}>
-          {MX.MIX_CARD_APPROVER_NAV_HINT}
-        </Typography>
-        <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
-          {mixCards.map((card) => {
-            const disabled = isMixCardApproverTabDisabled(card.mixCardSubmissionStatus);
-            const active = card.mixCardId === activeMixCardId;
-            const button = (
-              <Button
-                key={`approver-mix-card-${card.mixCardId}`}
-                size="small"
-                variant={active ? "contained" : "outlined"}
-                disabled={disabled}
-                onClick={() => onActiveMixCardChange(card.mixCardId)}
-                sx={{ whiteSpace: "nowrap", flexShrink: 0, textTransform: "none" }}
-              >
-                <Stack direction="row" alignItems="center" gap={0.75}>
-                  {card.label}
-                  <PremixStatusChip
-                    status={card.mixCardSubmissionStatus as PremixSubmissionStatus}
-                    statusConfig={statusConfig}
-                    showIcon={false}
-                    variant="embedded"
-                    onAccent={active}
-                  />
-                </Stack>
-              </Button>
-            );
-
-            return disabled ? (
-              <Tooltip
-                key={`approver-mix-card-tip-${card.mixCardId}`}
-                title={MX.MIX_CARD_APPROVER_TAB_DISABLED}
-              >
-                <span>{button}</span>
-              </Tooltip>
-            ) : (
-              button
-            );
-          })}
-        </Stack>
-      </Box>
+      <UserWorkflowNavPanel palette={navPalette}>
+        <UserWorkflowTabNav
+          title={MX.MIX_CARD_NAV_TITLE}
+          hint={MX.MIX_CARD_APPROVER_NAV_HINT}
+          tabs={mixCardNavTabs}
+          activeIndex={activeMixCardIndex >= 0 ? activeMixCardIndex : 0}
+          onActiveIndexChange={(index) => onActiveMixCardChange(mixCards[index].mixCardId)}
+          palette={navPalette}
+          showStepArrows
+          onStepBack={() => goToEnabledMixCard(-1)}
+          onStepNext={() => goToEnabledMixCard(1)}
+          disableStepBack={enabledMixCardIndex <= 0}
+          disableStepNext={
+            enabledMixCardIndex < 0 || enabledMixCardIndex >= enabledMixCards.length - 1
+          }
+          isTabDisabled={(_, index) =>
+            isMixCardApproverTabDisabled(mixCards[index]?.mixCardSubmissionStatus)
+          }
+          tabTooltip={(_, index) =>
+            isMixCardApproverTabDisabled(mixCards[index]?.mixCardSubmissionStatus)
+              ? MX.MIX_CARD_APPROVER_TAB_DISABLED
+              : undefined
+          }
+        />
+      </UserWorkflowNavPanel>
 
       {activeMixCard && !isMixCardApproverTabDisabled(activeMixCard.mixCardSubmissionStatus) ? (
         <Box

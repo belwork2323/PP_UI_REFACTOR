@@ -39,12 +39,19 @@ const UserWorkflowStatusAction = ({
 }: UserWorkflowStatusActionProps) => {
   const isToBeInitiated = status === statusMap?.TO_BE_INITIATED || status === "TO_BE_INITIATED";
 
-  const isInProgress = status === statusMap?.IN_PROGRESS || status === "IN_PROGRESS";
+  const isInProgress =
+    status === statusMap?.IN_PROGRESS ||
+    status === "IN_PROGRESS" ||
+    status === statusMap?.WAITING_FOR_PARTIAL_APPROVAL ||
+    status === "WAITING_FOR_PARTIAL_APPROVAL";
 
   const isRejected = status === statusMap?.REJECTED || status === "REJECTED";
 
   const isWaitingForApproval =
-    status === statusMap?.WAITING_FOR_APPROVAL || status === "WAITING_FOR_APPROVAL";
+    status === statusMap?.WAITING_FOR_APPROVAL ||
+    status === "WAITING_FOR_APPROVAL" ||
+    status === statusMap?.WAITING_FOR_COMPLETE_APPROVAL ||
+    status === "WAITING_FOR_COMPLETE_APPROVAL";
 
   const isApproved = status === statusMap?.APPROVED || status === "APPROVED";
 
@@ -96,9 +103,9 @@ const UserWorkflowStatusAction = ({
     );
   }
 
-    case statusMap.WAITING_FOR_APPROVAL:
-    case statusMap.WAITING_FOR_COMPLETE_APPROVAL:
-      return <Chip label={waitingLabel} size="small" sx={theme.batchList.chips.waiting} />;
+  if (isWaitingForApproval) {
+    return <Chip label={waitingLabel} size="small" sx={theme.batchList.chips.waiting} />;
+  }
 
   if (isApproved) {
     return (
@@ -117,7 +124,9 @@ const UserWorkflowStatusAction = ({
       />
     );
   }
-
+  if (isWaitingForApproval) {
+    <Chip label={waitingLabel} size="small" sx={theme.batchList.chips.waiting} />;
+  }
   return null;
 };
 

@@ -1,87 +1,53 @@
-import { Box, Button, CircularProgress, Typography } from "@mui/material";
-import CasePrepSelect from "../manufacturing/CasePreparation/CasePrepSelect";
+import React from "react";
+import { Box, Button, CircularProgress } from "@mui/material";
 import CasePrepDateField from "../manufacturing/CasePreparation/CasePrepDateField";
 import CasePrepTextField from "../manufacturing/CasePreparation/CasePrepTextField";
+import CasePrepSelect from "../manufacturing/CasePreparation/CasePrepSelect";
 import {
   DISPATCH_FLOW_LABELS,
-  DISPATCH_STAGE_OPTIONS,
   DISPATCH_YES_NO_OPTIONS,
-  canAddDispatchMotor,
+  DispatchSharedSetup,
   canLoadDispatchMotor,
-  dispatchMotorStagesMatch,
-  type DispatchAddedMotor,
-  type DispatchMotorOption,
 } from "../../../../hooks/user/dispatch/dispatchFlowConfig";
-import type { DispatchFormState } from "../../../../data/models/user/DispatchFormModel";
 import type getDispatchTheme from "../../../../app/theme/custom_themes/user/dispatch/dispatch_theme";
 
 type DispatchFlowBarProps = {
-  batchId?: string;
-  formData: DispatchFormState;
+  setup: DispatchSharedSetup;
   draftMotorId: string;
-  addedMotors: DispatchAddedMotor[];
-  availableMotors?: DispatchMotorOption[];
+  usedMotorIds?: string[];
+  hasMotors?: boolean;
   schemaLoading?: boolean;
-  onSetupChange: (field: string, value: string) => void;
-  onDraftMotorIdChange: (value: string) => void;
+  onSetupChange: <K extends keyof DispatchSharedSetup>(
+    field: K,
+    value: DispatchSharedSetup[K],
+  ) => void;
   onLoadForm: () => void;
-  onAddMotor: () => void;
   theme: any;
   dispatchTheme: ReturnType<typeof getDispatchTheme>;
 };
 
-const DispatchFlowBar = ({
-  formData,
+const DispatchFlowBar: React.FC<DispatchFlowBarProps> = ({
+  setup,
   draftMotorId,
-  addedMotors,
-  availableMotors = [],
+  usedMotorIds = [],
+  hasMotors = false,
   schemaLoading = false,
   onSetupChange,
-  onDraftMotorIdChange,
   onLoadForm,
-  onAddMotor,
   theme,
   dispatchTheme,
-}: DispatchFlowBarProps) => {
+}) => {
   const flowBar = dispatchTheme.flowBar;
   const casePrepFlowBar = theme.manufacturing?.casePreparation?.flowBar ?? {};
   const L = DISPATCH_FLOW_LABELS;
-  const usedMotorIds = addedMotors.map((motor) => motor.motorId);
-  const hasMotors = addedMotors.length > 0;
-  const sharedSetup = {
-    motorStage: formData.motorStage,
-    castingDate: formData.castingDate,
-    dispatchDate: formData.dispatchDate,
-    dispatchLocation: formData.dispatchLocation,
-    ndtClearance: formData.ndtClearance,
-    ndtMomNo: formData.ndtMomNo,
-    finalAcceptanceClearance: formData.finalAcceptanceClearance,
-    finalAcceptanceMomNo: formData.finalAcceptanceMomNo,
-  };
-
-  const motorOptions = availableMotors
-    .filter((motor) => dispatchMotorStagesMatch(motor.motorStage, formData.motorStage))
-    .map((motor) => ({
-      value: motor.motorId,
-      label: motor.motorId,
-      disabled: motor.motorId !== draftMotorId && usedMotorIds.includes(motor.motorId),
-    }));
 
   const canLoad = canLoadDispatchMotor({
-    setup: sharedSetup,
+    setup,
     draftMotorId,
     usedMotorIds,
     hasMotors,
   });
-  const canAdd = canAddDispatchMotor({
-    setup: sharedSetup,
-    draftMotorId,
-    usedMotorIds,
-    hasMotors,
-  });
-  const showLoad = canLoad;
-  const showAdd = !canLoad && canAdd;
-  const setupHint = hasMotors ? L.setupHintLoaded : L.setupHint;
+
   const selectTheme = {
     ...theme,
     manufacturing: theme.manufacturing ?? { casePreparation: { flowBar: casePrepFlowBar } },
@@ -89,121 +55,86 @@ const DispatchFlowBar = ({
 
   return (
     <Box sx={flowBar.container}>
-      {setupHint ? <Typography sx={flowBar.setupHint}>{setupHint}</Typography> : null}
-
-      <Box sx={{ display: "flex", flexDirection: "column", gap: 2.25 }}>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
+        {/* Row 1: Dates & Location */}
         <Box sx={flowBar.topRow}>
-          <CasePrepSelect
-            label={L.stage}
-            value={formData.motorStage}
-            placeholder={L.stagePlaceholder}
-            options={DISPATCH_STAGE_OPTIONS}
-            width={180}
-            theme={selectTheme}
-            onChange={(value) => onSetupChange("motorStage", value)}
-          />
-
-          <CasePrepSelect
-            label={L.motorId}
-            value={draftMotorId}
-            placeholder={L.motorIdPlaceholder}
-            options={motorOptions}
-            width={260}
-            theme={selectTheme}
-            disabled={!formData.motorStage || motorOptions.length === 0}
-            onChange={onDraftMotorIdChange}
-          />
-
           <CasePrepDateField
             label={L.castingDate}
-            value={formData.castingDate}
-            onChange={(value) => onSetupChange("castingDate", value)}
+            value={setup.castingDate ?? ""}
+            onChange={(val) => onSetupChange("castingDate", val)}
             theme={selectTheme}
           />
 
           <CasePrepDateField
             label={L.dispatchDate}
-            value={formData.dispatchDate}
-            onChange={(value) => onSetupChange("dispatchDate", value)}
+            value={setup.dispatchDate ?? ""}
+            onChange={(val) => onSetupChange("dispatchDate", val)}
             theme={selectTheme}
           />
 
           <CasePrepTextField
             label={L.dispatchLocation}
-            value={formData.dispatchLocation}
+            value={setup.dispatchLocation ?? ""}
             placeholder={L.dispatchLocationPlaceholder}
             width={240}
             theme={selectTheme}
-            onChange={(value) => onSetupChange("dispatchLocation", value)}
+            onChange={(val) => onSetupChange("dispatchLocation", val)}
           />
         </Box>
 
+        {/* Row 2: Clearances & Action */}
         <Box sx={flowBar.topRow}>
           <CasePrepSelect
             label={L.ndtClearance}
-            value={formData.ndtClearance}
+            value={setup.ndtClearance ?? ""}
             placeholder="Select"
             options={DISPATCH_YES_NO_OPTIONS}
-            width={260}
+            width={200}
             theme={selectTheme}
-            onChange={(value) => onSetupChange("ndtClearance", value)}
+            onChange={(val) => onSetupChange("ndtClearance", val)}
           />
 
-          {formData.ndtClearance === "YES" ? (
+          {setup.ndtClearance === "YES" && (
             <CasePrepTextField
               label={L.ndtMomNo}
-              value={formData.ndtMomNo}
+              value={setup.ndtMomNo ?? ""}
               placeholder={L.ndtMomNoPlaceholder}
               theme={selectTheme}
-              onChange={(value) => onSetupChange("ndtMomNo", value)}
+              onChange={(val) => onSetupChange("ndtMomNo", val)}
             />
-          ) : null}
+          )}
 
           <CasePrepSelect
             label={L.finalAcceptanceClearance}
-            value={formData.finalAcceptanceClearance}
+            value={setup.finalAcceptanceClearance ?? ""}
             placeholder="Select"
             options={DISPATCH_YES_NO_OPTIONS}
-            width={340}
+            width={240}
             theme={selectTheme}
-            onChange={(value) => onSetupChange("finalAcceptanceClearance", value)}
+            onChange={(val) => onSetupChange("finalAcceptanceClearance", val)}
           />
 
-          {formData.finalAcceptanceClearance === "YES" ? (
+          {setup.finalAcceptanceClearance === "YES" && (
             <CasePrepTextField
               label={L.finalAcceptanceMomNo}
-              value={formData.finalAcceptanceMomNo}
+              value={setup.finalAcceptanceMomNo ?? ""}
               placeholder={L.finalAcceptanceMomNoPlaceholder}
               theme={selectTheme}
-              onChange={(value) => onSetupChange("finalAcceptanceMomNo", value)}
+              onChange={(val) => onSetupChange("finalAcceptanceMomNo", val)}
             />
-          ) : null}
+          )}
 
-          <Box sx={{ ...flowBar.actionRow, ml: { sm: "auto" }, width: { xs: "100%", sm: "auto" } }}>
-            {showLoad ? (
-              <Button
-                variant="contained"
-                size="medium"
-                disabled={schemaLoading}
-                onClick={onLoadForm}
-                startIcon={schemaLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
-                sx={flowBar.primaryAction}
-              >
-                {schemaLoading ? L.loadingSchema : L.loadForm}
-              </Button>
-            ) : null}
-            {showAdd ? (
-              <Button
-                variant="contained"
-                size="medium"
-                disabled={schemaLoading}
-                onClick={onAddMotor}
-                startIcon={schemaLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
-                sx={flowBar.primaryAction}
-              >
-                {schemaLoading ? L.loadingSchema : L.addMotor}
-              </Button>
-            ) : null}
+          <Box sx={{ ...flowBar.actionRow, ml: "auto" }}>
+            <Button
+              variant="contained"
+              size="medium"
+              disabled={!canLoad || schemaLoading}
+              onClick={onLoadForm}
+              startIcon={schemaLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
+              sx={flowBar.primaryAction}
+            >
+              {schemaLoading ? L.loadingSchema : L.loadForm}
+            </Button>
           </Box>
         </Box>
       </Box>

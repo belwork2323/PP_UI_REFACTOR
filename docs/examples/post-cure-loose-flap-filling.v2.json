@@ -79,49 +79,81 @@
             "id": "PREPARATION_DETAILS",
             "rows": {
               "defaultCount": 4,
-              "allowAdd": false,
-              "allowDelete": false,
+              "allowAdd": true,
+              "allowDelete": true,
+              "min": 4,
+              "autoIncrementKey": "srNo",
+              "addLabel": "Add Row",
+              "rowComputations": [
+                {
+                  "rowKey": "TOTAL",
+                  "rowKeyColumn": "srNo",
+                  "targetColumn": "QUANTITY",
+                  "sourceColumn": "QUANTITY",
+                  "expression": "__SUM__",
+                  "editable": true
+                }
+              ],
               "presetRows": [
-                { "readonly": true, "INGREDIENT": "A-125 Hardener", "PARTS_BY_WEIGHT": "60 ±1" },
-                { "readonly": true, "INGREDIENT": "GX-257 Resin", "PARTS_BY_WEIGHT": "40 ±1" },
-                { "readonly": true, "INGREDIENT": "HY-960 Accelerator", "PARTS_BY_WEIGHT": "6 ±0.5" },
-                { "readonly": true, "INGREDIENT": "DY-026 Diluent", "PARTS_BY_WEIGHT": "10 ±0.5" }
+                {
+                  "readonly": true,
+                  "INGREDIENT": "A-125 Hardener",
+                  "PARTS_BY_WEIGHT": "60 ±1",
+                  "INGREDIENT__fieldType": "static",
+                  "PARTS_BY_WEIGHT__fieldType": "static"
+                },
+                {
+                  "readonly": true,
+                  "INGREDIENT": "GX-257 Resin",
+                  "PARTS_BY_WEIGHT": "40 ±1",
+                  "INGREDIENT__fieldType": "static",
+                  "PARTS_BY_WEIGHT__fieldType": "static"
+                },
+                {
+                  "readonly": true,
+                  "INGREDIENT": "HY-960 Accelerator",
+                  "PARTS_BY_WEIGHT": "6 ±0.5",
+                  "INGREDIENT__fieldType": "static",
+                  "PARTS_BY_WEIGHT__fieldType": "static"
+                },
+                {
+                  "readonly": true,
+                  "INGREDIENT": "DY-026 Diluent",
+                  "PARTS_BY_WEIGHT": "10 ±0.5",
+                  "INGREDIENT__fieldType": "static",
+                  "PARTS_BY_WEIGHT__fieldType": "static"
+                },
+                {
+                  "readonly": true,
+                  "srNo": "TOTAL",
+                  "INGREDIENT": "Total Quantity",
+                  "MFG_LOT": "",
+                  "PARTS_BY_WEIGHT": "",
+                  "INGREDIENT__fieldType": "static",
+                  "MFG_LOT__fieldType": "static",
+                  "PARTS_BY_WEIGHT__fieldType": "static",
+                  "QUANTITY__fieldType": "number"
+                }
               ]
             },
             "columns": [
               {
                 "type": "column",
                 "id": "INGREDIENT",
-                "fieldType": "static",
-                "label": "Ingredient",
-                "readonly": true
+                "fieldType": "text",
+                "label": "Ingredient"
               },
               {
                 "type": "column",
                 "id": "MFG_LOT",
-                "fieldType": "dropdown",
-                "label": "Mfg Lot",
-                "dataSource": {
-                  "type": "api",
-                  "api": {
-                    "endpoint": "MATERIAL_LOTS",
-                    "method": "POST",
-                    "requestField": "batchId",
-                    "requestBody": {
-                      "subDepartmentId": "{{subDepartmentId}}"
-                    },
-                    "responsePath": "data.materials",
-                    "displayKey": "lotId",
-                    "valueKey": "lotId"
-                  }
-                }
+                "fieldType": "text",
+                "label": "Mfg Lot"
               },
               {
                 "type": "column",
                 "id": "PARTS_BY_WEIGHT",
-                "fieldType": "static",
-                "label": "Parts By Weight",
-                "readonly": true
+                "fieldType": "text",
+                "label": "Parts By Weight"
               },
               {
                 "type": "column",
@@ -139,14 +171,36 @@
         "ui": { "variant": "card", "padding": "md" },
         "children": [
           {
-            "type": "field",
-            "id": "QUALIFICATION_BATCH_NO",
-            "fieldType": "text",
-            "label": "Batch No With Date Of Preparation",
+            "type": "group",
+            "id": "QUALIFICATION_BATCH_FIELDS",
             "ui": {
-              "colSpan": { "xs": 12, "sm": 6, "md": 4 },
-              "maxWidth": "300px"
-            }
+              "direction": "row",
+              "wrap": true,
+              "gap": "md",
+              "alignItems": "flex-end"
+            },
+            "children": [
+              {
+                "type": "field",
+                "id": "QUALIFICATION_BATCH_NO",
+                "fieldType": "text",
+                "label": "Batch No",
+                "ui": {
+                  "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+                  "maxWidth": "280px"
+                }
+              },
+              {
+                "type": "field",
+                "id": "QUALIFICATION_PREPARATION_DATE",
+                "fieldType": "date",
+                "label": "Date of Preparation",
+                "ui": {
+                  "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+                  "maxWidth": "280px"
+                }
+              }
+            ]
           },
           {
             "type": "table",
@@ -180,14 +234,14 @@
                 "id": "RESULT",
                 "fieldType": "text",
                 "label": "Result"
-              },
-              {
-                "type": "column",
-                "id": "QC_REPORT",
-                "fieldType": "file",
-                "label": "QC Report"
               }
             ]
+          },
+          {
+            "type": "field",
+            "id": "QUALIFICATION_QC_REPORT",
+            "fieldType": "file",
+            "label": "QC Report"
           }
         ]
       },

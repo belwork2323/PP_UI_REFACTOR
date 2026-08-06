@@ -30,6 +30,8 @@ import ToggleTabs from "../../common/ToggleTabs";
 import { batchStatusConfig, stageConfig, getSubDeptChipConfig } from "@/app/theme/roleConfig";
 import { getStatus } from "@/utils/batchManagementUtils";
 import { normalizeSubdepartmentBatchStatus } from "@/data/models/user/SubdepartmentBatchModel";
+import AppButton from "../../common/Button";
+import LayersRoundedIcon from "@mui/icons-material/LayersRounded";
 
 const BATCH_ID_COLOR = "#1565c0";
 
@@ -55,7 +57,8 @@ type Props = {
   loading: boolean;
   theme: any;
   title: string;
-  emptyText: string;
+  emptyText?: string;
+  emptySubtitle?: string;
   meta?: React.ReactNode;
   filterPanel?: React.ReactNode;
   cardSx?: any;
@@ -74,7 +77,6 @@ const BATCH_COLUMNS = [
   { label: "Batch ID", sortKey: "batchId" },
   { label: "Type", sortKey: "batchType" },
   { label: "Motor ID", sortKey: "motorId" },
-  // { label: "Motor Type", sortKey: "motorType" },
   { label: "Project Name", sortKey: "projectName" },
   { label: "Current Stage", sortKey: "currentStage" },
   { label: "Manager Name", sortKey: "managerName" },
@@ -90,6 +92,7 @@ export default function InProgressBatchesTable({
   theme,
   title,
   emptyText,
+  emptySubtitle,
   meta,
   filterPanel,
   cardSx,
@@ -106,28 +109,33 @@ export default function InProgressBatchesTable({
   const role = useAuthStore((s) => s.user?.role ?? "");
   const [sortField, setSortField] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [menuAnchor, setMenuAnchor] = useState<HTMLElement | null>(null);
   const [menuRow, setMenuRow] = useState<InProgressBatchRow | null>(null);
+
   const normalizedRole = String(role)
     .trim()
     .replace(/[^a-zA-Z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "")
     .toUpperCase();
+
   const canViewDetails =
     (normalizedRole === "SYSTEM_MANAGER" || normalizedRole === "CENTRE_HEAD") &&
     Boolean(onViewDetails);
 
-  const handleMenuOpen = (e: React.MouseEvent<HTMLElement>, row: InProgressBatchRow) => {
-    e.stopPropagation();
-    setMenuAnchor(e.currentTarget);
-    setMenuRow(row);
-  };
+  // Compute active columns count dynamically for skeleton and empty state colSpan
+  const activeColumns = BATCH_COLUMNS.filter(
+    ({ sortKey }) => !hideManagerColumns || (sortKey !== "managerName" && sortKey !== "managerId"),
+  );
+  const totalColumnCount = activeColumns.length + (canViewDetails ? 1 : 0);
+
   const handleMenuClose = () => {
-    setMenuAnchor(null);
     setMenuRow(null);
   };
-  const handleMenuViewDetails = () => {
-    if (menuRow && onViewDetails) onViewDetails(menuRow);
+
+  const handleMenuViewDetails = (row: InProgressBatchRow) => {
+    if (onViewDetails) {
+      setMenuRow(row);
+      onViewDetails(row);
+    }
     handleMenuClose();
   };
 
@@ -200,12 +208,10 @@ export default function InProgressBatchesTable({
         ) : null
       }
     >
+      {/* 1. Header always renders regardless of data presence */}
       <TableHead>
         <TableRow sx={th.table.headerRow}>
-          {BATCH_COLUMNS.filter(
-            ({ sortKey }) =>
-              !hideManagerColumns || (sortKey !== "managerName" && sortKey !== "managerId"),
-          ).map(({ label, sortKey }) => {
+          {activeColumns.map(({ label, sortKey }) => {
             const isActive = sortField === sortKey;
             const SortIcon = isActive
               ? sortDir === "asc"
@@ -226,21 +232,30 @@ export default function InProgressBatchesTable({
         </TableRow>
       </TableHead>
 
+      {/* 2. Body handles Loading, Empty List, and Data Rows */}
       <TableBody>
         {loading ? (
           <>
-            <SkeletonRow columns={(hideManagerColumns ? 9 : 11) + (canViewDetails ? 1 : 0)} />
-            <SkeletonRow columns={(hideManagerColumns ? 9 : 11) + (canViewDetails ? 1 : 0)} />
-            <SkeletonRow columns={(hideManagerColumns ? 9 : 11) + (canViewDetails ? 1 : 0)} />
+            <SkeletonRow columns={totalColumnCount} />
+            <SkeletonRow columns={totalColumnCount} />
+            <SkeletonRow columns={totalColumnCount} />
           </>
         ) : sortedRows.length === 0 ? (
           <TableRow>
-            <TableCell
-              colSpan={(hideManagerColumns ? 9 : 11) + (canViewDetails ? 1 : 0)}
-              align="center"
-              sx={th.table.emptyCell}
-            >
-              {emptyText}
+            <TableCell colSpan={totalColumnCount} sx={{ p: 0, borderBottom: "none" }}>
+              <Box
+                sx={{
+                  position: "relative",
+                  width: "100%",
+                  ...theme.batchListShell.sections.listWrap,
+                }}
+              >
+                <Box sx={theme.batchListShell.sections.emptyWrap}>
+                  <LayersRoundedIcon sx={theme.batchListShell.empty.icon} />
+                  <Typography sx={theme.batchListShell.empty.title}>{emptyText}</Typography>
+                  <Typography sx={theme.batchListShell.empty.subtitle}>{emptySubtitle}</Typography>
+                </Box>
+              </Box>
             </TableCell>
           </TableRow>
         ) : (
@@ -343,10 +358,10 @@ export default function InProgressBatchesTable({
                   <TableCell sx={{ ...th.table.cell, width: 48, p: 0.5 }}>
                     <IconButton
                       size="small"
-                      onClick={(e) => handleMenuOpen(e, p)}
-                      sx={{ color: "text.secondary" }}
+                      onClick={() => handleMenuViewDetails(p)}
+                      sx={{ color: "text.primary" }}
                     >
-                      <MoreVertIcon fontSize="small" />
+                      <VisibilityIcon fontSize="small" />
                     </IconButton>
                   </TableCell>
                 )}
@@ -355,26 +370,6 @@ export default function InProgressBatchesTable({
           })
         )}
       </TableBody>
-
-      {canViewDetails && (
-        <Menu
-          anchorEl={menuAnchor}
-          open={Boolean(menuAnchor)}
-          onClose={handleMenuClose}
-          PaperProps={{ elevation: 3, sx: { minWidth: 180, borderRadius: "10px" } }}
-          transformOrigin={{ horizontal: "right", vertical: "top" }}
-          anchorOrigin={{ horizontal: "right", vertical: "bottom" }}
-        >
-          <MenuItem onClick={handleMenuViewDetails} sx={{ gap: 1, py: 1 }}>
-            <ListItemIcon sx={{ minWidth: 28 }}>
-              <VisibilityIcon fontSize="small" sx={{ color: "#1565c0" }} />
-            </ListItemIcon>
-            <ListItemText primaryTypographyProps={{ fontSize: "0.85rem", fontWeight: 500 }}>
-              View Batch Details
-            </ListItemText>
-          </MenuItem>
-        </Menu>
-      )}
     </TableCard>
   );
 }

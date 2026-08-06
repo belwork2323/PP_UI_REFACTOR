@@ -11,6 +11,7 @@ import { normalizeApproverBatchStatus } from "../approver/ApproverBatchListModel
 import {
   getPremixStatusLabel,
   type PremixSubmissionStatus,
+  type PremixSubmissionType,
 } from "./RawMaterialPreparationModel";
 import { formatSubdepartmentBatchTypeLabel, normalizeSubdepartmentBatchStatus } from "./SubdepartmentBatchModel";
 
@@ -123,15 +124,18 @@ export const normalizeMixCardStatus = (
 
 export const isMixCardApproverTabDisabled = (
   status?: MixCardSubmissionStatus | string | null,
-): boolean => !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS";
+): boolean => !status || status === "TO_BE_INITIATED";
 
 export const isMixCardApproverActionable = (
   status?: MixCardSubmissionStatus | string | null,
-): boolean => status === "WAITING_FOR_APPROVAL";
+): boolean => {
+  const normalized = String(status ?? "").trim().toUpperCase().replace(/\s+/g, "_");
+  return normalized === "WAITING_FOR_APPROVAL" || normalized === "IN_PROGRESS";
+};
 
 export type MixCardStatusMeta = {
   mixCardSubmissionStatus: MixCardSubmissionStatus;
-  mixCardSubmissionType?: "DRAFT" | "SUBMIT" | string | null;
+  premixSubmissionType?: PremixSubmissionType | string | null;
   rejectionReason?: string | null;
   remarks?: string | null;
 };
@@ -938,19 +942,19 @@ export const mapMixingFormStateToPayload = (
   form: MixingFormState,
   options?: {
     targetMixCardId?: string | null;
-    mixCardSubmissionType?: "DRAFT" | "SUBMIT" | null;
+    premixSubmissionType?: PremixSubmissionType | null;
     mixCardStatusById?: Record<string, MixCardStatusMeta>;
   },
 ) => {
   const targetMixCardId = String(options?.targetMixCardId ?? "").trim();
-  const intentType = options?.mixCardSubmissionType ?? null;
+  const intentType = options?.premixSubmissionType ?? null;
   const statusById = options?.mixCardStatusById ?? {};
 
-  const resolveCardSubmissionType = (mixCardId: string) => {
+  const resolvePremixSubmissionType = (mixCardId: string) => {
     if (targetMixCardId && mixCardId === targetMixCardId && intentType) {
       return intentType;
     }
-    return statusById[mixCardId]?.mixCardSubmissionType ?? null;
+    return statusById[mixCardId]?.premixSubmissionType ?? null;
   };
 
   const payload = {
@@ -963,7 +967,7 @@ export const mapMixingFormStateToPayload = (
             const mixCardId = buildMixCardId("PREMIX", premix.premixNo);
             return {
               premixNo: Number(premix.premixNo) || 0,
-              mixCardSubmissionType: resolveCardSubmissionType(mixCardId),
+              premixSubmissionType: resolvePremixSubmissionType(mixCardId),
 
               mixerConfiguration: {
                 mixerId: premix.mixerType,
@@ -999,7 +1003,7 @@ export const mapMixingFormStateToPayload = (
             const mixCardId = buildMixCardId("FINAL_MIX", entry.mixNo);
             return {
               premixNo: Number(entry.mixNo) || 0,
-              mixCardSubmissionType: resolveCardSubmissionType(mixCardId),
+              premixSubmissionType: resolvePremixSubmissionType(mixCardId),
 
               linkedPremixNo: Number(entry.linkedPremixNo) || null,
 
@@ -1143,17 +1147,24 @@ const resolveApiMixCardStatus = (
   return normalizeMixCardStatus(explicit);
 };
 
+const resolveApiPremixSubmissionType = (
+  entry: Record<string, unknown> | null | undefined,
+): PremixSubmissionType | string | null => {
+  const raw =
+    entry?.premixSubmissionType ??
+    entry?.mixCardSubmissionType ??
+    null;
+  const normalized = String(raw ?? "").trim().toUpperCase();
+  if (normalized === "DRAFT" || normalized === "SUBMIT") {
+    return normalized as PremixSubmissionType;
+  }
+  return raw == null || normalized === "" ? null : String(raw);
+};
+
 const mapMixCardStatusesFromApi = (
   data: Record<string, unknown>,
-): Record<string, { mixCardSubmissionStatus: MixCardSubmissionStatus; rejectionReason?: string | null; remarks?: string | null }> => {
-  const result: Record<
-    string,
-    {
-      mixCardSubmissionStatus: MixCardSubmissionStatus;
-      rejectionReason?: string | null;
-      remarks?: string | null;
-    }
-  > = {};
+): Record<string, MixCardStatusMeta> => {
+  const result: Record<string, MixCardStatusMeta> = {};
 
   const lists = [
     data.mixCardStatuses,
@@ -1176,14 +1187,83 @@ const mapMixCardStatusesFromApi = (
         stageType === "FINAL_MIX" ? "FINAL_MIX" : "PREMIX";
       const id = buildMixCardId(resolvedStage, cardNo);
       result[id] = {
-        mixCardSubmissionStatus: normalizeMixCardStatus(entry.mixCardSubmissionStatus ?? entry.status),
+        ...result[id],
+        mixCardSubmissionStatus: normalizeMixCardStatus(
+          entry.mixCardSubmissionStatus ?? entry.premixSubmissionStatus ?? entry.status,
+        ),
+        premixSubmissionType:
+          resolveApiPremixSubmissionType(entry) ?? result[id]?.premixSubmissionType ?? null,
         rejectionReason: (entry.rejectionReason as string | null | undefined) ?? null,
         remarks: (entry.remarks as string | null | undefined) ?? null,
       };
     });
   });
 
+  const stages = ((data.mixingDetails as { stages?: Array<{ stageType?: string; premixes?: Record<string, unknown>[] }> } | undefined)
+    ?.stages ?? []) as Array<{ stageType?: string; premixes?: Record<string, unknown>[] }>;
+
+  stages.forEach((stage) => {
+    const stageType = String(stage?.stageType ?? "").toUpperCase();
+    (stage?.premixes ?? []).forEach((entry) => {
+      const cardNo = String(entry?.premixNo ?? entry?.mixNo ?? "").trim();
+      if (!cardNo) return;
+      const id = buildMixCardId(stageType === "FINAL_MIX" ? "FINAL_MIX" : "PREMIX", cardNo);
+      result[id] = {
+        ...result[id],
+        mixCardSubmissionStatus:
+          result[id]?.mixCardSubmissionStatus ??
+          resolveApiMixCardStatus(entry, "TO_BE_INITIATED"),
+        premixSubmissionType:
+          resolveApiPremixSubmissionType(entry) ?? result[id]?.premixSubmissionType ?? null,
+        rejectionReason:
+          result[id]?.rejectionReason ??
+          (entry.rejectionReason as string | null | undefined) ??
+          null,
+        remarks:
+          result[id]?.remarks ?? (entry.remarks as string | null | undefined) ?? null,
+      };
+    });
+  });
+
   return result;
+};
+
+export const buildMixCardStatusMapFromDetails = (
+  data: Record<string, unknown>,
+): Record<string, MixCardStatusMeta> => {
+  const detailView = mapMixingDetailsForDisplay(data);
+  const statusById = mapMixCardStatusesFromApi(data);
+  const next: Record<string, MixCardStatusMeta> = {};
+
+  buildMixingApproverCards(detailView).forEach((card) => {
+    const meta = statusById[card.mixCardId];
+    next[card.mixCardId] = {
+      mixCardSubmissionStatus: card.mixCardSubmissionStatus,
+      premixSubmissionType: meta?.premixSubmissionType ?? null,
+      rejectionReason: meta?.rejectionReason ?? card.rejectionReason ?? null,
+      remarks: meta?.remarks ?? card.remarks ?? null,
+    };
+  });
+
+  return next;
+};
+
+export const buildMixCardStatusMapFromForm = (
+  form: MixingFormState,
+): Record<string, MixCardStatusMeta> => {
+  const next: Record<string, MixCardStatusMeta> = {};
+  buildMixingApproverCards({
+    premixCards: form.premixCards,
+    finalMixCards: form.finalMixCards,
+  }).forEach((card) => {
+    next[card.mixCardId] = {
+      mixCardSubmissionStatus: card.mixCardSubmissionStatus ?? "TO_BE_INITIATED",
+      premixSubmissionType: null,
+      rejectionReason: card.rejectionReason ?? null,
+      remarks: card.remarks ?? null,
+    };
+  });
+  return next;
 };
 
 export const mapMixingDetailsForDisplay = (

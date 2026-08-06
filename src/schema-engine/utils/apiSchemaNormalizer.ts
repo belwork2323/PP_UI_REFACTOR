@@ -5,6 +5,7 @@ import type {
   SchemaSection,
   SchemaTableBlock,
   SchemaTableColumn,
+  SchemaTableColumnSlot,
 } from "../types";
 
 type ApiField = {
@@ -21,7 +22,12 @@ type ApiField = {
   valueKey?: string;
 };
 
-type ApiTableColumn = ApiField;
+type ApiTableColumn = ApiField & {
+  /** When present, this column slot is a group header spanning sub-columns. */
+  columns?: ApiField[];
+  /** Alternative key for sub-columns (used by some schemas). */
+  fields?: ApiField[];
+};
 
 type ApiTableRow = {
   rowId?: string;
@@ -52,6 +58,7 @@ type ApiTable = {
   rowHeaders?: string[];
   rows?: ApiTableRow[];
   predefinedRows?: ApiPredefinedRow[];
+  mergePresetColumns?: string[];
   specialRows?: ApiSpecialRow[];
   columns?: ApiTableColumn[];
 };
@@ -85,6 +92,7 @@ const toApiTableFromSection = (section: ApiFlatTableSection): ApiTable => ({
   tableId: section.sectionId ?? section.id,
   columns: section.columns,
   predefinedRows: section.predefinedRows,
+  mergePresetColumns: section.mergePresetColumns,
   addRowAllowed: section.addRowAllowed,
   addColumnsAllowed: section.addColumnsAllowed,
   deleteColumnsAllowed: section.deleteColumnsAllowed,
@@ -284,6 +292,22 @@ const normalizeApiTableColumn = (column: ApiTableColumn): SchemaTableColumn => {
   return col;
 };
 
+const normalizeApiTableColumnSlot = (column: ApiTableColumn): SchemaTableColumnSlot => {
+  const subColumns = column.columns ?? column.fields;
+  if (Array.isArray(subColumns) && subColumns.length > 0) {
+    return {
+      type: "group",
+      id: String(column.fieldId ?? column.id ?? column.label ?? ""),
+      label: String(column.label ?? ""),
+      columns: subColumns.map(normalizeApiTableColumn),
+    };
+  }
+  if (column.type === "group") {
+    return normalizeApiTableColumn({ ...column, type: "text" });
+  }
+  return normalizeApiTableColumn(column);
+};
+
 const buildPresetRowsFromApiTable = (table: ApiTable): Record<string, unknown>[] => {
   const predefinedPresetRows = buildPresetRowsFromPredefinedRows(
     table.predefinedRows,
@@ -325,11 +349,26 @@ const buildPresetRowsFromApiTable = (table: ApiTable): Record<string, unknown>[]
   return presetRows;
 };
 
+const flattenSlotIds = (slots: SchemaTableColumnSlot[]): string[] =>
+  slots.flatMap((slot) => "columns" in slot && slot.type === "group" ? slot.columns.map((c) => c.id) : [slot.id]);
+
+const findSerialColumn = (slots: SchemaTableColumnSlot[]): SchemaTableColumn | undefined => {
+  for (const slot of slots) {
+    if ("columns" in slot && slot.type === "group") {
+      const found = slot.columns.find((c) => c.fieldType === "serial");
+      if (found) return found;
+    } else if ((slot as SchemaTableColumn).fieldType === "serial") {
+      return slot as SchemaTableColumn;
+    }
+  }
+  return undefined;
+};
+
 const injectLeadingColumns = (
-  columns: SchemaTableColumn[],
+  columns: SchemaTableColumnSlot[],
   presetRows: Record<string, unknown>[],
-): SchemaTableColumn[] => {
-  const existingIds = new Set(columns.map((column) => column.id));
+): SchemaTableColumnSlot[] => {
+  const existingIds = new Set(flattenSlotIds(columns));
   const prefix: SchemaTableColumn[] = [];
 
   if (presetRows.some((row) => row.ROW_LABEL !== undefined) && !existingIds.has("ROW_LABEL")) {
@@ -385,10 +424,10 @@ const normalizeApiTable = (table: ApiTable): SchemaTableBlock => {
         ? false
         : !hasFixedRows && table.dynamicRows !== false;
   const columns = injectLeadingColumns(
-    (table.columns ?? []).map(normalizeApiTableColumn),
+    (table.columns ?? []).map(normalizeApiTableColumnSlot),
     presetRows,
   );
-  const serialColumn = columns.find((column) => column.fieldType === "serial");
+  const serialColumn = findSerialColumn(columns);
 
   return {
     type: "table",
@@ -403,6 +442,9 @@ const normalizeApiTable = (table: ApiTable): SchemaTableBlock => {
       autoIncrementKey: serialColumn?.id ?? "SR_NO",
       defaultCount: hasFixedRows ? presetRows.length : undefined,
       presetRows: hasFixedRows ? presetRows : undefined,
+      ...(table.mergePresetColumns?.length
+        ? { mergePresetColumns: table.mergePresetColumns.map(String) }
+        : {}),
       ...(table.rowGenerationSource
         ? { rowGenerationSource: String(table.rowGenerationSource) }
         : {}),

@@ -113,12 +113,14 @@ export const isMotorEditable = (status?: MotorSubmissionStatus | string | null) 
 
 export const isMotorApproverTabDisabled = (
   status?: MotorSubmissionStatus | string | null,
-): boolean =>
-  !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS";
+): boolean => !status || status === "TO_BE_INITIATED";
 
 export const isMotorApproverActionable = (
   status?: MotorSubmissionStatus | string | null,
-): boolean => status === "WAITING_FOR_APPROVAL";
+): boolean => {
+  const normalized = String(status ?? "").trim().toUpperCase().replace(/\s+/g, "_");
+  return normalized === "WAITING_FOR_APPROVAL" || normalized === "IN_PROGRESS";
+};
 
 /** Entire form can be approved/rejected once submitted and every motor is approved. */
 export const canApproverActionEntireCasePrepForm = (params: {
@@ -960,9 +962,29 @@ const mapPersonLabel = (value: unknown): string | null => {
   return String(value).trim() || null;
 };
 
+/** Keep motors in the same order as batch `motorIds` (user-side tab order). */
+export const sortCasePrepMotorsByPreferredIds = <T extends { motorId: string }>(
+  motors: T[],
+  preferredMotorIds?: Array<string | number> | null,
+): T[] => {
+  const preferred = (preferredMotorIds ?? [])
+    .map((id) => String(id ?? "").trim())
+    .filter(Boolean);
+  if (!preferred.length || motors.length <= 1) return motors;
+
+  const order = new Map(preferred.map((id, index) => [id, index]));
+  return [...motors].sort((a, b) => {
+    const aIndex = order.has(a.motorId) ? (order.get(a.motorId) as number) : Number.MAX_SAFE_INTEGER;
+    const bIndex = order.has(b.motorId) ? (order.get(b.motorId) as number) : Number.MAX_SAFE_INTEGER;
+    if (aIndex !== bIndex) return aIndex - bIndex;
+    return a.motorId.localeCompare(b.motorId);
+  });
+};
+
 export const mapCasePreparationDetailsForDisplay = (
   data: Record<string, unknown> | null | undefined,
   schema?: SchemaDocumentV2 | null,
+  options?: { preferredMotorIds?: Array<string | number> | null },
 ): CasePreparationDetailView | null => {
   if (!data) return null;
 
@@ -971,47 +993,61 @@ export const mapCasePreparationDetailsForDisplay = (
   const rawMotors = Array.isArray(details.motors) ? details.motors : [];
   const statusById = mapCasePreparationMotorStatusesFromApi(data);
 
-  const motors: CasePrepMotorDetailView[] = rawMotors
-    .map((motor) => {
-      const entry = motor as Record<string, unknown>;
-      const motorId = String(entry.motorId ?? "").trim();
-      const statusMeta = statusById[motorId];
-      const sections = sortCasePrepSections(
-        (Array.isArray(entry.sections) ? entry.sections : [])
-          .map((section) => {
-            const block = section as { sectionId?: string; sectionData?: Record<string, unknown>[] };
-            return parseCasePrepSectionData(
-              String(block.sectionId ?? ""),
-              block.sectionData,
-              labelIndex,
-            );
-          })
-          .filter((section) => section.fields.length > 0 || section.tables.length > 0),
-      );
+  const preferredMotorIds =
+    options?.preferredMotorIds ??
+    (Array.isArray(data.motorIds) ? (data.motorIds as Array<string | number>) : null) ??
+    (Array.isArray(details.motorIds) ? (details.motorIds as Array<string | number>) : null);
 
-      return {
-        motorId,
-        prrcClearanceDate: String(
-          entry.prrcClearanceDate ?? entry.prrcDate ?? entry.prrcClearance ?? "",
-        ).trim(),
-        motorSubmissionType:
-          statusMeta?.motorSubmissionType ??
-          normalizeMotorSubmissionType(entry.motorSubmissionType),
-        motorSubmissionStatus:
-          statusMeta?.motorSubmissionStatus ??
-          normalizeMotorStatus(entry.motorSubmissionStatus),
-        submittedAt: statusMeta?.submittedAt ?? (entry.submittedAt as string | null | undefined) ?? null,
-        reviewedBy: statusMeta?.reviewedBy ?? (entry.reviewedBy as string | null | undefined) ?? null,
-        reviewedAt: statusMeta?.reviewedAt ?? (entry.reviewedAt as string | null | undefined) ?? null,
-        remarks: statusMeta?.remarks ?? (entry.remarks as string | null | undefined) ?? null,
-        rejectionReason:
-          statusMeta?.rejectionReason ??
-          (entry.rejectionReason as string | null | undefined) ??
-          null,
-        sections,
-      };
-    })
-    .filter((motor) => motor.motorId.length > 0);
+  const motors: CasePrepMotorDetailView[] = sortCasePrepMotorsByPreferredIds(
+    rawMotors
+      .map((motor) => {
+        const entry = motor as Record<string, unknown>;
+        const motorId = String(entry.motorId ?? "").trim();
+        const statusMeta = statusById[motorId];
+        const sections = sortCasePrepSections(
+          (Array.isArray(entry.sections) ? entry.sections : [])
+            .map((section) => {
+              const block = section as {
+                sectionId?: string;
+                sectionData?: Record<string, unknown>[];
+              };
+              return parseCasePrepSectionData(
+                String(block.sectionId ?? ""),
+                block.sectionData,
+                labelIndex,
+              );
+            })
+            .filter((section) => section.fields.length > 0 || section.tables.length > 0),
+        );
+
+        return {
+          motorId,
+          prrcClearanceDate: String(
+            entry.prrcClearanceDate ?? entry.prrcDate ?? entry.prrcClearance ?? "",
+          ).trim(),
+          motorSubmissionType:
+            statusMeta?.motorSubmissionType ??
+            normalizeMotorSubmissionType(entry.motorSubmissionType),
+          motorSubmissionStatus:
+            statusMeta?.motorSubmissionStatus ??
+            normalizeMotorStatus(entry.motorSubmissionStatus),
+          submittedAt:
+            statusMeta?.submittedAt ?? (entry.submittedAt as string | null | undefined) ?? null,
+          reviewedBy:
+            statusMeta?.reviewedBy ?? (entry.reviewedBy as string | null | undefined) ?? null,
+          reviewedAt:
+            statusMeta?.reviewedAt ?? (entry.reviewedAt as string | null | undefined) ?? null,
+          remarks: statusMeta?.remarks ?? (entry.remarks as string | null | undefined) ?? null,
+          rejectionReason:
+            statusMeta?.rejectionReason ??
+            (entry.rejectionReason as string | null | undefined) ??
+            null,
+          sections,
+        };
+      })
+      .filter((motor) => motor.motorId.length > 0),
+    preferredMotorIds,
+  );
 
   const motorCountsFromApi = (data.motorCounts ?? details.motorCounts) as
     | Partial<MotorCounts>

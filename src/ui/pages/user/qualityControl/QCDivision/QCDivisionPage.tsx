@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
-import { Box, Button, CircularProgress, Stack } from "@mui/material";
+import { Box, Button, Stack } from "@mui/material";
 import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog";
+import WorkflowFormOpeningLoader from "../../../../components/common/WorkflowFormOpeningLoader";
 import UserWorkflowFormHeader from "../../../../components/custom/UserWorkflowFormHeader";
 import QCDivisionList from "./QCDivisionList";
 import QCForm from "./QCForm";
@@ -8,6 +9,7 @@ import QCDivisionDetailsView from "./QCDivisionDetailsView";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import getQualityControlTheme from "../../../../../app/theme/custom_themes/user/qualityControl/qualityControl_theme";
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
+import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import { STRINGS } from "../../../../../app/config/strings";
 import useQCDivisionHook from "../../../../../hooks/user/qualityControl/useQCDivisionHook";
 
@@ -27,7 +29,10 @@ const QualityControlPage = () => {
     isEditMode,
     formData,
     selectedDivision,
+    divisionOptions,
+    divisionsLoading,
     selectedRawMaterialType,
+    rawMaterialTypeOptions,
     selectedProcessingType,
     selectedPremix,
     selectedMixingStage,
@@ -72,6 +77,7 @@ const QualityControlPage = () => {
     handleWeightmentWeighscaleNoChange,
     handleWeightmentCalibrationDueDateChange,
     handleLoadQcForm,
+    handlePartialNavIndexChange,
     handleDivisionEntryValuesChange,
     handleDivisionEntryLiquidValuesChange,
     handleMixingFinalMixDetailsChange,
@@ -85,33 +91,42 @@ const QualityControlPage = () => {
     detailsRow,
     detailsData,
     detailsLoading,
+    scopedFormData,
+    partialNavItems,
+    activePartialNavIndex,
+    partialNavActive,
+    isActivePartialReadOnly,
+    divisionGroupStatusByFlowKey,
   } = hookState;
 
+  const formReadOnly = readOnly || isActivePartialReadOnly;
+
   const canAct =
-    (formData.divisionEntries?.length ?? 0) > 0 ||
-    formData.schemaFormLoaded ||
-    (formData.solidPremixEntries?.length ?? 0) > 0 ||
-    (formData.liquidPremixEntries?.length ?? 0) > 0;
+    !isActivePartialReadOnly &&
+    ((scopedFormData.divisionEntries?.length ?? 0) > 0 ||
+      scopedFormData.schemaFormLoaded ||
+      (scopedFormData.solidPremixEntries?.length ?? 0) > 0 ||
+      (scopedFormData.liquidPremixEntries?.length ?? 0) > 0);
 
-  if (loading) {
-    return (
-      <Box sx={theme.workflow.loadingContainer}>
-        <CircularProgress size={32} />
-      </Box>
-    );
-  }
+  const listLoading = loading && !loadingFormDetails && view === "list";
 
-  if (view === "list") {
-    return (
-      <Box sx={theme.workflow.animatedContainer}>
-        <QCDivisionList hookState={hookState} />
-      </Box>
-    );
-  }
+  return (
+    <Box sx={theme.workflow.animatedContainer}>
+      <WorkflowFormOpeningLoader
+        open={listLoading || Boolean(loadingFormDetails)}
+        title={loadingFormDetails ? strings.FORM_OPENING_TITLE : strings.TITLE}
+        message={
+          loadingFormDetails
+            ? strings.FORM_OPENING_MESSAGE
+            : "Loading quality control batches…"
+        }
+        color={QC_DIVISION_BRAND.primary}
+        accentColor={QC_DIVISION_BRAND.primaryLight}
+      />
 
-  if (view === "details" && detailsRow) {
-    return (
-      <Box sx={theme.workflow.animatedContainer}>
+      {view === "list" && !listLoading && <QCDivisionList hookState={hookState} />}
+
+      {view === "details" && detailsRow && (
         <QCDivisionDetailsView
           row={detailsRow}
           data={detailsData}
@@ -126,13 +141,9 @@ const QualityControlPage = () => {
           onActiveDivisionSubIndexChange={setActiveDivisionSubIndex}
           onBack={handleBackFromDetails}
         />
-      </Box>
-    );
-  }
+      )}
 
-  return (
-    <Box sx={theme.workflow.animatedContainer}>
-      {activeBatch ? (
+      {view === "form" && activeBatch && !loadingFormDetails && (
         <>
           <UserWorkflowFormHeader
             mode="update"
@@ -156,64 +167,72 @@ const QualityControlPage = () => {
             theme={theme}
           />
 
-          {!loadingFormDetails ? (
-            <QCForm
-              batch={activeBatch}
-              formData={formData}
-              subDepartmentId={subDepartmentId}
-              selectedDivision={selectedDivision}
-              selectedRawMaterialType={selectedRawMaterialType}
-              selectedProcessingType={selectedProcessingType}
-              selectedPremix={selectedPremix}
-              selectedMixingStage={selectedMixingStage}
-              selectedStfMotorType={selectedStfMotorType}
-              selectedMotorId={selectedMotorId}
-              selectedHardwareProcesses={selectedHardwareProcesses}
-              selectedCuringType={selectedCuringType}
-              selectedTrimmingMotorCount={selectedTrimmingMotorCount}
-              trimmingMotorReceivedDate={trimmingMotorReceivedDate}
-              selectedPostCureOperation={selectedPostCureOperation}
-              selectedInhibitorType={selectedInhibitorType}
-              selectedPropellantProcess={selectedPropellantProcess}
-              weightmentWeighscaleNo={weightmentWeighscaleNo}
-              weightmentCalibrationDueDate={weightmentCalibrationDueDate}
-              addedPremixNumbers={addedPremixNumbers}
-              addedDivisionEntryKeys={addedDivisionEntryKeys}
-              activeDivisionGroupIndex={activeDivisionGroupIndex}
-              activeDivisionSubIndex={activeDivisionSubIndex}
-              isEditMode={isEditMode}
-              readOnly={readOnly}
-              schemaLoading={schemaLoading}
-              schemaError={schemaError}
-              flowBarTheme={flowBarTheme}
-              onDivisionChange={handleDivisionChange}
-              onRawMaterialTypeChange={handleRawMaterialTypeChange}
-              onProcessingTypeChange={handleProcessingTypeChange}
-              onPremixChange={handlePremixChange}
-              onMixingStageChange={handleMixingStageChange}
-              onStfMotorTypeChange={handleStfMotorTypeChange}
-              onMotorIdChange={handleMotorIdChange}
-              onHardwareProcessesChange={handleHardwareProcessesChange}
-              onCuringTypeChange={handleCuringTypeChange}
-              onTrimmingMotorCountChange={handleTrimmingMotorCountChange}
-              onTrimmingMotorReceivedDateChange={handleTrimmingMotorReceivedDateChange}
-              onPostCureOperationChange={handlePostCureOperationChange}
-              onInhibitorTypeChange={handleInhibitorTypeChange}
-              onPropellantProcessChange={handlePropellantProcessChange}
-              onWeightmentWeighscaleNoChange={handleWeightmentWeighscaleNoChange}
-              onWeightmentCalibrationDueDateChange={handleWeightmentCalibrationDueDateChange}
-              onLoadForm={handleLoadQcForm}
-              onActiveDivisionGroupIndexChange={setActiveDivisionGroupIndex}
-              onActiveDivisionSubIndexChange={setActiveDivisionSubIndex}
-              onDivisionEntryValuesChange={handleDivisionEntryValuesChange}
-              onDivisionEntryLiquidValuesChange={handleDivisionEntryLiquidValuesChange}
-              onMixingFinalMixDetailsChange={handleMixingFinalMixDetailsChange}
-              onRemoveDivisionEntry={handleRemoveDivisionEntry}
-              theme={theme}
-            />
-          ) : null}
+          <QCForm
+            batch={activeBatch}
+            formData={formData}
+            scopedFormData={scopedFormData}
+            subDepartmentId={subDepartmentId}
+            selectedDivision={selectedDivision}
+            divisionOptions={divisionOptions}
+            divisionsLoading={divisionsLoading}
+            selectedRawMaterialType={selectedRawMaterialType}
+            rawMaterialTypeOptions={rawMaterialTypeOptions}
+            selectedProcessingType={selectedProcessingType}
+            selectedPremix={selectedPremix}
+            selectedMixingStage={selectedMixingStage}
+            selectedStfMotorType={selectedStfMotorType}
+            selectedMotorId={selectedMotorId}
+            selectedHardwareProcesses={selectedHardwareProcesses}
+            selectedCuringType={selectedCuringType}
+            selectedTrimmingMotorCount={selectedTrimmingMotorCount}
+            trimmingMotorReceivedDate={trimmingMotorReceivedDate}
+            selectedPostCureOperation={selectedPostCureOperation}
+            selectedInhibitorType={selectedInhibitorType}
+            selectedPropellantProcess={selectedPropellantProcess}
+            weightmentWeighscaleNo={weightmentWeighscaleNo}
+            weightmentCalibrationDueDate={weightmentCalibrationDueDate}
+            addedPremixNumbers={addedPremixNumbers}
+            addedDivisionEntryKeys={addedDivisionEntryKeys}
+            activeDivisionGroupIndex={activeDivisionGroupIndex}
+            activeDivisionSubIndex={activeDivisionSubIndex}
+            partialNavItems={partialNavItems}
+            activePartialNavIndex={activePartialNavIndex}
+            partialNavActive={partialNavActive}
+            divisionGroupStatusByFlowKey={divisionGroupStatusByFlowKey}
+            isEditMode={isEditMode}
+            readOnly={readOnly}
+            fieldsReadOnly={formReadOnly}
+            schemaLoading={schemaLoading}
+            schemaError={schemaError}
+            flowBarTheme={flowBarTheme}
+            onDivisionChange={handleDivisionChange}
+            onRawMaterialTypeChange={handleRawMaterialTypeChange}
+            onProcessingTypeChange={handleProcessingTypeChange}
+            onPremixChange={handlePremixChange}
+            onMixingStageChange={handleMixingStageChange}
+            onStfMotorTypeChange={handleStfMotorTypeChange}
+            onMotorIdChange={handleMotorIdChange}
+            onHardwareProcessesChange={handleHardwareProcessesChange}
+            onCuringTypeChange={handleCuringTypeChange}
+            onTrimmingMotorCountChange={handleTrimmingMotorCountChange}
+            onTrimmingMotorReceivedDateChange={handleTrimmingMotorReceivedDateChange}
+            onPostCureOperationChange={handlePostCureOperationChange}
+            onInhibitorTypeChange={handleInhibitorTypeChange}
+            onPropellantProcessChange={handlePropellantProcessChange}
+            onWeightmentWeighscaleNoChange={handleWeightmentWeighscaleNoChange}
+            onWeightmentCalibrationDueDateChange={handleWeightmentCalibrationDueDateChange}
+            onLoadForm={handleLoadQcForm}
+            onPartialNavIndexChange={handlePartialNavIndexChange}
+            onActiveDivisionGroupIndexChange={setActiveDivisionGroupIndex}
+            onActiveDivisionSubIndexChange={setActiveDivisionSubIndex}
+            onDivisionEntryValuesChange={handleDivisionEntryValuesChange}
+            onDivisionEntryLiquidValuesChange={handleDivisionEntryLiquidValuesChange}
+            onMixingFinalMixDetailsChange={handleMixingFinalMixDetailsChange}
+            onRemoveDivisionEntry={handleRemoveDivisionEntry}
+            theme={theme}
+          />
 
-          {!loadingFormDetails && !readOnly ? (
+          {!formReadOnly ? (
             <>
               <Box
                 sx={{
@@ -283,7 +302,7 @@ const QualityControlPage = () => {
             </>
           ) : null}
         </>
-      ) : null}
+      )}
 
       <ConfirmAlertDialog
         open={backConfirmOpen}

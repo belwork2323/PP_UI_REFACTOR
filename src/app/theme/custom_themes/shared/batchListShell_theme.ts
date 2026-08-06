@@ -21,7 +21,7 @@ const fadeUpKeyframes = "batchListShellFadeUp";
 export const getBatchListShellTheme = (
   palette: BatchListShellPalette,
   batchList: BatchListShellBatchListTokens = {},
-  options?: { fadeAnimation?: string }
+  options?: { fadeAnimation?: string },
 ) => {
   const p = palette;
   const t = batchList;
@@ -62,13 +62,20 @@ export const getBatchListShellTheme = (
         justifyContent: "center",
         py: 4,
       },
-      listWrap: {},
+      listWrap: {
+        width: "100%",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "stretch", // Ensures child elements stretch to 100% width
+      },
       emptyWrap: {
         textAlign: "center",
         py: 8,
         borderRadius: 3,
         border: `1.5px dashed ${alpha(p.primaryLight || "#000", 0.3)}`,
         background: alpha(p.surface || "#fff", 0.5),
+        width: "100%",
+        boxSizing: "border-box",
       },
     },
     statusTab: {
@@ -91,7 +98,9 @@ export const getBatchListShellTheme = (
               borderColor: meta?.color ? alpha(meta.color, 0.35) : p.border,
               color: meta?.color ?? p.textSub,
               "&:hover": {
-                background: meta?.color ? alpha(meta.color, 0.06) : alpha(p.primary || "#000", 0.05),
+                background: meta?.color
+                  ? alpha(meta.color, 0.06)
+                  : alpha(p.primary || "#000", 0.05),
                 borderColor: meta?.color ?? p.primary,
               },
             }),
@@ -101,8 +110,10 @@ export const getBatchListShellTheme = (
         minWidth: 22,
         fontSize: "0.6rem",
         fontWeight: fonts.weight.extrabold,
-        background: isActive ? alpha("#ffffff", 0.25) : alpha(meta?.color ?? p.primary ?? "#000", 0.1),
-        color: isActive ? "#ffffff" : meta?.color ?? p.primary,
+        background: isActive
+          ? alpha("#ffffff", 0.25)
+          : alpha(meta?.color ?? p.primary ?? "#000", 0.1),
+        color: isActive ? "#ffffff" : (meta?.color ?? p.primary),
         border: "none",
       }),
     },

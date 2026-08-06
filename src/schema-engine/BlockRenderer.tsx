@@ -40,6 +40,8 @@ export type BlockRenderContext = {
   motorId?: string;
   /** Top-level or nested section id used to scope field values in form state. */
   valueScope?: string;
+  /** When true, repeat-section instance titles (e.g. "Rocket Motor Casing 1") are hidden. */
+  hideRepeatInstanceLabels?: boolean;
 };
 
 const renderField = (block: SchemaFieldBlock, ctx: BlockRenderContext) => {
@@ -185,9 +187,11 @@ const renderRepeatSection = (block: SchemaSectionBlock, ctx: BlockRenderContext)
               borderRadius: 2,
             }}
           >
-            <Typography sx={{ fontWeight: 700, fontSize: "0.86rem", mb: 0.75, color: ctx.theme?.primary }}>
-              {label}
-            </Typography>
+            {!ctx.hideRepeatInstanceLabels ? (
+              <Typography sx={{ fontWeight: 700, fontSize: "0.86rem", mb: 0.75, color: ctx.theme?.primary }}>
+                {label}
+              </Typography>
+            ) : null}
             <GridFields
               direction={block.ui?.direction ?? "row"}
               wrap={block.ui?.wrap ?? true}
@@ -258,15 +262,17 @@ export const BlockRenderer = ({ block, ctx }: { block: SchemaBlock; ctx: BlockRe
   switch (block.type) {
     case "field": {
       const isTextarea = block.fieldType === "textarea";
+      const isFileUpload = block.fieldType === "file" || block.fieldType === "image";
       const hasCustomLayout = Boolean(block.ui?.colSpan || block.ui?.flex || block.ui?.width);
-      const layoutSx = isTextarea && !hasCustomLayout
-        ? resolveFullWidthBlockLayoutSx(block.ui)
-        : resolveBlockLayoutSx(block.ui);
+      const layoutSx =
+        (isTextarea || isFileUpload) && !hasCustomLayout
+          ? resolveFullWidthBlockLayoutSx(block.ui)
+          : resolveBlockLayoutSx(block.ui);
 
       return (
         <Box
           sx={layoutSx}
-          {...(hasCustomLayout || isTextarea ? { "data-custom-flex": true } : {})}
+          {...(hasCustomLayout || isTextarea || isFileUpload ? { "data-custom-flex": true } : {})}
         >
           {renderField(block, ctx)}
         </Box>

@@ -63,91 +63,78 @@
         },
         "children": [
           {
-            "type": "section",
-            "id": "cycle",
-            "title": "Cycle {index}",
-            "repeat": {
-              "defaultCount": 1,
+            "type": "table",
+            "id": "CURING_TABLE",
+            "rows": {
+              "defaultCount": 3,
               "min": 1,
               "max": 20,
-              "allowAdd": true,
-              "allowDelete": true,
-              "label": "Cycle {index}"
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "srNo"
             },
-            "children": [
+            "columns": [
               {
-                "type": "table",
-                "id": "CURING_TABLE",
-                "rows": {
-                  "defaultCount": 10,
-                  "allowAdd": true,
-                  "allowDelete": true,
-                  "autoIncrementKey": "srNo"
-                },
-                "columns": [
-                  {
-                    "type": "column",
-                    "id": "srNo",
-                    "fieldType": "serial",
-                    "label": "S.No",
-                    "readonly": true
-                  },
-                  {
-                    "type": "column",
-                    "id": "TEMPERATURE",
-                    "fieldType": "number",
-                    "label": "Temperature",
-                    "unit": "°C"
-                  },
-                  {
-                    "type": "column",
-                    "id": "TIME",
-                    "fieldType": "number",
-                    "label": "Time",
-                    "unit": "min"
-                  },
-                  {
-                    "type": "column",
-                    "id": "START_DATE",
-                    "fieldType": "date",
-                    "label": "Start Date"
-                  },
-                  {
-                    "type": "column",
-                    "id": "START_TIME",
-                    "fieldType": "time",
-                    "label": "Start Time"
-                  },
-                  {
-                    "type": "column",
-                    "id": "END_DATE",
-                    "fieldType": "date",
-                    "label": "End Date"
-                  },
-                  {
-                    "type": "column",
-                    "id": "END_TIME",
-                    "fieldType": "time",
-                    "label": "End Time"
-                  },
-                  {
-                    "type": "column",
-                    "id": "PROPELLANT_PRESSURE",
-                    "fieldType": "number",
-                    "label": "Propellant Pressure",
-                    "unit": "bar"
-                  },
-                  {
-                    "type": "column",
-                    "id": "HOT_WATER_STATUS",
-                    "fieldType": "dropdown",
-                    "label": "Status Of Hot Water Circulation",
-                    "dataSource": {
-                      "type": "static",
-                      "options": ["ON", "OFF", "NA"]
-                    }
-                  }
-                ]
+                "type": "column",
+                "id": "srNo",
+                "fieldType": "serial",
+                "label": "S.No",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "TEMPERATURE",
+                "fieldType": "number",
+                "label": "Temperature",
+                "unit": "°C"
+              },
+              {
+                "type": "column",
+                "id": "TIME",
+                "fieldType": "number",
+                "label": "Time",
+                "unit": "min"
+              },
+              {
+                "type": "column",
+                "id": "START_DATE",
+                "fieldType": "date",
+                "label": "Start Date"
+              },
+              {
+                "type": "column",
+                "id": "START_TIME",
+                "fieldType": "time",
+                "label": "Start Time"
+              },
+              {
+                "type": "column",
+                "id": "END_DATE",
+                "fieldType": "date",
+                "label": "End Date"
+              },
+              {
+                "type": "column",
+                "id": "END_TIME",
+                "fieldType": "time",
+                "label": "End Time"
+              },
+              {
+                "type": "column",
+                "id": "PROPELLANT_PRESSURE",
+                "fieldType": "number",
+                "label": "Propellant Pressure",
+                "unit": "bar"
+              },
+              {
+                "type": "column",
+                "id": "HOT_WATER_STATUS",
+                "fieldType": "dropdown",
+                "label": "Status Of Hot Water Circulation",
+                "dataSource": {
+                  "type": "static",
+                  "options": ["ON", "OFF", "NA"]
+                }
               }
             ]
           }
@@ -218,9 +205,8 @@
           {
             "type": "field",
             "id": "BUILDING_NO",
-            "fieldType": "textarea",
-            "label": "Building No",
-            "ui": { "colSpan": { "xs": 12, "sm": 6 } }
+            "fieldType": "text",
+            "label": "Building No"
           },
           {
             "type": "field",
@@ -228,6 +214,13 @@
             "fieldType": "number",
             "label": "De-coring Load",
             "unit": "kg"
+          },
+          {
+            "type": "field",
+            "id": "DECORING_REMARKS",
+            "fieldType": "textarea",
+            "label": "Remarks",
+            "ui": { "colSpan": { "xs": 12 } }
           },
           {
             "type": "field",

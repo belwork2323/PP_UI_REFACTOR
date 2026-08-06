@@ -35,6 +35,7 @@ type SchemaRendererProps = {
   setupContext?: SchemaSetupContext;
   batch?: { batchId?: string; projectName?: string; projectId?: string };
   motorId?: string;
+  hideRepeatInstanceLabels?: boolean;
 };
 
 const shouldSyncRowGeneration = (
@@ -108,6 +109,7 @@ const SchemaRenderer = ({
   setupContext,
   batch,
   motorId,
+  hideRepeatInstanceLabels,
 }: SchemaRendererProps) => {
   const visibilityContext = useMemo(() => buildFlatVisibilityContext(values), [values]);
   const layout = schema.data.ui?.layout ?? "flat";
@@ -140,8 +142,9 @@ const SchemaRenderer = ({
       visibilityContext,
       batch,
       motorId,
+      hideRepeatInstanceLabels,
     }),
-    [values, handleChange, readOnly, theme, apiContext, setupContext, visibilityContext, batch, motorId],
+    [values, handleChange, readOnly, theme, apiContext, setupContext, visibilityContext, batch, motorId, hideRepeatInstanceLabels],
   );
 
   const [expandedPanels, setExpandedPanels] = useState<string[]>(() =>

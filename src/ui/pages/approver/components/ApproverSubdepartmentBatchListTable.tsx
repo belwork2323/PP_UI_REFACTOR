@@ -1,5 +1,6 @@
 import {
   alpha,
+  Box,
   Button,
   Card,
   Chip,
@@ -16,8 +17,18 @@ import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import { STRINGS } from "../../../../app/config/strings";
 import { motorStageLabel } from "../../../../data/models/admin/BatchManagement/BatchManagementModel";
 import { formatSubdepartmentBatchTypeLabel } from "../../../../data/models/user/SubdepartmentBatchModel";
-import { canApproverViewBatchDetails, type ApproverStatusMeta } from "../../../../app/theme/approver";
-import { normalizeApproverBatchStatus, getApproverBatchStatusDisplayLabel } from "../../../../data/models/approver/ApproverBatchListModel";
+import {
+  canApproverViewBatchDetails,
+  type ApproverStatusMeta,
+} from "../../../../app/theme/approver";
+import {
+  normalizeApproverBatchStatus,
+  getApproverBatchStatusDisplayLabel,
+} from "../../../../data/models/approver/ApproverBatchListModel";
+import { useMemo } from "react";
+import getManufacturingTheme from "@/app/theme/custom_themes/user/manufacturing/manufacturing_theme";
+import { useThemeStore } from "@/app/store/themeStore";
+import { icons } from "@app/theme/icons";
 
 const BL = STRINGS.MANUFACTURING.BATCH_LIST;
 
@@ -27,6 +38,10 @@ export type ApproverSubdepartmentBatchListRow = Record<string, unknown> & {
   id?: string | number;
   batchId?: string;
   batchType?: string;
+  project?: {
+    projectId: string;
+    projectName: string;
+  };
   motorId?: string;
   motorStage?: string | number;
   motorType?: string;
@@ -91,6 +106,8 @@ const ApproverSubdepartmentBatchListTable = ({
   const headerAccent = accentLight ?? accentMain;
   const thSx = headerCellSx(accentMain, headerAccent);
   const tdSx = bodyCellSx(borderColor);
+  const mode = useThemeStore((state) => state.mode);
+  const theme = useMemo(() => getManufacturingTheme(mode), [mode]);
 
   return (
     <Card
@@ -107,6 +124,7 @@ const ApproverSubdepartmentBatchListTable = ({
           <TableHead>
             <TableRow>
               <TableCell sx={thSx}>{BL.COL_BATCH_ID}</TableCell>
+              <TableCell sx={thSx}>{BL.COL_PROJECT}</TableCell>
               <TableCell sx={thSx}>{BL.COL_BATCH_TYPE}</TableCell>
               <TableCell sx={thSx}>{BL.COL_MOTOR_ID}</TableCell>
               <TableCell sx={thSx}>{BL.COL_MOTOR_STAGE}</TableCell>
@@ -123,6 +141,7 @@ const ApproverSubdepartmentBatchListTable = ({
                 allowWhenApproved: allowViewDetailsWhenApproved,
               });
               const meta = statusMeta[status];
+              console.log(row);
 
               return (
                 <TableRow
@@ -138,6 +157,19 @@ const ApproverSubdepartmentBatchListTable = ({
                     <Typography sx={{ fontWeight: 800, fontSize: "0.82rem", color: accentMain }}>
                       {String(row.batchId ?? "—")}
                     </Typography>
+                  </TableCell>
+                  <TableCell sx={tdSx}>
+                    <Box sx={theme.batchList.projectCell}>
+                      <icons.batchMgmt.projectId sx={theme.batchList.projectIcon} />
+                      <Box sx={theme.batchList.projectInfo}>
+                        <Typography sx={theme.batchList.projectName}>
+                          {String(row.project.projectName || "—")}
+                        </Typography>
+                        <Typography sx={theme.batchList.projectId}>
+                          {String(row.project.projectId || "—")}
+                        </Typography>
+                      </Box>
+                    </Box>
                   </TableCell>
                   <TableCell sx={tdSx}>
                     <Chip
@@ -173,7 +205,9 @@ const ApproverSubdepartmentBatchListTable = ({
                   <TableCell sx={{ ...tdSx, fontSize: "0.78rem" }}>
                     {String(row.submittedBy ?? "—")}
                   </TableCell>
-                  <TableCell sx={{ ...tdSx, color: textSubColor, fontSize: "0.76rem", whiteSpace: "nowrap" }}>
+                  <TableCell
+                    sx={{ ...tdSx, color: textSubColor, fontSize: "0.76rem", whiteSpace: "nowrap" }}
+                  >
                     {formatCreatedOn(row.createdOn)}
                   </TableCell>
                   <TableCell sx={tdSx}>

@@ -7,7 +7,9 @@ import { APPROVER_STATUS_META } from "../../../../app/theme/approver";
 import useTrimmingApproverHook from "../../../../hooks/approver/manufacturing/useTrimmingApproverHook";
 import ApproverSubdepartmentBatchListSection from "../components/ApproverSubdepartmentBatchListSection";
 import ApproverActionDialog from "../../../components/custom/ApproverActionDialog";
-import TrimmingApproverDetailDialog from "./TrimmingApproverDetailDialog";
+import TrimmingApproverDetailDialog, {
+  type TrimmingApproverDetailItem,
+} from "./TrimmingApproverDetailDialog";
 
 const BRAND = {
   primary: TRIMMING_BRAND.primary,
@@ -28,12 +30,17 @@ const TrimmingApproverPage = () => {
     items,
     selected,
     detailsLoading,
-    detailView,
+    activeMotorId,
     dialogProps,
+    formDialogProps,
+    actionLoading,
     requestApprove,
     requestReject,
+    requestFormApprove,
+    requestFormReject,
     handleViewDetails,
     handleCloseDetail,
+    handleActiveMotorChange,
   } = useTrimmingApproverHook();
 
   return (
@@ -41,6 +48,7 @@ const TrimmingApproverPage = () => {
       department="manufacturing"
       subDepartment="trimming"
       items={items}
+      statusField="trStatus"
       statusMeta={TR_STATUS_META}
       onViewDetails={handleViewDetails}
       allowViewDetailsWhenApproved
@@ -56,14 +64,19 @@ const TrimmingApproverPage = () => {
       <TrimmingApproverDetailDialog
         open={!!selected}
         onClose={handleCloseDetail}
-        item={selected}
-        detailView={detailView}
+        item={selected as TrimmingApproverDetailItem | null}
         loading={detailsLoading}
+        activeMotorId={activeMotorId}
+        onActiveMotorChange={handleActiveMotorChange}
         onApprove={requestApprove}
         onReject={requestReject}
+        onApproveForm={requestFormApprove}
+        onRejectForm={requestFormReject}
+        actionLoading={actionLoading}
         theme={approverTheme}
       />
       <ApproverActionDialog {...dialogProps} />
+      <ApproverActionDialog {...formDialogProps} />
     </ApproverSubdepartmentBatchListSection>
   );
 };

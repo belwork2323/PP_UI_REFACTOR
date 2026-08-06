@@ -161,7 +161,7 @@ const SimpleDataTable = ({
   );
 };
 
-const MotorDetailPanel = ({
+export const MotorDetailPanel = ({
   motor,
   dt,
   palette,

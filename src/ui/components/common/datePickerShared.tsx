@@ -3,7 +3,7 @@ import { AdapterDayjs } from "@mui/x-date-pickers/AdapterDayjs";
 import dayjs, { type Dayjs } from "dayjs";
 import customParseFormat from "dayjs/plugin/customParseFormat";
 import "dayjs/locale/en-gb";
-import type { ReactNode } from "react";
+import { createContext, useContext, type ReactNode } from "react";
 import { TextField, type SxProps, type Theme, type TextFieldProps } from "@mui/material";
 import {
   appDatePickerCompactFieldSx,
@@ -38,11 +38,20 @@ export const appDatePickerFieldSlots = {
   slots: { textField: DatePickerTextField },
 };
 
-export const AppDatePickerProvider = ({ children }: { children: ReactNode }) => (
-  <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
-    {children}
-  </LocalizationProvider>
-);
+/** True when an ancestor already mounted LocalizationProvider — avoids N nested providers per cell. */
+const AppDatePickerContext = createContext(false);
+
+export const AppDatePickerProvider = ({ children }: { children: ReactNode }) => {
+  const alreadyProvided = useContext(AppDatePickerContext);
+  if (alreadyProvided) {
+    return <>{children}</>;
+  }
+  return (
+    <LocalizationProvider dateAdapter={AdapterDayjs} adapterLocale="en-gb">
+      <AppDatePickerContext.Provider value={true}>{children}</AppDatePickerContext.Provider>
+    </LocalizationProvider>
+  );
+};
 
 export const parseUiDate = (value: string): Dayjs | null => {
   if (!value) return null;

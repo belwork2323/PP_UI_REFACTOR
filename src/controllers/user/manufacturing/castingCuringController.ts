@@ -7,8 +7,13 @@ import {
 import {
   createCastingCuringFormApi,
   fetchCastingCuringFormDetailsApi,
+  fetchCuringCyclesApi,
   updateCastingCuringFormApi,
 } from "../../../data/api/users/manufacturing/castingCuringFormApi";
+import {
+  CuringCycleConfigModel,
+  type CuringCycleConfig,
+} from "../../../data/models/user/CuringCycleConfigModel";
 
 export type CastingCuringCreatePayload = {
   batchId: string;
@@ -61,6 +66,25 @@ export const castingCuringController = {
       );
     } catch (error) {
       console.error("Failed to update casting and curing form:", error);
+      return new ApiResponseModel(error);
+    }
+  },
+
+  fetchCuringCycles: async (payload: { motorStage: number }) => {
+    try {
+      const response = await fetchCuringCyclesApi(payload);
+      const normalizedResponse = {
+        ...response,
+        success:
+          response?.success ??
+          response?.statusCode === 200 ??
+          response?.code === 200,
+      };
+      return new ApiResponseModel<CuringCycleConfig>(normalizedResponse, (res) =>
+        CuringCycleConfigModel.fromApi(res),
+      );
+    } catch (error) {
+      console.error("Failed to fetch curing cycles:", error);
       return new ApiResponseModel(error);
     }
   },

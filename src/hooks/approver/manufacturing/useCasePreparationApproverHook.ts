@@ -61,7 +61,7 @@ export const useCasePreparationApproverHook = () => {
   }, [user]);
 
   const refreshSelectedDetails = useCallback(
-    async (formId: string) => {
+    async (formId: string, preferredMotorIds?: Array<string | number> | null) => {
       if (!subDepartmentId) return null;
       const response = await casePreparationController.fetchFormDetails({
         formId,
@@ -70,6 +70,8 @@ export const useCasePreparationApproverHook = () => {
       if (!response?.success || !response?.data) return null;
       return mapCasePreparationDetailsForDisplay(
         response.data as unknown as Record<string, unknown>,
+        undefined,
+        { preferredMotorIds },
       );
     },
     [subDepartmentId],
@@ -117,7 +119,10 @@ export const useCasePreparationApproverHook = () => {
       const formId = String(item.formId ?? "").trim();
       if (!formId) return;
 
-      const refreshed = await refreshSelectedDetails(formId);
+      const refreshed = await refreshSelectedDetails(
+        formId,
+        Array.isArray(item.motorIds) ? item.motorIds : null,
+      );
       if (!refreshed) return;
 
       const nextMotorId = resolveInitialApproverMotorId(refreshed.motors);
@@ -156,7 +161,10 @@ export const useCasePreparationApproverHook = () => {
       const formId = String(item.formId ?? "").trim();
       if (!formId) return;
 
-      const refreshed = await refreshSelectedDetails(formId);
+      const refreshed = await refreshSelectedDetails(
+        formId,
+        Array.isArray(item.motorIds) ? item.motorIds : null,
+      );
       const batchStatus = normalizeApproverBatchStatus(
         (response.data as { batchStatus?: string })?.batchStatus ??
           (response.data as { status?: string })?.status ??
@@ -225,6 +233,10 @@ export const useCasePreparationApproverHook = () => {
 
     const detailView = mapCasePreparationDetailsForDisplay(
       response.data as unknown as Record<string, unknown>,
+      undefined,
+      {
+        preferredMotorIds: Array.isArray(row.motorIds) ? row.motorIds : null,
+      },
     );
 
     setActiveMotorId(resolveInitialApproverMotorId(detailView?.motors ?? []));

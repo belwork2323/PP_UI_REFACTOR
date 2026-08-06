@@ -50,10 +50,7 @@ interface DashboardDateFilterProps {
 /** Human-readable label for the active date filter (e.g. chip on FilterToggleButton). */
 export function getDateFilterDisplayLabel(
   filterType: string,
-  strings: Pick<
-    DateFilterStrings,
-    "TODAY" | "THIS_WEEK" | "THIS_MONTH" | "CUSTOM" | "VALUES"
-  >,
+  strings: Pick<DateFilterStrings, "TODAY" | "THIS_WEEK" | "THIS_MONTH" | "CUSTOM" | "VALUES">,
 ): string {
   if (filterType === strings.VALUES.DAY) return strings.TODAY;
   if (filterType === strings.VALUES.WEEK) return strings.THIS_WEEK;

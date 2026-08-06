@@ -13,6 +13,7 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
+import PremixStatusChip from "../../../manufacturing/RawMaterial/components/PremixStatusChip";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import getQualityControlTheme from "../../../../../../app/theme/custom_themes/user/qualityControl/qualityControl_theme";
@@ -24,7 +25,6 @@ import {
   type CasePrepDetailSection,
   type CasePrepDetailTable,
 } from "../../../../../../data/models/user/CasePreparationFormModel";
-import { orderCastingCuringDisplayColumns } from "../../../../../../data/models/user/CastingCuringFormModel";
 import type {
   StfDetailView,
   StfMotorDetailView,
@@ -154,7 +154,10 @@ const FieldsTable = ({
 };
 
 const DataTable = ({ table, dt }: { table: CasePrepDetailTable; dt: STFDetailsTheme }) => {
-  const columns = orderCastingCuringDisplayColumns(Object.keys(table.columnLabels));
+  // Prefer schema / mapper insertion order from columnLabels (do not A–Z re-sort).
+  const columns = Object.keys(table.columnLabels ?? {}).filter(
+    (column) => !column.startsWith("_") && !column.endsWith("__fieldType"),
+  );
   if (!columns.length || !table.rows.length) return null;
 
   return (
@@ -202,14 +205,16 @@ const SectionPanel = ({ section, dt }: { section: CasePrepDetailSection; dt: STF
   </Box>
 );
 
-const MotorDetailPanel = ({
+const StfMotorDetailPanel = ({
   motor,
   dt,
   palette,
+  statusConfig,
 }: {
   motor: StfMotorDetailView;
   dt: STFDetailsTheme;
   palette: ReturnType<typeof getQualityControlTheme>["palette"];
+  statusConfig: Record<string, { color: string; bg: string; border: string }>;
 }) => (
   <Box>
     <Stack direction="row" alignItems="center" gap={1} mb={1.5} flexWrap="wrap">
@@ -225,6 +230,16 @@ const MotorDetailPanel = ({
         <Typography sx={{ fontSize: "0.72rem", color: palette.textSub }}>
           {motor.subTypeLabel}
         </Typography>
+      ) : null}
+      <Typography sx={{ fontSize: "0.72rem", color: palette.textSub, fontWeight: 600 }}>
+        {STF.STF_TEST_NO_LABEL}: {motor.stfTestNo?.trim() ? motor.stfTestNo : "—"}
+      </Typography>
+      {motor.motorSubmissionStatus ? (
+        <PremixStatusChip
+          status={motor.motorSubmissionStatus as any}
+          statusConfig={statusConfig}
+          variant="embedded"
+        />
       ) : null}
     </Stack>
 
@@ -254,6 +269,7 @@ const STFDetailsContent = ({
   resetOnFormId,
 }: STFDetailsContentProps) => {
   const dt = getStfTheme(theme).details;
+  const statusConfig = dt.bannerStatusConfig ?? {};
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
 
   const motors = detailView?.motors ?? [];
@@ -265,9 +281,18 @@ const STFDetailsContent = ({
     setActiveMotorIndex(0);
   }, [resetOnFormId]);
 
+  const isBem = detailView?.batchType === "BEM";
+
   const metaFields = [
-    { label: BL.COL_BATCH_ID, value: detailView?.batchId || row?.batchId || "—" },
-    { label: "Form ID", value: detailView?.formId || row?.formId || "—" },
+    ...(isBem
+      ? [
+          { label: STF.OTHER_BEM_MOTOR_NO_LABEL, value: detailView?.bemNo || "—" },
+          { label: STF.STF_TEST_NO_LABEL, value: detailView?.stfTestNo || "—" },
+        ]
+      : [
+          { label: BL.COL_BATCH_ID, value: detailView?.batchId || row?.batchId || "—" },
+          { label: "Form ID", value: detailView?.formId || row?.formId || "—" },
+        ]),
     { label: "Batch Type", value: detailView?.batchType || row?.batchType || "—" },
     {
       label: "Status",
@@ -340,28 +365,44 @@ const STFDetailsContent = ({
                 {STF.DETAILS_MOTOR_NAV_HINT}
               </Typography>
               <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
-                {motors.map((motor, index) => (
-                  <Button
-                    key={motor.motorId}
-                    size="small"
-                    variant={index === activeMotorIndexSafe ? "contained" : "outlined"}
-                    onClick={() => setActiveMotorIndex(index)}
-                    sx={{
-                      whiteSpace: "nowrap",
-                      flexShrink: 0,
-                      textTransform: "none",
-                      fontWeight: 700,
-                    }}
-                  >
-                    {motor.motorId}
-                  </Button>
-                ))}
+                {motors.map((motor, index) => {
+                  const motorStatus = motor.motorSubmissionStatus ?? "TO_BE_INITIATED";
+                  return (
+                    <Button
+                      key={motor.motorId}
+                      size="small"
+                      variant={index === activeMotorIndexSafe ? "contained" : "outlined"}
+                      onClick={() => setActiveMotorIndex(index)}
+                      sx={{
+                        whiteSpace: "nowrap",
+                        flexShrink: 0,
+                        textTransform: "none",
+                        fontWeight: 700,
+                        gap: 0.75,
+                      }}
+                    >
+                      {motor.motorId}
+                      <PremixStatusChip
+                        status={motorStatus as any}
+                        statusConfig={statusConfig}
+                        showIcon={false}
+                        variant="embedded"
+                        onAccent={index === activeMotorIndexSafe}
+                      />
+                    </Button>
+                  );
+                })}
               </Stack>
             </Box>
           ) : null}
 
           {activeMotor ? (
-            <MotorDetailPanel motor={activeMotor} dt={dt} palette={theme.palette} />
+            <StfMotorDetailPanel
+              motor={activeMotor}
+              dt={dt}
+              palette={theme.palette}
+              statusConfig={statusConfig}
+            />
           ) : null}
         </Box>
       ) : (
@@ -371,4 +412,5 @@ const STFDetailsContent = ({
   );
 };
 
+export { StfMotorDetailPanel };
 export default STFDetailsContent;

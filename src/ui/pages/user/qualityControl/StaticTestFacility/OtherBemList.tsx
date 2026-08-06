@@ -1,41 +1,28 @@
 import React, { useMemo, useState } from "react";
 import { Box, Button, CircularProgress, IconButton, Stack, Tooltip, alpha } from "@mui/material";
-import AppButton from "@/ui/components/common/Button";
-import AddIcon from "@mui/icons-material/Add";
-import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 
 import { icons } from "../../../../../app/theme/icons";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import getQualityControlTheme from "../../../../../app/theme/custom_themes/user/qualityControl/qualityControl_theme";
-import { getOperationStatusConfig, OPERATION_STATUS } from "../../../../../hooks/operationStatus";
+import { OPERATION_STATUS } from "../../../../../hooks/operationStatus";
 import { STRINGS } from "../../../../../app/config/strings";
+import { resolveBemMotorStatusTabs } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
 import STFSchemaPanel from "./STFSchemaPanel";
-import CasePrepTextField from "../../manufacturing/CasePreparation/CasePrepTextField";
 import ConfirmAlertDialog from "@/ui/components/common/ConfirmAlertDialog";
 import UserWorkflowStatusAction from "../../../../components/custom/UserWorkflowStatusAction";
+import UserWorkflowFormDetailsHeader from "../../../../components/custom/UserWorkflowFormDetailsHeader";
 import BemMotorListTable from "./BemMotorListTable";
+import StaticTestFacilityDetailsView from "./StaticTestFacilityDetailsView";
+import WorkflowCreateButton from "@/ui/components/common/WorkflowCreateButton";
+import UserWorkflowFormHeader from "@/ui/components/custom/UserWorkflowFormHeader";
+import AppTextField from "@/ui/components/common/AppTextField";
 
 const strings = STRINGS.QUALITY_CONTROL.STATIC_TEST_FACILITY;
 const S = STRINGS.QUALITY_CONTROL;
+const { rocketLaunch: RocketLaunchRoundedIcon } = icons.user.qualityControl.staticTestFacility.form;
 
-const {
-  pending: HourglassEmptyRoundedIcon,
-  approved: CheckCircleRoundedIcon,
-  rejected: CancelRoundedIcon,
-  pendingAction: PendingActionsRoundedIcon,
-  play: PlayCircleOutlineRoundedIcon,
-} = icons.user.qualityControl.staticTestFacility.list;
-
-export const STF_STATUS_CONFIG = getOperationStatusConfig({
-  initiated: HourglassEmptyRoundedIcon,
-  inProgress: PlayCircleOutlineRoundedIcon,
-  waitingForApproval: PendingActionsRoundedIcon,
-  approved: CheckCircleRoundedIcon,
-  rejected: CancelRoundedIcon,
-});
-
-const defaultCanViewDetails = (status) =>
+const defaultCanViewDetails = (status: string) =>
   status === OPERATION_STATUS.WAITING_FOR_APPROVAL || status === OPERATION_STATUS.APPROVED;
 
 const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => {
@@ -54,7 +41,6 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
     handleCreateNewBem,
     handleBackFromForm,
     onFormValuesChange,
-    canAct = true,
     actionLoading = false,
     isEditMode = false,
     handleSaveDraft,
@@ -64,6 +50,10 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
     page = 0,
     rowsPerPage = 10,
     search = "",
+    statusFilter = STRINGS.USER_BATCH_LIST.FILTER_ALL,
+    setStatusFilter,
+    statusCounts = {},
+    statusTabs: statusTabsFromHook,
     setPage,
     setRowsPerPage,
     setSearch,
@@ -73,187 +63,236 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
     handleEditForm,
     handleViewDetails,
     canViewDetails = defaultCanViewDetails,
+    draftBemNo = "",
+    detailsRow,
+    detailsData,
+    detailsLoading,
+    handleBackFromDetails,
+    backConfirmOpen,
+    setBackConfirmOpen,
+    handleDiscardAndBack,
+    hasSavedDraft = false,
+    activeBemMotor,
+    isStfTestNoLocked,
   } = hookState;
 
   const activeSchema =
     (formData?.stfSchema?.data ? (formData?.stfSchema ?? formData) : null) ?? null;
 
-  const bemMotorId = formData?.bemMotors?.[0]?.motorId ?? "BEM_FORM";
+  const bemMotorId = formData?.motors?.[0]?.motorId ?? "BEM_FORM";
   const activeFormValues =
     formData?.schemaFormValues ?? hookState.activeMotorSession?.schemaFormValues ?? {};
   const savedSections =
     formData?.motors?.[0]?.savedSections ?? hookState.activeMotorSession?.savedSections ?? [];
 
-  // Form / Schema View Mode
-  if (view === "form" || schemaLoading) {
+  // Determine rejection reason from formData or active motor session
+  const rejectionReason =
+    formData?.rejectionReason ?? hookState.activeMotorSession?.rejectionReason ?? null;
+
+  const displayRows = Array.isArray(bemMotors) ? bemMotors : [];
+
+  const bemMotorNo = String(draftBemNo || activeFormValues?.bemNo || "").trim();
+  const stfTestNoValue = String(activeFormValues?.stfTestNo || "").trim();
+  const canSubmitActions = bemMotorNo.length > 0 && stfTestNoValue.length > 0;
+  const stfTestNoLocked = [activeBemMotor?.motorId, bemMotorNo, draftBemNo, bemMotorId]
+    .map((id) => String(id ?? "").trim())
+    .filter(Boolean)
+    .some((id) => Boolean(isStfTestNoLocked?.(id)));
+
+  const statusTabs = useMemo(
+    () =>
+      Array.isArray(statusTabsFromHook) && statusTabsFromHook.length > 0
+        ? statusTabsFromHook
+        : resolveBemMotorStatusTabs(statusCounts),
+    [statusCounts, statusTabsFromHook],
+  );
+
+  if (view === "details" && detailsRow) {
     return (
-      <Box sx={{ mt: 1 }}>
-        <Box
-          sx={{
-            mb: 2,
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-          }}
-        >
-          <AppButton
-            variant="outlined"
-            size="small"
-            startIcon={<ArrowBackIcon />}
-            onClick={handleBemBack ?? handleBackFromForm ?? hookState.handleBack}
-          >
-            Back to List
-          </AppButton>
-        </Box>
-
-        {schemaLoading ? (
-          <Box
-            sx={{
-              p: 6,
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              background: theme.palette.surface ?? "#fff",
-              borderRadius: 2,
-            }}
-          >
-            <CircularProgress size={32} />
-          </Box>
-        ) : activeSchema ? (
-          <>
-            <Box
-              sx={{
-                mb: 3,
-                display: "flex",
-                flexDirection: { xs: "column", sm: "row" }, // Stack vertically on small screens, row on desktop
-                gap: 2.5, // Even spacing between text fields
-                alignItems: "stretch",
-                width: "100%",
-              }}
-            >
-              <Box sx={{ flex: 1 }}>
-                <CasePrepTextField
-                  label="Other BEM Motor No."
-                  value={activeFormValues?.bemNo ?? ""}
-                  placeholder="Enter Other BEM motor No."
-                  theme={theme}
-                  onChange={(val: string) => {
-                    onFormValuesChange?.("bemNo", {
-                      ...activeFormValues,
-                      bemNo: val,
-                    });
-                  }}
-                />
-              </Box>
-            </Box>
-            <STFSchemaPanel
-              schema={activeSchema}
-              formValues={activeFormValues}
-              savedSections={savedSections}
-              subDepartmentId={subDepartmentId}
-              batchId={batch?.batchId}
-              onChange={(values: any) => {
-                if (typeof onFormValuesChange === "function") {
-                  onFormValuesChange(bemMotorId, values);
-                }
-              }}
-              loading={schemaLoading}
-              error={schemaError}
-            />
-            {/* Action Bar */}
-            <Box
-              sx={{
-                mt: 2,
-                p: "12px 16px",
-                borderRadius: 2,
-                background: "#fff",
-                border: "1.5px solid #D5D8DC",
-              }}
-            >
-              <Stack
-                direction={{ xs: "column", sm: "row" }}
-                alignItems={{ sm: "center" }}
-                justifyContent="space-between"
-                gap={1.5}
-              >
-                <Box>
-                  <Box
-                    component="span"
-                    sx={{ fontSize: "0.76rem", fontWeight: 700, color: "#1C2833" }}
-                  >
-                    {canAct ? strings.READY_TO_SUBMIT : strings.NOT_READY_TO_SUBMIT}
-                  </Box>
-                </Box>
-
-                <Stack direction="row" gap={1}>
-                  <Button
-                    variant="outlined"
-                    disabled={!canAct || actionLoading}
-                    onClick={() => setDraftConfirmOpen(true)}
-                    startIcon={
-                      actionLoading ? <CircularProgress size={16} color="inherit" /> : null
-                    }
-                  >
-                    {strings.SAVE_DRAFT_LABEL.toUpperCase()}
-                  </Button>
-
-                  <Button
-                    variant="contained"
-                    disabled={!canAct || actionLoading}
-                    onClick={() => setSubmitConfirmOpen(true)}
-                    startIcon={
-                      actionLoading ? <CircularProgress size={16} color="inherit" /> : null
-                    }
-                  >
-                    {isEditMode
-                      ? strings.RESUBMIT_LABEL.toUpperCase()
-                      : strings.SUBMIT_LABEL.toUpperCase()}
-                  </Button>
-                </Stack>
-              </Stack>
-            </Box>
-            <ConfirmAlertDialog
-              open={draftConfirmOpen}
-              severity="info"
-              title={strings.DRAFT_CONFIRM_TITLE}
-              message={strings.DRAFT_CONFIRM_MESSAGE}
-              confirmLabel={strings.DRAFT_CONFIRM_LABEL}
-              cancelLabel={strings.CONFIRM_CANCEL_LABEL}
-              onConfirm={async () => {
-                setDraftConfirmOpen(false);
-                await handleSaveDraft();
-              }}
-              onCancel={() => setDraftConfirmOpen(false)}
-            />
-            <ConfirmAlertDialog
-              open={submitConfirmOpen}
-              severity="warning"
-              title={isEditMode ? strings.RESUBMIT_CONFIRM_TITLE : strings.SUBMIT_CONFIRM_TITLE}
-              message={
-                isEditMode ? strings.RESUBMIT_CONFIRM_MESSAGE : strings.SUBMIT_CONFIRM_MESSAGE
-              }
-              confirmLabel={
-                isEditMode ? strings.RESUBMIT_CONFIRM_LABEL : strings.SUBMIT_CONFIRM_LABEL
-              }
-              cancelLabel={strings.CONFIRM_GO_BACK_LABEL}
-              onCancel={() => setSubmitConfirmOpen(false)}
-              onConfirm={async () => {
-                setSubmitConfirmOpen(false);
-                await handleSubmit();
-              }}
-            />
-          </>
-        ) : (
-          <Box sx={{ p: 3, textAlign: "center", color: "text.secondary" }}>
-            No schema sections found for Other BEM.
-          </Box>
-        )}
-      </Box>
+      <StaticTestFacilityDetailsView
+        row={detailsRow}
+        data={detailsData}
+        loading={detailsLoading}
+        onBack={handleBackFromDetails}
+      />
     );
   }
 
-  // Render Table List UI by Default using Motor Data
-  const displayRows = Array.isArray(bemMotors) ? bemMotors : [];
+  // Form / Schema View Mode
+  if (view === "form") {
+    const currentBemNo = draftBemNo || activeFormValues?.bemNo;
+    const currentStfTestNo = activeFormValues?.stfTestNo;
+    const isExistingRecord = Boolean(activeBemMotor?.motorId) || hasSavedDraft;
+    const isCreateMode = !isEditMode && !isExistingRecord;
+
+    const headerTitle = isCreateMode
+      ? strings.FORM_HEADER_CREATE_OTHER_BEM_TITLE
+      : [
+          currentBemNo ? `BEM No: ${currentBemNo}` : null,
+          currentStfTestNo ? `${strings.STF_TEST_NO_LABEL}: ${currentStfTestNo}` : null,
+        ]
+          .filter(Boolean)
+          .join("   ·   ") || strings.OTHER_BEM_DETAILS_TITLE;
+
+    const headerSubtitle = isCreateMode
+      ? strings.FORM_HEADER_CREATE_OTHER_BEM_SUBTITLE
+      : undefined;
+
+    const statusLabel = isEditMode
+      ? STRINGS.MANUFACTURING.FORM_HEADER.EDITING_REJECTED
+      : isExistingRecord
+        ? "Draft"
+        : STRINGS.MANUFACTURING.FORM_HEADER.NEW_SUBMISSION;
+
+    const statusVariant = isEditMode ? "edit" : "new";
+
+    return (
+      <Box sx={{ mt: 1 }}>
+        <UserWorkflowFormHeader
+          theme={theme}
+          mode={isCreateMode ? "create" : "update"}
+          onBack={handleBackFromForm || handleBemBack}
+          backLabel={STRINGS.MANUFACTURING.FORM_HEADER.BACK_TO_LIST}
+          data={{
+            title: headerTitle,
+            subtitle: headerSubtitle,
+            statusLabel,
+            statusVariant,
+            rejectionReason: rejectionReason,
+          }}
+        />
+        <ConfirmAlertDialog
+          open={draftConfirmOpen}
+          severity="info"
+          title={strings.DRAFT_CONFIRM_TITLE}
+          message={strings.DRAFT_CONFIRM_MESSAGE}
+          confirmLabel={strings.DRAFT_CONFIRM_LABEL}
+          cancelLabel={strings.CONFIRM_CANCEL_LABEL}
+          onConfirm={async () => {
+            setDraftConfirmOpen(false);
+            await handleSaveDraft();
+          }}
+          onCancel={() => setDraftConfirmOpen(false)}
+        />
+
+        {/* Submit Confirmation Dialog */}
+        <ConfirmAlertDialog
+          open={submitConfirmOpen}
+          severity="warning"
+          title={isEditMode ? strings.RESUBMIT_CONFIRM_TITLE : strings.SUBMIT_CONFIRM_TITLE}
+          message={isEditMode ? strings.RESUBMIT_CONFIRM_MESSAGE : strings.SUBMIT_CONFIRM_MESSAGE}
+          confirmLabel={isEditMode ? strings.RESUBMIT_CONFIRM_LABEL : strings.SUBMIT_CONFIRM_LABEL}
+          cancelLabel={strings.CONFIRM_GO_BACK_LABEL}
+          onCancel={() => setSubmitConfirmOpen(false)}
+          onConfirm={async () => {
+            setSubmitConfirmOpen(false);
+            await handleSubmit();
+          }}
+        />
+
+        {/* Back / Unsaved Changes Confirmation Dialog */}
+        <ConfirmAlertDialog
+          open={backConfirmOpen}
+          severity="warning"
+          title="Unsaved Changes"
+          message="You have unsaved changes in the form. Are you sure you want to go back and discard your changes?"
+          confirmLabel="Discard & Go Back"
+          cancelLabel="Stay on Form"
+          onConfirm={handleDiscardAndBack}
+          onCancel={() => setBackConfirmOpen(false)}
+        />
+        <Box sx={{ mt: 2.5, display: "flex", flexDirection: "column", gap: 2.5 }}>
+          <UserWorkflowFormDetailsHeader
+            title={strings.OTHER_BEM_DETAILS_TITLE}
+            subtitle={strings.OTHER_BEM_DETAILS_SUBTITLE}
+            icon={RocketLaunchRoundedIcon}
+            theme={theme}
+          />
+          <Stack direction="row" justifyContent="flex-end" gap={1}>
+            <Button
+              variant="outlined"
+              disabled={(!isExistingRecord && !canSubmitActions) || actionLoading}
+              onClick={() => setDraftConfirmOpen(true)}
+              startIcon={actionLoading ? <CircularProgress size={16} color="inherit" /> : null}
+            >
+              {strings.SAVE_DRAFT_LABEL}
+            </Button>
+            <Button
+              variant="contained"
+              disabled={(!isExistingRecord && !canSubmitActions) || actionLoading}
+              onClick={() => setSubmitConfirmOpen(true)}
+              startIcon={actionLoading ? <CircularProgress size={16} color="inherit" /> : null}
+            >
+              {isEditMode ? strings.RESUBMIT_LABEL : strings.SUBMIT_LABEL}
+            </Button>
+          </Stack>
+          {activeSchema ? (
+            <>
+              <Box
+                sx={{
+                  display: "flex",
+                  flexDirection: { xs: "column", sm: "row" },
+                  gap: 2.5,
+                  alignItems: "stretch",
+                  width: "100%",
+                }}
+              >
+                <Box sx={{ flex: 1 }}>
+                  <AppTextField
+                    label={strings.OTHER_BEM_MOTOR_NO_LABEL}
+                    value={draftBemNo || activeFormValues?.bemNo || ""}
+                    placeholder={strings.OTHER_BEM_MOTOR_NO_PLACEHOLDER}
+                    disabled={isExistingRecord}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      const val = e.target.value;
+                      onFormValuesChange?.("bemNo", {
+                        ...activeFormValues,
+                        bemNo: val,
+                      });
+                    }}
+                  />
+                </Box>
+                <Box sx={{ flex: 1 }}>
+                  <AppTextField
+                    label={strings.STF_TEST_NO_LABEL}
+                    value={activeFormValues?.stfTestNo || ""}
+                    placeholder={strings.STF_TEST_NO_PLACEHOLDER}
+                    disabled={stfTestNoLocked || actionLoading}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                      if (stfTestNoLocked) return;
+                      const val = e.target.value;
+                      onFormValuesChange?.("stfTestNo", {
+                        ...activeFormValues,
+                        stfTestNo: val,
+                      });
+                    }}
+                  />
+                </Box>
+              </Box>
+              <STFSchemaPanel
+                schema={activeSchema}
+                formValues={activeFormValues}
+                savedSections={savedSections}
+                subDepartmentId={subDepartmentId}
+                batchId={batch?.batchId}
+                onChange={(values: any) => {
+                  if (typeof onFormValuesChange === "function") {
+                    onFormValuesChange(bemMotorId, values);
+                  }
+                }}
+                loading={schemaLoading}
+                error={schemaError}
+              />
+            </>
+          ) : (
+            <Box sx={{ p: 3, textAlign: "center", color: "text.secondary" }}>
+              No schema sections found for Other BEM.
+            </Box>
+          )}
+        </Box>
+      </Box>
+    );
+  }
 
   return (
     <BemMotorListTable
@@ -262,28 +301,22 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
       page={page}
       rowsPerPage={rowsPerPage}
       search={search}
+      activeStatus={statusFilter}
+      statusTabs={statusTabs}
+      statusCounts={statusCounts}
       loading={loading || isRefreshing}
-      theme={theme}
       onPageChange={setPage}
       onRowsPerPageChange={setRowsPerPage}
       onSearchChange={setSearch}
-      headerAction={
-        <AppButton
-          variant="contained"
-          size="medium"
-          startIcon={<AddIcon />}
+      onStatusChange={setStatusFilter}
+      statusToolbarEnd={
+        <WorkflowCreateButton
+          label="Add Other BEM Motor"
+          themeTokens={theme}
           onClick={handleCreateNewBem}
-          sx={{
-            px: 2.5,
-            py: 1,
-            whiteSpace: "nowrap",
-            fontWeight: 600,
-          }}
-        >
-          Add Other BEM Motor
-        </AppButton>
+        />
       }
-      renderAction={(row) => {
+      renderAction={(row: any) => {
         const status = String(row?.status ?? row?.operationStatus ?? "");
         const viewTooltip = S.BATCH_LIST.VIEW_DETAILS_TOOLTIP ?? "View Details";
 

@@ -34,39 +34,43 @@
           {
             "type": "field",
             "id": "typeOfCasing",
-            "fieldType": "dropdown",
-            "label": "Type of Casing",
-            "dataSource": {
-              "type": "static",
-              "options": [
-                {
-                  "label": "Metallic",
-                  "value": "METALLIC"
-                },
-                {
-                  "label": "Composite",
-                  "value": "COMPOSITE"
+            "fieldType": "text",
+            "label": "Type of Casting",
+            "readonly": true,
+            "populateFromApi": {
+              "dataSource": {
+                "type": "api",
+                "api": {
+                  "endpoint": "/api/v1/admin/batch/details",
+                  "method": "POST",
+                  "requestBody": {
+                    "batchId": "{{batchId}}"
+                  },
+                  "responsePath": "data.batch.identificationSheet.metadata.rocketMotorCasing.motors"
                 }
-              ]
+              },
+              "sourceField": "castingType"
             }
           },
           {
             "type": "field",
             "id": "typeOfInsulation",
-            "fieldType": "dropdown",
+            "fieldType": "text",
             "label": "Type of Insulation",
-            "dataSource": {
-              "type": "static",
-              "options": [
-                {
-                  "label": "Rocasin",
-                  "value": "ROCASIN"
-                },
-                {
-                  "label": "EPDM",
-                  "value": "EPDM"
+            "readonly": true,
+            "populateFromApi": {
+              "dataSource": {
+                "type": "api",
+                "api": {
+                  "endpoint": "/api/v1/admin/batch/details",
+                  "method": "POST",
+                  "requestBody": {
+                    "batchId": "{{batchId}}"
+                  },
+                  "responsePath": "data.batch.identificationSheet.metadata.rocketMotorCasing.motors"
                 }
-              ]
+              },
+              "sourceField": "insulationType"
             }
           },
           {

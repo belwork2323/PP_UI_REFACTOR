@@ -161,6 +161,126 @@ export const fetchBuildings = async (): Promise<SystemMasterOption[]> => {
   }
 };
 
+export type OvenMasterOption = SystemMasterOption & {
+  noOfOvenAvailable?: number;
+};
+
+const mapOvenMasterOption = (row: Record<string, unknown>): OvenMasterOption => {
+  const availableRaw = row.noOfOvenAvailable ?? row.noOfOvenAdded;
+  return {
+    ...mapSystemMasterOption(row),
+    noOfOvenAvailable:
+      availableRaw != null && availableRaw !== "" ? Number(availableRaw) : undefined,
+  };
+};
+
+/**
+ * Oven master — GET api/v1/system/ovens (authenticated)
+ * Dedupes concurrent / StrictMode remount calls onto a single in-flight request.
+ * @returns {Promise<OvenMasterOption[]>}
+ */
+let ovensRequestPromise: Promise<OvenMasterOption[]> | null = null;
+
+export const fetchOvens = async (): Promise<OvenMasterOption[]> => {
+  if (ovensRequestPromise) return ovensRequestPromise;
+
+  ovensRequestPromise = (async () => {
+    try {
+      const body = await get(SYSTEM.OVENS);
+      assertSuccessEnvelope(body);
+      return asList(body)
+        .map(mapOvenMasterOption)
+        .filter((item) => item.code);
+    } catch (error) {
+      ovensRequestPromise = null;
+      wrapLookupError(error);
+      return [];
+    }
+  })();
+
+  return ovensRequestPromise;
+};
+
+export type EquipmentMasterOption = {
+  equipmentId: number;
+  equipmentCode: string;
+  equipmentName: string;
+  equipmentType: string;
+};
+
+const mapEquipmentMasterOption = (row: Record<string, unknown>): EquipmentMasterOption => ({
+  equipmentId: Number(row.equipmentId ?? row.id ?? 0),
+  equipmentCode: String(row.equipmentCode ?? row.code ?? "").trim(),
+  equipmentName: String(row.equipmentName ?? row.name ?? "").trim(),
+  equipmentType: String(row.equipmentType ?? "").trim(),
+});
+
+/**
+ * Equipment master — GET api/v1/system/equipment-list (authenticated)
+ * Used by NDT radiography setup equipment dropdown.
+ */
+let equipmentListRequestPromise: Promise<EquipmentMasterOption[]> | null = null;
+
+export const fetchEquipmentList = async (): Promise<EquipmentMasterOption[]> => {
+  if (equipmentListRequestPromise) return equipmentListRequestPromise;
+
+  equipmentListRequestPromise = (async () => {
+    try {
+      const body = await get(SYSTEM.EQUIPMENT_LIST);
+      assertSuccessEnvelope(body);
+      return asList(body)
+        .map(mapEquipmentMasterOption)
+        .filter((item) => Boolean(item.equipmentCode || item.equipmentName));
+    } catch (error) {
+      equipmentListRequestPromise = null;
+      wrapLookupError(error);
+      return [];
+    }
+  })();
+
+  return equipmentListRequestPromise;
+};
+
+export type BeamEnergyMasterOption = {
+  beamEnergyId: number;
+  beamEnergyCode: string;
+  beamEnergyName: string;
+  energyUnit: string;
+};
+
+const mapBeamEnergyMasterOption = (row: Record<string, unknown>): BeamEnergyMasterOption => ({
+  beamEnergyId: Number(row.beamEnergyId ?? row.id ?? 0),
+  beamEnergyCode: String(row.beamEnergyCode ?? row.code ?? "").trim(),
+  beamEnergyName: String(row.beamEnergyName ?? row.name ?? "").trim(),
+  energyUnit: String(row.energyUnit ?? "").trim(),
+});
+
+/**
+ * Beam energy master — GET api/v1/system/energy-beam-list (authenticated)
+ * Used by NDT radiography setup beam energy dropdown.
+ */
+let beamEnergyListRequestPromise: Promise<BeamEnergyMasterOption[]> | null = null;
+
+export const fetchBeamEnergyList = async (): Promise<BeamEnergyMasterOption[]> => {
+  if (beamEnergyListRequestPromise) return beamEnergyListRequestPromise;
+
+  beamEnergyListRequestPromise = (async () => {
+    try {
+      const body = await get(SYSTEM.ENERGY_BEAM_LIST);
+      assertSuccessEnvelope(body);
+      return asList(body)
+        .map(mapBeamEnergyMasterOption)
+        .filter((item) => Boolean(item.beamEnergyCode || item.beamEnergyName));
+    } catch (error) {
+      beamEnergyListRequestPromise = null;
+      wrapLookupError(error);
+      return [];
+    }
+  })();
+
+  return beamEnergyListRequestPromise;
+};
+
 /** motorStage filter for mixing cycle master — always sent as string ("0" | "1" | "2" | "3" | "ALL") */
 export type MixingCycleMotorStage = 0 | 1 | 2 | 3 | "ALL" | number | string;
 
@@ -255,4 +375,8 @@ export const fetchSubscaleArticles = async (
     wrapLookupError(error);
     return [];
   }
+};
+
+export const fetchMixingCycleDetailsApi = async (mixingCycleCode: string) => {
+  return await post(SYSTEM.MIXING_CYCLES, { mixingCycleCode });
 };

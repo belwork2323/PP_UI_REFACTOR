@@ -1,9 +1,10 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { STRINGS } from "../../../app/config/strings";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshStore";
 import qcDivisionController from "../../../controllers/user/quality_control/qcDivisionController";
+import { batchManagementController } from "../../../controllers/admin/BatchManagement/batchManagementController";
 import { QCDivisionDetailsModel } from "../../../data/models/user/QCDivisionApiModel";
 import {
   createDefaultQualityControlFormState,
@@ -17,10 +18,26 @@ import type { QcApiDivision, QcApiSubType, QcInhibitorType } from "../../../sche
 import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
 import {
   getQcSchemaCacheKey,
+  mapQcDivisionsFromApi,
+  resolveQcDivisionIdForSelection,
+  resolveQcRawMaterialTypeOptions,
+  toQcDivisionSelectOptions,
   resolveBatchFlowSelection,
   resolveQcSchemaSelectionForSlot,
+  type QcDivisionCatalogItem,
   type QCBatch,
 } from "./qcFlowConfig";
+import {
+  hasPartialChildNav,
+  isPartialItemReadOnly,
+  mapDivisionDetailsToPartialNav,
+  resolveEntryIdsForPartialItem,
+  scopeFormStateToPartialItem,
+  updatePartialNavStatus,
+  aggregatePartialNavStatus,
+  type QcPartialNavItem,
+} from "./qcDivisionApprovalUnits";
+import { isRawMaterialProcessingType } from "./qcProcessingConfig";
 import {
   isBothProcessingType,
   isRawMaterialRevalidationType,
@@ -167,6 +184,18 @@ export const useQCDivisionHook = () => {
   }, [applyFullFormState, markFormDirty]);
 
   const [selectedDivision, setSelectedDivision] = useState("");
+  const [divisionCatalog, setDivisionCatalog] = useState<QcDivisionCatalogItem[]>([]);
+  const [divisionsLoading, setDivisionsLoading] = useState(false);
+  const [divisionAutoPopulateData, setDivisionAutoPopulateData] = useState<Record<string, unknown> | null>(
+    null,
+  );
+  const [divisionAutoPopulateLoading, setDivisionAutoPopulateLoading] = useState(false);
+  const divisionAutoPopulateRequestIdRef = useRef(0);
+  const [partialNavItems, setPartialNavItems] = useState<QcPartialNavItem[]>([]);
+  const [activePartialNavIndex, setActivePartialNavIndex] = useState(0);
+  const [partialItemLoading, setPartialItemLoading] = useState(false);
+  const partialNavLoadRequestIdRef = useRef(0);
+  const partialNavSeedKeyRef = useRef("");
   const [selectedRawMaterialType, setSelectedRawMaterialType] = useState("");
   const [selectedProcessingType, setSelectedProcessingType] = useState("");
   const [selectedPremixSlot, setSelectedPremixSlot] = useState<QcProcessingSlot>("SOLID_PROCESSING");
@@ -289,6 +318,14 @@ export const useQCDivisionHook = () => {
     setDetailsRow(null);
     setDetailsData(null);
     setDetailsLoading(false);
+    divisionAutoPopulateRequestIdRef.current += 1;
+    partialNavLoadRequestIdRef.current += 1;
+    setDivisionAutoPopulateData(null);
+    setDivisionAutoPopulateLoading(false);
+    setPartialNavItems([]);
+    setActivePartialNavIndex(0);
+    setPartialItemLoading(false);
+    partialNavSeedKeyRef.current = "";
   }, [applyFullFormState]);
 
   const getErrorMessage = (response: any, fallbackMessage: string) => {
@@ -370,36 +407,169 @@ export const useQCDivisionHook = () => {
     setWeightmentWeighscaleNo("");
     setWeightmentCalibrationDueDate("");
     setSchemaError(null);
+    setDivisionAutoPopulateData(null);
   }, []);
 
-  const handleDivisionChange = useCallback((value: string) => {
-    setSelectedDivision(value);
-    setSelectedRawMaterialType("");
-    setSelectedProcessingType("");
-    setSelectedPremixSlot("SOLID_PROCESSING");
-    setSelectedPremix("");
-    setSelectedMixingStage("");
-    setSelectedStfMotorType("");
-    setSelectedMotorId("");
-    setSelectedHardwareProcesses([]);
-    setSelectedCuringType("");
-    setSelectedTrimmingMotorCount("");
-    setTrimmingMotorReceivedDate("");
-    setSelectedPostCureOperation("");
-    setSelectedInhibitorType("");
-    setSelectedPropellantProcess("");
-    setWeightmentWeighscaleNo("");
-    setWeightmentCalibrationDueDate("");
-    setSchemaError(null);
+  const clearPartialNav = useCallback(() => {
+    partialNavLoadRequestIdRef.current += 1;
+    partialNavSeedKeyRef.current = "";
+    setPartialNavItems([]);
+    setActivePartialNavIndex(0);
+    setPartialItemLoading(false);
   }, []);
 
-  const handleRawMaterialTypeChange = useCallback((value: string) => {
-    setSelectedRawMaterialType(value);
-    setSelectedProcessingType("");
-    setSelectedPremixSlot("SOLID_PROCESSING");
-    setSelectedPremix("");
-    setSchemaError(null);
-  }, []);
+  const loadDivisionAutoPopulate = useCallback(
+    async (divisionFlowKey: string, typeValue?: string | null) => {
+      const batchId = String(activeBatch?.batchId ?? "").trim();
+      const divisionId = resolveQcDivisionIdForSelection(
+        divisionCatalog,
+        divisionFlowKey,
+        typeValue,
+      );
+
+      if (!batchId || !divisionFlowKey || divisionId == null) {
+        divisionAutoPopulateRequestIdRef.current += 1;
+        setDivisionAutoPopulateData(null);
+        setDivisionAutoPopulateLoading(false);
+        clearPartialNav();
+        return null;
+      }
+
+      const requestId = ++divisionAutoPopulateRequestIdRef.current;
+      setDivisionAutoPopulateLoading(true);
+      clearPartialNav();
+      try {
+        const typeKey = String(typeValue ?? "").trim();
+        const isRawMaterialProcessing =
+          divisionFlowKey === "RAW_MATERIAL" && isRawMaterialProcessingType(typeKey);
+
+        let batchPayload: unknown = null;
+        if (isRawMaterialProcessing) {
+          try {
+            batchPayload = await batchManagementController.getBatchById(batchId);
+          } catch (error) {
+            console.error("Failed to load batch details for premix auto-populate:", error);
+          }
+        }
+
+        const response = await qcDivisionController.fetchDivisionDetails({
+          batchId,
+          divisionId,
+        });
+        if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
+        if (!response?.success) {
+          setDivisionAutoPopulateData(null);
+          showAlert(response?.message || messages.DETAILS_FETCH_ERROR, "error");
+          return null;
+        }
+        const data = response.data;
+        const record =
+          data && typeof data === "object" && !Array.isArray(data)
+            ? (data as Record<string, unknown>)
+            : null;
+        setDivisionAutoPopulateData(record);
+
+        const navItems = mapDivisionDetailsToPartialNav(record ?? data, {
+          flowKey: divisionFlowKey,
+          rawMaterialType: typeKey,
+          batchPayload,
+        });
+        setPartialNavItems(navItems);
+        setActivePartialNavIndex(0);
+        return navItems;
+      } catch (error) {
+        console.error("Failed to auto-populate QC division details:", error);
+        if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
+        setDivisionAutoPopulateData(null);
+        clearPartialNav();
+        showAlert(messages.DETAILS_FETCH_ERROR, "error");
+        return null;
+      } finally {
+        if (requestId === divisionAutoPopulateRequestIdRef.current) {
+          setDivisionAutoPopulateLoading(false);
+        }
+      }
+    },
+    [
+      activeBatch?.batchId,
+      clearPartialNav,
+      divisionCatalog,
+      messages.DETAILS_FETCH_ERROR,
+      showAlert,
+    ],
+  );
+
+  const handleDivisionChange = useCallback(
+    (value: string) => {
+      setSelectedDivision(value);
+      setSelectedRawMaterialType("");
+      setSelectedProcessingType("");
+      setSelectedPremixSlot("SOLID_PROCESSING");
+      setSelectedPremix("");
+      setSelectedMixingStage("");
+      setSelectedStfMotorType("");
+      setSelectedMotorId("");
+      setSelectedHardwareProcesses([]);
+      setSelectedCuringType("");
+      setSelectedTrimmingMotorCount("");
+      setTrimmingMotorReceivedDate("");
+      setSelectedPostCureOperation("");
+      setSelectedInhibitorType("");
+      setSelectedPropellantProcess("");
+      setWeightmentWeighscaleNo("");
+      setWeightmentCalibrationDueDate("");
+      setSchemaError(null);
+      void loadDivisionAutoPopulate(value, null);
+    },
+    [loadDivisionAutoPopulate],
+  );
+
+  const loadDivisionCatalog = useCallback(async () => {
+    setDivisionsLoading(true);
+    try {
+      const response = await qcDivisionController.fetchDivisions();
+      if (!response?.success) {
+        showAlert(response?.message || messages.DETAILS_FETCH_ERROR, "error");
+        setDivisionCatalog([]);
+        return;
+      }
+      setDivisionCatalog(mapQcDivisionsFromApi(response.data));
+    } catch (error) {
+      console.error("Failed to load QC divisions:", error);
+      setDivisionCatalog([]);
+      showAlert(messages.DETAILS_FETCH_ERROR, "error");
+    } finally {
+      setDivisionsLoading(false);
+    }
+  }, [messages.DETAILS_FETCH_ERROR, showAlert]);
+
+  useEffect(() => {
+    if (view !== "form") return;
+    if (divisionCatalog.length > 0 || divisionsLoading) return;
+    void loadDivisionCatalog();
+  }, [divisionCatalog.length, divisionsLoading, loadDivisionCatalog, view]);
+
+  const divisionOptions = useMemo(
+    () => toQcDivisionSelectOptions(divisionCatalog),
+    [divisionCatalog],
+  );
+
+  const rawMaterialTypeOptions = useMemo(
+    () => resolveQcRawMaterialTypeOptions(divisionCatalog, selectedDivision),
+    [divisionCatalog, selectedDivision],
+  );
+
+  const handleRawMaterialTypeChange = useCallback(
+    (value: string) => {
+      setSelectedRawMaterialType(value);
+      setSelectedProcessingType("");
+      setSelectedPremixSlot("SOLID_PROCESSING");
+      setSelectedPremix("");
+      setSchemaError(null);
+      void loadDivisionAutoPopulate(selectedDivision, value);
+    },
+    [loadDivisionAutoPopulate, selectedDivision],
+  );
 
   const handleProcessingTypeChange = useCallback((value: string) => {
     setSelectedProcessingType(value);
@@ -543,11 +713,21 @@ export const useQCDivisionHook = () => {
         weighscaleNo?: string;
         calibrationDueDate?: string;
       },
+      overrides?: {
+        flowKey?: string;
+        rawMaterialType?: string;
+        processingType?: string;
+        mixingStage?: string;
+      },
     ): QcDivisionEntry => {
+      const flowKey = overrides?.flowKey ?? selectedDivision;
+      const rawMaterialType = overrides?.rawMaterialType ?? selectedRawMaterialType;
+      const processingType = overrides?.processingType ?? selectedProcessingType;
+      const mixingStage = overrides?.mixingStage ?? selectedMixingStage;
       const entryId = createDivisionEntryId();
       return {
         entryId,
-        flowKey: selectedDivision,
+        flowKey,
         kind,
         apiDivision: selection.division,
         subType: selection.subType,
@@ -559,14 +739,14 @@ export const useQCDivisionHook = () => {
         weighscaleNo: motorMeta?.weighscaleNo,
         calibrationDueDate: motorMeta?.calibrationDueDate,
         label: buildDivisionEntryLabel({
-          flowKey: selectedDivision,
+          flowKey,
           kind,
-          rawMaterialType: selectedRawMaterialType,
-          processingType: selectedProcessingType,
+          rawMaterialType,
+          processingType,
           premixNo,
           motorId,
           subType: selection.subType,
-          mixingStage: isQcMixingStage(selectedMixingStage) ? selectedMixingStage : undefined,
+          mixingStage: isQcMixingStage(mixingStage) ? mixingStage : undefined,
         }),
       };
     },
@@ -1098,6 +1278,266 @@ export const useQCDivisionHook = () => {
     resetFlowBarSelection,
   ]);
 
+  const loadFormForPartialItem = useCallback(
+    async (item: QcPartialNavItem) => {
+      const flowKey = selectedDivision;
+      if (!flowKey || !item) return;
+
+      const requestId = ++partialNavLoadRequestIdRef.current;
+      setPartialItemLoading(true);
+      setSchemaError(null);
+
+      try {
+        const currentEntries = formDataRef.current.divisionEntries ?? [];
+        const existingIds = resolveEntryIdsForPartialItem(currentEntries, item);
+        if (existingIds.length) {
+          navigateToEntry(currentEntries, existingIds[0]);
+          return;
+        }
+
+        if (item.kind === "MOTOR" && item.motorId) {
+          setSelectedMotorId(item.motorId);
+
+          const motorLoaders: Record<
+            string,
+            {
+              kind: NonNullable<ReturnType<typeof resolveDivisionEntryKind>>;
+              division: QcApiDivision;
+              subType: QcApiSubType;
+            }
+          > = {
+            CASTING: { kind: "CASTING_MOTOR", division: "CASTING", subType: null },
+            DE_CORING: { kind: "DE_CORING_MOTOR", division: "DE_CORING", subType: null },
+            NDT: { kind: "NDT_MOTOR", division: "NDT", subType: null },
+          };
+
+          const loader = motorLoaders[flowKey];
+          if (!loader) {
+            // Motor seeded; remaining fields (curing type, hardware processes, etc.) still use FlowBar + Load form.
+            return;
+          }
+
+          const dedupKey = buildDivisionEntryDedupKey({
+            flowKey,
+            kind: loader.kind,
+            motorId: item.motorId,
+          });
+          if (getAddedDivisionEntryKeys(formDataRef.current.divisionEntries ?? []).includes(dedupKey)) {
+            return;
+          }
+
+          const result = await fetchQcSchemaDocument(loader.division, loader.subType);
+          if (!result || requestId !== partialNavLoadRequestIdRef.current) return;
+
+          const entry = buildEntryFromSelection(
+            loader.kind,
+            { division: loader.division, subType: loader.subType },
+            undefined,
+            item.motorId,
+            undefined,
+            { flowKey },
+          );
+          const nextEntries = [...(formDataRef.current.divisionEntries ?? []), entry];
+          updateFormData((prev) =>
+            appendDivisionEntryToForm(
+              prev,
+              entry,
+              { schemaValues: createQcInitialValues(result.schema) },
+              [{ schema: result.schema, division: result.division, subType: result.subType }],
+            ),
+          );
+          navigateToEntry(nextEntries, entry.entryId);
+          return;
+        }
+
+        if (item.kind === "PREMIX" && item.premixNo != null) {
+          setSelectedPremix(item.premixNo);
+
+          if (flowKey === "MIXING") {
+            setSelectedMixingStage("PREMIX");
+            const result = await fetchQcSchemaDocument("MIXING", "PREMIX");
+            if (!result || requestId !== partialNavLoadRequestIdRef.current) return;
+
+            const entry = buildEntryFromSelection(
+              "MIXING_PREMIX",
+              { division: "MIXING", subType: "PREMIX" },
+              item.premixNo,
+              undefined,
+              undefined,
+              { flowKey, mixingStage: "PREMIX" },
+            );
+            const nextEntries = [...(formDataRef.current.divisionEntries ?? []), entry];
+            updateFormData((prev) =>
+              appendDivisionEntryToForm(
+                prev,
+                entry,
+                { schemaValues: createQcInitialValues(result.schema) },
+                [{ schema: result.schema, division: result.division, subType: result.subType }],
+              ),
+            );
+            navigateToEntry(nextEntries, entry.entryId);
+            return;
+          }
+
+          if (flowKey === "RAW_MATERIAL") {
+            const processingType = item.processingType || selectedProcessingType || "SOLID_PROCESSING";
+            setSelectedProcessingType(processingType);
+
+            if (processingType === "BOTH") {
+              const solidSelection = resolveQcSchemaSelectionForSlot("SOLID_PROCESSING");
+              const liquidSelection = resolveQcSchemaSelectionForSlot("LIQUID_PROCESSING");
+              const solidResult = await fetchQcSchemaDocument(
+                solidSelection.division,
+                solidSelection.subType,
+              );
+              const liquidResult = await fetchQcSchemaDocument(
+                liquidSelection.division,
+                liquidSelection.subType,
+              );
+              if (!solidResult || !liquidResult || requestId !== partialNavLoadRequestIdRef.current) {
+                return;
+              }
+              const entry = buildEntryFromSelection(
+                "BOTH_PREMIX",
+                solidSelection,
+                item.premixNo,
+                undefined,
+                undefined,
+                { flowKey, processingType, rawMaterialType: selectedRawMaterialType },
+              );
+              const nextEntries = [...(formDataRef.current.divisionEntries ?? []), entry];
+              updateFormData((prev) =>
+                appendDivisionEntryToForm(
+                  prev,
+                  entry,
+                  {
+                    schemaValues: createQcInitialValues(solidResult.schema),
+                    liquidSchemaValues: createQcInitialValues(liquidResult.schema),
+                  },
+                  [
+                    {
+                      schema: solidResult.schema,
+                      division: solidResult.division,
+                      subType: solidResult.subType,
+                    },
+                    {
+                      schema: liquidResult.schema,
+                      division: liquidResult.division,
+                      subType: liquidResult.subType,
+                    },
+                  ],
+                ),
+              );
+              navigateToEntry(nextEntries, entry.entryId);
+              return;
+            }
+
+            const kind =
+              processingType === "LIQUID_PROCESSING" ? "LIQUID_PREMIX" : "SOLID_PREMIX";
+            const selection = resolveQcSchemaSelectionForSlot(
+              processingType === "LIQUID_PROCESSING" ? "LIQUID_PROCESSING" : "SOLID_PROCESSING",
+            );
+            const result = await fetchQcSchemaDocument(selection.division, selection.subType);
+            if (!result || requestId !== partialNavLoadRequestIdRef.current) return;
+            const entry = buildEntryFromSelection(
+              kind,
+              selection,
+              item.premixNo,
+              undefined,
+              undefined,
+              { flowKey, processingType, rawMaterialType: selectedRawMaterialType },
+            );
+            const nextEntries = [...(formDataRef.current.divisionEntries ?? []), entry];
+            updateFormData((prev) =>
+              appendDivisionEntryToForm(
+                prev,
+                entry,
+                { schemaValues: createQcInitialValues(result.schema) },
+                [{ schema: result.schema, division: result.division, subType: result.subType }],
+              ),
+            );
+            navigateToEntry(nextEntries, entry.entryId);
+          }
+          return;
+        }
+
+        if (item.kind === "FINAL_MIX") {
+          const mixNo = item.finalMixNo ?? item.premixNo;
+          if (mixNo == null || flowKey !== "MIXING") return;
+          setSelectedMixingStage("FINAL_MIX");
+          setSelectedPremix(mixNo);
+
+          const result = await fetchQcSchemaDocument("MIXING", "FINAL_MIX");
+          if (!result || requestId !== partialNavLoadRequestIdRef.current) return;
+
+          const entry = buildEntryFromSelection(
+            "MIXING_FINAL_MIX",
+            { division: "MIXING", subType: "FINAL_MIX" },
+            mixNo,
+            undefined,
+            undefined,
+            { flowKey, mixingStage: "FINAL_MIX" },
+          );
+          const isFirstFinalMix =
+            getMixingFinalMixEntries(formDataRef.current.divisionEntries).length === 0;
+          const nextEntries = [...(formDataRef.current.divisionEntries ?? []), entry];
+          updateFormData((prev) => {
+            const next = appendDivisionEntryToForm(
+              prev,
+              entry,
+              { schemaValues: createMixingFinalMixViscosityValues(result.schema) },
+              [{ schema: result.schema, division: result.division, subType: result.subType }],
+            );
+            if (!isFirstFinalMix) return next;
+            return {
+              ...next,
+              mixingFinalMixDetailsValues: createMixingFinalMixDetailsValues(result.schema),
+            };
+          });
+          if (isFirstFinalMix) {
+            navigateToMixingDetails(nextEntries);
+          } else {
+            navigateToEntry(nextEntries, entry.entryId);
+          }
+        }
+      } finally {
+        if (requestId === partialNavLoadRequestIdRef.current) {
+          setPartialItemLoading(false);
+        }
+      }
+    },
+    [
+      buildEntryFromSelection,
+      fetchQcSchemaDocument,
+      navigateToEntry,
+      navigateToMixingDetails,
+      selectedDivision,
+      selectedProcessingType,
+      selectedRawMaterialType,
+      updateFormData,
+    ],
+  );
+
+  const handlePartialNavIndexChange = useCallback(
+    (index: number) => {
+      setActivePartialNavIndex(index);
+      const item = partialNavItems[index];
+      if (item) {
+        void loadFormForPartialItem(item);
+      }
+    },
+    [loadFormForPartialItem, partialNavItems],
+  );
+
+  useEffect(() => {
+    if (!hasPartialChildNav(partialNavItems)) return;
+    const seedKey = partialNavItems.map((item) => item.id).join("|");
+    if (!seedKey || seedKey === partialNavSeedKeyRef.current) return;
+    partialNavSeedKeyRef.current = seedKey;
+    setActivePartialNavIndex(0);
+    void loadFormForPartialItem(partialNavItems[0]);
+  }, [loadFormForPartialItem, partialNavItems]);
+
   const handleDivisionEntryValuesChange = useCallback((entryId: string, values: SchemaFormValues) => {
     setDivisionEntryValues((prev) => ({
       ...prev,
@@ -1614,17 +2054,30 @@ export const useQCDivisionHook = () => {
       return false;
     }
 
-    if (!hasDivisionEntries(formData) && !formData.schemaFormLoaded) {
+    const activePartialItem = hasPartialChildNav(partialNavItems)
+      ? partialNavItems[activePartialNavIndex] ?? null
+      : null;
+
+    if (activePartialItem && isPartialItemReadOnly(activePartialItem.status)) {
       showAlert(messages.EMPTY_FORM_ERROR, "warning");
       return false;
     }
 
-    if (!hasAnyQualityControlValue(formData)) {
+    const submitFormState = activePartialItem
+      ? scopeFormStateToPartialItem(formDataRef.current, activePartialItem)
+      : formDataRef.current;
+
+    if (!hasDivisionEntries(submitFormState) && !submitFormState.schemaFormLoaded) {
       showAlert(messages.EMPTY_FORM_ERROR, "warning");
       return false;
     }
 
-    const payload = mapQualityControlPayload(formDataRef.current);
+    if (!hasAnyQualityControlValue(submitFormState)) {
+      showAlert(messages.EMPTY_FORM_ERROR, "warning");
+      return false;
+    }
+
+    const payload = mapQualityControlPayload(submitFormState);
     const isCreateFlow =
       activeBatch.qcStatus === QUALITY_CONTROL_STATUS.TO_BE_INITIATED && !activeBatch.formId;
 
@@ -1683,6 +2136,11 @@ export const useQCDivisionHook = () => {
       );
       setIsFormDirty(false);
 
+      if (activePartialItem) {
+        const nextStatus = intent === "draft" ? "IN_PROGRESS" : "WAITING_FOR_APPROVAL";
+        setPartialNavItems((prev) => updatePartialNavStatus(prev, activePartialItem.id, nextStatus));
+      }
+
       if (intent === "draft") {
         showAlert(
           isCreateFlow ? messages.CREATE_DRAFT_SUCCESS : messages.UPDATE_DRAFT_SUCCESS,
@@ -1690,6 +2148,15 @@ export const useQCDivisionHook = () => {
           { autoCloseMs: 2200 },
         );
         setHasSavedDraft(true);
+      } else if (activePartialItem) {
+        showAlert(
+          isCreateFlow ? messages.CREATE_SUBMIT_SUCCESS : messages.UPDATE_SUBMIT_SUCCESS,
+          "success",
+          { autoCloseMs: 2200 },
+        );
+        setHasSavedDraft(true);
+        // Stay on form so user can continue other motors/premixes.
+        await listParams.refreshUserBatches();
       } else {
         showAlert(
           isCreateFlow ? messages.CREATE_SUBMIT_SUCCESS : messages.UPDATE_SUBMIT_SUCCESS,
@@ -1709,6 +2176,28 @@ export const useQCDivisionHook = () => {
   const handleSaveDraft = async () => submitForm("draft");
   const handleSubmit = async () => submitForm("submit");
 
+  const partialNavActive = hasPartialChildNav(partialNavItems);
+  const activePartialItem = partialNavActive
+    ? partialNavItems[activePartialNavIndex] ?? null
+    : null;
+  const isActivePartialReadOnly = Boolean(
+    activePartialItem && isPartialItemReadOnly(activePartialItem.status),
+  );
+  const divisionGroupStatusByFlowKey = useMemo(() => {
+    const map: Record<string, import("./qcDivisionApprovalUnits").QcPartialItemStatus> = {};
+    if (partialNavActive && selectedDivision && partialNavItems.length) {
+      map[selectedDivision] = aggregatePartialNavStatus(partialNavItems);
+    }
+    return map;
+  }, [partialNavActive, partialNavItems, selectedDivision]);
+  const scopedFormData = useMemo(
+    () =>
+      activePartialItem
+        ? scopeFormStateToPartialItem(formData, activePartialItem)
+        : formData,
+    [activePartialItem, formData],
+  );
+
   return {
     ...listParams,
     loading: listParams.loading,
@@ -1717,8 +2206,12 @@ export const useQCDivisionHook = () => {
     isEditMode,
     readOnly,
     formData,
+    scopedFormData,
     isFormDirty: isFormDirtyForView,
     selectedDivision,
+    divisionOptions,
+    divisionsLoading,
+    rawMaterialTypeOptions,
     selectedRawMaterialType,
     selectedProcessingType,
     selectedPremixSlot,
@@ -1740,8 +2233,17 @@ export const useQCDivisionHook = () => {
     activeDivisionGroupIndex,
     activeDivisionSubIndex,
     loadingFormDetails,
-    schemaLoading,
+    schemaLoading: schemaLoading || partialItemLoading || divisionAutoPopulateLoading,
     schemaError,
+    divisionAutoPopulateData,
+    divisionAutoPopulateLoading,
+    partialNavItems,
+    activePartialNavIndex,
+    partialNavActive,
+    activePartialItem,
+    isActivePartialReadOnly,
+    partialItemLoading,
+    divisionGroupStatusByFlowKey,
     actionLoading,
     backConfirmOpen,
     batches,
@@ -1774,6 +2276,7 @@ export const useQCDivisionHook = () => {
     handleWeightmentWeighscaleNoChange,
     handleWeightmentCalibrationDueDateChange,
     handleLoadQcForm,
+    handlePartialNavIndexChange,
     handleDivisionEntryValuesChange,
     handleDivisionEntryLiquidValuesChange,
     handleMixingFinalMixDetailsChange,

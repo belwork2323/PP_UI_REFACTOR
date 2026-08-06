@@ -4,7 +4,6 @@ import {
   Button,
   CircularProgress,
   Stack,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import getManufacturingTheme from "../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
@@ -22,6 +21,11 @@ import PremixStatusChip, {
 } from "../../user/manufacturing/RawMaterial/components/PremixStatusChip";
 import type { PremixSubmissionStatus } from "../../../../data/models/user/RawMaterialPreparationModel";
 import { MotorDetailPanel } from "../../user/manufacturing/CasePreparation/components/CasePreparationDetailsContent";
+import {
+  UserWorkflowNavPanel,
+  UserWorkflowTabNav,
+  type UserWorkflowNavTab,
+} from "../../../components/custom/UserWorkflowStepPager";
 
 const CP = STRINGS.MANUFACTURING.CASE_PREP;
 const {
@@ -113,6 +117,33 @@ const CasePreparationApproverReviewContent = ({
     status: detailView?.status,
     motors,
   });
+
+  const navPalette = {
+    primary: palette.primary,
+    primaryLight: palette.primaryLight,
+    border: palette.border,
+    surface: palette.surface,
+    textSub: palette.textSub,
+    text: palette.text,
+  };
+
+  const motorNavTabs = useMemo<UserWorkflowNavTab[]>(
+    () =>
+      motors.map((motor) => ({
+        id: motor.motorId,
+        label: motor.motorId,
+        endAdornment: (
+          <PremixStatusChip
+            status={motor.motorSubmissionStatus as PremixSubmissionStatus}
+            statusConfig={statusConfig}
+            showIcon={false}
+            variant="embedded"
+            onAccent={motor.motorId === activeMotorId}
+          />
+        ),
+      })),
+    [activeMotorId, motors, statusConfig],
+  );
 
   const goToEnabledMotor = (direction: -1 | 1) => {
     if (enabledMotors.length === 0) return;
@@ -207,89 +238,31 @@ const CasePreparationApproverReviewContent = ({
         </Box>
       ) : null}
 
-      <Box
-        sx={{
-          border: `1px solid ${palette.border}`,
-          borderRadius: 2,
-          px: 1.2,
-          py: 1,
-          background: palette.surface,
-        }}
-      >
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Button
-            variant="outlined"
-            size="small"
-            disabled={enabledMotorIndex <= 0}
-            onClick={() => goToEnabledMotor(-1)}
-          >
-            Back
-          </Button>
-          <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: palette.primary }}>
-            Motor {activeMotorIndex >= 0 ? activeMotorIndex + 1 : "—"} of {totalMotorCount || motors.length}
-          </Typography>
-          <Button
-            variant="outlined"
-            size="small"
-            disabled={enabledMotorIndex < 0 || enabledMotorIndex >= enabledMotors.length - 1}
-            onClick={() => goToEnabledMotor(1)}
-          >
-            Next
-          </Button>
-        </Stack>
-      </Box>
-
-      <Box
-        sx={{
-          border: `1px solid ${palette.border}`,
-          borderRadius: 2,
-          px: 1,
-          py: 1,
-          background: palette.surface,
-        }}
-      >
-        <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: palette.primary, mb: 0.4 }}>
-          {CP.MOTOR_NAV_TITLE}
-        </Typography>
-        <Typography sx={{ fontSize: "0.72rem", color: palette.textSub, mb: 0.9 }}>
-          {CP.MOTOR_APPROVER_NAV_HINT}
-        </Typography>
-        <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
-          {motors.map((motor) => {
-            const disabled = isMotorApproverTabDisabled(motor.motorSubmissionStatus);
-            const active = motor.motorId === activeMotorId;
-            const button = (
-              <Button
-                key={`approver-motor-${motor.motorId}`}
-                size="small"
-                variant={active ? "contained" : "outlined"}
-                disabled={disabled}
-                onClick={() => onActiveMotorChange(motor.motorId)}
-                sx={{ whiteSpace: "nowrap", flexShrink: 0, textTransform: "none" }}
-              >
-                <Stack direction="row" alignItems="center" gap={0.75}>
-                  {motor.motorId}
-                  <PremixStatusChip
-                    status={motor.motorSubmissionStatus as PremixSubmissionStatus}
-                    statusConfig={statusConfig}
-                    showIcon={false}
-                    variant="embedded"
-                    onAccent={active}
-                  />
-                </Stack>
-              </Button>
-            );
-
-            return disabled ? (
-              <Tooltip key={`approver-motor-tip-${motor.motorId}`} title={CP.MOTOR_APPROVER_TAB_DISABLED}>
-                <span>{button}</span>
-              </Tooltip>
-            ) : (
-              button
-            );
-          })}
-        </Stack>
-      </Box>
+      <UserWorkflowNavPanel palette={navPalette}>
+        <UserWorkflowTabNav
+          title={CP.MOTOR_NAV_TITLE}
+          hint={CP.MOTOR_APPROVER_NAV_HINT}
+          tabs={motorNavTabs}
+          activeIndex={activeMotorIndex >= 0 ? activeMotorIndex : 0}
+          onActiveIndexChange={(index) => onActiveMotorChange(motors[index].motorId)}
+          palette={navPalette}
+          showStepArrows
+          onStepBack={() => goToEnabledMotor(-1)}
+          onStepNext={() => goToEnabledMotor(1)}
+          disableStepBack={enabledMotorIndex <= 0}
+          disableStepNext={
+            enabledMotorIndex < 0 || enabledMotorIndex >= enabledMotors.length - 1
+          }
+          isTabDisabled={(_, index) =>
+            isMotorApproverTabDisabled(motors[index]?.motorSubmissionStatus)
+          }
+          tabTooltip={(_, index) =>
+            isMotorApproverTabDisabled(motors[index]?.motorSubmissionStatus)
+              ? CP.MOTOR_APPROVER_TAB_DISABLED
+              : undefined
+          }
+        />
+      </UserWorkflowNavPanel>
 
       {activeMotor && !isMotorApproverTabDisabled(activeMotor.motorSubmissionStatus) ? (
         <Box

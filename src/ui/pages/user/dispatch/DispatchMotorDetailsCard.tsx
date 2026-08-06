@@ -24,6 +24,7 @@ type DispatchMotorDetailsCardProps = {
     };
   };
   onFormValuesChange: (values: SchemaFormValues) => void;
+  readOnly?: boolean;
 };
 
 const formatStageLabel = (stage: string) => {
@@ -47,6 +48,7 @@ const DispatchMotorDetailsCard = ({
   schemaError = null,
   theme,
   onFormValuesChange,
+  readOnly = false,
 }: DispatchMotorDetailsCardProps) => {
   const L = DISPATCH_FLOW_LABELS;
   const panel = getDispatchTheme(theme).panel;
@@ -99,6 +101,7 @@ const DispatchMotorDetailsCard = ({
         onChange={onFormValuesChange}
         loading={schemaLoading}
         error={schemaError}
+        readOnly={readOnly}
       />
     </>
   );

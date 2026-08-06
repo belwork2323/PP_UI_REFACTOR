@@ -8,7 +8,9 @@ import {
   parseUiDate,
   UI_DATE_FORMAT,
 } from "./datePickerShared";
-import { UI_DATETIME_FORMAT } from "../../../utils/dateUtils";
+import { UI_DATETIME_FORMAT, UI_DATE_PLACEHOLDER } from "../../../utils/dateUtils";
+
+const UI_TIME_PLACEHOLDER = "HH:mm";
 
 export type DateFieldProps = {
   label?: string;
@@ -52,7 +54,7 @@ export const DateField = ({
         error,
         helperText,
         compact,
-        placeholder,
+        placeholder: placeholder ?? UI_DATE_PLACEHOLDER,
         sx,
         inputSx,
       })}
@@ -86,7 +88,7 @@ export const TimeField = ({
         error,
         helperText,
         compact,
-        placeholder,
+        placeholder: placeholder ?? UI_TIME_PLACEHOLDER,
         sx,
         inputSx,
       })}
@@ -121,7 +123,7 @@ export const DateTimeField = ({
         error,
         helperText,
         compact,
-        placeholder,
+        placeholder: placeholder ?? `${UI_DATE_PLACEHOLDER} ${UI_TIME_PLACEHOLDER}`,
         sx,
         inputSx,
       })}

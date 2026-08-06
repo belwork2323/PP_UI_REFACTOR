@@ -30,114 +30,70 @@
         "children": [
           {
             "type": "group",
-            "id": "PREMIX",
-            "label": "Premix",
+            "id": "HEMCOAT_PREMIX_BATCH_FIELDS",
+            "ui": {
+              "direction": "row",
+              "wrap": true,
+              "gap": "md",
+              "alignItems": "flex-end"
+            },
             "children": [
               {
-                "type": "table",
-                "id": "PREMIX_PREPARATION_TABLE",
-                "label": "Premix Preparation Details",
-                "rows": {
-                  "defaultCount": 5,
-                  "allowAdd": false,
-                  "allowDelete": false,
-                  "autoIncrementKey": "srNo",
-                  "presetRows": [
-                    { "readonly": true, "INGREDIENT": "HTPB", "PARTS_BY_WEIGHT": "80.00" },
-                    { "readonly": true, "INGREDIENT": "NBD", "PARTS_BY_WEIGHT": "2.80" },
-                    { "readonly": true, "INGREDIENT": "HT", "PARTS_BY_WEIGHT": "2.15" },
-                    { "readonly": true, "INGREDIENT": "Kaolin", "PARTS_BY_WEIGHT": "15.00" },
-                    { "readonly": true, "INGREDIENT": "Nonox-D", "PARTS_BY_WEIGHT": "0.05" }
-                  ]
-                },
-                "columns": [
-                  {
-                    "type": "column",
-                    "id": "srNo",
-                    "fieldType": "serial",
-                    "label": "Sr. No",
-                    "readonly": true
-                  },
-                  {
-                    "type": "column",
-                    "id": "BATCH_NO_DATE",
-                    "fieldType": "text",
-                    "label": "Batch No With Date"
-                  },
-                  {
-                    "type": "column",
-                    "id": "INGREDIENT",
-                    "fieldType": "static",
-                    "label": "Ingredient",
-                    "readonly": true
-                  },
-                  {
-                    "type": "column",
-                    "id": "MFG_LOT",
-                    "fieldType": "dropdown",
-                    "label": "Mfg Lot",
-                    "dataSource": {
-                      "type": "api",
-                      "api": {
-                        "endpoint": "MATERIAL_LOTS",
-                        "method": "POST",
-                        "requestField": "batchId",
-                        "requestBody": {
-                          "subDepartmentId": "{{subDepartmentId}}"
-                        },
-                        "responsePath": "data.materials",
-                        "displayKey": "lotId",
-                        "valueKey": "lotId"
-                      }
-                    }
-                  },
-                  {
-                    "type": "column",
-                    "id": "PARTS_BY_WEIGHT",
-                    "fieldType": "static",
-                    "label": "Parts By Weight",
-                    "readonly": true
-                  },
-                  {
-                    "type": "column",
-                    "id": "QTY_TAKEN",
-                    "fieldType": "number",
-                    "label": "Qty Taken (g)"
-                  },
-                  {
-                    "type": "column",
-                    "id": "TOTAL_QTY",
-                    "fieldType": "number",
-                    "label": "Total Quantity (g)",
-                    "readonly": true
-                  }
-                ]
+                "type": "field",
+                "id": "HEMCOAT_PREMIX_BATCH_NO",
+                "fieldType": "text",
+                "label": "Batch No",
+                "ui": {
+                  "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+                  "maxWidth": "280px"
+                }
+              },
+              {
+                "type": "field",
+                "id": "HEMCOAT_PREMIX_DATE",
+                "fieldType": "date",
+                "label": "Premix Date",
+                "ui": {
+                  "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+                  "maxWidth": "280px"
+                }
               }
             ]
-          }
-        ]
-      },
-      {
-        "id": "HEMCOAT_3K_FINAL_MIX",
-        "title": "Final Mix",
-        "ui": { "variant": "card", "padding": "md" },
-        "children": [
+          },
           {
             "type": "table",
-            "id": "FINAL_MIX_TABLE",
-            "label": "Hemcoat-3K Final Mix",
+            "id": "PREMIX_PREPARATION_TABLE",
+            "label": "Premix Preparation Details",
             "rows": {
-              "defaultCount": 3,
+              "defaultCount": 5,
               "allowAdd": false,
               "allowDelete": false,
               "autoIncrementKey": "srNo",
+              "rowComputations": [
+                {
+                  "rowKey": "TOTAL",
+                  "rowKeyColumn": "srNo",
+                  "targetColumn": "QTY_TAKEN",
+                  "sourceColumn": "QTY_TAKEN",
+                  "expression": "__SUM__",
+                  "editable": true
+                }
+              ],
               "presetRows": [
-                { "readonly": true, "INGREDIENT": "Hemcoat-3K Premix", "PARTS_BY_WEIGHT": "98" },
-                { "readonly": true, "INGREDIENT": "H12MDI", "PARTS_BY_WEIGHT": "2.3" },
+                { "readonly": true, "INGREDIENT": "HTPB", "PARTS_BY_WEIGHT": "80.00" },
+                { "readonly": true, "INGREDIENT": "NBD", "PARTS_BY_WEIGHT": "2.80" },
+                { "readonly": true, "INGREDIENT": "HT", "PARTS_BY_WEIGHT": "2.15" },
+                { "readonly": true, "INGREDIENT": "Kaolin", "PARTS_BY_WEIGHT": "15.00" },
+                { "readonly": true, "INGREDIENT": "Nonox-D", "PARTS_BY_WEIGHT": "0.05" },
                 {
                   "readonly": true,
-                  "INGREDIENT": "Catalyst (2.5% w/w FeAA in HTPB)",
-                  "PARTS_BY_WEIGHT": "2 ml"
+                  "srNo": "TOTAL",
+                  "INGREDIENT": "Total Quantity",
+                  "MFG_LOT": "",
+                  "PARTS_BY_WEIGHT": "",
+                  "MFG_LOT__fieldType": "static",
+                  "PARTS_BY_WEIGHT__fieldType": "static",
+                  "QTY_TAKEN__fieldType": "number"
                 }
               ]
             },
@@ -151,12 +107,6 @@
               },
               {
                 "type": "column",
-                "id": "BATCH_NO_DATE",
-                "fieldType": "text",
-                "label": "Batch No With Date"
-              },
-              {
-                "type": "column",
                 "id": "INGREDIENT",
                 "fieldType": "static",
                 "label": "Ingredient",
@@ -165,22 +115,8 @@
               {
                 "type": "column",
                 "id": "MFG_LOT",
-                "fieldType": "dropdown",
-                "label": "Mfg Lot",
-                "dataSource": {
-                  "type": "api",
-                  "api": {
-                    "endpoint": "MATERIAL_LOTS",
-                    "method": "POST",
-                    "requestField": "batchId",
-                    "requestBody": {
-                      "subDepartmentId": "{{subDepartmentId}}"
-                    },
-                    "responsePath": "data.materials",
-                    "displayKey": "lotId",
-                    "valueKey": "lotId"
-                  }
-                }
+                "fieldType": "text",
+                "label": "Mfg Lot"
               },
               {
                 "type": "column",
@@ -194,13 +130,120 @@
                 "id": "QTY_TAKEN",
                 "fieldType": "number",
                 "label": "Qty Taken (g)"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "HEMCOAT_3K_FINAL_MIX",
+        "title": "Final Mix",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "group",
+            "id": "HEMCOAT_FINAL_MIX_BATCH_FIELDS",
+            "ui": {
+              "direction": "row",
+              "wrap": true,
+              "gap": "md",
+              "alignItems": "flex-end"
+            },
+            "children": [
+              {
+                "type": "field",
+                "id": "HEMCOAT_FINAL_MIX_BATCH_NO",
+                "fieldType": "text",
+                "label": "Batch No",
+                "ui": {
+                  "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+                  "maxWidth": "280px"
+                }
+              },
+              {
+                "type": "field",
+                "id": "HEMCOAT_FINAL_MIX_DATE",
+                "fieldType": "date",
+                "label": "Final Mix Date",
+                "ui": {
+                  "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+                  "maxWidth": "280px"
+                }
+              }
+            ]
+          },
+          {
+            "type": "table",
+            "id": "FINAL_MIX_TABLE",
+            "label": "Hemcoat-3K Final Mix",
+            "rows": {
+              "defaultCount": 3,
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "srNo",
+              "rowComputations": [
+                {
+                  "rowKey": "TOTAL",
+                  "rowKeyColumn": "srNo",
+                  "targetColumn": "QTY_TAKEN",
+                  "sourceColumn": "QTY_TAKEN",
+                  "expression": "__SUM__",
+                  "editable": true
+                }
+              ],
+              "presetRows": [
+                { "readonly": true, "INGREDIENT": "Hemcoat-3K Premix", "PARTS_BY_WEIGHT": "98" },
+                { "readonly": true, "INGREDIENT": "H12MDI", "PARTS_BY_WEIGHT": "2.3" },
+                {
+                  "readonly": true,
+                  "INGREDIENT": "Catalyst (2.5% w/w FeAA in HTPB)",
+                  "PARTS_BY_WEIGHT": "2 ml"
+                },
+                {
+                  "readonly": true,
+                  "srNo": "TOTAL",
+                  "INGREDIENT": "Total Quantity",
+                  "MFG_LOT": "",
+                  "PARTS_BY_WEIGHT": "",
+                  "MFG_LOT__fieldType": "static",
+                  "PARTS_BY_WEIGHT__fieldType": "static",
+                  "QTY_TAKEN__fieldType": "number"
+                }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "srNo",
+                "fieldType": "serial",
+                "label": "Sr. No",
+                "readonly": true
               },
               {
                 "type": "column",
-                "id": "TOTAL_QTY",
-                "fieldType": "number",
-                "label": "Total Quantity (g)",
+                "id": "INGREDIENT",
+                "fieldType": "static",
+                "label": "Ingredient",
                 "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "MFG_LOT",
+                "fieldType": "text",
+                "label": "Mfg Lot"
+              },
+              {
+                "type": "column",
+                "id": "PARTS_BY_WEIGHT",
+                "fieldType": "static",
+                "label": "Parts By Weight",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "QTY_TAKEN",
+                "fieldType": "number",
+                "label": "Qty Taken (g)"
               }
             ]
           }
@@ -212,14 +255,36 @@
         "ui": { "variant": "card", "padding": "md" },
         "children": [
           {
-            "type": "field",
-            "id": "QUALIFICATION_BATCH_NO",
-            "fieldType": "text",
-            "label": "Batch No With Date Of Preparation",
+            "type": "group",
+            "id": "QUALIFICATION_BATCH_FIELDS",
             "ui": {
-              "colSpan": { "xs": 12, "sm": 6, "md": 4 },
-              "maxWidth": "300px"
-            }
+              "direction": "row",
+              "wrap": true,
+              "gap": "md",
+              "alignItems": "flex-end"
+            },
+            "children": [
+              {
+                "type": "field",
+                "id": "QUALIFICATION_BATCH_NO",
+                "fieldType": "text",
+                "label": "Batch No",
+                "ui": {
+                  "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+                  "maxWidth": "280px"
+                }
+              },
+              {
+                "type": "field",
+                "id": "QUALIFICATION_PREPARATION_DATE",
+                "fieldType": "date",
+                "label": "Date of Preparation",
+                "ui": {
+                  "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+                  "maxWidth": "280px"
+                }
+              }
+            ]
           },
           {
             "type": "table",
@@ -262,14 +327,14 @@
                 "id": "RESULT",
                 "fieldType": "text",
                 "label": "Result"
-              },
-              {
-                "type": "column",
-                "id": "QC_REPORT",
-                "fieldType": "file",
-                "label": "Upload QC Report"
               }
             ]
+          },
+          {
+            "type": "field",
+            "id": "QUALIFICATION_QC_REPORT",
+            "fieldType": "file",
+            "label": "QC Report"
           }
         ]
       },

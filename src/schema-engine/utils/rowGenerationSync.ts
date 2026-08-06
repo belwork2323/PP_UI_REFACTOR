@@ -8,7 +8,10 @@ import type {
   SchemaTableColumn,
 } from "../types";
 import { flattenTableColumns } from "./schemaUtils";
+import { applyRowComputations, getTableRowComputations } from "../rules/tableRowComputations";
 import {
+  appendTrailingTablePresetRows,
+  isTrailingTablePresetRow,
   isWrappedTableValue,
   resolveTableDeletedColumnIds,
   resolveTableExtraColumns,
@@ -297,17 +300,22 @@ const syncCountBasedTable = (entry: IndexedTable, values: SchemaFormValues): Sch
 
   const count = resolveRowGenerationCount(config, values, entry.block.rows?.max);
   const state = readTableRows(values, entry);
-  const nextRows = buildCountGeneratedRows(entry.block, count, state.rows);
+  const autoKey = entry.block.rows?.autoIncrementKey ?? "SR_NO";
+  const dataExisting = state.rows.filter((row) => !isTrailingTablePresetRow(row, autoKey));
+  const generatedRows = buildCountGeneratedRows(entry.block, count, dataExisting);
+  const nextRows = applyRowComputations(
+    appendTrailingTablePresetRows(generatedRows, entry.block, state.rows),
+    entry.block,
+  );
 
   const labelCol = config.labelColumn ?? "parameter";
-  const autoKey = entry.block.rows?.autoIncrementKey ?? "SR_NO";
   const unchanged =
     state.rows.length === nextRows.length &&
     nextRows.every((row, index) => {
       const prev = state.rows[index];
       if (!prev) return false;
       if (String(prev[labelCol] ?? "") !== String(row[labelCol] ?? "")) return false;
-      if (Number(prev[autoKey]) !== Number(row[autoKey])) return false;
+      if (String(prev[autoKey] ?? "") !== String(row[autoKey] ?? "")) return false;
       const hintKeys = Object.keys(config.rowDefaults ?? {}).filter((k) => k.endsWith("__fieldType"));
       return hintKeys.every((key) => prev[key] === row[key]);
     });
@@ -407,4 +415,42 @@ export const getRowGenerationCountTriggerFields = (
     if (config.countByFieldValue?.field) ids.add(config.countByFieldValue.field);
   });
   return ids;
+};
+
+const applyTableRowComputationsToStoredValue = (
+  table: SchemaTableBlock,
+  value: unknown,
+): unknown => {
+  if (!getTableRowComputations(table).length) return value;
+
+  if (isWrappedTableValue(value)) {
+    return { ...value, rows: applyRowComputations(value.rows, table) };
+  }
+
+  if (Array.isArray(value)) {
+    return applyRowComputations(value as Record<string, unknown>[], table);
+  }
+
+  return value;
+};
+
+/** Sync generated rows and apply table computations before building submit payload. */
+export const prepareSchemaValuesForSubmission = (
+  schema: SchemaDocumentV2 | null | undefined,
+  values: SchemaFormValues,
+): SchemaFormValues => {
+  if (!schema?.data?.sections?.length) return values;
+
+  let next = syncRowGenerationTables(schema, values);
+  const tables = collectTables(schema.data.sections);
+
+  tables.forEach((entry) => {
+    if (!getTableRowComputations(entry.block).length) return;
+    const updated = applyTableRowComputationsToStoredValue(entry.block, next[entry.formKey]);
+    if (updated !== next[entry.formKey]) {
+      next = { ...next, [entry.formKey]: updated };
+    }
+  });
+
+  return next;
 };

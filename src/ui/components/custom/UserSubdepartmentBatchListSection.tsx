@@ -9,7 +9,7 @@ import { useUserSubdepartmentBatchListFilterBar } from "./UserSubdepartmentBatch
 import type { SubdepartmentBatchListAdvancedFilters } from "../../../hooks/user/useSubdepartmentBatches";
 import {
   OPERATION_STATUS,
-  OPERATION_STATUS_FILTER_VALUES,
+  MANUFACTURING_STATUS_FILTER_VALUES,
   getOperationStatusFilterLabel,
   isManufacturingViewOnlyStatus,
   type OperationStatusMap,
@@ -86,6 +86,7 @@ export type UserSubdepartmentBatchListSectionProps = {
   emptyText?: string;
   hideAdvancedFilter?: boolean;
   headerActions?: React.ReactNode;
+  showBemMotorIds?: boolean;
 };
 
 const defaultCanViewDetails = (status: string) => isManufacturingViewOnlyStatus(status);
@@ -106,12 +107,13 @@ const UserSubdepartmentBatchListSection = ({
   viewDetailsTooltip = STRINGS.MANUFACTURING.BATCH_LIST.VIEW_DETAILS_TOOLTIP,
   actionStrings = STRINGS.MANUFACTURING.BATCH_LIST,
   columnLabels,
-  statusDropdownValues = [FILTER_ALL, ...OPERATION_STATUS_FILTER_VALUES],
+  statusDropdownValues = [FILTER_ALL, ...MANUFACTURING_STATUS_FILTER_VALUES],
   extraSearchFields = [],
   rejectedStatus = OPERATION_STATUS.REJECTED,
   emptyText,
   hideAdvancedFilter = false,
   headerActions = null,
+  showBemMotorIds = false,
 }: UserSubdepartmentBatchListSectionProps) => {
   const {
     batches,
@@ -155,6 +157,12 @@ const UserSubdepartmentBatchListSection = ({
     [rawStatusConfig, theme],
   );
 
+  /** Tabs follow manufacturing statusCounts keys (incl. Waiting for Complete Approval). */
+  const statusTabs = useMemo(
+    () => statusDropdownValues.filter((status) => status in statusConfig || status === FILTER_ALL),
+    [statusConfig, statusDropdownValues],
+  );
+
   const columns = useMemo(
     () =>
       buildSubdepartmentBatchListColumns({
@@ -166,12 +174,14 @@ const UserSubdepartmentBatchListSection = ({
         CalendarIcon,
         labels: columnLabels,
         rejectedStatus,
+        showBemMotorIds,
       }),
     [
       CalendarIcon,
       PersonIcon,
       columnLabels,
       rejectedStatus,
+      showBemMotorIds,
       statusConfig,
       statusField,
       statusLabel,
@@ -203,6 +213,7 @@ const UserSubdepartmentBatchListSection = ({
       columns={columns}
       statusField={statusField}
       statusConfig={statusConfig}
+      statusTabs={statusTabs}
       filters={[]}
       searchFields={[...SUBDEPARTMENT_BATCH_SEARCH_FIELDS, ...extraSearchFields]}
       highlightRow={(row: Record<string, unknown>) => row[statusField] === rejectedStatus}
@@ -231,7 +242,6 @@ const UserSubdepartmentBatchListSection = ({
       filterExtension={hideAdvancedFilter ? null : filterExtension}
       renderAction={(row: Record<string, unknown>) => {
         const status = String(row[statusField] ?? "");
-        console.log(status);
         return (
           <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.75}>
             {canViewDetails(status) ? (

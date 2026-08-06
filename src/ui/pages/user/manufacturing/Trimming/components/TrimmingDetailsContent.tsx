@@ -24,11 +24,12 @@ import {
   type CasePrepDetailSection,
   type CasePrepDetailTable,
 } from "../../../../../../data/models/user/CasePreparationFormModel";
+import { mapCastingCuringPersonLabel } from "../../../../../../data/models/user/CastingCuringFormModel";
 import {
-  mapCastingCuringPersonLabel,
-  orderCastingCuringDisplayColumns,
-} from "../../../../../../data/models/user/CastingCuringFormModel";
-import type { TrimmingDetailView, TrimmingMotorDetailView } from "../../../../../../data/models/user/TrimmingFormModel";
+  orderTrimmingDisplayColumns,
+  type TrimmingDetailView,
+  type TrimmingMotorDetailView,
+} from "../../../../../../data/models/user/TrimmingFormModel";
 import { OPERATION_STATUS_UI_TO_API } from "../../../../../../hooks/operationStatus";
 
 const API_OPERATION_STATUS_LABELS = Object.fromEntries(
@@ -100,14 +101,26 @@ const DataTable = ({
   table: CasePrepDetailTable;
   dt: TrimmingDetailsTheme;
 }) => {
-  const columns = orderCastingCuringDisplayColumns(Object.keys(table.columnLabels));
+  const preferredOrder = Object.keys(table.columnLabels);
+  const rowKeys = Array.from(
+    table.rows.reduce((keys, row) => {
+      Object.keys(row ?? {}).forEach((key) => keys.add(key));
+      return keys;
+    }, new Set<string>()),
+  );
+  const columns = orderTrimmingDisplayColumns(
+    preferredOrder.length ? preferredOrder : rowKeys,
+    preferredOrder,
+  );
   if (!columns.length || !table.rows.length) return null;
 
   return (
     <Box sx={{ mb: 1.5 }}>
-      <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: "text.secondary", mb: 0.75 }}>
-        {table.label || formatCasePrepSectionLabel(table.blockId)}
-      </Typography>
+      {table.label ? (
+        <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: "text.secondary", mb: 0.75 }}>
+          {table.label}
+        </Typography>
+      ) : null}
       <TableContainer sx={{ ...dt.tableContainer, overflowX: "auto" }}>
         <Table size="small" sx={{ minWidth: Math.max(720, columns.length * 120) }}>
           <TableHead>
@@ -167,7 +180,7 @@ const SectionPanel = ({
   </Box>
 );
 
-const MotorDetailPanel = ({
+export const MotorDetailPanel = ({
   motor,
   dt,
   palette,

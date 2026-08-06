@@ -554,6 +554,8 @@ export type CasingDetailBlock = {
   dimensionalTable?: CasingDimensionalTableRow[];
   /** Mock trial measurement tables (assy, motor length, mandrel assembly) */
   mockTrialTables?: MockTrialDetailTable[];
+  /** Radiography plan details table (sections, orientations, SFD, exposures, detector) */
+  radiographyPlanTables?: MockTrialDetailTable[];
 };
 
 export type RocketMotorCasingDetailsContext = {
@@ -860,6 +862,60 @@ export function mapCasingFormDataToDetailBlocks(
         detailRow("Receipt status", form.itemsReceiptStatus),
         detailRow("Observations", form.itemsObservations),
       ],
+      _columns: CASING_DETAIL_COLS,
+    },
+    {
+      material: "Radiography details",
+      rows: [
+        detailRow("Radiography plan ID", form.radiographyPlanId),
+        detailRow("Plan name", form.radiographyPlanName),
+        ...((form.radiographyPlanRows ?? []).some(
+          (row) =>
+            String(row.sections ?? "").trim() ||
+            String(row.orientations ?? "").trim() ||
+            String(row.sfd ?? "").trim() ||
+            String(row.normalExposures ?? "").trim() ||
+            String(row.tangentialExposures ?? "").trim() ||
+            String(row.detectorType ?? "").trim(),
+        )
+          ? []
+          : [detailRow("No radiography plan details recorded", "—")]),
+      ],
+      radiographyPlanTables: (() => {
+        const planRows = (form.radiographyPlanRows ?? []).filter(
+          (row) =>
+            String(row.sections ?? "").trim() ||
+            String(row.orientations ?? "").trim() ||
+            String(row.sfd ?? "").trim() ||
+            String(row.normalExposures ?? "").trim() ||
+            String(row.tangentialExposures ?? "").trim() ||
+            String(row.detectorType ?? "").trim(),
+        );
+        if (planRows.length === 0) return undefined;
+        return [
+          {
+            title: "Plan",
+            columns: [
+              { key: "srNo", label: "Sr." },
+              { key: "sections", label: "Sections" },
+              { key: "orientations", label: "Orientations" },
+              { key: "sfd", label: "SFD" },
+              { key: "normalExposures", label: "No. of Normal Exposure" },
+              { key: "tangentialExposures", label: "No. of Tangential Exposure" },
+              { key: "detectorType", label: "Type of Detector" },
+            ],
+            rows: planRows.map((row, index) => ({
+              srNo: String(row.srNo || index + 1),
+              sections: String(row.sections ?? "").trim(),
+              orientations: String(row.orientations ?? "").trim(),
+              sfd: String(row.sfd ?? "").trim(),
+              normalExposures: String(row.normalExposures ?? "").trim(),
+              tangentialExposures: String(row.tangentialExposures ?? "").trim(),
+              detectorType: String(row.detectorType ?? "").trim(),
+            })),
+          },
+        ];
+      })(),
       _columns: CASING_DETAIL_COLS,
     },
     {

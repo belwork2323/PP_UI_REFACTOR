@@ -34,6 +34,7 @@ const equipmentMap = createBidirectionalMap([
   ["6/9 MeV LINAC", "6_9_MEV_LINAC"],
   ["9/15 MeV LINAC", "9_15_MEV_LINAC"],
   ["450 KeV X ray Machine", "450_KEV_XRAY_MACHINE"],
+  ["Mag NDT", "MAG_NDT"],
 ] as const);
 
 const beamEnergyMap = createBidirectionalMap([
@@ -43,6 +44,7 @@ const beamEnergyMap = createBidirectionalMap([
   ["9 MeV", "9_MEV"],
   ["15 MeV", "15_MEV"],
   ["450 KeV", "450_KEV"],
+  ["Co 60", "CO_60"],
 ] as const);
 
 const detectorTypeMap = createBidirectionalMap([
@@ -64,7 +66,7 @@ const orientationMap = createBidirectionalMap(
 );
 
 const observationTypeMap = createBidirectionalMap([
-  ["Surface Paint/ Finish", "SURFACE_PAINT_FINISH"],
+  ["Rocket motor external surface", "SURFACE_PAINT_FINISH"],
   ["Dents/scratch/abnormalities on motor case", "DENTS_SCRATCHES_MOTOR_CASE"],
   ["Dents/scratch/abnormalities on propellant", "DENTS_SCRATCHES_PROPELLANT"],
   ["Nut & bolt groves cleanliness", "NUT_BOLT_GROOVES_CLEANLINESS"],
@@ -86,9 +88,7 @@ export const NDT_CUSTOM_OBSERVATION_TYPE = "ANY_OTHER_OBSERVATION";
 export const sanitizeNdtNumericInput = (value: string): string => value.replace(/\D/g, "");
 
 /** Parse a UI numeric string to a non-negative integer, or null when empty/invalid. */
-export const parseNdtPositiveInt = (
-  value: string | number | null | undefined,
-): number | null => {
+export const parseNdtPositiveInt = (value: string | number | null | undefined): number | null => {
   if (value === null || value === undefined) return null;
   const trimmed = sanitizeNdtNumericInput(String(value).trim());
   if (!trimmed) return null;
@@ -97,8 +97,22 @@ export const parseNdtPositiveInt = (
   return parsed;
 };
 
-export const mapNdtEquipmentToApi = (value: string) => equipmentMap.toApi(value);
-export const mapNdtEquipmentFromApi = (value: string) => equipmentMap.fromApi(value);
+export const mapNdtEquipmentToApi = (values: string[] | string): string[] => {
+  const items = Array.isArray(values) ? values : values ? [values] : [];
+  return items.map((val) => equipmentMap.toApi(val)).filter(Boolean);
+};
+
+export const mapNdtEquipmentFromApi = (value: string | string[] | null | undefined): string[] => {
+  const items = Array.isArray(value)
+    ? value
+    : value
+      ? String(value)
+          .split(",")
+          .map((part) => part.trim())
+          .filter(Boolean)
+      : [];
+  return items.map((item) => equipmentMap.fromApi(String(item))).filter(Boolean);
+};
 
 export const mapNdtBeamEnergyToApi = (value: string) => beamEnergyMap.toApi(value);
 export const mapNdtBeamEnergiesToApi = (values: string[] = []) =>

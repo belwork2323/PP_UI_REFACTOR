@@ -16,6 +16,21 @@ const formatMotorSubtitle = (batch?: {
   return motorId && motorId !== "—" ? motorId : undefined;
 };
 
+const resolveStatusLabel = (batch: any, isEdit: boolean) => {
+  if (isEdit) return S.FORM_HEADER.EDITING_REJECTED;
+
+  const status = String(batch?.pcStatus ?? batch?.status ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+  const inProgress =
+    status === "in_progress" ||
+    status === "waiting_for_partial_approval" ||
+    Boolean(batch?.formId);
+
+  return inProgress ? S.FORM_HEADER.DRAFT : S.POST_CURE.NEW_LABEL;
+};
+
 const PostCureHeader = ({ batch, isEdit, onBack, theme }: any) => {
   return (
     <UserWorkflowFormHeader
@@ -23,7 +38,7 @@ const PostCureHeader = ({ batch, isEdit, onBack, theme }: any) => {
       data={{
         title: String(batch?.batchId ?? batch?.lotId ?? "—"),
         subtitle: formatMotorSubtitle(batch),
-        statusLabel: isEdit ? S.FORM_HEADER.EDITING_REJECTED : S.POST_CURE.NEW_LABEL,
+        statusLabel: resolveStatusLabel(batch, isEdit),
         statusVariant: isEdit ? "edit" : "new",
         rejectionReason: batch?.rejectionReason,
       }}

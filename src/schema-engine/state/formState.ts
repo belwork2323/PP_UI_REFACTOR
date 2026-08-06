@@ -10,8 +10,11 @@ import { resolveSchemaCountToken, type SchemaSetupContext } from "../utils/setup
 import { flattenTableColumns } from "../utils/schemaUtils";
 import {
   applyExtraColumnCellsToRows,
+  appendTrailingTablePresetRows,
+  applyPresetRowMetadata,
   buildInitialExtraColumns,
   hasTableCommitGroup,
+  isTrailingTablePresetRow,
   isWrappedTableValue,
   PRESET_ROW_META_KEYS,
   rehydrateDynamicTableColumnState,
@@ -78,8 +81,9 @@ export const buildTableRows = (table: SchemaTableBlock): Record<string, unknown>
     return [];
   }
 
-  // Count-driven tables start empty; syncRowGenerationTables fills them from fields.
-  if (table.rows?.rowGenerationCount && !(table.rows?.presetRows?.length)) {
+  // Count-driven tables start empty; syncRowGenerationTables fills them
+  // (including any trailing preset footer rows such as totals).
+  if (table.rows?.rowGenerationCount) {
     return [];
   }
 
@@ -164,12 +168,26 @@ export const mergeSavedRowsIntoPresetTable = (
 ): Record<string, unknown>[] => {
   const saved = (Array.isArray(savedRows) ? savedRows : []) as Record<string, unknown>[];
   const presetBuilt = buildTableRows(table);
-  if (!table.rows?.presetRows?.length || !saved.length) {
+  const autoKey = table.rows?.autoIncrementKey ?? "srNo";
+
+  if (!saved.length) {
+    return presetBuilt;
+  }
+
+  // populateFromApi / count-driven tables have no static scaffold from buildTableRows.
+  if (!presetBuilt.length) {
+    const dataRows = saved.filter((row) => !isTrailingTablePresetRow(row, autoKey));
+    return applyPresetRowMetadata(
+      appendTrailingTablePresetRows(dataRows, table, saved),
+      table,
+    );
+  }
+
+  if (!table.rows?.presetRows?.length) {
     return presetBuilt;
   }
 
   const staticCol = findStaticDataColumnId(table);
-  const autoKey = table.rows?.autoIncrementKey ?? "srNo";
   const byStatic = new Map<string, Record<string, unknown>>();
   const bySrNo = new Map<string, Record<string, unknown>>();
 
@@ -306,6 +324,14 @@ export const buildInitialFormValues = (
   schema.data.sections.forEach((section) => {
     (section.children ?? []).forEach((block) => assignBlock(block, section.id));
   });
+
+  if (setupContext) {
+    Object.entries(setupContext).forEach(([key, val]) => {
+      if (val == null || val === "" || typeof val === "object") return;
+      values[key] = val;
+    });
+  }
+
   return values;
 };
 

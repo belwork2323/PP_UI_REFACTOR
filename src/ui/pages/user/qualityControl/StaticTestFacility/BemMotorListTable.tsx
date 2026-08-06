@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo, useState } from "react";
 import {
   Box,
   Typography,
@@ -10,28 +10,54 @@ import {
   TableRow,
   TablePagination,
   Paper,
-  Chip,
-  TextField,
-  InputAdornment,
   Stack,
   CircularProgress,
-  IconButton,
-  Tooltip,
   alpha,
 } from "@mui/material";
-import SearchIcon from "@mui/icons-material/Search";
-import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
+import LayersRoundedIcon from "@mui/icons-material/LayersRounded";
+import InboxRoundedIcon from "@mui/icons-material/InboxRounded";
 
 import fonts from "@/app/theme/fonts";
-import { batchStatusConfig } from "@/app/theme/roleConfig";
-import { getStatus } from "@/utils/batchManagementUtils";
-import getBatchManagementTheme from "@/app/theme/custom_themes/admin/BatchManagement/batchManagement_theme";
-import { OPERATION_STATUS } from "@/hooks/operationStatus";
-import UserWorkflowStatusAction from "@/ui/components/custom/UserWorkflowStatusAction";
-import type { OperationStatusMap } from "@hooks/operationStatus";
+import { STRINGS } from "@/app/config/strings";
+import { useThemeStore } from "@/app/store/themeStore";
+import getQualityControlTheme from "@/app/theme/custom_themes/user/qualityControl/qualityControl_theme";
+import { getBatchListShellTheme } from "@/app/theme/custom_themes/shared/batchListShell_theme";
+import {
+  getOperationStatusConfig,
+  getOperationStatusFilterLabel,
+  OPERATION_STATUS,
+} from "@/hooks/operationStatus";
+import BatchListShell, {
+  BatchListShellFilterField,
+  BatchListShellStatusMeta,
+} from "@/ui/components/custom/BatchListShell";
+import UserWorkflowStatusCell from "@/ui/components/custom/UserWorkflowStatusCell";
+import { icons } from "@/app/theme/icons";
 
-const defaultCanViewDetails = (status: string) =>
-  status === OPERATION_STATUS.WAITING_FOR_APPROVAL || status === OPERATION_STATUS.APPROVED;
+const {
+  pending: HourglassEmptyRoundedIcon,
+  approved: CheckCircleRoundedIcon,
+  rejected: CancelRoundedIcon,
+  pendingAction: PendingActionsRoundedIcon,
+  play: PlayCircleOutlineRoundedIcon,
+} = icons.user.qualityControl.staticTestFacility.list;
+
+const BEM_STATUS_CONFIG = getOperationStatusConfig({
+  initiated: HourglassEmptyRoundedIcon,
+  inProgress: PlayCircleOutlineRoundedIcon,
+  waitingForApproval: PendingActionsRoundedIcon,
+  approved: CheckCircleRoundedIcon,
+  rejected: CancelRoundedIcon,
+});
+
+export type ColumnConfig<T = any> = {
+  id: string;
+  label: string;
+  align?: "left" | "center" | "right";
+  width?: number | string;
+  cellSx?: object;
+  render?: (row: T, index: number) => React.ReactNode;
+};
 
 export type BemMotorListTableProps = {
   rows?: any[];
@@ -39,25 +65,26 @@ export type BemMotorListTableProps = {
   page?: number;
   rowsPerPage?: number;
   search?: string;
+  activeStatus?: string;
+  statusTabs?: string[];
+  statusMeta?: BatchListShellStatusMeta;
+  statusConfig?: Record<string, any>;
+  statusCounts?: Record<string, number>;
+  filterFields?: BatchListShellFilterField[];
+  filterValues?: Record<string, string>;
   loading?: boolean;
   onPageChange?: (page: number) => void;
   onRowsPerPageChange?: (rowsPerPage: number) => void;
   onSearchChange?: (search: string) => void;
+  onStatusChange?: (status: string) => void;
+  onFilterChange?: (field: string, value: string) => void;
   renderAction?: (row: any) => React.ReactNode;
-  onViewDetails?: (row: any) => void;
-  onFillForm?: (row: any) => void;
-  onEditForm?: (row: any) => void;
-  statusMap?: OperationStatusMap;
-  canViewDetails?: (status: string) => boolean;
-  actionStrings?: {
-    FILL_ACTION?: string;
-    CONTINUE_ACTION?: string;
-    EDIT_ACTION_TOOLTIP?: string;
-    VIEW_DETAILS_TOOLTIP?: string;
-  };
-  headerAction?: React.ReactNode;
-  theme?: any;
+  /** Rendered on the right of the status filter tab row (same as Rocket Motor create). */
+  statusToolbarEnd?: React.ReactNode;
+  customColumns?: ColumnConfig[];
 };
+
+const FILTER_ALL = STRINGS.USER_BATCH_LIST.FILTER_ALL;
 
 const BemMotorListTable: React.FC<BemMotorListTableProps> = ({
   rows = [],
@@ -65,85 +92,204 @@ const BemMotorListTable: React.FC<BemMotorListTableProps> = ({
   page = 0,
   rowsPerPage = 10,
   search = "",
+  activeStatus: externalActiveStatus,
+  statusTabs: statusTabsOverride,
+  statusMeta: statusMetaOverride,
+  statusConfig: statusConfigOverride,
+  statusCounts = {},
+  filterFields = [],
+  filterValues = {},
   loading = false,
   onPageChange,
   onRowsPerPageChange,
   onSearchChange,
+  onStatusChange,
+  onFilterChange,
   renderAction,
-  headerAction,
-  theme,
+  statusToolbarEnd,
+  customColumns,
 }) => {
-  const t = theme?.batchList || {};
-  const p = theme?.palette || {};
-  const batchTheme = getBatchManagementTheme();
+  const mode = useThemeStore((state) => state.mode) ?? "light";
+  const theme = useMemo(() => getQualityControlTheme(mode), [mode]);
+  const t = theme.batchList;
+  const p = theme.palette;
 
-  // Define Table Header Styling
-  const thSx = {
-    background: t.tableHeaderBg || p.primary || "#1976d2",
-    color: t.tableHeaderText || "#fff",
-    fontWeight: fonts?.weight?.bold ?? 700,
-    fontSize: fonts?.size?.xs ?? "0.75rem",
-    letterSpacing: "0.08em",
-    textTransform: "uppercase",
-    padding: "11px 14px",
-    whiteSpace: "nowrap",
-    borderBottom: `2px solid ${t.tableHeaderBorder || "transparent"}`,
+  const [internalActiveStatus, setInternalActiveStatus] = useState<string>(FILTER_ALL);
+  const currentStatus = externalActiveStatus ?? internalActiveStatus;
+
+  const statusConfig = useMemo(() => {
+    if (statusConfigOverride) return statusConfigOverride;
+    return Object.fromEntries(
+      Object.entries(BEM_STATUS_CONFIG).map(([status, config]) => [
+        status,
+        {
+          ...config,
+          ...(t.statusConfig?.[status] ?? {}),
+          label: getOperationStatusFilterLabel(status, { isSourcingLotSubdepartment: false }),
+        },
+      ]),
+    );
+  }, [statusConfigOverride, t.statusConfig]);
+
+  const statusTabs = useMemo(
+    () => (statusTabsOverride?.length ? statusTabsOverride : [FILTER_ALL]),
+    [statusTabsOverride],
+  );
+
+  const resolvedStatusMeta = useMemo(() => {
+    if (statusMetaOverride) return statusMetaOverride;
+    return Object.fromEntries(
+      Object.entries(statusConfig).map(([status, config]: [string, any]) => [
+        status,
+        {
+          color: config.color,
+          label: config.label ?? status,
+        },
+      ]),
+    );
+  }, [statusConfig, statusMetaOverride]);
+
+  const listShellTheme = useMemo(
+    () =>
+      getBatchListShellTheme(
+        {
+          primary: p.primary,
+          primaryLight: p.primaryLight,
+          border: p.border,
+          text: p.text,
+          textSub: p.textSub,
+          surface: p.surface,
+        },
+        { filterInputBg: t.filterInputBg },
+      ),
+    [p, t],
+  );
+
+  const handleStatusTabClick = (newStatus: string) => {
+    setInternalActiveStatus(newStatus);
+    onStatusChange?.(newStatus);
   };
 
-  // Define Table Cell Styling
-  const tdSx = {
-    padding: "10px 14px",
-    fontSize: fonts?.size?.sm ?? "0.875rem",
-    borderBottom: `1px solid ${alpha(p.border || "#000", 0.15)}`,
-    color: p.text || "#000",
-    verticalAlign: "middle",
-  };
+  const thSx = useMemo(
+    () => ({
+      background: t?.tableHeaderBg || p?.primary,
+      color: t?.tableHeaderText || "#fff",
+      fontWeight: fonts.weight.bold,
+      fontSize: fonts.size.xs,
+      letterSpacing: "0.08em",
+      textTransform: "uppercase" as const,
+      padding: "11px 14px",
+      whiteSpace: "nowrap" as const,
+      borderBottom: `2px solid ${t?.tableHeaderBorder || "transparent"}`,
+    }),
+    [t, p],
+  );
+
+  const tdSx = useMemo(
+    () => ({
+      padding: "10px 14px",
+      fontSize: fonts.size.sm,
+      borderBottom: `1px solid ${alpha(p?.border || "#000", 0.6)}`,
+      color: p?.text || "#000",
+      verticalAlign: "middle" as const,
+    }),
+    [p],
+  );
+
+  const resultText = `${STRINGS.USER_BATCH_LIST.SHOWING} ${Math.min(
+    rowsPerPage,
+    Math.max(0, totalRecords - page * rowsPerPage),
+  )} ${STRINGS.USER_BATCH_LIST.OF} ${totalRecords} ${STRINGS.USER_BATCH_LIST.RECORDS}${
+    currentStatus !== FILTER_ALL
+      ? ` · ${resolvedStatusMeta[currentStatus]?.label ?? currentStatus}`
+      : ""
+  }`;
+
+  const columns: ColumnConfig[] = useMemo(
+    () =>
+      customColumns ?? [
+        {
+          id: "motorId",
+          label: "Other BEM Motor ID",
+          cellSx: {
+            fontWeight: fonts.weight.bold,
+            fontSize: t?.batchIdText?.fontSize ?? "0.84rem",
+          },
+          render: (row) => row.motorId ?? "—",
+        },
+        {
+          id: "subType",
+          label: "Sub Type",
+          render: (row) => row.subType ?? "—",
+        },
+        {
+          id: "stfTestNo",
+          label: "STF Test No.",
+          render: (row) => row.stfTestNo ?? "—",
+        },
+        {
+          id: "createdBy",
+          label: "Created By",
+          render: (row) => row.createdBy ?? "—",
+        },
+        {
+          id: "status",
+          label: STRINGS.QUALITY_CONTROL.STATIC_TEST_FACILITY.COL_STATUS,
+          render: (row) => (
+            <UserWorkflowStatusCell
+              status={String(row?.status ?? "")}
+              statusConfig={statusConfig}
+              rejectedStatus={OPERATION_STATUS.REJECTED}
+              rejectionReason={row?.rejectionReason}
+              theme={theme}
+            />
+          ),
+        },
+        {
+          id: "actions",
+          label: STRINGS.USER_BATCH_LIST.COL_ACTION,
+          align: "center",
+          render: (row) => (
+            <Stack direction="row" alignItems="center" justifyContent="center" spacing={0.75}>
+              {renderAction?.(row)}
+            </Stack>
+          ),
+        },
+      ],
+    [customColumns, renderAction, statusConfig, t, theme],
+  );
 
   return (
-    <Box sx={{ width: "100%", display: "flex", flexDirection: "column", gap: 2 }}>
-      {/* Search Bar & Header Action Controls */}
-      <Stack
-        direction={{ xs: "column", sm: "row" }}
-        justifyContent="space-between"
-        alignItems={{ xs: "stretch", sm: "center" }}
-        spacing={2}
-        sx={{ mb: 0.5 }}
-      >
-        {/* Search Bar */}
-        <TextField
-          size="small"
-          placeholder="Search by Motor ID, Casing No, Sub Type..."
-          value={search}
-          onChange={(e) => onSearchChange?.(e.target.value)}
-          sx={{
-            flex: 1,
-            "& .MuiOutlinedInput-root": {
-              borderRadius: 2,
-              background: p.surface || "#fff",
-            },
-          }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon fontSize="small" sx={{ color: p.textSub || "action.active" }} />
-              </InputAdornment>
-            ),
-          }}
-        />
-
-        {/* Header Action / Add Button Container */}
-        <Box sx={{ flexShrink: 0 }}>{headerAction}</Box>
-      </Stack>
-
-      {/* Main Table Paper Container */}
+    <BatchListShell
+      activeStatus={currentStatus}
+      statusTabs={statusTabs}
+      statusMeta={resolvedStatusMeta}
+      statusCounts={statusCounts}
+      onStatusChange={handleStatusTabClick}
+      searchValue={search}
+      onSearchChange={(val) => onSearchChange?.(val)}
+      searchPlaceholder={STRINGS.USER_BATCH_LIST.SEARCH_PLACEHOLDER}
+      filterFields={filterFields}
+      filterValues={filterValues}
+      onFilterChange={onFilterChange}
+      resultIcon={LayersRoundedIcon}
+      resultText={resultText}
+      emptyIcon={InboxRoundedIcon}
+      emptyTitle="No BEM motors found"
+      emptySubtitle={STRINGS.USER_BATCH_LIST.EMPTY_SUBTITLE}
+      hasItems={rows.length > 0}
+      loading={loading}
+      statusToolbarEnd={statusToolbarEnd}
+      theme={listShellTheme}
+    >
       <Paper
         elevation={0}
         sx={{
           borderRadius: 3,
           overflow: "hidden",
-          background: p.surface || "#fff",
-          border: `1.5px solid ${p.border || "#E0E0E0"}`,
-          boxShadow: `0 2px 16px ${alpha(p.primary || "#000", 0.07)}`,
+          background: p?.surface || "#fff",
+          border: `1.5px solid ${p?.border || "#E0E0E0"}`,
+          boxShadow: `0 2px 16px ${alpha(p?.primary || "#000", 0.07)}`,
         }}
       >
         <TableContainer sx={{ minHeight: 300, position: "relative" }}>
@@ -155,7 +301,7 @@ const BemMotorListTable: React.FC<BemMotorListTableProps> = ({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: alpha(p.surface || "#FFF", 0.7),
+                background: alpha(p?.surface || "#FFF", 0.7),
                 zIndex: 2,
               }}
             >
@@ -166,95 +312,72 @@ const BemMotorListTable: React.FC<BemMotorListTableProps> = ({
           <Table stickyHeader aria-label="BEM Motor List Table">
             <TableHead>
               <TableRow>
-                <TableCell sx={{ ...thSx, width: 40, textAlign: "center" }}>#</TableCell>
-                <TableCell sx={thSx}>Other BEM Motor ID</TableCell>
-                <TableCell sx={thSx}>Sub Type</TableCell>
-                <TableCell sx={thSx}>STF Test No.</TableCell>
-                <TableCell sx={thSx}>Created By</TableCell>
-                <TableCell sx={thSx}>Status</TableCell>
-                <TableCell align="center" sx={thSx}>
-                  Action
+                <TableCell sx={{ ...thSx, width: 40, textAlign: "center" }}>
+                  {STRINGS.USER_BATCH_LIST.COL_HASH}
                 </TableCell>
+                {columns.map((col) => (
+                  <TableCell
+                    key={col.id}
+                    align={col.align ?? "left"}
+                    sx={{ ...thSx, width: col.width }}
+                  >
+                    {col.label}
+                  </TableCell>
+                ))}
               </TableRow>
             </TableHead>
 
             <TableBody>
-              {rows.length === 0 && !loading ? (
-                <TableRow>
-                  <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
-                    <Typography color="text.secondary" sx={{ fontSize: fonts?.size?.sm }}>
-                      No BEM Motors found.
-                    </Typography>
-                  </TableCell>
-                </TableRow>
-              ) : (
-                rows.map((row, idx) => {
-                  const status = getStatus(row);
-                  const scStatus = batchStatusConfig[status];
-
-                  return (
-                    <TableRow
-                      key={row.id || row.motorId || idx}
+              {rows.map((row, idx) => (
+                <TableRow
+                  key={row.id || row.motorId || idx}
+                  sx={{
+                    background:
+                      idx % 2 === 0
+                        ? t?.stripedRowEven || "inherit"
+                        : t?.stripedRowOdd || alpha(p?.primary || "#000", 0.015),
+                    "&:hover": {
+                      background: alpha(p?.primaryLight || p?.primary || "#000", 0.04),
+                    },
+                    "&:last-child td": { borderBottom: "none" },
+                    transition: "background 0.15s",
+                  }}
+                >
+                  <TableCell sx={{ ...tdSx, textAlign: "center" }}>
+                    <Typography
                       sx={{
-                        background:
-                          idx % 2 === 0
-                            ? t.stripedRowEven || "inherit"
-                            : t.stripedRowOdd || alpha(p.primary || "#000", 0.015),
-                        "&:hover": {
-                          background: alpha(p.primaryLight || p.primary || "#000", 0.05),
-                        },
-                        "&:last-child td": { borderBottom: "none" },
-                        transition: "background 0.15s",
+                        fontSize: fonts?.size?.xs,
+                        fontWeight: fonts?.weight?.bold,
+                        color: p?.textSub,
                       }}
                     >
-                      <TableCell sx={{ ...tdSx, textAlign: "center" }}>
-                        <Typography
-                          sx={{
-                            fontSize: fonts?.size?.xs,
-                            fontWeight: fonts?.weight?.bold,
-                            color: p.textSub,
-                          }}
-                        >
-                          {page * rowsPerPage + idx + 1}
-                        </Typography>
+                      {page * rowsPerPage + idx + 1}
+                    </Typography>
+                  </TableCell>
+
+                  {columns.map((col) => {
+                    const rawValue = row[col.id];
+
+                    return (
+                      <TableCell
+                        key={col.id}
+                        align={col.align ?? "left"}
+                        sx={{ ...tdSx, ...(col.cellSx ?? {}) }}
+                      >
+                        {col.render ? col.render(row, idx) : (rawValue ?? "—")}
                       </TableCell>
-                      <TableCell sx={{ ...tdSx, fontWeight: fonts?.weight?.bold }}>
-                        {row.motorId ?? "—"}
-                      </TableCell>
-                      <TableCell sx={tdSx}>{row.subType ?? "—"}</TableCell>
-                      <TableCell sx={tdSx}>{row.stfTestNo ?? "—"}</TableCell>
-                      <TableCell sx={tdSx}>{row.createdBy ?? "—"}</TableCell>
-                      <TableCell sx={tdSx}>
-                        <Chip
-                          icon={scStatus?.Icon ? <scStatus.Icon /> : undefined}
-                          label={status.replace(/_/g, " ").toUpperCase()}
-                          size="small"
-                          sx={batchTheme.tableCell.statusChip(scStatus)}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ ...tdSx, textAlign: "center" }}>
-                        <Stack
-                          direction="row"
-                          alignItems="center"
-                          justifyContent="center"
-                          spacing={0.75}
-                        >
-                          {renderAction && renderAction(row)}
-                        </Stack>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
+                    );
+                  })}
+                </TableRow>
+              ))}
             </TableBody>
           </Table>
         </TableContainer>
 
-        {/* Styled Pagination Controls */}
         <Box
           sx={{
-            borderTop: `1px solid ${alpha(p.border || "#000", 0.6)}`,
-            background: alpha(p.surface || "#fff", 0.4),
+            borderTop: `1px solid ${alpha(p?.border || "#000", 0.6)}`,
+            background: alpha(p?.surface || "#fff", 0.4),
           }}
         >
           <TablePagination
@@ -266,19 +389,19 @@ const BemMotorListTable: React.FC<BemMotorListTableProps> = ({
             onRowsPerPageChange={(e) => onRowsPerPageChange?.(parseInt(e.target.value, 10))}
             rowsPerPageOptions={[5, 10, 25, 50]}
             sx={{
-              color: p.text,
+              color: p?.text,
               "& .MuiTablePagination-toolbar": { fontSize: fonts?.size?.xs },
               "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": {
                 fontSize: fonts?.size?.xs,
-                color: p.textSub,
+                color: p?.textSub,
               },
               "& .MuiTablePagination-select": { fontSize: fonts?.size?.xs },
-              "& .MuiTablePagination-selectIcon": { color: p.textSub },
+              "& .MuiTablePagination-selectIcon": { color: p?.textSub },
             }}
           />
         </Box>
       </Paper>
-    </Box>
+    </BatchListShell>
   );
 };
 

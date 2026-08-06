@@ -29,6 +29,7 @@ type DispatchSchemaPanelProps = {
   onChange: (values: SchemaFormValues) => void;
   loading?: boolean;
   error?: string | null;
+  readOnly?: boolean;
 };
 
 const DispatchSchemaPanel = ({
@@ -40,6 +41,7 @@ const DispatchSchemaPanel = ({
   onChange,
   loading = false,
   error = null,
+  readOnly = false,
 }: DispatchSchemaPanelProps) => {
   const hydratedRef = useRef(false);
 
@@ -81,6 +83,7 @@ const DispatchSchemaPanel = ({
         onChange={onChange}
         loading={loading}
         error={error}
+        readOnly={readOnly}
         themeTokens={themeTokens}
         apiContext={{ subDepartmentId, batchId }}
       />

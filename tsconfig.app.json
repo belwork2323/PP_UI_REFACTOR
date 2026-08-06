@@ -2,9 +2,15 @@
   "compilerOptions": {
     "target": "ES2022",
     "useDefineForClassFields": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "lib": [
+      "ES2022",
+      "DOM",
+      "DOM.Iterable"
+    ],
     "module": "ESNext",
-    "types": ["vite/client"],
+    "types": [
+      "vite/client"
+    ],
     "skipLibCheck": true,
     "moduleResolution": "bundler",
     "esModuleInterop": true,
@@ -22,15 +28,33 @@
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
     "paths": {
-      "@/*": ["src/*"],
-      "@app/*": ["src/app/*"],
-      "@data/*": ["src/data/*"],
-      "@controllers/*": ["src/controllers/*"],
-      "@hooks/*": ["src/hooks/*"],
-      "@ui/*": ["src/ui/*"],
-      "@utils/*": ["src/utils/*"],
-      "@schema/*": ["src/schema-engine/*"]
+      "@/*": [
+        "src/*"
+      ],
+      "@app/*": [
+        "src/app/*"
+      ],
+      "@data/*": [
+        "src/data/*"
+      ],
+      "@controllers/*": [
+        "src/controllers/*"
+      ],
+      "@hooks/*": [
+        "src/hooks/*"
+      ],
+      "@ui/*": [
+        "src/ui/*"
+      ],
+      "@utils/*": [
+        "src/utils/*"
+      ],
+      "@schema/*": [
+        "src/schema-engine/*"
+      ]
     }
   },
-  "include": ["src"]
+  "include": [
+    "src"
+  ]
 }

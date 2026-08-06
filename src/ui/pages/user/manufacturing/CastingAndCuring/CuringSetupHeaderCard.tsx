@@ -1,9 +1,18 @@
 import { Box, Stack, Typography } from "@mui/material";
+import type { CuringCycleConfig } from "../../../../../data/models/user/CuringCycleConfigModel";
 import type { CuringProcessSetup } from "../../../../../data/models/user/CastingCuringFormModel";
-import { CASTING_CURING_FLOW_LABELS } from "../../../../../hooks/user/manufacturing/castingCuringFlowConfig";
+import {
+  CASTING_CURING_FLOW_LABELS,
+  formatCuringTypeLabel,
+  formatMotorStageLabel,
+  type CastingCuringBatchMotorSource,
+} from "../../../../../hooks/user/manufacturing/castingCuringFlowConfig";
+import { STRINGS } from "../../../../../app/config/strings";
 
 type CuringSetupHeaderCardProps = {
   setup: CuringProcessSetup;
+  curingCycleConfig?: CuringCycleConfig | null;
+  batch?: CastingCuringBatchMotorSource | null;
   theme: any;
 };
 
@@ -18,9 +27,23 @@ const DetailItem = ({ label, value }: { label: string; value: string }) => (
   </Box>
 );
 
-const CuringSetupHeaderCard = ({ setup, theme }: CuringSetupHeaderCardProps) => {
+const formatOvenNo = (ovenNo: string) => {
+  const n = Number(ovenNo);
+  if (!ovenNo.trim()) return "";
+  if (Number.isFinite(n) && n > 0) {
+    return STRINGS.MANUFACTURING.CASTING_CURING.CURING_OVEN_NO_OPTION(n);
+  }
+  return ovenNo;
+};
+
+const CuringSetupHeaderCard = ({
+  setup,
+  curingCycleConfig = null,
+  batch = null,
+  theme,
+}: CuringSetupHeaderCardProps) => {
   const L = CASTING_CURING_FLOW_LABELS;
-  const showMotorsToCure = String(setup.configuration).toLowerCase() === "multiple";
+  const motorStageLabel = formatMotorStageLabel(curingCycleConfig, batch);
 
   return (
     <Box
@@ -36,29 +59,14 @@ const CuringSetupHeaderCard = ({ setup, theme }: CuringSetupHeaderCardProps) => 
       <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: theme.palette.primary, mb: 1 }}>
         {L.curingProcessTitle}
       </Typography>
-      <Stack
-        direction="row"
-        useFlexGap
-        flexWrap="wrap"
-        gap={2}
-        sx={{
-          display: "grid",
-          gridTemplateColumns: {
-            xs: "repeat(2, minmax(0, 1fr))",
-            md: "repeat(4, minmax(0, 1fr))",
-          },
-        }}
-      >
+      <Stack direction="row" useFlexGap flexWrap="wrap" gap={2}>
+        <DetailItem label={L.curingMotorStage} value={motorStageLabel} />
+        <DetailItem
+          label={L.curingType}
+          value={formatCuringTypeLabel(curingCycleConfig?.curingType ?? setup.curingType)}
+        />
         <DetailItem label={L.curingSelectOven} value={setup.oven} />
-        <DetailItem label={L.curingType} value={setup.curingType} />
-        <DetailItem label={L.curingConfiguration} value={setup.configuration} />
-        {showMotorsToCure ? (
-          <DetailItem
-            label={L.curingMotorsToCure}
-            value={setup.motorsToCureCount === "" ? "" : String(setup.motorsToCureCount)}
-          />
-        ) : null}
-        <DetailItem label={L.curingOvensUtilized} value={setup.ovensUtilized} />
+        <DetailItem label={L.curingSelectOvenNo} value={formatOvenNo(setup.ovenNo)} />
       </Stack>
     </Box>
   );

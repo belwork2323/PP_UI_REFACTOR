@@ -151,7 +151,7 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
       }
 
       const allRows = (countRes.data.batches || []).map((batch: Record<string, unknown>) =>
-        mapSubdepartmentBatchListRow(batch, targetSlug),
+        mapSubdepartmentBatchListRow(batch, targetSlug, subDepartmentId),
       );
       const countPagination = countRes.data.pagination ?? {};
       const allTotal = Number(
@@ -227,7 +227,7 @@ export const useSubdepartmentBatches = (targetSlug?: string) => {
 
       if (res?.success && res.data) {
         const rows = (res.data.batches || []).map((batch: Record<string, unknown>) =>
-          mapSubdepartmentBatchListRow(batch, targetSlug),
+          mapSubdepartmentBatchListRow(batch, targetSlug, subDepartmentId),
         );
 
         const pagination = res.data.pagination ?? {};

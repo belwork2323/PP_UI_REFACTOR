@@ -1,4 +1,4 @@
-import { Box, Button, Stack, Typography } from "@mui/material";
+import { Box, Button, Chip, Stack, Typography } from "@mui/material";
 import {
   buildDivisionNavGroups,
   getDivisionNavSubHint,
@@ -8,6 +8,10 @@ import {
   shouldShowSubNav,
   type QcDivisionNavGroup,
 } from "../../../../../hooks/user/qualityControl/qcDivisionNav";
+import {
+  PARTIAL_ITEM_STATUS_CHIP,
+  type QcPartialItemStatus,
+} from "../../../../../hooks/user/qualityControl/qcDivisionApprovalUnits";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import { STRINGS } from "../../../../../app/config/strings";
 
@@ -19,6 +23,8 @@ type QCDivisionNavPanelProps = {
   activeSubIndex: number;
   onActiveGroupIndexChange: (index: number) => void;
   onActiveSubIndexChange: (index: number) => void;
+  groupStatusByFlowKey?: Record<string, QcPartialItemStatus>;
+  hideSubNav?: boolean;
 };
 
 const QCDivisionNavPanel = ({
@@ -27,6 +33,8 @@ const QCDivisionNavPanel = ({
   activeSubIndex,
   onActiveGroupIndexChange,
   onActiveSubIndexChange,
+  groupStatusByFlowKey = {},
+  hideSubNav = false,
 }: QCDivisionNavPanelProps) => {
   const BRAND = QC_DIVISION_BRAND;
   const groups = buildDivisionNavGroups(entries);
@@ -37,7 +45,7 @@ const QCDivisionNavPanel = ({
   const activeGroup = groups[safeGroupIndex] ?? groups[0];
   const subNavCount = getSubNavCount(activeGroup);
   const safeSubIndex = Math.min(Math.max(activeSubIndex, 0), Math.max(0, subNavCount - 1));
-  const showSubNav = shouldShowSubNav(activeGroup);
+  const showSubNav = !hideSubNav && shouldShowSubNav(activeGroup);
   const isMotorNav = activeGroup?.kind === "motor-based";
   const currentMotorLabel = isMotorNav ? getSubNavLabel(activeGroup, safeSubIndex) : "";
 
@@ -74,15 +82,39 @@ const QCDivisionNavPanel = ({
         <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
           {groups.map((group, index) => {
             const active = index === safeGroupIndex;
+            const status = groupStatusByFlowKey[group.flowKey];
+            const tone = status ? PARTIAL_ITEM_STATUS_CHIP[status] : null;
             return (
               <Button
                 key={group.flowKey}
                 size="small"
                 variant={active ? "contained" : "outlined"}
                 onClick={() => handleGroupChange(index)}
-                sx={{ whiteSpace: "nowrap", flexShrink: 0, textTransform: "none" }}
+                sx={{
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                  textTransform: "none",
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 0.75,
+                }}
               >
                 {group.label}
+                {tone ? (
+                  <Chip
+                    label={tone.label}
+                    size="small"
+                    sx={{
+                      height: 18,
+                      fontSize: "0.62rem",
+                      fontWeight: 700,
+                      background: active ? "rgba(255,255,255,0.22)" : tone.bg,
+                      color: active ? "#fff" : tone.color,
+                      border: active ? "1px solid rgba(255,255,255,0.35)" : `1px solid ${tone.border}`,
+                      "& .MuiChip-label": { px: 0.6 },
+                    }}
+                  />
+                ) : null}
               </Button>
             );
           })}

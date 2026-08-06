@@ -1,6 +1,217 @@
-import { NDT_RADIOGRAPHY_PLANS, type RadiographyPlanKey } from "../../../hooks/user/qualityControl/ndtFlowConfig";
-import { parseNdtPositiveInt } from "../../../hooks/user/qualityControl/ndtApiMappings";
+import {
+  NDT_RADIOGRAPHY_PLANS,
+  type RadiographyPlanKey,
+} from "../../../hooks/user/qualityControl/ndtFlowConfig";
+import {
+  mapNdtDetectorTypeFromApi,
+  parseNdtPositiveInt,
+} from "../../../hooks/user/qualityControl/ndtApiMappings";
+import { OPERATION_STATUS } from "../../../hooks/operationStatus";
 import { mapCastingCuringPersonLabel } from "./CastingCuringFormModel";
+import type { BatchMotorRadiographyDetails } from "../admin/BatchManagement/BatchManagementModel";
+
+export type NDTMotorSubmissionType = "DRAFT" | "SUBMIT";
+export type NDTMotorSubmissionStatus =
+  | "TO_BE_INITIATED"
+  | "IN_PROGRESS"
+  | "WAITING_FOR_APPROVAL"
+  | "APPROVED"
+  | "REJECTED";
+
+export type NDTMotorStatusMeta = {
+  motorSubmissionType?: NDTMotorSubmissionType;
+  motorSubmissionStatus: NDTMotorSubmissionStatus;
+  submittedAt?: string | null;
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  remarks?: string | null;
+  rejectionReason?: string | null;
+};
+
+export type NDTMotorCounts = {
+  pendingMotorCount: number;
+  approvedMotorCount: number;
+  rejectedMotorCount: number;
+  inProgressMotorCount: number;
+  totalMotorCount: number;
+};
+
+export const isNDTMotorLocked = (status?: NDTMotorSubmissionStatus | string | null) => {
+  const normalized = String(status ?? "").toUpperCase();
+  return normalized === "WAITING_FOR_APPROVAL" || normalized === "APPROVED";
+};
+
+export const isNDTMotorEditable = (status?: NDTMotorSubmissionStatus | string | null) =>
+  !status ||
+  status === "TO_BE_INITIATED" ||
+  status === "IN_PROGRESS" ||
+  status === "REJECTED";
+
+export const isNDTMotorApproverTabDisabled = (
+  status?: NDTMotorSubmissionStatus | string | null,
+): boolean => {
+  const normalized = String(status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+  return !normalized || normalized === "TO_BE_INITIATED";
+};
+
+export const isNDTMotorApproverActionable = (
+  status?: NDTMotorSubmissionStatus | string | null,
+): boolean => {
+  const normalized = String(status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+  return normalized === "WAITING_FOR_APPROVAL" || normalized === "IN_PROGRESS";
+};
+
+/** Entire form can be approved/rejected once ready for complete approval. */
+export const canApproverActionEntireNDTForm = (params: {
+  formSubmissionType?: string | null;
+  status?: string | null;
+  motors?: Array<{ motorSubmissionStatus?: NDTMotorSubmissionStatus | string | null }>;
+}): boolean => {
+  const status = String(params.status ?? "").trim();
+  const statusUpper = status.toUpperCase().replace(/\s+/g, "_");
+
+  if (
+    statusUpper === "APPROVED" ||
+    statusUpper === "REJECTED" ||
+    statusUpper === "FINAL_APPROVAL_COMPLETED" ||
+    status === OPERATION_STATUS.APPROVED ||
+    status === OPERATION_STATUS.REJECTED ||
+    status === OPERATION_STATUS.FINAL_APPROVAL_COMPLETED
+  ) {
+    return false;
+  }
+
+  if (
+    statusUpper === "WAITING_FOR_COMPLETE_APPROVAL" ||
+    status === OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL
+  ) {
+    return true;
+  }
+
+  const formType = String(params.formSubmissionType ?? "").trim().toUpperCase();
+  if (formType !== "SUBMIT") return false;
+
+  const motors = params.motors ?? [];
+  if (motors.length === 0) return false;
+  const allMotorsApproved = motors.every(
+    (motor) => String(motor.motorSubmissionStatus ?? "").toUpperCase() === "APPROVED",
+  );
+  if (!allMotorsApproved) return false;
+
+  return (
+    statusUpper === "WAITING_FOR_APPROVAL" ||
+    status === OPERATION_STATUS.WAITING_FOR_APPROVAL
+  );
+};
+
+export const normalizeNDTMotorStatus = (value: unknown): NDTMotorSubmissionStatus => {
+  const normalized = String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+  if (
+    normalized === "IN_PROGRESS" ||
+    normalized === "WAITING_FOR_APPROVAL" ||
+    normalized === "APPROVED" ||
+    normalized === "REJECTED"
+  ) {
+    return normalized;
+  }
+  return "TO_BE_INITIATED";
+};
+
+export const normalizeNDTMotorSubmissionType = (
+  value: unknown,
+): NDTMotorSubmissionType | undefined => {
+  const raw = String(value ?? "").trim().toUpperCase();
+  if (raw === "DRAFT" || raw === "SUBMIT") return raw;
+  return undefined;
+};
+
+export const mapNDTMotorStatusesFromApi = (
+  details: any,
+): Record<string, NDTMotorStatusMeta> => {
+  const root = details?.data ?? details ?? {};
+  const statusById: Record<string, NDTMotorStatusMeta> = {};
+
+  const mergeStatusEntry = (motorId: string, entry: any) => {
+    const id = String(motorId ?? "").trim();
+    if (!id) return;
+    const existing = statusById[id];
+    statusById[id] = {
+      motorSubmissionType:
+        normalizeNDTMotorSubmissionType(entry?.motorSubmissionType) ??
+        existing?.motorSubmissionType,
+      motorSubmissionStatus: normalizeNDTMotorStatus(
+        entry?.motorSubmissionStatus ?? existing?.motorSubmissionStatus,
+      ),
+      submittedAt: entry?.submittedAt ?? existing?.submittedAt ?? null,
+      reviewedBy: entry?.reviewedBy ?? entry?.actionBy ?? existing?.reviewedBy ?? null,
+      reviewedAt: entry?.reviewedAt ?? entry?.actionAt ?? existing?.reviewedAt ?? null,
+      remarks: entry?.remarks ?? existing?.remarks ?? null,
+      rejectionReason: entry?.rejectionReason ?? existing?.rejectionReason ?? null,
+    };
+  };
+
+  const recordCandidate =
+    details?.motorStatuses &&
+    !Array.isArray(details.motorStatuses) &&
+    typeof details.motorStatuses === "object"
+      ? details.motorStatuses
+      : root?.motorStatuses &&
+          !Array.isArray(root.motorStatuses) &&
+          typeof root.motorStatuses === "object"
+        ? root.motorStatuses
+        : null;
+
+  if (recordCandidate) {
+    Object.entries(recordCandidate as Record<string, any>).forEach(([motorId, entry]) => {
+      mergeStatusEntry(String(entry?.motorId ?? motorId), entry);
+    });
+  }
+
+  const rootStatuses = Array.isArray(root?.motorStatuses)
+    ? root.motorStatuses
+    : Array.isArray(details?.motorStatuses)
+      ? details.motorStatuses
+      : [];
+
+  rootStatuses.forEach((entry: any) => {
+    mergeStatusEntry(String(entry?.motorId ?? ""), entry);
+  });
+
+  const rawMotors = Array.isArray(root?.motors)
+    ? root.motors
+    : Array.isArray(details?.motors)
+      ? details.motors
+      : Array.isArray(details?.data?.motors)
+        ? details.data.motors
+        : [];
+
+  rawMotors.forEach((motor: any) => {
+    mergeStatusEntry(String(motor?.motorId ?? ""), motor);
+  });
+
+  return statusById;
+};
+
+export const getNDTBatchStatusLabel = (status: unknown): string => String(status ?? "").trim();
+
+export const areAllNDTMotorsApproved = (
+  motorStatusById: Record<string, NDTMotorStatusMeta>,
+): boolean => {
+  const entries = Object.values(motorStatusById);
+  if (entries.length === 0) return false;
+  return entries.every(
+    (meta) => String(meta.motorSubmissionStatus ?? "").toUpperCase() === "APPROVED",
+  );
+};
 
 export type NDTFileValue = File | string;
 
@@ -38,9 +249,11 @@ export type NDTVisualInspectionRow = {
 
 export type NDTMotorSession = {
   motorId: string;
-  equipment: string;
+  equipment: string[];
   beamEnergies: string[];
   radiographyPlan: string;
+  /** Display name from batch casing metadata (optional). */
+  radiographyPlanName?: string;
   radiographyPlanRows: NDTRadiographyPlanRow[];
   additionalExposureRows: NDTExposureRow[];
   radiographyObservationRows: NDTRadiographyObservationRow[];
@@ -53,7 +266,7 @@ export type NDTMotorSession = {
 export type NDTFormState = {
   batchId: string;
   formLoaded: boolean;
-  equipment: string;
+  equipment: string[];
   beamEnergies: string[];
   radiographyPlan: string;
   radiographyPlanRows: NDTRadiographyPlanRow[];
@@ -64,7 +277,7 @@ export type NDTFormState = {
 
 const createPresetVisualRows = (): NDTVisualInspectionRow[] =>
   [
-    "Surface Paint/ Finish",
+    "Rocket motor external surface",
     "Dents/scratch/abnormalities on motor case",
     "Dents/scratch/abnormalities on propellant",
     "Nut & bolt groves cleanliness",
@@ -82,9 +295,10 @@ const createPresetVisualRows = (): NDTVisualInspectionRow[] =>
 
 export const createEmptyNDTMotorSession = (motorId: string): NDTMotorSession => ({
   motorId,
-  equipment: "",
+  equipment: [],
   beamEnergies: [],
   radiographyPlan: "",
+  radiographyPlanName: "",
   radiographyPlanRows: [],
   additionalExposureRows: [{ sectionNumber: "", orientation: "", exposureCount: "" }],
   radiographyObservationRows: [{ section: "", orientation: "", observations: "", files: [] }],
@@ -96,10 +310,20 @@ export const createEmptyNDTMotorSession = (motorId: string): NDTMotorSession => 
 
 export const createMotorSessionFromDraft = (
   motorId: string,
-  draft: Pick<NDTFormState, "equipment" | "beamEnergies" | "radiographyPlan" | "radiographyPlanRows">,
+  draft: Pick<
+    NDTFormState,
+    "equipment" | "beamEnergies" | "radiographyPlan" | "radiographyPlanRows"
+  >,
 ): NDTMotorSession => ({
   ...createEmptyNDTMotorSession(motorId),
-  equipment: draft.equipment ?? "",
+  equipment: Array.isArray(draft?.equipment)
+    ? draft.equipment
+    : draft?.equipment
+      ? String(draft.equipment)
+          .split(",")
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [],
   beamEnergies: Array.isArray(draft.beamEnergies) ? draft.beamEnergies : [],
   radiographyPlan: draft.radiographyPlan ?? "",
   radiographyPlanRows:
@@ -108,7 +332,9 @@ export const createMotorSessionFromDraft = (
       : resolveRadiographyPlanRows(draft.radiographyPlan ?? ""),
 });
 
-export const normalizeNDTMotorSession = (motor: Partial<NDTMotorSession> & { motorId: string }): NDTMotorSession => {
+export const normalizeNDTMotorSession = (
+  motor: Partial<NDTMotorSession> & { motorId: string },
+): NDTMotorSession => {
   const base = createEmptyNDTMotorSession(motor.motorId);
   return {
     ...base,
@@ -117,6 +343,7 @@ export const normalizeNDTMotorSession = (motor: Partial<NDTMotorSession> & { mot
     equipment: motor.equipment ?? base.equipment,
     beamEnergies: Array.isArray(motor.beamEnergies) ? motor.beamEnergies : base.beamEnergies,
     radiographyPlan: motor.radiographyPlan ?? base.radiographyPlan,
+    radiographyPlanName: motor.radiographyPlanName ?? base.radiographyPlanName,
     radiographyPlanRows: Array.isArray(motor.radiographyPlanRows)
       ? motor.radiographyPlanRows
       : motor.radiographyPlan
@@ -144,10 +371,49 @@ export const resolveRadiographyPlanRows = (planKey: string): NDTRadiographyPlanR
   return plan ? plan.rows.map((row) => ({ ...row })) : [];
 };
 
+/** Map rocket-motor-casing batch metadata radiography into NDT motor plan fields. */
+export const mapBatchRadiographyDetailsToNdt = (
+  details?: BatchMotorRadiographyDetails | null,
+): Pick<NDTMotorSession, "radiographyPlan" | "radiographyPlanName" | "radiographyPlanRows"> => {
+  if (!details) {
+    return { radiographyPlan: "", radiographyPlanName: "", radiographyPlanRows: [] };
+  }
+
+  const planId = String(details.radiographyPlanId ?? "").trim();
+  const planName = String(details.radiographyPlanName ?? "").trim();
+  const radiographyPlanRows = (details.radiographyPlanDetails ?? []).map((row, index) => ({
+    srNo: index + 1,
+    sections:
+      row.numberOfSections != null && Number.isFinite(row.numberOfSections)
+        ? String(row.numberOfSections)
+        : "",
+    orientations:
+      row.numberOfOrientations != null && Number.isFinite(row.numberOfOrientations)
+        ? String(row.numberOfOrientations)
+        : "",
+    sfd: row.sfd != null && Number.isFinite(row.sfd) ? String(row.sfd) : "",
+    normalExposures:
+      row.numberOfNormalExposures != null && Number.isFinite(row.numberOfNormalExposures)
+        ? String(row.numberOfNormalExposures)
+        : "",
+    tangentialExposures:
+      row.numberOfTangentialExposures != null && Number.isFinite(row.numberOfTangentialExposures)
+        ? String(row.numberOfTangentialExposures)
+        : "",
+    detectorType: mapNdtDetectorTypeFromApi(String(row.detectorType ?? "")),
+  }));
+
+  return {
+    radiographyPlan: planId || planName,
+    radiographyPlanName: planName,
+    radiographyPlanRows,
+  };
+};
+
 export const createDefaultNDTFormState = (batchId = ""): NDTFormState => ({
   batchId,
   formLoaded: false,
-  equipment: "",
+  equipment: [],
   beamEnergies: [],
   radiographyPlan: "",
   radiographyPlanRows: [],
@@ -172,20 +438,38 @@ export const normalizeNDTFormState = (input?: Partial<LegacyNDTFormState> | null
       return {
         ...base,
         formLoaded: Boolean(input.formLoaded),
-        equipment: input.equipment ?? "",
+        equipment: Array.isArray(input?.equipment)
+          ? input.equipment
+          : input?.equipment
+            ? String(input)
+                .split(",")
+                .map((s) => s.trim())
+                .filter(Boolean)
+            : [],
         beamEnergies: Array.isArray(input.beamEnergies) ? input.beamEnergies : [],
         radiographyPlan: input.radiographyPlan ?? "",
-        radiographyPlanRows: Array.isArray(input.radiographyPlanRows) ? input.radiographyPlanRows : [],
+        radiographyPlanRows: Array.isArray(input.radiographyPlanRows)
+          ? input.radiographyPlanRows
+          : [],
         motorId: input.motorId ?? undefined,
       };
     }
     return {
       batchId: input.batchId ?? base.batchId,
       formLoaded: Boolean(input.formLoaded ?? true),
-      equipment: input.equipment ?? "",
+      equipment: Array.isArray(input?.equipment)
+        ? input.equipment
+        : input?.equipment
+          ? String(input.equipment)
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : [],
       beamEnergies: Array.isArray(input.beamEnergies) ? input.beamEnergies : [],
       radiographyPlan: input.radiographyPlan ?? "",
-      radiographyPlanRows: Array.isArray(input.radiographyPlanRows) ? input.radiographyPlanRows : [],
+      radiographyPlanRows: Array.isArray(input.radiographyPlanRows)
+        ? input.radiographyPlanRows
+        : [],
       motors: input.motors.map((motor) => normalizeNDTMotorSession(motor)),
       motorId: input.motorId ?? input.motors[0]?.motorId,
     };
@@ -200,16 +484,32 @@ export const normalizeNDTFormState = (input?: Partial<LegacyNDTFormState> | null
   if (!hasLegacyData) {
     return {
       ...base,
-      equipment: input.equipment ?? "",
+      equipment: Array.isArray(input?.equipment)
+        ? input.equipment
+        : input?.equipment
+          ? String(input.equipment)
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean)
+          : [],
       beamEnergies: Array.isArray(input.beamEnergies) ? input.beamEnergies : [],
       radiographyPlan: input.radiographyPlan ?? "",
-      radiographyPlanRows: Array.isArray(input.radiographyPlanRows) ? input.radiographyPlanRows : [],
+      radiographyPlanRows: Array.isArray(input.radiographyPlanRows)
+        ? input.radiographyPlanRows
+        : [],
       formLoaded: Boolean(input.formLoaded),
     };
   }
 
   const draft = {
-    equipment: input.equipment ?? "",
+    equipment: Array.isArray(input?.equipment)
+      ? input.equipment
+      : input?.equipment
+        ? String(input.equipment)
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean)
+        : [],
     beamEnergies: Array.isArray(input.beamEnergies) ? input.beamEnergies : [],
     radiographyPlan: input.radiographyPlan ?? "",
     radiographyPlanRows: Array.isArray(input.radiographyPlanRows)
@@ -242,16 +542,38 @@ export const normalizeNDTFormState = (input?: Partial<LegacyNDTFormState> | null
 const hasText = (value?: string | null) => Boolean(String(value ?? "").trim());
 const hasFiles = (files?: NDTFileValue[] | null) => (files?.length ?? 0) > 0;
 
+/** Motor has completed FlowBar radiography setup and can show inspection tables. */
+export const isNDTMotorSetupReady = (motor?: NDTMotorSession | null): boolean => {
+  if (!motor) return false;
+  const hasEquipment = Array.isArray(motor.equipment)
+    ? motor.equipment.length > 0
+    : Boolean(String(motor.equipment ?? "").trim());
+  const hasBeamEnergies = Array.isArray(motor.beamEnergies) && motor.beamEnergies.length > 0;
+  return hasEquipment && hasBeamEnergies;
+};
+
 export const motorHasValue = (motor: NDTMotorSession) => {
-  if (hasText(motor.equipment) || (motor.beamEnergies?.length ?? 0) > 0 || hasText(motor.radiographyPlan)) {
+  if (
+    (motor.equipment?.length ?? 0) > 0 ||
+    (motor.beamEnergies?.length ?? 0) > 0 ||
+    hasText(motor.radiographyPlan)
+  ) {
     return true;
   }
-  if (motor.additionalExposureRows.some((row) => hasText(row.sectionNumber) || hasText(row.orientation) || hasText(row.exposureCount))) {
+  if (
+    motor.additionalExposureRows.some(
+      (row) => hasText(row.sectionNumber) || hasText(row.orientation) || hasText(row.exposureCount),
+    )
+  ) {
     return true;
   }
   if (
     motor.radiographyObservationRows.some(
-      (row) => hasText(row.section) || hasText(row.orientation) || hasText(row.observations) || hasFiles(row.files),
+      (row) =>
+        hasText(row.section) ||
+        hasText(row.orientation) ||
+        hasText(row.observations) ||
+        hasFiles(row.files),
     )
   ) {
     return true;
@@ -278,6 +600,11 @@ export const hasAnyNDTValue = (form: NDTFormState) => {
   return (normalized.motors ?? []).some(motorHasValue);
 };
 
+export const hasMotorNDTValue = (form: NDTFormState, motorId: string) => {
+  const motor = (form.motors ?? []).find((entry) => entry.motorId === motorId);
+  return motor ? motorHasValue(motor) : false;
+};
+
 export const validateNDTMotorsForApi = (motors: NDTMotorSession[]): string | null => {
   const list = (motors ?? []).filter((motor) => String(motor.motorId ?? "").trim());
   if (list.length === 0) return null;
@@ -289,13 +616,14 @@ export const validateNDTMotorsForApi = (motors: NDTMotorSession[]): string | nul
     if ((motor.beamEnergies ?? []).length === 0) {
       return `Beam energy is required for motor ${motor.motorId}`;
     }
-    if (!String(motor.radiographyPlan ?? "").trim()) {
-      return `Radiography plan is required for motor ${motor.motorId}`;
-    }
+    // if (!String(motor.radiographyPlan ?? "").trim()) {
+    //   return `Radiography plan is required for motor ${motor.motorId}`;
+    // }
 
     for (const row of motor.additionalExposureRows ?? []) {
       const hasPartial =
-        Boolean(String(row.orientation ?? "").trim()) || Boolean(String(row.exposureCount ?? "").trim());
+        Boolean(String(row.orientation ?? "").trim()) ||
+        Boolean(String(row.exposureCount ?? "").trim());
       if (hasPartial && parseNdtPositiveInt(row.sectionNumber) === null) {
         return `Section number is required for additional exposure rows on motor ${motor.motorId}`;
       }
@@ -323,6 +651,9 @@ export const buildNDTAddedMotors = (form: NDTFormState) =>
 export type NDTMotorDetailView = NDTMotorSession & {
   radiographyPlanLabel: string;
   beamEnergiesLabel: string;
+  motorSubmissionType?: NDTMotorSubmissionType;
+  motorSubmissionStatus?: NDTMotorSubmissionStatus;
+  rejectionReason?: string | null;
 };
 
 export type NDTDetailView = {
@@ -330,6 +661,7 @@ export type NDTDetailView = {
   batchId: string;
   batchType: string;
   status?: string;
+  formSubmissionType?: string;
   createdBy?: string | null;
   createdAt?: string | null;
   submittedBy?: string | null;
@@ -337,6 +669,7 @@ export type NDTDetailView = {
   lastUpdatedBy?: string | null;
   lastUpdatedAt?: string | null;
   motors: NDTMotorDetailView[];
+  motorCounts?: NDTMotorCounts;
 };
 
 export const mapNDTDetailsForDisplay = (
@@ -346,31 +679,53 @@ export const mapNDTDetailsForDisplay = (
 
   const root = data as Record<string, unknown>;
   const nestedFormState = root.data as Partial<NDTFormState> | undefined;
-  const formState = normalizeNDTFormState(
-    nestedFormState?.motors ? nestedFormState : root,
-  );
+  const formState = normalizeNDTFormState(nestedFormState?.motors ? nestedFormState : root);
+  const motorStatuses = mapNDTMotorStatusesFromApi(data);
+
   const motors: NDTMotorDetailView[] = (formState.motors ?? [])
     .map((motor) => {
       const normalized = normalizeNDTMotorSession(motor);
       const planLabel =
-        NDT_RADIOGRAPHY_PLANS[normalized.radiographyPlan as RadiographyPlanKey]?.label ??
+        String(normalized.radiographyPlanName ?? "").trim() ||
+        NDT_RADIOGRAPHY_PLANS[normalized.radiographyPlan as RadiographyPlanKey]?.label ||
         normalized.radiographyPlan;
+      const statusMeta = motorStatuses[normalized.motorId];
       return {
         ...normalized,
         radiographyPlanLabel: planLabel,
         beamEnergiesLabel: (normalized.beamEnergies ?? []).join(", "),
+        motorSubmissionType: statusMeta?.motorSubmissionType,
+        motorSubmissionStatus: statusMeta?.motorSubmissionStatus,
+        rejectionReason: statusMeta?.rejectionReason ?? null,
       };
     })
     .filter((motor) => motor.motorId.trim().length > 0);
 
   const workflowInsights = root.workflowInsights as Record<string, unknown> | undefined;
-  const formStatus = String(root.formStatus ?? workflowInsights?.currentStatus ?? root.status ?? "");
+  const formStatus = String(
+    root.formStatus ?? workflowInsights?.currentStatus ?? root.status ?? "",
+  );
+
+  const countsFromApi = root.motorCounts as Partial<NDTMotorCounts> | undefined;
+  const derivedCounts: NDTMotorCounts = {
+    pendingMotorCount: motors.filter(
+      (m) =>
+        !m.motorSubmissionStatus ||
+        m.motorSubmissionStatus === "TO_BE_INITIATED" ||
+        m.motorSubmissionStatus === "WAITING_FOR_APPROVAL",
+    ).length,
+    approvedMotorCount: motors.filter((m) => m.motorSubmissionStatus === "APPROVED").length,
+    rejectedMotorCount: motors.filter((m) => m.motorSubmissionStatus === "REJECTED").length,
+    inProgressMotorCount: motors.filter((m) => m.motorSubmissionStatus === "IN_PROGRESS").length,
+    totalMotorCount: motors.length,
+  };
 
   return {
     formId: String(root.formId ?? ""),
     batchId: String(root.batchId ?? formState.batchId ?? ""),
     batchType: root.batchType != null ? String(root.batchType) : "",
     status: formStatus,
+    formSubmissionType: root.formSubmissionType != null ? String(root.formSubmissionType) : undefined,
     createdBy: mapCastingCuringPersonLabel(root.createdBy),
     createdAt:
       root.createdAt != null
@@ -395,5 +750,18 @@ export const mapNDTDetailsForDisplay = (
             ? String(root.updatedOn)
             : null,
     motors,
+    motorCounts: {
+      pendingMotorCount: Number(countsFromApi?.pendingMotorCount ?? derivedCounts.pendingMotorCount),
+      approvedMotorCount: Number(
+        countsFromApi?.approvedMotorCount ?? derivedCounts.approvedMotorCount,
+      ),
+      rejectedMotorCount: Number(
+        countsFromApi?.rejectedMotorCount ?? derivedCounts.rejectedMotorCount,
+      ),
+      inProgressMotorCount: Number(
+        countsFromApi?.inProgressMotorCount ?? derivedCounts.inProgressMotorCount,
+      ),
+      totalMotorCount: Number(countsFromApi?.totalMotorCount ?? derivedCounts.totalMotorCount),
+    },
   };
 };

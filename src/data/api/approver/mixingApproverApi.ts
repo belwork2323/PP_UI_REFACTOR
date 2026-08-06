@@ -34,4 +34,4 @@ export type MixingApproverMixCardChangeStatusResponse = {
 
 export const changeMixingApproverMixCardStatus = async (
   payload: MixingApproverMixCardChangeStatusPayload,
-) => post(APPROVER_ENDPOINTS.MIX_CARD_CHANGE_STATUS, payload);
+) => post(APPROVER_ENDPOINTS.PREMIX_CHANGE_STATUS, payload);

@@ -25,7 +25,10 @@ import {
   NDT_RADIOGRAPHY_PLANS,
   type RadiographyPlanKey,
 } from "../../../../../hooks/user/qualityControl/ndtFlowConfig";
-import { NDT_ORIENTATION_OPTIONS, sanitizeNdtNumericInput } from "../../../../../hooks/user/qualityControl/ndtApiMappings";
+import {
+  NDT_ORIENTATION_OPTIONS,
+  sanitizeNdtNumericInput,
+} from "../../../../../hooks/user/qualityControl/ndtApiMappings";
 
 const {
   add: AddRoundedIcon,
@@ -94,10 +97,24 @@ const UploadCell = ({
           }}
         >
           <ImageRoundedIcon sx={{ fontSize: 12, color: brand.primaryLight }} />
-          <Typography sx={{ fontSize: "0.62rem", fontWeight: 600, color: brand.primaryLight, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", flex: 1 }}>
+          <Typography
+            sx={{
+              fontSize: "0.62rem",
+              fontWeight: 600,
+              color: brand.primaryLight,
+              overflow: "hidden",
+              textOverflow: "ellipsis",
+              whiteSpace: "nowrap",
+              flex: 1,
+            }}
+          >
             {typeof file === "string" ? file : file.name}
           </Typography>
-          <IconButton size="small" onClick={() => onRemove(index)} sx={{ p: 0, color: brand.danger }}>
+          <IconButton
+            size="small"
+            onClick={() => onRemove(index)}
+            sx={{ p: 0, color: brand.danger }}
+          >
             <ClearRoundedIcon sx={{ fontSize: 10 }} />
           </IconButton>
         </Stack>
@@ -167,7 +184,9 @@ const SetupDetailItem = ({
     <Typography sx={{ fontSize: "0.65rem", fontWeight: 700, color: brand.textSub, mb: 0.35 }}>
       {label}
     </Typography>
-    <Typography sx={{ fontSize: "0.82rem", fontWeight: 600, color: brand.text, wordBreak: "break-word" }}>
+    <Typography
+      sx={{ fontSize: "0.82rem", fontWeight: 600, color: brand.text, wordBreak: "break-word" }}
+    >
       {value || "—"}
     </Typography>
   </Box>
@@ -261,6 +280,12 @@ const CSelect = ({
   </TextField>
 );
 
+const NDT_DETECTOR_OPTIONS = [
+  { value: "Imaging Plate", label: "Imaging Plate" },
+  { value: "DR Panel", label: "DR Panel" },
+  { value: "Film", label: "Film" },
+] as const;
+
 const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
   const motor = normalizeNDTMotorSession(rawMotor);
   const ndtTheme = theme.qualityControl.ndt;
@@ -269,24 +294,51 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
   const L = NDT_FLOW_LABELS;
   const safeBeamEnergies = Array.isArray(motor.beamEnergies) ? motor.beamEnergies : [];
   const safePlanRows = Array.isArray(motor.radiographyPlanRows) ? motor.radiographyPlanRows : [];
-  const planLabel =
-    NDT_RADIOGRAPHY_PLANS[motor.radiographyPlan as RadiographyPlanKey]?.label ?? motor.radiographyPlan;
+  const planId = String(motor.radiographyPlan ?? "").trim();
+  const planName =
+    String(motor.radiographyPlanName ?? "").trim() ||
+    NDT_RADIOGRAPHY_PLANS[motor.radiographyPlan as RadiographyPlanKey]?.label ||
+    "";
 
-  const updateExposure = (index: number, patch: Partial<NDTMotorSession["additionalExposureRows"][number]>) => {
+  const updateExposure = (
+    index: number,
+    patch: Partial<NDTMotorSession["additionalExposureRows"][number]>,
+  ) => {
     onChange({
-      additionalExposureRows: motor.additionalExposureRows.map((row, i) => (i === index ? { ...row, ...patch } : row)),
+      additionalExposureRows: motor.additionalExposureRows.map((row, i) =>
+        i === index ? { ...row, ...patch } : row,
+      ),
     });
   };
 
-  const updateObservation = (index: number, patch: Partial<NDTMotorSession["radiographyObservationRows"][number]>) => {
+  const updatePlanRow = (
+    index: number,
+    patch: Partial<NDTMotorSession["radiographyPlanRows"][number]>,
+  ) => {
     onChange({
-      radiographyObservationRows: motor.radiographyObservationRows.map((row, i) => (i === index ? { ...row, ...patch } : row)),
+      radiographyPlanRows: safePlanRows.map((row, i) => (i === index ? { ...row, ...patch } : row)),
     });
   };
 
-  const updateVisual = (index: number, patch: Partial<NDTMotorSession["visualInspectionRows"][number]>) => {
+  const updateObservation = (
+    index: number,
+    patch: Partial<NDTMotorSession["radiographyObservationRows"][number]>,
+  ) => {
     onChange({
-      visualInspectionRows: motor.visualInspectionRows.map((row, i) => (i === index ? { ...row, ...patch } : row)),
+      radiographyObservationRows: motor.radiographyObservationRows.map((row, i) =>
+        i === index ? { ...row, ...patch } : row,
+      ),
+    });
+  };
+
+  const updateVisual = (
+    index: number,
+    patch: Partial<NDTMotorSession["visualInspectionRows"][number]>,
+  ) => {
+    onChange({
+      visualInspectionRows: motor.visualInspectionRows.map((row, i) =>
+        i === index ? { ...row, ...patch } : row,
+      ),
     });
   };
 
@@ -307,36 +359,59 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
         <SectionTitle icon={DescriptionRoundedIcon} title="Radiography setup" theme={theme} />
         <Box
           sx={{
-            px: 1.75,
-            pb: 1.25,
+            p: 1.75,
             display: "grid",
             gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "1fr 1fr 1fr" },
             gap: 2,
           }}
         >
-          <SetupDetailItem label={L.equipment} value={motor.equipment ?? ""} brand={brand} />
+          <SetupDetailItem label={L.equipment} value={motor.equipment.join(", ")} brand={brand} />
           <SetupDetailItem
             label={L.beamEnergies}
             value={safeBeamEnergies.length > 0 ? safeBeamEnergies.join(", ") : ""}
             brand={brand}
           />
-          <SetupDetailItem label={L.radiographyPlan} value={planLabel} brand={brand} />
         </Box>
       </CompactCard>
 
       {safePlanRows.length > 0 ? (
         <CompactCard theme={theme}>
-          <SectionTitle icon={DescriptionRoundedIcon} title="Radiography plan details" theme={theme} />
-          {planLabel ? (
-            <Typography sx={{ px: 1.75, pb: 1, fontSize: "0.76rem", color: brand.textSub }}>
-              {planLabel}
-            </Typography>
-          ) : null}
+          <SectionTitle
+            icon={DescriptionRoundedIcon}
+            title="Radiography plan details"
+            theme={theme}
+          />
+          {(planId || planName) && (
+            <Box
+              sx={{
+                px: 1.75,
+                pb: 1,
+                display: "grid",
+                gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr" },
+                gap: 1.25,
+              }}
+            >
+              {planId ? (
+                <SetupDetailItem label="Radiography plan ID" value={planId} brand={brand} />
+              ) : null}
+              {planName ? (
+                <SetupDetailItem label="Plan name" value={planName} brand={brand} />
+              ) : null}
+            </Box>
+          )}
           <TableContainer sx={{ overflowX: "auto", px: 0.5, pb: 0.5 }}>
             <Table size="small" sx={{ minWidth: 720 }}>
               <TableHead>
                 <TableRow>
-                  {["Sr.", "Sections", "Orientations", "SFD", "Normal", "Tangential", "Detector"].map((label) => (
+                  {[
+                    "Sr.",
+                    "Sections",
+                    "Orientations",
+                    "SFD",
+                    "No. of Normal Exposure",
+                    "No. of Tangential Exposure",
+                    "Type of Detector",
+                  ].map((label) => (
                     <TableCell key={label} sx={TH}>
                       {label}
                     </TableCell>
@@ -345,14 +420,57 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
               </TableHead>
               <TableBody>
                 {safePlanRows.map((row, index) => (
-                  <TableRow key={row.srNo} sx={rowBg(index)}>
+                  <TableRow key={`${row.srNo}-${index}`} sx={rowBg(index)}>
                     <TableCell sx={TD}>{row.srNo}</TableCell>
-                    <TableCell sx={TD}>{row.sections}</TableCell>
-                    <TableCell sx={TD}>{row.orientations}</TableCell>
-                    <TableCell sx={TD}>{row.sfd}</TableCell>
-                    <TableCell sx={TD}>{row.normalExposures}</TableCell>
-                    <TableCell sx={TD}>{row.tangentialExposures}</TableCell>
-                    <TableCell sx={TD}>{row.detectorType}</TableCell>
+                    <TableCell sx={TD}>
+                      <CNumericInput
+                        fieldSx={fieldSx}
+                        value={row.sections}
+                        placeholder="Sections"
+                        onChange={(v) => updatePlanRow(index, { sections: v })}
+                      />
+                    </TableCell>
+                    <TableCell sx={TD}>
+                      <CNumericInput
+                        fieldSx={fieldSx}
+                        value={row.orientations}
+                        placeholder="Orientations"
+                        onChange={(v) => updatePlanRow(index, { orientations: v })}
+                      />
+                    </TableCell>
+                    <TableCell sx={TD}>
+                      <CNumericInput
+                        fieldSx={fieldSx}
+                        value={row.sfd}
+                        placeholder="SFD"
+                        onChange={(v) => updatePlanRow(index, { sfd: v })}
+                      />
+                    </TableCell>
+                    <TableCell sx={TD}>
+                      <CNumericInput
+                        fieldSx={fieldSx}
+                        value={row.normalExposures}
+                        placeholder="Normal"
+                        onChange={(v) => updatePlanRow(index, { normalExposures: v })}
+                      />
+                    </TableCell>
+                    <TableCell sx={TD}>
+                      <CNumericInput
+                        fieldSx={fieldSx}
+                        value={row.tangentialExposures}
+                        placeholder="Tangential"
+                        onChange={(v) => updatePlanRow(index, { tangentialExposures: v })}
+                      />
+                    </TableCell>
+                    <TableCell sx={TD}>
+                      <CSelect
+                        fieldSx={fieldSx}
+                        value={row.detectorType}
+                        options={NDT_DETECTOR_OPTIONS}
+                        placeholder="Select detector"
+                        onChange={(v) => updatePlanRow(index, { detectorType: v })}
+                      />
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -362,7 +480,11 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
       ) : null}
 
       <CompactCard theme={theme}>
-        <SectionTitle icon={DescriptionRoundedIcon} title="Additional exposure details" theme={theme} />
+        <SectionTitle
+          icon={DescriptionRoundedIcon}
+          title="Additional exposure details"
+          theme={theme}
+        />
         <TableContainer sx={{ overflowX: "auto", px: 0.5, pb: 0.5 }}>
           <Table size="small" sx={{ minWidth: 420 }}>
             <TableHead>
@@ -376,12 +498,50 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
             <TableBody>
               {motor.additionalExposureRows.map((row, index) => (
                 <TableRow key={index} sx={rowBg(index)}>
-                  <TableCell sx={TD}><CNumericInput fieldSx={fieldSx} value={row.sectionNumber} placeholder="Section no." onChange={(v) => updateExposure(index, { sectionNumber: v })} /></TableCell>
-                  <TableCell sx={TD}><CSelect fieldSx={fieldSx} value={row.orientation} options={NDT_ORIENTATION_OPTIONS} placeholder="Select orientation" onChange={(v) => updateExposure(index, { orientation: v })} /></TableCell>
-                  <TableCell sx={TD}><CNumericInput fieldSx={fieldSx} value={row.exposureCount} placeholder="Count" onChange={(v) => updateExposure(index, { exposureCount: v })} /></TableCell>
+                  <TableCell sx={TD}>
+                    <CNumericInput
+                      fieldSx={fieldSx}
+                      value={row.sectionNumber}
+                      placeholder="Section no."
+                      onChange={(v) => updateExposure(index, { sectionNumber: v })}
+                    />
+                  </TableCell>
+                  <TableCell sx={TD}>
+                    {/* <CSelect
+                      fieldSx={fieldSx}
+                      value={row.orientation}
+                      options={NDT_ORIENTATION_OPTIONS}
+                      placeholder="Select orientation"
+                      onChange={(v) => updateExposure(index, { orientation: v })}
+                    /> */}
+                    <CInput
+                      fieldSx={fieldSx}
+                      value={row.orientation}
+                      placeholder="Orientation"
+                      onChange={(v) => updateExposure(index, { orientation: v })}
+                    />
+                  </TableCell>
+                  <TableCell sx={TD}>
+                    <CNumericInput
+                      fieldSx={fieldSx}
+                      value={row.exposureCount}
+                      placeholder="Count"
+                      onChange={(v) => updateExposure(index, { exposureCount: v })}
+                    />
+                  </TableCell>
                   <TableCell sx={TD}>
                     {motor.additionalExposureRows.length > 1 ? (
-                      <IconButton size="small" onClick={() => onChange({ additionalExposureRows: motor.additionalExposureRows.filter((_, i) => i !== index) })} sx={{ color: brand.danger, p: 0.5 }}>
+                      <IconButton
+                        size="small"
+                        onClick={() =>
+                          onChange({
+                            additionalExposureRows: motor.additionalExposureRows.filter(
+                              (_, i) => i !== index,
+                            ),
+                          })
+                        }
+                        sx={{ color: brand.danger, p: 0.5 }}
+                      >
                         <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
                       </IconButton>
                     ) : null}
@@ -396,7 +556,14 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
             direction="row"
             alignItems="center"
             gap={0.5}
-            onClick={() => onChange({ additionalExposureRows: [...motor.additionalExposureRows, { sectionNumber: "", orientation: "", exposureCount: "" }] })}
+            onClick={() =>
+              onChange({
+                additionalExposureRows: [
+                  ...motor.additionalExposureRows,
+                  { sectionNumber: "", orientation: "", exposureCount: "" },
+                ],
+              })
+            }
             sx={addRowSx}
           >
             <AddRoundedIcon sx={{ fontSize: 15 }} />
@@ -406,7 +573,11 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
       </CompactCard>
 
       <CompactCard theme={theme}>
-        <SectionTitle icon={PhotoCameraRoundedIcon} title="Observation in radiography" theme={theme} />
+        <SectionTitle
+          icon={PhotoCameraRoundedIcon}
+          title="Observation in radiography"
+          theme={theme}
+        />
         <TableContainer sx={{ overflowX: "auto", px: 0.5, pb: 0.5 }}>
           <Table size="small" sx={{ minWidth: 560 }}>
             <TableHead>
@@ -423,9 +594,38 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
               {motor.radiographyObservationRows.map((row, index) => (
                 <TableRow key={index} sx={rowBg(index)}>
                   <TableCell sx={TD}>{index + 1}</TableCell>
-                  <TableCell sx={TD}><CNumericInput fieldSx={fieldSx} value={row.section} placeholder="Section no." onChange={(v) => updateObservation(index, { section: v })} /></TableCell>
-                  <TableCell sx={TD}><CSelect fieldSx={fieldSx} value={row.orientation} options={NDT_ORIENTATION_OPTIONS} placeholder="Select orientation" onChange={(v) => updateObservation(index, { orientation: v })} /></TableCell>
-                  <TableCell sx={TD}><CInput fieldSx={fieldSx} value={row.observations} onChange={(v) => updateObservation(index, { observations: v })} multiline /></TableCell>
+                  <TableCell sx={TD}>
+                    <CNumericInput
+                      fieldSx={fieldSx}
+                      value={row.section}
+                      placeholder="Section no."
+                      onChange={(v) => updateObservation(index, { section: v })}
+                    />
+                  </TableCell>
+                  <TableCell sx={TD}>
+                    {/* <CSelect
+                      fieldSx={fieldSx}
+                      value={row.orientation}
+                      options={NDT_ORIENTATION_OPTIONS}
+                      placeholder="Select orientation"
+                      onChange={(v) => updateObservation(index, { orientation: v })}
+                    /> */}
+
+                    <CInput
+                      fieldSx={fieldSx}
+                      value={row.orientation}
+                      placeholder="Orientation"
+                      onChange={(v) => updateObservation(index, { orientation: v })}
+                    />
+                  </TableCell>
+                  <TableCell sx={TD}>
+                    <CInput
+                      fieldSx={fieldSx}
+                      value={row.observations}
+                      onChange={(v) => updateObservation(index, { observations: v })}
+                      multiline
+                    />
+                  </TableCell>
                   <TableCell sx={TD}>
                     <UploadCell
                       uploadId={`ndt-radiography-obs-${index}`}
@@ -433,13 +633,27 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
                       files={row.files}
                       accept="image/*"
                       label="Image"
-                      onAdd={(picked) => updateObservation(index, { files: [...row.files, ...picked] })}
-                      onRemove={(fi) => updateObservation(index, { files: row.files.filter((_, i) => i !== fi) })}
+                      onAdd={(picked) =>
+                        updateObservation(index, { files: [...row.files, ...picked] })
+                      }
+                      onRemove={(fi) =>
+                        updateObservation(index, { files: row.files.filter((_, i) => i !== fi) })
+                      }
                     />
                   </TableCell>
                   <TableCell sx={TD}>
                     {motor.radiographyObservationRows.length > 1 ? (
-                      <IconButton size="small" onClick={() => onChange({ radiographyObservationRows: motor.radiographyObservationRows.filter((_, i) => i !== index) })} sx={{ color: brand.danger, p: 0.5 }}>
+                      <IconButton
+                        size="small"
+                        onClick={() =>
+                          onChange({
+                            radiographyObservationRows: motor.radiographyObservationRows.filter(
+                              (_, i) => i !== index,
+                            ),
+                          })
+                        }
+                        sx={{ color: brand.danger, p: 0.5 }}
+                      >
                         <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
                       </IconButton>
                     ) : null}
@@ -454,7 +668,14 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
             direction="row"
             alignItems="center"
             gap={0.5}
-            onClick={() => onChange({ radiographyObservationRows: [...motor.radiographyObservationRows, { section: "", orientation: "", observations: "", files: [] }] })}
+            onClick={() =>
+              onChange({
+                radiographyObservationRows: [
+                  ...motor.radiographyObservationRows,
+                  { section: "", orientation: "", observations: "", files: [] },
+                ],
+              })
+            }
             sx={addRowSx}
           >
             <AddRoundedIcon sx={{ fontSize: 15 }} />
@@ -484,7 +705,9 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
                   <TableCell sx={TD}>
                     {row.isPreset ? (
                       <Stack gap={0.75}>
-                        <Typography sx={{ fontSize: "0.8rem", fontWeight: 600 }}>{row.observation}</Typography>
+                        <Typography sx={{ fontSize: "0.8rem", fontWeight: 600 }}>
+                          {row.observation}
+                        </Typography>
                         <CInput
                           fieldSx={fieldSx}
                           value={row.observationNotes ?? ""}
@@ -494,23 +717,61 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
                         />
                       </Stack>
                     ) : (
-                      <CInput fieldSx={fieldSx} value={row.observation} onChange={(v) => updateVisual(index, { observation: v })} placeholder="Enter observation" />
+                      <CInput
+                        fieldSx={fieldSx}
+                        value={row.observation}
+                        onChange={(v) => updateVisual(index, { observation: v })}
+                        placeholder="Enter observation"
+                      />
                     )}
                   </TableCell>
-                  <TableCell sx={TD}><CNumericInput fieldSx={fieldSx} value={row.section} placeholder="Section no." onChange={(v) => updateVisual(index, { section: v })} /></TableCell>
-                  <TableCell sx={TD}><CSelect fieldSx={fieldSx} value={row.orientation} options={NDT_ORIENTATION_OPTIONS} placeholder="Select orientation" onChange={(v) => updateVisual(index, { orientation: v })} /></TableCell>
+                  <TableCell sx={TD}>
+                    <CNumericInput
+                      fieldSx={fieldSx}
+                      value={row.section}
+                      placeholder="Section no."
+                      onChange={(v) => updateVisual(index, { section: v })}
+                    />
+                  </TableCell>
+                  <TableCell sx={TD}>
+                    {/* <CSelect
+                      fieldSx={fieldSx}
+                      value={row.orientation}
+                      options={NDT_ORIENTATION_OPTIONS}
+                      placeholder="Select orientation"
+                      onChange={(v) => updateVisual(index, { orientation: v })}
+                    /> */}
+                    <CInput
+                      fieldSx={fieldSx}
+                      value={row.orientation}
+                      placeholder="Orientation"
+                      onChange={(v) => updateVisual(index, { orientation: v })}
+                    />
+                  </TableCell>
                   <TableCell sx={TD}>
                     <UploadCell
                       uploadId={`ndt-visual-inspection-${index}`}
                       brand={brand}
                       files={row.files}
                       onAdd={(picked) => updateVisual(index, { files: [...row.files, ...picked] })}
-                      onRemove={(fi) => updateVisual(index, { files: row.files.filter((_, i) => i !== fi) })}
+                      onRemove={(fi) =>
+                        updateVisual(index, { files: row.files.filter((_, i) => i !== fi) })
+                      }
                     />
                   </TableCell>
                   <TableCell sx={TD}>
                     {!row.isPreset ? (
-                      <IconButton size="small" onClick={() => onChange({ visualInspectionRows: motor.visualInspectionRows.filter((_, i) => i !== index) })} sx={{ color: brand.danger, p: 0.5 }}>
+                      <IconButton
+                        size="small"
+                        onClick={() =>
+                          onChange({
+                            visualInspectionRows: motor.visualInspectionRows.filter(
+                              (_, i) => i !== index,
+                            ),
+                          })
+                        }
+                        sx={{ color: brand.danger, p: 0.5 }}
+                      >
                         <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
                       </IconButton>
                     ) : null}
@@ -525,7 +786,14 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
             direction="row"
             alignItems="center"
             gap={0.5}
-            onClick={() => onChange({ visualInspectionRows: [...motor.visualInspectionRows, { observation: "", isPreset: false, section: "", orientation: "", files: [] }] })}
+            onClick={() =>
+              onChange({
+                visualInspectionRows: [
+                  ...motor.visualInspectionRows,
+                  { observation: "", isPreset: false, section: "", orientation: "", files: [] },
+                ],
+              })
+            }
             sx={{ ...addRowSx, mb: 1 }}
           >
             <AddRoundedIcon sx={{ fontSize: 15 }} />
@@ -537,14 +805,24 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
             files={motor.visualInspectionMedia}
             accept="image/*,video/*"
             label="Upload media"
-            onAdd={(picked) => onChange({ visualInspectionMedia: [...motor.visualInspectionMedia, ...picked] })}
-            onRemove={(fi) => onChange({ visualInspectionMedia: motor.visualInspectionMedia.filter((_, i) => i !== fi) })}
+            onAdd={(picked) =>
+              onChange({ visualInspectionMedia: [...motor.visualInspectionMedia, ...picked] })
+            }
+            onRemove={(fi) =>
+              onChange({
+                visualInspectionMedia: motor.visualInspectionMedia.filter((_, i) => i !== fi),
+              })
+            }
           />
         </Box>
       </CompactCard>
 
       <CompactCard theme={theme}>
-        <SectionTitle icon={UploadFileRoundedIcon} title="Signed NDT report & remarks" theme={theme} />
+        <SectionTitle
+          icon={UploadFileRoundedIcon}
+          title="Signed NDT report & remarks"
+          theme={theme}
+        />
         <Box sx={{ px: 1.75, py: 1.25 }}>
           <UploadCell
             uploadId="ndt-signed-report"

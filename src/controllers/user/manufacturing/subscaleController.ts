@@ -1,27 +1,21 @@
 import { ApiResponseModel } from "../../../data/models/common/ApiResponseModel";
-import type { SubscaleApiPayloadBody } from "../../../data/models/user/subscaleApiPayloadMapper";
 import {
   SubscaleDetailsModel,
   SubscaleSubmitResponseModel,
 } from "../../../data/models/user/SubscaleFormModel";
+import type {
+  CreateSubscaleProcessingRequest,
+  UpdateSubscaleProcessingRequest,
+} from "../../../data/models/user/subscaleApiPayloadMapper";
 import {
   createSubscaleFormApi,
   fetchSubscaleFormDetailsApi,
   updateSubscaleFormApi,
 } from "../../../data/api/users/manufacturing/subscaleFormApi";
 
-type SubscaleFormRequestBase = SubscaleApiPayloadBody & {
-  batchId: string;
-  batchType: string;
-  subDepartmentId: number;
-  formSubmissionType: "DRAFT" | "SUBMIT";
-};
+export type SubscaleCreatePayload = CreateSubscaleProcessingRequest;
 
-export type SubscaleCreatePayload = SubscaleFormRequestBase;
-
-export type SubscaleUpdatePayload = SubscaleFormRequestBase & {
-  formId: string;
-};
+export type SubscaleUpdatePayload = UpdateSubscaleProcessingRequest;
 
 export type SubscaleDetailsPayload = {
   formId: string;

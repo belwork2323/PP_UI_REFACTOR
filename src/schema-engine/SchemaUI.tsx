@@ -23,6 +23,7 @@ export type SchemaUIProps = {
   setupContext?: SchemaSetupContext;
   batch?: { batchId?: string; projectName?: string; projectId?: string };
   motorId?: string;
+  hideRepeatInstanceLabels?: boolean;
 };
 
 const SchemaUI = ({
@@ -37,6 +38,7 @@ const SchemaUI = ({
   setupContext,
   batch,
   motorId,
+  hideRepeatInstanceLabels,
 }: SchemaUIProps) => {
   const theme = mergeThemeFromDesignSystem(
     { ...defaultThemeTokens, ...themeTokens },
@@ -78,6 +80,7 @@ const SchemaUI = ({
       setupContext={setupContext}
       batch={batch}
       motorId={motorId}
+      hideRepeatInstanceLabels={hideRepeatInstanceLabels}
     />
   );
 };

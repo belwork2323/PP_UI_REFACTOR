@@ -58,15 +58,41 @@ export const isRowComputationTarget = (
   const rowComputations = getTableRowComputations(table);
   if (!rowComputations.length) return false;
   return rowComputations.some((computation) => {
+    if (computation.editable === true) return false;
     const keyColumn = computation.rowKeyColumn ?? autoKey;
     const rowKey = String(row[keyColumn] ?? "").trim();
     return computation.rowKey === rowKey && computation.targetColumn === columnId;
   });
 };
 
+/** Editable auto-computed cells (e.g. Total Quantity) — stay as inputs, not FormulaCell. */
+export const isEditableRowComputationTarget = (
+  table: Pick<SchemaTableBlock, "id" | "rows">,
+  row: Record<string, unknown>,
+  columnId: string,
+  autoKey: string,
+): boolean => {
+  const rowComputations = getTableRowComputations(table);
+  if (!rowComputations.length) return false;
+  return rowComputations.some((computation) => {
+    if (computation.editable !== true) return false;
+    const keyColumn = computation.rowKeyColumn ?? autoKey;
+    const rowKey = String(row[keyColumn] ?? "").trim();
+    return computation.rowKey === rowKey && computation.targetColumn === columnId;
+  });
+};
+
+export type ApplyRowComputationsOptions = {
+  /** Row index that triggered this recompute (e.g. from a cell edit). */
+  changedRowIndex?: number;
+  /** Column id that triggered this recompute. */
+  changedColumnId?: string;
+};
+
 export const applyRowComputations = (
   rows: Record<string, unknown>[],
   table: Pick<SchemaTableBlock, "id" | "rows">,
+  options?: ApplyRowComputationsOptions,
 ): Record<string, unknown>[] => {
   const rowsConfig = resolveRowsConfig(table);
   const computations = rowsConfig?.rowComputations;
@@ -76,9 +102,56 @@ export const applyRowComputations = (
   let nextRows = rows.map((row) => ({ ...row }));
 
   computations.forEach((computation) => {
+    if (computation.expression === "__SUM__") {
+      nextRows = applySumRowComputation(nextRows, computation, autoKey, options);
+      return;
+    }
     nextRows = applySingleRowComputation(nextRows, computation, rowsConfig, autoKey);
   });
 
+  return nextRows;
+};
+
+const applySumRowComputation = (
+  rows: Record<string, unknown>[],
+  computation: SchemaRowComputation,
+  autoKey: string,
+  options?: ApplyRowComputationsOptions,
+): Record<string, unknown>[] => {
+  const keyColumn = computation.rowKeyColumn ?? autoKey;
+  const sourceColumn = computation.sourceColumn ?? computation.targetColumn;
+  const targetIndex = rows.findIndex(
+    (row) => String(row[keyColumn] ?? "").trim() === computation.rowKey,
+  );
+  if (targetIndex < 0) return rows;
+
+  // Editable totals: keep the user's typed value when they are editing that cell.
+  // Still recompute when any other (source) cell changes.
+  if (
+    computation.editable === true &&
+    options?.changedRowIndex === targetIndex &&
+    options?.changedColumnId === computation.targetColumn
+  ) {
+    return rows;
+  }
+
+  let sum = 0;
+  let hasValue = false;
+  rows.forEach((row, index) => {
+    if (index === targetIndex) return;
+    const key = String(row[keyColumn] ?? "").trim();
+    if (!/^\d+$/.test(key)) return;
+    const val = parseNum(row[sourceColumn]);
+    if (val === null) return;
+    sum += val;
+    hasValue = true;
+  });
+
+  const nextRows = [...rows];
+  nextRows[targetIndex] = {
+    ...nextRows[targetIndex],
+    [computation.targetColumn]: hasValue ? String(sum) : "",
+  };
   return nextRows;
 };
 

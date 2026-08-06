@@ -70,7 +70,7 @@ function specRowsFromApi(targetSpecs: MaterialSpecificationItemModel[] = []): Sp
     specificationName: specification.specificationName,
     refRange: specification.formattedReferenceRange,
     analysedResult: "",
-    remarks: "",
+    acemQcResult: "",
     isOutOfRange: false,
     referenceRange: {
       minValue: specification.referenceRange.minValue,
@@ -128,7 +128,7 @@ function cloneLotTemplate(templateRows: SpecRow[]): MaterialLotBlock {
     rows: templateRows.map((row) => ({
       ...row,
       analysedResult: "",
-      remarks: "",
+      acemQcResult: "",
       status: null,
       isOutOfRange: false,
     })),
@@ -197,7 +197,12 @@ export const useRawMaterialSpecificationForm = ({
 
       const cacheKey = materialSelectionKey(code, gradeCode);
       const cached = specificationCache[cacheKey];
-      if (cached) return cached;
+      if (cached !== undefined) {
+        if (!cached.length) {
+          showAlert(STRINGS.SOURCING.SPECIFICATION_FORM.SPECIFICATIONS_UNAVAILABLE, "warning");
+        }
+        return cached;
+      }
 
       setLoadingByMaterial((prev) => ({ ...prev, [cacheKey]: true }));
 
@@ -218,6 +223,11 @@ export const useRawMaterialSpecificationForm = ({
 
         const specifications = response.data.specifications ?? [];
         setSpecificationCache((prev) => ({ ...prev, [cacheKey]: specifications }));
+
+        if (!specifications.length) {
+          showAlert(STRINGS.SOURCING.SPECIFICATION_FORM.SPECIFICATIONS_UNAVAILABLE, "warning");
+        }
+
         return specifications;
       } catch (error) {
         showAlert(STRINGS.SOURCING.SPECIFICATION_FORM.SPECIFICATIONS_FETCH_ERROR, "error");

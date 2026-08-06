@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
-import { Box, Button, CircularProgress, Stack } from "@mui/material";
+import { Box, CircularProgress } from "@mui/material";
 import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog";
+import WorkflowFormOpeningLoader from "../../../../components/common/WorkflowFormOpeningLoader";
 import UserWorkflowFormHeader from "../../../../components/custom/UserWorkflowFormHeader";
 import STFList from "./StaticTestFacilityList";
 import STFForm from "./StaticTestFacilityForm";
@@ -9,6 +10,7 @@ import OtherBemList from "./OtherBemList";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import getQualityControlTheme from "../../../../../app/theme/custom_themes/user/qualityControl/qualityControl_theme";
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
+import { STATIC_TEST_FACILITY_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import { STRINGS } from "../../../../../app/config/strings";
 import ToggleTabs, { ToggleTabOption } from "@/ui/components/common/ToggleTabs";
 import useOtherBEMMotorHook from "@/hooks/user/qualityControl/useOtherBEMMotorHook";
@@ -25,8 +27,9 @@ const STFPage = () => {
   const flowBarTheme = useMemo(() => getManufacturingTheme(mode), [mode]);
   const strings = STRINGS.QUALITY_CONTROL.STATIC_TEST_FACILITY;
 
-  const [draftConfirmOpen, setDraftConfirmOpen] = useState(false);
-  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const [motorDraftConfirmOpen, setMotorDraftConfirmOpen] = useState(false);
+  const [motorSubmitConfirmOpen, setMotorSubmitConfirmOpen] = useState(false);
+  const [pendingMotorId, setPendingMotorId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string | null>("ACEM");
 
   const acemHook = useACEMMotorHook(activeTab === "ACEM");
@@ -40,13 +43,19 @@ const STFPage = () => {
     activeBatch,
     isEditMode,
     formData,
-    bemMotors,
     selectedMotorType,
     motorCount,
     draftMotorIds,
     draftBemNo,
     addedMotors,
+    batchMotorEntries,
+    motorStatusById,
+    getMotorStatus,
+    isMotorEditable,
+    previousStageGate,
+    isStfTestNoLocked,
     availableMotorOptions,
+    availableBemMotorOptions,
     maxMotorCount,
     approvedMotorsLoading,
     loadingFormDetails,
@@ -64,67 +73,80 @@ const STFPage = () => {
     handleDraftBemNoChange,
     handleLoadStfForm,
     handleAddMotors,
-    handleRemoveMotor,
     handleFormValuesChange,
-    handleSaveDraft,
-    handleSubmit,
+    handleStfTestNoChange,
+    handleRemoveMotor,
+    handleSaveMotorDraft,
+    handleSubmitMotor,
+    handleSubmitForFinalApproval,
     detailsRow,
     detailsData,
     detailsLoading,
     handleBackFromDetails,
   } = hookState;
-  console.log(bemMotors);
-
-  const canAct = (formData?.motors ?? []).length > 0 && Boolean(formData?.schemaFormLoaded);
 
   const handleTabChange = (newTab: string) => {
     setActiveTab(newTab);
   };
+
   const handleBemBack = () => {
     setActiveTab("OTHER_BEM");
     handleBack();
   };
-  if (loading) {
-    return (
-      <Box sx={theme.workflow.loadingContainer}>
-        <CircularProgress size={32} />
-      </Box>
-    );
-  }
+
+  const listLoading = loading && !loadingFormDetails && view === "list";
 
   if (activeTab === "OTHER_BEM") {
     return (
       <Box sx={theme.workflow.animatedContainer}>
-        <ToggleTabs value={activeTab} options={STF_TABS} onChange={handleTabChange} />
-        <OtherBemList hookState={bemHook} handleBemBack={handleBemBack} />
+        <WorkflowFormOpeningLoader
+          open={Boolean(bemHook.loadingFormDetails)}
+          title={strings.OTHER_BEM_FORM_OPENING_TITLE}
+          message={strings.OTHER_BEM_FORM_OPENING_MESSAGE}
+          color={STATIC_TEST_FACILITY_BRAND.primary}
+          accentColor={STATIC_TEST_FACILITY_BRAND.primaryLight}
+        />
+        {bemHook.view === "list" && (
+          <ToggleTabs value={activeTab} options={STF_TABS} onChange={handleTabChange} />
+        )}
+        {!(bemHook.view === "form" && bemHook.loadingFormDetails) && (
+          <OtherBemList hookState={bemHook} handleBemBack={handleBemBack} />
+        )}
       </Box>
     );
   }
 
-  if (view === "list") {
-    return (
-      <Box sx={theme.workflow.animatedContainer}>
-        <ToggleTabs value={activeTab} options={STF_TABS} onChange={handleTabChange} />
-        <STFList key={activeTab} hookState={hookState} activeTab={activeTab} />
-      </Box>
-    );
-  }
-
-  if (view === "details" && detailsRow) {
-    return (
-      <STFDetailsView
-        row={detailsRow}
-        data={detailsData}
-        loading={detailsLoading}
-        onBack={handleBackFromDetails}
-      />
-    );
-  }
-
-  // ACEM Motor Form View
   return (
     <Box sx={theme.workflow.animatedContainer}>
-      {activeBatch ? (
+      <WorkflowFormOpeningLoader
+        open={listLoading || Boolean(loadingFormDetails)}
+        title={loadingFormDetails ? strings.FORM_OPENING_TITLE : strings.TITLE}
+        message={
+          loadingFormDetails
+            ? strings.FORM_OPENING_MESSAGE
+            : "Loading static test facility batches…"
+        }
+        color={STATIC_TEST_FACILITY_BRAND.primary}
+        accentColor={STATIC_TEST_FACILITY_BRAND.primaryLight}
+      />
+
+      {view === "list" && !listLoading && (
+        <>
+          <ToggleTabs value={activeTab} options={STF_TABS} onChange={handleTabChange} />
+          <STFList key={activeTab} hookState={hookState} activeTab={activeTab} />
+        </>
+      )}
+
+      {view === "details" && detailsRow && (
+        <STFDetailsView
+          row={detailsRow}
+          data={detailsData}
+          loading={detailsLoading}
+          onBack={handleBackFromDetails}
+        />
+      )}
+
+      {view === "form" && activeBatch && !loadingFormDetails && (
         <>
           <UserWorkflowFormHeader
             mode="update"
@@ -147,119 +169,53 @@ const STFPage = () => {
             rejectionTitle={STRINGS.QUALITY_CONTROL.FORM_HEADER.REJECTION_REASON}
             theme={theme}
           />
-          {!loadingFormDetails ? (
-            <STFForm
-              batch={activeBatch}
-              formData={formData}
-              subDepartmentId={subDepartmentId}
-              selectedMotorType={selectedMotorType}
-              motorCount={motorCount}
-              draftMotorIds={draftMotorIds}
-              draftBemNo={draftBemNo}
-              addedMotors={addedMotors}
-              availableMotorOptions={availableMotorOptions}
-              maxMotorCount={maxMotorCount}
-              approvedMotorsLoading={approvedMotorsLoading}
-              isEditMode={isEditMode}
-              schemaLoading={schemaLoading}
-              schemaError={schemaError}
-              flowBarTheme={flowBarTheme}
-              onMotorTypeChange={handleMotorTypeChange}
-              onMotorCountChange={handleMotorCountChange}
-              onDraftMotorIdChange={handleDraftMotorIdChange}
-              onDraftBemNoChange={handleDraftBemNoChange}
-              onLoadStfForm={handleLoadStfForm}
-              onAddMotors={handleAddMotors}
-              onRemoveMotor={handleRemoveMotor}
-              onFormValuesChange={handleFormValuesChange}
-              theme={theme}
-            />
-          ) : null}
 
-          {!loadingFormDetails ? (
-            <>
-              <Box
-                sx={{
-                  mt: 2,
-                  p: "12px 16px",
-                  borderRadius: 2,
-                  background: "#fff",
-                  border: "1.5px solid #D5D8DC",
-                }}
-              >
-                <Stack
-                  direction={{ xs: "column", sm: "row" }}
-                  alignItems={{ sm: "center" }}
-                  justifyContent="space-between"
-                  gap={1.5}
-                >
-                  <Box>
-                    <Box
-                      component="span"
-                      sx={{ fontSize: "0.76rem", fontWeight: 700, color: "#1C2833" }}
-                    >
-                      {canAct ? strings.READY_TO_SUBMIT : strings.NOT_READY_TO_SUBMIT}
-                    </Box>
-                  </Box>
-                  <Stack direction="row" gap={1}>
-                    <Button
-                      variant="outlined"
-                      disabled={!canAct || actionLoading}
-                      onClick={() => setDraftConfirmOpen(true)}
-                      startIcon={
-                        actionLoading ? <CircularProgress size={16} color="inherit" /> : null
-                      }
-                    >
-                      {strings.SAVE_DRAFT_LABEL}
-                    </Button>
-                    <Button
-                      variant="contained"
-                      disabled={!canAct || actionLoading}
-                      onClick={() => setSubmitConfirmOpen(true)}
-                      startIcon={
-                        actionLoading ? <CircularProgress size={16} color="inherit" /> : null
-                      }
-                    >
-                      {isEditMode ? strings.RESUBMIT_LABEL : strings.SUBMIT_LABEL}
-                    </Button>
-                  </Stack>
-                </Stack>
-              </Box>
-
-              <ConfirmAlertDialog
-                open={draftConfirmOpen}
-                severity="info"
-                title={strings.DRAFT_CONFIRM_TITLE}
-                message={strings.DRAFT_CONFIRM_MESSAGE}
-                confirmLabel={strings.DRAFT_CONFIRM_LABEL}
-                cancelLabel={strings.CONFIRM_CANCEL_LABEL}
-                onConfirm={async () => {
-                  setDraftConfirmOpen(false);
-                  await handleSaveDraft();
-                }}
-                onCancel={() => setDraftConfirmOpen(false)}
-              />
-              <ConfirmAlertDialog
-                open={submitConfirmOpen}
-                severity="warning"
-                title={isEditMode ? strings.RESUBMIT_CONFIRM_TITLE : strings.SUBMIT_CONFIRM_TITLE}
-                message={
-                  isEditMode ? strings.RESUBMIT_CONFIRM_MESSAGE : strings.SUBMIT_CONFIRM_MESSAGE
-                }
-                confirmLabel={
-                  isEditMode ? strings.RESUBMIT_CONFIRM_LABEL : strings.SUBMIT_CONFIRM_LABEL
-                }
-                cancelLabel={strings.CONFIRM_GO_BACK_LABEL}
-                onCancel={() => setSubmitConfirmOpen(false)}
-                onConfirm={async () => {
-                  setSubmitConfirmOpen(false);
-                  await handleSubmit();
-                }}
-              />
-            </>
-          ) : null}
+          <STFForm
+            batch={activeBatch}
+            formData={formData}
+            subDepartmentId={subDepartmentId}
+            selectedMotorType={selectedMotorType}
+            motorCount={motorCount}
+            draftMotorIds={draftMotorIds}
+            draftBemNo={draftBemNo}
+            addedMotors={addedMotors}
+            autoMotorEntries={batchMotorEntries}
+            availableMotorOptions={availableMotorOptions}
+            availableBemMotorOptions={availableBemMotorOptions}
+            maxMotorCount={maxMotorCount}
+            approvedMotorsLoading={approvedMotorsLoading}
+            motorStatusById={motorStatusById}
+            getMotorStatus={getMotorStatus}
+            isMotorEditable={isMotorEditable}
+            previousStageGate={previousStageGate}
+            isStfTestNoLocked={isStfTestNoLocked}
+            actionLoading={actionLoading}
+            isEditMode={isEditMode}
+            schemaLoading={schemaLoading}
+            schemaError={schemaError}
+            flowBarTheme={flowBarTheme}
+            onMotorTypeChange={handleMotorTypeChange}
+            onMotorCountChange={handleMotorCountChange}
+            onDraftMotorIdChange={handleDraftMotorIdChange}
+            onDraftBemNoChange={handleDraftBemNoChange}
+            onLoadStfForm={handleLoadStfForm}
+            onAddMotors={handleAddMotors}
+            onFormValuesChange={handleFormValuesChange}
+            onStfTestNoChange={handleStfTestNoChange}
+            onRemoveMotor={handleRemoveMotor}
+            onSaveMotorDraft={(motorId) => {
+              setPendingMotorId(motorId);
+              setMotorDraftConfirmOpen(true);
+            }}
+            onSubmitMotor={(motorId) => {
+              setPendingMotorId(motorId);
+              setMotorSubmitConfirmOpen(true);
+            }}
+            onSubmitForFinalApproval={handleSubmitForFinalApproval}
+            theme={theme}
+          />
         </>
-      ) : null}
+      )}
 
       <ConfirmAlertDialog
         open={backConfirmOpen}
@@ -270,6 +226,44 @@ const STFPage = () => {
         cancelLabel={strings.UNSAVED_BACK_CONFIRM}
         onConfirm={handleDiscardAndBack}
         onCancel={() => setBackConfirmOpen(false)}
+      />
+
+      <ConfirmAlertDialog
+        open={motorDraftConfirmOpen}
+        severity="warning"
+        title={strings.MOTOR_DRAFT_CONFIRM_TITLE}
+        message={strings.MOTOR_DRAFT_CONFIRM_MESSAGE(pendingMotorId ?? "")}
+        confirmLabel={strings.SAVE_MOTOR_DRAFT}
+        cancelLabel={strings.CONFIRM_CANCEL_LABEL}
+        onConfirm={async () => {
+          const motorId = pendingMotorId;
+          setMotorDraftConfirmOpen(false);
+          setPendingMotorId(null);
+          if (motorId) await handleSaveMotorDraft(motorId);
+        }}
+        onCancel={() => {
+          setMotorDraftConfirmOpen(false);
+          setPendingMotorId(null);
+        }}
+      />
+
+      <ConfirmAlertDialog
+        open={motorSubmitConfirmOpen}
+        severity="warning"
+        title={strings.MOTOR_SUBMIT_CONFIRM_TITLE}
+        message={strings.MOTOR_SUBMIT_CONFIRM_MESSAGE(pendingMotorId ?? "")}
+        confirmLabel={strings.SUBMIT_MOTOR}
+        cancelLabel={strings.CONFIRM_CANCEL_LABEL}
+        onConfirm={async () => {
+          const motorId = pendingMotorId;
+          setMotorSubmitConfirmOpen(false);
+          setPendingMotorId(null);
+          if (motorId) await handleSubmitMotor(motorId);
+        }}
+        onCancel={() => {
+          setMotorSubmitConfirmOpen(false);
+          setPendingMotorId(null);
+        }}
       />
     </Box>
   );

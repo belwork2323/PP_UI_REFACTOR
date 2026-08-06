@@ -10,12 +10,30 @@ export const HARDWARE_COUNT_FIELDS = [
   { id: "NO_OF_2KG_BEMS", label: "Number of 2 kg BEMs" },
   { id: "NO_OF_WHEEL_PEEL", label: "No. of Wheel Peel" },
   { id: "NO_OF_SBS_TBS", label: "No. of SBS/TBS" },
+  { id: "NO_OF_CARTOONS", label: "No of Cartoons" },
 ] as const;
 
 export const LINER_TYPE_FIELD = {
-  id: "LINER_TYPE_AND_BATCH",
-  label: "Liner Type and Batch",
+  id: "LINER_TYPE",
+  label: "Liner Type",
 } as const;
+
+export const LINER_BATCH_NO_FIELD = {
+  id: "LINER_BATCH_NO",
+  label: "Batch No.",
+} as const;
+
+export const LINER_BATCH_DATE_FIELD = {
+  id: "LINER_BATCH_DATE",
+  label: "Batch Date",
+} as const;
+
+export const LINER_TYPE_OPTIONS = [
+  { label: "HEMCOAT - 3L", value: "HEMCOAT - 3L" },
+  { label: "PEDCOAT", value: "PEDCOAT" },
+  { label: "HEMCOAT - 3M", value: "HEMCOAT - 3M" },
+  { label: "QE based", value: "QE based" },
+];
 
 export const ARTICLE_TYPE_SPECS = [
   { countField: "NO_OF_40KG_BEMS", articleType: "40 kg BEM" },
@@ -23,6 +41,7 @@ export const ARTICLE_TYPE_SPECS = [
   { countField: "NO_OF_2KG_BEMS", articleType: "2 kg BEM" },
   { countField: "NO_OF_WHEEL_PEEL", articleType: "Wheel Peel" },
   { countField: "NO_OF_SBS_TBS", articleType: "SBS/TBS" },
+  { countField: "NO_OF_CARTOONS", articleType: "Cartoons" },
 ] as const;
 
 export const ARTICLE_TYPE_EXTRA_OPTIONS = [
@@ -45,7 +64,7 @@ export type ArticleTypeRow = {
   RUBBER_MATERIAL: string;
   SLEEVE_NO: string;
   MOULD_NO: string;
-  LENGTH_MM: string;
+  SIZE_MM: string;
   THICKNESS_MM: string;
   LINER_APPLIED: string;
   OBSERVATIONS: string;
@@ -65,7 +84,7 @@ const emptyArticleRow = (
   RUBBER_MATERIAL: existing?.RUBBER_MATERIAL ?? "",
   SLEEVE_NO: existing?.SLEEVE_NO ?? "",
   MOULD_NO: existing?.MOULD_NO ?? "",
-  LENGTH_MM: existing?.LENGTH_MM ?? "",
+  SIZE_MM: existing?.SIZE_MM ?? "",
   THICKNESS_MM: existing?.THICKNESS_MM ?? "",
   LINER_APPLIED: existing?.LINER_APPLIED ?? "",
   OBSERVATIONS: existing?.OBSERVATIONS ?? "",
@@ -87,9 +106,12 @@ const isCountFieldFilled = (value: unknown) => {
 
 const isTextFieldFilled = (value: unknown) => String(value ?? "").trim().length > 0;
 
+/** All Hardware Preparation Details fields must be filled before Load Subscale Form. */
 export const isHardwarePreparationComplete = (values: SchemaFormValues) =>
   HARDWARE_COUNT_FIELDS.every((field) => isCountFieldFilled(values[field.id])) &&
-  isTextFieldFilled(values[LINER_TYPE_FIELD.id]);
+  isTextFieldFilled(values[LINER_TYPE_FIELD.id]) &&
+  isTextFieldFilled(values[LINER_BATCH_NO_FIELD.id]) &&
+  isTextFieldFilled(values[LINER_BATCH_DATE_FIELD.id]);
 
 export const isMainScaleSubscaleBatch = (batchType?: string | null) =>
   mapSubscaleBatchType(batchType) === "MAIN_SCALE";
@@ -155,5 +177,6 @@ export const mergeHardwareFormValues = (values: SchemaFormValues): SchemaFormVal
     ...values,
   });
 
-export const schemaHasHardwareSection = (schema: { data?: { sections?: { id: string }[] } } | null) =>
-  Boolean(schema?.data?.sections?.some((section) => section.id === HARDWARE_SECTION_ID));
+export const schemaHasHardwareSection = (
+  schema: { data?: { sections?: { id: string }[] } } | null,
+) => Boolean(schema?.data?.sections?.some((section) => section.id === HARDWARE_SECTION_ID));

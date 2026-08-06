@@ -478,7 +478,19 @@ export default function CHDashboard() {
                   applyLabel={S.COMMON.FILTERS_APPLY}
                   theme={adminTh}
                 >
-                  <Stack direction="row" gap={1.5} flexWrap="wrap" mb={2}>
+                  <Stack
+                    direction="row"
+                    gap={1.5}
+                    mb={2}
+                    sx={{
+                      width: "100%",
+                      overflowX: "auto",
+                      flexWrap: "nowrap",
+                      pr: 0.5,
+                      WebkitOverflowScrolling: "touch",
+                      msOverflowStyle: "-ms-autohiding-scrollbar",
+                    }}
+                  >
                     <FilterSelect
                       label={DP.FILTERS.STAGE}
                       value={batchDraftFilters.stage}
@@ -487,7 +499,11 @@ export default function CHDashboard() {
                       menuProps={filterMenuProps}
                       itemSx={filterMenuItemSx}
                       showAllOption={false}
-                      sx={adminTh.filterPanel.field}
+                      sx={{
+                        ...adminTh.filterPanel.field,
+                        minWidth: { xs: "100%", sm: 160 },
+                        flex: "0 0 auto",
+                      }}
                     />
 
                     <FilterSelect
@@ -498,7 +514,11 @@ export default function CHDashboard() {
                       menuProps={filterMenuProps}
                       itemSx={filterMenuItemSx}
                       showAllOption={false}
-                      sx={adminTh.filterPanel.field}
+                      sx={{
+                        ...adminTh.filterPanel.field,
+                        minWidth: { xs: "100%", sm: 160 },
+                        flex: "0 0 auto",
+                      }}
                     />
 
                     <FilterSelect
@@ -509,7 +529,11 @@ export default function CHDashboard() {
                       menuProps={filterMenuProps}
                       itemSx={filterMenuItemSx}
                       showAllOption={false}
-                      sx={adminTh.filterPanel.field}
+                      sx={{
+                        ...adminTh.filterPanel.field,
+                        minWidth: { xs: "100%", sm: 160 },
+                        flex: "0 0 auto",
+                      }}
                     />
                   </Stack>
                 </AdminFilterPanel>

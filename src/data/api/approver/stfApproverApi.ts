@@ -1,0 +1,35 @@
+import { post } from "../httpClient";
+import { APPROVER_ENDPOINTS } from "../endPoints";
+import type { ApproverFormActionType } from "./approverApi";
+
+export type STFApproverMotorChangeStatusPayload = {
+  formId: string;
+  motorId: string;
+  subDepartmentId: number;
+  actionType: ApproverFormActionType;
+  remarks?: string | null;
+  rejectionReason?: string | null;
+};
+
+export type STFApproverMotorChangeStatusResponse = {
+  formId: string;
+  batchId: string;
+  motorId: string;
+  actionType: string;
+  status: string;
+  motorSubmissionStatus: string;
+  batchStatus: string;
+  allMotorsApproved: boolean;
+  pendingMotorCount: number;
+  approvedMotorCount: number;
+  rejectedMotorCount: number;
+  totalMotorCount: number;
+  actionBy: string;
+  actionAt: string;
+  remarks: string | null;
+  rejectionReason: string | null;
+};
+
+export const changeSTFApproverMotorStatus = async (
+  payload: STFApproverMotorChangeStatusPayload,
+) => post(APPROVER_ENDPOINTS.MOTOR_CHANGE_STATUS, payload);

@@ -102,10 +102,8 @@
             "type": "text"
           },
           {
-            "fieldId": "NOZZLE_MATERIAL",
             "label": "Nozzle Material",
-            "type": "group",
-            "fields": [
+            "columns": [
               {
                 "fieldId": "MOTHER_GRAPHITE",
                 "label": "Mother Graphite",
@@ -119,10 +117,8 @@
             ]
           },
           {
-            "fieldId": "BEFORE_FIRING",
             "label": "Before Firing",
-            "type": "group",
-            "fields": [
+            "columns": [
               {
                 "fieldId": "DT_BEFORE",
                 "label": "Dt (mm)",
@@ -136,10 +132,8 @@
             ]
           },
           {
-            "fieldId": "AFTER_FIRING",
             "label": "After Firing",
-            "type": "group",
-            "fields": [
+            "columns": [
               {
                 "fieldId": "DT_AFTER",
                 "label": "Dt (mm)",
@@ -163,10 +157,15 @@
         "sectionId": "TESTING_DETAILS",
         "sectionName": "Testing Details",
         "type": "form",
+        "ui": {
+          "direction": "row",
+          "wrap": true,
+          "gap": "md"
+        },
         "fields": [
           {
             "fieldId": "THROAT_DIAMETER",
-            "label": "Throat Diameter",
+            "label": "Throat Dia.",
             "type": "number"
           },
           {
@@ -205,24 +204,7 @@
         "sectionId": "SENSOR_CONFIGURATION",
         "sectionName": "Sensor Configuration",
         "type": "table",
-        "addRowAllowed": false,
-        "predefinedRows": [
-          {
-            "channel": "PR1"
-          },
-          {
-            "channel": "PR2"
-          },
-          {
-            "channel": "TH1"
-          },
-          {
-            "channel": "TH2"
-          },
-          {
-            "channel": "FP"
-          }
-        ],
+        "addRowAllowed": true,
         "columns": [
           {
             "fieldId": "CHANNEL",
@@ -241,14 +223,19 @@
             "type": "number"
           },
           {
-            "fieldId": "MAX_EXPECTED",
-            "label": "Range Max Exp.",
-            "type": "number"
-          },
-          {
-            "fieldId": "SENSOR_RANGE",
-            "label": "Range Sensor",
-            "type": "number"
+            "label": "Range",
+            "columns": [
+              {
+                "fieldId": "MAX_EXPECTED",
+                "label": "Max",
+                "type": "number"
+              },
+              {
+                "fieldId": "SENSOR_RANGE",
+                "label": "Sensor exp.",
+                "type": "number"
+              }
+            ]
           },
           {
             "fieldId": "FILTER_HZ",
@@ -280,13 +267,21 @@
             "label": "Preloading",
             "type": "number"
           }
+        ],
+        "predefinedRows": [
+          { "channel": "PR1" },
+          { "channel": "PR2" },
+          { "channel": "TH1" },
+          { "channel": "TH2" },
+          { "channel": "FP" }
         ]
       },
       {
         "sectionId": "STATIC_TEST_RESULT",
         "sectionName": "Result",
-        "type": "form",
-        "fields": [
+        "type": "table",
+        "addRowAllowed": false,
+        "columns": [
           {
             "fieldId": "AVERAGE_PRESSURE",
             "label": "Avg. Pressure (ksc)",
@@ -323,6 +318,11 @@
         "sectionId": "UPLOAD_PT_CURVE",
         "sectionName": "Upload P-T Curve",
         "type": "form",
+        "ui": {
+          "direction": "row",
+          "wrap": true,
+          "gap": "md"
+        },
         "fields": [
           {
             "fieldId": "PT_CURVE_FILE",

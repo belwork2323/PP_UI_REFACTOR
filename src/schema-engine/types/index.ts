@@ -23,6 +23,7 @@ export type {
   SchemaMatrixRowField,
   SchemaMeta,
   SchemaPayload,
+  SchemaPopulateFromApiConfig,
   SchemaRepeatConfig,
   SchemaRootUi,
   SchemaRowsConfig,

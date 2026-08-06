@@ -216,78 +216,102 @@
         "title": "Section B: Casting Process",
         "children": [
           {
-            "type": "group",
-            "id": "FINAL_MIX_DETAILS",
-            "label": "Final Mix {index}",
-            "repeat": {
-              "defaultCount": "{{finalMixCount}}",
-              "min": "{{finalMixCount}}",
-              "max": "{{finalMixCount}}",
+            "type": "table",
+            "id": "FINAL_MIX_BOWL_DETAILS",
+            "label": "Final Mix Bowl Details",
+            "rows": {
               "allowAdd": false,
               "allowDelete": false,
-              "label": "Final Mix {index}"
-            },
-            "children": [
-              {
-                "type": "table",
-                "id": "BOWL_DETAILS",
-                "label": "Bowl Details",
-                "rows": {
-                  "defaultCount": 1,
-                  "allowAdd": true,
-                  "allowDelete": true
-                },
-                "columns": [
-                  {
-                    "type": "column",
-                    "id": "BOWL_ID",
-                    "fieldType": "dropdown",
-                    "label": "Bowl Id",
-                    "dataSource": {
-                      "type": "static",
-                      "options": [
-                        "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
-                        "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"
-                      ]
-                    }
-                  },
-                  {
-                    "type": "column",
-                    "id": "BOWL_RECEIPT_TIME",
-                    "fieldType": "time",
-                    "label": "Bowl Receipt Time"
-                  },
-                  {
-                    "type": "column",
-                    "id": "INITIAL_WEIGHT",
-                    "fieldType": "number",
-                    "label": "Initial Weight"
-                  },
-                  {
-                    "type": "column",
-                    "id": "FINAL_WEIGHT",
-                    "fieldType": "number",
-                    "label": "Final Weight"
-                  },
-                  {
-                    "type": "column",
-                    "id": "INITIAL_SLURRY_DEPTH",
-                    "fieldType": "number",
-                    "label": "Initial Slurry Depth"
-                  },
-                  {
-                    "type": "column",
-                    "id": "DC_OPEN_TIME",
-                    "fieldType": "time",
-                    "label": "Bowl D/C Valve Opening Time"
-                  },
-                  {
-                    "type": "column",
-                    "id": "DC_CLOSE_TIME",
-                    "fieldType": "time",
-                    "label": "Bowl D/C Valve Closing Time"
+              "autoIncrementKey": "SR_NO",
+              "populateFromApi": {
+                "dataSource": {
+                  "type": "api",
+                  "api": {
+                    "endpoint": "/api/v1/admin/batch/details",
+                    "method": "POST",
+                    "requestBody": {
+                      "batchId": "{{batchId}}"
+                    },
+                    "responsePath": "data.batch.identificationSheet.metadata.mixing.stages",
+                    "nestedOptionsKey": "premixes",
+                    "parentMatchField": "stageType",
+                    "parentMatchContextKey": "mixingStageType"
                   }
-                ]
+                },
+                "columnTemplates": [
+                  {
+                    "targetColumn": "BOWL_ID",
+                    "template": "FINAL_MIX {premixNo} / {bowlId}"
+                  }
+                ],
+                "fieldMappings": [
+                  {
+                    "sourceField": "premixNo",
+                    "targetColumn": "PREMIX_NO"
+                  },
+                  {
+                    "sourceField": "bowlId",
+                    "targetColumn": "BOWL_NO"
+                  }
+                ],
+                "readonlyColumns": ["BOWL_ID", "PREMIX_NO", "BOWL_NO"]
+              }
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "BOWL_ID",
+                "fieldType": "static",
+                "label": "Bowl Id",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "BOWL_RECEIPT_TIME",
+                "fieldType": "time",
+                "label": "Bowl Receipt Time"
+              },
+              {
+                "type": "column",
+                "id": "INITIAL_WEIGHT",
+                "fieldType": "number",
+                "label": "Initial Weight"
+              },
+              {
+                "type": "column",
+                "id": "FINAL_WEIGHT",
+                "fieldType": "number",
+                "label": "Final Weight"
+              },
+              {
+                "type": "column",
+                "id": "INITIAL_SLURRY_DEPTH",
+                "fieldType": "number",
+                "label": "Initial Slurry Depth"
+              },
+              {
+                "type": "column",
+                "id": "DC_OPEN_TIME",
+                "fieldType": "time",
+                "label": "Bowl D/C Valve Opening Time"
+              },
+              {
+                "type": "column",
+                "id": "DC_CLOSE_TIME",
+                "fieldType": "time",
+                "label": "Bowl D/C Valve Closing Time"
+              },
+              {
+                "type": "column",
+                "id": "SLURRY_DEPTH_AFTER_DC",
+                "fieldType": "number",
+                "label": "Depth of Slurry after Opening of D/C Valve"
+              },
+              {
+                "type": "column",
+                "id": "BALL_VALVE_OPEN_TIME",
+                "fieldType": "time",
+                "label": "Ball Valve Opening Time"
               }
             ]
           },
@@ -296,23 +320,53 @@
             "id": "CASTING_FROM_BOWL_DETAILS",
             "label": "Casting From Bowl Details",
             "rows": {
-              "defaultCount": 1,
-              "allowAdd": true,
-              "allowDelete": true
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "SR_NO",
+              "populateFromApi": {
+                "dataSource": {
+                  "type": "api",
+                  "api": {
+                    "endpoint": "/api/v1/admin/batch/details",
+                    "method": "POST",
+                    "requestBody": {
+                      "batchId": "{{batchId}}"
+                    },
+                    "responsePath": "data.batch.identificationSheet.metadata.mixing.stages",
+                    "nestedOptionsKey": "premixes",
+                    "parentMatchField": "stageType",
+                    "parentMatchContextKey": "mixingStageType"
+                  }
+                },
+                "columnTemplates": [
+                  {
+                    "targetColumn": "BOWL_ID",
+                    "template": "FINAL_MIX {premixNo} / {bowlId}"
+                  }
+                ],
+                "fieldMappings": [
+                  {
+                    "sourceField": "premixNo",
+                    "targetColumn": "PREMIX_NO"
+                  },
+                  {
+                    "sourceField": "bowlId",
+                    "targetColumn": "BOWL_NO"
+                  }
+                ],
+                "contextColumnMappings": {
+                  "MOTOR_ID": "motorId"
+                },
+                "readonlyColumns": ["BOWL_ID", "PREMIX_NO", "BOWL_NO", "MOTOR_ID"]
+              }
             },
             "columns": [
               {
                 "type": "column",
                 "id": "BOWL_ID",
-                "fieldType": "dropdown",
+                "fieldType": "static",
                 "label": "Bowl Id",
-                "dataSource": {
-                  "type": "static",
-                  "options": [
-                    "1", "2", "3", "4", "5", "6", "7", "8", "9", "10",
-                    "11", "12", "13", "14", "15", "16", "17", "18", "19", "20"
-                  ]
-                }
+                "readonly": true
               },
               {
                 "type": "column",
@@ -339,7 +393,8 @@
                 "type": "column",
                 "id": "MOTOR_ID",
                 "fieldType": "text",
-                "label": "Motor Id No."
+                "label": "Motor Id No.",
+                "readonly": true
               },
               {
                 "type": "column",
@@ -350,10 +405,155 @@
               },
               {
                 "type": "column",
+                "id": "SLURRY_CAST",
+                "fieldType": "number",
+                "label": "Slurry Cast",
+                "unit": "kg"
+              },
+              {
+                "type": "column",
+                "id": "FLOW_RATE",
+                "fieldType": "number",
+                "label": "Flow Rate",
+                "unit": "kg/min"
+              },
+              {
+                "type": "column",
+                "id": "VALVE_OPENING",
+                "fieldType": "number",
+                "label": "Valve Opening",
+                "unit": "%"
+              },
+              {
+                "type": "column",
                 "id": "VACUUM_LEVEL",
                 "fieldType": "number",
                 "label": "Vacuum Level",
                 "unit": "torr"
+              }
+            ]
+          },
+          {
+            "type": "group",
+            "id": "CASTING_VACUUM_DETAILS",
+            "ui": {
+              "direction": "row",
+              "wrap": true,
+              "gap": "md"
+            },
+            "children": [
+              {
+                "type": "field",
+                "id": "INITIAL_VACUUM",
+                "fieldType": "number",
+                "label": "Initial Vacuum",
+                "ui": {
+                  "placeholder": "Enter value"
+                }
+              },
+              {
+                "type": "field",
+                "id": "VACUUM_PRESSURE_CASTING",
+                "fieldType": "number",
+                "label": "Vacuum Pressure Created for Casting",
+                "ui": {
+                  "placeholder": "Enter value"
+                }
+              },
+              {
+                "type": "field",
+                "id": "VACUUM_PRESSURE_SOAKING",
+                "fieldType": "number",
+                "label": "Vacuum Pressure Created for Soaking",
+                "ui": {
+                  "placeholder": "Enter value"
+                }
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "id": "SLURRY_CAST_DETAILS",
+        "title": "Section C: Slurry Cast into motor from bowls",
+        "ui": {
+          "variant": "card",
+          "padding": "sm",
+          "gap": "sm"
+        },
+        "children": [
+          {
+            "type": "table",
+            "id": "SLURRY_CAST_FROM_BOWLS",
+            "rows": {
+              "allowAdd": false,
+              "allowDelete": false,
+              "autoIncrementKey": "ROW_KEY",
+              "populateFromApi": {
+                "dataSource": {
+                  "type": "api",
+                  "api": {
+                    "endpoint": "/api/v1/admin/batch/details",
+                    "method": "POST",
+                    "requestBody": {
+                      "batchId": "{{batchId}}"
+                    },
+                    "responsePath": "data.batch.identificationSheet.metadata.mixing.stages",
+                    "nestedOptionsKey": "premixes",
+                    "parentMatchField": "stageType",
+                    "parentMatchContextKey": "mixingStageType"
+                  }
+                },
+                "columnTemplates": [
+                  {
+                    "targetColumn": "FM_MOTOR_LABEL",
+                    "template": "FINAL_MIX {premixNo} / {bowlId}"
+                  }
+                ],
+                "fieldMappings": [
+                  {
+                    "sourceField": "premixNo",
+                    "targetColumn": "PREMIX_NO"
+                  },
+                  {
+                    "sourceField": "bowlId",
+                    "targetColumn": "BOWL_NO"
+                  }
+                ],
+                "readonlyColumns": ["FM_MOTOR_LABEL", "PREMIX_NO", "BOWL_NO"]
+              },
+              "rowComputations": [
+                {
+                  "rowKey": "TOTAL",
+                  "rowKeyColumn": "ROW_KEY",
+                  "targetColumn": "SLURRY_CAST",
+                  "sourceColumn": "SLURRY_CAST",
+                  "expression": "__SUM__"
+                }
+              ],
+              "presetRows": [
+                {
+                  "readonly": true,
+                  "ROW_KEY": "TOTAL",
+                  "FM_MOTOR_LABEL": "Total Slurry Cast",
+                  "SLURRY_CAST__fieldType": "number"
+                }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "FM_MOTOR_LABEL",
+                "fieldType": "static",
+                "label": "FM/Motor Id",
+                "readonly": true
+              },
+              {
+                "type": "column",
+                "id": "SLURRY_CAST",
+                "fieldType": "number",
+                "label": "Slurry Cast",
+                "unit": "kg"
               }
             ]
           }

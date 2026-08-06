@@ -8,6 +8,8 @@ import { mixingController } from "../../../controllers/user/manufacturing/mixing
 import type { IdentificationSheet } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
 import {
   buildMixCardId,
+  buildMixCardStatusMapFromDetails,
+  buildMixCardStatusMapFromForm,
   buildMixingApproverCards,
   createDefaultMixingFormState,
   createEmptyFinalMixEntry,
@@ -25,8 +27,14 @@ import {
   type MixCardSubmissionStatus,
   type MixingFormState,
 } from "../../../data/models/user/MixingFormModel";
+import type { PremixSubmissionType } from "../../../data/models/user/RawMaterialPreparationModel";
 import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
+import {
+  isPremixEnabledByPreviousStage,
+  resolvePreviousStageApprovedUnits,
+  type PreviousStageApprovedUnits,
+} from "../previousStageApproval";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -39,40 +47,6 @@ type MixingBatch = {
 
 const MX_STATUS = MANUFACTURING_STATUS;
 const parseStatus = (status: string | undefined) => String(status ?? "").toLowerCase();
-
-const buildMixCardStatusMapFromForm = (
-  form: MixingFormState,
-): Record<string, MixCardStatusMeta> => {
-  const next: Record<string, MixCardStatusMeta> = {};
-  buildMixingApproverCards({
-    premixCards: form.premixCards,
-    finalMixCards: form.finalMixCards,
-  }).forEach((card) => {
-    next[card.mixCardId] = {
-      mixCardSubmissionStatus: card.mixCardSubmissionStatus ?? "TO_BE_INITIATED",
-      mixCardSubmissionType: null,
-      rejectionReason: card.rejectionReason ?? null,
-      remarks: card.remarks ?? null,
-    };
-  });
-  return next;
-};
-
-const buildMixCardStatusMapFromDetails = (
-  data: Record<string, unknown>,
-): Record<string, MixCardStatusMeta> => {
-  const detailView = mapMixingDetailsForDisplay(data);
-  const next: Record<string, MixCardStatusMeta> = {};
-  buildMixingApproverCards(detailView).forEach((card) => {
-    next[card.mixCardId] = {
-      mixCardSubmissionStatus: card.mixCardSubmissionStatus,
-      mixCardSubmissionType: null,
-      rejectionReason: card.rejectionReason ?? null,
-      remarks: card.remarks ?? null,
-    };
-  });
-  return next;
-};
 
 export const useMixingHook = () => {
   const listParams = useSubdepartmentBatches("mixing");
@@ -104,14 +78,19 @@ export const useMixingHook = () => {
       null) as IdentificationSheet | null;
     const numberOfPremix = Number(identificationSheet?.numberOfPremix) || 1;
     const mixingCycle = (details as { mixingCycle?: unknown } | null | undefined)?.mixingCycle;
+    const stageProgress = (details as { stageProgress?: unknown } | null | undefined)?.stageProgress;
+    const currentStage = (details as { currentStage?: unknown } | null | undefined)?.currentStage;
 
-    return { identificationSheet, numberOfPremix, mixingCycle };
+    return { identificationSheet, numberOfPremix, mixingCycle, stageProgress, currentStage };
   }, []);
 
   const [formData, setFormData] = useState<MixingFormState>(() => createDefaultMixingFormState());
   const [initialSnapshot, setInitialSnapshot] = useState("{}");
   const [mixCardStatusById, setMixCardStatusById] = useState<Record<string, MixCardStatusMeta>>(
     {},
+  );
+  const [previousStageGate, setPreviousStageGate] = useState<PreviousStageApprovedUnits | null>(
+    null,
   );
 
   const formSnapshot = useMemo(() => JSON.stringify(formData), [formData]);
@@ -132,6 +111,7 @@ export const useMixingHook = () => {
     setFormData(defaults);
     setInitialSnapshot(JSON.stringify(defaults));
     setMixCardStatusById({});
+    setPreviousStageGate(null);
   }, []);
 
   const getErrorMessage = (response: any, fallbackMessage: string) => {
@@ -154,14 +134,25 @@ export const useMixingHook = () => {
       setLoadingFormDetails(true);
 
       try {
-        const { identificationSheet, numberOfPremix, mixingCycle } =
+        const { identificationSheet, numberOfPremix, mixingCycle, stageProgress, currentStage } =
           await loadBatchIdentificationSheet(batch.batchId);
+
+        const nextGate = resolvePreviousStageApprovedUnits({
+          stageProgress: stageProgress ?? batch.stageProgress,
+          currentStage: currentStage ?? batch.currentStage,
+          currentSlug: "mixing",
+          currentSubDepartmentId: subDepartmentId,
+          subDepartments: user?.allSubDepartments,
+        });
+        setPreviousStageGate(nextGate);
 
         let nextBatch: MixingBatch = {
           ...batch,
           identificationSheet,
           numberOfPremix,
           mixingCycle,
+          stageProgress: stageProgress ?? batch.stageProgress,
+          currentStage: currentStage ?? batch.currentStage,
         };
 
         const buildPrefilledFormData = () => {
@@ -334,7 +325,7 @@ export const useMixingHook = () => {
         setLoadingFormDetails(false);
       }
     },
-    [loadBatchIdentificationSheet, showAlert, subDepartmentId],
+    [loadBatchIdentificationSheet, showAlert, subDepartmentId, user?.allSubDepartments],
   );
   const handleViewMixingDetails = useCallback(
     async (row: MixingBatch) => {
@@ -440,18 +431,23 @@ export const useMixingHook = () => {
         return false;
       }
 
+      if (!isPremixEnabledByPreviousStage(cardNo, previousStageGate)) {
+        showAlert(STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED, "warning");
+        return false;
+      }
+
       if (intent === "submit" && !hasMixCardValue(formData, stageType, cardNo)) {
         showAlert(S.MIX_CARD_EMPTY_ERROR, "warning");
         return false;
       }
 
-      const mixCardSubmissionType = intent === "draft" ? "DRAFT" : "SUBMIT";
+      const premixSubmissionType: PremixSubmissionType = intent === "draft" ? "DRAFT" : "SUBMIT";
       const formSubmissionType = "DRAFT" as const;
       const status = parseStatus(activeBatch.mxStatus);
       const isCreateFlow = status === parseStatus(MX_STATUS.TO_BE_INITIATED) && !activeBatch.formId;
       const mixingDetails = mapMixingFormStateToPayload(formData, {
         targetMixCardId: mixCardId,
-        mixCardSubmissionType,
+        premixSubmissionType,
         mixCardStatusById,
       });
 
@@ -503,7 +499,7 @@ export const useMixingHook = () => {
             ...prev,
             [mixCardId]: {
               ...prev[mixCardId],
-              mixCardSubmissionType,
+              premixSubmissionType,
               mixCardSubmissionStatus: nextStatus,
             },
           };
@@ -524,8 +520,10 @@ export const useMixingHook = () => {
               );
               updated[id] = {
                 ...updated[id],
-                mixCardSubmissionType:
-                  entry.mixCardSubmissionType ?? updated[id]?.mixCardSubmissionType,
+                premixSubmissionType:
+                  entry.premixSubmissionType ??
+                  entry.mixCardSubmissionType ??
+                  updated[id]?.premixSubmissionType,
                 mixCardSubmissionStatus:
                   (String(entry.mixCardSubmissionStatus ?? entry.status ?? "")
                     .toUpperCase()
@@ -557,6 +555,7 @@ export const useMixingHook = () => {
       formData,
       getMixCardStatus,
       mixCardStatusById,
+      previousStageGate,
       showAlert,
       subDepartmentId,
     ],
@@ -648,6 +647,7 @@ export const useMixingHook = () => {
   return {
     ...listParams,
     loading: listParams.loading || loadingFormDetails,
+    loadingFormDetails,
     view,
     activeBatch,
     numberOfPremix: resolvePremixCount(activeBatch),
@@ -655,6 +655,7 @@ export const useMixingHook = () => {
     isEditMode,
     formData,
     mixCardStatusById,
+    previousStageGate,
     getMixCardStatus,
     isMixCardEditable: checkMixCardEditable,
     isFormDirty,

@@ -36,12 +36,14 @@ export const resolveSchemaCountToken = (
 
 export const buildCastingSetupContext = (setup?: {
   finalMixCount?: string | number;
+  motorId?: string;
   castingType?: string;
   castingStation?: string;
 }): SchemaSetupContext | undefined => {
   if (!setup) return undefined;
   return {
     finalMixCount: setup.finalMixCount,
+    motorId: setup.motorId,
     castingType: setup.castingType,
     castingStation: setup.castingStation,
   };

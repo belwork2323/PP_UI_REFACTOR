@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
-import { Box, Button, Stack } from "@mui/material";
+import { Box } from "@mui/material";
 import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog";
+import WorkflowFormOpeningLoader from "../../../../components/common/WorkflowFormOpeningLoader";
 import UserWorkflowFormHeader from "../../../../components/custom/UserWorkflowFormHeader";
 import NDTList from "./NDTList";
 import NDTForm from "./NDTForm";
@@ -8,8 +9,36 @@ import NDTDetailsView from "./NDTDetailsView";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import getQualityControlTheme from "../../../../../app/theme/custom_themes/user/qualityControl/qualityControl_theme";
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
+import { NDT_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import { STRINGS } from "../../../../../app/config/strings";
 import useNDTHook from "../../../../../hooks/user/qualityControl/useNDTHook";
+
+const formatMotorSubtitle = (batch?: {
+  motorId?: string;
+  motorIds?: Array<string | number>;
+} | null) => {
+  const ids = Array.isArray(batch?.motorIds)
+    ? batch.motorIds.map((id) => String(id).trim()).filter(Boolean)
+    : [];
+  if (ids.length > 0) return ids.join(" · ");
+  const motorId = String(batch?.motorId ?? "").trim();
+  return motorId && motorId !== "—" ? motorId : undefined;
+};
+
+const resolveStatusLabel = (batch: any, isEdit: boolean, strings: typeof STRINGS.QUALITY_CONTROL.NDT) => {
+  if (isEdit) return STRINGS.QUALITY_CONTROL.FORM_HEADER.EDITING_REJECTED;
+
+  const status = String(batch?.ndtStatus ?? batch?.status ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+  const inProgress =
+    status === "in_progress" ||
+    status === "waiting_for_partial_approval" ||
+    Boolean(batch?.formId);
+
+  return inProgress ? STRINGS.QUALITY_CONTROL.FORM_HEADER.DRAFT : strings.NEW_LABEL;
+};
 
 const NDTPage = () => {
   const mode = useThemeStore((state) => state.mode);
@@ -19,11 +48,13 @@ const NDTPage = () => {
     return { ...qc, manufacturing: mfg.manufacturing };
   }, [mode]);
   const strings = STRINGS.QUALITY_CONTROL.NDT;
-  const [draftConfirm, setDraftConfirm] = useState(false);
-  const [submitConfirm, setSubmitConfirm] = useState(false);
+  const [motorDraftConfirmOpen, setMotorDraftConfirmOpen] = useState(false);
+  const [motorSubmitConfirmOpen, setMotorSubmitConfirmOpen] = useState(false);
+  const [pendingMotorId, setPendingMotorId] = useState<string | null>(null);
 
   const hookState = useNDTHook();
   const {
+    loading,
     view,
     activeBatch,
     isEditMode,
@@ -34,65 +65,58 @@ const NDTPage = () => {
     setBackConfirmOpen,
     handleBack,
     handleDiscardAndBack,
-    handleSaveDraft,
-    handleSubmit,
+    handleSaveMotorDraft,
+    handleSubmitMotor,
+    handleSubmitForFinalApproval,
     handleBackFromDetails,
     detailsRow,
     detailsData,
     detailsLoading,
-    motorCount,
-    draftMotorIds,
     addedMotors,
+    batchMotorEntries,
     availableMotorOptions,
-    maxMotorCount,
+    motorStatusById,
+    getMotorStatus,
+    isMotorEditable,
+    previousStageGate,
     handleSetupChange,
     handleMotorSessionChange,
-    handleMotorCountChange,
-    handleDraftMotorIdChange,
     handleLoadNDTForm,
-    handleAddMotors,
-    handleRemoveMotor,
   } = hookState;
 
-  const canAct = formData.formLoaded;
+  const listLoading = loading && !loadingFormDetails && view === "list";
 
-  if (view === "list") {
-    return (
-      <Box sx={theme.workflow.animatedContainer}>
-        <NDTList hookState={hookState} />
-      </Box>
-    );
-  }
+  return (
+    <Box sx={theme.workflow.animatedContainer}>
+      <WorkflowFormOpeningLoader
+        open={listLoading || Boolean(loadingFormDetails)}
+        title={loadingFormDetails ? strings.FORM_OPENING_TITLE : strings.TITLE}
+        message={
+          loadingFormDetails ? strings.FORM_OPENING_MESSAGE : "Loading NDT batches…"
+        }
+        color={NDT_BRAND.primary}
+        accentColor={NDT_BRAND.primaryLight}
+      />
 
-  if (view === "details" && detailsRow) {
-    return (
-      <Box sx={theme.workflow.animatedContainer}>
+      {view === "list" && !listLoading && <NDTList hookState={hookState} />}
+
+      {view === "details" && detailsRow && (
         <NDTDetailsView
           row={detailsRow}
           data={detailsData}
           loading={detailsLoading}
           onBack={handleBackFromDetails}
         />
-      </Box>
-    );
-  }
+      )}
 
-  return (
-    <Box sx={theme.workflow.animatedContainer}>
-      {activeBatch && (
+      {view === "form" && activeBatch && !loadingFormDetails && (
         <>
           <UserWorkflowFormHeader
             mode="update"
             data={{
               title: String(activeBatch.lotId ?? activeBatch.batchId ?? "—"),
-              subtitle:
-                String(activeBatch.motorId ?? "").trim() &&
-                String(activeBatch.motorId).trim() !== "—"
-                  ? String(activeBatch.motorId).trim()
-                  : undefined,
-              statusLabel: isEditMode
-                ? STRINGS.QUALITY_CONTROL.FORM_HEADER.EDITING_REJECTED
-                : strings.NEW_LABEL,
+              subtitle: formatMotorSubtitle(activeBatch),
+              statusLabel: resolveStatusLabel(activeBatch, isEditMode, strings),
               statusVariant: isEditMode ? "edit" : "new",
               rejectionReason: activeBatch.rejectionReason,
             }}
@@ -102,85 +126,32 @@ const NDTPage = () => {
             rejectionTitle={STRINGS.QUALITY_CONTROL.FORM_HEADER.REJECTION_REASON}
             theme={theme}
           />
-          {!loadingFormDetails && (
-            <NDTForm
-              activeBatch={activeBatch}
-              formData={formData}
-              addedMotors={addedMotors}
-              motorCount={motorCount}
-              draftMotorIds={draftMotorIds}
-              availableMotorOptions={availableMotorOptions}
-              maxMotorCount={maxMotorCount}
-              isEditMode={isEditMode}
-              theme={theme}
-              onSetupChange={handleSetupChange}
-              onMotorSessionChange={handleMotorSessionChange}
-              onMotorCountChange={handleMotorCountChange}
-              onDraftMotorIdChange={handleDraftMotorIdChange}
-              onLoadNDTForm={handleLoadNDTForm}
-              onAddMotors={handleAddMotors}
-              onRemoveMotor={handleRemoveMotor}
-            />
-          )}
-
-          {!loadingFormDetails && canAct ? (
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              gap={1.5}
-              mt={3}
-              justifyContent="flex-end"
-            >
-              <Button
-                variant="outlined"
-                disabled={actionLoading}
-                onClick={() => setDraftConfirm(true)}
-              >
-                {strings.SAVE_DRAFT_LABEL}
-              </Button>
-              <Button
-                variant="contained"
-                disabled={actionLoading}
-                onClick={() => setSubmitConfirm(true)}
-              >
-                {isEditMode ? strings.RESUBMIT_LABEL : strings.SUBMIT_LABEL}
-              </Button>
-            </Stack>
-          ) : null}
-
-          {!loadingFormDetails && canAct ? (
-            <>
-              <ConfirmAlertDialog
-                open={draftConfirm}
-                severity="info"
-                title={strings.DRAFT_CONFIRM_TITLE}
-                message={strings.DRAFT_CONFIRM_MESSAGE}
-                confirmLabel={strings.DRAFT_CONFIRM_LABEL}
-                cancelLabel={strings.CONFIRM_CANCEL_LABEL}
-                onConfirm={async () => {
-                  setDraftConfirm(false);
-                  await handleSaveDraft();
-                }}
-                onCancel={() => setDraftConfirm(false)}
-              />
-              <ConfirmAlertDialog
-                open={submitConfirm}
-                severity="warning"
-                title={isEditMode ? strings.RESUBMIT_CONFIRM_TITLE : strings.SUBMIT_CONFIRM_TITLE}
-                message={
-                  isEditMode ? strings.RESUBMIT_CONFIRM_MESSAGE : strings.SUBMIT_CONFIRM_MESSAGE
-                }
-                confirmLabel={
-                  isEditMode ? strings.RESUBMIT_CONFIRM_LABEL : strings.SUBMIT_CONFIRM_LABEL
-                }
-                cancelLabel={strings.CONFIRM_GO_BACK_LABEL}
-                onConfirm={async () => {
-                  setSubmitConfirm(false);
-                  await handleSubmit();
-                }}
-                onCancel={() => setSubmitConfirm(false)}
-              />
-            </>
-          ) : null}
+          <NDTForm
+            activeBatch={activeBatch}
+            formData={formData}
+            addedMotors={addedMotors}
+            autoMotorEntries={batchMotorEntries}
+            availableMotorOptions={availableMotorOptions}
+            motorStatusById={motorStatusById}
+            getMotorStatus={getMotorStatus}
+            isMotorEditable={isMotorEditable}
+            previousStageGate={previousStageGate}
+            actionLoading={actionLoading}
+            isEditMode={isEditMode}
+            theme={theme}
+            onSetupChange={handleSetupChange}
+            onMotorSessionChange={handleMotorSessionChange}
+            onLoadNDTForm={handleLoadNDTForm}
+            onSaveMotorDraft={(motorId) => {
+              setPendingMotorId(motorId);
+              setMotorDraftConfirmOpen(true);
+            }}
+            onSubmitMotor={(motorId) => {
+              setPendingMotorId(motorId);
+              setMotorSubmitConfirmOpen(true);
+            }}
+            onSubmitForFinalApproval={handleSubmitForFinalApproval}
+          />
         </>
       )}
 
@@ -193,6 +164,44 @@ const NDTPage = () => {
         cancelLabel={strings.UNSAVED_BACK_CONFIRM}
         onConfirm={handleDiscardAndBack}
         onCancel={() => setBackConfirmOpen(false)}
+      />
+
+      <ConfirmAlertDialog
+        open={motorDraftConfirmOpen}
+        severity="warning"
+        title={strings.MOTOR_DRAFT_CONFIRM_TITLE}
+        message={strings.MOTOR_DRAFT_CONFIRM_MESSAGE(pendingMotorId ?? "")}
+        confirmLabel={strings.SAVE_MOTOR_DRAFT}
+        cancelLabel={strings.CONFIRM_CANCEL_LABEL}
+        onConfirm={async () => {
+          const motorId = pendingMotorId;
+          setMotorDraftConfirmOpen(false);
+          setPendingMotorId(null);
+          if (motorId) await handleSaveMotorDraft(motorId);
+        }}
+        onCancel={() => {
+          setMotorDraftConfirmOpen(false);
+          setPendingMotorId(null);
+        }}
+      />
+
+      <ConfirmAlertDialog
+        open={motorSubmitConfirmOpen}
+        severity="warning"
+        title={strings.MOTOR_SUBMIT_CONFIRM_TITLE}
+        message={strings.MOTOR_SUBMIT_CONFIRM_MESSAGE(pendingMotorId ?? "")}
+        confirmLabel={strings.SUBMIT_MOTOR}
+        cancelLabel={strings.CONFIRM_CANCEL_LABEL}
+        onConfirm={async () => {
+          const motorId = pendingMotorId;
+          setMotorSubmitConfirmOpen(false);
+          setPendingMotorId(null);
+          if (motorId) await handleSubmitMotor(motorId);
+        }}
+        onCancel={() => {
+          setMotorSubmitConfirmOpen(false);
+          setPendingMotorId(null);
+        }}
       />
     </Box>
   );

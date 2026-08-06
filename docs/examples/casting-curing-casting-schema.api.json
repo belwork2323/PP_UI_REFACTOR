@@ -1,0 +1,21 @@
+{
+  "request": {
+    "schemaVersion": "1.0",
+    "schemaType": "CASTING",
+    "motorStage": 1,
+    "subdepartmentId": 6,
+    "functionality": "CREATE_CASTING_FORM"
+  },
+  "success": true,
+  "statusCode": 200,
+  "schemaVersion": "1.0",
+  "schemaType": "CASTING",
+  "functionality": "CREATE_CASTING_FORM",
+  "motorStage": 1,
+  "message": "Casting schema fetched successfully",
+  "meta": {
+    "title": "Casting Form",
+    "description": "Casting process details for single motor"
+  },
+  "note": "Full section definitions are maintained in casting-form.v2.json"
+}

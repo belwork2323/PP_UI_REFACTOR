@@ -1,6 +1,7 @@
 import { Box } from "@mui/material";
 import { useMemo } from "react";
 import ConfirmAlertDialog from "../../../components/common/ConfirmAlertDialog";
+import WorkflowFormOpeningLoader from "../../../components/common/WorkflowFormOpeningLoader";
 import { useThemeStore } from "../../../../app/store/themeStore";
 import getSourcingTheme from "../../../../app/theme/custom_themes/user/sourcing/sourcing_theme";
 import useRawMaterialProcurementHook from "../../../../hooks/user/sourcing/useRawMaterialProcurementHook";
@@ -13,9 +14,11 @@ import { STRINGS } from "../../../../app/config/strings";
 const RawMaterialProcurement = () => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getSourcingTheme(mode), [mode]);
+  const strings = STRINGS.SOURCING.RAW_MATERIAL;
 
   const hookState = useRawMaterialProcurementHook();
   const {
+    loading,
     view,
     detailsRow,
     detailsBlocks,
@@ -45,14 +48,28 @@ const RawMaterialProcurement = () => {
   const createLotHeaderHeading =
     !isEditMode && formEntryMode === "create"
       ? {
-          title: STRINGS.SOURCING.RAW_MATERIAL.FORM_HEADER_CREATE_LOT_TITLE,
-          subtitle: STRINGS.SOURCING.RAW_MATERIAL.FORM_HEADER_CREATE_LOT_SUBTITLE,
+          title: strings.FORM_HEADER_CREATE_LOT_TITLE,
+          subtitle: strings.FORM_HEADER_CREATE_LOT_SUBTITLE,
         }
       : undefined;
 
+  const listLoading = loading && !loadingFormDetails && view === "list";
+
   return (
     <Box sx={theme.workflow.animatedContainer}>
-      {view === "list" && <RawMaterialBatchList hookState={hookState} />}
+      <WorkflowFormOpeningLoader
+        open={listLoading || Boolean(loadingFormDetails)}
+        title={loadingFormDetails ? strings.FORM_OPENING_TITLE : strings.TITLE}
+        message={
+          loadingFormDetails
+            ? strings.FORM_OPENING_MESSAGE
+            : "Loading raw material lots…"
+        }
+        color={theme.palette.primary}
+        accentColor={theme.palette.primaryLight}
+      />
+
+      {view === "list" && !listLoading && <RawMaterialBatchList hookState={hookState} />}
 
       {view === "details" && detailsRow && (
         <RawMaterialLotDetailsView
@@ -63,7 +80,7 @@ const RawMaterialProcurement = () => {
         />
       )}
 
-      {view === "form" && activeBatch && (
+      {view === "form" && activeBatch && !loadingFormDetails && (
         <Box>
           <UserWorkflowFormHeader
             mode={createLotHeaderHeading ? "create" : "update"}
@@ -76,7 +93,7 @@ const RawMaterialProcurement = () => {
                 : undefined,
               statusLabel: isEditMode
                 ? "Editing Rejected Submission"
-                : STRINGS.SOURCING.RAW_MATERIAL.NEW_SUBMISSION,
+                : strings.NEW_SUBMISSION,
               statusVariant: isEditMode ? "edit" : "new",
               rejectionReason: activeBatch.rejectionReason,
             }}
@@ -85,22 +102,20 @@ const RawMaterialProcurement = () => {
             theme={theme}
           />
 
-          {!loadingFormDetails && (
-            <SpecificationFormBuilder
-              key={`rm-spec-${formEntryMode}-${activeBatch.lotId || activeBatch.sourcingId || "new"}`}
-              initialBlocks={formEntryMode === "create" ? [] : formBlocks}
-              isEditMode={isEditMode}
-              createLotMode={formEntryMode === "create"}
-              lockLotNo={formEntryMode !== "create"}
-              onBlocksChange={handleBlocksChange}
-              onSaveDraft={handleSaveDraft}
-              onSubmit={handleSubmit}
-              actionLoading={actionLoading}
-              showDeleteLot={canDeleteActiveLot}
-              onDeleteLot={handleDeleteLotFromForm}
-              deleteLoading={deleteLoading}
-            />
-          )}
+          <SpecificationFormBuilder
+            key={`rm-spec-${formEntryMode}-${activeBatch.lotId || activeBatch.sourcingId || "new"}`}
+            initialBlocks={formEntryMode === "create" ? [] : formBlocks}
+            isEditMode={isEditMode}
+            createLotMode={formEntryMode === "create"}
+            lockLotNo={formEntryMode !== "create"}
+            onBlocksChange={handleBlocksChange}
+            onSaveDraft={handleSaveDraft}
+            onSubmit={handleSubmit}
+            actionLoading={actionLoading}
+            showDeleteLot={canDeleteActiveLot}
+            onDeleteLot={handleDeleteLotFromForm}
+            deleteLoading={deleteLoading}
+          />
         </Box>
       )}
 

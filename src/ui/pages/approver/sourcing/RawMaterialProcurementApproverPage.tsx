@@ -170,7 +170,7 @@ const RawMaterialDetailDialog = ({
                             {row.analysedResult || "—"}
                           </TableCell>
                           <TableCell sx={theme.dialog.innerRemarksText}>
-                            {row.remarks || "—"}
+                            {row.acemQcResult || "—"}
                           </TableCell>
                         </TableRow>
                       ))}

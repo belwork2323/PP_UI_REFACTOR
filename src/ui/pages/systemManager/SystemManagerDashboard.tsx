@@ -484,40 +484,50 @@ export default function SystemManagerDashboard() {
                   applyLabel={S.COMMON.FILTERS_APPLY}
                   theme={adminTh}
                 >
-                  <Stack direction="row" gap={1.5} flexWrap="wrap" mb={2}>
-                    <FilterSelect
-                      label={DP.FILTERS.STAGE}
-                      value={batchDraftFilters.stage}
-                      onChange={(e) => setBatchDraftFilter("stage", e.target.value)}
-                      options={stageOptions}
-                      menuProps={filterMenuProps}
-                      itemSx={filterMenuItemSx}
-                      showAllOption={false}
-                      sx={adminTh.filterPanel.field}
-                    />
+                  <FilterSelect
+                    label={DP.FILTERS.STAGE}
+                    value={batchDraftFilters.stage}
+                    onChange={(e) => setBatchDraftFilter("stage", e.target.value)}
+                    options={stageOptions}
+                    menuProps={filterMenuProps}
+                    itemSx={filterMenuItemSx}
+                    showAllOption={false}
+                    sx={{
+                      ...adminTh.filterPanel.field,
+                      minWidth: { xs: "100%", sm: 300 },
+                      flex: "0 0 auto",
+                    }}
+                  />
 
-                    <FilterSelect
-                      label={DP.FILTERS.TYPE}
-                      value={batchDraftFilters.batchType}
-                      onChange={(e) => setBatchDraftFilter("batchType", e.target.value)}
-                      options={typeOptions}
-                      menuProps={filterMenuProps}
-                      itemSx={filterMenuItemSx}
-                      showAllOption={false}
-                      sx={adminTh.filterPanel.field}
-                    />
+                  <FilterSelect
+                    label={DP.FILTERS.TYPE}
+                    value={batchDraftFilters.batchType}
+                    onChange={(e) => setBatchDraftFilter("batchType", e.target.value)}
+                    options={typeOptions}
+                    menuProps={filterMenuProps}
+                    itemSx={filterMenuItemSx}
+                    showAllOption={false}
+                    sx={{
+                      ...adminTh.filterPanel.field,
+                      minWidth: { xs: "100%", sm: 300 },
+                      flex: "0 0 auto",
+                    }}
+                  />
 
-                    <FilterSelect
-                      label={DP.FILTERS.STATUS}
-                      value={batchDraftFilters.status}
-                      onChange={(e) => setBatchDraftFilter("status", e.target.value)}
-                      options={statusOptions}
-                      menuProps={filterMenuProps}
-                      itemSx={filterMenuItemSx}
-                      showAllOption={false}
-                      sx={adminTh.filterPanel.field}
-                    />
-                  </Stack>
+                  <FilterSelect
+                    label={DP.FILTERS.STATUS}
+                    value={batchDraftFilters.status}
+                    onChange={(e) => setBatchDraftFilter("status", e.target.value)}
+                    options={statusOptions}
+                    menuProps={filterMenuProps}
+                    itemSx={filterMenuItemSx}
+                    showAllOption={false}
+                    sx={{
+                      ...adminTh.filterPanel.field,
+                      minWidth: { xs: "100%", sm: 300 },
+                      flex: "0 0 auto",
+                    }}
+                  />
                 </AdminFilterPanel>
               }
               theme={shellTheme}

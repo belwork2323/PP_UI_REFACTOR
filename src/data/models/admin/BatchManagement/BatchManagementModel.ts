@@ -120,6 +120,245 @@ export function mixingCycleLabel(cycle: MixingCycleInfo | string | null | undefi
   return name || code || "—";
 }
 
+export type BatchMotorRadiographyPlanDetail = {
+  numberOfSections: number | null;
+  numberOfOrientations: number | null;
+  sfd: number | null;
+  numberOfNormalExposures: number | null;
+  numberOfTangentialExposures: number | null;
+  detectorType: string;
+};
+
+export type BatchMotorRadiographyDetails = {
+  radiographyPlanId: string;
+  radiographyPlanName: string;
+  radiographyPlanDetails: BatchMotorRadiographyPlanDetail[];
+};
+
+export type BatchMotorMetadataItem = {
+  motorCasingId: string;
+  motorId: string;
+  castingType: string;
+  insulationType: string;
+  radiographyDetails?: BatchMotorRadiographyDetails | null;
+};
+
+export type IdentificationSheetRawMaterialPreparationMetadata = {
+  formId?: string;
+  premixes?: Array<Record<string, unknown>>;
+  weightmentSheet?: unknown;
+};
+
+export type IdentificationSheetMixingPremix = {
+  premixNo: number;
+  mixerId?: string;
+  buildingNo?: string;
+  bowlId?: string;
+  trialDate?: string | null;
+  observations?: string | null;
+  mixDate?: string | null;
+  mixQuantity?: number | string | null;
+  mixingCycle?: {
+    mixingCycleId?: number;
+    mixingCycleCode?: string;
+    mixingCycleName?: string;
+  } | null;
+};
+
+export type IdentificationSheetMixingStage = {
+  stageType: string;
+  premixes: IdentificationSheetMixingPremix[];
+};
+
+export type IdentificationSheetMixingMetadata = {
+  stages: IdentificationSheetMixingStage[];
+};
+
+export type IdentificationSheetMetadata = {
+  rawMaterialPreparation?: IdentificationSheetRawMaterialPreparationMetadata | null;
+  rocketMotorCasing?: { motors: BatchMotorMetadataItem[] } | null;
+  mixing?: IdentificationSheetMixingMetadata | null;
+  /** BEM motor numbers attached on the batch identification sheet. */
+  bemMotors?: string[] | null;
+};
+
+const parseNumOrNull = (v: unknown): number | null => {
+  if (v === null || v === undefined || v === "") return null;
+  const n = typeof v === "number" ? v : parseFloat(String(v).replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+};
+
+const parseBatchMotorRadiographyDetails = (raw: unknown): BatchMotorRadiographyDetails | null => {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  const rd = raw as Record<string, unknown>;
+  const detailsRaw = rd.radiographyPlanDetails;
+  const detailsList = Array.isArray(detailsRaw)
+    ? detailsRaw
+    : detailsRaw && typeof detailsRaw === "object"
+      ? [detailsRaw]
+      : [];
+
+  return {
+    radiographyPlanId: String(rd.radiographyPlanId ?? rd.planId ?? "").trim(),
+    radiographyPlanName: String(rd.radiographyPlanName ?? rd.planName ?? "").trim(),
+    radiographyPlanDetails: detailsList.map((item) => {
+      const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+      return {
+        numberOfSections: parseNumOrNull(row.numberOfSections ?? row.sections),
+        numberOfOrientations: parseNumOrNull(row.numberOfOrientations ?? row.orientations),
+        sfd: parseNumOrNull(row.sfd),
+        numberOfNormalExposures: parseNumOrNull(row.numberOfNormalExposures ?? row.normalExposures),
+        numberOfTangentialExposures: parseNumOrNull(
+          row.numberOfTangentialExposures ?? row.tangentialExposures,
+        ),
+        detectorType: String(row.detectorType ?? "").trim(),
+      };
+    }),
+  };
+};
+
+const parseRocketMotorCasingMotorsFromApi = (
+  raw: unknown,
+): { motors: BatchMotorMetadataItem[] } | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const motorsRaw = (raw as { motors?: unknown }).motors;
+  if (!Array.isArray(motorsRaw)) return { motors: [] };
+  return {
+    motors: motorsRaw.map((item) => {
+      const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+      return {
+        motorCasingId: String(row.motorCasingId ?? "").trim(),
+        motorId: String(row.motorId ?? "").trim(),
+        castingType: String(row.castingType ?? "").trim(),
+        insulationType: String(row.insulationType ?? "").trim(),
+        radiographyDetails: parseBatchMotorRadiographyDetails(row.radiographyDetails),
+      };
+    }),
+  };
+};
+
+const parseMixingPremixFromApi = (item: unknown): IdentificationSheetMixingPremix => {
+  const row = item && typeof item === "object" ? (item as Record<string, unknown>) : {};
+  const cycle =
+    row.mixingCycle && typeof row.mixingCycle === "object"
+      ? (row.mixingCycle as Record<string, unknown>)
+      : null;
+  return {
+    premixNo: Number(row.premixNo ?? 0) || 0,
+    mixerId: String(row.mixerId ?? "").trim() || undefined,
+    buildingNo: String(row.buildingNo ?? "").trim() || undefined,
+    bowlId: String(row.bowlId ?? "").trim() || undefined,
+    trialDate: (row.trialDate as string | null | undefined) ?? null,
+    observations: (row.observations as string | null | undefined) ?? null,
+    mixDate: (row.mixDate as string | null | undefined) ?? null,
+    mixQuantity: (row.mixQuantity as number | string | null | undefined) ?? null,
+    mixingCycle: cycle
+      ? {
+          mixingCycleId: Number(cycle.mixingCycleId ?? 0) || undefined,
+          mixingCycleCode: String(cycle.mixingCycleCode ?? "").trim() || undefined,
+          mixingCycleName: String(cycle.mixingCycleName ?? "").trim() || undefined,
+        }
+      : null,
+  };
+};
+
+const parseMixingMetadataFromApi = (raw: unknown): IdentificationSheetMixingMetadata | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const stagesRaw = (raw as { stages?: unknown }).stages;
+  if (!Array.isArray(stagesRaw)) return { stages: [] };
+  return {
+    stages: stagesRaw.map((stage) => {
+      const row = stage && typeof stage === "object" ? (stage as Record<string, unknown>) : {};
+      const premixes = Array.isArray(row.premixes) ? row.premixes : [];
+      return {
+        stageType: String(row.stageType ?? "")
+          .trim()
+          .toUpperCase(),
+        premixes: premixes.map(parseMixingPremixFromApi),
+      };
+    }),
+  };
+};
+
+const parseBemMotorIdsFromApi = (raw: unknown): string[] => {
+  const pushId = (value: unknown, into: string[]) => {
+    if (value == null) return;
+    if (typeof value === "string" || typeof value === "number") {
+      const normalized = String(value).trim();
+      if (normalized) into.push(normalized);
+      return;
+    }
+    if (typeof value === "object" && !Array.isArray(value)) {
+      const row = value as Record<string, unknown>;
+      // Subscale metadata uses bemMouldNo as the BEM motor id.
+      const id = String(
+        row.bemMouldNo ?? row.bemNo ?? row.bemMotorNo ?? row.motorId ?? row.motorCode ?? "",
+      ).trim();
+      if (id) into.push(id);
+    }
+  };
+
+  const ids: string[] = [];
+  if (Array.isArray(raw)) {
+    raw.forEach((item) => pushId(item, ids));
+  } else if (raw && typeof raw === "object") {
+    const obj = raw as Record<string, unknown>;
+    if (Array.isArray(obj.motors)) obj.motors.forEach((item) => pushId(item, ids));
+    if (Array.isArray(obj.bemMotors)) obj.bemMotors.forEach((item) => pushId(item, ids));
+    if (Array.isArray(obj.bemMotorIds)) obj.bemMotorIds.forEach((item) => pushId(item, ids));
+  }
+
+  return ids.filter((id, index, arr) => arr.indexOf(id) === index);
+};
+
+const parseIdentificationSheetMetadataFromApi = (
+  raw: unknown,
+): IdentificationSheetMetadata | null => {
+  if (!raw || typeof raw !== "object") return null;
+  const meta = raw as Record<string, unknown>;
+  const rmpRaw = meta.rawMaterialPreparation;
+  const rocketMotorCasing = parseRocketMotorCasingMotorsFromApi(meta.rocketMotorCasing);
+  const mixing = parseMixingMetadataFromApi(meta.mixing);
+  const subScaleRaw =
+    (meta.subScale && typeof meta.subScale === "object" ? meta.subScale : null) ??
+    (meta.subscale && typeof meta.subscale === "object" ? meta.subscale : null);
+  const subScaleBemMotors =
+    subScaleRaw && typeof subScaleRaw === "object"
+      ? (subScaleRaw as Record<string, unknown>).bemMotors
+      : null;
+  const bemMotors = parseBemMotorIdsFromApi(
+    meta.bemMotors ??
+      meta.bem ??
+      meta.bemMotorIds ??
+      meta.staticTestFacility ??
+      subScaleBemMotors ??
+      subScaleRaw,
+  );
+
+  let rawMaterialPreparation: IdentificationSheetRawMaterialPreparationMetadata | null = null;
+  if (rmpRaw && typeof rmpRaw === "object") {
+    const rmp = rmpRaw as Record<string, unknown>;
+    rawMaterialPreparation = {
+      formId: String(rmp.formId ?? "").trim() || undefined,
+      premixes: Array.isArray(rmp.premixes)
+        ? (rmp.premixes as Array<Record<string, unknown>>)
+        : undefined,
+      weightmentSheet: rmp.weightmentSheet ?? null,
+    };
+  }
+
+  if (!rawMaterialPreparation && !rocketMotorCasing && !mixing && bemMotors.length === 0) {
+    return null;
+  }
+
+  return {
+    rawMaterialPreparation,
+    rocketMotorCasing,
+    mixing,
+    bemMotors: bemMotors.length > 0 ? bemMotors : null,
+  };
+};
+
 /* ─────────────────────────────────────────────────────────────────────────────
    READ MODEL  —  BatchListItemModel
    Maps response.data.batches[] items and response.data.batch (details).
@@ -161,6 +400,10 @@ export class BatchListItemModel {
   identificationSheet: IdentificationSheet | null;
   objective: string | null;
   articles: SubscaleArticleRead[];
+
+  /** Workflow stage arrays from batch details / list (partial-approval gating). */
+  currentStage: unknown[] | null;
+  stageProgress: unknown[] | null;
 
   constructor(data: Record<string, any>) {
     this.id = data.id ?? null;
@@ -240,6 +483,8 @@ export class BatchListItemModel {
     this.identificationSheet = data.identificationSheet
       ? parseIdentificationSheetFromApi(data.identificationSheet)
       : null;
+    this.currentStage = Array.isArray(data.currentStage) ? data.currentStage : null;
+    this.stageProgress = Array.isArray(data.stageProgress) ? data.stageProgress : null;
     this.mixingCycle =
       data.mixingCycle && typeof data.mixingCycle === "object" ? data.mixingCycle : null;
     this.objective = data.objective ?? null;
@@ -303,7 +548,51 @@ export interface IdentificationSheet {
   /** @deprecated Legacy field — read from API responses when mixerType absent */
   mixerDetails?: string;
   prcApprovalDate: string;
+  metadata?: IdentificationSheetMetadata | null;
 }
+
+export const getRocketMotorCasingMotorsFromSheet = (
+  sheet?: IdentificationSheet | null,
+): BatchMotorMetadataItem[] => sheet?.metadata?.rocketMotorCasing?.motors ?? [];
+
+export const getRocketMotorCasingMotorIdsFromSheet = (
+  sheet?: IdentificationSheet | null,
+): string[] =>
+  getRocketMotorCasingMotorsFromSheet(sheet)
+    .map((motor) => motor.motorId)
+    .filter(Boolean);
+
+/** BEM motor numbers from identificationSheet.metadata (and casing motors tagged as BEM). */
+export const getBemMotorIdsFromSheet = (sheet?: IdentificationSheet | null): string[] => {
+  const fromMeta = Array.isArray(sheet?.metadata?.bemMotors) ? sheet!.metadata!.bemMotors! : [];
+  const fromCasing = getRocketMotorCasingMotorsFromSheet(sheet)
+    .filter((motor) => {
+      const castingType = String(motor.castingType ?? "")
+        .trim()
+        .toUpperCase();
+      return castingType === "BEM" || castingType.includes("BEM");
+    })
+    .map((motor) => motor.motorId)
+    .filter(Boolean);
+
+  return [...fromMeta, ...fromCasing].filter(
+    (id, index, arr) => Boolean(id) && arr.indexOf(id) === index,
+  );
+};
+
+/** FINAL_MIX premixes from identificationSheet.metadata.mixing (used by casting Section B). */
+export const getFinalMixPremixesFromSheet = (
+  sheet?: IdentificationSheet | null,
+): IdentificationSheetMixingPremix[] => {
+  const stages = sheet?.metadata?.mixing?.stages ?? [];
+  const finalMixStage = stages.find(
+    (stage) =>
+      String(stage.stageType ?? "")
+        .trim()
+        .toUpperCase() === "FINAL_MIX",
+  );
+  return (finalMixStage?.premixes ?? []).filter((premix) => Number(premix.premixNo) > 0);
+};
 
 function serializeMaterialForApi(material: Record<string, any>): Record<string, unknown> {
   const fromDate = formatToIsoDateInput(
@@ -398,9 +687,9 @@ export function parseIdentificationSheetFromApi(
         manufacturerName: m.manufacturerName ?? m.make ?? "",
         requiredComposition: m.requiredComposition ?? 0,
         quantityPerPremix: m.quantityPerPremix ?? 0,
-    revalidationFromDate: formatToUiDate(m.revalidationFromDate ?? m.revalidationDate ?? ""),
-    revalidationToDate: formatToUiDate(m.revalidationToDate ?? m.revalidationDate ?? ""),
-    revalidationDate: formatToUiDate(m.revalidationFromDate ?? m.revalidationDate ?? ""),
+        revalidationFromDate: formatToUiDate(m.revalidationFromDate ?? m.revalidationDate ?? ""),
+        revalidationToDate: formatToUiDate(m.revalidationToDate ?? m.revalidationDate ?? ""),
+        revalidationDate: formatToUiDate(m.revalidationFromDate ?? m.revalidationDate ?? ""),
       }))
     : [];
   return {
@@ -413,6 +702,7 @@ export function parseIdentificationSheetFromApi(
     remarks: sheet.remarks ?? "",
     materials,
     prcApprovalDate: formatToUiDate(sheet.prcApprovalDate),
+    metadata: parseIdentificationSheetMetadataFromApi(sheet.metadata),
   };
 }
 
@@ -474,7 +764,9 @@ export function serializeArticlesForApi(articles: unknown): SubscaleArticleWrite
         subscaleArticleCode: code,
       };
     })
-    .filter((item): item is SubscaleArticleWrite => item != null && Boolean(item.subscaleArticleCode));
+    .filter(
+      (item): item is SubscaleArticleWrite => item != null && Boolean(item.subscaleArticleCode),
+    );
 }
 
 /** Map API articles into form selections (keeps id + code for write-back). */
@@ -512,7 +804,13 @@ export function formatArticlesForDisplay(articles: unknown): string {
  */
 export function buildArticlesFromSelection(
   selectedCodes: string[],
-  catalog: Array<{ subscaleArticleId?: number; id?: number; subscaleArticleCode?: string; code?: string; value?: string }> = [],
+  catalog: Array<{
+    subscaleArticleId?: number;
+    id?: number;
+    subscaleArticleCode?: string;
+    code?: string;
+    value?: string;
+  }> = [],
 ): SubscaleArticleWrite[] {
   return selectedCodes
     .map((raw) => String(raw ?? "").trim())
@@ -821,7 +1119,7 @@ export const mapBatchToFormState = (batch: any): BatchFormState => {
     motorStage,
     mixingCycleCode: mixingCycle?.mixingCycleCode ?? "",
     // Draft "how many to add" input — keep empty; actual count comes from motorIds.
-    numberOfMotors: 0,
+    numberOfMotors: batch?.numberOfMotors ?? 0,
     motorIds: Array.isArray(batch?.motorIds) && batch.motorIds.length > 0 ? batch.motorIds : [""],
     priority: batch?.priority ?? "Medium",
     systemManagerId: batch?.systemManager?.id ?? batch?.systemManagerId ?? "",
@@ -878,7 +1176,7 @@ export const buildAdditionalBatchDetailsUpdatePayload = (
     projectId: batchForm.projectId,
     motorStage: batchForm.motorStage,
     mixingCycleCode: batchForm.mixingCycleCode,
-    numberOfMotors: Array.isArray(batchForm.motorIds) ? batchForm.motorIds.length : 0,
+    numberOfMotors: batchForm.numberOfMotors,
     motorIds: batchForm.motorIds,
     priority: batchForm.priority,
     systemManagerId: batchForm.systemManagerId,

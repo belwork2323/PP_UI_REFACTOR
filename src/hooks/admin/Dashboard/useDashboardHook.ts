@@ -6,6 +6,7 @@ import {
   enrichDashboardKpis,
   buildActiveBatchesFilterPayload,
 } from "@data/models/admin/Dashboard/DashboardModel";
+import { toOperationStatusApiValue } from "@/hooks/operationStatus";
 import { ToggleTabOption } from "@/ui/components/common/ToggleTabs";
 export type BatchTab = "IN_PROGRESS" | "COMPLETED";
 
@@ -99,7 +100,10 @@ function useDashboardGlobalFilterSection(mode: string) {
   }, [filterType, appliedCustomStart, appliedCustomEnd]);
 
   const fetchDashboardData = useCallback(async () => {
-    if (filterType === "custom" && (appliedCustomStart.length !== 10 || appliedCustomEnd.length !== 10))
+    if (
+      filterType === "custom" &&
+      (appliedCustomStart.length !== 10 || appliedCustomEnd.length !== 10)
+    )
       return;
     setStatsLoading(true);
     try {
@@ -238,7 +242,7 @@ function useDashboardActiveBatchesSection(globalDateBounds: {
         searchQuery,
         filterStage: appliedFilters.stage,
         filterBatchType: appliedFilters.batchType,
-        filterStatus: appliedFilters.status,
+        filterStatus: toOperationStatusApiValue(appliedFilters.status, "All") || "",
         filterType: globalDateBounds.filterType,
         dateFrom: appliedFilters.dateFrom || globalDateBounds.startDate,
         dateTo: appliedFilters.dateTo || globalDateBounds.endDate,

@@ -1,5 +1,7 @@
 import type { ReactNode } from "react";
-import { Box, Button, Stack, Typography, alpha } from "@mui/material";
+import { Box, Button, IconButton, Stack, Tooltip, Typography, alpha } from "@mui/material";
+import ArrowBackIosNewRoundedIcon from "@mui/icons-material/ArrowBackIosNewRounded";
+import ArrowForwardIosRoundedIcon from "@mui/icons-material/ArrowForwardIosRounded";
 
 export type UserWorkflowNavPalette = {
   primary: string;
@@ -8,103 +10,6 @@ export type UserWorkflowNavPalette = {
   surface: string;
   textSub?: string;
   text?: string;
-};
-
-type UserWorkflowStepPagerProps = {
-  /** 1-based current step index */
-  current: number;
-  total: number;
-  /**
-   * Entity name used in the default counter, e.g. "Premix" → "Premix 1 of 3".
-   * Prefer this when the counter pattern is always "{label} {n} of {total}".
-   */
-  entityLabel?: string;
-  /** Full counter override (e.g. "Motor Stage 2 of 5"). Wins over entityLabel. */
-  counterLabel?: string;
-  backLabel?: string;
-  nextLabel?: string;
-  onBack: () => void;
-  onNext: () => void;
-  disableBack?: boolean;
-  disableNext?: boolean;
-  /** When false, hide the pager if total <= 1. Default true. */
-  alwaysShow?: boolean;
-  palette: UserWorkflowNavPalette;
-};
-
-/**
- * Shared Back / "{entity} n of total" / Next pager for workflow forms
- * (premix, motor, stage, etc.).
- */
-const UserWorkflowStepPager = ({
-  current,
-  total,
-  entityLabel,
-  counterLabel,
-  backLabel = "Back",
-  nextLabel = "Next",
-  onBack,
-  onNext,
-  disableBack,
-  disableNext,
-  alwaysShow = true,
-  palette,
-}: UserWorkflowStepPagerProps) => {
-  if (!alwaysShow && total <= 1) return null;
-
-  const safeTotal = Math.max(total, 1);
-  const safeCurrent = Math.min(Math.max(current, 1), safeTotal);
-  const resolvedCounter =
-    counterLabel?.trim() ||
-    (entityLabel?.trim()
-      ? `${entityLabel.trim()} ${safeCurrent} of ${safeTotal}`
-      : `${safeCurrent} of ${safeTotal}`);
-
-  const accent = palette.primaryLight ?? palette.primary;
-
-  return (
-    <Box
-      sx={{
-        border: `1.5px solid ${alpha(accent, 0.55)}`,
-        borderRadius: 2,
-        px: 1.25,
-        py: 1,
-        background: palette.surface,
-        boxShadow: `inset 0 0 0 1px ${alpha(accent, 0.08)}`,
-      }}
-    >
-      <Stack direction="row" justifyContent="space-between" alignItems="center" gap={1}>
-        <Button
-          variant="outlined"
-          size="small"
-          disabled={disableBack ?? safeCurrent <= 1}
-          onClick={onBack}
-          sx={{ textTransform: "none", minWidth: 72, fontWeight: 700 }}
-        >
-          {backLabel}
-        </Button>
-        <Typography
-          sx={{
-            fontSize: "0.82rem",
-            fontWeight: 700,
-            color: palette.primary,
-            textAlign: "center",
-          }}
-        >
-          {resolvedCounter}
-        </Typography>
-        <Button
-          variant="outlined"
-          size="small"
-          disabled={disableNext ?? safeCurrent >= safeTotal}
-          onClick={onNext}
-          sx={{ textTransform: "none", minWidth: 72, fontWeight: 700 }}
-        >
-          {nextLabel}
-        </Button>
-      </Stack>
-    </Box>
-  );
 };
 
 export type UserWorkflowNavTab = {
@@ -123,6 +28,17 @@ type UserWorkflowTabNavProps = {
   palette: UserWorkflowNavPalette;
   /** Extra bottom margin when stacking multiple tab strips. */
   mb?: number | string;
+  /** Optional content next to the title (e.g. motor count chip). */
+  titleEndAdornment?: ReactNode;
+  /** Show previous / next arrow buttons flanking the tab strip. */
+  showStepArrows?: boolean;
+  /** Custom step handlers (e.g. skip disabled approver tabs). */
+  onStepBack?: () => void;
+  onStepNext?: () => void;
+  disableStepBack?: boolean;
+  disableStepNext?: boolean;
+  isTabDisabled?: (tab: UserWorkflowNavTab, index: number) => boolean;
+  tabTooltip?: (tab: UserWorkflowNavTab, index: number) => string | undefined;
 };
 
 /**
@@ -137,17 +53,48 @@ export const UserWorkflowTabNav = ({
   onActiveIndexChange,
   palette,
   mb = 0,
+  titleEndAdornment,
+  showStepArrows = false,
+  onStepBack,
+  onStepNext,
+  disableStepBack,
+  disableStepNext,
+  isTabDisabled,
+  tabTooltip,
 }: UserWorkflowTabNavProps) => {
   if (tabs.length === 0) return null;
 
   const safeIndex = Math.min(Math.max(activeIndex, 0), tabs.length - 1);
   const accent = palette.primaryLight ?? palette.primary;
+  const canStep = showStepArrows && tabs.length > 1;
+
+  const handleStepBack = () => {
+    if (onStepBack) {
+      onStepBack();
+      return;
+    }
+    onActiveIndexChange(safeIndex - 1);
+  };
+
+  const handleStepNext = () => {
+    if (onStepNext) {
+      onStepNext();
+      return;
+    }
+    onActiveIndexChange(safeIndex + 1);
+  };
+
+  const stepBackDisabled = disableStepBack ?? safeIndex <= 0;
+  const stepNextDisabled = disableStepNext ?? safeIndex >= tabs.length - 1;
 
   return (
     <Box sx={{ mb }}>
-      <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: palette.primary, mb: 0.4 }}>
-        {title}
-      </Typography>
+      <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" sx={{ mb: 0.4 }}>
+        <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: palette.primary }}>
+          {title}
+        </Typography>
+        {titleEndAdornment ?? null}
+      </Stack>
       {hint ? (
         <Typography sx={{ fontSize: "0.72rem", color: palette.textSub ?? palette.primary, mb: 0.9 }}>
           {hint}
@@ -155,40 +102,91 @@ export const UserWorkflowTabNav = ({
       ) : (
         <Box sx={{ mb: 0.75 }} />
       )}
-      <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
-        {tabs.map((tab, index) => {
-          const active = index === safeIndex;
-          return (
-            <Button
-              key={tab.id}
-              size="small"
-              variant={active ? "contained" : "outlined"}
-              onClick={() => onActiveIndexChange(index)}
-              sx={{
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-                textTransform: "none",
-                fontWeight: 700,
-                ...(active
-                  ? {
-                      background: `linear-gradient(135deg, ${palette.primary}, ${accent})`,
-                      "&:hover": {
+      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ pb: 0.5 }}>
+        {canStep ? (
+          <IconButton
+            size="small"
+            aria-label="Previous"
+            disabled={stepBackDisabled}
+            onClick={handleStepBack}
+            sx={{
+              color: palette.primary,
+              border: `1px solid ${alpha(palette.border, 0.9)}`,
+              borderRadius: 1.25,
+              width: 28,
+              height: 28,
+              flexShrink: 0,
+            }}
+          >
+            <ArrowBackIosNewRoundedIcon sx={{ fontSize: 14 }} />
+          </IconButton>
+        ) : null}
+        <Stack direction="row" spacing={1} sx={{ overflowX: "auto", flex: 1, minWidth: 0 }}>
+          {tabs.map((tab, index) => {
+            const active = index === safeIndex;
+            const disabled = isTabDisabled?.(tab, index) ?? false;
+            const tooltip = tabTooltip?.(tab, index);
+            const button = (
+              <Button
+                key={tab.id}
+                size="small"
+                variant={active ? "contained" : "outlined"}
+                disabled={disabled}
+                onClick={() => onActiveIndexChange(index)}
+                sx={{
+                  whiteSpace: "nowrap",
+                  flexShrink: 0,
+                  textTransform: "none",
+                  fontWeight: 700,
+                  ...(active
+                    ? {
                         background: `linear-gradient(135deg, ${palette.primary}, ${accent})`,
-                      },
-                    }
-                  : {
-                      borderColor: alpha(palette.border, 0.9),
-                      color: palette.text ?? palette.primary,
-                    }),
-              }}
-            >
-              <Stack direction="row" alignItems="center" gap={0.75}>
-                {tab.label}
-                {tab.endAdornment ?? null}
-              </Stack>
-            </Button>
-          );
-        })}
+                        "&:hover": {
+                          background: `linear-gradient(135deg, ${palette.primary}, ${accent})`,
+                        },
+                      }
+                    : {
+                        borderColor: alpha(palette.border, 0.9),
+                        color: palette.text ?? palette.primary,
+                      }),
+                }}
+              >
+                <Stack direction="row" alignItems="center" gap={0.75}>
+                  {tab.label}
+                  {tab.endAdornment ?? null}
+                </Stack>
+              </Button>
+            );
+
+            if (disabled && tooltip) {
+              return (
+                <Tooltip key={tab.id} title={tooltip}>
+                  <span>{button}</span>
+                </Tooltip>
+              );
+            }
+
+            return button;
+          })}
+        </Stack>
+        {canStep ? (
+          <IconButton
+            size="small"
+            aria-label="Next"
+            disabled={stepNextDisabled}
+            onClick={handleStepNext}
+            sx={{
+              color: palette.primary,
+              border: `1px solid ${alpha(palette.border, 0.9)}`,
+              borderRadius: 1.25,
+              width: 28,
+              height: 28,
+              flexShrink: 0,
+            }}
+          >
+            <ArrowForwardIosRoundedIcon sx={{ fontSize: 14 }} />
+          </IconButton>
+        ) : null}
       </Stack>
     </Box>
   );
@@ -217,5 +215,3 @@ export const UserWorkflowNavPanel = ({ palette, children }: UserWorkflowNavPanel
     </Box>
   );
 };
-
-export default UserWorkflowStepPager;

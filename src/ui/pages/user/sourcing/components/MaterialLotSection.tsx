@@ -336,8 +336,8 @@ const MaterialLotSection = ({
                       <TextField
                         size="small"
                         fullWidth
-                        value={row.remarks || ""}
-                        onChange={(event) => handleCellChange(rowIndex, "remarks", event.target.value)}
+                        value={row.acemQcResult || ""}
+                        onChange={(event) => handleCellChange(rowIndex, "acemQcResult", event.target.value)}
                         placeholder={formStrings.REMARKS_PLACEHOLDER}
                         sx={{
                           ...theme.workflow.formElements.cellField,

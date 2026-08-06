@@ -17,7 +17,9 @@ type CastingCuringMotorSchemaPanelProps = {
   projectId?: string;
   setupContext?: SchemaSetupContext;
   curingFormValues?: SchemaFormValues;
+  castingFormValues?: SchemaFormValues;
   onMotorChange: (next: CastingCuringMotorSession) => void;
+  onCastingFormValuesChange?: (values: SchemaFormValues) => void;
   onCuringFormValuesChange?: (values: SchemaFormValues) => void;
   loading?: boolean;
   error?: string | null;
@@ -32,7 +34,9 @@ const CastingCuringMotorSchemaPanel = ({
   projectId,
   setupContext,
   curingFormValues,
+  castingFormValues,
   onMotorChange,
+  onCastingFormValuesChange,
   onCuringFormValuesChange,
   loading = false,
   error = null,
@@ -52,7 +56,7 @@ const CastingCuringMotorSchemaPanel = ({
     [],
   );
 
-  const formValues = motor.formValues ?? {};
+  const formValues = castingFormValues ?? motor.formValues ?? {};
   const resolvedCuringFormValues = curingFormValues ?? motor.curingFormValues ?? {};
   const isCuringPanel = schema?.schemaType === "CURING";
   const value = isCuringPanel ? resolvedCuringFormValues : formValues;
@@ -64,6 +68,10 @@ const CastingCuringMotorSchemaPanel = ({
         return;
       }
       onMotorChange({ ...motor, curingFormValues: values });
+      return;
+    }
+    if (onCastingFormValuesChange) {
+      onCastingFormValuesChange(values);
       return;
     }
     onMotorChange({ ...motor, formValues: values });
@@ -80,10 +88,17 @@ const CastingCuringMotorSchemaPanel = ({
         error={error}
         readOnly={readOnly}
         themeTokens={themeTokens}
-        apiContext={{ subDepartmentId, batchId, projectId, motorId: motor.motorId }}
+        apiContext={{
+          subDepartmentId,
+          batchId,
+          projectId,
+          motorId: motor.motorId,
+          mixingStageType: "FINAL_MIX",
+        }}
         setupContext={setupContext}
         batch={{ batchId, projectId }}
         motorId={motor.motorId}
+        hideRepeatInstanceLabels={!isCuringPanel}
       />
     </Box>
   );

@@ -267,6 +267,33 @@ const resolveResponsePath = (root: Record<string, unknown>, path: string): unkno
       return (current as Record<string, unknown>)[segment];
     }, root);
 
+const isEmptyApiPathResult = (value: unknown): boolean =>
+  value == null || (Array.isArray(value) && value.length === 0);
+
+/** Schema paths may reference motorMetadata; batch details API nests casing under identification sheet. */
+const MOTOR_METADATA_MOTORS_FALLBACK_PATHS = [
+  "data.batch.identificationSheet.metadata.rocketMotorCasing.motors",
+  "data.batch.metadata.rocketMotorCasing.motors",
+] as const;
+
+const resolveBatchDetailsResponsePath = (
+  root: Record<string, unknown>,
+  path: string,
+): unknown => {
+  const trimmed = path.trim();
+  const direct = resolveResponsePath(root, trimmed);
+  if (!isEmptyApiPathResult(direct)) return direct;
+
+  if (trimmed.includes("motorMetadata")) {
+    for (const fallbackPath of MOTOR_METADATA_MOTORS_FALLBACK_PATHS) {
+      const fallback = resolveResponsePath(root, fallbackPath);
+      if (!isEmptyApiPathResult(fallback)) return fallback;
+    }
+  }
+
+  return direct;
+};
+
 const extractNestedListFromPayload = (payload: unknown): Record<string, unknown>[] => {
   if (Array.isArray(payload)) return payload as Record<string, unknown>[];
   if (!payload || typeof payload !== "object") return [];
@@ -289,7 +316,7 @@ export const extractSchemaApiOptionsList = (
 
   const root = response as Record<string, unknown>;
   if (responsePath?.trim()) {
-    const resolved = resolveResponsePath(root, responsePath.trim());
+    const resolved = resolveBatchDetailsResponsePath(root, responsePath.trim());
     return extractNestedListFromPayload(resolved);
   }
 
@@ -575,10 +602,20 @@ export const staticDataSourceOptions = (dataSource: SchemaDataSource) => {
   });
 };
 
+const resolveMotorMetadataItem = (
+  items: Record<string, unknown>[],
+  motorId?: string,
+): Record<string, unknown> | undefined => {
+  const target = String(motorId ?? "").trim();
+  if (!target || !items.length) return undefined;
+  return items.find((item) => String(item.motorId ?? "").trim() === target);
+};
+
 export const resolveSchemaApiResponseValue = (
   response: unknown,
   responsePath?: string,
   sourceField?: string,
+  apiContext?: SchemaApiContext,
 ): unknown => {
   if (response == null) return undefined;
 
@@ -586,9 +623,24 @@ export const resolveSchemaApiResponseValue = (
   if (typeof response === "object" && !Array.isArray(response)) {
     const root = response as Record<string, unknown>;
     if (responsePath?.trim()) {
-      resolved = resolveResponsePath(root, responsePath.trim());
+      resolved = resolveBatchDetailsResponsePath(root, responsePath.trim());
     } else {
       resolved = root.data ?? root;
+    }
+  }
+
+  // Motor-wise batch metadata: pick the entry matching apiContext.motorId.
+  // Only apply when motorId is present and the array looks like motor metadata —
+  // never treat arbitrary list responses (lots, options, etc.) as motor rows.
+  if (Array.isArray(resolved) && String(apiContext?.motorId ?? "").trim()) {
+    const items = resolved as Record<string, unknown>[];
+    const looksLikeMotorMeta = items.some(
+      (item) => item && typeof item === "object" && String(item.motorId ?? "").trim() !== "",
+    );
+    if (looksLikeMotorMeta) {
+      const match = resolveMotorMetadataItem(items, apiContext?.motorId);
+      if (!match) return undefined;
+      resolved = match;
     }
   }
 
@@ -636,7 +688,7 @@ export const fetchSchemaApiResolvedValue = async (
 
   try {
     const response = await fetchSchemaApiRawResponse(endpoint, method, payload);
-    return resolveSchemaApiResponseValue(response, api.responsePath, sourceField);
+    return resolveSchemaApiResponseValue(response, api.responsePath, sourceField, apiContext);
   } catch {
     return undefined;
   }

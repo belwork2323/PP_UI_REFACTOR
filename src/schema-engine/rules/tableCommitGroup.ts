@@ -126,8 +126,16 @@ export const findLastPickerRow = (rows: Record<string, unknown>[]) => {
   return index >= 0 ? rows[index] : null;
 };
 
-export const renumberTableRows = (rows: Record<string, unknown>[], autoKey: string) =>
-  rows.map((row, idx) => ({ ...row, [autoKey]: idx + 1 }));
+export const renumberTableRows = (rows: Record<string, unknown>[], autoKey: string) => {
+  let dataIndex = 0;
+  return rows.map((row) => {
+    const key = String(row[autoKey] ?? "").trim();
+    // Preserve trailing footer keys (e.g. TOTAL) — only renumber numeric data rows.
+    if (key && !/^\d+$/.test(key)) return row;
+    dataIndex += 1;
+    return { ...row, [autoKey]: dataIndex };
+  });
+};
 
 export const formatReferenceRangeValue = (referenceRange?: Record<string, unknown> | null): string => {
   if (!referenceRange || typeof referenceRange !== "object") return "";

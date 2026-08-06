@@ -7,7 +7,7 @@ export const useACEMMotorHook = (enabled: boolean = true) => {
 
   const baseHook = useBaseStaticTestFacility({
     listParams,
-    defaultMotorType: "MAIN_MOTOR",
+    defaultMotorType: "BEM",
     facilityType: "ACEM",
     enabled,
   });

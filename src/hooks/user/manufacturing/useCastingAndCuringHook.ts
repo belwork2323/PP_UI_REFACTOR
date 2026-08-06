@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { STRINGS } from "../../../app/config/strings";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshStore";
 import castingCuringController from "../../../controllers/user/manufacturing/castingCuringController";
+import { batchManagementController } from "../../../controllers/admin/BatchManagement/batchManagementController";
 import {
-  applyMotorCuringValuesMap,
+  applyMotorFormValuesMaps,
+  buildMotorCastingValuesMapFromSessions,
   buildMotorCuringValuesMapFromSessions,
   createDefaultCastingCuringFormState,
-  createDefaultCastingProcessSetup,
   createEmptyMotorSession,
   hasAnyCastingCuringValue,
   hydrateCastingCuringFormState,
@@ -17,15 +18,24 @@ import {
   normalizeCastingCuringMotorId,
   type CastingCuringFormState,
   type CastingCuringMotorSession,
-  type CastingProcessSetup,
   type CuringProcessSetup,
   createDefaultCuringProcessSetup,
+  type CastingCuringMotorStatusMeta,
+  type CastingCuringMotorSubmissionType,
+  type CastingCuringMotorSubmissionStatus,
+  mapCastingCuringMotorStatusesFromApi,
+  isCastingCuringMotorEditable,
+  areAllCastingCuringMotorsApproved,
+  normalizeCastingCuringMotorStatus,
+  normalizeCastingCuringMotorSubmissionType,
 } from "../../../data/models/user/CastingCuringFormModel";
+import type { CuringCycleConfig } from "../../../data/models/user/CuringCycleConfigModel";
 import {
   buildCastingCuringSchemaRequest,
   castingCuringCastingSchemaFetchConfig,
   castingCuringCuringSchemaFetchConfig,
   createCastingCuringInitialValues,
+  buildCuringFormValuesFromCycleConfig,
   buildCastingSetupContext,
   schemaEngineController,
   type SchemaFormValues,
@@ -33,15 +43,22 @@ import {
 import { cloneValue } from "../../../schema-engine/state/formState";
 import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
 import {
+  isMotorEnabledByPreviousStage,
+  resolvePreviousStageApprovedUnits,
+  type PreviousStageApprovedUnits,
+} from "../previousStageApproval";
+import {
+  enrichCastingCuringBatchFromDetails,
   filterUnusedCastingCuringMotorOptions,
-  getSelectedCastingDraftMotorIds,
   resolveCastingCuringMotorOptions,
+  resolveCastingFinalMixCount,
   resolveCastingMotorCount,
+  resizeCastingMotorDrafts,
   resolveMotorStage,
   canLoadCuringForm,
-  isMotorCastingComplete,
   type CastingCuringAddedMotor,
   type CastingCuringMotorOption,
+  type CastingMotorDraftEntry,
 } from "./castingCuringFlowConfig";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 
@@ -68,6 +85,7 @@ const buildAddedMotorsFromForm = (formData: CastingCuringFormState): CastingCuri
   (formData.motors ?? []).map((motor) => ({
     motorId: motor.motorId,
     motorReceivedAt: motor.motorReceivedAt,
+    castingStation: motor.castingStation,
   }));
 
 export const useCastingAndCuringHook = () => {
@@ -101,28 +119,32 @@ export const useCastingAndCuringHook = () => {
   const [initialSnapshot, setInitialSnapshot] = useState("{}");
 
   const [castingType, setCastingType] = useState("");
-  const [castingStation, setCastingStation] = useState("");
   const [motorCount, setMotorCount] = useState<number | "">("");
-  const [draftMotorIds, setDraftMotorIds] = useState<string[]>([]);
-  const [motorReceivedAt, setMotorReceivedAt] = useState("");
-  const [castingSetupDraft, setCastingSetupDraft] = useState<CastingProcessSetup>(
-    createDefaultCastingProcessSetup(),
-  );
+  const [castingMotorDrafts, setCastingMotorDrafts] = useState<CastingMotorDraftEntry[]>([]);
   const [addedMotors, setAddedMotors] = useState<CastingCuringAddedMotor[]>([]);
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
   const [curingSetupDrafts, setCuringSetupDrafts] = useState<Record<string, CuringProcessSetup>>({});
+  const [motorCastingValuesById, setMotorCastingValuesById] = useState<Record<string, SchemaFormValues>>({});
   const [motorCuringValuesById, setMotorCuringValuesById] = useState<Record<string, SchemaFormValues>>({});
+  const [motorStatusById, setMotorStatusById] = useState<Record<string, CastingCuringMotorStatusMeta>>({});
+  const [previousStageGate, setPreviousStageGate] = useState<PreviousStageApprovedUnits | null>(null);
+  const [curingCycleConfig, setCuringCycleConfig] = useState<CuringCycleConfig | null>(null);
+  const [curingCyclesLoading, setCuringCyclesLoading] = useState(false);
+  const [curingCyclesError, setCuringCyclesError] = useState<string | null>(null);
+  const curingCycleConfigRef = useRef<CuringCycleConfig | null>(null);
+
+  useEffect(() => {
+    curingCycleConfigRef.current = curingCycleConfig;
+  }, [curingCycleConfig]);
 
   const formSnapshot = useMemo(
     () =>
       JSON.stringify({
         formData,
         castingType,
-        castingStation,
-        castingSetupDraft,
         addedMotors,
       }),
-    [formData, castingType, castingStation, castingSetupDraft, addedMotors],
+    [formData, castingType, addedMotors],
   );
 
   const isFormDirty = useMemo(
@@ -132,15 +154,15 @@ export const useCastingAndCuringHook = () => {
 
   const resetFlowDraft = useCallback(() => {
     setCastingType("");
-    setCastingStation("");
     setMotorCount("");
-    setDraftMotorIds([]);
-    setMotorReceivedAt("");
-    setCastingSetupDraft(createDefaultCastingProcessSetup());
+    setCastingMotorDrafts([]);
     setAddedMotors([]);
     setActiveMotorIndex(0);
     setCuringSetupDrafts({});
+    setMotorCastingValuesById({});
     setMotorCuringValuesById({});
+    setMotorStatusById({});
+    setPreviousStageGate(null);
     setSchemaError(null);
     setCastingSchemaError(null);
     setCuringSchemaError(null);
@@ -163,14 +185,18 @@ export const useCastingAndCuringHook = () => {
     setBackConfirmOpen(false);
     setHasSavedDraft(false);
     setFormData(defaults);
+    setMotorCastingValuesById({});
     setMotorCuringValuesById({});
+    setMotorStatusById({});
+    setCuringCycleConfig(null);
+    curingCycleConfigRef.current = null;
+    setCuringCyclesLoading(false);
+    setCuringCyclesError(null);
     resetFlowDraft();
     setInitialSnapshot(
       JSON.stringify({
         formData: defaults,
         castingType: "",
-        castingStation: "",
-        castingSetupDraft: createDefaultCastingProcessSetup(),
         addedMotors: [],
       }),
     );
@@ -329,20 +355,40 @@ export const useCastingAndCuringHook = () => {
 
       let nextBatch = batch;
       let nextFormData = createDefaultCastingCuringFormState();
+      let detailsResponse: any = null;
 
-      if (shouldFetchDetails) {
-        if (!subDepartmentId) {
-          showAlert(STRINGS.MANUFACTURING.CASTING_CURING.SUB_DEPARTMENT_MISSING, "error");
-          return;
-        }
-        if (!batch.formId) {
-          showAlert(STRINGS.MANUFACTURING.CASTING_CURING.FORM_ID_MISSING, "error");
-          return;
+      setLoadingFormDetails(true);
+      try {
+        if (batch.batchId) {
+          try {
+            const batchDetails = await batchManagementController.getBatchById(batch.batchId);
+            nextBatch = enrichCastingCuringBatchFromDetails(batch, batchDetails);
+          } catch (error) {
+            console.error("Unable to resolve batch motor details", error);
+          }
         }
 
-        setLoadingFormDetails(true);
-        try {
-          const detailsResponse = await castingCuringController.fetchFormDetails({
+        setPreviousStageGate(
+          resolvePreviousStageApprovedUnits({
+            stageProgress: nextBatch.stageProgress ?? batch.stageProgress,
+            currentStage: nextBatch.currentStage ?? batch.currentStage,
+            currentSlug: "casting-and-curing",
+            currentSubDepartmentId: subDepartmentId,
+            subDepartments: user?.allSubDepartments,
+          }),
+        );
+
+        if (shouldFetchDetails) {
+          if (!subDepartmentId) {
+            showAlert(STRINGS.MANUFACTURING.CASTING_CURING.SUB_DEPARTMENT_MISSING, "error");
+            return;
+          }
+          if (!batch.formId) {
+            showAlert(STRINGS.MANUFACTURING.CASTING_CURING.FORM_ID_MISSING, "error");
+            return;
+          }
+
+          detailsResponse = await castingCuringController.fetchFormDetails({
             formId: batch.formId,
             subDepartmentId,
           });
@@ -356,16 +402,16 @@ export const useCastingAndCuringHook = () => {
             return;
           }
 
-          nextBatch = { ...batch, formId: detailsResponse.data.formId || batch.formId };
+          nextBatch = { ...nextBatch, formId: detailsResponse.data.formId || batch.formId };
           nextFormData = mapCastingCuringDetailsToFormState(
             detailsResponse.data?.castingCuringDetails ?? detailsResponse.data,
           );
 
           const { castingSchema, curingSchema } = await fetchSchemas(nextBatch);
           nextFormData = hydrateCastingCuringFormState(nextFormData, castingSchema, curingSchema);
-        } finally {
-          setLoadingFormDetails(false);
         }
+      } finally {
+        setLoadingFormDetails(false);
       }
 
       const nextAddedMotors = buildAddedMotorsFromForm(nextFormData);
@@ -373,20 +419,25 @@ export const useCastingAndCuringHook = () => {
       setActiveBatch(nextBatch);
       setIsEditMode(editMode);
       setFormData(nextFormData);
+      setMotorCastingValuesById(buildMotorCastingValuesMapFromSessions(nextFormData.motors ?? []));
       setMotorCuringValuesById(buildMotorCuringValuesMapFromSessions(nextFormData.motors ?? []));
+
+      // Extract motor-level statuses from the API response
+      if (detailsResponse?.data) {
+        const statuses = mapCastingCuringMotorStatusesFromApi(detailsResponse.data);
+        setMotorStatusById(statuses);
+      } else {
+        setMotorStatusById({});
+      }
+
       if (nextFormData.castingFormLoaded) {
         setCastingType("");
-        setCastingStation("");
-        setCastingSetupDraft(createDefaultCastingProcessSetup());
       } else {
-        setCastingType(nextFormData.castingType);
-        setCastingStation(nextFormData.castingStation);
-        setCastingSetupDraft(nextFormData.castingSetup);
+        setCastingType(nextFormData.castingType ?? "");
       }
       setAddedMotors(nextAddedMotors);
       setMotorCount("");
-      setDraftMotorIds([]);
-      setMotorReceivedAt("");
+      setCastingMotorDrafts([]);
       setCuringSetupDrafts(
         Object.fromEntries(
           (nextFormData.motors ?? [])
@@ -398,10 +449,6 @@ export const useCastingAndCuringHook = () => {
         JSON.stringify({
           formData: nextFormData,
           castingType: nextFormData.castingFormLoaded ? "" : nextFormData.castingType,
-          castingStation: nextFormData.castingFormLoaded ? "" : nextFormData.castingStation,
-          castingSetupDraft: nextFormData.castingFormLoaded
-            ? createDefaultCastingProcessSetup()
-            : nextFormData.castingSetup,
           addedMotors: nextAddedMotors,
         }),
       );
@@ -436,46 +483,56 @@ export const useCastingAndCuringHook = () => {
 
   const handleMotorCountChange = useCallback((count: number | "") => {
     setMotorCount(count);
-    if (count === "") {
-      setDraftMotorIds([]);
-      return;
-    }
-    setDraftMotorIds((prev) => Array.from({ length: Number(count) }, (_, idx) => prev[idx] ?? ""));
+    const resolvedCount = count === "" ? 0 : Number(count);
+    setCastingMotorDrafts((prev) => resizeCastingMotorDrafts(resolvedCount, prev));
   }, []);
 
-  const handleDraftMotorIdChange = useCallback((index: number, motorId: string) => {
-    setDraftMotorIds((prev) => {
-      const next = [...prev];
-      next[index] = motorId;
-      return next;
-    });
+  const handleCastingTypeChange = useCallback((value: string) => {
+    setCastingType(value);
+    setMotorCount("");
+    setCastingMotorDrafts([]);
   }, []);
+
+  const handleCastingMotorDraftChange = useCallback(
+    (index: number, field: keyof CastingMotorDraftEntry, value: string) => {
+      setCastingMotorDrafts((prev) => {
+        const next = [...prev];
+        const current = next[index] ?? { motorId: "", castingStation: "", motorReceivedAt: "" };
+        next[index] = { ...current, [field]: value };
+        return next;
+      });
+    },
+    [],
+  );
 
   useEffect(() => {
-    if (view !== "form" || !activeBatch) return;
+    if (!castingType) {
+      setCastingMotorDrafts([]);
+      return;
+    }
+
+    const normalized = String(castingType).toLowerCase();
+    if (normalized === "others") {
+      if (motorCount === "") {
+        setCastingMotorDrafts([]);
+        return;
+      }
+      setCastingMotorDrafts((prev) => resizeCastingMotorDrafts(Number(motorCount), prev));
+      return;
+    }
+
     const count = resolveCastingMotorCount(castingType, motorCount);
-    if (count !== 1) return;
-
-    const motorOptions = filterUnusedCastingCuringMotorOptions(
-      resolveCastingCuringMotorOptions(activeBatch),
-      addedMotors.map((motor) => motor.motorId),
-    );
-    if (motorOptions.length !== 1) return;
-
-    const singleId = motorOptions[0]?.value ?? "";
-    if (!singleId) return;
-
-    setDraftMotorIds((prev) => (prev[0] === singleId ? prev : [singleId]));
-  }, [view, activeBatch, castingType, motorCount, addedMotors]);
+    setCastingMotorDrafts((prev) => resizeCastingMotorDrafts(count, prev));
+  }, [castingType, motorCount]);
 
   const handleLoadCastingForm = useCallback(async () => {
     if (!activeBatch) return;
 
     const count = resolveCastingMotorCount(castingType, motorCount);
-    if (count <= 0) return;
+    if (count <= 0 || castingMotorDrafts.length !== count) return;
 
-    const selectedIds = getSelectedCastingDraftMotorIds(count, draftMotorIds);
-    if (!motorReceivedAt.trim()) return;
+    const selectedDrafts = castingMotorDrafts.filter((row) => String(row.motorId ?? "").trim());
+    if (selectedDrafts.length !== count) return;
 
     const motorOptions = resolveCastingCuringMotorOptions(activeBatch);
     const castingSchema =
@@ -489,6 +546,8 @@ export const useCastingAndCuringHook = () => {
       ).map((option) => option.value),
     );
 
+    const selectedIds = selectedDrafts.map((row) => row.motorId.trim());
+
     if (motorOptions.length > 0 && selectedIds.some((id) => !unusedMotorIds.has(id))) {
       showAlert("Select motor IDs that have not already been added.", "warning");
       return;
@@ -499,23 +558,27 @@ export const useCastingAndCuringHook = () => {
       return;
     }
 
-    const setupSnapshot = { ...castingSetupDraft };
-    const setupContext = buildCastingSetupContext({
-      finalMixCount: setupSnapshot.finalMixCount,
-      castingType,
-      castingStation,
-    });
-    const castingMeta = {
-      castingType,
-      castingStation,
-      castingSetup: setupSnapshot,
-    };
     const existingIds = new Set(addedMotors.map((motor) => motor.motorId));
-    const newIds = selectedIds.filter((id) => !existingIds.has(id));
+    const newDrafts = selectedDrafts.filter((row) => !existingIds.has(row.motorId.trim()));
     const isFirstLoad = !formData.castingFormLoaded;
+    const primaryStation = newDrafts[0]?.castingStation ?? "";
 
-    const newSessions: CastingCuringMotorSession[] = newIds.map((motorId) =>
-      createEmptyMotorSession(motorId, motorReceivedAt.trim(), castingSchema, setupContext, castingMeta),
+    const newSessions: CastingCuringMotorSession[] = newDrafts.map((row) =>
+      createEmptyMotorSession(
+        row.motorId.trim(),
+        row.motorReceivedAt.trim(),
+        castingSchema,
+        buildCastingSetupContext({
+          castingType,
+          castingStation: row.castingStation.trim(),
+          motorId: row.motorId.trim(),
+          finalMixCount: resolveCastingFinalMixCount(activeBatch),
+        }),
+        {
+          castingType,
+          castingStation: row.castingStation.trim(),
+        },
+      ),
     );
 
     const nextFormData = hydrateCastingCuringFormState(
@@ -524,8 +587,7 @@ export const useCastingAndCuringHook = () => {
         ...(isFirstLoad
           ? {
               castingType,
-              castingStation,
-              castingSetup: setupSnapshot,
+              castingStation: primaryStation,
               castingFormLoaded: true,
               readyForCuring: false,
               castingSchema,
@@ -541,38 +603,36 @@ export const useCastingAndCuringHook = () => {
 
     const nextAdded = [
       ...addedMotors,
-      ...newIds.map((motorId) => ({
-        motorId,
-        motorReceivedAt: motorReceivedAt.trim(),
+      ...newDrafts.map((row) => ({
+        motorId: row.motorId.trim(),
+        motorReceivedAt: row.motorReceivedAt.trim(),
+        castingStation: row.castingStation.trim(),
       })),
     ];
 
     setFormData(nextFormData);
+    setMotorCastingValuesById(buildMotorCastingValuesMapFromSessions(nextFormData.motors ?? []));
     setMotorCuringValuesById(buildMotorCuringValuesMapFromSessions(nextFormData.motors ?? []));
     setAddedMotors(nextAdded);
     setCastingType("");
-    setCastingStation("");
-    setCastingSetupDraft(createDefaultCastingProcessSetup());
-    setMotorReceivedAt("");
-    setDraftMotorIds([]);
+    setCastingMotorDrafts([]);
     setMotorCount("");
     setCuringSetupDrafts((prev) => ({
       ...prev,
-      ...Object.fromEntries(newIds.map((motorId) => [motorId, createDefaultCuringProcessSetup()])),
+      ...Object.fromEntries(
+        newDrafts.map((row) => [row.motorId.trim(), createDefaultCuringProcessSetup()]),
+      ),
     }));
-    if (newIds.length > 0) {
-      setActiveMotorIndex(nextAdded.length - newIds.length);
+    if (newDrafts.length > 0) {
+      setActiveMotorIndex(0);
     }
   }, [
     activeBatch,
-    castingSetupDraft,
-    castingStation,
+    castingMotorDrafts,
     castingType,
-    draftMotorIds,
     fetchCastingSchema,
     formData,
     motorCount,
-    motorReceivedAt,
     showAlert,
     addedMotors,
   ]);
@@ -592,26 +652,37 @@ export const useCastingAndCuringHook = () => {
     }));
   }, [activeBatch, fetchCuringSchema, formData.curingSchema]);
 
-  const handleRemoveLoadedCastingForm = useCallback(() => {
-    setCastingType("");
-    setCastingStation("");
-    setCastingSetupDraft(createDefaultCastingProcessSetup());
-    setDraftMotorIds([]);
-    setMotorReceivedAt("");
-    setMotorCount("");
-    setAddedMotors([]);
-    setActiveMotorIndex(0);
-    setCuringSetupDrafts({});
+  const fetchCuringCycleConfig = useCallback(async () => {
+    if (!activeBatch) return null;
 
-    setFormData((prev) => ({
-      ...prev,
-      castingFormLoaded: false,
-      readyForCuring: false,
-      motors: [],
-      curingFormValues: {},
-    }));
-    setMotorCuringValuesById({});
-  }, []);
+    const motorStage = resolveMotorStage(activeBatch);
+    if (curingCycleConfigRef.current?.motorStage === motorStage) {
+      return curingCycleConfigRef.current;
+    }
+
+    setCuringCyclesLoading(true);
+    setCuringCyclesError(null);
+
+    try {
+      const response = await castingCuringController.fetchCuringCycles({ motorStage });
+      if (response?.success && response.data) {
+        setCuringCycleConfig(response.data);
+        return response.data;
+      }
+
+      const message = response?.message ?? "Unable to load curing cycle configuration.";
+      setCuringCyclesError(message);
+      showAlert(message, "warning");
+      return null;
+    } finally {
+      setCuringCyclesLoading(false);
+    }
+  }, [activeBatch, showAlert]);
+
+  useEffect(() => {
+    if (view !== "form" || !activeBatch) return;
+    void fetchCuringCycleConfig();
+  }, [view, activeBatch, fetchCuringCycleConfig]);
 
   const getCuringSetupDraft = useCallback(
     (motorId: string): CuringProcessSetup =>
@@ -632,6 +703,39 @@ export const useCastingAndCuringHook = () => {
     },
     [formData.motors, motorCuringValuesById],
   );
+
+  const getMotorCastingFormValues = useCallback(
+    (motorId: string): SchemaFormValues => {
+      const normalizedMotorId = normalizeCastingCuringMotorId(motorId);
+      const fromMap = motorCastingValuesById[normalizedMotorId];
+      if (fromMap) return fromMap;
+
+      const motor = (formData.motors ?? []).find(
+        (entry) => normalizeCastingCuringMotorId(entry.motorId) === normalizedMotorId,
+      );
+      return motor?.formValues ?? {};
+    },
+    [formData.motors, motorCastingValuesById],
+  );
+
+  const handleMotorCastingValuesChange = useCallback((motorId: string, values: SchemaFormValues) => {
+    const normalizedMotorId = normalizeCastingCuringMotorId(motorId);
+    if (!normalizedMotorId) return;
+
+    const nextValues = cloneValue(values);
+    setMotorCastingValuesById((prev) => ({
+      ...prev,
+      [normalizedMotorId]: nextValues,
+    }));
+    setFormData((prev) => ({
+      ...prev,
+      motors: (prev.motors ?? []).map((motor) =>
+        normalizeCastingCuringMotorId(motor.motorId) === normalizedMotorId
+          ? { ...motor, formValues: cloneValue(nextValues) }
+          : motor,
+      ),
+    }));
+  }, []);
 
   const handleMotorCuringValuesChange = useCallback((motorId: string, values: SchemaFormValues) => {
     const normalizedMotorId = normalizeCastingCuringMotorId(motorId);
@@ -685,20 +789,31 @@ export const useCastingAndCuringHook = () => {
       const curingSchema = cachedSchema ?? (await fetchCuringSchema(activeBatch));
       if (!curingSchema) return;
 
-      const setupSnapshot = { ...draft };
+      const motorStage = resolveMotorStage(activeBatch);
+      let cycleConfig =
+        curingCycleConfigRef.current?.motorStage === motorStage
+          ? curingCycleConfigRef.current
+          : null;
+      if (!cycleConfig) {
+        cycleConfig = await fetchCuringCycleConfig();
+      }
+
+      const setupSnapshot = {
+        ...draft,
+        curingType: cycleConfig?.curingType ?? draft.curingType,
+      };
       const targetMotor = (formData.motors ?? []).find(
         (motor) => normalizeCastingCuringMotorId(motor.motorId) === normalizedMotorId,
       );
       if (!targetMotor) return;
 
       const setupContext = buildCastingSetupContext({
-        ...(targetMotor.castingSetup ?? formData.castingSetup),
         castingType: targetMotor.castingType ?? formData.castingType,
         castingStation: targetMotor.castingStation ?? formData.castingStation,
       });
-      const nextCuringFormValues = cloneValue(
-        createCastingCuringInitialValues(curingSchema, setupContext),
-      );
+      const nextCuringFormValues = cycleConfig
+        ? cloneValue(buildCuringFormValuesFromCycleConfig(curingSchema, cycleConfig, setupContext))
+        : cloneValue(createCastingCuringInitialValues(curingSchema, setupContext));
 
       setMotorCuringValuesById((prevValues) => ({
         ...prevValues,
@@ -727,7 +842,7 @@ export const useCastingAndCuringHook = () => {
         [normalizedMotorId]: createDefaultCuringProcessSetup(),
       }));
     },
-    [activeBatch, curingSetupDrafts, fetchCuringSchema, formData],
+    [activeBatch, curingSetupDrafts, fetchCuringCycleConfig, fetchCuringSchema, formData],
   );
 
   const handleRemoveMotor = useCallback((motorId: string) => {
@@ -743,6 +858,11 @@ export const useCastingAndCuringHook = () => {
         (motor) => normalizeCastingCuringMotorId(motor.motorId) !== normalizedMotorId,
       ),
     }));
+    setMotorCastingValuesById((prev) => {
+      const next = { ...prev };
+      delete next[normalizedMotorId];
+      return next;
+    });
     setMotorCuringValuesById((prev) => {
       const next = { ...prev };
       delete next[normalizedMotorId];
@@ -755,36 +875,28 @@ export const useCastingAndCuringHook = () => {
     });
   }, []);
 
-  const handleSetupDraftChange = useCallback(
-    (field: keyof CastingProcessSetup, value: string) => {
-      setCastingSetupDraft((prev) => ({ ...prev, [field]: value }));
-    },
-    [],
-  );
-
   const handleMotorSessionChange = useCallback(
     (motorId: string, nextMotor: CastingCuringMotorSession) => {
       const normalizedMotorId = normalizeCastingCuringMotorId(motorId);
-      const nextCuringFormValues = nextMotor.curingFormValues
-        ? cloneValue(nextMotor.curingFormValues)
-        : nextMotor.curingFormValues;
 
       setFormData((prev) => ({
         ...prev,
         motors: (prev.motors ?? []).map((motor) =>
-          normalizeCastingCuringMotorId(motor.motorId) === normalizedMotorId
-            ? {
-                ...nextMotor,
-                curingFormValues: nextCuringFormValues,
-              }
-            : motor,
+          normalizeCastingCuringMotorId(motor.motorId) === normalizedMotorId ? nextMotor : motor,
         ),
       }));
 
-      if (nextCuringFormValues) {
+      if (nextMotor.formValues && Object.keys(nextMotor.formValues).length > 0) {
+        setMotorCastingValuesById((prev) => ({
+          ...prev,
+          [normalizedMotorId]: cloneValue(nextMotor.formValues),
+        }));
+      }
+
+      if (nextMotor.curingFormValues && Object.keys(nextMotor.curingFormValues).length > 0) {
         setMotorCuringValuesById((prev) => ({
           ...prev,
-          [normalizedMotorId]: cloneValue(nextCuringFormValues),
+          [normalizedMotorId]: cloneValue(nextMotor.curingFormValues!),
         }));
       }
     },
@@ -817,7 +929,11 @@ export const useCastingAndCuringHook = () => {
         return false;
       }
 
-      const payloadForm = applyMotorCuringValuesMap(formData, motorCuringValuesById);
+      const payloadForm = applyMotorFormValuesMaps(
+        formData,
+        motorCastingValuesById,
+        motorCuringValuesById,
+      );
       const status = parseStatus(activeBatch.ccStatus);
       const isCreateFlow = status === parseStatus(CC_STATUS.TO_BE_INITIATED) && !activeBatch.formId;
       const motors = mapCastingCuringFormStateToPayload(payloadForm).motors;
@@ -895,10 +1011,10 @@ export const useCastingAndCuringHook = () => {
     },
     [
       activeBatch,
-      castingStation,
       castingType,
       formData,
       formSnapshot,
+      motorCastingValuesById,
       motorCuringValuesById,
       showAlert,
       listParams,
@@ -910,48 +1026,201 @@ export const useCastingAndCuringHook = () => {
   const handleSaveDraft = useCallback(async () => submitForm("draft"), [submitForm]);
   const handleSubmit = useCallback(async () => submitForm("submit"), [submitForm]);
 
-  const handleSaveCastingAndContinue = useCallback(
-    async (motorId: string) => {
-      const motorSession = (formData.motors ?? []).find((motor) => motor.motorId === motorId);
-      if (!motorSession || !formData.castingSchema) {
+  const submitMotor = useCallback(
+    async (motorId: string, intent: "draft" | "submit") => {
+      if (!activeBatch) return false;
+      if (!isMotorEnabledByPreviousStage(motorId, previousStageGate)) {
+        showAlert(STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED, "warning");
+        return false;
+      }
+      if (!subDepartmentId) {
+        showAlert(STRINGS.MANUFACTURING.CASTING_CURING.SUB_DEPARTMENT_MISSING, "error");
+        return false;
+      }
+      if (!formData.castingSchema) {
+        showAlert("Load the form schema before saving.", "warning");
         return false;
       }
 
-      if (!isMotorCastingComplete(formData.castingSchema, motorSession.formValues ?? {})) {
-        showAlert(STRINGS.MANUFACTURING.CASTING_CURING.CASTING_INCOMPLETE_FOR_CURING, "warning");
-        return false;
+      const payloadForm = applyMotorFormValuesMaps(
+        formData,
+        motorCastingValuesById,
+        motorCuringValuesById,
+      );
+      const motorSubmissionType: CastingCuringMotorSubmissionType = intent === "draft" ? "DRAFT" : "SUBMIT";
+      const body = mapCastingCuringFormStateToPayload(payloadForm, {
+        targetMotorIds: [motorId],
+        motorSubmissionType,
+      });
+
+      const status = parseStatus(activeBatch.ccStatus);
+      const isCreateFlow = status === parseStatus(CC_STATUS.TO_BE_INITIATED) && !activeBatch.formId;
+
+      setActionLoading(true);
+      try {
+        let response: any;
+
+        if (isCreateFlow) {
+          if (!activeBatch.batchId) {
+            showAlert(STRINGS.MANUFACTURING.CASTING_CURING.BATCH_ID_MISSING, "error");
+            return false;
+          }
+          response = await castingCuringController.createForm({
+            batchId: activeBatch.batchId,
+            subDepartmentId,
+            formSubmissionType: "DRAFT",
+            motors: body.motors,
+          });
+        } else {
+          if (!activeBatch.formId) {
+            showAlert(STRINGS.MANUFACTURING.CASTING_CURING.FORM_ID_MISSING, "error");
+            return false;
+          }
+          response = await castingCuringController.updateForm({
+            formId: activeBatch.formId,
+            batchId: activeBatch.batchId,
+            subDepartmentId,
+            formSubmissionType: "DRAFT",
+            motors: body.motors,
+          });
+        }
+
+        if (!response?.success) {
+          showAlert(
+            getErrorMessage(response, `Failed to ${intent} motor ${motorId}.`),
+            "error",
+          );
+          return false;
+        }
+
+        const nextFormId = response.data?.formId ?? activeBatch.formId ?? null;
+        setActiveBatch((prev) => (prev ? { ...prev, formId: nextFormId } : prev));
+        setInitialSnapshot(formSnapshot);
+        setHasSavedDraft(true);
+
+        setMotorStatusById((prev) => {
+          const nextStatus: CastingCuringMotorSubmissionStatus =
+            intent === "draft" ? "IN_PROGRESS" : "WAITING_FOR_APPROVAL";
+          const updated: Record<string, CastingCuringMotorStatusMeta> = {
+            ...prev,
+            [motorId]: {
+              ...prev[motorId],
+              motorSubmissionType: motorSubmissionType,
+              motorSubmissionStatus: nextStatus,
+            },
+          };
+
+          const responseStatuses =
+            response.data?.motorStatuses ??
+            (response.data as { motorStatuses?: unknown[] } | undefined)?.motorStatuses;
+          if (Array.isArray(responseStatuses)) {
+            responseStatuses.forEach((entry: any) => {
+              const id = String(entry?.motorId ?? "").trim();
+              if (!id) return;
+              updated[id] = {
+                ...updated[id],
+                motorSubmissionType:
+                  normalizeCastingCuringMotorSubmissionType(entry?.motorSubmissionType) ??
+                  updated[id]?.motorSubmissionType,
+                motorSubmissionStatus: normalizeCastingCuringMotorStatus(
+                  entry?.motorSubmissionStatus ?? updated[id]?.motorSubmissionStatus,
+                ),
+              };
+            });
+          }
+
+          return updated;
+        });
+
+        showAlert(
+          intent === "draft"
+            ? `Motor ${motorId} draft saved successfully.`
+            : `Motor ${motorId} submitted for approval.`,
+          "success",
+          { autoCloseMs: 2200 },
+        );
+
+        return true;
+      } finally {
+        setActionLoading(false);
       }
-
-      const saved = await submitForm("draft");
-      if (!saved) {
-        return false;
-      }
-
-      let curingSchema = formData.curingSchema;
-      if (activeBatch && !curingSchema) {
-        curingSchema = await fetchCuringSchema(activeBatch);
-      }
-
-      setFormData((prev) => ({
-        ...prev,
-        curingSchema: curingSchema ?? prev.curingSchema,
-        motors: (prev.motors ?? []).map((motor) =>
-          motor.motorId === motorId ? { ...motor, castingSavedForCuring: true } : motor,
-        ),
-      }));
-
-      return true;
     },
-    [
-      activeBatch,
-      fetchCuringSchema,
-      formData.castingSchema,
-      formData.curingSchema,
-      formData.motors,
-      showAlert,
-      submitForm,
-    ],
+    [activeBatch, formData, formSnapshot, motorCastingValuesById, motorCuringValuesById, previousStageGate, showAlert, subDepartmentId],
   );
+
+  const handleSaveMotorDraft = useCallback(
+    async (motorId: string) => submitMotor(motorId, "draft"),
+    [submitMotor],
+  );
+
+  const handleSubmitMotor = useCallback(
+    async (motorId: string) => submitMotor(motorId, "submit"),
+    [submitMotor],
+  );
+
+  const getMotorStatus = useCallback(
+    (motorId: string): CastingCuringMotorSubmissionStatus =>
+      motorStatusById[motorId]?.motorSubmissionStatus ?? "TO_BE_INITIATED",
+    [motorStatusById],
+  );
+
+  const checkMotorEditable = useCallback(
+    (motorId: string) => {
+      if (!isMotorEnabledByPreviousStage(motorId, previousStageGate)) return false;
+      return isCastingCuringMotorEditable(getMotorStatus(motorId));
+    },
+    [getMotorStatus, previousStageGate],
+  );
+
+  const handleSubmitForFinalApproval = useCallback(async () => {
+    if (!activeBatch?.formId) return false;
+    if (!subDepartmentId) return false;
+    if (!areAllCastingCuringMotorsApproved(motorStatusById)) return false;
+
+    setActionLoading(true);
+    try {
+      const detailsRes = await castingCuringController.fetchFormDetails({
+        formId: activeBatch.formId,
+        subDepartmentId,
+      });
+
+      if (!detailsRes?.success || !detailsRes?.data) {
+        showAlert("Failed to fetch latest form data for final approval.", "error");
+        return false;
+      }
+
+      const latestPayload = detailsRes.data?.castingCuringDetails ?? detailsRes.data;
+      const rawMotors = Array.isArray(latestPayload?.motors) ? latestPayload.motors : [];
+
+      const response = await castingCuringController.updateForm({
+        formId: activeBatch.formId,
+        batchId: activeBatch.batchId,
+        subDepartmentId,
+        formSubmissionType: "SUBMIT",
+        motors: rawMotors.map((m: any) => ({
+          motorId: String(m.motorId ?? ""),
+          motorReceivedAt: String(m.motorReceivedAt ?? m.details?.motorReceivedAt ?? ""),
+          motorSubmissionType: "SUBMIT",
+          setup: m.setup ?? m.details?.setup ?? {},
+          curingSetup: m.curingSetup ?? m.details?.curingSetup ?? {},
+          castingSections: m.castingSections ?? m.details?.castingSections ?? [],
+          curingSections: m.curingSections ?? m.details?.curingSections ?? [],
+        })),
+      });
+
+      if (!response?.success) {
+        showAlert(getErrorMessage(response, "Final approval submission failed."), "error");
+        return false;
+      }
+
+      showAlert("Form submitted for final approval successfully.", "success", { autoCloseMs: 2200 });
+      await listParams.refreshUserBatches();
+      resetFormContext();
+      return true;
+    } finally {
+      setActionLoading(false);
+    }
+  }, [activeBatch, motorStatusById, showAlert, subDepartmentId, listParams, resetFormContext]);
 
   const handleViewCastingCuringDetails = useCallback(
     async (row: CastingCuringBatch) => {
@@ -993,6 +1262,7 @@ export const useCastingAndCuringHook = () => {
   return {
     ...listParams,
     loading: listParams.loading || loadingFormDetails,
+    loadingFormDetails,
     view,
     activeBatch,
     isEditMode,
@@ -1003,13 +1273,13 @@ export const useCastingAndCuringHook = () => {
     schemaError,
     castingSchemaError,
     curingSchemaError,
+    curingCycleConfig,
+    curingCyclesLoading,
+    curingCyclesError,
     subDepartmentId,
     castingType,
-    castingStation,
     motorCount,
-    draftMotorIds,
-    motorReceivedAt,
-    castingSetupDraft,
+    castingMotorDrafts,
     addedMotors,
     activeMotorIndex,
     setActiveMotorIndex,
@@ -1019,26 +1289,31 @@ export const useCastingAndCuringHook = () => {
     handleEditForm,
     handleBack,
     handleDiscardAndBack,
-    setCastingType,
-    setCastingStation,
+    handleCastingTypeChange,
     handleMotorCountChange,
-    handleDraftMotorIdChange,
-    setMotorReceivedAt,
-    handleSetupDraftChange,
+    handleCastingMotorDraftChange,
     handleLoadCastingForm,
     handleAddMotors,
-    handleRemoveLoadedCastingForm,
     handleLoadCuringForm,
     getCuringSetupDraft,
+    getMotorCastingFormValues,
     getMotorCuringFormValues,
     handleCuringSetupDraftChange,
+    handleMotorCastingValuesChange,
     handleMotorCuringValuesChange,
     handleFetchCuringSchema,
+    fetchCuringCycleConfig,
     handleMotorSessionChange,
     handleRemoveMotor,
     handleSaveDraft,
     handleSubmit,
-    handleSaveCastingAndContinue,
+    handleSaveMotorDraft,
+    handleSubmitMotor,
+    handleSubmitForFinalApproval,
+    motorStatusById,
+    previousStageGate,
+    getMotorStatus,
+    isMotorEditable: checkMotorEditable,
     detailsRow,
     detailsData,
     detailsLoading,

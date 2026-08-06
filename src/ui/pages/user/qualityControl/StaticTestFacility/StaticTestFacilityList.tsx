@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 
 import { icons } from "../../../../../app/theme/icons";
-import { qualityControlBatchListLabels } from "../../../../components/custom/subdepartmentBatchListColumns";
+import { qualityControlBatchListLabels, staticTestFacilityBatchListLabels } from "../../../../components/custom/subdepartmentBatchListColumns";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import getQualityControlTheme from "../../../../../app/theme/custom_themes/user/qualityControl/qualityControl_theme";
 import { getOperationStatusConfig, OPERATION_STATUS } from "../../../../../hooks/operationStatus";
@@ -46,7 +46,8 @@ const STFList = ({ hookState, activeTab, rowsPerPageOptions }: any) => {
       PersonIcon={PersonRoundedIcon}
       CalendarIcon={CalendarMonthRoundedIcon}
       actionStrings={S.BATCH_LIST}
-      columnLabels={qualityControlBatchListLabels()}
+      columnLabels={staticTestFacilityBatchListLabels()}
+      showBemMotorIds
     />
   );
 };

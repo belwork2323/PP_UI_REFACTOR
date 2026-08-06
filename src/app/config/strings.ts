@@ -346,6 +346,9 @@ export const STRINGS = {
     },
     RAW_MATERIAL: {
       TITLE: "Raw Material Sourcing",
+      FORM_OPENING_TITLE: "Opening Raw Material Lot Form",
+      FORM_OPENING_MESSAGE:
+        "Loading lot details, specifications, and form data. This will only take a moment…",
       SHORT_DESCRIPTION: "Register new material lots, update partner details.",
       NEW_SUBMISSION: "New Submission",
       FORM_HEADER_CREATE_LOT_TITLE: "Create Lot",
@@ -360,6 +363,9 @@ export const STRINGS = {
     },
     CASING: {
       TITLE: "Rocket Motor Casing Receipt", // Merged
+      FORM_OPENING_TITLE: "Opening Motor Casing Form",
+      FORM_OPENING_MESSAGE:
+        "Loading casing details, dimensional parameters, and form data. This will only take a moment…",
       DESCRIPTION: "Store casing data received from sources and link reports & media.",
       MANDATORY: "(Mandatory)",
       SUBMIT: "Submit for Verification",
@@ -502,6 +508,7 @@ export const STRINGS = {
       MATERIALS_FETCH_ERROR: "An unexpected error occurred while fetching materials",
       SPECIFICATIONS_FETCH_ERROR: "Unable to fetch specifications for selected material",
       SPECIFICATIONS_NOT_FOUND: "Specifications not found for selected material",
+      SPECIFICATIONS_UNAVAILABLE: "For this raw material, specifications are unavailable.",
       DRAFT_SAVED_SUCCESS: "Draft saved successfully. You can continue later.",
       SUBMIT_SUCCESS: "Specifications submitted for approval.",
       DETAILS_FETCH_ERROR: "Unable to load existing form details. Please try again.",
@@ -711,6 +718,21 @@ export const STRINGS = {
       TITLE: "Motor Casing Receipt",
       SUBTITLE: "Enter motor casing details per receipt, inspection, and weighment format",
       SECTION_IDENTIFICATION: "Identification",
+      SECTION_RADIOGRAPHY: "Radiography details",
+      RADIOGRAPHY_HINT: "Enter radiography plan details for this motor casing.",
+      RADIOGRAPHY_PLAN_ID: "Radiography plan ID",
+      RADIOGRAPHY_PLAN_ID_PH: "e.g. PLAN-001",
+      RADIOGRAPHY_PLAN_NAME: "Plan name",
+      RADIOGRAPHY_PLAN_NAME_PH: "e.g. Standard Radiography Plan",
+      COL_RADIOGRAPHY_SR: "Sr.",
+      COL_RADIOGRAPHY_SECTIONS: "Sections",
+      COL_RADIOGRAPHY_ORIENTATIONS: "Orientations",
+      COL_RADIOGRAPHY_SFD: "SFD",
+      COL_RADIOGRAPHY_NORMAL: "No. of Normal Exposure",
+      COL_RADIOGRAPHY_TANGENTIAL: "No. of Tangential Exposure",
+      COL_RADIOGRAPHY_DETECTOR: "Type of Detector",
+      RADIOGRAPHY_DETECTOR_PH: "Select detector",
+      RADIOGRAPHY_ADD_ROW: "Add row",
       PROJECT: "Project name",
       MOTOR_STAGE: "Rocket motor name / stage",
       MOTOR_NO: "Motor no.",
@@ -755,12 +777,12 @@ export const STRINGS = {
       ACEM_SPEC: "Spec @ ACEM",
       TEST_RESULT_ACEM: "Test Result @ ACEM",
       SECTION_NDT: "NDT / UT report",
-      POST_PPT_UT: "Date of post PPT UT",
-      NDT_DATE: "Date of NDT",
-      NDT_OBSERVATIONS: "Observations (NDT & post PPT UT)",
+      POST_PPT_UT: "A. Date of post PPT UT",
+      NDT_DATE: "B. Date of NDT",
+      NDT_OBSERVATIONS: "C. Observations (NDT & post PPT UT)",
       ACEM_NDT: "D. ACEM NDT observations",
       PROJECT_RUBBER: "E. Project rubber surface observations",
-      OTHER_DETAILS: "Other details",
+      OTHER_DETAILS: "F. Other details",
       SECTION_VISUAL: "Visual inspection",
       COL_SR: "Sr.",
       COL_DESCRIPTION: "Description",
@@ -856,6 +878,14 @@ export const STRINGS = {
     DEPARTMENT_NAME: "Manufacturing Department",
     HEADER_SUBTITLE:
       "Select a process below to view detailed information and manage its operations.",
+    PREVIOUS_STAGE_UNIT_DISABLED:
+      "This unit was not approved in the previous stage and cannot be filled yet.",
+    PREVIOUS_STAGE_PREMIX_TAB_DISABLED:
+      "This premix was not approved in Raw Material Preparation.",
+    PREVIOUS_STAGE_MOTOR_TAB_DISABLED:
+      "This motor was not approved in the previous stage.",
+    PREVIOUS_STAGE_NO_UNITS:
+      "No units from the previous stage are approved yet. Complete prior approvals to continue.",
 
     // ── Shared Batch List Strings ────────────────────────────────────────────
     BATCH_LIST: {
@@ -904,6 +934,7 @@ export const STRINGS = {
     FORM_HEADER: {
       BACK_TO_LIST: "Back to List",
       NEW_SUBMISSION: "New Submission",
+      DRAFT: "Draft",
       EDITING_REJECTED: "Editing Rejected Submission",
       REJECTION_REASON: "Rejection Reason",
     },
@@ -1187,6 +1218,9 @@ export const STRINGS = {
     },
     MIXING: {
       TITLE: "Mixing",
+      FORM_OPENING_TITLE: "Opening Mixing Form",
+      FORM_OPENING_MESSAGE:
+        "Loading batch details, mix cards, and form data. This will only take a moment…",
       COL_MIX_TYPE: "Mix Type",
       COL_MX_STATUS: "MX Status",
       COL_OPERATION_STATUS: "Operation Status",
@@ -1243,7 +1277,7 @@ export const STRINGS = {
       LABEL_BOWL_TRIAL_DATE: "Bowl Trial Date",
       LABEL_BOWL_TRIAL_OBS: "Observations",
       LABEL_PREMIX_DATE: "Premix Date",
-      LABEL_PREMIX_QTY: "Premix Quantity",
+      LABEL_PREMIX_QTY: "Batch Size",
       LABEL_MIXING_CYCLE: "Mixing cycle",
       LABEL_FINAL_MIX_CYCLE: "Select the final mix cycle",
       PLACEHOLDER_FINAL_MIX_CYCLE: "Choose final mix cycle",
@@ -1260,7 +1294,7 @@ export const STRINGS = {
       PLACEHOLDER_MIXER_BLDG: "Choose mixer & building no.",
       PLACEHOLDER_BOWL_ID: "Choose bowl id",
       PLACEHOLDER_BOWL_TRIAL_OBS: "Enter bowl trial observations...",
-      PLACEHOLDER_PREMIX_QTY: "Enter premix quantity",
+      PLACEHOLDER_PREMIX_QTY: "Batch Size",
       PLACEHOLDER_MIXING_CYCLE: "mixing cycle",
       PLACEHOLDER_RPM: "Enter rpm",
       PLACEHOLDER_TIME: "Enter min",
@@ -1326,8 +1360,10 @@ export const STRINGS = {
         "All mixing cards are approved. You can approve or reject the entire form.",
       FINAL_APPROVAL_NOT_READY:
         "All premix and final mix cards must be approved before final form approval.",
-      SAVE_MIX_CARD_DRAFT: "Save Card Draft",
-      SUBMIT_MIX_CARD: "Submit Card for Approval",
+      SAVE_PREMIX_DRAFT: "Save Premix Draft",
+      SUBMIT_PREMIX: "Submit Premix for Approval",
+      SAVE_FINAL_MIX_DRAFT: "Save Final Mix Draft",
+      SUBMIT_FINAL_MIX: "Submit Final Mix for Approval",
       SUBMIT_FOR_FINAL_APPROVAL: "Submit for Final Approval",
       FINAL_APPROVAL_DIALOG_TITLE: "Submit for Final Approval",
       FINAL_APPROVAL_DIALOG_INFO:
@@ -1347,6 +1383,9 @@ export const STRINGS = {
     },
     CASTING_CURING: {
       TITLE: "Casting and Curing",
+      FORM_OPENING_TITLE: "Opening Casting and Curing Form",
+      FORM_OPENING_MESSAGE:
+        "Loading batch details, schemas, and motor form data. This will only take a moment…",
       COL_STAGE: "Stage",
       COL_CC_STATUS: "CC Status",
       TABLE_LABEL: "Casting and curing batch list",
@@ -1387,6 +1426,10 @@ export const STRINGS = {
       FLOW_CASTING_TYPE_PLACEHOLDER: "Select casting type",
       FLOW_CASTING_STATION: "Casting Station",
       FLOW_CASTING_STATION_PLACEHOLDER: "Select station",
+      FLOW_BATCH_MOTORS_AVAILABLE: "No. of Motors available",
+      FLOW_MOTORS_TO_PROCESS: "No. of Motors to Process",
+      FLOW_MOTORS_TO_PROCESS_PLACEHOLDER: "Select count",
+      FLOW_MOTOR_ROW_TITLE: "Motor",
       FLOW_MOTOR_COUNT: "Number of Motors",
       FLOW_MOTOR_COUNT_PLACEHOLDER: "Select count",
       FLOW_MOTOR_ID: "Motor ID",
@@ -1425,6 +1468,14 @@ export const STRINGS = {
       CURING_PROCESS_TITLE: "Curing Process",
       CURING_SELECT_OVEN: "Select Oven",
       CURING_SELECT_OVEN_PLACEHOLDER: "Select oven",
+      CURING_SELECT_OVEN_NO: "Select Oven Number",
+      CURING_SELECT_OVEN_NO_PLACEHOLDER: "Select oven number",
+      CURING_OVEN_NO_OPTION: (n: number) => `Oven no ${n}`,
+      CURING_MOTOR_STAGE: "Motor Stage",
+      CURING_TYPE_NORMAL: "Normal Curing",
+      CURING_TYPE_CONFINED: "Confined Curing",
+      CURING_TYPE_NITROGEN_PRESSURE: "Nitrogen Pressure Curing",
+      CURING_CYCLES_LOADING: "Loading curing configuration…",
       CURING_TYPE: "Type of Curing",
       CURING_TYPE_PLACEHOLDER: "Select curing type",
       CURING_CONFIGURATION: "Curing Configuration",
@@ -1460,9 +1511,43 @@ export const STRINGS = {
       DETAILS_NO_CURING: "No curing data recorded for this motor.",
       DETAILS_CASTING_SETUP: "Casting setup",
       DETAILS_CURING_SETUP: "Curing setup",
+      BATCH_MOTOR_COUNT_LABEL: "Motors",
+      SAVE_MOTOR_DRAFT: "Save Motor Draft",
+      SUBMIT_MOTOR: "Submit Motor for Approval",
+      SUBMIT_FOR_FINAL_APPROVAL: "Submit for Final Approval",
+      MOTOR_LOCKED_WAITING: "This motor is waiting for approval and cannot be edited.",
+      MOTOR_LOCKED_APPROVED: "This motor has been approved and cannot be edited.",
+      MOTOR_DRAFT_CONFIRM_TITLE: "Save motor as draft?",
+      MOTOR_DRAFT_CONFIRM_MESSAGE: (motorId: string) =>
+        `Save draft for motor ${motorId}? You can continue editing later.`,
+      MOTOR_SUBMIT_CONFIRM_TITLE: "Submit motor for approval?",
+      MOTOR_SUBMIT_CONFIRM_MESSAGE: (motorId: string) =>
+        `Submit motor ${motorId} for approval? This motor will be locked until reviewed.`,
+      FINAL_APPROVAL_DIALOG_TITLE: "Submit for Final Approval",
+      FINAL_APPROVAL_DIALOG_INFO:
+        "Review motor approval statuses below. Final approval can proceed only when every motor is approved.",
+      FINAL_APPROVAL_PROCEED: "Proceed",
+      FINAL_APPROVAL_CLOSE: "Close",
+      FINAL_APPROVAL_NOT_READY: "All motors must be approved before submitting for final approval.",
+      FINAL_APPROVAL_COL_MOTOR: "Motor ID",
+      FINAL_APPROVAL_COL_TYPE: "Submission Type",
+      FINAL_APPROVAL_COL_STATUS: "Status",
+      MOTOR_APPROVER_TAB_DISABLED: "This motor has not been submitted for approval yet.",
+      MOTOR_APPROVER_NAV_HINT:
+        "Review each submitted motor. Use arrows to move between motors ready for review.",
+      MOTOR_APPROVER_APPROVE: "Approve Motor",
+      MOTOR_APPROVER_REJECT: "Reject Motor",
+      FORM_APPROVER_APPROVE: "Approve Form",
+      FORM_APPROVER_REJECT: "Reject Form",
+      FORM_APPROVER_ACTIONS_HINT: "All motors are approved. Approve or reject the complete form.",
+      MOTOR_APPROVER_NO_ACTIONABLE:
+        "No motor is ready for review. Select a submitted motor from the tabs above.",
     },
     POST_CURE: {
       TITLE: "Post-Cure Operations",
+      FORM_OPENING_TITLE: "Opening Post-Cure Form",
+      FORM_OPENING_MESSAGE:
+        "Loading batch details, schema, and motor form data. This will only take a moment…",
       COL_OPERATION_TYPE: "Operation Type",
       COL_PC_STATUS: "PC Status",
       TABLE_LABEL: "Post-cure operation batch list",
@@ -1471,12 +1556,15 @@ export const STRINGS = {
       VIEW_DETAILS: "View Details",
       VIEW_DETAILS_TOOLTIP: "View completed details",
       FORM_TITLE: "Post-Cure Operations",
-      FORM_SUBTITLE: "Select motor, receipt date and operation details",
+      FORM_SUBTITLE:
+        "Select a motor tab, enter received date & time and operation, then load the form",
       PANEL_TITLE: "Post-Cure Setup",
       MOTOR_ID_LABEL: "Select Motor Id No.",
       MOTOR_ID_PLACEHOLDER: "Choose motor ID",
       MOTOR_RECEIPT_DATE_LABEL: "Motor Receipt Date",
       MOTOR_RECEIPT_DATE_PLACEHOLDER: "DD-MM-YYYY",
+      MOTOR_RECEIVED_AT_LABEL: "Motor Received Date & Time",
+      MOTOR_RECEIVED_AT_PLACEHOLDER: "DD-MM-YYYY HH:mm",
       OPERATION_LABEL: "Select Operation",
       OPERATION_PLACEHOLDER: "Choose operation",
       OPERATION_LOOSE_FLAP_FILLING: "Loose flap filling",
@@ -1490,13 +1578,16 @@ export const STRINGS = {
       INHIBITOR_TYPE_LABEL: "Select type of Inhibitor to be applied",
       INHIBITOR_TYPE_PLACEHOLDER: "Choose inhibitor type",
       INHIBITOR_TYPE_NOT_APPLICABLE: "Not Applicable",
-      LOAD_FORM: "Load Form",
+      LOAD_FORM: "Load Post Cure Form",
       ADD_MOTOR_ACTION: "Add Motor",
       MOTOR_NAV_TITLE: "Motor Navigation",
       MOTOR_NAV_HINT:
-        "Click a motor tab below to switch between motors and continue filling details.",
+        "Select a motor tab, enter received date & time and operation, then load the form.",
+      BATCH_MOTOR_DETAILS_MISSING:
+        "Motor details are missing from the batch identification sheet. Complete the identification sheet before filling this form.",
       MOTOR_CARD_TITLE: "Motor",
       DELETE_MOTOR_TOOLTIP: "Remove motor",
+      BATCH_MOTOR_COUNT_LABEL: "No. of Motors",
       SCHEMA_LOADING: "Loading form...",
       SCHEMA_FETCH_ERROR: "Schema failed to load. Please try again.",
       SCHEMA_NOT_LOADED: "Load the form schema before saving or submitting.",
@@ -1519,6 +1610,36 @@ export const STRINGS = {
       CREATE_SUBMIT_SUCCESS: "Post-cure form submitted for approval successfully.",
       UPDATE_DRAFT_SUCCESS: "Post-cure form saved as draft successfully.",
       UPDATE_SUBMIT_SUCCESS: "Post-cure form resubmitted for approval successfully.",
+      SAVE_MOTOR_DRAFT: "Save Motor Draft",
+      SUBMIT_MOTOR: "Submit Motor for Approval",
+      SUBMIT_FOR_FINAL_APPROVAL: "Submit for Final Approval",
+      MOTOR_LOCKED_WAITING: "This motor is waiting for approval and cannot be edited.",
+      MOTOR_LOCKED_APPROVED: "This motor has been approved and cannot be edited.",
+      MOTOR_DRAFT_CONFIRM_TITLE: "Save motor as draft?",
+      MOTOR_DRAFT_CONFIRM_MESSAGE: (motorId: string) =>
+        `Save draft for motor ${motorId}? You can continue editing later.`,
+      MOTOR_SUBMIT_CONFIRM_TITLE: "Submit motor for approval?",
+      MOTOR_SUBMIT_CONFIRM_MESSAGE: (motorId: string) =>
+        `Submit motor ${motorId} for approval? This motor will be locked until reviewed.`,
+      FINAL_APPROVAL_DIALOG_TITLE: "Submit for Final Approval",
+      FINAL_APPROVAL_DIALOG_INFO:
+        "Review motor approval statuses below. Final approval can proceed only when every motor is approved.",
+      FINAL_APPROVAL_PROCEED: "Proceed",
+      FINAL_APPROVAL_CLOSE: "Close",
+      FINAL_APPROVAL_NOT_READY: "All motors must be approved before submitting for final approval.",
+      FINAL_APPROVAL_COL_MOTOR: "Motor ID",
+      FINAL_APPROVAL_COL_TYPE: "Submission Type",
+      FINAL_APPROVAL_COL_STATUS: "Status",
+      MOTOR_APPROVER_TAB_DISABLED: "This motor has not been submitted for approval yet.",
+      MOTOR_APPROVER_NAV_HINT:
+        "Review each submitted motor. Use arrows to move between motors ready for review.",
+      MOTOR_APPROVER_APPROVE: "Approve Motor",
+      MOTOR_APPROVER_REJECT: "Reject Motor",
+      FORM_APPROVER_APPROVE: "Approve Form",
+      FORM_APPROVER_REJECT: "Reject Form",
+      FORM_APPROVER_ACTIONS_HINT: "All motors are approved. Approve or reject the complete form.",
+      MOTOR_APPROVER_NO_ACTIONABLE:
+        "No motor is ready for review. Select a submitted motor from the tabs above.",
       UNSAVED_BACK_TITLE: "Unsaved changes detected",
       UNSAVED_BACK_MESSAGE:
         "You have unsaved post-cure changes. Save as draft to avoid losing your data.",
@@ -1527,6 +1648,9 @@ export const STRINGS = {
     },
     TRIMMING: {
       TITLE: "Trimming",
+      FORM_OPENING_TITLE: "Opening Trimming Form",
+      FORM_OPENING_MESSAGE:
+        "Loading batch details, schema, and motor form data. This will only take a moment…",
       COL_TR_STATUS: "TR Status",
       TABLE_LABEL: "Trimming batch list",
       VIEW_DETAILS: "View Details",
@@ -1534,7 +1658,8 @@ export const STRINGS = {
       EMPTY_TEXT: "No trimming batches found",
       NEW_LABEL: "New Submission",
       FORM_TITLE: "Trimming Operations",
-      FORM_SUBTITLE: "Record trimming machine details and post-trim dimensions",
+      FORM_SUBTITLE:
+        "Select a motor tab, fill trimming details, then save draft or submit per motor",
       MOTOR_STAGE_LABEL: "Motor Stage",
       MOTOR_STAGE_PLACEHOLDER: "Select motor stage",
       MOTOR_COUNT_LABEL: "No. of Motor(s)",
@@ -1548,7 +1673,8 @@ export const STRINGS = {
       MOTOR_STAGES_LOADING: "Loading motor stages...",
       APPROVED_MOTORS_LOADING: "Loading approved motors...",
       MOTOR_NAV_TITLE: "Motor Navigation",
-      MOTOR_NAV_HINT: "Click a motor tab below to open its trimming details.",
+      MOTOR_NAV_HINT:
+        "Review each motor. Save draft or submit for approval per motor; final approval when all are approved.",
       MOTOR_CARD_TITLE: "Motor",
       NAV_BACK: "Back",
       NAV_NEXT: "Next",
@@ -1568,6 +1694,42 @@ export const STRINGS = {
       CREATE_SUBMIT_SUCCESS: "Trimming form submitted for approval successfully.",
       UPDATE_DRAFT_SUCCESS: "Trimming form saved as draft successfully.",
       UPDATE_SUBMIT_SUCCESS: "Trimming form resubmitted for approval successfully.",
+      SAVE_MOTOR_DRAFT: "Save Motor Draft",
+      SUBMIT_MOTOR: "Submit Motor for Approval",
+      SUBMIT_FOR_FINAL_APPROVAL: "Submit for Final Approval",
+      MOTOR_LOCKED_WAITING: "This motor is waiting for approval and cannot be edited.",
+      MOTOR_LOCKED_APPROVED: "This motor has been approved and cannot be edited.",
+      MOTOR_RECEIVED_REQUIRED: "Enter motor received date before submitting this motor.",
+      MOTOR_SAVE_DRAFT_SUCCESS: (motorId: string) =>
+        `Draft saved for motor ${motorId} successfully.`,
+      MOTOR_SUBMIT_SUCCESS: (motorId: string) =>
+        `Motor ${motorId} submitted for approval successfully.`,
+      MOTOR_DRAFT_CONFIRM_TITLE: "Save motor as draft?",
+      MOTOR_DRAFT_CONFIRM_MESSAGE: (motorId: string) =>
+        `Save draft for motor ${motorId}? You can continue editing later.`,
+      MOTOR_SUBMIT_CONFIRM_TITLE: "Submit motor for approval?",
+      MOTOR_SUBMIT_CONFIRM_MESSAGE: (motorId: string) =>
+        `Submit motor ${motorId} for approval? This motor will be locked until reviewed.`,
+      FINAL_APPROVAL_DIALOG_TITLE: "Submit for Final Approval",
+      FINAL_APPROVAL_DIALOG_INFO:
+        "Review motor approval statuses below. Final approval can proceed only when every motor is approved.",
+      FINAL_APPROVAL_PROCEED: "Proceed",
+      FINAL_APPROVAL_CLOSE: "Close",
+      FINAL_APPROVAL_NOT_READY: "All motors must be approved before submitting for final approval.",
+      FINAL_APPROVAL_COL_MOTOR: "Motor ID",
+      FINAL_APPROVAL_COL_TYPE: "Submission Type",
+      FINAL_APPROVAL_COL_STATUS: "Status",
+      BATCH_MOTOR_COUNT_LABEL: "No. of Motors",
+      MOTOR_APPROVER_TAB_DISABLED: "This motor has not been submitted for approval yet.",
+      MOTOR_APPROVER_NAV_HINT:
+        "Review each submitted motor. Use arrows to move between motors ready for review.",
+      MOTOR_APPROVER_APPROVE: "Approve Motor",
+      MOTOR_APPROVER_REJECT: "Reject Motor",
+      FORM_APPROVER_APPROVE: "Approve Form",
+      FORM_APPROVER_REJECT: "Reject Form",
+      FORM_APPROVER_ACTIONS_HINT: "All motors are approved. Approve or reject the complete form.",
+      MOTOR_APPROVER_NO_ACTIONABLE:
+        "No motor is ready for review. Select a submitted motor from the tabs above.",
       UNSAVED_BACK_TITLE: "Unsaved changes detected",
       UNSAVED_BACK_MESSAGE:
         "You have unsaved trimming changes. Save as draft to avoid losing your data.",
@@ -1581,6 +1743,9 @@ export const STRINGS = {
     },
     SUBSCALE: {
       TITLE: "Subscale",
+      FORM_OPENING_TITLE: "Opening Subscale Form",
+      FORM_OPENING_MESSAGE:
+        "Loading batch details, hardware setup, and processing form data. This will only take a moment…",
       COL_ARTICLE_ID: "Article ID",
       COL_SS_STATUS: "SS Status",
       TABLE_LABEL: "Subscale batch list",
@@ -1601,6 +1766,7 @@ export const STRINGS = {
       BATCH_ID_MISSING: "Unable to create form. Batch ID is missing.",
       SUB_DEPARTMENT_MISSING: "Unable to proceed. Sub-department context is missing.",
       EMPTY_FORM_ERROR: "Add at least one value before saving or submitting.",
+      LOAD_FORM_REQUIRED: "Load the subscale form before saving or submitting.",
       CREATE_FAILED: "Failed to create subscale form.",
       UPDATE_FAILED: "Failed to update subscale form.",
       CREATE_DRAFT_SUCCESS: "Subscale form saved as draft successfully.",
@@ -1628,25 +1794,37 @@ export const STRINGS = {
         COL_SLEEVE_NO: "Sleeve No.",
         COL_MOULD_NO: "Mould No.",
         COL_DIMENSION: "Dimension",
-        COL_LENGTH: "Length (mm)",
+        COL_LENGTH: "Size (mm)",
         COL_THICKNESS: "Thickness (mm)",
-        COL_LINER_APPLIED: "Liner Applied",
+        COL_LINER_APPLIED: "Liner Applied Quantity (Gms)",
         COL_OBSERVATIONS: "Observations",
         MAIN_SCALE_PANEL_HINT:
           "Load the main scale processing form. Hardware preparation details are captured first.",
+        LOAD_FORM: "Load Subscale Form",
+        LOADING_FORM_TITLE: "Loading Subscale Form",
+        LOADING_FORM_MESSAGE: "Preparing article and process tables…",
+        SAVE_DRAFT: "Save as Draft",
+        SUBMIT: "Submit for Approval",
+        RESUBMIT: "Resubmit for Approval",
         HARDWARE_LOCKED:
           "Complete the general batch information above to enable hardware preparation.",
       },
       BATCH_SETUP: {
         GENERAL_TITLE: "General Batch Information",
-        BATCH_SIZE: "Batch Size",
-        MIXER_BLDG_NO: "Mixer & Bldg No.",
+        BATCH_SIZE: "Batch Size (KG)",
+        MIXER_BLDG_NO: "Bldg No.",
         PREMIX_DATE: "Premix Date",
         FINAL_MIX_DATE: "Final Mix Date",
         MIXING_CYCLE_TITLE: "Mixing Cycle",
         MIXING_CYCLE_HINT: "Select motor stage-wise mixing cycle and enter process particulars.",
         MIXING_CYCLE_LABEL: "Mixing Cycle {index}",
-        MIXING_CYCLE_STAGE: "Mixing Cycle (Motor Stage)",
+        MIXING_CYCLE_STAGE: "Motor Stage",
+        MIXING_CYCLE_STAGE_PLACEHOLDER: "Select motor stage",
+        MIXING_CYCLE_SELECT_LABEL: "Mixing Cycle",
+        MIXING_CYCLE_SELECT_PLACEHOLDER: "Select mixing cycle",
+        MIXING_CYCLE_SELECT_STAGE_FIRST: "Select motor stage first",
+        MIXING_CYCLES_LOADING: "Loading mixing cycles...",
+        MOTOR_STAGES_LOADING: "Loading motor stages...",
         ADD_MIXING_CYCLE: "Add Mixing Cycle",
         PROCESS_PARTICULARS_EMPTY: "Select a mixing cycle stage to load process particulars.",
       },
@@ -1674,6 +1852,7 @@ export const STRINGS = {
     },
     FORM_HEADER: {
       BACK_TO_LIST: "Back to List",
+      DRAFT: "Draft",
       EDITING_REJECTED: "Editing Rejected Submission",
       REJECTION_REASON: "Rejection Reason",
     },
@@ -1746,6 +1925,9 @@ export const STRINGS = {
       TABLE_LABEL: "Quality Control batch list",
       COL_STATUS: "QC Status",
       TITLE: "Quality Control",
+      FORM_OPENING_TITLE: "Opening Quality Control Form",
+      FORM_OPENING_MESSAGE:
+        "Loading batch details, division schema, and form data. This will only take a moment…",
       SUBTITLE: "Select division and form type to load the QC schema",
       DIVISION_LABEL: "Division",
       DIVISION_PLACEHOLDER: "Select division",
@@ -1933,11 +2115,14 @@ export const STRINGS = {
       DIVISION_ALREADY_ADDED: "This division configuration is already added.",
     },
     NDT: {
+      FORM_OPENING_TITLE: "Opening NDT Form",
+      FORM_OPENING_MESSAGE:
+        "Loading batch details, schema, and motor form data. This will only take a moment…",
       NEW_LABEL: "New NDT Submission",
       TABLE_LABEL: "NDT batch list",
       COL_STATUS: "NDT Status",
       TITLE: "NDT",
-      SUBTITLE: "Non-destructive testing - defect observations",
+      SUBTITLE: "Non-destructive testing",
       EDIT_MODE_BANNER:
         "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
       DETAILS_FETCH_ERROR: "Unable to load existing NDT report details. Please try again.",
@@ -1975,6 +2160,43 @@ export const STRINGS = {
       UPDATE_DRAFT_SUCCESS: "NDT draft updated successfully.",
       CREATE_SUBMIT_SUCCESS: "NDT report submitted for approval successfully.",
       UPDATE_SUBMIT_SUCCESS: "NDT report resubmitted for approval successfully.",
+      SAVE_MOTOR_DRAFT: "Save Motor Draft",
+      SUBMIT_MOTOR: "Submit Motor for Approval",
+      SUBMIT_FOR_FINAL_APPROVAL: "Submit for Final Approval",
+      MOTOR_LOCKED_WAITING: "This motor is waiting for approval and cannot be edited.",
+      MOTOR_LOCKED_APPROVED: "This motor has been approved and cannot be edited.",
+      MOTOR_SAVE_DRAFT_SUCCESS: (motorId: string) =>
+        `Draft saved for motor ${motorId} successfully.`,
+      MOTOR_SUBMIT_SUCCESS: (motorId: string) =>
+        `Motor ${motorId} submitted for approval successfully.`,
+      MOTOR_DRAFT_CONFIRM_TITLE: "Save motor as draft?",
+      MOTOR_DRAFT_CONFIRM_MESSAGE: (motorId: string) =>
+        `Save draft for motor ${motorId}? You can continue editing later.`,
+      MOTOR_SUBMIT_CONFIRM_TITLE: "Submit motor for approval?",
+      MOTOR_SUBMIT_CONFIRM_MESSAGE: (motorId: string) =>
+        `Submit motor ${motorId} for approval? This motor will be locked until reviewed.`,
+      FINAL_APPROVAL_DIALOG_TITLE: "Submit for Final Approval",
+      FINAL_APPROVAL_DIALOG_INFO:
+        "Review motor approval statuses below. Final approval can proceed only when every motor is approved.",
+      FINAL_APPROVAL_PROCEED: "Proceed",
+      FINAL_APPROVAL_CLOSE: "Close",
+      FINAL_APPROVAL_NOT_READY: "All motors must be approved before submitting for final approval.",
+      FINAL_APPROVAL_COL_MOTOR: "Motor ID",
+      FINAL_APPROVAL_COL_TYPE: "Submission Type",
+      FINAL_APPROVAL_COL_STATUS: "Status",
+      BATCH_MOTOR_COUNT_LABEL: "No. of Motors",
+      MOTOR_NAV_TITLE: "Motor navigation",
+      MOTOR_NAV_HINT: "Switch between motors to fill inspection details.",
+      MOTOR_APPROVER_TAB_DISABLED: "This motor has not been submitted for approval yet.",
+      MOTOR_APPROVER_NAV_HINT:
+        "Review each submitted motor. Use arrows to move between motors ready for review.",
+      MOTOR_APPROVER_APPROVE: "Approve Motor",
+      MOTOR_APPROVER_REJECT: "Reject Motor",
+      FORM_APPROVER_APPROVE: "Approve Form",
+      FORM_APPROVER_REJECT: "Reject Form",
+      FORM_APPROVER_ACTIONS_HINT: "All motors are approved. Approve or reject the complete form.",
+      MOTOR_APPROVER_NO_ACTIONABLE:
+        "No motor is ready for review. Select a submitted motor from the tabs above.",
       DELETE_MOTOR_TOOLTIP: "Remove motor",
       DETAILS_BATCH_SECTION: "Batch information",
       DETAILS_FORM_SECTION: "NDT form details",
@@ -1985,7 +2207,8 @@ export const STRINGS = {
     STATIC_TEST_FACILITY: {
       NEW_LABEL: "New STF Record",
       TABLE_LABEL: "Static Test Facility batch list",
-      COL_STATUS: "STF Status",
+      COL_BEM_MOTOR_IDS: "BEM IDs",
+      COL_STATUS: "Status",
       TITLE: "Static Testing Facility",
       SUBTITLE: "Record static testing process parameters and evaluation details",
       SCHEMA_FETCH_ERROR: "Unable to load static testing schema. Please try again.",
@@ -2030,11 +2253,61 @@ export const STRINGS = {
       DETAILS_MOTOR_NAV_HINT: "Click a motor tab below to view its static testing details.",
       DETAILS_NO_MOTOR_DATA: "No form data recorded for this motor.",
       MOTOR_NAV_TITLE: "Motor navigation",
+      MOTOR_NAV_HINT: "Switch between motors to fill static testing details.",
       MOTOR_CARD_TITLE: "Motor",
       BEM_CARD_TITLE: "BEM",
+      BATCH_MOTOR_COUNT_LABEL: "No. of Motors",
+      SAVE_MOTOR_DRAFT: "Save Motor Draft",
+      SUBMIT_MOTOR: "Submit Motor for Approval",
+      SUBMIT_FOR_FINAL_APPROVAL: "Submit for Final Approval",
+      MOTOR_LOCKED_WAITING: "This motor is waiting for approval and cannot be edited.",
+      MOTOR_LOCKED_APPROVED: "This motor has been approved and cannot be edited.",
+      DELETE_MOTOR_TOOLTIP: "Remove BEM motor",
+      BEM_MOTOR_REMOVE_LOCKED:
+        "This BEM motor cannot be removed after it has been saved or submitted.",
+      MOTOR_SAVE_DRAFT_SUCCESS: (motorId: string) =>
+        `Draft saved for motor ${motorId} successfully.`,
+      MOTOR_SUBMIT_SUCCESS: (motorId: string) =>
+        `Motor ${motorId} submitted for approval successfully.`,
+      MOTOR_DRAFT_CONFIRM_TITLE: "Save motor as draft?",
+      MOTOR_DRAFT_CONFIRM_MESSAGE: (motorId: string) =>
+        `Save draft for motor ${motorId}? You can continue editing later.`,
+      MOTOR_SUBMIT_CONFIRM_TITLE: "Submit motor for approval?",
+      MOTOR_SUBMIT_CONFIRM_MESSAGE: (motorId: string) =>
+        `Submit motor ${motorId} for approval? This motor will be locked until reviewed.`,
+      FINAL_APPROVAL_NOT_READY:
+        "All motors must be approved before submitting for final approval.",
+      FORM_OPENING_TITLE: "Opening Static Test Facility Form",
+      FORM_OPENING_MESSAGE:
+        "Loading batch details, schema, and motor form data. This will only take a moment…",
+      FORM_HEADER_CREATE_OTHER_BEM_TITLE: "Create Other BEM Motor",
+      FORM_HEADER_CREATE_OTHER_BEM_SUBTITLE: "Enter details to register a new other BEM motor",
+      OTHER_BEM_FORM_OPENING_TITLE: "Opening Other BEM Motor",
+      OTHER_BEM_FORM_OPENING_MESSAGE: "Loading schema and preparing the form. This will only take a moment…",
+      OTHER_BEM_DETAILS_TITLE: "Other BEM Motor Details",
+      OTHER_BEM_DETAILS_SUBTITLE:
+        "Enter static testing details for other BEM motor per conditioning, grain dimension, and hardware format",
+      OTHER_BEM_MOTOR_NO_LABEL: "Other BEM Motor No.",
+      OTHER_BEM_MOTOR_NO_PLACEHOLDER: "Enter Other BEM motor No.",
+      STF_TEST_NO_LABEL: "STF Test No.",
+      STF_TEST_NO_PLACEHOLDER: "Enter STF Test No.",
+      MOTOR_APPROVER_TAB_DISABLED: "This motor has not been submitted for approval yet.",
+      MOTOR_APPROVER_NAV_HINT:
+        "Select a motor tab to review its static testing details and approve or reject.",
+      MOTOR_APPROVER_APPROVE: "Approve Motor",
+      MOTOR_APPROVER_REJECT: "Reject Motor",
+      FORM_APPROVER_APPROVE: "Approve Form",
+      FORM_APPROVER_REJECT: "Reject Form",
+      FORM_APPROVER_ACTIONS_HINT:
+        "All motors are approved. Approve or reject the complete form.",
+      MOTOR_APPROVER_NO_ACTIONABLE:
+        "No submitted motor is available for review right now.",
     },
   },
   DISPATCH: {
+    FORM_OPENING_TITLE: "Opening Dispatch Form",
+    FORM_OPENING_MESSAGE:
+      "Loading batch details, schema, and motor form data. This will only take a moment…",
     BATCH_LIST: {
       COL_BATCH_ID: "Batch ID",
       COL_PROJECT: "Project",
@@ -2111,6 +2384,41 @@ export const STRINGS = {
     UPDATE_DRAFT_SUCCESS: "Dispatch draft updated successfully.",
     CREATE_SUBMIT_SUCCESS: "Dispatch record submitted for approval successfully.",
     UPDATE_SUBMIT_SUCCESS: "Dispatch record resubmitted for approval successfully.",
+    SAVE_MOTOR_DRAFT: "Save Motor Draft",
+    SUBMIT_MOTOR: "Submit Motor for Approval",
+    SUBMIT_FOR_FINAL_APPROVAL: "Submit for Final Approval",
+    MOTOR_LOCKED_WAITING: "This motor is waiting for approval and cannot be edited.",
+    MOTOR_LOCKED_APPROVED: "This motor has been approved and cannot be edited.",
+    MOTOR_SAVE_DRAFT_SUCCESS: (motorId: string) => `Draft saved for motor ${motorId} successfully.`,
+    MOTOR_SUBMIT_SUCCESS: (motorId: string) =>
+      `Motor ${motorId} submitted for approval successfully.`,
+    MOTOR_DRAFT_CONFIRM_TITLE: "Save motor as draft?",
+    MOTOR_DRAFT_CONFIRM_MESSAGE: (motorId: string) =>
+      `Save draft for motor ${motorId}? You can continue editing later.`,
+    MOTOR_SUBMIT_CONFIRM_TITLE: "Submit motor for approval?",
+    MOTOR_SUBMIT_CONFIRM_MESSAGE: (motorId: string) =>
+      `Submit motor ${motorId} for approval? This motor will be locked until reviewed.`,
+    FINAL_APPROVAL_DIALOG_TITLE: "Submit for Final Approval",
+    FINAL_APPROVAL_DIALOG_INFO:
+      "Review motor approval statuses below. Final approval can proceed only when every motor is approved.",
+    FINAL_APPROVAL_PROCEED: "Proceed",
+    FINAL_APPROVAL_CLOSE: "Close",
+    FINAL_APPROVAL_NOT_READY: "All motors must be approved before submitting for final approval.",
+    FINAL_APPROVAL_COL_MOTOR: "Motor ID",
+    FINAL_APPROVAL_COL_TYPE: "Submission Type",
+    FINAL_APPROVAL_COL_STATUS: "Status",
+    BATCH_MOTOR_COUNT_LABEL: "No. of Motors",
+    MOTOR_NAV_TITLE: "Motor navigation",
+    MOTOR_NAV_HINT: "Switch between motors to fill dispatch details.",
+    MOTOR_APPROVER_TAB_DISABLED: "This motor has not been submitted for approval yet.",
+    MOTOR_APPROVER_NAV_HINT:
+      "Review each submitted motor. Use arrows to move between motors ready for review.",
+    MOTOR_APPROVER_APPROVE: "Approve Motor",
+    MOTOR_APPROVER_REJECT: "Reject Motor",
+    FORM_APPROVER_APPROVE: "Approve Form",
+    FORM_APPROVER_REJECT: "Reject Form",
+    FORM_APPROVER_ACTIONS_HINT: "All motors are approved. Approve or reject the complete form.",
+    MOTOR_APPROVER_NO_ACTIONABLE: "No submitted motor is available for review right now.",
     UNSAVED_BACK_TITLE: "Unsaved changes detected",
     UNSAVED_BACK_MESSAGE:
       "You have unsaved dispatch changes. Save as draft to avoid losing your data.",
@@ -2205,8 +2513,16 @@ export const STRINGS = {
           "Motor casing verification, dimensional validation and release approvals",
         ROCKET_CASING_SECTION: "Rocket Casing Submissions",
       },
-      MANUFACTURING: {
-        DEPARTMENT_NAME: "Manufacturing Department",
+  MANUFACTURING: {
+    DEPARTMENT_NAME: "Manufacturing Department",
+    PREVIOUS_STAGE_UNIT_DISABLED:
+      "This unit was not approved in the previous stage and cannot be filled yet.",
+    PREVIOUS_STAGE_PREMIX_TAB_DISABLED:
+      "This premix was not approved in Raw Material Preparation.",
+    PREVIOUS_STAGE_MOTOR_TAB_DISABLED:
+      "This motor was not approved in the previous stage.",
+    PREVIOUS_STAGE_NO_UNITS:
+      "No units from the previous stage are approved yet. Complete prior approvals to continue.",
         RAW_MATERIAL_LABEL: "Raw Material Preparation",
         RAW_MATERIAL_DESCRIPTION:
           "HTPB weighing, DOA mixing, curing agent and binder preparation approvals",

@@ -1,5 +1,14 @@
 import { useMemo, useState } from "react";
-import { Box, Button, CircularProgress, Dialog, DialogContent, IconButton, Stack, Typography } from "@mui/material";
+import {
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogContent,
+  IconButton,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { alpha } from "@mui/material/styles";
 
 import { useThemeStore } from "../../../../app/store/themeStore";
@@ -11,6 +20,8 @@ import { STRINGS } from "../../../../app/config/strings";
 import type { StfDetailView } from "../../../../data/models/user/StaticTestFacilityApiModel";
 import { ReportPreviewDialog } from "../components/ReportPdf";
 import STFDetailsContent from "../../user/qualityControl/StaticTestFacility/components/STFDetailsContent";
+import STFApproverReviewContent from "./STFApproverReviewContent";
+import { OtherBemDetailView } from "@/data/models/approver/OtherBemApiModel";
 
 const {
   approved: CheckCircleRoundedIcon,
@@ -28,49 +39,74 @@ const STF_ACCENT = {
 export type STFApproverDetailItem = Record<string, unknown> & {
   formId?: string | null;
   batchId?: string | null;
+  motorId?: string | null;
   batchType?: string | null;
   status?: string | null;
   stfStatus?: string | null;
+  bemStatus?: string | null;
+  detailView?: StfDetailView | OtherBemDetailView | null;
 };
 
 type STFApproverDetailDialogProps = {
   open: boolean;
   onClose: () => void;
   item: STFApproverDetailItem | null;
-  detailView: StfDetailView | null;
+  detailView?: StfDetailView | OtherBemDetailView | null;
   loading: boolean;
+  activeMotorId?: string | null;
+  onActiveMotorChange?: (motorId: string) => void;
   onApprove: (item: STFApproverDetailItem) => void;
   onReject: (item: STFApproverDetailItem) => void;
+  onApproveForm?: (item: STFApproverDetailItem) => void;
+  onRejectForm?: (item: STFApproverDetailItem) => void;
+  actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
+  subDepartment?: "static-test-facility" | "other-bem-motors" | string;
 };
 
 const STFApproverDetailDialog = ({
   open,
   onClose,
   item,
-  detailView,
+  detailView: detailViewProp,
   loading,
+  activeMotorId = null,
+  onActiveMotorChange,
   onApprove,
   onReject,
+  onApproveForm,
+  onRejectForm,
+  actionLoading = false,
   theme,
+  subDepartment = "static-test-facility",
 }: STFApproverDetailDialogProps) => {
   const [pdfOpen, setPdfOpen] = useState(false);
   const mode = useThemeStore((state) => state.mode);
   const qcTheme = useMemo(() => getQualityControlTheme(mode), [mode]);
   const strings = STRINGS.QUALITY_CONTROL.STATIC_TEST_FACILITY;
+  const isAcemFlow = subDepartment === "static-test-facility";
 
   if (!item) return null;
 
-  const rowStatus = String(item.stfStatus ?? item.status ?? detailView?.status ?? "");
-  const canApproveOrReject = isApproverActionableStatus(rowStatus);
-  const motorIds = (detailView?.motors ?? []).map((motor) => motor.motorId).filter(Boolean);
+  const detailView = (isAcemFlow ? item.detailView : detailViewProp ?? item.detailView) as
+    | StfDetailView
+    | OtherBemDetailView
+    | null;
+
+  const rowStatus = String(
+    item.stfStatus ?? item.bemStatus ?? item.status ?? detailView?.status ?? "",
+  );
+  const canApproveOrReject = !isAcemFlow && isApproverActionableStatus(rowStatus);
+
+  const displayId = item.batchId ?? item.motorId ?? (detailView as StfDetailView)?.batchId ?? "";
+  const formId = detailView?.formId ?? item.formId ?? null;
 
   return (
     <>
       <Dialog
         open={open}
         onClose={onClose}
-        maxWidth="xl"
+        maxWidth={isAcemFlow ? "lg" : "xl"}
         fullWidth
         PaperProps={{ sx: { ...theme.dialog.paper, maxHeight: "92vh" } }}
       >
@@ -83,13 +119,14 @@ const STFApproverDetailDialog = ({
           <Stack direction="row" alignItems="center" gap={1.5}>
             <RocketLaunchRoundedIcon sx={theme.dialog.headerIcon} />
             <Box>
-              <Typography sx={theme.dialog.headerTitle}>{strings.TITLE} Submission</Typography>
+              <Typography sx={theme.dialog.headerTitle}>
+                {subDepartment === "other-bem-motors" ? "Other BEM Motor" : strings.TITLE}{" "}
+                Submission
+              </Typography>
               <Typography sx={theme.dialog.headerSubtitle}>
-                {item.batchId}
-                {loading ? " · loading…" : item.formId ? ` · ${item.formId}` : ""}
-                {!loading && motorIds.length > 0
-                  ? ` · ${motorIds.length} motor${motorIds.length === 1 ? "" : "s"}`
-                  : ""}
+                {displayId}
+                {loading ? " · loading…" : activeMotorId ? ` · ${activeMotorId}` : ""}
+                {!loading && formId ? ` · ${formId}` : ""}
               </Typography>
             </Box>
           </Stack>
@@ -100,7 +137,7 @@ const STFApproverDetailDialog = ({
               variant="contained"
               startIcon={<PictureAsPdfRoundedIcon sx={{ fontSize: "14px !important" }} />}
               onClick={() => setPdfOpen(true)}
-              disabled={loading || !item.formId}
+              disabled={loading || !formId || actionLoading}
               sx={theme.dialog.pdfButton}
             >
               View as PDF
@@ -112,30 +149,52 @@ const STFApproverDetailDialog = ({
         </Box>
 
         <DialogContent sx={theme.dialog.content}>
-          <STFDetailsContent
-            detailView={detailView}
-            row={{
-              ...item,
-              status: rowStatus || detailView?.status,
-              stfStatus: rowStatus || detailView?.status,
-            }}
-            loading={loading}
-            theme={qcTheme}
-            resetOnFormId={detailView?.formId ?? item.formId ?? null}
-          />
+          {isAcemFlow ? (
+            <STFApproverReviewContent
+              detailView={detailView as StfDetailView | null}
+              loading={loading}
+              activeMotorId={activeMotorId}
+              onActiveMotorChange={onActiveMotorChange ?? (() => undefined)}
+              onApprove={() => onApprove(item)}
+              onReject={() => onReject(item)}
+              onApproveForm={onApproveForm ? () => onApproveForm(item) : undefined}
+              onRejectForm={onRejectForm ? () => onRejectForm(item) : undefined}
+              actionLoading={actionLoading}
+              formStatus={rowStatus}
+              qcTheme={qcTheme}
+              approverTheme={theme}
+            />
+          ) : (
+            <STFDetailsContent
+              detailView={detailView as StfDetailView | null}
+              row={{
+                ...item,
+                status: rowStatus,
+                stfStatus: rowStatus,
+              }}
+              loading={loading}
+              theme={qcTheme}
+              resetOnFormId={formId}
+            />
+          )}
         </DialogContent>
 
         <Box sx={theme.dialog.footer}>
-          <Button variant="outlined" onClick={onClose} disabled={loading} sx={theme.dialog.closeAction}>
+          <Button
+            variant="outlined"
+            onClick={onClose}
+            disabled={loading || actionLoading}
+            sx={theme.dialog.closeAction}
+          >
             Close
           </Button>
-          {canApproveOrReject ? (
+          {!isAcemFlow && canApproveOrReject ? (
             <>
               <Button
                 variant="contained"
                 startIcon={<CancelRoundedIcon />}
                 onClick={() => onReject(item)}
-                disabled={loading}
+                disabled={loading || actionLoading}
                 sx={theme.dialog.rejectAction}
               >
                 Reject
@@ -144,7 +203,7 @@ const STFApproverDetailDialog = ({
                 variant="contained"
                 startIcon={<CheckCircleRoundedIcon />}
                 onClick={() => onApprove(item)}
-                disabled={loading}
+                disabled={loading || actionLoading}
                 sx={theme.dialog.approveAction}
               >
                 Approve
@@ -157,10 +216,10 @@ const STFApproverDetailDialog = ({
       <ReportPreviewDialog
         open={pdfOpen}
         onClose={() => setPdfOpen(false)}
-        formId={item.formId}
+        formId={formId}
         department="qualityControl"
-        subDepartment="static-test-facility"
-        dialogTitle={`${strings.TITLE} Report — ${item.batchId}`}
+        subDepartment={subDepartment}
+        dialogTitle={`${subDepartment === "other-bem-motors" ? "Other BEM Motor" : strings.TITLE} Report — ${displayId}`}
       />
     </>
   );

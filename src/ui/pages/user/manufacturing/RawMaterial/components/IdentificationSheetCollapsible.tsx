@@ -155,7 +155,7 @@ const IdentificationSheetCollapsible = ({
             p: 1.5,
             borderRadius: 2,
             border: `1px solid ${theme.palette.border}`,
-            background: theme.palette.background,
+            background: theme.palette.pageBg,
           }}
         >
           <Typography sx={{ ...dt.sectionTitle, mb: 1.25 }}>

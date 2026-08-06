@@ -233,8 +233,36 @@ export const useRocketMotorCasingApproverHook = () => {
     setSubmitting(false);
 
     if (response.success) {
-      setSelected(null);
+      const nextStatus =
+        (response.data as { status?: string })?.status ??
+        (actionType === "APPROVED" ? "Approved" : "Rejected");
+
       closeDialog();
+
+      setDetailsLoading(true);
+      const detailsResponse = await rocketMotorCasingController.fetchFormDetails({
+        motorCasingId,
+      });
+      setDetailsLoading(false);
+
+      if (detailsResponse?.success && detailsResponse?.data) {
+        const model = detailsResponse.data as RocketMotorCasingDetailsModel;
+        setSelected((current) =>
+          current
+            ? {
+                ...current,
+                status: nextStatus,
+                motorCasingId,
+                batchId: motorCasingId,
+                formId: motorCasingId,
+                casingBlocks: RocketMotorCasingDetailsModel.toDetailBlocks(model),
+              }
+            : current,
+        );
+      } else {
+        setSelected((current) => (current ? { ...current, status: nextStatus } : current));
+      }
+
       bumpListVersion();
       showAlert(getResponseMessage(response), "success", { autoCloseMs: 2000 });
       return;

@@ -6,7 +6,9 @@ import { APPROVER_STATUS_META } from "../../../../app/theme/approver";
 import useDispatchApproverHook from "../../../../hooks/approver/useDispatchApproverHook";
 import ApproverSubdepartmentBatchListSection from "../components/ApproverSubdepartmentBatchListSection";
 import ApproverActionDialog from "../../../components/custom/ApproverActionDialog";
-import DispatchApproverDetailDialog from "./DispatchApproverDetailDialog";
+import DispatchApproverDetailDialog, {
+  type DispatchApproverDetailItem,
+} from "./DispatchApproverDetailDialog";
 
 const BRAND = {
   primary: "#1B4F72",
@@ -26,12 +28,17 @@ const DispatchApproverPage = () => {
     items,
     selected,
     detailsLoading,
-    detailView,
+    activeMotorId,
     dialogProps,
+    formDialogProps,
+    actionLoading,
     requestApprove,
     requestReject,
+    requestFormApprove,
+    requestFormReject,
     handleViewDetails,
     handleCloseDetail,
+    handleActiveMotorChange,
   } = useDispatchApproverHook();
 
   return (
@@ -55,14 +62,19 @@ const DispatchApproverPage = () => {
       <DispatchApproverDetailDialog
         open={!!selected}
         onClose={handleCloseDetail}
-        item={selected}
-        detailView={detailView}
+        item={selected as DispatchApproverDetailItem | null}
         loading={detailsLoading}
+        activeMotorId={activeMotorId}
+        onActiveMotorChange={handleActiveMotorChange}
         onApprove={requestApprove}
         onReject={requestReject}
+        onApproveForm={requestFormApprove}
+        onRejectForm={requestFormReject}
+        actionLoading={actionLoading}
         theme={approverTheme}
       />
       <ApproverActionDialog {...dialogProps} />
+      <ApproverActionDialog {...formDialogProps} />
     </ApproverSubdepartmentBatchListSection>
   );
 };

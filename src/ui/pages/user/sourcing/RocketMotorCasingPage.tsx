@@ -1,6 +1,7 @@
-import { Box, CircularProgress, Stack, Typography } from "@mui/material";
+import { Box } from "@mui/material";
 import { useMemo } from "react";
 import ConfirmAlertDialog from "../../../components/common/ConfirmAlertDialog";
+import WorkflowFormOpeningLoader from "../../../components/common/WorkflowFormOpeningLoader";
 import { useThemeStore } from "../../../../app/store/themeStore";
 import getSourcingTheme from "../../../../app/theme/custom_themes/user/sourcing/sourcing_theme";
 import useRocketMotorCasingHook from "../../../../hooks/user/sourcing/useRocketMotorCasingHook";
@@ -18,9 +19,11 @@ import { OPERATION_STATUS } from "../../../../hooks/operationStatus";
 const RocketMotorCasing = () => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getSourcingTheme(mode), [mode]);
+  const strings = STRINGS.SOURCING.CASING;
 
   const hookState = useRocketMotorCasingHook();
   const {
+    loading,
     view,
     detailsRow,
     detailsBlocks,
@@ -100,9 +103,23 @@ const RocketMotorCasing = () => {
     .filter(Boolean)
     .join(" · ");
 
+  const listLoading = loading && !loadingFormDetails && view === "list";
+
   return (
     <Box sx={theme.workflow.animatedContainer}>
-      {view === "list" && (
+      <WorkflowFormOpeningLoader
+        open={listLoading || Boolean(loadingFormDetails)}
+        title={loadingFormDetails ? strings.FORM_OPENING_TITLE : strings.TITLE}
+        message={
+          loadingFormDetails
+            ? strings.FORM_OPENING_MESSAGE
+            : "Loading rocket motor casing batches…"
+        }
+        color={theme.palette.primary}
+        accentColor={theme.palette.primaryLight}
+      />
+
+      {view === "list" && !listLoading && (
         <RocketMotorBatchList hookState={hookState} rowsPerPageOptions={[5, 10, 25]} />
       )}
 
@@ -115,7 +132,7 @@ const RocketMotorCasing = () => {
         />
       )}
 
-      {view === "form" && activeBatch && (
+      {view === "form" && activeBatch && !loadingFormDetails && (
         <Box>
           <UserWorkflowFormHeader
             mode={createMotorCasingHeaderHeading ? "create" : "update"}
@@ -147,55 +164,42 @@ const RocketMotorCasing = () => {
             theme={theme}
           />
 
-          {loadingFormDetails ? (
-            <Box sx={theme.workflow.loadingContainer}>
-              <Stack alignItems="center" spacing={1.5}>
-                <CircularProgress size={32} sx={{ color: theme.palette.primaryLight }} />
-                <Typography sx={{ fontSize: "0.82rem", color: theme.palette.textSub, fontWeight: 600 }}>
-                  {STRINGS.SOURCING.CASING_FORM.LOADING_FORM_DETAILS}
-                </Typography>
-              </Stack>
-            </Box>
-          ) : (
-            <>
-              <Box sx={{ mt: 2.5 }}>
-                <MotorCasingCreateForm
-                  key={activeBatch.batchId ?? activeBatch.motorCasingId ?? "new-casing"}
-                  form={casingForm}
-                  setForm={setCasingForm}
-                  lookups={lookups}
-                  dimensionalParameters={dimensionalParameters}
-                  dimensionalParametersErrorMessage={dimensionalParametersErrorMessage}
-                  motorStage={resolvedMotorStage}
-                  subDepartmentId={subDepartmentId}
-                  loadingDimensionalParams={loadingDimensionalParams}
-                  lockIdentification={lockIdentification}
-                  showDeleteCasing={canDeleteActiveCasing}
-                  onDeleteCasing={handleDeleteCasingFromForm}
-                  deleteLoading={deleteLoading}
-                  theme={theme}
-                />
-              </Box>
+          <Box sx={{ mt: 2.5 }}>
+            <MotorCasingCreateForm
+              key={activeBatch.batchId ?? activeBatch.motorCasingId ?? "new-casing"}
+              form={casingForm}
+              setForm={setCasingForm}
+              lookups={lookups}
+              dimensionalParameters={dimensionalParameters}
+              dimensionalParametersErrorMessage={dimensionalParametersErrorMessage}
+              motorStage={resolvedMotorStage}
+              subDepartmentId={subDepartmentId}
+              loadingDimensionalParams={loadingDimensionalParams}
+              lockIdentification={lockIdentification}
+              showDeleteCasing={canDeleteActiveCasing}
+              onDeleteCasing={handleDeleteCasingFromForm}
+              deleteLoading={deleteLoading}
+              theme={theme}
+            />
+          </Box>
 
-              <UserWorkflowActionBar
-                isEdit={isEditMode}
-                canSubmit={canSubmit}
-                canSaveDraft={canSaveDraft}
-                readinessText={STRINGS.SOURCING.CASING_FORM.READY_TO_SUBMIT}
-                pendingText={STRINGS.SOURCING.CASING_FORM.NOT_READY_TO_SUBMIT}
-                helperText={STRINGS.SOURCING.CASING_FORM.ACTION_HELPER}
-                saveLabel={STRINGS.SOURCING.CASING_FORM.SAVE_DRAFT}
-                submitLabel={STRINGS.SOURCING.CASING_FORM.SUBMIT_APPROVAL}
-                resubmitLabel={STRINGS.SOURCING.CASING_FORM.RESUBMIT_APPROVAL}
-                saveTooltip={STRINGS.SOURCING.CASING_FORM.SAVE_TOOLTIP}
-                disableActions={actionLoading}
-                disableSubmit={actionLoading || loadingDimensionalParams}
-                onSaveDraft={() => setDraftConfirm(true)}
-                onSubmitClick={() => setSubmitConfirm(true)}
-                theme={theme}
-              />
-            </>
-          )}
+          <UserWorkflowActionBar
+            isEdit={isEditMode}
+            canSubmit={canSubmit}
+            canSaveDraft={canSaveDraft}
+            readinessText={STRINGS.SOURCING.CASING_FORM.READY_TO_SUBMIT}
+            pendingText={STRINGS.SOURCING.CASING_FORM.NOT_READY_TO_SUBMIT}
+            helperText={STRINGS.SOURCING.CASING_FORM.ACTION_HELPER}
+            saveLabel={STRINGS.SOURCING.CASING_FORM.SAVE_DRAFT}
+            submitLabel={STRINGS.SOURCING.CASING_FORM.SUBMIT_APPROVAL}
+            resubmitLabel={STRINGS.SOURCING.CASING_FORM.RESUBMIT_APPROVAL}
+            saveTooltip={STRINGS.SOURCING.CASING_FORM.SAVE_TOOLTIP}
+            disableActions={actionLoading}
+            disableSubmit={actionLoading || loadingDimensionalParams}
+            onSaveDraft={() => setDraftConfirm(true)}
+            onSubmitClick={() => setSubmitConfirm(true)}
+            theme={theme}
+          />
         </Box>
       )}
 

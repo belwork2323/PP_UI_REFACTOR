@@ -104,6 +104,19 @@ export type SchemaPopulateFromApiConfig = {
   readonlyColumns?: string[];
   /** When the resolved API value is an object, read this property for scalar fields. */
   sourceField?: string;
+  /**
+   * Build a display cell from an API item template.
+   * Placeholders use `{field}` syntax (e.g. `FINAL_MIX {premixNo} / {bowlId}`).
+   */
+  columnTemplates?: Array<{
+    targetColumn: string;
+    template: string;
+  }>;
+  /**
+   * Copy apiContext values into row columns after mapping
+   * (e.g. `{ "MOTOR_ID": "motorId" }`).
+   */
+  contextColumnMappings?: Record<string, string>;
 };
 
 export type SchemaTableCommitGroupConfig = {
@@ -114,6 +127,8 @@ export type SchemaTableCommitGroupConfig = {
   readonlyExpandedColumns?: string[];
   /** Span these columns across expanded rows in a committed group (e.g. ingredient). */
   mergeExpandedColumns?: string[];
+  /** Span these columns across fixed preset/predefined rows (single shared input). */
+  mergePresetColumns?: string[];
   /** When false, skip the full-width group header row (default: false if mergeExpandedColumns is set). */
   showGroupHeader?: boolean;
   fieldMappings: SchemaCommitFieldMapping[];
@@ -167,6 +182,11 @@ export type SchemaRowComputation = {
   sourceColumn?: string;
   /** Column holding row identifiers (defaults to `rows.autoIncrementKey`). */
   rowKeyColumn?: string;
+  /**
+   * When true, the target cell stays an editable input (auto-filled by the computation).
+   * Default false → display-only FormulaCell.
+   */
+  editable?: boolean;
 };
 
 export type SchemaColSpan = {

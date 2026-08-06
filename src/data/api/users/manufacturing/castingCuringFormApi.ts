@@ -15,3 +15,7 @@ export const fetchCastingCuringFormDetailsApi = async (payload: {
 export const updateCastingCuringFormApi = async (payload: any) => {
   return await put(USER_CASTING_CURING_FORM_ENDPOINTS.UPDATE_FORM, payload);
 };
+
+export const fetchCuringCyclesApi = async (payload: { motorStage: number }) => {
+  return await post(USER_CASTING_CURING_FORM_ENDPOINTS.CURING_CYCLES, payload);
+};

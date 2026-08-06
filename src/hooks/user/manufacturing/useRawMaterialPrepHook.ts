@@ -15,10 +15,12 @@ import rawMaterialPreparationController from "../../../controllers/user/manufact
 import {
   createEmptyPremixSchemaSession,
   createEmptyWeightmentSheet,
+  hasRawMaterialPrepPersistedData,
   isPremixEditable,
   mapPreparationDetailsFromApi,
   mapPreparationDetailsFromSavedForm,
   mapPreparationDetailsPayload,
+  mapWeightmentSheetFromApi,
   premixSessionHasData,
   type PremixStatusMeta,
   type PremixSubmissionStatus,
@@ -713,6 +715,10 @@ export const useRawMaterialPrepHook = () => {
           resolvedSolidMaterials,
           resolvedLiquidMaterials,
         );
+        const weightmentFromBatch = sheet.metadata?.rawMaterialPreparation?.weightmentSheet;
+        if (weightmentFromBatch) {
+          nextWeightmentSheet = mapWeightmentSheetFromApi(weightmentFromBatch);
+        }
       }
 
       nextPremixSessions = normalizePremixSessionKeys(
@@ -1009,7 +1015,8 @@ export const useRawMaterialPrepHook = () => {
       }
     }
 
-    const isCreateFlow = !activeBatch.formId;
+    const currentPremixStatuses = premixStatusByNoByBatch[activeFormBatchKey] ?? {};
+    const isCreateFlow = !hasRawMaterialPrepPersistedData(currentPremixStatuses);
     // Premix type follows Save Draft / Submit Premix.
     // Form stays DRAFT until "Proceed for Approval" (final approval).
     const premixSubmissionType = isDraft ? "DRAFT" : "SUBMIT";
@@ -1137,6 +1144,7 @@ export const useRawMaterialPrepHook = () => {
     weightmentSheet,
     clearMaterialsCacheForKey,
     activeFormBatchKey,
+    premixStatusByNoByBatch,
     identificationSheet,
     numberOfPremix,
     checkPremixEditable,

@@ -79,8 +79,13 @@ export const formatPostCureMotorOperationLabel = (operation: string, inhibitorTy
 
 export const mapPostCureOperationToApi = (operation: string): "LOOSE_FLAP_FILLING" | "INHIBITION" | null => {
   const normalized = String(operation ?? "").trim().toLowerCase();
-  if (normalized === POST_CURE_OPERATION_LOOSE_FLAP) return "LOOSE_FLAP_FILLING";
-  if (normalized === POST_CURE_OPERATION_INHIBITION) return "INHIBITION";
+  const upper = String(operation ?? "").trim().toUpperCase();
+  if (normalized === POST_CURE_OPERATION_LOOSE_FLAP || upper === "LOOSE_FLAP_FILLING") {
+    return "LOOSE_FLAP_FILLING";
+  }
+  if (normalized === POST_CURE_OPERATION_INHIBITION || upper === "INHIBITION") {
+    return "INHIBITION";
+  }
   return null;
 };
 
@@ -88,9 +93,10 @@ export const mapPostCureInhibitorTypeToApi = (
   inhibitorType: string,
 ): "IR1" | "HEMCOAT_3K" | "NOT_APPLICABLE" | null => {
   const normalized = String(inhibitorType ?? "").trim();
-  if (normalized === "IR1") return "IR1";
-  if (normalized === "Hemcoat-3K") return "HEMCOAT_3K";
-  if (normalized === "not-applicable") return "NOT_APPLICABLE";
+  const upper = normalized.toUpperCase().replace(/[-\s]/g, "_");
+  if (normalized === "IR1" || upper === "IR1") return "IR1";
+  if (normalized === "Hemcoat-3K" || upper === "HEMCOAT_3K") return "HEMCOAT_3K";
+  if (normalized === "not-applicable" || upper === "NOT_APPLICABLE") return "NOT_APPLICABLE";
   return null;
 };
 

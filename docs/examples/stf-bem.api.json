@@ -61,6 +61,11 @@
         "sectionId": "CONDITIONING_DETAILS",
         "sectionName": "Conditioning Details",
         "type": "form",
+        "ui": {
+          "direction": "row",
+          "wrap": true,
+          "gap": "md"
+        },
         "fields": [
           {
             "fieldId": "FROM_DATE_TIME",
@@ -94,6 +99,7 @@
         "sectionName": "Grain Dimension",
         "type": "table",
         "addRowAllowed": false,
+        "mergePresetColumns": ["LENGTH", "WEIGHT"],
         "columns": [
           {
             "fieldId": "SIDE",
@@ -145,6 +151,11 @@
         "sectionId": "BEM_HARDWARE_DETAILS",
         "sectionName": "BEM Hardware Details",
         "type": "form",
+        "ui": {
+          "direction": "row",
+          "wrap": true,
+          "gap": "md"
+        },
         "fields": [
           {
             "fieldId": "HEAD_END_NO",
@@ -168,12 +179,12 @@
           },
           {
             "fieldId": "CASING_OD",
-            "label": "Casing OD",
+            "label": "OD",
             "type": "number"
           },
           {
             "fieldId": "CASING_ID",
-            "label": "Casing ID",
+            "label": "ID",
             "type": "number"
           },
           {
@@ -192,6 +203,11 @@
         "sectionId": "IGNITER_DETAILS",
         "sectionName": "Igniter Details",
         "type": "form",
+        "ui": {
+          "direction": "row",
+          "wrap": true,
+          "gap": "md"
+        },
         "fields": [
           {
             "fieldId": "CONTAINER_TYPE",
@@ -232,38 +248,53 @@
           },
           {
             "fieldId": "THROAT_MATERIAL",
-            "label": "Throat Material",
-            "type": "text"
-          },
-          {
-            "fieldId": "MOTHER_GRAPHITE",
-            "label": "Mother Graphite",
-            "type": "text"
-          },
-          {
-            "fieldId": "NOZZLE_INSERT",
-            "label": "Nozzle Insert",
-            "type": "text"
-          },
-          {
-            "fieldId": "BEFORE_D1",
-            "label": "Before Firing D1(mm)",
+            "label": "T (mm)",
             "type": "number"
           },
           {
-            "fieldId": "BEFORE_D2",
-            "label": "Before Firing D2(mm)",
-            "type": "number"
+            "label": "Nozzle Material",
+            "columns": [
+              {
+                "fieldId": "MOTHER_GRAPHITE",
+                "label": "Mother Graphite",
+                "type": "text"
+              },
+              {
+                "fieldId": "NOZZLE_INSERT",
+                "label": "Nozzle Insert",
+                "type": "text"
+              }
+            ]
           },
           {
-            "fieldId": "AFTER_D1",
-            "label": "After Firing D1(mm)",
-            "type": "number"
+            "label": "Before Firing",
+            "columns": [
+              {
+                "fieldId": "BEFORE_D1",
+                "label": "D₁ (mm)",
+                "type": "number"
+              },
+              {
+                "fieldId": "BEFORE_D2",
+                "label": "D₂ (mm)",
+                "type": "number"
+              }
+            ]
           },
           {
-            "fieldId": "AFTER_D2",
-            "label": "After Firing D2(mm)",
-            "type": "number"
+            "label": "After Firing",
+            "columns": [
+              {
+                "fieldId": "AFTER_D1",
+                "label": "D₁ (mm)",
+                "type": "number"
+              },
+              {
+                "fieldId": "AFTER_D2",
+                "label": "D₂ (mm)",
+                "type": "number"
+              }
+            ]
           },
           {
             "fieldId": "REMARKS",
@@ -276,6 +307,11 @@
         "sectionId": "TESTING_DETAILS",
         "sectionName": "Testing Details",
         "type": "form",
+        "ui": {
+          "direction": "row",
+          "wrap": true,
+          "gap": "md"
+        },
         "fields": [
           {
             "fieldId": "THROAT_DIAMETER",
@@ -336,14 +372,19 @@
             "type": "number"
           },
           {
-            "fieldId": "MAX_RANGE",
-            "label": "Range Max",
-            "type": "number"
-          },
-          {
-            "fieldId": "SENSOR_RANGE",
-            "label": "Range Sensor",
-            "type": "number"
+            "label": "Range",
+            "columns": [
+              {
+                "fieldId": "MAX_RANGE",
+                "label": "Max",
+                "type": "number"
+              },
+              {
+                "fieldId": "SENSOR_RANGE",
+                "label": "Sensor exp.",
+                "type": "number"
+              }
+            ]
           },
           {
             "fieldId": "FILTER_HZ",
@@ -397,11 +438,12 @@
       {
         "sectionId": "RESULT_DETAILS",
         "sectionName": "Result",
-        "type": "form",
-        "fields": [
+        "type": "table",
+        "addRowAllowed": false,
+        "columns": [
           {
             "fieldId": "AVG_PRESSURE",
-            "label": "Avg Pressure (ksc)",
+            "label": "Avg. Pressure (ksc)",
             "type": "number"
           },
           {
@@ -435,6 +477,11 @@
         "sectionId": "UPLOAD_PT_CURVE",
         "sectionName": "Upload P-T Curve",
         "type": "form",
+        "ui": {
+          "direction": "row",
+          "wrap": true,
+          "gap": "md"
+        },
         "fields": [
           {
             "fieldId": "PT_CURVE_UPLOAD",

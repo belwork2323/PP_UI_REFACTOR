@@ -154,7 +154,7 @@ const SectionPanel = ({ section, dt }: { section: CasePrepDetailSection; dt: Dis
   </Box>
 );
 
-const MotorDetailPanel = ({
+export const MotorDetailPanel = ({
   motor,
   dt,
   palette,

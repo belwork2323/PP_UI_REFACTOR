@@ -67,7 +67,7 @@ export type SpecRow = {
   specificationName?: string;
   refRange: string;
   analysedResult: string;
-  remarks: string;
+  acemQcResult: string;
   status?: string | null;
   isOutOfRange?: boolean;
   referenceRange?: {
@@ -390,7 +390,7 @@ export type RawMaterialLotSpecificationPayload = {
   specificationCode: string;
   analysedResult: number | null;
   isOutOfRange: boolean;
-  remarks: string;
+  acemQcResult: string;
 };
 
 export type RawMaterialLotCreatePayload = {
@@ -432,7 +432,7 @@ export type RawMaterialLotUpdatePayload = {
       unit: string | null;
     };
     analysedResult: number | null;
-    remarks: string;
+    acemQcResult: string;
     status: string | null;
   }>;
   certificates: LotCertificate[];
@@ -542,7 +542,7 @@ export class RawMaterialProcurementDetailsModel {
         unit: string | null;
       };
       analysedResult: number | null;
-      remarks: string;
+      acemQcResult: string;
       status: string | null;
     }>;
   }>;
@@ -574,7 +574,7 @@ export class RawMaterialProcurementDetailsModel {
           specificationName: spec.specificationName,
           refRange: formatReferenceRangeLabel(referenceRange),
           analysedResult,
-          remarks: spec.remarks ?? "",
+          acemQcResult: String(spec.acemQcResult ?? "").trim(),
           status,
           isOutOfRange:
             String(status ?? "")
@@ -606,7 +606,7 @@ export class RawMaterialLotDetailsModel {
       unit: string | null;
     };
     analysedResult: number | null;
-    remarks: string;
+    acemQcResult: string;
     status: string | null;
   }>;
   certificates: LotCertificate[];
@@ -662,7 +662,7 @@ export class RawMaterialLotDetailsModel {
             specificationName: spec.specificationName,
             refRange: formatReferenceRangeLabel(referenceRange),
             analysedResult,
-            remarks: spec.remarks ?? "",
+            acemQcResult: String(spec.acemQcResult ?? "").trim(),
             status,
             isOutOfRange:
               String(status ?? "")
@@ -816,7 +816,7 @@ function mapLotBlockToCreatePayload(lot: MaterialLotBlock): RawMaterialLotCreate
             ? null
             : Number(row.analysedResult),
         isOutOfRange: Boolean(row.isOutOfRange),
-        remarks: row.remarks ?? "",
+        acemQcResult: row.acemQcResult ?? "",
       })),
     certificates: (lot.certificates ?? [])
       .filter(
@@ -885,7 +885,7 @@ export function mapFirstBlockToLotUpdatePayload(
           row.analysedResult === undefined
             ? null
             : Number(row.analysedResult),
-        remarks: row.remarks ?? "",
+        acemQcResult: row.acemQcResult ?? "",
         status: null,
       })),
     certificates: (block.certificates ?? [])
@@ -914,7 +914,7 @@ export const mapBlocksToMaterialsPayload = (blocks: MaterialBlock[]) => {
         row.analysedResult === "" || row.analysedResult === null || row.analysedResult === undefined
           ? null
           : Number(row.analysedResult),
-      remarks: row.remarks ?? "",
+      acemQcResult: row.acemQcResult ?? "",
     })),
   }));
 };

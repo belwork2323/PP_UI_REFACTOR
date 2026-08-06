@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from "react";
-import { Box, Button, CircularProgress, Stack } from "@mui/material";
+import { Box } from "@mui/material";
 import ConfirmAlertDialog from "../../../components/common/ConfirmAlertDialog";
+import WorkflowFormOpeningLoader from "../../../components/common/WorkflowFormOpeningLoader";
 import UserWorkflowFormHeader from "../../../components/custom/UserWorkflowFormHeader";
 import { STRINGS } from "../../../../app/config/strings";
 import DispatchList from "./DispatchList";
@@ -43,9 +44,7 @@ const dispatchTheme = {
         background: isEdit
           ? "linear-gradient(135deg,rgba(192,57,43,0.06),rgba(192,57,43,0.02))"
           : "linear-gradient(135deg,rgba(27,79,114,0.06),rgba(46,134,193,0.03))",
-        border: isEdit
-          ? "1.5px solid rgba(192,57,43,0.2)"
-          : "1.5px solid rgba(46,134,193,0.25)",
+        border: isEdit ? "1.5px solid rgba(192,57,43,0.2)" : "1.5px solid rgba(46,134,193,0.25)",
       }),
       backButton: {
         fontWeight: 700,
@@ -133,11 +132,41 @@ const dispatchTheme = {
   },
 };
 
+const formatMotorSubtitle = (batch?: {
+  motorId?: string;
+  motorIds?: Array<string | number>;
+  projectName?: string;
+  projectId?: string;
+} | null) => {
+  const project = [batch?.projectName, batch?.projectId].filter(Boolean).join(" · ");
+  const ids = Array.isArray(batch?.motorIds)
+    ? batch.motorIds.map((id) => String(id).trim()).filter(Boolean)
+    : [];
+  const motors = ids.length > 0 ? ids.join(" · ") : String(batch?.motorId ?? "").trim();
+  return [project, motors && motors !== "—" ? motors : ""].filter(Boolean).join(" · ") || undefined;
+};
+
+const resolveStatusLabel = (batch: any, isEdit: boolean) => {
+  if (isEdit) return STRINGS.QUALITY_CONTROL.FORM_HEADER.EDITING_REJECTED;
+  const status = String(batch?.dispatchStatus ?? batch?.status ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/\s+/g, "_");
+  const inProgress =
+    status === "in_progress" ||
+    status === "waiting_for_partial_approval" ||
+    Boolean(batch?.formId);
+  return inProgress
+    ? STRINGS.QUALITY_CONTROL.FORM_HEADER.DRAFT
+    : STRINGS.DISPATCH.NEW_LABEL;
+};
+
 const DispatchPage = () => {
   const flowBarTheme = useMemo(() => getManufacturingTheme("light"), []);
   const strings = STRINGS.DISPATCH;
-  const [draftConfirmOpen, setDraftConfirmOpen] = useState(false);
-  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const [motorDraftConfirmOpen, setMotorDraftConfirmOpen] = useState(false);
+  const [motorSubmitConfirmOpen, setMotorSubmitConfirmOpen] = useState(false);
+  const [pendingMotorId, setPendingMotorId] = useState<string | null>(null);
 
   const hookState = useDispatchHook();
   const {
@@ -147,10 +176,13 @@ const DispatchPage = () => {
     activeBatch,
     isEditMode,
     formData,
-    canSaveDraft,
-    canSubmit,
     draftMotorId,
     addedMotors,
+    batchMotorEntries,
+    motorStatusById,
+    getMotorStatus,
+    isMotorEditable,
+    previousStageGate,
     schemaLoading,
     schemaError,
     actionLoading,
@@ -162,62 +194,52 @@ const DispatchPage = () => {
     updateSetupField,
     handleDraftMotorIdChange,
     handleLoadDispatchForm,
-    handleAddDispatchMotor,
     handleFormValuesChange,
-    handleRemoveMotor,
-    handleSaveDraft,
-    handleSubmit,
+    handleSaveMotorDraft,
+    handleSubmitMotor,
+    handleSubmitForFinalApproval,
     detailsRow,
     detailsData,
     detailsLoading,
     handleBackFromDetails,
   } = hookState;
 
-  const canAct = canSubmit;
-  const availableMotors = useMemo(
-    () => resolveDispatchMotorOptions(activeBatch),
-    [activeBatch],
-  );
+  const availableMotors = useMemo(() => resolveDispatchMotorOptions(activeBatch), [activeBatch]);
+  const listLoading = loading && !loadingFormDetails && view === "list";
 
-  if (view === "list" && loading) {
-    return (
-      <Box sx={dispatchTheme.workflow.loadingContainer}>
-        <CircularProgress size={32} />
-      </Box>
-    );
-  }
-
-  if (view === "list") {
-    return (
-      <Box sx={dispatchTheme.workflow.animatedContainer}>
-        <DispatchList hookState={hookState} />
-      </Box>
-    );
-  }
-  if (view === "details") {
-    return (
-      <DispatchDetailsView
-        row={detailsRow}
-        data={detailsData}
-        loading={detailsLoading}
-        onBack={handleBackFromDetails}
-      />
-    );
-  }
   return (
     <Box sx={dispatchTheme.workflow.animatedContainer}>
-      {activeBatch ? (
+      <WorkflowFormOpeningLoader
+        open={listLoading || Boolean(loadingFormDetails)}
+        title={loadingFormDetails ? strings.FORM_OPENING_TITLE : strings.TITLE}
+        message={
+          loadingFormDetails
+            ? strings.FORM_OPENING_MESSAGE
+            : "Loading dispatch batches…"
+        }
+        color={dispatchTheme.palette.primaryLight}
+        accentColor={dispatchTheme.palette.primary}
+      />
+
+      {view === "list" && !listLoading && <DispatchList hookState={hookState} />}
+
+      {view === "details" && detailsRow && (
+        <DispatchDetailsView
+          row={detailsRow}
+          data={detailsData}
+          loading={detailsLoading}
+          onBack={handleBackFromDetails}
+        />
+      )}
+
+      {view === "form" && activeBatch && !loadingFormDetails && (
         <>
           <UserWorkflowFormHeader
             mode="update"
             data={{
               title: String(activeBatch.batchId ?? "—"),
-              subtitle: [activeBatch.projectName, activeBatch.projectId]
-                .filter(Boolean)
-                .join(" · ") || undefined,
-              statusLabel: isEditMode
-                ? STRINGS.QUALITY_CONTROL.FORM_HEADER.EDITING_REJECTED
-                : strings.NEW_LABEL,
+              subtitle: formatMotorSubtitle(activeBatch),
+              statusLabel: resolveStatusLabel(activeBatch, isEditMode),
               statusVariant: isEditMode ? "edit" : "new",
               rejectionReason: activeBatch.rejectionReason,
             }}
@@ -228,12 +250,17 @@ const DispatchPage = () => {
             theme={dispatchTheme}
           />
 
-          {!loadingFormDetails ? (
-            <DispatchForm
+          <DispatchForm
               batch={activeBatch}
               formData={formData}
               draftMotorId={draftMotorId}
               addedMotors={addedMotors}
+              autoMotorEntries={batchMotorEntries}
+              motorStatusById={motorStatusById}
+              getMotorStatus={getMotorStatus}
+              isMotorEditable={isMotorEditable}
+              previousStageGate={previousStageGate}
+              actionLoading={actionLoading}
               subDepartmentId={subDepartmentId}
               isEditMode={isEditMode}
               schemaLoading={schemaLoading}
@@ -243,84 +270,20 @@ const DispatchPage = () => {
               onSetupChange={updateSetupField}
               onDraftMotorIdChange={handleDraftMotorIdChange}
               onLoadDispatchForm={handleLoadDispatchForm}
-              onAddDispatchMotor={handleAddDispatchMotor}
-              onRemoveMotor={handleRemoveMotor}
               onFormValuesChange={handleFormValuesChange}
+              onSaveMotorDraft={(motorId) => {
+                setPendingMotorId(motorId);
+                setMotorDraftConfirmOpen(true);
+              }}
+              onSubmitMotor={(motorId) => {
+                setPendingMotorId(motorId);
+                setMotorSubmitConfirmOpen(true);
+              }}
+              onSubmitForFinalApproval={handleSubmitForFinalApproval}
               theme={dispatchTheme}
             />
-          ) : null}
-
-          {!loadingFormDetails ? (
-            <>
-              <Box
-                sx={{
-                  mt: 2,
-                  p: "12px 16px",
-                  borderRadius: 2,
-                  background: "#fff",
-                  border: "1.5px solid #D5D8DC",
-                }}
-              >
-                <Stack
-                  direction={{ xs: "column", sm: "row" }}
-                  alignItems={{ sm: "center" }}
-                  justifyContent="space-between"
-                  gap={1.5}
-                >
-                  <Box>
-                    <Box component="span" sx={{ fontSize: "0.76rem", fontWeight: 700, color: "#1C2833" }}>
-                      {canAct ? strings.READY_TO_SUBMIT : strings.NOT_READY_TO_SUBMIT}
-                    </Box>
-                  </Box>
-                  <Stack direction="row" gap={1}>
-                    <Button
-                      variant="outlined"
-                      disabled={!canSaveDraft || actionLoading}
-                      onClick={() => setDraftConfirmOpen(true)}
-                    >
-                      {strings.SAVE_DRAFT_LABEL}
-                    </Button>
-                    <Button
-                      variant="contained"
-                      disabled={!canSubmit || actionLoading}
-                      onClick={() => setSubmitConfirmOpen(true)}
-                    >
-                      {isEditMode ? strings.RESUBMIT_LABEL : strings.SUBMIT_LABEL}
-                    </Button>
-                  </Stack>
-                </Stack>
-              </Box>
-
-              <ConfirmAlertDialog
-                open={draftConfirmOpen}
-                severity="info"
-                title={strings.DRAFT_CONFIRM_TITLE}
-                message={strings.DRAFT_CONFIRM_MESSAGE}
-                confirmLabel={strings.DRAFT_CONFIRM_LABEL}
-                cancelLabel={strings.CONFIRM_CANCEL_LABEL}
-                onConfirm={async () => {
-                  setDraftConfirmOpen(false);
-                  await handleSaveDraft();
-                }}
-                onCancel={() => setDraftConfirmOpen(false)}
-              />
-              <ConfirmAlertDialog
-                open={submitConfirmOpen}
-                severity="warning"
-                title={isEditMode ? strings.RESUBMIT_CONFIRM_TITLE : strings.SUBMIT_CONFIRM_TITLE}
-                message={isEditMode ? strings.RESUBMIT_CONFIRM_MESSAGE : strings.SUBMIT_CONFIRM_MESSAGE}
-                confirmLabel={isEditMode ? strings.RESUBMIT_CONFIRM_LABEL : strings.SUBMIT_CONFIRM_LABEL}
-                cancelLabel={strings.CONFIRM_GO_BACK_LABEL}
-                onConfirm={async () => {
-                  setSubmitConfirmOpen(false);
-                  await handleSubmit();
-                }}
-                onCancel={() => setSubmitConfirmOpen(false)}
-              />
-            </>
-          ) : null}
         </>
-      ) : null}
+      )}
 
       <ConfirmAlertDialog
         open={backConfirmOpen}
@@ -331,6 +294,44 @@ const DispatchPage = () => {
         cancelLabel={strings.UNSAVED_BACK_CONFIRM}
         onConfirm={handleDiscardAndBack}
         onCancel={() => setBackConfirmOpen(false)}
+      />
+
+      <ConfirmAlertDialog
+        open={motorDraftConfirmOpen}
+        severity="warning"
+        title={strings.MOTOR_DRAFT_CONFIRM_TITLE}
+        message={strings.MOTOR_DRAFT_CONFIRM_MESSAGE(pendingMotorId ?? "")}
+        confirmLabel={strings.SAVE_MOTOR_DRAFT}
+        cancelLabel={strings.CONFIRM_CANCEL_LABEL}
+        onConfirm={async () => {
+          const motorId = pendingMotorId;
+          setMotorDraftConfirmOpen(false);
+          setPendingMotorId(null);
+          if (motorId) await handleSaveMotorDraft(motorId);
+        }}
+        onCancel={() => {
+          setMotorDraftConfirmOpen(false);
+          setPendingMotorId(null);
+        }}
+      />
+
+      <ConfirmAlertDialog
+        open={motorSubmitConfirmOpen}
+        severity="warning"
+        title={strings.MOTOR_SUBMIT_CONFIRM_TITLE}
+        message={strings.MOTOR_SUBMIT_CONFIRM_MESSAGE(pendingMotorId ?? "")}
+        confirmLabel={strings.SUBMIT_MOTOR}
+        cancelLabel={strings.CONFIRM_CANCEL_LABEL}
+        onConfirm={async () => {
+          const motorId = pendingMotorId;
+          setMotorSubmitConfirmOpen(false);
+          setPendingMotorId(null);
+          if (motorId) await handleSubmitMotor(motorId);
+        }}
+        onCancel={() => {
+          setMotorSubmitConfirmOpen(false);
+          setPendingMotorId(null);
+        }}
       />
     </Box>
   );

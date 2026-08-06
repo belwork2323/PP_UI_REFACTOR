@@ -117,23 +117,32 @@ export class DashboardModel {
     const data = getApiData(apiResponse);
     const batches = data?.batches || [];
 
-    const activeBatches: ActiveBatchRowModel[] = batches.map((b: any) => ({
-      id: b.id ?? "",
-      batchId: b.batchId ?? "",
-      batchType: b.type ?? b.batchType ?? "NA",
-      motorId: b.motorId ?? "",
-      motorType: b.motorType?.motorTypeName ?? b.motorType?.typeName ?? b.motorType ?? "NA",
-      projectName: b.projectName ?? "",
-      stage: b.stage ?? "NA",
-      currentStage: b.stage?.department ?? "NA",
-      stageDept: b.stage?.subDepartment ?? "NA",
-      managerId: b.systemManager?.id ?? b.systemManagerId ?? "NA",
-      managerName: b.systemManager?.name ?? b.systemManagerName ?? "NA",
-      status: b.status ?? "NA",
-      createdOn: b.createdOn ?? b.date ?? "",
-      completion: typeof b.completion === "number" ? b.completion : 0,
-      color: b.color ?? DEFAULT_BATCH_COLOR,
-    }));
+    const activeBatches: ActiveBatchRowModel[] = batches.map((b: any) => {
+      // Get the last item from currentStage array if present
+      const stages = Array.isArray(b.currentStage) ? b.currentStage : [];
+      const lastStage = stages.length > 0 ? stages[stages.length - 1] : null;
+
+      // Extract subDepartmentName from the last stage object
+      const subDeptName = lastStage?.subDepartmentName ?? "NA";
+
+      return {
+        id: b.id ?? b.batchId ?? "",
+        batchId: b.batchId ?? "",
+        batchType: b.type ?? b.batchType ?? "NA",
+        motorId: b.motorId ?? "",
+        motorType: b.motorType?.motorTypeName ?? b.motorType?.typeName ?? b.motorType ?? "NA",
+        projectName: b.projectName ?? "",
+        stage: b.stage ?? "NA",
+        currentStage: subDeptName,
+        stageDept: subDeptName,
+        managerId: b.systemManager?.id ?? b.systemManagerId ?? "NA",
+        managerName: b.systemManager?.fullName ?? b.systemManagerName ?? "NA",
+        status: lastStage?.status ?? b.status ?? "NA",
+        createdOn: b.createdOn ?? b.date ?? "",
+        completion: typeof b.completion === "number" ? b.completion : 0,
+        color: b.color ?? DEFAULT_BATCH_COLOR,
+      };
+    });
 
     return {
       activeBatches,

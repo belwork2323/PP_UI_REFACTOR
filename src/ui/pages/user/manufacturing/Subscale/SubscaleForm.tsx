@@ -1,4 +1,4 @@
-import { Box, Chip, CircularProgress, Stack, Typography } from "@mui/material";
+import { Box, Chip, Stack, Typography } from "@mui/material";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import { SUBSCALE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/subscale_theme";
@@ -20,24 +20,31 @@ type SubscaleFormProps = {
   schemaError?: string | null;
   onFormValuesChange: (values: import("../../../../../schema-engine").SchemaFormValues) => void;
   theme: any;
+  batchDetails;
+  actionLoading?: boolean;
+  isEditMode?: boolean;
+  onRequestSaveDraft?: () => void;
+  onRequestSubmit?: () => void;
 };
 
 const SubscaleForm = ({
   batch,
   formData,
   subDepartmentId,
-  schemaLoading = false,
-  schemaError = null,
   onFormValuesChange,
   theme,
+  batchDetails,
+  actionLoading,
+  isEditMode,
+  onRequestSaveDraft,
+  onRequestSubmit,
 }: SubscaleFormProps) => {
   const BRAND = SUBSCALE_BRAND;
   const isMainScale = isMainScaleSubscaleBatch(batch?.batchType);
   const processingLabel = getSubscaleProcessingLabel(batch?.batchType);
-  const isReady = formData.schemaFormLoaded && formData.subscaleSchema;
 
   return (
-    <Box sx={{ fontFamily: "'DM Sans', sans-serif" }}>
+    <Box>
       <Box
         sx={{
           borderRadius: 2.5,
@@ -65,10 +72,10 @@ const SubscaleForm = ({
               <ScaleRoundedIcon sx={{ color: "#fff", fontSize: 20 }} />
             </Box>
             <Box>
-              <Typography sx={{ fontWeight: 800, fontSize: "1rem", color: BRAND.text }}>
+              <Typography sx={{ fontWeight: 700, fontSize: "0.95rem", color: BRAND.text }}>
                 {S.FORM_TITLE}
               </Typography>
-              <Typography sx={{ fontSize: "0.74rem", color: BRAND.textSub, mt: 0.2 }}>
+              <Typography sx={{ fontSize: "0.78rem", color: BRAND.textSub, mt: 0.2 }}>
                 {processingLabel}
                 {batch?.batchId ? ` · ${batch.batchId}` : ""}
               </Typography>
@@ -80,7 +87,7 @@ const SubscaleForm = ({
             sx={{
               height: 26,
               fontWeight: 700,
-              fontSize: "0.7rem",
+              fontSize: "0.72rem",
               alignSelf: { xs: "flex-start", sm: "center" },
               background: isMainScale ? "rgba(21,101,192,0.1)" : "rgba(21,101,192,0.1)",
               color: isMainScale ? BRAND.primary : BRAND.ss,
@@ -90,7 +97,7 @@ const SubscaleForm = ({
         </Stack>
       </Box>
 
-      {schemaLoading && !isReady ? (
+      {/* {!isReady ? (
         <Box
           sx={{
             borderRadius: 2.5,
@@ -112,52 +119,32 @@ const SubscaleForm = ({
             {S.SCHEMA_LOADING_HINT}
           </Typography>
         </Box>
-      ) : null}
+      ) : null} */}
 
-      {schemaError && !schemaLoading ? (
-        <Box
-          sx={{
-            borderRadius: 2.5,
-            border: `1px solid ${BRAND.danger}44`,
-            background: `${BRAND.danger}08`,
-            px: 2,
-            py: 4,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 1,
-            mb: 2,
-          }}
-        >
-          <Typography sx={{ fontWeight: 600, fontSize: "0.85rem", color: BRAND.danger, textAlign: "center" }}>
-            {schemaError}
-          </Typography>
-        </Box>
-      ) : null}
-
-      {isReady ? (
-        <Box
-          sx={{
-            borderRadius: 2.5,
-            border: `1px solid ${theme.palette.border}`,
-            background: theme.palette.surface,
-            px: { xs: 1, sm: 1.5 },
-            py: 1.5,
-          }}
-        >
-          <SubscaleSchemaPanel
-            schema={formData.subscaleSchema}
-            formValues={formData.schemaFormValues ?? {}}
-            savedSections={formData.savedSections}
-            subDepartmentId={subDepartmentId}
-            batchId={batch?.batchId}
-            batchType={batch?.batchType}
-            onChange={onFormValuesChange}
-            loading={schemaLoading}
-            error={schemaError}
-          />
-        </Box>
-      ) : null}
+      <Box
+        sx={{
+          borderRadius: 2.5,
+          border: `1px solid ${theme.palette.border}`,
+          background: theme.palette.surface,
+          px: { xs: 1, sm: 1.5 },
+          py: 1.5,
+        }}
+      >
+        <SubscaleSchemaPanel
+          schema={formData.subscaleSchema}
+          formValues={formData.schemaFormValues ?? {}}
+          savedSections={formData.savedSections}
+          subDepartmentId={subDepartmentId}
+          batchId={batch?.batchId}
+          batchType={batch?.batchType}
+          onChange={onFormValuesChange}
+          batchDetails={batchDetails}
+          actionLoading={actionLoading}
+          isEditMode={isEditMode}
+          onRequestSaveDraft={onRequestSaveDraft}
+          onRequestSubmit={onRequestSubmit}
+        />
+      </Box>
     </Box>
   );
 };

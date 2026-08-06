@@ -1,14 +1,35 @@
-import { get, post } from "../../httpClient";
-import { DISPATCH_APPROVER_ENDPOINTS } from "../../endPoints";
+import { post } from "../../httpClient";
+import { APPROVER_ENDPOINTS } from "../../endPoints";
+import type { ApproverFormActionType } from "../approverApi";
 
-export const fetchDraftDispatchesApi = () => 
-  get(DISPATCH_APPROVER_ENDPOINTS.PENDING_LIST);
+export type DispatchApproverMotorChangeStatusPayload = {
+  formId: string;
+  motorId: string;
+  subDepartmentId: number;
+  actionType: ApproverFormActionType;
+  remarks?: string | null;
+  rejectionReason?: string | null;
+};
 
-export const fetchDispatchDetailsApi = (batchId) => 
-  get(DISPATCH_APPROVER_ENDPOINTS.DETAILS(batchId));
+export type DispatchApproverMotorChangeStatusResponse = {
+  formId: string;
+  batchId: string;
+  motorId: string;
+  actionType: string;
+  status: string;
+  motorSubmissionStatus: string;
+  batchStatus: string;
+  allMotorsApproved: boolean;
+  pendingMotorCount: number;
+  approvedMotorCount: number;
+  rejectedMotorCount: number;
+  totalMotorCount: number;
+  actionBy: string;
+  actionAt: string;
+  remarks: string | null;
+  rejectionReason: string | null;
+};
 
-export const updateDispatchStatusApi = (batchId, status, approver) => 
-  post(DISPATCH_APPROVER_ENDPOINTS.UPDATE_STATUS(batchId), { 
-    dispatchStatus: status, 
-    approverName: approver 
-  });
+export const changeDispatchApproverMotorStatus = async (
+  payload: DispatchApproverMotorChangeStatusPayload,
+) => post(APPROVER_ENDPOINTS.MOTOR_CHANGE_STATUS, payload);

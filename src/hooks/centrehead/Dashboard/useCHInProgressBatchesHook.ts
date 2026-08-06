@@ -1,9 +1,13 @@
 import { STRINGS } from "@/app/config/strings";
 import { generalController } from "@/controllers/admin/common/generalController";
 import { systemManagerController } from "@/controllers/system_manager/systemManagerController";
-import { APPROVER_BATCH_STATUS } from "@/data/models/approver/ApproverBatchListModel";
+import {
+  APPROVER_BATCH_STATUS,
+  APPROVER_BATCH_STATUS_LABEL,
+} from "@/data/models/approver/ApproverBatchListModel";
 import { BatchTab } from "@/hooks/admin/Dashboard/useDashboardHook";
 import { useCallback, useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { toOperationStatusApiValue } from "@/hooks/operationStatus";
 
 type ActiveBatchLike = Record<string, any>;
 
@@ -40,7 +44,7 @@ const DEFAULT_PANEL_FILTERS: BatchPanelFilters = {
 };
 
 const TYPE_OPTIONS = STRINGS.DASHBOARD_PAGE.BATCH_FILTERS.TYPES;
-const STATUS_OPTIONS = ["All", ...Object.values(APPROVER_BATCH_STATUS)];
+const STATUS_OPTIONS = ["All", ...Object.values(APPROVER_BATCH_STATUS_LABEL)];
 
 const toStageKey = (stageName: string = "") => {
   const normalized = stageName.toLowerCase();
@@ -147,7 +151,7 @@ export function useSMInProgressBatches(
         search: batchSearch.trim() || undefined,
         stage: appliedFilters.stage !== "All" ? appliedFilters.stage : undefined,
         type: appliedFilters.batchType !== "All" ? appliedFilters.batchType : undefined,
-        status: appliedFilters.status !== "All" ? appliedFilters.status : undefined,
+        status: toOperationStatusApiValue(appliedFilters.status, "All") || undefined,
         listType: activeTab,
       });
 

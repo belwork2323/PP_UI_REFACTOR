@@ -97,7 +97,7 @@ const ManufacturingBatchListFilterPanel = ({
         sx={{
           ...theme.batchList.filterPanelField,
           minWidth: { xs: "100%", sm: 160 },
-          flex: { lg: 1 },
+          flex: { md: 1 },
         }}
       />
 

@@ -235,8 +235,34 @@ export const useRawMaterialApproverHook = () => {
         (response.data as { status?: string })?.status ??
         (actionType === "APPROVED" ? "Approved" : "Rejected");
 
-      setSelected(null);
       closeDialog();
+
+      const lotIdForRefresh = lotId;
+      setDetailsLoading(true);
+      const detailsResponse = await rawMaterialProcurementController.fetchLotDetails({
+        lotId: lotIdForRefresh,
+      });
+      setDetailsLoading(false);
+
+      if (detailsResponse?.success && detailsResponse.data) {
+        const model = detailsResponse.data as RawMaterialLotDetailsModel;
+        setSelected((current) =>
+          current
+            ? {
+                ...current,
+                status: nextStatus,
+                lotId: model.lotId || lotIdForRefresh,
+                batchId: lotIdForRefresh,
+                formId: current.lotId ?? lotIdForRefresh,
+                materialCode: model.materialCode || current.materialCode,
+                qcBlocks: RawMaterialLotDetailsModel.toMaterialBlocks(model),
+              }
+            : current,
+        );
+      } else {
+        setSelected((current) => (current ? { ...current, status: nextStatus } : current));
+      }
+
       bumpListVersion();
       showAlert(getResponseMessage(response), "success", { autoCloseMs: 2000 });
       return;

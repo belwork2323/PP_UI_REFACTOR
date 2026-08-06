@@ -4,6 +4,9 @@ import {
   fetchRoles,
   fetchMixers,
   fetchBuildings,
+  fetchOvens,
+  fetchEquipmentList,
+  fetchBeamEnergyList,
   fetchMixingCycles,
   fetchSubscaleArticles,
   type MixingCycleMotorStage,
@@ -101,6 +104,57 @@ export const generalController = {
   getBuildings: async () => {
     try {
       const data = await fetchBuildings();
+      return new ApiResponseModel({
+        success: true,
+        statusCode: 200,
+        message: "Success",
+        data: Array.isArray(data) ? data : [],
+      });
+    } catch (error) {
+      return new ApiResponseModel<null>(error);
+    }
+  },
+
+  /* ─────────────────────────────
+     Oven master (casting & curing)
+  ───────────────────────────── */
+  getOvens: async () => {
+    try {
+      const data = await fetchOvens();
+      return new ApiResponseModel({
+        success: true,
+        statusCode: 200,
+        message: "Success",
+        data: Array.isArray(data) ? data : [],
+      });
+    } catch (error) {
+      return new ApiResponseModel<null>(error);
+    }
+  },
+
+  /* ─────────────────────────────
+     Equipment master (NDT radiography setup)
+  ───────────────────────────── */
+  getEquipmentList: async () => {
+    try {
+      const data = await fetchEquipmentList();
+      return new ApiResponseModel({
+        success: true,
+        statusCode: 200,
+        message: "Success",
+        data: Array.isArray(data) ? data : [],
+      });
+    } catch (error) {
+      return new ApiResponseModel<null>(error);
+    }
+  },
+
+  /* ─────────────────────────────
+     Beam energy master (NDT radiography setup)
+  ───────────────────────────── */
+  getBeamEnergyList: async () => {
+    try {
+      const data = await fetchBeamEnergyList();
       return new ApiResponseModel({
         success: true,
         statusCode: 200,

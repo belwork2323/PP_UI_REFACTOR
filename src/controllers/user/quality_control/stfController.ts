@@ -1,5 +1,6 @@
 import { ApiResponseModel } from "../../../data/models/common/ApiResponseModel";
 import {
+  BEMMotorDetailsModel,
   STFDetailsModel,
   STFMotorPayload,
   STFSubmitResponseModel,
@@ -110,8 +111,7 @@ export const stfController = {
   getBemMotorDetails: async (payload: { motorId: string }) => {
     try {
       const response = await FetchDetails(payload);
-      const apiResponse = new ApiResponseModel(response);
-      return apiResponse;
+      return new ApiResponseModel(response, (res) => BEMMotorDetailsModel.fromApi(res));
     } catch (error) {
       console.error("Failed to fetch BEM motor details:", error);
       return new ApiResponseModel(error);

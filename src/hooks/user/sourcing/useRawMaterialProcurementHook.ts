@@ -340,8 +340,8 @@ export const useRawMaterialProcurementHook = () => {
       }
       return (block?.rows ?? []).some((row) => {
         const analysedResult = String(row?.analysedResult ?? "").trim();
-        const remarks = String(row?.remarks ?? "").trim();
-        return analysedResult.length > 0 || remarks.length > 0;
+        const acemQcResult = String(row?.acemQcResult ?? "").trim();
+        return analysedResult.length > 0 || acemQcResult.length > 0;
       });
     });
 

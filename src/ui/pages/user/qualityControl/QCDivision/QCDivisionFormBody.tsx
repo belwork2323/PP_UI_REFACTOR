@@ -20,7 +20,7 @@ import QCDivisionEntryPanel from "./QCDivisionEntryPanel";
 import QCDivisionNavPanel from "./QCDivisionNavPanel";
 import QCSchemaPanel from "./QCSchemaPanel";
 import QCDivisionSavedSectionsDisplay from "./components/QCDivisionSavedSectionsDisplay";
-import { QC_MIXING_FINAL_MIX_DETAILS_SECTION_ID } from "../../../../../hooks/user/qualityControl/qcMixingConfig";
+import type { QcPartialItemStatus } from "../../../../../hooks/user/qualityControl/qcDivisionApprovalUnits";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 
@@ -48,6 +48,8 @@ export type QCDivisionFormBodyProps = {
   onDivisionEntryLiquidValuesChange: (entryId: string, values: SchemaFormValues) => void;
   onMixingFinalMixDetailsChange: (values: SchemaFormValues) => void;
   onRemoveDivisionEntry: (entryId: string) => void;
+  hideDivisionSubNav?: boolean;
+  groupStatusByFlowKey?: Record<string, QcPartialItemStatus>;
   theme: any;
 };
 
@@ -60,6 +62,8 @@ const QCDivisionFormBody = ({
   readOnly = false,
   schemaLoading = false,
   schemaError = null,
+  hideDivisionSubNav = false,
+  groupStatusByFlowKey = {},
   onActiveDivisionGroupIndexChange,
   onActiveDivisionSubIndexChange,
   onDivisionEntryValuesChange,
@@ -161,6 +165,8 @@ const QCDivisionFormBody = ({
         entries={divisionEntries}
         activeGroupIndex={activeDivisionGroupIndex}
         activeSubIndex={activeDivisionSubIndex}
+        groupStatusByFlowKey={groupStatusByFlowKey}
+        hideSubNav={hideDivisionSubNav}
         onActiveGroupIndexChange={onActiveDivisionGroupIndexChange}
         onActiveSubIndexChange={onActiveDivisionSubIndexChange}
       />

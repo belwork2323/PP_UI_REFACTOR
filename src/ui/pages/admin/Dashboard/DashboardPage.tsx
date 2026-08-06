@@ -6,8 +6,8 @@ import useDashboardHook from "@hooks/admin/Dashboard/useDashboardHook";
 import { useThemeStore } from "@app/store/themeStore";
 import DashboardKpiSection from "./components/DashboardKpiSection";
 import DashboardChartsSection from "./components/DashboardChartsSection";
-import DashboardActiveBatchesSection from "./components/DashboardActiveBatchesSection";
 import DashboardBlockchainSection from "./components/DashboardBlockchainSection";
+import DashboardActiveBatchesSection from "./components/DashboardActiveBatchesSection";
 
 export default function DashboardPage() {
   const mode = useThemeStore((s) => s.mode);

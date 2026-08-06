@@ -7,16 +7,16 @@ import subscaleController from "../../../controllers/user/manufacturing/subscale
 import {
   createDefaultSubscaleFormState,
   hasAnySubscaleValue,
-  hydrateSubscaleFormState,
   mapSubscaleDetailsToFormState,
   mapSubscaleFormStateToPayload,
   type SubscaleFormState,
 } from "../../../data/models/user/SubscaleFormModel";
 import { normalizeBatchTypeCode } from "../../../data/models/user/SubdepartmentBatchModel";
-import { fetchSubscaleSchema } from "../../../schema-engine";
 import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import type { SchemaFormValues } from "../../../schema-engine";
+import { batchManagementController } from "@/controllers/admin/BatchManagement/batchManagementController";
+import { fetchMixingCycleDetailsApi } from "@/data/api/common/generalAPI";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -49,10 +49,9 @@ export const useSubscaleHook = () => {
 
   const [view, setView] = useState<WorkflowView>("list");
   const [activeBatch, setActiveBatch] = useState<SubscaleBatch | null>(null);
+  const [batchDetails, setBatchDetails] = useState<any>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [loadingFormDetails, setLoadingFormDetails] = useState(false);
-  const [schemaLoading, setSchemaLoading] = useState(false);
-  const [schemaError, setSchemaError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
@@ -72,10 +71,9 @@ export const useSubscaleHook = () => {
     const defaults = createDefaultSubscaleFormState();
     setView("list");
     setActiveBatch(null);
+    setBatchDetails(null);
     setIsEditMode(false);
     setLoadingFormDetails(false);
-    setSchemaLoading(false);
-    setSchemaError(null);
     setActionLoading(false);
     setBackConfirmOpen(false);
     setHasSavedDraft(false);
@@ -89,30 +87,38 @@ export const useSubscaleHook = () => {
     return fallbackMessage;
   };
 
-  const fetchSubscaleSchemaDocument = useCallback(async (batchType?: string | null) => {
-    setSchemaLoading(true);
-    setSchemaError(null);
+  const fetchBatchDetailsData = useCallback(async (batchId: string) => {
     try {
-      const response = await fetchSubscaleSchema({ batchType });
-      if (!response?.success || !response?.data) {
-        const message = getErrorMessage(response, STRINGS.MANUFACTURING.SUBSCALE.SCHEMA_FETCH_ERROR);
-        setSchemaError(message);
-        showAlert(message, "error");
-        return null;
-      }
-      return response.data;
-    } finally {
-      setSchemaLoading(false);
+      const response = await batchManagementController.getBatchById(batchId);
+      setBatchDetails(response);
+      return response;
+    } catch (error) {
+      console.error("Error fetching batch details:", error);
+      return null;
     }
-  }, [showAlert]);
+  }, []);
+
+  const fetchMixingCycleList = useCallback(async (mixingCycleCode: string) => {
+    if (!mixingCycleCode) return null;
+    try {
+      const response = await fetchMixingCycleDetailsApi(mixingCycleCode);
+      return response;
+    } catch (error) {
+      console.error("Error fetching mixing cycle details:", error);
+      return null;
+    }
+  }, []);
 
   const openFormWithResolvedData = useCallback(
     async (batch: SubscaleBatch, editMode: boolean) => {
       const status = parseStatus(batch.ssStatus);
+      const existingFormId = resolveFormId(batch);
       const shouldFetchDetails =
-        editMode ||
-        status === parseStatus(SS_STATUS.IN_PROGRESS) ||
-        status === parseStatus(SS_STATUS.REJECTED);
+        Boolean(existingFormId) &&
+        (editMode ||
+          status === parseStatus(SS_STATUS.IN_PROGRESS) ||
+          status === parseStatus(SS_STATUS.REJECTED) ||
+          status === parseStatus(SS_STATUS.TO_BE_INITIATED));
 
       let nextBatch = batch;
       let nextFormData = createDefaultSubscaleFormState();
@@ -124,13 +130,13 @@ export const useSubscaleHook = () => {
             showAlert(STRINGS.MANUFACTURING.SUBSCALE.SUB_DEPARTMENT_MISSING, "error");
             return;
           }
-          if (!batch.formId) {
+          if (!existingFormId) {
             showAlert(STRINGS.MANUFACTURING.SUBSCALE.FORM_ID_MISSING, "error");
             return;
           }
 
           const detailsResponse = await subscaleController.fetchFormDetails({
-            formId: batch.formId,
+            formId: existingFormId,
             subDepartmentId,
           });
 
@@ -143,17 +149,13 @@ export const useSubscaleHook = () => {
             return;
           }
 
-          nextBatch = { ...batch, formId: detailsResponse.data.formId || batch.formId };
+          nextBatch = { ...batch, formId: detailsResponse.data.formId || existingFormId };
           nextFormData = mapSubscaleDetailsToFormState(detailsResponse.data);
         }
 
-        const schema = await fetchSubscaleSchemaDocument(batch.batchType);
-        if (!schema) return;
-
-        nextFormData = hydrateSubscaleFormState(
-          { ...nextFormData, schemaFormLoaded: true },
-          schema,
-        );
+        if (batch.batchId) {
+          await fetchBatchDetailsData(batch.batchId);
+        }
       } finally {
         setLoadingFormDetails(false);
       }
@@ -164,7 +166,7 @@ export const useSubscaleHook = () => {
       setInitialSnapshot(JSON.stringify(nextFormData));
       setView("form");
     },
-    [showAlert, subDepartmentId, fetchSubscaleSchemaDocument],
+    [showAlert, subDepartmentId, fetchBatchDetailsData],
   );
 
   const handleFillForm = useCallback(
@@ -192,17 +194,16 @@ export const useSubscaleHook = () => {
   }, [resetFormContext, bumpBatchRefresh]);
 
   const handleFormValuesChange = useCallback((values: SchemaFormValues) => {
-    setFormData((prev) => ({ ...prev, schemaFormValues: values }));
+    setFormData((prev) => ({
+      ...prev,
+      schemaFormValues: values,
+      schemaFormLoaded: Boolean(values.IS_PROCESS_FORM_LOADED) || prev.schemaFormLoaded,
+    }));
   }, []);
 
   const submitForm = useCallback(
     async (intent: "draft" | "submit") => {
       if (!activeBatch) return false;
-
-      if (!formData.schemaFormLoaded || !formData.subscaleSchema) {
-        showAlert(STRINGS.MANUFACTURING.SUBSCALE.SCHEMA_NOT_LOADED, "warning");
-        return false;
-      }
 
       if (!subDepartmentId) {
         showAlert(STRINGS.MANUFACTURING.SUBSCALE.SUB_DEPARTMENT_MISSING, "error");
@@ -214,7 +215,23 @@ export const useSubscaleHook = () => {
         return false;
       }
 
-      const isCreateFlow = !resolveFormId(activeBatch);
+      if (!formData.schemaFormValues?.IS_PROCESS_FORM_LOADED && !formData.schemaFormLoaded) {
+        showAlert(STRINGS.MANUFACTURING.SUBSCALE.LOAD_FORM_REQUIRED, "warning");
+        return false;
+      }
+
+      const existingFormId = resolveFormId(activeBatch);
+      const status = parseStatus(activeBatch.ssStatus);
+      const isToBeInitiated =
+        !activeBatch.ssStatus || status === parseStatus(SS_STATUS.TO_BE_INITIATED);
+      // First save on To Be Initiated (no form yet) → create; otherwise update.
+      const useCreate = isToBeInitiated && !existingFormId;
+
+      if (!useCreate && !existingFormId) {
+        showAlert(STRINGS.MANUFACTURING.SUBSCALE.FORM_ID_MISSING, "error");
+        return false;
+      }
+
       const apiBatchType = normalizeBatchTypeCode(activeBatch.batchType);
       const payloadBody = mapSubscaleFormStateToPayload(formData, activeBatch.batchType);
 
@@ -222,7 +239,7 @@ export const useSubscaleHook = () => {
       try {
         let response: any;
 
-        if (isCreateFlow) {
+        if (useCreate) {
           if (!activeBatch.batchId) {
             showAlert(STRINGS.MANUFACTURING.SUBSCALE.BATCH_ID_MISSING, "error");
             return false;
@@ -235,13 +252,8 @@ export const useSubscaleHook = () => {
             ...payloadBody,
           });
         } else {
-          const formId = resolveFormId(activeBatch);
-          if (!formId) {
-            showAlert(STRINGS.MANUFACTURING.SUBSCALE.FORM_ID_MISSING, "error");
-            return false;
-          }
           response = await subscaleController.updateForm({
-            formId,
+            formId: existingFormId as string,
             batchId: activeBatch.batchId,
             batchType: apiBatchType,
             subDepartmentId,
@@ -251,20 +263,31 @@ export const useSubscaleHook = () => {
         }
 
         if (!response?.success) {
-          const fallback = isCreateFlow
+          const fallback = useCreate
             ? STRINGS.MANUFACTURING.SUBSCALE.CREATE_FAILED
             : STRINGS.MANUFACTURING.SUBSCALE.UPDATE_FAILED;
           showAlert(getErrorMessage(response, fallback), "error");
           return false;
         }
 
-        const nextFormId = response.data?.formId ?? activeBatch.formId ?? null;
-        setActiveBatch((prev) => (prev ? { ...prev, formId: nextFormId } : prev));
+        const nextFormId = response.data?.formId ?? existingFormId ?? null;
+        setActiveBatch((prev) =>
+          prev
+            ? {
+                ...prev,
+                formId: nextFormId,
+                ssStatus:
+                  intent === "draft" && isToBeInitiated
+                    ? SS_STATUS.IN_PROGRESS
+                    : prev.ssStatus,
+              }
+            : prev,
+        );
         setInitialSnapshot(formSnapshot);
 
         if (intent === "draft") {
           showAlert(
-            isCreateFlow
+            useCreate
               ? STRINGS.MANUFACTURING.SUBSCALE.CREATE_DRAFT_SUCCESS
               : STRINGS.MANUFACTURING.SUBSCALE.UPDATE_DRAFT_SUCCESS,
             "success",
@@ -273,7 +296,7 @@ export const useSubscaleHook = () => {
           setHasSavedDraft(true);
         } else {
           showAlert(
-            isCreateFlow
+            useCreate
               ? STRINGS.MANUFACTURING.SUBSCALE.CREATE_SUBMIT_SUCCESS
               : STRINGS.MANUFACTURING.SUBSCALE.UPDATE_SUBMIT_SUCCESS,
             "success",
@@ -313,10 +336,7 @@ export const useSubscaleHook = () => {
       setDetailsLoading(false);
 
       if (!response?.success || !response?.data) {
-        showAlert(
-          response?.message || STRINGS.MANUFACTURING.SUBSCALE.DETAILS_FETCH_ERROR,
-          "error",
-        );
+        showAlert(response?.message || STRINGS.MANUFACTURING.SUBSCALE.DETAILS_FETCH_ERROR, "error");
         return;
       }
 
@@ -336,14 +356,15 @@ export const useSubscaleHook = () => {
 
   return {
     ...listParams,
-    loading: listParams.loading || loadingFormDetails || schemaLoading,
+    loading: listParams.loading || loadingFormDetails,
+    loadingFormDetails,
     view,
     activeBatch,
+    batchDetails,
+    fetchBatchDetailsData,
     isEditMode,
     formData,
     isFormDirty,
-    schemaLoading,
-    schemaError,
     actionLoading,
     backConfirmOpen,
     setBackConfirmOpen,
@@ -360,6 +381,7 @@ export const useSubscaleHook = () => {
     handleSubmit,
     handleViewDetails,
     handleBackFromDetails,
+    fetchMixingCycleList,
   };
 };
 

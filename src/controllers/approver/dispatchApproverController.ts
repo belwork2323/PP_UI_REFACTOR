@@ -1,43 +1,37 @@
 import {
-  fetchDraftDispatchesApi,
-  fetchDispatchDetailsApi,
-  updateDispatchStatusApi,
-} from "@data/api/approver/dispatch/dispatchApproverApi";
-import { useAlertStore } from "@app/store/alertStore";
+  changeDispatchApproverMotorStatus,
+  type DispatchApproverMotorChangeStatusPayload,
+  type DispatchApproverMotorChangeStatusResponse,
+} from "../../data/api/approver/dispatch/dispatchApproverApi";
+import {
+  changeApproverFormStatus,
+  type ApproverChangeStatusPayload,
+} from "../../data/api/approver/approverApi";
+import { ApiResponseModel } from "../../data/models/common/ApiResponseModel";
 
-export const dispatchApproverController = {
-  getPendingList: async (setBatches, setLoading) => {
-    setLoading(true);
-    try {
-      const data = await fetchDraftDispatchesApi();
-      setBatches(Array.isArray(data) ? data : []);
-    } catch (error) {
-      useAlertStore.getState().showAlert("Failed to fetch pending dispatches", "error");
-    } finally {
-      setLoading(false);
-    }
-  },
-
-  getDetails: async (batchId, setDetails, setLoading) => {
-    setLoading(true);
-    try {
-      const data = await fetchDispatchDetailsApi(batchId);
-      setDetails(data);
-    } catch (error) {
-      useAlertStore.getState().showAlert("Failed to load dispatch details", "error");
-    } finally {
-      setLoading(false);
-    }
-  },
-
-  processApproval: async (batchId, status, onunda) => {
-    const user = JSON.parse(localStorage.getItem("user"))?.username || "unknown_approver";
-    try {
-      await updateDispatchStatusApi(batchId, status, user);
-      useAlertStore.getState().showAlert(`Batch ${batchId} ${status} successfully`, "success");
-      onunda(); // Callback to refresh list/navigate back
-    } catch (error) {
-      useAlertStore.getState().showAlert(`Failed to ${status} batch`, "error");
-    }
+export const submitDispatchApproverMotorStatusChange = async (
+  payload: DispatchApproverMotorChangeStatusPayload,
+) => {
+  try {
+    const response = await changeDispatchApproverMotorStatus(payload);
+    return new ApiResponseModel<DispatchApproverMotorChangeStatusResponse>(response);
+  } catch (error) {
+    return new ApiResponseModel(error);
   }
+};
+
+export const submitDispatchApproverFormStatusChange = async (
+  payload: ApproverChangeStatusPayload,
+) => {
+  try {
+    const response = await changeApproverFormStatus(payload);
+    return new ApiResponseModel(response);
+  } catch (error) {
+    return new ApiResponseModel(error);
+  }
+};
+
+export default {
+  submitMotorStatusChange: submitDispatchApproverMotorStatusChange,
+  submitFormStatusChange: submitDispatchApproverFormStatusChange,
 };

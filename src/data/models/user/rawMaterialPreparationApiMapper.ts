@@ -171,11 +171,23 @@ const expandSectionSubmissionFromApi = (
   );
   if (repeatGroups.length === 1) {
     const repeatId = repeatGroups[0].id;
+    // Some API payloads nest rows under the repeat group id instead of flattening.
+    let rows = apiRows;
+    if (apiRows.length === 1 && apiRows[0] && typeof apiRows[0] === "object") {
+      const only = apiRows[0] as Record<string, unknown>;
+      const nested =
+        only[repeatId] ??
+        only[toCamelCaseKey(repeatId)] ??
+        only[toSchemaKey(repeatId)];
+      if (Array.isArray(nested)) {
+        rows = nested as Record<string, unknown>[];
+      }
+    }
     return {
       sectionId: schemaSectionId,
       sectionData: [
         {
-          [repeatId]: apiRows.map(
+          [repeatId]: rows.map(
             (row) => mapObjectKeysDeep(row, toSchemaKey) as Record<string, unknown>,
           ),
         },

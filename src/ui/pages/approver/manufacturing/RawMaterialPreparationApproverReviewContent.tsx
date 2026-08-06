@@ -4,7 +4,6 @@ import {
   Button,
   CircularProgress,
   Stack,
-  Tooltip,
   Typography,
 } from "@mui/material";
 import GrainRoundedIcon from "@mui/icons-material/GrainRounded";
@@ -28,6 +27,11 @@ import {
   ProcessDetailBlock,
   WeightmentSheetDetailBlock,
 } from "../../user/manufacturing/RawMaterial/components/RawMaterialPreparationDetailsContent";
+import {
+  UserWorkflowNavPanel,
+  UserWorkflowTabNav,
+  type UserWorkflowNavTab,
+} from "../../../components/custom/UserWorkflowStepPager";
 
 const RM = STRINGS.MANUFACTURING.RAW_MATERIAL_PREP;
 const {
@@ -159,6 +163,42 @@ const RawMaterialPreparationApproverReviewContent = ({
     premixes,
   });
 
+  const navPalette = {
+    primary: palette.primary,
+    primaryLight: palette.primaryLight,
+    border: palette.border,
+    surface: palette.surface,
+    textSub: palette.textSub,
+    text: palette.text,
+  };
+
+  const premixNavTabs = useMemo<UserWorkflowNavTab[]>(
+    () =>
+      premixes.map((premix) => ({
+        id: `premix-${premix.premixNo}`,
+        label: `Premix ${premix.premixNo}`,
+        endAdornment: (
+          <PremixStatusChip
+            status={premix.premixSubmissionStatus}
+            statusConfig={statusConfig}
+            showIcon={false}
+            variant="embedded"
+            onAccent={premix.premixNo === activePremixNo}
+          />
+        ),
+      })),
+    [activePremixNo, premixes, statusConfig],
+  );
+
+  const materialNavTabs = useMemo<UserWorkflowNavTab[]>(
+    () =>
+      materialTabs.map((entry) => ({
+        id: entry.key,
+        label: entry.label,
+      })),
+    [materialTabs],
+  );
+
   useEffect(() => {
     setActiveMaterialIndex(0);
   }, [activePremixNo]);
@@ -256,113 +296,45 @@ const RawMaterialPreparationApproverReviewContent = ({
         </Box>
       ) : null}
 
-      <Box
-        sx={{
-          border: `1px solid ${palette.border}`,
-          borderRadius: 2,
-          px: 1.2,
-          py: 1,
-          background: palette.surface,
-        }}
-      >
-        <Stack direction="row" justifyContent="space-between" alignItems="center">
-          <Button
-            variant="outlined"
-            size="small"
-            disabled={enabledPremixIndex <= 0}
-            onClick={() => goToEnabledPremix(-1)}
-          >
-            Back
-          </Button>
-          <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, color: palette.primary }}>
-            Premix {activePremixIndex >= 0 ? activePremixIndex + 1 : "—"} of {totalPremixCount || premixes.length}
-          </Typography>
-          <Button
-            variant="outlined"
-            size="small"
-            disabled={enabledPremixIndex < 0 || enabledPremixIndex >= enabledPremixes.length - 1}
-            onClick={() => goToEnabledPremix(1)}
-          >
-            Next
-          </Button>
-        </Stack>
-      </Box>
-
-      <Box
-        sx={{
-          border: `1px solid ${palette.border}`,
-          borderRadius: 2,
-          px: 1,
-          py: 1,
-          background: palette.surface,
-        }}
-      >
-        <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: palette.primary, mb: 0.4 }}>
-          Premix Navigation
-        </Typography>
-        <Typography sx={{ fontSize: "0.72rem", color: palette.textSub, mb: 0.9 }}>
-          {RM.PREMIX_APPROVER_NAV_HINT}
-        </Typography>
-        <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5, mb: 1 }}>
-          {premixes.map((premix) => {
-            const disabled = isPremixApproverTabDisabled(premix.premixSubmissionStatus);
-            const active = premix.premixNo === activePremixNo;
-            const button = (
-              <Button
-                key={`approver-premix-${premix.premixNo}`}
-                size="small"
-                variant={active ? "contained" : "outlined"}
-                disabled={disabled}
-                onClick={() => {
-                  onActivePremixChange(premix.premixNo);
-                  setActiveMaterialIndex(0);
-                }}
-                sx={{ whiteSpace: "nowrap", flexShrink: 0, textTransform: "none" }}
-              >
-                <Stack direction="row" alignItems="center" gap={0.75}>
-                  Premix {premix.premixNo}
-                  <PremixStatusChip
-                    status={premix.premixSubmissionStatus}
-                    statusConfig={statusConfig}
-                    showIcon={false}
-                    variant="embedded"
-                    onAccent={active}
-                  />
-                </Stack>
-              </Button>
-            );
-
-            return disabled ? (
-              <Tooltip key={`approver-premix-tip-${premix.premixNo}`} title={RM.PREMIX_APPROVER_TAB_DISABLED}>
-                <span>{button}</span>
-              </Tooltip>
-            ) : (
-              button
-            );
-          })}
-        </Stack>
-
-        {materialTabs.length > 0 ? (
-          <>
-            <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: palette.primary, mb: 0.4 }}>
-              Premix Material Navigation
-            </Typography>
-            <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
-              {materialTabs.map((entry, index) => (
-                <Button
-                  key={entry.key}
-                  size="small"
-                  variant={index === activeMaterialIndexSafe ? "contained" : "outlined"}
-                  onClick={() => setActiveMaterialIndex(index)}
-                  sx={{ whiteSpace: "nowrap", flexShrink: 0, textTransform: "none" }}
-                >
-                  {entry.label}
-                </Button>
-              ))}
-            </Stack>
-          </>
+      <UserWorkflowNavPanel palette={navPalette}>
+        <UserWorkflowTabNav
+          title="Premix Navigation"
+          hint={RM.PREMIX_APPROVER_NAV_HINT}
+          tabs={premixNavTabs}
+          activeIndex={activePremixIndex >= 0 ? activePremixIndex : 0}
+          onActiveIndexChange={(index) => {
+            onActivePremixChange(premixes[index].premixNo);
+            setActiveMaterialIndex(0);
+          }}
+          palette={navPalette}
+          showStepArrows
+          onStepBack={() => goToEnabledPremix(-1)}
+          onStepNext={() => goToEnabledPremix(1)}
+          disableStepBack={enabledPremixIndex <= 0}
+          disableStepNext={
+            enabledPremixIndex < 0 || enabledPremixIndex >= enabledPremixes.length - 1
+          }
+          isTabDisabled={(_, index) =>
+            isPremixApproverTabDisabled(premixes[index]?.premixSubmissionStatus)
+          }
+          tabTooltip={(_, index) =>
+            isPremixApproverTabDisabled(premixes[index]?.premixSubmissionStatus)
+              ? RM.PREMIX_APPROVER_TAB_DISABLED
+              : undefined
+          }
+          mb={materialNavTabs.length > 0 ? 1 : 0}
+        />
+        {materialNavTabs.length > 0 ? (
+          <UserWorkflowTabNav
+            title="Premix Material Navigation"
+            tabs={materialNavTabs}
+            activeIndex={activeMaterialIndexSafe}
+            onActiveIndexChange={setActiveMaterialIndex}
+            palette={navPalette}
+            showStepArrows
+          />
         ) : null}
-      </Box>
+      </UserWorkflowNavPanel>
 
       {activePremix && !isPremixApproverTabDisabled(activePremix.premixSubmissionStatus) ? (
         <Box

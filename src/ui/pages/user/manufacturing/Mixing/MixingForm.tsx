@@ -40,6 +40,10 @@ import {
 } from "../../../../../data/models/user/MixingFormModel";
 import type { FinalMixEntry, PremixEntry } from "../../../../../data/models/user/MixingFormModel";
 import { useMixingFormHook } from "../../../../../hooks/user/manufacturing/useMixingFormHook";
+import {
+  isPremixEnabledByPreviousStage,
+  type PreviousStageApprovedUnits,
+} from "../../../../../hooks/user/previousStageApproval";
 import { mixingController } from "../../../../../controllers/user/manufacturing/mixingController";
 import MixingDateField from "./MixingDateField";
 import MixingCardNavigation from "./MixingCardNavigation";
@@ -138,6 +142,9 @@ const EmptySectionState = ({ message }: { message: string }) => (
 type PremixStageCardProps = {
   premix: PremixEntry;
   readOnly?: boolean;
+  statusChip?: React.ReactNode;
+  headerActions?: React.ReactNode;
+  lockedMessage?: string | null;
   onRemove: (premixNo: string) => void;
   onPremixFieldChange: (
     premixNo: string,
@@ -161,6 +168,9 @@ type PremixStageCardProps = {
 const PremixStageCard = ({
   premix,
   readOnly = false,
+  statusChip,
+  headerActions,
+  lockedMessage,
   onRemove,
   onPremixFieldChange,
   onProcessChange,
@@ -168,7 +178,7 @@ const PremixStageCard = ({
 }: PremixStageCardProps) => (
   <SectionCard>
     <SectionHeader>
-      <Stack direction="row" alignItems="center" gap={1.5}>
+      <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" minWidth={0}>
         <Box
           sx={{
             width: 34,
@@ -179,6 +189,7 @@ const PremixStageCard = ({
             alignItems: "center",
             justifyContent: "center",
             boxShadow: "0 3px 10px rgba(21,101,192,0.3)",
+            flexShrink: 0,
           }}
         >
           <ChecklistRoundedIcon sx={{ color: "#fff", fontSize: 18 }} />
@@ -186,17 +197,28 @@ const PremixStageCard = ({
         <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: BRAND.text }}>
           {S.SECTION_PREMIX_STAGE} — {getPremixNoLabel(Number(premix.premixNo))}
         </Typography>
+        {statusChip ?? null}
       </Stack>
-      {/* <Tooltip title={S.REMOVE_CARD_TOOLTIP} arrow>
-        <IconButton
-          size="small"
-          onClick={() => onRemove(premix.premixNo)}
-          sx={{ color: BRAND.danger }}
-        >
-          <DeleteOutlineRoundedIcon fontSize="small" />
-        </IconButton>
-      </Tooltip> */}
+      {headerActions ?? null}
     </SectionHeader>
+
+    {lockedMessage ? (
+      <Box
+        sx={{
+          mx: 2,
+          mt: 1.5,
+          px: 1.25,
+          py: 0.75,
+          borderRadius: 1.5,
+          border: `1px solid ${alpha(BRAND.border, 0.9)}`,
+          bgcolor: alpha(BRAND.surface, 0.8),
+        }}
+      >
+        <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub, fontWeight: 600 }}>
+          {lockedMessage}
+        </Typography>
+      </Box>
+    ) : null}
 
     <Box sx={{ p: 2 }}>
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2, mb: 2.5 }}>
@@ -234,8 +256,8 @@ const PremixStageCard = ({
             value={premix.premixQuantity}
             placeholder={S.PLACEHOLDER_PREMIX_QTY}
             type="number"
-            disabled={readOnly}
-            onChange={(value) => onPremixFieldChange(premix.premixNo, "premixQuantity", value)}
+            disabled
+            onChange={() => undefined}
           />
           <MixingTextField
             label={S.LABEL_MIXING_CYCLE}
@@ -374,6 +396,9 @@ const PremixStageCard = ({
 const FinalMixStageCard = ({
   entry,
   readOnly = false,
+  statusChip,
+  headerActions,
+  lockedMessage,
   onRemove,
   onFieldChange,
   onProcessChange,
@@ -381,6 +406,9 @@ const FinalMixStageCard = ({
 }: {
   entry: FinalMixEntry;
   readOnly?: boolean;
+  statusChip?: React.ReactNode;
+  headerActions?: React.ReactNode;
+  lockedMessage?: string | null;
   onRemove: (mixNo: string) => void;
   onFieldChange: (
     mixNo: string,
@@ -402,7 +430,7 @@ const FinalMixStageCard = ({
 }) => (
   <SectionCard>
     <SectionHeader>
-      <Stack direction="row" alignItems="center" gap={1.5}>
+      <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" minWidth={0}>
         <Box
           sx={{
             width: 34,
@@ -413,6 +441,7 @@ const FinalMixStageCard = ({
             alignItems: "center",
             justifyContent: "center",
             boxShadow: "0 3px 10px rgba(21,101,192,0.3)",
+            flexShrink: 0,
           }}
         >
           <BlenderRoundedIcon sx={{ color: "#fff", fontSize: 18 }} />
@@ -420,13 +449,28 @@ const FinalMixStageCard = ({
         <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: BRAND.text }}>
           {S.SECTION_FINAL_MIX_STAGE} — {getFinalMixNoLabel(Number(entry.mixNo))}
         </Typography>
+        {statusChip ?? null}
       </Stack>
-      <Tooltip title={S.REMOVE_CARD_TOOLTIP} arrow>
-        <IconButton size="small" onClick={() => onRemove(entry.mixNo)} sx={{ color: BRAND.danger }}>
-          <DeleteOutlineRoundedIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
+      {headerActions ?? null}
     </SectionHeader>
+
+    {lockedMessage ? (
+      <Box
+        sx={{
+          mx: 2,
+          mt: 1.5,
+          px: 1.25,
+          py: 0.75,
+          borderRadius: 1.5,
+          border: `1px solid ${alpha(BRAND.border, 0.9)}`,
+          bgcolor: alpha(BRAND.surface, 0.8),
+        }}
+      >
+        <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub, fontWeight: 600 }}>
+          {lockedMessage}
+        </Typography>
+      </Box>
+    ) : null}
 
     <Box sx={{ p: 2 }}>
       <Box
@@ -571,6 +615,7 @@ type MixingFormProps = {
   mixCardStatusById?: Record<string, MixCardStatusMeta>;
   getMixCardStatus?: (mixCardId: string) => MixCardSubmissionStatus;
   isMixCardEditable?: (mixCardId: string) => boolean;
+  previousStageGate?: PreviousStageApprovedUnits | null;
   actionLoading?: boolean;
   canSubmitForFinalApproval?: boolean;
   onSaveMixCardDraft?: (stageType: MixCardStageType, cardNo: string) => void;
@@ -587,6 +632,7 @@ const MixingForm = ({
   mixCardStatusById = {},
   getMixCardStatus,
   isMixCardEditable: checkMixCardEditable,
+  previousStageGate = null,
   actionLoading = false,
   canSubmitForFinalApproval = false,
   onSaveMixCardDraft,
@@ -643,8 +689,27 @@ const MixingForm = ({
       setActiveCardIndex(0);
       return;
     }
-    setActiveCardIndex((prev) => Math.min(prev, combinedNavItems.length - 1));
-  }, [combinedNavItems.length]);
+    const firstEnabled = combinedNavItems.findIndex((item) => {
+      const cardNo =
+        item.kind === "PREMIX"
+          ? premixCards[item.cardIndex]?.premixNo
+          : finalMixCards[item.cardIndex]?.mixNo;
+      return isPremixEnabledByPreviousStage(cardNo, previousStageGate);
+    });
+    setActiveCardIndex((prev) => {
+      const currentItem = combinedNavItems[prev];
+      if (currentItem) {
+        const cardNo =
+          currentItem.kind === "PREMIX"
+            ? premixCards[currentItem.cardIndex]?.premixNo
+            : finalMixCards[currentItem.cardIndex]?.mixNo;
+        if (isPremixEnabledByPreviousStage(cardNo, previousStageGate)) {
+          return Math.min(prev, combinedNavItems.length - 1);
+        }
+      }
+      return firstEnabled >= 0 ? firstEnabled : Math.min(prev, combinedNavItems.length - 1);
+    });
+  }, [combinedNavItems, finalMixCards, premixCards, previousStageGate]);
 
   useEffect(() => {
     let isMounted = true;
@@ -733,10 +798,17 @@ const MixingForm = ({
       ? getMixCardStatus?.(activeMixCardId) ??
         mixCardStatusById[activeMixCardId]?.mixCardSubmissionStatus
       : undefined) ?? "TO_BE_INITIATED";
-  const activeMixCardLocked =
-    activeMixCardId != null
-      ? !(checkMixCardEditable?.(activeMixCardId) ?? !isMixCardLocked(activeMixCardStatus))
+  const activeUnitEnabled = activePremix
+    ? isPremixEnabledByPreviousStage(activePremix.premixNo, previousStageGate)
+    : activeFinalMix
+      ? isPremixEnabledByPreviousStage(activeFinalMix.mixNo, previousStageGate)
       : false;
+
+  const activeMixCardLocked =
+    !activeUnitEnabled ||
+    (activeMixCardId != null
+      ? !(checkMixCardEditable?.(activeMixCardId) ?? !isMixCardLocked(activeMixCardStatus))
+      : false);
 
   const resolveStatus = useCallback(
     (stageType: MixCardStageType, cardNo: string) => {
@@ -828,17 +900,6 @@ const MixingForm = ({
             </Typography>
           </Box>
         </Stack>
-
-        {combinedNavItems.length > 0 ? (
-          <Button
-            variant="contained"
-            size="small"
-            disabled={actionLoading || !canSubmitForFinalApproval}
-            onClick={() => setFinalApprovalOpen(true)}
-          >
-            {S.SUBMIT_FOR_FINAL_APPROVAL}
-          </Button>
-        ) : null}
       </Stack>
 
       {combinedNavItems.length === 0 || (!activePremix && !activeFinalMix) ? (
@@ -850,103 +911,134 @@ const MixingForm = ({
           tabs={combinedNavTabs}
           activeIndex={activeCardIndex}
           onActiveIndexChange={setActiveCardIndex}
+          isTabDisabled={(_, index) => {
+            const item = combinedNavItems[index];
+            if (!item) return true;
+            const cardNo =
+              item.kind === "PREMIX"
+                ? premixCards[item.cardIndex]?.premixNo
+                : finalMixCards[item.cardIndex]?.mixNo;
+            return !isPremixEnabledByPreviousStage(cardNo, previousStageGate);
+          }}
+          tabTooltip={(_, index) => {
+            const item = combinedNavItems[index];
+            if (!item) return undefined;
+            const cardNo =
+              item.kind === "PREMIX"
+                ? premixCards[item.cardIndex]?.premixNo
+                : finalMixCards[item.cardIndex]?.mixNo;
+            return isPremixEnabledByPreviousStage(cardNo, previousStageGate)
+              ? undefined
+              : STRINGS.MANUFACTURING.PREVIOUS_STAGE_PREMIX_TAB_DISABLED;
+          }}
         >
-          <Box
-            sx={{
-              borderRadius: 2.5,
-              border: `1px solid ${alpha(BRAND.border, 0.9)}`,
-              background: BRAND.surface,
-              px: 1.5,
-              py: 1.25,
-              mb: 1.25,
-            }}
-          >
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              alignItems={{ sm: "center" }}
-              justifyContent="space-between"
-              gap={1}
-              mb={activeMixCardLocked ? 1 : 0}
-            >
-              <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
-                <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: BRAND.mx }}>
-                  {activePremix
-                    ? `${S.SECTION_PREMIX_STAGE} — ${getPremixNoLabel(Number(activePremix.premixNo))}`
-                    : `${S.SECTION_FINAL_MIX_STAGE} — ${getFinalMixNoLabel(Number(activeFinalMix?.mixNo))}`}
-                </Typography>
-                <PremixStatusChip
-                  status={activeMixCardStatus as any}
-                  statusConfig={statusConfig}
-                  variant="embedded"
-                />
-              </Stack>
-
-              <Stack direction="row" gap={1} flexShrink={0}>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  disabled={actionLoading || activeMixCardLocked}
-                  onClick={() => {
-                    if (activePremix) onSaveMixCardDraft?.("PREMIX", activePremix.premixNo);
-                    else if (activeFinalMix) onSaveMixCardDraft?.("FINAL_MIX", activeFinalMix.mixNo);
-                  }}
-                >
-                  {S.SAVE_MIX_CARD_DRAFT}
-                </Button>
-                <Button
-                  variant="contained"
-                  size="small"
-                  disabled={actionLoading || activeMixCardLocked}
-                  onClick={() => {
-                    if (activePremix) onSubmitMixCard?.("PREMIX", activePremix.premixNo);
-                    else if (activeFinalMix) onSubmitMixCard?.("FINAL_MIX", activeFinalMix.mixNo);
-                  }}
-                >
-                  {S.SUBMIT_MIX_CARD}
-                </Button>
-              </Stack>
+          <Stack spacing={1.25}>
+            <Stack direction="row" justifyContent="flex-end">
+              <Button
+                variant="contained"
+                size="small"
+                disabled={actionLoading || !canSubmitForFinalApproval}
+                onClick={() => setFinalApprovalOpen(true)}
+                sx={{ textTransform: "none", fontWeight: 700 }}
+              >
+                {S.SUBMIT_FOR_FINAL_APPROVAL}
+              </Button>
             </Stack>
 
-            {activeMixCardLocked ? (
-              <Box
-                sx={{
-                  px: 1.25,
-                  py: 0.75,
-                  borderRadius: 1.5,
-                  border: `1px solid ${alpha(BRAND.border, 0.9)}`,
-                  bgcolor: alpha(BRAND.surface, 0.8),
-                }}
-              >
-                <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub, fontWeight: 600 }}>
-                  {activeMixCardStatus === "APPROVED"
-                    ? S.MIX_CARD_LOCKED_APPROVED
-                    : S.MIX_CARD_LOCKED_WAITING}
-                </Typography>
-              </Box>
+            {activePremix ? (
+              <PremixStageCard
+                key={`premix-card-${activePremix.premixNo}`}
+                premix={activePremix}
+                readOnly={activeMixCardLocked}
+                statusChip={
+                  <PremixStatusChip
+                    status={activeMixCardStatus as any}
+                    statusConfig={statusConfig}
+                    variant="embedded"
+                  />
+                }
+                lockedMessage={
+                  !activeUnitEnabled
+                    ? STRINGS.MANUFACTURING.PREVIOUS_STAGE_PREMIX_TAB_DISABLED
+                    : activeMixCardLocked
+                      ? activeMixCardStatus === "APPROVED"
+                        ? S.MIX_CARD_LOCKED_APPROVED
+                        : S.MIX_CARD_LOCKED_WAITING
+                      : null
+                }
+                headerActions={
+                  <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      disabled={actionLoading || activeMixCardLocked}
+                      onClick={() => onSaveMixCardDraft?.("PREMIX", activePremix.premixNo)}
+                    >
+                      {S.SAVE_PREMIX_DRAFT}
+                    </Button>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      disabled={actionLoading || activeMixCardLocked}
+                      onClick={() => onSubmitMixCard?.("PREMIX", activePremix.premixNo)}
+                    >
+                      {S.SUBMIT_PREMIX}
+                    </Button>
+                  </Stack>
+                }
+                onRemove={handleRemovePremix}
+                onPremixFieldChange={updatePremixField}
+                onProcessChange={updateProcessParticular}
+                onQualityChange={updateQualityCheck}
+              />
+            ) : activeFinalMix ? (
+              <FinalMixStageCard
+                key={`final-mix-card-${activeFinalMix.mixNo}`}
+                entry={activeFinalMix}
+                readOnly={activeMixCardLocked}
+                statusChip={
+                  <PremixStatusChip
+                    status={activeMixCardStatus as any}
+                    statusConfig={statusConfig}
+                    variant="embedded"
+                  />
+                }
+                lockedMessage={
+                  !activeUnitEnabled
+                    ? STRINGS.MANUFACTURING.PREVIOUS_STAGE_PREMIX_TAB_DISABLED
+                    : activeMixCardLocked
+                      ? activeMixCardStatus === "APPROVED"
+                        ? S.MIX_CARD_LOCKED_APPROVED
+                        : S.MIX_CARD_LOCKED_WAITING
+                      : null
+                }
+                headerActions={
+                  <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      disabled={actionLoading || activeMixCardLocked}
+                      onClick={() => onSaveMixCardDraft?.("FINAL_MIX", activeFinalMix.mixNo)}
+                    >
+                      {S.SAVE_FINAL_MIX_DRAFT}
+                    </Button>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      disabled={actionLoading || activeMixCardLocked}
+                      onClick={() => onSubmitMixCard?.("FINAL_MIX", activeFinalMix.mixNo)}
+                    >
+                      {S.SUBMIT_FINAL_MIX}
+                    </Button>
+                  </Stack>
+                }
+                onRemove={handleRemoveFinalMix}
+                onFieldChange={updateFinalMixField}
+                onQualityChange={updateFinalMixQualityCheck}
+                onProcessChange={updateFinalMixProcessParticular}
+              />
             ) : null}
-          </Box>
-
-          {activePremix ? (
-            <PremixStageCard
-              key={`premix-card-${activePremix.premixNo}`}
-              premix={activePremix}
-              readOnly={activeMixCardLocked}
-              onRemove={handleRemovePremix}
-              onPremixFieldChange={updatePremixField}
-              onProcessChange={updateProcessParticular}
-              onQualityChange={updateQualityCheck}
-            />
-          ) : activeFinalMix ? (
-            <FinalMixStageCard
-              key={`final-mix-card-${activeFinalMix.mixNo}`}
-              entry={activeFinalMix}
-              readOnly={activeMixCardLocked}
-              onRemove={handleRemoveFinalMix}
-              onFieldChange={updateFinalMixField}
-              onQualityChange={updateFinalMixQualityCheck}
-              onProcessChange={updateFinalMixProcessParticular}
-            />
-          ) : null}
+          </Stack>
         </MixingCardNavigation>
       )}
 

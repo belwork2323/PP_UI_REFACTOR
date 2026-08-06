@@ -1,16 +1,263 @@
-import { scopedFormKey, syncRowGenerationTables, type SchemaDocumentV2, type SchemaFormValues, type SchemaSectionSubmission } from "../../../schema-engine";
+import {
+  scopedFormKey,
+  syncRowGenerationTables,
+  type SchemaDocumentV2,
+  type SchemaFormValues,
+  type SchemaSectionSubmission,
+} from "../../../schema-engine";
 import { mapSubscaleBatchType } from "../../../schema-engine/adapters/subscale.adapter";
 import {
   ARTICLE_TYPE_TABLE_ID,
   HARDWARE_COUNT_FIELDS,
   HARDWARE_SECTION_ID,
   LINER_TYPE_FIELD,
+  LINER_BATCH_NO_FIELD,
+  LINER_BATCH_DATE_FIELD,
   type ArticleTypeRow,
 } from "../../../hooks/user/manufacturing/subscaleHardwareConfig";
 import {
   SUBSCALE_BATCH_FIELDS,
   normalizeSubscaleMixingCycles,
 } from "../../../hooks/user/manufacturing/subscaleBatchConfig";
+import { formatToIsoDateInput } from "../../../utils/dateUtils";
+
+/** Mirrors backend `SubscaleDetailsDTO.MixParticular` */
+export type SubscaleMixParticularDTO = {
+  operationId?: number;
+  operation?: string;
+  rpm?: string;
+  time?: string;
+  temp?: string;
+  vacuum?: string;
+};
+
+/** Mirrors backend `SubscaleDetailsDTO.MixingCycle` */
+export type SubscaleMixingCycleDTO = {
+  motorStage?: number;
+  mixingCycleId?: number;
+  mixingCycleCode?: string;
+  mixingCycleName?: string;
+  premixParticulars?: SubscaleMixParticularDTO[];
+  finalMixParticulars?: SubscaleMixParticularDTO[];
+};
+
+/** Mirrors backend `SubscaleDetailsDTO` */
+export type SubscaleDetailsDTO = {
+  batchSize?: number;
+  premixDate?: string;
+  mixerType?: string;
+  bldgNo?: string;
+  finalMixDate?: string;
+  mixingCycle?: SubscaleMixingCycleDTO;
+};
+
+/** Mirrors backend `HardwarePreparationDetailsDTO` */
+export type HardwarePreparationDetailsDTO = {
+  numberOf40KgBems?: number;
+  numberOf10KgBems?: number;
+  numberOf2KgBems?: number;
+  numberOfWheelPeels?: number;
+  numberOfCartoons?: number;
+  numberOfSbsTbs?: number;
+  linerType?: string;
+  linerBatchNo?: string;
+  linerBatchDate?: string;
+};
+
+/** Mirrors backend `HardwarePreparationTableDTO` */
+export type HardwarePreparationTableDTO = {
+  articleType?: string;
+  rubberMaterial?: string;
+  sleeveNo?: string;
+  mouldNo?: string;
+  lengthMm?: string;
+  thicknessMm?: number;
+  linerApplied?: boolean;
+  observations?: string;
+};
+
+/** Mirrors backend `CastingTableDTO` */
+export type CastingTableDTO = {
+  articleType?: string;
+  bemMouldNo?: string;
+  castingPitNo?: string;
+  castingStartTime?: string;
+  castingEndTime?: string;
+  vacuumLevel?: number;
+  remarks?: string;
+};
+
+/** Mirrors backend `CastingDetailsDTO` */
+export type CastingDetailsDTO = {
+  dateOfCasting?: string;
+  castingTable?: CastingTableDTO[];
+};
+
+/** Mirrors backend `CuringTableDTO` */
+export type CuringTableDTO = {
+  articleType?: string;
+  bemMouldNo?: string;
+  curingStartDate?: string;
+  curingEndDate?: string;
+  ovenNo?: string;
+  temperature?: number;
+  hardness?: number;
+  decoringDate?: string;
+  decoringLoad?: number;
+  grainSurfaceObservations?: string;
+};
+
+/** Mirrors backend `CuringDetailsDTO` */
+export type CuringDetailsDTO = {
+  curingTable?: CuringTableDTO[];
+};
+
+/** Mirrors backend `NdtTableDTO` */
+export type NdtTableDTO = {
+  articleType?: string;
+  bemNo?: string;
+  dateOfNdt?: string;
+  observations?: string;
+};
+
+/** Mirrors backend `NdtDetailsDTO` */
+export type NdtDetailsDTO = {
+  ndtTable?: NdtTableDTO[];
+};
+
+/** Mirrors backend `TrimmingTableDTO` */
+export type TrimmingTableDTO = {
+  articleType?: string;
+  bemNo?: string;
+  heOd?: number;
+  hePortInner?: number;
+  hePortOuter?: number;
+  heBeforeInhibitionInner?: number;
+  heBeforeInhibitionOuter?: number;
+  neOd?: number;
+  nePortInner?: number;
+  nePortOuter?: number;
+  neWebInner?: number;
+  neWebOuter?: number;
+  lengthBeforeInhibition?: number;
+};
+
+/** Mirrors backend `TrimmingDetailsDTO` */
+export type TrimmingDetailsDTO = {
+  trimmingTable?: TrimmingTableDTO[];
+};
+
+/** Mirrors backend `InhibitionTableDTO` */
+export type InhibitionTableDTO = {
+  articleType?: string;
+  bemNo?: string;
+  linerCoatedSleeveWeight?: number;
+  weightBeforeInhibition?: number;
+  weightAfterInhibition?: number;
+  irAppliedWeight?: number;
+  remarks?: string;
+};
+
+/** Mirrors backend `InhibitionDetailsDTO` */
+export type InhibitionDetailsDTO = {
+  irBatchNo?: string;
+  dateOfManufacturing?: string;
+  dateOfApplication?: string;
+  inhibitionTable?: InhibitionTableDTO[];
+};
+
+/** Mirrors backend `StaticTestingTableDTO` (API may return `nvalue` lowercase) */
+export type StaticTestingTableDTO = {
+  articleType?: string | null;
+  bemNo?: string | null;
+  propellantMass?: number | null;
+  dt?: number | null;
+  webThickness?: number | null;
+  nValue?: number | null;
+  nvalue?: number | null;
+  pressureAvg?: number | null;
+  thrustAvg?: number | null;
+  burnRate?: number | null;
+  graphDocumentId?: string | null;
+};
+
+/** Mirrors backend `StaticTestingDetailsDTO` */
+export type StaticTestingDetailsDTO = {
+  staticTestingTable?: StaticTestingTableDTO[];
+};
+
+/** Mirrors backend `MechanicalPropertiesTableDTO` */
+export type MechanicalPropertiesTableDTO = {
+  articleType?: string;
+  bemNo?: string;
+  ts?: number;
+  elongation?: number;
+  modulus?: number;
+  sbs?: number;
+  tbs?: number;
+  peelStrength?: number;
+  density?: number;
+  actor?: string;
+};
+
+/** Mirrors backend `MechanicalInterfacePropertiesDTO` */
+export type MechanicalInterfacePropertiesDTO = {
+  mechanicalPropertiesTable?: MechanicalPropertiesTableDTO[];
+};
+
+/** Section payload body shared by create and update requests */
+export type SubscaleApiPayloadBody = {
+  subscaleDetails?: SubscaleDetailsDTO;
+  hardwarePreparationDetails?: HardwarePreparationDetailsDTO;
+  hardwarePreparationTable?: HardwarePreparationTableDTO[];
+  castingDetails?: CastingDetailsDTO;
+  curingDetails?: CuringDetailsDTO;
+  ndtDetails?: NdtDetailsDTO;
+  trimmingDetails?: TrimmingDetailsDTO;
+  inhibitionDetails?: InhibitionDetailsDTO;
+  staticTestingDetails?: StaticTestingDetailsDTO;
+  mechanicalInterfaceProperties?: MechanicalInterfacePropertiesDTO;
+};
+
+export type SubscaleFormSubmissionType = "DRAFT" | "SUBMIT";
+
+/** Mirrors backend `CreateSubscaleProcessingRequest` */
+export type CreateSubscaleProcessingRequest = SubscaleApiPayloadBody & {
+  batchId: string;
+  batchType: string;
+  subDepartmentId: number;
+  formSubmissionType: SubscaleFormSubmissionType;
+};
+
+/** Mirrors backend update request (includes formId) */
+export type UpdateSubscaleProcessingRequest = CreateSubscaleProcessingRequest & {
+  formId: string;
+};
+
+/** Person reference as returned by form details API */
+export type SubscalePersonRef = {
+  id?: string;
+  fullName?: string;
+  name?: string;
+};
+
+/** Full form details response from `/api/v1/user/subscale/form/details` */
+export type SubscaleDetailsResponse = SubscaleApiPayloadBody & {
+  subscaleProcessingId: string;
+  formId: string;
+  batchId: string;
+  batchType: string;
+  status?: string;
+  createdBy?: string | SubscalePersonRef | null;
+  createdAt?: string | null;
+  submittedBy?: string | SubscalePersonRef | null;
+  submittedAt?: string | null;
+  lastUpdatedBy?: string | SubscalePersonRef | null;
+  lastUpdatedAt?: string | null;
+  subDepartmentId?: number;
+  formSubmissionType?: string;
+  sections?: SchemaSectionSubmission[];
+};
 
 const HARDWARE_COUNT_TO_API: Record<string, string> = {
   NO_OF_40KG_BEMS: "numberOf40KgBems",
@@ -18,6 +265,7 @@ const HARDWARE_COUNT_TO_API: Record<string, string> = {
   NO_OF_2KG_BEMS: "numberOf2KgBems",
   NO_OF_WHEEL_PEEL: "numberOfWheelPeels",
   NO_OF_SBS_TBS: "numberOfSbsTbs",
+  NO_OF_CARTOONS: "numberOfCartoons",
 };
 
 const ARTICLE_TYPE_TO_API: Record<string, string> = {
@@ -26,11 +274,14 @@ const ARTICLE_TYPE_TO_API: Record<string, string> = {
   "2 kg BEM": "2_KG_BEM",
   "Wheel Peel": "WHEEL_PEEL",
   "SBS/TBS": "SBS_TBS",
+  Cartoons: "CARTOONS",
+  Cartons: "CARTOONS",
   "40_KG_BEM": "40_KG_BEM",
   "10_KG_BEM": "10_KG_BEM",
   "2_KG_BEM": "2_KG_BEM",
   WHEEL_PEEL: "WHEEL_PEEL",
   SBS_TBS: "SBS_TBS",
+  CARTOONS: "CARTOONS",
 };
 
 const TABLE_FIELD_TO_API: Record<string, string> = {
@@ -60,9 +311,14 @@ const ARTICLE_TYPE_TO_COUNT_FIELD: Record<string, string> = {
   "2 kg BEM": "NO_OF_2KG_BEMS",
   "Wheel Peel": "NO_OF_WHEEL_PEEL",
   "SBS/TBS": "NO_OF_SBS_TBS",
+  Cartoons: "NO_OF_CARTOONS",
+  Cartons: "NO_OF_CARTOONS",
 };
 
 const RUNTIME_ROW_KEYS = new Set(["SR_NO", "srNo"]);
+
+/** UI-only table columns not sent to the API */
+const TABLE_ROW_EXCLUDED_KEYS = new Set(["PROPELLANT_WEIGHT", "DATE_OF_APPLICATION"]);
 
 const bridgeHardwareArticleTableToSchemaScope = (values: SchemaFormValues) => {
   const rows = values[ARTICLE_TYPE_TABLE_ID];
@@ -82,9 +338,7 @@ export const applySubscaleHardwareRowGeneration = (
 };
 
 const toCamelCase = (key: string) =>
-  key
-    .toLowerCase()
-    .replace(/_([a-z0-9])/gi, (_, char: string) => char.toUpperCase());
+  key.toLowerCase().replace(/_([a-z0-9])/gi, (_, char: string) => char.toUpperCase());
 
 const parseNumber = (value: unknown): number | undefined => {
   if (value === null || value === undefined || value === "") return undefined;
@@ -103,10 +357,13 @@ const parseBoolean = (value: unknown): boolean | undefined => {
 const isRuntimeRowKey = (key: string) => key.startsWith("_") || RUNTIME_ROW_KEYS.has(key);
 
 const getScopedValue = (values: SchemaFormValues, sectionId: string, fieldId: string) =>
-  values[scopedFormKey(sectionId, fieldId)];
+  values[scopedFormKey(sectionId, fieldId)] ?? values[fieldId];
+
+const getFieldValue = (values: SchemaFormValues, sectionId: string, fieldId: string) =>
+  getScopedValue(values, sectionId, fieldId) ?? values[fieldId];
 
 const getTableRows = (values: SchemaFormValues, sectionId: string, tableId: string) => {
-  const raw = getScopedValue(values, sectionId, tableId);
+  const raw = getScopedValue(values, sectionId, tableId) ?? values[tableId];
   if (Array.isArray(raw)) return raw as Record<string, unknown>[];
   if (raw && typeof raw === "object" && Array.isArray((raw as { rows?: unknown[] }).rows)) {
     return (raw as { rows: Record<string, unknown>[] }).rows;
@@ -118,9 +375,16 @@ const mapTableRowToApi = (row: Record<string, unknown>): Record<string, unknown>
   const mapped: Record<string, unknown> = {};
 
   Object.entries(row).forEach(([key, value]) => {
-    if (isRuntimeRowKey(key)) return;
+    if (isRuntimeRowKey(key) || TABLE_ROW_EXCLUDED_KEYS.has(key)) return;
     const apiKey = TABLE_FIELD_TO_API[key] ?? toCamelCase(key);
     if (value === null || value === undefined || value === "") return;
+
+    if (key === "ARTICLE_TYPE") {
+      const raw = String(value).trim();
+      mapped.articleType =
+        ARTICLE_TYPE_TO_API[raw] ?? raw.replace(/\s+/g, "_").toUpperCase();
+      return;
+    }
 
     if (key === "LINER_APPLIED") {
       const bool = parseBoolean(value);
@@ -182,59 +446,53 @@ const mapTableRowToApi = (row: Record<string, unknown>): Record<string, unknown>
 const mapTableRowsToApi = (rows: Record<string, unknown>[]) =>
   rows.map(mapTableRowToApi).filter((row) => Object.keys(row).length > 0);
 
-const resolveLinerFields = (values: SchemaFormValues) => {
-  const raw = String(values[LINER_TYPE_FIELD.id] ?? "").trim();
-  if (!raw) return { linerType: undefined, linerBatchNo: undefined };
-
-  const upper = raw.toUpperCase();
-  if (upper === "EPDM" || upper === "NBR") {
-    return { linerType: upper, linerBatchNo: undefined };
-  }
-
-  const [first, ...rest] = raw.split(/[\s-]+/);
-  if (first && (first.toUpperCase() === "EPDM" || first.toUpperCase() === "NBR")) {
-    return {
-      linerType: first.toUpperCase(),
-      linerBatchNo: rest.join("-").trim() || undefined,
-    };
-  }
-
-  return { linerType: undefined, linerBatchNo: raw };
-};
-
-const mapHardwarePreparationDetails = (values: SchemaFormValues) => {
-  const details: Record<string, unknown> = {};
+const mapHardwarePreparationDetails = (
+  values: SchemaFormValues,
+): HardwarePreparationDetailsDTO | undefined => {
+  const details: HardwarePreparationDetailsDTO = {};
   HARDWARE_COUNT_FIELDS.forEach((field) => {
-    const apiKey = HARDWARE_COUNT_TO_API[field.id];
+    const apiKey = HARDWARE_COUNT_TO_API[field.id] as keyof HardwarePreparationDetailsDTO;
     const num = parseNumber(values[field.id]);
-    if (apiKey && num !== undefined) details[apiKey] = num;
+    if (apiKey && num !== undefined) (details as Record<string, unknown>)[apiKey] = num;
   });
 
-  const liner = resolveLinerFields(values);
-  if (liner.linerType) details.linerType = liner.linerType;
-  if (liner.linerBatchNo) details.linerBatchNo = liner.linerBatchNo;
+  const linerType = String(values[LINER_TYPE_FIELD.id] ?? "").trim();
+  if (linerType) details.linerType = linerType;
+
+  const linerBatchNo = String(values[LINER_BATCH_NO_FIELD.id] ?? "").trim();
+  if (linerBatchNo) details.linerBatchNo = linerBatchNo;
+
+  const linerBatchDate = formatToIsoDateInput(
+    String(values[LINER_BATCH_DATE_FIELD.id] ?? "").trim(),
+  );
+  if (linerBatchDate) details.linerBatchDate = linerBatchDate;
 
   return Object.keys(details).length > 0 ? details : undefined;
 };
 
-const mapHardwarePreparationTable = (values: SchemaFormValues) => {
+const mapHardwarePreparationTable = (values: SchemaFormValues): HardwarePreparationTableDTO[] => {
   const rows = Array.isArray(values[ARTICLE_TYPE_TABLE_ID])
     ? (values[ARTICLE_TYPE_TABLE_ID] as ArticleTypeRow[])
     : [];
 
   return rows
     .map((row) => {
-      const articleType = ARTICLE_TYPE_TO_API[String(row.ARTICLE_TYPE ?? "").trim()] ??
-        String(row.ARTICLE_TYPE ?? "").trim().replace(/\s+/g, "_").toUpperCase();
+      const articleType =
+        ARTICLE_TYPE_TO_API[String(row.ARTICLE_TYPE ?? "").trim()] ??
+        String(row.ARTICLE_TYPE ?? "")
+          .trim()
+          .replace(/\s+/g, "_")
+          .toUpperCase();
 
-      const mapped: Record<string, unknown> = {};
+      const mapped: HardwarePreparationTableDTO = {};
       if (articleType) mapped.articleType = articleType;
       if (row.RUBBER_MATERIAL) mapped.rubberMaterial = row.RUBBER_MATERIAL;
       if (row.SLEEVE_NO) mapped.sleeveNo = row.SLEEVE_NO;
       if (row.MOULD_NO) mapped.mouldNo = row.MOULD_NO;
 
-      const lengthMm = parseNumber(row.LENGTH_MM);
-      if (lengthMm !== undefined) mapped.lengthMm = lengthMm;
+      const lengthMm = String(row.SIZE_MM ?? "").trim();
+      if (lengthMm) mapped.lengthMm = lengthMm;
+
       const thicknessMm = parseNumber(row.THICKNESS_MM);
       if (thicknessMm !== undefined) mapped.thicknessMm = thicknessMm;
 
@@ -260,63 +518,92 @@ const buildSectionTablePayload = (
   return Object.keys(payload).length > 0 ? payload : {};
 };
 
-const buildProcessParticularsSummary = (values: SchemaFormValues) => {
-  const cycles = normalizeSubscaleMixingCycles(values[SUBSCALE_BATCH_FIELDS.MIXING_CYCLES]);
-  if (!cycles.length) return "";
-
-  return cycles
-    .filter((cycle) => cycle.stage)
-    .map((cycle) => {
-      const ops = cycle.processParticulars
-        .map((row) => {
-          const parts = [row.operation, row.rpm && `rpm ${row.rpm}`, row.time && `time ${row.time}`]
-            .filter(Boolean)
-            .join(" ");
-          return parts;
-        })
-        .filter(Boolean)
-        .join("; ");
-      return ops ? `Stage ${cycle.stage}: ${ops}` : `Stage ${cycle.stage}`;
+const mapProcessParticularRowsToApi = (
+  rows: Array<{
+    operationId?: number;
+    operation?: string;
+    rpm?: string;
+    time?: string;
+    temp?: string;
+    vacuum?: string;
+  }> = [],
+) =>
+  rows
+    .map((row) => {
+      const mapped: Record<string, unknown> = {};
+      const operationId = Number(row.operationId);
+      if (Number.isFinite(operationId) && operationId > 0) mapped.operationId = operationId;
+      const operation = String(row.operation ?? "").trim();
+      if (operation) mapped.operation = operation;
+      const rpm = String(row.rpm ?? "").trim();
+      if (rpm) mapped.rpm = rpm;
+      const time = String(row.time ?? "").trim();
+      if (time) mapped.time = time;
+      const temp = String(row.temp ?? "").trim();
+      if (temp) mapped.temp = temp;
+      const vacuum = String(row.vacuum ?? "").trim();
+      if (vacuum) mapped.vacuum = vacuum;
+      return mapped;
     })
-    .join(" | ");
-};
+    .filter((row) => Object.keys(row).length > 0);
 
-const mapSubscaleDetails = (values: SchemaFormValues) => {
-  const cycles = normalizeSubscaleMixingCycles(values[SUBSCALE_BATCH_FIELDS.MIXING_CYCLES]);
-  const primaryStage = cycles.find((cycle) => cycle.stage)?.stage ?? "";
+const mapMixingCycleToApi = (values: SchemaFormValues): SubscaleMixingCycleDTO | undefined => {
+  const cycle = normalizeSubscaleMixingCycles(values[SUBSCALE_BATCH_FIELDS.MIXING_CYCLES])[0];
+  if (!cycle) return undefined;
 
-  const payload: Record<string, unknown> = {};
-  const batchSize = parseNumber(values[SUBSCALE_BATCH_FIELDS.BATCH_SIZE]);
-  if (batchSize !== undefined) payload.batchSize = batchSize;
+  const payload: SubscaleMixingCycleDTO = {};
+  const stageRaw = String(cycle.stage ?? "").trim();
+  if (stageRaw) {
+    const stageNum = Number(stageRaw);
+    if (Number.isFinite(stageNum)) payload.motorStage = stageNum;
+  }
 
-  const mixer = String(values[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO] ?? "").trim();
-  if (mixer) payload.mixerAndBuildingNo = mixer;
+  if (cycle.mixingCycleId != null && Number.isFinite(Number(cycle.mixingCycleId))) {
+    payload.mixingCycleId = Number(cycle.mixingCycleId);
+  }
 
-  const premixDate = String(values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ?? "").trim();
-  if (premixDate) payload.premixDate = premixDate;
+  const mixingCycleCode = String(cycle.mixingCycleCode ?? "").trim();
+  if (mixingCycleCode) payload.mixingCycleCode = mixingCycleCode;
 
-  const finalMixDate = String(values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] ?? "").trim();
-  if (finalMixDate) payload.finalMixDate = finalMixDate;
+  const mixingCycleName = String(cycle.mixingCycleName ?? "").trim();
+  if (mixingCycleName) payload.mixingCycleName = mixingCycleName;
 
-  if (primaryStage) payload.mixingCycle = primaryStage;
+  const premixParticulars = mapProcessParticularRowsToApi(
+    cycle.premixParticulars?.length ? cycle.premixParticulars : cycle.processParticulars,
+  );
+  if (premixParticulars.length > 0) payload.premixParticulars = premixParticulars;
 
-  const processParticulars = buildProcessParticularsSummary(values);
-  if (processParticulars) payload.processParticulars = processParticulars;
+  const finalMixParticulars = mapProcessParticularRowsToApi(cycle.finalMixParticulars);
+  if (finalMixParticulars.length > 0) payload.finalMixParticulars = finalMixParticulars;
 
   return Object.keys(payload).length > 0 ? payload : undefined;
 };
 
-export type SubscaleApiPayloadBody = {
-  hardwarePreparationDetails?: Record<string, unknown>;
-  hardwarePreparationTable?: Record<string, unknown>[];
-  subscaleDetails?: Record<string, unknown>;
-  castingDetails?: Record<string, unknown>;
-  curingDetails?: Record<string, unknown>;
-  ndtDetails?: Record<string, unknown>;
-  trimmingDetails?: Record<string, unknown>;
-  inhibitionDetails?: Record<string, unknown>;
-  staticTestingDetails?: Record<string, unknown>;
-  mechanicalInterfaceProperties?: Record<string, unknown>;
+export const mapSubscaleDetails = (values: SchemaFormValues): SubscaleDetailsDTO | undefined => {
+  const payload: SubscaleDetailsDTO = {};
+  const batchSize = parseNumber(values[SUBSCALE_BATCH_FIELDS.BATCH_SIZE]);
+  if (batchSize !== undefined) payload.batchSize = batchSize;
+
+  const bldgNo = String(values[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO] ?? "").trim();
+  if (bldgNo) payload.bldgNo = bldgNo;
+
+  const mixerType = String(values.mixerType ?? values.MIXER_TYPE ?? "").trim();
+  if (mixerType) payload.mixerType = mixerType;
+
+  const premixDate = formatToIsoDateInput(
+    String(values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ?? "").trim(),
+  );
+  if (premixDate) payload.premixDate = premixDate;
+
+  const finalMixDate = formatToIsoDateInput(
+    String(values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] ?? "").trim(),
+  );
+  if (finalMixDate) payload.finalMixDate = finalMixDate;
+
+  const mixingCycle = mapMixingCycleToApi(values);
+  if (mixingCycle) payload.mixingCycle = mixingCycle;
+
+  return Object.keys(payload).length > 0 ? payload : undefined;
 };
 
 const SUBSCALE_SECTIONS_OBJECT_METADATA_KEYS = new Set([
@@ -342,6 +629,7 @@ export const SUBSCALE_STRUCTURED_PAYLOAD_KEYS = [
 ] as const;
 
 const SUBSCALE_DISPLAY_SECTION_GROUPS: Array<{ sectionId: string; keys: string[] }> = [
+  { sectionId: "SUBSCALE_DETAILS", keys: ["subscaleDetails"] },
   {
     sectionId: "HARDWARE_PREPARATION_DETAILS",
     keys: ["hardwarePreparationDetails", "hardwarePreparationTable"],
@@ -353,7 +641,6 @@ const SUBSCALE_DISPLAY_SECTION_GROUPS: Array<{ sectionId: string; keys: string[]
   { sectionId: "INHIBITION_DETAILS", keys: ["inhibitionDetails"] },
   { sectionId: "STATIC_TESTING", keys: ["staticTestingDetails"] },
   { sectionId: "MECHANICAL_INTERFACE_PROPERTIES", keys: ["mechanicalInterfaceProperties"] },
-  { sectionId: "SUBSCALE_DETAILS", keys: ["subscaleDetails"] },
 ];
 
 export const normalizeSubscaleApiDetailsPayload = (
@@ -397,16 +684,23 @@ export const mapSubscaleFormValuesToApiPayload = (
   const hardwarePreparationDetails = mapHardwarePreparationDetails(values);
   const hardwarePreparationTable = mapHardwarePreparationTable(values);
 
-  const castingDate = String(getScopedValue(values, "CASTING_DETAILS", "DATE_OF_CASTING") ?? "").trim();
+  const castingDate = formatToIsoDateInput(
+    String(getFieldValue(values, "CASTING_DETAILS", "DATE_OF_CASTING") ?? "").trim(),
+  );
   const castingDetails = buildSectionTablePayload(
     values,
     "CASTING_DETAILS",
     "CASTING_TABLE",
     "castingTable",
     castingDate ? { dateOfCasting: castingDate } : undefined,
-  );
+  ) as CastingDetailsDTO;
 
-  const curingDetails = buildSectionTablePayload(values, "CURING_DETAILS", "CURING_TABLE", "curingTable");
+  const curingDetails = buildSectionTablePayload(
+    values,
+    "CURING_DETAILS",
+    "CURING_TABLE",
+    "curingTable",
+  );
   const ndtDetails = buildSectionTablePayload(values, "NDT_DETAILS", "NDT_TABLE", "ndtTable");
   const trimmingDetails = buildSectionTablePayload(
     values,
@@ -415,19 +709,37 @@ export const mapSubscaleFormValuesToApiPayload = (
     "trimmingTable",
   );
 
-  const inhibitionFields: Record<string, unknown> = {};
+  const inhibitionFields: Partial<InhibitionDetailsDTO> = {};
   const irBatchNo = String(
-    getScopedValue(values, SUBSCALE_SCHEMA_SECTIONS.INHIBITION, INHIBITION_FIELD_IDS.IR_BATCH_NO) ?? "",
-  ).trim();
-  if (irBatchNo) inhibitionFields.irBatchNo = irBatchNo;
-  const dateOfMfg = String(
-    getScopedValue(values, SUBSCALE_SCHEMA_SECTIONS.INHIBITION, INHIBITION_FIELD_IDS.DATE_OF_MANUFACTURING) ?? "",
-  ).trim();
-  if (dateOfMfg) inhibitionFields.dateOfManufacturing = dateOfMfg;
-  const dateOfApplication = String(
-    getScopedValue(values, SUBSCALE_SCHEMA_SECTIONS.INHIBITION, INHIBITION_FIELD_IDS.DATE_OF_APPLICATION) ??
+    getFieldValue(values, SUBSCALE_SCHEMA_SECTIONS.INHIBITION, INHIBITION_FIELD_IDS.IR_BATCH_NO) ??
+      values.IR_BATCH_NO ??
       "",
   ).trim();
+  if (irBatchNo) inhibitionFields.irBatchNo = irBatchNo;
+  const dateOfMfg = formatToIsoDateInput(
+    String(
+      getFieldValue(
+        values,
+        SUBSCALE_SCHEMA_SECTIONS.INHIBITION,
+        INHIBITION_FIELD_IDS.DATE_OF_MANUFACTURING,
+      ) ??
+        values.DATE_OF_MANUFACTURING ??
+        values.DATE_OF_MFG ??
+        "",
+    ).trim(),
+  );
+  if (dateOfMfg) inhibitionFields.dateOfManufacturing = dateOfMfg;
+  const dateOfApplication = formatToIsoDateInput(
+    String(
+      getFieldValue(
+        values,
+        SUBSCALE_SCHEMA_SECTIONS.INHIBITION,
+        INHIBITION_FIELD_IDS.DATE_OF_APPLICATION,
+      ) ??
+        values.DATE_OF_APPLICATION ??
+        "",
+    ).trim(),
+  );
   if (dateOfApplication) inhibitionFields.dateOfApplication = dateOfApplication;
 
   const inhibitionDetails = buildSectionTablePayload(
@@ -436,21 +748,28 @@ export const mapSubscaleFormValuesToApiPayload = (
     "INHIBITION_TABLE",
     "inhibitionTable",
     inhibitionFields,
-  );
+  ) as InhibitionDetailsDTO;
 
-  const staticTestingDetails = buildSectionTablePayload(
-    values,
-    SUBSCALE_SCHEMA_SECTIONS.STATIC_TESTING,
-    "STATIC_TESTING_TABLE",
-    "staticTestingTable",
-  );
+  const isMainScale = mapSubscaleBatchType(batchType) === "MAIN_SCALE";
 
-  const mechanicalInterfaceProperties = buildSectionTablePayload(
-    values,
-    "MECHANICAL_INTERFACE_PROPERTIES",
-    "MECHANICAL_PROPERTIES_TABLE",
-    "mechanicalPropertiesTable",
-  );
+  // MAIN_SCALE does not collect BEM static/mechanical tables — send empty.
+  const staticTestingDetails = isMainScale
+    ? { staticTestingTable: [] }
+    : buildSectionTablePayload(
+        values,
+        SUBSCALE_SCHEMA_SECTIONS.STATIC_TESTING,
+        "STATIC_TESTING_TABLE",
+        "staticTestingTable",
+      );
+
+  const mechanicalInterfaceProperties = isMainScale
+    ? { mechanicalPropertiesTable: [] }
+    : buildSectionTablePayload(
+        values,
+        "MECHANICAL_INTERFACE_PROPERTIES",
+        "MECHANICAL_PROPERTIES_TABLE",
+        "mechanicalPropertiesTable",
+      );
 
   const payload: SubscaleApiPayloadBody = {
     ...(hardwarePreparationDetails ? { hardwarePreparationDetails } : {}),
@@ -482,6 +801,8 @@ const API_TO_TABLE_FIELD: Record<string, string> = {
   graphDocumentId: "GRAPH_FILE",
   bemNo: "BEM_NO",
   bemMouldNo: "BEM_MOULD_NO",
+  nvalue: "N_VALUE",
+  nValue: "N_VALUE",
 };
 
 const ARTICLE_TYPE_FROM_API: Record<string, string> = {
@@ -490,6 +811,8 @@ const ARTICLE_TYPE_FROM_API: Record<string, string> = {
   "2_KG_BEM": "2 kg BEM",
   WHEEL_PEEL: "Wheel Peel",
   SBS_TBS: "SBS/TBS",
+  CARTOONS: "Cartoons",
+  CARTONS: "Cartoons",
 };
 
 const formatUiCellValue = (value: unknown): unknown => {
@@ -502,13 +825,22 @@ const mapApiTableRowToUi = (row: Record<string, unknown>, index: number) => {
   const mapped: Record<string, unknown> = { SR_NO: index + 1 };
 
   Object.entries(row).forEach(([key, value]) => {
-    if (value === null || value === undefined) return;
     const uiKey = API_TO_TABLE_FIELD[key] ?? toScreamingSnake(key);
-    if (uiKey === "LINER_APPLIED" && typeof value === "boolean") {
-      mapped[uiKey] = value ? "Yes" : "No";
+    if (uiKey === "ARTICLE_TYPE") {
+      const raw = value == null ? "" : String(value);
+      mapped[uiKey] = raw ? ARTICLE_TYPE_FROM_API[raw] ?? raw : "";
       return;
     }
-    mapped[uiKey] = formatUiCellValue(value);
+    if (uiKey === "LINER_APPLIED") {
+      if (typeof value === "boolean") {
+        mapped[uiKey] = value ? "Yes" : "No";
+        return;
+      }
+      mapped[uiKey] = value == null ? "" : formatUiCellValue(value);
+      return;
+    }
+    // Keep null/empty keys so details tables always render the full column set.
+    mapped[uiKey] = value == null ? "" : formatUiCellValue(value);
   });
 
   return mapped;
@@ -527,10 +859,20 @@ const setScopedTable = (
   tableId: string,
   rows: Record<string, unknown>[],
 ) => {
-  if (rows.length > 0) values[scopedFormKey(sectionId, tableId)] = rows;
+  if (rows.length === 0) return;
+  values[scopedFormKey(sectionId, tableId)] = rows;
+  // Hardware article panel reads unscoped table keys.
+  values[tableId] = rows;
 };
 
-export const mapSubscaleApiDetailsToFormValues = (payload: Record<string, unknown>): SchemaFormValues => {
+const setUnscopedField = (values: SchemaFormValues, fieldId: string, value: unknown) => {
+  if (value == null || value === "") return;
+  values[fieldId] = value;
+};
+
+export const mapSubscaleApiDetailsToFormValues = (
+  payload: Record<string, unknown>,
+): SchemaFormValues => {
   const normalized = normalizeSubscaleApiDetailsPayload(payload);
   const values: SchemaFormValues = {};
   const hardware = (normalized.hardwarePreparationDetails ?? {}) as Record<string, unknown>;
@@ -539,11 +881,13 @@ export const mapSubscaleApiDetailsToFormValues = (payload: Record<string, unknow
     if (hardware[apiKey] !== undefined) values[uiKey] = String(hardware[apiKey]);
   });
 
-  const linerType = String(hardware.linerType ?? "").trim();
-  const linerBatchNo = String(hardware.linerBatchNo ?? "").trim();
-  if (linerType && linerBatchNo) values[LINER_TYPE_FIELD.id] = `${linerType} ${linerBatchNo}`;
-  else if (linerBatchNo) values[LINER_TYPE_FIELD.id] = linerBatchNo;
-  else if (linerType) values[LINER_TYPE_FIELD.id] = linerType;
+  if (hardware.linerType != null) values[LINER_TYPE_FIELD.id] = String(hardware.linerType);
+  if (hardware.linerBatchNo != null) {
+    values[LINER_BATCH_NO_FIELD.id] = String(hardware.linerBatchNo);
+  }
+  if (hardware.linerBatchDate != null) {
+    values[LINER_BATCH_DATE_FIELD.id] = String(hardware.linerBatchDate);
+  }
 
   const hardwareRows = Array.isArray(normalized.hardwarePreparationTable)
     ? normalized.hardwarePreparationTable
@@ -564,43 +908,92 @@ export const mapSubscaleApiDetailsToFormValues = (payload: Record<string, unknow
         RUBBER_MATERIAL: String(source.rubberMaterial ?? ""),
         SLEEVE_NO: String(source.sleeveNo ?? ""),
         MOULD_NO: String(source.mouldNo ?? ""),
-        LENGTH_MM: source.lengthMm != null ? String(source.lengthMm) : "",
+        SIZE_MM: source.lengthMm != null ? String(source.lengthMm) : "",
         THICKNESS_MM: source.thicknessMm != null ? String(source.thicknessMm) : "",
         LINER_APPLIED:
           source.linerApplied === true ? "Yes" : source.linerApplied === false ? "No" : "",
         OBSERVATIONS: String(source.observations ?? ""),
-        ...(countField
-          ? { _articleKey: countField, _articleIndex: articleIndex }
-          : {}),
+        ...(countField ? { _articleKey: countField, _articleIndex: articleIndex } : {}),
       };
     });
     bridgeHardwareArticleTableToSchemaScope(values);
   }
 
-  const subscale = (normalized.subscaleDetails ?? {}) as Record<string, unknown>;
-  if (subscale.batchSize != null) values[SUBSCALE_BATCH_FIELDS.BATCH_SIZE] = String(subscale.batchSize);
-  if (subscale.mixerAndBuildingNo != null) {
-    values[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO] = String(subscale.mixerAndBuildingNo);
+  const subscale = (normalized.subscaleDetails ?? {}) as SubscaleDetailsDTO;
+  const subscaleLegacy = subscale as SubscaleDetailsDTO & Record<string, unknown>;
+  if (subscale.batchSize != null)
+    values[SUBSCALE_BATCH_FIELDS.BATCH_SIZE] = String(subscale.batchSize);
+  const mixerBldg =
+    subscale.bldgNo ??
+    subscaleLegacy.mixerAndBuildingNo ??
+    subscaleLegacy.mixerBldgNo ??
+    subscaleLegacy.buildingNo;
+  if (mixerBldg != null && String(mixerBldg).trim() !== "") {
+    values[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO] = String(mixerBldg);
   }
-  if (subscale.premixDate != null) values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] = String(subscale.premixDate);
+  if (subscale.mixerType != null) {
+    values.mixerType = String(subscale.mixerType);
+  }
+  if (subscale.premixDate != null)
+    values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] = String(subscale.premixDate);
   if (subscale.finalMixDate != null) {
     values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] = String(subscale.finalMixDate);
   }
-  if (subscale.mixingCycle != null) {
-    values[SUBSCALE_BATCH_FIELDS.MIXING_CYCLES] = normalizeSubscaleMixingCycles([
-      {
-        _key: "mixing-cycle-1",
-        stage: String(subscale.mixingCycle),
-        processParticulars: [],
-      },
-    ]);
+
+  const mixingCycleRaw = subscale.mixingCycle;
+  if (mixingCycleRaw != null) {
+    if (typeof mixingCycleRaw === "object" && !Array.isArray(mixingCycleRaw)) {
+      const mc = mixingCycleRaw as Record<string, unknown>;
+      const mapParticulars = (rows: unknown) =>
+        Array.isArray(rows)
+          ? rows.map((row) => {
+              const item = (row ?? {}) as Record<string, unknown>;
+              return {
+                operationId: Number(item.operationId ?? 0) || 0,
+                operation: String(item.operation ?? item.operationName ?? ""),
+                rpm: String(item.rpm ?? ""),
+                time: String(item.time ?? ""),
+                temp: String(item.temp ?? ""),
+                vacuum: String(item.vacuum ?? ""),
+              };
+            })
+          : [];
+
+      values[SUBSCALE_BATCH_FIELDS.MIXING_CYCLES] = normalizeSubscaleMixingCycles([
+        {
+          _key: "mixing-cycle-1",
+          stage: String(mc.motorStage ?? ""),
+          mixingCycleCode: String(mc.mixingCycleCode ?? ""),
+          mixingCycleName: String(mc.mixingCycleName ?? ""),
+          mixingCycleId:
+            mc.mixingCycleId == null || mc.mixingCycleId === ""
+              ? null
+              : Number(mc.mixingCycleId),
+          premixParticulars: mapParticulars(mc.premixParticulars),
+          finalMixParticulars: mapParticulars(mc.finalMixParticulars),
+        },
+      ]);
+    } else {
+      // Legacy string mixingCycle (motor stage only)
+      values[SUBSCALE_BATCH_FIELDS.MIXING_CYCLES] = normalizeSubscaleMixingCycles([
+        {
+          _key: "mixing-cycle-1",
+          stage: String(mixingCycleRaw),
+          mixingCycleCode: "",
+          mixingCycleName: "",
+          mixingCycleId: null,
+          premixParticulars: [],
+          finalMixParticulars: [],
+        },
+      ]);
+    }
   }
 
   const casting = (normalized.castingDetails ?? {}) as Record<string, unknown>;
   if (casting.dateOfCasting != null) {
-    values[scopedFormKey(SUBSCALE_SCHEMA_SECTIONS.CASTING, "DATE_OF_CASTING")] = String(
-      casting.dateOfCasting,
-    );
+    const dateOfCasting = String(casting.dateOfCasting);
+    values[scopedFormKey(SUBSCALE_SCHEMA_SECTIONS.CASTING, "DATE_OF_CASTING")] = dateOfCasting;
+    setUnscopedField(values, "DATE_OF_CASTING", dateOfCasting);
   }
   setScopedTable(
     values,
@@ -635,21 +1028,25 @@ export const mapSubscaleApiDetailsToFormValues = (payload: Record<string, unknow
 
   const inhibition = (normalized.inhibitionDetails ?? {}) as Record<string, unknown>;
   if (inhibition.irBatchNo != null) {
+    const irBatchNo = String(inhibition.irBatchNo);
     values[scopedFormKey(SUBSCALE_SCHEMA_SECTIONS.INHIBITION, INHIBITION_FIELD_IDS.IR_BATCH_NO)] =
-      String(inhibition.irBatchNo);
+      irBatchNo;
+    setUnscopedField(values, "IR_BATCH_NO", irBatchNo);
   }
   if (inhibition.dateOfManufacturing != null) {
+    const dateOfMfg = String(inhibition.dateOfManufacturing);
     values[
-      scopedFormKey(
-        SUBSCALE_SCHEMA_SECTIONS.INHIBITION,
-        INHIBITION_FIELD_IDS.DATE_OF_MANUFACTURING,
-      )
-    ] = String(inhibition.dateOfManufacturing);
+      scopedFormKey(SUBSCALE_SCHEMA_SECTIONS.INHIBITION, INHIBITION_FIELD_IDS.DATE_OF_MANUFACTURING)
+    ] = dateOfMfg;
+    setUnscopedField(values, "DATE_OF_MFG", dateOfMfg);
+    setUnscopedField(values, "DATE_OF_MANUFACTURING", dateOfMfg);
   }
   if (inhibition.dateOfApplication != null) {
+    const dateOfApplication = String(inhibition.dateOfApplication);
     values[
       scopedFormKey(SUBSCALE_SCHEMA_SECTIONS.INHIBITION, INHIBITION_FIELD_IDS.DATE_OF_APPLICATION)
-    ] = String(inhibition.dateOfApplication);
+    ] = dateOfApplication;
+    setUnscopedField(values, "DATE_OF_APPLICATION", dateOfApplication);
   }
   setScopedTable(
     values,
@@ -674,10 +1071,175 @@ export const mapSubscaleApiDetailsToFormValues = (payload: Record<string, unknow
     mapApiTableRowsToUi(mechanical.mechanicalPropertiesTable),
   );
 
+  const hasProcessTables =
+    (Array.isArray(values.CASTING_TABLE) && (values.CASTING_TABLE as unknown[]).length > 0) ||
+    (Array.isArray(values[ARTICLE_TYPE_TABLE_ID]) &&
+      (values[ARTICLE_TYPE_TABLE_ID] as unknown[]).length > 0);
+  if (hasProcessTables) {
+    values.IS_PROCESS_FORM_LOADED = true;
+  }
+
   return values;
 };
 
-const rebuildSubscaleSectionsRecord = (payload: Record<string, unknown>): Record<string, unknown> => {
+const HARDWARE_COUNT_FROM_API = Object.fromEntries(
+  Object.entries(HARDWARE_COUNT_TO_API).map(([uiKey, apiKey]) => [apiKey, uiKey]),
+);
+
+const mapMixParticularsApiToDisplay = (rows: unknown) =>
+  Array.isArray(rows)
+    ? rows.map((row, index) => {
+        const item = (row ?? {}) as Record<string, unknown>;
+        return {
+          SR_NO: index + 1,
+          OPERATION: String(item.operation ?? item.operationName ?? ""),
+          RPM: item.rpm == null ? "" : String(item.rpm),
+          TIME: item.time == null ? "" : String(item.time),
+          TEMP: item.temp == null ? "" : String(item.temp),
+          VACUUM: item.vacuum == null ? "" : String(item.vacuum),
+        };
+      })
+    : [];
+
+const mapSubscaleDetailsApiToDisplayMerged = (
+  details: SubscaleDetailsDTO | Record<string, unknown>,
+): Record<string, unknown> => {
+  const source = details as SubscaleDetailsDTO;
+  const merged: Record<string, unknown> = {};
+
+  if (source.batchSize != null) merged.BATCH_SIZE = String(source.batchSize);
+  if (source.bldgNo) merged.MIXER_BLDG_NO = source.bldgNo;
+  if (source.mixerType) merged.MIXER_TYPE = source.mixerType;
+  if (source.premixDate) merged.PREMIX_DATE = source.premixDate;
+  if (source.finalMixDate) merged.FINAL_MIX_DATE = source.finalMixDate;
+
+  const mixingCycle = source.mixingCycle;
+  if (mixingCycle) {
+    merged.SUBSCALE_MIXING_CYCLES = [
+      {
+        MOTOR_STAGE: mixingCycle.motorStage != null ? String(mixingCycle.motorStage) : "",
+        MIXING_CYCLE_CODE: mixingCycle.mixingCycleCode ?? "",
+        MIXING_CYCLE_NAME: mixingCycle.mixingCycleName ?? "",
+        MIXING_CYCLE_ID: mixingCycle.mixingCycleId ?? "",
+        PREMIX_PARTICULARS: mapMixParticularsApiToDisplay(mixingCycle.premixParticulars),
+        FINAL_MIX_PARTICULARS: mapMixParticularsApiToDisplay(mixingCycle.finalMixParticulars),
+      },
+    ];
+  }
+
+  return merged;
+};
+
+const mapHardwareDetailsApiToDisplayMerged = (
+  details: HardwarePreparationDetailsDTO | Record<string, unknown>,
+): Record<string, unknown> => {
+  const source = details as HardwarePreparationDetailsDTO;
+  const merged: Record<string, unknown> = {};
+
+  Object.entries(HARDWARE_COUNT_FROM_API).forEach(([apiKey, uiKey]) => {
+    const value = (source as Record<string, unknown>)[apiKey];
+    if (value != null) merged[uiKey] = String(value);
+  });
+
+  if (source.linerType) merged[LINER_TYPE_FIELD.id] = source.linerType;
+  if (source.linerBatchNo) merged[LINER_BATCH_NO_FIELD.id] = source.linerBatchNo;
+  if (source.linerBatchDate) merged[LINER_BATCH_DATE_FIELD.id] = source.linerBatchDate;
+
+  return merged;
+};
+
+const mapHardwareTableApiToDisplay = (rows: unknown): Record<string, unknown>[] => {
+  if (!Array.isArray(rows)) return [];
+  const typeCounters: Record<string, number> = {};
+
+  return rows.map((row, index) => {
+    const source = (row ?? {}) as HardwarePreparationTableDTO;
+    const articleType =
+      ARTICLE_TYPE_FROM_API[String(source.articleType ?? "")] ?? String(source.articleType ?? "");
+    const countField = ARTICLE_TYPE_TO_COUNT_FIELD[articleType] ?? "";
+    const articleIndex = countField ? (typeCounters[countField] ?? 0) : 0;
+    if (countField) typeCounters[countField] = articleIndex + 1;
+
+    return {
+      SR_NO: index + 1,
+      ARTICLE_TYPE: articleType,
+      RUBBER_MATERIAL: source.rubberMaterial ?? "",
+      SLEEVE_NO: source.sleeveNo ?? "",
+      MOULD_NO: source.mouldNo ?? "",
+      SIZE_MM: source.lengthMm != null ? String(source.lengthMm) : "",
+      THICKNESS_MM: source.thicknessMm != null ? String(source.thicknessMm) : "",
+      LINER_APPLIED:
+        source.linerApplied === true ? "Yes" : source.linerApplied === false ? "No" : "",
+      OBSERVATIONS: source.observations ?? "",
+      ...(countField ? { _articleKey: countField, _articleIndex: articleIndex } : {}),
+    };
+  });
+};
+
+const mapProcessSectionApiToDisplayMerged = (
+  section: Record<string, unknown>,
+  tableApiKey: string,
+  tableUiKey: string,
+  scalarFields: Array<{ apiKey: string; uiKey: string }> = [],
+): Record<string, unknown> => {
+  const merged: Record<string, unknown> = {};
+
+  scalarFields.forEach(({ apiKey, uiKey }) => {
+    const value = section[apiKey];
+    if (value != null && value !== "") merged[uiKey] = value;
+  });
+
+  const tableRows = mapApiTableRowsToUi(section[tableApiKey]);
+  if (tableRows.length > 0) merged[tableUiKey] = tableRows;
+
+  return merged;
+};
+
+export const parseSubscaleDetailsApiResponse = (data: unknown): SubscaleDetailsResponse => {
+  const raw = ((data as { data?: Record<string, unknown> })?.data ??
+    data ??
+    {}) as Record<string, unknown>;
+  const payload = normalizeSubscaleApiDetailsPayload(raw);
+
+  return {
+    subscaleProcessingId: String(payload.subscaleProcessingId ?? payload.formId ?? ""),
+    formId: String(payload.formId ?? payload.subscaleProcessingId ?? ""),
+    batchId: String(payload.batchId ?? ""),
+    batchType: String(payload.batchType ?? ""),
+    status: payload.status != null ? String(payload.status) : undefined,
+    createdBy: (payload.createdBy as SubscaleDetailsResponse["createdBy"]) ?? null,
+    createdAt: payload.createdAt != null ? String(payload.createdAt) : null,
+    submittedBy: (payload.submittedBy as SubscaleDetailsResponse["submittedBy"]) ?? null,
+    submittedAt: payload.submittedAt != null ? String(payload.submittedAt) : null,
+    lastUpdatedBy: (payload.lastUpdatedBy as SubscaleDetailsResponse["lastUpdatedBy"]) ?? null,
+    lastUpdatedAt: payload.lastUpdatedAt != null ? String(payload.lastUpdatedAt) : null,
+    subDepartmentId:
+      payload.subDepartmentId != null ? Number(payload.subDepartmentId) : undefined,
+    formSubmissionType:
+      payload.formSubmissionType != null ? String(payload.formSubmissionType) : undefined,
+    subscaleDetails: payload.subscaleDetails as SubscaleDetailsDTO | undefined,
+    hardwarePreparationDetails: payload.hardwarePreparationDetails as
+      | HardwarePreparationDetailsDTO
+      | undefined,
+    hardwarePreparationTable: payload.hardwarePreparationTable as
+      | HardwarePreparationTableDTO[]
+      | undefined,
+    castingDetails: payload.castingDetails as CastingDetailsDTO | undefined,
+    curingDetails: payload.curingDetails as CuringDetailsDTO | undefined,
+    ndtDetails: payload.ndtDetails as NdtDetailsDTO | undefined,
+    trimmingDetails: payload.trimmingDetails as TrimmingDetailsDTO | undefined,
+    inhibitionDetails: payload.inhibitionDetails as InhibitionDetailsDTO | undefined,
+    staticTestingDetails: payload.staticTestingDetails as StaticTestingDetailsDTO | undefined,
+    mechanicalInterfaceProperties: payload.mechanicalInterfaceProperties as
+      | MechanicalInterfacePropertiesDTO
+      | undefined,
+    sections: resolveSubscaleApiSectionsForDisplay(raw.sections, raw),
+  };
+};
+
+const rebuildSubscaleSectionsRecord = (
+  payload: Record<string, unknown>,
+): Record<string, unknown> => {
   const record: Record<string, unknown> = {};
   SUBSCALE_DISPLAY_SECTION_GROUPS.forEach(({ keys }) => {
     keys.forEach((key) => {
@@ -696,6 +1258,98 @@ const mergeSubscaleApiSectionRecord = (
   keys.forEach((key) => {
     const value = record[key];
     if (value == null) return;
+
+    if (key === "subscaleDetails") {
+      Object.assign(merged, mapSubscaleDetailsApiToDisplayMerged(value as SubscaleDetailsDTO));
+      return;
+    }
+
+    if (key === "hardwarePreparationDetails") {
+      Object.assign(
+        merged,
+        mapHardwareDetailsApiToDisplayMerged(value as HardwarePreparationDetailsDTO),
+      );
+      return;
+    }
+
+    if (key === "hardwarePreparationTable") {
+      const rows = mapHardwareTableApiToDisplay(value);
+      if (rows.length > 0) merged[ARTICLE_TYPE_TABLE_ID] = rows;
+      return;
+    }
+
+    if (key === "castingDetails") {
+      Object.assign(
+        merged,
+        mapProcessSectionApiToDisplayMerged(value as Record<string, unknown>, "castingTable", "CASTING_TABLE", [
+          { apiKey: "dateOfCasting", uiKey: "DATE_OF_CASTING" },
+        ]),
+      );
+      return;
+    }
+
+    if (key === "curingDetails") {
+      Object.assign(
+        merged,
+        mapProcessSectionApiToDisplayMerged(value as Record<string, unknown>, "curingTable", "CURING_TABLE"),
+      );
+      return;
+    }
+
+    if (key === "ndtDetails") {
+      Object.assign(
+        merged,
+        mapProcessSectionApiToDisplayMerged(value as Record<string, unknown>, "ndtTable", "NDT_TABLE"),
+      );
+      return;
+    }
+
+    if (key === "trimmingDetails") {
+      Object.assign(
+        merged,
+        mapProcessSectionApiToDisplayMerged(
+          value as Record<string, unknown>,
+          "trimmingTable",
+          "TRIMMING_TABLE",
+        ),
+      );
+      return;
+    }
+
+    if (key === "inhibitionDetails") {
+      const source = value as InhibitionDetailsDTO;
+      if (source.irBatchNo) merged.IR_BATCH_NO = source.irBatchNo;
+      if (source.dateOfManufacturing) merged.DATE_OF_MANUFACTURING = source.dateOfManufacturing;
+      if (source.dateOfApplication) merged.DATE_OF_APPLICATION = source.dateOfApplication;
+      const rows = mapApiTableRowsToUi(source.inhibitionTable);
+      if (rows.length > 0) merged.INHIBITION_TABLE = rows;
+      return;
+    }
+
+    if (key === "staticTestingDetails") {
+      Object.assign(
+        merged,
+        mapProcessSectionApiToDisplayMerged(
+          value as Record<string, unknown>,
+          "staticTestingTable",
+          "STATIC_TESTING_TABLE",
+        ),
+      );
+      return;
+    }
+
+    if (key === "mechanicalInterfaceProperties") {
+      Object.assign(
+        merged,
+        mapProcessSectionApiToDisplayMerged(
+          value as Record<string, unknown>,
+          "mechanicalPropertiesTable",
+          "MECHANICAL_PROPERTIES_TABLE",
+        ),
+      );
+      return;
+    }
+
     if (typeof value === "object" && !Array.isArray(value)) {
       Object.assign(merged, value as Record<string, unknown>);
     } else {
@@ -709,12 +1363,66 @@ const mergeSubscaleDisplayValues = (
   values: SchemaFormValues,
   merged: Record<string, unknown>,
 ) => {
+  if (sectionId === "SUBSCALE_DETAILS") {
+    if (values[SUBSCALE_BATCH_FIELDS.BATCH_SIZE] != null) {
+      merged.BATCH_SIZE = values[SUBSCALE_BATCH_FIELDS.BATCH_SIZE];
+    }
+    if (values[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO] != null) {
+      merged.MIXER_BLDG_NO = values[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO];
+    }
+    if (values.mixerType != null) merged.MIXER_TYPE = values.mixerType;
+    if (values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] != null) {
+      merged.PREMIX_DATE = values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE];
+    }
+    if (values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] != null) {
+      merged.FINAL_MIX_DATE = values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE];
+    }
+
+    const cycles = normalizeSubscaleMixingCycles(values[SUBSCALE_BATCH_FIELDS.MIXING_CYCLES]);
+    if (cycles.length > 0) {
+      merged.SUBSCALE_MIXING_CYCLES = cycles.map((cycle) => ({
+        MOTOR_STAGE: cycle.stage || "",
+        MIXING_CYCLE_CODE: cycle.mixingCycleCode || "",
+        MIXING_CYCLE_NAME: cycle.mixingCycleName || "",
+        MIXING_CYCLE_ID: cycle.mixingCycleId ?? "",
+        PREMIX_PARTICULARS: (cycle.premixParticulars?.length
+          ? cycle.premixParticulars
+          : cycle.processParticulars || []
+        ).map((row, index) => ({
+          SR_NO: index + 1,
+          OPERATION: row.operation || "",
+          RPM: row.rpm || "",
+          TIME: row.time || "",
+          TEMP: row.temp || "",
+          VACUUM: row.vacuum || "",
+        })),
+        FINAL_MIX_PARTICULARS: (cycle.finalMixParticulars || []).map((row, index) => ({
+          SR_NO: index + 1,
+          OPERATION: row.operation || "",
+          RPM: row.rpm || "",
+          TIME: row.time || "",
+          TEMP: row.temp || "",
+          VACUUM: row.vacuum || "",
+        })),
+      }));
+    }
+    return;
+  }
+
   if (sectionId === "HARDWARE_PREPARATION_DETAILS") {
     HARDWARE_COUNT_FIELDS.forEach((field) => {
-      if (values[field.id] != null) merged[field.id] = values[field.id];
+      if (values[field.id] != null && values[field.id] !== "") {
+        merged[field.id] = values[field.id];
+      }
     });
-    if (values[LINER_TYPE_FIELD.id] != null) {
+    if (values[LINER_TYPE_FIELD.id] != null && values[LINER_TYPE_FIELD.id] !== "") {
       merged[LINER_TYPE_FIELD.id] = values[LINER_TYPE_FIELD.id];
+    }
+    if (values[LINER_BATCH_NO_FIELD.id] != null && values[LINER_BATCH_NO_FIELD.id] !== "") {
+      merged[LINER_BATCH_NO_FIELD.id] = values[LINER_BATCH_NO_FIELD.id];
+    }
+    if (values[LINER_BATCH_DATE_FIELD.id] != null && values[LINER_BATCH_DATE_FIELD.id] !== "") {
+      merged[LINER_BATCH_DATE_FIELD.id] = values[LINER_BATCH_DATE_FIELD.id];
     }
     if (values[ARTICLE_TYPE_TABLE_ID] != null) {
       merged[ARTICLE_TYPE_TABLE_ID] = values[ARTICLE_TYPE_TABLE_ID];
@@ -734,13 +1442,28 @@ const mergeSubscaleDisplayValues = (
   const tableId = tableIdBySection[sectionId];
   if (tableId) {
     const scopedKey = scopedFormKey(sectionId, tableId);
-    if (values[scopedKey] != null) merged[tableId] = values[scopedKey];
+    const rows = values[scopedKey] ?? values[tableId];
+    if (rows != null) merged[tableId] = rows;
   }
   Object.keys(values).forEach((key) => {
     if (!key.startsWith(`${sectionId}::`)) return;
     const fieldId = key.split("::")[1];
-    if (fieldId) merged[fieldId] = values[key];
+    if (fieldId && fieldId !== tableId) merged[fieldId] = values[key];
   });
+  // Unscoped scalar fallbacks used by the hardware article panel.
+  if (sectionId === "CASTING_DETAILS" && values.DATE_OF_CASTING != null) {
+    merged.DATE_OF_CASTING = values.DATE_OF_CASTING;
+  }
+  if (sectionId === "INHIBITION_DETAILS") {
+    if (values.IR_BATCH_NO != null) merged.IR_BATCH_NO = values.IR_BATCH_NO;
+    if (values.DATE_OF_MFG != null) merged.DATE_OF_MANUFACTURING = values.DATE_OF_MFG;
+    if (values.DATE_OF_MANUFACTURING != null) {
+      merged.DATE_OF_MANUFACTURING = values.DATE_OF_MANUFACTURING;
+    }
+    if (values.DATE_OF_APPLICATION != null) {
+      merged.DATE_OF_APPLICATION = values.DATE_OF_APPLICATION;
+    }
+  }
 };
 
 export const resolveSubscaleApiSectionsForDisplay = (

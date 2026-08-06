@@ -48,6 +48,7 @@ export type BackendMotorDispatchDetails = {
 export type BackendMotorPayload = {
   motorId: string;
   dispatchDetails: BackendMotorDispatchDetails;
+  motorSubmissionType?: "DRAFT" | "SUBMIT";
 };
 
 // Main Controller Interface Payloads

@@ -1,10 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
+import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import {
   Box,
   Chip,
   Button,
   CircularProgress,
+  IconButton,
+  MenuItem,
   Stack,
   Table,
   TableBody,
@@ -22,10 +25,12 @@ import StackRow from "../../../../../components/common/StackRow";
 import { STRINGS } from "../../../../../../app/config/strings";
 import {
   type InsulationType,
+  CASING_DETECTOR_TYPE_OPTIONS,
   DIM_READING_KEYS,
   type RocketMotorCasingFormData,
   CASING_FORM_STEP_COUNT,
   EMPTY_LOOSE_FLAP,
+  createEmptyRadiographyPlanRow,
   isLooseFlapDimensionalParam,
   validateCasingFormStep,
   isCasingIdentificationComplete,
@@ -112,12 +117,13 @@ const MotorCasingCreateForm = ({
     setForm((prev) => ({ ...prev, ...partial }));
 
   const onInsulationTypeChange = (type: string) => {
-    const next =
-      type === "ROCASIN" || type === "EPDM" ? (type as InsulationType) : ("" as const);
+    const next = type === "ROCASIN" || type === "EPDM" ? (type as InsulationType) : ("" as const);
     setForm((prev) => ({
       ...prev,
       insulationType: next,
-      ...(next ? {} : { mechanicalProperties: {}, thermalProperties: {}, insulationSpecifications: null }),
+      ...(next
+        ? {}
+        : { mechanicalProperties: {}, thermalProperties: {}, insulationSpecifications: null }),
     }));
   };
   useEffect(() => {
@@ -202,7 +208,7 @@ const MotorCasingCreateForm = ({
     const opts = [...stageOptions];
     const stage = String(form.motorStageApi ?? "").trim();
     if (stage && !opts.some((o) => o.value === stage)) {
-      opts.unshift({ value: stage, label: `Stage ${stage}` });
+      opts.unshift({ value: stage, label: `Stage ${stage}`, meta: null });
     }
     return opts;
   }, [stageOptions, form.motorStageApi]);
@@ -357,9 +363,7 @@ const MotorCasingCreateForm = ({
                 }}
                 options={identificationStageOptions}
                 placeholder={S.SELECT_STAGE}
-                disabled={
-                  lockIdentification || lookups.loading || loadingDimensionalParams
-                }
+                disabled={lockIdentification || lookups.loading || loadingDimensionalParams}
                 theme={theme}
               />
               <TextFieldField
@@ -405,12 +409,198 @@ const MotorCasingCreateForm = ({
             </Typography>
           ) : null}
 
-          {/* 2 — Motor receipt */}
+          {/* 2 — Radiography details (same columns as NDT radiography plan table) */}
           <SectionCard
             number="2"
-            title={S.SECTION_MOTOR_RECEIPT}
+            title={S.SECTION_RADIOGRAPHY}
             accentColor={sectionColors.motorId}
             index={1}
+            disabled={!identificationComplete}
+            theme={theme}
+            cf={cf}
+          >
+            <Typography
+              sx={{
+                fontSize: "0.78rem",
+                color: theme.palette.textSub,
+                mb: 1.25,
+                fontWeight: 500,
+              }}
+            >
+              {S.RADIOGRAPHY_HINT}
+            </Typography>
+            <FieldGrid theme={theme} cf={cf}>
+              <TextFieldField
+                label={S.RADIOGRAPHY_PLAN_ID}
+                value={form.radiographyPlanId}
+                onChange={(v) => patch({ radiographyPlanId: v })}
+                placeholder={S.RADIOGRAPHY_PLAN_ID_PH}
+                disabled={!identificationComplete}
+                theme={theme}
+              />
+              <TextFieldField
+                label={S.RADIOGRAPHY_PLAN_NAME}
+                value={form.radiographyPlanName}
+                onChange={(v) => patch({ radiographyPlanName: v })}
+                placeholder={S.RADIOGRAPHY_PLAN_NAME_PH}
+                disabled={!identificationComplete}
+                theme={theme}
+              />
+            </FieldGrid>
+            <TableContainer sx={{ ...casingTheme.tableContainer, mt: 1.5, overflowX: "auto" }}>
+              <Table size="small" sx={{ minWidth: 720 }}>
+                <TableHead>
+                  <TableRow>
+                    {[
+                      S.COL_RADIOGRAPHY_SR,
+                      S.COL_RADIOGRAPHY_SECTIONS,
+                      S.COL_RADIOGRAPHY_ORIENTATIONS,
+                      S.COL_RADIOGRAPHY_SFD,
+                      S.COL_RADIOGRAPHY_NORMAL,
+                      S.COL_RADIOGRAPHY_TANGENTIAL,
+                      S.COL_RADIOGRAPHY_DETECTOR,
+                      "",
+                    ].map((label, headerIndex) => (
+                      <TableCell
+                        key={headerIndex}
+                        sx={{
+                          ...theme.workflow.formElements.tableHeader,
+                          width: headerIndex === 7 ? 44 : undefined,
+                        }}
+                      >
+                        {label}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {(form.radiographyPlanRows ?? []).map((row, index) => (
+                    <TableRow
+                      key={`radiography-${row.srNo}-${index}`}
+                      sx={casingTheme.dataRow(index % 2 === 0)}
+                    >
+                      <TableCell sx={theme.workflow.formElements.tableCell}>{row.srNo}</TableCell>
+                      {(
+                        [
+                          "sections",
+                          "orientations",
+                          "sfd",
+                          "normalExposures",
+                          "tangentialExposures",
+                        ] as const
+                      ).map((field) => (
+                        <TableCell key={field} sx={theme.workflow.formElements.tableCell}>
+                          <TextField
+                            size="small"
+                            fullWidth
+                            value={row[field]}
+                            onChange={(e) => {
+                              const next = String(e.target.value).replace(/[^\d.]/g, "");
+                              patch({
+                                radiographyPlanRows: form.radiographyPlanRows.map((r, i) =>
+                                  i === index ? { ...r, [field]: next } : r,
+                                ),
+                              });
+                            }}
+                            disabled={!identificationComplete}
+                            inputProps={{ inputMode: "decimal" }}
+                            sx={{
+                              ...theme.workflow.formElements.cellField,
+                              ...casingTheme.dimInput,
+                            }}
+                          />
+                        </TableCell>
+                      ))}
+                      <TableCell sx={theme.workflow.formElements.tableCell}>
+                        <TextField
+                          select
+                          size="small"
+                          fullWidth
+                          value={row.detectorType}
+                          onChange={(e) =>
+                            patch({
+                              radiographyPlanRows: form.radiographyPlanRows.map((r, i) =>
+                                i === index ? { ...r, detectorType: e.target.value } : r,
+                              ),
+                            })
+                          }
+                          disabled={!identificationComplete}
+                          SelectProps={{ displayEmpty: true }}
+                          sx={{
+                            ...theme.workflow.formElements.cellField,
+                            ...casingTheme.dimInput,
+                          }}
+                        >
+                          <MenuItem value="">
+                            <Typography sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
+                              {S.RADIOGRAPHY_DETECTOR_PH}
+                            </Typography>
+                          </MenuItem>
+                          {CASING_DETECTOR_TYPE_OPTIONS.map((option) => (
+                            <MenuItem key={option.value} value={option.value}>
+                              {option.label}
+                            </MenuItem>
+                          ))}
+                        </TextField>
+                      </TableCell>
+                      <TableCell sx={theme.workflow.formElements.tableCell}>
+                        {(form.radiographyPlanRows?.length ?? 0) > 1 ? (
+                          <IconButton
+                            size="small"
+                            disabled={!identificationComplete}
+                            onClick={() =>
+                              patch({
+                                radiographyPlanRows: form.radiographyPlanRows
+                                  .filter((_, i) => i !== index)
+                                  .map((r, i) => ({ ...r, srNo: i + 1 })),
+                              })
+                            }
+                            sx={{ color: theme.palette.danger, p: 0.5 }}
+                          >
+                            <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
+                          </IconButton>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+            <Stack
+              direction="row"
+              alignItems="center"
+              gap={0.5}
+              onClick={() => {
+                if (!identificationComplete) return;
+                const nextSr = (form.radiographyPlanRows?.length ?? 0) + 1;
+                patch({
+                  radiographyPlanRows: [
+                    ...(form.radiographyPlanRows ?? []),
+                    createEmptyRadiographyPlanRow(nextSr),
+                  ],
+                });
+              }}
+              sx={{
+                cursor: identificationComplete ? "pointer" : "not-allowed",
+                width: "fit-content",
+                mt: 1.25,
+                color: theme.palette.primaryLight,
+                fontSize: "0.72rem",
+                fontWeight: 700,
+                opacity: identificationComplete ? 1 : 0.5,
+              }}
+            >
+              <AddRoundedIcon sx={{ fontSize: 15 }} />
+              {S.RADIOGRAPHY_ADD_ROW}
+            </Stack>
+          </SectionCard>
+
+          {/* 3 — Motor receipt */}
+          <SectionCard
+            number="3"
+            title={S.SECTION_MOTOR_RECEIPT}
+            accentColor={sectionColors.motorId}
+            index={2}
             disabled={!identificationComplete}
             theme={theme}
             cf={cf}
@@ -725,11 +915,11 @@ const MotorCasingCreateForm = ({
 
       {step === 1 && identificationComplete && (
         <SectionCard
-          number="3"
+          number="4"
           title={S.SECTION_VISUAL}
           subtitle={S.COL_DESCRIPTION}
           accentColor={sectionColors.visual}
-          index={2}
+          index={3}
           theme={theme}
           cf={cf}
         >
@@ -823,10 +1013,10 @@ const MotorCasingCreateForm = ({
 
       {step === 2 && identificationComplete && (
         <SectionCard
-          number="4"
+          number="5"
           title={S.SECTION_WEIGHMENT}
           accentColor={sectionColors.clearance}
-          index={3}
+          index={4}
           theme={theme}
           cf={cf}
         >
@@ -863,10 +1053,10 @@ const MotorCasingCreateForm = ({
 
       {step === 3 && identificationComplete && (
         <SectionCard
-          number="5"
+          number="6"
           title={S.SECTION_DIMENSIONAL}
           accentColor={sectionColors.dimensional}
-          index={4}
+          index={5}
           theme={theme}
           cf={cf}
         >
@@ -1031,10 +1221,10 @@ const MotorCasingCreateForm = ({
 
       {step === 4 && identificationComplete && (
         <SectionCard
-          number="6"
+          number="7"
           title={S.SECTION_MOCK_TRIAL}
           accentColor={sectionColors.mockTrial}
-          index={5}
+          index={6}
           disabled={!String(form.motorStageApi ?? "").trim()}
           theme={theme}
           cf={cf}
@@ -1050,10 +1240,10 @@ const MotorCasingCreateForm = ({
       )}
       {step === 5 && identificationComplete && (
         <SectionCard
-          number="7"
+          number="8"
           title={S.SECTION_UPLOAD_REPORT}
           accentColor={sectionColors.mockTrial}
-          index={5}
+          index={7}
           disabled={!String(form.motorStageApi ?? "").trim()}
           theme={theme}
           cf={cf}

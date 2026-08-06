@@ -20,7 +20,6 @@ import {
   type CasePrepDetailSection,
   type CasePrepDetailTable,
 } from "../../../../../../data/models/user/CasePreparationFormModel";
-import { orderCastingCuringDisplayColumns } from "../../../../../../data/models/user/CastingCuringFormModel";
 import type { SubscaleDetailView } from "../../../../../../data/models/user/SubscaleFormModel";
 import { OPERATION_STATUS_UI_TO_API } from "../../../../../../hooks/operationStatus";
 
@@ -93,7 +92,10 @@ const DataTable = ({
   table: CasePrepDetailTable;
   dt: SubscaleDetailsTheme;
 }) => {
-  const columns = orderCastingCuringDisplayColumns(Object.keys(table.columnLabels));
+  // Prefer the columnLabels insertion order (canonical subscale schema) over casting/curing sort.
+  const columns = Object.keys(table.columnLabels).filter(
+    (col) => !col.startsWith("_") && !col.endsWith("__fieldType"),
+  );
   if (!columns.length || !table.rows.length) return null;
 
   return (
@@ -150,7 +152,7 @@ const SectionPanel = ({
   dt: SubscaleDetailsTheme;
 }) => (
   <Box sx={{ mb: 2.5 }}>
-    <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: "text.primary", mb: 1 }}>
+    <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: "text.primary", mb: 1 }}>
       {section.label}
     </Typography>
     <FieldsTable fields={section.fields} dt={dt} />

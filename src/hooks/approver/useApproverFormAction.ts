@@ -33,7 +33,10 @@ type UseApproverFormActionArgs<T extends ActionableApproverItem> = {
   submitChangeStatus?: (
     payload: ApproverChangeStatusRequest,
   ) => Promise<ApiResponseModel<unknown>>;
-  onStatusChangeSuccess?: (item: T, response: ApiResponseModel<unknown>) => void;
+  onStatusChangeSuccess?: (
+    item: T,
+    response: ApiResponseModel<unknown>,
+  ) => void | Promise<void>;
   closeSelectedOnSuccess?: boolean;
 };
 
@@ -190,7 +193,12 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
         }),
       );
 
-      onStatusChangeSuccess?.(dialogItem, response);
+      try {
+        await onStatusChangeSuccess?.(dialogItem, response);
+      } catch (error) {
+        console.error("Approver post-action details refresh failed", error);
+      }
+
       if (closeSelectedOnSuccess) {
         setSelected(null);
       }

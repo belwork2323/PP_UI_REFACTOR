@@ -23,14 +23,15 @@ export const useSchemaApiPopulation = (
   apiContextRef.current = apiContext;
 
   const batchId = String(apiContext?.batchId ?? "").trim();
+  const motorId = String(apiContext?.motorId ?? "").trim();
   const populationKey =
     schema && batchId
-      ? `${schema.schemaType}:${schema.schemaVersion}:${batchId}`
+      ? `${schema.schemaType}:${schema.schemaVersion}:${batchId}:${motorId}`
       : null;
 
   useEffect(() => {
     populatedKeyRef.current = null;
-  }, [schema?.schemaVersion, schema?.schemaType, batchId]);
+  }, [schema?.schemaVersion, schema?.schemaType, batchId, motorId]);
 
   useEffect(() => {
     if (readOnly || !schema || !populationKey || !schemaHasPopulateFromApi(schema)) return;
@@ -41,6 +42,7 @@ export const useSchemaApiPopulation = (
     void populateSchemaValuesFromApi(schema, valuesRef.current, {
       ...apiContextRef.current,
       batchId,
+      motorId: motorId || undefined,
     }).then((nextValues) => {
       if (cancelled) return;
       populatedKeyRef.current = populationKey;
@@ -51,7 +53,7 @@ export const useSchemaApiPopulation = (
     return () => {
       cancelled = true;
     };
-  }, [schema, populationKey, batchId, readOnly]);
+  }, [schema, populationKey, batchId, motorId, readOnly]);
 };
 
 export default useSchemaApiPopulation;

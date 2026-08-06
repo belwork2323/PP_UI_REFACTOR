@@ -18,7 +18,11 @@ import {
   type SchemaApiContext,
 } from "./apiDependency";
 import { flattenTableColumns } from "../utils/schemaUtils";
-import { isWrappedTableValue, resolveTableRows } from "../utils/tableRowUtils";
+import {
+  appendTrailingTablePresetRows,
+  isWrappedTableValue,
+  resolveTableRows,
+} from "../utils/tableRowUtils";
 
 const applyFieldTransform = (value: unknown, transform?: SchemaFieldValueTransform): unknown => {
   if (transform === "referenceRange") {
@@ -42,6 +46,9 @@ const mapApiItemToRow = (
   autoKey: string,
   rowIndex: number,
   readonlyColumns: string[],
+  columnTemplates?: Array<{ targetColumn: string; template: string }>,
+  contextColumnMappings?: Record<string, string>,
+  apiContext?: SchemaApiContext,
 ): Record<string, unknown> => {
   const row: Record<string, unknown> = { [autoKey]: rowIndex + 1 };
 
@@ -54,6 +61,21 @@ const mapApiItemToRow = (
   mappings.forEach((mapping) => {
     row[mapping.targetColumn] = applyFieldTransform(item[mapping.sourceField], mapping.transform);
   });
+
+  columnTemplates?.forEach(({ targetColumn, template }) => {
+    const rendered = String(template ?? "").replace(/\{(\w+)\}/g, (_, key: string) =>
+      String(item[key] ?? "").trim(),
+    );
+    row[targetColumn] = rendered.replace(/\s*\/\s*$/, "").trim();
+  });
+
+  if (contextColumnMappings && apiContext) {
+    Object.entries(contextColumnMappings).forEach(([targetColumn, contextKey]) => {
+      const value = apiContext[contextKey];
+      if (value == null || value === "") return;
+      row[targetColumn] = String(value).trim();
+    });
+  }
 
   if (readonlyColumns.length) {
     row._readonly = true;
@@ -133,10 +155,20 @@ const populateTableFromConfig = async (
   const readonlyColumns = config.readonlyColumns ?? [];
 
   const rows = options.map((item, index) =>
-    mapApiItemToRow(item, mappings, flatColumns, autoKey, index, readonlyColumns),
+    mapApiItemToRow(
+      item,
+      mappings,
+      flatColumns,
+      autoKey,
+      index,
+      readonlyColumns,
+      config.columnTemplates,
+      config.contextColumnMappings,
+      apiContext,
+    ),
   );
 
-  return applyRowComputations(rows, table);
+  return applyRowComputations(appendTrailingTablePresetRows(rows, table), table);
 };
 
 export const populateSchemaValuesFromApi = async (

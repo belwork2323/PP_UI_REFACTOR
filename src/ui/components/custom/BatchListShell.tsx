@@ -30,7 +30,7 @@ export type BatchListShellStatusMeta = Record<
   }
 >;
 
-type BatchListShellTheme = {
+export type BatchListShellTheme = {
   sections: {
     emptyWrap: Record<string, unknown>;
     filterContainer: Record<string, unknown>;
@@ -171,78 +171,114 @@ const BatchListShell = ({
       ) : null}
 
       <Box sx={theme.sections.filterContainer}>
-        <Stack {...theme.sections.filterStack}>
+        <Stack direction="column" spacing={1.5} sx={{ width: "100%" }}>
           <Stack
             direction="row"
             spacing={1}
             alignItems="center"
-            sx={{ flex: { sm: 1 }, minWidth: { xs: "100%", sm: 260 } }}
+            flexWrap="wrap"
+            sx={{ width: "100%" }}
           >
-            <TextField
-              size="small"
-              placeholder={searchPlaceholder}
-              value={searchValue}
-              onChange={(event) => onSearchChange(event.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <SearchRoundedIcon sx={theme.inputs.startIcon.search} />
-                  </InputAdornment>
-                ),
-              }}
-              sx={{ ...theme.inputs.search, flex: 1, minWidth: 0 }}
-            />
-            {searchBarEnd ?? null}
+            <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{ flex: 1, minWidth: { xs: "100%", sm: 260 } }}
+            >
+              <TextField
+                size="small"
+                placeholder={searchPlaceholder}
+                value={searchValue}
+                onChange={(event) => onSearchChange(event.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchRoundedIcon sx={theme.inputs.startIcon.search} />
+                    </InputAdornment>
+                  ),
+                }}
+                sx={{ ...theme.inputs.search, flex: 1, minWidth: 0 }}
+              />
+              {searchBarEnd ?? null}
+            </Stack>
+
+            <Box sx={theme.sections.resultsWrap}>
+              <ResultIcon sx={theme.results.icon} />
+              <Typography sx={theme.results.text}>{resultText}</Typography>
+            </Box>
           </Stack>
 
-          {filterFields.map(({ field, label, minWidth, options }) => (
-            <TextField
-              key={field}
-              select
-              size="small"
-              label={label}
-              value={filterValues[field] ?? options[0] ?? ""}
-              onChange={(event) => onFilterChange?.(field, event.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <FilterListRoundedIcon sx={theme.inputs.startIcon.filter} />
-                  </InputAdornment>
-                ),
+          {filterFields.length > 0 ? (
+            <Stack
+              direction="row"
+              spacing={1.5}
+              alignItems="center"
+              sx={{
+                width: "100%",
+                overflowX: "auto",
+                flexWrap: "nowrap",
+                pr: 0.5,
+                WebkitOverflowScrolling: "touch",
+                msOverflowStyle: "-ms-autohiding-scrollbar",
               }}
-              sx={{ ...theme.inputs.filter, minWidth: minWidth ?? theme.inputs.filter.minWidth }}
             >
-              {options.map((option) => (
-                <MenuItem key={option} value={option} sx={theme.inputs.menuItem}>
-                  {option}
-                </MenuItem>
+              {filterFields.map(({ field, label, minWidth, options }) => (
+                <TextField
+                  key={field}
+                  select
+                  size="small"
+                  label={label}
+                  value={filterValues[field] ?? options[0] ?? ""}
+                  onChange={(event) => onFilterChange?.(field, event.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <FilterListRoundedIcon sx={theme.inputs.startIcon.filter} />
+                      </InputAdornment>
+                    ),
+                  }}
+                  sx={{
+                    ...theme.inputs.filter,
+                    minWidth: minWidth ?? theme.inputs.filter.minWidth,
+                    flex: "0 0 auto",
+                  }}
+                >
+                  {options.map((option) => (
+                    <MenuItem key={option} value={option} sx={theme.inputs.menuItem}>
+                      {option}
+                    </MenuItem>
+                  ))}
+                </TextField>
               ))}
-            </TextField>
-          ))}
+            </Stack>
+          ) : null}
 
-          <Box sx={theme.sections.resultsWrap}>
-            <ResultIcon sx={theme.results.icon} />
-            <Typography sx={theme.results.text}>{resultText}</Typography>
-          </Box>
+          {filterExtension ? (
+            <Box
+              sx={{
+                display: "flex",
+                flexWrap: "wrap",
+                gap: 1.5,
+                alignItems: "center",
+                width: "100%",
+              }}
+            >
+              {filterExtension}
+            </Box>
+          ) : null}
         </Stack>
-        {filterExtension}
       </Box>
 
-      {loading && !hasItems ? (
-        <Box sx={theme.sections.loadingWrap}>
-          <CircularProgress size={24} sx={theme.loading.spinner} />
-        </Box>
-      ) : null}
+      {/* Main Content Area: Always renders children so Table Headers / Card wrappers stay visible */}
+      <Box sx={{ position: "relative", ...theme.sections.listWrap }}>
+        {loading && !hasItems ? (
+          <Box sx={theme.sections.loadingWrap}>
+            <CircularProgress size={24} sx={theme.loading.spinner} />
+          </Box>
+        ) : null}
 
-      {hasItems ? <Box sx={theme.sections.listWrap}>{children}</Box> : null}
-
-      {!loading && !hasItems ? (
-        <Box sx={theme.sections.emptyWrap}>
-          <EmptyIcon sx={theme.empty.icon} />
-          <Typography sx={theme.empty.title}>{emptyTitle}</Typography>
-          <Typography sx={theme.empty.subtitle}>{emptySubtitle}</Typography>
-        </Box>
-      ) : null}
+        {children}
+      </Box>
     </Box>
   );
 };

@@ -27,7 +27,7 @@ export {
   scopedFormKey,
 } from "./state/formState";
 
-export { syncRowGenerationTables } from "./utils/rowGenerationSync";
+export { syncRowGenerationTables, prepareSchemaValuesForSubmission } from "./utils/rowGenerationSync";
 
 export { parseSchemaDocument } from "./utils/schemaUtils";
 export {
@@ -145,6 +145,7 @@ export {
   castingCuringCuringSchemaFetchConfig,
   buildCastingCuringSchemaRequest,
   createCastingCuringInitialValues,
+  buildCuringFormValuesFromCycleConfig,
   hydrateCastingCuringValuesFromSections,
   buildCastingCuringSectionPayload,
 } from "./adapters/castingCuring.adapter";

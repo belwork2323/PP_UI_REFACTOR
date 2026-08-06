@@ -30,6 +30,11 @@ import FinalApprovalMotorDialog, {
   areAllMotorsApproved,
   buildFinalApprovalMotorRows,
 } from "./components/FinalApprovalMotorDialog";
+import {
+  UserWorkflowNavPanel,
+  UserWorkflowTabNav,
+  type UserWorkflowNavTab,
+} from "../../../../components/custom/UserWorkflowStepPager";
 
 const S = STRINGS.MANUFACTURING.CASE_PREP;
 const { cleaningServices: CleaningServicesRoundedIcon } = icons.user.manufacturing.casePreparation.form;
@@ -129,6 +134,41 @@ const CasePreparationForm = ({
   );
   const allMotorsApproved = areAllMotorsApproved(finalApprovalRows);
   const canOpenFinalApproval = Boolean(batch?.formId);
+
+  const navPalette = useMemo(
+    () => ({
+      primary: theme.palette.primary,
+      primaryLight: theme.palette.primaryLight,
+      border: theme.palette.border,
+      surface: theme.palette.surface,
+      textSub: theme.palette.textSub,
+      text: theme.palette.text,
+    }),
+    [theme.palette],
+  );
+
+  const motorTabs = useMemo<UserWorkflowNavTab[]>(
+    () =>
+      motorCards.map((entry, index) => {
+        const status =
+          getMotorStatus?.(entry.motorId) ??
+          motorStatusById[entry.motorId]?.motorSubmissionStatus ??
+          "TO_BE_INITIATED";
+        return {
+          id: entry.motorId,
+          label: entry.motorId,
+          endAdornment: (
+            <PremixStatusChip
+              status={status as any}
+              statusConfig={statusConfig}
+              variant="embedded"
+              onAccent={index === activeMotorIndex}
+            />
+          ),
+        };
+      }),
+    [activeMotorIndex, getMotorStatus, motorCards, motorStatusById, statusConfig],
+  );
 
   useEffect(() => {
     if (!schema || !isMainMotorBatch(batch?.batchType)) return;
@@ -265,68 +305,31 @@ const CasePreparationForm = ({
         activeMotorSession &&
         schema && (
           <Stack spacing={1.25}>
-            <Box
-              sx={{
-                border: `1px solid ${theme.palette.border}`,
-                borderRadius: 2,
-                px: 1.25,
-                py: 1.1,
-                background: theme.palette.surface,
-              }}
-            >
-              <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" mb={0.5}>
-                <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: theme.palette.primary }}>
-                  {S.MOTOR_NAV_TITLE}
-                </Typography>
-                <Chip
-                  label={`${S.BATCH_MOTOR_COUNT_LABEL}: ${batchMotorCount}`}
-                  size="small"
-                  sx={{
-                    fontWeight: 800,
-                    fontSize: "0.72rem",
-                    height: 24,
-                    background: BRAND.cp ?? "#1565C0",
-                    color: "#fff",
-                    "& .MuiChip-label": { px: 1 },
-                  }}
-                />
-              </Stack>
-              <Typography sx={{ fontSize: "0.72rem", color: theme.palette.textSub, mb: 0.9 }}>
-                {S.MOTOR_NAV_HINT}
-              </Typography>
-              <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
-                {motorCards.map((entry, idx) => {
-                  const status =
-                    getMotorStatus?.(entry.motorId) ??
-                    motorStatusById[entry.motorId]?.motorSubmissionStatus ??
-                    "TO_BE_INITIATED";
-                  const selected = idx === activeMotorIndex;
-                  return (
-                    <Chip
-                      key={`motor-tab-${entry.motorId}`}
-                      clickable
-                      color={selected ? "primary" : "default"}
-                      variant={selected ? "filled" : "outlined"}
-                      onClick={() => setActiveMotorIndex(idx)}
-                      label={
-                        <Stack direction="row" alignItems="center" gap={0.75}>
-                          <Box component="span" sx={{ fontWeight: selected ? 700 : 500 }}>
-                            {entry.motorId}
-                          </Box>
-                          <PremixStatusChip
-                            status={status as any}
-                            statusConfig={statusConfig}
-                            variant="embedded"
-                            onAccent={selected}
-                          />
-                        </Stack>
-                      }
-                      sx={{ flexShrink: 0, height: 34, "& .MuiChip-label": { px: 1 } }}
-                    />
-                  );
-                })}
-              </Stack>
-            </Box>
+            <UserWorkflowNavPanel palette={navPalette}>
+              <UserWorkflowTabNav
+                title={S.MOTOR_NAV_TITLE}
+                hint={S.MOTOR_NAV_HINT}
+                tabs={motorTabs}
+                activeIndex={activeMotorIndex}
+                onActiveIndexChange={setActiveMotorIndex}
+                palette={navPalette}
+                showStepArrows
+                titleEndAdornment={
+                  <Chip
+                    label={`${S.BATCH_MOTOR_COUNT_LABEL}: ${batchMotorCount}`}
+                    size="small"
+                    sx={{
+                      fontWeight: 800,
+                      fontSize: "0.72rem",
+                      height: 24,
+                      background: BRAND.cp ?? "#1565C0",
+                      color: "#fff",
+                      "& .MuiChip-label": { px: 1 },
+                    }}
+                  />
+                }
+              />
+            </UserWorkflowNavPanel>
 
             <Box
               sx={{

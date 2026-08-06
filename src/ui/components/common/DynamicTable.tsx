@@ -17,7 +17,7 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import type { SxProps, Theme } from "@mui/material";
 import type { SchemaTableBlock, SchemaTableColumn, SchemaTableColumnSlot, SchemaDataSource } from "../../../schema-engine/types";
 import { applyFormulaColumns } from "../../../schema-engine/rules/formulaEval";
-import { applyRowComputations, isRowComputationTarget } from "../../../schema-engine/rules/tableRowComputations";
+import { applyRowComputations, isEditableRowComputationTarget, isRowComputationTarget } from "../../../schema-engine/rules/tableRowComputations";
 import { flattenTableColumns, isColumnGroup } from "../../../schema-engine/utils/schemaUtils";
 import {
   buildRowApiContext,
@@ -44,11 +44,15 @@ import {
 } from "../../../schema-engine/rules/tableCommitGroup";
 import type { SchemaThemeTokens } from "../../../schema-engine/utils/schemaUtils";
 import {
+  computePresetMergedCellSpans,
   isPresetLockedCell,
   isPresetLockedRow,
   isExpandedRow,
   isPickerRow,
+  isTrailingTablePresetRow,
   resolveDynamicColumn,
+  resolveMergedPresetCellValue,
+  syncMergedPresetColumnValues,
 } from "../../../schema-engine/utils/tableRowUtils";
 import SchemaApiDropdown from "./SchemaApiDropdown";
 import { DateField, DateTimeField, TimeField } from "./DateField";
@@ -349,6 +353,17 @@ const renderCellEditor = (
     return <FormulaCell value={value} unit={col.unit} />;
   }
 
+  // Locked preset cells (fixed ingredient labels, total-row blanks, etc.) — plain text, not disabled inputs.
+  if (
+    readOnly &&
+    (col.fieldType === "text" ||
+      col.fieldType === "textarea" ||
+      col.fieldType === "number" ||
+      col.fieldType === "decimal")
+  ) {
+    return <FormulaCell value={value} unit={col.unit} />;
+  }
+
   const cellDisabled = readOnly || col.readonly === true;
 
   switch (col.fieldType) {
@@ -446,6 +461,8 @@ const DynamicTable = ({
   const autoKey = config.rows?.autoIncrementKey ?? "srNo";
   const commitGroup = getTableCommitGroup(config);
   const isCommitGroupMode = hasTableCommitGroup(config);
+  const mergePresetColumns = config.rows?.mergePresetColumns ?? [];
+  const presetRowCount = config.rows?.presetRows?.length ?? 0;
   const mergeExpandedColumns = commitGroup ? getMergeExpandedColumns(commitGroup) : [];
   const expandedGroupCellSpans = useMemo(
     () =>
@@ -453,6 +470,13 @@ const DynamicTable = ({
         ? computeExpandedGroupCellSpans(rows, mergeExpandedColumns)
         : new Map(),
     [isCommitGroupMode, mergeExpandedColumns, rows],
+  );
+  const presetMergedCellSpans = useMemo(
+    () =>
+      !isCommitGroupMode && mergePresetColumns.length && presetRowCount > 1
+        ? computePresetMergedCellSpans(rows.length, mergePresetColumns, presetRowCount)
+        : new Map(),
+    [isCommitGroupMode, mergePresetColumns, presetRowCount, rows.length],
   );
   const commitGroupRowMeta = useMemo(() => {
     if (!isCommitGroupMode) return [];
@@ -516,21 +540,29 @@ const DynamicTable = ({
   const updateCell = (rowIndex: number, colId: string, value: string) => {
     const changedColumn = flatColumns.find((col) => col.id === colId);
     const dependentColumnIds = getDependentColumnIds(flatColumns, colId);
-    const nextRows = applyRowComputations(
-      rows.map((row, idx) => {
-        if (idx !== rowIndex) return row;
-        const updated: Record<string, unknown> = { ...row, [colId]: value };
-        dependentColumnIds.forEach((dependentId) => {
-          updated[dependentId] = "";
-        });
-        if (changedColumn?.derive?.sourceField) {
-          const targetColumn = changedColumn.derive.targetColumn;
-          if (targetColumn) updated[targetColumn] = "";
-        }
-        return applyFormulaColumns(updated, flatColumns, colId);
-      }),
-      config,
+    const updatedRows = rows.map((row, idx) => {
+      if (idx !== rowIndex) return row;
+      const updated: Record<string, unknown> = { ...row, [colId]: value };
+      dependentColumnIds.forEach((dependentId) => {
+        updated[dependentId] = "";
+      });
+      if (changedColumn?.derive?.sourceField) {
+        const targetColumn = changedColumn.derive.targetColumn;
+        if (targetColumn) updated[targetColumn] = "";
+      }
+      return applyFormulaColumns(updated, flatColumns, colId);
+    });
+    const syncedRows = syncMergedPresetColumnValues(
+      updatedRows,
+      colId,
+      value,
+      mergePresetColumns,
+      presetRowCount,
     );
+    const nextRows = applyRowComputations(syncedRows, config, {
+      changedRowIndex: rowIndex,
+      changedColumnId: colId,
+    });
     onChange(nextRows);
 
     if (changedColumn?.derive && value) {
@@ -560,11 +592,27 @@ const DynamicTable = ({
       return;
     }
 
-    const row: Record<string, unknown> = { [autoKey]: rows.length + 1 };
+    const trailingStart = rows.findIndex((row) => isTrailingTablePresetRow(row, autoKey));
+    const insertAt = trailingStart >= 0 ? trailingStart : rows.length;
+    const dataCount = trailingStart >= 0 ? trailingStart : rows.length;
+
+    const row: Record<string, unknown> = {
+      [autoKey]: dataCount + 1,
+      _readonly: false,
+      _readonlyColumns: [],
+    };
     flatColumns.forEach((col) => {
       if (col.fieldType !== "serial") row[col.id] = "";
     });
-    onChange([...rows, applyFormulaColumns(row, flatColumns)]);
+
+    const nextRows = applyRowComputations(
+      renumberTableRows(
+        [...rows.slice(0, insertAt), applyFormulaColumns(row, flatColumns), ...rows.slice(insertAt)],
+        autoKey,
+      ),
+      config,
+    );
+    onChange(nextRows);
   };
 
   const removeRow = (rowIndex: number) => {
@@ -589,9 +637,12 @@ const DynamicTable = ({
     if (rows.length <= minRows) return;
 
     onChange(
-      renumberTableRows(
-        rows.filter((_, idx) => idx !== rowIndex),
-        autoKey,
+      applyRowComputations(
+        renumberTableRows(
+          rows.filter((_, idx) => idx !== rowIndex),
+          autoKey,
+        ),
+        config,
       ),
     );
   };
@@ -698,7 +749,12 @@ const DynamicTable = ({
               );
             }
 
-            const rowPresetLocked = isPresetLockedRow(row, rowIndex, config.rows?.presetRows);
+            const rowPresetLocked = isPresetLockedRow(
+              row,
+              rowIndex,
+              config.rows?.presetRows,
+              autoKey,
+            );
             const isPicker = isCommitGroupMode && isPickerRow(row);
             const isExpanded = isCommitGroupMode && isExpandedRow(row);
             const rowGroupId = row._groupId ? String(row._groupId) : "";
@@ -714,7 +770,9 @@ const DynamicTable = ({
                 }}
               >
                 {flatColumns.map((col) => {
-                  const mergeSpan = expandedGroupCellSpans.get(`${rowIndex}:${col.id}`);
+                  const mergeSpan =
+                    expandedGroupCellSpans.get(`${rowIndex}:${col.id}`) ??
+                    presetMergedCellSpans.get(`${rowIndex}:${col.id}`);
                   if (mergeSpan?.isContinuation) return null;
 
                   if (col.fieldType === "serial") {
@@ -757,17 +815,31 @@ const DynamicTable = ({
                     row,
                     rowIndex,
                     config.rows?.presetRows,
+                    autoKey,
                   );
-                  const cellValue = String(row[col.id] ?? "");
+                  const cellValue = resolveMergedPresetCellValue(
+                    rows,
+                    col.id,
+                    rowIndex,
+                    mergePresetColumns,
+                    presetRowCount,
+                  );
                   const isComputedCell = isRowComputationTarget(config, row, col.id, autoKey);
+                  const isEditableComputedCell = isEditableRowComputationTarget(
+                    config,
+                    row,
+                    col.id,
+                    autoKey,
+                  );
                   const cellReadOnly =
                     readOnly ||
                     isReadonlyCol(resolvedCol) ||
                     isComputedCell ||
-                    isPresetLockedCell(row, col.id, rowIndex, config.rows?.presetRows, autoKey) ||
                     (isExpanded && commitGroup
                       ? isExpandedColumnReadonly(commitGroup, col.id)
-                      : false);
+                      : false) ||
+                    (!isEditableComputedCell &&
+                      isPresetLockedCell(row, col.id, rowIndex, config.rows?.presetRows, autoKey));
                   const rowApiContext = buildRowApiContext(apiContext, row);
                   const trackPickerOptionCount = isPicker && Boolean(nestedOptionsApi?.nestedOptionsKey);
                   const showGroupRemove =
@@ -787,7 +859,12 @@ const DynamicTable = ({
                     <TableCell
                       key={col.id}
                       rowSpan={mergeSpan?.rowSpan && mergeSpan.rowSpan > 1 ? mergeSpan.rowSpan : undefined}
-                      sx={cellSx(resolvedCol)}
+                      sx={{
+                        ...cellSx(resolvedCol),
+                        ...(mergeSpan?.rowSpan && mergeSpan.rowSpan > 1
+                          ? { verticalAlign: "middle" }
+                          : {}),
+                      }}
                     >
                       <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
                         {isReadonlyExpandedDisplay ? (

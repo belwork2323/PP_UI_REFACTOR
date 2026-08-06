@@ -1,14 +1,12 @@
 import type { ReactNode } from "react";
 import { Box } from "@mui/material";
-import { STRINGS } from "../../../../../app/config/strings";
 import { MIXING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/mixing_theme";
-import UserWorkflowStepPager, {
+import {
   UserWorkflowNavPanel,
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
 } from "../../../../components/custom/UserWorkflowStepPager";
 
-const S = STRINGS.MANUFACTURING.MIXING;
 const BRAND = MIXING_BRAND;
 
 export type MixingNavTab = UserWorkflowNavTab;
@@ -16,26 +14,27 @@ export type MixingNavTab = UserWorkflowNavTab;
 type MixingCardNavigationProps = {
   sectionTitle: string;
   sectionHint: string;
-  /** Optional override; defaults to the active tab label (e.g. Premix 1). */
+  /** Optional override; kept for call-site compatibility (unused after pager removal). */
   counterLabel?: string;
   tabs: MixingNavTab[];
   activeIndex: number;
   onActiveIndexChange: (index: number) => void;
+  isTabDisabled?: (tab: MixingNavTab, index: number) => boolean;
+  tabTooltip?: (tab: MixingNavTab, index: number) => string | undefined;
   children: ReactNode;
 };
 
 const MixingCardNavigation = ({
   sectionTitle,
   sectionHint,
-  counterLabel,
   tabs,
   activeIndex,
   onActiveIndexChange,
+  isTabDisabled,
+  tabTooltip,
   children,
 }: MixingCardNavigationProps) => {
   const safeIndex = Math.min(Math.max(activeIndex, 0), Math.max(tabs.length - 1, 0));
-  const activeTabLabel = tabs[safeIndex]?.label?.trim() || "";
-  const resolvedCounter = counterLabel?.trim() || activeTabLabel;
   const palette = {
     primary: BRAND.mx,
     primaryLight: BRAND.mxLight,
@@ -45,21 +44,23 @@ const MixingCardNavigation = ({
     text: BRAND.text,
   };
 
+  const enabledIndexes = tabs
+    .map((_, index) => index)
+    .filter((index) => !(isTabDisabled?.(tabs[index], index) ?? false));
+  const enabledPos = enabledIndexes.indexOf(safeIndex);
+
+  const goToEnabled = (direction: -1 | 1) => {
+    if (enabledIndexes.length === 0) return;
+    const currentPos = Math.max(0, enabledPos);
+    const nextPos = Math.min(
+      enabledIndexes.length - 1,
+      Math.max(0, currentPos + direction),
+    );
+    onActiveIndexChange(enabledIndexes[nextPos]);
+  };
+
   return (
     <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
-      <UserWorkflowStepPager
-        current={safeIndex + 1}
-        total={tabs.length}
-        counterLabel={resolvedCounter}
-        backLabel={S.NAV_BACK}
-        nextLabel={S.NAV_NEXT}
-        onBack={() => onActiveIndexChange(Math.max(0, safeIndex - 1))}
-        onNext={() => onActiveIndexChange(Math.min(tabs.length - 1, safeIndex + 1))}
-        disableBack={safeIndex <= 0}
-        disableNext={safeIndex >= tabs.length - 1}
-        palette={palette}
-      />
-
       <UserWorkflowNavPanel palette={palette}>
         <UserWorkflowTabNav
           title={sectionTitle}
@@ -68,6 +69,13 @@ const MixingCardNavigation = ({
           activeIndex={safeIndex}
           onActiveIndexChange={onActiveIndexChange}
           palette={palette}
+          showStepArrows
+          onStepBack={() => goToEnabled(-1)}
+          onStepNext={() => goToEnabled(1)}
+          disableStepBack={enabledPos <= 0}
+          disableStepNext={enabledPos < 0 || enabledPos >= enabledIndexes.length - 1}
+          isTabDisabled={isTabDisabled}
+          tabTooltip={tabTooltip}
         />
       </UserWorkflowNavPanel>
 

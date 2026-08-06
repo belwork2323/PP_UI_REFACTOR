@@ -227,7 +227,7 @@ const RawMaterialLotDetailsView = ({
                               </TableCell>
                               <TableCell sx={rmTheme.tableCell}>
                                 <Typography sx={rmTheme.remarksText}>
-                                  {specRow.remarks || "—"}
+                                  {specRow.acemQcResult || "—"}
                                 </Typography>
                               </TableCell>
                               <TableCell sx={rmTheme.tableCell}>

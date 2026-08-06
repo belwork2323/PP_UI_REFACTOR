@@ -6,7 +6,9 @@ import { APPROVER_STATUS_META } from "../../../../app/theme/approver";
 import useCastingAndCuringApproverHook from "../../../../hooks/approver/manufacturing/useCastingAndCuringApproverHook";
 import ApproverSubdepartmentBatchListSection from "../components/ApproverSubdepartmentBatchListSection";
 import ApproverActionDialog from "../../../components/custom/ApproverActionDialog";
-import CastingAndCuringApproverDetailDialog from "./CastingAndCuringApproverDetailDialog";
+import CastingAndCuringApproverDetailDialog, {
+  type CastingAndCuringApproverDetailItem,
+} from "./CastingAndCuringApproverDetailDialog";
 
 const BRAND = {
   primary: "#1B4F72",
@@ -27,12 +29,17 @@ const CastingAndCuringApproverPage = () => {
     items,
     selected,
     detailsLoading,
-    detailView,
+    activeMotorId,
     dialogProps,
+    formDialogProps,
+    actionLoading,
     requestApprove,
     requestReject,
+    requestFormApprove,
+    requestFormReject,
     handleViewDetails,
     handleCloseDetail,
+    handleActiveMotorChange,
   } = useCastingAndCuringApproverHook();
 
   return (
@@ -55,14 +62,19 @@ const CastingAndCuringApproverPage = () => {
       <CastingAndCuringApproverDetailDialog
         open={!!selected}
         onClose={handleCloseDetail}
-        item={selected}
-        detailView={detailView}
+        item={selected as CastingAndCuringApproverDetailItem | null}
         loading={detailsLoading}
+        activeMotorId={activeMotorId}
+        onActiveMotorChange={handleActiveMotorChange}
         onApprove={requestApprove}
         onReject={requestReject}
+        onApproveForm={requestFormApprove}
+        onRejectForm={requestFormReject}
+        actionLoading={actionLoading}
         theme={approverTheme}
       />
       <ApproverActionDialog {...dialogProps} />
+      <ApproverActionDialog {...formDialogProps} />
     </ApproverSubdepartmentBatchListSection>
   );
 };

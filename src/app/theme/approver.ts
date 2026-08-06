@@ -93,6 +93,11 @@ export const APPROVER_STATUS_META: ApproverStatusMeta = {
   FINAL_APPROVAL_COMPLETED: APPROVED_META,
   [OPERATION_STATUS.REJECTED]: REJECTED_META,
   REJECTED: REJECTED_META,
+  "Status Unavailable": {
+    bg: alpha("#5D6D7E", 0.08),
+    color: "#2E4053",
+    border: alpha("#5D6D7E", 0.2),
+  },
 };
 
 export const APPROVER_PRIORITY_META: ApproverStatusMeta = {
@@ -224,14 +229,17 @@ export const getApproverBrand = (
 
 export const isApproverActionableStatus = (status?: string | null) => {
   const normalized = String(status ?? "").trim();
+  const upper = normalized.toUpperCase().replace(/\s+/g, "_");
   return (
     normalized === "Pending" ||
+    normalized === OPERATION_STATUS.IN_PROGRESS ||
+    upper === "IN_PROGRESS" ||
     normalized === OPERATION_STATUS.WAITING_FOR_APPROVAL ||
     normalized === OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL ||
     normalized === OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL ||
-    normalized === "WAITING_FOR_APPROVAL" ||
-    normalized === "WAITING_FOR_PARTIAL_APPROVAL" ||
-    normalized === "WAITING_FOR_COMPLETE_APPROVAL"
+    upper === "WAITING_FOR_APPROVAL" ||
+    upper === "WAITING_FOR_PARTIAL_APPROVAL" ||
+    upper === "WAITING_FOR_COMPLETE_APPROVAL"
   );
 };
 

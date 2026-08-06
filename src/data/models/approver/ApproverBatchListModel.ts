@@ -6,7 +6,12 @@ import {
   type OperationStatus,
 } from "../../../hooks/operationStatus";
 import { motorStageForApi, normalizeMotorStage } from "../admin/BatchManagement/BatchManagementModel";
-import { batchTypeFilterToApiValue, SUBDEPT_STATUS_FIELD } from "../user/SubdepartmentBatchModel";
+import {
+  BATCH_STATUS_UNAVAILABLE,
+  batchTypeFilterToApiValue,
+  resolveWorkflowStatusFromBatchStages,
+  SUBDEPT_STATUS_FIELD,
+} from "../user/SubdepartmentBatchModel";
 
 /** API status values returned by POST /approver/subdepartment/batch-list */
 export const APPROVER_BATCH_STATUS = {
@@ -61,6 +66,7 @@ const LABEL_TO_API = Object.fromEntries(
 export function normalizeApproverBatchStatus(status: unknown): string {
   const raw = String(status ?? "").trim();
   if (!raw) return OPERATION_STATUS.TO_BE_INITIATED;
+  if (raw === BATCH_STATUS_UNAVAILABLE) return BATCH_STATUS_UNAVAILABLE;
 
   if (raw in LABEL_TO_API) {
     // Batch lists do not use a distinct WAITING_FOR_APPROVAL stage — fold complete-approval alias.
@@ -385,7 +391,18 @@ export function approverRowMatchesSearchQuery(
   });
 }
 
-const resolveRawBatchStatus = (batch: Record<string, unknown>) => {
+const resolveRawBatchStatus = (
+  batch: Record<string, unknown>,
+  subDepartmentId?: number | null,
+) => {
+  const stageResolution = resolveWorkflowStatusFromBatchStages(batch, subDepartmentId);
+  if (
+    stageResolution.status != null &&
+    String(stageResolution.status).trim()
+  ) {
+    return stageResolution.status;
+  }
+
   const direct = batch.status;
   if (direct != null && String(direct).trim()) {
     return direct;
@@ -418,7 +435,10 @@ export function resolveApproverRowStatus(
   return String(row.status ?? "").trim();
 }
 
-export function mapApproverBatchListRow(batch: Record<string, unknown>) {
+export function mapApproverBatchListRow(
+  batch: Record<string, unknown>,
+  subDepartmentId?: number | null,
+) {
   const assignedTo = resolveAssignedTo(batch);
   const createdBy = resolveCreatedBy(batch);
   const formSubmittedBy = resolveFormSubmittedBy(batch);
@@ -426,7 +446,10 @@ export function mapApproverBatchListRow(batch: Record<string, unknown>) {
   const submittedBy = String(
     batch.submittedBy ?? formSubmittedBy?.fullName ?? formSubmittedBy?.id ?? "",
   ).trim();
-  const workflowStatus = normalizeApproverBatchStatus(resolveRawBatchStatus(batch));
+  const stageResolution = resolveWorkflowStatusFromBatchStages(batch, subDepartmentId);
+  const workflowStatus = normalizeApproverBatchStatus(
+    resolveRawBatchStatus(batch, subDepartmentId),
+  );
   const motorStage = normalizeMotorStage(batch.motorStage ?? batch.motorType);
   const statusMirrors = buildSubdepartmentStatusMirrors(workflowStatus);
 
@@ -448,7 +471,9 @@ export function mapApproverBatchListRow(batch: Record<string, unknown>) {
     systemManager,
     submittedBy: submittedBy || "NA",
     createdOn: batch.createdOn,
-    rejectionReason: batch.rejectionReason ?? null,
+    rejectionReason:
+      stageResolution.rejectionReason ??
+      (batch.rejectionReason != null ? String(batch.rejectionReason) : null),
     status: workflowStatus,
     statusApi: toApproverBatchListApiStatus(workflowStatus) ?? undefined,
   };

@@ -24,10 +24,10 @@ import {
   type CasePrepDetailSection,
   type CasePrepDetailTable,
 } from "../../../../../../data/models/user/CasePreparationFormModel";
-import { orderCastingCuringDisplayColumns } from "../../../../../../data/models/user/CastingCuringFormModel";
-import type {
-  PostCureDetailView,
-  PostCureMotorDetailView,
+import {
+  orderPostCureDisplayColumns,
+  type PostCureDetailView,
+  type PostCureMotorDetailView,
 } from "../../../../../../data/models/user/PostCureFormModel";
 import { OPERATION_STATUS_UI_TO_API } from "../../../../../../hooks/operationStatus";
 
@@ -94,7 +94,7 @@ const FieldsTable = ({
 };
 
 const DataTable = ({ table, dt }: { table: CasePrepDetailTable; dt: PostCureDetailsTheme }) => {
-  const columns = orderCastingCuringDisplayColumns(Object.keys(table.columnLabels));
+  const columns = orderPostCureDisplayColumns(Object.keys(table.columnLabels));
   if (!columns.length || !table.rows.length) return null;
 
   return (
@@ -164,7 +164,7 @@ const SectionPanel = ({
   </Box>
 );
 
-const MotorDetailPanel = ({
+export const MotorDetailPanel = ({
   motor,
   dt,
   palette,

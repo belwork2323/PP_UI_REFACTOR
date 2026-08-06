@@ -405,7 +405,10 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
       if (response.success && data) {
         const nextBatches = (Array.isArray(data.batches) ? data.batches : []).map(
           (batch: Record<string, unknown>) =>
-            mapApproverBatchListRow(batch) as ApproverBatchSummary,
+            mapApproverBatchListRow(
+              batch,
+              selectedSubDepartment.subDepartmentId,
+            ) as ApproverBatchSummary,
         );
         const resolvedPagination = resolveSubdepartmentBatchPagination(
           data.pagination as Record<string, unknown> | undefined,

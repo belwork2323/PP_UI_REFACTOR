@@ -1,7 +1,6 @@
+import React, { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import {
   Box,
-  Button,
-  IconButton,
   MenuItem,
   Stack,
   Table,
@@ -12,27 +11,113 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
-import AddRoundedIcon from "@mui/icons-material/AddRounded";
-import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import InfoOutlinedIcon from "@mui/icons-material/InfoOutlined";
 import FormInput from "../../../../components/common/FormInput";
+import DateField from "../../../../components/common/DateField";
+import {
+  APP_CONTROL_FONT_SIZE,
+  appDropdownMenuProps,
+  appDropdownPlaceholderSx,
+} from "../../../../components/common/fieldStyles";
 import { STRINGS } from "../../../../../app/config/strings";
+import { formatToUiDate } from "../../../../../utils/dateUtils";
 import { SUBSCALE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/subscale_theme";
 import {
   SUBSCALE_BATCH_FIELDS,
-  SUBSCALE_MIXER_BLDG_OPTIONS,
-  SUBSCALE_MOTOR_STAGE_OPTIONS,
-  buildSubscaleProcessParticulars,
-  createSubscaleMixingCycleEntry,
-  isSubscaleGeneralBatchComplete,
   mergeSubscaleBatchFormValues,
   normalizeSubscaleMixingCycles,
+  resolveMixingCycleOperations,
+  mergeProcessParticularsWithOperations,
   type SubscaleMixingCycleEntry,
-  type SubscaleProcessParticularRow,
+  type ProcessParticularRow,
 } from "../../../../../hooks/user/manufacturing/subscaleBatchConfig";
 import type { SchemaFormValues } from "../../../../../schema-engine";
-import SubscaleHardwareArticlePanel from "./SubscaleHardwareArticlePanel";
-import { sectionCardSx, sectionHeaderSx } from "./SubscaleHardwareArticlePanel";
+import SubscaleHardwareArticlePanel, {
+  sectionCardSx,
+  sectionHeaderSx,
+} from "./SubscaleHardwareArticlePanel";
+import {
+  fetchMixingCycleDetailsApi,
+  type MixingCycleMasterItem,
+} from "@/data/api/common/generalAPI";
+import { generalController } from "@/controllers/admin/common/generalController";
+import { operationsController } from "@/controllers/user/operationsController";
+import { isSubscaleProcessingBatch } from "@/hooks/user/manufacturing/subscaleHardwareConfig";
+
+type MotorStageOption = {
+  motorStage: string;
+  noOfmotors: number;
+};
+
+/** Survives Strict Mode remounts — avoids duplicate network calls for the same lookup key. */
+const motorStagesRequestByKey = new Map<string, Promise<MotorStageOption[]>>();
+const mixingCyclesByStageCache = new Map<string, MixingCycleMasterItem[]>();
+const mixingCyclesByStageRequest = new Map<string, Promise<MixingCycleMasterItem[]>>();
+const mixingCycleDetailsRequest = new Map<string, Promise<unknown>>();
+
+const hasMixingCycleParticulars = (cycle?: SubscaleMixingCycleEntry) =>
+  (cycle?.premixParticulars?.length ?? 0) > 0 ||
+  (cycle?.finalMixParticulars?.length ?? 0) > 0 ||
+  (cycle?.processParticulars?.length ?? 0) > 0;
+
+const fetchMotorStagesDeduped = async (projectId?: string): Promise<MotorStageOption[]> => {
+  const key = projectId?.trim() || "__all__";
+  let pending = motorStagesRequestByKey.get(key);
+  if (!pending) {
+    pending = (async () => {
+      const response = await operationsController.fetchMotorsStageList(
+        projectId ? { projectId } : undefined,
+      );
+      const stages = response?.success && response.data?.stages ? response.data.stages : [];
+      return stages
+        .map((stage) => ({
+          motorStage: String(stage.motorStage ?? "").trim(),
+          noOfmotors: Number(stage.noOfmotors ?? 0),
+        }))
+        .filter((stage) => stage.motorStage);
+    })();
+    motorStagesRequestByKey.set(key, pending);
+  }
+  return pending;
+};
+
+const fetchMixingCyclesForStageDeduped = async (
+  motorStage: string,
+): Promise<MixingCycleMasterItem[]> => {
+  const stage = String(motorStage ?? "").trim();
+  if (!stage) return [];
+
+  const cached = mixingCyclesByStageCache.get(stage);
+  if (cached) return cached;
+
+  let pending = mixingCyclesByStageRequest.get(stage);
+  if (!pending) {
+    pending = (async () => {
+      const response = await generalController.getMixingCycles(stage);
+      return response?.success && Array.isArray(response.data)
+        ? (response.data as MixingCycleMasterItem[])
+        : [];
+    })();
+    mixingCyclesByStageRequest.set(stage, pending);
+  }
+
+  const list = await pending;
+  mixingCyclesByStageCache.set(stage, list);
+  return list;
+};
+
+const fetchMixingCycleDetailsDeduped = async (mixingCycleCode: string) => {
+  const code = String(mixingCycleCode ?? "").trim();
+  if (!code) return null;
+
+  let pending = mixingCycleDetailsRequest.get(code);
+  if (!pending) {
+    pending = fetchMixingCycleDetailsApi(code);
+    mixingCycleDetailsRequest.set(code, pending);
+  }
+
+  const response = await pending;
+  return (response as { data?: unknown })?.data ?? response;
+};
 
 const S = STRINGS.MANUFACTURING.SUBSCALE.BATCH_SETUP;
 const PROCESS_S = STRINGS.MANUFACTURING.MIXING;
@@ -40,66 +125,460 @@ const PROCESS_S = STRINGS.MANUFACTURING.MIXING;
 type SubscaleSubscaleBatchPanelProps = {
   values: SchemaFormValues;
   onChange: (values: SchemaFormValues) => void;
+  batchDetails: any;
+  actionLoading?: boolean;
+  isEditMode?: boolean;
+  onRequestSaveDraft?: () => void;
+  onRequestSubmit?: () => void;
 };
 
-const SubscaleSubscaleBatchPanel = ({ values, onChange }: SubscaleSubscaleBatchPanelProps) => {
-  const generalComplete = isSubscaleGeneralBatchComplete(values);
+const normalizeSubBatchType = (value: unknown) =>
+  String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+
+const isExperimentalSubscaleBatch = (batchDetails: any) => {
+  const batchType = batchDetails?.batchType ?? batchDetails?.batch_type;
+  const subBatchType =
+    batchDetails?.subBatchType ?? batchDetails?.sub_batch_type ?? batchDetails?.subBatchTypeCode;
+  return (
+    isSubscaleProcessingBatch(batchType) && normalizeSubBatchType(subBatchType) === "EXPERIMENTAL"
+  );
+};
+
+const formatMixingCycleLabel = (cycle: { mixingCycleName?: string; mixingCycleCode?: string }) => {
+  const name = String(cycle.mixingCycleName ?? "").trim();
+  const code = String(cycle.mixingCycleCode ?? "").trim();
+  if (name && code && name !== code) return `${name} (${code})`;
+  return name || code || "";
+};
+
+const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
+  values,
+  onChange,
+  batchDetails,
+  actionLoading,
+  isEditMode,
+  onRequestSaveDraft,
+  onRequestSubmit,
+}) => {
   const mixingCycles = normalizeSubscaleMixingCycles(values[SUBSCALE_BATCH_FIELDS.MIXING_CYCLES]);
+  const isExperimental = isExperimentalSubscaleBatch(batchDetails);
+  const batchType = batchDetails?.batchType ?? batchDetails?.batch_type ?? null;
+
+  const [motorStageOptions, setMotorStageOptions] = useState<MotorStageOption[]>([]);
+  const [motorStagesLoading, setMotorStagesLoading] = useState(false);
+  const [mixingCycleOptionsByStage, setMixingCycleOptionsByStage] = useState<
+    Record<string, MixingCycleMasterItem[]>
+  >({});
+  const [mixingCyclesLoadingByStage, setMixingCyclesLoadingByStage] = useState<
+    Record<string, boolean>
+  >({});
 
   const patchValues = (patch: SchemaFormValues) => {
     onChange(mergeSubscaleBatchFormValues({ ...values, ...patch }));
   };
 
-  const updateMixingCycles = (cycles: SubscaleMixingCycleEntry[]) => {
-    patchValues({ [SUBSCALE_BATCH_FIELDS.MIXING_CYCLES]: cycles });
+  const updateMixingCycles = useCallback(
+    (cycles: SubscaleMixingCycleEntry[]) => {
+      patchValues({ [SUBSCALE_BATCH_FIELDS.MIXING_CYCLES]: cycles });
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- patchValues closes over latest values
+    [values, onChange],
+  );
+
+  // Sync batchDetails defaults into values on initial load if not present
+  useEffect(() => {
+    if (!batchDetails?.identificationSheet) return;
+    const sheet = batchDetails.identificationSheet;
+    const batchSize = sheet.batchSize;
+    const mixerType = sheet.mixerType;
+    const bldgNo = sheet.BldgNo ?? sheet.bldgNo ?? "";
+
+    const nextBatchSize = String(values[SUBSCALE_BATCH_FIELDS.BATCH_SIZE] ?? "").trim();
+    const nextMixerType = String(values.mixerType ?? "").trim();
+    const nextBldg = String(values[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO] ?? "").trim();
+
+    patchValues({
+      [SUBSCALE_BATCH_FIELDS.BATCH_SIZE]: nextBatchSize || batchSize || "",
+      mixerType: nextMixerType || mixerType || "",
+      [SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO]: nextBldg || bldgNo || "",
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [batchDetails]);
+
+  // Seed cycle stage/code from batch mixingCycle when empty (qualification + experimental prefill)
+  useEffect(() => {
+    const batchCycle = batchDetails?.mixingCycle;
+    if (!batchCycle) return;
+
+    const stageFromBatch = String(batchCycle.motorStage ?? "").trim();
+    const codeFromBatch = String(batchCycle.mixingCycleCode ?? "").trim();
+    const nameFromBatch = String(batchCycle.mixingCycleName ?? "").trim();
+    if (!stageFromBatch && !codeFromBatch) return;
+
+    const needsSeed = mixingCycles.some(
+      (cycle) => !String(cycle.stage ?? "").trim() || !String(cycle.mixingCycleCode ?? "").trim(),
+    );
+    if (!needsSeed) return;
+
+    updateMixingCycles(
+      mixingCycles.map((cycle) => ({
+        ...cycle,
+        stage: String(cycle.stage ?? "").trim() || stageFromBatch,
+        mixingCycleCode: String(cycle.mixingCycleCode ?? "").trim() || codeFromBatch,
+        mixingCycleName: String(cycle.mixingCycleName ?? "").trim() || nameFromBatch,
+        mixingCycleId: cycle.mixingCycleId ?? batchCycle.id ?? batchCycle.mixingCycleId ?? null,
+      })),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [batchDetails?.mixingCycle?.mixingCycleCode, batchDetails?.mixingCycle?.motorStage]);
+
+  // Load motor stages for Experimental dropdowns (once batchDetails is available)
+  useEffect(() => {
+    if (!isExperimental || !batchDetails) return;
+    let cancelled = false;
+
+    const loadStages = async () => {
+      setMotorStagesLoading(true);
+      try {
+        const projectId = String(
+          batchDetails?.projectId ?? batchDetails?.project?.projectId ?? "",
+        ).trim();
+        const stages = await fetchMotorStagesDeduped(projectId || undefined);
+        if (!cancelled) setMotorStageOptions(stages);
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to fetch motor stages:", error);
+          setMotorStageOptions([]);
+        }
+      } finally {
+        if (!cancelled) setMotorStagesLoading(false);
+      }
+    };
+
+    void loadStages();
+    return () => {
+      cancelled = true;
+    };
+  }, [isExperimental, batchDetails]);
+
+  const fetchMixingCyclesForStage = useCallback(
+    async (motorStage: string) => {
+      const stage = String(motorStage ?? "").trim();
+      if (!stage) return;
+
+      if (mixingCycleOptionsByStage[stage]?.length || mixingCyclesLoadingByStage[stage]) return;
+
+      setMixingCyclesLoadingByStage((prev) => ({ ...prev, [stage]: true }));
+      try {
+        const list = await fetchMixingCyclesForStageDeduped(stage);
+        setMixingCycleOptionsByStage((prev) => ({ ...prev, [stage]: list }));
+      } catch (error) {
+        console.error("Failed to fetch mixing cycles:", error);
+        setMixingCycleOptionsByStage((prev) => ({ ...prev, [stage]: [] }));
+      } finally {
+        setMixingCyclesLoadingByStage((prev) => ({ ...prev, [stage]: false }));
+      }
+    },
+    [mixingCycleOptionsByStage, mixingCyclesLoadingByStage],
+  );
+
+  // Prefetch mixing cycles for stages already selected on Experimental cycles
+  useEffect(() => {
+    if (!isExperimental) return;
+    const stages = Array.from(
+      new Set(mixingCycles.map((cycle) => String(cycle.stage ?? "").trim()).filter(Boolean)),
+    );
+    stages.forEach((stage) => {
+      if (mixingCycleOptionsByStage[stage]?.length || mixingCyclesLoadingByStage[stage]) return;
+
+      const cached = mixingCyclesByStageCache.get(stage);
+      if (cached) {
+        setMixingCycleOptionsByStage((prev) =>
+          prev[stage]?.length ? prev : { ...prev, [stage]: cached },
+        );
+        return;
+      }
+
+      void fetchMixingCyclesForStage(stage);
+    });
+  }, [
+    isExperimental,
+    mixingCycles,
+    mixingCycleOptionsByStage,
+    mixingCyclesLoadingByStage,
+    fetchMixingCyclesForStage,
+  ]);
+
+  const applyMixingCycleDetails = useCallback(
+    async (cycleIndex: number, mixingCycleCode: string, motorStage?: string) => {
+      const code = String(mixingCycleCode ?? "").trim();
+      if (!code) return;
+
+      const currentCycles = normalizeSubscaleMixingCycles(
+        values[SUBSCALE_BATCH_FIELDS.MIXING_CYCLES],
+      );
+      const currentCycle = currentCycles[cycleIndex];
+      if (hasMixingCycleParticulars(currentCycle)) return;
+
+      try {
+        const resData = await fetchMixingCycleDetailsDeduped(code);
+        if (!resData || typeof resData !== "object") return;
+
+        const { premixOperations, finalMixOperations } = resolveMixingCycleOperations(
+          resData as Record<string, unknown>,
+        );
+        const next = currentCycles.map((cycle, index) => {
+          if (index !== cycleIndex) return cycle;
+          const currentPremix = cycle.premixParticulars || cycle.processParticulars || [];
+          const currentFinal = cycle.finalMixParticulars || [];
+          const cycleData = resData as Record<string, unknown>;
+          return {
+            ...cycle,
+            stage:
+              String(motorStage ?? cycle.stage ?? "").trim() ||
+              String(cycleData.motorStage ?? "").trim(),
+            mixingCycleCode: code,
+            mixingCycleName:
+              String(cycle.mixingCycleName ?? "").trim() ||
+              String(cycleData.mixingCycleName ?? "").trim(),
+            premixParticulars: mergeProcessParticularsWithOperations(
+              premixOperations,
+              currentPremix,
+            ),
+            finalMixParticulars: mergeProcessParticularsWithOperations(
+              finalMixOperations,
+              currentFinal,
+            ),
+          };
+        });
+        updateMixingCycles(next);
+      } catch (error) {
+        console.error("Failed to fetch mixing cycle details:", error);
+      }
+    },
+    [updateMixingCycles, values],
+  );
+
+  // Qualification: load particulars from batch mixing cycle only when form has none yet
+  useEffect(() => {
+    if (isExperimental) return;
+
+    const cycle = mixingCycles[0];
+    if (hasMixingCycleParticulars(cycle)) return;
+
+    const cycleCode = String(
+      cycle?.mixingCycleCode ?? batchDetails?.mixingCycle?.mixingCycleCode ?? "",
+    ).trim();
+    if (!cycleCode) return;
+
+    void applyMixingCycleDetails(
+      0,
+      cycleCode,
+      String(cycle?.stage ?? batchDetails?.mixingCycle?.motorStage ?? ""),
+    );
+  }, [
+    isExperimental,
+    mixingCycles[0]?.mixingCycleCode,
+    mixingCycles[0]?.premixParticulars?.length,
+    mixingCycles[0]?.finalMixParticulars?.length,
+    batchDetails?.mixingCycle?.mixingCycleCode,
+    applyMixingCycleDetails,
+  ]);
+
+  // Experimental: load particulars when a cycle code is set but rows are still empty
+  const mixingCycleFetchKey = mixingCycles
+    .map(
+      (cycle) =>
+        `${cycle.mixingCycleCode ?? ""}:${hasMixingCycleParticulars(cycle) ? "loaded" : "pending"}`,
+    )
+    .join("|");
+
+  useEffect(() => {
+    if (!isExperimental) return;
+    mixingCycles.forEach((cycle, index) => {
+      const code = String(cycle.mixingCycleCode ?? "").trim();
+      if (!code || hasMixingCycleParticulars(cycle)) return;
+      void applyMixingCycleDetails(index, code, cycle.stage);
+    });
+  }, [isExperimental, mixingCycleFetchKey, applyMixingCycleDetails]);
+
+  const handleMotorStageChange = (cycleIndex: number, motorStage: string) => {
+    const stage = String(motorStage ?? "").trim();
+    const next = mixingCycles.map((cycle, index) => {
+      if (index !== cycleIndex) return cycle;
+      return {
+        ...cycle,
+        stage,
+        mixingCycleCode: "",
+        mixingCycleName: "",
+        mixingCycleId: null,
+        premixParticulars: [],
+        finalMixParticulars: [],
+        processParticulars: [],
+      };
+    });
+    updateMixingCycles(next);
+    if (stage) void fetchMixingCyclesForStage(stage);
   };
 
-  const updateCycleStage = (index: number, stage: string) => {
-    const next = mixingCycles.map((cycle, cycleIndex) =>
-      cycleIndex === index
-        ? { ...cycle, stage, processParticulars: buildSubscaleProcessParticulars(stage) }
-        : cycle,
-    );
+  const handleMixingCycleChange = (cycleIndex: number, mixingCycleCode: string) => {
+    const code = String(mixingCycleCode ?? "").trim();
+    const stage = String(mixingCycles[cycleIndex]?.stage ?? "").trim();
+    const options = mixingCycleOptionsByStage[stage] ?? [];
+    const selected = options.find((item) => item.mixingCycleCode === code);
+
+    const next = mixingCycles.map((cycle, index) => {
+      if (index !== cycleIndex) return cycle;
+      return {
+        ...cycle,
+        mixingCycleCode: code,
+        mixingCycleName: selected?.mixingCycleName ?? "",
+        mixingCycleId: selected?.mixingCycleId ?? null,
+        premixParticulars: [],
+        finalMixParticulars: [],
+        processParticulars: [],
+      };
+    });
     updateMixingCycles(next);
+    if (code) void applyMixingCycleDetails(cycleIndex, code, stage);
   };
 
   const updateProcessField = (
     cycleIndex: number,
+    sectionKey: "premixParticulars" | "finalMixParticulars",
     rowIndex: number,
-    field: keyof SubscaleProcessParticularRow,
+    field: keyof ProcessParticularRow,
     raw: string,
   ) => {
     const next = mixingCycles.map((cycle, index) => {
       if (index !== cycleIndex) return cycle;
-      const processParticulars = cycle.processParticulars.map((row, rIndex) =>
+      const rows = (cycle[sectionKey] || []).map((row, rIndex) =>
         rIndex === rowIndex ? { ...row, [field]: raw } : row,
       );
-      return { ...cycle, processParticulars };
+      return { ...cycle, [sectionKey]: rows };
     });
     updateMixingCycles(next);
   };
 
-  const addMixingCycle = () => {
-    updateMixingCycles([
-      ...mixingCycles,
-      createSubscaleMixingCycleEntry(mixingCycles.length + 1),
-    ]);
-  };
+  const qualificationStageLabel = useMemo(() => {
+    const stage = mixingCycles[0]?.stage || batchDetails?.mixingCycle?.motorStage;
+    return stage !== undefined && stage !== null && String(stage).trim() !== ""
+      ? `Motor Stage ${stage}`
+      : "";
+  }, [mixingCycles, batchDetails?.mixingCycle?.motorStage]);
 
-  const removeMixingCycle = (index: number) => {
-    if (mixingCycles.length <= 1) return;
-    updateMixingCycles(mixingCycles.filter((_, cycleIndex) => cycleIndex !== index));
-  };
+  const qualificationCycleLabel = useMemo(() => {
+    const fromCycle = mixingCycles[0];
+    if (fromCycle?.mixingCycleCode || fromCycle?.mixingCycleName) {
+      return formatMixingCycleLabel(fromCycle);
+    }
+    return formatMixingCycleLabel(batchDetails?.mixingCycle ?? {});
+  }, [mixingCycles, batchDetails?.mixingCycle]);
+
+  const renderParticularsTable = (
+    title: string,
+    rows: ProcessParticularRow[] = [],
+    cycleIndex: number,
+    sectionKey: "premixParticulars" | "finalMixParticulars",
+  ) => (
+    <Box sx={{ mb: 2.5 }}>
+      <Typography
+        sx={{
+          fontWeight: 700,
+          fontSize: "0.78rem",
+          color: SUBSCALE_BRAND.text,
+          mb: 1,
+          letterSpacing: "0.01em",
+        }}
+      >
+        {title}
+      </Typography>
+      <TableContainer sx={{ border: `1px solid ${SUBSCALE_BRAND.border}`, borderRadius: 1.5 }}>
+        <Table size="small">
+          <TableHead>
+            <TableRow sx={{ background: "rgba(21,101,192,0.08)" }}>
+              <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem" }}>
+                {PROCESS_S.COL_OPERATION}
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", width: "18%" }}>
+                {PROCESS_S.COL_ROTATION}
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", width: "18%" }}>
+                {PROCESS_S.COL_TIME}
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", width: "18%" }}>
+                {PROCESS_S.COL_TEMP}
+              </TableCell>
+              <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", width: "18%" }}>
+                {PROCESS_S.COL_VACUUM}
+              </TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {rows.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={5}>
+                  <Typography
+                    sx={{
+                      fontSize: "0.75rem",
+                      color: SUBSCALE_BRAND.textSub,
+                      py: 1.5,
+                      textAlign: "center",
+                    }}
+                  >
+                    {S.PROCESS_PARTICULARS_EMPTY}
+                  </Typography>
+                </TableCell>
+              </TableRow>
+            ) : (
+              rows.map((row, rowIndex) => (
+                <TableRow key={`${sectionKey}-${row.operationId}-${rowIndex}`}>
+                  <TableCell sx={{ fontSize: "0.78rem", fontWeight: 600 }}>
+                    {row.operation}
+                  </TableCell>
+                  {(
+                    [
+                      ["rpm", "RPM"],
+                      ["time", "Time"],
+                      ["temp", "Temp"],
+                      ["vacuum", "Vacuum"],
+                    ] as const
+                  ).map(([field, placeholder]) => (
+                    <TableCell key={field}>
+                      <FormInput
+                        value={row[field] ?? ""}
+                        placeholder={placeholder}
+                        onChange={(event) =>
+                          updateProcessField(
+                            cycleIndex,
+                            sectionKey,
+                            rowIndex,
+                            field,
+                            event.target.value,
+                          )
+                        }
+                      />
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </TableContainer>
+    </Box>
+  );
 
   return (
-    <Stack spacing={2.5} sx={{ mb: 3 }}>
+    <Stack spacing={3}>
       <Box sx={sectionCardSx}>
         <Box sx={sectionHeaderSx}>
-          <InfoOutlinedIcon sx={{ fontSize: 18 }} />
-          <Typography sx={{ fontWeight: 800, fontSize: "0.85rem", letterSpacing: "0.02em" }}>
-            {S.GENERAL_TITLE}
-          </Typography>
+          <Typography sx={{ fontWeight: 700, fontSize: "0.8rem" }}>{S.GENERAL_TITLE}</Typography>
         </Box>
+
         <Box
           sx={{
             p: 2,
@@ -109,186 +588,208 @@ const SubscaleSubscaleBatchPanel = ({ values, onChange }: SubscaleSubscaleBatchP
           }}
         >
           <FormInput
+            disabled
             label={S.BATCH_SIZE}
             type="number"
-            value={values[SUBSCALE_BATCH_FIELDS.BATCH_SIZE] ?? ""}
-            onChange={(event) => patchValues({ [SUBSCALE_BATCH_FIELDS.BATCH_SIZE]: event.target.value })}
+            value={
+              values[SUBSCALE_BATCH_FIELDS.BATCH_SIZE] ||
+              batchDetails?.identificationSheet?.batchSize ||
+              ""
+            }
           />
+
           <FormInput
-            select
+            disabled
+            label="Mixer Type"
+            value={values.mixerType || batchDetails?.identificationSheet?.mixerType || ""}
+          />
+
+          <FormInput
+            disabled
             label={S.MIXER_BLDG_NO}
-            value={values[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO] ?? ""}
-            onChange={(event) =>
-              patchValues({ [SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO]: event.target.value })
-            }
-          >
-            <MenuItem value="">—</MenuItem>
-            {SUBSCALE_MIXER_BLDG_OPTIONS.map((option) => (
-              <MenuItem key={option} value={option}>
-                {option}
-              </MenuItem>
-            ))}
-          </FormInput>
-          <FormInput
-            label={S.PREMIX_DATE}
-            type="date"
-            InputLabelProps={{ shrink: true }}
-            value={values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ?? ""}
-            onChange={(event) =>
-              patchValues({ [SUBSCALE_BATCH_FIELDS.PREMIX_DATE]: event.target.value })
+            value={
+              values[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO] ||
+              batchDetails?.identificationSheet?.BldgNo ||
+              batchDetails?.identificationSheet?.bldgNo ||
+              ""
             }
           />
-          <FormInput
+
+          <DateField
+            label={S.PREMIX_DATE}
+            value={formatToUiDate(String(values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ?? ""))}
+            onChange={(next) => patchValues({ [SUBSCALE_BATCH_FIELDS.PREMIX_DATE]: next })}
+            placeholder="DD-MM-YYYY"
+          />
+
+          <DateField
             label={S.FINAL_MIX_DATE}
-            type="date"
-            InputLabelProps={{ shrink: true }}
-            value={values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] ?? ""}
-            onChange={(event) =>
-              patchValues({ [SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE]: event.target.value })
-            }
+            value={formatToUiDate(String(values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] ?? ""))}
+            onChange={(next) => patchValues({ [SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE]: next })}
+            placeholder="DD-MM-YYYY"
           />
         </Box>
 
         <Box sx={{ px: 2, pb: 2 }}>
           <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
             <Box>
-              <Typography sx={{ fontWeight: 700, fontSize: "0.82rem", color: SUBSCALE_BRAND.text }}>
+              <Typography sx={{ fontWeight: 700, fontSize: "0.8rem", color: SUBSCALE_BRAND.text }}>
                 {S.MIXING_CYCLE_TITLE}
               </Typography>
-              <Typography sx={{ fontSize: "0.72rem", color: SUBSCALE_BRAND.textSub }}>
+              <Typography sx={{ fontSize: "0.78rem", color: SUBSCALE_BRAND.textSub }}>
                 {S.MIXING_CYCLE_HINT}
               </Typography>
             </Box>
-            <Button
-              size="small"
-              variant="outlined"
-              startIcon={<AddRoundedIcon />}
-              onClick={addMixingCycle}
-              sx={{ borderColor: SUBSCALE_BRAND.ss, color: SUBSCALE_BRAND.ss }}
-            >
-              {S.ADD_MIXING_CYCLE}
-            </Button>
           </Stack>
 
           <Stack spacing={2}>
-            {mixingCycles.map((cycle, cycleIndex) => (
-              <Box
-                key={cycle._key}
-                sx={{
-                  border: `1px solid ${SUBSCALE_BRAND.border}`,
-                  borderRadius: 2,
-                  overflow: "hidden",
-                }}
-              >
-                <Stack
-                  direction="row"
-                  alignItems="center"
-                  justifyContent="space-between"
-                  sx={{ px: 1.5, py: 1, background: "rgba(21,101,192,0.06)" }}
-                >
-                  <Typography sx={{ fontWeight: 700, fontSize: "0.78rem", color: SUBSCALE_BRAND.text }}>
-                    {S.MIXING_CYCLE_LABEL.replace("{index}", String(cycleIndex + 1))}
-                  </Typography>
-                  {mixingCycles.length > 1 ? (
-                    <IconButton size="small" onClick={() => removeMixingCycle(cycleIndex)}>
-                      <DeleteOutlineRoundedIcon fontSize="small" />
-                    </IconButton>
-                  ) : null}
-                </Stack>
-                <Box sx={{ p: 1.5 }}>
-                  <FormInput
-                    select
-                    label={S.MIXING_CYCLE_STAGE}
-                    value={cycle.stage}
-                    onChange={(event) => updateCycleStage(cycleIndex, event.target.value)}
-                    sx={{ mb: 1.5, maxWidth: 280 }}
-                  >
-                    <MenuItem value="">—</MenuItem>
-                    {SUBSCALE_MOTOR_STAGE_OPTIONS.map((option) => (
-                      <MenuItem key={option.value} value={option.value}>
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </FormInput>
+            {mixingCycles.map((cycle, cycleIndex) => {
+              const stage = String(cycle.stage ?? "").trim();
+              const cycleOptions = mixingCycleOptionsByStage[stage] ?? [];
+              const cyclesLoading = Boolean(mixingCyclesLoadingByStage[stage]);
+              const mixingCyclePlaceholder = !stage
+                ? S.MIXING_CYCLE_SELECT_STAGE_FIRST
+                : cyclesLoading
+                  ? S.MIXING_CYCLES_LOADING
+                  : S.MIXING_CYCLE_SELECT_PLACEHOLDER;
 
-                  <Typography sx={{ fontWeight: 700, fontSize: "0.75rem", color: SUBSCALE_BRAND.text, mb: 1 }}>
-                    {PROCESS_S.SECTION_PROCESS_PARTICULARS}
-                  </Typography>
-                  <TableContainer sx={{ border: `1px solid ${SUBSCALE_BRAND.border}`, borderRadius: 1.5 }}>
-                    <Table size="small">
-                      <TableHead>
-                        <TableRow sx={{ background: "rgba(21,101,192,0.08)" }}>
-                          <TableCell sx={{ fontWeight: 700, fontSize: "0.68rem" }}>
-                            {PROCESS_S.COL_OPERATION}
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 700, fontSize: "0.68rem" }}>
-                            {PROCESS_S.COL_ROTATION}
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 700, fontSize: "0.68rem" }}>
-                            {PROCESS_S.COL_TIME}
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 700, fontSize: "0.68rem" }}>
-                            {PROCESS_S.COL_TEMP}
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 700, fontSize: "0.68rem" }}>
-                            {PROCESS_S.COL_VACUUM}
-                          </TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {cycle.processParticulars.length === 0 ? (
-                          <TableRow>
-                            <TableCell colSpan={5}>
-                              <Typography sx={{ fontSize: "0.75rem", color: SUBSCALE_BRAND.textSub, py: 1.5 }}>
-                                {S.PROCESS_PARTICULARS_EMPTY}
-                              </Typography>
-                            </TableCell>
-                          </TableRow>
-                        ) : (
-                          cycle.processParticulars.map((row, rowIndex) => (
-                            <TableRow key={row.id}>
-                              <TableCell sx={{ fontSize: "0.78rem", fontWeight: 600 }}>{row.operation}</TableCell>
-                              <TableCell>
-                                <FormInput
-                                  value={row.rpm}
-                                  onChange={(event) =>
-                                    updateProcessField(cycleIndex, rowIndex, "rpm", event.target.value)
-                                  }
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <FormInput
-                                  value={row.time}
-                                  onChange={(event) =>
-                                    updateProcessField(cycleIndex, rowIndex, "time", event.target.value)
-                                  }
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <FormInput
-                                  value={row.temp}
-                                  onChange={(event) =>
-                                    updateProcessField(cycleIndex, rowIndex, "temp", event.target.value)
-                                  }
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <FormInput
-                                  value={row.vacuum}
-                                  onChange={(event) =>
-                                    updateProcessField(cycleIndex, rowIndex, "vacuum", event.target.value)
-                                  }
-                                />
-                              </TableCell>
-                            </TableRow>
-                          ))
-                        )}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
+              return (
+                <Box
+                  key={cycle._key || cycleIndex}
+                  sx={{
+                    border: `1px solid ${SUBSCALE_BRAND.border}`,
+                    borderRadius: 2,
+                    overflow: "hidden",
+                  }}
+                >
+                  <Stack
+                    direction="row"
+                    alignItems="center"
+                    justifyContent="space-between"
+                    sx={{ px: 1.5, py: 1, background: "rgba(21,101,192,0.06)" }}
+                  >
+                    <Typography
+                      sx={{ fontWeight: 700, fontSize: "0.78rem", color: SUBSCALE_BRAND.text }}
+                    >
+                      {cycle.mixingCycleName
+                        ? cycle.mixingCycleName
+                        : batchDetails?.mixingCycle?.mixingCycleName
+                          ? batchDetails.mixingCycle.mixingCycleName
+                          : S.MIXING_CYCLE_TITLE}
+                    </Typography>
+                  </Stack>
+
+                  <Box sx={{ p: 1.5 }}>
+                    <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ mb: 2 }}>
+                      {isExperimental ? (
+                        <>
+                          <FormInput
+                            select
+                            label={S.MIXING_CYCLE_STAGE}
+                            value={stage}
+                            onChange={(event) =>
+                              handleMotorStageChange(cycleIndex, event.target.value)
+                            }
+                            SelectProps={{ displayEmpty: true, MenuProps: appDropdownMenuProps }}
+                            sx={{ flex: 1 }}
+                            disabled={motorStagesLoading}
+                          >
+                            <MenuItem value="">
+                              <em
+                                style={
+                                  {
+                                    ...appDropdownPlaceholderSx,
+                                    fontStyle: "normal",
+                                  } as CSSProperties
+                                }
+                              >
+                                {motorStagesLoading
+                                  ? S.MOTOR_STAGES_LOADING
+                                  : S.MIXING_CYCLE_STAGE_PLACEHOLDER}
+                              </em>
+                            </MenuItem>
+                            {motorStageOptions.map((option) => (
+                              <MenuItem
+                                key={option.motorStage}
+                                value={option.motorStage}
+                                sx={{ fontSize: APP_CONTROL_FONT_SIZE }}
+                              >
+                                Stage {option.motorStage}
+                              </MenuItem>
+                            ))}
+                          </FormInput>
+
+                          <FormInput
+                            select
+                            label={S.MIXING_CYCLE_SELECT_LABEL}
+                            value={cycle.mixingCycleCode ?? ""}
+                            onChange={(event) =>
+                              handleMixingCycleChange(cycleIndex, event.target.value)
+                            }
+                            SelectProps={{ displayEmpty: true, MenuProps: appDropdownMenuProps }}
+                            sx={{ flex: 1 }}
+                            disabled={!stage || cyclesLoading || cycleOptions.length === 0}
+                          >
+                            <MenuItem value="">
+                              <em
+                                style={
+                                  {
+                                    ...appDropdownPlaceholderSx,
+                                    fontStyle: "normal",
+                                  } as CSSProperties
+                                }
+                              >
+                                {mixingCyclePlaceholder}
+                              </em>
+                            </MenuItem>
+                            {cycleOptions.map((option) => (
+                              <MenuItem
+                                key={`${option.mixingCycleId}-${option.mixingCycleCode}`}
+                                value={option.mixingCycleCode}
+                                sx={{ fontSize: APP_CONTROL_FONT_SIZE }}
+                              >
+                                {formatMixingCycleLabel(option)}
+                              </MenuItem>
+                            ))}
+                          </FormInput>
+                        </>
+                      ) : (
+                        <>
+                          <FormInput
+                            disabled
+                            label={S.MIXING_CYCLE_STAGE}
+                            value={
+                              cycle.stage ? `Motor Stage ${cycle.stage}` : qualificationStageLabel
+                            }
+                            sx={{ flex: 1 }}
+                          />
+                          <FormInput
+                            disabled
+                            label={S.MIXING_CYCLE_SELECT_LABEL}
+                            value={formatMixingCycleLabel(cycle) || qualificationCycleLabel}
+                            sx={{ flex: 1 }}
+                          />
+                        </>
+                      )}
+                    </Stack>
+
+                    {renderParticularsTable(
+                      "Premix Cycle Process Particulars",
+                      cycle.premixParticulars || cycle.processParticulars || [],
+                      cycleIndex,
+                      "premixParticulars",
+                    )}
+
+                    {renderParticularsTable(
+                      "Final Mix Cycle Process Particulars",
+                      cycle.finalMixParticulars || [],
+                      cycleIndex,
+                      "finalMixParticulars",
+                    )}
+                  </Box>
                 </Box>
-              </Box>
-            ))}
+              );
+            })}
           </Stack>
         </Box>
       </Box>
@@ -296,7 +797,11 @@ const SubscaleSubscaleBatchPanel = ({ values, onChange }: SubscaleSubscaleBatchP
       <SubscaleHardwareArticlePanel
         values={values}
         onChange={onChange}
-        hardwareFieldsDisabled={!generalComplete}
+        batchType={batchType}
+        actionLoading={actionLoading}
+        isEditMode={isEditMode}
+        onRequestSaveDraft={onRequestSaveDraft}
+        onRequestSubmit={onRequestSubmit}
       />
     </Stack>
   );

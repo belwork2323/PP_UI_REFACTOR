@@ -24,12 +24,24 @@ export type FinalApprovalMotorRow = {
   motorSubmissionType?: string | null;
 };
 
+type FinalApprovalCopy = {
+  title: string;
+  info: string;
+  proceed: string;
+  close: string;
+  notReady: string;
+  colMotor: string;
+  colType: string;
+  colStatus: string;
+};
+
 type FinalApprovalMotorDialogProps = {
   open: boolean;
   rows: FinalApprovalMotorRow[];
   statusConfig: PremixStatusThemeConfig;
   allMotorsApproved: boolean;
   confirmDisabled?: boolean;
+  copy?: FinalApprovalCopy;
   onClose: () => void;
   onProceed: () => void;
 };
@@ -64,17 +76,30 @@ const FinalApprovalMotorDialog = ({
   statusConfig,
   allMotorsApproved,
   confirmDisabled = false,
+  copy,
   onClose,
   onProceed,
-}: FinalApprovalMotorDialogProps) => (
+}: FinalApprovalMotorDialogProps) => {
+  const labels = copy ?? {
+    title: S.FINAL_APPROVAL_DIALOG_TITLE,
+    info: S.FINAL_APPROVAL_DIALOG_INFO,
+    proceed: S.FINAL_APPROVAL_PROCEED,
+    close: S.FINAL_APPROVAL_CLOSE,
+    notReady: S.FINAL_APPROVAL_NOT_READY,
+    colMotor: S.FINAL_APPROVAL_COL_MOTOR,
+    colType: S.FINAL_APPROVAL_COL_TYPE,
+    colStatus: S.FINAL_APPROVAL_COL_STATUS,
+  };
+
+  return (
   <ConfirmAlertDialog
     open={open}
-    title={S.FINAL_APPROVAL_DIALOG_TITLE}
-    message={S.FINAL_APPROVAL_DIALOG_INFO}
+    title={labels.title}
+    message={labels.info}
     severity="info"
     maxWidth="sm"
-    confirmLabel={S.FINAL_APPROVAL_PROCEED}
-    cancelLabel={S.FINAL_APPROVAL_CLOSE}
+    confirmLabel={labels.proceed}
+    cancelLabel={labels.close}
     confirmDisabled={!allMotorsApproved || confirmDisabled}
     onConfirm={onProceed}
     onCancel={onClose}
@@ -92,13 +117,13 @@ const FinalApprovalMotorDialog = ({
         <TableHead>
           <TableRow sx={{ bgcolor: "action.hover" }}>
             <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem" }}>
-              {S.FINAL_APPROVAL_COL_MOTOR}
+              {labels.colMotor}
             </TableCell>
             <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem" }}>
-              {S.FINAL_APPROVAL_COL_TYPE}
+              {labels.colType}
             </TableCell>
             <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem" }}>
-              {S.FINAL_APPROVAL_COL_STATUS}
+              {labels.colStatus}
             </TableCell>
           </TableRow>
         </TableHead>
@@ -125,10 +150,11 @@ const FinalApprovalMotorDialog = ({
     </Box>
     {!allMotorsApproved ? (
       <Box sx={{ mt: 1.25, fontSize: "0.74rem", color: "text.secondary", fontWeight: 600 }}>
-        {S.FINAL_APPROVAL_NOT_READY}
+        {labels.notReady}
       </Box>
     ) : null}
   </ConfirmAlertDialog>
-);
+  );
+};
 
 export default FinalApprovalMotorDialog;

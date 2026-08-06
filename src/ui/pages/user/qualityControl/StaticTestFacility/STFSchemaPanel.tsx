@@ -42,7 +42,7 @@ const STFSchemaPanel = ({
     if (hydratedRef.current) return;
 
     if (savedSections?.length) {
-      onChange(hydrateStfValuesFromSections(schema, savedSections));
+      onChange({ ...formValues, ...hydrateStfValuesFromSections(schema, savedSections) });
     } else if (Object.keys(formValues ?? {}).length === 0) {
       onChange(createStfInitialValues(schema));
     }

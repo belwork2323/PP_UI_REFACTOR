@@ -1,38 +1,35 @@
-import { useState } from "react";
-import { Box, Button, CircularProgress, Dialog, DialogContent, IconButton, Stack, Typography } from "@mui/material";
+import { useMemo, useState } from "react";
+import {
+  Box,
+  Button,
+  CircularProgress,
+  Dialog,
+  DialogContent,
+  IconButton,
+  Stack,
+  Typography,
+} from "@mui/material";
 import { alpha } from "@mui/material/styles";
 
+import getDispatchTheme, {
+  DISPATCH_BRAND,
+} from "../../../../app/theme/custom_themes/user/dispatch/dispatch_theme";
 import getRawMaterialPreparationApproverTheme from "../../../../app/theme/custom_themes/approver/manufacturing/rawMaterialPreparationApprover_theme";
-import { isApproverActionableStatus } from "../../../../app/theme/approver";
 import { icons } from "../../../../app/theme/icons";
 import { STRINGS } from "../../../../app/config/strings";
 import type { DispatchDetailView } from "../../../../data/models/user/DispatchApiModel";
 import { ReportPreviewDialog } from "../components/ReportPdf";
-import DispatchDetailsContent from "../../user/dispatch/components/DispatchDetailsContent";
+import DispatchApproverReviewContent from "./DispatchApproverReviewContent";
 
 const {
-  approved: CheckCircleRoundedIcon,
-  rejected: CancelRoundedIcon,
   close: CloseRoundedIcon,
   localShipping: LocalShippingRoundedIcon,
   pdf: PictureAsPdfRoundedIcon,
 } = icons.approver.dispatch.page;
 
 const DISPATCH_ACCENT = {
-  primary: "#1B4F72",
-  primaryLight: "#2E86C1",
-};
-
-const dispatchDetailsTheme = {
-  palette: {
-    primary: DISPATCH_ACCENT.primary,
-    primaryLight: DISPATCH_ACCENT.primaryLight,
-    border: "#D5D8DC",
-    text: "#1C2833",
-    textSub: "#5D6D7E",
-    surface: "#F4F6F8",
-    pageBg: "#fff",
-  },
+  primary: DISPATCH_BRAND.primary,
+  primaryLight: DISPATCH_BRAND.primaryLight,
 };
 
 export type DispatchApproverDetailItem = Record<string, unknown> & {
@@ -41,16 +38,21 @@ export type DispatchApproverDetailItem = Record<string, unknown> & {
   batchType?: string | null;
   status?: string | null;
   dispatchStatus?: string | null;
+  detailView?: DispatchDetailView | null;
 };
 
 type DispatchApproverDetailDialogProps = {
   open: boolean;
   onClose: () => void;
   item: DispatchApproverDetailItem | null;
-  detailView: DispatchDetailView | null;
   loading: boolean;
+  activeMotorId?: string | null;
+  onActiveMotorChange?: (motorId: string) => void;
   onApprove: (item: DispatchApproverDetailItem) => void;
   onReject: (item: DispatchApproverDetailItem) => void;
+  onApproveForm?: (item: DispatchApproverDetailItem) => void;
+  onRejectForm?: (item: DispatchApproverDetailItem) => void;
+  actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
 
@@ -58,20 +60,40 @@ const DispatchApproverDetailDialog = ({
   open,
   onClose,
   item,
-  detailView,
   loading,
+  activeMotorId = null,
+  onActiveMotorChange,
   onApprove,
   onReject,
+  onApproveForm,
+  onRejectForm,
+  actionLoading = false,
   theme,
 }: DispatchApproverDetailDialogProps) => {
   const [pdfOpen, setPdfOpen] = useState(false);
+  const dispatchTheme = useMemo(
+    () =>
+      getDispatchTheme({
+        palette: {
+          primary: DISPATCH_ACCENT.primary,
+          primaryLight: DISPATCH_ACCENT.primaryLight,
+          accent: DISPATCH_BRAND.accent,
+          danger: DISPATCH_BRAND.danger,
+          warn: DISPATCH_BRAND.warn,
+          border: DISPATCH_BRAND.border,
+          text: DISPATCH_BRAND.text,
+          textSub: DISPATCH_BRAND.textSub,
+          surface: DISPATCH_BRAND.surface,
+          pageBg: "#fff",
+        },
+      }),
+    [],
+  );
   const strings = STRINGS.DISPATCH;
 
   if (!item) return null;
 
-  const rowStatus = String(item.dispatchStatus ?? item.status ?? detailView?.status ?? "");
-  const canApproveOrReject = isApproverActionableStatus(rowStatus);
-  const motorIds = (detailView?.motors ?? []).map((motor) => motor.motorId).filter(Boolean);
+  const detailView = item.detailView ?? null;
 
   return (
     <>
@@ -94,10 +116,7 @@ const DispatchApproverDetailDialog = ({
               <Typography sx={theme.dialog.headerTitle}>{strings.TITLE} Submission</Typography>
               <Typography sx={theme.dialog.headerSubtitle}>
                 {item.batchId}
-                {loading ? " · loading…" : item.formId ? ` · ${item.formId}` : ""}
-                {!loading && motorIds.length > 0
-                  ? ` · ${motorIds.length} motor${motorIds.length === 1 ? "" : "s"}`
-                  : ""}
+                {loading ? " · loading…" : activeMotorId ? ` · ${activeMotorId}` : ""}
               </Typography>
             </Box>
           </Stack>
@@ -108,7 +127,7 @@ const DispatchApproverDetailDialog = ({
               variant="contained"
               startIcon={<PictureAsPdfRoundedIcon sx={{ fontSize: "14px !important" }} />}
               onClick={() => setPdfOpen(true)}
-              disabled={loading || !item.formId}
+              disabled={loading || !item.formId || actionLoading}
               sx={theme.dialog.pdfButton}
             >
               View as PDF
@@ -120,51 +139,31 @@ const DispatchApproverDetailDialog = ({
         </Box>
 
         <DialogContent sx={theme.dialog.content}>
-          <DispatchDetailsContent
+          <DispatchApproverReviewContent
             detailView={detailView}
-            row={{
-              ...item,
-              status: rowStatus || detailView?.status,
-              dispatchStatus: rowStatus || detailView?.status,
-            }}
             loading={loading}
-            theme={dispatchDetailsTheme}
-            resetOnFormId={detailView?.formId ?? item.formId ?? null}
+            activeMotorId={activeMotorId}
+            onActiveMotorChange={onActiveMotorChange ?? (() => undefined)}
+            onApprove={() => onApprove(item)}
+            onReject={() => onReject(item)}
+            onApproveForm={onApproveForm ? () => onApproveForm(item) : undefined}
+            onRejectForm={onRejectForm ? () => onRejectForm(item) : undefined}
+            actionLoading={actionLoading}
+            formStatus={String(item.dispatchStatus ?? item.status ?? "")}
+            dispatchTheme={dispatchTheme}
+            approverTheme={theme}
           />
         </DialogContent>
 
         <Box sx={theme.dialog.footer}>
-          <Button variant="outlined" onClick={onClose} disabled={loading} sx={theme.dialog.closeAction}>
+          <Button
+            variant="outlined"
+            onClick={onClose}
+            disabled={loading || actionLoading}
+            sx={theme.dialog.closeAction}
+          >
             Close
           </Button>
-          {canApproveOrReject ? (
-            <>
-              <Button
-                variant="contained"
-                startIcon={<CancelRoundedIcon />}
-                onClick={() => onReject(item)}
-                disabled={loading}
-                sx={theme.dialog.rejectAction}
-              >
-                Reject
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<CheckCircleRoundedIcon />}
-                onClick={() => onApprove(item)}
-                disabled={loading}
-                sx={{
-                  ...theme.dialog.approveAction,
-                  background: `linear-gradient(135deg, ${DISPATCH_ACCENT.primary}, ${DISPATCH_ACCENT.primaryLight})`,
-                  "&:hover": {
-                    background: DISPATCH_ACCENT.primary,
-                  },
-                }}
-              >
-                Approve
-              </Button>
-            </>
-          ) : null}
         </Box>
       </Dialog>
 

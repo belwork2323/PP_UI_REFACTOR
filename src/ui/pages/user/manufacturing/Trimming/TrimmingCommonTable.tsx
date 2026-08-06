@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Box,
   Stack,
@@ -14,88 +14,107 @@ import {
   TextField,
   alpha,
 } from "@mui/material";
-import { styled, keyframes } from "@mui/material/styles";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AddIcon from "@mui/icons-material/Add";
 import FormInput from "@/ui/components/common/FormInput";
-import DateField from "@/ui/components/common/DateField";
+import DateField, { DateTimeField } from "@/ui/components/common/DateField";
 import SchemaFileField from "@/ui/components/common/SchemaFileField";
+import { STRINGS } from "../../../../../app/config/strings";
+import { TRIMMING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/trimming_theme";
 
-// --- Theme Tokens & Animations ---
-const BRAND = {
-  primary: "#1565C0",
-  primaryLight: "#1976D2",
-  border: "rgba(21, 101, 192, 0.2)",
-  borderDark: "rgba(21, 101, 192, 0.14)",
-  surface: "#F4F6F9",
-  text: "#1E293B",
-  textSub: "#64748B",
-  tableBorder: "rgba(213, 216, 220, 0.5)",
-  danger: "#d32f2f",
-};
+const S = STRINGS.MANUFACTURING.TRIMMING;
 
-const slideIn = keyframes`
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
-`;
-
-// --- Styled Components ---
-const SectionCard = styled(Box)({
-  borderRadius: 16,
-  border: `1px solid ${BRAND.border}`,
-  background: "#fff",
-  overflow: "hidden",
-  boxShadow: "0 2px 18px rgba(21, 101, 192, 0.07)",
-  animation: `${slideIn} 0.35s ease both`,
-  marginBottom: 24,
-});
-
-const SectionHeader = styled(Box)({
-  padding: "13px 20px",
-  background: "linear-gradient(135deg, rgba(21, 101, 192, 0.07), rgba(25, 118, 210, 0.03))",
-  borderBottom: `1px solid ${BRAND.borderDark}`,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "space-between",
-});
-
-const TH = styled(TableCell)({
-  background: `linear-gradient(135deg, ${BRAND.primary}, ${BRAND.primaryLight})`,
-  color: "#fff",
+const sectionTitleSx = (color: string) => ({
   fontWeight: 700,
-  fontSize: "0.7rem",
-  letterSpacing: "0.07em",
-  textTransform: "uppercase",
-  padding: "11px 14px",
-  whiteSpace: "nowrap",
-  borderBottom: "none",
-  verticalAlign: "middle",
+  fontSize: "0.8rem",
+  color,
 });
 
-const TD = styled(TableCell)({
-  padding: "10px 10px",
-  borderBottom: `1px solid ${BRAND.tableBorder}`,
-  verticalAlign: "middle",
+const actionButtonSx = (primary: string) => ({
+  fontWeight: 700,
+  textTransform: "none" as const,
+  borderColor: alpha(primary, 0.4),
+  color: primary,
+  "&:hover": {
+    borderColor: primary,
+    background: alpha(primary, 0.04),
+  },
 });
-
-const tableShellSx = {
-  border: `1px solid ${alpha(BRAND.tableBorder, 0.85)}`,
-  borderRadius: 2,
-  background: "#fff",
-  overflowX: "visible",
-};
 
 export const TrimmingCommonTable = ({
   activeMotorSession,
   activeMotorEntry,
   onMotorSessionChange,
+  readOnly = false,
+  theme,
 }) => {
+  const palette = theme?.palette ?? {};
+  const colors = useMemo(
+    () => ({
+      primary: palette.primary ?? TRIMMING_BRAND.primary,
+      primaryLight: palette.primaryLight ?? TRIMMING_BRAND.primaryLight,
+      border: palette.border ?? TRIMMING_BRAND.border,
+      surface: palette.surface ?? TRIMMING_BRAND.surface,
+      text: palette.text ?? TRIMMING_BRAND.text,
+      textSub: palette.textSub ?? TRIMMING_BRAND.textSub,
+      danger: palette.danger ?? TRIMMING_BRAND.danger,
+      pageBg: palette.pageBg ?? "#fff",
+    }),
+    [palette],
+  );
+
+  const sectionCardSx = {
+    borderRadius: 2.5,
+    border: `1px solid ${colors.border}`,
+    background: colors.pageBg,
+    overflow: "hidden",
+    mb: 2,
+  };
+
+  const sectionHeaderSx = {
+    px: 1.5,
+    py: 1.1,
+    borderBottom: `1px solid ${alpha(colors.border, 0.9)}`,
+    background: alpha(colors.primary, 0.04),
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 1,
+  };
+
+  const thSx = {
+    background: colors.primary,
+    color: "#fff",
+    fontWeight: 700,
+    fontSize: "0.7rem",
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+    padding: "10px 12px",
+    whiteSpace: "nowrap",
+    borderBottom: "none",
+    verticalAlign: "middle",
+  };
+
+  const tdSx = {
+    padding: "8px 10px",
+    borderBottom: `1px solid ${alpha(colors.border, 0.85)}`,
+    verticalAlign: "middle",
+  };
+
+  const tableShellSx = {
+    border: `1px solid ${alpha(colors.border, 0.9)}`,
+    borderRadius: 2,
+    background: colors.pageBg,
+    overflowX: "auto",
+  };
+
   const dynamicLocations = activeMotorSession.commonFormatLocations ?? [];
   const [isAddingColumn, setIsAddingColumn] = useState(false);
   const [newColInput, setNewColInput] = useState("");
 
   // --- Handlers for Dynamic Columns ---
   const handleSaveNewColumn = () => {
+    if (readOnly) return;
     const formattedColName = newColInput.trim().toUpperCase();
     if (!formattedColName) {
       setIsAddingColumn(false);
@@ -170,53 +189,57 @@ export const TrimmingCommonTable = ({
   };
 
   return (
-    <Box sx={{ fontFamily: "'DM Sans', sans-serif" }}>
-      {/* MOTOR RECEIVE DATE (WITH TIME) */}
-      <SectionCard>
-        <SectionHeader>
-          <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: BRAND.text }}>
-            Motor Receive date & Time
+    <Box
+      sx={{
+        ...(readOnly
+          ? {
+              pointerEvents: "none",
+              opacity: 0.78,
+            }
+          : null),
+      }}
+    >
+      <Box sx={sectionCardSx}>
+        <Box sx={sectionHeaderSx}>
+          <Typography sx={sectionTitleSx(colors.primary)}>
+            {S.MOTOR_RECEIVED_AT_LABEL}
           </Typography>
-        </SectionHeader>
-        <Box sx={{ p: 2 }}>
-          <TextField
-            type="datetime-local"
-            size="small"
+        </Box>
+        <Box sx={{ p: 1.5, maxWidth: 320 }}>
+          <DateTimeField
             value={activeMotorSession.motorReceivedAt ?? ""}
-            onChange={(e) =>
+            onChange={(value) =>
               onMotorSessionChange(activeMotorEntry.motorId, {
                 ...activeMotorSession,
-                motorReceivedAt: e.target.value,
+                motorReceivedAt: value,
               })
             }
-            InputLabelProps={{ shrink: true }}
-            sx={{ width: 260 }}
+            placeholder={S.MOTOR_RECEIVED_AT_PLACEHOLDER}
+            compact
+            disabled={readOnly}
           />
         </Box>
-      </SectionCard>
+      </Box>
 
-      {/* TABLE 1: TRIMMING DETAILS */}
-      <SectionCard>
-        <SectionHeader>
-          <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: BRAND.text }}>
-            Trimming Details
-          </Typography>
-        </SectionHeader>
+      <Box sx={sectionCardSx}>
+        <Box sx={sectionHeaderSx}>
+          <Typography sx={sectionTitleSx(colors.primary)}>Trimming Details</Typography>
+        </Box>
 
-        <Box sx={{ p: 2 }}>
-          <TableContainer sx={{ ...tableShellSx, mb: 1.5, overflow: "visible" }}>
+        <Box sx={{ p: 1.5 }}>
+          <TableContainer sx={{ ...tableShellSx, mb: 1.5 }}>
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TH>Machine Details</TH>
-                  <TH>Start Date</TH>
-                  <TH>Completion Date</TH>
-                  <TH>Arbor Size</TH>
-                  <TH>Cutter Size</TH>
-                  <TH>Remarks</TH>
-                  <TH align="center" sx={{ width: 50 }}>
+                  <TableCell sx={thSx}>Machine Details</TableCell>
+                  <TableCell sx={thSx}>Start Date</TableCell>
+                  <TableCell sx={thSx}>Completion Date</TableCell>
+                  <TableCell sx={thSx}>Arbor Size</TableCell>
+                  <TableCell sx={thSx}>Cutter Size</TableCell>
+                  <TableCell sx={thSx}>Remarks</TableCell>
+                  <TableCell align="center" sx={{ ...thSx, width: 50 }}>
                     Actions
-                  </TH>
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -224,10 +247,10 @@ export const TrimmingCommonTable = ({
                   <TableRow
                     key={`detail-row-${rowIndex}`}
                     sx={{
-                      background: rowIndex % 2 === 0 ? "#fff" : alpha(BRAND.surface, 0.55),
+                      background: rowIndex % 2 === 0 ? colors.pageBg : alpha(colors.surface, 0.7),
                     }}
                   >
-                    <TD>
+                    <TableCell sx={tdSx}>
                       <FormInput
                         value={row.machineDetails}
                         size="small"
@@ -243,10 +266,11 @@ export const TrimmingCommonTable = ({
                           });
                         }}
                       />
-                    </TD>
-                    <TD>
+                    </TableCell>
+                    <TableCell sx={tdSx}>
                       <DateField
                         value={row.startDate}
+                        compact
                         onChange={(val) => {
                           const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
                           nextRows[rowIndex] = { ...nextRows[rowIndex], startDate: val };
@@ -256,10 +280,11 @@ export const TrimmingCommonTable = ({
                           });
                         }}
                       />
-                    </TD>
-                    <TD>
+                    </TableCell>
+                    <TableCell sx={tdSx}>
                       <DateField
                         value={row.completionDate}
+                        compact
                         onChange={(val) => {
                           const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
                           nextRows[rowIndex] = { ...nextRows[rowIndex], completionDate: val };
@@ -269,8 +294,8 @@ export const TrimmingCommonTable = ({
                           });
                         }}
                       />
-                    </TD>
-                    <TD>
+                    </TableCell>
+                    <TableCell sx={tdSx}>
                       <FormInput
                         value={row.arborSize}
                         inputMode="decimal"
@@ -283,8 +308,8 @@ export const TrimmingCommonTable = ({
                           });
                         }}
                       />
-                    </TD>
-                    <TD>
+                    </TableCell>
+                    <TableCell sx={tdSx}>
                       <FormInput
                         value={row.cutterSize}
                         inputMode="decimal"
@@ -300,8 +325,8 @@ export const TrimmingCommonTable = ({
                           });
                         }}
                       />
-                    </TD>
-                    <TD>
+                    </TableCell>
+                    <TableCell sx={tdSx}>
                       <FormInput
                         value={row.remarks}
                         onChange={(e) => {
@@ -313,18 +338,18 @@ export const TrimmingCommonTable = ({
                           });
                         }}
                       />
-                    </TD>
-                    <TD align="center">
+                    </TableCell>
+                    <TableCell align="center" sx={tdSx}>
                       {rowIndex > 0 && (
                         <IconButton
                           size="small"
-                          sx={{ color: BRAND.danger }}
+                          sx={{ color: colors.danger }}
                           onClick={() => handleDeleteTrimmingRow(rowIndex)}
                         >
                           <DeleteOutlineIcon fontSize="small" />
                         </IconButton>
                       )}
-                    </TD>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -335,16 +360,7 @@ export const TrimmingCommonTable = ({
             <Button
               variant="outlined"
               size="small"
-              sx={{
-                fontWeight: 700,
-                textTransform: "none",
-                borderColor: alpha(BRAND.primary, 0.4),
-                color: BRAND.primary,
-                "&:hover": {
-                  borderColor: BRAND.primary,
-                  background: alpha(BRAND.primary, 0.04),
-                },
-              }}
+              sx={actionButtonSx(colors.primary)}
               onClick={() => {
                 const details = activeMotorSession.trimmingDetails ?? [];
                 onMotorSessionChange(activeMotorEntry.motorId, {
@@ -367,15 +383,11 @@ export const TrimmingCommonTable = ({
             </Button>
           </Stack>
         </Box>
-      </SectionCard>
+      </Box>
 
-      {/* TABLE 2: DIMENSIONS AFTER TRIMMING */}
-      <SectionCard>
-        <SectionHeader>
-          <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: BRAND.text }}>
-            Dimensions After Trimming
-          </Typography>
-
+      <Box sx={sectionCardSx}>
+        <Box sx={sectionHeaderSx}>
+          <Typography sx={sectionTitleSx(colors.primary)}>Dimensions After Trimming</Typography>
           <Button
             variant="contained"
             size="small"
@@ -384,30 +396,30 @@ export const TrimmingCommonTable = ({
             sx={{
               fontWeight: 700,
               textTransform: "none",
-              background: `linear-gradient(135deg, ${BRAND.primary}, ${BRAND.primaryLight})`,
+              background: colors.primary,
               color: "#fff",
-              "&:hover": { background: BRAND.primary },
+              "&:hover": { background: colors.primaryLight },
             }}
             onClick={() => setIsAddingColumn(true)}
           >
             Add Column
           </Button>
-        </SectionHeader>
+        </Box>
 
-        <Box sx={{ p: 2 }}>
-          <TableContainer sx={{ ...tableShellSx, mb: 1.5, overflowX: "auto" }}>
+        <Box sx={{ p: 1.5 }}>
+          <TableContainer sx={{ ...tableShellSx, mb: 1.5 }}>
             <Table size="small">
               <TableHead>
                 <TableRow>
-                  <TH sx={{ minWidth: 160 }}>Parameter</TH>
-                  <TH sx={{ minWidth: 110 }}>Stage</TH>
-                  <TH sx={{ minWidth: 110 }}>Specification</TH>
-                  <TH sx={{ minWidth: 80 }}>R2T</TH>
-                  <TH sx={{ minWidth: 80 }}>R2B</TH>
-                  <TH sx={{ minWidth: 80 }}>R1R</TH>
-                  <TH sx={{ minWidth: 80 }}>R1L</TH>
+                  <TableCell sx={{ ...thSx, minWidth: 160 }}>Parameter</TableCell>
+                  <TableCell sx={{ ...thSx, minWidth: 110 }}>Stage</TableCell>
+                  <TableCell sx={{ ...thSx, minWidth: 110 }}>Specification</TableCell>
+                  <TableCell sx={{ ...thSx, minWidth: 80 }}>R2T</TableCell>
+                  <TableCell sx={{ ...thSx, minWidth: 80 }}>R2B</TableCell>
+                  <TableCell sx={{ ...thSx, minWidth: 80 }}>R1R</TableCell>
+                  <TableCell sx={{ ...thSx, minWidth: 80 }}>R1L</TableCell>
                   {dynamicLocations.map((loc) => (
-                    <TH key={`col-head-${loc}`} sx={{ minWidth: 100 }}>
+                    <TableCell key={`col-head-${loc}`} sx={{ ...thSx, minWidth: 100 }}>
                       <Stack
                         direction="row"
                         alignItems="center"
@@ -423,10 +435,10 @@ export const TrimmingCommonTable = ({
                           <DeleteOutlineIcon sx={{ fontSize: "1rem" }} />
                         </IconButton>
                       </Stack>
-                    </TH>
+                    </TableCell>
                   ))}
                   {isAddingColumn && (
-                    <TH sx={{ minWidth: 120, p: "4px 8px" }}>
+                    <TableCell sx={{ ...thSx, minWidth: 120, p: "4px 8px" }}>
                       <TextField
                         autoFocus
                         size="small"
@@ -439,21 +451,21 @@ export const TrimmingCommonTable = ({
                           if (e.key === "Escape") setIsAddingColumn(false);
                         }}
                         sx={{
-                          bg: "#fff",
+                          bgcolor: "#fff",
                           borderRadius: 1,
                           input: {
-                            color: "#000",
+                            color: colors.text,
                             fontSize: "0.75rem",
                             padding: "4px 8px",
                             background: "#fff",
                           },
                         }}
                       />
-                    </TH>
+                    </TableCell>
                   )}
-                  <TH align="center" sx={{ width: 50 }}>
+                  <TableCell align="center" sx={{ ...thSx, width: 50 }}>
                     Actions
-                  </TH>
+                  </TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -462,17 +474,18 @@ export const TrimmingCommonTable = ({
                     <TableRow
                       key={`param-${paramIndex}-stage-${stageIndex}`}
                       sx={{
-                        background: paramIndex % 2 === 0 ? "#fff" : alpha(BRAND.surface, 0.55),
+                        background:
+                          paramIndex % 2 === 0 ? colors.pageBg : alpha(colors.surface, 0.7),
                       }}
                     >
-                      {/* Spans full height of the parameter (Before + After) */}
                       {stageIndex === 0 ? (
-                        <TD
+                        <TableCell
                           rowSpan={param.stages.length}
                           sx={{
+                            ...tdSx,
                             fontWeight: 700,
                             verticalAlign: "middle",
-                            borderRight: `1px solid ${BRAND.tableBorder}`,
+                            borderRight: `1px solid ${alpha(colors.border, 0.85)}`,
                           }}
                         >
                           <FormInput
@@ -492,24 +505,21 @@ export const TrimmingCommonTable = ({
                               });
                             }}
                           />
-                        </TD>
+                        </TableCell>
                       ) : null}
 
-                      <TD>
-                        <Typography
-                          sx={{
-                            fontSize: "0.78rem",
-                            fontWeight: 600,
-                            color: BRAND.text,
-                          }}
-                        >
-                          {stage.stage === "BEFORE_TRIMMING" ? "Before Trimming" : "After Trimming"}
+                      <TableCell sx={tdSx}>
+                        <Typography sx={{ fontSize: "0.78rem", fontWeight: 600, color: colors.text }}>
+                          {stage.stage === "BEFORE_TRIMMING" ||
+                          stage.stageName === "Before Trimming"
+                            ? "Before Trimming"
+                            : "After Trimming"}
                         </Typography>
-                      </TD>
+                      </TableCell>
 
-                      <TD>
+                      <TableCell sx={tdSx}>
                         <FormInput
-                          value={stage.specification}
+                          value={stage.specification ?? ""}
                           onChange={(e) => {
                             const nextParams = [
                               ...(activeMotorSession.commonFormatParameters ?? []),
@@ -526,10 +536,10 @@ export const TrimmingCommonTable = ({
                             });
                           }}
                         />
-                      </TD>
+                      </TableCell>
 
                       {["R2T", "R2B", "R1R", "R1L"].map((location) => (
-                        <TD key={`reading-${location}`}>
+                        <TableCell key={`reading-${location}`} sx={tdSx}>
                           <FormInput
                             value={stage.readings[location] ?? ""}
                             inputMode="decimal"
@@ -554,11 +564,11 @@ export const TrimmingCommonTable = ({
                               });
                             }}
                           />
-                        </TD>
+                        </TableCell>
                       ))}
 
                       {dynamicLocations.map((location) => (
-                        <TD key={`reading-${location}`}>
+                        <TableCell key={`reading-${location}`} sx={tdSx}>
                           <FormInput
                             value={stage.readings[location] ?? ""}
                             inputMode="decimal"
@@ -583,28 +593,27 @@ export const TrimmingCommonTable = ({
                               });
                             }}
                           />
-                        </TD>
+                        </TableCell>
                       ))}
 
-                      {isAddingColumn && <TD />}
+                      {isAddingColumn && <TableCell sx={tdSx} />}
 
-                      {/* Single Action Cell spanning across all stages for the Parameter */}
                       {stageIndex === 0 ? (
-                        <TD
+                        <TableCell
                           align="center"
                           rowSpan={param.stages.length}
-                          sx={{ verticalAlign: "middle" }}
+                          sx={{ ...tdSx, verticalAlign: "middle" }}
                         >
                           {paramIndex >= 3 && (
                             <IconButton
                               size="small"
-                              sx={{ color: BRAND.danger }}
+                              sx={{ color: colors.danger }}
                               onClick={() => handleDeleteParameter(paramIndex)}
                             >
                               <DeleteOutlineIcon fontSize="small" />
                             </IconButton>
                           )}
-                        </TD>
+                        </TableCell>
                       ) : null}
                     </TableRow>
                   )),
@@ -617,16 +626,7 @@ export const TrimmingCommonTable = ({
             <Button
               variant="outlined"
               size="small"
-              sx={{
-                fontWeight: 700,
-                textTransform: "none",
-                borderColor: alpha(BRAND.primary, 0.4),
-                color: BRAND.primary,
-                "&:hover": {
-                  borderColor: BRAND.primary,
-                  background: alpha(BRAND.primary, 0.04),
-                },
-              }}
+              sx={actionButtonSx(colors.primary)}
               onClick={() => {
                 const params = activeMotorSession.commonFormatParameters ?? [];
                 const initialReadings = dynamicLocations.reduce((acc, loc) => {
@@ -643,11 +643,13 @@ export const TrimmingCommonTable = ({
                       stages: [
                         {
                           stage: "BEFORE_TRIMMING",
+                          stageName: "Before Trimming",
                           specification: "",
                           readings: { ...initialReadings },
                         },
                         {
                           stage: "AFTER_TRIMMING",
+                          stageName: "After Trimming",
                           specification: "",
                           readings: { ...initialReadings },
                         },
@@ -661,17 +663,14 @@ export const TrimmingCommonTable = ({
             </Button>
           </Stack>
         </Box>
-      </SectionCard>
+      </Box>
 
-      {/* SECTION 3: REMARKS & ATTACHMENTS */}
-      <SectionCard>
-        <SectionHeader>
-          <Typography sx={{ fontWeight: 800, fontSize: "0.92rem", color: BRAND.text }}>
-            Remarks & Attachments
-          </Typography>
-        </SectionHeader>
-        <Box sx={{ p: 2 }}>
-          <Stack spacing={2.5}>
+      <Box sx={sectionCardSx}>
+        <Box sx={sectionHeaderSx}>
+          <Typography sx={sectionTitleSx(colors.primary)}>Remarks & Attachments</Typography>
+        </Box>
+        <Box sx={{ p: 1.5 }}>
+          <Stack spacing={2}>
             <FormInput
               multiline
               minRows={3}
@@ -698,7 +697,7 @@ export const TrimmingCommonTable = ({
             />
           </Stack>
         </Box>
-      </SectionCard>
+      </Box>
     </Box>
   );
 };

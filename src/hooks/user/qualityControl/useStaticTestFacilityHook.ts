@@ -666,7 +666,13 @@ export const useStaticTestFacilityHook = () => {
       }
 
       setDetailsRow(row);
-      setDetailsData(response.data);
+      setDetailsData(
+        STFDetailsModel.toPlainRecord(
+          response.data instanceof STFDetailsModel
+            ? response.data
+            : STFDetailsModel.fromApi({ data: response.data }),
+        ),
+      );
       setView("details");
     },
     [showAlert, subDepartmentId, messages],

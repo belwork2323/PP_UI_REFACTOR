@@ -181,7 +181,7 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
                         </Stack>
                         {block.dimensionalTable?.length ? (
                           <DimensionalInspectionDetailTable rows={block.dimensionalTable} dt={dt} />
-                        ) : block.mockTrialTables?.length ? (
+                        ) : block.mockTrialTables?.length || block.radiographyPlanTables?.length ? (
                           <>
                             {block.rows.length > 0 ? (
                               <TableContainer sx={dt.tableContainer}>
@@ -207,7 +207,10 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
                                 </Table>
                               </TableContainer>
                             ) : null}
-                            <MockTrialDetailTables tables={block.mockTrialTables} dt={dt} />
+                            <MockTrialDetailTables
+                              tables={block.mockTrialTables ?? block.radiographyPlanTables ?? []}
+                              dt={dt}
+                            />
                           </>
                         ) : (
                           <TableContainer sx={dt.tableContainer}>

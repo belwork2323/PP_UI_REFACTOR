@@ -6,7 +6,9 @@ import { APPROVER_STATUS_META } from "../../../../app/theme/approver";
 import useNDTApproverHook from "../../../../hooks/approver/qualityControl/useNDTApproverHook";
 import ApproverSubdepartmentBatchListSection from "../components/ApproverSubdepartmentBatchListSection";
 import ApproverActionDialog from "../../../components/custom/ApproverActionDialog";
-import NDTApproverDetailDialog from "./NDTApproverDetailDialog";
+import NDTApproverDetailDialog, {
+  type NDTApproverDetailItem,
+} from "./NDTApproverDetailDialog";
 
 const BRAND = {
   primary: "#1B4F72",
@@ -27,12 +29,17 @@ const NDTApproverPage = () => {
     items,
     selected,
     detailsLoading,
-    detailView,
+    activeMotorId,
     dialogProps,
+    formDialogProps,
+    actionLoading,
     requestApprove,
     requestReject,
+    requestFormApprove,
+    requestFormReject,
     handleViewDetails,
     handleCloseDetail,
+    handleActiveMotorChange,
   } = useNDTApproverHook();
 
   return (
@@ -56,14 +63,19 @@ const NDTApproverPage = () => {
       <NDTApproverDetailDialog
         open={!!selected}
         onClose={handleCloseDetail}
-        item={selected}
-        detailView={detailView}
+        item={selected as NDTApproverDetailItem | null}
         loading={detailsLoading}
+        activeMotorId={activeMotorId}
+        onActiveMotorChange={handleActiveMotorChange}
         onApprove={requestApprove}
         onReject={requestReject}
+        onApproveForm={requestFormApprove}
+        onRejectForm={requestFormReject}
+        actionLoading={actionLoading}
         theme={approverTheme}
       />
       <ApproverActionDialog {...dialogProps} />
+      <ApproverActionDialog {...formDialogProps} />
     </ApproverSubdepartmentBatchListSection>
   );
 };

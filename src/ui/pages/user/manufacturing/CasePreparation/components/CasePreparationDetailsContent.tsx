@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Box,
-  Button,
   Chip,
   CircularProgress,
   Stack,
@@ -26,6 +25,11 @@ import {
   type CasePrepMotorDetailView,
   type CasePreparationDetailView,
 } from "../../../../../../data/models/user/CasePreparationFormModel";
+import {
+  UserWorkflowNavPanel,
+  UserWorkflowTabNav,
+  type UserWorkflowNavTab,
+} from "../../../../../components/custom/UserWorkflowStepPager";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const CP = STRINGS.MANUFACTURING.CASE_PREP;
@@ -207,6 +211,24 @@ const CasePreparationDetailsContent = ({
     setActiveMotorIndex(0);
   }, [resetMotorOnFormId]);
 
+  const navPalette = {
+    primary: theme.palette.primary,
+    primaryLight: theme.palette.primaryLight,
+    border: theme.palette.border,
+    surface: theme.palette.surface,
+    textSub: theme.palette.textSub,
+    text: theme.palette.text,
+  };
+
+  const motorTabs = useMemo<UserWorkflowNavTab[]>(
+    () =>
+      motors.map((motor) => ({
+        id: motor.motorId,
+        label: motor.motorId,
+      })),
+    [motors],
+  );
+
   const metaFields = [
     { label: BL.COL_BATCH_ID, value: detailView?.batchId || row?.batchId || "—" },
     { label: "Form ID", value: detailView?.formId || row?.formId || "—" },
@@ -254,34 +276,18 @@ const CasePreparationDetailsContent = ({
           </Typography>
 
           {motors.length > 1 ? (
-            <Box
-              sx={{
-                mb: 2,
-                p: 1.25,
-                borderRadius: 2,
-                border: `1px solid ${theme.palette.border}`,
-                background: theme.palette.surface,
-              }}
-            >
-              <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: theme.palette.primary, mb: 0.75 }}>
-                {CP.MOTOR_NAV_TITLE}
-              </Typography>
-              <Typography sx={{ fontSize: "0.72rem", color: theme.palette.textSub, mb: 1 }}>
-                {CP.MOTOR_NAV_HINT}
-              </Typography>
-              <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
-                {motors.map((motor, index) => (
-                  <Button
-                    key={motor.motorId}
-                    size="small"
-                    variant={index === activeMotorIndexSafe ? "contained" : "outlined"}
-                    onClick={() => setActiveMotorIndex(index)}
-                    sx={{ whiteSpace: "nowrap", flexShrink: 0, textTransform: "none", fontWeight: 700 }}
-                  >
-                    {motor.motorId}
-                  </Button>
-                ))}
-              </Stack>
+            <Box sx={{ mb: 2 }}>
+              <UserWorkflowNavPanel palette={navPalette}>
+                <UserWorkflowTabNav
+                  title={CP.MOTOR_NAV_TITLE}
+                  hint={CP.MOTOR_NAV_HINT}
+                  tabs={motorTabs}
+                  activeIndex={activeMotorIndexSafe}
+                  onActiveIndexChange={setActiveMotorIndex}
+                  palette={navPalette}
+                  showStepArrows
+                />
+              </UserWorkflowNavPanel>
             </Box>
           ) : null}
 

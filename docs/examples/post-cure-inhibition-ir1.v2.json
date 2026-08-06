@@ -29,6 +29,38 @@
         "ui": { "variant": "card", "padding": "md" },
         "children": [
           {
+            "type": "group",
+            "id": "IR1_PREMIX_BATCH_FIELDS",
+            "ui": {
+              "direction": "row",
+              "wrap": true,
+              "gap": "md",
+              "alignItems": "flex-end"
+            },
+            "children": [
+              {
+                "type": "field",
+                "id": "IR1_PREMIX_BATCH_NO",
+                "fieldType": "text",
+                "label": "Batch No",
+                "ui": {
+                  "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+                  "maxWidth": "280px"
+                }
+              },
+              {
+                "type": "field",
+                "id": "IR1_PREMIX_DATE",
+                "fieldType": "date",
+                "label": "Premix Date",
+                "ui": {
+                  "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+                  "maxWidth": "280px"
+                }
+              }
+            ]
+          },
+          {
             "type": "table",
             "id": "IR1_PREMIX_TABLE",
             "rows": {
@@ -36,11 +68,31 @@
               "allowAdd": false,
               "allowDelete": false,
               "autoIncrementKey": "srNo",
+              "rowComputations": [
+                {
+                  "rowKey": "TOTAL",
+                  "rowKeyColumn": "srNo",
+                  "targetColumn": "QTY_TAKEN",
+                  "sourceColumn": "QTY_TAKEN",
+                  "expression": "__SUM__",
+                  "editable": true
+                }
+              ],
               "presetRows": [
                 { "readonly": true, "INGREDIENT": "Castor Oil", "PARTS_BY_WEIGHT": "60.0±1.0" },
                 { "readonly": true, "INGREDIENT": "Asbestos Powder", "PARTS_BY_WEIGHT": "38.5±1.0" },
                 { "readonly": true, "INGREDIENT": "Nonox-D", "PARTS_BY_WEIGHT": "1.0±0.1" },
-                { "readonly": true, "INGREDIENT": "Ferric Oxide", "PARTS_BY_WEIGHT": "0.5±0.05" }
+                { "readonly": true, "INGREDIENT": "Ferric Oxide", "PARTS_BY_WEIGHT": "0.5±0.05" },
+                {
+                  "readonly": true,
+                  "srNo": "TOTAL",
+                  "INGREDIENT": "Total Quantity",
+                  "MFG_LOT": "",
+                  "PARTS_BY_WEIGHT": "",
+                  "MFG_LOT__fieldType": "static",
+                  "PARTS_BY_WEIGHT__fieldType": "static",
+                  "QTY_TAKEN__fieldType": "number"
+                }
               ]
             },
             "columns": [
@@ -53,12 +105,6 @@
               },
               {
                 "type": "column",
-                "id": "BATCH_NO",
-                "fieldType": "text",
-                "label": "Batch No. with date"
-              },
-              {
-                "type": "column",
                 "id": "INGREDIENT",
                 "fieldType": "static",
                 "label": "Ingredient",
@@ -67,22 +113,8 @@
               {
                 "type": "column",
                 "id": "MFG_LOT",
-                "fieldType": "dropdown",
-                "label": "Mfg. Lot",
-                "dataSource": {
-                  "type": "api",
-                  "api": {
-                    "endpoint": "MATERIAL_LOTS",
-                    "method": "POST",
-                    "requestField": "batchId",
-                    "requestBody": {
-                      "subDepartmentId": "{{subDepartmentId}}"
-                    },
-                    "responsePath": "data.materials",
-                    "displayKey": "lotId",
-                    "valueKey": "lotId"
-                  }
-                }
+                "fieldType": "text",
+                "label": "Mfg. Lot"
               },
               {
                 "type": "column",
@@ -96,12 +128,6 @@
                 "id": "QTY_TAKEN",
                 "fieldType": "number",
                 "label": "Qty taken (g)"
-              },
-              {
-                "type": "column",
-                "id": "TOTAL_QUANTITY",
-                "fieldType": "number",
-                "label": "Total Quantity (g)"
               }
             ]
           }
@@ -113,6 +139,38 @@
         "ui": { "variant": "card", "padding": "md" },
         "children": [
           {
+            "type": "group",
+            "id": "IR1_FINAL_MIX_BATCH_FIELDS",
+            "ui": {
+              "direction": "row",
+              "wrap": true,
+              "gap": "md",
+              "alignItems": "flex-end"
+            },
+            "children": [
+              {
+                "type": "field",
+                "id": "IR1_FINAL_MIX_BATCH_NO",
+                "fieldType": "text",
+                "label": "Batch No",
+                "ui": {
+                  "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+                  "maxWidth": "280px"
+                }
+              },
+              {
+                "type": "field",
+                "id": "IR1_FINAL_MIX_DATE",
+                "fieldType": "date",
+                "label": "Final Mix Date",
+                "ui": {
+                  "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+                  "maxWidth": "280px"
+                }
+              }
+            ]
+          },
+          {
             "type": "table",
             "id": "IR1_FINAL_MIX_TABLE",
             "rows": {
@@ -120,6 +178,16 @@
               "allowAdd": false,
               "allowDelete": false,
               "autoIncrementKey": "srNo",
+              "rowComputations": [
+                {
+                  "rowKey": "TOTAL",
+                  "rowKeyColumn": "srNo",
+                  "targetColumn": "QTY_TAKEN",
+                  "sourceColumn": "QTY_TAKEN",
+                  "expression": "__SUM__",
+                  "editable": true
+                }
+              ],
               "presetRows": [
                 { "readonly": true, "INGREDIENT": "IR-1 Premix", "PARTS_BY_WEIGHT": "100" },
                 { "readonly": true, "INGREDIENT": "TDI", "PARTS_BY_WEIGHT": "14.5" },
@@ -127,6 +195,16 @@
                   "readonly": true,
                   "INGREDIENT": "Catalyst (5% w/w FeAA in benzene)",
                   "PARTS_BY_WEIGHT": "2 ml"
+                },
+                {
+                  "readonly": true,
+                  "srNo": "TOTAL",
+                  "INGREDIENT": "Total Quantity",
+                  "MFG_LOT": "",
+                  "PARTS_BY_WEIGHT": "",
+                  "MFG_LOT__fieldType": "static",
+                  "PARTS_BY_WEIGHT__fieldType": "static",
+                  "QTY_TAKEN__fieldType": "number"
                 }
               ]
             },
@@ -140,12 +218,6 @@
               },
               {
                 "type": "column",
-                "id": "BATCH_NO",
-                "fieldType": "text",
-                "label": "Batch No. with date"
-              },
-              {
-                "type": "column",
                 "id": "INGREDIENT",
                 "fieldType": "static",
                 "label": "Ingredient",
@@ -154,22 +226,8 @@
               {
                 "type": "column",
                 "id": "MFG_LOT",
-                "fieldType": "dropdown",
-                "label": "Mfg. Lot",
-                "dataSource": {
-                  "type": "api",
-                  "api": {
-                    "endpoint": "MATERIAL_LOTS",
-                    "method": "POST",
-                    "requestField": "batchId",
-                    "requestBody": {
-                      "subDepartmentId": "{{subDepartmentId}}"
-                    },
-                    "responsePath": "data.materials",
-                    "displayKey": "lotId",
-                    "valueKey": "lotId"
-                  }
-                }
+                "fieldType": "text",
+                "label": "Mfg. Lot"
               },
               {
                 "type": "column",
@@ -183,12 +241,6 @@
                 "id": "QTY_TAKEN",
                 "fieldType": "number",
                 "label": "Qty taken (g)"
-              },
-              {
-                "type": "column",
-                "id": "TOTAL_QUANTITY",
-                "fieldType": "number",
-                "label": "Total Qty (g)"
               }
             ]
           }
@@ -200,14 +252,36 @@
         "ui": { "variant": "card", "padding": "md" },
         "children": [
           {
-            "type": "field",
-            "id": "BATCH_PREPARATION_DATE",
-            "fieldType": "text",
-            "label": "Batch No. with date of preparation",
+            "type": "group",
+            "id": "QUALIFICATION_BATCH_FIELDS",
             "ui": {
-              "colSpan": { "xs": 12, "sm": 6, "md": 4 },
-              "maxWidth": "300px"
-            }
+              "direction": "row",
+              "wrap": true,
+              "gap": "md",
+              "alignItems": "flex-end"
+            },
+            "children": [
+              {
+                "type": "field",
+                "id": "QUALIFICATION_BATCH_NO",
+                "fieldType": "text",
+                "label": "Batch No",
+                "ui": {
+                  "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+                  "maxWidth": "280px"
+                }
+              },
+              {
+                "type": "field",
+                "id": "QUALIFICATION_PREPARATION_DATE",
+                "fieldType": "date",
+                "label": "Date of Preparation",
+                "ui": {
+                  "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+                  "maxWidth": "280px"
+                }
+              }
+            ]
           },
           {
             "type": "table",
@@ -249,14 +323,131 @@
                 "id": "RESULT",
                 "fieldType": "text",
                 "label": "Result"
+              }
+            ]
+          },
+          {
+            "type": "field",
+            "id": "QUALIFICATION_QC_REPORT",
+            "fieldType": "file",
+            "label": "QC Report"
+          }
+        ]
+      },
+      {
+        "id": "INHIBITION_BATCH_DETAILS",
+        "title": "Inhibitor Batch Information",
+        "ui": {
+          "variant": "card",
+          "padding": "md",
+          "direction": "row",
+          "wrap": true,
+          "gap": "md"
+        },
+        "children": [
+          {
+            "type": "field",
+            "id": "INHIBITOR_BATCH_NO",
+            "fieldType": "text",
+            "label": "Batch No"
+          },
+          {
+            "type": "field",
+            "id": "INHIBITOR_BATCH_SIZE",
+            "fieldType": "number",
+            "label": "Batch Size",
+            "unit": "g"
+          }
+        ]
+      },
+      {
+        "id": "INHIBITION_APPLICATION_DETAILS",
+        "title": "Inhibition Application Details",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "table",
+            "id": "INHIBITION_APPLICATION_TABLE",
+            "rows": {
+              "defaultCount": 2,
+              "allowAdd": false,
+              "allowDelete": false,
+              "presetRows": [
+                { "readonly": true, "LOCATION": "HE_SIDE" },
+                { "readonly": true, "LOCATION": "NE_SIDE" }
+              ]
+            },
+            "columns": [
+              {
+                "type": "column",
+                "id": "LOCATION",
+                "fieldType": "static",
+                "label": "Location",
+                "readonly": true
               },
               {
                 "type": "column",
-                "id": "QC_REPORT",
-                "fieldType": "file",
-                "label": "Upload QC Report"
+                "id": "FROM_DATE",
+                "fieldType": "date",
+                "label": "From Date"
+              },
+              {
+                "type": "column",
+                "id": "TO_DATE",
+                "fieldType": "date",
+                "label": "To Date"
+              },
+              {
+                "type": "column",
+                "id": "QTY_APPLIED",
+                "fieldType": "number",
+                "label": "Qty Applied (g)"
+              },
+              {
+                "type": "column",
+                "id": "OBSERVATIONS",
+                "fieldType": "textarea",
+                "label": "Observations"
               }
             ]
+          }
+        ]
+      },
+      {
+        "id": "DISPATCH_DETAILS",
+        "title": "Dispatch Details",
+        "ui": {
+          "variant": "card",
+          "padding": "md",
+          "direction": "row",
+          "wrap": true,
+          "gap": "md"
+        },
+        "children": [
+          {
+            "type": "field",
+            "id": "DISPATCH_DATE",
+            "fieldType": "date",
+            "label": "Date Of Dispatch"
+          },
+          {
+            "type": "field",
+            "id": "DISPATCH_STATION",
+            "fieldType": "dropdown",
+            "label": "Dispatch Station",
+            "dataSource": {
+              "type": "api",
+              "api": {
+                "endpoint": "CASTING_STATION_LIST",
+                "method": "GET",
+                "requestBody": {
+                  "subDepartmentId": "{{subDepartmentId}}"
+                },
+                "responsePath": "data.materials",
+                "displayKey": "stationName",
+                "valueKey": "stationCode"
+              }
+            }
           }
         ]
       }

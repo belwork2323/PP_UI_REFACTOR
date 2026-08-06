@@ -68,6 +68,158 @@ export type VisualInspectionFormRow = {
   }>;
 };
 
+/** Matches NDT radiography plan details table columns. */
+export type CasingRadiographyPlanRow = {
+  srNo: number;
+  sections: string;
+  orientations: string;
+  sfd: string;
+  normalExposures: string;
+  tangentialExposures: string;
+  detectorType: string;
+};
+
+export const CASING_DETECTOR_TYPE_OPTIONS = [
+  { value: "Imaging Plate", label: "Imaging Plate" },
+  { value: "DR Panel", label: "DR Panel" },
+  { value: "Film", label: "Film" },
+] as const;
+
+const CASING_DETECTOR_TO_API: Record<string, string> = {
+  "Imaging Plate": "IMAGING_PLATE",
+  "DR Panel": "DR",
+  Film: "FILM",
+  IMAGING_PLATE: "IMAGING_PLATE",
+  DR: "DR",
+  FILM: "FILM",
+};
+
+const CASING_DETECTOR_FROM_API: Record<string, string> = {
+  IMAGING_PLATE: "Imaging Plate",
+  DR: "DR Panel",
+  FILM: "Film",
+};
+
+export const createEmptyRadiographyPlanRow = (srNo = 1): CasingRadiographyPlanRow => ({
+  srNo,
+  sections: "",
+  orientations: "",
+  sfd: "",
+  normalExposures: "",
+  tangentialExposures: "",
+  detectorType: "",
+});
+
+export const createInitialRadiographyPlanRows = (): CasingRadiographyPlanRow[] => [
+  createEmptyRadiographyPlanRow(1),
+];
+
+const mapCasingDetectorTypeToApi = (value: string): string => {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return "";
+  return CASING_DETECTOR_TO_API[trimmed] ?? trimmed.toUpperCase().replace(/\s+/g, "_");
+};
+
+const mapCasingDetectorTypeFromApi = (value: string): string => {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return "";
+  return CASING_DETECTOR_FROM_API[trimmed] ?? trimmed;
+};
+
+const radiographyPlanRowHasData = (row: CasingRadiographyPlanRow): boolean =>
+  Boolean(
+    String(row.sections ?? "").trim() ||
+    String(row.orientations ?? "").trim() ||
+    String(row.sfd ?? "").trim() ||
+    String(row.normalExposures ?? "").trim() ||
+    String(row.tangentialExposures ?? "").trim() ||
+    String(row.detectorType ?? "").trim(),
+  );
+
+const buildRadiographyDetailsPayload = (
+  rows: CasingRadiographyPlanRow[],
+  planId: string,
+  planName: string,
+) => {
+  const radiographyPlanDetails = (Array.isArray(rows) ? rows : [])
+    .filter(radiographyPlanRowHasData)
+    .map((row) => ({
+      numberOfSections: parseNum(row.sections) ?? 0,
+      numberOfOrientations: parseNum(row.orientations) ?? 0,
+      sfd: parseNum(row.sfd) ?? 0,
+      numberOfNormalExposures: parseNum(row.normalExposures) ?? 0,
+      numberOfTangentialExposures: parseNum(row.tangentialExposures) ?? 0,
+      detectorType: mapCasingDetectorTypeToApi(row.detectorType),
+    }));
+
+  return {
+    radiographyPlanId: String(planId ?? "").trim(),
+    radiographyPlanName: String(planName ?? "").trim(),
+    radiographyPlanDetails,
+  };
+};
+
+const parseRadiographyPlanMetaFromSections = (
+  sections: Record<string, unknown>,
+): { radiographyPlanId: string; radiographyPlanName: string } => {
+  const raw = sections.radiographyDetails;
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return { radiographyPlanId: "", radiographyPlanName: "" };
+  }
+  const asRecord = raw as Record<string, unknown>;
+  return {
+    radiographyPlanId: String(
+      asRecord.radiographyPlanId ?? asRecord.planId ?? asRecord.radiography_plan_id ?? "",
+    ).trim(),
+    radiographyPlanName: String(
+      asRecord.radiographyPlanName ?? asRecord.planName ?? asRecord.radiography_plan_name ?? "",
+    ).trim(),
+  };
+};
+
+const parseRadiographyPlanRowsFromSections = (
+  sections: Record<string, unknown>,
+): CasingRadiographyPlanRow[] => {
+  const raw = sections.radiographyDetails;
+  if (!raw) return createInitialRadiographyPlanRows();
+
+  const asRecord =
+    typeof raw === "object" && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null;
+  const list = Array.isArray(raw)
+    ? raw
+    : Array.isArray(asRecord?.radiographyPlanDetails)
+      ? asRecord.radiographyPlanDetails
+      : Array.isArray(asRecord?.planRows)
+        ? asRecord.planRows
+        : Array.isArray(asRecord?.rows)
+          ? asRecord.rows
+          : asRecord?.radiographyPlanDetails && typeof asRecord.radiographyPlanDetails === "object"
+            ? [asRecord.radiographyPlanDetails]
+            : [];
+
+  if (list.length === 0) return createInitialRadiographyPlanRows();
+
+  return list.map((entry: any, index: number) => ({
+    srNo: Number(entry?.srNo ?? index + 1) || index + 1,
+    sections: valueFromApiField(
+      entry?.numberOfSections ?? entry?.sections ?? entry?.number_of_sections,
+    ),
+    orientations: valueFromApiField(
+      entry?.numberOfOrientations ?? entry?.orientations ?? entry?.number_of_orientations,
+    ),
+    sfd: valueFromApiField(entry?.sfd),
+    normalExposures: valueFromApiField(
+      entry?.numberOfNormalExposures ?? entry?.normalExposures ?? entry?.number_of_normal_exposures,
+    ),
+    tangentialExposures: valueFromApiField(
+      entry?.numberOfTangentialExposures ??
+        entry?.tangentialExposures ??
+        entry?.number_of_tangential_exposures,
+    ),
+    detectorType: mapCasingDetectorTypeFromApi(String(entry?.detectorType ?? "")),
+  }));
+};
+
 export type DimensionalReadingFormRow = {
   paramId: string;
   paramName: string;
@@ -166,6 +318,9 @@ export type RocketMotorCasingFormData = {
   acemNdtObservations: string;
   projectRubberSurfaceObservations: string;
   otherDetails: string;
+  radiographyPlanId: string;
+  radiographyPlanName: string;
+  radiographyPlanRows: CasingRadiographyPlanRow[];
   visualInspection: VisualInspectionFormRow[];
   weightWithoutHarness: string;
   weightWithHarness: string;
@@ -620,6 +775,9 @@ export const INITIAL_ROCKET_MOTOR_CASING_FORM: RocketMotorCasingFormData = {
   acemNdtObservations: "",
   projectRubberSurfaceObservations: "",
   otherDetails: "",
+  radiographyPlanId: "",
+  radiographyPlanName: "",
+  radiographyPlanRows: createInitialRadiographyPlanRows(),
   visualInspection: createInitialVisualInspection(),
   weightWithoutHarness: "",
   weightWithHarness: "",
@@ -758,10 +916,14 @@ export function buildCasingFormPayload(
     motorId: form.motorId.trim(),
     formSubmissionType,
     sections: {
+      radiographyDetails: buildRadiographyDetailsPayload(
+        form.radiographyPlanRows,
+        form.radiographyPlanId,
+        form.radiographyPlanName,
+      ),
       motorReceipt: {
         casingType: form.casingType,
-        receivingDate:
-          toPayloadDate(form.receivingDate) || new Date().toISOString().slice(0, 10),
+        receivingDate: toPayloadDate(form.receivingDate) || new Date().toISOString().slice(0, 10),
         itemsReceived: {
           itemType: "RUBBER_SHEET",
           description: form.itemsDescription.trim() || "Rubber Sheet",
@@ -1050,6 +1212,8 @@ export function parseSectionsToFormData(
     acemNdtObservations: str(mr.acemNdtObservations),
     projectRubberSurfaceObservations: str(mr.projectRubberSurfaceObservations),
     otherDetails: str(mr.otherDetails),
+    ...parseRadiographyPlanMetaFromSections(sections),
+    radiographyPlanRows: parseRadiographyPlanRowsFromSections(sections),
     visualInspection,
     weightWithoutHarness:
       parseApiNumeric(wwh.value) != null

@@ -5,9 +5,15 @@ import { STRINGS } from "../../../../../app/config/strings";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { QualityControlFormState } from "../../../../../data/models/user/QualityControlFormModel";
 import { buildDivisionNavGroups } from "../../../../../hooks/user/qualityControl/qcDivisionNav";
+import type {
+  QcDivisionOption,
+  QcRawMaterialTypeOption,
+} from "../../../../../hooks/user/qualityControl/qcFlowConfig";
+import type { QcPartialNavItem } from "../../../../../hooks/user/qualityControl/qcDivisionApprovalUnits";
 import type { SchemaFormValues } from "../../../../../schema-engine";
 import QCDivisionFormBody from "./QCDivisionFormBody";
 import QCFlowBar from "./QCFlowBar";
+import QCPartialItemNavigation from "./QCPartialItemNavigation";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 const { science: ScienceRoundedIcon } = icons.user.qualityControl.qcDivision.form;
@@ -15,9 +21,13 @@ const { science: ScienceRoundedIcon } = icons.user.qualityControl.qcDivision.for
 type QCFormProps = {
   batch?: { batchId?: string } | null;
   formData: QualityControlFormState;
+  scopedFormData?: QualityControlFormState;
   subDepartmentId?: number;
   selectedDivision: string;
+  divisionOptions?: QcDivisionOption[];
+  divisionsLoading?: boolean;
   selectedRawMaterialType: string;
+  rawMaterialTypeOptions?: QcRawMaterialTypeOption[];
   selectedProcessingType: string;
   selectedPremix: number | "";
   selectedMixingStage: string;
@@ -36,8 +46,13 @@ type QCFormProps = {
   addedDivisionEntryKeys: string[];
   activeDivisionGroupIndex: number;
   activeDivisionSubIndex: number;
+  partialNavItems?: QcPartialNavItem[];
+  activePartialNavIndex?: number;
+  partialNavActive?: boolean;
+  divisionGroupStatusByFlowKey?: Record<string, import("../../../../../hooks/user/qualityControl/qcDivisionApprovalUnits").QcPartialItemStatus>;
   isEditMode?: boolean;
   readOnly?: boolean;
+  fieldsReadOnly?: boolean;
   schemaLoading?: boolean;
   schemaError?: string | null;
   flowBarTheme: any;
@@ -58,6 +73,7 @@ type QCFormProps = {
   onWeightmentWeighscaleNoChange: (value: string) => void;
   onWeightmentCalibrationDueDateChange: (value: string) => void;
   onLoadForm: () => void;
+  onPartialNavIndexChange?: (index: number) => void;
   onActiveDivisionGroupIndexChange: (index: number) => void;
   onActiveDivisionSubIndexChange: (index: number) => void;
   onDivisionEntryValuesChange: (entryId: string, values: SchemaFormValues) => void;
@@ -70,9 +86,13 @@ type QCFormProps = {
 const QCForm = ({
   batch,
   formData,
+  scopedFormData,
   subDepartmentId,
   selectedDivision,
+  divisionOptions = [],
+  divisionsLoading = false,
   selectedRawMaterialType,
+  rawMaterialTypeOptions = [],
   selectedProcessingType,
   selectedPremix,
   selectedMixingStage,
@@ -91,8 +111,13 @@ const QCForm = ({
   addedDivisionEntryKeys,
   activeDivisionGroupIndex,
   activeDivisionSubIndex,
+  partialNavItems = [],
+  activePartialNavIndex = 0,
+  partialNavActive = false,
+  divisionGroupStatusByFlowKey = {},
   isEditMode = false,
   readOnly = false,
+  fieldsReadOnly = false,
   schemaLoading = false,
   schemaError = null,
   flowBarTheme,
@@ -113,6 +138,7 @@ const QCForm = ({
   onWeightmentWeighscaleNoChange,
   onWeightmentCalibrationDueDateChange,
   onLoadForm,
+  onPartialNavIndexChange,
   onActiveDivisionGroupIndexChange,
   onActiveDivisionSubIndexChange,
   onDivisionEntryValuesChange,
@@ -122,7 +148,8 @@ const QCForm = ({
   theme,
 }: QCFormProps) => {
   const BRAND = QC_DIVISION_BRAND;
-  const divisionEntries = formData.divisionEntries ?? [];
+  const bodyFormData = scopedFormData ?? formData;
+  const divisionEntries = bodyFormData.divisionEntries ?? [];
   const hasDivisionEntries = divisionEntries.length > 0;
   const navGroupsCount = useMemo(
     () => (hasDivisionEntries ? buildDivisionNavGroups(divisionEntries).length : 0),
@@ -185,7 +212,21 @@ const QCForm = ({
               </Typography>
             </Box>
           </Stack>
-          {hasDivisionEntries ? (
+          {partialNavActive ? (
+            <Chip
+              label={`${partialNavItems.length} item${partialNavItems.length === 1 ? "" : "s"}`}
+              size="small"
+              sx={{
+                height: 26,
+                fontWeight: 700,
+                fontSize: "0.7rem",
+                alignSelf: { xs: "flex-start", sm: "center" },
+                background: "rgba(27,79,114,0.1)",
+                color: BRAND.primary,
+                border: `1px solid ${BRAND.primary}44`,
+              }}
+            />
+          ) : hasDivisionEntries ? (
             <Chip
               label={`${navGroupsCount} division${navGroupsCount === 1 ? "" : "s"} added`}
               size="small"
@@ -207,7 +248,10 @@ const QCForm = ({
         <QCFlowBar
           batch={batch}
           selectedDivision={selectedDivision}
+          divisionOptions={divisionOptions}
+          divisionsLoading={divisionsLoading}
           selectedRawMaterialType={selectedRawMaterialType}
+          rawMaterialTypeOptions={rawMaterialTypeOptions}
           selectedProcessingType={selectedProcessingType}
           selectedPremix={selectedPremix}
           selectedMixingStage={selectedMixingStage}
@@ -226,6 +270,7 @@ const QCForm = ({
           addedDivisionEntryKeys={addedDivisionEntryKeys}
           hasDivisionEntries={hasDivisionEntries}
           schemaLoading={schemaLoading}
+          partialNavActive={partialNavActive}
           onDivisionChange={onDivisionChange}
           onRawMaterialTypeChange={onRawMaterialTypeChange}
           onProcessingTypeChange={onProcessingTypeChange}
@@ -247,15 +292,26 @@ const QCForm = ({
         />
       ) : null}
 
+      {partialNavActive ? (
+        <QCPartialItemNavigation
+          items={partialNavItems}
+          activeIndex={activePartialNavIndex}
+          onActiveIndexChange={onPartialNavIndexChange ?? (() => undefined)}
+          loading={schemaLoading}
+        />
+      ) : null}
+
       <QCDivisionFormBody
         batch={batch}
-        formData={formData}
+        formData={bodyFormData}
         subDepartmentId={subDepartmentId}
         activeDivisionGroupIndex={activeDivisionGroupIndex}
         activeDivisionSubIndex={activeDivisionSubIndex}
-        readOnly={readOnly}
+        readOnly={readOnly || fieldsReadOnly}
         schemaLoading={schemaLoading}
         schemaError={schemaError}
+        hideDivisionSubNav={partialNavActive}
+        groupStatusByFlowKey={divisionGroupStatusByFlowKey}
         onActiveDivisionGroupIndexChange={onActiveDivisionGroupIndexChange}
         onActiveDivisionSubIndexChange={onActiveDivisionSubIndexChange}
         onDivisionEntryValuesChange={onDivisionEntryValuesChange}

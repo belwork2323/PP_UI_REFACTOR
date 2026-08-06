@@ -1,25 +1,30 @@
 import React, { useMemo, useState } from "react";
-import { Box, CircularProgress, Button, Stack } from "@mui/material";
+import { Box } from "@mui/material";
 import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog";
+import WorkflowFormOpeningLoader from "../../../../components/common/WorkflowFormOpeningLoader";
 import TrimmingList from "./TrimmingList";
 import TrimmingForm from "./TrimmingForm";
 import TrimmingHeader from "./TrimmingHeader";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
+import { TRIMMING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/trimming_theme";
 import useTrimmingHook from "../../../../../hooks/user/manufacturing/useTrimmingHook";
 import { STRINGS } from "../../../../../app/config/strings";
 import TrimmingDetailsView from "./TrimmingDetailsView";
+
 const TrimmingPage = () => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getManufacturingTheme(mode), [mode]);
-  const actionStrings = STRINGS.SOURCING.SPECIFICATION_FORM;
-  const [draftConfirmOpen, setDraftConfirmOpen] = useState(false);
-  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const S = STRINGS.MANUFACTURING.TRIMMING;
+  const [motorDraftConfirmOpen, setMotorDraftConfirmOpen] = useState(false);
+  const [motorSubmitConfirmOpen, setMotorSubmitConfirmOpen] = useState(false);
+  const [pendingMotorId, setPendingMotorId] = useState<string | null>(null);
 
   const hookState = useTrimmingHook();
 
   const {
     loading,
+    loadingFormDetails,
     view,
     activeBatch,
     isEditMode,
@@ -29,116 +34,123 @@ const TrimmingPage = () => {
     setBackConfirmOpen,
     handleBack,
     handleDiscardAndBack,
-    handleSaveDraft,
-    handleSubmit,
     addedMotors,
     batchMotorEntries,
+    motorStatusById,
+    getMotorStatus,
+    isMotorEditable,
+    previousStageGate,
     detailsRow,
     detailsData,
     detailsLoading,
     handleBackFromDetails,
     handleMotorSessionChange,
+    handleSaveMotorDraft,
+    handleSubmitMotor,
+    handleSubmitForFinalApproval,
   } = hookState;
 
-  if (loading) {
-    return (
-      <Box sx={theme.workflow.loadingContainer}>
-        <CircularProgress size={32} />
-      </Box>
-    );
-  }
-
-  if (view === "list") {
-    return (
-      <Box sx={theme.workflow.animatedContainer}>
-        <TrimmingList hookState={hookState} />
-      </Box>
-    );
-  }
-  if (view === "details" && detailsRow) {
-    return (
-      <TrimmingDetailsView
-        row={detailsRow}
-        data={detailsData}
-        loading={detailsLoading}
-        onBack={handleBackFromDetails}
-      />
-    );
-  }
+  const listLoading = loading && !loadingFormDetails && view === "list";
 
   return (
     <Box sx={theme.workflow.animatedContainer}>
-      <TrimmingHeader batch={activeBatch} isEdit={isEditMode} onBack={handleBack} theme={theme} />
-      <TrimmingForm
-        batch={activeBatch}
-        formData={formData}
-        addedMotors={addedMotors}
-        autoMotorEntries={batchMotorEntries}
-        onMotorSessionChange={handleMotorSessionChange}
-        theme={theme}
-      />
-
-      <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} mt={3} justifyContent="flex-end">
-        <Button
-          variant="outlined"
-          disabled={addedMotors.length === 0 || actionLoading}
-          onClick={() => setDraftConfirmOpen(true)}
-        >
-          {actionStrings.SAVE_DRAFT}
-        </Button>
-        <Button
-          variant="contained"
-          disabled={addedMotors.length === 0 || actionLoading}
-          onClick={() => setSubmitConfirmOpen(true)}
-        >
-          {isEditMode ? actionStrings.RESUBMIT_APPROVAL : actionStrings.SUBMIT_APPROVAL}
-        </Button>
-      </Stack>
-
-      <ConfirmAlertDialog
-        open={backConfirmOpen}
-        severity="warning"
-        title={STRINGS.MANUFACTURING.TRIMMING.UNSAVED_BACK_TITLE}
-        message={STRINGS.MANUFACTURING.TRIMMING.UNSAVED_BACK_MESSAGE}
-        confirmLabel={STRINGS.MANUFACTURING.TRIMMING.UNSAVED_BACK_DISCARD}
-        cancelLabel={STRINGS.MANUFACTURING.TRIMMING.UNSAVED_BACK_CONFIRM}
-        onConfirm={handleDiscardAndBack}
-        onCancel={() => setBackConfirmOpen(false)}
-      />
-
-      <ConfirmAlertDialog
-        open={draftConfirmOpen}
-        severity="warning"
-        title={actionStrings.CONFIRM_DRAFT_TITLE}
-        message={actionStrings.CONFIRM_DRAFT_MESSAGE}
-        confirmLabel={actionStrings.CONFIRM_DRAFT_ACTION}
-        cancelLabel={actionStrings.CONFIRM_DRAFT_CANCEL_ACTION}
-        onConfirm={async () => {
-          setDraftConfirmOpen(false);
-          await handleSaveDraft();
-        }}
-        onCancel={() => setDraftConfirmOpen(false)}
-      />
-
-      <ConfirmAlertDialog
-        open={submitConfirmOpen}
-        severity="warning"
-        title={
-          isEditMode ? actionStrings.CONFIRM_RESUBMIT_TITLE : actionStrings.CONFIRM_SUBMIT_TITLE
-        }
+      <WorkflowFormOpeningLoader
+        open={listLoading || Boolean(loadingFormDetails)}
+        title={loadingFormDetails ? S.FORM_OPENING_TITLE : S.TITLE}
         message={
-          isEditMode ? actionStrings.CONFIRM_RESUBMIT_MESSAGE : actionStrings.CONFIRM_SUBMIT_MESSAGE
+          loadingFormDetails ? S.FORM_OPENING_MESSAGE : "Loading trimming batches…"
         }
-        confirmLabel={
-          isEditMode ? actionStrings.CONFIRM_RESUBMIT_ACTION : actionStrings.CONFIRM_SUBMIT_ACTION
-        }
-        cancelLabel={actionStrings.CONFIRM_CANCEL_ACTION}
-        onConfirm={async () => {
-          setSubmitConfirmOpen(false);
-          await handleSubmit();
-        }}
-        onCancel={() => setSubmitConfirmOpen(false)}
+        color={TRIMMING_BRAND.tr}
+        accentColor={TRIMMING_BRAND.trLight}
       />
+
+      {view === "list" && !listLoading && <TrimmingList hookState={hookState} />}
+
+      {view === "details" && detailsRow && (
+        <TrimmingDetailsView
+          row={detailsRow}
+          data={detailsData}
+          loading={detailsLoading}
+          onBack={handleBackFromDetails}
+        />
+      )}
+
+      {view === "form" && activeBatch && !loadingFormDetails && (
+        <>
+          <TrimmingHeader batch={activeBatch} isEdit={isEditMode} onBack={handleBack} theme={theme} />
+          <TrimmingForm
+            batch={activeBatch}
+            formData={formData}
+            addedMotors={addedMotors}
+            autoMotorEntries={batchMotorEntries}
+            motorStatusById={motorStatusById}
+            getMotorStatus={getMotorStatus}
+            isMotorEditable={isMotorEditable}
+            previousStageGate={previousStageGate}
+            actionLoading={actionLoading}
+            onMotorSessionChange={handleMotorSessionChange}
+            onSaveMotorDraft={(motorId) => {
+              setPendingMotorId(motorId);
+              setMotorDraftConfirmOpen(true);
+            }}
+            onSubmitMotor={(motorId) => {
+              setPendingMotorId(motorId);
+              setMotorSubmitConfirmOpen(true);
+            }}
+            onSubmitForFinalApproval={handleSubmitForFinalApproval}
+            theme={theme}
+          />
+
+          <ConfirmAlertDialog
+            open={backConfirmOpen}
+            severity="warning"
+            title={S.UNSAVED_BACK_TITLE}
+            message={S.UNSAVED_BACK_MESSAGE}
+            confirmLabel={S.UNSAVED_BACK_DISCARD}
+            cancelLabel={S.UNSAVED_BACK_CONFIRM}
+            onConfirm={handleDiscardAndBack}
+            onCancel={() => setBackConfirmOpen(false)}
+          />
+
+          <ConfirmAlertDialog
+            open={motorDraftConfirmOpen}
+            severity="warning"
+            title={S.MOTOR_DRAFT_CONFIRM_TITLE}
+            message={S.MOTOR_DRAFT_CONFIRM_MESSAGE(pendingMotorId ?? "")}
+            confirmLabel={S.SAVE_MOTOR_DRAFT}
+            cancelLabel={STRINGS.SOURCING.SPECIFICATION_FORM.CONFIRM_CANCEL_ACTION}
+            onConfirm={async () => {
+              const motorId = pendingMotorId;
+              setMotorDraftConfirmOpen(false);
+              setPendingMotorId(null);
+              if (motorId) await handleSaveMotorDraft(motorId);
+            }}
+            onCancel={() => {
+              setMotorDraftConfirmOpen(false);
+              setPendingMotorId(null);
+            }}
+          />
+
+          <ConfirmAlertDialog
+            open={motorSubmitConfirmOpen}
+            severity="warning"
+            title={S.MOTOR_SUBMIT_CONFIRM_TITLE}
+            message={S.MOTOR_SUBMIT_CONFIRM_MESSAGE(pendingMotorId ?? "")}
+            confirmLabel={S.SUBMIT_MOTOR}
+            cancelLabel={STRINGS.SOURCING.SPECIFICATION_FORM.CONFIRM_CANCEL_ACTION}
+            onConfirm={async () => {
+              const motorId = pendingMotorId;
+              setMotorSubmitConfirmOpen(false);
+              setPendingMotorId(null);
+              if (motorId) await handleSubmitMotor(motorId);
+            }}
+            onCancel={() => {
+              setMotorSubmitConfirmOpen(false);
+              setPendingMotorId(null);
+            }}
+          />
+        </>
+      )}
     </Box>
   );
 };

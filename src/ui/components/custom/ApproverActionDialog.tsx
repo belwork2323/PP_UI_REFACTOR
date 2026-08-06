@@ -44,14 +44,25 @@ const ApproverActionDialog = ({
 
   return (
     <Dialog open={open} onClose={submitting ? undefined : onCancel} maxWidth="sm" fullWidth>
-      <DialogTitle>{isReject ? STRINGS.APPROVER.ACTION.REJECT_TITLE : STRINGS.APPROVER.ACTION.APPROVE_TITLE}</DialogTitle>
+      <DialogTitle>
+        {isReject ? STRINGS.APPROVER.ACTION.REJECT_TITLE : STRINGS.APPROVER.ACTION.APPROVE_TITLE}
+      </DialogTitle>
       <DialogContent>
         <Typography sx={{ fontSize: "0.9rem", color: "text.secondary", mb: 2 }}>
-          {isReject ? STRINGS.APPROVER.ACTION.REJECT_MESSAGE : STRINGS.APPROVER.ACTION.APPROVE_MESSAGE}
+          {isReject
+            ? STRINGS.APPROVER.ACTION.REJECT_MESSAGE
+            : STRINGS.APPROVER.ACTION.APPROVE_MESSAGE}
         </Typography>
         {batchId ? (
           <Box sx={{ mb: 2 }}>
-            <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, color: "text.secondary", textTransform: "uppercase" }}>
+            <Typography
+              sx={{
+                fontSize: "0.75rem",
+                fontWeight: 700,
+                color: "text.secondary",
+                textTransform: "uppercase",
+              }}
+            >
               {idLabel}
             </Typography>
             <Typography sx={{ fontSize: "0.92rem", fontWeight: 600 }}>{batchId}</Typography>
@@ -63,7 +74,9 @@ const ApproverActionDialog = ({
           multiline
           minRows={4}
           label={
-            isReject ? STRINGS.APPROVER.ACTION.REJECTION_REASON_LABEL : STRINGS.APPROVER.ACTION.REMARKS_LABEL
+            isReject
+              ? STRINGS.APPROVER.ACTION.REJECTION_REASON_LABEL
+              : STRINGS.APPROVER.ACTION.REMARKS_LABEL
           }
           placeholder={
             isReject
@@ -79,7 +92,12 @@ const ApproverActionDialog = ({
         />
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 3 }}>
-        <Button onClick={onCancel} disabled={submitting} variant="outlined" sx={{ textTransform: "none" }}>
+        <Button
+          onClick={onCancel}
+          disabled={submitting}
+          variant="outlined"
+          sx={{ textTransform: "none" }}
+        >
           {STRINGS.APPROVER.ACTION.CANCEL_LABEL}
         </Button>
         <Button

@@ -50,11 +50,22 @@ export const isPremixLocked = (status: PremixSubmissionStatus | undefined): bool
 export const isPremixEditable = (status: PremixSubmissionStatus | undefined): boolean =>
   !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED";
 
-export const isPremixApproverTabDisabled = (status: PremixSubmissionStatus | undefined): boolean =>
-  !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS";
+/** True once any premix has been saved (draft/submit) — list `formId` may exist earlier. */
+export const hasRawMaterialPrepPersistedData = (
+  premixStatusByNo: Record<number, PremixStatusMeta> | undefined | null,
+): boolean =>
+  Object.values(premixStatusByNo ?? {}).some((meta) => {
+    const status = meta?.premixSubmissionStatus ?? "TO_BE_INITIATED";
+    return status !== "TO_BE_INITIATED";
+  });
 
-export const isPremixApproverActionable = (status: PremixSubmissionStatus | undefined): boolean =>
-  status === "WAITING_FOR_APPROVAL";
+export const isPremixApproverTabDisabled = (status: PremixSubmissionStatus | undefined): boolean =>
+  !status || status === "TO_BE_INITIATED";
+
+export const isPremixApproverActionable = (status: PremixSubmissionStatus | undefined): boolean => {
+  const normalized = String(status ?? "").trim().toUpperCase().replace(/\s+/g, "_");
+  return normalized === "WAITING_FOR_APPROVAL" || normalized === "IN_PROGRESS";
+};
 
 /** Entire form can be approved/rejected once submitted and every premix is approved. */
 export const canApproverActionEntireRawMaterialPrepForm = (params: {
@@ -670,6 +681,44 @@ export const mapPreparationDetailsFromApi = (
   const addedPremixSelections: RawMaterialPrepPremixSelection[] = [];
   const premixSessions: Record<string, RawMaterialPrepPremixSession> = {};
 
+  const gradesReferToSame = (
+    left: string,
+    right: string,
+    material?: MaterialsListItem,
+  ): boolean => {
+    const a = left.trim().toUpperCase();
+    const b = right.trim().toUpperCase();
+    if (!a || !b) return true;
+    if (a === b) return true;
+
+    const grades = material?.grades ?? [];
+    if (!grades.length) return false;
+
+    const resolve = (raw: string) =>
+      grades.find(
+        (grade) =>
+          grade.gradeCode.toUpperCase() === raw ||
+          grade.gradeName.toUpperCase() === raw,
+      );
+
+    const leftGrade = resolve(a);
+    const rightGrade = resolve(b);
+    if (leftGrade && rightGrade) return leftGrade.gradeId === rightGrade.gradeId;
+    if (leftGrade) {
+      return (
+        leftGrade.gradeCode.toUpperCase() === b ||
+        leftGrade.gradeName.toUpperCase() === b
+      );
+    }
+    if (rightGrade) {
+      return (
+        rightGrade.gradeCode.toUpperCase() === a ||
+        rightGrade.gradeName.toUpperCase() === a
+      );
+    }
+    return false;
+  };
+
   const matchProcessToSelection = (
     process: PreparationProcessEntry | undefined,
     selection: RawMaterialPrepPremixSelection,
@@ -685,9 +734,19 @@ export const mapPreparationDetailsFromApi = (
     if (!code || code !== selectionCode) return false;
 
     if (slot === "solid" && selection.solidGradeCode) {
-      const processGrade = String(process.gradeCode ?? "").trim().toUpperCase();
-      const selectionGrade = selection.solidGradeCode.trim().toUpperCase();
-      if (processGrade && selectionGrade && processGrade !== selectionGrade) return false;
+      const processGrade = String(process.gradeCode ?? "").trim();
+      const selectionGrade = selection.solidGradeCode.trim();
+      if (
+        processGrade &&
+        selectionGrade &&
+        !gradesReferToSame(
+          processGrade,
+          selectionGrade,
+          findMaterialInList(solidMaterials, selection.solidMaterialCode),
+        )
+      ) {
+        return false;
+      }
     }
 
     return true;
@@ -698,8 +757,6 @@ export const mapPreparationDetailsFromApi = (
     return sheetMaterials.map((row) => {
       const materialCode = String(row.materialCode ?? "").trim();
       const gradeRaw = String(row.gradeCode ?? row.gradeName ?? "").trim();
-      const materialKey =
-        materialSelectionKey(materialCode, gradeRaw || undefined) || `sr-${row.srNo}`;
       const inSolid = solidMaterials.some(
         (material) => material.materialCode.toUpperCase() === materialCode.toUpperCase(),
       );
@@ -713,11 +770,10 @@ export const mapPreparationDetailsFromApi = (
 
       const solidMaterial = inSolid ? findMaterialInList(solidMaterials, materialCode) : undefined;
       const liquidMaterial = inLiquid ? findMaterialInList(liquidMaterials, materialCode) : undefined;
-      const gradeMatch = solidMaterial?.grades?.find(
-        (grade) =>
-          grade.gradeCode.toUpperCase() === gradeRaw.toUpperCase() ||
-          grade.gradeName.toUpperCase() === gradeRaw.toUpperCase(),
-      );
+      const gradeMatch = findGradeInMaterial(solidMaterial, gradeRaw);
+      const resolvedGradeCode = gradeMatch?.gradeCode ?? gradeRaw;
+      const materialKey =
+        materialSelectionKey(materialCode, resolvedGradeCode || undefined) || `sr-${row.srNo}`;
 
       return {
         premix: premixNo,
@@ -731,13 +787,35 @@ export const mapPreparationDetailsFromApi = (
         requiredComposition: Number(row.requiredComposition ?? 0),
         selectedProcesses,
         solidMaterialCode: selectedProcesses.solid ? materialCode : "",
-        solidGradeCode: selectedProcesses.solid ? gradeMatch?.gradeCode ?? gradeRaw : "",
+        solidGradeCode: selectedProcesses.solid ? resolvedGradeCode : "",
         solidMaterialId: solidMaterial?.materialId,
         solidGradeId: gradeMatch?.gradeId,
         liquidMaterialCode: selectedProcesses.liquid ? materialCode : "",
         liquidMaterialId: liquidMaterial?.materialId,
       } satisfies RawMaterialPrepPremixSelection;
     });
+  };
+
+  const resolveProcessSessionKey = (
+    premixNo: number,
+    process: PreparationProcessEntry,
+    selections: RawMaterialPrepPremixSelection[],
+    slot: "solid" | "liquid",
+  ) => {
+    const matched = selections.find((selection) =>
+      matchProcessToSelection(process, selection, slot),
+    );
+    if (matched) return `${premixNo}:${matched.materialKey}`;
+
+    const code = String(process.materialCode ?? "").trim();
+    const gradeRaw = String(process.gradeCode ?? "").trim();
+    if (slot === "solid") {
+      const material = findMaterialInList(solidMaterials, code);
+      const gradeMatch = findGradeInMaterial(material, gradeRaw);
+      const resolvedGrade = gradeMatch?.gradeCode ?? gradeRaw;
+      return `${premixNo}:${materialSelectionKey(code, resolvedGrade || undefined)}`;
+    }
+    return `${premixNo}:${materialSelectionKey(code)}`;
   };
 
   const premixNumbers = premixCount > 0
@@ -776,7 +854,7 @@ export const mapPreparationDetailsFromApi = (
       const code = String(process.materialCode ?? "").trim();
       if (!code || !process.sections?.length) return;
       const grade = String(process.gradeCode ?? "").trim();
-      const sessionKey = `${premixNo}:${materialSelectionKey(code, grade || undefined)}`;
+      const sessionKey = resolveProcessSessionKey(premixNo, process, selections, "solid");
       premixSessions[sessionKey] = {
         ...(premixSessions[sessionKey] ?? {
           ...createEmptyPremixSchemaSession(),
@@ -785,6 +863,8 @@ export const mapPreparationDetailsFromApi = (
           solidGradeCode: grade,
           liquidMaterialCode: "",
         }),
+        solidMaterialCode: premixSessions[sessionKey]?.solidMaterialCode || code,
+        solidGradeCode: premixSessions[sessionKey]?.solidGradeCode || grade,
         pendingSolidSections: process.sections,
       };
     });
@@ -792,7 +872,7 @@ export const mapPreparationDetailsFromApi = (
     (apiPremix?.liquidProcess ?? []).forEach((process) => {
       const code = String(process.materialCode ?? "").trim();
       if (!code || !process.sections?.length) return;
-      const sessionKey = `${premixNo}:${materialSelectionKey(code)}`;
+      const sessionKey = resolveProcessSessionKey(premixNo, process, selections, "liquid");
       premixSessions[sessionKey] = {
         ...(premixSessions[sessionKey] ?? {
           ...createEmptyPremixSchemaSession(),
@@ -801,6 +881,7 @@ export const mapPreparationDetailsFromApi = (
           solidGradeCode: "",
           liquidMaterialCode: code,
         }),
+        liquidMaterialCode: premixSessions[sessionKey]?.liquidMaterialCode || code,
         pendingLiquidSections: process.sections,
       };
     });

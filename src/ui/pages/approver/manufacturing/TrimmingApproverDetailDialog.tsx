@@ -1,20 +1,15 @@
 import { useMemo, useState } from "react";
 import { Box, Button, CircularProgress, Dialog, DialogContent, IconButton, Stack, Typography } from "@mui/material";
-import { alpha } from "@mui/material/styles";
 
 import { useThemeStore } from "../../../../app/store/themeStore";
 import getManufacturingTheme from "../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
-import { TRIMMING_BRAND } from "../../../../app/theme/custom_themes/user/manufacturing/trimming_theme";
 import getRawMaterialPreparationApproverTheme from "../../../../app/theme/custom_themes/approver/manufacturing/rawMaterialPreparationApprover_theme";
-import { isApproverActionableStatus } from "../../../../app/theme/approver";
 import { icons } from "../../../../app/theme/icons";
 import type { TrimmingDetailView } from "../../../../data/models/user/TrimmingFormModel";
 import { ReportPreviewDialog } from "../components/ReportPdf";
-import TrimmingDetailsContent from "../../user/manufacturing/Trimming/components/TrimmingDetailsContent";
+import TrimmingApproverReviewContent from "./TrimmingApproverReviewContent";
 
 const {
-  approved: CheckCircleRoundedIcon,
-  rejected: CancelRoundedIcon,
   close: CloseRoundedIcon,
   straighten: StraightenRoundedIcon,
   pdf: PictureAsPdfRoundedIcon,
@@ -23,18 +18,24 @@ const {
 export type TrimmingApproverDetailItem = Record<string, unknown> & {
   formId?: string | null;
   batchId?: string | null;
+  motorId?: string | null;
   status?: string | null;
   trStatus?: string | null;
+  detailView?: TrimmingDetailView | null;
 };
 
 type TrimmingApproverDetailDialogProps = {
   open: boolean;
   onClose: () => void;
   item: TrimmingApproverDetailItem | null;
-  detailView: TrimmingDetailView | null;
   loading: boolean;
+  activeMotorId?: string | null;
+  onActiveMotorChange?: (motorId: string) => void;
   onApprove: (item: TrimmingApproverDetailItem) => void;
   onReject: (item: TrimmingApproverDetailItem) => void;
+  onApproveForm?: (item: TrimmingApproverDetailItem) => void;
+  onRejectForm?: (item: TrimmingApproverDetailItem) => void;
+  actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
 
@@ -42,10 +43,14 @@ const TrimmingApproverDetailDialog = ({
   open,
   onClose,
   item,
-  detailView,
   loading,
+  activeMotorId = null,
+  onActiveMotorChange,
   onApprove,
   onReject,
+  onApproveForm,
+  onRejectForm,
+  actionLoading = false,
   theme,
 }: TrimmingApproverDetailDialogProps) => {
   const [pdfOpen, setPdfOpen] = useState(false);
@@ -54,40 +59,30 @@ const TrimmingApproverDetailDialog = ({
 
   if (!item) return null;
 
-  const rowStatus = String(item.trStatus ?? item.status ?? detailView?.status ?? "");
-  const canApproveOrReject = isApproverActionableStatus(rowStatus);
-  const motorIds = (detailView?.motors ?? []).map((motor) => motor.motorId).filter(Boolean);
+  const detailView = item.detailView ?? null;
 
   return (
     <>
-      <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth PaperProps={{ sx: theme.dialog.paper }}>
-        <Box
-          sx={{
-            ...theme.dialog.header,
-            background: `linear-gradient(135deg, ${TRIMMING_BRAND.tr}, ${TRIMMING_BRAND.trLight})`,
-          }}
-        >
+      <Dialog open={open} onClose={onClose} maxWidth="lg" fullWidth PaperProps={{ sx: theme.dialog.paper }}>
+        <Box sx={theme.dialog.header}>
           <Stack direction="row" alignItems="center" gap={1.5}>
             <StraightenRoundedIcon sx={theme.dialog.headerIcon} />
             <Box>
               <Typography sx={theme.dialog.headerTitle}>Trimming Submission</Typography>
               <Typography sx={theme.dialog.headerSubtitle}>
                 {item.batchId}
-                {loading ? " · loading…" : item.formId ? ` · ${item.formId}` : ""}
-                {!loading && motorIds.length > 0
-                  ? ` · ${motorIds.length} motor${motorIds.length === 1 ? "" : "s"}`
-                  : ""}
+                {loading ? " · loading…" : activeMotorId ? ` · ${activeMotorId}` : ""}
               </Typography>
             </Box>
           </Stack>
           <Stack direction="row" gap={1} alignItems="center">
-            {loading ? <CircularProgress size={16} sx={{ color: alpha("#fff", 0.7) }} /> : null}
+            {loading ? <CircularProgress size={16} sx={{ color: theme.dialog.headerIcon.color }} /> : null}
             <Button
               size="small"
               variant="contained"
               startIcon={<PictureAsPdfRoundedIcon sx={{ fontSize: "14px !important" }} />}
               onClick={() => setPdfOpen(true)}
-              disabled={loading || !item.formId}
+              disabled={loading || !item.formId || actionLoading}
               sx={theme.dialog.pdfButton}
             >
               View as PDF
@@ -99,45 +94,31 @@ const TrimmingApproverDetailDialog = ({
         </Box>
 
         <DialogContent sx={theme.dialog.content}>
-          <TrimmingDetailsContent
+          <TrimmingApproverReviewContent
             detailView={detailView}
-            row={{
-              ...item,
-              status: rowStatus || detailView?.status,
-              trStatus: rowStatus || detailView?.status,
-            }}
             loading={loading}
-            theme={manufacturingTheme}
-            resetOnFormId={detailView?.formId ?? item.formId ?? null}
+            activeMotorId={activeMotorId}
+            onActiveMotorChange={onActiveMotorChange ?? (() => undefined)}
+            onApprove={() => onApprove(item)}
+            onReject={() => onReject(item)}
+            onApproveForm={onApproveForm ? () => onApproveForm(item) : undefined}
+            onRejectForm={onRejectForm ? () => onRejectForm(item) : undefined}
+            actionLoading={actionLoading}
+            formStatus={String(item.trStatus ?? item.status ?? "")}
+            manufacturingTheme={manufacturingTheme}
+            approverTheme={theme}
           />
         </DialogContent>
 
         <Box sx={theme.dialog.footer}>
-          <Button variant="outlined" onClick={onClose} disabled={loading} sx={theme.dialog.closeAction}>
+          <Button
+            variant="outlined"
+            onClick={onClose}
+            disabled={loading || actionLoading}
+            sx={theme.dialog.closeAction}
+          >
             Close
           </Button>
-          {canApproveOrReject ? (
-            <>
-              <Button
-                variant="contained"
-                startIcon={<CancelRoundedIcon />}
-                onClick={() => onReject(item)}
-                disabled={loading}
-                sx={theme.dialog.rejectAction}
-              >
-                Reject
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<CheckCircleRoundedIcon />}
-                onClick={() => onApprove(item)}
-                disabled={loading}
-                sx={theme.dialog.approveAction}
-              >
-                Approve
-              </Button>
-            </>
-          ) : null}
         </Box>
       </Dialog>
 

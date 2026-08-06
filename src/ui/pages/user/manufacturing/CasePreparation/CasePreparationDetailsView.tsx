@@ -55,8 +55,11 @@ const CasePreparationDetailsView = ({ row, data, schema, loading, onBack }: Case
   );
 
   const detailView = useMemo(
-    () => mapCasePreparationDetailsForDisplay(data, schema),
-    [data, schema],
+    () =>
+      mapCasePreparationDetailsForDisplay(data, schema, {
+        preferredMotorIds: Array.isArray(row.motorIds) ? (row.motorIds as Array<string | number>) : null,
+      }),
+    [data, row.motorIds, schema],
   );
 
   return (

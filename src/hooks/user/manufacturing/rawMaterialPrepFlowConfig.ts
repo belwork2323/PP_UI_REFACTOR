@@ -163,11 +163,18 @@ export const createEmptyPremixSelection = (premix: number) => ({
   liquidMaterialCode: "",
 });
 
-export const getSheetMaterialKey = (row: MaterialItem) =>
-  materialSelectionKey(
-    String(row.materialCode ?? "").trim(),
-    String(row.gradeCode ?? row.gradeName ?? "").trim() || undefined,
-  ) || `sr-${row.srNo}`;
+export const getSheetMaterialKey = (
+  row: MaterialItem,
+  solidMaterial?: RawMaterialPrepMaterialOption,
+) => {
+  const materialCode = String(row.materialCode ?? "").trim();
+  const resolved = solidMaterial
+    ? resolveGradeFromSheetRow(row, solidMaterial).gradeCode
+    : String(row.gradeCode ?? row.gradeName ?? "").trim();
+  return (
+    materialSelectionKey(materialCode, resolved || undefined) || `sr-${row.srNo}`
+  );
+};
 
 export const getPremixMaterialSessionKey = (premix: number, materialKey: string) =>
   `${premix}:${materialKey}`;
@@ -275,7 +282,6 @@ export const buildMaterialSelectionFromSheetRow = (
   liquidMaterialId?: number;
 } => {
   const materialCode = String(row.materialCode ?? "").trim();
-  const materialKey = getSheetMaterialKey(row);
   const selectedProcesses = resolvePremixProcessesForMaterial(
     materialCode,
     solidMaterials,
@@ -292,6 +298,8 @@ export const buildMaterialSelectionFromSheetRow = (
     liquidMaterial ??
     findPrepMaterialByCode(mergeMaterialsLists(solidMaterials, liquidMaterials), materialCode);
   const grade = resolveGradeFromSheetRow(row, solidMaterial);
+  const materialKey =
+    materialSelectionKey(materialCode, grade.gradeCode || undefined) || `sr-${row.srNo}`;
 
   return {
     premix,
@@ -378,7 +386,80 @@ export const buildPremixMaterialSessionsFromSelections = (
     };
   });
 
-  return sessions;
+  return alignPremixSessionsToSelections(sessions, selections);
+};
+
+/**
+ * Move pending API sections onto canonical selection keys when grade aliases diverge
+ * (e.g. sheet "AP Coarse" vs API/catalog "COARSE").
+ */
+export const alignPremixSessionsToSelections = (
+  sessions: Record<string, RawMaterialPrepPremixSession>,
+  selections: Array<{
+    premix: number;
+    materialKey: string;
+    solidMaterialCode: string;
+    solidGradeCode: string;
+    liquidMaterialCode: string;
+    selectedProcesses?: { solid: boolean; liquid: boolean };
+  }>,
+) => {
+  const next = { ...sessions };
+
+  selections.forEach((selection) => {
+    const key = getPremixMaterialSessionKey(selection.premix, selection.materialKey);
+    const current = next[key];
+    const hasPending =
+      Boolean(current?.pendingSolidSections?.length) ||
+      Boolean(current?.pendingLiquidSections?.length);
+    if (hasPending) return;
+
+    const orphanEntry = Object.entries(next).find(([sessionKey, session]) => {
+      if (sessionKey === key) return false;
+      const sep = sessionKey.indexOf(":");
+      if (sep <= 0) return false;
+      if (Number(sessionKey.slice(0, sep)) !== selection.premix) return false;
+
+      if (
+        selection.solidMaterialCode &&
+        String(session.solidMaterialCode ?? "").toUpperCase() ===
+          selection.solidMaterialCode.toUpperCase() &&
+        Boolean(session.pendingSolidSections?.length)
+      ) {
+        return true;
+      }
+
+      if (
+        selection.liquidMaterialCode &&
+        String(session.liquidMaterialCode ?? "").toUpperCase() ===
+          selection.liquidMaterialCode.toUpperCase() &&
+        Boolean(session.pendingLiquidSections?.length)
+      ) {
+        return true;
+      }
+
+      return false;
+    });
+
+    if (!orphanEntry) return;
+    const [, orphan] = orphanEntry;
+
+    next[key] = {
+      ...(current ?? createEmptyPremixSchemaSession()),
+      selectedProcesses: selection.selectedProcesses ??
+        orphan.selectedProcesses ??
+        current?.selectedProcesses ?? { solid: false, liquid: false },
+      solidMaterialCode: selection.solidMaterialCode || orphan.solidMaterialCode,
+      solidGradeCode: selection.solidGradeCode || orphan.solidGradeCode,
+      liquidMaterialCode: selection.liquidMaterialCode || orphan.liquidMaterialCode,
+      pendingSolidSections: orphan.pendingSolidSections ?? current?.pendingSolidSections,
+      pendingLiquidSections: orphan.pendingLiquidSections ?? current?.pendingLiquidSections,
+      solid: current?.solid ?? orphan.solid,
+      liquid: current?.liquid ?? orphan.liquid,
+    };
+  });
+
+  return next;
 };
 
 export const mergePremixMaterialSelections = (

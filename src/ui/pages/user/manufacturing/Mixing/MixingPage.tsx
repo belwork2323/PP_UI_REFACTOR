@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from "react";
-import { Box, CircularProgress } from "@mui/material";
+import { Box } from "@mui/material";
 import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog";
+import WorkflowFormOpeningLoader from "../../../../components/common/WorkflowFormOpeningLoader";
 import MixingList from "./MixingList";
 import MixingForm from "./MixingForm";
 import MixingHeader from "./MixingHeader";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
+import { MIXING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/mixing_theme";
 import useMixingHook from "../../../../../hooks/user/manufacturing/useMixingHook";
 import { STRINGS } from "../../../../../app/config/strings";
 import MixingDetailsView from "./MixingDetailsView";
@@ -27,6 +29,7 @@ const MixingPage = () => {
 
   const {
     loading,
+    loadingFormDetails,
     view,
     activeBatch,
     isEditMode,
@@ -36,6 +39,7 @@ const MixingPage = () => {
     mixCardStatusById,
     getMixCardStatus,
     isMixCardEditable,
+    previousStageGate,
     actionLoading,
     backConfirmOpen,
     setBackConfirmOpen,
@@ -51,104 +55,107 @@ const MixingPage = () => {
     handleBackFromDetails,
   } = hookState;
 
-  if (loading) {
-    return (
-      <Box sx={theme.workflow.loadingContainer}>
-        <CircularProgress size={32} />
-      </Box>
-    );
-  }
+  const listLoading = loading && !loadingFormDetails && view === "list";
 
-  if (view === "details") {
-    return (
-      <MixingDetailsView
-        row={detailsRow}
-        data={detailsData}
-        loading={detailsLoading}
-        onBack={handleBackFromDetails}
-      />
-    );
-  }
-  if (view === "list") {
-    return (
-      <Box sx={theme.workflow.animatedContainer}>
-        <MixingList hookState={hookState} />
-      </Box>
-    );
-  }
   return (
     <Box sx={theme.workflow.animatedContainer}>
-      <MixingHeader batch={activeBatch} isEdit={isEditMode} onBack={handleBack} theme={theme} />
-      <MixingForm
-        initialData={formData}
-        numberOfPremix={numberOfPremix}
-        motorStage={motorStage}
-        onBlocksChange={handleFormChange}
-        identificationSheet={activeBatch?.identificationSheet}
-        mixCardStatusById={mixCardStatusById}
-        getMixCardStatus={getMixCardStatus}
-        isMixCardEditable={isMixCardEditable}
-        actionLoading={actionLoading}
-        canSubmitForFinalApproval={Boolean(activeBatch?.formId)}
-        onSaveMixCardDraft={(stageType, cardNo) => {
-          setPendingMixCard({ stageType, cardNo });
-          setMixCardDraftConfirmOpen(true);
-        }}
-        onSubmitMixCard={(stageType, cardNo) => {
-          setPendingMixCard({ stageType, cardNo });
-          setMixCardSubmitConfirmOpen(true);
-        }}
-        onSubmitForFinalApproval={handleSubmitForFinalApproval}
+      <WorkflowFormOpeningLoader
+        open={listLoading || Boolean(loadingFormDetails)}
+        title={loadingFormDetails ? S.FORM_OPENING_TITLE : S.TITLE}
+        message={
+          loadingFormDetails ? S.FORM_OPENING_MESSAGE : "Loading mixing batches…"
+        }
+        color={MIXING_BRAND.mx}
+        accentColor={MIXING_BRAND.mxLight}
       />
 
-      <ConfirmAlertDialog
-        open={backConfirmOpen}
-        severity="warning"
-        title={S.UNSAVED_BACK_TITLE}
-        message={S.UNSAVED_BACK_MESSAGE}
-        confirmLabel={S.UNSAVED_BACK_DISCARD}
-        cancelLabel={S.UNSAVED_BACK_CONFIRM}
-        onConfirm={handleDiscardAndBack}
-        onCancel={() => setBackConfirmOpen(false)}
-      />
+      {view === "list" && !listLoading && <MixingList hookState={hookState} />}
 
-      <ConfirmAlertDialog
-        open={mixCardDraftConfirmOpen}
-        severity="warning"
-        title={actionStrings.CONFIRM_DRAFT_TITLE}
-        message={actionStrings.CONFIRM_DRAFT_MESSAGE}
-        confirmLabel={actionStrings.CONFIRM_DRAFT_ACTION}
-        cancelLabel={actionStrings.CONFIRM_DRAFT_CANCEL_ACTION}
-        onConfirm={async () => {
-          setMixCardDraftConfirmOpen(false);
-          if (!pendingMixCard) return;
-          await handleSaveMixCardDraft(pendingMixCard.stageType, pendingMixCard.cardNo);
-          setPendingMixCard(null);
-        }}
-        onCancel={() => {
-          setMixCardDraftConfirmOpen(false);
-          setPendingMixCard(null);
-        }}
-      />
+      {view === "details" && detailsRow && (
+        <MixingDetailsView
+          row={detailsRow}
+          data={detailsData}
+          loading={detailsLoading}
+          onBack={handleBackFromDetails}
+        />
+      )}
 
-      <ConfirmAlertDialog
-        open={mixCardSubmitConfirmOpen}
-        severity="warning"
-        title={actionStrings.CONFIRM_SUBMIT_TITLE}
-        message={actionStrings.CONFIRM_SUBMIT_MESSAGE}
-        confirmLabel={actionStrings.CONFIRM_SUBMIT_ACTION}
-        cancelLabel={actionStrings.CONFIRM_CANCEL_ACTION}
-        onConfirm={async () => {
-          setMixCardSubmitConfirmOpen(false);
-          if (!pendingMixCard) return;
-          await handleSubmitMixCard(pendingMixCard.stageType, pendingMixCard.cardNo);
-          setPendingMixCard(null);
-        }}
-        onCancel={() => {
-          setMixCardSubmitConfirmOpen(false);
-          setPendingMixCard(null);
-        }}
-      />
+      {view === "form" && activeBatch && !loadingFormDetails && (
+        <>
+          <MixingHeader batch={activeBatch} isEdit={isEditMode} onBack={handleBack} theme={theme} />
+          <MixingForm
+            initialData={formData}
+            numberOfPremix={numberOfPremix}
+            motorStage={motorStage}
+            onBlocksChange={handleFormChange}
+            identificationSheet={activeBatch?.identificationSheet}
+            mixCardStatusById={mixCardStatusById}
+            getMixCardStatus={getMixCardStatus}
+            isMixCardEditable={isMixCardEditable}
+            previousStageGate={previousStageGate}
+            actionLoading={actionLoading}
+            canSubmitForFinalApproval={Boolean(activeBatch?.formId)}
+            onSaveMixCardDraft={(stageType, cardNo) => {
+              setPendingMixCard({ stageType, cardNo });
+              setMixCardDraftConfirmOpen(true);
+            }}
+            onSubmitMixCard={(stageType, cardNo) => {
+              setPendingMixCard({ stageType, cardNo });
+              setMixCardSubmitConfirmOpen(true);
+            }}
+            onSubmitForFinalApproval={handleSubmitForFinalApproval}
+          />
+
+          <ConfirmAlertDialog
+            open={backConfirmOpen}
+            severity="warning"
+            title={S.UNSAVED_BACK_TITLE}
+            message={S.UNSAVED_BACK_MESSAGE}
+            confirmLabel={S.UNSAVED_BACK_DISCARD}
+            cancelLabel={S.UNSAVED_BACK_CONFIRM}
+            onConfirm={handleDiscardAndBack}
+            onCancel={() => setBackConfirmOpen(false)}
+          />
+
+          <ConfirmAlertDialog
+            open={mixCardDraftConfirmOpen}
+            severity="warning"
+            title={actionStrings.CONFIRM_DRAFT_TITLE}
+            message={actionStrings.CONFIRM_DRAFT_MESSAGE}
+            confirmLabel={actionStrings.CONFIRM_DRAFT_ACTION}
+            cancelLabel={actionStrings.CONFIRM_DRAFT_CANCEL_ACTION}
+            onConfirm={async () => {
+              setMixCardDraftConfirmOpen(false);
+              if (!pendingMixCard) return;
+              await handleSaveMixCardDraft(pendingMixCard.stageType, pendingMixCard.cardNo);
+              setPendingMixCard(null);
+            }}
+            onCancel={() => {
+              setMixCardDraftConfirmOpen(false);
+              setPendingMixCard(null);
+            }}
+          />
+
+          <ConfirmAlertDialog
+            open={mixCardSubmitConfirmOpen}
+            severity="warning"
+            title={actionStrings.CONFIRM_SUBMIT_TITLE}
+            message={actionStrings.CONFIRM_SUBMIT_MESSAGE}
+            confirmLabel={actionStrings.CONFIRM_SUBMIT_ACTION}
+            cancelLabel={actionStrings.CONFIRM_CANCEL_ACTION}
+            onConfirm={async () => {
+              setMixCardSubmitConfirmOpen(false);
+              if (!pendingMixCard) return;
+              await handleSubmitMixCard(pendingMixCard.stageType, pendingMixCard.cardNo);
+              setPendingMixCard(null);
+            }}
+            onCancel={() => {
+              setMixCardSubmitConfirmOpen(false);
+              setPendingMixCard(null);
+            }}
+          />
+        </>
+      )}
     </Box>
   );
 };

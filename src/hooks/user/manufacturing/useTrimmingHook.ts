@@ -1,23 +1,29 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { STRINGS } from "../../../app/config/strings";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshStore";
 import { batchManagementController } from "../../../controllers/admin/BatchManagement/batchManagementController";
-import { operationsController } from "../../../controllers/user/operationsController";
 import trimmingController from "../../../controllers/user/manufacturing/trimmingController";
 import {
   createDefaultTrimmingFormState,
   createEmptyTrimmingMotorSession,
-  hasAnyTrimmingValue,
+  hasMotorTrimmingValue,
+  isTrimmingMotorEditable,
+  mapTrimmingDetailsFromSavedForm,
   mapTrimmingDetailsToFormState,
   mapTrimmingFormStateToPayload,
+  mapTrimmingMotorStatusesFromApi,
   type TrimmingFormState,
   type TrimmingMotorSession,
+  type TrimmingMotorStatusMeta,
+  type TrimmingMotorSubmissionStatus,
+  type TrimmingMotorSubmissionType,
 } from "../../../data/models/user/TrimmingFormModel";
-import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
 import {
-  mapApprovedMotorsToOptions,
+  isManufacturingContinueFillingStatus,
+} from "../../operationStatus";
+import {
   mergeTrimmingMotorOptions,
   resolveTrimmingMotorCountLimit,
   resolveTrimmingMotorOptions,
@@ -26,6 +32,11 @@ import {
 } from "./trimmingFlowConfig";
 import { useCuringMotorStages } from "./useCuringMotorStages";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
+import {
+  isMotorEnabledByPreviousStage,
+  resolvePreviousStageApprovedUnits,
+  type PreviousStageApprovedUnits,
+} from "../previousStageApproval";
 import type { SchemaFormValues } from "../../../schema-engine";
 
 type WorkflowView = "list" | "form" | "details";
@@ -43,8 +54,7 @@ type TrimmingBatch = {
   [key: string]: any;
 };
 
-const TR_STATUS = MANUFACTURING_STATUS;
-const parseStatus = (status: string | undefined) => String(status ?? "").toLowerCase();
+const S = STRINGS.MANUFACTURING.TRIMMING;
 
 const resolveTrimmingFormId = (batch?: TrimmingBatch | null) =>
   String(batch?.formId ?? "").trim() || null;
@@ -126,6 +136,58 @@ const resolveBatchMotorEntries = (
   }));
 };
 
+/**
+ * Always show every batch motor as a tab. Overlay saved form data when present
+ * so a partial draft still lists remaining motors.
+ */
+const mergeMotorsFromBatchAndForm = (
+  batchEntries: TrimmingAddedMotor[],
+  formData: TrimmingFormState,
+  fallbackStage: string,
+): { formData: TrimmingFormState; addedMotors: TrimmingAddedMotor[] } => {
+  if (!batchEntries.length) {
+    return {
+      formData,
+      addedMotors: buildAddedMotorsFromForm(formData),
+    };
+  }
+
+  const fromFormById = new Map((formData.motors ?? []).map((motor) => [motor.motorId, motor]));
+  const batchIds = new Set(batchEntries.map((entry) => entry.motorId));
+
+  const motors: TrimmingMotorSession[] = batchEntries.map((entry) => {
+    const existing = fromFormById.get(entry.motorId);
+    if (existing) {
+      return {
+        ...existing,
+        motorStage: existing.motorStage || Number(entry.motorStage) || Number(fallbackStage) || 0,
+        motorReceivedAt: existing.motorReceivedAt || entry.motorReceivedAt,
+      };
+    }
+    return createEmptyTrimmingMotorSession(
+      entry.motorId,
+      entry.motorStage || fallbackStage || "",
+      entry.motorReceivedAt || "",
+      null,
+    );
+  });
+
+  (formData.motors ?? []).forEach((motor) => {
+    if (!batchIds.has(motor.motorId)) {
+      motors.push(motor);
+    }
+  });
+
+  return {
+    formData: { ...formData, schemaFormLoaded: true, motors },
+    addedMotors: motors.map((motor) => ({
+      motorId: motor.motorId,
+      motorStage: String(motor.motorStage),
+      motorReceivedAt: motor.motorReceivedAt,
+    })),
+  };
+};
+
 export const useTrimmingHook = () => {
   const listParams = useSubdepartmentBatches("trimming");
   const user = useAuthStore((s) => s.user);
@@ -154,10 +216,12 @@ export const useTrimmingHook = () => {
   const [motorReceivedAt, setMotorReceivedAt] = useState("");
   const [addedMotors, setAddedMotors] = useState<TrimmingAddedMotor[]>([]);
   const [batchMotorEntries, setBatchMotorEntries] = useState<TrimmingAddedMotor[]>([]);
-  const [approvedMotorOptions, setApprovedMotorOptions] = useState<
-    ReturnType<typeof mapApprovedMotorsToOptions>
-  >([]);
-  const [approvedMotorsLoading, setApprovedMotorsLoading] = useState(false);
+  const [motorStatusById, setMotorStatusById] = useState<Record<string, TrimmingMotorStatusMeta>>(
+    {},
+  );
+  const [previousStageGate, setPreviousStageGate] =
+    useState<PreviousStageApprovedUnits | null>(null);
+  const [approvedMotorOptions] = useState<ReturnType<typeof resolveTrimmingMotorOptions>>([]);
 
   const projectId = useMemo(() => resolveBatchProjectId(activeBatch), [activeBatch]);
   const { stages: motorStages, loading: motorStagesLoading } = useCuringMotorStages(projectId);
@@ -180,8 +244,11 @@ export const useTrimmingHook = () => {
   const batchMotorOptions = useMemo(() => resolveTrimmingMotorOptions(activeBatch), [activeBatch]);
 
   const availableMotorOptions = useMemo(
-    () => mergeTrimmingMotorOptions(approvedMotorOptions, batchMotorOptions),
-    [approvedMotorOptions, batchMotorOptions],
+    () =>
+      mergeTrimmingMotorOptions(approvedMotorOptions, batchMotorOptions).filter((option) =>
+        isMotorEnabledByPreviousStage(option.value, previousStageGate),
+      ),
+    [approvedMotorOptions, batchMotorOptions, previousStageGate],
   );
 
   const maxMotorCount = useMemo(
@@ -200,8 +267,9 @@ export const useTrimmingHook = () => {
         formData,
         addedMotors,
         selectedMotorStage,
+        motorStatusById,
       }),
-    [formData, addedMotors, selectedMotorStage],
+    [formData, addedMotors, selectedMotorStage, motorStatusById],
   );
 
   const isFormDirty = useMemo(
@@ -219,7 +287,7 @@ export const useTrimmingHook = () => {
     clearFlowBarDrafts();
     setAddedMotors([]);
     setBatchMotorEntries([]);
-    setApprovedMotorOptions([]);
+    setMotorStatusById({});
   }, [clearFlowBarDrafts]);
 
   const resetFormContext = useCallback(() => {
@@ -232,12 +300,14 @@ export const useTrimmingHook = () => {
     setBackConfirmOpen(false);
     setHasSavedDraft(false);
     setFormData(defaults);
+    setPreviousStageGate(null);
     resetFlowDraft();
     setInitialSnapshot(
       JSON.stringify({
         formData: defaults,
         addedMotors: [],
         selectedMotorStage: "",
+        motorStatusById: {},
       }),
     );
   }, [resetFlowDraft]);
@@ -248,47 +318,20 @@ export const useTrimmingHook = () => {
     return fallbackMessage;
   };
 
-  useEffect(() => {
-    const stage = String(selectedMotorStage ?? "").trim();
-    const pid = resolveBatchProjectId(activeBatch);
-    if (!stage || !pid) {
-      setApprovedMotorOptions([]);
-      return;
-    }
-
-    let active = true;
-    setApprovedMotorsLoading(true);
-    void operationsController
-      .fetchApprovedMotorsList({ projectId: pid, motorStage: stage })
-      .then((response) => {
-        if (!active) return;
-        if (response?.success && response.data) {
-          setApprovedMotorOptions(mapApprovedMotorsToOptions(response.data.motors ?? []));
-        } else {
-          setApprovedMotorOptions([]);
-        }
-      })
-      .finally(() => {
-        if (active) setApprovedMotorsLoading(false);
-      });
-
-    return () => {
-      active = false;
-    };
-  }, [activeBatch, selectedMotorStage]);
-
   const openFormWithResolvedData = useCallback(
     async (batch: TrimmingBatch, editMode: boolean) => {
-      const status = parseStatus(batch.trStatus);
       const shouldFetchDetails =
         editMode ||
-        status === parseStatus(TR_STATUS.IN_PROGRESS) ||
-        status === parseStatus(TR_STATUS.REJECTED);
+        isManufacturingContinueFillingStatus(batch.trStatus) ||
+        String(batch.trStatus ?? "")
+          .toLowerCase()
+          .includes("reject");
 
       let nextBatch = batch;
       let nextFormData = createDefaultTrimmingFormState();
       const initialStage = resolveInitialMotorStage(batch);
       let autoMotorEntries: TrimmingAddedMotor[] = [];
+      let nextStatuses: Record<string, TrimmingMotorStatusMeta> = {};
 
       setLoadingFormDetails(true);
       try {
@@ -296,18 +339,40 @@ export const useTrimmingHook = () => {
           try {
             const batchDetails = await batchManagementController.getBatchById(batch.batchId);
             autoMotorEntries = resolveBatchMotorEntries(batch, batchDetails);
+            nextBatch = {
+              ...batch,
+              motorIds: batchDetails?.motorIds?.length
+                ? batchDetails.motorIds.map(String)
+                : batch.motorIds,
+              motorId:
+                batchDetails?.motorIds?.length > 0
+                  ? batchDetails.motorIds.join(", ")
+                  : batch.motorId,
+              stageProgress: batchDetails?.stageProgress ?? batch.stageProgress,
+              currentStage: batchDetails?.currentStage ?? batch.currentStage,
+            };
           } catch (error) {
             console.error("Unable to resolve batch motor details", error);
           }
         }
 
+        setPreviousStageGate(
+          resolvePreviousStageApprovedUnits({
+            stageProgress: nextBatch.stageProgress ?? batch.stageProgress,
+            currentStage: nextBatch.currentStage ?? batch.currentStage,
+            currentSlug: "trimming",
+            currentSubDepartmentId: subDepartmentId,
+            subDepartments: user?.allSubDepartments,
+          }),
+        );
+
         if (shouldFetchDetails) {
           if (!subDepartmentId) {
-            showAlert(STRINGS.MANUFACTURING.TRIMMING.SUB_DEPARTMENT_MISSING, "error");
+            showAlert(S.SUB_DEPARTMENT_MISSING, "error");
             return;
           }
           if (!batch.formId) {
-            showAlert(STRINGS.MANUFACTURING.TRIMMING.FORM_ID_MISSING, "error");
+            showAlert(S.FORM_ID_MISSING, "error");
             return;
           }
 
@@ -317,63 +382,56 @@ export const useTrimmingHook = () => {
 
           if (!detailsResponse?.success || !detailsResponse?.data) {
             const fallback =
-              detailsResponse?.statusCode === 404
-                ? STRINGS.MANUFACTURING.TRIMMING.DETAILS_NOT_FOUND
-                : STRINGS.MANUFACTURING.TRIMMING.DETAILS_FETCH_ERROR;
+              detailsResponse?.statusCode === 404 ? S.DETAILS_NOT_FOUND : S.DETAILS_FETCH_ERROR;
             showAlert(getErrorMessage(detailsResponse, fallback), "error");
             return;
           }
 
-          nextBatch = { ...batch, formId: detailsResponse.data.formId || batch.formId };
+          nextBatch = { ...nextBatch, formId: detailsResponse.data.formId || batch.formId };
           nextFormData = mapTrimmingDetailsToFormState(detailsResponse.data);
+          nextStatuses = mapTrimmingMotorStatusesFromApi(detailsResponse.data);
         }
       } finally {
         setLoadingFormDetails(false);
       }
 
-      const existingMotorIds = new Set((nextFormData.motors ?? []).map((motor) => motor.motorId));
-      const motorEntriesToUse = autoMotorEntries.filter(
-        (entry) => Boolean(entry.motorId) && !existingMotorIds.has(entry.motorId),
-      );
+      const merged = mergeMotorsFromBatchAndForm(autoMotorEntries, nextFormData, initialStage);
+      nextFormData = merged.formData;
+      const nextAddedMotors = merged.addedMotors;
 
-      if (motorEntriesToUse.length > 0 && (nextFormData.motors ?? []).length === 0) {
-        nextFormData = {
-          ...nextFormData,
-          schemaFormLoaded: true,
-          motors: motorEntriesToUse.map((entry) =>
-            createEmptyTrimmingMotorSession(
-              entry.motorId,
-              entry.motorStage || initialStage || "",
-              entry.motorReceivedAt || "",
-              null,
-            ),
-          ),
-        };
-      } else if ((nextFormData.motors ?? []).length > 0) {
-        nextFormData = {
-          ...nextFormData,
-          schemaFormLoaded: true,
-        };
+      if (Object.keys(nextStatuses).length === 0) {
+        nextStatuses = Object.fromEntries(
+          nextAddedMotors.map((entry) => [
+            entry.motorId,
+            { motorSubmissionStatus: "TO_BE_INITIATED" as TrimmingMotorSubmissionStatus },
+          ]),
+        );
+      } else {
+        nextAddedMotors.forEach((entry) => {
+          if (!nextStatuses[entry.motorId]) {
+            nextStatuses[entry.motorId] = { motorSubmissionStatus: "TO_BE_INITIATED" };
+          }
+        });
       }
-
-      const nextAddedMotors = buildAddedMotorsFromForm(nextFormData);
 
       setActiveBatch(nextBatch);
       setIsEditMode(editMode);
       setFormData(nextFormData);
       setAddedMotors(nextAddedMotors);
       setBatchMotorEntries(autoMotorEntries);
+      setMotorStatusById(nextStatuses);
       clearFlowBarDrafts();
       setInitialSnapshot(
         JSON.stringify({
           formData: nextFormData,
           addedMotors: nextAddedMotors,
           selectedMotorStage: "",
+          motorStatusById: nextStatuses,
         }),
       );
       setView("form");
     },
-    [clearFlowBarDrafts, showAlert, subDepartmentId],
+    [clearFlowBarDrafts, showAlert, subDepartmentId, user?.allSubDepartments],
   );
 
   const handleViewTrimmingDetails = useCallback(async (row: any) => {
@@ -413,13 +471,13 @@ export const useTrimmingHook = () => {
   );
 
   const handleBack = useCallback(() => {
-    if (isFormDirty) {
+    if (isFormDirty && !hasSavedDraft) {
       setBackConfirmOpen(true);
       return;
     }
     bumpBatchRefresh();
     resetFormContext();
-  }, [isFormDirty, resetFormContext, bumpBatchRefresh]);
+  }, [hasSavedDraft, isFormDirty, resetFormContext, bumpBatchRefresh]);
 
   const handleDiscardAndBack = useCallback(() => {
     bumpBatchRefresh();
@@ -453,31 +511,68 @@ export const useTrimmingHook = () => {
     }));
   }, []);
 
-  const submitForm = useCallback(
-    async (intent: "draft" | "submit") => {
+  const getMotorStatus = useCallback(
+    (motorId: string): TrimmingMotorSubmissionStatus =>
+      motorStatusById[motorId]?.motorSubmissionStatus ?? "TO_BE_INITIATED",
+    [motorStatusById],
+  );
+
+  const checkMotorEditable = useCallback(
+    (motorId: string) => {
+      if (!isMotorEnabledByPreviousStage(motorId, previousStageGate)) return false;
+      return isTrimmingMotorEditable(getMotorStatus(motorId));
+    },
+    [getMotorStatus, previousStageGate],
+  );
+
+  const submitMotor = useCallback(
+    async (motorId: string, intent: "draft" | "submit") => {
       if (!activeBatch) return false;
 
-      if ((formData.motors ?? []).length === 0) {
+      if (!subDepartmentId) {
+        showAlert(S.SUB_DEPARTMENT_MISSING, "error");
+        return false;
+      }
+
+      if (!isMotorEnabledByPreviousStage(motorId, previousStageGate)) {
+        showAlert(STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED, "warning");
+        return false;
+      }
+
+      if (!checkMotorEditable(motorId)) {
         showAlert(
-          STRINGS.MANUFACTURING.TRIMMING.EMPTY_FORM_ERROR ||
-            "Please add at least one motor before submitting.",
+          getMotorStatus(motorId) === "APPROVED" ? S.MOTOR_LOCKED_APPROVED : S.MOTOR_LOCKED_WAITING,
           "warning",
         );
         return false;
       }
 
-      if (!subDepartmentId) {
-        showAlert(STRINGS.MANUFACTURING.TRIMMING.SUB_DEPARTMENT_MISSING, "error");
-        return false;
+      const motor = (formData.motors ?? []).find((entry) => entry.motorId === motorId);
+      if (!motor) return false;
+
+      if (intent === "submit") {
+        if (!String(motor.motorReceivedAt ?? "").trim()) {
+          showAlert(S.MOTOR_RECEIVED_REQUIRED, "warning");
+          return false;
+        }
+        if (!hasMotorTrimmingValue(formData, motorId)) {
+          showAlert(S.EMPTY_FORM_ERROR, "warning");
+          return false;
+        }
       }
 
-      if (!hasAnyTrimmingValue(formData)) {
-        showAlert(STRINGS.MANUFACTURING.TRIMMING.EMPTY_FORM_ERROR, "warning");
-        return false;
-      }
-
+      const motorSubmissionType: TrimmingMotorSubmissionType =
+        intent === "draft" ? "DRAFT" : "SUBMIT";
       const isCreateFlow = !resolveTrimmingFormId(activeBatch);
-      const payloadBody = mapTrimmingFormStateToPayload(formData);
+      const payloadBody = mapTrimmingFormStateToPayload(formData, {
+        targetMotorIds: [motorId],
+        motorSubmissionType,
+      });
+
+      if (!payloadBody.motors?.length) {
+        showAlert(S.EMPTY_FORM_ERROR, "warning");
+        return false;
+      }
 
       setActionLoading(true);
       try {
@@ -485,77 +580,192 @@ export const useTrimmingHook = () => {
 
         if (isCreateFlow) {
           if (!activeBatch.batchId) {
-            showAlert(STRINGS.MANUFACTURING.TRIMMING.BATCH_ID_MISSING, "error");
+            showAlert(S.BATCH_ID_MISSING, "error");
             return false;
           }
           response = await trimmingController.createForm({
             batchId: activeBatch.batchId,
             subDepartmentId,
-            formSubmissionType: intent === "draft" ? "DRAFT" : "SUBMIT",
+            formSubmissionType: "DRAFT",
             ...payloadBody,
           });
         } else {
           const formId = resolveTrimmingFormId(activeBatch);
           if (!formId) {
-            showAlert(STRINGS.MANUFACTURING.TRIMMING.FORM_ID_MISSING, "error");
+            showAlert(S.FORM_ID_MISSING, "error");
             return false;
           }
           response = await trimmingController.updateForm({
             formId,
             batchId: activeBatch.batchId,
             subDepartmentId,
-            formSubmissionType: intent === "draft" ? "DRAFT" : "SUBMIT",
+            formSubmissionType: "DRAFT",
             ...payloadBody,
           });
         }
 
         if (!response?.success) {
-          const fallback = isCreateFlow
-            ? STRINGS.MANUFACTURING.TRIMMING.CREATE_FAILED
-            : STRINGS.MANUFACTURING.TRIMMING.UPDATE_FAILED;
-          showAlert(getErrorMessage(response, fallback), "error");
+          showAlert(
+            getErrorMessage(response, isCreateFlow ? S.CREATE_FAILED : S.UPDATE_FAILED),
+            "error",
+          );
           return false;
         }
 
         const nextFormId = response.data?.formId ?? activeBatch.formId ?? null;
         setActiveBatch((prev) => (prev ? { ...prev, formId: nextFormId } : prev));
-        setInitialSnapshot(formSnapshot);
+        setHasSavedDraft(true);
 
-        if (intent === "draft") {
-          showAlert(
-            isCreateFlow
-              ? STRINGS.MANUFACTURING.TRIMMING.CREATE_DRAFT_SUCCESS
-              : STRINGS.MANUFACTURING.TRIMMING.UPDATE_DRAFT_SUCCESS,
-            "success",
-            { autoCloseMs: 2200 },
-          );
-          setHasSavedDraft(true);
-        } else {
-          showAlert(
-            isCreateFlow
-              ? STRINGS.MANUFACTURING.TRIMMING.CREATE_SUBMIT_SUCCESS
-              : STRINGS.MANUFACTURING.TRIMMING.UPDATE_SUBMIT_SUCCESS,
-            "success",
-            { autoCloseMs: 2200 },
-          );
-          await listParams.refreshUserBatches();
-          resetFormContext();
-        }
+        const nextStatus: TrimmingMotorSubmissionStatus =
+          intent === "draft" ? "IN_PROGRESS" : "WAITING_FOR_APPROVAL";
 
+        setMotorStatusById((prev) => {
+          const updated: Record<string, TrimmingMotorStatusMeta> = {
+            ...prev,
+            [motorId]: {
+              ...prev[motorId],
+              motorSubmissionType,
+              motorSubmissionStatus: nextStatus,
+            },
+          };
+
+          if (Array.isArray(response.data?.motorStatuses)) {
+            response.data.motorStatuses.forEach((entry: any) => {
+              const id = String(entry?.motorId ?? "").trim();
+              if (!id) return;
+              updated[id] = {
+                ...updated[id],
+                motorSubmissionType:
+                  entry.motorSubmissionType ?? updated[id]?.motorSubmissionType,
+                motorSubmissionStatus:
+                  (String(entry.motorSubmissionStatus ?? "").toUpperCase() as TrimmingMotorSubmissionStatus) ||
+                  updated[id]?.motorSubmissionStatus ||
+                  "TO_BE_INITIATED",
+              };
+            });
+          }
+          return updated;
+        });
+
+        setInitialSnapshot(
+          JSON.stringify({
+            formData,
+            addedMotors,
+            selectedMotorStage,
+            motorStatusById: {
+              ...motorStatusById,
+              [motorId]: {
+                ...motorStatusById[motorId],
+                motorSubmissionType,
+                motorSubmissionStatus: nextStatus,
+              },
+            },
+          }),
+        );
+
+        showAlert(
+          intent === "draft" ? S.MOTOR_SAVE_DRAFT_SUCCESS(motorId) : S.MOTOR_SUBMIT_SUCCESS(motorId),
+          "success",
+          { autoCloseMs: 2200 },
+        );
         return true;
       } finally {
         setActionLoading(false);
       }
     },
-    [activeBatch, subDepartmentId, formData, formSnapshot, showAlert, listParams, resetFormContext],
+    [
+      activeBatch,
+      addedMotors,
+      checkMotorEditable,
+      formData,
+      getMotorStatus,
+      motorStatusById,
+      previousStageGate,
+      selectedMotorStage,
+      showAlert,
+      subDepartmentId,
+    ],
   );
 
-  const handleSaveDraft = useCallback(async () => submitForm("draft"), [submitForm]);
-  const handleSubmit = useCallback(async () => submitForm("submit"), [submitForm]);
+  const handleSaveMotorDraft = useCallback(
+    async (motorId: string) => submitMotor(motorId, "draft"),
+    [submitMotor],
+  );
+
+  const handleSubmitMotor = useCallback(
+    async (motorId: string) => submitMotor(motorId, "submit"),
+    [submitMotor],
+  );
+
+  const handleSubmitForFinalApproval = useCallback(async () => {
+    if (!activeBatch?.formId) {
+      showAlert(S.FORM_ID_MISSING, "error");
+      return false;
+    }
+    if (!subDepartmentId) {
+      showAlert(S.SUB_DEPARTMENT_MISSING, "error");
+      return false;
+    }
+
+    const motorIds = addedMotors.map((m) => m.motorId);
+    const allApproved =
+      motorIds.length > 0 &&
+      motorIds.every(
+        (id) => String(motorStatusById[id]?.motorSubmissionStatus ?? "").toUpperCase() === "APPROVED",
+      );
+    if (!allApproved) {
+      showAlert(S.FINAL_APPROVAL_NOT_READY, "warning");
+      return false;
+    }
+
+    setActionLoading(true);
+    try {
+      const detailsResponse = await trimmingController.fetchFormDetails({
+        formId: activeBatch.formId,
+      });
+      if (!detailsResponse?.success || !detailsResponse?.data) {
+        showAlert(getErrorMessage(detailsResponse, S.DETAILS_FETCH_ERROR), "error");
+        return false;
+      }
+
+      const payloadBody = mapTrimmingDetailsFromSavedForm(detailsResponse.data, {
+        motorStatusById,
+      });
+
+      const response = await trimmingController.updateForm({
+        formId: activeBatch.formId,
+        batchId: activeBatch.batchId,
+        subDepartmentId,
+        formSubmissionType: "SUBMIT",
+        ...payloadBody,
+      });
+
+      if (!response?.success) {
+        showAlert(getErrorMessage(response, S.UPDATE_FAILED), "error");
+        return false;
+      }
+
+      showAlert(S.CREATE_SUBMIT_SUCCESS, "success", { autoCloseMs: 2200 });
+      await listParams.refreshUserBatches();
+      resetFormContext();
+      return true;
+    } finally {
+      setActionLoading(false);
+    }
+  }, [
+    activeBatch,
+    addedMotors,
+    listParams,
+    motorStatusById,
+    resetFormContext,
+    showAlert,
+    subDepartmentId,
+  ]);
 
   return {
     ...listParams,
     loading: listParams.loading || loadingFormDetails,
+    loadingFormDetails,
     view,
     activeBatch,
     isEditMode,
@@ -572,9 +782,13 @@ export const useTrimmingHook = () => {
     motorReceivedAt,
     addedMotors,
     availableMotorOptions,
-    approvedMotorsLoading,
+    approvedMotorsLoading: false,
     maxMotorCount,
     batchMotorEntries,
+    motorStatusById,
+    getMotorStatus,
+    isMotorEditable: checkMotorEditable,
+    previousStageGate,
     handleFillForm,
     handleEditForm,
     handleBack,
@@ -584,8 +798,9 @@ export const useTrimmingHook = () => {
     handleMotorReceivedAtChange: setMotorReceivedAt,
     handleMotorSessionChange,
     handleFormValuesChange,
-    handleSaveDraft,
-    handleSubmit,
+    handleSaveMotorDraft,
+    handleSubmitMotor,
+    handleSubmitForFinalApproval,
     detailsRow,
     detailsData,
     detailsLoading,

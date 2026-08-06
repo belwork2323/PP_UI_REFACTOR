@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import {
   alpha,
   Box,
-  Button,
   Chip,
   CircularProgress,
   Stack,
@@ -37,6 +36,11 @@ import {
 } from "../../../../../../data/models/user/RawMaterialPreparationModel";
 import PremixStatusChip, { PremixCountsSummary } from "./PremixStatusChip";
 import { formatToIsoDateInput } from "../../../../../../utils/dateUtils";
+import {
+  UserWorkflowNavPanel,
+  UserWorkflowTabNav,
+  type UserWorkflowNavTab,
+} from "../../../../../components/custom/UserWorkflowStepPager";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const RM = STRINGS.MANUFACTURING.RAW_MATERIAL_PREP;
@@ -428,6 +432,33 @@ const RawMaterialPreparationDetailsContent = ({
 
   const resolvedPremixCounts = premixCounts ?? detailView?.premixCounts;
 
+  const navPalette = {
+    primary: theme.palette.primary,
+    primaryLight: theme.palette.primaryLight,
+    border: theme.palette.border,
+    surface: theme.palette.surface,
+    textSub: theme.palette.textSub,
+    text: theme.palette.text,
+  };
+
+  const premixTabs = useMemo<UserWorkflowNavTab[]>(
+    () =>
+      premixes.map((premix, index) => ({
+        id: `premix-${premix.premixNo}`,
+        label: `Premix ${premix.premixNo}`,
+        endAdornment: (
+          <PremixStatusChip
+            status={premix.premixSubmissionStatus}
+            statusConfig={statusConfig}
+            variant="embedded"
+            onAccent={index === activePremixIndexSafe}
+            showIcon={false}
+          />
+        ),
+      })),
+    [activePremixIndexSafe, premixes, statusConfig],
+  );
+
   const metaFields = [
     { label: BL.COL_BATCH_ID, value: detailView?.batchId || row?.batchId || "—" },
     { label: "Form ID", value: detailView?.formId || row?.formId || "—" },
@@ -500,52 +531,17 @@ const RawMaterialPreparationDetailsContent = ({
           </Typography>
 
           {showPremixTabs && premixes.length > 1 ? (
-            <Box
-              sx={{
-                mb: 2,
-                p: 1.25,
-                borderRadius: 2,
-                border: `1px solid ${theme.palette.border}`,
-                background: theme.palette.surface,
-              }}
-            >
-              <Typography
-                sx={{
-                  fontSize: "0.76rem",
-                  fontWeight: 700,
-                  color: theme.palette.primary,
-                  mb: 0.75,
-                }}
-              >
-                Premix Navigation
-              </Typography>
-              <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
-                {premixes.map((premix, index) => (
-                  <Button
-                    key={premix.premixNo}
-                    size="small"
-                    variant={index === activePremixIndexSafe ? "contained" : "outlined"}
-                    onClick={() => setActivePremixIndex(index)}
-                    sx={{
-                      whiteSpace: "nowrap",
-                      flexShrink: 0,
-                      textTransform: "none",
-                      fontWeight: 700,
-                    }}
-                  >
-                    <Stack direction="row" alignItems="center" gap={0.75}>
-                      Premix {premix.premixNo}
-                      <PremixStatusChip
-                        status={premix.premixSubmissionStatus}
-                        statusConfig={statusConfig}
-                        variant="embedded"
-                        onAccent={index === activePremixIndexSafe}
-                        showIcon={false}
-                      />
-                    </Stack>
-                  </Button>
-                ))}
-              </Stack>
+            <Box sx={{ mb: 2 }}>
+              <UserWorkflowNavPanel palette={navPalette}>
+                <UserWorkflowTabNav
+                  title="Premix Navigation"
+                  tabs={premixTabs}
+                  activeIndex={activePremixIndexSafe}
+                  onActiveIndexChange={setActivePremixIndex}
+                  palette={navPalette}
+                  showStepArrows
+                />
+              </UserWorkflowNavPanel>
             </Box>
           ) : null}
 

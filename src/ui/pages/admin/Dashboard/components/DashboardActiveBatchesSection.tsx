@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Stack, Tab, Tabs } from "@mui/material";
+import { Box, Stack, Tab, Tabs, Button } from "@mui/material";
 import FilterSelect from "@ui/components/common/FilterSelect";
 import DateRangeRow from "@ui/components/common/DateRangeRow";
 import AdminListShell from "@ui/components/custom/admin/AdminListShell";
@@ -9,6 +9,7 @@ import { APPROVER_BATCH_STATUS } from "@data/models/approver/ApproverBatchListMo
 import { STRINGS } from "@app/config/strings";
 import ToggleTabs, { ToggleTabOption } from "@/ui/components/common/ToggleTabs";
 import { BatchTab } from "@/hooks/admin/Dashboard/useDashboardHook";
+import { OPERATION_STATUS } from "@/hooks/operationStatus";
 
 const AC = STRINGS.ADMIN_COMMON;
 
@@ -87,7 +88,6 @@ export default function DashboardActiveBatchesSection({
             ? t.BATCH_TABLE.SECTION_COMPLETED_TITLE
             : t.BATCH_TABLE.SECTION_INPOROGRESS_TITLE
         }
-        emptyText={t.EMPTY_STATES.NO_BATCHES}
         cardSx={th.card}
         headerContent={
           <ToggleTabs
@@ -109,6 +109,7 @@ export default function DashboardActiveBatchesSection({
             loading={activeBatchesLoading}
             hasItems={filteredBatches.length > 0}
             emptyTitle={t.EMPTY_STATES.NO_BATCHES}
+            emptySubtitle={t.EMPTY_STATES.NO_BATCHES_SUBTITLE}
             filterExtension={
               <AdminFilterPanel
                 title={t.FILTERS.BUTTON}
@@ -121,7 +122,19 @@ export default function DashboardActiveBatchesSection({
                 applyLabel={AC.FILTERS_APPLY}
                 theme={th}
               >
-                <Stack direction="row" gap={1.5} flexWrap="wrap" mb={2}>
+                <Stack
+                  direction="row"
+                  gap={1.5}
+                  mb={2}
+                  sx={{
+                    width: "100%",
+                    minWidth: "100%",
+                    display: "flex",
+                    flex: 1,
+                    // flexWrap: "noWrap",
+                    flexDirection: { xs: "column", md: "row" },
+                  }}
+                >
                   <FilterSelect
                     label={t.FILTERS.STAGE}
                     value={batchDraftFilters.stage}
@@ -130,8 +143,11 @@ export default function DashboardActiveBatchesSection({
                     menuProps={filterMenuProps}
                     itemSx={filterMenuItemSx}
                     showAllOption={false}
-                    sx={th.filterPanel.field}
+                    sx={{
+                      ...th.filterPanel.field,
+                    }}
                   />
+
                   <FilterSelect
                     label={t.FILTERS.TYPE}
                     value={batchDraftFilters.batchType}
@@ -140,19 +156,44 @@ export default function DashboardActiveBatchesSection({
                     menuProps={filterMenuProps}
                     itemSx={filterMenuItemSx}
                     showAllOption={false}
-                    sx={th.filterPanel.field}
+                    sx={{
+                      ...th.filterPanel.field,
+                    }}
                   />
+
                   <FilterSelect
                     label={t.FILTERS.STATUS}
                     value={batchDraftFilters.status}
                     onChange={(e) => setBatchDraftFilter("status", e.target.value)}
-                    options={["All", ...Object.values(APPROVER_BATCH_STATUS)]}
+                    options={["All", ...Object.values(OPERATION_STATUS)]}
                     menuProps={filterMenuProps}
                     itemSx={filterMenuItemSx}
                     showAllOption={false}
-                    sx={th.filterPanel.field}
+                    sx={{
+                      ...th.filterPanel.field,
+                    }}
                   />
+
+                  {/* <Stack direction="row" spacing={1} sx={{ ml: "auto" }}>
+                    <Button
+                      variant="outlined"
+                      size="small"
+                      onClick={() => setFilterOpen(false)}
+                      sx={th.filterPanel.closeButton}
+                    >
+                      {AC.FILTERS_CLOSE}
+                    </Button>
+                    <Button
+                      variant="contained"
+                      size="small"
+                      onClick={applyBatchFilters}
+                      sx={th.filterPanel.applyButton}
+                    >
+                      {AC.FILTERS_APPLY}
+                    </Button>
+                  </Stack> */}
                 </Stack>
+
                 <DateRangeRow
                   from={batchDraftFilters.dateFrom}
                   to={batchDraftFilters.dateTo}

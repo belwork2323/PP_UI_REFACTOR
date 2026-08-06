@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef } from "react";
 import { Box } from "@mui/material";
 import {
   SchemaUI,
@@ -41,7 +41,7 @@ const CasePrepMotorSchemaPanel = ({
   const motorRef = useRef(motor);
   motorRef.current = motor;
 
-  useLayoutEffect(() => {
+  useEffect(() => {
     if (!schema) return;
 
     const hasValues = Object.keys(motor.formValues ?? {}).length > 0;

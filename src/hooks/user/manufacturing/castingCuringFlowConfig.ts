@@ -1,5 +1,10 @@
 import { STRINGS } from "../../../app/config/strings";
 import type { CuringProcessSetup } from "../../../data/models/user/CastingCuringFormModel";
+import {
+  getFinalMixPremixesFromSheet,
+  getRocketMotorCasingMotorIdsFromSheet,
+  type IdentificationSheet,
+} from "../../../data/models/admin/BatchManagement/BatchManagementModel";
 import type { SchemaBlock, SchemaDocumentV2, SchemaFormValues } from "../../../schema-engine";
 import { scopedFormKey } from "../../../schema-engine/state/formState";
 
@@ -14,7 +19,29 @@ export type CastingCuringMotorOption = {
 export type CastingCuringAddedMotor = {
   motorId: string;
   motorReceivedAt: string;
+  castingStation?: string;
 };
+
+export type CastingMotorDraftEntry = {
+  motorId: string;
+  castingStation: string;
+  motorReceivedAt: string;
+};
+
+export const createEmptyCastingMotorDraftEntry = (): CastingMotorDraftEntry => ({
+  motorId: "",
+  castingStation: "",
+  motorReceivedAt: "",
+});
+
+export const resizeCastingMotorDrafts = (
+  count: number,
+  prev: CastingMotorDraftEntry[],
+): CastingMotorDraftEntry[] =>
+  Array.from(
+    { length: Math.max(count, 0) },
+    (_, idx) => prev[idx] ?? createEmptyCastingMotorDraftEntry(),
+  );
 
 export const CASTING_TYPE_OPTIONS = [
   { value: "Single", label: "Single" },
@@ -23,58 +50,200 @@ export const CASTING_TYPE_OPTIONS = [
   { value: "Others", label: "Others" },
 ] as const;
 
-export const CURING_OVEN_OPTIONS = [
-  { value: "15A", label: "15A" },
-  { value: "15B", label: "15B" },
-  { value: "15C", label: "15C" },
-  { value: "15E", label: "15E" },
-  { value: "15F", label: "15F" },
-] as const;
-
-export const CURING_TYPE_OPTIONS = [
-  { value: "Normal", label: "Normal" },
-  { value: "Confined Curing", label: "Confined Curing" },
-  { value: "Nitrogen Pressure Curing", label: "Nitrogen Pressure Curing" },
-] as const;
-
-export const CURING_CONFIGURATION_OPTIONS = [
-  { value: "Single", label: "Single" },
-  { value: "Multiple", label: "Multiple" },
-] as const;
-
-export const CURING_OVENS_UTILIZED_OPTIONS = [
-  { value: "One", label: "One" },
-  { value: "Multiple", label: "Multiple" },
-] as const;
-
-export const CURING_MOTORS_TO_CURE_OPTIONS = [1, 2, 3, 4, 5, 6].map((count) => ({
-  value: String(count),
-  label: String(count),
-}));
-
-export type CastingProcessSetupDraft = {
-  initialVacuum: string;
-  castingVacuumPressure: string;
-  soakingVacuumPressure: string;
-  finalMixCount: string;
+export type CastingCuringBatchMotorSource = {
+  batchId?: string;
+  formId?: string;
+  batchType?: string;
+  motorId?: string;
+  motorIds?: Array<string | number>;
+  numberOfMotors?: number | string;
+  numberOfPremix?: number | string;
+  projectId?: string;
+  projectName?: string;
+  motorStage?: unknown;
+  motorType?: unknown;
+  identificationSheet?: IdentificationSheet | null;
 };
 
-const hasNumericValue = (value: string) => String(value ?? "").trim().length > 0;
+export const enrichCastingCuringBatchFromDetails = <T extends CastingCuringBatchMotorSource>(
+  batch: T,
+  batchDetails: CastingCuringBatchMotorSource | null | undefined,
+): T => {
+  if (!batchDetails) return batch;
+
+  const identificationSheet = batchDetails.identificationSheet ?? batch.identificationSheet ?? null;
+  const motorIdsFromRocketMotorCasing = getRocketMotorCasingMotorIdsFromSheet(identificationSheet);
+
+  const resolvedMotorIds = (
+    batchDetails.motorIds?.length
+      ? batchDetails.motorIds
+      : motorIdsFromRocketMotorCasing.length
+        ? motorIdsFromRocketMotorCasing
+        : batch.motorIds
+  )
+    ?.map((id) => String(id).trim())
+    .filter(Boolean);
+
+  return {
+    ...batch,
+    batchType: batch.batchType ?? batchDetails.batchType ?? batch.batchType,
+    motorIds: resolvedMotorIds?.length ? resolvedMotorIds : batch.motorIds,
+    numberOfMotors: resolvedMotorIds?.length ?? batchDetails.numberOfMotors ?? batch.numberOfMotors,
+    motorId: resolvedMotorIds?.length ? resolvedMotorIds.join(", ") : batch.motorId,
+    projectId: batch.projectId ?? batchDetails.projectId ?? batch.projectId,
+    projectName: batch.projectName ?? batchDetails.projectName ?? batch.projectName,
+    motorStage: batch.motorStage ?? batchDetails.motorStage ?? batch.motorType ?? batch.motorStage,
+    numberOfPremix:
+      batchDetails.numberOfPremix ??
+      batchDetails.identificationSheet?.numberOfPremix ??
+      batch.numberOfPremix ??
+      batch.identificationSheet?.numberOfPremix,
+    identificationSheet,
+    stageProgress:
+      (batchDetails as { stageProgress?: unknown }).stageProgress ??
+      (batch as { stageProgress?: unknown }).stageProgress,
+    currentStage:
+      (batchDetails as { currentStage?: unknown }).currentStage ??
+      (batch as { currentStage?: unknown }).currentStage,
+  };
+};
+
+/** Motor count is driven by motorIds length when present. */
+export const resolveCastingCuringBatchMotorCount = (
+  batch?: CastingCuringBatchMotorSource | null,
+): number => {
+  const ids = Array.isArray(batch?.motorIds)
+    ? batch.motorIds.map((id) => String(id).trim()).filter(Boolean)
+    : [];
+  if (ids.length > 0) return ids.length;
+
+  const fromBatch = Number(batch?.numberOfMotors ?? 0);
+  if (Number.isFinite(fromBatch) && fromBatch > 0) return fromBatch;
+
+  const singleId = String(batch?.motorId ?? "").trim();
+  if (!singleId) return 0;
+
+  const parsed = singleId
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+  return parsed.length > 0 ? parsed.length : 1;
+};
+
+/** Final mix bowl rows follow FINAL_MIX premixes from batch mixing metadata. */
+export const resolveCastingFinalMixCount = (
+  batch?: Pick<CastingCuringBatchMotorSource, "numberOfPremix" | "identificationSheet"> | null,
+): number => {
+  const fromMixing = getFinalMixPremixesFromSheet(batch?.identificationSheet).length;
+  if (fromMixing > 0) return fromMixing;
+
+  const count = Number(batch?.numberOfPremix ?? batch?.identificationSheet?.numberOfPremix ?? 1);
+  return Number.isFinite(count) && count > 0 ? count : 1;
+};
+
+const CASTING_TYPE_REQUIRED_MOTORS: Record<string, number> = {
+  single: 1,
+  pair: 2,
+  triple: 3,
+};
+
+export const resolveCastingTypeOptionsForBatch = (
+  batchMotorCount: number,
+): CastingCuringMotorOption[] =>
+  CASTING_TYPE_OPTIONS.map((option) => {
+    const key = option.value.toLowerCase();
+
+    if (batchMotorCount <= 0) {
+      return { value: option.value, label: option.label, disabled: true };
+    }
+
+    if (key === "others") {
+      return {
+        value: option.value,
+        label: option.label,
+        disabled: batchMotorCount <= 3,
+      };
+    }
+
+    const requiredMotors = CASTING_TYPE_REQUIRED_MOTORS[key] ?? Number.MAX_SAFE_INTEGER;
+    return {
+      value: option.value,
+      label: option.label,
+      disabled: requiredMotors > batchMotorCount,
+    };
+  });
+
+export const shouldShowMotorsToProcessField = (batchMotorCount: number, castingType: string) =>
+  batchMotorCount > 3 && String(castingType).toLowerCase() === "others";
+
+export const resolveCastingMotorDraftCount = (castingType: string, motorCount: number | "") =>
+  resolveCastingMotorCount(castingType, motorCount);
 
 export const resolveCastingMotorCount = (castingType: string, customCount: number | "") => {
-  const normalized = String(castingType ?? "").trim().toLowerCase();
+  const normalized = String(castingType ?? "")
+    .trim()
+    .toLowerCase();
   if (normalized === "single") return 1;
   if (normalized === "pair") return 2;
   if (normalized === "triple") return 3;
   return customCount === "" ? 0 : Number(customCount);
 };
 
-export const resolveCastingCuringMotorOptions = (batch?: {
-  motorId?: string;
-  motorIds?: Array<string | number>;
-  numberOfMotors?: number | string;
-  projectName?: string;
-} | null): CastingCuringMotorOption[] => {
+export const canSubmitCastingMotorDraft = ({
+  castingType,
+  motorCount,
+  castingMotorDrafts,
+  usedMotorIds,
+  availableMotorOptions,
+  maxMotorCount,
+}: {
+  castingType: string;
+  motorCount: number | "";
+  castingMotorDrafts: CastingMotorDraftEntry[];
+  usedMotorIds: string[];
+  availableMotorOptions: CastingCuringMotorOption[];
+  maxMotorCount: number;
+}) => {
+  if (!String(castingType ?? "").trim()) return false;
+
+  const count = resolveCastingMotorCount(castingType, motorCount);
+  if (count <= 0 || count > maxMotorCount) return false;
+  if (castingMotorDrafts.length !== count) return false;
+
+  const rowsComplete = castingMotorDrafts.every(
+    (row) =>
+      String(row.motorId ?? "").trim() &&
+      String(row.castingStation ?? "").trim() &&
+      String(row.motorReceivedAt ?? "").trim(),
+  );
+  if (!rowsComplete) return false;
+
+  const selectedIds = castingMotorDrafts
+    .map((row) => String(row.motorId ?? "").trim())
+    .filter(Boolean);
+  if (selectedIds.length !== count || new Set(selectedIds).size !== count) return false;
+  if (selectedIds.some((id) => usedMotorIds.includes(id))) return false;
+
+  if (availableMotorOptions.length === 0) return true;
+
+  const selectableOptions = filterUnusedCastingCuringMotorOptions(
+    availableMotorOptions,
+    usedMotorIds,
+  );
+  if (selectableOptions.length === 0) return false;
+
+  return selectedIds.every((id) => selectableOptions.some((option) => option.value === id));
+};
+
+export const resolveCastingCuringMotorOptions = (
+  batch?: {
+    motorId?: string;
+    motorIds?: Array<string | number>;
+    numberOfMotors?: number | string;
+    projectName?: string;
+  } | null,
+): CastingCuringMotorOption[] => {
   const ids = Array.isArray(batch?.motorIds)
     ? batch.motorIds.map((id) => String(id).trim()).filter(Boolean)
     : [];
@@ -98,31 +267,6 @@ export const resolveCastingCuringMotorOptions = (batch?: {
   return [{ value: singleId, label: singleId }];
 };
 
-/** Total motors on the batch from API (`numberOfMotors`) or derived from motor IDs. */
-export const resolveCastingCuringBatchMotorCount = (batch?: {
-  numberOfMotors?: number | string;
-  motorIds?: Array<string | number>;
-  motorId?: string;
-} | null): number => {
-  const fromBatch = Number(batch?.numberOfMotors ?? 0);
-  if (Number.isFinite(fromBatch) && fromBatch > 0) return fromBatch;
-
-  const ids = Array.isArray(batch?.motorIds)
-    ? batch.motorIds.map((id) => String(id).trim()).filter(Boolean)
-    : [];
-  if (ids.length > 0) return ids.length;
-
-  const singleId = String(batch?.motorId ?? "").trim();
-  if (!singleId) return 0;
-
-  const parsed = singleId
-    .split(",")
-    .map((id) => id.trim())
-    .filter(Boolean);
-
-  return parsed.length > 0 ? parsed.length : 1;
-};
-
 export const filterUnusedCastingCuringMotorOptions = (
   options: CastingCuringMotorOption[],
   usedMotorIds: string[],
@@ -134,11 +278,19 @@ export const filterUnusedCastingCuringMotorOptions = (
 export const resolveCastingCuringMotorOptionsForSlot = (
   availableMotorOptions: CastingCuringMotorOption[],
   usedMotorIds: string[],
-  draftMotorIds: string[],
+  castingMotorDrafts: CastingMotorDraftEntry[],
   slotIndex: number,
 ): CastingCuringMotorOption[] => {
-  const currentValue = String(draftMotorIds[slotIndex] ?? "").trim();
-  const used = new Set(usedMotorIds.map((id) => String(id).trim()).filter(Boolean));
+  const currentValue = String(castingMotorDrafts[slotIndex]?.motorId ?? "").trim();
+  const selectedInOtherSlots = new Set(
+    castingMotorDrafts
+      .map((row, idx) => (idx !== slotIndex ? String(row.motorId ?? "").trim() : ""))
+      .filter(Boolean),
+  );
+  const used = new Set([
+    ...usedMotorIds.map((id) => String(id).trim()).filter(Boolean),
+    ...selectedInOtherSlots,
+  ]);
 
   return availableMotorOptions.map((option) => ({
     ...option,
@@ -152,11 +304,7 @@ export const resolveCastingCuringMotorCountLimit = ({
   usedMotorIds,
   castingFormLoaded,
 }: {
-  batch?: {
-    numberOfMotors?: number | string;
-    motorIds?: Array<string | number>;
-    motorId?: string;
-  } | null;
+  batch?: CastingCuringBatchMotorSource | null;
   batchMotorOptions: CastingCuringMotorOption[];
   usedMotorIds: string[];
   castingFormLoaded: boolean;
@@ -179,11 +327,21 @@ export const getCastingMotorCountOptions = (maxCount: number) => {
   }));
 };
 
-export const getSelectedCastingDraftMotorIds = (
-  count: number,
-  draftMotorIds: string[],
-): string[] =>
-  Array.from({ length: count }, (_, idx) => String(draftMotorIds[idx] ?? "").trim()).filter(Boolean);
+export const getSelectedCastingDraftMotorIds = (count: number, draftMotorIds: string[]): string[] =>
+  Array.from({ length: count }, (_, idx) => String(draftMotorIds[idx] ?? "").trim()).filter(
+    Boolean,
+  );
+
+export const buildCuringOvenNoOptions = (noOfOvenAvailable: number | null | undefined) => {
+  const count = Math.max(0, Number(noOfOvenAvailable) || 0);
+  return Array.from({ length: count }, (_, idx) => {
+    const n = idx + 1;
+    return {
+      value: String(n),
+      label: STRINGS.MANUFACTURING.CASTING_CURING.CURING_OVEN_NO_OPTION(n),
+    };
+  });
+};
 
 export const canLoadCuringForm = ({
   setup,
@@ -193,86 +351,25 @@ export const canLoadCuringForm = ({
   curingFormLoaded: boolean;
 }) => {
   if (curingFormLoaded) return false;
-  if (!String(setup.oven ?? "").trim()) return false;
-  if (!String(setup.curingType ?? "").trim()) return false;
-  if (!String(setup.configuration ?? "").trim()) return false;
-  if (!String(setup.ovensUtilized ?? "").trim()) return false;
-  if (String(setup.configuration).toLowerCase() === "multiple" && setup.motorsToCureCount === "") {
-    return false;
-  }
-  return true;
-};
-
-export const canSubmitCastingMotorDraft = ({
-  castingType,
-  castingStation,
-  motorCount,
-  draftMotorIds,
-  motorReceivedAt,
-  usedMotorIds,
-  availableMotorOptions,
-  setup,
-  maxMotorCount,
-}: {
-  castingType: string;
-  castingStation: string;
-  motorCount: number | "";
-  draftMotorIds: string[];
-  motorReceivedAt: string;
-  usedMotorIds: string[];
-  availableMotorOptions: CastingCuringMotorOption[];
-  setup: CastingProcessSetupDraft;
-  maxMotorCount: number;
-}) => {
-  if (!String(castingType ?? "").trim() || !String(castingStation ?? "").trim()) return false;
-  if (!String(motorReceivedAt ?? "").trim()) return false;
-  if (
-    !hasNumericValue(setup.initialVacuum) ||
-    !hasNumericValue(setup.castingVacuumPressure) ||
-    !hasNumericValue(setup.soakingVacuumPressure) ||
-    !hasNumericValue(setup.finalMixCount)
-  ) {
-    return false;
-  }
-
-  const count = resolveCastingMotorCount(castingType, motorCount);
-  if (count <= 0 || count > maxMotorCount) return false;
-
-  if (availableMotorOptions.length === 0) return true;
-
-  const selectableOptions = filterUnusedCastingCuringMotorOptions(availableMotorOptions, usedMotorIds);
-  if (selectableOptions.length === 0) return false;
-
-  const selectedIds = getSelectedCastingDraftMotorIds(count, draftMotorIds);
-  return (
-    selectedIds.length === count &&
-    new Set(selectedIds).size === count &&
-    selectedIds.every((id) => !usedMotorIds.includes(id))
-  );
+  return Boolean(String(setup.oven ?? "").trim() && String(setup.ovenNo ?? "").trim());
 };
 
 export const canAddCastingCuringMotors = (params: {
   castingFormLoaded: boolean;
   castingType: string;
-  castingStation: string;
   motorCount: number | "";
-  draftMotorIds: string[];
-  motorReceivedAt: string;
+  castingMotorDrafts: CastingMotorDraftEntry[];
   usedMotorIds: string[];
   availableMotorOptions: CastingCuringMotorOption[];
-  setup: CastingProcessSetupDraft;
   maxMotorCount: number;
 }) => params.castingFormLoaded && canSubmitCastingMotorDraft(params);
 
 export const canLoadCastingForm = (params: {
   castingType: string;
-  castingStation: string;
   motorCount: number | "";
-  draftMotorIds: string[];
-  motorReceivedAt: string;
+  castingMotorDrafts: CastingMotorDraftEntry[];
   usedMotorIds: string[];
   availableMotorOptions: CastingCuringMotorOption[];
-  setup: CastingProcessSetupDraft;
   castingFormLoaded: boolean;
   maxMotorCount: number;
 }) => !params.castingFormLoaded && canSubmitCastingMotorDraft(params);
@@ -280,46 +377,51 @@ export const canLoadCastingForm = (params: {
 /** @deprecated Use canLoadCastingForm */
 export const canStartCastingCuringForm = ({
   castingType,
-  castingStation,
   motorCount,
   draftMotorIds,
   motorReceivedAt,
   usedMotorIds,
   schemasReady,
   availableMotorOptions,
-  setup = {
-    initialVacuum: "",
-    castingVacuumPressure: "",
-    soakingVacuumPressure: "",
-    finalMixCount: "",
-  },
   castingFormLoaded = schemasReady,
   maxMotorCount = Number.MAX_SAFE_INTEGER,
+  castingStation: _castingStation,
+  castingMotorDrafts,
 }: {
   castingType: string;
-  castingStation: string;
+  castingStation?: string;
   motorCount: number | "";
-  draftMotorIds: string[];
-  motorReceivedAt: string;
+  draftMotorIds?: string[];
+  motorReceivedAt?: string;
   usedMotorIds: string[];
   schemasReady: boolean;
   availableMotorOptions: CastingCuringMotorOption[];
-  setup?: CastingProcessSetupDraft;
   castingFormLoaded?: boolean;
   maxMotorCount?: number;
-}) =>
-  canLoadCastingForm({
+  castingMotorDrafts?: CastingMotorDraftEntry[];
+}) => {
+  const count = resolveCastingMotorCount(castingType, motorCount);
+  const resolvedDrafts =
+    castingMotorDrafts ??
+    resizeCastingMotorDrafts(
+      count,
+      (draftMotorIds ?? []).map((motorId, index) => ({
+        motorId,
+        castingStation: _castingStation ?? "",
+        motorReceivedAt: index === 0 ? (motorReceivedAt ?? "") : "",
+      })),
+    );
+
+  return canLoadCastingForm({
     castingType,
-    castingStation,
     motorCount,
-    draftMotorIds,
-    motorReceivedAt,
+    castingMotorDrafts: resolvedDrafts,
     usedMotorIds,
     availableMotorOptions,
-    setup,
     castingFormLoaded,
     maxMotorCount: maxMotorCount ?? Number.MAX_SAFE_INTEGER,
   });
+};
 
 export const CASTING_CURING_FLOW_LABELS = {
   castingProcessTitle: S.CASTING_PROCESS_TITLE,
@@ -327,20 +429,16 @@ export const CASTING_CURING_FLOW_LABELS = {
   castingTypePlaceholder: S.FLOW_CASTING_TYPE_PLACEHOLDER,
   castingStation: S.FLOW_CASTING_STATION,
   castingStationPlaceholder: S.FLOW_CASTING_STATION_PLACEHOLDER,
+  batchMotorsAvailable: S.FLOW_BATCH_MOTORS_AVAILABLE,
+  motorsToProcess: S.FLOW_MOTORS_TO_PROCESS,
+  motorsToProcessPlaceholder: S.FLOW_MOTORS_TO_PROCESS_PLACEHOLDER,
+  motorRowTitle: S.FLOW_MOTOR_ROW_TITLE,
   motorCount: S.FLOW_MOTOR_COUNT,
   motorCountPlaceholder: S.FLOW_MOTOR_COUNT_PLACEHOLDER,
   motorId: S.FLOW_MOTOR_ID,
   motorIdPlaceholder: S.FLOW_MOTOR_ID_PLACEHOLDER,
   motorReceivedAt: S.FLOW_MOTOR_RECEIVED_AT,
   motorReceivedAtPlaceholder: S.FLOW_MOTOR_RECEIVED_AT_PLACEHOLDER,
-  initialVacuum: S.FLOW_INITIAL_VACUUM,
-  initialVacuumPlaceholder: S.FLOW_INITIAL_VACUUM_PLACEHOLDER,
-  castingVacuumPressure: S.FLOW_CASTING_VACUUM_PRESSURE,
-  castingVacuumPressurePlaceholder: S.FLOW_CASTING_VACUUM_PRESSURE_PLACEHOLDER,
-  soakingVacuumPressure: S.FLOW_SOAKING_VACUUM_PRESSURE,
-  soakingVacuumPressurePlaceholder: S.FLOW_SOAKING_VACUUM_PRESSURE_PLACEHOLDER,
-  finalMixCount: S.FLOW_FINAL_MIX_COUNT,
-  finalMixCountPlaceholder: S.FLOW_FINAL_MIX_COUNT_PLACEHOLDER,
   loadCastingForm: S.FLOW_LOAD_CASTING_FORM,
   addMotors: S.ADD_MOTORS_ACTION,
   loadCuringForm: S.FLOW_LOAD_CURING_FORM,
@@ -352,6 +450,8 @@ export const CASTING_CURING_FLOW_LABELS = {
   curingProcessTitle: S.CURING_PROCESS_TITLE,
   curingSelectOven: S.CURING_SELECT_OVEN,
   curingSelectOvenPlaceholder: S.CURING_SELECT_OVEN_PLACEHOLDER,
+  curingSelectOvenNo: S.CURING_SELECT_OVEN_NO,
+  curingSelectOvenNoPlaceholder: S.CURING_SELECT_OVEN_NO_PLACEHOLDER,
   curingType: S.CURING_TYPE,
   curingTypePlaceholder: S.CURING_TYPE_PLACEHOLDER,
   curingConfiguration: S.CURING_CONFIGURATION,
@@ -372,6 +472,8 @@ export const CASTING_CURING_FLOW_LABELS = {
   curingMatrixAddColumnPlaceholder: S.CURING_MATRIX_ADD_COLUMN_PLACEHOLDER,
   curingMatrixNoStages: S.CURING_MATRIX_NO_STAGES,
   curingStagesLoading: S.CURING_STAGES_LOADING,
+  curingMotorStage: S.CURING_MOTOR_STAGE,
+  curingCyclesLoading: S.CURING_CYCLES_LOADING,
   startForm: S.FLOW_START_FORM,
   schemaLoading: S.SCHEMA_LOADING,
   curingNextStepHint: S.CURING_NEXT_STEP_HINT,
@@ -381,13 +483,43 @@ export const resolveMotorStage = (batch?: { motorStage?: unknown; motorType?: un
   const stage = batch?.motorStage ?? batch?.motorType;
   if (stage && typeof stage === "object") {
     const record = stage as { motorStageId?: number; id?: number };
-    const parsed = Number(record.motorStageId ?? record.id ?? 1);
-    return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+    const parsed = Number(record.motorStageId ?? record.id);
+    if (Number.isFinite(parsed) && parsed >= 0 && parsed <= 3) return parsed;
+    return 1;
   }
 
   const numeric = Number(stage);
-  if (Number.isFinite(numeric) && numeric > 0) return numeric;
+  if (Number.isFinite(numeric) && numeric >= 0 && numeric <= 3) return numeric;
   return 1;
+};
+
+export const formatCuringTypeLabel = (curingType: string) => {
+  const normalized = String(curingType ?? "")
+    .trim()
+    .toUpperCase();
+  if (normalized === "NORMAL_CURING") return S.CURING_TYPE_NORMAL;
+  if (normalized === "CONFINED_CURING") return S.CURING_TYPE_CONFINED;
+  if (normalized === "NITROGEN_PRESSURE_CURING") return S.CURING_TYPE_NITROGEN_PRESSURE;
+  return curingType || "—";
+};
+
+export const formatMotorStageLabel = (
+  config?: { motorStage?: number; motorStageName?: string } | null,
+  batch?: { motorStage?: unknown; motorType?: unknown } | null,
+) => {
+  const fromConfig = String(config?.motorStageName ?? "").trim();
+  if (fromConfig) return fromConfig;
+
+  const stage =
+    config?.motorStage != null && Number.isFinite(Number(config.motorStage))
+      ? Number(config.motorStage)
+      : resolveMotorStage(batch);
+
+  if (Number.isFinite(stage) && stage >= 0 && stage <= 3) {
+    return `Stage ${stage}`;
+  }
+
+  return "";
 };
 
 const IGNORED_VALUE_KEYS = new Set(["displayValue", "srNo", "_cycleKey"]);
@@ -398,16 +530,14 @@ const valueHasUserData = (value: unknown): boolean => {
     return value.some((item) =>
       item && typeof item === "object"
         ? Object.entries(item as Record<string, unknown>).some(
-            ([key, nestedValue]) =>
-              !IGNORED_VALUE_KEYS.has(key) && valueHasUserData(nestedValue),
+            ([key, nestedValue]) => !IGNORED_VALUE_KEYS.has(key) && valueHasUserData(nestedValue),
           )
         : String(item ?? "").trim().length > 0,
     );
   }
   if (typeof value === "object") {
     return Object.entries(value as Record<string, unknown>).some(
-      ([key, nestedValue]) =>
-        !IGNORED_VALUE_KEYS.has(key) && valueHasUserData(nestedValue),
+      ([key, nestedValue]) => !IGNORED_VALUE_KEYS.has(key) && valueHasUserData(nestedValue),
     );
   }
   return String(value).trim().length > 0;
@@ -421,7 +551,9 @@ const rowHasUserData = (row: Record<string, unknown>) =>
 export const sectionHasUserData = (sectionId: string, values: SchemaFormValues): boolean => {
   const rows = values[sectionId];
   if (!Array.isArray(rows) || rows.length === 0) return false;
-  return rows.some((row) => row && typeof row === "object" && rowHasUserData(row as Record<string, unknown>));
+  return rows.some(
+    (row) => row && typeof row === "object" && rowHasUserData(row as Record<string, unknown>),
+  );
 };
 
 const isDisplayBlock = (block: SchemaBlock) => block.type === "display";

@@ -19,7 +19,6 @@ export const APPROVER_ENDPOINTS = {
   CHANGE_STATUS: `${API_BASE}/approver/form/change-status`,
   PREMIX_CHANGE_STATUS: `${API_BASE}/approver/form/premix/change-status`,
   MOTOR_CHANGE_STATUS: `${API_BASE}/approver/form/motor/change-status`,
-  MIX_CARD_CHANGE_STATUS: `${API_BASE}/approver/form/mix-card/change-status`,
   FORM_PDF: `${API_BASE}/approver/form/pdf`,
   RAW_MATERIAL_PROCUREMENT_LIST: `${API_BASE}/approver/raw-material-sourcing/list`,
   RAW_MATERIAL_PROCUREMENT_CHANGE_STATUS: `${API_BASE}/approver/form/change-status`,
@@ -149,6 +148,11 @@ export const SYSTEM = {
   SUB_DEPARTMENTS: `${API_BASE}/system/sub-departments`,
   MIXERS: `${API_BASE}/system/mixers`,
   BUILDINGS: `${API_BASE}/system/buildings`,
+  OVENS: `${API_BASE}/system/ovens`,
+  /** GET — NDT / radiography equipment master */
+  EQUIPMENT_LIST: `${API_BASE}/system/equipment-list`,
+  /** GET — NDT / radiography beam energy master */
+  ENERGY_BEAM_LIST: `${API_BASE}/system/energy-beam-list`,
   MIXING_CYCLES: `${API_BASE}/system/mixing-cycles`,
   /** POST body: `{ motorStage: "0" | "1" | "2" | "3" | "ALL" }` (string) */
   MIXING_CYCLE_LIST: `${API_BASE}/system/mixing-cycle-list`,
@@ -255,6 +259,7 @@ export const USER_CASTING_CURING_FORM_ENDPOINTS = {
   UPDATE_FORM: `${API_BASE}/user/casting-curing/form/update`,
   CASTING_SCHEMA: `${API_BASE}/user/casting-curing/schema/casting`,
   CURING_SCHEMA: `${API_BASE}/user/casting-curing/schema/curing`,
+  CURING_CYCLES: `${API_BASE}/user/casting-curing/curing-cycles`,
 };
 
 export const USER_POST_CURE_FORM_ENDPOINTS = {
@@ -286,6 +291,8 @@ export const USER_RAW_MATERIAL_REVALIDATION_ENDPOINTS = {
 
 export const USER_QC_DIVISION_ENDPOINTS = {
   SCHEMA: `${API_BASE}/user/quality-control/schema`,
+  DIVISIONS: `${API_BASE}/user/qc-division/divisions`,
+  DIVISION_DETAILS: `${API_BASE}/user/qc-division/division-details`,
   CREATE_FORM: `${API_BASE}/user/qc-division/create`,
   FORM_DETAILS: `${API_BASE}/user/qc-division/details`,
   UPDATE_FORM: `${API_BASE}/user/qc-division/update`,
@@ -308,6 +315,11 @@ export const USER_STF_ENDPOINTS = {
   UPDATE_BEM_MOTOR: `${API_BASE}/user/stf/bem-motor/update`,
 };
 
+export const APPROVER_STF_OTHER_BEM_ENDPOINTS = {
+  LIST: `${API_BASE}/approver/bem-motor/list`,
+  DETAILS: `${API_BASE}/user/stf/bem-motor/details`,
+  APPROVE: `${API_BASE}/approver/bem-motor/change-status`,
+};
 export const USER_DISPATCH_ENDPOINTS = {
   SCHEMA: `${API_BASE}/user/dispatch/schema`,
   CREATE_FORM: `${API_BASE}/user/dispatch/form/create`,
