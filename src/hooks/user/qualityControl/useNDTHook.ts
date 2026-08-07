@@ -37,6 +37,7 @@ import {
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import {
   isMotorEnabledByPreviousStage,
+  isMotorEnabledForWorkflow,
   resolvePreviousStageApprovedUnits,
   type PreviousStageApprovedUnits,
 } from "../previousStageApproval";
@@ -581,10 +582,19 @@ export const useNDTHook = () => {
 
   const checkMotorEditable = useCallback(
     (motorId: string) => {
-      if (!isMotorEnabledByPreviousStage(motorId, previousStageGate)) return false;
+      if (
+        !isMotorEnabledForWorkflow(
+          motorId,
+          addedMotors.map((motor) => motor.motorId),
+          previousStageGate,
+          getMotorStatus,
+        )
+      ) {
+        return false;
+      }
       return isNDTMotorEditable(getMotorStatus(motorId));
     },
-    [getMotorStatus, previousStageGate],
+    [addedMotors, getMotorStatus, previousStageGate],
   );
 
   const submitMotor = useCallback(
@@ -596,7 +606,14 @@ export const useNDTHook = () => {
         return false;
       }
 
-      if (!isMotorEnabledByPreviousStage(motorId, previousStageGate)) {
+      if (
+        !isMotorEnabledForWorkflow(
+          motorId,
+          addedMotors.map((motor) => motor.motorId),
+          previousStageGate,
+          getMotorStatus,
+        )
+      ) {
         showAlert(STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED, "warning");
         return false;
       }

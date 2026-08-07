@@ -10,7 +10,8 @@ type CertificateFileInputProps = {
   multiple?: boolean;
 };
 
-/** Hidden file input; activated via <label htmlFor={id}> (works with display:none). */
+/** Hidden file input; activated via <label htmlFor={id}> (works with display:none).
+ *  No `accept` attribute — keeps the native picker fast on Linux Chromium. */
 const CertificateFileInput = forwardRef(function CertificateFileInput(
   { id, onChange, multiple = true }: CertificateFileInputProps,
   ref: Ref<HTMLInputElement>
@@ -21,7 +22,6 @@ const CertificateFileInput = forwardRef(function CertificateFileInput(
       ref={ref}
       type="file"
       multiple={multiple}
-      accept={CERTIFICATE_FILE_ACCEPT}
       onChange={onChange}
       style={{ display: "none" }}
     />

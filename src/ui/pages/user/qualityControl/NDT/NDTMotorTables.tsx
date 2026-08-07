@@ -29,6 +29,7 @@ import {
   NDT_ORIENTATION_OPTIONS,
   sanitizeNdtNumericInput,
 } from "../../../../../hooks/user/qualityControl/ndtApiMappings";
+import { FILE_PICKER_ACCEPT, fileNameMatchesAccept } from "../../../../../utils/FileUtils";
 
 const {
   add: AddRoundedIcon,
@@ -55,7 +56,7 @@ const UploadCell = ({
   files = [],
   onAdd,
   onRemove,
-  accept = "image/*,video/*",
+  accept = FILE_PICKER_ACCEPT.IMAGE_VIDEO,
   label = "Upload",
   brand,
 }: {
@@ -71,11 +72,13 @@ const UploadCell = ({
     <input
       type="file"
       multiple
-      accept={accept}
       style={{ display: "none" }}
       id={uploadId}
       onChange={(e) => {
-        onAdd(Array.from(e.target.files ?? []));
+        const selected = Array.from(e.target.files ?? []).filter((file) =>
+          fileNameMatchesAccept(file.name, accept),
+        );
+        if (selected.length) onAdd(selected);
         e.target.value = "";
       }}
     />
@@ -631,7 +634,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
                       uploadId={`ndt-radiography-obs-${index}`}
                       brand={brand}
                       files={row.files}
-                      accept="image/*"
+                      accept={FILE_PICKER_ACCEPT.IMAGE}
                       label="Image"
                       onAdd={(picked) =>
                         updateObservation(index, { files: [...row.files, ...picked] })
@@ -803,7 +806,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
             uploadId="ndt-visual-inspection-media"
             brand={brand}
             files={motor.visualInspectionMedia}
-            accept="image/*,video/*"
+            accept={FILE_PICKER_ACCEPT.IMAGE_VIDEO}
             label="Upload media"
             onAdd={(picked) =>
               onChange({ visualInspectionMedia: [...motor.visualInspectionMedia, ...picked] })

@@ -14,6 +14,7 @@ import {
 export type DivisionDetailEntry = {
   division: string;
   subType: string | null;
+  divisionSubmissionType?: "DRAFT" | "SUBMIT";
   data: Record<string, unknown>;
 };
 

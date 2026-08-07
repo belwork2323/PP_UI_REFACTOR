@@ -29,7 +29,6 @@ import { STRINGS } from "@/app/config/strings";
 
 const S = STRINGS.SOURCING.CASING_CREATE;
 
-const ACCEPT = "application/pdf,.pdf,image/*,video/*";
 const MAX_SIZE_MB = 50;
 const ALLOWED_IMAGE = ["image/jpeg", "image/png", "image/webp"];
 const ALLOWED_VIDEO = ["video/mp4", "video/webm", "video/quicktime"];
@@ -349,7 +348,6 @@ const CasingReportUpload = ({ form, patch, theme }: CasingReportUploadProps) => 
                         inputRefs.current[entry.key] = el;
                       }}
                       type="file"
-                      accept={ACCEPT}
                       multiple
                       hidden
                       onChange={(e) => handlePick(entry, e)}

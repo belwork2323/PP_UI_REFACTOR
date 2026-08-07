@@ -55,6 +55,7 @@ const CastingCuringPage = () => {
     getCuringSetupDraft,
     getMotorCastingFormValues,
     getMotorCuringFormValues,
+    getCrossMotorExcludedBowlSelections,
     handleCuringSetupDraftChange,
     handleMotorCastingValuesChange,
     handleMotorCuringValuesChange,
@@ -133,6 +134,7 @@ const CastingCuringPage = () => {
             getCuringSetupDraft={getCuringSetupDraft}
             getMotorCastingFormValues={getMotorCastingFormValues}
             getMotorCuringFormValues={getMotorCuringFormValues}
+            getCrossMotorExcludedBowlSelections={getCrossMotorExcludedBowlSelections}
             onCuringSetupDraftChange={handleCuringSetupDraftChange}
             onMotorCastingValuesChange={handleMotorCastingValuesChange}
             onMotorCuringValuesChange={handleMotorCuringValuesChange}

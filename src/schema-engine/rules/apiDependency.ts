@@ -184,6 +184,12 @@ export const resolveDataSourceApi = (
       api.filterByContext && typeof api.filterByContext === "object"
         ? (api.filterByContext as Record<string, string>)
         : undefined,
+    optionLabelTemplate:
+      typeof api.optionLabelTemplate === "string" ? api.optionLabelTemplate : undefined,
+    optionValueTemplate:
+      typeof api.optionValueTemplate === "string" ? api.optionValueTemplate : undefined,
+    optionFilterField:
+      typeof api.optionFilterField === "string" ? api.optionFilterField : undefined,
   };
 };
 
@@ -588,6 +594,19 @@ export const resolveSchemaOptionKeys = (
     return {
       displayKey: displayKey ?? "materialName",
       valueKey: valueKey ?? ("materialCode" in sample ? "materialCode" : "materialName"),
+    };
+  }
+
+  if (sample && "bowlId" in sample) {
+    return {
+      displayKey: displayKey ?? "bowlId",
+      valueKey: valueKey ?? "bowlId",
+    };
+  }
+  if (sample && "premixNo" in sample) {
+    return {
+      displayKey: displayKey ?? "premixNo",
+      valueKey: valueKey ?? "premixNo",
     };
   }
 

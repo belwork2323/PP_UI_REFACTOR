@@ -19,7 +19,7 @@ import type {
 } from "../../../../../data/models/user/TrimmingFormModel";
 import type { TrimmingAddedMotor } from "../../../../../hooks/user/manufacturing/trimmingFlowConfig";
 import {
-  isMotorEnabledByPreviousStage,
+  buildMotorNavGateHelpers,
   type PreviousStageApprovedUnits,
 } from "../../../../../hooks/user/previousStageApproval";
 import PremixStatusChip from "../RawMaterial/components/PremixStatusChip";
@@ -86,6 +86,17 @@ const TrimmingForm = ({
     return autoCards.length > 0 ? autoCards : Array.isArray(addedMotors) ? addedMotors : [];
   }, [addedMotors, autoMotorEntries]);
 
+  const motorNavGate = useMemo(() => {
+    const resolveMotorStatus = (motorId: string) =>
+      getMotorStatus?.(motorId) ??
+      motorStatusById[motorId]?.motorSubmissionStatus ??
+      "TO_BE_INITIATED";
+    return buildMotorNavGateHelpers(motorCards, previousStageGate, resolveMotorStatus, {
+      previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
+      sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
+    });
+  }, [motorCards, previousStageGate, getMotorStatus, motorStatusById]);
+
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
   const [finalApprovalOpen, setFinalApprovalOpen] = useState(false);
   const prevMotorCountRef = useRef(0);
@@ -104,9 +115,7 @@ const TrimmingForm = ({
     }
 
     const prevCount = prevMotorCountRef.current;
-    const firstEnabled = motorCards.findIndex((entry) =>
-      isMotorEnabledByPreviousStage(entry.motorId, previousStageGate),
-    );
+    const firstEnabled = motorCards.findIndex((_, index) => motorNavGate.isMotorTabEnabled(index));
 
     if (prevCount === 0) {
       setActiveMotorIndex(firstEnabled >= 0 ? firstEnabled : 0);
@@ -115,10 +124,7 @@ const TrimmingForm = ({
     } else {
       setActiveMotorIndex((prev) => {
         const current = motorCards[prev];
-        if (
-          current &&
-          isMotorEnabledByPreviousStage(current.motorId, previousStageGate)
-        ) {
+        if (current && motorNavGate.isMotorWorkflowEnabled(current.motorId)) {
           return Math.min(prev, motorCards.length - 1);
         }
         return firstEnabled >= 0
@@ -128,7 +134,7 @@ const TrimmingForm = ({
     }
 
     prevMotorCountRef.current = motorCards.length;
-  }, [motorCards, previousStageGate]);
+  }, [motorCards, motorNavGate]);
 
   const activeMotorEntry = useMemo(
     () => (motorCards.length > 0 ? motorCards[activeMotorIndex] : null),
@@ -147,10 +153,7 @@ const TrimmingForm = ({
   const activeMotorStatus = (getMotorStatus?.(activeMotorId) ??
     motorStatusById[activeMotorId]?.motorSubmissionStatus ??
     "TO_BE_INITIATED") as TrimmingMotorSubmissionStatus;
-  const activeMotorPriorEnabled = isMotorEnabledByPreviousStage(
-    activeMotorId,
-    previousStageGate,
-  );
+  const activeMotorPriorEnabled = motorNavGate.isMotorWorkflowEnabled(activeMotorId);
   const activeMotorLocked = activeMotorId
     ? !activeMotorPriorEnabled || !(isMotorEditable?.(activeMotorId) ?? true)
     : false;
@@ -276,20 +279,8 @@ const TrimmingForm = ({
               tabs={motorTabs}
               activeIndex={activeMotorIndex}
               onActiveIndexChange={setActiveMotorIndex}
-              isTabDisabled={(_, index) =>
-                !isMotorEnabledByPreviousStage(
-                  motorCards[index]?.motorId,
-                  previousStageGate,
-                )
-              }
-              tabTooltip={(_, index) =>
-                isMotorEnabledByPreviousStage(
-                  motorCards[index]?.motorId,
-                  previousStageGate,
-                )
-                  ? undefined
-                  : STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED
-              }
+              isTabDisabled={(_, index) => !motorNavGate.isMotorTabEnabled(index)}
+              tabTooltip={(_, index) => motorNavGate.getMotorTabTooltip(index)}
               palette={navPalette}
               showStepArrows
               titleEndAdornment={

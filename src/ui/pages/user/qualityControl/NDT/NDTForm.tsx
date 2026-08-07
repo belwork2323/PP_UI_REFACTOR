@@ -21,7 +21,7 @@ import {
 } from "../../../../../data/models/user/NDTFormModel";
 import type { NDTBatch } from "../../../../../hooks/user/qualityControl/useNDTHook";
 import {
-  isMotorEnabledByPreviousStage,
+  buildMotorNavGateHelpers,
   type PreviousStageApprovedUnits,
 } from "../../../../../hooks/user/previousStageApproval";
 import { generalController } from "../../../../../controllers/admin/common/generalController";
@@ -104,6 +104,17 @@ const NDTForm = ({
       : [];
     return autoCards.length > 0 ? autoCards : Array.isArray(addedMotors) ? addedMotors : [];
   }, [addedMotors, autoMotorEntries]);
+
+  const motorNavGate = useMemo(() => {
+    const resolveMotorStatus = (motorId: string) =>
+      getMotorStatus?.(motorId) ??
+      motorStatusById[motorId]?.motorSubmissionStatus ??
+      "TO_BE_INITIATED";
+    return buildMotorNavGateHelpers(motorCards, previousStageGate, resolveMotorStatus, {
+      previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
+      sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
+    });
+  }, [motorCards, previousStageGate, getMotorStatus, motorStatusById]);
 
   const safeBeamEnergies = Array.isArray(formData.beamEnergies) ? formData.beamEnergies : [];
   const safeEquipment = useMemo(() => {
@@ -207,9 +218,7 @@ const NDTForm = ({
     }
 
     const prevCount = prevMotorCountRef.current;
-    const firstEnabled = motorCards.findIndex((entry) =>
-      isMotorEnabledByPreviousStage(entry.motorId, previousStageGate),
-    );
+    const firstEnabled = motorCards.findIndex((_, index) => motorNavGate.isMotorTabEnabled(index));
 
     if (prevCount === 0) {
       setActiveMotorIndex(firstEnabled >= 0 ? firstEnabled : 0);
@@ -218,10 +227,7 @@ const NDTForm = ({
     } else {
       setActiveMotorIndex((prev) => {
         const current = motorCards[prev];
-        if (
-          current &&
-          isMotorEnabledByPreviousStage(current.motorId, previousStageGate)
-        ) {
+        if (current && motorNavGate.isMotorWorkflowEnabled(current.motorId)) {
           return Math.min(prev, motorCards.length - 1);
         }
         return firstEnabled >= 0
@@ -231,7 +237,7 @@ const NDTForm = ({
     }
 
     prevMotorCountRef.current = motorCards.length;
-  }, [motorCards, previousStageGate]);
+  }, [motorCards, motorNavGate]);
 
   const activeMotorEntry = useMemo(
     () => (motorCards.length > 0 ? motorCards[activeMotorIndex] : null),
@@ -260,10 +266,7 @@ const NDTForm = ({
   const activeMotorStatus = (getMotorStatus?.(activeMotorId) ??
     motorStatusById[activeMotorId]?.motorSubmissionStatus ??
     "TO_BE_INITIATED") as NDTMotorSubmissionStatus;
-  const activeMotorPriorEnabled = isMotorEnabledByPreviousStage(
-    activeMotorId,
-    previousStageGate,
-  );
+  const activeMotorPriorEnabled = motorNavGate.isMotorWorkflowEnabled(activeMotorId);
   const activeMotorLocked = activeMotorId
     ? !activeMotorPriorEnabled || !(isMotorEditable?.(activeMotorId) ?? true)
     : false;
@@ -373,20 +376,8 @@ const NDTForm = ({
               tabs={motorTabs}
               activeIndex={activeMotorIndex}
               onActiveIndexChange={setActiveMotorIndex}
-              isTabDisabled={(_, index) =>
-                !isMotorEnabledByPreviousStage(
-                  motorCards[index]?.motorId,
-                  previousStageGate,
-                )
-              }
-              tabTooltip={(_, index) =>
-                isMotorEnabledByPreviousStage(
-                  motorCards[index]?.motorId,
-                  previousStageGate,
-                )
-                  ? undefined
-                  : STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED
-              }
+              isTabDisabled={(_, index) => !motorNavGate.isMotorTabEnabled(index)}
+              tabTooltip={(_, index) => motorNavGate.getMotorTabTooltip(index)}
               palette={navPalette}
               showStepArrows
               titleEndAdornment={

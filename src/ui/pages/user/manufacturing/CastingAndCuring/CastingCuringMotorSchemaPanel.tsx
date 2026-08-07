@@ -7,6 +7,7 @@ import {
   type SchemaSetupContext,
 } from "../../../../../schema-engine";
 import { CASTING_CURING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/castingAndCuring_theme";
+import { STRINGS } from "../../../../../app/config/strings";
 import type { CastingCuringMotorSession } from "../../../../../data/models/user/CastingCuringFormModel";
 
 type CastingCuringMotorSchemaPanelProps = {
@@ -18,6 +19,7 @@ type CastingCuringMotorSchemaPanelProps = {
   setupContext?: SchemaSetupContext;
   curingFormValues?: SchemaFormValues;
   castingFormValues?: SchemaFormValues;
+  getCrossMotorExcludedBowlSelections?: (motorId: string) => string[];
   onMotorChange: (next: CastingCuringMotorSession) => void;
   onCastingFormValuesChange?: (values: SchemaFormValues) => void;
   onCuringFormValuesChange?: (values: SchemaFormValues) => void;
@@ -35,6 +37,7 @@ const CastingCuringMotorSchemaPanel = ({
   setupContext,
   curingFormValues,
   castingFormValues,
+  getCrossMotorExcludedBowlSelections,
   onMotorChange,
   onCastingFormValuesChange,
   onCuringFormValuesChange,
@@ -60,6 +63,11 @@ const CastingCuringMotorSchemaPanel = ({
   const resolvedCuringFormValues = curingFormValues ?? motor.curingFormValues ?? {};
   const isCuringPanel = schema?.schemaType === "CURING";
   const value = isCuringPanel ? resolvedCuringFormValues : formValues;
+
+  const crossMotorExcludedBowlSelections = useMemo(
+    () => getCrossMotorExcludedBowlSelections?.(motor.motorId) ?? [],
+    [getCrossMotorExcludedBowlSelections, motor.motorId],
+  );
 
   const handleValuesChange = (values: SchemaFormValues) => {
     if (isCuringPanel) {
@@ -94,6 +102,8 @@ const CastingCuringMotorSchemaPanel = ({
           projectId,
           motorId: motor.motorId,
           mixingStageType: "FINAL_MIX",
+          crossMotorExcludedBowlSelections,
+          noBowlsAvailablePlaceholder: STRINGS.MANUFACTURING.CASTING_CURING.PLACEHOLDER_NO_BOWLS_AVAILABLE,
         }}
         setupContext={setupContext}
         batch={{ batchId, projectId }}

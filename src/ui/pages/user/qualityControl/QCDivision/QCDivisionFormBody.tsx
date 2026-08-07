@@ -13,11 +13,11 @@ import {
   getSchemaForDivisionEntry,
   getSolidSchemaForBothEntry,
 } from "../../../../../hooks/user/qualityControl/qcDivisionEntries";
-import { sliceMixingFinalMixSchema } from "../../../../../hooks/user/qualityControl/qcMixingConfig";
+import { sliceMixingFinalMixSchema, QC_MIXING_FINAL_MIX_DETAILS_SECTION_ID } from "../../../../../hooks/user/qualityControl/qcMixingConfig";
 import { createQcInitialValues } from "../../../../../schema-engine/adapters/qc.adapter";
 import type { SchemaFormValues } from "../../../../../schema-engine";
-import QCDivisionEntryPanel from "./QCDivisionEntryPanel";
-import QCDivisionNavPanel from "./QCDivisionNavPanel";
+import QCDivisionEntryPanel, { type QCDivisionEntryUnitActions } from "./QCDivisionEntryPanel";
+import QCDivisionNavPanel, { type QCDivisionNavApprovalActions } from "./QCDivisionNavPanel";
 import QCSchemaPanel from "./QCSchemaPanel";
 import QCDivisionSavedSectionsDisplay from "./components/QCDivisionSavedSectionsDisplay";
 import type { QcPartialItemStatus } from "../../../../../hooks/user/qualityControl/qcDivisionApprovalUnits";
@@ -50,6 +50,8 @@ export type QCDivisionFormBodyProps = {
   onRemoveDivisionEntry: (entryId: string) => void;
   hideDivisionSubNav?: boolean;
   groupStatusByFlowKey?: Record<string, QcPartialItemStatus>;
+  navApprovalActions?: QCDivisionNavApprovalActions | null;
+  unitActions?: QCDivisionEntryUnitActions | null;
   theme: any;
 };
 
@@ -70,6 +72,8 @@ const QCDivisionFormBody = ({
   onDivisionEntryLiquidValuesChange,
   onMixingFinalMixDetailsChange,
   onRemoveDivisionEntry,
+  navApprovalActions = null,
+  unitActions = null,
   theme,
 }: QCDivisionFormBodyProps) => {
   const BRAND = QC_DIVISION_BRAND;
@@ -122,6 +126,16 @@ const QCDivisionFormBody = ({
   const visibleEntries = useMemo(() => resolveVisibleEntries(activeContent), [activeContent]);
   const bothPremixSolidSchema = useMemo(() => getSolidSchemaForBothEntry(formData), [formData.schemasByKey]);
   const bothPremixLiquidSchema = useMemo(() => getLiquidSchemaForBothEntry(formData), [formData.schemasByKey]);
+  // Raw Material Revalidation is division-scoped only — no unit draft/submit actions.
+  const resolvedUnitActions = useMemo(() => {
+    if (!unitActions?.show) return unitActions;
+    const isRevalidationOnly =
+      visibleEntries.length > 0 && visibleEntries.every((entry) => entry.kind === "REVALIDATION");
+    if (isRevalidationOnly || activeEntry?.kind === "REVALIDATION") {
+      return { ...unitActions, show: false };
+    }
+    return unitActions;
+  }, [activeEntry?.kind, unitActions, visibleEntries]);
 
   if (schemaLoading && !hasDivisionEntries) {
     return (
@@ -167,6 +181,7 @@ const QCDivisionFormBody = ({
         activeSubIndex={activeDivisionSubIndex}
         groupStatusByFlowKey={groupStatusByFlowKey}
         hideSubNav={hideDivisionSubNav}
+        approvalActions={navApprovalActions}
         onActiveGroupIndexChange={onActiveDivisionGroupIndexChange}
         onActiveSubIndexChange={onActiveDivisionSubIndexChange}
       />
@@ -239,6 +254,7 @@ const QCDivisionFormBody = ({
               onEntryValuesChange={onDivisionEntryValuesChange}
               onEntryLiquidValuesChange={onDivisionEntryLiquidValuesChange}
               onRemoveEntry={onRemoveDivisionEntry}
+              unitActions={resolvedUnitActions}
             />
           );
         })}

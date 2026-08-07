@@ -35,13 +35,19 @@ const MAX_SIZE_MB = 50;
 
 const DEFAULT_ACCEPT_MODES = { allowImage: true, allowVideo: true, allowPdf: false };
 
-/** Derive allowed types from the `accept` attribute string. */
+/** Derive allowed types from accept string (MIME and/or extensions). */
 const parseAcceptModes = (accept) => {
   if (!accept) return DEFAULT_ACCEPT_MODES;
   const a = String(accept).toLowerCase();
   return {
-    allowImage: a.includes("image/") || ALLOWED_IMAGE_TYPES.some((t) => a.includes(t)),
-    allowVideo: a.includes("video/") || ALLOWED_VIDEO_TYPES.some((t) => a.includes(t)),
+    allowImage:
+      a.includes("image/") ||
+      ALLOWED_IMAGE_TYPES.some((t) => a.includes(t)) ||
+      /\.(jpe?g|png|webp|gif|bmp)(,|$)/.test(`${a},`),
+    allowVideo:
+      a.includes("video/") ||
+      ALLOWED_VIDEO_TYPES.some((t) => a.includes(t)) ||
+      /\.(mp4|webm|mov)(,|$)/.test(`${a},`),
     allowPdf: a.includes("pdf"),
   };
 };
@@ -54,8 +60,12 @@ const validateFile = (file, modes = DEFAULT_ACCEPT_MODES) => {
   const sizeInMB = file.size / (1024 * 1024);
   if (sizeInMB > MAX_SIZE_MB) return { valid: false, error: `File exceeds ${MAX_SIZE_MB}MB limit` };
 
-  const isImage = ALLOWED_IMAGE_TYPES.includes(file.type);
-  const isVideo = ALLOWED_VIDEO_TYPES.includes(file.type);
+  const isImage =
+    ALLOWED_IMAGE_TYPES.includes(file.type) ||
+    /\.(png|jpe?g|webp|gif|bmp)$/i.test(String(file.name ?? ""));
+  const isVideo =
+    ALLOWED_VIDEO_TYPES.includes(file.type) ||
+    /\.(mp4|webm|mov)$/i.test(String(file.name ?? ""));
   const isPdf = isPdfFile(file);
 
   const allowed =
@@ -423,7 +433,6 @@ const MediaUpload = ({
   const [previewUrl, setPreviewUrl] = useState(null);
 
   const acceptModes = parseAcceptModes(accept);
-  const acceptStr = accept || [...ALLOWED_IMAGE_TYPES, ...ALLOWED_VIDEO_TYPES].join(",");
   const formatChips = formatChipsFromModes(acceptModes);
   const formatHint = formatHintFromModes(acceptModes);
   const showExisting = Boolean(existingFile?.fileUrl) && !value;
@@ -482,7 +491,7 @@ const MediaUpload = ({
         onDrop={handleDrop}
         sx={isCompact ? { borderRadius: 2, minHeight: value || showExisting ? "auto" : 52 } : undefined}
       >
-        <HiddenInput ref={inputRef} type="file" accept={acceptStr} onChange={handleInputChange} />
+        <HiddenInput ref={inputRef} type="file" onChange={handleInputChange} />
 
         {showExisting && (
           <ExistingFilePreview

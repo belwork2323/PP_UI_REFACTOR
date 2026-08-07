@@ -12,6 +12,8 @@ import type {
 import type { QcPartialNavItem } from "../../../../../hooks/user/qualityControl/qcDivisionApprovalUnits";
 import type { SchemaFormValues } from "../../../../../schema-engine";
 import QCDivisionFormBody from "./QCDivisionFormBody";
+import type { QCDivisionNavApprovalActions } from "./QCDivisionNavPanel";
+import type { QCDivisionEntryUnitActions } from "./QCDivisionEntryPanel";
 import QCFlowBar from "./QCFlowBar";
 import QCPartialItemNavigation from "./QCPartialItemNavigation";
 
@@ -80,6 +82,8 @@ type QCFormProps = {
   onDivisionEntryLiquidValuesChange: (entryId: string, values: SchemaFormValues) => void;
   onMixingFinalMixDetailsChange: (values: SchemaFormValues) => void;
   onRemoveDivisionEntry: (entryId: string) => void;
+  navApprovalActions?: QCDivisionNavApprovalActions | null;
+  unitActions?: QCDivisionEntryUnitActions | null;
   theme: any;
 };
 
@@ -145,6 +149,8 @@ const QCForm = ({
   onDivisionEntryLiquidValuesChange,
   onMixingFinalMixDetailsChange,
   onRemoveDivisionEntry,
+  navApprovalActions = null,
+  unitActions = null,
   theme,
 }: QCFormProps) => {
   const BRAND = QC_DIVISION_BRAND;
@@ -318,6 +324,8 @@ const QCForm = ({
         onDivisionEntryLiquidValuesChange={onDivisionEntryLiquidValuesChange}
         onMixingFinalMixDetailsChange={onMixingFinalMixDetailsChange}
         onRemoveDivisionEntry={onRemoveDivisionEntry}
+        navApprovalActions={navApprovalActions}
+        unitActions={unitActions}
         theme={theme}
       />
     </Box>

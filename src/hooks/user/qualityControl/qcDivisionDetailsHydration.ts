@@ -30,6 +30,10 @@ import {
   QC_MIXING_VISCOSITY_SECTION_ID,
   sliceMixingFinalMixSchema,
 } from "./qcMixingConfig";
+import {
+  createInitialRevalidationSchemaValues,
+  hydrateRevalidationValuesFromSections,
+} from "./qcRawMaterialRevalidationTable";
 import { fetchQcSchemaWithInflightDedup, getCachedQcSchema, mapWithConcurrency } from "./qcSchemaFetchCache";
 
 const getEntryKind = (
@@ -200,7 +204,9 @@ export async function hydrateQcDivisionFormFromDetails(
         list.push(section);
         sectionsByMotor.set(groupKey, list);
       } else {
-        enqueueSchema(division, detailSubType);
+        if (division !== "RAW_MATERIAL_REVALIDATION") {
+          enqueueSchema(division, detailSubType);
+        }
         simpleSections.push(section);
       }
     }
@@ -231,7 +237,12 @@ export async function hydrateQcDivisionFormFromDetails(
     } else if (simpleSections.length > 0) {
       const { kind } = getEntryKind(division, detailSubType);
       const { entryId } = makeEntry(kind, detailSubType, simpleSections);
-      entryValues[entryId] = { schemaValues: {} };
+      entryValues[entryId] = {
+        schemaValues:
+          kind === "REVALIDATION"
+            ? hydrateRevalidationValuesFromSections(simpleSections)
+            : {},
+      };
     }
   }
 
@@ -270,6 +281,27 @@ export async function hydrateQcDivisionFormFromDetails(
   });
 
   for (const entry of entries) {
+    if (entry.kind === "REVALIDATION") {
+      const sectionsToHydrate =
+        entry.savedSections ??
+        (resolvedData.savedSections ?? []).filter(
+          (s) => s.sectionId === "RAW_MATERIAL_DETAILS",
+        );
+      if (sectionsToHydrate.length > 0) {
+        entryValues[entry.entryId] = {
+          schemaValues: hydrateRevalidationValuesFromSections(sectionsToHydrate),
+        };
+      } else if (
+        !entryValues[entry.entryId]?.schemaValues ||
+        Object.keys(entryValues[entry.entryId].schemaValues).length === 0
+      ) {
+        entryValues[entry.entryId] = {
+          schemaValues: createInitialRevalidationSchemaValues(),
+        };
+      }
+      continue;
+    }
+
     const cacheKey = getQcSchemaCacheKey(entry.apiDivision, entry.subType, entry.inhibitorType);
     const schema = schemasByKey[cacheKey];
     if (!schema) continue;

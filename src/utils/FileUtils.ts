@@ -11,6 +11,37 @@ const CERTIFICATE_EXTENSION_FALLBACK = [
 ] as const;
 
 /**
+ * Extension-only accept hints for post-pick validation / UI copy.
+ * Do NOT put MIME wildcards (`image/*`) or long MIME lists on `<input accept>` —
+ * Linux Chrome/Chromium + xdg-desktop-portal can take several seconds to open.
+ * Prefer omitting `accept` on the input and filtering after selection.
+ */
+export const FILE_PICKER_ACCEPT = {
+  IMAGE: ".jpg,.jpeg,.png,.webp,.gif,.bmp",
+  IMAGE_VIDEO: ".jpg,.jpeg,.png,.webp,.gif,.bmp,.mp4,.webm,.mov",
+  IMAGE_VIDEO_PDF: ".jpg,.jpeg,.png,.webp,.gif,.bmp,.mp4,.webm,.mov,.pdf",
+  IMAGE_PDF: ".jpg,.jpeg,.png,.webp,.pdf",
+  PDF: ".pdf",
+} as const;
+
+/** Extensions from an accept string (ignores MIME tokens). */
+export const extractFileExtensions = (accept?: string | null): string[] =>
+  String(accept ?? "")
+    .split(",")
+    .map((part) => part.trim().toLowerCase())
+    .filter((part) => part.startsWith(".") && part.length > 1);
+
+export const fileNameMatchesAccept = (
+  fileName: string,
+  accept?: string | null,
+): boolean => {
+  const extensions = extractFileExtensions(accept);
+  if (!extensions.length) return true;
+  const lower = String(fileName ?? "").toLowerCase();
+  return extensions.some((ext) => lower.endsWith(ext));
+};
+
+/**
  * Utility to handle file validations and formatting
  */
 export const fileUtils = {

@@ -39,6 +39,7 @@ import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import {
   isMotorEnabledByPreviousStage,
+  isMotorEnabledForWorkflow,
   pickFirstPreviousStageEnabledMotorId,
   resolvePreviousStageApprovedUnits,
   type PreviousStageApprovedUnits,
@@ -678,10 +679,19 @@ export const usePostCureHook = () => {
 
   const checkMotorEditable = useCallback(
     (motorId: string) => {
-      if (!isMotorEnabledByPreviousStage(motorId, previousStageGate)) return false;
+      if (
+        !isMotorEnabledForWorkflow(
+          motorId,
+          addedMotors.map((motor) => motor.motorId),
+          previousStageGate,
+          getMotorStatus,
+        )
+      ) {
+        return false;
+      }
       return isPostCureMotorEditable(getMotorStatus(motorId));
     },
-    [getMotorStatus, previousStageGate],
+    [addedMotors, getMotorStatus, previousStageGate],
   );
 
   const handleSubmitForFinalApproval = useCallback(async () => {

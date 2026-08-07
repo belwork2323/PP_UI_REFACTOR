@@ -10,6 +10,7 @@ import {
   createDefaultQualityControlFormState,
   hasAnyQualityControlValue,
   hydrateQualityControlFormState,
+  mapQualityControlDivisionSubmitPayload,
   mapQualityControlPayload,
   type QualityControlFormState,
 } from "../../../data/models/user/QualityControlFormModel";
@@ -35,7 +36,13 @@ import {
   scopeFormStateToPartialItem,
   updatePartialNavStatus,
   aggregatePartialNavStatus,
+  areAllPartialItemsApproved,
+  buildDivisionApprovalRows,
+  buildFinalApprovalRows,
+  areAllFinalApprovalRowsApproved,
+  applyStatusMapsToPartialNav,
   type QcPartialNavItem,
+  type QcPartialItemStatus,
 } from "./qcDivisionApprovalUnits";
 import { isRawMaterialProcessingType } from "./qcProcessingConfig";
 import {
@@ -57,6 +64,13 @@ import {
   parseMotorDivisionGroupKey,
   resolveDivisionEntryKind,
 } from "./qcDivisionEntries";
+import {
+  createInitialRevalidationSchemaValues,
+  buildRevalidationValuesFromDivisionDetails,
+  hydrateRevalidationValuesFromSections,
+} from "./qcRawMaterialRevalidationTable";
+import { operationsController } from "../../../controllers/user/operationsController";
+import { MaterialSpecificationListModel } from "../../../data/models/user/MaterialSpecificationModel";
 import type { QcDivisionEntry, QcDivisionEntryValues } from "./qcDivisionEntryTypes";
 import {
   isQcCuringSubType,
@@ -194,6 +208,9 @@ export const useQCDivisionHook = () => {
   const [partialNavItems, setPartialNavItems] = useState<QcPartialNavItem[]>([]);
   const [activePartialNavIndex, setActivePartialNavIndex] = useState(0);
   const [partialItemLoading, setPartialItemLoading] = useState(false);
+  const [divisionStatusByFlowKey, setDivisionStatusByFlowKey] = useState<
+    Record<string, QcPartialItemStatus>
+  >({});
   const partialNavLoadRequestIdRef = useRef(0);
   const partialNavSeedKeyRef = useRef("");
   const [selectedRawMaterialType, setSelectedRawMaterialType] = useState("");
@@ -325,6 +342,7 @@ export const useQCDivisionHook = () => {
     setPartialNavItems([]);
     setActivePartialNavIndex(0);
     setPartialItemLoading(false);
+    setDivisionStatusByFlowKey({});
     partialNavSeedKeyRef.current = "";
   }, [applyFullFormState]);
 
@@ -474,9 +492,14 @@ export const useQCDivisionHook = () => {
           rawMaterialType: typeKey,
           batchPayload,
         });
-        setPartialNavItems(navItems);
+        const withStatuses = applyStatusMapsToPartialNav(navItems, {
+          motorStatuses: record?.motorStatuses ?? (record as any)?.motors,
+          premixStatuses: record?.premixStatuses ?? (record as any)?.premixes,
+          division: divisionFlowKey,
+        });
+        setPartialNavItems(withStatuses);
         setActivePartialNavIndex(0);
-        return navItems;
+        return withStatuses;
       } catch (error) {
         console.error("Failed to auto-populate QC division details:", error);
         if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
@@ -1204,6 +1227,72 @@ export const useQCDivisionHook = () => {
       return;
     }
 
+    // Raw Material Revalidation uses a dedicated table UI — no schema fetch.
+    // Seed from /qc-division/division-details when available; otherwise empty picker UI.
+    if (entryKind === "REVALIDATION") {
+      const selection = resolveDivisionSchemaRequest(selectedDivision, divisionFlowState);
+      if (!selection) return;
+
+      let autoPopulatePayload: unknown = divisionAutoPopulateData;
+      const divisionId = resolveQcDivisionIdForSelection(
+        divisionCatalog,
+        selectedDivision,
+        selectedRawMaterialType,
+      );
+      const batchId = String(activeBatch?.batchId ?? "").trim();
+      if (!autoPopulatePayload && divisionId && batchId) {
+        try {
+          const response = await qcDivisionController.fetchDivisionDetails({
+            batchId,
+            divisionId,
+          });
+          if (response?.success) {
+            autoPopulatePayload = response.data;
+            const record =
+              response.data && typeof response.data === "object" && !Array.isArray(response.data)
+                ? (response.data as Record<string, unknown>)
+                : null;
+            setDivisionAutoPopulateData(record);
+          }
+        } catch (error) {
+          console.error("Failed to load revalidation division-details seed:", error);
+        }
+      }
+
+      const schemaValues = await buildRevalidationValuesFromDivisionDetails(
+        autoPopulatePayload,
+        async (materialCode) => {
+          const response = await operationsController.fetchMaterialSpecificationList({
+            materialCode,
+            gradeCode: null,
+          });
+          const model =
+            response?.data instanceof MaterialSpecificationListModel
+              ? response.data
+              : MaterialSpecificationListModel.fromApi(response?.data ?? response);
+          return (model.specifications ?? []).map((spec) => ({
+            specificationName: spec.specificationName,
+            specificationCode: spec.specificationCode,
+            specsLabel: spec.formattedReferenceRange,
+          }));
+        },
+      );
+
+      const entry = buildEntryFromSelection(entryKind, selection, premixNo);
+      const nextEntries = [...(formData.divisionEntries ?? []), entry];
+      updateFormData((prev) =>
+        appendDivisionEntryToForm(
+          prev,
+          entry,
+          { schemaValues },
+          [],
+        ),
+      );
+      navigateToEntry(nextEntries, entry.entryId);
+      resetFlowBarSelection();
+      return;
+    }
+
     const selection = resolveDivisionSchemaRequest(selectedDivision, divisionFlowState);
     if (!selection) return;
 
@@ -1613,6 +1702,7 @@ export const useQCDivisionHook = () => {
       const flowSelection = resolveBatchFlowSelection(batch.division, batch.subType);
       let initialRawMaterialType = flowSelection.rawMaterialType;
       let initialProcessingType = flowSelection.processingType;
+      let fetchedDetailsPayload: Record<string, unknown> | null = null;
 
       if (shouldFetchDetails) {
         if (!subDepartmentId) {
@@ -1643,6 +1733,8 @@ export const useQCDivisionHook = () => {
         if (options?.forDetails) {
           setDetailsData(detailsResponse.data as unknown as Record<string, unknown>);
         }
+
+        fetchedDetailsPayload = detailsResponse.data as unknown as Record<string, unknown>;
 
         const rawDivisionDetails = detailsResponse.data?.divisionDetails;
         const hasDivisionDetails = Array.isArray(rawDivisionDetails) && rawDivisionDetails.length > 0;
@@ -1801,7 +1893,9 @@ export const useQCDivisionHook = () => {
                 list.push(section);
                 sectionsByMotor.set(groupKey, list);
               } else {
-                enqueueSchema(division, detailSubType);
+                if (division !== "RAW_MATERIAL_REVALIDATION") {
+                  enqueueSchema(division, detailSubType);
+                }
                 simpleSections.push(section);
               }
             }
@@ -1832,7 +1926,12 @@ export const useQCDivisionHook = () => {
             } else if (simpleSections.length > 0) {
               const { kind } = getEntryKind(division, detailSubType);
               const { entryId } = makeEntry(kind, detailSubType, simpleSections);
-              entryValues[entryId] = { schemaValues: {} };
+              entryValues[entryId] = {
+                schemaValues:
+                  kind === "REVALIDATION"
+                    ? hydrateRevalidationValuesFromSections(simpleSections)
+                    : {},
+              };
             }
           }
 
@@ -1864,6 +1963,25 @@ export const useQCDivisionHook = () => {
           }
 
           for (const entry of entries) {
+            if (entry.kind === "REVALIDATION") {
+              const sectionsToHydrate =
+                entry.savedSections ??
+                (resolvedData.savedSections ?? []).filter(
+                  (s) => s.sectionId === "RAW_MATERIAL_DETAILS",
+                );
+              if (sectionsToHydrate.length > 0) {
+                entryValues[entry.entryId] = {
+                  schemaValues: hydrateRevalidationValuesFromSections(sectionsToHydrate),
+                };
+              } else if (!entryValues[entry.entryId]?.schemaValues ||
+                Object.keys(entryValues[entry.entryId].schemaValues).length === 0) {
+                entryValues[entry.entryId] = {
+                  schemaValues: createInitialRevalidationSchemaValues(),
+                };
+              }
+              continue;
+            }
+
             const cacheKey = getQcSchemaCacheKey(entry.apiDivision, entry.subType, entry.inhibitorType);
             const schema = schemasByKey[cacheKey];
             if (!schema) continue;
@@ -1933,7 +2051,7 @@ export const useQCDivisionHook = () => {
             const schemasToLoad: Array<{ division: QcApiDivision; subType: QcApiSubType }> = [];
 
             if (isRawMaterialRevalidationType(initialRawMaterialType)) {
-              schemasToLoad.push({ division: "RAW_MATERIAL_REVALIDATION", subType: null });
+              // Dedicated table UI — no schema document required.
             } else if (initialProcessingType === "SOLID_PROCESSING") {
               schemasToLoad.push({ division: "RAW_MATERIAL_PROCESSING", subType: "SOLID_PROCESSING" });
             } else if (initialProcessingType === "LIQUID_PROCESSING") {
@@ -1980,6 +2098,49 @@ export const useQCDivisionHook = () => {
       applyFullFormState(resolvedData);
       setIsFormDirty(false);
       setIsEditMode(editMode);
+
+      const detailsPayload = fetchedDetailsPayload as any;
+      if (detailsPayload && Array.isArray(detailsPayload.divisionStatuses)) {
+        const nextMap: Record<string, QcPartialItemStatus> = {};
+        detailsPayload.divisionStatuses.forEach((entry: any) => {
+          const key = String(entry?.division ?? "").trim();
+          if (!key) return;
+          nextMap[key] = String(entry?.status ?? "TO_BE_INITIATED")
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, "_") as QcPartialItemStatus;
+        });
+        setDivisionStatusByFlowKey(nextMap);
+      }
+
+      if (detailsPayload && Array.isArray(detailsPayload.divisionDetails)) {
+        const firstDetail = detailsPayload.divisionDetails[0];
+        const flowKey = String(initialDivision || firstDetail?.division || "").trim();
+        if (flowKey) {
+          const navFromDetails = mapDivisionDetailsToPartialNav(
+            {
+              data: firstDetail?.data ?? {},
+              motors: detailsPayload.motorStatuses,
+              premixes: detailsPayload.premixStatuses,
+            },
+            {
+              flowKey,
+              rawMaterialType: initialRawMaterialType,
+            },
+          );
+          if (navFromDetails.length) {
+            setPartialNavItems(
+              applyStatusMapsToPartialNav(navFromDetails, {
+                motorStatuses: detailsPayload.motorStatuses,
+                premixStatuses: detailsPayload.premixStatuses,
+                division: String(firstDetail?.division ?? ""),
+              }),
+            );
+            setActivePartialNavIndex(0);
+          }
+        }
+      }
+
       if (!options?.forDetails) {
         setView("form");
       }
@@ -2046,7 +2207,7 @@ export const useQCDivisionHook = () => {
     resetFormContext();
   };
 
-  const submitForm = async (intent: "draft" | "submit") => {
+  const submitUnit = async (intent: "draft" | "submit") => {
     if (!activeBatch) return false;
 
     if (!subDepartmentId) {
@@ -2077,7 +2238,17 @@ export const useQCDivisionHook = () => {
       return false;
     }
 
-    const payload = mapQualityControlPayload(submitFormState);
+    const unitSubmissionType = intent === "draft" ? "DRAFT" : "SUBMIT";
+    // Unit saves always keep root formSubmissionType as DRAFT (Case Prep / RMP pattern).
+    const formSubmissionType = "DRAFT" as const;
+    const payload = mapQualityControlPayload(submitFormState, {
+      unitSubmissionType,
+      ...(activePartialItem
+        ? {}
+        : intent === "submit"
+          ? { divisionSubmissionType: "SUBMIT" as const }
+          : { divisionSubmissionType: "DRAFT" as const }),
+    });
     const isCreateFlow =
       activeBatch.qcStatus === QUALITY_CONTROL_STATUS.TO_BE_INITIATED && !activeBatch.formId;
 
@@ -2094,7 +2265,7 @@ export const useQCDivisionHook = () => {
         response = await qcDivisionController.createForm({
           batchId: activeBatch.batchId,
           subDepartmentId,
-          formSubmissionType: intent === "draft" ? "DRAFT" : "SUBMIT",
+          formSubmissionType,
           ...payload,
         });
       } else {
@@ -2112,7 +2283,7 @@ export const useQCDivisionHook = () => {
           formId: activeBatch.formId,
           batchId: activeBatch.batchId,
           subDepartmentId,
-          formSubmissionType: intent === "draft" ? "DRAFT" : "SUBMIT",
+          formSubmissionType,
           ...payload,
         });
       }
@@ -2127,18 +2298,38 @@ export const useQCDivisionHook = () => {
       setActiveBatch((prev) =>
         prev
           ? {
-            ...prev,
-            formId: nextFormId,
-            division: formData.division,
-            subType: formData.subType,
-          }
+              ...prev,
+              formId: nextFormId,
+              division: formData.division,
+              subType: formData.subType,
+            }
           : prev,
       );
       setIsFormDirty(false);
 
       if (activePartialItem) {
         const nextStatus = intent === "draft" ? "IN_PROGRESS" : "WAITING_FOR_APPROVAL";
-        setPartialNavItems((prev) => updatePartialNavStatus(prev, activePartialItem.id, nextStatus));
+        setPartialNavItems((prev) => {
+          const updated = updatePartialNavStatus(prev, activePartialItem.id, nextStatus);
+          return applyStatusMapsToPartialNav(updated, {
+            motorStatuses: (response.data as any)?.motorStatuses,
+            premixStatuses: (response.data as any)?.premixStatuses,
+            division: String(formData.division ?? selectedDivision ?? ""),
+          });
+        });
+      }
+
+      if (Array.isArray((response.data as any)?.divisionStatuses)) {
+        const nextMap: Record<string, QcPartialItemStatus> = {};
+        (response.data as any).divisionStatuses.forEach((entry: any) => {
+          const key = String(entry?.division ?? "").trim();
+          if (!key) return;
+          nextMap[key] = String(entry?.status ?? "TO_BE_INITIATED")
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, "_") as QcPartialItemStatus;
+        });
+        setDivisionStatusByFlowKey((prev) => ({ ...prev, ...nextMap }));
       }
 
       if (intent === "draft") {
@@ -2148,23 +2339,14 @@ export const useQCDivisionHook = () => {
           { autoCloseMs: 2200 },
         );
         setHasSavedDraft(true);
-      } else if (activePartialItem) {
-        showAlert(
-          isCreateFlow ? messages.CREATE_SUBMIT_SUCCESS : messages.UPDATE_SUBMIT_SUCCESS,
-          "success",
-          { autoCloseMs: 2200 },
-        );
-        setHasSavedDraft(true);
-        // Stay on form so user can continue other motors/premixes.
-        await listParams.refreshUserBatches();
       } else {
         showAlert(
           isCreateFlow ? messages.CREATE_SUBMIT_SUCCESS : messages.UPDATE_SUBMIT_SUCCESS,
           "success",
           { autoCloseMs: 2200 },
         );
+        setHasSavedDraft(true);
         await listParams.refreshUserBatches();
-        resetFormContext();
       }
 
       return true;
@@ -2173,8 +2355,131 @@ export const useQCDivisionHook = () => {
     }
   };
 
-  const handleSaveDraft = async () => submitForm("draft");
-  const handleSubmit = async () => submitForm("submit");
+  const handleSaveDraft = async () => submitUnit("draft");
+  const handleSubmit = async () => submitUnit("submit");
+
+  const handleSubmitDivision = useCallback(async () => {
+    if (!activeBatch) return false;
+    if (!subDepartmentId) {
+      showAlert(messages.SUB_DEPARTMENT_MISSING, "error");
+      return false;
+    }
+    if (!areAllPartialItemsApproved(partialNavItems) && hasPartialChildNav(partialNavItems)) {
+      showAlert(messages.DIVISION_APPROVAL_NOT_READY, "warning");
+      return false;
+    }
+
+    const division =
+      (formData.division as QcApiDivision | null) ??
+      (selectedDivision as QcApiDivision | null);
+    if (!division) {
+      showAlert(messages.EMPTY_FORM_ERROR, "warning");
+      return false;
+    }
+
+    if (!activeBatch.formId) {
+      showAlert(messages.FORM_ID_MISSING, "error");
+      return false;
+    }
+    if (!activeBatch.batchId) {
+      showAlert(messages.BATCH_ID_MISSING, "error");
+      return false;
+    }
+
+    const payload = mapQualityControlDivisionSubmitPayload({
+      division,
+      subType: formData.subType,
+    });
+
+    setActionLoading(true);
+    try {
+      const response = await qcDivisionController.updateForm({
+        formId: activeBatch.formId,
+        batchId: activeBatch.batchId,
+        subDepartmentId,
+        formSubmissionType: "DRAFT",
+        ...payload,
+      });
+
+      if (!response?.success) {
+        showAlert(getErrorMessage(response, messages.DIVISION_SUBMIT_FAILED), "error");
+        return false;
+      }
+
+      setDivisionStatusByFlowKey((prev) => ({
+        ...prev,
+        [String(selectedDivision || division)]: "WAITING_FOR_APPROVAL",
+      }));
+
+      if (Array.isArray((response.data as any)?.divisionStatuses)) {
+        const nextMap: Record<string, QcPartialItemStatus> = {};
+        (response.data as any).divisionStatuses.forEach((entry: any) => {
+          const key = String(entry?.division ?? "").trim();
+          if (!key) return;
+          nextMap[key] = String(entry?.status ?? "WAITING_FOR_APPROVAL")
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, "_") as QcPartialItemStatus;
+        });
+        setDivisionStatusByFlowKey((prev) => ({ ...prev, ...nextMap }));
+      }
+
+      showAlert(messages.DIVISION_SUBMIT_SUCCESS, "success", { autoCloseMs: 2200 });
+      await listParams.refreshUserBatches();
+      return true;
+    } finally {
+      setActionLoading(false);
+    }
+  }, [
+    activeBatch,
+    formData.division,
+    formData.subType,
+    listParams,
+    messages,
+    partialNavItems,
+    selectedDivision,
+    showAlert,
+    subDepartmentId,
+  ]);
+
+  const handleSubmitForFinalApproval = useCallback(async () => {
+    if (!activeBatch) return false;
+    if (!subDepartmentId) {
+      showAlert(messages.SUB_DEPARTMENT_MISSING, "error");
+      return false;
+    }
+    if (!activeBatch.formId) {
+      showAlert(messages.FORM_ID_MISSING, "error");
+      return false;
+    }
+    if (!activeBatch.batchId) {
+      showAlert(messages.BATCH_ID_MISSING, "error");
+      return false;
+    }
+
+    setActionLoading(true);
+    try {
+      const response = await qcDivisionController.updateForm({
+        formId: activeBatch.formId,
+        batchId: activeBatch.batchId,
+        subDepartmentId,
+        formSubmissionType: "SUBMIT",
+        divisionDetails: [],
+      });
+
+      if (!response?.success) {
+        showAlert(getErrorMessage(response, messages.FINAL_APPROVAL_FAILED), "error");
+        return false;
+      }
+
+      showAlert(messages.FINAL_APPROVAL_SUCCESS, "success", { autoCloseMs: 2200 });
+      await listParams.refreshUserBatches();
+      resetFormContext();
+      return true;
+    } finally {
+      setActionLoading(false);
+    }
+  }, [activeBatch, listParams, messages, resetFormContext, showAlert, subDepartmentId]);
 
   const partialNavActive = hasPartialChildNav(partialNavItems);
   const activePartialItem = partialNavActive
@@ -2183,13 +2488,75 @@ export const useQCDivisionHook = () => {
   const isActivePartialReadOnly = Boolean(
     activePartialItem && isPartialItemReadOnly(activePartialItem.status),
   );
+
   const divisionGroupStatusByFlowKey = useMemo(() => {
-    const map: Record<string, import("./qcDivisionApprovalUnits").QcPartialItemStatus> = {};
+    const map: Record<string, QcPartialItemStatus> = { ...divisionStatusByFlowKey };
     if (partialNavActive && selectedDivision && partialNavItems.length) {
       map[selectedDivision] = aggregatePartialNavStatus(partialNavItems);
     }
     return map;
-  }, [partialNavActive, partialNavItems, selectedDivision]);
+  }, [divisionStatusByFlowKey, partialNavActive, partialNavItems, selectedDivision]);
+
+  const divisionLabel =
+    divisionOptions.find((option) => option.value === selectedDivision)?.label ||
+    selectedDivision ||
+    "Division";
+
+  const divisionApprovalRows = useMemo(
+    () => buildDivisionApprovalRows(partialNavItems, divisionLabel),
+    [divisionLabel, partialNavItems],
+  );
+
+  const canProceedDivisionSubmit = useMemo(() => {
+    if (partialNavActive) return areAllPartialItemsApproved(partialNavItems);
+    // Division-scoped (revalidation): allow proceed when form has data / draft saved.
+    return hasAnyQualityControlValue(formData) || Boolean(activeBatch?.formId);
+  }, [activeBatch?.formId, formData, partialNavActive, partialNavItems]);
+
+  const finalApprovalRows = useMemo(() => {
+    const divisions: Array<{
+      divisionLabel: string;
+      divisionStatus?: QcPartialItemStatus;
+      units: QcPartialNavItem[];
+    }> = [];
+
+    if (selectedDivision) {
+      divisions.push({
+        divisionLabel,
+        divisionStatus: divisionGroupStatusByFlowKey[selectedDivision],
+        units: partialNavItems,
+      });
+    }
+
+    Object.entries(divisionStatusByFlowKey).forEach(([key, status]) => {
+      if (key === selectedDivision) return;
+      const label =
+        divisionOptions.find((option) => option.value === key)?.label || key;
+      divisions.push({
+        divisionLabel: label,
+        divisionStatus: status,
+        units: [],
+      });
+    });
+
+    return buildFinalApprovalRows(divisions);
+  }, [
+    divisionGroupStatusByFlowKey,
+    divisionLabel,
+    divisionOptions,
+    divisionStatusByFlowKey,
+    partialNavItems,
+    selectedDivision,
+  ]);
+
+  const canProceedFinalApproval = useMemo(() => {
+    if (!finalApprovalRows.length) return false;
+    if (Object.keys(divisionStatusByFlowKey).length > 0) {
+      return Object.values(divisionStatusByFlowKey).every((status) => status === "APPROVED");
+    }
+    return areAllFinalApprovalRowsApproved(finalApprovalRows);
+  }, [divisionStatusByFlowKey, finalApprovalRows]);
+
   const scopedFormData = useMemo(
     () =>
       activePartialItem
@@ -2197,6 +2564,7 @@ export const useQCDivisionHook = () => {
         : formData,
     [activePartialItem, formData],
   );
+
 
   return {
     ...listParams,
@@ -2286,6 +2654,12 @@ export const useQCDivisionHook = () => {
     handleFormValuesChange,
     handleSaveDraft,
     handleSubmit,
+    handleSubmitDivision,
+    handleSubmitForFinalApproval,
+    canProceedDivisionSubmit,
+    canProceedFinalApproval,
+    divisionApprovalRows,
+    finalApprovalRows,
   };
 };
 

@@ -1,5 +1,6 @@
 import {
   useEffect,
+  useRef,
   useState,
   type ChangeEventHandler,
   type CSSProperties,
@@ -44,6 +45,7 @@ import {
 } from "../../../../components/common/fieldStyles";
 import { STRINGS } from "../../../../../app/config/strings";
 import { formatToUiDate } from "../../../../../utils/dateUtils";
+import { FILE_PICKER_ACCEPT } from "../../../../../utils/FileUtils";
 import { SUBSCALE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/subscale_theme";
 import fonts from "../../../../../app/theme/fonts";
 import {
@@ -160,7 +162,7 @@ const formatArticleTypeLabel = (rawLabel: string) => {
 };
 
 // Reusable File Upload Button Component
-type FileUploadButtonProps = Omit<ButtonProps<"label">, "onChange" | "component"> & {
+type FileUploadButtonProps = Omit<ButtonProps<"button">, "onChange" | "component" | "onClick"> & {
   label?: string;
   icon?: ElementType;
   accept?: string;
@@ -171,40 +173,48 @@ const FileUploadButton = ({
   label,
   icon: Icon,
   onChange,
-  accept,
+  accept: _accept,
   ...props
 }: FileUploadButtonProps) => {
+  const inputRef = useRef<HTMLInputElement | null>(null);
   return (
-    <Button
-      variant="outlined"
-      fullWidth
-      startIcon={Icon ? <Icon /> : null}
-      sx={{
-        textTransform: "none",
-        borderRadius: 2,
-        borderStyle: "dashed",
-        py: 1,
-        fontSize: "0.78rem",
-        backgroundColor: "rgba(0, 0, 0, 0.02)",
-        "&:hover": {
-          borderStyle: "solid",
-          backgroundColor: "rgba(25, 118, 210, 0.04)",
-        },
-      }}
-      {...props}
-      component="label"
-    >
-      {label || "Choose File"}
+    <>
       <input
-        hidden
+        ref={inputRef}
         type="file"
-        accept={accept}
+        style={{ display: "none" }}
         onChange={onChange}
-        onClick={(e) => {
-          (e.target as HTMLInputElement).value = "";
-        }}
+        tabIndex={-1}
       />
-    </Button>
+      <Button
+        type="button"
+        variant="outlined"
+        fullWidth
+        disableRipple
+        startIcon={Icon ? <Icon /> : null}
+        onClick={() => {
+          if (inputRef.current) {
+            inputRef.current.value = "";
+            inputRef.current.click();
+          }
+        }}
+        sx={{
+          textTransform: "none",
+          borderRadius: 2,
+          borderStyle: "dashed",
+          py: 1,
+          fontSize: "0.78rem",
+          backgroundColor: "rgba(0, 0, 0, 0.02)",
+          "&:hover": {
+            borderStyle: "solid",
+            backgroundColor: "rgba(25, 118, 210, 0.04)",
+          },
+        }}
+        {...props}
+      >
+        {label || "Choose File"}
+      </Button>
+    </>
   );
 };
 
@@ -1600,7 +1610,7 @@ const SubscaleHardwareArticlePanel = ({
                           <FileUploadButton
                             icon={UploadFileIcon}
                             label={row.GRAPH_UPLOAD ? row.GRAPH_UPLOAD.name : "Upload Graph"}
-                            accept="image/*,.pdf"
+                            accept={FILE_PICKER_ACCEPT.IMAGE_PDF}
                             onChange={(e) => {
                               const file = e.target.files?.[0];
                               if (file) {

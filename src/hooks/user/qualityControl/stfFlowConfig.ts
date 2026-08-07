@@ -10,6 +10,11 @@ import {
   normalizeSubdepartmentBatchStatus,
 } from "../../../data/models/user/SubdepartmentBatchModel";
 import { OPERATION_STATUS } from "../../operationStatus";
+import {
+  buildMotorNavGateHelpers,
+  isMotorEnabledForWorkflow,
+  type PreviousStageApprovedUnits,
+} from "../previousStageApproval";
 import { mapApprovedMotorsToOptions as mapTrimmingApprovedMotorsToOptions } from "../manufacturing/trimmingFlowConfig";
 
 export type STFBatch = {
@@ -504,4 +509,88 @@ export const resolveBemMotorStatusTabs = (
     (key) => !BEM_STATUS_TAB_ORDER.includes(key as (typeof BEM_STATUS_TAB_ORDER)[number]),
   );
   return [allKey, ...ordered, ...extras];
+};
+
+export type StfNavigationMotor = {
+  motorId?: string;
+  subType?: StfSubType | string | null;
+};
+
+export const isStfMotorEnabledForWorkflow = (
+  motorId: string,
+  motorCards: StfNavigationMotor[],
+  gate: PreviousStageApprovedUnits | null | undefined,
+  getStatus: (motorId: string) => string | undefined | null,
+  options: {
+    facilityType: "ACEM" | "OTHER_BEM";
+    subType?: StfSubType | string | null;
+  },
+): boolean => {
+  if (options.facilityType === "OTHER_BEM") return true;
+  if (String(options.subType ?? "").toUpperCase() === "BEM") return true;
+
+  const mainMotorIds = motorCards
+    .filter((entry) => String(entry.subType ?? "").toUpperCase() !== "BEM")
+    .map((entry) => String(entry.motorId ?? "").trim())
+    .filter(Boolean);
+
+  return isMotorEnabledForWorkflow(motorId, mainMotorIds, gate, getStatus);
+};
+
+export const buildStfMotorNavGateHelpers = (
+  motorCards: StfNavigationMotor[],
+  previousStageGate: PreviousStageApprovedUnits | null | undefined,
+  resolveMotorStatus: (motorId: string) => string | undefined | null,
+  facilityType: "ACEM" | "OTHER_BEM",
+  messages: {
+    previousStage?: string;
+    sequential?: string;
+  } = {},
+) => {
+  const mainMotorCards = motorCards.filter(
+    (entry) => String(entry.subType ?? "").toUpperCase() !== "BEM",
+  );
+  const mainMotorGate = buildMotorNavGateHelpers(
+    mainMotorCards,
+    previousStageGate,
+    resolveMotorStatus,
+    messages,
+  );
+
+  const resolveMainMotorIndex = (index: number) => {
+    const entry = motorCards[index];
+    if (!entry) return -1;
+    return mainMotorCards.findIndex(
+      (mainEntry) => String(mainEntry.motorId ?? "").trim() === String(entry.motorId ?? "").trim(),
+    );
+  };
+
+  return {
+    isStfMotorTabEnabled: (index: number) => {
+      const entry = motorCards[index];
+      if (!entry) return false;
+      if (facilityType === "OTHER_BEM") return true;
+      if (String(entry.subType ?? "").toUpperCase() === "BEM") return true;
+      const mainIndex = resolveMainMotorIndex(index);
+      if (mainIndex < 0) return false;
+      return mainMotorGate.isMotorTabEnabled(mainIndex);
+    },
+    getStfMotorTabTooltip: (index: number) => {
+      const entry = motorCards[index];
+      if (!entry) return undefined;
+      if (facilityType === "OTHER_BEM") return undefined;
+      if (String(entry.subType ?? "").toUpperCase() === "BEM") return undefined;
+      const mainIndex = resolveMainMotorIndex(index);
+      if (mainIndex < 0) return undefined;
+      return mainMotorGate.getMotorTabTooltip(mainIndex);
+    },
+    isStfMotorWorkflowEnabled: (
+      motorId: string,
+      subType?: StfSubType | string | null,
+    ) =>
+      isStfMotorEnabledForWorkflow(motorId, motorCards, previousStageGate, resolveMotorStatus, {
+        facilityType,
+        subType,
+      }),
+  };
 };

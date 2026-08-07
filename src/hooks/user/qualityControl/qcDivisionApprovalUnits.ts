@@ -126,7 +126,7 @@ const extractMotorIds = (data: Record<string, unknown>): Array<{ motorId: string
       const motorId = pickString(row);
       return motorId ? { motorId } : null;
     })
-    .filter((row): row is { motorId: string; status?: unknown } => Boolean(row));
+    .filter((row): row is NonNullable<typeof row> => Boolean(row));
 
   if (fromObjects.length) return fromObjects;
 
@@ -252,7 +252,7 @@ const extractFinalMixes = (
       const finalMixNo = pickNumber(row);
       return finalMixNo != null ? { finalMixNo } : null;
     })
-    .filter((row): row is { finalMixNo: number; status?: unknown } => Boolean(row));
+    .filter((row): row is NonNullable<typeof row> => Boolean(row));
 
   if (fromObjects.length) return fromObjects;
 
@@ -454,3 +454,156 @@ export const getPartialNavHint = (items: QcPartialNavItem[]): string => {
   }
   return "Select an item to continue.";
 };
+
+export type QcApprovalTableRow = {
+  id: string;
+  divisionLabel: string;
+  unitLabel: string;
+  unitKind: QcPartialNavKind | "DIVISION";
+  submissionType: string;
+  status: QcPartialItemStatus;
+};
+
+export const areAllPartialItemsApproved = (items: QcPartialNavItem[] | null | undefined) => {
+  const list = items ?? [];
+  return list.length > 0 && list.every((item) => item.status === "APPROVED");
+};
+
+export const buildDivisionApprovalRows = (
+  items: QcPartialNavItem[],
+  divisionLabel: string,
+): QcApprovalTableRow[] => {
+  if (!items.length) {
+    return [
+      {
+        id: `division:${divisionLabel || "current"}`,
+        divisionLabel: divisionLabel || "—",
+        unitLabel: "—",
+        unitKind: "DIVISION",
+        submissionType: "—",
+        status: "TO_BE_INITIATED",
+      },
+    ];
+  }
+
+  return items.map((item) => ({
+    id: item.id,
+    divisionLabel: divisionLabel || "—",
+    unitLabel: item.label,
+    unitKind: item.kind,
+    submissionType:
+      item.kind === "MOTOR"
+        ? "MOTOR"
+        : item.kind === "FINAL_MIX"
+          ? "FINAL_MIX"
+          : item.kind === "PREMIX"
+            ? "PREMIX"
+            : "DIVISION",
+    status: item.status,
+  }));
+};
+
+export const buildFinalApprovalRows = (
+  divisions: Array<{
+    divisionLabel: string;
+    divisionStatus?: QcPartialItemStatus;
+    units: QcPartialNavItem[];
+  }>,
+): QcApprovalTableRow[] => {
+  const rows: QcApprovalTableRow[] = [];
+  divisions.forEach((division) => {
+    if (!division.units.length) {
+      rows.push({
+        id: `division-only:${division.divisionLabel}`,
+        divisionLabel: division.divisionLabel,
+        unitLabel: "—",
+        unitKind: "DIVISION",
+        submissionType: "DIVISION",
+        status: division.divisionStatus ?? "TO_BE_INITIATED",
+      });
+      return;
+    }
+    division.units.forEach((item) => {
+      rows.push({
+        id: `${division.divisionLabel}:${item.id}`,
+        divisionLabel: division.divisionLabel,
+        unitLabel: item.label,
+        unitKind: item.kind,
+        submissionType:
+          item.kind === "MOTOR"
+            ? "MOTOR"
+            : item.kind === "FINAL_MIX"
+              ? "FINAL_MIX"
+              : item.kind === "PREMIX"
+                ? "PREMIX"
+                : "DIVISION",
+        status: item.status,
+      });
+    });
+  });
+  return rows;
+};
+
+export const areAllFinalApprovalRowsApproved = (rows: QcApprovalTableRow[]) =>
+  rows.length > 0 && rows.every((row) => row.status === "APPROVED");
+
+export const applyStatusMapsToPartialNav = (
+  items: QcPartialNavItem[],
+  payload: {
+    motorStatuses?: unknown;
+    premixStatuses?: unknown;
+    division?: string;
+  },
+): QcPartialNavItem[] => {
+  const motors = asArray(payload.motorStatuses);
+  const premixes = asArray(payload.premixStatuses);
+  const divisionFilter = String(payload.division ?? "").trim().toUpperCase();
+
+  const motorStatusById = new Map<string, QcPartialItemStatus>();
+  motors.forEach((row) => {
+    const rec = asRecord(row);
+    if (!rec) return;
+    const division = String(rec.division ?? "").trim().toUpperCase();
+    if (divisionFilter && division && division !== divisionFilter) return;
+    const motorId = pickString(rec.motorId, rec.motor_id, rec.motorIdNo);
+    if (!motorId) return;
+    motorStatusById.set(motorId, normalizeStatus(rec.motorSubmissionStatus ?? rec.status));
+  });
+
+  const premixStatusByKey = new Map<string, QcPartialItemStatus>();
+  premixes.forEach((row) => {
+    const rec = asRecord(row);
+    if (!rec) return;
+    const division = String(rec.division ?? "").trim().toUpperCase();
+    if (divisionFilter && division && division !== divisionFilter) return;
+    const premixNo = pickNumber(rec.premixNo, rec.premix_no);
+    if (premixNo == null) return;
+    const stage = String(rec.stageType ?? rec.stage_type ?? "")
+      .trim()
+      .toUpperCase();
+    const key = stage === "FINAL_MIX" ? `final-mix:${premixNo}` : `premix:${premixNo}`;
+    premixStatusByKey.set(
+      key,
+      normalizeStatus(rec.premixSubmissionStatus ?? rec.status),
+    );
+  });
+
+  return items.map((item) => {
+    if (item.kind === "MOTOR" && item.motorId && motorStatusById.has(item.motorId)) {
+      return { ...item, status: motorStatusById.get(item.motorId)! };
+    }
+    if (item.kind === "PREMIX" && item.premixNo != null) {
+      const key = `premix:${item.premixNo}`;
+      if (premixStatusByKey.has(key)) return { ...item, status: premixStatusByKey.get(key)! };
+    }
+    if (item.kind === "FINAL_MIX") {
+      const mixNo = item.finalMixNo ?? item.premixNo;
+      if (mixNo != null) {
+        const key = `final-mix:${mixNo}`;
+        if (premixStatusByKey.has(key)) return { ...item, status: premixStatusByKey.get(key)! };
+      }
+    }
+    return item;
+  });
+};
+

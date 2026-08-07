@@ -291,6 +291,163 @@ export const pickFirstPreviousStageEnabledMotorId = (
   return firstEnabled ?? normalized[0] ?? "";
 };
 
+/** Approved within the current subdepartment — required before the next unit unlocks. */
+export const isSequentialUnitApproved = (status: unknown): boolean =>
+  isApprovedUnitStatus(status);
+
+export const arePriorSequentialUnitsApproved = (
+  unitIndex: number,
+  orderedUnitKeys: string[],
+  getStatus: (unitKey: string) => string | undefined | null,
+): boolean => {
+  if (unitIndex <= 0) return true;
+
+  for (let index = 0; index < unitIndex; index += 1) {
+    const unitKey = String(orderedUnitKeys[index] ?? "").trim();
+    if (!unitKey) return false;
+    if (!isSequentialUnitApproved(getStatus(unitKey))) return false;
+  }
+
+  return true;
+};
+
+export const arePriorMotorsApprovedInSequence = (
+  motorIndex: number,
+  orderedMotorIds: string[],
+  getStatus: (motorId: string) => string | undefined | null,
+): boolean => arePriorSequentialUnitsApproved(motorIndex, orderedMotorIds, getStatus);
+
+export const arePriorPremixesApprovedInSequence = (
+  premixIndex: number,
+  orderedPremixNos: Array<number | string>,
+  getStatus: (premixNo: number | string) => string | undefined | null,
+): boolean =>
+  arePriorSequentialUnitsApproved(
+    premixIndex,
+    orderedPremixNos.map((premixNo) => String(premixNo)),
+    (premixKey) => getStatus(premixKey),
+  );
+
+export const isMotorEnabledForWorkflow = (
+  motorId: string | null | undefined,
+  orderedMotorIds: string[],
+  gate: PreviousStageApprovedUnits | null | undefined,
+  getStatus: (motorId: string) => string | undefined | null,
+): boolean => {
+  const id = String(motorId ?? "").trim();
+  if (!id) return false;
+  if (!isMotorEnabledByPreviousStage(id, gate)) return false;
+
+  const motorIndex = orderedMotorIds.findIndex(
+    (entry) => String(entry ?? "").trim() === id,
+  );
+  if (motorIndex < 0) return false;
+
+  return arePriorMotorsApprovedInSequence(motorIndex, orderedMotorIds, getStatus);
+};
+
+export const getMotorNavTabDisabledReason = (
+  motorId: string | undefined,
+  motorIndex: number,
+  orderedMotorIds: string[],
+  gate: PreviousStageApprovedUnits | null | undefined,
+  getStatus: (motorId: string) => string | undefined | null,
+  messages: {
+    previousStage?: string;
+    sequential?: string;
+  } = {},
+): string | undefined => {
+  const id = String(motorId ?? "").trim();
+  if (!id) return undefined;
+
+  if (!isMotorEnabledByPreviousStage(id, gate)) {
+    return messages.previousStage;
+  }
+
+  if (!arePriorMotorsApprovedInSequence(motorIndex, orderedMotorIds, getStatus)) {
+    return messages.sequential;
+  }
+
+  return undefined;
+};
+
+export const isPremixEnabledForWorkflow = (
+  premixNo: number | string | null | undefined,
+  orderedPremixNos: Array<number | string>,
+  gate: PreviousStageApprovedUnits | null | undefined,
+  getStatus: (premixNo: number | string) => string | undefined | null,
+): boolean => {
+  const no = Number(premixNo);
+  if (!Number.isFinite(no) || no <= 0) return false;
+  if (!isPremixEnabledByPreviousStage(no, gate)) return false;
+
+  const premixIndex = orderedPremixNos.findIndex((entry) => Number(entry) === no);
+  if (premixIndex < 0) return false;
+
+  return arePriorPremixesApprovedInSequence(premixIndex, orderedPremixNos, getStatus);
+};
+
+export const getPremixNavTabDisabledReason = (
+  premixNo: number | string | undefined,
+  premixIndex: number,
+  orderedPremixNos: Array<number | string>,
+  gate: PreviousStageApprovedUnits | null | undefined,
+  getStatus: (premixNo: number | string) => string | undefined | null,
+  messages: {
+    previousStage?: string;
+    sequential?: string;
+  } = {},
+): string | undefined => {
+  const no = Number(premixNo);
+  if (!Number.isFinite(no) || no <= 0) return undefined;
+
+  if (!isPremixEnabledByPreviousStage(no, gate)) {
+    return messages.previousStage;
+  }
+
+  if (!arePriorPremixesApprovedInSequence(premixIndex, orderedPremixNos, getStatus)) {
+    return messages.sequential;
+  }
+
+  return undefined;
+};
+
+export const buildMotorNavGateHelpers = (
+  motorCards: Array<{ motorId?: string | null }>,
+  previousStageGate: PreviousStageApprovedUnits | null | undefined,
+  resolveMotorStatus: (motorId: string) => string | undefined | null,
+  messages: {
+    previousStage?: string;
+    sequential?: string;
+  } = {},
+) => {
+  const orderedMotorIds = motorCards
+    .map((motor) => String(motor.motorId ?? "").trim())
+    .filter(Boolean);
+
+  return {
+    orderedMotorIds,
+    isMotorTabEnabled: (index: number) =>
+      isMotorEnabledForWorkflow(
+        motorCards[index]?.motorId,
+        orderedMotorIds,
+        previousStageGate,
+        resolveMotorStatus,
+      ),
+    getMotorTabTooltip: (index: number) =>
+      getMotorNavTabDisabledReason(
+        motorCards[index]?.motorId,
+        index,
+        orderedMotorIds,
+        previousStageGate,
+        resolveMotorStatus,
+        messages,
+      ),
+    isMotorWorkflowEnabled: (motorId: string | null | undefined) =>
+      isMotorEnabledForWorkflow(motorId, orderedMotorIds, previousStageGate, resolveMotorStatus),
+  };
+};
+
 /** Pick stage arrays from a batch / batch-details object. */
 export const getBatchStageProgressArrays = (
   batch: Record<string, unknown> | null | undefined,

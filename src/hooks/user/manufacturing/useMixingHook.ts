@@ -32,6 +32,7 @@ import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import {
   isPremixEnabledByPreviousStage,
+  isPremixEnabledForWorkflow,
   resolvePreviousStageApprovedUnits,
   type PreviousStageApprovedUnits,
 } from "../previousStageApproval";
@@ -404,9 +405,47 @@ export const useMixingHook = () => {
     [mixCardStatusById],
   );
 
+  const orderedPremixNos = useMemo(
+    () => (formData.premixCards ?? []).map((card) => card.premixNo),
+    [formData.premixCards],
+  );
+
+  const orderedFinalMixNos = useMemo(
+    () => (formData.finalMixCards ?? []).map((card) => card.mixNo),
+    [formData.finalMixCards],
+  );
+
+  const isMixCardWorkflowEnabled = useCallback(
+    (stageType: MixCardStageType, cardNo: string | number) => {
+      const cardNoStr = String(cardNo);
+      if (stageType === "PREMIX") {
+        return isPremixEnabledForWorkflow(
+          cardNo,
+          orderedPremixNos,
+          previousStageGate,
+          (premixNo) => getMixCardStatus(buildMixCardId("PREMIX", String(premixNo))),
+        );
+      }
+      return isPremixEnabledForWorkflow(
+        cardNo,
+        orderedFinalMixNos,
+        previousStageGate,
+        (mixNo) => getMixCardStatus(buildMixCardId("FINAL_MIX", String(mixNo))),
+      );
+    },
+    [getMixCardStatus, orderedFinalMixNos, orderedPremixNos, previousStageGate],
+  );
+
   const checkMixCardEditable = useCallback(
-    (mixCardId: string) => isMixCardEditable(getMixCardStatus(mixCardId)),
-    [getMixCardStatus],
+    (mixCardId: string) => {
+      const dashIdx = mixCardId.indexOf("-");
+      if (dashIdx < 0) return false;
+      const stageType = mixCardId.slice(0, dashIdx) as MixCardStageType;
+      const cardNo = mixCardId.slice(dashIdx + 1);
+      if (!isMixCardWorkflowEnabled(stageType, cardNo)) return false;
+      return isMixCardEditable(getMixCardStatus(mixCardId));
+    },
+    [getMixCardStatus, isMixCardWorkflowEnabled],
   );
 
   const submitMixCard = useCallback(
@@ -431,8 +470,13 @@ export const useMixingHook = () => {
         return false;
       }
 
-      if (!isPremixEnabledByPreviousStage(cardNo, previousStageGate)) {
-        showAlert(STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED, "warning");
+      if (!isMixCardWorkflowEnabled(stageType, cardNo)) {
+        showAlert(
+          isPremixEnabledByPreviousStage(cardNo, previousStageGate)
+            ? STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED
+            : STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED,
+          "warning",
+        );
         return false;
       }
 
@@ -554,6 +598,7 @@ export const useMixingHook = () => {
       checkMixCardEditable,
       formData,
       getMixCardStatus,
+      isMixCardWorkflowEnabled,
       mixCardStatusById,
       previousStageGate,
       showAlert,

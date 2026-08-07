@@ -19,10 +19,20 @@ type SchemaApiDropdownProps = {
   disabled?: boolean;
   required?: boolean;
   placeholder?: string;
+  emptyPlaceholder?: string;
+  excludedValues?: string[];
+  /** Fetch API options on mount instead of waiting for open (e.g. bowl selection). */
+  prefetch?: boolean;
   onOptionsCountChange?: (count: number) => void;
   compact?: boolean;
   compactWrap?: boolean;
 };
+
+const renderRowTemplate = (template: string, row: Record<string, unknown>): string =>
+  String(template ?? "")
+    .replace(/\{(\w+)\}/g, (_, key: string) => String(row[key] ?? "").trim())
+    .replace(/\s*\/\s*$/, "")
+    .trim();
 
 const buildCompactSelectSx = (wrap: boolean) => ({
   mb: 0,
@@ -65,6 +75,9 @@ const SchemaApiDropdown = ({
   disabled,
   required,
   placeholder,
+  emptyPlaceholder,
+  excludedValues = [],
+  prefetch = false,
   onOptionsCountChange,
   compact = false,
   compactWrap = false,
@@ -72,7 +85,10 @@ const SchemaApiDropdown = ({
   const [options, setOptions] = useState<Array<{ label: string; value: string }>>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [shouldFetchOptions, setShouldFetchOptions] = useState(dataSource?.type === "static");
+  const [hasLoadedOptions, setHasLoadedOptions] = useState(dataSource?.type === "static");
+  const [shouldFetchOptions, setShouldFetchOptions] = useState(
+    dataSource?.type === "static" || prefetch,
+  );
 
   const resolvedApi = useMemo(
     () =>
@@ -96,12 +112,14 @@ const SchemaApiDropdown = ({
 
   useEffect(() => {
     lastReportedCountRef.current = null;
-    setShouldFetchOptions(dataSource?.type === "static");
-  }, [dataSource, apiContextKey, resolvedApi]);
+    setHasLoadedOptions(dataSource?.type === "static");
+    setShouldFetchOptions(dataSource?.type === "static" || prefetch);
+  }, [dataSource, apiContextKey, resolvedApi, prefetch]);
 
   useEffect(() => {
     if (!dataSource) {
       setOptions([]);
+      setHasLoadedOptions(true);
       reportOptionsCount(0);
       return;
     }
@@ -109,6 +127,7 @@ const SchemaApiDropdown = ({
     if (dataSource.type === "static") {
       const staticOptions = staticDataSourceOptions(dataSource);
       setOptions(staticOptions);
+      setHasLoadedOptions(true);
       reportOptionsCount(staticOptions.length);
       return;
     }
@@ -119,6 +138,7 @@ const SchemaApiDropdown = ({
 
     if (!resolvedApi?.endpoint) {
       setOptions([]);
+      setHasLoadedOptions(true);
       setError("API endpoint is not configured.");
       reportOptionsCount(0);
       return;
@@ -129,12 +149,25 @@ const SchemaApiDropdown = ({
     fetchSchemaDataSourceOptions(dataSource, apiContext).then(({ options: rows, error: fetchError }) => {
       if (cancelled) return;
       setLoading(false);
+      setHasLoadedOptions(true);
       setError(fetchError);
       const keys = resolveSchemaOptionKeys(resolvedApi.displayKey, resolvedApi.valueKey, rows);
-      const nextOptions = rows.map((row) => ({
-        label: String(row[keys.displayKey] ?? ""),
-        value: String(row[keys.valueKey] ?? ""),
-      }));
+      const labelTemplate = resolvedApi.optionLabelTemplate;
+      const valueTemplate = resolvedApi.optionValueTemplate ?? labelTemplate;
+      const filterField = resolvedApi.optionFilterField;
+      const filteredRows = filterField
+        ? rows.filter((row) => String(row[filterField] ?? "").trim())
+        : rows;
+      const nextOptions = filteredRows
+        .map((row) => ({
+          label: labelTemplate
+            ? renderRowTemplate(labelTemplate, row)
+            : String(row[keys.displayKey] ?? ""),
+          value: valueTemplate
+            ? renderRowTemplate(valueTemplate, row)
+            : String(row[keys.valueKey] ?? ""),
+        }))
+        .filter((option) => option.value.trim());
       setOptions(nextOptions);
       reportOptionsCount(nextOptions.length);
     });
@@ -144,7 +177,21 @@ const SchemaApiDropdown = ({
     };
   }, [dataSource, apiContextKey, resolvedApi, shouldFetchOptions]);
 
-  const selectedLabel = options.find((option) => option.value === value)?.label;
+  const excludedSet = useMemo(
+    () => new Set(excludedValues.map((entry) => String(entry).trim()).filter(Boolean)),
+    [excludedValues],
+  );
+  const visibleOptions = useMemo(
+    () => options.filter((option) => option.value === value || !excludedSet.has(option.value)),
+    [excludedSet, options, value],
+  );
+  const resolvedEmptyPlaceholder = emptyPlaceholder ?? placeholder ?? "No options available";
+  const noOptionsAvailable =
+    hasLoadedOptions && !loading && visibleOptions.length === 0 && !value;
+  const displayPlaceholder = noOptionsAvailable ? resolvedEmptyPlaceholder : placeholder;
+
+  const selectedLabel = visibleOptions.find((option) => option.value === value)?.label
+    ?? options.find((option) => option.value === value)?.label;
   const resolvedLabel = selectedLabel ?? (value ? String(value) : "");
   const compactSelectSx = useMemo(() => buildCompactSelectSx(compactWrap), [compactWrap]);
 
@@ -153,7 +200,7 @@ const SchemaApiDropdown = ({
       label={label}
       value={value}
       onChange={onChange}
-      placeholder={placeholder}
+      placeholder={displayPlaceholder}
       loading={loading}
       disabled={disabled}
       required={required}
@@ -169,7 +216,7 @@ const SchemaApiDropdown = ({
         if (!selected) {
           return (
             <Box component="span" sx={{ color: "text.secondary", fontSize: "0.78rem", lineHeight: 1.4 }}>
-              {placeholder}
+              {displayPlaceholder}
             </Box>
           );
         }
@@ -195,7 +242,7 @@ const SchemaApiDropdown = ({
         );
       }}
     >
-      {options.map((option) => (
+      {visibleOptions.map((option) => (
         <MenuItem key={option.value} value={option.value}>
           {option.label}
         </MenuItem>

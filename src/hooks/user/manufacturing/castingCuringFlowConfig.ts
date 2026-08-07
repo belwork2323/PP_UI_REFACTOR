@@ -267,6 +267,35 @@ export const resolveCastingCuringMotorOptions = (
   return [{ value: singleId, label: singleId }];
 };
 
+/** Navigation tabs include every batch motor; saved form rows fill in receipt metadata. */
+export const mergeCastingCuringMotorsFromBatchAndForm = (
+  batch?: CastingCuringBatchMotorSource | null,
+  formMotors: CastingCuringAddedMotor[] = [],
+): CastingCuringAddedMotor[] => {
+  const fromBatch = resolveCastingCuringMotorOptions(batch).map((option) => ({
+    motorId: option.value,
+    motorReceivedAt: "",
+    castingStation: "",
+  }));
+  if (!fromBatch.length) return formMotors;
+
+  const formById = new Map(formMotors.map((motor) => [motor.motorId, motor]));
+  return fromBatch.map(
+    (entry) =>
+      formById.get(entry.motorId) ?? {
+        motorId: entry.motorId,
+        motorReceivedAt: "",
+        castingStation: "",
+      },
+  );
+};
+
+export const getCastingCuringOrderedMotorIds = (
+  batch?: CastingCuringBatchMotorSource | null,
+  formMotors: CastingCuringAddedMotor[] = [],
+): string[] =>
+  mergeCastingCuringMotorsFromBatchAndForm(batch, formMotors).map((motor) => motor.motorId);
+
 export const filterUnusedCastingCuringMotorOptions = (
   options: CastingCuringMotorOption[],
   usedMotorIds: string[],

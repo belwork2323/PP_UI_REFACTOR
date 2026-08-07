@@ -1,5 +1,5 @@
-import { memo, useCallback, useMemo } from "react";
-import { Box, CircularProgress, Stack, Typography } from "@mui/material";
+import { memo, useCallback, useMemo, type ReactNode } from "react";
+import { Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
 import type { QcDivisionEntry, QcDivisionEntryValues } from "../../../../../data/models/user/QualityControlFormModel";
 import { sliceMixingFinalMixSchema } from "../../../../../hooks/user/qualityControl/qcMixingConfig";
 import { createQcInitialValues } from "../../../../../schema-engine/adapters/qc.adapter";
@@ -9,8 +9,22 @@ import { STRINGS } from "../../../../../app/config/strings";
 import RemoveProcessButton from "../../../../components/common/RemoveProcessButton";
 import QCSchemaPanel from "./QCSchemaPanel";
 import QCDivisionSavedSectionsDisplay from "./components/QCDivisionSavedSectionsDisplay";
+import QCRawMaterialRevalidationTable from "./QCRawMaterialRevalidationTable";
+import {
+  createInitialRevalidationSchemaValues,
+  hydrateRevalidationValuesFromSections,
+} from "../../../../../hooks/user/qualityControl/qcRawMaterialRevalidationTable";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
+
+export type QCDivisionEntryUnitActions = {
+  show?: boolean;
+  canAct?: boolean;
+  actionLoading?: boolean;
+  isEditMode?: boolean;
+  onSaveDraft?: () => void;
+  onSubmit?: () => void;
+};
 
 type QCDivisionEntryPanelProps = {
   entry: QcDivisionEntry;
@@ -26,6 +40,7 @@ type QCDivisionEntryPanelProps = {
   onEntryValuesChange: (entryId: string, values: SchemaFormValues) => void;
   onEntryLiquidValuesChange: (entryId: string, values: SchemaFormValues) => void;
   onRemoveEntry: (entryId: string) => void;
+  unitActions?: QCDivisionEntryUnitActions | null;
 };
 
 const QCDivisionEntryPanel = ({
@@ -42,6 +57,7 @@ const QCDivisionEntryPanel = ({
   onEntryValuesChange,
   onEntryLiquidValuesChange,
   onRemoveEntry,
+  unitActions = null,
 }: QCDivisionEntryPanelProps) => {
   const BRAND = QC_DIVISION_BRAND;
 
@@ -65,11 +81,57 @@ const QCDivisionEntryPanel = ({
 
   const handleRemove = useCallback(() => onRemoveEntry(entry.entryId), [entry.entryId, onRemoveEntry]);
 
+  const headerActions = useMemo((): ReactNode => {
+    const showUnitActions = Boolean(unitActions?.show) && !readOnly;
+    const showRemove = !readOnly;
+    if (!showUnitActions && !showRemove) return null;
+
+    return (
+      <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" justifyContent="flex-end">
+        {showUnitActions ? (
+          <>
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={!unitActions?.canAct || unitActions?.actionLoading}
+              onClick={unitActions?.onSaveDraft}
+              sx={{ textTransform: "none", whiteSpace: "nowrap" }}
+            >
+              {S.SAVE_UNIT_DRAFT}
+            </Button>
+            <Button
+              size="small"
+              variant="contained"
+              disabled={!unitActions?.canAct || unitActions?.actionLoading}
+              onClick={unitActions?.onSubmit}
+              sx={{ textTransform: "none", whiteSpace: "nowrap" }}
+            >
+              {unitActions?.isEditMode ? S.RESUBMIT_UNIT : S.SUBMIT_UNIT}
+            </Button>
+          </>
+        ) : null}
+        {showRemove ? (
+          <RemoveProcessButton
+            onClick={handleRemove}
+            dangerColor={BRAND.danger}
+            tooltip={S.DIVISION_REMOVE_TOOLTIP}
+          />
+        ) : null}
+      </Stack>
+    );
+  }, [BRAND.danger, handleRemove, readOnly, unitActions]);
+
   const formValues = useMemo(() => {
     const saved = entryValues.schemaValues;
     if (saved && Object.keys(saved).length > 0) return saved;
+    if (entry.kind === "REVALIDATION") {
+      if (entry.savedSections?.length) {
+        return hydrateRevalidationValuesFromSections(entry.savedSections);
+      }
+      return createInitialRevalidationSchemaValues();
+    }
     return resolvedSchema ? createQcInitialValues(resolvedSchema) : {};
-  }, [entryValues.schemaValues, resolvedSchema]);
+  }, [entry.kind, entry.savedSections, entryValues.schemaValues, resolvedSchema]);
 
   const solidValues = useMemo(() => {
     const saved = entryValues.schemaValues;
@@ -84,6 +146,33 @@ const QCDivisionEntryPanel = ({
   }, [entryValues.liquidSchemaValues, liquidSchema]);
 
   if (!entryValues) return null;
+
+  if (entry.kind === "REVALIDATION") {
+    return (
+      <Box
+        sx={{
+          borderRadius: 2.5,
+          border: `1px solid ${BRAND.border}`,
+          background: BRAND.surface,
+          px: 1.5,
+          py: 1.25,
+        }}
+      >
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1} gap={1}>
+          <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: BRAND.primary }}>
+            {entry.label}
+          </Typography>
+          {headerActions}
+        </Stack>
+        <QCRawMaterialRevalidationTable
+          values={formValues}
+          onChange={handleValuesChange}
+          batchId={batchId}
+          readOnly={readOnly}
+        />
+      </Box>
+    );
+  }
 
   if (!resolvedSchema) {
     if (schemaLoading) {
@@ -219,17 +308,11 @@ const QCDivisionEntryPanel = ({
           py: 1.25,
         }}
       >
-        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1.5} gap={1}>
           <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: BRAND.primary }}>
             {entry.label}
           </Typography>
-          {!readOnly ? (
-            <RemoveProcessButton
-              onClick={handleRemove}
-              dangerColor={BRAND.danger}
-              tooltip={S.DIVISION_REMOVE_TOOLTIP}
-            />
-          ) : null}
+          {headerActions}
         </Stack>
 
         <Stack spacing={2}>
@@ -296,7 +379,7 @@ const QCDivisionEntryPanel = ({
       }}
     >
       {isTrimmingMotor ? (
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1.25}>
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1.25} gap={1}>
           <Box>
             <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: BRAND.primary }}>
               {entry.motorId}
@@ -305,16 +388,10 @@ const QCDivisionEntryPanel = ({
               {S.TRIMMING_MOTOR_RECEIVED_DATE_LABEL}: {entry.motorReceivedDate?.trim() || "—"}
             </Typography>
           </Box>
-          {!readOnly ? (
-            <RemoveProcessButton
-              onClick={handleRemove}
-              dangerColor={BRAND.danger}
-              tooltip={S.DIVISION_REMOVE_TOOLTIP}
-            />
-          ) : null}
+          {headerActions}
         </Stack>
       ) : isWeightmentMotor ? (
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1.25}>
+        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1.25} gap={1}>
           <Box>
             <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: BRAND.primary }}>
               {entry.motorId}
@@ -326,34 +403,18 @@ const QCDivisionEntryPanel = ({
               {S.WEIGHTMENT_CALIBRATION_DUE_DATE_LABEL}: {entry.calibrationDueDate?.trim() || "—"}
             </Typography>
           </Box>
-          <RemoveProcessButton
-            onClick={handleRemove}
-            dangerColor={BRAND.danger}
-            tooltip={S.DIVISION_REMOVE_TOOLTIP}
-          />
+          {headerActions}
         </Stack>
       ) : showEntryHeader ? (
-        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1}>
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1} gap={1}>
           <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: BRAND.primary }}>
             {entry.label}
           </Typography>
-          {!readOnly ? (
-            <RemoveProcessButton
-              onClick={handleRemove}
-              dangerColor={BRAND.danger}
-              tooltip={S.DIVISION_REMOVE_TOOLTIP}
-            />
-          ) : null}
+          {headerActions}
         </Stack>
       ) : (
         <Stack direction="row" justifyContent="flex-end" alignItems="center" mb={1}>
-          {!readOnly ? (
-            <RemoveProcessButton
-              onClick={handleRemove}
-              dangerColor={BRAND.danger}
-              tooltip={S.DIVISION_REMOVE_TOOLTIP}
-            />
-          ) : null}
+          {headerActions}
         </Stack>
       )}
 

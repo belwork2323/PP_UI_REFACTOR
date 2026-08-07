@@ -23,7 +23,7 @@ import type {
 } from "../../../../hooks/user/dispatch/dispatchFlowConfig";
 import { DISPATCH_FLOW_LABELS } from "../../../../hooks/user/dispatch/dispatchFlowConfig";
 import {
-  isMotorEnabledByPreviousStage,
+  buildMotorNavGateHelpers,
   type PreviousStageApprovedUnits,
 } from "../../../../hooks/user/previousStageApproval";
 import PremixStatusChip from "../manufacturing/RawMaterial/components/PremixStatusChip";
@@ -119,6 +119,17 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
     return Array.isArray(addedMotors) ? addedMotors : [];
   }, [addedMotors, autoMotorEntries, availableMotors]);
 
+  const motorNavGate = useMemo(() => {
+    const resolveMotorStatus = (motorId: string) =>
+      getMotorStatus?.(motorId) ??
+      motorStatusById[motorId]?.motorSubmissionStatus ??
+      "TO_BE_INITIATED";
+    return buildMotorNavGateHelpers(motorCards, previousStageGate, resolveMotorStatus, {
+      previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
+      sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
+    });
+  }, [motorCards, previousStageGate, getMotorStatus, motorStatusById]);
+
   useEffect(() => {
     setActiveMotorIndex(0);
     prevMotorCountRef.current = 0;
@@ -131,9 +142,7 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
       return;
     }
     const prevCount = prevMotorCountRef.current;
-    const firstEnabled = motorCards.findIndex((entry) =>
-      isMotorEnabledByPreviousStage(entry.motorId, previousStageGate),
-    );
+    const firstEnabled = motorCards.findIndex((_, index) => motorNavGate.isMotorTabEnabled(index));
     if (prevCount === 0) {
       setActiveMotorIndex(firstEnabled >= 0 ? firstEnabled : 0);
     } else if (motorCards.length > prevCount) {
@@ -141,10 +150,7 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
     } else {
       setActiveMotorIndex((prev) => {
         const current = motorCards[prev];
-        if (
-          current &&
-          isMotorEnabledByPreviousStage(current.motorId, previousStageGate)
-        ) {
+        if (current && motorNavGate.isMotorWorkflowEnabled(current.motorId)) {
           return Math.min(prev, motorCards.length - 1);
         }
         return firstEnabled >= 0
@@ -153,7 +159,7 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
       });
     }
     prevMotorCountRef.current = motorCards.length;
-  }, [motorCards, previousStageGate]);
+  }, [motorCards, motorNavGate]);
 
   const activeMotorEntry = useMemo(
     () => (motorCards.length > 0 ? motorCards[activeMotorIndex] : null),
@@ -170,10 +176,7 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
   const activeMotorStatus = (getMotorStatus?.(activeMotorId) ??
     motorStatusById[activeMotorId]?.motorSubmissionStatus ??
     "TO_BE_INITIATED") as DispatchMotorSubmissionStatus;
-  const activeMotorPriorEnabled = isMotorEnabledByPreviousStage(
-    activeMotorId,
-    previousStageGate,
-  );
+  const activeMotorPriorEnabled = motorNavGate.isMotorWorkflowEnabled(activeMotorId);
   const activeMotorLocked = activeMotorId
     ? !activeMotorPriorEnabled || !(isMotorEditable?.(activeMotorId) ?? true)
     : false;
@@ -288,20 +291,8 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
               tabs={motorTabs}
               activeIndex={activeMotorIndex}
               onActiveIndexChange={handleTabChange}
-              isTabDisabled={(_, index) =>
-                !isMotorEnabledByPreviousStage(
-                  motorCards[index]?.motorId,
-                  previousStageGate,
-                )
-              }
-              tabTooltip={(_, index) =>
-                isMotorEnabledByPreviousStage(
-                  motorCards[index]?.motorId,
-                  previousStageGate,
-                )
-                  ? undefined
-                  : STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED
-              }
+              isTabDisabled={(_, index) => !motorNavGate.isMotorTabEnabled(index)}
+              tabTooltip={(_, index) => motorNavGate.getMotorTabTooltip(index)}
               palette={navPalette}
               showStepArrows
               titleEndAdornment={

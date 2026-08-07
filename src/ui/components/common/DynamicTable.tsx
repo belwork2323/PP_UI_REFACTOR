@@ -19,6 +19,7 @@ import type { SchemaTableBlock, SchemaTableColumn, SchemaTableColumnSlot, Schema
 import { applyFormulaColumns } from "../../../schema-engine/rules/formulaEval";
 import { applyRowComputations, isEditableRowComputationTarget, isRowComputationTarget } from "../../../schema-engine/rules/tableRowComputations";
 import { flattenTableColumns, isColumnGroup } from "../../../schema-engine/utils/schemaUtils";
+import { sanitizeNumericInput } from "../../../schema-engine/utils/numericInput";
 import {
   buildRowApiContext,
   getDependentColumnIds,
@@ -54,10 +55,17 @@ import {
   resolveMergedPresetCellValue,
   syncMergedPresetColumnValues,
 } from "../../../schema-engine/utils/tableRowUtils";
+import {
+  findCastingBowlSelectionColumn,
+  getExcludedBowlSelectionsForRow,
+  isCastingBowlSelectionColumn,
+  syncBowlSelectionRowFields,
+} from "../../../schema-engine/utils/castingBowlSelection";
 import SchemaApiDropdown from "./SchemaApiDropdown";
 import { DateField, DateTimeField, TimeField } from "./DateField";
 import FormulaCell from "./FormulaCell";
 import SchemaFileField from "./SchemaFileField";
+import { FILE_PICKER_ACCEPT } from "../../../utils/FileUtils";
 import SchemaReadonlyDisplay from "./SchemaReadonlyDisplay";
 
 type DynamicTableProps = {
@@ -332,7 +340,10 @@ const renderCellEditor = (
   readOnly: boolean,
   apiContext?: SchemaApiContext,
   onOptionsCountChange?: (count: number) => void,
+  excludedValues?: string[],
+  emptyPlaceholder?: string,
 ) => {
+  const isBowlSelection = isCastingBowlSelectionColumn(col);
   if (readOnly && col.fieldType === "dropdown" && col.dataSource) {
     return (
       <SchemaApiDropdown
@@ -344,6 +355,9 @@ const renderCellEditor = (
         compact
         compactWrap={isCompactWrapDropdown(col)}
         placeholder={col.ui?.placeholder}
+        emptyPlaceholder={emptyPlaceholder}
+        excludedValues={excludedValues}
+        prefetch={isBowlSelection}
         onOptionsCountChange={onOptionsCountChange}
       />
     );
@@ -378,6 +392,9 @@ const renderCellEditor = (
           compact
           compactWrap={isCompactWrapDropdown(col)}
           placeholder={col.ui?.placeholder}
+          emptyPlaceholder={emptyPlaceholder}
+          excludedValues={excludedValues}
+          prefetch={isBowlSelection}
           onOptionsCountChange={onOptionsCountChange}
         />
       );
@@ -409,7 +426,11 @@ const renderCellEditor = (
           onChange={onChange}
           disabled={cellDisabled}
           compact
-          accept={col.fieldType === "image" ? "image/*,video/*" : "image/*,video/*,application/pdf"}
+          accept={
+            col.fieldType === "image"
+              ? FILE_PICKER_ACCEPT.IMAGE_VIDEO
+              : FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF
+          }
           emptyLabel={col.label || "Upload"}
           multiple
         />
@@ -420,11 +441,11 @@ const renderCellEditor = (
         <TextField
           size="small"
           fullWidth
-          type="number"
+          type="text"
           value={value}
           disabled={cellDisabled}
-          onChange={(e) => onChange(e.target.value)}
-          inputProps={{ style: { fontSize: "0.78rem" } }}
+          onChange={(e) => onChange(sanitizeNumericInput(e.target.value))}
+          inputProps={{ inputMode: "decimal", style: { fontSize: "0.78rem" } }}
           sx={{ minWidth: 80 }}
         />
       );
@@ -508,6 +529,16 @@ const DynamicTable = ({
       return { ...prev, [columnId]: count };
     });
   }, []);
+  const bowlSelectionColumn = useMemo(() => findCastingBowlSelectionColumn(config), [config]);
+  const [bowlOptionCount, setBowlOptionCount] = useState<number | null>(null);
+  const crossMotorExcludedBowls = useMemo(() => {
+    const raw = apiContext?.crossMotorExcludedBowlSelections;
+    return Array.isArray(raw) ? raw.map((entry) => String(entry).trim()).filter(Boolean) : [];
+  }, [apiContext?.crossMotorExcludedBowlSelections]);
+  const noBowlsPlaceholder =
+    typeof apiContext?.noBowlsAvailablePlaceholder === "string"
+      ? apiContext.noBowlsAvailablePlaceholder
+      : "No bowls available";
   const allowAdd = config.rows?.allowAdd !== false && !readOnly;
   const allowDelete = config.rows?.allowDelete !== false && !readOnly;
   const deletableIds = new Set(deletableColumnIds);
@@ -542,7 +573,16 @@ const DynamicTable = ({
     const dependentColumnIds = getDependentColumnIds(flatColumns, colId);
     const updatedRows = rows.map((row, idx) => {
       if (idx !== rowIndex) return row;
-      const updated: Record<string, unknown> = { ...row, [colId]: value };
+      let updated: Record<string, unknown> = { ...row, [colId]: value };
+      if (changedColumn && isCastingBowlSelectionColumn(changedColumn)) {
+        updated = syncBowlSelectionRowFields(
+          updated,
+          colId,
+          value,
+          flatColumns,
+          apiContext?.motorId ? String(apiContext.motorId) : undefined,
+        );
+      }
       dependentColumnIds.forEach((dependentId) => {
         updated[dependentId] = "";
       });
@@ -604,6 +644,9 @@ const DynamicTable = ({
     flatColumns.forEach((col) => {
       if (col.fieldType !== "serial") row[col.id] = "";
     });
+    if (apiContext?.motorId && flatColumns.some((col) => col.id === "MOTOR_ID")) {
+      row.MOTOR_ID = String(apiContext.motorId);
+    }
 
     const nextRows = applyRowComputations(
       renumberTableRows(
@@ -647,10 +690,24 @@ const DynamicTable = ({
     );
   };
 
+  const dataRowCount = rows.filter((row) => !isTrailingTablePresetRow(row, autoKey)).length;
+  const availableBowlPool =
+    bowlOptionCount != null
+      ? Math.max(0, bowlOptionCount - crossMotorExcludedBowls.length)
+      : null;
+  const selectedBowlsInTable = rows.filter((row) => {
+    if (!bowlSelectionColumn || isTrailingTablePresetRow(row, autoKey)) return false;
+    return String(row[bowlSelectionColumn.id] ?? "").trim() !== "";
+  }).length;
+  const bowlAddRowDisabled =
+    Boolean(bowlSelectionColumn) &&
+    (availableBowlPool === 0 ||
+      (availableBowlPool != null &&
+        (selectedBowlsInTable >= availableBowlPool || dataRowCount >= availableBowlPool)));
   const addRowDisabled =
     isCommitGroupMode && commitGroup
       ? !isCommitAddReady(commitGroup, pickerRow, pickerOptionCounts)
-      : false;
+      : bowlAddRowDisabled;
   const addRowLabel =
     config.rows?.addLabel ?? commitGroup?.addLabel ?? "Add Row";
 
@@ -841,6 +898,9 @@ const DynamicTable = ({
                     (!isEditableComputedCell &&
                       isPresetLockedCell(row, col.id, rowIndex, config.rows?.presetRows, autoKey));
                   const rowApiContext = buildRowApiContext(apiContext, row);
+                  const bowlApiContext = isCastingBowlSelectionColumn(resolvedCol)
+                    ? apiContext
+                    : rowApiContext;
                   const trackPickerOptionCount = isPicker && Boolean(nestedOptionsApi?.nestedOptionsKey);
                   const showGroupRemove =
                     allowDelete &&
@@ -882,13 +942,25 @@ const DynamicTable = ({
                             cellValue,
                             (v) => updateCell(rowIndex, col.id, v),
                             cellReadOnly,
-                            rowApiContext,
+                            bowlApiContext,
                             trackPickerOptionCount
                               ? (count) => {
                                   if (!nestedParentSelected) return;
                                   handlePickerOptionCountChange(col.id, count);
                                 }
+                              : isCastingBowlSelectionColumn(resolvedCol)
+                                ? (count) => setBowlOptionCount(count)
+                                : undefined,
+                            isCastingBowlSelectionColumn(resolvedCol)
+                              ? getExcludedBowlSelectionsForRow(
+                                  rows,
+                                  col.id,
+                                  autoKey,
+                                  rowIndex,
+                                  crossMotorExcludedBowls,
+                                )
                               : undefined,
+                            isCastingBowlSelectionColumn(resolvedCol) ? noBowlsPlaceholder : undefined,
                           )
                         )}
                         {showGroupRemove ? (

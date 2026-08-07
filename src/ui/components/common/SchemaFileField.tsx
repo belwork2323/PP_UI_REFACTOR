@@ -1,4 +1,4 @@
-import type { ChangeEvent } from "react";
+import { memo, useId, useRef, type ChangeEvent } from "react";
 import {
   alpha,
   Box,
@@ -14,6 +14,10 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import VideocamRoundedIcon from "@mui/icons-material/VideocamRounded";
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
+import {
+  FILE_PICKER_ACCEPT,
+  fileNameMatchesAccept,
+} from "../../../utils/FileUtils";
 import { schemaFieldLabelProps } from "./fieldStyles";
 
 const BRAND = {
@@ -50,6 +54,7 @@ type SchemaFileFieldProps = {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  /** Used for post-pick filtering only — not set on the native input (keeps picker fast). */
   accept?: string;
   helperText?: string;
   compact?: boolean;
@@ -143,25 +148,37 @@ const SchemaFileField = ({
   value,
   onChange,
   disabled = false,
-  accept = "image/*,video/*",
+  accept = FILE_PICKER_ACCEPT.IMAGE_VIDEO,
   helperText,
   compact = false,
   multiple = true,
   addLabel,
   emptyLabel,
 }: SchemaFileFieldProps) => {
+  const inputRef = useRef<HTMLInputElement | null>(null);
+  const inputId = useId();
   const files = parseSchemaFileList(value);
 
   const handleInputChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const picked = Array.from(event.target.files ?? []).map((file) => file.name);
+    const picked = Array.from(event.target.files ?? [])
+      .map((file) => file.name)
+      .filter((name) => fileNameMatchesAccept(name, accept));
+    event.target.value = "";
     if (!picked.length) return;
     const next = multiple ? [...files, ...picked] : picked.slice(0, 1);
     onChange(joinSchemaFileList(next));
-    event.target.value = "";
   };
 
   const handleRemove = (index: number) => {
     onChange(joinSchemaFileList(files.filter((_, idx) => idx !== index)));
+  };
+
+  const openPicker = () => {
+    const input = inputRef.current;
+    if (!input || disabled) return;
+    // Reset before open so re-selecting the same file still fires change.
+    input.value = "";
+    input.click();
   };
 
   const uploadLabel =
@@ -172,6 +189,7 @@ const SchemaFileField = ({
       {label && !compact ? (
         <Typography
           component="label"
+          htmlFor={inputId}
           sx={{
             ...schemaFieldLabelProps.sx,
             display: "block",
@@ -199,12 +217,30 @@ const SchemaFileField = ({
         </Typography>
       ) : null}
 
+      {/*
+        Keep the native input outside MUI Button and omit `accept`.
+        Accept filtering on Linux portal dialogs is a major open-latency source.
+      */}
+      <input
+        id={inputId}
+        ref={inputRef}
+        type="file"
+        multiple={multiple}
+        disabled={disabled}
+        onChange={handleInputChange}
+        style={{ display: "none" }}
+        tabIndex={-1}
+      />
+
       {!disabled ? (
         <Button
-          component="label"
+          type="button"
           variant="outlined"
           fullWidth={!compact}
           size={compact ? "small" : "medium"}
+          disableRipple
+          disableTouchRipple
+          onClick={openPicker}
           startIcon={<CloudUploadRoundedIcon sx={{ fontSize: compact ? 16 : 18 }} />}
           sx={{
             textTransform: "none",
@@ -224,16 +260,6 @@ const SchemaFileField = ({
           }}
         >
           {uploadLabel}
-          <input
-            hidden
-            type="file"
-            accept={accept}
-            multiple={multiple}
-            onChange={handleInputChange}
-            onClick={(event) => {
-              (event.target as HTMLInputElement).value = "";
-            }}
-          />
         </Button>
       ) : null}
 
@@ -246,4 +272,4 @@ const SchemaFileField = ({
   );
 };
 
-export default SchemaFileField;
+export default memo(SchemaFileField);

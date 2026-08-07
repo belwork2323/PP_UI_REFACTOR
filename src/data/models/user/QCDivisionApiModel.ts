@@ -34,6 +34,9 @@ export class QCDivisionDetailsModel {
   subType?: string | null;
   sections?: SchemaSectionSubmission[];
   divisionDetails?: any[];
+  motorStatuses?: unknown;
+  premixStatuses?: unknown;
+  divisionStatuses?: unknown;
   workflowInsights: {
     currentStatus: string;
     rejectionReason: string | null;
@@ -49,6 +52,9 @@ export class QCDivisionDetailsModel {
     this.submittedAt = payload?.submittedAt ?? null;
     this.createdBy = payload?.createdBy ?? null;
     this.createdAt = payload?.createdAt ?? null;
+    this.motorStatuses = payload?.motorStatuses;
+    this.premixStatuses = payload?.premixStatuses;
+    this.divisionStatuses = payload?.divisionStatuses;
 
     this.workflowInsights = {
       currentStatus: payload?.workflowInsights?.currentStatus ?? payload?.status ?? "",
@@ -93,6 +99,9 @@ export class QCDivisionDetailsModel {
       createdBy: model.createdBy,
       createdAt: model.createdAt,
       divisionDetails: model.divisionDetails,
+      motorStatuses: model.motorStatuses,
+      premixStatuses: model.premixStatuses,
+      divisionStatuses: model.divisionStatuses,
       workflowInsights: model.workflowInsights,
     };
   }

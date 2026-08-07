@@ -38,6 +38,7 @@ import {
 } from "./casePreparationFlowConfig";
 import { isManufacturingContinueFillingStatus } from "../../operationStatus";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
+import { isMotorEnabledForWorkflow } from "../previousStageApproval";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -547,8 +548,20 @@ export const useCasePreparationHook = () => {
   );
 
   const checkMotorEditable = useCallback(
-    (motorId: string) => isMotorEditable(getMotorStatus(motorId)),
-    [getMotorStatus],
+    (motorId: string) => {
+      if (
+        !isMotorEnabledForWorkflow(
+          motorId,
+          addedMotors.map((motor) => motor.motorId),
+          null,
+          getMotorStatus,
+        )
+      ) {
+        return false;
+      }
+      return isMotorEditable(getMotorStatus(motorId));
+    },
+    [addedMotors, getMotorStatus],
   );
 
   const submitMotor = useCallback(

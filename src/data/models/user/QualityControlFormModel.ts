@@ -16,6 +16,7 @@ import {
   getSchemaForDivisionEntry,
   getSolidSchemaForBothEntry,
 } from "../../../hooks/user/qualityControl/qcDivisionEntries";
+import { buildRevalidationSectionPayload, hasRevalidationTableData } from "../../../hooks/user/qualityControl/qcRawMaterialRevalidationTable";
 import type {
   QcDivisionEntry,
   QcDivisionEntryValues,
@@ -239,13 +240,27 @@ const premixValuesHaveUserData = (valuesByNo?: Record<number, SchemaFormValues>)
   Object.values(valuesByNo ?? {}).some((values) => schemaValuesHaveUserData(values ?? {}));
 
 export const hasAnyQualityControlValue = (form: QualityControlFormState) => {
-  const divisionValues = Object.values(form.divisionEntryValues ?? {});
+  const entries = form.divisionEntries ?? [];
+  const valuesById = form.divisionEntryValues ?? {};
   if (
-    divisionValues.some(
-      (entry) =>
-        schemaValuesHaveUserData(entry.schemaValues ?? {}) ||
-        schemaValuesHaveUserData(entry.liquidSchemaValues ?? {}),
-    )
+    entries.some((entry) => {
+      const entryValues = valuesById[entry.entryId];
+      if (!entryValues) return false;
+      if (entry.kind === "REVALIDATION") {
+        return hasRevalidationTableData(entryValues.schemaValues);
+      }
+      return (
+        schemaValuesHaveUserData(entryValues.schemaValues ?? {}) ||
+        schemaValuesHaveUserData(entryValues.liquidSchemaValues ?? {})
+      );
+    }) ||
+    Object.values(valuesById).some((entryValues) => {
+      // Fallback for entries missing from divisionEntries list
+      return (
+        schemaValuesHaveUserData(entryValues.schemaValues ?? {}) ||
+        schemaValuesHaveUserData(entryValues.liquidSchemaValues ?? {})
+      );
+    })
   ) {
     return true;
   }
@@ -277,6 +292,10 @@ const buildDivisionEntrySections = (
 ) => {
   const entryValues = form.divisionEntryValues?.[entry.entryId];
   if (!entryValues) return [];
+
+  if (entry.kind === "REVALIDATION") {
+    return buildRevalidationSectionPayload(entryValues.schemaValues);
+  }
 
   if (entry.kind === "BOTH_PREMIX" && entry.premixNo) {
     const solidSchema = getSolidSchemaForBothEntry(form);
@@ -410,25 +429,135 @@ const buildDivisionEntrySections = (
   return buildQcSectionPayload(schema, entryValues.schemaValues);
 };
 
+export type QcUnitSubmissionType = "DRAFT" | "SUBMIT";
+
+export type MapQualityControlPayloadOptions = {
+  /** Unit-level DRAFT/SUBMIT (motor or premix). Root formSubmissionType stays DRAFT for unit saves. */
+  unitSubmissionType?: QcUnitSubmissionType | null;
+  /** Division-level DRAFT/SUBMIT (e.g. revalidation or division proceed). */
+  divisionSubmissionType?: QcUnitSubmissionType | null;
+};
+
+type SectionWithUnitMeta = SchemaSectionSubmission & {
+  motorId?: string;
+  premixNo?: number;
+  subType?: string | null;
+  motorCount?: number;
+  motorReceivedDate?: string;
+  inhibitorType?: string;
+  weighscaleNo?: string;
+  calibrationDueDate?: string;
+};
+
+const stripUnitKeysFromSection = (section: SectionWithUnitMeta): SchemaSectionSubmission => {
+  const {
+    motorId: _motorId,
+    premixNo: _premixNo,
+    motorCount: _motorCount,
+    motorReceivedDate: _motorReceivedDate,
+    inhibitorType: _inhibitorType,
+    weighscaleNo: _weighscaleNo,
+    calibrationDueDate: _calibrationDueDate,
+    ...rest
+  } = section;
+  return rest;
+};
+
+const wrapDivisionDataFromSections = (
+  sections: SectionWithUnitMeta[],
+  options?: MapQualityControlPayloadOptions,
+): Record<string, unknown> => {
+  const motorsById = new Map<string, SectionWithUnitMeta[]>();
+  const premixesByKey = new Map<string, { premixNo: number; stageType?: string; sections: SectionWithUnitMeta[] }>();
+  const plainSections: SchemaSectionSubmission[] = [];
+
+  sections.forEach((section) => {
+    const motorId = String(section.motorId ?? "").trim();
+    const premixNo = Number(section.premixNo);
+    if (motorId) {
+      const list = motorsById.get(motorId) ?? [];
+      list.push(section);
+      motorsById.set(motorId, list);
+      return;
+    }
+    if (Number.isFinite(premixNo) && premixNo > 0) {
+      const stageType =
+        String(section.subType ?? "")
+          .trim()
+          .toUpperCase() === "FINAL_MIX"
+          ? "FINAL_MIX"
+          : String(section.subType ?? "")
+                .trim()
+                .toUpperCase() === "PREMIX"
+            ? "PREMIX"
+            : undefined;
+      const key = `${premixNo}:${stageType ?? "DEFAULT"}`;
+      const existing = premixesByKey.get(key) ?? { premixNo, stageType, sections: [] };
+      existing.sections.push(section);
+      premixesByKey.set(key, existing);
+      return;
+    }
+    plainSections.push(stripUnitKeysFromSection(section));
+  });
+
+  const data: Record<string, unknown> = {};
+  const unitType = options?.unitSubmissionType ?? null;
+
+  if (motorsById.size > 0) {
+    data.motors = Array.from(motorsById.entries()).map(([motorId, motorSections]) => {
+      const first = motorSections[0];
+      return {
+        motorId,
+        ...(unitType ? { motorSubmissionType: unitType } : {}),
+        ...(first?.motorCount != null ? { motorCount: first.motorCount } : {}),
+        ...(first?.motorReceivedDate ? { motorReceivedDate: first.motorReceivedDate } : {}),
+        ...(first?.inhibitorType ? { inhibitorType: first.inhibitorType } : {}),
+        ...(first?.weighscaleNo ? { weighscaleNo: first.weighscaleNo } : {}),
+        ...(first?.calibrationDueDate ? { calibrationDueDate: first.calibrationDueDate } : {}),
+        sections: motorSections.map(stripUnitKeysFromSection),
+      };
+    });
+  }
+
+  if (premixesByKey.size > 0) {
+    data.premixes = Array.from(premixesByKey.values()).map((entry) => ({
+      premixNo: entry.premixNo,
+      ...(entry.stageType ? { stageType: entry.stageType } : {}),
+      ...(unitType ? { premixSubmissionType: unitType } : {}),
+      sections: entry.sections.map(stripUnitKeysFromSection),
+    }));
+  }
+
+  if (plainSections.length > 0 || (!motorsById.size && !premixesByKey.size)) {
+    data.sections = plainSections;
+  }
+
+  return data;
+};
+
 export const mapQualityControlPayload = (
   form: QualityControlFormState,
+  options?: MapQualityControlPayloadOptions,
 ): {
   divisionDetails: Array<{
     division: QcApiDivision;
     subType: QcApiSubType;
+    divisionSubmissionType?: QcUnitSubmissionType;
     data: Record<string, unknown>;
   }>;
 } => {
   const divisionEntries = form.divisionEntries ?? [];
+  const divisionSubmissionType = options?.divisionSubmissionType ?? undefined;
 
   const buildDivisionDetail = (
     division: QcApiDivision,
     subType: QcApiSubType,
-    sections: SchemaSectionSubmission[],
+    sections: SectionWithUnitMeta[],
   ) => ({
     division,
     subType,
-    data: { sections },
+    ...(divisionSubmissionType ? { divisionSubmissionType } : {}),
+    data: wrapDivisionDataFromSections(sections, options),
   });
 
   if (divisionEntries.length > 0) {
@@ -459,7 +588,7 @@ export const mapQualityControlPayload = (
       const sections = [
         ...(division === "MIXING" ? sharedFinalMixDetails : []),
         ...entries.flatMap((entry) => buildDivisionEntrySections(form, entry)),
-      ];
+      ] as SectionWithUnitMeta[];
       const hasMixedSubTypes = entries.some((e) => e.subType !== entries[0].subType);
       return buildDivisionDetail(
         division,
@@ -486,10 +615,11 @@ export const mapQualityControlPayload = (
       ...(hasLiquidPremix
         ? buildPremixSections(liquidSchema!, liquidEntries, form.liquidPremixValuesByNo, "LIQUID_PROCESSING")
         : []),
-    ];
+    ] as SectionWithUnitMeta[];
 
     const division: QcApiDivision = form.division ?? "RAW_MATERIAL_PROCESSING";
-    const subType: QcApiSubType = hasSolidPremix && hasLiquidPremix ? null : hasSolidPremix ? "SOLID_PROCESSING" : "LIQUID_PROCESSING";
+    const subType: QcApiSubType =
+      hasSolidPremix && hasLiquidPremix ? null : hasSolidPremix ? "SOLID_PROCESSING" : "LIQUID_PROCESSING";
 
     return {
       divisionDetails: [buildDivisionDetail(division, subType, sections)],
@@ -501,11 +631,34 @@ export const mapQualityControlPayload = (
       buildDivisionDetail(
         form.division ?? "RAW_MATERIAL_REVALIDATION",
         form.subType,
-        form.qcSchema ? buildQcSectionPayload(form.qcSchema, form.schemaFormValues) : [],
+        (form.qcSchema ? buildQcSectionPayload(form.qcSchema, form.schemaFormValues) : []) as SectionWithUnitMeta[],
       ),
     ],
   };
 };
+
+/** Division-only proceed payload (no unit body). */
+export const mapQualityControlDivisionSubmitPayload = (params: {
+  division: QcApiDivision;
+  subType?: QcApiSubType;
+}): {
+  divisionDetails: Array<{
+    division: QcApiDivision;
+    subType: QcApiSubType;
+    divisionSubmissionType: "SUBMIT";
+    data: Record<string, unknown>;
+  }>;
+} => ({
+  divisionDetails: [
+    {
+      division: params.division,
+      subType: params.subType ?? null,
+      divisionSubmissionType: "SUBMIT",
+      data: {},
+    },
+  ],
+});
+
 
 export type QCDivisionDetailView = {
   formId: string;

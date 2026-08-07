@@ -35,6 +35,9 @@ import {
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
 } from "../../../../components/custom/UserWorkflowStepPager";
+import {
+  buildMotorNavGateHelpers,
+} from "../../../../../hooks/user/previousStageApproval";
 
 const S = STRINGS.MANUFACTURING.CASE_PREP;
 const { cleaningServices: CleaningServicesRoundedIcon } = icons.user.manufacturing.casePreparation.form;
@@ -92,6 +95,15 @@ const CasePreparationForm = ({
   const BRAND = CASE_PREP_BRAND;
   const schema = formData.schema;
   const motorCards = Array.isArray(addedMotors) ? addedMotors : [];
+  const motorNavGate = useMemo(() => {
+    const resolveMotorStatus = (motorId: string) =>
+      getMotorStatus?.(motorId) ??
+      motorStatusById[motorId]?.motorSubmissionStatus ??
+      "TO_BE_INITIATED";
+    return buildMotorNavGateHelpers(motorCards, null, resolveMotorStatus, {
+      sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
+    });
+  }, [motorCards, getMotorStatus, motorStatusById]);
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
   const [finalApprovalOpen, setFinalApprovalOpen] = useState(false);
 
@@ -126,7 +138,9 @@ const CasePreparationForm = ({
     (getMotorStatus?.(activeMotorId) ??
       motorStatusById[activeMotorId]?.motorSubmissionStatus ??
       "TO_BE_INITIATED") as MotorSubmissionStatus;
-  const activeMotorLocked = activeMotorId ? !(isMotorEditable?.(activeMotorId) ?? true) : false;
+  const activeMotorLocked = activeMotorId
+    ? !motorNavGate.isMotorWorkflowEnabled(activeMotorId) || !(isMotorEditable?.(activeMotorId) ?? true)
+    : false;
 
   const finalApprovalRows = useMemo(
     () => buildFinalApprovalMotorRows(motorStatusById, motorCards.map((m) => m.motorId)),
@@ -312,6 +326,8 @@ const CasePreparationForm = ({
                 tabs={motorTabs}
                 activeIndex={activeMotorIndex}
                 onActiveIndexChange={setActiveMotorIndex}
+                isTabDisabled={(_, index) => !motorNavGate.isMotorTabEnabled(index)}
+                tabTooltip={(_, index) => motorNavGate.getMotorTabTooltip(index)}
                 palette={navPalette}
                 showStepArrows
                 titleEndAdornment={

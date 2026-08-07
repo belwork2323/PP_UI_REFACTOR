@@ -4,17 +4,13 @@ const parseNum = (v: unknown): number | null => {
   return Number.isFinite(n) ? n : null;
 };
 
-const expressionKeyCache = new Map<string, string[]>();
+const escapeRegExp = (value: string) => value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
-const getExpressionRowKeys = (expression: string, row: Record<string, unknown>): string[] => {
-  const cacheKey = expression.trim();
-  const cached = expressionKeyCache.get(cacheKey);
-  if (cached) return cached;
-
-  const keys = Object.keys(row).sort((a, b) => b.length - a.length);
-  expressionKeyCache.set(cacheKey, keys);
-  return keys;
-};
+/** Column ids referenced by a formula expression, longest-first for safe replacement. */
+const getExpressionRowKeys = (expression: string, row: Record<string, unknown>): string[] =>
+  Object.keys(row)
+    .filter((key) => new RegExp(`\\b${escapeRegExp(key)}\\b`).test(expression))
+    .sort((a, b) => b.length - a.length);
 
 export const evaluateRowFormula = (
   expression: string,
@@ -25,10 +21,9 @@ export const evaluateRowFormula = (
 
   try {
     let resolved = expr;
-    const keys = getExpressionRowKeys(expr, row);
-    keys.forEach((key) => {
+    getExpressionRowKeys(expr, row).forEach((key) => {
       const val = parseNum(row[key]) ?? 0;
-      resolved = resolved.replace(new RegExp(`\\b${key}\\b`, "g"), String(val));
+      resolved = resolved.replace(new RegExp(`\\b${escapeRegExp(key)}\\b`, "g"), String(val));
     });
     if (!/^[\d.\s+\-*/()]+$/.test(resolved)) return "";
     const result = Function(`"use strict"; return (${resolved})`)() as number;
@@ -41,15 +36,25 @@ export const evaluateRowFormula = (
 export const applyFormulaColumns = (
   row: Record<string, unknown>,
   columns: { id: string; formula?: { expression?: string } }[],
-  changedColumnId?: string,
+  // Kept for call-site compatibility; all formula columns are re-evaluated so cascades stay correct.
+  _changedColumnId?: string,
 ): Record<string, unknown> => {
+  const formulaCols = columns.filter((col) => col.formula?.expression);
+  if (!formulaCols.length) return row;
+
   const next = { ...row };
-  columns.forEach((col) => {
-    if (!col.formula?.expression) return;
-    if (changedColumnId && col.id !== changedColumnId && !col.formula.expression.includes(changedColumnId)) {
-      return;
+  // Multi-pass: E depends on C, C depends on A/B — one pass alone leaves E stale.
+  const maxPasses = Math.max(formulaCols.length, 1);
+  for (let pass = 0; pass < maxPasses; pass++) {
+    let anyChanged = false;
+    for (const col of formulaCols) {
+      const value = evaluateRowFormula(col.formula!.expression!, next);
+      if (next[col.id] !== value) {
+        next[col.id] = value;
+        anyChanged = true;
+      }
     }
-    next[col.id] = evaluateRowFormula(col.formula.expression, next);
-  });
+    if (!anyChanged) break;
+  }
   return next;
 };

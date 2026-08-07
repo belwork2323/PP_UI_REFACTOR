@@ -18,7 +18,7 @@ import FinalApprovalMotorDialog, {
   buildFinalApprovalMotorRows,
 } from "../CasePreparation/components/FinalApprovalMotorDialog";
 import {
-  isMotorEnabledByPreviousStage,
+  buildMotorNavGateHelpers,
   type PreviousStageApprovedUnits,
 } from "../../../../../hooks/user/previousStageApproval";
 import {
@@ -98,6 +98,16 @@ const PostCureForm = ({
 }: PostCureFormProps) => {
   const BRAND = POST_CURE_BRAND;
   const motorCards = Array.isArray(addedMotors) ? addedMotors : [];
+  const motorNavGate = useMemo(() => {
+    const resolveMotorStatus = (motorId: string) =>
+      getMotorStatus?.(motorId) ??
+      motorStatusById[motorId]?.motorSubmissionStatus ??
+      "TO_BE_INITIATED";
+    return buildMotorNavGateHelpers(motorCards, previousStageGate, resolveMotorStatus, {
+      previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
+      sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
+    });
+  }, [motorCards, previousStageGate, getMotorStatus, motorStatusById]);
   const [finalApprovalOpen, setFinalApprovalOpen] = useState(false);
 
   const batchMotorCount = Math.max(motorCards.length, 0);
@@ -110,14 +120,16 @@ const PostCureForm = ({
 
   useEffect(() => {
     if (!motorCards.length) return;
-    const activeEnabled = isMotorEnabledByPreviousStage(activeMotorId, previousStageGate);
+    const activeEnabled = motorNavGate.isMotorWorkflowEnabled(activeMotorId);
     const hasActive = motorCards.some((entry) => entry.motorId === activeMotorId);
     if (hasActive && activeEnabled) return;
-    const firstEnabled = motorCards.find((entry) =>
-      isMotorEnabledByPreviousStage(entry.motorId, previousStageGate),
+    const firstEnabledIndex = motorCards.findIndex((_, index) =>
+      motorNavGate.isMotorTabEnabled(index),
     );
-    onActiveMotorChange(firstEnabled?.motorId ?? motorCards[0].motorId);
-  }, [activeMotorId, motorCards, onActiveMotorChange, previousStageGate]);
+    onActiveMotorChange(
+      (firstEnabledIndex >= 0 ? motorCards[firstEnabledIndex] : motorCards[0])?.motorId ?? "",
+    );
+  }, [activeMotorId, motorCards, motorNavGate, onActiveMotorChange]);
 
   const activeMotorEntry = useMemo(
     () => (motorCards.length > 0 ? motorCards[activeMotorIndex] : null),
@@ -133,10 +145,7 @@ const PostCureForm = ({
   const activeMotorStatus = (getMotorStatus?.(resolvedActiveMotorId) ??
     motorStatusById[resolvedActiveMotorId]?.motorSubmissionStatus ??
     "TO_BE_INITIATED") as PostCureMotorSubmissionStatus;
-  const activeMotorPriorEnabled = isMotorEnabledByPreviousStage(
-    resolvedActiveMotorId,
-    previousStageGate,
-  );
+  const activeMotorPriorEnabled = motorNavGate.isMotorWorkflowEnabled(resolvedActiveMotorId);
   const activeMotorLocked = resolvedActiveMotorId
     ? !activeMotorPriorEnabled || !(isMotorEditable?.(resolvedActiveMotorId) ?? true)
     : false;
@@ -247,14 +256,8 @@ const PostCureForm = ({
                 const next = motorCards[index];
                 if (next) onActiveMotorChange(next.motorId);
               }}
-              isTabDisabled={(_, index) =>
-                !isMotorEnabledByPreviousStage(motorCards[index]?.motorId, previousStageGate)
-              }
-              tabTooltip={(_, index) =>
-                isMotorEnabledByPreviousStage(motorCards[index]?.motorId, previousStageGate)
-                  ? undefined
-                  : STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED
-              }
+              isTabDisabled={(_, index) => !motorNavGate.isMotorTabEnabled(index)}
+              tabTooltip={(_, index) => motorNavGate.getMotorTabTooltip(index)}
               palette={navPalette}
               showStepArrows
               titleEndAdornment={

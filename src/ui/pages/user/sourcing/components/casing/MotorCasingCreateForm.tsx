@@ -20,6 +20,7 @@ import {
 } from "@mui/material";
 import { icons } from "../../../../../../app/theme/icons";
 import MediaUpload from "../../../../../components/common/MediaUpload";
+import { FILE_PICKER_ACCEPT } from "../../../../../../utils/FileUtils";
 import VisualInspectionMediaField from "./VisualInspectionMediaField";
 import StackRow from "../../../../../components/common/StackRow";
 import { STRINGS } from "../../../../../../app/config/strings";
@@ -751,7 +752,7 @@ const MotorCasingCreateForm = ({
                 }
                 label={S.REPORT_UPLOAD}
                 description="PDF or image"
-                accept="application/pdf,.pdf,image/*"
+                accept={FILE_PICKER_ACCEPT.IMAGE_PDF}
                 uploadedFileLabel={S.UPLOADED_FILE_LABEL}
                 changeFileLabel={S.CHANGE_FILE}
                 removeFileLabel={S.REMOVE_FILE}

@@ -40,16 +40,21 @@ import {
   schemaEngineController,
   type SchemaFormValues,
 } from "../../../schema-engine";
+import { collectCrossMotorExcludedBowlSelections, patchCastingSchemaForBowlSelection } from "../../../schema-engine/utils/castingBowlSelection";
 import { cloneValue } from "../../../schema-engine/state/formState";
 import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
 import {
   isMotorEnabledByPreviousStage,
+  isMotorEnabledForWorkflow,
+  getMotorNavTabDisabledReason,
   resolvePreviousStageApprovedUnits,
   type PreviousStageApprovedUnits,
 } from "../previousStageApproval";
 import {
   enrichCastingCuringBatchFromDetails,
   filterUnusedCastingCuringMotorOptions,
+  getCastingCuringOrderedMotorIds,
+  mergeCastingCuringMotorsFromBatchAndForm,
   resolveCastingCuringMotorOptions,
   resolveCastingFinalMixCount,
   resolveCastingMotorCount,
@@ -87,6 +92,41 @@ const buildAddedMotorsFromForm = (formData: CastingCuringFormState): CastingCuri
     motorReceivedAt: motor.motorReceivedAt,
     castingStation: motor.castingStation,
   }));
+
+const ensureCastingCuringMotorsInForm = (
+  batch: CastingCuringBatch | null,
+  formData: CastingCuringFormState,
+): CastingCuringFormState => {
+  const castingSchema = formData.castingSchema;
+  if (!batch || !castingSchema || !formData.castingFormLoaded) return formData;
+
+  const batchOptions = resolveCastingCuringMotorOptions(batch);
+  if (!batchOptions.length) return formData;
+
+  const existing = new Map((formData.motors ?? []).map((motor) => [motor.motorId, motor]));
+  const motors = batchOptions.map((option) => {
+    const current = existing.get(option.value);
+    if (current) return current;
+
+    return createEmptyMotorSession(
+      option.value,
+      "",
+      castingSchema,
+      buildCastingSetupContext({
+        castingType: formData.castingType,
+        castingStation: formData.castingStation,
+        motorId: option.value,
+        finalMixCount: resolveCastingFinalMixCount(batch),
+      }),
+      {
+        castingType: formData.castingType,
+        castingStation: formData.castingStation,
+      },
+    );
+  });
+
+  return motors.length ? { ...formData, motors } : formData;
+};
 
 export const useCastingAndCuringHook = () => {
   const listParams = useSubdepartmentBatches("casting-and-curing");
@@ -226,7 +266,9 @@ export const useCastingAndCuringHook = () => {
           buildCastingCuringSchemaRequest({ subDepartmentId, motorStage, schemaType: "CASTING" }),
         );
 
-        const castingSchema = castingResponse?.success ? castingResponse.data : null;
+        const castingSchema = castingResponse?.success
+          ? patchCastingSchemaForBowlSelection(castingResponse.data)
+          : null;
         const nextCastingError = castingSchema
           ? null
           : getErrorMessage(castingResponse, "Unable to load casting schema.");
@@ -315,7 +357,9 @@ export const useCastingAndCuringHook = () => {
           ),
         ]);
 
-        const castingSchema = castingResponse?.success ? castingResponse.data : null;
+        const castingSchema = castingResponse?.success
+          ? patchCastingSchemaForBowlSelection(castingResponse.data)
+          : null;
         const curingSchema = curingResponse?.success ? curingResponse.data : null;
         const nextCastingError = castingSchema
           ? null
@@ -409,12 +453,18 @@ export const useCastingAndCuringHook = () => {
 
           const { castingSchema, curingSchema } = await fetchSchemas(nextBatch);
           nextFormData = hydrateCastingCuringFormState(nextFormData, castingSchema, curingSchema);
+          nextFormData = ensureCastingCuringMotorsInForm(nextBatch, nextFormData);
         }
       } finally {
         setLoadingFormDetails(false);
       }
 
-      const nextAddedMotors = buildAddedMotorsFromForm(nextFormData);
+      const formMotors = buildAddedMotorsFromForm(nextFormData);
+      // Keep batch motors out of addedMotors until the casting form is loaded, otherwise
+      // the flow bar treats them as already used and hides motor draft fields.
+      const nextAddedMotors = nextFormData.castingFormLoaded
+        ? mergeCastingCuringMotorsFromBatchAndForm(nextBatch, formMotors)
+        : formMotors;
 
       setActiveBatch(nextBatch);
       setIsEditMode(editMode);
@@ -601,18 +651,23 @@ export const useCastingAndCuringHook = () => {
       isFirstLoad ? null : formData.curingSchema,
     );
 
-    const nextAdded = [
-      ...addedMotors,
-      ...newDrafts.map((row) => ({
-        motorId: row.motorId.trim(),
-        motorReceivedAt: row.motorReceivedAt.trim(),
-        castingStation: row.castingStation.trim(),
-      })),
-    ];
+    const hydratedFormData = ensureCastingCuringMotorsInForm(activeBatch, nextFormData);
 
-    setFormData(nextFormData);
-    setMotorCastingValuesById(buildMotorCastingValuesMapFromSessions(nextFormData.motors ?? []));
-    setMotorCuringValuesById(buildMotorCuringValuesMapFromSessions(nextFormData.motors ?? []));
+    const nextAdded = mergeCastingCuringMotorsFromBatchAndForm(
+      activeBatch,
+      [
+        ...addedMotors,
+        ...newDrafts.map((row) => ({
+          motorId: row.motorId.trim(),
+          motorReceivedAt: row.motorReceivedAt.trim(),
+          castingStation: row.castingStation.trim(),
+        })),
+      ],
+    );
+
+    setFormData(hydratedFormData);
+    setMotorCastingValuesById(buildMotorCastingValuesMapFromSessions(hydratedFormData.motors ?? []));
+    setMotorCuringValuesById(buildMotorCuringValuesMapFromSessions(hydratedFormData.motors ?? []));
     setAddedMotors(nextAdded);
     setCastingType("");
     setCastingMotorDrafts([]);
@@ -1029,7 +1084,14 @@ export const useCastingAndCuringHook = () => {
   const submitMotor = useCallback(
     async (motorId: string, intent: "draft" | "submit") => {
       if (!activeBatch) return false;
-      if (!isMotorEnabledByPreviousStage(motorId, previousStageGate)) {
+      if (
+        !isMotorEnabledForWorkflow(
+          motorId,
+          getCastingCuringOrderedMotorIds(activeBatch, addedMotors),
+          previousStageGate,
+          (id) => motorStatusById[id]?.motorSubmissionStatus ?? "TO_BE_INITIATED",
+        )
+      ) {
         showAlert(STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED, "warning");
         return false;
       }
@@ -1164,12 +1226,31 @@ export const useCastingAndCuringHook = () => {
     [motorStatusById],
   );
 
+  const getCrossMotorExcludedBowlSelections = useCallback(
+    (motorId: string) => collectCrossMotorExcludedBowlSelections(motorCastingValuesById, motorId),
+    [motorCastingValuesById],
+  );
+
+  const orderedMotorIds = useMemo(
+    () => getCastingCuringOrderedMotorIds(activeBatch, addedMotors),
+    [activeBatch, addedMotors],
+  );
+
   const checkMotorEditable = useCallback(
     (motorId: string) => {
-      if (!isMotorEnabledByPreviousStage(motorId, previousStageGate)) return false;
+      if (
+        !isMotorEnabledForWorkflow(
+          motorId,
+          orderedMotorIds,
+          previousStageGate,
+          (id) => getMotorStatus(id),
+        )
+      ) {
+        return false;
+      }
       return isCastingCuringMotorEditable(getMotorStatus(motorId));
     },
-    [getMotorStatus, previousStageGate],
+    [getMotorStatus, orderedMotorIds, previousStageGate],
   );
 
   const handleSubmitForFinalApproval = useCallback(async () => {
@@ -1313,6 +1394,7 @@ export const useCastingAndCuringHook = () => {
     motorStatusById,
     previousStageGate,
     getMotorStatus,
+    getCrossMotorExcludedBowlSelections,
     isMotorEditable: checkMotorEditable,
     detailsRow,
     detailsData,

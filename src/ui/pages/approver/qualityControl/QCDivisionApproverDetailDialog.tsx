@@ -5,17 +5,19 @@ import { alpha } from "@mui/material/styles";
 import { useThemeStore } from "../../../../app/store/themeStore";
 import getQualityControlTheme from "../../../../app/theme/custom_themes/user/qualityControl/qualityControl_theme";
 import getRawMaterialPreparationApproverTheme from "../../../../app/theme/custom_themes/approver/manufacturing/rawMaterialPreparationApprover_theme";
-import { isApproverActionableStatus } from "../../../../app/theme/approver";
 import { icons } from "../../../../app/theme/icons";
 import { STRINGS } from "../../../../app/config/strings";
 import type { QCDivisionDetailView } from "../../../../data/models/user/QualityControlFormModel";
 import type { QualityControlFormState } from "../../../../data/models/user/QualityControlFormModel";
+import type {
+  QcApprovalTableRow,
+  QcPartialItemStatus,
+  QcPartialNavItem,
+} from "../../../../hooks/user/qualityControl/qcDivisionApprovalUnits";
 import { ReportPreviewDialog } from "../components/ReportPdf";
-import QCDivisionDetailsContent from "../../user/qualityControl/QCDivision/components/QCDivisionDetailsContent";
+import QCDivisionApproverReviewContent from "./QCDivisionApproverReviewContent";
 
 const {
-  approved: CheckCircleRoundedIcon,
-  rejected: CancelRoundedIcon,
   close: CloseRoundedIcon,
   factCheck: FactCheckRoundedIcon,
   pdf: PictureAsPdfRoundedIcon,
@@ -47,8 +49,18 @@ type QCDivisionApproverDetailDialogProps = {
   activeDivisionSubIndex: number;
   onActiveDivisionGroupIndexChange: (index: number) => void;
   onActiveDivisionSubIndexChange: (index: number) => void;
+  partialNavItems: QcPartialNavItem[];
+  activePartialNavIndex: number;
+  onActivePartialNavIndexChange: (index: number) => void;
+  divisionStatusByFlowKey: Record<string, QcPartialItemStatus>;
+  divisionApprovalRows: QcApprovalTableRow[];
+  finalApprovalRows: QcApprovalTableRow[];
+  canApproveForm: boolean;
   onApprove: (item: QCDivisionApproverDetailItem) => void;
   onReject: (item: QCDivisionApproverDetailItem) => void;
+  onApproveForm: (item: QCDivisionApproverDetailItem) => void;
+  onRejectForm: (item: QCDivisionApproverDetailItem) => void;
+  actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
 
@@ -65,8 +77,18 @@ const QCDivisionApproverDetailDialog = ({
   activeDivisionSubIndex,
   onActiveDivisionGroupIndexChange,
   onActiveDivisionSubIndexChange,
+  partialNavItems,
+  activePartialNavIndex,
+  onActivePartialNavIndexChange,
+  divisionStatusByFlowKey,
+  divisionApprovalRows,
+  finalApprovalRows,
+  canApproveForm,
   onApprove,
   onReject,
+  onApproveForm,
+  onRejectForm,
+  actionLoading = false,
   theme,
 }: QCDivisionApproverDetailDialogProps) => {
   const [pdfOpen, setPdfOpen] = useState(false);
@@ -77,9 +99,8 @@ const QCDivisionApproverDetailDialog = ({
   if (!item) return null;
 
   const rowStatus = String(item.qcDivStatus ?? item.status ?? detailView?.status ?? "");
-  const canApproveOrReject = isApproverActionableStatus(rowStatus);
   const divisionCount = detailView?.divisionCount ?? formData.divisionEntries?.length ?? 0;
-  const actionableItem = { ...item, status: rowStatus, qcDivStatus: rowStatus };
+  const unitLabel = partialNavItems[activePartialNavIndex]?.label;
 
   return (
     <>
@@ -110,6 +131,7 @@ const QCDivisionApproverDetailDialog = ({
               <Typography sx={theme.dialog.headerSubtitle}>
                 {item.batchId}
                 {loading ? " · loading…" : item.formId ? ` · ${item.formId}` : ""}
+                {!loading && unitLabel ? ` · ${unitLabel}` : ""}
                 {!loading && divisionCount > 0
                   ? ` · ${divisionCount} division${divisionCount === 1 ? "" : "s"}`
                   : ""}
@@ -123,7 +145,7 @@ const QCDivisionApproverDetailDialog = ({
               variant="contained"
               startIcon={<PictureAsPdfRoundedIcon sx={{ fontSize: "14px !important" }} />}
               onClick={() => setPdfOpen(true)}
-              disabled={loading || !item.formId}
+              disabled={loading || !item.formId || actionLoading}
               sx={theme.dialog.pdfButton}
             >
               View as PDF
@@ -135,52 +157,43 @@ const QCDivisionApproverDetailDialog = ({
         </Box>
 
         <DialogContent sx={{ ...theme.dialog.content, overflow: "auto" }}>
-          <QCDivisionDetailsContent
+          <QCDivisionApproverReviewContent
             detailView={detailView}
-            row={{
-              ...item,
-              status: rowStatus || detailView?.status,
-              qcDivStatus: rowStatus || detailView?.status,
-            }}
             formData={formData}
-            subDepartmentId={subDepartmentId ?? undefined}
             loading={loading}
-            schemaLoading={schemaLoading || loading}
+            schemaLoading={schemaLoading}
+            subDepartmentId={subDepartmentId}
             activeDivisionGroupIndex={activeDivisionGroupIndex}
             activeDivisionSubIndex={activeDivisionSubIndex}
             onActiveDivisionGroupIndexChange={onActiveDivisionGroupIndexChange}
             onActiveDivisionSubIndexChange={onActiveDivisionSubIndexChange}
-            theme={qcTheme}
-            resetOnFormId={detailView?.formId ?? item.formId ?? null}
+            partialNavItems={partialNavItems}
+            activePartialNavIndex={activePartialNavIndex}
+            onActivePartialNavIndexChange={onActivePartialNavIndexChange}
+            divisionStatusByFlowKey={divisionStatusByFlowKey}
+            divisionApprovalRows={divisionApprovalRows}
+            finalApprovalRows={finalApprovalRows}
+            formStatus={rowStatus}
+            formSubmissionType={detailView?.formSubmissionType}
+            onApproveUnit={() => onApprove(item)}
+            onRejectUnit={() => onReject(item)}
+            onApproveForm={canApproveForm ? () => onApproveForm(item) : undefined}
+            onRejectForm={canApproveForm ? () => onRejectForm(item) : undefined}
+            actionLoading={actionLoading}
+            qcTheme={qcTheme}
+            approverTheme={theme}
           />
         </DialogContent>
 
         <Box sx={theme.dialog.footer}>
-          <Button variant="outlined" onClick={onClose} disabled={loading || schemaLoading} sx={theme.dialog.closeAction}>
+          <Button
+            variant="outlined"
+            onClick={onClose}
+            disabled={loading || schemaLoading || actionLoading}
+            sx={theme.dialog.closeAction}
+          >
             Close
           </Button>
-          {canApproveOrReject ? (
-            <>
-              <Button
-                variant="contained"
-                startIcon={<CancelRoundedIcon />}
-                onClick={() => onReject(actionableItem)}
-                disabled={loading || schemaLoading}
-                sx={theme.dialog.rejectAction}
-              >
-                Reject
-              </Button>
-              <Button
-                variant="contained"
-                startIcon={<CheckCircleRoundedIcon />}
-                onClick={() => onApprove(actionableItem)}
-                disabled={loading || schemaLoading}
-                sx={theme.dialog.approveAction}
-              >
-                Approve
-              </Button>
-            </>
-          ) : null}
         </Box>
       </Dialog>
 

@@ -1,11 +1,13 @@
 import React, { useMemo, useState } from "react";
-import { Box, Button, Stack } from "@mui/material";
+import { Box } from "@mui/material";
 import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog";
 import WorkflowFormOpeningLoader from "../../../../components/common/WorkflowFormOpeningLoader";
 import UserWorkflowFormHeader from "../../../../components/custom/UserWorkflowFormHeader";
 import QCDivisionList from "./QCDivisionList";
 import QCForm from "./QCForm";
 import QCDivisionDetailsView from "./QCDivisionDetailsView";
+import DivisionApprovalUnitDialog from "./components/DivisionApprovalUnitDialog";
+import FinalApprovalDivisionDialog from "./components/FinalApprovalDivisionDialog";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import getQualityControlTheme from "../../../../../app/theme/custom_themes/user/qualityControl/qualityControl_theme";
 import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
@@ -20,6 +22,8 @@ const QualityControlPage = () => {
   const strings = STRINGS.QUALITY_CONTROL.QC_DIVISION;
   const [draftConfirmOpen, setDraftConfirmOpen] = useState(false);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const [divisionDialogOpen, setDivisionDialogOpen] = useState(false);
+  const [finalDialogOpen, setFinalDialogOpen] = useState(false);
 
   const hookState = useQCDivisionHook();
   const {
@@ -87,6 +91,12 @@ const QualityControlPage = () => {
     readOnly,
     handleSaveDraft,
     handleSubmit,
+    handleSubmitDivision,
+    handleSubmitForFinalApproval,
+    canProceedDivisionSubmit,
+    canProceedFinalApproval,
+    divisionApprovalRows,
+    finalApprovalRows,
     handleBackFromDetails,
     detailsRow,
     detailsData,
@@ -107,6 +117,14 @@ const QualityControlPage = () => {
       scopedFormData.schemaFormLoaded ||
       (scopedFormData.solidPremixEntries?.length ?? 0) > 0 ||
       (scopedFormData.liquidPremixEntries?.length ?? 0) > 0);
+
+  const canOpenDivisionDialog =
+    Boolean(activeBatch?.formId) ||
+    (scopedFormData.divisionEntries?.length ?? 0) > 0 ||
+    scopedFormData.schemaFormLoaded ||
+    partialNavItems.length > 0;
+
+  const canOpenFinalDialog = Boolean(activeBatch?.formId);
 
   const listLoading = loading && !loadingFormDetails && view === "list";
 
@@ -229,55 +247,40 @@ const QualityControlPage = () => {
             onDivisionEntryLiquidValuesChange={handleDivisionEntryLiquidValuesChange}
             onMixingFinalMixDetailsChange={handleMixingFinalMixDetailsChange}
             onRemoveDivisionEntry={handleRemoveDivisionEntry}
+            navApprovalActions={
+              !readOnly
+                ? {
+                    show: true,
+                    actionLoading,
+                    canSubmitDivision: canOpenDivisionDialog,
+                    canSubmitFinalApproval: canOpenFinalDialog,
+                    onSubmitDivision: () => setDivisionDialogOpen(true),
+                    onSubmitFinalApproval: () => setFinalDialogOpen(true),
+                  }
+                : null
+            }
+            unitActions={
+              !readOnly && !isActivePartialReadOnly
+                ? {
+                    show: true,
+                    canAct,
+                    actionLoading,
+                    isEditMode,
+                    onSaveDraft: () => setDraftConfirmOpen(true),
+                    onSubmit: () => setSubmitConfirmOpen(true),
+                  }
+                : null
+            }
             theme={theme}
           />
 
-          {!formReadOnly ? (
+          {!readOnly ? (
             <>
-              <Box
-                sx={{
-                  mt: 2,
-                  p: "12px 16px",
-                  borderRadius: 2,
-                  background: "#fff",
-                  border: "1.5px solid #D5D8DC",
-                }}
-              >
-                <Stack
-                  direction={{ xs: "column", sm: "row" }}
-                  alignItems={{ sm: "center" }}
-                  justifyContent="space-between"
-                  gap={1.5}
-                >
-                  <Box>
-                    <Box component="span" sx={{ fontSize: "0.76rem", fontWeight: 700, color: "#1C2833" }}>
-                      {canAct ? strings.READY_TO_SUBMIT : strings.NOT_READY_TO_SUBMIT}
-                    </Box>
-                  </Box>
-                  <Stack direction="row" gap={1}>
-                    <Button
-                      variant="outlined"
-                      disabled={!canAct || actionLoading}
-                      onClick={() => setDraftConfirmOpen(true)}
-                    >
-                      {strings.SAVE_DRAFT_LABEL}
-                    </Button>
-                    <Button
-                      variant="contained"
-                      disabled={!canAct || actionLoading}
-                      onClick={() => setSubmitConfirmOpen(true)}
-                    >
-                      {isEditMode ? strings.RESUBMIT_LABEL : strings.SUBMIT_LABEL}
-                    </Button>
-                  </Stack>
-                </Stack>
-              </Box>
-
               <ConfirmAlertDialog
                 open={draftConfirmOpen}
                 severity="info"
-                title={strings.DRAFT_CONFIRM_TITLE}
-                message={strings.DRAFT_CONFIRM_MESSAGE}
+                title={strings.UNIT_DRAFT_CONFIRM_TITLE}
+                message={strings.UNIT_DRAFT_CONFIRM_MESSAGE}
                 confirmLabel={strings.DRAFT_CONFIRM_LABEL}
                 cancelLabel={strings.CONFIRM_CANCEL_LABEL}
                 onConfirm={async () => {
@@ -289,8 +292,14 @@ const QualityControlPage = () => {
               <ConfirmAlertDialog
                 open={submitConfirmOpen}
                 severity="warning"
-                title={isEditMode ? strings.RESUBMIT_CONFIRM_TITLE : strings.SUBMIT_CONFIRM_TITLE}
-                message={isEditMode ? strings.RESUBMIT_CONFIRM_MESSAGE : strings.SUBMIT_CONFIRM_MESSAGE}
+                title={
+                  isEditMode ? strings.UNIT_RESUBMIT_CONFIRM_TITLE : strings.UNIT_SUBMIT_CONFIRM_TITLE
+                }
+                message={
+                  isEditMode
+                    ? strings.UNIT_RESUBMIT_CONFIRM_MESSAGE
+                    : strings.UNIT_SUBMIT_CONFIRM_MESSAGE
+                }
                 confirmLabel={isEditMode ? strings.RESUBMIT_CONFIRM_LABEL : strings.SUBMIT_CONFIRM_LABEL}
                 cancelLabel={strings.CONFIRM_GO_BACK_LABEL}
                 onConfirm={async () => {
@@ -298,6 +307,28 @@ const QualityControlPage = () => {
                   await handleSubmit();
                 }}
                 onCancel={() => setSubmitConfirmOpen(false)}
+              />
+              <DivisionApprovalUnitDialog
+                open={divisionDialogOpen}
+                rows={divisionApprovalRows}
+                canProceed={canProceedDivisionSubmit}
+                confirmDisabled={actionLoading}
+                onClose={() => setDivisionDialogOpen(false)}
+                onProceed={async () => {
+                  setDivisionDialogOpen(false);
+                  await handleSubmitDivision();
+                }}
+              />
+              <FinalApprovalDivisionDialog
+                open={finalDialogOpen}
+                rows={finalApprovalRows}
+                canProceed={canProceedFinalApproval}
+                confirmDisabled={actionLoading}
+                onClose={() => setFinalDialogOpen(false)}
+                onProceed={async () => {
+                  setFinalDialogOpen(false);
+                  await handleSubmitForFinalApproval();
+                }}
               />
             </>
           ) : null}

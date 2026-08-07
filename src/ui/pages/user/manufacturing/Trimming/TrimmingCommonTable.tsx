@@ -19,6 +19,7 @@ import AddIcon from "@mui/icons-material/Add";
 import FormInput from "@/ui/components/common/FormInput";
 import DateField, { DateTimeField } from "@/ui/components/common/DateField";
 import SchemaFileField from "@/ui/components/common/SchemaFileField";
+import { FILE_PICKER_ACCEPT } from "@/utils/FileUtils";
 import { STRINGS } from "../../../../../app/config/strings";
 import { TRIMMING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/trimming_theme";
 
@@ -692,7 +693,7 @@ export const TrimmingCommonTable = ({
                   reportLink: val,
                 })
               }
-              accept="image/*,video/*,application/pdf"
+              accept={FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF}
               multiple
             />
           </Stack>

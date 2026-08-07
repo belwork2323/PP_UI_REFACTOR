@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -23,12 +23,10 @@ import type { StfSubType } from "../../../../../schema-engine";
 import type { StfAddedMotor, StfMotorOption } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
 import {
   shouldShowStfBemMotorSelection,
+  buildStfMotorNavGateHelpers,
   STF_FLOW_LABELS,
 } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
-import {
-  isMotorEnabledByPreviousStage,
-  type PreviousStageApprovedUnits,
-} from "../../../../../hooks/user/previousStageApproval";
+import type { PreviousStageApprovedUnits } from "../../../../../hooks/user/previousStageApproval";
 import PremixStatusChip from "../../manufacturing/RawMaterial/components/PremixStatusChip";
 import FinalApprovalMotorDialog, {
   areAllMotorsApproved,
@@ -143,6 +141,23 @@ const StaticTestFacilityForm = ({
     [addedMotors, autoMotorEntries],
   );
 
+  const resolveMotorStatus = useCallback(
+    (motorId: string) =>
+      getMotorStatus?.(motorId) ??
+      motorStatusById[motorId]?.motorSubmissionStatus ??
+      "TO_BE_INITIATED",
+    [getMotorStatus, motorStatusById],
+  );
+
+  const stfMotorNavGate = useMemo(
+    () =>
+      buildStfMotorNavGateHelpers(motorCards, previousStageGate, resolveMotorStatus, "ACEM", {
+        previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
+        sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
+      }),
+    [motorCards, previousStageGate, resolveMotorStatus],
+  );
+
   const hasMotors = motorCards.length > 0;
   const showBemFlowBar = shouldShowStfBemMotorSelection(batch?.batchType, batch?.subBatchType);
 
@@ -169,10 +184,11 @@ const StaticTestFacilityForm = ({
     prevMotorCountRef.current = 0;
   }, [formSessionKey]);
 
-  const isStfTabPriorEnabled = (entry?: StfAddedMotor | null) => {
+  const isStfTabEnabled = (entry?: StfAddedMotor | null, index?: number) => {
     if (!entry) return false;
-    if (entry.subType === "BEM") return true;
-    return isMotorEnabledByPreviousStage(entry.motorId, previousStageGate);
+    if (typeof index === "number") return stfMotorNavGate.isStfMotorTabEnabled(index);
+    const resolvedIndex = motorCards.findIndex((motor) => motor.motorId === entry.motorId);
+    return resolvedIndex >= 0 ? stfMotorNavGate.isStfMotorTabEnabled(resolvedIndex) : false;
   };
 
   useEffect(() => {
@@ -183,7 +199,7 @@ const StaticTestFacilityForm = ({
     }
 
     const prevCount = prevMotorCountRef.current;
-    const firstEnabled = motorCards.findIndex((entry) => isStfTabPriorEnabled(entry));
+    const firstEnabled = motorCards.findIndex((_, index) => stfMotorNavGate.isStfMotorTabEnabled(index));
 
     if (prevCount === 0) {
       setActiveMotorIndex(firstEnabled >= 0 ? firstEnabled : 0);
@@ -192,7 +208,7 @@ const StaticTestFacilityForm = ({
     } else {
       setActiveMotorIndex((prev) => {
         const current = motorCards[prev];
-        if (current && isStfTabPriorEnabled(current)) {
+        if (current && stfMotorNavGate.isStfMotorTabEnabled(prev)) {
           return Math.min(prev, motorCards.length - 1);
         }
         return firstEnabled >= 0
@@ -201,7 +217,7 @@ const StaticTestFacilityForm = ({
       });
     }
     prevMotorCountRef.current = motorCards.length;
-  }, [motorCards, previousStageGate]);
+  }, [motorCards, stfMotorNavGate]);
 
   const activeMotorEntry = useMemo(
     () => (motorCards.length > 0 ? motorCards[activeMotorIndex] : null),
@@ -223,7 +239,7 @@ const StaticTestFacilityForm = ({
   const activeMotorStatus = (getMotorStatus?.(activeMotorId) ??
     motorStatusById[activeMotorId]?.motorSubmissionStatus ??
     "TO_BE_INITIATED") as StfMotorSubmissionStatus;
-  const activeMotorPriorEnabled = isStfTabPriorEnabled(activeMotorEntry);
+  const activeMotorPriorEnabled = isStfTabEnabled(activeMotorEntry, activeMotorIndex);
   const activeMotorLocked = activeMotorId
     ? !activeMotorPriorEnabled || !(isMotorEditable?.(activeMotorId) ?? true)
     : false;
@@ -410,12 +426,8 @@ const StaticTestFacilityForm = ({
               tabs={motorTabs}
               activeIndex={activeMotorIndex}
               onActiveIndexChange={setActiveMotorIndex}
-              isTabDisabled={(_, index) => !isStfTabPriorEnabled(motorCards[index])}
-              tabTooltip={(_, index) =>
-                isStfTabPriorEnabled(motorCards[index])
-                  ? undefined
-                  : STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED
-              }
+              isTabDisabled={(_, index) => !stfMotorNavGate.isStfMotorTabEnabled(index)}
+              tabTooltip={(_, index) => stfMotorNavGate.getStfMotorTabTooltip(index)}
               palette={navPalette}
               showStepArrows
               titleEndAdornment={

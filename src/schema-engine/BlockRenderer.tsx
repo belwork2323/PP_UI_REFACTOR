@@ -7,6 +7,7 @@ import { setBlockValue, buildRepeatInstanceChildValues, buildTableRows, scopedFo
 import { isBlockVisible } from "./rules/visibility";
 import { resolveSchemaCountToken, type SchemaSetupContext } from "./utils/setupContext";
 import { resolveBlockLayoutSx, resolveFullWidthBlockLayoutSx, resolveGridGap } from "./utils/blockLayout";
+import { sanitizeNumericInput } from "./utils/numericInput";
 import {
   createNextPrefixedTableColumn,
   isDeletablePrefixedColumn,
@@ -25,6 +26,7 @@ import MatrixTable from "../ui/components/common/MatrixTable";
 import GridFields from "../ui/components/common/GridFields";
 import SchemaFileField from "../ui/components/common/SchemaFileField";
 import { DateField, DateTimeField, TimeField } from "../ui/components/common/DateField";
+import { FILE_PICKER_ACCEPT } from "../utils/FileUtils";
 import type { CuringProjectStageMatrix } from "../data/models/user/curingProjectStageMatrix";
 import { buildDefaultCuringProjectStageMatrix } from "../data/models/user/curingProjectStageMatrix";
 
@@ -92,7 +94,11 @@ const renderField = (block: SchemaFieldBlock, ctx: BlockRenderContext) => {
           value={value}
           onChange={onFieldChange}
           disabled={disabled}
-          accept={block.fieldType === "image" ? "image/*,video/*" : "image/*,video/*,application/pdf"}
+          accept={
+            block.fieldType === "image"
+              ? FILE_PICKER_ACCEPT.IMAGE_VIDEO
+              : FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF
+          }
           helperText={block.ui?.placeholder}
           multiple
         />
@@ -105,7 +111,7 @@ const renderField = (block: SchemaFieldBlock, ctx: BlockRenderContext) => {
           value={value}
           type="text"
           inputMode="decimal"
-          onChange={(e) => onFieldChange(e.target.value)}
+          onChange={(e) => onFieldChange(sanitizeNumericInput(e.target.value))}
           disabled={disabled}
           required={block.validation?.required}
         />

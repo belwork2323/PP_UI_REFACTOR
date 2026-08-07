@@ -17,6 +17,7 @@ import { icons } from "../../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../../app/config/strings";
 import type { UploadedFileRef } from "../../../../../../data/models/user/RocketMotorCasingFormModel";
 import MediaUpload from "../../../../../components/common/MediaUpload";
+import { FILE_PICKER_ACCEPT } from "../../../../../../utils/FileUtils";
 
 const S = STRINGS.SOURCING.CASING_CREATE;
 
@@ -107,7 +108,7 @@ const VisualInspectionMediaField = ({
           onChange={handleFilePicked}
           label={S.COL_MEDIA}
           description={S.ADD_MEDIA}
-          accept="image/*,video/*"
+          accept={FILE_PICKER_ACCEPT.IMAGE_VIDEO}
         />
       </Box>
     );

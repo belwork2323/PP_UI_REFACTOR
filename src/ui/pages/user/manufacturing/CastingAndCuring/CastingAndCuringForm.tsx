@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
   Box,
@@ -17,6 +17,7 @@ import {
   CASTING_CURING_FLOW_LABELS,
   canAddCastingCuringMotors,
   isCastingCuringFormStarted,
+  mergeCastingCuringMotorsFromBatchAndForm,
   resolveCastingCuringBatchMotorCount,
   resolveCastingCuringMotorCountLimit,
   resolveCastingCuringMotorOptions,
@@ -47,6 +48,7 @@ import CuringProcessFlowBar from "./CuringProcessFlowBar";
 import CuringSetupHeaderCard from "./CuringSetupHeaderCard";
 import { generalController } from "../../../../../controllers/admin/common/generalController";
 import {
+  buildMotorNavGateHelpers,
   isMotorEnabledByPreviousStage,
   type PreviousStageApprovedUnits,
 } from "../../../../../hooks/user/previousStageApproval";
@@ -89,6 +91,7 @@ type CastingAndCuringFormProps = {
   getCuringSetupDraft: (motorId: string) => CuringProcessSetup;
   getMotorCastingFormValues: (motorId: string) => SchemaFormValues;
   getMotorCuringFormValues: (motorId: string) => SchemaFormValues;
+  getCrossMotorExcludedBowlSelections?: (motorId: string) => string[];
   onCuringSetupDraftChange: (
     motorId: string,
     field: keyof CuringProcessSetup,
@@ -133,6 +136,7 @@ const CastingAndCuringForm = ({
   getCuringSetupDraft,
   getMotorCastingFormValues,
   getMotorCuringFormValues,
+  getCrossMotorExcludedBowlSelections,
   onCuringSetupDraftChange,
   onMotorCastingValuesChange,
   onMotorCuringValuesChange,
@@ -149,7 +153,29 @@ const CastingAndCuringForm = ({
   theme,
 }: CastingAndCuringFormProps) => {
   const BRAND = CASTING_CURING_BRAND;
-  const motorCards = Array.isArray(addedMotors) ? addedMotors : [];
+  const castingFormLoaded = Boolean(formData.castingFormLoaded);
+  // Only merge batch motors into nav after the casting form is loaded. Merging earlier
+  // marks every batch motor as "used" and hides the load-form draft dropdowns.
+  const motorCards = useMemo(() => {
+    const formMotors = Array.isArray(addedMotors) ? addedMotors : [];
+    if (!castingFormLoaded) return formMotors;
+    return mergeCastingCuringMotorsFromBatchAndForm(batch, formMotors);
+  }, [addedMotors, batch, castingFormLoaded]);
+  const resolveMotorStatus = useCallback(
+    (motorId: string) =>
+      getMotorStatus?.(motorId) ??
+      motorStatusById[motorId]?.motorSubmissionStatus ??
+      "TO_BE_INITIATED",
+    [getMotorStatus, motorStatusById],
+  );
+  const motorNavGate = useMemo(
+    () =>
+      buildMotorNavGateHelpers(motorCards, previousStageGate, resolveMotorStatus, {
+        previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
+        sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
+      }),
+    [motorCards, previousStageGate, resolveMotorStatus],
+  );
   const prevMotorCountRef = useRef(0);
   const formSessionKey = `${batch?.batchId ?? ""}:${formData.castingFormLoaded ? "loaded" : "draft"}`;
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
@@ -159,8 +185,13 @@ const CastingAndCuringForm = ({
     Array<{ value: string; label: string; noOfOvenAvailable?: number }>
   >([]);
   const [ovensLoading, setOvensLoading] = useState(false);
-  const castingFormLoaded = Boolean(formData.castingFormLoaded);
-  const usedMotorIds = motorCards.map((motor) => motor.motorId);
+  const usedMotorIds = useMemo(
+    () =>
+      (formData.motors ?? [])
+        .map((motor) => String(motor.motorId ?? "").trim())
+        .filter(Boolean),
+    [formData.motors],
+  );
 
   const batchMotorOptions = useMemo(() => {
     const options = resolveCastingCuringMotorOptions(batch);
@@ -248,9 +279,7 @@ const CastingAndCuringForm = ({
     }
 
     const prevCount = prevMotorCountRef.current;
-    const firstEnabled = motorCards.findIndex((entry) =>
-      isMotorEnabledByPreviousStage(entry.motorId, previousStageGate),
-    );
+    const firstEnabled = motorCards.findIndex((_, index) => motorNavGate.isMotorTabEnabled(index));
 
     if (prevCount === 0) {
       setActiveMotorIndex(firstEnabled >= 0 ? firstEnabled : 0);
@@ -259,7 +288,7 @@ const CastingAndCuringForm = ({
     } else {
       setActiveMotorIndex((prev) => {
         const current = motorCards[prev];
-        if (current && isMotorEnabledByPreviousStage(current.motorId, previousStageGate)) {
+        if (current && motorNavGate.isMotorWorkflowEnabled(current.motorId)) {
           return Math.min(prev, motorCards.length - 1);
         }
         return firstEnabled >= 0 ? firstEnabled : Math.min(prev, motorCards.length - 1);
@@ -267,7 +296,7 @@ const CastingAndCuringForm = ({
     }
 
     prevMotorCountRef.current = motorCards.length;
-  }, [motorCards, previousStageGate]);
+  }, [motorCards, motorNavGate]);
 
   const activeMotorEntry = motorCards[activeMotorIndex] ?? motorCards[0] ?? null;
   const activeMotorSession = useMemo(() => {
@@ -333,7 +362,7 @@ const CastingAndCuringForm = ({
   const activeMotorStatus = (getMotorStatus?.(activeMotorId) ??
     motorStatusById[activeMotorId]?.motorSubmissionStatus ??
     "TO_BE_INITIATED") as CastingCuringMotorSubmissionStatus;
-  const activeMotorPriorEnabled = isMotorEnabledByPreviousStage(activeMotorId, previousStageGate);
+  const activeMotorPriorEnabled = motorNavGate.isMotorWorkflowEnabled(activeMotorId);
   const activeMotorLocked = activeMotorId
     ? !activeMotorPriorEnabled || !(isMotorEditable?.(activeMotorId) ?? true)
     : false;
@@ -443,7 +472,7 @@ const CastingAndCuringForm = ({
           </Box>
         </Stack>
 
-        {motorCards.length > 0 ? (
+        {castingFormLoaded && motorCards.length > 0 ? (
           <Button
             variant="contained"
             size="small"
@@ -490,14 +519,8 @@ const CastingAndCuringForm = ({
                 tabs={motorTabs}
                 activeIndex={activeMotorIndex}
                 onActiveIndexChange={handleMotorNavIndexChange}
-                isTabDisabled={(_, index) =>
-                  !isMotorEnabledByPreviousStage(motorCards[index]?.motorId, previousStageGate)
-                }
-                tabTooltip={(_, index) =>
-                  isMotorEnabledByPreviousStage(motorCards[index]?.motorId, previousStageGate)
-                    ? undefined
-                    : STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED
-                }
+                isTabDisabled={(_, index) => !motorNavGate.isMotorTabEnabled(index)}
+                tabTooltip={(_, index) => motorNavGate.getMotorTabTooltip(index)}
                 palette={navPalette}
                 showStepArrows
                 titleEndAdornment={
@@ -646,6 +669,7 @@ const CastingAndCuringForm = ({
                   schema={formData.castingSchema}
                   motor={activeMotorSession}
                   castingFormValues={getMotorCastingFormValues(activeMotorSession.motorId)}
+                  getCrossMotorExcludedBowlSelections={getCrossMotorExcludedBowlSelections}
                   subDepartmentId={subDepartmentId}
                   batchId={batch?.batchId}
                   setupContext={castingSetupContext}

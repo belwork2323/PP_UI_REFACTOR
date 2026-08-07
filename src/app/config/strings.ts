@@ -884,6 +884,8 @@ export const STRINGS = {
       "This premix was not approved in Raw Material Preparation.",
     PREVIOUS_STAGE_MOTOR_TAB_DISABLED:
       "This motor was not approved in the previous stage.",
+    SEQUENTIAL_UNIT_TAB_DISABLED:
+      "Complete approval for the previous unit before continuing.",
     PREVIOUS_STAGE_NO_UNITS:
       "No units from the previous stage are approved yet. Complete prior approvals to continue.",
 
@@ -1403,6 +1405,7 @@ export const STRINGS = {
       SECTION_CURING_SUBTITLE:
         "Temperature achievement, curing cycle, soaking and hardness verification",
       ADD_BOWL_ROW: "Add Bowl Row",
+      PLACEHOLDER_NO_BOWLS_AVAILABLE: "No bowls available",
       DETAILS_FETCH_ERROR:
         "Unable to load existing casting and curing form details. Please try again.",
       DETAILS_NOT_FOUND: "No saved casting and curing form data found for this submission.",
@@ -2113,6 +2116,63 @@ export const STRINGS = {
       DIVISION_REMOVE_TOOLTIP: "Remove this division card",
       ADD_DIVISION_LABEL: "Add Division",
       DIVISION_ALREADY_ADDED: "This division configuration is already added.",
+      SAVE_UNIT_DRAFT: "Save as Draft",
+      SUBMIT_UNIT: "Submit for Approval",
+      RESUBMIT_UNIT: "Resubmit for Approval",
+      SUBMIT_DIVISION: "Submit Division for Approval",
+      SUBMIT_FOR_FINAL_APPROVAL: "Submit Batch for Final Approval",
+      UNIT_DRAFT_CONFIRM_TITLE: "Save Unit Draft?",
+      UNIT_DRAFT_CONFIRM_MESSAGE:
+        "Your progress for this unit will be saved. You can return and continue later.",
+      UNIT_SUBMIT_CONFIRM_TITLE: "Submit Unit for Approval?",
+      UNIT_SUBMIT_CONFIRM_MESSAGE:
+        "Once submitted, you will not be able to edit this unit until the approver takes action.",
+      UNIT_RESUBMIT_CONFIRM_TITLE: "Resubmit Unit for Approval?",
+      UNIT_RESUBMIT_CONFIRM_MESSAGE:
+        "You are resubmitting a previously rejected unit. Ensure all corrections have been made.",
+      DIVISION_APPROVAL_DIALOG_TITLE: "Submit Division for Approval",
+      DIVISION_APPROVAL_DIALOG_INFO:
+        "Review unit statuses for this division. Proceed only when every unit is approved.",
+      DIVISION_APPROVAL_PROCEED: "Proceed",
+      DIVISION_APPROVAL_CLOSE: "Close",
+      DIVISION_APPROVAL_NOT_READY:
+        "All units in this division must be approved before proceeding.",
+      DIVISION_APPROVAL_COL_UNIT: "Unit",
+      DIVISION_APPROVAL_COL_TYPE: "Type",
+      DIVISION_APPROVAL_COL_STATUS: "Status",
+      DIVISION_SUBMIT_SUCCESS: "Division submitted for approval successfully.",
+      DIVISION_SUBMIT_FAILED: "Failed to submit division for approval.",
+      FINAL_APPROVAL_DIALOG_TITLE: "Submit Batch for Final Approval",
+      FINAL_APPROVAL_DIALOG_INFO:
+        "Review division and unit statuses. Proceed only when every division is approved.",
+      FINAL_APPROVAL_PROCEED: "Proceed for Approval",
+      FINAL_APPROVAL_CLOSE: "Close",
+      FINAL_APPROVAL_NOT_READY:
+        "All divisions must be approved before submitting the batch for final approval.",
+      FINAL_APPROVAL_COL_DIVISION: "Division",
+      FINAL_APPROVAL_COL_UNIT: "Unit",
+      FINAL_APPROVAL_COL_TYPE: "Type",
+      FINAL_APPROVAL_COL_STATUS: "Status",
+      FINAL_APPROVAL_SUCCESS: "Batch submitted for final approval successfully.",
+      FINAL_APPROVAL_FAILED: "Failed to submit batch for final approval.",
+      FINAL_APPROVAL_NOT_READY_ALERT:
+        "All divisions must be approved before proceeding for final approval.",
+      UNIT_APPROVER_LOCKED:
+        "This unit is not waiting for approval and cannot be actioned right now.",
+      UNIT_APPROVER_APPROVE: "Approve Unit",
+      UNIT_APPROVER_REJECT: "Reject Unit",
+      UNIT_APPROVER_TAB_DISABLED: "This unit has not been submitted for approval yet.",
+      UNIT_APPROVER_NAV_HINT:
+        "Review each submitted unit. Use navigation to move between units ready for review.",
+      UNIT_APPROVER_NO_ACTIONABLE: "No submitted unit is available for review right now.",
+      FORM_APPROVER_APPROVE: "Approve Form",
+      FORM_APPROVER_REJECT: "Reject Form",
+      FORM_APPROVER_ACTIONS_HINT:
+        "All divisions are approved. Approve or reject the complete form.",
+      FORM_APPROVER_NOT_READY:
+        "Form final approval is available only when the batch is waiting for complete approval and every division is approved.",
+      APPROVER_STATUS_OVERVIEW_TITLE: "Approval status overview",
+      APPROVER_UNIT_COUNTS_LABEL: "Unit status summary",
     },
     NDT: {
       FORM_OPENING_TITLE: "Opening NDT Form",
@@ -2521,6 +2581,8 @@ export const STRINGS = {
       "This premix was not approved in Raw Material Preparation.",
     PREVIOUS_STAGE_MOTOR_TAB_DISABLED:
       "This motor was not approved in the previous stage.",
+    SEQUENTIAL_UNIT_TAB_DISABLED:
+      "Complete approval for the previous unit before continuing.",
     PREVIOUS_STAGE_NO_UNITS:
       "No units from the previous stage are approved yet. Complete prior approvals to continue.",
         RAW_MATERIAL_LABEL: "Raw Material Preparation",

@@ -25,10 +25,13 @@ import getMixingTheme, {
 } from "../../../../../app/theme/custom_themes/user/manufacturing/mixing_theme";
 import {
   BOWL_ID_OPTIONS,
+  collectAssignedBowlIdsByStageType,
   FINAL_MIX_CYCLE_OPTIONS,
+  getAvailableBowlIds,
   getFinalMixNoLabel,
   getPremixNoLabel,
 } from "../../../../../hooks/user/manufacturing/mixingConfig";
+import type { IdentificationSheetMixingStage } from "../../../../../data/models/admin/BatchManagement/BatchManagementModel";
 import {
   buildMixCardId,
   createDefaultMixingFormState,
@@ -41,7 +44,8 @@ import {
 import type { FinalMixEntry, PremixEntry } from "../../../../../data/models/user/MixingFormModel";
 import { useMixingFormHook } from "../../../../../hooks/user/manufacturing/useMixingFormHook";
 import {
-  isPremixEnabledByPreviousStage,
+  isPremixEnabledForWorkflow,
+  getPremixNavTabDisabledReason,
   type PreviousStageApprovedUnits,
 } from "../../../../../hooks/user/previousStageApproval";
 import { mixingController } from "../../../../../controllers/user/manufacturing/mixingController";
@@ -141,6 +145,7 @@ const EmptySectionState = ({ message }: { message: string }) => (
 
 type PremixStageCardProps = {
   premix: PremixEntry;
+  bowlIdOptions: string[];
   readOnly?: boolean;
   statusChip?: React.ReactNode;
   headerActions?: React.ReactNode;
@@ -167,6 +172,7 @@ type PremixStageCardProps = {
 
 const PremixStageCard = ({
   premix,
+  bowlIdOptions,
   readOnly = false,
   statusChip,
   headerActions,
@@ -279,7 +285,7 @@ const PremixStageCard = ({
             label={S.LABEL_BOWL_ID}
             value={premix.bowlId}
             placeholder={S.PLACEHOLDER_BOWL_ID}
-            options={BOWL_ID_OPTIONS}
+            options={bowlIdOptions}
             disabled={readOnly}
             onChange={(value) => onPremixFieldChange(premix.premixNo, "bowlId", value)}
           />
@@ -395,6 +401,7 @@ const PremixStageCard = ({
 
 const FinalMixStageCard = ({
   entry,
+  bowlIdOptions,
   readOnly = false,
   statusChip,
   headerActions,
@@ -405,6 +412,7 @@ const FinalMixStageCard = ({
   onQualityChange,
 }: {
   entry: FinalMixEntry;
+  bowlIdOptions: string[];
   readOnly?: boolean;
   statusChip?: React.ReactNode;
   headerActions?: React.ReactNode;
@@ -513,7 +521,7 @@ const FinalMixStageCard = ({
           label={S.LABEL_BOWL_ID}
           value={entry.bowlId}
           placeholder={S.PLACEHOLDER_BOWL_ID}
-          options={BOWL_ID_OPTIONS}
+          options={bowlIdOptions}
           disabled={readOnly}
           onChange={(value) => onFieldChange(entry.mixNo, "bowlId", value)}
         />
@@ -611,7 +619,15 @@ type MixingFormProps = {
   numberOfPremix?: number;
   motorStage?: number;
   onBlocksChange?: (payload: ReturnType<typeof createDefaultMixingFormState>) => void;
-  identificationSheet?: { mixerType?: string | null; bldgNo?: string | null } | null;
+  identificationSheet?: {
+    mixerType?: string | null;
+    bldgNo?: string | null;
+    metadata?: {
+      mixing?: {
+        stages?: IdentificationSheetMixingStage[];
+      } | null;
+    } | null;
+  } | null;
   mixCardStatusById?: Record<string, MixCardStatusMeta>;
   getMixCardStatus?: (mixCardId: string) => MixCardSubmissionStatus;
   isMixCardEditable?: (mixCardId: string) => boolean;
@@ -668,6 +684,41 @@ const MixingForm = ({
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [finalApprovalOpen, setFinalApprovalOpen] = useState(false);
 
+  const batchMixingStages = useMemo(
+    () => identificationSheet?.metadata?.mixing?.stages ?? [],
+    [identificationSheet?.metadata?.mixing?.stages],
+  );
+
+  const batchPremixBowlIds = useMemo(
+    () => collectAssignedBowlIdsByStageType(batchMixingStages, "PREMIX"),
+    [batchMixingStages],
+  );
+
+  const batchFinalMixBowlIds = useMemo(
+    () => collectAssignedBowlIdsByStageType(batchMixingStages, "FINAL_MIX"),
+    [batchMixingStages],
+  );
+
+  const getPremixBowlIdOptions = useCallback(
+    (currentBowlId?: string | null) =>
+      getAvailableBowlIds(
+        BOWL_ID_OPTIONS,
+        [...premixCards.map((card) => card.bowlId), ...batchPremixBowlIds],
+        currentBowlId,
+      ),
+    [batchPremixBowlIds, premixCards],
+  );
+
+  const getFinalMixBowlIdOptions = useCallback(
+    (currentBowlId?: string | null) =>
+      getAvailableBowlIds(
+        BOWL_ID_OPTIONS,
+        [...finalMixCards.map((card) => card.bowlId), ...batchFinalMixBowlIds],
+        currentBowlId,
+      ),
+    [batchFinalMixBowlIds, finalMixCards],
+  );
+
   const combinedNavItems = useMemo<CombinedNavItem[]>(() => {
     const premixItems = premixCards.map((entry, cardIndex) => ({
       kind: "PREMIX" as const,
@@ -683,33 +734,6 @@ const MixingForm = ({
     }));
     return [...premixItems, ...finalMixItems];
   }, [premixCards, finalMixCards]);
-
-  useEffect(() => {
-    if (combinedNavItems.length === 0) {
-      setActiveCardIndex(0);
-      return;
-    }
-    const firstEnabled = combinedNavItems.findIndex((item) => {
-      const cardNo =
-        item.kind === "PREMIX"
-          ? premixCards[item.cardIndex]?.premixNo
-          : finalMixCards[item.cardIndex]?.mixNo;
-      return isPremixEnabledByPreviousStage(cardNo, previousStageGate);
-    });
-    setActiveCardIndex((prev) => {
-      const currentItem = combinedNavItems[prev];
-      if (currentItem) {
-        const cardNo =
-          currentItem.kind === "PREMIX"
-            ? premixCards[currentItem.cardIndex]?.premixNo
-            : finalMixCards[currentItem.cardIndex]?.mixNo;
-        if (isPremixEnabledByPreviousStage(cardNo, previousStageGate)) {
-          return Math.min(prev, combinedNavItems.length - 1);
-        }
-      }
-      return firstEnabled >= 0 ? firstEnabled : Math.min(prev, combinedNavItems.length - 1);
-    });
-  }, [combinedNavItems, finalMixCards, premixCards, previousStageGate]);
 
   useEffect(() => {
     let isMounted = true;
@@ -787,6 +811,66 @@ const MixingForm = ({
   const activeFinalMix =
     activeNavItem?.kind === "FINAL_MIX" ? finalMixCards[activeNavItem.cardIndex] ?? null : null;
 
+  const resolveStatus = useCallback(
+    (stageType: MixCardStageType, cardNo: string) => {
+      const mixCardId = buildMixCardId(stageType, cardNo);
+      return (
+        getMixCardStatus?.(mixCardId) ??
+        mixCardStatusById[mixCardId]?.mixCardSubmissionStatus ??
+        "TO_BE_INITIATED"
+      );
+    },
+    [getMixCardStatus, mixCardStatusById],
+  );
+
+  const isMixCardWorkflowEnabled = useCallback(
+    (stageType: MixCardStageType, cardNo: string | number) => {
+      if (stageType === "PREMIX") {
+        return isPremixEnabledForWorkflow(
+          cardNo,
+          premixCards.map((card) => card.premixNo),
+          previousStageGate,
+          (premixNo) => resolveStatus("PREMIX", String(premixNo)),
+        );
+      }
+      return isPremixEnabledForWorkflow(
+        cardNo,
+        finalMixCards.map((card) => card.mixNo),
+        previousStageGate,
+        (mixNo) => resolveStatus("FINAL_MIX", String(mixNo)),
+      );
+    },
+    [finalMixCards, premixCards, previousStageGate, resolveStatus],
+  );
+
+  useEffect(() => {
+    if (combinedNavItems.length === 0) {
+      setActiveCardIndex(0);
+      return;
+    }
+    const firstEnabled = combinedNavItems.findIndex((item) => {
+      const cardNo =
+        item.kind === "PREMIX"
+          ? premixCards[item.cardIndex]?.premixNo
+          : finalMixCards[item.cardIndex]?.mixNo;
+      if (cardNo == null || cardNo === "") return false;
+      return isMixCardWorkflowEnabled(item.kind, cardNo);
+    });
+    setActiveCardIndex((prev) => {
+      const currentItem = combinedNavItems[prev];
+      if (currentItem) {
+        const cardNo =
+          currentItem.kind === "PREMIX"
+            ? premixCards[currentItem.cardIndex]?.premixNo
+            : finalMixCards[currentItem.cardIndex]?.mixNo;
+        if (cardNo != null && cardNo !== "" && isMixCardWorkflowEnabled(currentItem.kind, cardNo)) {
+          return Math.min(prev, combinedNavItems.length - 1);
+        }
+      }
+      return firstEnabled >= 0 ? firstEnabled : Math.min(prev, combinedNavItems.length - 1);
+    });
+  }, [combinedNavItems, finalMixCards, isMixCardWorkflowEnabled, premixCards]);
+
   const activeMixCardId = activePremix
     ? buildMixCardId("PREMIX", activePremix.premixNo)
     : activeFinalMix
@@ -799,9 +883,9 @@ const MixingForm = ({
         mixCardStatusById[activeMixCardId]?.mixCardSubmissionStatus
       : undefined) ?? "TO_BE_INITIATED";
   const activeUnitEnabled = activePremix
-    ? isPremixEnabledByPreviousStage(activePremix.premixNo, previousStageGate)
+    ? isMixCardWorkflowEnabled("PREMIX", activePremix.premixNo)
     : activeFinalMix
-      ? isPremixEnabledByPreviousStage(activeFinalMix.mixNo, previousStageGate)
+      ? isMixCardWorkflowEnabled("FINAL_MIX", activeFinalMix.mixNo)
       : false;
 
   const activeMixCardLocked =
@@ -809,18 +893,6 @@ const MixingForm = ({
     (activeMixCardId != null
       ? !(checkMixCardEditable?.(activeMixCardId) ?? !isMixCardLocked(activeMixCardStatus))
       : false);
-
-  const resolveStatus = useCallback(
-    (stageType: MixCardStageType, cardNo: string) => {
-      const mixCardId = buildMixCardId(stageType, cardNo);
-      return (
-        getMixCardStatus?.(mixCardId) ??
-        mixCardStatusById[mixCardId]?.mixCardSubmissionStatus ??
-        "TO_BE_INITIATED"
-      );
-    },
-    [getMixCardStatus, mixCardStatusById],
-  );
 
   const combinedNavTabs = useMemo(
     () =>
@@ -918,18 +990,40 @@ const MixingForm = ({
               item.kind === "PREMIX"
                 ? premixCards[item.cardIndex]?.premixNo
                 : finalMixCards[item.cardIndex]?.mixNo;
-            return !isPremixEnabledByPreviousStage(cardNo, previousStageGate);
+            if (cardNo == null || cardNo === "") return true;
+            return !isMixCardWorkflowEnabled(item.kind, cardNo);
           }}
           tabTooltip={(_, index) => {
             const item = combinedNavItems[index];
             if (!item) return undefined;
-            const cardNo =
-              item.kind === "PREMIX"
-                ? premixCards[item.cardIndex]?.premixNo
-                : finalMixCards[item.cardIndex]?.mixNo;
-            return isPremixEnabledByPreviousStage(cardNo, previousStageGate)
-              ? undefined
-              : STRINGS.MANUFACTURING.PREVIOUS_STAGE_PREMIX_TAB_DISABLED;
+            if (item.kind === "PREMIX") {
+              const orderedPremixNos = premixCards.map((card) => card.premixNo);
+              const premixIndex = item.cardIndex;
+              return getPremixNavTabDisabledReason(
+                premixCards[premixIndex]?.premixNo,
+                premixIndex,
+                orderedPremixNos,
+                previousStageGate,
+                (premixNo) => resolveStatus("PREMIX", String(premixNo)),
+                {
+                  previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_PREMIX_TAB_DISABLED,
+                  sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
+                },
+              );
+            }
+            const orderedFinalMixNos = finalMixCards.map((card) => card.mixNo);
+            const finalMixIndex = item.cardIndex;
+            return getPremixNavTabDisabledReason(
+              finalMixCards[finalMixIndex]?.mixNo,
+              finalMixIndex,
+              orderedFinalMixNos,
+              previousStageGate,
+              (mixNo) => resolveStatus("FINAL_MIX", String(mixNo)),
+              {
+                previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_PREMIX_TAB_DISABLED,
+                sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
+              },
+            );
           }}
         >
           <Stack spacing={1.25}>
@@ -949,6 +1043,7 @@ const MixingForm = ({
               <PremixStageCard
                 key={`premix-card-${activePremix.premixNo}`}
                 premix={activePremix}
+                bowlIdOptions={getPremixBowlIdOptions(activePremix.bowlId)}
                 readOnly={activeMixCardLocked}
                 statusChip={
                   <PremixStatusChip
@@ -995,6 +1090,7 @@ const MixingForm = ({
               <FinalMixStageCard
                 key={`final-mix-card-${activeFinalMix.mixNo}`}
                 entry={activeFinalMix}
+                bowlIdOptions={getFinalMixBowlIdOptions(activeFinalMix.bowlId)}
                 readOnly={activeMixCardLocked}
                 statusChip={
                   <PremixStatusChip

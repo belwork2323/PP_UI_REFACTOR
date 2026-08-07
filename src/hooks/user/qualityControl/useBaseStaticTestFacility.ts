@@ -66,26 +66,13 @@ import {
   resolveStfWorkingSubBatchType,
   shouldSeedStfMainMotors,
   shouldShowStfBemMotorSelection,
+  isStfMotorEnabledForWorkflow,
   type STFBatch,
   type StfAddedMotor,
   type StfMotorOption,
 } from "./stfFlowConfig";
 
 type WorkflowView = "list" | "form" | "details";
-
-/** ACEM BEM subtype + OTHER_BEM are not locked by NDT motor approvals. */
-const isStfMotorEnabledByPreviousStage = (
-  motorId: string,
-  gate: PreviousStageApprovedUnits | null | undefined,
-  options: {
-    facilityType: "ACEM" | "OTHER_BEM";
-    subType?: StfSubType | string | null;
-  },
-): boolean => {
-  if (options.facilityType === "OTHER_BEM") return true;
-  if (String(options.subType ?? "").toUpperCase() === "BEM") return true;
-  return isMotorEnabledByPreviousStage(motorId, gate);
-};
 
 interface BaseHookProps {
   listParams?: {
@@ -695,6 +682,11 @@ export const useBaseStaticTestFacility = ({
     [motorStatusById],
   );
 
+  const navigationMotors = useMemo(
+    () => resolveStfNavigationMotors(addedMotors, batchMotorEntries),
+    [addedMotors, batchMotorEntries],
+  );
+
   const checkMotorEditable = useCallback(
     (motorId: string) => {
       const navEntry =
@@ -704,7 +696,7 @@ export const useBaseStaticTestFacility = ({
         ?.subType;
       const subType = navEntry?.subType ?? sessionSubType;
       if (
-        !isStfMotorEnabledByPreviousStage(motorId, previousStageGate, {
+        !isStfMotorEnabledForWorkflow(motorId, navigationMotors, previousStageGate, getMotorStatus, {
           facilityType,
           subType,
         })
@@ -719,6 +711,7 @@ export const useBaseStaticTestFacility = ({
       facilityType,
       formData.motors,
       getMotorStatus,
+      navigationMotors,
       previousStageGate,
     ],
   );
@@ -1384,12 +1377,17 @@ export const useBaseStaticTestFacility = ({
       const gateSubType = navEntry?.subType ?? sessionSubType;
 
       if (
-        !isStfMotorEnabledByPreviousStage(motorId, previousStageGate, {
+        !isStfMotorEnabledForWorkflow(motorId, navigationMotors, previousStageGate, getMotorStatus, {
           facilityType,
           subType: gateSubType,
         })
       ) {
-        showAlert(STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED, "warning");
+        showAlert(
+          isMotorEnabledByPreviousStage(motorId, previousStageGate)
+            ? STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED
+            : STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED,
+          "warning",
+        );
         return false;
       }
 
@@ -1537,6 +1535,7 @@ export const useBaseStaticTestFacility = ({
       getMotorStatus,
       lockStfTestNoForMotor,
       motorStatusById,
+      navigationMotors,
       previousStageGate,
       showAlert,
       subDepartmentId,

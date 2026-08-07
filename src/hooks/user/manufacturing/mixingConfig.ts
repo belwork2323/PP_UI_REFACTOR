@@ -41,6 +41,38 @@ export const getAvailableStageNumbers = (usedNumbers: number[], maxCount: number
   return buildStageNumberOptions(maxCount).filter((number) => !used.has(number));
 };
 
+export type MixingStageBowlSource = {
+  stageType?: string | null;
+  premixes?: Array<{ bowlId?: string | null; premixNo?: number | string | null }> | null;
+};
+
+export const collectAssignedBowlIdsByStageType = (
+  stages: MixingStageBowlSource[] | null | undefined,
+  stageType: "PREMIX" | "FINAL_MIX",
+): string[] => {
+  const normalizedStageType = String(stageType).trim().toUpperCase();
+  const stage = (stages ?? []).find(
+    (entry) => String(entry?.stageType ?? "").trim().toUpperCase() === normalizedStageType,
+  );
+
+  return (stage?.premixes ?? [])
+    .map((premix) => String(premix?.bowlId ?? "").trim())
+    .filter(Boolean);
+};
+
+export const getAvailableBowlIds = (
+  allOptions: string[],
+  usedBowlIds: Array<string | null | undefined>,
+  currentBowlId?: string | null,
+) => {
+  const used = new Set(
+    usedBowlIds.map((bowlId) => String(bowlId ?? "").trim()).filter(Boolean),
+  );
+  const current = String(currentBowlId ?? "").trim();
+  if (current) used.delete(current);
+  return allOptions.filter((option) => !used.has(option));
+};
+
 export const getPremixNoLabel = (premixNo: number) => `Premix ${premixNo}`;
 
 export const getFinalMixNoLabel = (mixNo: number) => `Final Mix ${mixNo}`;

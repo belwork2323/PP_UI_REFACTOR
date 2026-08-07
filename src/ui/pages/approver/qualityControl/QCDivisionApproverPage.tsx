@@ -34,10 +34,21 @@ const QCDivisionApproverPage = () => {
     activeDivisionSubIndex,
     setActiveDivisionGroupIndex,
     setActiveDivisionSubIndex,
+    activePartialNavIndex,
+    setActivePartialNavIndex,
+    partialNavItems,
+    divisionStatusByFlowKey,
+    divisionApprovalRows,
+    finalApprovalRows,
+    canApproveForm,
     subDepartmentId,
     dialogProps,
+    formDialogProps,
+    actionLoading,
     requestApprove,
     requestReject,
+    requestFormApprove,
+    requestFormReject,
     handleViewDetails,
     handleCloseDetail,
   } = useQCDivisionApproverHook();
@@ -73,11 +84,22 @@ const QCDivisionApproverPage = () => {
         activeDivisionSubIndex={activeDivisionSubIndex}
         onActiveDivisionGroupIndexChange={setActiveDivisionGroupIndex}
         onActiveDivisionSubIndexChange={setActiveDivisionSubIndex}
+        partialNavItems={partialNavItems}
+        activePartialNavIndex={activePartialNavIndex}
+        onActivePartialNavIndexChange={setActivePartialNavIndex}
+        divisionStatusByFlowKey={divisionStatusByFlowKey}
+        divisionApprovalRows={divisionApprovalRows}
+        finalApprovalRows={finalApprovalRows}
+        canApproveForm={canApproveForm}
         onApprove={requestApprove}
         onReject={requestReject}
+        onApproveForm={requestFormApprove}
+        onRejectForm={requestFormReject}
+        actionLoading={actionLoading}
         theme={approverTheme}
       />
       <ApproverActionDialog {...dialogProps} />
+      <ApproverActionDialog {...formDialogProps} />
     </ApproverSubdepartmentBatchListSection>
   );
 };

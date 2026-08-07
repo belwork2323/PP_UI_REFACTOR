@@ -17,6 +17,15 @@ import { STRINGS } from "../../../../../app/config/strings";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 
+export type QCDivisionNavApprovalActions = {
+  show?: boolean;
+  actionLoading?: boolean;
+  canSubmitDivision?: boolean;
+  canSubmitFinalApproval?: boolean;
+  onSubmitDivision?: () => void;
+  onSubmitFinalApproval?: () => void;
+};
+
 type QCDivisionNavPanelProps = {
   entries: import("../../../../../hooks/user/qualityControl/qcDivisionEntryTypes").QcDivisionEntry[];
   activeGroupIndex: number;
@@ -25,6 +34,7 @@ type QCDivisionNavPanelProps = {
   onActiveSubIndexChange: (index: number) => void;
   groupStatusByFlowKey?: Record<string, QcPartialItemStatus>;
   hideSubNav?: boolean;
+  approvalActions?: QCDivisionNavApprovalActions | null;
 };
 
 const QCDivisionNavPanel = ({
@@ -35,6 +45,7 @@ const QCDivisionNavPanel = ({
   onActiveSubIndexChange,
   groupStatusByFlowKey = {},
   hideSubNav = false,
+  approvalActions = null,
 }: QCDivisionNavPanelProps) => {
   const BRAND = QC_DIVISION_BRAND;
   const groups = buildDivisionNavGroups(entries);
@@ -48,6 +59,7 @@ const QCDivisionNavPanel = ({
   const showSubNav = !hideSubNav && shouldShowSubNav(activeGroup);
   const isMotorNav = activeGroup?.kind === "motor-based";
   const currentMotorLabel = isMotorNav ? getSubNavLabel(activeGroup, safeSubIndex) : "";
+  const showApprovalActions = Boolean(approvalActions?.show);
 
   const handleGroupChange = (index: number) => {
     onActiveGroupIndexChange(index);
@@ -73,51 +85,94 @@ const QCDivisionNavPanel = ({
           background: BRAND.surface,
         }}
       >
-        <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: BRAND.primary, mb: 0.4 }}>
-          {S.DIVISION_NAV_TITLE}
-        </Typography>
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          alignItems={{ xs: "stretch", sm: "flex-start" }}
+          justifyContent="space-between"
+          gap={1}
+          mb={0.4}
+        >
+          <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: BRAND.primary }}>
+            {S.DIVISION_NAV_TITLE}
+          </Typography>
+          {showApprovalActions ? (
+            <Button
+              size="small"
+              variant="contained"
+              disabled={!approvalActions?.canSubmitFinalApproval || approvalActions?.actionLoading}
+              onClick={approvalActions?.onSubmitFinalApproval}
+              sx={{
+                textTransform: "none",
+                whiteSpace: "nowrap",
+                alignSelf: { xs: "stretch", sm: "flex-start" },
+              }}
+            >
+              {S.SUBMIT_FOR_FINAL_APPROVAL}
+            </Button>
+          ) : null}
+        </Stack>
         <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub, mb: 0.9 }}>
           {S.DIVISION_NAV_HINT}
         </Typography>
-        <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
-          {groups.map((group, index) => {
-            const active = index === safeGroupIndex;
-            const status = groupStatusByFlowKey[group.flowKey];
-            const tone = status ? PARTIAL_ITEM_STATUS_CHIP[status] : null;
-            return (
-              <Button
-                key={group.flowKey}
-                size="small"
-                variant={active ? "contained" : "outlined"}
-                onClick={() => handleGroupChange(index)}
-                sx={{
-                  whiteSpace: "nowrap",
-                  flexShrink: 0,
-                  textTransform: "none",
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 0.75,
-                }}
-              >
-                {group.label}
-                {tone ? (
-                  <Chip
-                    label={tone.label}
-                    size="small"
-                    sx={{
-                      height: 18,
-                      fontSize: "0.62rem",
-                      fontWeight: 700,
-                      background: active ? "rgba(255,255,255,0.22)" : tone.bg,
-                      color: active ? "#fff" : tone.color,
-                      border: active ? "1px solid rgba(255,255,255,0.35)" : `1px solid ${tone.border}`,
-                      "& .MuiChip-label": { px: 0.6 },
-                    }}
-                  />
-                ) : null}
-              </Button>
-            );
-          })}
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          spacing={1}
+          alignItems={{ xs: "stretch", sm: "center" }}
+          justifyContent="space-between"
+        >
+          <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5, flex: 1, minWidth: 0 }}>
+            {groups.map((group, index) => {
+              const active = index === safeGroupIndex;
+              const status = groupStatusByFlowKey[group.flowKey];
+              const tone = status ? PARTIAL_ITEM_STATUS_CHIP[status] : null;
+              return (
+                <Button
+                  key={group.flowKey}
+                  size="small"
+                  variant={active ? "contained" : "outlined"}
+                  onClick={() => handleGroupChange(index)}
+                  sx={{
+                    whiteSpace: "nowrap",
+                    flexShrink: 0,
+                    textTransform: "none",
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 0.75,
+                  }}
+                >
+                  {group.label}
+                  {tone ? (
+                    <Chip
+                      label={tone.label}
+                      size="small"
+                      sx={{
+                        height: 18,
+                        fontSize: "0.62rem",
+                        fontWeight: 700,
+                        background: active ? "rgba(255,255,255,0.22)" : tone.bg,
+                        color: active ? "#fff" : tone.color,
+                        border: active
+                          ? "1px solid rgba(255,255,255,0.35)"
+                          : `1px solid ${tone.border}`,
+                        "& .MuiChip-label": { px: 0.6 },
+                      }}
+                    />
+                  ) : null}
+                </Button>
+              );
+            })}
+          </Stack>
+          {showApprovalActions ? (
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={!approvalActions?.canSubmitDivision || approvalActions?.actionLoading}
+              onClick={approvalActions?.onSubmitDivision}
+              sx={{ textTransform: "none", whiteSpace: "nowrap", flexShrink: 0 }}
+            >
+              {S.SUBMIT_DIVISION}
+            </Button>
+          ) : null}
         </Stack>
       </Box>
 

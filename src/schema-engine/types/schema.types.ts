@@ -76,6 +76,12 @@ export type SchemaApiDataSource = {
   parentMatchContextKey?: string;
   /** Filter API rows where item[field] matches apiContext[contextKey] (skipped when context is empty). */
   filterByContext?: Record<string, string>;
+  /** Build dropdown labels from row fields using `{field}` placeholders. */
+  optionLabelTemplate?: string;
+  /** Build dropdown values from row fields (defaults to optionLabelTemplate). */
+  optionValueTemplate?: string;
+  /** Only include API rows where this field is non-empty (e.g. assigned `bowlId`). */
+  optionFilterField?: string;
 };
 
 export type SchemaDataSource =
@@ -228,6 +234,8 @@ export type SchemaUiConfig = {
   justifyContent?: string;
   order?: number;
   sx?: Record<string, unknown>;
+  /** Casting bowl dropdown — drives row exclusion and field sync in DynamicTable. */
+  bowlSelection?: boolean;
 };
 
 export type SchemaDesignSystem = {
