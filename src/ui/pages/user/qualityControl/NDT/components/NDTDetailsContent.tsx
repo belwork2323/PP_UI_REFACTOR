@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Box,
-  Button,
   Chip,
   CircularProgress,
   Stack,
@@ -23,6 +22,10 @@ import type { NDTDetailView, NDTMotorDetailView } from "../../../../../../data/m
 import { NDT_FLOW_LABELS } from "../../../../../../hooks/user/qualityControl/ndtFlowConfig";
 import { NDT_ORIENTATION_OPTIONS } from "../../../../../../hooks/user/qualityControl/ndtApiMappings";
 import { OPERATION_STATUS_UI_TO_API } from "../../../../../../hooks/operationStatus";
+import {
+  UserWorkflowTabNav,
+  type UserWorkflowNavTab,
+} from "../../../../../components/custom/UserWorkflowStepPager";
 
 const API_OPERATION_STATUS_LABELS = Object.fromEntries(
   Object.entries(OPERATION_STATUS_UI_TO_API).map(([label, apiValue]) => [apiValue, label]),
@@ -361,6 +364,14 @@ const NDTDetailsContent = ({
   const motors = detailView?.motors ?? [];
   const activeMotorIndexSafe = motors.length > 0 ? Math.min(activeMotorIndex, motors.length - 1) : 0;
   const activeMotor = motors[activeMotorIndexSafe] ?? null;
+  const motorNavTabs = useMemo<UserWorkflowNavTab[]>(
+    () =>
+      motors.map((motor) => ({
+        id: motor.motorId,
+        label: motor.motorId,
+      })),
+    [motors],
+  );
 
   useEffect(() => {
     setActiveMotorIndex(0);
@@ -427,25 +438,23 @@ const NDTDetailsContent = ({
                 background: theme.palette.surface,
               }}
             >
-              <Typography sx={{ fontSize: "0.76rem", fontWeight: 700, color: theme.palette.primary, mb: 0.75 }}>
-                {L.motorNavTitle}
-              </Typography>
-              <Typography sx={{ fontSize: "0.72rem", color: theme.palette.textSub, mb: 1 }}>
-                {NDT.DETAILS_MOTOR_NAV_HINT}
-              </Typography>
-              <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
-                {motors.map((motor, index) => (
-                  <Button
-                    key={motor.motorId}
-                    size="small"
-                    variant={index === activeMotorIndexSafe ? "contained" : "outlined"}
-                    onClick={() => setActiveMotorIndex(index)}
-                    sx={{ whiteSpace: "nowrap", flexShrink: 0, textTransform: "none", fontWeight: 700 }}
-                  >
-                    {motor.motorId}
-                  </Button>
-                ))}
-              </Stack>
+              <UserWorkflowTabNav
+                title={L.motorNavTitle}
+                hint={NDT.DETAILS_MOTOR_NAV_HINT}
+                tabs={motorNavTabs}
+                activeIndex={activeMotorIndexSafe}
+                onActiveIndexChange={setActiveMotorIndex}
+                palette={{
+                  primary: theme.palette.primary,
+                  primaryLight: theme.palette.primaryLight,
+                  border: theme.palette.border,
+                  surface: theme.palette.surface,
+                  textSub: theme.palette.textSub,
+                  text: theme.palette.text,
+                }}
+                showStepArrows
+                wrapTabs
+              />
             </Box>
           ) : null}
 

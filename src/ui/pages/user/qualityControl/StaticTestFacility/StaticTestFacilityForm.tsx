@@ -430,6 +430,7 @@ const StaticTestFacilityForm = ({
               tabTooltip={(_, index) => stfMotorNavGate.getStfMotorTabTooltip(index)}
               palette={navPalette}
               showStepArrows
+              wrapTabs
               titleEndAdornment={
                 <Chip
                   label={`${S.BATCH_MOTOR_COUNT_LABEL}: ${motorCards.length}`}

@@ -180,7 +180,7 @@ export const useMixingHook = () => {
             { length: Math.max(1, Number(numberOfPremix) || 1) },
             (_, index) => ({
               ...createEmptyFinalMixEntry(index + 1),
-              linkedPremixNo: String(index + 1),
+              finalMixNo: String(index + 1),
               mixerType: String(identificationSheet?.mixerType ?? ""),
               bldgNo: String(
                 (identificationSheet as any)?.bldgNo ?? (identificationSheet as any)?.BldgNo ?? "",

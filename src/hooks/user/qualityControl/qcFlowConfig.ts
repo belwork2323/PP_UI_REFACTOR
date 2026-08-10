@@ -204,6 +204,53 @@ export const toQcDivisionSelectOptions = (
     disabled: item.disabled,
   }));
 
+/** Flattened division tab for always-visible catalog navigation. */
+export type QcDivisionCatalogNavTab = {
+  /** Unique tab id (type value when nested, otherwise flow key). */
+  tabKey: string;
+  /** Parent flow key used by registry / entries (e.g. RAW_MATERIAL, MIXING). */
+  flowKey: string;
+  /** Nested type value when the tab comes from parent.types (e.g. RAW_MATERIAL_REVALIDATION). */
+  rawMaterialType: string;
+  label: string;
+  divisionId: number;
+};
+
+/**
+ * Flatten GET /divisions into enabled top-level tabs.
+ * Parents with nested types become separate tabs (no parent tab).
+ * Disabled parents/types are omitted.
+ */
+export const toQcDivisionNavTabs = (
+  catalog: QcDivisionCatalogItem[] | undefined,
+): QcDivisionCatalogNavTab[] => {
+  const tabs: QcDivisionCatalogNavTab[] = [];
+  for (const item of catalog ?? []) {
+    if (item.disabled) continue;
+    const enabledTypes = (item.types ?? []).filter((type) => !type.disabled);
+    if (enabledTypes.length) {
+      for (const type of enabledTypes) {
+        tabs.push({
+          tabKey: type.value,
+          flowKey: item.value,
+          rawMaterialType: type.value,
+          label: type.label,
+          divisionId: type.divisionId,
+        });
+      }
+      continue;
+    }
+    tabs.push({
+      tabKey: item.value,
+      flowKey: item.value,
+      rawMaterialType: "",
+      label: item.label,
+      divisionId: item.divisionId,
+    });
+  }
+  return tabs;
+};
+
 export const resolveQcRawMaterialTypeOptions = (
   catalog: QcDivisionCatalogItem[] | undefined,
   selectedDivision: string,
@@ -242,6 +289,89 @@ export const resolveQcDivisionIdForSelection = (
 
   const parentId = Number(division.divisionId ?? 0);
   return parentId > 0 ? parentId : null;
+};
+
+const normalizeQcDivisionLookupKey = (value: string | null | undefined) =>
+  String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+
+/** Flat map of API division keys → numeric divisionId from GET /qc-division/divisions. */
+export const buildQcDivisionIdByApiKey = (
+  catalog: QcDivisionCatalogItem[] | undefined,
+): Record<string, number> => {
+  const map: Record<string, number> = {};
+  const put = (key: string | null | undefined, id: number) => {
+    const normalized = normalizeQcDivisionLookupKey(key);
+    if (!normalized || !(id > 0)) return;
+    map[normalized] = id;
+    // Also keep original casing key for direct lookups.
+    const raw = String(key ?? "").trim();
+    if (raw) map[raw] = id;
+  };
+
+  for (const tab of toQcDivisionNavTabs(catalog)) {
+    put(tab.tabKey, tab.divisionId);
+    if (tab.rawMaterialType) {
+      put(tab.rawMaterialType, tab.divisionId);
+    } else {
+      put(tab.flowKey, tab.divisionId);
+    }
+  }
+
+  for (const item of catalog ?? []) {
+    if (!(item.types ?? []).length) {
+      put(item.value, item.divisionId);
+      put(item.divisionName, item.divisionId);
+    }
+    for (const type of item.types ?? []) {
+      put(type.value, type.divisionId);
+      put(type.divisionName, type.divisionId);
+    }
+  }
+
+  // Alias: PROPELLANT_PROPERTIES ↔ QC
+  const qcId = map.QC ?? map.PROPELLANT_PROPERTIES;
+  if (qcId) {
+    map.QC = qcId;
+    map.PROPELLANT_PROPERTIES = qcId;
+    map.PROPELLANT = qcId;
+  }
+
+  return map;
+};
+
+/**
+ * Resolve numeric divisionId from catalog using an API division key
+ * (e.g. RAW_MATERIAL_REVALIDATION, MIXING, HARDWARE, PROPELLANT_PROPERTIES).
+ */
+export const resolveQcDivisionIdFromApiDivision = (
+  catalog: QcDivisionCatalogItem[] | undefined,
+  apiDivision: string | null | undefined,
+): number | null => {
+  const wanted = normalizeQcDivisionLookupKey(apiDivision);
+  if (!wanted) return null;
+
+  const fromMap = buildQcDivisionIdByApiKey(catalog);
+  const mapped =
+    Number(fromMap[wanted] ?? 0) ||
+    Number(fromMap[String(apiDivision ?? "").trim()] ?? 0);
+  if (mapped > 0) return mapped;
+
+  // Flow-key aliases (QC ↔ PROPELLANT_PROPERTIES) when map missed them
+  if (wanted === "PROPELLANT_PROPERTIES" || wanted === "PROPELLANT") {
+    return (
+      resolveQcDivisionIdFromApiDivision(catalog, "QC") ??
+      resolveQcDivisionIdForSelection(catalog, "QC")
+    );
+  }
+  if (wanted === "QC") {
+    const byFlow = resolveQcDivisionIdForSelection(catalog, "QC");
+    if (byFlow) return byFlow;
+  }
+
+  return null;
 };
 
 export const QC_PROCESSING_TYPE_OPTIONS: QcProcessingTypeOption[] = [

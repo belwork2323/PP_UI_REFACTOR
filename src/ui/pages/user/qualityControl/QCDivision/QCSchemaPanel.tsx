@@ -23,6 +23,8 @@ type QCSchemaPanelProps = {
   batchId?: string;
   onChange: (values: SchemaFormValues) => void;
   readOnly?: boolean;
+  /** Values editable; no Add Row / REMOVE / repeat Add (shared RAW_MATERIALS schema). */
+  lockStructure?: boolean;
   loading?: boolean;
   error?: string | null;
 };
@@ -37,6 +39,7 @@ const QCSchemaPanel = ({
   batchId,
   onChange,
   readOnly = false,
+  lockStructure = false,
   loading = false,
   error = null,
 }: QCSchemaPanelProps) => {
@@ -95,6 +98,7 @@ const QCSchemaPanel = ({
         value={formValues}
         onChange={onChange}
         readOnly={readOnly}
+        lockStructure={lockStructure}
         loading={loading}
         error={error}
         themeTokens={themeTokens}

@@ -48,6 +48,17 @@ export const getMixingFinalMixEntries = (entries: QcDivisionEntry[] = []) =>
 export const hasMixingFinalMixEntries = (entries: QcDivisionEntry[] = []) =>
   getMixingFinalMixEntries(entries).length > 0;
 
+export const isFirstMixingFinalMixEntry = (
+  entry: QcDivisionEntry | null | undefined,
+  entries: QcDivisionEntry[] = [],
+): boolean => {
+  if (!entry || entry.kind !== "MIXING_FINAL_MIX") return false;
+  const finalMixEntries = getMixingFinalMixEntries(entries).sort(
+    (left, right) => (left.premixNo ?? 0) - (right.premixNo ?? 0),
+  );
+  return finalMixEntries[0]?.entryId === entry.entryId;
+};
+
 export type QcDivisionNavTab =
   | { kind: "final-mix-details" }
   | { kind: "entry"; entry: QcDivisionEntry };

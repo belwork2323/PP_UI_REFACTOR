@@ -26,6 +26,7 @@ export const WEIGHTMENT_SCHEMA_FUNCTIONALITY = "CREATE_WEIGHTMENT_FORM";
 export type QcInhibitorType = "IR1" | "HEMCOAT-3K" | "NOT_APPLICABLE";
 
 export type QcApiDivision =
+  | "RAW_MATERIAL"
   | "RAW_MATERIAL_REVALIDATION"
   | "RAW_MATERIAL_PROCESSING"
   | "MIXING"
@@ -35,6 +36,7 @@ export type QcApiDivision =
   | "DE_CORING"
   | "TRIMMING"
   | "POST_CURE"
+  | "POST_CURE_OPERATION"
   | "NDT"
   | "PROPELLANT_PROPERTIES"
   | "WEIGHTMENT"
@@ -42,6 +44,8 @@ export type QcApiDivision =
   | "STATIC_TEST_FACILITY";
 
 export type QcApiSubType =
+  | "RAW_MATERIAL_REVALIDATION"
+  | "RAW_MATERIAL_PROCESSING"
   | "SOLID_PROCESSING"
   | "LIQUID_PROCESSING"
   | "BEM"

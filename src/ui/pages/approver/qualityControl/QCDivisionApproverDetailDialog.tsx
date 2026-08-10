@@ -11,9 +11,11 @@ import type { QCDivisionDetailView } from "../../../../data/models/user/QualityC
 import type { QualityControlFormState } from "../../../../data/models/user/QualityControlFormModel";
 import type {
   QcApprovalTableRow,
+  QcFinalApprovalDivisionGroup,
   QcPartialItemStatus,
   QcPartialNavItem,
 } from "../../../../hooks/user/qualityControl/qcDivisionApprovalUnits";
+import type { QcDivisionCatalogNavTab } from "../../../../hooks/user/qualityControl/qcFlowConfig";
 import { ReportPreviewDialog } from "../components/ReportPdf";
 import QCDivisionApproverReviewContent from "./QCDivisionApproverReviewContent";
 
@@ -52,8 +54,12 @@ type QCDivisionApproverDetailDialogProps = {
   partialNavItems: QcPartialNavItem[];
   activePartialNavIndex: number;
   onActivePartialNavIndexChange: (index: number) => void;
+  divisionNavTabs?: QcDivisionCatalogNavTab[];
+  activeDivisionTabKey?: string;
+  onActiveDivisionTabKeyChange?: (tabKey: string) => void;
   divisionStatusByFlowKey: Record<string, QcPartialItemStatus>;
   divisionApprovalRows: QcApprovalTableRow[];
+  finalApprovalGroups?: QcFinalApprovalDivisionGroup[];
   finalApprovalRows: QcApprovalTableRow[];
   canApproveForm: boolean;
   onApprove: (item: QCDivisionApproverDetailItem) => void;
@@ -80,8 +86,12 @@ const QCDivisionApproverDetailDialog = ({
   partialNavItems,
   activePartialNavIndex,
   onActivePartialNavIndexChange,
+  divisionNavTabs = [],
+  activeDivisionTabKey = "",
+  onActiveDivisionTabKeyChange,
   divisionStatusByFlowKey,
   divisionApprovalRows,
+  finalApprovalGroups,
   finalApprovalRows,
   canApproveForm,
   onApprove,
@@ -167,11 +177,15 @@ const QCDivisionApproverDetailDialog = ({
             activeDivisionSubIndex={activeDivisionSubIndex}
             onActiveDivisionGroupIndexChange={onActiveDivisionGroupIndexChange}
             onActiveDivisionSubIndexChange={onActiveDivisionSubIndexChange}
+            divisionNavTabs={divisionNavTabs}
+            activeDivisionTabKey={activeDivisionTabKey}
+            onActiveDivisionTabKeyChange={onActiveDivisionTabKeyChange}
             partialNavItems={partialNavItems}
             activePartialNavIndex={activePartialNavIndex}
             onActivePartialNavIndexChange={onActivePartialNavIndexChange}
             divisionStatusByFlowKey={divisionStatusByFlowKey}
             divisionApprovalRows={divisionApprovalRows}
+            finalApprovalGroups={finalApprovalGroups}
             finalApprovalRows={finalApprovalRows}
             formStatus={rowStatus}
             formSubmissionType={detailView?.formSubmissionType}

@@ -1,15 +1,26 @@
-import { memo, useCallback, useMemo, type ReactNode } from "react";
-import { Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
+import { memo, useCallback, useEffect, useMemo, type ReactNode } from "react";
+import { Box, Button, Stack, Typography } from "@mui/material";
 import type { QcDivisionEntry, QcDivisionEntryValues } from "../../../../../data/models/user/QualityControlFormModel";
-import { sliceMixingFinalMixSchema } from "../../../../../hooks/user/qualityControl/qcMixingConfig";
 import { createQcInitialValues } from "../../../../../schema-engine/adapters/qc.adapter";
 import type { SchemaDocumentV2, SchemaFormValues } from "../../../../../schema-engine";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import { STRINGS } from "../../../../../app/config/strings";
 import RemoveProcessButton from "../../../../components/common/RemoveProcessButton";
 import QCSchemaPanel from "./QCSchemaPanel";
+import QCSchemaBufferingLoader from "./QCSchemaBufferingLoader";
 import QCDivisionSavedSectionsDisplay from "./components/QCDivisionSavedSectionsDisplay";
 import QCRawMaterialRevalidationTable from "./QCRawMaterialRevalidationTable";
+import QCMixingDetailsTable from "./QCMixingDetailsTable";
+import QCMixingViscosityTable from "./QCMixingViscosityTable";
+import {
+  applyMixingDivisionEntryToValues,
+  createInitialPremixDetailsValues,
+  createInitialViscosityValues,
+  hydrateMixingDetailsValuesFromSections,
+  hydrateViscosityValuesFromSections,
+  resolveMixingDetailsSeed,
+  type QcMixingQualityCheckDefinition,
+} from "../../../../../hooks/user/qualityControl/qcMixingTables";
 import {
   createInitialRevalidationSchemaValues,
   hydrateRevalidationValuesFromSections,
@@ -34,6 +45,9 @@ type QCDivisionEntryPanelProps = {
   liquidSchema?: SchemaDocumentV2 | null;
   subDepartmentId?: number;
   batchId?: string;
+  divisionAutoPopulateData?: Record<string, unknown> | null;
+  mixingQualityCheckDefinitions?: QcMixingQualityCheckDefinition[] | null;
+  batchPayload?: unknown;
   readOnly?: boolean;
   schemaLoading?: boolean;
   schemaError?: string | null;
@@ -51,6 +65,9 @@ const QCDivisionEntryPanel = ({
   liquidSchema = null,
   subDepartmentId,
   batchId,
+  divisionAutoPopulateData = null,
+  mixingQualityCheckDefinitions = null,
+  batchPayload = null,
   readOnly = false,
   schemaLoading = false,
   schemaError = null,
@@ -63,16 +80,95 @@ const QCDivisionEntryPanel = ({
 
   const resolvedSchema = useMemo(() => {
     if (!schema) return null;
-    if (entry.kind === "MIXING_FINAL_MIX") {
-      return sliceMixingFinalMixSchema(schema, "viscosity");
-    }
+    if (entry.kind === "MIXING_PREMIX" || entry.kind === "MIXING_FINAL_MIX") return null;
     return schema;
   }, [entry.kind, schema]);
+
+  const mixingPremixValues = useMemo(() => {
+    const saved = entryValues.schemaValues;
+    let base: SchemaFormValues;
+    if (saved && Object.keys(saved).length > 0) {
+      base = saved;
+    } else if (entry.savedSections?.length) {
+      base = hydrateMixingDetailsValuesFromSections(entry.savedSections, "premix");
+    } else {
+      base = createInitialPremixDetailsValues(mixingQualityCheckDefinitions);
+    }
+    return applyMixingDivisionEntryToValues(
+      base,
+      {
+        variant: "premix",
+        premixNo: entry.premixNo,
+        autoPopulatePayload: divisionAutoPopulateData,
+        batchPayload,
+        qualityCheckDefinitions: mixingQualityCheckDefinitions,
+      },
+      { onlyIfEmpty: true },
+    );
+  }, [
+    batchPayload,
+    divisionAutoPopulateData,
+    entry.premixNo,
+    entry.savedSections,
+    entryValues.schemaValues,
+    mixingQualityCheckDefinitions,
+  ]);
+
+  const premixAutoSeed = useMemo(
+    () =>
+      resolveMixingDetailsSeed({
+        variant: "premix",
+        premixNo: entry.premixNo,
+        autoPopulatePayload: divisionAutoPopulateData,
+        batchPayload,
+      }),
+    [batchPayload, divisionAutoPopulateData, entry.premixNo],
+  );
+
+  const mixingViscosityValues = useMemo(() => {
+    const saved = entryValues.schemaValues;
+    if (saved && Object.keys(saved).length > 0) return saved;
+    if (entry.savedSections?.length) {
+      return hydrateViscosityValuesFromSections(entry.savedSections);
+    }
+    return createInitialViscosityValues();
+  }, [entry.savedSections, entryValues.schemaValues]);
 
   const handleValuesChange = useCallback(
     (values: SchemaFormValues) => onEntryValuesChange(entry.entryId, values),
     [entry.entryId, onEntryValuesChange],
   );
+
+  useEffect(() => {
+    if (readOnly || entry.kind !== "MIXING_PREMIX") return;
+    if (!premixAutoSeed && !(mixingQualityCheckDefinitions?.length)) return;
+    const current = entryValues.schemaValues;
+    const base =
+      current && Object.keys(current).length > 0
+        ? current
+        : createInitialPremixDetailsValues(mixingQualityCheckDefinitions);
+    const seeded = applyMixingDivisionEntryToValues(base, {
+      variant: "premix",
+      premixNo: entry.premixNo,
+      autoPopulatePayload: divisionAutoPopulateData,
+      batchPayload,
+      qualityCheckDefinitions: mixingQualityCheckDefinitions,
+    }, { onlyIfEmpty: true });
+    if (JSON.stringify(seeded) !== JSON.stringify(current ?? {})) {
+      onEntryValuesChange(entry.entryId, seeded);
+    }
+  }, [
+    batchPayload,
+    divisionAutoPopulateData,
+    entry.entryId,
+    entry.kind,
+    entry.premixNo,
+    entryValues.schemaValues,
+    mixingQualityCheckDefinitions,
+    onEntryValuesChange,
+    premixAutoSeed,
+    readOnly,
+  ]);
 
   const handleLiquidValuesChange = useCallback(
     (values: SchemaFormValues) => onEntryLiquidValuesChange(entry.entryId, values),
@@ -82,8 +178,10 @@ const QCDivisionEntryPanel = ({
   const handleRemove = useCallback(() => onRemoveEntry(entry.entryId), [entry.entryId, onRemoveEntry]);
 
   const headerActions = useMemo((): ReactNode => {
-    const showUnitActions = Boolean(unitActions?.show) && !readOnly;
-    const showRemove = !readOnly;
+    const showUnitActions = Boolean(unitActions?.show);
+    // Mixing units are managed via Mix Navigation — no remove control.
+    const showRemove =
+      !readOnly && entry.kind !== "MIXING_PREMIX" && entry.kind !== "MIXING_FINAL_MIX";
     if (!showUnitActions && !showRemove) return null;
 
     return (
@@ -93,7 +191,7 @@ const QCDivisionEntryPanel = ({
             <Button
               size="small"
               variant="outlined"
-              disabled={!unitActions?.canAct || unitActions?.actionLoading}
+              disabled={readOnly || !unitActions?.canAct || unitActions?.actionLoading}
               onClick={unitActions?.onSaveDraft}
               sx={{ textTransform: "none", whiteSpace: "nowrap" }}
             >
@@ -102,7 +200,7 @@ const QCDivisionEntryPanel = ({
             <Button
               size="small"
               variant="contained"
-              disabled={!unitActions?.canAct || unitActions?.actionLoading}
+              disabled={readOnly || !unitActions?.canAct || unitActions?.actionLoading}
               onClick={unitActions?.onSubmit}
               sx={{ textTransform: "none", whiteSpace: "nowrap" }}
             >
@@ -119,7 +217,7 @@ const QCDivisionEntryPanel = ({
         ) : null}
       </Stack>
     );
-  }, [BRAND.danger, handleRemove, readOnly, unitActions]);
+  }, [BRAND.danger, entry.kind, handleRemove, readOnly, unitActions]);
 
   const formValues = useMemo(() => {
     const saved = entryValues.schemaValues;
@@ -144,8 +242,6 @@ const QCDivisionEntryPanel = ({
     if (saved && Object.keys(saved).length > 0) return saved;
     return liquidSchema ? createQcInitialValues(liquidSchema) : {};
   }, [entryValues.liquidSchemaValues, liquidSchema]);
-
-  if (!entryValues) return null;
 
   if (entry.kind === "REVALIDATION") {
     return (
@@ -174,23 +270,65 @@ const QCDivisionEntryPanel = ({
     );
   }
 
+  if (entry.kind === "MIXING_PREMIX") {
+    return (
+      <Box
+        sx={{
+          borderRadius: 2.5,
+          border: `1px solid ${BRAND.border}`,
+          background: BRAND.surface,
+          px: 1.5,
+          py: 1.25,
+        }}
+      >
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1} gap={1}>
+          <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: BRAND.primary }}>
+            {entry.label}
+          </Typography>
+          {headerActions}
+        </Stack>
+        <QCMixingDetailsTable
+          variant="premix"
+          values={mixingPremixValues}
+          onChange={handleValuesChange}
+          readOnly={readOnly}
+          autoSeed={premixAutoSeed}
+        />
+      </Box>
+    );
+  }
+
+  if (entry.kind === "MIXING_FINAL_MIX") {
+    return (
+      <Box
+        sx={{
+          borderRadius: 2.5,
+          border: `1px solid ${BRAND.border}`,
+          background: BRAND.surface,
+          px: 1.5,
+          py: 1.25,
+        }}
+      >
+        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1} gap={1}>
+          <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: BRAND.primary }}>
+            {entry.label}
+          </Typography>
+          {headerActions}
+        </Stack>
+        <QCMixingViscosityTable
+          values={mixingViscosityValues}
+          onChange={handleValuesChange}
+          readOnly={readOnly}
+        />
+      </Box>
+    );
+  }
+
+  if (!entryValues) return null;
+
   if (!resolvedSchema) {
     if (schemaLoading) {
-      return (
-        <Box
-          sx={{
-            borderRadius: 2.5,
-            border: `1px solid ${BRAND.border}`,
-            background: BRAND.surface,
-            px: 1.5,
-            py: 3,
-            display: "flex",
-            justifyContent: "center",
-          }}
-        >
-          <CircularProgress size={24} sx={{ color: BRAND.primary }} />
-        </Box>
-      );
+      return <QCSchemaBufferingLoader />;
     }
 
     if (readOnly && (entry.savedSections?.length ?? 0) > 0) {
@@ -238,21 +376,7 @@ const QCDivisionEntryPanel = ({
 
   if (entry.kind === "BOTH_PREMIX") {
     if (schemaLoading) {
-      return (
-        <Box
-          sx={{
-            borderRadius: 2.5,
-            border: `1px solid ${BRAND.border}`,
-            background: BRAND.surface,
-            px: 1.5,
-            py: 3,
-            display: "flex",
-            justifyContent: "center",
-          }}
-        >
-          <CircularProgress size={24} sx={{ color: BRAND.primary }} />
-        </Box>
-      );
+      return <QCSchemaBufferingLoader />;
     }
 
     if (!solidSchema || !liquidSchema) {

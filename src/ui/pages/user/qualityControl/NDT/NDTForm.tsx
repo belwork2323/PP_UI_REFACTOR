@@ -380,6 +380,7 @@ const NDTForm = ({
               tabTooltip={(_, index) => motorNavGate.getMotorTabTooltip(index)}
               palette={navPalette}
               showStepArrows
+              wrapTabs
               titleEndAdornment={
                 <Chip
                   label={`${strings.BATCH_MOTOR_COUNT_LABEL}: ${motorCards.length}`}

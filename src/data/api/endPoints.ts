@@ -19,6 +19,13 @@ export const APPROVER_ENDPOINTS = {
   CHANGE_STATUS: `${API_BASE}/approver/form/change-status`,
   PREMIX_CHANGE_STATUS: `${API_BASE}/approver/form/premix/change-status`,
   MOTOR_CHANGE_STATUS: `${API_BASE}/approver/form/motor/change-status`,
+  /** QC Division unit/division approvals (premix, final mix, motor, revalidation, etc.). */
+  DIVISION_CHANGE_STATUS: `${API_BASE}/approver/form/division/change-status`,
+  /**
+   * Division catalog for resolving numeric divisionId.
+   * Reuses the shared QC divisions list (same payload as user create-form).
+   */
+  QC_DIVISIONS: `${API_BASE}/user/qc-division/divisions`,
   FORM_PDF: `${API_BASE}/approver/form/pdf`,
   RAW_MATERIAL_PROCUREMENT_LIST: `${API_BASE}/approver/raw-material-sourcing/list`,
   RAW_MATERIAL_PROCUREMENT_CHANGE_STATUS: `${API_BASE}/approver/form/change-status`,

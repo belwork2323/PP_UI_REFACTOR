@@ -880,12 +880,9 @@ export const STRINGS = {
       "Select a process below to view detailed information and manage its operations.",
     PREVIOUS_STAGE_UNIT_DISABLED:
       "This unit was not approved in the previous stage and cannot be filled yet.",
-    PREVIOUS_STAGE_PREMIX_TAB_DISABLED:
-      "This premix was not approved in Raw Material Preparation.",
-    PREVIOUS_STAGE_MOTOR_TAB_DISABLED:
-      "This motor was not approved in the previous stage.",
-    SEQUENTIAL_UNIT_TAB_DISABLED:
-      "Complete approval for the previous unit before continuing.",
+    PREVIOUS_STAGE_PREMIX_TAB_DISABLED: "This premix was not approved in Raw Material Preparation.",
+    PREVIOUS_STAGE_MOTOR_TAB_DISABLED: "This motor was not approved in the previous stage.",
+    SEQUENTIAL_UNIT_TAB_DISABLED: "Complete approval for the previous unit before continuing.",
     PREVIOUS_STAGE_NO_UNITS:
       "No units from the previous stage are approved yet. Complete prior approvals to continue.",
 
@@ -1931,6 +1928,7 @@ export const STRINGS = {
       FORM_OPENING_TITLE: "Opening Quality Control Form",
       FORM_OPENING_MESSAGE:
         "Loading batch details, division schema, and form data. This will only take a moment…",
+      SCHEMA_LOADING_TITLE: "Loading QC Form",
       SUBTITLE: "Select division and form type to load the QC schema",
       DIVISION_LABEL: "Division",
       DIVISION_PLACEHOLDER: "Select division",
@@ -1949,6 +1947,8 @@ export const STRINGS = {
       FORM_ID_MISSING: "Unable to continue. Form ID is missing for this batch.",
       BATCH_ID_MISSING: "Unable to create form. Batch ID is missing.",
       SUB_DEPARTMENT_MISSING: "Unable to proceed. Sub-department context is missing.",
+      DIVISION_ID_MISSING:
+        "Unable to resolve this division for approval. Refresh the page and try again.",
       CREATE_FAILED: "Failed to create Quality Control form.",
       UPDATE_FAILED: "Failed to update Quality Control form.",
       READY_TO_SUBMIT: "Ready to submit for approval",
@@ -2107,6 +2107,12 @@ export const STRINGS = {
       DIVISION_NAV_TITLE: "Division Navigation",
       DIVISION_NAV_HINT:
         "Click any division tab below to switch between added divisions and continue filling details.",
+      MATERIAL_NAV_TITLE: "Premix Material Navigation",
+      MATERIAL_NAV_HINT:
+        "Select a material tab below to open its preparation schema and continue filling QC processing details.",
+      MATERIAL_NAV_COUNTER: "Material {current} of {total}",
+      PROCESSING_NO_MATERIALS_MESSAGE:
+        "No materials were found for this premix in division details.",
       SUBDIVISION_NAV_TITLE: "Subdivision Navigation",
       SUBDIVISION_NAV_HINT:
         "Click any subdivision tab below to switch between added entries and continue filling details.",
@@ -2133,10 +2139,33 @@ export const STRINGS = {
       DIVISION_APPROVAL_DIALOG_TITLE: "Submit Division for Approval",
       DIVISION_APPROVAL_DIALOG_INFO:
         "Review unit statuses for this division. Proceed only when every unit is approved.",
+      DIVISION_CONFIRM_TITLE: "Submit Division for Approval?",
+      DIVISION_CONFIRM_MESSAGE:
+        "You will not be able to edit until the approver takes action.",
+      DIVISION_CONFIRM_LABEL: "Submit",
+      UNIT_LOCKED_WAITING: "This unit is waiting for approval and cannot be edited.",
+      UNIT_LOCKED_APPROVED: "This unit has been approved and cannot be edited.",
+      DIVISION_LOCKED_WAITING: "This division is waiting for approval and cannot be edited.",
+      DIVISION_LOCKED_APPROVED: "This division has been approved and cannot be edited.",
+      PREVIOUS_STAGE_UNIT_DISABLED:
+        "This unit was not approved in the previous division and cannot be filled yet.",
+      PREVIOUS_STAGE_PREMIX_TAB_DISABLED:
+        "This premix was not approved in {division}.",
+      PREVIOUS_STAGE_MOTOR_TAB_DISABLED:
+        "This motor was not approved in the previous division.",
+      SEQUENTIAL_UNIT_TAB_DISABLED:
+        "Complete approval for the previous unit before continuing.",
+      DIVISION_TAB_APPROVE_DIVISION:
+        "Approve {previous} to enable {current}.",
+      DIVISION_TAB_APPROVE_ANY_PREMIX:
+        "Approve at least one premix in {previous} to enable {current}.",
+      DIVISION_TAB_APPROVE_ANY_MOTOR:
+        "Approve at least one motor in {previous} to enable {current}.",
+      DIVISION_TAB_APPROVE_MIXING_PAIR:
+        "Approve a premix and its matching final mix in {previous} to enable {current}.",
       DIVISION_APPROVAL_PROCEED: "Proceed",
       DIVISION_APPROVAL_CLOSE: "Close",
-      DIVISION_APPROVAL_NOT_READY:
-        "All units in this division must be approved before proceeding.",
+      DIVISION_APPROVAL_NOT_READY: "All units in this division must be approved before proceeding.",
       DIVISION_APPROVAL_COL_UNIT: "Unit",
       DIVISION_APPROVAL_COL_TYPE: "Type",
       DIVISION_APPROVAL_COL_STATUS: "Status",
@@ -2151,6 +2180,8 @@ export const STRINGS = {
         "All divisions must be approved before submitting the batch for final approval.",
       FINAL_APPROVAL_COL_DIVISION: "Division",
       FINAL_APPROVAL_COL_UNIT: "Unit",
+      FINAL_APPROVAL_COL_PREMIX: "Premix",
+      FINAL_APPROVAL_COL_MOTOR: "Motor",
       FINAL_APPROVAL_COL_TYPE: "Type",
       FINAL_APPROVAL_COL_STATUS: "Status",
       FINAL_APPROVAL_SUCCESS: "Batch submitted for final approval successfully.",
@@ -2172,7 +2203,7 @@ export const STRINGS = {
       FORM_APPROVER_NOT_READY:
         "Form final approval is available only when the batch is waiting for complete approval and every division is approved.",
       APPROVER_STATUS_OVERVIEW_TITLE: "Approval status overview",
-      APPROVER_UNIT_COUNTS_LABEL: "Unit status summary",
+      APPROVER_UNIT_COUNTS_LABEL: "Division summary",
     },
     NDT: {
       FORM_OPENING_TITLE: "Opening NDT Form",
@@ -2335,15 +2366,15 @@ export const STRINGS = {
       MOTOR_SUBMIT_CONFIRM_TITLE: "Submit motor for approval?",
       MOTOR_SUBMIT_CONFIRM_MESSAGE: (motorId: string) =>
         `Submit motor ${motorId} for approval? This motor will be locked until reviewed.`,
-      FINAL_APPROVAL_NOT_READY:
-        "All motors must be approved before submitting for final approval.",
+      FINAL_APPROVAL_NOT_READY: "All motors must be approved before submitting for final approval.",
       FORM_OPENING_TITLE: "Opening Static Test Facility Form",
       FORM_OPENING_MESSAGE:
         "Loading batch details, schema, and motor form data. This will only take a moment…",
       FORM_HEADER_CREATE_OTHER_BEM_TITLE: "Create Other BEM Motor",
       FORM_HEADER_CREATE_OTHER_BEM_SUBTITLE: "Enter details to register a new other BEM motor",
       OTHER_BEM_FORM_OPENING_TITLE: "Opening Other BEM Motor",
-      OTHER_BEM_FORM_OPENING_MESSAGE: "Loading schema and preparing the form. This will only take a moment…",
+      OTHER_BEM_FORM_OPENING_MESSAGE:
+        "Loading schema and preparing the form. This will only take a moment…",
       OTHER_BEM_DETAILS_TITLE: "Other BEM Motor Details",
       OTHER_BEM_DETAILS_SUBTITLE:
         "Enter static testing details for other BEM motor per conditioning, grain dimension, and hardware format",
@@ -2358,10 +2389,8 @@ export const STRINGS = {
       MOTOR_APPROVER_REJECT: "Reject Motor",
       FORM_APPROVER_APPROVE: "Approve Form",
       FORM_APPROVER_REJECT: "Reject Form",
-      FORM_APPROVER_ACTIONS_HINT:
-        "All motors are approved. Approve or reject the complete form.",
-      MOTOR_APPROVER_NO_ACTIONABLE:
-        "No submitted motor is available for review right now.",
+      FORM_APPROVER_ACTIONS_HINT: "All motors are approved. Approve or reject the complete form.",
+      MOTOR_APPROVER_NO_ACTIONABLE: "No submitted motor is available for review right now.",
     },
   },
   DISPATCH: {
@@ -2573,18 +2602,16 @@ export const STRINGS = {
           "Motor casing verification, dimensional validation and release approvals",
         ROCKET_CASING_SECTION: "Rocket Casing Submissions",
       },
-  MANUFACTURING: {
-    DEPARTMENT_NAME: "Manufacturing Department",
-    PREVIOUS_STAGE_UNIT_DISABLED:
-      "This unit was not approved in the previous stage and cannot be filled yet.",
-    PREVIOUS_STAGE_PREMIX_TAB_DISABLED:
-      "This premix was not approved in Raw Material Preparation.",
-    PREVIOUS_STAGE_MOTOR_TAB_DISABLED:
-      "This motor was not approved in the previous stage.",
-    SEQUENTIAL_UNIT_TAB_DISABLED:
-      "Complete approval for the previous unit before continuing.",
-    PREVIOUS_STAGE_NO_UNITS:
-      "No units from the previous stage are approved yet. Complete prior approvals to continue.",
+      MANUFACTURING: {
+        DEPARTMENT_NAME: "Manufacturing Department",
+        PREVIOUS_STAGE_UNIT_DISABLED:
+          "This unit was not approved in the previous stage and cannot be filled yet.",
+        PREVIOUS_STAGE_PREMIX_TAB_DISABLED:
+          "This premix was not approved in Raw Material Preparation.",
+        PREVIOUS_STAGE_MOTOR_TAB_DISABLED: "This motor was not approved in the previous stage.",
+        SEQUENTIAL_UNIT_TAB_DISABLED: "Complete approval for the previous unit before continuing.",
+        PREVIOUS_STAGE_NO_UNITS:
+          "No units from the previous stage are approved yet. Complete prior approvals to continue.",
         RAW_MATERIAL_LABEL: "Raw Material Preparation",
         RAW_MATERIAL_DESCRIPTION:
           "HTPB weighing, DOA mixing, curing agent and binder preparation approvals",

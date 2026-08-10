@@ -1,9 +1,8 @@
-import { useMemo } from "react";
-import { Box, CircularProgress, Typography } from "@mui/material";
+import { useEffect, useMemo } from "react";
+import { Box, Button, Stack, Typography } from "@mui/material";
 import { STRINGS } from "../../../../../app/config/strings";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { QcDivisionEntry, QualityControlFormState } from "../../../../../data/models/user/QualityControlFormModel";
-import { getQcSchemaCacheKey } from "../../../../../hooks/user/qualityControl/qcFlowConfig";
 import {
   buildDivisionNavGroups,
   resolveActiveNavContent,
@@ -13,14 +12,23 @@ import {
   getSchemaForDivisionEntry,
   getSolidSchemaForBothEntry,
 } from "../../../../../hooks/user/qualityControl/qcDivisionEntries";
-import { sliceMixingFinalMixSchema, QC_MIXING_FINAL_MIX_DETAILS_SECTION_ID } from "../../../../../hooks/user/qualityControl/qcMixingConfig";
-import { createQcInitialValues } from "../../../../../schema-engine/adapters/qc.adapter";
+import { isFirstMixingFinalMixEntry, QC_MIXING_FINAL_MIX_DETAILS_SECTION_ID, getMixingFinalMixEntries } from "../../../../../hooks/user/qualityControl/qcMixingConfig";
+import {
+  applyMixingDivisionEntryToValues,
+  createInitialFinalMixDetailsValues,
+  hydrateMixingDetailsValuesFromSections,
+  resolveMixingDetailsSeed,
+  type QcMixingQualityCheckDefinition,
+} from "../../../../../hooks/user/qualityControl/qcMixingTables";
+import QCMixingDetailsTable from "./QCMixingDetailsTable";
 import type { SchemaFormValues } from "../../../../../schema-engine";
+import {
+  UserWorkflowTabNav,
+  type UserWorkflowNavTab,
+} from "../../../../components/custom/UserWorkflowStepPager";
 import QCDivisionEntryPanel, { type QCDivisionEntryUnitActions } from "./QCDivisionEntryPanel";
-import QCDivisionNavPanel, { type QCDivisionNavApprovalActions } from "./QCDivisionNavPanel";
-import QCSchemaPanel from "./QCSchemaPanel";
-import QCDivisionSavedSectionsDisplay from "./components/QCDivisionSavedSectionsDisplay";
-import type { QcPartialItemStatus } from "../../../../../hooks/user/qualityControl/qcDivisionApprovalUnits";
+import QCProcessingMaterialsPanel from "./QCProcessingMaterialsPanel";
+import QCSchemaBufferingLoader from "./QCSchemaBufferingLoader";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 
@@ -35,6 +43,11 @@ const resolveVisibleEntries = (
 
 export type QCDivisionFormBodyProps = {
   batch?: { batchId?: string } | null;
+  divisionAutoPopulateData?: Record<string, unknown> | null;
+  mixingQualityChecksByStage?: {
+    PREMIX: QcMixingQualityCheckDefinition[];
+    FINAL_MIX: QcMixingQualityCheckDefinition[];
+  };
   formData: QualityControlFormState;
   subDepartmentId?: number;
   activeDivisionGroupIndex: number;
@@ -48,15 +61,16 @@ export type QCDivisionFormBodyProps = {
   onDivisionEntryLiquidValuesChange: (entryId: string, values: SchemaFormValues) => void;
   onMixingFinalMixDetailsChange: (values: SchemaFormValues) => void;
   onRemoveDivisionEntry: (entryId: string) => void;
-  hideDivisionSubNav?: boolean;
-  groupStatusByFlowKey?: Record<string, QcPartialItemStatus>;
-  navApprovalActions?: QCDivisionNavApprovalActions | null;
+  /** When true, hide entry-group switcher (catalog division tabs + partial nav own navigation). */
+  hideEntryGroupNav?: boolean;
   unitActions?: QCDivisionEntryUnitActions | null;
   theme: any;
 };
 
 const QCDivisionFormBody = ({
   batch,
+  divisionAutoPopulateData = null,
+  mixingQualityChecksByStage = { PREMIX: [], FINAL_MIX: [] },
   formData,
   subDepartmentId,
   activeDivisionGroupIndex,
@@ -64,38 +78,19 @@ const QCDivisionFormBody = ({
   readOnly = false,
   schemaLoading = false,
   schemaError = null,
-  hideDivisionSubNav = false,
-  groupStatusByFlowKey = {},
+  hideEntryGroupNav = false,
   onActiveDivisionGroupIndexChange,
   onActiveDivisionSubIndexChange,
   onDivisionEntryValuesChange,
   onDivisionEntryLiquidValuesChange,
   onMixingFinalMixDetailsChange,
   onRemoveDivisionEntry,
-  navApprovalActions = null,
   unitActions = null,
   theme,
 }: QCDivisionFormBodyProps) => {
   const BRAND = QC_DIVISION_BRAND;
   const divisionEntries = formData.divisionEntries ?? [];
   const hasDivisionEntries = divisionEntries.length > 0;
-
-  const finalMixFullSchema = useMemo(() => {
-    const cacheKey = getQcSchemaCacheKey("MIXING", "FINAL_MIX");
-    return formData.schemasByKey?.[cacheKey] ?? null;
-  }, [formData.schemasByKey]);
-
-  const finalMixDetailsSchema = useMemo(
-    () => (finalMixFullSchema ? sliceMixingFinalMixSchema(finalMixFullSchema, "details") : null),
-    [finalMixFullSchema],
-  );
-
-  const finalMixDetailsValues = useMemo(
-    () =>
-      formData.mixingFinalMixDetailsValues ??
-      (finalMixDetailsSchema ? createQcInitialValues(finalMixDetailsSchema) : {}),
-    [finalMixDetailsSchema, formData.mixingFinalMixDetailsValues],
-  );
 
   const finalMixDetailSections = useMemo(
     () =>
@@ -123,7 +118,89 @@ const QCDivisionFormBody = ({
   );
   const activeEntry = activeContent?.type === "entry" ? activeContent.entry : null;
   const activeMotorId = activeContent?.type === "motor-entries" ? activeContent.motorId : null;
+
+  const finalMixSeedPremixNo = useMemo(() => {
+    if (activeEntry?.kind === "MIXING_FINAL_MIX" && activeEntry.premixNo != null) {
+      return activeEntry.premixNo;
+    }
+    const finalMixEntries = getMixingFinalMixEntries(divisionEntries);
+    return finalMixEntries[0]?.premixNo ?? null;
+  }, [activeEntry?.kind, activeEntry?.premixNo, divisionEntries]);
+
+  const finalMixAutoSeed = useMemo(
+    () =>
+      resolveMixingDetailsSeed({
+        variant: "finalMix",
+        premixNo: finalMixSeedPremixNo,
+        autoPopulatePayload: divisionAutoPopulateData,
+        batchPayload: batch,
+      }),
+    [batch, divisionAutoPopulateData, finalMixSeedPremixNo],
+  );
+
+  const finalMixDetailsValues = useMemo(() => {
+    let base: SchemaFormValues;
+    if (formData.mixingFinalMixDetailsValues) {
+      base = formData.mixingFinalMixDetailsValues;
+    } else if (finalMixDetailSections.length) {
+      base = hydrateMixingDetailsValuesFromSections(finalMixDetailSections, "finalMix");
+    } else {
+      base = createInitialFinalMixDetailsValues(mixingQualityChecksByStage.FINAL_MIX);
+    }
+    return applyMixingDivisionEntryToValues(base, {
+      variant: "finalMix",
+      premixNo: finalMixSeedPremixNo,
+      autoPopulatePayload: divisionAutoPopulateData,
+      batchPayload: batch,
+      qualityCheckDefinitions: mixingQualityChecksByStage.FINAL_MIX,
+    }, { onlyIfEmpty: true });
+  }, [
+    batch,
+    divisionAutoPopulateData,
+    finalMixAutoSeed,
+    finalMixDetailSections,
+    finalMixSeedPremixNo,
+    formData.mixingFinalMixDetailsValues,
+    mixingQualityChecksByStage.FINAL_MIX,
+  ]);
+
+  useEffect(() => {
+    if (readOnly) return;
+    if (!finalMixAutoSeed && !mixingQualityChecksByStage.FINAL_MIX.length) return;
+    const current = formData.mixingFinalMixDetailsValues;
+    const base =
+      current && Object.keys(current).length > 0
+        ? current
+        : createInitialFinalMixDetailsValues(mixingQualityChecksByStage.FINAL_MIX);
+    const seeded = applyMixingDivisionEntryToValues(base, {
+      variant: "finalMix",
+      premixNo: finalMixSeedPremixNo,
+      autoPopulatePayload: divisionAutoPopulateData,
+      batchPayload: batch,
+      qualityCheckDefinitions: mixingQualityChecksByStage.FINAL_MIX,
+    }, { onlyIfEmpty: true });
+    if (JSON.stringify(seeded) !== JSON.stringify(current ?? {})) {
+      onMixingFinalMixDetailsChange(seeded);
+    }
+  }, [
+    batch,
+    divisionAutoPopulateData,
+    finalMixAutoSeed,
+    finalMixSeedPremixNo,
+    formData.mixingFinalMixDetailsValues,
+    mixingQualityChecksByStage.FINAL_MIX,
+    onMixingFinalMixDetailsChange,
+    readOnly,
+  ]);
+
   const visibleEntries = useMemo(() => resolveVisibleEntries(activeContent), [activeContent]);
+  const processingMaterialEntries = useMemo(
+    () => divisionEntries.filter((entry) => entry.kind === "PROCESSING_MATERIAL"),
+    [divisionEntries],
+  );
+  const showProcessingMaterialsPanel =
+    processingMaterialEntries.length > 0 &&
+    processingMaterialEntries.length === divisionEntries.length;
   const bothPremixSolidSchema = useMemo(() => getSolidSchemaForBothEntry(formData), [formData.schemasByKey]);
   const bothPremixLiquidSchema = useMemo(() => getLiquidSchemaForBothEntry(formData), [formData.schemasByKey]);
   // Raw Material Revalidation is division-scoped only — no unit draft/submit actions.
@@ -137,22 +214,46 @@ const QCDivisionFormBody = ({
     return unitActions;
   }, [activeEntry?.kind, unitActions, visibleEntries]);
 
+  const showInlineFinalMixDetails = useMemo(
+    () =>
+      hideEntryGroupNav &&
+      Boolean(activeEntry && isFirstMixingFinalMixEntry(activeEntry, divisionEntries)),
+    [activeEntry, divisionEntries, hideEntryGroupNav],
+  );
+
+  const showFinalMixDetailsPanel =
+    activeContent?.type === "final-mix-details" || showInlineFinalMixDetails;
+
+  /** Final Mix: draft/submit sit above Final Mix Details; hide duplicate actions on viscosity panel. */
+  const finalMixTopUnitActions =
+    showFinalMixDetailsPanel && resolvedUnitActions?.show ? resolvedUnitActions : null;
+  const entryPanelUnitActions =
+    activeEntry?.kind === "MIXING_FINAL_MIX" && finalMixTopUnitActions
+      ? { ...resolvedUnitActions!, show: false }
+      : resolvedUnitActions;
+
+  const showEntryGroupNav = !hideEntryGroupNav && navGroups.length > 1;
+
+  const entryGroupTabs = useMemo<UserWorkflowNavTab[]>(
+    () =>
+      navGroups.map((group) => ({
+        id: group.flowKey,
+        label: group.label,
+      })),
+    [navGroups],
+  );
+
+  const navPalette = {
+    primary: BRAND.primary,
+    primaryLight: BRAND.primaryLight,
+    border: BRAND.border,
+    surface: BRAND.surface,
+    textSub: BRAND.textSub,
+    text: BRAND.text,
+  };
+
   if (schemaLoading && !hasDivisionEntries) {
-    return (
-      <Box
-        sx={{
-          borderRadius: 2.5,
-          border: `1px solid ${theme.palette.border}`,
-          background: theme.palette.surface,
-          px: 2,
-          py: 5,
-          display: "flex",
-          justifyContent: "center",
-        }}
-      >
-        <CircularProgress size={28} />
-      </Box>
-    );
+    return <QCSchemaBufferingLoader />;
   }
 
   if (!hasDivisionEntries || navGroups.length === 0) {
@@ -175,18 +276,36 @@ const QCDivisionFormBody = ({
 
   return (
     <>
-      <QCDivisionNavPanel
-        entries={divisionEntries}
-        activeGroupIndex={activeDivisionGroupIndex}
-        activeSubIndex={activeDivisionSubIndex}
-        groupStatusByFlowKey={groupStatusByFlowKey}
-        hideSubNav={hideDivisionSubNav}
-        approvalActions={navApprovalActions}
-        onActiveGroupIndexChange={onActiveDivisionGroupIndexChange}
-        onActiveSubIndexChange={onActiveDivisionSubIndexChange}
-      />
-      <Box sx={{ mt: 1.25 }}>
-        {activeContent?.type === "final-mix-details" ? (
+      {showEntryGroupNav ? (
+        <Box
+          sx={{
+            border: `1px solid ${BRAND.border}`,
+            borderRadius: 2,
+            px: 1.25,
+            py: 1.1,
+            mb: 1.25,
+            mt: 1,
+            background: BRAND.surface,
+          }}
+        >
+          <UserWorkflowTabNav
+            title={S.DIVISION_NAV_TITLE}
+            hint={S.DIVISION_NAV_HINT}
+            tabs={entryGroupTabs}
+            activeIndex={safeGroupIndex}
+            onActiveIndexChange={(index) => {
+              onActiveDivisionGroupIndexChange(index);
+              onActiveDivisionSubIndexChange(0);
+            }}
+            palette={navPalette}
+            showStepArrows
+            wrapTabs
+          />
+        </Box>
+      ) : null}
+
+      <Box sx={{ mt: showEntryGroupNav ? 0 : 1.25 }}>
+        {showFinalMixDetailsPanel ? (
           <Box
             sx={{
               borderRadius: 2.5,
@@ -194,38 +313,39 @@ const QCDivisionFormBody = ({
               background: BRAND.surface,
               px: 1.5,
               py: 1.25,
+              mb: showInlineFinalMixDetails ? 1.25 : 0,
             }}
           >
-            {finalMixDetailsSchema ? (
-              <QCSchemaPanel
-                schema={finalMixDetailsSchema}
-                formValues={finalMixDetailsValues}
-                savedSections={formData.savedSections}
-                subDepartmentId={subDepartmentId}
-                batchId={batch?.batchId}
-                onChange={onMixingFinalMixDetailsChange}
-                readOnly={readOnly}
-                loading={schemaLoading}
-                error={schemaError}
-              />
-            ) : readOnly && finalMixDetailSections.length > 0 ? (
-              <QCDivisionSavedSectionsDisplay sections={finalMixDetailSections} />
-            ) : schemaLoading ? (
-              <Box sx={{ display: "flex", justifyContent: "center", py: 3 }}>
-                <CircularProgress size={24} />
-              </Box>
-            ) : (
-              <Typography sx={{ fontSize: "0.76rem", color: BRAND.textSub }}>
-                {schemaError || S.SCHEMA_FETCH_ERROR}
-              </Typography>
-            )}
+            {finalMixTopUnitActions ? (
+              <Stack direction="row" justifyContent="flex-end" alignItems="center" mb={1} gap={1}>
+                <Button
+                  size="small"
+                  variant="outlined"
+                  disabled={readOnly || !finalMixTopUnitActions.canAct || finalMixTopUnitActions.actionLoading}
+                  onClick={finalMixTopUnitActions.onSaveDraft}
+                  sx={{ textTransform: "none", whiteSpace: "nowrap" }}
+                >
+                  {S.SAVE_UNIT_DRAFT}
+                </Button>
+                <Button
+                  size="small"
+                  variant="contained"
+                  disabled={readOnly || !finalMixTopUnitActions.canAct || finalMixTopUnitActions.actionLoading}
+                  onClick={finalMixTopUnitActions.onSubmit}
+                  sx={{ textTransform: "none", whiteSpace: "nowrap" }}
+                >
+                  {finalMixTopUnitActions.isEditMode ? S.RESUBMIT_UNIT : S.SUBMIT_UNIT}
+                </Button>
+              </Stack>
+            ) : null}
+            <QCMixingDetailsTable
+              variant="finalMix"
+              values={finalMixDetailsValues}
+              onChange={onMixingFinalMixDetailsChange}
+              readOnly={readOnly}
+              autoSeed={finalMixAutoSeed}
+            />
           </Box>
-        ) : null}
-
-        {activeEntry?.kind === "MIXING_FINAL_MIX" ? (
-          <Typography sx={{ fontSize: "0.74rem", color: BRAND.textSub, mb: 1 }}>
-            {S.MIXING_FINAL_MIX_VISCOSITY_ENTRY_HINT}
-          </Typography>
         ) : null}
 
         {activeMotorId && activeContent?.type === "motor-entries" && activeContent.flowKey !== "TRIMMING" ? (
@@ -234,30 +354,55 @@ const QCDivisionFormBody = ({
           </Typography>
         ) : null}
 
-        {visibleEntries.map((entry) => {
-          const entryValues = formData.divisionEntryValues?.[entry.entryId];
-          if (!entryValues) return null;
+        {showProcessingMaterialsPanel ? (
+          <QCProcessingMaterialsPanel
+            key={`processing-materials-${processingMaterialEntries[0]?.premixNo ?? "all"}`}
+            formData={formData}
+            entries={processingMaterialEntries}
+            entryValuesById={formData.divisionEntryValues ?? {}}
+            subDepartmentId={subDepartmentId}
+            batchId={batch?.batchId}
+            readOnly={readOnly}
+            schemaLoading={schemaLoading}
+            schemaError={schemaError}
+            onEntryValuesChange={onDivisionEntryValuesChange}
+            unitActions={resolvedUnitActions}
+          />
+        ) : (
+          visibleEntries.map((entry) => {
+            const entryValues = formData.divisionEntryValues?.[entry.entryId];
+            if (!entryValues) return null;
 
-          return (
-            <QCDivisionEntryPanel
-              key={entry.entryId}
-              entry={entry}
-              entryValues={entryValues}
-              schema={getSchemaForDivisionEntry(formData, entry)}
-              solidSchema={entry.kind === "BOTH_PREMIX" ? bothPremixSolidSchema : undefined}
-              liquidSchema={entry.kind === "BOTH_PREMIX" ? bothPremixLiquidSchema : undefined}
-              subDepartmentId={subDepartmentId}
-              batchId={batch?.batchId}
-              readOnly={readOnly}
-              schemaLoading={schemaLoading}
-              schemaError={schemaError}
-              onEntryValuesChange={onDivisionEntryValuesChange}
-              onEntryLiquidValuesChange={onDivisionEntryLiquidValuesChange}
-              onRemoveEntry={onRemoveDivisionEntry}
-              unitActions={resolvedUnitActions}
-            />
-          );
-        })}
+            return (
+              <QCDivisionEntryPanel
+                key={entry.entryId}
+                entry={entry}
+                entryValues={entryValues}
+                schema={getSchemaForDivisionEntry(formData, entry)}
+                solidSchema={entry.kind === "BOTH_PREMIX" ? bothPremixSolidSchema : undefined}
+                liquidSchema={entry.kind === "BOTH_PREMIX" ? bothPremixLiquidSchema : undefined}
+                subDepartmentId={subDepartmentId}
+                batchId={batch?.batchId}
+                divisionAutoPopulateData={divisionAutoPopulateData}
+                mixingQualityCheckDefinitions={
+                  entry.kind === "MIXING_PREMIX"
+                    ? mixingQualityChecksByStage.PREMIX
+                    : entry.kind === "MIXING_FINAL_MIX"
+                      ? mixingQualityChecksByStage.FINAL_MIX
+                      : undefined
+                }
+                batchPayload={batch}
+                readOnly={readOnly}
+                schemaLoading={schemaLoading}
+                schemaError={schemaError}
+                onEntryValuesChange={onDivisionEntryValuesChange}
+                onEntryLiquidValuesChange={onDivisionEntryLiquidValuesChange}
+                onRemoveEntry={onRemoveDivisionEntry}
+                unitActions={entryPanelUnitActions}
+              />
+            );
+          })
+        )}
       </Box>
     </>
   );

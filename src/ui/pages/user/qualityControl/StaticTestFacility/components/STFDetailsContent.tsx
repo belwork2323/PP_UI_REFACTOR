@@ -1,7 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Box,
-  Button,
   Chip,
   CircularProgress,
   Stack,
@@ -32,6 +31,10 @@ import type {
 import { STF_FLOW_LABELS } from "../../../../../../hooks/user/qualityControl/stfFlowConfig";
 import { OPERATION_STATUS_UI_TO_API } from "../../../../../../hooks/operationStatus";
 import { parseSchemaFileList } from "../../../../../components/common/SchemaFileField";
+import {
+  UserWorkflowTabNav,
+  type UserWorkflowNavTab,
+} from "../../../../../components/custom/UserWorkflowStepPager";
 
 const API_OPERATION_STATUS_LABELS = Object.fromEntries(
   Object.entries(OPERATION_STATUS_UI_TO_API).map(([label, apiValue]) => [apiValue, label]),
@@ -276,6 +279,26 @@ const STFDetailsContent = ({
   const activeMotorIndexSafe =
     motors.length > 0 ? Math.min(activeMotorIndex, motors.length - 1) : 0;
   const activeMotor = motors[activeMotorIndexSafe] ?? null;
+  const motorNavTabs = useMemo<UserWorkflowNavTab[]>(
+    () =>
+      motors.map((motor, index) => {
+        const motorStatus = motor.motorSubmissionStatus ?? "TO_BE_INITIATED";
+        return {
+          id: motor.motorId,
+          label: motor.motorId,
+          endAdornment: (
+            <PremixStatusChip
+              status={motorStatus as any}
+              statusConfig={statusConfig}
+              showIcon={false}
+              variant="embedded"
+              onAccent={index === activeMotorIndexSafe}
+            />
+          ),
+        };
+      }),
+    [activeMotorIndexSafe, motors, statusConfig],
+  );
 
   useEffect(() => {
     setActiveMotorIndex(0);
@@ -351,48 +374,23 @@ const STFDetailsContent = ({
                 background: theme.palette.surface,
               }}
             >
-              <Typography
-                sx={{
-                  fontSize: "0.76rem",
-                  fontWeight: 700,
-                  color: theme.palette.primary,
-                  mb: 0.75,
+              <UserWorkflowTabNav
+                title={L.motorNavTitle}
+                hint={STF.DETAILS_MOTOR_NAV_HINT}
+                tabs={motorNavTabs}
+                activeIndex={activeMotorIndexSafe}
+                onActiveIndexChange={setActiveMotorIndex}
+                palette={{
+                  primary: theme.palette.primary,
+                  primaryLight: theme.palette.primaryLight,
+                  border: theme.palette.border,
+                  surface: theme.palette.surface,
+                  textSub: theme.palette.textSub,
+                  text: theme.palette.text,
                 }}
-              >
-                {L.motorNavTitle}
-              </Typography>
-              <Typography sx={{ fontSize: "0.72rem", color: theme.palette.textSub, mb: 1 }}>
-                {STF.DETAILS_MOTOR_NAV_HINT}
-              </Typography>
-              <Stack direction="row" spacing={1} sx={{ overflowX: "auto", pb: 0.5 }}>
-                {motors.map((motor, index) => {
-                  const motorStatus = motor.motorSubmissionStatus ?? "TO_BE_INITIATED";
-                  return (
-                    <Button
-                      key={motor.motorId}
-                      size="small"
-                      variant={index === activeMotorIndexSafe ? "contained" : "outlined"}
-                      onClick={() => setActiveMotorIndex(index)}
-                      sx={{
-                        whiteSpace: "nowrap",
-                        flexShrink: 0,
-                        textTransform: "none",
-                        fontWeight: 700,
-                        gap: 0.75,
-                      }}
-                    >
-                      {motor.motorId}
-                      <PremixStatusChip
-                        status={motorStatus as any}
-                        statusConfig={statusConfig}
-                        showIcon={false}
-                        variant="embedded"
-                        onAccent={index === activeMotorIndexSafe}
-                      />
-                    </Button>
-                  );
-                })}
-              </Stack>
+                showStepArrows
+                wrapTabs
+              />
             </Box>
           ) : null}
 

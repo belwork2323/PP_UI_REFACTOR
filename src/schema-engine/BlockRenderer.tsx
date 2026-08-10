@@ -34,6 +34,8 @@ export type BlockRenderContext = {
   values: SchemaFormValues;
   onChange: (values: SchemaFormValues, meta?: SchemaChangeMeta) => void;
   readOnly?: boolean;
+  /** Values stay editable; block Add/Remove row, repeat instance, and column mutations. */
+  lockStructure?: boolean;
   theme?: SchemaThemeTokens;
   apiContext?: SchemaApiContext;
   setupContext?: SchemaSetupContext;
@@ -133,8 +135,8 @@ const renderRepeatSection = (block: SchemaSectionBlock, ctx: BlockRenderContext)
   const instances = (Array.isArray(ctx.values[block.id]) ? ctx.values[block.id] : []) as Record<string, unknown>[];
   const min = resolveSchemaCountToken(block.repeat?.min ?? 1, ctx.setupContext);
   const max = resolveSchemaCountToken(block.repeat?.max ?? 20, ctx.setupContext);
-  const allowAdd = block.repeat?.allowAdd !== false && !ctx.readOnly;
-  const allowDelete = block.repeat?.allowDelete !== false && !ctx.readOnly;
+  const allowAdd = block.repeat?.allowAdd !== false && !ctx.readOnly && !ctx.lockStructure;
+  const allowDelete = block.repeat?.allowDelete !== false && !ctx.readOnly && !ctx.lockStructure;
 
   const updateInstance = (index: number, instance: Record<string, unknown>) => {
     const next = [...instances];
@@ -304,7 +306,7 @@ export const BlockRenderer = ({ block, ctx }: { block: SchemaBlock; ctx: BlockRe
       };
 
       const handleAddColumn = () => {
-        if (!block.allowAddColumn) return;
+        if (!block.allowAddColumn || ctx.lockStructure) return;
         const column = createNextPrefixedTableColumn(block, extraColumns, deletedColumnIds);
         const nextExtraColumns = [...extraColumns, column];
         const nextRows = rows.map((row) => ({ ...row, [column.id]: row[column.id] ?? "" }));
@@ -323,7 +325,7 @@ export const BlockRenderer = ({ block, ctx }: { block: SchemaBlock; ctx: BlockRe
       };
 
       const handleDeleteColumn = (columnId: string) => {
-        if (!block.allowDeleteColumn) return;
+        if (!block.allowDeleteColumn || ctx.lockStructure) return;
 
         const isExtra = extraColumns.some((col) => col.id === columnId);
         let nextExtraColumns = extraColumns;
@@ -357,6 +359,8 @@ export const BlockRenderer = ({ block, ctx }: { block: SchemaBlock; ctx: BlockRe
         );
       };
 
+      const canMutateColumns = Boolean(block.allowAddColumn || block.allowDeleteColumn) && !ctx.lockStructure;
+
       return (
         <Box sx={resolveFullWidthBlockLayoutSx(block.ui)} data-custom-flex>
           <DynamicTable
@@ -364,13 +368,14 @@ export const BlockRenderer = ({ block, ctx }: { block: SchemaBlock; ctx: BlockRe
             rows={rows}
             onChange={handleTableChange}
             readOnly={ctx.readOnly}
+            lockStructure={ctx.lockStructure}
             theme={ctx.theme}
             apiContext={ctx.apiContext}
-            allowAddColumn={block.allowAddColumn}
-            onAddColumn={block.allowAddColumn ? handleAddColumn : undefined}
-            allowDeleteColumn={block.allowDeleteColumn}
+            allowAddColumn={canMutateColumns && Boolean(block.allowAddColumn)}
+            onAddColumn={canMutateColumns && block.allowAddColumn ? handleAddColumn : undefined}
+            allowDeleteColumn={canMutateColumns && Boolean(block.allowDeleteColumn)}
             deletableColumnIds={deletableColumnIds}
-            onDeleteColumn={block.allowDeleteColumn ? handleDeleteColumn : undefined}
+            onDeleteColumn={canMutateColumns && block.allowDeleteColumn ? handleDeleteColumn : undefined}
           />
         </Box>
       );
@@ -393,6 +398,7 @@ export const BlockRenderer = ({ block, ctx }: { block: SchemaBlock; ctx: BlockRe
               })
             }
             readOnly={ctx.readOnly}
+            lockStructure={ctx.lockStructure}
             theme={ctx.theme}
             apiContext={ctx.apiContext}
             batch={ctx.batch}

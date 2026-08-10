@@ -30,6 +30,7 @@ type SchemaRendererProps = {
   values: SchemaFormValues;
   onChange: (values: SchemaFormValues) => void;
   readOnly?: boolean;
+  lockStructure?: boolean;
   theme?: SchemaThemeTokens;
   apiContext?: SchemaApiContext;
   setupContext?: SchemaSetupContext;
@@ -104,6 +105,7 @@ const SchemaRenderer = ({
   values,
   onChange,
   readOnly = false,
+  lockStructure = false,
   theme,
   apiContext,
   setupContext,
@@ -136,6 +138,7 @@ const SchemaRenderer = ({
       values,
       onChange: handleChange,
       readOnly,
+      lockStructure,
       theme,
       apiContext,
       setupContext,
@@ -144,7 +147,19 @@ const SchemaRenderer = ({
       motorId,
       hideRepeatInstanceLabels,
     }),
-    [values, handleChange, readOnly, theme, apiContext, setupContext, visibilityContext, batch, motorId, hideRepeatInstanceLabels],
+    [
+      values,
+      handleChange,
+      readOnly,
+      lockStructure,
+      theme,
+      apiContext,
+      setupContext,
+      visibilityContext,
+      batch,
+      motorId,
+      hideRepeatInstanceLabels,
+    ],
   );
 
   const [expandedPanels, setExpandedPanels] = useState<string[]>(() =>

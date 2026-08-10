@@ -37,8 +37,12 @@ const QCDivisionApproverPage = () => {
     activePartialNavIndex,
     setActivePartialNavIndex,
     partialNavItems,
+    activeDivisionTabKey,
+    divisionNavTabs,
+    setActiveDivisionTabKey,
     divisionStatusByFlowKey,
     divisionApprovalRows,
+    finalApprovalGroups,
     finalApprovalRows,
     canApproveForm,
     subDepartmentId,
@@ -84,11 +88,15 @@ const QCDivisionApproverPage = () => {
         activeDivisionSubIndex={activeDivisionSubIndex}
         onActiveDivisionGroupIndexChange={setActiveDivisionGroupIndex}
         onActiveDivisionSubIndexChange={setActiveDivisionSubIndex}
+        divisionNavTabs={divisionNavTabs}
+        activeDivisionTabKey={activeDivisionTabKey}
+        onActiveDivisionTabKeyChange={setActiveDivisionTabKey}
         partialNavItems={partialNavItems}
         activePartialNavIndex={activePartialNavIndex}
         onActivePartialNavIndexChange={setActivePartialNavIndex}
         divisionStatusByFlowKey={divisionStatusByFlowKey}
         divisionApprovalRows={divisionApprovalRows}
+        finalApprovalGroups={finalApprovalGroups}
         finalApprovalRows={finalApprovalRows}
         canApproveForm={canApproveForm}
         onApprove={requestApprove}

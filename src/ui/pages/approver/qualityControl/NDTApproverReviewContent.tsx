@@ -247,6 +247,7 @@ const NDTApproverReviewContent = ({
           onActiveIndexChange={(index) => onActiveMotorChange(motors[index].motorId)}
           palette={navPalette}
           showStepArrows
+          wrapTabs
           onStepBack={() => goToEnabledMotor(-1)}
           onStepNext={() => goToEnabledMotor(1)}
           disableStepBack={enabledMotorIndex <= 0}

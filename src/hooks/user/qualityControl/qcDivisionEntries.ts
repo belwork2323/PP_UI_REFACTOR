@@ -45,12 +45,18 @@ export const buildDivisionEntryDedupKey = (params: {
   motorId?: string;
   subType?: QcApiSubType;
   inhibitorType?: string;
+  materialId?: number;
+  gradeCode?: string | null;
+  processSlot?: "solid" | "liquid";
 }): string => {
   if (params.kind === "MIXING_PREMIX") {
     return `MIXING:PREMIX:${params.premixNo}`;
   }
   if (params.kind === "MIXING_FINAL_MIX") {
     return `MIXING:FINAL_MIX:${params.premixNo}`;
+  }
+  if (params.kind === "PROCESSING_MATERIAL" && params.premixNo != null && params.materialId != null) {
+    return `RAW_MATERIAL:PROCESSING:${params.premixNo}:${params.processSlot ?? "solid"}:${params.materialId}:${String(params.gradeCode ?? "").trim() || "NONE"}`;
   }
   if (params.kind === "SOLID_PREMIX") {
     return `RAW_MATERIAL:SOLID:${params.premixNo}`;
@@ -141,6 +147,9 @@ export const getDivisionEntryDedupKey = (entry: QcDivisionEntry) =>
     motorId: entry.motorId,
     subType: entry.subType,
     inhibitorType: entry.inhibitorType,
+    materialId: entry.materialId,
+    gradeCode: entry.gradeCode,
+    processSlot: entry.processSlot,
   });
 
 export const getAddedDivisionEntryKeys = (entries: QcDivisionEntry[] = []) =>
@@ -191,6 +200,7 @@ export const buildDivisionEntryLabel = (params: {
   subType?: QcApiSubType;
   mixingStage?: QcMixingStage;
   motorId?: string;
+  materialCode?: string;
 }): string => {
   if (params.kind === "MIXING_PREMIX" && params.premixNo && params.mixingStage) {
     return `Mixing · ${getQcMixingStageLabel(params.mixingStage)} · ${getQcMixingNumberLabel(params.mixingStage, params.premixNo)}`;
@@ -202,6 +212,10 @@ export const buildDivisionEntryLabel = (params: {
 
   if (params.kind === "MIXING_PREMIX" && params.premixNo) {
     return `Mixing · ${getQcPremixLabel(params.premixNo)}`;
+  }
+
+  if (params.kind === "PROCESSING_MATERIAL" && params.premixNo && params.materialCode) {
+    return `Premix-${params.premixNo} ${params.materialCode}`;
   }
 
   if (params.kind === "BOTH_PREMIX" && params.premixNo) {
@@ -307,6 +321,9 @@ export const getSchemaForDivisionEntry = (
   form: QualityControlFormState,
   entry: QcDivisionEntry,
 ): SchemaDocumentV2 | null => {
+  if (entry.kind === "PROCESSING_MATERIAL" && entry.schemaCacheKey) {
+    return form.schemasByKey?.[entry.schemaCacheKey] ?? null;
+  }
   const key = getQcSchemaCacheKey(entry.apiDivision, entry.subType, entry.inhibitorType);
   return form.schemasByKey?.[key] ?? null;
 };
@@ -327,14 +344,20 @@ export const appendDivisionEntryToForm = (
   values: QcDivisionEntryValues,
   schemas: Array<{
     schema: SchemaDocumentV2;
-    division: QcApiDivision;
-    subType: QcApiSubType;
+    division?: QcApiDivision;
+    subType?: QcApiSubType;
     inhibitorType?: string | null;
+    cacheKey?: string;
   }>,
 ): QualityControlFormState => {
   const schemasByKey = { ...(prev.schemasByKey ?? {}) };
   schemas.forEach((item) => {
-    schemasByKey[getQcSchemaCacheKey(item.division, item.subType, item.inhibitorType)] = item.schema;
+    const key =
+      item.cacheKey ||
+      (item.division
+        ? getQcSchemaCacheKey(item.division, item.subType ?? null, item.inhibitorType)
+        : "");
+    if (key) schemasByKey[key] = item.schema;
   });
 
   return {

@@ -234,7 +234,7 @@ export const FinalMixDetailPanel = ({ entry, dt }: { entry: FinalMixEntry; dt: M
       }}
     >
       <DetailField label={S.DETAIL_LABEL_FINAL_MIX_NO} value={entry.mixNo} dt={dt} />
-      <DetailField label={S.DETAIL_LABEL_PREMIX_NO} value={entry.linkedPremixNo} dt={dt} />
+      <DetailField label={S.DETAIL_LABEL_FINAL_MIX_NO} value={entry.finalMixNo} dt={dt} />
       <DetailField label={S.DETAIL_LABEL_MIXER} value={entry.mixerType} dt={dt} />
       <DetailField label={S.DETAIL_LABEL_MIXER_BLDG} value={entry.bldgNo} dt={dt} />
       <DetailField label={S.DETAIL_LABEL_BOWL_ID} value={entry.bowlId} dt={dt} />

@@ -5,6 +5,10 @@ import {
   getMixingFinalMixEntries,
   type QcDivisionNavTab,
 } from "./qcMixingConfig";
+import {
+  resolveEntryIdsForPartialItem,
+  type QcPartialNavItem,
+} from "./qcDivisionApprovalUnits";
 import type { QcDivisionEntry } from "./qcDivisionEntryTypes";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
@@ -159,6 +163,33 @@ export const resolveActiveNavContent = (
   const entry = group.entries[subIndex];
   if (!entry) return null;
   return { type: "entry", entry };
+};
+
+/** Map partial-approval nav selection to form body group/sub indices. */
+export const resolveFormNavForPartialItem = (
+  entries: QcDivisionEntry[] | undefined,
+  item: QcPartialNavItem | null | undefined,
+  options?: { flowKey?: string | null },
+): { groupIndex: number; subIndex: number } => {
+  const list = entries ?? [];
+  if (!item || item.kind === "DIVISION") {
+    return { groupIndex: 0, subIndex: 0 };
+  }
+
+  const entryIds = resolveEntryIdsForPartialItem(list, item, options);
+  if (entryIds.length > 0) {
+    return resolveNavIndicesForEntry(list, entryIds[0]);
+  }
+
+  if (item.kind === "FINAL_MIX" || item.kind === "PREMIX") {
+    const groups = buildDivisionNavGroups(list);
+    const mixingGroupIndex = groups.findIndex((group) => group.flowKey === "MIXING");
+    if (mixingGroupIndex >= 0) {
+      return { groupIndex: mixingGroupIndex, subIndex: 0 };
+    }
+  }
+
+  return { groupIndex: 0, subIndex: 0 };
 };
 
 export const resolveNavIndicesForEntry = (

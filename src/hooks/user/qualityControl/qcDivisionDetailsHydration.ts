@@ -12,7 +12,7 @@ import {
   type QcApiSubType,
   type QcInhibitorType,
 } from "../../../schema-engine/adapters/qc.adapter";
-import type { SchemaDocumentV2, SchemaSectionSubmission } from "../../../schema-engine";
+import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
 import { getQcSchemaCacheKey } from "./qcFlowConfig";
 import {
   buildDivisionEntryLabel,
@@ -25,23 +25,43 @@ import { getHardwareSectionIdForSubType } from "./qcHardwareConfig";
 import { resolveQcSectionInhibitorType } from "./qcPostCureConfig";
 import {
   groupMixingDetailSections,
-  hydrateMixingFinalMixDetailsValues,
   QC_MIXING_PREMIX_SECTION_ID,
   QC_MIXING_VISCOSITY_SECTION_ID,
-  sliceMixingFinalMixSchema,
 } from "./qcMixingConfig";
+import {
+  createInitialPremixDetailsValues,
+  createInitialViscosityValues,
+  hydrateMixingDetailsValuesFromSections,
+  hydrateMixingDivisionFromFormData,
+  hydrateViscosityValuesFromSections,
+} from "./qcMixingTables";
 import {
   createInitialRevalidationSchemaValues,
   hydrateRevalidationValuesFromSections,
+  mapDivisionDetailsToRevalidationValues,
 } from "./qcRawMaterialRevalidationTable";
 import { fetchQcSchemaWithInflightDedup, getCachedQcSchema, mapWithConcurrency } from "./qcSchemaFetchCache";
+import {
+  buildProcessingMaterialEntry,
+  fetchQcProcessingMaterialSchema,
+  hydrateProcessingMaterialValuesFromSeed,
+  parseProcessingMaterialsFromDivisionDetails,
+} from "./qcProcessingMaterials";
 
 const getEntryKind = (
   division: QcApiDivision,
   subType: QcApiSubType,
 ): { flowKey: string; kind: QcDivisionEntry["kind"] } => {
-  if (division === "RAW_MATERIAL_REVALIDATION") return { flowKey: "RAW_MATERIAL", kind: "REVALIDATION" };
-  if (division === "RAW_MATERIAL_PROCESSING") {
+  if (
+    division === "RAW_MATERIAL_REVALIDATION" ||
+    (division === "RAW_MATERIAL" && subType === "RAW_MATERIAL_REVALIDATION")
+  ) {
+    return { flowKey: "RAW_MATERIAL", kind: "REVALIDATION" };
+  }
+  if (
+    division === "RAW_MATERIAL_PROCESSING" ||
+    (division === "RAW_MATERIAL" && subType === "RAW_MATERIAL_PROCESSING")
+  ) {
     const kind =
       subType === "SOLID_PROCESSING"
         ? "SOLID_PREMIX"
@@ -61,7 +81,9 @@ const getEntryKind = (
   if (division === "CURING") return { flowKey: "CURING", kind: "CURING_MOTOR" };
   if (division === "TRIMMING") return { flowKey: "TRIMMING", kind: "TRIMMING_MOTOR" };
   if (division === "DE_CORING") return { flowKey: "DE_CORING", kind: "DE_CORING_MOTOR" };
-  if (division === "POST_CURE") return { flowKey: "POST_CURE", kind: "POST_CURE_MOTOR" };
+  if (division === "POST_CURE" || division === "POST_CURE_OPERATION") {
+    return { flowKey: "POST_CURE", kind: "POST_CURE_MOTOR" };
+  }
   if (division === "NDT") return { flowKey: "NDT", kind: "NDT_MOTOR" };
   if (division === "PROPELLANT_PROPERTIES") return { flowKey: "QC", kind: "PROPELLANT_PROCESS" };
   if (division === "WEIGHTMENT") return { flowKey: "WEIGHTMENT", kind: "WEIGHTMENT_MOTOR" };
@@ -90,6 +112,7 @@ export async function hydrateQcDivisionFormFromDetails(
     { division: QcApiDivision; subType: QcApiSubType; inhibitorType?: QcInhibitorType }
   >();
   const mixingFinalMixDetailSections: SchemaSectionSubmission[] = [];
+  let domainMixingFinalMixDetailsValues: SchemaFormValues | undefined;
 
   const enqueueSchema = (
     division: QcApiDivision,
@@ -104,9 +127,19 @@ export async function hydrateQcDivisionFormFromDetails(
     return key;
   };
 
-  const rawMaterialTypeForLabel = (division: QcApiDivision): string => {
-    if (division === "RAW_MATERIAL_REVALIDATION") return "RAW_MATERIAL_REVALIDATION";
-    if (division === "RAW_MATERIAL_PROCESSING") return "RAW_MATERIAL_PROCESSING";
+  const rawMaterialTypeForLabel = (division: QcApiDivision, subType?: QcApiSubType): string => {
+    if (
+      division === "RAW_MATERIAL_REVALIDATION" ||
+      (division === "RAW_MATERIAL" && subType === "RAW_MATERIAL_REVALIDATION")
+    ) {
+      return "RAW_MATERIAL_REVALIDATION";
+    }
+    if (
+      division === "RAW_MATERIAL_PROCESSING" ||
+      (division === "RAW_MATERIAL" && subType === "RAW_MATERIAL_PROCESSING")
+    ) {
+      return "RAW_MATERIAL_PROCESSING";
+    }
     return "";
   };
 
@@ -118,6 +151,47 @@ export async function hydrateQcDivisionFormFromDetails(
   for (const detail of rawDivisionDetails) {
     const division = detail.division as QcApiDivision;
     const detailSubType = detail.subType as QcApiSubType;
+    const detailData = detail.data ?? detail;
+    const processingSeeds =
+      division === "RAW_MATERIAL_PROCESSING" ||
+      (division === "RAW_MATERIAL" && detailSubType === "RAW_MATERIAL_PROCESSING")
+        ? parseProcessingMaterialsFromDivisionDetails({ data: detailData })
+        : [];
+
+    if (processingSeeds.length > 0) {
+      for (const seed of processingSeeds) {
+        try {
+          const schema = await fetchQcProcessingMaterialSchema({
+            subDepartmentId: effectiveSubDepartmentId,
+            seed,
+          });
+          const entry = buildProcessingMaterialEntry(seed);
+          entries.push(entry);
+          if (schema) {
+            if (entry.schemaCacheKey) {
+              schemasByKey[entry.schemaCacheKey] = schema;
+            }
+            entryValues[entry.entryId] = {
+              schemaValues: hydrateProcessingMaterialValuesFromSeed(schema, seed),
+            };
+          } else {
+            // Keep entry + saved sections so details/approver can still render read-only data.
+            entryValues[entry.entryId] = { schemaValues: {} };
+          }
+        } catch {
+          // Schema fetch failure should not drop the material entry for display.
+          try {
+            const entry = buildProcessingMaterialEntry(seed);
+            entries.push(entry);
+            entryValues[entry.entryId] = { schemaValues: {} };
+          } catch {
+            // ignore malformed seed
+          }
+        }
+      }
+      continue;
+    }
+
     const sections: SchemaSectionSubmission[] =
       detail.data?.sections ?? (detail as { sections?: SchemaSectionSubmission[] }).sections ?? [];
 
@@ -133,7 +207,7 @@ export async function hydrateQcDivisionFormFromDetails(
       const label = buildDivisionEntryLabel({
         flowKey: getEntryKind(division, entrySubType).flowKey,
         kind: entryKind,
-        rawMaterialType: rawMaterialTypeForLabel(division),
+        rawMaterialType: rawMaterialTypeForLabel(division, detailSubType),
         processingType: processingTypeForLabel(division, entrySubType),
         premixNo,
         subType: entrySubType,
@@ -155,18 +229,54 @@ export async function hydrateQcDivisionFormFromDetails(
       return { entryId, entrySections };
     };
 
+    const isRevalidationDivision =
+      division === "RAW_MATERIAL_REVALIDATION" ||
+      (division === "RAW_MATERIAL" && detailSubType === "RAW_MATERIAL_REVALIDATION");
+
+    if (isRevalidationDivision && !sections.length) {
+      const revalidationValues = mapDivisionDetailsToRevalidationValues(detailData);
+      if (revalidationValues) {
+        const { entryId } = makeEntry(
+          "REVALIDATION",
+          detailSubType ?? "RAW_MATERIAL_REVALIDATION",
+          [],
+        );
+        entryValues[entryId] = { schemaValues: revalidationValues };
+        continue;
+      }
+    }
+
     if (division === "MIXING") {
+      const hydratedMixing = hydrateMixingDivisionFromFormData(detailData);
+      if (hydratedMixing) {
+        hydratedMixing.premixEntries.forEach(({ premixNo, values }) => {
+          const { entryId } = makeEntry("MIXING_PREMIX", "PREMIX", [], premixNo);
+          entryValues[entryId] = { schemaValues: values };
+        });
+        hydratedMixing.finalMixEntries.forEach(({ premixNo, values }) => {
+          const { entryId } = makeEntry("MIXING_FINAL_MIX", "FINAL_MIX", [], premixNo);
+          entryValues[entryId] = { schemaValues: values };
+        });
+        if (hydratedMixing.finalMixDetailsValues && !domainMixingFinalMixDetailsValues) {
+          domainMixingFinalMixDetailsValues = hydratedMixing.finalMixDetailsValues;
+        }
+        continue;
+      }
+
       const grouped = groupMixingDetailSections(sections, detailSubType);
-      grouped.schemaSubTypes.forEach((subType) => enqueueSchema(division, subType));
 
       grouped.premixEntries.forEach(({ premixNo, sections: preSections }) => {
         const { entryId } = makeEntry("MIXING_PREMIX", "PREMIX", preSections, premixNo);
-        entryValues[entryId] = { schemaValues: {} };
+        entryValues[entryId] = {
+          schemaValues: hydrateMixingDetailsValuesFromSections(preSections, "premix"),
+        };
       });
 
       grouped.finalMixEntries.forEach(({ premixNo, sections: visSections }) => {
         const { entryId } = makeEntry("MIXING_FINAL_MIX", "FINAL_MIX", visSections, premixNo);
-        entryValues[entryId] = { schemaValues: {} };
+        entryValues[entryId] = {
+          schemaValues: hydrateViscosityValuesFromSections(visSections),
+        };
       });
 
       if (grouped.finalMixDetailSections.length) {
@@ -204,7 +314,10 @@ export async function hydrateQcDivisionFormFromDetails(
         list.push(section);
         sectionsByMotor.set(groupKey, list);
       } else {
-        if (division !== "RAW_MATERIAL_REVALIDATION") {
+        if (
+          division !== "RAW_MATERIAL_REVALIDATION" &&
+          !(division === "RAW_MATERIAL" && detailSubType === "RAW_MATERIAL_REVALIDATION")
+        ) {
           enqueueSchema(division, detailSubType);
         }
         simpleSections.push(section);
@@ -302,6 +415,38 @@ export async function hydrateQcDivisionFormFromDetails(
       continue;
     }
 
+    if (entry.kind === "MIXING_PREMIX" || entry.kind === "MIXING_FINAL_MIX") {
+      const sectionsToHydrate =
+        entry.savedSections ??
+        (resolvedData.savedSections ?? []).filter((s) => {
+          if (entry.kind === "MIXING_PREMIX" && s.sectionId !== QC_MIXING_PREMIX_SECTION_ID) return false;
+          if (entry.kind === "MIXING_FINAL_MIX" && s.sectionId !== QC_MIXING_VISCOSITY_SECTION_ID) {
+            return false;
+          }
+          if (entry.premixNo != null && s.premixNo !== entry.premixNo) return false;
+          return true;
+        });
+      if (sectionsToHydrate.length > 0) {
+        entryValues[entry.entryId] = {
+          schemaValues:
+            entry.kind === "MIXING_FINAL_MIX"
+              ? hydrateViscosityValuesFromSections(sectionsToHydrate)
+              : hydrateMixingDetailsValuesFromSections(sectionsToHydrate, "premix"),
+        };
+      } else if (
+        !entryValues[entry.entryId]?.schemaValues ||
+        Object.keys(entryValues[entry.entryId].schemaValues).length === 0
+      ) {
+        entryValues[entry.entryId] = {
+          schemaValues:
+            entry.kind === "MIXING_FINAL_MIX"
+              ? createInitialViscosityValues()
+              : createInitialPremixDetailsValues(),
+        };
+      }
+      continue;
+    }
+
     const cacheKey = getQcSchemaCacheKey(entry.apiDivision, entry.subType, entry.inhibitorType);
     const schema = schemasByKey[cacheKey];
     if (!schema) continue;
@@ -310,8 +455,6 @@ export async function hydrateQcDivisionFormFromDetails(
       entry.savedSections ??
       (resolvedData.savedSections ?? []).filter((s) => {
         if (entry.kind === "REVALIDATION" && s.sectionId !== "RAW_MATERIAL_DETAILS") return false;
-        if (entry.kind === "MIXING_PREMIX" && s.sectionId !== QC_MIXING_PREMIX_SECTION_ID) return false;
-        if (entry.kind === "MIXING_FINAL_MIX" && s.sectionId !== QC_MIXING_VISCOSITY_SECTION_ID) return false;
         if (entry.kind === "HARDWARE_PROCESS" && entry.subType) {
           const expectedSectionId = getHardwareSectionIdForSubType(String(entry.subType));
           if (expectedSectionId && s.sectionId !== expectedSectionId) return false;
@@ -345,21 +488,17 @@ export async function hydrateQcDivisionFormFromDetails(
       });
 
     if (sectionsToHydrate.length > 0) {
-      const hydrationSchema =
-        entry.kind === "MIXING_FINAL_MIX"
-          ? sliceMixingFinalMixSchema(schema, "viscosity") ?? schema
-          : schema;
       entryValues[entry.entryId] = {
-        schemaValues: hydrateQcValuesFromSections(hydrationSchema, sectionsToHydrate),
+        schemaValues: hydrateQcValuesFromSections(schema, sectionsToHydrate),
       };
     }
   }
 
-  const finalMixSchema = schemasByKey[getQcSchemaCacheKey("MIXING", "FINAL_MIX")];
   const mixingFinalMixDetailsValues =
-    finalMixSchema && mixingFinalMixDetailSections.length
-      ? hydrateMixingFinalMixDetailsValues(finalMixSchema, mixingFinalMixDetailSections)
-      : undefined;
+    domainMixingFinalMixDetailsValues ??
+    (mixingFinalMixDetailSections.length > 0
+      ? hydrateMixingDetailsValuesFromSections(mixingFinalMixDetailSections, "finalMix")
+      : undefined);
 
   return {
     ...resolvedData,

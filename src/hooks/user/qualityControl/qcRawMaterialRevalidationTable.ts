@@ -52,7 +52,7 @@ export const createEmptyRevalidationPickerRow = (srNo = 1): QcRevalidationRow =>
 });
 
 export const createInitialRevalidationSchemaValues = (): SchemaFormValues => ({
-  [QC_REVALIDATION_FORM_KEY]: [createEmptyRevalidationPickerRow(1)],
+  [QC_REVALIDATION_FORM_KEY]: [],
 });
 
 export const getRevalidationRows = (values: SchemaFormValues | null | undefined): QcRevalidationRow[] => {
@@ -135,6 +135,72 @@ export const buildRevalidationSectionPayload = (
   ];
 };
 
+const normalizeCertificateList = (value: unknown): string[] => {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item ?? "").trim()).filter(Boolean);
+  }
+  const single = String(value ?? "").trim();
+  return single ? [single] : [];
+};
+
+/**
+ * Create/update payload shape:
+ * data.materials[{ ingredient, qcDetails: [{ lotBatchNumber, parameter, ... }] }]
+ * (no schema sections)
+ */
+export const buildRevalidationMaterialsPayload = (
+  values: SchemaFormValues | null | undefined,
+): Array<{
+  ingredient: string;
+  qcDetails: Array<{
+    lotBatchNumber: string;
+    parameter: string;
+    specification: string;
+    result: string;
+    validity: string;
+    remarks: string;
+    qcCertificate: string[];
+  }>;
+}> => {
+  const rows = getRevalidationRows(values)
+    .filter((row) => row._rowRole !== "picker")
+    .filter((row) => !isEmptyRevalidationRow(row));
+
+  const byIngredient = new Map<
+    string,
+    Array<{
+      lotBatchNumber: string;
+      parameter: string;
+      specification: string;
+      result: string;
+      validity: string;
+      remarks: string;
+      qcCertificate: string[];
+    }>
+  >();
+
+  rows.forEach((row) => {
+    const ingredient = String(row.INGREDIENT ?? "").trim();
+    if (!ingredient) return;
+    const list = byIngredient.get(ingredient) ?? [];
+    list.push({
+      lotBatchNumber: String(row.LOT_BATCH_NUMBER ?? "").trim(),
+      parameter: String(row.PARAMETER ?? "").trim(),
+      specification: String(row.SPECIFICATION ?? "").trim(),
+      result: String(row.RESULT ?? row.ACEM_QC_RESULT ?? "").trim(),
+      validity: String(row.VALIDITY ?? "").trim(),
+      remarks: String(row.REMARKS ?? "").trim(),
+      qcCertificate: normalizeCertificateList(row.QC_CERTIFICATE),
+    });
+    byIngredient.set(ingredient, list);
+  });
+
+  return Array.from(byIngredient.entries()).map(([ingredient, qcDetails]) => ({
+    ingredient,
+    qcDetails,
+  }));
+};
+
 const extractRowsFromSectionData = (sectionData: unknown): QcRevalidationRow[] => {
   if (!Array.isArray(sectionData)) return [];
 
@@ -191,10 +257,7 @@ export const hydrateRevalidationValuesFromSections = (
     }),
   );
 
-  return setRevalidationRows(
-    {},
-    renumberRevalidationRows([...expanded, createEmptyRevalidationPickerRow(expanded.length + 1)]),
-  );
+  return setRevalidationRows({}, renumberRevalidationRows(expanded));
 };
 
 export type QcRevalidationSpecOption = {
@@ -230,11 +293,7 @@ export const expandRevalidationIngredient = (
   }));
 
   const withoutPicker = rows.filter((_, index) => index !== pickerIndex);
-  return renumberRevalidationRows([
-    ...withoutPicker,
-    ...expanded,
-    createEmptyRevalidationPickerRow(withoutPicker.length + expanded.length + 1),
-  ]);
+  return renumberRevalidationRows([...withoutPicker, ...expanded]);
 };
 
 export const removeRevalidationGroup = (
@@ -242,10 +301,7 @@ export const removeRevalidationGroup = (
   groupId: string,
 ): QcRevalidationRow[] => {
   const next = rows.filter((row) => String(row._groupId ?? "") !== groupId);
-  const hasPicker = next.some((row) => row._rowRole === "picker");
-  return renumberRevalidationRows(
-    hasPicker ? next : [...next, createEmptyRevalidationPickerRow(next.length + 1)],
-  );
+  return renumberRevalidationRows(next.filter((row) => row._rowRole !== "picker"));
 };
 
 export const hasRevalidationTableData = (values: SchemaFormValues | null | undefined): boolean =>
@@ -411,20 +467,35 @@ const extractRowsFromMaterials = (materials: unknown[]): QcRevalidationRow[] => 
     ).trim();
     const groupId = `${ingredient}-${index}`;
     const materialCertificate = readQcCertificateValue(record);
-    const specs = Array.isArray(record.specifications)
-      ? record.specifications
-      : Array.isArray(record.parameters)
-        ? record.parameters
-        : Array.isArray(record.rows)
-          ? record.rows
-          : [];
+    const specs = Array.isArray(record.qcDetails)
+      ? record.qcDetails
+      : Array.isArray(record.specifications)
+        ? record.specifications
+        : Array.isArray(record.parameters)
+          ? record.parameters
+          : Array.isArray(record.rows)
+            ? record.rows
+            : [];
 
     if (specs.length) {
       rows.push(
-        ...normalizeSpecRows(ingredient, lotId, specs, groupId).map((row) => ({
-          ...row,
-          QC_CERTIFICATE: row.QC_CERTIFICATE || materialCertificate,
-        })),
+        ...normalizeSpecRows(ingredient, lotId, specs, groupId).map((row) => {
+          const specRec = row as Record<string, unknown>;
+          const lotFromDetail = String(
+            specRec.lotBatchNumber ?? specRec.LOT_BATCH_NUMBER ?? lotId,
+          ).trim();
+          return {
+            ...row,
+            LOT_BATCH_NUMBER: lotFromDetail || row.LOT_BATCH_NUMBER,
+            RESULT: String(
+              specRec.result ?? specRec.RESULT ?? specRec.analysedResult ?? row.RESULT ?? "",
+            ).trim(),
+            QC_CERTIFICATE:
+              row.QC_CERTIFICATE ||
+              readQcCertificateValue(specRec) ||
+              materialCertificate,
+          };
+        }),
       );
       return;
     }
@@ -527,18 +598,12 @@ const collectSectionsFromPayload = (payload: unknown): SchemaSectionSubmission[]
 
 const wrapExpandedRows = (expanded: QcRevalidationRow[]): SchemaFormValues | null => {
   if (!expanded.length) return null;
-  return setRevalidationRows(
-    {},
-    renumberRevalidationRows([
-      ...expanded,
-      createEmptyRevalidationPickerRow(expanded.length + 1),
-    ]),
-  );
+  return setRevalidationRows({}, renumberRevalidationRows(expanded));
 };
 
 /**
  * Map `/qc-division/division-details` auto-populate payload into revalidation table values.
- * Returns null when the payload has no usable initial rows (UI should fall back to empty picker).
+ * Returns null when the payload has no usable initial rows.
  */
 export const mapDivisionDetailsToRevalidationValues = (
   payload: unknown,

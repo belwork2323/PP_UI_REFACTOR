@@ -1,14 +1,17 @@
 import { OPERATION_STATUS } from "../../operationStatus";
 import {
-  applyStatusMapsToPartialNav,
   buildDivisionApprovalRows,
+  buildFinalApprovalDivisionGroups,
   buildFinalApprovalRows,
-  hasPartialChildNav,
-  mapDivisionDetailsToPartialNav,
   type QcApprovalTableRow,
+  type QcFinalApprovalDivisionGroup,
   type QcPartialItemStatus,
   type QcPartialNavItem,
 } from "../../user/qualityControl/qcDivisionApprovalUnits";
+import {
+  groupUnitStatusesByDivisionTabKey,
+  resolveUnitStatusTabKey,
+} from "../../user/qualityControl/qcDivisionDataSource";
 
 const normalizeStatusKey = (value: unknown): string =>
   String(value ?? "")
@@ -103,7 +106,6 @@ export const buildQcApproverPartialState = (
   detailsPayload: Record<string, unknown> | null | undefined,
 ): QcApproverPartialState => {
   const root = detailsPayload ?? {};
-  const divisionDetails = Array.isArray(root.divisionDetails) ? root.divisionDetails : [];
   const motorStatuses = root.motorStatuses;
   const premixStatuses = root.premixStatuses;
   const divisionStatuses = Array.isArray(root.divisionStatuses) ? root.divisionStatuses : [];
@@ -112,67 +114,57 @@ export const buildQcApproverPartialState = (
   divisionStatuses.forEach((entry) => {
     if (!entry || typeof entry !== "object") return;
     const rec = entry as Record<string, unknown>;
-    const key = String(rec.division ?? "").trim();
+    const key =
+      resolveUnitStatusTabKey({
+        division: String(rec.division ?? ""),
+        subType: String(rec.subType ?? ""),
+      }) || String(rec.division ?? "").trim().toUpperCase();
     if (!key) return;
     divisionStatusByFlowKey[key] = toPartialStatus(rec.status);
   });
 
-  const partialNavByDivision: Record<string, QcPartialNavItem[]> = {};
-
-  divisionDetails.forEach((entry) => {
-    if (!entry || typeof entry !== "object") return;
-    const rec = entry as Record<string, unknown>;
-    const division = String(rec.division ?? "").trim();
-    if (!division) return;
-
-    const flowKey = division;
-    const rawMaterialType =
-      division === "RAW_MATERIAL_PROCESSING" || division === "RAW_MATERIAL"
-        ? "RAW_MATERIAL_PROCESSING"
-        : undefined;
-
-    let items = mapDivisionDetailsToPartialNav(
-      {
-        data: rec.data ?? {},
-        motors: motorStatuses,
-        premixes: premixStatuses,
-      },
-      {
-        flowKey,
-        rawMaterialType,
-      },
-    );
-
-    items = applyStatusMapsToPartialNav(items, {
-      motorStatuses,
-      premixStatuses,
-      division,
-    });
-
-    if (!hasPartialChildNav(items)) {
-      items = [
-        {
-          id: `division:${division}`,
-          kind: "DIVISION",
-          label: String(rec.subType ?? division),
-          status: divisionStatusByFlowKey[division] ?? toPartialStatus(rec.status),
-        },
-      ];
-    }
-
-    partialNavByDivision[division] = items;
+  // Unit chips come strictly from form premixStatuses / motorStatuses (same as user final-approval).
+  const unitsByTabKey = groupUnitStatusesByDivisionTabKey({
+    premixStatuses,
+    motorStatuses,
   });
 
-  Object.keys(divisionStatusByFlowKey).forEach((division) => {
-    if (partialNavByDivision[division]?.length) return;
-    partialNavByDivision[division] = [
-      {
-        id: `division:${division}`,
-        kind: "DIVISION",
-        label: division,
-        status: divisionStatusByFlowKey[division],
-      },
-    ];
+  const partialNavByDivision: Record<string, QcPartialNavItem[]> = {};
+  const allKeys = new Set<string>([
+    ...Object.keys(divisionStatusByFlowKey),
+    ...Object.keys(unitsByTabKey),
+  ]);
+
+  allKeys.forEach((key) => {
+    const normalized = String(key).trim().toUpperCase();
+    if (!normalized) return;
+    // Skip alias / parent keys that are not primary tab keys.
+    if (
+      normalized === "PROPELLANT_PROPERTIES" ||
+      normalized === "POST_CURE_OPERATION" ||
+      normalized === "RAW_MATERIAL"
+    ) {
+      return;
+    }
+    partialNavByDivision[normalized] = (unitsByTabKey[normalized] ?? []).filter(
+      (item) =>
+        item.kind === "PREMIX" || item.kind === "FINAL_MIX" || item.kind === "MOTOR",
+    );
+    if (!(normalized in divisionStatusByFlowKey)) {
+      // Infer division status from units when divisionStatuses omitted the key.
+      const units = partialNavByDivision[normalized];
+      if (units.some((unit) => unit.status === "REJECTED")) {
+        divisionStatusByFlowKey[normalized] = "REJECTED";
+      } else if (units.some((unit) => unit.status === "WAITING_FOR_APPROVAL")) {
+        divisionStatusByFlowKey[normalized] = "WAITING_FOR_APPROVAL";
+      } else if (units.some((unit) => unit.status === "IN_PROGRESS")) {
+        divisionStatusByFlowKey[normalized] = "IN_PROGRESS";
+      } else if (units.length > 0 && units.every((unit) => unit.status === "APPROVED")) {
+        divisionStatusByFlowKey[normalized] = "APPROVED";
+      } else {
+        divisionStatusByFlowKey[normalized] = "TO_BE_INITIATED";
+      }
+    }
   });
 
   return {
@@ -193,17 +185,112 @@ export const buildQcApproverDivisionRows = (
   divisionLabel: string,
 ): QcApprovalTableRow[] => buildDivisionApprovalRows(items, divisionLabel);
 
+const formatQcApproverDivisionLabel = (key: string): string => {
+  const normalized = String(key ?? "").trim().toUpperCase();
+  const labels: Record<string, string> = {
+    RAW_MATERIAL_REVALIDATION: "Raw Material Revalidation",
+    RAW_MATERIAL_PROCESSING: "Raw Material Processing",
+    RAW_MATERIAL: "Raw Material",
+    MIXING: "Mixing",
+    HARDWARE: "Hardware",
+    CASTING: "Casting",
+    CURING: "Curing",
+    DE_CORING: "De-coring",
+    TRIMMING: "Trimming",
+    POST_CURE: "Post Cure",
+    POST_CURE_OPERATION: "Post Cure",
+    NDT: "NDT",
+    QC: "QC",
+    PROPELLANT_PROPERTIES: "QC",
+    WEIGHTMENT: "Weightment",
+    STATIC_TEST_FACILITY: "Static Test Facility",
+  };
+  if (labels[normalized]) return labels[normalized];
+  return normalized
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(" ");
+};
+
+const QC_APPROVER_OVERVIEW_ORDER = [
+  "RAW_MATERIAL_REVALIDATION",
+  "RAW_MATERIAL_PROCESSING",
+  "MIXING",
+  "HARDWARE",
+  "CASTING",
+  "CURING",
+  "DE_CORING",
+  "TRIMMING",
+  "POST_CURE",
+  "NDT",
+  "QC",
+  "WEIGHTMENT",
+  "STATIC_TEST_FACILITY",
+] as const;
+
+const OVERVIEW_SKIP_KEYS = new Set([
+  "RAW_MATERIAL",
+  "PROPELLANT_PROPERTIES",
+  "POST_CURE_OPERATION",
+]);
+
+const sortQcApproverOverviewKeys = (keys: string[]): string[] => {
+  const orderIndex = new Map(
+    QC_APPROVER_OVERVIEW_ORDER.map((key, index) => [key, index] as const),
+  );
+  return [...keys].sort((a, b) => {
+    const aIdx = orderIndex.get(a as (typeof QC_APPROVER_OVERVIEW_ORDER)[number]);
+    const bIdx = orderIndex.get(b as (typeof QC_APPROVER_OVERVIEW_ORDER)[number]);
+    if (aIdx != null && bIdx != null) return aIdx - bIdx;
+    if (aIdx != null) return -1;
+    if (bIdx != null) return 1;
+    return a.localeCompare(b);
+  });
+};
+
+export const buildQcApproverFinalGroups = (
+  partialNavByDivision: Record<string, QcPartialNavItem[]>,
+  divisionStatusByFlowKey: Record<string, QcPartialItemStatus>,
+): QcFinalApprovalDivisionGroup[] => {
+  const keys = sortQcApproverOverviewKeys(
+    Object.keys({
+      ...divisionStatusByFlowKey,
+      ...partialNavByDivision,
+    }).filter((key) => {
+      const normalized = String(key ?? "").trim().toUpperCase();
+      return Boolean(normalized) && !OVERVIEW_SKIP_KEYS.has(normalized);
+    }),
+  );
+
+  return buildFinalApprovalDivisionGroups(
+    keys.map((key) => ({
+      divisionKey: key,
+      divisionLabel: formatQcApproverDivisionLabel(key),
+      divisionStatus: divisionStatusByFlowKey[key] ?? "TO_BE_INITIATED",
+      units: (partialNavByDivision[key] ?? []).filter(
+        (item) =>
+          item.kind === "PREMIX" || item.kind === "FINAL_MIX" || item.kind === "MOTOR",
+      ),
+    })),
+  );
+};
+
 export const buildQcApproverFinalRows = (
   partialNavByDivision: Record<string, QcPartialNavItem[]>,
   divisionStatusByFlowKey: Record<string, QcPartialItemStatus>,
 ): QcApprovalTableRow[] => {
-  const divisions = Object.keys({
-    ...divisionStatusByFlowKey,
-    ...partialNavByDivision,
-  }).map((divisionLabel) => ({
-    divisionLabel,
-    divisionStatus: divisionStatusByFlowKey[divisionLabel],
-    units: partialNavByDivision[divisionLabel] ?? [],
-  }));
-  return buildFinalApprovalRows(divisions);
+  const groups = buildQcApproverFinalGroups(partialNavByDivision, divisionStatusByFlowKey);
+  return buildFinalApprovalRows(
+    groups.map((group) => ({
+      divisionLabel: group.divisionLabel,
+      divisionStatus: group.divisionStatus,
+      units: group.units.map((unit) => ({
+        id: unit.id,
+        kind: unit.kind,
+        label: unit.label,
+        status: unit.status,
+      })),
+    })),
+  );
 };

@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, Fragment } from "react";
 import {
   Box,
-  Button,
-  CircularProgress,
   IconButton,
   MenuItem,
   Stack,
@@ -18,8 +16,6 @@ import {
 } from "@mui/material";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { operationsController } from "../../../../../controllers/user/operationsController";
-import { normalizeMaterialsListResponse } from "../../../../../data/models/user/MaterialsListModel";
-import { MaterialSpecificationListModel } from "../../../../../data/models/user/MaterialSpecificationModel";
 import type { SchemaFormValues } from "../../../../../schema-engine";
 import { computeExpandedGroupCellSpans } from "../../../../../schema-engine/rules/tableCommitGroup";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
@@ -29,7 +25,6 @@ import { FILE_PICKER_ACCEPT } from "../../../../../utils/FileUtils";
 import {
   QC_REVALIDATION_COLUMNS,
   QC_REVALIDATION_MERGE_COLUMNS,
-  expandRevalidationIngredient,
   getRevalidationRows,
   removeRevalidationGroup,
   renumberRevalidationRows,
@@ -54,6 +49,40 @@ const cellSx = {
   borderColor: alpha("#1B4F72", 0.12),
 };
 
+const readOnlyCellSx = {
+  fontSize: "0.72rem",
+  py: 0.5,
+  px: 1,
+  verticalAlign: "middle",
+  borderColor: alpha("#1B4F72", 0.12),
+};
+
+const displayValue = (value: unknown) => {
+  const text = String(value ?? "").trim();
+  return text || "—";
+};
+
+const ReadOnlyValue = ({
+  value,
+  muted = false,
+}: {
+  value: unknown;
+  muted?: boolean;
+}) => (
+  <Typography
+    sx={{
+      fontSize: "0.72rem",
+      fontWeight: muted ? 500 : 600,
+      color: muted ? QC_DIVISION_BRAND.textSub : QC_DIVISION_BRAND.text,
+      lineHeight: 1.35,
+      whiteSpace: "pre-wrap",
+      wordBreak: "break-word",
+    }}
+  >
+    {displayValue(value)}
+  </Typography>
+);
+
 const QCRawMaterialRevalidationTable = ({
   values,
   onChange,
@@ -61,34 +90,13 @@ const QCRawMaterialRevalidationTable = ({
   readOnly = false,
 }: QCRawMaterialRevalidationTableProps) => {
   const BRAND = QC_DIVISION_BRAND;
-  const rows = useMemo(() => getRevalidationRows(values), [values]);
-  const [ingredientOptions, setIngredientOptions] = useState<Option[]>([]);
+  const baseCellSx = readOnly ? readOnlyCellSx : cellSx;
+  const rows = useMemo(
+    () => getRevalidationRows(values).filter((row) => row._rowRole !== "picker"),
+    [values],
+  );
   const [lotOptions, setLotOptions] = useState<Option[]>([]);
-  const [loadingIngredients, setLoadingIngredients] = useState(false);
   const [loadingLots, setLoadingLots] = useState(false);
-  const [adding, setAdding] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  const usedIngredients = useMemo(
-    () =>
-      new Set(
-        rows
-          .filter((row) => row._rowRole === "expanded")
-          .map((row) => String(row.INGREDIENT ?? "").trim())
-          .filter(Boolean),
-      ),
-    [rows],
-  );
-
-  const pickerRow = useMemo(
-    () => [...rows].reverse().find((row) => row._rowRole === "picker") ?? null,
-    [rows],
-  );
-
-  const hasExpandedRows = useMemo(
-    () => rows.some((row) => row._rowRole === "expanded"),
-    [rows],
-  );
 
   const mergeSpans = useMemo(
     () =>
@@ -98,34 +106,6 @@ const QCRawMaterialRevalidationTable = ({
       ),
     [rows],
   );
-
-  useEffect(() => {
-    let active = true;
-    setLoadingIngredients(true);
-    void operationsController
-      .fetchMaterialsList({ materialType: "BOTH" })
-      .then((response: any) => {
-        if (!active) return;
-        const list = Array.isArray(response?.data)
-          ? response.data
-          : normalizeMaterialsListResponse(response?.data);
-        setIngredientOptions(
-          (list as Array<{ materialCode?: string; materialName?: string }>).map((item) => ({
-            value: String(item.materialCode ?? "").trim(),
-            label: String(item.materialName || item.materialCode || "").trim(),
-          })).filter((option) => option.value),
-        );
-      })
-      .catch(() => {
-        if (active) setIngredientOptions([]);
-      })
-      .finally(() => {
-        if (active) setLoadingIngredients(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, []);
 
   useEffect(() => {
     if (!batchId) {
@@ -177,56 +157,6 @@ const QCRawMaterialRevalidationTable = ({
       commitRows(rows.map((row, idx) => (idx === index ? { ...row, ...patch } : row)));
     },
     [commitRows, rows],
-  );
-
-  const handleAddIngredient = useCallback(async () => {
-    if (!pickerRow) return;
-    const ingredient = String(pickerRow.INGREDIENT ?? "").trim();
-    if (!ingredient) {
-      setError("Select an ingredient before adding.");
-      return;
-    }
-    if (usedIngredients.has(ingredient)) {
-      setError("This ingredient is already added.");
-      return;
-    }
-
-    setAdding(true);
-    setError(null);
-    try {
-      const response = await operationsController.fetchMaterialSpecificationList({
-        materialCode: ingredient,
-        gradeCode: null,
-      });
-      const model =
-        response?.data instanceof MaterialSpecificationListModel
-          ? response.data
-          : MaterialSpecificationListModel.fromApi(response?.data ?? response);
-      const specs = (model.specifications ?? []).map((spec) => ({
-        specificationName: spec.specificationName,
-        specificationCode: spec.specificationCode,
-        specsLabel: spec.formattedReferenceRange,
-      }));
-      if (!specs.length) {
-        setError("No specifications found for the selected ingredient.");
-        return;
-      }
-      const next = expandRevalidationIngredient(rows, specs);
-      if (next) commitRows(next);
-    } catch {
-      setError("Failed to load ingredient specifications.");
-    } finally {
-      setAdding(false);
-    }
-  }, [commitRows, pickerRow, rows, usedIngredients]);
-
-  const availableIngredientOptions = useMemo(
-    () =>
-      ingredientOptions.map((option) => ({
-        ...option,
-        disabled: usedIngredients.has(option.value) && option.value !== String(pickerRow?.INGREDIENT ?? ""),
-      })),
-    [ingredientOptions, pickerRow?.INGREDIENT, usedIngredients],
   );
 
   const renderSelect = (
@@ -281,32 +211,35 @@ const QCRawMaterialRevalidationTable = ({
   const mergedCellSx = (rowSpan: number) =>
     rowSpan > 1
       ? {
-          ...cellSx,
+          ...baseCellSx,
           verticalAlign: "middle" as const,
           borderRight: `1px solid ${alpha("#1B4F72", 0.12)}`,
           background: alpha(BRAND.primaryLight, 0.04),
         }
-      : cellSx;
+      : baseCellSx;
 
   return (
     <Box>
       <TableContainer
         sx={{
           border: `1px solid ${BRAND.border}`,
-          borderRadius: 2,
+          borderRadius: readOnly ? 1 : 2,
           background: "#fff",
           overflowX: "auto",
         }}
       >
-        <Table size="small" stickyHeader>
+        <Table size="small" stickyHeader={!readOnly}>
           <TableHead>
             <TableRow>
               {QC_REVALIDATION_COLUMNS.map((column) => (
                 <TableCell
                   key={column.id}
                   sx={{
-                    ...cellSx,
+                    ...baseCellSx,
                     fontWeight: 800,
+                    fontSize: readOnly ? "0.65rem" : "0.72rem",
+                    letterSpacing: readOnly ? "0.02em" : undefined,
+                    textTransform: readOnly ? "uppercase" : undefined,
                     color: BRAND.primary,
                     background: alpha(BRAND.primaryLight, 0.08),
                     whiteSpace: "nowrap",
@@ -318,7 +251,7 @@ const QCRawMaterialRevalidationTable = ({
               {!readOnly ? (
                 <TableCell
                   sx={{
-                    ...cellSx,
+                    ...baseCellSx,
                     fontWeight: 800,
                     color: BRAND.primary,
                     background: alpha(BRAND.primaryLight, 0.08),
@@ -330,7 +263,6 @@ const QCRawMaterialRevalidationTable = ({
           </TableHead>
           <TableBody>
             {rows.map((row, index) => {
-              const isPicker = row._rowRole === "picker";
               const isExpanded = row._rowRole === "expanded";
               const groupId = String(row._groupId ?? "");
               const showGroupDelete =
@@ -361,52 +293,38 @@ const QCRawMaterialRevalidationTable = ({
               const lotSpan = mergeSpans.get(`${index}:LOT_BATCH_NUMBER`);
 
               return (
-              <Fragment key={`${row._groupId ?? "picker"}-${index}`}>
-                <TableRow
-                  sx={{
-                    background: isPicker ? alpha(BRAND.primaryLight, 0.03) : undefined,
-                  }}
-                >
+              <Fragment key={`${row._groupId ?? "row"}-${index}`}>
+                <TableRow>
                   {srSpan?.isContinuation ? null : (
                     <TableCell
                       sx={mergedCellSx(srSpan?.rowSpan ?? 1)}
                       rowSpan={srSpan?.rowSpan && srSpan.rowSpan > 1 ? srSpan.rowSpan : undefined}
                     >
-                      {row.SR_NO}
+                      <ReadOnlyValue value={row.SR_NO} />
                     </TableCell>
                   )}
                   {ingredientSpan?.isContinuation ? null : (
                     <TableCell
-                      sx={{ ...mergedCellSx(ingredientSpan?.rowSpan ?? 1), minWidth: 180 }}
+                      sx={{ ...mergedCellSx(ingredientSpan?.rowSpan ?? 1), minWidth: readOnly ? 100 : 180 }}
                       rowSpan={
                         ingredientSpan?.rowSpan && ingredientSpan.rowSpan > 1
                           ? ingredientSpan.rowSpan
                           : undefined
                       }
                     >
-                      {isPicker
-                        ? renderSelect(
-                            String(row.INGREDIENT ?? ""),
-                            availableIngredientOptions,
-                            (next) => updateRow(index, { INGREDIENT: next, LOT_BATCH_NUMBER: "" }),
-                            "Select ingredient",
-                            false,
-                            loadingIngredients,
-                          )
-                        : (
-                          <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.text }}>
-                            {String(row.INGREDIENT ?? "—")}
-                          </Typography>
-                        )}
+                      <ReadOnlyValue value={row.INGREDIENT} />
                     </TableCell>
                   )}
                   {lotSpan?.isContinuation ? null : (
                     <TableCell
-                      sx={{ ...mergedCellSx(lotSpan?.rowSpan ?? 1), minWidth: 170 }}
+                      sx={{ ...mergedCellSx(lotSpan?.rowSpan ?? 1), minWidth: readOnly ? 110 : 170 }}
                       rowSpan={lotSpan?.rowSpan && lotSpan.rowSpan > 1 ? lotSpan.rowSpan : undefined}
                     >
-                      {isPicker || isExpanded
-                        ? renderSelect(
+                      {isExpanded ? (
+                        readOnly ? (
+                          <ReadOnlyValue value={row.LOT_BATCH_NUMBER} />
+                        ) : (
+                          renderSelect(
                             String(row.LOT_BATCH_NUMBER ?? ""),
                             lotOptions.filter(
                               (option) =>
@@ -414,10 +332,6 @@ const QCRawMaterialRevalidationTable = ({
                                 option.materialCode === String(row.INGREDIENT ?? "").trim(),
                             ),
                             (next) => {
-                              if (isPicker) {
-                                updateRow(index, { LOT_BATCH_NUMBER: next });
-                                return;
-                              }
                               commitRows(
                                 rows.map((entry) =>
                                   String(entry._groupId ?? "") === groupId
@@ -427,75 +341,77 @@ const QCRawMaterialRevalidationTable = ({
                               );
                             },
                             "Select lot / batch",
-                            readOnly || !String(row.INGREDIENT ?? "").trim(),
+                            !String(row.INGREDIENT ?? "").trim(),
                             loadingLots,
                           )
-                        : String(row.LOT_BATCH_NUMBER ?? "—")}
+                        )
+                      ) : (
+                        <ReadOnlyValue value={row.LOT_BATCH_NUMBER} />
+                      )}
                     </TableCell>
                   )}
-                  <TableCell sx={{ ...cellSx, minWidth: 180 }}>
-                    {isPicker ? (
-                      <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub, fontStyle: "italic" }}>
-                        Auto-filled on add
-                      </Typography>
-                    ) : (
-                      <Typography sx={{ fontSize: "0.72rem", color: BRAND.text }}>
-                        {String(row.PARAMETER ?? "—")}
-                      </Typography>
-                    )}
+                  <TableCell sx={{ ...baseCellSx, minWidth: readOnly ? 140 : 180 }}>
+                    <ReadOnlyValue value={row.PARAMETER} muted />
                   </TableCell>
-                  <TableCell sx={{ ...cellSx, minWidth: 120 }}>
-                    {isPicker ? (
-                      <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub, fontStyle: "italic" }}>
-                        —
-                      </Typography>
-                    ) : (
-                      <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub }}>
-                        {String(row.SPECIFICATION ?? "—")}
-                      </Typography>
-                    )}
+                  <TableCell sx={{ ...baseCellSx, minWidth: readOnly ? 90 : 120 }}>
+                    <ReadOnlyValue value={row.SPECIFICATION} muted />
                   </TableCell>
-                  <TableCell sx={{ ...cellSx, minWidth: 120 }}>
-                    {isExpanded
-                      ? renderText(
+                  <TableCell sx={{ ...baseCellSx, minWidth: readOnly ? 90 : 120 }}>
+                    {isExpanded ? (
+                      readOnly ? (
+                        <ReadOnlyValue value={row.RESULT} />
+                      ) : (
+                        renderText(
                           String(row.RESULT ?? ""),
                           (next) => updateRow(index, { RESULT: next }),
                           "Analysed Result",
                         )
-                      : null}
+                      )
+                    ) : null}
                   </TableCell>
-                  <TableCell sx={{ ...cellSx, minWidth: 120 }}>
-                    {isExpanded
-                      ? renderText(
+                  <TableCell sx={{ ...baseCellSx, minWidth: readOnly ? 90 : 120 }}>
+                    {isExpanded ? (
+                      readOnly ? (
+                        <ReadOnlyValue value={row.ACEM_QC_RESULT} />
+                      ) : (
+                        renderText(
                           String(row.ACEM_QC_RESULT ?? ""),
                           (next) => updateRow(index, { ACEM_QC_RESULT: next }),
                           "ACEM QC Result",
                         )
-                      : null}
-                  </TableCell>
-                  <TableCell sx={{ ...cellSx, minWidth: 150 }}>
-                    {isExpanded ? (
-                      <DateField
-                        value={String(row.VALIDITY ?? "")}
-                        onChange={(next) => updateRow(index, { VALIDITY: next })}
-                        disabled={readOnly}
-                        placeholder="Validity"
-                      />
+                      )
                     ) : null}
                   </TableCell>
-                  <TableCell sx={{ ...cellSx, minWidth: 150 }}>
-                    {isExpanded
-                      ? renderText(
+                  <TableCell sx={{ ...baseCellSx, minWidth: readOnly ? 100 : 150 }}>
+                    {isExpanded ? (
+                      readOnly ? (
+                        <ReadOnlyValue value={row.VALIDITY} />
+                      ) : (
+                        <DateField
+                          value={String(row.VALIDITY ?? "")}
+                          onChange={(next) => updateRow(index, { VALIDITY: next })}
+                          placeholder="Validity"
+                        />
+                      )
+                    ) : null}
+                  </TableCell>
+                  <TableCell sx={{ ...baseCellSx, minWidth: readOnly ? 110 : 150 }}>
+                    {isExpanded ? (
+                      readOnly ? (
+                        <ReadOnlyValue value={row.REMARKS} muted />
+                      ) : (
+                        renderText(
                           String(row.REMARKS ?? ""),
                           (next) => updateRow(index, { REMARKS: next }),
                           "Remarks",
                           false,
                           true,
                         )
-                      : null}
+                      )
+                    ) : null}
                   </TableCell>
                   {!readOnly ? (
-                    <TableCell sx={cellSx}>
+                    <TableCell sx={baseCellSx}>
                       {showGroupDelete ? (
                         <IconButton
                           size="small"
@@ -512,40 +428,50 @@ const QCRawMaterialRevalidationTable = ({
                   <TableRow sx={{ background: alpha(BRAND.primaryLight, 0.03) }}>
                     <TableCell
                       colSpan={QC_REVALIDATION_COLUMNS.length + (readOnly ? 0 : 1)}
-                      sx={{ ...cellSx, py: 1 }}
+                      sx={{ ...baseCellSx, py: readOnly ? 0.65 : 1 }}
                     >
-                      <Stack
-                        direction={{ xs: "column", sm: "row" }}
-                        alignItems={{ xs: "stretch", sm: "center" }}
-                        justifyContent="space-between"
-                        gap={1.25}
-                      >
-                        <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.text }}>
-                          Upload QC Certificate
-                          {String(row.LOT_BATCH_NUMBER ?? "").trim()
-                            ? ` · ${String(row.LOT_BATCH_NUMBER).trim()}`
-                            : ""}
-                        </Typography>
-                        <Box sx={{ minWidth: { sm: 260 }, maxWidth: 420, width: "100%" }}>
-                          <SchemaFileField
-                            value={groupCertificate}
-                            onChange={(next) =>
-                              commitRows(
-                                rows.map((entry) =>
-                                  String(entry._groupId ?? "") === groupId
-                                    ? { ...entry, QC_CERTIFICATE: next }
-                                    : entry,
-                                ),
-                              )
-                            }
-                            disabled={readOnly}
-                            compact
-                            accept={FILE_PICKER_ACCEPT.IMAGE_PDF}
-                            emptyLabel="Upload"
-                            multiple={false}
-                          />
-                        </Box>
-                      </Stack>
+                      {readOnly ? (
+                        <Stack
+                          direction={{ xs: "column", sm: "row" }}
+                          alignItems={{ xs: "flex-start", sm: "center" }}
+                          justifyContent="space-between"
+                          gap={0.75}
+                        >
+                          <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: BRAND.textSub }}>
+                            QC Certificate
+                          </Typography>
+                          <ReadOnlyValue value={groupCertificate} />
+                        </Stack>
+                      ) : (
+                        <Stack
+                          direction={{ xs: "column", sm: "row" }}
+                          alignItems={{ xs: "stretch", sm: "center" }}
+                          justifyContent="space-between"
+                          gap={1.25}
+                        >
+                          <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.text }}>
+                            Upload QC Certificate
+                          </Typography>
+                          <Box sx={{ minWidth: { sm: 260 }, maxWidth: 420, width: "100%" }}>
+                            <SchemaFileField
+                              value={groupCertificate}
+                              onChange={(next) =>
+                                commitRows(
+                                  rows.map((entry) =>
+                                    String(entry._groupId ?? "") === groupId
+                                      ? { ...entry, QC_CERTIFICATE: next }
+                                      : entry,
+                                  ),
+                                )
+                              }
+                              compact
+                              accept={FILE_PICKER_ACCEPT.IMAGE_PDF}
+                              emptyLabel="Upload"
+                              multiple={false}
+                            />
+                          </Box>
+                        </Stack>
+                      )}
                     </TableCell>
                   </TableRow>
                 ) : null}
@@ -555,30 +481,6 @@ const QCRawMaterialRevalidationTable = ({
           </TableBody>
         </Table>
       </TableContainer>
-
-      {!readOnly ? (
-        <Stack direction="row" alignItems="center" justifyContent="space-between" gap={1} mt={1.25}>
-          {error ? (
-            <Typography sx={{ fontSize: "0.72rem", color: BRAND.danger }}>{error}</Typography>
-          ) : (
-            <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub }}>
-              {hasExpandedRows
-                ? "Use Add Row to append another ingredient and its specification rows."
-                : "Select an ingredient, then add it to load specification rows."}
-            </Typography>
-          )}
-          <Button
-            size="small"
-            variant="contained"
-            disabled={adding || !String(pickerRow?.INGREDIENT ?? "").trim()}
-            onClick={() => void handleAddIngredient()}
-            startIcon={adding ? <CircularProgress size={14} color="inherit" /> : undefined}
-            sx={{ textTransform: "none", whiteSpace: "nowrap" }}
-          >
-            {adding ? "Adding…" : hasExpandedRows ? "Add Row" : "Add Ingredient"}
-          </Button>
-        </Stack>
-      ) : null}
     </Box>
   );
 };

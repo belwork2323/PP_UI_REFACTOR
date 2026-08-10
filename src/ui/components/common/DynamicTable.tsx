@@ -73,6 +73,7 @@ type DynamicTableProps = {
   rows: Record<string, unknown>[];
   onChange: (rows: Record<string, unknown>[]) => void;
   readOnly?: boolean;
+  lockStructure?: boolean;
   theme?: SchemaThemeTokens;
   apiContext?: SchemaApiContext;
   allowAddColumn?: boolean;
@@ -469,6 +470,7 @@ const DynamicTable = ({
   rows,
   onChange,
   readOnly = false,
+  lockStructure = false,
   theme,
   apiContext,
   allowAddColumn = false,
@@ -539,8 +541,8 @@ const DynamicTable = ({
     typeof apiContext?.noBowlsAvailablePlaceholder === "string"
       ? apiContext.noBowlsAvailablePlaceholder
       : "No bowls available";
-  const allowAdd = config.rows?.allowAdd !== false && !readOnly;
-  const allowDelete = config.rows?.allowDelete !== false && !readOnly;
+  const allowAdd = config.rows?.allowAdd !== false && !readOnly && !lockStructure;
+  const allowDelete = config.rows?.allowDelete !== false && !readOnly && !lockStructure;
   const deletableIds = new Set(deletableColumnIds);
   const headerOptions = {
     deletableColumnIds: deletableIds,
@@ -550,7 +552,7 @@ const DynamicTable = ({
   };
   const toolbarTop = isToolbarTop(config);
   const addColumnLabel = config.columnActions?.addLabel ?? "Add Column";
-  const showColumnToolbar = allowAddColumn && onAddColumn && !readOnly;
+  const showColumnToolbar = allowAddColumn && onAddColumn && !readOnly && !lockStructure;
   const tableMinWidth = resolveTableMinWidth(flatColumns, allowDelete);
   const columnMinWidths = flatColumns.map((col) => resolveColumnMinWidth(col));
 

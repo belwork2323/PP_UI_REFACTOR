@@ -35,6 +35,7 @@ type MatrixTableProps = {
   value: CuringProjectStageMatrix;
   onChange: (value: CuringProjectStageMatrix) => void;
   readOnly?: boolean;
+  lockStructure?: boolean;
   theme?: SchemaThemeTokens;
   apiContext?: SchemaApiContext;
   batch?: { batchId?: string; projectName?: string; projectId?: string };
@@ -46,6 +47,7 @@ const MatrixTable = ({
   value,
   onChange,
   readOnly = false,
+  lockStructure = false,
   theme,
   apiContext,
   batch = {},
@@ -109,9 +111,15 @@ const MatrixTable = ({
     onChange({ ...value, rows: value.rows.filter((row) => row._rowKey !== rowKey) });
   };
 
+  const canMutateStructure = !readOnly && !lockStructure;
+  const allowAddRows = canMutateStructure && config.rows?.allowAdd !== false;
+  const allowDeleteRows = canMutateStructure && config.rows?.allowDelete !== false;
+  const allowAddColumns = canMutateStructure && Boolean(config.allowAddColumn);
+  const allowDeleteColumns = canMutateStructure && Boolean(config.allowDeleteColumn);
+
   const addColumn = () => {
     const label = newColumnLabel.trim();
-    if (!label || !config.allowAddColumn) return;
+    if (!label || !allowAddColumns) return;
     const column = createCustomStageColumn(label, stageColumns);
     onChange({
       columns: [...stageColumns, column],
@@ -124,7 +132,7 @@ const MatrixTable = ({
   };
 
   const removeColumn = (column: CuringStageColumn) => {
-    if (!column.isCustom || !config.allowDeleteColumn) return;
+    if (!column.isCustom || !allowDeleteColumns) return;
     onChange({
       columns: stageColumns.filter((col) => col.columnKey !== column.columnKey),
       rows: value.rows.map((row) => {
@@ -165,7 +173,7 @@ const MatrixTable = ({
                 <TableCell key={col.columnKey} align="center" sx={{ fontWeight: 700, fontSize: "0.72rem" }}>
                   <Stack direction="row" alignItems="center" justifyContent="center" gap={0.5}>
                     <span>{col.stage}</span>
-                    {col.isCustom && !readOnly && config.allowDeleteColumn ? (
+                    {col.isCustom && allowDeleteColumns ? (
                       <IconButton size="small" onClick={() => removeColumn(col)}>
                         <CloseIcon sx={{ fontSize: 14 }} />
                       </IconButton>
@@ -173,7 +181,7 @@ const MatrixTable = ({
                   </Stack>
                 </TableCell>
               ))}
-              {!readOnly && config.rows?.allowDelete !== false ? <TableCell sx={{ width: 48 }} /> : null}
+              {allowDeleteRows ? <TableCell sx={{ width: 48 }} /> : null}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -197,7 +205,7 @@ const MatrixTable = ({
                     />
                   </TableCell>
                 ))}
-                {!readOnly && config.rows?.allowDelete !== false ? (
+                {allowDeleteRows ? (
                   <TableCell>
                     {value.rows.length > 1 ? (
                       <IconButton size="small" color="error" onClick={() => removeRow(row._rowKey)}>
@@ -212,14 +220,14 @@ const MatrixTable = ({
         </Table>
       </TableContainer>
 
-      {!readOnly ? (
+      {canMutateStructure ? (
         <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }} sx={{ mt: 1 }}>
-          {config.rows?.allowAdd !== false ? (
+          {allowAddRows ? (
             <Button size="small" variant="outlined" onClick={addRow} sx={{ textTransform: "none", fontWeight: 700 }}>
               Add Row
             </Button>
           ) : null}
-          {config.allowAddColumn ? (
+          {allowAddColumns ? (
             <Stack direction="row" spacing={1} alignItems="center" flex={1}>
               <TextField
                 size="small"

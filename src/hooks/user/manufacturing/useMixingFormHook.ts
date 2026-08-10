@@ -1,8 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  getAvailableStageNumbers,
-  type MixingStageValue,
-} from "./mixingConfig";
+import { getAvailableStageNumbers, type MixingStageValue } from "./mixingConfig";
 import {
   createDefaultMixingFormState,
   createEmptyFinalMixEntry,
@@ -15,9 +12,6 @@ import {
   type ProcessParticularRow,
   type QualityCheckRow,
 } from "../../../data/models/user/MixingFormModel";
-
-const buildInitialPremixCards = (count: number): PremixEntry[] =>
-  Array.from({ length: Math.max(1, count || 1) }, (_, index) => createEmptyPremixEntry(index + 1));
 
 const buildInitialPremixCardsWithDefaults = (
   count: number,
@@ -33,7 +27,7 @@ const buildInitialPremixCardsWithDefaults = (
 const buildInitialFinalMixCards = (count: number): FinalMixEntry[] =>
   Array.from({ length: Math.max(1, count || 1) }, (_, index) => {
     const card = createEmptyFinalMixEntry(index + 1);
-    return { ...card, linkedPremixNo: String(index + 1) };
+    return { ...card, finalMixNo: String(index + 1) };
   });
 
 const buildInitialFinalMixCardsWithDefaults = (
@@ -45,7 +39,7 @@ const buildInitialFinalMixCardsWithDefaults = (
 ): FinalMixEntry[] => {
   return Array.from({ length: Math.max(1, count || 1) }, (_, index) => {
     const card = createFinalMixEntryWithDefaults(index + 1, mixerType, bldgNo);
-    return { ...card, linkedPremixNo: String(index + 1) };
+    return { ...card, finalMixNo: String(index + 1) };
   });
 };
 
@@ -72,6 +66,7 @@ export const useMixingFormHook = (
           identificationSheet?.date,
         ),
   );
+
   const [finalMixCards, setFinalMixCards] = useState<FinalMixEntry[]>(
     initialData?.finalMixCards?.length
       ? initialData.finalMixCards
@@ -83,63 +78,54 @@ export const useMixingFormHook = (
           identificationSheet?.date,
         ),
   );
+
   const [selectedMixingStage, setSelectedMixingStage] = useState<MixingStageValue | "">("");
   const [selectedStageNo, setSelectedStageNo] = useState<number | "">("");
-  const finalMixCardsRef = useRef<FinalMixEntry[]>(finalMixCards);
 
+  // Ref to hold onBlocksChange to avoid triggering useEffect loops
+  const onBlocksChangeRef = useRef(onBlocksChange);
   useEffect(() => {
-    finalMixCardsRef.current = finalMixCards;
-  }, [finalMixCards]);
+    onBlocksChangeRef.current = onBlocksChange;
+  }, [onBlocksChange]);
 
+  // Keep a reference to prevent initialData updates from triggering cyclic re-renders
+  const isInternalUpdate = useRef(false);
+
+  // Sync state upward to parent ONLY when state changes internally
   useEffect(() => {
-    const next = initialData ?? createDefaultMixingFormState();
-    const hasPersistedPremixCards = (next.premixCards?.length ?? 0) > 0;
-    const hasPersistedFinalMixCards = (next.finalMixCards?.length ?? 0) > 0;
-    const cardCount = Math.max(
-      next.premixCards?.length ?? 0,
-      next.finalMixCards?.length ?? 0,
-      Math.max(1, Number(maxStageCount) || 1),
-    );
-    const bldgNo = identificationSheet?.bldgNo ?? identificationSheet?.BldgNo;
+    if (isInternalUpdate.current) {
+      isInternalUpdate.current = false;
+      return;
+    }
+    onBlocksChangeRef.current?.({
+      premixCards,
+      finalMixCards,
+    });
+  }, [premixCards, finalMixCards]);
+
+  // Sync initialData downward ONLY when initialData actually changes externally
+  useEffect(() => {
+    if (!initialData) return;
+
+    const hasPersistedPremixCards = (initialData.premixCards?.length ?? 0) > 0;
+    const hasPersistedFinalMixCards = (initialData.finalMixCards?.length ?? 0) > 0;
 
     if (hasPersistedPremixCards) {
-      setPremixCards(next.premixCards);
+      isInternalUpdate.current = true;
+      setPremixCards(initialData.premixCards);
       setFinalMixCards(
         hasPersistedFinalMixCards
-          ? next.finalMixCards
+          ? initialData.finalMixCards
           : buildInitialFinalMixCardsWithDefaults(
-              next.premixCards.length,
+              initialData.premixCards.length,
               identificationSheet?.mixerType,
-              bldgNo,
+              identificationSheet?.bldgNo ?? identificationSheet?.BldgNo,
               identificationSheet?.batchSize,
               identificationSheet?.date,
             ),
       );
-      setSelectedMixingStage("");
-      setSelectedStageNo("");
-      return;
     }
-
-    const generatedPremixCards = buildInitialPremixCardsWithDefaults(
-      cardCount,
-      identificationSheet?.mixerType,
-      bldgNo,
-      identificationSheet?.batchSize,
-      identificationSheet?.date,
-    );
-    const generatedFinalMixCards = buildInitialFinalMixCardsWithDefaults(
-      cardCount,
-      identificationSheet?.mixerType,
-      bldgNo,
-      identificationSheet?.batchSize,
-      identificationSheet?.date,
-    );
-
-    setPremixCards(generatedPremixCards);
-    setFinalMixCards(generatedFinalMixCards);
-    setSelectedMixingStage("");
-    setSelectedStageNo("");
-  }, [initialData, maxStageCount, identificationSheet]);
+  }, [initialData]);
 
   const usedPremixNumbers = useMemo(
     () => premixCards.map((entry) => Number(entry.premixNo)).filter((value) => value > 0),
@@ -203,24 +189,22 @@ export const useMixingFormHook = (
 
   const removePremixCard = useCallback(
     (premixNo: string) => {
-      const nextPremixCards = premixCards.filter((entry) => entry.premixNo !== premixNo);
-      setPremixCards(nextPremixCards);
+      setPremixCards((prev) => prev.filter((entry) => entry.premixNo !== premixNo));
       if (selectedStageNo === Number(premixNo)) {
         setSelectedStageNo("");
       }
     },
-    [finalMixCards, premixCards, selectedStageNo],
+    [selectedStageNo],
   );
 
   const removeFinalMixCard = useCallback(
     (mixNo: string) => {
-      const nextFinalMixCards = finalMixCards.filter((entry) => entry.mixNo !== mixNo);
-      setFinalMixCards(nextFinalMixCards);
+      setFinalMixCards((prev) => prev.filter((entry) => entry.mixNo !== mixNo));
       if (selectedStageNo === Number(mixNo)) {
         setSelectedStageNo("");
       }
     },
-    [finalMixCards, premixCards, selectedStageNo],
+    [selectedStageNo],
   );
 
   const updatePremixField = useCallback(
@@ -240,8 +224,8 @@ export const useMixingFormHook = (
 
   const updateProcessParticular = useCallback(
     (premixNo: string, rowId: number, field: keyof ProcessParticularRow, value: string) => {
-      setPremixCards((prev) => {
-        const next = prev.map((premix) => {
+      setPremixCards((prev) =>
+        prev.map((premix) => {
           if (premix.premixNo !== premixNo) return premix;
           return {
             ...premix,
@@ -249,11 +233,10 @@ export const useMixingFormHook = (
               row.operationId === rowId ? { ...row, [field]: value } : row,
             ),
           };
-        });
-        return next;
-      });
+        }),
+      );
     },
-    [finalMixCards],
+    [],
   );
 
   const applyPremixQualityChecks = useCallback((rows: QualityCheckRow[]) => {
@@ -277,6 +260,7 @@ export const useMixingFormHook = (
       })),
     );
   }, []);
+
   const applyFinalMixQualityChecks = useCallback((rows: QualityCheckRow[]) => {
     setFinalMixCards((prev) =>
       prev.map((entry) => {
@@ -284,7 +268,7 @@ export const useMixingFormHook = (
 
         const nextRows = rows.map((row) => {
           const currentRow = entry.qualityChecks.find(
-            (entry) => entry.parameterId === row.parameterId,
+            (item) => item.parameterId === row.parameterId,
           );
           return {
             ...row,
@@ -299,22 +283,25 @@ export const useMixingFormHook = (
       }),
     );
   }, []);
-  const updateFinalMixProcessParticular = useCallback((mixNo, rowId, field, value) => {
-    setFinalMixCards((prev) => {
-      const next = prev.map((card) =>
-        card.mixNo === mixNo
-          ? {
-              ...card,
-              processParticulars: card.processParticulars.map((row) =>
-                row.operationId === rowId ? { ...row, [field]: value } : row,
-              ),
-            }
-          : card,
-      );
 
-      return next;
-    });
-  }, []);
+  const updateFinalMixProcessParticular = useCallback(
+    (mixNo: string, rowId: number, field: keyof ProcessParticularRow, value: string) => {
+      setFinalMixCards((prev) =>
+        prev.map((card) =>
+          card.mixNo === mixNo
+            ? {
+                ...card,
+                processParticulars: card.processParticulars.map((row) =>
+                  row.operationId === rowId ? { ...row, [field]: value } : row,
+                ),
+              }
+            : card,
+        ),
+      );
+    },
+    [],
+  );
+
   const updateQualityCheck = useCallback(
     (
       premixNo: string,
@@ -322,8 +309,8 @@ export const useMixingFormHook = (
       field: "observed1" | "observed2" | "observed3" | "observed4",
       value: string,
     ) => {
-      setPremixCards((prev) => {
-        const next = prev.map((premix) => {
+      setPremixCards((prev) =>
+        prev.map((premix) => {
           if (premix.premixNo !== premixNo) return premix;
           return {
             ...premix,
@@ -331,23 +318,19 @@ export const useMixingFormHook = (
               row.parameterId === parameterId ? { ...row, [field]: value } : row,
             ),
           };
-        });
-        return next;
-      });
+        }),
+      );
     },
-    [finalMixCards],
+    [],
   );
 
   const updateFinalMixField = useCallback(
     (mixNo: string, field: keyof Omit<FinalMixEntry, "mixNo" | "qualityChecks">, value: string) => {
-      setFinalMixCards((prev) => {
-        const next = prev.map((entry) =>
-          entry.mixNo === mixNo ? { ...entry, [field]: value } : entry,
-        );
-        return next;
-      });
+      setFinalMixCards((prev) =>
+        prev.map((entry) => (entry.mixNo === mixNo ? { ...entry, [field]: value } : entry)),
+      );
     },
-    [premixCards],
+    [],
   );
 
   const updateFinalMixQualityCheck = useCallback(
@@ -357,8 +340,8 @@ export const useMixingFormHook = (
       field: "observed1" | "observed2" | "observed3" | "observed4",
       value: string,
     ) => {
-      setFinalMixCards((prev) => {
-        const next = prev.map((entry) => {
+      setFinalMixCards((prev) =>
+        prev.map((entry) => {
           if (entry.mixNo !== mixNo) return entry;
           return {
             ...entry,
@@ -366,20 +349,14 @@ export const useMixingFormHook = (
               row.parameterId === parameterId ? { ...row, [field]: value } : row,
             ),
           };
-        });
-        return next;
-      });
+        }),
+      );
     },
-    [premixCards],
+    [],
   );
 
   const formState = useMemo(() => ({ premixCards, finalMixCards }), [finalMixCards, premixCards]);
-  useEffect(() => {
-    onBlocksChange?.({
-      premixCards,
-      finalMixCards,
-    });
-  }, [premixCards, finalMixCards]);
+
   return {
     premixCards,
     finalMixCards,

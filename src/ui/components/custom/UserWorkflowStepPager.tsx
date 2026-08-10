@@ -32,6 +32,11 @@ type UserWorkflowTabNavProps = {
   titleEndAdornment?: ReactNode;
   /** Show previous / next arrow buttons flanking the tab strip. */
   showStepArrows?: boolean;
+  /**
+   * Wrap tabs into multiple rows (no horizontal scrollbar).
+   * Defaults to true when `showStepArrows` is enabled.
+   */
+  wrapTabs?: boolean;
   /** Custom step handlers (e.g. skip disabled approver tabs). */
   onStepBack?: () => void;
   onStepNext?: () => void;
@@ -55,6 +60,7 @@ export const UserWorkflowTabNav = ({
   mb = 0,
   titleEndAdornment,
   showStepArrows = false,
+  wrapTabs,
   onStepBack,
   onStepNext,
   disableStepBack,
@@ -67,6 +73,7 @@ export const UserWorkflowTabNav = ({
   const safeIndex = Math.min(Math.max(activeIndex, 0), tabs.length - 1);
   const accent = palette.primaryLight ?? palette.primary;
   const canStep = showStepArrows && tabs.length > 1;
+  const shouldWrap = wrapTabs ?? showStepArrows;
 
   const handleStepBack = () => {
     if (onStepBack) {
@@ -102,7 +109,7 @@ export const UserWorkflowTabNav = ({
       ) : (
         <Box sx={{ mb: 0.75 }} />
       )}
-      <Stack direction="row" alignItems="center" spacing={0.75} sx={{ pb: 0.5 }}>
+      <Stack direction="row" alignItems={shouldWrap ? "flex-start" : "center"} spacing={0.75} sx={{ pb: 0.5 }}>
         {canStep ? (
           <IconButton
             size="small"
@@ -116,12 +123,25 @@ export const UserWorkflowTabNav = ({
               width: 28,
               height: 28,
               flexShrink: 0,
+              mt: shouldWrap ? 0.25 : 0,
             }}
           >
             <ArrowBackIosNewRoundedIcon sx={{ fontSize: 14 }} />
           </IconButton>
         ) : null}
-        <Stack direction="row" spacing={1} sx={{ overflowX: "auto", flex: 1, minWidth: 0 }}>
+        <Box
+          sx={{
+            flex: 1,
+            minWidth: 0,
+            display: "flex",
+            flexDirection: "row",
+            flexWrap: shouldWrap ? "wrap" : "nowrap",
+            gap: 1,
+            ...(shouldWrap
+              ? { overflow: "visible" }
+              : { overflowX: "auto", pb: 0.25 }),
+          }}
+        >
           {tabs.map((tab, index) => {
             const active = index === safeIndex;
             const disabled = isTabDisabled?.(tab, index) ?? false;
@@ -168,7 +188,7 @@ export const UserWorkflowTabNav = ({
 
             return button;
           })}
-        </Stack>
+        </Box>
         {canStep ? (
           <IconButton
             size="small"
@@ -182,6 +202,7 @@ export const UserWorkflowTabNav = ({
               width: 28,
               height: 28,
               flexShrink: 0,
+              mt: shouldWrap ? 0.25 : 0,
             }}
           >
             <ArrowForwardIosRoundedIcon sx={{ fontSize: 14 }} />

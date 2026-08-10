@@ -12,156 +12,165 @@ import {
 import { alpha } from "@mui/material/styles";
 import type { SchemaSectionSubmission } from "../../../../../../schema-engine";
 import { QC_DIVISION_BRAND } from "../../../../../../app/theme/custom_themes/user/qualityControl/tokens";
+import {
+  collectPrepSectionNestedTableRows,
+  expandRawMaterialPrepSectionRows,
+  extractPrepSectionNestedTableKeys,
+  formatPrepSectionCellValue,
+  formatPrepSectionLabel,
+  orderPrepSectionColumns,
+} from "../../../../../../data/models/user/RawMaterialPreparationModel";
 
 const BRAND = QC_DIVISION_BRAND;
 
-const formatLabel = (key: string) =>
-  key
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+const headerCellSx = (isFirst: boolean) => ({
+  fontWeight: 800,
+  fontSize: "0.65rem",
+  letterSpacing: "0.02em",
+  textTransform: "uppercase" as const,
+  color: BRAND.primary,
+  background: isFirst ? alpha(BRAND.primary, 0.1) : alpha(BRAND.primaryLight, 0.08),
+  px: 1,
+  py: 0.55,
+  borderColor: alpha(BRAND.primary, 0.12),
+  whiteSpace: "nowrap" as const,
+});
 
-const formatCellValue = (value: unknown) => {
-  if (value == null || value === "") return "—";
-  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-  if (Array.isArray(value)) {
-    return value.length ? `[${value.length} rows]` : "—";
-  }
-  if (typeof value === "object") {
-    const entries = Object.entries(value as Record<string, unknown>).filter(
-      ([key]) => !key.startsWith("_") && !key.endsWith("__tableColumns"),
-    );
-    if (!entries.length) return "—";
-    return entries.map(([key, nested]) => `${formatLabel(key)}: ${formatCellValue(nested)}`).join(", ");
-  }
-  return "—";
+const bodyCellSx = {
+  fontSize: "0.72rem",
+  fontWeight: 600,
+  color: BRAND.text,
+  px: 1,
+  py: 0.55,
+  borderColor: alpha(BRAND.primary, 0.1),
+  verticalAlign: "top" as const,
+  whiteSpace: "pre-wrap" as const,
+  wordBreak: "break-word" as const,
 };
 
-const isTableKey = (key: string, value: unknown) =>
-  !key.endsWith("__tableColumns") && Array.isArray(value) && value.length > 0 && typeof value[0] === "object";
+const collectColumns = (tableRows: Record<string, unknown>[], skipKeys?: Set<string>) =>
+  orderPrepSectionColumns(
+    Array.from(
+      tableRows.reduce((keys, row) => {
+        Object.keys(row ?? {}).forEach((key) => {
+          if (key.startsWith("_")) return;
+          if (skipKeys?.has(key)) return;
+          keys.add(key);
+        });
+        return keys;
+      }, new Set<string>()),
+    ),
+  );
+
+const SectionDataTable = ({
+  rows,
+  columns,
+}: {
+  rows: Record<string, unknown>[];
+  columns: string[];
+}) => {
+  if (!rows.length || !columns.length) return null;
+
+  return (
+    <TableContainer
+      sx={{
+        border: `1px solid ${BRAND.border}`,
+        borderRadius: 1,
+        overflow: "hidden",
+        background: "#fff",
+      }}
+    >
+      <Table size="small">
+        <TableHead>
+          <TableRow>
+            {columns.map((column, index) => (
+              <TableCell key={column} sx={headerCellSx(index === 0)}>
+                {formatPrepSectionLabel(column)}
+              </TableCell>
+            ))}
+          </TableRow>
+        </TableHead>
+        <TableBody>
+          {rows.map((row, rowIndex) => (
+            <TableRow
+              key={rowIndex}
+              sx={{
+                background: rowIndex % 2 === 0 ? "#fff" : alpha(BRAND.primaryLight, 0.03),
+              }}
+            >
+              {columns.map((column) => (
+                <TableCell key={column} sx={bodyCellSx}>
+                  {formatPrepSectionCellValue(row?.[column])}
+                </TableCell>
+              ))}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </TableContainer>
+  );
+};
 
 type QCDivisionSavedSectionsDisplayProps = {
   sections: SchemaSectionSubmission[];
 };
 
+/**
+ * Compact tabular read-only view for QC saved sections (same shape as RMP process sections).
+ * Each section becomes one table: columns = field keys, rows = sectionData entries.
+ */
 const QCDivisionSavedSectionsDisplay = ({ sections }: QCDivisionSavedSectionsDisplayProps) => {
   if (!sections.length) return null;
 
   return (
-    <Stack spacing={2}>
+    <Stack spacing={1.5}>
       {sections.map((section, sectionIndex) => {
-        const sectionEntries = section.sectionData ?? [];
-        if (!sectionEntries.length) return null;
+        const rows = expandRawMaterialPrepSectionRows(
+          (section.sectionData ?? []) as Record<string, unknown>[],
+        );
+        if (!rows.length) return null;
+
+        const nestedTableKeys = extractPrepSectionNestedTableKeys(rows);
+        const nestedKeySet = new Set(nestedTableKeys);
+        const mainColumns = collectColumns(rows, nestedKeySet);
 
         return (
           <Box key={`${section.sectionId}-${sectionIndex}`}>
             <Box
               sx={{
-                px: 1.5,
-                py: 1,
-                mb: 1,
+                px: 1.25,
+                py: 0.75,
+                mb: 0.75,
                 background: alpha(BRAND.primary, 0.06),
                 borderRadius: 1,
                 borderLeft: `3px solid ${BRAND.primary}`,
               }}
             >
-              <Typography sx={{ fontWeight: 700, fontSize: "0.78rem", color: BRAND.primary }}>
-                {formatLabel(section.sectionId)}
+              <Typography sx={{ fontWeight: 700, fontSize: "0.76rem", color: BRAND.primary }}>
+                {formatPrepSectionLabel(section.sectionId)}
               </Typography>
             </Box>
 
-            {sectionEntries.map((entry, entryIndex) => {
-              const record = entry as Record<string, unknown>;
-              const simpleFields = Object.entries(record).filter(
-                ([key, value]) =>
-                  !key.startsWith("_") && !key.endsWith("__tableColumns") && !isTableKey(key, value),
-              );
-              const tableFields = Object.entries(record).filter(([key, value]) => isTableKey(key, value));
+            <SectionDataTable rows={rows} columns={mainColumns} />
+
+            {nestedTableKeys.map((nestedKey) => {
+              const nestedRows = collectPrepSectionNestedTableRows(rows, nestedKey);
+              const nestedColumns = collectColumns(nestedRows);
+              if (!nestedRows.length || !nestedColumns.length) return null;
 
               return (
-                <Box key={`${section.sectionId}-entry-${entryIndex}`} sx={{ mb: 1.5 }}>
-                  {simpleFields.length > 0 ? (
-                    <TableContainer
-                      sx={{ border: `1px solid ${BRAND.border}`, borderRadius: 1, mb: tableFields.length ? 1 : 0 }}
-                    >
-                      <Table size="small">
-                        <TableBody>
-                          {simpleFields.map(([key, value]) => (
-                            <TableRow key={key}>
-                              <TableCell
-                                sx={{
-                                  fontWeight: 600,
-                                  fontSize: "0.7rem",
-                                  color: BRAND.textSub,
-                                  px: 1.5,
-                                  py: 0.6,
-                                  width: 220,
-                                  borderBottom: `1px solid ${alpha(BRAND.border, 0.5)}`,
-                                }}
-                              >
-                                {formatLabel(key)}
-                              </TableCell>
-                              <TableCell
-                                sx={{
-                                  fontSize: "0.75rem",
-                                  fontWeight: 600,
-                                  color: BRAND.text,
-                                  px: 1.5,
-                                  py: 0.6,
-                                  borderBottom: `1px solid ${alpha(BRAND.border, 0.5)}`,
-                                }}
-                              >
-                                {formatCellValue(value)}
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  ) : null}
-
-                  {tableFields.map(([tableKey, rows]) => {
-                    const tableRows = rows as Record<string, unknown>[];
-                    const columns = Object.keys(tableRows[0] ?? {}).filter((key) => !key.startsWith("_"));
-
-                    return (
-                      <Box key={tableKey} sx={{ mb: 1 }}>
-                        {tableFields.length > 1 || simpleFields.length > 0 ? (
-                          <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.textSub, mb: 0.5 }}>
-                            {formatLabel(tableKey)}
-                          </Typography>
-                        ) : null}
-                        <TableContainer sx={{ border: `1px solid ${BRAND.border}`, borderRadius: 1 }}>
-                          <Table size="small">
-                            <TableHead>
-                              <TableRow>
-                                {columns.map((column) => (
-                                  <TableCell
-                                    key={column}
-                                    sx={{ fontWeight: 700, fontSize: "0.65rem", color: BRAND.textSub, px: 1, py: 0.5 }}
-                                  >
-                                    {formatLabel(column)}
-                                  </TableCell>
-                                ))}
-                              </TableRow>
-                            </TableHead>
-                            <TableBody>
-                              {tableRows.map((row, rowIndex) => (
-                                <TableRow key={rowIndex}>
-                                  {columns.map((column) => (
-                                    <TableCell key={column} sx={{ fontSize: "0.72rem", px: 1, py: 0.5 }}>
-                                      {formatCellValue(row[column])}
-                                    </TableCell>
-                                  ))}
-                                </TableRow>
-                              ))}
-                            </TableBody>
-                          </Table>
-                        </TableContainer>
-                      </Box>
-                    );
-                  })}
+                <Box key={nestedKey} sx={{ mt: 1 }}>
+                  <Typography
+                    sx={{
+                      fontSize: "0.7rem",
+                      fontWeight: 700,
+                      color: BRAND.textSub,
+                      mb: 0.5,
+                    }}
+                  >
+                    {formatPrepSectionLabel(nestedKey)}
+                  </Typography>
+                  <SectionDataTable rows={nestedRows} columns={nestedColumns} />
                 </Box>
               );
             })}

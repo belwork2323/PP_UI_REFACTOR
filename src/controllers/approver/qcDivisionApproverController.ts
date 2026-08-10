@@ -1,10 +1,7 @@
 import {
-  changeQcDivisionApproverDivisionStatus,
-  changeQcDivisionApproverMotorStatus,
-  changeQcDivisionApproverPremixStatus,
-  type QcDivisionApproverDivisionChangeStatusPayload,
-  type QcDivisionApproverMotorChangeStatusPayload,
-  type QcDivisionApproverPremixChangeStatusPayload,
+  changeQcDivisionApproverUnitStatus,
+  fetchQcDivisionCatalogApi,
+  type QcDivisionApproverChangeStatusPayload,
   type QcDivisionApproverUnitChangeStatusResponse,
 } from "../../data/api/approver/qcDivisionApproverApi";
 import {
@@ -13,39 +10,29 @@ import {
 } from "../../data/api/approver/approverApi";
 import { ApiResponseModel } from "../../data/models/common/ApiResponseModel";
 
-export const submitQcDivisionApproverMotorStatusChange = async (
-  payload: QcDivisionApproverMotorChangeStatusPayload,
+/** Load QC division catalog (ids/names) for resolving change-status divisionId. */
+export const fetchQcDivisionApproverCatalog = async () => {
+  try {
+    const response = await fetchQcDivisionCatalogApi();
+    return new ApiResponseModel<unknown>(response, (res) => res?.data ?? res ?? []);
+  } catch (error) {
+    return new ApiResponseModel(error);
+  }
+};
+
+/** Approve/reject a QC division unit (premix, final mix, motor) or division-level workflow. */
+export const submitQcDivisionApproverUnitStatusChange = async (
+  payload: QcDivisionApproverChangeStatusPayload,
 ) => {
   try {
-    const response = await changeQcDivisionApproverMotorStatus(payload);
+    const response = await changeQcDivisionApproverUnitStatus(payload);
     return new ApiResponseModel<QcDivisionApproverUnitChangeStatusResponse>(response);
   } catch (error) {
     return new ApiResponseModel(error);
   }
 };
 
-export const submitQcDivisionApproverPremixStatusChange = async (
-  payload: QcDivisionApproverPremixChangeStatusPayload,
-) => {
-  try {
-    const response = await changeQcDivisionApproverPremixStatus(payload);
-    return new ApiResponseModel<QcDivisionApproverUnitChangeStatusResponse>(response);
-  } catch (error) {
-    return new ApiResponseModel(error);
-  }
-};
-
-export const submitQcDivisionApproverDivisionStatusChange = async (
-  payload: QcDivisionApproverDivisionChangeStatusPayload,
-) => {
-  try {
-    const response = await changeQcDivisionApproverDivisionStatus(payload);
-    return new ApiResponseModel<QcDivisionApproverUnitChangeStatusResponse>(response);
-  } catch (error) {
-    return new ApiResponseModel(error);
-  }
-};
-
+/** Final form-level approve/reject (entire QC form). */
 export const submitQcDivisionApproverFormStatusChange = async (
   payload: ApproverChangeStatusPayload,
 ) => {
@@ -58,8 +45,11 @@ export const submitQcDivisionApproverFormStatusChange = async (
 };
 
 export default {
-  submitMotorStatusChange: submitQcDivisionApproverMotorStatusChange,
-  submitPremixStatusChange: submitQcDivisionApproverPremixStatusChange,
-  submitDivisionStatusChange: submitQcDivisionApproverDivisionStatusChange,
+  fetchDivisionCatalog: fetchQcDivisionApproverCatalog,
+  submitUnitStatusChange: submitQcDivisionApproverUnitStatusChange,
   submitFormStatusChange: submitQcDivisionApproverFormStatusChange,
+  // Back-compat aliases
+  submitMotorStatusChange: submitQcDivisionApproverUnitStatusChange,
+  submitPremixStatusChange: submitQcDivisionApproverUnitStatusChange,
+  submitDivisionStatusChange: submitQcDivisionApproverUnitStatusChange,
 };

@@ -71,7 +71,7 @@ const MOTOR_FLOW_KEYS = new Set([
   "WEIGHTMENT",
 ]);
 
-const normalizeStatus = (value: unknown): QcPartialItemStatus => {
+export const normalizePartialItemStatus = (value: unknown): QcPartialItemStatus => {
   const raw = String(value ?? "")
     .trim()
     .toUpperCase()
@@ -89,6 +89,38 @@ const normalizeStatus = (value: unknown): QcPartialItemStatus => {
     return "WAITING_FOR_APPROVAL";
   }
   return "TO_BE_INITIATED";
+};
+
+const normalizeStatus = normalizePartialItemStatus;
+
+/** Match QC division keys across legacy and contract shapes. */
+export const qcDivisionStatusKeysMatch = (
+  left: string | null | undefined,
+  right: string | null | undefined,
+): boolean => {
+  const a = String(left ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+  const b = String(right ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+  if (!a || !b) return false;
+  if (a === b) return true;
+  if (
+    (a === "POST_CURE" && b === "POST_CURE_OPERATION") ||
+    (b === "POST_CURE" && a === "POST_CURE_OPERATION")
+  ) {
+    return true;
+  }
+  if (
+    (a === "QC" && b === "PROPELLANT_PROPERTIES") ||
+    (b === "QC" && a === "PROPELLANT_PROPERTIES")
+  ) {
+    return true;
+  }
+  return false;
 };
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -264,6 +296,39 @@ const extractFinalMixes = (
     .filter((row): row is { finalMixNo: number } => Boolean(row));
 };
 
+/** Mixing `/qc-division/division-details` nests premix/final-mix units under `stages`. */
+const extractMixingStagesUnits = (data: Record<string, unknown>) => {
+  const premixes: Array<{ premixNo: number; status?: unknown }> = [];
+  const finalMixes: Array<{ finalMixNo: number; status?: unknown }> = [];
+
+  asArray(data.stages).forEach((stageRow) => {
+    const stage = asRecord(stageRow);
+    if (!stage) return;
+    const stageType = String(stage.stageType ?? "").trim().toUpperCase();
+    asArray(stage.premixes).forEach((entryRow) => {
+      const entry = asRecord(entryRow);
+      if (!entry) return;
+      const no = pickNumber(entry.premixNo, entry.finalMixNo, entry.mixNo, entry.no);
+      if (no == null) return;
+      const details = asRecord(entry.details);
+      const status =
+        entry.premixSubmissionStatus ??
+        entry.status ??
+        details?.premixSubmissionStatus ??
+        details?.status;
+      if (stageType === "FINAL_MIX") {
+        finalMixes.push({ finalMixNo: no, status });
+        return;
+      }
+      if (stageType === "PREMIX") {
+        premixes.push({ premixNo: no, status });
+      }
+    });
+  });
+
+  return { premixes, finalMixes };
+};
+
 export const isMotorBasedPartialFlow = (flowKey: string) => MOTOR_FLOW_KEYS.has(flowKey);
 
 export const hasPartialChildNav = (items: QcPartialNavItem[] | null | undefined) =>
@@ -271,8 +336,17 @@ export const hasPartialChildNav = (items: QcPartialNavItem[] | null | undefined)
     (item) => item.kind === "MOTOR" || item.kind === "PREMIX" || item.kind === "FINAL_MIX",
   );
 
-export const isPartialItemReadOnly = (status: QcPartialItemStatus) =>
-  status === "WAITING_FOR_APPROVAL" || status === "APPROVED";
+/** Same lock rule as RMP premix / Case Prep motor / Mixing mix-card. */
+export const isQcUnitLocked = (status?: QcPartialItemStatus | string | null) => {
+  const normalized = normalizePartialItemStatus(status);
+  return normalized === "WAITING_FOR_APPROVAL" || normalized === "APPROVED";
+};
+
+export const isQcUnitEditable = (status?: QcPartialItemStatus | string | null) =>
+  !isQcUnitLocked(status);
+
+/** @deprecated Prefer isQcUnitLocked — kept for existing call sites. */
+export const isPartialItemReadOnly = (status: QcPartialItemStatus) => isQcUnitLocked(status);
 
 export const aggregatePartialNavStatus = (
   items: QcPartialNavItem[] | null | undefined,
@@ -307,7 +381,17 @@ export const mapDivisionDetailsToPartialNav = (
 
   const motors = extractMotorIds(data);
   let premixes = extractPremixes(data);
-  const finalMixes = extractFinalMixes(data);
+  let finalMixes = extractFinalMixes(data);
+
+  if (flowKey === "MIXING") {
+    const fromStages = extractMixingStagesUnits(data);
+    if (!premixes.length && fromStages.premixes.length) {
+      premixes = fromStages.premixes;
+    }
+    if (!finalMixes.length && fromStages.finalMixes.length) {
+      finalMixes = fromStages.finalMixes;
+    }
+  }
 
   if (!premixes.length && isRawMaterialProcessing && flowKey === "RAW_MATERIAL") {
     const batchCount = extractBatchPremixCount(options.batchPayload);
@@ -339,14 +423,15 @@ export const mapDivisionDetailsToPartialNav = (
         id: `premix:${premix.premixNo}`,
         kind: "PREMIX",
         label: premix.label ?? `Premix ${premix.premixNo}`,
-        status: normalizeStatus(premix.status),
+        // Processing seed comes from manufacturing division-details — QC owns status.
+        status: isRawMaterialProcessing ? "TO_BE_INITIATED" : normalizeStatus(premix.status),
         premixNo: premix.premixNo,
         processingType: premix.processingType ?? "SOLID_PROCESSING",
       });
     });
   }
 
-  if (finalMixes.length > 0 || (flowKey === "MIXING" && finalMixes.length > 0)) {
+  if (finalMixes.length > 0) {
     finalMixes.forEach((mix) => {
       items.push({
         id: `final-mix:${mix.finalMixNo}`,
@@ -365,21 +450,41 @@ export const mapDivisionDetailsToPartialNav = (
 export const resolveEntryIdsForPartialItem = (
   entries: QcDivisionEntry[] | undefined,
   item: QcPartialNavItem | null | undefined,
+  options?: { flowKey?: string | null },
 ): string[] => {
   if (!item) return [];
   const list = entries ?? [];
+  const flowKey = String(options?.flowKey ?? "")
+    .trim()
+    .toUpperCase();
 
   if (item.kind === "MOTOR" && item.motorId) {
-    return list.filter((entry) => entry.motorId === item.motorId).map((entry) => entry.entryId);
+    return list
+      .filter((entry) => {
+        if (entry.motorId !== item.motorId) return false;
+        if (flowKey && String(entry.flowKey ?? "").trim().toUpperCase() !== flowKey) return false;
+        return true;
+      })
+      .map((entry) => entry.entryId);
   }
 
   if (item.kind === "PREMIX" && item.premixNo != null) {
     return list
-      .filter(
-        (entry) =>
-          entry.premixNo === item.premixNo &&
-          entry.kind !== "MIXING_FINAL_MIX",
-      )
+      .filter((entry) => {
+        if (entry.premixNo !== item.premixNo) return false;
+        if (entry.kind === "MIXING_FINAL_MIX") return false;
+        if (flowKey === "MIXING") return entry.kind === "MIXING_PREMIX";
+        if (flowKey === "RAW_MATERIAL") {
+          return (
+            entry.kind === "PROCESSING_MATERIAL" ||
+            entry.kind === "SOLID_PREMIX" ||
+            entry.kind === "LIQUID_PREMIX" ||
+            entry.kind === "BOTH_PREMIX"
+          );
+        }
+        if (flowKey) return String(entry.flowKey ?? "").trim().toUpperCase() === flowKey;
+        return true;
+      })
       .map((entry) => entry.entryId);
   }
 
@@ -387,13 +492,18 @@ export const resolveEntryIdsForPartialItem = (
     const mixNo = item.finalMixNo ?? item.premixNo;
     return list
       .filter(
-        (entry) => entry.kind === "MIXING_FINAL_MIX" && (mixNo == null || entry.premixNo === mixNo),
+        (entry) =>
+          entry.kind === "MIXING_FINAL_MIX" && (mixNo == null || entry.premixNo === mixNo),
       )
       .map((entry) => entry.entryId);
   }
 
   if (item.kind === "DIVISION") {
-    return list.map((entry) => entry.entryId);
+    return list
+      .filter((entry) =>
+        flowKey ? String(entry.flowKey ?? "").trim().toUpperCase() === flowKey : true,
+      )
+      .map((entry) => entry.entryId);
   }
 
   return [];
@@ -402,9 +512,10 @@ export const resolveEntryIdsForPartialItem = (
 export const scopeFormStateToPartialItem = (
   form: QualityControlFormState,
   item: QcPartialNavItem | null | undefined,
+  options?: { flowKey?: string | null },
 ): QualityControlFormState => {
   if (!item || item.kind === "DIVISION") return form;
-  const entryIds = new Set(resolveEntryIdsForPartialItem(form.divisionEntries, item));
+  const entryIds = new Set(resolveEntryIdsForPartialItem(form.divisionEntries, item, options));
   if (!entryIds.size) {
     return {
       ...form,
@@ -442,7 +553,8 @@ export const getPartialNavTitle = (items: QcPartialNavItem[]): string => {
   }
   if (items.some((item) => item.kind === "FINAL_MIX")) return "Final Mix Navigation";
   if (items.some((item) => item.kind === "PREMIX")) return "Premix Navigation";
-  return "Item Navigation";
+  if (items.some((item) => item.kind === "DIVISION")) return "Division Navigation";
+  return "Division Navigation";
 };
 
 export const getPartialNavHint = (items: QcPartialNavItem[]): string => {
@@ -452,7 +564,10 @@ export const getPartialNavHint = (items: QcPartialNavItem[]): string => {
   if (items.some((item) => item.kind === "PREMIX") || items.some((item) => item.kind === "FINAL_MIX")) {
     return "Select a premix or final mix to fill and submit its QC form individually.";
   }
-  return "Select an item to continue.";
+  if (items.some((item) => item.kind === "DIVISION")) {
+    return "Select a division to continue.";
+  }
+  return "Select a division to continue.";
 };
 
 export type QcApprovalTableRow = {
@@ -462,6 +577,20 @@ export type QcApprovalTableRow = {
   unitKind: QcPartialNavKind | "DIVISION";
   submissionType: string;
   status: QcPartialItemStatus;
+};
+
+/** One division card for final-approval dialog — units nested, division not repeated. */
+export type QcFinalApprovalDivisionGroup = {
+  id: string;
+  divisionKey: string;
+  divisionLabel: string;
+  divisionStatus: QcPartialItemStatus;
+  units: Array<{
+    id: string;
+    label: string;
+    kind: QcPartialNavKind;
+    status: QcPartialItemStatus;
+  }>;
 };
 
 export const areAllPartialItemsApproved = (items: QcPartialNavItem[] | null | undefined) => {
@@ -503,6 +632,28 @@ export const buildDivisionApprovalRows = (
   }));
 };
 
+export const buildFinalApprovalDivisionGroups = (
+  divisions: Array<{
+    divisionKey: string;
+    divisionLabel: string;
+    divisionStatus?: QcPartialItemStatus;
+    units: QcPartialNavItem[];
+  }>,
+): QcFinalApprovalDivisionGroup[] =>
+  divisions.map((division) => ({
+    id: `division:${division.divisionKey || division.divisionLabel}`,
+    divisionKey: division.divisionKey || division.divisionLabel,
+    divisionLabel: division.divisionLabel,
+    divisionStatus: division.divisionStatus ?? "TO_BE_INITIATED",
+    units: division.units.map((item) => ({
+      id: item.id,
+      label: item.label,
+      kind: item.kind,
+      status: item.status,
+    })),
+  }));
+
+/** @deprecated Prefer buildFinalApprovalDivisionGroups for dialog UI. */
 export const buildFinalApprovalRows = (
   divisions: Array<{
     divisionLabel: string;
@@ -547,6 +698,14 @@ export const buildFinalApprovalRows = (
 export const areAllFinalApprovalRowsApproved = (rows: QcApprovalTableRow[]) =>
   rows.length > 0 && rows.every((row) => row.status === "APPROVED");
 
+export const areAllFinalApprovalGroupsApproved = (groups: QcFinalApprovalDivisionGroup[]) =>
+  groups.length > 0 &&
+  groups.every((group) =>
+    group.units.length > 0
+      ? group.units.every((unit) => unit.status === "APPROVED")
+      : group.divisionStatus === "APPROVED",
+  );
+
 export const applyStatusMapsToPartialNav = (
   items: QcPartialNavItem[],
   payload: {
@@ -557,14 +716,20 @@ export const applyStatusMapsToPartialNav = (
 ): QcPartialNavItem[] => {
   const motors = asArray(payload.motorStatuses);
   const premixes = asArray(payload.premixStatuses);
-  const divisionFilter = String(payload.division ?? "").trim().toUpperCase();
+  const divisionFilter = String(payload.division ?? "").trim();
 
   const motorStatusById = new Map<string, QcPartialItemStatus>();
   motors.forEach((row) => {
     const rec = asRecord(row);
     if (!rec) return;
-    const division = String(rec.division ?? "").trim().toUpperCase();
-    if (divisionFilter && division && division !== divisionFilter) return;
+    const division = String(rec.division ?? "").trim();
+    if (
+      divisionFilter &&
+      division &&
+      !qcDivisionStatusKeysMatch(division, divisionFilter)
+    ) {
+      return;
+    }
     const motorId = pickString(rec.motorId, rec.motor_id, rec.motorIdNo);
     if (!motorId) return;
     motorStatusById.set(motorId, normalizeStatus(rec.motorSubmissionStatus ?? rec.status));
@@ -574,8 +739,20 @@ export const applyStatusMapsToPartialNav = (
   premixes.forEach((row) => {
     const rec = asRecord(row);
     if (!rec) return;
-    const division = String(rec.division ?? "").trim().toUpperCase();
-    if (divisionFilter && division && division !== divisionFilter) return;
+    const division = String(rec.division ?? "").trim();
+    const subType = String(rec.subType ?? rec.sub_type ?? "").trim();
+    if (divisionFilter) {
+      const matchesDivision =
+        !division ||
+        qcDivisionStatusKeysMatch(division, divisionFilter) ||
+        qcDivisionStatusKeysMatch(subType, divisionFilter) ||
+        // Contract shape: division=RAW_MATERIAL, subType=RAW_MATERIAL_PROCESSING
+        (divisionFilter.toUpperCase().includes("PROCESSING") &&
+          (division.toUpperCase() === "RAW_MATERIAL" ||
+            subType.toUpperCase() === "RAW_MATERIAL_PROCESSING" ||
+            division.toUpperCase() === "RAW_MATERIAL_PROCESSING"));
+      if (!matchesDivision) return;
+    }
     const premixNo = pickNumber(rec.premixNo, rec.premix_no);
     if (premixNo == null) return;
     const stage = String(rec.stageType ?? rec.stage_type ?? "")

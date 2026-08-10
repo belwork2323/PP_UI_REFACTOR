@@ -16,6 +16,11 @@ export type SchemaUIProps = {
   value: SchemaFormValues;
   onChange: (values: SchemaFormValues) => void;
   readOnly?: boolean;
+  /**
+   * Values stay editable; hide/disable Add Row, REMOVE, repeat Add, and column add/delete.
+   * Use for shared schemas (e.g. RAW_MATERIALS) where QC may edit values but not structure.
+   */
+  lockStructure?: boolean;
   loading?: boolean;
   error?: string | null;
   themeTokens?: Partial<SchemaThemeTokens>;
@@ -31,6 +36,7 @@ const SchemaUI = ({
   value,
   onChange,
   readOnly = false,
+  lockStructure = false,
   loading = false,
   error = null,
   themeTokens,
@@ -75,6 +81,7 @@ const SchemaUI = ({
       values={value}
       onChange={onChange}
       readOnly={readOnly}
+      lockStructure={lockStructure}
       theme={theme}
       apiContext={apiContext}
       setupContext={setupContext}

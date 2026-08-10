@@ -23,6 +23,7 @@ const QualityControlPage = () => {
   const [draftConfirmOpen, setDraftConfirmOpen] = useState(false);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
   const [divisionDialogOpen, setDivisionDialogOpen] = useState(false);
+  const [divisionConfirmOpen, setDivisionConfirmOpen] = useState(false);
   const [finalDialogOpen, setFinalDialogOpen] = useState(false);
 
   const hookState = useQCDivisionHook();
@@ -33,10 +34,10 @@ const QualityControlPage = () => {
     isEditMode,
     formData,
     selectedDivision,
-    divisionOptions,
     divisionsLoading,
+    divisionNavTabs,
+    activeDivisionTabKey,
     selectedRawMaterialType,
-    rawMaterialTypeOptions,
     selectedProcessingType,
     selectedPremix,
     selectedMixingStage,
@@ -58,14 +59,15 @@ const QualityControlPage = () => {
     loadingFormDetails,
     schemaLoading,
     schemaError,
+    divisionAutoPopulateData,
+    mixingQualityChecksByStage,
     actionLoading,
     backConfirmOpen,
     subDepartmentId,
     setBackConfirmOpen,
     handleBack,
     handleDiscardAndBack,
-    handleDivisionChange,
-    handleRawMaterialTypeChange,
+    handleDivisionNavTabChange,
     handleProcessingTypeChange,
     handlePremixChange,
     handleMixingStageChange,
@@ -96,6 +98,7 @@ const QualityControlPage = () => {
     canProceedDivisionSubmit,
     canProceedFinalApproval,
     divisionApprovalRows,
+    finalApprovalGroups,
     finalApprovalRows,
     handleBackFromDetails,
     detailsRow,
@@ -106,23 +109,31 @@ const QualityControlPage = () => {
     activePartialNavIndex,
     partialNavActive,
     isActivePartialReadOnly,
+    isActiveDivisionReadOnly,
+    isFormFieldsReadOnly,
+    formLockMessage,
     divisionGroupStatusByFlowKey,
+    isPartialNavTabEnabled,
+    getPartialNavTabDisabledReason,
+    isDivisionNavTabEnabled,
+    getDivisionNavTabDisabledReason,
   } = hookState;
 
-  const formReadOnly = readOnly || isActivePartialReadOnly;
+  const formReadOnly = isFormFieldsReadOnly;
 
   const canAct =
-    !isActivePartialReadOnly &&
+    !formReadOnly &&
     ((scopedFormData.divisionEntries?.length ?? 0) > 0 ||
       scopedFormData.schemaFormLoaded ||
       (scopedFormData.solidPremixEntries?.length ?? 0) > 0 ||
       (scopedFormData.liquidPremixEntries?.length ?? 0) > 0);
 
   const canOpenDivisionDialog =
-    Boolean(activeBatch?.formId) ||
-    (scopedFormData.divisionEntries?.length ?? 0) > 0 ||
-    scopedFormData.schemaFormLoaded ||
-    partialNavItems.length > 0;
+    !isActiveDivisionReadOnly &&
+    (Boolean(activeBatch?.formId) ||
+      (scopedFormData.divisionEntries?.length ?? 0) > 0 ||
+      scopedFormData.schemaFormLoaded ||
+      partialNavItems.length > 0);
 
   const canOpenFinalDialog = Boolean(activeBatch?.formId);
 
@@ -187,14 +198,16 @@ const QualityControlPage = () => {
 
           <QCForm
             batch={activeBatch}
+            divisionAutoPopulateData={divisionAutoPopulateData}
+            mixingQualityChecksByStage={mixingQualityChecksByStage}
             formData={formData}
             scopedFormData={scopedFormData}
             subDepartmentId={subDepartmentId}
             selectedDivision={selectedDivision}
-            divisionOptions={divisionOptions}
             divisionsLoading={divisionsLoading}
+            divisionNavTabs={divisionNavTabs}
+            activeDivisionTabKey={activeDivisionTabKey}
             selectedRawMaterialType={selectedRawMaterialType}
-            rawMaterialTypeOptions={rawMaterialTypeOptions}
             selectedProcessingType={selectedProcessingType}
             selectedPremix={selectedPremix}
             selectedMixingStage={selectedMixingStage}
@@ -217,14 +230,19 @@ const QualityControlPage = () => {
             activePartialNavIndex={activePartialNavIndex}
             partialNavActive={partialNavActive}
             divisionGroupStatusByFlowKey={divisionGroupStatusByFlowKey}
+            isPartialNavTabEnabled={isPartialNavTabEnabled}
+            getPartialNavTabDisabledReason={getPartialNavTabDisabledReason}
+            isDivisionNavTabEnabled={isDivisionNavTabEnabled}
+            getDivisionNavTabDisabledReason={getDivisionNavTabDisabledReason}
             isEditMode={isEditMode}
             readOnly={readOnly}
             fieldsReadOnly={formReadOnly}
+            canEditDivisionStructure={!readOnly && !isActiveDivisionReadOnly}
+            formLockMessage={formLockMessage}
             schemaLoading={schemaLoading}
             schemaError={schemaError}
             flowBarTheme={flowBarTheme}
-            onDivisionChange={handleDivisionChange}
-            onRawMaterialTypeChange={handleRawMaterialTypeChange}
+            onDivisionNavTabChange={handleDivisionNavTabChange}
             onProcessingTypeChange={handleProcessingTypeChange}
             onPremixChange={handlePremixChange}
             onMixingStageChange={handleMixingStageChange}
@@ -252,15 +270,22 @@ const QualityControlPage = () => {
                 ? {
                     show: true,
                     actionLoading,
+                    // Locked divisions (waiting / approved) keep the button visible but disabled.
                     canSubmitDivision: canOpenDivisionDialog,
                     canSubmitFinalApproval: canOpenFinalDialog,
-                    onSubmitDivision: () => setDivisionDialogOpen(true),
+                    onSubmitDivision: () => {
+                      if (partialNavActive) {
+                        setDivisionDialogOpen(true);
+                      } else {
+                        setDivisionConfirmOpen(true);
+                      }
+                    },
                     onSubmitFinalApproval: () => setFinalDialogOpen(true),
                   }
                 : null
             }
             unitActions={
-              !readOnly && !isActivePartialReadOnly
+              !readOnly
                 ? {
                     show: true,
                     canAct,
@@ -308,6 +333,20 @@ const QualityControlPage = () => {
                 }}
                 onCancel={() => setSubmitConfirmOpen(false)}
               />
+              <ConfirmAlertDialog
+                open={divisionConfirmOpen}
+                severity="warning"
+                title={strings.DIVISION_CONFIRM_TITLE}
+                message={strings.DIVISION_CONFIRM_MESSAGE}
+                confirmLabel={strings.DIVISION_CONFIRM_LABEL}
+                cancelLabel={strings.CONFIRM_CANCEL_LABEL}
+                confirmDisabled={actionLoading}
+                onConfirm={async () => {
+                  setDivisionConfirmOpen(false);
+                  await handleSubmitDivision();
+                }}
+                onCancel={() => setDivisionConfirmOpen(false)}
+              />
               <DivisionApprovalUnitDialog
                 open={divisionDialogOpen}
                 rows={divisionApprovalRows}
@@ -321,7 +360,7 @@ const QualityControlPage = () => {
               />
               <FinalApprovalDivisionDialog
                 open={finalDialogOpen}
-                rows={finalApprovalRows}
+                groups={finalApprovalGroups}
                 canProceed={canProceedFinalApproval}
                 confirmDisabled={actionLoading}
                 onClose={() => setFinalDialogOpen(false)}

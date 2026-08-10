@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
@@ -7,21 +7,35 @@ import { normalizeApproverBatchStatus } from "../../../data/models/approver/Appr
 import qcDivisionController from "../../../controllers/user/quality_control/qcDivisionController";
 import qcDivisionApproverController from "../../../controllers/approver/qcDivisionApproverController";
 import type { ApproverChangeStatusPayload } from "../../../data/api/approver/approverApi";
-import type {
-  QcDivisionApproverDivisionChangeStatusPayload,
-  QcDivisionApproverMotorChangeStatusPayload,
-  QcDivisionApproverPremixChangeStatusPayload,
-} from "../../../data/api/approver/qcDivisionApproverApi";
+import type { QcDivisionApproverChangeStatusPayload } from "../../../data/api/approver/qcDivisionApproverApi";
 import type { QCDivisionDetailView } from "../../../data/models/user/QualityControlFormModel";
 import type { QualityControlFormState } from "../../../data/models/user/QualityControlFormModel";
 import { createDefaultQualityControlFormState } from "../../../data/models/user/QualityControlFormModel";
 import { QCDivisionDetailsModel } from "../../../data/models/user/QCDivisionApiModel";
+import { ApiResponseModel } from "../../../data/models/common/ApiResponseModel";
 import useApproverFormAction from "../useApproverFormAction";
 import { loadQcDivisionDetailsViewState } from "../../user/qualityControl/qcDivisionDetailsHydration";
-import { buildDivisionNavGroups } from "../../user/qualityControl/qcDivisionNav";
-import type { QcPartialItemStatus, QcPartialNavItem } from "../../user/qualityControl/qcDivisionApprovalUnits";
+import { buildDivisionNavGroups, resolveFormNavForPartialItem } from "../../user/qualityControl/qcDivisionNav";
+import {
+  scopeFormStateToPartialItem,
+  type QcPartialItemStatus,
+  type QcPartialNavItem,
+} from "../../user/qualityControl/qcDivisionApprovalUnits";
+import {
+  isRawMaterialProcessingType,
+  isRawMaterialRevalidationType,
+} from "../../user/qualityControl/qcProcessingConfig";
+import {
+  buildQcDivisionIdByApiKey,
+  mapQcDivisionsFromApi,
+  resolveQcDivisionIdFromApiDivision,
+  type QcDivisionCatalogItem,
+  type QcDivisionCatalogNavTab,
+} from "../../user/qualityControl/qcFlowConfig";
+import type { QcDivisionEntry } from "../../user/qualityControl/qcDivisionEntryTypes";
 import {
   buildQcApproverDivisionRows,
+  buildQcApproverFinalGroups,
   buildQcApproverFinalRows,
   buildQcApproverPartialState,
   canApproverActionEntireQcDivisionForm,
@@ -32,6 +46,36 @@ import {
 const DEPARTMENT = "qualityControl" as const;
 const SUB_DEPARTMENT = "qc-division";
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
+
+const toApproverFlowKey = (tabKey: string): string => {
+  const key = String(tabKey ?? "").trim().toUpperCase();
+  if (key === "RAW_MATERIAL_PROCESSING" || key === "RAW_MATERIAL_REVALIDATION") {
+    return "RAW_MATERIAL";
+  }
+  if (key === "POST_CURE_OPERATION") return "POST_CURE";
+  if (key === "PROPELLANT_PROPERTIES") return "QC";
+  return key;
+};
+
+const entryMatchesApproverDivisionTab = (
+  entry: QcDivisionEntry,
+  tab: QcDivisionCatalogNavTab,
+): boolean => {
+  if (entry.flowKey !== tab.flowKey) return false;
+  if (!tab.rawMaterialType) return true;
+  if (isRawMaterialRevalidationType(tab.rawMaterialType)) {
+    return entry.kind === "REVALIDATION";
+  }
+  if (isRawMaterialProcessingType(tab.rawMaterialType)) {
+    return (
+      entry.kind === "PROCESSING_MATERIAL" ||
+      entry.kind === "SOLID_PREMIX" ||
+      entry.kind === "LIQUID_PREMIX" ||
+      entry.kind === "BOTH_PREMIX"
+    );
+  }
+  return true;
+};
 
 type ApproverListRow = Record<string, unknown> & {
   id?: number | string;
@@ -57,17 +101,56 @@ const resolveSubDepartmentId = (
   return match?.subDepartmentId ?? null;
 };
 
+const extractDivisionIdMap = (detailsPayload: Record<string, unknown> | null | undefined) => {
+  const map: Record<string, number> = {};
+  const root = detailsPayload ?? {};
+
+  const absorb = (entry: unknown) => {
+    if (!entry || typeof entry !== "object") return;
+    const rec = entry as Record<string, unknown>;
+    const division = String(rec.division ?? "").trim();
+    const divisionId = Number(rec.divisionId ?? 0);
+    if (!division || !(divisionId > 0)) return;
+    map[division] = divisionId;
+  };
+
+  (Array.isArray(root.divisionDetails) ? root.divisionDetails : []).forEach(absorb);
+  (Array.isArray(root.divisionStatuses) ? root.divisionStatuses : []).forEach(absorb);
+
+  return map;
+};
+
 const resolveActiveDivisionKey = (
   formData: QualityControlFormState,
   groupIndex: number,
+  subIndex = 0,
 ): string => {
   const groups = buildDivisionNavGroups(formData.divisionEntries ?? []);
-  const safeIndex = Math.min(Math.max(groupIndex, 0), Math.max(0, groups.length - 1));
-  const group = groups[safeIndex];
+  const safeGroupIndex = Math.min(Math.max(groupIndex, 0), Math.max(0, groups.length - 1));
+  const group = groups[safeGroupIndex];
   if (!group) return "";
-  const entries = formData.divisionEntries ?? [];
-  const matching = entries.find((entry) => entry.flowKey === group.flowKey);
-  return String(matching?.apiDivision ?? group.flowKey ?? "").trim();
+
+  if (group.kind === "entries") {
+    const entry = group.entries[Math.min(Math.max(subIndex, 0), Math.max(0, group.entries.length - 1))];
+    return String(entry?.apiDivision ?? group.flowKey ?? "").trim();
+  }
+
+  if (group.kind === "mixing") {
+    const tab = group.tabs[Math.min(Math.max(subIndex, 0), Math.max(0, group.tabs.length - 1))];
+    if (tab && tab.kind === "entry") {
+      return String(tab.entry.apiDivision ?? group.flowKey ?? "").trim();
+    }
+    const firstEntry = group.tabs.find((item) => item.kind === "entry");
+    if (firstEntry && firstEntry.kind === "entry") {
+      return String(firstEntry.entry.apiDivision ?? group.flowKey ?? "").trim();
+    }
+    return String(group.flowKey ?? "").trim();
+  }
+
+  const motorTab =
+    group.motorTabs[Math.min(Math.max(subIndex, 0), Math.max(0, group.motorTabs.length - 1))];
+  const entry = motorTab?.entries?.[0];
+  return String(entry?.apiDivision ?? group.flowKey ?? "").trim();
 };
 
 export const useQCDivisionApproverHook = () => {
@@ -84,25 +167,87 @@ export const useQCDivisionApproverHook = () => {
   const [activeDivisionGroupIndex, setActiveDivisionGroupIndex] = useState(0);
   const [activeDivisionSubIndex, setActiveDivisionSubIndex] = useState(0);
   const [activePartialNavIndex, setActivePartialNavIndex] = useState(0);
+  const [activeDivisionTabKey, setActiveDivisionTabKey] = useState("");
   const [partialNavByDivision, setPartialNavByDivision] = useState<
     Record<string, QcPartialNavItem[]>
   >({});
   const [divisionStatusByFlowKey, setDivisionStatusByFlowKey] = useState<
     Record<string, QcPartialItemStatus>
   >({});
+  const [divisionIdByKey, setDivisionIdByKey] = useState<Record<string, number>>({});
   const [formSubmissionType, setFormSubmissionType] = useState<string>("");
   const [resolvedSubDepartmentId, setResolvedSubDepartmentId] = useState<number | null>(null);
+  const [divisionCatalog, setDivisionCatalog] = useState<QcDivisionCatalogItem[]>([]);
+  const divisionCatalogRef = useRef<QcDivisionCatalogItem[]>([]);
+  const divisionIdByKeyRef = useRef<Record<string, number>>({});
 
   const subDepartmentId = useMemo(() => resolveSubDepartmentId(user), [user]);
 
+  const loadDivisionCatalog = useCallback(async (force = false) => {
+    if (!force && divisionCatalogRef.current.length > 0) {
+      return divisionCatalogRef.current;
+    }
+    try {
+      const response = await qcDivisionApproverController.fetchDivisionCatalog();
+      if (!response?.success) return divisionCatalogRef.current;
+      const mapped = mapQcDivisionsFromApi(response.data);
+      divisionCatalogRef.current = mapped;
+      setDivisionCatalog(mapped);
+
+      // Merge catalog divisionIds into the lookup used by change-status.
+      const fromCatalog = buildQcDivisionIdByApiKey(mapped);
+      const merged = { ...fromCatalog, ...divisionIdByKeyRef.current };
+      // Prefer catalog ids for catalog keys; keep any detail-sourced ids that catalog lacks.
+      Object.entries(fromCatalog).forEach(([key, id]) => {
+        merged[key] = id;
+      });
+      divisionIdByKeyRef.current = merged;
+      setDivisionIdByKey(merged);
+
+      return mapped;
+    } catch (error) {
+      console.error("Failed to load QC division catalog for approver:", error);
+      return divisionCatalogRef.current;
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadDivisionCatalog();
+  }, [loadDivisionCatalog]);
+
+  useEffect(() => {
+    divisionCatalogRef.current = divisionCatalog;
+  }, [divisionCatalog]);
+
+  useEffect(() => {
+    divisionIdByKeyRef.current = divisionIdByKey;
+  }, [divisionIdByKey]);
+
   const activeDivisionKey = useMemo(
-    () => resolveActiveDivisionKey(formData, activeDivisionGroupIndex),
-    [activeDivisionGroupIndex, formData],
+    () => resolveActiveDivisionKey(formData, activeDivisionGroupIndex, activeDivisionSubIndex),
+    [activeDivisionGroupIndex, activeDivisionSubIndex, formData],
   );
 
+  const effectiveDivisionKey = useMemo(() => {
+    if (activeDivisionTabKey && (partialNavByDivision[activeDivisionTabKey] || divisionStatusByFlowKey[activeDivisionTabKey])) {
+      return activeDivisionTabKey;
+    }
+    if (partialNavByDivision[activeDivisionKey]?.length) return activeDivisionKey;
+    const waitingKey = Object.keys(partialNavByDivision).find((key) =>
+      (partialNavByDivision[key] ?? []).some((item) => item.status === "WAITING_FOR_APPROVAL"),
+    );
+    if (waitingKey) return waitingKey;
+    return Object.keys(partialNavByDivision)[0] ?? activeDivisionKey;
+  }, [
+    activeDivisionKey,
+    activeDivisionTabKey,
+    divisionStatusByFlowKey,
+    partialNavByDivision,
+  ]);
+
   const partialNavItems = useMemo(
-    () => partialNavByDivision[activeDivisionKey] ?? [],
-    [activeDivisionKey, partialNavByDivision],
+    () => partialNavByDivision[effectiveDivisionKey] ?? [],
+    [effectiveDivisionKey, partialNavByDivision],
   );
 
   const activePartialItem = useMemo(() => {
@@ -114,6 +259,25 @@ export const useQCDivisionApproverHook = () => {
     return partialNavItems[safeIndex] ?? null;
   }, [activePartialNavIndex, partialNavItems]);
 
+  const resolveDivisionId = useCallback(
+    (division: string, catalog = divisionCatalogRef.current) => {
+      const raw = String(division ?? "").trim();
+      if (!raw) return null;
+
+      const fromDetailsOrCatalog =
+        Number(divisionIdByKeyRef.current[raw] ?? 0) ||
+        Number(
+          divisionIdByKeyRef.current[
+            raw.toUpperCase().replace(/[\s-]+/g, "_")
+          ] ?? 0,
+        );
+      if (fromDetailsOrCatalog > 0) return fromDetailsOrCatalog;
+
+      return resolveQcDivisionIdFromApiDivision(catalog, raw);
+    },
+    [],
+  );
+
   const applyPartialState = useCallback(
     (detailsPayload: Record<string, unknown>, preferredDivision?: string) => {
       const state = buildQcApproverPartialState(detailsPayload);
@@ -121,10 +285,21 @@ export const useQCDivisionApproverHook = () => {
       setDivisionStatusByFlowKey(state.divisionStatusByFlowKey);
       setFormSubmissionType(state.formSubmissionType);
 
+      const fromDetails = extractDivisionIdMap(detailsPayload);
+      const fromCatalog = buildQcDivisionIdByApiKey(divisionCatalogRef.current);
+      const merged = { ...fromCatalog, ...fromDetails };
+      setDivisionIdByKey(merged);
+      divisionIdByKeyRef.current = merged;
+
       const divisionKey =
-        preferredDivision && state.partialNavByDivision[preferredDivision]
+        preferredDivision &&
+        (state.partialNavByDivision[preferredDivision] ||
+          state.divisionStatusByFlowKey[preferredDivision])
           ? preferredDivision
-          : Object.keys(state.partialNavByDivision)[0] ?? "";
+          : Object.keys(state.divisionStatusByFlowKey)[0] ||
+            Object.keys(state.partialNavByDivision)[0] ||
+            "";
+      setActiveDivisionTabKey(divisionKey);
       const itemsForDivision = state.partialNavByDivision[divisionKey] ?? [];
       setActivePartialNavIndex(resolveInitialApproverPartialNavIndex(itemsForDivision));
       return state;
@@ -171,35 +346,55 @@ export const useQCDivisionApproverHook = () => {
   const submitUnitChangeStatus = useCallback(
     async (payload: Record<string, unknown>) => {
       const kind = String(payload.unitKind ?? "").trim().toUpperCase();
-      const base = {
+      const division = String(payload.division ?? "").trim();
+
+      // Always ensure divisions API catalog is available before resolving id.
+      let catalog = await loadDivisionCatalog();
+      let divisionId =
+        Number(payload.divisionId ?? 0) || resolveDivisionId(division, catalog) || 0;
+
+      if (!(divisionId > 0)) {
+        catalog = await loadDivisionCatalog(true);
+        divisionId = resolveDivisionId(division, catalog) || 0;
+      }
+
+      if (!(divisionId > 0) || !division) {
+        return new ApiResponseModel({
+          success: false,
+          message: S.DIVISION_ID_MISSING,
+          statusCode: 400,
+        });
+      }
+
+      const base: QcDivisionApproverChangeStatusPayload = {
         formId: String(payload.formId ?? ""),
-        division: String(payload.division ?? ""),
         subDepartmentId: Number(payload.subDepartmentId ?? 0),
+        divisionId,
+        division,
         actionType: payload.actionType as ApproverChangeStatusPayload["actionType"],
         remarks: (payload.remarks as string | null | undefined) ?? null,
         rejectionReason: (payload.rejectionReason as string | null | undefined) ?? null,
       };
 
       if (kind === "MOTOR") {
-        return qcDivisionApproverController.submitMotorStatusChange({
+        return qcDivisionApproverController.submitUnitStatusChange({
           ...base,
-          motorId: String(payload.motorId ?? ""),
-        } as QcDivisionApproverMotorChangeStatusPayload);
+          motorId: String(payload.motorId ?? "").trim(),
+        });
       }
 
       if (kind === "PREMIX" || kind === "FINAL_MIX") {
-        return qcDivisionApproverController.submitPremixStatusChange({
+        return qcDivisionApproverController.submitUnitStatusChange({
           ...base,
           premixNo: Number(payload.premixNo ?? 0),
-          stageType: (kind === "FINAL_MIX" ? "FINAL_MIX" : "PREMIX") as "PREMIX" | "FINAL_MIX",
-        } as QcDivisionApproverPremixChangeStatusPayload);
+          stageType: kind === "FINAL_MIX" ? "FINAL_MIX" : "PREMIX",
+        });
       }
 
-      return qcDivisionApproverController.submitDivisionStatusChange({
-        ...base,
-      } as QcDivisionApproverDivisionChangeStatusPayload);
+      // Division-level (Revalidation, Weightment, etc.): omit premixNo / motorId / stageType
+      return qcDivisionApproverController.submitUnitStatusChange(base);
     },
-    [],
+    [loadDivisionCatalog, resolveDivisionId],
   );
 
   const submitFormChangeStatus = useCallback(
@@ -254,12 +449,17 @@ export const useQCDivisionApproverHook = () => {
     subDepartment: SUB_DEPARTMENT,
     statusField: "qcDivStatus",
     submitChangeStatus: submitUnitChangeStatus,
-    buildChangeStatusPayload: () => ({
-      unitKind: activePartialItem?.kind,
-      motorId: activePartialItem?.motorId,
-      premixNo: activePartialItem?.finalMixNo ?? activePartialItem?.premixNo,
-      division: activeDivisionKey || undefined,
-    }),
+    buildChangeStatusPayload: () => {
+      const division = effectiveDivisionKey || activeDivisionKey || "";
+      const divisionId = resolveDivisionId(division);
+      return {
+        unitKind: activePartialItem?.kind,
+        motorId: activePartialItem?.motorId,
+        premixNo: activePartialItem?.finalMixNo ?? activePartialItem?.premixNo,
+        division: division || undefined,
+        divisionId: divisionId ?? undefined,
+      };
+    },
     onStatusChangeSuccess: async (item, response) => {
       const formId = String(item.formId ?? "").trim();
       if (!formId) return;
@@ -347,8 +547,11 @@ export const useQCDivisionApproverHook = () => {
     setActiveDivisionGroupIndex(0);
     setActiveDivisionSubIndex(0);
     setActivePartialNavIndex(0);
+    setActiveDivisionTabKey("");
     setPartialNavByDivision({});
     setDivisionStatusByFlowKey({});
+    setDivisionIdByKey({});
+    divisionIdByKeyRef.current = {};
     setFormSubmissionType("");
     setDetailsLoading(true);
     setSchemaLoading(false);
@@ -371,6 +574,7 @@ export const useQCDivisionApproverHook = () => {
     }
 
     try {
+      await loadDivisionCatalog();
       const response = await qcDivisionController.fetchFormDetails({
         formId,
         subDepartmentId: rowSubDepartmentId,
@@ -440,8 +644,11 @@ export const useQCDivisionApproverHook = () => {
     setActiveDivisionGroupIndex(0);
     setActiveDivisionSubIndex(0);
     setActivePartialNavIndex(0);
+    setActiveDivisionTabKey("");
     setPartialNavByDivision({});
     setDivisionStatusByFlowKey({});
+    setDivisionIdByKey({});
+    divisionIdByKeyRef.current = {};
     setFormSubmissionType("");
     setResolvedSubDepartmentId(null);
   };
@@ -450,37 +657,107 @@ export const useQCDivisionApproverHook = () => {
     (index: number) => {
       setActiveDivisionGroupIndex(index);
       setActiveDivisionSubIndex(0);
-      const nextDivision = resolveActiveDivisionKey(formData, index);
-      const itemsForDivision = partialNavByDivision[nextDivision] ?? [];
+      const nextDivision = resolveActiveDivisionKey(formData, index, 0);
+      const normalized = String(nextDivision ?? "").trim().toUpperCase();
+      const tabKey =
+        (normalized &&
+          (partialNavByDivision[normalized] || divisionStatusByFlowKey[normalized]) &&
+          normalized) ||
+        (normalized === "RAW_MATERIAL"
+          ? Object.keys(partialNavByDivision).find((key) => key.startsWith("RAW_MATERIAL_"))
+          : null) ||
+        normalized;
+      if (tabKey) setActiveDivisionTabKey(tabKey);
+      const itemsForDivision =
+        partialNavByDivision[tabKey] ??
+        partialNavByDivision[normalized] ??
+        [];
       setActivePartialNavIndex(resolveInitialApproverPartialNavIndex(itemsForDivision));
     },
-    [formData, partialNavByDivision],
+    [divisionStatusByFlowKey, formData, partialNavByDivision],
   );
 
-  const handleActivePartialNavIndexChange = useCallback((index: number) => {
-    setActivePartialNavIndex(index);
-  }, []);
+  const handleDivisionNavTabChange = useCallback(
+    (tabKey: string) => {
+      const key = String(tabKey ?? "").trim();
+      if (!key) return;
+      setActiveDivisionTabKey(key);
+      // Scoped form data rebuilds groups per tab — always start at the first group.
+      setActiveDivisionGroupIndex(0);
+      setActiveDivisionSubIndex(0);
+      const itemsForDivision = partialNavByDivision[key] ?? [];
+      setActivePartialNavIndex(resolveInitialApproverPartialNavIndex(itemsForDivision));
+    },
+    [partialNavByDivision],
+  );
+
+  const handleActivePartialNavIndexChange = useCallback(
+    (index: number) => {
+      setActivePartialNavIndex(index);
+      const tabKey = effectiveDivisionKey || activeDivisionTabKey;
+      const items = partialNavByDivision[tabKey] ?? [];
+      const item = items[index];
+      if (item) {
+        const { groupIndex, subIndex } = resolveFormNavForPartialItem(
+          formData.divisionEntries,
+          item,
+          { flowKey: toApproverFlowKey(tabKey) },
+        );
+        setActiveDivisionGroupIndex(groupIndex);
+        setActiveDivisionSubIndex(subIndex);
+        return;
+      }
+      setActiveDivisionGroupIndex(0);
+      setActiveDivisionSubIndex(0);
+    },
+    [
+      activeDivisionTabKey,
+      effectiveDivisionKey,
+      formData.divisionEntries,
+      partialNavByDivision,
+    ],
+  );
+
+  useEffect(() => {
+    if (!activePartialItem) return;
+    const tabKey = effectiveDivisionKey || activeDivisionTabKey;
+    const { groupIndex, subIndex } = resolveFormNavForPartialItem(
+      formData.divisionEntries,
+      activePartialItem,
+      { flowKey: toApproverFlowKey(tabKey) },
+    );
+    setActiveDivisionGroupIndex(groupIndex);
+    setActiveDivisionSubIndex(subIndex);
+  }, [
+    activeDivisionTabKey,
+    activePartialItem,
+    effectiveDivisionKey,
+    formData.divisionEntries,
+  ]);
 
   const requestUnitApprove = useCallback(
-    (item: ApproverListRow) => {
+    async (item: ApproverListRow) => {
       if (!activePartialItem || !isQcPartialItemApproverActionable(activePartialItem.status)) {
         showAlert(S.UNIT_APPROVER_LOCKED, "warning", { autoCloseMs: 3000 });
         return;
       }
+      // Ensure catalog is warm before remarks confirm; do not block the popup.
+      void loadDivisionCatalog();
       requestUnitApproveAction(item);
     },
-    [activePartialItem, requestUnitApproveAction, showAlert],
+    [activePartialItem, loadDivisionCatalog, requestUnitApproveAction, showAlert],
   );
 
   const requestUnitReject = useCallback(
-    (item: ApproverListRow) => {
+    async (item: ApproverListRow) => {
       if (!activePartialItem || !isQcPartialItemApproverActionable(activePartialItem.status)) {
         showAlert(S.UNIT_APPROVER_LOCKED, "warning", { autoCloseMs: 3000 });
         return;
       }
+      void loadDivisionCatalog();
       requestUnitRejectAction(item);
     },
-    [activePartialItem, requestUnitRejectAction, showAlert],
+    [activePartialItem, loadDivisionCatalog, requestUnitRejectAction, showAlert],
   );
 
   const canApproveForm = useMemo(
@@ -553,6 +830,48 @@ export const useQCDivisionApproverHook = () => {
     [activeDivisionKey, partialNavItems],
   );
 
+  const finalApprovalGroups = useMemo(
+    () => buildQcApproverFinalGroups(partialNavByDivision, divisionStatusByFlowKey),
+    [divisionStatusByFlowKey, partialNavByDivision],
+  );
+
+  const divisionNavTabs = useMemo<QcDivisionCatalogNavTab[]>(
+    () =>
+      finalApprovalGroups.map((group) => {
+        const tabKey = String(group.divisionKey ?? "").trim();
+        const flowKey = toApproverFlowKey(tabKey);
+        return {
+          tabKey,
+          flowKey,
+          rawMaterialType: flowKey === "RAW_MATERIAL" ? tabKey : "",
+          label: group.divisionLabel,
+          divisionId: Number(divisionIdByKey[tabKey] ?? divisionIdByKey[flowKey] ?? 0),
+        };
+      }),
+    [divisionIdByKey, finalApprovalGroups],
+  );
+
+  const scopedFormData = useMemo(() => {
+    const tab = divisionNavTabs.find((entry) => entry.tabKey === effectiveDivisionKey);
+    const unitScoped =
+      activePartialItem &&
+      (activePartialItem.kind === "PREMIX" ||
+        activePartialItem.kind === "FINAL_MIX" ||
+        activePartialItem.kind === "MOTOR")
+        ? scopeFormStateToPartialItem(formData, activePartialItem, {
+            flowKey: toApproverFlowKey(effectiveDivisionKey),
+          })
+        : formData;
+
+    if (!tab) return unitScoped;
+
+    const entries = (unitScoped.divisionEntries ?? []).filter((entry) =>
+      entryMatchesApproverDivisionTab(entry, tab),
+    );
+    if (entries.length === (unitScoped.divisionEntries ?? []).length) return unitScoped;
+    return { ...unitScoped, divisionEntries: entries };
+  }, [activePartialItem, divisionNavTabs, effectiveDivisionKey, formData]);
+
   const finalApprovalRows = useMemo(
     () => buildQcApproverFinalRows(partialNavByDivision, divisionStatusByFlowKey),
     [divisionStatusByFlowKey, partialNavByDivision],
@@ -566,17 +885,21 @@ export const useQCDivisionApproverHook = () => {
     detailsLoading,
     schemaLoading,
     detailView,
-    formData,
+    formData: scopedFormData,
     activeDivisionGroupIndex,
     activeDivisionSubIndex,
     setActiveDivisionSubIndex,
     setActiveDivisionGroupIndex: handleActiveDivisionGroupIndexChange,
+    activeDivisionTabKey: effectiveDivisionKey,
+    divisionNavTabs,
+    setActiveDivisionTabKey: handleDivisionNavTabChange,
     activePartialNavIndex,
     setActivePartialNavIndex: handleActivePartialNavIndexChange,
     partialNavItems,
     activePartialItem,
     divisionStatusByFlowKey,
     divisionApprovalRows,
+    finalApprovalGroups,
     finalApprovalRows,
     canApproveActiveUnit,
     canApproveForm,

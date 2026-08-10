@@ -37,6 +37,26 @@ const formatDateTime = (value?: string | null) => {
   });
 };
 
+export const buildQcDivisionBatchMetaFields = (
+  detailView: QCDivisionDetailView | null,
+  row?: Record<string, unknown>,
+) => [
+  { label: BL.COL_BATCH_ID, value: detailView?.batchId || row?.batchId || "—" },
+  { label: "Form ID", value: detailView?.formId || row?.formId || "—" },
+  {
+    label: "Status",
+    value: formatStatusLabel(detailView?.status || String(row?.qcDivStatus ?? row?.status ?? "")),
+  },
+  { label: BL.COL_CREATED_BY, value: detailView?.createdBy || "—" },
+  { label: BL.COL_CREATED_ON, value: formatDateTime(detailView?.createdAt) },
+  { label: "Submitted By", value: detailView?.submittedBy || "—" },
+  { label: "Submitted On", value: formatDateTime(detailView?.submittedAt) },
+  {
+    label: "Divisions",
+    value: detailView?.divisionCount ? String(detailView.divisionCount) : "—",
+  },
+];
+
 export type QCDivisionDetailsContentProps = {
   detailView: QCDivisionDetailView | null;
   row?: Record<string, unknown>;
@@ -51,6 +71,10 @@ export type QCDivisionDetailsContentProps = {
   onActiveDivisionSubIndexChange: (index: number) => void;
   theme: ReturnType<typeof getQualityControlTheme>;
   resetOnFormId?: string | null;
+  /** When false, omit the batch meta block (caller can render it elsewhere). */
+  showBatchSection?: boolean;
+  /** Match user QC form: catalog + partial nav own top-level switching. */
+  hideEntryGroupNav?: boolean;
 };
 
 const QCDivisionDetailsContent = ({
@@ -67,6 +91,8 @@ const QCDivisionDetailsContent = ({
   onActiveDivisionSubIndexChange,
   theme,
   resetOnFormId,
+  showBatchSection = true,
+  hideEntryGroupNav = false,
 }: QCDivisionDetailsContentProps) => {
   const dt = getQcDivisionTheme(theme).details;
   const [navGroupIndex, setNavGroupIndex] = useState(activeDivisionGroupIndex);
@@ -95,22 +121,7 @@ const QCDivisionDetailsContent = ({
     onActiveDivisionSubIndexChange(index);
   };
 
-  const metaFields = [
-    { label: BL.COL_BATCH_ID, value: detailView?.batchId || row?.batchId || "—" },
-    { label: "Form ID", value: detailView?.formId || row?.formId || "—" },
-    {
-      label: "Status",
-      value: formatStatusLabel(detailView?.status || String(row?.qcDivStatus ?? row?.status ?? "")),
-    },
-    { label: BL.COL_CREATED_BY, value: detailView?.createdBy || "—" },
-    { label: BL.COL_CREATED_ON, value: formatDateTime(detailView?.createdAt) },
-    { label: "Submitted By", value: detailView?.submittedBy || "—" },
-    { label: "Submitted On", value: formatDateTime(detailView?.submittedAt) },
-    {
-      label: "Divisions",
-      value: detailView?.divisionCount ? String(detailView.divisionCount) : "—",
-    },
-  ];
+  const metaFields = buildQcDivisionBatchMetaFields(detailView, row);
 
   if (loading) {
     return (
@@ -125,20 +136,22 @@ const QCDivisionDetailsContent = ({
 
   return (
     <>
-      <Box sx={dt.section}>
-        <Typography sx={dt.sectionTitle}>
-          <DescriptionRoundedIcon sx={{ fontSize: 18 }} />
-          {S.DETAILS_BATCH_SECTION}
-        </Typography>
-        <Box sx={dt.metaGrid}>
-          {metaFields.map((field) => (
-            <Box key={field.label} sx={dt.metaItem}>
-              <Typography sx={dt.metaLabel}>{field.label}</Typography>
-              <Typography sx={dt.metaValue}>{String(field.value ?? "—")}</Typography>
-            </Box>
-          ))}
+      {showBatchSection ? (
+        <Box sx={dt.section}>
+          <Typography sx={dt.sectionTitle}>
+            <DescriptionRoundedIcon sx={{ fontSize: 18 }} />
+            {S.DETAILS_BATCH_SECTION}
+          </Typography>
+          <Box sx={dt.metaGrid}>
+            {metaFields.map((field) => (
+              <Box key={field.label} sx={dt.metaItem}>
+                <Typography sx={dt.metaLabel}>{field.label}</Typography>
+                <Typography sx={dt.metaValue}>{String(field.value ?? "—")}</Typography>
+              </Box>
+            ))}
+          </Box>
         </Box>
-      </Box>
+      ) : null}
 
       <Box sx={{ ...dt.section, mb: 0 }}>
         <Typography sx={dt.sectionTitle}>
@@ -156,6 +169,7 @@ const QCDivisionDetailsContent = ({
             readOnly
             schemaLoading={schemaLoading}
             schemaError={schemaError}
+            hideEntryGroupNav={hideEntryGroupNav}
             onActiveDivisionGroupIndexChange={handleGroupIndexChange}
             onActiveDivisionSubIndexChange={handleSubIndexChange}
             onDivisionEntryValuesChange={() => {}}

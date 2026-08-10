@@ -58,7 +58,7 @@ export type PremixEntry = {
 
 export type FinalMixEntry = {
   mixNo: string;
-  linkedPremixNo: string;
+  finalMixNo: string;
   mixerType: string;
   bldgNo: string;
   bowlId: string;
@@ -532,7 +532,7 @@ export const createPremixEntryWithDefaults = (
 
 export const createEmptyFinalMixEntry = (mixNo: number): FinalMixEntry => ({
   mixNo: String(mixNo),
-  linkedPremixNo: "",
+  finalMixNo: "",
   mixerType: "",
   bldgNo: "",
   bowlId: "",
@@ -552,9 +552,10 @@ export const createFinalMixEntryWithDefaults = (
   bldgNo: String(bldgNo ?? ""),
 });
 
-/** Resolves linked premix from FINAL_MIX API entry (premixNo when linkedPremixNo is omitted). */
-const resolveApiLinkedPremixNo = (entry: Record<string, unknown> | null | undefined): string => {
+/** Resolves final mix no from FINAL_MIX API entry (supports legacy linkedPremixNo). */
+const resolveApiFinalMixNo = (entry: Record<string, unknown> | null | undefined): string => {
   const explicit =
+    entry?.finalMixNo ??
     entry?.linkedPremixNo ??
     (entry?.linkedPremix as { premixNo?: unknown } | undefined)?.premixNo ??
     entry?.linkedPremixNumber ??
@@ -577,7 +578,12 @@ const normalizeFinalMixEntry = (
 
   return {
     mixNo: coerceFieldValue(entry.mixNo ?? fallbackNo),
-    linkedPremixNo: coerceFieldValue(entry.linkedPremixNo ?? ""),
+    finalMixNo: coerceFieldValue(
+      entry.finalMixNo ??
+        entry.linkedPremixNo ??
+        resolveApiFinalMixNo(entry) ??
+        "",
+    ),
     mixerType: String(entry.mixerType ?? ""),
     bldgNo: String(entry.bldgNo ?? ""),
     bowlId: String(entry.bowlId ?? ""),
@@ -812,7 +818,7 @@ export const mapMixingDetailsToFormState = (details: Partial<MixingDetails>): Mi
         {
           mixNo: entry?.premixNo ?? entry?.finalMixNo ?? entry?.mixNo ?? index + 1,
 
-          linkedPremixNo: resolveApiLinkedPremixNo(entry),
+          finalMixNo: resolveApiFinalMixNo(entry),
 
           mixerType: String(
             entry?.mixerConfiguration?.mixerId ?? identificationSheet?.mixerType ?? "",
@@ -853,7 +859,7 @@ const mapProcessRowsToApi = (rows: ProcessParticularRow[]) =>
   }));
 const mapQualityChecksToApi = (rows: QualityCheckRow[]) =>
   rows.map((row) => {
-    const observations = [];
+    const observations: Array<{ value: string }> = [];
     const sampleCount = resolveSampleCount(
       row.sampleCount,
       isQuadObservedLayout(row.observedLayout) ? 4 : 1,
@@ -863,17 +869,37 @@ const mapQualityChecksToApi = (rows: QualityCheckRow[]) =>
     for (let index = 0; index < sampleCount; index += 1) {
       const value = String(observedValues[index] ?? "").trim();
       if (!value) continue;
-      observations.push({
-        sampleNo: index + 1,
-        value,
-      });
+      observations.push({ value });
     }
 
     return {
       parameterId: row.parameterId,
+      noOfSamples: sampleCount,
       observations,
     };
   });
+
+/** Read observation values by index; still accept legacy `{ sampleNo, value }` payloads. */
+const readObservationValues = (observations: unknown[]): string[] => {
+  const byIndex: string[] = [];
+  observations.forEach((obs, index) => {
+    if (obs == null) return;
+    if (typeof obs === "string" || typeof obs === "number") {
+      byIndex[index] = String(obs);
+      return;
+    }
+    const rec = obs as Record<string, unknown>;
+    const value = String(rec.value ?? "").trim();
+    const sampleNo = Number(rec.sampleNo);
+    if (Number.isFinite(sampleNo) && sampleNo > 0) {
+      byIndex[sampleNo - 1] = value;
+      return;
+    }
+    byIndex[index] = value;
+  });
+  return byIndex;
+};
+
 const mapProcessRows = (
   operations: MixingOperation[] = [],
   apiRows: any[] = [],
@@ -895,13 +921,15 @@ const mapProcessRows = (
 const mapApiQualityChecksToRows = (apiRows: any[] = []): QualityCheckRow[] =>
   apiRows.map((row) => {
     const observations = Array.isArray(row?.observations) ? row.observations : [];
-    const maxSample = observations.reduce(
-      (max, obs) => Math.max(max, Number(obs?.sampleNo) || 0),
+    const values = readObservationValues(observations);
+    const filledSlots = values.reduce(
+      (count, value, index) =>
+        value != null && String(value).trim() ? Math.max(count, index + 1) : count,
       0,
     );
     const sampleCount = resolveSampleCount(
       row?.noOfSamples ?? row?.sampleCount,
-      Math.max(1, maxSample),
+      Math.max(1, filledSlots),
     );
 
     return {
@@ -910,10 +938,10 @@ const mapApiQualityChecksToRows = (apiRows: any[] = []): QualityCheckRow[] =>
       specification: formatSpecificationValue(row?.specification),
       observedLayout: sampleCount > 1 ? "quad" : "single",
       sampleCount,
-      observed1: String(observations.find((o) => Number(o?.sampleNo) === 1)?.value ?? ""),
-      observed2: String(observations.find((o) => Number(o?.sampleNo) === 2)?.value ?? ""),
-      observed3: String(observations.find((o) => Number(o?.sampleNo) === 3)?.value ?? ""),
-      observed4: String(observations.find((o) => Number(o?.sampleNo) === 4)?.value ?? ""),
+      observed1: String(values[0] ?? ""),
+      observed2: String(values[1] ?? ""),
+      observed3: String(values[2] ?? ""),
+      observed4: String(values[3] ?? ""),
     };
   });
 
@@ -927,13 +955,14 @@ const mergeQualityChecks = (
 
   return masterRows.map((master) => {
     const api = apiRows.find((row) => row.parameterId === master.parameterId);
+    const values = readObservationValues(Array.isArray(api?.observations) ? api.observations : []);
 
     return {
       ...master,
-      observed1: String(api?.observations?.find((o: any) => Number(o?.sampleNo) === 1)?.value ?? ""),
-      observed2: String(api?.observations?.find((o: any) => Number(o?.sampleNo) === 2)?.value ?? ""),
-      observed3: String(api?.observations?.find((o: any) => Number(o?.sampleNo) === 3)?.value ?? ""),
-      observed4: String(api?.observations?.find((o: any) => Number(o?.sampleNo) === 4)?.value ?? ""),
+      observed1: String(values[0] ?? ""),
+      observed2: String(values[1] ?? ""),
+      observed3: String(values[2] ?? ""),
+      observed4: String(values[3] ?? ""),
     };
   });
 };
@@ -1005,7 +1034,7 @@ export const mapMixingFormStateToPayload = (
               premixNo: Number(entry.mixNo) || 0,
               premixSubmissionType: resolvePremixSubmissionType(mixCardId),
 
-              linkedPremixNo: Number(entry.linkedPremixNo) || null,
+              finalMixNo: Number(entry.finalMixNo) || null,
 
               mixerConfiguration: {
                 mixerId: entry.mixerType,
@@ -1059,7 +1088,7 @@ const premixHasValue = (premix: PremixEntry) => {
 
 const finalMixHasValue = (entry: FinalMixEntry) => {
   const headerFilled =
-    hasValue(entry.linkedPremixNo) ||
+    hasValue(entry.finalMixNo) ||
     hasValue(entry.mixerType) ||
     hasValue(entry.bldgNo) ||
     hasValue(entry.bowlId) ||

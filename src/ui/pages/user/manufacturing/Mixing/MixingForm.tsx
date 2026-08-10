@@ -490,9 +490,9 @@ const FinalMixStageCard = ({
         }}
       >
         <MixingTextField
-          label="Linked Premix No"
-          value={entry.linkedPremixNo}
-          placeholder="Linked Premix No"
+          label={S.DETAIL_LABEL_FINAL_MIX_NO}
+          value={entry.finalMixNo}
+          placeholder={S.DETAIL_LABEL_FINAL_MIX_NO}
           disabled
           onChange={() => undefined}
         />

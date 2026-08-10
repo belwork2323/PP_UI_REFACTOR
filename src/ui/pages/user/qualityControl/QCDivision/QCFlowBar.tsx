@@ -2,11 +2,8 @@ import CasePrepSelect from "../../manufacturing/CasePreparation/CasePrepSelect";
 import {
   QC_FLOW_LABELS,
   QC_PROCESSING_TYPE_OPTIONS,
-  type QcDivisionOption,
-  type QcRawMaterialTypeOption,
 } from "../../../../../hooks/user/qualityControl/qcFlowConfig";
 import {
-  canLoadDivisionSchema,
   getQcDivisionPanelType,
   isCastingDivisionFlow,
   isCuringDivisionFlow,
@@ -51,7 +48,7 @@ import {
 } from "../../../../../hooks/user/qualityControl/qcPropellantConfig";
 import { STF_FLOW_LABELS } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
 import { STRINGS } from "../../../../../app/config/strings";
-import { Box, Button, CircularProgress } from "@mui/material";
+import { Box } from "@mui/material";
 import CasePrepMultiSelect from "../../manufacturing/CasePreparation/CasePrepMultiSelect";
 import CasePrepDateField from "../../manufacturing/CasePreparation/CasePrepDateField";
 import CasePrepTextField from "../../manufacturing/CasePreparation/CasePrepTextField";
@@ -63,10 +60,7 @@ const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 type QCFlowBarProps = {
   batch?: { batchId?: string; motorId?: string; motorIds?: string[] } | null;
   selectedDivision: string;
-  divisionOptions?: QcDivisionOption[];
-  divisionsLoading?: boolean;
   selectedRawMaterialType: string;
-  rawMaterialTypeOptions?: QcRawMaterialTypeOption[];
   selectedProcessingType: string;
   selectedPremix: number | "";
   selectedMixingStage: string;
@@ -87,8 +81,6 @@ type QCFlowBarProps = {
   schemaLoading?: boolean;
   /** When division-details seeded motor/premix nav, hide redundant pickers for auto-loaded flows. */
   partialNavActive?: boolean;
-  onDivisionChange: (value: string) => void;
-  onRawMaterialTypeChange: (value: string) => void;
   onProcessingTypeChange: (value: string) => void;
   onPremixChange: (value: number | "") => void;
   onMixingStageChange: (value: string) => void;
@@ -103,17 +95,13 @@ type QCFlowBarProps = {
   onPropellantProcessChange: (value: string) => void;
   onWeightmentWeighscaleNoChange: (value: string) => void;
   onWeightmentCalibrationDueDateChange: (value: string) => void;
-  onLoadForm: () => void;
   theme: any;
 };
 
 const QCFlowBar = ({
   batch,
   selectedDivision,
-  divisionOptions = [],
-  divisionsLoading = false,
   selectedRawMaterialType,
-  rawMaterialTypeOptions = [],
   selectedProcessingType,
   selectedPremix,
   selectedMixingStage,
@@ -133,8 +121,6 @@ const QCFlowBar = ({
   hasDivisionEntries,
   schemaLoading = false,
   partialNavActive = false,
-  onDivisionChange,
-  onRawMaterialTypeChange,
   onProcessingTypeChange,
   onPremixChange,
   onMixingStageChange,
@@ -149,7 +135,6 @@ const QCFlowBar = ({
   onPropellantProcessChange,
   onWeightmentWeighscaleNoChange,
   onWeightmentCalibrationDueDateChange,
-  onLoadForm,
   theme,
 }: QCFlowBarProps) => {
   const flowBar = theme.manufacturing?.casePreparation?.flowBar ?? {};
@@ -312,28 +297,6 @@ const QCFlowBar = ({
       ),
   }));
 
-  const flowState = {
-    rawMaterialType: selectedRawMaterialType,
-    processingType: selectedProcessingType,
-    mixingStage: selectedMixingStage,
-    selectedPremix,
-    addedPremixNumbers,
-    stfMotorType: selectedStfMotorType,
-    selectedMotorId,
-    selectedHardwareProcesses,
-    selectedCuringType,
-    selectedTrimmingMotorCount,
-    trimmingMotorReceivedDate,
-    selectedPostCureOperation,
-    selectedInhibitorType,
-    selectedPropellantProcess,
-    weightmentWeighscaleNo,
-    weightmentCalibrationDueDate,
-    addedDivisionEntryKeys,
-  };
-
-  const canLoad = canLoadDivisionSchema(selectedDivision, flowState);
-
   const availablePremixOptions = QC_PROCESSING_PREMIX_OPTIONS.filter(
     (premixNo) => !addedPremixNumbers.includes(premixNo),
   );
@@ -341,76 +304,32 @@ const QCFlowBar = ({
     (number) => !addedPremixNumbers.includes(number),
   );
 
-  const showLoadAction =
-    !autoSeededPartialFlow &&
-    Boolean(selectedDivision) &&
-    (panelType === "SIMPLE" ||
-      panelType === "STF" ||
-      isMixingFlow ||
-      isHardwareFlow ||
-      isCastingFlow ||
-      isCuringFlow ||
-      isTrimmingFlow ||
-      isDeCoringFlow ||
-      isNdtFlow ||
-      isPropellantFlow ||
-      isWeightmentFlow ||
-      isPostCureFlow ||
-      (showRawMaterialType &&
-        selectedRawMaterialType &&
-        (!showProcessingType || selectedProcessingType)));
+  const hasVisiblePickers =
+    showProcessingType ||
+    showPremixSelect ||
+    showMixingStage ||
+    showMixingNumber ||
+    showStfMotorType ||
+    showTrimmingMotorCount ||
+    showTrimmingMotorId ||
+    showTrimmingReceivedDate ||
+    showPostCureOperation ||
+    showPostCureMotorId ||
+    (showMotorIdSelect && !isTrimmingFlow) ||
+    showCuringType ||
+    showWeightmentWeighscale ||
+    showWeightmentCalibrationDate ||
+    showPropellantProcess ||
+    showHardwareProcesses ||
+    showInhibitorType;
 
-  const isPremixAction = isRawMaterialPremixFlow || isMixingFlow;
-  const isHardwareAction = isHardwareFlow;
-  const numberAlreadyAdded =
-    selectedPremix !== "" && addedPremixNumbers.includes(Number(selectedPremix));
-  const loadDisabled = !canLoad || schemaLoading || (isPremixAction && numberAlreadyAdded);
-  const loadLabel = hasDivisionEntries
-    ? isPremixAction
-      ? S.ADD_PREMIX_LABEL
-      : isHardwareAction
-        ? S.ADD_DIVISION_LABEL
-        : S.ADD_DIVISION_LABEL
-    : schemaLoading
-      ? L.loadingSchema
-      : isPremixAction
-        ? S.ADD_PREMIX_LABEL
-        : L.loadForm;
+  // Load Form removed — tab / picker selection auto-loads the form in the hook.
+  if (!hasVisiblePickers) return null;
 
   return (
     <Box sx={flowBar.container}>
       <Box sx={{ display: "flex", flexDirection: "column", gap: 2 }}>
         <Box sx={{ ...flowBar.topRow, alignItems: "flex-end", flexWrap: "wrap" }}>
-          <CasePrepSelect
-            label={L.division}
-            value={selectedDivision}
-            placeholder={divisionsLoading ? "Loading divisions…" : L.divisionPlaceholder}
-            options={divisionOptions.map((option) => ({
-              value: option.value,
-              label: option.label,
-              disabled: option.disabled,
-            }))}
-            width={240}
-            theme={theme}
-            onChange={onDivisionChange}
-            disabled={divisionsLoading}
-          />
-
-          {showRawMaterialType ? (
-            <CasePrepSelect
-              label={L.rawMaterialType}
-              value={selectedRawMaterialType}
-              placeholder={L.rawMaterialTypePlaceholder}
-              options={rawMaterialTypeOptions.map((option) => ({
-                value: option.value,
-                label: option.label,
-              }))}
-              width={280}
-              theme={theme}
-              onChange={onRawMaterialTypeChange}
-            />
-          ) : null}
-
           {showProcessingType ? (
             <CasePrepSelect
               label={L.processingType}
@@ -662,20 +581,6 @@ const QCFlowBar = ({
             />
           ) : null}
         </Box>
-
-        {showLoadAction ? (
-          <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-            <Button
-              variant="contained"
-              size="small"
-              disabled={loadDisabled}
-              onClick={onLoadForm}
-              startIcon={schemaLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
-            >
-              {schemaLoading ? L.loadingSchema : loadLabel}
-            </Button>
-          </Box>
-        ) : null}
       </Box>
     </Box>
   );
