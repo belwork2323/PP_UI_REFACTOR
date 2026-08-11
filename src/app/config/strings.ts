@@ -2040,6 +2040,16 @@ export const STRINGS = {
       HARDWARE_PROCESS_PREHEATING: "Preheating",
       HARDWARE_PROCESS_LINEAR_COATING: "Liner Coating",
       HARDWARE_PROCESS_DISPATCH: "Dispatch",
+      HARDWARE_UPLOAD_SECTION_TITLE: "Upload Report / Graph / Photo",
+      HARDWARE_UPLOAD_SECTION_HINT:
+        "Upload PDF, image, or video files for report, graph, and photo attachments.",
+      HARDWARE_UPLOAD_COL_TYPE: "Attachment Type",
+      HARDWARE_UPLOAD_COL_FILES: "Uploaded Files",
+      HARDWARE_UPLOAD_REPORT: "Report",
+      HARDWARE_UPLOAD_GRAPH: "Graph",
+      HARDWARE_UPLOAD_PHOTO: "Photo",
+      HARDWARE_UPLOAD_ACTION: "Upload",
+      HARDWARE_UPLOAD_ADD_MORE: "Add more files",
       HARDWARE_MOTOR_NAV_HINT:
         "All processes added for this motor are shown below. Add more processes from the picker row to append them here.",
       CASTING_MOTOR_ID_LABEL: "Motor ID",
@@ -2152,7 +2162,7 @@ export const STRINGS = {
       PREVIOUS_STAGE_PREMIX_TAB_DISABLED:
         "This premix was not approved in {division}.",
       PREVIOUS_STAGE_MOTOR_TAB_DISABLED:
-        "This motor was not approved in the previous division.",
+        "This motor was not approved in the previous subdepartment.",
       SEQUENTIAL_UNIT_TAB_DISABLED:
         "Complete approval for the previous unit before continuing.",
       DIVISION_TAB_APPROVE_DIVISION:

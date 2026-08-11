@@ -23,6 +23,12 @@ import {
   setViscosityRows,
   type QcMixingViscosityRow,
 } from "../../../../../hooks/user/qualityControl/qcMixingTables";
+import {
+  QCDivisionReadOnlyValue,
+  qcReadOnlyBodyCellSx,
+  qcReadOnlyTableContainerSx,
+  qcReadOnlyTableHeaderCellSx,
+} from "./components/QCDivisionReadOnlyValue";
 
 const BRAND = QC_DIVISION_BRAND;
 
@@ -55,17 +61,13 @@ type QCMixingViscosityTableProps = {
   readOnly?: boolean;
 };
 
-const displayValue = (value: unknown) => {
-  const text = String(value ?? "").trim();
-  return text || "—";
-};
-
 const QCMixingViscosityTable = ({
   values,
   onChange,
   readOnly = false,
 }: QCMixingViscosityTableProps) => {
   const rows = useMemo(() => getViscosityRows(values), [values]);
+  const baseCellSx = readOnly ? qcReadOnlyBodyCellSx : cellSx;
 
   const updateRows = useCallback(
     (nextRows: QcMixingViscosityRow[]) => {
@@ -101,25 +103,40 @@ const QCMixingViscosityTable = ({
     [rows, updateRows],
   );
 
+  const headerColumns = ["S. No", "Time (min)", "Viscosity Value (P @ 40°C)"];
+
   return (
     <Box>
-      <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: BRAND.primary, mb: 0.5 }}>
-        Viscosity Build-up (P @ 40°C)
-      </Typography>
-      <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub, mb: 1 }}>
-        {STRINGS.QUALITY_CONTROL.QC_DIVISION.MIXING_FINAL_MIX_VISCOSITY_ENTRY_HINT}
-      </Typography>
+      {!readOnly ? (
+        <>
+          <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: BRAND.primary, mb: 0.5 }}>
+            Viscosity Build-up (P @ 40°C)
+          </Typography>
+          <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub, mb: 1 }}>
+            {STRINGS.QUALITY_CONTROL.QC_DIVISION.MIXING_FINAL_MIX_VISCOSITY_ENTRY_HINT}
+          </Typography>
+        </>
+      ) : (
+        <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: BRAND.primary, mb: 1 }}>
+          Viscosity Build-up (P @ 40°C)
+        </Typography>
+      )}
       <TableContainer
-        sx={{
-          overflow: "hidden",
-          overflowX: "auto",
-          border: `1px solid ${TABLE_BORDER}`,
-          borderRadius: 2,
-          background: "#fff",
-        }}
+        sx={
+          readOnly
+            ? qcReadOnlyTableContainerSx
+            : {
+                overflow: "hidden",
+                overflowX: "auto",
+                border: `1px solid ${TABLE_BORDER}`,
+                borderRadius: 2,
+                background: "#fff",
+              }
+        }
       >
         <Table
           size="small"
+          stickyHeader={!readOnly}
           sx={{
             minWidth: 420,
             borderCollapse: "collapse",
@@ -127,9 +144,17 @@ const QCMixingViscosityTable = ({
         >
           <TableHead>
             <TableRow>
-              <TableCell sx={TH}>S. No</TableCell>
-              <TableCell sx={TH}>Time (min)</TableCell>
-              <TableCell sx={TH}>Viscosity Value (P @ 40°C)</TableCell>
+              {headerColumns.map((label) =>
+                readOnly ? (
+                  <TableCell key={label} sx={qcReadOnlyTableHeaderCellSx}>
+                    {label}
+                  </TableCell>
+                ) : (
+                  <TableCell key={label} sx={TH}>
+                    {label}
+                  </TableCell>
+                ),
+              )}
               {!readOnly ? <TableCell sx={TH} align="center" /> : null}
             </TableRow>
           </TableHead>
@@ -137,12 +162,19 @@ const QCMixingViscosityTable = ({
             {rows.map((row, index) => (
               <TableRow
                 key={`viscosity-${index}`}
-                sx={{ background: index % 2 === 0 ? "#fff" : alpha(BRAND.surface, 0.55) }}
+                sx={{
+                  background:
+                    readOnly && index % 2 === 1
+                      ? alpha(BRAND.surface, 0.45)
+                      : index % 2 === 0
+                        ? "#fff"
+                        : alpha(BRAND.surface, 0.55),
+                }}
               >
-                <TableCell sx={cellSx}>{index + 1}</TableCell>
-                <TableCell sx={cellSx}>
+                <TableCell sx={baseCellSx}>{index + 1}</TableCell>
+                <TableCell sx={baseCellSx}>
                   {readOnly ? (
-                    displayValue(row.TIME)
+                    <QCDivisionReadOnlyValue value={row.TIME} />
                   ) : (
                     <TextField
                       size="small"
@@ -154,9 +186,9 @@ const QCMixingViscosityTable = ({
                     />
                   )}
                 </TableCell>
-                <TableCell sx={cellSx}>
+                <TableCell sx={baseCellSx}>
                   {readOnly ? (
-                    displayValue(row.VISCOSITY_VALUE)
+                    <QCDivisionReadOnlyValue value={row.VISCOSITY_VALUE} />
                   ) : (
                     <TextField
                       size="small"
@@ -169,7 +201,7 @@ const QCMixingViscosityTable = ({
                   )}
                 </TableCell>
                 {!readOnly ? (
-                  <TableCell sx={cellSx} align="center">
+                  <TableCell sx={baseCellSx} align="center">
                     <IconButton
                       size="small"
                       disabled={rows.length <= 1}

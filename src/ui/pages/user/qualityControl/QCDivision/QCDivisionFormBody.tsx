@@ -1,4 +1,4 @@
-import { useEffect, useMemo } from "react";
+import { useCallback, useEffect, useMemo } from "react";
 import { Box, Button, Stack, Typography } from "@mui/material";
 import { STRINGS } from "../../../../../app/config/strings";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
@@ -12,11 +12,14 @@ import {
   getSchemaForDivisionEntry,
   getSolidSchemaForBothEntry,
 } from "../../../../../hooks/user/qualityControl/qcDivisionEntries";
-import { isFirstMixingFinalMixEntry, QC_MIXING_FINAL_MIX_DETAILS_SECTION_ID, getMixingFinalMixEntries } from "../../../../../hooks/user/qualityControl/qcMixingConfig";
+import { QC_MIXING_FINAL_MIX_DETAILS_SECTION_ID, getMixingFinalMixEntries } from "../../../../../hooks/user/qualityControl/qcMixingConfig";
 import {
   applyMixingDivisionEntryToValues,
   createInitialFinalMixDetailsValues,
   hydrateMixingDetailsValuesFromSections,
+  mergeFinalMixEntrySchemaValues,
+  pickFinalMixDetailsSchemaValues,
+  pickViscositySchemaValues,
   resolveMixingDetailsSeed,
   type QcMixingQualityCheckDefinition,
 } from "../../../../../hooks/user/qualityControl/qcMixingTables";
@@ -29,6 +32,9 @@ import {
 import QCDivisionEntryPanel, { type QCDivisionEntryUnitActions } from "./QCDivisionEntryPanel";
 import QCProcessingMaterialsPanel from "./QCProcessingMaterialsPanel";
 import QCSchemaBufferingLoader from "./QCSchemaBufferingLoader";
+import QCHardwareAttachmentUpload from "./QCHardwareAttachmentUpload";
+import { createInitialHardwareProcessValues } from "../../../../../hooks/user/qualityControl/qcHardwareTables";
+import { resolveHardwareUploadAnchorEntry } from "../../../../../hooks/user/qualityControl/qcHardwareConfig";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 
@@ -132,66 +138,96 @@ const QCDivisionFormBody = ({
       resolveMixingDetailsSeed({
         variant: "finalMix",
         premixNo: finalMixSeedPremixNo,
-        autoPopulatePayload: divisionAutoPopulateData,
+        autoPopulatePayload:
+          (divisionAutoPopulateData as { __manufacturingDivisionData?: unknown } | null)
+            ?.__manufacturingDivisionData ?? divisionAutoPopulateData,
         batchPayload: batch,
       }),
     [batch, divisionAutoPopulateData, finalMixSeedPremixNo],
   );
 
   const finalMixDetailsValues = useMemo(() => {
-    let base: SchemaFormValues;
-    if (formData.mixingFinalMixDetailsValues) {
-      base = formData.mixingFinalMixDetailsValues;
-    } else if (finalMixDetailSections.length) {
-      base = hydrateMixingDetailsValuesFromSections(finalMixDetailSections, "finalMix");
-    } else {
-      base = createInitialFinalMixDetailsValues(mixingQualityChecksByStage.FINAL_MIX);
+    const fromActiveEntry =
+      activeEntry?.kind === "MIXING_FINAL_MIX"
+        ? pickFinalMixDetailsSchemaValues(
+            formData.divisionEntryValues?.[activeEntry.entryId]?.schemaValues,
+          )
+        : null;
+    if (fromActiveEntry && Object.keys(fromActiveEntry).length > 0) {
+      return fromActiveEntry;
     }
-    return applyMixingDivisionEntryToValues(base, {
-      variant: "finalMix",
-      premixNo: finalMixSeedPremixNo,
-      autoPopulatePayload: divisionAutoPopulateData,
-      batchPayload: batch,
-      qualityCheckDefinitions: mixingQualityChecksByStage.FINAL_MIX,
-    }, { onlyIfEmpty: true });
+    if (formData.mixingFinalMixDetailsValues) {
+      return formData.mixingFinalMixDetailsValues;
+    }
+    if (finalMixDetailSections.length) {
+      return hydrateMixingDetailsValuesFromSections(finalMixDetailSections, "finalMix");
+    }
+    return createInitialFinalMixDetailsValues(mixingQualityChecksByStage.FINAL_MIX);
   }, [
-    batch,
-    divisionAutoPopulateData,
-    finalMixAutoSeed,
+    activeEntry?.entryId,
+    activeEntry?.kind,
     finalMixDetailSections,
-    finalMixSeedPremixNo,
+    formData.divisionEntryValues,
     formData.mixingFinalMixDetailsValues,
     mixingQualityChecksByStage.FINAL_MIX,
   ]);
 
+  const handleFinalMixDetailsChange = useCallback(
+    (values: SchemaFormValues) => {
+      onMixingFinalMixDetailsChange(values);
+      if (activeEntry?.kind === "MIXING_FINAL_MIX") {
+        const current = formData.divisionEntryValues?.[activeEntry.entryId]?.schemaValues;
+        // Details first, then viscosity-only — never spread full current (it would clobber edits).
+        onDivisionEntryValuesChange(
+          activeEntry.entryId,
+          mergeFinalMixEntrySchemaValues(values, pickViscositySchemaValues(current)),
+        );
+      }
+    },
+    [
+      activeEntry?.entryId,
+      activeEntry?.kind,
+      formData.divisionEntryValues,
+      onDivisionEntryValuesChange,
+      onMixingFinalMixDetailsChange,
+    ],
+  );
+
+  // Seed once when the active Final Mix unit changes — do not re-seed on every keystroke.
   useEffect(() => {
     if (readOnly) return;
-    if (!finalMixAutoSeed && !mixingQualityChecksByStage.FINAL_MIX.length) return;
-    const current = formData.mixingFinalMixDetailsValues;
-    const base =
-      current && Object.keys(current).length > 0
-        ? current
-        : createInitialFinalMixDetailsValues(mixingQualityChecksByStage.FINAL_MIX);
-    const seeded = applyMixingDivisionEntryToValues(base, {
-      variant: "finalMix",
-      premixNo: finalMixSeedPremixNo,
-      autoPopulatePayload: divisionAutoPopulateData,
-      batchPayload: batch,
-      qualityCheckDefinitions: mixingQualityChecksByStage.FINAL_MIX,
-    }, { onlyIfEmpty: true });
-    if (JSON.stringify(seeded) !== JSON.stringify(current ?? {})) {
-      onMixingFinalMixDetailsChange(seeded);
+    if (activeEntry?.kind !== "MIXING_FINAL_MIX") return;
+    const fromEntry = pickFinalMixDetailsSchemaValues(
+      formData.divisionEntryValues?.[activeEntry.entryId]?.schemaValues,
+    );
+    if (fromEntry && Object.keys(fromEntry).length > 0) {
+      if (
+        JSON.stringify(fromEntry) !== JSON.stringify(formData.mixingFinalMixDetailsValues ?? {})
+      ) {
+        onMixingFinalMixDetailsChange(fromEntry);
+      }
+      return;
     }
-  }, [
-    batch,
-    divisionAutoPopulateData,
-    finalMixAutoSeed,
-    finalMixSeedPremixNo,
-    formData.mixingFinalMixDetailsValues,
-    mixingQualityChecksByStage.FINAL_MIX,
-    onMixingFinalMixDetailsChange,
-    readOnly,
-  ]);
+    if (!finalMixAutoSeed && !mixingQualityChecksByStage.FINAL_MIX.length) return;
+    if (formData.mixingFinalMixDetailsValues && Object.keys(formData.mixingFinalMixDetailsValues).length > 0) {
+      return;
+    }
+    const manufacturing =
+      (divisionAutoPopulateData as any)?.__manufacturingDivisionData ?? divisionAutoPopulateData;
+    const seeded = applyMixingDivisionEntryToValues(
+      createInitialFinalMixDetailsValues(mixingQualityChecksByStage.FINAL_MIX),
+      {
+        variant: "finalMix",
+        premixNo: finalMixSeedPremixNo,
+        autoPopulatePayload: manufacturing,
+        batchPayload: batch,
+        qualityCheckDefinitions: mixingQualityChecksByStage.FINAL_MIX,
+      },
+      { onlyIfEmpty: true },
+    );
+    handleFinalMixDetailsChange(seeded);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed only when active Final Mix unit changes
+  }, [activeEntry?.entryId, activeEntry?.kind, finalMixSeedPremixNo, readOnly]);
 
   const visibleEntries = useMemo(() => resolveVisibleEntries(activeContent), [activeContent]);
   const processingMaterialEntries = useMemo(
@@ -215,10 +251,8 @@ const QCDivisionFormBody = ({
   }, [activeEntry?.kind, unitActions, visibleEntries]);
 
   const showInlineFinalMixDetails = useMemo(
-    () =>
-      hideEntryGroupNav &&
-      Boolean(activeEntry && isFirstMixingFinalMixEntry(activeEntry, divisionEntries)),
-    [activeEntry, divisionEntries, hideEntryGroupNav],
+    () => hideEntryGroupNav && activeEntry?.kind === "MIXING_FINAL_MIX",
+    [activeEntry?.kind, hideEntryGroupNav],
   );
 
   const showFinalMixDetailsPanel =
@@ -227,6 +261,35 @@ const QCDivisionFormBody = ({
   /** Final Mix: draft/submit sit above Final Mix Details; hide duplicate actions on viscosity panel. */
   const finalMixTopUnitActions =
     showFinalMixDetailsPanel && resolvedUnitActions?.show ? resolvedUnitActions : null;
+  const firstHardwareEntryId = useMemo(
+    () => visibleEntries.find((entry) => entry.kind === "HARDWARE_PROCESS")?.entryId ?? null,
+    [visibleEntries],
+  );
+  const hardwareUploadAnchorEntry = useMemo(() => {
+    const hardwareEntries = visibleEntries.filter((entry) => entry.kind === "HARDWARE_PROCESS");
+    if (!hardwareEntries.length) return null;
+    if (activeMotorId) {
+      return resolveHardwareUploadAnchorEntry(hardwareEntries, activeMotorId) ?? null;
+    }
+    return resolveHardwareUploadAnchorEntry(hardwareEntries, hardwareEntries[0].motorId ?? "") ?? null;
+  }, [activeMotorId, visibleEntries]);
+  const showHardwareUploadPanel = useMemo(
+    () => visibleEntries.some((entry) => entry.kind === "HARDWARE_PROCESS"),
+    [visibleEntries],
+  );
+  const hardwareUploadValues = useMemo(() => {
+    if (!hardwareUploadAnchorEntry) return createInitialHardwareProcessValues("ABRADING");
+    const saved = formData.divisionEntryValues?.[hardwareUploadAnchorEntry.entryId]?.schemaValues;
+    if (saved && Object.keys(saved).length > 0) return saved;
+    return createInitialHardwareProcessValues("ABRADING");
+  }, [formData.divisionEntryValues, hardwareUploadAnchorEntry]);
+  const handleHardwareUploadChange = useCallback(
+    (values: SchemaFormValues) => {
+      if (!hardwareUploadAnchorEntry) return;
+      onDivisionEntryValuesChange(hardwareUploadAnchorEntry.entryId, values);
+    },
+    [hardwareUploadAnchorEntry, onDivisionEntryValuesChange],
+  );
   const entryPanelUnitActions =
     activeEntry?.kind === "MIXING_FINAL_MIX" && finalMixTopUnitActions
       ? { ...resolvedUnitActions!, show: false }
@@ -341,7 +404,7 @@ const QCDivisionFormBody = ({
             <QCMixingDetailsTable
               variant="finalMix"
               values={finalMixDetailsValues}
-              onChange={onMixingFinalMixDetailsChange}
+              onChange={handleFinalMixDetailsChange}
               readOnly={readOnly}
               autoSeed={finalMixAutoSeed}
             />
@@ -398,11 +461,24 @@ const QCDivisionFormBody = ({
                 onEntryValuesChange={onDivisionEntryValuesChange}
                 onEntryLiquidValuesChange={onDivisionEntryLiquidValuesChange}
                 onRemoveEntry={onRemoveDivisionEntry}
-                unitActions={entryPanelUnitActions}
+                unitActions={
+                  entry.kind === "HARDWARE_PROCESS" && entry.entryId !== firstHardwareEntryId
+                    ? { ...entryPanelUnitActions!, show: false }
+                    : entryPanelUnitActions
+                }
               />
             );
           })
         )}
+        {showHardwareUploadPanel && hardwareUploadAnchorEntry ? (
+          <Box sx={{ mt: 2 }}>
+            <QCHardwareAttachmentUpload
+              values={hardwareUploadValues}
+              onChange={handleHardwareUploadChange}
+              readOnly={readOnly}
+            />
+          </Box>
+        ) : null}
       </Box>
     </>
   );

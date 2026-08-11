@@ -128,8 +128,11 @@ const QualityControlPage = () => {
       (scopedFormData.solidPremixEntries?.length ?? 0) > 0 ||
       (scopedFormData.liquidPremixEntries?.length ?? 0) > 0);
 
+  // Keep Submit Division enabled so users can open the unit-status popup (RMP / Mixing).
+  // Proceed inside the dialog stays gated by canProceedDivisionSubmit (all units approved).
   const canOpenDivisionDialog =
-    !isActiveDivisionReadOnly &&
+    !readOnly &&
+    (partialNavActive || !isActiveDivisionReadOnly) &&
     (Boolean(activeBatch?.formId) ||
       (scopedFormData.divisionEntries?.length ?? 0) > 0 ||
       scopedFormData.schemaFormLoaded ||
@@ -237,7 +240,9 @@ const QualityControlPage = () => {
             isEditMode={isEditMode}
             readOnly={readOnly}
             fieldsReadOnly={formReadOnly}
-            canEditDivisionStructure={!readOnly && !isActiveDivisionReadOnly}
+            canEditDivisionStructure={
+              !readOnly && (partialNavActive || !isActiveDivisionReadOnly)
+            }
             formLockMessage={formLockMessage}
             schemaLoading={schemaLoading}
             schemaError={schemaError}

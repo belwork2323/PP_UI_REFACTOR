@@ -34,6 +34,42 @@ const pickString = (...values: unknown[]): string => {
 export const isQcStatusAwaitingInitiation = (status: unknown): boolean =>
   normalizePartialItemStatus(status) === "TO_BE_INITIATED";
 
+export const resolveMotorQcStatusFromFormDetails = (
+  payload: unknown,
+  motorId: string,
+): QcPartialItemStatus | null => {
+  const root = asRecord(payload);
+  const normalizedMotorId = String(motorId ?? "").trim();
+  if (!root || !normalizedMotorId) return null;
+
+  for (const row of asArray(root.motorStatuses)) {
+    const rec = asRecord(row);
+    if (!rec) continue;
+    if (pickString(rec.motorId, rec.motor_id) !== normalizedMotorId) continue;
+    return normalizePartialItemStatus(rec.status ?? rec.motorSubmissionStatus);
+  }
+
+  return null;
+};
+
+export const resolvePremixQcStatusFromFormDetails = (
+  payload: unknown,
+  premixNo: number,
+): QcPartialItemStatus | null => {
+  const root = asRecord(payload);
+  if (!root || !Number.isFinite(premixNo)) return null;
+
+  for (const row of asArray(root.premixStatuses)) {
+    const rec = asRecord(row);
+    if (!rec) continue;
+    const rowPremixNo = pickNumber(rec.premixNo, rec.premix_no);
+    if (rowPremixNo !== premixNo) continue;
+    return normalizePartialItemStatus(rec.status ?? rec.premixSubmissionStatus);
+  }
+
+  return null;
+};
+
 /** Once past initiation, show saved QC form data from /qc-division/details. */
 export const shouldUseQcFormDetailsData = (status: unknown): boolean =>
   !isQcStatusAwaitingInitiation(status);
@@ -166,10 +202,23 @@ export const toDivisionAutoPopulateRecord = (
   const rec = asRecord(detailOrPayload);
   if (!rec) return null;
   const nestedData = asRecord(rec.data);
-  if (nestedData && (nestedData.premixes != null || nestedData.sections != null || nestedData.materials != null)) {
+  if (
+    nestedData &&
+    (nestedData.premixes != null ||
+      nestedData.sections != null ||
+      nestedData.materials != null ||
+      nestedData.motorDetails != null ||
+      nestedData.motors != null)
+  ) {
     return nestedData;
   }
-  if (rec.premixes != null || rec.sections != null || rec.materials != null) {
+  if (
+    rec.premixes != null ||
+    rec.sections != null ||
+    rec.materials != null ||
+    rec.motorDetails != null ||
+    rec.motors != null
+  ) {
     return rec;
   }
   return nestedData ?? rec;
@@ -447,9 +496,56 @@ export const mergePartialNavItems = (
   secondary.forEach((item) => byId.set(item.id, item));
   primary.forEach((item) => {
     const existing = byId.get(item.id);
-    byId.set(item.id, existing ? { ...existing, ...item, status: item.status || existing.status } : item);
+    byId.set(
+      item.id,
+      existing
+        ? {
+            ...existing,
+            ...item,
+            status: item.status || existing.status,
+            divisionDetailsStatus:
+              item.divisionDetailsStatus ??
+              existing.divisionDetailsStatus ??
+              item.status ??
+              existing.status,
+          }
+        : item,
+    );
   });
   return Array.from(byId.values()).sort(compareQcPartialNavItems);
+};
+
+/** Prerequisite approval status always comes from manufacturing `/division-details`. */
+const applyManufacturingPrerequisiteStatuses = (
+  items: QcPartialNavItem[],
+  autoPopulatePayload: unknown,
+  options: {
+    flowKey: string;
+    rawMaterialType?: string | null;
+    batchPayload?: unknown;
+  },
+): QcPartialNavItem[] => {
+  const root = asRecord(autoPopulatePayload);
+  const manufacturingPayload = root?.__manufacturingDivisionData;
+  if (!manufacturingPayload) return items;
+
+  const fromManufacturing = mapDivisionDetailsToPartialNav(manufacturingPayload, {
+    flowKey: options.flowKey,
+    rawMaterialType: options.rawMaterialType,
+    batchPayload: options.batchPayload,
+  });
+  if (!fromManufacturing.length) return items;
+
+  const mfgStatusById = new Map<string, QcPartialItemStatus>();
+  fromManufacturing.forEach((item) => {
+    mfgStatusById.set(item.id, item.divisionDetailsStatus ?? item.status);
+  });
+
+  return items.map((item) => {
+    const mfgStatus = mfgStatusById.get(item.id);
+    if (!mfgStatus) return item;
+    return { ...item, divisionDetailsStatus: mfgStatus };
+  });
 };
 
 export const buildQcDivisionPartialNav = (params: {
@@ -477,7 +573,16 @@ export const buildQcDivisionPartialNav = (params: {
     division: statusDivisionKey,
   });
   const merged = mergePartialNavItems(fromStatuses, fromPayload);
-  return applyStatusMapsToPartialNav(merged, {
+  const withManufacturingPrerequisites = applyManufacturingPrerequisiteStatuses(
+    merged,
+    params.autoPopulatePayload,
+    {
+      flowKey: params.flowKey,
+      rawMaterialType: typeKey,
+      batchPayload: params.batchPayload,
+    },
+  );
+  return applyStatusMapsToPartialNav(withManufacturingPrerequisites, {
     motorStatuses: params.motorStatuses,
     premixStatuses: params.premixStatuses,
     division: statusDivisionKey,

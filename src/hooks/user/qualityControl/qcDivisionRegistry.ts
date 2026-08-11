@@ -295,16 +295,8 @@ export const canLoadDivisionSchema = (
   }
 
   if (panelType === "HARDWARE") {
-    if (!state.selectedMotorId) return false;
-    if (!state.selectedHardwareProcesses.length) return false;
-    return (
-      getPendingHardwareProcesses(
-        state.selectedMotorId,
-        state.selectedHardwareProcesses,
-        state.addedDivisionEntryKeys,
-        divisionFlowKey,
-      ).length > 0
-    );
+    // Motor Navigation seeds all 4 processes — no FlowBar Motor/Process pickers.
+    return false;
   }
 
   if (panelType === "CASTING") {

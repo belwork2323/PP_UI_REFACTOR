@@ -20,11 +20,33 @@ export const isQcHardwareProcessSubType = (value: string): value is QcHardwarePr
 export const getQcHardwareProcessLabel = (subType: string) =>
   QC_HARDWARE_PROCESS_OPTIONS.find((option) => option.value === subType)?.label ?? subType;
 
+export const QC_HARDWARE_ATTACHMENTS_SECTION_ID = "HARDWARE_ATTACHMENTS";
+
 export const QC_HARDWARE_SECTION_IDS: Record<QcHardwareProcessSubType, string> = {
   ABRADING: "ABRADING_DETAILS",
   PREHEATING: "PREHEATING_DETAILS",
   LINEAR_COATING: "LINEAR_COATING_DETAILS",
   DISPATCH: "DISPATCH_DETAILS",
+};
+
+export const resolveHardwareUploadAnchorEntry = (
+  entries: QcDivisionEntry[],
+  motorId: string,
+): QcDivisionEntry | undefined => {
+  const normalizedMotorId = String(motorId ?? "").trim();
+  if (!normalizedMotorId) return undefined;
+
+  for (const process of QC_HARDWARE_PROCESS_OPTIONS) {
+    const entry = entries.find(
+      (candidate) =>
+        candidate.kind === "HARDWARE_PROCESS" &&
+        String(candidate.motorId ?? "").trim() === normalizedMotorId &&
+        candidate.subType === process.value,
+    );
+    if (entry) return entry;
+  }
+
+  return undefined;
 };
 
 export const getHardwareSectionIdForSubType = (subType: string) =>

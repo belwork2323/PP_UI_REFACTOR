@@ -71,7 +71,7 @@ export type QcMixingDetailsRow = {
   readonly?: boolean;
 };
 
-/** Spec list row from mixing quality-checks API (parameterId → name + specification). */
+/** Spec list row from Mixing division-details / QC details qualityChecks. */
 export type QcMixingQualityCheckDefinition = {
   parameterId: string;
   parameter: string;
@@ -141,20 +141,33 @@ const pickString = (...values: unknown[]): string => {
   return "";
 };
 
-const formatSpecificationLabel = (specification: unknown): string => {
-  if (!specification || typeof specification !== "object" || Array.isArray(specification)) {
-    return pickString(specification);
+/** Unwrap `{ source, parsedValue }` bounds from division-details / QC details specs. */
+const resolveSpecBound = (value: unknown): string => {
+  if (value == null) return "";
+  if (typeof value === "object" && !Array.isArray(value)) {
+    const rec = value as Record<string, unknown>;
+    return pickString(rec.parsedValue, rec.source, rec.value);
   }
-  const rec = specification as Record<string, unknown>;
-  const minValue = pickString(rec.minValue, rec.min);
-  const maxValue = pickString(rec.maxValue, rec.max);
-  const unit = pickString(rec.unit);
-  if (minValue && maxValue) return `${minValue} - ${maxValue}${unit ? ` ${unit}` : ""}`.trim();
-  if (minValue || maxValue) return `${minValue || maxValue}${unit ? ` ${unit}` : ""}`.trim();
-  return unit;
+  return pickString(value);
 };
 
-/** Parse mixing quality-checks / specification-list API payload into definition rows. */
+/** Format API specification; empty `{}` / missing bounds → `"NA"`. */
+const formatSpecificationLabel = (specification: unknown): string => {
+  if (specification == null) return "NA";
+  if (typeof specification !== "object" || Array.isArray(specification)) {
+    return pickString(specification) || "NA";
+  }
+  const rec = specification as Record<string, unknown>;
+  const minValue = resolveSpecBound(rec.minValue ?? rec.min);
+  const maxValue = resolveSpecBound(rec.maxValue ?? rec.max);
+  const unit = pickString(rec.unit);
+  if (!minValue && !maxValue && !unit) return "NA";
+  if (minValue && maxValue) return `${minValue} - ${maxValue}${unit ? ` ${unit}` : ""}`.trim();
+  if (minValue || maxValue) return `${minValue || maxValue}${unit ? ` ${unit}` : ""}`.trim();
+  return unit || "NA";
+};
+
+/** Parse qualityChecks arrays from division-details / QC details (or legacy quality-checks API). */
 export const parseMixingQualityCheckDefinitions = (
   response: unknown,
 ): QcMixingQualityCheckDefinition[] => {
@@ -165,13 +178,15 @@ export const parseMixingQualityCheckDefinitions = (
     nestedData?.qualityChecks ??
       data?.qualityChecks ??
       root?.qualityChecks ??
+      data?.parameters ??
+      root?.parameters ??
       data?.specificationList ??
       data?.specifications ??
       root?.specificationList,
   );
 
   return definitions
-    .map((item) => {
+    .map((item): QcMixingQualityCheckDefinition | null => {
       const rec = asRecord(item);
       if (!rec) return null;
       const parameterId = pickString(
@@ -191,15 +206,15 @@ export const parseMixingQualityCheckDefinitions = (
         rec.specification ?? rec.referenceRange ?? rec.specs,
       );
       if (!parameterId && !parameter) return null;
-      const sampleCount = pickNumber(rec.noOfSamples, rec.sampleCount) ?? undefined;
+      const sampleCount = pickNumber(rec.noOfSamples, rec.sampleCount);
       return {
         parameterId: parameterId || parameter,
         parameter,
         specification,
-        sampleCount: sampleCount ?? undefined,
+        ...(sampleCount != null ? { sampleCount } : {}),
       };
     })
-    .filter((row): row is QcMixingQualityCheckDefinition => Boolean(row));
+    .filter((row): row is QcMixingQualityCheckDefinition => row != null);
 };
 
 const pickNumber = (...values: unknown[]): number | null => {
@@ -316,6 +331,56 @@ export const resolveMixingDivisionEntry = (params: {
   const stages = resolveMixingStages(params.autoPopulatePayload);
   const stageType = params.variant === "premix" ? "PREMIX" : "FINAL_MIX";
   return unwrapStagePremixEntry(findStagePremixEntry(stages, stageType, premixNo));
+};
+
+/**
+ * Build parameter/spec rows from division-details or QC form details payloads.
+ * Quality-checks live under stages[].premixes[].details.qualityChecks (or domain parameters).
+ */
+export const extractMixingQualityCheckDefinitionsFromPayload = (
+  payload: unknown,
+  stageType: "PREMIX" | "FINAL_MIX",
+): QcMixingQualityCheckDefinition[] => {
+  const stages = resolveMixingStages(payload);
+  if (stages.length) {
+    const stage = stages.find(
+      (row) =>
+        String(asRecord(row)?.stageType ?? "")
+          .trim()
+          .toUpperCase() === stageType,
+    );
+    for (const entry of asArray(asRecord(stage)?.premixes)) {
+      const unwrapped = unwrapStagePremixEntry(asRecord(entry));
+      const checks = asArray(unwrapped?.qualityChecks);
+      if (checks.length) {
+        return parseMixingQualityCheckDefinitions({ qualityChecks: checks });
+      }
+    }
+  }
+
+  const roots = [
+    payload,
+    asRecord(payload)?.data,
+    asRecord(payload)?.__manufacturingDivisionData,
+    asRecord(payload)?.__qcFormDivisionData,
+  ];
+  for (const root of roots) {
+    const premixes = asArray(asRecord(root)?.premixes);
+    for (const item of premixes) {
+      const rec = asRecord(item);
+      if (!rec) continue;
+      const details =
+        stageType === "PREMIX"
+          ? asRecord(rec.premixDetails) ?? asRecord(rec.details)
+          : asRecord(rec.finalMixDetails) ?? asRecord(rec.details);
+      const checks = asArray(details?.qualityChecks ?? details?.parameters);
+      if (checks.length) {
+        return parseMixingQualityCheckDefinitions({ qualityChecks: checks });
+      }
+    }
+  }
+
+  return [];
 };
 
 const buildMixingDetailsSeedFromEntry = (
@@ -484,11 +549,10 @@ const applyMixingQualityChecksToValues = (
         : undefined);
 
     const next = { ...row };
-    // Parameter name + specification always come from the quality-checks / specification list.
-    // Division-details qualityChecks typically only carry parameterId + observations.
+    // Prefer embedded qualityChecks from division-details / QC details (name + specification + observations).
     if (definition) {
       next.PARAMETER = definition.parameter || next.PARAMETER;
-      next.SPECIFICATION = definition.specification || next.SPECIFICATION;
+      next.SPECIFICATION = definition.specification || "NA";
       next.PARAMETER_ID = definition.parameterId || next.PARAMETER_ID;
     } else if (check) {
       const parameterName = pickString(
@@ -500,7 +564,7 @@ const applyMixingQualityChecksToValues = (
         check.specification ?? check.referenceRange ?? check.specs,
       );
       if (parameterName) next.PARAMETER = parameterName;
-      if (specification) next.SPECIFICATION = specification;
+      next.SPECIFICATION = specification || "NA";
       const checkId = pickString(check.parameterId, check.specificationCode, check.specCode);
       if (checkId) next.PARAMETER_ID = checkId;
     }
@@ -605,7 +669,7 @@ export const applyMixingDetailsSeedToValues = (
   const dateKey = DETAILS_DATE_KEY[variant];
   const rows = getMixingDetailsRows(values, variant).map((row) => {
     const next = { ...row };
-    const assign = (field: keyof QcMixingDetailsRow, seedValue?: string) => {
+    const assign = (field: keyof QcMixingDetailsSeed, seedValue?: string) => {
       const incoming = String(seedValue ?? "").trim();
       if (!incoming) return;
       const current = String(next[field] ?? "").trim();
@@ -671,7 +735,7 @@ export const createInitialMixingDetailsRows = (
       [DETAILS_DATE_KEY[variant]]: "",
       MIXER_BLDG_NO: "",
       PREMIX_QTY: "",
-      SPECIFICATION: definition.specification ?? "",
+      SPECIFICATION: definition.specification || "NA",
       VALUE_1: "",
       VALUE_2: "",
       VALUE_3: "",
@@ -750,7 +814,13 @@ export const getMixingDetailsRows = (
         ...(match ?? {}),
         PARAMETER: definition.parameter || match?.PARAMETER || "",
         PARAMETER_ID: definition.parameterId || match?.PARAMETER_ID || "",
-        SPECIFICATION: definition.specification || match?.SPECIFICATION || "",
+        SPECIFICATION: definition.specification || match?.SPECIFICATION || "NA",
+        REMARKS: match?.REMARKS ?? "",
+        VALUE_1: match?.VALUE_1 ?? "",
+        VALUE_2: match?.VALUE_2 ?? "",
+        VALUE_3: match?.VALUE_3 ?? "",
+        VALUE_4: match?.VALUE_4 ?? "",
+        VALUE_5: match?.VALUE_5 ?? "",
         readonly: true,
       };
     });
@@ -800,6 +870,41 @@ export const setViscosityRows = (
     SR_NO: row.SR_NO ?? index + 1,
   })),
 });
+
+/** Merge Final Mix Details + Viscosity into one entry schemaValues blob. */
+export const mergeFinalMixEntrySchemaValues = (
+  detailsValues?: SchemaFormValues | null,
+  viscosityValues?: SchemaFormValues | null,
+): SchemaFormValues => ({
+  ...(detailsValues ?? {}),
+  ...(viscosityValues ?? {}),
+});
+
+/** Read Final Mix Details from a Final Mix entry (falls back to shared form values). */
+export const pickFinalMixDetailsSchemaValues = (
+  entrySchemaValues?: SchemaFormValues | null,
+  sharedFallback?: SchemaFormValues | null,
+): SchemaFormValues => {
+  if (entrySchemaValues?.[QC_MIXING_FINAL_MIX_DETAILS_FORM_KEY] != null) {
+    return {
+      [QC_MIXING_FINAL_MIX_DETAILS_FORM_KEY]:
+        entrySchemaValues[QC_MIXING_FINAL_MIX_DETAILS_FORM_KEY],
+    };
+  }
+  return sharedFallback ?? {};
+};
+
+/** Read only Viscosity rows from a Final Mix entry schemaValues blob. */
+export const pickViscositySchemaValues = (
+  entrySchemaValues?: SchemaFormValues | null,
+): SchemaFormValues => {
+  if (entrySchemaValues?.[QC_MIXING_VISCOSITY_FORM_KEY] != null) {
+    return {
+      [QC_MIXING_VISCOSITY_FORM_KEY]: entrySchemaValues[QC_MIXING_VISCOSITY_FORM_KEY],
+    };
+  }
+  return {};
+};
 
 const syncSharedDetailsFields = (
   rows: QcMixingDetailsRow[],
@@ -917,6 +1022,7 @@ export type QcMixingDomainParameter = {
 };
 
 export type QcMixingDomainDetails = {
+  premixSubmissionType?: "DRAFT" | "SUBMIT";
   bowlNo?: string;
   dateOfPremix?: string;
   dateOfFinalMix?: string;
@@ -955,7 +1061,6 @@ export const buildMixingDetailsDomainPayload = (
   const rows = sanitizeDetailsRowsForVariant(getMixingDetailsRows(values, variant), variant);
   if (!rows.length) return null;
   const first = rows[0];
-  const dateKey = DETAILS_DATE_KEY[variant];
   return {
     bowlNo: pickString(first.BOWL_NO),
     ...(variant === "premix"
@@ -964,6 +1069,33 @@ export const buildMixingDetailsDomainPayload = (
     mixerBuildingNo: pickString(first.MIXER_BLDG_NO),
     premixQty: pickString(first.PREMIX_QTY),
     parameters: buildDomainParametersFromRows(rows, variant),
+  };
+};
+
+/** Build Mixing details object with submission type first (backend contract). */
+const buildMixingDetailsWithSubmissionType = (
+  details: QcMixingDomainDetails,
+  submissionType?: "DRAFT" | "SUBMIT" | null,
+): QcMixingDomainDetails => {
+  const {
+    premixSubmissionType: _ignored,
+    bowlNo,
+    dateOfPremix,
+    dateOfFinalMix,
+    mixerBuildingNo,
+    premixQty,
+    parameters,
+    viscosityBuildUp,
+  } = details;
+  return {
+    ...(submissionType ? { premixSubmissionType: submissionType } : {}),
+    ...(bowlNo != null ? { bowlNo } : {}),
+    ...(dateOfPremix != null ? { dateOfPremix } : {}),
+    ...(dateOfFinalMix != null ? { dateOfFinalMix } : {}),
+    ...(mixerBuildingNo != null ? { mixerBuildingNo } : {}),
+    ...(premixQty != null ? { premixQty } : {}),
+    parameters: parameters ?? [],
+    ...(viscosityBuildUp != null ? { viscosityBuildUp } : {}),
   };
 };
 
@@ -1010,32 +1142,45 @@ export const buildMixingPremixesPayload = (
   return Array.from(byPremix.entries())
     .sort(([a], [b]) => a - b)
     .map(([premixNo, bucket]) => {
+      // RMP-style premix root: premixNo first; Mixing details live under premixDetails/finalMixDetails.
       const payload: Record<string, unknown> = { premixNo };
-      if (options?.unitSubmissionType) {
-        payload.premixSubmissionType = options.unitSubmissionType;
-      }
+      const submissionType = options?.unitSubmissionType ?? null;
 
       if (bucket.premixEntryId) {
-        const premixDetails = buildMixingDetailsDomainPayload(
-          form.divisionEntryValues?.[bucket.premixEntryId]?.schemaValues,
-          "premix",
-        );
-        if (premixDetails) payload.premixDetails = premixDetails;
+        const baseDetails =
+          buildMixingDetailsDomainPayload(
+            form.divisionEntryValues?.[bucket.premixEntryId]?.schemaValues,
+            "premix",
+          ) ?? {
+            bowlNo: "",
+            dateOfPremix: "",
+            mixerBuildingNo: "",
+            premixQty: "",
+            parameters: [],
+          };
+        // Backend reads premixSubmissionType from inside premixDetails (not the premix root).
+        payload.premixDetails = buildMixingDetailsWithSubmissionType(baseDetails, submissionType);
       }
 
-      const sharedFinalMixDetails = buildMixingDetailsDomainPayload(
+      const entrySchemaValues = bucket.finalMixEntryId
+        ? form.divisionEntryValues?.[bucket.finalMixEntryId]?.schemaValues
+        : undefined;
+      // Prefer per-unit Final Mix Details on the entry; shared form values are legacy fallback.
+      const finalMixDetailsSource = pickFinalMixDetailsSchemaValues(
+        entrySchemaValues,
         form.mixingFinalMixDetailsValues,
+      );
+      const perUnitFinalMixDetails = buildMixingDetailsDomainPayload(
+        finalMixDetailsSource,
         "finalMix",
       );
-      const viscosityBuildUp = bucket.finalMixEntryId
-        ? buildViscosityDomainPayload(
-            form.divisionEntryValues?.[bucket.finalMixEntryId]?.schemaValues,
-          )
+      const viscosityBuildUp = entrySchemaValues
+        ? buildViscosityDomainPayload(entrySchemaValues)
         : [];
 
-      if (sharedFinalMixDetails || viscosityBuildUp.length) {
-        payload.finalMixDetails = {
-          ...(sharedFinalMixDetails ?? {
+      if (perUnitFinalMixDetails || viscosityBuildUp.length || bucket.finalMixEntryId) {
+        const baseFinalMixDetails: QcMixingDomainDetails = {
+          ...(perUnitFinalMixDetails ?? {
             bowlNo: "",
             dateOfFinalMix: "",
             mixerBuildingNo: "",
@@ -1044,6 +1189,13 @@ export const buildMixingPremixesPayload = (
           }),
           viscosityBuildUp,
         };
+        // Final-mix unit saves also expect submission type nested under finalMixDetails.
+        payload.finalMixDetails = buildMixingDetailsWithSubmissionType(
+          baseFinalMixDetails,
+          submissionType && bucket.finalMixEntryId && !bucket.premixEntryId
+            ? submissionType
+            : null,
+        );
       }
 
       return payload;
@@ -1090,11 +1242,11 @@ const mapDomainParametersToRows = (
     const row: QcMixingDetailsRow = {
       ...shared,
       PARAMETER_ID: pickString(rec.parameterId, rec.specificationCode, rec.specCode),
-      PARAMETER: pickString(rec.parameter, rec.parameterName, rec.specificationName),
+      PARAMETER: pickString(rec.parameterName, rec.parameter, rec.specificationName),
       SPECIFICATION: formatSpecificationLabel(
         rec.specification ?? rec.referenceRange ?? rec.specs,
-      ),
-      REMARKS: pickString(rec.remarks),
+      ) || "NA",
+      REMARKS: pickString(rec.remarks, rec.remark, rec.REMARKS),
       readonly: true,
     };
     valueFields.forEach((field, index) => {
@@ -1185,15 +1337,19 @@ export const hydrateMixingDivisionFromFormData = (
 
       const finalMixDetails = asRecord(rec.finalMixDetails);
       if (finalMixDetails) {
+        const detailsValues = hydrateMixingDetailsValuesFromDomain(
+          finalMixDetails,
+          "finalMix",
+        );
         if (!finalMixDetailsValues) {
-          finalMixDetailsValues = hydrateMixingDetailsValuesFromDomain(
-            finalMixDetails,
-            "finalMix",
-          );
+          finalMixDetailsValues = detailsValues;
         }
         finalMixEntries.push({
           premixNo,
-          values: hydrateViscosityValuesFromDomain(finalMixDetails.viscosityBuildUp),
+          values: mergeFinalMixEntrySchemaValues(
+            detailsValues,
+            hydrateViscosityValuesFromDomain(finalMixDetails.viscosityBuildUp),
+          ),
         });
       }
     });
@@ -1262,6 +1418,47 @@ export const findMixingPremixDomainEntry = (
     return pickNumber(rec?.premixNo, rec?.finalMixNo, rec?.mixNo) === premixNo;
   });
   return asRecord(match);
+};
+
+/**
+ * QC /qc-division/details may split Mixing into separate PREMIX + FINAL_MIX divisionDetails.
+ * Merge all Mixing premixes by premixNo so premixDetails + finalMixDetails are available together.
+ */
+export const resolveMixingQcFormData = (formDetails: unknown): Record<string, unknown> | null => {
+  const root = asRecord(formDetails);
+  if (!root) return null;
+
+  if (asArray(root.premixes).length) return root;
+  const nested = asRecord(root.data);
+  if (nested && asArray(nested.premixes).length) return nested;
+
+  const byPremix = new Map<number, Record<string, unknown>>();
+  for (const detail of asArray(root.divisionDetails)) {
+    const rec = asRecord(detail);
+    if (!rec) continue;
+    const division = String(rec.division ?? "")
+      .trim()
+      .toUpperCase();
+    if (division !== "MIXING") continue;
+    const data = asRecord(rec.data) ?? rec;
+    for (const item of asArray(data.premixes)) {
+      const premix = asRecord(item);
+      if (!premix) continue;
+      const premixNo = pickNumber(premix.premixNo, premix.finalMixNo, premix.mixNo);
+      if (premixNo == null) continue;
+      const existing = byPremix.get(premixNo) ?? { premixNo };
+      if (premix.premixDetails != null) existing.premixDetails = premix.premixDetails;
+      if (premix.finalMixDetails != null) existing.finalMixDetails = premix.finalMixDetails;
+      byPremix.set(premixNo, existing);
+    }
+  }
+
+  if (!byPremix.size) return null;
+  return {
+    premixes: Array.from(byPremix.values()).sort(
+      (a, b) => Number(a.premixNo) - Number(b.premixNo),
+    ),
+  };
 };
 
 /** @deprecated Schema no longer required — use createInitialPremixDetailsValues */

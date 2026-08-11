@@ -164,6 +164,7 @@ const QCFlowBar = ({
         isDeCoringFlow ||
         isNdtFlow ||
         isMixingFlow ||
+        isHardwareFlow ||
         isRawMaterialPremixFlow));
   const showMixingStage = isMixingFlow && !autoSeededPartialFlow;
   const showMixingNumber =
@@ -172,8 +173,7 @@ const QCFlowBar = ({
   const showStfMotorType = panelType === "STF";
   const showMotorIdSelect =
     !autoSeededPartialFlow &&
-    (isHardwareFlow ||
-      isCastingFlow ||
+    (isCastingFlow ||
       isCuringFlow ||
       isDeCoringFlow ||
       isNdtFlow ||
@@ -183,7 +183,7 @@ const QCFlowBar = ({
   const showPropellantProcess = isPropellantFlow && Boolean(selectedMotorId);
   const showWeightmentWeighscale = isWeightmentFlow && Boolean(selectedMotorId);
   const showWeightmentCalibrationDate = isWeightmentFlow && Boolean(selectedMotorId);
-  const showHardwareProcesses = isHardwareFlow && Boolean(selectedMotorId);
+  const showHardwareProcesses = false;
   const showCuringType = isCuringFlow;
   const showPostCureOperation = isPostCureFlow;
   const showInhibitorType =

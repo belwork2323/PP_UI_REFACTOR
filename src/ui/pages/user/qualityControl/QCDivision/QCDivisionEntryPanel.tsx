@@ -12,15 +12,31 @@ import QCDivisionSavedSectionsDisplay from "./components/QCDivisionSavedSections
 import QCRawMaterialRevalidationTable from "./QCRawMaterialRevalidationTable";
 import QCMixingDetailsTable from "./QCMixingDetailsTable";
 import QCMixingViscosityTable from "./QCMixingViscosityTable";
+import QCHardwareProcessPanel from "./QCHardwareProcessPanel";
+import QCCastingMotorPanel from "./QCCastingMotorPanel";
 import {
   applyMixingDivisionEntryToValues,
   createInitialPremixDetailsValues,
   createInitialViscosityValues,
   hydrateMixingDetailsValuesFromSections,
   hydrateViscosityValuesFromSections,
+  mergeFinalMixEntrySchemaValues,
+  pickFinalMixDetailsSchemaValues,
+  pickViscositySchemaValues,
   resolveMixingDetailsSeed,
   type QcMixingQualityCheckDefinition,
 } from "../../../../../hooks/user/qualityControl/qcMixingTables";
+import {
+  createInitialHardwareProcessValues,
+  hydrateHardwareProcessValuesFromSections,
+  hydrateHardwareUploadValuesFromSections,
+  isQcHardwareProcessSubType,
+  mergeHardwareUploadValuesIntoEntryValues,
+} from "../../../../../hooks/user/qualityControl/qcHardwareTables";
+import {
+  createInitialCastingValues,
+  hydrateCastingValuesFromSections,
+} from "../../../../../hooks/user/qualityControl/qcCastingTables";
 import {
   createInitialRevalidationSchemaValues,
   hydrateRevalidationValuesFromSections,
@@ -80,35 +96,25 @@ const QCDivisionEntryPanel = ({
 
   const resolvedSchema = useMemo(() => {
     if (!schema) return null;
-    if (entry.kind === "MIXING_PREMIX" || entry.kind === "MIXING_FINAL_MIX") return null;
+    if (
+      entry.kind === "MIXING_PREMIX" ||
+      entry.kind === "MIXING_FINAL_MIX" ||
+      entry.kind === "HARDWARE_PROCESS" ||
+      entry.kind === "CASTING_MOTOR"
+    ) {
+      return null;
+    }
     return schema;
   }, [entry.kind, schema]);
 
   const mixingPremixValues = useMemo(() => {
     const saved = entryValues.schemaValues;
-    let base: SchemaFormValues;
-    if (saved && Object.keys(saved).length > 0) {
-      base = saved;
-    } else if (entry.savedSections?.length) {
-      base = hydrateMixingDetailsValuesFromSections(entry.savedSections, "premix");
-    } else {
-      base = createInitialPremixDetailsValues(mixingQualityCheckDefinitions);
+    if (saved && Object.keys(saved).length > 0) return saved;
+    if (entry.savedSections?.length) {
+      return hydrateMixingDetailsValuesFromSections(entry.savedSections, "premix");
     }
-    return applyMixingDivisionEntryToValues(
-      base,
-      {
-        variant: "premix",
-        premixNo: entry.premixNo,
-        autoPopulatePayload: divisionAutoPopulateData,
-        batchPayload,
-        qualityCheckDefinitions: mixingQualityCheckDefinitions,
-      },
-      { onlyIfEmpty: true },
-    );
+    return createInitialPremixDetailsValues(mixingQualityCheckDefinitions);
   }, [
-    batchPayload,
-    divisionAutoPopulateData,
-    entry.premixNo,
     entry.savedSections,
     entryValues.schemaValues,
     mixingQualityCheckDefinitions,
@@ -119,7 +125,9 @@ const QCDivisionEntryPanel = ({
       resolveMixingDetailsSeed({
         variant: "premix",
         premixNo: entry.premixNo,
-        autoPopulatePayload: divisionAutoPopulateData,
+        autoPopulatePayload:
+          (divisionAutoPopulateData as { __manufacturingDivisionData?: unknown } | null)
+            ?.__manufacturingDivisionData ?? divisionAutoPopulateData,
         batchPayload,
       }),
     [batchPayload, divisionAutoPopulateData, entry.premixNo],
@@ -135,37 +143,49 @@ const QCDivisionEntryPanel = ({
   }, [entry.savedSections, entryValues.schemaValues]);
 
   const handleValuesChange = useCallback(
-    (values: SchemaFormValues) => onEntryValuesChange(entry.entryId, values),
-    [entry.entryId, onEntryValuesChange],
+    (values: SchemaFormValues) => {
+      if (entry.kind === "MIXING_FINAL_MIX") {
+        // Viscosity table may pass viscosity-only or full blob — keep details, take viscosity from `values`.
+        onEntryValuesChange(
+          entry.entryId,
+          mergeFinalMixEntrySchemaValues(
+            pickFinalMixDetailsSchemaValues(entryValues.schemaValues),
+            pickViscositySchemaValues(values),
+          ),
+        );
+        return;
+      }
+      onEntryValuesChange(entry.entryId, values);
+    },
+    [entry.entryId, entry.kind, entryValues.schemaValues, onEntryValuesChange],
   );
 
+  // Seed Premix once when the entry/seed source changes — never on every keystroke.
   useEffect(() => {
     if (readOnly || entry.kind !== "MIXING_PREMIX") return;
     if (!premixAutoSeed && !(mixingQualityCheckDefinitions?.length)) return;
     const current = entryValues.schemaValues;
-    const base =
-      current && Object.keys(current).length > 0
-        ? current
-        : createInitialPremixDetailsValues(mixingQualityCheckDefinitions);
-    const seeded = applyMixingDivisionEntryToValues(base, {
-      variant: "premix",
-      premixNo: entry.premixNo,
-      autoPopulatePayload: divisionAutoPopulateData,
-      batchPayload,
-      qualityCheckDefinitions: mixingQualityCheckDefinitions,
-    }, { onlyIfEmpty: true });
-    if (JSON.stringify(seeded) !== JSON.stringify(current ?? {})) {
-      onEntryValuesChange(entry.entryId, seeded);
-    }
+    if (current && Object.keys(current).length > 0) return;
+    const seeded = applyMixingDivisionEntryToValues(
+      createInitialPremixDetailsValues(mixingQualityCheckDefinitions),
+      {
+        variant: "premix",
+        premixNo: entry.premixNo,
+        autoPopulatePayload: divisionAutoPopulateData,
+        batchPayload,
+        qualityCheckDefinitions: mixingQualityCheckDefinitions,
+      },
+      { onlyIfEmpty: true },
+    );
+    onEntryValuesChange(entry.entryId, seeded);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- seed only when entry identity / seed source arrives empty
   }, [
     batchPayload,
     divisionAutoPopulateData,
     entry.entryId,
     entry.kind,
     entry.premixNo,
-    entryValues.schemaValues,
     mixingQualityCheckDefinitions,
-    onEntryValuesChange,
     premixAutoSeed,
     readOnly,
   ]);
@@ -181,7 +201,11 @@ const QCDivisionEntryPanel = ({
     const showUnitActions = Boolean(unitActions?.show);
     // Mixing units are managed via Mix Navigation — no remove control.
     const showRemove =
-      !readOnly && entry.kind !== "MIXING_PREMIX" && entry.kind !== "MIXING_FINAL_MIX";
+      !readOnly &&
+      entry.kind !== "MIXING_PREMIX" &&
+      entry.kind !== "MIXING_FINAL_MIX" &&
+      entry.kind !== "HARDWARE_PROCESS" &&
+      entry.kind !== "CASTING_MOTOR";
     if (!showUnitActions && !showRemove) return null;
 
     return (
@@ -228,8 +252,31 @@ const QCDivisionEntryPanel = ({
       }
       return createInitialRevalidationSchemaValues();
     }
+    if (entry.kind === "HARDWARE_PROCESS") {
+      const subType = String(entry.subType ?? "");
+      if (entry.savedSections?.length && isQcHardwareProcessSubType(subType)) {
+        let values = hydrateHardwareProcessValuesFromSections(entry.savedSections, subType);
+        if (subType === "ABRADING") {
+          values = mergeHardwareUploadValuesIntoEntryValues(
+            values,
+            hydrateHardwareUploadValuesFromSections(entry.savedSections),
+          );
+        }
+        return values;
+      }
+      if (isQcHardwareProcessSubType(subType)) {
+        return createInitialHardwareProcessValues(subType);
+      }
+      return {};
+    }
+    if (entry.kind === "CASTING_MOTOR") {
+      if (entry.savedSections?.length) {
+        return hydrateCastingValuesFromSections(entry.savedSections);
+      }
+      return createInitialCastingValues();
+    }
     return resolvedSchema ? createQcInitialValues(resolvedSchema) : {};
-  }, [entry.kind, entry.savedSections, entryValues.schemaValues, resolvedSchema]);
+  }, [entry.kind, entry.savedSections, entry.subType, entryValues.schemaValues, resolvedSchema]);
 
   const solidValues = useMemo(() => {
     const saved = entryValues.schemaValues;
@@ -242,6 +289,30 @@ const QCDivisionEntryPanel = ({
     if (saved && Object.keys(saved).length > 0) return saved;
     return liquidSchema ? createQcInitialValues(liquidSchema) : {};
   }, [entryValues.liquidSchemaValues, liquidSchema]);
+
+  if (entry.kind === "HARDWARE_PROCESS") {
+    return (
+      <QCHardwareProcessPanel
+        subType={String(entry.subType ?? "")}
+        values={formValues}
+        onChange={handleValuesChange}
+        readOnly={readOnly}
+        headerActions={headerActions}
+      />
+    );
+  }
+
+  if (entry.kind === "CASTING_MOTOR") {
+    return (
+      <QCCastingMotorPanel
+        motorId={entry.motorId}
+        values={formValues}
+        onChange={handleValuesChange}
+        readOnly={readOnly}
+        headerActions={headerActions}
+      />
+    );
+  }
 
   if (entry.kind === "REVALIDATION") {
     return (

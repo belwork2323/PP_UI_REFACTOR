@@ -17,6 +17,13 @@ import {
 } from "../../../hooks/user/qualityControl/qcDivisionEntries";
 import { buildRevalidationMaterialsPayload, buildRevalidationSectionPayload, hasRevalidationTableData } from "../../../hooks/user/qualityControl/qcRawMaterialRevalidationTable";
 import { buildProcessingPremixesPayload } from "../../../hooks/user/qualityControl/qcProcessingMaterials";
+import {
+  applyHardwareAttachmentsToMotorSections,
+  buildHardwareAttachmentsSectionsForForm,
+  buildHardwareProcessSectionPayload,
+} from "../../../hooks/user/qualityControl/qcHardwareTables";
+import { buildCastingSectionPayload } from "../../../hooks/user/qualityControl/qcCastingTables";
+import { isQcHardwareProcessSubType } from "../../../hooks/user/qualityControl/qcHardwareConfig";
 import type {
   QcDivisionEntry,
   QcDivisionEntryValues,
@@ -328,11 +335,10 @@ const buildDivisionEntrySections = (
     return [];
   }
 
-  const schema = getSchemaForDivisionEntry(form, entry);
-  if (!schema) return [];
-
   if (entry.kind === "HARDWARE_PROCESS") {
-    return buildQcSectionPayload(schema, entryValues.schemaValues).map((section) => ({
+    const subType = String(entry.subType ?? "");
+    if (!isQcHardwareProcessSubType(subType)) return [];
+    return buildHardwareProcessSectionPayload(entryValues.schemaValues, subType).map((section) => ({
       ...section,
       motorId: entry.motorId,
       subType: entry.subType ?? undefined,
@@ -340,11 +346,14 @@ const buildDivisionEntrySections = (
   }
 
   if (entry.kind === "CASTING_MOTOR") {
-    return buildQcSectionPayload(schema, entryValues.schemaValues).map((section) => ({
+    return buildCastingSectionPayload(entryValues.schemaValues).map((section) => ({
       ...section,
       motorId: entry.motorId,
     }));
   }
+
+  const schema = getSchemaForDivisionEntry(form, entry);
+  if (!schema) return [];
 
   if (entry.kind === "CURING_MOTOR") {
     return buildQcSectionPayload(schema, entryValues.schemaValues).map((section) => ({
@@ -452,6 +461,71 @@ const stripUnitKeysFromSection = (section: SectionWithUnitMeta): SchemaSectionSu
     ...rest
   } = section;
   return rest;
+};
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
+
+const pickMotorIdFromRecord = (rec: Record<string, unknown>) =>
+  String(rec.motorIdNo ?? rec.motorId ?? rec.id ?? "").trim();
+
+/** Flatten division detail `data` (motorDetails / motors / sections) into section rows with motorId. */
+export const expandDivisionDetailSections = (
+  detailData: Record<string, unknown> | null | undefined,
+): SchemaSectionSubmission[] => {
+  const data = detailData ?? {};
+  const plainSections = asArray(data.sections) as SchemaSectionSubmission[];
+  const expandedMotorSections: SchemaSectionSubmission[] = [];
+
+  for (const motor of [...asArray(data.motorDetails), ...asArray(data.motors)]) {
+    const rec = asRecord(motor);
+    if (!rec) continue;
+    const motorId = pickMotorIdFromRecord(rec);
+    if (!motorId) continue;
+
+    const details = asRecord(rec.details);
+    const motorSections = asArray(details?.sections ?? rec.sections);
+    motorSections.forEach((section) => {
+      const sec = asRecord(section);
+      if (!sec) return;
+      expandedMotorSections.push({
+        ...(sec as SchemaSectionSubmission),
+        motorId,
+      });
+    });
+  }
+
+  return [...plainSections, ...expandedMotorSections];
+};
+
+const wrapHardwareDivisionDataFromSections = (
+  sections: SectionWithUnitMeta[],
+  options?: MapQualityControlPayloadOptions,
+): Record<string, unknown> => {
+  const motorsById = new Map<string, SectionWithUnitMeta[]>();
+
+  sections.forEach((section) => {
+    const motorId = String(section.motorId ?? "").trim();
+    if (!motorId) return;
+    const list = motorsById.get(motorId) ?? [];
+    list.push(section);
+    motorsById.set(motorId, list);
+  });
+
+  const motorSubmissionType: QcUnitSubmissionType = options?.unitSubmissionType ?? "DRAFT";
+
+  return {
+    motorDetails: Array.from(motorsById.entries()).map(([motorIdNo, motorSections]) => ({
+      motorIdNo,
+      motorId: motorIdNo,
+      motorSubmissionType,
+      sections: motorSections.map(stripUnitKeysFromSection),
+    })),
+  };
 };
 
 const wrapDivisionDataFromSections = (
@@ -595,7 +669,8 @@ export const mapQualityControlPayload = (
       });
     }
 
-    // MIXING → data.premixes[{ premixDetails, finalMixDetails }]
+    // MIXING → data.premixes[{ premixNo, premixDetails|finalMixDetails }]
+    // Top-level mirrors RMP (division + subType + divisionSubmissionType + data.premixes).
     const mixingEntries = divisionEntries.filter(
       (entry) => entry.kind === "MIXING_PREMIX" || entry.kind === "MIXING_FINAL_MIX",
     );
@@ -604,9 +679,18 @@ export const mapQualityControlPayload = (
         unitSubmissionType: options?.unitSubmissionType ?? null,
       });
       if (premixes.length > 0) {
+        const hasPremix = mixingEntries.some((entry) => entry.kind === "MIXING_PREMIX");
+        const hasFinalMix = mixingEntries.some((entry) => entry.kind === "MIXING_FINAL_MIX");
+        // Unit saves set stage subType (like RMP’s processing subType). Mixed/full saves keep null.
+        const mixingSubType: QcApiSubType =
+          hasPremix && !hasFinalMix
+            ? "PREMIX"
+            : hasFinalMix && !hasPremix
+              ? "FINAL_MIX"
+              : null;
         divisionDetails.push({
           division: "MIXING",
-          subType: null,
+          subType: mixingSubType,
           divisionSubmissionType,
           data: { premixes },
         });
@@ -636,12 +720,37 @@ export const mapQualityControlPayload = (
         const sections = entries.flatMap((entry) =>
           buildDivisionEntrySections(form, entry),
         ) as SectionWithUnitMeta[];
+        const hardwareEntries = entries.filter((entry) => entry.kind === "HARDWARE_PROCESS");
+        const attachmentSections =
+          division === "HARDWARE" && hardwareEntries.length > 0
+            ? (buildHardwareAttachmentsSectionsForForm(
+                hardwareEntries,
+                form.divisionEntryValues ?? {},
+              ) as SectionWithUnitMeta[])
+            : [];
+
+        if (division === "HARDWARE") {
+          const motorSections = applyHardwareAttachmentsToMotorSections(
+            [...sections, ...attachmentSections],
+            hardwareEntries,
+            form.divisionEntryValues ?? {},
+          ) as SectionWithUnitMeta[];
+          return {
+            division: "HARDWARE" as const,
+            subType: null,
+            divisionSubmissionType,
+            data: wrapHardwareDivisionDataFromSections(motorSections, options),
+          };
+        }
+
         const hasMixedSubTypes = entries.some((e) => e.subType !== entries[0].subType);
-        return buildDivisionDetail(
+        const subType = hasMixedSubTypes ? null : entries[0].subType;
+        return {
           division,
-          hasMixedSubTypes ? null : entries[0].subType,
-          sections,
-        );
+          ...(subType != null ? { subType } : {}),
+          divisionSubmissionType,
+          data: wrapDivisionDataFromSections(sections, options),
+        };
       }),
     );
 

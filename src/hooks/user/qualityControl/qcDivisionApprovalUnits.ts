@@ -15,6 +15,8 @@ export type QcPartialNavItem = {
   kind: QcPartialNavKind;
   label: string;
   status: QcPartialItemStatus;
+  /** Status from `/qc-division/division-details` — prerequisite for enabling QC on this unit. */
+  divisionDetailsStatus?: QcPartialItemStatus;
   motorId?: string;
   premixNo?: number;
   finalMixNo?: number;
@@ -147,13 +149,19 @@ const pickString = (...values: unknown[]): string => {
 };
 
 const extractMotorIds = (data: Record<string, unknown>): Array<{ motorId: string; status?: unknown }> => {
-  const fromObjects = asArray(data.motors)
+  const fromObjects = [...asArray(data.motorDetails), ...asArray(data.motors)]
     .map((row) => {
       const rec = asRecord(row);
       if (rec) {
-        const motorId = pickString(rec.motorId, rec.id, rec.motor_id);
+        const motorId = pickString(rec.motorIdNo, rec.motorId, rec.id, rec.motor_id);
         if (!motorId) return null;
-        return { motorId, status: rec.status ?? rec.motorSubmissionStatus };
+        return {
+          motorId,
+          status:
+            rec.status ??
+            rec.motorSubmissionStatus ??
+            rec.motor_submission_status,
+        };
       }
       const motorId = pickString(row);
       return motorId ? { motorId } : null;
@@ -279,7 +287,14 @@ const extractFinalMixes = (
           rec.number,
         );
         if (finalMixNo == null) return null;
-        return { finalMixNo, status: rec.status ?? rec.mixSubmissionStatus };
+        return {
+          finalMixNo,
+          status:
+            rec.status ??
+            rec.mixSubmissionStatus ??
+            rec.premixSubmissionStatus ??
+            rec.premix_submission_status,
+        };
       }
       const finalMixNo = pickNumber(row);
       return finalMixNo != null ? { finalMixNo } : null;
@@ -345,6 +360,65 @@ export const isQcUnitLocked = (status?: QcPartialItemStatus | string | null) => 
 export const isQcUnitEditable = (status?: QcPartialItemStatus | string | null) =>
   !isQcUnitLocked(status);
 
+/** Unit must be Approved in division-details before QC can open/fill it. */
+export const isQcPartialItemEnabledByDivisionDetails = (
+  item: QcPartialNavItem | null | undefined,
+): boolean => {
+  if (!item || item.kind === "DIVISION") return true;
+  const qcStatus = normalizePartialItemStatus(item.status);
+  // QC unit already started or resubmitted — keep accessible regardless of seed status.
+  if (qcStatus !== "TO_BE_INITIATED" && qcStatus !== "REJECTED") return true;
+  const prerequisite = item.divisionDetailsStatus ?? item.status;
+  return normalizePartialItemStatus(prerequisite) === "APPROVED";
+};
+
+export const isQcPartialItemEnabledForWorkflow = (
+  item: QcPartialNavItem | null | undefined,
+  gate: { approvedPremixNos?: Set<number>; approvedMotorIds?: Set<string>; enableAll?: boolean } | null | undefined,
+): boolean => {
+  if (!isQcPartialItemEnabledByDivisionDetails(item)) return false;
+  if (!item || item.kind === "DIVISION") return true;
+  if (!gate || gate.enableAll) return true;
+  if (item.kind === "PREMIX" || item.kind === "FINAL_MIX") {
+    const premixNo = item.premixNo ?? item.finalMixNo;
+    if (premixNo == null) return true;
+    return gate.approvedPremixNos?.has(premixNo) ?? false;
+  }
+  if (item.kind === "MOTOR" && item.motorId) {
+    return gate.approvedMotorIds?.has(item.motorId) ?? false;
+  }
+  return true;
+};
+
+export const getQcPartialNavDivisionDetailsDisabledReason = (
+  item: QcPartialNavItem | undefined,
+  messages: {
+    motor?: string;
+    premix?: string;
+    premixDivisionLabel?: string;
+  } = {},
+): string | undefined => {
+  if (!item || isQcPartialItemEnabledByDivisionDetails(item)) return undefined;
+  if (item.kind === "PREMIX" || item.kind === "FINAL_MIX") {
+    const template =
+      messages.premix ??
+      "This premix was not approved in {division} and cannot be filled in QC yet.";
+    return template.replace("{division}", messages.premixDivisionLabel ?? "division details");
+  }
+  return (
+    messages.motor ??
+    "This motor was not approved in division details and cannot be filled in QC yet."
+  );
+};
+
+export const findFirstEnabledPartialNavIndex = (
+  items: QcPartialNavItem[],
+  isEnabled: (index: number) => boolean,
+): number => {
+  const index = items.findIndex((_, itemIndex) => isEnabled(itemIndex));
+  return index >= 0 ? index : 0;
+};
+
 /** @deprecated Prefer isQcUnitLocked — kept for existing call sites. */
 export const isPartialItemReadOnly = (status: QcPartialItemStatus) => isQcUnitLocked(status);
 
@@ -407,11 +481,13 @@ export const mapDivisionDetailsToPartialNav = (
 
   if (motors.length > 0 && (isMotorBasedPartialFlow(flowKey) || !premixes.length)) {
     motors.forEach((motor) => {
+      const divisionDetailsStatus = normalizeStatus(motor.status);
       items.push({
         id: `motor:${motor.motorId}`,
         kind: "MOTOR",
         label: motor.motorId,
-        status: normalizeStatus(motor.status),
+        status: divisionDetailsStatus,
+        divisionDetailsStatus,
         motorId: motor.motorId,
       });
     });
@@ -419,12 +495,13 @@ export const mapDivisionDetailsToPartialNav = (
 
   if (premixes.length > 0) {
     premixes.forEach((premix) => {
+      const divisionDetailsStatus = normalizeStatus(premix.status);
       items.push({
         id: `premix:${premix.premixNo}`,
         kind: "PREMIX",
         label: premix.label ?? `Premix ${premix.premixNo}`,
-        // Processing seed comes from manufacturing division-details — QC owns status.
-        status: isRawMaterialProcessing ? "TO_BE_INITIATED" : normalizeStatus(premix.status),
+        status: divisionDetailsStatus,
+        divisionDetailsStatus,
         premixNo: premix.premixNo,
         processingType: premix.processingType ?? "SOLID_PROCESSING",
       });
@@ -433,11 +510,13 @@ export const mapDivisionDetailsToPartialNav = (
 
   if (finalMixes.length > 0) {
     finalMixes.forEach((mix) => {
+      const divisionDetailsStatus = normalizeStatus(mix.status);
       items.push({
         id: `final-mix:${mix.finalMixNo}`,
         kind: "FINAL_MIX",
         label: `Final Mix ${mix.finalMixNo}`,
-        status: normalizeStatus(mix.status),
+        status: divisionDetailsStatus,
+        divisionDetailsStatus,
         finalMixNo: mix.finalMixNo,
         premixNo: mix.finalMixNo,
       });
@@ -766,21 +845,30 @@ export const applyStatusMapsToPartialNav = (
   });
 
   return items.map((item) => {
+    const divisionDetailsStatus = item.divisionDetailsStatus ?? item.status;
     if (item.kind === "MOTOR" && item.motorId && motorStatusById.has(item.motorId)) {
-      return { ...item, status: motorStatusById.get(item.motorId)! };
+      return {
+        ...item,
+        divisionDetailsStatus,
+        status: motorStatusById.get(item.motorId)!,
+      };
     }
     if (item.kind === "PREMIX" && item.premixNo != null) {
       const key = `premix:${item.premixNo}`;
-      if (premixStatusByKey.has(key)) return { ...item, status: premixStatusByKey.get(key)! };
+      if (premixStatusByKey.has(key)) {
+        return { ...item, divisionDetailsStatus, status: premixStatusByKey.get(key)! };
+      }
     }
     if (item.kind === "FINAL_MIX") {
       const mixNo = item.finalMixNo ?? item.premixNo;
       if (mixNo != null) {
         const key = `final-mix:${mixNo}`;
-        if (premixStatusByKey.has(key)) return { ...item, status: premixStatusByKey.get(key)! };
+        if (premixStatusByKey.has(key)) {
+          return { ...item, divisionDetailsStatus, status: premixStatusByKey.get(key)! };
+        }
       }
     }
-    return item;
+    return { ...item, divisionDetailsStatus };
   });
 };
 

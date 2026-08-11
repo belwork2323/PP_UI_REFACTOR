@@ -25,6 +25,12 @@ import {
   type QcMixingDetailsSeed,
   type QcMixingDetailsVariant,
 } from "../../../../../hooks/user/qualityControl/qcMixingTables";
+import {
+  QCDivisionReadOnlyValue,
+  qcReadOnlyBodyCellSx,
+  qcReadOnlyTableContainerSx,
+  qcReadOnlyTableHeaderCellSx,
+} from "./components/QCDivisionReadOnlyValue";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 const BRAND = QC_DIVISION_BRAND;
@@ -38,12 +44,6 @@ const cellSx = {
   px: 0.75,
   verticalAlign: "top",
   border: `1px solid ${TABLE_BORDER}`,
-};
-
-const readOnlyCellSx = {
-  ...cellSx,
-  py: 0.5,
-  verticalAlign: "middle",
 };
 
 const tableFieldSx = { "& .MuiOutlinedInput-root": { fontSize: "0.72rem" } };
@@ -81,11 +81,6 @@ type QCMixingDetailsTableProps = {
   autoSeed?: QcMixingDetailsSeed | null;
 };
 
-const displayValue = (value: unknown) => {
-  const text = String(value ?? "").trim();
-  return text || "—";
-};
-
 const QCMixingDetailsTable = ({
   variant,
   values,
@@ -101,8 +96,22 @@ const QCMixingDetailsTable = ({
   const title =
     variant === "premix" ? "Premix Details" : S.MIXING_FINAL_MIX_SHARED_DETAILS_TITLE;
   const dateLabel = variant === "premix" ? "Date of Premix" : "Date of Final Mix";
-  const baseCellSx = readOnly ? readOnlyCellSx : cellSx;
+  const baseCellSx = readOnly ? qcReadOnlyBodyCellSx : cellSx;
   const tableMinWidth = variant === "premix" ? 1080 : 860;
+
+  const headerColumns = useMemo(
+    () => [
+      { key: "bowl", label: "Bowl No", show: mergeColumns.includes("BOWL_NO") },
+      { key: "date", label: dateLabel, show: mergeColumns.includes(dateKey) },
+      { key: "mixer", label: "Mixer & Bldg No.", show: mergeColumns.includes("MIXER_BLDG_NO") },
+      { key: "qty", label: "Batch size (KG)", show: mergeColumns.includes("PREMIX_QTY") },
+      { key: "parameter", label: "Parameter", show: true },
+      { key: "spec", label: "Specification", show: true },
+      { key: "value", label: "Value", show: true, colSpan: valueFields.length },
+      { key: "remarks", label: "Remarks", show: true },
+    ],
+    [dateKey, dateLabel, mergeColumns, valueFields.length],
+  );
 
   const isSharedFieldLocked = useCallback(
     (field: keyof QcMixingDetailsSeed) => Boolean(String(autoSeed?.[field] ?? "").trim()),
@@ -145,27 +154,46 @@ const QCMixingDetailsTable = ({
     seedField: keyof QcMixingDetailsSeed,
     input: ReactNode,
   ) => {
-    const display = displayValue(row[field]);
-    if (readOnly || isSharedFieldLocked(seedField)) return display;
+    if (readOnly || isSharedFieldLocked(seedField)) {
+      return <QCDivisionReadOnlyValue value={row[field]} />;
+    }
     return input;
   };
 
+  const renderHeaderCell = (label: string, colSpan = 1, align?: "center") =>
+    readOnly ? (
+      <TableCell key={label} colSpan={colSpan} align={align} sx={qcReadOnlyTableHeaderCellSx}>
+        {label}
+      </TableCell>
+    ) : (
+      <TableCell key={label} colSpan={colSpan} align={align} sx={TH}>
+        {label}
+      </TableCell>
+    );
+
   return (
     <Box>
-      <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: BRAND.primary, mb: 1 }}>
-        {title}
-      </Typography>
+      {!readOnly ? (
+        <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: BRAND.primary, mb: 1 }}>
+          {title}
+        </Typography>
+      ) : null}
       <TableContainer
-        sx={{
-          overflow: "hidden",
-          overflowX: "auto",
-          border: `1px solid ${TABLE_BORDER}`,
-          borderRadius: 2,
-          background: "#fff",
-        }}
+        sx={
+          readOnly
+            ? qcReadOnlyTableContainerSx
+            : {
+                overflow: "hidden",
+                overflowX: "auto",
+                border: `1px solid ${TABLE_BORDER}`,
+                borderRadius: 2,
+                background: "#fff",
+              }
+        }
       >
         <Table
           size="small"
+          stickyHeader={!readOnly}
           sx={{
             minWidth: tableMinWidth,
             tableLayout: "fixed",
@@ -174,23 +202,29 @@ const QCMixingDetailsTable = ({
         >
           <TableHead>
             <TableRow>
-              <TableCell sx={TH}>Bowl No</TableCell>
-              <TableCell sx={TH}>{dateLabel}</TableCell>
-              <TableCell sx={TH}>Mixer & Bldg No.</TableCell>
-              <TableCell sx={TH}>Batch size (KG)</TableCell>
-              <TableCell sx={TH}>Parameter</TableCell>
-              <TableCell sx={TH}>Specification</TableCell>
-              <TableCell sx={TH} colSpan={valueFields.length} align="center">
-                Value
-              </TableCell>
-              <TableCell sx={TH}>Remarks</TableCell>
+              {headerColumns
+                .filter((column) => column.show)
+                .map((column) =>
+                  renderHeaderCell(
+                    column.label,
+                    column.colSpan,
+                    column.key === "value" ? "center" : undefined,
+                  ),
+                )}
             </TableRow>
           </TableHead>
           <TableBody>
             {rows.map((row, rowIndex) => (
               <TableRow
                 key={`${row.PARAMETER}-${rowIndex}`}
-                sx={{ background: rowIndex % 2 === 0 ? "#fff" : alpha(BRAND.surface, 0.55) }}
+                sx={{
+                  background:
+                    readOnly && rowIndex % 2 === 1
+                      ? alpha(BRAND.surface, 0.45)
+                      : rowIndex % 2 === 0
+                        ? "#fff"
+                        : alpha(BRAND.surface, 0.55),
+                }}
               >
                 {mergeColumns.includes("BOWL_NO")
                   ? renderSharedCell(
@@ -264,13 +298,17 @@ const QCMixingDetailsTable = ({
                     )
                   : null}
                 <TableCell sx={baseCellSx}>
-                  <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.text }}>
-                    {row.PARAMETER}
-                  </Typography>
+                  {readOnly ? (
+                    <QCDivisionReadOnlyValue value={row.PARAMETER} muted />
+                  ) : (
+                    <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.text }}>
+                      {row.PARAMETER}
+                    </Typography>
+                  )}
                 </TableCell>
                 <TableCell sx={baseCellSx}>
                   {readOnly ? (
-                    displayValue(row.SPECIFICATION)
+                    <QCDivisionReadOnlyValue value={row.SPECIFICATION} muted />
                   ) : (
                     <TextField
                       size="small"
@@ -286,7 +324,7 @@ const QCMixingDetailsTable = ({
                 {valueFields.map((field) => (
                   <TableCell key={field} sx={baseCellSx}>
                     {readOnly ? (
-                      displayValue(row[field])
+                      <QCDivisionReadOnlyValue value={row[field]} />
                     ) : (
                       <TextField
                         size="small"
@@ -301,7 +339,7 @@ const QCMixingDetailsTable = ({
                 ))}
                 <TableCell sx={baseCellSx}>
                   {readOnly ? (
-                    displayValue(row.REMARKS)
+                    <QCDivisionReadOnlyValue value={row.REMARKS} muted />
                   ) : (
                     <TextField
                       size="small"

@@ -10,6 +10,7 @@ import {
   createDefaultQualityControlFormState,
   hasAnyQualityControlValue,
   hydrateQualityControlFormState,
+  expandDivisionDetailSections,
   mapQualityControlDivisionSubmitPayload,
   mapQualityControlPayload,
   type QualityControlFormState,
@@ -44,6 +45,9 @@ import {
   areAllFinalApprovalGroupsApproved,
   applyStatusMapsToPartialNav,
   normalizePartialItemStatus,
+  findFirstEnabledPartialNavIndex,
+  getQcPartialNavDivisionDetailsDisabledReason,
+  isQcPartialItemEnabledByDivisionDetails,
   type QcPartialNavItem,
   type QcPartialItemStatus,
 } from "./qcDivisionApprovalUnits";
@@ -54,6 +58,7 @@ import {
   groupUnitStatusesByDivisionTabKey,
   isQcStatusAwaitingInitiation,
   mergePartialNavItems,
+  resolveMotorQcStatusFromFormDetails,
   resolveQcDivisionStatus,
   resolveQcDivisionStatusFromSources,
   shouldUseQcFormDetailsData,
@@ -107,8 +112,25 @@ import {
 } from "./qcDivisionNav";
 import {
   getHardwareSectionIdForSubType,
-  getPendingHardwareProcesses,
+  QC_HARDWARE_ATTACHMENTS_SECTION_ID,
+  QC_HARDWARE_PROCESS_OPTIONS,
 } from "./qcHardwareConfig";
+import {
+  applyHardwareDivisionDetailsSeed,
+  applyHardwareSharedUploadsToEntryValues,
+  resolveManufacturingDivisionDetailsPayload,
+} from "./qcHardwareDivisionDetails";
+import {
+  createInitialHardwareProcessValues,
+  hydrateHardwareProcessValuesFromSections,
+  hydrateHardwareUploadValuesFromSections,
+  isQcHardwareProcessSubType,
+  mergeHardwareUploadValuesIntoEntryValues,
+} from "./qcHardwareTables";
+import {
+  createInitialCastingValues,
+  hydrateCastingValuesFromSections,
+} from "./qcCastingTables";
 import {
   isQcPropellantProcessSubType,
   mapQcPropellantProcessToApi,
@@ -129,17 +151,18 @@ import {
   applyMixingDivisionEntryToValues,
   createInitialViscosityValues,
   createSeededMixingDetailsValues,
+  extractMixingQualityCheckDefinitionsFromPayload,
   findMixingPremixDomainEntry,
   hydrateMixingDetailsValuesFromDomain,
   hydrateMixingDetailsValuesFromSections,
   hydrateMixingDivisionFromFormData,
   hydrateViscosityValuesFromDomain,
   hydrateViscosityValuesFromSections,
-  parseMixingQualityCheckDefinitions,
+  mergeFinalMixEntrySchemaValues,
+  pickFinalMixDetailsSchemaValues,
+  resolveMixingQcFormData,
   type QcMixingQualityCheckDefinition,
 } from "./qcMixingTables";
-import mixingController from "../../../controllers/user/manufacturing/mixingController";
-import { resolveMotorStage } from "../manufacturing/castingCuringFlowConfig";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import { isManufacturingFillDetailsStatus, isManufacturingViewOnlyStatus } from "../../operationStatus";
 import { QUALITY_CONTROL_STATUS } from "./qualityControlWorkflowData";
@@ -243,27 +266,56 @@ export const useQCDivisionHook = () => {
   );
   const divisionAutoPopulateDataRef = useRef(divisionAutoPopulateData);
   divisionAutoPopulateDataRef.current = divisionAutoPopulateData;
-  const [mixingQualityChecksByStage, setMixingQualityChecksByStage] = useState<{
-    PREMIX: QcMixingQualityCheckDefinition[];
-    FINAL_MIX: QcMixingQualityCheckDefinition[];
-  }>({ PREMIX: [], FINAL_MIX: [] });
+  // Derive Mixing parameter/spec rows from division-details / QC details (no quality-checks API).
+  const mixingQualityChecksByStage = useMemo(
+    () =>
+      selectedDivision === "MIXING"
+        ? {
+            PREMIX: extractMixingQualityCheckDefinitionsFromPayload(
+              divisionAutoPopulateData,
+              "PREMIX",
+            ),
+            FINAL_MIX: extractMixingQualityCheckDefinitionsFromPayload(
+              divisionAutoPopulateData,
+              "FINAL_MIX",
+            ),
+          }
+        : { PREMIX: [] as QcMixingQualityCheckDefinition[], FINAL_MIX: [] as QcMixingQualityCheckDefinition[] },
+    [divisionAutoPopulateData, selectedDivision],
+  );
   const mixingQualityChecksByStageRef = useRef(mixingQualityChecksByStage);
   mixingQualityChecksByStageRef.current = mixingQualityChecksByStage;
 
-  const buildSeededPremixDetailsValues = (premixNo: number) =>
-    createSeededMixingDetailsValues("premix", {
+  const buildSeededPremixDetailsValues = (
+    premixNo: number,
+    autoPopulatePayload?: unknown,
+  ) => {
+    const payload = autoPopulatePayload ?? divisionAutoPopulateDataRef.current;
+    const fromPayload = extractMixingQualityCheckDefinitionsFromPayload(payload, "PREMIX");
+    return createSeededMixingDetailsValues("premix", {
       premixNo,
-      autoPopulatePayload: divisionAutoPopulateDataRef.current,
+      autoPopulatePayload: payload,
       batchPayload: activeBatchRef.current,
-      qualityCheckDefinitions: mixingQualityChecksByStageRef.current.PREMIX,
+      qualityCheckDefinitions: fromPayload.length
+        ? fromPayload
+        : mixingQualityChecksByStageRef.current.PREMIX,
     });
-  const buildSeededFinalMixDetailsValues = (premixNo: number) =>
-    createSeededMixingDetailsValues("finalMix", {
+  };
+  const buildSeededFinalMixDetailsValues = (
+    premixNo: number,
+    autoPopulatePayload?: unknown,
+  ) => {
+    const payload = autoPopulatePayload ?? divisionAutoPopulateDataRef.current;
+    const fromPayload = extractMixingQualityCheckDefinitionsFromPayload(payload, "FINAL_MIX");
+    return createSeededMixingDetailsValues("finalMix", {
       premixNo,
-      autoPopulatePayload: divisionAutoPopulateDataRef.current,
+      autoPopulatePayload: payload,
       batchPayload: activeBatchRef.current,
-      qualityCheckDefinitions: mixingQualityChecksByStageRef.current.FINAL_MIX,
+      qualityCheckDefinitions: fromPayload.length
+        ? fromPayload
+        : mixingQualityChecksByStageRef.current.FINAL_MIX,
     });
+  };
   const [divisionAutoPopulateLoading, setDivisionAutoPopulateLoading] = useState(false);
   const divisionAutoPopulateRequestIdRef = useRef(0);
   const [partialNavItems, setPartialNavItems] = useState<QcPartialNavItem[]>([]);
@@ -614,25 +666,41 @@ export const useQCDivisionHook = () => {
         let seedRecord: Record<string, unknown> | null = null;
 
         if (useFormDetails) {
-          // IN_PROGRESS / APPROVED / etc. → only /qc-division/details (no division-details).
-          // Manufacturing seeds for any remaining TO_BE_INITIATED units are fetched on demand
-          // when that unit is selected (see loadFormForPartialItem).
+          // IN_PROGRESS / APPROVED / etc. → /qc-division/details for saved QC data.
+          // Manufacturing /division-details is only fetched for non-HARDWARE divisions that
+          // may still have TO_BE_INITIATED sibling units. HARDWARE loads division-details
+          // lazily when a TO_BE_INITIATED motor is opened (never for IN_PROGRESS motors).
           const formDetails = formDetailsForStatus ?? (await ensureQcFormDetailsPayload());
           if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
           const matchingDetail = findQcFormDivisionDetail(formDetails, {
             flowKey: divisionFlowKey,
             rawMaterialType: typeKey,
           });
-          seedRecord =
+          // Mixing QC details split PREMIX + FINAL_MIX across divisionDetails — merge by premixNo.
+          const qcData =
+            (divisionFlowKey === "MIXING"
+              ? resolveMixingQcFormData(formDetails)
+              : null) ??
             toDivisionAutoPopulateRecord(matchingDetail) ??
             matchingDetail ??
             (formDetails ? toDivisionAutoPopulateRecord(formDetails) : null);
-          if (seedRecord) {
-            seedRecord = {
-              ...seedRecord,
-              __qcFormDivisionData: seedRecord,
-            };
+
+          const shouldFetchManufacturing = divisionFlowKey !== "HARDWARE";
+          const manufacturing = shouldFetchManufacturing
+            ? await fetchManufacturingDivisionDetails({ batchId, divisionId })
+            : null;
+          if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
+
+          if (!qcData && !manufacturing) {
+            setDivisionAutoPopulateData(null);
+            return null;
           }
+
+          seedRecord = {
+            ...(qcData ?? manufacturing ?? {}),
+            ...(qcData ? { __qcFormDivisionData: qcData } : {}),
+            ...(manufacturing ? { __manufacturingDivisionData: manufacturing } : {}),
+          };
         } else {
           // TO_BE_INITIATED → seed from /qc-division/division-details
           seedRecord = await fetchManufacturingDivisionDetails({ batchId, divisionId });
@@ -641,6 +709,10 @@ export const useQCDivisionHook = () => {
             setDivisionAutoPopulateData(null);
             return null;
           }
+          seedRecord = {
+            ...seedRecord,
+            __manufacturingDivisionData: seedRecord,
+          };
         }
 
         setDivisionAutoPopulateData(seedRecord);
@@ -798,34 +870,6 @@ export const useQCDivisionHook = () => {
     setSelectedRawMaterialType(first.rawMaterialType);
     void loadDivisionAutoPopulate(first.flowKey, first.rawMaterialType || null);
   }, [divisionNavTabs, loadDivisionAutoPopulate, selectedDivision, view]);
-
-  // Load mixing quality-check specification list (parameter name + specification by parameterId).
-  useEffect(() => {
-    if (view !== "form" || selectedDivision !== "MIXING") return;
-    let cancelled = false;
-    const motorStage = resolveMotorStage(activeBatch);
-
-    const load = async () => {
-      try {
-        const [premixResponse, finalMixResponse] = await Promise.all([
-          mixingController.fetchQualityChecks("PREMIX", motorStage),
-          mixingController.fetchQualityChecks("FINAL_MIX", motorStage),
-        ]);
-        if (cancelled) return;
-        setMixingQualityChecksByStage({
-          PREMIX: parseMixingQualityCheckDefinitions(premixResponse),
-          FINAL_MIX: parseMixingQualityCheckDefinitions(finalMixResponse),
-        });
-      } catch (error) {
-        console.warn("Failed to fetch mixing quality-check specifications:", error);
-      }
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [activeBatch, selectedDivision, view]);
 
   const rawMaterialTypeOptions = useMemo(
     () => resolveQcRawMaterialTypeOptions(divisionCatalog, selectedDivision),
@@ -1036,53 +1080,7 @@ export const useQCDivisionHook = () => {
     if (!entryKind) return;
 
     if (entryKind === "HARDWARE_PROCESS") {
-      const pendingProcesses = getPendingHardwareProcesses(
-        selectedMotorId,
-        selectedHardwareProcesses,
-        addedDivisionEntryKeys,
-        selectedDivision,
-      );
-      if (!pendingProcesses.length) return;
-
-      const additions: Array<{
-        entry: QcDivisionEntry;
-        schema: Awaited<ReturnType<typeof fetchQcSchemaDocument>> & object;
-      }> = [];
-
-      for (const process of pendingProcesses) {
-        const result = await fetchQcSchemaDocument("HARDWARE", process);
-        if (!result) return;
-        additions.push({
-          entry: buildEntryFromSelection(
-            "HARDWARE_PROCESS",
-            { division: "HARDWARE", subType: process },
-            undefined,
-            selectedMotorId,
-          ),
-          schema: result,
-        });
-      }
-
-      let nextEntries = [...(formData.divisionEntries ?? [])];
-      updateFormData((prev) => {
-        let next = prev;
-        additions.forEach(({ entry, schema }) => {
-          next = appendDivisionEntryToForm(
-            next,
-            entry,
-            { schemaValues: createQcInitialValues(schema.schema) },
-            [{ schema: schema.schema, division: schema.division, subType: schema.subType }],
-          );
-          nextEntries = [...nextEntries, entry];
-        });
-        return next;
-      });
-
-      const lastEntry = additions[additions.length - 1]?.entry;
-      if (lastEntry) {
-        navigateToEntry(nextEntries, lastEntry.entryId);
-      }
-      resetFlowBarSelection();
+      // Hardware processes are auto-created from Motor Navigation (all 4 at once).
       return;
     }
 
@@ -1099,9 +1097,6 @@ export const useQCDivisionHook = () => {
         return;
       }
 
-      const result = await fetchQcSchemaDocument("CASTING", null);
-      if (!result) return;
-
       const entry = buildEntryFromSelection(
         "CASTING_MOTOR",
         { division: "CASTING", subType: null },
@@ -1113,8 +1108,8 @@ export const useQCDivisionHook = () => {
         appendDivisionEntryToForm(
           prev,
           entry,
-          { schemaValues: createQcInitialValues(result.schema) },
-          [{ schema: result.schema, division: result.division, subType: result.subType }],
+          { schemaValues: createInitialCastingValues() },
+          [],
         ),
       );
       navigateToEntry(nextEntries, entry.entryId);
@@ -1614,19 +1609,23 @@ export const useQCDivisionHook = () => {
     }
 
     if (entryKind === "MIXING_FINAL_MIX") {
-      const isFirstFinalMix = getMixingFinalMixEntries(formData.divisionEntries).length === 0;
       const nextEntries = [...(formData.divisionEntries ?? []), entry];
+      const detailsValues = buildSeededFinalMixDetailsValues(premixNo!);
       updateFormData((prev) => {
         const next = appendDivisionEntryToForm(
           prev,
           entry,
-          { schemaValues: createInitialViscosityValues() },
+          {
+            schemaValues: mergeFinalMixEntrySchemaValues(
+              detailsValues,
+              createInitialViscosityValues(),
+            ),
+          },
           [],
         );
-        if (!isFirstFinalMix) return next;
         return {
           ...next,
-          mixingFinalMixDetailsValues: buildSeededFinalMixDetailsValues(premixNo!),
+          mixingFinalMixDetailsValues: detailsValues,
         };
       });
       navigateToEntry(nextEntries, entry.entryId);
@@ -1746,10 +1745,27 @@ export const useQCDivisionHook = () => {
         const auto = divisionAutoPopulateDataRef.current;
         if (shouldUseQcFormDetailsData(item.status)) {
           const formDetails = await ensureQcFormDetailsPayload();
+          if (flowKey === "MIXING") {
+            return (
+              resolveMixingQcFormData(formDetails) ??
+              (auto as any)?.__qcFormDivisionData ??
+              toDivisionAutoPopulateRecord(auto) ??
+              auto
+            );
+          }
           const matchingDetail = findQcFormDivisionDetail(formDetails, {
             flowKey,
             rawMaterialType: selectedRawMaterialType,
           });
+          // IN_PROGRESS+ hardware/other units: QC form details only — never fall back to
+          // divisionAutoPopulateData (may still carry __manufacturingDivisionData).
+          if (flowKey === "HARDWARE") {
+            return (
+              toDivisionAutoPopulateRecord(matchingDetail) ??
+              (auto as any)?.__qcFormDivisionData ??
+              null
+            );
+          }
           return (
             toDivisionAutoPopulateRecord(matchingDetail) ??
             (auto as any)?.__qcFormDivisionData ??
@@ -1785,28 +1801,95 @@ export const useQCDivisionHook = () => {
       try {
         const currentEntries = formDataRef.current.divisionEntries ?? [];
         const existingIds = resolveEntryIdsForPartialItem(currentEntries, item, { flowKey });
-        if (existingIds.length) {
+        const hardwareNeedsMoreProcesses =
+          flowKey === "HARDWARE" &&
+          item.kind === "MOTOR" &&
+          existingIds.length > 0 &&
+          existingIds.length < QC_HARDWARE_PROCESS_OPTIONS.length;
+        if (existingIds.length && !hardwareNeedsMoreProcesses) {
           navigateToEntry(currentEntries, existingIds[0]);
 
-          // Once past TO_BE_INITIATED, refresh Mixing content from /qc-division/details.
+          if (
+            flowKey === "HARDWARE" &&
+            item.kind === "MOTOR" &&
+            item.motorId &&
+            !shouldUseQcFormDetailsData(item.status)
+          ) {
+            const seedPayload = await resolveSeedPayloadForUnit();
+            if (requestId !== partialNavLoadRequestIdRef.current) return;
+            updateFormData((prev) => {
+              let entryValues = { ...(prev.divisionEntryValues ?? {}) };
+              for (const entry of prev.divisionEntries ?? []) {
+                if (entry.kind !== "HARDWARE_PROCESS" || entry.motorId !== item.motorId) continue;
+                const subType = String(entry.subType ?? "");
+                if (!isQcHardwareProcessSubType(subType)) continue;
+                entryValues = {
+                  ...entryValues,
+                  [entry.entryId]: {
+                    ...entryValues[entry.entryId],
+                    schemaValues: applyHardwareDivisionDetailsSeed(
+                      entryValues[entry.entryId]?.schemaValues,
+                      seedPayload,
+                      item.motorId!,
+                      subType,
+                      { onlyIfEmpty: true },
+                    ),
+                  },
+                };
+              }
+              return {
+                ...prev,
+                divisionEntryValues: entryValues,
+              };
+            });
+          } else if (
+            flowKey === "HARDWARE" &&
+            item.kind === "MOTOR" &&
+            item.motorId &&
+            shouldUseQcFormDetailsData(item.status)
+          ) {
+            const seedPayload = await resolveSeedPayloadForUnit();
+            if (requestId !== partialNavLoadRequestIdRef.current) return;
+            const seedRoot =
+              seedPayload && typeof seedPayload === "object"
+                ? (seedPayload as Record<string, unknown>)
+                : null;
+            updateFormData((prev) => ({
+              ...prev,
+              divisionEntryValues: applyHardwareSharedUploadsToEntryValues(
+                prev.divisionEntries ?? [],
+                prev.divisionEntryValues ?? {},
+                seedRoot ? expandDivisionDetailSections(seedRoot) : null,
+              ),
+            }));
+          }
+
+          // Unit-status rule (all QC divisions):
+          // TO_BE_INITIATED → manufacturing /division-details seed
+          // IN_PROGRESS+ → saved /qc-division/details
           if (
             flowKey === "MIXING" &&
-            shouldUseQcFormDetailsData(item.status) &&
             (item.kind === "PREMIX" || item.kind === "FINAL_MIX")
           ) {
-            const formDetails = await ensureQcFormDetailsPayload({ forceRefresh: true });
-            if (requestId !== partialNavLoadRequestIdRef.current) return;
-            const matchingDetail = findQcFormDivisionDetail(formDetails, {
-              flowKey,
-              rawMaterialType: selectedRawMaterialType,
-            });
-            const formData = toDivisionAutoPopulateRecord(matchingDetail) ??
-              toDivisionAutoPopulateRecord(formDetails);
             const mixNo =
               item.kind === "FINAL_MIX"
                 ? item.finalMixNo ?? item.premixNo
                 : item.premixNo;
-            if (mixNo != null && formData) {
+            if (mixNo == null) return;
+
+            if (shouldUseQcFormDetailsData(item.status)) {
+              const formDetails = await ensureQcFormDetailsPayload({ forceRefresh: true });
+              if (requestId !== partialNavLoadRequestIdRef.current) return;
+              const formData =
+                resolveMixingQcFormData(formDetails) ??
+                toDivisionAutoPopulateRecord(
+                  findQcFormDivisionDetail(formDetails, {
+                    flowKey,
+                    rawMaterialType: selectedRawMaterialType,
+                  }),
+                ) ??
+                toDivisionAutoPopulateRecord(formDetails);
+              if (!formData) return;
               const domainEntry = findMixingPremixDomainEntry(formData, mixNo);
               const hydrated = hydrateMixingDivisionFromFormData(formData);
               updateFormData((prev) => {
@@ -1828,45 +1911,85 @@ export const useQCDivisionHook = () => {
                     !Array.isArray(domainEntry.finalMixDetails)
                       ? (domainEntry.finalMixDetails as Record<string, unknown>)
                       : null;
-                  let schemaValues: SchemaFormValues | undefined;
+                  let viscosityValues: SchemaFormValues | undefined;
                   if (finalMixDetails?.viscosityBuildUp) {
-                    schemaValues = hydrateViscosityValuesFromDomain(
+                    viscosityValues = hydrateViscosityValuesFromDomain(
                       finalMixDetails.viscosityBuildUp,
                     );
                   } else {
                     const fromHydrated = hydrated?.finalMixEntries.find(
                       (row) => row.premixNo === mixNo,
                     );
-                    if (fromHydrated) schemaValues = fromHydrated.values;
+                    if (fromHydrated) viscosityValues = fromHydrated.values;
                   }
-                  if (schemaValues) {
+                  const detailsValues = finalMixDetails
+                    ? hydrateMixingDetailsValuesFromDomain(finalMixDetails, "finalMix")
+                    : hydrated?.finalMixDetailsValues;
+                  if (viscosityValues || detailsValues) {
                     entryValues[existingIds[0]] = {
                       ...entryValues[existingIds[0]],
-                      schemaValues,
+                      schemaValues: mergeFinalMixEntrySchemaValues(
+                        detailsValues,
+                        viscosityValues ??
+                          entryValues[existingIds[0]]?.schemaValues,
+                      ),
                     };
                   }
-                  if (hydrated?.finalMixDetailsValues) {
+                  if (detailsValues) {
                     next = {
                       ...next,
-                      mixingFinalMixDetailsValues: hydrated.finalMixDetailsValues,
+                      mixingFinalMixDetailsValues: detailsValues,
                     };
                   }
                 }
                 return { ...next, divisionEntryValues: entryValues };
               });
-            }
-          } else if (item.kind === "FINAL_MIX") {
-            const mixNo = item.finalMixNo ?? item.premixNo;
-            const firstFinalMix = getMixingFinalMixEntries(currentEntries)[0];
-            if (
-              mixNo != null &&
-              firstFinalMix?.entryId === existingIds[0] &&
-              !formDataRef.current.mixingFinalMixDetailsValues
-            ) {
-              updateFormData((prev) => ({
-                ...prev,
-                mixingFinalMixDetailsValues: buildSeededFinalMixDetailsValues(mixNo),
-              }));
+            } else {
+              // TO_BE_INITIATED → re-seed empty fields from manufacturing division-details.
+              const seedPayload = await resolveSeedPayloadForUnit();
+              if (requestId !== partialNavLoadRequestIdRef.current) return;
+              const premixDefs = extractMixingQualityCheckDefinitionsFromPayload(
+                seedPayload,
+                "PREMIX",
+              );
+              updateFormData((prev) => {
+                let next = { ...prev };
+                const entryValues = { ...(prev.divisionEntryValues ?? {}) };
+                if (item.kind === "PREMIX") {
+                  const current = entryValues[existingIds[0]]?.schemaValues;
+                  entryValues[existingIds[0]] = {
+                    ...entryValues[existingIds[0]],
+                    schemaValues: applyMixingDivisionEntryToValues(
+                      current ?? buildSeededPremixDetailsValues(mixNo, seedPayload),
+                      {
+                        variant: "premix",
+                        premixNo: mixNo,
+                        autoPopulatePayload: seedPayload,
+                        batchPayload: activeBatchRef.current,
+                        qualityCheckDefinitions: premixDefs.length
+                          ? premixDefs
+                          : mixingQualityChecksByStageRef.current.PREMIX,
+                      },
+                      { onlyIfEmpty: true },
+                    ),
+                  };
+                }
+                if (item.kind === "FINAL_MIX") {
+                  // Unit-status rule: TO_BE_INITIATED always reseeds from manufacturing for this mixNo.
+                  // Do not keep prior Final Mix unit's QC details in the shared / entry blob.
+                  const detailsValues = buildSeededFinalMixDetailsValues(mixNo, seedPayload);
+                  const current = entryValues[existingIds[0]]?.schemaValues;
+                  entryValues[existingIds[0]] = {
+                    ...entryValues[existingIds[0]],
+                    schemaValues: mergeFinalMixEntrySchemaValues(detailsValues, current),
+                  };
+                  next = {
+                    ...next,
+                    mixingFinalMixDetailsValues: detailsValues,
+                  };
+                }
+                return { ...next, divisionEntryValues: entryValues };
+              });
             }
           }
           return;
@@ -1874,6 +1997,139 @@ export const useQCDivisionHook = () => {
 
         if (item.kind === "MOTOR" && item.motorId) {
           setSelectedMotorId(item.motorId);
+
+          if (flowKey === "HARDWARE") {
+            const currentEntries = formDataRef.current.divisionEntries ?? [];
+            const existingIds = resolveEntryIdsForPartialItem(currentEntries, item, { flowKey });
+            if (existingIds.length >= QC_HARDWARE_PROCESS_OPTIONS.length) {
+              navigateToEntry(currentEntries, existingIds[0]);
+              return;
+            }
+
+            const seedPayload = await resolveSeedPayloadForUnit();
+            if (requestId !== partialNavLoadRequestIdRef.current) return;
+
+            const additions: Array<{
+              entry: QcDivisionEntry;
+              values: SchemaFormValues;
+            }> = [];
+
+            for (const process of QC_HARDWARE_PROCESS_OPTIONS) {
+              const dedupKey = buildDivisionEntryDedupKey({
+                flowKey,
+                kind: "HARDWARE_PROCESS",
+                motorId: item.motorId,
+                subType: process.value,
+              });
+              if (
+                getAddedDivisionEntryKeys(formDataRef.current.divisionEntries ?? []).includes(
+                  dedupKey,
+                )
+              ) {
+                continue;
+              }
+
+              let values = createInitialHardwareProcessValues(process.value);
+              if (shouldUseQcFormDetailsData(item.status)) {
+                const expectedSectionId = getHardwareSectionIdForSubType(process.value);
+                const seedRoot =
+                  seedPayload && typeof seedPayload === "object"
+                    ? (seedPayload as Record<string, unknown>)
+                    : null;
+                const allSections = expandDivisionDetailSections(
+                  seedRoot && typeof seedRoot === "object"
+                    ? (seedRoot as Record<string, unknown>)
+                    : null,
+                );
+                const processSections = allSections.filter((section) => {
+                  const sectionMotorId = String((section as { motorId?: string }).motorId ?? "").trim();
+                  if (sectionMotorId && sectionMotorId !== item.motorId) return false;
+                  const sid = String(section.sectionId ?? "").trim();
+                  if (
+                    process.value === "ABRADING" &&
+                    sid === QC_HARDWARE_ATTACHMENTS_SECTION_ID
+                  ) {
+                    return true;
+                  }
+                  if (expectedSectionId && sid !== expectedSectionId) return false;
+                  const sectionSubType = String((section as { subType?: string }).subType ?? "")
+                    .trim()
+                    .toUpperCase();
+                  return !sectionSubType || sectionSubType === process.value;
+                });
+                if (processSections.length) {
+                  values = hydrateHardwareProcessValuesFromSections(
+                    processSections,
+                    process.value,
+                  );
+                  if (process.value === "ABRADING") {
+                    values = mergeHardwareUploadValuesIntoEntryValues(
+                      values,
+                      hydrateHardwareUploadValuesFromSections(processSections),
+                    );
+                  }
+                }
+              } else {
+                values = applyHardwareDivisionDetailsSeed(
+                  values,
+                  seedPayload,
+                  item.motorId,
+                  process.value,
+                  { onlyIfEmpty: false },
+                );
+              }
+
+              additions.push({
+                entry: buildEntryFromSelection(
+                  "HARDWARE_PROCESS",
+                  { division: "HARDWARE", subType: process.value },
+                  undefined,
+                  item.motorId,
+                  undefined,
+                  { flowKey },
+                ),
+                values,
+              });
+            }
+
+            if (!additions.length) {
+              const ids = resolveEntryIdsForPartialItem(
+                formDataRef.current.divisionEntries ?? [],
+                item,
+                { flowKey },
+              );
+              if (ids[0]) navigateToEntry(formDataRef.current.divisionEntries ?? [], ids[0]);
+              return;
+            }
+
+            const nextEntries = [
+              ...(formDataRef.current.divisionEntries ?? []),
+              ...additions.map((row) => row.entry),
+            ];
+            updateFormData((prev) => {
+              let next = prev;
+              additions.forEach(({ entry, values }) => {
+                next = appendDivisionEntryToForm(next, entry, { schemaValues: values }, []);
+              });
+              if (shouldUseQcFormDetailsData(item.status)) {
+                const seedRoot =
+                  seedPayload && typeof seedPayload === "object"
+                    ? (seedPayload as Record<string, unknown>)
+                    : null;
+                next = {
+                  ...next,
+                  divisionEntryValues: applyHardwareSharedUploadsToEntryValues(
+                    next.divisionEntries ?? [],
+                    next.divisionEntryValues ?? {},
+                    seedRoot ? expandDivisionDetailSections(seedRoot) : null,
+                  ),
+                };
+              }
+              return next;
+            });
+            navigateToEntry(nextEntries, additions[0].entry.entryId);
+            return;
+          }
 
           const motorLoaders: Record<
             string,
@@ -1890,7 +2146,7 @@ export const useQCDivisionHook = () => {
 
           const loader = motorLoaders[flowKey];
           if (!loader) {
-            // Motor seeded; remaining fields (curing type, hardware processes, etc.) still use FlowBar + Load form.
+            // Motor seeded; remaining fields (curing type, etc.) still use FlowBar + Load form.
             return;
           }
 
@@ -1900,6 +2156,40 @@ export const useQCDivisionHook = () => {
             motorId: item.motorId,
           });
           if (getAddedDivisionEntryKeys(formDataRef.current.divisionEntries ?? []).includes(dedupKey)) {
+            return;
+          }
+
+          if (loader.division === "CASTING") {
+            let initialValues = createInitialCastingValues();
+            if (shouldUseQcFormDetailsData(item.status)) {
+              const seedPayload = await resolveSeedPayloadForUnit();
+              if (requestId !== partialNavLoadRequestIdRef.current) return;
+              const seedRoot =
+                seedPayload && typeof seedPayload === "object"
+                  ? (seedPayload as Record<string, unknown>)
+                  : null;
+              const sections = expandDivisionDetailSections(seedRoot);
+              const motorSections = sections.filter(
+                (section) => String((section as { motorId?: string }).motorId ?? "").trim() === item.motorId,
+              );
+              if (motorSections.length) {
+                initialValues = hydrateCastingValuesFromSections(motorSections);
+              }
+            }
+
+            const entry = buildEntryFromSelection(
+              loader.kind,
+              { division: loader.division, subType: loader.subType },
+              undefined,
+              item.motorId,
+              undefined,
+              { flowKey },
+            );
+            const nextEntries = [...(formDataRef.current.divisionEntries ?? []), entry];
+            updateFormData((prev) =>
+              appendDivisionEntryToForm(prev, entry, { schemaValues: initialValues }, []),
+            );
+            navigateToEntry(nextEntries, entry.entryId);
             return;
           }
 
@@ -1915,11 +2205,9 @@ export const useQCDivisionHook = () => {
               seedPayload && typeof seedPayload === "object"
                 ? (seedPayload as Record<string, unknown>)
                 : null;
-            const sections = Array.isArray(seedRoot?.sections)
-              ? (seedRoot!.sections as SchemaSectionSubmission[])
-              : [];
+            const sections = expandDivisionDetailSections(seedRoot);
             const motorSections = sections.filter(
-              (section) => String((section as any)?.motorId ?? "").trim() === item.motorId,
+              (section) => String((section as { motorId?: string }).motorId ?? "").trim() === item.motorId,
             );
             if (motorSections.length) {
               initialValues = hydrateQcValuesFromSections(result.schema, motorSections);
@@ -1952,16 +2240,23 @@ export const useQCDivisionHook = () => {
 
           if (flowKey === "MIXING") {
             setSelectedMixingStage("PREMIX");
-            let initialValues = buildSeededPremixDetailsValues(item.premixNo);
+            // TO_BE_INITIATED → division-details; IN_PROGRESS+ → qc-division/details.
+            const seedPayload = isQcStatusAwaitingInitiation(item.status)
+              ? await resolveSeedPayloadForUnit()
+              : divisionAutoPopulateDataRef.current;
+            if (requestId !== partialNavLoadRequestIdRef.current) return;
+            let initialValues = buildSeededPremixDetailsValues(item.premixNo, seedPayload);
             if (shouldUseQcFormDetailsData(item.status)) {
               const formDetails = await ensureQcFormDetailsPayload({ forceRefresh: true });
               if (requestId !== partialNavLoadRequestIdRef.current) return;
-              const matchingDetail = findQcFormDivisionDetail(formDetails, {
-                flowKey,
-                rawMaterialType: selectedRawMaterialType,
-              });
               const formData =
-                toDivisionAutoPopulateRecord(matchingDetail) ??
+                resolveMixingQcFormData(formDetails) ??
+                toDivisionAutoPopulateRecord(
+                  findQcFormDivisionDetail(formDetails, {
+                    flowKey,
+                    rawMaterialType: selectedRawMaterialType,
+                  }),
+                ) ??
                 toDivisionAutoPopulateRecord(formDetails);
               const domainEntry = formData
                 ? findMixingPremixDomainEntry(formData, item.premixNo)
@@ -1972,18 +2267,18 @@ export const useQCDivisionHook = () => {
                   {
                     variant: "premix",
                     premixNo: item.premixNo,
-                    autoPopulatePayload: divisionAutoPopulateDataRef.current,
+                    autoPopulatePayload: seedPayload,
                     batchPayload: activeBatchRef.current,
                     qualityCheckDefinitions: mixingQualityChecksByStageRef.current.PREMIX,
                   },
                   { onlyIfEmpty: true },
                 );
               } else {
-                const seedPayload = formData ?? (await resolveSeedPayloadForUnit());
+                const fallbackPayload = formData ?? seedPayload ?? (await resolveSeedPayloadForUnit());
                 if (requestId !== partialNavLoadRequestIdRef.current) return;
                 const seedRoot =
-                  seedPayload && typeof seedPayload === "object"
-                    ? (seedPayload as Record<string, unknown>)
+                  fallbackPayload && typeof fallbackPayload === "object"
+                    ? (fallbackPayload as Record<string, unknown>)
                     : null;
                 const sections = Array.isArray(seedRoot?.sections)
                   ? (seedRoot!.sections as SchemaSectionSubmission[])
@@ -1997,7 +2292,7 @@ export const useQCDivisionHook = () => {
                     {
                       variant: "premix",
                       premixNo: item.premixNo,
-                      autoPopulatePayload: divisionAutoPopulateDataRef.current,
+                      autoPopulatePayload: seedPayload,
                       batchPayload: activeBatchRef.current,
                       qualityCheckDefinitions: mixingQualityChecksByStageRef.current.PREMIX,
                     },
@@ -2097,15 +2392,23 @@ export const useQCDivisionHook = () => {
 
           let initialValues = createInitialViscosityValues();
           let sharedFinalMixDetails: SchemaFormValues | undefined;
+          // TO_BE_INITIATED → division-details; IN_PROGRESS+ → qc-division/details.
+          const seedPayload = isQcStatusAwaitingInitiation(item.status)
+            ? await resolveSeedPayloadForUnit()
+            : divisionAutoPopulateDataRef.current;
+          if (requestId !== partialNavLoadRequestIdRef.current) return;
+
           if (shouldUseQcFormDetailsData(item.status)) {
             const formDetails = await ensureQcFormDetailsPayload({ forceRefresh: true });
             if (requestId !== partialNavLoadRequestIdRef.current) return;
-            const matchingDetail = findQcFormDivisionDetail(formDetails, {
-              flowKey,
-              rawMaterialType: selectedRawMaterialType,
-            });
             const formData =
-              toDivisionAutoPopulateRecord(matchingDetail) ??
+              resolveMixingQcFormData(formDetails) ??
+              toDivisionAutoPopulateRecord(
+                findQcFormDivisionDetail(formDetails, {
+                  flowKey,
+                  rawMaterialType: selectedRawMaterialType,
+                }),
+              ) ??
               toDivisionAutoPopulateRecord(formDetails);
             const hydrated = formData ? hydrateMixingDivisionFromFormData(formData) : null;
             const domainEntry = formData ? findMixingPremixDomainEntry(formData, mixNo) : null;
@@ -2122,19 +2425,19 @@ export const useQCDivisionHook = () => {
               const fromHydrated = hydrated?.finalMixEntries.find((row) => row.premixNo === mixNo);
               if (fromHydrated) initialValues = fromHydrated.values;
             }
-            if (hydrated?.finalMixDetailsValues) {
-              sharedFinalMixDetails = hydrated.finalMixDetailsValues;
-            } else if (finalMixDetails) {
+            if (finalMixDetails) {
               sharedFinalMixDetails = hydrateMixingDetailsValuesFromDomain(
                 finalMixDetails,
                 "finalMix",
               );
+            } else if (hydrated?.finalMixDetailsValues) {
+              sharedFinalMixDetails = hydrated.finalMixDetailsValues;
             } else {
-              const seedPayload = formData ?? (await resolveSeedPayloadForUnit());
+              const fallbackPayload = formData ?? seedPayload ?? (await resolveSeedPayloadForUnit());
               if (requestId !== partialNavLoadRequestIdRef.current) return;
               const seedRoot =
-                seedPayload && typeof seedPayload === "object"
-                  ? (seedPayload as Record<string, unknown>)
+                fallbackPayload && typeof fallbackPayload === "object"
+                  ? (fallbackPayload as Record<string, unknown>)
                   : null;
               const sections = Array.isArray(seedRoot?.sections)
                 ? (seedRoot!.sections as SchemaSectionSubmission[])
@@ -2148,6 +2451,9 @@ export const useQCDivisionHook = () => {
                 initialValues = hydrateViscosityValuesFromSections(visSections);
               }
             }
+          } else {
+            // TO_BE_INITIATED → always seed this mixNo from manufacturing division-details.
+            sharedFinalMixDetails = buildSeededFinalMixDetailsValues(mixNo, seedPayload);
           }
 
           const entry = buildEntryFromSelection(
@@ -2158,18 +2464,23 @@ export const useQCDivisionHook = () => {
             undefined,
             { flowKey, mixingStage: "FINAL_MIX" },
           );
-          const isFirstFinalMix =
-            getMixingFinalMixEntries(formDataRef.current.divisionEntries).length === 0;
           const nextEntries = [...(formDataRef.current.divisionEntries ?? []), entry];
           updateFormData((prev) => {
-            const next = appendDivisionEntryToForm(prev, entry, { schemaValues: initialValues }, []);
-            if (!isFirstFinalMix && !sharedFinalMixDetails) return next;
+            const entrySchemaValues = mergeFinalMixEntrySchemaValues(
+              sharedFinalMixDetails,
+              initialValues,
+            );
+            const next = appendDivisionEntryToForm(
+              prev,
+              entry,
+              { schemaValues: entrySchemaValues },
+              [],
+            );
             return {
               ...next,
               mixingFinalMixDetailsValues:
                 sharedFinalMixDetails ??
-                prev.mixingFinalMixDetailsValues ??
-                buildSeededFinalMixDetailsValues(mixNo),
+                pickFinalMixDetailsSchemaValues(entrySchemaValues, prev.mixingFinalMixDetailsValues),
             };
           });
           navigateToEntry(nextEntries, entry.entryId);
@@ -2198,10 +2509,50 @@ export const useQCDivisionHook = () => {
     ],
   );
 
+  const isPartialNavTabEnabled = useCallback(
+    (index: number) => {
+      const item = partialNavItems[index];
+      if (!item) return false;
+      return isQcPartialItemEnabledByDivisionDetails(item);
+    },
+    [partialNavItems],
+  );
+
+  const getPartialNavTabDisabledReason = useCallback(
+    (index: number) => {
+      const item = partialNavItems[index];
+      if (!item) return undefined;
+
+      const resolvedDivisionLabel =
+        divisionNavTabs.find((tab) => tab.tabKey === activeDivisionTabKey)?.label ||
+        divisionOptions.find((option) => option.value === selectedDivision)?.label ||
+        selectedDivision ||
+        "division details";
+
+      return getQcPartialNavDivisionDetailsDisabledReason(item, {
+        motor: messages.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
+        premix: messages.PREVIOUS_STAGE_PREMIX_TAB_DISABLED,
+        premixDivisionLabel: resolvedDivisionLabel,
+      });
+    },
+    [
+      activeDivisionTabKey,
+      divisionNavTabs,
+      divisionOptions,
+      messages.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
+      messages.PREVIOUS_STAGE_PREMIX_TAB_DISABLED,
+      partialNavItems,
+      selectedDivision,
+    ],
+  );
+
   const handlePartialNavIndexChange = useCallback(
     (index: number) => {
-      setActivePartialNavIndex(index);
       const item = partialNavItems[index];
+      if (item && !isQcPartialItemEnabledByDivisionDetails(item)) {
+        return;
+      }
+      setActivePartialNavIndex(index);
       if (item) {
         const { groupIndex, subIndex } = resolveFormNavForPartialItem(
           formDataRef.current.divisionEntries,
@@ -2221,8 +2572,16 @@ export const useQCDivisionHook = () => {
     const seedKey = partialNavItems.map((item) => item.id).join("|");
     if (!seedKey || seedKey === partialNavSeedKeyRef.current) return;
     partialNavSeedKeyRef.current = seedKey;
-    setActivePartialNavIndex(0);
-    const firstItem = partialNavItems[0];
+
+    const isTabEnabled = (index: number) => {
+      const item = partialNavItems[index];
+      if (!item) return false;
+      return isQcPartialItemEnabledByDivisionDetails(item);
+    };
+
+    const firstEnabledIndex = findFirstEnabledPartialNavIndex(partialNavItems, isTabEnabled);
+    setActivePartialNavIndex(firstEnabledIndex);
+    const firstItem = partialNavItems[firstEnabledIndex];
     if (firstItem) {
       const { groupIndex, subIndex } = resolveFormNavForPartialItem(
         formDataRef.current.divisionEntries,
@@ -2232,7 +2591,9 @@ export const useQCDivisionHook = () => {
       setActiveDivisionGroupIndex(groupIndex);
       setActiveDivisionSubIndex(subIndex);
     }
-    void loadFormForPartialItem(firstItem);
+    if (firstItem && isTabEnabled(firstEnabledIndex)) {
+      void loadFormForPartialItem(firstItem);
+    }
   }, [loadFormForPartialItem, partialNavItems, selectedDivision]);
 
   const handleDivisionEntryValuesChange = useCallback((entryId: string, values: SchemaFormValues) => {
@@ -2504,7 +2865,11 @@ export const useQCDivisionHook = () => {
               continue;
             }
 
-            const sections: SchemaSectionSubmission[] = detail.data?.sections ?? [];
+            const sections: SchemaSectionSubmission[] = expandDivisionDetailSections(
+              detailData && typeof detailData === "object"
+                ? (detailData as Record<string, unknown>)
+                : null,
+            );
 
             const makeEntry = (
               entryKind: QcDivisionEntry["kind"],
@@ -2592,13 +2957,22 @@ export const useQCDivisionHook = () => {
                 list.push(section);
                 sectionsByPremix.set(groupKey, list);
               } else if ((section as { motorId?: string }).motorId) {
-                const sectionSubType = (section.subType ?? detailSubType) as QcApiSubType;
+                let sectionSubType = (section.subType ?? detailSubType) as QcApiSubType;
+                // Shared hardware uploads belong on the Abrading (anchor) entry.
+                if (
+                  division === "HARDWARE" &&
+                  String(section.sectionId ?? "").trim() === QC_HARDWARE_ATTACHMENTS_SECTION_ID
+                ) {
+                  sectionSubType = "ABRADING";
+                }
                 const sectionInhibitorType = resolveQcSectionInhibitorType(
                   division,
                   sectionSubType,
                   (section as { inhibitorType?: string }).inhibitorType,
                 );
-                enqueueSchema(division, sectionSubType, sectionInhibitorType);
+                if (division !== "HARDWARE") {
+                  enqueueSchema(division, sectionSubType, sectionInhibitorType);
+                }
                 const motorId = String((section as { motorId?: string }).motorId);
                 const groupKey = buildMotorDivisionGroupKey(motorId, sectionSubType, {
                   division,
@@ -2731,6 +3105,97 @@ export const useQCDivisionHook = () => {
               continue;
             }
 
+            if (entry.kind === "HARDWARE_PROCESS") {
+              const subType = String(entry.subType ?? "");
+              const sectionsToHydrate =
+                entry.savedSections ??
+                (resolvedData.savedSections ?? []).filter((s) => {
+                  const expectedSectionId = getHardwareSectionIdForSubType(subType);
+                  if (expectedSectionId && s.sectionId !== expectedSectionId) return false;
+                  if (entry.motorId != null) {
+                    const sectionMotorId = String((s as { motorId?: string }).motorId ?? "").trim();
+                    if (sectionMotorId && sectionMotorId !== entry.motorId) return false;
+                  }
+                  const sectionSubType = String((s as { subType?: string }).subType ?? "")
+                    .trim()
+                    .toUpperCase();
+                  return !sectionSubType || sectionSubType === subType.toUpperCase();
+                });
+              if (sectionsToHydrate.length > 0 && isQcHardwareProcessSubType(subType)) {
+                let schemaValues = hydrateHardwareProcessValuesFromSections(
+                  sectionsToHydrate,
+                  subType,
+                );
+                // Abrading is the upload anchor — merge HARDWARE_ATTACHMENTS / per-section uploads.
+                if (subType === "ABRADING") {
+                  const motorSections =
+                    entry.savedSections ??
+                    (resolvedData.savedSections ?? []).filter((s) => {
+                      const sectionMotorId = String((s as { motorId?: string }).motorId ?? "").trim();
+                      return !sectionMotorId || sectionMotorId === entry.motorId;
+                    });
+                  const uploads = hydrateHardwareUploadValuesFromSections([
+                    ...sectionsToHydrate,
+                    ...motorSections,
+                  ]);
+                  schemaValues = mergeHardwareUploadValuesIntoEntryValues(schemaValues, uploads);
+                }
+                entryValues[entry.entryId] = { schemaValues };
+              } else if (
+                isQcHardwareProcessSubType(subType) &&
+                (!entryValues[entry.entryId]?.schemaValues ||
+                  Object.keys(entryValues[entry.entryId].schemaValues).length === 0)
+              ) {
+                const motorStatus =
+                  entry.motorId != null
+                    ? resolveMotorQcStatusFromFormDetails(fetchedDetailsPayload, entry.motorId)
+                    : null;
+                // Only TO_BE_INITIATED motors seed from manufacturing /division-details.
+                const manufacturingPayload =
+                  motorStatus != null && isQcStatusAwaitingInitiation(motorStatus)
+                    ? resolveManufacturingDivisionDetailsPayload(divisionAutoPopulateDataRef.current)
+                    : null;
+                entryValues[entry.entryId] = {
+                  schemaValues:
+                    manufacturingPayload && entry.motorId
+                      ? applyHardwareDivisionDetailsSeed(
+                          createInitialHardwareProcessValues(subType),
+                          manufacturingPayload,
+                          entry.motorId,
+                          subType,
+                          { onlyIfEmpty: false },
+                        )
+                      : createInitialHardwareProcessValues(subType),
+                };
+              }
+              continue;
+            }
+
+            if (entry.kind === "CASTING_MOTOR") {
+              const sectionsToHydrate =
+                entry.savedSections ??
+                (resolvedData.savedSections ?? []).filter((s) => {
+                  if (entry.motorId != null) {
+                    const sectionMotorId = String((s as { motorId?: string }).motorId ?? "").trim();
+                    if (sectionMotorId && sectionMotorId !== entry.motorId) return false;
+                  }
+                  return true;
+                });
+              if (sectionsToHydrate.length > 0) {
+                entryValues[entry.entryId] = {
+                  schemaValues: hydrateCastingValuesFromSections(sectionsToHydrate),
+                };
+              } else if (
+                !entryValues[entry.entryId]?.schemaValues ||
+                Object.keys(entryValues[entry.entryId].schemaValues).length === 0
+              ) {
+                entryValues[entry.entryId] = {
+                  schemaValues: createInitialCastingValues(),
+                };
+              }
+              continue;
+            }
+
             const cacheKey = getQcSchemaCacheKey(entry.apiDivision, entry.subType, entry.inhibitorType);
             const schema = schemasByKey[cacheKey];
             if (!schema) continue;
@@ -2739,10 +3204,6 @@ export const useQCDivisionHook = () => {
               entry.savedSections ??
               (resolvedData.savedSections ?? []).filter((s) => {
                 if (entry.kind === "REVALIDATION" && s.sectionId !== "RAW_MATERIAL_DETAILS") return false;
-                if (entry.kind === "HARDWARE_PROCESS" && entry.subType) {
-                  const expectedSectionId = getHardwareSectionIdForSubType(String(entry.subType));
-                  if (expectedSectionId && s.sectionId !== expectedSectionId) return false;
-                }
                 if (entry.premixNo != null) {
                   if (s.premixNo !== entry.premixNo) return false;
                   if (entry.subType && (s as any).subType && (s as any).subType !== entry.subType) return false;
@@ -2778,10 +3239,16 @@ export const useQCDivisionHook = () => {
               ? hydrateMixingDetailsValuesFromSections(mixingFinalMixDetailSections, "finalMix")
               : undefined);
 
+          const entryValuesWithHardwareUploads = applyHardwareSharedUploadsToEntryValues(
+            entries,
+            entryValues,
+            resolvedData.savedSections,
+          );
+
           resolvedData = {
             ...resolvedData,
             divisionEntries: entries,
-            divisionEntryValues: entryValues,
+            divisionEntryValues: entryValuesWithHardwareUploads,
             schemasByKey,
             ...(mixingFinalMixDetailsValues && { mixingFinalMixDetailsValues }),
           };
@@ -3141,12 +3608,14 @@ export const useQCDivisionHook = () => {
         activePartialItem &&
         (activePartialItem.kind === "PREMIX" || activePartialItem.kind === "FINAL_MIX")
       ) {
-        const matchingDetail = findQcFormDivisionDetail(refreshedDetails, {
-          flowKey: "MIXING",
-          rawMaterialType: selectedRawMaterialType,
-        });
         const detailRecord =
-          toDivisionAutoPopulateRecord(matchingDetail) ??
+          resolveMixingQcFormData(refreshedDetails) ??
+          toDivisionAutoPopulateRecord(
+            findQcFormDivisionDetail(refreshedDetails, {
+              flowKey: "MIXING",
+              rawMaterialType: selectedRawMaterialType,
+            }),
+          ) ??
           toDivisionAutoPopulateRecord(refreshedDetails);
         const mixNo =
           activePartialItem.kind === "FINAL_MIX"
@@ -3180,33 +3649,68 @@ export const useQCDivisionHook = () => {
                 !Array.isArray(domainEntry.finalMixDetails)
                   ? (domainEntry.finalMixDetails as Record<string, unknown>)
                   : null;
-              let schemaValues: SchemaFormValues | undefined;
+              let viscosityValues: SchemaFormValues | undefined;
               if (finalMixDetails?.viscosityBuildUp) {
-                schemaValues = hydrateViscosityValuesFromDomain(
+                viscosityValues = hydrateViscosityValuesFromDomain(
                   finalMixDetails.viscosityBuildUp,
                 );
               } else {
                 const fromHydrated = hydrated?.finalMixEntries.find(
                   (row) => row.premixNo === mixNo,
                 );
-                if (fromHydrated) schemaValues = fromHydrated.values;
+                if (fromHydrated) viscosityValues = fromHydrated.values;
               }
-              if (schemaValues) {
+              const detailsValues = finalMixDetails
+                ? hydrateMixingDetailsValuesFromDomain(finalMixDetails, "finalMix")
+                : hydrated?.finalMixDetailsValues;
+              if (viscosityValues || detailsValues) {
                 entryValues[entryId] = {
                   ...entryValues[entryId],
-                  schemaValues,
+                  schemaValues: mergeFinalMixEntrySchemaValues(
+                    detailsValues,
+                    viscosityValues ?? entryValues[entryId]?.schemaValues,
+                  ),
                 };
               }
-              if (hydrated?.finalMixDetailsValues) {
+              if (detailsValues) {
                 next = {
                   ...next,
-                  mixingFinalMixDetailsValues: hydrated.finalMixDetailsValues,
+                  mixingFinalMixDetailsValues: detailsValues,
                 };
               }
             }
             return { ...next, divisionEntryValues: entryValues };
           });
         }
+      }
+
+      // Hardware: restore shared upload fields from saved /qc-division/details after create/update.
+      if (
+        refreshedDetails &&
+        activeFlowKey === "HARDWARE" &&
+        activePartialItem?.kind === "MOTOR" &&
+        activePartialItem.motorId
+      ) {
+        const detailRecord =
+          toDivisionAutoPopulateRecord(
+            findQcFormDivisionDetail(refreshedDetails, {
+              flowKey: "HARDWARE",
+              rawMaterialType: selectedRawMaterialType,
+            }),
+          ) ?? toDivisionAutoPopulateRecord(refreshedDetails);
+        const sections = expandDivisionDetailSections(
+          detailRecord && typeof detailRecord === "object"
+            ? (detailRecord as Record<string, unknown>)
+            : null,
+        );
+        updateFormData((prev) => ({
+          ...prev,
+          divisionEntryValues: applyHardwareSharedUploadsToEntryValues(
+            prev.divisionEntries ?? [],
+            prev.divisionEntryValues ?? {},
+            sections,
+          ),
+        }));
       }
 
       if (activePartialItem) {
@@ -3576,7 +4080,12 @@ export const useQCDivisionHook = () => {
     activePartialItem && isQcUnitLocked(activePartialItem.status),
   );
 
-  const isFormFieldsReadOnly = readOnly || isActiveDivisionReadOnly || isActivePartialReadOnly;
+  // Mixing / RMP / motor flows approve per unit. Division status may be WAITING when only
+  // one unit is submitted — do not lock sibling units that are still editable.
+  const isFormFieldsReadOnly =
+    readOnly ||
+    isActivePartialReadOnly ||
+    (!partialNavActive && isActiveDivisionReadOnly);
 
   const formLockMessage = useMemo(() => {
     if (readOnly) return null;
@@ -3585,7 +4094,7 @@ export const useQCDivisionHook = () => {
         ? messages.UNIT_LOCKED_APPROVED
         : messages.UNIT_LOCKED_WAITING;
     }
-    if (isActiveDivisionReadOnly) {
+    if (!partialNavActive && isActiveDivisionReadOnly) {
       return activeDivisionStatus === "APPROVED"
         ? messages.DIVISION_LOCKED_APPROVED
         : messages.DIVISION_LOCKED_WAITING;
@@ -3600,12 +4109,9 @@ export const useQCDivisionHook = () => {
     messages.DIVISION_LOCKED_WAITING,
     messages.UNIT_LOCKED_APPROVED,
     messages.UNIT_LOCKED_WAITING,
+    partialNavActive,
     readOnly,
   ]);
-
-  const isPartialNavTabEnabled = useCallback((_index: number) => true, []);
-
-  const getPartialNavTabDisabledReason = useCallback((_index: number) => undefined, []);
 
   const divisionLabel =
     divisionNavTabs.find((tab) => tab.tabKey === activeDivisionTabKey)?.label ||

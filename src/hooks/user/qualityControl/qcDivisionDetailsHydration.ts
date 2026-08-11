@@ -1,6 +1,7 @@
 import { QCDivisionDetailsModel } from "../../../data/models/user/QCDivisionApiModel";
 import {
   createDefaultQualityControlFormState,
+  expandDivisionDetailSections,
   mapQCDivisionDetailsForDisplay,
   type QCDivisionDetailView,
   type QualityControlFormState,
@@ -21,7 +22,21 @@ import {
   parseMotorDivisionGroupKey,
 } from "./qcDivisionEntries";
 import type { QcDivisionEntry, QcDivisionEntryValues } from "./qcDivisionEntryTypes";
-import { getHardwareSectionIdForSubType } from "./qcHardwareConfig";
+import { getHardwareSectionIdForSubType, QC_HARDWARE_ATTACHMENTS_SECTION_ID } from "./qcHardwareConfig";
+import {
+  applyHardwareSharedUploadsToEntryValues,
+} from "./qcHardwareDivisionDetails";
+import {
+  createInitialHardwareProcessValues,
+  hydrateHardwareProcessValuesFromSections,
+  hydrateHardwareUploadValuesFromSections,
+  isQcHardwareProcessSubType,
+  mergeHardwareUploadValuesIntoEntryValues,
+} from "./qcHardwareTables";
+import {
+  createInitialCastingValues,
+  hydrateCastingValuesFromSections,
+} from "./qcCastingTables";
 import { resolveQcSectionInhibitorType } from "./qcPostCureConfig";
 import {
   groupMixingDetailSections,
@@ -34,6 +49,7 @@ import {
   hydrateMixingDetailsValuesFromSections,
   hydrateMixingDivisionFromFormData,
   hydrateViscosityValuesFromSections,
+  resolveMixingQcFormData,
 } from "./qcMixingTables";
 import {
   createInitialRevalidationSchemaValues,
@@ -113,6 +129,7 @@ export async function hydrateQcDivisionFormFromDetails(
   >();
   const mixingFinalMixDetailSections: SchemaSectionSubmission[] = [];
   let domainMixingFinalMixDetailsValues: SchemaFormValues | undefined;
+  let mixingDomainHydrated = false;
 
   const enqueueSchema = (
     division: QcApiDivision,
@@ -192,8 +209,9 @@ export async function hydrateQcDivisionFormFromDetails(
       continue;
     }
 
-    const sections: SchemaSectionSubmission[] =
-      detail.data?.sections ?? (detail as { sections?: SchemaSectionSubmission[] }).sections ?? [];
+    const sections: SchemaSectionSubmission[] = expandDivisionDetailSections(
+      detailData && typeof detailData === "object" ? (detailData as Record<string, unknown>) : null,
+    );
 
     const makeEntry = (
       entryKind: QcDivisionEntry["kind"],
@@ -247,19 +265,32 @@ export async function hydrateQcDivisionFormFromDetails(
     }
 
     if (division === "MIXING") {
-      const hydratedMixing = hydrateMixingDivisionFromFormData(detailData);
-      if (hydratedMixing) {
-        hydratedMixing.premixEntries.forEach(({ premixNo, values }) => {
-          const { entryId } = makeEntry("MIXING_PREMIX", "PREMIX", [], premixNo);
-          entryValues[entryId] = { schemaValues: values };
-        });
-        hydratedMixing.finalMixEntries.forEach(({ premixNo, values }) => {
-          const { entryId } = makeEntry("MIXING_FINAL_MIX", "FINAL_MIX", [], premixNo);
-          entryValues[entryId] = { schemaValues: values };
-        });
-        if (hydratedMixing.finalMixDetailsValues && !domainMixingFinalMixDetailsValues) {
-          domainMixingFinalMixDetailsValues = hydratedMixing.finalMixDetailsValues;
+      // QC details split Mixing into PREMIX + FINAL_MIX divisionDetails — hydrate once from merged data.
+      if (!mixingDomainHydrated) {
+        const mergedMixingData =
+          resolveMixingQcFormData(detailsData) ??
+          (detailData && typeof detailData === "object"
+            ? (detailData as Record<string, unknown>)
+            : null);
+        const hydratedMixing = mergedMixingData
+          ? hydrateMixingDivisionFromFormData(mergedMixingData)
+          : null;
+        if (hydratedMixing) {
+          mixingDomainHydrated = true;
+          hydratedMixing.premixEntries.forEach(({ premixNo, values }) => {
+            const { entryId } = makeEntry("MIXING_PREMIX", "PREMIX", [], premixNo);
+            entryValues[entryId] = { schemaValues: values };
+          });
+          hydratedMixing.finalMixEntries.forEach(({ premixNo, values }) => {
+            const { entryId } = makeEntry("MIXING_FINAL_MIX", "FINAL_MIX", [], premixNo);
+            entryValues[entryId] = { schemaValues: values };
+          });
+          if (hydratedMixing.finalMixDetailsValues && !domainMixingFinalMixDetailsValues) {
+            domainMixingFinalMixDetailsValues = hydratedMixing.finalMixDetailsValues;
+          }
+          continue;
         }
+      } else {
         continue;
       }
 
@@ -298,7 +329,13 @@ export async function hydrateQcDivisionFormFromDetails(
         list.push(section);
         sectionsByPremix.set(groupKey, list);
       } else if ((section as { motorId?: string }).motorId) {
-        const sectionSubType = (section.subType ?? detailSubType) as QcApiSubType;
+        let sectionSubType = (section.subType ?? detailSubType) as QcApiSubType;
+        if (
+          division === "HARDWARE" &&
+          String(section.sectionId ?? "").trim() === QC_HARDWARE_ATTACHMENTS_SECTION_ID
+        ) {
+          sectionSubType = "ABRADING";
+        }
         const sectionInhibitorType = resolveQcSectionInhibitorType(
           division,
           sectionSubType,
@@ -447,6 +484,83 @@ export async function hydrateQcDivisionFormFromDetails(
       continue;
     }
 
+    if (entry.kind === "HARDWARE_PROCESS") {
+      const subType = String(entry.subType ?? "");
+      const sectionsToHydrate =
+        entry.savedSections ??
+        (resolvedData.savedSections ?? []).filter((s) => {
+          const expectedSectionId = getHardwareSectionIdForSubType(subType);
+          if (expectedSectionId && s.sectionId !== expectedSectionId) {
+            if (
+              subType === "ABRADING" &&
+              String(s.sectionId ?? "").trim() === QC_HARDWARE_ATTACHMENTS_SECTION_ID
+            ) {
+              return true;
+            }
+            return false;
+          }
+          if (entry.motorId != null) {
+            const sectionMotorId = String((s as { motorId?: string }).motorId ?? "").trim();
+            if (sectionMotorId && sectionMotorId !== entry.motorId) return false;
+          }
+          const sectionSubType = String((s as { subType?: string }).subType ?? "")
+            .trim()
+            .toUpperCase();
+          return !sectionSubType || sectionSubType === subType.toUpperCase();
+        });
+
+      if (sectionsToHydrate.length > 0 && isQcHardwareProcessSubType(subType)) {
+        let schemaValues = hydrateHardwareProcessValuesFromSections(sectionsToHydrate, subType);
+        if (subType === "ABRADING") {
+          const motorSections =
+            entry.savedSections ??
+            (resolvedData.savedSections ?? []).filter((s) => {
+              const sectionMotorId = String((s as { motorId?: string }).motorId ?? "").trim();
+              return !sectionMotorId || sectionMotorId === entry.motorId;
+            });
+          schemaValues = mergeHardwareUploadValuesIntoEntryValues(
+            schemaValues,
+            hydrateHardwareUploadValuesFromSections([...sectionsToHydrate, ...motorSections]),
+          );
+        }
+        entryValues[entry.entryId] = { schemaValues };
+      } else if (
+        isQcHardwareProcessSubType(subType) &&
+        (!entryValues[entry.entryId]?.schemaValues ||
+          Object.keys(entryValues[entry.entryId].schemaValues).length === 0)
+      ) {
+        entryValues[entry.entryId] = {
+          schemaValues: createInitialHardwareProcessValues(subType),
+        };
+      }
+      continue;
+    }
+
+    if (entry.kind === "CASTING_MOTOR") {
+      const sectionsToHydrate =
+        entry.savedSections ??
+        (resolvedData.savedSections ?? []).filter((s) => {
+          if (entry.motorId != null) {
+            const sectionMotorId = String((s as { motorId?: string }).motorId ?? "").trim();
+            if (sectionMotorId && sectionMotorId !== entry.motorId) return false;
+          }
+          return true;
+        });
+      if (sectionsToHydrate.length > 0) {
+        entryValues[entry.entryId] = {
+          schemaValues: hydrateCastingValuesFromSections(sectionsToHydrate),
+        };
+      } else if (
+        !entryValues[entry.entryId]?.schemaValues ||
+        Object.keys(entryValues[entry.entryId].schemaValues).length === 0
+      ) {
+        entryValues[entry.entryId] = {
+          schemaValues: createInitialCastingValues(),
+        };
+      }
+      continue;
+    }
+
     const cacheKey = getQcSchemaCacheKey(entry.apiDivision, entry.subType, entry.inhibitorType);
     const schema = schemasByKey[cacheKey];
     if (!schema) continue;
@@ -500,10 +614,16 @@ export async function hydrateQcDivisionFormFromDetails(
       ? hydrateMixingDetailsValuesFromSections(mixingFinalMixDetailSections, "finalMix")
       : undefined);
 
+  const entryValuesWithHardwareUploads = applyHardwareSharedUploadsToEntryValues(
+    entries,
+    entryValues,
+    resolvedData.savedSections,
+  );
+
   return {
     ...resolvedData,
     divisionEntries: entries,
-    divisionEntryValues: entryValues,
+    divisionEntryValues: entryValuesWithHardwareUploads,
     schemasByKey,
     savedSections:
       mixingFinalMixDetailSections.length > 0
