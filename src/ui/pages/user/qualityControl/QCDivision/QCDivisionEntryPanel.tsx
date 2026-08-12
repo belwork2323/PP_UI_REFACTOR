@@ -14,6 +14,8 @@ import QCMixingDetailsTable from "./QCMixingDetailsTable";
 import QCMixingViscosityTable from "./QCMixingViscosityTable";
 import QCHardwareProcessPanel from "./QCHardwareProcessPanel";
 import QCCastingMotorPanel from "./QCCastingMotorPanel";
+import QCCuringMotorPanel from "./QCCuringMotorPanel";
+import QCDeCoringMotorPanel from "./QCDeCoringMotorPanel";
 import {
   applyMixingDivisionEntryToValues,
   createInitialPremixDetailsValues,
@@ -37,6 +39,16 @@ import {
   createInitialCastingValues,
   hydrateCastingValuesFromSections,
 } from "../../../../../hooks/user/qualityControl/qcCastingTables";
+import {
+  createInitialCuringValues,
+  getCuringSetupField,
+  hydrateCuringValuesFromSections,
+  setCuringSetupField,
+} from "../../../../../hooks/user/qualityControl/qcCuringTables";
+import {
+  createInitialDeCoringValues,
+  hydrateDeCoringValuesFromSections,
+} from "../../../../../hooks/user/qualityControl/qcDeCoringTables";
 import {
   createInitialRevalidationSchemaValues,
   hydrateRevalidationValuesFromSections,
@@ -100,7 +112,9 @@ const QCDivisionEntryPanel = ({
       entry.kind === "MIXING_PREMIX" ||
       entry.kind === "MIXING_FINAL_MIX" ||
       entry.kind === "HARDWARE_PROCESS" ||
-      entry.kind === "CASTING_MOTOR"
+      entry.kind === "CASTING_MOTOR" ||
+      entry.kind === "CURING_MOTOR" ||
+      entry.kind === "DE_CORING_MOTOR"
     ) {
       return null;
     }
@@ -205,7 +219,9 @@ const QCDivisionEntryPanel = ({
       entry.kind !== "MIXING_PREMIX" &&
       entry.kind !== "MIXING_FINAL_MIX" &&
       entry.kind !== "HARDWARE_PROCESS" &&
-      entry.kind !== "CASTING_MOTOR";
+      entry.kind !== "CASTING_MOTOR" &&
+      entry.kind !== "CURING_MOTOR" &&
+      entry.kind !== "DE_CORING_MOTOR";
     if (!showUnitActions && !showRemove) return null;
 
     return (
@@ -275,6 +291,22 @@ const QCDivisionEntryPanel = ({
       }
       return createInitialCastingValues();
     }
+    if (entry.kind === "CURING_MOTOR") {
+      if (entry.savedSections?.length) {
+        let hydrated = hydrateCuringValuesFromSections(entry.savedSections);
+        if (!getCuringSetupField(hydrated, "CURING_TYPE") && entry.subType) {
+          hydrated = setCuringSetupField(hydrated, "CURING_TYPE", String(entry.subType));
+        }
+        return hydrated;
+      }
+      return createInitialCuringValues(entry.subType);
+    }
+    if (entry.kind === "DE_CORING_MOTOR") {
+      if (entry.savedSections?.length) {
+        return hydrateDeCoringValuesFromSections(entry.savedSections);
+      }
+      return createInitialDeCoringValues();
+    }
     return resolvedSchema ? createQcInitialValues(resolvedSchema) : {};
   }, [entry.kind, entry.savedSections, entry.subType, entryValues.schemaValues, resolvedSchema]);
 
@@ -305,6 +337,31 @@ const QCDivisionEntryPanel = ({
   if (entry.kind === "CASTING_MOTOR") {
     return (
       <QCCastingMotorPanel
+        motorId={entry.motorId}
+        values={formValues}
+        onChange={handleValuesChange}
+        readOnly={readOnly}
+        headerActions={headerActions}
+      />
+    );
+  }
+
+  if (entry.kind === "CURING_MOTOR") {
+    return (
+      <QCCuringMotorPanel
+        motorId={entry.motorId}
+        curingSubType={entry.subType}
+        values={formValues}
+        onChange={handleValuesChange}
+        readOnly={readOnly}
+        headerActions={headerActions}
+      />
+    );
+  }
+
+  if (entry.kind === "DE_CORING_MOTOR") {
+    return (
+      <QCDeCoringMotorPanel
         motorId={entry.motorId}
         values={formValues}
         onChange={handleValuesChange}
@@ -553,8 +610,6 @@ const QCDivisionEntryPanel = ({
   }
 
   const showEntryHeader =
-    entry.kind !== "CASTING_MOTOR" &&
-    entry.kind !== "CURING_MOTOR" &&
     entry.kind !== "TRIMMING_MOTOR" &&
     entry.kind !== "DE_CORING_MOTOR" &&
     entry.kind !== "POST_CURE_MOTOR" &&

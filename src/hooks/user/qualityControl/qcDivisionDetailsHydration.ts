@@ -37,6 +37,15 @@ import {
   createInitialCastingValues,
   hydrateCastingValuesFromSections,
 } from "./qcCastingTables";
+import {
+  createInitialCuringValues,
+  hydrateCuringValuesFromSections,
+} from "./qcCuringTables";
+import { normalizeQcCuringType } from "./qcCuringConfig";
+import {
+  createInitialDeCoringValues,
+  hydrateDeCoringValuesFromSections,
+} from "./qcDeCoringTables";
 import { resolveQcSectionInhibitorType } from "./qcPostCureConfig";
 import {
   groupMixingDetailSections,
@@ -137,6 +146,7 @@ export async function hydrateQcDivisionFormFromDetails(
     inhibitorType?: QcInhibitorType,
   ) => {
     if (division === "MIXING" && subType == null) return "";
+    if (division === "CASTING" || division === "CURING" || division === "DE_CORING") return "";
     const key = getQcSchemaCacheKey(division, subType, inhibitorType);
     if (!schemaFetchQueue.has(key)) {
       schemaFetchQueue.set(key, { division, subType, inhibitorType });
@@ -556,6 +566,57 @@ export async function hydrateQcDivisionFormFromDetails(
       ) {
         entryValues[entry.entryId] = {
           schemaValues: createInitialCastingValues(),
+        };
+      }
+      continue;
+    }
+
+    if (entry.kind === "CURING_MOTOR") {
+      const sectionsToHydrate =
+        entry.savedSections ??
+        (resolvedData.savedSections ?? []).filter((s) => {
+          if (entry.motorId != null) {
+            const sectionMotorId = String((s as { motorId?: string }).motorId ?? "").trim();
+            if (sectionMotorId && sectionMotorId !== entry.motorId) return false;
+          }
+          return true;
+        });
+      if (sectionsToHydrate.length > 0) {
+        entryValues[entry.entryId] = {
+          schemaValues: hydrateCuringValuesFromSections(sectionsToHydrate),
+        };
+      } else if (
+        !entryValues[entry.entryId]?.schemaValues ||
+        Object.keys(entryValues[entry.entryId].schemaValues).length === 0
+      ) {
+        const curingSubType = normalizeQcCuringType(entry.subType) || "NORMAL";
+        entryValues[entry.entryId] = {
+          schemaValues: createInitialCuringValues(curingSubType),
+        };
+      }
+      continue;
+    }
+
+    if (entry.kind === "DE_CORING_MOTOR") {
+      const sectionsToHydrate =
+        entry.savedSections ??
+        (resolvedData.savedSections ?? []).filter((s) => {
+          if (entry.motorId != null) {
+            const sectionMotorId = String((s as { motorId?: string }).motorId ?? "").trim();
+            if (sectionMotorId && sectionMotorId !== entry.motorId) return false;
+          }
+          return true;
+        });
+      if (sectionsToHydrate.length > 0) {
+        entryValues[entry.entryId] = {
+          schemaValues: hydrateDeCoringValuesFromSections(sectionsToHydrate),
+        };
+      } else if (
+        !entryValues[entry.entryId]?.schemaValues ||
+        Object.keys(entryValues[entry.entryId].schemaValues).length === 0
+      ) {
+        entryValues[entry.entryId] = {
+          schemaValues: createInitialDeCoringValues(),
         };
       }
       continue;

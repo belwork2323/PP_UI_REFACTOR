@@ -26,7 +26,12 @@ import {
   setHardwareUploadValue,
   type QcHardwareUploadType,
 } from "../../../../../hooks/user/qualityControl/qcHardwareTables";
-import { QCDivisionReadOnlyValue } from "./components/QCDivisionReadOnlyValue";
+import {
+  QCDivisionReadOnlyValue,
+  qcReadOnlyBodyCellSx,
+  qcReadOnlyTableContainerSx,
+  qcReadOnlyTableHeaderCellSx,
+} from "./components/QCDivisionReadOnlyValue";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 const BRAND = QC_DIVISION_BRAND;
@@ -71,6 +76,8 @@ const QCHardwareAttachmentUpload = ({
   readOnly = false,
 }: QCHardwareAttachmentUploadProps) => {
   const uploads = getHardwareUploadValues(values);
+  const headerSx = readOnly ? qcReadOnlyTableHeaderCellSx : TH;
+  const bodyCellSx = readOnly ? qcReadOnlyBodyCellSx : cellSx;
 
   return (
     <Box
@@ -85,23 +92,29 @@ const QCHardwareAttachmentUpload = ({
       <Typography sx={{ fontSize: "0.78rem", fontWeight: 800, color: BRAND.primary, mb: 0.75 }}>
         {S.HARDWARE_UPLOAD_SECTION_TITLE}
       </Typography>
-      <Typography sx={{ fontSize: "0.68rem", color: BRAND.textSub, mb: 1 }}>
-        {S.HARDWARE_UPLOAD_SECTION_HINT}
-      </Typography>
+      {!readOnly ? (
+        <Typography sx={{ fontSize: "0.68rem", color: BRAND.textSub, mb: 1 }}>
+          {S.HARDWARE_UPLOAD_SECTION_HINT}
+        </Typography>
+      ) : null}
       <TableContainer
-        sx={{
-          overflow: "hidden",
-          overflowX: "auto",
-          border: `1px solid ${TABLE_BORDER}`,
-          borderRadius: 2,
-          background: "#fff",
-        }}
+        sx={
+          readOnly
+            ? qcReadOnlyTableContainerSx
+            : {
+                overflow: "hidden",
+                overflowX: "auto",
+                border: `1px solid ${TABLE_BORDER}`,
+                borderRadius: 2,
+                background: "#fff",
+              }
+        }
       >
         <Table size="small" sx={{ minWidth: 520, borderCollapse: "collapse" }}>
           <TableHead>
             <TableRow>
-              <TableCell sx={{ ...TH, width: "28%" }}>{S.HARDWARE_UPLOAD_COL_TYPE}</TableCell>
-              <TableCell sx={TH}>{S.HARDWARE_UPLOAD_COL_FILES}</TableCell>
+              <TableCell sx={{ ...headerSx, width: "28%" }}>{S.HARDWARE_UPLOAD_COL_TYPE}</TableCell>
+              <TableCell sx={headerSx}>{S.HARDWARE_UPLOAD_COL_FILES}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -112,14 +125,26 @@ const QCHardwareAttachmentUpload = ({
               return (
                 <TableRow
                   key={uploadType}
-                  sx={{ background: index % 2 === 0 ? "#fff" : alpha(BRAND.surface, 0.55) }}
+                  sx={{
+                    background: readOnly
+                      ? index % 2 === 1
+                        ? alpha(BRAND.primary, 0.03)
+                        : "#fff"
+                      : index % 2 === 0
+                        ? "#fff"
+                        : alpha(BRAND.surface, 0.55),
+                  }}
                 >
-                  <TableCell sx={cellSx}>
-                    <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.text }}>
-                      {UPLOAD_LABELS[uploadType]}
-                    </Typography>
+                  <TableCell sx={bodyCellSx}>
+                    {readOnly ? (
+                      <QCDivisionReadOnlyValue value={UPLOAD_LABELS[uploadType]} />
+                    ) : (
+                      <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.text }}>
+                        {UPLOAD_LABELS[uploadType]}
+                      </Typography>
+                    )}
                   </TableCell>
-                  <TableCell sx={cellSx}>
+                  <TableCell sx={bodyCellSx}>
                     {readOnly ? (
                       fileNames.length ? (
                         <Stack spacing={0.35}>

@@ -1,4 +1,5 @@
-import FlowBarDateField from "../../../../components/common/FlowBarDateField";
+import { Box, Typography } from "@mui/material";
+import DateField from "../../../../components/common/DateField";
 
 type CasePrepDateFieldProps = {
   label: string;
@@ -17,20 +18,37 @@ const CasePrepDateField = ({
   placeholder = "DD-MM-YYYY",
   theme,
 }: CasePrepDateFieldProps) => {
-  const flowBar = theme?.manufacturing?.casePreparation?.flowBar;
   const accentColor = theme?.palette?.primaryLight ?? theme?.palette?.primary ?? "#2E86C1";
+  const labelSx = theme?.manufacturing?.casePreparation?.flowBar?.selectLabel;
 
   return (
-    <FlowBarDateField
-      label={label}
-      value={value}
-      onChange={onChange}
-      disabled={disabled}
-      placeholder={placeholder}
-      width={220}
-      flowBar={flowBar}
-      accentColor={accentColor}
-    />
+    <Box sx={{ minWidth: 220, maxWidth: 280 }}>
+      {label ? (
+        <Typography
+          sx={{
+            fontSize: "0.72rem",
+            fontWeight: 700,
+            color: theme?.palette?.textSub ?? "#5D6D7E",
+            mb: 0.5,
+            ...(labelSx ?? {}),
+          }}
+        >
+          {label}
+        </Typography>
+      ) : null}
+      <DateField
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        placeholder={placeholder}
+        compact
+        inputSx={{
+          "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {
+            borderColor: accentColor,
+          },
+        }}
+      />
+    </Box>
   );
 };
 

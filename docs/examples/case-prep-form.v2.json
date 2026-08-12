@@ -555,8 +555,13 @@
               "allowAdd": false,
               "allowDelete": false,
               "autoIncrementKey": "SR_NO",
-              "defaultCount": 4,
+              "defaultCount": 5,
               "presetRows": [
+                {
+                  "readonly": true,
+                  "parameter": "Date",
+                  "value__fieldType": "date"
+                },
                 {
                   "readonly": true,
                   "parameter": "Oven Start Time",
@@ -974,8 +979,13 @@
                   "allowAdd": false,
                   "allowDelete": false,
                   "autoIncrementKey": "SR_NO",
-                  "defaultCount": 12,
+                  "defaultCount": 13,
                   "presetRows": [
+                    {
+                      "readonly": true,
+                      "parameter": "Date",
+                      "value__fieldType": "date"
+                    },
                     {
                       "readonly": true,
                       "parameter": "Oven Out Time",

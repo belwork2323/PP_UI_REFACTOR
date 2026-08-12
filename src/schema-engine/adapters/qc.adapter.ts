@@ -14,8 +14,6 @@ export const QC_SCHEMA_VERSION = "1.0";
 
 export const MIXING_SCHEMA_FUNCTIONALITY = "CREATE_MIXING_FORM";
 export const HARDWARE_SCHEMA_FUNCTIONALITY = "CREATE_HARDWARE_FORM";
-export const CASTING_SCHEMA_FUNCTIONALITY = "CREATE_CASTING_FORM";
-export const CURING_SCHEMA_FUNCTIONALITY = "CREATE_CURING_FORM";
 export const DE_CORING_SCHEMA_FUNCTIONALITY = "CREATE_DE_CORING_FORM";
 export const TRIMMING_SCHEMA_FUNCTIONALITY = "CREATE_TRIMMING_FORM";
 export const POST_CURE_SCHEMA_FUNCTIONALITY = "CREATE_POST_CURE_FORM";
@@ -98,20 +96,6 @@ export const resolveQcSchemaMeta = (
     return {
       schemaType: QC_SCHEMA_TYPE,
       functionality: HARDWARE_SCHEMA_FUNCTIONALITY,
-    };
-  }
-
-  if (division === "CASTING") {
-    return {
-      schemaType: QC_SCHEMA_TYPE,
-      functionality: CASTING_SCHEMA_FUNCTIONALITY,
-    };
-  }
-
-  if (division === "CURING") {
-    return {
-      schemaType: QC_SCHEMA_TYPE,
-      functionality: CURING_SCHEMA_FUNCTIONALITY,
     };
   }
 

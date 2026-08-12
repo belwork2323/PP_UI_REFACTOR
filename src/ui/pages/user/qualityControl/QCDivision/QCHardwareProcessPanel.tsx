@@ -37,6 +37,13 @@ import {
   type QcHardwarePreheatingRow,
 } from "../../../../../hooks/user/qualityControl/qcHardwareTables";
 
+import {
+  QCDivisionReadOnlyValue,
+  qcReadOnlyBodyCellSx,
+  qcReadOnlyTableContainerSx,
+  qcReadOnlyTableHeaderCellSx,
+} from "./components/QCDivisionReadOnlyValue";
+
 const BRAND = QC_DIVISION_BRAND;
 const TABLE_BORDER = alpha(BRAND.primary, 0.18);
 const HEADER_CELL_BORDER = alpha("#fff", 0.22);
@@ -130,11 +137,6 @@ type EditableTableProps<T extends Record<string, unknown>> = {
   readOnly?: boolean;
 };
 
-const displayValue = (value: unknown) => {
-  const text = String(value ?? "").trim();
-  return text || "—";
-};
-
 const HardwareEditableTable = <T extends Record<string, unknown>>({
   title,
   columns,
@@ -143,6 +145,9 @@ const HardwareEditableTable = <T extends Record<string, unknown>>({
   createEmptyRow,
   readOnly = false,
 }: EditableTableProps<T>) => {
+  const headerSx = readOnly ? qcReadOnlyTableHeaderCellSx : TH;
+  const bodyCellSx = readOnly ? qcReadOnlyBodyCellSx : cellSx;
+
   const updateRow = (index: number, field: keyof T & string, value: string) => {
     onChange(
       rows.map((row, rowIndex) =>
@@ -169,7 +174,12 @@ const HardwareEditableTable = <T extends Record<string, unknown>>({
   const renderInput = (row: T, index: number, column: ColumnDef<T>): ReactNode => {
     const value = String(row[column.id] ?? "");
     if (readOnly) {
-      return displayValue(column.fieldType === "time" ? normalizeTimeValue(value) : value);
+      return (
+        <QCDivisionReadOnlyValue
+          value={column.fieldType === "time" ? normalizeTimeValue(value) : value}
+          muted={!String(value ?? "").trim()}
+        />
+      );
     }
 
     if (column.fieldType === "date") {
@@ -216,40 +226,54 @@ const HardwareEditableTable = <T extends Record<string, unknown>>({
         {title}
       </Typography>
       <TableContainer
-        sx={{
-          overflow: "hidden",
-          overflowX: "auto",
-          border: `1px solid ${TABLE_BORDER}`,
-          borderRadius: 2,
-          background: "#fff",
-        }}
+        sx={
+          readOnly
+            ? qcReadOnlyTableContainerSx
+            : {
+                overflow: "hidden",
+                overflowX: "auto",
+                border: `1px solid ${TABLE_BORDER}`,
+                borderRadius: 2,
+                background: "#fff",
+              }
+        }
       >
         <Table size="small" sx={{ minWidth: 560, borderCollapse: "collapse" }}>
           <TableHead>
             <TableRow>
-              <TableCell sx={TH}>S. No</TableCell>
+              <TableCell sx={headerSx}>S. No</TableCell>
               {columns.map((column) => (
-                <TableCell key={column.id} sx={TH}>
+                <TableCell key={column.id} sx={headerSx}>
                   {column.label}
                 </TableCell>
               ))}
-              {!readOnly ? <TableCell sx={TH} align="center" /> : null}
+              {!readOnly ? <TableCell sx={headerSx} align="center" /> : null}
             </TableRow>
           </TableHead>
           <TableBody>
             {rows.map((row, index) => (
               <TableRow
                 key={`${title}-${index}`}
-                sx={{ background: index % 2 === 0 ? "#fff" : alpha(BRAND.surface, 0.55) }}
+                sx={{
+                  background: readOnly
+                    ? index % 2 === 1
+                      ? alpha(BRAND.primary, 0.03)
+                      : "#fff"
+                    : index % 2 === 0
+                      ? "#fff"
+                      : alpha(BRAND.surface, 0.55),
+                }}
               >
-                <TableCell sx={cellSx}>{index + 1}</TableCell>
+                <TableCell sx={bodyCellSx}>
+                  {readOnly ? <QCDivisionReadOnlyValue value={index + 1} /> : index + 1}
+                </TableCell>
                 {columns.map((column) => (
-                  <TableCell key={column.id} sx={cellSx}>
+                  <TableCell key={column.id} sx={bodyCellSx}>
                     {renderInput(row, index, column)}
                   </TableCell>
                 ))}
                 {!readOnly ? (
-                  <TableCell sx={cellSx} align="center">
+                  <TableCell sx={bodyCellSx} align="center">
                     <IconButton
                       size="small"
                       disabled={rows.length <= 1}
@@ -468,21 +492,31 @@ const QCHardwareProcessPanel = ({
             useFlexGap
             flexWrap="wrap"
             sx={{
-              border: `1px solid ${TABLE_BORDER}`,
-              borderRadius: 2,
+              border: `1px solid ${readOnly ? BRAND.border : TABLE_BORDER}`,
+              borderRadius: readOnly ? 1 : 2,
               background: "#fff",
               p: 1.5,
             }}
           >
             {DISPATCH_NUMBER_FIELDS.map((field) => (
               <Box key={field.key} sx={{ flex: "1 1 220px", minWidth: 200 }}>
-                <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: BRAND.textSub, mb: 0.5 }}>
+                <Typography
+                  sx={{
+                    fontSize: "0.65rem",
+                    fontWeight: readOnly ? 800 : 700,
+                    letterSpacing: readOnly ? "0.02em" : undefined,
+                    textTransform: readOnly ? "uppercase" : undefined,
+                    color: readOnly ? BRAND.primary : BRAND.textSub,
+                    mb: 0.5,
+                  }}
+                >
                   {field.label}
                 </Typography>
                 {readOnly ? (
-                  <Typography sx={{ fontSize: "0.78rem", color: BRAND.text }}>
-                    {displayValue(dispatchValues[field.key])}
-                  </Typography>
+                  <QCDivisionReadOnlyValue
+                    value={dispatchValues[field.key]}
+                    muted={!String(dispatchValues[field.key] ?? "").trim()}
+                  />
                 ) : (
                   <TextField
                     size="small"
@@ -503,13 +537,23 @@ const QCHardwareProcessPanel = ({
               </Box>
             ))}
             <Box sx={{ flex: "1 1 280px", minWidth: 240 }}>
-              <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: BRAND.textSub, mb: 0.5 }}>
+              <Typography
+                sx={{
+                  fontSize: "0.65rem",
+                  fontWeight: readOnly ? 800 : 700,
+                  letterSpacing: readOnly ? "0.02em" : undefined,
+                  textTransform: readOnly ? "uppercase" : undefined,
+                  color: readOnly ? BRAND.primary : BRAND.textSub,
+                  mb: 0.5,
+                }}
+              >
                 Date and Time of dispatch of motor to casting division
               </Typography>
               {readOnly ? (
-                <Typography sx={{ fontSize: "0.78rem", color: BRAND.text }}>
-                  {displayValue(dispatchValues.DISPATCH_DATE_TIME)}
-                </Typography>
+                <QCDivisionReadOnlyValue
+                  value={dispatchValues.DISPATCH_DATE_TIME}
+                  muted={!String(dispatchValues.DISPATCH_DATE_TIME ?? "").trim()}
+                />
               ) : (
                 <DateTimeField
                   compact
@@ -530,19 +574,29 @@ const QCHardwareProcessPanel = ({
           </Stack>
           <Box
             sx={{
-              border: `1px solid ${TABLE_BORDER}`,
-              borderRadius: 2,
+              border: `1px solid ${readOnly ? BRAND.border : TABLE_BORDER}`,
+              borderRadius: readOnly ? 1 : 2,
               background: "#fff",
               p: 1.5,
             }}
           >
-            <Typography sx={{ fontSize: "0.68rem", fontWeight: 700, color: BRAND.textSub, mb: 0.5 }}>
+            <Typography
+              sx={{
+                fontSize: "0.65rem",
+                fontWeight: readOnly ? 800 : 700,
+                letterSpacing: readOnly ? "0.02em" : undefined,
+                textTransform: readOnly ? "uppercase" : undefined,
+                color: readOnly ? BRAND.primary : BRAND.textSub,
+                mb: 0.5,
+              }}
+            >
               Observations
             </Typography>
             {readOnly ? (
-              <Typography sx={{ fontSize: "0.78rem", color: BRAND.text, whiteSpace: "pre-wrap" }}>
-                {displayValue(dispatchValues.OBSERVATIONS)}
-              </Typography>
+              <QCDivisionReadOnlyValue
+                value={dispatchValues.OBSERVATIONS}
+                muted={!String(dispatchValues.OBSERVATIONS ?? "").trim()}
+              />
             ) : (
               <TextField
                 size="small"

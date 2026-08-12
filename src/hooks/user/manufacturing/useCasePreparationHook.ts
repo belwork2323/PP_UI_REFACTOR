@@ -24,6 +24,7 @@ import {
   buildCasePreparationSchemaRequest,
   casePreparationSchemaFetchConfig,
   createCasePrepInitialValues,
+  enrichCasePreparationSchemaDates,
   mapCasePrepBatchTypeToSchema,
   schemaEngineController,
   type SchemaDocumentV2,
@@ -291,8 +292,9 @@ export const useCasePreparationHook = () => {
         return null;
       }
 
-      schemaCacheRef.current.set(cacheKey, response.data);
-      return response.data;
+      const enrichedSchema = enrichCasePreparationSchemaDates(response.data);
+      schemaCacheRef.current.set(cacheKey, enrichedSchema);
+      return enrichedSchema;
     },
     [showAlert, subDepartmentId],
   );
@@ -468,7 +470,11 @@ export const useCasePreparationHook = () => {
 
       setDetailsRow(row);
       setDetailsData(response.data);
-      setDetailsSchema(schemaResponse?.success ? schemaResponse.data ?? null : null);
+      setDetailsSchema(
+        schemaResponse?.success && schemaResponse.data
+          ? enrichCasePreparationSchemaDates(schemaResponse.data)
+          : null,
+      );
       setView("details");
     },
     [showAlert, subDepartmentId],

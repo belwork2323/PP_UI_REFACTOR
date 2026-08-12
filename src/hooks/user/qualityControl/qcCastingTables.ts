@@ -1,4 +1,5 @@
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import { formatToIsoDateInput, formatToUiDate } from "../../../utils/dateUtils";
 import { QC_CASTING_SECTION_IDS } from "./qcCastingConfig";
 
 export type QcCastingMandrelRow = {
@@ -33,6 +34,8 @@ export type QcCastingPressurePlateRow = {
   OBSERVATIONS?: string;
 };
 
+export type QcCastingMotorSubmissionType = "DRAFT" | "SUBMIT";
+
 const formKey = (sectionId: string, blockId: string) => `${sectionId}::${blockId}`;
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -43,6 +46,96 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
 const hasValue = (value: unknown) => Boolean(String(value ?? "").trim());
+
+const toFiniteNumber = (value: unknown): number | undefined => {
+  const raw = String(value ?? "")
+    .trim()
+    .replace(/,/g, "");
+  if (!raw) return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+const formatWeightmentNumber = (value: number): string => {
+  if (!Number.isFinite(value)) return "";
+  const rounded = Math.round(value * 10000) / 10000;
+  return String(rounded);
+};
+
+/** Auto total weight = final − initial (matches API example 1500 − 1000 = 500). */
+export const calcWeightmentTotalWeight = (
+  initial: unknown,
+  finalReading: unknown,
+): string => {
+  const a = toFiniteNumber(initial);
+  const b = toFiniteNumber(finalReading);
+  if (a == null || b == null) return "";
+  return formatWeightmentNumber(b - a);
+};
+
+export const applyWeightmentFieldChange = (
+  row: QcCastingWeightmentRow,
+  field: keyof QcCastingWeightmentRow,
+  value: string,
+): QcCastingWeightmentRow => {
+  const next: QcCastingWeightmentRow = { ...row, [field]: value };
+  if (field === "LOAD_CELL_INITIAL" || field === "LOAD_CELL_FINAL") {
+    next.TOTAL_WEIGHT = calcWeightmentTotalWeight(next.LOAD_CELL_INITIAL, next.LOAD_CELL_FINAL);
+  }
+  return next;
+};
+
+const emptyWeightmentRow = (): QcCastingWeightmentRow => ({
+  LOAD_CELL_INITIAL: "",
+  LOAD_CELL_FINAL: "",
+  TOTAL_WEIGHT: "",
+});
+
+const fillWeightmentTotalIfEmpty = (row: QcCastingWeightmentRow): QcCastingWeightmentRow => ({
+  ...row,
+  TOTAL_WEIGHT:
+    String(row.TOTAL_WEIGHT ?? "").trim() ||
+    calcWeightmentTotalWeight(row.LOAD_CELL_INITIAL, row.LOAD_CELL_FINAL),
+});
+
+const firstWeightmentRow = (rows: QcCastingWeightmentRow[]): QcCastingWeightmentRow =>
+  rows[0] ?? emptyWeightmentRow();
+
+/** HH:mm → hours number for API; plain number stays numeric. */
+const toSoakingDurationApi = (value: string): number | string | undefined => {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return undefined;
+  const time = trimmed.match(/^(\d{1,2}):(\d{2})$/);
+  if (time) {
+    const hours = Number(time[1]);
+    const minutes = Number(time[2]);
+    if (!Number.isFinite(hours) || !Number.isFinite(minutes)) return trimmed;
+    const total = hours + minutes / 60;
+    return minutes === 0 ? hours : Number(total.toFixed(2));
+  }
+  const n = Number(trimmed);
+  return Number.isFinite(n) ? n : trimmed;
+};
+
+const fromSoakingDurationApi = (value: unknown): string => {
+  if (value == null || value === "") return "";
+  if (typeof value === "number" && Number.isFinite(value)) {
+    const hours = Math.floor(value);
+    const minutes = Math.round((value - hours) * 60);
+    return `${String(hours).padStart(2, "0")}:${String(Math.max(0, minutes)).padStart(2, "0")}`;
+  }
+  const raw = String(value).trim();
+  if (/^\d{1,2}:\d{2}/.test(raw)) {
+    const match = raw.match(/^(\d{1,2}):(\d{2})/);
+    if (!match) return raw;
+    return `${match[1].padStart(2, "0")}:${match[2]}`;
+  }
+  const n = Number(raw);
+  if (Number.isFinite(n) && !raw.includes(":")) return fromSoakingDurationApi(n);
+  return raw;
+};
+
+const toApiDate = (value: string) => formatToIsoDateInput(value) || undefined;
 
 const emptyMandrelRow = (srNo = 1): QcCastingMandrelRow => ({
   SR_NO: srNo,
@@ -59,12 +152,6 @@ const emptyCastingRow = (srNo = 1): QcCastingTableRow => ({
   CASTING_COMPLETION_TIME: "",
   SLURRY_CAST_FROM_EACH_BOWL: "",
   REMARKS: "",
-});
-
-const emptyWeightmentRow = (): QcCastingWeightmentRow => ({
-  LOAD_CELL_INITIAL: "",
-  LOAD_CELL_FINAL: "",
-  TOTAL_WEIGHT: "",
 });
 
 const emptyPressurePlateRow = (srNo = 1): QcCastingPressurePlateRow => ({
@@ -194,7 +281,7 @@ export const getCastingWeightmentRows = (
     formKey(QC_CASTING_SECTION_IDS.WEIGHTMENT, "WEIGHTMENT_DETAILS"),
     [emptyWeightmentRow()],
   );
-  return rows.length ? rows : [emptyWeightmentRow()];
+  return [firstWeightmentRow(rows)];
 };
 
 export const setCastingWeightmentRows = (
@@ -202,9 +289,9 @@ export const setCastingWeightmentRows = (
   rows: QcCastingWeightmentRow[],
 ): SchemaFormValues => ({
   ...(values ?? {}),
-  [formKey(QC_CASTING_SECTION_IDS.WEIGHTMENT, "WEIGHTMENT_DETAILS")]: rows.length
-    ? rows
-    : [emptyWeightmentRow()],
+  [formKey(QC_CASTING_SECTION_IDS.WEIGHTMENT, "WEIGHTMENT_DETAILS")]: [
+    rows[0] ?? emptyWeightmentRow(),
+  ],
 });
 
 export const getCastingPostCastField = (
@@ -253,9 +340,7 @@ const castingRowHasData = (row: QcCastingTableRow) =>
   hasValue(row.REMARKS);
 
 const weightmentRowHasData = (row: QcCastingWeightmentRow) =>
-  hasValue(row.LOAD_CELL_INITIAL) ||
-  hasValue(row.LOAD_CELL_FINAL) ||
-  hasValue(row.TOTAL_WEIGHT);
+  hasValue(row.LOAD_CELL_INITIAL) || hasValue(row.LOAD_CELL_FINAL);
 
 const pressurePlateRowHasData = (row: QcCastingPressurePlateRow) =>
   hasValue(row.START_TIME) ||
@@ -283,13 +368,13 @@ const sanitizeCastingRows = (rows: QcCastingTableRow[]) =>
     REMARKS: String(row.REMARKS ?? "").trim(),
   }));
 
-const sanitizeWeightmentRows = (rows: QcCastingWeightmentRow[]) => {
-  const sanitized = rows.filter(weightmentRowHasData).map((row) => ({
+const sanitizeWeightmentRow = (rows: QcCastingWeightmentRow[]): QcCastingWeightmentRow => {
+  const row = fillWeightmentTotalIfEmpty(rows[0] ?? emptyWeightmentRow());
+  return {
     LOAD_CELL_INITIAL: String(row.LOAD_CELL_INITIAL ?? "").trim(),
     LOAD_CELL_FINAL: String(row.LOAD_CELL_FINAL ?? "").trim(),
     TOTAL_WEIGHT: String(row.TOTAL_WEIGHT ?? "").trim(),
-  }));
-  return sanitized.length ? sanitized : [];
+  };
 };
 
 const sanitizePressurePlateRows = (rows: QcCastingPressurePlateRow[]) =>
@@ -302,6 +387,114 @@ const sanitizePressurePlateRows = (rows: QcCastingPressurePlateRow[]) =>
     OBSERVATIONS: String(row.OBSERVATIONS ?? "").trim(),
   }));
 
+const mapMandrelRowsForApi = (rows: ReturnType<typeof sanitizeMandrelRows>) =>
+  rows.map((row) => ({
+    srNo: row.SR_NO,
+    readingWithoutCup: toFiniteNumber(row.READING_WITHOUT_CUP) ?? row.READING_WITHOUT_CUP,
+    readingWithBottomCup:
+      toFiniteNumber(row.READING_WITH_BOTTOM_CUP) ?? row.READING_WITH_BOTTOM_CUP,
+  }));
+
+const mapCastingDetailsForApi = (rows: ReturnType<typeof sanitizeCastingRows>) =>
+  rows.map((row) => ({
+    srNo: row.SR_NO,
+    finalMixBowlNo: row.FINAL_MIX_BOWL_NO,
+    propellantQty: toFiniteNumber(row.PROPELLANT_QTY) ?? row.PROPELLANT_QTY,
+    initialUnloadingViscosity:
+      toFiniteNumber(row.INITIAL_UNLOADING_VISCOSITY) ?? row.INITIAL_UNLOADING_VISCOSITY,
+    castingStartTime: row.CASTING_START_TIME,
+    castingCompletionTime: row.CASTING_COMPLETION_TIME,
+    slurryCastFromEachBowl:
+      toFiniteNumber(row.SLURRY_CAST_FROM_EACH_BOWL) ?? row.SLURRY_CAST_FROM_EACH_BOWL,
+    remarks: row.REMARKS,
+  }));
+
+const mapWeightmentDetailsForApi = (row: QcCastingWeightmentRow) => {
+  const initial = toFiniteNumber(row.LOAD_CELL_INITIAL);
+  const finalReading = toFiniteNumber(row.LOAD_CELL_FINAL);
+  const totalWeight =
+    toFiniteNumber(row.TOTAL_WEIGHT) ?? toFiniteNumber(calcWeightmentTotalWeight(initial, finalReading));
+  return {
+    loadCellReading: {
+      ...(initial != null ? { initial } : {}),
+      ...(finalReading != null ? { final: finalReading } : {}),
+    },
+    ...(totalWeight != null ? { totalWeight } : {}),
+  };
+};
+
+const mapPressurePlateDetailsForApi = (rows: ReturnType<typeof sanitizePressurePlateRows>) =>
+  rows.map((row) => ({
+    srNo: row.SR_NO,
+    startTime: row.START_TIME,
+    endTime: row.END_TIME,
+    pressureSensorUsed: row.PRESSURE_SENSOR_USED,
+    initialPressureReading:
+      toFiniteNumber(row.INITIAL_PRESSURE_READING) ?? row.INITIAL_PRESSURE_READING,
+    observations: row.OBSERVATIONS,
+  }));
+
+/** Nested Casting motor payload for create/update (`data.motorDetails[]`). */
+export const buildCastingMotorDetailPayload = (
+  values: SchemaFormValues | null | undefined,
+  motorIdNo: string,
+  motorSubmissionType: QcCastingMotorSubmissionType = "DRAFT",
+): Record<string, unknown> => {
+  const castingType = getCastingType(values).trim();
+  const assemblyDate = toApiDate(getCastingAssemblyDate(values));
+  const mandrelAssembly = mapMandrelRowsForApi(sanitizeMandrelRows(getCastingMandrelRows(values)));
+
+  const dateOfCasting = toApiDate(getCastingPropellantField(values, "DATE_OF_CASTING"));
+  const rhPercent = toFiniteNumber(getCastingPropellantField(values, "RH_PERCENT"));
+  const vacuumMaintained = toFiniteNumber(
+    getCastingPropellantField(values, "VACUUM_MAINTAINED"),
+  );
+  const castingDetails = mapCastingDetailsForApi(sanitizeCastingRows(getCastingTableRows(values)));
+  const weightmentDetails = mapWeightmentDetailsForApi(
+    sanitizeWeightmentRow(getCastingWeightmentRows(values)),
+  );
+
+  const soakingRaw = getCastingPostCastField(values, "SOAKING_DURATION");
+  const soakingDuration = toSoakingDurationApi(soakingRaw);
+  const pressureRequired = getCastingPostCastField(
+    values,
+    "PRESSURE_PLATE_ASSEMBLY_REQUIRED",
+  ).trim();
+  const pressurePlateDetails =
+    pressureRequired === "YES"
+      ? mapPressurePlateDetailsForApi(sanitizePressurePlateRows(getCastingPressurePlateRows(values)))
+      : [];
+
+  return {
+    motorIdNo,
+    motorSubmissionType,
+    castingSelection: {
+      castingType: castingType || undefined,
+    },
+    finalAssembly: {
+      ...(assemblyDate ? { assemblyDate } : {}),
+      mandrelAssembly,
+    },
+    propellantCasting: {
+      ...(dateOfCasting ? { dateOfCasting } : {}),
+      ...(rhPercent != null ? { rhPercent } : {}),
+      ...(vacuumMaintained != null ? { vacuumMaintained } : {}),
+      castingDetails,
+    },
+    weightmentDetails,
+    postCastOperations: {
+      soakingDetails: {
+        ...(soakingDuration != null ? { soakingDuration } : {}),
+      },
+      pressurePlateAssembly: {
+        ...(pressureRequired ? { required: pressureRequired } : {}),
+      },
+      pressurePlateDetails,
+    },
+  };
+};
+
+/** Legacy section payload (internal hydrate / manufacturing seed). */
 export const buildCastingSectionPayload = (
   values: SchemaFormValues | null | undefined,
 ): SchemaSectionSubmission[] => {
@@ -359,11 +552,11 @@ export const buildCastingSectionPayload = (
     });
   }
 
-  const weightmentRows = sanitizeWeightmentRows(getCastingWeightmentRows(values));
-  if (weightmentRows.length) {
+  const weightmentRow = sanitizeWeightmentRow(getCastingWeightmentRows(values));
+  if (weightmentRowHasData(weightmentRow)) {
     sections.push({
       sectionId: QC_CASTING_SECTION_IDS.WEIGHTMENT,
-      sectionData: [{ WEIGHTMENT_DETAILS: weightmentRows }],
+      sectionData: [{ WEIGHTMENT_DETAILS: [weightmentRow] }],
     });
   }
 
@@ -383,6 +576,206 @@ export const buildCastingSectionPayload = (
             ? { PRESSURE_PLATE_ASSEMBLY_REQUIRED: pressureRequired }
             : {}),
           ...(pressureRows.length ? { PRESSURE_PLATE_DETAILS: pressureRows } : {}),
+        },
+      ],
+    });
+  }
+
+  return sections;
+};
+
+const pickRowField = (row: Record<string, unknown>, ...keys: string[]) => {
+  for (const key of keys) {
+    if (row[key] != null && String(row[key]).trim() !== "") return row[key];
+  }
+  return "";
+};
+
+const mapApiMandrelRows = (rows: unknown[]): QcCastingMandrelRow[] =>
+  rows
+    .map((row, index) => {
+      const rec = asRecord(row);
+      if (!rec) return null;
+      return {
+        SR_NO: Number(pickRowField(rec, "srNo", "SR_NO")) || index + 1,
+        READING_WITHOUT_CUP: String(
+          pickRowField(rec, "readingWithoutCup", "READING_WITHOUT_CUP"),
+        ),
+        READING_WITH_BOTTOM_CUP: String(
+          pickRowField(rec, "readingWithBottomCup", "READING_WITH_BOTTOM_CUP"),
+        ),
+      } satisfies QcCastingMandrelRow;
+    })
+    .filter(Boolean) as QcCastingMandrelRow[];
+
+const mapApiCastingDetailRows = (rows: unknown[]): QcCastingTableRow[] =>
+  rows
+    .map((row, index) => {
+      const rec = asRecord(row);
+      if (!rec) return null;
+      return {
+        SR_NO: Number(pickRowField(rec, "srNo", "SR_NO")) || index + 1,
+        FINAL_MIX_BOWL_NO: String(pickRowField(rec, "finalMixBowlNo", "FINAL_MIX_BOWL_NO")),
+        PROPELLANT_QTY: String(pickRowField(rec, "propellantQty", "PROPELLANT_QTY")),
+        INITIAL_UNLOADING_VISCOSITY: String(
+          pickRowField(rec, "initialUnloadingViscosity", "INITIAL_UNLOADING_VISCOSITY"),
+        ),
+        CASTING_START_TIME: String(
+          pickRowField(rec, "castingStartTime", "CASTING_START_TIME"),
+        ),
+        CASTING_COMPLETION_TIME: String(
+          pickRowField(rec, "castingCompletionTime", "CASTING_COMPLETION_TIME"),
+        ),
+        SLURRY_CAST_FROM_EACH_BOWL: String(
+          pickRowField(rec, "slurryCastFromEachBowl", "SLURRY_CAST_FROM_EACH_BOWL"),
+        ),
+        REMARKS: String(pickRowField(rec, "remarks", "REMARKS")),
+      } satisfies QcCastingTableRow;
+    })
+    .filter(Boolean) as QcCastingTableRow[];
+
+const mapApiWeightmentRow = (value: unknown): QcCastingWeightmentRow | null => {
+  const rec = asRecord(value) ?? asRecord(asArray(value)[0]);
+  if (!rec) return null;
+  const loadCell = asRecord(rec.loadCellReading) ?? asRecord(rec.LOAD_CELL_READING);
+  const initial = pickRowField(
+    { ...(loadCell ?? {}), ...rec },
+    "initial",
+    "INITIAL",
+    "LOAD_CELL_INITIAL",
+  );
+  const finalReading = pickRowField(
+    { ...(loadCell ?? {}), ...rec },
+    "final",
+    "FINAL",
+    "LOAD_CELL_FINAL",
+  );
+  return fillWeightmentTotalIfEmpty({
+    LOAD_CELL_INITIAL: String(initial ?? ""),
+    LOAD_CELL_FINAL: String(finalReading ?? ""),
+    TOTAL_WEIGHT: String(pickRowField(rec, "totalWeight", "TOTAL_WEIGHT") ?? ""),
+  });
+};
+
+const mapApiPressurePlateRows = (rows: unknown[]): QcCastingPressurePlateRow[] =>
+  rows
+    .map((row, index) => {
+      const rec = asRecord(row);
+      if (!rec) return null;
+      return {
+        SR_NO: Number(pickRowField(rec, "srNo", "SR_NO")) || index + 1,
+        START_TIME: String(pickRowField(rec, "startTime", "START_TIME")),
+        END_TIME: String(pickRowField(rec, "endTime", "END_TIME")),
+        PRESSURE_SENSOR_USED: String(
+          pickRowField(rec, "pressureSensorUsed", "PRESSURE_SENSOR_USED"),
+        ),
+        INITIAL_PRESSURE_READING: String(
+          pickRowField(rec, "initialPressureReading", "INITIAL_PRESSURE_READING"),
+        ),
+        OBSERVATIONS: String(pickRowField(rec, "observations", "OBSERVATIONS")),
+      } satisfies QcCastingPressurePlateRow;
+    })
+    .filter(Boolean) as QcCastingPressurePlateRow[];
+
+export const isCastingNestedMotorDetail = (motor: Record<string, unknown>) =>
+  Boolean(
+    motor.castingSelection ||
+      motor.finalAssembly ||
+      motor.propellantCasting ||
+      motor.weightmentDetails ||
+      motor.postCastOperations,
+  );
+
+/** Convert nested Casting motorDetails item → section rows for hydrateCastingValuesFromSections. */
+export const castingMotorDetailToSections = (
+  motor: Record<string, unknown>,
+  motorId?: string,
+): SchemaSectionSubmission[] => {
+  const id =
+    String(motorId ?? motor.motorIdNo ?? motor.motorId ?? motor.id ?? "").trim() || undefined;
+  const sections: SchemaSectionSubmission[] = [];
+
+  const selection = asRecord(motor.castingSelection);
+  if (selection) {
+    sections.push({
+      sectionId: QC_CASTING_SECTION_IDS.SELECTION,
+      ...(id ? { motorId: id } : {}),
+      sectionData: [
+        {
+          CASTING_TYPE: String(selection.castingType ?? selection.CASTING_TYPE ?? ""),
+        },
+      ],
+    });
+  }
+
+  const finalAssembly = asRecord(motor.finalAssembly);
+  if (finalAssembly) {
+    const assemblyDateRaw = String(
+      finalAssembly.assemblyDate ?? finalAssembly.ASSEMBLY_DATE ?? "",
+    );
+    sections.push({
+      sectionId: QC_CASTING_SECTION_IDS.FINAL_ASSEMBLY,
+      ...(id ? { motorId: id } : {}),
+      sectionData: [
+        {
+          ASSEMBLY_DATE: formatToUiDate(assemblyDateRaw) || assemblyDateRaw,
+          MANDREL_ASSEMBLY: mapApiMandrelRows(asArray(finalAssembly.mandrelAssembly)),
+        },
+      ],
+    });
+  }
+
+  const propellant = asRecord(motor.propellantCasting);
+  if (propellant) {
+    const dateRaw = String(propellant.dateOfCasting ?? propellant.DATE_OF_CASTING ?? "");
+    sections.push({
+      sectionId: QC_CASTING_SECTION_IDS.PROPELLANT_CASTING,
+      ...(id ? { motorId: id } : {}),
+      sectionData: [
+        {
+          DATE_OF_CASTING: formatToUiDate(dateRaw) || dateRaw,
+          RH_PERCENT: String(propellant.rhPercent ?? propellant.RH_PERCENT ?? ""),
+          VACUUM_MAINTAINED: String(
+            propellant.vacuumMaintained ?? propellant.VACUUM_MAINTAINED ?? "",
+          ),
+          CASTING_TABLE: mapApiCastingDetailRows(
+            asArray(propellant.castingDetails ?? propellant.CASTING_TABLE),
+          ),
+        },
+      ],
+    });
+  }
+
+  const weightmentRow = mapApiWeightmentRow(motor.weightmentDetails);
+  if (weightmentRow && weightmentRowHasData(weightmentRow)) {
+    sections.push({
+      sectionId: QC_CASTING_SECTION_IDS.WEIGHTMENT,
+      ...(id ? { motorId: id } : {}),
+      sectionData: [{ WEIGHTMENT_DETAILS: [weightmentRow] }],
+    });
+  }
+
+  const postCast = asRecord(motor.postCastOperations);
+  if (postCast) {
+    const soaking = asRecord(postCast.soakingDetails);
+    const pressureAssembly = asRecord(postCast.pressurePlateAssembly);
+    sections.push({
+      sectionId: QC_CASTING_SECTION_IDS.POST_CAST,
+      ...(id ? { motorId: id } : {}),
+      sectionData: [
+        {
+          SOAKING_DURATION: fromSoakingDurationApi(
+            soaking?.soakingDuration ?? soaking?.SOAKING_DURATION ?? postCast.SOAKING_DURATION,
+          ),
+          PRESSURE_PLATE_ASSEMBLY_REQUIRED: String(
+            pressureAssembly?.required ??
+              pressureAssembly?.REQUIRED ??
+              postCast.PRESSURE_PLATE_ASSEMBLY_REQUIRED ??
+              "",
+          ),
+          PRESSURE_PLATE_DETAILS: mapApiPressurePlateRows(
+            asArray(postCast.pressurePlateDetails),
+          ),
         },
       ],
     });
@@ -450,14 +843,17 @@ export const hydrateCastingValuesFromSections = (
         section.sectionData,
         "WEIGHTMENT_DETAILS",
       );
-      if (rows.length) {
-        values[formKey(sectionId, "WEIGHTMENT_DETAILS")] = rows;
+      const mapped = mapApiWeightmentRow(rows[0] ?? data.WEIGHTMENT_DETAILS ?? data);
+      if (mapped) {
+        values[formKey(sectionId, "WEIGHTMENT_DETAILS")] = [mapped];
       }
       continue;
     }
 
     if (sectionId === QC_CASTING_SECTION_IDS.POST_CAST) {
-      values[formKey(sectionId, "SOAKING_DURATION")] = String(data.SOAKING_DURATION ?? "");
+      values[formKey(sectionId, "SOAKING_DURATION")] = fromSoakingDurationApi(
+        data.SOAKING_DURATION,
+      );
       values[formKey(sectionId, "PRESSURE_PLATE_ASSEMBLY_REQUIRED")] = String(
         data.PRESSURE_PLATE_ASSEMBLY_REQUIRED ?? "",
       );

@@ -44,7 +44,6 @@ const QualityControlPage = () => {
     selectedStfMotorType,
     selectedMotorId,
     selectedHardwareProcesses,
-    selectedCuringType,
     selectedTrimmingMotorCount,
     trimmingMotorReceivedDate,
     selectedPostCureOperation,
@@ -74,7 +73,6 @@ const QualityControlPage = () => {
     handleStfMotorTypeChange,
     handleMotorIdChange,
     handleHardwareProcessesChange,
-    handleCuringTypeChange,
     handleTrimmingMotorCountChange,
     handleTrimmingMotorReceivedDateChange,
     handlePostCureOperationChange,
@@ -120,9 +118,11 @@ const QualityControlPage = () => {
   } = hookState;
 
   const formReadOnly = isFormFieldsReadOnly;
+  const unitActionsLocked = isActivePartialReadOnly || (!partialNavActive && isActiveDivisionReadOnly);
 
   const canAct =
-    !formReadOnly &&
+    !readOnly &&
+    !unitActionsLocked &&
     ((scopedFormData.divisionEntries?.length ?? 0) > 0 ||
       scopedFormData.schemaFormLoaded ||
       (scopedFormData.solidPremixEntries?.length ?? 0) > 0 ||
@@ -148,9 +148,7 @@ const QualityControlPage = () => {
         open={listLoading || Boolean(loadingFormDetails)}
         title={loadingFormDetails ? strings.FORM_OPENING_TITLE : strings.TITLE}
         message={
-          loadingFormDetails
-            ? strings.FORM_OPENING_MESSAGE
-            : "Loading quality control batches…"
+          loadingFormDetails ? strings.FORM_OPENING_MESSAGE : "Loading quality control batches…"
         }
         color={QC_DIVISION_BRAND.primary}
         accentColor={QC_DIVISION_BRAND.primaryLight}
@@ -217,7 +215,6 @@ const QualityControlPage = () => {
             selectedStfMotorType={selectedStfMotorType}
             selectedMotorId={selectedMotorId}
             selectedHardwareProcesses={selectedHardwareProcesses}
-            selectedCuringType={selectedCuringType}
             selectedTrimmingMotorCount={selectedTrimmingMotorCount}
             trimmingMotorReceivedDate={trimmingMotorReceivedDate}
             selectedPostCureOperation={selectedPostCureOperation}
@@ -240,9 +237,7 @@ const QualityControlPage = () => {
             isEditMode={isEditMode}
             readOnly={readOnly}
             fieldsReadOnly={formReadOnly}
-            canEditDivisionStructure={
-              !readOnly && (partialNavActive || !isActiveDivisionReadOnly)
-            }
+            canEditDivisionStructure={!readOnly && (partialNavActive || !isActiveDivisionReadOnly)}
             formLockMessage={formLockMessage}
             schemaLoading={schemaLoading}
             schemaError={schemaError}
@@ -254,7 +249,6 @@ const QualityControlPage = () => {
             onStfMotorTypeChange={handleStfMotorTypeChange}
             onMotorIdChange={handleMotorIdChange}
             onHardwareProcessesChange={handleHardwareProcessesChange}
-            onCuringTypeChange={handleCuringTypeChange}
             onTrimmingMotorCountChange={handleTrimmingMotorCountChange}
             onTrimmingMotorReceivedDateChange={handleTrimmingMotorReceivedDateChange}
             onPostCureOperationChange={handlePostCureOperationChange}
@@ -323,14 +317,18 @@ const QualityControlPage = () => {
                 open={submitConfirmOpen}
                 severity="warning"
                 title={
-                  isEditMode ? strings.UNIT_RESUBMIT_CONFIRM_TITLE : strings.UNIT_SUBMIT_CONFIRM_TITLE
+                  isEditMode
+                    ? strings.UNIT_RESUBMIT_CONFIRM_TITLE
+                    : strings.UNIT_SUBMIT_CONFIRM_TITLE
                 }
                 message={
                   isEditMode
                     ? strings.UNIT_RESUBMIT_CONFIRM_MESSAGE
                     : strings.UNIT_SUBMIT_CONFIRM_MESSAGE
                 }
-                confirmLabel={isEditMode ? strings.RESUBMIT_CONFIRM_LABEL : strings.SUBMIT_CONFIRM_LABEL}
+                confirmLabel={
+                  isEditMode ? strings.RESUBMIT_CONFIRM_LABEL : strings.SUBMIT_CONFIRM_LABEL
+                }
                 cancelLabel={strings.CONFIRM_GO_BACK_LABEL}
                 onConfirm={async () => {
                   setSubmitConfirmOpen(false);

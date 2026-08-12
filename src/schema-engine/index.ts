@@ -132,6 +132,7 @@ export {
   buildCasePrepSectionPayload,
   buildCasePrepMotorSubmission,
   filterCasePrepSchemaForMotor,
+  enrichCasePreparationSchemaDates,
   isCasePrepSchemaDocument,
 } from "./adapters/casePreparation.adapter";
 

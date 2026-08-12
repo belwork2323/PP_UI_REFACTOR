@@ -22,7 +22,14 @@ import {
   buildHardwareAttachmentsSectionsForForm,
   buildHardwareProcessSectionPayload,
 } from "../../../hooks/user/qualityControl/qcHardwareTables";
-import { buildCastingSectionPayload } from "../../../hooks/user/qualityControl/qcCastingTables";
+import { buildCastingMotorDetailPayload, castingMotorDetailToSections, isCastingNestedMotorDetail } from "../../../hooks/user/qualityControl/qcCastingTables";
+import {
+  buildCuringMotorDetailPayload,
+  curingMotorDetailToSections,
+  getCuringTypeFromValues,
+  isCuringNestedMotorDetail,
+} from "../../../hooks/user/qualityControl/qcCuringTables";
+import { buildDeCoringSectionPayload } from "../../../hooks/user/qualityControl/qcDeCoringTables";
 import { isQcHardwareProcessSubType } from "../../../hooks/user/qualityControl/qcHardwareConfig";
 import type {
   QcDivisionEntry,
@@ -346,22 +353,21 @@ const buildDivisionEntrySections = (
   }
 
   if (entry.kind === "CASTING_MOTOR") {
-    return buildCastingSectionPayload(entryValues.schemaValues).map((section) => ({
-      ...section,
-      motorId: entry.motorId,
-    }));
+    // Casting create/update uses nested motorDetails (not sections).
+    return [];
+  }
+
+  if (entry.kind === "CURING_MOTOR") {
+    // Curing create/update uses nested curingDetails (not sections).
+    return [];
+  }
+
+  if (entry.kind === "DE_CORING_MOTOR") {
+    return buildDeCoringSectionPayload(entryValues.schemaValues, entry.motorId);
   }
 
   const schema = getSchemaForDivisionEntry(form, entry);
   if (!schema) return [];
-
-  if (entry.kind === "CURING_MOTOR") {
-    return buildQcSectionPayload(schema, entryValues.schemaValues).map((section) => ({
-      ...section,
-      motorId: entry.motorId,
-      subType: entry.subType ?? undefined,
-    }));
-  }
 
   if (entry.kind === "TRIMMING_MOTOR") {
     return buildQcSectionPayload(schema, entryValues.schemaValues).map((section) => ({
@@ -370,13 +376,6 @@ const buildDivisionEntrySections = (
       motorCount: entry.motorCount,
       motorReceivedDate: entry.motorReceivedDate,
       subType: entry.subType ?? undefined,
-    }));
-  }
-
-  if (entry.kind === "DE_CORING_MOTOR") {
-    return buildQcSectionPayload(schema, entryValues.schemaValues).map((section) => ({
-      ...section,
-      motorId: entry.motorId,
     }));
   }
 
@@ -481,11 +480,25 @@ export const expandDivisionDetailSections = (
   const plainSections = asArray(data.sections) as SchemaSectionSubmission[];
   const expandedMotorSections: SchemaSectionSubmission[] = [];
 
-  for (const motor of [...asArray(data.motorDetails), ...asArray(data.motors)]) {
+  for (const motor of [
+    ...asArray(data.motorDetails),
+    ...asArray(data.motors),
+    ...asArray(data.curingDetails),
+  ]) {
     const rec = asRecord(motor);
     if (!rec) continue;
     const motorId = pickMotorIdFromRecord(rec);
     if (!motorId) continue;
+
+    if (isCastingNestedMotorDetail(rec)) {
+      expandedMotorSections.push(...castingMotorDetailToSections(rec, motorId));
+      continue;
+    }
+
+    if (isCuringNestedMotorDetail(rec)) {
+      expandedMotorSections.push(...curingMotorDetailToSections(rec, motorId));
+      continue;
+    }
 
     const details = asRecord(rec.details);
     const motorSections = asArray(details?.sections ?? rec.sections);
@@ -526,6 +539,49 @@ const wrapHardwareDivisionDataFromSections = (
       sections: motorSections.map(stripUnitKeysFromSection),
     })),
   };
+};
+
+const wrapCastingDivisionDataFromEntries = (
+  form: QualityControlFormState,
+  entries: QcDivisionEntry[],
+  options?: MapQualityControlPayloadOptions,
+): Record<string, unknown> => {
+  const motorSubmissionType: QcUnitSubmissionType = options?.unitSubmissionType ?? "DRAFT";
+  const motorDetails = entries
+    .filter((entry) => entry.kind === "CASTING_MOTOR")
+    .flatMap((entry) => {
+      const motorIdNo = String(entry.motorId ?? "").trim();
+      if (!motorIdNo) return [];
+      const values = form.divisionEntryValues?.[entry.entryId]?.schemaValues;
+      return [buildCastingMotorDetailPayload(values, motorIdNo, motorSubmissionType)];
+    });
+
+  return { motorDetails };
+};
+
+const wrapCuringDivisionDataFromEntries = (
+  form: QualityControlFormState,
+  entries: QcDivisionEntry[],
+  options?: MapQualityControlPayloadOptions,
+): Record<string, unknown> => {
+  const motorSubmissionType: QcUnitSubmissionType = options?.unitSubmissionType ?? "DRAFT";
+  const curingDetails = entries
+    .filter((entry) => entry.kind === "CURING_MOTOR")
+    .flatMap((entry) => {
+      const motorIdNo = String(entry.motorId ?? "").trim();
+      if (!motorIdNo) return [];
+      const values = form.divisionEntryValues?.[entry.entryId]?.schemaValues;
+      return [
+        buildCuringMotorDetailPayload(
+          values,
+          motorIdNo,
+          motorSubmissionType,
+          getCuringTypeFromValues(values, entry.subType) || entry.subType,
+        ),
+      ];
+    });
+
+  return { curingDetails };
 };
 
 const wrapDivisionDataFromSections = (
@@ -740,6 +796,24 @@ export const mapQualityControlPayload = (
             subType: null,
             divisionSubmissionType,
             data: wrapHardwareDivisionDataFromSections(motorSections, options),
+          };
+        }
+
+        if (division === "CASTING") {
+          return {
+            division: "CASTING" as const,
+            subType: null,
+            divisionSubmissionType,
+            data: wrapCastingDivisionDataFromEntries(form, entries, options),
+          };
+        }
+
+        if (division === "CURING") {
+          return {
+            division: "CURING" as const,
+            subType: null,
+            divisionSubmissionType,
+            data: wrapCuringDivisionDataFromEntries(form, entries, options),
           };
         }
 

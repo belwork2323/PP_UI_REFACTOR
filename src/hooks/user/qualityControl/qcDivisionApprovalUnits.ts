@@ -357,6 +357,10 @@ export const isQcUnitLocked = (status?: QcPartialItemStatus | string | null) => 
   return normalized === "WAITING_FOR_APPROVAL" || normalized === "APPROVED";
 };
 
+/** Read-only details theme applies only after approval — not while waiting for approval. */
+export const isQcUnitApproved = (status?: QcPartialItemStatus | string | null) =>
+  normalizePartialItemStatus(status) === "APPROVED";
+
 export const isQcUnitEditable = (status?: QcPartialItemStatus | string | null) =>
   !isQcUnitLocked(status);
 

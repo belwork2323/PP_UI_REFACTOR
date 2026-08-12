@@ -321,6 +321,14 @@ export const getSchemaForDivisionEntry = (
   form: QualityControlFormState,
   entry: QcDivisionEntry,
 ): SchemaDocumentV2 | null => {
+  // Casting / Curing / De-coring use custom panels — never bind a schema document.
+  if (
+    entry.kind === "CASTING_MOTOR" ||
+    entry.kind === "CURING_MOTOR" ||
+    entry.kind === "DE_CORING_MOTOR"
+  ) {
+    return null;
+  }
   if (entry.kind === "PROCESSING_MATERIAL" && entry.schemaCacheKey) {
     return form.schemasByKey?.[entry.schemaCacheKey] ?? null;
   }

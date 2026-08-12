@@ -39,7 +39,6 @@ type QCFormProps = {
   selectedStfMotorType: string;
   selectedMotorId: string;
   selectedHardwareProcesses: string[];
-  selectedCuringType: string;
   selectedTrimmingMotorCount: number | "";
   trimmingMotorReceivedDate: string;
   selectedPostCureOperation: string;
@@ -78,7 +77,6 @@ type QCFormProps = {
   onStfMotorTypeChange: (value: string) => void;
   onMotorIdChange: (value: string) => void;
   onHardwareProcessesChange: (values: string[]) => void;
-  onCuringTypeChange: (value: string) => void;
   onTrimmingMotorCountChange: (value: number | "") => void;
   onTrimmingMotorReceivedDateChange: (value: string) => void;
   onPostCureOperationChange: (value: string) => void;
@@ -114,7 +112,6 @@ const QCForm = ({
   selectedStfMotorType,
   selectedMotorId,
   selectedHardwareProcesses,
-  selectedCuringType,
   selectedTrimmingMotorCount,
   trimmingMotorReceivedDate,
   selectedPostCureOperation,
@@ -152,7 +149,6 @@ const QCForm = ({
   onStfMotorTypeChange,
   onMotorIdChange,
   onHardwareProcessesChange,
-  onCuringTypeChange,
   onTrimmingMotorCountChange,
   onTrimmingMotorReceivedDateChange,
   onPostCureOperationChange,
@@ -315,7 +311,6 @@ const QCForm = ({
           selectedStfMotorType={selectedStfMotorType}
           selectedMotorId={selectedMotorId}
           selectedHardwareProcesses={selectedHardwareProcesses}
-          selectedCuringType={selectedCuringType}
           selectedTrimmingMotorCount={selectedTrimmingMotorCount}
           trimmingMotorReceivedDate={trimmingMotorReceivedDate}
           selectedPostCureOperation={selectedPostCureOperation}
@@ -334,7 +329,6 @@ const QCForm = ({
           onStfMotorTypeChange={onStfMotorTypeChange}
           onMotorIdChange={onMotorIdChange}
           onHardwareProcessesChange={onHardwareProcessesChange}
-          onCuringTypeChange={onCuringTypeChange}
           onTrimmingMotorCountChange={onTrimmingMotorCountChange}
           onTrimmingMotorReceivedDateChange={onTrimmingMotorReceivedDateChange}
           onPostCureOperationChange={onPostCureOperationChange}

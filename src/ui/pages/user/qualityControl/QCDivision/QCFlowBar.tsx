@@ -17,7 +17,6 @@ import {
   isWeightmentDivisionFlow,
   STF_MOTOR_TYPE_SELECT_OPTIONS,
 } from "../../../../../hooks/user/qualityControl/qcDivisionRegistry";
-import { QC_CURING_TYPE_OPTIONS } from "../../../../../hooks/user/qualityControl/qcCuringConfig";
 import {
   QC_HARDWARE_PROCESS_OPTIONS,
   resolveQcMotorIdOptions,
@@ -67,7 +66,6 @@ type QCFlowBarProps = {
   selectedStfMotorType: string;
   selectedMotorId: string;
   selectedHardwareProcesses: string[];
-  selectedCuringType: string;
   selectedTrimmingMotorCount: number | "";
   trimmingMotorReceivedDate: string;
   selectedPostCureOperation: string;
@@ -87,7 +85,6 @@ type QCFlowBarProps = {
   onStfMotorTypeChange: (value: string) => void;
   onMotorIdChange: (value: string) => void;
   onHardwareProcessesChange: (values: string[]) => void;
-  onCuringTypeChange: (value: string) => void;
   onTrimmingMotorCountChange: (value: number | "") => void;
   onTrimmingMotorReceivedDateChange: (value: string) => void;
   onPostCureOperationChange: (value: string) => void;
@@ -108,7 +105,6 @@ const QCFlowBar = ({
   selectedStfMotorType,
   selectedMotorId,
   selectedHardwareProcesses,
-  selectedCuringType,
   selectedTrimmingMotorCount,
   trimmingMotorReceivedDate,
   selectedPostCureOperation,
@@ -127,7 +123,6 @@ const QCFlowBar = ({
   onStfMotorTypeChange,
   onMotorIdChange,
   onHardwareProcessesChange,
-  onCuringTypeChange,
   onTrimmingMotorCountChange,
   onTrimmingMotorReceivedDateChange,
   onPostCureOperationChange,
@@ -143,7 +138,9 @@ const QCFlowBar = ({
   const showRawMaterialType = panelType === "RAW_MATERIAL";
   const hideRawMaterialProcessingPickers = isRawMaterialProcessingType(selectedRawMaterialType);
   const showProcessingType =
-    showRawMaterialType && isRawMaterialProcessingType(selectedRawMaterialType) && !hideRawMaterialProcessingPickers;
+    showRawMaterialType &&
+    isRawMaterialProcessingType(selectedRawMaterialType) &&
+    !hideRawMaterialProcessingPickers;
   const isRawMaterialPremixFlow =
     isPremixProcessingFlow(selectedRawMaterialType, selectedProcessingType) &&
     !hideRawMaterialProcessingPickers;
@@ -161,6 +158,7 @@ const QCFlowBar = ({
     hideRawMaterialProcessingPickers ||
     (partialNavActive &&
       (isCastingFlow ||
+        isCuringFlow ||
         isDeCoringFlow ||
         isNdtFlow ||
         isMixingFlow ||
@@ -173,18 +171,11 @@ const QCFlowBar = ({
   const showStfMotorType = panelType === "STF";
   const showMotorIdSelect =
     !autoSeededPartialFlow &&
-    (isCastingFlow ||
-      isCuringFlow ||
-      isDeCoringFlow ||
-      isNdtFlow ||
-      isPropellantFlow ||
-      isWeightmentFlow ||
-      isTrimmingFlow);
+    (isNdtFlow || isPropellantFlow || isWeightmentFlow || isTrimmingFlow);
   const showPropellantProcess = isPropellantFlow && Boolean(selectedMotorId);
   const showWeightmentWeighscale = isWeightmentFlow && Boolean(selectedMotorId);
   const showWeightmentCalibrationDate = isWeightmentFlow && Boolean(selectedMotorId);
   const showHardwareProcesses = false;
-  const showCuringType = isCuringFlow;
   const showPostCureOperation = isPostCureFlow;
   const showInhibitorType =
     isPostCureFlow && isQcPostCureInhibitionOperation(selectedPostCureOperation);
@@ -219,14 +210,7 @@ const QCFlowBar = ({
           motorId,
         }),
       )) ||
-    (isCuringFlow &&
-      addedDivisionEntryKeys.includes(
-        buildDivisionEntryDedupKey({
-          flowKey: selectedDivision,
-          kind: "CURING_MOTOR",
-          motorId,
-        }),
-      )) ||
+    (isCuringFlow && addedDivisionEntryKeys.some((key) => key.startsWith(`CURING:${motorId}:`))) ||
     (isTrimmingFlow &&
       addedDivisionEntryKeys.includes(
         buildDivisionEntryDedupKey({
@@ -316,7 +300,6 @@ const QCFlowBar = ({
     showPostCureOperation ||
     showPostCureMotorId ||
     (showMotorIdSelect && !isTrimmingFlow) ||
-    showCuringType ||
     showWeightmentWeighscale ||
     showWeightmentCalibrationDate ||
     showPropellantProcess ||
@@ -417,9 +400,7 @@ const QCFlowBar = ({
               options={trimmingMotorCountOptions}
               width={220}
               theme={theme}
-              onChange={(value) =>
-                onTrimmingMotorCountChange(value === "" ? "" : Number(value))
-              }
+              onChange={(value) => onTrimmingMotorCountChange(value === "" ? "" : Number(value))}
             />
           ) : null}
 
@@ -484,55 +465,28 @@ const QCFlowBar = ({
           {showMotorIdSelect && !isTrimmingFlow ? (
             <CasePrepSelect
               label={
-                isCuringFlow
-                  ? S.CURING_MOTOR_ID_LABEL
-                  : isCastingFlow
-                    ? S.CASTING_MOTOR_ID_LABEL
-                    : isDeCoringFlow
-                      ? S.DE_CORING_MOTOR_ID_LABEL
-                      : isNdtFlow
-                        ? S.NDT_MOTOR_ID_LABEL
-                        : isWeightmentFlow
-                          ? S.HARDWARE_MOTOR_ID_LABEL
-                          : isPropellantFlow
-                            ? S.HARDWARE_MOTOR_ID_LABEL
-                            : S.HARDWARE_MOTOR_ID_LABEL
+                isNdtFlow
+                  ? S.NDT_MOTOR_ID_LABEL
+                  : isWeightmentFlow
+                    ? S.HARDWARE_MOTOR_ID_LABEL
+                    : isPropellantFlow
+                      ? S.HARDWARE_MOTOR_ID_LABEL
+                      : S.HARDWARE_MOTOR_ID_LABEL
               }
               value={selectedMotorId}
               placeholder={
-                isCuringFlow
-                  ? S.CURING_MOTOR_ID_PLACEHOLDER
-                  : isCastingFlow
-                    ? S.CASTING_MOTOR_ID_PLACEHOLDER
-                    : isDeCoringFlow
-                      ? S.DE_CORING_MOTOR_ID_PLACEHOLDER
-                      : isNdtFlow
-                        ? S.NDT_MOTOR_ID_PLACEHOLDER
-                        : isWeightmentFlow
-                          ? S.HARDWARE_MOTOR_ID_PLACEHOLDER
-                          : isPropellantFlow
-                            ? S.HARDWARE_MOTOR_ID_PLACEHOLDER
-                            : S.HARDWARE_MOTOR_ID_PLACEHOLDER
+                isNdtFlow
+                  ? S.NDT_MOTOR_ID_PLACEHOLDER
+                  : isWeightmentFlow
+                    ? S.HARDWARE_MOTOR_ID_PLACEHOLDER
+                    : isPropellantFlow
+                      ? S.HARDWARE_MOTOR_ID_PLACEHOLDER
+                      : S.HARDWARE_MOTOR_ID_PLACEHOLDER
               }
               options={motorIdOptions}
               width={260}
               theme={theme}
               onChange={onMotorIdChange}
-            />
-          ) : null}
-
-          {showCuringType ? (
-            <CasePrepSelect
-              label={S.CURING_TYPE_LABEL}
-              value={selectedCuringType}
-              placeholder={S.CURING_TYPE_PLACEHOLDER}
-              options={QC_CURING_TYPE_OPTIONS.map((option) => ({
-                value: option.value,
-                label: option.label,
-              }))}
-              width={260}
-              theme={theme}
-              onChange={onCuringTypeChange}
             />
           ) : null}
 
