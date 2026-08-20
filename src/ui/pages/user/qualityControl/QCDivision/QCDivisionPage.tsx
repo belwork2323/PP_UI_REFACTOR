@@ -6,7 +6,6 @@ import UserWorkflowFormHeader from "../../../../components/custom/UserWorkflowFo
 import QCDivisionList from "./QCDivisionList";
 import QCForm from "./QCForm";
 import QCDivisionDetailsView from "./QCDivisionDetailsView";
-import DivisionApprovalUnitDialog from "./components/DivisionApprovalUnitDialog";
 import FinalApprovalDivisionDialog from "./components/FinalApprovalDivisionDialog";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import getQualityControlTheme from "../../../../../app/theme/custom_themes/user/qualityControl/qualityControl_theme";
@@ -14,6 +13,7 @@ import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/m
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import { STRINGS } from "../../../../../app/config/strings";
 import useQCDivisionHook from "../../../../../hooks/user/qualityControl/useQCDivisionHook";
+import { resolveQcUnitActionLabelsFromPartialItem } from "../../../../../hooks/user/qualityControl/qcDivisionUnitActionLabels";
 
 const QualityControlPage = () => {
   const mode = useThemeStore((state) => state.mode);
@@ -22,7 +22,6 @@ const QualityControlPage = () => {
   const strings = STRINGS.QUALITY_CONTROL.QC_DIVISION;
   const [draftConfirmOpen, setDraftConfirmOpen] = useState(false);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
-  const [divisionDialogOpen, setDivisionDialogOpen] = useState(false);
   const [divisionConfirmOpen, setDivisionConfirmOpen] = useState(false);
   const [finalDialogOpen, setFinalDialogOpen] = useState(false);
 
@@ -49,8 +48,6 @@ const QualityControlPage = () => {
     selectedPostCureOperation,
     selectedInhibitorType,
     selectedPropellantProcess,
-    weightmentWeighscaleNo,
-    weightmentCalibrationDueDate,
     addedPremixNumbers,
     addedDivisionEntryKeys,
     activeDivisionGroupIndex,
@@ -78,8 +75,6 @@ const QualityControlPage = () => {
     handlePostCureOperationChange,
     handleInhibitorTypeChange,
     handlePropellantProcessChange,
-    handleWeightmentWeighscaleNoChange,
-    handleWeightmentCalibrationDueDateChange,
     handleLoadQcForm,
     handlePartialNavIndexChange,
     handleDivisionEntryValuesChange,
@@ -92,10 +87,7 @@ const QualityControlPage = () => {
     handleSaveDraft,
     handleSubmit,
     handleSubmitDivision,
-    handleSubmitForFinalApproval,
     canProceedDivisionSubmit,
-    canProceedFinalApproval,
-    divisionApprovalRows,
     finalApprovalGroups,
     finalApprovalRows,
     handleBackFromDetails,
@@ -105,9 +97,11 @@ const QualityControlPage = () => {
     scopedFormData,
     partialNavItems,
     activePartialNavIndex,
+    activePartialItem,
     partialNavActive,
     isActivePartialReadOnly,
     isActiveDivisionReadOnly,
+    isFormFieldsLocked,
     isFormFieldsReadOnly,
     formLockMessage,
     divisionGroupStatusByFlowKey,
@@ -117,7 +111,8 @@ const QualityControlPage = () => {
     getDivisionNavTabDisabledReason,
   } = hookState;
 
-  const formReadOnly = isFormFieldsReadOnly;
+  const formDetailsTheme = isFormFieldsReadOnly;
+  const formFieldsDisabled = isFormFieldsLocked;
   const unitActionsLocked = isActivePartialReadOnly || (!partialNavActive && isActiveDivisionReadOnly);
 
   const canAct =
@@ -128,9 +123,13 @@ const QualityControlPage = () => {
       (scopedFormData.solidPremixEntries?.length ?? 0) > 0 ||
       (scopedFormData.liquidPremixEntries?.length ?? 0) > 0);
 
-  // Keep Submit Division enabled so users can open the unit-status popup (RMP / Mixing).
-  // Proceed inside the dialog stays gated by canProceedDivisionSubmit (all units approved).
+  const isRevalidationDivision =
+    activeDivisionTabKey === "RAW_MATERIAL_REVALIDATION" ||
+    selectedDivision === "RAW_MATERIAL_REVALIDATION" ||
+    selectedRawMaterialType === "RAW_MATERIAL_REVALIDATION";
+
   const canOpenDivisionDialog =
+    isRevalidationDivision &&
     !readOnly &&
     (partialNavActive || !isActiveDivisionReadOnly) &&
     (Boolean(activeBatch?.formId) ||
@@ -139,6 +138,11 @@ const QualityControlPage = () => {
       partialNavItems.length > 0);
 
   const canOpenFinalDialog = Boolean(activeBatch?.formId);
+
+  const unitActionLabels = useMemo(
+    () => resolveQcUnitActionLabelsFromPartialItem(activePartialItem),
+    [activePartialItem],
+  );
 
   const listLoading = loading && !loadingFormDetails && view === "list";
 
@@ -220,14 +224,13 @@ const QualityControlPage = () => {
             selectedPostCureOperation={selectedPostCureOperation}
             selectedInhibitorType={selectedInhibitorType}
             selectedPropellantProcess={selectedPropellantProcess}
-            weightmentWeighscaleNo={weightmentWeighscaleNo}
-            weightmentCalibrationDueDate={weightmentCalibrationDueDate}
             addedPremixNumbers={addedPremixNumbers}
             addedDivisionEntryKeys={addedDivisionEntryKeys}
             activeDivisionGroupIndex={activeDivisionGroupIndex}
             activeDivisionSubIndex={activeDivisionSubIndex}
             partialNavItems={partialNavItems}
             activePartialNavIndex={activePartialNavIndex}
+            activePartialItem={activePartialItem}
             partialNavActive={partialNavActive}
             divisionGroupStatusByFlowKey={divisionGroupStatusByFlowKey}
             isPartialNavTabEnabled={isPartialNavTabEnabled}
@@ -236,7 +239,8 @@ const QualityControlPage = () => {
             getDivisionNavTabDisabledReason={getDivisionNavTabDisabledReason}
             isEditMode={isEditMode}
             readOnly={readOnly}
-            fieldsReadOnly={formReadOnly}
+            fieldsReadOnly={formDetailsTheme}
+            fieldsDisabled={formFieldsDisabled}
             canEditDivisionStructure={!readOnly && (partialNavActive || !isActiveDivisionReadOnly)}
             formLockMessage={formLockMessage}
             schemaLoading={schemaLoading}
@@ -254,8 +258,6 @@ const QualityControlPage = () => {
             onPostCureOperationChange={handlePostCureOperationChange}
             onInhibitorTypeChange={handleInhibitorTypeChange}
             onPropellantProcessChange={handlePropellantProcessChange}
-            onWeightmentWeighscaleNoChange={handleWeightmentWeighscaleNoChange}
-            onWeightmentCalibrationDueDateChange={handleWeightmentCalibrationDueDateChange}
             onLoadForm={handleLoadQcForm}
             onPartialNavIndexChange={handlePartialNavIndexChange}
             onActiveDivisionGroupIndexChange={setActiveDivisionGroupIndex}
@@ -269,17 +271,14 @@ const QualityControlPage = () => {
                 ? {
                     show: true,
                     actionLoading,
-                    // Locked divisions (waiting / approved) keep the button visible but disabled.
+                    showSubmitDivision: isRevalidationDivision,
                     canSubmitDivision: canOpenDivisionDialog,
-                    canSubmitFinalApproval: canOpenFinalDialog,
-                    onSubmitDivision: () => {
-                      if (partialNavActive) {
-                        setDivisionDialogOpen(true);
-                      } else {
-                        setDivisionConfirmOpen(true);
-                      }
-                    },
-                    onSubmitFinalApproval: () => setFinalDialogOpen(true),
+                    canViewStatus: canOpenFinalDialog,
+                    showSaveDraft: isRevalidationDivision,
+                    canSaveDraft: canAct,
+                    onSaveDraft: () => setDraftConfirmOpen(true),
+                    onSubmitDivision: () => setDivisionConfirmOpen(true),
+                    onViewStatus: () => setFinalDialogOpen(true),
                   }
                 : null
             }
@@ -290,6 +289,12 @@ const QualityControlPage = () => {
                     canAct,
                     actionLoading,
                     isEditMode,
+                    saveDraftLabel: unitActionLabels.saveDraftLabel,
+                    submitLabel: unitActionLabels.submitLabel,
+                    draftConfirmTitle: unitActionLabels.draftConfirmTitle,
+                    draftConfirmMessage: unitActionLabels.draftConfirmMessage,
+                    submitConfirmTitle: unitActionLabels.submitConfirmTitle,
+                    submitConfirmMessage: unitActionLabels.submitConfirmMessage,
                     onSaveDraft: () => setDraftConfirmOpen(true),
                     onSubmit: () => setSubmitConfirmOpen(true),
                   }
@@ -303,8 +308,16 @@ const QualityControlPage = () => {
               <ConfirmAlertDialog
                 open={draftConfirmOpen}
                 severity="info"
-                title={strings.UNIT_DRAFT_CONFIRM_TITLE}
-                message={strings.UNIT_DRAFT_CONFIRM_MESSAGE}
+                title={
+                  isRevalidationDivision
+                    ? strings.DRAFT_CONFIRM_TITLE
+                    : unitActionLabels.draftConfirmTitle
+                }
+                message={
+                  isRevalidationDivision
+                    ? strings.DRAFT_CONFIRM_MESSAGE
+                    : unitActionLabels.draftConfirmMessage
+                }
                 confirmLabel={strings.DRAFT_CONFIRM_LABEL}
                 cancelLabel={strings.CONFIRM_CANCEL_LABEL}
                 onConfirm={async () => {
@@ -316,16 +329,8 @@ const QualityControlPage = () => {
               <ConfirmAlertDialog
                 open={submitConfirmOpen}
                 severity="warning"
-                title={
-                  isEditMode
-                    ? strings.UNIT_RESUBMIT_CONFIRM_TITLE
-                    : strings.UNIT_SUBMIT_CONFIRM_TITLE
-                }
-                message={
-                  isEditMode
-                    ? strings.UNIT_RESUBMIT_CONFIRM_MESSAGE
-                    : strings.UNIT_SUBMIT_CONFIRM_MESSAGE
-                }
+                title={unitActionLabels.submitConfirmTitle}
+                message={unitActionLabels.submitConfirmMessage}
                 confirmLabel={
                   isEditMode ? strings.RESUBMIT_CONFIRM_LABEL : strings.SUBMIT_CONFIRM_LABEL
                 }
@@ -350,27 +355,13 @@ const QualityControlPage = () => {
                 }}
                 onCancel={() => setDivisionConfirmOpen(false)}
               />
-              <DivisionApprovalUnitDialog
-                open={divisionDialogOpen}
-                rows={divisionApprovalRows}
-                canProceed={canProceedDivisionSubmit}
-                confirmDisabled={actionLoading}
-                onClose={() => setDivisionDialogOpen(false)}
-                onProceed={async () => {
-                  setDivisionDialogOpen(false);
-                  await handleSubmitDivision();
-                }}
-              />
               <FinalApprovalDivisionDialog
                 open={finalDialogOpen}
                 groups={finalApprovalGroups}
-                canProceed={canProceedFinalApproval}
-                confirmDisabled={actionLoading}
+                canProceed={false}
+                hideConfirm
                 onClose={() => setFinalDialogOpen(false)}
-                onProceed={async () => {
-                  setFinalDialogOpen(false);
-                  await handleSubmitForFinalApproval();
-                }}
+                onProceed={() => undefined}
               />
             </>
           ) : null}

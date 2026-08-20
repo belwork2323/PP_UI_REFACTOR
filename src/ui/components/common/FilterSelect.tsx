@@ -19,6 +19,7 @@ interface FilterSelectProps {
   /** Override for the “All …” menu item text. */
   allOptionLabel?: string;
   compact?: boolean;
+  filterPanel?: boolean;
 }
 
 function defaultAllOptionLabel(label: string): string {
@@ -45,6 +46,7 @@ const FilterSelect = ({
   showAllOption = true,
   allOptionLabel,
   compact = false,
+  filterPanel = false,
 }: FilterSelectProps) => {
   const items: FilterSelectOption[] =
     optionItems ?? options.map((option) => ({ value: option, label: option }));
@@ -62,8 +64,9 @@ const FilterSelect = ({
       value={value}
       onChange={(nextValue) => onChange({ target: { value: nextValue } })}
       options={dropdownOptions}
-      compact={compact}
-      sx={{ minWidth: 140, ...sx }}
+      compact={filterPanel ? false : compact}
+      filterPanel={filterPanel}
+      sx={filterPanel ? sx : { minWidth: 140, ...sx }}
       MenuProps={menuProps}
       itemSx={itemSx}
     />

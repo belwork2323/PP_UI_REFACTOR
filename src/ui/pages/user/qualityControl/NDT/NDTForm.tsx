@@ -26,6 +26,7 @@ import {
 } from "../../../../../hooks/user/previousStageApproval";
 import { generalController } from "../../../../../controllers/admin/common/generalController";
 import PremixStatusChip from "../../manufacturing/RawMaterial/components/PremixStatusChip";
+import ViewStatusButton from "../../../../components/common/ViewStatusButton";
 import FinalApprovalMotorDialog, {
   areAllMotorsApproved,
   buildFinalApprovalMotorRows,
@@ -60,7 +61,6 @@ type Props = {
   onLoadNDTForm: (motorId?: string) => void;
   onSaveMotorDraft?: (motorId: string) => void;
   onSubmitMotor?: (motorId: string) => void;
-  onSubmitForFinalApproval?: () => void;
 };
 
 const NDTForm = ({
@@ -81,7 +81,6 @@ const NDTForm = ({
   onLoadNDTForm,
   onSaveMotorDraft,
   onSubmitMotor,
-  onSubmitForFinalApproval,
 }: Props) => {
   const ndtTheme = theme.qualityControl.ndt;
   const brand = ndtTheme.brand;
@@ -230,9 +229,7 @@ const NDTForm = ({
         if (current && motorNavGate.isMotorWorkflowEnabled(current.motorId)) {
           return Math.min(prev, motorCards.length - 1);
         }
-        return firstEnabled >= 0
-          ? firstEnabled
-          : Math.min(prev, motorCards.length - 1);
+        return firstEnabled >= 0 ? firstEnabled : Math.min(prev, motorCards.length - 1);
       });
     }
 
@@ -280,7 +277,6 @@ const NDTForm = ({
     [motorCards, motorStatusById],
   );
   const allMotorsApproved = areAllMotorsApproved(finalApprovalRows);
-  const canOpenFinalApproval = Boolean(activeBatch?.formId);
 
   const navPalette = {
     primary: brand.primary,
@@ -354,16 +350,6 @@ const NDTForm = ({
             </Box>
           </Stack>
 
-          {motorCards.length > 0 ? (
-            <Button
-              variant="contained"
-              size="small"
-              disabled={actionLoading || !canOpenFinalApproval}
-              onClick={() => setFinalApprovalOpen(true)}
-            >
-              {strings.SUBMIT_FOR_FINAL_APPROVAL}
-            </Button>
-          ) : null}
         </Stack>
       </Box>
 
@@ -398,6 +384,32 @@ const NDTForm = ({
             />
           </UserWorkflowNavPanel>
 
+          <Stack direction="row" justifyContent="flex-end" spacing={1}>
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={actionLoading || activeMotorLocked || !isCurrentMotorSetupReady}
+              onClick={() => onSaveMotorDraft?.(activeMotorEntry.motorId)}
+              sx={{ textTransform: "none", fontWeight: 700 }}
+            >
+              {strings.SAVE_MOTOR_DRAFT(activeMotorEntry.motorId)}
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              disabled={actionLoading || activeMotorLocked || !isCurrentMotorSetupReady}
+              onClick={() => onSubmitMotor?.(activeMotorEntry.motorId)}
+              sx={{ textTransform: "none", fontWeight: 700 }}
+            >
+              {strings.SUBMIT_MOTOR(activeMotorEntry.motorId)}
+            </Button>
+            <ViewStatusButton
+              disabled={actionLoading}
+              onClick={() => setFinalApprovalOpen(true)}
+              label={strings.VIEW_STATUS}
+            />
+          </Stack>
+
           <Box sx={ndtTheme.panel.motorCard}>
             <Stack
               direction={{ xs: "column", sm: "row" }}
@@ -417,24 +429,6 @@ const NDTForm = ({
                 />
               </Stack>
 
-              <Stack direction="row" gap={1} flexShrink={0} alignItems="center">
-                <Button
-                  variant="outlined"
-                  size="small"
-                  disabled={actionLoading || activeMotorLocked || !isCurrentMotorSetupReady}
-                  onClick={() => onSaveMotorDraft?.(activeMotorEntry.motorId)}
-                >
-                  {strings.SAVE_MOTOR_DRAFT}
-                </Button>
-                <Button
-                  variant="contained"
-                  size="small"
-                  disabled={actionLoading || activeMotorLocked || !isCurrentMotorSetupReady}
-                  onClick={() => onSubmitMotor?.(activeMotorEntry.motorId)}
-                >
-                  {strings.SUBMIT_MOTOR}
-                </Button>
-              </Stack>
             </Stack>
 
             {activeMotorLocked ? (
@@ -503,7 +497,7 @@ const NDTForm = ({
         rows={finalApprovalRows}
         statusConfig={statusConfig}
         allMotorsApproved={allMotorsApproved}
-        confirmDisabled={actionLoading}
+        hideConfirm
         copy={{
           title: strings.FINAL_APPROVAL_DIALOG_TITLE,
           info: strings.FINAL_APPROVAL_DIALOG_INFO,
@@ -515,10 +509,6 @@ const NDTForm = ({
           colStatus: strings.FINAL_APPROVAL_COL_STATUS,
         }}
         onClose={() => setFinalApprovalOpen(false)}
-        onProceed={async () => {
-          setFinalApprovalOpen(false);
-          await onSubmitForFinalApproval?.();
-        }}
       />
     </Box>
   );

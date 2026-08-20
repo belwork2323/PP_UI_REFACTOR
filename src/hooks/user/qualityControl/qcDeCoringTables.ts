@@ -1,9 +1,13 @@
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import dayjs from "dayjs";
+import { UI_DATETIME_FORMAT } from "../../../utils/dateUtils";
 import {
   QC_DE_CORING_MANUFACTURING_SECTION_ID,
   QC_DE_CORING_SECTION_IDS,
   type QcDeCoringField,
 } from "./qcDeCoringConfig";
+
+export type QcDeCoringMotorSubmissionType = "DRAFT" | "SUBMIT";
 
 const formKey = (sectionId: string, blockId: string) => `${sectionId}::${blockId}`;
 
@@ -23,6 +27,11 @@ const pickFirstValue = (...candidates: unknown[]): string => {
   }
   return "";
 };
+
+const omitEmpty = <T extends Record<string, unknown>>(record: T): Record<string, unknown> =>
+  Object.fromEntries(
+    Object.entries(record).filter(([, value]) => value !== undefined && value !== "" && value !== null),
+  );
 
 export const createInitialDeCoringValues = (): SchemaFormValues => ({
   [formKey(QC_DE_CORING_SECTION_IDS.DETAILS, "DE_CORING_LOAD")]: "",
@@ -68,21 +77,65 @@ const mapObservationsFromRecord = (data: Record<string, unknown>): string => {
     data.DECORING_VISUAL_OBSERVATION,
     data.VISUAL_OBSERVATION,
     data.VISUAL_OBSERVATIONS,
+    data.visualObservation,
+    data.visualObservations,
   );
   return [observations, remarks, visual].filter(Boolean).join("; ");
 };
 
-const mapDetailsFromRecord = (data: Record<string, unknown>): Record<QcDeCoringField, string> => ({
-  DE_CORING_LOAD: pickFirstValue(data.DE_CORING_LOAD, data.DECORING_LOAD, data.decoringLoad),
-  DE_CORING_DATE_TIME: pickFirstValue(
-    data.DE_CORING_DATE_TIME,
-    data.DECORING_DATE_TIME,
-    data.DECORING_DATE,
-    data.decoringDateTime,
-    data.decoringDate,
+const toUiDeCoringDateTime = (value: string): string => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (/^\d{1,2}-\d{1,2}-\d{4}/.test(raw)) return raw;
+  const parsed = dayjs(raw);
+  if (!parsed.isValid()) return raw;
+  if (/[T\s]\d{1,2}:\d{2}/.test(raw)) return parsed.format(UI_DATETIME_FORMAT);
+  return parsed.format("DD-MM-YYYY");
+};
+
+export const mapDeCoringDetailsFromRecord = (
+  data: Record<string, unknown>,
+): Record<QcDeCoringField, string> => ({
+  DE_CORING_LOAD: pickFirstValue(
+    data.DE_CORING_LOAD,
+    data.DECORING_LOAD,
+    data.deCoringLoad,
+    data.decoringLoad,
+    data.decoringLoadKg,
+    data.DECORING_LOAD_KG,
+  ),
+  DE_CORING_DATE_TIME: toUiDeCoringDateTime(
+    pickFirstValue(
+      data.DE_CORING_DATE_TIME,
+      data.DECORING_DATE_TIME,
+      data.DECORING_DATE,
+      data.deCoringDateTime,
+      data.decoringDateTime,
+      data.decoringDate,
+    ),
   ),
   OBSERVATIONS: mapObservationsFromRecord(data),
 });
+
+/** Prefer nested manufacturing/QC `details.decoringDetails` / flat `deCoringDetails` when present. */
+export const resolveDeCoringDetailsRecord = (
+  motor: Record<string, unknown> | null | undefined,
+): Record<string, unknown> => {
+  if (!motor) return {};
+  const details = asRecord(motor.details) ?? {};
+  const nested =
+    asRecord(details.deCoringDetails) ??
+    asRecord(details.decoringDetails) ??
+    asRecord(motor.deCoringDetails) ??
+    asRecord(motor.decoringDetails) ??
+    asRecord(details.DECORING_DETAILS) ??
+    null;
+  return {
+    ...motor,
+    ...details,
+    ...(nested ?? {}),
+  };
+};
 
 export const hydrateDeCoringValuesFromSections = (
   sections: SchemaSectionSubmission[] | null | undefined,
@@ -94,16 +147,152 @@ export const hydrateDeCoringValuesFromSections = (
     if (!isDeCoringSectionId(sectionId)) continue;
     const data = asRecord(asArray(section.sectionData)[0]);
     if (!data) continue;
-    const mapped = mapDetailsFromRecord(data);
-    values[formKey(QC_DE_CORING_SECTION_IDS.DETAILS, "DE_CORING_LOAD")] = mapped.DE_CORING_LOAD;
-    values[formKey(QC_DE_CORING_SECTION_IDS.DETAILS, "DE_CORING_DATE_TIME")] =
-      mapped.DE_CORING_DATE_TIME;
-    values[formKey(QC_DE_CORING_SECTION_IDS.DETAILS, "OBSERVATIONS")] = mapped.OBSERVATIONS;
+    const mapped = mapDeCoringDetailsFromRecord(data);
+    (Object.keys(mapped) as QcDeCoringField[]).forEach((field) => {
+      values[formKey(QC_DE_CORING_SECTION_IDS.DETAILS, field)] = mapped[field];
+    });
   }
 
   return values;
 };
 
+/** Convert UI datetime (DD-MM-YYYY HH:mm) → API `YYYY-MM-DDTHH:mm:ss`. */
+const toDeCoringApiDateTime = (value: string): string | undefined => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return undefined;
+
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2})?/.test(raw)) {
+    return raw.length === 16 ? `${raw}:00` : raw.slice(0, 19);
+  }
+
+  const dmyTime = raw.match(
+    /^(\d{1,2})-(\d{1,2})-(\d{4})(?:[ T](\d{1,2}):(\d{2})(?::\d{2})?)?$/,
+  );
+  if (dmyTime) {
+    const day = dmyTime[1].padStart(2, "0");
+    const month = dmyTime[2].padStart(2, "0");
+    const year = dmyTime[3];
+    const hour = (dmyTime[4] ?? "0").padStart(2, "0");
+    const minute = (dmyTime[5] ?? "0").padStart(2, "0");
+    return `${year}-${month}-${day}T${hour}:${minute}:00`;
+  }
+
+  return raw;
+};
+
+const toDeCoringApiLoad = (value: string): number | string | undefined => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return undefined;
+  const asNumber = Number(raw);
+  return Number.isFinite(asNumber) ? asNumber : raw;
+};
+
+/**
+ * Flat De-coring motor payload for create/update (`data.deCoringDetails[]`).
+ * Matches:
+ * `{ motorIdNo, motorSubmissionType, deCoringLoad, deCoringDateTime, observations }`
+ */
+export const buildDeCoringMotorDetailPayload = (
+  values: SchemaFormValues | null | undefined,
+  motorIdNo: string,
+  motorSubmissionType: QcDeCoringMotorSubmissionType = "DRAFT",
+): Record<string, unknown> => {
+  const load = toDeCoringApiLoad(getDeCoringField(values, "DE_CORING_LOAD"));
+  const dateTime = toDeCoringApiDateTime(getDeCoringField(values, "DE_CORING_DATE_TIME"));
+  const observations = getDeCoringField(values, "OBSERVATIONS");
+
+  return omitEmpty({
+    motorIdNo,
+    motorSubmissionType,
+    deCoringLoad: load,
+    deCoringDateTime: dateTime,
+    observations: observations || undefined,
+  });
+};
+
+export const isDeCoringNestedMotorDetail = (rec: Record<string, unknown>) => {
+  if (Array.isArray(rec.decoringSections)) return true;
+  const details = asRecord(rec.details);
+  if (Array.isArray(details?.decoringSections)) return true;
+  if (
+    asRecord(details?.deCoringDetails) ||
+    asRecord(details?.decoringDetails) ||
+    asRecord(rec.deCoringDetails) ||
+    asRecord(rec.decoringDetails)
+  ) {
+    return true;
+  }
+  // Flat QC create/update unit shape
+  if (
+    rec.deCoringLoad != null ||
+    rec.deCoringDateTime != null ||
+    rec.DE_CORING_LOAD != null ||
+    rec.DE_CORING_DATE_TIME != null
+  ) {
+    return true;
+  }
+
+  const candidateSections = [
+    ...asArray(rec.sections),
+    ...asArray(details?.sections),
+  ];
+  return candidateSections.some((section) => {
+    const sectionId = String(asRecord(section)?.sectionId ?? "")
+      .trim()
+      .toUpperCase()
+      .replace(/-/g, "_");
+    return (
+      sectionId === QC_DE_CORING_SECTION_IDS.DETAILS ||
+      sectionId === QC_DE_CORING_MANUFACTURING_SECTION_ID
+    );
+  });
+};
+
+/** Flatten nested create/update de-coring motor into form sections for hydrate. */
+export const deCoringMotorDetailToSections = (
+  rec: Record<string, unknown>,
+  motorId: string,
+): SchemaSectionSubmission[] => {
+  const sections: SchemaSectionSubmission[] = [];
+  const nestedSections = [
+    ...asArray(rec.sections),
+    ...asArray(rec.decoringSections),
+    ...asArray(asRecord(rec.details)?.sections),
+    ...asArray(asRecord(rec.details)?.decoringSections),
+  ];
+
+  for (const section of nestedSections) {
+    const sec = asRecord(section);
+    if (!sec) continue;
+    const sectionId = String(sec.sectionId ?? "").trim();
+    if (!isDeCoringSectionId(sectionId)) continue;
+    const data = asRecord(asArray(sec.sectionData)[0]) ?? {};
+    const mapped = mapDeCoringDetailsFromRecord({
+      ...resolveDeCoringDetailsRecord(rec),
+      ...data,
+    });
+    sections.push({
+      sectionId: QC_DE_CORING_SECTION_IDS.DETAILS,
+      sectionData: [mapped],
+      motorId,
+    } as SchemaSectionSubmission);
+  }
+
+  if (!sections.length) {
+    const mapped = mapDeCoringDetailsFromRecord(resolveDeCoringDetailsRecord(rec));
+    if (Object.values(mapped).some(hasValue)) {
+      sections.push({
+        sectionId: QC_DE_CORING_SECTION_IDS.DETAILS,
+        sectionData: [mapped],
+        motorId,
+      } as SchemaSectionSubmission);
+    }
+  }
+
+  return sections;
+};
+
+/** Legacy section payload (internal hydrate / manufacturing seed). */
 export const buildDeCoringSectionPayload = (
   values: SchemaFormValues | null | undefined,
   motorId?: string | null,

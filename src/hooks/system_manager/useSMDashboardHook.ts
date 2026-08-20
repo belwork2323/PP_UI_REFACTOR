@@ -2,11 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAuthStore } from "../../app/store/authStore";
 import { systemManagerController } from "../../controllers/system_manager/systemManagerController";
 import { SMChartDataModel } from "../../data/models/SystemManagerModel";
+import { DEFAULT_DATE_FILTER_TYPE } from "../../ui/components/custom/dashboard/DashboardDateFilter";
 
 const createEmptyDashboard = (stageConfig: any[]) => ({
   kpiData: [],
   stageMetrics: [],
-  stageData: { totalBatches: 0, filterType: "month", stages: [] as any[] },
+  stageData: { totalBatches: 0, filterType: DEFAULT_DATE_FILTER_TYPE, stages: [] as any[] },
   activeBatches: [],
   blockEvents: [],
   chartData: { areaData: [], barData: [] },
@@ -36,6 +37,16 @@ export const getSMDateRange = (
   customEndDate: string,
 ) => {
   const now = new Date();
+  if (filterType === "six_months") {
+    const start = new Date(now);
+    start.setMonth(start.getMonth() - 6);
+    return { apiFilter: "custom", startDate: toApiDate(start), endDate: toApiDate(now) };
+  }
+  if (filterType === "one_year") {
+    const start = new Date(now);
+    start.setFullYear(start.getFullYear() - 1);
+    return { apiFilter: "custom", startDate: toApiDate(start), endDate: toApiDate(now) };
+  }
   if (filterType === "day") {
     const today = toApiDate(now);
     return { apiFilter: "day", startDate: today, endDate: today };
@@ -78,7 +89,7 @@ export const useSMDashboard = (config: {
   const [loading, setLoading] = useState(true);
   const [statsLoading, setStatsLoading] = useState(false);
   const [alertsLoading, setAlertsLoading] = useState(false);
-  const [filterType, setFilterTypeState] = useState("month");
+  const [filterType, setFilterTypeState] = useState(DEFAULT_DATE_FILTER_TYPE);
   /** Draft custom dates (picker) — applied only on Apply Filter */
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
@@ -86,7 +97,7 @@ export const useSMDashboard = (config: {
   const [appliedCustomStart, setAppliedCustomStart] = useState("");
   const [appliedCustomEnd, setAppliedCustomEnd] = useState("");
   const hasLoadedOnceRef = useRef(false);
-  const lastValidBoundsRef = useRef(getSMDateRange("month", "", ""));
+  const lastValidBoundsRef = useRef(getSMDateRange(DEFAULT_DATE_FILTER_TYPE, "", ""));
   const [customApplyToken, setCustomApplyToken] = useState(0);
 
   const { stageConfig, stageColors, kpiVariants } = config;
@@ -152,7 +163,7 @@ export const useSMDashboard = (config: {
         }),
         stageData: {
           totalBatches: chartData.totalActiveBatches ?? chartData.stageTotalBatches ?? 0,
-          filterType: apiFilter,
+          filterType: ft,
           stages: (chartData.stageProcessed ?? []).map((item: any) => {
             const key = toStageKey(item.stage);
             const stageCfg = stageConfig.find((sc: any) => sc.key === key);
@@ -239,7 +250,7 @@ export const useSMDashboard = (config: {
   }, [customStartDate, customEndDate]);
 
   const clearDateFilter = useCallback(() => {
-    setFilterTypeState("month");
+    setFilterTypeState(DEFAULT_DATE_FILTER_TYPE);
     setCustomStartDate("");
     setCustomEndDate("");
     setAppliedCustomStart("");

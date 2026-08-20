@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, type ChangeEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import {
   alpha,
   Box,
@@ -17,15 +17,15 @@ import {
 } from "@mui/material";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
-import { useAlertStore } from "../../../../../app/store/alertStore";
-import { fileUtils } from "../../../../../utils/FileUtils";
-import { rmCertDebug, rmCertDebugFile, summarizeLotCerts } from "../../../../../utils/rawMaterialCertUploadDebug";
+import { rmCertDebug, summarizeLotCerts } from "../../../../../utils/rawMaterialCertUploadDebug";
 import CertificateUploadSection from "./CertificateUploadSection";
+import FilePreviewDialog from "../../../../components/common/FilePreviewDialog";
 import type { LotCertificate, MaterialLotBlock, SpecRow } from "../../../../../data/models/user/RawMaterialProcurementModel";
 import {
   computeIsOutOfRange,
   isSpecRowFailed,
 } from "../../../../../data/models/user/RawMaterialProcurementModel";
+import { useLotCertificateActions } from "../../../../../hooks/user/sourcing/useLotCertificateActions";
 import MandatoryFormField, { mandatoryAsteriskSx, mandatoryFieldInputSx } from "./MandatoryFormField";
 import {
   getLotFieldErrors,
@@ -62,7 +62,24 @@ const MaterialLotSection = ({
   const formStrings = STRINGS.SOURCING.SPECIFICATION_FORM;
   const specStyles = theme.sourcing.rawMaterial.specificationForm;
   const lotErrors = getLotFieldErrors(lot, validationMessages, showFieldErrors);
-  const showAlert = useAlertStore((state) => state.showAlert);
+  const lotRef = useRef(lot);
+  lotRef.current = lot;
+
+  const handleCertificatesChange = useCallback(
+    (certificates: LotCertificate[]) => {
+      onUpdate({ ...lotRef.current, certificates });
+    },
+    [onUpdate],
+  );
+  const {
+    handleFilesSelected,
+    handleRetry,
+    handleRemove,
+    handleOpen,
+    filePreview,
+    closeFilePreview,
+    downloadFilePreview,
+  } = useLotCertificateActions(lot.certificates ?? [], handleCertificatesChange);
 
   useEffect(() => {
     rmCertDebug("0.lot.render", {
@@ -110,89 +127,6 @@ const MaterialLotSection = ({
       onUpdate({ ...lot, certificates: certs });
     },
     [lot, onUpdate]
-  );
-
-  const removeCertificate = useCallback(
-    (certIndex: number) => {
-      const certs = [...(lot.certificates ?? [])];
-      const removed = certs[certIndex];
-      if (removed?.fileUrl?.startsWith("blob:")) {
-        try {
-          URL.revokeObjectURL(removed.fileUrl);
-        } catch {
-          /* ignore */
-        }
-      }
-      onUpdate({ ...lot, certificates: certs.filter((_, i) => i !== certIndex) });
-    },
-    [lot, onUpdate]
-  );
-
-  const handleCertificateFiles = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const input = event.currentTarget;
-      // Copy before clearing — FileList is live; clearing value empties it (breaks on some browsers).
-      const incoming = input.files ? Array.from(input.files) : [];
-
-      rmCertDebug("1.fileInput.onChange", {
-        lotIndex,
-        lotNo: lot.lotNo,
-        pickedCount: incoming.length,
-        files: incoming.map((f) => ({
-          name: f.name,
-          size: f.size,
-          type: f.type || "(empty mime)",
-        })),
-        priorCertCount: (lot.certificates ?? []).length,
-      });
-
-      if (!incoming.length) {
-        rmCertDebug("1.fileInput.empty", { reason: "zero files after copy" });
-        return;
-      }
-
-      const next = [...(lot.certificates ?? [])];
-      let added = 0;
-
-      try {
-        for (const file of incoming) {
-          rmCertDebugFile("2.file.picked", file, { lotIndex, lotNo: lot.lotNo });
-          const { valid, error } = fileUtils.validateCertificateFile(file);
-          if (!valid) {
-            rmCertDebug("2.file.rejected", { name: file.name, error });
-            showAlert(`${file.name}: ${error ?? formStrings.CERT_INVALID_FILE}`, "warning");
-            continue;
-          }
-          const blobUrl = URL.createObjectURL(file);
-          rmCertDebug("2.file.accepted", {
-            name: file.name,
-            blobUrlPrefix: blobUrl.slice(0, 40),
-          });
-          next.push({ fileName: file.name, fileUrl: blobUrl, certificateType: "", file });
-          added += 1;
-        }
-
-        if (added > 0) {
-          const updatedLot = { ...lot, certificates: next };
-          rmCertDebug("3.lot.onUpdate.call", {
-            lotIndex,
-            added,
-            lot: summarizeLotCerts(updatedLot),
-          });
-          onUpdate(updatedLot);
-        } else {
-          rmCertDebug("3.lot.onUpdate.skipped", { reason: "no valid files added" });
-        }
-      } catch (err) {
-        rmCertDebug("1.fileInput.error", { message: err instanceof Error ? err.message : String(err) });
-        showAlert(formStrings.CERT_INVALID_FILE, "error");
-      } finally {
-        queueMicrotask(() => {
-          input.value = "";
-        });
-      }
-    },
-    [formStrings.CERT_INVALID_FILE, lot, lotIndex, onUpdate, showAlert]
   );
 
   return (
@@ -357,9 +291,19 @@ const MaterialLotSection = ({
         certificates={lot.certificates ?? []}
         formStrings={formStrings}
         theme={theme}
-        onFilesSelected={handleCertificateFiles}
+        onFilesSelected={handleFilesSelected}
         onCertChange={handleCertChange}
-        onRemove={removeCertificate}
+        onRemove={handleRemove}
+        onRetry={handleRetry}
+        onOpen={handleOpen}
+      />
+
+      <FilePreviewDialog
+        preview={filePreview}
+        onClose={closeFilePreview}
+        onDownload={downloadFilePreview}
+        themeColor={theme.palette.primary}
+        themeColorLight={theme.palette.primaryLight}
       />
     </Box>
   );

@@ -17,14 +17,61 @@
   "subType": "INHIBITION",
   "inhibitorType": "NOT_APPLICABLE",
   "functionality": "CREATE_POST_CURE_FORM",
-  "message": "Inhibition not applicable",
+  "message": "Inhibition not applicable schema fetched successfully",
   "timestamp": "2026-06-10T10:00:00Z",
   "data": {
     "layout": { "type": "flat" },
     "meta": {
-      "title": "Inhibition Details",
-      "description": "Inhibition skipped for selected motor"
+      "title": "Inhibition Not Applicable",
+      "description": "Dispatch and station details when inhibition is not applicable"
     },
-    "sections": []
+    "sections": [
+      {
+        "id": "INHIBITION_NOT_APPLICABLE",
+        "title": "Inhibition Not Applicable",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "group",
+            "id": "DISPATCH_STATION_FIELDS",
+            "ui": {
+              "direction": "row",
+              "wrap": true,
+              "gap": "md",
+              "alignItems": "flex-end"
+            },
+            "children": [
+              {
+                "type": "field",
+                "id": "DISPATCH_DATE",
+                "fieldType": "date",
+                "label": "Dispatch Time",
+                "ui": {
+                  "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+                  "maxWidth": "280px"
+                }
+              },
+              {
+                "type": "field",
+                "id": "DISPATCH_STATION",
+                "fieldType": "text",
+                "label": "Station",
+                "ui": {
+                  "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+                  "maxWidth": "280px"
+                }
+              }
+            ]
+          },
+          {
+            "type": "field",
+            "id": "REMARKS",
+            "fieldType": "textarea",
+            "label": "Remarks",
+            "ui": { "colSpan": { "xs": 12 } }
+          }
+        ]
+      }
+    ]
   }
 }

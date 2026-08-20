@@ -11,6 +11,8 @@ import {
 import {
   groupUnitStatusesByDivisionTabKey,
   resolveUnitStatusTabKey,
+  extractWeighmentMotorNavFromFormDetails,
+  mergePartialNavItems,
 } from "../../user/qualityControl/qcDivisionDataSource";
 
 const normalizeStatusKey = (value: unknown): string =>
@@ -95,6 +97,35 @@ export const resolveInitialApproverPartialNavIndex = (
   return viewableIndex >= 0 ? viewableIndex : 0;
 };
 
+const formatQcApproverDivisionLabel = (key: string): string => {
+  const normalized = String(key ?? "").trim().toUpperCase();
+  const labels: Record<string, string> = {
+    RAW_MATERIAL_REVALIDATION: "Raw Material Revalidation",
+    RAW_MATERIAL_PROCESSING: "Raw Material Processing",
+    RAW_MATERIAL: "Raw Material",
+    MIXING: "Mixing",
+    HARDWARE: "Hardware",
+    CASTING: "Casting",
+    CURING: "Curing",
+    DE_CORING: "De-coring",
+    TRIMMING: "Trimming",
+    POST_CURE: "Post Cure",
+    POST_CURE_OPERATION: "Post Cure",
+    NDT: "NDT",
+    QC: "QC",
+    PROPELLANT_PROPERTIES: "QC",
+    WEIGHTMENT: "Weighment",
+    WEIGHMENT: "Weighment",
+    STATIC_TEST_FACILITY: "Static Test Facility",
+  };
+  if (labels[normalized]) return labels[normalized];
+  return normalized
+    .split("_")
+    .filter(Boolean)
+    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
+    .join(" ");
+};
+
 export type QcApproverPartialState = {
   partialNavByDivision: Record<string, QcPartialNavItem[]>;
   divisionStatusByFlowKey: Record<string, QcPartialItemStatus>;
@@ -123,11 +154,18 @@ export const buildQcApproverPartialState = (
     divisionStatusByFlowKey[key] = toPartialStatus(rec.status);
   });
 
-  // Unit chips come strictly from form premixStatuses / motorStatuses (same as user final-approval).
+  // Unit chips from motorStatuses / premixStatuses; Weighment also from divisionDetails.motorWeightDetails.
   const unitsByTabKey = groupUnitStatusesByDivisionTabKey({
     premixStatuses,
     motorStatuses,
   });
+  const weighmentMotors = extractWeighmentMotorNavFromFormDetails(root);
+  if (weighmentMotors.length) {
+    unitsByTabKey.WEIGHTMENT = mergePartialNavItems(
+      unitsByTabKey.WEIGHTMENT ?? [],
+      weighmentMotors,
+    );
+  }
 
   const partialNavByDivision: Record<string, QcPartialNavItem[]> = {};
   const allKeys = new Set<string>([
@@ -142,14 +180,31 @@ export const buildQcApproverPartialState = (
     if (
       normalized === "PROPELLANT_PROPERTIES" ||
       normalized === "POST_CURE_OPERATION" ||
-      normalized === "RAW_MATERIAL"
+      normalized === "RAW_MATERIAL" ||
+      normalized === "WEIGHMENT"
     ) {
       return;
     }
-    partialNavByDivision[normalized] = (unitsByTabKey[normalized] ?? []).filter(
+    const units = (unitsByTabKey[normalized] ?? []).filter(
       (item) =>
-        item.kind === "PREMIX" || item.kind === "FINAL_MIX" || item.kind === "MOTOR",
+        item.kind === "PREMIX" ||
+        item.kind === "FINAL_MIX" ||
+        item.kind === "MOTOR" ||
+        item.kind === "DIVISION",
     );
+    // Revalidation with no unit chips: expose a division unit for approve/reject.
+    if (!units.length && normalized === "RAW_MATERIAL_REVALIDATION") {
+      const divisionStatus = divisionStatusByFlowKey[normalized];
+      if (divisionStatus && divisionStatus !== "TO_BE_INITIATED") {
+        units.push({
+          id: `division:${normalized}`,
+          kind: "DIVISION",
+          label: formatQcApproverDivisionLabel(normalized),
+          status: divisionStatus,
+        });
+      }
+    }
+    partialNavByDivision[normalized] = units;
     if (!(normalized in divisionStatusByFlowKey)) {
       // Infer division status from units when divisionStatuses omitted the key.
       const units = partialNavByDivision[normalized];
@@ -185,34 +240,6 @@ export const buildQcApproverDivisionRows = (
   divisionLabel: string,
 ): QcApprovalTableRow[] => buildDivisionApprovalRows(items, divisionLabel);
 
-const formatQcApproverDivisionLabel = (key: string): string => {
-  const normalized = String(key ?? "").trim().toUpperCase();
-  const labels: Record<string, string> = {
-    RAW_MATERIAL_REVALIDATION: "Raw Material Revalidation",
-    RAW_MATERIAL_PROCESSING: "Raw Material Processing",
-    RAW_MATERIAL: "Raw Material",
-    MIXING: "Mixing",
-    HARDWARE: "Hardware",
-    CASTING: "Casting",
-    CURING: "Curing",
-    DE_CORING: "De-coring",
-    TRIMMING: "Trimming",
-    POST_CURE: "Post Cure",
-    POST_CURE_OPERATION: "Post Cure",
-    NDT: "NDT",
-    QC: "QC",
-    PROPELLANT_PROPERTIES: "QC",
-    WEIGHTMENT: "Weightment",
-    STATIC_TEST_FACILITY: "Static Test Facility",
-  };
-  if (labels[normalized]) return labels[normalized];
-  return normalized
-    .split("_")
-    .filter(Boolean)
-    .map((part) => part.charAt(0) + part.slice(1).toLowerCase())
-    .join(" ");
-};
-
 const QC_APPROVER_OVERVIEW_ORDER = [
   "RAW_MATERIAL_REVALIDATION",
   "RAW_MATERIAL_PROCESSING",
@@ -233,6 +260,7 @@ const OVERVIEW_SKIP_KEYS = new Set([
   "RAW_MATERIAL",
   "PROPELLANT_PROPERTIES",
   "POST_CURE_OPERATION",
+  "WEIGHMENT",
 ]);
 
 const sortQcApproverOverviewKeys = (keys: string[]): string[] => {

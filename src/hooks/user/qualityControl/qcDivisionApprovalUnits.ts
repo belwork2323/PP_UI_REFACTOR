@@ -149,7 +149,17 @@ const pickString = (...values: unknown[]): string => {
 };
 
 const extractMotorIds = (data: Record<string, unknown>): Array<{ motorId: string; status?: unknown }> => {
-  const fromObjects = [...asArray(data.motorDetails), ...asArray(data.motors)]
+  const fromObjects = [
+    ...asArray(data.motorDetails),
+    ...asArray(data.motors),
+    ...asArray(data.curingDetails),
+    ...asArray(data.deCoringDetails),
+    ...asArray(data.decoringDetails),
+    ...asArray(data.trimmingDetails),
+    ...asArray(data.postCureMotorDetails),
+    ...asArray(data.weighmentDetails),
+    ...asArray(data.motorWeightDetails),
+  ]
     .map((row) => {
       const rec = asRecord(row);
       if (rec) {
@@ -357,7 +367,7 @@ export const isQcUnitLocked = (status?: QcPartialItemStatus | string | null) => 
   return normalized === "WAITING_FOR_APPROVAL" || normalized === "APPROVED";
 };
 
-/** Read-only details theme applies only after approval — not while waiting for approval. */
+/** Details theme applies only after approval — not while waiting for approval. */
 export const isQcUnitApproved = (status?: QcPartialItemStatus | string | null) =>
   normalizePartialItemStatus(status) === "APPROVED";
 
@@ -490,7 +500,8 @@ export const mapDivisionDetailsToPartialNav = (
         id: `motor:${motor.motorId}`,
         kind: "MOTOR",
         label: motor.motorId,
-        status: divisionDetailsStatus,
+        // Manufacturing / previous-stage status is a gate only — QC chips start TO_BE_INITIATED.
+        status: "TO_BE_INITIATED",
         divisionDetailsStatus,
         motorId: motor.motorId,
       });
@@ -504,7 +515,7 @@ export const mapDivisionDetailsToPartialNav = (
         id: `premix:${premix.premixNo}`,
         kind: "PREMIX",
         label: premix.label ?? `Premix ${premix.premixNo}`,
-        status: divisionDetailsStatus,
+        status: "TO_BE_INITIATED",
         divisionDetailsStatus,
         premixNo: premix.premixNo,
         processingType: premix.processingType ?? "SOLID_PROCESSING",
@@ -519,7 +530,7 @@ export const mapDivisionDetailsToPartialNav = (
         id: `final-mix:${mix.finalMixNo}`,
         kind: "FINAL_MIX",
         label: `Final Mix ${mix.finalMixNo}`,
-        status: divisionDetailsStatus,
+        status: "TO_BE_INITIATED",
         divisionDetailsStatus,
         finalMixNo: mix.finalMixNo,
         premixNo: mix.finalMixNo,

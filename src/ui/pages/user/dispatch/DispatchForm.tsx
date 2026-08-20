@@ -1,12 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Alert, Box, Button, Chip, Stack, Typography } from "@mui/material";
 import { icons } from "../../../../app/theme/icons";
 import { STRINGS } from "../../../../app/config/strings";
 import getDispatchTheme from "../../../../app/theme/custom_themes/user/dispatch/dispatch_theme";
@@ -27,6 +20,7 @@ import {
   type PreviousStageApprovedUnits,
 } from "../../../../hooks/user/previousStageApproval";
 import PremixStatusChip from "../manufacturing/RawMaterial/components/PremixStatusChip";
+import ViewStatusButton from "../../../components/common/ViewStatusButton";
 import FinalApprovalMotorDialog, {
   areAllMotorsApproved,
   buildFinalApprovalMotorRows,
@@ -68,7 +62,6 @@ type DispatchFormProps = {
   onFormValuesChange: (motorId: string, values: any) => void;
   onSaveMotorDraft?: (motorId: string) => void;
   onSubmitMotor?: (motorId: string) => void;
-  onSubmitForFinalApproval?: () => void;
   theme: any;
 };
 
@@ -95,7 +88,6 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
   onFormValuesChange,
   onSaveMotorDraft,
   onSubmitMotor,
-  onSubmitForFinalApproval,
   theme,
 }) => {
   const dispatchTheme = getDispatchTheme(theme);
@@ -153,9 +145,7 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
         if (current && motorNavGate.isMotorWorkflowEnabled(current.motorId)) {
           return Math.min(prev, motorCards.length - 1);
         }
-        return firstEnabled >= 0
-          ? firstEnabled
-          : Math.min(prev, motorCards.length - 1);
+        return firstEnabled >= 0 ? firstEnabled : Math.min(prev, motorCards.length - 1);
       });
     }
     prevMotorCountRef.current = motorCards.length;
@@ -190,7 +180,6 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
     [motorCards, motorStatusById],
   );
   const allMotorsApproved = areAllMotorsApproved(finalApprovalRows);
-  const canOpenFinalApproval = Boolean(batch?.formId);
 
   const navPalette = {
     primary: brand.primary,
@@ -268,17 +257,6 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
               </Typography>
             </Box>
           </Stack>
-
-          {motorCards.length > 0 ? (
-            <Button
-              variant="contained"
-              size="small"
-              disabled={actionLoading || !canOpenFinalApproval}
-              onClick={() => setFinalApprovalOpen(true)}
-            >
-              {S.SUBMIT_FOR_FINAL_APPROVAL}
-            </Button>
-          ) : null}
         </Stack>
       </Box>
 
@@ -312,6 +290,32 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
             />
           </UserWorkflowNavPanel>
 
+          <Stack direction="row" justifyContent="flex-end" spacing={1} flexWrap="wrap">
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={actionLoading || activeMotorLocked || !isCurrentMotorSetupReady}
+              onClick={() => onSaveMotorDraft?.(activeMotorEntry.motorId)}
+              sx={{ textTransform: "none", fontWeight: 700 }}
+            >
+              {S.SAVE_MOTOR_DRAFT(activeMotorEntry.motorId)}
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              disabled={actionLoading || activeMotorLocked || !isCurrentMotorSetupReady}
+              onClick={() => onSubmitMotor?.(activeMotorEntry.motorId)}
+              sx={{ textTransform: "none", fontWeight: 700 }}
+            >
+              {S.SUBMIT_MOTOR(activeMotorEntry.motorId)}
+            </Button>
+            <ViewStatusButton
+              disabled={actionLoading}
+              onClick={() => setFinalApprovalOpen(true)}
+              label={S.VIEW_STATUS}
+            />
+          </Stack>
+
           <Box sx={panel.motorCard}>
             <Stack
               direction={{ xs: "column", sm: "row" }}
@@ -329,25 +333,6 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
                   statusConfig={statusConfig}
                   variant="embedded"
                 />
-              </Stack>
-
-              <Stack direction="row" gap={1} flexShrink={0} alignItems="center">
-                <Button
-                  variant="outlined"
-                  size="small"
-                  disabled={actionLoading || activeMotorLocked || !isCurrentMotorSetupReady}
-                  onClick={() => onSaveMotorDraft?.(activeMotorEntry.motorId)}
-                >
-                  {S.SAVE_MOTOR_DRAFT}
-                </Button>
-                <Button
-                  variant="contained"
-                  size="small"
-                  disabled={actionLoading || activeMotorLocked || !isCurrentMotorSetupReady}
-                  onClick={() => onSubmitMotor?.(activeMotorEntry.motorId)}
-                >
-                  {S.SUBMIT_MOTOR}
-                </Button>
               </Stack>
             </Stack>
 
@@ -372,8 +357,7 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
               </Box>
             ) : null}
 
-            {activeMotorStatus === "REJECTED" &&
-            motorStatusById[activeMotorId]?.rejectionReason ? (
+            {activeMotorStatus === "REJECTED" && motorStatusById[activeMotorId]?.rejectionReason ? (
               <Alert severity="error" sx={{ fontSize: "0.78rem", mb: 1.25 }}>
                 {motorStatusById[activeMotorId]?.rejectionReason}
               </Alert>
@@ -422,7 +406,7 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
         rows={finalApprovalRows}
         statusConfig={statusConfig}
         allMotorsApproved={allMotorsApproved}
-        confirmDisabled={actionLoading}
+        hideConfirm
         copy={{
           title: S.FINAL_APPROVAL_DIALOG_TITLE,
           info: S.FINAL_APPROVAL_DIALOG_INFO,
@@ -434,10 +418,6 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
           colStatus: S.FINAL_APPROVAL_COL_STATUS,
         }}
         onClose={() => setFinalApprovalOpen(false)}
-        onProceed={async () => {
-          setFinalApprovalOpen(false);
-          await onSubmitForFinalApproval?.();
-        }}
       />
     </Box>
   );

@@ -29,42 +29,26 @@ const CastingCuringPage = () => {
     activeBatch,
     isEditMode,
     formData,
-    castingType,
-    motorCount,
-    castingMotorDrafts,
+    castingMotorDraftsById,
     addedMotors,
-    schemaLoading,
-    schemaError,
-    castingSchemaError,
-    curingSchemaError,
     curingCycleConfig,
     curingCyclesLoading,
-    curingCyclesError,
-    subDepartmentId,
     actionLoading,
     backConfirmOpen,
     setBackConfirmOpen,
     handleBack,
     handleDiscardAndBack,
-    handleCastingTypeChange,
-    handleMotorCountChange,
     handleCastingMotorDraftChange,
     handleLoadCastingForm,
-    handleAddMotors,
     handleLoadCuringForm,
     getCuringSetupDraft,
-    getMotorCastingFormValues,
-    getMotorCuringFormValues,
     getCrossMotorExcludedBowlSelections,
     handleCuringSetupDraftChange,
-    handleMotorCastingValuesChange,
-    handleMotorCuringValuesChange,
     fetchCuringCycleConfig,
     handleMotorSessionChange,
     handleRemoveMotor,
     handleSaveMotorDraft,
     handleSubmitMotor,
-    handleSubmitForFinalApproval,
     motorStatusById,
     getMotorStatus,
     isMotorEditable,
@@ -113,31 +97,17 @@ const CastingCuringPage = () => {
           <CastingCuringForm
             batch={activeBatch}
             formData={formData}
-            castingType={castingType}
-            motorCount={motorCount}
-            castingMotorDrafts={castingMotorDrafts}
+            castingMotorDraftsById={castingMotorDraftsById}
             addedMotors={addedMotors}
-            schemaLoading={schemaLoading}
-            schemaError={schemaError}
-            castingSchemaError={castingSchemaError}
-            curingSchemaError={curingSchemaError}
             curingCycleConfig={curingCycleConfig}
             curingCyclesLoading={curingCyclesLoading}
             onFetchCuringCycleConfig={fetchCuringCycleConfig}
-            subDepartmentId={subDepartmentId}
-            onCastingTypeChange={handleCastingTypeChange}
-            onMotorCountChange={handleMotorCountChange}
             onCastingMotorDraftChange={handleCastingMotorDraftChange}
             onLoadCastingForm={handleLoadCastingForm}
-            onAddMotors={handleAddMotors}
             onLoadCuringForm={handleLoadCuringForm}
             getCuringSetupDraft={getCuringSetupDraft}
-            getMotorCastingFormValues={getMotorCastingFormValues}
-            getMotorCuringFormValues={getMotorCuringFormValues}
             getCrossMotorExcludedBowlSelections={getCrossMotorExcludedBowlSelections}
             onCuringSetupDraftChange={handleCuringSetupDraftChange}
-            onMotorCastingValuesChange={handleMotorCastingValuesChange}
-            onMotorCuringValuesChange={handleMotorCuringValuesChange}
             onMotorSessionChange={handleMotorSessionChange}
             onRemoveMotor={handleRemoveMotor}
             motorStatusById={motorStatusById}
@@ -152,7 +122,6 @@ const CastingCuringPage = () => {
               setPendingMotorId(motorId);
               setMotorSubmitConfirmOpen(true);
             }}
-            onSubmitForFinalApproval={handleSubmitForFinalApproval}
             actionLoading={actionLoading}
             theme={theme}
           />
@@ -179,7 +148,9 @@ const CastingCuringPage = () => {
             ? S.MOTOR_DRAFT_CONFIRM_MESSAGE(pendingMotorId)
             : S.MOTOR_DRAFT_CONFIRM_TITLE
         }
-        confirmLabel={S.SAVE_MOTOR_DRAFT}
+        confirmLabel={
+          pendingMotorId ? S.SAVE_MOTOR_DRAFT(pendingMotorId) : S.MOTOR_DRAFT_CONFIRM_TITLE
+        }
         cancelLabel={actionStrings.CONFIRM_DRAFT_CANCEL_ACTION}
         onConfirm={async () => {
           const motorId = pendingMotorId;
@@ -202,7 +173,9 @@ const CastingCuringPage = () => {
             ? S.MOTOR_SUBMIT_CONFIRM_MESSAGE(pendingMotorId)
             : S.MOTOR_SUBMIT_CONFIRM_TITLE
         }
-        confirmLabel={S.SUBMIT_MOTOR}
+        confirmLabel={
+          pendingMotorId ? S.SUBMIT_MOTOR(pendingMotorId) : S.MOTOR_SUBMIT_CONFIRM_TITLE
+        }
         cancelLabel={actionStrings.CONFIRM_CANCEL_ACTION}
         onConfirm={async () => {
           const motorId = pendingMotorId;

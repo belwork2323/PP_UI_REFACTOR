@@ -165,12 +165,9 @@ const STFApproverPage = () => {
     detailsLoading: acemDetailsLoading,
     activeMotorId: acemActiveMotorId,
     dialogProps: acemDialogProps,
-    formDialogProps: acemFormDialogProps,
     actionLoading: acemActionLoading,
     requestApprove: acemRequestApprove,
     requestReject: acemRequestReject,
-    requestFormApprove: acemRequestFormApprove,
-    requestFormReject: acemRequestFormReject,
     handleViewDetails: acemHandleViewDetails,
     handleCloseDetail: acemHandleCloseDetail,
     handleActiveMotorChange: acemHandleActiveMotorChange,
@@ -231,14 +228,11 @@ const STFApproverPage = () => {
             onActiveMotorChange={acemHandleActiveMotorChange}
             onApprove={acemRequestApprove}
             onReject={acemRequestReject}
-            onApproveForm={acemRequestFormApprove}
-            onRejectForm={acemRequestFormReject}
             actionLoading={acemActionLoading}
             theme={approverTheme}
             subDepartment="static-test-facility"
           />
           <ApproverActionDialog {...acemDialogProps} />
-          <ApproverActionDialog {...acemFormDialogProps} />
         </ApproverSubdepartmentBatchListSection>
       ) : (
         <React.Fragment>

@@ -48,7 +48,6 @@ const PostCurePage = () => {
     handleActiveMotorChange,
     handleSaveMotorDraft,
     handleSubmitMotor,
-    handleSubmitForFinalApproval,
     motorStatusById,
     getMotorStatus,
     isMotorEditable,
@@ -121,7 +120,6 @@ const PostCurePage = () => {
               setPendingMotorId(motorId);
               setMotorSubmitConfirmOpen(true);
             }}
-            onSubmitForFinalApproval={handleSubmitForFinalApproval}
             motorStatusById={motorStatusById}
             getMotorStatus={getMotorStatus}
             isMotorEditable={isMotorEditable}
@@ -150,7 +148,9 @@ const PostCurePage = () => {
                 ? S.MOTOR_DRAFT_CONFIRM_MESSAGE(pendingMotorId)
                 : S.MOTOR_DRAFT_CONFIRM_TITLE
             }
-            confirmLabel={S.SAVE_MOTOR_DRAFT}
+            confirmLabel={
+              pendingMotorId ? S.SAVE_MOTOR_DRAFT(pendingMotorId) : S.MOTOR_DRAFT_CONFIRM_TITLE
+            }
             cancelLabel={actionStrings.CONFIRM_DRAFT_CANCEL_ACTION}
             onConfirm={async () => {
               const motorId = pendingMotorId;
@@ -173,7 +173,9 @@ const PostCurePage = () => {
                 ? S.MOTOR_SUBMIT_CONFIRM_MESSAGE(pendingMotorId)
                 : S.MOTOR_SUBMIT_CONFIRM_TITLE
             }
-            confirmLabel={S.SUBMIT_MOTOR}
+            confirmLabel={
+              pendingMotorId ? S.SUBMIT_MOTOR(pendingMotorId) : S.MOTOR_SUBMIT_CONFIRM_TITLE
+            }
             cancelLabel={actionStrings.CONFIRM_CANCEL_ACTION}
             onConfirm={async () => {
               const motorId = pendingMotorId;

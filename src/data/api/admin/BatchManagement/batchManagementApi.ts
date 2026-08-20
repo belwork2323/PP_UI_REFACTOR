@@ -35,7 +35,17 @@ export interface BatchFilters {
   motorIds?: string[];
   /** Filter by one or more lot IDs (POST body filters.lotIds) */
   lotIds?: string[];
+  motorStage?: string;
+  filterType?: string;
+  startDate?: string;
+  endDate?: string;
 }
+
+export type BatchDateFilter = {
+  filterType?: string;
+  startDate?: string;
+  endDate?: string;
+};
 
 export interface BatchSort {
   field?: string;
@@ -53,8 +63,8 @@ export const fetchAllBatches = (
   page: number = 1,
   limit: number = 10,
   filters: BatchFilters = {},
-  dateFilter: {},
   sort: BatchSort = { field: "createdOn", order: "desc" },
+  dateFilter: BatchDateFilter = {},
 ) => {
   // Strip undefined / empty — server expects {} for "no filters"
   const cleanFilters: Record<string, string | string[]> = {};
@@ -65,7 +75,7 @@ export const fetchAllBatches = (
     cleanFilters[key] = val as string | string[];
   });
 
-  const payload = {
+  const payload: Record<string, unknown> = {
     pagination: { page, limit },
     filters: cleanFilters,
     sort: {
@@ -73,6 +83,10 @@ export const fetchAllBatches = (
       order: sort.order ?? "desc",
     },
   };
+
+  if (dateFilter.filterType) payload.filterType = dateFilter.filterType;
+  if (dateFilter.startDate) payload.startDate = dateFilter.startDate;
+  if (dateFilter.endDate) payload.endDate = dateFilter.endDate;
 
   return post(BATCH_MANAGEMENT.GET_ALL_BATCHES, payload);
 };

@@ -5,6 +5,7 @@ import {
   Button,
   Chip,
   IconButton,
+  LinearProgress,
   Stack,
   TextField,
   Tooltip,
@@ -20,6 +21,7 @@ const {
   uploadFile: UploadFileRoundedIcon,
   insertDriveFile: InsertDriveFileOutlinedIcon,
   openInNew: OpenInNewRoundedIcon,
+  refresh: RefreshRoundedIcon,
 } = icons.user.sourcing.specificationFormBuilder;
 
 export type CertificateUploadStrings = {
@@ -31,6 +33,9 @@ export type CertificateUploadStrings = {
   ADD_MORE_CERTIFICATES: string;
   OPEN_CERT_LINK: string;
   REMOVE_CERTIFICATE: string;
+  UPLOADING: string;
+  STATUS_FAILED: string;
+  REUPLOAD_CERTIFICATE: string;
 };
 
 type CertificateUploadSectionProps = {
@@ -57,6 +62,8 @@ type CertificateUploadSectionProps = {
   onFilesSelected: (event: ChangeEvent<HTMLInputElement>) => void;
   onCertChange: (certIndex: number, field: keyof LotCertificate, value: string) => void;
   onRemove: (certIndex: number) => void;
+  onRetry?: (certIndex: number) => void;
+  onOpen?: (certIndex: number) => void;
 };
 
 function fileExtensionLabel(fileName: string) {
@@ -73,6 +80,8 @@ const CertificateUploadSection = ({
   onFilesSelected,
   onCertChange,
   onRemove,
+  onRetry,
+  onOpen,
 }: CertificateUploadSectionProps) => {
   const certFileInputId = useId();
   const primaryLight = theme.palette.primaryLight ?? "#2E86C1";
@@ -188,7 +197,7 @@ const CertificateUploadSection = ({
         <Stack spacing={1}>
           {certificates.map((cert, ci) => (
             <Box
-              key={`${cert.fileName}-${ci}-${cert.fileUrl?.slice(0, 24) ?? ""}`}
+              key={cert.localId || `${cert.fileName}-${ci}-${cert.fileId ?? ""}`}
               sx={certCardSx}
             >
               <Stack
@@ -210,7 +219,11 @@ const CertificateUploadSection = ({
                       border: `1px solid ${alpha(primaryLight, 0.2)}`,
                     }}
                   >
-                    <InsertDriveFileOutlinedIcon sx={{ fontSize: 22, color: primaryLight }} />
+                    {cert.status === "uploading" ? (
+                      <UploadFileRoundedIcon sx={{ fontSize: 22, color: primaryLight }} />
+                    ) : (
+                      <InsertDriveFileOutlinedIcon sx={{ fontSize: 22, color: primaryLight }} />
+                    )}
                   </Box>
                   <Box sx={{ flex: 1, minWidth: 0 }}>
                     <Typography
@@ -238,7 +251,35 @@ const CertificateUploadSection = ({
                           border: `1px solid ${alpha(primaryLight, 0.22)}`,
                         }}
                       />
-                      {fileUtils.isOpenableCertificateUrl(cert.fileUrl) ? (
+                      {cert.status === "failed" ? (
+                        <Chip
+                          label={formStrings.STATUS_FAILED}
+                          size="small"
+                          sx={{
+                            height: 20,
+                            fontSize: "0.6rem",
+                            fontWeight: 700,
+                            color: theme.palette.danger,
+                          }}
+                        />
+                      ) : null}
+                      {cert.fileId && onOpen ? (
+                        <Tooltip
+                          title={
+                            fileUtils.getFileKind(cert.fileName) === "video"
+                              ? "Download video"
+                              : formStrings.OPEN_CERT_LINK
+                          }
+                        >
+                          <IconButton
+                            size="small"
+                            onClick={() => onOpen(ci)}
+                            sx={{ color: primaryLight, p: 0.25 }}
+                          >
+                            <OpenInNewRoundedIcon sx={{ fontSize: 18 }} />
+                          </IconButton>
+                        </Tooltip>
+                      ) : fileUtils.isOpenableCertificateUrl(cert.fileUrl) ? (
                         <Tooltip title={formStrings.OPEN_CERT_LINK}>
                           <IconButton
                             size="small"
@@ -253,6 +294,40 @@ const CertificateUploadSection = ({
                         </Tooltip>
                       ) : null}
                     </Stack>
+                    {cert.status === "uploading" ? (
+                      <Box sx={{ mt: 0.85 }}>
+                        <Stack direction="row" alignItems="center" spacing={1}>
+                          <LinearProgress
+                            variant="determinate"
+                            value={cert.uploadProgress ?? 0}
+                            sx={{
+                              flex: 1,
+                              height: 6,
+                              borderRadius: 3,
+                              bgcolor: alpha(primaryLight, 0.12),
+                              "& .MuiLinearProgress-bar": {
+                                borderRadius: 3,
+                                bgcolor: primaryLight,
+                              },
+                            }}
+                          />
+                          <Typography
+                            sx={{
+                              fontSize: "0.7rem",
+                              fontWeight: 700,
+                              color: primaryLight,
+                              minWidth: 34,
+                              textAlign: "right",
+                            }}
+                          >
+                            {cert.uploadProgress ?? 0}%
+                          </Typography>
+                        </Stack>
+                        <Typography sx={{ fontSize: "0.68rem", color: theme.palette.textSub, mt: 0.35 }}>
+                          {formStrings.UPLOADING}
+                        </Typography>
+                      </Box>
+                    ) : null}
                   </Box>
                 </Stack>
 
@@ -271,22 +346,40 @@ const CertificateUploadSection = ({
                 </Box>
 
                 <Tooltip title={formStrings.REMOVE_CERTIFICATE}>
-                  <IconButton
-                    size="small"
-                    onClick={() => onRemove(ci)}
-                    sx={{
-                      alignSelf: { xs: "flex-end", sm: "center" },
-                      flexShrink: 0,
-                      color: theme.palette.textSub,
-                      "&:hover": {
-                        color: theme.palette.danger,
-                        background: alpha(theme.palette.danger ?? "#C0392B", 0.08),
-                      },
-                    }}
-                  >
-                    <DeleteOutlineRoundedIcon fontSize="small" />
-                  </IconButton>
+                  <span>
+                    <IconButton
+                      size="small"
+                      onClick={() => onRemove(ci)}
+                      disabled={cert.status === "uploading"}
+                      sx={{
+                        alignSelf: { xs: "flex-end", sm: "center" },
+                        flexShrink: 0,
+                        color: theme.palette.textSub,
+                        "&:hover": {
+                          color: theme.palette.danger,
+                          background: alpha(theme.palette.danger ?? "#C0392B", 0.08),
+                        },
+                      }}
+                    >
+                      <DeleteOutlineRoundedIcon fontSize="small" />
+                    </IconButton>
+                  </span>
                 </Tooltip>
+                {cert.status === "failed" && cert.file && onRetry ? (
+                  <Tooltip title={formStrings.REUPLOAD_CERTIFICATE}>
+                    <IconButton
+                      size="small"
+                      onClick={() => onRetry(ci)}
+                      sx={{
+                        alignSelf: { xs: "flex-end", sm: "center" },
+                        flexShrink: 0,
+                        color: primaryLight,
+                      }}
+                    >
+                      <RefreshRoundedIcon fontSize="small" />
+                    </IconButton>
+                  </Tooltip>
+                ) : null}
               </Stack>
             </Box>
           ))}

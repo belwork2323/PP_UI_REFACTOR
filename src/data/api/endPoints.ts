@@ -13,6 +13,14 @@ export const USER_ENDPOINTS = {
   SUBDEPT_DASHBOARD_STATS: `${API_BASE}/user/subdepartment/dashboard/stats`,
 };
 
+export const FILE_ENDPOINTS = {
+  UPLOAD: `${API_BASE}/files/upload`,
+  DOWNLOAD: `${API_BASE}/files/download`,
+  DOWNLOAD_STREAM: `${API_BASE}/files/download/stream`,
+  DELETE: `${API_BASE}/files/delete`,
+  DELETE_TEMP: `${API_BASE}/files/delete/temp`,
+};
+
 export const APPROVER_ENDPOINTS = {
   SUBDEPT_DASHBOARD_STATS: `${API_BASE}/approver/subdepartment/dashboard/stats`,
   BATCH_LIST: `${API_BASE}/approver/subdepartment/batch-list`,

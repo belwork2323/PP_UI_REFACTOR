@@ -31,12 +31,9 @@ const NDTApproverPage = () => {
     detailsLoading,
     activeMotorId,
     dialogProps,
-    formDialogProps,
     actionLoading,
     requestApprove,
     requestReject,
-    requestFormApprove,
-    requestFormReject,
     handleViewDetails,
     handleCloseDetail,
     handleActiveMotorChange,
@@ -69,13 +66,10 @@ const NDTApproverPage = () => {
         onActiveMotorChange={handleActiveMotorChange}
         onApprove={requestApprove}
         onReject={requestReject}
-        onApproveForm={requestFormApprove}
-        onRejectForm={requestFormReject}
         actionLoading={actionLoading}
         theme={approverTheme}
       />
       <ApproverActionDialog {...dialogProps} />
-      <ApproverActionDialog {...formDialogProps} />
     </ApproverSubdepartmentBatchListSection>
   );
 };

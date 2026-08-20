@@ -1,14 +1,26 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { dashboardController } from "@controllers/admin/Dashboard/dashboardController";
 import { generalController } from "@controllers/admin/common/generalController";
-import { getDashboardFilterBounds, formatDateToApiDate } from "@utils/dateUtils";
+import {
+  getDashboardFilterBounds,
+  formatDateToApiDate,
+  toDashboardApiFilterType,
+} from "@utils/dateUtils";
 import {
   enrichDashboardKpis,
   buildActiveBatchesFilterPayload,
 } from "@data/models/admin/Dashboard/DashboardModel";
 import { toOperationStatusApiValue } from "@/hooks/operationStatus";
 import { ToggleTabOption } from "@/ui/components/common/ToggleTabs";
+import { DEFAULT_DATE_FILTER_TYPE } from "@/ui/components/custom/dashboard/DashboardDateFilter";
 export type BatchTab = "IN_PROGRESS" | "COMPLETED";
+
+type DashboardDateBounds = {
+  filterType: string;
+  apiFilter: string;
+  startDate: string;
+  endDate: string;
+};
 
 export const batchTabOptions: ToggleTabOption[] = [
   { value: "IN_PROGRESS", label: "In Progress" },
@@ -24,16 +36,17 @@ function useDashboardGlobalFilterSection(mode: string) {
   const [chartData, setChartData] = useState<any>(null);
   const [chartUpdatedAt, setChartUpdatedAt] = useState<Date | null>(null);
 
-  const [filterType, setFilterTypeState] = useState("month");
+  const [filterType, setFilterTypeState] = useState(DEFAULT_DATE_FILTER_TYPE);
   /** Draft custom dates (pickers) — applied only on Apply Filter */
   const [customStartDate, setCustomStartDateState] = useState("");
   const [customEndDate, setCustomEndDateState] = useState("");
   const [appliedCustomStart, setAppliedCustomStart] = useState("");
   const [appliedCustomEnd, setAppliedCustomEnd] = useState("");
   const [customApplyToken, setCustomApplyToken] = useState(0);
-  const lastValidBoundsRef = useRef({
-    filterType: "month",
-    ...getDashboardFilterBounds("month"),
+  const lastValidBoundsRef = useRef<DashboardDateBounds>({
+    filterType: DEFAULT_DATE_FILTER_TYPE,
+    apiFilter: "custom",
+    ...getDashboardFilterBounds(DEFAULT_DATE_FILTER_TYPE),
   });
 
   const clearTableFiltersRef = useRef<(() => void) | null>(null);
@@ -41,6 +54,11 @@ function useDashboardGlobalFilterSection(mode: string) {
   const clearFilters = useCallback(() => {
     clearTableFiltersRef.current?.();
   }, []);
+
+  const resolveApiFilterType = useCallback(
+    (value: string) => toDashboardApiFilterType(value),
+    [],
+  );
 
   const setFilterType = useCallback(
     (val: string) => {
@@ -73,7 +91,7 @@ function useDashboardGlobalFilterSection(mode: string) {
   }, [customStartDate, customEndDate, clearFilters]);
 
   const clearDateFilter = useCallback(() => {
-    setFilterTypeState("month");
+    setFilterTypeState(DEFAULT_DATE_FILTER_TYPE);
     setCustomStartDateState("");
     setCustomEndDateState("");
     setAppliedCustomStart("");
@@ -86,6 +104,7 @@ function useDashboardGlobalFilterSection(mode: string) {
       if (appliedCustomStart.length === 10 && appliedCustomEnd.length === 10) {
         const next = {
           filterType: "custom",
+          apiFilter: "custom",
           startDate: appliedCustomStart,
           endDate: appliedCustomEnd,
         };
@@ -94,10 +113,14 @@ function useDashboardGlobalFilterSection(mode: string) {
       }
       return lastValidBoundsRef.current;
     }
-    const next = { filterType, ...getDashboardFilterBounds(filterType) };
+    const next = {
+      filterType,
+      apiFilter: resolveApiFilterType(filterType),
+      ...getDashboardFilterBounds(filterType),
+    };
     lastValidBoundsRef.current = next;
     return next;
-  }, [filterType, appliedCustomStart, appliedCustomEnd]);
+  }, [filterType, appliedCustomStart, appliedCustomEnd, resolveApiFilterType]);
 
   const fetchDashboardData = useCallback(async () => {
     if (
@@ -109,13 +132,13 @@ function useDashboardGlobalFilterSection(mode: string) {
     try {
       const [fetchedStats, fetchedCharts] = await Promise.all([
         dashboardController.getStats(
-          filterType,
+          globalDateBounds.apiFilter,
           globalDateBounds.startDate,
           globalDateBounds.endDate,
           modeRef.current,
         ),
         dashboardController.getChartData(
-          filterType,
+          globalDateBounds.apiFilter,
           globalDateBounds.startDate,
           globalDateBounds.endDate,
         ),
@@ -170,11 +193,7 @@ function useDashboardGlobalFilterSection(mode: string) {
   };
 }
 
-function useDashboardActiveBatchesSection(globalDateBounds: {
-  filterType: string;
-  startDate: string;
-  endDate: string;
-}) {
+function useDashboardActiveBatchesSection(globalDateBounds: DashboardDateBounds) {
   const DEFAULT_PANEL_FILTERS = {
     stage: "All",
     batchType: "All",
@@ -243,7 +262,7 @@ function useDashboardActiveBatchesSection(globalDateBounds: {
         filterStage: appliedFilters.stage,
         filterBatchType: appliedFilters.batchType,
         filterStatus: toOperationStatusApiValue(appliedFilters.status, "All") || "",
-        filterType: globalDateBounds.filterType,
+        filterType: globalDateBounds.apiFilter,
         dateFrom: appliedFilters.dateFrom || globalDateBounds.startDate,
         dateTo: appliedFilters.dateTo || globalDateBounds.endDate,
         currentMonthOnly: appliedFilters.currentMonthOnly,

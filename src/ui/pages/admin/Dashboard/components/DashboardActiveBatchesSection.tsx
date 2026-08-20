@@ -1,9 +1,9 @@
 import React from "react";
-import { Box, Stack, Tab, Tabs, Button } from "@mui/material";
+import { Box } from "@mui/material";
 import FilterSelect from "@ui/components/common/FilterSelect";
 import DateRangeRow from "@ui/components/common/DateRangeRow";
 import AdminListShell from "@ui/components/custom/admin/AdminListShell";
-import AdminFilterPanel from "@ui/components/custom/admin/AdminFilterPanel";
+import AdminListFilterPanel from "@ui/components/custom/admin/AdminListFilterPanel";
 import InProgressBatchesTable from "@ui/components/custom/dashboard/InProgressBatchesTable";
 import { APPROVER_BATCH_STATUS } from "@data/models/approver/ApproverBatchListModel";
 import { STRINGS } from "@app/config/strings";
@@ -111,7 +111,7 @@ export default function DashboardActiveBatchesSection({
             emptyTitle={t.EMPTY_STATES.NO_BATCHES}
             emptySubtitle={t.EMPTY_STATES.NO_BATCHES_SUBTITLE}
             filterExtension={
-              <AdminFilterPanel
+              <AdminListFilterPanel
                 title={t.FILTERS.BUTTON}
                 activeFilterCount={activeFilterCount}
                 onClear={clearBatchesFilters}
@@ -122,77 +122,41 @@ export default function DashboardActiveBatchesSection({
                 applyLabel={AC.FILTERS_APPLY}
                 theme={th}
               >
-                <Stack
-                  direction="row"
-                  gap={1.5}
-                  mb={2}
-                  sx={{
-                    width: "100%",
-                    minWidth: "100%",
-                    display: "flex",
-                    flex: 1,
-                    // flexWrap: "noWrap",
-                    flexDirection: { xs: "column", md: "row" },
-                  }}
-                >
-                  <FilterSelect
-                    label={t.FILTERS.STAGE}
-                    value={batchDraftFilters.stage}
-                    onChange={(e) => setBatchDraftFilter("stage", e.target.value)}
-                    options={["All", ...subDepartments]}
-                    menuProps={filterMenuProps}
-                    itemSx={filterMenuItemSx}
-                    showAllOption={false}
-                    sx={{
-                      ...th.filterPanel.field,
-                    }}
-                  />
+                <FilterSelect
+                  label={t.FILTERS.STAGE}
+                  value={batchDraftFilters.stage}
+                  onChange={(e) => setBatchDraftFilter("stage", e.target.value)}
+                  options={["All", ...subDepartments]}
+                  menuProps={filterMenuProps}
+                  itemSx={filterMenuItemSx}
+                  showAllOption={false}
+                  filterPanel
+                  sx={{ ...th.filterPanel.field, ...th.filterPanel.fieldItem }}
+                />
 
-                  <FilterSelect
-                    label={t.FILTERS.TYPE}
-                    value={batchDraftFilters.batchType}
-                    onChange={(e) => setBatchDraftFilter("batchType", e.target.value)}
-                    options={t.BATCH_FILTERS.TYPES}
-                    menuProps={filterMenuProps}
-                    itemSx={filterMenuItemSx}
-                    showAllOption={false}
-                    sx={{
-                      ...th.filterPanel.field,
-                    }}
-                  />
+                <FilterSelect
+                  label={t.FILTERS.TYPE}
+                  value={batchDraftFilters.batchType}
+                  onChange={(e) => setBatchDraftFilter("batchType", e.target.value)}
+                  options={t.BATCH_FILTERS.TYPES}
+                  menuProps={filterMenuProps}
+                  itemSx={filterMenuItemSx}
+                  showAllOption={false}
+                  filterPanel
+                  sx={{ ...th.filterPanel.field, ...th.filterPanel.fieldItem }}
+                />
 
-                  <FilterSelect
-                    label={t.FILTERS.STATUS}
-                    value={batchDraftFilters.status}
-                    onChange={(e) => setBatchDraftFilter("status", e.target.value)}
-                    options={["All", ...Object.values(OPERATION_STATUS)]}
-                    menuProps={filterMenuProps}
-                    itemSx={filterMenuItemSx}
-                    showAllOption={false}
-                    sx={{
-                      ...th.filterPanel.field,
-                    }}
-                  />
-
-                  {/* <Stack direction="row" spacing={1} sx={{ ml: "auto" }}>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      onClick={() => setFilterOpen(false)}
-                      sx={th.filterPanel.closeButton}
-                    >
-                      {AC.FILTERS_CLOSE}
-                    </Button>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      onClick={applyBatchFilters}
-                      sx={th.filterPanel.applyButton}
-                    >
-                      {AC.FILTERS_APPLY}
-                    </Button>
-                  </Stack> */}
-                </Stack>
+                <FilterSelect
+                  label={t.FILTERS.STATUS}
+                  value={batchDraftFilters.status}
+                  onChange={(e) => setBatchDraftFilter("status", e.target.value)}
+                  options={["All", ...Object.values(OPERATION_STATUS)]}
+                  menuProps={filterMenuProps}
+                  itemSx={filterMenuItemSx}
+                  showAllOption={false}
+                  filterPanel
+                  sx={{ ...th.filterPanel.field, ...th.filterPanel.fieldItem }}
+                />
 
                 <DateRangeRow
                   from={batchDraftFilters.dateFrom}
@@ -211,12 +175,17 @@ export default function DashboardActiveBatchesSection({
                   toLabel={t.FILTERS.TO}
                   separatorLabel={t.FILTERS.DATE_SEPARATOR}
                   thisMonthLabel={t.FILTERS.THIS_MONTH_CHIP}
+                  showLeadingIcon={false}
+                  nowrap
+                  alignInputs="filter"
+                  controlHeight={32}
                   calendarIconSx={th.table.calendarIcon}
-                  datePickerSx={th.table.datePicker(false)}
+                  datePickerSx={th.filterPanel.field}
+                  containerSx={{ ...th.filterPanel.fieldItem, flex: "2 1 320px" }}
                   separatorSx={th.table.filterDateSeparator}
                   thisMonthChipSx={th.table.thisMonthChip}
                 />
-              </AdminFilterPanel>
+              </AdminListFilterPanel>
             }
             theme={shellTheme}
           />

@@ -7,6 +7,7 @@ import {
 import type { QcDivisionCatalogNavTab } from "../../../../../hooks/user/qualityControl/qcFlowConfig";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import { STRINGS } from "../../../../../app/config/strings";
+import ViewStatusButton from "../../../../components/common/ViewStatusButton";
 import {
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
@@ -17,10 +18,16 @@ const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 export type QCDivisionNavApprovalActions = {
   show?: boolean;
   actionLoading?: boolean;
+  /** Raw Material Revalidation only — other divisions use per-unit submit. */
+  showSubmitDivision?: boolean;
   canSubmitDivision?: boolean;
-  canSubmitFinalApproval?: boolean;
+  canViewStatus?: boolean;
+  /** Division-scoped Save as Draft (Raw Material Revalidation — no unit nav). */
+  showSaveDraft?: boolean;
+  canSaveDraft?: boolean;
+  onSaveDraft?: () => void;
   onSubmitDivision?: () => void;
-  onSubmitFinalApproval?: () => void;
+  onViewStatus?: () => void;
 };
 
 type QCDivisionNavPanelProps = {
@@ -129,19 +136,12 @@ const QCDivisionNavPanel = ({
           {S.DIVISION_SECTION_TITLE}
         </Typography>
         {showApprovalActions ? (
-          <Button
-            size="small"
-            variant="contained"
-            disabled={!approvalActions?.canSubmitFinalApproval || approvalActions?.actionLoading}
-            onClick={approvalActions?.onSubmitFinalApproval}
-            sx={{
-              textTransform: "none",
-              whiteSpace: "nowrap",
-              alignSelf: { xs: "stretch", sm: "flex-start" },
-            }}
-          >
-            {S.SUBMIT_FOR_FINAL_APPROVAL}
-          </Button>
+          <ViewStatusButton
+            disabled={!approvalActions?.canViewStatus || approvalActions?.actionLoading}
+            onClick={approvalActions?.onViewStatus}
+            label={S.VIEW_STATUS}
+            sx={{ alignSelf: { xs: "stretch", sm: "flex-start" } }}
+          />
         ) : null}
       </Stack>
 
@@ -183,17 +183,31 @@ const QCDivisionNavPanel = ({
         />
       </Box>
 
-      {showApprovalActions ? (
-        <Stack direction="row" justifyContent="flex-end">
-          <Button
-            size="small"
-            variant="outlined"
-            disabled={!approvalActions?.canSubmitDivision || approvalActions?.actionLoading}
-            onClick={approvalActions?.onSubmitDivision}
-            sx={{ textTransform: "none", whiteSpace: "nowrap" }}
-          >
-            {S.SUBMIT_DIVISION}
-          </Button>
+      {showApprovalActions &&
+      (approvalActions?.showSaveDraft || approvalActions?.showSubmitDivision) ? (
+        <Stack direction="row" justifyContent="flex-end" gap={1} flexWrap="wrap">
+          {approvalActions?.showSaveDraft ? (
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={!approvalActions?.canSaveDraft || approvalActions?.actionLoading}
+              onClick={approvalActions?.onSaveDraft}
+              sx={{ textTransform: "none", whiteSpace: "nowrap" }}
+            >
+              {S.SAVE_UNIT_DRAFT}
+            </Button>
+          ) : null}
+          {approvalActions?.showSubmitDivision ? (
+            <Button
+              size="small"
+              variant="outlined"
+              disabled={!approvalActions?.canSubmitDivision || approvalActions?.actionLoading}
+              onClick={approvalActions?.onSubmitDivision}
+              sx={{ textTransform: "none", whiteSpace: "nowrap" }}
+            >
+              {S.SUBMIT_DIVISION}
+            </Button>
+          ) : null}
         </Stack>
       ) : null}
     </Stack>

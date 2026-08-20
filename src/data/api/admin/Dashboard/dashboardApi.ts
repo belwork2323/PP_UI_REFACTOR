@@ -3,18 +3,15 @@ import { ADMIN_ENDPOINTS } from "@data/api/endPoints";
 
 /**
  * Fetch dashboard statistics with optional date filters
- * @param filterType - "day" | "week" | "month" | "custom"
- * @param startDate - Date string "DD-MM-YYYY" (required for custom)
- * @param endDate - Date string "DD-MM-YYYY" (required for custom)
+ * @param filterType - "month" | "six_months" | "one_year" | "custom"
+ * @param startDate - Date string "DD-MM-YYYY" (required for custom / rolling ranges)
+ * @param endDate - Date string "DD-MM-YYYY" (required for custom / rolling ranges)
  */
 export const fetchDashboardStatsApi = (filterType: string, startDate?: string, endDate?: string) => {
   const payload: any = { filterType };
 
-  // For custom date range, include start and end dates
-  if (filterType === "custom") {
-    payload.startDate = startDate;
-    payload.endDate = endDate;
-  }
+  if (startDate) payload.startDate = startDate;
+  if (endDate) payload.endDate = endDate;
 
   return post(ADMIN_ENDPOINTS.DASHBOARD_ENDPOINTS.GET_STATS, payload);
 };

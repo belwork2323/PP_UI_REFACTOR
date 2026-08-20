@@ -7,6 +7,7 @@ import {
   deleteBatch,
 } from "@data/api/admin/BatchManagement/batchManagementApi";
 import type {
+  BatchDateFilter,
   BatchFilters,
   BatchSort,
   BatchStatsPayload,
@@ -47,7 +48,7 @@ export const batchManagementController = {
     page: number = 1,
     limit: number = 10,
     filters: BatchFilters = {},
-    dateFilter: {},
+    dateFilter: BatchDateFilter = {},
     sort: BatchSort = { field: "createdOn", order: "desc" },
   ) => {
     try {

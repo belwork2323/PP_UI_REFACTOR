@@ -1,29 +1,32 @@
-import type {
-  SchemaDocumentV2,
-  SchemaFormValues,
-  SchemaSectionSubmission,
-  SchemaSetupContext,
-} from "../../../schema-engine";
-import {
-  buildCastingCuringSectionPayload,
-  createCastingCuringInitialValues,
-  hydrateCastingCuringValuesFromSections,
-  buildCastingSetupContext,
-  schemaValuesHaveUserData,
-} from "../../../schema-engine";
-import { cloneValue } from "../../../schema-engine/state/formState";
 import type { CuringProjectStageMatrix } from "./curingProjectStageMatrix";
 import { OPERATION_STATUS } from "../../../hooks/operationStatus";
 import { normalizeSubdepartmentBatchStatus } from "./SubdepartmentBatchModel";
-import {
-  formatPrepSectionCellValue,
-  formatPrepSectionLabel,
-} from "./RawMaterialPreparationModel";
+import { formatPrepSectionCellValue, formatPrepSectionLabel } from "./RawMaterialPreparationModel";
 import type {
   CasePrepDetailField,
   CasePrepDetailSection,
   CasePrepDetailTable,
 } from "./CasePreparationFormModel";
+import {
+  buildCastingSectionsPayload,
+  castingMotorDataHasUserInput,
+  createEmptyCastingMotorData,
+  parseCastingMotorDataFromSections,
+  type CastingMotorData,
+} from "./CastingMotorDataModel";
+import {
+  buildCuringSectionsPayload,
+  createEmptyCuringMotorData,
+  curingMotorDataHasUserInput,
+  parseCuringMotorDataFromSections,
+  type CuringMotorData,
+} from "./CuringMotorDataModel";
+
+/** Local section payload shape for CastingCuringFormBody (no schema-engine dependency). */
+export type SchemaSectionSubmission = {
+  sectionId: string;
+  sectionData: unknown[];
+};
 
 export type CastingProcessSetup = Record<string, never>;
 
@@ -54,16 +57,16 @@ export type CastingCuringMotorStatusMeta = {
   rejectionReason?: string | null;
 };
 
-export const isCastingCuringMotorLocked = (status?: CastingCuringMotorSubmissionStatus | string | null) => {
+export const isCastingCuringMotorLocked = (
+  status?: CastingCuringMotorSubmissionStatus | string | null,
+) => {
   const normalized = String(status ?? "").toUpperCase();
   return normalized === "WAITING_FOR_APPROVAL" || normalized === "APPROVED";
 };
 
-export const isCastingCuringMotorEditable = (status?: CastingCuringMotorSubmissionStatus | string | null) =>
-  !status ||
-  status === "TO_BE_INITIATED" ||
-  status === "IN_PROGRESS" ||
-  status === "REJECTED";
+export const isCastingCuringMotorEditable = (
+  status?: CastingCuringMotorSubmissionStatus | string | null,
+) => !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED";
 
 export const areAllCastingCuringMotorsApproved = (
   motorStatusById: Record<string, CastingCuringMotorStatusMeta>,
@@ -77,13 +80,21 @@ export const areAllCastingCuringMotorsApproved = (
 
 export const isCastingCuringMotorApproverTabDisabled = (
   status?: CastingCuringMotorSubmissionStatus | string | null,
-): boolean =>
-  !status || status === "TO_BE_INITIATED";
+): boolean => {
+  const normalized = String(status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+  return !normalized || normalized === "TO_BE_INITIATED" || normalized === "IN_PROGRESS";
+};
 
 export const isCastingCuringMotorApproverActionable = (
   status?: CastingCuringMotorSubmissionStatus | string | null,
 ): boolean => {
-  const normalized = String(status ?? "").trim().toUpperCase().replace(/\s+/g, "_");
+  const normalized = String(status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
   return normalized === "WAITING_FOR_APPROVAL" || normalized === "IN_PROGRESS";
 };
 
@@ -92,7 +103,9 @@ export const canApproverActionEntireCastingCuringForm = (params: {
   status?: string | null;
   motors?: Array<{ motorSubmissionStatus?: CastingCuringMotorSubmissionStatus | string | null }>;
 }): boolean => {
-  const formType = String(params.formSubmissionType ?? "").trim().toUpperCase();
+  const formType = String(params.formSubmissionType ?? "")
+    .trim()
+    .toUpperCase();
   if (formType !== "SUBMIT") return false;
 
   const motors = params.motors ?? [];
@@ -136,7 +149,9 @@ export type CastingCuringMotorCounts = {
   totalMotorCount: number;
 };
 
-export const normalizeCastingCuringMotorStatus = (value: unknown): CastingCuringMotorSubmissionStatus => {
+export const normalizeCastingCuringMotorStatus = (
+  value: unknown,
+): CastingCuringMotorSubmissionStatus => {
   const normalized = String(value ?? "")
     .trim()
     .toUpperCase()
@@ -157,7 +172,9 @@ const normalizeCCMotorStatus = normalizeCastingCuringMotorStatus;
 export const normalizeCastingCuringMotorSubmissionType = (
   value: unknown,
 ): CastingCuringMotorSubmissionType | undefined => {
-  const raw = String(value ?? "").trim().toUpperCase();
+  const raw = String(value ?? "")
+    .trim()
+    .toUpperCase();
   if (raw === "DRAFT" || raw === "SUBMIT") return raw;
   return undefined;
 };
@@ -198,8 +215,7 @@ export const mapCastingCuringMotorStatusesFromApi = (
     const existing = statusById[motorId];
     statusById[motorId] = {
       motorSubmissionType:
-        normalizeCCMotorSubmissionType(motor?.motorSubmissionType) ??
-        existing?.motorSubmissionType,
+        normalizeCCMotorSubmissionType(motor?.motorSubmissionType) ?? existing?.motorSubmissionType,
       motorSubmissionStatus: normalizeCCMotorStatus(
         motor?.motorSubmissionStatus ?? existing?.motorSubmissionStatus,
       ),
@@ -221,15 +237,13 @@ export type CastingCuringMotorSession = {
   castingType?: string;
   castingStation?: string;
   castingSetup?: CastingProcessSetup;
-  formValues: SchemaFormValues;
+  castingData: CastingMotorData;
   curingSetup: CuringProcessSetup;
   /** Set after user saves casting and explicitly continues to curing. */
   castingSavedForCuring?: boolean;
   curingFormLoaded?: boolean;
-  curingFormValues?: SchemaFormValues;
+  curingData: CuringMotorData;
   curingProjectStageMatrix?: CuringProjectStageMatrix;
-  savedSections?: SchemaSectionSubmission[];
-  curingSavedSections?: SchemaSectionSubmission[];
 };
 
 export type CastingCuringFormState = {
@@ -238,11 +252,7 @@ export type CastingCuringFormState = {
   castingSetup: CastingProcessSetup;
   castingFormLoaded: boolean;
   readyForCuring: boolean;
-  castingSchema: SchemaDocumentV2 | null;
-  curingSchema: SchemaDocumentV2 | null;
   motors: CastingCuringMotorSession[];
-  curingFormValues: SchemaFormValues;
-  curingSavedSections?: SchemaSectionSubmission[];
 };
 
 export type CastingCuringFormBody = {
@@ -284,10 +294,7 @@ export const createDefaultCastingCuringFormState = (): CastingCuringFormState =>
   castingSetup: createDefaultCastingProcessSetup(),
   castingFormLoaded: false,
   readyForCuring: false,
-  castingSchema: null,
-  curingSchema: null,
   motors: [],
-  curingFormValues: {},
 });
 
 export const resolveCastingMotorProcessMeta = (
@@ -303,233 +310,122 @@ export type CastingMotorProcessMeta = ReturnType<typeof resolveCastingMotorProce
 
 export const normalizeCastingCuringMotorId = (motorId: string) => String(motorId).trim();
 
-export const resolveMotorCuringFormValues = (
-  motor: Pick<CastingCuringMotorSession, "curingFormValues" | "curingSavedSections">,
-  curingSchema: SchemaDocumentV2,
-  setupContext?: SchemaSetupContext,
-): SchemaFormValues => {
-  if (motor.curingSavedSections?.length) {
-    return cloneValue(
-      hydrateCastingCuringValuesFromSections(
-        curingSchema,
-        motor.curingSavedSections,
-        setupContext,
-      ),
-    );
-  }
-  if (motor.curingFormValues && Object.keys(motor.curingFormValues).length > 0) {
-    return cloneValue(motor.curingFormValues);
-  }
-  return cloneValue(createCastingCuringInitialValues(curingSchema, setupContext));
-};
-
-export const buildMotorCuringValuesMapFromSessions = (
-  motors: CastingCuringMotorSession[],
-): Record<string, SchemaFormValues> => {
-  const map: Record<string, SchemaFormValues> = {};
-  for (const motor of motors) {
-    const motorId = normalizeCastingCuringMotorId(motor.motorId);
-    if (!motorId || !motor.curingFormLoaded) continue;
-    if (!motor.curingFormValues || Object.keys(motor.curingFormValues).length === 0) continue;
-    map[motorId] = cloneValue(motor.curingFormValues);
-  }
-  return map;
-};
-
-export const buildMotorCastingValuesMapFromSessions = (
-  motors: CastingCuringMotorSession[],
-): Record<string, SchemaFormValues> => {
-  const map: Record<string, SchemaFormValues> = {};
-  for (const motor of motors) {
-    const motorId = normalizeCastingCuringMotorId(motor.motorId);
-    if (!motorId || !motor.formValues || Object.keys(motor.formValues).length === 0) continue;
-    map[motorId] = cloneValue(motor.formValues);
-  }
-  return map;
-};
-
-export const applyMotorCuringValuesMap = (
-  form: CastingCuringFormState,
-  valuesById: Record<string, SchemaFormValues>,
-): CastingCuringFormState => ({
-  ...form,
-  curingFormValues: {},
-  motors: (form.motors ?? []).map((motor) => {
-    const motorId = normalizeCastingCuringMotorId(motor.motorId);
-    if (!motor.curingFormLoaded) return motor;
-    const curingFormValues = valuesById[motorId];
-    if (!curingFormValues) return motor;
-    return { ...motor, curingFormValues: cloneValue(curingFormValues) };
-  }),
-});
-
-export const applyMotorCastingValuesMap = (
-  form: CastingCuringFormState,
-  valuesById: Record<string, SchemaFormValues>,
-): CastingCuringFormState => ({
-  ...form,
-  motors: (form.motors ?? []).map((motor) => {
-    const motorId = normalizeCastingCuringMotorId(motor.motorId);
-    const castingFormValues = valuesById[motorId];
-    if (!castingFormValues) return motor;
-    return { ...motor, formValues: cloneValue(castingFormValues) };
-  }),
-});
-
-export const applyMotorFormValuesMaps = (
-  form: CastingCuringFormState,
-  castingValuesById: Record<string, SchemaFormValues>,
-  curingValuesById: Record<string, SchemaFormValues>,
-): CastingCuringFormState =>
-  applyMotorCuringValuesMap(applyMotorCastingValuesMap(form, castingValuesById), curingValuesById);
-
 export const createEmptyMotorSession = (
   motorId: string,
   motorReceivedAt: string,
-  schema: SchemaDocumentV2 | null,
-  setupContext?: SchemaSetupContext,
   castingMeta?: CastingMotorProcessMeta,
 ): CastingCuringMotorSession => ({
   motorId,
   motorReceivedAt,
   castingType: castingMeta?.castingType,
   castingStation: castingMeta?.castingStation,
-  castingSetup: castingMeta?.castingSetup
-    ? { ...castingMeta.castingSetup }
-    : undefined,
-  formValues: schema ? createCastingCuringInitialValues(schema, setupContext) : {},
-  curingFormValues: {},
+  castingSetup: castingMeta?.castingSetup ? { ...castingMeta.castingSetup } : undefined,
+  castingData: createEmptyCastingMotorData(),
+  curingData: createEmptyCuringMotorData(),
   curingSetup: createDefaultCuringProcessSetup(),
   curingFormLoaded: false,
   castingSavedForCuring: false,
-  savedSections: undefined,
 });
+
+const resolveMotorCastingSections = (motor: any, src: any): SchemaSectionSubmission[] | undefined => {
+  if (Array.isArray(motor?.castingSections)) return motor.castingSections;
+  if (Array.isArray(src?.castingSections)) return src.castingSections;
+  if (Array.isArray(motor?.sections)) return motor.sections;
+  if (Array.isArray(src?.sections)) return src.sections;
+  return undefined;
+};
+
+const resolveMotorCuringSections = (motor: any, src: any): SchemaSectionSubmission[] | undefined => {
+  if (Array.isArray(motor?.curingSections)) return motor.curingSections;
+  if (Array.isArray(src?.curingSections)) return src.curingSections;
+  return undefined;
+};
 
 export const mapCastingCuringDetailsToFormState = (details: any): CastingCuringFormState => {
   const payload = details?.castingCuringDetails ?? details?.preparationDetails ?? details ?? {};
   const rawMotors = Array.isArray(payload?.motors) ? payload.motors : [];
 
-  const extractMotorData = (motor: any) => {
+  const extractMotorData = (motor: any): CastingCuringMotorSession | null => {
     const src = motor?.details ?? motor;
     const motorSetup = motor?.setup ?? src?.setup ?? {};
+    const castingSections = resolveMotorCastingSections(motor, src);
+    const curingSections = resolveMotorCuringSections(motor, src);
+    const motorId = String(motor?.motorId ?? src?.motorId ?? "").trim();
+    if (!motorId) return null;
+
+    const curingSetup: CuringProcessSetup = {
+      oven: String(motor?.curingSetup?.oven ?? src?.curingSetup?.oven ?? ""),
+      ovenNo: String(motor?.curingSetup?.ovenNo ?? src?.curingSetup?.ovenNo ?? ""),
+      curingType: String(motor?.curingSetup?.curingType ?? src?.curingSetup?.curingType ?? ""),
+      configuration: String(
+        motor?.curingSetup?.configuration ?? src?.curingSetup?.configuration ?? "",
+      ),
+      motorsToCureCount:
+        Number(motor?.curingSetup?.motorsToCureCount ?? src?.curingSetup?.motorsToCureCount ?? "") ||
+        "",
+      ovensUtilized: String(
+        motor?.curingSetup?.ovensUtilized ?? src?.curingSetup?.ovensUtilized ?? "",
+      ),
+    };
+
     return {
-      motorId: String(motor?.motorId ?? src?.motorId ?? "").trim(),
+      motorId,
       motorReceivedAt: String(src?.motorReceivedAt ?? motor?.motorReceivedAt ?? "").trim(),
       castingType: String(motorSetup?.castingType ?? "").trim(),
       castingStation: String(motorSetup?.castingStation ?? "").trim(),
       castingSetup: createDefaultCastingProcessSetup(),
-      formValues: {},
-      curingSetup: {
-        oven: String(motor?.curingSetup?.oven ?? ""),
-        ovenNo: String(motor?.curingSetup?.ovenNo ?? ""),
-        curingType: String(motor?.curingSetup?.curingType ?? ""),
-        configuration: String(motor?.curingSetup?.configuration ?? ""),
-        motorsToCureCount: Number(motor?.curingSetup?.motorsToCureCount ?? "") || "",
-        ovensUtilized: String(motor?.curingSetup?.ovensUtilized ?? ""),
-      },
+      castingData: parseCastingMotorDataFromSections(castingSections),
+      curingData: parseCuringMotorDataFromSections(curingSections),
+      curingSetup,
       curingFormLoaded: Boolean(
-        String(motor?.curingSetup?.oven ?? "").trim() &&
-          String(motor?.curingSetup?.ovenNo ?? "").trim(),
+        String(curingSetup.oven ?? "").trim() && String(curingSetup.ovenNo ?? "").trim(),
       ),
       castingSavedForCuring: Boolean(
         motor?.castingSavedForCuring ||
-          (Array.isArray(motor?.sections) && motor.sections.length > 0) ||
-          (Array.isArray(motor?.castingSections) && motor.castingSections.length > 0) ||
-          (String(motor?.curingSetup?.oven ?? "").trim() &&
-            String(motor?.curingSetup?.ovenNo ?? "").trim()),
+          (castingSections?.length ?? 0) > 0 ||
+          (String(curingSetup.oven ?? "").trim() && String(curingSetup.ovenNo ?? "").trim()),
       ),
-      savedSections: Array.isArray(motor?.sections)
-        ? motor.sections
-        : Array.isArray(motor?.castingSections)
-          ? motor.castingSections
-          : undefined,
-      curingSavedSections: Array.isArray(motor?.curingSections) ? motor.curingSections : undefined,
       curingProjectStageMatrix: motor?.curingProjectStageMatrix ?? undefined,
     };
   };
 
-  const motors = rawMotors.map(extractMotorData).filter((motor) => motor.motorId.length > 0);
+  const motors = rawMotors
+    .map(extractMotorData)
+    .filter((motor): motor is CastingCuringMotorSession => Boolean(motor));
 
-const curingSections = Array.isArray(payload?.curingSections)
-  ? payload.curingSections
-  : motors.find((motor) => Array.isArray(motor.curingSavedSections))?.curingSavedSections;
-
-const firstMotorSetup = rawMotors.find((m: any) => m?.setup)?.setup ?? {};
-
-return {
-  castingType: String(
-    payload?.setup?.castingType ?? payload?.castingType ?? firstMotorSetup?.castingType ?? "",
-  ),
-  castingStation: String(
-    payload?.setup?.castingStation ?? payload?.castingStation ?? firstMotorSetup?.castingStation ?? "",
-  ),
-  castingSetup: createDefaultCastingProcessSetup(),
-  castingFormLoaded: motors.length > 0,
-  readyForCuring: false,
-  castingSchema: null,
-  curingSchema: null,
-  motors,
-  curingFormValues: {},
-  curingSavedSections: curingSections,
-};
-};
-
-export const hydrateCastingCuringFormState = (
-  state: CastingCuringFormState,
-  castingSchema: SchemaDocumentV2 | null,
-  curingSchema: SchemaDocumentV2 | null,
-): CastingCuringFormState => {
-  const motors = (state.motors ?? []).map((motor) => {
-    const motorContext = buildCastingSetupContext({
-      ...(motor.castingSetup ?? state.castingSetup),
-      castingType: motor.castingType ?? state.castingType,
-      castingStation: motor.castingStation ?? state.castingStation,
-      motorId: motor.motorId,
-    });
-
-    let curingFormValues: SchemaFormValues = {};
-    if (curingSchema && motor.curingFormLoaded) {
-      if (motor.curingSavedSections?.length) {
-        curingFormValues = cloneValue(
-          hydrateCastingCuringValuesFromSections(
-            curingSchema,
-            motor.curingSavedSections,
-            motorContext,
-          ),
-        );
-      } else if (motor.curingFormValues && Object.keys(motor.curingFormValues).length > 0) {
-        curingFormValues = cloneValue(motor.curingFormValues);
-      } else {
-        curingFormValues = cloneValue(createCastingCuringInitialValues(curingSchema, motorContext));
-      }
-    }
-
-    const formValues = castingSchema
-      ? motor.savedSections?.length
-        ? hydrateCastingCuringValuesFromSections(castingSchema, motor.savedSections, motorContext)
-        : Object.keys(motor.formValues ?? {}).length > 0
-          ? motor.formValues
-          : createCastingCuringInitialValues(castingSchema, motorContext)
-      : motor.formValues;
-
-    return {
-      ...motor,
-      curingSetup: motor.curingSetup ?? createDefaultCuringProcessSetup(),
-      castingSavedForCuring: Boolean(motor.castingSavedForCuring),
-      curingFormLoaded: Boolean(motor.curingFormLoaded),
-      curingFormValues,
-      formValues,
-    };
-  });
+  const firstMotorSetup = rawMotors.find((m: any) => m?.setup)?.setup ?? {};
 
   return {
-    ...state,
-    castingSchema,
-    curingSchema,
+    castingType: String(
+      payload?.setup?.castingType ?? payload?.castingType ?? firstMotorSetup?.castingType ?? "",
+    ),
+    castingStation: String(
+      payload?.setup?.castingStation ??
+        payload?.castingStation ??
+        firstMotorSetup?.castingStation ??
+        "",
+    ),
+    castingSetup: createDefaultCastingProcessSetup(),
+    castingFormLoaded: motors.length > 0,
+    readyForCuring: motors.some((motor) => Boolean(motor.curingFormLoaded)),
     motors,
-    curingFormValues: {},
   };
 };
+
+/** Ensure typed motor data objects exist (parse happens in mapCastingCuringDetailsToFormState). */
+export const hydrateCastingCuringFormState = (
+  state: CastingCuringFormState,
+): CastingCuringFormState => ({
+  ...state,
+  motors: (state.motors ?? []).map((motor) => ({
+    ...motor,
+    castingData: motor.castingData ?? createEmptyCastingMotorData(),
+    curingData: motor.curingData ?? createEmptyCuringMotorData(),
+    curingSetup: motor.curingSetup ?? createDefaultCuringProcessSetup(),
+    castingSavedForCuring: Boolean(motor.castingSavedForCuring),
+    curingFormLoaded: Boolean(motor.curingFormLoaded),
+  })),
+});
 
 export const mapCastingCuringFormStateToPayload = (
   form: CastingCuringFormState,
@@ -538,44 +434,41 @@ export const mapCastingCuringFormStateToPayload = (
     motorSubmissionType?: CastingCuringMotorSubmissionType;
   },
 ): CastingCuringFormBody => {
-  const castingSchema = form.castingSchema;
-  const curingSchema = form.curingSchema;
-
   const targetIds = options?.targetMotorIds?.length
     ? new Set(options.targetMotorIds.map((id) => String(id).trim()).filter(Boolean))
     : null;
 
   return {
-    motors: castingSchema
-      ? (form.motors ?? [])
-          .filter((motor) => !targetIds || targetIds.has(motor.motorId))
-          .map((motor) => {
-            const meta = resolveCastingMotorProcessMeta(motor, form);
-            return {
-              motorId: motor.motorId,
-              motorReceivedAt: motor.motorReceivedAt,
-              ...(options?.motorSubmissionType
-                ? { motorSubmissionType: options.motorSubmissionType }
-                : {}),
-              setup: {
-                castingType: meta.castingType,
-                castingStation: meta.castingStation,
-              },
-              curingSetup: {
-                oven: String(motor.curingSetup?.oven ?? ""),
-                ovenNo: String(motor.curingSetup?.ovenNo ?? ""),
-                curingType: String(motor.curingSetup?.curingType ?? ""),
-                configuration: String(motor.curingSetup?.configuration ?? ""),
-                motorsToCureCount: motor.curingSetup?.motorsToCureCount ?? "",
-                ovensUtilized: String(motor.curingSetup?.ovensUtilized ?? ""),
-              },
-              castingSections: buildCastingCuringSectionPayload(castingSchema, motor.formValues),
-              curingSections: curingSchema
-                ? buildCastingCuringSectionPayload(curingSchema, motor.curingFormValues ?? {})
-                : [],
-            };
-          })
-      : [],
+    motors: (form.motors ?? [])
+      .filter((motor) => !targetIds || targetIds.has(motor.motorId))
+      .map((motor) => {
+        const meta = resolveCastingMotorProcessMeta(motor, form);
+        return {
+          motorId: motor.motorId,
+          motorReceivedAt: motor.motorReceivedAt,
+          ...(options?.motorSubmissionType
+            ? { motorSubmissionType: options.motorSubmissionType }
+            : {}),
+          setup: {
+            castingType: meta.castingType,
+            castingStation: meta.castingStation,
+          },
+          curingSetup: {
+            oven: String(motor.curingSetup?.oven ?? ""),
+            ovenNo: String(motor.curingSetup?.ovenNo ?? ""),
+            curingType: String(motor.curingSetup?.curingType ?? ""),
+            configuration: String(motor.curingSetup?.configuration ?? ""),
+            motorsToCureCount: motor.curingSetup?.motorsToCureCount ?? "",
+            ovensUtilized: String(motor.curingSetup?.ovensUtilized ?? ""),
+          },
+          castingSections: buildCastingSectionsPayload(
+            motor.castingData ?? createEmptyCastingMotorData(),
+          ),
+          curingSections: buildCuringSectionsPayload(
+            motor.curingData ?? createEmptyCuringMotorData(),
+          ),
+        };
+      }),
   };
 };
 
@@ -584,23 +477,35 @@ export const hasAnyCastingCuringValue = (form: CastingCuringFormState) => {
     return true;
   }
 
-  if ((form.motors ?? []).some((motor) => schemaValuesHaveUserData(motor.formValues ?? {}))) {
-    return true;
-  }
-
-  if ((form.motors ?? []).some((motor) => schemaValuesHaveUserData(motor.curingFormValues ?? {}))) {
-    return true;
-  }
-
-  return false;
+  return (form.motors ?? []).some(
+    (motor) =>
+      castingMotorDataHasUserInput(motor.castingData ?? createEmptyCastingMotorData()) ||
+      curingMotorDataHasUserInput(motor.curingData ?? createEmptyCuringMotorData()) ||
+      String(motor.castingStation ?? "").trim() ||
+      String(motor.motorReceivedAt ?? "").trim(),
+  );
 };
 
-const CASTING_CURING_HIDDEN_COLUMNS = new Set([
-  "type",
-  "_rowType",
-  "_headerLabel",
-  "_groupId",
-]);
+export const collectCrossMotorExcludedBowlLabels = (
+  motors: CastingCuringMotorSession[],
+  currentMotorId: string,
+): string[] => {
+  const normalizedCurrent = normalizeCastingCuringMotorId(currentMotorId);
+  const excluded = new Set<string>();
+
+  (motors ?? []).forEach((motor) => {
+    if (normalizeCastingCuringMotorId(motor.motorId) === normalizedCurrent) return;
+    const rows = motor.castingData?.CASTING_PROCESS?.FINAL_MIX_BOWL_DETAILS ?? [];
+    rows.forEach((row) => {
+      const label = String(row.BOWL_ID ?? "").trim();
+      if (label) excluded.add(label);
+    });
+  });
+
+  return Array.from(excluded);
+};
+
+const CASTING_CURING_HIDDEN_COLUMNS = new Set(["type", "_rowType", "_headerLabel", "_groupId"]);
 
 const CASTING_CURING_TABLE_HIDDEN_COLUMNS: Record<string, Set<string>> = {
   POST_CAST_TABLE: new Set(["MOTOR_ID", "motorId"]),
@@ -610,15 +515,10 @@ const resolveCastingCuringTableBlockKey = (blockId: string) =>
   blockId.replace(/\s+\(\d+\)$/, "").trim();
 
 const getCastingCuringHiddenColumnsForTable = (blockId: string) =>
-  CASTING_CURING_TABLE_HIDDEN_COLUMNS[resolveCastingCuringTableBlockKey(blockId)] ?? new Set<string>();
+  CASTING_CURING_TABLE_HIDDEN_COLUMNS[resolveCastingCuringTableBlockKey(blockId)] ??
+  new Set<string>();
 
-const CASTING_CURING_COLUMN_PRIORITY = [
-  "srNo",
-  "SR_NO",
-  "sr_no",
-  "BOWL_ID",
-  "BOWL_NO",
-];
+const CASTING_CURING_COLUMN_PRIORITY = ["srNo", "SR_NO", "sr_no", "BOWL_ID", "BOWL_NO"];
 
 const isFlatCastingCuringTable = (value: unknown): value is Record<string, unknown>[] => {
   if (!Array.isArray(value) || value.length === 0) return false;
@@ -678,12 +578,16 @@ const buildCastingCuringTableColumnLabels = (
     ),
     tableHidden,
   );
-  return Object.fromEntries(columns.map((columnId) => [columnId, formatPrepSectionLabel(columnId)]));
+  return Object.fromEntries(
+    columns.map((columnId) => [columnId, formatPrepSectionLabel(columnId)]),
+  );
 };
 
 const resolveCastingCuringTableLabel = (blockId: string, tables: CasePrepDetailTable[]) => {
   const baseLabel = formatPrepSectionLabel(blockId);
-  const duplicates = tables.filter((table) => table.blockId === blockId || table.blockId.startsWith(`${blockId} (`));
+  const duplicates = tables.filter(
+    (table) => table.blockId === blockId || table.blockId.startsWith(`${blockId} (`),
+  );
   if (duplicates.length === 0) return { blockId, label: baseLabel };
   const suffix = duplicates.length + 1;
   return { blockId: `${blockId} (${suffix})`, label: `${baseLabel} (${suffix})` };
@@ -753,9 +657,8 @@ const walkCastingCuringValue = (
   }
 
   if (Array.isArray(value)) {
-    const objectItems = value.filter(
-      (item): item is Record<string, unknown> =>
-        Boolean(item && typeof item === "object" && !Array.isArray(item)),
+    const objectItems = value.filter((item): item is Record<string, unknown> =>
+      Boolean(item && typeof item === "object" && !Array.isArray(item)),
     );
     if (!objectItems.length) return;
 
@@ -875,7 +778,32 @@ export const mapCastingCuringDetailsForDisplay = (
     (Array.isArray(data.motorIds) ? (data.motorIds as Array<string | number>) : null) ??
     (Array.isArray(details.motorIds) ? (details.motorIds as Array<string | number>) : null);
 
-  const motors: CastingCuringMotorDetailView[] = rawMotors
+  const createPlaceholderMotor = (motorId: string): CastingCuringMotorDetailView => {
+    const statusMeta = motorStatuses[motorId];
+    return {
+      motorId,
+      motorReceivedAt: "",
+      motorSubmissionType: statusMeta?.motorSubmissionType,
+      motorSubmissionStatus: statusMeta?.motorSubmissionStatus ?? "TO_BE_INITIATED",
+      rejectionReason: statusMeta?.rejectionReason ?? null,
+      setup: {
+        castingType: "",
+        castingStation: "",
+      },
+      curingSetup: {
+        oven: "",
+        ovenNo: "",
+        curingType: "",
+        configuration: "",
+        motorsToCureCount: "",
+        ovensUtilized: "",
+      },
+      castingSections: [],
+      curingSections: [],
+    };
+  };
+
+  const mappedMotors: CastingCuringMotorDetailView[] = rawMotors
     .map((motor) => {
       const entry = motor as Record<string, unknown>;
       const src = (entry.details ?? entry) as Record<string, unknown>;
@@ -887,9 +815,13 @@ export const mapCastingCuringDetailsForDisplay = (
       return {
         motorId,
         motorReceivedAt: String(src.motorReceivedAt ?? "").trim(),
-        motorSubmissionType: statusMeta?.motorSubmissionType ?? normalizeCCMotorSubmissionType(entry.motorSubmissionType as unknown),
-        motorSubmissionStatus: statusMeta?.motorSubmissionStatus ?? normalizeCCMotorStatus(entry.motorSubmissionStatus),
-        rejectionReason: statusMeta?.rejectionReason ?? (entry.rejectionReason as string | null) ?? null,
+        motorSubmissionType:
+          statusMeta?.motorSubmissionType ??
+          normalizeCCMotorSubmissionType(entry.motorSubmissionType as unknown),
+        motorSubmissionStatus:
+          statusMeta?.motorSubmissionStatus ?? normalizeCCMotorStatus(entry.motorSubmissionStatus),
+        rejectionReason:
+          statusMeta?.rejectionReason ?? (entry.rejectionReason as string | null) ?? null,
         setup: {
           castingType: String(setup.castingType ?? ""),
           castingStation: String(setup.castingStation ?? ""),
@@ -902,11 +834,27 @@ export const mapCastingCuringDetailsForDisplay = (
           motorsToCureCount: String(curingSetup.motorsToCureCount ?? ""),
           ovensUtilized: String(curingSetup.ovensUtilized ?? ""),
         },
-        castingSections: parseCastingCuringDisplaySections(src.castingSections as unknown[] | undefined),
-        curingSections: parseCastingCuringDisplaySections(src.curingSections as unknown[] | undefined),
+        castingSections: parseCastingCuringDisplaySections(
+          src.castingSections as unknown[] | undefined,
+        ),
+        curingSections: parseCastingCuringDisplaySections(
+          src.curingSections as unknown[] | undefined,
+        ),
       };
     })
     .filter((motor) => motor.motorId.length > 0);
+
+  const motorsById = new Map(mappedMotors.map((motor) => [motor.motorId, motor]));
+  const preferredIds = (preferredMotorIds ?? [])
+    .map((id) => String(id ?? "").trim())
+    .filter(Boolean);
+  const extraIds = [
+    ...mappedMotors.map((motor) => motor.motorId),
+    ...Object.keys(motorStatuses),
+  ].filter((id) => id && !preferredIds.includes(id));
+  const motors: CastingCuringMotorDetailView[] = [...new Set([...preferredIds, ...extraIds])].map(
+    (motorId) => motorsById.get(motorId) ?? createPlaceholderMotor(motorId),
+  );
 
   const sortByPreferredMotorIds = (
     entries: CastingCuringMotorDetailView[],
@@ -915,9 +863,7 @@ export const mapCastingCuringDetailsForDisplay = (
     if (!preferredIds?.length) {
       return [...entries].sort((a, b) => a.motorId.localeCompare(b.motorId));
     }
-    const order = new Map(
-      preferredIds.map((id, index) => [String(id).trim(), index] as const),
-    );
+    const order = new Map(preferredIds.map((id, index) => [String(id).trim(), index] as const));
     return [...entries].sort((a, b) => {
       const ai = order.get(a.motorId);
       const bi = order.get(b.motorId);
@@ -960,9 +906,7 @@ export const mapCastingCuringDetailsForDisplay = (
         : details.status != null
           ? getCastingCuringBatchStatusLabel(details.status)
           : undefined,
-    formSubmissionType: String(
-      data.formSubmissionType ?? details.formSubmissionType ?? "",
-    ),
+    formSubmissionType: String(data.formSubmissionType ?? details.formSubmissionType ?? ""),
     projectId: String(project.projectId ?? ""),
     projectName: String(project.projectName ?? ""),
     createdBy: mapCastingCuringPersonLabel(data.createdBy ?? details.createdBy),
@@ -987,16 +931,11 @@ export const mapCastingCuringDetailsForDisplay = (
           ? String(details.lastUpdatedAt)
           : null,
     motorCounts: {
-      pendingMotorCount:
-        motorCountsFromApi?.pendingMotorCount ?? derivedCounts.pendingMotorCount,
-      approvedMotorCount:
-        motorCountsFromApi?.approvedMotorCount ?? derivedCounts.approvedMotorCount,
-      rejectedMotorCount:
-        motorCountsFromApi?.rejectedMotorCount ?? derivedCounts.rejectedMotorCount,
-      inProgressMotorCount:
-        motorCountsFromApi?.inProgressMotorCount ?? derivedCounts.inProgressMotorCount,
-      toBeInitiatedMotorCount:
-        motorCountsFromApi?.toBeInitiatedMotorCount ?? derivedCounts.toBeInitiatedMotorCount,
+      pendingMotorCount: derivedCounts.pendingMotorCount,
+      approvedMotorCount: derivedCounts.approvedMotorCount,
+      rejectedMotorCount: derivedCounts.rejectedMotorCount,
+      inProgressMotorCount: derivedCounts.inProgressMotorCount,
+      toBeInitiatedMotorCount: derivedCounts.toBeInitiatedMotorCount,
       totalMotorCount: Math.max(
         Number(motorCountsFromApi?.totalMotorCount ?? 0),
         derivedCounts.totalMotorCount,
@@ -1031,7 +970,14 @@ export type CastingCuringMotorDetail = {
   motorSubmissionType?: CastingCuringMotorSubmissionType;
   motorSubmissionStatus?: CastingCuringMotorSubmissionStatus;
   setup?: { castingType: string; castingStation: string };
-  curingSetup?: { oven: string; ovenNo: string; curingType: string; configuration: string; motorsToCureCount: number | ""; ovensUtilized: string };
+  curingSetup?: {
+    oven: string;
+    ovenNo: string;
+    curingType: string;
+    configuration: string;
+    motorsToCureCount: number | "";
+    ovensUtilized: string;
+  };
   castingConfiguration?: Record<string, any>;
   castingDetails?: Record<string, any>;
   curingConfiguration?: Record<string, any>;
@@ -1093,21 +1039,29 @@ export class CastingCuringDetailsModel {
       subDepartmentId: Number(details?.subDepartmentId ?? payload?.subDepartmentId ?? 0),
       formSubmissionType: String(details?.formSubmissionType ?? payload?.formSubmissionType ?? ""),
       status: String(details?.status ?? payload?.status ?? ""),
-      project: details?.project ?? payload?.project
-        ? {
-          projectId: String((details?.project ?? payload?.project)?.projectId ?? ""),
-          projectName: String((details?.project ?? payload?.project)?.projectName ?? ""),
-        }
-        : undefined,
+      project:
+        (details?.project ?? payload?.project)
+          ? {
+              projectId: String((details?.project ?? payload?.project)?.projectId ?? ""),
+              projectName: String((details?.project ?? payload?.project)?.projectName ?? ""),
+            }
+          : undefined,
       motors: rawMotors.map((m: any) => {
         const src = m?.details ?? m;
         const setup = src?.setup ?? {};
         return {
           motorId: String(m.motorId ?? src?.motorId ?? ""),
-          motorStage: (m.motorStage ?? src?.motorStage) != null ? Number(m.motorStage ?? src?.motorStage) : undefined,
+          motorStage:
+            (m.motorStage ?? src?.motorStage) != null
+              ? Number(m.motorStage ?? src?.motorStage)
+              : undefined,
           motorReceivedAt: String(src?.motorReceivedAt ?? m?.motorReceivedAt ?? ""),
-          motorSubmissionType: normalizeCCMotorSubmissionType(m?.motorSubmissionType ?? src?.motorSubmissionType),
-          motorSubmissionStatus: normalizeCCMotorStatus(m?.motorSubmissionStatus ?? src?.motorSubmissionStatus),
+          motorSubmissionType: normalizeCCMotorSubmissionType(
+            m?.motorSubmissionType ?? src?.motorSubmissionType,
+          ),
+          motorSubmissionStatus: normalizeCCMotorStatus(
+            m?.motorSubmissionStatus ?? src?.motorSubmissionStatus,
+          ),
           setup: {
             castingType: String(setup?.castingType ?? ""),
             castingStation: String(setup?.castingStation ?? ""),
@@ -1130,16 +1084,18 @@ export class CastingCuringDetailsModel {
         };
       }),
       motorStatuses: Array.isArray(payload?.motorStatuses)
-        ? payload.motorStatuses.map((entry: any) => ({
-          motorId: String(entry?.motorId ?? "").trim(),
-          motorSubmissionType: normalizeCCMotorSubmissionType(entry?.motorSubmissionType),
-          motorSubmissionStatus: normalizeCCMotorStatus(entry?.motorSubmissionStatus),
-          submittedAt: entry?.submittedAt ?? null,
-          reviewedBy: entry?.reviewedBy ?? entry?.actionBy ?? null,
-          reviewedAt: entry?.reviewedAt ?? entry?.actionAt ?? null,
-          remarks: entry?.remarks ?? null,
-          rejectionReason: entry?.rejectionReason ?? null,
-        })).filter((entry: { motorId: string }) => entry.motorId.length > 0)
+        ? payload.motorStatuses
+            .map((entry: any) => ({
+              motorId: String(entry?.motorId ?? "").trim(),
+              motorSubmissionType: normalizeCCMotorSubmissionType(entry?.motorSubmissionType),
+              motorSubmissionStatus: normalizeCCMotorStatus(entry?.motorSubmissionStatus),
+              submittedAt: entry?.submittedAt ?? null,
+              reviewedBy: entry?.reviewedBy ?? entry?.actionBy ?? null,
+              reviewedAt: entry?.reviewedAt ?? entry?.actionAt ?? null,
+              remarks: entry?.remarks ?? null,
+              rejectionReason: entry?.rejectionReason ?? null,
+            }))
+            .filter((entry: { motorId: string }) => entry.motorId.length > 0)
         : undefined,
       allMotorsApproved: payload?.allMotorsApproved ?? undefined,
       pendingMotorCount: payload?.pendingMotorCount ?? undefined,
@@ -1149,15 +1105,23 @@ export class CastingCuringDetailsModel {
       totalMotorCount: payload?.totalMotorCount ?? undefined,
       createdBy: mapCastingCuringPersonLabel(payload?.createdBy ?? details?.createdBy) ?? undefined,
       createdAt: formatCastingCuringApiDate(payload?.createdAt ?? details?.createdAt) || undefined,
-      submittedBy: mapCastingCuringPersonLabel(payload?.submittedBy ?? details?.submittedBy) ?? undefined,
-      submittedAt: formatCastingCuringApiDate(payload?.submittedAt ?? details?.submittedAt) || undefined,
+      submittedBy:
+        mapCastingCuringPersonLabel(payload?.submittedBy ?? details?.submittedBy) ?? undefined,
+      submittedAt:
+        formatCastingCuringApiDate(payload?.submittedAt ?? details?.submittedAt) || undefined,
       lastUpdatedBy:
         mapCastingCuringPersonLabel(
-          payload?.lastUpdatedBy ?? details?.lastUpdatedBy ?? payload?.updatedBy ?? details?.updatedBy,
+          payload?.lastUpdatedBy ??
+            details?.lastUpdatedBy ??
+            payload?.updatedBy ??
+            details?.updatedBy,
         ) ?? undefined,
       lastUpdatedAt:
         formatCastingCuringApiDate(
-          payload?.lastUpdatedAt ?? details?.lastUpdatedAt ?? payload?.updatedAt ?? details?.updatedAt,
+          payload?.lastUpdatedAt ??
+            details?.lastUpdatedAt ??
+            payload?.updatedAt ??
+            details?.updatedAt,
         ) || undefined,
     };
   }

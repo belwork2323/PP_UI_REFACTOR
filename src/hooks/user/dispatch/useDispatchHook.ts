@@ -1,8 +1,10 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { STRINGS } from "../../../app/config/strings";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshStore";
+import { useFileService } from "../../../hooks/useFileService";
+import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
 import { batchManagementController } from "../../../controllers/admin/BatchManagement/batchManagementController";
 import dispatchController from "../../../controllers/user/dispatch/dispatchController";
 import { DispatchDetailsModel } from "../../../data/models/user/DispatchApiModel";
@@ -13,7 +15,6 @@ import {
   hasMotorDispatchValue,
   isDispatchMotorEditable,
   isDispatchMotorSetupReady,
-  mapDispatchDetailsFromSavedForm,
   mapDispatchFormStateToBackendPayload,
   mapDispatchFormStateToUpdatePayload,
   mapDispatchMotorStatusesFromApi,
@@ -140,6 +141,7 @@ export const useDispatchHook = () => {
   const user = useAuthStore((state) => state.user);
   const showAlert = useAlertStore((state) => state.showAlert);
   const bumpBatchRefresh = useUserBatchRefreshStore((state) => state.bumpVersion);
+  const { deleteTemp } = useFileService();
 
   const subDepartmentId = useMemo(
     () =>
@@ -192,6 +194,11 @@ export const useDispatchHook = () => {
     () => view === "form" && formSnapshot !== initialSnapshot,
     [view, formSnapshot, initialSnapshot],
   );
+
+  const snapshotStateRef = useRef({ formData, addedMotors, motorStatusById });
+  snapshotStateRef.current = { formData, addedMotors, motorStatusById };
+  const initialSnapshotRef = useRef(initialSnapshot);
+  initialSnapshotRef.current = initialSnapshot;
 
   const resetFormContext = useCallback(() => {
     const defaults = createDefaultDispatchFormState();
@@ -503,19 +510,27 @@ export const useDispatchHook = () => {
   );
 
   const handleBack = useCallback(() => {
-    if (view === "form" && isFormDirty && !hasSavedDraft) {
+    if (view === "form" && isFormDirty) {
       setBackConfirmOpen(true);
       return;
     }
     bumpBatchRefresh();
     resetFormContext();
-  }, [view, isFormDirty, hasSavedDraft, bumpBatchRefresh, resetFormContext]);
+  }, [view, isFormDirty, bumpBatchRefresh, resetFormContext]);
 
-  const handleDiscardAndBack = useCallback(() => {
+  const handleDiscardAndBack = useCallback(async () => {
     setBackConfirmOpen(false);
-    bumpBatchRefresh();
-    resetFormContext();
-  }, [bumpBatchRefresh, resetFormContext]);
+    await discardWorkflowSnapshotForm({
+      subDepartmentId,
+      initialSnapshot: initialSnapshotRef.current,
+      currentState: snapshotStateRef.current,
+      deleteTemp,
+      resetForm: () => {
+        bumpBatchRefresh();
+        resetFormContext();
+      },
+    });
+  }, [bumpBatchRefresh, deleteTemp, resetFormContext, subDepartmentId]);
 
   const getMotorStatus = useCallback(
     (motorId: string): DispatchMotorSubmissionStatus =>
@@ -726,72 +741,6 @@ export const useDispatchHook = () => {
     [submitMotor],
   );
 
-  const handleSubmitForFinalApproval = useCallback(async () => {
-    if (!activeBatch?.formId) {
-      showAlert(messages.FORM_ID_MISSING, "error");
-      return false;
-    }
-    if (!subDepartmentId) {
-      showAlert(messages.SUB_DEPARTMENT_MISSING, "error");
-      return false;
-    }
-
-    const motorIds = addedMotors.map((m) => m.motorId);
-    const allApproved =
-      motorIds.length > 0 &&
-      motorIds.every(
-        (id) =>
-          String(motorStatusById[id]?.motorSubmissionStatus ?? "").toUpperCase() === "APPROVED",
-      );
-    if (!allApproved) {
-      showAlert(messages.FINAL_APPROVAL_NOT_READY, "warning");
-      return false;
-    }
-
-    setActionLoading(true);
-    try {
-      const detailsResponse = await dispatchController.fetchFormDetails({
-        formId: activeBatch.formId,
-      });
-      if (!detailsResponse?.success || !detailsResponse?.data) {
-        showAlert(getErrorMessage(detailsResponse, messages.DETAILS_FETCH_ERROR), "error");
-        return false;
-      }
-
-      const payloadBody = mapDispatchDetailsFromSavedForm(detailsResponse.data, {
-        motorStatusById,
-      });
-
-      const response = await dispatchController.updateForm({
-        formId: activeBatch.formId,
-        batchId: activeBatch.batchId,
-        subDepartmentId,
-        formSubmissionType: "SUBMIT",
-        ...payloadBody,
-      });
-
-      if (!response?.success) {
-        showAlert(getErrorMessage(response, messages.UPDATE_FAILED), "error");
-        return false;
-      }
-
-      showAlert(messages.CREATE_SUBMIT_SUCCESS, "success", { autoCloseMs: 2200 });
-      await listParams.refreshUserBatches();
-      resetFormContext();
-      return true;
-    } finally {
-      setActionLoading(false);
-    }
-  }, [
-    activeBatch,
-    addedMotors,
-    listParams,
-    motorStatusById,
-    resetFormContext,
-    showAlert,
-    subDepartmentId,
-  ]);
-
   return {
     ...listParams,
     loading: listParams.loading || loadingFormDetails,
@@ -825,7 +774,6 @@ export const useDispatchHook = () => {
     handleFormValuesChange,
     handleSaveMotorDraft,
     handleSubmitMotor,
-    handleSubmitForFinalApproval,
     detailsRow,
     detailsData,
     detailsLoading,

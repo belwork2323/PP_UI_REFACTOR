@@ -63,7 +63,10 @@ export const isPremixApproverTabDisabled = (status: PremixSubmissionStatus | und
   !status || status === "TO_BE_INITIATED";
 
 export const isPremixApproverActionable = (status: PremixSubmissionStatus | undefined): boolean => {
-  const normalized = String(status ?? "").trim().toUpperCase().replace(/\s+/g, "_");
+  const normalized = String(status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
   return normalized === "WAITING_FOR_APPROVAL" || normalized === "IN_PROGRESS";
 };
 
@@ -73,7 +76,9 @@ export const canApproverActionEntireRawMaterialPrepForm = (params: {
   status?: string | null;
   premixes?: Array<{ premixSubmissionStatus?: PremixSubmissionStatus | string | null }>;
 }): boolean => {
-  const formType = String(params.formSubmissionType ?? "").trim().toUpperCase();
+  const formType = String(params.formSubmissionType ?? "")
+    .trim()
+    .toUpperCase();
   if (formType !== "SUBMIT") return false;
 
   const premixes = params.premixes ?? [];
@@ -230,12 +235,17 @@ const unwrapApiScalar = (value: unknown): unknown => {
   return value;
 };
 
-const mapWeightmentDetailFromApi = (row: Record<string, unknown>): RawMaterialPrepWeightmentDetail => ({
+const mapWeightmentDetailFromApi = (
+  row: Record<string, unknown>,
+): RawMaterialPrepWeightmentDetail => ({
   materialCode: String(row.materialCode ?? ""),
   materialName: String(row.materialName ?? row.materialCode ?? ""),
-  percentage: unwrapApiScalar(row.percentage) != null ? String(unwrapApiScalar(row.percentage)) : "",
+  percentage:
+    unwrapApiScalar(row.percentage) != null ? String(unwrapApiScalar(row.percentage)) : "",
   weightTransferred:
-    unwrapApiScalar(row.weightTransferred) != null ? String(unwrapApiScalar(row.weightTransferred)) : "",
+    unwrapApiScalar(row.weightTransferred) != null
+      ? String(unwrapApiScalar(row.weightTransferred))
+      : "",
   containerType: String(row.containerType ?? ""),
   containerNumber: String(row.containerNumber ?? ""),
   weighScaleNumber: String(row.weighScaleNumber ?? ""),
@@ -251,7 +261,9 @@ export const mapWeightmentSheetFromApi = (value: unknown): RawMaterialPrepWeight
 
   return {
     mixerBuildingNumber: String(sheet.mixerBuildingNumber ?? ""),
-    weightmentDetails: rows.map((row) => mapWeightmentDetailFromApi(row as Record<string, unknown>)),
+    weightmentDetails: rows.map((row) =>
+      mapWeightmentDetailFromApi(row as Record<string, unknown>),
+    ),
     validation: {
       compareWithIdentificationSheet: Boolean(validation.compareWithIdentificationSheet),
       deviationFound: Boolean(validation.deviationFound),
@@ -260,7 +272,9 @@ export const mapWeightmentSheetFromApi = (value: unknown): RawMaterialPrepWeight
   };
 };
 
-export const mapWeightmentSheetToApi = (sheet: RawMaterialPrepWeightmentSheet | null | undefined) => {
+export const mapWeightmentSheetToApi = (
+  sheet: RawMaterialPrepWeightmentSheet | null | undefined,
+) => {
   if (!sheet) return {};
 
   const rows = (sheet.weightmentDetails ?? []).filter(
@@ -395,16 +409,18 @@ const resolveMaterialNameFallback = (
   material: MaterialsListItem | undefined,
   materialCode: string,
 ): string => {
-  const root = schema as (SchemaDocumentV2 & {
-    rawMaterialDetails?: { materialName?: string };
-    materialName?: string;
-  }) | null;
+  const root = schema as
+    | (SchemaDocumentV2 & {
+        rawMaterialDetails?: { materialName?: string };
+        materialName?: string;
+      })
+    | null;
 
   return (
-    root?.rawMaterialDetails?.materialName
-    ?? root?.materialName
-    ?? material?.materialName
-    ?? materialCode
+    root?.rawMaterialDetails?.materialName ??
+    root?.materialName ??
+    material?.materialName ??
+    materialCode
   );
 };
 
@@ -413,7 +429,12 @@ const buildProcessForSlot = (
   values: SchemaFormValues,
   material: MaterialsListItem | undefined,
   gradeCode: string,
-  fallback?: { materialId?: number; materialCode?: string; materialName?: string; gradeId?: number },
+  fallback?: {
+    materialId?: number;
+    materialCode?: string;
+    materialName?: string;
+    gradeId?: number;
+  },
   options?: { allowEmptyValues?: boolean },
 ): PreparationProcessEntry | null => {
   if (!schema) return null;
@@ -491,7 +512,9 @@ export const mapPreparationDetailsFromSavedForm = (
     const liquidProcess = Array.isArray(premix.liquidProcess) ? premix.liquidProcess : [];
     const hasSolid = solidProcess.length > 0;
     const hasLiquid = liquidProcess.length > 0;
-    const materialTypeRaw = String(premix.materialType ?? "").trim().toUpperCase();
+    const materialTypeRaw = String(premix.materialType ?? "")
+      .trim()
+      .toUpperCase();
     const materialType =
       materialTypeRaw === "SOLID" || materialTypeRaw === "LIQUID" || materialTypeRaw === "BOTH"
         ? materialTypeRaw
@@ -505,7 +528,9 @@ export const mapPreparationDetailsFromSavedForm = (
 
     return {
       premixNo,
-      premixDate: formatToIsoDateInput(String(premix.premixDate ?? "").trim()) || String(premix.premixDate ?? ""),
+      premixDate:
+        formatToIsoDateInput(String(premix.premixDate ?? "").trim()) ||
+        String(premix.premixDate ?? ""),
       materialType: materialType as "SOLID" | "LIQUID" | "BOTH",
       premixSubmissionType:
         statusMeta?.premixSubmissionType ??
@@ -627,7 +652,8 @@ export const mapPreparationDetailsPayload = (params: {
       }
     });
 
-    if (solidProcess.length === 0 && liquidProcess.length === 0 && !params.includeEmptyPremixes) return;
+    if (solidProcess.length === 0 && liquidProcess.length === 0 && !params.includeEmptyPremixes)
+      return;
 
     const premixDate = String(entries[0]?.premixDate ?? "").trim();
     const hasSolid = entries.some((entry) => entry.selectedProcesses.solid);
@@ -639,9 +665,7 @@ export const mapPreparationDetailsPayload = (params: {
       premixNo,
       premixDate: formatToIsoDateInput(premixDate) || premixDate,
       materialType,
-      ...(params.premixSubmissionType
-        ? { premixSubmissionType: params.premixSubmissionType }
-        : {}),
+      ...(params.premixSubmissionType ? { premixSubmissionType: params.premixSubmissionType } : {}),
       solidProcess,
       liquidProcess,
     });
@@ -657,17 +681,19 @@ export const mapPreparationDetailsPayload = (params: {
 
 export const mapPreparationDetailsFromApi = (
   details: RawMaterialPreparationDetails,
-  sheet?: { materials?: Array<{
-    srNo: number;
-    materialCode: string;
-    materialName?: string;
-    gradeCode?: string;
-    gradeName?: string;
-    lotId: string;
-    make: string;
-    requiredComposition: number;
-    quantityPerPremix: number;
-  }> } | null,
+  sheet?: {
+    materials?: Array<{
+      srNo: number;
+      materialCode: string;
+      materialName?: string;
+      gradeCode?: string;
+      gradeName?: string;
+      lotId: string;
+      make: string;
+      requiredComposition: number;
+      quantityPerPremix: number;
+    }>;
+  } | null,
   premixCount = 0,
   solidMaterials: MaterialsListItem[] = [],
   liquidMaterials: MaterialsListItem[] = [],
@@ -696,25 +722,17 @@ export const mapPreparationDetailsFromApi = (
 
     const resolve = (raw: string) =>
       grades.find(
-        (grade) =>
-          grade.gradeCode.toUpperCase() === raw ||
-          grade.gradeName.toUpperCase() === raw,
+        (grade) => grade.gradeCode.toUpperCase() === raw || grade.gradeName.toUpperCase() === raw,
       );
 
     const leftGrade = resolve(a);
     const rightGrade = resolve(b);
     if (leftGrade && rightGrade) return leftGrade.gradeId === rightGrade.gradeId;
     if (leftGrade) {
-      return (
-        leftGrade.gradeCode.toUpperCase() === b ||
-        leftGrade.gradeName.toUpperCase() === b
-      );
+      return leftGrade.gradeCode.toUpperCase() === b || leftGrade.gradeName.toUpperCase() === b;
     }
     if (rightGrade) {
-      return (
-        rightGrade.gradeCode.toUpperCase() === a ||
-        rightGrade.gradeName.toUpperCase() === a
-      );
+      return rightGrade.gradeCode.toUpperCase() === a || rightGrade.gradeName.toUpperCase() === a;
     }
     return false;
   };
@@ -725,7 +743,9 @@ export const mapPreparationDetailsFromApi = (
     slot: "solid" | "liquid",
   ) => {
     if (!process) return false;
-    const code = String(process.materialCode ?? "").trim().toUpperCase();
+    const code = String(process.materialCode ?? "")
+      .trim()
+      .toUpperCase();
     const selectionCode = String(
       slot === "solid" ? selection.solidMaterialCode : selection.liquidMaterialCode,
     )
@@ -769,7 +789,9 @@ export const mapPreparationDetailsFromApi = (
       };
 
       const solidMaterial = inSolid ? findMaterialInList(solidMaterials, materialCode) : undefined;
-      const liquidMaterial = inLiquid ? findMaterialInList(liquidMaterials, materialCode) : undefined;
+      const liquidMaterial = inLiquid
+        ? findMaterialInList(liquidMaterials, materialCode)
+        : undefined;
       const gradeMatch = findGradeInMaterial(solidMaterial, gradeRaw);
       const resolvedGradeCode = gradeMatch?.gradeCode ?? gradeRaw;
       const materialKey =
@@ -818,9 +840,10 @@ export const mapPreparationDetailsFromApi = (
     return `${premixNo}:${materialSelectionKey(code)}`;
   };
 
-  const premixNumbers = premixCount > 0
-    ? Array.from({ length: premixCount }, (_, index) => index + 1)
-    : apiPremixes.map((premix) => Number(premix.premixNo ?? 0)).filter(Boolean);
+  const premixNumbers =
+    premixCount > 0
+      ? Array.from({ length: premixCount }, (_, index) => index + 1)
+      : apiPremixes.map((premix) => Number(premix.premixNo ?? 0)).filter(Boolean);
 
   premixNumbers.forEach((premixNo) => {
     const apiPremix = apiPremixes.find((premix) => Number(premix.premixNo ?? 0) === premixNo);
@@ -918,7 +941,7 @@ export const mapPreparationDetailsFromApi = (
       reviewedBy:
         typeof premix.reviewedBy === "string"
           ? premix.reviewedBy
-          : premixStatusByNo[premixNo]?.reviewedBy ?? null,
+          : (premixStatusByNo[premixNo]?.reviewedBy ?? null),
       reviewedAt: premix.reviewedAt ?? premixStatusByNo[premixNo]?.reviewedAt ?? null,
       remarks: premix.remarks ?? premixStatusByNo[premixNo]?.remarks ?? null,
       rejectionReason:
@@ -1083,9 +1106,7 @@ const mergePremixStatusesOntoDetails = (
       liquidProcess: premix?.liquidProcess ?? [],
       premixSubmissionType: premix?.premixSubmissionType ?? statusEntry?.premixSubmissionType,
       premixSubmissionStatus:
-        premix?.premixSubmissionStatus ??
-        statusEntry?.premixSubmissionStatus ??
-        "TO_BE_INITIATED",
+        premix?.premixSubmissionStatus ?? statusEntry?.premixSubmissionStatus ?? "TO_BE_INITIATED",
       submittedAt: premix?.submittedAt ?? statusEntry?.submittedAt ?? null,
       reviewedBy:
         typeof premix?.reviewedBy === "string"
@@ -1107,10 +1128,8 @@ export class RawMaterialPreparationDetailsModel {
     const premixStatuses = Array.isArray(root?.premixStatuses ?? data?.premixStatuses)
       ? (root?.premixStatuses ?? data?.premixStatuses)
       : [];
-    const preparationDetails =
-      root?.preparationDetails ??
-      data?.preparationDetails ??
-      { premixes: [] };
+    const preparationDetails = root?.preparationDetails ??
+      data?.preparationDetails ?? { premixes: [] };
     const mergedPremixes = mergePremixStatusesOntoDetails(
       preparationDetails?.premixes,
       premixStatuses,
@@ -1122,7 +1141,12 @@ export class RawMaterialPreparationDetailsModel {
       batchId: String(root?.batchId ?? data?.batchId ?? ""),
       subDepartmentId: Number(root?.subDepartmentId ?? data?.subDepartmentId ?? 0),
       formSubmissionType: String(root?.formSubmissionType ?? data?.formSubmissionType ?? ""),
-      status: root?.status != null ? String(root.status) : data?.status != null ? String(data.status) : undefined,
+      status:
+        root?.status != null
+          ? String(root.status)
+          : data?.status != null
+            ? String(data.status)
+            : undefined,
       createdBy: mapPrepPersonFromApi(root?.createdBy ?? data?.createdBy) || null,
       createdAt:
         root?.createdAt != null
@@ -1133,7 +1157,9 @@ export class RawMaterialPreparationDetailsModel {
       pendingPremixCount: Number(root?.pendingPremixCount ?? data?.pendingPremixCount ?? 0),
       approvedPremixCount: Number(root?.approvedPremixCount ?? data?.approvedPremixCount ?? 0),
       rejectedPremixCount: Number(root?.rejectedPremixCount ?? data?.rejectedPremixCount ?? 0),
-      inProgressPremixCount: Number(root?.inProgressPremixCount ?? data?.inProgressPremixCount ?? 0),
+      inProgressPremixCount: Number(
+        root?.inProgressPremixCount ?? data?.inProgressPremixCount ?? 0,
+      ),
       totalPremixCount: Number(root?.totalPremixCount ?? data?.totalPremixCount ?? 0),
       premixStatuses,
       preparationDetails: {
@@ -1243,7 +1269,10 @@ export const formatPrepSectionCellValue = (value: unknown): string => {
     );
     if (entries.length === 0) return "—";
     return entries
-      .map(([key, entryValue]) => `${formatPrepSectionLabel(key)}: ${formatPrepSectionCellValue(entryValue)}`)
+      .map(
+        ([key, entryValue]) =>
+          `${formatPrepSectionLabel(key)}: ${formatPrepSectionCellValue(entryValue)}`,
+      )
       .join("; ");
   }
   return String(unwrapped);
@@ -1257,7 +1286,11 @@ const prepSectionRowHasContent = (row: Record<string, unknown>): boolean =>
       value !== null &&
       value !== undefined &&
       value !== "" &&
-      !(typeof value === "object" && !Array.isArray(value) && Object.keys(value as object).length === 0),
+      !(
+        typeof value === "object" &&
+        !Array.isArray(value) &&
+        Object.keys(value as object).length === 0
+      ),
   );
 
 export const expandRawMaterialPrepSectionRows = (
@@ -1292,17 +1325,13 @@ export const expandRawMaterialPrepSectionRows = (
   return rows;
 };
 
-export const isPrepSectionNestedTableValue = (
-  value: unknown,
-): value is Record<string, unknown>[] =>
+export const isPrepSectionNestedTableValue = (value: unknown): value is Record<string, unknown>[] =>
   Array.isArray(value) &&
   value.length > 0 &&
   value.every((entry) => entry && typeof entry === "object" && !Array.isArray(entry));
 
 /** Nested table blocks embedded in a section row (e.g. qcChecks inside blending). */
-export const extractPrepSectionNestedTableKeys = (
-  rows: Record<string, unknown>[],
-): string[] => {
+export const extractPrepSectionNestedTableKeys = (rows: Record<string, unknown>[]): string[] => {
   const keys = new Set<string>();
   rows.forEach((row) => {
     Object.entries(row).forEach(([key, value]) => {
@@ -1323,7 +1352,9 @@ export const collectPrepSectionNestedTableRows = (
     return isPrepSectionNestedTableValue(nested) ? nested : [];
   });
 
-const mapProcessSections = (process: PreparationProcessEntry): RawMaterialPrepApproverProcessView => ({
+const mapProcessSections = (
+  process: PreparationProcessEntry,
+): RawMaterialPrepApproverProcessView => ({
   materialCode: String(process.materialCode ?? ""),
   materialName: String(process.materialName ?? process.materialCode ?? ""),
   gradeCode: process.gradeCode ?? null,

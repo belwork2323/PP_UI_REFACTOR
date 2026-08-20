@@ -15,6 +15,7 @@ import {
 } from "../../../schema-engine/adapters/qc.adapter";
 import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
 import { getQcSchemaCacheKey } from "./qcFlowConfig";
+import { shouldSkipQcSchemaFetch } from "./qcDivisionRegistry";
 import {
   buildDivisionEntryLabel,
   buildMotorDivisionGroupKey,
@@ -48,6 +49,35 @@ import {
 } from "./qcDeCoringTables";
 import { resolveQcSectionInhibitorType } from "./qcPostCureConfig";
 import {
+  createInitialPostCureValues,
+  hydratePostCureValuesFromMotorDetail,
+  hydratePostCureValuesFromSections,
+  postCureFormValuesHaveUserData,
+  postCureMotorDetailToSections,
+} from "./qcPostCureTables";
+import {
+  buildInitialPostCureValuesForMotor,
+  resolvePostCureSelectionFromMotorDetails,
+} from "./qcPostCureDivisionDetails";
+import {
+  createInitialNdtValues,
+  hydrateNdtValuesFromSections,
+  ndtFormValuesHaveUserData,
+} from "./qcNdtTables";
+import { buildInitialNdtValuesForMotor } from "./qcNdtDivisionDetails";
+import {
+  createInitialWeighmentValues,
+  hydrateWeighmentValuesFromRecord,
+  hydrateWeighmentValuesFromSections,
+  weighmentFormValuesHaveUserData,
+  weighmentMotorDetailToSections,
+} from "./qcWeighmentTables";
+import { buildInitialWeighmentValuesForMotor } from "./qcWeighmentDivisionDetails";
+import {
+  createInitialPropellantValues,
+  hydratePropellantValuesFromSections,
+} from "./qcPropellantTables";
+import {
   groupMixingDetailSections,
   QC_MIXING_PREMIX_SECTION_ID,
   QC_MIXING_VISCOSITY_SECTION_ID,
@@ -72,6 +102,19 @@ import {
   hydrateProcessingMaterialValuesFromSeed,
   parseProcessingMaterialsFromDivisionDetails,
 } from "./qcProcessingMaterials";
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
+
+const pickMotorIdFromUnknown = (value: unknown): string => {
+  const rec = asRecord(value);
+  if (!rec) return "";
+  return String(rec.motorIdNo ?? rec.motorId ?? rec.id ?? "").trim();
+};
 
 const getEntryKind = (
   division: QcApiDivision,
@@ -110,8 +153,12 @@ const getEntryKind = (
     return { flowKey: "POST_CURE", kind: "POST_CURE_MOTOR" };
   }
   if (division === "NDT") return { flowKey: "NDT", kind: "NDT_MOTOR" };
-  if (division === "PROPELLANT_PROPERTIES") return { flowKey: "QC", kind: "PROPELLANT_PROCESS" };
-  if (division === "WEIGHTMENT") return { flowKey: "WEIGHTMENT", kind: "WEIGHTMENT_MOTOR" };
+  if (division === "PROPELLANT_PROPERTIES" || division === "QC") {
+    return { flowKey: "QC", kind: "PROPELLANT_MOTOR" };
+  }
+  if (division === "WEIGHTMENT" || division === "WEIGHMENT") {
+    return { flowKey: "WEIGHTMENT", kind: "WEIGHTMENT_MOTOR" };
+  }
   if (division === "STATIC_TEST_FACILITY") return { flowKey: "STATIC_TEST_FACILITY", kind: "STF" };
   return { flowKey: division, kind: "SIMPLE" };
 };
@@ -123,6 +170,9 @@ export async function hydrateQcDivisionFormFromDetails(
   const effectiveSubDepartmentId = Number(detailsData.subDepartmentId || subDepartmentId);
   const rawDivisionDetails = detailsData.divisionDetails;
   const hasDivisionDetails = Array.isArray(rawDivisionDetails) && rawDivisionDetails.length > 0;
+  const detailsRecord =
+    (QCDivisionDetailsModel.toPlainRecord(detailsData) as Record<string, unknown> | null) ??
+    (detailsData as unknown as Record<string, unknown>);
 
   if (!hasDivisionDetails || !effectiveSubDepartmentId) {
     return QCDivisionDetailsModel.toFormState(detailsData);
@@ -145,8 +195,7 @@ export async function hydrateQcDivisionFormFromDetails(
     subType: QcApiSubType,
     inhibitorType?: QcInhibitorType,
   ) => {
-    if (division === "MIXING" && subType == null) return "";
-    if (division === "CASTING" || division === "CURING" || division === "DE_CORING") return "";
+    if (shouldSkipQcSchemaFetch(division, subType)) return "";
     const key = getQcSchemaCacheKey(division, subType, inhibitorType);
     if (!schemaFetchQueue.has(key)) {
       schemaFetchQueue.set(key, { division, subType, inhibitorType });
@@ -176,6 +225,7 @@ export async function hydrateQcDivisionFormFromDetails(
   };
 
   for (const detail of rawDivisionDetails) {
+    try {
     const division = detail.division as QcApiDivision;
     const detailSubType = detail.subType as QcApiSubType;
     const detailData = detail.data ?? detail;
@@ -326,6 +376,84 @@ export async function hydrateQcDivisionFormFromDetails(
       continue;
     }
 
+    if (division === "POST_CURE" || division === "POST_CURE_OPERATION") {
+      const dataRec = asRecord(detailData) ?? {};
+      const motors = [
+        ...asArray(dataRec.postCureMotorDetails),
+        ...asArray(dataRec.motors),
+        ...asArray(dataRec.motorDetails),
+      ];
+      let createdFromNested = false;
+
+      for (const motor of motors) {
+        const rec = asRecord(motor);
+        const motorId = pickMotorIdFromUnknown(rec);
+        if (!rec || !motorId) continue;
+
+        const selection =
+          resolvePostCureSelectionFromMotorDetails(dataRec, motorId) ??
+          resolvePostCureSelectionFromMotorDetails(detailsRecord, motorId) ??
+          resolvePostCureSelectionFromMotorDetails(rec, motorId);
+        const entrySubType = (selection?.subType ?? detailSubType) as QcApiSubType;
+        const entryInhibitor = selection?.inhibitorType;
+        const nestedValues = hydratePostCureValuesFromMotorDetail(
+          rec,
+          entrySubType,
+          entryInhibitor,
+        );
+        const schemaValues = postCureFormValuesHaveUserData(nestedValues)
+          ? nestedValues
+          : buildInitialPostCureValuesForMotor(
+              dataRec,
+              motorId,
+              entrySubType,
+              entryInhibitor,
+            );
+        const savedSections = postCureMotorDetailToSections(rec, motorId);
+        const { entryId } = makeEntry(
+          "POST_CURE_MOTOR",
+          entrySubType,
+          savedSections,
+          undefined,
+          motorId,
+          entryInhibitor,
+        );
+        entryValues[entryId] = { schemaValues };
+        createdFromNested = true;
+      }
+
+      if (createdFromNested) continue;
+    }
+
+    if (division === "WEIGHTMENT" || division === "WEIGHMENT") {
+      const dataRec = asRecord(detailData) ?? {};
+      const scale = asRecord(dataRec.weighscaleDetails);
+      const motors = [
+        ...asArray(dataRec.motorWeightDetails),
+        ...asArray(dataRec.motors),
+        ...asArray(dataRec.motorDetails),
+      ];
+      let createdFromNested = false;
+
+      for (const motor of motors) {
+        const rec = asRecord(motor);
+        const motorId = pickMotorIdFromUnknown(rec);
+        if (!rec || !motorId || !Array.isArray(rec.weights)) continue;
+        const withScale = scale ? { ...rec, weighscaleDetails: scale } : rec;
+        const { entryId } = makeEntry(
+          "WEIGHTMENT_MOTOR",
+          detailSubType,
+          weighmentMotorDetailToSections(withScale, motorId),
+          undefined,
+          motorId,
+        );
+        entryValues[entryId] = { schemaValues: hydrateWeighmentValuesFromRecord(withScale) };
+        createdFromNested = true;
+      }
+
+      if (createdFromNested) continue;
+    }
+
     const sectionsByPremix = new Map<string, SchemaSectionSubmission[]>();
     const sectionsByMotor = new Map<string, SchemaSectionSubmission[]>();
     const simpleSections: SchemaSectionSubmission[] = [];
@@ -404,6 +532,9 @@ export async function hydrateQcDivisionFormFromDetails(
             : {},
       };
     }
+    } catch (error) {
+      console.error("Failed to hydrate QC division detail", detail?.division, error);
+    }
   }
 
   const schemaRequests = Array.from(schemaFetchQueue.values());
@@ -441,6 +572,7 @@ export async function hydrateQcDivisionFormFromDetails(
   });
 
   for (const entry of entries) {
+    try {
     if (entry.kind === "REVALIDATION") {
       const sectionsToHydrate =
         entry.savedSections ??
@@ -622,6 +754,163 @@ export async function hydrateQcDivisionFormFromDetails(
       continue;
     }
 
+    if (entry.kind === "POST_CURE_MOTOR") {
+      if (postCureFormValuesHaveUserData(entryValues[entry.entryId]?.schemaValues)) {
+        continue;
+      }
+      if (entry.motorId) {
+        const nestedValues =
+          buildInitialPostCureValuesForMotor(
+            detailsRecord,
+            entry.motorId,
+            entry.subType,
+            entry.inhibitorType,
+          );
+        if (postCureFormValuesHaveUserData(nestedValues)) {
+          entryValues[entry.entryId] = { schemaValues: nestedValues };
+          continue;
+        }
+      }
+
+      const sectionsToHydrate =
+        entry.savedSections ??
+        (resolvedData.savedSections ?? []).filter((s) => {
+          if (entry.motorId != null) {
+            const sectionMotorId = String((s as { motorId?: string }).motorId ?? "").trim();
+            if (sectionMotorId && sectionMotorId !== entry.motorId) return false;
+          }
+          if (
+            entry.subType &&
+            (s as { subType?: string }).subType &&
+            (s as { subType?: string }).subType !== entry.subType
+          ) {
+            return false;
+          }
+          if (
+            entry.inhibitorType &&
+            (s as { inhibitorType?: string }).inhibitorType &&
+            (s as { inhibitorType?: string }).inhibitorType !== entry.inhibitorType
+          ) {
+            return false;
+          }
+          return true;
+        });
+      if (sectionsToHydrate.length > 0) {
+        entryValues[entry.entryId] = {
+          schemaValues: hydratePostCureValuesFromSections(
+            sectionsToHydrate,
+            entry.subType,
+            entry.inhibitorType,
+          ),
+        };
+      } else if (
+        !entryValues[entry.entryId]?.schemaValues ||
+        Object.keys(entryValues[entry.entryId].schemaValues).length === 0
+      ) {
+        entryValues[entry.entryId] = {
+          schemaValues: createInitialPostCureValues(entry.subType, entry.inhibitorType),
+        };
+      }
+      continue;
+    }
+
+    if (entry.kind === "NDT_MOTOR") {
+      if (entry.motorId) {
+        const nestedValues = buildInitialNdtValuesForMotor(
+          detailsData as unknown as Record<string, unknown>,
+          entry.motorId,
+        );
+        if (ndtFormValuesHaveUserData(nestedValues)) {
+          entryValues[entry.entryId] = { schemaValues: nestedValues };
+          continue;
+        }
+      }
+
+      const sectionsToHydrate =
+        entry.savedSections ??
+        (resolvedData.savedSections ?? []).filter((s) => {
+          if (entry.motorId != null) {
+            const sectionMotorId = String((s as { motorId?: string }).motorId ?? "").trim();
+            if (sectionMotorId && sectionMotorId !== entry.motorId) return false;
+          }
+          return true;
+        });
+      if (sectionsToHydrate.length > 0) {
+        entryValues[entry.entryId] = {
+          schemaValues: hydrateNdtValuesFromSections(sectionsToHydrate),
+        };
+      } else if (
+        !entryValues[entry.entryId]?.schemaValues ||
+        Object.keys(entryValues[entry.entryId].schemaValues).length === 0
+      ) {
+        entryValues[entry.entryId] = {
+          schemaValues: createInitialNdtValues(),
+        };
+      }
+      continue;
+    }
+
+    if (entry.kind === "WEIGHTMENT_MOTOR") {
+      if (weighmentFormValuesHaveUserData(entryValues[entry.entryId]?.schemaValues)) {
+        continue;
+      }
+      if (entry.motorId) {
+        const nestedValues = buildInitialWeighmentValuesForMotor(detailsRecord, entry.motorId);
+        if (weighmentFormValuesHaveUserData(nestedValues)) {
+          entryValues[entry.entryId] = { schemaValues: nestedValues };
+          continue;
+        }
+      }
+
+      const sectionsToHydrate =
+        entry.savedSections ??
+        (resolvedData.savedSections ?? []).filter((s) => {
+          if (entry.motorId != null) {
+            const sectionMotorId = String((s as { motorId?: string }).motorId ?? "").trim();
+            if (sectionMotorId && sectionMotorId !== entry.motorId) return false;
+          }
+          return true;
+        });
+      if (sectionsToHydrate.length > 0) {
+        entryValues[entry.entryId] = {
+          schemaValues: hydrateWeighmentValuesFromSections(sectionsToHydrate),
+        };
+      } else if (
+        !entryValues[entry.entryId]?.schemaValues ||
+        Object.keys(entryValues[entry.entryId].schemaValues).length === 0
+      ) {
+        entryValues[entry.entryId] = {
+          schemaValues: createInitialWeighmentValues(),
+        };
+      }
+      continue;
+    }
+
+    if (entry.kind === "PROPELLANT_MOTOR" || entry.kind === "PROPELLANT_PROCESS") {
+      const sectionsToHydrate =
+        entry.savedSections ??
+        (resolvedData.savedSections ?? []).filter((s) => {
+          if (entry.motorId != null) {
+            const sectionMotorId = String((s as { motorId?: string }).motorId ?? "").trim();
+            if (sectionMotorId && sectionMotorId !== entry.motorId) return false;
+          }
+          return true;
+        });
+      if (sectionsToHydrate.length > 0) {
+        entryValues[entry.entryId] = {
+          schemaValues: hydratePropellantValuesFromSections(sectionsToHydrate),
+        };
+      } else if (
+        !entryValues[entry.entryId]?.schemaValues ||
+        Object.keys(entryValues[entry.entryId].schemaValues).length === 0
+      ) {
+        entryValues[entry.entryId] = {
+          schemaValues: createInitialPropellantValues(),
+        };
+      }
+      continue;
+    }
+
     const cacheKey = getQcSchemaCacheKey(entry.apiDivision, entry.subType, entry.inhibitorType);
     const schema = schemasByKey[cacheKey];
     if (!schema) continue;
@@ -667,6 +956,12 @@ export async function hydrateQcDivisionFormFromDetails(
         schemaValues: hydrateQcValuesFromSections(schema, sectionsToHydrate),
       };
     }
+    } catch (error) {
+      console.error("Failed to hydrate QC division entry", entry.kind, entry.entryId, error);
+      if (!entryValues[entry.entryId]) {
+        entryValues[entry.entryId] = { schemaValues: {} };
+      }
+    }
   }
 
   const mixingFinalMixDetailsValues =
@@ -675,11 +970,16 @@ export async function hydrateQcDivisionFormFromDetails(
       ? hydrateMixingDetailsValuesFromSections(mixingFinalMixDetailSections, "finalMix")
       : undefined);
 
-  const entryValuesWithHardwareUploads = applyHardwareSharedUploadsToEntryValues(
-    entries,
-    entryValues,
-    resolvedData.savedSections,
-  );
+  let entryValuesWithHardwareUploads = entryValues;
+  try {
+    entryValuesWithHardwareUploads = applyHardwareSharedUploadsToEntryValues(
+      entries,
+      entryValues,
+      resolvedData.savedSections,
+    );
+  } catch (error) {
+    console.error("Failed to apply hardware shared uploads", error);
+  }
 
   return {
     ...resolvedData,

@@ -94,7 +94,7 @@ export const getDashboardWidgetsTheme = (mode: "light" | "dark" = "light") => {
       containerSx: {
         display: "flex",
         gap: 1.25,
-        alignItems: "center",
+        alignItems: "flex-end",
         mb: 1.5,
         mt: 1,
         px: 1.25,
@@ -103,7 +103,7 @@ export const getDashboardWidgetsTheme = (mode: "light" | "dark" = "light") => {
         border: `1px solid ${s.cardBorder}`,
         borderRadius: general.borderRadius.lg,
         boxShadow: s.cardShadow,
-        flexWrap: "wrap",
+        flexWrap: { xs: "wrap", sm: "nowrap" },
       },
     },
     loadingOverlay: {

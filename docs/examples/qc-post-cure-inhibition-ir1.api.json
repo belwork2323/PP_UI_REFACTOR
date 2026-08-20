@@ -32,11 +32,36 @@
         "ui": { "variant": "card", "padding": "md" },
         "children": [
           {
-            "type": "field",
-            "id": "IR1_BATCH_PREPARATION",
-            "fieldType": "text",
-            "label": "Batch No. with date of preparation",
-            "ui": { "colSpan": { "xs": 12, "sm": 8, "md": 6 } }
+            "type": "group",
+            "id": "IR1_BATCH_FIELDS",
+            "ui": {
+              "direction": "row",
+              "wrap": true,
+              "gap": "md",
+              "alignItems": "flex-end"
+            },
+            "children": [
+              {
+                "type": "field",
+                "id": "IR1_BATCH_NO",
+                "fieldType": "text",
+                "label": "Batch No",
+                "ui": {
+                  "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+                  "maxWidth": "280px"
+                }
+              },
+              {
+                "type": "field",
+                "id": "IR1_PREPARATION_DATE",
+                "fieldType": "date",
+                "label": "Date of Preparation",
+                "ui": {
+                  "colSpan": { "xs": 12, "sm": 6, "md": 4 },
+                  "maxWidth": "280px"
+                }
+              }
+            ]
           },
           {
             "type": "table",
@@ -64,9 +89,15 @@
               { "type": "column", "id": "SR_NO", "fieldType": "serial", "label": "Sr No", "readonly": true },
               { "type": "column", "id": "PARAMETER", "fieldType": "static", "label": "Parameter", "readonly": true },
               { "type": "column", "id": "SPECIFICATION", "fieldType": "static", "label": "Specification", "readonly": true },
-              { "type": "column", "id": "RESULT", "fieldType": "text", "label": "Result" },
-              { "type": "column", "id": "QC_REPORT", "fieldType": "file", "label": "Upload QC Report" }
+              { "type": "column", "id": "RESULT", "fieldType": "text", "label": "Result" }
             ]
+          },
+          {
+            "type": "field",
+            "id": "IR1_QC_REPORT",
+            "fieldType": "file",
+            "label": "Upload QC Report",
+            "ui": { "colSpan": { "xs": 12, "sm": 8, "md": 6 } }
           }
         ]
       },

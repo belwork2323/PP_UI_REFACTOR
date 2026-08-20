@@ -44,8 +44,6 @@ type QCFormProps = {
   selectedPostCureOperation: string;
   selectedInhibitorType: string;
   selectedPropellantProcess: string;
-  weightmentWeighscaleNo: string;
-  weightmentCalibrationDueDate: string;
   addedPremixNumbers: number[];
   addedDivisionEntryKeys: string[];
   activeDivisionGroupIndex: number;
@@ -55,6 +53,7 @@ type QCFormProps = {
   divisionsLoading?: boolean;
   partialNavItems?: QcPartialNavItem[];
   activePartialNavIndex?: number;
+  activePartialItem?: QcPartialNavItem | null;
   partialNavActive?: boolean;
   divisionGroupStatusByFlowKey?: Record<string, QcPartialItemStatus>;
   isPartialNavTabEnabled?: (index: number) => boolean;
@@ -63,7 +62,10 @@ type QCFormProps = {
   getDivisionNavTabDisabledReason?: (tabKey: string) => string | undefined;
   isEditMode?: boolean;
   readOnly?: boolean;
+  /** Approved / view-details theme (uppercase labels, read-only values). */
   fieldsReadOnly?: boolean;
+  /** Waiting or Approved — block edits while keeping form UI when not approved. */
+  fieldsDisabled?: boolean;
   /** Hide add-unit flow bar when division itself is locked / view-only. */
   canEditDivisionStructure?: boolean;
   formLockMessage?: string | null;
@@ -82,8 +84,6 @@ type QCFormProps = {
   onPostCureOperationChange: (value: string) => void;
   onInhibitorTypeChange: (value: string) => void;
   onPropellantProcessChange: (value: string) => void;
-  onWeightmentWeighscaleNoChange: (value: string) => void;
-  onWeightmentCalibrationDueDateChange: (value: string) => void;
   onLoadForm?: () => void;
   onPartialNavIndexChange?: (index: number) => void;
   onActiveDivisionGroupIndexChange: (index: number) => void;
@@ -117,8 +117,6 @@ const QCForm = ({
   selectedPostCureOperation,
   selectedInhibitorType,
   selectedPropellantProcess,
-  weightmentWeighscaleNo,
-  weightmentCalibrationDueDate,
   addedPremixNumbers,
   addedDivisionEntryKeys,
   activeDivisionGroupIndex,
@@ -128,6 +126,7 @@ const QCForm = ({
   divisionsLoading = false,
   partialNavItems = [],
   activePartialNavIndex = 0,
+  activePartialItem = null,
   partialNavActive = false,
   divisionGroupStatusByFlowKey = {},
   isPartialNavTabEnabled,
@@ -137,6 +136,7 @@ const QCForm = ({
   isEditMode = false,
   readOnly = false,
   fieldsReadOnly = false,
+  fieldsDisabled = false,
   canEditDivisionStructure = true,
   formLockMessage = null,
   schemaLoading = false,
@@ -154,8 +154,6 @@ const QCForm = ({
   onPostCureOperationChange,
   onInhibitorTypeChange,
   onPropellantProcessChange,
-  onWeightmentWeighscaleNoChange,
-  onWeightmentCalibrationDueDateChange,
   onLoadForm,
   onPartialNavIndexChange,
   onActiveDivisionGroupIndexChange,
@@ -316,8 +314,6 @@ const QCForm = ({
           selectedPostCureOperation={selectedPostCureOperation}
           selectedInhibitorType={selectedInhibitorType}
           selectedPropellantProcess={selectedPropellantProcess}
-          weightmentWeighscaleNo={weightmentWeighscaleNo}
-          weightmentCalibrationDueDate={weightmentCalibrationDueDate}
           addedPremixNumbers={addedPremixNumbers}
           addedDivisionEntryKeys={addedDivisionEntryKeys}
           hasDivisionEntries={hasDivisionEntries}
@@ -334,8 +330,7 @@ const QCForm = ({
           onPostCureOperationChange={onPostCureOperationChange}
           onInhibitorTypeChange={onInhibitorTypeChange}
           onPropellantProcessChange={onPropellantProcessChange}
-          onWeightmentWeighscaleNoChange={onWeightmentWeighscaleNoChange}
-          onWeightmentCalibrationDueDateChange={onWeightmentCalibrationDueDateChange}
+          onLoadForm={onLoadForm ?? (() => undefined)}
           theme={flowBarTheme}
         />
       ) : null}
@@ -367,6 +362,7 @@ const QCForm = ({
           activeDivisionGroupIndex={activeDivisionGroupIndex}
           activeDivisionSubIndex={activeDivisionSubIndex}
           readOnly={readOnly || fieldsReadOnly}
+          fieldsDisabled={readOnly || fieldsDisabled}
           schemaLoading={schemaLoading}
           schemaError={schemaError}
           hideEntryGroupNav
@@ -376,6 +372,7 @@ const QCForm = ({
           onDivisionEntryLiquidValuesChange={onDivisionEntryLiquidValuesChange}
           onMixingFinalMixDetailsChange={onMixingFinalMixDetailsChange}
           onRemoveDivisionEntry={onRemoveDivisionEntry}
+          activePartialItem={activePartialItem}
           unitActions={unitActions}
           theme={theme}
         />

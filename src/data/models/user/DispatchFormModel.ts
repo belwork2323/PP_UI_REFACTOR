@@ -29,20 +29,13 @@ export type DispatchMotorStatusMeta = {
   rejectionReason?: string | null;
 };
 
-export const isDispatchMotorLocked = (
-  status?: DispatchMotorSubmissionStatus | string | null,
-) => {
+export const isDispatchMotorLocked = (status?: DispatchMotorSubmissionStatus | string | null) => {
   const normalized = String(status ?? "").toUpperCase();
   return normalized === "WAITING_FOR_APPROVAL" || normalized === "APPROVED";
 };
 
-export const isDispatchMotorEditable = (
-  status?: DispatchMotorSubmissionStatus | string | null,
-) =>
-  !status ||
-  status === "TO_BE_INITIATED" ||
-  status === "IN_PROGRESS" ||
-  status === "REJECTED";
+export const isDispatchMotorEditable = (status?: DispatchMotorSubmissionStatus | string | null) =>
+  !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED";
 
 export const isDispatchMotorApproverTabDisabled = (
   status?: DispatchMotorSubmissionStatus | string | null,
@@ -90,7 +83,9 @@ export const canApproverActionEntireDispatchForm = (params: {
     return true;
   }
 
-  const formType = String(params.formSubmissionType ?? "").trim().toUpperCase();
+  const formType = String(params.formSubmissionType ?? "")
+    .trim()
+    .toUpperCase();
   if (formType !== "SUBMIT") return false;
 
   const motors = params.motors ?? [];
@@ -100,15 +95,10 @@ export const canApproverActionEntireDispatchForm = (params: {
   );
   if (!allMotorsApproved) return false;
 
-  return (
-    statusUpper === "WAITING_FOR_APPROVAL" ||
-    status === OPERATION_STATUS.WAITING_FOR_APPROVAL
-  );
+  return statusUpper === "WAITING_FOR_APPROVAL" || status === OPERATION_STATUS.WAITING_FOR_APPROVAL;
 };
 
-export const normalizeDispatchMotorStatus = (
-  value: unknown,
-): DispatchMotorSubmissionStatus => {
+export const normalizeDispatchMotorStatus = (value: unknown): DispatchMotorSubmissionStatus => {
   const normalized = String(value ?? "")
     .trim()
     .toUpperCase()
@@ -127,7 +117,9 @@ export const normalizeDispatchMotorStatus = (
 export const normalizeDispatchMotorSubmissionType = (
   value: unknown,
 ): DispatchMotorSubmissionType | undefined => {
-  const raw = String(value ?? "").trim().toUpperCase();
+  const raw = String(value ?? "")
+    .trim()
+    .toUpperCase();
   if (raw === "DRAFT" || raw === "SUBMIT") return raw;
   return undefined;
 };
@@ -367,7 +359,13 @@ export const appendDispatchMotorToState = (
 export const hydrateDispatchFormState = (
   state: DispatchFormState,
   schema: SchemaDocumentV2,
-): DispatchFormState => appendDispatchMotorToState(state, schema, state.motors[0]?.motorId ?? "", state.motors[0]?.savedSchemaValues);
+): DispatchFormState =>
+  appendDispatchMotorToState(
+    state,
+    schema,
+    state.motors[0]?.motorId ?? "",
+    state.motors[0]?.savedSchemaValues,
+  );
 
 const buildDispatchDetailsPayload = (
   schema: SchemaDocumentV2,
@@ -438,9 +436,7 @@ export const mapDispatchFormStateToBackendPayload = (
         motor.setup ?? createDefaultDispatchMotorSetup(),
         motor.schemaFormValues ?? {},
       ),
-      ...(options?.motorSubmissionType
-        ? { motorSubmissionType: options.motorSubmissionType }
-        : {}),
+      ...(options?.motorSubmissionType ? { motorSubmissionType: options.motorSubmissionType } : {}),
     }));
 
   return {
@@ -525,12 +521,9 @@ export const mapDispatchFormStateToPayload = (form: DispatchFormState): Dispatch
 };
 
 const hasDispatchSetupValue = (setup: DispatchMotorSetup) =>
-  [
-    setup.motorStage,
-    setup.castingDate,
-    setup.dispatchDate,
-    setup.dispatchLocation,
-  ].some((value) => String(value ?? "").trim().length > 0) ||
+  [setup.motorStage, setup.castingDate, setup.dispatchDate, setup.dispatchLocation].some(
+    (value) => String(value ?? "").trim().length > 0,
+  ) ||
   (setup.ndtClearance === "YES" && String(setup.ndtMomNo ?? "").trim().length > 0) ||
   (setup.finalAcceptanceClearance === "YES" &&
     String(setup.finalAcceptanceMomNo ?? "").trim().length > 0);

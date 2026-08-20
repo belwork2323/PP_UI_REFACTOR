@@ -709,7 +709,7 @@ const QCCastingMotorPanel = ({
           readOnly={readOnly}
         >
           <CastingEditableTable
-            title="Weightment Details"
+            title="Weighment Details"
             columns={WEIGHTMENT_COLUMNS}
             rows={weightmentRows}
             onChange={setWeightmentRows}

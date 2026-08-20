@@ -49,8 +49,6 @@ type NDTApproverDetailDialogProps = {
   onActiveMotorChange?: (motorId: string) => void;
   onApprove: (item: NDTApproverDetailItem) => void;
   onReject: (item: NDTApproverDetailItem) => void;
-  onApproveForm?: (item: NDTApproverDetailItem) => void;
-  onRejectForm?: (item: NDTApproverDetailItem) => void;
   actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
@@ -64,8 +62,6 @@ const NDTApproverDetailDialog = ({
   onActiveMotorChange,
   onApprove,
   onReject,
-  onApproveForm,
-  onRejectForm,
   actionLoading = false,
   theme,
 }: NDTApproverDetailDialogProps) => {
@@ -123,10 +119,7 @@ const NDTApproverDetailDialog = ({
             onActiveMotorChange={onActiveMotorChange ?? (() => undefined)}
             onApprove={() => onApprove(item)}
             onReject={() => onReject(item)}
-            onApproveForm={onApproveForm ? () => onApproveForm(item) : undefined}
-            onRejectForm={onRejectForm ? () => onRejectForm(item) : undefined}
             actionLoading={actionLoading}
-            formStatus={String(item.ndtStatus ?? item.status ?? "")}
             qcTheme={qcTheme}
             approverTheme={theme}
           />

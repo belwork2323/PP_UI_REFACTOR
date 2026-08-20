@@ -28,6 +28,9 @@ import {
   type RawMaterialLotDetailsContext,
 } from "../../../../../data/models/user/RawMaterialProcurementModel";
 import { fileUtils } from "../../../../../utils/FileUtils";
+import { useAuthStore } from "../../../../../app/store/authStore";
+import { useFilePreview } from "../../../../../hooks/useFilePreview";
+import FilePreviewDialog from "../../../../components/common/FilePreviewDialog";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const FH = STRINGS.MANUFACTURING.FORM_HEADER;
@@ -76,6 +79,10 @@ const RawMaterialLotDetailsView = ({
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getSourcingTheme(mode), [mode]);
   const rmTheme = theme.sourcing.rawMaterial.lotDetails;
+  const subDepartmentId = useAuthStore(
+    (s) => s.user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "raw-material")?.subDepartmentId,
+  );
+  const { preview, openFile, closePreview, downloadCurrent } = useFilePreview();
 
   const statusConfig = useMemo(
     () =>
@@ -267,8 +274,12 @@ const RawMaterialLotDetailsView = ({
                 </Typography>
                 {block?.certificates?.length ? (
                   <Stack spacing={1}>
-                    {block.certificates.map((cert, ci) => (
-                      <Box key={`${cert.fileName}-${ci}`} sx={rmTheme.certRow}>
+                    {block.certificates.map((cert, ci) => {
+                      const fileId = String(cert.fileId ?? "").trim();
+                      const canOpenStored = Boolean(fileId && subDepartmentId);
+                      const canOpenUrl = fileUtils.isOpenableCertificateUrl(cert.fileUrl);
+                      return (
+                      <Box key={`${cert.fileId || cert.fileName}-${ci}`} sx={rmTheme.certRow}>
                         <InsertDriveFileOutlinedIcon
                           sx={{ fontSize: 20, color: theme.palette.primaryLight }}
                         />
@@ -284,21 +295,34 @@ const RawMaterialLotDetailsView = ({
                             </Typography>
                           ) : null}
                         </Box>
-                        {fileUtils.isOpenableCertificateUrl(cert.fileUrl) ? (
+                        {canOpenStored ? (
+                          <Link
+                            component="button"
+                            type="button"
+                            onClick={() => void openFile(fileId, subDepartmentId!, cert.fileName)}
+                            sx={rmTheme.certLink}
+                          >
+                            {fileUtils.getFileKind(cert.fileName) === "video" ? "Download" : "View"}
+                            <OpenInNewRoundedIcon
+                              sx={{ fontSize: 14, ml: 0.3, verticalAlign: "middle" }}
+                            />
+                          </Link>
+                        ) : canOpenUrl ? (
                           <Link
                             href={cert.fileUrl}
                             target="_blank"
                             rel="noopener noreferrer"
                             sx={rmTheme.certLink}
                           >
-                            Open
+                            View
                             <OpenInNewRoundedIcon
                               sx={{ fontSize: 14, ml: 0.3, verticalAlign: "middle" }}
                             />
                           </Link>
                         ) : null}
                       </Box>
-                    ))}
+                      );
+                    })}
                   </Stack>
                 ) : (
                   <Typography sx={rmTheme.emptyText}>{BL.LOT_DETAILS_NO_CERTIFICATES}</Typography>
@@ -308,6 +332,14 @@ const RawMaterialLotDetailsView = ({
           )}
         </Box>
       </Box>
+
+      <FilePreviewDialog
+        preview={preview}
+        onClose={closePreview}
+        onDownload={downloadCurrent}
+        themeColor={theme.palette.primary}
+        themeColorLight={theme.palette.primaryLight}
+      />
     </Box>
   );
 };

@@ -40,9 +40,8 @@
               "addLabel": "Add Column"
             },
             "rows": {
-              "allowAdd": true,
-              "allowDelete": true,
-              "addLabel": "Add Row",
+              "allowAdd": false,
+              "allowDelete": false,
               "presetRows": [
                 { "readonly": true, "PROPERTY": "SSBR Burn rate (mm/s)" },
                 { "readonly": true, "PROPERTY": "Ultrasonic Burn Rate (mm/s)" }
@@ -53,7 +52,10 @@
               { "type": "column", "id": "SPECIFICATION", "fieldType": "text", "label": "Specification" },
               { "type": "column", "id": "FM_1", "fieldType": "number", "label": "FM-1" },
               { "type": "column", "id": "FM_2", "fieldType": "number", "label": "FM-2" },
-              { "type": "column", "id": "FM_3", "fieldType": "number", "label": "FM-3" }
+              { "type": "column", "id": "FM_3", "fieldType": "number", "label": "FM-3" },
+              { "type": "column", "id": "AVG", "fieldType": "number", "label": "Avg" },
+              { "type": "column", "id": "STD_DEV", "fieldType": "number", "label": "Std Dev" },
+              { "type": "column", "id": "UPLOAD_GRAPH", "fieldType": "file", "label": "Upload" }
             ]
           }
         ]

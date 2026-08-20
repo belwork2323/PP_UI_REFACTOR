@@ -6,13 +6,15 @@ import {
 import { OPERATION_STATUS, type OperationStatus } from "../../../hooks/operationStatus";
 import {
   EPDM_MECH_KEYS,
+  buildMockTrialPayload,
   isLooseFlapDimensionalParam,
   parseSectionsToFormData,
   ROCASIN_MECH_KEYS,
   THERMAL_PROP_KEYS,
   type RocketMotorCasingFormData,
+  type RocketMotorCasingMockTrialData,
+  type RocketMotorCasingMockTrialPayload,
 } from "./RocketMotorCasingFormModel";
-import type { SchemaSectionSubmission } from "../../../schema-engine";
 
 /** Soft-delete is allowed only while the casing form is still in progress (draft). */
 export const canDeleteRocketMotorCasing = (status: string | null | undefined) =>
@@ -627,134 +629,116 @@ const mapDimensionalTableRows = (form: RocketMotorCasingFormData): CasingDimensi
     isLooseFlap: isLooseFlapDimensionalParam(d),
   }));
 
-const humanizeMockTrialKey = (key: string): string => {
-  const trimmed = String(key ?? "").trim();
-  if (!trimmed) return "—";
-  if (trimmed === "srNo") return "Sr. No.";
-  return trimmed
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replace(/[_-]+/g, " ")
-    .replace(/\b\w/g, (ch) => ch.toUpperCase())
-    .trim();
-};
-
-const extractMockTrialSectionPayload = (
-  section: SchemaSectionSubmission,
-): Record<string, unknown> => {
-  const sectionData = Array.isArray(section.sectionData) ? section.sectionData : [];
-  const first = sectionData[0];
-  return first && typeof first === "object" ? (first as Record<string, unknown>) : {};
-};
-
-const extractMockTrialTableRows = (section: SchemaSectionSubmission): Record<string, unknown>[] => {
-  const sectionId = String(section.sectionId ?? "");
-  const payload = extractMockTrialSectionPayload(section);
-  const nested = payload[sectionId];
-  if (Array.isArray(nested)) return nested as Record<string, unknown>[];
-
-  const camelKey = sectionId ? `${sectionId.charAt(0).toLowerCase()}${sectionId.slice(1)}` : "";
-  const nestedCamel = camelKey ? payload[camelKey] : undefined;
-  if (Array.isArray(nestedCamel)) return nestedCamel as Record<string, unknown>[];
-
-  // Any nested array under the section payload is treated as table rows.
-  for (const value of Object.values(payload)) {
-    if (Array.isArray(value) && value.every((row) => row && typeof row === "object")) {
-      return value as Record<string, unknown>[];
-    }
+const formatMeasuredMm = (value: unknown): string => {
+  if (value == null) return "";
+  if (typeof value === "object" && value !== null && "value" in value) {
+    const measured = value as { value?: unknown; unit?: unknown };
+    if (measured.value == null || String(measured.value).trim() === "") return "";
+    const unit = String(measured.unit ?? "mm").trim() || "mm";
+    return `${String(measured.value).trim()} ${unit}`;
   }
-
-  const sectionData = Array.isArray(section.sectionData) ? section.sectionData : [];
-  if (
-    sectionData.length > 0 &&
-    sectionData.every(
-      (row) =>
-        row && typeof row === "object" && !("castingStation" in (row as Record<string, unknown>)),
-    )
-  ) {
-    return sectionData as Record<string, unknown>[];
-  }
-
-  return [];
+  return formatMeasuredValue(value, "mm");
 };
 
-const deriveMockTrialColumnsFromRows = (
-  rows: Record<string, unknown>[],
-): Array<{ key: string; label: string }> => {
-  const keys: string[] = [];
-  const seen = new Set<string>();
+const flattenMockTrialMotorDimRow = (
+  row: RocketMotorCasingMockTrialPayload["motorDimensions"][number],
+): Record<string, unknown> => ({
+  srNo: row.srNo,
+  lfRubberThicknessHe: formatMeasuredMm(row.lfRubberThicknessHe),
+  heBossWidthWithoutLfRubber: formatMeasuredMm(row.heBossWidthWithoutLfRubber),
+  heDiaId: formatMeasuredMm(row.heDiaId),
+  heOuterToNeOuter: formatMeasuredMm(row.motorLength?.heOuterToNeOuter),
+  heInnerToNeInner: formatMeasuredMm(row.motorLength?.heInnerToNeInner),
+  neOuterToHeInner: formatMeasuredMm(row.motorLength?.neOuterToHeInner),
+});
 
-  rows.forEach((row) => {
-    Object.keys(row).forEach((key) => {
-      if (!key || key.startsWith("_") || seen.has(key)) return;
-      seen.add(key);
-      keys.push(key);
-    });
-  });
+const MOCK_TRIAL_MOTOR_DIM_COLUMNS = [
+  { key: "srNo", label: "Sr. No." },
+  { key: "lfRubberThicknessHe", label: "Loose flap thickness of rubber at HE (mm)" },
+  { key: "heBossWidthWithoutLfRubber", label: "HE Boss Width without LF Rubber (mm)" },
+  { key: "heDiaId", label: "HE Dia ID (mm)" },
+  { key: "heOuterToNeOuter", label: "HE outer to NE outer" },
+  { key: "heInnerToNeInner", label: "HE inner to NE inner" },
+  { key: "neOuterToHeInner", label: "NE outer to HE inner" },
+];
 
-  keys.sort((a, b) => {
-    if (a === "srNo") return -1;
-    if (b === "srNo") return 1;
-    return 0;
-  });
+const MOCK_TRIAL_MANDREL_COLUMNS = [
+  { key: "srNo", label: "Sr. No." },
+  { key: "mandrelRestOnDomeA", label: "Mandrel rest on dome (A)" },
+  { key: "mandrelRestOnBottomCupB", label: "Mandrel rest on bottom cup (B)" },
+  { key: "differenceC", label: "Difference C=(A-B)" },
+  { key: "bellowThicknessD", label: "Bellow thickness (D)" },
+  { key: "mandrelLiftE", label: "Mandrel lift E=(C-D)" },
+];
 
-  return keys.map((key) => ({ key, label: humanizeMockTrialKey(key) }));
-};
-
-const mapMockTrialTableRows = (
-  rawRows: Record<string, unknown>[],
-  columns: Array<{ key: string; label: string; unit?: string }>,
-): Array<Record<string, string>> =>
-  rawRows.map((row) =>
-    Object.fromEntries(
-      columns.map((col) => [col.key, formatMeasuredValue(row[col.key], col.unit) || "—"]),
-    ),
+const mockTrialHasData = (mockTrial: RocketMotorCasingMockTrialData): boolean =>
+  Boolean(
+    mockTrial.castingStation ||
+      mockTrial.mandrelId ||
+      mockTrial.bottomCupId ||
+      mockTrial.motorDimensions?.some((r) =>
+        [
+          r.lfRubberThicknessHe,
+          r.heBossWidthWithoutLfRubber,
+          r.heDiaId,
+          r.heOuterToNeOuter,
+          r.heInnerToNeInner,
+          r.neOuterToHeInner,
+        ].some((v) => String(v ?? "").trim()),
+      ) ||
+      mockTrial.mandrelAssemblyMeasurements?.some((r) =>
+        [r.mandrelRestOnDomeA, r.mandrelRestOnBottomCupB, r.bellowThicknessD].some((v) =>
+          String(v ?? "").trim(),
+        ),
+      ),
   );
 
-/** Build mock-trial detail rows/tables from server-saved section payloads only (no local schema). */
+/** Build mock-trial detail rows/tables from the typed mock-trial payload. */
 const buildMockTrialDetailContent = (
-  sections: SchemaSectionSubmission[] | undefined,
+  mockTrial: RocketMotorCasingMockTrialData,
 ): Pick<CasingDetailBlock, "rows" | "mockTrialTables"> => {
-  if (!Array.isArray(sections) || sections.length === 0) {
+  if (!mockTrialHasData(mockTrial)) {
     return { rows: [detailRow("No mock trial data recorded", "—")] };
   }
 
-  const rows: CasingDetailBlock["rows"] = [];
+  const payload = buildMockTrialPayload(mockTrial);
+  const rows: CasingDetailBlock["rows"] = [
+    detailRow("Casting Station", payload.basicDetails.castingStation || "—"),
+    detailRow("Mandrel Id No.", payload.basicDetails.mandrelId || "—"),
+    detailRow("Bottom Cup Id", payload.basicDetails.bottomCupId || "—"),
+  ];
+
   const mockTrialTables: MockTrialDetailTable[] = [];
 
-  for (const section of sections) {
-    const sectionId = String(section.sectionId ?? "");
-    const sectionIdLower = sectionId.toLowerCase();
-    const tableRows = extractMockTrialTableRows(section);
-
-    if (tableRows.length > 0) {
-      const columns = deriveMockTrialColumnsFromRows(tableRows);
-      if (!columns.length) continue;
-
-      mockTrialTables.push({
-        title: humanizeMockTrialKey(sectionId),
-        columns,
-        rows: mapMockTrialTableRows(tableRows, columns),
-      });
-      continue;
-    }
-
-    const data = extractMockTrialSectionPayload(section);
-    const fieldEntries = Object.entries(data).filter(
-      ([key, value]) => key && !key.startsWith("_") && !Array.isArray(value),
-    );
-
-    if (!fieldEntries.length) continue;
-
-    // Prefer basic-details style key/value rows for non-table sections.
-    if (sectionIdLower === "basicdetails" || fieldEntries.length <= 8) {
-      fieldEntries.forEach(([key, value]) => {
-        rows.push(detailRow(humanizeMockTrialKey(key), String(value ?? "—")));
-      });
-    }
+  if (payload.motorDimensions.length > 0) {
+    mockTrialTables.push({
+      title: "Motor Dimensions",
+      columns: MOCK_TRIAL_MOTOR_DIM_COLUMNS,
+      rows: payload.motorDimensions.map((row) => {
+        const flat = flattenMockTrialMotorDimRow(row);
+        return Object.fromEntries(
+          MOCK_TRIAL_MOTOR_DIM_COLUMNS.map((col) => [
+            col.key,
+            String(flat[col.key] ?? "—") || "—",
+          ]),
+        );
+      }),
+    });
   }
 
-  if (!rows.length && !mockTrialTables.length) {
-    return { rows: [detailRow("No mock trial data recorded", "—")] };
+  if (payload.mandrelAssemblyMeasurements.length > 0) {
+    mockTrialTables.push({
+      title: "Mandrel Assembly Measurements",
+      columns: MOCK_TRIAL_MANDREL_COLUMNS,
+      rows: payload.mandrelAssemblyMeasurements.map((row) =>
+        Object.fromEntries(
+          MOCK_TRIAL_MANDREL_COLUMNS.map((col) => {
+            const raw = row[col.key as keyof typeof row];
+            return [col.key, raw == null || raw === "" ? "—" : String(raw)];
+          }),
+        ),
+      ),
+    });
   }
 
   return { rows, mockTrialTables: mockTrialTables.length ? mockTrialTables : undefined };
@@ -973,11 +957,11 @@ export function mapCasingFormDataToDetailBlocks(
       rows: dimensionalTable.length ? [] : [detailRow("No dimensional data recorded", "—")],
       dimensionalTable: dimensionalTable.length ? dimensionalTable : undefined,
     },
-    ...(form.mockTrial?.savedSections && form.mockTrial.savedSections.length > 0
+    ...(form.mockTrial && mockTrialHasData(form.mockTrial)
       ? [
           {
             material: "Mock trial",
-            ...buildMockTrialDetailContent(form.mockTrial.savedSections),
+            ...buildMockTrialDetailContent(form.mockTrial),
             _columns: CASING_DETAIL_COLS,
           },
         ]

@@ -10,7 +10,7 @@ import RefreshIconButton from "@ui/components/common/RefreshIconButton";
 import AdminManagementStatsGrid from "@ui/components/custom/admin/AdminManagementStatsGrid";
 import AdminManagementPageHeader from "@ui/components/custom/admin/AdminManagementPageHeader";
 import AdminListShell from "@ui/components/custom/admin/AdminListShell";
-import AdminFilterPanel from "@ui/components/custom/admin/AdminFilterPanel";
+import AdminListFilterPanel from "@ui/components/custom/admin/AdminListFilterPanel";
 import useUserManagementHook from "@hooks/admin/UserManagement/useUserManagementHook";
 import { getDisplayName, getUsername } from "@utils/userManagementUtils";
 import UserManagementList from "./UserManagementList";
@@ -79,11 +79,11 @@ const UserManagementPage = () => {
       <Box sx={{ mb: 2 }}>
         <FilterToggleButton
           label="Date Filter"
-          count={stats.filterType !== S1.DATE_FILTER.VALUES.MONTH ? 1 : 0}
+          count={stats.filterType !== S1.DATE_FILTER.VALUES.ONE_YEAR ? 1 : 0}
           isOpen={stats.dateFilterOpen}
           onClick={stats.toggleDateFilter}
           sx={th.table.filterBtn(
-            stats.dateFilterOpen || stats.filterType !== S1.DATE_FILTER.VALUES.MONTH,
+            stats.dateFilterOpen || stats.filterType !== S1.DATE_FILTER.VALUES.ONE_YEAR,
           )}
           iconSx={th.table.filterBtnIcon}
           textSx={th.table.filterBtnText}
@@ -141,7 +141,7 @@ const UserManagementPage = () => {
           />
         }
         filterExtension={
-          <AdminFilterPanel
+          <AdminListFilterPanel
             title={AC.FILTERS_TITLE}
             activeFilterCount={list.activeFilterCount}
             onClear={list.clearFilters}
@@ -152,37 +152,39 @@ const UserManagementPage = () => {
             applyLabel={AC.FILTERS_APPLY}
             theme={t}
           >
-            <Stack direction="row" gap={1.5} flexWrap="wrap">
-              <FilterSelect
-                label={S.TOOLBAR.FILTER_ROLE_LABEL}
-                value={draftFilters.role}
-                onChange={(e) => list.setDraftFilter("role", e.target.value)}
-                options={lookups.roleNames}
-                sx={t.filterPanel.field}
-              />
-              <FilterSelect
-                label={S.TOOLBAR.FILTER_DEPT_LABEL}
-                value={draftFilters.dept}
-                onChange={(e) => list.setDraftFilter("dept", e.target.value)}
-                options={lookups.deptNames}
-                sx={t.filterPanel.field}
-              />
-              <FilterSelect
-                label={S.TOOLBAR.FILTER_SUB_DEPT_LABEL}
-                value={draftFilters.subDept}
-                onChange={(e) => list.setDraftFilter("subDept", e.target.value)}
-                optionItems={lookups.subDeptOptions}
-                sx={t.filterPanel.field}
-              />
-              <FilterSelect
-                label={S.TOOLBAR.FILTER_STATUS_LABEL}
-                value={draftFilters.status}
-                onChange={(e) => list.setDraftFilter("status", e.target.value)}
-                options={S.STATUS}
-                sx={t.filterPanel.field}
-              />
-            </Stack>
-          </AdminFilterPanel>
+            <FilterSelect
+              label={S.TOOLBAR.FILTER_ROLE_LABEL}
+              value={draftFilters.role}
+              onChange={(e) => list.setDraftFilter("role", e.target.value)}
+              options={lookups.roleNames}
+              filterPanel
+              sx={{ ...t.filterPanel.field, ...t.filterPanel.fieldItem }}
+            />
+            <FilterSelect
+              label={S.TOOLBAR.FILTER_DEPT_LABEL}
+              value={draftFilters.dept}
+              onChange={(e) => list.setDraftFilter("dept", e.target.value)}
+              options={lookups.deptNames}
+              filterPanel
+              sx={{ ...t.filterPanel.field, ...t.filterPanel.fieldItem }}
+            />
+            <FilterSelect
+              label={S.TOOLBAR.FILTER_SUB_DEPT_LABEL}
+              value={draftFilters.subDept}
+              onChange={(e) => list.setDraftFilter("subDept", e.target.value)}
+              optionItems={lookups.subDeptOptions}
+              filterPanel
+              sx={{ ...t.filterPanel.field, ...t.filterPanel.fieldItem }}
+            />
+            <FilterSelect
+              label={S.TOOLBAR.FILTER_STATUS_LABEL}
+              value={draftFilters.status}
+              onChange={(e) => list.setDraftFilter("status", e.target.value)}
+              options={S.STATUS}
+              filterPanel
+              sx={{ ...t.filterPanel.field, ...t.filterPanel.fieldItem }}
+            />
+          </AdminListFilterPanel>
         }
         theme={t}
       >

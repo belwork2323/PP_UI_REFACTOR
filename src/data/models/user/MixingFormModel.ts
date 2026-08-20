@@ -13,7 +13,10 @@ import {
   type PremixSubmissionStatus,
   type PremixSubmissionType,
 } from "./RawMaterialPreparationModel";
-import { formatSubdepartmentBatchTypeLabel, normalizeSubdepartmentBatchStatus } from "./SubdepartmentBatchModel";
+import {
+  formatSubdepartmentBatchTypeLabel,
+  normalizeSubdepartmentBatchStatus,
+} from "./SubdepartmentBatchModel";
 
 export type ProcessParticularRow = {
   operationId: number;
@@ -102,9 +105,7 @@ export type MixCardCounts = {
 export const buildMixCardId = (stageType: MixCardStageType, cardNo: string | number) =>
   `${stageType}-${String(cardNo).trim()}`;
 
-export const normalizeMixCardStatus = (
-  status: unknown,
-): MixCardSubmissionStatus => {
+export const normalizeMixCardStatus = (status: unknown): MixCardSubmissionStatus => {
   const normalized = String(status ?? "")
     .trim()
     .toUpperCase()
@@ -129,7 +130,10 @@ export const isMixCardApproverTabDisabled = (
 export const isMixCardApproverActionable = (
   status?: MixCardSubmissionStatus | string | null,
 ): boolean => {
-  const normalized = String(status ?? "").trim().toUpperCase().replace(/\s+/g, "_");
+  const normalized = String(status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
   return normalized === "WAITING_FOR_APPROVAL" || normalized === "IN_PROGRESS";
 };
 
@@ -146,10 +150,7 @@ export const isMixCardLocked = (status?: MixCardSubmissionStatus | string | null
 };
 
 export const isMixCardEditable = (status?: MixCardSubmissionStatus | string | null) =>
-  !status ||
-  status === "TO_BE_INITIATED" ||
-  status === "IN_PROGRESS" ||
-  status === "REJECTED";
+  !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED";
 
 /** Entire form can be approved/rejected once submitted and every mix card is approved. */
 export const canApproverActionEntireMixingForm = (params: {
@@ -157,7 +158,9 @@ export const canApproverActionEntireMixingForm = (params: {
   status?: string | null;
   mixCards?: Array<{ mixCardSubmissionStatus?: MixCardSubmissionStatus | string | null }>;
 }): boolean => {
-  const formType = String(params.formSubmissionType ?? "").trim().toUpperCase();
+  const formType = String(params.formSubmissionType ?? "")
+    .trim()
+    .toUpperCase();
   if (formType !== "SUBMIT") return false;
 
   const mixCards = params.mixCards ?? [];
@@ -196,9 +199,7 @@ export const getMixingBatchStatusLabel = (status: unknown): string =>
   String(normalizeSubdepartmentBatchStatus(status));
 
 /** Derive a card status from batch/form status when per-card API fields are absent. */
-export const stubMixCardStatusFromFormStatus = (
-  formStatus: unknown,
-): MixCardSubmissionStatus => {
+export const stubMixCardStatusFromFormStatus = (formStatus: unknown): MixCardSubmissionStatus => {
   const status = String(formStatus ?? "").trim();
   const statusUpper = status.toUpperCase().replace(/\s+/g, "_");
 
@@ -233,10 +234,15 @@ export const stubMixCardStatusFromFormStatus = (
   return "TO_BE_INITIATED";
 };
 
-export const buildMixingApproverCards = (detailView: {
-  premixCards?: PremixEntry[];
-  finalMixCards?: FinalMixEntry[];
-} | null | undefined): MixingApproverCard[] => {
+export const buildMixingApproverCards = (
+  detailView:
+    | {
+        premixCards?: PremixEntry[];
+        finalMixCards?: FinalMixEntry[];
+      }
+    | null
+    | undefined,
+): MixingApproverCard[] => {
   if (!detailView) return [];
 
   const premixCards = (detailView.premixCards ?? []).map((premix) => {
@@ -350,9 +356,7 @@ const resolveSampleCount = (value: unknown, fallback = 1) => {
 };
 
 const resolveOperationLabel = (row: any, fallbackId?: number): string => {
-  const named = String(
-    row?.operationName ?? row?.operation ?? row?.operationLabel ?? "",
-  ).trim();
+  const named = String(row?.operationName ?? row?.operation ?? row?.operationLabel ?? "").trim();
   if (named) return named;
   const operationId = Number(row?.operationId ?? fallbackId ?? 0);
   if (Number.isFinite(operationId) && operationId > 0) {
@@ -404,9 +408,7 @@ export const mergeProcessParticularsWithOperations = (
     }));
   }
 
-  const existingById = new Map(
-    existingRows.map((row) => [Number(row.operationId), row] as const),
-  );
+  const existingById = new Map(existingRows.map((row) => [Number(row.operationId), row] as const));
   const hasAnyIdMatch = operations.some((operation) =>
     existingById.has(Number(operation.operationId)),
   );
@@ -419,17 +421,14 @@ export const mergeProcessParticularsWithOperations = (
       return {
         ...row,
         operation: String(
-          operation?.operationName ??
-            row.operation ??
-            resolveOperationLabel(row, row.operationId),
+          operation?.operationName ?? row.operation ?? resolveOperationLabel(row, row.operationId),
         ),
       };
     });
   }
 
   return operations.map((operation, index) => {
-    const existing =
-      existingById.get(Number(operation.operationId)) ?? existingRows[index];
+    const existing = existingById.get(Number(operation.operationId)) ?? existingRows[index];
     return {
       operationId: Number(operation.operationId),
       operation: String(
@@ -573,16 +572,12 @@ const normalizeFinalMixEntry = (
   fallbackNo: number,
 ): FinalMixEntry => {
   const qualityChecks = mergeQualityChecks(createQualityCheckRows([]), entry.qualityChecks ?? []);
-  const mixingCycleSource =
-    entry.mixingCycle ?? entry.finalMixCycle ?? entry.mixingCycleCode ?? "";
+  const mixingCycleSource = entry.mixingCycle ?? entry.finalMixCycle ?? entry.mixingCycleCode ?? "";
 
   return {
     mixNo: coerceFieldValue(entry.mixNo ?? fallbackNo),
     finalMixNo: coerceFieldValue(
-      entry.finalMixNo ??
-        entry.linkedPremixNo ??
-        resolveApiFinalMixNo(entry) ??
-        "",
+      entry.finalMixNo ?? entry.linkedPremixNo ?? resolveApiFinalMixNo(entry) ?? "",
     ),
     mixerType: String(entry.mixerType ?? ""),
     bldgNo: String(entry.bldgNo ?? ""),
@@ -739,10 +734,7 @@ export const mapMixingDetailsToFormState = (details: Partial<MixingDetails>): Mi
     date?: unknown;
     batchSize?: unknown;
   } | null;
-  const stages =
-    details?.mixingDetails?.stages ??
-    (details as any)?.stages ??
-    [];
+  const stages = details?.mixingDetails?.stages ?? (details as any)?.stages ?? [];
 
   const premixStage = stages.find(
     (stage) => String(stage?.stageType ?? "").toUpperCase() === "PREMIX",
@@ -767,9 +759,7 @@ export const mapMixingDetailsToFormState = (details: Partial<MixingDetails>): Mi
           mixerType: String(
             premix?.mixerConfiguration?.mixerId ?? identificationSheet?.mixerType ?? "",
           ),
-          bldgNo: String(
-            premix?.mixerConfiguration?.bldgNo ?? identificationSheet?.bldgNo ?? "",
-          ),
+          bldgNo: String(premix?.mixerConfiguration?.bldgNo ?? identificationSheet?.bldgNo ?? ""),
           bowlId: premix?.mixerConfiguration?.bowlId ?? "",
 
           bowlTrialDate: premix?.trialDetails?.trialDate ?? "",
@@ -823,9 +813,7 @@ export const mapMixingDetailsToFormState = (details: Partial<MixingDetails>): Mi
           mixerType: String(
             entry?.mixerConfiguration?.mixerId ?? identificationSheet?.mixerType ?? "",
           ),
-          bldgNo: String(
-            entry?.mixerConfiguration?.bldgNo ?? identificationSheet?.bldgNo ?? "",
-          ),
+          bldgNo: String(entry?.mixerConfiguration?.bldgNo ?? identificationSheet?.bldgNo ?? ""),
           bowlId: entry?.mixerConfiguration?.bowlId ?? "",
 
           mixingCycle: resolveApiMixingCycleDisplayValue(
@@ -1179,11 +1167,10 @@ const resolveApiMixCardStatus = (
 const resolveApiPremixSubmissionType = (
   entry: Record<string, unknown> | null | undefined,
 ): PremixSubmissionType | string | null => {
-  const raw =
-    entry?.premixSubmissionType ??
-    entry?.mixCardSubmissionType ??
-    null;
-  const normalized = String(raw ?? "").trim().toUpperCase();
+  const raw = entry?.premixSubmissionType ?? entry?.mixCardSubmissionType ?? null;
+  const normalized = String(raw ?? "")
+    .trim()
+    .toUpperCase();
   if (normalized === "DRAFT" || normalized === "SUBMIT") {
     return normalized as PremixSubmissionType;
   }
@@ -1212,8 +1199,7 @@ const mapMixCardStatusesFromApi = (
         entry.premixNo ?? entry.mixNo ?? entry.finalMixNo ?? entry.cardNo ?? "",
       ).trim();
       if (!cardNo) return;
-      const resolvedStage: MixCardStageType =
-        stageType === "FINAL_MIX" ? "FINAL_MIX" : "PREMIX";
+      const resolvedStage: MixCardStageType = stageType === "FINAL_MIX" ? "FINAL_MIX" : "PREMIX";
       const id = buildMixCardId(resolvedStage, cardNo);
       result[id] = {
         ...result[id],
@@ -1228,8 +1214,11 @@ const mapMixCardStatusesFromApi = (
     });
   });
 
-  const stages = ((data.mixingDetails as { stages?: Array<{ stageType?: string; premixes?: Record<string, unknown>[] }> } | undefined)
-    ?.stages ?? []) as Array<{ stageType?: string; premixes?: Record<string, unknown>[] }>;
+  const stages = ((
+    data.mixingDetails as
+      | { stages?: Array<{ stageType?: string; premixes?: Record<string, unknown>[] }> }
+      | undefined
+  )?.stages ?? []) as Array<{ stageType?: string; premixes?: Record<string, unknown>[] }>;
 
   stages.forEach((stage) => {
     const stageType = String(stage?.stageType ?? "").toUpperCase();
@@ -1240,16 +1229,14 @@ const mapMixCardStatusesFromApi = (
       result[id] = {
         ...result[id],
         mixCardSubmissionStatus:
-          result[id]?.mixCardSubmissionStatus ??
-          resolveApiMixCardStatus(entry, "TO_BE_INITIATED"),
+          result[id]?.mixCardSubmissionStatus ?? resolveApiMixCardStatus(entry, "TO_BE_INITIATED"),
         premixSubmissionType:
           resolveApiPremixSubmissionType(entry) ?? result[id]?.premixSubmissionType ?? null,
         rejectionReason:
           result[id]?.rejectionReason ??
           (entry.rejectionReason as string | null | undefined) ??
           null,
-        remarks:
-          result[id]?.remarks ?? (entry.remarks as string | null | undefined) ?? null,
+        remarks: result[id]?.remarks ?? (entry.remarks as string | null | undefined) ?? null,
       };
     });
   });
@@ -1304,8 +1291,10 @@ export const mapMixingDetailsForDisplay = (
   const formStatus = normalizeApproverBatchStatus(data.status);
   const stubStatus = stubMixCardStatusFromFormStatus(data.status ?? formStatus);
   const statusById = mapMixCardStatusesFromApi(data);
-  const stages = ((data.mixingDetails as { stages?: any[] } | undefined)?.stages ??
-    []) as Array<{ stageType?: string; premixes?: any[] }>;
+  const stages = ((data.mixingDetails as { stages?: any[] } | undefined)?.stages ?? []) as Array<{
+    stageType?: string;
+    premixes?: any[];
+  }>;
 
   const premixApiByNo = new Map<string, Record<string, unknown>>();
   const finalMixApiByNo = new Map<string, Record<string, unknown>>();
@@ -1327,14 +1316,12 @@ export const mapMixingDetailsForDisplay = (
     return {
       ...card,
       mixCardSubmissionStatus:
-        statusMeta?.mixCardSubmissionStatus ??
-        resolveApiMixCardStatus(apiEntry, stubStatus),
+        statusMeta?.mixCardSubmissionStatus ?? resolveApiMixCardStatus(apiEntry, stubStatus),
       rejectionReason:
         statusMeta?.rejectionReason ??
         (apiEntry?.rejectionReason as string | null | undefined) ??
         null,
-      remarks:
-        statusMeta?.remarks ?? (apiEntry?.remarks as string | null | undefined) ?? null,
+      remarks: statusMeta?.remarks ?? (apiEntry?.remarks as string | null | undefined) ?? null,
     };
   });
 
@@ -1346,14 +1333,12 @@ export const mapMixingDetailsForDisplay = (
     return {
       ...card,
       mixCardSubmissionStatus:
-        statusMeta?.mixCardSubmissionStatus ??
-        resolveApiMixCardStatus(apiEntry, stubStatus),
+        statusMeta?.mixCardSubmissionStatus ?? resolveApiMixCardStatus(apiEntry, stubStatus),
       rejectionReason:
         statusMeta?.rejectionReason ??
         (apiEntry?.rejectionReason as string | null | undefined) ??
         null,
-      remarks:
-        statusMeta?.remarks ?? (apiEntry?.remarks as string | null | undefined) ?? null,
+      remarks: statusMeta?.remarks ?? (apiEntry?.remarks as string | null | undefined) ?? null,
     };
   });
 

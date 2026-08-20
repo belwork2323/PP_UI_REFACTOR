@@ -53,7 +53,6 @@ const RawMaterialPreparationPage = () => {
     handleDiscardAndBack,
     handleSavePremixDraft,
     handleSubmitPremix,
-    handleSubmitForFinalApproval,
   } = hookState;
 
   const listLoading = loading && !loadingFormDetails && view === "list";
@@ -123,7 +122,6 @@ const RawMaterialPreparationPage = () => {
               setPendingPremixNo(premixNo);
               setSubmitConfirmOpen(true);
             }}
-            onSubmitForFinalApproval={handleSubmitForFinalApproval}
             actionLoading={actionLoading}
           />
         </Box>
@@ -149,7 +147,11 @@ const RawMaterialPreparationPage = () => {
             ? actionStrings.PREMIX_DRAFT_CONFIRM_MESSAGE(pendingPremixNo)
             : actionStrings.PREMIX_DRAFT_CONFIRM_TITLE
         }
-        confirmLabel={actionStrings.SAVE_PREMIX_DRAFT}
+        confirmLabel={
+          pendingPremixNo != null
+            ? actionStrings.SAVE_PREMIX_DRAFT(pendingPremixNo)
+            : actionStrings.PREMIX_DRAFT_CONFIRM_TITLE
+        }
         cancelLabel={STRINGS.SOURCING.SPECIFICATION_FORM.CONFIRM_DRAFT_CANCEL_ACTION}
         onConfirm={async () => {
           const premixNo = pendingPremixNo;
@@ -172,7 +174,11 @@ const RawMaterialPreparationPage = () => {
             ? actionStrings.PREMIX_SUBMIT_CONFIRM_MESSAGE(pendingPremixNo)
             : actionStrings.PREMIX_SUBMIT_CONFIRM_TITLE
         }
-        confirmLabel={actionStrings.SUBMIT_PREMIX}
+        confirmLabel={
+          pendingPremixNo != null
+            ? actionStrings.SUBMIT_PREMIX(pendingPremixNo)
+            : actionStrings.PREMIX_SUBMIT_CONFIRM_TITLE
+        }
         cancelLabel={STRINGS.SOURCING.SPECIFICATION_FORM.CONFIRM_CANCEL_ACTION}
         onConfirm={async () => {
           const premixNo = pendingPremixNo;

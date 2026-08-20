@@ -13,15 +13,6 @@ import {
 import { isRawMaterialProcessingType } from "./qcProcessingConfig";
 import { buildDivisionEntryDedupKey, resolveDivisionEntryKind } from "./qcDivisionEntries";
 import { isQcMixingStage, mapQcMixingStageToSubType } from "./qcMixingConfig";
-import { mapQcTrimmingSubTypeToApi, resolveQcTrimmingSubType } from "./qcTrimmingConfig";
-import {
-  isQcPostCureInhibitionOperation,
-  isQcPostCureOperation,
-  mapQcInhibitorTypeToApi,
-  resolveQcPostCureSchemaSelection,
-} from "./qcPostCureConfig";
-import { getPendingHardwareProcesses } from "./qcHardwareConfig";
-import { isQcPropellantProcessSubType, mapQcPropellantProcessToApi } from "./qcPropellantConfig";
 
 export type QcDivisionPanelType =
   | "RAW_MATERIAL"
@@ -63,7 +54,7 @@ export const QC_DIVISION_DEFINITIONS: QcDivisionDefinition[] = [
   { flowKey: "QC", label: "QC", panelType: "PROPELLANT", apiDivision: "PROPELLANT_PROPERTIES" },
   {
     flowKey: "WEIGHTMENT",
-    label: "Weightment",
+    label: "Weighment",
     panelType: "WEIGHTMENT",
     apiDivision: "WEIGHTMENT",
   },
@@ -80,8 +71,68 @@ export const DEFAULT_QC_DIVISION_FLOW_KEY = QC_DIVISION_OPTIONS[0]?.value ?? "RA
 export const getQcDivisionDefinition = (flowKey: string): QcDivisionDefinition | null =>
   QC_DIVISION_DEFINITIONS.find((definition) => definition.flowKey === flowKey) ?? null;
 
+/** API `division` value for approver change-status, resolved from a UI tab key. */
+export const resolveQcApiDivisionForTabKey = (tabKey: string): string => {
+  const key = String(tabKey ?? "")
+    .trim()
+    .toUpperCase();
+  if (!key) return "";
+  if (key === "RAW_MATERIAL_PROCESSING" || key === "RAW_MATERIAL_REVALIDATION") return key;
+  if (key === "PROPELLANT_PROPERTIES" || key === "PROPELLANT") return "PROPELLANT_PROPERTIES";
+  if (key === "WEIGHMENT") return "WEIGHTMENT";
+  const flowKey = key === "POST_CURE_OPERATION" ? "POST_CURE" : key;
+  return getQcDivisionDefinition(flowKey)?.apiDivision ?? key;
+};
+
 export const getQcDivisionPanelType = (flowKey: string): QcDivisionPanelType =>
   getQcDivisionDefinition(flowKey)?.panelType ?? "SIMPLE";
+
+/**
+ * Custom QC division UIs hydrate from /qc-division/details JSON.
+ * Do not call GET /user/quality-control/schema for these divisions.
+ */
+export const shouldSkipQcSchemaFetch = (
+  division?: string | null,
+  subType?: string | null,
+): boolean => {
+  const div = String(division ?? "")
+    .trim()
+    .toUpperCase();
+  const type = String(subType ?? "")
+    .trim()
+    .toUpperCase();
+  if (!div) return true;
+  if (
+    div === "CASTING" ||
+    div === "CURING" ||
+    div === "DE_CORING" ||
+    div === "TRIMMING" ||
+    div === "POST_CURE" ||
+    div === "POST_CURE_OPERATION" ||
+    div === "NDT" ||
+    div === "PROPELLANT_PROPERTIES" ||
+    div === "QC" ||
+    div === "HARDWARE" ||
+    div === "MIXING" ||
+    div === "RAW_MATERIAL_REVALIDATION" ||
+    div === "RAW_MATERIAL_PROCESSING" ||
+    div === "WEIGHTMENT" ||
+    div === "WEIGHMENT"
+  ) {
+    return true;
+  }
+  if (div === "RAW_MATERIAL") {
+    return (
+      type === "RAW_MATERIAL_REVALIDATION" ||
+      type === "RAW_MATERIAL_PROCESSING" ||
+      type === "SOLID_PROCESSING" ||
+      type === "LIQUID_PROCESSING" ||
+      type === "BOTH" ||
+      type === ""
+    );
+  }
+  return false;
+};
 
 export type QcDivisionFlowState = {
   rawMaterialType: string;
@@ -97,8 +148,6 @@ export type QcDivisionFlowState = {
   selectedPostCureOperation: string;
   selectedInhibitorType: string;
   selectedPropellantProcess: string;
-  weightmentWeighscaleNo: string;
-  weightmentCalibrationDueDate: string;
   addedDivisionEntryKeys: string[];
 };
 
@@ -140,83 +189,39 @@ export const resolveDivisionSchemaRequest = (
   }
 
   if (definition.panelType === "HARDWARE") {
-    const pending = getPendingHardwareProcesses(
-      state.selectedMotorId,
-      state.selectedHardwareProcesses,
-      state.addedDivisionEntryKeys,
-      divisionFlowKey,
-    );
-    const nextProcess = pending[0];
-    if (!state.selectedMotorId || !nextProcess) return null;
-    return {
-      division: definition.apiDivision,
-      subType: nextProcess,
-    };
+    // Custom hardware panels — Motor Navigation seeds forms; no schema fetch.
+    return null;
   }
 
   if (
     definition.panelType === "CASTING" ||
     definition.panelType === "CURING" ||
-    definition.panelType === "DE_CORING"
+    definition.panelType === "DE_CORING" ||
+    definition.panelType === "TRIMMING"
   ) {
     // Custom panels — Motor Navigation seeds forms; no schema fetch / FlowBar load.
     return null;
   }
 
-  if (definition.panelType === "TRIMMING") {
-    if (
-      !state.selectedMotorId ||
-      state.selectedTrimmingMotorCount === "" ||
-      !state.trimmingMotorReceivedDate.trim()
-    ) {
-      return null;
-    }
-    return {
-      division: definition.apiDivision,
-      subType: mapQcTrimmingSubTypeToApi(resolveQcTrimmingSubType()),
-    };
-  }
-
   if (definition.panelType === "POST_CURE") {
-    if (!state.selectedMotorId || !isQcPostCureOperation(state.selectedPostCureOperation)) {
-      return null;
-    }
-    return resolveQcPostCureSchemaSelection(
-      state.selectedPostCureOperation,
-      state.selectedInhibitorType,
-    );
+    // Custom panels by operation / inhibitor dropdown — no schema fetch.
+    // Selection metadata is resolved in handleLoadQcForm via resolveQcPostCureSchemaSelection.
+    return null;
   }
 
   if (definition.panelType === "NDT") {
-    if (!state.selectedMotorId) return null;
-    return {
-      division: definition.apiDivision,
-      subType: null,
-    };
+    // Custom panel — Motor Navigation seeds forms; no schema fetch / FlowBar load.
+    return null;
   }
 
   if (definition.panelType === "PROPELLANT") {
-    if (!state.selectedMotorId || !isQcPropellantProcessSubType(state.selectedPropellantProcess)) {
-      return null;
-    }
-    return {
-      division: definition.apiDivision,
-      subType: mapQcPropellantProcessToApi(state.selectedPropellantProcess),
-    };
+    // Custom panel — Motor Navigation seeds all 4 process tables; no schema fetch / FlowBar load.
+    return null;
   }
 
   if (definition.panelType === "WEIGHTMENT") {
-    if (
-      !state.selectedMotorId ||
-      !state.weightmentWeighscaleNo.trim() ||
-      !state.weightmentCalibrationDueDate.trim()
-    ) {
-      return null;
-    }
-    return {
-      division: definition.apiDivision,
-      subType: null,
-    };
+    // Custom panel — Motor Navigation seeds forms; no schema fetch / FlowBar load.
+    return null;
   }
 
   if (definition.panelType === "STF") {
@@ -297,79 +302,28 @@ export const canLoadDivisionSchema = (divisionFlowKey: string, state: QcDivision
   }
 
   if (panelType === "TRIMMING") {
-    if (!state.selectedMotorId) return false;
-    if (state.selectedTrimmingMotorCount === "" || state.selectedTrimmingMotorCount == null)
-      return false;
-    if (!state.trimmingMotorReceivedDate.trim()) return false;
-    const dedupKey = buildDivisionEntryDedupKey({
-      flowKey: divisionFlowKey,
-      kind: "TRIMMING_MOTOR",
-      motorId: state.selectedMotorId,
-    });
-    return !state.addedDivisionEntryKeys.includes(dedupKey);
+    // Motor Navigation seeds the trimming form — no FlowBar motor count / ID / date pickers.
+    return false;
   }
 
   if (panelType === "POST_CURE") {
-    if (!state.selectedMotorId || !isQcPostCureOperation(state.selectedPostCureOperation))
-      return false;
-    if (
-      isQcPostCureInhibitionOperation(state.selectedPostCureOperation) &&
-      !mapQcInhibitorTypeToApi(state.selectedInhibitorType)
-    ) {
-      return false;
-    }
-    const selection = resolveQcPostCureSchemaSelection(
-      state.selectedPostCureOperation,
-      state.selectedInhibitorType,
-    );
-    if (!selection) return false;
-    const dedupKey = buildDivisionEntryDedupKey({
-      flowKey: divisionFlowKey,
-      kind: "POST_CURE_MOTOR",
-      motorId: state.selectedMotorId,
-      subType: selection.subType,
-      inhibitorType: selection.inhibitorType,
-    });
-    return !state.addedDivisionEntryKeys.includes(dedupKey);
+    // Motor Navigation seeds from manufacturing operationType — no FlowBar pickers / Load Form.
+    return false;
   }
 
   if (panelType === "NDT") {
-    if (!state.selectedMotorId) return false;
-    const dedupKey = buildDivisionEntryDedupKey({
-      flowKey: divisionFlowKey,
-      kind: "NDT_MOTOR",
-      motorId: state.selectedMotorId,
-    });
-    return !state.addedDivisionEntryKeys.includes(dedupKey);
+    // Motor Navigation seeds the NDT form — no FlowBar Motor ID picker / Load Form.
+    return false;
   }
 
   if (panelType === "PROPELLANT") {
-    if (!state.selectedMotorId || !isQcPropellantProcessSubType(state.selectedPropellantProcess)) {
-      return false;
-    }
-    const dedupKey = buildDivisionEntryDedupKey({
-      flowKey: divisionFlowKey,
-      kind: "PROPELLANT_PROCESS",
-      motorId: state.selectedMotorId,
-      subType: mapQcPropellantProcessToApi(state.selectedPropellantProcess) ?? undefined,
-    });
-    return !state.addedDivisionEntryKeys.includes(dedupKey);
+    // Motor Navigation seeds the QC form — no FlowBar Motor ID / process pickers / Load Form.
+    return false;
   }
 
   if (panelType === "WEIGHTMENT") {
-    if (
-      !state.selectedMotorId ||
-      !state.weightmentWeighscaleNo.trim() ||
-      !state.weightmentCalibrationDueDate.trim()
-    ) {
-      return false;
-    }
-    const dedupKey = buildDivisionEntryDedupKey({
-      flowKey: divisionFlowKey,
-      kind: "WEIGHTMENT_MOTOR",
-      motorId: state.selectedMotorId,
-    });
-    return !state.addedDivisionEntryKeys.includes(dedupKey);
+    // Motor Navigation seeds the weighment form — no FlowBar Motor ID / weighscale pickers.
+    return false;
   }
 
   if (panelType === "STF") {
@@ -416,8 +370,19 @@ export const isNdtDivisionFlow = (divisionFlowKey: string) =>
 export const isPropellantDivisionFlow = (divisionFlowKey: string) =>
   getQcDivisionPanelType(divisionFlowKey) === "PROPELLANT";
 
-export const isWeightmentDivisionFlow = (divisionFlowKey: string) =>
+export const isWeighmentDivisionFlow = (divisionFlowKey: string) =>
   getQcDivisionPanelType(divisionFlowKey) === "WEIGHTMENT";
+
+/** @deprecated Use isWeighmentDivisionFlow */
+export const isWeightmentDivisionFlow = isWeighmentDivisionFlow;
+
+/** QC / Weighment seed motor nav from the batch — no manufacturing /division-details. */
+export const isBatchMotorSeededQcFlow = (divisionFlowKey: string) => {
+  const key = String(divisionFlowKey ?? "")
+    .trim()
+    .toUpperCase();
+  return key === "QC" || key === "WEIGHTMENT" || key === "WEIGHMENT";
+};
 
 /** @deprecated Use isMixingDivisionFlow */
 export const isPremixDivisionFlow = isMixingDivisionFlow;

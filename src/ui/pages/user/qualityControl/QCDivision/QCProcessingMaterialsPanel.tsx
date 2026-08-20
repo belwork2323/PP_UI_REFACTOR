@@ -195,20 +195,20 @@ const QCProcessingMaterialsPanel = ({
             size="small"
             variant="outlined"
             disabled={readOnly || !unitActions?.canAct || unitActions?.actionLoading}
-            onClick={unitActions?.onSaveDraft}
-            sx={{ textTransform: "none", whiteSpace: "nowrap" }}
-          >
-            {S.SAVE_UNIT_DRAFT}
-          </Button>
-          <Button
-            size="small"
-            variant="contained"
-            disabled={readOnly || !unitActions?.canAct || unitActions?.actionLoading}
-            onClick={unitActions?.onSubmit}
-            sx={{ textTransform: "none", whiteSpace: "nowrap" }}
-          >
-            {unitActions?.isEditMode ? S.RESUBMIT_UNIT : S.SUBMIT_UNIT}
-          </Button>
+              onClick={unitActions?.onSaveDraft}
+              sx={{ textTransform: "none", whiteSpace: "nowrap" }}
+            >
+              {unitActions?.saveDraftLabel ?? S.SAVE_UNIT_DRAFT}
+            </Button>
+            <Button
+              size="small"
+              variant="contained"
+              disabled={readOnly || !unitActions?.canAct || unitActions?.actionLoading}
+              onClick={unitActions?.onSubmit}
+              sx={{ textTransform: "none", whiteSpace: "nowrap" }}
+            >
+              {unitActions?.submitLabel ?? S.SUBMIT_UNIT}
+            </Button>
         </Stack>
       ) : null}
 

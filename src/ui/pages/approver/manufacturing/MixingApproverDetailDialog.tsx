@@ -41,8 +41,6 @@ type MixingApproverDetailDialogProps = {
   onActiveMixCardChange?: (mixCardId: string) => void;
   onApprove: (item: MixingApproverDetailItem) => void;
   onReject: (item: MixingApproverDetailItem) => void;
-  onApproveForm?: (item: MixingApproverDetailItem) => void;
-  onRejectForm?: (item: MixingApproverDetailItem) => void;
   actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
@@ -56,8 +54,6 @@ const MixingApproverDetailDialog = ({
   onActiveMixCardChange,
   onApprove,
   onReject,
-  onApproveForm,
-  onRejectForm,
   actionLoading = false,
   theme,
 }: MixingApproverDetailDialogProps) => {
@@ -111,8 +107,6 @@ const MixingApproverDetailDialog = ({
             onActiveMixCardChange={onActiveMixCardChange ?? (() => undefined)}
             onApprove={() => onApprove(item)}
             onReject={() => onReject(item)}
-            onApproveForm={onApproveForm ? () => onApproveForm(item) : undefined}
-            onRejectForm={onRejectForm ? () => onRejectForm(item) : undefined}
             actionLoading={actionLoading}
             manufacturingTheme={manufacturingTheme}
             approverTheme={theme}

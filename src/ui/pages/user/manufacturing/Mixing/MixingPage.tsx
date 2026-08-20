@@ -48,7 +48,6 @@ const MixingPage = () => {
     handleFormChange,
     handleSaveMixCardDraft,
     handleSubmitMixCard,
-    handleSubmitForFinalApproval,
     detailsRow,
     detailsData,
     detailsLoading,
@@ -94,7 +93,6 @@ const MixingPage = () => {
             isMixCardEditable={isMixCardEditable}
             previousStageGate={previousStageGate}
             actionLoading={actionLoading}
-            canSubmitForFinalApproval={Boolean(activeBatch?.formId)}
             onSaveMixCardDraft={(stageType, cardNo) => {
               setPendingMixCard({ stageType, cardNo });
               setMixCardDraftConfirmOpen(true);
@@ -103,7 +101,6 @@ const MixingPage = () => {
               setPendingMixCard({ stageType, cardNo });
               setMixCardSubmitConfirmOpen(true);
             }}
-            onSubmitForFinalApproval={handleSubmitForFinalApproval}
           />
 
           <ConfirmAlertDialog
@@ -122,7 +119,13 @@ const MixingPage = () => {
             severity="warning"
             title={actionStrings.CONFIRM_DRAFT_TITLE}
             message={actionStrings.CONFIRM_DRAFT_MESSAGE}
-            confirmLabel={actionStrings.CONFIRM_DRAFT_ACTION}
+            confirmLabel={
+              pendingMixCard?.stageType === "FINAL_MIX"
+                ? S.SAVE_FINAL_MIX_DRAFT(pendingMixCard.cardNo)
+                : pendingMixCard
+                  ? S.SAVE_PREMIX_DRAFT(pendingMixCard.cardNo)
+                  : actionStrings.CONFIRM_DRAFT_ACTION
+            }
             cancelLabel={actionStrings.CONFIRM_DRAFT_CANCEL_ACTION}
             onConfirm={async () => {
               setMixCardDraftConfirmOpen(false);
@@ -141,7 +144,13 @@ const MixingPage = () => {
             severity="warning"
             title={actionStrings.CONFIRM_SUBMIT_TITLE}
             message={actionStrings.CONFIRM_SUBMIT_MESSAGE}
-            confirmLabel={actionStrings.CONFIRM_SUBMIT_ACTION}
+            confirmLabel={
+              pendingMixCard?.stageType === "FINAL_MIX"
+                ? S.SUBMIT_FINAL_MIX(pendingMixCard.cardNo)
+                : pendingMixCard
+                  ? S.SUBMIT_PREMIX(pendingMixCard.cardNo)
+                  : actionStrings.CONFIRM_SUBMIT_ACTION
+            }
             cancelLabel={actionStrings.CONFIRM_CANCEL_ACTION}
             onConfirm={async () => {
               setMixCardSubmitConfirmOpen(false);

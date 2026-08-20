@@ -8,6 +8,7 @@ import {
   parseUiDate,
   UI_DATE_FORMAT,
 } from "./datePickerShared";
+import { APP_CONTROL_HEIGHT, appDatePickerFieldSx } from "./fieldStyles";
 import { formatDateToApiDate, formatToUiDate } from "../../../utils/dateUtils";
 
 interface DateRangeRowProps {
@@ -33,6 +34,12 @@ interface DateRangeRowProps {
   textFieldProps?: Partial<TextFieldProps>;
   /** Compact height / font to match adjacent filter controls. */
   controlHeight?: number;
+  /** Keep start/end pickers on one line (filter bars). */
+  nowrap?: boolean;
+  /** Align pickers with adjacent filter dropdown / buttons. */
+  alignInputs?: "filter";
+  /** Styles applied to the outer date-range row container. */
+  containerSx?: SxProps<Theme>;
 }
 
 /** Parse filter value (DD-MM-YYYY or YYYY-MM-DD) to dayjs. */
@@ -65,36 +72,62 @@ const DateRangeRow = ({
   separatorSx,
   thisMonthChipSx,
   textFieldProps,
-  controlHeight = 36,
+  controlHeight,
+  nowrap = false,
+  alignInputs,
+  containerSx,
 }: DateRangeRowProps) => {
-  const compactFieldSx = {
-    mb: 0,
-    width: 152,
-    minWidth: 152,
-    ...(datePickerSx as object),
-    "& .MuiInputBase-root:not(.MuiInputBase-multiline)": {
-      minHeight: controlHeight,
-      height: controlHeight,
-    },
-    "& .MuiInputBase-input:not(textarea)": {
-      py: 0,
-      px: 1.25,
-      fontSize: "0.8125rem",
-      letterSpacing: "0.01em",
-    },
-  };
+  const isFilterLayout = alignInputs === "filter";
+  const resolvedControlHeight = controlHeight ?? (isFilterLayout ? APP_CONTROL_HEIGHT : 36);
+
+  const compactFieldSx = isFilterLayout
+    ? {
+        width: 152,
+        minWidth: 152,
+        ...(datePickerSx as object),
+      }
+    : {
+        mb: 0,
+        width: 152,
+        minWidth: 152,
+        ...(datePickerSx as object),
+        "& .MuiInputBase-root:not(.MuiInputBase-multiline)": {
+          minHeight: resolvedControlHeight,
+          height: resolvedControlHeight,
+        },
+        "& .MuiInputBase-input:not(textarea)": {
+          py: 0,
+          px: 1.25,
+          fontSize: "0.8125rem",
+          letterSpacing: "0.01em",
+        },
+      };
 
   const sharedSlotProps = {
-    ...buildAppDatePickerSlotProps({ sx: compactFieldSx as SxProps<Theme> }),
+    ...buildAppDatePickerSlotProps({
+      compact: isFilterLayout,
+      filterPanel: isFilterLayout,
+      sx: compactFieldSx as SxProps<Theme>,
+    }),
     textField: {
-      ...buildAppDatePickerSlotProps({ sx: compactFieldSx as SxProps<Theme> }).textField,
+      ...buildAppDatePickerSlotProps({
+        compact: isFilterLayout,
+        filterPanel: isFilterLayout,
+        sx: compactFieldSx as SxProps<Theme>,
+      }).textField,
       ...textFieldProps,
     },
   };
 
   return (
     <AppDatePickerProvider>
-      <Stack direction="row" gap={1} alignItems="center" flexWrap="wrap">
+      <Stack
+        direction="row"
+        gap={1}
+        alignItems={isFilterLayout ? "flex-end" : "center"}
+        flexWrap={nowrap ? "nowrap" : "wrap"}
+        sx={containerSx}
+      >
         {showLeadingIcon && (
           <CalendarMonthIcon sx={{ fontSize: 18, opacity: 0.7, ...((calendarIconSx as object) || {}) }} />
         )}
@@ -117,7 +150,17 @@ const DateRangeRow = ({
           slotProps={sharedSlotProps}
         />
 
-        <Typography sx={{ fontSize: "0.85rem", color: "text.secondary", px: 0.25, ...((separatorSx as object) || {}) }}>
+        <Typography
+          sx={{
+            fontSize: "0.85rem",
+            color: "text.secondary",
+            px: 0.25,
+            ...(isFilterLayout
+              ? { alignSelf: "center", mb: "10px" }
+              : {}),
+            ...((separatorSx as object) || {}),
+          }}
+        >
           {separatorLabel}
         </Typography>
 

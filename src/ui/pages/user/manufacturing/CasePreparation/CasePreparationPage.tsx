@@ -47,7 +47,6 @@ const CasePreparationPage = () => {
     setBackConfirmOpen,
     detailsRow,
     detailsData,
-    detailsSchema,
     detailsLoading,
     handleViewCasePrepDetails,
     handleBackFromDetails,
@@ -57,7 +56,6 @@ const CasePreparationPage = () => {
     handleSubscaleValuesChange,
     handleSaveMotorDraft,
     handleSubmitMotor,
-    handleSubmitForFinalApproval,
     handleSaveDraft,
     handleSubmit,
   } = hookState;
@@ -70,11 +68,7 @@ const CasePreparationPage = () => {
       <WorkflowFormOpeningLoader
         open={listLoading || Boolean(loadingFormDetails)}
         title={loadingFormDetails ? S.FORM_OPENING_TITLE : S.TITLE}
-        message={
-          loadingFormDetails
-            ? S.FORM_OPENING_MESSAGE
-            : "Loading case preparation batches…"
-        }
+        message={loadingFormDetails ? S.FORM_OPENING_MESSAGE : "Loading case preparation batches…"}
         color={CASE_PREP_BRAND.cp}
         accentColor={CASE_PREP_BRAND.cpLight}
       />
@@ -85,7 +79,6 @@ const CasePreparationPage = () => {
         <CasePreparationDetailsView
           row={detailsRow}
           data={detailsData}
-          schema={detailsSchema}
           loading={detailsLoading}
           onBack={handleBackFromDetails}
         />
@@ -121,12 +114,16 @@ const CasePreparationPage = () => {
               setPendingMotorId(motorId);
               setMotorSubmitConfirmOpen(true);
             }}
-            onSubmitForFinalApproval={handleSubmitForFinalApproval}
             theme={theme}
           />
 
           {isSubscale ? (
-            <Stack direction={{ xs: "column", sm: "row" }} gap={1.5} mt={3} justifyContent="flex-end">
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              gap={1.5}
+              mt={3}
+              justifyContent="flex-end"
+            >
               <Button
                 variant="outlined"
                 disabled={actionLoading}
@@ -166,7 +163,9 @@ const CasePreparationPage = () => {
             ? S.MOTOR_DRAFT_CONFIRM_MESSAGE(pendingMotorId)
             : S.MOTOR_DRAFT_CONFIRM_TITLE
         }
-        confirmLabel={S.SAVE_MOTOR_DRAFT}
+        confirmLabel={
+          pendingMotorId ? S.SAVE_MOTOR_DRAFT(pendingMotorId) : S.MOTOR_DRAFT_CONFIRM_TITLE
+        }
         cancelLabel={actionStrings.CONFIRM_DRAFT_CANCEL_ACTION}
         onConfirm={async () => {
           const motorId = pendingMotorId;
@@ -189,7 +188,9 @@ const CasePreparationPage = () => {
             ? S.MOTOR_SUBMIT_CONFIRM_MESSAGE(pendingMotorId)
             : S.MOTOR_SUBMIT_CONFIRM_TITLE
         }
-        confirmLabel={S.SUBMIT_MOTOR}
+        confirmLabel={
+          pendingMotorId ? S.SUBMIT_MOTOR(pendingMotorId) : S.MOTOR_SUBMIT_CONFIRM_TITLE
+        }
         cancelLabel={actionStrings.CONFIRM_CANCEL_ACTION}
         onConfirm={async () => {
           const motorId = pendingMotorId;
@@ -220,9 +221,15 @@ const CasePreparationPage = () => {
       <ConfirmAlertDialog
         open={submitConfirmOpen}
         severity="warning"
-        title={isEditMode ? actionStrings.CONFIRM_RESUBMIT_TITLE : actionStrings.CONFIRM_SUBMIT_TITLE}
-        message={isEditMode ? actionStrings.CONFIRM_RESUBMIT_MESSAGE : actionStrings.CONFIRM_SUBMIT_MESSAGE}
-        confirmLabel={isEditMode ? actionStrings.CONFIRM_RESUBMIT_ACTION : actionStrings.CONFIRM_SUBMIT_ACTION}
+        title={
+          isEditMode ? actionStrings.CONFIRM_RESUBMIT_TITLE : actionStrings.CONFIRM_SUBMIT_TITLE
+        }
+        message={
+          isEditMode ? actionStrings.CONFIRM_RESUBMIT_MESSAGE : actionStrings.CONFIRM_SUBMIT_MESSAGE
+        }
+        confirmLabel={
+          isEditMode ? actionStrings.CONFIRM_RESUBMIT_ACTION : actionStrings.CONFIRM_SUBMIT_ACTION
+        }
         cancelLabel={actionStrings.CONFIRM_CANCEL_ACTION}
         onConfirm={async () => {
           setSubmitConfirmOpen(false);

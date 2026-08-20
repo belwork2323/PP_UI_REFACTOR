@@ -13,7 +13,6 @@ import getRawMaterialPreparationApproverTheme from "../../../../app/theme/custom
 import { STRINGS } from "../../../../app/config/strings";
 import { icons } from "../../../../app/theme/icons";
 import {
-  canApproverActionEntireCastingCuringForm,
   isCastingCuringMotorApproverActionable,
   isCastingCuringMotorApproverTabDisabled,
   type CastingCuringDetailView,
@@ -44,8 +43,6 @@ type CastingCuringApproverReviewContentProps = {
   onActiveMotorChange: (motorId: string) => void;
   onApprove: () => void;
   onReject: () => void;
-  onApproveForm?: () => void;
-  onRejectForm?: () => void;
   actionLoading?: boolean;
   manufacturingTheme: ReturnType<typeof getManufacturingTheme>;
   approverTheme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
@@ -58,8 +55,6 @@ const CastingCuringApproverReviewContent = ({
   onActiveMotorChange,
   onApprove,
   onReject,
-  onApproveForm,
-  onRejectForm,
   actionLoading = false,
   manufacturingTheme,
   approverTheme,
@@ -80,39 +75,31 @@ const CastingCuringApproverReviewContent = ({
 
   const derivedMotorCounts = useMemo(() => {
     const counts = {
-      pendingMotorCount: detailView?.motorCounts?.pendingMotorCount ?? 0,
-      approvedMotorCount: detailView?.motorCounts?.approvedMotorCount ?? 0,
-      rejectedMotorCount: detailView?.motorCounts?.rejectedMotorCount ?? 0,
-      inProgressMotorCount: detailView?.motorCounts?.inProgressMotorCount ?? 0,
-      toBeInitiatedMotorCount: detailView?.motorCounts?.toBeInitiatedMotorCount ?? 0,
-      totalMotorCount: detailView?.motorCounts?.totalMotorCount ?? motors.length,
+      pendingMotorCount: 0,
+      approvedMotorCount: 0,
+      rejectedMotorCount: 0,
+      inProgressMotorCount: 0,
+      toBeInitiatedMotorCount: 0,
+      totalMotorCount: motors.length,
     };
 
-    if (
-      counts.pendingMotorCount +
-        counts.approvedMotorCount +
-        counts.rejectedMotorCount +
-        counts.inProgressMotorCount +
-        counts.toBeInitiatedMotorCount ===
-      0
-    ) {
-      motors.forEach((motor) => {
-        const status = String(motor.motorSubmissionStatus ?? "TO_BE_INITIATED").toUpperCase();
-        if (status === "WAITING_FOR_APPROVAL") counts.pendingMotorCount += 1;
-        else if (status === "APPROVED") counts.approvedMotorCount += 1;
-        else if (status === "REJECTED") counts.rejectedMotorCount += 1;
-        else if (status === "IN_PROGRESS") counts.inProgressMotorCount += 1;
-        else counts.toBeInitiatedMotorCount += 1;
-      });
-      counts.totalMotorCount = Math.max(counts.totalMotorCount, motors.length, 0);
-    }
+    motors.forEach((motor) => {
+      const status = String(motor.motorSubmissionStatus ?? "TO_BE_INITIATED").toUpperCase();
+      if (status === "WAITING_FOR_APPROVAL") counts.pendingMotorCount += 1;
+      else if (status === "APPROVED") counts.approvedMotorCount += 1;
+      else if (status === "REJECTED") counts.rejectedMotorCount += 1;
+      else if (status === "IN_PROGRESS") counts.inProgressMotorCount += 1;
+      else counts.toBeInitiatedMotorCount += 1;
+    });
 
+    const apiTotal = Number(detailView?.motorCounts?.totalMotorCount ?? 0);
+    counts.totalMotorCount = Math.max(apiTotal, motors.length, 0);
     if (counts.totalMotorCount > motors.length) {
       counts.toBeInitiatedMotorCount += counts.totalMotorCount - motors.length;
     }
 
     return counts;
-  }, [detailView?.motorCounts, motors]);
+  }, [detailView?.motorCounts?.totalMotorCount, motors]);
 
   const enabledMotors = useMemo(
     () => motors.filter((motor) => !isCastingCuringMotorApproverTabDisabled(motor.motorSubmissionStatus)),
@@ -127,11 +114,6 @@ const CastingCuringApproverReviewContent = ({
   const activeMotorIndex = motors.findIndex((motor) => motor.motorId === activeMotorId);
   const enabledMotorIndex = enabledMotors.findIndex((motor) => motor.motorId === activeMotorId);
   const canApproveOrReject = isCastingCuringMotorApproverActionable(activeMotor?.motorSubmissionStatus);
-  const canApproveOrRejectForm = canApproverActionEntireCastingCuringForm({
-    formSubmissionType: detailView?.formSubmissionType,
-    status: detailView?.status,
-    motors,
-  });
 
   const navPalette = {
     primary: palette.primary,
@@ -208,58 +190,19 @@ const CastingCuringApproverReviewContent = ({
         />
       </Box>
 
-      {canApproveOrRejectForm ? (
-        <Box
-          sx={{
-            border: `1px solid ${palette.border}`,
-            borderRadius: 2,
-            px: 1.25,
-            py: 1,
-            background: palette.surface,
-          }}
-        >
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            alignItems={{ xs: "stretch", sm: "center" }}
-            justifyContent="space-between"
-            gap={1}
-          >
-            <Typography sx={{ fontSize: "0.74rem", color: palette.textSub, fontWeight: 600 }}>
-              {CC.FORM_APPROVER_ACTIONS_HINT}
-            </Typography>
-            <Stack direction={{ xs: "column", sm: "row" }} gap={1}>
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<RejectIcon />}
-                disabled={actionLoading || !onRejectForm}
-                onClick={onRejectForm}
-                sx={approverTheme.dialog.rejectAction}
-              >
-                {CC.FORM_APPROVER_REJECT}
-              </Button>
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<ApproveIcon />}
-                disabled={actionLoading || !onApproveForm}
-                onClick={onApproveForm}
-                sx={approverTheme.dialog.approveAction}
-              >
-                {CC.FORM_APPROVER_APPROVE}
-              </Button>
-            </Stack>
-          </Stack>
-        </Box>
-      ) : null}
-
       <UserWorkflowNavPanel palette={navPalette}>
         <UserWorkflowTabNav
           title={CC.MOTOR_NAV_TITLE}
           hint={CC.MOTOR_APPROVER_NAV_HINT}
           tabs={motorNavTabs}
           activeIndex={activeMotorIndex >= 0 ? activeMotorIndex : 0}
-          onActiveIndexChange={(index) => onActiveMotorChange(motors[index].motorId)}
+          onActiveIndexChange={(index) => {
+            const motor = motors[index];
+            if (!motor || isCastingCuringMotorApproverTabDisabled(motor.motorSubmissionStatus)) {
+              return;
+            }
+            onActiveMotorChange(motor.motorId);
+          }}
           palette={navPalette}
           showStepArrows
           onStepBack={() => goToEnabledMotor(-1)}

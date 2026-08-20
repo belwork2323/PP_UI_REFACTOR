@@ -11,6 +11,8 @@ import type { IdentificationSheet } from "../../../data/models/admin/BatchManage
 import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
 import { ManufacturingBatch, WorkflowView } from "./useManufacturingWorkflow";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
+import { useFileService } from "../../../hooks/useFileService";
+import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
 import rawMaterialPreparationController from "../../../controllers/user/manufacturing/rawMaterialPreparationController";
 import {
   createEmptyPremixSchemaSession,
@@ -199,6 +201,7 @@ export const useRawMaterialPrepHook = () => {
   const showAlert = useAlertStore((state) => state.showAlert);
   const user = useAuthStore((s) => s.user);
   const bumpBatchRefresh = useUserBatchRefreshStore((state) => state.bumpVersion);
+  const { deleteTemp } = useFileService();
 
   const subDepartmentId = useMemo(() => {
     const subDepartments = user?.allSubDepartments ?? [];
@@ -582,6 +585,11 @@ export const useRawMaterialPrepHook = () => {
     [view, formSnapshot, initialSnapshot]
   );
 
+  const snapshotStateRef = useRef({ addedPremixSelections, premixSessions, weightmentSheet });
+  snapshotStateRef.current = { addedPremixSelections, premixSessions, weightmentSheet };
+  const initialSnapshotRef = useRef(initialSnapshot);
+  initialSnapshotRef.current = initialSnapshot;
+
   const resetFormContext = useCallback(() => {
     setView("list");
     setActiveBatch(null);
@@ -834,10 +842,19 @@ export const useRawMaterialPrepHook = () => {
     resetFormContext();
   }, [isFormDirty, resetFormContext, bumpBatchRefresh]);
 
-  const handleDiscardAndBack = useCallback(() => {
-    bumpBatchRefresh();
-    resetFormContext();
-  }, [resetFormContext, bumpBatchRefresh]);
+  const handleDiscardAndBack = useCallback(async () => {
+    setBackConfirmOpen(false);
+    await discardWorkflowSnapshotForm({
+      subDepartmentId,
+      initialSnapshot: initialSnapshotRef.current,
+      currentState: snapshotStateRef.current,
+      deleteTemp,
+      resetForm: () => {
+        bumpBatchRefresh();
+        resetFormContext();
+      },
+    });
+  }, [bumpBatchRefresh, deleteTemp, resetFormContext, subDepartmentId]);
 
   const handlePremixDateChange = useCallback(
     (premix: number, premixDate: string) => {

@@ -1,12 +1,14 @@
 import { STRINGS } from "../../../app/config/strings";
 import type { CuringProcessSetup } from "../../../data/models/user/CastingCuringFormModel";
 import {
+  castingMotorDataHasUserInput,
+  type CastingMotorData,
+} from "../../../data/models/user/CastingMotorDataModel";
+import {
   getFinalMixPremixesFromSheet,
   getRocketMotorCasingMotorIdsFromSheet,
   type IdentificationSheet,
 } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
-import type { SchemaBlock, SchemaDocumentV2, SchemaFormValues } from "../../../schema-engine";
-import { scopedFormKey } from "../../../schema-engine/state/formState";
 
 const S = STRINGS.MANUFACTURING.CASTING_CURING;
 
@@ -403,6 +405,19 @@ export const canLoadCastingForm = (params: {
   maxMotorCount: number;
 }) => !params.castingFormLoaded && canSubmitCastingMotorDraft(params);
 
+export const DEFAULT_CASTING_TYPE = "Single";
+
+export const canLoadCastingFormForMotor = (draft?: {
+  motorId?: string;
+  castingStation?: string;
+  motorReceivedAt?: string;
+} | null) =>
+  Boolean(
+    String(draft?.motorId ?? "").trim() &&
+      String(draft?.castingStation ?? "").trim() &&
+      String(draft?.motorReceivedAt ?? "").trim(),
+  );
+
 /** @deprecated Use canLoadCastingForm */
 export const canStartCastingCuringForm = ({
   castingType,
@@ -551,95 +566,41 @@ export const formatMotorStageLabel = (
   return "";
 };
 
-const IGNORED_VALUE_KEYS = new Set(["displayValue", "srNo", "_cycleKey"]);
-
-const valueHasUserData = (value: unknown): boolean => {
-  if (value == null) return false;
-  if (Array.isArray(value)) {
-    return value.some((item) =>
-      item && typeof item === "object"
-        ? Object.entries(item as Record<string, unknown>).some(
-            ([key, nestedValue]) => !IGNORED_VALUE_KEYS.has(key) && valueHasUserData(nestedValue),
-          )
-        : String(item ?? "").trim().length > 0,
-    );
-  }
-  if (typeof value === "object") {
-    return Object.entries(value as Record<string, unknown>).some(
-      ([key, nestedValue]) => !IGNORED_VALUE_KEYS.has(key) && valueHasUserData(nestedValue),
-    );
-  }
-  return String(value).trim().length > 0;
+export type CastingBowlSeedRow = {
+  premixNo?: string | number;
+  bowlId?: string;
+  label?: string;
 };
 
-const rowHasUserData = (row: Record<string, unknown>) =>
-  Object.entries(row).some(
-    ([key, value]) => !IGNORED_VALUE_KEYS.has(key) && valueHasUserData(value),
-  );
-
-export const sectionHasUserData = (sectionId: string, values: SchemaFormValues): boolean => {
-  const rows = values[sectionId];
-  if (!Array.isArray(rows) || rows.length === 0) return false;
-  return rows.some(
-    (row) => row && typeof row === "object" && rowHasUserData(row as Record<string, unknown>),
-  );
-};
-
-const isDisplayBlock = (block: SchemaBlock) => block.type === "display";
-
-const blockHasUserDataInValues = (
-  block: SchemaBlock,
-  formValues: SchemaFormValues,
-  scope: string,
-): boolean => {
-  if (block.type === "display") return true;
-
-  if (block.type === "section") {
-    if (block.repeat) {
-      return valueHasUserData(formValues[block.id]);
-    }
-    const children = block.children ?? [];
-    if (!children.length) return true;
-    return children.every((child) => blockHasUserDataInValues(child, formValues, block.id));
-  }
-
-  if (block.type === "group") {
-    if (block.repeat) {
-      return valueHasUserData(formValues[block.id]);
-    }
-    const children = block.children ?? [];
-    if (!children.length) return true;
-    return children.every((child) => blockHasUserDataInValues(child, formValues, scope));
-  }
-
-  if (block.type === "field" || block.type === "table" || block.type === "matrix") {
-    return valueHasUserData(formValues[scopedFormKey(scope, block.id)]);
-  }
-
-  return true;
-};
-
-export const isMotorCastingComplete = (
-  castingSchema: SchemaDocumentV2 | null,
-  formValues: SchemaFormValues,
-): boolean => {
-  const sections = castingSchema?.data?.sections ?? [];
-  if (!sections.length) return false;
-
-  return sections.every((section) => {
-    const children = (section.children ?? []).filter((block) => !isDisplayBlock(block));
-    if (!children.length) return true;
-    return children.every((block) => blockHasUserDataInValues(block, formValues, section.id));
+/** FINAL_MIX premix/bowl rows from batch identification sheet for CastingMotorPanel. */
+export const getCastingBowlSeedRowsFromBatch = (
+  batch?: CastingCuringBatchMotorSource | null,
+): CastingBowlSeedRow[] => {
+  const premixes = getFinalMixPremixesFromSheet(batch?.identificationSheet ?? null);
+  return premixes.map((premix) => {
+    const premixNo = premix.premixNo;
+    const bowlId = String(premix.bowlId ?? "").trim();
+    const label =
+      bowlId || premixNo
+        ? `FINAL_MIX ${premixNo}${bowlId ? ` / ${bowlId}` : ""}`.trim()
+        : "";
+    return {
+      premixNo,
+      bowlId: bowlId || undefined,
+      label: label || undefined,
+    };
   });
 };
 
+export const isMotorCastingComplete = (castingData?: CastingMotorData | null): boolean =>
+  Boolean(castingData) && castingMotorDataHasUserInput(castingData);
+
 export const isCastingCompleteForAllMotors = (form: {
-  castingSchema: SchemaDocumentV2 | null;
-  motors?: Array<{ formValues: SchemaFormValues }>;
+  motors?: Array<{ castingData?: CastingMotorData }>;
 }) => {
-  const { castingSchema, motors } = form;
-  if (!castingSchema || !motors?.length) return false;
-  return motors.every((motor) => isMotorCastingComplete(castingSchema, motor.formValues ?? {}));
+  const motors = form.motors ?? [];
+  if (!motors.length) return false;
+  return motors.every((motor) => isMotorCastingComplete(motor.castingData));
 };
 
 export const isCastingCuringFormStarted = (motors?: Array<unknown>) => (motors?.length ?? 0) > 0;

@@ -82,9 +82,7 @@ export const parseTrimmingSectionData = (
 ): CasePrepDetailSection => {
   const fields: CasePrepDetailSection["fields"] = [];
   const tables: CasePrepDetailSection["tables"] = [];
-  const rows = Array.isArray(sectionData)
-    ? (sectionData as Record<string, unknown>[])
-    : [];
+  const rows = Array.isArray(sectionData) ? (sectionData as Record<string, unknown>[]) : [];
 
   if (sectionId === "TRIMMING_DETAILS") {
     const displayRows = rows
@@ -95,9 +93,7 @@ export const parseTrimmingSectionData = (
         });
         return next;
       })
-      .filter((row) =>
-        Object.values(row).some((value) => String(value ?? "").trim().length > 0),
-      );
+      .filter((row) => Object.values(row).some((value) => String(value ?? "").trim().length > 0));
 
     if (displayRows.length > 0) {
       const usedColumns = TRIMMING_DETAILS_COLUMN_ORDER.filter((key) =>
@@ -223,9 +219,7 @@ export const orderTrimmingDisplayColumns = (
   columns: string[],
   preferredOrder: string[] = [],
 ): string[] => {
-  const visible = columns.filter(
-    (col) => !col.startsWith("_") && !col.endsWith("__fieldType"),
-  );
+  const visible = columns.filter((col) => !col.startsWith("_") && !col.endsWith("__fieldType"));
   if (!preferredOrder.length) {
     // Keep Object.keys insertion order when labels were built intentionally
     return visible;
@@ -260,10 +254,7 @@ export const isTrimmingMotorLocked = (status?: TrimmingMotorSubmissionStatus | s
 };
 
 export const isTrimmingMotorEditable = (status?: TrimmingMotorSubmissionStatus | string | null) =>
-  !status ||
-  status === "TO_BE_INITIATED" ||
-  status === "IN_PROGRESS" ||
-  status === "REJECTED";
+  !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED";
 
 export const isTrimmingMotorApproverTabDisabled = (
   status?: TrimmingMotorSubmissionStatus | string | null,
@@ -312,7 +303,9 @@ export const canApproverActionEntireTrimmingForm = (params: {
     return true;
   }
 
-  const formType = String(params.formSubmissionType ?? "").trim().toUpperCase();
+  const formType = String(params.formSubmissionType ?? "")
+    .trim()
+    .toUpperCase();
   if (formType !== "SUBMIT") return false;
 
   const motors = params.motors ?? [];
@@ -322,10 +315,7 @@ export const canApproverActionEntireTrimmingForm = (params: {
   );
   if (!allMotorsApproved) return false;
 
-  return (
-    statusUpper === "WAITING_FOR_APPROVAL" ||
-    status === OPERATION_STATUS.WAITING_FOR_APPROVAL
-  );
+  return statusUpper === "WAITING_FOR_APPROVAL" || status === OPERATION_STATUS.WAITING_FOR_APPROVAL;
 };
 
 export const getTrimmingBatchStatusLabel = (status: unknown): string => String(status ?? "").trim();
@@ -338,9 +328,7 @@ export type TrimmingMotorCounts = {
   totalMotorCount: number;
 };
 
-export const normalizeTrimmingMotorStatus = (
-  value: unknown,
-): TrimmingMotorSubmissionStatus => {
+export const normalizeTrimmingMotorStatus = (value: unknown): TrimmingMotorSubmissionStatus => {
   const normalized = String(value ?? "")
     .trim()
     .toUpperCase()
@@ -359,7 +347,9 @@ export const normalizeTrimmingMotorStatus = (
 export const normalizeTrimmingMotorSubmissionType = (
   value: unknown,
 ): TrimmingMotorSubmissionType | undefined => {
-  const raw = String(value ?? "").trim().toUpperCase();
+  const raw = String(value ?? "")
+    .trim()
+    .toUpperCase();
   if (raw === "DRAFT" || raw === "SUBMIT") return raw;
   return undefined;
 };
@@ -865,7 +855,8 @@ export const mapTrimmingDetailsFromSavedForm = (
     .filter(Boolean) as TrimmingMotorSubmission[];
 
   return {
-    motorStage: motors[0]?.motorStage ?? resolveTrimmingMotorStageNumber({ motorStage: payload?.motorStage }),
+    motorStage:
+      motors[0]?.motorStage ?? resolveTrimmingMotorStageNumber({ motorStage: payload?.motorStage }),
     motors,
   };
 };
@@ -987,9 +978,7 @@ export const mapTrimmingDetailsForDisplay = (
             : details.trStatus != null
               ? String(details.trStatus)
               : undefined,
-    formSubmissionType: String(
-      data.formSubmissionType ?? details.formSubmissionType ?? "",
-    ),
+    formSubmissionType: String(data.formSubmissionType ?? details.formSubmissionType ?? ""),
     createdBy: mapCastingCuringPersonLabel(details.createdBy ?? data.createdBy),
     createdAt:
       details.createdAt != null

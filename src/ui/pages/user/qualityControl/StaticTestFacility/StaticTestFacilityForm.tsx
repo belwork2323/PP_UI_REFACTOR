@@ -20,7 +20,10 @@ import {
   type StfMotorSubmissionStatus,
 } from "../../../../../data/models/user/StaticTestFacilityFormModel";
 import type { StfSubType } from "../../../../../schema-engine";
-import type { StfAddedMotor, StfMotorOption } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
+import type {
+  StfAddedMotor,
+  StfMotorOption,
+} from "../../../../../hooks/user/qualityControl/stfFlowConfig";
 import {
   shouldShowStfBemMotorSelection,
   buildStfMotorNavGateHelpers,
@@ -28,6 +31,7 @@ import {
 } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
 import type { PreviousStageApprovedUnits } from "../../../../../hooks/user/previousStageApproval";
 import PremixStatusChip from "../../manufacturing/RawMaterial/components/PremixStatusChip";
+import ViewStatusButton from "../../../../components/common/ViewStatusButton";
 import FinalApprovalMotorDialog, {
   areAllMotorsApproved,
   buildFinalApprovalMotorRows,
@@ -81,12 +85,14 @@ type StaticTestFacilityFormProps = {
   onDraftBemNoChange: (value: string) => void;
   onLoadStfForm: () => void;
   onAddMotors: () => void;
-  onFormValuesChange: (motorId: string, values: import("../../../../../schema-engine").SchemaFormValues) => void;
+  onFormValuesChange: (
+    motorId: string,
+    values: import("../../../../../schema-engine").SchemaFormValues,
+  ) => void;
   onStfTestNoChange?: (motorId: string, stfTestNo: string) => void;
   onRemoveMotor?: (motorId: string) => void;
   onSaveMotorDraft?: (motorId: string) => void;
   onSubmitMotor?: (motorId: string) => void;
-  onSubmitForFinalApproval?: () => void;
   theme: any;
 };
 
@@ -125,7 +131,6 @@ const StaticTestFacilityForm = ({
   onRemoveMotor,
   onSaveMotorDraft,
   onSubmitMotor,
-  onSubmitForFinalApproval,
   theme,
 }: StaticTestFacilityFormProps) => {
   const BRAND = STATIC_TEST_FACILITY_BRAND;
@@ -152,7 +157,7 @@ const StaticTestFacilityForm = ({
   const stfMotorNavGate = useMemo(
     () =>
       buildStfMotorNavGateHelpers(motorCards, previousStageGate, resolveMotorStatus, "ACEM", {
-        previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
+        previousStage: S.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
         sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
       }),
     [motorCards, previousStageGate, resolveMotorStatus],
@@ -199,7 +204,9 @@ const StaticTestFacilityForm = ({
     }
 
     const prevCount = prevMotorCountRef.current;
-    const firstEnabled = motorCards.findIndex((_, index) => stfMotorNavGate.isStfMotorTabEnabled(index));
+    const firstEnabled = motorCards.findIndex((_, index) =>
+      stfMotorNavGate.isStfMotorTabEnabled(index),
+    );
 
     if (prevCount === 0) {
       setActiveMotorIndex(firstEnabled >= 0 ? firstEnabled : 0);
@@ -211,9 +218,7 @@ const StaticTestFacilityForm = ({
         if (current && stfMotorNavGate.isStfMotorTabEnabled(prev)) {
           return Math.min(prev, motorCards.length - 1);
         }
-        return firstEnabled >= 0
-          ? firstEnabled
-          : Math.min(prev, motorCards.length - 1);
+        return firstEnabled >= 0 ? firstEnabled : Math.min(prev, motorCards.length - 1);
       });
     }
     prevMotorCountRef.current = motorCards.length;
@@ -226,7 +231,9 @@ const StaticTestFacilityForm = ({
 
   const activeMotorSession = useMemo(() => {
     if (!activeMotorEntry) return null;
-    const found = (formData.motors ?? []).find((motor) => motor.motorId === activeMotorEntry.motorId);
+    const found = (formData.motors ?? []).find(
+      (motor) => motor.motorId === activeMotorEntry.motorId,
+    );
     return found ? normalizeStfMotorSession(found) : null;
   }, [activeMotorEntry, formData.motors]);
 
@@ -257,7 +264,6 @@ const StaticTestFacilityForm = ({
     [motorCards, motorStatusById],
   );
   const allMotorsApproved = areAllMotorsApproved(finalApprovalRows);
-  const canOpenFinalApproval = Boolean(batch?.formId);
 
   const navPalette = {
     primary: BRAND.primary,
@@ -362,16 +368,6 @@ const StaticTestFacilityForm = ({
                 }}
               />
             ) : null}
-            {motorCards.length > 0 ? (
-              <Button
-                variant="contained"
-                size="small"
-                disabled={actionLoading || !canOpenFinalApproval}
-                onClick={() => setFinalApprovalOpen(true)}
-              >
-                {S.SUBMIT_FOR_FINAL_APPROVAL}
-              </Button>
-            ) : null}
           </Stack>
         </Stack>
       </Box>
@@ -448,7 +444,48 @@ const StaticTestFacilityForm = ({
             />
           </UserWorkflowNavPanel>
 
-          <Box sx={stfTheme?.panel?.motorCard ?? { borderRadius: 2, border: `1px solid ${BRAND.border}`, p: 2 }}>
+          <Stack direction="row" justifyContent="flex-end" spacing={1} flexWrap="wrap">
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={actionLoading || activeMotorLocked || !isCurrentMotorSchemaReady}
+              onClick={() => onSaveMotorDraft?.(activeMotorEntry.motorId)}
+              sx={{ textTransform: "none", fontWeight: 700 }}
+            >
+              {S.SAVE_MOTOR_DRAFT(activeMotorEntry.motorId)}
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              disabled={actionLoading || activeMotorLocked || !isCurrentMotorSchemaReady}
+              onClick={() => onSubmitMotor?.(activeMotorEntry.motorId)}
+              sx={{ textTransform: "none", fontWeight: 700 }}
+            >
+              {S.SUBMIT_MOTOR(activeMotorEntry.motorId)}
+            </Button>
+            <ViewStatusButton
+              disabled={actionLoading}
+              onClick={() => setFinalApprovalOpen(true)}
+              label={S.VIEW_STATUS}
+            />
+            {canRemoveActiveMotor ? (
+              <RemoveProcessButton
+                onClick={() => onRemoveMotor?.(activeMotorEntry.motorId)}
+                dangerColor={BRAND.danger}
+                tooltip={S.DELETE_MOTOR_TOOLTIP}
+              />
+            ) : null}
+          </Stack>
+
+          <Box
+            sx={
+              stfTheme?.panel?.motorCard ?? {
+                borderRadius: 2,
+                border: `1px solid ${BRAND.border}`,
+                p: 2,
+              }
+            }
+          >
             <Stack
               direction={{ xs: "column", sm: "row" }}
               alignItems={{ sm: "center" }}
@@ -468,32 +505,6 @@ const StaticTestFacilityForm = ({
                   statusConfig={statusConfig}
                   variant="embedded"
                 />
-              </Stack>
-
-              <Stack direction="row" gap={1} flexShrink={0} alignItems="center">
-                <Button
-                  variant="outlined"
-                  size="small"
-                  disabled={actionLoading || activeMotorLocked || !isCurrentMotorSchemaReady}
-                  onClick={() => onSaveMotorDraft?.(activeMotorEntry.motorId)}
-                >
-                  {S.SAVE_MOTOR_DRAFT}
-                </Button>
-                <Button
-                  variant="contained"
-                  size="small"
-                  disabled={actionLoading || activeMotorLocked || !isCurrentMotorSchemaReady}
-                  onClick={() => onSubmitMotor?.(activeMotorEntry.motorId)}
-                >
-                  {S.SUBMIT_MOTOR}
-                </Button>
-                {canRemoveActiveMotor ? (
-                  <RemoveProcessButton
-                    onClick={() => onRemoveMotor?.(activeMotorEntry.motorId)}
-                    dangerColor={BRAND.danger}
-                    tooltip={S.DELETE_MOTOR_TOOLTIP}
-                  />
-                ) : null}
               </Stack>
             </Stack>
 
@@ -518,8 +529,7 @@ const StaticTestFacilityForm = ({
               </Box>
             ) : null}
 
-            {activeMotorStatus === "REJECTED" &&
-            motorStatusById[activeMotorId]?.rejectionReason ? (
+            {activeMotorStatus === "REJECTED" && motorStatusById[activeMotorId]?.rejectionReason ? (
               <Alert severity="error" sx={{ fontSize: "0.78rem", mb: 1.25 }}>
                 {motorStatusById[activeMotorId]?.rejectionReason}
               </Alert>
@@ -539,13 +549,7 @@ const StaticTestFacilityForm = ({
             </Box>
 
             {activeMotorSession && activeMotorSchema ? (
-              <Box
-                sx={
-                  activeMotorLocked
-                    ? { pointerEvents: "none", opacity: 0.72 }
-                    : undefined
-                }
-              >
+              <Box sx={activeMotorLocked ? { pointerEvents: "none", opacity: 0.72 } : undefined}>
                 <STFSchemaPanel
                   schema={activeMotorSchema}
                   formValues={activeMotorSession.schemaFormValues}
@@ -581,12 +585,18 @@ const StaticTestFacilityForm = ({
         rows={finalApprovalRows}
         statusConfig={statusConfig}
         allMotorsApproved={allMotorsApproved}
-        confirmDisabled={actionLoading}
-        onClose={() => setFinalApprovalOpen(false)}
-        onProceed={async () => {
-          setFinalApprovalOpen(false);
-          await onSubmitForFinalApproval?.();
+        hideConfirm
+        copy={{
+          title: S.FINAL_APPROVAL_DIALOG_TITLE,
+          info: S.FINAL_APPROVAL_DIALOG_INFO,
+          proceed: S.FINAL_APPROVAL_PROCEED,
+          close: S.FINAL_APPROVAL_CLOSE,
+          notReady: S.FINAL_APPROVAL_NOT_READY,
+          colMotor: S.FINAL_APPROVAL_COL_MOTOR,
+          colType: S.FINAL_APPROVAL_COL_TYPE,
+          colStatus: S.FINAL_APPROVAL_COL_STATUS,
         }}
+        onClose={() => setFinalApprovalOpen(false)}
       />
     </Box>
   );

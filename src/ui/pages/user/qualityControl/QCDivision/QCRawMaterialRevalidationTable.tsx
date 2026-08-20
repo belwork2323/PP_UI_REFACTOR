@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, Fragment } from "react";
 import {
   Box,
-  IconButton,
   MenuItem,
   Stack,
   Table,
@@ -14,7 +13,6 @@ import {
   Typography,
   alpha,
 } from "@mui/material";
-import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { operationsController } from "../../../../../controllers/user/operationsController";
 import type { SchemaFormValues } from "../../../../../schema-engine";
 import { computeExpandedGroupCellSpans } from "../../../../../schema-engine/rules/tableCommitGroup";
@@ -26,7 +24,6 @@ import {
   QC_REVALIDATION_COLUMNS,
   QC_REVALIDATION_MERGE_COLUMNS,
   getRevalidationRows,
-  removeRevalidationGroup,
   renumberRevalidationRows,
   setRevalidationRows,
   type QcRevalidationRow,
@@ -248,27 +245,12 @@ const QCRawMaterialRevalidationTable = ({
                   {column.label}
                 </TableCell>
               ))}
-              {!readOnly ? (
-                <TableCell
-                  sx={{
-                    ...baseCellSx,
-                    fontWeight: 800,
-                    color: BRAND.primary,
-                    background: alpha(BRAND.primaryLight, 0.08),
-                    width: 48,
-                  }}
-                />
-              ) : null}
             </TableRow>
           </TableHead>
           <TableBody>
             {rows.map((row, index) => {
               const isExpanded = row._rowRole === "expanded";
               const groupId = String(row._groupId ?? "");
-              const showGroupDelete =
-                !readOnly &&
-                isExpanded &&
-                rows.findIndex((entry) => String(entry._groupId ?? "") === groupId) === index;
               const nextRow = rows[index + 1];
               const isLastInGroup =
                 isExpanded &&
@@ -410,24 +392,11 @@ const QCRawMaterialRevalidationTable = ({
                       )
                     ) : null}
                   </TableCell>
-                  {!readOnly ? (
-                    <TableCell sx={baseCellSx}>
-                      {showGroupDelete ? (
-                        <IconButton
-                          size="small"
-                          onClick={() => commitRows(removeRevalidationGroup(rows, groupId))}
-                          sx={{ color: BRAND.danger }}
-                        >
-                          <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
-                        </IconButton>
-                      ) : null}
-                    </TableCell>
-                  ) : null}
                 </TableRow>
                 {isLastInGroup ? (
                   <TableRow sx={{ background: alpha(BRAND.primaryLight, 0.03) }}>
                     <TableCell
-                      colSpan={QC_REVALIDATION_COLUMNS.length + (readOnly ? 0 : 1)}
+                      colSpan={QC_REVALIDATION_COLUMNS.length}
                       sx={{ ...baseCellSx, py: readOnly ? 0.65 : 1 }}
                     >
                       {readOnly ? (

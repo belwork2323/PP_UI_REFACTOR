@@ -35,6 +35,8 @@ import QCSchemaBufferingLoader from "./QCSchemaBufferingLoader";
 import QCHardwareAttachmentUpload from "./QCHardwareAttachmentUpload";
 import { createInitialHardwareProcessValues } from "../../../../../hooks/user/qualityControl/qcHardwareTables";
 import { resolveHardwareUploadAnchorEntry } from "../../../../../hooks/user/qualityControl/qcHardwareConfig";
+import type { QcPartialNavItem } from "../../../../../hooks/user/qualityControl/qcDivisionApprovalUnits";
+import { resolveQcUnitActionLabels } from "../../../../../hooks/user/qualityControl/qcDivisionUnitActionLabels";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 
@@ -59,6 +61,8 @@ export type QCDivisionFormBodyProps = {
   activeDivisionGroupIndex: number;
   activeDivisionSubIndex: number;
   readOnly?: boolean;
+  /** Block field edits (Waiting / Approved) without forcing details theme. */
+  fieldsDisabled?: boolean;
   schemaLoading?: boolean;
   schemaError?: string | null;
   onActiveDivisionGroupIndexChange: (index: number) => void;
@@ -69,6 +73,7 @@ export type QCDivisionFormBodyProps = {
   onRemoveDivisionEntry: (entryId: string) => void;
   /** When true, hide entry-group switcher (catalog division tabs + partial nav own navigation). */
   hideEntryGroupNav?: boolean;
+  activePartialItem?: QcPartialNavItem | null;
   unitActions?: QCDivisionEntryUnitActions | null;
   theme: any;
 };
@@ -82,9 +87,11 @@ const QCDivisionFormBody = ({
   activeDivisionGroupIndex,
   activeDivisionSubIndex,
   readOnly = false,
+  fieldsDisabled = false,
   schemaLoading = false,
   schemaError = null,
   hideEntryGroupNav = false,
+  activePartialItem = null,
   onActiveDivisionGroupIndexChange,
   onActiveDivisionSubIndexChange,
   onDivisionEntryValuesChange,
@@ -250,6 +257,15 @@ const QCDivisionFormBody = ({
     return unitActions;
   }, [activeEntry?.kind, unitActions, visibleEntries]);
 
+  const resolveEntryUnitActions = useCallback(
+    (entry?: QcDivisionEntry | null): QCDivisionEntryUnitActions | null => {
+      if (!resolvedUnitActions?.show) return resolvedUnitActions;
+      const labels = resolveQcUnitActionLabels({ partialItem: activePartialItem, entry });
+      return { ...resolvedUnitActions, ...labels };
+    },
+    [activePartialItem, resolvedUnitActions],
+  );
+
   const showInlineFinalMixDetails = useMemo(
     () => hideEntryGroupNav && activeEntry?.kind === "MIXING_FINAL_MIX",
     [activeEntry?.kind, hideEntryGroupNav],
@@ -290,10 +306,7 @@ const QCDivisionFormBody = ({
     },
     [hardwareUploadAnchorEntry, onDivisionEntryValuesChange],
   );
-  const entryPanelUnitActions =
-    activeEntry?.kind === "MIXING_FINAL_MIX" && finalMixTopUnitActions
-      ? { ...resolvedUnitActions!, show: false }
-      : resolvedUnitActions;
+  const finalMixActionLabels = resolveEntryUnitActions(activeEntry);
 
   const showEntryGroupNav = !hideEntryGroupNav && navGroups.length > 1;
 
@@ -377,6 +390,9 @@ const QCDivisionFormBody = ({
               px: 1.5,
               py: 1.25,
               mb: showInlineFinalMixDetails ? 1.25 : 0,
+              ...(fieldsDisabled && !readOnly
+                ? { pointerEvents: "none", userSelect: "none", opacity: 0.92 }
+                : null),
             }}
           >
             {finalMixTopUnitActions ? (
@@ -384,20 +400,30 @@ const QCDivisionFormBody = ({
                 <Button
                   size="small"
                   variant="outlined"
-                  disabled={readOnly || !finalMixTopUnitActions.canAct || finalMixTopUnitActions.actionLoading}
+                  disabled={
+                    fieldsDisabled ||
+                    readOnly ||
+                    !finalMixTopUnitActions.canAct ||
+                    finalMixTopUnitActions.actionLoading
+                  }
                   onClick={finalMixTopUnitActions.onSaveDraft}
                   sx={{ textTransform: "none", whiteSpace: "nowrap" }}
                 >
-                  {S.SAVE_UNIT_DRAFT}
+                  {finalMixActionLabels?.saveDraftLabel ?? S.SAVE_UNIT_DRAFT}
                 </Button>
                 <Button
                   size="small"
                   variant="contained"
-                  disabled={readOnly || !finalMixTopUnitActions.canAct || finalMixTopUnitActions.actionLoading}
+                  disabled={
+                    fieldsDisabled ||
+                    readOnly ||
+                    !finalMixTopUnitActions.canAct ||
+                    finalMixTopUnitActions.actionLoading
+                  }
                   onClick={finalMixTopUnitActions.onSubmit}
                   sx={{ textTransform: "none", whiteSpace: "nowrap" }}
                 >
-                  {finalMixTopUnitActions.isEditMode ? S.RESUBMIT_UNIT : S.SUBMIT_UNIT}
+                  {finalMixActionLabels?.submitLabel ?? S.SUBMIT_UNIT}
                 </Button>
               </Stack>
             ) : null}
@@ -418,19 +444,27 @@ const QCDivisionFormBody = ({
         ) : null}
 
         {showProcessingMaterialsPanel ? (
-          <QCProcessingMaterialsPanel
-            key={`processing-materials-${processingMaterialEntries[0]?.premixNo ?? "all"}`}
-            formData={formData}
-            entries={processingMaterialEntries}
-            entryValuesById={formData.divisionEntryValues ?? {}}
-            subDepartmentId={subDepartmentId}
-            batchId={batch?.batchId}
-            readOnly={readOnly}
-            schemaLoading={schemaLoading}
-            schemaError={schemaError}
-            onEntryValuesChange={onDivisionEntryValuesChange}
-            unitActions={resolvedUnitActions}
-          />
+          <Box
+            sx={
+              fieldsDisabled && !readOnly
+                ? { pointerEvents: "none", userSelect: "none", opacity: 0.92 }
+                : undefined
+            }
+          >
+            <QCProcessingMaterialsPanel
+              key={`processing-materials-${processingMaterialEntries[0]?.premixNo ?? "all"}`}
+              formData={formData}
+              entries={processingMaterialEntries}
+              entryValuesById={formData.divisionEntryValues ?? {}}
+              subDepartmentId={subDepartmentId}
+              batchId={batch?.batchId}
+              readOnly={readOnly}
+              schemaLoading={schemaLoading}
+              schemaError={schemaError}
+              onEntryValuesChange={onDivisionEntryValuesChange}
+              unitActions={resolveEntryUnitActions(processingMaterialEntries[0] ?? null)}
+            />
+          </Box>
         ) : (
           visibleEntries.map((entry) => {
             const entryValues = formData.divisionEntryValues?.[entry.entryId];
@@ -456,6 +490,7 @@ const QCDivisionFormBody = ({
                 }
                 batchPayload={batch}
                 readOnly={readOnly}
+                fieldsDisabled={fieldsDisabled}
                 schemaLoading={schemaLoading}
                 schemaError={schemaError}
                 onEntryValuesChange={onDivisionEntryValuesChange}
@@ -463,15 +498,22 @@ const QCDivisionFormBody = ({
                 onRemoveEntry={onRemoveDivisionEntry}
                 unitActions={
                   entry.kind === "HARDWARE_PROCESS" && entry.entryId !== firstHardwareEntryId
-                    ? { ...entryPanelUnitActions!, show: false }
-                    : entryPanelUnitActions
+                    ? { ...resolveEntryUnitActions(entry)!, show: false }
+                    : resolveEntryUnitActions(entry)
                 }
               />
             );
           })
         )}
         {showHardwareUploadPanel && hardwareUploadAnchorEntry ? (
-          <Box sx={{ mt: 2 }}>
+          <Box
+            sx={{
+              mt: 2,
+              ...(fieldsDisabled && !readOnly
+                ? { pointerEvents: "none", userSelect: "none", opacity: 0.92 }
+                : null),
+            }}
+          >
             <QCHardwareAttachmentUpload
               values={hardwareUploadValues}
               onChange={handleHardwareUploadChange}

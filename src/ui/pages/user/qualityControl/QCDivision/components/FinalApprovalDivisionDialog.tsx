@@ -29,6 +29,7 @@ type FinalApprovalDivisionDialogProps = {
   groups: QcFinalApprovalDivisionGroup[];
   canProceed: boolean;
   confirmDisabled?: boolean;
+  hideConfirm?: boolean;
   onClose: () => void;
   onProceed: () => void;
 };
@@ -78,6 +79,7 @@ const FinalApprovalDivisionDialog = ({
   groups,
   canProceed,
   confirmDisabled = false,
+  hideConfirm = false,
   onClose,
   onProceed,
 }: FinalApprovalDivisionDialogProps) => {
@@ -111,6 +113,7 @@ const FinalApprovalDivisionDialog = ({
       confirmLabel={S.FINAL_APPROVAL_PROCEED}
       cancelLabel={S.FINAL_APPROVAL_CLOSE}
       confirmDisabled={!canProceed || confirmDisabled}
+      hideConfirm={hideConfirm}
       onConfirm={onProceed}
       onCancel={onClose}
     >
@@ -232,7 +235,7 @@ const FinalApprovalDivisionDialog = ({
         </Stack>
       </Box>
 
-      {!canProceed ? (
+      {!hideConfirm && !canProceed ? (
         <Box sx={{ mt: 1.25, fontSize: "0.78rem", color: "text.secondary", fontWeight: 600 }}>
           {S.FINAL_APPROVAL_NOT_READY}
         </Box>

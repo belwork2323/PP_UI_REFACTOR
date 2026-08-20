@@ -13,7 +13,6 @@ import getRawMaterialPreparationApproverTheme from "../../../../app/theme/custom
 import { STRINGS } from "../../../../app/config/strings";
 import { icons } from "../../../../app/theme/icons";
 import {
-  canApproverActionEntireRawMaterialPrepForm,
   isPremixApproverActionable,
   isPremixApproverTabDisabled,
   type RawMaterialPrepApproverDetailView,
@@ -72,8 +71,6 @@ type RawMaterialPreparationApproverReviewContentProps = {
   onActivePremixChange: (premixNo: number) => void;
   onApprove: () => void;
   onReject: () => void;
-  onApproveForm?: () => void;
-  onRejectForm?: () => void;
   actionLoading?: boolean;
   manufacturingTheme: ReturnType<typeof getManufacturingTheme>;
   approverTheme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
@@ -87,8 +84,6 @@ const RawMaterialPreparationApproverReviewContent = ({
   onActivePremixChange,
   onApprove,
   onReject,
-  onApproveForm,
-  onRejectForm,
   actionLoading = false,
   manufacturingTheme,
   approverTheme,
@@ -157,11 +152,6 @@ const RawMaterialPreparationApproverReviewContent = ({
   const activePremixIndex = premixes.findIndex((premix) => premix.premixNo === activePremixNo);
   const enabledPremixIndex = enabledPremixes.findIndex((premix) => premix.premixNo === activePremixNo);
   const canApproveOrReject = isPremixApproverActionable(activePremix?.premixSubmissionStatus);
-  const canApproveOrRejectForm = canApproverActionEntireRawMaterialPrepForm({
-    formSubmissionType: detailView?.formSubmissionType,
-    status: detailView?.status,
-    premixes,
-  });
 
   const navPalette = {
     primary: palette.primary,
@@ -250,51 +240,6 @@ const RawMaterialPreparationApproverReviewContent = ({
           statusConfig={statusConfig}
         />
       </Box>
-
-      {canApproveOrRejectForm ? (
-        <Box
-          sx={{
-            border: `1px solid ${palette.border}`,
-            borderRadius: 2,
-            px: 1.25,
-            py: 1,
-            background: palette.surface,
-          }}
-        >
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            alignItems={{ xs: "stretch", sm: "center" }}
-            justifyContent="space-between"
-            gap={1}
-          >
-            <Typography sx={{ fontSize: "0.74rem", color: palette.textSub, fontWeight: 600 }}>
-              {RM.FORM_APPROVER_ACTIONS_HINT}
-            </Typography>
-            <Stack direction={{ xs: "column", sm: "row" }} gap={1}>
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<RejectIcon />}
-                disabled={actionLoading || !onRejectForm}
-                onClick={onRejectForm}
-                sx={approverTheme.dialog.rejectAction}
-              >
-                {RM.FORM_APPROVER_REJECT}
-              </Button>
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<ApproveIcon />}
-                disabled={actionLoading || !onApproveForm}
-                onClick={onApproveForm}
-                sx={approverTheme.dialog.approveAction}
-              >
-                {RM.FORM_APPROVER_APPROVE}
-              </Button>
-            </Stack>
-          </Stack>
-        </Box>
-      ) : null}
 
       <UserWorkflowNavPanel palette={navPalette}>
         <UserWorkflowTabNav

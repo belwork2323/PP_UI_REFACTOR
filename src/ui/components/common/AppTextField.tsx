@@ -11,6 +11,8 @@ export type AppTextFieldProps = TextFieldProps & {
   compact?: boolean;
   /** Extra field CSS merged after the base theme. */
   inputSx?: SxProps<Theme>;
+  /** Floating-label batch-list filter styling (matches subdepartment filter panels). */
+  filterPanel?: boolean;
 };
 
 /**
@@ -23,19 +25,26 @@ const AppTextField = ({
   InputLabelProps,
   inputProps,
   compact = false,
+  filterPanel = false,
   type,
   ...props
 }: AppTextFieldProps) => (
   <TextField
-    fullWidth
+    fullWidth={filterPanel !== false}
     size="small"
     variant="outlined"
     type={type}
-    InputLabelProps={{ ...appDropdownLabelProps, ...InputLabelProps }}
-    inputProps={{ ...appDropdownInputProps, ...inputProps }}
+    InputLabelProps={
+      filterPanel ? InputLabelProps : { ...appDropdownLabelProps, ...InputLabelProps }
+    }
+    inputProps={
+      filterPanel
+        ? { style: { fontSize: "0.72rem" }, ...inputProps }
+        : { ...appDropdownInputProps, ...inputProps }
+    }
     sx={
       [
-        compact ? appDenseControlSx : appDropdownSx,
+        filterPanel ? { mb: 0 } : compact ? appDenseControlSx : appDropdownSx,
         type === "number" && {
           "& input[type=number]": { MozAppearance: "textfield" },
           "& input[type=number]::-webkit-outer-spin-button, & input[type=number]::-webkit-inner-spin-button":

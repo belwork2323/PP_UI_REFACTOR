@@ -16,6 +16,11 @@ import QCHardwareProcessPanel from "./QCHardwareProcessPanel";
 import QCCastingMotorPanel from "./QCCastingMotorPanel";
 import QCCuringMotorPanel from "./QCCuringMotorPanel";
 import QCDeCoringMotorPanel from "./QCDeCoringMotorPanel";
+import QCTrimmingMotorPanel from "./QCTrimmingMotorPanel";
+import QCPostCureMotorPanel from "./QCPostCureMotorPanel";
+import QCNdtMotorPanel from "./QCNdtMotorPanel";
+import QCPropellantMotorPanel from "./QCPropellantMotorPanel";
+import QCWeighmentMotorPanel from "./QCWeighmentMotorPanel";
 import {
   applyMixingDivisionEntryToValues,
   createInitialPremixDetailsValues,
@@ -50,6 +55,28 @@ import {
   hydrateDeCoringValuesFromSections,
 } from "../../../../../hooks/user/qualityControl/qcDeCoringTables";
 import {
+  createInitialTrimmingValues,
+  hydrateTrimmingValuesFromSections,
+} from "../../../../../hooks/user/qualityControl/qcTrimmingTables";
+import {
+  createInitialPostCureValues,
+  hydratePostCureValuesFromSections,
+  postCureFormValuesHaveUserData,
+} from "../../../../../hooks/user/qualityControl/qcPostCureTables";
+import {
+  createInitialNdtValues,
+  hydrateNdtValuesFromSections,
+} from "../../../../../hooks/user/qualityControl/qcNdtTables";
+import {
+  createInitialPropellantValues,
+  hydratePropellantValuesFromSections,
+} from "../../../../../hooks/user/qualityControl/qcPropellantTables";
+import { resolveQcPropellantPremixCount } from "../../../../../hooks/user/qualityControl/qcPropellantConfig";
+import {
+  createInitialWeighmentValues,
+  hydrateWeighmentValuesFromSections,
+} from "../../../../../hooks/user/qualityControl/qcWeighmentTables";
+import {
   createInitialRevalidationSchemaValues,
   hydrateRevalidationValuesFromSections,
 } from "../../../../../hooks/user/qualityControl/qcRawMaterialRevalidationTable";
@@ -61,6 +88,12 @@ export type QCDivisionEntryUnitActions = {
   canAct?: boolean;
   actionLoading?: boolean;
   isEditMode?: boolean;
+  saveDraftLabel?: string;
+  submitLabel?: string;
+  draftConfirmTitle?: string;
+  draftConfirmMessage?: string;
+  submitConfirmTitle?: string;
+  submitConfirmMessage?: string;
   onSaveDraft?: () => void;
   onSubmit?: () => void;
 };
@@ -77,6 +110,8 @@ type QCDivisionEntryPanelProps = {
   mixingQualityCheckDefinitions?: QcMixingQualityCheckDefinition[] | null;
   batchPayload?: unknown;
   readOnly?: boolean;
+  /** Waiting/Approved lock — disable edits without details theme. */
+  fieldsDisabled?: boolean;
   schemaLoading?: boolean;
   schemaError?: string | null;
   onEntryValuesChange: (entryId: string, values: SchemaFormValues) => void;
@@ -97,6 +132,7 @@ const QCDivisionEntryPanel = ({
   mixingQualityCheckDefinitions = null,
   batchPayload = null,
   readOnly = false,
+  fieldsDisabled = false,
   schemaLoading = false,
   schemaError = null,
   onEntryValuesChange,
@@ -114,7 +150,12 @@ const QCDivisionEntryPanel = ({
       entry.kind === "HARDWARE_PROCESS" ||
       entry.kind === "CASTING_MOTOR" ||
       entry.kind === "CURING_MOTOR" ||
-      entry.kind === "DE_CORING_MOTOR"
+      entry.kind === "DE_CORING_MOTOR" ||
+      entry.kind === "TRIMMING_MOTOR" ||
+      entry.kind === "POST_CURE_MOTOR" ||
+      entry.kind === "NDT_MOTOR" ||
+      entry.kind === "PROPELLANT_MOTOR" ||
+      entry.kind === "PROPELLANT_PROCESS"
     ) {
       return null;
     }
@@ -216,12 +257,20 @@ const QCDivisionEntryPanel = ({
     // Mixing units are managed via Mix Navigation — no remove control.
     const showRemove =
       !readOnly &&
+      !fieldsDisabled &&
+      entry.kind !== "REVALIDATION" &&
       entry.kind !== "MIXING_PREMIX" &&
       entry.kind !== "MIXING_FINAL_MIX" &&
       entry.kind !== "HARDWARE_PROCESS" &&
       entry.kind !== "CASTING_MOTOR" &&
       entry.kind !== "CURING_MOTOR" &&
-      entry.kind !== "DE_CORING_MOTOR";
+      entry.kind !== "DE_CORING_MOTOR" &&
+      entry.kind !== "TRIMMING_MOTOR" &&
+      entry.kind !== "POST_CURE_MOTOR" &&
+      entry.kind !== "NDT_MOTOR" &&
+      entry.kind !== "PROPELLANT_MOTOR" &&
+      entry.kind !== "PROPELLANT_PROCESS" &&
+      entry.kind !== "WEIGHTMENT_MOTOR";
     if (!showUnitActions && !showRemove) return null;
 
     return (
@@ -231,20 +280,24 @@ const QCDivisionEntryPanel = ({
             <Button
               size="small"
               variant="outlined"
-              disabled={readOnly || !unitActions?.canAct || unitActions?.actionLoading}
+              disabled={
+                readOnly || fieldsDisabled || !unitActions?.canAct || unitActions?.actionLoading
+              }
               onClick={unitActions?.onSaveDraft}
               sx={{ textTransform: "none", whiteSpace: "nowrap" }}
             >
-              {S.SAVE_UNIT_DRAFT}
+              {unitActions?.saveDraftLabel ?? S.SAVE_UNIT_DRAFT}
             </Button>
             <Button
               size="small"
               variant="contained"
-              disabled={readOnly || !unitActions?.canAct || unitActions?.actionLoading}
+              disabled={
+                readOnly || fieldsDisabled || !unitActions?.canAct || unitActions?.actionLoading
+              }
               onClick={unitActions?.onSubmit}
               sx={{ textTransform: "none", whiteSpace: "nowrap" }}
             >
-              {unitActions?.isEditMode ? S.RESUBMIT_UNIT : S.SUBMIT_UNIT}
+              {unitActions?.submitLabel ?? S.SUBMIT_UNIT}
             </Button>
           </>
         ) : null}
@@ -257,11 +310,26 @@ const QCDivisionEntryPanel = ({
         ) : null}
       </Stack>
     );
-  }, [BRAND.danger, entry.kind, handleRemove, readOnly, unitActions]);
+  }, [BRAND.danger, entry.kind, fieldsDisabled, handleRemove, readOnly, unitActions]);
 
   const formValues = useMemo(() => {
     const saved = entryValues.schemaValues;
-    if (saved && Object.keys(saved).length > 0) return saved;
+    const hasSavedValues = Boolean(saved && Object.keys(saved).length > 0);
+    if (
+      entry.kind === "POST_CURE_MOTOR" &&
+      (!hasSavedValues || !postCureFormValuesHaveUserData(saved))
+    ) {
+      if (entry.savedSections?.length) {
+        return hydratePostCureValuesFromSections(
+          entry.savedSections,
+          entry.subType,
+          entry.inhibitorType,
+        );
+      }
+      if (hasSavedValues) return saved!;
+      return createInitialPostCureValues(entry.subType, entry.inhibitorType);
+    }
+    if (hasSavedValues) return saved!;
     if (entry.kind === "REVALIDATION") {
       if (entry.savedSections?.length) {
         return hydrateRevalidationValuesFromSections(entry.savedSections);
@@ -307,8 +375,45 @@ const QCDivisionEntryPanel = ({
       }
       return createInitialDeCoringValues();
     }
+    if (entry.kind === "TRIMMING_MOTOR") {
+      if (entry.savedSections?.length) {
+        return hydrateTrimmingValuesFromSections(entry.savedSections, {
+          motorReceivedAt: entry.motorReceivedDate ?? "",
+        });
+      }
+      return createInitialTrimmingValues(entry.motorReceivedDate ?? "");
+    }
+    if (entry.kind === "NDT_MOTOR") {
+      if (entry.savedSections?.length) {
+        return hydrateNdtValuesFromSections(entry.savedSections);
+      }
+      return createInitialNdtValues();
+    }
+    if (entry.kind === "PROPELLANT_MOTOR" || entry.kind === "PROPELLANT_PROCESS") {
+      const fmCount = resolveQcPropellantPremixCount(divisionAutoPopulateData, batchPayload);
+      if (entry.savedSections?.length) {
+        return hydratePropellantValuesFromSections(entry.savedSections, fmCount);
+      }
+      return createInitialPropellantValues(fmCount);
+    }
+    if (entry.kind === "WEIGHTMENT_MOTOR") {
+      if (entry.savedSections?.length) {
+        return hydrateWeighmentValuesFromSections(entry.savedSections);
+      }
+      return createInitialWeighmentValues();
+    }
     return resolvedSchema ? createQcInitialValues(resolvedSchema) : {};
-  }, [entry.kind, entry.savedSections, entry.subType, entryValues.schemaValues, resolvedSchema]);
+  }, [
+    batchPayload,
+    divisionAutoPopulateData,
+    entry.inhibitorType,
+    entry.kind,
+    entry.motorReceivedDate,
+    entry.savedSections,
+    entry.subType,
+    entryValues.schemaValues,
+    resolvedSchema,
+  ]);
 
   const solidValues = useMemo(() => {
     const saved = entryValues.schemaValues;
@@ -324,38 +429,62 @@ const QCDivisionEntryPanel = ({
 
   if (entry.kind === "HARDWARE_PROCESS") {
     return (
-      <QCHardwareProcessPanel
-        subType={String(entry.subType ?? "")}
-        values={formValues}
-        onChange={handleValuesChange}
-        readOnly={readOnly}
-        headerActions={headerActions}
-      />
+      <Box
+        sx={
+          fieldsDisabled && !readOnly
+            ? { pointerEvents: "none", userSelect: "none", opacity: 0.92 }
+            : undefined
+        }
+      >
+        <QCHardwareProcessPanel
+          subType={String(entry.subType ?? "")}
+          values={formValues}
+          onChange={handleValuesChange}
+          readOnly={readOnly}
+          headerActions={headerActions}
+        />
+      </Box>
     );
   }
 
   if (entry.kind === "CASTING_MOTOR") {
     return (
-      <QCCastingMotorPanel
-        motorId={entry.motorId}
-        values={formValues}
-        onChange={handleValuesChange}
-        readOnly={readOnly}
-        headerActions={headerActions}
-      />
+      <Box
+        sx={
+          fieldsDisabled && !readOnly
+            ? { pointerEvents: "none", userSelect: "none", opacity: 0.92 }
+            : undefined
+        }
+      >
+        <QCCastingMotorPanel
+          motorId={entry.motorId}
+          values={formValues}
+          onChange={handleValuesChange}
+          readOnly={readOnly}
+          headerActions={headerActions}
+        />
+      </Box>
     );
   }
 
   if (entry.kind === "CURING_MOTOR") {
     return (
-      <QCCuringMotorPanel
-        motorId={entry.motorId}
-        curingSubType={entry.subType}
-        values={formValues}
-        onChange={handleValuesChange}
-        readOnly={readOnly}
-        headerActions={headerActions}
-      />
+      <Box
+        sx={
+          fieldsDisabled && !readOnly
+            ? { pointerEvents: "none", userSelect: "none", opacity: 0.92 }
+            : undefined
+        }
+      >
+        <QCCuringMotorPanel
+          motorId={entry.motorId}
+          curingSubType={entry.subType}
+          values={formValues}
+          onChange={handleValuesChange}
+          readOnly={readOnly}
+          headerActions={headerActions}
+        />
+      </Box>
     );
   }
 
@@ -366,6 +495,75 @@ const QCDivisionEntryPanel = ({
         values={formValues}
         onChange={handleValuesChange}
         readOnly={readOnly}
+        disabled={fieldsDisabled}
+        headerActions={headerActions}
+      />
+    );
+  }
+
+  if (entry.kind === "TRIMMING_MOTOR") {
+    return (
+      <QCTrimmingMotorPanel
+        motorId={entry.motorId}
+        values={formValues}
+        onChange={handleValuesChange}
+        readOnly={readOnly}
+        disabled={fieldsDisabled}
+        headerActions={headerActions}
+      />
+    );
+  }
+
+  if (entry.kind === "POST_CURE_MOTOR") {
+    return (
+      <QCPostCureMotorPanel
+        motorId={entry.motorId}
+        subType={entry.subType}
+        inhibitorType={entry.inhibitorType}
+        values={formValues}
+        onChange={handleValuesChange}
+        readOnly={readOnly}
+        disabled={fieldsDisabled}
+        headerActions={headerActions}
+      />
+    );
+  }
+
+  if (entry.kind === "NDT_MOTOR") {
+    return (
+      <QCNdtMotorPanel
+        motorId={entry.motorId}
+        values={formValues}
+        onChange={handleValuesChange}
+        readOnly={readOnly}
+        disabled={fieldsDisabled}
+        headerActions={headerActions}
+      />
+    );
+  }
+
+  if (entry.kind === "PROPELLANT_MOTOR" || entry.kind === "PROPELLANT_PROCESS") {
+    return (
+      <QCPropellantMotorPanel
+        motorId={entry.motorId}
+        values={formValues}
+        onChange={handleValuesChange}
+        readOnly={readOnly}
+        disabled={fieldsDisabled}
+        headerActions={headerActions}
+        batchPayload={divisionAutoPopulateData ?? batchPayload}
+      />
+    );
+  }
+
+  if (entry.kind === "WEIGHTMENT_MOTOR") {
+    return (
+      <QCWeighmentMotorPanel
+        motorId={entry.motorId}
+        values={formValues}
+        onChange={handleValuesChange}
+        readOnly={readOnly}
+        disabled={fieldsDisabled}
         headerActions={headerActions}
       />
     );
@@ -380,6 +578,9 @@ const QCDivisionEntryPanel = ({
           background: BRAND.surface,
           px: 1.5,
           py: 1.25,
+          ...(fieldsDisabled && !readOnly
+            ? { pointerEvents: "none", userSelect: "none", opacity: 0.92 }
+            : null),
         }}
       >
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1} gap={1}>
@@ -407,6 +608,9 @@ const QCDivisionEntryPanel = ({
           background: BRAND.surface,
           px: 1.5,
           py: 1.25,
+          ...(fieldsDisabled && !readOnly
+            ? { pointerEvents: "none", userSelect: "none", opacity: 0.92 }
+            : null),
         }}
       >
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1} gap={1}>
@@ -435,6 +639,9 @@ const QCDivisionEntryPanel = ({
           background: BRAND.surface,
           px: 1.5,
           py: 1.25,
+          ...(fieldsDisabled && !readOnly
+            ? { pointerEvents: "none", userSelect: "none", opacity: 0.92 }
+            : null),
         }}
       >
         <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1} gap={1}>
@@ -581,7 +788,7 @@ const QCDivisionEntryPanel = ({
               subDepartmentId={subDepartmentId}
               batchId={batchId}
               onChange={handleValuesChange}
-              readOnly={readOnly}
+              readOnly={fieldsDisabled}
               loading={schemaLoading}
               error={schemaError}
             />
@@ -599,7 +806,7 @@ const QCDivisionEntryPanel = ({
               subDepartmentId={subDepartmentId}
               batchId={batchId}
               onChange={handleLiquidValuesChange}
-              readOnly={readOnly}
+              readOnly={fieldsDisabled}
               loading={schemaLoading}
               error={schemaError}
             />
@@ -614,9 +821,10 @@ const QCDivisionEntryPanel = ({
     entry.kind !== "DE_CORING_MOTOR" &&
     entry.kind !== "POST_CURE_MOTOR" &&
     entry.kind !== "NDT_MOTOR" &&
+    entry.kind !== "PROPELLANT_MOTOR" &&
+    entry.kind !== "PROPELLANT_PROCESS" &&
     entry.kind !== "WEIGHTMENT_MOTOR";
-  const isTrimmingMotor = entry.kind === "TRIMMING_MOTOR";
-  const isWeightmentMotor = entry.kind === "WEIGHTMENT_MOTOR";
+  const isTrimmingMotor = false;
 
   return (
     <Box
@@ -636,21 +844,6 @@ const QCDivisionEntryPanel = ({
             </Typography>
             <Typography sx={{ fontSize: "0.74rem", color: BRAND.textSub, mt: 0.25 }}>
               {S.TRIMMING_MOTOR_RECEIVED_DATE_LABEL}: {entry.motorReceivedDate?.trim() || "—"}
-            </Typography>
-          </Box>
-          {headerActions}
-        </Stack>
-      ) : isWeightmentMotor ? (
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1.25} gap={1}>
-          <Box>
-            <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: BRAND.primary }}>
-              {entry.motorId}
-            </Typography>
-            <Typography sx={{ fontSize: "0.74rem", color: BRAND.textSub, mt: 0.25 }}>
-              {S.WEIGHTMENT_WEIGHSCALE_NO_LABEL}: {entry.weighscaleNo?.trim() || "—"}
-            </Typography>
-            <Typography sx={{ fontSize: "0.74rem", color: BRAND.textSub, mt: 0.25 }}>
-              {S.WEIGHTMENT_CALIBRATION_DUE_DATE_LABEL}: {entry.calibrationDueDate?.trim() || "—"}
             </Typography>
           </Box>
           {headerActions}
@@ -677,7 +870,7 @@ const QCDivisionEntryPanel = ({
         subDepartmentId={subDepartmentId}
         batchId={batchId}
         onChange={handleValuesChange}
-        readOnly={readOnly}
+        readOnly={fieldsDisabled}
         loading={schemaLoading}
         error={schemaError}
       />

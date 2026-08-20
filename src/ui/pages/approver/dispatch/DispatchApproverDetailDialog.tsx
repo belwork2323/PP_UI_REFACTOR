@@ -50,8 +50,6 @@ type DispatchApproverDetailDialogProps = {
   onActiveMotorChange?: (motorId: string) => void;
   onApprove: (item: DispatchApproverDetailItem) => void;
   onReject: (item: DispatchApproverDetailItem) => void;
-  onApproveForm?: (item: DispatchApproverDetailItem) => void;
-  onRejectForm?: (item: DispatchApproverDetailItem) => void;
   actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
@@ -65,8 +63,6 @@ const DispatchApproverDetailDialog = ({
   onActiveMotorChange,
   onApprove,
   onReject,
-  onApproveForm,
-  onRejectForm,
   actionLoading = false,
   theme,
 }: DispatchApproverDetailDialogProps) => {
@@ -146,10 +142,7 @@ const DispatchApproverDetailDialog = ({
             onActiveMotorChange={onActiveMotorChange ?? (() => undefined)}
             onApprove={() => onApprove(item)}
             onReject={() => onReject(item)}
-            onApproveForm={onApproveForm ? () => onApproveForm(item) : undefined}
-            onRejectForm={onRejectForm ? () => onRejectForm(item) : undefined}
             actionLoading={actionLoading}
-            formStatus={String(item.dispatchStatus ?? item.status ?? "")}
             dispatchTheme={dispatchTheme}
             approverTheme={theme}
           />

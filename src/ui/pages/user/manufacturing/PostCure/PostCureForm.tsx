@@ -13,6 +13,7 @@ import type {
 import type { PostCureAddedMotor } from "../../../../../hooks/user/manufacturing/postCureFlowConfig";
 import RemoveProcessButton from "../../../../components/common/RemoveProcessButton";
 import PremixStatusChip from "../RawMaterial/components/PremixStatusChip";
+import ViewStatusButton from "../../../../components/common/ViewStatusButton";
 import FinalApprovalMotorDialog, {
   areAllMotorsApproved,
   buildFinalApprovalMotorRows,
@@ -58,7 +59,6 @@ type PostCureFormProps = {
   onMotorSessionChange: (motorId: string, next: PostCureMotorSession) => void;
   onSaveMotorDraft?: (motorId: string) => void;
   onSubmitMotor?: (motorId: string) => void;
-  onSubmitForFinalApproval?: () => void;
   motorStatusById?: Record<string, PostCureMotorStatusMeta>;
   getMotorStatus?: (motorId: string) => PostCureMotorSubmissionStatus;
   isMotorEditable?: (motorId: string) => boolean;
@@ -88,7 +88,6 @@ const PostCureForm = ({
   onMotorSessionChange,
   onSaveMotorDraft,
   onSubmitMotor,
-  onSubmitForFinalApproval,
   motorStatusById = {},
   getMotorStatus,
   isMotorEditable,
@@ -160,7 +159,6 @@ const PostCureForm = ({
     [motorCards, motorStatusById],
   );
   const allMotorsApproved = areAllMotorsApproved(finalApprovalRows);
-  const canOpenFinalApproval = Boolean(batch?.formId);
 
   const navPalette = useMemo(
     () => ({
@@ -231,17 +229,6 @@ const PostCureForm = ({
             </Typography>
           </Box>
         </Stack>
-
-        {motorCards.length > 0 ? (
-          <Button
-            variant="contained"
-            size="small"
-            disabled={actionLoading || !canOpenFinalApproval}
-            onClick={() => setFinalApprovalOpen(true)}
-          >
-            {S.SUBMIT_FOR_FINAL_APPROVAL}
-          </Button>
-        ) : null}
       </Stack>
 
       {motorCards.length > 0 ? (
@@ -276,6 +263,36 @@ const PostCureForm = ({
               }
             />
           </UserWorkflowNavPanel>
+
+          <Stack direction="row" justifyContent="flex-end" spacing={1}>
+            {activeMotorLoaded && activeMotorEntry ? (
+              <>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={actionLoading || activeMotorLocked}
+                  onClick={() => onSaveMotorDraft?.(activeMotorEntry.motorId)}
+                  sx={{ textTransform: "none", fontWeight: 700 }}
+                >
+                  {S.SAVE_MOTOR_DRAFT(activeMotorEntry.motorId)}
+                </Button>
+                <Button
+                  variant="contained"
+                  size="small"
+                  disabled={actionLoading || activeMotorLocked}
+                  onClick={() => onSubmitMotor?.(activeMotorEntry.motorId)}
+                  sx={{ textTransform: "none", fontWeight: 700 }}
+                >
+                  {S.SUBMIT_MOTOR(activeMotorEntry.motorId)}
+                </Button>
+              </>
+            ) : null}
+            <ViewStatusButton
+              disabled={actionLoading}
+              onClick={() => setFinalApprovalOpen(true)}
+              label={S.VIEW_STATUS}
+            />
+          </Stack>
         </Stack>
       ) : null}
 
@@ -347,31 +364,13 @@ const PostCureForm = ({
               />
             </Stack>
 
-            <Stack direction="row" gap={1} flexShrink={0} alignItems="center">
-              <Button
-                variant="outlined"
-                size="small"
-                disabled={actionLoading || activeMotorLocked}
-                onClick={() => onSaveMotorDraft?.(activeMotorEntry.motorId)}
-              >
-                {S.SAVE_MOTOR_DRAFT}
-              </Button>
-              <Button
-                variant="contained"
-                size="small"
-                disabled={actionLoading || activeMotorLocked}
-                onClick={() => onSubmitMotor?.(activeMotorEntry.motorId)}
-              >
-                {S.SUBMIT_MOTOR}
-              </Button>
-              {activeMotorStatus === "TO_BE_INITIATED" ? (
-                <RemoveProcessButton
-                  onClick={() => onRemoveMotor(activeMotorEntry.motorId)}
-                  dangerColor={BRAND.danger}
-                  tooltip={S.DELETE_MOTOR_TOOLTIP}
-                />
-              ) : null}
-            </Stack>
+            {activeMotorStatus === "TO_BE_INITIATED" ? (
+              <RemoveProcessButton
+                onClick={() => onRemoveMotor(activeMotorEntry.motorId)}
+                dangerColor={BRAND.danger}
+                tooltip={S.DELETE_MOTOR_TOOLTIP}
+              />
+            ) : null}
           </Stack>
 
           {activeMotorLocked ? (
@@ -440,7 +439,7 @@ const PostCureForm = ({
         rows={finalApprovalRows}
         statusConfig={statusConfig}
         allMotorsApproved={allMotorsApproved}
-        confirmDisabled={actionLoading}
+        hideConfirm
         copy={{
           title: S.FINAL_APPROVAL_DIALOG_TITLE,
           info: S.FINAL_APPROVAL_DIALOG_INFO,
@@ -452,10 +451,6 @@ const PostCureForm = ({
           colStatus: S.FINAL_APPROVAL_COL_STATUS,
         }}
         onClose={() => setFinalApprovalOpen(false)}
-        onProceed={async () => {
-          setFinalApprovalOpen(false);
-          await onSubmitForFinalApproval?.();
-        }}
       />
     </Box>
   );

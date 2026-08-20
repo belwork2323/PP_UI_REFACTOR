@@ -38,6 +38,14 @@ api.interceptors.request.use(
       }
     }
 
+    if (config.data instanceof FormData) {
+      config.headers =
+        config.headers instanceof axios.AxiosHeaders
+          ? config.headers
+          : new axios.AxiosHeaders(config.headers);
+      config.headers.delete("Content-Type");
+    }
+
     return config;
   },
   (error: unknown) => {

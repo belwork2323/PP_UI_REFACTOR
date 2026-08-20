@@ -11,7 +11,6 @@ import getRawMaterialPreparationApproverTheme from "../../../../app/theme/custom
 import { STRINGS } from "../../../../app/config/strings";
 import { icons } from "../../../../app/theme/icons";
 import {
-  canApproverActionEntireTrimmingForm,
   isTrimmingMotorApproverActionable,
   isTrimmingMotorApproverTabDisabled,
   type TrimmingDetailView,
@@ -40,11 +39,7 @@ type TrimmingApproverReviewContentProps = {
   onActiveMotorChange: (motorId: string) => void;
   onApprove: () => void;
   onReject: () => void;
-  onApproveForm?: () => void;
-  onRejectForm?: () => void;
   actionLoading?: boolean;
-  /** Fallback when details payload omits batch status (e.g. list row pcStatus). */
-  formStatus?: string | null;
   manufacturingTheme: ReturnType<typeof getManufacturingTheme>;
   approverTheme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
@@ -56,10 +51,7 @@ const TrimmingApproverReviewContent = ({
   onActiveMotorChange,
   onApprove,
   onReject,
-  onApproveForm,
-  onRejectForm,
   actionLoading = false,
-  formStatus = null,
   manufacturingTheme,
   approverTheme,
 }: TrimmingApproverReviewContentProps) => {
@@ -113,11 +105,6 @@ const TrimmingApproverReviewContent = ({
   const activeMotorIndex = motors.findIndex((motor) => motor.motorId === activeMotorId);
   const enabledMotorIndex = enabledMotors.findIndex((motor) => motor.motorId === activeMotorId);
   const canApproveOrReject = isTrimmingMotorApproverActionable(activeMotor?.motorSubmissionStatus);
-  const canApproveOrRejectForm = canApproverActionEntireTrimmingForm({
-    formSubmissionType: detailView?.formSubmissionType,
-    status: detailView?.status ?? formStatus,
-    motors,
-  });
 
   const navPalette = {
     primary: palette.primary,
@@ -193,51 +180,6 @@ const TrimmingApproverReviewContent = ({
           statusConfig={statusConfig}
         />
       </Box>
-
-      {canApproveOrRejectForm ? (
-        <Box
-          sx={{
-            border: `1px solid ${palette.border}`,
-            borderRadius: 2,
-            px: 1.25,
-            py: 1,
-            background: palette.surface,
-          }}
-        >
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            alignItems={{ xs: "stretch", sm: "center" }}
-            justifyContent="space-between"
-            gap={1}
-          >
-            <Typography sx={{ fontSize: "0.74rem", color: palette.textSub, fontWeight: 600 }}>
-              {TR.FORM_APPROVER_ACTIONS_HINT}
-            </Typography>
-            <Stack direction={{ xs: "column", sm: "row" }} gap={1}>
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<RejectIcon />}
-                disabled={actionLoading || !onRejectForm}
-                onClick={onRejectForm}
-                sx={approverTheme.dialog.rejectAction}
-              >
-                {TR.FORM_APPROVER_REJECT}
-              </Button>
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<ApproveIcon />}
-                disabled={actionLoading || !onApproveForm}
-                onClick={onApproveForm}
-                sx={approverTheme.dialog.approveAction}
-              >
-                {TR.FORM_APPROVER_APPROVE}
-              </Button>
-            </Stack>
-          </Stack>
-        </Box>
-      ) : null}
 
       <UserWorkflowNavPanel palette={navPalette}>
         <UserWorkflowTabNav

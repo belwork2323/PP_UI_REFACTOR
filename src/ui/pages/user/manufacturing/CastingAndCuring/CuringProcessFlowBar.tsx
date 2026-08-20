@@ -37,7 +37,9 @@ const DetailItem = ({ label, value }: { label: string; value: string }) => (
     <Typography sx={{ fontSize: "0.65rem", fontWeight: 700, color: "text.secondary", mb: 0.25 }}>
       {label}
     </Typography>
-    <Typography sx={{ fontSize: "0.82rem", fontWeight: 600, color: "text.primary", wordBreak: "break-word" }}>
+    <Typography
+      sx={{ fontSize: "0.82rem", fontWeight: 600, color: "text.primary", wordBreak: "break-word" }}
+    >
       {value || "—"}
     </Typography>
   </Box>
@@ -87,7 +89,9 @@ const CuringProcessFlowBar = ({
 
   return (
     <Box sx={flowBar.container}>
-      <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: theme.palette.primary, mb: 1.5 }}>
+      <Typography
+        sx={{ fontSize: "0.84rem", fontWeight: 800, color: theme.palette.primary, mb: 1.5 }}
+      >
         {L.curingProcessTitle}
       </Typography>
       <Stack direction="row" useFlexGap flexWrap="wrap" gap={2} sx={{ mb: 1.5 }}>

@@ -44,15 +44,11 @@ const QCDivisionApproverPage = () => {
     divisionApprovalRows,
     finalApprovalGroups,
     finalApprovalRows,
-    canApproveForm,
     subDepartmentId,
     dialogProps,
-    formDialogProps,
     actionLoading,
     requestApprove,
     requestReject,
-    requestFormApprove,
-    requestFormReject,
     handleViewDetails,
     handleCloseDetail,
   } = useQCDivisionApproverHook();
@@ -98,16 +94,12 @@ const QCDivisionApproverPage = () => {
         divisionApprovalRows={divisionApprovalRows}
         finalApprovalGroups={finalApprovalGroups}
         finalApprovalRows={finalApprovalRows}
-        canApproveForm={canApproveForm}
         onApprove={requestApprove}
         onReject={requestReject}
-        onApproveForm={requestFormApprove}
-        onRejectForm={requestFormReject}
         actionLoading={actionLoading}
         theme={approverTheme}
       />
       <ApproverActionDialog {...dialogProps} />
-      <ApproverActionDialog {...formDialogProps} />
     </ApproverSubdepartmentBatchListSection>
   );
 };

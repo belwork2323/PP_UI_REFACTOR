@@ -30,12 +30,9 @@ const RawMaterialPreparationApproverPage = () => {
     detailsLoading,
     activePremixNo,
     dialogProps,
-    formDialogProps,
     actionLoading,
     requestApprove,
     requestReject,
-    requestFormApprove,
-    requestFormReject,
     handleViewDetails,
     handleCloseDetail,
     handleActivePremixChange,
@@ -67,13 +64,10 @@ const RawMaterialPreparationApproverPage = () => {
         onActivePremixChange={handleActivePremixChange}
         onApprove={requestApprove}
         onReject={requestReject}
-        onApproveForm={requestFormApprove}
-        onRejectForm={requestFormReject}
         actionLoading={actionLoading}
         theme={approverTheme}
       />
       <ApproverActionDialog {...dialogProps} />
-      <ApproverActionDialog {...formDialogProps} />
     </ApproverSubdepartmentBatchListSection>
   );
 };

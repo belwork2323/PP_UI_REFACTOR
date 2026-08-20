@@ -34,8 +34,6 @@ type RawMaterialPreparationApproverDetailDialogProps = {
   onActivePremixChange?: (premixNo: number) => void;
   onApprove: (item: RawMaterialPreparationApproverDetailItem) => void;
   onReject: (item: RawMaterialPreparationApproverDetailItem) => void;
-  onApproveForm?: (item: RawMaterialPreparationApproverDetailItem) => void;
-  onRejectForm?: (item: RawMaterialPreparationApproverDetailItem) => void;
   actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
@@ -49,8 +47,6 @@ const RawMaterialPreparationApproverDetailDialog = ({
   onActivePremixChange,
   onApprove,
   onReject,
-  onApproveForm,
-  onRejectForm,
   actionLoading = false,
   theme,
 }: RawMaterialPreparationApproverDetailDialogProps) => {
@@ -113,8 +109,6 @@ const RawMaterialPreparationApproverDetailDialog = ({
             onActivePremixChange={onActivePremixChange ?? (() => undefined)}
             onApprove={() => onApprove(item)}
             onReject={() => onReject(item)}
-            onApproveForm={onApproveForm ? () => onApproveForm(item) : undefined}
-            onRejectForm={onRejectForm ? () => onRejectForm(item) : undefined}
             actionLoading={actionLoading}
             manufacturingTheme={manufacturingTheme}
             approverTheme={theme}

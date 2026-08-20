@@ -11,7 +11,6 @@ import getRawMaterialPreparationApproverTheme from "../../../../app/theme/custom
 import { STRINGS } from "../../../../app/config/strings";
 import { icons } from "../../../../app/theme/icons";
 import {
-  canApproverActionEntireNDTForm,
   isNDTMotorApproverActionable,
   isNDTMotorApproverTabDisabled,
   type NDTDetailView,
@@ -40,10 +39,7 @@ type NDTApproverReviewContentProps = {
   onActiveMotorChange: (motorId: string) => void;
   onApprove: () => void;
   onReject: () => void;
-  onApproveForm?: () => void;
-  onRejectForm?: () => void;
   actionLoading?: boolean;
-  formStatus?: string | null;
   qcTheme: ReturnType<typeof getQualityControlTheme>;
   approverTheme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
@@ -55,10 +51,7 @@ const NDTApproverReviewContent = ({
   onActiveMotorChange,
   onApprove,
   onReject,
-  onApproveForm,
-  onRejectForm,
   actionLoading = false,
-  formStatus = null,
   qcTheme,
   approverTheme,
 }: NDTApproverReviewContentProps) => {
@@ -112,11 +105,6 @@ const NDTApproverReviewContent = ({
   const activeMotorIndex = motors.findIndex((motor) => motor.motorId === activeMotorId);
   const enabledMotorIndex = enabledMotors.findIndex((motor) => motor.motorId === activeMotorId);
   const canApproveOrReject = isNDTMotorApproverActionable(activeMotor?.motorSubmissionStatus);
-  const canApproveOrRejectForm = canApproverActionEntireNDTForm({
-    formSubmissionType: detailView?.formSubmissionType,
-    status: detailView?.status ?? formStatus,
-    motors,
-  });
 
   const navPalette = {
     primary: palette.primary,
@@ -192,51 +180,6 @@ const NDTApproverReviewContent = ({
           statusConfig={statusConfig}
         />
       </Box>
-
-      {canApproveOrRejectForm ? (
-        <Box
-          sx={{
-            border: `1px solid ${palette.border}`,
-            borderRadius: 2,
-            px: 1.25,
-            py: 1,
-            background: palette.surface,
-          }}
-        >
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            alignItems={{ xs: "stretch", sm: "center" }}
-            justifyContent="space-between"
-            gap={1}
-          >
-            <Typography sx={{ fontSize: "0.74rem", color: palette.textSub, fontWeight: 600 }}>
-              {NDT.FORM_APPROVER_ACTIONS_HINT}
-            </Typography>
-            <Stack direction={{ xs: "column", sm: "row" }} gap={1}>
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<RejectIcon />}
-                disabled={actionLoading || !onRejectForm}
-                onClick={onRejectForm}
-                sx={approverTheme.dialog.rejectAction}
-              >
-                {NDT.FORM_APPROVER_REJECT}
-              </Button>
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<ApproveIcon />}
-                disabled={actionLoading || !onApproveForm}
-                onClick={onApproveForm}
-                sx={approverTheme.dialog.approveAction}
-              >
-                {NDT.FORM_APPROVER_APPROVE}
-              </Button>
-            </Stack>
-          </Stack>
-        </Box>
-      ) : null}
 
       <UserWorkflowNavPanel palette={navPalette}>
         <UserWorkflowTabNav

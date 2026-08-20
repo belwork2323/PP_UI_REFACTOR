@@ -34,8 +34,9 @@ type FinalApprovalMixCardDialogProps = {
   statusConfig: PremixStatusThemeConfig;
   allMixCardsApproved: boolean;
   confirmDisabled?: boolean;
+  hideConfirm?: boolean;
   onClose: () => void;
-  onProceed: () => void;
+  onProceed?: () => void;
 };
 
 export const buildFinalApprovalMixCardRows = (
@@ -84,6 +85,7 @@ const FinalApprovalMixCardDialog = ({
   statusConfig,
   allMixCardsApproved,
   confirmDisabled = false,
+  hideConfirm = false,
   onClose,
   onProceed,
 }: FinalApprovalMixCardDialogProps) => (
@@ -96,6 +98,7 @@ const FinalApprovalMixCardDialog = ({
     confirmLabel={S.FINAL_APPROVAL_PROCEED}
     cancelLabel={S.FINAL_APPROVAL_CLOSE}
     confirmDisabled={!allMixCardsApproved || confirmDisabled}
+    hideConfirm={hideConfirm}
     onConfirm={onProceed}
     onCancel={onClose}
   >

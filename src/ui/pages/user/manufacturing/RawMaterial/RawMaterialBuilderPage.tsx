@@ -14,8 +14,8 @@ import { STRINGS } from "../../../../../app/config/strings";
 import { icons } from "../../../../../app/theme/icons";
 import { createEmptyPremixSchemaSession, type PremixStatusMeta } from "../../../../../data/models/user/RawMaterialPreparationModel";
 import PremixStatusChip from "./components/PremixStatusChip";
+import ViewStatusButton from "../../../../components/common/ViewStatusButton";
 import FinalApprovalPremixDialog, {
-  areAllPremixesApproved,
   buildFinalApprovalPremixRows,
 } from "./components/FinalApprovalPremixDialog";
 import type {
@@ -57,7 +57,6 @@ const RawMaterialBuilderForm = ({
   theme,
   onSavePremixDraft,
   onSubmitPremix,
-  onSubmitForFinalApproval,
   premixStatusByNo,
   isPremixEditable,
   actionLoading,
@@ -170,11 +169,6 @@ const RawMaterialBuilderForm = ({
     () => buildFinalApprovalPremixRows(premixStatusByNo, premixTotal),
     [premixStatusByNo, premixTotal],
   );
-  const allPremixesApproved = useMemo(
-    () => areAllPremixesApproved(finalApprovalRows),
-    [finalApprovalRows],
-  );
-  const canOpenFinalApproval = Boolean(String(activeBatch?.formId ?? "").trim());
 
   return (
     <>
@@ -204,16 +198,30 @@ const RawMaterialBuilderForm = ({
             />
           </UserWorkflowNavPanel>
 
-          <Stack direction="row" justifyContent="flex-end">
+          <Stack direction="row" justifyContent="flex-end" spacing={1}>
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={actionLoading || activePremixLocked}
+              onClick={() => onSavePremixDraft(activeMaterialEntry.premix)}
+              sx={{ textTransform: "none", fontWeight: 700 }}
+            >
+              {RM.SAVE_PREMIX_DRAFT(activeMaterialEntry.premix)}
+            </Button>
             <Button
               variant="contained"
               size="small"
-              disabled={actionLoading || !canOpenFinalApproval}
-              onClick={() => setFinalApprovalOpen(true)}
+              disabled={actionLoading || activePremixLocked}
+              onClick={() => onSubmitPremix(activeMaterialEntry.premix)}
               sx={{ textTransform: "none", fontWeight: 700 }}
             >
-              {RM.SUBMIT_FOR_FINAL_APPROVAL}
+              {RM.SUBMIT_PREMIX(activeMaterialEntry.premix)}
             </Button>
+            <ViewStatusButton
+              disabled={actionLoading}
+              onClick={() => setFinalApprovalOpen(true)}
+              label={RM.VIEW_STATUS}
+            />
           </Stack>
 
           <Box
@@ -264,25 +272,6 @@ const RawMaterialBuilderForm = ({
                     variant="embedded"
                   />
                 ) : null}
-              </Stack>
-
-              <Stack direction="row" gap={1} flexShrink={0}>
-                <Button
-                  variant="outlined"
-                  size="small"
-                  disabled={actionLoading || activePremixLocked}
-                  onClick={() => onSavePremixDraft(activeMaterialEntry.premix)}
-                >
-                  {RM.SAVE_PREMIX_DRAFT}
-                </Button>
-                <Button
-                  variant="contained"
-                  size="small"
-                  disabled={actionLoading || activePremixLocked}
-                  onClick={() => onSubmitPremix(activeMaterialEntry.premix)}
-                >
-                  {RM.SUBMIT_PREMIX}
-                </Button>
               </Stack>
             </Stack>
 
@@ -497,14 +486,7 @@ const RawMaterialBuilderForm = ({
         open={finalApprovalOpen}
         rows={finalApprovalRows}
         statusConfig={statusConfig}
-        allPremixesApproved={allPremixesApproved}
-        confirmDisabled={actionLoading}
         onClose={() => setFinalApprovalOpen(false)}
-        onProceed={async () => {
-          if (!allPremixesApproved || typeof onSubmitForFinalApproval !== "function") return;
-          const ok = await onSubmitForFinalApproval();
-          if (ok) setFinalApprovalOpen(false);
-        }}
       />
     </>
   );

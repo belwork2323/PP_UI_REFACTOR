@@ -2,7 +2,6 @@ import { Box, Stack, Typography } from "@mui/material";
 import { CASTING_CURING_FLOW_LABELS } from "../../../../../hooks/user/manufacturing/castingCuringFlowConfig";
 
 type CastingCuringSetupHeaderCardProps = {
-  castingType: string;
   castingStation: string;
   motorId: string;
   motorReceivedAt: string;
@@ -21,7 +20,6 @@ const DetailItem = ({ label, value }: { label: string; value: string }) => (
 );
 
 const CastingCuringSetupHeaderCard = ({
-  castingType,
   castingStation,
   motorId,
   motorReceivedAt,
@@ -51,14 +49,13 @@ const CastingCuringSetupHeaderCard = ({
         sx={{
           display: "grid",
           gridTemplateColumns: {
-            xs: "repeat(2, minmax(0, 1fr))",
-            md: "repeat(4, minmax(0, 1fr))",
+            xs: "repeat(1, minmax(0, 1fr))",
+            sm: "repeat(3, minmax(0, 1fr))",
           },
         }}
       >
-        <DetailItem label={L.castingType} value={castingType} />
-        <DetailItem label={L.castingStation} value={castingStation} />
         <DetailItem label={L.motorId} value={motorId} />
+        <DetailItem label={L.castingStation} value={castingStation} />
         <DetailItem label={L.motorReceivedAt} value={motorReceivedAt} />
       </Stack>
     </Box>

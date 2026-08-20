@@ -1,14 +1,6 @@
 import type { SchemaRowComputation, SchemaRowsConfig, SchemaTableBlock } from "../types";
 
-const QC_WEIGHTMENT_ROW_H_COMPUTATION: SchemaRowComputation = {
-  rowKey: "H",
-  targetColumn: "WEIGHT_KG",
-  expression: "G - (A - B + C + D - E + F)",
-};
-
-const BUILTIN_TABLE_ROW_COMPUTATIONS: Record<string, SchemaRowComputation[]> = {
-  MOTOR_WEIGHT_DETAILS: [QC_WEIGHTMENT_ROW_H_COMPUTATION],
-};
+const BUILTIN_TABLE_ROW_COMPUTATIONS: Record<string, SchemaRowComputation[]> = {};
 
 export const getTableRowComputations = (
   table: Pick<SchemaTableBlock, "id" | "rows">,

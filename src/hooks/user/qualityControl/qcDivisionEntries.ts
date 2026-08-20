@@ -14,7 +14,6 @@ import {
 } from "./qcHardwareConfig";
 import { getQcPropellantProcessLabel } from "./qcPropellantConfig";
 import {
-  QC_POST_CURE_API_DIVISION,
   QC_POST_CURE_SUB_TYPE_INHIBITION,
 } from "./qcPostCureConfig";
 import {
@@ -94,6 +93,9 @@ export const buildDivisionEntryDedupKey = (params: {
   if (params.kind === "NDT_MOTOR") {
     return `NDT:${params.motorId ?? "NONE"}`;
   }
+  if (params.kind === "PROPELLANT_MOTOR") {
+    return `PROPELLANT:${params.motorId ?? "NONE"}`;
+  }
   if (params.kind === "PROPELLANT_PROCESS") {
     return `PROPELLANT:${params.motorId ?? "NONE"}:${params.subType ?? "NONE"}`;
   }
@@ -108,10 +110,16 @@ export const buildMotorDivisionGroupKey = (
   subType: QcApiSubType,
   options?: { division?: QcApiDivision; inhibitorType?: string | null },
 ): string => {
+  const division = String(options?.division ?? "").trim().toUpperCase();
+  const isPostCure = division === "POST_CURE" || division === "POST_CURE_OPERATION";
+  const isPropellant = division === "PROPELLANT_PROPERTIES" || division === "QC";
+  if (isPropellant) {
+    return motorId;
+  }
   if (
-    options?.division === QC_POST_CURE_API_DIVISION &&
+    isPostCure &&
     subType === QC_POST_CURE_SUB_TYPE_INHIBITION &&
-    options.inhibitorType
+    options?.inhibitorType
   ) {
     return `${motorId}:${subType}:${options.inhibitorType}`;
   }
@@ -248,6 +256,10 @@ export const buildDivisionEntryLabel = (params: {
     return getQcHardwareProcessLabel(String(params.subType));
   }
 
+  if (params.kind === "PROPELLANT_MOTOR" && params.motorId) {
+    return params.motorId;
+  }
+
   if (params.kind === "PROPELLANT_PROCESS" && params.subType) {
     return getQcPropellantProcessLabel(String(params.subType));
   }
@@ -273,6 +285,10 @@ export const buildDivisionEntryLabel = (params: {
   }
 
   if (params.kind === "NDT_MOTOR" && params.motorId) {
+    return params.motorId;
+  }
+
+  if (params.kind === "WEIGHTMENT_MOTOR" && params.motorId) {
     return params.motorId;
   }
 
@@ -304,8 +320,8 @@ export const resolveDivisionEntryKind = (
   if (flowKey === "DE_CORING") return "DE_CORING_MOTOR";
   if (flowKey === "POST_CURE") return "POST_CURE_MOTOR";
   if (flowKey === "NDT") return "NDT_MOTOR";
-  if (flowKey === "QC") return "PROPELLANT_PROCESS";
-  if (flowKey === "WEIGHTMENT") return "WEIGHTMENT_MOTOR";
+  if (flowKey === "QC") return "PROPELLANT_MOTOR";
+  if (flowKey === "WEIGHTMENT" || flowKey === "WEIGHMENT") return "WEIGHTMENT_MOTOR";
   if (flowKey === "STATIC_TEST_FACILITY") return "STF";
   if (flowKey === "RAW_MATERIAL") {
     if (isRawMaterialRevalidationType(rawMaterialType)) return "REVALIDATION";
@@ -321,11 +337,17 @@ export const getSchemaForDivisionEntry = (
   form: QualityControlFormState,
   entry: QcDivisionEntry,
 ): SchemaDocumentV2 | null => {
-  // Casting / Curing / De-coring use custom panels — never bind a schema document.
+  // Casting / Curing / De-coring / Trimming / Post Cure / NDT / QC use custom panels — never bind a schema document.
   if (
     entry.kind === "CASTING_MOTOR" ||
     entry.kind === "CURING_MOTOR" ||
-    entry.kind === "DE_CORING_MOTOR"
+    entry.kind === "DE_CORING_MOTOR" ||
+    entry.kind === "TRIMMING_MOTOR" ||
+    entry.kind === "POST_CURE_MOTOR" ||
+    entry.kind === "NDT_MOTOR" ||
+    entry.kind === "PROPELLANT_MOTOR" ||
+    entry.kind === "PROPELLANT_PROCESS" ||
+    entry.kind === "WEIGHTMENT_MOTOR"
   ) {
     return null;
   }

@@ -18,6 +18,7 @@ export type QcDivisionEntryKind =
   | "DE_CORING_MOTOR"
   | "POST_CURE_MOTOR"
   | "NDT_MOTOR"
+  | "PROPELLANT_MOTOR"
   | "PROPELLANT_PROCESS"
   | "WEIGHTMENT_MOTOR";
 

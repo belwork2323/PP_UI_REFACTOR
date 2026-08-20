@@ -4,6 +4,7 @@ import {
   QC_PROCESSING_TYPE_OPTIONS,
 } from "../../../../../hooks/user/qualityControl/qcFlowConfig";
 import {
+  canLoadDivisionSchema,
   getQcDivisionPanelType,
   isCastingDivisionFlow,
   isCuringDivisionFlow,
@@ -14,7 +15,7 @@ import {
   isPostCureDivisionFlow,
   isPropellantDivisionFlow,
   isTrimmingDivisionFlow,
-  isWeightmentDivisionFlow,
+  isWeighmentDivisionFlow,
   STF_MOTOR_TYPE_SELECT_OPTIONS,
 } from "../../../../../hooks/user/qualityControl/qcDivisionRegistry";
 import {
@@ -36,21 +37,14 @@ import {
 } from "../../../../../hooks/user/qualityControl/qcProcessingConfig";
 import { resolveQcTrimmingMotorCountOptions } from "../../../../../hooks/user/qualityControl/qcTrimmingConfig";
 import {
-  QC_INHIBITOR_TYPE_OPTIONS,
-  QC_POST_CURE_OPERATION_OPTIONS,
-  isQcPostCureInhibitionOperation,
-  resolveQcPostCureSchemaSelection,
-} from "../../../../../hooks/user/qualityControl/qcPostCureConfig";
-import {
   QC_PROPELLANT_PROCESS_OPTIONS,
   mapQcPropellantProcessToApi,
 } from "../../../../../hooks/user/qualityControl/qcPropellantConfig";
 import { STF_FLOW_LABELS } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
 import { STRINGS } from "../../../../../app/config/strings";
-import { Box } from "@mui/material";
+import { Box, Button, CircularProgress } from "@mui/material";
 import CasePrepMultiSelect from "../../manufacturing/CasePreparation/CasePrepMultiSelect";
 import CasePrepDateField from "../../manufacturing/CasePreparation/CasePrepDateField";
-import CasePrepTextField from "../../manufacturing/CasePreparation/CasePrepTextField";
 import { buildDivisionEntryDedupKey } from "../../../../../hooks/user/qualityControl/qcDivisionEntries";
 import type { QcApiSubType } from "../../../../../schema-engine/adapters/qc.adapter";
 
@@ -71,8 +65,6 @@ type QCFlowBarProps = {
   selectedPostCureOperation: string;
   selectedInhibitorType: string;
   selectedPropellantProcess: string;
-  weightmentWeighscaleNo: string;
-  weightmentCalibrationDueDate: string;
   addedPremixNumbers: number[];
   addedDivisionEntryKeys: string[];
   hasDivisionEntries: boolean;
@@ -90,8 +82,7 @@ type QCFlowBarProps = {
   onPostCureOperationChange: (value: string) => void;
   onInhibitorTypeChange: (value: string) => void;
   onPropellantProcessChange: (value: string) => void;
-  onWeightmentWeighscaleNoChange: (value: string) => void;
-  onWeightmentCalibrationDueDateChange: (value: string) => void;
+  onLoadForm: () => void;
   theme: any;
 };
 
@@ -110,8 +101,6 @@ const QCFlowBar = ({
   selectedPostCureOperation,
   selectedInhibitorType,
   selectedPropellantProcess,
-  weightmentWeighscaleNo,
-  weightmentCalibrationDueDate,
   addedPremixNumbers,
   addedDivisionEntryKeys,
   hasDivisionEntries,
@@ -128,8 +117,7 @@ const QCFlowBar = ({
   onPostCureOperationChange,
   onInhibitorTypeChange,
   onPropellantProcessChange,
-  onWeightmentWeighscaleNoChange,
-  onWeightmentCalibrationDueDateChange,
+  onLoadForm,
   theme,
 }: QCFlowBarProps) => {
   const flowBar = theme.manufacturing?.casePreparation?.flowBar ?? {};
@@ -153,14 +141,18 @@ const QCFlowBar = ({
   const isPostCureFlow = isPostCureDivisionFlow(selectedDivision);
   const isNdtFlow = isNdtDivisionFlow(selectedDivision);
   const isPropellantFlow = isPropellantDivisionFlow(selectedDivision);
-  const isWeightmentFlow = isWeightmentDivisionFlow(selectedDivision);
+  const isWeightmentFlow = isWeighmentDivisionFlow(selectedDivision);
   const autoSeededPartialFlow =
     hideRawMaterialProcessingPickers ||
     (partialNavActive &&
       (isCastingFlow ||
         isCuringFlow ||
         isDeCoringFlow ||
+        isTrimmingFlow ||
+        isPostCureFlow ||
         isNdtFlow ||
+        isPropellantFlow ||
+        isWeightmentFlow ||
         isMixingFlow ||
         isHardwareFlow ||
         isRawMaterialPremixFlow));
@@ -169,23 +161,16 @@ const QCFlowBar = ({
     isMixingFlow && isQcMixingStage(selectedMixingStage) && !autoSeededPartialFlow;
   const showPremixSelect = isRawMaterialPremixFlow && !autoSeededPartialFlow;
   const showStfMotorType = panelType === "STF";
-  const showMotorIdSelect =
-    !autoSeededPartialFlow &&
-    (isNdtFlow || isPropellantFlow || isWeightmentFlow || isTrimmingFlow);
-  const showPropellantProcess = isPropellantFlow && Boolean(selectedMotorId);
-  const showWeightmentWeighscale = isWeightmentFlow && Boolean(selectedMotorId);
-  const showWeightmentCalibrationDate = isWeightmentFlow && Boolean(selectedMotorId);
+  const showMotorIdSelect = false;
+  const showPropellantProcess = false;
   const showHardwareProcesses = false;
-  const showPostCureOperation = isPostCureFlow;
-  const showInhibitorType =
-    isPostCureFlow && isQcPostCureInhibitionOperation(selectedPostCureOperation);
-  const showPostCureMotorId =
-    isPostCureFlow &&
-    Boolean(selectedPostCureOperation) &&
-    (!showInhibitorType || Boolean(selectedInhibitorType));
-  const showTrimmingMotorCount = isTrimmingFlow;
-  const showTrimmingMotorId = isTrimmingFlow && selectedTrimmingMotorCount !== "";
-  const showTrimmingReceivedDate = isTrimmingFlow && Boolean(selectedMotorId);
+  // Post Cure is Motor-Nav seeded from manufacturing operationType — no FlowBar pickers.
+  const showPostCureOperation = false;
+  const showInhibitorType = false;
+  const showPostCureMotorId = false;
+  const showTrimmingMotorCount = false;
+  const showTrimmingMotorId = false;
+  const showTrimmingReceivedDate = false;
   const trimmingMotorCountOptions = resolveQcTrimmingMotorCountOptions(batch);
   const mixingStage = isQcMixingStage(selectedMixingStage) ? selectedMixingStage : null;
   const propellantProcessOptions = QC_PROPELLANT_PROCESS_OPTIONS.map((option) => ({
@@ -244,24 +229,7 @@ const QCFlowBar = ({
         }),
       )) ||
     (isPostCureFlow &&
-      (() => {
-        const selection = resolveQcPostCureSchemaSelection(
-          selectedPostCureOperation,
-          selectedInhibitorType,
-        );
-        return (
-          Boolean(selection) &&
-          addedDivisionEntryKeys.includes(
-            buildDivisionEntryDedupKey({
-              flowKey: selectedDivision,
-              kind: "POST_CURE_MOTOR",
-              motorId,
-              subType: selection.subType,
-              inhibitorType: selection.inhibitorType,
-            }),
-          )
-        );
-      })());
+      addedDivisionEntryKeys.some((key) => key.startsWith(`POST_CURE:${motorId}:`)));
 
   const motorIdOptions = resolveQcMotorIdOptions(batch).map((option) => ({
     ...option,
@@ -288,6 +256,47 @@ const QCFlowBar = ({
     (number) => !addedPremixNumbers.includes(number),
   );
 
+  const flowState = {
+    rawMaterialType: selectedRawMaterialType,
+    processingType: selectedProcessingType,
+    selectedPremix,
+    mixingStage: selectedMixingStage as QcMixingStage | "",
+    addedPremixNumbers,
+    stfMotorType: selectedStfMotorType,
+    selectedMotorId,
+    selectedHardwareProcesses,
+    selectedTrimmingMotorCount,
+    trimmingMotorReceivedDate,
+    selectedPostCureOperation,
+    selectedInhibitorType,
+    selectedPropellantProcess,
+    addedDivisionEntryKeys,
+  };
+
+  const canLoad = canLoadDivisionSchema(selectedDivision, flowState);
+
+  const isPremixAction = isRawMaterialPremixFlow || isMixingFlow;
+
+  const showLoadAction =
+    !autoSeededPartialFlow &&
+    Boolean(selectedDivision) &&
+    !(hasDivisionEntries && !isPremixAction) &&
+    (panelType === "SIMPLE" ||
+      panelType === "STF" ||
+      isMixingFlow ||
+      (showRawMaterialType &&
+        selectedRawMaterialType &&
+        (!showProcessingType || selectedProcessingType)));
+
+  const numberAlreadyAdded =
+    selectedPremix !== "" && addedPremixNumbers.includes(Number(selectedPremix));
+  const loadDisabled = !canLoad || schemaLoading || (isPremixAction && numberAlreadyAdded);
+  const loadLabel = schemaLoading
+    ? L.loadingSchema
+    : isPremixAction
+      ? S.ADD_PREMIX_LABEL
+      : L.loadForm;
+
   const hasVisiblePickers =
     showProcessingType ||
     showPremixSelect ||
@@ -300,13 +309,11 @@ const QCFlowBar = ({
     showPostCureOperation ||
     showPostCureMotorId ||
     (showMotorIdSelect && !isTrimmingFlow) ||
-    showWeightmentWeighscale ||
-    showWeightmentCalibrationDate ||
     showPropellantProcess ||
     showHardwareProcesses ||
-    showInhibitorType;
+    showInhibitorType ||
+    showLoadAction;
 
-  // Load Form removed — tab / picker selection auto-loads the form in the hook.
   if (!hasVisiblePickers) return null;
 
   return (
@@ -426,88 +433,15 @@ const QCFlowBar = ({
             />
           ) : null}
 
-          {showPostCureOperation ? (
-            <CasePrepSelect
-              label={S.POST_CURE_OPERATION_LABEL}
-              value={selectedPostCureOperation}
-              placeholder={S.POST_CURE_OPERATION_PLACEHOLDER}
-              options={QC_POST_CURE_OPERATION_OPTIONS}
-              width={260}
-              theme={theme}
-              onChange={onPostCureOperationChange}
-            />
-          ) : null}
-
-          {showInhibitorType ? (
-            <CasePrepSelect
-              label={S.INHIBITOR_TYPE_LABEL}
-              value={selectedInhibitorType}
-              placeholder={S.INHIBITOR_TYPE_PLACEHOLDER}
-              options={QC_INHIBITOR_TYPE_OPTIONS}
-              width={260}
-              theme={theme}
-              onChange={onInhibitorTypeChange}
-            />
-          ) : null}
-
-          {showPostCureMotorId ? (
-            <CasePrepSelect
-              label={S.CASTING_MOTOR_ID_LABEL}
-              value={selectedMotorId}
-              placeholder={S.CASTING_MOTOR_ID_PLACEHOLDER}
-              options={motorIdOptions}
-              width={260}
-              theme={theme}
-              onChange={onMotorIdChange}
-            />
-          ) : null}
-
           {showMotorIdSelect && !isTrimmingFlow ? (
             <CasePrepSelect
-              label={
-                isNdtFlow
-                  ? S.NDT_MOTOR_ID_LABEL
-                  : isWeightmentFlow
-                    ? S.HARDWARE_MOTOR_ID_LABEL
-                    : isPropellantFlow
-                      ? S.HARDWARE_MOTOR_ID_LABEL
-                      : S.HARDWARE_MOTOR_ID_LABEL
-              }
+              label={isNdtFlow ? S.NDT_MOTOR_ID_LABEL : S.HARDWARE_MOTOR_ID_LABEL}
               value={selectedMotorId}
-              placeholder={
-                isNdtFlow
-                  ? S.NDT_MOTOR_ID_PLACEHOLDER
-                  : isWeightmentFlow
-                    ? S.HARDWARE_MOTOR_ID_PLACEHOLDER
-                    : isPropellantFlow
-                      ? S.HARDWARE_MOTOR_ID_PLACEHOLDER
-                      : S.HARDWARE_MOTOR_ID_PLACEHOLDER
-              }
+              placeholder={isNdtFlow ? S.NDT_MOTOR_ID_PLACEHOLDER : S.HARDWARE_MOTOR_ID_PLACEHOLDER}
               options={motorIdOptions}
               width={260}
               theme={theme}
               onChange={onMotorIdChange}
-            />
-          ) : null}
-
-          {showWeightmentWeighscale ? (
-            <CasePrepTextField
-              label={S.WEIGHTMENT_WEIGHSCALE_NO_LABEL}
-              value={weightmentWeighscaleNo}
-              placeholder={S.WEIGHTMENT_WEIGHSCALE_NO_PLACEHOLDER}
-              width={260}
-              theme={theme}
-              onChange={onWeightmentWeighscaleNoChange}
-            />
-          ) : null}
-
-          {showWeightmentCalibrationDate ? (
-            <CasePrepDateField
-              label={S.WEIGHTMENT_CALIBRATION_DUE_DATE_LABEL}
-              value={weightmentCalibrationDueDate}
-              placeholder={S.WEIGHTMENT_CALIBRATION_DUE_DATE_PLACEHOLDER}
-              theme={theme}
-              onChange={onWeightmentCalibrationDueDateChange}
             />
           ) : null}
 
@@ -535,6 +469,20 @@ const QCFlowBar = ({
             />
           ) : null}
         </Box>
+
+        {showLoadAction ? (
+          <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
+            <Button
+              variant="contained"
+              size="small"
+              disabled={loadDisabled}
+              onClick={onLoadForm}
+              startIcon={schemaLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
+            >
+              {schemaLoading ? L.loadingSchema : loadLabel}
+            </Button>
+          </Box>
+        ) : null}
       </Box>
     </Box>
   );

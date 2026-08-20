@@ -67,7 +67,6 @@ const NDTPage = () => {
     handleDiscardAndBack,
     handleSaveMotorDraft,
     handleSubmitMotor,
-    handleSubmitForFinalApproval,
     handleBackFromDetails,
     detailsRow,
     detailsData,
@@ -150,7 +149,6 @@ const NDTPage = () => {
               setPendingMotorId(motorId);
               setMotorSubmitConfirmOpen(true);
             }}
-            onSubmitForFinalApproval={handleSubmitForFinalApproval}
           />
         </>
       )}
@@ -171,7 +169,9 @@ const NDTPage = () => {
         severity="warning"
         title={strings.MOTOR_DRAFT_CONFIRM_TITLE}
         message={strings.MOTOR_DRAFT_CONFIRM_MESSAGE(pendingMotorId ?? "")}
-        confirmLabel={strings.SAVE_MOTOR_DRAFT}
+        confirmLabel={
+          pendingMotorId ? strings.SAVE_MOTOR_DRAFT(pendingMotorId) : strings.MOTOR_DRAFT_CONFIRM_TITLE
+        }
         cancelLabel={strings.CONFIRM_CANCEL_LABEL}
         onConfirm={async () => {
           const motorId = pendingMotorId;
@@ -190,7 +190,9 @@ const NDTPage = () => {
         severity="warning"
         title={strings.MOTOR_SUBMIT_CONFIRM_TITLE}
         message={strings.MOTOR_SUBMIT_CONFIRM_MESSAGE(pendingMotorId ?? "")}
-        confirmLabel={strings.SUBMIT_MOTOR}
+        confirmLabel={
+          pendingMotorId ? strings.SUBMIT_MOTOR(pendingMotorId) : strings.MOTOR_SUBMIT_CONFIRM_TITLE
+        }
         cancelLabel={strings.CONFIRM_CANCEL_LABEL}
         onConfirm={async () => {
           const motorId = pendingMotorId;

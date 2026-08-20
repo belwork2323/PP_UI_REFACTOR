@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { STRINGS } from "../../../app/config/strings";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
@@ -36,6 +36,8 @@ import {
   resolvePreviousStageApprovedUnits,
   type PreviousStageApprovedUnits,
 } from "../previousStageApproval";
+import { useFileService } from "../../../hooks/useFileService";
+import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -54,6 +56,7 @@ export const useMixingHook = () => {
   const user = useAuthStore((s) => s.user);
   const showAlert = useAlertStore((state) => state.showAlert);
   const bumpBatchRefresh = useUserBatchRefreshStore((state) => state.bumpVersion);
+  const { deleteTemp } = useFileService();
 
   const subDepartmentId = useMemo(
     () => user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "mixing")?.subDepartmentId,
@@ -99,6 +102,11 @@ export const useMixingHook = () => {
     () => view === "form" && formSnapshot !== initialSnapshot,
     [view, formSnapshot, initialSnapshot],
   );
+
+  const snapshotStateRef = useRef(formData);
+  snapshotStateRef.current = formData;
+  const initialSnapshotRef = useRef(initialSnapshot);
+  initialSnapshotRef.current = initialSnapshot;
 
   const resetFormContext = useCallback(() => {
     const defaults = createDefaultMixingFormState();
@@ -385,10 +393,19 @@ export const useMixingHook = () => {
     resetFormContext();
   }, [isFormDirty, resetFormContext, bumpBatchRefresh]);
 
-  const handleDiscardAndBack = useCallback(() => {
-    bumpBatchRefresh();
-    resetFormContext();
-  }, [resetFormContext, bumpBatchRefresh]);
+  const handleDiscardAndBack = useCallback(async () => {
+    setBackConfirmOpen(false);
+    await discardWorkflowSnapshotForm({
+      subDepartmentId,
+      initialSnapshot: initialSnapshotRef.current,
+      currentState: snapshotStateRef.current,
+      deleteTemp,
+      resetForm: () => {
+        bumpBatchRefresh();
+        resetFormContext();
+      },
+    });
+  }, [bumpBatchRefresh, deleteTemp, resetFormContext, subDepartmentId]);
 
   const handleFormChange = useCallback((payload) => {
     setFormData((prev) => {

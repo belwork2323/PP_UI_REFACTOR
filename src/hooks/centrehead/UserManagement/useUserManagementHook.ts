@@ -11,6 +11,7 @@ import {
   resolveUserUuid,
 } from "@data/models/centrehead/UserManagement/UserManagementModel";
 import { getDateRange } from "@/utils/dateUtils";
+import { DEFAULT_DATE_FILTER_TYPE } from "@/ui/components/custom/dashboard/DashboardDateFilter";
 
 const S = STRINGS.USER_MANAGEMENT;
 
@@ -179,7 +180,7 @@ function useUserStatsSection() {
     pendingResetRequests: 0,
   });
   const [statsLoading, setStatsLoading] = useState(true);
-  const [filterType, setFilterTypeState] = useState("month");
+  const [filterType, setFilterTypeState] = useState(DEFAULT_DATE_FILTER_TYPE);
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
   const [appliedCustomStart, setAppliedCustomStart] = useState("");
@@ -247,7 +248,7 @@ function useUserStatsSection() {
   }, [customStartDate, customEndDate]);
 
   const clearDateFilter = useCallback(() => {
-    setFilterTypeState("month");
+    setFilterTypeState(DEFAULT_DATE_FILTER_TYPE);
     setCustomStartDate("");
     setCustomEndDate("");
     setAppliedCustomStart("");

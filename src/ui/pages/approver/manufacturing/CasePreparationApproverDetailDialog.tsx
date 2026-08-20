@@ -32,8 +32,6 @@ type CasePreparationApproverDetailDialogProps = {
   onActiveMotorChange?: (motorId: string) => void;
   onApprove: (item: CasePreparationApproverDetailItem) => void;
   onReject: (item: CasePreparationApproverDetailItem) => void;
-  onApproveForm?: (item: CasePreparationApproverDetailItem) => void;
-  onRejectForm?: (item: CasePreparationApproverDetailItem) => void;
   actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
@@ -47,8 +45,6 @@ const CasePreparationApproverDetailDialog = ({
   onActiveMotorChange,
   onApprove,
   onReject,
-  onApproveForm,
-  onRejectForm,
   actionLoading = false,
   theme,
 }: CasePreparationApproverDetailDialogProps) => {
@@ -100,8 +96,6 @@ const CasePreparationApproverDetailDialog = ({
             onActiveMotorChange={onActiveMotorChange ?? (() => undefined)}
             onApprove={() => onApprove(item)}
             onReject={() => onReject(item)}
-            onApproveForm={onApproveForm ? () => onApproveForm(item) : undefined}
-            onRejectForm={onRejectForm ? () => onRejectForm(item) : undefined}
             actionLoading={actionLoading}
             manufacturingTheme={manufacturingTheme}
             approverTheme={theme}

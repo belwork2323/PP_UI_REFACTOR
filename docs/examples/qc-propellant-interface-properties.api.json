@@ -46,9 +46,7 @@
               "presetRows": [
                 { "readonly": true, "SAMPLE_NO": 1, "PROPERTY": "Peel Strength (kgf/cm)" },
                 { "readonly": true, "SAMPLE_NO": 2, "PROPERTY": "SBS (kgf/cm²)" },
-                { "readonly": true, "SAMPLE_NO": 3, "PROPERTY": "TBS (kgf/cm²)" },
-                { "readonly": true, "PROPERTY": "Avg." },
-                { "readonly": true, "PROPERTY": "Std." }
+                { "readonly": true, "SAMPLE_NO": 3, "PROPERTY": "TBS (kgf/cm²)" }
               ]
             },
             "columns": [
@@ -58,7 +56,10 @@
               { "type": "column", "id": "FM_1", "fieldType": "number", "label": "FM-1" },
               { "type": "column", "id": "FM_2", "fieldType": "number", "label": "FM-2" },
               { "type": "column", "id": "FM_3", "fieldType": "number", "label": "FM-3" },
-              { "type": "column", "id": "REMARKS", "fieldType": "textarea", "label": "Remarks" }
+              { "type": "column", "id": "AVG", "fieldType": "number", "label": "Avg" },
+              { "type": "column", "id": "STD_DEV", "fieldType": "number", "label": "Std Dev" },
+              { "type": "column", "id": "REMARKS", "fieldType": "textarea", "label": "Remarks" },
+              { "type": "column", "id": "UPLOAD_GRAPH", "fieldType": "file", "label": "Upload" }
             ]
           }
         ]

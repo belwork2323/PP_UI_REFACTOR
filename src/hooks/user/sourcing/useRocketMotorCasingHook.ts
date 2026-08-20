@@ -1,4 +1,4 @@
-import { startTransition, useCallback, useEffect, useMemo, useState } from "react";
+import { startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshStore";
@@ -31,6 +31,8 @@ import {
 import { useRocketMotorCasingList } from "./useRocketMotorCasingList";
 import useRocketMotorCasingLookups from "./useRocketMotorCasingLookups";
 import { OPERATION_STATUS } from "../../operationStatus";
+import { useFileService } from "../../../hooks/useFileService";
+import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
 
 type WorkflowView = "list" | "form" | "details";
 type FormEntryMode = "create" | "fill" | "edit";
@@ -78,6 +80,7 @@ export const useRocketMotorCasingHook = () => {
   const showAlert = useAlertStore.getState().showAlert;
   const user = useAuthStore((s) => s.user);
   const bumpBatchRefresh = useUserBatchRefreshStore((s) => s.bumpVersion);
+  const { deleteTemp } = useFileService();
   const { fetchDimensionalParameters, isLoading: isDimensionalParamsLoading } =
     useDimensionalParametersHook();
 
@@ -91,6 +94,11 @@ export const useRocketMotorCasingHook = () => {
     () => serializeCasingForm(casingForm) !== initialSnapshot,
     [casingForm, initialSnapshot],
   );
+
+  const snapshotStateRef = useRef(casingForm);
+  snapshotStateRef.current = casingForm;
+  const initialSnapshotRef = useRef(initialSnapshot);
+  initialSnapshotRef.current = initialSnapshot;
 
   const resolvedMotorStage =
     String(casingForm.motorStageApi ?? "").trim() || activeBatch?.motorType || "";
@@ -465,11 +473,19 @@ export const useRocketMotorCasingHook = () => {
     resetFormContext();
   };
 
-  const handleDiscardAndBack = () => {
+  const handleDiscardAndBack = useCallback(async () => {
     setBackConfirmOpen(false);
-    bumpBatchRefresh();
-    resetFormContext();
-  };
+    await discardWorkflowSnapshotForm({
+      subDepartmentId,
+      initialSnapshot: initialSnapshotRef.current,
+      currentState: snapshotStateRef.current,
+      deleteTemp,
+      resetForm: () => {
+        bumpBatchRefresh();
+        resetFormContext();
+      },
+    });
+  }, [bumpBatchRefresh, deleteTemp, resetFormContext, subDepartmentId]);
 
   const submitCasingForm = async (intent: "draft" | "submit") => {
     if (!activeBatch) return false;

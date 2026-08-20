@@ -54,6 +54,7 @@ import MixingCardNavigation from "./MixingCardNavigation";
 import MixingQualityChecksTable from "./MixingQualityChecksTable";
 import { MixingSelectField, MixingTableInput, MixingTextField } from "./MixingFormFields";
 import PremixStatusChip from "../RawMaterial/components/PremixStatusChip";
+import ViewStatusButton from "../../../../components/common/ViewStatusButton";
 import FinalApprovalMixCardDialog, {
   areAllMixCardsApproved,
   buildFinalApprovalMixCardRows,
@@ -633,10 +634,8 @@ type MixingFormProps = {
   isMixCardEditable?: (mixCardId: string) => boolean;
   previousStageGate?: PreviousStageApprovedUnits | null;
   actionLoading?: boolean;
-  canSubmitForFinalApproval?: boolean;
   onSaveMixCardDraft?: (stageType: MixCardStageType, cardNo: string) => void;
   onSubmitMixCard?: (stageType: MixCardStageType, cardNo: string) => void;
-  onSubmitForFinalApproval?: () => void;
 };
 
 const MixingForm = ({
@@ -650,10 +649,8 @@ const MixingForm = ({
   isMixCardEditable: checkMixCardEditable,
   previousStageGate = null,
   actionLoading = false,
-  canSubmitForFinalApproval = false,
   onSaveMixCardDraft,
   onSubmitMixCard,
-  onSubmitForFinalApproval,
 }: MixingFormProps) => {
   const {
     premixCards,
@@ -807,9 +804,9 @@ const MixingForm = ({
 
   const activeNavItem = combinedNavItems[activeCardIndex] ?? null;
   const activePremix =
-    activeNavItem?.kind === "PREMIX" ? premixCards[activeNavItem.cardIndex] ?? null : null;
+    activeNavItem?.kind === "PREMIX" ? (premixCards[activeNavItem.cardIndex] ?? null) : null;
   const activeFinalMix =
-    activeNavItem?.kind === "FINAL_MIX" ? finalMixCards[activeNavItem.cardIndex] ?? null : null;
+    activeNavItem?.kind === "FINAL_MIX" ? (finalMixCards[activeNavItem.cardIndex] ?? null) : null;
 
   const resolveStatus = useCallback(
     (stageType: MixCardStageType, cardNo: string) => {
@@ -879,8 +876,8 @@ const MixingForm = ({
 
   const activeMixCardStatus =
     (activeMixCardId
-      ? getMixCardStatus?.(activeMixCardId) ??
-        mixCardStatusById[activeMixCardId]?.mixCardSubmissionStatus
+      ? (getMixCardStatus?.(activeMixCardId) ??
+        mixCardStatusById[activeMixCardId]?.mixCardSubmissionStatus)
       : undefined) ?? "TO_BE_INITIATED";
   const activeUnitEnabled = activePremix
     ? isMixCardWorkflowEnabled("PREMIX", activePremix.premixNo)
@@ -918,22 +915,11 @@ const MixingForm = ({
           ),
         };
       }),
-    [
-      activeNavItem,
-      combinedNavItems,
-      finalMixCards,
-      premixCards,
-      resolveStatus,
-      statusConfig,
-    ],
+    [activeNavItem, combinedNavItems, finalMixCards, premixCards, resolveStatus, statusConfig],
   );
 
   const finalApprovalRows = useMemo(
-    () =>
-      buildFinalApprovalMixCardRows(
-        { premixCards, finalMixCards },
-        mixCardStatusById,
-      ),
+    () => buildFinalApprovalMixCardRows({ premixCards, finalMixCards }, mixCardStatusById),
     [finalMixCards, mixCardStatusById, premixCards],
   );
   const allMixCardsApproved = areAllMixCardsApproved(finalApprovalRows);
@@ -1027,16 +1013,55 @@ const MixingForm = ({
           }}
         >
           <Stack spacing={1.25}>
-            <Stack direction="row" justifyContent="flex-end">
-              <Button
-                variant="contained"
-                size="small"
-                disabled={actionLoading || !canSubmitForFinalApproval}
+            <Stack direction="row" justifyContent="flex-end" spacing={1}>
+              {activePremix ? (
+                <>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    disabled={actionLoading || activeMixCardLocked}
+                    onClick={() => onSaveMixCardDraft?.("PREMIX", activePremix.premixNo)}
+                    sx={{ textTransform: "none", fontWeight: 700 }}
+                  >
+                    {S.SAVE_PREMIX_DRAFT(activePremix.premixNo)}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    disabled={actionLoading || activeMixCardLocked}
+                    onClick={() => onSubmitMixCard?.("PREMIX", activePremix.premixNo)}
+                    sx={{ textTransform: "none", fontWeight: 700 }}
+                  >
+                    {S.SUBMIT_PREMIX(activePremix.premixNo)}
+                  </Button>
+                </>
+              ) : activeFinalMix ? (
+                <>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    disabled={actionLoading || activeMixCardLocked}
+                    onClick={() => onSaveMixCardDraft?.("FINAL_MIX", activeFinalMix.mixNo)}
+                    sx={{ textTransform: "none", fontWeight: 700 }}
+                  >
+                    {S.SAVE_FINAL_MIX_DRAFT(activeFinalMix.mixNo)}
+                  </Button>
+                  <Button
+                    variant="contained"
+                    size="small"
+                    disabled={actionLoading || activeMixCardLocked}
+                    onClick={() => onSubmitMixCard?.("FINAL_MIX", activeFinalMix.mixNo)}
+                    sx={{ textTransform: "none", fontWeight: 700 }}
+                  >
+                    {S.SUBMIT_FINAL_MIX(activeFinalMix.mixNo)}
+                  </Button>
+                </>
+              ) : null}
+              <ViewStatusButton
+                disabled={actionLoading}
                 onClick={() => setFinalApprovalOpen(true)}
-                sx={{ textTransform: "none", fontWeight: 700 }}
-              >
-                {S.SUBMIT_FOR_FINAL_APPROVAL}
-              </Button>
+                label={S.VIEW_STATUS}
+              />
             </Stack>
 
             {activePremix ? (
@@ -1060,26 +1085,6 @@ const MixingForm = ({
                         ? S.MIX_CARD_LOCKED_APPROVED
                         : S.MIX_CARD_LOCKED_WAITING
                       : null
-                }
-                headerActions={
-                  <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      disabled={actionLoading || activeMixCardLocked}
-                      onClick={() => onSaveMixCardDraft?.("PREMIX", activePremix.premixNo)}
-                    >
-                      {S.SAVE_PREMIX_DRAFT}
-                    </Button>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      disabled={actionLoading || activeMixCardLocked}
-                      onClick={() => onSubmitMixCard?.("PREMIX", activePremix.premixNo)}
-                    >
-                      {S.SUBMIT_PREMIX}
-                    </Button>
-                  </Stack>
                 }
                 onRemove={handleRemovePremix}
                 onPremixFieldChange={updatePremixField}
@@ -1108,26 +1113,6 @@ const MixingForm = ({
                         : S.MIX_CARD_LOCKED_WAITING
                       : null
                 }
-                headerActions={
-                  <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      disabled={actionLoading || activeMixCardLocked}
-                      onClick={() => onSaveMixCardDraft?.("FINAL_MIX", activeFinalMix.mixNo)}
-                    >
-                      {S.SAVE_FINAL_MIX_DRAFT}
-                    </Button>
-                    <Button
-                      variant="contained"
-                      size="small"
-                      disabled={actionLoading || activeMixCardLocked}
-                      onClick={() => onSubmitMixCard?.("FINAL_MIX", activeFinalMix.mixNo)}
-                    >
-                      {S.SUBMIT_FINAL_MIX}
-                    </Button>
-                  </Stack>
-                }
                 onRemove={handleRemoveFinalMix}
                 onFieldChange={updateFinalMixField}
                 onQualityChange={updateFinalMixQualityCheck}
@@ -1143,12 +1128,8 @@ const MixingForm = ({
         rows={finalApprovalRows}
         statusConfig={statusConfig}
         allMixCardsApproved={allMixCardsApproved}
-        confirmDisabled={actionLoading}
+        hideConfirm
         onClose={() => setFinalApprovalOpen(false)}
-        onProceed={async () => {
-          setFinalApprovalOpen(false);
-          await onSubmitForFinalApproval?.();
-        }}
       />
     </Box>
   );

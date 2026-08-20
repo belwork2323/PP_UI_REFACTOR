@@ -251,7 +251,7 @@ export const getDivisionNavSubHint = (group: QcDivisionNavGroup | null | undefin
     return S.PROPELLANT_MOTOR_NAV_HINT;
   }
   if (group.kind === "motor-based" && group.flowKey === "WEIGHTMENT") {
-    return S.WEIGHTMENT_MOTOR_NAV_HINT;
+    return S.WEIGHMENT_MOTOR_NAV_HINT;
   }
   if (group.kind === "mixing") {
     const tab = group.tabs[0];

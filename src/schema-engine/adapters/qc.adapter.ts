@@ -19,7 +19,6 @@ export const TRIMMING_SCHEMA_FUNCTIONALITY = "CREATE_TRIMMING_FORM";
 export const POST_CURE_SCHEMA_FUNCTIONALITY = "CREATE_POST_CURE_FORM";
 export const NDT_SCHEMA_FUNCTIONALITY = "CREATE_NDT_FORM";
 export const PROPELLANT_SCHEMA_FUNCTIONALITY = "CREATE_QC_PROPELLANT_FORM";
-export const WEIGHTMENT_SCHEMA_FUNCTIONALITY = "CREATE_WEIGHTMENT_FORM";
 
 export type QcInhibitorType = "IR1" | "HEMCOAT-3K" | "NOT_APPLICABLE";
 
@@ -134,13 +133,6 @@ export const resolveQcSchemaMeta = (
     };
   }
 
-  if (division === "WEIGHTMENT") {
-    return {
-      schemaType: QC_SCHEMA_TYPE,
-      functionality: WEIGHTMENT_SCHEMA_FUNCTIONALITY,
-    };
-  }
-
   return {
     schemaType: QC_SCHEMA_TYPE,
     functionality: QC_SCHEMA_FUNCTIONALITY,
@@ -192,6 +184,418 @@ export const buildQcSectionPayload = (
   values: SchemaFormValues,
 ): SchemaSectionSubmission[] => toSectionSubmissions(schema, values);
 
+type SchemaNode = Record<string, unknown>;
+
+const asSchemaNodes = (value: unknown): SchemaNode[] =>
+  Array.isArray(value)
+    ? value.filter((item): item is SchemaNode => Boolean(item) && typeof item === "object")
+    : [];
+
+const walkSchemaNodes = (nodes: SchemaNode[], visit: (node: SchemaNode) => void) => {
+  nodes.forEach((node) => {
+    visit(node);
+    walkSchemaNodes(asSchemaNodes(node.children), visit);
+  });
+};
+
+/**
+ * Align QC Loose Flap Filling schema with Post Cure manufacturing layout:
+ * - Bellow Bonding Details title (replaces Bellow Removal)
+ * - Loose Flap Epoxy Details group + Qualification table title
+ * - Batch No and Date of Preparation as separate fields
+ * - Single QC report upload (not per-row)
+ */
+export const normalizeQcLooseFlapFillingSchema = (
+  schema: SchemaDocumentV2,
+): SchemaDocumentV2 => {
+  const sections = asSchemaNodes(schema.data?.sections);
+  if (!sections.length) return schema;
+
+  walkSchemaNodes(sections, (node) => {
+    const id = String(node.id ?? "").trim();
+    const type = String(node.type ?? "").trim();
+
+    if (
+      id === "BELLOW_REMOVAL_GROUP" ||
+      id === "BELLOW_BONDING_GROUP" ||
+      id === "BELLOW_REMOVAL_DETAILS" ||
+      id === "BELLOW_BONDING_DETAILS"
+    ) {
+      if (type === "group" || node.label != null) node.label = "Bellow Bonding Details";
+      if (type === "table" || node.title != null || id.includes("DETAILS")) {
+        node.title = "Bellow Bonding Details";
+      }
+    }
+
+    if (
+      id === "LF_EPOXY_QUALIFICATION_GROUP" ||
+      id === "LF_EPOXY_DETAILS_GROUP"
+    ) {
+      node.label = "Loose Flap Epoxy Details";
+    }
+
+    if (id === "LF_EPOXY_QUALIFICATION" && (type === "table" || Array.isArray(node.columns))) {
+      node.title = "Qualification Details";
+      const columns = asSchemaNodes(node.columns).filter(
+        (column) => String(column.id ?? "").trim() !== "QC_REPORT",
+      );
+      node.columns = columns;
+    }
+
+    if (id === "LF_EPOXY_FILLING_DETAILS" || id === "LF_EPOXY_FILLING_GROUP") {
+      if (type === "group" || node.label != null) node.label = "LF Epoxy Filling Details";
+      if (type === "table" || Array.isArray(node.columns)) {
+        node.title = "LF Epoxy Filling Details";
+      }
+    }
+  });
+
+  walkSchemaNodes(sections, (node) => {
+    if (!Array.isArray(node.children)) return;
+    const children = asSchemaNodes(node.children);
+    const batchIndex = children.findIndex(
+      (child) => String(child.id ?? "").trim() === "LF_EPOXY_BATCH_PREPARATION",
+    );
+
+    let nextChildren = children;
+    if (batchIndex >= 0) {
+      nextChildren = [
+        ...children.slice(0, batchIndex),
+        {
+          type: "group",
+          id: "LF_EPOXY_BATCH_FIELDS",
+          ui: {
+            direction: "row",
+            wrap: true,
+            gap: "md",
+            alignItems: "flex-end",
+          },
+          children: [
+            {
+              type: "field",
+              id: "LF_EPOXY_BATCH_NO",
+              fieldType: "text",
+              label: "Batch No",
+              ui: {
+                colSpan: { xs: 12, sm: 6, md: 4 },
+                maxWidth: "280px",
+              },
+            },
+            {
+              type: "field",
+              id: "LF_EPOXY_PREPARATION_DATE",
+              fieldType: "date",
+              label: "Date of Preparation",
+              ui: {
+                colSpan: { xs: 12, sm: 6, md: 4 },
+                maxWidth: "280px",
+              },
+            },
+          ],
+        },
+        ...children.slice(batchIndex + 1),
+      ];
+    }
+
+    const hasQcReportField = nextChildren.some(
+      (child) => String(child.id ?? "").trim() === "LF_EPOXY_QC_REPORT",
+    );
+    const qualificationIndex = nextChildren.findIndex(
+      (child) => String(child.id ?? "").trim() === "LF_EPOXY_QUALIFICATION",
+    );
+    if (!hasQcReportField && qualificationIndex >= 0) {
+      nextChildren = [
+        ...nextChildren.slice(0, qualificationIndex + 1),
+        {
+          type: "field",
+          id: "LF_EPOXY_QC_REPORT",
+          fieldType: "file",
+          label: "Upload QC Report",
+          ui: { colSpan: { xs: 12, sm: 8, md: 6 } },
+        },
+        ...nextChildren.slice(qualificationIndex + 1),
+      ];
+    }
+
+    node.children = nextChildren;
+  });
+
+  return {
+    ...schema,
+    data: {
+      ...schema.data,
+      sections: sections as SchemaDocumentV2["data"]["sections"],
+    },
+  };
+};
+
+const QC_INHIBITION_NOT_APPLICABLE_SECTION = {
+  id: "INHIBITION_NOT_APPLICABLE",
+  title: "Inhibition Not Applicable",
+  ui: { variant: "card", padding: "md" },
+  children: [
+    {
+      type: "group",
+      id: "DISPATCH_STATION_FIELDS",
+      ui: {
+        direction: "row",
+        wrap: true,
+        gap: "md",
+        alignItems: "flex-end",
+      },
+      children: [
+        {
+          type: "field",
+          id: "DISPATCH_DATE",
+          fieldType: "date",
+          label: "Dispatch Time",
+          ui: {
+            colSpan: { xs: 12, sm: 6, md: 4 },
+            maxWidth: "280px",
+          },
+        },
+        {
+          type: "field",
+          id: "DISPATCH_STATION",
+          fieldType: "text",
+          label: "Station",
+          ui: {
+            colSpan: { xs: 12, sm: 6, md: 4 },
+            maxWidth: "280px",
+          },
+        },
+      ],
+    },
+    {
+      type: "field",
+      id: "REMARKS",
+      fieldType: "textarea",
+      label: "Remarks",
+      ui: { colSpan: { xs: 12 } },
+    },
+  ],
+} as const;
+
+/**
+ * Ensure QC Inhibition NOT_APPLICABLE schema has Dispatch Time (date) + Station fields.
+ * Backend may still return empty sections.
+ */
+export const normalizeQcInhibitionNotApplicableSchema = (
+  schema: SchemaDocumentV2,
+): SchemaDocumentV2 => {
+  const sections = asSchemaNodes(schema.data?.sections);
+  const hasDispatchDate = (() => {
+    let found = false;
+    walkSchemaNodes(sections, (node) => {
+      if (String(node.id ?? "").trim() === "DISPATCH_DATE") found = true;
+    });
+    return found;
+  })();
+  const hasStation = (() => {
+    let found = false;
+    walkSchemaNodes(sections, (node) => {
+      if (String(node.id ?? "").trim() === "DISPATCH_STATION") found = true;
+    });
+    return found;
+  })();
+
+  if (hasDispatchDate && hasStation) {
+    return schema;
+  }
+
+  const targetIndex = sections.findIndex(
+    (section) => String(section.id ?? "").trim() === "INHIBITION_NOT_APPLICABLE",
+  );
+
+  if (targetIndex >= 0) {
+    const target = sections[targetIndex];
+    const children = asSchemaNodes(target.children);
+    const nextChildren = [...children];
+
+    if (!hasDispatchDate || !hasStation) {
+      const groupIndex = nextChildren.findIndex(
+        (child) => String(child.id ?? "").trim() === "DISPATCH_STATION_FIELDS",
+      );
+      if (groupIndex >= 0) {
+        nextChildren[groupIndex] = {
+          ...QC_INHIBITION_NOT_APPLICABLE_SECTION.children[0],
+        } as SchemaNode;
+      } else {
+        nextChildren.unshift({
+          ...QC_INHIBITION_NOT_APPLICABLE_SECTION.children[0],
+        } as SchemaNode);
+      }
+    }
+
+    const hasRemarks = nextChildren.some(
+      (child) => String(child.id ?? "").trim() === "REMARKS",
+    );
+    if (!hasRemarks) {
+      nextChildren.push({
+        ...QC_INHIBITION_NOT_APPLICABLE_SECTION.children[1],
+      } as SchemaNode);
+    }
+
+    sections[targetIndex] = {
+      ...target,
+      title: String(target.title ?? "").trim() || "Inhibition Not Applicable",
+      children: nextChildren,
+    };
+  } else {
+    sections.push({ ...QC_INHIBITION_NOT_APPLICABLE_SECTION } as SchemaNode);
+  }
+
+  return {
+    ...schema,
+    data: {
+      ...schema.data,
+      meta: {
+        ...(schema.data?.meta ?? {}),
+        title: schema.data?.meta?.title || "Inhibition Not Applicable",
+        description:
+          schema.data?.meta?.description ||
+          "Dispatch and station details when inhibition is not applicable",
+      },
+      sections: sections as SchemaDocumentV2["data"]["sections"],
+    },
+  };
+};
+
+const IR1_BATCH_FIELDS_GROUP = {
+  type: "group",
+  id: "IR1_BATCH_FIELDS",
+  ui: {
+    direction: "row",
+    wrap: true,
+    gap: "md",
+    alignItems: "flex-end",
+  },
+  children: [
+    {
+      type: "field",
+      id: "IR1_BATCH_NO",
+      fieldType: "text",
+      label: "Batch No",
+      ui: {
+        colSpan: { xs: 12, sm: 6, md: 4 },
+        maxWidth: "280px",
+      },
+    },
+    {
+      type: "field",
+      id: "IR1_PREPARATION_DATE",
+      fieldType: "date",
+      label: "Date of Preparation",
+      ui: {
+        colSpan: { xs: 12, sm: 6, md: 4 },
+        maxWidth: "280px",
+      },
+    },
+  ],
+} as const;
+
+/**
+ * Split IR1 combined "Batch No. with date of preparation" into:
+ * Batch No (text) + Date of Preparation (date picker).
+ * Move per-row QC Report column to a single shared upload field.
+ */
+export const normalizeQcInhibitionIr1Schema = (
+  schema: SchemaDocumentV2,
+): SchemaDocumentV2 => {
+  const sections = asSchemaNodes(schema.data?.sections);
+  if (!sections.length) return schema;
+
+  walkSchemaNodes(sections, (node) => {
+    const id = String(node.id ?? "").trim();
+    if (id === "IR1_QUALIFICATION" && Array.isArray(node.columns)) {
+      node.columns = asSchemaNodes(node.columns).filter(
+        (column) => String(column.id ?? "").trim() !== "QC_REPORT",
+      );
+    }
+  });
+
+  walkSchemaNodes(sections, (node) => {
+    if (!Array.isArray(node.children)) return;
+    const children = asSchemaNodes(node.children);
+    const combinedIndex = children.findIndex((child) => {
+      const childId = String(child.id ?? "").trim();
+      return childId === "IR1_BATCH_PREPARATION" || childId === "IR1_BATCH_DATE_PREPARATION";
+    });
+    const alreadySplit = children.some(
+      (child) => String(child.id ?? "").trim() === "IR1_BATCH_FIELDS",
+    );
+    const hasBatchNo = (() => {
+      let found = false;
+      walkSchemaNodes(children, (child) => {
+        if (String(child.id ?? "").trim() === "IR1_BATCH_NO") found = true;
+      });
+      return found;
+    })();
+    const hasPrepDate = (() => {
+      let found = false;
+      walkSchemaNodes(children, (child) => {
+        if (String(child.id ?? "").trim() === "IR1_PREPARATION_DATE") found = true;
+      });
+      return found;
+    })();
+
+    let nextChildren = children;
+
+    if (!(alreadySplit && hasBatchNo && hasPrepDate)) {
+      if (combinedIndex >= 0) {
+        nextChildren = [
+          ...children.slice(0, combinedIndex),
+          { ...IR1_BATCH_FIELDS_GROUP } as SchemaNode,
+          ...children.slice(combinedIndex + 1),
+        ];
+      } else if (!hasBatchNo || !hasPrepDate) {
+        const qualificationIndex = children.findIndex(
+          (child) => String(child.id ?? "").trim() === "IR1_QUALIFICATION",
+        );
+        if (qualificationIndex >= 0) {
+          nextChildren = [
+            ...children.slice(0, qualificationIndex),
+            { ...IR1_BATCH_FIELDS_GROUP } as SchemaNode,
+            ...children.slice(qualificationIndex),
+          ];
+        } else if (String(node.id ?? "").trim() === "INHIBITOR_QUALIFICATION_DETAILS") {
+          nextChildren = [{ ...IR1_BATCH_FIELDS_GROUP } as SchemaNode, ...children];
+        }
+      }
+    }
+
+    const hasQcReportField = nextChildren.some(
+      (child) => String(child.id ?? "").trim() === "IR1_QC_REPORT",
+    );
+    const qualificationIndex = nextChildren.findIndex(
+      (child) => String(child.id ?? "").trim() === "IR1_QUALIFICATION",
+    );
+    if (!hasQcReportField && qualificationIndex >= 0) {
+      nextChildren = [
+        ...nextChildren.slice(0, qualificationIndex + 1),
+        {
+          type: "field",
+          id: "IR1_QC_REPORT",
+          fieldType: "file",
+          label: "Upload QC Report",
+          ui: { colSpan: { xs: 12, sm: 8, md: 6 } },
+        },
+        ...nextChildren.slice(qualificationIndex + 1),
+      ];
+    }
+
+    node.children = nextChildren;
+  });
+
+  return {
+    ...schema,
+    data: {
+      ...schema.data,
+      sections: sections as SchemaDocumentV2["data"]["sections"],
+    },
+  };
+};
+
 export const fetchQcSchema = async (params: {
   subDepartmentId: number;
   division: QcApiDivision;
@@ -199,5 +603,25 @@ export const fetchQcSchema = async (params: {
   inhibitorType?: QcInhibitorType | null;
 }) => {
   const request = buildQcSchemaRequest(params);
-  return schemaEngineController.fetchSchema(qcSchemaFetchConfig, request);
+  const response = await schemaEngineController.fetchSchema(qcSchemaFetchConfig, request);
+  if (response.success && response.data) {
+    if (params.division === "POST_CURE" && params.subType === "LOOSE_FLAP_FILLING") {
+      response.data = normalizeQcLooseFlapFillingSchema(response.data);
+    }
+    if (
+      params.division === "POST_CURE" &&
+      params.subType === "INHIBITION" &&
+      params.inhibitorType === "IR1"
+    ) {
+      response.data = normalizeQcInhibitionIr1Schema(response.data);
+    }
+    if (
+      params.division === "POST_CURE" &&
+      params.subType === "INHIBITION" &&
+      params.inhibitorType === "NOT_APPLICABLE"
+    ) {
+      response.data = normalizeQcInhibitionNotApplicableSchema(response.data);
+    }
+  }
+  return response;
 };

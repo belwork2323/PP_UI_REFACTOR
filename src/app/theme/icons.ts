@@ -183,6 +183,7 @@ import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import WaterRoundedIcon from "@mui/icons-material/WaterRounded";
 import Project from "@mui/icons-material/AccountTreeRounded";
 import AccountBalanceIcon from "@mui/icons-material/AccountBalance";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 export const icons = {
   dashboard: DashboardIcon,
   users: PeopleIcon,
@@ -590,6 +591,10 @@ export const icons = {
         uploadFile: UploadFileRoundedIcon,
         insertDriveFile: InsertDriveFileOutlinedIcon,
         openInNew: OpenInNewRoundedIcon,
+        refresh: RefreshRoundedIcon,
+        checkCircle: CheckCircleRoundedIcon,
+        error: ErrorOutlineRoundedIcon,
+        visibility: VisibilityRoundedIcon,
       },
       rawMaterialBatchList: {
         pending: HourglassEmptyRoundedIcon,

@@ -26,10 +26,7 @@ type FinalApprovalPremixDialogProps = {
   open: boolean;
   rows: FinalApprovalPremixRow[];
   statusConfig: PremixStatusThemeConfig;
-  allPremixesApproved: boolean;
-  confirmDisabled?: boolean;
   onClose: () => void;
-  onProceed: () => void;
 };
 
 export const buildFinalApprovalPremixRows = (
@@ -61,10 +58,7 @@ const FinalApprovalPremixDialog = ({
   open,
   rows,
   statusConfig,
-  allPremixesApproved,
-  confirmDisabled = false,
   onClose,
-  onProceed,
 }: FinalApprovalPremixDialogProps) => (
   <ConfirmAlertDialog
     open={open}
@@ -72,10 +66,8 @@ const FinalApprovalPremixDialog = ({
     message={RM.FINAL_APPROVAL_DIALOG_INFO}
     severity="info"
     maxWidth="sm"
-    confirmLabel={RM.FINAL_APPROVAL_PROCEED}
+    hideConfirm
     cancelLabel={RM.FINAL_APPROVAL_CLOSE}
-    confirmDisabled={!allPremixesApproved || confirmDisabled}
-    onConfirm={onProceed}
     onCancel={onClose}
   >
     <Box

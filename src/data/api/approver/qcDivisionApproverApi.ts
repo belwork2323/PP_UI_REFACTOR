@@ -7,7 +7,7 @@ import type { ApproverFormActionType } from "./approverApi";
  * POST /api/v1/approver/form/division/change-status
  *
  * Variants:
- * - Division-level (Revalidation / Weightment): omit premixNo, motorId, stageType
+ * - Division-level (Revalidation): omit premixNo, motorId, stageType
  * - Premix / Final mix: pass premixNo + stageType
  * - Motor: pass motorId only
  */

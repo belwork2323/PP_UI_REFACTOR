@@ -1,19 +1,17 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { STRINGS } from "../../../app/config/strings";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshStore";
+import { useFileService } from "../../../hooks/useFileService";
+import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
 import { batchManagementController } from "../../../controllers/admin/BatchManagement/batchManagementController";
 import {
   getRocketMotorCasingMotorsFromSheet,
   type BatchMotorMetadataItem,
 } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
 import ndtController from "../../../controllers/user/quality_control/ndtController";
-import {
-  mapNDTDetailsFromSavedForm,
-  mapNDTPayload,
-  NDTDetailsModel,
-} from "../../../data/models/user/NDTApiModel";
+import { mapNDTPayload, NDTDetailsModel } from "../../../data/models/user/NDTApiModel";
 import {
   buildNDTAddedMotors,
   createDefaultNDTFormState,
@@ -193,6 +191,7 @@ export const useNDTHook = () => {
   const user = useAuthStore((state) => state.user);
   const showAlert = useAlertStore((state) => state.showAlert);
   const bumpBatchRefresh = useUserBatchRefreshStore((state) => state.bumpVersion);
+  const { deleteTemp } = useFileService();
 
   const subDepartmentId = useMemo(
     () =>
@@ -234,6 +233,11 @@ export const useNDTHook = () => {
     () => view === "form" && formSnapshot !== initialSnapshot,
     [view, formSnapshot, initialSnapshot],
   );
+
+  const snapshotStateRef = useRef({ formData, addedMotors, motorStatusById });
+  snapshotStateRef.current = { formData, addedMotors, motorStatusById };
+  const initialSnapshotRef = useRef(initialSnapshot);
+  initialSnapshotRef.current = initialSnapshot;
 
   const resetFlowDraft = useCallback(() => {
     setMotorCount("");
@@ -559,20 +563,28 @@ export const useNDTHook = () => {
   }, []);
 
   const handleBack = useCallback(() => {
-    if (view === "form" && isFormDirty && !hasSavedDraft) {
+    if (view === "form" && isFormDirty) {
       setBackConfirmOpen(true);
       return;
     }
 
     bumpBatchRefresh();
     resetFormContext();
-  }, [bumpBatchRefresh, hasSavedDraft, isFormDirty, resetFormContext, view]);
+  }, [bumpBatchRefresh, isFormDirty, resetFormContext, view]);
 
-  const handleDiscardAndBack = useCallback(() => {
+  const handleDiscardAndBack = useCallback(async () => {
     setBackConfirmOpen(false);
-    bumpBatchRefresh();
-    resetFormContext();
-  }, [bumpBatchRefresh, resetFormContext]);
+    await discardWorkflowSnapshotForm({
+      subDepartmentId,
+      initialSnapshot: initialSnapshotRef.current,
+      currentState: snapshotStateRef.current,
+      deleteTemp,
+      resetForm: () => {
+        bumpBatchRefresh();
+        resetFormContext();
+      },
+    });
+  }, [bumpBatchRefresh, deleteTemp, resetFormContext, subDepartmentId]);
 
   const getMotorStatus = useCallback(
     (motorId: string): NDTMotorSubmissionStatus =>
@@ -785,73 +797,6 @@ export const useNDTHook = () => {
     [submitMotor],
   );
 
-  const handleSubmitForFinalApproval = useCallback(async () => {
-    if (!activeBatch?.formId) {
-      showAlert(messages.FORM_ID_MISSING, "error");
-      return false;
-    }
-    if (!subDepartmentId) {
-      showAlert(messages.SUB_DEPARTMENT_MISSING, "error");
-      return false;
-    }
-
-    const motorIds = addedMotors.map((m) => m.motorId);
-    const allApproved =
-      motorIds.length > 0 &&
-      motorIds.every(
-        (id) =>
-          String(motorStatusById[id]?.motorSubmissionStatus ?? "").toUpperCase() === "APPROVED",
-      );
-    if (!allApproved) {
-      showAlert(messages.FINAL_APPROVAL_NOT_READY, "warning");
-      return false;
-    }
-
-    setActionLoading(true);
-    try {
-      const detailsResponse = await ndtController.fetchFormDetails({
-        formId: activeBatch.formId,
-        subDepartmentId,
-      });
-      if (!detailsResponse?.success || !detailsResponse?.data) {
-        showAlert(getErrorMessage(detailsResponse, messages.DETAILS_FETCH_ERROR), "error");
-        return false;
-      }
-
-      const payloadBody = mapNDTDetailsFromSavedForm(detailsResponse.data, {
-        motorStatusById,
-      });
-
-      const response = await ndtController.updateForm({
-        formId: activeBatch.formId,
-        batchId: activeBatch.batchId,
-        subDepartmentId,
-        formSubmissionType: "SUBMIT",
-        ...payloadBody,
-      });
-
-      if (!response?.success) {
-        showAlert(getErrorMessage(response, messages.UPDATE_FAILED), "error");
-        return false;
-      }
-
-      showAlert(messages.CREATE_SUBMIT_SUCCESS, "success", { autoCloseMs: 2200 });
-      await listParams.refreshUserBatches();
-      resetFormContext();
-      return true;
-    } finally {
-      setActionLoading(false);
-    }
-  }, [
-    activeBatch,
-    addedMotors,
-    listParams,
-    motorStatusById,
-    resetFormContext,
-    showAlert,
-    subDepartmentId,
-  ]);
-
   const handleViewDetails = useCallback(
     async (row: NDTBatch) => {
       if (!row.formId) {
@@ -929,7 +874,6 @@ export const useNDTHook = () => {
     setBackConfirmOpen,
     handleSaveMotorDraft,
     handleSubmitMotor,
-    handleSubmitForFinalApproval,
     handleViewDetails,
     handleBackFromDetails,
   };

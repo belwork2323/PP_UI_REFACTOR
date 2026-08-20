@@ -43,6 +43,8 @@ export type AppDropdownProps = {
   itemSx?: SxProps<Theme>;
   sx?: SxProps<Theme>;
   compact?: boolean;
+  /** Floating-label batch-list filter styling (matches subdepartment filter panels). */
+  filterPanel?: boolean;
   InputLabelProps?: TextFieldProps["InputLabelProps"];
   id?: string;
   name?: string;
@@ -75,6 +77,7 @@ const AppDropdown = ({
   onOpen,
   SelectProps: selectProps,
   compact = false,
+  filterPanel = false,
 }: AppDropdownProps) => {
   const resolvedPlaceholder =
     loading && loadingPlaceholder ? loadingPlaceholder : placeholder;
@@ -107,7 +110,7 @@ const AppDropdown = ({
       id={id}
       name={name}
       select
-      fullWidth={fullWidth}
+      fullWidth={filterPanel ? true : fullWidth}
       size={size}
       variant="outlined"
       label={label}
@@ -117,8 +120,12 @@ const AppDropdown = ({
       required={required}
       helperText={helperText}
       error={error}
-      InputLabelProps={{ ...appDropdownLabelProps, ...InputLabelProps }}
-      inputProps={appDropdownInputProps}
+      InputLabelProps={
+        filterPanel ? InputLabelProps : { ...appDropdownLabelProps, ...InputLabelProps }
+      }
+      inputProps={
+        filterPanel ? { style: { fontSize: "0.72rem" } } : appDropdownInputProps
+      }
       SelectProps={{
         displayEmpty: hasPlaceholder,
         renderValue: resolveRenderValue,
@@ -127,7 +134,9 @@ const AppDropdown = ({
         ...selectProps,
       }}
       sx={
-        [compact ? appDenseControlSx : appDropdownSx, sx] as SxProps<Theme>
+        (filterPanel
+          ? [{ mb: 0 }, sx]
+          : [compact ? appDenseControlSx : appDropdownSx, sx]) as SxProps<Theme>
       }
     >
       {hasPlaceholder ? (

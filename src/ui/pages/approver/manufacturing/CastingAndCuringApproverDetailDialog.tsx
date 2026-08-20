@@ -32,8 +32,6 @@ type CastingAndCuringApproverDetailDialogProps = {
   onActiveMotorChange?: (motorId: string) => void;
   onApprove: (item: CastingAndCuringApproverDetailItem) => void;
   onReject: (item: CastingAndCuringApproverDetailItem) => void;
-  onApproveForm?: (item: CastingAndCuringApproverDetailItem) => void;
-  onRejectForm?: (item: CastingAndCuringApproverDetailItem) => void;
   actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
@@ -47,8 +45,6 @@ const CastingAndCuringApproverDetailDialog = ({
   onActiveMotorChange,
   onApprove,
   onReject,
-  onApproveForm,
-  onRejectForm,
   actionLoading = false,
   theme,
 }: CastingAndCuringApproverDetailDialogProps) => {
@@ -100,8 +96,6 @@ const CastingAndCuringApproverDetailDialog = ({
             onActiveMotorChange={onActiveMotorChange ?? (() => undefined)}
             onApprove={() => onApprove(item)}
             onReject={() => onReject(item)}
-            onApproveForm={onApproveForm ? () => onApproveForm(item) : undefined}
-            onRejectForm={onRejectForm ? () => onRejectForm(item) : undefined}
             actionLoading={actionLoading}
             manufacturingTheme={manufacturingTheme}
             approverTheme={theme}

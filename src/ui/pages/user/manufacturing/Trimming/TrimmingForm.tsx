@@ -1,12 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Alert, Box, Button, Chip, Stack, Typography } from "@mui/material";
 import { alpha } from "@mui/material/styles";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
@@ -23,6 +16,7 @@ import {
   type PreviousStageApprovedUnits,
 } from "../../../../../hooks/user/previousStageApproval";
 import PremixStatusChip from "../RawMaterial/components/PremixStatusChip";
+import ViewStatusButton from "../../../../components/common/ViewStatusButton";
 import FinalApprovalMotorDialog, {
   areAllMotorsApproved,
   buildFinalApprovalMotorRows,
@@ -56,7 +50,6 @@ type TrimmingFormProps = {
   onMotorSessionChange: (motorId: string, next: TrimmingMotorSession) => void;
   onSaveMotorDraft?: (motorId: string) => void;
   onSubmitMotor?: (motorId: string) => void;
-  onSubmitForFinalApproval?: () => void;
   theme: any;
 };
 
@@ -73,7 +66,6 @@ const TrimmingForm = ({
   onMotorSessionChange,
   onSaveMotorDraft,
   onSubmitMotor,
-  onSubmitForFinalApproval,
   theme,
 }: TrimmingFormProps) => {
   const BRAND = TRIMMING_BRAND;
@@ -127,9 +119,7 @@ const TrimmingForm = ({
         if (current && motorNavGate.isMotorWorkflowEnabled(current.motorId)) {
           return Math.min(prev, motorCards.length - 1);
         }
-        return firstEnabled >= 0
-          ? firstEnabled
-          : Math.min(prev, motorCards.length - 1);
+        return firstEnabled >= 0 ? firstEnabled : Math.min(prev, motorCards.length - 1);
       });
     }
 
@@ -167,7 +157,6 @@ const TrimmingForm = ({
     [motorCards, motorStatusById],
   );
   const allMotorsApproved = areAllMotorsApproved(finalApprovalRows);
-  const canOpenFinalApproval = Boolean(batch?.formId);
 
   const navPalette = {
     primary: theme.palette.primary,
@@ -256,17 +245,6 @@ const TrimmingForm = ({
               </Typography>
             </Box>
           </Stack>
-
-          {motorCards.length > 0 ? (
-            <Button
-              variant="contained"
-              size="small"
-              disabled={actionLoading || !canOpenFinalApproval}
-              onClick={() => setFinalApprovalOpen(true)}
-            >
-              {S.SUBMIT_FOR_FINAL_APPROVAL}
-            </Button>
-          ) : null}
         </Stack>
       </Box>
 
@@ -300,6 +278,32 @@ const TrimmingForm = ({
             />
           </UserWorkflowNavPanel>
 
+          <Stack direction="row" justifyContent="flex-end" spacing={1}>
+            <Button
+              variant="outlined"
+              size="small"
+              disabled={actionLoading || activeMotorLocked}
+              onClick={() => onSaveMotorDraft?.(activeMotorEntry.motorId)}
+              sx={{ textTransform: "none", fontWeight: 700 }}
+            >
+              {S.SAVE_MOTOR_DRAFT(activeMotorEntry.motorId)}
+            </Button>
+            <Button
+              variant="contained"
+              size="small"
+              disabled={actionLoading || activeMotorLocked}
+              onClick={() => onSubmitMotor?.(activeMotorEntry.motorId)}
+              sx={{ textTransform: "none", fontWeight: 700 }}
+            >
+              {S.SUBMIT_MOTOR(activeMotorEntry.motorId)}
+            </Button>
+            <ViewStatusButton
+              disabled={actionLoading}
+              onClick={() => setFinalApprovalOpen(true)}
+              label={S.VIEW_STATUS}
+            />
+          </Stack>
+
           <Box
             key={`${activeMotorEntry.motorId}-${activeMotorSession.motorStage}`}
             sx={{
@@ -327,25 +331,6 @@ const TrimmingForm = ({
                   variant="embedded"
                 />
               </Stack>
-
-              <Stack direction="row" gap={1} flexShrink={0} alignItems="center">
-                <Button
-                  variant="outlined"
-                  size="small"
-                  disabled={actionLoading || activeMotorLocked}
-                  onClick={() => onSaveMotorDraft?.(activeMotorEntry.motorId)}
-                >
-                  {S.SAVE_MOTOR_DRAFT}
-                </Button>
-                <Button
-                  variant="contained"
-                  size="small"
-                  disabled={actionLoading || activeMotorLocked}
-                  onClick={() => onSubmitMotor?.(activeMotorEntry.motorId)}
-                >
-                  {S.SUBMIT_MOTOR}
-                </Button>
-              </Stack>
             </Stack>
 
             {activeMotorLocked ? (
@@ -359,7 +344,9 @@ const TrimmingForm = ({
                   bgcolor: theme.palette.background ?? BRAND.surface,
                 }}
               >
-                <Typography sx={{ fontSize: "0.72rem", color: theme.palette.textSub, fontWeight: 600 }}>
+                <Typography
+                  sx={{ fontSize: "0.72rem", color: theme.palette.textSub, fontWeight: 600 }}
+                >
                   {!activeMotorPriorEnabled
                     ? STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED
                     : activeMotorStatus === "APPROVED"
@@ -369,15 +356,17 @@ const TrimmingForm = ({
               </Box>
             ) : null}
 
-            {activeMotorStatus === "REJECTED" &&
-            motorStatusById[activeMotorId]?.rejectionReason ? (
+            {activeMotorStatus === "REJECTED" && motorStatusById[activeMotorId]?.rejectionReason ? (
               <Alert severity="error" sx={{ fontSize: "0.78rem", mb: 1.25 }}>
                 {motorStatusById[activeMotorId]?.rejectionReason}
               </Alert>
             ) : null}
 
-            <Typography sx={{ fontSize: "0.74rem", color: theme.palette.textSub ?? BRAND.textSub, mb: 1.25 }}>
-              {S.MOTOR_STAGE_LABEL}: {activeMotorEntry.motorStage || activeMotorSession.motorStage || "—"}
+            <Typography
+              sx={{ fontSize: "0.74rem", color: theme.palette.textSub ?? BRAND.textSub, mb: 1.25 }}
+            >
+              {S.MOTOR_STAGE_LABEL}:{" "}
+              {activeMotorEntry.motorStage || activeMotorSession.motorStage || "—"}
             </Typography>
 
             <TrimmingCommonTable
@@ -396,7 +385,7 @@ const TrimmingForm = ({
         rows={finalApprovalRows}
         statusConfig={statusConfig}
         allMotorsApproved={allMotorsApproved}
-        confirmDisabled={actionLoading}
+        hideConfirm
         copy={{
           title: S.FINAL_APPROVAL_DIALOG_TITLE,
           info: S.FINAL_APPROVAL_DIALOG_INFO,
@@ -408,10 +397,6 @@ const TrimmingForm = ({
           colStatus: S.FINAL_APPROVAL_COL_STATUS,
         }}
         onClose={() => setFinalApprovalOpen(false)}
-        onProceed={async () => {
-          setFinalApprovalOpen(false);
-          await onSubmitForFinalApproval?.();
-        }}
       />
     </Box>
   );

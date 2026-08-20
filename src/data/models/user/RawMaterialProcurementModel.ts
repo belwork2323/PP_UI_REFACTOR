@@ -53,12 +53,27 @@ export type RawMaterialLotDeleteResponse = {
   status: string;
 };
 
+export type LotCertificateStatus = "uploading" | "uploaded" | "failed";
+
 export type LotCertificate = {
+  localId?: string;
+  fileId?: string | null;
   fileName: string;
   fileUrl: string;
   certificateType: string;
-  /** Local file pending upload (casing-aligned; not sent in JSON payload). */
+  /** Local file kept until upload succeeds (not sent in JSON payload). */
   file?: File | null;
+  status?: LotCertificateStatus;
+  /** Local upload progress 0–100 while status is "uploading". */
+  uploadProgress?: number;
+  /** True until the parent lot create/update succeeds. */
+  isTemp?: boolean;
+};
+
+export type RawMaterialCertificateApiPayload = {
+  fileId: string;
+  fileName: string;
+  certificateType: string;
 };
 
 export type SpecRow = {
@@ -221,12 +236,20 @@ export function computeIsOutOfRange(
   return false;
 }
 
-/** Stable JSON for dirty-check / snapshots (File → name only). */
+/** Stable JSON for dirty-check / snapshots (File → name only; strips upload UI state). */
 export function serializeMaterialBlocks(blocks: MaterialBlock[]): string {
-  return JSON.stringify(blocks ?? [], (_key, value) => {
-    if (value instanceof File) return value.name;
-    return value;
-  });
+  // Lazy import avoided — inline same normalization as workflowFormSnapshot
+  const normalized = JSON.parse(
+    JSON.stringify(blocks ?? [], (_key, value) => {
+      if (value instanceof File) return undefined;
+      if (_key === "uploadProgress") return undefined;
+      if (_key === "file") return undefined;
+      if (_key === "localId") return undefined;
+      if (_key === "status" && value === "uploading") return undefined;
+      return value;
+    }),
+  );
+  return JSON.stringify(normalized ?? []);
 }
 
 export function flattenMaterialGroups(groups: MaterialFormGroup[]): MaterialBlock[] {
@@ -396,7 +419,7 @@ export type RawMaterialLotSpecificationPayload = {
 export type RawMaterialLotCreatePayload = {
   lotId: string;
   specifications: RawMaterialLotSpecificationPayload[];
-  certificates: LotCertificate[];
+  certificates: RawMaterialCertificateApiPayload[];
 };
 
 export type RawMaterialMaterialCreatePayload = {
@@ -435,7 +458,7 @@ export type RawMaterialLotUpdatePayload = {
     acemQcResult: string;
     status: string | null;
   }>;
-  certificates: LotCertificate[];
+  certificates: RawMaterialCertificateApiPayload[];
 };
 
 export type RawMaterialLotListRequest = {
@@ -630,7 +653,9 @@ export class RawMaterialLotDetailsModel {
     this.materialCode = payload?.materialCode ?? "";
     this.grade = resolveGradeCode(payload?.grade);
     this.specifications = Array.isArray(payload?.specifications) ? payload.specifications : [];
-    this.certificates = Array.isArray(payload?.certificates) ? payload.certificates : [];
+    this.certificates = Array.isArray(payload?.certificates)
+      ? payload.certificates.map(normalizeLotCertificate)
+      : [];
     this.progressInsights = payload?.progressInsights;
     this.qualityInsights = payload?.qualityInsights;
     this.workflowInsights = payload?.workflowInsights;
@@ -778,28 +803,59 @@ export function createEmptyFormBatch(): RawMaterialFormBatch {
   };
 }
 
-/**
- * Legacy placeholder when neither https URL nor pending-upload marker applies.
- * Backend contract: accept `pending-upload://` refs (same as rocket motor casing reportUpload)
- * or provide a dedicated multipart upload endpoint — see fileToCertificateApiRef.
- */
-export const RAW_MATERIAL_CERTIFICATE_PLACEHOLDER_FILE_URL =
-  "https://example.invalid/raw-material-procurement/certificate-upload-pending";
-
-/** Casing-aligned pending marker for new local files in create/update payloads. */
-export function pendingCertificateUploadUrl(fileName: string): string {
-  return `pending-upload://${encodeURIComponent(String(fileName ?? "file").trim() || "file")}`;
+export function newCertificateLocalId(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  return `cert-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export function certificateFileUrlForApi(cert: LotCertificate): string {
-  const url = String(cert.fileUrl ?? "").trim();
-  if (/^https?:\/\//i.test(url)) return url;
-  if (/^pending-upload:\/\//i.test(url)) return url;
-  if (cert.file) return pendingCertificateUploadUrl(cert.file.name || cert.fileName);
-  if (/^blob:/i.test(url) && cert.fileName) {
-    return pendingCertificateUploadUrl(cert.fileName);
-  }
-  return RAW_MATERIAL_CERTIFICATE_PLACEHOLDER_FILE_URL;
+export function normalizeLotCertificate(raw: unknown): LotCertificate {
+  const source = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  const fileId = String(source.fileId ?? "").trim() || null;
+  const fileName = String(source.fileName ?? "").trim();
+  const fileUrl = String(source.fileUrl ?? "").trim();
+  return {
+    localId: String(source.localId ?? "").trim() || newCertificateLocalId(),
+    fileId,
+    fileName,
+    fileUrl: /^blob:/i.test(fileUrl) ? "" : fileUrl,
+    certificateType: String(source.certificateType ?? "").trim(),
+    file: null,
+    status: fileId ? "uploaded" : undefined,
+    isTemp: false,
+  };
+}
+
+export function isCertificateUploadIncomplete(cert: LotCertificate): boolean {
+  return cert.status === "uploading" || cert.status === "failed";
+}
+
+export function hasIncompleteCertificateUploads(
+  blocks: Array<{ certificates?: LotCertificate[] }>,
+): boolean {
+  return (blocks ?? []).some((block) =>
+    (block.certificates ?? []).some(isCertificateUploadIncomplete),
+  );
+}
+
+export function mapCertificateToApiPayload(
+  cert: LotCertificate,
+): RawMaterialCertificateApiPayload | null {
+  if (isCertificateUploadIncomplete(cert)) return null;
+  const fileId = String(cert.fileId ?? "").trim();
+  if (!fileId) return null;
+  return {
+    fileId,
+    fileName: String(cert.fileName ?? "").trim(),
+    certificateType: String(cert.certificateType ?? "").trim(),
+  };
+}
+
+function mapCertificatesForApi(certs: LotCertificate[] | undefined): RawMaterialCertificateApiPayload[] {
+  return (certs ?? [])
+    .map(mapCertificateToApiPayload)
+    .filter((item): item is RawMaterialCertificateApiPayload => item != null);
 }
 
 function mapLotBlockToCreatePayload(lot: MaterialLotBlock): RawMaterialLotCreatePayload {
@@ -818,18 +874,7 @@ function mapLotBlockToCreatePayload(lot: MaterialLotBlock): RawMaterialLotCreate
         isOutOfRange: Boolean(row.isOutOfRange),
         acemQcResult: row.acemQcResult ?? "",
       })),
-    certificates: (lot.certificates ?? [])
-      .filter(
-        (c) =>
-          String(c.fileUrl ?? "").trim().length > 0 ||
-          String(c.fileName ?? "").trim().length > 0 ||
-          String(c.certificateType ?? "").trim().length > 0,
-      )
-      .map((c) => ({
-        fileName: String(c.fileName ?? "").trim(),
-        certificateType: String(c.certificateType ?? "").trim(),
-        fileUrl: certificateFileUrlForApi(c),
-      })),
+    certificates: mapCertificatesForApi(lot.certificates),
   };
 }
 
@@ -888,18 +933,7 @@ export function mapFirstBlockToLotUpdatePayload(
         acemQcResult: row.acemQcResult ?? "",
         status: null,
       })),
-    certificates: (block.certificates ?? [])
-      .filter(
-        (c) =>
-          String(c.fileUrl ?? "").trim().length > 0 ||
-          String(c.fileName ?? "").trim().length > 0 ||
-          String(c.certificateType ?? "").trim().length > 0,
-      )
-      .map((c) => ({
-        fileName: String(c.fileName ?? "").trim(),
-        certificateType: String(c.certificateType ?? "").trim(),
-        fileUrl: certificateFileUrlForApi(c),
-      })),
+    certificates: mapCertificatesForApi(block.certificates),
   };
 }
 

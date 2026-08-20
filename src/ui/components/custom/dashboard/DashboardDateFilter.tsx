@@ -2,28 +2,30 @@ import React from "react";
 import {
   Box,
   Button,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   CircularProgress,
+  MenuItem,
   SxProps,
   Theme,
+  type SelectProps,
 } from "@mui/material";
+import AppDropdown from "@ui/components/common/AppDropdown";
 import DateRangeRow from "@ui/components/common/DateRangeRow";
+import { APP_CONTROL_HEIGHT } from "@ui/components/common/fieldStyles";
 
 export interface DateFilterStrings {
   LABEL: string;
-  TODAY: string;
-  THIS_WEEK: string;
-  THIS_MONTH: string;
+  LAST_SIX_MONTHS: string;
+  LAST_ONE_YEAR: string;
   CUSTOM: string;
   START_DATE: string;
   END_DATE: string;
   APPLY?: string;
   CLEAR?: string;
-  VALUES: { DAY: string; WEEK: string; MONTH: string; CUSTOM: string };
+  VALUES: { SIX_MONTHS: string; ONE_YEAR: string; CUSTOM: string };
 }
+
+/** Default date filter for admin / system manager dashboards. */
+export const DEFAULT_DATE_FILTER_TYPE = "one_year";
 
 interface DashboardDateFilterProps {
   filterType: string;
@@ -34,13 +36,13 @@ interface DashboardDateFilterProps {
   onEndChange: (v: string) => void;
   /** Called when Apply is clicked for a complete custom range. */
   onApplyCustom?: () => void;
-  /** Resets the date filter to the default month range. */
+  /** Resets the date filter to the default range (last one year). */
   onClearFilter?: () => void;
   strings: DateFilterStrings;
   loading?: boolean;
   containerSx?: SxProps<Theme>;
   selectSx?: SxProps<Theme>;
-  menuProps?: React.ComponentProps<typeof Select>["MenuProps"];
+  menuProps?: SelectProps["MenuProps"];
   menuItemSx?: SxProps<Theme>;
   textFieldSx?: SxProps<Theme>;
   applyButtonSx?: SxProps<Theme>;
@@ -50,48 +52,26 @@ interface DashboardDateFilterProps {
 /** Human-readable label for the active date filter (e.g. chip on FilterToggleButton). */
 export function getDateFilterDisplayLabel(
   filterType: string,
-  strings: Pick<DateFilterStrings, "TODAY" | "THIS_WEEK" | "THIS_MONTH" | "CUSTOM" | "VALUES">,
+  strings: Pick<
+    DateFilterStrings,
+    "LAST_SIX_MONTHS" | "LAST_ONE_YEAR" | "CUSTOM" | "VALUES"
+  >,
 ): string {
-  if (filterType === strings.VALUES.DAY) return strings.TODAY;
-  if (filterType === strings.VALUES.WEEK) return strings.THIS_WEEK;
-  if (filterType === strings.VALUES.MONTH) return strings.THIS_MONTH;
+  if (filterType === strings.VALUES.SIX_MONTHS) return strings.LAST_SIX_MONTHS;
+  if (filterType === strings.VALUES.ONE_YEAR) return strings.LAST_ONE_YEAR;
   if (filterType === strings.VALUES.CUSTOM) return strings.CUSTOM;
   return filterType;
 }
-
-const FILTER_CONTROL_HEIGHT = 36;
-
-const heightOverrideSx = {
-  "& .MuiOutlinedInput-root": {
-    height: FILTER_CONTROL_HEIGHT,
-    minHeight: FILTER_CONTROL_HEIGHT,
-  },
-  "& .MuiInputBase-input": {
-    py: 0,
-    fontSize: "0.8125rem",
-  },
-  "& .MuiInputLabel-root": {
-    fontSize: "0.8125rem",
-  },
-  "& .MuiInputLabel-root:not(.MuiInputLabel-shrink)": {
-    transform: "translate(14px, 8px) scale(1)",
-  },
-  "& .MuiSelect-select": {
-    display: "flex",
-    alignItems: "center",
-    py: 0,
-    boxSizing: "border-box",
-  },
-};
 
 const actionButtonSx: SxProps<Theme> = {
   textTransform: "none",
   fontWeight: 700,
   px: 1.75,
-  height: FILTER_CONTROL_HEIGHT,
-  minHeight: FILTER_CONTROL_HEIGHT,
+  height: APP_CONTROL_HEIGHT,
+  minHeight: APP_CONTROL_HEIGHT,
   py: 0,
   fontSize: "0.8125rem",
+  flexShrink: 0,
 };
 
 function DashboardDateFilter({
@@ -114,7 +94,7 @@ function DashboardDateFilter({
   clearButtonSx,
 }: DashboardDateFilterProps) {
   const isCustom = filterType === s.VALUES.CUSTOM;
-  const isDefaultMonth = filterType === s.VALUES.MONTH;
+  const isDefaultFilter = filterType === s.VALUES.ONE_YEAR;
   const canApplyCustom =
     isCustom &&
     customStartDate.length === 10 &&
@@ -125,46 +105,43 @@ function DashboardDateFilter({
     <Box
       sx={
         {
-          display: "flex",
-          gap: 1.5,
-          alignItems: "center",
-          flexWrap: "wrap",
           ...(containerSx as object),
+          display: "flex",
+          flexDirection: "row",
+          gap: 1.5,
+          alignItems: "flex-end",
+          flexWrap: { xs: "wrap", sm: "nowrap" },
         } as any
       }
     >
-      <FormControl
-        size="small"
+      <AppDropdown
+        label={s.LABEL}
+        value={filterType}
+        onChange={onFilterChange}
+        disabled={loading}
+        fullWidth={false}
+        renderValue={(value) => getDateFilterDisplayLabel(value, s)}
+        MenuProps={menuProps}
+        itemSx={menuItemSx}
         sx={
           {
             minWidth: 150,
-            my: 0,
-            // Theme colors first, then force medium control height last
-            // so nested `& .MuiOutlinedInput-root` from selectSx cannot wipe height.
+            mb: 0,
+            flexShrink: 0,
             ...(selectSx as object),
-            ...heightOverrideSx,
           } as any
         }
       >
-        <InputLabel>{s.LABEL}</InputLabel>
-        <Select
-          value={filterType}
-          label={s.LABEL}
-          onChange={(e) => onFilterChange(e.target.value)}
-          MenuProps={menuProps}
-          disabled={loading}
-        >
-          <MenuItem value={s.VALUES.DAY} sx={menuItemSx}>
-            {s.TODAY}
-          </MenuItem>
-          <MenuItem value={s.VALUES.MONTH} sx={menuItemSx}>
-            {s.THIS_MONTH}
-          </MenuItem>
-          <MenuItem value={s.VALUES.CUSTOM} sx={menuItemSx}>
-            {s.CUSTOM}
-          </MenuItem>
-        </Select>
-      </FormControl>
+        <MenuItem value={s.VALUES.SIX_MONTHS} sx={menuItemSx}>
+          {s.LAST_SIX_MONTHS}
+        </MenuItem>
+        <MenuItem value={s.VALUES.ONE_YEAR} sx={menuItemSx}>
+          {s.LAST_ONE_YEAR}
+        </MenuItem>
+        <MenuItem value={s.VALUES.CUSTOM} sx={menuItemSx}>
+          {s.CUSTOM}
+        </MenuItem>
+      </AppDropdown>
 
       {isCustom && (
         <DateRangeRow
@@ -176,8 +153,10 @@ function DashboardDateFilter({
           toLabel={s.END_DATE}
           separatorLabel="-"
           showLeadingIcon={false}
-          controlHeight={FILTER_CONTROL_HEIGHT}
-          datePickerSx={textFieldSx}
+          nowrap
+          alignInputs="filter"
+          controlHeight={APP_CONTROL_HEIGHT}
+          datePickerSx={{ mb: 0, ...(textFieldSx as object) }}
         />
       )}
 
@@ -203,7 +182,7 @@ function DashboardDateFilter({
         <Button
           variant="outlined"
           size="small"
-          disabled={loading || isDefaultMonth}
+          disabled={loading || isDefaultFilter}
           onClick={onClearFilter}
           sx={
             {

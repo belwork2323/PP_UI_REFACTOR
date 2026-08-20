@@ -253,31 +253,25 @@ const BatchListShell = ({
             </Stack>
           ) : null}
 
-          {filterExtension ? (
-            <Box
-              sx={{
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 1.5,
-                alignItems: "center",
-                width: "100%",
-              }}
-            >
-              {filterExtension}
-            </Box>
-          ) : null}
+          {filterExtension ? <Box sx={{ width: "100%" }}>{filterExtension}</Box> : null}
         </Stack>
       </Box>
 
-      {/* Main Content Area: Always renders children so Table Headers / Card wrappers stay visible */}
+      {/* Main content: loading spinner, empty state, or list children */}
       <Box sx={{ position: "relative", ...theme.sections.listWrap }}>
         {loading && !hasItems ? (
           <Box sx={theme.sections.loadingWrap}>
             <CircularProgress size={24} sx={theme.loading.spinner} />
           </Box>
-        ) : null}
-
-        {children}
+        ) : !hasItems ? (
+          <Box sx={theme.sections.emptyWrap}>
+            <EmptyIcon sx={theme.empty.icon} />
+            <Typography sx={theme.empty.title}>{emptyTitle}</Typography>
+            <Typography sx={theme.empty.subtitle}>{emptySubtitle}</Typography>
+          </Box>
+        ) : (
+          children
+        )}
       </Box>
     </Box>
   );

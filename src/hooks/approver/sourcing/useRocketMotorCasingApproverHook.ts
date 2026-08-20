@@ -9,7 +9,10 @@ import { operationsController } from "../../../controllers/user/operationsContro
 import rocketMotorCasingController from "../../../controllers/user/sourcing/rocketMotorCasingController";
 import type { ApproverFormActionType } from "../../../data/api/approver/approverApi";
 import { ROCKET_MOTOR_CASING_APPROVER_STATUS_TABS } from "../../../data/models/approver/RocketMotorCasingApproverModel";
-import { RocketMotorCasingDetailsModel } from "../../../data/models/user/RocketMotorCasingProcurementModel";
+import {
+  normalizeRocketCasingListStatus,
+  RocketMotorCasingDetailsModel,
+} from "../../../data/models/user/RocketMotorCasingProcurementModel";
 import { submitApproverFormStatusChange } from "../../../controllers/approver/approverController";
 import type { MotorStageOption } from "../../user/sourcing/useRocketMotorCasingList";
 import { OPERATION_STATUS } from "../../operationStatus";
@@ -233,9 +236,12 @@ export const useRocketMotorCasingApproverHook = () => {
     setSubmitting(false);
 
     if (response.success) {
-      const nextStatus =
-        (response.data as { status?: string })?.status ??
-        (actionType === "APPROVED" ? "Approved" : "Rejected");
+      const nextStatus = normalizeRocketCasingListStatus(
+        String(
+          (response.data as { status?: string })?.status ??
+            (actionType === "APPROVED" ? "Approved" : "Rejected"),
+        ),
+      );
 
       closeDialog();
 

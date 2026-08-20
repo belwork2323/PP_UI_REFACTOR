@@ -361,7 +361,9 @@ const UserBatchList = ({
       emptyTitle={emptyText}
       filterFields={shellFilterFields}
       filterValues={localFilterState}
-      hasItems={filtered.length > 0}
+      // Keep table chrome visible when empty; empty message is rendered in TableBody.
+      // While first-loading with no rows, shell shows the spinner instead.
+      hasItems={isLoading ? filtered.length > 0 : true}
       loading={isLoading}
       onFilterChange={(field, value) => {
         handleDropdownChange(field)({ target: { value } });
@@ -414,7 +416,23 @@ const UserBatchList = ({
             </TableHead>
 
             <TableBody>
-              {paginated.map((row: any, idx: number) => {
+              {!isLoading && paginated.length === 0 ? (
+                <TableRow>
+                  <TableCell
+                    colSpan={(columns?.length ?? 0) + (showActionCol ? 1 : 0) + 1}
+                    sx={{ p: 0, borderBottom: "none" }}
+                  >
+                    <Box sx={listShellTheme.sections.emptyWrap}>
+                      <LayersRoundedIcon sx={listShellTheme.empty.icon} />
+                      <Typography sx={listShellTheme.empty.title}>{emptyText}</Typography>
+                      <Typography sx={listShellTheme.empty.subtitle}>
+                        {STRINGS.USER_BATCH_LIST.EMPTY_SUBTITLE}
+                      </Typography>
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ) : (
+                paginated.map((row: any, idx: number) => {
                 const isHighlighted = highlightRow?.(row) ?? false;
                 const globalIdx = activePage * activeRowsPerPage + idx + 1;
 
@@ -481,7 +499,8 @@ const UserBatchList = ({
                     )}
                   </TableRow>
                 );
-              })}
+              })
+              )}
             </TableBody>
           </Table>
         </TableContainer>

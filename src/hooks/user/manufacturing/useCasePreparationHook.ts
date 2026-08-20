@@ -1,19 +1,19 @@
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { STRINGS } from "../../../app/config/strings";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshStore";
 import { batchManagementController } from "../../../controllers/admin/BatchManagement/batchManagementController";
+import type { IdentificationSheet } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
 import casePreparationController from "../../../controllers/user/manufacturing/casePreparationController";
 import {
+  buildCasePreparationFormBody,
   createDefaultCasePreparationFormState,
   createEmptyMotorSession,
   hasMotorCasePreparationValue,
-  hydrateCasePreparationFormState,
   isMotorEditable,
   mapCasePreparationDetailsFromSavedForm,
   mapCasePreparationDetailsToFormState,
-  mapCasePreparationFormStateToPayload,
   mapCasePreparationMotorStatusesFromApi,
   type CasePrepMotorSession,
   type CasePreparationFormState,
@@ -21,15 +21,9 @@ import {
   type MotorSubmissionStatus,
 } from "../../../data/models/user/CasePreparationFormModel";
 import {
-  buildCasePreparationSchemaRequest,
-  casePreparationSchemaFetchConfig,
-  createCasePrepInitialValues,
-  enrichCasePreparationSchemaDates,
-  mapCasePrepBatchTypeToSchema,
-  schemaEngineController,
-  type SchemaDocumentV2,
-  type SchemaFormValues,
-} from "../../../schema-engine";
+  createEmptyCasePrepMotorData,
+  type CasePrepMotorData,
+} from "../../../data/models/user/CasePrepMotorDataModel";
 import {
   isMainMotorBatch,
   isSubscaleBatch,
@@ -40,6 +34,9 @@ import {
 import { isManufacturingContinueFillingStatus } from "../../operationStatus";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import { isMotorEnabledForWorkflow } from "../previousStageApproval";
+import { useFileService } from "../../../hooks/useFileService";
+import { discardWorkflowForm } from "../../../utils/workflowDiscard";
+import { noopTempFileExtractor } from "../../../utils/workflowTempFiles";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -51,9 +48,16 @@ type CasePrepBatch = {
   motorId?: string;
   motorIds?: Array<string | number>;
   numberOfMotors?: number | string;
-  identificationSheet?: { prcApprovalDate?: string } | null;
+  identificationSheet?: IdentificationSheet | { prcApprovalDate?: string } | null;
   prrcClearanceDate?: string;
   [key: string]: any;
+};
+
+const mapCasePrepBatchTypeForApi = (batchType: string | undefined | null) => {
+  const normalized = String(batchType ?? "").toUpperCase();
+  if (normalized === "MAIN" || normalized === "MAIN_BATCH") return "MAIN";
+  if (normalized === "SUBSCALE" || normalized === "SUBSCALE_BATCH") return "SUBSCALE";
+  return normalized;
 };
 
 const resolveFormId = (batch: CasePrepBatch | null | undefined) => {
@@ -92,6 +96,7 @@ const mergeMotorsFromBatchAndForm = (
       return {
         ...existing,
         prrcClearanceDate: existing.prrcClearanceDate || entry.prrcClearanceDate,
+        data: existing.data ?? createEmptyCasePrepMotorData(),
       };
     }
     return createEmptyMotorSession(entry.motorId, entry.prrcClearanceDate);
@@ -111,13 +116,6 @@ const mergeMotorsFromBatchAndForm = (
     })),
   };
 };
-
-const buildCasePrepSetupContext = (
-  batch: CasePrepBatch | null | undefined,
-  fallbackCount = 1,
-) => ({
-  numberOfMotors: resolveCasePrepBatchMotorCount(batch, fallbackCount),
-});
 
 const enrichBatchFromDetails = (
   batch: CasePrepBatch,
@@ -142,30 +140,20 @@ const enrichBatchFromDetails = (
   };
 };
 
-/** Create motor shells only — no schema walks. First motor is hydrated below. */
+/** Create motor shells with empty typed data — no schema. */
 const initializeCasePrepFormFromBatch = (
   batch: CasePrepBatch,
-  schema: SchemaDocumentV2,
   baseFormData: CasePreparationFormState = createDefaultCasePreparationFormState(),
 ): { formData: CasePreparationFormState; addedMotors: CasePrepAddedMotor[] } => {
   const motorsFromBatch = resolveCasePrepMotorsFromBatch(batch);
-  const setupContext = buildCasePrepSetupContext(
-    batch,
-    Math.max(motorsFromBatch.length, 1),
-  );
 
   if (isSubscaleBatch(batch.batchType)) {
     return {
-      formData: hydrateCasePreparationFormState(
-        {
-          ...baseFormData,
-          schema,
-          motors: [],
-          subscaleFormValues: createCasePrepInitialValues(schema, setupContext),
-        },
-        schema,
-        setupContext,
-      ),
+      formData: {
+        ...baseFormData,
+        motors: [],
+        subscaleData: baseFormData.subscaleData ?? createEmptyCasePrepMotorData(),
+      },
       addedMotors: [],
     };
   }
@@ -174,18 +162,12 @@ const initializeCasePrepFormFromBatch = (
     createEmptyMotorSession(entry.motorId, entry.prrcClearanceDate),
   );
 
-  const firstMotorId = sessions[0]?.motorId;
   return {
-    formData: hydrateCasePreparationFormState(
-      {
-        ...baseFormData,
-        schema,
-        motors: sessions,
-      },
-      schema,
-      setupContext,
-      firstMotorId ? { hydrateMotorIds: [firstMotorId] } : undefined,
-    ),
+    formData: {
+      ...baseFormData,
+      motors: sessions,
+      subscaleData: null,
+    },
     addedMotors: motorsFromBatch,
   };
 };
@@ -195,6 +177,7 @@ export const useCasePreparationHook = () => {
   const user = useAuthStore((s) => s.user);
   const showAlert = useAlertStore((state) => state.showAlert);
   const bumpBatchRefresh = useUserBatchRefreshStore((state) => state.bumpVersion);
+  const { deleteTemp } = useFileService();
 
   const subDepartmentId = useMemo(
     () =>
@@ -203,18 +186,13 @@ export const useCasePreparationHook = () => {
     [user],
   );
 
-  const schemaCacheRef = useRef<Map<string, SchemaDocumentV2>>(new Map());
-
   const [view, setView] = useState<WorkflowView>("list");
   const [activeBatch, setActiveBatch] = useState<CasePrepBatch | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [loadingFormDetails, setLoadingFormDetails] = useState(false);
   const [detailsRow, setDetailsRow] = useState<any>(null);
   const [detailsData, setDetailsData] = useState<any>(null);
-  const [detailsSchema, setDetailsSchema] = useState<SchemaDocumentV2 | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
-  const [schemaLoading, setSchemaLoading] = useState(false);
-  const [schemaError, setSchemaError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
@@ -228,7 +206,6 @@ export const useCasePreparationHook = () => {
 
   const resetFlowDraft = useCallback(() => {
     setAddedMotors([]);
-    setSchemaError(null);
     setMotorStatusById({});
   }, []);
 
@@ -238,12 +215,9 @@ export const useCasePreparationHook = () => {
     setActiveBatch(null);
     setDetailsRow(null);
     setDetailsData(null);
-    setDetailsSchema(null);
     setDetailsLoading(false);
     setIsEditMode(false);
     setLoadingFormDetails(false);
-    setSchemaLoading(false);
-    setSchemaError(null);
     setActionLoading(false);
     setBackConfirmOpen(false);
     setHasSavedDraft(false);
@@ -258,47 +232,6 @@ export const useCasePreparationHook = () => {
     return fallbackMessage;
   };
 
-  const fetchCasePrepSchema = useCallback(
-    async (batchType: string | undefined): Promise<SchemaDocumentV2 | null> => {
-      if (!subDepartmentId) {
-        showAlert(STRINGS.MANUFACTURING.CASE_PREP.SUB_DEPARTMENT_MISSING, "error");
-        return null;
-      }
-
-      const cacheKey = `${subDepartmentId}:${mapCasePrepBatchTypeToSchema(batchType ?? "")}`;
-      const cached = schemaCacheRef.current.get(cacheKey);
-      if (cached) {
-        setSchemaError(null);
-        return cached;
-      }
-
-      setSchemaLoading(true);
-      setSchemaError(null);
-
-      const response = await schemaEngineController.fetchSchema(
-        casePreparationSchemaFetchConfig,
-        buildCasePreparationSchemaRequest({
-          subDepartmentId,
-          batchType: batchType ?? "",
-        }),
-      );
-
-      setSchemaLoading(false);
-
-      if (!response?.success || !response.data) {
-        const message = getErrorMessage(response, STRINGS.MANUFACTURING.CASE_PREP.SCHEMA_LOAD_ERROR);
-        setSchemaError(message);
-        showAlert(message, "error");
-        return null;
-      }
-
-      const enrichedSchema = enrichCasePreparationSchemaDates(response.data);
-      schemaCacheRef.current.set(cacheKey, enrichedSchema);
-      return enrichedSchema;
-    },
-    [showAlert, subDepartmentId],
-  );
-
   const openFormWithResolvedData = useCallback(
     async (batch: CasePrepBatch, editMode: boolean) => {
       if (!batch.batchId) {
@@ -311,15 +244,8 @@ export const useCasePreparationHook = () => {
         const status = batch.cpStatus ?? batch.status;
         const shouldFetchDetails =
           editMode || isManufacturingContinueFillingStatus(String(status ?? ""));
-        const knownBatchType = batch.batchType;
 
-        // Parallelize: batch details + schema (when batchType known) start together.
-        const batchDetailsPromise = batchManagementController.getBatchById(batch.batchId);
-        const schemaPromise = knownBatchType
-          ? fetchCasePrepSchema(knownBatchType)
-          : Promise.resolve(null);
-
-        const batchDetails = await batchDetailsPromise;
+        const batchDetails = await batchManagementController.getBatchById(batch.batchId);
         const nextBatch = enrichBatchFromDetails(batch, batchDetails);
         if (!nextBatch) return;
 
@@ -338,14 +264,10 @@ export const useCasePreparationHook = () => {
             return;
           }
 
-          const detailsPromise = casePreparationController.fetchFormDetails({
+          const detailsResponse = await casePreparationController.fetchFormDetails({
             formId,
             subDepartmentId,
           });
-          const [detailsResponse, schemaFromKnown] = await Promise.all([
-            detailsPromise,
-            schemaPromise,
-          ]);
 
           if (!detailsResponse?.success || !detailsResponse?.data) {
             const fallback =
@@ -361,30 +283,12 @@ export const useCasePreparationHook = () => {
             batch.batchType ?? detailsResponse.data.batchType ?? nextBatch.batchType;
           nextFormData = mapCasePreparationDetailsToFormState(detailsResponse.data);
 
-          const schema =
-            schemaFromKnown &&
-            mapCasePrepBatchTypeToSchema(knownBatchType) ===
-              mapCasePrepBatchTypeToSchema(nextBatch.batchType)
-              ? schemaFromKnown
-              : await fetchCasePrepSchema(nextBatch.batchType);
-
           const merged = mergeMotorsFromBatchAndForm(nextBatch, nextFormData);
           nextFormData = merged.formData;
           nextAddedMotors = merged.addedMotors;
 
-          if (schema) {
-            const firstMotorId = nextFormData.motors[0]?.motorId;
-            nextFormData = hydrateCasePreparationFormState(
-              nextFormData,
-              schema,
-              buildCasePrepSetupContext(nextBatch, nextFormData.motors.length),
-              firstMotorId ? { hydrateMotorIds: [firstMotorId] } : undefined,
-            );
-          }
-
           if (isMainMotorBatch(nextBatch.batchType) && nextAddedMotors.length === 0) {
-            if (!schema) return;
-            const initialized = initializeCasePrepFormFromBatch(nextBatch, schema, nextFormData);
+            const initialized = initializeCasePrepFormFromBatch(nextBatch, nextFormData);
             nextFormData = initialized.formData;
             nextAddedMotors = initialized.addedMotors;
           }
@@ -394,11 +298,6 @@ export const useCasePreparationHook = () => {
             nextAddedMotors.map((m) => m.motorId),
           );
         } else {
-          const schemaFromKnown = await schemaPromise;
-          const schema =
-            schemaFromKnown ?? (await fetchCasePrepSchema(nextBatch.batchType));
-          if (!schema) return;
-
           if (isMainMotorBatch(nextBatch.batchType)) {
             const motorsFromBatch = resolveCasePrepMotorsFromBatch(nextBatch);
             if (!motorsFromBatch.length) {
@@ -407,7 +306,7 @@ export const useCasePreparationHook = () => {
             }
           }
 
-          const initialized = initializeCasePrepFormFromBatch(nextBatch, schema);
+          const initialized = initializeCasePrepFormFromBatch(nextBatch);
           nextFormData = initialized.formData;
           nextAddedMotors = initialized.addedMotors;
           nextMotorStatuses = Object.fromEntries(
@@ -429,7 +328,7 @@ export const useCasePreparationHook = () => {
         setLoadingFormDetails(false);
       }
     },
-    [fetchCasePrepSchema, showAlert, subDepartmentId],
+    [showAlert, subDepartmentId],
   );
 
   const handleViewCasePrepDetails = useCallback(
@@ -444,20 +343,10 @@ export const useCasePreparationHook = () => {
       }
 
       setDetailsLoading(true);
-      const batchType = mapCasePrepBatchTypeToSchema(row.batchType ?? "MAIN_BATCH");
-      const [response, schemaResponse] = await Promise.all([
-        casePreparationController.fetchFormDetails({
-          formId: row.formId,
-          subDepartmentId,
-        }),
-        schemaEngineController.fetchSchema(
-          casePreparationSchemaFetchConfig,
-          buildCasePreparationSchemaRequest({
-            subDepartmentId,
-            batchType,
-          }),
-        ),
-      ]);
+      const response = await casePreparationController.fetchFormDetails({
+        formId: row.formId,
+        subDepartmentId,
+      });
       setDetailsLoading(false);
 
       if (!response?.success || !response?.data) {
@@ -470,11 +359,6 @@ export const useCasePreparationHook = () => {
 
       setDetailsRow(row);
       setDetailsData(response.data);
-      setDetailsSchema(
-        schemaResponse?.success && schemaResponse.data
-          ? enrichCasePreparationSchemaDates(schemaResponse.data)
-          : null,
-      );
       setView("details");
     },
     [showAlert, subDepartmentId],
@@ -483,7 +367,6 @@ export const useCasePreparationHook = () => {
   const handleBackFromDetails = useCallback(() => {
     setDetailsRow(null);
     setDetailsData(null);
-    setDetailsSchema(null);
     setView("list");
     bumpBatchRefresh();
   }, [bumpBatchRefresh]);
@@ -507,43 +390,48 @@ export const useCasePreparationHook = () => {
     resetFormContext();
   }, [isFormDirty, resetFormContext, bumpBatchRefresh]);
 
-  const handleDiscardAndBack = useCallback(() => {
-    bumpBatchRefresh();
-    resetFormContext();
-  }, [resetFormContext, bumpBatchRefresh]);
+  const handleDiscardAndBack = useCallback(async () => {
+    setBackConfirmOpen(false);
+    await discardWorkflowForm({
+      subDepartmentId,
+      baselineState: null,
+      currentState: null,
+      extractTempFileIds: noopTempFileExtractor,
+      deleteTemp,
+      resetForm: () => {
+        bumpBatchRefresh();
+        resetFormContext();
+      },
+    });
+  }, [bumpBatchRefresh, deleteTemp, resetFormContext, subDepartmentId]);
 
-  const handleMotorSessionChange = useCallback(
-    (motorId: string, nextMotor: CasePrepMotorSession, meta?: { hydrate?: boolean }) => {
-      setFormData((prev) => {
-        const motors = prev.motors ?? [];
-        let changed = false;
-        const nextMotors = motors.map((motor) => {
-          if (motor.motorId !== motorId) return motor;
-          if (motor === nextMotor) return motor;
-          changed = true;
-          return nextMotor;
-        });
-        return changed ? { ...prev, motors: nextMotors } : prev;
+  const handleMotorSessionChange = useCallback((motorId: string, nextMotor: CasePrepMotorSession) => {
+    setFormData((prev) => {
+      const motors = prev.motors ?? [];
+      let changed = false;
+      const nextMotors = motors.map((motor) => {
+        if (motor.motorId !== motorId) return motor;
+        if (motor === nextMotor) return motor;
+        changed = true;
+        return nextMotor;
       });
-      setAddedMotors((prev) => {
-        let changed = false;
-        const next = prev.map((motor) => {
-          if (motor.motorId !== motorId) return motor;
-          if (motor.prrcClearanceDate === nextMotor.prrcClearanceDate) return motor;
-          changed = true;
-          return { ...motor, prrcClearanceDate: nextMotor.prrcClearanceDate };
-        });
-        return changed ? next : prev;
+      return changed ? { ...prev, motors: nextMotors } : prev;
+    });
+    setAddedMotors((prev) => {
+      let changed = false;
+      const next = prev.map((motor) => {
+        if (motor.motorId !== motorId) return motor;
+        if (motor.prrcClearanceDate === nextMotor.prrcClearanceDate) return motor;
+        changed = true;
+        return { ...motor, prrcClearanceDate: nextMotor.prrcClearanceDate };
       });
-      if (!meta?.hydrate) {
-        setIsFormDirty(true);
-      }
-    },
-    [],
-  );
+      return changed ? next : prev;
+    });
+    setIsFormDirty(true);
+  }, []);
 
-  const handleSubscaleValuesChange = useCallback((values: SchemaFormValues) => {
-    setFormData((prev) => ({ ...prev, subscaleFormValues: values }));
+  const handleSubscaleValuesChange = useCallback((data: CasePrepMotorData) => {
+    setFormData((prev) => ({ ...prev, subscaleData: data }));
     setIsFormDirty(true);
   }, []);
 
@@ -559,7 +447,14 @@ export const useCasePreparationHook = () => {
         !isMotorEnabledForWorkflow(
           motorId,
           addedMotors.map((motor) => motor.motorId),
-          null,
+          {
+            enableAll: true,
+            kind: "motor",
+            previousSubDepartmentId: null,
+            previousSubDepartmentName: null,
+            approvedPremixNos: new Set(),
+            approvedMotorIds: new Set(),
+          },
           getMotorStatus,
         )
       ) {
@@ -577,10 +472,6 @@ export const useCasePreparationHook = () => {
 
       if (!subDepartmentId) {
         showAlert(S.SUB_DEPARTMENT_MISSING, "error");
-        return false;
-      }
-      if (!formData.schema) {
-        showAlert(S.SCHEMA_LOAD_ERROR, "warning");
         return false;
       }
       if (!checkMotorEditable(motorId)) {
@@ -609,7 +500,7 @@ export const useCasePreparationHook = () => {
       const motorSubmissionType = isDraft ? "DRAFT" : "SUBMIT";
       const formSubmissionType = "DRAFT" as const;
       const isCreateFlow = !resolveFormId(activeBatch);
-      const payloadBody = mapCasePreparationFormStateToPayload(formData, {
+      const payloadBody = buildCasePreparationFormBody(formData, {
         targetMotorIds: [motorId],
         motorSubmissionType,
       });
@@ -629,7 +520,7 @@ export const useCasePreparationHook = () => {
           }
           response = await casePreparationController.createForm({
             batchId: activeBatch.batchId,
-            batchType: mapCasePrepBatchTypeToSchema(activeBatch.batchType),
+            batchType: mapCasePrepBatchTypeForApi(activeBatch.batchType),
             subDepartmentId,
             formSubmissionType,
             casePreparationDetails: payloadBody,
@@ -643,7 +534,7 @@ export const useCasePreparationHook = () => {
           response = await casePreparationController.updateForm({
             batchId: activeBatch.batchId,
             formId,
-            batchType: mapCasePrepBatchTypeToSchema(activeBatch.batchType),
+            batchType: mapCasePrepBatchTypeForApi(activeBatch.batchType),
             subDepartmentId,
             formSubmissionType,
             casePreparationDetails: payloadBody,
@@ -763,7 +654,7 @@ export const useCasePreparationHook = () => {
       const response = await casePreparationController.updateForm({
         batchId: activeBatch.batchId,
         formId: activeBatch.formId,
-        batchType: mapCasePrepBatchTypeToSchema(activeBatch.batchType),
+        batchType: mapCasePrepBatchTypeForApi(activeBatch.batchType),
         subDepartmentId,
         formSubmissionType: "SUBMIT",
         casePreparationDetails: payloadBody,
@@ -802,13 +693,9 @@ export const useCasePreparationHook = () => {
         showAlert(S.SUB_DEPARTMENT_MISSING, "error");
         return false;
       }
-      if (!formData.schema) {
-        showAlert(S.SCHEMA_LOAD_ERROR, "warning");
-        return false;
-      }
 
       const isCreateFlow = !resolveFormId(activeBatch);
-      const payloadBody = mapCasePreparationFormStateToPayload(formData);
+      const payloadBody = buildCasePreparationFormBody(formData);
 
       setActionLoading(true);
       try {
@@ -816,7 +703,7 @@ export const useCasePreparationHook = () => {
         if (isCreateFlow) {
           response = await casePreparationController.createForm({
             batchId: activeBatch.batchId,
-            batchType: mapCasePrepBatchTypeToSchema(activeBatch.batchType),
+            batchType: mapCasePrepBatchTypeForApi(activeBatch.batchType),
             subDepartmentId,
             formSubmissionType: intent === "draft" ? "DRAFT" : "SUBMIT",
             casePreparationDetails: payloadBody,
@@ -825,7 +712,7 @@ export const useCasePreparationHook = () => {
           response = await casePreparationController.updateForm({
             batchId: activeBatch.batchId,
             formId: activeBatch.formId,
-            batchType: mapCasePrepBatchTypeToSchema(activeBatch.batchType),
+            batchType: mapCasePrepBatchTypeForApi(activeBatch.batchType),
             subDepartmentId,
             formSubmissionType: intent === "draft" ? "DRAFT" : "SUBMIT",
             casePreparationDetails: payloadBody,
@@ -882,8 +769,9 @@ export const useCasePreparationHook = () => {
     motorStatusById,
     getMotorStatus,
     isMotorEditable: checkMotorEditable,
-    schemaLoading,
-    schemaError,
+    /** Compatibility stubs — schema fetch removed for typed Case Prep form. */
+    schemaLoading: false,
+    schemaError: null as string | null,
     subDepartmentId,
     batchMotorCount: resolveCasePrepBatchMotorCount(
       activeBatch,
@@ -896,7 +784,7 @@ export const useCasePreparationHook = () => {
     setBackConfirmOpen,
     detailsRow,
     detailsData,
-    detailsSchema,
+    detailsSchema: null as null,
     detailsLoading,
     handleViewCasePrepDetails,
     handleBackFromDetails,
@@ -911,6 +799,7 @@ export const useCasePreparationHook = () => {
     handleSubmitForFinalApproval,
     handleSaveDraft,
     handleSubmit,
+    hasSavedDraft,
   };
 };
 

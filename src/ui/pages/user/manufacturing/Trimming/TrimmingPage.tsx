@@ -47,7 +47,6 @@ const TrimmingPage = () => {
     handleMotorSessionChange,
     handleSaveMotorDraft,
     handleSubmitMotor,
-    handleSubmitForFinalApproval,
   } = hookState;
 
   const listLoading = loading && !loadingFormDetails && view === "list";
@@ -97,7 +96,6 @@ const TrimmingPage = () => {
               setPendingMotorId(motorId);
               setMotorSubmitConfirmOpen(true);
             }}
-            onSubmitForFinalApproval={handleSubmitForFinalApproval}
             theme={theme}
           />
 
@@ -117,7 +115,9 @@ const TrimmingPage = () => {
             severity="warning"
             title={S.MOTOR_DRAFT_CONFIRM_TITLE}
             message={S.MOTOR_DRAFT_CONFIRM_MESSAGE(pendingMotorId ?? "")}
-            confirmLabel={S.SAVE_MOTOR_DRAFT}
+            confirmLabel={
+              pendingMotorId ? S.SAVE_MOTOR_DRAFT(pendingMotorId) : S.MOTOR_DRAFT_CONFIRM_TITLE
+            }
             cancelLabel={STRINGS.SOURCING.SPECIFICATION_FORM.CONFIRM_CANCEL_ACTION}
             onConfirm={async () => {
               const motorId = pendingMotorId;
@@ -136,7 +136,9 @@ const TrimmingPage = () => {
             severity="warning"
             title={S.MOTOR_SUBMIT_CONFIRM_TITLE}
             message={S.MOTOR_SUBMIT_CONFIRM_MESSAGE(pendingMotorId ?? "")}
-            confirmLabel={S.SUBMIT_MOTOR}
+            confirmLabel={
+              pendingMotorId ? S.SUBMIT_MOTOR(pendingMotorId) : S.MOTOR_SUBMIT_CONFIRM_TITLE
+            }
             cancelLabel={STRINGS.SOURCING.SPECIFICATION_FORM.CONFIRM_CANCEL_ACTION}
             onConfirm={async () => {
               const motorId = pendingMotorId;

@@ -8,6 +8,7 @@ import {
   getProjectManagementErrorMessage,
 } from "@data/models/centrehead/ProjectManagement/ProjectManagementModel";
 import { getDateRange } from "@/utils/dateUtils";
+import { DEFAULT_DATE_FILTER_TYPE } from "@/ui/components/custom/dashboard/DashboardDateFilter";
 
 const S = STRINGS.PROJECT_MANAGEMENT;
 
@@ -142,7 +143,7 @@ function useProjectStatsSection(
     idleProjects: 0,
   });
   const [statsLoading, setStatsLoading] = useState(true);
-  const [filterType, setFilterType] = useState("month");
+  const [filterType, setFilterType] = useState(DEFAULT_DATE_FILTER_TYPE);
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
   const [appliedCustomStart, setAppliedCustomStart] = useState("");
@@ -222,7 +223,7 @@ function useProjectStatsSection(
   }, [customStartDate, customEndDate, setDashboardDateFilter]);
 
   const clearDateFilter = useCallback(() => {
-    setFilterType("month");
+    setFilterType(DEFAULT_DATE_FILTER_TYPE);
     setCustomStartDate("");
     setCustomEndDate("");
     setAppliedCustomStart("");

@@ -13,7 +13,6 @@ import { STRINGS } from "../../../../app/config/strings";
 import { icons } from "../../../../app/theme/icons";
 import {
   buildMixingApproverCards,
-  canApproverActionEntireMixingForm,
   isMixCardApproverActionable,
   isMixCardApproverTabDisabled,
   type MixingDetailView,
@@ -45,8 +44,6 @@ type MixingApproverReviewContentProps = {
   onActiveMixCardChange: (mixCardId: string) => void;
   onApprove: () => void;
   onReject: () => void;
-  onApproveForm?: () => void;
-  onRejectForm?: () => void;
   actionLoading?: boolean;
   manufacturingTheme: ReturnType<typeof getManufacturingTheme>;
   approverTheme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
@@ -59,8 +56,6 @@ const MixingApproverReviewContent = ({
   onActiveMixCardChange,
   onApprove,
   onReject,
-  onApproveForm,
-  onRejectForm,
   actionLoading = false,
   manufacturingTheme,
   approverTheme,
@@ -119,11 +114,6 @@ const MixingApproverReviewContent = ({
     (card) => card.mixCardId === activeMixCardId,
   );
   const canApproveOrReject = isMixCardApproverActionable(activeMixCard?.mixCardSubmissionStatus);
-  const canApproveOrRejectForm = canApproverActionEntireMixingForm({
-    formSubmissionType: detailView?.formSubmissionType,
-    status: detailView?.status,
-    mixCards,
-  });
 
   const navPalette = {
     primary: palette.primary,
@@ -199,51 +189,6 @@ const MixingApproverReviewContent = ({
           statusConfig={statusConfig}
         />
       </Box>
-
-      {canApproveOrRejectForm ? (
-        <Box
-          sx={{
-            border: `1px solid ${palette.border}`,
-            borderRadius: 2,
-            px: 1.25,
-            py: 1,
-            background: palette.surface,
-          }}
-        >
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            alignItems={{ xs: "stretch", sm: "center" }}
-            justifyContent="space-between"
-            gap={1}
-          >
-            <Typography sx={{ fontSize: "0.74rem", color: palette.textSub, fontWeight: 600 }}>
-              {MX.FORM_APPROVER_ACTIONS_HINT}
-            </Typography>
-            <Stack direction={{ xs: "column", sm: "row" }} gap={1}>
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<RejectIcon />}
-                disabled={actionLoading || !onRejectForm}
-                onClick={onRejectForm}
-                sx={approverTheme.dialog.rejectAction}
-              >
-                {MX.FORM_APPROVER_REJECT}
-              </Button>
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<ApproveIcon />}
-                disabled={actionLoading || !onApproveForm}
-                onClick={onApproveForm}
-                sx={approverTheme.dialog.approveAction}
-              >
-                {MX.FORM_APPROVER_APPROVE}
-              </Button>
-            </Stack>
-          </Stack>
-        </Box>
-      ) : null}
 
       <UserWorkflowNavPanel palette={navPalette}>
         <UserWorkflowTabNav

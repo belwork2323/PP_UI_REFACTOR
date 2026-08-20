@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import { Button, Stack } from "@mui/material";
 import FilterPanelHeader from "@ui/components/common/FilterPanelHeader";
 
-type AdminFilterPanelProps = {
+type AdminListFilterPanelProps = {
   title: string;
   activeFilterCount: number;
   onClear: () => void;
@@ -15,20 +15,21 @@ type AdminFilterPanelProps = {
   theme: {
     filterToggle: {
       filterPanelHeader: object;
-      filterBtnIcon: object;
-      filterLabel: object;
-      filterBadge: object;
-      clearChip: object;
+      filterPanelIcon: object;
+      filterPanelLabel: object;
+      filterPanelBadge: object;
+      filterPanelClearChip: object;
     };
     filterPanel: {
       extension: object;
+      fieldsRow: object;
       closeButton: object;
       applyButton: object;
     };
   };
 };
 
-const AdminFilterPanel = ({
+const AdminListFilterPanel = ({
   title,
   activeFilterCount,
   onClear,
@@ -39,7 +40,7 @@ const AdminFilterPanel = ({
   applyLabel,
   children,
   theme,
-}: AdminFilterPanelProps) => {
+}: AdminListFilterPanelProps) => {
   const { filterToggle, filterPanel } = theme;
 
   return (
@@ -50,13 +51,22 @@ const AdminFilterPanel = ({
         onClear={onClear}
         clearLabel={clearLabel}
         containerSx={filterToggle.filterPanelHeader}
-        iconSx={filterToggle.filterBtnIcon}
-        labelSx={filterToggle.filterLabel}
-        badgeSx={filterToggle.filterBadge}
-        clearChipSx={filterToggle.clearChip}
+        iconSx={filterToggle.filterPanelIcon}
+        labelSx={filterToggle.filterPanelLabel}
+        badgeSx={filterToggle.filterPanelBadge}
+        clearChipSx={filterToggle.filterPanelClearChip}
       />
 
-      {children}
+      <Stack
+        direction={{ xs: "column", lg: "row" }}
+        spacing={1.25}
+        flexWrap="wrap"
+        useFlexGap
+        alignItems="flex-end"
+        sx={filterPanel.fieldsRow}
+      >
+        {children}
+      </Stack>
 
       <Stack direction="row" justifyContent="flex-end" spacing={1}>
         <Button variant="outlined" size="small" onClick={onClose} sx={filterPanel.closeButton}>
@@ -70,4 +80,4 @@ const AdminFilterPanel = ({
   );
 };
 
-export default AdminFilterPanel;
+export default AdminListFilterPanel;

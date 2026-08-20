@@ -1,15 +1,4 @@
 import type { DimensionalParameterModel } from "./SubdepartmentCommonModel";
-import type {
-  SchemaDocumentV2,
-  SchemaFormValues,
-  SchemaSectionSubmission,
-} from "../../../schema-engine";
-import {
-  buildMockTrialSectionPayload,
-  createMockTrialInitialValues,
-  hydrateMockTrialValuesFromSections,
-  parseMockTrialSavedSections,
-} from "../../../schema-engine/adapters/rocketMotorCasingMockTrial.adapter";
 import { formatToIsoDateInput } from "../../../utils/dateUtils";
 
 /** API payload dates stay YYYY-MM-DD regardless of UI display format. */
@@ -113,6 +102,303 @@ export const createEmptyRadiographyPlanRow = (srNo = 1): CasingRadiographyPlanRo
 export const createInitialRadiographyPlanRows = (): CasingRadiographyPlanRow[] => [
   createEmptyRadiographyPlanRow(1),
 ];
+
+/** Mock trial — typed RMC form state aligned to API payload. */
+export type MockTrialMotorDimensionRow = {
+  srNo: number;
+  lfRubberThicknessHe: string;
+  heBossWidthWithoutLfRubber: string;
+  heDiaId: string;
+  heOuterToNeOuter: string;
+  heInnerToNeInner: string;
+  neOuterToHeInner: string;
+};
+
+export type MockTrialMandrelAssemblyRow = {
+  srNo: number;
+  mandrelRestOnDomeA: string;
+  mandrelRestOnBottomCupB: string;
+  bellowThicknessD: string;
+};
+
+export type RocketMotorCasingMockTrialData = {
+  castingStation: string;
+  mandrelId: string;
+  bottomCupId: string;
+  motorDimensions: MockTrialMotorDimensionRow[];
+  mandrelAssemblyMeasurements: MockTrialMandrelAssemblyRow[];
+};
+
+export type MockTrialMeasuredMm = {
+  value: number | null;
+  unit: "mm";
+};
+
+export type RocketMotorCasingMockTrialPayload = {
+  basicDetails: {
+    castingStation: string;
+    mandrelId: string;
+    bottomCupId: string;
+  };
+  motorDimensions: Array<{
+    srNo: number;
+    lfRubberThicknessHe: MockTrialMeasuredMm;
+    heBossWidthWithoutLfRubber: MockTrialMeasuredMm;
+    heDiaId: MockTrialMeasuredMm;
+    motorLength: {
+      heOuterToNeOuter: MockTrialMeasuredMm;
+      heInnerToNeInner: MockTrialMeasuredMm;
+      neOuterToHeInner: MockTrialMeasuredMm;
+    };
+  }>;
+  mandrelAssemblyMeasurements: Array<{
+    srNo: number;
+    mandrelRestOnDomeA: number | null;
+    mandrelRestOnBottomCupB: number | null;
+    differenceC: number | null;
+    bellowThicknessD: number | null;
+    mandrelLiftE: number | null;
+  }>;
+};
+
+export const createEmptyMockTrialMotorDimensionRow = (
+  srNo = 1,
+): MockTrialMotorDimensionRow => ({
+  srNo,
+  lfRubberThicknessHe: "",
+  heBossWidthWithoutLfRubber: "",
+  heDiaId: "",
+  heOuterToNeOuter: "",
+  heInnerToNeInner: "",
+  neOuterToHeInner: "",
+});
+
+export const createEmptyMockTrialMandrelAssemblyRow = (
+  srNo = 1,
+): MockTrialMandrelAssemblyRow => ({
+  srNo,
+  mandrelRestOnDomeA: "",
+  mandrelRestOnBottomCupB: "",
+  bellowThicknessD: "",
+});
+
+export const createEmptyMockTrialData = (): RocketMotorCasingMockTrialData => ({
+  castingStation: "",
+  mandrelId: "",
+  bottomCupId: "",
+  motorDimensions: [createEmptyMockTrialMotorDimensionRow(1)],
+  mandrelAssemblyMeasurements: [createEmptyMockTrialMandrelAssemblyRow(1)],
+});
+
+const parseDecimalInput = (value: unknown): string => {
+  if (value == null || value === "") return "";
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  return String(value).trim();
+};
+
+const parseNumOrNull = (value: string): number | null => {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return null;
+  const n = Number(trimmed.replace(",", "."));
+  return Number.isFinite(n) ? n : null;
+};
+
+const toMeasuredMm = (value: string): MockTrialMeasuredMm => ({
+  value: parseNumOrNull(value),
+  unit: "mm",
+});
+
+const fromMeasuredMm = (value: unknown): string => {
+  if (value == null || value === "") return "";
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "object") {
+    return parseDecimalInput((value as { value?: unknown }).value);
+  }
+  return parseDecimalInput(value);
+};
+
+/** C = A − B (readonly formula in UI). */
+export const computeMockTrialDifferenceC = (row: MockTrialMandrelAssemblyRow): string => {
+  const a = parseNumOrNull(row.mandrelRestOnDomeA);
+  const b = parseNumOrNull(row.mandrelRestOnBottomCupB);
+  if (a == null || b == null) return "";
+  return String(Number((a - b).toFixed(4)));
+};
+
+/** E = C − D (readonly formula in UI). */
+export const computeMockTrialMandrelLiftE = (row: MockTrialMandrelAssemblyRow): string => {
+  const c = parseNumOrNull(computeMockTrialDifferenceC(row));
+  const d = parseNumOrNull(row.bellowThicknessD);
+  if (c == null || d == null) return "";
+  return String(Number((c - d).toFixed(4)));
+};
+
+export const buildMockTrialPayload = (
+  mockTrial: RocketMotorCasingMockTrialData,
+): RocketMotorCasingMockTrialPayload => ({
+  basicDetails: {
+    castingStation: String(mockTrial.castingStation ?? "").trim(),
+    mandrelId: String(mockTrial.mandrelId ?? "").trim(),
+    bottomCupId: String(mockTrial.bottomCupId ?? "").trim(),
+  },
+  motorDimensions: (mockTrial.motorDimensions ?? []).map((row, index) => ({
+    srNo: index + 1,
+    lfRubberThicknessHe: toMeasuredMm(row.lfRubberThicknessHe),
+    heBossWidthWithoutLfRubber: toMeasuredMm(row.heBossWidthWithoutLfRubber),
+    heDiaId: toMeasuredMm(row.heDiaId),
+    motorLength: {
+      heOuterToNeOuter: toMeasuredMm(row.heOuterToNeOuter),
+      heInnerToNeInner: toMeasuredMm(row.heInnerToNeInner),
+      neOuterToHeInner: toMeasuredMm(row.neOuterToHeInner),
+    },
+  })),
+  mandrelAssemblyMeasurements: (mockTrial.mandrelAssemblyMeasurements ?? []).map((row, index) => ({
+    srNo: index + 1,
+    mandrelRestOnDomeA: parseNumOrNull(row.mandrelRestOnDomeA),
+    mandrelRestOnBottomCupB: parseNumOrNull(row.mandrelRestOnBottomCupB),
+    differenceC: parseNumOrNull(computeMockTrialDifferenceC(row)),
+    bellowThicknessD: parseNumOrNull(row.bellowThicknessD),
+    mandrelLiftE: parseNumOrNull(computeMockTrialMandrelLiftE(row)),
+  })),
+});
+
+/** @deprecated Use buildMockTrialPayload */
+export const buildMockTrialSectionPayload = buildMockTrialPayload;
+
+const mapMotorDimensionRowFromApi = (
+  row: Record<string, unknown>,
+  index: number,
+): MockTrialMotorDimensionRow => {
+  const motorLength =
+    row.motorLength && typeof row.motorLength === "object"
+      ? (row.motorLength as Record<string, unknown>)
+      : {};
+
+  return {
+    srNo: Number(row.srNo ?? index + 1),
+    lfRubberThicknessHe: fromMeasuredMm(
+      row.lfRubberThicknessHe ?? row.looseFlapThicknessRubberHe,
+    ),
+    heBossWidthWithoutLfRubber: fromMeasuredMm(
+      row.heBossWidthWithoutLfRubber ?? row.metalWidth ?? row.heMetalPolarBossId,
+    ),
+    heDiaId: fromMeasuredMm(row.heDiaId ?? row.heRubberPolarBossId ?? row.rubberWidth),
+    heOuterToNeOuter: fromMeasuredMm(
+      motorLength.heOuterToNeOuter ?? row.heOuterToNeOuter,
+    ),
+    heInnerToNeInner: fromMeasuredMm(
+      motorLength.heInnerToNeInner ?? row.heInnerToNeInner,
+    ),
+    neOuterToHeInner: fromMeasuredMm(
+      motorLength.neOuterToHeInner ?? row.heInnerToNeOuter ?? row.neOuterToHeInner,
+    ),
+  };
+};
+
+const mapMandrelAssemblyRowFromApi = (
+  row: Record<string, unknown>,
+  index: number,
+): MockTrialMandrelAssemblyRow => ({
+  srNo: Number(row.srNo ?? index + 1),
+  mandrelRestOnDomeA: fromMeasuredMm(row.mandrelRestOnDomeA),
+  mandrelRestOnBottomCupB: fromMeasuredMm(row.mandrelRestOnBottomCupB),
+  bellowThicknessD: fromMeasuredMm(row.bellowThicknessD),
+});
+
+export const parseMockTrialFromApi = (value: unknown): RocketMotorCasingMockTrialData => {
+  const empty = createEmptyMockTrialData();
+  if (!value || typeof value !== "object") return empty;
+
+  // New object payload: { basicDetails, motorDimensions, mandrelAssemblyMeasurements }
+  if (!Array.isArray(value) && !("sectionId" in (value as object))) {
+    const root = value as Record<string, unknown>;
+    const basic =
+      root.basicDetails && typeof root.basicDetails === "object"
+        ? (root.basicDetails as Record<string, unknown>)
+        : root;
+    const motorDimRows = Array.isArray(root.motorDimensions)
+      ? (root.motorDimensions as Record<string, unknown>[])
+      : [];
+    const mandrelRows = Array.isArray(root.mandrelAssemblyMeasurements)
+      ? (root.mandrelAssemblyMeasurements as Record<string, unknown>[])
+      : [];
+
+    return {
+      castingStation: String(basic.castingStation ?? "").trim(),
+      mandrelId: String(basic.mandrelId ?? "").trim(),
+      bottomCupId: String(basic.bottomCupId ?? "").trim(),
+      motorDimensions:
+        motorDimRows.length > 0
+          ? motorDimRows.map(mapMotorDimensionRowFromApi)
+          : empty.motorDimensions,
+      mandrelAssemblyMeasurements:
+        mandrelRows.length > 0
+          ? mandrelRows.map(mapMandrelAssemblyRowFromApi)
+          : empty.mandrelAssemblyMeasurements,
+    };
+  }
+
+  // Legacy schema section-array fallback
+  if (!Array.isArray(value)) return empty;
+
+  const sections = value
+    .filter((item) => item && typeof item === "object" && "sectionId" in (item as object))
+    .map((item) => {
+      const row = item as { sectionId?: string; sectionData?: unknown[] };
+      return {
+        sectionId: String(row.sectionId ?? ""),
+        sectionData: Array.isArray(row.sectionData) ? row.sectionData : [],
+      };
+    });
+
+  if (!sections.length) return empty;
+
+  const byId = Object.fromEntries(sections.map((s) => [s.sectionId, s]));
+  const basicData = Array.isArray(byId.basicDetails?.sectionData)
+    ? byId.basicDetails.sectionData[0]
+    : null;
+  const basic =
+    basicData && typeof basicData === "object"
+      ? (basicData as Record<string, unknown>)
+      : {};
+
+  const extractRows = (sectionId: string): Record<string, unknown>[] => {
+    const section = byId[sectionId];
+    if (!section) return [];
+    const first = section.sectionData[0];
+    if (first && typeof first === "object") {
+      const nested = (first as Record<string, unknown>)[sectionId];
+      if (Array.isArray(nested)) return nested as Record<string, unknown>[];
+    }
+    if (
+      section.sectionData.length > 0 &&
+      section.sectionData.every((row) => row && typeof row === "object")
+    ) {
+      return section.sectionData as Record<string, unknown>[];
+    }
+    return [];
+  };
+
+  const motorDimRows = extractRows("motorDimensions");
+  const mandrelRows = extractRows("mandrelAssemblyMeasurements");
+
+  return {
+    castingStation: String(basic.castingStation ?? "").trim(),
+    mandrelId: String(basic.mandrelId ?? "").trim(),
+    bottomCupId: String(basic.bottomCupId ?? "").trim(),
+    motorDimensions:
+      motorDimRows.length > 0
+        ? motorDimRows.map(mapMotorDimensionRowFromApi)
+        : empty.motorDimensions,
+    mandrelAssemblyMeasurements:
+      mandrelRows.length > 0
+        ? mandrelRows.map(mapMandrelAssemblyRowFromApi)
+        : empty.mandrelAssemblyMeasurements,
+  };
+};
+
+/** @deprecated Use parseMockTrialFromApi */
+export const parseMockTrialFromSections = parseMockTrialFromApi;
 
 const mapCasingDetectorTypeToApi = (value: string): string => {
   const trimmed = String(value ?? "").trim();
@@ -327,7 +613,7 @@ export type RocketMotorCasingFormData = {
   weighscaleEquipment: string;
   calibrationDueDate: string;
   dimensionalData: DimensionalReadingFormRow[];
-  mockTrial: RocketMotorCasingMockTrialSlot;
+  mockTrial: RocketMotorCasingMockTrialData;
   ndtUtReportFiles: File[];
   ndtUtReportExisting: UploadedFileRef[];
 
@@ -349,22 +635,8 @@ export type RocketMotorCasingFormData = {
   reportUpload: ReportUploadSection | null;
 };
 
-export type RocketMotorCasingMockTrialSlot = {
-  schema: SchemaDocumentV2 | null;
-  schemaLoading: boolean;
-  schemaError: string | null;
-  formValues: SchemaFormValues;
-  /** Persisted section rows from API until schema is fetched */
-  savedSections?: SchemaSectionSubmission[];
-};
-
-export const createEmptyMockTrialSlot = (): RocketMotorCasingMockTrialSlot => ({
-  schema: null,
-  schemaLoading: false,
-  schemaError: null,
-  formValues: {},
-  savedSections: undefined,
-});
+export const createEmptyMockTrialSlot = (): RocketMotorCasingMockTrialData =>
+  createEmptyMockTrialData();
 
 export type RocketMotorCasingFormPayload = {
   subDepartmentId: number;
@@ -970,14 +1242,7 @@ export function buildCasingFormPayload(
         },
       },
       dimensionalInspection,
-      ...(form.mockTrial.schema
-        ? {
-            mockTrial: buildMockTrialSectionPayload(
-              form.mockTrial.schema,
-              form.mockTrial.formValues,
-            ),
-          }
-        : {}),
+      mockTrial: buildMockTrialPayload(form.mockTrial),
       reportUpload: {
         ndtUtReport: buildReportUpload(
           "NDT_UT_REPORT",
@@ -1148,7 +1413,7 @@ export function parseSectionsToFormData(
         })
       : createInitialVisualInspection();
 
-  const mockTrialSaved = parseMockTrialSavedSections(sections.mockTrial);
+  const mockTrial = parseMockTrialFromApi(sections.mockTrial);
 
   const dimApi = Array.isArray(sections.dimensionalInspection)
     ? sections.dimensionalInspection
@@ -1230,10 +1495,7 @@ export function parseSectionsToFormData(
     weighscaleEquipment: str(cal.equipmentDetails),
     calibrationDueDate: str(cal.calibrationDueDate).slice(0, 10),
     dimensionalData,
-    mockTrial: {
-      ...createEmptyMockTrialSlot(),
-      savedSections: mockTrialSaved,
-    },
+    mockTrial,
     ndtUtReportFiles: [],
     ndtUtReportExisting: mapReportFiles(reportUpload.ndtUtReport),
 
@@ -1405,13 +1667,7 @@ export function serializeCasingForm(form: RocketMotorCasingFormData): string {
       mediaFile: v.mediaFile?.name ?? null,
       mediaExisting: v.mediaExisting?.fileName ?? null,
     })),
-    mockTrial: {
-      schema: null,
-      schemaLoading: false,
-      schemaError: form.mockTrial.schemaError,
-      formValues: form.mockTrial.formValues,
-      savedSections: form.mockTrial.savedSections,
-    },
+    mockTrial: form.mockTrial,
   });
 }
 

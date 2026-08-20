@@ -220,12 +220,16 @@ export const getAdminCommonTheme = (mode: "light" | "dark" = "light") => {
     textSecondary: s.textSecondary,
   });
 
+  const primaryLight = isDark ? "#90caf9" : base.accentBlue;
+
   const filterPanelField = {
+    mt: 0,
+    mb: 0,
     "& .MuiOutlinedInput-root, & .MuiPickersOutlinedInput-root": {
       height: 32,
       minHeight: 32,
       maxHeight: 32,
-      fontSize: fonts.typography.label.fontSize,
+      fontSize: "0.72rem",
       borderRadius: "6px",
       bgcolor: semantic.filterInputBg,
       boxSizing: "border-box",
@@ -233,19 +237,29 @@ export const getAdminCommonTheme = (mode: "light" | "dark" = "light") => {
         borderColor: alpha(s.borderDefault, 0.65),
       },
       "&:hover fieldset, &:hover .MuiPickersOutlinedInput-notchedOutline": {
-        borderColor: base.accentBlue,
+        borderColor: primaryLight,
       },
       "&.Mui-focused fieldset, &.Mui-focused .MuiPickersOutlinedInput-notchedOutline": {
-        borderColor: base.accentBlue,
+        borderColor: primaryLight,
       },
     },
     "& .MuiInputBase-input, & .MuiPickersSectionList-root, & .MuiSelect-select": {
-      fontSize: fonts.typography.label.fontSize,
+      fontSize: "0.72rem",
       padding: "5px 8px",
       minHeight: "unset !important",
+      "&::placeholder": {
+        fontSize: "0.68rem",
+        opacity: 0.65,
+      },
     },
     "& .MuiInputLabel-root": {
-      fontSize: fonts.typography.label.fontSize,
+      fontSize: "0.72rem",
+    },
+    "& .MuiInputLabel-shrink": {
+      transform: "translate(14px, -8px) scale(0.85)",
+    },
+    "& .MuiInputAdornment-root .MuiIconButton-root": {
+      padding: 2,
     },
   };
 
@@ -260,23 +274,87 @@ export const getAdminCommonTheme = (mode: "light" | "dark" = "light") => {
         clearColor: f.clearColor,
         clearBorder: f.clearBorder,
       }),
+      filterPanelHeader: { alignItems: "center", pb: 0.5 },
+      filterPanelIcon: { fontSize: 18, color: primaryLight },
+      filterPanelLabel: { fontSize: "0.82rem", fontWeight: 700, color: s.textPrimary },
+      filterPanelBadge: {
+        minWidth: 20,
+        height: 20,
+        borderRadius: "50%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: "0.65rem",
+        fontWeight: 800,
+        bgcolor: alpha(primaryLight, 0.15),
+        color: primaryLight,
+      },
+      filterPanelClearChip: {
+        fontWeight: 700,
+        fontSize: "0.75rem",
+        height: "28px",
+        px: 0.5,
+        borderColor: alpha(colors.error.main, 0.35),
+        color: colors.error.main,
+        "& .MuiChip-label": { px: 1.5 },
+      },
     },
     filterPanel: {
       field: filterPanelField,
       menuItem: {
-        fontSize: fonts.typography.label.fontSize,
+        fontSize: "0.72rem",
         py: 0.5,
         minHeight: 32,
       },
+      fieldsRow: {
+        width: "100%",
+        alignSelf: "stretch",
+      },
+      fieldItem: {
+        flex: "1 1 160px",
+        minWidth: { xs: "100%", sm: 140 },
+        maxWidth: "100%",
+        "& > .MuiTextField-root": {
+          width: "100%",
+        },
+      },
+      fieldItemWide: {
+        flex: "1 1 180px",
+        minWidth: { xs: "100%", sm: 180 },
+        maxWidth: "100%",
+        "& > .MuiTextField-root": {
+          width: "100%",
+        },
+      },
+      fieldItemGrow: {
+        flex: "2 1 200px",
+        minWidth: { xs: "100%", sm: 160 },
+        maxWidth: "100%",
+        "& > .MuiTextField-root": {
+          width: "100%",
+        },
+      },
       extension: {
         mt: 1.5,
-        pt: 2,
-        borderTop: `1px solid ${alpha(s.borderDefault, 0.55)}`,
+        width: "100%",
+        alignSelf: "stretch",
       },
       applyButton: {
-        ...base.primaryButton,
         textTransform: "none" as const,
-        fontSize: fonts.typography.label.fontSize,
+        fontWeight: fonts.weight.bold,
+        fontSize: fonts.size.xs,
+        borderRadius: 2,
+        px: 1.8,
+        py: "5px",
+        color: isDark ? "#000000" : "#ffffff",
+        whiteSpace: "nowrap" as const,
+        background: `linear-gradient(135deg, ${base.accentBlue}, ${primaryLight})`,
+        boxShadow: `0 2px 8px ${alpha(base.accentBlue, 0.28)}`,
+        "&:hover": {
+          boxShadow: `0 4px 12px ${alpha(base.accentBlue, 0.38)}`,
+          transform: "translateY(-1px)",
+        },
+        transition: "all 0.18s",
       },
       closeButton: {
         textTransform: "none" as const,

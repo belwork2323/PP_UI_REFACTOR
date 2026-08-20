@@ -37,16 +37,62 @@ export const isQcStatusAwaitingInitiation = (status: unknown): boolean =>
 export const resolveMotorQcStatusFromFormDetails = (
   payload: unknown,
   motorId: string,
+  division?: string | null,
 ): QcPartialItemStatus | null => {
   const root = asRecord(payload);
   const normalizedMotorId = String(motorId ?? "").trim();
+  const normalizedDivision = String(division ?? "").trim().toUpperCase();
   if (!root || !normalizedMotorId) return null;
 
   for (const row of asArray(root.motorStatuses)) {
     const rec = asRecord(row);
     if (!rec) continue;
-    if (pickString(rec.motorId, rec.motor_id) !== normalizedMotorId) continue;
+    if (pickString(rec.motorId, rec.motorIdNo, rec.motor_id) !== normalizedMotorId) continue;
+    const rowDivision = pickString(rec.division);
+    if (
+      normalizedDivision &&
+      rowDivision &&
+      !qcDivisionStatusKeysMatch(rowDivision, normalizedDivision)
+    ) {
+      continue;
+    }
     return normalizePartialItemStatus(rec.status ?? rec.motorSubmissionStatus);
+  }
+
+  // Fallback: nested division details / postCureMotorDetails motorSubmissionStatus.
+  for (const detail of asArray(root.divisionDetails)) {
+    const detailRec = asRecord(detail);
+    if (!detailRec) continue;
+    const detailDivision = pickString(detailRec.division);
+    if (
+      normalizedDivision &&
+      detailDivision &&
+      !qcDivisionStatusKeysMatch(detailDivision, normalizedDivision)
+    ) {
+      continue;
+    }
+    const data = asRecord(detailRec.data) ?? detailRec;
+    for (const motor of [
+      ...asArray(data.postCureMotorDetails),
+      ...asArray(data.motors),
+      ...asArray(data.motorDetails),
+      ...asArray(data.trimmingDetails),
+      ...asArray(data.deCoringDetails),
+      ...asArray(data.decoringDetails),
+      ...asArray(data.curingDetails),
+    ]) {
+      const motorRec = asRecord(motor);
+      if (!motorRec) continue;
+      if (
+        pickString(motorRec.motorIdNo, motorRec.motorId, motorRec.id) !== normalizedMotorId
+      ) {
+        continue;
+      }
+      const status = motorRec.motorSubmissionStatus ?? motorRec.status ?? motorRec.motor_submission_status;
+      if (status != null && String(status).trim()) {
+        return normalizePartialItemStatus(status);
+      }
+    }
   }
 
   return null;
@@ -178,6 +224,9 @@ export const findQcFormDivisionDetail = (
     if (flowKey === "QC" || flowKey === "PROPELLANT_PROPERTIES") {
       return division === "QC" || division === "PROPELLANT_PROPERTIES";
     }
+    if (flowKey === "WEIGHTMENT" || flowKey === "WEIGHMENT") {
+      return division === "WEIGHTMENT" || division === "WEIGHMENT";
+    }
     if (flowKey === "POST_CURE") {
       return division === "POST_CURE" || division === "POST_CURE_OPERATION";
     }
@@ -202,25 +251,25 @@ export const toDivisionAutoPopulateRecord = (
   const rec = asRecord(detailOrPayload);
   if (!rec) return null;
   const nestedData = asRecord(rec.data);
-  if (
-    nestedData &&
-    (nestedData.premixes != null ||
-      nestedData.sections != null ||
-      nestedData.materials != null ||
-      nestedData.motorDetails != null ||
-      nestedData.motors != null)
-  ) {
-    return nestedData;
-  }
-  if (
-    rec.premixes != null ||
-    rec.sections != null ||
-    rec.materials != null ||
-    rec.motorDetails != null ||
-    rec.motors != null
-  ) {
-    return rec;
-  }
+  const hasDivisionData = (value: Record<string, unknown> | null) =>
+    Boolean(
+      value &&
+        (value.premixes != null ||
+          value.sections != null ||
+          value.materials != null ||
+          value.motorDetails != null ||
+          value.motors != null ||
+          value.trimmingDetails != null ||
+          value.deCoringDetails != null ||
+          value.decoringDetails != null ||
+          value.curingDetails != null ||
+          value.postCureMotorDetails != null ||
+          value.motorWeightDetails != null ||
+          value.weighscaleDetails != null),
+    );
+
+  if (hasDivisionData(nestedData)) return nestedData;
+  if (hasDivisionData(rec)) return rec;
   return nestedData ?? rec;
 };
 
@@ -257,6 +306,9 @@ const matchesStatusDivision = (
   }
   if (upperFilter === "QC" || upperFilter === "PROPELLANT_PROPERTIES") {
     return upperDivision === "QC" || upperDivision === "PROPELLANT_PROPERTIES";
+  }
+  if (upperFilter === "WEIGHTMENT" || upperFilter === "WEIGHMENT") {
+    return upperDivision === "WEIGHTMENT" || upperDivision === "WEIGHMENT";
   }
   if (upperFilter === "POST_CURE" || upperFilter === "POST_CURE_OPERATION") {
     return upperDivision === "POST_CURE" || upperDivision === "POST_CURE_OPERATION";
@@ -296,6 +348,7 @@ export const resolveUnitStatusTabKey = (params: {
 
   if (div === "PROPELLANT_PROPERTIES" || div === "QC") return "QC";
   if (div === "POST_CURE" || div === "POST_CURE_OPERATION") return "POST_CURE";
+  if (div === "WEIGHMENT" || div === "WEIGHTMENT") return "WEIGHTMENT";
   if (div) return div;
   return null;
 };
@@ -402,6 +455,50 @@ export const groupUnitStatusesByDivisionTabKey = (payload: {
   });
 
   return grouped;
+};
+
+/** Weighment motors live in divisionDetails.data.motorWeightDetails when motorStatuses omits them. */
+export const extractWeighmentMotorNavFromFormDetails = (
+  payload: unknown,
+): QcPartialNavItem[] => {
+  const root = asRecord(payload);
+  if (!root) return [];
+  const items: QcPartialNavItem[] = [];
+  const seen = new Set<string>();
+
+  for (const detail of asArray(root.divisionDetails)) {
+    const rec = asRecord(detail);
+    if (!rec) continue;
+    const division = String(rec.division ?? "")
+      .trim()
+      .toUpperCase();
+    if (division !== "WEIGHTMENT" && division !== "WEIGHMENT") continue;
+    const data = asRecord(rec.data) ?? rec;
+    const divisionStatus = normalizePartialItemStatus(
+      rec.divisionSubmissionStatus ?? rec.status,
+    );
+    for (const motor of [
+      ...asArray(data.motorWeightDetails),
+      ...asArray(data.motors),
+      ...asArray(data.motorDetails),
+    ]) {
+      const motorRec = asRecord(motor);
+      const motorId = pickString(motorRec?.motorId, motorRec?.motorIdNo, motorRec?.id);
+      if (!motorId || seen.has(motorId)) continue;
+      seen.add(motorId);
+      items.push({
+        id: `motor:${motorId}`,
+        kind: "MOTOR",
+        label: motorId,
+        status: normalizePartialItemStatus(
+          motorRec?.motorSubmissionStatus ?? motorRec?.status ?? divisionStatus,
+        ),
+        motorId,
+      });
+    }
+  }
+
+  return items.sort(compareQcPartialNavItems);
 };
 
 /** Build unit nav chips from /qc-division/details status arrays. */

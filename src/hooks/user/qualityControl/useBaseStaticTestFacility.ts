@@ -20,7 +20,6 @@ import {
   isStfMotorEditable,
   mapBemDetailsResponseToFormState,
   mapStaticTestFacilityFormStateToPayload,
-  mapStfDetailsFromSavedForm,
   mapStfMotorStatusesFromApi,
   mapStfTestNoByMotorIdFromApi,
   applyStfTestNoToFormMotors,
@@ -71,6 +70,8 @@ import {
   type StfAddedMotor,
   type StfMotorOption,
 } from "./stfFlowConfig";
+import { useFileService } from "../../../hooks/useFileService";
+import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -209,6 +210,7 @@ export const useBaseStaticTestFacility = ({
   const user = useAuthStore((state) => state.user);
   const showAlert = useAlertStore((state) => state.showAlert);
   const bumpBatchRefresh = useUserBatchRefreshStore((state) => state.bumpVersion);
+  const { deleteTemp } = useFileService();
   const refreshVersion = useUserBatchRefreshStore((state) => state.version);
 
   const messages = STRINGS.QUALITY_CONTROL.STATIC_TEST_FACILITY;
@@ -375,6 +377,23 @@ export const useBaseStaticTestFacility = ({
     () => view === "form" && formSnapshot !== initialSnapshot,
     [view, formSnapshot, initialSnapshot],
   );
+
+  const snapshotStateRef = useRef({
+    formData,
+    addedMotors,
+    selectedMotorType,
+    draftBemNo,
+    motorStatusById,
+  });
+  snapshotStateRef.current = {
+    formData,
+    addedMotors,
+    selectedMotorType,
+    draftBemNo,
+    motorStatusById,
+  };
+  const initialSnapshotRef = useRef(initialSnapshot);
+  initialSnapshotRef.current = initialSnapshot;
 
   const resetFlowDraft = useCallback(() => {
     setMotorCount("");
@@ -1188,15 +1207,23 @@ export const useBaseStaticTestFacility = ({
       return;
     }
 
-    if (hasSavedDraft) bumpBatchRefresh();
+    bumpBatchRefresh();
     resetFormContext();
-  }, [view, isFormDirty, hasSavedDraft, bumpBatchRefresh, resetFormContext]);
+  }, [view, isFormDirty, bumpBatchRefresh, resetFormContext]);
 
-  const handleDiscardAndBack = useCallback(() => {
+  const handleDiscardAndBack = useCallback(async () => {
     setBackConfirmOpen(false);
-    if (hasSavedDraft) bumpBatchRefresh();
-    resetFormContext();
-  }, [hasSavedDraft, bumpBatchRefresh, resetFormContext]);
+    await discardWorkflowSnapshotForm({
+      subDepartmentId,
+      initialSnapshot: initialSnapshotRef.current,
+      currentState: snapshotStateRef.current,
+      deleteTemp,
+      resetForm: () => {
+        bumpBatchRefresh();
+        resetFormContext();
+      },
+    });
+  }, [bumpBatchRefresh, deleteTemp, resetFormContext, subDepartmentId]);
 
   // Submit Logic
   const submitForm = async (intent: "draft" | "submit") => {
@@ -1385,7 +1412,7 @@ export const useBaseStaticTestFacility = ({
         showAlert(
           isMotorEnabledByPreviousStage(motorId, previousStageGate)
             ? STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED
-            : STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED,
+            : messages.PREVIOUS_STAGE_UNIT_DISABLED,
           "warning",
         );
         return false;
@@ -1552,74 +1579,6 @@ export const useBaseStaticTestFacility = ({
     [submitMotor],
   );
 
-  const handleSubmitForFinalApproval = useCallback(async () => {
-    if (facilityType !== "ACEM" || !activeBatch?.formId) {
-      showAlert(messages.FORM_ID_MISSING, "error");
-      return false;
-    }
-    if (!subDepartmentId) {
-      showAlert(messages.SUB_DEPARTMENT_MISSING, "error");
-      return false;
-    }
-
-    const motorIds = addedMotors.map((m) => m.motorId);
-    const allApproved =
-      motorIds.length > 0 &&
-      motorIds.every(
-        (id) =>
-          String(motorStatusById[id]?.motorSubmissionStatus ?? "").toUpperCase() === "APPROVED",
-      );
-    if (!allApproved) {
-      showAlert(messages.FINAL_APPROVAL_NOT_READY, "warning");
-      return false;
-    }
-
-    setActionLoading(true);
-    try {
-      const detailsResponse = await stfController.fetchFormDetails({
-        formId: activeBatch.formId,
-        subDepartmentId,
-      });
-      if (!detailsResponse?.success || !detailsResponse?.data) {
-        showAlert(getErrorMessage(detailsResponse, messages.DETAILS_FETCH_ERROR), "error");
-        return false;
-      }
-
-      const payloadBody = mapStfDetailsFromSavedForm(detailsResponse.data, {
-        motorStatusById,
-      });
-
-      const response = await stfController.updateForm({
-        formId: activeBatch.formId,
-        batchId: activeBatch.batchId ?? "",
-        subDepartmentId,
-        formSubmissionType: "SUBMIT",
-        motors: payloadBody.motors,
-      });
-
-      if (!response?.success) {
-        showAlert(getErrorMessage(response, messages.UPDATE_FAILED), "error");
-        return false;
-      }
-
-      showAlert(messages.CREATE_SUBMIT_SUCCESS, "success", { autoCloseMs: 2200 });
-      bumpBatchRefresh();
-      resetFormContext();
-      return true;
-    } finally {
-      setActionLoading(false);
-    }
-  }, [
-    activeBatch,
-    addedMotors,
-    bumpBatchRefresh,
-    facilityType,
-    motorStatusById,
-    resetFormContext,
-    showAlert,
-    subDepartmentId,
-  ]);
-
   // Fetch & View Details
   const handleViewDetails = useCallback(
     async (row: STFBatch | BemMotor) => {
@@ -1737,7 +1696,6 @@ export const useBaseStaticTestFacility = ({
     handleSubmit,
     handleSaveMotorDraft,
     handleSubmitMotor,
-    handleSubmitForFinalApproval,
     detailsRow,
     detailsData,
     detailsLoading,

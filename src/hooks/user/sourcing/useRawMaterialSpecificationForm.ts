@@ -32,6 +32,7 @@ import type {
 import {
   computeIsOutOfRange,
   flattenMaterialGroups,
+  hasIncompleteCertificateUploads,
   serializeMaterialBlocks,
 } from "../../../data/models/user/RawMaterialProcurementModel";
 import {
@@ -411,8 +412,12 @@ export const useRawMaterialSpecificationForm = ({
   const allAnalyzedFilled = useMemo(() => areAllAnalyzedResultsFilled(blocks), [blocks]);
 
   const canSaveDraft = useMemo(
-    () => hasBlocks && mandatoryComplete && allAnalyzedFilled,
-    [allAnalyzedFilled, hasBlocks, mandatoryComplete],
+    () =>
+      hasBlocks &&
+      mandatoryComplete &&
+      allAnalyzedFilled &&
+      !hasIncompleteCertificateUploads(blocks),
+    [allAnalyzedFilled, blocks, hasBlocks, mandatoryComplete],
   );
 
   const canSubmit = canSaveDraft;
@@ -612,19 +617,25 @@ export const useRawMaterialSpecificationForm = ({
     if (actionLoading || !hasBlocks) return;
     if (!canSaveDraft) {
       setShowFieldErrors(true);
+      if (hasIncompleteCertificateUploads(blocks)) {
+        showAlert(formStrings.CERT_UPLOAD_PENDING, "warning");
+      }
       return;
     }
     setDraftConfirm(true);
-  }, [actionLoading, canSaveDraft, hasBlocks]);
+  }, [actionLoading, blocks, canSaveDraft, formStrings.CERT_UPLOAD_PENDING, hasBlocks, showAlert]);
 
   const openSubmitConfirm = useCallback(() => {
     if (actionLoading) return;
     if (!canSubmit) {
       setShowFieldErrors(true);
+      if (hasIncompleteCertificateUploads(blocks)) {
+        showAlert(formStrings.CERT_UPLOAD_PENDING, "warning");
+      }
       return;
     }
     setSubmitConfirm(true);
-  }, [actionLoading, canSubmit]);
+  }, [actionLoading, blocks, canSubmit, formStrings.CERT_UPLOAD_PENDING, showAlert]);
 
   const closeDraftConfirm = useCallback(() => {
     setDraftConfirm(false);

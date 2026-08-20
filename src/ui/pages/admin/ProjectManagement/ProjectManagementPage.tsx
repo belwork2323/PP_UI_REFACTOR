@@ -10,7 +10,7 @@ import RefreshIconButton from "@ui/components/common/RefreshIconButton";
 import AdminManagementStatsGrid from "@ui/components/custom/admin/AdminManagementStatsGrid";
 import AdminManagementPageHeader from "@ui/components/custom/admin/AdminManagementPageHeader";
 import AdminListShell from "@ui/components/custom/admin/AdminListShell";
-import AdminFilterPanel from "@ui/components/custom/admin/AdminFilterPanel";
+import AdminListFilterPanel from "@ui/components/custom/admin/AdminListFilterPanel";
 import useProjectManagementHook from "@hooks/admin/ProjectManagement/useProjectManagementHook";
 import { getProjectName } from "@utils/projectManagementUtils";
 import ProjectManagementList from "./ProjectManagementList";
@@ -85,11 +85,11 @@ const ProjectManagementPage = () => {
       <Box sx={{ mb: 2 }}>
         <FilterToggleButton
           label="Date Filter"
-          count={stats.filterType !== S.DATE_FILTER.VALUES.MONTH ? 1 : 0}
+          count={stats.filterType !== S.DATE_FILTER.VALUES.ONE_YEAR ? 1 : 0}
           isOpen={stats.dateFilterOpen}
           onClick={stats.toggleDateFilter}
           sx={th.table.filterBtn(
-            stats.dateFilterOpen || stats.filterType !== S.DATE_FILTER.VALUES.MONTH,
+            stats.dateFilterOpen || stats.filterType !== S.DATE_FILTER.VALUES.ONE_YEAR,
           )}
           iconSx={th.table.filterBtnIcon}
           textSx={th.table.filterBtnText}
@@ -147,7 +147,7 @@ const ProjectManagementPage = () => {
           />
         }
         filterExtension={
-          <AdminFilterPanel
+          <AdminListFilterPanel
             title={AC.FILTERS_TITLE}
             activeFilterCount={list.activeFilterCount}
             onClear={list.clearFilters}
@@ -165,9 +165,14 @@ const ProjectManagementPage = () => {
               onToChange={(value) => list.setDraftFilter("toDate", value)}
               fromLabel={S.TOOLBAR.FILTER_DATE_FROM_LABEL}
               toLabel={S.TOOLBAR.FILTER_DATE_TO_LABEL}
+              showLeadingIcon={false}
+              nowrap
+              alignInputs="filter"
+              controlHeight={32}
               datePickerSx={t.filterPanel.field}
+              containerSx={{ ...t.filterPanel.fieldItemGrow, flex: "1 1 100%" }}
             />
-          </AdminFilterPanel>
+          </AdminListFilterPanel>
         }
         theme={t}
       >

@@ -108,6 +108,7 @@ type QCDeCoringMotorPanelProps = {
   values: SchemaFormValues;
   onChange: (values: SchemaFormValues) => void;
   readOnly?: boolean;
+  disabled?: boolean;
   headerActions?: ReactNode;
 };
 
@@ -116,11 +117,13 @@ const QCDeCoringMotorPanel = ({
   values,
   onChange,
   readOnly = false,
+  disabled = false,
   headerActions,
 }: QCDeCoringMotorPanelProps) => {
   const load = useMemo(() => getDeCoringField(values, "DE_CORING_LOAD"), [values]);
   const dateTime = useMemo(() => getDeCoringField(values, "DE_CORING_DATE_TIME"), [values]);
   const observations = useMemo(() => getDeCoringField(values, "OBSERVATIONS"), [values]);
+  const inputsDisabled = disabled || readOnly;
 
   return (
     <Box
@@ -153,6 +156,7 @@ const QCDeCoringMotorPanel = ({
                 fullWidth
                 type="number"
                 value={load}
+                disabled={inputsDisabled}
                 onChange={(event) =>
                   onChange(setDeCoringField(values, "DE_CORING_LOAD", event.target.value))
                 }
@@ -167,6 +171,7 @@ const QCDeCoringMotorPanel = ({
               <DateTimeField
                 compact
                 value={dateTime}
+                disabled={inputsDisabled}
                 onChange={(next) => onChange(setDeCoringField(values, "DE_CORING_DATE_TIME", next))}
                 placeholder="DD-MM-YYYY HH:mm"
                 inputSx={setupDateTimeFieldSx}
@@ -183,6 +188,7 @@ const QCDeCoringMotorPanel = ({
                 multiline
                 minRows={2}
                 value={observations}
+                disabled={inputsDisabled}
                 onChange={(event) =>
                   onChange(setDeCoringField(values, "OBSERVATIONS", event.target.value))
                 }

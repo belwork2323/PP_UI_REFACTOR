@@ -55,10 +55,7 @@ export const isPostCureMotorLocked = (status?: PostCureMotorSubmissionStatus | s
 };
 
 export const isPostCureMotorEditable = (status?: PostCureMotorSubmissionStatus | string | null) =>
-  !status ||
-  status === "TO_BE_INITIATED" ||
-  status === "IN_PROGRESS" ||
-  status === "REJECTED";
+  !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED";
 
 export const isPostCureMotorApproverTabDisabled = (
   status?: PostCureMotorSubmissionStatus | string | null,
@@ -108,7 +105,9 @@ export const canApproverActionEntirePostCureForm = (params: {
     return true;
   }
 
-  const formType = String(params.formSubmissionType ?? "").trim().toUpperCase();
+  const formType = String(params.formSubmissionType ?? "")
+    .trim()
+    .toUpperCase();
   if (formType !== "SUBMIT") return false;
 
   const motors = params.motors ?? [];
@@ -118,10 +117,7 @@ export const canApproverActionEntirePostCureForm = (params: {
   );
   if (!allMotorsApproved) return false;
 
-  return (
-    statusUpper === "WAITING_FOR_APPROVAL" ||
-    status === OPERATION_STATUS.WAITING_FOR_APPROVAL
-  );
+  return statusUpper === "WAITING_FOR_APPROVAL" || status === OPERATION_STATUS.WAITING_FOR_APPROVAL;
 };
 
 export const getPostCureBatchStatusLabel = (status: unknown): string => String(status ?? "").trim();
@@ -163,7 +159,9 @@ export const normalizePostCureMotorStatus = (value: unknown): PostCureMotorSubmi
 export const normalizePostCureMotorSubmissionType = (
   value: unknown,
 ): PostCureMotorSubmissionType | undefined => {
-  const raw = String(value ?? "").trim().toUpperCase();
+  const raw = String(value ?? "")
+    .trim()
+    .toUpperCase();
   if (raw === "DRAFT" || raw === "SUBMIT") return raw;
   return undefined;
 };
@@ -359,7 +357,9 @@ const mapDetailsMotorToSession = (
   };
 };
 
-export const mapPostCureDetailsToFormState = (details: Partial<PostCureDetails>): PostCureFormState => {
+export const mapPostCureDetailsToFormState = (
+  details: Partial<PostCureDetails>,
+): PostCureFormState => {
   const defaults = createDefaultPostCureFormState();
   const fallback = {
     operation: String(details?.operation ?? ""),
@@ -455,9 +455,7 @@ const POST_CURE_COLUMN_PRIORITY = [
 ];
 
 export const orderPostCureDisplayColumns = (columns: string[]): string[] => {
-  const visible = columns.filter(
-    (col) => !col.startsWith("_") && !col.endsWith("__fieldType"),
-  );
+  const visible = columns.filter((col) => !col.startsWith("_") && !col.endsWith("__fieldType"));
   return [...visible].sort((a, b) => {
     const ai = POST_CURE_COLUMN_PRIORITY.indexOf(a);
     const bi = POST_CURE_COLUMN_PRIORITY.indexOf(b);
@@ -587,9 +585,7 @@ export const mapPostCureDetailsForDisplay = (
             : details.pcStatus != null
               ? String(details.pcStatus)
               : undefined,
-    formSubmissionType: String(
-      data.formSubmissionType ?? details.formSubmissionType ?? "",
-    ),
+    formSubmissionType: String(data.formSubmissionType ?? details.formSubmissionType ?? ""),
     createdBy: mapCastingCuringPersonLabel(data.createdBy ?? details.createdBy),
     createdAt:
       data.createdAt != null
@@ -657,7 +653,8 @@ export class PostCureDetailsModel {
     const inhibitorType = String(payload?.inhibitorType ?? "").trim();
 
     const operation = mapApiOperationType(operationType) || String(payload?.operation ?? "");
-    const mappedInhibitorType = mapApiInhibitorType(inhibitorType) || String(payload?.inhibitorType ?? "");
+    const mappedInhibitorType =
+      mapApiInhibitorType(inhibitorType) || String(payload?.inhibitorType ?? "");
 
     const rawMotors = Array.isArray(payload?.motors) ? payload.motors : [];
 

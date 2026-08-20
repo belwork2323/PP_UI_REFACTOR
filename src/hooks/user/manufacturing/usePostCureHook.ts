@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { STRINGS } from "../../../app/config/strings";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
@@ -36,6 +36,7 @@ import {
   type PostCureAddedMotor,
 } from "./postCureFlowConfig";
 import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
+import { isManufacturingContinueFillingStatus } from "../../../hooks/operationStatus";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import {
   isMotorEnabledByPreviousStage,
@@ -44,6 +45,8 @@ import {
   resolvePreviousStageApprovedUnits,
   type PreviousStageApprovedUnits,
 } from "../previousStageApproval";
+import { useFileService } from "../../../hooks/useFileService";
+import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -78,6 +81,7 @@ export const usePostCureHook = () => {
   const user = useAuthStore((s) => s.user);
   const showAlert = useAlertStore((state) => state.showAlert);
   const bumpBatchRefresh = useUserBatchRefreshStore((state) => state.bumpVersion);
+  const { deleteTemp } = useFileService();
 
   const subDepartmentId = useMemo(
     () =>
@@ -120,6 +124,11 @@ export const usePostCureHook = () => {
     () => view === "form" && formSnapshot !== initialSnapshot,
     [view, formSnapshot, initialSnapshot],
   );
+
+  const snapshotStateRef = useRef(formData);
+  snapshotStateRef.current = formData;
+  const initialSnapshotRef = useRef(initialSnapshot);
+  initialSnapshotRef.current = initialSnapshot;
 
   const resetFormContext = useCallback(() => {
     const defaults = createDefaultPostCureFormState();
@@ -208,11 +217,10 @@ export const usePostCureHook = () => {
 
   const openFormWithResolvedData = useCallback(
     async (batch: PostCureBatch, editMode: boolean) => {
-      const status = parseStatus(batch.pcStatus);
       const shouldFetchDetails =
         editMode ||
-        status === parseStatus(PC_STATUS.IN_PROGRESS) ||
-        status === parseStatus(PC_STATUS.REJECTED);
+        isManufacturingContinueFillingStatus(batch.pcStatus) ||
+        parseStatus(batch.pcStatus) === parseStatus(PC_STATUS.REJECTED);
 
       let nextBatch = batch;
       let nextFormData = createDefaultPostCureFormState();
@@ -366,10 +374,19 @@ export const usePostCureHook = () => {
     resetFormContext();
   }, [isFormDirty, resetFormContext, bumpBatchRefresh]);
 
-  const handleDiscardAndBack = useCallback(() => {
-    bumpBatchRefresh();
-    resetFormContext();
-  }, [resetFormContext, bumpBatchRefresh]);
+  const handleDiscardAndBack = useCallback(async () => {
+    setBackConfirmOpen(false);
+    await discardWorkflowSnapshotForm({
+      subDepartmentId,
+      initialSnapshot: initialSnapshotRef.current,
+      currentState: snapshotStateRef.current,
+      deleteTemp,
+      resetForm: () => {
+        bumpBatchRefresh();
+        resetFormContext();
+      },
+    });
+  }, [bumpBatchRefresh, deleteTemp, resetFormContext, subDepartmentId]);
 
   const handleDraftOperationChange = useCallback((operation: string) => {
     setDraftOperation(operation);

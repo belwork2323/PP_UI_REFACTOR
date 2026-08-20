@@ -17,7 +17,7 @@ import {
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AddIcon from "@mui/icons-material/Add";
 import FormInput from "@/ui/components/common/FormInput";
-import DateField, { DateTimeField } from "@/ui/components/common/DateField";
+import DateField from "@/ui/components/common/DateField";
 import SchemaFileField from "@/ui/components/common/SchemaFileField";
 import { FILE_PICKER_ACCEPT } from "@/utils/FileUtils";
 import { STRINGS } from "../../../../../app/config/strings";
@@ -47,6 +47,8 @@ export const TrimmingCommonTable = ({
   activeMotorEntry,
   onMotorSessionChange,
   readOnly = false,
+  disabled = false,
+  allowStructureActions = true,
   theme,
 }) => {
   const palette = theme?.palette ?? {};
@@ -64,6 +66,9 @@ export const TrimmingCommonTable = ({
     [palette],
   );
 
+  const inputsLocked = Boolean(readOnly || disabled);
+  const showStructureActions = Boolean(allowStructureActions && !inputsLocked);
+
   const sectionCardSx = {
     borderRadius: 2.5,
     border: `1px solid ${colors.border}`,
@@ -76,38 +81,90 @@ export const TrimmingCommonTable = ({
     px: 1.5,
     py: 1.1,
     borderBottom: `1px solid ${alpha(colors.border, 0.9)}`,
-    background: alpha(colors.primary, 0.04),
+    background: alpha(colors.primary, readOnly ? 0.06 : 0.04),
     display: "flex",
     alignItems: "center",
     justifyContent: "space-between",
     gap: 1,
   };
 
-  const thSx = {
-    background: colors.primary,
-    color: "#fff",
-    fontWeight: 700,
-    fontSize: "0.7rem",
-    letterSpacing: "0.04em",
-    textTransform: "uppercase",
-    padding: "10px 12px",
-    whiteSpace: "nowrap",
-    borderBottom: "none",
-    verticalAlign: "middle",
-  };
+  const sectionTitleStyle = readOnly
+    ? {
+        fontWeight: 800,
+        fontSize: "0.72rem",
+        letterSpacing: "0.02em",
+        textTransform: "uppercase" as const,
+        color: colors.primary,
+      }
+    : sectionTitleSx(colors.primary);
 
-  const tdSx = {
-    padding: "8px 10px",
-    borderBottom: `1px solid ${alpha(colors.border, 0.85)}`,
-    verticalAlign: "middle",
-  };
+  const thSx = readOnly
+    ? {
+        fontSize: "0.65rem",
+        fontWeight: 800,
+        letterSpacing: "0.02em",
+        textTransform: "uppercase" as const,
+        color: colors.primary,
+        background: alpha(colors.primaryLight, 0.08),
+        whiteSpace: "nowrap" as const,
+        py: 0.5,
+        px: 1,
+        verticalAlign: "middle" as const,
+        border: `1px solid ${alpha(colors.primary, 0.12)}`,
+      }
+    : {
+        background: `linear-gradient(135deg, ${colors.primary}, ${colors.primaryLight})`,
+        color: "#fff",
+        fontWeight: 700,
+        fontSize: "0.68rem",
+        letterSpacing: "0.06em",
+        textTransform: "uppercase" as const,
+        padding: "10px 12px",
+        whiteSpace: "nowrap" as const,
+        border: `1px solid ${alpha("#fff", 0.22)}`,
+        verticalAlign: "middle" as const,
+      };
+
+  const tdSx = readOnly
+    ? {
+        fontSize: "0.72rem",
+        py: 0.5,
+        px: 1,
+        verticalAlign: "middle" as const,
+        border: `1px solid ${alpha(colors.primary, 0.12)}`,
+      }
+    : {
+        padding: "8px 10px",
+        border: `1px solid ${alpha(colors.primary, 0.18)}`,
+        verticalAlign: "middle" as const,
+      };
 
   const tableShellSx = {
-    border: `1px solid ${alpha(colors.border, 0.9)}`,
-    borderRadius: 2,
+    border: `1px solid ${alpha(colors.primary, readOnly ? 0.12 : 0.18)}`,
+    borderRadius: readOnly ? 1 : 2,
     background: colors.pageBg,
     overflowX: "auto",
   };
+
+  const displayValue = (value: unknown) => {
+    const text = String(value ?? "").trim();
+    return text || "—";
+  };
+
+  const ReadOnlyValue = ({ value }: { value: unknown }) => (
+    <Typography
+      sx={{
+        fontSize: "0.72rem",
+        fontWeight: String(value ?? "").trim() ? 600 : 500,
+        color: String(value ?? "").trim() ? colors.text : colors.textSub,
+        lineHeight: 1.35,
+        whiteSpace: "pre-wrap",
+        wordBreak: "break-word",
+      }}
+    >
+      {displayValue(value)}
+    </Typography>
+  );
 
   const dynamicLocations = activeMotorSession.commonFormatLocations ?? [];
   const [isAddingColumn, setIsAddingColumn] = useState(false);
@@ -115,7 +172,7 @@ export const TrimmingCommonTable = ({
 
   // --- Handlers for Dynamic Columns ---
   const handleSaveNewColumn = () => {
-    if (readOnly) return;
+    if (!showStructureActions) return;
     const formattedColName = newColInput.trim().toUpperCase();
     if (!formattedColName) {
       setIsAddingColumn(false);
@@ -151,6 +208,7 @@ export const TrimmingCommonTable = ({
   };
 
   const handleDeleteColumn = (colToDelete) => {
+    if (!showStructureActions) return;
     const updatedLocations = dynamicLocations.filter((loc) => loc !== colToDelete);
     const updatedParams = (activeMotorSession.commonFormatParameters ?? []).map((param) => ({
       ...param,
@@ -170,6 +228,7 @@ export const TrimmingCommonTable = ({
 
   // --- Handlers for Rows & Parameters ---
   const handleDeleteTrimmingRow = (rowIndex) => {
+    if (!showStructureActions) return;
     const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
     nextRows.splice(rowIndex, 1);
     onMotorSessionChange(activeMotorEntry.motorId, {
@@ -180,6 +239,7 @@ export const TrimmingCommonTable = ({
 
   // Deletes the entire parameter (including both before & after trimming stages)
   const handleDeleteParameter = (paramIndex) => {
+    if (!showStructureActions) return;
     const currentParams = [...(activeMotorSession.commonFormatParameters ?? [])];
     currentParams.splice(paramIndex, 1);
 
@@ -192,44 +252,50 @@ export const TrimmingCommonTable = ({
   return (
     <Box
       sx={{
-        ...(readOnly
+        // Waiting / locked (not approved details theme): soft-disable interactions.
+        ...(disabled && !readOnly
           ? {
               pointerEvents: "none",
-              opacity: 0.78,
+              userSelect: "none",
+              opacity: 0.92,
             }
           : null),
       }}
     >
       <Box sx={sectionCardSx}>
         <Box sx={sectionHeaderSx}>
-          <Typography sx={sectionTitleSx(colors.primary)}>
+          <Typography sx={sectionTitleStyle}>
             {S.MOTOR_RECEIVED_AT_LABEL}
           </Typography>
         </Box>
         <Box sx={{ p: 1.5, maxWidth: 320 }}>
-          <DateTimeField
-            value={activeMotorSession.motorReceivedAt ?? ""}
-            onChange={(value) =>
-              onMotorSessionChange(activeMotorEntry.motorId, {
-                ...activeMotorSession,
-                motorReceivedAt: value,
-              })
-            }
-            placeholder={S.MOTOR_RECEIVED_AT_PLACEHOLDER}
-            compact
-            disabled={readOnly}
-          />
+          {readOnly ? (
+            <ReadOnlyValue value={activeMotorSession.motorReceivedAt} />
+          ) : (
+            <DateField
+              value={activeMotorSession.motorReceivedAt ?? ""}
+              onChange={(value) =>
+                onMotorSessionChange(activeMotorEntry.motorId, {
+                  ...activeMotorSession,
+                  motorReceivedAt: value,
+                })
+              }
+              placeholder={S.MOTOR_RECEIVED_AT_PLACEHOLDER}
+              compact
+              disabled={inputsLocked}
+            />
+          )}
         </Box>
       </Box>
 
       <Box sx={sectionCardSx}>
         <Box sx={sectionHeaderSx}>
-          <Typography sx={sectionTitleSx(colors.primary)}>Trimming Details</Typography>
+          <Typography sx={sectionTitleStyle}>Trimming Details</Typography>
         </Box>
 
         <Box sx={{ p: 1.5 }}>
           <TableContainer sx={{ ...tableShellSx, mb: 1.5 }}>
-            <Table size="small">
+            <Table size="small" sx={{ borderCollapse: "collapse", minWidth: 720 }}>
               <TableHead>
                 <TableRow>
                   <TableCell sx={thSx}>Machine Details</TableCell>
@@ -238,9 +304,11 @@ export const TrimmingCommonTable = ({
                   <TableCell sx={thSx}>Arbor Size</TableCell>
                   <TableCell sx={thSx}>Cutter Size</TableCell>
                   <TableCell sx={thSx}>Remarks</TableCell>
-                  <TableCell align="center" sx={{ ...thSx, width: 50 }}>
-                    Actions
-                  </TableCell>
+                  {showStructureActions ? (
+                    <TableCell align="center" sx={{ ...thSx, width: 50 }}>
+                      Actions
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -252,164 +320,203 @@ export const TrimmingCommonTable = ({
                     }}
                   >
                     <TableCell sx={tdSx}>
-                      <FormInput
-                        value={row.machineDetails}
-                        size="small"
-                        onChange={(e) => {
-                          const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
-                          nextRows[rowIndex] = {
-                            ...nextRows[rowIndex],
-                            machineDetails: e.target.value,
-                          };
-                          onMotorSessionChange(activeMotorEntry.motorId, {
-                            ...activeMotorSession,
-                            trimmingDetails: nextRows,
-                          });
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell sx={tdSx}>
-                      <DateField
-                        value={row.startDate}
-                        compact
-                        onChange={(val) => {
-                          const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
-                          nextRows[rowIndex] = { ...nextRows[rowIndex], startDate: val };
-                          onMotorSessionChange(activeMotorEntry.motorId, {
-                            ...activeMotorSession,
-                            trimmingDetails: nextRows,
-                          });
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell sx={tdSx}>
-                      <DateField
-                        value={row.completionDate}
-                        compact
-                        onChange={(val) => {
-                          const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
-                          nextRows[rowIndex] = { ...nextRows[rowIndex], completionDate: val };
-                          onMotorSessionChange(activeMotorEntry.motorId, {
-                            ...activeMotorSession,
-                            trimmingDetails: nextRows,
-                          });
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell sx={tdSx}>
-                      <FormInput
-                        value={row.arborSize}
-                        inputMode="decimal"
-                        onChange={(e) => {
-                          const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
-                          nextRows[rowIndex] = { ...nextRows[rowIndex], arborSize: e.target.value };
-                          onMotorSessionChange(activeMotorEntry.motorId, {
-                            ...activeMotorSession,
-                            trimmingDetails: nextRows,
-                          });
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell sx={tdSx}>
-                      <FormInput
-                        value={row.cutterSize}
-                        inputMode="decimal"
-                        onChange={(e) => {
-                          const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
-                          nextRows[rowIndex] = {
-                            ...nextRows[rowIndex],
-                            cutterSize: e.target.value,
-                          };
-                          onMotorSessionChange(activeMotorEntry.motorId, {
-                            ...activeMotorSession,
-                            trimmingDetails: nextRows,
-                          });
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell sx={tdSx}>
-                      <FormInput
-                        value={row.remarks}
-                        onChange={(e) => {
-                          const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
-                          nextRows[rowIndex] = { ...nextRows[rowIndex], remarks: e.target.value };
-                          onMotorSessionChange(activeMotorEntry.motorId, {
-                            ...activeMotorSession,
-                            trimmingDetails: nextRows,
-                          });
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell align="center" sx={tdSx}>
-                      {rowIndex > 0 && (
-                        <IconButton
+                      {readOnly ? (
+                        <ReadOnlyValue value={row.machineDetails} />
+                      ) : (
+                        <FormInput
+                          value={row.machineDetails}
                           size="small"
-                          sx={{ color: colors.danger }}
-                          onClick={() => handleDeleteTrimmingRow(rowIndex)}
-                        >
-                          <DeleteOutlineIcon fontSize="small" />
-                        </IconButton>
+                          onChange={(e) => {
+                            const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
+                            nextRows[rowIndex] = {
+                              ...nextRows[rowIndex],
+                              machineDetails: e.target.value,
+                            };
+                            onMotorSessionChange(activeMotorEntry.motorId, {
+                              ...activeMotorSession,
+                              trimmingDetails: nextRows,
+                            });
+                          }}
+                          disabled={inputsLocked}
+                        />
                       )}
                     </TableCell>
+                    <TableCell sx={tdSx}>
+                      {readOnly ? (
+                        <ReadOnlyValue value={row.startDate} />
+                      ) : (
+                        <DateField
+                          value={row.startDate}
+                          compact
+                          onChange={(val) => {
+                            const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
+                            nextRows[rowIndex] = { ...nextRows[rowIndex], startDate: val };
+                            onMotorSessionChange(activeMotorEntry.motorId, {
+                              ...activeMotorSession,
+                              trimmingDetails: nextRows,
+                            });
+                          }}
+                          disabled={inputsLocked}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell sx={tdSx}>
+                      {readOnly ? (
+                        <ReadOnlyValue value={row.completionDate} />
+                      ) : (
+                        <DateField
+                          value={row.completionDate}
+                          compact
+                          onChange={(val) => {
+                            const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
+                            nextRows[rowIndex] = { ...nextRows[rowIndex], completionDate: val };
+                            onMotorSessionChange(activeMotorEntry.motorId, {
+                              ...activeMotorSession,
+                              trimmingDetails: nextRows,
+                            });
+                          }}
+                          disabled={inputsLocked}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell sx={tdSx}>
+                      {readOnly ? (
+                        <ReadOnlyValue value={row.arborSize} />
+                      ) : (
+                        <FormInput
+                          value={row.arborSize}
+                          inputMode="decimal"
+                          onChange={(e) => {
+                            const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
+                            nextRows[rowIndex] = { ...nextRows[rowIndex], arborSize: e.target.value };
+                            onMotorSessionChange(activeMotorEntry.motorId, {
+                              ...activeMotorSession,
+                              trimmingDetails: nextRows,
+                            });
+                          }}
+                          disabled={inputsLocked}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell sx={tdSx}>
+                      {readOnly ? (
+                        <ReadOnlyValue value={row.cutterSize} />
+                      ) : (
+                        <FormInput
+                          value={row.cutterSize}
+                          inputMode="decimal"
+                          onChange={(e) => {
+                            const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
+                            nextRows[rowIndex] = {
+                              ...nextRows[rowIndex],
+                              cutterSize: e.target.value,
+                            };
+                            onMotorSessionChange(activeMotorEntry.motorId, {
+                              ...activeMotorSession,
+                              trimmingDetails: nextRows,
+                            });
+                          }}
+                          disabled={inputsLocked}
+                        />
+                      )}
+                    </TableCell>
+                    <TableCell sx={tdSx}>
+                      {readOnly ? (
+                        <ReadOnlyValue value={row.remarks} />
+                      ) : (
+                        <FormInput
+                          value={row.remarks}
+                          size="small"
+                          onChange={(e) => {
+                            const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
+                            nextRows[rowIndex] = { ...nextRows[rowIndex], remarks: e.target.value };
+                            onMotorSessionChange(activeMotorEntry.motorId, {
+                              ...activeMotorSession,
+                              trimmingDetails: nextRows,
+                            });
+                          }}
+                          disabled={inputsLocked}
+                        />
+                      )}
+                    </TableCell>
+                    {showStructureActions ? (
+                      <TableCell align="center" sx={tdSx}>
+                        {rowIndex > 0 && (
+                          <IconButton
+                            size="small"
+                            sx={{ color: colors.danger }}
+                            onClick={() => handleDeleteTrimmingRow(rowIndex)}
+                          >
+                            <DeleteOutlineIcon fontSize="small" />
+                          </IconButton>
+                        )}
+                      </TableCell>
+                    ) : null}
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </TableContainer>
 
-          <Stack direction="row" justifyContent="flex-start">
-            <Button
-              variant="outlined"
-              size="small"
-              sx={actionButtonSx(colors.primary)}
-              onClick={() => {
-                const details = activeMotorSession.trimmingDetails ?? [];
-                onMotorSessionChange(activeMotorEntry.motorId, {
-                  ...activeMotorSession,
-                  trimmingDetails: [
-                    ...details,
-                    {
-                      machineDetails: "",
-                      startDate: "",
-                      completionDate: "",
-                      arborSize: "",
-                      cutterSize: "",
-                      remarks: "",
-                    },
-                  ],
-                });
-              }}
-            >
-              Add row
-            </Button>
-          </Stack>
+          {showStructureActions ? (
+            <Stack direction="row" justifyContent="flex-start">
+              <Button
+                variant="outlined"
+                size="small"
+                sx={actionButtonSx(colors.primary)}
+                onClick={() => {
+                  const details = activeMotorSession.trimmingDetails ?? [];
+                  onMotorSessionChange(activeMotorEntry.motorId, {
+                    ...activeMotorSession,
+                    trimmingDetails: [
+                      ...details,
+                      {
+                        machineDetails: "",
+                        startDate: "",
+                        completionDate: "",
+                        arborSize: "",
+                        cutterSize: "",
+                        remarks: "",
+                      },
+                    ],
+                  });
+                }}
+              >
+                Add row
+              </Button>
+            </Stack>
+          ) : null}
         </Box>
       </Box>
 
       <Box sx={sectionCardSx}>
         <Box sx={sectionHeaderSx}>
-          <Typography sx={sectionTitleSx(colors.primary)}>Dimensions After Trimming</Typography>
-          <Button
-            variant="contained"
-            size="small"
-            disableElevation
-            startIcon={<AddIcon />}
-            sx={{
-              fontWeight: 700,
-              textTransform: "none",
-              background: colors.primary,
-              color: "#fff",
-              "&:hover": { background: colors.primaryLight },
-            }}
-            onClick={() => setIsAddingColumn(true)}
-          >
-            Add Column
-          </Button>
+          <Typography sx={sectionTitleStyle}>Dimensions After Trimming</Typography>
+          {showStructureActions ? (
+            <Button
+              variant="contained"
+              size="small"
+              disableElevation
+              startIcon={<AddIcon />}
+              sx={{
+                fontWeight: 700,
+                textTransform: "none",
+                background: `linear-gradient(135deg, ${colors.primary}, ${colors.primaryLight})`,
+                color: "#fff",
+                "&:hover": {
+                  background: `linear-gradient(135deg, ${colors.primaryLight}, ${colors.primary})`,
+                },
+              }}
+              onClick={() => setIsAddingColumn(true)}
+            >
+              Add Column
+            </Button>
+          ) : null}
         </Box>
 
         <Box sx={{ p: 1.5 }}>
           <TableContainer sx={{ ...tableShellSx, mb: 1.5 }}>
-            <Table size="small">
+            <Table size="small" sx={{ borderCollapse: "collapse", minWidth: 900 }}>
               <TableHead>
                 <TableRow>
                   <TableCell sx={{ ...thSx, minWidth: 160 }}>Parameter</TableCell>
@@ -428,13 +535,15 @@ export const TrimmingCommonTable = ({
                         spacing={1}
                       >
                         <span>{loc}</span>
-                        <IconButton
-                          size="small"
-                          sx={{ color: "#fff", p: 0.2 }}
-                          onClick={() => handleDeleteColumn(loc)}
-                        >
-                          <DeleteOutlineIcon sx={{ fontSize: "1rem" }} />
-                        </IconButton>
+                        {showStructureActions ? (
+                          <IconButton
+                            size="small"
+                            sx={{ color: "#fff", p: 0.2 }}
+                            onClick={() => handleDeleteColumn(loc)}
+                          >
+                            <DeleteOutlineIcon sx={{ fontSize: "1rem" }} />
+                          </IconButton>
+                        ) : null}
                       </Stack>
                     </TableCell>
                   ))}
@@ -464,9 +573,11 @@ export const TrimmingCommonTable = ({
                       />
                     </TableCell>
                   )}
-                  <TableCell align="center" sx={{ ...thSx, width: 50 }}>
-                    Actions
-                  </TableCell>
+                  {showStructureActions ? (
+                    <TableCell align="center" sx={{ ...thSx, width: 50 }}>
+                      Actions
+                    </TableCell>
+                  ) : null}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -489,7 +600,10 @@ export const TrimmingCommonTable = ({
                             borderRight: `1px solid ${alpha(colors.border, 0.85)}`,
                           }}
                         >
-                          <FormInput
+                          {readOnly ? (
+                        <ReadOnlyValue value={param.parameterName} />
+                      ) : (
+                        <FormInput
                             value={param.parameterName}
                             placeholder={param.parameterName}
                             onChange={(e) => {
@@ -505,7 +619,10 @@ export const TrimmingCommonTable = ({
                                 commonFormatParameters: nextParams,
                               });
                             }}
-                          />
+                          
+                        disabled={inputsLocked}
+                      />
+                      )}
                         </TableCell>
                       ) : null}
 
@@ -519,6 +636,9 @@ export const TrimmingCommonTable = ({
                       </TableCell>
 
                       <TableCell sx={tdSx}>
+                        {readOnly ? (
+                        <ReadOnlyValue value={stage.specification ?? ""} />
+                      ) : (
                         <FormInput
                           value={stage.specification ?? ""}
                           onChange={(e) => {
@@ -536,70 +656,83 @@ export const TrimmingCommonTable = ({
                               commonFormatParameters: nextParams,
                             });
                           }}
-                        />
+                        
+                        disabled={inputsLocked}
+                      />
+                      )}
                       </TableCell>
 
                       {["R2T", "R2B", "R1R", "R1L"].map((location) => (
                         <TableCell key={`reading-${location}`} sx={tdSx}>
-                          <FormInput
-                            value={stage.readings[location] ?? ""}
-                            inputMode="decimal"
-                            onChange={(e) => {
-                              const nextParams = [
-                                ...(activeMotorSession.commonFormatParameters ?? []),
-                              ];
-                              nextParams[paramIndex] = {
-                                ...nextParams[paramIndex],
-                                stages: nextParams[paramIndex].stages.map((s, idx) =>
-                                  idx === stageIndex
-                                    ? {
-                                        ...s,
-                                        readings: { ...s.readings, [location]: e.target.value },
-                                      }
-                                    : s,
-                                ),
-                              };
-                              onMotorSessionChange(activeMotorEntry.motorId, {
-                                ...activeMotorSession,
-                                commonFormatParameters: nextParams,
-                              });
-                            }}
-                          />
+                          {readOnly ? (
+                            <ReadOnlyValue value={stage.readings[location] ?? ""} />
+                          ) : (
+                            <FormInput
+                              value={stage.readings[location] ?? ""}
+                              inputMode="decimal"
+                              onChange={(e) => {
+                                const nextParams = [
+                                  ...(activeMotorSession.commonFormatParameters ?? []),
+                                ];
+                                nextParams[paramIndex] = {
+                                  ...nextParams[paramIndex],
+                                  stages: nextParams[paramIndex].stages.map((s, idx) =>
+                                    idx === stageIndex
+                                      ? {
+                                          ...s,
+                                          readings: { ...s.readings, [location]: e.target.value },
+                                        }
+                                      : s,
+                                  ),
+                                };
+                                onMotorSessionChange(activeMotorEntry.motorId, {
+                                  ...activeMotorSession,
+                                  commonFormatParameters: nextParams,
+                                });
+                              }}
+                              disabled={inputsLocked}
+                            />
+                          )}
                         </TableCell>
                       ))}
 
                       {dynamicLocations.map((location) => (
                         <TableCell key={`reading-${location}`} sx={tdSx}>
-                          <FormInput
-                            value={stage.readings[location] ?? ""}
-                            inputMode="decimal"
-                            onChange={(e) => {
-                              const nextParams = [
-                                ...(activeMotorSession.commonFormatParameters ?? []),
-                              ];
-                              nextParams[paramIndex] = {
-                                ...nextParams[paramIndex],
-                                stages: nextParams[paramIndex].stages.map((s, idx) =>
-                                  idx === stageIndex
-                                    ? {
-                                        ...s,
-                                        readings: { ...s.readings, [location]: e.target.value },
-                                      }
-                                    : s,
-                                ),
-                              };
-                              onMotorSessionChange(activeMotorEntry.motorId, {
-                                ...activeMotorSession,
-                                commonFormatParameters: nextParams,
-                              });
-                            }}
-                          />
+                          {readOnly ? (
+                            <ReadOnlyValue value={stage.readings[location] ?? ""} />
+                          ) : (
+                            <FormInput
+                              value={stage.readings[location] ?? ""}
+                              inputMode="decimal"
+                              onChange={(e) => {
+                                const nextParams = [
+                                  ...(activeMotorSession.commonFormatParameters ?? []),
+                                ];
+                                nextParams[paramIndex] = {
+                                  ...nextParams[paramIndex],
+                                  stages: nextParams[paramIndex].stages.map((s, idx) =>
+                                    idx === stageIndex
+                                      ? {
+                                          ...s,
+                                          readings: { ...s.readings, [location]: e.target.value },
+                                        }
+                                      : s,
+                                  ),
+                                };
+                                onMotorSessionChange(activeMotorEntry.motorId, {
+                                  ...activeMotorSession,
+                                  commonFormatParameters: nextParams,
+                                });
+                              }}
+                              disabled={inputsLocked}
+                            />
+                          )}
                         </TableCell>
                       ))}
 
                       {isAddingColumn && <TableCell sx={tdSx} />}
 
-                      {stageIndex === 0 ? (
+                      {showStructureActions && stageIndex === 0 ? (
                         <TableCell
                           align="center"
                           rowSpan={param.stages.length}
@@ -623,79 +756,120 @@ export const TrimmingCommonTable = ({
             </Table>
           </TableContainer>
 
-          <Stack direction="row" justifyContent="flex-start">
-            <Button
-              variant="outlined"
-              size="small"
-              sx={actionButtonSx(colors.primary)}
-              onClick={() => {
-                const params = activeMotorSession.commonFormatParameters ?? [];
-                const initialReadings = dynamicLocations.reduce((acc, loc) => {
-                  acc[loc] = "";
-                  return acc;
-                }, {});
+          {showStructureActions ? (
+            <Stack direction="row" justifyContent="flex-start">
+              <Button
+                variant="outlined"
+                size="small"
+                sx={actionButtonSx(colors.primary)}
+                onClick={() => {
+                  const params = activeMotorSession.commonFormatParameters ?? [];
+                  const initialReadings = dynamicLocations.reduce((acc, loc) => {
+                    acc[loc] = "";
+                    return acc;
+                  }, {});
 
-                onMotorSessionChange(activeMotorEntry.motorId, {
-                  ...activeMotorSession,
-                  commonFormatParameters: [
-                    ...params,
-                    {
-                      parameterName: `Parameter ${params.length + 1}`,
-                      stages: [
-                        {
-                          stage: "BEFORE_TRIMMING",
-                          stageName: "Before Trimming",
-                          specification: "",
-                          readings: { ...initialReadings },
-                        },
-                        {
-                          stage: "AFTER_TRIMMING",
-                          stageName: "After Trimming",
-                          specification: "",
-                          readings: { ...initialReadings },
-                        },
-                      ],
-                    },
-                  ],
-                });
-              }}
-            >
-              Add parameter
-            </Button>
-          </Stack>
+                  onMotorSessionChange(activeMotorEntry.motorId, {
+                    ...activeMotorSession,
+                    commonFormatParameters: [
+                      ...params,
+                      {
+                        parameterName: `Parameter ${params.length + 1}`,
+                        stages: [
+                          {
+                            stage: "BEFORE_TRIMMING",
+                            stageName: "Before Trimming",
+                            specification: "",
+                            readings: { ...initialReadings },
+                          },
+                          {
+                            stage: "AFTER_TRIMMING",
+                            stageName: "After Trimming",
+                            specification: "",
+                            readings: { ...initialReadings },
+                          },
+                        ],
+                      },
+                    ],
+                  });
+                }}
+              >
+                Add parameter
+              </Button>
+            </Stack>
+          ) : null}
         </Box>
       </Box>
 
       <Box sx={sectionCardSx}>
         <Box sx={sectionHeaderSx}>
-          <Typography sx={sectionTitleSx(colors.primary)}>Remarks & Attachments</Typography>
+          <Typography sx={sectionTitleStyle}>Remarks & Attachments</Typography>
         </Box>
         <Box sx={{ p: 1.5 }}>
           <Stack spacing={2}>
-            <FormInput
-              multiline
-              minRows={3}
-              label="Remarks"
-              value={activeMotorSession.motorRemarks ?? ""}
-              onChange={(e) =>
-                onMotorSessionChange(activeMotorEntry.motorId, {
-                  ...activeMotorSession,
-                  motorRemarks: e.target.value,
-                })
-              }
-            />
-            <SchemaFileField
-              label="Upload Report"
-              value={activeMotorSession.reportLink ?? ""}
-              onChange={(val) =>
-                onMotorSessionChange(activeMotorEntry.motorId, {
-                  ...activeMotorSession,
-                  reportLink: val,
-                })
-              }
-              accept={FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF}
-              multiple
-            />
+            {readOnly ? (
+              <>
+                <Box>
+                  <Typography
+                    sx={{
+                      fontSize: "0.65rem",
+                      fontWeight: 800,
+                      letterSpacing: "0.02em",
+                      textTransform: "uppercase",
+                      color: colors.primary,
+                      mb: 0.5,
+                    }}
+                  >
+                    Remarks
+                  </Typography>
+                  <ReadOnlyValue value={activeMotorSession.motorRemarks} />
+                </Box>
+                <Box>
+                  <Typography
+                    sx={{
+                      fontSize: "0.65rem",
+                      fontWeight: 800,
+                      letterSpacing: "0.02em",
+                      textTransform: "uppercase",
+                      color: colors.primary,
+                      mb: 0.5,
+                    }}
+                  >
+                    Upload Report
+                  </Typography>
+                  <ReadOnlyValue value={activeMotorSession.reportLink} />
+                </Box>
+              </>
+            ) : (
+              <>
+                <FormInput
+                  multiline
+                  minRows={3}
+                  label="Remarks"
+                  value={activeMotorSession.motorRemarks ?? ""}
+                  onChange={(e) =>
+                    onMotorSessionChange(activeMotorEntry.motorId, {
+                      ...activeMotorSession,
+                      motorRemarks: e.target.value,
+                    })
+                  }
+                  disabled={inputsLocked}
+                />
+                <SchemaFileField
+                  label="Upload Report"
+                  disabled={inputsLocked}
+                  value={activeMotorSession.reportLink ?? ""}
+                  onChange={(val) =>
+                    onMotorSessionChange(activeMotorEntry.motorId, {
+                      ...activeMotorSession,
+                      reportLink: val,
+                    })
+                  }
+                  accept={FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF}
+                  multiple
+                />
+              </>
+            )}
           </Stack>
         </Box>
       </Box>

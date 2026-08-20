@@ -33,8 +33,6 @@ type PostCureApproverDetailDialogProps = {
   onActiveMotorChange?: (motorId: string) => void;
   onApprove: (item: PostCureApproverDetailItem) => void;
   onReject: (item: PostCureApproverDetailItem) => void;
-  onApproveForm?: (item: PostCureApproverDetailItem) => void;
-  onRejectForm?: (item: PostCureApproverDetailItem) => void;
   actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
@@ -48,8 +46,6 @@ const PostCureApproverDetailDialog = ({
   onActiveMotorChange,
   onApprove,
   onReject,
-  onApproveForm,
-  onRejectForm,
   actionLoading = false,
   theme,
 }: PostCureApproverDetailDialogProps) => {
@@ -101,8 +97,6 @@ const PostCureApproverDetailDialog = ({
             onActiveMotorChange={onActiveMotorChange ?? (() => undefined)}
             onApprove={() => onApprove(item)}
             onReject={() => onReject(item)}
-            onApproveForm={onApproveForm ? () => onApproveForm(item) : undefined}
-            onRejectForm={onRejectForm ? () => onRejectForm(item) : undefined}
             actionLoading={actionLoading}
             formStatus={String(item.pcStatus ?? item.status ?? "")}
             manufacturingTheme={manufacturingTheme}

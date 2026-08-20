@@ -61,11 +61,8 @@ type QCDivisionApproverDetailDialogProps = {
   divisionApprovalRows: QcApprovalTableRow[];
   finalApprovalGroups?: QcFinalApprovalDivisionGroup[];
   finalApprovalRows: QcApprovalTableRow[];
-  canApproveForm: boolean;
   onApprove: (item: QCDivisionApproverDetailItem) => void;
   onReject: (item: QCDivisionApproverDetailItem) => void;
-  onApproveForm: (item: QCDivisionApproverDetailItem) => void;
-  onRejectForm: (item: QCDivisionApproverDetailItem) => void;
   actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
@@ -93,11 +90,8 @@ const QCDivisionApproverDetailDialog = ({
   divisionApprovalRows,
   finalApprovalGroups,
   finalApprovalRows,
-  canApproveForm,
   onApprove,
   onReject,
-  onApproveForm,
-  onRejectForm,
   actionLoading = false,
   theme,
 }: QCDivisionApproverDetailDialogProps) => {
@@ -191,8 +185,6 @@ const QCDivisionApproverDetailDialog = ({
             formSubmissionType={detailView?.formSubmissionType}
             onApproveUnit={() => onApprove(item)}
             onRejectUnit={() => onReject(item)}
-            onApproveForm={canApproveForm ? () => onApproveForm(item) : undefined}
-            onRejectForm={canApproveForm ? () => onRejectForm(item) : undefined}
             actionLoading={actionLoading}
             qcTheme={qcTheme}
             approverTheme={theme}

@@ -22,12 +22,19 @@ dayjs.extend(customParseFormat);
 dayjs.locale("en-gb");
 
 /** Dedicated text field for date pickers — avoids FormInput's 40px dropdown padding. */
-const DatePickerTextField = ({ sx, InputLabelProps, ...props }: TextFieldProps) => (
+const DatePickerTextField = ({
+  sx,
+  InputLabelProps,
+  filterPanel,
+  ...props
+}: TextFieldProps & { filterPanel?: boolean }) => (
   <TextField
-    fullWidth
+    fullWidth={filterPanel !== false}
     size="small"
     variant="outlined"
-    InputLabelProps={{ ...appDropdownLabelProps, ...InputLabelProps }}
+    InputLabelProps={
+      filterPanel ? InputLabelProps : { ...appDropdownLabelProps, ...InputLabelProps }
+    }
     sx={sx}
     {...props}
   />
@@ -66,6 +73,7 @@ export type AppDatePickerTextFieldProps = {
   error?: boolean;
   helperText?: string;
   compact?: boolean;
+  filterPanel?: boolean;
   placeholder?: string;
   /** Extra styles merged onto the date text field. */
   sx?: SxProps<Theme>;
@@ -78,6 +86,7 @@ export const buildAppDatePickerSlotProps = ({
   error,
   helperText,
   compact,
+  filterPanel,
   placeholder = UI_DATE_PLACEHOLDER,
   sx,
   inputSx,
@@ -102,11 +111,12 @@ export const buildAppDatePickerSlotProps = ({
     error,
     helperText,
     placeholder,
-    sx: [
-      compact ? appDatePickerCompactFieldSx : appDatePickerFieldSx,
-      inputSx,
-      sx,
-    ] as SxProps<Theme>,
+    filterPanel,
+    sx: (
+      filterPanel
+        ? [inputSx, sx]
+        : [compact ? appDatePickerCompactFieldSx : appDatePickerFieldSx, inputSx, sx]
+    ) as SxProps<Theme>,
   },
 });
 

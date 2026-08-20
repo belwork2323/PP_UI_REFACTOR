@@ -1,15 +1,3 @@
-import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission, SchemaTableBlock } from "../../../schema-engine";
-import type { SchemaSetupContext } from "../../../schema-engine/utils/setupContext";
-import {
-  buildCasePrepMotorSubmission,
-  buildCasePrepSectionPayload,
-  createCasePrepInitialValues,
-  hydrateCasePrepValuesFromSections,
-  type CasePrepMotorSubmission,
-} from "../../../schema-engine";
-import { flattenTableColumns, walkBlocks } from "../../../schema-engine/utils/schemaUtils";
-import { isWrappedTableValue } from "../../../schema-engine/utils/tableRowUtils";
-import { schemaValuesHaveUserData } from "../../../schema-engine/state/formState";
 import { formatToIsoDateInput } from "../../../utils/dateUtils";
 import { OPERATION_STATUS } from "../../../hooks/operationStatus";
 import { normalizeSubdepartmentBatchStatus } from "./SubdepartmentBatchModel";
@@ -19,6 +7,16 @@ import {
   getPremixStatusLabel,
 } from "./RawMaterialPreparationModel";
 import { formatDateTimeForApi } from "./rawMaterialPreparationApiMapper";
+import {
+  buildCasePrepMotorDetailsPayload,
+  casePrepMotorDataHasUserInput,
+  CASE_PREP_MOTOR_SECTION_KEYS,
+  createEmptyCasePrepMotorData,
+  parseCasePrepMotorDataFromApi,
+  type CasePrepMotorData,
+  type CasePrepMotorDetailsPayload,
+  type CasePrepMotorSectionPayload,
+} from "./CasePrepMotorDataModel";
 
 export {
   formatPrepSectionLabel as formatCasePrepSectionLabel,
@@ -37,7 +35,7 @@ const toCasePrepPayloadDate = (value: unknown): string => {
 const toCasePrepPayloadDateValue = (value: unknown): unknown => {
   if (typeof value !== "string") return value;
   const raw = value.trim();
-  if (!raw) return value;
+  if (!raw) return undefined;
 
   // UI datetime (DD-MM-YYYY HH:mm) → ISO, matching RMP weighingDateTime
   if (/^\d{1,2}-\d{1,2}-\d{4}[ T]\d{2}:\d{2}/.test(raw)) {
@@ -53,34 +51,52 @@ const toCasePrepPayloadDateValue = (value: unknown): unknown => {
   return value;
 };
 
-const convertCasePrepDatesDeep = (value: unknown): unknown => {
+const CASE_PREP_DATETIME_KEYS = new Set([
+  "heMotorPastingDateTime",
+  "neMotorPastingDateTime",
+  "tceCleaningDateTime",
+  "prrcClearanceDate",
+]);
+
+const convertCasePrepDatesDeep = (value: unknown, keyHint = ""): unknown => {
   if (Array.isArray(value)) {
-    return value.map(convertCasePrepDatesDeep);
+    return value.map((entry) => convertCasePrepDatesDeep(entry));
   }
   if (value && typeof value === "object") {
     const out: Record<string, unknown> = {};
     Object.entries(value as Record<string, unknown>).forEach(([key, entry]) => {
-      out[key] = convertCasePrepDatesDeep(entry);
+      const next = convertCasePrepDatesDeep(entry, key);
+      // Never send "" for Instant/date fields — omit instead.
+      if (
+        CASE_PREP_DATETIME_KEYS.has(key) &&
+        (next == null || (typeof next === "string" && !next.trim()))
+      ) {
+        return;
+      }
+      // Table row `value` cells that look like blank datetimes stay as "" (string ops).
+      out[key] = next;
     });
     return out;
+  }
+  if (typeof value === "string" && CASE_PREP_DATETIME_KEYS.has(keyHint) && !value.trim()) {
+    return undefined;
   }
   return toCasePrepPayloadDateValue(value);
 };
 
-const convertCasePrepSectionsDatesForApi = (
-  sections: SchemaSectionSubmission[] | undefined,
-): SchemaSectionSubmission[] | undefined => {
-  if (!sections) return sections;
-  return convertCasePrepDatesDeep(sections) as SchemaSectionSubmission[];
-};
-
 const convertCasePrepMotorDatesForApi = (
   motor: CasePrepMotorSubmission,
-): CasePrepMotorSubmission => ({
-  ...motor,
-  prrcClearanceDate: toCasePrepPayloadDate(motor.prrcClearanceDate),
-  sections: convertCasePrepSectionsDatesForApi(motor.sections) ?? [],
-});
+): CasePrepMotorSubmission => {
+  const { motorId, prrcClearanceDate, motorSubmissionType, ...details } = motor;
+  const converted = convertCasePrepDatesDeep(details) as CasePrepMotorDetailsPayload;
+  const clearance = toCasePrepPayloadDate(prrcClearanceDate);
+  return {
+    motorId,
+    ...(clearance ? { prrcClearanceDate: clearance } : { prrcClearanceDate: "" }),
+    ...(motorSubmissionType ? { motorSubmissionType } : {}),
+    ...converted,
+  };
+};
 
 export type MotorSubmissionType = "DRAFT" | "SUBMIT";
 export type MotorSubmissionStatus =
@@ -106,10 +122,7 @@ export const isMotorLocked = (status?: MotorSubmissionStatus | string | null) =>
 };
 
 export const isMotorEditable = (status?: MotorSubmissionStatus | string | null) =>
-  !status ||
-  status === "TO_BE_INITIATED" ||
-  status === "IN_PROGRESS" ||
-  status === "REJECTED";
+  !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED";
 
 export const isMotorApproverTabDisabled = (
   status?: MotorSubmissionStatus | string | null,
@@ -118,7 +131,10 @@ export const isMotorApproverTabDisabled = (
 export const isMotorApproverActionable = (
   status?: MotorSubmissionStatus | string | null,
 ): boolean => {
-  const normalized = String(status ?? "").trim().toUpperCase().replace(/\s+/g, "_");
+  const normalized = String(status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
   return normalized === "WAITING_FOR_APPROVAL" || normalized === "IN_PROGRESS";
 };
 
@@ -128,7 +144,9 @@ export const canApproverActionEntireCasePrepForm = (params: {
   status?: string | null;
   motors?: Array<{ motorSubmissionStatus?: MotorSubmissionStatus | string | null }>;
 }): boolean => {
-  const formType = String(params.formSubmissionType ?? "").trim().toUpperCase();
+  const formType = String(params.formSubmissionType ?? "")
+    .trim()
+    .toUpperCase();
   if (formType !== "SUBMIT") return false;
 
   const motors = params.motors ?? [];
@@ -178,38 +196,36 @@ export type MotorCounts = {
 export type CasePrepMotorSession = {
   motorId: string;
   prrcClearanceDate: string;
-  formValues: SchemaFormValues;
-  savedSections?: SchemaSectionSubmission[];
+  data: CasePrepMotorData;
 };
 
 export type CasePreparationFormState = {
-  schema: SchemaDocumentV2 | null;
   motors: CasePrepMotorSession[];
-  subscaleFormValues: SchemaFormValues;
-  subscaleSavedSections?: SchemaSectionSubmission[];
+  subscaleData: CasePrepMotorData | null;
 };
+
+export type CasePrepMotorSubmission = {
+  motorId: string;
+  prrcClearanceDate: string;
+  motorSubmissionType?: MotorSubmissionType;
+} & CasePrepMotorDetailsPayload;
 
 export type CasePreparationFormBody = {
   motors: CasePrepMotorSubmission[];
-  sections?: SchemaSectionSubmission[];
 };
 
 export const createDefaultCasePreparationFormState = (): CasePreparationFormState => ({
-  schema: null,
   motors: [],
-  subscaleFormValues: {},
+  subscaleData: null,
 });
 
 export const createEmptyMotorSession = (
   motorId: string,
   prrcClearanceDate: string,
-  _schema?: SchemaDocumentV2 | null,
-  _setupContext?: SchemaSetupContext,
 ): CasePrepMotorSession => ({
   motorId,
   prrcClearanceDate,
-  formValues: {},
-  savedSections: undefined,
+  data: createEmptyCasePrepMotorData(),
 });
 
 const resolveCasePrepDetailsPayload = (details: any) =>
@@ -232,9 +248,27 @@ const normalizeMotorStatus = (value: unknown): MotorSubmissionStatus => {
 };
 
 const normalizeMotorSubmissionType = (value: unknown): MotorSubmissionType | undefined => {
-  const normalized = String(value ?? "").trim().toUpperCase();
+  const normalized = String(value ?? "")
+    .trim()
+    .toUpperCase();
   if (normalized === "DRAFT" || normalized === "SUBMIT") return normalized;
   return undefined;
+};
+
+const resolveMotorSections = (motor: any): CasePrepMotorSectionPayload[] | undefined => {
+  if (Array.isArray(motor?.sections)) return motor.sections;
+  if (Array.isArray(motor?.motorSections)) return motor.motorSections;
+  return undefined;
+};
+
+const motorHasNestedCasePrepDetails = (motor: any): boolean =>
+  CASE_PREP_MOTOR_SECTION_KEYS.some((key) => motor?.[key] && typeof motor[key] === "object");
+
+const parseMotorCasePrepData = (motor: any): CasePrepMotorData => {
+  if (motorHasNestedCasePrepDetails(motor)) {
+    return parseCasePrepMotorDataFromApi(motor as Record<string, unknown>);
+  }
+  return parseCasePrepMotorDataFromApi(resolveMotorSections(motor));
 };
 
 /** Build motorStatusById from details root motorStatuses + motors[]. */
@@ -273,8 +307,7 @@ export const mapCasePreparationMotorStatusesFromApi = (
     const existing = statusById[motorId];
     statusById[motorId] = {
       motorSubmissionType:
-        normalizeMotorSubmissionType(motor?.motorSubmissionType) ??
-        existing?.motorSubmissionType,
+        normalizeMotorSubmissionType(motor?.motorSubmissionType) ?? existing?.motorSubmissionType,
       motorSubmissionStatus: normalizeMotorStatus(
         motor?.motorSubmissionStatus ?? existing?.motorSubmissionStatus,
       ),
@@ -300,19 +333,18 @@ export const mapCasePreparationDetailsToFormState = (details: any): CasePreparat
   const rawMotors = Array.isArray(payload?.motors) ? payload.motors : [];
 
   const motors = rawMotors
-    .map((motor: any) => ({
-      motorId: String(motor?.motorId ?? "").trim(),
-      prrcClearanceDate: String(
-        motor?.prrcClearanceDate ?? motor?.prrcDate ?? motor?.prrcClearance ?? "",
-      ).trim(),
-      formValues: {},
-      savedSections: Array.isArray(motor?.sections)
-        ? motor.sections
-        : Array.isArray(motor?.motorSections)
-          ? motor.motorSections
-          : undefined,
-    }))
-    .filter((motor) => motor.motorId.length > 0);
+    .map((motor: any) => {
+      const motorId = String(motor?.motorId ?? "").trim();
+      if (!motorId) return null;
+      return {
+        motorId,
+        prrcClearanceDate: String(
+          motor?.prrcClearanceDate ?? motor?.prrcDate ?? motor?.prrcClearance ?? "",
+        ).trim(),
+        data: parseMotorCasePrepData(motor),
+      } satisfies CasePrepMotorSession;
+    })
+    .filter(Boolean) as CasePrepMotorSession[];
 
   const sections = Array.isArray(payload?.sections)
     ? payload.sections
@@ -321,94 +353,22 @@ export const mapCasePreparationDetailsToFormState = (details: any): CasePreparat
       : undefined;
 
   return {
-    schema: null,
     motors,
-    subscaleFormValues: {},
-    subscaleSavedSections: sections,
+    subscaleData: sections?.length
+      ? parseCasePrepMotorDataFromApi(sections)
+      : motors.length === 0
+        ? createEmptyCasePrepMotorData()
+        : null,
   };
 };
 
-/**
- * Attach schema only. Motor form values are hydrated lazily in the active panel
- * so opening Fill Details stays O(1) instead of O(motors × schema walk).
- * Optionally hydrate a single motor (e.g. first tab) for immediate paint.
- */
-export const hydrateCasePreparationFormState = (
-  state: CasePreparationFormState,
-  schema: SchemaDocumentV2 | null,
-  setupContext?: SchemaSetupContext,
-  options?: { hydrateMotorIds?: string[] },
-): CasePreparationFormState => {
-  if (!schema) return state;
-
-  const hydrateIds = options?.hydrateMotorIds?.length
-    ? new Set(options.hydrateMotorIds)
-    : null;
-
-  const motors = (state.motors ?? []).map((motor) => {
-    if (Object.keys(motor.formValues ?? {}).length > 0) {
-      return motor;
-    }
-    if (!hydrateIds?.has(motor.motorId)) {
-      return motor;
-    }
-    if (motor.savedSections?.length) {
-      return {
-        ...motor,
-        formValues: hydrateCasePrepValuesFromSections(
-          schema,
-          motor.savedSections,
-          setupContext,
-        ),
-        savedSections: undefined,
-      };
-    }
-    return {
-      ...motor,
-      formValues: createCasePrepInitialValues(schema, setupContext),
-    };
-  });
-
-  const subscaleFormValues = state.subscaleSavedSections?.length
-    ? hydrateCasePrepValuesFromSections(schema, state.subscaleSavedSections, setupContext)
-    : Object.keys(state.subscaleFormValues ?? {}).length > 0
-      ? state.subscaleFormValues
-      : isSubscaleNeedsInitial(state)
-        ? createCasePrepInitialValues(schema, setupContext)
-        : state.subscaleFormValues ?? {};
-
-  return {
-    ...state,
-    schema,
-    motors,
-    subscaleFormValues,
-    subscaleSavedSections: state.subscaleSavedSections?.length
-      ? undefined
-      : state.subscaleSavedSections,
-  };
-};
-
-const isSubscaleNeedsInitial = (state: CasePreparationFormState) =>
-  (state.motors?.length ?? 0) === 0 &&
-  Object.keys(state.subscaleFormValues ?? {}).length === 0 &&
-  !(state.subscaleSavedSections?.length);
-
-export const mapCasePreparationFormStateToPayload = (
+export const buildCasePreparationFormBody = (
   form: CasePreparationFormState,
   options?: {
     targetMotorIds?: string[];
     motorSubmissionType?: MotorSubmissionType;
   },
 ): CasePreparationFormBody => {
-  const schema = form.schema;
-
-  if (!schema) {
-    return {
-      motors: [],
-      sections: [],
-    };
-  }
-
   const targetIds = options?.targetMotorIds?.length
     ? new Set(options.targetMotorIds.map((id) => String(id).trim()).filter(Boolean))
     : null;
@@ -416,40 +376,43 @@ export const mapCasePreparationFormStateToPayload = (
   const motors = (form.motors ?? [])
     .filter((motor) => !targetIds || targetIds.has(motor.motorId))
     .map((motor) => {
-      if (
-        Object.keys(motor.formValues ?? {}).length === 0 &&
-        motor.savedSections?.length
-      ) {
-        return {
-          motorId: motor.motorId,
-          prrcClearanceDate: motor.prrcClearanceDate,
+      const details = buildCasePrepMotorDetailsPayload(
+        motor.data ?? createEmptyCasePrepMotorData(),
+      );
+      const submission: CasePrepMotorSubmission = {
+        motorId: motor.motorId,
+        prrcClearanceDate: motor.prrcClearanceDate,
+        ...(options?.motorSubmissionType
+          ? { motorSubmissionType: options.motorSubmissionType }
+          : {}),
+        ...details,
+      };
+      return submission;
+    });
+
+  if (!motors.length && form.subscaleData) {
+    const details = buildCasePrepMotorDetailsPayload(form.subscaleData);
+    return {
+      motors: [
+        convertCasePrepMotorDatesForApi({
+          motorId: "SUBSCALE",
+          prrcClearanceDate: "",
           ...(options?.motorSubmissionType
             ? { motorSubmissionType: options.motorSubmissionType }
             : {}),
-          sections: motor.savedSections,
-        };
-      }
-      return buildCasePrepMotorSubmission(
-        motor.motorId,
-        motor.prrcClearanceDate,
-        schema,
-        motor.formValues,
-        options?.motorSubmissionType,
-      );
-    });
+          ...details,
+        }),
+      ],
+    };
+  }
 
   return {
     motors: motors.map(convertCasePrepMotorDatesForApi),
-    sections: convertCasePrepSectionsDatesForApi(
-      motors.length === 0
-        ? form.subscaleSavedSections?.length &&
-          Object.keys(form.subscaleFormValues ?? {}).length === 0
-          ? form.subscaleSavedSections
-          : buildCasePrepSectionPayload(schema, form.subscaleFormValues)
-        : undefined,
-    ),
   };
 };
+
+/** @deprecated Use buildCasePreparationFormBody */
+export const mapCasePreparationFormStateToPayload = buildCasePreparationFormBody;
 
 /** Rebuild payload from saved details for final form SUBMIT (RMP mirror). */
 export const mapCasePreparationDetailsFromSavedForm = (
@@ -465,6 +428,7 @@ export const mapCasePreparationDetailsFromSavedForm = (
       const motorId = String(motor?.motorId ?? "").trim();
       if (!motorId) return null;
       const statusMeta = statusById[motorId];
+      const details = buildCasePrepMotorDetailsPayload(parseMotorCasePrepData(motor));
       return {
         motorId,
         prrcClearanceDate: String(motor?.prrcClearanceDate ?? "").trim(),
@@ -472,44 +436,27 @@ export const mapCasePreparationDetailsFromSavedForm = (
           statusMeta?.motorSubmissionType ??
           normalizeMotorSubmissionType(motor?.motorSubmissionType) ??
           "SUBMIT",
-        sections: Array.isArray(motor?.sections) ? motor.sections : [],
+        ...details,
       } as CasePrepMotorSubmission;
     })
     .filter(Boolean) as CasePrepMotorSubmission[];
 
   return {
     motors: motors.map(convertCasePrepMotorDatesForApi),
-    sections: convertCasePrepSectionsDatesForApi(
-      Array.isArray(payload?.sections) ? payload.sections : undefined,
-    ),
   };
 };
 
 export const hasAnyCasePreparationValue = (form: CasePreparationFormState) => {
-  if (
-    (form.motors ?? []).some(
-      (motor) =>
-        schemaValuesHaveUserData(motor.formValues ?? {}) ||
-        Boolean(motor.savedSections?.length),
-    )
-  ) {
+  if ((form.motors ?? []).some((motor) => casePrepMotorDataHasUserInput(motor.data))) {
     return true;
   }
-  return (
-    schemaValuesHaveUserData(form.subscaleFormValues ?? {}) ||
-    Boolean(form.subscaleSavedSections?.length)
-  );
+  return form.subscaleData ? casePrepMotorDataHasUserInput(form.subscaleData) : false;
 };
 
-export const hasMotorCasePreparationValue = (
-  form: CasePreparationFormState,
-  motorId: string,
-) => {
+export const hasMotorCasePreparationValue = (form: CasePreparationFormState, motorId: string) => {
   const motor = (form.motors ?? []).find((entry) => entry.motorId === motorId);
   if (!motor) return false;
-  return (
-    schemaValuesHaveUserData(motor.formValues ?? {}) || Boolean(motor.savedSections?.length)
-  );
+  return casePrepMotorDataHasUserInput(motor.data);
 };
 
 export class CasePreparationSubmitResponseModel {
@@ -558,22 +505,12 @@ export class CasePreparationDetailsModel {
       submittedBy: mapPerson(payload?.submittedBy),
       submittedAt: payload?.submittedAt != null ? String(payload.submittedAt) : null,
       casePreparationDetails,
-      motors:
-        casePreparationDetails?.motors ??
-        payload?.motors ??
-        [],
-      sections:
-        casePreparationDetails?.sections ??
-        payload?.sections ??
-        [],
+      motors: casePreparationDetails?.motors ?? payload?.motors ?? [],
+      sections: casePreparationDetails?.sections ?? payload?.sections ?? [],
       generalActivities:
-        casePreparationDetails?.generalActivities ??
-        payload?.generalActivities ??
-        {},
+        casePreparationDetails?.generalActivities ?? payload?.generalActivities ?? {},
       linearCoatingOperation:
-        casePreparationDetails?.linearCoatingOperation ??
-        payload?.linearCoatingOperation ??
-        {},
+        casePreparationDetails?.linearCoatingOperation ?? payload?.linearCoatingOperation ?? {},
     };
   }
 }
@@ -598,55 +535,125 @@ export type CasePrepSchemaLabelIndex = {
   tablePresetRows: Record<string, Record<string, unknown>[]>;
 };
 
+/** Static labels matching case-prep schema JSON — details/approver need no schema fetch. */
+export const getCasePrepStaticLabelIndex = (): CasePrepSchemaLabelIndex => ({
+  sections: {
+    abradingOperation: "Abrading Operation",
+    bellowBonding: "Bellow Bonding",
+    tceCleaning: "TCE Cleaning",
+    preHeating: "Pre-heating",
+    linerCoatingOperation: "Liner Coating Operation",
+    dispatchToCasting: "Dispatch To Casting",
+  },
+  blocks: {
+    abradingConfigurationHeading: "Abrading Configuration",
+    typeOfCasing: "Type of Casting",
+    typeOfInsulation: "Type of Insulation",
+    abradingWheelType: "Abrading Wheel Type",
+    abradingDetails: "Abrading Details",
+    adhesiveDetailsHeading: "Adhesive Details",
+    adhesiveDetails: "Adhesive Details",
+    heBellowDimension: "HE Bellow Dimension",
+    heMotorPastingDateTime: "HE Pasting Date & Time",
+    neBellowDimension: "NE Bellow Dimension",
+    neMotorPastingDateTime: "NE Pasting Date & Time",
+    numberOfSpacers: "No. of Spacers",
+    pastingDetails: "Pasting Details",
+    remarks: "Remarks",
+    tceCleaningDateTime: "TCE Cleaning Date & Time",
+    solventUsedQtyKg: "Solvent Used Qty (KG)",
+    observation: "Observation",
+    testReport: "Upload Test Report",
+    preHeatingConfigurationHeading: "Pre-heating Configuration",
+    vacuumBaggingApplied: "Vacuum Bagging Application",
+    vacuumAppliedHint: "If YES, then vacuum applied",
+    vacuumApplied: "Enter vacuum value",
+    preHeatingRecipe: "Pre-heating Recipe",
+    otherTemperature: "Other Temperature",
+    otherDuration: "Other Duration",
+    temperatureDurationHeading: "Temperature Duration",
+    temperatureDuration: "Temperature Duration",
+    preHeatingMonitoring: "Pre-heating Monitoring",
+    preHeatingDate: "Pre-heating Date",
+    linerCoatingOperation: "Liner Coating Operation",
+    linerType: "Select Liner Type",
+    otherLinerType: "Other Liner Type",
+    linerPreparationDetails: "Liner Preparation Details",
+    batchNo: "Batch No.",
+    batchSize: "Batch Size",
+    premixIngredients: "Premix",
+    finalMixIngredients: "Final Mix",
+    qualificationDetails: "Qualification Details",
+    qualifyingSubscaleBatchNo: "Qualifying Subscale Batch No.",
+    qualificationParameters: "Qualification Parameters",
+    linerApplicationLog: "Liner Application Process Log",
+    linerCoatingDate: "Liner Coating Date",
+    dispatchVisualObservations: "Dispatch Visual Observations",
+    dispatchToCastingDetails: "Dispatch To Casting Details",
+  },
+  tableColumns: {
+    abradingDetails: {
+      operation: "Operation",
+      value: "Value",
+      remarksObservations: "Remarks / Observations",
+      attachments: "Photos / Videos",
+    },
+    temperatureDuration: {
+      parameter: "Parameter",
+      value: "Value",
+      remarks: "Remarks",
+    },
+    preHeatingMonitoring: {
+      parameter: "Parameter",
+      value: "Value",
+      remarks: "Remarks",
+    },
+    premixIngredients: {
+      srNo: "Sr. No.",
+      materialName: "Material Name",
+      ingredient: "Material Code",
+      mfgLot: "Mfg. Lot",
+      partsByWeight: "Parts by Wt.",
+      quantityTaken: "Quantity Taken (g)",
+      totalQuantity: "Total Quantity (g)",
+    },
+    finalMixIngredients: {
+      srNo: "Sr. No.",
+      materialName: "Material Name",
+      ingredient: "Material Code",
+      mfgLot: "Mfg. Lot",
+      partsByWeight: "Parts by Wt.",
+      quantityTaken: "Quantity Taken (g)",
+      totalQuantity: "Total Quantity (g)",
+    },
+    qualificationParameters: {
+      srNo: "Sr. No.",
+      parameter: "Parameter",
+      specification: "Specification",
+      result: "Result",
+    },
+    linerApplicationLog: {
+      parameter: "Operation",
+      value: "Value",
+      remarks: "Remarks",
+    },
+    dispatchVisualObservations: {
+      parameter: "Operation",
+      observations: "Observations",
+    },
+    dispatchToCastingDetails: {
+      parameter: "Operation",
+      value: "Value",
+      remarks: "Remarks",
+    },
+  },
+  tablePresetRows: {},
+});
+
+/** @deprecated Prefer getCasePrepStaticLabelIndex — schema walk no longer required. */
 export const buildCasePrepSchemaLabelIndex = (
-  schema: SchemaDocumentV2 | null | undefined,
-): CasePrepSchemaLabelIndex => {
-  const index: CasePrepSchemaLabelIndex = {
-    sections: {},
-    blocks: {},
-    tableColumns: {},
-    tablePresetRows: {},
-  };
-
-  if (!schema?.data?.sections) return index;
-
-  schema.data.sections.forEach((section) => {
-    index.sections[section.id] = section.title ?? formatPrepSectionLabel(section.id);
-
-    walkBlocks(section.children, (block) => {
-      if (block.type === "field") {
-        index.blocks[block.id] = block.label ?? formatPrepSectionLabel(block.id);
-        return;
-      }
-
-      if (block.type === "display") {
-        index.blocks[block.id] = block.label ?? formatPrepSectionLabel(block.id);
-        return;
-      }
-
-      if (block.type === "group" && block.label) {
-        index.blocks[block.id] = block.label;
-        return;
-      }
-
-      if (block.type === "table") {
-        const table = block as SchemaTableBlock;
-        index.blocks[table.id] =
-          table.title ?? table.label ?? formatPrepSectionLabel(table.id);
-        index.tableColumns[table.id] = {};
-        flattenTableColumns(table.columns).forEach((column) => {
-          index.tableColumns[table.id][column.id] =
-            column.label ?? formatPrepSectionLabel(column.id);
-        });
-        if (table.rows?.presetRows?.length) {
-          index.tablePresetRows[table.id] = table.rows.presetRows;
-        }
-      }
-    });
-  });
-
-  return index;
-};
+  _schema?: unknown,
+): CasePrepSchemaLabelIndex => getCasePrepStaticLabelIndex();
 
 const resolveCasePrepBlockLabel = (
   labelIndex: CasePrepSchemaLabelIndex | undefined,
@@ -662,8 +669,7 @@ const resolveCasePrepColumnLabel = (
   labelIndex: CasePrepSchemaLabelIndex | undefined,
   tableId: string,
   columnId: string,
-): string =>
-  labelIndex?.tableColumns[tableId]?.[columnId] ?? formatPrepSectionLabel(columnId);
+): string => labelIndex?.tableColumns[tableId]?.[columnId] ?? formatPrepSectionLabel(columnId);
 
 export type CasePrepDetailSection = {
   sectionId: string;
@@ -745,7 +751,9 @@ const CASE_PREP_COLUMN_PRIORITY = [
 ];
 
 export const orderCasePrepDisplayColumns = (columns: string[]): string[] => {
-  const visible = columns.filter((col) => !CASE_PREP_HIDDEN_TABLE_COLUMNS.has(col) && !col.startsWith("_"));
+  const visible = columns.filter(
+    (col) => !CASE_PREP_HIDDEN_TABLE_COLUMNS.has(col) && !col.startsWith("_"),
+  );
   return [...visible].sort((a, b) => {
     const ai = CASE_PREP_COLUMN_PRIORITY.indexOf(a);
     const bi = CASE_PREP_COLUMN_PRIORITY.indexOf(b);
@@ -818,9 +826,22 @@ const buildTableColumnLabels = (
   );
 
   return Object.fromEntries(
-    columns.map((columnId) => [columnId, resolveCasePrepColumnLabel(labelIndex, tableId, columnId)]),
+    columns.map((columnId) => [
+      columnId,
+      resolveCasePrepColumnLabel(labelIndex, tableId, columnId),
+    ]),
   );
 };
+
+const isWrappedTableValue = (
+  value: unknown,
+): value is { rows: Record<string, unknown>[] } =>
+  Boolean(
+    value &&
+      typeof value === "object" &&
+      !Array.isArray(value) &&
+      Array.isArray((value as { rows?: unknown }).rows),
+  );
 
 const isTableRowArray = (value: unknown): value is Record<string, unknown>[] =>
   Array.isArray(value) &&
@@ -836,7 +857,9 @@ const isCasePrepTableRow = (row: unknown): row is Record<string, unknown> => {
   );
 };
 
-const isFlatCasePrepTableSection = (sectionData: Record<string, unknown>[] | undefined): boolean => {
+const isFlatCasePrepTableSection = (
+  sectionData: Record<string, unknown>[] | undefined,
+): boolean => {
   const rows = sectionData ?? [];
   if (!rows.length) return false;
   return rows.every((row) => isCasePrepTableRow(row));
@@ -894,9 +917,8 @@ export const parseCasePrepSectionData = (
     if (!dataRow || typeof dataRow !== "object") return;
 
     if (Array.isArray(dataRow)) {
-      const nestedRows = dataRow.filter(
-        (item): item is Record<string, unknown> =>
-          Boolean(item && typeof item === "object" && !Array.isArray(item)),
+      const nestedRows = dataRow.filter((item): item is Record<string, unknown> =>
+        Boolean(item && typeof item === "object" && !Array.isArray(item)),
       );
       if (nestedRows.length > 0 && nestedRows.every(isCasePrepTableRow)) {
         pushCasePrepDetailTable(tables, sectionId, nestedRows, labelIndex);
@@ -942,6 +964,36 @@ export const parseCasePrepSectionData = (
   };
 };
 
+/** Build detail sections from nested motor keys or legacy `sections[]`. */
+export const resolveCasePrepMotorDetailSections = (
+  motor: Record<string, unknown>,
+  labelIndex?: CasePrepSchemaLabelIndex,
+): CasePrepDetailSection[] => {
+  if (Array.isArray(motor.sections)) {
+    return (motor.sections as Array<{ sectionId?: string; sectionData?: Record<string, unknown>[] }>)
+      .map((section) =>
+        parseCasePrepSectionData(
+          String(section.sectionId ?? ""),
+          section.sectionData,
+          labelIndex,
+        ),
+      )
+      .filter((section) => section.sectionId);
+  }
+
+  return CASE_PREP_MOTOR_SECTION_KEYS.map((sectionId) => {
+    const sectionObj = motor[sectionId];
+    if (!sectionObj || typeof sectionObj !== "object" || Array.isArray(sectionObj)) {
+      return parseCasePrepSectionData(sectionId, [], labelIndex);
+    }
+    return parseCasePrepSectionData(
+      sectionId,
+      [sectionObj as Record<string, unknown>],
+      labelIndex,
+    );
+  });
+};
+
 const sortCasePrepSections = (sections: CasePrepDetailSection[]): CasePrepDetailSection[] =>
   [...sections].sort((a, b) => {
     const ai = CASE_PREP_SECTION_ORDER.indexOf(a.sectionId);
@@ -967,15 +1019,17 @@ export const sortCasePrepMotorsByPreferredIds = <T extends { motorId: string }>(
   motors: T[],
   preferredMotorIds?: Array<string | number> | null,
 ): T[] => {
-  const preferred = (preferredMotorIds ?? [])
-    .map((id) => String(id ?? "").trim())
-    .filter(Boolean);
+  const preferred = (preferredMotorIds ?? []).map((id) => String(id ?? "").trim()).filter(Boolean);
   if (!preferred.length || motors.length <= 1) return motors;
 
   const order = new Map(preferred.map((id, index) => [id, index]));
   return [...motors].sort((a, b) => {
-    const aIndex = order.has(a.motorId) ? (order.get(a.motorId) as number) : Number.MAX_SAFE_INTEGER;
-    const bIndex = order.has(b.motorId) ? (order.get(b.motorId) as number) : Number.MAX_SAFE_INTEGER;
+    const aIndex = order.has(a.motorId)
+      ? (order.get(a.motorId) as number)
+      : Number.MAX_SAFE_INTEGER;
+    const bIndex = order.has(b.motorId)
+      ? (order.get(b.motorId) as number)
+      : Number.MAX_SAFE_INTEGER;
     if (aIndex !== bIndex) return aIndex - bIndex;
     return a.motorId.localeCompare(b.motorId);
   });
@@ -983,12 +1037,12 @@ export const sortCasePrepMotorsByPreferredIds = <T extends { motorId: string }>(
 
 export const mapCasePreparationDetailsForDisplay = (
   data: Record<string, unknown> | null | undefined,
-  schema?: SchemaDocumentV2 | null,
+  _schema?: unknown,
   options?: { preferredMotorIds?: Array<string | number> | null },
 ): CasePreparationDetailView | null => {
   if (!data) return null;
 
-  const labelIndex = buildCasePrepSchemaLabelIndex(schema);
+  const labelIndex = getCasePrepStaticLabelIndex();
   const details = (data.casePreparationDetails ?? data) as Record<string, unknown>;
   const rawMotors = Array.isArray(details.motors) ? details.motors : [];
   const statusById = mapCasePreparationMotorStatusesFromApi(data);
@@ -1005,19 +1059,9 @@ export const mapCasePreparationDetailsForDisplay = (
         const motorId = String(entry.motorId ?? "").trim();
         const statusMeta = statusById[motorId];
         const sections = sortCasePrepSections(
-          (Array.isArray(entry.sections) ? entry.sections : [])
-            .map((section) => {
-              const block = section as {
-                sectionId?: string;
-                sectionData?: Record<string, unknown>[];
-              };
-              return parseCasePrepSectionData(
-                String(block.sectionId ?? ""),
-                block.sectionData,
-                labelIndex,
-              );
-            })
-            .filter((section) => section.fields.length > 0 || section.tables.length > 0),
+          resolveCasePrepMotorDetailSections(entry, labelIndex).filter(
+            (section) => section.fields.length > 0 || section.tables.length > 0,
+          ),
         );
 
         return {
@@ -1029,8 +1073,7 @@ export const mapCasePreparationDetailsForDisplay = (
             statusMeta?.motorSubmissionType ??
             normalizeMotorSubmissionType(entry.motorSubmissionType),
           motorSubmissionStatus:
-            statusMeta?.motorSubmissionStatus ??
-            normalizeMotorStatus(entry.motorSubmissionStatus),
+            statusMeta?.motorSubmissionStatus ?? normalizeMotorStatus(entry.motorSubmissionStatus),
           submittedAt:
             statusMeta?.submittedAt ?? (entry.submittedAt as string | null | undefined) ?? null,
           reviewedBy:
@@ -1077,9 +1120,8 @@ export const mapCasePreparationDetailsForDisplay = (
         : details.status != null
           ? getCasePrepBatchStatusLabel(details.status)
           : undefined,
-    formSubmissionType: String(
-      data.formSubmissionType ?? details.formSubmissionType ?? "",
-    ).trim() || undefined,
+    formSubmissionType:
+      String(data.formSubmissionType ?? details.formSubmissionType ?? "").trim() || undefined,
     createdBy: mapPersonLabel(data.createdBy),
     createdAt: data.createdAt != null ? String(data.createdAt) : null,
     submittedBy: mapPersonLabel(data.submittedBy),

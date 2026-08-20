@@ -72,7 +72,8 @@
             "columns": [
               { "type": "column", "id": "SR_NO", "fieldType": "serial", "label": "Sr. No.", "readonly": true },
               { "type": "column", "id": "TYPE_OF_DEFECT", "fieldType": "static", "label": "Type of Defect", "readonly": true },
-              { "type": "column", "id": "OBSERVATION_LOCATION", "fieldType": "textarea", "label": "Observation and Location" }
+              { "type": "column", "id": "OBSERVATIONS", "fieldType": "textarea", "label": "Observations" },
+              { "type": "column", "id": "LOCATION", "fieldType": "text", "label": "Location" }
             ]
           }
         ]

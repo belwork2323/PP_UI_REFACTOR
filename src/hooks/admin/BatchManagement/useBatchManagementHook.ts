@@ -28,7 +28,8 @@ import {
 import { useAlertStore } from "@app/store/alertStore";
 import { STRINGS } from "@app/config/strings";
 import { canDeleteAdminBatch } from "@utils/batchManagementUtils";
-import { getDateRange } from "@utils/dateUtils";
+import { getDashboardFilterBounds, toDashboardApiFilterType } from "@utils/dateUtils";
+import { DEFAULT_DATE_FILTER_TYPE } from "@/ui/components/custom/dashboard/DashboardDateFilter";
 import { OPERATION_STATUS } from "@hooks/operationStatus";
 import type {
   MixingCycleMasterItem,
@@ -1122,7 +1123,7 @@ function useBatchDeleteSection(onRefresh: () => void) {
 }
 
 export default function useBatchManagementHook() {
-  const [filterType, setFilterType] = useState("month");
+  const [filterType, setFilterType] = useState(DEFAULT_DATE_FILTER_TYPE);
   const [customStartDate, setCustomStartDate] = useState("");
   const [customEndDate, setCustomEndDate] = useState("");
   const [appliedCustomStart, setAppliedCustomStart] = useState("");
@@ -1146,7 +1147,7 @@ export default function useBatchManagementHook() {
   }, [customStartDate, customEndDate]);
 
   const clearDateFilter = useCallback(() => {
-    setFilterType("month");
+    setFilterType(DEFAULT_DATE_FILTER_TYPE);
     setCustomStartDate("");
     setCustomEndDate("");
     setAppliedCustomStart("");
@@ -1156,16 +1157,16 @@ export default function useBatchManagementHook() {
   const dateFilterPayload = useMemo(() => {
     if (filterType === "custom") {
       return {
-        filterType,
+        filterType: "custom",
         startDate: appliedCustomStart,
         endDate: appliedCustomEnd,
       };
     }
 
-    const { startDate, endDate } = getDateRange(filterType);
+    const { startDate, endDate } = getDashboardFilterBounds(filterType);
 
     return {
-      filterType,
+      filterType: toDashboardApiFilterType(filterType),
       startDate,
       endDate,
     };

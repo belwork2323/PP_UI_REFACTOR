@@ -14,7 +14,7 @@ import StackRow from "@ui/components/common/StackRow";
 import FilterSelect from "@ui/components/common/FilterSelect";
 import DateRangeRow from "@ui/components/common/DateRangeRow";
 import AdminListShell from "@ui/components/custom/admin/AdminListShell";
-import AdminFilterPanel from "@ui/components/custom/admin/AdminFilterPanel";
+import AdminListFilterPanel from "@ui/components/custom/admin/AdminListFilterPanel";
 import { STRINGS } from "@app/config/strings";
 
 const AC = STRINGS.ADMIN_COMMON;
@@ -91,7 +91,7 @@ export default function DashboardBlockchainSection({
         hasItems={recentEvents.length > 0}
         emptyTitle={t.EMPTY_STATES.NO_EVENTS}
         filterExtension={
-          <AdminFilterPanel
+          <AdminListFilterPanel
             title={t.FILTERS.TIMELINE_LABEL}
             activeFilterCount={eventsActiveFilterCount}
             onClear={clearEventsFilters}
@@ -102,28 +102,28 @@ export default function DashboardBlockchainSection({
             applyLabel={AC.FILTERS_APPLY}
             theme={th}
           >
-            <Stack direction="row" gap={1.5} flexWrap="wrap" mb={2}>
-              <FilterSelect
-                label={t.FILTERS.TYPE}
-                value={eventsDraftFilters.type}
-                onChange={(e) => setEventsDraftFilter("type", e.target.value)}
-                options={t.EVENT_FILTERS.TYPES}
-                menuProps={filterMenuProps}
-                itemSx={filterMenuItemSx}
-                showAllOption={false}
-                sx={th.filterPanel.field}
-              />
-              <FilterSelect
-                label={t.FILTERS.DEPARTMENT}
-                value={eventsDraftFilters.department}
-                onChange={(e) => setEventsDraftFilter("department", e.target.value)}
-                options={t.EVENT_FILTERS.DEPARTMENTS}
-                menuProps={filterMenuProps}
-                itemSx={filterMenuItemSx}
-                showAllOption={false}
-                sx={th.filterPanel.field}
-              />
-            </Stack>
+            <FilterSelect
+              label={t.FILTERS.TYPE}
+              value={eventsDraftFilters.type}
+              onChange={(e) => setEventsDraftFilter("type", e.target.value)}
+              options={t.EVENT_FILTERS.TYPES}
+              menuProps={filterMenuProps}
+              itemSx={filterMenuItemSx}
+              showAllOption={false}
+              filterPanel
+              sx={{ ...th.filterPanel.field, ...th.filterPanel.fieldItem }}
+            />
+            <FilterSelect
+              label={t.FILTERS.DEPARTMENT}
+              value={eventsDraftFilters.department}
+              onChange={(e) => setEventsDraftFilter("department", e.target.value)}
+              options={t.EVENT_FILTERS.DEPARTMENTS}
+              menuProps={filterMenuProps}
+              itemSx={filterMenuItemSx}
+              showAllOption={false}
+              filterPanel
+              sx={{ ...th.filterPanel.field, ...th.filterPanel.fieldItem }}
+            />
 
             <DateRangeRow
               from={eventsDraftFilters.dateFrom}
@@ -140,12 +140,17 @@ export default function DashboardBlockchainSection({
               fromLabel={t.FILTERS.FROM}
               toLabel={t.FILTERS.TO}
               separatorLabel={t.FILTERS.DATE_SEPARATOR}
+              showLeadingIcon={false}
+              nowrap
+              alignInputs="filter"
+              controlHeight={32}
               calendarIconSx={th.table.calendarIcon}
-              datePickerSx={th.table.datePicker}
+              datePickerSx={th.filterPanel.field}
+              containerSx={{ ...th.filterPanel.fieldItem, flex: "2 1 320px" }}
               separatorSx={th.table.filterDateSeparator}
               textFieldProps={th.table.dateInputProps}
             />
-          </AdminFilterPanel>
+          </AdminListFilterPanel>
         }
         theme={shellTheme}
       >

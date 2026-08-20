@@ -40,7 +40,7 @@ import {
   createInitialMechanicalProperties,
 } from "../../../../../../data/models/user/RocketMotorCasingFormModel";
 import CasingFormStepNav from "./CasingFormStepNav";
-import RocketMotorCasingMockTrialSchemaPanel from "./RocketMotorCasingMockTrialSchemaPanel";
+import RocketMotorCasingMockTrialPanel from "./RocketMotorCasingMockTrialPanel";
 import type { useRocketMotorCasingLookups } from "../../../../../../hooks/user/sourcing/useRocketMotorCasingLookups";
 import {
   DateField,
@@ -103,7 +103,7 @@ const MotorCasingCreateForm = ({
   dimensionalParameters,
   dimensionalParametersErrorMessage,
   motorStage,
-  subDepartmentId,
+  subDepartmentId: _subDepartmentId,
   loadingDimensionalParams = false,
   lockIdentification = false,
   showDeleteCasing = false,
@@ -1230,12 +1230,12 @@ const MotorCasingCreateForm = ({
           theme={theme}
           cf={cf}
         >
-          <RocketMotorCasingMockTrialSchemaPanel
-            motorStage={form.motorStageApi || motorStage}
-            subDepartmentId={subDepartmentId}
-            slot={form.mockTrial}
-            onSlotChange={(mockTrial) => patch({ mockTrial })}
+          <RocketMotorCasingMockTrialPanel
+            value={form.mockTrial}
+            onChange={(mockTrial) => patch({ mockTrial })}
+            disabled={!String(form.motorStageApi ?? "").trim()}
             theme={theme}
+            cf={cf}
           />
         </SectionCard>
       )}

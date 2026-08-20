@@ -57,7 +57,7 @@ export const QC_DIVISION_OPTIONS: QcDivisionOption[] = [
   { value: "POST_CURE", label: "Post Cure" },
   { value: "NDT", label: "NDT" },
   { value: "QC", label: "QC" },
-  { value: "WEIGHTMENT", label: "Weightment" },
+  { value: "WEIGHTMENT", label: "Weighment" },
   { value: "STATIC_TEST_FACILITY", label: "Static Test Facility", disabled: true },
 ];
 
@@ -80,6 +80,7 @@ const QC_DIVISION_NAME_TO_FLOW_KEY: Record<string, string> = {
   ndt: "NDT",
   qc: "QC",
   weightment: "WEIGHTMENT",
+  weighment: "WEIGHTMENT",
   statictestfacility: "STATIC_TEST_FACILITY",
 };
 
@@ -289,6 +290,22 @@ export const resolveQcDivisionIdForSelection = (
 
   const parentId = Number(division.divisionId ?? 0);
   return parentId > 0 ? parentId : null;
+};
+
+/**
+ * Manufacturing `/qc-division/division-details` divisionId for auto-populate.
+ * De-coring QC reads curing manufacturing data — use the Curing division id, not De-coring.
+ */
+export const resolveQcManufacturingDivisionDetailsId = (
+  catalog: QcDivisionCatalogItem[] | undefined,
+  selectedDivision: string,
+  selectedTypeValue?: string | null,
+): number | null => {
+  const flowKey = String(selectedDivision ?? "").trim();
+  if (flowKey === "DE_CORING") {
+    return resolveQcDivisionIdForSelection(catalog, "CURING", null);
+  }
+  return resolveQcDivisionIdForSelection(catalog, selectedDivision, selectedTypeValue);
 };
 
 const normalizeQcDivisionLookupKey = (value: string | null | undefined) =>

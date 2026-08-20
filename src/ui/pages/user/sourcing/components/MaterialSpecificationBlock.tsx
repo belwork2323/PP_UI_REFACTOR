@@ -1,4 +1,4 @@
-import { useCallback, useMemo, type ChangeEvent } from "react";
+import { useCallback, useMemo, useRef } from "react";
 import {
   alpha,
   Box,
@@ -19,15 +19,15 @@ import {
 } from "@mui/material";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
-import { useAlertStore } from "../../../../../app/store/alertStore";
-import { fileUtils } from "../../../../../utils/FileUtils";
 import CertificateUploadSection from "./CertificateUploadSection";
+import FilePreviewDialog from "../../../../components/common/FilePreviewDialog";
 import StackRow from "../../../../components/common/StackRow";
 import type { LotCertificate } from "../../../../../data/models/user/RawMaterialProcurementModel";
 import {
   computeIsOutOfRange,
   isSpecRowFailed,
 } from "../../../../../data/models/user/RawMaterialProcurementModel";
+import { useLotCertificateActions } from "../../../../../hooks/user/sourcing/useLotCertificateActions";
 import {
   SpecificationBlock,
   SpecificationRow,
@@ -106,22 +106,6 @@ function useMaterialBlockState(
     [block, index, onUpdate]
   );
 
-  const removeCertificate = useCallback(
-    (certIndex: number) => {
-      const certs = [...(block.certificates ?? [])];
-      const removed = certs[certIndex];
-      if (removed?.fileUrl?.startsWith("blob:")) {
-        try {
-          URL.revokeObjectURL(removed.fileUrl);
-        } catch {
-          /* ignore */
-        }
-      }
-      onUpdate(index, { ...block, certificates: certs.filter((_, i) => i !== certIndex) });
-    },
-    [block, index, onUpdate]
-  );
-
   const filledCount = useMemo(
     () => block.rows.filter((row) => row.analysedResult.trim() !== "").length,
     [block.rows]
@@ -137,7 +121,6 @@ function useMaterialBlockState(
     handleLotNoChange,
     handleBlockMeta,
     handleCertChange,
-    removeCertificate,
   };
 }
 
@@ -166,44 +149,26 @@ const MaterialSpecificationBlock = ({
     handleLotNoChange,
     handleBlockMeta,
     handleCertChange,
-    removeCertificate,
     totalCount,
   } = useMaterialBlockState(block, index, onUpdate);
 
-  const showAlert = useAlertStore((state) => state.showAlert);
-
-  const handleCertificateFiles = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => {
-      const input = event.currentTarget;
-      const incoming = input.files ? Array.from(input.files) : [];
-      if (!incoming.length) return;
-
-      const next = [...(block.certificates ?? [])];
-      let added = 0;
-
-      try {
-        for (const file of incoming) {
-          const { valid, error } = fileUtils.validateCertificateFile(file);
-          if (!valid) {
-            showAlert(`${file.name}: ${error ?? formStrings.CERT_INVALID_FILE}`, "warning");
-            continue;
-          }
-          const blobUrl = URL.createObjectURL(file);
-          next.push({ fileName: file.name, fileUrl: blobUrl, certificateType: "", file });
-          added += 1;
-        }
-
-        if (added > 0) {
-          onUpdate(index, { ...block, certificates: next });
-        }
-      } finally {
-        queueMicrotask(() => {
-          input.value = "";
-        });
-      }
+  const blockRef = useRef(block);
+  blockRef.current = block;
+  const handleCertificatesChange = useCallback(
+    (certificates: LotCertificate[]) => {
+      onUpdate(index, { ...blockRef.current, certificates });
     },
-    [block, formStrings.CERT_INVALID_FILE, index, onUpdate, showAlert]
+    [index, onUpdate],
   );
+  const {
+    handleFilesSelected,
+    handleRetry,
+    handleRemove,
+    handleOpen,
+    filePreview,
+    closeFilePreview,
+    downloadFilePreview,
+  } = useLotCertificateActions(block.certificates ?? [], handleCertificatesChange);
 
   return (
     <Box sx={{ ...theme.workflow.formElements.blockCard, ...specStyles.animatedBlockCard(index) }}>
@@ -452,9 +417,19 @@ const MaterialSpecificationBlock = ({
         certificates={block.certificates ?? []}
         formStrings={formStrings}
         theme={theme}
-        onFilesSelected={handleCertificateFiles}
+        onFilesSelected={handleFilesSelected}
         onCertChange={handleCertChange}
-        onRemove={removeCertificate}
+        onRemove={handleRemove}
+        onRetry={handleRetry}
+        onOpen={handleOpen}
+      />
+
+      <FilePreviewDialog
+        preview={filePreview}
+        onClose={closeFilePreview}
+        onDownload={downloadFilePreview}
+        themeColor={theme.palette.primary}
+        themeColorLight={theme.palette.primaryLight}
       />
     </Box>
   );

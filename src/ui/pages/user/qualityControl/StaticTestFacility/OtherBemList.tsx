@@ -194,10 +194,10 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
         <ConfirmAlertDialog
           open={backConfirmOpen}
           severity="warning"
-          title="Unsaved Changes"
-          message="You have unsaved changes in the form. Are you sure you want to go back and discard your changes?"
-          confirmLabel="Discard & Go Back"
-          cancelLabel="Stay on Form"
+          title={strings.UNSAVED_BACK_TITLE}
+          message={strings.UNSAVED_BACK_MESSAGE}
+          confirmLabel={strings.UNSAVED_BACK_DISCARD}
+          cancelLabel={strings.UNSAVED_BACK_CONFIRM}
           onConfirm={handleDiscardAndBack}
           onCancel={() => setBackConfirmOpen(false)}
         />

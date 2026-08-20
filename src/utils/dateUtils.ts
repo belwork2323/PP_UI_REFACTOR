@@ -122,10 +122,29 @@ export const formatToIsoDateInput = (value: string | null | undefined): string =
   return "";
 };
 
+/**
+ * Preset dashboard ranges (one year / six months) are sent as `custom`
+ * with computed start/end dates — same contract as Admin Dashboard.
+ */
+export const toDashboardApiFilterType = (filterType: string) =>
+  filterType === "one_year" || filterType === "six_months" ? "custom" : filterType;
+
 /** Dashboard global date filter bounds (DD-MM-YYYY). */
 export const getDashboardFilterBounds = (filterType: string) => {
   const now = new Date();
   const endIso = toIsoDate(now);
+
+  if (filterType === "six_months") {
+    const start = new Date(now);
+    start.setMonth(start.getMonth() - 6);
+    return { startDate: toApiDate(start), endDate: toApiDate(now) };
+  }
+
+  if (filterType === "one_year") {
+    const start = new Date(now);
+    start.setFullYear(start.getFullYear() - 1);
+    return { startDate: toApiDate(start), endDate: toApiDate(now) };
+  }
 
   if (filterType === "day") {
     return { startDate: toApiDate(now), endDate: toApiDate(now) };
@@ -148,6 +167,18 @@ export const getDashboardFilterBounds = (filterType: string) => {
 /** Returns DD-MM-YYYY bounds for batch/dashboard stats filters. */
 export const getDateRange = (filterType: string) => {
   const now = new Date();
+
+  if (filterType === "six_months") {
+    const start = new Date(now);
+    start.setMonth(start.getMonth() - 6);
+    return { startDate: toApiDate(start), endDate: toApiDate(now) };
+  }
+
+  if (filterType === "one_year") {
+    const start = new Date(now);
+    start.setFullYear(start.getFullYear() - 1);
+    return { startDate: toApiDate(start), endDate: toApiDate(now) };
+  }
 
   if (filterType === "day") {
     const today = toApiDate(now);

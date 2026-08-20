@@ -6,7 +6,6 @@ import { useAuthStore } from "../../app/store/authStore";
 import { normalizeApproverBatchStatus } from "../../data/models/approver/ApproverBatchListModel";
 import dispatchApproverController from "../../controllers/approver/dispatchApproverController";
 import dispatchController from "../../controllers/user/dispatch/dispatchController";
-import type { ApproverChangeStatusPayload } from "../../data/api/approver/approverApi";
 import type { DispatchApproverMotorChangeStatusPayload } from "../../data/api/approver/dispatch/dispatchApproverApi";
 import {
   getDispatchBatchStatusLabel,
@@ -14,7 +13,6 @@ import {
   type DispatchDetailView,
 } from "../../data/models/user/DispatchApiModel";
 import {
-  canApproverActionEntireDispatchForm,
   isDispatchMotorApproverTabDisabled,
 } from "../../data/models/user/DispatchFormModel";
 import useApproverFormAction from "./useApproverFormAction";
@@ -81,18 +79,6 @@ export const useDispatchApproverHook = () => {
     [],
   );
 
-  const submitFormChangeStatus = useCallback(
-    async (payload: Record<string, unknown>) =>
-      dispatchApproverController.submitFormStatusChange({
-        formId: String(payload.formId ?? ""),
-        subDepartmentId: Number(payload.subDepartmentId ?? 0),
-        actionType: payload.actionType as ApproverChangeStatusPayload["actionType"],
-        remarks: (payload.remarks as string | null | undefined) ?? null,
-        rejectionReason: (payload.rejectionReason as string | null | undefined) ?? null,
-      }),
-    [],
-  );
-
   const {
     dialogProps: motorDialogBaseProps,
     requestApprove: requestMotorApproveAction,
@@ -136,43 +122,6 @@ export const useDispatchApproverHook = () => {
       );
     },
     closeSelectedOnSuccess: false,
-  });
-
-  const {
-    dialogProps: formDialogProps,
-    requestApprove: requestFormApproveAction,
-    requestReject: requestFormRejectAction,
-  } = useApproverFormAction({
-    department: DEPARTMENT,
-    setItems,
-    setSelected,
-    subDepartment: SUB_DEPARTMENT,
-    statusField: "dispatchStatus",
-    submitChangeStatus: submitFormChangeStatus,
-    onStatusChangeSuccess: async (item, response) => {
-      const formId = String(item.formId ?? "").trim();
-      if (!formId) return;
-
-      const refreshed = await refreshSelectedDetails(formId);
-      const batchStatus = normalizeApproverBatchStatus(
-        (response.data as { batchStatus?: string })?.batchStatus ||
-          (response.data as { status?: string })?.status ||
-          refreshed?.status ||
-          "",
-      );
-
-      setSelected((current) =>
-        current
-          ? {
-              ...current,
-              status: batchStatus || current.status,
-              dispatchStatus: batchStatus || current.dispatchStatus,
-              detailView: refreshed ?? current.detailView,
-            }
-          : current,
-      );
-    },
-    closeSelectedOnSuccess: true,
   });
 
   const motorDialogProps = useMemo(
@@ -307,52 +256,15 @@ export const useDispatchApproverHook = () => {
     [activeMotorId, requestMotorRejectAction, showAlert],
   );
 
-  const requestFormApprove = useCallback(
-    (item: ApproverListRow) => {
-      if (
-        !canApproverActionEntireDispatchForm({
-          formSubmissionType: item.detailView?.formSubmissionType,
-          status: item.detailView?.status ?? item.dispatchStatus ?? item.status,
-          motors: item.detailView?.motors,
-        })
-      ) {
-        showAlert(S.FINAL_APPROVAL_NOT_READY, "warning", { autoCloseMs: 3000 });
-        return;
-      }
-      requestFormApproveAction(item);
-    },
-    [requestFormApproveAction, showAlert],
-  );
-
-  const requestFormReject = useCallback(
-    (item: ApproverListRow) => {
-      if (
-        !canApproverActionEntireDispatchForm({
-          formSubmissionType: item.detailView?.formSubmissionType,
-          status: item.detailView?.status ?? item.dispatchStatus ?? item.status,
-          motors: item.detailView?.motors,
-        })
-      ) {
-        showAlert(S.FINAL_APPROVAL_NOT_READY, "warning", { autoCloseMs: 3000 });
-        return;
-      }
-      requestFormRejectAction(item);
-    },
-    [requestFormRejectAction, showAlert],
-  );
-
   return {
     items,
     selected,
     detailsLoading,
     activeMotorId,
     dialogProps: motorDialogProps,
-    formDialogProps,
-    actionLoading: motorDialogBaseProps.submitting || formDialogProps.submitting,
+    actionLoading: motorDialogBaseProps.submitting,
     requestApprove: requestMotorApprove,
     requestReject: requestMotorReject,
-    requestFormApprove,
-    requestFormReject,
     handleViewDetails,
     handleCloseDetail,
     handleActiveMotorChange,

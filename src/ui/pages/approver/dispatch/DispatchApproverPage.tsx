@@ -30,12 +30,9 @@ const DispatchApproverPage = () => {
     detailsLoading,
     activeMotorId,
     dialogProps,
-    formDialogProps,
     actionLoading,
     requestApprove,
     requestReject,
-    requestFormApprove,
-    requestFormReject,
     handleViewDetails,
     handleCloseDetail,
     handleActiveMotorChange,
@@ -68,13 +65,10 @@ const DispatchApproverPage = () => {
         onActiveMotorChange={handleActiveMotorChange}
         onApprove={requestApprove}
         onReject={requestReject}
-        onApproveForm={requestFormApprove}
-        onRejectForm={requestFormReject}
         actionLoading={actionLoading}
         theme={approverTheme}
       />
       <ApproverActionDialog {...dialogProps} />
-      <ApproverActionDialog {...formDialogProps} />
     </ApproverSubdepartmentBatchListSection>
   );
 };

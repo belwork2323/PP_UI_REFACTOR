@@ -33,8 +33,6 @@ type TrimmingApproverDetailDialogProps = {
   onActiveMotorChange?: (motorId: string) => void;
   onApprove: (item: TrimmingApproverDetailItem) => void;
   onReject: (item: TrimmingApproverDetailItem) => void;
-  onApproveForm?: (item: TrimmingApproverDetailItem) => void;
-  onRejectForm?: (item: TrimmingApproverDetailItem) => void;
   actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
 };
@@ -48,8 +46,6 @@ const TrimmingApproverDetailDialog = ({
   onActiveMotorChange,
   onApprove,
   onReject,
-  onApproveForm,
-  onRejectForm,
   actionLoading = false,
   theme,
 }: TrimmingApproverDetailDialogProps) => {
@@ -101,10 +97,7 @@ const TrimmingApproverDetailDialog = ({
             onActiveMotorChange={onActiveMotorChange ?? (() => undefined)}
             onApprove={() => onApprove(item)}
             onReject={() => onReject(item)}
-            onApproveForm={onApproveForm ? () => onApproveForm(item) : undefined}
-            onRejectForm={onRejectForm ? () => onRejectForm(item) : undefined}
             actionLoading={actionLoading}
-            formStatus={String(item.trStatus ?? item.status ?? "")}
             manufacturingTheme={manufacturingTheme}
             approverTheme={theme}
           />

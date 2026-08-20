@@ -46,7 +46,13 @@ type SpecificationFormBuilderProps = {
 };
 
 const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
-  const { lockLotNo = false, showDeleteLot = false, onDeleteLot, deleteLoading = false, ...formProps } = props;
+  const {
+    lockLotNo = false,
+    showDeleteLot = false,
+    onDeleteLot,
+    deleteLoading = false,
+    ...formProps
+  } = props;
   const {
     actionHelperText,
     addingMaterial,

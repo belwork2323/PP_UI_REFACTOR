@@ -9,7 +9,6 @@ import { STRINGS } from "../../../../../app/config/strings";
 import { getOperationStatusConfig, OPERATION_STATUS } from "../../../../../hooks/operationStatus";
 import UserWorkflowStatusCell from "../../../../components/custom/UserWorkflowStatusCell";
 import { mapCasePreparationDetailsForDisplay } from "../../../../../data/models/user/CasePreparationFormModel";
-import type { SchemaDocumentV2 } from "../../../../../schema-engine";
 import CasePreparationDetailsContent from "./components/CasePreparationDetailsContent";
 
 const FH = STRINGS.MANUFACTURING.FORM_HEADER;
@@ -33,12 +32,11 @@ const STATUS_CONFIG = getOperationStatusConfig({
 type CasePreparationDetailsViewProps = {
   row: Record<string, unknown>;
   data: Record<string, unknown> | null;
-  schema?: SchemaDocumentV2 | null;
   loading: boolean;
   onBack: () => void;
 };
 
-const CasePreparationDetailsView = ({ row, data, schema, loading, onBack }: CasePreparationDetailsViewProps) => {
+const CasePreparationDetailsView = ({ row, data, loading, onBack }: CasePreparationDetailsViewProps) => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getManufacturingTheme(mode), [mode]);
   const dt = theme.manufacturing.casePreparation.details;
@@ -56,10 +54,10 @@ const CasePreparationDetailsView = ({ row, data, schema, loading, onBack }: Case
 
   const detailView = useMemo(
     () =>
-      mapCasePreparationDetailsForDisplay(data, schema, {
+      mapCasePreparationDetailsForDisplay(data, undefined, {
         preferredMotorIds: Array.isArray(row.motorIds) ? (row.motorIds as Array<string | number>) : null,
       }),
-    [data, row.motorIds, schema],
+    [data, row.motorIds],
   );
 
   return (

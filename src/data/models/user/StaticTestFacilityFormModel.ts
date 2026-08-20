@@ -35,14 +35,14 @@ export type StfMotorStatusMeta = {
 const normalizeStfMotorSubmissionType = (
   value?: string | null,
 ): StfMotorSubmissionType | undefined => {
-  const raw = String(value ?? "").trim().toUpperCase();
+  const raw = String(value ?? "")
+    .trim()
+    .toUpperCase();
   if (raw === "DRAFT" || raw === "SUBMIT") return raw;
   return undefined;
 };
 
-const normalizeStfMotorSubmissionStatus = (
-  value?: string | null,
-): StfMotorSubmissionStatus => {
+const normalizeStfMotorSubmissionStatus = (value?: string | null): StfMotorSubmissionStatus => {
   const raw = String(value ?? "")
     .trim()
     .toUpperCase()
@@ -57,15 +57,11 @@ const normalizeStfMotorSubmissionStatus = (
 export const isStfMotorEditable = (status?: StfMotorSubmissionStatus | string | null) => {
   const normalized = normalizeStfMotorSubmissionStatus(status);
   return (
-    normalized === "TO_BE_INITIATED" ||
-    normalized === "IN_PROGRESS" ||
-    normalized === "REJECTED"
+    normalized === "TO_BE_INITIATED" || normalized === "IN_PROGRESS" || normalized === "REJECTED"
   );
 };
 
-export const mapStfMotorStatusesFromApi = (
-  details: any,
-): Record<string, StfMotorStatusMeta> => {
+export const mapStfMotorStatusesFromApi = (details: any): Record<string, StfMotorStatusMeta> => {
   const root = details?.data ?? details ?? {};
   const statusById: Record<string, StfMotorStatusMeta> = {};
 
@@ -516,16 +512,13 @@ export const hasMotorStaticTestFacilityValue = (
   const motor = (form.motors ?? []).find((entry) => entry.motorId === motorId);
   if (!motor) return false;
   return (
-    schemaValuesHaveUserData(motor.schemaFormValues ?? {}) ||
-    Boolean(motor.savedSections?.length)
+    schemaValuesHaveUserData(motor.schemaFormValues ?? {}) || Boolean(motor.savedSections?.length)
   );
 };
 
 export type StfNavigationMotor = { motorId: string; subType: StfSubType };
 
-export const buildStfAddedMotors = (
-  form: StaticTestFacilityFormState,
-): StfNavigationMotor[] => {
+export const buildStfAddedMotors = (form: StaticTestFacilityFormState): StfNavigationMotor[] => {
   const motors = (form.motors ?? []).filter((motor) => motor.motorId.trim());
   if (motors.length > 0) {
     return motors.map((motor) => ({ motorId: motor.motorId, subType: motor.subType }));
@@ -670,10 +663,9 @@ export const mapStaticTestFacilityFormStateToPayload = (
     ? new Set(options.targetMotorIds.map((id) => String(id).trim()).filter(Boolean))
     : null;
 
-  const navigationMotors =
-    options?.navigationMotors?.length
-      ? options.navigationMotors
-      : buildStfAddedMotors(form);
+  const navigationMotors = options?.navigationMotors?.length
+    ? options.navigationMotors
+    : buildStfAddedMotors(form);
 
   const sessionById = new Map(
     (form.motors ?? [])
@@ -691,8 +683,7 @@ export const mapStaticTestFacilityFormStateToPayload = (
     motors: motorsToMap.map((navMotor) => {
       const motorId = String(navMotor.motorId ?? "").trim();
       const session =
-        sessionById.get(motorId) ??
-        createEmptyStfMotorSession(motorId, navMotor.subType);
+        sessionById.get(motorId) ?? createEmptyStfMotorSession(motorId, navMotor.subType);
       const statusMeta = statusById[motorId];
       const submissionTypeOverride =
         targetIds?.has(motorId) && options?.motorSubmissionType

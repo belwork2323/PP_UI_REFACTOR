@@ -1,8 +1,9 @@
-import { startTransition, useCallback, useMemo, useState } from "react";
+import { startTransition, useCallback, useMemo, useRef, useState } from "react";
 import { STRINGS } from "../../../app/config/strings";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshStore";
+import { useFileService } from "../../../hooks/useFileService";
 import rawMaterialProcurementController from "../../../controllers/user/sourcing/rawMaterialProcurementController";
 import {
   createEmptyFormBatch,
@@ -13,6 +14,7 @@ import {
   MaterialBlock,
   normalizeRawMaterialLotListStatus,
   serializeMaterialBlocks,
+  hasIncompleteCertificateUploads,
   RawMaterialFormBatch,
   RawMaterialLotDetailsModel,
   RawMaterialLotDetailsContext,
@@ -21,6 +23,8 @@ import {
 } from "../../../data/models/user/RawMaterialProcurementModel";
 import { useRawMaterialLotList } from "./useRawMaterialLotList";
 import { rmCertDebug, summarizeBlocks } from "../../../utils/rawMaterialCertUploadDebug";
+import { discardWorkflowForm } from "../../../utils/workflowDiscard";
+import { extractTempFileIdsFromMaterialBlocks } from "../../../utils/workflowTempFiles";
 
 type WorkflowView = "list" | "form" | "details";
 type FormEntryMode = "create" | "fill" | "edit";
@@ -47,6 +51,7 @@ export const useRawMaterialProcurementHook = () => {
   const user = useAuthStore((s) => s.user);
   const showAlert = useAlertStore((state) => state.showAlert);
   const bumpBatchRefresh = useUserBatchRefreshStore((state) => state.bumpVersion);
+  const { deleteTemp } = useFileService();
 
   const subDepartmentId = useMemo(
     () =>
@@ -58,6 +63,20 @@ export const useRawMaterialProcurementHook = () => {
     () => serializeMaterialBlocks(formBlocks) !== initialSnapshot,
     [formBlocks, initialSnapshot],
   );
+
+  const formBlocksRef = useRef(formBlocks);
+  formBlocksRef.current = formBlocks;
+  const initialSnapshotRef = useRef(initialSnapshot);
+  initialSnapshotRef.current = initialSnapshot;
+
+  const parseBaselineBlocks = useCallback((): MaterialBlock[] => {
+    try {
+      const parsed = JSON.parse(initialSnapshotRef.current);
+      return Array.isArray(parsed) ? (parsed as MaterialBlock[]) : [];
+    } catch {
+      return [];
+    }
+  }, []);
 
   const resetFormContext = () => {
     setView("list");
@@ -311,11 +330,20 @@ export const useRawMaterialProcurementHook = () => {
     resetFormContext();
   };
 
-  const handleDiscardAndBack = () => {
+  const handleDiscardAndBack = useCallback(async () => {
     setBackConfirmOpen(false);
-    bumpBatchRefresh();
-    resetFormContext();
-  };
+    await discardWorkflowForm({
+      subDepartmentId,
+      baselineState: parseBaselineBlocks(),
+      currentState: formBlocksRef.current,
+      extractTempFileIds: extractTempFileIdsFromMaterialBlocks,
+      deleteTemp,
+      resetForm: () => {
+        bumpBatchRefresh();
+        resetFormContext();
+      },
+    });
+  }, [bumpBatchRefresh, deleteTemp, parseBaselineBlocks, subDepartmentId]);
 
   const submitForm = async (blocks: MaterialBlock[], intent: "draft" | "submit") => {
     if (!activeBatch) {
@@ -327,13 +355,21 @@ export const useRawMaterialProcurementHook = () => {
       return false;
     }
 
+    if (hasIncompleteCertificateUploads(blocks)) {
+      showAlert(STRINGS.SOURCING.SPECIFICATION_FORM.CERT_UPLOAD_PENDING, "warning");
+      return false;
+    }
+
     const hasAnyDraftData = (blocks ?? []).some((block) => {
       if ((block?.lotNo ?? "").trim().length > 0) return true;
       if ((block?.supplyOrderNo ?? "").trim().length > 0) return true;
       if ((block?.manufacturerName ?? "").trim().length > 0) return true;
       if (
         (block?.certificates ?? []).some(
-          (c) => String(c.fileName ?? "").trim().length > 0 || Boolean(c.file),
+          (c) =>
+            String(c.fileName ?? "").trim().length > 0 ||
+            Boolean(c.file) ||
+            Boolean(String(c.fileId ?? "").trim()),
         )
       ) {
         return true;
@@ -386,7 +422,8 @@ export const useRawMaterialProcurementHook = () => {
             certCount: (l.certificates ?? []).length,
             certificates: (l.certificates ?? []).map((c) => ({
               fileName: c.fileName,
-              fileUrl: String(c.fileUrl ?? "").slice(0, 56),
+              fileId: c.fileId,
+              certificateType: c.certificateType,
             })),
           })),
         })),

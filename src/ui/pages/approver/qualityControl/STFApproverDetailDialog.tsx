@@ -57,8 +57,6 @@ type STFApproverDetailDialogProps = {
   onActiveMotorChange?: (motorId: string) => void;
   onApprove: (item: STFApproverDetailItem) => void;
   onReject: (item: STFApproverDetailItem) => void;
-  onApproveForm?: (item: STFApproverDetailItem) => void;
-  onRejectForm?: (item: STFApproverDetailItem) => void;
   actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
   subDepartment?: "static-test-facility" | "other-bem-motors" | string;
@@ -74,8 +72,6 @@ const STFApproverDetailDialog = ({
   onActiveMotorChange,
   onApprove,
   onReject,
-  onApproveForm,
-  onRejectForm,
   actionLoading = false,
   theme,
   subDepartment = "static-test-facility",
@@ -157,10 +153,7 @@ const STFApproverDetailDialog = ({
               onActiveMotorChange={onActiveMotorChange ?? (() => undefined)}
               onApprove={() => onApprove(item)}
               onReject={() => onReject(item)}
-              onApproveForm={onApproveForm ? () => onApproveForm(item) : undefined}
-              onRejectForm={onRejectForm ? () => onRejectForm(item) : undefined}
               actionLoading={actionLoading}
-              formStatus={rowStatus}
               qcTheme={qcTheme}
               approverTheme={theme}
             />

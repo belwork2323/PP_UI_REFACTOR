@@ -31,12 +31,9 @@ const MixingApproverPage = () => {
     detailsLoading,
     activeMixCardId,
     dialogProps,
-    formDialogProps,
     actionLoading,
     requestApprove,
     requestReject,
-    requestFormApprove,
-    requestFormReject,
     handleViewDetails,
     handleCloseDetail,
     handleActiveMixCardChange,
@@ -68,13 +65,10 @@ const MixingApproverPage = () => {
         onActiveMixCardChange={handleActiveMixCardChange}
         onApprove={requestApprove}
         onReject={requestReject}
-        onApproveForm={requestFormApprove}
-        onRejectForm={requestFormReject}
         actionLoading={actionLoading}
         theme={approverTheme}
       />
       <ApproverActionDialog {...dialogProps} />
-      <ApproverActionDialog {...formDialogProps} />
     </ApproverSubdepartmentBatchListSection>
   );
 };

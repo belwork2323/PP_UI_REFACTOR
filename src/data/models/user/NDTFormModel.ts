@@ -42,10 +42,7 @@ export const isNDTMotorLocked = (status?: NDTMotorSubmissionStatus | string | nu
 };
 
 export const isNDTMotorEditable = (status?: NDTMotorSubmissionStatus | string | null) =>
-  !status ||
-  status === "TO_BE_INITIATED" ||
-  status === "IN_PROGRESS" ||
-  status === "REJECTED";
+  !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED";
 
 export const isNDTMotorApproverTabDisabled = (
   status?: NDTMotorSubmissionStatus | string | null,
@@ -94,7 +91,9 @@ export const canApproverActionEntireNDTForm = (params: {
     return true;
   }
 
-  const formType = String(params.formSubmissionType ?? "").trim().toUpperCase();
+  const formType = String(params.formSubmissionType ?? "")
+    .trim()
+    .toUpperCase();
   if (formType !== "SUBMIT") return false;
 
   const motors = params.motors ?? [];
@@ -104,10 +103,7 @@ export const canApproverActionEntireNDTForm = (params: {
   );
   if (!allMotorsApproved) return false;
 
-  return (
-    statusUpper === "WAITING_FOR_APPROVAL" ||
-    status === OPERATION_STATUS.WAITING_FOR_APPROVAL
-  );
+  return statusUpper === "WAITING_FOR_APPROVAL" || status === OPERATION_STATUS.WAITING_FOR_APPROVAL;
 };
 
 export const normalizeNDTMotorStatus = (value: unknown): NDTMotorSubmissionStatus => {
@@ -129,14 +125,14 @@ export const normalizeNDTMotorStatus = (value: unknown): NDTMotorSubmissionStatu
 export const normalizeNDTMotorSubmissionType = (
   value: unknown,
 ): NDTMotorSubmissionType | undefined => {
-  const raw = String(value ?? "").trim().toUpperCase();
+  const raw = String(value ?? "")
+    .trim()
+    .toUpperCase();
   if (raw === "DRAFT" || raw === "SUBMIT") return raw;
   return undefined;
 };
 
-export const mapNDTMotorStatusesFromApi = (
-  details: any,
-): Record<string, NDTMotorStatusMeta> => {
+export const mapNDTMotorStatusesFromApi = (details: any): Record<string, NDTMotorStatusMeta> => {
   const root = details?.data ?? details ?? {};
   const statusById: Record<string, NDTMotorStatusMeta> = {};
 
@@ -725,7 +721,8 @@ export const mapNDTDetailsForDisplay = (
     batchId: String(root.batchId ?? formState.batchId ?? ""),
     batchType: root.batchType != null ? String(root.batchType) : "",
     status: formStatus,
-    formSubmissionType: root.formSubmissionType != null ? String(root.formSubmissionType) : undefined,
+    formSubmissionType:
+      root.formSubmissionType != null ? String(root.formSubmissionType) : undefined,
     createdBy: mapCastingCuringPersonLabel(root.createdBy),
     createdAt:
       root.createdAt != null
@@ -751,7 +748,9 @@ export const mapNDTDetailsForDisplay = (
             : null,
     motors,
     motorCounts: {
-      pendingMotorCount: Number(countsFromApi?.pendingMotorCount ?? derivedCounts.pendingMotorCount),
+      pendingMotorCount: Number(
+        countsFromApi?.pendingMotorCount ?? derivedCounts.pendingMotorCount,
+      ),
       approvedMotorCount: Number(
         countsFromApi?.approvedMotorCount ?? derivedCounts.approvedMotorCount,
       ),

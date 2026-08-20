@@ -37,7 +37,7 @@ export default function DashboardKpiSection({
   clearDateFilter,
 }: DashboardKpiSectionProps) {
   const [dateFilterOpen, setDateFilterOpen] = useState(true);
-  const dateFilterCount = filterType !== t.DATE_FILTER.VALUES.MONTH ? 1 : 0;
+  const dateFilterCount = filterType !== t.DATE_FILTER.VALUES.ONE_YEAR ? 1 : 0;
 
   return (
     <>

@@ -12,7 +12,10 @@ export const QC_DE_CORING_SECTION_TITLES: Record<string, string> = {
   [QC_DE_CORING_SECTION_IDS.DETAILS]: "De-coring Details",
 };
 
-export type QcDeCoringField = "DE_CORING_LOAD" | "DE_CORING_DATE_TIME" | "OBSERVATIONS";
+export type QcDeCoringField =
+  | "DE_CORING_LOAD"
+  | "DE_CORING_DATE_TIME"
+  | "OBSERVATIONS";
 
 export const QC_DE_CORING_FIELD_LABELS: Record<QcDeCoringField, string> = {
   DE_CORING_LOAD: "De-coring Load",

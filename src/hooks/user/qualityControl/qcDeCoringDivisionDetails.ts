@@ -6,7 +6,12 @@ import {
   QC_DE_CORING_MANUFACTURING_SECTION_ID,
   QC_DE_CORING_SECTION_IDS,
 } from "./qcDeCoringConfig";
-import { createInitialDeCoringValues, hydrateDeCoringValuesFromSections } from "./qcDeCoringTables";
+import {
+  createInitialDeCoringValues,
+  hydrateDeCoringValuesFromSections,
+  mapDeCoringDetailsFromRecord,
+  resolveDeCoringDetailsRecord,
+} from "./qcDeCoringTables";
 
 type ManufacturingSection = {
   sectionId: string;
@@ -69,10 +74,12 @@ const collectMotorLists = (payload: unknown): unknown[] => {
   return [
     ...asArray(details.motors),
     ...asArray(details.motorDetails),
+    ...asArray(details.deCoringDetails),
     ...asArray(details.decoringDetails),
     ...asArray(details.curingDetails),
     ...asArray(root.motors),
     ...asArray(root.motorDetails),
+    ...asArray(root.deCoringDetails),
     ...asArray(root.decoringDetails),
     ...asArray(root.curingDetails),
   ];
@@ -94,13 +101,8 @@ const findDeCoringMotorRecord = (
   return null;
 };
 
-const extractMotorSections = (motor: Record<string, unknown> | null): ManufacturingSection[] => {
-  if (!motor) return [];
-  const details = asRecord(motor.details) ?? motor;
-  const sections = asArray(
-    details.decoringSections ?? details.sections ?? motor.decoringSections ?? motor.sections,
-  );
-  return sections
+const toManufacturingSections = (sections: unknown[]): ManufacturingSection[] =>
+  sections
     .map((section) => asRecord(section))
     .filter(Boolean)
     .map((section) => ({
@@ -108,6 +110,41 @@ const extractMotorSections = (motor: Record<string, unknown> | null): Manufactur
       sectionData: asArray(section!.sectionData),
     }))
     .filter((section) => section.sectionId);
+
+const extractMotorSections = (motor: Record<string, unknown> | null): ManufacturingSection[] => {
+  if (!motor) return [];
+  const details = asRecord(motor.details) ?? motor;
+  const nestedObject =
+    asRecord(details.deCoringDetails) ??
+    asRecord(details.decoringDetails) ??
+    asRecord(motor.deCoringDetails) ??
+    asRecord(motor.decoringDetails);
+  // Manufacturing division-details often returns a flat object under details.decoringDetails
+  // (not section arrays). Synthesize a section so hydrate paths stay consistent.
+  if (
+    nestedObject &&
+    !Array.isArray(details.deCoringDetails) &&
+    !Array.isArray(details.decoringDetails) &&
+    !Array.isArray(motor.deCoringDetails) &&
+    !Array.isArray(motor.decoringDetails)
+  ) {
+    return [
+      {
+        sectionId: QC_DE_CORING_MANUFACTURING_SECTION_ID,
+        sectionData: [nestedObject],
+      },
+    ];
+  }
+  return toManufacturingSections(
+    asArray(
+      details.decoringSections ??
+        details.sections ??
+        details.curingSections ??
+        motor.decoringSections ??
+        motor.sections ??
+        motor.curingSections,
+    ),
+  );
 };
 
 const firstSectionRecord = (
@@ -132,39 +169,16 @@ const mapDeCoringFieldsFromManufacturing = (
   motor: Record<string, unknown>,
   sections: ManufacturingSection[],
 ): Record<string, string> => {
-  const details = asRecord(motor.details) ?? {};
   const qcSection = firstSectionRecord(sections, QC_DE_CORING_SECTION_IDS.DETAILS);
   const mfgSection = firstSectionRecord(sections, QC_DE_CORING_MANUFACTURING_SECTION_ID);
-  const source = qcSection ?? mfgSection ?? {};
-
-  const remarks = pickFirstValue(source.DECORING_REMARKS, source.REMARKS, source.remarks);
-  const visual = pickFirstValue(
-    source.DECORING_VISUAL_OBSERVATION,
-    source.VISUAL_OBSERVATION,
-    source.VISUAL_OBSERVATIONS,
-  );
-  const observations = pickFirstValue(source.OBSERVATIONS, source.observations);
-  const combinedObservations = [observations, remarks, visual].filter(Boolean).join("; ");
+  const nested = resolveDeCoringDetailsRecord(motor);
+  const source = { ...nested, ...(mfgSection ?? {}), ...(qcSection ?? {}) };
+  const mapped = mapDeCoringDetailsFromRecord(source);
 
   return {
-    DE_CORING_LOAD: pickFirstValue(
-      source.DE_CORING_LOAD,
-      source.DECORING_LOAD,
-      motor.decoringLoad,
-      details.decoringLoad,
-    ),
-    DE_CORING_DATE_TIME: formatManufacturingDateTime(
-      pickFirstValue(
-        source.DE_CORING_DATE_TIME,
-        source.DECORING_DATE_TIME,
-        source.DECORING_DATE,
-        motor.decoringDateTime,
-        motor.decoringDate,
-        details.decoringDateTime,
-        details.decoringDate,
-      ),
-    ),
-    OBSERVATIONS: combinedObservations,
+    DE_CORING_LOAD: mapped.DE_CORING_LOAD,
+    DE_CORING_DATE_TIME: formatManufacturingDateTime(mapped.DE_CORING_DATE_TIME),
+    OBSERVATIONS: mapped.OBSERVATIONS,
   };
 };
 

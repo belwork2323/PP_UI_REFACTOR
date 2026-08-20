@@ -9,6 +9,8 @@ export type PartialFlowUnitKind = "premix" | "motor";
 export type StageProgressUnitStatus = {
   premixNo?: number | string | null;
   motorId?: string | null;
+  division?: string | null;
+  subType?: string | null;
   premixSubmissionStatus?: string | null;
   motorSubmissionStatus?: string | null;
   status?: string | null;
@@ -31,6 +33,8 @@ export type PreviousStageApprovedUnits = {
   previousSubDepartmentName: string | null;
   approvedPremixNos: Set<number>;
   approvedMotorIds: Set<string>;
+  /** Mixing final-mix units, when gated separately from premix. */
+  approvedFinalMixNos?: Set<number>;
 };
 
 type SubDeptRef = {
@@ -69,7 +73,14 @@ const PREDECESSOR_BY_SLUG: Record<
   },
   "static-test-facility": {
     kind: "motor",
-    predecessors: ["ndt", "trimming", "post-cure-operations", "casting-and-curing"],
+    predecessors: [
+      "qc-division",
+      "quality-control",
+      "ndt",
+      "trimming",
+      "post-cure-operations",
+      "casting-and-curing",
+    ],
   },
   dispatch: {
     kind: "motor",
@@ -118,6 +129,38 @@ const asStageEntries = (stages: unknown): StageProgressEntry[] => {
   return stages.filter((entry) => entry && typeof entry === "object") as StageProgressEntry[];
 };
 
+/** Prefer stageProgress order; overlay currentStage by subDepartmentId for latest statuses. */
+const mergeStageProgress = (
+  stageProgress?: unknown,
+  currentStage?: unknown,
+): StageProgressEntry[] => {
+  const progress = asStageEntries(stageProgress);
+  const current = asStageEntries(currentStage);
+  if (!progress.length) return current;
+  if (!current.length) return progress;
+
+  const currentById = new Map<number, StageProgressEntry>();
+  current.forEach((stage) => {
+    const id = Number(stage.subDepartmentId);
+    if (Number.isFinite(id) && id > 0) currentById.set(id, stage);
+  });
+
+  const merged = progress.map((stage) => {
+    const id = Number(stage.subDepartmentId);
+    return (Number.isFinite(id) && id > 0 && currentById.get(id)) || stage;
+  });
+
+  current.forEach((stage) => {
+    const id = Number(stage.subDepartmentId);
+    if (!Number.isFinite(id) || id <= 0) return;
+    if (!merged.some((entry) => Number(entry.subDepartmentId) === id)) {
+      merged.push(stage);
+    }
+  });
+
+  return merged;
+};
+
 const collectApprovedPremixNos = (entry: StageProgressEntry | null): Set<number> => {
   const ids = new Set<number>();
   if (!entry) return ids;
@@ -145,6 +188,114 @@ const collectApprovedMotorIds = (entry: StageProgressEntry | null): Set<string> 
     if (motorId) ids.add(motorId);
   });
   return ids;
+};
+
+/** QC divisions that use motors as units — STF requires approval in every one. */
+const QC_MOTOR_UNIT_DIVISIONS = new Set([
+  "HARDWARE",
+  "CASTING",
+  "CURING",
+  "DE_CORING",
+  "TRIMMING",
+  "POST_CURE",
+  "NDT",
+  "QC",
+  "WEIGHTMENT",
+]);
+
+const normalizeQcMotorDivision = (value: unknown): string => {
+  const raw = String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+  if (!raw) return "";
+  if (raw === "DECORING" || raw === "DE_CORING") return "DE_CORING";
+  if (raw === "POSTCURE" || raw === "POST_CURE") return "POST_CURE";
+  if (raw === "PROPELLANT_PROPERTIES" || raw === "PROPELLANT") return "QC";
+  if (raw === "WEIGHMENT" || raw === "WEIGHTMENT") return "WEIGHTMENT";
+  return raw;
+};
+
+const normalizeStageNameKey = (value: unknown) =>
+  String(value ?? "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "");
+
+/** QC Quality Control catalog — not QC NDT or Static Test Facility. */
+const isQcQualityControlStage = (stage: StageProgressEntry): boolean => {
+  const sub = normalizeStageNameKey(stage.subDepartmentName);
+  if (!sub || sub === "ndt" || sub === "statictestfacility") return false;
+  return sub === "qualitycontrol" || sub === "qcdivision" || sub === "qc";
+};
+
+const findQcQualityControlStage = (stages: StageProgressEntry[]): StageProgressEntry | null => {
+  const matches = stages.filter(isQcQualityControlStage);
+  if (!matches.length) return null;
+  const withMotorRows = matches.find((stage) =>
+    Array.isArray(stage.motorStatuses) ? stage.motorStatuses.length > 0 : false,
+  );
+  return withMotorRows ?? matches[matches.length - 1] ?? null;
+};
+
+/**
+ * Enable a motor in STF only when every motor-unit QC division in stage
+ * progress has APPROVED that motor. Partial approval (e.g. Hardware only)
+ * must not unlock STF.
+ */
+const collectMotorsApprovedInAllQcMotorDivisions = (
+  entry: StageProgressEntry | null,
+): Set<string> => {
+  const ids = new Set<string>();
+  if (!entry) return ids;
+
+  const rows = Array.isArray(entry.motorStatuses) ? entry.motorStatuses : [];
+  const tagged = rows.filter((row) => {
+    const division = normalizeQcMotorDivision(row.division);
+    return Boolean(division) && QC_MOTOR_UNIT_DIVISIONS.has(division);
+  });
+
+  if (!tagged.length) return collectApprovedMotorIds(entry);
+
+  const requiredDivisions = new Set(
+    tagged.map((row) => normalizeQcMotorDivision(row.division)).filter(Boolean),
+  );
+  const byMotor = new Map<string, Map<string, boolean>>();
+
+  tagged.forEach((row) => {
+    const motorId = String(row.motorId ?? "").trim();
+    const division = normalizeQcMotorDivision(row.division);
+    if (!motorId || !division) return;
+    const approved = isApprovedUnitStatus(row.motorSubmissionStatus ?? row.status);
+    if (!byMotor.has(motorId)) byMotor.set(motorId, new Map());
+    const divisionMap = byMotor.get(motorId)!;
+    const previous = divisionMap.get(division);
+    divisionMap.set(division, previous === undefined ? approved : previous && approved);
+  });
+
+  byMotor.forEach((divisionMap, motorId) => {
+    const complete = [...requiredDivisions].every((division) => divisionMap.get(division) === true);
+    if (complete) ids.add(motorId);
+  });
+
+  return ids;
+};
+
+const resolveStfPreviousStageApprovedUnits = (
+  stages: StageProgressEntry[],
+  fallback: PreviousStageApprovedUnits,
+): PreviousStageApprovedUnits => {
+  const qcStage = findQcQualityControlStage(stages);
+  if (!qcStage) return fallback;
+
+  return {
+    enableAll: false,
+    kind: "motor",
+    previousSubDepartmentId: Number(qcStage.subDepartmentId ?? 0) || null,
+    previousSubDepartmentName: String(qcStage.subDepartmentName ?? "").trim() || "Quality Control",
+    approvedPremixNos: new Set(),
+    approvedMotorIds: collectMotorsApprovedInAllQcMotorDivisions(qcStage),
+  };
 };
 
 const resolveSubDepartmentIdsForSlugs = (
@@ -203,10 +354,7 @@ export const resolvePreviousStageApprovedUnits = (params: {
   subDepartments?: SubDeptRef[] | null;
 }): PreviousStageApprovedUnits => {
   const slug = normalizeSlug(params.currentSlug);
-  const stageProgress = asStageEntries(params.stageProgress);
-  // Prefer stageProgress; fall back to currentStage only when progress is empty
-  const stages =
-    stageProgress.length > 0 ? stageProgress : asStageEntries(params.currentStage);
+  const stages = mergeStageProgress(params.stageProgress, params.currentStage);
 
   if (PREMIX_STARTER_SLUGS.has(slug)) {
     return emptyResult("premix", true);
@@ -219,6 +367,13 @@ export const resolvePreviousStageApprovedUnits = (params: {
   if (!config) {
     // Unknown slug — do not gate (avoid locking unrelated screens)
     return emptyResult(null, true);
+  }
+
+  if (slug === "static-test-facility") {
+    const qcGate = resolveStfPreviousStageApprovedUnits(stages, emptyResult("motor", false));
+    if (qcGate.previousSubDepartmentId || qcGate.previousSubDepartmentName) {
+      return qcGate;
+    }
   }
 
   const predecessorIds = resolveSubDepartmentIdsForSlugs(
@@ -332,26 +487,22 @@ export const isMotorEnabledForWorkflow = (
   motorId: string | null | undefined,
   orderedMotorIds: string[],
   gate: PreviousStageApprovedUnits | null | undefined,
-  getStatus: (motorId: string) => string | undefined | null,
+  _getStatus?: (motorId: string) => string | undefined | null,
 ): boolean => {
   const id = String(motorId ?? "").trim();
   if (!id) return false;
-  if (!isMotorEnabledByPreviousStage(id, gate)) return false;
-
-  const motorIndex = orderedMotorIds.findIndex(
-    (entry) => String(entry ?? "").trim() === id,
-  );
-  if (motorIndex < 0) return false;
-
-  return arePriorMotorsApprovedInSequence(motorIndex, orderedMotorIds, getStatus);
+  if (!orderedMotorIds.some((entry) => String(entry ?? "").trim() === id)) return false;
+  // Case Prep (starter / enableAll) opens every motor. Later subdepts only check
+  // the previous subdepartment's status for this motor — not sibling-motor sequence.
+  return isMotorEnabledByPreviousStage(id, gate);
 };
 
 export const getMotorNavTabDisabledReason = (
   motorId: string | undefined,
-  motorIndex: number,
-  orderedMotorIds: string[],
+  _motorIndex: number,
+  _orderedMotorIds: string[],
   gate: PreviousStageApprovedUnits | null | undefined,
-  getStatus: (motorId: string) => string | undefined | null,
+  _getStatus?: (motorId: string) => string | undefined | null,
   messages: {
     previousStage?: string;
     sequential?: string;
@@ -362,10 +513,6 @@ export const getMotorNavTabDisabledReason = (
 
   if (!isMotorEnabledByPreviousStage(id, gate)) {
     return messages.previousStage;
-  }
-
-  if (!arePriorMotorsApprovedInSequence(motorIndex, orderedMotorIds, getStatus)) {
-    return messages.sequential;
   }
 
   return undefined;
@@ -448,10 +595,38 @@ export const buildMotorNavGateHelpers = (
   };
 };
 
-/** Pick stage arrays from a batch / batch-details object. */
+const asStageArraySource = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+
+/** Pick stage arrays from a batch / batch-details object (nested `data.batch` included). */
 export const getBatchStageProgressArrays = (
   batch: Record<string, unknown> | null | undefined,
-): { stageProgress: unknown; currentStage: unknown } => ({
-  stageProgress: batch?.stageProgress,
-  currentStage: batch?.currentStage,
-});
+): { stageProgress: unknown; currentStage: unknown } => {
+  if (!batch) return { stageProgress: null, currentStage: null };
+
+  const candidates: Record<string, unknown>[] = [batch];
+  const data = asStageArraySource(batch.data);
+  if (data) {
+    candidates.push(data);
+    const nestedBatch = asStageArraySource(data.batch);
+    if (nestedBatch) candidates.push(nestedBatch);
+  }
+  const rootBatch = asStageArraySource(batch.batch);
+  if (rootBatch) candidates.push(rootBatch);
+
+  for (const source of candidates) {
+    if (Array.isArray(source.stageProgress) || Array.isArray(source.currentStage)) {
+      return {
+        stageProgress: Array.isArray(source.stageProgress) ? source.stageProgress : null,
+        currentStage: Array.isArray(source.currentStage) ? source.currentStage : null,
+      };
+    }
+  }
+
+  return {
+    stageProgress: batch.stageProgress ?? null,
+    currentStage: batch.currentStage ?? null,
+  };
+};

@@ -32,13 +32,8 @@
           {
             "type": "table",
             "id": "BALLISTIC_EVALUATION",
-            "allowAddColumn": true,
-            "allowDeleteColumn": true,
-            "addColumnPrefix": "FM_",
-            "columnActions": {
-              "position": "top-right",
-              "addLabel": "Add Column"
-            },
+            "allowAddColumn": false,
+            "allowDeleteColumn": false,
             "rows": {
               "allowAdd": false,
               "allowDelete": false,

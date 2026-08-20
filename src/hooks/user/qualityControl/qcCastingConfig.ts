@@ -30,7 +30,7 @@ export const QC_CASTING_SECTION_TITLES: Record<string, string> = {
   [QC_CASTING_SECTION_IDS.SELECTION]: "Casting Selection",
   [QC_CASTING_SECTION_IDS.FINAL_ASSEMBLY]: "Final Assembly",
   [QC_CASTING_SECTION_IDS.PROPELLANT_CASTING]: "Propellant Casting",
-  [QC_CASTING_SECTION_IDS.WEIGHTMENT]: "Weightment Details",
+  [QC_CASTING_SECTION_IDS.WEIGHTMENT]: "Weighment Details",
   [QC_CASTING_SECTION_IDS.POST_CAST]: "Post Cast Operations",
 };
 

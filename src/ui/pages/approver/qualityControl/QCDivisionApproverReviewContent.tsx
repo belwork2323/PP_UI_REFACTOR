@@ -33,13 +33,13 @@ import QCPartialItemNavigation from "../../user/qualityControl/QCDivision/QCPart
 import type { QcDivisionCatalogNavTab } from "../../../../hooks/user/qualityControl/qcFlowConfig";
 import {
   PARTIAL_ITEM_STATUS_CHIP,
+  hasPartialChildNav,
   type QcApprovalTableRow,
   type QcFinalApprovalDivisionGroup,
   type QcPartialItemStatus,
   type QcPartialNavItem,
 } from "../../../../hooks/user/qualityControl/qcDivisionApprovalUnits";
 import {
-  canApproverActionEntireQcDivisionForm,
   isQcPartialItemApproverActionable,
   isQcPartialItemApproverTabDisabled,
 } from "../../../../hooks/approver/qualityControl/qcDivisionApproverGuards";
@@ -74,8 +74,6 @@ type QCDivisionApproverReviewContentProps = {
   formSubmissionType?: string | null;
   onApproveUnit: () => void;
   onRejectUnit: () => void;
-  onApproveForm?: () => void;
-  onRejectForm?: () => void;
   actionLoading?: boolean;
   qcTheme: ReturnType<typeof getQualityControlTheme>;
   approverTheme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
@@ -121,6 +119,172 @@ const unitColumnLabel = (group: QcFinalApprovalDivisionGroup): string => {
   return S.FINAL_APPROVAL_COL_UNIT || "Unit";
 };
 
+const unitActionLabels = (
+  item: QcPartialNavItem | null,
+  isRevalidationDivisionTab = false,
+) => {
+  if (item?.kind === "DIVISION" || isRevalidationDivisionTab) {
+    return { approve: S.DIVISION_APPROVER_APPROVE, reject: S.DIVISION_APPROVER_REJECT };
+  }
+  if (item?.kind === "MOTOR") {
+    const motorId = String(item.motorId ?? item.label ?? "").trim();
+    return {
+      approve: motorId ? `${S.MOTOR_APPROVER_APPROVE} ${motorId}` : S.MOTOR_APPROVER_APPROVE,
+      reject: motorId ? `${S.MOTOR_APPROVER_REJECT} ${motorId}` : S.MOTOR_APPROVER_REJECT,
+    };
+  }
+  if (item?.kind === "PREMIX") {
+    const premixNo = item.premixNo;
+    return {
+      approve:
+        premixNo != null ? `${S.PREMIX_APPROVER_APPROVE} ${premixNo}` : S.PREMIX_APPROVER_APPROVE,
+      reject:
+        premixNo != null ? `${S.PREMIX_APPROVER_REJECT} ${premixNo}` : S.PREMIX_APPROVER_REJECT,
+    };
+  }
+  if (item?.kind === "FINAL_MIX") {
+    const mixNo = item.finalMixNo ?? item.premixNo;
+    const mixLabel =
+      String(item.label ?? "").trim() ||
+      (mixNo != null ? `Final Mix ${mixNo}` : "");
+    return {
+      approve: mixLabel ? `Approve ${mixLabel}` : S.PREMIX_APPROVER_APPROVE,
+      reject: mixLabel ? `Reject ${mixLabel}` : S.PREMIX_APPROVER_REJECT,
+    };
+  }
+  return { approve: S.UNIT_APPROVER_APPROVE, reject: S.UNIT_APPROVER_REJECT };
+};
+
+const COLLAPSED_OVERVIEW_ROWS = 2;
+
+const ApproverStatusOverviewRows = ({
+  groups,
+  expandedById,
+  onToggleGroup,
+}: {
+  groups: QcFinalApprovalDivisionGroup[];
+  expandedById: Record<string, boolean>;
+  onToggleGroup: (groupId: string) => void;
+}) => (
+  <>
+    {groups.map((group, index) => {
+      const hasUnits = group.units.length > 0;
+      const expanded = Boolean(expandedById[group.id]);
+      return (
+        <Box
+          key={group.id}
+          sx={{
+            borderBottom: index < groups.length - 1 ? "1px solid" : "none",
+            borderColor: "divider",
+            bgcolor: "background.paper",
+          }}
+        >
+          <Stack
+            direction="row"
+            alignItems="center"
+            justifyContent="space-between"
+            spacing={1}
+            onClick={hasUnits ? () => onToggleGroup(group.id) : undefined}
+            sx={{
+              px: 1.25,
+              py: 1,
+              bgcolor: "grey.50",
+              cursor: hasUnits ? "pointer" : "default",
+              "&:hover": hasUnits ? { bgcolor: "action.hover" } : undefined,
+            }}
+          >
+            <Stack direction="row" alignItems="center" spacing={0.5} sx={{ minWidth: 0 }}>
+              {hasUnits ? (
+                <IconButton
+                  size="small"
+                  aria-label={expanded ? "Collapse division" : "Expand division"}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    onToggleGroup(group.id);
+                  }}
+                  sx={{ color: "text.secondary" }}
+                >
+                  {expanded ? (
+                    <ExpandLessRoundedIcon fontSize="small" />
+                  ) : (
+                    <ExpandMoreRoundedIcon fontSize="small" />
+                  )}
+                </IconButton>
+              ) : (
+                <Box sx={{ width: 34 }} />
+              )}
+              <Typography
+                sx={{
+                  fontSize: "0.84rem",
+                  fontWeight: 700,
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {group.divisionLabel}
+              </Typography>
+            </Stack>
+            <StatusChip status={group.divisionStatus} />
+          </Stack>
+
+          {hasUnits ? (
+            <Collapse in={expanded} timeout="auto" unmountOnExit>
+              <Box
+                sx={{
+                  px: 1.25,
+                  pb: 1.1,
+                  pt: 0.75,
+                  bgcolor: "background.default",
+                  borderTop: "1px dashed",
+                  borderColor: "divider",
+                }}
+              >
+                <TableContainer>
+                  <Table
+                    size="small"
+                    sx={{
+                      border: "1px solid",
+                      borderColor: "divider",
+                      borderRadius: 1,
+                      bgcolor: "background.paper",
+                      overflow: "hidden",
+                      "& th, & td": { borderColor: "divider" },
+                    }}
+                  >
+                    <TableHead>
+                      <TableRow sx={{ bgcolor: "action.hover" }}>
+                        <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", width: "55%" }}>
+                          {unitColumnLabel(group)}
+                        </TableCell>
+                        <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem" }}>
+                          {S.FINAL_APPROVAL_COL_STATUS}
+                        </TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {group.units.map((unit) => (
+                        <TableRow key={`${group.id}:${unit.id}`} hover>
+                          <TableCell sx={{ fontSize: "0.8rem", fontWeight: 600 }}>
+                            {unit.label}
+                          </TableCell>
+                          <TableCell>
+                            <StatusChip status={unit.status} />
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              </Box>
+            </Collapse>
+          ) : null}
+        </Box>
+      );
+    })}
+  </>
+);
+
 const ApproverStatusOverview = ({
   title,
   groups,
@@ -129,6 +293,7 @@ const ApproverStatusOverview = ({
   groups: QcFinalApprovalDivisionGroup[];
 }) => {
   const [expandedById, setExpandedById] = useState<Record<string, boolean>>({});
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     const next: Record<string, boolean> = {};
@@ -136,6 +301,7 @@ const ApproverStatusOverview = ({
       next[group.id] = false;
     });
     setExpandedById(next);
+    setShowAll(false);
   }, [groups]);
 
   const toggleGroup = (groupId: string) => {
@@ -146,6 +312,12 @@ const ApproverStatusOverview = ({
   };
 
   if (!groups.length) return null;
+
+  const canToggleList = groups.length > COLLAPSED_OVERVIEW_ROWS;
+  const visibleGroups = canToggleList && !showAll
+    ? groups.slice(0, COLLAPSED_OVERVIEW_ROWS)
+    : groups;
+  const hiddenCount = groups.length - COLLAPSED_OVERVIEW_ROWS;
 
   return (
     <Box
@@ -168,123 +340,44 @@ const ApproverStatusOverview = ({
         </Typography>
       </Stack>
 
-      <Box sx={{ maxHeight: 420, overflowY: "auto" }}>
-        {groups.map((group, index) => {
-          const hasUnits = group.units.length > 0;
-          const expanded = Boolean(expandedById[group.id]);
-          return (
-            <Box
-              key={group.id}
-              sx={{
-                borderBottom: index < groups.length - 1 ? "1px solid" : "none",
-                borderColor: "divider",
-                bgcolor: "background.paper",
-              }}
-            >
-              <Stack
-                direction="row"
-                alignItems="center"
-                justifyContent="space-between"
-                spacing={1}
-                onClick={hasUnits ? () => toggleGroup(group.id) : undefined}
-                sx={{
-                  px: 1.25,
-                  py: 1,
-                  bgcolor: "grey.50",
-                  cursor: hasUnits ? "pointer" : "default",
-                  "&:hover": hasUnits ? { bgcolor: "action.hover" } : undefined,
-                }}
-              >
-                <Stack direction="row" alignItems="center" spacing={0.5} sx={{ minWidth: 0 }}>
-                  {hasUnits ? (
-                    <IconButton
-                      size="small"
-                      aria-label={expanded ? "Collapse division" : "Expand division"}
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        toggleGroup(group.id);
-                      }}
-                      sx={{ color: "text.secondary" }}
-                    >
-                      {expanded ? (
-                        <ExpandLessRoundedIcon fontSize="small" />
-                      ) : (
-                        <ExpandMoreRoundedIcon fontSize="small" />
-                      )}
-                    </IconButton>
-                  ) : (
-                    <Box sx={{ width: 34 }} />
-                  )}
-                  <Typography
-                    sx={{
-                      fontSize: "0.84rem",
-                      fontWeight: 700,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {group.divisionLabel}
-                  </Typography>
-                </Stack>
-                <StatusChip status={group.divisionStatus} />
-              </Stack>
-
-              {hasUnits ? (
-                <Collapse in={expanded} timeout="auto" unmountOnExit>
-                  <Box
-                    sx={{
-                      px: 1.25,
-                      pb: 1.1,
-                      pt: 0.75,
-                      bgcolor: "background.default",
-                      borderTop: "1px dashed",
-                      borderColor: "divider",
-                    }}
-                  >
-                    <TableContainer>
-                      <Table
-                        size="small"
-                        sx={{
-                          border: "1px solid",
-                          borderColor: "divider",
-                          borderRadius: 1,
-                          bgcolor: "background.paper",
-                          overflow: "hidden",
-                          "& th, & td": { borderColor: "divider" },
-                        }}
-                      >
-                        <TableHead>
-                          <TableRow sx={{ bgcolor: "action.hover" }}>
-                            <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", width: "55%" }}>
-                              {unitColumnLabel(group)}
-                            </TableCell>
-                            <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem" }}>
-                              {S.FINAL_APPROVAL_COL_STATUS}
-                            </TableCell>
-                          </TableRow>
-                        </TableHead>
-                        <TableBody>
-                          {group.units.map((unit) => (
-                            <TableRow key={`${group.id}:${unit.id}`} hover>
-                              <TableCell sx={{ fontSize: "0.8rem", fontWeight: 600 }}>
-                                {unit.label}
-                              </TableCell>
-                              <TableCell>
-                                <StatusChip status={unit.status} />
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </TableContainer>
-                  </Box>
-                </Collapse>
-              ) : null}
-            </Box>
-          );
-        })}
+      <Box sx={{ maxHeight: showAll ? 420 : undefined, overflowY: showAll ? "auto" : "hidden" }}>
+        <ApproverStatusOverviewRows
+          groups={visibleGroups}
+          expandedById={expandedById}
+          onToggleGroup={toggleGroup}
+        />
       </Box>
+
+      {canToggleList ? (
+        <Button
+          fullWidth
+          size="small"
+          onClick={() => setShowAll((prev) => !prev)}
+          endIcon={
+            showAll ? (
+              <ExpandLessRoundedIcon fontSize="small" />
+            ) : (
+              <ExpandMoreRoundedIcon fontSize="small" />
+            )
+          }
+          sx={{
+            borderRadius: 0,
+            py: 0.85,
+            fontSize: "0.75rem",
+            fontWeight: 700,
+            textTransform: "none",
+            borderTop: "1px solid",
+            borderColor: "divider",
+            bgcolor: "grey.50",
+            color: "text.primary",
+            "&:hover": { bgcolor: "action.hover" },
+          }}
+        >
+          {showAll
+            ? S.APPROVER_STATUS_OVERVIEW_SHOW_LESS
+            : `${S.APPROVER_STATUS_OVERVIEW_SHOW_MORE} (${hiddenCount})`}
+        </Button>
+      ) : null}
     </Box>
   );
 };
@@ -339,8 +432,6 @@ const QCDivisionApproverReviewContent = ({
   formSubmissionType = null,
   onApproveUnit,
   onRejectUnit,
-  onApproveForm,
-  onRejectForm,
   actionLoading = false,
   qcTheme,
   approverTheme,
@@ -392,12 +483,10 @@ const QCDivisionApproverReviewContent = ({
   );
 
   const activeItem = partialNavItems[activePartialNavIndex] ?? null;
-  const canApproveOrRejectUnit = isQcPartialItemApproverActionable(activeItem?.status);
-  const canApproveOrRejectForm = canApproverActionEntireQcDivisionForm({
-    formSubmissionType: formSubmissionType || detailView?.formSubmissionType,
-    status: detailView?.status ?? formStatus,
-    divisionStatusByFlowKey,
-  });
+  const isRevalidationDivisionTab = activeDivisionTabKey === "RAW_MATERIAL_REVALIDATION";
+  const canApproveOrRejectUnit =
+    isQcPartialItemApproverActionable(activeItem?.status) &&
+    (activeItem?.kind !== "DIVISION" || isRevalidationDivisionTab);
 
   if (loading) {
     return (
@@ -452,51 +541,6 @@ const QCDivisionApproverReviewContent = ({
         />
       </Box>
 
-      {canApproveOrRejectForm ? (
-        <Box
-          sx={{
-            border: `1px solid ${palette.border}`,
-            borderRadius: 2,
-            px: 1.25,
-            py: 1,
-            background: palette.surface,
-          }}
-        >
-          <Stack
-            direction={{ xs: "column", sm: "row" }}
-            alignItems={{ xs: "stretch", sm: "center" }}
-            justifyContent="space-between"
-            gap={1}
-          >
-            <Typography sx={{ fontSize: "0.74rem", color: palette.textSub, fontWeight: 600 }}>
-              {S.FORM_APPROVER_ACTIONS_HINT}
-            </Typography>
-            <Stack direction={{ xs: "column", sm: "row" }} gap={1}>
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<RejectIcon />}
-                disabled={actionLoading || !onRejectForm}
-                onClick={onRejectForm}
-                sx={approverTheme.dialog.rejectAction}
-              >
-                {S.FORM_APPROVER_REJECT}
-              </Button>
-              <Button
-                variant="contained"
-                size="small"
-                startIcon={<ApproveIcon />}
-                disabled={actionLoading || !onApproveForm}
-                onClick={onApproveForm}
-                sx={approverTheme.dialog.approveAction}
-              >
-                {S.FORM_APPROVER_APPROVE}
-              </Button>
-            </Stack>
-          </Stack>
-        </Box>
-      ) : null}
-
       <ApproverStatusOverview
         title={S.APPROVER_STATUS_OVERVIEW_TITLE}
         groups={overviewGroups}
@@ -512,19 +556,21 @@ const QCDivisionApproverReviewContent = ({
 
       {partialNavItems.length > 0 ? (
         <>
-          <QCPartialItemNavigation
-            items={partialNavItems}
-            activeIndex={activePartialNavIndex}
-            onActiveIndexChange={(index) => {
-              if (isQcPartialItemApproverTabDisabled(partialNavItems[index]?.status)) return;
-              onActivePartialNavIndexChange(index);
-            }}
-            loading={actionLoading || schemaLoading}
-            isTabEnabled={(index) =>
-              !isQcPartialItemApproverTabDisabled(partialNavItems[index]?.status)
-            }
-            getTabDisabledReason={() => S.UNIT_APPROVER_TAB_DISABLED}
-          />
+          {hasPartialChildNav(partialNavItems) ? (
+            <QCPartialItemNavigation
+              items={partialNavItems}
+              activeIndex={activePartialNavIndex}
+              onActiveIndexChange={(index) => {
+                if (isQcPartialItemApproverTabDisabled(partialNavItems[index]?.status)) return;
+                onActivePartialNavIndexChange(index);
+              }}
+              loading={actionLoading || schemaLoading}
+              isTabEnabled={(index) =>
+                !isQcPartialItemApproverTabDisabled(partialNavItems[index]?.status)
+              }
+              getTabDisabledReason={() => S.UNIT_APPROVER_TAB_DISABLED}
+            />
+          ) : null}
 
           {activeItem && !isQcPartialItemApproverTabDisabled(activeItem.status) ? (
             canApproveOrRejectUnit ? (
@@ -541,7 +587,7 @@ const QCDivisionApproverReviewContent = ({
                   onClick={onRejectUnit}
                   sx={approverTheme.dialog.rejectAction}
                 >
-                  {S.UNIT_APPROVER_REJECT} {activeItem.label}
+                  {unitActionLabels(activeItem, isRevalidationDivisionTab).reject}
                 </Button>
                 <Button
                   variant="contained"
@@ -551,7 +597,7 @@ const QCDivisionApproverReviewContent = ({
                   onClick={onApproveUnit}
                   sx={approverTheme.dialog.approveAction}
                 >
-                  {S.UNIT_APPROVER_APPROVE} {activeItem.label}
+                  {unitActionLabels(activeItem, isRevalidationDivisionTab).approve}
                 </Button>
               </Stack>
             ) : null

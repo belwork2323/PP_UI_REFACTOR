@@ -78,7 +78,6 @@ const STFPage = () => {
     handleRemoveMotor,
     handleSaveMotorDraft,
     handleSubmitMotor,
-    handleSubmitForFinalApproval,
     detailsRow,
     detailsData,
     detailsLoading,
@@ -211,7 +210,6 @@ const STFPage = () => {
               setPendingMotorId(motorId);
               setMotorSubmitConfirmOpen(true);
             }}
-            onSubmitForFinalApproval={handleSubmitForFinalApproval}
             theme={theme}
           />
         </>
@@ -233,7 +231,9 @@ const STFPage = () => {
         severity="warning"
         title={strings.MOTOR_DRAFT_CONFIRM_TITLE}
         message={strings.MOTOR_DRAFT_CONFIRM_MESSAGE(pendingMotorId ?? "")}
-        confirmLabel={strings.SAVE_MOTOR_DRAFT}
+        confirmLabel={
+          pendingMotorId ? strings.SAVE_MOTOR_DRAFT(pendingMotorId) : strings.MOTOR_DRAFT_CONFIRM_TITLE
+        }
         cancelLabel={strings.CONFIRM_CANCEL_LABEL}
         onConfirm={async () => {
           const motorId = pendingMotorId;
@@ -252,7 +252,9 @@ const STFPage = () => {
         severity="warning"
         title={strings.MOTOR_SUBMIT_CONFIRM_TITLE}
         message={strings.MOTOR_SUBMIT_CONFIRM_MESSAGE(pendingMotorId ?? "")}
-        confirmLabel={strings.SUBMIT_MOTOR}
+        confirmLabel={
+          pendingMotorId ? strings.SUBMIT_MOTOR(pendingMotorId) : strings.MOTOR_SUBMIT_CONFIRM_TITLE
+        }
         cancelLabel={strings.CONFIRM_CANCEL_LABEL}
         onConfirm={async () => {
           const motorId = pendingMotorId;

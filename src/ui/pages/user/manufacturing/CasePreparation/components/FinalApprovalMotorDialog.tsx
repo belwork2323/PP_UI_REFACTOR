@@ -42,8 +42,9 @@ type FinalApprovalMotorDialogProps = {
   allMotorsApproved: boolean;
   confirmDisabled?: boolean;
   copy?: FinalApprovalCopy;
+  hideConfirm?: boolean;
   onClose: () => void;
-  onProceed: () => void;
+  onProceed?: () => void;
 };
 
 export const buildFinalApprovalMotorRows = (
@@ -77,6 +78,7 @@ const FinalApprovalMotorDialog = ({
   allMotorsApproved,
   confirmDisabled = false,
   copy,
+  hideConfirm = false,
   onClose,
   onProceed,
 }: FinalApprovalMotorDialogProps) => {
@@ -101,6 +103,7 @@ const FinalApprovalMotorDialog = ({
     confirmLabel={labels.proceed}
     cancelLabel={labels.close}
     confirmDisabled={!allMotorsApproved || confirmDisabled}
+    hideConfirm={hideConfirm}
     onConfirm={onProceed}
     onCancel={onClose}
   >
@@ -148,7 +151,7 @@ const FinalApprovalMotorDialog = ({
         </TableBody>
       </Table>
     </Box>
-    {!allMotorsApproved ? (
+    {!hideConfirm && !allMotorsApproved ? (
       <Box sx={{ mt: 1.25, fontSize: "0.74rem", color: "text.secondary", fontWeight: 600 }}>
         {labels.notReady}
       </Box>

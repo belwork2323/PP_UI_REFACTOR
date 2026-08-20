@@ -15,15 +15,10 @@ import { STRINGS } from "../../../../../app/config/strings";
 import { CASTING_CURING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/castingAndCuring_theme";
 import {
   CASTING_CURING_FLOW_LABELS,
-  canAddCastingCuringMotors,
-  isCastingCuringFormStarted,
+  getCastingBowlSeedRowsFromBatch,
   mergeCastingCuringMotorsFromBatchAndForm,
   resolveCastingCuringBatchMotorCount,
-  resolveCastingCuringMotorCountLimit,
-  resolveCastingCuringMotorOptions,
-  resolveCastingFinalMixCount,
   type CastingCuringBatchMotorSource,
-  type CastingMotorDraftEntry,
 } from "../../../../../hooks/user/manufacturing/castingCuringFlowConfig";
 import {
   createDefaultCuringProcessSetup,
@@ -34,22 +29,24 @@ import {
   type CastingCuringMotorSubmissionStatus,
   type CuringProcessSetup,
 } from "../../../../../data/models/user/CastingCuringFormModel";
+import { createEmptyCastingMotorData } from "../../../../../data/models/user/CastingMotorDataModel";
+import { createEmptyCuringMotorData } from "../../../../../data/models/user/CuringMotorDataModel";
 import type { CuringCycleConfig } from "../../../../../data/models/user/CuringCycleConfigModel";
-import { buildCastingSetupContext, type SchemaFormValues } from "../../../../../schema-engine";
 import PremixStatusChip from "../RawMaterial/components/PremixStatusChip";
+import ViewStatusButton from "../../../../components/common/ViewStatusButton";
 import FinalApprovalMotorDialog, {
   areAllMotorsApproved,
   buildFinalApprovalMotorRows,
 } from "../CasePreparation/components/FinalApprovalMotorDialog";
 import CastingCuringFlowBar from "./CastingCuringFlowBar";
-import CastingCuringMotorSchemaPanel from "./CastingCuringMotorSchemaPanel";
+import CastingMotorPanel from "./CastingMotorPanel";
+import CuringMotorPanel from "./CuringMotorPanel";
 import CastingCuringSetupHeaderCard from "./CastingCuringSetupHeaderCard";
 import CuringProcessFlowBar from "./CuringProcessFlowBar";
 import CuringSetupHeaderCard from "./CuringSetupHeaderCard";
 import { generalController } from "../../../../../controllers/admin/common/generalController";
 import {
   buildMotorNavGateHelpers,
-  isMotorEnabledByPreviousStage,
   type PreviousStageApprovedUnits,
 } from "../../../../../hooks/user/previousStageApproval";
 import {
@@ -66,44 +63,29 @@ type MotorProcessTab = "CASTING" | "CURING";
 type CastingAndCuringFormProps = {
   batch?: CastingCuringBatchMotorSource | null;
   formData: CastingCuringFormState;
-  castingType: string;
-  motorCount: number | "";
-  castingMotorDrafts: CastingMotorDraftEntry[];
+  castingMotorDraftsById: Record<string, { castingStation: string; motorReceivedAt: string }>;
   addedMotors: Array<{ motorId: string; motorReceivedAt: string; castingStation?: string }>;
-  schemaLoading?: boolean;
-  schemaError?: string | null;
-  castingSchemaError?: string | null;
-  curingSchemaError?: string | null;
   curingCycleConfig?: CuringCycleConfig | null;
   curingCyclesLoading?: boolean;
   onFetchCuringCycleConfig?: () => void | Promise<unknown>;
-  subDepartmentId?: number;
-  onCastingTypeChange: (value: string) => void;
-  onMotorCountChange: (count: number | "") => void;
   onCastingMotorDraftChange: (
-    index: number,
-    field: keyof CastingMotorDraftEntry,
+    motorId: string,
+    field: "castingStation" | "motorReceivedAt",
     value: string,
   ) => void;
-  onLoadCastingForm: () => void;
-  onAddMotors: () => void;
+  onLoadCastingForm: (motorId: string) => void;
   onLoadCuringForm: (motorId: string) => void;
   getCuringSetupDraft: (motorId: string) => CuringProcessSetup;
-  getMotorCastingFormValues: (motorId: string) => SchemaFormValues;
-  getMotorCuringFormValues: (motorId: string) => SchemaFormValues;
   getCrossMotorExcludedBowlSelections?: (motorId: string) => string[];
   onCuringSetupDraftChange: (
     motorId: string,
     field: keyof CuringProcessSetup,
     value: string | number | "",
   ) => void;
-  onMotorCuringValuesChange: (motorId: string, values: SchemaFormValues) => void;
-  onMotorCastingValuesChange: (motorId: string, values: SchemaFormValues) => void;
   onMotorSessionChange: (motorId: string, next: CastingCuringMotorSession) => void;
   onRemoveMotor: (motorId: string) => void;
   onSaveMotorDraft?: (motorId: string) => void;
   onSubmitMotor?: (motorId: string) => void;
-  onSubmitForFinalApproval?: () => void;
   motorStatusById?: Record<string, CastingCuringMotorStatusMeta>;
   getMotorStatus?: (motorId: string) => CastingCuringMotorSubmissionStatus;
   isMotorEditable?: (motorId: string) => boolean;
@@ -115,36 +97,21 @@ type CastingAndCuringFormProps = {
 const CastingAndCuringForm = ({
   batch,
   formData,
-  castingType,
-  motorCount,
-  castingMotorDrafts,
+  castingMotorDraftsById,
   addedMotors,
-  schemaLoading = false,
-  schemaError = null,
-  castingSchemaError = null,
-  curingSchemaError = null,
   curingCycleConfig = null,
   curingCyclesLoading = false,
   onFetchCuringCycleConfig,
-  subDepartmentId,
-  onCastingTypeChange,
-  onMotorCountChange,
   onCastingMotorDraftChange,
   onLoadCastingForm,
-  onAddMotors,
   onLoadCuringForm,
   getCuringSetupDraft,
-  getMotorCastingFormValues,
-  getMotorCuringFormValues,
   getCrossMotorExcludedBowlSelections,
   onCuringSetupDraftChange,
-  onMotorCastingValuesChange,
-  onMotorCuringValuesChange,
   onMotorSessionChange,
-  onRemoveMotor,
+  onRemoveMotor: _onRemoveMotor,
   onSaveMotorDraft,
   onSubmitMotor,
-  onSubmitForFinalApproval,
   motorStatusById = {},
   getMotorStatus,
   isMotorEditable,
@@ -153,14 +120,10 @@ const CastingAndCuringForm = ({
   theme,
 }: CastingAndCuringFormProps) => {
   const BRAND = CASTING_CURING_BRAND;
-  const castingFormLoaded = Boolean(formData.castingFormLoaded);
-  // Only merge batch motors into nav after the casting form is loaded. Merging earlier
-  // marks every batch motor as "used" and hides the load-form draft dropdowns.
   const motorCards = useMemo(() => {
     const formMotors = Array.isArray(addedMotors) ? addedMotors : [];
-    if (!castingFormLoaded) return formMotors;
     return mergeCastingCuringMotorsFromBatchAndForm(batch, formMotors);
-  }, [addedMotors, batch, castingFormLoaded]);
+  }, [addedMotors, batch]);
   const resolveMotorStatus = useCallback(
     (motorId: string) =>
       getMotorStatus?.(motorId) ??
@@ -177,7 +140,7 @@ const CastingAndCuringForm = ({
     [motorCards, previousStageGate, resolveMotorStatus],
   );
   const prevMotorCountRef = useRef(0);
-  const formSessionKey = `${batch?.batchId ?? ""}:${formData.castingFormLoaded ? "loaded" : "draft"}`;
+  const formSessionKey = `${batch?.batchId ?? ""}`;
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
   const [activeProcessTab, setActiveProcessTab] = useState<MotorProcessTab>("CASTING");
   const [finalApprovalOpen, setFinalApprovalOpen] = useState(false);
@@ -185,40 +148,8 @@ const CastingAndCuringForm = ({
     Array<{ value: string; label: string; noOfOvenAvailable?: number }>
   >([]);
   const [ovensLoading, setOvensLoading] = useState(false);
-  const usedMotorIds = useMemo(
-    () =>
-      (formData.motors ?? [])
-        .map((motor) => String(motor.motorId ?? "").trim())
-        .filter(Boolean),
-    [formData.motors],
-  );
-
-  const batchMotorOptions = useMemo(() => {
-    const options = resolveCastingCuringMotorOptions(batch);
-    return options.filter((option) =>
-      isMotorEnabledByPreviousStage(option.value, previousStageGate),
-    );
-  }, [batch, previousStageGate]);
   const batchMotorCount = useMemo(() => resolveCastingCuringBatchMotorCount(batch), [batch]);
-  const maxMotorCount = useMemo(
-    () =>
-      resolveCastingCuringMotorCountLimit({
-        batch,
-        batchMotorOptions,
-        usedMotorIds,
-        castingFormLoaded,
-      }),
-    [batch, batchMotorOptions, usedMotorIds, castingFormLoaded],
-  );
-  const canAddMotors = canAddCastingCuringMotors({
-    castingFormLoaded,
-    castingType,
-    motorCount,
-    castingMotorDrafts,
-    usedMotorIds,
-    availableMotorOptions: batchMotorOptions,
-    maxMotorCount,
-  });
+  const bowlSeedRows = useMemo(() => getCastingBowlSeedRowsFromBatch(batch), [batch]);
 
   useEffect(() => {
     setActiveMotorIndex(0);
@@ -308,42 +239,34 @@ const CastingAndCuringForm = ({
     );
   }, [activeMotorEntry, formData.motors]);
 
-  const formStarted = isCastingCuringFormStarted(formData.motors);
   const curingFormLoaded = Boolean(activeMotorSession?.curingFormLoaded);
   const curingSetupDraft = activeMotorEntry ? getCuringSetupDraft(activeMotorEntry.motorId) : null;
+  const activeDraft = activeMotorEntry
+    ? (castingMotorDraftsById[activeMotorEntry.motorId] ?? {
+        castingStation: "",
+        motorReceivedAt: "",
+      })
+    : { castingStation: "", motorReceivedAt: "" };
 
   useEffect(() => {
     if (activeProcessTab !== "CURING") return;
     void onFetchCuringCycleConfig?.();
   }, [activeProcessTab, onFetchCuringCycleConfig, batch?.batchId, batch?.motorStage]);
-  const batchProjectId = String(batch?.projectId ?? "").trim();
-  const showMotorWorkspace = Boolean(
-    castingFormLoaded && formStarted && activeMotorEntry && activeMotorSession,
-  );
+  const showMotorNav = motorCards.length > 0;
+  const showMotorWorkspace = Boolean(activeMotorEntry && activeMotorSession);
 
   const headerMotorId = activeMotorEntry?.motorId ?? "";
   const headerReceivedAt = activeMotorEntry?.motorReceivedAt ?? "";
   const activeMotorMeta = useMemo(() => {
     if (!activeMotorSession) {
       return {
-        castingType: castingFormLoaded ? formData.castingType : castingType,
-        castingStation: castingFormLoaded ? formData.castingStation : "",
+        castingType: formData.castingType,
+        castingStation: formData.castingStation,
       };
     }
     return resolveCastingMotorProcessMeta(activeMotorSession, formData);
-  }, [activeMotorSession, castingFormLoaded, castingType, formData]);
-  const headerCastingType = activeMotorMeta.castingType;
+  }, [activeMotorSession, formData]);
   const headerCastingStation = activeMotorMeta.castingStation;
-  const castingSetupContext = useMemo(
-    () =>
-      buildCastingSetupContext({
-        castingType: activeMotorMeta.castingType,
-        castingStation: activeMotorMeta.castingStation,
-        motorId: activeMotorEntry?.motorId ?? "",
-        finalMixCount: resolveCastingFinalMixCount(batch),
-      }),
-    [activeMotorEntry?.motorId, activeMotorMeta, batch],
-  );
 
   const navPalette = useMemo(
     () => ({
@@ -376,7 +299,6 @@ const CastingAndCuringForm = ({
     [motorCards, motorStatusById],
   );
   const allMotorsApproved = areAllMotorsApproved(finalApprovalRows);
-  const canOpenFinalApproval = Boolean(batch?.formId);
 
   const motorTabs = useMemo<UserWorkflowNavTab[]>(
     () =>
@@ -435,6 +357,10 @@ const CastingAndCuringForm = ({
     onCuringSetupDraftChange(activeMotorEntry.motorId, field, value);
   };
 
+  const excludedBowlLabels = activeMotorSession
+    ? (getCrossMotorExcludedBowlSelections?.(activeMotorSession.motorId) ?? [])
+    : [];
+
   return (
     <Box sx={{ fontFamily: "'DM Sans', sans-serif" }}>
       <Stack
@@ -471,297 +397,299 @@ const CastingAndCuringForm = ({
             </Typography>
           </Box>
         </Stack>
-
-        {castingFormLoaded && motorCards.length > 0 ? (
-          <Button
-            variant="contained"
-            size="small"
-            disabled={actionLoading || !canOpenFinalApproval}
-            onClick={() => setFinalApprovalOpen(true)}
-          >
-            {S.SUBMIT_FOR_FINAL_APPROVAL}
-          </Button>
-        ) : null}
       </Stack>
 
-      <CastingCuringFlowBar
-        batchMotorCount={batchMotorCount}
-        castingType={castingType}
-        motorCount={motorCount}
-        castingMotorDrafts={castingMotorDrafts}
-        availableMotorOptions={batchMotorOptions}
-        usedMotorIds={usedMotorIds}
-        maxMotorCount={maxMotorCount}
-        castingFormLoaded={castingFormLoaded}
-        onCastingTypeChange={onCastingTypeChange}
-        onMotorCountChange={onMotorCountChange}
-        onCastingMotorDraftChange={onCastingMotorDraftChange}
-        onLoadCastingForm={onLoadCastingForm}
-        onAddMotors={onAddMotors}
-        canAddMotors={canAddMotors}
-        schemaLoading={schemaLoading}
-        theme={theme}
-      />
-
-      {schemaError ? (
-        <Typography sx={{ fontSize: "0.82rem", color: BRAND.danger, mb: 2 }}>
-          {schemaError}
-        </Typography>
-      ) : null}
-
-      {showMotorWorkspace ? (
+      {showMotorNav ? (
         <Stack spacing={1.25}>
-          {motorCards.length > 0 ? (
-            <UserWorkflowNavPanel palette={navPalette}>
-              <UserWorkflowTabNav
-                title={S.MOTOR_NAV_TITLE}
-                hint={S.MOTOR_NAV_HINT}
-                tabs={motorTabs}
-                activeIndex={activeMotorIndex}
-                onActiveIndexChange={handleMotorNavIndexChange}
-                isTabDisabled={(_, index) => !motorNavGate.isMotorTabEnabled(index)}
-                tabTooltip={(_, index) => motorNavGate.getMotorTabTooltip(index)}
-                palette={navPalette}
-                showStepArrows
-                titleEndAdornment={
-                  <Chip
-                    label={`${S.BATCH_MOTOR_COUNT_LABEL}: ${batchMotorCount}`}
-                    size="small"
-                    sx={{
-                      fontWeight: 800,
-                      fontSize: "0.72rem",
-                      height: 24,
-                      background: BRAND.cc ?? "#1565C0",
-                      color: "#fff",
-                      "& .MuiChip-label": { px: 1 },
-                    }}
-                  />
-                }
-              />
-            </UserWorkflowNavPanel>
-          ) : null}
-
-          <Box
-            sx={{
-              borderRadius: 2.5,
-              border: `1px solid ${theme.palette.border}`,
-              background: theme.palette.surface,
-              px: 1.5,
-              py: 1.25,
-            }}
-          >
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              alignItems={{ sm: "center" }}
-              justifyContent="space-between"
-              gap={1}
-              mb={1}
-            >
-              <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
-                <Typography
-                  sx={{ fontSize: "0.8rem", fontWeight: 700, color: theme.palette.primary }}
-                >
-                  {S.MOTOR_CARD_TITLE} — {activeMotorEntry.motorId}
-                </Typography>
-                <PremixStatusChip
-                  status={activeMotorStatus}
-                  statusConfig={statusConfig}
-                  variant="embedded"
+          <UserWorkflowNavPanel palette={navPalette}>
+            <UserWorkflowTabNav
+              title={S.MOTOR_NAV_TITLE}
+              hint={S.MOTOR_NAV_HINT}
+              tabs={motorTabs}
+              activeIndex={activeMotorIndex}
+              onActiveIndexChange={handleMotorNavIndexChange}
+              isTabDisabled={(_, index) => !motorNavGate.isMotorTabEnabled(index)}
+              tabTooltip={(_, index) => motorNavGate.getMotorTabTooltip(index)}
+              palette={navPalette}
+              showStepArrows
+              titleEndAdornment={
+                <Chip
+                  label={`${S.BATCH_MOTOR_COUNT_LABEL}: ${batchMotorCount}`}
+                  size="small"
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: "0.72rem",
+                    height: 24,
+                    background: BRAND.cc ?? "#1565C0",
+                    color: "#fff",
+                    "& .MuiChip-label": { px: 1 },
+                  }}
                 />
-              </Stack>
+              }
+            />
+          </UserWorkflowNavPanel>
 
-              <Stack direction="row" gap={1} flexShrink={0}>
+          <Stack direction="row" justifyContent="flex-end" spacing={1}>
+            {showMotorWorkspace && activeMotorEntry ? (
+              <>
                 <Button
                   variant="outlined"
                   size="small"
                   disabled={actionLoading || activeMotorLocked}
                   onClick={() => onSaveMotorDraft?.(activeMotorEntry.motorId)}
+                  sx={{ textTransform: "none", fontWeight: 700 }}
                 >
-                  {S.SAVE_MOTOR_DRAFT}
+                  {S.SAVE_MOTOR_DRAFT(activeMotorEntry.motorId)}
                 </Button>
                 <Button
                   variant="contained"
                   size="small"
                   disabled={actionLoading || activeMotorLocked}
                   onClick={() => onSubmitMotor?.(activeMotorEntry.motorId)}
+                  sx={{ textTransform: "none", fontWeight: 700 }}
                 >
-                  {S.SUBMIT_MOTOR}
+                  {S.SUBMIT_MOTOR(activeMotorEntry.motorId)}
                 </Button>
-              </Stack>
-            </Stack>
+              </>
+            ) : null}
+            <ViewStatusButton
+              disabled={actionLoading}
+              onClick={() => setFinalApprovalOpen(true)}
+              label={S.VIEW_STATUS}
+            />
+          </Stack>
 
-            {activeMotorLocked ? (
-              <Box
-                sx={{
-                  mb: 1.25,
-                  px: 1.25,
-                  py: 0.75,
-                  borderRadius: 1.5,
-                  border: `1px solid ${theme.palette.border}`,
-                  bgcolor: theme.palette.background ?? BRAND.surface,
-                }}
-              >
-                <Typography
-                  sx={{ fontSize: "0.72rem", color: theme.palette.textSub, fontWeight: 600 }}
+          {!showMotorWorkspace && activeMotorEntry ? (
+            <>
+              {!activeMotorPriorEnabled ? (
+                <Box
+                  sx={{
+                    px: 1.25,
+                    py: 0.75,
+                    borderRadius: 1.5,
+                    border: `1px solid ${theme.palette.border}`,
+                    bgcolor: theme.palette.background ?? BRAND.surface,
+                  }}
                 >
-                  {!activeMotorPriorEnabled
-                    ? STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED
-                    : activeMotorStatus === "APPROVED"
-                      ? S.MOTOR_LOCKED_APPROVED
-                      : S.MOTOR_LOCKED_WAITING}
-                </Typography>
-              </Box>
-            ) : null}
+                  <Typography
+                    sx={{ fontSize: "0.72rem", color: theme.palette.textSub, fontWeight: 600 }}
+                  >
+                    {STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED}
+                  </Typography>
+                </Box>
+              ) : null}
+              <CastingCuringFlowBar
+                motorId={activeMotorEntry.motorId}
+                castingStation={activeDraft.castingStation}
+                motorReceivedAt={activeDraft.motorReceivedAt}
+                onCastingStationChange={(value) =>
+                  onCastingMotorDraftChange(activeMotorEntry.motorId, "castingStation", value)
+                }
+                onMotorReceivedAtChange={(value) =>
+                  onCastingMotorDraftChange(activeMotorEntry.motorId, "motorReceivedAt", value)
+                }
+                onLoadCastingForm={() => onLoadCastingForm(activeMotorEntry.motorId)}
+                schemaLoading={false}
+                disabled={!activeMotorPriorEnabled || activeMotorLocked}
+                theme={theme}
+              />
+            </>
+          ) : null}
 
-            {activeMotorStatus === "REJECTED" && motorStatusById[activeMotorId]?.rejectionReason ? (
-              <Alert severity="error" sx={{ fontSize: "0.78rem", mb: 1.25 }}>
-                {motorStatusById[activeMotorId]?.rejectionReason}
-              </Alert>
-            ) : null}
-
-            <Typography sx={{ fontSize: "0.74rem", color: theme.palette.textSub, mb: 1 }}>
-              {S.FLOW_MOTOR_RECEIVED_AT}: {activeMotorEntry.motorReceivedAt || "—"}
-            </Typography>
-
-            <ToggleButtonGroup
-              exclusive
-              fullWidth
-              size="small"
-              value={activeProcessTab}
-              onChange={(_, value: MotorProcessTab | null) => {
-                if (!value) return;
-                setActiveProcessTab(value);
+          {showMotorWorkspace ? (
+            <Box
+              sx={{
+                borderRadius: 2.5,
+                border: `1px solid ${theme.palette.border}`,
+                background: theme.palette.surface,
+                px: 1.5,
+                py: 1.25,
               }}
-              sx={sectionToggleSx}
             >
-              <ToggleButton value="CASTING">
-                {CASTING_CURING_FLOW_LABELS.sectionTabCasting}
-              </ToggleButton>
-              <ToggleButton value="CURING">
-                {CASTING_CURING_FLOW_LABELS.sectionTabCuring}
-              </ToggleButton>
-            </ToggleButtonGroup>
-
-            {activeProcessTab === "CASTING" ? (
-              <Box
-                sx={{
-                  borderRadius: 2.5,
-                  border: `1px solid ${theme.palette.border}`,
-                  background: theme.palette.surface,
-                  px: 1.5,
-                  py: 1.25,
-                }}
+              <Stack
+                direction={{ xs: "column", sm: "row" }}
+                alignItems={{ sm: "center" }}
+                justifyContent="space-between"
+                gap={1}
+                mb={1}
               >
-                <Typography
-                  sx={{ fontSize: "0.8rem", fontWeight: 700, color: theme.palette.primary, mb: 1 }}
-                >
-                  {S.CASTING_SECTION_TITLE} — {activeMotorEntry.motorId}
-                </Typography>
-                <CastingCuringSetupHeaderCard
-                  castingType={headerCastingType}
-                  castingStation={headerCastingStation}
-                  motorId={headerMotorId}
-                  motorReceivedAt={headerReceivedAt}
-                  theme={theme}
-                />
-                <CastingCuringMotorSchemaPanel
-                  key={`casting-${activeMotorSession.motorId}`}
-                  schema={formData.castingSchema}
-                  motor={activeMotorSession}
-                  castingFormValues={getMotorCastingFormValues(activeMotorSession.motorId)}
-                  getCrossMotorExcludedBowlSelections={getCrossMotorExcludedBowlSelections}
-                  subDepartmentId={subDepartmentId}
-                  batchId={batch?.batchId}
-                  setupContext={castingSetupContext}
-                  onMotorChange={(nextMotor) =>
-                    onMotorSessionChange(String(activeMotorSession.motorId).trim(), nextMotor)
-                  }
-                  onCastingFormValuesChange={(values) =>
-                    onMotorCastingValuesChange(String(activeMotorSession.motorId).trim(), values)
-                  }
-                  loading={schemaLoading}
-                  error={castingSchemaError}
-                  readOnly={activeMotorLocked}
-                />
-              </Box>
-            ) : null}
-
-            {activeProcessTab === "CURING" ? (
-              <Stack spacing={1.25}>
-                <CuringProcessFlowBar
-                  setup={curingSetupDraft ?? createDefaultCuringProcessSetup()}
-                  curingFormLoaded={curingFormLoaded}
-                  curingCycleConfig={curingCycleConfig}
-                  batch={batch}
-                  curingCyclesLoading={curingCyclesLoading}
-                  ovenOptions={ovenOptions}
-                  ovensLoading={ovensLoading}
-                  onChange={handleCuringSetupChange}
-                  onLoadCuringForm={() =>
-                    activeMotorEntry && onLoadCuringForm(activeMotorEntry.motorId)
-                  }
-                  schemaLoading={schemaLoading}
-                  theme={theme}
-                />
-                {curingFormLoaded && activeMotorSession ? (
-                  <CuringSetupHeaderCard
-                    setup={activeMotorSession.curingSetup}
-                    curingCycleConfig={curingCycleConfig}
-                    batch={batch}
-                    theme={theme}
+                <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
+                  <Typography
+                    sx={{ fontSize: "0.8rem", fontWeight: 700, color: theme.palette.primary }}
+                  >
+                    {S.MOTOR_CARD_TITLE} — {activeMotorEntry.motorId}
+                  </Typography>
+                  <PremixStatusChip
+                    status={activeMotorStatus}
+                    statusConfig={statusConfig}
+                    variant="embedded"
                   />
-                ) : null}
-                {curingFormLoaded && formData.curingSchema ? (
-                  <Box
+                </Stack>
+              </Stack>
+
+              {activeMotorLocked ? (
+                <Box
+                  sx={{
+                    mb: 1.25,
+                    px: 1.25,
+                    py: 0.75,
+                    borderRadius: 1.5,
+                    border: `1px solid ${theme.palette.border}`,
+                    bgcolor: theme.palette.background ?? BRAND.surface,
+                  }}
+                >
+                  <Typography
+                    sx={{ fontSize: "0.72rem", color: theme.palette.textSub, fontWeight: 600 }}
+                  >
+                    {!activeMotorPriorEnabled
+                      ? STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED
+                      : activeMotorStatus === "APPROVED"
+                        ? S.MOTOR_LOCKED_APPROVED
+                        : S.MOTOR_LOCKED_WAITING}
+                  </Typography>
+                </Box>
+              ) : null}
+
+              {activeMotorStatus === "REJECTED" &&
+              motorStatusById[activeMotorId]?.rejectionReason ? (
+                <Alert severity="error" sx={{ fontSize: "0.78rem", mb: 1.25 }}>
+                  {motorStatusById[activeMotorId]?.rejectionReason}
+                </Alert>
+              ) : null}
+
+              <Typography sx={{ fontSize: "0.74rem", color: theme.palette.textSub, mb: 1 }}>
+                {S.FLOW_MOTOR_RECEIVED_AT}: {activeMotorEntry.motorReceivedAt || "—"}
+              </Typography>
+
+              <ToggleButtonGroup
+                exclusive
+                fullWidth
+                size="small"
+                value={activeProcessTab}
+                onChange={(_, value: MotorProcessTab | null) => {
+                  if (!value) return;
+                  setActiveProcessTab(value);
+                }}
+                sx={sectionToggleSx}
+              >
+                <ToggleButton value="CASTING">
+                  {CASTING_CURING_FLOW_LABELS.sectionTabCasting}
+                </ToggleButton>
+                <ToggleButton value="CURING">
+                  {CASTING_CURING_FLOW_LABELS.sectionTabCuring}
+                </ToggleButton>
+              </ToggleButtonGroup>
+
+              {activeProcessTab === "CASTING" && activeMotorSession ? (
+                <Box
+                  sx={{
+                    borderRadius: 2.5,
+                    border: `1px solid ${theme.palette.border}`,
+                    background: theme.palette.surface,
+                    px: 1.5,
+                    py: 1.25,
+                  }}
+                >
+                  <Typography
                     sx={{
-                      borderRadius: 2.5,
-                      border: `1px solid ${theme.palette.border}`,
-                      background: theme.palette.surface,
-                      px: 1.5,
-                      py: 1.25,
+                      fontSize: "0.8rem",
+                      fontWeight: 700,
+                      color: theme.palette.primary,
+                      mb: 1,
                     }}
                   >
-                    <Typography
+                    {S.CASTING_SECTION_TITLE} — {activeMotorEntry.motorId}
+                  </Typography>
+                  <CastingCuringSetupHeaderCard
+                    castingStation={headerCastingStation}
+                    motorId={headerMotorId}
+                    motorReceivedAt={headerReceivedAt}
+                    theme={theme}
+                  />
+                  <CastingMotorPanel
+                    key={`casting-${activeMotorSession.motorId}`}
+                    value={activeMotorSession.castingData ?? createEmptyCastingMotorData()}
+                    onChange={(next) =>
+                      onMotorSessionChange(String(activeMotorSession.motorId).trim(), {
+                        ...activeMotorSession,
+                        castingData: next,
+                      })
+                    }
+                    motorId={activeMotorSession.motorId}
+                    batchId={batch?.batchId}
+                    bowlSeedRows={bowlSeedRows}
+                    excludedBowlLabels={excludedBowlLabels}
+                    disabled={activeMotorLocked}
+                    theme={theme}
+                  />
+                </Box>
+              ) : null}
+
+              {activeProcessTab === "CURING" ? (
+                <Stack spacing={1.25}>
+                  <CuringProcessFlowBar
+                    setup={curingSetupDraft ?? createDefaultCuringProcessSetup()}
+                    curingFormLoaded={curingFormLoaded}
+                    curingCycleConfig={curingCycleConfig}
+                    batch={batch}
+                    curingCyclesLoading={curingCyclesLoading}
+                    ovenOptions={ovenOptions}
+                    ovensLoading={ovensLoading}
+                    onChange={handleCuringSetupChange}
+                    onLoadCuringForm={() =>
+                      activeMotorEntry && onLoadCuringForm(activeMotorEntry.motorId)
+                    }
+                    schemaLoading={false}
+                    theme={theme}
+                  />
+                  {curingFormLoaded && activeMotorSession ? (
+                    <CuringSetupHeaderCard
+                      setup={activeMotorSession.curingSetup}
+                      curingCycleConfig={curingCycleConfig}
+                      batch={batch}
+                      theme={theme}
+                    />
+                  ) : null}
+                  {curingFormLoaded && activeMotorSession ? (
+                    <Box
                       sx={{
-                        fontSize: "0.8rem",
-                        fontWeight: 700,
-                        color: theme.palette.primary,
-                        mb: 1,
+                        borderRadius: 2.5,
+                        border: `1px solid ${theme.palette.border}`,
+                        background: theme.palette.surface,
+                        px: 1.5,
+                        py: 1.25,
                       }}
                     >
-                      {S.CURING_SECTION_TITLE} — {activeMotorEntry.motorId}
-                    </Typography>
-                    <CastingCuringMotorSchemaPanel
-                      key={`curing-${activeMotorSession.motorId}`}
-                      schema={formData.curingSchema}
-                      motor={activeMotorSession}
-                      curingFormValues={getMotorCuringFormValues(activeMotorSession.motorId)}
-                      subDepartmentId={subDepartmentId}
-                      batchId={batch?.batchId}
-                      projectId={batchProjectId || undefined}
-                      setupContext={castingSetupContext}
-                      onMotorChange={(nextMotor) =>
-                        onMotorSessionChange(String(activeMotorSession.motorId).trim(), nextMotor)
-                      }
-                      onCuringFormValuesChange={(values) =>
-                        onMotorCuringValuesChange(String(activeMotorSession.motorId).trim(), values)
-                      }
-                      loading={schemaLoading}
-                      error={curingSchemaError}
-                      readOnly={activeMotorLocked}
-                    />
-                  </Box>
-                ) : null}
-              </Stack>
-            ) : null}
-          </Box>
+                      <Typography
+                        sx={{
+                          fontSize: "0.8rem",
+                          fontWeight: 700,
+                          color: theme.palette.primary,
+                          mb: 1,
+                        }}
+                      >
+                        {S.CURING_SECTION_TITLE} — {activeMotorEntry.motorId}
+                      </Typography>
+                      <CuringMotorPanel
+                        key={`curing-${activeMotorSession.motorId}`}
+                        value={activeMotorSession.curingData ?? createEmptyCuringMotorData()}
+                        onChange={(next) =>
+                          onMotorSessionChange(String(activeMotorSession.motorId).trim(), {
+                            ...activeMotorSession,
+                            curingData: next,
+                          })
+                        }
+                        motorId={activeMotorSession.motorId}
+                        disabled={activeMotorLocked}
+                        theme={theme}
+                      />
+                    </Box>
+                  ) : null}
+                </Stack>
+              ) : null}
+            </Box>
+          ) : null}
         </Stack>
-      ) : null}
-
-      {!castingFormLoaded ? (
-        <Typography sx={{ fontSize: "0.78rem", color: BRAND.textSub, mt: 2 }}>
-          Fill all casting process fields above, then load the casting form.
-        </Typography>
       ) : null}
 
       <FinalApprovalMotorDialog
@@ -769,7 +697,7 @@ const CastingAndCuringForm = ({
         rows={finalApprovalRows}
         statusConfig={statusConfig}
         allMotorsApproved={allMotorsApproved}
-        confirmDisabled={actionLoading}
+        hideConfirm
         copy={{
           title: S.FINAL_APPROVAL_DIALOG_TITLE,
           info: S.FINAL_APPROVAL_DIALOG_INFO,
@@ -781,10 +709,6 @@ const CastingAndCuringForm = ({
           colStatus: S.FINAL_APPROVAL_COL_STATUS,
         }}
         onClose={() => setFinalApprovalOpen(false)}
-        onProceed={async () => {
-          setFinalApprovalOpen(false);
-          await onSubmitForFinalApproval?.();
-        }}
       />
     </Box>
   );

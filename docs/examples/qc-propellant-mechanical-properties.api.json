@@ -47,9 +47,7 @@
                 { "readonly": true, "SAMPLE_NO": 1, "PROPERTY": "Tensile Strength (kgf/cm²)" },
                 { "readonly": true, "SAMPLE_NO": 2, "PROPERTY": "Elongation (%)" },
                 { "readonly": true, "SAMPLE_NO": 3, "PROPERTY": "E-Modulus (kgf/cm²)" },
-                { "readonly": true, "SAMPLE_NO": 4, "PROPERTY": "Density (g/cc)" },
-                { "readonly": true, "PROPERTY": "Mean" },
-                { "readonly": true, "PROPERTY": "Std. Dev." }
+                { "readonly": true, "SAMPLE_NO": 4, "PROPERTY": "Density (g/cc)" }
               ]
             },
             "columns": [
@@ -59,9 +57,17 @@
               { "type": "column", "id": "FM_1", "fieldType": "number", "label": "FM-1" },
               { "type": "column", "id": "FM_2", "fieldType": "number", "label": "FM-2" },
               { "type": "column", "id": "FM_3", "fieldType": "number", "label": "FM-3" },
-              { "type": "column", "id": "REMARKS", "fieldType": "textarea", "label": "Remarks" },
-              { "type": "column", "id": "UPLOAD_GRAPH", "fieldType": "file", "label": "Upload Graph" }
+              { "type": "column", "id": "AVG", "fieldType": "number", "label": "Avg" },
+              { "type": "column", "id": "STD_DEV", "fieldType": "number", "label": "Std Dev" },
+              { "type": "column", "id": "REMARKS", "fieldType": "textarea", "label": "Remarks" }
             ]
+          },
+          {
+            "type": "field",
+            "id": "UPLOAD_GRAPH",
+            "fieldType": "file",
+            "label": "Upload Graph",
+            "multiple": false
           }
         ]
       }

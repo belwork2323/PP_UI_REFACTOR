@@ -43,7 +43,7 @@ import StageStatusPanel from "./components/StageStatusPanel";
 import ToggleTabs from "@/ui/components/common/ToggleTabs";
 import { BatchTab, batchTabOptions } from "@/hooks/admin/Dashboard/useDashboardHook";
 import AdminListShell from "@/ui/components/custom/admin/AdminListShell";
-import AdminFilterPanel from "@/ui/components/custom/admin/AdminFilterPanel";
+import AdminListFilterPanel from "@/ui/components/custom/admin/AdminListFilterPanel";
 import getDashboardTheme from "@/app/theme/custom_themes/admin/Dashboard/dashboard_theme";
 
 const {
@@ -126,7 +126,7 @@ export default function SystemManagerDashboard() {
   })();
 
   const [dateFilterOpen, setDateFilterOpen] = useState(true);
-  const dateFilterCount = filterType !== S.DATE_FILTER.VALUES.MONTH ? 1 : 0;
+  const dateFilterCount = filterType !== S.DATE_FILTER.VALUES.ONE_YEAR ? 1 : 0;
   const { filterMenuProps, filterMenuItemSx } = sharedTh;
 
   const {
@@ -473,7 +473,7 @@ export default function SystemManagerDashboard() {
               hasItems={filteredInProgressRows.length > 0}
               emptyTitle={S.EMPTY_STATES.NO_BATCHES}
               filterExtension={
-                <AdminFilterPanel
+                <AdminListFilterPanel
                   title={S.COMMON.FILTERS_TITLE}
                   activeFilterCount={activeBatchFilterCount}
                   onClear={clearBatchFilters}
@@ -492,11 +492,8 @@ export default function SystemManagerDashboard() {
                     menuProps={filterMenuProps}
                     itemSx={filterMenuItemSx}
                     showAllOption={false}
-                    sx={{
-                      ...adminTh.filterPanel.field,
-                      minWidth: { xs: "100%", sm: 300 },
-                      flex: "0 0 auto",
-                    }}
+                    filterPanel
+                    sx={{ ...adminTh.filterPanel.field, ...adminTh.filterPanel.fieldItem }}
                   />
 
                   <FilterSelect
@@ -507,11 +504,8 @@ export default function SystemManagerDashboard() {
                     menuProps={filterMenuProps}
                     itemSx={filterMenuItemSx}
                     showAllOption={false}
-                    sx={{
-                      ...adminTh.filterPanel.field,
-                      minWidth: { xs: "100%", sm: 300 },
-                      flex: "0 0 auto",
-                    }}
+                    filterPanel
+                    sx={{ ...adminTh.filterPanel.field, ...adminTh.filterPanel.fieldItem }}
                   />
 
                   <FilterSelect
@@ -522,13 +516,10 @@ export default function SystemManagerDashboard() {
                     menuProps={filterMenuProps}
                     itemSx={filterMenuItemSx}
                     showAllOption={false}
-                    sx={{
-                      ...adminTh.filterPanel.field,
-                      minWidth: { xs: "100%", sm: 300 },
-                      flex: "0 0 auto",
-                    }}
+                    filterPanel
+                    sx={{ ...adminTh.filterPanel.field, ...adminTh.filterPanel.fieldItem }}
                   />
-                </AdminFilterPanel>
+                </AdminListFilterPanel>
               }
               theme={shellTheme}
             />

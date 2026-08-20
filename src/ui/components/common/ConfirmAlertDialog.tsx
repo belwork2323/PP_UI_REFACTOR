@@ -13,8 +13,9 @@ type ConfirmAlertDialogProps = {
   cancelLabel?: string;
   severity?: "warning" | "error" | "info";
   confirmDisabled?: boolean;
+  hideConfirm?: boolean;
   maxWidth?: "xs" | "sm" | "md" | "lg" | "xl" | false;
-  onConfirm: () => void;
+  onConfirm?: () => void;
   onCancel: () => void;
   children?: React.ReactNode;
 };
@@ -48,6 +49,7 @@ const ConfirmAlertDialog = ({
   cancelLabel  = "Cancel",
   severity     = "warning",
   confirmDisabled = false,
+  hideConfirm  = false,
   maxWidth     = "xs",
   onConfirm,
   onCancel,
@@ -119,22 +121,24 @@ const ConfirmAlertDialog = ({
         >
           {cancelLabel}
         </Button>
-        <Button
-          variant="contained"
-          onClick={onConfirm}
-          disabled={confirmDisabled}
-          size="small"
-          sx={{
-            borderRadius:    "8px",
-            textTransform:   "none",
-            fontWeight:      600,
-            minWidth:        80,
-            bgcolor:         config.color,
-            "&:hover":       { bgcolor: config.color, filter: "brightness(0.9)" },
-          }}
-        >
-          {confirmLabel}
-        </Button>
+        {!hideConfirm ? (
+          <Button
+            variant="contained"
+            onClick={onConfirm}
+            disabled={confirmDisabled}
+            size="small"
+            sx={{
+              borderRadius:    "8px",
+              textTransform:   "none",
+              fontWeight:      600,
+              minWidth:        80,
+              bgcolor:         config.color,
+              "&:hover":       { bgcolor: config.color, filter: "brightness(0.9)" },
+            }}
+          >
+            {confirmLabel}
+          </Button>
+        ) : null}
       </DialogActions>
     </Dialog>
   );

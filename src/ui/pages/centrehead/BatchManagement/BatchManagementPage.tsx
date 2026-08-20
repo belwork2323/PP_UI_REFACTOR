@@ -11,7 +11,7 @@ import RefreshIconButton from "@ui/components/common/RefreshIconButton";
 import AdminManagementStatsGrid from "@ui/components/custom/admin/AdminManagementStatsGrid";
 import AdminManagementPageHeader from "@ui/components/custom/admin/AdminManagementPageHeader";
 import AdminListShell from "@ui/components/custom/admin/AdminListShell";
-import AdminFilterPanel from "@ui/components/custom/admin/AdminFilterPanel";
+import AdminListFilterPanel from "@ui/components/custom/admin/AdminListFilterPanel";
 import BatchManagementList from "./BatchManagementList";
 import BatchDetailsView from "./BatchDetailsView";
 import FilterToggleButton from "@/ui/components/common/FilterToggleButton";
@@ -100,11 +100,11 @@ const CHBatchManagementPage = () => {
       <Box sx={{ mb: 2 }}>
         <FilterToggleButton
           label="Date Filter"
-          count={filter.filterType !== S1.DATE_FILTER.VALUES.MONTH ? 1 : 0}
+          count={filter.filterType !== S1.DATE_FILTER.VALUES.ONE_YEAR ? 1 : 0}
           isOpen={stats.dateFilterOpen}
           onClick={stats.toggleDateFilter}
           sx={th.table.filterBtn(
-            stats.dateFilterOpen || filter.filterType !== S1.DATE_FILTER.VALUES.MONTH,
+            stats.dateFilterOpen || filter.filterType !== S1.DATE_FILTER.VALUES.ONE_YEAR,
           )}
           iconSx={th.table.filterBtnIcon}
           textSx={th.table.filterBtnText}
@@ -158,7 +158,7 @@ const CHBatchManagementPage = () => {
           />
         }
         filterExtension={
-          <AdminFilterPanel
+          <AdminListFilterPanel
             title={S.TOOLBAR.FILTERS_TITLE}
             activeFilterCount={list.activeFilterCount}
             onClear={list.clearFilters}
@@ -169,77 +169,65 @@ const CHBatchManagementPage = () => {
             applyLabel={AC.FILTERS_APPLY}
             theme={t}
           >
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: {
-                  xs: "1fr",
-                  md: "repeat(2, minmax(0, 1fr))",
-                  lg: "repeat(4, minmax(0, 1fr))",
-                },
-                gap: 1.25,
-                alignItems: "start",
-              }}
+            <FormInput
+              label={S.TOOLBAR.SEARCH_MOTOR_PLACEHOLDER}
+              value={draftFilters.motorIds.join(", ")}
+              onChange={(e) =>
+                list.setDraftFilter(
+                  "motorIds",
+                  e.target.value
+                    .split(",")
+                    .map((id) => id.trim())
+                    .filter(Boolean),
+                )
+              }
+              placeholder="e.g. MTR-445, MTR-446"
+              filterPanel
+              sx={{ ...t.filterPanel.field, ...t.filterPanel.fieldItemGrow }}
+            />
+
+            <AppDropdown
+              label={S.TOOLBAR.FILTER_STAGE_LABEL}
+              value={draftFilters.stage}
+              onChange={(value) => list.setDraftFilter("stage", value)}
+              loading={lookups.loading}
+              loadingPlaceholder="Loading motor stages..."
+              disabled={lookups.loading}
+              filterPanel
+              sx={{ ...t.filterPanel.field, ...t.filterPanel.fieldItem }}
+              MenuProps={t.menuPaper}
+              itemSx={t.filterPanel.menuItem}
             >
-              <FormInput
-                label={S.TOOLBAR.SEARCH_MOTOR_PLACEHOLDER}
-                value={draftFilters.motorIds.join(", ")}
-                onChange={(e) =>
-                  list.setDraftFilter(
-                    "motorIds",
-                    e.target.value
-                      .split(",")
-                      .map((id) => id.trim())
-                      .filter(Boolean),
-                  )
-                }
-                placeholder="e.g. MTR-445, MTR-446"
-                sx={{ mb: 0, ...t.filterPanel.field }}
-              />
+              <MenuItem value="All">All</MenuItem>
+              {lookups.motorStageOptions.map((stage) => (
+                <MenuItem key={stage.motorStage} value={String(stage.motorStage)}>
+                  Stage {stage.motorStage}
+                </MenuItem>
+              ))}
+            </AppDropdown>
 
-              <AppDropdown
-                label={S.TOOLBAR.FILTER_STAGE_LABEL}
-                value={draftFilters.stage}
-                onChange={(value) => list.setDraftFilter("stage", value)}
-                loading={lookups.loading}
-                loadingPlaceholder="Loading motor stages..."
-                disabled={lookups.loading}
-                compact
-                sx={{ mb: 0, ...t.filterPanel.field }}
-                MenuProps={t.menuPaper}
-                itemSx={t.filterPanel.menuItem}
-              >
-                <MenuItem value="All">All</MenuItem>
-                {lookups.motorStageOptions.map((stage) => (
-                  <MenuItem key={stage.motorStage} value={String(stage.motorStage)}>
-                    Stage {stage.motorStage}
-                  </MenuItem>
-                ))}
-              </AppDropdown>
+            <FilterSelect
+              label={S.TOOLBAR.FILTER_STATUS_LABEL}
+              value={draftFilters.status}
+              onChange={(e) => list.setDraftFilter("status", e.target.value)}
+              options={S.FILTER_OPTIONS.STATUS}
+              filterPanel
+              sx={{ ...t.filterPanel.field, ...t.filterPanel.fieldItem }}
+              menuProps={t.menuPaper}
+              itemSx={t.filterPanel.menuItem}
+            />
 
-              <FilterSelect
-                label={S.TOOLBAR.FILTER_STATUS_LABEL}
-                value={draftFilters.status}
-                onChange={(e) => list.setDraftFilter("status", e.target.value)}
-                options={S.FILTER_OPTIONS.STATUS}
-                compact
-                sx={{ mb: 0, ...t.filterPanel.field }}
-                menuProps={t.menuPaper}
-                itemSx={t.filterPanel.menuItem}
-              />
-
-              <FilterSelect
-                label={S.TOOLBAR.FILTER_SUB_DEPT_LABEL}
-                value={draftFilters.subDept}
-                onChange={(e) => list.setDraftFilter("subDept", e.target.value)}
-                options={[...lookups.subDeptNames]}
-                compact
-                sx={{ mb: 0, ...t.filterPanel.field }}
-                menuProps={t.menuPaper}
-                itemSx={t.filterPanel.menuItem}
-              />
-            </Box>
-          </AdminFilterPanel>
+            <FilterSelect
+              label={S.TOOLBAR.FILTER_SUB_DEPT_LABEL}
+              value={draftFilters.subDept}
+              onChange={(e) => list.setDraftFilter("subDept", e.target.value)}
+              options={[...lookups.subDeptNames]}
+              filterPanel
+              sx={{ ...t.filterPanel.field, ...t.filterPanel.fieldItem }}
+              menuProps={t.menuPaper}
+              itemSx={t.filterPanel.menuItem}
+            />
+          </AdminListFilterPanel>
         }
         theme={t}
       >

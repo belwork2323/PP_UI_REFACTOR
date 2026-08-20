@@ -57,9 +57,7 @@ const NDTFlowBar = ({
   const lookupsLoading = equipmentLoading || beamEnergyLoading;
 
   const resolvedEquipmentOptions =
-    equipmentOptions && equipmentOptions.length > 0
-      ? equipmentOptions
-      : [...NDT_EQUIPMENT_OPTIONS];
+    equipmentOptions && equipmentOptions.length > 0 ? equipmentOptions : [...NDT_EQUIPMENT_OPTIONS];
 
   const resolvedBeamEnergyOptions =
     beamEnergyOptions && beamEnergyOptions.length > 0

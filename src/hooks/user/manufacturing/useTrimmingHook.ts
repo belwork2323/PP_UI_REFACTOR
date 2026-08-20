@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { STRINGS } from "../../../app/config/strings";
 import { useAlertStore } from "../../../app/store/alertStore";
 import { useAuthStore } from "../../../app/store/authStore";
@@ -10,7 +10,6 @@ import {
   createEmptyTrimmingMotorSession,
   hasMotorTrimmingValue,
   isTrimmingMotorEditable,
-  mapTrimmingDetailsFromSavedForm,
   mapTrimmingDetailsToFormState,
   mapTrimmingFormStateToPayload,
   mapTrimmingMotorStatusesFromApi,
@@ -39,6 +38,8 @@ import {
   type PreviousStageApprovedUnits,
 } from "../previousStageApproval";
 import type { SchemaFormValues } from "../../../schema-engine";
+import { useFileService } from "../../../hooks/useFileService";
+import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -194,6 +195,7 @@ export const useTrimmingHook = () => {
   const user = useAuthStore((s) => s.user);
   const showAlert = useAlertStore((state) => state.showAlert);
   const bumpBatchRefresh = useUserBatchRefreshStore((state) => state.bumpVersion);
+  const { deleteTemp } = useFileService();
 
   const subDepartmentId = useMemo(
     () => user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "trimming")?.subDepartmentId,
@@ -277,6 +279,11 @@ export const useTrimmingHook = () => {
     () => view === "form" && formSnapshot !== initialSnapshot,
     [view, formSnapshot, initialSnapshot],
   );
+
+  const snapshotStateRef = useRef({ formData, addedMotors, selectedMotorStage, motorStatusById });
+  snapshotStateRef.current = { formData, addedMotors, selectedMotorStage, motorStatusById };
+  const initialSnapshotRef = useRef(initialSnapshot);
+  initialSnapshotRef.current = initialSnapshot;
 
   const clearFlowBarDrafts = useCallback(() => {
     setSelectedMotorStage("");
@@ -472,18 +479,27 @@ export const useTrimmingHook = () => {
   );
 
   const handleBack = useCallback(() => {
-    if (isFormDirty && !hasSavedDraft) {
+    if (isFormDirty) {
       setBackConfirmOpen(true);
       return;
     }
     bumpBatchRefresh();
     resetFormContext();
-  }, [hasSavedDraft, isFormDirty, resetFormContext, bumpBatchRefresh]);
+  }, [isFormDirty, resetFormContext, bumpBatchRefresh]);
 
-  const handleDiscardAndBack = useCallback(() => {
-    bumpBatchRefresh();
-    resetFormContext();
-  }, [resetFormContext, bumpBatchRefresh]);
+  const handleDiscardAndBack = useCallback(async () => {
+    setBackConfirmOpen(false);
+    await discardWorkflowSnapshotForm({
+      subDepartmentId,
+      initialSnapshot: initialSnapshotRef.current,
+      currentState: snapshotStateRef.current,
+      deleteTemp,
+      resetForm: () => {
+        bumpBatchRefresh();
+        resetFormContext();
+      },
+    });
+  }, [bumpBatchRefresh, deleteTemp, resetFormContext, subDepartmentId]);
 
   const handleMotorStageChange = useCallback((value: string) => {
     setSelectedMotorStage(value);
@@ -714,71 +730,6 @@ export const useTrimmingHook = () => {
     [submitMotor],
   );
 
-  const handleSubmitForFinalApproval = useCallback(async () => {
-    if (!activeBatch?.formId) {
-      showAlert(S.FORM_ID_MISSING, "error");
-      return false;
-    }
-    if (!subDepartmentId) {
-      showAlert(S.SUB_DEPARTMENT_MISSING, "error");
-      return false;
-    }
-
-    const motorIds = addedMotors.map((m) => m.motorId);
-    const allApproved =
-      motorIds.length > 0 &&
-      motorIds.every(
-        (id) => String(motorStatusById[id]?.motorSubmissionStatus ?? "").toUpperCase() === "APPROVED",
-      );
-    if (!allApproved) {
-      showAlert(S.FINAL_APPROVAL_NOT_READY, "warning");
-      return false;
-    }
-
-    setActionLoading(true);
-    try {
-      const detailsResponse = await trimmingController.fetchFormDetails({
-        formId: activeBatch.formId,
-      });
-      if (!detailsResponse?.success || !detailsResponse?.data) {
-        showAlert(getErrorMessage(detailsResponse, S.DETAILS_FETCH_ERROR), "error");
-        return false;
-      }
-
-      const payloadBody = mapTrimmingDetailsFromSavedForm(detailsResponse.data, {
-        motorStatusById,
-      });
-
-      const response = await trimmingController.updateForm({
-        formId: activeBatch.formId,
-        batchId: activeBatch.batchId,
-        subDepartmentId,
-        formSubmissionType: "SUBMIT",
-        ...payloadBody,
-      });
-
-      if (!response?.success) {
-        showAlert(getErrorMessage(response, S.UPDATE_FAILED), "error");
-        return false;
-      }
-
-      showAlert(S.CREATE_SUBMIT_SUCCESS, "success", { autoCloseMs: 2200 });
-      await listParams.refreshUserBatches();
-      resetFormContext();
-      return true;
-    } finally {
-      setActionLoading(false);
-    }
-  }, [
-    activeBatch,
-    addedMotors,
-    listParams,
-    motorStatusById,
-    resetFormContext,
-    showAlert,
-    subDepartmentId,
-  ]);
-
   return {
     ...listParams,
     loading: listParams.loading || loadingFormDetails,
@@ -817,7 +768,6 @@ export const useTrimmingHook = () => {
     handleFormValuesChange,
     handleSaveMotorDraft,
     handleSubmitMotor,
-    handleSubmitForFinalApproval,
     detailsRow,
     detailsData,
     detailsLoading,
