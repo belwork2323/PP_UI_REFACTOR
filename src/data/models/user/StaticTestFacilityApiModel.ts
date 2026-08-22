@@ -8,8 +8,17 @@ import {
   type StfMotorSubmissionType,
 } from "./StaticTestFacilityFormModel";
 import { OPERATION_STATUS } from "../../../hooks/operationStatus";
-import type { SchemaDocumentV2, SchemaSectionSubmission, SchemaTableBlock } from "../../../schema-engine";
-import { mapStfSubType } from "../../../schema-engine";
+import type {
+  SchemaDocumentV2,
+  SchemaSectionSubmission,
+  SchemaTableBlock,
+} from "../../../schema-engine";
+import { mapStfSubType } from "../../../hooks/user/qualityControl/stfFlowConfig";
+import {
+  parseStfMotorDataFromApi,
+  type StfMotorData,
+  type StfStaticTestingDetailsApi,
+} from "./StfMotorDataModel";
 import { flattenTableColumns, walkBlocks } from "../../../schema-engine/utils/schemaUtils";
 import {
   mapCastingCuringPersonLabel,
@@ -28,7 +37,8 @@ export type STFMotorPayload = {
   motorId: string;
   subType: string;
   stfTestNo?: string;
-  staticTestingDetails: any;
+  motorSubmissionType?: StfMotorSubmissionType;
+  staticTestingDetails: StfStaticTestingDetailsApi;
 };
 
 // ============================================================================
@@ -284,13 +294,13 @@ const extractMotorsFromPayload = (
       };
     })
     .filter(Boolean) as Array<{
-      motorId: string;
-      subType: string;
-      stfTestNo: string;
-      motorSubmissionType?: StfMotorSubmissionType;
-      motorSubmissionStatus?: StfMotorSubmissionStatus;
-      staticTestingDetails: Record<string, unknown>;
-    }>;
+    motorId: string;
+    subType: string;
+    stfTestNo: string;
+    motorSubmissionType?: StfMotorSubmissionType;
+    motorSubmissionStatus?: StfMotorSubmissionStatus;
+    staticTestingDetails: Record<string, unknown>;
+  }>;
 };
 
 const extractSectionsFromPayload = (payload: any): SchemaSectionSubmission[] => {
@@ -326,6 +336,7 @@ export type StfMotorDetailView = {
   motorSubmissionStatus?: StfMotorSubmissionStatus;
   rejectionReason?: string | null;
   sections: CasePrepDetailSection[];
+  stfData: StfMotorData;
 };
 
 export type StfMotorCounts = {
@@ -401,7 +412,9 @@ export const canApproverActionEntireStfForm = (params: {
     return true;
   }
 
-  const formType = String(params.formSubmissionType ?? "").trim().toUpperCase();
+  const formType = String(params.formSubmissionType ?? "")
+    .trim()
+    .toUpperCase();
   if (formType !== "SUBMIT") return false;
 
   const motors = params.motors ?? [];
@@ -411,10 +424,7 @@ export const canApproverActionEntireStfForm = (params: {
   );
   if (!allMotorsApproved) return false;
 
-  return (
-    statusUpper === "WAITING_FOR_APPROVAL" ||
-    status === OPERATION_STATUS.WAITING_FOR_APPROVAL
-  );
+  return statusUpper === "WAITING_FOR_APPROVAL" || status === OPERATION_STATUS.WAITING_FOR_APPROVAL;
 };
 
 export type StfSchemaDisplayIndex = {
@@ -445,8 +455,7 @@ export const buildStfSchemaDisplayIndex = (
     if (!sectionId) return;
 
     index.sectionOrder.push(sectionId);
-    index.sectionLabels[sectionId] =
-      section.title ?? formatCasePrepSectionLabel(sectionId);
+    index.sectionLabels[sectionId] = section.title ?? formatCasePrepSectionLabel(sectionId);
     index.blockOrderBySection[sectionId] = [];
 
     walkBlocks(section.children, (block) => {
@@ -582,8 +591,7 @@ const applyStfSchemaToDetailSection = (
 
     preferredBlocks.forEach((blockId) => {
       const match =
-        byKey.get(blockId) ??
-        section.fields.find((field) => leafKey(field.key) === blockId);
+        byKey.get(blockId) ?? section.fields.find((field) => leafKey(field.key) === blockId);
       if (!match || used.has(match.key)) return;
       ordered.push({
         ...match,
@@ -782,17 +790,16 @@ export const mapStfDetailsForDisplay = (
     if (!motorId) return null;
 
     const statusMeta = statusById[motorId];
-    const subType = String(
-      statusEntry?.subType ?? dataEntry?.subType ?? root.subType ?? "",
-    ).trim();
+    const subType = String(statusEntry?.subType ?? dataEntry?.subType ?? root.subType ?? "").trim();
     const schemaSubType = mapStfSubType(subType);
-    const schema = schemasBySubType?.[schemaSubType] ?? null;
+    const stfData = parseStfMotorDataFromApi(dataEntry ?? null, schemaSubType);
     const sections = dataEntry
-      ? resolveStfMotorSections(dataEntry, legacySectionsForMotor, schema)
+      ? resolveStfMotorSections(dataEntry, legacySectionsForMotor, null)
       : [];
     const stfTestNo =
-      String(dataEntry?.stfTestNo ?? statusEntry?.stfTestNo ?? stfTestNoById[motorId] ?? "")
-        .trim() || undefined;
+      String(
+        dataEntry?.stfTestNo ?? statusEntry?.stfTestNo ?? stfTestNoById[motorId] ?? "",
+      ).trim() || undefined;
 
     return {
       motorId,
@@ -809,6 +816,7 @@ export const mapStfDetailsForDisplay = (
         dataEntry?.motorSubmissionStatus,
       rejectionReason: statusMeta?.rejectionReason ?? null,
       sections,
+      stfData,
     };
   };
 
@@ -843,12 +851,17 @@ export const mapStfDetailsForDisplay = (
       subType: String(root.subType ?? ""),
       subTypeLabel: formatStfSubTypeLabel(String(root.subType ?? "")),
       stfTestNo:
-        String(stfTestNoById[legacyMotorId] ?? (root as { stfTestNo?: string }).stfTestNo ?? "")
-          .trim() || undefined,
+        String(
+          stfTestNoById[legacyMotorId] ?? (root as { stfTestNo?: string }).stfTestNo ?? "",
+        ).trim() || undefined,
       motorSubmissionType: statusMeta?.motorSubmissionType,
       motorSubmissionStatus: statusMeta?.motorSubmissionStatus,
       rejectionReason: statusMeta?.rejectionReason ?? null,
-      sections: parseStfDisplaySections(legacySections as unknown[]),
+      sections: parseStfDisplaySections(legacySections as unknown[], null),
+      stfData: parseStfMotorDataFromApi(
+        { staticTestingDetails: { [FORM_SECTIONS_KEY]: legacySections } },
+        mapStfSubType(String(root.subType ?? "")),
+      ),
     });
   }
 
@@ -902,9 +915,7 @@ export const mapStfDetailsForDisplay = (
       pendingMotorCount: Number(root.pendingMotorCount ?? derivedCounts.pendingMotorCount),
       approvedMotorCount: Number(root.approvedMotorCount ?? derivedCounts.approvedMotorCount),
       rejectedMotorCount: Number(root.rejectedMotorCount ?? derivedCounts.rejectedMotorCount),
-      inProgressMotorCount: Number(
-        root.inProgressMotorCount ?? derivedCounts.inProgressMotorCount,
-      ),
+      inProgressMotorCount: Number(root.inProgressMotorCount ?? derivedCounts.inProgressMotorCount),
       totalMotorCount: Number(root.totalMotorCount ?? derivedCounts.totalMotorCount),
     },
   };
@@ -925,8 +936,12 @@ export const mapBemDetailsForDisplay = (
 
   const displaySections = parseStfDisplaySections(
     Array.isArray(rawSections) ? rawSections : [],
-    schema,
+    null,
   );
+  const bemMotorPayload = {
+    staticTestingDetails: root.staticTestingDetails ?? { formSections: rawSections },
+    sections: rawSections,
+  };
 
   return {
     formId: String(root.bemMotorId ?? root.id ?? ""),
@@ -969,6 +984,7 @@ export const mapBemDetailsForDisplay = (
         subTypeLabel: "BEM",
         stfTestNo,
         sections: displaySections,
+        stfData: parseStfMotorDataFromApi(bemMotorPayload, "BEM"),
       },
     ],
   };

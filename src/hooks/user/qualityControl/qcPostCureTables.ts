@@ -7,6 +7,8 @@ import {
   QC_POST_CURE_HEMCOAT_QUALIFICATION_PRESET,
   QC_POST_CURE_IR1_QUALIFICATION_PRESET,
   QC_POST_CURE_LF_QUALIFICATION_PRESET,
+  QC_POST_CURE_OPERATION_INHIBITION,
+  QC_POST_CURE_OPERATION_LOOSE_FLAP,
   QC_POST_CURE_SECTION_IDS,
   QC_POST_CURE_SUB_TYPE_INHIBITION,
   QC_POST_CURE_SUB_TYPE_LOOSE_FLAP,
@@ -823,11 +825,17 @@ const buildLooseFlapFillingDetailsPayload = (
   );
 
   return omitEmpty({
-    bellowBondingDetails: mapLocationRowsForApi(bellowRows),
-    batchNo: getPostCureField(values, section, "LF_EPOXY_BATCH_NO") || undefined,
-    preparationDate: toApiDate(getPostCureField(values, section, "LF_EPOXY_PREPARATION_DATE")),
-    qualificationDetails: mapQualificationRowsForApi(qualRows),
-    qcReport: getPostCureField(values, section, "LF_EPOXY_QC_REPORT") || undefined,
+    bellowRemovalDetails: mapLocationRowsForApi(bellowRows),
+    epoxyPreparationIngredients: omitEmpty({
+      batchNo: getPostCureField(values, section, "LF_EPOXY_BATCH_NO") || undefined,
+      preparationDate: toApiDate(getPostCureField(values, section, "LF_EPOXY_PREPARATION_DATE")),
+    }),
+    qualificationDetails: omitEmpty({
+      batchNo: getPostCureField(values, section, "LF_EPOXY_BATCH_NO") || undefined,
+      preparationDate: toApiDate(getPostCureField(values, section, "LF_EPOXY_PREPARATION_DATE")),
+      parameters: mapQualificationRowsForApi(qualRows),
+      qcReport: getPostCureField(values, section, "LF_EPOXY_QC_REPORT") || undefined,
+    }),
     fillingDetails: mapLocationRowsForApi(fillingRows, "QTY_FILLED"),
   });
 };
@@ -875,7 +883,8 @@ const buildInhibitionDetailsPayload = (
         preparationDate: toApiDate(
           getPostCureField(values, qual, "HEMCOAT_3K_PREPARATION_DATE"),
         ),
-        qualification: mapQualificationRowsForApi(qualRows, true),
+        parameters: mapQualificationRowsForApi(qualRows, true),
+        qcReport: getPostCureField(values, qual, "HEMCOAT_3K_QC_REPORT") || undefined,
       }),
       applicationDetails: mapLocationRowsForApi(applicationRows, "QTY_APPLIED"),
       ...omitEmpty({
@@ -905,7 +914,7 @@ const buildInhibitionDetailsPayload = (
     qualificationDetails: omitEmpty({
       batchNo: getPostCureField(values, qual, "IR1_BATCH_NO") || undefined,
       preparationDate: toApiDate(getPostCureField(values, qual, "IR1_PREPARATION_DATE")),
-      qualification: mapQualificationRowsForApi(qualRows),
+      parameters: mapQualificationRowsForApi(qualRows),
       qcReport: getPostCureField(values, qual, "IR1_QC_REPORT") || undefined,
     }),
     applicationDetails: mapLocationRowsForApi(applicationRows, "QTY_APPLIED"),
@@ -918,44 +927,45 @@ const buildInhibitionDetailsPayload = (
 
 /**
  * Nested Post Cure motor payload for create/update (`data.postCureMotorDetails[]`).
- * Matches:
- * `{ motorIdNo, motorSubmissionType, looseFlapFillingDetails?, inhibitionDetails? }`
  */
 export const buildPostCureMotorDetailPayload = (
   values: SchemaFormValues | null | undefined,
-  motorIdNo: string,
+  motorId: string,
   motorSubmissionType: QcPostCureMotorSubmissionType = "DRAFT",
   subType?: string | null,
   inhibitorType?: string | null,
 ): Record<string, unknown> => {
   const resolvedSubType = String(subType ?? "").trim().toUpperCase();
   const resolvedInhibitor = String(inhibitorType ?? "").trim().toUpperCase();
+  const operationType =
+    resolvedSubType === QC_POST_CURE_SUB_TYPE_INHIBITION
+      ? QC_POST_CURE_OPERATION_INHIBITION
+      : QC_POST_CURE_OPERATION_LOOSE_FLAP;
+
+  const base = omitEmpty({
+    motorId,
+    motorSubmissionType,
+    operationType,
+    ...(resolvedInhibitor ? { inhibitorType: resolvedInhibitor } : {}),
+  });
 
   if (resolvedSubType === QC_POST_CURE_SUB_TYPE_LOOSE_FLAP) {
     return {
-      motorIdNo,
-      motorSubmissionType,
+      ...base,
       looseFlapFillingDetails: buildLooseFlapFillingDetailsPayload(values),
     };
   }
 
   if (resolvedSubType === QC_POST_CURE_SUB_TYPE_INHIBITION) {
     return {
-      motorIdNo,
-      motorSubmissionType,
+      ...base,
       inhibitionDetails: buildInhibitionDetailsPayload(values, resolvedInhibitor || "IR1"),
     };
   }
 
   return {
-    motorIdNo,
-    motorSubmissionType,
-    looseFlapFillingDetails: {},
-    inhibitionDetails: {
-      inhibitorType: resolvedInhibitor || undefined,
-      qualificationDetails: {},
-      applicationDetails: [],
-    },
+    ...base,
+    looseFlapFillingDetails: buildLooseFlapFillingDetailsPayload(values),
   };
 };
 

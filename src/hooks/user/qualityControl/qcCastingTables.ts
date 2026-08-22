@@ -137,6 +137,14 @@ const fromSoakingDurationApi = (value: unknown): string => {
 
 const toApiDate = (value: string) => formatToIsoDateInput(value) || undefined;
 
+const normalizeTimeValue = (value: unknown) => {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return "";
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return trimmed;
+  return `${match[1].padStart(2, "0")}:${match[2]}`;
+};
+
 const emptyMandrelRow = (srNo = 1): QcCastingMandrelRow => ({
   SR_NO: srNo,
   READING_WITHOUT_CUP: "",
@@ -434,64 +442,133 @@ const mapPressurePlateDetailsForApi = (rows: ReturnType<typeof sanitizePressureP
     observations: row.OBSERVATIONS,
   }));
 
-/** Nested Casting motor payload for create/update (`data.motorDetails[]`). */
+const omitEmpty = <T extends Record<string, unknown>>(record: T): Record<string, unknown> =>
+  Object.fromEntries(
+    Object.entries(record).filter(([, value]) => {
+      if (value === undefined || value === null || value === "") return false;
+      if (Array.isArray(value) && value.length === 0) return false;
+      return true;
+    }),
+  );
+
+const buildQcCastingSectionsPayload = (
+  values: SchemaFormValues | null | undefined,
+): Record<string, unknown> => {
+  const mandrelRows = sanitizeMandrelRows(getCastingMandrelRows(values));
+  const castingRows = sanitizeCastingRows(getCastingTableRows(values));
+  const weightmentRow = sanitizeWeightmentRow(getCastingWeightmentRows(values));
+  const soakingDuration = getCastingPostCastField(values, "SOAKING_DURATION");
+  const pressureRows =
+    getCastingPostCastField(values, "PRESSURE_PLATE_ASSEMBLY_REQUIRED") === "YES"
+      ? sanitizePressurePlateRows(getCastingPressurePlateRows(values))
+      : [];
+
+  const finalAssemblyDetails =
+    mandrelRows.length || hasValue(getCastingAssemblyDate(values))
+      ? {
+          motorCasing: [
+            omitEmpty({
+              mandrelMeasurements: mandrelRows.map((row, index) =>
+                omitEmpty({
+                  srNo: Number(row.SR_NO) || index + 1,
+                  aMock: toFiniteNumber(row.READING_WITHOUT_CUP),
+                  bMock: toFiniteNumber(row.READING_WITH_BOTTOM_CUP),
+                }),
+              ),
+              emptyMotorWeight: toFiniteNumber(weightmentRow.TOTAL_WEIGHT),
+            }),
+          ],
+        }
+      : undefined;
+
+  const castingProcess =
+    castingRows.length ||
+    hasValue(getCastingPropellantField(values, "RH_PERCENT")) ||
+    hasValue(getCastingPropellantField(values, "VACUUM_MAINTAINED"))
+      ? omitEmpty({
+          finalMixBowlDetails: castingRows.map((row, index) =>
+            omitEmpty({
+              srNo: Number(row.SR_NO) || index + 1,
+              bowlId: row.FINAL_MIX_BOWL_NO || undefined,
+              bowlReceiptTime: row.CASTING_START_TIME || undefined,
+              initialWeight: toFiniteNumber(row.PROPELLANT_QTY),
+              finalWeight: toFiniteNumber(row.SLURRY_CAST_FROM_EACH_BOWL),
+            }),
+          ),
+          castingFromBowlDetails: castingRows.map((row, index) =>
+            omitEmpty({
+              srNo: Number(row.SR_NO) || index + 1,
+              bowlId: row.FINAL_MIX_BOWL_NO || undefined,
+              viscosity: toFiniteNumber(row.INITIAL_UNLOADING_VISCOSITY),
+              slurryCast: toFiniteNumber(row.SLURRY_CAST_FROM_EACH_BOWL),
+              motorId: row.REMARKS || undefined,
+            }),
+          ),
+          initialVacuum: toFiniteNumber(getCastingPropellantField(values, "VACUUM_MAINTAINED")),
+          vacuumPressureCasting: toFiniteNumber(getCastingPropellantField(values, "VACUUM_MAINTAINED")),
+          vacuumPressureSoaking: toFiniteNumber(getCastingPropellantField(values, "VACUUM_MAINTAINED")),
+        })
+      : undefined;
+
+  const slurryCastDetails = castingRows.length
+    ? {
+        slurryCastFromBowls: castingRows.map((row, index) =>
+          omitEmpty({
+            rowKey: String(Number(row.SR_NO) || index + 1),
+            fmMotorLabel: row.FINAL_MIX_BOWL_NO || undefined,
+            slurryCast: toFiniteNumber(row.SLURRY_CAST_FROM_EACH_BOWL),
+          }),
+        ),
+      }
+    : undefined;
+
+  const postCastOperations =
+    hasValue(soakingDuration) || pressureRows.length
+      ? omitEmpty({
+          postCastTable: [
+            ...(hasValue(soakingDuration)
+              ? [{ srNo: 1, activity: "Soaking Time", details: soakingDuration }]
+              : []),
+            ...pressureRows.map((row, index) =>
+              omitEmpty({
+                srNo: (hasValue(soakingDuration) ? 2 : 1) + index,
+                activity: "Pressure Plate",
+                details: row.OBSERVATIONS || row.PRESSURE_SENSOR_USED || undefined,
+              }),
+            ),
+          ],
+        })
+      : undefined;
+
+  return omitEmpty({
+    finalAssemblyDetails,
+    castingProcess,
+    slurryCastDetails,
+    postCastOperations,
+  });
+};
+
+/** Nested Casting/Curing direct DTO for QC create/update (`data.motorDetails[]`). */
 export const buildCastingMotorDetailPayload = (
   values: SchemaFormValues | null | undefined,
-  motorIdNo: string,
+  motorId: string,
   motorSubmissionType: QcCastingMotorSubmissionType = "DRAFT",
+  options?: { motorReceivedAt?: string; castingStation?: string },
 ): Record<string, unknown> => {
   const castingType = getCastingType(values).trim();
   const assemblyDate = toApiDate(getCastingAssemblyDate(values));
-  const mandrelAssembly = mapMandrelRowsForApi(sanitizeMandrelRows(getCastingMandrelRows(values)));
 
-  const dateOfCasting = toApiDate(getCastingPropellantField(values, "DATE_OF_CASTING"));
-  const rhPercent = toFiniteNumber(getCastingPropellantField(values, "RH_PERCENT"));
-  const vacuumMaintained = toFiniteNumber(
-    getCastingPropellantField(values, "VACUUM_MAINTAINED"),
-  );
-  const castingDetails = mapCastingDetailsForApi(sanitizeCastingRows(getCastingTableRows(values)));
-  const weightmentDetails = mapWeightmentDetailsForApi(
-    sanitizeWeightmentRow(getCastingWeightmentRows(values)),
-  );
-
-  const soakingRaw = getCastingPostCastField(values, "SOAKING_DURATION");
-  const soakingDuration = toSoakingDurationApi(soakingRaw);
-  const pressureRequired = getCastingPostCastField(
-    values,
-    "PRESSURE_PLATE_ASSEMBLY_REQUIRED",
-  ).trim();
-  const pressurePlateDetails =
-    pressureRequired === "YES"
-      ? mapPressurePlateDetailsForApi(sanitizePressurePlateRows(getCastingPressurePlateRows(values)))
-      : [];
-
-  return {
-    motorIdNo,
+  return omitEmpty({
+    motorId,
     motorSubmissionType,
-    castingSelection: {
+    ...(options?.motorReceivedAt ? { motorReceivedAt: options.motorReceivedAt } : {}),
+    ...(assemblyDate ? { motorReceivedAt: `${assemblyDate}T00:00:00` } : {}),
+    setup: omitEmpty({
       castingType: castingType || undefined,
-    },
-    finalAssembly: {
-      ...(assemblyDate ? { assemblyDate } : {}),
-      mandrelAssembly,
-    },
-    propellantCasting: {
-      ...(dateOfCasting ? { dateOfCasting } : {}),
-      ...(rhPercent != null ? { rhPercent } : {}),
-      ...(vacuumMaintained != null ? { vacuumMaintained } : {}),
-      castingDetails,
-    },
-    weightmentDetails,
-    postCastOperations: {
-      soakingDetails: {
-        ...(soakingDuration != null ? { soakingDuration } : {}),
-      },
-      pressurePlateAssembly: {
-        ...(pressureRequired ? { required: pressureRequired } : {}),
-      },
-      pressurePlateDetails,
-    },
-  };
+      castingStation: options?.castingStation || undefined,
+    }),
+    castingSections: buildQcCastingSectionsPayload(values),
+  });
 };
 
 /** Legacy section payload (internal hydrate / manufacturing seed). */
@@ -596,14 +673,17 @@ const mapApiMandrelRows = (rows: unknown[]): QcCastingMandrelRow[] =>
     .map((row, index) => {
       const rec = asRecord(row);
       if (!rec) return null;
+      const withoutCup =
+        pickRowField(rec, "readingWithoutCup", "READING_WITHOUT_CUP", "aFinal", "A_FINAL", "afinal", "amock", "A_MOCK") ||
+        "";
+      const withCup =
+        pickRowField(rec, "readingWithBottomCup", "READING_WITH_BOTTOM_CUP", "bFinal", "B_FINAL", "bfinal", "bmock", "B_MOCK") ||
+        "";
+      if (!withoutCup && !withCup) return null;
       return {
         SR_NO: Number(pickRowField(rec, "srNo", "SR_NO")) || index + 1,
-        READING_WITHOUT_CUP: String(
-          pickRowField(rec, "readingWithoutCup", "READING_WITHOUT_CUP"),
-        ),
-        READING_WITH_BOTTOM_CUP: String(
-          pickRowField(rec, "readingWithBottomCup", "READING_WITH_BOTTOM_CUP"),
-        ),
+        READING_WITHOUT_CUP: withoutCup,
+        READING_WITH_BOTTOM_CUP: withCup,
       } satisfies QcCastingMandrelRow;
     })
     .filter(Boolean) as QcCastingMandrelRow[];
@@ -615,21 +695,47 @@ const mapApiCastingDetailRows = (rows: unknown[]): QcCastingTableRow[] =>
       if (!rec) return null;
       return {
         SR_NO: Number(pickRowField(rec, "srNo", "SR_NO")) || index + 1,
-        FINAL_MIX_BOWL_NO: String(pickRowField(rec, "finalMixBowlNo", "FINAL_MIX_BOWL_NO")),
-        PROPELLANT_QTY: String(pickRowField(rec, "propellantQty", "PROPELLANT_QTY")),
-        INITIAL_UNLOADING_VISCOSITY: String(
-          pickRowField(rec, "initialUnloadingViscosity", "INITIAL_UNLOADING_VISCOSITY"),
+        FINAL_MIX_BOWL_NO: pickRowField(
+          rec,
+          "finalMixBowlNo",
+          "FINAL_MIX_BOWL_NO",
+          "bowlId",
+          "BOWL_ID",
         ),
-        CASTING_START_TIME: String(
-          pickRowField(rec, "castingStartTime", "CASTING_START_TIME"),
+        PROPELLANT_QTY: pickRowField(
+          rec,
+          "propellantQty",
+          "PROPELLANT_QTY",
+          "initialWeight",
+          "finalWeight",
         ),
-        CASTING_COMPLETION_TIME: String(
-          pickRowField(rec, "castingCompletionTime", "CASTING_COMPLETION_TIME"),
+        INITIAL_UNLOADING_VISCOSITY: pickRowField(
+          rec,
+          "initialUnloadingViscosity",
+          "INITIAL_UNLOADING_VISCOSITY",
+          "viscosity",
+          "VISCOSITY",
         ),
-        SLURRY_CAST_FROM_EACH_BOWL: String(
-          pickRowField(rec, "slurryCastFromEachBowl", "SLURRY_CAST_FROM_EACH_BOWL"),
+        CASTING_START_TIME: normalizeTimeValue(
+          pickRowField(rec, "castingStartTime", "CASTING_START_TIME", "bowlReceiptTime", "dcOpenTime"),
         ),
-        REMARKS: String(pickRowField(rec, "remarks", "REMARKS")),
+        CASTING_COMPLETION_TIME: normalizeTimeValue(
+          pickRowField(
+            rec,
+            "castingCompletionTime",
+            "CASTING_COMPLETION_TIME",
+            "dcCloseTime",
+            "ballValveOpenTime",
+          ),
+        ),
+        SLURRY_CAST_FROM_EACH_BOWL: pickRowField(
+          rec,
+          "slurryCastFromEachBowl",
+          "SLURRY_CAST_FROM_EACH_BOWL",
+          "slurryCast",
+          "SLURRY_CAST",
+        ),
+        REMARKS: pickRowField(rec, "remarks", "REMARKS"),
       } satisfies QcCastingTableRow;
     })
     .filter(Boolean) as QcCastingTableRow[];
@@ -679,7 +785,10 @@ const mapApiPressurePlateRows = (rows: unknown[]): QcCastingPressurePlateRow[] =
 
 export const isCastingNestedMotorDetail = (motor: Record<string, unknown>) =>
   Boolean(
-    motor.castingSelection ||
+    motor.setup ||
+      motor.castingSections ||
+      asRecord(motor.details)?.castingSections ||
+      motor.castingSelection ||
       motor.finalAssembly ||
       motor.propellantCasting ||
       motor.weightmentDetails ||
@@ -693,7 +802,105 @@ export const castingMotorDetailToSections = (
 ): SchemaSectionSubmission[] => {
   const id =
     String(motorId ?? motor.motorIdNo ?? motor.motorId ?? motor.id ?? "").trim() || undefined;
+
+  const castingSections =
+    asRecord(motor.castingSections) ?? asRecord(asRecord(motor.details)?.castingSections);
+  if (castingSections) {
+    const sections: SchemaSectionSubmission[] = [];
+    const setup = asRecord(motor.setup) ?? asRecord(asRecord(motor.details)?.setup);
+    if (setup) {
+      sections.push({
+        sectionId: QC_CASTING_SECTION_IDS.SELECTION,
+        ...(id ? { motorId: id } : {}),
+        sectionData: [
+          { CASTING_TYPE: String(setup.castingType ?? setup.CASTING_TYPE ?? "") },
+        ],
+      });
+    }
+
+    const finalAssemblyDetails = asRecord(castingSections.finalAssemblyDetails);
+    const motorCasing = asRecord(asArray(finalAssemblyDetails?.motorCasing)[0]);
+    if (motorCasing) {
+      sections.push({
+        sectionId: QC_CASTING_SECTION_IDS.FINAL_ASSEMBLY,
+        ...(id ? { motorId: id } : {}),
+        sectionData: [
+          {
+            MANDREL_ASSEMBLY: mapApiMandrelRows(
+              asArray(motorCasing.mandrelMeasurements ?? motorCasing.MANDREL_MEASUREMENTS),
+            ),
+          },
+        ],
+      });
+      const emptyWeight = pickRowField(motorCasing, "emptyMotorWeight", "EMPTY_MOTOR_WEIGHT");
+      if (emptyWeight) {
+        sections.push({
+          sectionId: QC_CASTING_SECTION_IDS.WEIGHTMENT,
+          ...(id ? { motorId: id } : {}),
+          sectionData: [{ WEIGHTMENT_DETAILS: [{ TOTAL_WEIGHT: emptyWeight }] }],
+        });
+      }
+    }
+
+    const castingProcess = asRecord(castingSections.castingProcess);
+    if (castingProcess) {
+      sections.push({
+        sectionId: QC_CASTING_SECTION_IDS.PROPELLANT_CASTING,
+        ...(id ? { motorId: id } : {}),
+        sectionData: [
+          {
+            VACUUM_MAINTAINED: String(
+              castingProcess.initialVacuum ??
+                castingProcess.vacuumPressureCasting ??
+                castingProcess.vacuumPressureSoaking ??
+                "",
+            ),
+            CASTING_TABLE: mapApiCastingDetailRows(
+              asArray(
+                castingProcess.castingFromBowlDetails ??
+                  castingProcess.CASTING_FROM_BOWL_DETAILS ??
+                  castingProcess.finalMixBowlDetails,
+              ),
+            ),
+          },
+        ],
+      });
+    }
+
+    const postCastOperations = asRecord(castingSections.postCastOperations);
+    if (postCastOperations) {
+      const postCastTable = asArray(postCastOperations.postCastTable);
+      const soakingRow = postCastTable.find((row) =>
+        /soaking/i.test(String(asRecord(row)?.activity ?? "")),
+      );
+      sections.push({
+        sectionId: QC_CASTING_SECTION_IDS.POST_CAST,
+        ...(id ? { motorId: id } : {}),
+        sectionData: [
+          {
+            SOAKING_DURATION: String(asRecord(soakingRow)?.details ?? ""),
+          },
+        ],
+      });
+    }
+
+    return sections;
+  }
+
   const sections: SchemaSectionSubmission[] = [];
+
+  const setup = asRecord(motor.setup);
+  if (setup && !asRecord(motor.castingSelection)) {
+    sections.push({
+      sectionId: QC_CASTING_SECTION_IDS.SELECTION,
+      ...(id ? { motorId: id } : {}),
+      sectionData: [
+        {
+          CASTING_TYPE: String(setup.castingType ?? setup.CASTING_TYPE ?? ""),
+        },
+      ],
+    });
+  }
 
   const selection = asRecord(motor.castingSelection);
   if (selection) {

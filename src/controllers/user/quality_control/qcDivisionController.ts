@@ -11,6 +11,30 @@ import {
   updateQCDivisionFormApi,
 } from "../../../data/api/users/quality_control/qcDivisionApi";
 
+export type QcRawMaterialProcessingProcessPayload = {
+  materialId: number;
+  materialCode: string;
+  materialName: string;
+  gradeId?: number;
+  gradeCode?: string;
+  schemaVersion: string;
+  schemaType: string;
+  sections: Array<{ sectionId: string; sectionData: Record<string, unknown>[] }>;
+};
+
+export type QcRawMaterialProcessingPremixPayload = {
+  premixNo: number;
+  premixDate?: string;
+  materialType: "SOLID" | "LIQUID" | "BOTH";
+  premixSubmissionType?: "DRAFT" | "SUBMIT";
+  solidProcess: QcRawMaterialProcessingProcessPayload[];
+  liquidProcess: QcRawMaterialProcessingProcessPayload[];
+};
+
+export type QcRawMaterialProcessingDivisionData = {
+  premixes: QcRawMaterialProcessingPremixPayload[];
+};
+
 export type DivisionDetailEntry = {
   division: string;
   subType: string | null;

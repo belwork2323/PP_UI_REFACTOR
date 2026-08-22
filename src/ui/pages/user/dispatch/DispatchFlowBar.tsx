@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Button, CircularProgress } from "@mui/material";
+import { Box, Button } from "@mui/material";
 import CasePrepDateField from "../manufacturing/CasePreparation/CasePrepDateField";
 import CasePrepTextField from "../manufacturing/CasePreparation/CasePrepTextField";
 import CasePrepSelect from "../manufacturing/CasePreparation/CasePrepSelect";
@@ -16,7 +16,6 @@ type DispatchFlowBarProps = {
   draftMotorId: string;
   usedMotorIds?: string[];
   hasMotors?: boolean;
-  schemaLoading?: boolean;
   onSetupChange: <K extends keyof DispatchSharedSetup>(
     field: K,
     value: DispatchSharedSetup[K],
@@ -31,7 +30,6 @@ const DispatchFlowBar: React.FC<DispatchFlowBarProps> = ({
   draftMotorId,
   usedMotorIds = [],
   hasMotors = false,
-  schemaLoading = false,
   onSetupChange,
   onLoadForm,
   theme,
@@ -128,12 +126,11 @@ const DispatchFlowBar: React.FC<DispatchFlowBarProps> = ({
             <Button
               variant="contained"
               size="medium"
-              disabled={!canLoad || schemaLoading}
+              disabled={!canLoad}
               onClick={onLoadForm}
-              startIcon={schemaLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
               sx={flowBar.primaryAction}
             >
-              {schemaLoading ? L.loadingSchema : L.loadForm}
+              {L.loadForm}
             </Button>
           </Box>
         </Box>

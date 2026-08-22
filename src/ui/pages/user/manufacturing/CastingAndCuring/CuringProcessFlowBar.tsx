@@ -28,7 +28,6 @@ type CuringProcessFlowBarProps = {
   ovensLoading?: boolean;
   onChange: (field: keyof CuringProcessSetup, value: string | number | "") => void;
   onLoadCuringForm: () => void;
-  schemaLoading?: boolean;
   theme: any;
 };
 
@@ -55,7 +54,6 @@ const CuringProcessFlowBar = ({
   ovensLoading = false,
   onChange,
   onLoadCuringForm,
-  schemaLoading = false,
   theme,
 }: CuringProcessFlowBarProps) => {
   const flowBar = theme.manufacturing?.casePreparation?.flowBar ?? {};
@@ -109,7 +107,7 @@ const CuringProcessFlowBar = ({
           <CasePrepSelect
             label={L.curingSelectOven}
             value={setup.oven}
-            placeholder={ovensLoading ? L.schemaLoading : L.curingSelectOvenPlaceholder}
+            placeholder={ovensLoading ? L.curingCyclesLoading : L.curingSelectOvenPlaceholder}
             options={ovenOptions}
             width={200}
             theme={theme}
@@ -137,10 +135,12 @@ const CuringProcessFlowBar = ({
             variant="contained"
             size="small"
             onClick={onLoadCuringForm}
-            disabled={!canLoad || schemaLoading || ovensLoading || curingCyclesLoading}
-            startIcon={schemaLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
+            disabled={!canLoad || ovensLoading || curingCyclesLoading}
+            startIcon={
+              curingCyclesLoading ? <CircularProgress size={14} color="inherit" /> : undefined
+            }
           >
-            {schemaLoading ? L.schemaLoading : L.loadCuringForm}
+            {curingCyclesLoading ? L.curingCyclesLoading : L.loadCuringForm}
           </Button>
         </Box>
       </Box>

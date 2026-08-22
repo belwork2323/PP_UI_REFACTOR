@@ -1,5 +1,3 @@
-import type { StfSubType } from "../../../schema-engine";
-import { mapStfSubType } from "../../../schema-engine";
 import { STRINGS } from "../../../app/config/strings";
 import {
   getBemMotorIdsFromSheet,
@@ -593,4 +591,11 @@ export const buildStfMotorNavGateHelpers = (
         subType,
       }),
   };
+};
+
+export type StfSubType = "BEM" | "MAIN_MOTOR";
+
+export const mapStfSubType = (subType?: string | null): StfSubType => {
+  const normalized = String(subType ?? "").toUpperCase();
+  return normalized === "MAIN_MOTOR" ? "MAIN_MOTOR" : "BEM";
 };

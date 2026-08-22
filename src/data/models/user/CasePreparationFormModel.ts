@@ -689,6 +689,7 @@ export type CasePrepMotorDetailView = {
   remarks?: string | null;
   rejectionReason?: string | null;
   sections: CasePrepDetailSection[];
+  casePrepData: CasePrepMotorData;
 };
 
 export type CasePreparationDetailView = {
@@ -1086,6 +1087,7 @@ export const mapCasePreparationDetailsForDisplay = (
             (entry.rejectionReason as string | null | undefined) ??
             null,
           sections,
+          casePrepData: parseCasePrepMotorDataFromApi(entry),
         };
       })
       .filter((motor) => motor.motorId.length > 0),

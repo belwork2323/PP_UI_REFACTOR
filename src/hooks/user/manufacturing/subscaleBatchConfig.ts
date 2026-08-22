@@ -150,14 +150,19 @@ export const createDefaultSubscaleBatchValues = (): SchemaFormValues => ({
   ...createDefaultHardwareValues(),
 });
 
-export const mergeSubscaleBatchFormValues = (values: SchemaFormValues): SchemaFormValues =>
-  mergeHardwareFormValues({
+export const mergeSubscaleBatchFormValues = (values: SchemaFormValues): SchemaFormValues => {
+  if (values.IS_PROCESS_FORM_LOADED) {
+    return values;
+  }
+
+  return mergeHardwareFormValues({
     ...createDefaultSubscaleBatchValues(),
     ...values,
     [SUBSCALE_BATCH_FIELDS.MIXING_CYCLES]: normalizeSubscaleMixingCycles(
       values[SUBSCALE_BATCH_FIELDS.MIXING_CYCLES],
     ),
   });
+};
 
 export const isSubscaleBatchFieldFilled = (fieldId: string, value: unknown) => {
   if (

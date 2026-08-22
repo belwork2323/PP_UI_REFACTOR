@@ -1,4 +1,4 @@
-import { Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
+import { Box, Button, Stack, Typography } from "@mui/material";
 import { STRINGS } from "../../../../../app/config/strings";
 import {
   isPostCureInhibitionOperation,
@@ -16,7 +16,6 @@ type PostCureFlowBarProps = {
   draftOperation: string;
   draftInhibitorType: string;
   canLoadForm: boolean;
-  schemaLoading?: boolean;
   onDraftMotorReceiptDateChange: (value: string) => void;
   onDraftOperationChange: (value: string) => void;
   onDraftInhibitorTypeChange: (value: string) => void;
@@ -30,7 +29,6 @@ const PostCureFlowBar = ({
   draftOperation,
   draftInhibitorType,
   canLoadForm,
-  schemaLoading = false,
   onDraftMotorReceiptDateChange,
   onDraftOperationChange,
   onDraftInhibitorTypeChange,
@@ -134,10 +132,9 @@ const PostCureFlowBar = ({
             variant="contained"
             size="small"
             onClick={onLoadForm}
-            disabled={!canLoadForm || schemaLoading}
-            startIcon={schemaLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
+            disabled={!canLoadForm}
           >
-            {schemaLoading ? S.SCHEMA_LOADING : S.LOAD_FORM}
+            {S.LOAD_FORM}
           </Button>
         </Box>
       </Stack>

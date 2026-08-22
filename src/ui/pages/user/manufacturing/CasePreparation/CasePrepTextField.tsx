@@ -1,10 +1,12 @@
 import { Box, TextField, Typography } from "@mui/material";
+import { WorkflowReadOnlyText } from "../../../../components/common/WorkflowReadOnlyText";
 
 type CasePrepTextFieldProps = {
   label: string;
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  readOnly?: boolean;
   placeholder?: string;
   width?: number | string;
   theme: any;
@@ -15,6 +17,7 @@ const CasePrepTextField = ({
   value,
   onChange,
   disabled = false,
+  readOnly = false,
   placeholder = "",
   width = 220,
   theme,
@@ -28,6 +31,9 @@ const CasePrepTextField = ({
       <Typography component="label" sx={flowBar.selectLabel}>
         {label}
       </Typography>
+      {readOnly ? (
+        <WorkflowReadOnlyText value={value} sx={{ fontSize: "0.82rem", py: 0.75 }} />
+      ) : (
       <TextField
         fullWidth
         size="small"
@@ -51,6 +57,7 @@ const CasePrepTextField = ({
           },
         }}
       />
+      )}
     </Box>
   );
 };

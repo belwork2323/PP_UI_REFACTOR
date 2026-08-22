@@ -116,7 +116,7 @@ export const resolvePremixQcStatusFromFormDetails = (
   return null;
 };
 
-/** Once past initiation, show saved QC form data from /qc-division/details. */
+/** Once past initiation, show saved QC form data from /qc-division/details (all divisions). */
 export const shouldUseQcFormDetailsData = (status: unknown): boolean =>
   !isQcStatusAwaitingInitiation(status);
 

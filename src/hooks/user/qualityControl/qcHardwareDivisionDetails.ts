@@ -82,7 +82,11 @@ const findHardwareMotorRecord = (
   for (const motor of asArray(data.motors)) {
     const rec = asRecord(motor);
     if (!rec) continue;
-    if (String(rec.motorId ?? rec.id ?? "").trim() !== normalizedMotorId) continue;
+    const details = asRecord(rec.details);
+    const recordMotorId = String(
+      rec.motorId ?? rec.id ?? details?.motorId ?? "",
+    ).trim();
+    if (recordMotorId !== normalizedMotorId) continue;
     return rec;
   }
 
@@ -102,6 +106,33 @@ export const extractHardwareMotorMetaFromDivisionDetails = (
   };
 };
 
+const mapLegacyHardwareMotorSections = (sections: unknown[]): ManufacturingSection[] =>
+  sections
+    .map((section) => asRecord(section))
+    .filter(Boolean)
+    .map((section) => ({
+      sectionId: String(section!.sectionId ?? "").trim(),
+      sectionData: asArray(section!.sectionData),
+    }))
+    .filter((section) => section.sectionId);
+
+const mapNestedHardwareMotorSections = (
+  details: Record<string, unknown>,
+): ManufacturingSection[] => {
+  const sections: ManufacturingSection[] = [];
+
+  for (const sectionId of Object.values(QC_HARDWARE_MANUFACTURING_SECTION_IDS)) {
+    const block = asRecord(details[sectionId]);
+    if (!block) continue;
+    sections.push({
+      sectionId,
+      sectionData: [block],
+    });
+  }
+
+  return sections;
+};
+
 export const extractHardwareMotorSectionsFromDivisionDetails = (
   payload: unknown,
   motorId: string,
@@ -110,15 +141,13 @@ export const extractHardwareMotorSectionsFromDivisionDetails = (
   if (!rec) return [];
 
   const details = asRecord(rec.details);
-  const sections = asArray(details?.sections ?? rec.sections);
-  return sections
-    .map((section) => asRecord(section))
-    .filter(Boolean)
-    .map((section) => ({
-      sectionId: String(section!.sectionId ?? "").trim(),
-      sectionData: asArray(section!.sectionData),
-    }))
-    .filter((section) => section.sectionId);
+  const legacySections = asArray(details?.sections ?? rec.sections);
+  if (legacySections.length) {
+    return mapLegacyHardwareMotorSections(legacySections);
+  }
+
+  if (!details) return [];
+  return mapNestedHardwareMotorSections(details);
 };
 
 const firstSectionRecord = (
@@ -308,20 +337,31 @@ const mapPreheatingValues = (
   if (!section && !hasMotorMeta) return base;
 
   const monitoring = asArray(section?.preHeatingMonitoring);
+  const monitoringDate = findLogEntry(monitoring, "Date");
   const ovenStart = findLogEntry(monitoring, "Oven Start Time");
   const cycleStart = findLogEntry(monitoring, "Cycle Start Time");
   const cycleEnd = findLogEntry(monitoring, "Cycle End Time");
   const visual = findLogEntry(monitoring, /Visual Observation/i);
 
-  const firstTemp = asRecord(asArray(section?.temperatureDuration)[0]);
+  const temperatureRows = asArray(section?.temperatureDuration);
+  const lastTemp = asRecord(temperatureRows[temperatureRows.length - 1]);
+  const firstTemp = asRecord(temperatureRows[0]);
+  const peakTemp = temperatureRows.reduce((max, row) => {
+    const value = Number(asRecord(row)?.value);
+    return Number.isFinite(value) ? Math.max(max, value) : max;
+  }, Number.NaN);
+  const temperature = String(
+    lastTemp?.value ?? firstTemp?.value ?? (Number.isFinite(peakTemp) ? peakTemp : ""),
+  ).trim();
+
   const row: QcHardwarePreheatingRow = {
     SR_NO: 1,
-    DATE: "",
+    DATE: formatToUiDate(monitoringDate.value),
     START_TIME: cycleStart.value || ovenStart.value,
     END_TIME: cycleEnd.value,
     OVEN_NUMBER: motorMeta.ovenNo,
     BUILDING_NO: motorMeta.buildingNo,
-    TEMPERATURE: String(firstTemp?.value ?? "").trim(),
+    TEMPERATURE: temperature,
     VACUUM_LEVEL: String(section?.vacuumApplied ?? "").trim(),
     OBSERVATIONS: joinObservations(visual.value, visual.remarks, cycleStart.remarks, cycleEnd.remarks),
   };
@@ -341,6 +381,7 @@ const mapLinearCoatingValues = (
   if (!section) return base;
 
   const log = asArray(section.linerApplicationLog);
+  const logDate = findLogEntry(log, "Date");
   const start = findLogEntry(log, "Start Time");
   const end = findLogEntry(log, "End Time");
   const insulation = findLogEntry(log, /Insulation Temp/i);
@@ -348,7 +389,7 @@ const mapLinearCoatingValues = (
 
   const row: QcHardwareLinearCoatingRow = {
     SR_NO: 1,
-    DATE: "",
+    DATE: formatToUiDate(logDate.value),
     START_TIME: start.value,
     END_TIME: end.value,
     LINER_QTY: linerQty.value,
@@ -376,6 +417,7 @@ const mapDispatchValues = (
 
   const he = findLogEntry(details, /Puncturing at HE/i);
   const ne = findLogEntry(details, /Puncturing at NE/i);
+  const lf = findLogEntry(details, /LF Extension/i);
   const dispatchTime = findLogEntry(details, /Dispatch Time/i);
 
   const visualObservations = visualRows
@@ -391,6 +433,15 @@ const mapDispatchValues = (
     .filter(Boolean)
     .join("\n");
 
+  const dispatchObservations = joinObservations(
+    visualObservations,
+    lf.value ? `Puncturing at LF Extension (Nos): ${lf.value}` : "",
+    lf.remarks,
+    he.remarks,
+    ne.remarks,
+    dispatchTime.remarks,
+  );
+
   const sectionId = QC_HARDWARE_SECTION_IDS.DISPATCH;
   const { dateTime } = splitDateTimeValue(dispatchTime.value);
 
@@ -399,7 +450,7 @@ const mapDispatchValues = (
     [formKey(sectionId, "HE_PUNCTURES")]: he.value,
     [formKey(sectionId, "NE_PUNCTURES")]: ne.value,
     [formKey(sectionId, "DISPATCH_DATE_TIME")]: dateTime,
-    [formKey(sectionId, "OBSERVATIONS")]: visualObservations,
+    [formKey(sectionId, "OBSERVATIONS")]: dispatchObservations,
   };
 };
 

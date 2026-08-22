@@ -1577,7 +1577,7 @@ export const STRINGS = {
       TITLE: "Post-Cure Operations",
       FORM_OPENING_TITLE: "Opening Post-Cure Form",
       FORM_OPENING_MESSAGE:
-        "Loading batch details, schema, and motor form data. This will only take a moment…",
+        "Loading batch details and motor form data. This will only take a moment…",
       COL_OPERATION_TYPE: "Operation Type",
       COL_PC_STATUS: "PC Status",
       TABLE_LABEL: "Post-cure operation batch list",
@@ -1620,7 +1620,8 @@ export const STRINGS = {
       BATCH_MOTOR_COUNT_LABEL: "No. of Motors",
       SCHEMA_LOADING: "Loading form...",
       SCHEMA_FETCH_ERROR: "Schema failed to load. Please try again.",
-      SCHEMA_NOT_LOADED: "Load the form schema before saving or submitting.",
+      SCHEMA_NOT_LOADED: "Load the form before saving or submitting.",
+      FORM_NOT_LOADED: "Load the form before saving or submitting.",
       OPERATION_MISSING: "Select an operation before loading the form.",
       SECTION_TITLE: "Post-Cure Operations",
       SECTION_SUBTITLE: "Record motor receipt and operation selection for each motor",
@@ -2060,7 +2061,7 @@ export const STRINGS = {
       MIXING_FINAL_MIX_SHARED_DETAILS_HINT:
         "These details are common for all final mixes in this batch. Fill once when adding the first final mix.",
       MIXING_FINAL_MIX_VISCOSITY_ENTRY_HINT:
-        "Record viscosity build-up for this final mix. Use the tabs below to switch between final mixes.",
+        "Record viscosity build-up readings for this final mix.",
       HARDWARE_MOTOR_ID_LABEL: "Motor ID",
       HARDWARE_MOTOR_ID_PLACEHOLDER: "Select motor ID",
       HARDWARE_PROCESS_LABEL: "Process",
@@ -2195,6 +2196,7 @@ export const STRINGS = {
       MOTOR_SUBMIT_CONFIRM_MESSAGE: (motorId: string) =>
         `Submit motor ${motorId} for approval? It will be locked until the approver acts.`,
       SUBMIT_DIVISION: "Submit Division for Approval",
+      VIEW_DETAILS: "View Details",
       VIEW_STATUS: "View Status",
       SUBMIT_FOR_FINAL_APPROVAL: "Submit Batch for Final Approval",
       UNIT_DRAFT_CONFIRM_TITLE: "Save Unit Draft?",
@@ -2376,6 +2378,7 @@ export const STRINGS = {
       SUBTITLE: "Record static testing process parameters and evaluation details",
       SCHEMA_FETCH_ERROR: "Unable to load static testing schema. Please try again.",
       SCHEMA_NOT_LOADED: "Select a motor type and load the form before saving.",
+      FORM_NOT_LOADED: "Add motors and fill the form before saving.",
       EDIT_MODE_BANNER:
         "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
       DETAILS_FETCH_ERROR: "Unable to load existing STF details. Please try again.",

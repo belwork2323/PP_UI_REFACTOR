@@ -171,11 +171,16 @@ export const createDefaultHardwareValues = (): SchemaFormValues => {
   return defaults;
 };
 
-export const mergeHardwareFormValues = (values: SchemaFormValues): SchemaFormValues =>
-  syncHardwareArticleTable({
+export const mergeHardwareFormValues = (values: SchemaFormValues): SchemaFormValues => {
+  const merged = {
     ...createDefaultHardwareValues(),
     ...values,
-  });
+  };
+  if (merged.IS_PROCESS_FORM_LOADED) {
+    return merged;
+  }
+  return syncHardwareArticleTable(merged);
+};
 
 export const schemaHasHardwareSection = (
   schema: { data?: { sections?: { id: string }[] } } | null,

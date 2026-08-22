@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   Box,
   MenuItem,
@@ -163,7 +163,11 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
   onRequestSaveDraft,
   onRequestSubmit,
 }) => {
-  const mixingCycles = normalizeSubscaleMixingCycles(values[SUBSCALE_BATCH_FIELDS.MIXING_CYCLES]);
+  const mixingCyclesRaw = values[SUBSCALE_BATCH_FIELDS.MIXING_CYCLES];
+  const mixingCycles = useMemo(
+    () => normalizeSubscaleMixingCycles(mixingCyclesRaw),
+    [mixingCyclesRaw],
+  );
   const isExperimental = isExperimentalSubscaleBatch(batchDetails);
   const batchType = batchDetails?.batchType ?? batchDetails?.batch_type ?? null;
 
@@ -176,16 +180,23 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
     Record<string, boolean>
   >({});
 
-  const patchValues = (patch: SchemaFormValues) => {
-    onChange(mergeSubscaleBatchFormValues({ ...values, ...patch }));
-  };
+  const valuesRef = useRef(values);
+  valuesRef.current = values;
+
+  const patchValues = useCallback((patch: SchemaFormValues) => {
+    const next = { ...valuesRef.current, ...patch };
+    if (next.IS_PROCESS_FORM_LOADED) {
+      onChange(next);
+      return;
+    }
+    onChange(mergeSubscaleBatchFormValues(next));
+  }, [onChange]);
 
   const updateMixingCycles = useCallback(
     (cycles: SubscaleMixingCycleEntry[]) => {
       patchValues({ [SUBSCALE_BATCH_FIELDS.MIXING_CYCLES]: cycles });
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- patchValues closes over latest values
-    [values, onChange],
+    [patchValues],
   );
 
   // Sync batchDetails defaults into values on initial load if not present
@@ -318,7 +329,7 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
       if (!code) return;
 
       const currentCycles = normalizeSubscaleMixingCycles(
-        values[SUBSCALE_BATCH_FIELDS.MIXING_CYCLES],
+        valuesRef.current[SUBSCALE_BATCH_FIELDS.MIXING_CYCLES],
       );
       const currentCycle = currentCycles[cycleIndex];
       if (hasMixingCycleParticulars(currentCycle)) return;
@@ -359,7 +370,7 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
         console.error("Failed to fetch mixing cycle details:", error);
       }
     },
-    [updateMixingCycles, values],
+    [updateMixingCycles],
   );
 
   // Qualification: load particulars from batch mixing cycle only when form has none yet

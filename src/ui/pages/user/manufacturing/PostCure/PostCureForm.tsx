@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Box, Button, Chip, CircularProgress, Stack, Typography } from "@mui/material";
+import { Alert, Box, Button, Chip, Stack, Typography } from "@mui/material";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import { POST_CURE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/postCure_theme";
@@ -28,7 +28,7 @@ import {
   type UserWorkflowNavTab,
 } from "../../../../components/custom/UserWorkflowStepPager";
 import PostCureFlowBar from "./PostCureFlowBar";
-import PostCureSchemaPanel from "./PostCureSchemaPanel";
+import PostCureMotorPanel from "./PostCureMotorPanel";
 
 const S = STRINGS.MANUFACTURING.POST_CURE;
 const { handyman: HandymanRoundedIcon } = icons.user.manufacturing.postCure.form;
@@ -47,8 +47,6 @@ type PostCureFormProps = {
   draftOperation: string;
   draftInhibitorType: string;
   subDepartmentId?: number;
-  schemaLoading?: boolean;
-  schemaError?: string | null;
   canLoadForm?: boolean;
   onActiveMotorChange: (motorId: string) => void;
   onDraftMotorReceiptDateChange: (value: string) => void;
@@ -76,8 +74,6 @@ const PostCureForm = ({
   draftOperation,
   draftInhibitorType,
   subDepartmentId,
-  schemaLoading = false,
-  schemaError = null,
   canLoadForm = false,
   onActiveMotorChange,
   onDraftMotorReceiptDateChange,
@@ -148,7 +144,7 @@ const PostCureForm = ({
   const activeMotorLocked = resolvedActiveMotorId
     ? !activeMotorPriorEnabled || !(isMotorEditable?.(resolvedActiveMotorId) ?? true)
     : false;
-  const activeMotorLoaded = Boolean(activeMotorSession?.postCureSchema);
+  const activeMotorLoaded = Boolean(activeMotorSession?.formLoaded);
 
   const finalApprovalRows = useMemo(
     () =>
@@ -304,7 +300,6 @@ const PostCureForm = ({
             draftOperation={draftOperation}
             draftInhibitorType={draftInhibitorType}
             canLoadForm={canLoadForm}
-            schemaLoading={schemaLoading}
             onDraftMotorReceiptDateChange={onDraftMotorReceiptDateChange}
             onDraftOperationChange={onDraftOperationChange}
             onDraftInhibitorTypeChange={onDraftInhibitorTypeChange}
@@ -312,26 +307,6 @@ const PostCureForm = ({
             theme={theme}
           />
         </Box>
-      ) : null}
-
-      {schemaLoading && !activeMotorLoaded ? (
-        <Stack
-          direction="row"
-          alignItems="center"
-          gap={1.25}
-          sx={{ py: 3, justifyContent: "center" }}
-        >
-          <CircularProgress size={22} />
-          <Typography sx={{ fontSize: "0.82rem", color: BRAND.textSub }}>
-            {S.SCHEMA_LOADING}
-          </Typography>
-        </Stack>
-      ) : null}
-
-      {schemaError ? (
-        <Typography sx={{ fontSize: "0.82rem", color: BRAND.danger, mb: 2 }}>
-          {schemaError}
-        </Typography>
       ) : null}
 
       {activeMotorLoaded && activeMotorEntry && activeMotorSession ? (
@@ -414,22 +389,19 @@ const PostCureForm = ({
             )}
           </Typography>
 
-          <PostCureSchemaPanel
-            schema={activeMotorSession.postCureSchema}
-            formValues={activeMotorSession.schemaFormValues}
-            savedSections={activeMotorSession.savedSections}
+          <PostCureMotorPanel
+            value={activeMotorSession.postCureData}
+            onChange={(postCureData) =>
+              onMotorSessionChange(activeMotorEntry.motorId, {
+                ...activeMotorSession,
+                postCureData,
+              })
+            }
+            disabled={activeMotorLocked}
+            theme={theme}
             subDepartmentId={subDepartmentId}
             batchId={batch?.batchId}
             motorId={activeMotorEntry.motorId}
-            readOnly={activeMotorLocked}
-            onChange={(values) =>
-              onMotorSessionChange(activeMotorEntry.motorId, {
-                ...activeMotorSession,
-                schemaFormValues: values,
-              })
-            }
-            loading={schemaLoading}
-            error={schemaError}
           />
         </Box>
       ) : null}

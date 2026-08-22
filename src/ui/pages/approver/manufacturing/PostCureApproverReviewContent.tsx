@@ -19,7 +19,7 @@ import PremixStatusChip, {
   PremixCountsSummary,
 } from "../../user/manufacturing/RawMaterial/components/PremixStatusChip";
 import type { PremixSubmissionStatus } from "../../../../data/models/user/RawMaterialPreparationModel";
-import { MotorDetailPanel } from "../../user/manufacturing/PostCure/components/PostCureDetailsContent";
+import PostCureMotorPanel from "../../user/manufacturing/PostCure/PostCureMotorPanel";
 import {
   UserWorkflowNavPanel,
   UserWorkflowTabNav,
@@ -267,7 +267,14 @@ const PostCureApproverReviewContent = ({
             </Stack>
           ) : null}
 
-          <MotorDetailPanel motor={activeMotor} dt={dt} palette={palette} />
+          <PostCureMotorPanel
+            value={activeMotor.postCureData}
+            onChange={() => undefined}
+            readOnly
+            theme={manufacturingTheme}
+            batchId={detailView?.batchId}
+            motorId={activeMotor.motorId}
+          />
         </Box>
       ) : (
         <Typography sx={dt.emptyText}>{PC.MOTOR_APPROVER_NO_ACTIONABLE}</Typography>

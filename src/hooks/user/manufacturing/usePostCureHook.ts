@@ -8,7 +8,6 @@ import {
   areAllPostCureMotorsApproved,
   createDefaultPostCureFormState,
   createEmptyPostCureMotorSession,
-  hydratePostCureMotorSession,
   isPostCureMotorEditable,
   mapPostCureDetailsToFormState,
   mapPostCureFormStateToPayload,
@@ -21,7 +20,6 @@ import {
   type PostCureMotorSubmissionStatus,
   type PostCureMotorSubmissionType,
 } from "../../../data/models/user/PostCureFormModel";
-import { fetchPostCureSchema as fetchPostCureSchemaFromEngine } from "../../../schema-engine";
 import { batchManagementController } from "../../../controllers/admin/BatchManagement/batchManagementController";
 import {
   isPostCureInhibitionOperation,
@@ -59,11 +57,6 @@ type PostCureBatch = {
   [key: string]: any;
 };
 
-type PostCureSchemaSetup = {
-  operation: string;
-  inhibitorType: string;
-};
-
 const PC_STATUS = MANUFACTURING_STATUS;
 const parseStatus = (status: string | undefined) => String(status ?? "").toLowerCase();
 
@@ -94,8 +87,6 @@ export const usePostCureHook = () => {
   const [activeBatch, setActiveBatch] = useState<PostCureBatch | null>(null);
   const [isEditMode, setIsEditMode] = useState(false);
   const [loadingFormDetails, setLoadingFormDetails] = useState(false);
-  const [schemaLoading, setSchemaLoading] = useState(false);
-  const [schemaError, setSchemaError] = useState<string | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
@@ -139,8 +130,6 @@ export const usePostCureHook = () => {
     setDetailsLoading(false);
     setIsEditMode(false);
     setLoadingFormDetails(false);
-    setSchemaLoading(false);
-    setSchemaError(null);
     setActionLoading(false);
     setBackConfirmOpen(false);
     setHasSavedDraft(false);
@@ -157,63 +146,6 @@ export const usePostCureHook = () => {
     if (response?.message) return response.message;
     return fallbackMessage;
   };
-
-  const fetchPostCureSchema = useCallback(
-    async (setup: PostCureSchemaSetup) => {
-      if (!subDepartmentId) {
-        showAlert(STRINGS.MANUFACTURING.POST_CURE.SUB_DEPARTMENT_MISSING, "error");
-        return null;
-      }
-
-      const operationType = mapPostCureOperationToApi(setup.operation);
-      if (!operationType) {
-        showAlert(STRINGS.MANUFACTURING.POST_CURE.OPERATION_MISSING, "warning");
-        return null;
-      }
-
-      const inhibitorType = mapPostCureInhibitorTypeToApi(setup.inhibitorType);
-      setSchemaLoading(true);
-      setSchemaError(null);
-      try {
-        const response = await fetchPostCureSchemaFromEngine({
-          subDepartmentId,
-          operationType,
-          ...(operationType === "INHIBITION" && inhibitorType ? { inhibitorType } : {}),
-        });
-        if (!response?.success || !response?.data) {
-          const message = getErrorMessage(
-            response,
-            STRINGS.MANUFACTURING.POST_CURE.SCHEMA_FETCH_ERROR,
-          );
-          setSchemaError(message);
-          showAlert(message, "error");
-          return null;
-        }
-        return response.data;
-      } finally {
-        setSchemaLoading(false);
-      }
-    },
-    [showAlert, subDepartmentId],
-  );
-
-  const hydrateMotorsWithSchemas = useCallback(
-    async (motors: PostCureMotorSession[]) => {
-      const hydrated: PostCureMotorSession[] = [];
-
-      for (const motor of motors) {
-        const schema = await fetchPostCureSchema({
-          operation: motor.operation,
-          inhibitorType: resolveInhibitorType(motor.operation, motor.inhibitorType),
-        });
-        if (!schema) return null;
-        hydrated.push(hydratePostCureMotorSession(motor, schema));
-      }
-
-      return hydrated;
-    },
-    [fetchPostCureSchema],
-  );
 
   const openFormWithResolvedData = useCallback(
     async (batch: PostCureBatch, editMode: boolean) => {
@@ -271,16 +203,6 @@ export const usePostCureHook = () => {
 
           nextBatch = { ...nextBatch, formId: detailsResponse.data.formId || batch.formId };
           nextFormData = mapPostCureDetailsToFormState(detailsResponse.data);
-
-          if (nextFormData.motors.some((motor) => motor.savedSections?.length)) {
-            const hydratedMotors = await hydrateMotorsWithSchemas(nextFormData.motors);
-            if (!hydratedMotors) return;
-            nextFormData = {
-              ...nextFormData,
-              schemaFormLoaded: true,
-              motors: hydratedMotors,
-            };
-          }
         }
 
         const nextAddedMotors = mergePostCureMotorsFromBatchAndForm(
@@ -328,7 +250,7 @@ export const usePostCureHook = () => {
         setLoadingFormDetails(false);
       }
     },
-    [showAlert, subDepartmentId, hydrateMotorsWithSchemas, clearSetupDrafts, user?.allSubDepartments],
+    [showAlert, subDepartmentId, clearSetupDrafts, user?.allSubDepartments],
   );
   const handleViewPostCureDetails = useCallback(async (row: any) => {
     if (!row?.formId) return;
@@ -422,7 +344,7 @@ export const usePostCureHook = () => {
         return {
           ...prev,
           motors: remainingMotors,
-          schemaFormLoaded: remainingMotors.some((motor) => Boolean(motor.postCureSchema)),
+          formLoaded: remainingMotors.some((motor) => motor.formLoaded),
         };
       });
 
@@ -441,22 +363,22 @@ export const usePostCureHook = () => {
       setActiveMotorId(motorId);
       const entry = addedMotors.find((motor) => motor.motorId === motorId);
       const session = (formData.motors ?? []).find((motor) => motor.motorId === motorId);
-      if (session?.postCureSchema) {
+      if (session?.formLoaded) {
         clearSetupDrafts();
         return;
       }
       setDraftMotorReceiptDate(entry?.motorReceiptDate || "");
-      setDraftOperation("");
-      setDraftInhibitorType("");
+      setDraftOperation(session?.operation || "");
+      setDraftInhibitorType(session?.inhibitorType || "");
     },
     [addedMotors, clearSetupDrafts, formData.motors],
   );
 
-  const handleLoadForm = useCallback(async () => {
+  const handleLoadForm = useCallback(() => {
     const motorId = String(activeMotorId ?? "").trim();
     const inhibitorType = resolveInhibitorType(draftOperation, draftInhibitorType);
     const alreadyLoaded = Boolean(
-      (formData.motors ?? []).find((motor) => motor.motorId === motorId)?.postCureSchema,
+      (formData.motors ?? []).find((motor) => motor.motorId === motorId)?.formLoaded,
     );
 
     if (
@@ -471,21 +393,21 @@ export const usePostCureHook = () => {
       return;
     }
 
-    const schema = await fetchPostCureSchema({ operation: draftOperation, inhibitorType });
-    if (!schema) return;
-
     const motorSession = createEmptyPostCureMotorSession(
       motorId,
       draftMotorReceiptDate.trim(),
       draftOperation,
       inhibitorType,
-      schema,
     );
+    if (!motorSession) {
+      showAlert(STRINGS.MANUFACTURING.POST_CURE.OPERATION_MISSING, "warning");
+      return;
+    }
 
     setFormData((prev) => {
       const others = (prev.motors ?? []).filter((motor) => motor.motorId !== motorId);
       return {
-        schemaFormLoaded: true,
+        formLoaded: true,
         motors: [...others, motorSession],
       };
     });
@@ -497,15 +419,14 @@ export const usePostCureHook = () => {
       ),
     );
     clearSetupDrafts();
-    setSchemaError(null);
   }, [
     activeMotorId,
     draftMotorReceiptDate,
     draftOperation,
     draftInhibitorType,
     formData.motors,
-    fetchPostCureSchema,
     clearSetupDrafts,
+    showAlert,
   ]);
   const resolveRootOperationFields = useCallback((motors: PostCureMotorSession[]) => {
     const firstMotor = motors[0];
@@ -538,8 +459,8 @@ export const usePostCureHook = () => {
       }
 
       const targetMotor = (formData.motors ?? []).find((motor) => motor.motorId === motorId);
-      if (!targetMotor?.postCureSchema) {
-        showAlert(STRINGS.MANUFACTURING.POST_CURE.SCHEMA_NOT_LOADED, "warning");
+      if (!targetMotor?.formLoaded) {
+        showAlert(STRINGS.MANUFACTURING.POST_CURE.FORM_NOT_LOADED, "warning");
         return false;
       }
 
@@ -745,6 +666,11 @@ export const usePostCureHook = () => {
         mapPostCureInhibitorTypeToApi(String(rawMotors[0]?.inhibitorType ?? "")) ||
         undefined;
 
+      const formState = mapPostCureDetailsToFormState(detailsRes.data);
+      const payloadBody = mapPostCureFormStateToPayload(formState, {
+        motorSubmissionType: "SUBMIT",
+      });
+
       const response = await postCureController.updateForm({
         formId: activeBatch.formId,
         batchId: activeBatch.batchId,
@@ -752,28 +678,7 @@ export const usePostCureHook = () => {
         formSubmissionType: "SUBMIT",
         operationType: rootOperationType as "LOOSE_FLAP_FILLING" | "INHIBITION",
         ...(rootInhibitorType ? { inhibitorType: rootInhibitorType } : {}),
-        motors: rawMotors.map((m: any) => ({
-          motorId: String(m.motorId ?? ""),
-          motorReceiptDate: String(m.motorReceiptDate ?? m.details?.motorReceiptDate ?? ""),
-          motorSubmissionType: "SUBMIT" as const,
-          operationType:
-            (String(m.operationType ?? "").trim() as "LOOSE_FLAP_FILLING" | "INHIBITION") ||
-            mapPostCureOperationToApi(String(m.operation ?? "")) ||
-            null,
-          sections: Array.isArray(m.sections)
-            ? m.sections
-            : Array.isArray(m.details?.sections)
-              ? m.details.sections
-              : [],
-          ...(m.inhibitorType || m.details?.inhibitorType
-            ? {
-                inhibitorType:
-                  mapPostCureInhibitorTypeToApi(
-                    String(m.inhibitorType ?? m.details?.inhibitorType ?? ""),
-                  ) || undefined,
-              }
-            : {}),
-        })),
+        motors: payloadBody.motors,
       });
 
       if (!response?.success) {
@@ -794,9 +699,7 @@ export const usePostCureHook = () => {
   const draftInhibitor = resolveInhibitorType(draftOperation, draftInhibitorType);
   const activeMotorAlreadyLoaded = useMemo(
     () =>
-      Boolean(
-        (formData.motors ?? []).find((motor) => motor.motorId === activeMotorId)?.postCureSchema,
-      ),
+      Boolean((formData.motors ?? []).find((motor) => motor.motorId === activeMotorId)?.formLoaded),
     [activeMotorId, formData.motors],
   );
 
@@ -833,8 +736,6 @@ export const usePostCureHook = () => {
     draftInhibitorType,
     isFormDirty,
     actionLoading,
-    schemaLoading,
-    schemaError,
     canLoadForm,
     usedMotorIds,
     subDepartmentId,

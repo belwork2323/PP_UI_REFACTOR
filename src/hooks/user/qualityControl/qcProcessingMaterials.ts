@@ -12,8 +12,10 @@ import { isSchemaDocumentReady } from "../../../schema-engine/utils/schemaMessag
 import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
 import {
   normalizeProcessSubmissionFromApi,
+  normalizeSectionsForApiPayload,
   serializeProcessSubmissionForApi,
 } from "../../../data/models/user/rawMaterialPreparationApiMapper";
+import { formatToIsoDateInput } from "../../../utils/dateUtils";
 import type { QcDivisionEntry } from "./qcDivisionEntryTypes";
 
 const createProcessingEntryId = () =>
@@ -238,34 +240,34 @@ export const parseProcessingMaterialsFromDivisionDetails = (
     if (!rec) return;
     const premixNo = pickNumber(rec.premixNo, rec.premix_no, rec.no);
     if (premixNo == null) return;
-    const details = asRecord(rec.details) ?? rec;
-    const premixDate = pickString(details.premixDate, details.premix_date, rec.premixDate) || undefined;
+    const details = asRecord(rec.details);
+    const premixDate =
+      pickString(rec.premixDate, rec.premix_date, details?.premixDate, details?.premix_date) ||
+      undefined;
     const materialType =
-      pickString(details.materialType, details.material_type, rec.materialType) || undefined;
+      pickString(rec.materialType, rec.material_type, details?.materialType, details?.material_type) ||
+      undefined;
+
+    const solidSource =
+      rec.solidProcess ??
+      rec.solid_process ??
+      details?.solidProcess ??
+      details?.solid_process ??
+      details?.solidProcessingDetails ??
+      details?.solid_processing_details ??
+      details?.solidProcessDetails;
+    const liquidSource =
+      rec.liquidProcess ??
+      rec.liquid_process ??
+      details?.liquidProcess ??
+      details?.liquid_process ??
+      details?.liquidProcessingDetails ??
+      details?.liquid_processing_details ??
+      details?.liquidProcessDetails;
 
     seeds.push(
-      ...parseProcessMaterials(
-        premixNo,
-        premixDate,
-        materialType,
-        "solid",
-        details.solidProcess ??
-          details.solid_process ??
-          details.solidProcessingDetails ??
-          details.solid_processing_details ??
-          details.solidProcessDetails,
-      ),
-      ...parseProcessMaterials(
-        premixNo,
-        premixDate,
-        materialType,
-        "liquid",
-        details.liquidProcess ??
-          details.liquid_process ??
-          details.liquidProcessingDetails ??
-          details.liquid_processing_details ??
-          details.liquidProcessDetails,
-      ),
+      ...parseProcessMaterials(premixNo, premixDate, materialType, "solid", solidSource),
+      ...parseProcessMaterials(premixNo, premixDate, materialType, "liquid", liquidSource),
     );
   });
 
@@ -370,20 +372,56 @@ export const buildQcProcessingMaterialSubmission = (
   sections: toSectionSubmissions(schema, values),
 });
 
+export type QcProcessingProcessApiPayload = {
+  materialId: number;
+  materialCode: string;
+  materialName: string;
+  gradeId?: number;
+  gradeCode?: string;
+  schemaVersion: string;
+  schemaType: string;
+  sections: Array<{ sectionId: string; sectionData: Record<string, unknown>[] }>;
+};
+
+export type QcProcessingPremixApiPayload = {
+  premixNo: number;
+  premixDate?: string;
+  materialType: "SOLID" | "LIQUID" | "BOTH";
+  premixSubmissionType?: "DRAFT" | "SUBMIT";
+  solidProcess: QcProcessingProcessApiPayload[];
+  liquidProcess: QcProcessingProcessApiPayload[];
+};
+
+const toApiProcessPayload = (process: SchemaProcessSubmission): QcProcessingProcessApiPayload => {
+  const payload: QcProcessingProcessApiPayload = {
+    materialId: Number(process.materialId ?? 0),
+    materialCode: String(process.materialCode ?? "").trim(),
+    materialName: String(process.materialName ?? process.materialCode ?? "").trim(),
+    schemaVersion: process.schemaVersion || RMP_SCHEMA_VERSION,
+    schemaType: process.schemaType || RMP_SCHEMA_TYPE,
+    sections: normalizeSectionsForApiPayload(process.sections ?? []),
+  };
+  if (process.gradeId != null) payload.gradeId = Number(process.gradeId);
+  const gradeCode = String(process.gradeCode ?? "").trim();
+  if (gradeCode) payload.gradeCode = gradeCode;
+  return payload;
+};
+
 /** Fallback when schema is not hydrated — keep material identity + any saved sections. */
 const buildProcessingProcessFromEntry = (
   entry: QcDivisionEntry,
   sections: SchemaSectionSubmission[],
-): SchemaProcessSubmission => ({
-  materialId: Number(entry.materialId ?? 0),
-  materialCode: String(entry.materialCode ?? "").trim(),
-  materialName: String(entry.materialName ?? entry.materialCode ?? "").trim(),
-  gradeId: entry.gradeId ?? null,
-  gradeCode: entry.gradeCode ?? null,
-  schemaVersion: RMP_SCHEMA_VERSION,
-  schemaType: RMP_SCHEMA_TYPE,
-  sections,
-});
+): QcProcessingProcessApiPayload =>
+  toApiProcessPayload({
+    materialId: Number(entry.materialId ?? 0),
+    materialCode: String(entry.materialCode ?? "").trim(),
+    materialName: String(entry.materialName ?? entry.materialCode ?? "").trim(),
+    gradeId: entry.gradeId ?? null,
+    gradeCode: entry.gradeCode ?? null,
+    schemaVersion: RMP_SCHEMA_VERSION,
+    schemaType: RMP_SCHEMA_TYPE,
+    sections,
+  });
 
 export const deriveProcessingMaterialType = (
   solidCount: number,
@@ -409,7 +447,7 @@ export const buildProcessingPremixesPayload = (
   },
   entries: QcDivisionEntry[],
   options?: { unitSubmissionType?: "DRAFT" | "SUBMIT" | null },
-) => {
+): QcProcessingPremixApiPayload[] => {
   const byPremix = new Map<number, QcDivisionEntry[]>();
   entries.forEach((entry) => {
     if (entry.kind !== "PROCESSING_MATERIAL" || entry.premixNo == null) return;
@@ -421,19 +459,21 @@ export const buildProcessingPremixesPayload = (
   return Array.from(byPremix.entries())
     .sort(([a], [b]) => a - b)
     .map(([premixNo, premixEntries]) => {
-      const solidProcess: SchemaProcessSubmission[] = [];
-      const liquidProcess: SchemaProcessSubmission[] = [];
+      const solidProcess: QcProcessingProcessApiPayload[] = [];
+      const liquidProcess: QcProcessingProcessApiPayload[] = [];
 
       premixEntries.forEach((entry) => {
         const schemaKey = entry.schemaCacheKey;
         const schema = schemaKey ? form.schemasByKey?.[schemaKey] : null;
         const values = form.divisionEntryValues?.[entry.entryId]?.schemaValues ?? {};
 
-        let process: SchemaProcessSubmission;
+        let process: QcProcessingProcessApiPayload;
         if (schema) {
-          process = serializeProcessSubmissionForApi(
-            buildQcProcessingMaterialSubmission(schema, values, entry),
-            schema,
+          process = toApiProcessPayload(
+            serializeProcessSubmissionForApi(
+              buildQcProcessingMaterialSubmission(schema, values, entry),
+              schema,
+            ),
           );
         } else {
           process = buildProcessingProcessFromEntry(entry, entry.savedSections ?? []);
@@ -446,7 +486,10 @@ export const buildProcessingPremixesPayload = (
         }
       });
 
-      const premixDate = String(premixEntries[0]?.premixDate ?? "").trim();
+      const premixDateRaw = String(premixEntries[0]?.premixDate ?? "").trim();
+      const premixDate = premixDateRaw
+        ? formatToIsoDateInput(premixDateRaw) || premixDateRaw
+        : "";
       return {
         premixNo,
         ...(premixDate ? { premixDate } : {}),

@@ -183,8 +183,6 @@ const DispatchPage = () => {
     getMotorStatus,
     isMotorEditable,
     previousStageGate,
-    schemaLoading,
-    schemaError,
     actionLoading,
     backConfirmOpen,
     subDepartmentId,
@@ -194,7 +192,7 @@ const DispatchPage = () => {
     updateSetupField,
     handleDraftMotorIdChange,
     handleLoadDispatchForm,
-    handleFormValuesChange,
+    handleMotorDataChange,
     handleSaveMotorDraft,
     handleSubmitMotor,
     detailsRow,
@@ -262,14 +260,12 @@ const DispatchPage = () => {
               actionLoading={actionLoading}
               subDepartmentId={subDepartmentId}
               isEditMode={isEditMode}
-              schemaLoading={schemaLoading}
-              schemaError={schemaError}
               flowBarTheme={flowBarTheme}
               availableMotors={availableMotors}
               onSetupChange={updateSetupField}
               onDraftMotorIdChange={handleDraftMotorIdChange}
               onLoadDispatchForm={handleLoadDispatchForm}
-              onFormValuesChange={handleFormValuesChange}
+              onMotorDataChange={handleMotorDataChange}
               onSaveMotorDraft={(motorId) => {
                 setPendingMotorId(motorId);
                 setMotorDraftConfirmOpen(true);

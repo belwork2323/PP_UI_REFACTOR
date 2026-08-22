@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo } from "react";
-import { Box, Button, Stack, Typography } from "@mui/material";
+import { Box, Stack, Typography } from "@mui/material";
 import { STRINGS } from "../../../../../app/config/strings";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { QcDivisionEntry, QualityControlFormState } from "../../../../../data/models/user/QualityControlFormModel";
@@ -23,7 +23,7 @@ import {
   resolveMixingDetailsSeed,
   type QcMixingQualityCheckDefinition,
 } from "../../../../../hooks/user/qualityControl/qcMixingTables";
-import QCMixingDetailsTable from "./QCMixingDetailsTable";
+import QCMixingFinalMixPanel from "./QCMixingFinalMixPanel";
 import type { SchemaFormValues } from "../../../../../schema-engine";
 import {
   UserWorkflowTabNav,
@@ -266,17 +266,13 @@ const QCDivisionFormBody = ({
     [activePartialItem, resolvedUnitActions],
   );
 
-  const showInlineFinalMixDetails = useMemo(
+  const showUnifiedFinalMixPanel = useMemo(
     () => hideEntryGroupNav && activeEntry?.kind === "MIXING_FINAL_MIX",
     [activeEntry?.kind, hideEntryGroupNav],
   );
 
-  const showFinalMixDetailsPanel =
-    activeContent?.type === "final-mix-details" || showInlineFinalMixDetails;
+  const finalMixActionLabels = resolveEntryUnitActions(activeEntry);
 
-  /** Final Mix: draft/submit sit above Final Mix Details; hide duplicate actions on viscosity panel. */
-  const finalMixTopUnitActions =
-    showFinalMixDetailsPanel && resolvedUnitActions?.show ? resolvedUnitActions : null;
   const firstHardwareEntryId = useMemo(
     () => visibleEntries.find((entry) => entry.kind === "HARDWARE_PROCESS")?.entryId ?? null,
     [visibleEntries],
@@ -306,9 +302,16 @@ const QCDivisionFormBody = ({
     },
     [hardwareUploadAnchorEntry, onDivisionEntryValuesChange],
   );
-  const finalMixActionLabels = resolveEntryUnitActions(activeEntry);
 
   const showEntryGroupNav = !hideEntryGroupNav && navGroups.length > 1;
+
+  const entriesToRender = useMemo(
+    () =>
+      showUnifiedFinalMixPanel
+        ? visibleEntries.filter((entry) => entry.kind !== "MIXING_FINAL_MIX")
+        : visibleEntries,
+    [showUnifiedFinalMixPanel, visibleEntries],
+  );
 
   const entryGroupTabs = useMemo<UserWorkflowNavTab[]>(
     () =>
@@ -381,58 +384,19 @@ const QCDivisionFormBody = ({
       ) : null}
 
       <Box sx={{ mt: showEntryGroupNav ? 0 : 1.25 }}>
-        {showFinalMixDetailsPanel ? (
-          <Box
-            sx={{
-              borderRadius: 2.5,
-              border: `1px solid ${BRAND.border}`,
-              background: BRAND.surface,
-              px: 1.5,
-              py: 1.25,
-              mb: showInlineFinalMixDetails ? 1.25 : 0,
-              ...(fieldsDisabled && !readOnly
-                ? { pointerEvents: "none", userSelect: "none", opacity: 0.92 }
-                : null),
-            }}
-          >
-            {finalMixTopUnitActions ? (
-              <Stack direction="row" justifyContent="flex-end" alignItems="center" mb={1} gap={1}>
-                <Button
-                  size="small"
-                  variant="outlined"
-                  disabled={
-                    fieldsDisabled ||
-                    readOnly ||
-                    !finalMixTopUnitActions.canAct ||
-                    finalMixTopUnitActions.actionLoading
-                  }
-                  onClick={finalMixTopUnitActions.onSaveDraft}
-                  sx={{ textTransform: "none", whiteSpace: "nowrap" }}
-                >
-                  {finalMixActionLabels?.saveDraftLabel ?? S.SAVE_UNIT_DRAFT}
-                </Button>
-                <Button
-                  size="small"
-                  variant="contained"
-                  disabled={
-                    fieldsDisabled ||
-                    readOnly ||
-                    !finalMixTopUnitActions.canAct ||
-                    finalMixTopUnitActions.actionLoading
-                  }
-                  onClick={finalMixTopUnitActions.onSubmit}
-                  sx={{ textTransform: "none", whiteSpace: "nowrap" }}
-                >
-                  {finalMixActionLabels?.submitLabel ?? S.SUBMIT_UNIT}
-                </Button>
-              </Stack>
-            ) : null}
-            <QCMixingDetailsTable
-              variant="finalMix"
-              values={finalMixDetailsValues}
-              onChange={handleFinalMixDetailsChange}
+        {showUnifiedFinalMixPanel && activeEntry ? (
+          <Box sx={{ mb: entriesToRender.length > 0 ? 1.25 : 0 }}>
+            <QCMixingFinalMixPanel
+              entry={activeEntry}
+              finalMixDetailsValues={finalMixDetailsValues}
+              entrySchemaValues={formData.divisionEntryValues?.[activeEntry.entryId]?.schemaValues}
+              onFinalMixDetailsChange={handleFinalMixDetailsChange}
+              onEntryValuesChange={onDivisionEntryValuesChange}
               readOnly={readOnly}
+              fieldsDisabled={fieldsDisabled}
               autoSeed={finalMixAutoSeed}
+              unitActions={finalMixActionLabels}
+              actionLabels={finalMixActionLabels ?? undefined}
             />
           </Box>
         ) : null}
@@ -466,7 +430,7 @@ const QCDivisionFormBody = ({
             />
           </Box>
         ) : (
-          visibleEntries.map((entry) => {
+          entriesToRender.map((entry) => {
             const entryValues = formData.divisionEntryValues?.[entry.entryId];
             if (!entryValues) return null;
 

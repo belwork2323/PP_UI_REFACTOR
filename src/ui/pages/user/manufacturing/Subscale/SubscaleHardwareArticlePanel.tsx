@@ -404,18 +404,14 @@ const SubscaleHardwareArticlePanel = ({
     if (tableId === "INHIBITION_TABLE") {
       const aRaw = targetRow.LINER_COATED_SLEEVE_WEIGHT;
       const bRaw = targetRow.WEIGHT_BEFORE_INHIBITION;
-      const cRaw = targetRow.WEIGHT_AFTER_INHIBITION;
       const hasInputs =
-        String(aRaw ?? "").trim() !== "" ||
-        String(bRaw ?? "").trim() !== "" ||
-        String(cRaw ?? "").trim() !== "";
+        String(aRaw ?? "").trim() !== "" || String(bRaw ?? "").trim() !== "";
       if (!hasInputs) {
         targetRow.PROPELLANT_WEIGHT = "";
       } else {
-        const c = parseFloat(cRaw || 0);
         const b = parseFloat(bRaw || 0);
         const a = parseFloat(aRaw || 0);
-        targetRow.PROPELLANT_WEIGHT = c - b - a;
+        targetRow.PROPELLANT_WEIGHT = b - a;
       }
     }
 

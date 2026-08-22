@@ -59,8 +59,6 @@ const STFPage = () => {
     maxMotorCount,
     approvedMotorsLoading,
     loadingFormDetails,
-    schemaLoading,
-    schemaError,
     actionLoading,
     backConfirmOpen,
     subDepartmentId,
@@ -190,8 +188,6 @@ const STFPage = () => {
             isStfTestNoLocked={isStfTestNoLocked}
             actionLoading={actionLoading}
             isEditMode={isEditMode}
-            schemaLoading={schemaLoading}
-            schemaError={schemaError}
             flowBarTheme={flowBarTheme}
             onMotorTypeChange={handleMotorTypeChange}
             onMotorCountChange={handleMotorCountChange}

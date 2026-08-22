@@ -8,8 +8,11 @@ import {
   type DispatchMotorSubmissionStatus,
   type DispatchMotorSubmissionType,
 } from "./DispatchFormModel";
-import type { SchemaSectionSubmission } from "../../../schema-engine";
 import { mapCastingCuringPersonLabel } from "./CastingCuringFormModel";
+import {
+  parseDispatchMotorDataFromApi,
+  type DispatchMotorData,
+} from "./DispatchMotorDataModel";
 import {
   formatCasePrepCellValue,
   formatCasePrepSectionLabel,
@@ -177,7 +180,7 @@ export class DispatchDetailsModel {
       finalAcceptanceMomNo: model.finalAcceptanceMomNo,
       motors: model.motors.map((motor) => ({
         motorId: motor.motorId,
-        schemaValues: motor.schemaValues,
+        dispatchDetails: motor.dispatchDetails,
         setup: motor.setup,
       })),
     });
@@ -190,6 +193,7 @@ export const mapDispatchPayload = (form: DispatchFormState) =>
 export type DispatchMotorDetailView = {
   motorId: string;
   setup: DispatchMotorSetup;
+  dispatchData: DispatchMotorData;
   setupFields: CasePrepDetailSection["fields"];
   sections: CasePrepDetailSection[];
   motorSubmissionType?: DispatchMotorSubmissionType;
@@ -489,6 +493,7 @@ export const mapDispatchDetailsForDisplay = (
     return {
       motorId: motor.motorId,
       setup,
+      dispatchData: parseDispatchMotorDataFromApi(motorDetails),
       setupFields,
       sections,
       motorSubmissionType: statusMeta?.motorSubmissionType,

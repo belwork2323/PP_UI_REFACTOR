@@ -11,16 +11,25 @@ import {
   buildCastingSectionsPayload,
   castingMotorDataHasUserInput,
   createEmptyCastingMotorData,
-  parseCastingMotorDataFromSections,
+  parseCastingMotorDataFromApi,
   type CastingMotorData,
+  type CastingSectionsPayload,
 } from "./CastingMotorDataModel";
 import {
   buildCuringSectionsPayload,
   createEmptyCuringMotorData,
   curingMotorDataHasUserInput,
-  parseCuringMotorDataFromSections,
+  parseCuringMotorDataFromApi,
   type CuringMotorData,
+  type CuringSectionsPayload,
 } from "./CuringMotorDataModel";
+import {
+  asRecord,
+  emptyToNull,
+  emptyToNullNumber,
+  toApiDateTime,
+  toUiDateTime,
+} from "./castingCuringFieldCodec";
 
 /** Local section payload shape for CastingCuringFormBody (no schema-engine dependency). */
 export type SchemaSectionSubmission = {
@@ -268,12 +277,12 @@ export type CastingCuringFormBody = {
       oven: string;
       ovenNo: string;
       curingType: string;
-      configuration: string;
-      motorsToCureCount: number | "";
-      ovensUtilized: string;
+      configuration: string | null;
+      motorsToCureCount: number | null;
+      ovensUtilized: string | null;
     };
-    castingSections: SchemaSectionSubmission[];
-    curingSections: SchemaSectionSubmission[];
+    castingSections: CastingSectionsPayload;
+    curingSections: CuringSectionsPayload;
   }>;
 };
 
@@ -327,18 +336,17 @@ export const createEmptyMotorSession = (
   castingSavedForCuring: false,
 });
 
-const resolveMotorCastingSections = (motor: any, src: any): SchemaSectionSubmission[] | undefined => {
-  if (Array.isArray(motor?.castingSections)) return motor.castingSections;
-  if (Array.isArray(src?.castingSections)) return src.castingSections;
-  if (Array.isArray(motor?.sections)) return motor.sections;
-  if (Array.isArray(src?.sections)) return src.sections;
-  return undefined;
-};
+const resolveMotorCastingSections = (motor: any, src: any): unknown =>
+  motor?.castingSections ?? src?.castingSections ?? motor?.sections ?? src?.sections ?? undefined;
 
-const resolveMotorCuringSections = (motor: any, src: any): SchemaSectionSubmission[] | undefined => {
-  if (Array.isArray(motor?.curingSections)) return motor.curingSections;
-  if (Array.isArray(src?.curingSections)) return src.curingSections;
-  return undefined;
+const resolveMotorCuringSections = (motor: any, src: any): unknown =>
+  motor?.curingSections ?? src?.curingSections ?? undefined;
+
+const hasSectionPayload = (value: unknown): boolean => {
+  if (value == null) return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value as object).length > 0;
+  return false;
 };
 
 export const mapCastingCuringDetailsToFormState = (details: any): CastingCuringFormState => {
@@ -370,19 +378,20 @@ export const mapCastingCuringDetailsToFormState = (details: any): CastingCuringF
 
     return {
       motorId,
-      motorReceivedAt: String(src?.motorReceivedAt ?? motor?.motorReceivedAt ?? "").trim(),
+      motorReceivedAt: toUiDateTime(src?.motorReceivedAt ?? motor?.motorReceivedAt) ||
+        String(src?.motorReceivedAt ?? motor?.motorReceivedAt ?? "").trim(),
       castingType: String(motorSetup?.castingType ?? "").trim(),
       castingStation: String(motorSetup?.castingStation ?? "").trim(),
       castingSetup: createDefaultCastingProcessSetup(),
-      castingData: parseCastingMotorDataFromSections(castingSections),
-      curingData: parseCuringMotorDataFromSections(curingSections),
+      castingData: parseCastingMotorDataFromApi(castingSections),
+      curingData: parseCuringMotorDataFromApi(curingSections),
       curingSetup,
       curingFormLoaded: Boolean(
         String(curingSetup.oven ?? "").trim() && String(curingSetup.ovenNo ?? "").trim(),
       ),
       castingSavedForCuring: Boolean(
         motor?.castingSavedForCuring ||
-          (castingSections?.length ?? 0) > 0 ||
+          hasSectionPayload(castingSections) ||
           (String(curingSetup.oven ?? "").trim() && String(curingSetup.ovenNo ?? "").trim()),
       ),
       curingProjectStageMatrix: motor?.curingProjectStageMatrix ?? undefined,
@@ -445,7 +454,7 @@ export const mapCastingCuringFormStateToPayload = (
         const meta = resolveCastingMotorProcessMeta(motor, form);
         return {
           motorId: motor.motorId,
-          motorReceivedAt: motor.motorReceivedAt,
+          motorReceivedAt: toApiDateTime(motor.motorReceivedAt) || motor.motorReceivedAt,
           ...(options?.motorSubmissionType
             ? { motorSubmissionType: options.motorSubmissionType }
             : {}),
@@ -457,9 +466,9 @@ export const mapCastingCuringFormStateToPayload = (
             oven: String(motor.curingSetup?.oven ?? ""),
             ovenNo: String(motor.curingSetup?.ovenNo ?? ""),
             curingType: String(motor.curingSetup?.curingType ?? ""),
-            configuration: String(motor.curingSetup?.configuration ?? ""),
-            motorsToCureCount: motor.curingSetup?.motorsToCureCount ?? "",
-            ovensUtilized: String(motor.curingSetup?.ovensUtilized ?? ""),
+            configuration: emptyToNull(motor.curingSetup?.configuration),
+            motorsToCureCount: emptyToNullNumber(motor.curingSetup?.motorsToCureCount),
+            ovensUtilized: emptyToNull(motor.curingSetup?.ovensUtilized),
           },
           castingSections: buildCastingSectionsPayload(
             motor.castingData ?? createEmptyCastingMotorData(),
@@ -691,6 +700,8 @@ export const parseCastingCuringSectionData = (
     sectionData.forEach((dataRow) => {
       walkCastingCuringValue(sectionId, dataRow, fields, tables);
     });
+  } else if (sectionData && typeof sectionData === "object") {
+    walkCastingCuringValue(sectionId, sectionData, fields, tables);
   }
 
   return {
@@ -721,6 +732,8 @@ export type CastingCuringMotorDetailView = {
   };
   castingSections: CasePrepDetailSection[];
   curingSections: CasePrepDetailSection[];
+  castingData: CastingMotorData;
+  curingData: CuringMotorData;
 };
 
 export type CastingCuringDetailView = {
@@ -751,15 +764,23 @@ export const mapCastingCuringPersonLabel = (value: unknown): string | null => {
   return String(value).trim() || null;
 };
 
-const parseCastingCuringDisplaySections = (
-  sections: unknown[] | undefined,
-): CasePrepDetailSection[] =>
-  (sections ?? [])
-    .map((section) => {
-      const block = section as { sectionId?: string; sectionData?: Record<string, unknown>[] };
-      return parseCastingCuringSectionData(String(block.sectionId ?? ""), block.sectionData);
-    })
+const parseCastingCuringDisplaySections = (sections: unknown): CasePrepDetailSection[] => {
+  if (Array.isArray(sections)) {
+    return sections
+      .map((section) => {
+        const block = section as { sectionId?: string; sectionData?: unknown };
+        return parseCastingCuringSectionData(String(block.sectionId ?? ""), block.sectionData);
+      })
+      .filter((section) => section.fields.length > 0 || section.tables.length > 0);
+  }
+
+  const nested = asRecord(sections);
+  if (!nested) return [];
+
+  return Object.entries(nested)
+    .map(([key, value]) => parseCastingCuringSectionData(key, value))
     .filter((section) => section.fields.length > 0 || section.tables.length > 0);
+};
 
 export const mapCastingCuringDetailsForDisplay = (
   data: Record<string, unknown> | null | undefined,
@@ -800,6 +821,8 @@ export const mapCastingCuringDetailsForDisplay = (
       },
       castingSections: [],
       curingSections: [],
+      castingData: createEmptyCastingMotorData(),
+      curingData: createEmptyCuringMotorData(),
     };
   };
 
@@ -814,7 +837,7 @@ export const mapCastingCuringDetailsForDisplay = (
 
       return {
         motorId,
-        motorReceivedAt: String(src.motorReceivedAt ?? "").trim(),
+        motorReceivedAt: toUiDateTime(src.motorReceivedAt) || String(src.motorReceivedAt ?? "").trim(),
         motorSubmissionType:
           statusMeta?.motorSubmissionType ??
           normalizeCCMotorSubmissionType(entry.motorSubmissionType as unknown),
@@ -834,12 +857,10 @@ export const mapCastingCuringDetailsForDisplay = (
           motorsToCureCount: String(curingSetup.motorsToCureCount ?? ""),
           ovensUtilized: String(curingSetup.ovensUtilized ?? ""),
         },
-        castingSections: parseCastingCuringDisplaySections(
-          src.castingSections as unknown[] | undefined,
-        ),
-        curingSections: parseCastingCuringDisplaySections(
-          src.curingSections as unknown[] | undefined,
-        ),
+        castingSections: parseCastingCuringDisplaySections(src.castingSections),
+        curingSections: parseCastingCuringDisplaySections(src.curingSections),
+        castingData: parseCastingMotorDataFromApi(src),
+        curingData: parseCuringMotorDataFromApi(src),
       };
     })
     .filter((motor) => motor.motorId.length > 0);
@@ -982,8 +1003,8 @@ export type CastingCuringMotorDetail = {
   castingDetails?: Record<string, any>;
   curingConfiguration?: Record<string, any>;
   curingDetails?: Record<string, any>;
-  castingSections?: any[];
-  curingSections?: any[];
+  castingSections?: CastingSectionsPayload | any[];
+  curingSections?: CuringSectionsPayload | any[];
 };
 
 export type CastingCuringFormDetails = {
@@ -1055,7 +1076,9 @@ export class CastingCuringDetailsModel {
             (m.motorStage ?? src?.motorStage) != null
               ? Number(m.motorStage ?? src?.motorStage)
               : undefined,
-          motorReceivedAt: String(src?.motorReceivedAt ?? m?.motorReceivedAt ?? ""),
+          motorReceivedAt:
+            toUiDateTime(src?.motorReceivedAt ?? m?.motorReceivedAt) ||
+            String(src?.motorReceivedAt ?? m?.motorReceivedAt ?? ""),
           motorSubmissionType: normalizeCCMotorSubmissionType(
             m?.motorSubmissionType ?? src?.motorSubmissionType,
           ),
@@ -1071,16 +1094,8 @@ export class CastingCuringDetailsModel {
           castingDetails: src.castingDetails ?? undefined,
           curingConfiguration: src.curingConfiguration ?? undefined,
           curingDetails: src.curingDetails ?? undefined,
-          castingSections: Array.isArray(src?.castingSections)
-            ? src.castingSections
-            : Array.isArray(m?.castingSections)
-              ? m.castingSections
-              : undefined,
-          curingSections: Array.isArray(src?.curingSections)
-            ? src.curingSections
-            : Array.isArray(m?.curingSections)
-              ? m.curingSections
-              : undefined,
+          castingSections: src?.castingSections ?? m?.castingSections ?? undefined,
+          curingSections: src?.curingSections ?? m?.curingSections ?? undefined,
         };
       }),
       motorStatuses: Array.isArray(payload?.motorStatuses)

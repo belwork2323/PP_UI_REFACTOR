@@ -101,6 +101,6 @@ export const mapPostCureInhibitorTypeToApi = (
 };
 
 export const createPostCureData = () => ({
-  schemaFormLoaded: false,
+  formLoaded: false,
   motors: [] as import("../../../data/models/user/PostCureFormModel").PostCureMotorSession[],
 });

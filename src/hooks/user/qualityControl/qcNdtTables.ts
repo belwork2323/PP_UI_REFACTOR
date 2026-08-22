@@ -544,13 +544,119 @@ const splitFileList = (value: string) =>
 export type QcNdtMotorSubmissionType = "DRAFT" | "SUBMIT";
 
 export const isNdtNestedMotorDetail = (rec: Record<string, unknown> | null | undefined) =>
-  Boolean(rec && Array.isArray(rec.processDetails));
+  Boolean(
+    rec &&
+      (rec.radiographyDetails != null ||
+        rec.radiographyObservations != null ||
+        rec.visualInspectionDetails != null ||
+        rec.signedNdtReport != null ||
+        Array.isArray(rec.processDetails)),
+  );
 
 export const ndtMotorDetailToSections = (
   rec: Record<string, unknown>,
   motorId: string,
 ): SchemaSectionSubmission[] => {
   const source = asRecord(rec.details) ?? rec;
+  if (
+    source.radiographyDetails != null ||
+    source.radiographyObservations != null ||
+    source.visualInspectionDetails != null
+  ) {
+    const sections: SchemaSectionSubmission[] = [];
+    const radiographyDetails = asRecord(source.radiographyDetails);
+    const planDetails = asArray(radiographyDetails?.radiographyPlanDetails);
+    if (radiographyDetails) {
+      sections.push({
+        sectionId: QC_NDT_SECTION_IDS.RADIOGRAPHY_DETAILS,
+        sectionData: [
+          {
+            [QC_NDT_TABLE_IDS.RADIOGRAPHY_DETAILS]: planDetails.length
+              ? planDetails.map((row, index) => {
+                  const recRow = asRecord(row) ?? {};
+                  return {
+                    MACHINE_NO: String(
+                      asArray(radiographyDetails.equipmentUtilized)[0] ?? recRow.machineNo ?? "",
+                    ),
+                    NO_OF_SECTIONS: String(recRow.numberOfSections ?? recRow.noOfSections ?? ""),
+                    NO_OF_ORIENTATIONS: String(
+                      recRow.numberOfOrientations ?? recRow.noOfOrientations ?? "",
+                    ),
+                    NORMAL_EXPOSURES: String(
+                      recRow.numberOfNormalExposures ?? recRow.normalExposures ?? "",
+                    ),
+                    TANGENTIAL_EXPOSURES: String(
+                      recRow.numberOfTangentialExposures ?? recRow.tangentialExposures ?? "",
+                    ),
+                    SR_NO: recRow.srNo ?? index + 1,
+                  };
+                })
+              : [],
+          },
+        ],
+        motorId,
+      } as SchemaSectionSubmission);
+    }
+
+    const observations = asArray(source.radiographyObservations);
+    if (observations.length) {
+      sections.push({
+        sectionId: QC_NDT_SECTION_IDS.RADIOGRAPHY_OBSERVATIONS,
+        sectionData: [
+          {
+            [QC_NDT_TABLE_IDS.RADIOGRAPHY_OBSERVATIONS]: observations.map((row, index) => {
+              const recRow = asRecord(row) ?? {};
+              return {
+                SR_NO: recRow.sectionNumber ?? recRow.srNo ?? index + 1,
+                TYPE_OF_DEFECT: recRow.typeOfDefect ?? recRow.TYPE_OF_DEFECT ?? "",
+                OBSERVATIONS: recRow.observation ?? recRow.observations ?? "",
+                LOCATION: recRow.orientation ?? recRow.location ?? "",
+              };
+            }),
+          },
+        ],
+        motorId,
+      } as SchemaSectionSubmission);
+    }
+
+    const visualRows = asArray(source.visualInspectionDetails);
+    if (visualRows.length) {
+      sections.push({
+        sectionId: QC_NDT_SECTION_IDS.VISUAL_INSPECTION,
+        sectionData: [
+          {
+            [QC_NDT_TABLE_IDS.VISUAL_INSPECTION]: visualRows.map((row, index) => {
+              const recRow = asRecord(row) ?? {};
+              const images = asArray(recRow.uploadedImages ?? recRow.uploadImage);
+              return {
+                SR_NO: recRow.sectionNumber ?? recRow.srNo ?? index + 1,
+                OBSERVATION_TYPE: recRow.observationType ?? recRow.OBSERVATION_TYPE ?? "",
+                OBSERVATION: recRow.observation ?? recRow.OBSERVATION ?? "",
+                LOCATION: recRow.orientation ?? recRow.location ?? "",
+                UPLOAD_IMAGE: images.join(", "),
+              };
+            }),
+          },
+        ],
+        motorId,
+      } as SchemaSectionSubmission);
+    }
+
+    const uploadedVideos = [
+      ...asArray(source.uploadedVideos),
+      ...asArray(asRecord(source.signedNdtReport)?.report),
+    ];
+    if (uploadedVideos.length) {
+      sections.push({
+        sectionId: QC_NDT_SECTION_IDS.UPLOAD_MEDIA,
+        sectionData: [{ UPLOAD_VIDEO_PHOTO: uploadedVideos.join(", ") }],
+        motorId,
+      } as SchemaSectionSubmission);
+    }
+
+    if (sections.length) return sections;
+  }
+
   const processes = asArray(source.processDetails);
   const sections: SchemaSectionSubmission[] = [];
   const trimmedMotorId = String(motorId ?? "").trim();
@@ -625,51 +731,53 @@ export const buildNdtMotorDetailPayload = (
   values: SchemaFormValues | null | undefined,
   motorId: string,
   motorSubmissionType: QcNdtMotorSubmissionType = "DRAFT",
-): Record<string, unknown> => ({
-  motorId,
-  motorSubmissionType,
-  processDetails: [
-    {
-      process: "RADIOGRAPHY",
-      radiographyDetails: getNdtRadiographyDetailRows(values).map((row, index) =>
+): Record<string, unknown> => {
+  const detailRows = getNdtRadiographyDetailRows(values);
+  const firstDetail = detailRows[0];
+  const machineNo = String(firstDetail?.MACHINE_NO ?? "").trim();
+  const uploadMedia = splitFileList(getNdtUploadMedia(values));
+
+  return omitEmpty({
+    motorId,
+    motorSubmissionType,
+    radiographyDetails: omitEmpty({
+      equipmentUtilized: machineNo ? [machineNo] : undefined,
+      radiographyPlanDetails: detailRows.map((row, index) =>
         omitEmpty({
-          srNo: index + 1,
-          machineNo: row.MACHINE_NO || undefined,
-          noOfSections: toApiNumber(row.NO_OF_SECTIONS),
-          noOfOrientations: toApiNumber(row.NO_OF_ORIENTATIONS),
+          numberOfSections: toApiNumber(row.NO_OF_SECTIONS),
+          numberOfOrientations: toApiNumber(row.NO_OF_ORIENTATIONS),
           normalExposures: toApiNumber(row.NORMAL_EXPOSURES),
           tangentialExposures: toApiNumber(row.TANGENTIAL_EXPOSURES),
+          srNo: index + 1,
         }),
       ),
-      radiographyObservations: getNdtObservationRows(values).map((row) =>
-        omitEmpty({
-          srNo: row.SR_NO,
-          typeOfDefect: row.TYPE_OF_DEFECT,
-          observations: String(row.OBSERVATIONS ?? "").trim() || undefined,
-          location: String(row.LOCATION ?? "").trim() || undefined,
-        }),
-      ),
-    },
-    {
-      process: "VISUAL_INSPECTION",
-      visualInspectionDetails: getNdtVisualRows(values).map((row) =>
-        omitEmpty({
-          srNo: row.SR_NO,
-          observationType: row.OBSERVATION_TYPE,
-          observation: String(row.OBSERVATION ?? "").trim() || undefined,
-          location: String(row.LOCATION ?? "").trim() || undefined,
-          uploadImage: splitFileList(row.UPLOAD_IMAGE),
-        }),
-      ),
-    },
-    {
-      process: "UPLOAD_MEDIA",
-      mediaDetails: {
-        uploadVideoPhoto: splitFileList(getNdtUploadMedia(values)),
-      },
-    },
-  ],
-});
+    }),
+    radiographyObservations: getNdtObservationRows(values).map((row) =>
+      omitEmpty({
+        sectionNumber: row.SR_NO,
+        observation: String(row.OBSERVATIONS ?? "").trim() || undefined,
+        orientation: String(row.LOCATION ?? "").trim() || undefined,
+        typeOfDefect: row.TYPE_OF_DEFECT || undefined,
+      }),
+    ),
+    visualInspectionDetails: getNdtVisualRows(values).map((row) =>
+      omitEmpty({
+        observationType: row.OBSERVATION_TYPE || undefined,
+        observation: String(row.OBSERVATION ?? "").trim() || undefined,
+        sectionNumber: row.SR_NO,
+        orientation: String(row.LOCATION ?? "").trim() || undefined,
+        uploadedImages: splitFileList(row.UPLOAD_IMAGE),
+      }),
+    ),
+    uploadedVideos: uploadMedia,
+    signedNdtReport: uploadMedia.length
+      ? omitEmpty({
+          additionalRemarks: "Uploaded from QC form",
+          report: uploadMedia[0],
+        })
+      : undefined,
+  });
+};
 
 export const buildNdtSectionPayload = (
   values: SchemaFormValues | null | undefined,

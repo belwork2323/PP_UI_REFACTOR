@@ -94,8 +94,12 @@ export type QCDivisionEntryUnitActions = {
   draftConfirmMessage?: string;
   submitConfirmTitle?: string;
   submitConfirmMessage?: string;
+  showViewDetails?: boolean;
+  canViewDetails?: boolean;
+  viewDetailsLabel?: string;
   onSaveDraft?: () => void;
   onSubmit?: () => void;
+  onViewDetails?: () => void;
 };
 
 type QCDivisionEntryPanelProps = {

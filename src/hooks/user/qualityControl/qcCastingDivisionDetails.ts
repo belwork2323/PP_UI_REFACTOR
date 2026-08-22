@@ -92,26 +92,102 @@ const findCastingMotorRecord = (
   for (const motor of asArray(details.motors ?? root.motors)) {
     const rec = asRecord(motor);
     if (!rec) continue;
-    const id = String(rec.motorId ?? rec.id ?? "").trim();
+    const id = String(rec.motorId ?? rec.id ?? asRecord(rec.details)?.motorId ?? "").trim();
     if (id === normalizedMotorId) return rec;
   }
   return null;
 };
 
+const pickField = (row: Record<string, unknown> | null | undefined, ...keys: string[]): string => {
+  if (!row) return "";
+  for (const key of keys) {
+    if (row[key] != null && String(row[key]).trim() !== "") return String(row[key]).trim();
+  }
+  const normalized = new Map(
+    Object.entries(row).map(([key, value]) => [key.toLowerCase(), value]),
+  );
+  for (const key of keys) {
+    const value = normalized.get(key.toLowerCase());
+    if (value != null && String(value).trim() !== "") return String(value).trim();
+  }
+  return "";
+};
+
+const extractCastingSectionsObject = (
+  motor: Record<string, unknown> | null,
+): Record<string, unknown> | null => {
+  if (!motor) return null;
+  const details = asRecord(motor.details) ?? motor;
+  const nested =
+    asRecord(details.castingSections) ?? asRecord(motor.castingSections);
+  return nested;
+};
+
+const mapNestedCastingMotorSections = (
+  castingSections: Record<string, unknown>,
+): ManufacturingSection[] => {
+  const sections: ManufacturingSection[] = [];
+
+  const finalAssembly = asRecord(castingSections.finalAssemblyDetails);
+  if (finalAssembly) {
+    const motorCasing = asArray(finalAssembly.motorCasing);
+    sections.push({
+      sectionId: "FINAL_ASSEMBLY_DETAILS",
+      sectionData: motorCasing.length ? motorCasing : [finalAssembly],
+    });
+  }
+
+  const castingProcess = asRecord(castingSections.castingProcess);
+  if (castingProcess) {
+    sections.push({
+      sectionId: "CASTING_PROCESS",
+      sectionData: [castingProcess],
+    });
+  }
+
+  const slurry = asRecord(castingSections.slurryCastDetails);
+  if (slurry) {
+    sections.push({
+      sectionId: "SLURRY_CAST_DETAILS",
+      sectionData: [slurry],
+    });
+  }
+
+  const postCast = asRecord(castingSections.postCastOperations);
+  if (postCast) {
+    sections.push({
+      sectionId: "POST_CAST_OPERATIONS",
+      sectionData: [postCast],
+    });
+  }
+
+  return sections;
+};
+
 const extractMotorSections = (motor: Record<string, unknown> | null): ManufacturingSection[] => {
   if (!motor) return [];
+
+  const nestedCasting = extractCastingSectionsObject(motor);
+  if (nestedCasting) {
+    return mapNestedCastingMotorSections(nestedCasting);
+  }
+
   const details = asRecord(motor.details) ?? motor;
-  const sections = asArray(
-    details.sections ?? details.castingSections ?? motor.sections ?? motor.castingSections,
+  const legacySections = asArray(
+    details.sections ?? motor.sections,
   );
-  return sections
-    .map((section) => asRecord(section))
-    .filter(Boolean)
-    .map((section) => ({
-      sectionId: String(section!.sectionId ?? "").trim(),
-      sectionData: asArray(section!.sectionData),
-    }))
-    .filter((section) => section.sectionId);
+  if (legacySections.length) {
+    return legacySections
+      .map((section) => asRecord(section))
+      .filter(Boolean)
+      .map((section) => ({
+        sectionId: String(section!.sectionId ?? "").trim(),
+        sectionData: asArray(section!.sectionData),
+      }))
+      .filter((section) => section.sectionId);
+  }
+
+  return [];
 };
 
 const firstSectionRecord = (
@@ -258,16 +334,41 @@ const mapMandrelRowsFromManufacturing = (sections: ManufacturingSection[]): QcCa
   const assembly =
     firstSectionRecord(sections, "FINAL_ASSEMBLY_DETAILS") ??
     firstSectionRecord(sections, "FINAL_ASSEMBLY");
-  const rows = deepFindTableRows(assembly ?? sections, "MANDREL_MEASUREMENTS");
+  const rows = deepFindTableRows(assembly ?? sections, "mandrelMeasurements").length
+    ? deepFindTableRows(assembly ?? sections, "mandrelMeasurements")
+    : deepFindTableRows(assembly ?? sections, "MANDREL_MEASUREMENTS");
   const mapped = rows
     .map((row, index) => {
-      const withoutCup = String(row.A_FINAL ?? row.A_MOCK ?? row.READING_WITHOUT_CUP ?? "").trim();
-      const withCup = String(
-        row.B_FINAL ?? row.B_MOCK ?? row.READING_WITH_BOTTOM_CUP ?? "",
-      ).trim();
+      const rec = asRecord(row) ?? {};
+      const withoutCup = pickField(
+        rec,
+        "aFinal",
+        "A_FINAL",
+        "afinal",
+        "aMock",
+        "A_MOCK",
+        "amock",
+        "eFinal",
+        "E_FINAL",
+        "efinal",
+        "READING_WITHOUT_CUP",
+      );
+      const withCup = pickField(
+        rec,
+        "bFinal",
+        "B_FINAL",
+        "bfinal",
+        "bMock",
+        "B_MOCK",
+        "bmock",
+        "cFinal",
+        "C_FINAL",
+        "cfinal",
+        "READING_WITH_BOTTOM_CUP",
+      );
       if (!withoutCup && !withCup) return null;
       return {
-        SR_NO: index + 1,
+        SR_NO: Number(pickField(rec, "srNo", "SR_NO")) || index + 1,
         READING_WITHOUT_CUP: withoutCup,
         READING_WITH_BOTTOM_CUP: withCup,
       } satisfies QcCastingMandrelRow;
@@ -281,56 +382,86 @@ const mapCastingTableFromManufacturing = (sections: ManufacturingSection[]): QcC
     firstSectionRecord(sections, "CASTING_PROCESS") ??
     firstSectionRecord(sections, "PROPELLANT_CASTING");
   const slurrySection = firstSectionRecord(sections, "SLURRY_CAST_DETAILS");
-  const bowlRows = deepFindTableRows(process ?? sections, "FINAL_MIX_BOWL_DETAILS");
-  const fromBowlRows = deepFindTableRows(process ?? sections, "CASTING_FROM_BOWL_DETAILS");
-  const slurryRows = deepFindTableRows(slurrySection ?? sections, "SLURRY_CAST_FROM_BOWLS");
+  const bowlRows = deepFindTableRows(process ?? sections, "finalMixBowlDetails").length
+    ? deepFindTableRows(process ?? sections, "finalMixBowlDetails")
+    : deepFindTableRows(process ?? sections, "FINAL_MIX_BOWL_DETAILS");
+  const fromBowlRows = deepFindTableRows(process ?? sections, "castingFromBowlDetails").length
+    ? deepFindTableRows(process ?? sections, "castingFromBowlDetails")
+    : deepFindTableRows(process ?? sections, "CASTING_FROM_BOWL_DETAILS");
+  const slurryRows = deepFindTableRows(slurrySection ?? sections, "slurryCastFromBowls").length
+    ? deepFindTableRows(slurrySection ?? sections, "slurryCastFromBowls")
+    : deepFindTableRows(slurrySection ?? sections, "SLURRY_CAST_FROM_BOWLS");
   const castingRows = deepFindTableRows(process ?? sections, "CASTING_TABLE");
 
   if (castingRows.length) {
-    return castingRows.map((row, index) => ({
-      SR_NO: index + 1,
-      FINAL_MIX_BOWL_NO: String(row.FINAL_MIX_BOWL_NO ?? row.BOWL_ID ?? row.BOWL_NO ?? "").trim(),
-      PROPELLANT_QTY: String(row.PROPELLANT_QTY ?? "").trim(),
-      INITIAL_UNLOADING_VISCOSITY: String(
-        row.INITIAL_UNLOADING_VISCOSITY ?? row.VISCOSITY ?? "",
-      ).trim(),
-      CASTING_START_TIME: String(row.CASTING_START_TIME ?? "").trim(),
-      CASTING_COMPLETION_TIME: String(row.CASTING_COMPLETION_TIME ?? "").trim(),
-      SLURRY_CAST_FROM_EACH_BOWL: String(
-        row.SLURRY_CAST_FROM_EACH_BOWL ?? row.SLURRY_CAST ?? "",
-      ).trim(),
-      REMARKS: String(row.REMARKS ?? "").trim(),
-    }));
+    return castingRows.map((row, index) => {
+      const rec = asRecord(row) ?? {};
+      return {
+        SR_NO: Number(pickField(rec, "srNo", "SR_NO")) || index + 1,
+        FINAL_MIX_BOWL_NO: pickField(rec, "finalMixBowlNo", "FINAL_MIX_BOWL_NO", "bowlId", "BOWL_ID"),
+        PROPELLANT_QTY: pickField(rec, "propellantQty", "PROPELLANT_QTY", "initialWeight", "finalWeight"),
+        INITIAL_UNLOADING_VISCOSITY: pickField(
+          rec,
+          "initialUnloadingViscosity",
+          "INITIAL_UNLOADING_VISCOSITY",
+          "viscosity",
+          "VISCOSITY",
+        ),
+        CASTING_START_TIME: normalizeTimeValue(
+          pickField(rec, "castingStartTime", "CASTING_START_TIME", "bowlReceiptTime", "dcOpenTime"),
+        ),
+        CASTING_COMPLETION_TIME: normalizeTimeValue(
+          pickField(
+            rec,
+            "castingCompletionTime",
+            "CASTING_COMPLETION_TIME",
+            "dcCloseTime",
+            "ballValveOpenTime",
+          ),
+        ),
+        SLURRY_CAST_FROM_EACH_BOWL: pickField(
+          rec,
+          "slurryCastFromEachBowl",
+          "SLURRY_CAST_FROM_EACH_BOWL",
+          "slurryCast",
+          "SLURRY_CAST",
+        ),
+        REMARKS: pickField(rec, "remarks", "REMARKS"),
+      };
+    });
   }
 
-  // Prefer FINAL_MIX_BOWL_DETAILS from CASTING_PROCESS (BOWL_ID like "FINAL_MIX 1 / Bowl No.1").
+  // Prefer FINAL_MIX_BOWL_DETAILS from CASTING_PROCESS (bowlId like "FINAL_MIX 1 / Bowl No.1").
   const count = Math.max(bowlRows.length, fromBowlRows.length, 0);
   if (!count) return [];
 
   const slurryByLabel = new Map<string, string>();
   for (const row of slurryRows) {
-    const label = String(row.FM_MOTOR_LABEL ?? row.BOWL_ID ?? "").trim();
-    const rowKey = String(row.ROW_KEY ?? "").trim().toUpperCase();
+    const rec = asRecord(row) ?? {};
+    const label = pickField(rec, "fmMotorLabel", "FM_MOTOR_LABEL", "bowlId", "BOWL_ID");
+    const rowKey = pickField(rec, "rowKey", "ROW_KEY").toUpperCase();
     if (!label || rowKey === "TOTAL") continue;
-    const slurry = String(row.SLURRY_CAST ?? "").trim();
+    const slurry = pickField(rec, "slurryCast", "SLURRY_CAST");
     if (slurry) slurryByLabel.set(label, slurry);
   }
 
   return Array.from({ length: count }, (_, index) => {
     const bowl = asRecord(bowlRows[index]) ?? {};
     const fromBowl = asRecord(fromBowlRows[index]) ?? {};
-    const bowlId = String(bowl.BOWL_ID ?? bowl.BOWL_NO ?? fromBowl.BOWL_ID ?? "").trim();
+    const bowlId =
+      pickField(bowl, "bowlId", "BOWL_ID", "BOWL_NO") || pickField(fromBowl, "bowlId", "BOWL_ID");
     return {
-      SR_NO: index + 1,
+      SR_NO: Number(pickField(bowl, "srNo", "SR_NO")) || index + 1,
       FINAL_MIX_BOWL_NO: bowlId,
-      // Propellant qty is seeded from batch identificationSheet.batchSize.
-      PROPELLANT_QTY: "",
-      INITIAL_UNLOADING_VISCOSITY: String(fromBowl.VISCOSITY ?? "").trim(),
-      CASTING_START_TIME: "",
-      CASTING_COMPLETION_TIME: "",
-      SLURRY_CAST_FROM_EACH_BOWL: String(
-        fromBowl.SLURRY_CAST ?? slurryByLabel.get(bowlId) ?? "",
-      ).trim(),
+      PROPELLANT_QTY: pickField(bowl, "initialWeight", "finalWeight", "INITIAL_WEIGHT", "FINAL_WEIGHT"),
+      INITIAL_UNLOADING_VISCOSITY: pickField(fromBowl, "viscosity", "VISCOSITY"),
+      CASTING_START_TIME: normalizeTimeValue(
+        pickField(bowl, "bowlReceiptTime", "BOWL_RECEIPT_TIME", "dcOpenTime", "DC_OPEN_TIME"),
+      ),
+      CASTING_COMPLETION_TIME: normalizeTimeValue(
+        pickField(bowl, "dcCloseTime", "DC_CLOSE_TIME", "ballValveOpenTime", "BALL_VALVE_OPEN_TIME"),
+      ),
+      SLURRY_CAST_FROM_EACH_BOWL: pickField(fromBowl, "slurryCast", "SLURRY_CAST") || slurryByLabel.get(bowlId) || "",
       REMARKS: "",
     } satisfies QcCastingTableRow;
   }).filter(
@@ -338,7 +469,9 @@ const mapCastingTableFromManufacturing = (sections: ManufacturingSection[]): QcC
       hasValue(row.FINAL_MIX_BOWL_NO) ||
       hasValue(row.PROPELLANT_QTY) ||
       hasValue(row.INITIAL_UNLOADING_VISCOSITY) ||
-      hasValue(row.SLURRY_CAST_FROM_EACH_BOWL),
+      hasValue(row.SLURRY_CAST_FROM_EACH_BOWL) ||
+      hasValue(row.CASTING_START_TIME) ||
+      hasValue(row.CASTING_COMPLETION_TIME),
   );
 };
 
@@ -346,26 +479,27 @@ const mapPropellantFieldsFromManufacturing = (sections: ManufacturingSection[]) 
   const process =
     firstSectionRecord(sections, "CASTING_PROCESS") ??
     firstSectionRecord(sections, "PROPELLANT_CASTING");
-  const fromBowl = deepFindTableRows(process ?? sections, "CASTING_FROM_BOWL_DETAILS");
+  const fromBowl = deepFindTableRows(process ?? sections, "castingFromBowlDetails").length
+    ? deepFindTableRows(process ?? sections, "castingFromBowlDetails")
+    : deepFindTableRows(process ?? sections, "CASTING_FROM_BOWL_DETAILS");
   const vacuumTable = deepFindTableRows(process ?? sections, "CASTING_VACUUM_DETAILS");
   const firstFromBowl = asRecord(fromBowl[0]);
   const firstVacuum = asRecord(vacuumTable[0]);
-  const data = process ?? {};
-
+  const data = asRecord(process) ?? {};
   return {
     DATE_OF_CASTING: formatToUiDate(
-      String(data.DATE_OF_CASTING ?? data.dateOfCasting ?? "").trim(),
+      pickField(data, "dateOfCasting", "DATE_OF_CASTING"),
     ),
-    RH_PERCENT: String(data.RH_PERCENT ?? firstFromBowl?.RH ?? "").trim(),
-    VACUUM_MAINTAINED: String(
-      data.VACUUM_MAINTAINED ??
-        data.VACUUM_PRESSURE_CASTING ??
-        data.INITIAL_VACUUM ??
-        firstVacuum?.VACUUM_PRESSURE_CASTING ??
-        firstVacuum?.INITIAL_VACUUM ??
-        firstFromBowl?.VACUUM_LEVEL ??
-        "",
-    ).trim(),
+    RH_PERCENT: pickField(firstFromBowl ?? {}, "rh", "RH", "RH_PERCENT"),
+    VACUUM_MAINTAINED: pickField(
+      data,
+      "initialVacuum",
+      "INITIAL_VACUUM",
+      "vacuumPressureCasting",
+      "VACUUM_PRESSURE_CASTING",
+      "vacuumPressureSoaking",
+      "VACUUM_PRESSURE_SOAKING",
+    ) || pickField(firstFromBowl ?? {}, "vacuumLevel", "VACUUM_LEVEL"),
   };
 };
 
@@ -377,24 +511,39 @@ const mapWeightmentFromManufacturing = (
     firstSectionRecord(sections, QC_CASTING_SECTION_IDS.WEIGHTMENT);
   const rows = deepFindTableRows(weightment ?? sections, "WEIGHTMENT_DETAILS");
   const mapped = rows
-    .map((row) => ({
-      LOAD_CELL_INITIAL: String(row.LOAD_CELL_INITIAL ?? "").trim(),
-      LOAD_CELL_FINAL: String(row.LOAD_CELL_FINAL ?? "").trim(),
-      TOTAL_WEIGHT: String(row.TOTAL_WEIGHT ?? "").trim(),
-    }))
+    .map((row) => {
+      const rec = asRecord(row) ?? {};
+      return {
+        LOAD_CELL_INITIAL: pickField(rec, "LOAD_CELL_INITIAL", "initial"),
+        LOAD_CELL_FINAL: pickField(rec, "LOAD_CELL_FINAL", "final"),
+        TOTAL_WEIGHT: pickField(rec, "TOTAL_WEIGHT", "totalWeight"),
+      };
+    })
     .filter(
       (row) =>
         hasValue(row.LOAD_CELL_INITIAL) ||
         hasValue(row.LOAD_CELL_FINAL) ||
         hasValue(row.TOTAL_WEIGHT),
     );
-  if (!mapped.length) return [];
-  const first = mapped[0];
+
+  const assembly =
+    firstSectionRecord(sections, "FINAL_ASSEMBLY_DETAILS") ??
+    firstSectionRecord(sections, "FINAL_ASSEMBLY");
+  const emptyMotorWeight = pickField(assembly ?? {}, "emptyMotorWeight", "EMPTY_MOTOR_WEIGHT");
+
+  if (!mapped.length && !emptyMotorWeight) return [];
+
+  const first = mapped[0] ?? {
+    LOAD_CELL_INITIAL: "",
+    LOAD_CELL_FINAL: "",
+    TOTAL_WEIGHT: emptyMotorWeight,
+  };
   return [
     {
       ...first,
       TOTAL_WEIGHT:
         first.TOTAL_WEIGHT ||
+        emptyMotorWeight ||
         calcWeightmentTotalWeight(first.LOAD_CELL_INITIAL, first.LOAD_CELL_FINAL),
     },
   ];

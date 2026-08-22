@@ -52,8 +52,6 @@ const PostCurePage = () => {
     getMotorStatus,
     isMotorEditable,
     previousStageGate,
-    schemaLoading,
-    schemaError,
     handleLoadForm,
     canLoadForm,
     subDepartmentId,
@@ -102,8 +100,6 @@ const PostCurePage = () => {
             draftOperation={draftOperation}
             draftInhibitorType={draftInhibitorType}
             subDepartmentId={subDepartmentId}
-            schemaLoading={schemaLoading}
-            schemaError={schemaError}
             canLoadForm={canLoadForm}
             onActiveMotorChange={handleActiveMotorChange}
             onDraftMotorReceiptDateChange={setDraftMotorReceiptDate}

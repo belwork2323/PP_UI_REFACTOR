@@ -1,9 +1,6 @@
 import {
   createPostCureData,
   formatPostCureMotorOperationLabel,
-  isPostCureInhibitionOperation,
-  mapPostCureInhibitorTypeToApi,
-  mapPostCureOperationToApi,
 } from "../../../hooks/user/manufacturing/postCureConfig";
 import type { CasePrepDetailSection } from "./CasePreparationFormModel";
 import {
@@ -11,14 +8,18 @@ import {
   parseCastingCuringSectionData,
 } from "./CastingCuringFormModel";
 import {
-  buildPostCureSectionPayload,
-  createPostCureInitialValues,
-  hydratePostCureValuesFromSections,
-  schemaValuesHaveUserData,
-  type SchemaDocumentV2,
-  type SchemaFormValues,
-  type SchemaSectionSubmission,
-} from "../../../schema-engine";
+  buildPostCureMotorDetailsPayload,
+  buildPostCureSectionsPayload,
+  createEmptyPostCureMotorData,
+  formatPostCureMotorReceiptDateForApi,
+  formatPostCureMotorReceiptDateForUi,
+  parsePostCureMotorDataFromApi,
+  postCureMotorDataHasUserInput,
+  resolvePostCureDataVariant,
+  type InhibitionDetailsApi,
+  type LooseFlapFillingDetailsApi,
+  type PostCureMotorData,
+} from "./PostCureMotorDataModel";
 import { OPERATION_STATUS } from "../../../hooks/operationStatus";
 
 export type PostCureMotorSession = {
@@ -26,9 +27,8 @@ export type PostCureMotorSession = {
   motorReceiptDate: string;
   operation: string;
   inhibitorType: string;
-  postCureSchema: SchemaDocumentV2 | null;
-  schemaFormValues: SchemaFormValues;
-  savedSections?: SchemaSectionSubmission[];
+  formLoaded: boolean;
+  postCureData: PostCureMotorData;
 };
 
 export type PostCureMotorSubmissionType = "DRAFT" | "SUBMIT";
@@ -236,7 +236,8 @@ export type PostCureDetails = {
   motorReceiptDate?: string;
   operation?: string;
   inhibitorType?: string;
-  sections?: SchemaSectionSubmission[];
+  looseFlapFillingDetails?: LooseFlapFillingDetailsApi;
+  inhibitionDetails?: InhibitionDetailsApi;
   motors?: Array<{
     motorId: string;
     motorReceiptDate?: string;
@@ -246,7 +247,8 @@ export type PostCureDetails = {
     motorSubmissionType?: PostCureMotorSubmissionType;
     motorSubmissionStatus?: PostCureMotorSubmissionStatus;
     rejectionReason?: string | null;
-    sections?: SchemaSectionSubmission[];
+    looseFlapFillingDetails?: LooseFlapFillingDetailsApi;
+    inhibitionDetails?: InhibitionDetailsApi;
   }>;
   motorStatuses?: Array<{
     motorId: string;
@@ -269,9 +271,8 @@ export type PostCureDetails = {
 export type PostCureMotorPayload = {
   motorId: string;
   motorReceiptDate: string;
-  operationType: "LOOSE_FLAP_FILLING" | "INHIBITION" | null;
-  sections: SchemaSectionSubmission[];
-  inhibitorType?: "IR1" | "HEMCOAT_3K" | "NOT_APPLICABLE";
+  looseFlapFillingDetails?: LooseFlapFillingDetailsApi;
+  inhibitionDetails?: InhibitionDetailsApi;
   motorSubmissionType?: PostCureMotorSubmissionType;
 };
 
@@ -286,29 +287,41 @@ export const createEmptyPostCureMotorSession = (
   motorReceiptDate: string,
   operation: string,
   inhibitorType: string,
-  schema: SchemaDocumentV2,
-): PostCureMotorSession => ({
-  motorId,
-  motorReceiptDate,
-  operation,
-  inhibitorType,
-  postCureSchema: schema,
-  schemaFormValues: createPostCureInitialValues(schema),
-  savedSections: undefined,
-});
+): PostCureMotorSession | null => {
+  const variant = resolvePostCureDataVariant(operation, inhibitorType);
+  if (!variant) return null;
+
+  return {
+    motorId,
+    motorReceiptDate,
+    operation,
+    inhibitorType,
+    formLoaded: true,
+    postCureData: createEmptyPostCureMotorData(variant),
+  };
+};
 
 export const hydratePostCureMotorSession = (
-  motor: PostCureMotorSession,
-  schema: SchemaDocumentV2,
-): PostCureMotorSession => ({
-  ...motor,
-  postCureSchema: schema,
-  schemaFormValues: motor.savedSections?.length
-    ? hydratePostCureValuesFromSections(schema, motor.savedSections)
-    : Object.keys(motor.schemaFormValues ?? {}).length > 0
-      ? motor.schemaFormValues
-      : createPostCureInitialValues(schema),
-});
+  motor: Omit<PostCureMotorSession, "postCureData" | "formLoaded"> & {
+    apiMotor?: Record<string, unknown>;
+  },
+): PostCureMotorSession | null => {
+  const variant = resolvePostCureDataVariant(motor.operation, motor.inhibitorType);
+  if (!variant) return null;
+
+  const postCureData = motor.apiMotor
+    ? parsePostCureMotorDataFromApi(motor.apiMotor, variant)
+    : createEmptyPostCureMotorData(variant);
+
+  return {
+    motorId: motor.motorId,
+    motorReceiptDate: motor.motorReceiptDate,
+    operation: motor.operation,
+    inhibitorType: motor.inhibitorType,
+    formLoaded: true,
+    postCureData,
+  };
+};
 
 const mapApiOperationType = (operationType: string) => {
   if (operationType === "LOOSE_FLAP_FILLING") return "loose-flap-filling";
@@ -329,7 +342,8 @@ const mapDetailsMotorToSession = (
     operation?: string;
     inhibitorType?: string;
     operationType?: string;
-    sections?: SchemaSectionSubmission[];
+    looseFlapFillingDetails?: LooseFlapFillingDetailsApi;
+    inhibitionDetails?: InhibitionDetailsApi;
   },
   fallback?: { operation?: string; inhibitorType?: string },
 ): PostCureMotorSession | null => {
@@ -346,15 +360,13 @@ const mapDetailsMotorToSession = (
     mapApiInhibitorType(String(motor?.inhibitorType ?? "").trim()) ||
     String(fallback?.inhibitorType ?? "");
 
-  return {
+  return hydratePostCureMotorSession({
     motorId,
-    motorReceiptDate: String(motor?.motorReceiptDate ?? ""),
+    motorReceiptDate: formatPostCureMotorReceiptDateForUi(motor?.motorReceiptDate),
     operation,
     inhibitorType,
-    postCureSchema: null,
-    schemaFormValues: {},
-    savedSections: Array.isArray(motor?.sections) ? motor.sections : undefined,
-  };
+    apiMotor: motor as Record<string, unknown>,
+  });
 };
 
 export const mapPostCureDetailsToFormState = (
@@ -378,11 +390,11 @@ export const mapPostCureDetailsToFormState = (
           )
         : [];
 
-  const hasSavedSections = motors.some((motor) => Boolean(motor.savedSections?.length));
+  const hasLoadedMotors = motors.some((motor) => motor.formLoaded);
 
   return {
     ...defaults,
-    schemaFormLoaded: hasSavedSections,
+    formLoaded: hasLoadedMotors,
     motors,
   };
 };
@@ -401,25 +413,14 @@ export const mapPostCureFormStateToPayload = (
   return {
     motors: (form.motors ?? [])
       .filter((motor) => !targetIds || targetIds.has(motor.motorId))
-      .map((motor) => {
-        const operationType = mapPostCureOperationToApi(motor.operation);
-        const inhibitorType = isPostCureInhibitionOperation(motor.operation)
-          ? mapPostCureInhibitorTypeToApi(motor.inhibitorType)
-          : null;
-
-        return {
-          motorId: String(motor.motorId ?? ""),
-          motorReceiptDate: String(motor.motorReceiptDate ?? ""),
-          operationType,
-          sections: motor.postCureSchema
-            ? buildPostCureSectionPayload(motor.postCureSchema, motor.schemaFormValues)
-            : [],
-          ...(inhibitorType ? { inhibitorType } : {}),
-          ...(options?.motorSubmissionType
-            ? { motorSubmissionType: options.motorSubmissionType }
-            : {}),
-        };
-      }),
+      .map((motor) => ({
+        motorId: String(motor.motorId ?? ""),
+        motorReceiptDate: formatPostCureMotorReceiptDateForApi(motor.motorReceiptDate),
+        ...(motor.formLoaded ? buildPostCureMotorDetailsPayload(motor.postCureData) : {}),
+        ...(options?.motorSubmissionType
+          ? { motorSubmissionType: options.motorSubmissionType }
+          : {}),
+      })),
   };
 };
 
@@ -428,7 +429,7 @@ export const hasAnyPostCureValue = (form: PostCureFormState) =>
     (motor) =>
       [motor.motorId, motor.motorReceiptDate, motor.operation, motor.inhibitorType].some(
         (value) => String(value ?? "").trim().length > 0,
-      ) || schemaValuesHaveUserData(motor.schemaFormValues ?? {}),
+      ) || postCureMotorDataHasUserInput(motor.postCureData),
   );
 
 /** Display column order for Post-Cure detail tables (avoids alphabetical fallback). */
@@ -474,6 +475,7 @@ export type PostCureMotorDetailView = {
   motorSubmissionStatus?: PostCureMotorSubmissionStatus;
   rejectionReason?: string | null;
   sections: CasePrepDetailSection[];
+  postCureData: PostCureMotorData;
 };
 
 export type PostCureDetailView = {
@@ -503,6 +505,32 @@ const parsePostCureDisplaySections = (sections: unknown[] | undefined): CasePrep
 const resolvePostCureMotorSections = (motor: Record<string, unknown>): CasePrepDetailSection[] => {
   if (Array.isArray(motor.sections)) {
     return parsePostCureDisplaySections(motor.sections as unknown[]);
+  }
+
+  const operation =
+    String(motor.operation ?? "").trim() ||
+    mapApiOperationType(String(motor.operationType ?? "").trim());
+  const inhibitorType =
+    mapApiInhibitorType(String(motor.inhibitorType ?? "").trim()) ||
+    String(motor.inhibitorType ?? "").trim();
+  const variant = resolvePostCureDataVariant(operation, inhibitorType);
+
+  if (
+    variant &&
+    (motor.looseFlapFillingDetails || motor.inhibitionDetails || motor.details)
+  ) {
+    const apiMotor = {
+      ...((motor.details as Record<string, unknown> | undefined) ?? {}),
+      looseFlapFillingDetails:
+        motor.looseFlapFillingDetails ??
+        (motor.details as Record<string, unknown> | undefined)?.looseFlapFillingDetails,
+      inhibitionDetails:
+        motor.inhibitionDetails ??
+        (motor.details as Record<string, unknown> | undefined)?.inhibitionDetails,
+      sections: motor.sections,
+    };
+    const data = parsePostCureMotorDataFromApi(apiMotor, variant);
+    return parsePostCureDisplaySections(buildPostCureSectionsPayload(data) as unknown[]);
   }
 
   const details = (motor.details ?? motor) as Record<string, unknown>;
@@ -535,9 +563,24 @@ export const mapPostCureDetailsForDisplay = (
         mapApiInhibitorType(String(src.inhibitorType ?? "").trim()) ||
         String(src.inhibitorType ?? "").trim();
 
+      const variant = resolvePostCureDataVariant(operation, inhibitorType);
+      const apiMotor = {
+        ...src,
+        looseFlapFillingDetails:
+          entry.looseFlapFillingDetails ??
+          (src.looseFlapFillingDetails as Record<string, unknown> | undefined),
+        inhibitionDetails:
+          entry.inhibitionDetails ?? (src.inhibitionDetails as Record<string, unknown> | undefined),
+        sections: entry.sections ?? src.sections,
+      };
+      const postCureData = parsePostCureMotorDataFromApi(
+        apiMotor,
+        variant ?? "loose-flap-filling",
+      );
+
       return {
         motorId,
-        motorReceiptDate: String(src.motorReceiptDate ?? "").trim(),
+        motorReceiptDate: formatPostCureMotorReceiptDateForUi(src.motorReceiptDate),
         operationLabel: formatPostCureMotorOperationLabel(operation, inhibitorType),
         motorSubmissionType:
           statusMeta?.motorSubmissionType ??
@@ -548,6 +591,7 @@ export const mapPostCureDetailsForDisplay = (
         rejectionReason:
           statusMeta?.rejectionReason ?? (entry.rejectionReason as string | null) ?? null,
         sections: resolvePostCureMotorSections(entry),
+        postCureData,
       };
     })
     .filter((motor) => motor.motorId.length > 0);
@@ -678,15 +722,14 @@ export class PostCureDetailsModel {
             ? String(payload.updatedAt)
             : null,
       motorId: String(payload?.motorId ?? ""),
-      motorReceiptDate: String(payload?.motorReceiptDate ?? ""),
+      motorReceiptDate: formatPostCureMotorReceiptDateForUi(payload?.motorReceiptDate),
       operation,
       inhibitorType: mappedInhibitorType,
-      sections: Array.isArray(payload?.sections) ? payload.sections : undefined,
       motors:
         rawMotors.length > 0
           ? rawMotors.map((motor: any) => ({
               motorId: String(motor?.motorId ?? ""),
-              motorReceiptDate: String(motor?.motorReceiptDate ?? ""),
+              motorReceiptDate: formatPostCureMotorReceiptDateForUi(motor?.motorReceiptDate),
               operation: mapApiOperationType(String(motor?.operationType ?? "")) || operation,
               inhibitorType:
                 mapApiInhibitorType(String(motor?.inhibitorType ?? "")) || mappedInhibitorType,
@@ -694,7 +737,8 @@ export class PostCureDetailsModel {
               motorSubmissionType: normalizePostCureMotorSubmissionType(motor?.motorSubmissionType),
               motorSubmissionStatus: normalizePostCureMotorStatus(motor?.motorSubmissionStatus),
               rejectionReason: motor?.rejectionReason ?? null,
-              sections: Array.isArray(motor?.sections) ? motor.sections : undefined,
+              looseFlapFillingDetails: motor?.looseFlapFillingDetails,
+              inhibitionDetails: motor?.inhibitionDetails,
             }))
           : undefined,
       motorStatuses: Array.isArray(payload?.motorStatuses)

@@ -1,3 +1,17 @@
+import {
+  compactRecord,
+  isLegacySectionArray,
+  pickField,
+  toApiDate,
+  toApiDateTime,
+  toApiNumber,
+  toApiTime,
+  toUiDate,
+  toUiDateTime,
+  toUiTime,
+  unwrapMotorSectionPayload,
+} from "./castingCuringFieldCodec";
+
 export type CuringOption = { value: string; label: string };
 
 /** Dropdown options from curing-schema.v2.json HOT_WATER_STATUS. */
@@ -43,6 +57,14 @@ export type CuringMotorData = {
 export type CuringMotorSectionPayload = {
   sectionId: string;
   sectionData: Record<string, unknown>[];
+};
+
+export type CuringSectionsPayload = {
+  curingCycles: {
+    curingTable: Array<Record<string, unknown>>;
+  };
+  postCuringDetails: Record<string, unknown>;
+  decoringDetails: Record<string, unknown>;
 };
 
 export const CURING_MOTOR_SECTION_IDS = [
@@ -147,132 +169,153 @@ const hasUserContent = (value: unknown): boolean => {
 export const curingMotorDataHasUserInput = (data: CuringMotorData): boolean =>
   hasUserContent(data);
 
-const stripRowForPayload = (row: Record<string, unknown>): Record<string, unknown> => {
-  const out: Record<string, unknown> = {};
-  Object.entries(row).forEach(([key, value]) => {
-    if (key === "valueFieldType" || key === "readonly") return;
-    if (key.endsWith("__fieldType") || key.startsWith("_")) return;
-    out[key] = value;
-  });
-  return out;
-};
+const rowHasPayloadValues = (row: Record<string, unknown>): boolean =>
+  Object.entries(row).some(([key, value]) => key !== "srNo" && value !== undefined && value !== "");
 
-const curingCycleRowsForPayload = (rows: CuringCycleRow[]): unknown[] =>
-  rows.map((row, index) =>
-    stripRowForPayload({
-      srNo: Number(row.srNo) || index + 1,
-      TEMPERATURE: row.TEMPERATURE,
-      TIME: row.TIME,
-      START_DATE: row.START_DATE,
-      START_TIME: row.START_TIME,
-      END_DATE: row.END_DATE,
-      END_TIME: row.END_TIME,
-      PROPELLANT_PRESSURE: row.PROPELLANT_PRESSURE,
-      HOT_WATER_STATUS: row.HOT_WATER_STATUS,
-    }),
-  );
+const curingCycleRowsForPayload = (rows: CuringCycleRow[]): Record<string, unknown>[] =>
+  rows
+    .map((row, index) =>
+      compactRecord({
+        srNo: Number(row.srNo) || index + 1,
+        temperature: toApiNumber(row.TEMPERATURE),
+        time: toApiNumber(row.TIME),
+        startDate: toApiDate(row.START_DATE),
+        startTime: toApiTime(row.START_TIME),
+        endDate: toApiDate(row.END_DATE),
+        endTime: toApiTime(row.END_TIME),
+        hotWaterStatus: str(row.HOT_WATER_STATUS).trim() || undefined,
+        propellantPressure: toApiNumber(row.PROPELLANT_PRESSURE),
+      }),
+    )
+    .filter(rowHasPayloadValues);
 
-export const buildCuringSectionsPayload = (
-  data: CuringMotorData,
-): CuringMotorSectionPayload[] => [
-  {
-    sectionId: "CURING_CYCLES",
-    sectionData: [
-      {
-        CURING_TABLE: curingCycleRowsForPayload(data.CURING_CYCLES.CURING_TABLE ?? []),
-      },
-    ],
+export const buildCuringSectionsPayload = (data: CuringMotorData): CuringSectionsPayload => ({
+  curingCycles: {
+    curingTable: curingCycleRowsForPayload(data.CURING_CYCLES.CURING_TABLE ?? []),
   },
-  {
-    sectionId: "POST_CURING_DETAILS",
-    sectionData: [
-      {
-        OTHER_OBSERVATIONS: str(data.POST_CURING_DETAILS.OTHER_OBSERVATIONS).trim(),
-        VISUAL_OBSERVATION: str(data.POST_CURING_DETAILS.VISUAL_OBSERVATION).trim(),
-        PRESSURE_PLATE_REMOVAL_DATE_TIME: str(
-          data.POST_CURING_DETAILS.PRESSURE_PLATE_REMOVAL_DATE_TIME,
-        ).trim(),
-        SHORE_A_HARDNESS: str(data.POST_CURING_DETAILS.SHORE_A_HARDNESS).trim(),
-        DE_CORING_DISPATCH_DATE_TIME: str(
-          data.POST_CURING_DETAILS.DE_CORING_DISPATCH_DATE_TIME,
-        ).trim(),
-      },
-    ],
-  },
-  {
-    sectionId: "DECORING_DETAILS",
-    sectionData: [
-      {
-        DECORING_DATE: str(data.DECORING_DETAILS.DECORING_DATE).trim(),
-        BUILDING_NO: str(data.DECORING_DETAILS.BUILDING_NO).trim(),
-        DECORING_LOAD: str(data.DECORING_DETAILS.DECORING_LOAD).trim(),
-        DECORING_REMARKS: str(data.DECORING_DETAILS.DECORING_REMARKS).trim(),
-        DECORING_VISUAL_OBSERVATION: toApiAttachments(
-          data.DECORING_DETAILS.DECORING_VISUAL_OBSERVATION,
-        ),
-      },
-    ],
-  },
-];
+  postCuringDetails: compactRecord({
+    otherObservations: str(data.POST_CURING_DETAILS.OTHER_OBSERVATIONS).trim() || undefined,
+    visualObservation: str(data.POST_CURING_DETAILS.VISUAL_OBSERVATION).trim() || undefined,
+    pressurePlateRemovalDateTime: toApiDateTime(
+      data.POST_CURING_DETAILS.PRESSURE_PLATE_REMOVAL_DATE_TIME,
+    ),
+    shoreAHardness: toApiNumber(data.POST_CURING_DETAILS.SHORE_A_HARDNESS),
+    decoringDispatchDateTime: toApiDateTime(
+      data.POST_CURING_DETAILS.DE_CORING_DISPATCH_DATE_TIME,
+    ),
+  }),
+  decoringDetails: compactRecord({
+    decoringDate: toApiDate(data.DECORING_DETAILS.DECORING_DATE),
+    buildingNo: str(data.DECORING_DETAILS.BUILDING_NO).trim() || undefined,
+    decoringLoad: toApiNumber(data.DECORING_DETAILS.DECORING_LOAD),
+    decoringRemarks: str(data.DECORING_DETAILS.DECORING_REMARKS).trim() || undefined,
+    decoringVisualObservation:
+      toApiAttachments(data.DECORING_DETAILS.DECORING_VISUAL_OBSERVATION) || undefined,
+  }),
+});
 
 const firstSectionRow = (
   sections: Array<{ sectionId?: string; sectionData?: unknown[] }> | undefined,
   sectionId: string,
 ): Record<string, unknown> => {
-  const match = (sections ?? []).find(
-    (section) => str(section.sectionId).trim() === sectionId,
-  );
+  const match = (sections ?? []).find((section) => {
+    const id = str(section.sectionId).trim();
+    return id === sectionId || id.toUpperCase() === sectionId.toUpperCase();
+  });
   const rows = asArray(match?.sectionData);
   return asRecord(rows[0]) ?? {};
+};
+
+const resolveCuringSection = (
+  source: unknown,
+  camelKey: string,
+  snakeKey: string,
+): Record<string, unknown> => {
+  if (isLegacySectionArray(source)) {
+    const fromSnake = firstSectionRow(source, snakeKey);
+    if (Object.keys(fromSnake).length) return fromSnake;
+    return firstSectionRow(source, camelKey);
+  }
+  const nested = asRecord(source) ?? {};
+  return asRecord(nested[camelKey]) ?? asRecord(nested[snakeKey]) ?? {};
 };
 
 const parseCuringCycleRow = (item: unknown, index: number): CuringCycleRow => {
   const row = asRecord(item) ?? {};
   return {
-    srNo: str(row.srNo ?? row.SR_NO ?? index + 1),
-    TEMPERATURE: str(row.TEMPERATURE ?? row.temperature ?? ""),
-    TIME: str(row.TIME ?? row.durationMinutes ?? row.DURATION ?? ""),
-    START_DATE: str(row.START_DATE ?? row.startDate ?? ""),
-    START_TIME: str(row.START_TIME ?? row.startTime ?? ""),
-    END_DATE: str(row.END_DATE ?? row.endDate ?? ""),
-    END_TIME: str(row.END_TIME ?? row.endTime ?? ""),
-    PROPELLANT_PRESSURE: str(row.PROPELLANT_PRESSURE ?? row.propellantPressure ?? ""),
-    HOT_WATER_STATUS: str(row.HOT_WATER_STATUS ?? row.hotWaterCirculation ?? ""),
+    srNo: str(pickField(row, "srNo", "SR_NO") ?? index + 1),
+    TEMPERATURE: str(pickField(row, "temperature", "TEMPERATURE") ?? ""),
+    TIME: str(pickField(row, "time", "durationMinutes", "DURATION", "TIME") ?? ""),
+    START_DATE: toUiDate(pickField(row, "startDate", "START_DATE") ?? ""),
+    START_TIME: toUiTime(pickField(row, "startTime", "START_TIME") ?? ""),
+    END_DATE: toUiDate(pickField(row, "endDate", "END_DATE") ?? ""),
+    END_TIME: toUiTime(pickField(row, "endTime", "END_TIME") ?? ""),
+    PROPELLANT_PRESSURE: str(
+      pickField(row, "propellantPressure", "PROPELLANT_PRESSURE") ?? "",
+    ),
+    HOT_WATER_STATUS: str(
+      pickField(row, "hotWaterStatus", "HOT_WATER_STATUS", "hotWaterCirculation") ?? "",
+    ),
   };
 };
 
-export const parseCuringMotorDataFromSections = (
-  sections: Array<{ sectionId?: string; sectionData?: unknown[] }> | undefined,
-): CuringMotorData => {
+export const parseCuringMotorDataFromApi = (source: unknown): CuringMotorData => {
   const empty = createEmptyCuringMotorData();
-  if (!sections?.length) return empty;
+  if (source == null) return empty;
+  if (Array.isArray(source) && source.length === 0) return empty;
+  if (typeof source === "object" && !Array.isArray(source) && Object.keys(source).length === 0) {
+    return empty;
+  }
 
-  const cycles = firstSectionRow(sections, "CURING_CYCLES");
-  const post = firstSectionRow(sections, "POST_CURING_DETAILS");
-  const decor = firstSectionRow(sections, "DECORING_DETAILS");
+  const resolved = unwrapMotorSectionPayload(source, "curingSections");
 
-  const tableRows = asArray(cycles.CURING_TABLE).map(parseCuringCycleRow);
+  const cycles = resolveCuringSection(resolved, "curingCycles", "CURING_CYCLES");
+  const post = resolveCuringSection(resolved, "postCuringDetails", "POST_CURING_DETAILS");
+  const decor = resolveCuringSection(resolved, "decoringDetails", "DECORING_DETAILS");
+
+  const tableRows = asArray(pickField(cycles, "curingTable", "CURING_TABLE")).map(
+    parseCuringCycleRow,
+  );
 
   return {
     CURING_CYCLES: {
       CURING_TABLE: tableRows.length ? tableRows : empty.CURING_CYCLES.CURING_TABLE,
     },
     POST_CURING_DETAILS: {
-      OTHER_OBSERVATIONS: str(post.OTHER_OBSERVATIONS ?? ""),
-      VISUAL_OBSERVATION: str(post.VISUAL_OBSERVATION ?? ""),
-      PRESSURE_PLATE_REMOVAL_DATE_TIME: str(post.PRESSURE_PLATE_REMOVAL_DATE_TIME ?? ""),
-      SHORE_A_HARDNESS: str(post.SHORE_A_HARDNESS ?? ""),
-      DE_CORING_DISPATCH_DATE_TIME: str(post.DE_CORING_DISPATCH_DATE_TIME ?? ""),
+      OTHER_OBSERVATIONS: str(
+        pickField(post, "otherObservations", "OTHER_OBSERVATIONS") ?? "",
+      ),
+      VISUAL_OBSERVATION: str(
+        pickField(post, "visualObservation", "VISUAL_OBSERVATION") ?? "",
+      ),
+      PRESSURE_PLATE_REMOVAL_DATE_TIME: toUiDateTime(
+        pickField(post, "pressurePlateRemovalDateTime", "PRESSURE_PLATE_REMOVAL_DATE_TIME") ??
+          "",
+      ),
+      SHORE_A_HARDNESS: str(pickField(post, "shoreAHardness", "SHORE_A_HARDNESS") ?? ""),
+      DE_CORING_DISPATCH_DATE_TIME: toUiDateTime(
+        pickField(
+          post,
+          "decoringDispatchDateTime",
+          "deCoringDispatchDateTime",
+          "DE_CORING_DISPATCH_DATE_TIME",
+        ) ?? "",
+      ),
     },
     DECORING_DETAILS: {
-      DECORING_DATE: str(decor.DECORING_DATE ?? ""),
-      BUILDING_NO: str(decor.BUILDING_NO ?? ""),
-      DECORING_LOAD: str(decor.DECORING_LOAD ?? ""),
-      DECORING_REMARKS: str(decor.DECORING_REMARKS ?? ""),
-      DECORING_VISUAL_OBSERVATION: toApiAttachments(decor.DECORING_VISUAL_OBSERVATION),
+      DECORING_DATE: toUiDate(pickField(decor, "decoringDate", "DECORING_DATE") ?? ""),
+      BUILDING_NO: str(pickField(decor, "buildingNo", "BUILDING_NO") ?? ""),
+      DECORING_LOAD: str(pickField(decor, "decoringLoad", "DECORING_LOAD") ?? ""),
+      DECORING_REMARKS: str(pickField(decor, "decoringRemarks", "DECORING_REMARKS") ?? ""),
+      DECORING_VISUAL_OBSERVATION: toApiAttachments(
+        pickField(decor, "decoringVisualObservation", "DECORING_VISUAL_OBSERVATION"),
+      ),
     },
   };
 };
+
+/** @deprecated Use parseCuringMotorDataFromApi */
+export const parseCuringMotorDataFromSections = parseCuringMotorDataFromApi;
 
 /**
  * Replace CURING_TABLE from curing-cycles API mapped rows (partials accepted).
@@ -296,10 +339,10 @@ export const applyCuringCycleConfigRows = (
       srNo: str(row.srNo ?? row.SR_NO ?? row.sequenceNo ?? index + 1),
       TEMPERATURE: str(row.TEMPERATURE ?? row.temperature ?? base.TEMPERATURE),
       TIME: str(row.TIME ?? row.durationMinutes ?? row.DURATION ?? base.TIME),
-      START_DATE: str(row.START_DATE ?? row.startDate ?? base.START_DATE),
-      START_TIME: str(row.START_TIME ?? row.startTime ?? base.START_TIME),
-      END_DATE: str(row.END_DATE ?? row.endDate ?? base.END_DATE),
-      END_TIME: str(row.END_TIME ?? row.endTime ?? base.END_TIME),
+      START_DATE: toUiDate(row.START_DATE ?? row.startDate ?? base.START_DATE),
+      START_TIME: toUiTime(row.START_TIME ?? row.startTime ?? base.START_TIME),
+      END_DATE: toUiDate(row.END_DATE ?? row.endDate ?? base.END_DATE),
+      END_TIME: toUiTime(row.END_TIME ?? row.endTime ?? base.END_TIME),
       PROPELLANT_PRESSURE: str(
         row.PROPELLANT_PRESSURE ?? row.propellantPressure ?? base.PROPELLANT_PRESSURE,
       ),

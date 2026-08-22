@@ -1,15 +1,11 @@
-import {
-  buildDispatchSectionPayload,
-  createDispatchInitialValues,
-  DISPATCH_SCHEMA_TYPE,
-  mapDispatchDetailsToSchemaValues,
-  mapDispatchSchemaValuesToDispatchDetails,
-  schemaValuesHaveUserData,
-  type SchemaDocumentV2,
-  type SchemaFormValues,
-  type SchemaSectionSubmission,
-} from "../../../schema-engine";
 import { OPERATION_STATUS } from "../../../hooks/operationStatus";
+import {
+  buildDispatchMotorDetailsPayload,
+  createEmptyDispatchMotorData,
+  dispatchMotorDataHasUserInput,
+  parseDispatchMotorDataFromApi,
+  type DispatchMotorData,
+} from "./DispatchMotorDataModel";
 
 export type DispatchMotorSubmissionType = "DRAFT" | "SUBMIT";
 export type DispatchMotorSubmissionStatus =
@@ -215,8 +211,8 @@ export type DispatchMotorSetup = {
 export type DispatchMotorSession = {
   motorId: string;
   setup: DispatchMotorSetup;
-  schemaFormValues: SchemaFormValues;
-  savedSchemaValues?: Record<string, unknown>;
+  formLoaded: boolean;
+  dispatchData: DispatchMotorData;
 };
 
 export const createDefaultDispatchMotorSetup = (): DispatchMotorSetup => ({
@@ -233,21 +229,19 @@ export const createDefaultDispatchMotorSetup = (): DispatchMotorSetup => ({
 export const createEmptyDispatchMotorSession = (motorId: string): DispatchMotorSession => ({
   motorId,
   setup: createDefaultDispatchMotorSetup(),
-  schemaFormValues: {},
+  formLoaded: false,
+  dispatchData: createEmptyDispatchMotorData(),
 });
 
 export const hydrateDispatchMotorSession = (
   motorId: string,
-  schema: SchemaDocumentV2,
   setup: DispatchMotorSetup,
-  savedSchemaValues?: Record<string, unknown>,
+  dispatchDetails?: Record<string, unknown>,
 ): DispatchMotorSession => ({
   motorId,
   setup,
-  schemaFormValues: savedSchemaValues
-    ? mapDispatchDetailsToSchemaValues(schema, savedSchemaValues)
-    : createDispatchInitialValues(schema),
-  savedSchemaValues,
+  formLoaded: true,
+  dispatchData: parseDispatchMotorDataFromApi(dispatchDetails),
 });
 
 export const createDispatchData = () => ({
@@ -259,8 +253,6 @@ export const createDispatchData = () => ({
   ndtMomNo: "",
   finalAcceptanceClearance: "NO",
   finalAcceptanceMomNo: "",
-  schemaFormLoaded: false,
-  dispatchSchema: null as SchemaDocumentV2 | null,
   motors: [] as DispatchMotorSession[],
 });
 
@@ -304,15 +296,13 @@ export type DispatchDetails = {
   finalAcceptanceMomNo?: string;
   motors?: Array<{
     motorId: string;
+    dispatchDetails?: Record<string, unknown>;
     schemaValues?: Record<string, unknown>;
     setup?: DispatchMotorSetup;
   }>;
-  sections?: SchemaSectionSubmission[];
 };
 
 export type DispatchFormBody = {
-  schemaVersion?: string;
-  schemaType?: string;
   motorStage?: string;
   motorId?: string;
   castingDate?: string;
@@ -322,16 +312,14 @@ export type DispatchFormBody = {
   ndtMomNo?: string;
   finalAcceptanceClearance?: string;
   finalAcceptanceMomNo?: string;
-  sections: SchemaSectionSubmission[];
 };
 
 export const createDefaultDispatchFormState = (): DispatchFormState => createDispatchData();
 
 export const appendDispatchMotorToState = (
   state: DispatchFormState,
-  schema: SchemaDocumentV2,
   motorId: string,
-  savedSchemaValues?: Record<string, unknown>,
+  dispatchDetails?: Record<string, unknown>,
   setupOverride?: DispatchMotorSetup,
 ): DispatchFormState => {
   const trimmedId = String(motorId ?? "").trim();
@@ -339,7 +327,7 @@ export const appendDispatchMotorToState = (
 
   const existing = state.motors ?? [];
   const setup = setupOverride ?? snapshotDispatchSetupFromForm(state);
-  const nextSession = hydrateDispatchMotorSession(trimmedId, schema, setup, savedSchemaValues);
+  const nextSession = hydrateDispatchMotorSession(trimmedId, setup, dispatchDetails);
   const clearedState = clearDispatchFormSetup(state);
 
   const alreadyPresent = existing.some((motor) => motor.motorId === trimmedId);
@@ -349,29 +337,26 @@ export const appendDispatchMotorToState = (
 
   return {
     ...clearedState,
-    dispatchSchema: clearedState.dispatchSchema ?? schema,
     motors: nextMotors,
-    schemaFormLoaded: true,
   };
 };
 
 /** @deprecated Use appendDispatchMotorToState */
 export const hydrateDispatchFormState = (
   state: DispatchFormState,
-  schema: SchemaDocumentV2,
+  _schema: unknown,
 ): DispatchFormState =>
   appendDispatchMotorToState(
     state,
-    schema,
     state.motors[0]?.motorId ?? "",
-    state.motors[0]?.savedSchemaValues,
+    undefined,
+    state.motors[0]?.setup,
   );
 
 const buildDispatchDetailsPayload = (
-  schema: SchemaDocumentV2,
   setup: DispatchMotorSetup,
-  schemaValues: SchemaFormValues,
-) => mapDispatchSchemaValuesToDispatchDetails(schema, schemaValues, setup);
+  dispatchData: DispatchMotorData,
+) => buildDispatchMotorDetailsPayload(dispatchData, setup);
 
 export const mapDispatchDetailsToFormState = (details: DispatchDetails): DispatchFormState => {
   const defaults = createDefaultDispatchFormState();
@@ -393,11 +378,12 @@ export const mapDispatchDetailsToFormState = (details: DispatchDetails): Dispatc
       .map((motor) => ({
         motorId: String(motor?.motorId ?? "").trim(),
         setup: motor.setup ?? fallbackSetup,
-        schemaFormValues: {},
-        savedSchemaValues: motor?.schemaValues,
+        formLoaded: Boolean(motor?.dispatchDetails ?? motor?.schemaValues),
+        dispatchData: parseDispatchMotorDataFromApi(
+          (motor?.dispatchDetails ?? motor?.schemaValues) as Record<string, unknown>,
+        ),
       }))
       .filter((motor) => motor.motorId.length > 0),
-    schemaFormLoaded: motors.length > 0,
   };
 };
 
@@ -411,30 +397,19 @@ export const mapDispatchFormStateToBackendPayload = (
     motorSubmissionType?: DispatchMotorSubmissionType;
   },
 ) => {
-  const schema = form.dispatchSchema;
   const targetIds = options?.targetMotorIds?.length
     ? new Set(options.targetMotorIds.map((id) => String(id).trim()).filter(Boolean))
     : null;
 
-  if (!schema) {
-    return {
-      batchId,
-      subDepartmentId,
-      formSubmissionType: intent,
-      motors: [],
-    };
-  }
-
   const motors = (form.motors ?? [])
     .filter((motor) => String(motor.motorId ?? "").trim())
     .filter((motor) => !targetIds || targetIds.has(motor.motorId))
-    .filter((motor) => isDispatchMotorSetupReady(motor))
+    .filter((motor) => isDispatchMotorSetupReady(motor) && motor.formLoaded)
     .map((motor) => ({
       motorId: motor.motorId,
       dispatchDetails: buildDispatchDetailsPayload(
-        schema,
         motor.setup ?? createDefaultDispatchMotorSetup(),
-        motor.schemaFormValues ?? {},
+        motor.dispatchData ?? createEmptyDispatchMotorData(),
       ),
       ...(options?.motorSubmissionType ? { motorSubmissionType: options.motorSubmissionType } : {}),
     }));
@@ -494,13 +469,10 @@ export const mapDispatchDetailsFromSavedForm = (
 };
 
 export const mapDispatchFormStateToPayload = (form: DispatchFormState): DispatchFormBody => {
-  const schema = form.dispatchSchema;
   const primaryMotor = form.motors[0];
   const primarySetup = primaryMotor?.setup ?? snapshotDispatchSetupFromForm(form);
 
   return {
-    schemaVersion: schema?.schemaVersion,
-    schemaType: schema?.schemaType ?? DISPATCH_SCHEMA_TYPE,
     motorStage: primarySetup.motorStage || undefined,
     motorId: primaryMotor?.motorId || undefined,
     castingDate: primarySetup.castingDate || undefined,
@@ -513,10 +485,6 @@ export const mapDispatchFormStateToPayload = (form: DispatchFormState): Dispatch
       primarySetup.finalAcceptanceClearance === "YES"
         ? primarySetup.finalAcceptanceMomNo || undefined
         : undefined,
-    sections:
-      schema && primaryMotor
-        ? buildDispatchSectionPayload(schema, primaryMotor.schemaFormValues ?? {})
-        : [],
   };
 };
 
@@ -528,7 +496,7 @@ const hasDispatchSetupValue = (setup: DispatchMotorSetup) =>
   (setup.finalAcceptanceClearance === "YES" &&
     String(setup.finalAcceptanceMomNo ?? "").trim().length > 0);
 
-/** Motor has completed FlowBar setup and can show the schema form. */
+/** Motor has completed FlowBar setup and can show the dispatch form. */
 export const isDispatchMotorSetupReady = (motor?: DispatchMotorSession | null): boolean => {
   if (!motor) return false;
   return hasDispatchSetupValue(motor.setup ?? createDefaultDispatchMotorSetup());
@@ -542,13 +510,13 @@ const hasSetupValue = (form: DispatchFormState) =>
 
 export const hasAnyDispatchValue = (form: DispatchFormState) =>
   hasSetupValue(form) ||
-  (form.motors ?? []).some((motor) => schemaValuesHaveUserData(motor.schemaFormValues ?? {}));
+  (form.motors ?? []).some((motor) => dispatchMotorDataHasUserInput(motor.dispatchData));
 
 export const hasMotorDispatchValue = (form: DispatchFormState, motorId: string) => {
   const motor = (form.motors ?? []).find((entry) => entry.motorId === motorId);
   if (!motor) return false;
   return (
     hasDispatchSetupValue(motor.setup ?? createDefaultDispatchMotorSetup()) ||
-    schemaValuesHaveUserData(motor.schemaFormValues ?? {})
+    dispatchMotorDataHasUserInput(motor.dispatchData)
   );
 };

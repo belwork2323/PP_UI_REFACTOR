@@ -6,7 +6,7 @@ import {
   type StfAddedMotor,
   type StfMotorOption,
 } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
-import type { StfSubType } from "../../../../../schema-engine";
+import type { StfSubType } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
 import CasePrepSelect from "../../manufacturing/CasePreparation/CasePrepSelect";
 
 type STFFlowBarProps = {

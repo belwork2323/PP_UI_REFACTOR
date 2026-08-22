@@ -96,7 +96,12 @@ import {
   hydrateProcessingMaterialValuesFromSeed,
   parseProcessingMaterialsFromDivisionDetails,
 } from "./qcProcessingMaterials";
-import { resolveDivisionSchemaRequest, canLoadDivisionSchema, shouldSkipQcSchemaFetch, isBatchMotorSeededQcFlow } from "./qcDivisionRegistry";
+import {
+  resolveDivisionSchemaRequest,
+  canLoadDivisionSchema,
+  shouldSkipQcSchemaFetch,
+  isBatchMotorSeededQcFlow,
+} from "./qcDivisionRegistry";
 import {
   appendDivisionEntryToForm,
   buildDivisionEntryDedupKey,
@@ -742,11 +747,8 @@ export const useQCDivisionHook = () => {
         let seedRecord: Record<string, unknown> | null = null;
 
         if (useFormDetails) {
-          // IN_PROGRESS / APPROVED / etc. → /qc-division/details for saved QC data.
-          // Manufacturing /division-details is only fetched for non-HARDWARE / non-QC divisions that
-          // may still have TO_BE_INITIATED sibling units. HARDWARE loads division-details
-          // lazily when a TO_BE_INITIATED motor is opened (never for IN_PROGRESS motors).
-          // QC (propellant) never calls /division-details — the custom motor UI loads empty.
+          // IN_PROGRESS / APPROVED / etc. → /qc-division/details only (all divisions).
+          // Manufacturing /division-details is lazy-loaded per TO_BE_INITIATED unit on open.
           const formDetails = formDetailsForStatus ?? (await ensureQcFormDetailsPayload());
           if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
           const matchingDetail = findQcFormDivisionDetail(formDetails, {
@@ -758,32 +760,13 @@ export const useQCDivisionHook = () => {
             (divisionFlowKey === "MIXING" ? resolveMixingQcFormData(formDetails) : null) ??
             toDivisionAutoPopulateRecord(matchingDetail) ??
             matchingDetail ??
-            (formDetails ? toDivisionAutoPopulateRecord(formDetails) : null);
+            null;
 
-          const shouldFetchManufacturing =
-            divisionFlowKey !== "HARDWARE" && !isBatchMotorSeededQcFlow(divisionFlowKey);
-          const manufacturing = shouldFetchManufacturing
-            ? await fetchManufacturingDivisionDetails({ batchId, divisionId })
-            : null;
-          if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
-
-          if (!qcData && !manufacturing) {
-            if (isBatchMotorSeededQcFlow(divisionFlowKey)) {
-              seedRecord = {
-                ...(batchPayload ? { __batchDetails: batchPayload } : {}),
-              };
-            } else {
-              setDivisionAutoPopulateData(null);
-              return null;
-            }
-          } else {
-            seedRecord = {
-              ...(qcData ?? manufacturing ?? {}),
-              ...(qcData ? { __qcFormDivisionData: qcData } : {}),
-              ...(manufacturing ? { __manufacturingDivisionData: manufacturing } : {}),
-              ...(batchPayload ? { __batchDetails: batchPayload } : {}),
-            };
-          }
+          seedRecord = {
+            ...(qcData ?? {}),
+            ...(qcData ? { __qcFormDivisionData: qcData } : {}),
+            ...(batchPayload ? { __batchDetails: batchPayload } : {}),
+          };
         } else if (isBatchMotorSeededQcFlow(divisionFlowKey)) {
           // QC / Weighment have no manufacturing seed — load empty motor UI from batch motors.
           seedRecord = {
@@ -1175,15 +1158,51 @@ export const useQCDivisionHook = () => {
         undefined,
         selectedMotorId,
       );
-      const seedPayload = divisionAutoPopulateDataRef.current;
       const batchPayload =
-        (seedPayload as { __batchDetails?: unknown } | null)?.__batchDetails ?? null;
-      const initialValues = applyCastingDivisionDetailsSeed(
-        createInitialCastingValues(),
-        seedPayload,
-        selectedMotorId,
-        { onlyIfEmpty: false, batchPayload },
+        (divisionAutoPopulateDataRef.current as { __batchDetails?: unknown } | null)
+          ?.__batchDetails ?? null;
+      const motorNavItem = partialNavItems.find(
+        (nav) => nav.kind === "MOTOR" && nav.motorId === selectedMotorId,
       );
+      const motorStatus = motorNavItem?.status ?? "TO_BE_INITIATED";
+
+      let initialValues = createInitialCastingValues();
+      if (shouldUseQcFormDetailsData(motorStatus)) {
+        const formDetails = await ensureQcFormDetailsPayload();
+        const matchingDetail = findQcFormDivisionDetail(formDetails, {
+          flowKey: selectedDivision,
+          rawMaterialType: selectedRawMaterialType,
+        });
+        const seedRoot =
+          matchingDetail && typeof matchingDetail === "object"
+            ? (matchingDetail as Record<string, unknown>)
+            : null;
+        const sections = expandDivisionDetailSections(seedRoot);
+        const motorSections = sections.filter(
+          (section) =>
+            String((section as { motorId?: string }).motorId ?? "").trim() === selectedMotorId,
+        );
+        if (motorSections.length) {
+          initialValues = hydrateCastingValuesFromSections(motorSections);
+        }
+        initialValues = applyCastingDivisionDetailsSeed(
+          initialValues,
+          null,
+          selectedMotorId,
+          { onlyIfEmpty: true, batchPayload },
+        );
+      } else {
+        const seedPayload =
+          resolveManufacturingDivisionDetailsPayload(divisionAutoPopulateDataRef.current) ??
+          divisionAutoPopulateDataRef.current;
+        initialValues = applyCastingDivisionDetailsSeed(
+          initialValues,
+          seedPayload,
+          selectedMotorId,
+          { onlyIfEmpty: false, batchPayload },
+        );
+      }
+
       const nextEntries = [...(formData.divisionEntries ?? []), entry];
       updateFormData((prev) =>
         appendDivisionEntryToForm(prev, entry, { schemaValues: initialValues }, []),
@@ -1260,8 +1279,43 @@ export const useQCDivisionHook = () => {
         entryKind === "LIQUID_PREMIX") &&
       premixNo != null
     ) {
-      const materialSeeds = getProcessingMaterialsForPremix(divisionAutoPopulateData, premixNo);
-      if (!materialSeeds.length || !subDepartmentId) {
+      const premixNavItem = partialNavItems.find(
+        (nav) => nav.kind === "PREMIX" && nav.premixNo === premixNo,
+      );
+      const premixStatus = premixNavItem?.status ?? "TO_BE_INITIATED";
+      if (shouldUseQcFormDetailsData(premixStatus)) {
+        // IN_PROGRESS+ premix units are loaded from /qc-division/details via motor/premix nav.
+        return;
+      }
+
+      let seedPayload =
+        resolveManufacturingDivisionDetailsPayload(divisionAutoPopulateData) ??
+        divisionAutoPopulateData;
+      const materialSeeds = getProcessingMaterialsForPremix(seedPayload, premixNo);
+      if (!materialSeeds.length) {
+        const divisionId = resolveQcManufacturingDivisionDetailsId(
+          divisionCatalog,
+          selectedDivision,
+          selectedRawMaterialType,
+        );
+        const batchId = String(activeBatch?.batchId ?? "").trim();
+        if (divisionId != null && batchId) {
+          try {
+            const response = await qcDivisionController.fetchDivisionDetails({
+              batchId,
+              divisionId,
+            });
+            if (response?.success) {
+              seedPayload = response.data;
+            }
+          } catch (error) {
+            console.error("Failed to load raw material division-details seed:", error);
+          }
+        }
+      }
+
+      const resolvedSeeds = getProcessingMaterialsForPremix(seedPayload, premixNo);
+      if (!resolvedSeeds.length || !subDepartmentId) {
         showAlert(messages.SCHEMA_FETCH_ERROR, "error");
         return;
       }
@@ -1275,7 +1329,7 @@ export const useQCDivisionHook = () => {
       setSchemaLoading(true);
       setSchemaError(null);
       try {
-        for (const seed of materialSeeds) {
+        for (const seed of resolvedSeeds) {
           const schema = await fetchQcProcessingMaterialSchema({ subDepartmentId, seed });
           if (!schema) {
             showAlert(messages.SCHEMA_FETCH_ERROR, "error");
@@ -1330,9 +1384,7 @@ export const useQCDivisionHook = () => {
           rawMaterialType: selectedRawMaterialType,
         });
         autoPopulatePayload =
-          toDivisionAutoPopulateRecord(matchingDetail) ??
-          matchingDetail ??
-          divisionAutoPopulateData;
+          toDivisionAutoPopulateRecord(matchingDetail) ?? matchingDetail ?? null;
       } else {
         autoPopulatePayload = divisionAutoPopulateData;
         const divisionId = resolveQcDivisionIdForSelection(
@@ -1475,6 +1527,7 @@ export const useQCDivisionHook = () => {
     divisionAutoPopulateData,
     divisionCatalog,
     activeBatch?.batchId,
+    partialNavItems,
   ]);
 
   // Tab / picker selection auto-loads the form UI — no separate Load Form click.
@@ -1539,37 +1592,19 @@ export const useQCDivisionHook = () => {
           if (flowKey === "MIXING") {
             return (
               resolveMixingQcFormData(formDetails) ??
-              (auto as any)?.__qcFormDivisionData ??
-              toDivisionAutoPopulateRecord(auto) ??
-              auto
+              (auto as { __qcFormDivisionData?: unknown } | null)?.__qcFormDivisionData ??
+              null
             );
           }
           const matchingDetail = findQcFormDivisionDetail(formDetails, {
             flowKey,
             rawMaterialType: selectedRawMaterialType,
           });
-          // IN_PROGRESS+ hardware/de-coring/other units: QC form details only — never fall back to
-          // divisionAutoPopulateData (may still carry __manufacturingDivisionData).
-          if (
-            flowKey === "HARDWARE" ||
-            flowKey === "DE_CORING" ||
-            flowKey === "TRIMMING" ||
-            flowKey === "POST_CURE" ||
-            flowKey === "NDT" ||
-            flowKey === "QC" ||
-            flowKey === "WEIGHTMENT"
-          ) {
-            return (
-              toDivisionAutoPopulateRecord(matchingDetail) ??
-              (auto as any)?.__qcFormDivisionData ??
-              null
-            );
-          }
+          // IN_PROGRESS+ (all divisions): QC form details only — never manufacturing fallback.
           return (
             toDivisionAutoPopulateRecord(matchingDetail) ??
-            (auto as any)?.__qcFormDivisionData ??
-            toDivisionAutoPopulateRecord(auto) ??
-            auto
+            (auto as { __qcFormDivisionData?: unknown } | null)?.__qcFormDivisionData ??
+            null
           );
         }
 
@@ -1667,6 +1702,53 @@ export const useQCDivisionHook = () => {
             flowKey === "CASTING" &&
             item.kind === "MOTOR" &&
             item.motorId &&
+            shouldUseQcFormDetailsData(item.status)
+          ) {
+            const seedPayload = await resolveSeedPayloadForUnit();
+            if (requestId !== partialNavLoadRequestIdRef.current) return;
+            const batchPayload =
+              (divisionAutoPopulateDataRef.current as { __batchDetails?: unknown } | null)
+                ?.__batchDetails ?? null;
+            const seedRoot =
+              seedPayload && typeof seedPayload === "object"
+                ? (seedPayload as Record<string, unknown>)
+                : null;
+            updateFormData((prev) => {
+              let entryValues = { ...(prev.divisionEntryValues ?? {}) };
+              for (const entryId of existingIds) {
+                let schemaValues = entryValues[entryId]?.schemaValues ?? createInitialCastingValues();
+                const sections = expandDivisionDetailSections(seedRoot);
+                const motorSections = sections.filter(
+                  (section) =>
+                    String((section as { motorId?: string }).motorId ?? "").trim() ===
+                    item.motorId,
+                );
+                if (motorSections.length) {
+                  schemaValues = hydrateCastingValuesFromSections(motorSections);
+                }
+                schemaValues = applyCastingDivisionDetailsSeed(
+                  schemaValues,
+                  null,
+                  item.motorId!,
+                  { onlyIfEmpty: true, batchPayload },
+                );
+                entryValues = {
+                  ...entryValues,
+                  [entryId]: {
+                    ...entryValues[entryId],
+                    schemaValues,
+                  },
+                };
+              }
+              return {
+                ...prev,
+                divisionEntryValues: entryValues,
+              };
+            });
+          } else if (
+            flowKey === "CASTING" &&
+            item.kind === "MOTOR" &&
+            item.motorId &&
             !shouldUseQcFormDetailsData(item.status)
           ) {
             const seedPayload = await resolveSeedPayloadForUnit();
@@ -1699,6 +1781,44 @@ export const useQCDivisionHook = () => {
             flowKey === "CURING" &&
             item.kind === "MOTOR" &&
             item.motorId &&
+            shouldUseQcFormDetailsData(item.status)
+          ) {
+            const seedPayload = await resolveSeedPayloadForUnit();
+            if (requestId !== partialNavLoadRequestIdRef.current) return;
+            const seedRoot =
+              seedPayload && typeof seedPayload === "object"
+                ? (seedPayload as Record<string, unknown>)
+                : null;
+            updateFormData((prev) => {
+              let entryValues = { ...(prev.divisionEntryValues ?? {}) };
+              for (const entryId of existingIds) {
+                let schemaValues = entryValues[entryId]?.schemaValues ?? createInitialCuringValues();
+                const sections = expandDivisionDetailSections(seedRoot);
+                const motorSections = sections.filter(
+                  (section) =>
+                    String((section as { motorId?: string }).motorId ?? "").trim() ===
+                    item.motorId,
+                );
+                if (motorSections.length) {
+                  schemaValues = hydrateCuringValuesFromSections(motorSections);
+                }
+                entryValues = {
+                  ...entryValues,
+                  [entryId]: {
+                    ...entryValues[entryId],
+                    schemaValues,
+                  },
+                };
+              }
+              return {
+                ...prev,
+                divisionEntryValues: entryValues,
+              };
+            });
+          } else if (
+            flowKey === "CURING" &&
+            item.kind === "MOTOR" &&
+            item.motorId &&
             !shouldUseQcFormDetailsData(item.status)
           ) {
             const seedPayload = await resolveSeedPayloadForUnit();
@@ -1716,6 +1836,45 @@ export const useQCDivisionHook = () => {
                       item.motorId!,
                       { onlyIfEmpty: true },
                     ),
+                  },
+                };
+              }
+              return {
+                ...prev,
+                divisionEntryValues: entryValues,
+              };
+            });
+          } else if (
+            flowKey === "DE_CORING" &&
+            item.kind === "MOTOR" &&
+            item.motorId &&
+            shouldUseQcFormDetailsData(item.status)
+          ) {
+            const seedPayload = await resolveSeedPayloadForUnit();
+            if (requestId !== partialNavLoadRequestIdRef.current) return;
+            const seedRoot =
+              seedPayload && typeof seedPayload === "object"
+                ? (seedPayload as Record<string, unknown>)
+                : null;
+            updateFormData((prev) => {
+              let entryValues = { ...(prev.divisionEntryValues ?? {}) };
+              for (const entryId of existingIds) {
+                let schemaValues =
+                  entryValues[entryId]?.schemaValues ?? createInitialDeCoringValues();
+                const sections = expandDivisionDetailSections(seedRoot);
+                const motorSections = sections.filter(
+                  (section) =>
+                    String((section as { motorId?: string }).motorId ?? "").trim() ===
+                    item.motorId,
+                );
+                if (motorSections.length) {
+                  schemaValues = hydrateDeCoringValuesFromSections(motorSections);
+                }
+                entryValues = {
+                  ...entryValues,
+                  [entryId]: {
+                    ...entryValues[entryId],
+                    schemaValues,
                   },
                 };
               }
@@ -2306,11 +2465,11 @@ export const useQCDivisionHook = () => {
               if (motorSections.length) {
                 initialValues = hydrateCastingValuesFromSections(motorSections);
               }
-              // Still overlay casting type from batch metadata when QC details omit it.
+              // Batch metadata only — saved fields already hydrated from QC form details above.
               if (item.motorId) {
                 initialValues = applyCastingDivisionDetailsSeed(
                   initialValues,
-                  seedPayload,
+                  null,
                   item.motorId,
                   { onlyIfEmpty: true, batchPayload },
                 );
@@ -2364,14 +2523,6 @@ export const useQCDivisionHook = () => {
               if (motorSections.length) {
                 initialValues = hydrateCuringValuesFromSections(motorSections);
               }
-              if (item.motorId) {
-                initialValues = applyCuringDivisionDetailsSeed(
-                  initialValues,
-                  seedPayload,
-                  item.motorId,
-                  { onlyIfEmpty: true },
-                );
-              }
             } else if (item.motorId) {
               initialValues = buildInitialCuringValuesForMotor(
                 seedPayload,
@@ -2414,14 +2565,6 @@ export const useQCDivisionHook = () => {
               );
               if (motorSections.length) {
                 initialValues = hydrateDeCoringValuesFromSections(motorSections);
-              }
-              if (item.motorId) {
-                initialValues = applyDeCoringDivisionDetailsSeed(
-                  initialValues,
-                  seedPayload,
-                  item.motorId,
-                  { onlyIfEmpty: true },
-                );
               }
             } else if (item.motorId) {
               initialValues = buildInitialDeCoringValuesForMotor(seedPayload, item.motorId);
@@ -2705,10 +2848,8 @@ export const useQCDivisionHook = () => {
 
           if (flowKey === "MIXING") {
             setSelectedMixingStage("PREMIX");
-            // TO_BE_INITIATED → division-details; IN_PROGRESS+ → qc-division/details.
-            const seedPayload = isQcStatusAwaitingInitiation(item.status)
-              ? await resolveSeedPayloadForUnit()
-              : divisionAutoPopulateDataRef.current;
+            // Unit status selects seed: TO_BE_INITIATED → division-details; IN_PROGRESS+ → qc-division/details.
+            const seedPayload = await resolveSeedPayloadForUnit();
             if (requestId !== partialNavLoadRequestIdRef.current) return;
             let initialValues = buildSeededPremixDetailsValues(item.premixNo, seedPayload);
             if (shouldUseQcFormDetailsData(item.status)) {
@@ -2793,15 +2934,17 @@ export const useQCDivisionHook = () => {
               item.processingType || selectedProcessingType || "SOLID_PROCESSING";
             setSelectedProcessingType(processingType);
 
+            if (shouldUseQcFormDetailsData(item.status)) {
+              // IN_PROGRESS+ premix units hydrate from saved /qc-division/details on form load.
+              return;
+            }
+
             const seedPayload = await resolveSeedPayloadForUnit();
             if (requestId !== partialNavLoadRequestIdRef.current) return;
 
             const materialSeeds = getProcessingMaterialsForPremix(seedPayload, item.premixNo);
             if (!materialSeeds.length || !subDepartmentId) {
-              // Mixed division: IN_PROGRESS unit may only exist in form details; TO_BE_INITIATED needs manufacturing.
-              if (isQcStatusAwaitingInitiation(item.status)) {
-                showAlert(messages.SCHEMA_FETCH_ERROR, "error");
-              }
+              showAlert(messages.SCHEMA_FETCH_ERROR, "error");
               return;
             }
 
@@ -2856,10 +2999,7 @@ export const useQCDivisionHook = () => {
 
           let initialValues = createInitialViscosityValues();
           let sharedFinalMixDetails: SchemaFormValues | undefined;
-          // TO_BE_INITIATED → division-details; IN_PROGRESS+ → qc-division/details.
-          const seedPayload = isQcStatusAwaitingInitiation(item.status)
-            ? await resolveSeedPayloadForUnit()
-            : divisionAutoPopulateDataRef.current;
+          const seedPayload = await resolveSeedPayloadForUnit();
           if (requestId !== partialNavLoadRequestIdRef.current) return;
 
           if (shouldUseQcFormDetailsData(item.status)) {
@@ -3783,19 +3923,9 @@ export const useQCDivisionHook = () => {
                   return true;
                 });
               if (sectionsToHydrate.length > 0) {
-                let schemaValues = hydrateCuringValuesFromSections(sectionsToHydrate);
-                const manufacturingPayload = resolveManufacturingDivisionDetailsPayload(
-                  divisionAutoPopulateDataRef.current,
-                );
-                if (manufacturingPayload && entry.motorId) {
-                  schemaValues = applyCuringDivisionDetailsSeed(
-                    schemaValues,
-                    manufacturingPayload,
-                    entry.motorId,
-                    { onlyIfEmpty: true },
-                  );
-                }
-                entryValues[entry.entryId] = { schemaValues };
+                entryValues[entry.entryId] = {
+                  schemaValues: hydrateCuringValuesFromSections(sectionsToHydrate),
+                };
               } else if (
                 !entryValues[entry.entryId]?.schemaValues ||
                 Object.keys(entryValues[entry.entryId].schemaValues).length === 0

@@ -20,7 +20,7 @@ import PremixStatusChip, {
   PremixCountsSummary,
 } from "../../user/manufacturing/RawMaterial/components/PremixStatusChip";
 import type { PremixSubmissionStatus } from "../../../../data/models/user/RawMaterialPreparationModel";
-import { StfMotorDetailPanel } from "../../user/qualityControl/StaticTestFacility/components/STFDetailsContent";
+import StfMotorPanel from "../../user/qualityControl/StaticTestFacility/StfMotorPanel";
 import {
   UserWorkflowNavPanel,
   UserWorkflowTabNav,
@@ -267,11 +267,13 @@ const STFApproverReviewContent = ({
             </Stack>
           ) : null}
 
-          <StfMotorDetailPanel
-            motor={activeMotor}
-            dt={dt}
-            palette={palette}
-            statusConfig={statusConfig}
+          <StfMotorPanel
+            value={activeMotor.stfData}
+            onChange={() => undefined}
+            readOnly
+            theme={qcTheme}
+            batchId={detailView?.batchId}
+            motorId={activeMotor.motorId}
           />
         </Box>
       ) : (

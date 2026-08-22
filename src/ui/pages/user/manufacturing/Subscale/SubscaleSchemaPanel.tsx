@@ -87,6 +87,10 @@ const SubscaleSchemaPanel = ({
 
   const handleHardwareChange = useCallback(
     (next: SchemaFormValues) => {
+      if (next.IS_PROCESS_FORM_LOADED) {
+        onChange(next);
+        return;
+      }
       const merged = mergeHardwareFormValues(next);
       onChange(applySubscaleHardwareRowGeneration(schema, merged));
     },
@@ -95,6 +99,10 @@ const SubscaleSchemaPanel = ({
 
   const handleBatchSetupChange = useCallback(
     (next: SchemaFormValues) => {
+      if (next.IS_PROCESS_FORM_LOADED) {
+        onChange(next);
+        return;
+      }
       onChange(mergeSubscaleBatchFormValues(next));
     },
     [onChange],
@@ -121,15 +129,7 @@ const SubscaleSchemaPanel = ({
       emitChange(initial);
     }
     hydratedRef.current = true;
-  }, [
-    schema,
-    savedSections,
-    batchType,
-    showMainScaleSetup,
-    showSubscaleBatchSetup,
-    emitChange,
-    formValues,
-  ]);
+  }, [schema, savedSections, batchType, emitChange]);
 
   const themeTokens = useMemo(
     () => ({

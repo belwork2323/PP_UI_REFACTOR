@@ -19,7 +19,7 @@ import PremixStatusChip, {
   PremixCountsSummary,
 } from "../../user/manufacturing/RawMaterial/components/PremixStatusChip";
 import type { PremixSubmissionStatus } from "../../../../data/models/user/RawMaterialPreparationModel";
-import { MotorDetailPanel } from "../../user/dispatch/components/DispatchDetailsContent";
+import DispatchMotorDetailsCard from "../../user/dispatch/DispatchMotorDetailsCard";
 import {
   UserWorkflowNavPanel,
   UserWorkflowTabNav,
@@ -274,7 +274,18 @@ const DispatchApproverReviewContent = ({
             </Stack>
           ) : null}
 
-          <MotorDetailPanel motor={activeMotor} dt={dt} palette={palette} />
+          <DispatchMotorDetailsCard
+            motor={{
+              motorId: activeMotor.motorId,
+              setup: activeMotor.setup,
+              formLoaded: true,
+              dispatchData: activeMotor.dispatchData,
+            }}
+            batchId={detailView.batchId}
+            theme={{ palette: palette }}
+            readOnly
+            onMotorDataChange={() => undefined}
+          />
         </Box>
       ) : (
         <Typography sx={dt.emptyText}>{D.MOTOR_APPROVER_NO_ACTIONABLE}</Typography>

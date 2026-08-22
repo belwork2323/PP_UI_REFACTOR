@@ -8,7 +8,8 @@ import getQualityControlTheme from "../../../../../app/theme/custom_themes/user/
 import { OPERATION_STATUS } from "../../../../../hooks/operationStatus";
 import { STRINGS } from "../../../../../app/config/strings";
 import { resolveBemMotorStatusTabs } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
-import STFSchemaPanel from "./STFSchemaPanel";
+import { createEmptyStfMotorSession, normalizeStfMotorSession } from "../../../../../data/models/user/StaticTestFacilityFormModel";
+import StfMotorPanel from "./StfMotorPanel";
 import ConfirmAlertDialog from "@/ui/components/common/ConfirmAlertDialog";
 import UserWorkflowStatusAction from "../../../../components/custom/UserWorkflowStatusAction";
 import UserWorkflowFormDetailsHeader from "../../../../components/custom/UserWorkflowFormDetailsHeader";
@@ -33,14 +34,14 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
 
   const {
     view,
-    schemaLoading,
-    schemaError,
     subDepartmentId,
     batch,
     formData,
     handleCreateNewBem,
     handleBackFromForm,
     onFormValuesChange,
+    handleStfTestNoChange,
+    handleDraftBemNoChange,
     actionLoading = false,
     isEditMode = false,
     handleSaveDraft,
@@ -76,23 +77,21 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
     isStfTestNoLocked,
   } = hookState;
 
-  const activeSchema =
-    (formData?.stfSchema?.data ? (formData?.stfSchema ?? formData) : null) ?? null;
+  const bemMotorSession = useMemo(() => {
+    const found = formData?.motors?.[0];
+    if (found) return normalizeStfMotorSession(found);
+    return createEmptyStfMotorSession(draftBemNo || "", "BEM");
+  }, [draftBemNo, formData?.motors]);
 
-  const bemMotorId = formData?.motors?.[0]?.motorId ?? "BEM_FORM";
-  const activeFormValues =
-    formData?.schemaFormValues ?? hookState.activeMotorSession?.schemaFormValues ?? {};
-  const savedSections =
-    formData?.motors?.[0]?.savedSections ?? hookState.activeMotorSession?.savedSections ?? [];
+  const bemMotorId = bemMotorSession.motorId || "BEM_FORM";
 
-  // Determine rejection reason from formData or active motor session
   const rejectionReason =
     formData?.rejectionReason ?? hookState.activeMotorSession?.rejectionReason ?? null;
 
   const displayRows = Array.isArray(bemMotors) ? bemMotors : [];
 
-  const bemMotorNo = String(draftBemNo || activeFormValues?.bemNo || "").trim();
-  const stfTestNoValue = String(activeFormValues?.stfTestNo || "").trim();
+  const bemMotorNo = String(draftBemNo || formData?.bemNo || bemMotorSession.motorId || "").trim();
+  const stfTestNoValue = String(bemMotorSession.stfTestNo || formData?.stfTestNo || "").trim();
   const canSubmitActions = bemMotorNo.length > 0 && stfTestNoValue.length > 0;
   const stfTestNoLocked = [activeBemMotor?.motorId, bemMotorNo, draftBemNo, bemMotorId]
     .map((id) => String(id ?? "").trim())
@@ -118,10 +117,9 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
     );
   }
 
-  // Form / Schema View Mode
   if (view === "form") {
-    const currentBemNo = draftBemNo || activeFormValues?.bemNo;
-    const currentStfTestNo = activeFormValues?.stfTestNo;
+    const currentBemNo = bemMotorNo;
+    const currentStfTestNo = stfTestNoValue;
     const isExistingRecord = Boolean(activeBemMotor?.motorId) || hasSavedDraft;
     const isCreateMode = !isEditMode && !isExistingRecord;
 
@@ -175,7 +173,6 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
           onCancel={() => setDraftConfirmOpen(false)}
         />
 
-        {/* Submit Confirmation Dialog */}
         <ConfirmAlertDialog
           open={submitConfirmOpen}
           severity="warning"
@@ -190,7 +187,6 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
           }}
         />
 
-        {/* Back / Unsaved Changes Confirmation Dialog */}
         <ConfirmAlertDialog
           open={backConfirmOpen}
           severity="warning"
@@ -226,69 +222,48 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
               {isEditMode ? strings.RESUBMIT_LABEL : strings.SUBMIT_LABEL}
             </Button>
           </Stack>
-          {activeSchema ? (
-            <>
-              <Box
-                sx={{
-                  display: "flex",
-                  flexDirection: { xs: "column", sm: "row" },
-                  gap: 2.5,
-                  alignItems: "stretch",
-                  width: "100%",
+          <Box
+            sx={{
+              display: "flex",
+              flexDirection: { xs: "column", sm: "row" },
+              gap: 2.5,
+              alignItems: "stretch",
+              width: "100%",
+            }}
+          >
+            <Box sx={{ flex: 1 }}>
+              <AppTextField
+                label={strings.OTHER_BEM_MOTOR_NO_LABEL}
+                value={draftBemNo || formData?.bemNo || bemMotorSession.motorId || ""}
+                placeholder={strings.OTHER_BEM_MOTOR_NO_PLACEHOLDER}
+                disabled={isExistingRecord}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  handleDraftBemNoChange?.(e.target.value);
                 }}
-              >
-                <Box sx={{ flex: 1 }}>
-                  <AppTextField
-                    label={strings.OTHER_BEM_MOTOR_NO_LABEL}
-                    value={draftBemNo || activeFormValues?.bemNo || ""}
-                    placeholder={strings.OTHER_BEM_MOTOR_NO_PLACEHOLDER}
-                    disabled={isExistingRecord}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                      const val = e.target.value;
-                      onFormValuesChange?.("bemNo", {
-                        ...activeFormValues,
-                        bemNo: val,
-                      });
-                    }}
-                  />
-                </Box>
-                <Box sx={{ flex: 1 }}>
-                  <AppTextField
-                    label={strings.STF_TEST_NO_LABEL}
-                    value={activeFormValues?.stfTestNo || ""}
-                    placeholder={strings.STF_TEST_NO_PLACEHOLDER}
-                    disabled={stfTestNoLocked || actionLoading}
-                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
-                      if (stfTestNoLocked) return;
-                      const val = e.target.value;
-                      onFormValuesChange?.("stfTestNo", {
-                        ...activeFormValues,
-                        stfTestNo: val,
-                      });
-                    }}
-                  />
-                </Box>
-              </Box>
-              <STFSchemaPanel
-                schema={activeSchema}
-                formValues={activeFormValues}
-                savedSections={savedSections}
-                subDepartmentId={subDepartmentId}
-                batchId={batch?.batchId}
-                onChange={(values: any) => {
-                  if (typeof onFormValuesChange === "function") {
-                    onFormValuesChange(bemMotorId, values);
-                  }
-                }}
-                loading={schemaLoading}
-                error={schemaError}
               />
-            </>
-          ) : (
-            <Box sx={{ p: 3, textAlign: "center", color: "text.secondary" }}>
-              No schema sections found for Other BEM.
             </Box>
-          )}
+            <Box sx={{ flex: 1 }}>
+              <AppTextField
+                label={strings.STF_TEST_NO_LABEL}
+                value={stfTestNoValue}
+                placeholder={strings.STF_TEST_NO_PLACEHOLDER}
+                disabled={stfTestNoLocked || actionLoading}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+                  if (stfTestNoLocked) return;
+                  handleStfTestNoChange?.(bemMotorId, e.target.value);
+                }}
+              />
+            </Box>
+          </Box>
+          <StfMotorPanel
+            value={bemMotorSession.stfData}
+            onChange={(next) => onFormValuesChange?.(bemMotorId, next)}
+            disabled={actionLoading}
+            theme={theme}
+            subDepartmentId={subDepartmentId}
+            batchId={batch?.batchId}
+            motorId={bemMotorNo || bemMotorId}
+          />
         </Box>
       </Box>
     );

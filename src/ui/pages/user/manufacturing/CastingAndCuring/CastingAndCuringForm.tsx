@@ -639,7 +639,6 @@ const CastingAndCuringForm = ({
                     onLoadCuringForm={() =>
                       activeMotorEntry && onLoadCuringForm(activeMotorEntry.motorId)
                     }
-                    schemaLoading={false}
                     theme={theme}
                   />
                   {curingFormLoaded && activeMotorSession ? (
@@ -680,8 +679,10 @@ const CastingAndCuringForm = ({
                           })
                         }
                         motorId={activeMotorSession.motorId}
+                        buildingNo={String(batch?.identificationSheet?.BldgNo ?? "")}
                         disabled={activeMotorLocked}
                         theme={theme}
+                        showPropellantPressure={curingCycleConfig?.showPropellantPressure !== false}
                       />
                     </Box>
                   ) : null}

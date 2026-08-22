@@ -54,6 +54,7 @@ type SchemaFileFieldProps = {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  readOnly?: boolean;
   /** Used for post-pick filtering only — not set on the native input (keeps picker fast). */
   accept?: string;
   helperText?: string;
@@ -148,6 +149,7 @@ const SchemaFileField = ({
   value,
   onChange,
   disabled = false,
+  readOnly = false,
   accept = FILE_PICKER_ACCEPT.IMAGE_VIDEO,
   helperText,
   compact = false,
@@ -155,6 +157,7 @@ const SchemaFileField = ({
   addLabel,
   emptyLabel,
 }: SchemaFileFieldProps) => {
+  const isLocked = disabled || readOnly;
   const inputRef = useRef<HTMLInputElement | null>(null);
   const inputId = useId();
   const files = parseSchemaFileList(value);
@@ -207,13 +210,13 @@ const SchemaFileField = ({
               key={`${name}-${index}`}
               name={name}
               compact={compact}
-              onRemove={disabled ? undefined : () => handleRemove(index)}
+              onRemove={isLocked ? undefined : () => handleRemove(index)}
             />
           ))}
         </Stack>
-      ) : disabled ? (
+      ) : isLocked ? (
         <Typography sx={{ fontSize: compact ? "0.72rem" : "0.78rem", color: BRAND.textSub, fontStyle: "italic" }}>
-          No files uploaded
+          {readOnly ? "—" : "No files uploaded"}
         </Typography>
       ) : null}
 
@@ -226,13 +229,13 @@ const SchemaFileField = ({
         ref={inputRef}
         type="file"
         multiple={multiple}
-        disabled={disabled}
+        disabled={isLocked}
         onChange={handleInputChange}
         style={{ display: "none" }}
         tabIndex={-1}
       />
 
-      {!disabled ? (
+      {!isLocked ? (
         <Button
           type="button"
           variant="outlined"

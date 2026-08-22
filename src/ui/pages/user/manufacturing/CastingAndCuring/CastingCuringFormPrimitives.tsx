@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import {
   Box,
+  MenuItem,
   Table,
   TableBody,
   TableCell,
@@ -12,6 +13,7 @@ import {
   alpha,
 } from "@mui/material";
 import { CASTING_CURING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/castingAndCuring_theme";
+import { WorkflowReadOnlyText } from "../../../../components/common/WorkflowReadOnlyText";
 
 const BRAND = CASTING_CURING_BRAND;
 
@@ -226,6 +228,7 @@ export const TableTextInput = ({
   onChange,
   placeholder = "",
   disabled = false,
+  readOnly = false,
   type = "text",
   multiline = false,
   minRows,
@@ -234,23 +237,70 @@ export const TableTextInput = ({
   onChange: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  readOnly?: boolean;
   type?: string;
   multiline?: boolean;
   minRows?: number;
-}) => (
-  <TextField
-    size="small"
-    fullWidth
-    type={type}
-    multiline={multiline}
-    minRows={minRows}
-    value={value}
-    placeholder={placeholder}
-    disabled={disabled}
-    onChange={(event) => onChange(event.target.value)}
-    sx={castingCuringTableInputSx}
-  />
-);
+}) =>
+  readOnly ? (
+    <WorkflowReadOnlyText value={value} />
+  ) : (
+    <TextField
+      size="small"
+      fullWidth
+      type={type}
+      multiline={multiline}
+      minRows={minRows}
+      value={value}
+      placeholder={placeholder}
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.value)}
+      sx={castingCuringTableInputSx}
+    />
+  );
+
+export const TableSelectInput = ({
+  value,
+  onChange,
+  options,
+  placeholder = "Select",
+  disabled = false,
+  readOnly = false,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string }>;
+  placeholder?: string;
+  disabled?: boolean;
+  readOnly?: boolean;
+}) => {
+  if (readOnly) {
+    const label = options.find((option) => option.value === value)?.label ?? value;
+    return <WorkflowReadOnlyText value={label} />;
+  }
+
+  return (
+    <TextField
+      select
+      size="small"
+      fullWidth
+      value={value}
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.value)}
+      sx={castingCuringTableInputSx}
+      SelectProps={{ displayEmpty: true }}
+    >
+      <MenuItem value="">
+        <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub }}>{placeholder}</Typography>
+      </MenuItem>
+      {options.map((option) => (
+        <MenuItem key={option.value} value={option.value}>
+          {option.label}
+        </MenuItem>
+      ))}
+    </TextField>
+  );
+};
 
 type ParameterTableColumn = {
   key: "parameter" | "value" | "remarks" | "observations";
@@ -275,6 +325,7 @@ type ParameterTableProps = {
   onChangeObservations?: (index: number, value: string) => void;
   renderValue?: (row: ParameterTableRow, index: number) => ReactNode;
   disabled?: boolean;
+  readOnly?: boolean;
   emptyText?: string;
 };
 
@@ -292,6 +343,7 @@ export const ParameterTable = ({
   onChangeObservations,
   renderValue,
   disabled = false,
+  readOnly = false,
   emptyText = "No rows",
 }: ParameterTableProps) => {
   if (!rows.length) {
@@ -335,6 +387,7 @@ export const ParameterTable = ({
                             value={row.value ?? ""}
                             onChange={(next) => onChangeValue?.(index, next)}
                             disabled={disabled}
+                            readOnly={readOnly}
                             type={row.valueFieldType === "number" ? "number" : "text"}
                             multiline={row.valueFieldType === "textarea"}
                             minRows={row.valueFieldType === "textarea" ? 2 : undefined}
@@ -351,6 +404,7 @@ export const ParameterTable = ({
                         value={row.observations ?? ""}
                         onChange={(next) => onChangeObservations?.(index, next)}
                         disabled={disabled}
+                        readOnly={readOnly}
                         multiline
                         minRows={2}
                         placeholder="Observations"
@@ -364,6 +418,7 @@ export const ParameterTable = ({
                       value={row.remarks ?? ""}
                       onChange={(next) => onChangeRemarks?.(index, next)}
                       disabled={disabled}
+                      readOnly={readOnly}
                       placeholder="Remarks"
                     />
                   </TableCell>

@@ -1,4 +1,7 @@
+import dayjs from "dayjs";
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import { formatDateTimeForApi } from "../../../data/models/user/rawMaterialPreparationApiMapper";
+import { formatToIsoDateInput } from "../../../utils/dateUtils";
 import type { QcDivisionEntry } from "./qcDivisionEntryTypes";
 import {
   QC_HARDWARE_ATTACHMENTS_SECTION_ID,
@@ -838,6 +841,278 @@ export const collectHardwareMotorSections = (
     merged.push(section);
   });
   return merged;
+};
+
+export type QcHardwareMotorSubmissionType = "DRAFT" | "SUBMIT";
+
+const omitEmpty = <T extends Record<string, unknown>>(record: T): Record<string, unknown> =>
+  Object.fromEntries(
+    Object.entries(record).filter(([, value]) => {
+      if (value === undefined || value === null || value === "") return false;
+      if (Array.isArray(value) && value.length === 0) return false;
+      return true;
+    }),
+  );
+
+const splitAttachmentList = (value: string) =>
+  String(value ?? "")
+    .split(",")
+    .map((part) => part.trim())
+    .filter(Boolean);
+
+const combineUiDateTime = (date: string, time: string): string | undefined => {
+  const d = String(date ?? "").trim();
+  const t = String(time ?? "").trim();
+  if (!d && !t) return undefined;
+  if (d && t) return formatDateTimeForApi(`${d} ${t}`) ?? undefined;
+  if (d) return formatToIsoDateInput(d) || undefined;
+  if (/^\d{1,2}:\d{2}/.test(t)) {
+    const parsed = dayjs(`1970-01-01 ${t}`);
+    return parsed.isValid() ? parsed.format("HH:mm") : t;
+  }
+  return undefined;
+};
+
+const cutRowToAbradingDetails = (
+  row: QcHardwareCutRow,
+  dustLabel: "A" | "B",
+  startSrNo: number,
+): Record<string, unknown>[] => {
+  const details: Record<string, unknown>[] = [];
+  let srNo = startSrNo;
+  const startValue = combineUiDateTime(String(row.DATE ?? ""), String(row.START_TIME ?? ""));
+  const endValue = combineUiDateTime(String(row.DATE ?? ""), String(row.END_TIME ?? ""));
+  const remarks = String(row.OBSERVATIONS ?? "").trim() || undefined;
+
+  if (startValue) {
+    details.push({
+      SR_NO: srNo++,
+      operation: "Start Date & Time",
+      value: startValue,
+      remarksObservations: remarks,
+    });
+  }
+  if (endValue) {
+    details.push({
+      SR_NO: srNo++,
+      operation: "End Date & Time",
+      value: endValue,
+      remarksObservations: remarks,
+    });
+  }
+  if (hasValue(row.DUST_QTY)) {
+    details.push({
+      SR_NO: srNo++,
+      operation: `Dust Weight (in gm) (${dustLabel})`,
+      value: String(row.DUST_QTY ?? "").trim(),
+      remarksObservations: remarks,
+    });
+  }
+  return details;
+};
+
+const buildAbradingOperationPayload = (values: SchemaFormValues): Record<string, unknown> => {
+  const firstCut = sanitizeCutRows(
+    getHardwareAbradingRows(values, QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID),
+  );
+  const secondCut = sanitizeCutRows(
+    getHardwareAbradingRows(values, QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID),
+  );
+  const abradingDetails = [
+    ...cutRowToAbradingDetails(firstCut[0] ?? emptyCutRow(1), "A", 1),
+    ...cutRowToAbradingDetails(secondCut[0] ?? emptyCutRow(1), "B", 4),
+  ];
+  const dustA = Number(firstCut[0]?.DUST_QTY);
+  const dustB = Number(secondCut[0]?.DUST_QTY);
+  if (Number.isFinite(dustA) && Number.isFinite(dustB)) {
+    abradingDetails.push({
+      SR_NO: abradingDetails.length + 1,
+      operation: "Total Dust Weight (in gm) (A+B)",
+      value: String(dustA + dustB),
+      remarksObservations: undefined,
+    });
+  }
+  const photoFiles = splitAttachmentList(
+    getHardwareUploadValues(values)[QC_HARDWARE_UPLOAD_PHOTO_KEY],
+  );
+
+  return omitEmpty({
+    abradingDetails: abradingDetails.map((row, index) => ({
+      ...row,
+      SR_NO: index + 1,
+      attachments: index === 0 && photoFiles.length ? photoFiles.join(", ") : undefined,
+    })),
+  });
+};
+
+const buildPreHeatingPayload = (values: SchemaFormValues): Record<string, unknown> => {
+  const rows = sanitizePreheatingRows(getHardwarePreheatingRows(values));
+  const row = rows[0];
+  if (!row) return {};
+
+  const monitoring: Record<string, unknown>[] = [];
+  let srNo = 1;
+  if (hasValue(row.DATE)) {
+    monitoring.push({
+      SR_NO: srNo++,
+      parameter: "Date",
+      value: formatToIsoDateInput(String(row.DATE)) || String(row.DATE),
+      remarks: String(row.OBSERVATIONS ?? "").trim() || undefined,
+    });
+  }
+  if (hasValue(row.START_TIME)) {
+    monitoring.push({
+      SR_NO: srNo++,
+      parameter: "Cycle Start Time",
+      value: String(row.START_TIME).trim(),
+      remarks: undefined,
+    });
+  }
+  if (hasValue(row.END_TIME)) {
+    monitoring.push({
+      SR_NO: srNo++,
+      parameter: "Cycle End Time",
+      value: String(row.END_TIME).trim(),
+      remarks: undefined,
+    });
+  }
+  if (hasValue(row.OBSERVATIONS)) {
+    monitoring.push({
+      SR_NO: srNo++,
+      parameter: "Visual Observation After Pre-heating",
+      value: String(row.OBSERVATIONS).trim(),
+      remarks: undefined,
+    });
+  }
+
+  const temperatureDuration = hasValue(row.TEMPERATURE)
+    ? [
+        {
+          SR_NO: 1,
+          parameter: "Temperature @ 1 Hour",
+          value: String(row.TEMPERATURE).trim(),
+          remarks: undefined,
+        },
+      ]
+    : [];
+
+  return omitEmpty({
+    vacuumBaggingApplied: hasValue(row.VACUUM_LEVEL) ? "YES" : undefined,
+    vacuumApplied: hasValue(row.VACUUM_LEVEL) ? Number(row.VACUUM_LEVEL) : undefined,
+    temperatureDuration,
+    preHeatingMonitoring: monitoring,
+  });
+};
+
+const buildLinerCoatingPayload = (values: SchemaFormValues): Record<string, unknown> => {
+  const rows = sanitizeLinearCoatingRows(getHardwareLinearCoatingRows(values));
+  const row = rows[0];
+  if (!row) return {};
+
+  const log: Record<string, unknown>[] = [];
+  let srNo = 1;
+  const pushLog = (parameter: string, value: unknown, remarks?: string) => {
+    if (!hasValue(value)) return;
+    log.push({
+      SR_NO: srNo++,
+      parameter,
+      value: String(value).trim(),
+      remarks: remarks?.trim() || undefined,
+    });
+  };
+
+  pushLog("Date", formatToIsoDateInput(String(row.DATE ?? "")) || row.DATE, row.OBSERVATIONS);
+  pushLog("Start Time", row.START_TIME, row.OBSERVATIONS);
+  pushLog("End Time", row.END_TIME, row.OBSERVATIONS);
+  pushLog("Rocket Motor Insulation Temp", row.INSULATION_TEMP, row.OBSERVATIONS);
+  pushLog("Liner Applied (w/o DCM)", row.LINER_QTY, row.OBSERVATIONS);
+
+  return omitEmpty({
+    rh: row.RH || undefined,
+    linerApplicationLog: log,
+  });
+};
+
+const buildDispatchToCastingPayload = (values: SchemaFormValues): Record<string, unknown> => {
+  const dispatch = getHardwareDispatchValues(values);
+  const details: Record<string, unknown>[] = [];
+  let srNo = 1;
+  const pushDetail = (parameter: string, value: unknown, remarks?: string) => {
+    if (!hasValue(value)) return;
+    details.push({
+      SR_NO: srNo++,
+      parameter,
+      value: String(value).trim(),
+      remarks: remarks?.trim() || undefined,
+    });
+  };
+
+  pushDetail("Puncturing at HE (Nos)", dispatch.HE_PUNCTURES);
+  pushDetail("Puncturing at NE (Nos)", dispatch.NE_PUNCTURES);
+  pushDetail("Dispatch Time", combineUiDateTime("", String(dispatch.DISPATCH_DATE_TIME ?? "")));
+
+  const visualObservations = String(dispatch.OBSERVATIONS ?? "")
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line, index) => {
+      const [parameter, ...rest] = line.split(":");
+      if (rest.length) {
+        return {
+          SR_NO: index + 1,
+          parameter: parameter.trim(),
+          observations: rest.join(":").trim(),
+        };
+      }
+      return { SR_NO: index + 1, parameter: "Observations", observations: line };
+    });
+
+  return omitEmpty({
+    dispatchVisualObservations: visualObservations,
+    dispatchToCastingDetails: details,
+  });
+};
+
+const buildTceCleaningPayload = (values: SchemaFormValues): Record<string, unknown> => {
+  const uploads = getHardwareUploadValues(values);
+  const report = uploads[QC_HARDWARE_UPLOAD_REPORT_KEY];
+  if (!hasValue(report)) return {};
+  return omitEmpty({
+    testReport: report,
+  });
+};
+
+export const mergeHardwareMotorSchemaValues = (
+  hardwareEntries: QcDivisionEntry[],
+  valuesByEntryId: Record<string, { schemaValues?: SchemaFormValues } | undefined>,
+): SchemaFormValues => {
+  const merged = createInitialHardwareProcessValues("ABRADING");
+  hardwareEntries.forEach((entry) => {
+    const subType = String(entry.subType ?? "");
+    if (!isQcHardwareProcessSubType(subType)) return;
+    const values = valuesByEntryId[entry.entryId]?.schemaValues;
+    if (!values) return;
+    Object.assign(merged, values);
+  });
+  return merged;
+};
+
+/** Strict Case Preparation DTO for QC create/update (`data.motorDetails[]`). */
+export const buildHardwareMotorDetailPayload = (
+  values: SchemaFormValues | null | undefined,
+  motorId: string,
+  motorSubmissionType: QcHardwareMotorSubmissionType = "DRAFT",
+): Record<string, unknown> => {
+  const merged = values ?? createInitialHardwareProcessValues("ABRADING");
+  return omitEmpty({
+    motorId,
+    motorSubmissionType,
+    abradingOperation: buildAbradingOperationPayload(merged),
+    tceCleaning: buildTceCleaningPayload(merged),
+    preHeating: buildPreHeatingPayload(merged),
+    linerCoatingOperation: buildLinerCoatingPayload(merged),
+    dispatchToCasting: buildDispatchToCastingPayload(merged),
+  });
 };
 
 export const listHardwareProcessSubTypes = (): QcHardwareProcessSubType[] =>

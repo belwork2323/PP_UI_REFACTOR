@@ -91,6 +91,7 @@ const QualityControlPage = () => {
     finalApprovalGroups,
     finalApprovalRows,
     handleBackFromDetails,
+    handleViewDetails,
     detailsRow,
     detailsData,
     detailsLoading,
@@ -295,8 +296,14 @@ const QualityControlPage = () => {
                     draftConfirmMessage: unitActionLabels.draftConfirmMessage,
                     submitConfirmTitle: unitActionLabels.submitConfirmTitle,
                     submitConfirmMessage: unitActionLabels.submitConfirmMessage,
+                    showViewDetails: true,
+                    canViewDetails: canOpenFinalDialog,
+                    viewDetailsLabel: strings.VIEW_DETAILS,
                     onSaveDraft: () => setDraftConfirmOpen(true),
                     onSubmit: () => setSubmitConfirmOpen(true),
+                    onViewDetails: () => {
+                      if (activeBatch) void handleViewDetails(activeBatch);
+                    },
                   }
                 : null
             }

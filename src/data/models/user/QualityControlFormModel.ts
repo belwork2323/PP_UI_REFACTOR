@@ -18,9 +18,9 @@ import {
 import { buildRevalidationMaterialsPayload, buildRevalidationSectionPayload, hasRevalidationTableData } from "../../../hooks/user/qualityControl/qcRawMaterialRevalidationTable";
 import { buildProcessingPremixesPayload } from "../../../hooks/user/qualityControl/qcProcessingMaterials";
 import {
-  applyHardwareAttachmentsToMotorSections,
-  buildHardwareAttachmentsSectionsForForm,
+  buildHardwareMotorDetailPayload,
   buildHardwareProcessSectionPayload,
+  mergeHardwareMotorSchemaValues,
 } from "../../../hooks/user/qualityControl/qcHardwareTables";
 import { buildCastingMotorDetailPayload, castingMotorDetailToSections, isCastingNestedMotorDetail } from "../../../hooks/user/qualityControl/qcCastingTables";
 import {
@@ -53,6 +53,7 @@ import {
 } from "../../../hooks/user/qualityControl/qcPropellantTables";
 import { buildWeighmentDivisionData, isWeighmentNestedMotorDetail, weighmentMotorDetailToSections } from "../../../hooks/user/qualityControl/qcWeighmentTables";
 import { isQcHardwareProcessSubType } from "../../../hooks/user/qualityControl/qcHardwareConfig";
+import { QC_HARDWARE_MANUFACTURING_SECTION_IDS } from "../../../hooks/user/qualityControl/qcHardwareDivisionDetails";
 import type {
   QcDivisionEntry,
   QcDivisionEntryValues,
@@ -548,6 +549,28 @@ export const expandDivisionDetailSections = (
     }
 
     const details = asRecord(rec.details);
+    if (
+      rec.abradingOperation ||
+      rec.preHeating ||
+      rec.linerCoatingOperation ||
+      rec.dispatchToCasting ||
+      rec.tceCleaning ||
+      rec.bellowBonding ||
+      details?.abradingOperation
+    ) {
+      const nested = { ...details, ...rec };
+      for (const sectionId of Object.values(QC_HARDWARE_MANUFACTURING_SECTION_IDS)) {
+        const block = nested[sectionId];
+        if (!block || typeof block !== "object") continue;
+        expandedMotorSections.push({
+          sectionId,
+          sectionData: [block],
+          motorId,
+        });
+      }
+      continue;
+    }
+
     const motorSections = asArray(details?.sections ?? rec.sections);
     motorSections.forEach((section) => {
       const sec = asRecord(section);
@@ -562,30 +585,32 @@ export const expandDivisionDetailSections = (
   return [...plainSections, ...expandedMotorSections];
 };
 
-const wrapHardwareDivisionDataFromSections = (
-  sections: SectionWithUnitMeta[],
+const wrapHardwareDivisionDataFromEntries = (
+  form: QualityControlFormState,
+  entries: QcDivisionEntry[],
   options?: MapQualityControlPayloadOptions,
 ): Record<string, unknown> => {
-  const motorsById = new Map<string, SectionWithUnitMeta[]>();
-
-  sections.forEach((section) => {
-    const motorId = String(section.motorId ?? "").trim();
-    if (!motorId) return;
-    const list = motorsById.get(motorId) ?? [];
-    list.push(section);
-    motorsById.set(motorId, list);
-  });
-
   const motorSubmissionType: QcUnitSubmissionType = options?.unitSubmissionType ?? "DRAFT";
+  const hardwareEntries = entries.filter((entry) => entry.kind === "HARDWARE_PROCESS");
+  const motorsSeen = new Set<string>();
+  const motorDetails: Record<string, unknown>[] = [];
 
-  return {
-    motorDetails: Array.from(motorsById.entries()).map(([motorIdNo, motorSections]) => ({
-      motorIdNo,
-      motorId: motorIdNo,
-      motorSubmissionType,
-      sections: motorSections.map(stripUnitKeysFromSection),
-    })),
-  };
+  for (const entry of hardwareEntries) {
+    const motorId = String(entry.motorId ?? "").trim();
+    if (!motorId || motorsSeen.has(motorId)) continue;
+    motorsSeen.add(motorId);
+
+    const motorEntries = hardwareEntries.filter(
+      (candidate) => String(candidate.motorId ?? "").trim() === motorId,
+    );
+    const mergedValues = mergeHardwareMotorSchemaValues(
+      motorEntries,
+      form.divisionEntryValues ?? {},
+    );
+    motorDetails.push(buildHardwareMotorDetailPayload(mergedValues, motorId, motorSubmissionType));
+  }
+
+  return { motorDetails };
 };
 
 const wrapCastingDivisionDataFromEntries = (
@@ -922,6 +947,9 @@ export const mapQualityControlPayload = (
       if (
         entry.kind === "REVALIDATION" ||
         entry.kind === "PROCESSING_MATERIAL" ||
+        entry.kind === "SOLID_PREMIX" ||
+        entry.kind === "LIQUID_PREMIX" ||
+        entry.kind === "BOTH_PREMIX" ||
         entry.kind === "MIXING_PREMIX" ||
         entry.kind === "MIXING_FINAL_MIX"
       ) {
@@ -940,26 +968,13 @@ export const mapQualityControlPayload = (
         const sections = entries.flatMap((entry) =>
           buildDivisionEntrySections(form, entry),
         ) as SectionWithUnitMeta[];
-        const hardwareEntries = entries.filter((entry) => entry.kind === "HARDWARE_PROCESS");
-        const attachmentSections =
-          division === "HARDWARE" && hardwareEntries.length > 0
-            ? (buildHardwareAttachmentsSectionsForForm(
-                hardwareEntries,
-                form.divisionEntryValues ?? {},
-              ) as SectionWithUnitMeta[])
-            : [];
 
         if (division === "HARDWARE") {
-          const motorSections = applyHardwareAttachmentsToMotorSections(
-            [...sections, ...attachmentSections],
-            hardwareEntries,
-            form.divisionEntryValues ?? {},
-          ) as SectionWithUnitMeta[];
           return {
             division: "HARDWARE" as const,
             subType: null,
             divisionSubmissionType,
-            data: wrapHardwareDivisionDataFromSections(motorSections, options),
+            data: wrapHardwareDivisionDataFromEntries(form, entries, options),
           };
         }
 
@@ -1001,7 +1016,7 @@ export const mapQualityControlPayload = (
 
         if (division === "POST_CURE" || division === "POST_CURE_OPERATION") {
           return {
-            division: "POST_CURE_OPERATION" as const,
+            division: "POST_CURE" as const,
             subType: null,
             divisionSubmissionType,
             data: wrapPostCureDivisionDataFromEntries(form, entries, options),
@@ -1049,30 +1064,6 @@ export const mapQualityControlPayload = (
     return { divisionDetails };
   }
 
-  const solidSchema = getProcessingSchemaFromFormState(form, "SOLID_PROCESSING");
-  const liquidSchema = getProcessingSchemaFromFormState(form, "LIQUID_PROCESSING");
-  const solidEntries = form.solidPremixEntries ?? [];
-  const liquidEntries = form.liquidPremixEntries ?? [];
-  const hasSolidPremix = solidEntries.length > 0 && Boolean(solidSchema);
-  const hasLiquidPremix = liquidEntries.length > 0 && Boolean(liquidSchema);
-
-  if (hasSolidPremix || hasLiquidPremix) {
-    const sections = [
-      ...(hasSolidPremix
-        ? buildPremixSections(solidSchema!, solidEntries, form.solidPremixValuesByNo, "SOLID_PROCESSING")
-        : []),
-      ...(hasLiquidPremix
-        ? buildPremixSections(liquidSchema!, liquidEntries, form.liquidPremixValuesByNo, "LIQUID_PROCESSING")
-        : []),
-    ] as SectionWithUnitMeta[];
-
-    return {
-      divisionDetails: [
-        buildDivisionDetail("RAW_MATERIAL", "RAW_MATERIAL_PROCESSING", sections),
-      ],
-    };
-  }
-
   return {
     divisionDetails: [
       buildDivisionDetail(
@@ -1106,8 +1097,8 @@ export const mapQualityControlDivisionSubmitPayload = (params: {
   } else if (division === "RAW_MATERIAL_PROCESSING") {
     division = "RAW_MATERIAL";
     subType = "RAW_MATERIAL_PROCESSING";
-  } else if (division === "POST_CURE") {
-    division = "POST_CURE_OPERATION";
+  } else if (division === "POST_CURE" || division === "POST_CURE_OPERATION") {
+    division = "POST_CURE";
   }
 
   return {

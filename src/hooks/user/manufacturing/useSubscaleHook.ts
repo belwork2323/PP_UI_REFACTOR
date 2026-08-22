@@ -60,15 +60,10 @@ export const useSubscaleHook = () => {
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
   const [formData, setFormData] = useState<SubscaleFormState>(createDefaultSubscaleFormState());
   const [initialSnapshot, setInitialSnapshot] = useState("{}");
+  const [isFormDirty, setIsFormDirty] = useState(false);
   const [detailsRow, setDetailsRow] = useState<SubscaleBatch | null>(null);
   const [detailsData, setDetailsData] = useState<any>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
-
-  const formSnapshot = useMemo(() => JSON.stringify(formData), [formData]);
-  const isFormDirty = useMemo(
-    () => view === "form" && formSnapshot !== initialSnapshot,
-    [view, formSnapshot, initialSnapshot],
-  );
 
   const snapshotStateRef = useRef(formData);
   snapshotStateRef.current = formData;
@@ -87,6 +82,7 @@ export const useSubscaleHook = () => {
     setHasSavedDraft(false);
     setFormData(defaults);
     setInitialSnapshot(JSON.stringify(defaults));
+    setIsFormDirty(false);
   }, []);
 
   const getErrorMessage = (response: any, fallbackMessage: string) => {
@@ -172,6 +168,7 @@ export const useSubscaleHook = () => {
       setIsEditMode(editMode);
       setFormData(nextFormData);
       setInitialSnapshot(JSON.stringify(nextFormData));
+      setIsFormDirty(false);
       setView("form");
     },
     [showAlert, subDepartmentId, fetchBatchDetailsData],
@@ -188,13 +185,13 @@ export const useSubscaleHook = () => {
   );
 
   const handleBack = useCallback(() => {
-    if (isFormDirty) {
+    if (view === "form" && isFormDirty) {
       setBackConfirmOpen(true);
       return;
     }
     bumpBatchRefresh();
     resetFormContext();
-  }, [isFormDirty, resetFormContext, bumpBatchRefresh]);
+  }, [view, isFormDirty, resetFormContext, bumpBatchRefresh]);
 
   const handleDiscardAndBack = useCallback(async () => {
     setBackConfirmOpen(false);
@@ -216,6 +213,7 @@ export const useSubscaleHook = () => {
       schemaFormValues: values,
       schemaFormLoaded: Boolean(values.IS_PROCESS_FORM_LOADED) || prev.schemaFormLoaded,
     }));
+    setIsFormDirty(true);
   }, []);
 
   const submitForm = useCallback(
@@ -300,7 +298,8 @@ export const useSubscaleHook = () => {
               }
             : prev,
         );
-        setInitialSnapshot(formSnapshot);
+        setInitialSnapshot(JSON.stringify(formData));
+        setIsFormDirty(false);
 
         if (intent === "draft") {
           showAlert(
@@ -328,7 +327,7 @@ export const useSubscaleHook = () => {
         setActionLoading(false);
       }
     },
-    [activeBatch, subDepartmentId, formData, formSnapshot, showAlert, listParams, resetFormContext],
+    [activeBatch, subDepartmentId, formData, showAlert, listParams, resetFormContext],
   );
 
   const handleSaveDraft = useCallback(async () => submitForm("draft"), [submitForm]);

@@ -188,29 +188,35 @@ const toDeCoringApiLoad = (value: string): number | string | undefined => {
 };
 
 /**
- * Flat De-coring motor payload for create/update (`data.deCoringDetails[]`).
- * Matches:
- * `{ motorIdNo, motorSubmissionType, deCoringLoad, deCoringDateTime, observations }`
+ * De-coring motor payload for create/update (`data.deCoringDetails[]`).
+ * Matches `{ motorId, motorSubmissionType, decoringDetails }`.
  */
 export const buildDeCoringMotorDetailPayload = (
   values: SchemaFormValues | null | undefined,
-  motorIdNo: string,
+  motorId: string,
   motorSubmissionType: QcDeCoringMotorSubmissionType = "DRAFT",
 ): Record<string, unknown> => {
   const load = toDeCoringApiLoad(getDeCoringField(values, "DE_CORING_LOAD"));
   const dateTime = toDeCoringApiDateTime(getDeCoringField(values, "DE_CORING_DATE_TIME"));
   const observations = getDeCoringField(values, "OBSERVATIONS");
+  const decoringDate =
+    dateTime?.split("T")[0] ??
+    (getDeCoringField(values, "DE_CORING_DATE_TIME").split("T")[0] || undefined);
 
   return omitEmpty({
-    motorIdNo,
+    motorId,
     motorSubmissionType,
-    deCoringLoad: load,
-    deCoringDateTime: dateTime,
-    observations: observations || undefined,
+    decoringDetails: omitEmpty({
+      decoringDate,
+      decoringLoad: load,
+      decoringRemarks: observations || undefined,
+      decoringVisualObservation: observations || undefined,
+    }),
   });
 };
 
 export const isDeCoringNestedMotorDetail = (rec: Record<string, unknown>) => {
+  if (asRecord(rec.decoringDetails)) return true;
   if (Array.isArray(rec.decoringSections)) return true;
   const details = asRecord(rec.details);
   if (Array.isArray(details?.decoringSections)) return true;

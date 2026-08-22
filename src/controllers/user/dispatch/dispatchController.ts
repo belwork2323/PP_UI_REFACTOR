@@ -10,8 +10,23 @@ import {
 } from "../../../data/api/users/dispatch/dispatchAPI";
 
 // Fully aligned with the backend's explicit JSON schema structure
+export type BackendPropellantProperty = {
+  srNo: number;
+  property: string;
+  specification?: string;
+  finalMixResults?: Array<{ finalMixNo: number; value: string }>;
+};
+
+export type BackendObservationRow = {
+  srNo?: number;
+  parameter?: string;
+  checkPoint?: string;
+  nomenclature?: string;
+  observation?: string;
+};
+
 export type BackendMotorDispatchDetails = {
-  projectName: string;
+  projectName?: string;
   stage: string;
   castingDate: string;
   dispatchDate: string;
@@ -24,24 +39,24 @@ export type BackendMotorDispatchDetails = {
     accorded: string;
     momNo?: string;
   };
-  propellantProperties: any[];
+  propellantProperties: BackendPropellantProperty[];
   waiverDetails: {
     available: boolean;
     details: string;
     uploadedDocuments: string[];
   };
-  rocketMotorInspection: any[];
-  vehicleDetails: any[];
-  rocketMotorPackingDetails: any[];
+  rocketMotorInspection: BackendObservationRow[];
+  vehicleDetails: BackendObservationRow[];
+  rocketMotorPackingDetails: BackendObservationRow[];
   uploadDispatchPhotos: string[];
   safetyClearance: {
     accorded: string;
-    clearanceCertificate: string;
+    clearanceCertificate?: string;
   };
   dispatchTeam: {
-    qaRepresentative: string;
-    safetyRepresentative: string;
-    projectRepresentative: string;
+    qaRepresentative?: string;
+    safetyRepresentative?: string;
+    projectRepresentative?: string;
   };
 };
 

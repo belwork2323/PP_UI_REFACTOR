@@ -1,4 +1,8 @@
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import {
+  buildCuringSectionsPayload,
+  createEmptyCuringMotorData,
+} from "../../../data/models/user/CuringMotorDataModel";
 import { formatToUiDate } from "../../../utils/dateUtils";
 import {
   QC_CURING_CYCLE_PRESET_ROWS,
@@ -458,10 +462,50 @@ const mapSubscaleRowsForApi = (rows: ReturnType<typeof sanitizeSubscaleRows>) =>
     }),
   );
 
-/** Nested Curing motor payload for create/update (`data.curingDetails[]`). */
+const mapQcCuringTypeForApi = (subType: string) => {
+  const normalized = normalizeQcCuringType(subType);
+  if (normalized === "NORMAL") return "NORMAL_CURING";
+  if (normalized === "CONFINED") return "CONFINED_CURING";
+  if (normalized === "N2_PRESSURE") return "N2_PRESSURE_CURING";
+  return normalized || undefined;
+};
+
+const qcValuesToCuringMotorData = (values: SchemaFormValues | null | undefined) => {
+  const empty = createEmptyCuringMotorData();
+  const cycles = sanitizeCycleRows(getCuringCycleRows(values)).map((row, index) => ({
+    srNo: String(row.SR_NO ?? index + 1),
+    TEMPERATURE: String(row.TEMPERATURE ?? ""),
+    TIME: String(row.DURATION ?? row.TIME ?? ""),
+    START_DATE: String(row.START_DATE ?? ""),
+    START_TIME: String(row.START_TIME ?? ""),
+    END_DATE: String(row.END_DATE ?? ""),
+    END_TIME: String(row.END_TIME ?? ""),
+    HOT_WATER_STATUS: String(row.HOT_WATER_STATUS ?? ""),
+    PROPELLANT_PRESSURE: String(row.PROPELLANT_PRESSURE ?? ""),
+  }));
+
+  return {
+    ...empty,
+    CURING_CYCLES: {
+      CURING_TABLE: cycles.length ? cycles : empty.CURING_CYCLES.CURING_TABLE,
+    },
+    POST_CURING_DETAILS: {
+      OTHER_OBSERVATIONS: getCuringPostField(values, "VISUAL_OBSERVATIONS"),
+      VISUAL_OBSERVATION: getCuringPostField(values, "VISUAL_OBSERVATIONS"),
+      PRESSURE_PLATE_REMOVAL_DATE_TIME: getCuringPostField(
+        values,
+        "PRESSURE_PLATE_REMOVAL_DATE_TIME",
+      ),
+      SHORE_A_HARDNESS: getCuringPostField(values, "SHORE_A_HARDNESS"),
+      DE_CORING_DISPATCH_DATE_TIME: getCuringPostField(values, "DISPATCH_DATE_TIME"),
+    },
+  };
+};
+
+/** Nested Casting/Curing direct DTO for QC create/update (`data.curingDetails[]`). */
 export const buildCuringMotorDetailPayload = (
   values: SchemaFormValues | null | undefined,
-  motorIdNo: string,
+  motorId: string,
   motorSubmissionType: QcCuringMotorSubmissionType = "DRAFT",
   fallbackSubType?: string | null,
 ): Record<string, unknown> => {
@@ -470,73 +514,27 @@ export const buildCuringMotorDetailPayload = (
   const oven = getCuringSetupField(values, "OVEN");
   const ovenNumber = getCuringSetupField(values, "OVEN_NUMBER");
   const motorPositioning = getCuringSetupField(values, "MOTOR_POSITIONING_DATE_TIME");
-  const curingSections: SchemaSectionSubmission[] = [];
-
-  const cycleRows = mapCycleRowsForApi(sanitizeCycleRows(getCuringCycleRows(values)), curingType);
-  if (cycleRows.length) {
-    curingSections.push({
-      sectionId: QC_CURING_API_SECTION_IDS.CURING_TABLE,
-      sectionData: cycleRows,
-    });
-  }
-
-  const post = omitEmpty({
-    visualObservations: getCuringPostField(values, "VISUAL_OBSERVATIONS") || undefined,
-    pressurePlateRemovalDateTime:
-      getCuringPostField(values, "PRESSURE_PLATE_REMOVAL_DATE_TIME") || undefined,
-    shoreAHardness: toApiScalar(getCuringPostField(values, "SHORE_A_HARDNESS")),
-    deCoringDispatchDateTime: getCuringPostField(values, "DISPATCH_DATE_TIME") || undefined,
-  });
-  if (Object.keys(post).length) {
-    curingSections.push({
-      sectionId: QC_CURING_API_SECTION_IDS.POST_CURING,
-      sectionData: [post],
-    });
-  }
-
-  const subscaleFields = omitEmpty({
-    numberOfOvens: getCuringSubscaleField(values, "NUMBER_OF_OVENS") || undefined,
-    curingStartDate: getCuringSubscaleField(values, "CURING_START_DATE") || undefined,
-    cycleStartTime: getCuringSubscaleField(values, "CYCLE_START_TIME") || undefined,
-    curingCompleteDate: getCuringSubscaleField(values, "CURING_COMPLETE_DATE") || undefined,
-    cycleEndTime: getCuringSubscaleField(values, "CYCLE_END_TIME") || undefined,
-    bemAverageShoreAHardness: toApiScalar(
-      getCuringSubscaleField(values, "BEM_AVERAGE_SHORE_A_HARDNESS"),
-    ),
-    cartonAverageShoreAHardness: toApiScalar(
-      getCuringSubscaleField(values, "CARTON_AVERAGE_SHORE_A_HARDNESS"),
-    ),
-    visualObservations: getCuringSubscaleField(values, "SUBSCALE_VISUAL_OBSERVATIONS") || undefined,
-  });
-  const subscaleRows = mapSubscaleRowsForApi(sanitizeSubscaleRows(getCuringSubscaleParameterRows(values)));
-  if (Object.keys(subscaleFields).length || subscaleRows.length) {
-    curingSections.push({
-      sectionId: QC_CURING_API_SECTION_IDS.SUBSCALE,
-      sectionData: [
-        {
-          ...subscaleFields,
-          ...(subscaleRows.length ? { curingParameterTable: subscaleRows } : {}),
-        },
-      ],
-    });
-  }
+  const motorData = qcValuesToCuringMotorData(values);
 
   return omitEmpty({
-    motorIdNo,
+    motorId,
     motorSubmissionType,
-    motorStage: motorStage || undefined,
-    curingType: curingType ? getQcCuringTypeLabel(curingType) : undefined,
-    oven: oven || undefined,
-    ovenNumber: ovenNumber || undefined,
-    motorPositioningDateTime: motorPositioning || undefined,
-    curingSections: curingSections.length ? curingSections : undefined,
+    ...(motorPositioning ? { motorReceivedAt: motorPositioning } : {}),
+    curingSetup: omitEmpty({
+      oven: oven || undefined,
+      ovenNo: ovenNumber || undefined,
+      curingType: curingType ? mapQcCuringTypeForApi(curingType) : undefined,
+      configuration: motorStage || undefined,
+    }),
+    curingSections: buildCuringSectionsPayload(motorData),
   });
 };
 
 export const isCuringNestedMotorDetail = (rec: Record<string, unknown>) => {
+  if (asRecord(rec.curingSetup) || asRecord(rec.curingSections)) return true;
   if (Array.isArray(rec.curingSections)) return true;
   const details = asRecord(rec.details);
-  return Array.isArray(details?.curingSections);
+  return Boolean(asRecord(details?.curingSetup) || asRecord(details?.curingSections));
 };
 
 export const mapApiCuringCycleRowToForm = (
@@ -567,6 +565,64 @@ export const curingMotorDetailToSections = (
   motorId: string,
 ): SchemaSectionSubmission[] => {
   const sections: SchemaSectionSubmission[] = [];
+  const nestedSections =
+    asRecord(rec.curingSections) ?? asRecord(asRecord(rec.details)?.curingSections);
+  if (nestedSections && !Array.isArray(rec.curingSections)) {
+    const curingSetup = asRecord(rec.curingSetup) ?? asRecord(asRecord(rec.details)?.curingSetup);
+    if (curingSetup) {
+      sections.push({
+        sectionId: QC_CURING_SECTION_IDS.MOTOR_SETUP,
+        sectionData: [
+          omitEmpty({
+            MOTOR_STAGE: curingSetup.configuration ?? rec.motorStage,
+            CURING_TYPE: curingSetup.curingType ?? rec.curingType,
+            OVEN: curingSetup.oven ?? rec.oven,
+            OVEN_NUMBER: curingSetup.ovenNo ?? curingSetup.ovenNumber ?? rec.ovenNumber,
+            MOTOR_POSITIONING_DATE_TIME:
+              rec.motorReceivedAt ?? rec.motorPositioningDateTime ?? curingSetup.motorPositioningDateTime,
+          }),
+        ],
+        motorId,
+      } as SchemaSectionSubmission);
+    }
+
+    const cycles = asRecord(nestedSections.curingCycles);
+    const cycleRows = asArray(cycles?.curingTable)
+      .map((row, index) => mapApiCuringCycleRowToForm(asRecord(row) ?? {}, index))
+      .filter((row) => Object.values(row).some((value) => String(value ?? "").trim()));
+    if (cycleRows.length) {
+      sections.push({
+        sectionId: QC_CURING_SECTION_IDS.CYCLE_DETAILS,
+        sectionData: [{ CURING_CYCLE_DETAILS: cycleRows }],
+        motorId,
+      } as SchemaSectionSubmission);
+    }
+
+    const post = asRecord(nestedSections.postCuringDetails);
+    if (post) {
+      sections.push({
+        sectionId: QC_CURING_SECTION_IDS.POST_CURING,
+        sectionData: [
+          {
+            VISUAL_OBSERVATIONS: String(
+              post.otherObservations ?? post.visualObservation ?? post.VISUAL_OBSERVATIONS ?? "",
+            ),
+            PRESSURE_PLATE_REMOVAL_DATE_TIME: String(
+              post.pressurePlateRemovalDateTime ?? post.PRESSURE_PLATE_REMOVAL_DATE_TIME ?? "",
+            ),
+            SHORE_A_HARDNESS: String(post.shoreAHardness ?? post.SHORE_A_HARDNESS ?? ""),
+            DISPATCH_DATE_TIME: String(
+              post.decoringDispatchDateTime ?? post.DISPATCH_DATE_TIME ?? "",
+            ),
+          },
+        ],
+        motorId,
+      } as SchemaSectionSubmission);
+    }
+
+    return sections;
+  }
+
   const setup = omitEmpty({
     MOTOR_STAGE: rec.motorStage,
     CURING_TYPE: rec.curingType,

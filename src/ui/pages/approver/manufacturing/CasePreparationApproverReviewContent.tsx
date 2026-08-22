@@ -19,7 +19,7 @@ import PremixStatusChip, {
   PremixCountsSummary,
 } from "../../user/manufacturing/RawMaterial/components/PremixStatusChip";
 import type { PremixSubmissionStatus } from "../../../../data/models/user/RawMaterialPreparationModel";
-import { MotorDetailPanel } from "../../user/manufacturing/CasePreparation/components/CasePreparationDetailsContent";
+import CasePrepMotorPanel from "../../user/manufacturing/CasePreparation/CasePrepMotorPanel";
 import {
   UserWorkflowNavPanel,
   UserWorkflowTabNav,
@@ -267,7 +267,14 @@ const CasePreparationApproverReviewContent = ({
             </Stack>
           ) : null}
 
-          <MotorDetailPanel motor={activeMotor} dt={dt} palette={palette} />
+          <CasePrepMotorPanel
+            value={activeMotor.casePrepData}
+            onChange={() => undefined}
+            readOnly
+            theme={manufacturingTheme}
+            motorId={activeMotor.motorId}
+            batchId={detailView?.batchId}
+          />
         </Box>
       ) : (
         <Typography sx={dt.emptyText}>{CP.MOTOR_APPROVER_NO_ACTIONABLE}</Typography>

@@ -20,7 +20,7 @@ export const usePostCureFormHook = (
 
   const data = useMemo(
     () => ({
-      schemaFormLoaded: initialData?.schemaFormLoaded ?? false,
+      formLoaded: initialData?.formLoaded ?? false,
       motors: initialData?.motors ?? [],
     }),
     [initialData],
@@ -38,7 +38,7 @@ export const usePostCureFormHook = (
       setOperationState(value);
       notify({
         ...data,
-        schemaFormLoaded: false,
+        formLoaded: false,
         motors: [],
       });
     },
@@ -50,7 +50,7 @@ export const usePostCureFormHook = (
       setInhibitorTypeState(value);
       notify({
         ...data,
-        schemaFormLoaded: false,
+        formLoaded: false,
         motors: [],
       });
     },

@@ -8,6 +8,7 @@ import {
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import { useMemo } from "react";
 import { icons } from "../../../../../app/theme/icons";
+import { WorkflowReadOnlyText } from "../../../../components/common/WorkflowReadOnlyText";
 
 const { input: InputRoundedIcon } = icons.user.manufacturing.casePreparation.form;
 
@@ -24,6 +25,7 @@ type CasePrepSelectProps = {
   options: CasePrepSelectOption[];
   onChange: (value: string) => void;
   disabled?: boolean;
+  readOnly?: boolean;
   width?: number | string;
   theme: any;
 };
@@ -35,6 +37,7 @@ const CasePrepSelect = ({
   options,
   onChange,
   disabled = false,
+  readOnly = false,
   width = "100%",
   theme,
 }: CasePrepSelectProps) => {
@@ -54,6 +57,12 @@ const CasePrepSelect = ({
       <Typography component="label" sx={flowBar.selectLabel}>
         {label}
       </Typography>
+      {readOnly ? (
+        <WorkflowReadOnlyText
+          value={selectedOption?.label ?? value}
+          sx={{ fontSize: "0.82rem", py: 0.75 }}
+        />
+      ) : (
       <TextField
         select
         fullWidth
@@ -97,6 +106,7 @@ const CasePrepSelect = ({
           </MenuItem>
         ))}
       </TextField>
+      )}
     </Box>
   );
 };

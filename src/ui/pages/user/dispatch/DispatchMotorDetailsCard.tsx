@@ -1,17 +1,14 @@
 import { Box, Stack, Typography } from "@mui/material";
 import { DISPATCH_FLOW_LABELS } from "../../../../hooks/user/dispatch/dispatchFlowConfig";
 import type { DispatchMotorSession } from "../../../../data/models/user/DispatchFormModel";
-import type { SchemaFormValues } from "../../../../schema-engine";
-import DispatchSchemaPanel from "./DispatchSchemaPanel";
+import type { DispatchMotorData } from "../../../../data/models/user/DispatchMotorDataModel";
+import DispatchMotorPanel from "./DispatchMotorPanel";
 import getDispatchTheme from "../../../../app/theme/custom_themes/user/dispatch/dispatch_theme";
 
 type DispatchMotorDetailsCardProps = {
   motor: DispatchMotorSession;
   subDepartmentId?: number;
   batchId?: string;
-  schema: import("../../../../schema-engine").SchemaDocumentV2;
-  schemaLoading?: boolean;
-  schemaError?: string | null;
   theme: {
     palette: {
       border: string;
@@ -23,8 +20,9 @@ type DispatchMotorDetailsCardProps = {
       pageBg?: string;
     };
   };
-  onFormValuesChange: (values: SchemaFormValues) => void;
+  onMotorDataChange: (data: DispatchMotorData) => void;
   readOnly?: boolean;
+  disabled?: boolean;
 };
 
 const formatStageLabel = (stage: string) => {
@@ -43,12 +41,10 @@ const DispatchMotorDetailsCard = ({
   motor,
   subDepartmentId,
   batchId,
-  schema,
-  schemaLoading = false,
-  schemaError = null,
   theme,
-  onFormValuesChange,
+  onMotorDataChange,
   readOnly = false,
+  disabled = false,
 }: DispatchMotorDetailsCardProps) => {
   const L = DISPATCH_FLOW_LABELS;
   const panel = getDispatchTheme(theme).panel;
@@ -93,15 +89,15 @@ const DispatchMotorDetailsCard = ({
 
       <Typography sx={panel.detailsSectionTitle}>{L.detailsFormSection}</Typography>
 
-      <DispatchSchemaPanel
-        schema={schema}
-        formValues={motor.schemaFormValues}
+      <DispatchMotorPanel
+        value={motor.dispatchData}
+        onChange={onMotorDataChange}
+        theme={theme}
+        readOnly={readOnly}
+        disabled={disabled}
         subDepartmentId={subDepartmentId}
         batchId={batchId}
-        onChange={onFormValuesChange}
-        loading={schemaLoading}
-        error={schemaError}
-        readOnly={readOnly}
+        motorId={motor.motorId}
       />
     </>
   );

@@ -49,8 +49,6 @@ type DispatchFormProps = {
   actionLoading?: boolean;
   subDepartmentId?: number;
   isEditMode?: boolean;
-  schemaLoading?: boolean;
-  schemaError?: string | null;
   flowBarTheme: any;
   availableMotors?: DispatchMotorOption[];
   onSetupChange: <K extends keyof DispatchSharedSetup>(
@@ -59,7 +57,7 @@ type DispatchFormProps = {
   ) => void;
   onDraftMotorIdChange: (value: string) => void;
   onLoadDispatchForm: (val: string) => void;
-  onFormValuesChange: (motorId: string, values: any) => void;
+  onMotorDataChange: (motorId: string, data: import("../../../../data/models/user/DispatchMotorDataModel").DispatchMotorData) => void;
   onSaveMotorDraft?: (motorId: string) => void;
   onSubmitMotor?: (motorId: string) => void;
   theme: any;
@@ -78,14 +76,12 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
   actionLoading = false,
   subDepartmentId,
   isEditMode = false,
-  schemaLoading = false,
-  schemaError = null,
   flowBarTheme,
   availableMotors = [],
   onSetupChange,
   onDraftMotorIdChange,
   onLoadDispatchForm,
-  onFormValuesChange,
+  onMotorDataChange,
   onSaveMotorDraft,
   onSubmitMotor,
   theme,
@@ -162,6 +158,7 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
   }, [activeMotorEntry, formData.motors]);
 
   const isCurrentMotorSetupReady = isDispatchMotorSetupReady(activeMotorData);
+  const isCurrentMotorFormLoaded = Boolean(activeMotorData?.formLoaded);
   const activeMotorId = activeMotorEntry?.motorId ?? "";
   const activeMotorStatus = (getMotorStatus?.(activeMotorId) ??
     motorStatusById[activeMotorId]?.motorSubmissionStatus ??
@@ -294,7 +291,7 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
             <Button
               variant="outlined"
               size="small"
-              disabled={actionLoading || activeMotorLocked || !isCurrentMotorSetupReady}
+              disabled={actionLoading || activeMotorLocked || !isCurrentMotorSetupReady || !isCurrentMotorFormLoaded}
               onClick={() => onSaveMotorDraft?.(activeMotorEntry.motorId)}
               sx={{ textTransform: "none", fontWeight: 700 }}
             >
@@ -303,7 +300,7 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
             <Button
               variant="contained"
               size="small"
-              disabled={actionLoading || activeMotorLocked || !isCurrentMotorSetupReady}
+              disabled={actionLoading || activeMotorLocked || !isCurrentMotorSetupReady || !isCurrentMotorFormLoaded}
               onClick={() => onSubmitMotor?.(activeMotorEntry.motorId)}
               sx={{ textTransform: "none", fontWeight: 700 }}
             >
@@ -363,35 +360,31 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
               </Alert>
             ) : null}
 
-            {!isCurrentMotorSetupReady ? (
+            {!isCurrentMotorSetupReady || !isCurrentMotorFormLoaded ? (
               <DispatchFlowBar
                 setup={formData}
                 draftMotorId={draftMotorId || activeMotorEntry.motorId}
                 usedMotorIds={(formData.motors ?? [])
-                  .filter((motor) => isDispatchMotorSetupReady(motor))
+                  .filter((motor) => isDispatchMotorSetupReady(motor) && motor.formLoaded)
                   .map((m) => m.motorId)}
-                hasMotors={(formData.motors ?? []).some((m) => isDispatchMotorSetupReady(m))}
-                schemaLoading={schemaLoading}
+                hasMotors={(formData.motors ?? []).some((m) => isDispatchMotorSetupReady(m) && m.formLoaded)}
                 onSetupChange={onSetupChange}
                 onLoadForm={() => onLoadDispatchForm(activeMotorEntry.motorId)}
                 theme={flowBarTheme}
                 dispatchTheme={dispatchTheme}
               />
             ) : (
-              formData.dispatchSchema &&
               activeMotorData && (
                 <Box sx={activeMotorLocked ? { pointerEvents: "none", opacity: 0.72 } : undefined}>
                   <DispatchMotorDetailsCard
                     motor={activeMotorData}
-                    schema={formData.dispatchSchema}
                     subDepartmentId={subDepartmentId}
                     batchId={batch?.batchId}
-                    schemaLoading={schemaLoading}
-                    schemaError={schemaError}
                     theme={theme}
                     readOnly={activeMotorLocked}
-                    onFormValuesChange={(values) =>
-                      onFormValuesChange(activeMotorEntry.motorId, values)
+                    disabled={activeMotorLocked}
+                    onMotorDataChange={(data) =>
+                      onMotorDataChange(activeMotorEntry.motorId, data)
                     }
                   />
                 </Box>

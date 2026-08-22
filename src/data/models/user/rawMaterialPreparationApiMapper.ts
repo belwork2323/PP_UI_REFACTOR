@@ -78,6 +78,57 @@ const resolveSchemaSectionId = (sectionId: string, schema: SchemaDocumentV2): st
   return sectionId;
 };
 
+const pickSectionBlockValue = (
+  sectionRow: Record<string, unknown>,
+  blockId: string,
+): unknown => {
+  if (sectionRow[blockId] !== undefined && sectionRow[blockId] !== null) {
+    return sectionRow[blockId];
+  }
+  const camel = toCamelCaseKey(blockId);
+  if (camel && sectionRow[camel] !== undefined && sectionRow[camel] !== null) {
+    return sectionRow[camel];
+  }
+  const snake = toSchemaKey(blockId);
+  if (snake !== blockId && sectionRow[snake] !== undefined && sectionRow[snake] !== null) {
+    return sectionRow[snake];
+  }
+  const target = blockId.toLowerCase().replace(/_/g, "");
+  for (const [key, value] of Object.entries(sectionRow)) {
+    if (key.startsWith("_")) continue;
+    if (key.toLowerCase().replace(/_/g, "") === target) return value;
+  }
+  return undefined;
+};
+
+const flattenNormalizedSectionDataRow = (row: unknown): Record<string, unknown>[] => {
+  const rec =
+    row && typeof row === "object" && !Array.isArray(row)
+      ? (mapObjectKeysDeep(row, toCamelCaseKey) as Record<string, unknown>)
+      : null;
+  if (!rec) return [];
+
+  const entries = Object.entries(rec).filter(([key]) => !key.startsWith("_"));
+  if (entries.length === 1) {
+    const [, onlyValue] = entries[0];
+    if (Array.isArray(onlyValue)) {
+      return onlyValue
+        .filter((item) => item && typeof item === "object" && !Array.isArray(item))
+        .map((item) => mapObjectKeysDeep(item, toCamelCaseKey) as Record<string, unknown>);
+    }
+    if (onlyValue && typeof onlyValue === "object" && !Array.isArray(onlyValue)) {
+      const tableRows = extractTableRows(onlyValue);
+      if (tableRows.length > 0) {
+        return tableRows.map(
+          (tableRow) => mapObjectKeysDeep(tableRow, toCamelCaseKey) as Record<string, unknown>,
+        );
+      }
+    }
+  }
+
+  return [rec];
+};
+
 const flattenSectionRowForApi = (
   schema: SchemaDocumentV2,
   sectionId: string,
@@ -85,7 +136,7 @@ const flattenSectionRowForApi = (
 ): Record<string, unknown>[] => {
   const section = schema.data.sections.find((entry) => entry.id === sectionId);
   if (!section) {
-    return [mapObjectKeysDeep(sectionRow, toCamelCaseKey) as Record<string, unknown>];
+    return flattenNormalizedSectionDataRow(sectionRow);
   }
 
   const repeatGroups = findBlocks(
@@ -94,8 +145,8 @@ const flattenSectionRowForApi = (
   );
   if (repeatGroups.length === 1) {
     const repeatId = repeatGroups[0].id;
-    const rows = sectionRow[repeatId];
-    if (Array.isArray(rows) && rows.length > 0) {
+    const rows = pickSectionBlockValue(sectionRow, repeatId);
+    if (Array.isArray(rows)) {
       return rows.map(
         (row) => mapObjectKeysDeep(row, toCamelCaseKey) as Record<string, unknown>,
       );
@@ -104,7 +155,8 @@ const flattenSectionRowForApi = (
 
   const tables = findBlocks(section.children, (block) => block.type === "table");
   if (tables.length === 1) {
-    const rows = extractTableRows(sectionRow[tables[0].id]);
+    const tableValue = pickSectionBlockValue(sectionRow, tables[0].id);
+    const rows = extractTableRows(tableValue);
     if (rows.length > 0) {
       return rows.map(
         (row) => mapObjectKeysDeep(row, toCamelCaseKey) as Record<string, unknown>,
@@ -113,10 +165,13 @@ const flattenSectionRowForApi = (
   }
 
   const matrices = findBlocks(section.children, (block) => block.type === "matrix");
-  if (matrices.length === 1 && sectionRow[matrices[0].id] !== undefined) {
-    return [
-      mapObjectKeysDeep(sectionRow[matrices[0].id], toCamelCaseKey) as Record<string, unknown>,
-    ];
+  if (matrices.length === 1) {
+    const matrixValue = pickSectionBlockValue(sectionRow, matrices[0].id);
+    if (matrixValue !== undefined) {
+      return [
+        mapObjectKeysDeep(matrixValue, toCamelCaseKey) as Record<string, unknown>,
+      ];
+    }
   }
 
   const flatEntries = Object.entries(sectionRow).filter(
@@ -131,8 +186,34 @@ const flattenSectionRowForApi = (
     return [mapObjectKeysDeep(sectionRow, toCamelCaseKey) as Record<string, unknown>];
   }
 
-  return [mapObjectKeysDeep(sectionRow, toCamelCaseKey) as Record<string, unknown>];
+  return flattenNormalizedSectionDataRow(sectionRow);
 };
+
+export const normalizeSectionsForApiPayload = (
+  sections: SchemaSectionSubmission[],
+): Array<{ sectionId: string; sectionData: Record<string, unknown>[] }> =>
+  (sections ?? []).map((section) => {
+    const sectionData = Array.isArray(section.sectionData) ? section.sectionData : [];
+    const apiSectionId = toCamelCaseKey(String(section.sectionId ?? ""));
+    const alreadyFlat =
+      sectionData.length > 0 &&
+      sectionData.every((row) => {
+        const rec = row && typeof row === "object" && !Array.isArray(row) ? (row as Record<string, unknown>) : null;
+        if (!rec) return false;
+        const keys = Object.keys(rec).filter((key) => !key.startsWith("_"));
+        if (keys.length === 0) return false;
+        return !keys.some((key) => Array.isArray(rec[key]));
+      });
+
+    return {
+      sectionId: apiSectionId,
+      sectionData: alreadyFlat
+        ? sectionData.map(
+            (row) => mapObjectKeysDeep(row, toCamelCaseKey) as Record<string, unknown>,
+          )
+        : sectionData.flatMap((row) => flattenNormalizedSectionDataRow(row)),
+    };
+  });
 
 export const serializeSectionSubmissionForApi = (
   schema: SchemaDocumentV2,

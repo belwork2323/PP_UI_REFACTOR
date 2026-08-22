@@ -21,7 +21,8 @@ import PremixStatusChip, {
   PremixCountsSummary,
 } from "../../user/manufacturing/RawMaterial/components/PremixStatusChip";
 import type { PremixSubmissionStatus } from "../../../../data/models/user/RawMaterialPreparationModel";
-import { MotorDetailPanel } from "../../user/manufacturing/CastingAndCuring/components/CastingCuringDetailsContent";
+import CastingMotorPanel from "../../user/manufacturing/CastingAndCuring/CastingMotorPanel";
+import CuringMotorPanel from "../../user/manufacturing/CastingAndCuring/CuringMotorPanel";
 import {
   UserWorkflowNavPanel,
   UserWorkflowTabNav,
@@ -292,12 +293,24 @@ const CastingCuringApproverReviewContent = ({
             <ToggleButton value="CURING">{CC.SECTION_TAB_CURING}</ToggleButton>
           </ToggleButtonGroup>
 
-          <MotorDetailPanel
-            motor={activeMotor}
-            processTab={activeProcessTab}
-            dt={dt}
-            palette={palette}
-          />
+          {activeProcessTab === "CASTING" ? (
+            <CastingMotorPanel
+              value={activeMotor.castingData}
+              onChange={() => undefined}
+              readOnly
+              theme={manufacturingTheme}
+              motorId={activeMotor.motorId}
+              batchId={detailView?.batchId}
+            />
+          ) : (
+            <CuringMotorPanel
+              value={activeMotor.curingData}
+              onChange={() => undefined}
+              readOnly
+              theme={manufacturingTheme}
+              motorId={activeMotor.motorId}
+            />
+          )}
         </Box>
       ) : (
         <Typography sx={dt.emptyText}>{CC.MOTOR_APPROVER_NO_ACTIONABLE}</Typography>

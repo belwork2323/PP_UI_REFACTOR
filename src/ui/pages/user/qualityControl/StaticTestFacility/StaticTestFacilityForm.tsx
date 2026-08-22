@@ -4,7 +4,6 @@ import {
   Box,
   Button,
   Chip,
-  CircularProgress,
   Stack,
   Typography,
   alpha,
@@ -14,12 +13,13 @@ import { STRINGS } from "../../../../../app/config/strings";
 import { STATIC_TEST_FACILITY_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { StaticTestFacilityFormState } from "../../../../../data/models/user/StaticTestFacilityFormModel";
 import {
+  createEmptyStfMotorSession,
   normalizeStfMotorSession,
   resolveStfNavigationMotors,
   type StfMotorStatusMeta,
   type StfMotorSubmissionStatus,
 } from "../../../../../data/models/user/StaticTestFacilityFormModel";
-import type { StfSubType } from "../../../../../schema-engine";
+import type { StfSubType } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
 import type {
   StfAddedMotor,
   StfMotorOption,
@@ -43,7 +43,7 @@ import {
 } from "../../../../components/custom/UserWorkflowStepPager";
 import RemoveProcessButton from "../../../../components/common/RemoveProcessButton";
 import STFFlowBar from "./STFFlowBar";
-import STFSchemaPanel from "./STFSchemaPanel";
+import StfMotorPanel from "./StfMotorPanel";
 import AppTextField from "../../../../components/common/AppTextField";
 
 const S = STRINGS.QUALITY_CONTROL.STATIC_TEST_FACILITY;
@@ -76,8 +76,6 @@ type StaticTestFacilityFormProps = {
   isStfTestNoLocked?: (motorId: string) => boolean;
   actionLoading?: boolean;
   isEditMode?: boolean;
-  schemaLoading?: boolean;
-  schemaError?: string | null;
   flowBarTheme: any;
   onMotorTypeChange: (value: string) => void;
   onMotorCountChange: (count: number | "") => void;
@@ -87,7 +85,7 @@ type StaticTestFacilityFormProps = {
   onAddMotors: () => void;
   onFormValuesChange: (
     motorId: string,
-    values: import("../../../../../schema-engine").SchemaFormValues,
+    values: import("../../../../../data/models/user/StfMotorDataModel").StfMotorData,
   ) => void;
   onStfTestNoChange?: (motorId: string, stfTestNo: string) => void;
   onRemoveMotor?: (motorId: string) => void;
@@ -117,8 +115,6 @@ const StaticTestFacilityForm = ({
   isStfTestNoLocked,
   actionLoading = false,
   isEditMode = false,
-  schemaLoading = false,
-  schemaError = null,
   flowBarTheme,
   onMotorTypeChange,
   onMotorCountChange,
@@ -234,13 +230,8 @@ const StaticTestFacilityForm = ({
     const found = (formData.motors ?? []).find(
       (motor) => motor.motorId === activeMotorEntry.motorId,
     );
-    return found ? normalizeStfMotorSession(found) : null;
+    return found ? normalizeStfMotorSession(found) : createEmptyStfMotorSession(activeMotorEntry.motorId, activeMotorEntry.subType);
   }, [activeMotorEntry, formData.motors]);
-
-  const activeMotorSchema = useMemo(() => {
-    if (!activeMotorSession) return null;
-    return formData.schemasBySubType?.[activeMotorSession.subType] ?? formData.stfSchema ?? null;
-  }, [activeMotorSession, formData.schemasBySubType, formData.stfSchema]);
 
   const activeMotorId = activeMotorEntry?.motorId ?? "";
   const activeMotorStatus = (getMotorStatus?.(activeMotorId) ??
@@ -253,7 +244,7 @@ const StaticTestFacilityForm = ({
   const activeStfTestNoLocked = activeMotorId ? Boolean(isStfTestNoLocked?.(activeMotorId)) : false;
   const canRemoveActiveMotor =
     activeMotorEntry?.subType === "BEM" && activeMotorStatus === "TO_BE_INITIATED";
-  const isCurrentMotorSchemaReady = Boolean(activeMotorSchema && activeMotorSession);
+  const isCurrentMotorFormReady = Boolean(activeMotorSession?.formLoaded);
 
   const finalApprovalRows = useMemo(
     () =>
@@ -385,7 +376,7 @@ const StaticTestFacilityForm = ({
           availableBemMotorOptions={availableBemMotorOptions}
           maxMotorCount={maxMotorCount}
           approvedMotorsLoading={approvedMotorsLoading}
-          schemaLoading={schemaLoading}
+          schemaLoading={false}
           lockMotorTypeToBem
           onMotorTypeChange={onMotorTypeChange}
           onMotorCountChange={onMotorCountChange}
@@ -395,22 +386,6 @@ const StaticTestFacilityForm = ({
           onAddMotors={onAddMotors}
           theme={flowBarTheme}
         />
-      ) : null}
-
-      {schemaLoading && !hasMotors ? (
-        <Box
-          sx={{
-            borderRadius: 2.5,
-            border: `1px solid ${theme.palette.border}`,
-            background: theme.palette.surface,
-            px: 2,
-            py: 5,
-            display: "flex",
-            justifyContent: "center",
-          }}
-        >
-          <CircularProgress size={28} />
-        </Box>
       ) : null}
 
       {hasMotors && activeMotorEntry ? (
@@ -448,7 +423,7 @@ const StaticTestFacilityForm = ({
             <Button
               variant="outlined"
               size="small"
-              disabled={actionLoading || activeMotorLocked || !isCurrentMotorSchemaReady}
+              disabled={actionLoading || activeMotorLocked || !isCurrentMotorFormReady}
               onClick={() => onSaveMotorDraft?.(activeMotorEntry.motorId)}
               sx={{ textTransform: "none", fontWeight: 700 }}
             >
@@ -457,7 +432,7 @@ const StaticTestFacilityForm = ({
             <Button
               variant="contained"
               size="small"
-              disabled={actionLoading || activeMotorLocked || !isCurrentMotorSchemaReady}
+              disabled={actionLoading || activeMotorLocked || !isCurrentMotorFormReady}
               onClick={() => onSubmitMotor?.(activeMotorEntry.motorId)}
               sx={{ textTransform: "none", fontWeight: 700 }}
             >
@@ -548,17 +523,16 @@ const StaticTestFacilityForm = ({
               />
             </Box>
 
-            {activeMotorSession && activeMotorSchema ? (
+            {activeMotorSession ? (
               <Box sx={activeMotorLocked ? { pointerEvents: "none", opacity: 0.72 } : undefined}>
-                <STFSchemaPanel
-                  schema={activeMotorSchema}
-                  formValues={activeMotorSession.schemaFormValues}
-                  savedSections={activeMotorSession.savedSections}
+                <StfMotorPanel
+                  value={activeMotorSession.stfData}
+                  onChange={(next) => onFormValuesChange(activeMotorSession.motorId, next)}
+                  disabled={actionLoading || activeMotorLocked}
+                  theme={theme}
                   subDepartmentId={subDepartmentId}
                   batchId={batch?.batchId}
-                  onChange={(values) => onFormValuesChange(activeMotorSession.motorId, values)}
-                  loading={schemaLoading}
-                  error={schemaError}
+                  motorId={activeMotorSession.motorId}
                 />
               </Box>
             ) : (
@@ -572,7 +546,7 @@ const StaticTestFacilityForm = ({
                 }}
               >
                 <Typography sx={{ fontSize: "0.8rem", color: BRAND.textSub, fontWeight: 600 }}>
-                  {S.SCHEMA_NOT_LOADED}
+                  {S.FORM_NOT_LOADED}
                 </Typography>
               </Box>
             )}

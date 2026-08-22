@@ -32,8 +32,12 @@ import type { CuringCycleConfig } from "../../../data/models/user/CuringCycleCon
 import {
   applyCuringCycleConfigRows,
   createEmptyCuringMotorData,
+  buildCuringSectionsPayload,
 } from "../../../data/models/user/CuringMotorDataModel";
-import { createEmptyCastingMotorData } from "../../../data/models/user/CastingMotorDataModel";
+import {
+  createEmptyCastingMotorData,
+  buildCastingSectionsPayload,
+} from "../../../data/models/user/CastingMotorDataModel";
 import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
 import {
   isMotorEnabledByPreviousStage,
@@ -864,8 +868,14 @@ export const useCastingAndCuringHook = () => {
           motorSubmissionType: "SUBMIT",
           setup: m.setup ?? m.details?.setup ?? {},
           curingSetup: m.curingSetup ?? m.details?.curingSetup ?? {},
-          castingSections: m.castingSections ?? m.details?.castingSections ?? [],
-          curingSections: m.curingSections ?? m.details?.curingSections ?? [],
+          castingSections:
+            m.castingSections ??
+            m.details?.castingSections ??
+            buildCastingSectionsPayload(createEmptyCastingMotorData()),
+          curingSections:
+            m.curingSections ??
+            m.details?.curingSections ??
+            buildCuringSectionsPayload(createEmptyCuringMotorData()),
         })),
       });
 

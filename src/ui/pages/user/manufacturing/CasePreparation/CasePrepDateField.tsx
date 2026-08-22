@@ -1,11 +1,13 @@
 import { Box, Typography } from "@mui/material";
 import DateField from "../../../../components/common/DateField";
+import { WorkflowReadOnlyText } from "../../../../components/common/WorkflowReadOnlyText";
 
 type CasePrepDateFieldProps = {
   label: string;
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
+  readOnly?: boolean;
   placeholder?: string;
   theme: any;
 };
@@ -15,6 +17,7 @@ const CasePrepDateField = ({
   value,
   onChange,
   disabled = false,
+  readOnly = false,
   placeholder = "DD-MM-YYYY",
   theme,
 }: CasePrepDateFieldProps) => {
@@ -36,6 +39,9 @@ const CasePrepDateField = ({
           {label}
         </Typography>
       ) : null}
+      {readOnly ? (
+        <WorkflowReadOnlyText value={value} sx={{ fontSize: "0.82rem", py: 0.75 }} />
+      ) : (
       <DateField
         value={value}
         onChange={onChange}
@@ -48,6 +54,7 @@ const CasePrepDateField = ({
           },
         }}
       />
+      )}
     </Box>
   );
 };

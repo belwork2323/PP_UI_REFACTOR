@@ -1,14 +1,12 @@
+import { mapStfSubType, type StfSubType } from "../../../hooks/user/qualityControl/stfFlowConfig";
 import {
-  createStfInitialValues,
-  hydrateStfValuesFromSections,
-  mapStfSubType,
-  schemaValuesHaveUserData,
-  toSectionSubmissions,
-  type SchemaDocumentV2,
-  type SchemaFormValues,
-  type SchemaSectionSubmission,
-  type StfSubType,
-} from "../../../schema-engine";
+  buildStfMotorStaticTestingDetails,
+  createEmptyStfMotorData,
+  parseStfMotorDataFromApi,
+  stfMotorDataHasUserInput,
+  type StfMotorData,
+  type StfStaticTestingDetailsApi,
+} from "./StfMotorDataModel";
 
 export type { StfSubType };
 
@@ -172,8 +170,8 @@ export type StfMotorSession = {
   motorId: string;
   subType: StfSubType;
   stfTestNo?: string;
-  schemaFormValues: SchemaFormValues;
-  savedSections?: SchemaSectionSubmission[];
+  formLoaded: boolean;
+  stfData: StfMotorData;
 };
 
 export const createEmptyStfMotorSession = (
@@ -183,29 +181,30 @@ export const createEmptyStfMotorSession = (
   motorId,
   subType,
   stfTestNo: "",
-  schemaFormValues: {},
+  formLoaded: true,
+  stfData: createEmptyStfMotorData(subType),
 });
 
 export const normalizeStfMotorSession = (
   motor: Partial<StfMotorSession> & { motorId: string; subType: StfSubType },
-): StfMotorSession => ({
-  motorId: motor.motorId,
-  subType: motor.subType,
-  stfTestNo: String(motor.stfTestNo ?? "").trim(),
-  schemaFormValues: motor.schemaFormValues ?? {},
-  savedSections: motor.savedSections,
-});
+): StfMotorSession => {
+  const subType = motor.subType;
+  const base = createEmptyStfMotorSession(motor.motorId, subType);
+  return {
+    ...base,
+    stfTestNo: String(motor.stfTestNo ?? "").trim(),
+    formLoaded: motor.formLoaded ?? true,
+    stfData: motor.stfData ?? base.stfData,
+  };
+};
 
 export const createStfData = () => ({
-  schemaFormLoaded: false,
+  formLoaded: false,
   subType: null as StfSubType | null,
-  stfSchema: null as SchemaDocumentV2 | null,
-  schemasBySubType: {} as Partial<Record<StfSubType, SchemaDocumentV2>>,
   motors: [] as StfMotorSession[],
   motorId: null as string | null,
   bemNo: null as string | null,
   stfTestNo: null as string | null,
-  schemaFormValues: {} as SchemaFormValues,
 });
 
 export type StaticTestFacilityFormState = ReturnType<typeof createStfData>;
@@ -213,61 +212,18 @@ export type StaticTestFacilityFormState = ReturnType<typeof createStfData>;
 export const createDefaultStaticTestFacilityFormState = (): StaticTestFacilityFormState =>
   createStfData();
 
-// ============================================================================
-// Hydration Helpers
-// ============================================================================
-
-export const hydrateStfMotorSession = (
-  motor: StfMotorSession,
-  schema: SchemaDocumentV2,
-): StfMotorSession => ({
-  ...motor,
-  schemaFormValues: motor.savedSections?.length
-    ? hydrateStfValuesFromSections(schema, motor.savedSections)
-    : Object.keys(motor.schemaFormValues ?? {}).length > 0
-      ? motor.schemaFormValues
-      : createStfInitialValues(schema),
-});
-
-export const hydrateStaticTestFacilityFormState = (
-  state: StaticTestFacilityFormState,
-  schema: SchemaDocumentV2,
+const hydrateStfMotorSessionFromApi = (
+  motorId: string,
   subType: StfSubType,
-  motorIds?: string[],
-): StaticTestFacilityFormState => {
-  const targetIds = motorIds?.length ? new Set(motorIds) : null;
-
-  return {
-    ...state,
-    subType: state.subType ?? subType,
-    stfSchema: schema,
-    schemasBySubType: {
-      ...(state.schemasBySubType ?? {}),
-      [subType]: schema,
-    },
-    motors: (state.motors ?? []).map((motor) => {
-      if (targetIds && !targetIds.has(motor.motorId)) return motor;
-      if (motor.subType !== subType) return motor;
-      return hydrateStfMotorSession(motor, schema);
-    }),
-    schemaFormValues:
-      state.motors && state.motors.length > 0
-        ? state.motors[0].schemaFormValues
-        : state.schemaFormValues,
-    schemaFormLoaded:
-      (state.motors ?? []).length > 0 || Object.keys(state.schemaFormValues ?? {}).length > 0,
-  };
-};
-
-const extractSectionsFromMotorDetails = (
-  details?: Record<string, unknown>,
-): SchemaSectionSubmission[] | undefined => {
-  const formSections = details?.[FORM_SECTIONS_KEY];
-  if (Array.isArray(formSections) && formSections.length > 0) {
-    return formSections as SchemaSectionSubmission[];
-  }
-  return undefined;
-};
+  apiMotor?: Record<string, unknown> | null,
+  stfTestNo?: string | null,
+): StfMotorSession => ({
+  motorId,
+  subType,
+  stfTestNo: String(stfTestNo ?? "").trim(),
+  formLoaded: true,
+  stfData: parseStfMotorDataFromApi(apiMotor ?? null, subType),
+});
 
 // ============================================================================
 // 1. Generic STF Batch / Form Submission API Models & Mappers
@@ -280,7 +236,7 @@ export type StaticTestFacilityDetails = {
   formSubmissionType: string;
   subType?: StfSubType | string | null;
   motorIdNo?: string | null;
-  sections?: SchemaSectionSubmission[];
+  sections?: FormSectionPayload[];
   motors?: Array<{
     motorId?: string;
     subType?: StfSubType | string | null;
@@ -294,10 +250,7 @@ export type StfBatchMotorItem = {
   subType: StfSubType;
   stfTestNo?: string;
   motorSubmissionType?: StfMotorSubmissionType;
-  staticTestingDetails: {
-    [FORM_SECTIONS_KEY]?: SchemaSectionSubmission[];
-    [key: string]: unknown;
-  };
+  staticTestingDetails: StfStaticTestingDetailsApi;
 };
 
 /** Payload structure for POST /api/v1/user/stf/create */
@@ -333,14 +286,12 @@ export const mapStaticTestFacilityDetailsToFormState = (
             const motorSubType = motor?.subType
               ? mapStfSubType(motor.subType)
               : (subType ?? "MAIN_MOTOR");
-            const savedSections = extractSectionsFromMotorDetails(motor?.staticTestingDetails);
-            return normalizeStfMotorSession({
+            return hydrateStfMotorSessionFromApi(
               motorId,
-              subType: motorSubType,
-              stfTestNo: String((motor as { stfTestNo?: string })?.stfTestNo ?? "").trim(),
-              schemaFormValues: {},
-              ...(savedSections?.length ? { savedSections } : {}),
-            });
+              motorSubType,
+              motor as Record<string, unknown>,
+              (motor as { stfTestNo?: string })?.stfTestNo,
+            );
           })
           .filter((motor): motor is StfMotorSession => Boolean(motor))
       : [];
@@ -350,19 +301,18 @@ export const mapStaticTestFacilityDetailsToFormState = (
 
   if (!motors.length && legacySections?.length && legacyMotorId) {
     motors.push(
-      normalizeStfMotorSession({
-        motorId: legacyMotorId,
-        subType: subType ?? "MAIN_MOTOR",
-        schemaFormValues: {},
-        savedSections: legacySections,
-      }),
+      hydrateStfMotorSessionFromApi(
+        legacyMotorId,
+        subType ?? "MAIN_MOTOR",
+        { staticTestingDetails: { [FORM_SECTIONS_KEY]: legacySections } },
+      ),
     );
   }
 
   return {
     ...defaults,
     subType,
-    schemaFormLoaded: motors.some((motor) => (motor.savedSections?.length ?? 0) > 0),
+    formLoaded: motors.length > 0,
     motors,
   };
 };
@@ -379,18 +329,12 @@ export const mapFormStateToCreateStfBatchPayload = (params: {
     batchId: params.batchId,
     subDepartmentId: params.subDepartmentId,
     formSubmissionType: params.formSubmissionType,
-    motors: motors.map((motor) => {
-      const schema =
-        params.formState.schemasBySubType?.[motor.subType] ?? params.formState.stfSchema;
-      const sections = schema ? toSectionSubmissions(schema, motor.schemaFormValues ?? {}) : [];
-
-      return {
-        motorId: motor.motorId,
-        subType: motor.subType,
-        stfTestNo: String(motor.stfTestNo ?? "").trim() || undefined,
-        staticTestingDetails: { [FORM_SECTIONS_KEY]: sections },
-      };
-    }),
+    motors: motors.map((motor) => ({
+      motorId: motor.motorId,
+      subType: motor.subType,
+      stfTestNo: String(motor.stfTestNo ?? "").trim() || undefined,
+      staticTestingDetails: buildStfMotorStaticTestingDetails(motor.stfData),
+    })),
   };
 };
 
@@ -418,16 +362,16 @@ export type CreateBemMotorPayload = {
   subType: "BEM" | string;
   stfTestNo: string | unknown;
   formSubmissionType: "DRAFT" | "SUBMIT";
-  staticTestingDetails: any;
+  staticTestingDetails: StfStaticTestingDetailsApi;
 };
 
-/** Payload structure for PUT /api/v1/user/stf/bem-motor/update/{bemMotorId} */
+/** Payload structure for PUT /api/v1/user/stf/bem-motor/update */
 export type UpdateBemMotorPayload = {
   motorId: string;
   stfTestNo: string | unknown;
-  subType: "BEM" | string;
+  subType?: "BEM" | string;
   formSubmissionType: "DRAFT" | "SUBMIT";
-  staticTestingDetails: any;
+  staticTestingDetails: StfStaticTestingDetailsApi;
 };
 
 export type BemMotorDetailsResponse = {
@@ -438,9 +382,9 @@ export type BemMotorDetailsResponse = {
   subDepartmentId?: number;
   subType?: string;
   status?: string;
-  sections?: SchemaSectionSubmission[];
+  sections?: FormSectionPayload[];
   staticTestingDetails?: {
-    [FORM_SECTIONS_KEY]?: SchemaSectionSubmission[];
+    [FORM_SECTIONS_KEY]?: FormSectionPayload[];
     [key: string]: unknown;
   };
   workflowInsights?: {
@@ -453,35 +397,27 @@ export type BemMotorDetailsResponse = {
 
 export const mapBemDetailsResponseToFormState = (
   data: BemMotorDetailsResponse,
-  schema?: SchemaDocumentV2,
 ): StaticTestFacilityFormState => {
   const defaults = createDefaultStaticTestFacilityFormState();
   const bemNo = String(data.bemNo ?? data.motorCode ?? data.motorId ?? "").trim();
   const stfTestNo = String(data.stfTestNo ?? "").trim();
-  const savedSections = data.staticTestingDetails?.[FORM_SECTIONS_KEY] ?? data.sections ?? [];
-
-  const hydratedValues =
-    schema && savedSections.length > 0 ? hydrateStfValuesFromSections(schema, savedSections) : {};
-  const schemaFormValues = bemNo ? { ...hydratedValues, bemNo } : hydratedValues;
-
-  const bemMotorSession: StfMotorSession = {
-    motorId: bemNo,
-    subType: "BEM",
-    stfTestNo: stfTestNo,
-    schemaFormValues,
-    savedSections,
-  };
-  console.log(stfTestNo);
+  const bemMotorSession = hydrateStfMotorSessionFromApi(
+    bemNo,
+    "BEM",
+    {
+      staticTestingDetails: data.staticTestingDetails,
+      sections: data.sections,
+    },
+    stfTestNo,
+  );
 
   return {
     ...defaults,
     bemNo,
+    stfTestNo,
     subType: "BEM",
-    stfSchema: schema ?? null,
-    schemasBySubType: schema ? { BEM: schema } : {},
     motors: [bemMotorSession],
-    schemaFormValues,
-    schemaFormLoaded: Boolean(schema && savedSections.length > 0),
+    formLoaded: true,
   };
 };
 
@@ -498,12 +434,8 @@ export const resolveStfFormSubTypes = (form: StaticTestFacilityFormState): StfSu
   return Array.from(subTypes);
 };
 
-export const hasAnyStaticTestFacilityValue = (form: StaticTestFacilityFormState): boolean => {
-  if (schemaValuesHaveUserData(form.schemaFormValues ?? {})) return true;
-  return (form.motors ?? []).some((motor) =>
-    schemaValuesHaveUserData(motor.schemaFormValues ?? {}),
-  );
-};
+export const hasAnyStaticTestFacilityValue = (form: StaticTestFacilityFormState): boolean =>
+  (form.motors ?? []).some((motor) => stfMotorDataHasUserInput(motor.stfData));
 
 export const hasMotorStaticTestFacilityValue = (
   form: StaticTestFacilityFormState,
@@ -511,9 +443,7 @@ export const hasMotorStaticTestFacilityValue = (
 ): boolean => {
   const motor = (form.motors ?? []).find((entry) => entry.motorId === motorId);
   if (!motor) return false;
-  return (
-    schemaValuesHaveUserData(motor.schemaFormValues ?? {}) || Boolean(motor.savedSections?.length)
-  );
+  return stfMotorDataHasUserInput(motor.stfData);
 };
 
 export type StfNavigationMotor = { motorId: string; subType: StfSubType };
@@ -567,9 +497,12 @@ export interface FormSectionPayload {
   sectionData: Record<string, any>[];
 }
 
-export interface StaticTestingDetailsPayload {
+/** @deprecated Legacy schema section wrapper — API now uses camelCase DTO fields. */
+export interface LegacyStaticTestingDetailsPayload {
   formSections: FormSectionPayload[];
 }
+
+export type StaticTestingDetailsPayload = StfStaticTestingDetailsApi;
 
 /**
  * Recursively strips UI metadata keys (starting with '_') from object or array items
@@ -597,7 +530,7 @@ const sanitizeData = (data: any): any => {
 
 export const buildStaticTestingDetails = (
   schemaValues: Record<string, any> = {},
-): StaticTestingDetailsPayload => {
+): LegacyStaticTestingDetailsPayload => {
   const sectionsMap: Record<string, Record<string, any>> = {};
 
   // Group incoming flat schemaValues (`SECTION_ID::FIELD_NAME`) by SECTION_ID
@@ -635,19 +568,8 @@ export const buildStaticTestingDetails = (
   return { formSections };
 };
 
-const buildStfMotorStaticTestingDetails = (
-  motor: StfMotorSession,
-  form: StaticTestFacilityFormState,
-): StaticTestingDetailsPayload => {
-  const values = motor.schemaFormValues ?? form.schemaFormValues ?? {};
-  if (schemaValuesHaveUserData(values)) {
-    return buildStaticTestingDetails(values);
-  }
-  if (motor.savedSections?.length) {
-    return { formSections: motor.savedSections as FormSectionPayload[] };
-  }
-  return { formSections: [] };
-};
+const buildStfMotorStaticTestingDetailsFromSession = (motor: StfMotorSession) =>
+  buildStfMotorStaticTestingDetails(motor.stfData);
 
 // Main mapper supporting both batch motors and single BEM payload
 export const mapStaticTestFacilityFormStateToPayload = (
@@ -698,7 +620,7 @@ export const mapStaticTestFacilityFormStateToPayload = (
           statusMeta,
           submissionTypeOverride,
         ),
-        staticTestingDetails: buildStfMotorStaticTestingDetails(session, form),
+        staticTestingDetails: buildStfMotorStaticTestingDetailsFromSession(session),
       };
     }),
   };

@@ -13,12 +13,6 @@ import {
   STFDetailsModel,
   type StfDetailView,
 } from "../../../data/models/user/StaticTestFacilityApiModel";
-import {
-  fetchStfSchema,
-  mapStfSubType,
-  type SchemaDocumentV2,
-  type StfSubType,
-} from "../../../schema-engine";
 import useApproverFormAction from "../useApproverFormAction";
 
 const DEPARTMENT = "qualityControl" as const;
@@ -35,20 +29,6 @@ type ApproverListRow = Record<string, unknown> & {
   detailView?: StfDetailView | null;
 };
 
-type StfSchemasBySubType = Partial<Record<StfSubType, SchemaDocumentV2 | null>>;
-
-const collectMotorSubTypes = (details: Record<string, unknown> | null | undefined): StfSubType[] => {
-  const root = details ?? {};
-  const motors = Array.isArray(root.motors) ? root.motors : [];
-  const types = new Set<StfSubType>();
-  motors.forEach((motor) => {
-    const entry = motor as { subType?: string };
-    types.add(mapStfSubType(entry?.subType));
-  });
-  if (types.size === 0) types.add("MAIN_MOTOR");
-  return Array.from(types);
-};
-
 const resolveInitialApproverMotorId = (motors: StfDetailView["motors"]): string | null => {
   const waitingMotor = motors.find(
     (motor) => motor.motorSubmissionStatus === "WAITING_FOR_APPROVAL",
@@ -59,6 +39,16 @@ const resolveInitialApproverMotorId = (motors: StfDetailView["motors"]): string 
     (motor) => !isStfMotorApproverTabDisabled(motor.motorSubmissionStatus),
   );
   return viewableMotor?.motorId ?? null;
+};
+
+const mapDetailsForDisplay = (detailsPayload: unknown): StfDetailView | null => {
+  const detailsModel =
+    detailsPayload instanceof STFDetailsModel
+      ? detailsPayload
+      : STFDetailsModel.fromApi({ data: detailsPayload });
+  const plain = STFDetailsModel.toPlainRecord(detailsModel);
+  if (!plain) return null;
+  return mapStfDetailsForDisplay(plain);
 };
 
 export const useStfApproverHook = () => {
@@ -77,54 +67,14 @@ export const useStfApproverHook = () => {
     return match?.subDepartmentId ?? null;
   }, [user]);
 
-  const loadSchemasForDetails = useCallback(
-    async (details: Record<string, unknown>): Promise<StfSchemasBySubType> => {
-      if (!subDepartmentId) return {};
-
-      const subTypes = collectMotorSubTypes(details);
-      const entries = await Promise.all(
-        subTypes.map(async (subType) => {
-          try {
-            const response = await fetchStfSchema({ subDepartmentId, subType });
-            const schema =
-              response?.success && response.data
-                ? (response.data as SchemaDocumentV2)
-                : null;
-            return [subType, schema] as const;
-          } catch {
-            return [subType, null] as const;
-          }
-        }),
-      );
-
-      return Object.fromEntries(entries) as StfSchemasBySubType;
-    },
-    [subDepartmentId],
-  );
-
-  const mapDetailsWithSchema = useCallback(
-    async (detailsPayload: unknown) => {
-      const detailsModel =
-        detailsPayload instanceof STFDetailsModel
-          ? detailsPayload
-          : STFDetailsModel.fromApi({ data: detailsPayload });
-      const plain = STFDetailsModel.toPlainRecord(detailsModel);
-      if (!plain) return null;
-
-      const schemasBySubType = await loadSchemasForDetails(plain);
-      return mapStfDetailsForDisplay(plain, schemasBySubType);
-    },
-    [loadSchemasForDetails],
-  );
-
   const refreshSelectedDetails = useCallback(
     async (formId: string) => {
       if (!subDepartmentId) return null;
       const response = await stfController.fetchFormDetails({ formId, subDepartmentId });
       if (!response?.success || !response?.data) return null;
-      return mapDetailsWithSchema(response.data);
+      return mapDetailsForDisplay(response.data);
     },
-    [mapDetailsWithSchema, subDepartmentId],
+    [subDepartmentId],
   );
 
   const submitMotorChangeStatus = useCallback(
@@ -229,7 +179,7 @@ export const useStfApproverHook = () => {
       return;
     }
 
-    const detailView = await mapDetailsWithSchema(response.data);
+    const detailView = mapDetailsForDisplay(response.data);
     if (!detailView) {
       showAlert(S.DETAILS_FETCH_ERROR, "error", { autoCloseMs: 3500 });
       setSelected(null);
