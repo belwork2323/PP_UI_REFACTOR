@@ -14,9 +14,11 @@ import ndtController from "../../../controllers/user/quality_control/ndtControll
 import { mapNDTPayload, NDTDetailsModel } from "../../../data/models/user/NDTApiModel";
 import {
   buildNDTAddedMotors,
+  collectTempFileIdsFromNdtForm,
   createDefaultNDTFormState,
   createEmptyNDTMotorSession,
   createMotorSessionFromDraft,
+  hasIncompleteNdtUploads,
   hasMotorNDTValue,
   isNDTMotorEditable,
   isNDTMotorSetupReady,
@@ -579,6 +581,7 @@ export const useNDTHook = () => {
       initialSnapshot: initialSnapshotRef.current,
       currentState: snapshotStateRef.current,
       deleteTemp,
+      extractTempFileIds: collectTempFileIdsFromNdtForm,
       resetForm: () => {
         bumpBatchRefresh();
         resetFormContext();
@@ -642,6 +645,11 @@ export const useNDTHook = () => {
 
       const motor = (formData.motors ?? []).find((entry) => entry.motorId === motorId);
       if (!motor) return false;
+
+      if (hasIncompleteNdtUploads({ motors: [motor] })) {
+        showAlert(messages.FILE_UPLOAD_PENDING, "warning");
+        return false;
+      }
 
       if (intent === "submit") {
         if (!isNDTMotorSetupReady(motor) || !hasMotorNDTValue(formData, motorId)) {

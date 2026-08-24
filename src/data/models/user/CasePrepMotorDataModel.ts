@@ -36,6 +36,130 @@ export type AbradingWheelValue = "G60" | "G36" | "";
 export type VacuumBaggingValue = "YES" | "NO" | "";
 export type LinerTypeValue = "PEDCOAT" | "HEMCOAT_3L" | "HEMCOAT_3L_M" | "OTHERS" | "";
 
+export type CasePrepFileUploadStatus = "uploading" | "uploaded" | "failed";
+
+/** Eager file-service ref (RMS/RMC parity) for Case Prep attachments / test report. */
+export type CasePrepFileRef = {
+  fileName: string;
+  fileUrl: string;
+  mimeType?: string;
+  storedFileName?: string;
+  originalFileName?: string;
+  fileId?: string | null;
+  localId?: string;
+  status?: CasePrepFileUploadStatus;
+  uploadProgress?: number;
+  isTemp?: boolean;
+  file?: File | null;
+};
+
+export const newCasePrepFileLocalId = (): string =>
+  `case-prep-file-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+export const isCasePrepFileUploadIncomplete = (ref: CasePrepFileRef | null | undefined): boolean =>
+  ref?.status === "uploading" || ref?.status === "failed";
+
+export const isCasePrepFileReady = (ref: CasePrepFileRef | null | undefined): boolean => {
+  if (!ref || isCasePrepFileUploadIncomplete(ref)) return false;
+  const fileId = String(ref.fileId ?? "").trim();
+  if (fileId) return true;
+  const url = String(ref.fileUrl ?? "").trim();
+  return Boolean(url) && !/^pending-upload:\/\//i.test(url);
+};
+
+export type CasePrepFileApiPayload = {
+  fileId: string;
+  fileName: string;
+  mimeType: string;
+};
+
+export const parseCasePrepFileRef = (value: unknown): CasePrepFileRef | null => {
+  if (value == null) return null;
+  if (typeof value === "string") {
+    const fileName = value.trim();
+    if (!fileName) return null;
+    // Legacy filename-only values — not openable without fileId.
+    return {
+      fileName,
+      fileUrl: "",
+      mimeType: "application/octet-stream",
+      localId: newCasePrepFileLocalId(),
+      status: "uploaded",
+      isTemp: false,
+      file: null,
+    };
+  }
+  if (typeof value !== "object") return null;
+  const o = value as Record<string, unknown>;
+  const fileId = String(o.fileId ?? "").trim() || null;
+  const fileUrl = String(o.fileUrl ?? o.filePath ?? o.downloadUrl ?? fileId ?? "").trim();
+  const fileName =
+    String(o.fileName ?? o.originalFileName ?? o.name ?? "").trim() ||
+    String(fileUrl.split("/").pop() || "").trim();
+  if (!fileId && !fileName && !fileUrl) return null;
+  return {
+    fileName: fileName || "file",
+    fileUrl: fileUrl || fileId || "",
+    mimeType: String(o.mimeType ?? "").trim() || "application/octet-stream",
+    storedFileName: String(o.storedFileName ?? "").trim() || undefined,
+    originalFileName: String(o.originalFileName ?? "").trim() || undefined,
+    fileId,
+    localId: newCasePrepFileLocalId(),
+    status: "uploaded",
+    isTemp: false,
+    file: null,
+  };
+};
+
+export const parseCasePrepFileRefs = (value: unknown): CasePrepFileRef[] => {
+  if (value == null || value === "") return [];
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((part) => parseCasePrepFileRef(part.trim()))
+      .filter((r): r is CasePrepFileRef => Boolean(r));
+  }
+  if (Array.isArray(value)) {
+    return value.map(parseCasePrepFileRef).filter((r): r is CasePrepFileRef => Boolean(r));
+  }
+  const single = parseCasePrepFileRef(value);
+  return single ? [single] : [];
+};
+
+export const toCasePrepFileApiPayload = (ref: CasePrepFileRef): CasePrepFileApiPayload | null => {
+  if (!isCasePrepFileReady(ref)) return null;
+  const fileId = String(ref.fileId ?? "").trim();
+  if (!fileId) return null;
+  return {
+    fileId,
+    fileName: String(ref.fileName ?? "").trim() || "file",
+    mimeType: String(ref.mimeType ?? "").trim() || "application/octet-stream",
+  };
+};
+
+export const toCasePrepFilesApiPayload = (value: unknown): CasePrepFileApiPayload[] => {
+  const refs = Array.isArray(value)
+    ? (value as CasePrepFileRef[])
+    : value
+      ? parseCasePrepFileRefs(value)
+      : [];
+  return refs.map(toCasePrepFileApiPayload).filter((p): p is CasePrepFileApiPayload => Boolean(p));
+};
+
+export const toCasePrepSingleFileApiPayload = (
+  value: unknown,
+): CasePrepFileApiPayload | null => {
+  if (value == null) return null;
+  if (Array.isArray(value)) {
+    return toCasePrepFilesApiPayload(value)[0] ?? null;
+  }
+  if (typeof value === "object" && value !== null && "fileName" in (value as object)) {
+    return toCasePrepFileApiPayload(value as CasePrepFileRef);
+  }
+  const refs = parseCasePrepFileRefs(value);
+  return refs[0] ? toCasePrepFileApiPayload(refs[0]) : null;
+};
+
 export type CasePrepAbradingHeaderRow = {
   type: "header";
   label: string;
@@ -46,7 +170,7 @@ export type CasePrepAbradingDataRow = {
   operation: string;
   value: string;
   remarksObservations: string;
-  attachments: unknown;
+  attachments: CasePrepFileRef[];
   valueFieldType?: string;
   readonly?: boolean;
 };
@@ -109,7 +233,7 @@ export type CasePrepTceCleaningData = {
   tceCleaningDateTime: string;
   solventUsedQtyKg: string;
   observation: string;
-  testReport: unknown;
+  testReport: CasePrepFileRef | null;
 };
 
 export type CasePrepPreHeatingData = {
@@ -262,7 +386,7 @@ export const createEmptyCasePrepAbradingDetails = (): CasePrepAbradingDetailsRow
     operation: "Start Date & Time",
     value: "",
     remarksObservations: "",
-    attachments: null,
+    attachments: [],
     valueFieldType: "datetime",
     readonly: true,
   },
@@ -270,7 +394,7 @@ export const createEmptyCasePrepAbradingDetails = (): CasePrepAbradingDetailsRow
     operation: "End Date & Time",
     value: "",
     remarksObservations: "",
-    attachments: null,
+    attachments: [],
     valueFieldType: "datetime",
     readonly: true,
   },
@@ -278,7 +402,7 @@ export const createEmptyCasePrepAbradingDetails = (): CasePrepAbradingDetailsRow
     operation: ABRADING_DUST_A,
     value: "",
     remarksObservations: "",
-    attachments: null,
+    attachments: [],
     valueFieldType: "number",
     readonly: true,
   },
@@ -287,7 +411,7 @@ export const createEmptyCasePrepAbradingDetails = (): CasePrepAbradingDetailsRow
     operation: "Start Date & Time",
     value: "",
     remarksObservations: "",
-    attachments: null,
+    attachments: [],
     valueFieldType: "datetime",
     readonly: true,
   },
@@ -295,7 +419,7 @@ export const createEmptyCasePrepAbradingDetails = (): CasePrepAbradingDetailsRow
     operation: "End Date & Time",
     value: "",
     remarksObservations: "",
-    attachments: null,
+    attachments: [],
     valueFieldType: "datetime",
     readonly: true,
   },
@@ -303,7 +427,7 @@ export const createEmptyCasePrepAbradingDetails = (): CasePrepAbradingDetailsRow
     operation: ABRADING_DUST_B,
     value: "",
     remarksObservations: "",
-    attachments: null,
+    attachments: [],
     valueFieldType: "number",
     readonly: true,
   },
@@ -311,7 +435,7 @@ export const createEmptyCasePrepAbradingDetails = (): CasePrepAbradingDetailsRow
     operation: ABRADING_DUST_TOTAL,
     value: "",
     remarksObservations: "",
-    attachments: null,
+    attachments: [],
     valueFieldType: "number",
     readonly: true,
   },
@@ -524,16 +648,6 @@ const toApiNumber = (value: unknown): number | undefined => {
   return Number.isFinite(n) ? n : undefined;
 };
 
-const toApiAttachments = (value: unknown): string => {
-  if (value == null) return "";
-  if (typeof value === "string") return value;
-  if (typeof File !== "undefined" && value instanceof File) return value.name;
-  if (typeof value === "object") {
-    const rec = value as Record<string, unknown>;
-    return str(rec.name ?? rec.fileName ?? rec.fileUrl ?? rec.path ?? "");
-  }
-  return str(value);
-};
 
 const abradingRowsForPayload = (rows: CasePrepAbradingDetailsRow[]): unknown[] => {
   let srNo = 0;
@@ -546,7 +660,7 @@ const abradingRowsForPayload = (rows: CasePrepAbradingDetailsRow[]): unknown[] =
         operation: row.operation,
         value: row.value,
         remarksObservations: row.remarksObservations,
-        attachments: toApiAttachments(row.attachments),
+        attachments: toCasePrepFilesApiPayload(row.attachments),
       });
     });
 };
@@ -658,7 +772,7 @@ export const buildCasePrepMotorDetailsPayload = (
       ...(tceCleaningDateTime ? { tceCleaningDateTime } : {}),
       ...(solventUsedQtyKg !== undefined ? { solventUsedQtyKg } : {}),
       observation: str(synced.tceCleaning.observation).trim(),
-      testReport: toApiAttachments(synced.tceCleaning.testReport),
+      testReport: toCasePrepSingleFileApiPayload(synced.tceCleaning.testReport),
     },
     preHeating: {
       vacuumBaggingApplied,
@@ -754,7 +868,7 @@ const parseAbradingDetails = (value: unknown): CasePrepAbradingDetailsRow[] => {
       operation: str(rec.operation ?? ""),
       value: str(rec.value ?? ""),
       remarksObservations: str(rec.remarksObservations ?? rec.remarks ?? ""),
-      attachments: rec.attachments ?? null,
+      attachments: parseCasePrepFileRefs(rec.attachments),
       valueFieldType: str(rec.valueFieldType ?? rec.value__fieldType ?? "") || undefined,
       readonly: rec.readonly === true,
     } as CasePrepAbradingDataRow;
@@ -777,7 +891,7 @@ const parseAbradingDetails = (value: unknown): CasePrepAbradingDetailsRow[] => {
       ...preset,
       value: saved.value,
       remarksObservations: saved.remarksObservations,
-      attachments: saved.attachments ?? preset.attachments,
+      attachments: saved.attachments?.length ? saved.attachments : preset.attachments,
     };
   });
 };
@@ -964,7 +1078,7 @@ export const parseCasePrepMotorDataFromApi = (
       tceCleaningDateTime: str(tce.tceCleaningDateTime ?? ""),
       solventUsedQtyKg: str(tce.solventUsedQtyKg ?? ""),
       observation: str(tce.observation ?? ""),
-      testReport: tce.testReport ?? null,
+      testReport: parseCasePrepFileRefs(tce.testReport)[0] ?? null,
     },
     preHeating: {
       vacuumBaggingApplied: str(preHeating.vacuumBaggingApplied ?? ""),
@@ -1019,3 +1133,46 @@ export const parseCasePrepMotorDataFromApi = (
 export const parseCasePrepMotorDataFromSections = (
   sections: Array<{ sectionId?: string; sectionData?: unknown[] }> | undefined,
 ): CasePrepMotorData => parseCasePrepMotorDataFromApi(sections);
+
+export const collectCasePrepFileRefsFromMotorData = (data: CasePrepMotorData | null | undefined): CasePrepFileRef[] => {
+  if (!data) return [];
+  const refs: CasePrepFileRef[] = [];
+  for (const row of data.abradingOperation?.abradingDetails ?? []) {
+    if (row && typeof row === "object" && "attachments" in row && Array.isArray((row as CasePrepAbradingDataRow).attachments)) {
+      refs.push(...((row as CasePrepAbradingDataRow).attachments ?? []));
+    }
+  }
+  if (data.tceCleaning?.testReport) refs.push(data.tceCleaning.testReport);
+  return refs;
+};
+
+export const collectCasePrepFileRefsFromForm = (form: {
+  motors?: Array<{ data?: CasePrepMotorData | null }>;
+  subscaleData?: CasePrepMotorData | null;
+}): CasePrepFileRef[] => {
+  const refs: CasePrepFileRef[] = [];
+  for (const motor of form?.motors ?? []) {
+    refs.push(...collectCasePrepFileRefsFromMotorData(motor?.data));
+  }
+  refs.push(...collectCasePrepFileRefsFromMotorData(form?.subscaleData));
+  return refs;
+};
+
+export const hasIncompleteCasePrepUploads = (form: {
+  motors?: Array<{ data?: CasePrepMotorData | null }>;
+  subscaleData?: CasePrepMotorData | null;
+}): boolean => collectCasePrepFileRefsFromForm(form).some(isCasePrepFileUploadIncomplete);
+
+export const collectTempFileIdsFromCasePrepForm = (form: {
+  motors?: Array<{ data?: CasePrepMotorData | null }>;
+  subscaleData?: CasePrepMotorData | null;
+}): string[] =>
+  [
+    ...new Set(
+      collectCasePrepFileRefsFromForm(form)
+        .filter((ref) => ref.isTemp !== false)
+        .map((ref) => String(ref.fileId ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
+

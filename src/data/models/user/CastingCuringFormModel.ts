@@ -618,6 +618,21 @@ const pushCastingCuringTable = (
   });
 };
 
+
+const isCastingCuringFileRefLike = (value: unknown): boolean => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const entry = value as Record<string, unknown>;
+  return "fileId" in entry || "fileName" in entry || "mimeType" in entry;
+};
+
+const isCastingCuringFileRefList = (value: unknown): boolean =>
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.every(
+    (entry) => entry == null || typeof entry === "string" || isCastingCuringFileRefLike(entry),
+  ) &&
+  value.some((entry) => isCastingCuringFileRefLike(entry) || typeof entry === "string");
+
 const walkCastingCuringObject = (
   blockId: string,
   obj: Record<string, unknown>,
@@ -634,6 +649,15 @@ const walkCastingCuringObject = (
 
       if (Array.isArray(value)) {
         walkCastingCuringValue(key, value, fields, tables);
+        return;
+      }
+
+      if (isCastingCuringFileRefLike(value) || isCastingCuringFileRefList(value)) {
+        fields.push({
+          key: blockId ? `${blockId}.${key}` : key,
+          label: formatPrepSectionLabel(key),
+          value,
+        });
         return;
       }
 
@@ -662,6 +686,15 @@ const walkCastingCuringValue = (
 
   if (isFlatCastingCuringTable(value)) {
     pushCastingCuringTable(tables, blockId, value);
+    return;
+  }
+
+  if (isCastingCuringFileRefList(value)) {
+    fields.push({
+      key: blockId,
+      label: formatPrepSectionLabel(blockId),
+      value,
+    });
     return;
   }
 

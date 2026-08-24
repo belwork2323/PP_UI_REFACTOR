@@ -21,7 +21,9 @@ import {
   type MotorSubmissionStatus,
 } from "../../../data/models/user/CasePreparationFormModel";
 import {
+  collectTempFileIdsFromCasePrepForm,
   createEmptyCasePrepMotorData,
+  hasIncompleteCasePrepUploads,
   type CasePrepMotorData,
 } from "../../../data/models/user/CasePrepMotorDataModel";
 import {
@@ -36,7 +38,6 @@ import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import { isMotorEnabledForWorkflow } from "../previousStageApproval";
 import { useFileService } from "../../../hooks/useFileService";
 import { discardWorkflowForm } from "../../../utils/workflowDiscard";
-import { noopTempFileExtractor } from "../../../utils/workflowTempFiles";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -394,16 +395,16 @@ export const useCasePreparationHook = () => {
     setBackConfirmOpen(false);
     await discardWorkflowForm({
       subDepartmentId,
-      baselineState: null,
-      currentState: null,
-      extractTempFileIds: noopTempFileExtractor,
+      baselineState: createDefaultCasePreparationFormState(),
+      currentState: formData,
+      extractTempFileIds: collectTempFileIdsFromCasePrepForm,
       deleteTemp,
       resetForm: () => {
         bumpBatchRefresh();
         resetFormContext();
       },
     });
-  }, [bumpBatchRefresh, deleteTemp, resetFormContext, subDepartmentId]);
+  }, [bumpBatchRefresh, deleteTemp, formData, resetFormContext, subDepartmentId]);
 
   const handleMotorSessionChange = useCallback((motorId: string, nextMotor: CasePrepMotorSession) => {
     setFormData((prev) => {
@@ -484,6 +485,11 @@ export const useCasePreparationHook = () => {
 
       const motor = (formData.motors ?? []).find((entry) => entry.motorId === motorId);
       if (!motor) return false;
+
+      if (hasIncompleteCasePrepUploads({ motors: [motor] })) {
+        showAlert(S.FILE_UPLOAD_PENDING, "warning");
+        return false;
+      }
 
       if (intent === "submit") {
         if (!String(motor.prrcClearanceDate ?? "").trim()) {
@@ -691,6 +697,11 @@ export const useCasePreparationHook = () => {
       const S = STRINGS.MANUFACTURING.CASE_PREP;
       if (!subDepartmentId) {
         showAlert(S.SUB_DEPARTMENT_MISSING, "error");
+        return false;
+      }
+
+      if (hasIncompleteCasePrepUploads(formData)) {
+        showAlert(S.FILE_UPLOAD_PENDING, "warning");
         return false;
       }
 

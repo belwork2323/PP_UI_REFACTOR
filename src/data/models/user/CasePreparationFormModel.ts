@@ -518,7 +518,8 @@ export class CasePreparationDetailsModel {
 export type CasePrepDetailField = {
   key: string;
   label: string;
-  value: string;
+  /** Raw cell value (string, file ref, or file ref list). Formatted at render. */
+  value: unknown;
 };
 
 export type CasePrepDetailTable = {
@@ -952,7 +953,7 @@ export const parseCasePrepSectionData = (
       fields.push({
         key,
         label: resolveCasePrepBlockLabel(labelIndex, key),
-        value: formatted,
+        value,
       });
     });
   });

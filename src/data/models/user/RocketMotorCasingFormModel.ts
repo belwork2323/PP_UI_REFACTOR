@@ -30,12 +30,38 @@ export type ThermalPropFormRow = {
   unit: string;
 };
 
+export type CasingFileUploadStatus = "uploading" | "uploaded" | "failed";
+
 export type UploadedFileRef = {
   fileName: string;
   fileUrl: string;
-  mimeType: string;
+  mimeType?: string;
   storedFileName?: string;
   originalFileName?: string;
+  /** Shared file-service id after upload (preferred over pending-upload URLs). */
+  fileId?: string | null;
+  localId?: string;
+  status?: CasingFileUploadStatus;
+  /** 0–100 while status is uploading. */
+  uploadProgress?: number;
+  /** True until parent form create/update succeeds. */
+  isTemp?: boolean;
+  /** Local File kept for retry; never JSON-serialized. */
+  file?: File | null;
+};
+
+export const newCasingFileLocalId = (): string =>
+  `casing-file-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+export const isCasingFileUploadIncomplete = (ref: UploadedFileRef | null | undefined): boolean =>
+  ref?.status === "uploading" || ref?.status === "failed";
+
+export const isUploadedCasingFileReady = (ref: UploadedFileRef | null | undefined): boolean => {
+  if (!ref || isCasingFileUploadIncomplete(ref)) return false;
+  const fileId = String(ref.fileId ?? "").trim();
+  if (fileId) return true;
+  const url = String(ref.fileUrl ?? "").trim();
+  return Boolean(url) && !/^pending-upload:\/\//i.test(url);
 };
 
 export type VisualInspectionFormRow = {
@@ -676,8 +702,9 @@ const valueFromApiField = (v: unknown): string => {
 export const parseUploadedFileRef = (value: unknown): UploadedFileRef | null => {
   if (!value || typeof value !== "object") return null;
   const o = value as Record<string, unknown>;
-  const fileUrl = String(o.fileUrl ?? "").trim();
-  if (!fileUrl) return null;
+  const fileId = String(o.fileId ?? "").trim() || null;
+  const fileUrl = String(o.fileUrl ?? o.filePath ?? o.downloadUrl ?? fileId ?? "").trim();
+  if (!fileUrl && !fileId) return null;
   const decodeName = (name: string) => {
     try {
       return decodeURIComponent(name);
@@ -686,12 +713,21 @@ export const parseUploadedFileRef = (value: unknown): UploadedFileRef | null => 
     }
   };
   const fileName =
-    decodeName(String(o.fileName ?? "").trim()) ||
-    decodeName(String(fileUrl.split("/").pop() || "file").replace(/^pending-upload:\/\//i, ""));
+    decodeName(String(o.fileName ?? o.originalFileName ?? "").trim()) ||
+    decodeName(
+      String(fileUrl.split("/").pop() || "file").replace(/^pending-upload:\/\//i, ""),
+    );
   return {
     fileName,
-    fileUrl,
-    mimeType: String(o.mimeType ?? "application/octet-stream"),
+    fileUrl: fileUrl || fileId || "",
+    mimeType: String(o.mimeType ?? "").trim() || "application/octet-stream",
+    storedFileName: String(o.storedFileName ?? "").trim() || undefined,
+    originalFileName: String(o.originalFileName ?? "").trim() || undefined,
+    fileId,
+    localId: newCasingFileLocalId(),
+    status: "uploaded",
+    isTemp: false,
+    file: null,
   };
 };
 
@@ -704,45 +740,33 @@ export const parseUploadedFileRefs = (value: unknown): UploadedFileRef[] => {
   return single ? [single] : [];
 };
 
-const fileToMediaRef = (file: File | null, existing?: UploadedFileRef | null) => {
-  if (file) {
-    return {
-      fileName: file.name,
-      fileUrl: `pending-upload://${encodeURIComponent(file.name)}`,
-      mimeType: file.type || "application/octet-stream",
-    };
-  }
-  if (existing?.fileUrl) {
-    return {
-      fileName: existing.fileName,
-      fileUrl: existing.fileUrl,
-      mimeType: existing.mimeType || "application/octet-stream",
-    };
-  }
-  return null;
+/** Emit media payload only for files already uploaded via file service (or legacy openable URLs). */
+const fileToMediaRef = (_file: File | null, existing?: UploadedFileRef | null) => {
+  if (!isUploadedCasingFileReady(existing)) return null;
+  const fileId = String(existing?.fileId ?? "").trim() || null;
+  return {
+    ...(fileId ? { fileId } : {}),
+    fileName: existing!.fileName,
+    fileUrl: existing!.fileUrl || fileId || "",
+    mimeType: String(existing!.mimeType ?? "").trim() || "application/octet-stream",
+  };
 };
 
-const buildReportUpload = (documentType: string, files: File[], existing: UploadedFileRef[]) => {
-  const existingDocs = existing.map((file) => ({
-    documentType,
-    originalFileName: file.fileName,
-    filePath: file.fileUrl,
-    storedFileName: file.fileUrl,
-    mimeType: file.mimeType,
-    fileSize: 0,
-  }));
-
-  const newDocs = files.map((file) => ({
-    documentType,
-    originalFileName: file.name,
-    filePath: file.name,
-    storedFileName: file.name,
-    mimeType: file.type || "application/octet-stream",
-    fileSize: file.size,
-  }));
-
-  return [...existingDocs, ...newDocs];
-};
+/** Build report docs from uploaded refs only — local File[] must be uploaded before submit. */
+const buildReportUpload = (documentType: string, _files: File[], existing: UploadedFileRef[]) =>
+  (existing ?? [])
+    .filter(isUploadedCasingFileReady)
+    .map((file) => {
+      const fileId = String(file.fileId ?? "").trim() || undefined;
+      return {
+        documentType,
+        ...(fileId ? { fileId } : {}),
+        originalFileName: file.fileName,
+        filePath: file.fileUrl || fileId || "",
+        storedFileName: file.storedFileName || fileId || file.fileUrl,
+        mimeType: String(file.mimeType ?? "").trim() || "application/octet-stream",
+      };
+    });
 
 const isWithinRange = (value: number | null, min: number | null, max: number | null): boolean => {
   if (value == null) return false;
@@ -1326,13 +1350,18 @@ export function parseSectionsToFormData(
   const reportUpload = (sections.reportUpload ?? {}) as Record<string, unknown>;
   const mapReportFiles = (docs: unknown): UploadedFileRef[] => {
     if (!Array.isArray(docs)) return [];
-
-    return docs.map((doc: any) => ({
-      fileName: doc.originalFileName,
-      fileUrl: doc.filePath, // or downloadUrl if your API returns one
-      mimeType: doc.mimeType,
-      storedFileName: doc.storedFileName,
-    }));
+    return docs
+      .map((doc: any) =>
+        parseUploadedFileRef({
+          fileId: doc?.fileId,
+          fileName: doc?.originalFileName ?? doc?.fileName,
+          originalFileName: doc?.originalFileName,
+          fileUrl: doc?.filePath ?? doc?.fileUrl ?? doc?.downloadUrl,
+          mimeType: doc?.mimeType,
+          storedFileName: doc?.storedFileName,
+        }),
+      )
+      .filter((r): r is UploadedFileRef => Boolean(r));
   };
   const parseCasingType = (raw: unknown): CasingType | "" => {
     const v = String(raw ?? "")
@@ -1644,28 +1673,38 @@ export function validateCasingFormForSubmit(
 }
 
 export function serializeCasingForm(form: RocketMotorCasingFormData): string {
+  const serializeRef = (ref: UploadedFileRef | null | undefined) =>
+    ref
+      ? {
+          fileName: ref.fileName,
+          fileUrl: ref.fileUrl,
+          mimeType: ref.mimeType ?? null,
+          fileId: ref.fileId ?? null,
+          status: ref.status ?? null,
+          isTemp: ref.isTemp !== false,
+        }
+      : null;
+
   return JSON.stringify({
     ...form,
     insulationReportFile: form.insulationReportFile?.name ?? null,
-    insulationReportExisting: form.insulationReportExisting?.fileName ?? null,
+    insulationReportExisting: serializeRef(form.insulationReportExisting),
     ndtUtReportFiles: form.ndtUtReportFiles.map((f) => f.name),
-    ndtUtReportExisting: form.ndtUtReportExisting.map((f) => f.fileName),
+    ndtUtReportExisting: form.ndtUtReportExisting.map(serializeRef),
     visualInspectionReportFiles: form.visualInspectionReportFiles.map((f) => f.name),
-    visualInspectionReportExisting: form.visualInspectionReportExisting.map((f) => f.fileName),
+    visualInspectionReportExisting: form.visualInspectionReportExisting.map(serializeRef),
     weighmentReportFiles: form.weighmentReportFiles.map((f) => f.name),
-    weighmentReportExisting: form.weighmentReportExisting.map((f) => f.fileName),
+    weighmentReportExisting: form.weighmentReportExisting.map(serializeRef),
     dimensionalInspectionReportFiles: form.dimensionalInspectionReportFiles.map((f) => f.name),
-    dimensionalInspectionReportExisting: form.dimensionalInspectionReportExisting.map(
-      (f) => f.fileName,
-    ),
+    dimensionalInspectionReportExisting: form.dimensionalInspectionReportExisting.map(serializeRef),
     mockTrialReportFiles: form.mockTrialReportFiles.map((f) => f.name),
-    mockTrialReportExisting: form.mockTrialReportExisting.map((f) => f.fileName),
+    mockTrialReportExisting: form.mockTrialReportExisting.map(serializeRef),
     insulationLiningReportFiles: form.insulationLiningReportFiles.map((f) => f.name),
-    insulationLiningReportExisting: form.insulationLiningReportExisting.map((f) => f.fileName),
+    insulationLiningReportExisting: form.insulationLiningReportExisting.map(serializeRef),
     visualInspection: form.visualInspection.map((v) => ({
       ...v,
       mediaFile: v.mediaFile?.name ?? null,
-      mediaExisting: v.mediaExisting?.fileName ?? null,
+      mediaExisting: serializeRef(v.mediaExisting),
     })),
     mockTrial: form.mockTrial,
   });
@@ -1709,6 +1748,32 @@ export const REPORT_UPLOADS = [
     label: "Insulation Lining Report",
   },
 ] as const;
+
+export const collectCasingFileRefs = (form: RocketMotorCasingFormData): UploadedFileRef[] => {
+  const refs: UploadedFileRef[] = [];
+  for (const entry of REPORT_UPLOADS) {
+    const list = form[entry.existingField] as UploadedFileRef[] | undefined;
+    if (Array.isArray(list)) refs.push(...list);
+  }
+  if (form.insulationReportExisting) refs.push(form.insulationReportExisting);
+  for (const row of form.visualInspection ?? []) {
+    if (row.mediaExisting) refs.push(row.mediaExisting);
+  }
+  return refs;
+};
+
+export const hasIncompleteCasingUploads = (form: RocketMotorCasingFormData): boolean =>
+  collectCasingFileRefs(form).some(isCasingFileUploadIncomplete);
+
+export const collectTempFileIdsFromCasingForm = (form: RocketMotorCasingFormData): string[] =>
+  [
+    ...new Set(
+      collectCasingFileRefs(form)
+        .filter((ref) => ref.isTemp !== false)
+        .map((ref) => String(ref.fileId ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
 
 export interface InsulationSpecificationRequest {
   insulationType: "ROCASIN" | "EPDM";

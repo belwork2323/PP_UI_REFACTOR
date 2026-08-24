@@ -33,6 +33,8 @@ import {
   applyCuringCycleConfigRows,
   createEmptyCuringMotorData,
   buildCuringSectionsPayload,
+  hasIncompleteCastingCuringUploads,
+  collectTempFileIdsFromCastingCuringForm,
 } from "../../../data/models/user/CuringMotorDataModel";
 import {
   createEmptyCastingMotorData,
@@ -322,6 +324,8 @@ export const useCastingAndCuringHook = () => {
       subDepartmentId,
       initialSnapshot: initialSnapshotRef.current,
       currentState: snapshotStateRef.current,
+      extractTempFileIds: (state) =>
+        collectTempFileIdsFromCastingCuringForm({ motors: state?.formData?.motors ?? [] }),
       deleteTemp,
       resetForm: () => {
         bumpBatchRefresh();
@@ -578,6 +582,12 @@ export const useCastingAndCuringHook = () => {
         return false;
       }
 
+
+      if (hasIncompleteCastingCuringUploads({ motors: formData.motors ?? [] })) {
+        showAlert(STRINGS.MANUFACTURING.CASTING_CURING.FILE_UPLOAD_PENDING, "warning");
+        return false;
+      }
+
       if (!hasAnyCastingCuringValue(formData)) {
         showAlert(STRINGS.MANUFACTURING.CASTING_CURING.EMPTY_FORM_ERROR, "warning");
         return false;
@@ -680,6 +690,12 @@ export const useCastingAndCuringHook = () => {
       }
       if (!subDepartmentId) {
         showAlert(STRINGS.MANUFACTURING.CASTING_CURING.SUB_DEPARTMENT_MISSING, "error");
+        return false;
+      }
+
+
+      if (hasIncompleteCastingCuringUploads({ motors: formData.motors ?? [] })) {
+        showAlert(STRINGS.MANUFACTURING.CASTING_CURING.FILE_UPLOAD_PENDING, "warning");
         return false;
       }
 

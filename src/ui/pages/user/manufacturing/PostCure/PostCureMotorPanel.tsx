@@ -24,8 +24,9 @@ import type {
   QualificationRow,
 } from "../../../../../data/models/user/PostCureMotorDataModel";
 import { recomputeIngredientTotal } from "../../../../../data/models/user/PostCureMotorDataModel";
+import type { CasePrepFileRef } from "../../../../../data/models/user/CasePrepMotorDataModel";
 import { DateField } from "../../../../components/common/DateField";
-import SchemaFileField from "../../../../components/common/SchemaFileField";
+import PostCureFileField from "./PostCureFileField";
 import {
   FieldGrid,
   FieldLabel,
@@ -356,11 +357,11 @@ const QualificationSection = ({
 }: {
   batchNo: string;
   prepDate: string;
-  qcReport: string;
+  qcReport: CasePrepFileRef[];
   rows: QualificationRow[];
   onBatchNoChange: (value: string) => void;
   onPrepDateChange: (value: string) => void;
-  onQcReportChange: (value: string) => void;
+  onQcReportChange: (value: CasePrepFileRef[]) => void;
   onRowsChange: (rows: QualificationRow[]) => void;
   disabled?: boolean;
   readOnly?: boolean;
@@ -379,10 +380,13 @@ const QualificationSection = ({
     <QualificationTable rows={rows} onChange={onRowsChange} disabled={disabled} readOnly={readOnly} />
     <Box sx={{ mt: 1.5 }}>
       <FieldLabel>QC Report</FieldLabel>
-      <SchemaFileField
-        value={qcReport}
+      <PostCureFileField
+        files={qcReport ?? []}
         onChange={onQcReportChange}
-        disabled={disabled} readOnly={readOnly}
+        multiple
+        acceptMode="imageVideoPdf"
+        disabled={disabled}
+        readOnly={readOnly}
       />
     </Box>
   </>

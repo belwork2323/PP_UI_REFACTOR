@@ -20,6 +20,10 @@ import {
   type PostCureMotorSubmissionStatus,
   type PostCureMotorSubmissionType,
 } from "../../../data/models/user/PostCureFormModel";
+import {
+  collectTempFileIdsFromPostCureForm,
+  hasIncompletePostCureUploads,
+} from "../../../data/models/user/PostCureMotorDataModel";
 import { batchManagementController } from "../../../controllers/admin/BatchManagement/batchManagementController";
 import {
   isPostCureInhibitionOperation,
@@ -302,6 +306,7 @@ export const usePostCureHook = () => {
       subDepartmentId,
       initialSnapshot: initialSnapshotRef.current,
       currentState: snapshotStateRef.current,
+      extractTempFileIds: collectTempFileIdsFromPostCureForm,
       deleteTemp,
       resetForm: () => {
         bumpBatchRefresh();
@@ -461,6 +466,11 @@ export const usePostCureHook = () => {
       const targetMotor = (formData.motors ?? []).find((motor) => motor.motorId === motorId);
       if (!targetMotor?.formLoaded) {
         showAlert(STRINGS.MANUFACTURING.POST_CURE.FORM_NOT_LOADED, "warning");
+        return false;
+      }
+
+      if (hasIncompletePostCureUploads({ motors: [targetMotor] })) {
+        showAlert(STRINGS.MANUFACTURING.POST_CURE.FILE_UPLOAD_PENDING, "warning");
         return false;
       }
 

@@ -3,6 +3,7 @@ import {
   Box,
   Chip,
   CircularProgress,
+  Link,
   Stack,
   Table,
   TableBody,
@@ -13,14 +14,22 @@ import {
   Typography,
 } from "@mui/material";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
+import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
+import { useAuthStore } from "../../../../../../app/store/authStore";
 import getQualityControlTheme from "../../../../../../app/theme/custom_themes/user/qualityControl/qualityControl_theme";
 import { getNdtTheme } from "../../../../../../app/theme/custom_themes/user/qualityControl/ndt_theme";
 import { STRINGS } from "../../../../../../app/config/strings";
 import { formatCasePrepCellValue } from "../../../../../../data/models/user/CasePreparationFormModel";
+import {
+  parseCasePrepFileRefs,
+  type CasePrepFileRef,
+} from "../../../../../../data/models/user/CasePrepMotorDataModel";
 import type { NDTDetailView, NDTMotorDetailView } from "../../../../../../data/models/user/NDTFormModel";
 import { NDT_FLOW_LABELS } from "../../../../../../hooks/user/qualityControl/ndtFlowConfig";
 import { NDT_ORIENTATION_OPTIONS } from "../../../../../../hooks/user/qualityControl/ndtApiMappings";
+import { useFilePreview } from "../../../../../../hooks/useFilePreview";
+import FilePreviewDialog from "../../../../../components/common/FilePreviewDialog";
 import { OPERATION_STATUS_UI_TO_API } from "../../../../../../hooks/operationStatus";
 import {
   UserWorkflowTabNav,
@@ -63,18 +72,96 @@ const formatOrientationLabel = (value?: string) => {
   return NDT_ORIENTATION_OPTIONS.find((option) => option.value === trimmed)?.label ?? trimmed;
 };
 
-const formatFileRef = (file: unknown) => {
-  if (!file) return "—";
-  if (typeof file === "string") return file;
-  if (typeof file === "object" && file !== null && "name" in file) {
-    return String((file as { name?: string }).name ?? "—");
+const looksLikeNdtFiles = (value: unknown): boolean => {
+  if (value == null || value === "") return false;
+  if (typeof value === "string") return false;
+  if (Array.isArray(value)) {
+    return value.some(
+      (entry) =>
+        entry &&
+        typeof entry === "object" &&
+        ("fileId" in entry || "fileName" in entry || "mimeType" in entry),
+    );
   }
-  return "—";
+  return (
+    typeof value === "object" &&
+    ("fileId" in (value as object) ||
+      "fileName" in (value as object) ||
+      "mimeType" in (value as object))
+  );
 };
 
-const formatFileList = (files?: unknown[]) => {
-  if (!files?.length) return "—";
-  return files.map(formatFileRef).join(", ");
+const NdtFileLinks = ({
+  refs,
+  subDepartmentId,
+  onOpen,
+}: {
+  refs: CasePrepFileRef[];
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
+}) => {
+  if (!refs.length) return <>{formatCasePrepCellValue(null)}</>;
+  return (
+    <Stack spacing={0.5}>
+      {refs.map((ref, index) => {
+        const fileId = String(ref.fileId ?? "").trim();
+        const name = ref.fileName || "file";
+        const canOpen = Boolean(fileId && subDepartmentId);
+        return (
+          <Stack
+            key={ref.localId ?? `${fileId || name}-${index}`}
+            direction="row"
+            alignItems="center"
+            gap={1}
+            flexWrap="wrap"
+          >
+            <Typography component="span" sx={{ fontSize: "0.75rem", fontWeight: 600 }}>
+              {name}
+            </Typography>
+            {canOpen ? (
+              <Link
+                component="button"
+                type="button"
+                onClick={() => onOpen(fileId, name)}
+                sx={{
+                  fontSize: "0.72rem",
+                  fontWeight: 700,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 0.25,
+                  cursor: "pointer",
+                }}
+              >
+                {NDT.FILE_OPEN}
+                <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
+              </Link>
+            ) : null}
+          </Stack>
+        );
+      })}
+    </Stack>
+  );
+};
+
+const NdtCellValue = ({
+  value,
+  subDepartmentId,
+  onOpen,
+}: {
+  value: unknown;
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
+}) => {
+  if (looksLikeNdtFiles(value)) {
+    return (
+      <NdtFileLinks
+        refs={parseCasePrepFileRefs(value)}
+        subDepartmentId={subDepartmentId}
+        onOpen={onOpen}
+      />
+    );
+  }
+  return <>{formatCasePrepCellValue(value)}</>;
 };
 
 const FieldsTable = ({
@@ -115,11 +202,15 @@ const SimpleDataTable = ({
   columns,
   rows,
   dt,
+  subDepartmentId,
+  onOpen,
 }: {
   title: string;
   columns: { key: string; label: string }[];
   rows: Record<string, unknown>[];
   dt: NDTDetailsTheme;
+  subDepartmentId?: number;
+  onOpen?: (fileId: string, fileName: string) => void;
 }) => {
   const visibleRows = rows.filter((row) =>
     columns.some((column) => {
@@ -152,7 +243,15 @@ const SimpleDataTable = ({
               <TableRow key={rowIndex} sx={dt.tableRow(rowIndex)}>
                 {columns.map((column) => (
                   <TableCell key={column.key} sx={dt.tableCell}>
-                    {formatCasePrepCellValue(row[column.key])}
+                    {onOpen ? (
+                      <NdtCellValue
+                        value={row[column.key]}
+                        subDepartmentId={subDepartmentId}
+                        onOpen={onOpen}
+                      />
+                    ) : (
+                      formatCasePrepCellValue(row[column.key])
+                    )}
                   </TableCell>
                 ))}
               </TableRow>
@@ -168,10 +267,14 @@ export const MotorDetailPanel = ({
   motor,
   dt,
   palette,
+  subDepartmentId,
+  onOpen,
 }: {
   motor: NDTMotorDetailView;
   dt: NDTDetailsTheme;
   palette: ReturnType<typeof getQualityControlTheme>["palette"];
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
 }) => {
   const setupFields = [
     { key: "equipment", label: L.equipment, value: motor.equipment },
@@ -199,7 +302,7 @@ export const MotorDetailPanel = ({
     section: row.section,
     orientation: formatOrientationLabel(row.orientation),
     observations: row.observations,
-    files: formatFileList(row.files),
+    files: row.files ?? [],
   }));
 
   const visualRows = (motor.visualInspectionRows ?? [])
@@ -219,14 +322,20 @@ export const MotorDetailPanel = ({
         : row.observation,
       section: row.section,
       orientation: formatOrientationLabel(row.orientation),
-      files: formatFileList(row.files),
+      files: row.files ?? [],
     }));
 
   const hasMotorData =
     setupFields.some((field) => String(field.value ?? "").trim()) ||
     planRows.length > 0 ||
     exposureRows.some((row) => Object.values(row).some((value) => String(value ?? "").trim())) ||
-    observationRows.some((row) => Object.values(row).some((value) => String(value ?? "").trim() && value !== "—")) ||
+    observationRows.some(
+      (row) =>
+        String(row.section ?? "").trim() ||
+        String(row.orientation ?? "").trim() ||
+        String(row.observations ?? "").trim() ||
+        (row.files?.length ?? 0) > 0,
+    ) ||
     visualRows.length > 0 ||
     (motor.visualInspectionMedia?.length ?? 0) > 0 ||
     Boolean(motor.signedReport) ||
@@ -290,6 +399,8 @@ export const MotorDetailPanel = ({
           <SimpleDataTable
             title="Observation in radiography"
             dt={dt}
+            subDepartmentId={subDepartmentId}
+            onOpen={onOpen}
             columns={[
               { key: "section", label: "Section" },
               { key: "orientation", label: "Orientation" },
@@ -302,6 +413,8 @@ export const MotorDetailPanel = ({
           <SimpleDataTable
             title="Visual inspection"
             dt={dt}
+            subDepartmentId={subDepartmentId}
+            onOpen={onOpen}
             columns={[
               { key: "observation", label: "Observation" },
               { key: "section", label: "Section" },
@@ -316,7 +429,11 @@ export const MotorDetailPanel = ({
               <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: "text.secondary", mb: 0.75 }}>
                 Visual inspection media
               </Typography>
-              <Typography sx={dt.remarksText}>{formatFileList(motor.visualInspectionMedia)}</Typography>
+              <NdtFileLinks
+                refs={motor.visualInspectionMedia ?? []}
+                subDepartmentId={subDepartmentId}
+                onOpen={onOpen}
+              />
             </Box>
           ) : null}
 
@@ -325,7 +442,11 @@ export const MotorDetailPanel = ({
               <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: "text.secondary", mb: 0.75 }}>
                 Signed NDT report
               </Typography>
-              <Typography sx={dt.remarksText}>{formatFileRef(motor.signedReport)}</Typography>
+              <NdtFileLinks
+                refs={[motor.signedReport]}
+                subDepartmentId={subDepartmentId}
+                onOpen={onOpen}
+              />
             </Box>
           ) : null}
 
@@ -360,6 +481,14 @@ const NDTDetailsContent = ({
 }: NDTDetailsContentProps) => {
   const dt = getNdtTheme(theme).details;
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
+  const subDepartmentId = useAuthStore(
+    (s) => s.user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "ndt")?.subDepartmentId,
+  );
+  const { preview, openFile, closePreview, downloadCurrent } = useFilePreview();
+  const onOpenFile = (fileId: string, fileName: string) => {
+    if (!subDepartmentId) return;
+    void openFile(fileId, subDepartmentId, fileName);
+  };
 
   const motors = detailView?.motors ?? [];
   const activeMotorIndexSafe = motors.length > 0 ? Math.min(activeMotorIndex, motors.length - 1) : 0;
@@ -459,12 +588,24 @@ const NDTDetailsContent = ({
           ) : null}
 
           {activeMotor ? (
-            <MotorDetailPanel motor={activeMotor} dt={dt} palette={theme.palette} />
+            <MotorDetailPanel
+              motor={activeMotor}
+              dt={dt}
+              palette={theme.palette}
+              subDepartmentId={subDepartmentId}
+              onOpen={onOpenFile}
+            />
           ) : null}
         </Box>
       ) : (
         <Typography sx={dt.emptyText}>No form data recorded</Typography>
       )}
+
+      <FilePreviewDialog
+        preview={preview}
+        onClose={closePreview}
+        onDownload={downloadCurrent}
+      />
     </>
   );
 };

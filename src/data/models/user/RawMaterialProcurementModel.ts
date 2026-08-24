@@ -60,6 +60,7 @@ export type LotCertificate = {
   fileId?: string | null;
   fileName: string;
   fileUrl: string;
+  mimeType?: string;
   certificateType: string;
   /** Local file kept until upload succeeds (not sent in JSON payload). */
   file?: File | null;
@@ -73,6 +74,7 @@ export type LotCertificate = {
 export type RawMaterialCertificateApiPayload = {
   fileId: string;
   fileName: string;
+  mimeType: string;
   certificateType: string;
 };
 
@@ -820,6 +822,7 @@ export function normalizeLotCertificate(raw: unknown): LotCertificate {
     fileId,
     fileName,
     fileUrl: /^blob:/i.test(fileUrl) ? "" : fileUrl,
+    mimeType: String(source.mimeType ?? "").trim() || "application/octet-stream",
     certificateType: String(source.certificateType ?? "").trim(),
     file: null,
     status: fileId ? "uploaded" : undefined,
@@ -848,6 +851,7 @@ export function mapCertificateToApiPayload(
   return {
     fileId,
     fileName: String(cert.fileName ?? "").trim(),
+    mimeType: String(cert.mimeType ?? "").trim() || "application/octet-stream",
     certificateType: String(cert.certificateType ?? "").trim(),
   };
 }

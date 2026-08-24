@@ -1,15 +1,16 @@
 import {
-  buildTrimmingSectionPayload,
-  createTrimmingInitialValues,
-  hydrateTrimmingValuesFromSections,
   mapTrimmingMotorStage,
   resolveTrimmingMotorStageNumber,
-  schemaValuesHaveUserData,
-  type SchemaDocumentV2,
-  type SchemaFormValues,
   type SchemaSectionSubmission,
 } from "../../../schema-engine";
 import type { CasePrepDetailSection } from "./CasePreparationFormModel";
+import {
+  isCasePrepFileReady,
+  isCasePrepFileUploadIncomplete,
+  parseCasePrepFileRefs,
+  toCasePrepFilesApiPayload,
+  type CasePrepFileRef,
+} from "./CasePrepMotorDataModel";
 import {
   mapCastingCuringPersonLabel,
   parseCastingCuringSectionData,
@@ -64,7 +65,23 @@ const formatTrimmingStageLabel = (stage: unknown, stageName: unknown): string =>
   return String(stage ?? stageName ?? "").trim() || "—";
 };
 
-const resolveReportDisplayValue = (row: Record<string, unknown>): string => {
+const isTrimmingFileRefLike = (value: unknown): boolean => {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const entry = value as Record<string, unknown>;
+  return "fileId" in entry || "fileName" in entry || "mimeType" in entry;
+};
+
+const isTrimmingFileRefList = (value: unknown): boolean =>
+  Array.isArray(value) &&
+  value.length > 0 &&
+  value.some((entry) => isTrimmingFileRefLike(entry) || typeof entry === "string");
+
+const resolveReportDisplayValue = (row: Record<string, unknown>): unknown => {
+  const raw =
+    row.reportFiles ?? row.reportFile ?? row.reportLink ?? row.reportFiles ?? undefined;
+  if (isTrimmingFileRefList(raw) || isTrimmingFileRefLike(raw)) {
+    return raw;
+  }
   if (row.reportFile && typeof row.reportFile === "object") {
     const file = row.reportFile as Record<string, unknown>;
     const name = String(
@@ -197,7 +214,7 @@ export const parseTrimmingSectionData = (
       fields.push({ key: "remarks", label: "Remarks", value: remarks });
     }
     if (reportValue) {
-      fields.push({ key: "reportLink", label: "Report", value: reportValue });
+      fields.push({ key: "reportFiles", label: "Report", value: reportValue });
     }
 
     return {
@@ -448,23 +465,20 @@ export type TrimmingMotorSession = {
   motorId: string;
   motorStage: number;
   motorReceivedAt: string;
-  schema: SchemaDocumentV2 | null;
-  formValues: SchemaFormValues;
   savedSections?: SchemaSectionSubmission[];
   trimmingDetails: TrimmingDetailsRow[];
   commonFormatParameters: TrimmingCommonFormatParameter[];
   motorRemarks: string;
-  reportFile?: TrimmingReportFile | null; // UPDATED to structured file object
-  reportLink?: string; // Fallback / legacy support
+  reportFiles: CasePrepFileRef[];
+  /** Legacy hydrate only — do not bind UI. */
+  reportFile?: TrimmingReportFile | null;
+  /** Legacy hydrate only — do not bind UI. */
+  reportLink?: string;
 };
 
 export const createTrimmingData = () => ({
-  schemaFormLoaded: false,
-  trimmingSchema: null as SchemaDocumentV2 | null,
-  schemasByStage: {} as Record<number, SchemaDocumentV2>,
   selectedMotorStage: null as string | null,
   motors: [] as TrimmingMotorSession[],
-  schemaFormValues: {} as SchemaFormValues,
   savedSections: undefined as SchemaSectionSubmission[] | undefined,
 });
 
@@ -569,63 +583,16 @@ export const createEmptyTrimmingMotorSession = (
   motorId: string,
   motorStage: number | string,
   motorReceivedAt: string,
-  schema: SchemaDocumentV2 | null,
 ): TrimmingMotorSession => ({
   motorId,
   motorStage: resolveTrimmingMotorStageNumber({ motorStage }),
   motorReceivedAt,
-  schema,
-  formValues: schema ? createTrimmingInitialValues(schema) : {},
   savedSections: undefined,
   trimmingDetails: createDefaultTrimmingDetailsRows(),
   commonFormatParameters: createDefaultCommonFormatParameters(),
   motorRemarks: "",
-  reportFile: null,
-  reportLink: "",
+  reportFiles: [],
 });
-
-export const hydrateTrimmingMotorSession = (
-  motor: TrimmingMotorSession,
-  schema: SchemaDocumentV2 | null,
-): TrimmingMotorSession => {
-  if (!schema) return motor;
-
-  return {
-    ...motor,
-    schema,
-    formValues: motor.savedSections?.length
-      ? hydrateTrimmingValuesFromSections(schema, motor.savedSections)
-      : Object.keys(motor.formValues ?? {}).length > 0
-        ? motor.formValues
-        : createTrimmingInitialValues(schema),
-  };
-};
-
-export const hydrateTrimmingFormState = (
-  state: TrimmingFormState,
-  schema: SchemaDocumentV2,
-  motorStage?: number | string,
-): TrimmingFormState => {
-  const stageNum = resolveTrimmingMotorStageNumber({
-    motorStage: motorStage ?? state.selectedMotorStage,
-  });
-  const schemasByStage = {
-    ...(state.schemasByStage ?? {}),
-    [stageNum]: schema,
-  };
-
-  const motors = (state.motors ?? []).map((motor) =>
-    motor.motorStage === stageNum ? hydrateTrimmingMotorSession(motor, schema) : motor,
-  );
-
-  return {
-    ...state,
-    trimmingSchema: schema,
-    schemasByStage,
-    motors,
-    schemaFormLoaded: true,
-  };
-};
 
 export const mapTrimmingDetailsToFormState = (
   details: Partial<TrimmingDetails>,
@@ -652,8 +619,6 @@ export const mapTrimmingDetailsToFormState = (
           motorStage: motor?.motorStage ?? motorStage,
         }),
         motorReceivedAt: String(motor?.motorReceivedAt ?? "").trim(),
-        schema: null,
-        formValues: {},
         savedSections: motorSections.length > 0 ? motorSections : undefined,
         trimmingDetails:
           (detailsSection?.sectionData as TrimmingDetailsRow[]) ??
@@ -662,8 +627,9 @@ export const mapTrimmingDetailsToFormState = (
           (commonSection?.sectionData as TrimmingCommonFormatParameter[]) ??
           createDefaultCommonFormatParameters(),
         motorRemarks: remarksData.remarks ?? "",
-        reportFile: remarksData.reportFile ?? null,
-        reportLink: remarksData.reportLink ?? "",
+        reportFiles: parseCasePrepFileRefs(
+          remarksData.reportFiles ?? remarksData.reportFile ?? remarksData.reportLink,
+        ),
       };
     })
     .filter((motor) => motor.motorId.length > 0);
@@ -673,22 +639,16 @@ export const mapTrimmingDetailsToFormState = (
       motorId: "",
       motorStage: resolveTrimmingMotorStageNumber({ motorStage }),
       motorReceivedAt: "",
-      schema: null,
-      formValues: {},
       savedSections,
       trimmingDetails: createDefaultTrimmingDetailsRows(),
       commonFormatParameters: createDefaultCommonFormatParameters(),
       motorRemarks: "",
-      reportFile: null,
-      reportLink: "",
+      reportFiles: [],
     });
   }
 
   return {
     ...defaults,
-    schemaFormLoaded: Boolean(
-      motors.some((motor) => motor.savedSections?.length) || savedSections?.length,
-    ),
     selectedMotorStage: motorStage != null ? String(motorStage) : null,
     motors,
     savedSections,
@@ -710,7 +670,6 @@ export const mapTrimmingFormStateToPayload = (
     .filter((motor) => motor.motorId.trim().length > 0)
     .filter((motor) => !targetIds || targetIds.has(motor.motorId))
     .map((motor) => {
-      const schema = motor.schema ?? form.schemasByStage?.[motor.motorStage] ?? form.trimmingSchema;
       const sections: SchemaSectionSubmission[] = [];
 
       // 1. Trimming Details
@@ -727,26 +686,27 @@ export const mapTrimmingFormStateToPayload = (
       }
 
       // 3. Trimming Remarks & File Upload
-      if (motor.motorRemarks?.trim() || motor.reportFile || motor.reportLink?.trim()) {
-        const remarksPayload: Record<string, any> = {
+      const readyReportFiles = toCasePrepFilesApiPayload(motor.reportFiles ?? []);
+      const legacyReportLink = String(motor.reportLink ?? "").trim();
+      if (
+        motor.motorRemarks?.trim() ||
+        readyReportFiles.length ||
+        legacyReportLink
+      ) {
+        const remarksPayload: Record<string, unknown> = {
           remarks: motor.motorRemarks ?? "",
         };
 
-        if (motor.reportFile) {
-          remarksPayload.reportFile = motor.reportFile;
-        } else if (motor.reportLink) {
-          remarksPayload.reportLink = motor.reportLink;
+        if (readyReportFiles.length) {
+          remarksPayload.reportFile = readyReportFiles;
+        } else if (legacyReportLink) {
+          remarksPayload.reportLink = legacyReportLink;
         }
 
         sections.push({
           sectionId: "TRIMMING_REMARKS",
           sectionData: [remarksPayload],
         });
-      }
-
-      // 4. Schema Engine Fields
-      if (schema) {
-        sections.push(...buildTrimmingSectionPayload(schema, motor.formValues));
       }
 
       return {
@@ -767,18 +727,18 @@ export const mapTrimmingFormStateToPayload = (
     };
   }
 
-  const fallbackSchema = form.trimmingSchema;
   return {
     motorStage: resolveTrimmingMotorStageNumber({ motorStage: form.selectedMotorStage }),
-    sections: fallbackSchema
-      ? buildTrimmingSectionPayload(fallbackSchema, form.schemaFormValues)
-      : [],
+    sections: [],
   };
 };
 
 const motorHasTrimmingValue = (motor: TrimmingMotorSession) => {
-  if (schemaValuesHaveUserData(motor.formValues ?? {})) return true;
-  if (motor.motorRemarks?.trim() || motor.reportFile || motor.reportLink?.trim()) return true;
+  if (motor.motorRemarks?.trim()) return true;
+  if ((motor.reportFiles ?? []).some((ref) => isCasePrepFileReady(ref) || ref.fileName?.trim())) {
+    return true;
+  }
+  if (String(motor.reportLink ?? "").trim()) return true;
   if (String(motor.motorReceivedAt ?? "").trim()) return true;
 
   if (
@@ -813,13 +773,35 @@ export const hasMotorTrimmingValue = (form: TrimmingFormState, motorId: string) 
   return motor ? motorHasTrimmingValue(motor) : false;
 };
 
-export const hasAnyTrimmingValue = (form: TrimmingFormState) => {
-  if ((form.motors ?? []).some((motor) => motorHasTrimmingValue(motor))) {
-    return true;
-  }
+export const hasAnyTrimmingValue = (form: TrimmingFormState) =>
+  (form.motors ?? []).some((motor) => motorHasTrimmingValue(motor));
 
-  return schemaValuesHaveUserData(form.schemaFormValues ?? {});
+export const collectTrimmingFileRefsFromForm = (form: {
+  motors?: TrimmingMotorSession[];
+}): CasePrepFileRef[] => {
+  const refs: CasePrepFileRef[] = [];
+  for (const motor of form?.motors ?? []) {
+    refs.push(...(motor.reportFiles ?? []));
+  }
+  return refs;
 };
+
+export const hasIncompleteTrimmingUploads = (form: {
+  motors?: TrimmingMotorSession[];
+}): boolean =>
+  collectTrimmingFileRefsFromForm(form).some(isCasePrepFileUploadIncomplete);
+
+export const collectTempFileIdsFromTrimmingForm = (form: {
+  motors?: TrimmingMotorSession[];
+}): string[] =>
+  [
+    ...new Set(
+      collectTrimmingFileRefsFromForm(form)
+        .filter((ref) => ref.isTemp !== false)
+        .map((ref) => String(ref.fileId ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
 
 /** Build final-approval payload from latest saved form details (all motors). */
 export const mapTrimmingDetailsFromSavedForm = (

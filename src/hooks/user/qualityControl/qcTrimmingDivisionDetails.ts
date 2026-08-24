@@ -152,8 +152,7 @@ const mergeTrimmingSessions = (
       ? current.commonFormatLocations
       : incoming.commonFormatLocations,
     motorRemarks: current.motorRemarks || incoming.motorRemarks,
-    reportFile: current.reportFile || incoming.reportFile,
-    reportLink: current.reportLink || incoming.reportLink,
+    reportFiles: (current.reportFiles?.length ? current.reportFiles : incoming.reportFiles) ?? [],
   });
 
 export const applyTrimmingDivisionDetailsSeed = (

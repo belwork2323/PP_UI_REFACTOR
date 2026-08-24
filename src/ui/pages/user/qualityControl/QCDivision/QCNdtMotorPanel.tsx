@@ -14,7 +14,9 @@ import {
 } from "@mui/material";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { SchemaFormValues } from "../../../../../schema-engine";
-import SchemaFileField from "../../../../components/common/SchemaFileField";
+import type { CasePrepFileRef } from "../../../../../data/models/user/CasePrepMotorDataModel";
+import { STRINGS } from "../../../../../app/config/strings";
+import NdtFileField from "../NDT/NdtFileField";
 import {
   QC_NDT_FIELD_LABELS,
   QC_NDT_SECTION_TITLES,
@@ -41,6 +43,7 @@ import {
 } from "./components/QCDivisionReadOnlyValue";
 
 const BRAND = QC_DIVISION_BRAND;
+const NDT_S = STRINGS.QUALITY_CONTROL.NDT;
 const TABLE_BORDER = alpha(BRAND.primary, 0.18);
 const HEADER_CELL_BORDER = alpha("#fff", 0.22);
 
@@ -314,12 +317,14 @@ const VisualInspectionTable = ({
   const bodyCellSx = readOnly ? qcReadOnlyBodyCellSx : cellSx;
   const inputsDisabled = disabled || readOnly;
 
-  const updateCell = (
-    index: number,
-    field: "OBSERVATION" | "LOCATION" | "UPLOAD_IMAGE",
-    value: string,
-  ) => {
+  const updateTextCell = (index: number, field: "OBSERVATION" | "LOCATION", value: string) => {
     onChange(rows.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row)));
+  };
+
+  const updateFiles = (index: number, next: CasePrepFileRef[]) => {
+    onChange(
+      rows.map((row, rowIndex) => (rowIndex === index ? { ...row, UPLOAD_IMAGE: next } : row)),
+    );
   };
 
   return (
@@ -369,7 +374,7 @@ const VisualInspectionTable = ({
                     minRows={1}
                     value={row.OBSERVATION}
                     disabled={inputsDisabled}
-                    onChange={(event) => updateCell(index, "OBSERVATION", event.target.value)}
+                    onChange={(event) => updateTextCell(index, "OBSERVATION", event.target.value)}
                     sx={tableFieldSx}
                   />
                 )}
@@ -383,22 +388,23 @@ const VisualInspectionTable = ({
                     fullWidth
                     value={row.LOCATION}
                     disabled={inputsDisabled}
-                    onChange={(event) => updateCell(index, "LOCATION", event.target.value)}
+                    onChange={(event) => updateTextCell(index, "LOCATION", event.target.value)}
                     sx={tableFieldSx}
                   />
                 )}
               </TableCell>
               <TableCell sx={bodyCellSx}>
-                {readOnly ? (
-                  <QCDivisionReadOnlyValue value={row.UPLOAD_IMAGE} muted={!row.UPLOAD_IMAGE.trim()} />
-                ) : (
-                  <SchemaFileField
-                    value={row.UPLOAD_IMAGE}
-                    onChange={(next) => updateCell(index, "UPLOAD_IMAGE", next)}
-                    disabled={inputsDisabled}
-                    emptyLabel="Upload"
-                  />
-                )}
+                <NdtFileField
+                  files={row.UPLOAD_IMAGE ?? []}
+                  onChange={(next) => updateFiles(index, next)}
+                  multiple
+                  acceptMode="image"
+                  subDeptSlug="qc-division"
+                  compact
+                  readOnly={readOnly}
+                  disabled={inputsDisabled}
+                  emptyLabel={NDT_S.FILE_EMPTY_IMAGE}
+                />
               </TableCell>
             </TableRow>
           ))}
@@ -473,17 +479,16 @@ const QCNdtMotorPanel = ({
           />
         </SectionCard>
         <SectionCard title={QC_NDT_SECTION_TITLES.UPLOAD_MEDIA} readOnly={readOnly}>
-          {readOnly ? (
-            <QCDivisionReadOnlyValue value={uploadMedia} muted={!uploadMedia.trim()} />
-          ) : (
-            <SchemaFileField
-              value={uploadMedia}
-              onChange={(next) => onChange(setNdtUploadMedia(values, next))}
-              disabled={inputsDisabled}
-              multiple
-              emptyLabel={QC_NDT_FIELD_LABELS.UPLOAD_VIDEO_PHOTO}
-            />
-          )}
+          <NdtFileField
+            files={uploadMedia}
+            onChange={(next) => onChange(setNdtUploadMedia(values, next))}
+            multiple
+            acceptMode="imageVideo"
+            subDeptSlug="qc-division"
+            readOnly={readOnly}
+            disabled={inputsDisabled}
+            emptyLabel={QC_NDT_FIELD_LABELS.UPLOAD_VIDEO_PHOTO}
+          />
         </SectionCard>
       </Stack>
     </Box>

@@ -17,7 +17,7 @@ import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
 import PhotoCameraRoundedIcon from "@mui/icons-material/PhotoCameraRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import { icons } from "../../../../../app/theme/icons";
-import type { NDTFileValue, NDTMotorSession } from "../../../../../data/models/user/NDTFormModel";
+import type { NDTMotorSession } from "../../../../../data/models/user/NDTFormModel";
 import { normalizeNDTMotorSession } from "../../../../../data/models/user/NDTFormModel";
 import getQualityControlTheme from "../../../../../app/theme/custom_themes/user/qualityControl/qualityControl_theme";
 import {
@@ -29,14 +29,15 @@ import {
   NDT_ORIENTATION_OPTIONS,
   sanitizeNdtNumericInput,
 } from "../../../../../hooks/user/qualityControl/ndtApiMappings";
-import { FILE_PICKER_ACCEPT, fileNameMatchesAccept } from "../../../../../utils/FileUtils";
+import { STRINGS } from "../../../../../app/config/strings";
+import NdtFileField from "./NdtFileField";
+
+const S = STRINGS.QUALITY_CONTROL.NDT;
 
 const {
   add: AddRoundedIcon,
   delete: DeleteOutlineRoundedIcon,
   uploadFile: UploadFileRoundedIcon,
-  image: ImageRoundedIcon,
-  clear: ClearRoundedIcon,
 } = icons.user.qualityControl.ndt.form;
 
 const buildFieldSx = (border: string, primaryLight: string) => ({
@@ -50,102 +51,6 @@ const buildFieldSx = (border: string, primaryLight: string) => ({
     "&.Mui-focused fieldset": { borderColor: primaryLight },
   },
 });
-
-const UploadCell = ({
-  uploadId,
-  files = [],
-  onAdd,
-  onRemove,
-  accept = FILE_PICKER_ACCEPT.IMAGE_VIDEO,
-  label = "Upload",
-  brand,
-}: {
-  uploadId: string;
-  files?: NDTFileValue[];
-  onAdd: (files: File[]) => void;
-  onRemove: (index: number) => void;
-  accept?: string;
-  label?: string;
-  brand: { primaryLight: string; danger: string };
-}) => (
-  <Box sx={{ minWidth: 120 }}>
-    <input
-      type="file"
-      multiple
-      style={{ display: "none" }}
-      id={uploadId}
-      onChange={(e) => {
-        const selected = Array.from(e.target.files ?? []).filter((file) =>
-          fileNameMatchesAccept(file.name, accept),
-        );
-        if (selected.length) onAdd(selected);
-        e.target.value = "";
-      }}
-    />
-    <Stack gap={0.35}>
-      {files.map((file, index) => (
-        <Stack
-          key={index}
-          direction="row"
-          alignItems="center"
-          gap={0.4}
-          sx={{
-            px: "4px",
-            py: "2px",
-            borderRadius: "5px",
-            background: alpha(brand.primaryLight, 0.08),
-            border: `1px solid ${alpha(brand.primaryLight, 0.2)}`,
-            maxWidth: 180,
-            overflow: "hidden",
-          }}
-        >
-          <ImageRoundedIcon sx={{ fontSize: 12, color: brand.primaryLight }} />
-          <Typography
-            sx={{
-              fontSize: "0.62rem",
-              fontWeight: 600,
-              color: brand.primaryLight,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-              flex: 1,
-            }}
-          >
-            {typeof file === "string" ? file : file.name}
-          </Typography>
-          <IconButton
-            size="small"
-            onClick={() => onRemove(index)}
-            sx={{ p: 0, color: brand.danger }}
-          >
-            <ClearRoundedIcon sx={{ fontSize: 10 }} />
-          </IconButton>
-        </Stack>
-      ))}
-      <label htmlFor={uploadId}>
-        <Stack
-          direction="row"
-          alignItems="center"
-          gap={0.4}
-          sx={{
-            cursor: "pointer",
-            px: 0.75,
-            py: 0.35,
-            borderRadius: "6px",
-            border: `1px solid ${alpha(brand.primaryLight, 0.4)}`,
-            color: brand.primaryLight,
-            fontSize: "0.68rem",
-            fontWeight: 700,
-            width: "fit-content",
-          }}
-        >
-          <UploadFileRoundedIcon sx={{ fontSize: 12 }} />
-          {label}
-        </Stack>
-      </label>
-    </Stack>
-  </Box>
-);
 
 const SectionTitle = ({
   icon: Icon,
@@ -630,18 +535,14 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
                     />
                   </TableCell>
                   <TableCell sx={TD}>
-                    <UploadCell
-                      uploadId={`ndt-radiography-obs-${index}`}
-                      brand={brand}
-                      files={row.files}
-                      accept={FILE_PICKER_ACCEPT.IMAGE}
-                      label="Image"
-                      onAdd={(picked) =>
-                        updateObservation(index, { files: [...row.files, ...picked] })
-                      }
-                      onRemove={(fi) =>
-                        updateObservation(index, { files: row.files.filter((_, i) => i !== fi) })
-                      }
+                    <NdtFileField
+                      files={row.files ?? []}
+                      onChange={(next) => updateObservation(index, { files: next })}
+                      multiple
+                      acceptMode="image"
+                      subDeptSlug="ndt"
+                      compact
+                      emptyLabel={S.FILE_EMPTY_IMAGE}
                     />
                   </TableCell>
                   <TableCell sx={TD}>
@@ -752,14 +653,14 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
                     />
                   </TableCell>
                   <TableCell sx={TD}>
-                    <UploadCell
-                      uploadId={`ndt-visual-inspection-${index}`}
-                      brand={brand}
-                      files={row.files}
-                      onAdd={(picked) => updateVisual(index, { files: [...row.files, ...picked] })}
-                      onRemove={(fi) =>
-                        updateVisual(index, { files: row.files.filter((_, i) => i !== fi) })
-                      }
+                    <NdtFileField
+                      files={row.files ?? []}
+                      onChange={(next) => updateVisual(index, { files: next })}
+                      multiple
+                      acceptMode="imageVideo"
+                      subDeptSlug="ndt"
+                      compact
+                      emptyLabel={S.FILE_EMPTY_IMAGE}
                     />
                   </TableCell>
                   <TableCell sx={TD}>
@@ -802,20 +703,14 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
             <AddRoundedIcon sx={{ fontSize: 15 }} />
             Add observation
           </Stack>
-          <UploadCell
-            uploadId="ndt-visual-inspection-media"
-            brand={brand}
-            files={motor.visualInspectionMedia}
-            accept={FILE_PICKER_ACCEPT.IMAGE_VIDEO}
+          <NdtFileField
+            files={motor.visualInspectionMedia ?? []}
+            onChange={(next) => onChange({ visualInspectionMedia: next })}
+            multiple
+            acceptMode="imageVideo"
+            subDeptSlug="ndt"
             label="Upload media"
-            onAdd={(picked) =>
-              onChange({ visualInspectionMedia: [...motor.visualInspectionMedia, ...picked] })
-            }
-            onRemove={(fi) =>
-              onChange({
-                visualInspectionMedia: motor.visualInspectionMedia.filter((_, i) => i !== fi),
-              })
-            }
+            emptyLabel={S.FILE_EMPTY_MEDIA}
           />
         </Box>
       </CompactCard>
@@ -827,14 +722,14 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
           theme={theme}
         />
         <Box sx={{ px: 1.75, py: 1.25 }}>
-          <UploadCell
-            uploadId="ndt-signed-report"
-            brand={brand}
+          <NdtFileField
             files={motor.signedReport ? [motor.signedReport] : []}
-            accept=".pdf,application/pdf"
+            onChange={(next) => onChange({ signedReport: next[0] ?? null })}
+            multiple={false}
+            acceptMode="pdf"
+            subDeptSlug="ndt"
             label="Upload PDF"
-            onAdd={(picked) => onChange({ signedReport: picked[0] ?? null })}
-            onRemove={() => onChange({ signedReport: null })}
+            emptyLabel={S.FILE_EMPTY_REPORT}
           />
           <Box sx={{ mt: 1.25 }}>
             <CInput

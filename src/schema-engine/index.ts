@@ -150,19 +150,10 @@ export {
 export type { SubscaleBatchType } from "./adapters/subscale.adapter";
 
 export {
-  TR_SCHEMA_FUNCTIONALITY,
-  TR_SCHEMA_TYPE,
-  TR_SCHEMA_VERSION,
-  trimmingSchemaFetchConfig,
-  buildTrimmingSchemaRequest,
   mapTrimmingMotorStage,
   resolveTrimmingMotorStage,
   resolveTrimmingMotorStageNumber,
   resolveTrimmingMotorStageForApi,
-  fetchTrimmingSchema,
-  createTrimmingInitialValues,
-  hydrateTrimmingValuesFromSections,
-  buildTrimmingSectionPayload,
 } from "./adapters/trimming.adapter";
 
 export {

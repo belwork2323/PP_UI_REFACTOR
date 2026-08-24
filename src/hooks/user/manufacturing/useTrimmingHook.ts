@@ -6,8 +6,10 @@ import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshSto
 import { batchManagementController } from "../../../controllers/admin/BatchManagement/batchManagementController";
 import trimmingController from "../../../controllers/user/manufacturing/trimmingController";
 import {
+  collectTempFileIdsFromTrimmingForm,
   createDefaultTrimmingFormState,
   createEmptyTrimmingMotorSession,
+  hasIncompleteTrimmingUploads,
   hasMotorTrimmingValue,
   isTrimmingMotorEditable,
   mapTrimmingDetailsToFormState,
@@ -37,7 +39,6 @@ import {
   resolvePreviousStageApprovedUnits,
   type PreviousStageApprovedUnits,
 } from "../previousStageApproval";
-import type { SchemaFormValues } from "../../../schema-engine";
 import { useFileService } from "../../../hooks/useFileService";
 import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
 
@@ -170,7 +171,6 @@ const mergeMotorsFromBatchAndForm = (
       entry.motorId,
       entry.motorStage || fallbackStage || "",
       entry.motorReceivedAt || "",
-      null,
     );
   });
 
@@ -181,7 +181,7 @@ const mergeMotorsFromBatchAndForm = (
   });
 
   return {
-    formData: { ...formData, schemaFormLoaded: true, motors },
+    formData: { ...formData, motors },
     addedMotors: motors.map((motor) => ({
       motorId: motor.motorId,
       motorStage: String(motor.motorStage),
@@ -494,6 +494,7 @@ export const useTrimmingHook = () => {
       initialSnapshot: initialSnapshotRef.current,
       currentState: snapshotStateRef.current,
       deleteTemp,
+      extractTempFileIds: collectTempFileIdsFromTrimmingForm,
       resetForm: () => {
         bumpBatchRefresh();
         resetFormContext();
@@ -515,16 +516,6 @@ export const useTrimmingHook = () => {
     setFormData((prev) => ({
       ...prev,
       motors: (prev.motors ?? []).map((motor) => (motor.motorId === motorId ? next : motor)),
-    }));
-  }, []);
-
-  const handleFormValuesChange = useCallback((motorId: string, values: SchemaFormValues) => {
-    setFormData((prev) => ({
-      ...prev,
-      motors: (prev.motors ?? []).map((motor) =>
-        motor.motorId === motorId ? { ...motor, formValues: values } : motor,
-      ),
-      schemaFormValues: values,
     }));
   }, []);
 
@@ -582,6 +573,11 @@ export const useTrimmingHook = () => {
 
       const motor = (formData.motors ?? []).find((entry) => entry.motorId === motorId);
       if (!motor) return false;
+
+      if (hasIncompleteTrimmingUploads({ motors: [motor] })) {
+        showAlert(S.FILE_UPLOAD_PENDING, "warning");
+        return false;
+      }
 
       if (intent === "submit") {
         if (!String(motor.motorReceivedAt ?? "").trim()) {
@@ -765,7 +761,6 @@ export const useTrimmingHook = () => {
     handleMotorCountChange,
     handleMotorReceivedAtChange: setMotorReceivedAt,
     handleMotorSessionChange,
-    handleFormValuesChange,
     handleSaveMotorDraft,
     handleSubmitMotor,
     detailsRow,

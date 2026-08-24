@@ -3,7 +3,6 @@ import {
   normalizeNDTFormState,
   normalizeNDTMotorSession,
   mapNDTMotorStatusesFromApi,
-  type NDTFileValue,
   type NDTFormState,
   type NDTMotorSession,
   type NDTMotorStatusMeta,
@@ -12,11 +11,15 @@ import {
   type NDTVisualInspectionRow,
 } from "./NDTFormModel";
 import { mapCastingCuringPersonLabel } from "./CastingCuringFormModel";
+import {
+  parseCasePrepFileRef,
+  parseCasePrepFileRefs,
+  toCasePrepFilesApiPayload,
+  toCasePrepSingleFileApiPayload,
+} from "./CasePrepMotorDataModel";
 import { NDT_VISUAL_INSPECTION_PRESETS } from "../../../hooks/user/qualityControl/ndtFlowConfig";
 import {
   NDT_CUSTOM_OBSERVATION_TYPE,
-  fileToNdtApiRef,
-  filesToNdtApiRefs,
   mapNdtBeamEnergiesFromApi,
   mapNdtBeamEnergiesToApi,
   mapNdtDetectorTypeFromApi,
@@ -62,7 +65,7 @@ const mergeVisualInspectionFromApi = (apiRows: any[] = []): NDTVisualInspectionR
         section: String(apiRow?.sectionNumber ?? ""),
         orientation: mapNdtOrientationFromApi(apiRow?.orientation ?? ""),
         observationNotes: apiRow?.observation ?? "",
-        files: Array.isArray(apiRow?.uploadedImages) ? apiRow.uploadedImages : [],
+        files: parseCasePrepFileRefs(apiRow?.uploadedImages),
       };
       continue;
     }
@@ -82,7 +85,7 @@ const mergeVisualInspectionFromApi = (apiRows: any[] = []): NDTVisualInspectionR
       isPreset: false,
       section: String(apiRow?.sectionNumber ?? ""),
       orientation: mapNdtOrientationFromApi(apiRow?.orientation ?? ""),
-      files: Array.isArray(apiRow?.uploadedImages) ? apiRow.uploadedImages : [],
+      files: parseCasePrepFileRefs(apiRow?.uploadedImages),
     });
   }
 
@@ -159,11 +162,16 @@ const mapMotorSessionFromApi = (motor: any): NDTMotorSession => {
       section: String(row.sectionNumber ?? ""),
       orientation: mapNdtOrientationFromApi(row.orientation ?? ""),
       observations: row.observation ?? "",
-      files: Array.isArray(row.uploadedImages) ? row.uploadedImages : [],
+      files: parseCasePrepFileRefs(row.uploadedImages),
     })),
     visualInspectionRows: mergeVisualInspectionFromApi(motor?.visualInspectionDetails),
-    visualInspectionMedia: Array.isArray(motor?.uploadedVideos) ? motor.uploadedVideos : [],
-    signedReport: motor?.signedNdtReport?.documentId ?? null,
+    visualInspectionMedia: parseCasePrepFileRefs(motor?.uploadedVideos),
+    signedReport:
+      parseCasePrepFileRef(
+        motor?.signedNdtReport?.documentId ??
+          motor?.signedNdtReport?.report ??
+          motor?.signedNdtReport,
+      ) ?? null,
     additionalRemarks: motor?.additionalRemarks ?? "",
   });
 };
@@ -177,7 +185,7 @@ const mapVisualInspectionRowToApi = (row: NDTVisualInspectionRow) => {
     sectionNumber: sectionNumber ?? 0,
     orientation: mapNdtOrientationToApi(row.orientation),
     observation: row.isPreset ? (row.observationNotes ?? "") : (row.observation ?? ""),
-    uploadedImages: filesToNdtApiRefs(row.files ?? []),
+    uploadedImages: toCasePrepFilesApiPayload(row.files ?? []),
   };
 };
 
@@ -255,7 +263,7 @@ const mapMotorSessionToApi = (motor: NDTMotorSession) => {
         sectionNumber: parseNdtPositiveInt(row.section)!,
         orientation: mapNdtOrientationToApi(row.orientation),
         observation: row.observations ?? "",
-        uploadedImages: filesToNdtApiRefs(row.files ?? []),
+        uploadedImages: toCasePrepFilesApiPayload(row.files ?? []),
       })),
     visualInspectionDetails: (normalized.visualInspectionRows ?? [])
       .filter(visualInspectionRowHasValue)
@@ -264,11 +272,18 @@ const mapMotorSessionToApi = (motor: NDTMotorSession) => {
         return !sectionText || parseNdtPositiveInt(row.section) !== null;
       })
       .map(mapVisualInspectionRowToApi),
-    uploadedVideos: filesToNdtApiRefs(normalized.visualInspectionMedia ?? []),
+    uploadedVideos: toCasePrepFilesApiPayload(normalized.visualInspectionMedia ?? []),
     additionalRemarks: normalized.additionalRemarks ?? "",
-    signedNdtReport: {
-      documentId: fileToNdtApiRef(normalized.signedReport) ?? "",
-    },
+    signedNdtReport: (() => {
+      const ready = toCasePrepSingleFileApiPayload(normalized.signedReport);
+      if (ready) {
+        return {
+          documentId: ready.fileId,
+          report: ready,
+        };
+      }
+      return { documentId: "" };
+    })(),
   };
 };
 
@@ -299,9 +314,11 @@ const hydrateFormState = (payload: any): NDTFormState => {
     additionalExposureRows: payload?.additionalExposureRows,
     radiographyObservationRows: payload?.radiographyObservationRows,
     visualInspectionRows: payload?.visualInspectionRows,
-    visualInspectionMedia:
+    visualInspectionMedia: parseCasePrepFileRefs(
       payload?.visualInspectionMediaFilePaths ?? payload?.visualInspectionMedia,
-    signedReport: payload?.signedReportFilePath ?? payload?.signedReport,
+    ),
+    signedReport:
+      parseCasePrepFileRef(payload?.signedReportFilePath ?? payload?.signedReport) ?? null,
     additionalRemarks: payload?.additionalRemarks,
     formLoaded: true,
   });

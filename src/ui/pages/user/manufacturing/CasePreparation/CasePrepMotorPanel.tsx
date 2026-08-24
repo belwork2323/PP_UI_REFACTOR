@@ -28,10 +28,9 @@ import {
   type CasePrepQualificationParameterRow,
 } from "../../../../../data/models/user/CasePrepMotorDataModel";
 import { DateTimeField, TimeField } from "../../../../components/common/DateField";
-import SchemaFileField from "../../../../components/common/SchemaFileField";
-import { FILE_PICKER_ACCEPT } from "../../../../../utils/FileUtils";
 import { CASE_PREP_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/casePreparation_theme";
 import CasePrepDateField from "./CasePrepDateField";
+import CasePrepFileField from "./CasePrepFileField";
 import CasePrepSelect from "./CasePrepSelect";
 import CasePrepTextField from "./CasePrepTextField";
 import {
@@ -106,17 +105,6 @@ const sumQuantityPerPremix = (materials: MaterialInput[]): string => {
     any = true;
   }
   return any ? String(total) : "";
-};
-
-const toFileFieldValue = (value: unknown): string => {
-  if (!value) return "";
-  if (typeof value === "string") return value;
-  if (typeof File !== "undefined" && value instanceof File) return value.name;
-  if (typeof value === "object" && value !== null) {
-    const rec = value as Record<string, unknown>;
-    return str(rec.name ?? rec.fileName ?? rec.fileUrl ?? rec.path ?? "");
-  }
-  return "";
 };
 
 const CompactDateTime = ({
@@ -645,14 +633,14 @@ const CasePrepMotorPanel = ({
                       />
                     </TableCell>
                     <TableCell sx={casePrepTableCellSx}>
-                      <SchemaFileField
-                        value={toFileFieldValue(row.attachments)}
+                      <CasePrepFileField
+                        files={row.attachments ?? []}
                         onChange={(next) => updateAbradingDataRow(index, { attachments: next })}
-                        disabled={disabled} readOnly={readOnly}
+                        disabled={disabled}
+                        readOnly={readOnly}
                         compact
                         multiple
-                        accept={FILE_PICKER_ACCEPT.IMAGE_VIDEO}
-                        emptyLabel="Upload"
+                        acceptMode="imageVideo"
                       />
                     </TableCell>
                   </TableRow>
@@ -782,14 +770,16 @@ const CasePrepMotorPanel = ({
               sx={casePrepTableInputSx}
             />
           </Box>
-          <SchemaFileField
+          <CasePrepFileField
             label="Test Report"
-            value={toFileFieldValue(tce.testReport)}
-            onChange={(next) => patchSection("tceCleaning", { testReport: next })}
-            disabled={disabled} readOnly={readOnly}
+            files={tce.testReport ? [tce.testReport] : []}
+            onChange={(next) =>
+              patchSection("tceCleaning", { testReport: next[0] ?? null })
+            }
+            disabled={disabled}
+            readOnly={readOnly}
             multiple={false}
-            accept={FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF}
-            emptyLabel="Upload test report"
+            acceptMode="imageVideoPdf"
           />
         </FieldGrid>
       </SectionCard>

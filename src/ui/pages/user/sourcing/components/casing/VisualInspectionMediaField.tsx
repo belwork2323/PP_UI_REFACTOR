@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   alpha,
   Box,
   Button,
   Chip,
   IconButton,
+  LinearProgress,
   List,
   ListItem,
   Stack,
@@ -13,11 +14,14 @@ import {
 } from "@mui/material";
 import ImageRoundedIcon from "@mui/icons-material/ImageRounded";
 import VideocamRoundedIcon from "@mui/icons-material/VideocamRounded";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import { icons } from "../../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../../app/config/strings";
 import type { UploadedFileRef } from "../../../../../../data/models/user/RocketMotorCasingFormModel";
 import MediaUpload from "../../../../../components/common/MediaUpload";
+import FilePreviewDialog from "../../../../../components/common/FilePreviewDialog";
 import { FILE_PICKER_ACCEPT } from "../../../../../../utils/FileUtils";
+import { useCasingFileActions } from "../../../../../../hooks/user/sourcing/useCasingFileActions";
 
 const S = STRINGS.SOURCING.CASING_CREATE;
 
@@ -26,8 +30,6 @@ const {
   openInNew: OpenInNewRoundedIcon,
   delete: DeleteOutlineRoundedIcon,
 } = icons.user.sourcing.specificationFormBuilder;
-
-const isWebUrl = (url: string) => /^https?:\/\//i.test(String(url ?? "").trim());
 
 const isImageMimeOrName = (mimeType?: string, fileName?: string) => {
   if (String(mimeType ?? "").startsWith("image/")) return true;
@@ -40,50 +42,67 @@ const isVideoMimeOrName = (mimeType?: string, fileName?: string) => {
 };
 
 type VisualInspectionMediaFieldProps = {
-  mediaFile: File | null;
   mediaExisting?: UploadedFileRef | null;
-  onMediaFileChange: (file: File | null) => void;
-  onClearExisting: () => void;
+  onMediaExistingChange: (next: UploadedFileRef | null) => void;
   theme: any;
   listSx?: object;
 };
 
 const VisualInspectionMediaField = ({
-  mediaFile,
-  mediaExisting,
-  onMediaFileChange,
-  onClearExisting,
+  mediaExisting = null,
+  onMediaExistingChange,
   theme,
   listSx,
 }: VisualInspectionMediaFieldProps) => {
   const [showUploader, setShowUploader] = useState(false);
   const palette = theme.palette ?? {};
+  const files = useMemo(() => (mediaExisting ? [mediaExisting] : []), [mediaExisting]);
 
-  const hasNew = Boolean(mediaFile);
-  const hasSaved = Boolean(mediaExisting?.fileUrl);
-  const hasAny = hasNew || hasSaved;
+  const {
+    uploadSingleFile,
+    handleRetry,
+    handleRemove,
+    handleOpen,
+    filePreview,
+    closeFilePreview,
+    downloadFilePreview,
+  } = useCasingFileActions(files, (next) => onMediaExistingChange(next[0] ?? null));
+
+  const isUploading = mediaExisting?.status === "uploading";
+  const isFailed = mediaExisting?.status === "failed";
+  const hasAny = Boolean(mediaExisting?.fileName);
 
   useEffect(() => {
     if (!hasAny) setShowUploader(false);
   }, [hasAny]);
 
-  const displayName = hasNew ? mediaFile!.name : mediaExisting?.fileName ?? "";
-  const displayMime = hasNew ? mediaFile!.type : mediaExisting?.mimeType;
-  const displayUrl = hasNew ? "" : mediaExisting?.fileUrl ?? "";
+  const displayName = mediaExisting?.fileName ?? "";
+  const displayMime = mediaExisting?.mimeType;
   const isImage = isImageMimeOrName(displayMime, displayName);
   const isVideo = isVideoMimeOrName(displayMime, displayName);
-  const canOpen = isWebUrl(displayUrl);
+  const canOpen =
+    Boolean(String(mediaExisting?.fileId ?? "").trim()) ||
+    /^https?:\/\//i.test(String(mediaExisting?.fileUrl ?? ""));
   const typeLabel = isImage ? "Image" : isVideo ? "Video" : "File";
-  const TypeIcon = isImage ? ImageRoundedIcon : isVideo ? VideocamRoundedIcon : InsertDriveFileOutlinedIcon;
+  const TypeIcon = isImage
+    ? ImageRoundedIcon
+    : isVideo
+      ? VideocamRoundedIcon
+      : InsertDriveFileOutlinedIcon;
+  const statusChipLabel = isUploading
+    ? S.UPLOAD_REPORT_UPLOADING
+    : isFailed
+      ? S.UPLOAD_REPORT_FAILED
+      : typeLabel;
+  const statusColor = isFailed ? palette.danger ?? "#c0392b" : palette.primaryLight ?? "#2E86C1";
 
-  const handleRemove = () => {
-    onMediaFileChange(null);
-    onClearExisting();
+  const handleRemoveAll = () => {
+    void handleRemove(0);
     setShowUploader(false);
   };
 
   const handleFilePicked = (file: File | null) => {
-    onMediaFileChange(file);
+    uploadSingleFile(file);
     if (file) setShowUploader(false);
   };
 
@@ -104,11 +123,16 @@ const VisualInspectionMediaField = ({
         <MediaUpload
           variant="compact"
           hideLabel
-          value={mediaFile}
+          value={null}
           onChange={handleFilePicked}
           label={S.COL_MEDIA}
           description={S.ADD_MEDIA}
           accept={FILE_PICKER_ACCEPT.IMAGE_VIDEO}
+        />
+        <FilePreviewDialog
+          preview={filePreview}
+          onClose={closeFilePreview}
+          onDownload={downloadFilePreview}
         />
       </Box>
     );
@@ -116,7 +140,9 @@ const VisualInspectionMediaField = ({
 
   return (
     <Box sx={{ mt: 1.25, ...listSx }}>
-      <Typography sx={{ ...theme.workflow.formElements.fieldLabel, mb: 0.75 }}>{S.COL_MEDIA}</Typography>
+      <Typography sx={{ ...theme.workflow.formElements.fieldLabel, mb: 0.75 }}>
+        {S.COL_MEDIA}
+      </Typography>
       <List disablePadding sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
         <ListItem
           disableGutters
@@ -141,18 +167,9 @@ const VisualInspectionMediaField = ({
                 justifyContent: "center",
                 background: alpha(palette.primaryLight ?? "#2E86C1", 0.1),
                 border: `1px solid ${alpha(palette.primaryLight ?? "#2E86C1", 0.2)}`,
-                overflow: "hidden",
               }}
             >
-              {canOpen && isImage ? (
-                <img
-                  src={displayUrl}
-                  alt={displayName}
-                  style={{ width: "100%", height: "100%", objectFit: "cover" }}
-                />
-              ) : (
-                <TypeIcon sx={{ fontSize: 20, color: palette.primaryLight }} />
-              )}
+              <TypeIcon sx={{ fontSize: 20, color: palette.primaryLight }} />
             </Box>
             <Box sx={{ flex: 1, minWidth: 0 }}>
               <Typography
@@ -168,36 +185,56 @@ const VisualInspectionMediaField = ({
               </Typography>
               <Stack direction="row" alignItems="center" gap={0.75} sx={{ mt: 0.35 }}>
                 <Chip
-                  label={hasNew ? `${typeLabel} · new` : typeLabel}
+                  label={statusChipLabel}
                   size="small"
                   sx={{
                     height: 20,
                     fontSize: "0.6rem",
                     fontWeight: 700,
-                    background: alpha(palette.primaryLight ?? "#2E86C1", 0.1),
-                    color: palette.primaryLight,
+                    background: alpha(statusColor, 0.1),
+                    color: statusColor,
                   }}
                 />
-                {canOpen ? (
+                {canOpen && !isUploading ? (
                   <Tooltip title={S.OPEN_FILE}>
                     <IconButton
                       size="small"
-                      component="a"
-                      href={displayUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      onClick={() => handleOpen(0)}
                       sx={{ color: palette.primaryLight, p: 0.25 }}
                     >
                       <OpenInNewRoundedIcon sx={{ fontSize: 17 }} />
                     </IconButton>
                   </Tooltip>
                 ) : null}
+                {isFailed ? (
+                  <Tooltip title={S.UPLOAD_REPORT_RETRY}>
+                    <IconButton
+                      size="small"
+                      onClick={() => handleRetry(0)}
+                      sx={{ color: palette.primaryLight, p: 0.25 }}
+                    >
+                      <RefreshRoundedIcon sx={{ fontSize: 17 }} />
+                    </IconButton>
+                  </Tooltip>
+                ) : null}
               </Stack>
+              {isUploading ? (
+                <LinearProgress
+                  variant={
+                    typeof mediaExisting?.uploadProgress === "number"
+                      ? "determinate"
+                      : "indeterminate"
+                  }
+                  value={mediaExisting?.uploadProgress ?? 0}
+                  sx={{ mt: 0.75, height: 4, borderRadius: 1 }}
+                />
+              ) : null}
             </Box>
             <Stack direction="row" alignItems="center" gap={0.5} flexShrink={0}>
               <Button
                 size="small"
                 variant="outlined"
+                disabled={isUploading}
                 onClick={() => setShowUploader(true)}
                 sx={{
                   textTransform: "none",
@@ -215,10 +252,14 @@ const VisualInspectionMediaField = ({
               <Tooltip title={S.REMOVE_FILE}>
                 <IconButton
                   size="small"
-                  onClick={handleRemove}
+                  onClick={handleRemoveAll}
+                  disabled={isUploading}
                   sx={{
                     color: palette.textSub,
-                    "&:hover": { color: palette.danger, background: alpha(palette.danger ?? "#c0392b", 0.08) },
+                    "&:hover": {
+                      color: palette.danger,
+                      background: alpha(palette.danger ?? "#c0392b", 0.08),
+                    },
                   }}
                 >
                   <DeleteOutlineRoundedIcon sx={{ fontSize: 18 }} />
@@ -228,6 +269,11 @@ const VisualInspectionMediaField = ({
           </Stack>
         </ListItem>
       </List>
+      <FilePreviewDialog
+        preview={filePreview}
+        onClose={closeFilePreview}
+        onDownload={downloadFilePreview}
+      />
     </Box>
   );
 };

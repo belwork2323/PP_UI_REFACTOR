@@ -1,6 +1,13 @@
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
 import { formatToUiDate } from "../../../utils/dateUtils";
 import {
+  isCasePrepFileReady,
+  isCasePrepFileUploadIncomplete,
+  parseCasePrepFileRefs,
+  toCasePrepFilesApiPayload,
+  type CasePrepFileRef,
+} from "../../../data/models/user/CasePrepMotorDataModel";
+import {
   mapNdtBeamEnergiesFromApi,
   mapNdtEquipmentFromApi,
   mapNdtObservationTypeFromApi,
@@ -94,7 +101,7 @@ const emptyVisualRows = (): QcNdtVisualInspectionRow[] =>
     OBSERVATION_TYPE: row.OBSERVATION_TYPE,
     OBSERVATION: "",
     LOCATION: "",
-    UPLOAD_IMAGE: "",
+    UPLOAD_IMAGE: [],
   }));
 
 const normalizeRadiographyDetailRows = (value: unknown): QcNdtRadiographyDetailRow[] => {
@@ -140,39 +147,13 @@ const normalizeObservationRows = (value: unknown): QcNdtRadiographyObservationRo
   });
 };
 
-const fileRefToName = (value: unknown): string => {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!trimmed || trimmed.toLowerCase() === "null") return "";
-    if (trimmed.toLowerCase().startsWith("pending-upload://")) {
-      const encoded = trimmed.slice("pending-upload://".length);
-      try {
-        return decodeURIComponent(encoded);
-      } catch {
-        return encoded;
-      }
-    }
-    return trimmed;
+const parseNdtUploadFiles = (...candidates: unknown[]): CasePrepFileRef[] => {
+  for (const candidate of candidates) {
+    if (candidate == null || candidate === "") continue;
+    const refs = parseCasePrepFileRefs(candidate);
+    if (refs.length) return refs;
   }
-  const rec = asRecord(value);
-  if (!rec) return "";
-  return fileRefToName(rec.documentId ?? rec.fileName ?? rec.name ?? rec.fileUrl ?? rec.url);
-};
-
-const joinFileRefs = (...candidates: unknown[]): string => {
-  const names: string[] = [];
-  const pushName = (item: unknown) => {
-    const name = fileRefToName(item);
-    if (name && !names.includes(name)) names.push(name);
-  };
-  candidates.forEach((candidate) => {
-    if (Array.isArray(candidate)) {
-      candidate.forEach(pushName);
-      return;
-    }
-    pushName(candidate);
-  });
-  return names.join(", ");
+  return [];
 };
 
 const formatNdtSectionLocation = (sectionNumber: unknown, orientation: unknown) => {
@@ -261,10 +242,10 @@ const normalizeVisualRows = (value: unknown): QcNdtVisualInspectionRow[] => {
       OBSERVATION_TYPE: fallback.OBSERVATION_TYPE,
       OBSERVATION: pickEditableString(row?.OBSERVATION, row?.observation, row?.OBSERVATIONS),
       LOCATION: location,
-      UPLOAD_IMAGE: pickString(
+      UPLOAD_IMAGE: parseNdtUploadFiles(
         row?.UPLOAD_IMAGE,
         row?.uploadImage,
-        joinFileRefs(row?.uploadedImages),
+        row?.uploadedImages,
       ),
     };
   });
@@ -328,20 +309,20 @@ const applyManufacturingNdtDetails = (
       LOCATION:
         pickEditableString(rec.LOCATION, rec.location) ||
         formatNdtSectionLocation(rec.sectionNumber, rec.orientation),
-      UPLOAD_IMAGE: joinFileRefs(rec.uploadedImages, rec.UPLOAD_IMAGE, rec.uploadImage),
+      UPLOAD_IMAGE: parseNdtUploadFiles(rec.uploadedImages, rec.UPLOAD_IMAGE, rec.uploadImage),
     };
   });
   values[formKey(QC_NDT_SECTION_IDS.VISUAL_INSPECTION, QC_NDT_TABLE_IDS.VISUAL_INSPECTION)] =
     visualRows;
 
-  const media = joinFileRefs(
+  const media = parseNdtUploadFiles(
     data.uploadedVideos,
     data.UPLOAD_VIDEO_PHOTO,
     data.uploadVideoPhoto,
     asRecord(data.signedNdtReport)?.documentId,
     data.signedNdtReport,
   );
-  if (media) {
+  if (media.length) {
     values[formKey(QC_NDT_SECTION_IDS.UPLOAD_MEDIA, "UPLOAD_VIDEO_PHOTO")] = media;
   }
   return values;
@@ -352,16 +333,38 @@ export const ndtFormValuesHaveUserData = (values: SchemaFormValues | null | unde
   if (!values) return false;
   return Object.values(values).some((value) => {
     if (value == null || value === "") return false;
-    if (!Array.isArray(value)) return String(value).trim().length > 0;
-    return value.some((row) => {
-      if (!row || typeof row !== "object") return false;
-      return Object.entries(row as Record<string, unknown>).some(([field, fieldValue]) => {
-        if (field === "SR_NO" || field === "TYPE_OF_DEFECT" || field === "OBSERVATION_TYPE") {
-          return false;
-        }
-        return String(fieldValue ?? "").trim().length > 0;
+    if (Array.isArray(value)) {
+      if (
+        value.length > 0 &&
+        value.every(
+          (entry) =>
+            entry &&
+            typeof entry === "object" &&
+            ("fileName" in (entry as object) || "fileId" in (entry as object)),
+        )
+      ) {
+        return value.some(
+          (ref) =>
+            isCasePrepFileReady(ref as CasePrepFileRef) ||
+            String((ref as CasePrepFileRef).fileName ?? "").trim(),
+        );
+      }
+      return value.some((row) => {
+        if (!row || typeof row !== "object") return false;
+        return Object.entries(row as Record<string, unknown>).some(([field, fieldValue]) => {
+          if (field === "SR_NO" || field === "TYPE_OF_DEFECT" || field === "OBSERVATION_TYPE") {
+            return false;
+          }
+          if (field === "UPLOAD_IMAGE") {
+            return parseCasePrepFileRefs(fieldValue).some(
+              (ref) => isCasePrepFileReady(ref) || String(ref.fileName ?? "").trim(),
+            );
+          }
+          return String(fieldValue ?? "").trim().length > 0;
+        });
       });
-    });
+    }
+    return String(value).trim().length > 0;
   });
 };
 
@@ -372,7 +375,7 @@ export const createInitialNdtValues = (): SchemaFormValues => ({
   [formKey(QC_NDT_SECTION_IDS.RADIOGRAPHY_OBSERVATIONS, QC_NDT_TABLE_IDS.RADIOGRAPHY_OBSERVATIONS)]:
     emptyObservationRows(),
   [formKey(QC_NDT_SECTION_IDS.VISUAL_INSPECTION, QC_NDT_TABLE_IDS.VISUAL_INSPECTION)]: emptyVisualRows(),
-  [formKey(QC_NDT_SECTION_IDS.UPLOAD_MEDIA, "UPLOAD_VIDEO_PHOTO")]: "",
+  [formKey(QC_NDT_SECTION_IDS.UPLOAD_MEDIA, "UPLOAD_VIDEO_PHOTO")]: [],
 });
 
 export const getNdtRadiographyDetailRows = (values: SchemaFormValues | null | undefined) =>
@@ -417,17 +420,42 @@ export const setNdtVisualRows = (
   [formKey(QC_NDT_SECTION_IDS.VISUAL_INSPECTION, QC_NDT_TABLE_IDS.VISUAL_INSPECTION)]: rows,
 });
 
-export const getNdtUploadMedia = (values: SchemaFormValues | null | undefined) =>
-  String(values?.[formKey(QC_NDT_SECTION_IDS.UPLOAD_MEDIA, "UPLOAD_VIDEO_PHOTO")] ?? "");
+export const getNdtUploadMedia = (values: SchemaFormValues | null | undefined): CasePrepFileRef[] =>
+  parseCasePrepFileRefs(values?.[formKey(QC_NDT_SECTION_IDS.UPLOAD_MEDIA, "UPLOAD_VIDEO_PHOTO")]);
 
 export const setNdtUploadMedia = (
   values: SchemaFormValues | null | undefined,
-  value: string,
+  next: CasePrepFileRef[],
 ): SchemaFormValues => ({
   ...(values ?? {}),
-  [formKey(QC_NDT_SECTION_IDS.UPLOAD_MEDIA, "UPLOAD_VIDEO_PHOTO")]: value,
+  [formKey(QC_NDT_SECTION_IDS.UPLOAD_MEDIA, "UPLOAD_VIDEO_PHOTO")]: next ?? [],
 });
 
+export const collectNdtFileRefsFromQcValues = (
+  values: SchemaFormValues | null | undefined,
+): CasePrepFileRef[] => {
+  const refs: CasePrepFileRef[] = [];
+  for (const row of getNdtVisualRows(values)) {
+    refs.push(...(row.UPLOAD_IMAGE ?? []));
+  }
+  refs.push(...getNdtUploadMedia(values));
+  return refs;
+};
+
+export const hasIncompleteQcNdtUploads = (values: SchemaFormValues | null | undefined): boolean =>
+  collectNdtFileRefsFromQcValues(values).some(isCasePrepFileUploadIncomplete);
+
+export const collectTempFileIdsFromQcNdtValues = (
+  values: SchemaFormValues | null | undefined,
+): string[] =>
+  [
+    ...new Set(
+      collectNdtFileRefsFromQcValues(values)
+        .filter((ref) => ref.isTemp !== false)
+        .map((ref) => String(ref.fileId ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
 const hydrateFromSectionData = (values: SchemaFormValues, sectionId: string, data: Record<string, unknown>) => {
   if (isManufacturingNdtDetails(data)) {
     applyManufacturingNdtDetails(values, data);
@@ -494,12 +522,14 @@ const hydrateFromSectionData = (values: SchemaFormValues, sectionId: string, dat
     data.uploadVideoPhoto != null ||
     data.uploadedVideos != null
   ) {
-    const media = pickString(
+    const media = parseNdtUploadFiles(
       data.UPLOAD_VIDEO_PHOTO,
       data.uploadVideoPhoto,
-      joinFileRefs(data.uploadedVideos),
+      data.uploadedVideos,
     );
-    if (media) values[formKey(QC_NDT_SECTION_IDS.UPLOAD_MEDIA, "UPLOAD_VIDEO_PHOTO")] = media;
+    if (media.length) {
+      values[formKey(QC_NDT_SECTION_IDS.UPLOAD_MEDIA, "UPLOAD_VIDEO_PHOTO")] = media;
+    }
   }
 };
 
@@ -534,12 +564,6 @@ const toApiNumber = (value: string) => {
   const numeric = Number(trimmed);
   return Number.isFinite(numeric) ? numeric : trimmed;
 };
-
-const splitFileList = (value: string) =>
-  String(value ?? "")
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
 
 export type QcNdtMotorSubmissionType = "DRAFT" | "SUBMIT";
 
@@ -627,13 +651,16 @@ export const ndtMotorDetailToSections = (
           {
             [QC_NDT_TABLE_IDS.VISUAL_INSPECTION]: visualRows.map((row, index) => {
               const recRow = asRecord(row) ?? {};
-              const images = asArray(recRow.uploadedImages ?? recRow.uploadImage);
               return {
                 SR_NO: recRow.sectionNumber ?? recRow.srNo ?? index + 1,
                 OBSERVATION_TYPE: recRow.observationType ?? recRow.OBSERVATION_TYPE ?? "",
                 OBSERVATION: recRow.observation ?? recRow.OBSERVATION ?? "",
                 LOCATION: recRow.orientation ?? recRow.location ?? "",
-                UPLOAD_IMAGE: images.join(", "),
+                UPLOAD_IMAGE: parseNdtUploadFiles(
+                  recRow.uploadedImages,
+                  recRow.uploadImage,
+                  recRow.UPLOAD_IMAGE,
+                ),
               };
             }),
           },
@@ -642,14 +669,15 @@ export const ndtMotorDetailToSections = (
       } as SchemaSectionSubmission);
     }
 
-    const uploadedVideos = [
-      ...asArray(source.uploadedVideos),
-      ...asArray(asRecord(source.signedNdtReport)?.report),
-    ];
+    const uploadedVideos = parseNdtUploadFiles(
+      source.uploadedVideos,
+      asRecord(source.signedNdtReport)?.report,
+      asRecord(source.signedNdtReport)?.documentId,
+    );
     if (uploadedVideos.length) {
       sections.push({
         sectionId: QC_NDT_SECTION_IDS.UPLOAD_MEDIA,
-        sectionData: [{ UPLOAD_VIDEO_PHOTO: uploadedVideos.join(", ") }],
+        sectionData: [{ UPLOAD_VIDEO_PHOTO: uploadedVideos }],
         motorId,
       } as SchemaSectionSubmission);
     }
@@ -712,7 +740,7 @@ export const ndtMotorDetailToSections = (
           sectionId: QC_NDT_SECTION_IDS.UPLOAD_MEDIA,
           sectionData: [
             omitEmpty({
-              UPLOAD_VIDEO_PHOTO: joinFileRefs(
+              UPLOAD_VIDEO_PHOTO: parseNdtUploadFiles(
                 media.uploadVideoPhoto,
                 media.UPLOAD_VIDEO_PHOTO,
                 process.uploadVideoPhoto,
@@ -735,7 +763,7 @@ export const buildNdtMotorDetailPayload = (
   const detailRows = getNdtRadiographyDetailRows(values);
   const firstDetail = detailRows[0];
   const machineNo = String(firstDetail?.MACHINE_NO ?? "").trim();
-  const uploadMedia = splitFileList(getNdtUploadMedia(values));
+  const uploadMediaPayload = toCasePrepFilesApiPayload(getNdtUploadMedia(values));
 
   return omitEmpty({
     motorId,
@@ -766,14 +794,15 @@ export const buildNdtMotorDetailPayload = (
         observation: String(row.OBSERVATION ?? "").trim() || undefined,
         sectionNumber: row.SR_NO,
         orientation: String(row.LOCATION ?? "").trim() || undefined,
-        uploadedImages: splitFileList(row.UPLOAD_IMAGE),
+        uploadedImages: toCasePrepFilesApiPayload(row.UPLOAD_IMAGE),
       }),
     ),
-    uploadedVideos: uploadMedia,
-    signedNdtReport: uploadMedia.length
+    uploadedVideos: uploadMediaPayload.length ? uploadMediaPayload : undefined,
+    signedNdtReport: uploadMediaPayload.length
       ? omitEmpty({
           additionalRemarks: "Uploaded from QC form",
-          report: uploadMedia[0],
+          report: uploadMediaPayload[0],
+          documentId: uploadMediaPayload[0]?.fileId,
         })
       : undefined,
   });
@@ -825,7 +854,9 @@ export const buildNdtSectionPayload = (
               OBSERVATION_TYPE: row.OBSERVATION_TYPE,
               OBSERVATION: String(row.OBSERVATION ?? "").trim() || undefined,
               LOCATION: String(row.LOCATION ?? "").trim() || undefined,
-              UPLOAD_IMAGE: row.UPLOAD_IMAGE || undefined,
+              UPLOAD_IMAGE: toCasePrepFilesApiPayload(row.UPLOAD_IMAGE).length
+                ? toCasePrepFilesApiPayload(row.UPLOAD_IMAGE)
+                : undefined,
             }),
           ),
         },
@@ -835,7 +866,9 @@ export const buildNdtSectionPayload = (
       sectionId: QC_NDT_SECTION_IDS.UPLOAD_MEDIA,
       sectionData: [
         omitEmpty({
-          UPLOAD_VIDEO_PHOTO: getNdtUploadMedia(values) || undefined,
+          UPLOAD_VIDEO_PHOTO: toCasePrepFilesApiPayload(getNdtUploadMedia(values)).length
+            ? toCasePrepFilesApiPayload(getNdtUploadMedia(values))
+            : undefined,
         }),
       ],
     },

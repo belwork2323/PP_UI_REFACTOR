@@ -9,6 +9,11 @@ import {
 import { OPERATION_STATUS } from "../../../hooks/operationStatus";
 import { mapCastingCuringPersonLabel } from "./CastingCuringFormModel";
 import type { BatchMotorRadiographyDetails } from "../admin/BatchManagement/BatchManagementModel";
+import {
+  isCasePrepFileReady,
+  isCasePrepFileUploadIncomplete,
+  type CasePrepFileRef,
+} from "./CasePrepMotorDataModel";
 
 export type NDTMotorSubmissionType = "DRAFT" | "SUBMIT";
 export type NDTMotorSubmissionStatus =
@@ -209,7 +214,8 @@ export const areAllNDTMotorsApproved = (
   );
 };
 
-export type NDTFileValue = File | string;
+/** @deprecated Prefer CasePrepFileRef — kept for transitional imports. */
+export type NDTFileValue = CasePrepFileRef | File | string;
 
 export type NDTRadiographyPlanRow = {
   srNo: number;
@@ -231,7 +237,7 @@ export type NDTRadiographyObservationRow = {
   section: string;
   orientation: string;
   observations: string;
-  files: NDTFileValue[];
+  files: CasePrepFileRef[];
 };
 
 export type NDTVisualInspectionRow = {
@@ -240,7 +246,7 @@ export type NDTVisualInspectionRow = {
   isPreset: boolean;
   section: string;
   orientation: string;
-  files: NDTFileValue[];
+  files: CasePrepFileRef[];
 };
 
 export type NDTMotorSession = {
@@ -254,8 +260,8 @@ export type NDTMotorSession = {
   additionalExposureRows: NDTExposureRow[];
   radiographyObservationRows: NDTRadiographyObservationRow[];
   visualInspectionRows: NDTVisualInspectionRow[];
-  visualInspectionMedia: NDTFileValue[];
-  signedReport: NDTFileValue | null;
+  visualInspectionMedia: CasePrepFileRef[];
+  signedReport: CasePrepFileRef | null;
   additionalRemarks: string;
 };
 
@@ -420,8 +426,8 @@ type LegacyNDTFormState = NDTFormState & {
   additionalExposureRows?: NDTExposureRow[];
   radiographyObservationRows?: NDTRadiographyObservationRow[];
   visualInspectionRows?: NDTVisualInspectionRow[];
-  visualInspectionMedia?: NDTFileValue[];
-  signedReport?: NDTFileValue | null;
+  visualInspectionMedia?: CasePrepFileRef[];
+  signedReport?: CasePrepFileRef | null;
   additionalRemarks?: string;
 };
 
@@ -536,7 +542,10 @@ export const normalizeNDTFormState = (input?: Partial<LegacyNDTFormState> | null
 };
 
 const hasText = (value?: string | null) => Boolean(String(value ?? "").trim());
-const hasFiles = (files?: NDTFileValue[] | null) => (files?.length ?? 0) > 0;
+const hasFileContent = (ref: CasePrepFileRef | null | undefined) =>
+  Boolean(ref && (isCasePrepFileReady(ref) || String(ref.fileName ?? "").trim()));
+const hasFiles = (files?: CasePrepFileRef[] | null) =>
+  (files ?? []).some((ref) => hasFileContent(ref));
 
 /** Motor has completed FlowBar radiography setup and can show inspection tables. */
 export const isNDTMotorSetupReady = (motor?: NDTMotorSession | null): boolean => {
@@ -586,7 +595,7 @@ export const motorHasValue = (motor: NDTMotorSession) => {
     return true;
   }
   if (hasFiles(motor.visualInspectionMedia)) return true;
-  if (motor.signedReport) return true;
+  if (hasFileContent(motor.signedReport)) return true;
   if (hasText(motor.additionalRemarks)) return true;
   return false;
 };
@@ -600,6 +609,38 @@ export const hasMotorNDTValue = (form: NDTFormState, motorId: string) => {
   const motor = (form.motors ?? []).find((entry) => entry.motorId === motorId);
   return motor ? motorHasValue(motor) : false;
 };
+
+export const collectNdtFileRefsFromForm = (form: {
+  motors?: NDTMotorSession[];
+}): CasePrepFileRef[] => {
+  const refs: CasePrepFileRef[] = [];
+  for (const motor of form?.motors ?? []) {
+    for (const row of motor.radiographyObservationRows ?? []) {
+      refs.push(...(row.files ?? []));
+    }
+    for (const row of motor.visualInspectionRows ?? []) {
+      refs.push(...(row.files ?? []));
+    }
+    refs.push(...(motor.visualInspectionMedia ?? []));
+    if (motor.signedReport) refs.push(motor.signedReport);
+  }
+  return refs;
+};
+
+export const hasIncompleteNdtUploads = (form: { motors?: NDTMotorSession[] }): boolean =>
+  collectNdtFileRefsFromForm(form).some(isCasePrepFileUploadIncomplete);
+
+export const collectTempFileIdsFromNdtForm = (form: {
+  motors?: NDTMotorSession[];
+}): string[] =>
+  [
+    ...new Set(
+      collectNdtFileRefsFromForm(form)
+        .filter((ref) => ref.isTemp !== false)
+        .map((ref) => String(ref.fileId ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
 
 export const validateNDTMotorsForApi = (motors: NDTMotorSession[]): string | null => {
   const list = (motors ?? []).filter((motor) => String(motor.motorId ?? "").trim());

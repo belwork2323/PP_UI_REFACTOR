@@ -11,6 +11,13 @@ import {
   toUiTime,
   unwrapMotorSectionPayload,
 } from "./castingCuringFieldCodec";
+import {
+  isCasePrepFileUploadIncomplete,
+  parseCasePrepFileRefs,
+  toCasePrepFilesApiPayload,
+  type CasePrepFileRef,
+} from "./CasePrepMotorDataModel";
+
 
 export type CuringOption = { value: string; label: string };
 
@@ -49,8 +56,8 @@ export type CuringMotorData = {
     BUILDING_NO: string;
     DECORING_LOAD: string;
     DECORING_REMARKS: string;
-    /** File name(s), same shape as SchemaFileField string values. */
-    DECORING_VISUAL_OBSERVATION: string;
+    /** Eager file-service refs (Case Prep / RMS / RMC parity). */
+    DECORING_VISUAL_OBSERVATION: CasePrepFileRef[];
   };
 };
 
@@ -87,22 +94,6 @@ const str = (value: unknown): string => {
   return String(value);
 };
 
-const toApiAttachments = (value: unknown): string => {
-  if (value == null) return "";
-  if (typeof value === "string") return value;
-  if (typeof File !== "undefined" && value instanceof File) return value.name;
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => toApiAttachments(item))
-      .filter(Boolean)
-      .join(", ");
-  }
-  if (typeof value === "object") {
-    const rec = value as Record<string, unknown>;
-    return str(rec.name ?? rec.fileName ?? rec.fileUrl ?? rec.path ?? "");
-  }
-  return str(value);
-};
 
 export const createEmptyCuringCycleRow = (srNo: number | string = 1): CuringCycleRow => ({
   srNo: String(srNo),
@@ -136,7 +127,7 @@ export const createEmptyCuringMotorData = (): CuringMotorData => ({
     BUILDING_NO: "",
     DECORING_LOAD: "",
     DECORING_REMARKS: "",
-    DECORING_VISUAL_OBSERVATION: "",
+    DECORING_VISUAL_OBSERVATION: [],
   },
 });
 
@@ -209,8 +200,12 @@ export const buildCuringSectionsPayload = (data: CuringMotorData): CuringSection
     buildingNo: str(data.DECORING_DETAILS.BUILDING_NO).trim() || undefined,
     decoringLoad: toApiNumber(data.DECORING_DETAILS.DECORING_LOAD),
     decoringRemarks: str(data.DECORING_DETAILS.DECORING_REMARKS).trim() || undefined,
-    decoringVisualObservation:
-      toApiAttachments(data.DECORING_DETAILS.DECORING_VISUAL_OBSERVATION) || undefined,
+    decoringVisualObservation: (() => {
+      const files = toCasePrepFilesApiPayload(
+        data.DECORING_DETAILS.DECORING_VISUAL_OBSERVATION,
+      );
+      return files.length ? files : undefined;
+    })(),
   }),
 });
 
@@ -307,7 +302,7 @@ export const parseCuringMotorDataFromApi = (source: unknown): CuringMotorData =>
       BUILDING_NO: str(pickField(decor, "buildingNo", "BUILDING_NO") ?? ""),
       DECORING_LOAD: str(pickField(decor, "decoringLoad", "DECORING_LOAD") ?? ""),
       DECORING_REMARKS: str(pickField(decor, "decoringRemarks", "DECORING_REMARKS") ?? ""),
-      DECORING_VISUAL_OBSERVATION: toApiAttachments(
+      DECORING_VISUAL_OBSERVATION: parseCasePrepFileRefs(
         pickField(decor, "decoringVisualObservation", "DECORING_VISUAL_OBSERVATION"),
       ),
     },
@@ -357,3 +352,35 @@ export const applyCuringCycleConfigRows = (
     CURING_CYCLES: { CURING_TABLE },
   };
 };
+
+
+export const collectCastingCuringFileRefsFromMotorData = (
+  data: CuringMotorData | null | undefined,
+): CasePrepFileRef[] => data?.DECORING_DETAILS?.DECORING_VISUAL_OBSERVATION ?? [];
+
+export const collectCastingCuringFileRefsFromForm = (form: {
+  motors?: Array<{ curingData?: CuringMotorData | null }>;
+}): CasePrepFileRef[] => {
+  const refs: CasePrepFileRef[] = [];
+  for (const motor of form?.motors ?? []) {
+    refs.push(...collectCastingCuringFileRefsFromMotorData(motor?.curingData));
+  }
+  return refs;
+};
+
+export const hasIncompleteCastingCuringUploads = (form: {
+  motors?: Array<{ curingData?: CuringMotorData | null }>;
+}): boolean =>
+  collectCastingCuringFileRefsFromForm(form).some(isCasePrepFileUploadIncomplete);
+
+export const collectTempFileIdsFromCastingCuringForm = (form: {
+  motors?: Array<{ curingData?: CuringMotorData | null }>;
+}): string[] =>
+  [
+    ...new Set(
+      collectCastingCuringFileRefsFromForm(form)
+        .filter((ref) => ref.isTemp !== false)
+        .map((ref) => String(ref.fileId ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];

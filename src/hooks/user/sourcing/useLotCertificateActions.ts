@@ -54,6 +54,7 @@ export function useLotCertificateActions(
       patchByLocalId(localId, {
         fileId: result.fileId,
         fileName: result.fileName || file.name,
+        mimeType: file.type || "application/octet-stream",
         status: "uploaded",
         isTemp: true,
         file,
@@ -81,6 +82,7 @@ export function useLotCertificateActions(
           fileId: null,
           fileName: file.name,
           fileUrl: "",
+          mimeType: file.type || "application/octet-stream",
           certificateType: "",
           file,
           status: "uploading",

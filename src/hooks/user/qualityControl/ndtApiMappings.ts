@@ -1,4 +1,3 @@
-import type { NDTFileValue } from "../../../data/models/user/NDTFormModel";
 import { NDT_VISUAL_INSPECTION_PRESETS } from "./ndtFlowConfig";
 
 const toApiEnum = (value: string) =>
@@ -149,15 +148,3 @@ export const mapNdtRadiographyPlanFromApi = (value: string) => radiographyPlanMa
 
 export const isNdtPresetObservationLabel = (value: string) =>
   (NDT_VISUAL_INSPECTION_PRESETS as readonly string[]).includes(value);
-
-export const fileToNdtApiRef = (file: NDTFileValue | null | undefined): string | null => {
-  if (!file) return null;
-  if (typeof file === "string") {
-    const trimmed = file.trim();
-    return trimmed.length > 0 ? trimmed : null;
-  }
-  return `pending-upload://${encodeURIComponent(file.name)}`;
-};
-
-export const filesToNdtApiRefs = (files: NDTFileValue[] = []): string[] =>
-  files.map(fileToNdtApiRef).filter((ref): ref is string => Boolean(ref));

@@ -4,6 +4,12 @@ import type {
   TrimmingDetailsRow,
   TrimmingReportFile,
 } from "../../../data/models/user/TrimmingFormModel";
+import {
+  isCasePrepFileReady,
+  parseCasePrepFileRefs,
+  toCasePrepFilesApiPayload,
+  type CasePrepFileRef,
+} from "../../../data/models/user/CasePrepMotorDataModel";
 import { formatToIsoDateInput, formatToUiDate } from "../../../utils/dateUtils";
 import { QC_TRIMMING_SECTION_IDS } from "./qcTrimmingConfig";
 
@@ -17,7 +23,10 @@ export type QcTrimmingSessionValues = {
   commonFormatParameters: TrimmingCommonFormatParameter[];
   commonFormatLocations: string[];
   motorRemarks: string;
+  reportFiles: CasePrepFileRef[];
+  /** Legacy hydrate only. */
   reportFile?: TrimmingReportFile | null;
+  /** Legacy hydrate only. */
   reportLink?: string;
 };
 
@@ -99,8 +108,7 @@ export const createInitialTrimmingValues = (
     commonFormatParameters: createDefaultCommonFormatParameters(),
     commonFormatLocations: [],
     motorRemarks: "",
-    reportFile: null,
-    reportLink: "",
+    reportFiles: [],
   }) as SchemaFormValues;
 
 export const getTrimmingSessionFromValues = (
@@ -126,8 +134,7 @@ export const getTrimmingSessionFromValues = (
     commonFormatParameters: params.length ? params : createDefaultCommonFormatParameters(),
     commonFormatLocations: locations,
     motorRemarks: String(rec.motorRemarks ?? "").trim(),
-    reportFile: (rec.reportFile as TrimmingReportFile | null | undefined) ?? null,
-    reportLink: String(rec.reportLink ?? "").trim(),
+    reportFiles: parseCasePrepFileRefs(rec.reportFiles ?? rec.reportFile ?? rec.reportLink),
   };
 };
 
@@ -142,8 +149,7 @@ export const setTrimmingSessionValues = (
       session.commonFormatParameters ?? createDefaultCommonFormatParameters(),
     commonFormatLocations: session.commonFormatLocations ?? [],
     motorRemarks: session.motorRemarks ?? "",
-    reportFile: session.reportFile ?? null,
-    reportLink: session.reportLink ?? "",
+    reportFiles: session.reportFiles ?? [],
   }) as SchemaFormValues;
 
 const findSectionData = (
@@ -198,8 +204,9 @@ export const hydrateTrimmingValuesFromSections = (
       : createDefaultCommonFormatParameters(),
     commonFormatLocations: Array.from(locationSet),
     motorRemarks: String(remarks.remarks ?? remarks.motorRemarks ?? "").trim(),
-    reportFile: (remarks.reportFile as TrimmingReportFile | null | undefined) ?? null,
-    reportLink: String(remarks.reportLink ?? "").trim(),
+    reportFiles: parseCasePrepFileRefs(
+      remarks.reportFiles ?? remarks.reportFile ?? remarks.reportLink,
+    ),
   });
 };
 
@@ -359,6 +366,11 @@ export const hydrateCommonFormatFromMeasurementDetails = (
 
 const resolveTrimmingReportLink = (session: QcTrimmingSessionValues): string => {
   if (hasValue(session.reportLink)) return String(session.reportLink).trim();
+  const fromFiles = (session.reportFiles ?? [])
+    .map((ref) => String(ref.fileName ?? "").trim())
+    .filter(Boolean)
+    .join(", ");
+  if (fromFiles) return fromFiles;
   const file = session.reportFile;
   if (!file || typeof file !== "object") return "";
   return String(
@@ -387,15 +399,20 @@ export const buildTrimmingMotorSections = (
     });
   }
 
-  if (session.motorRemarks.trim() || session.reportFile || session.reportLink?.trim()) {
-    const remarksPayload = omitEmpty({
+  const readyReportFiles = toCasePrepFilesApiPayload(session.reportFiles ?? []);
+  const legacyReportLink = String(session.reportLink ?? "").trim();
+  if (session.motorRemarks.trim() || readyReportFiles.length || legacyReportLink) {
+    const remarksPayload: Record<string, unknown> = {
       remarks: session.motorRemarks || undefined,
-      reportFile: session.reportFile || undefined,
-      reportLink: session.reportLink || undefined,
-    });
+    };
+    if (readyReportFiles.length) {
+      remarksPayload.reportFile = readyReportFiles;
+    } else if (legacyReportLink) {
+      remarksPayload.reportLink = legacyReportLink;
+    }
     sections.push({
       sectionId: QC_TRIMMING_SECTION_IDS.REMARKS,
-      sectionData: [remarksPayload],
+      sectionData: [omitEmpty(remarksPayload)],
     });
   }
 
@@ -420,10 +437,15 @@ export const buildTrimmingMotorDetailPayload = (
   const trimmingMeasurementDetails = buildTrimmingMeasurementDetailsPayload(
     session.commonFormatParameters,
   );
-  const reportLink = resolveTrimmingReportLink(session);
+  const readyReportFiles = toCasePrepFilesApiPayload(session.reportFiles ?? []);
+  const legacyReportLink = resolveTrimmingReportLink(session);
   const trimmingRemarks = omitEmpty({
     remarks: session.motorRemarks || undefined,
-    reportLink: reportLink || undefined,
+    ...(readyReportFiles.length
+      ? { reportFile: readyReportFiles }
+      : legacyReportLink
+        ? { reportLink: legacyReportLink }
+        : {}),
   });
 
   return {
@@ -505,8 +527,9 @@ export const hydrateTrimmingValuesFromMotorDetail = (
       : createDefaultCommonFormatParameters(),
     commonFormatLocations: [],
     motorRemarks: String(remarks.remarks ?? source.remarks ?? "").trim(),
-    reportFile: null,
-    reportLink: String(remarks.reportLink ?? source.reportLink ?? "").trim(),
+    reportFiles: parseCasePrepFileRefs(
+      remarks.reportFiles ?? remarks.reportFile ?? remarks.reportLink ?? source.reportLink,
+    ),
   });
 };
 
@@ -553,7 +576,10 @@ export const trimmingMotorDetailToSections = (
 export const trimmingValuesHaveData = (values: SchemaFormValues | null | undefined) => {
   const session = getTrimmingSessionFromValues(values);
   if (hasValue(session.motorReceivedAt) || hasValue(session.motorRemarks)) return true;
-  if (session.reportFile || hasValue(session.reportLink)) return true;
+  if ((session.reportFiles ?? []).some((ref) => isCasePrepFileReady(ref) || ref.fileName?.trim())) {
+    return true;
+  }
+  if (hasValue(session.reportLink)) return true;
   if (session.commonFormatParameters.some((param) =>
     (param.stages ?? []).some((stage) =>
       Object.values(stage.readings ?? {}).some((value) => String(value ?? "").trim()),

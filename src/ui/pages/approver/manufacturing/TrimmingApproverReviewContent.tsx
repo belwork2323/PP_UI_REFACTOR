@@ -6,6 +6,7 @@ import {
   Stack,
   Typography,
 } from "@mui/material";
+import { useAuthStore } from "../../../../app/store/authStore";
 import getManufacturingTheme from "../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import getRawMaterialPreparationApproverTheme from "../../../../app/theme/custom_themes/approver/manufacturing/rawMaterialPreparationApprover_theme";
 import { STRINGS } from "../../../../app/config/strings";
@@ -20,6 +21,8 @@ import PremixStatusChip, {
 } from "../../user/manufacturing/RawMaterial/components/PremixStatusChip";
 import type { PremixSubmissionStatus } from "../../../../data/models/user/RawMaterialPreparationModel";
 import { MotorDetailPanel } from "../../user/manufacturing/Trimming/components/TrimmingDetailsContent";
+import { useFilePreview } from "../../../../hooks/useFilePreview";
+import FilePreviewDialog from "../../../components/common/FilePreviewDialog";
 import {
   UserWorkflowNavPanel,
   UserWorkflowTabNav,
@@ -57,6 +60,14 @@ const TrimmingApproverReviewContent = ({
 }: TrimmingApproverReviewContentProps) => {
   const dt = manufacturingTheme.manufacturing.trimming.details;
   const palette = manufacturingTheme.palette;
+  const subDepartmentId = useAuthStore(
+    (s) => s.user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "trimming")?.subDepartmentId,
+  );
+  const { preview, openFile, closePreview, downloadCurrent } = useFilePreview();
+  const onOpenFile = (fileId: string, fileName: string) => {
+    if (!subDepartmentId) return;
+    void openFile(fileId, subDepartmentId, fileName);
+  };
   const statusConfig = dt.bannerStatusConfig as Record<
     string,
     { color: string; bg: string; border: string }
@@ -265,11 +276,23 @@ const TrimmingApproverReviewContent = ({
             </Stack>
           ) : null}
 
-          <MotorDetailPanel motor={activeMotor} dt={dt} palette={palette} />
+          <MotorDetailPanel
+            motor={activeMotor}
+            dt={dt}
+            palette={palette}
+            subDepartmentId={subDepartmentId}
+            onOpen={onOpenFile}
+          />
         </Box>
       ) : (
         <Typography sx={dt.emptyText}>{TR.MOTOR_APPROVER_NO_ACTIONABLE}</Typography>
       )}
+
+      <FilePreviewDialog
+        preview={preview}
+        onClose={closePreview}
+        onDownload={downloadCurrent}
+      />
     </Stack>
   );
 };

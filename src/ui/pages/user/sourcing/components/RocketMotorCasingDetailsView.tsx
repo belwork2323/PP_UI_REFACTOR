@@ -4,6 +4,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Link,
   Stack,
   Table,
   TableBody,
@@ -14,12 +15,16 @@ import {
   Typography,
 } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
+import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import { icons } from "../../../../../app/theme/icons";
 import { useThemeStore } from "../../../../../app/store/themeStore";
+import { useAuthStore } from "../../../../../app/store/authStore";
 import getSourcingTheme from "../../../../../app/theme/custom_themes/user/sourcing/sourcing_theme";
 import { STRINGS } from "../../../../../app/config/strings";
 import { getOperationStatusConfig, OPERATION_STATUS } from "../../../../../hooks/operationStatus";
+import { useFilePreview } from "../../../../../hooks/useFilePreview";
 import UserWorkflowStatusCell from "../../../../components/custom/UserWorkflowStatusCell";
+import FilePreviewDialog from "../../../../components/common/FilePreviewDialog";
 import type {
   CasingDetailBlock,
   RocketMotorCasingDetailsContext,
@@ -67,6 +72,42 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getSourcingTheme(mode), [mode]);
   const dt = theme.sourcing.rocketMotor.casingDetails;
+  const subDepartmentId = useAuthStore(
+    (s) =>
+      s.user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "rocket-motor")?.subDepartmentId,
+  );
+  const { preview, openFile, closePreview, downloadCurrent } = useFilePreview();
+
+  const renderResultCell = (specRow: CasingDetailBlock["rows"][number]) => {
+    const fileId = String(specRow.fileId ?? "").trim();
+    const canOpen = Boolean(fileId && subDepartmentId);
+    if (!canOpen) return specRow.analysedResult || "—";
+    return (
+      <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
+        <Typography component="span" sx={dt.resultText}>
+          {specRow.analysedResult || "—"}
+        </Typography>
+        <Link
+          component="button"
+          type="button"
+          onClick={() =>
+            void openFile(fileId, subDepartmentId!, specRow.fileName || specRow.analysedResult)
+          }
+          sx={{
+            fontSize: "0.75rem",
+            fontWeight: 700,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 0.25,
+            cursor: "pointer",
+          }}
+        >
+          View
+          <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
+        </Link>
+      </Stack>
+    );
+  };
 
   const statusConfig = useMemo(
     () =>
@@ -199,7 +240,7 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
                                           {specRow.specification}
                                         </TableCell>
                                         <TableCell sx={{ ...dt.tableCell, ...dt.resultText }}>
-                                          {specRow.analysedResult || "—"}
+                                          {renderResultCell(specRow)}
                                         </TableCell>
                                       </TableRow>
                                     ))}
@@ -231,7 +272,7 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
                                       {specRow.specification}
                                     </TableCell>
                                     <TableCell sx={{ ...dt.tableCell, ...dt.resultText }}>
-                                      {specRow.analysedResult || "—"}
+                                      {renderResultCell(specRow)}
                                     </TableCell>
                                     <TableCell sx={dt.tableCell}>
                                       <Typography sx={dt.remarksText}>
@@ -255,6 +296,14 @@ const RocketMotorCasingDetailsView = ({ row, blocks, loading, onBack }: RocketMo
           )}
         </Box>
       </Box>
+
+      <FilePreviewDialog
+        preview={preview}
+        onClose={closePreview}
+        onDownload={downloadCurrent}
+        themeColor={theme.palette.primary}
+        themeColorLight={theme.palette.primaryLight}
+      />
     </Box>
   );
 };

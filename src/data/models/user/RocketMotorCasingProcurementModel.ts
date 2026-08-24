@@ -50,6 +50,8 @@ export {
   ROCASIN_MECH_KEYS,
   EPDM_MECH_KEYS,
   THERMAL_PROP_KEYS,
+  hasIncompleteCasingUploads,
+  collectTempFileIdsFromCasingForm,
 } from "./RocketMotorCasingFormModel";
 
 type DimensionalRow = {
@@ -550,7 +552,13 @@ export type MockTrialDetailTable = {
 export type CasingDetailBlock = {
   material: string;
   lotNo?: string;
-  rows: Array<{ specification: string; analysedResult: string; remarks: string }>;
+  rows: Array<{
+    specification: string;
+    analysedResult: string;
+    remarks: string;
+    fileId?: string;
+    fileName?: string;
+  }>;
   _columns?: CasingDetailColumn[];
   /** When set, UI renders a multi-column dimensional readings table */
   dimensionalTable?: CasingDimensionalTableRow[];
@@ -585,10 +593,18 @@ const REPORT_COLUMNS: CasingDetailColumn[] = [
   { key: "reportType", label: "Section ", width: "35%" },
   { key: "files", label: "File", width: "35%" },
 ];
-const detailRow = (specification: string, analysedResult: string, remarks = "") => ({
+const detailRow = (
+  specification: string,
+  analysedResult: string,
+  remarks = "",
+  extras?: { fileId?: string | null; fileName?: string | null },
+) => ({
   specification,
   analysedResult: analysedResult?.trim() ? analysedResult : "—",
   remarks: remarks?.trim() ?? "",
+  ...(extras?.fileId
+    ? { fileId: String(extras.fileId).trim(), fileName: extras.fileName ?? analysedResult }
+    : {}),
 });
 
 const formatMeasuredValue = (value: unknown, unit?: string) => {
@@ -783,7 +799,12 @@ export function mapCasingFormDataToDetailBlocks(
     detailRow("Report no.", form.insulationReportNo),
     detailRow("Receipt status", form.insulationReceiptStatus),
     ...(form.insulationReportExisting
-      ? [detailRow("Report upload", form.insulationReportExisting.fileName)]
+      ? [
+          detailRow("Report upload", form.insulationReportExisting.fileName, "", {
+            fileId: form.insulationReportExisting.fileId,
+            fileName: form.insulationReportExisting.fileName,
+          }),
+        ]
       : []),
     ...mechRows,
     ...thermalRows,
@@ -794,7 +815,10 @@ export function mapCasingFormDataToDetailBlocks(
       ? form.visualInspection.flatMap((v) => {
           const base = detailRow(v.description || v.itemKey, v.observations, v.remark);
           const mediaRow = v.mediaExisting
-            ? detailRow("Attached media", v.mediaExisting.fileName)
+            ? detailRow("Attached media", v.mediaExisting.fileName, "", {
+                fileId: v.mediaExisting.fileId,
+                fileName: v.mediaExisting.fileName,
+              })
             : null;
           const subRows =
             v.subItems?.map((s) =>
@@ -807,27 +831,26 @@ export function mapCasingFormDataToDetailBlocks(
   const dimensionalTable = mapDimensionalTableRows(form);
 
   const reportConfigs = [
-    { label: "NDT / UT Report", files: form.reportUpload?.ndtUtReport },
-    {
-      label: "Visual Inspection Report",
-      files: form.reportUpload?.visualInspectionReport,
-    },
-    { label: "Weighment Report", files: form.reportUpload?.weighmentReport },
+    { label: "NDT / UT Report", files: form.ndtUtReportExisting },
+    { label: "Visual Inspection Report", files: form.visualInspectionReportExisting },
+    { label: "Weighment Report", files: form.weighmentReportExisting },
     {
       label: "Dimensional Inspection Report",
-      files: form.reportUpload?.dimensionalInspectionReport,
+      files: form.dimensionalInspectionReportExisting,
     },
-    { label: "Mock Trial Report", files: form.reportUpload?.mockTrialReport },
-    {
-      label: "Insulation Lining Report",
-      files: form.reportUpload?.insulationLiningReport,
-    },
+    { label: "Mock Trial Report", files: form.mockTrialReportExisting },
+    { label: "Insulation Lining Report", files: form.insulationLiningReportExisting },
   ];
 
   const reportUploadRows: CasingDetailBlock["rows"] = reportConfigs.flatMap(({ label, files }) =>
-    (files ?? []).map((file) =>
-      detailRow(label, file.originalFileName ?? file.storedFileName ?? file.fileName ?? "—"),
-    ),
+    (files ?? []).map((file) => {
+      const name =
+        file.originalFileName ?? file.storedFileName ?? file.fileName ?? "—";
+      return detailRow(label, name, "", {
+        fileId: file.fileId,
+        fileName: name,
+      });
+    }),
   );
 
   const blocks: CasingDetailBlock[] = [

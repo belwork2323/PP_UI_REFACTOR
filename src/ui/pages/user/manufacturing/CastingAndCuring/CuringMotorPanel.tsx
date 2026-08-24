@@ -6,8 +6,7 @@ import {
   type CuringMotorData,
 } from "../../../../../data/models/user/CuringMotorDataModel";
 import { DateField, DateTimeField, TimeField } from "../../../../components/common/DateField";
-import SchemaFileField from "../../../../components/common/SchemaFileField";
-import { FILE_PICKER_ACCEPT } from "../../../../../utils/FileUtils";
+import CastingCuringFileField from "./CastingCuringFileField";
 import {
   FieldGrid,
   FieldLabel,
@@ -36,16 +35,6 @@ type Props = {
 
 const str = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 
-const toFileFieldValue = (value: unknown): string => {
-  if (!value) return "";
-  if (typeof value === "string") return value;
-  if (typeof File !== "undefined" && value instanceof File) return value.name;
-  if (typeof value === "object" && value !== null) {
-    const rec = value as Record<string, unknown>;
-    return str(rec.name ?? rec.fileName ?? rec.fileUrl ?? rec.path ?? "");
-  }
-  return "";
-};
 
 const CompactTime = ({
   value,
@@ -363,17 +352,17 @@ const CuringMotorPanel = ({
             />
           </Box>
           <Box sx={{ gridColumn: { xs: "1", md: "1 / -1" } }}>
-            <SchemaFileField
+            <CastingCuringFileField
               label="Visual Observations"
-              value={toFileFieldValue(decor.DECORING_VISUAL_OBSERVATION)}
+              files={decor.DECORING_VISUAL_OBSERVATION ?? []}
               onChange={(next) =>
                 patchSection("DECORING_DETAILS", { DECORING_VISUAL_OBSERVATION: next })
               }
-              disabled={disabled} readOnly={readOnly}
+              disabled={disabled}
+              readOnly={readOnly}
               multiple
-              accept={FILE_PICKER_ACCEPT.IMAGE_VIDEO}
+              acceptMode="imageVideo"
               emptyLabel="Upload photos or videos"
-              helperText="Upload photos or videos of visual observations during de-coring. Supported: JPG, PNG, WEBP, MP4, WEBM."
             />
           </Box>
         </FieldGrid>

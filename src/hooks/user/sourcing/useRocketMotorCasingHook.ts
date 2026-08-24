@@ -19,6 +19,8 @@ import {
   serializeCasingForm,
   canSaveCasingDraft,
   validateCasingFormForSubmit,
+  hasIncompleteCasingUploads,
+  collectTempFileIdsFromCasingForm,
   type RocketMotorCasingFormData,
 } from "../../../data/models/user/RocketMotorCasingProcurementModel";
 import useDimensionalParametersHook from "../useDimensionalParametersHook";
@@ -479,6 +481,7 @@ export const useRocketMotorCasingHook = () => {
       subDepartmentId,
       initialSnapshot: initialSnapshotRef.current,
       currentState: snapshotStateRef.current,
+      extractTempFileIds: collectTempFileIdsFromCasingForm,
       deleteTemp,
       resetForm: () => {
         bumpBatchRefresh();
@@ -492,6 +495,11 @@ export const useRocketMotorCasingHook = () => {
 
     if (!subDepartmentId) {
       showAlert(STRINGS.SOURCING.CASING_FORM.SUB_DEPARTMENT_MISSING, "error");
+      return false;
+    }
+
+    if (hasIncompleteCasingUploads(casingForm)) {
+      showAlert(STRINGS.SOURCING.CASING_CREATE.FILE_UPLOAD_PENDING, "warning");
       return false;
     }
 

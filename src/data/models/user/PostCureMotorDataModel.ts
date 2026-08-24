@@ -9,6 +9,14 @@ import {
   toUiDate,
   toUiDateTime,
 } from "./castingCuringFieldCodec";
+import {
+  isCasePrepFileUploadIncomplete,
+  parseCasePrepFileRefs,
+  toCasePrepFilesApiPayload,
+  type CasePrepFileApiPayload,
+  type CasePrepFileRef,
+} from "./CasePrepMotorDataModel";
+
 type LegacySectionSubmission = {
   sectionId: string;
   sectionData: Record<string, unknown>[];
@@ -78,7 +86,7 @@ export type LooseFlapMotorData = {
     QUALIFICATION_BATCH_NO: string;
     QUALIFICATION_PREPARATION_DATE: string;
     QUALIFICATION_TABLE: QualificationRow[];
-    QUALIFICATION_QC_REPORT: string;
+    QUALIFICATION_QC_REPORT: CasePrepFileRef[];
   };
   LF_EPOXY_FILLING_DETAILS: { LF_FILLING_TABLE: LocationQtyRow[] };
 };
@@ -99,7 +107,7 @@ export type InhibitionIr1MotorData = {
     QUALIFICATION_BATCH_NO: string;
     QUALIFICATION_PREPARATION_DATE: string;
     QUALIFICATION_TABLE: QualificationRow[];
-    QUALIFICATION_QC_REPORT: string;
+    QUALIFICATION_QC_REPORT: CasePrepFileRef[];
   };
   INHIBITION_BATCH_DETAILS: {
     INHIBITOR_BATCH_NO: string;
@@ -130,7 +138,7 @@ export type InhibitionHemcoatMotorData = {
     QUALIFICATION_BATCH_NO: string;
     QUALIFICATION_PREPARATION_DATE: string;
     QUALIFICATION_TABLE: QualificationRow[];
-    QUALIFICATION_QC_REPORT: string;
+    QUALIFICATION_QC_REPORT: CasePrepFileRef[];
   };
   INHIBITION_BATCH_DETAILS: {
     INHIBITOR_BATCH_NO: string;
@@ -303,7 +311,7 @@ export const createEmptyPostCureMotorData = (variant: PostCureDataVariant): Post
             { PARAMETER: "Tensile Strength", SPECIFICATION: ">=40 KSC" },
             { PARAMETER: "% Elongation", SPECIFICATION: ">=25" },
           ]),
-          QUALIFICATION_QC_REPORT: "",
+          QUALIFICATION_QC_REPORT: [],
         },
         LF_EPOXY_FILLING_DETAILS: {
           LF_FILLING_TABLE: [locationQtyRow("HE_SIDE"), locationQtyRow("NE_SIDE")],
@@ -329,7 +337,7 @@ export const createEmptyPostCureMotorData = (variant: PostCureDataVariant): Post
             { PARAMETER: "Tensile Strength", SPECIFICATION: ">=8 KSC" },
             { PARAMETER: "% Elongation", SPECIFICATION: ">=30" },
           ]),
-          QUALIFICATION_QC_REPORT: "",
+          QUALIFICATION_QC_REPORT: [],
         },
         INHIBITION_BATCH_DETAILS: { INHIBITOR_BATCH_NO: "", INHIBITOR_BATCH_SIZE: "" },
         INHIBITION_APPLICATION_DETAILS: {
@@ -360,7 +368,7 @@ export const createEmptyPostCureMotorData = (variant: PostCureDataVariant): Post
             { PARAMETER: "Tensile Strength", SPECIFICATION: "≥25 KSC" },
             { PARAMETER: "% Elongation", SPECIFICATION: "≥100" },
           ]),
-          QUALIFICATION_QC_REPORT: "",
+          QUALIFICATION_QC_REPORT: [],
         },
         INHIBITION_BATCH_DETAILS: { INHIBITOR_BATCH_NO: "", INHIBITOR_BATCH_SIZE: "" },
         INHIBITION_APPLICATION_DETAILS: {
@@ -534,9 +542,7 @@ export const parsePostCureMotorDataFromSections = (
             empty.QUALIFICATION_DETAILS.QUALIFICATION_TABLE,
             pickField(qual, "QUALIFICATION_TABLE", "qualificationTable"),
           ),
-          QUALIFICATION_QC_REPORT: str(
-            pickField(qual, "QUALIFICATION_QC_REPORT", "qualificationQcReport"),
-          ),
+          QUALIFICATION_QC_REPORT: parseCasePrepFileRefs(pickField(qual, "QUALIFICATION_QC_REPORT", "qualificationQcReport")),
         },
         LF_EPOXY_FILLING_DETAILS: {
           LF_FILLING_TABLE: fillRows.length
@@ -589,9 +595,7 @@ export const parsePostCureMotorDataFromSections = (
             empty.IR1_QUALIFICATION.QUALIFICATION_TABLE,
             pickField(qual, "QUALIFICATION_TABLE", "qualificationTable"),
           ),
-          QUALIFICATION_QC_REPORT: str(
-            pickField(qual, "QUALIFICATION_QC_REPORT", "qualificationQcReport"),
-          ),
+          QUALIFICATION_QC_REPORT: parseCasePrepFileRefs(pickField(qual, "QUALIFICATION_QC_REPORT", "qualificationQcReport")),
         },
         INHIBITION_BATCH_DETAILS: {
           INHIBITOR_BATCH_NO: str(pickField(batch, "INHIBITOR_BATCH_NO", "inhibitorBatchNo")),
@@ -656,9 +660,7 @@ export const parsePostCureMotorDataFromSections = (
             empty.HEMCOAT_3K_QUALIFICATION.QUALIFICATION_TABLE,
             pickField(qual, "QUALIFICATION_TABLE", "qualificationTable"),
           ),
-          QUALIFICATION_QC_REPORT: str(
-            pickField(qual, "QUALIFICATION_QC_REPORT", "qualificationQcReport"),
-          ),
+          QUALIFICATION_QC_REPORT: parseCasePrepFileRefs(pickField(qual, "QUALIFICATION_QC_REPORT", "qualificationQcReport")),
         },
         INHIBITION_BATCH_DETAILS: {
           INHIBITOR_BATCH_NO: str(pickField(batch, "INHIBITOR_BATCH_NO", "inhibitorBatchNo")),
@@ -802,7 +804,7 @@ export type LooseFlapFillingDetailsApi = {
       specification?: string;
       result?: string;
     }>;
-    qcReport?: string;
+    qcReport?: CasePrepFileApiPayload[] | string;
   };
   fillingDetails?: Array<{
     location?: string;
@@ -845,7 +847,7 @@ export type InhibitionDetailsApi = {
       specification?: string;
       result?: string;
     }>;
-    qcReport?: string;
+    qcReport?: CasePrepFileApiPayload[] | string;
   };
   inhibitorBatchDetails?: {
     batchNo?: string;
@@ -968,7 +970,10 @@ const buildLooseFlapFillingDetailsPayload = (data: LooseFlapMotorData): LooseFla
     batchNo: data.QUALIFICATION_DETAILS.QUALIFICATION_BATCH_NO.trim() || undefined,
     preparationDate: apiDateOrUi(data.QUALIFICATION_DETAILS.QUALIFICATION_PREPARATION_DATE),
     parameters: mapQualificationParamsForApi(data.QUALIFICATION_DETAILS.QUALIFICATION_TABLE),
-    qcReport: data.QUALIFICATION_DETAILS.QUALIFICATION_QC_REPORT.trim() || undefined,
+    qcReport: (() => {
+      const files = toCasePrepFilesApiPayload(data.QUALIFICATION_DETAILS.QUALIFICATION_QC_REPORT);
+      return files.length ? files : undefined;
+    })(),
   }) as LooseFlapFillingDetailsApi["qualificationDetails"],
   fillingDetails: mapLocationQtyRowsForApi(data.LF_EPOXY_FILLING_DETAILS.LF_FILLING_TABLE),
 });
@@ -988,7 +993,10 @@ const buildInhibitionIr1DetailsPayload = (data: InhibitionIr1MotorData): Inhibit
     batchNo: data.IR1_QUALIFICATION.QUALIFICATION_BATCH_NO.trim() || undefined,
     preparationDate: apiDateOrUi(data.IR1_QUALIFICATION.QUALIFICATION_PREPARATION_DATE),
     parameters: mapQualificationParamsForApi(data.IR1_QUALIFICATION.QUALIFICATION_TABLE),
-    qcReport: data.IR1_QUALIFICATION.QUALIFICATION_QC_REPORT.trim() || undefined,
+    qcReport: (() => {
+      const files = toCasePrepFilesApiPayload(data.IR1_QUALIFICATION.QUALIFICATION_QC_REPORT);
+      return files.length ? files : undefined;
+    })(),
   }) as InhibitionDetailsApi["qualificationDetails"],
   inhibitorBatchDetails: omitEmpty({
     batchNo: data.INHIBITION_BATCH_DETAILS.INHIBITOR_BATCH_NO.trim() || undefined,
@@ -1022,7 +1030,10 @@ const buildInhibitionHemcoatDetailsPayload = (
     batchNo: data.HEMCOAT_3K_QUALIFICATION.QUALIFICATION_BATCH_NO.trim() || undefined,
     preparationDate: apiDateOrUi(data.HEMCOAT_3K_QUALIFICATION.QUALIFICATION_PREPARATION_DATE),
     parameters: mapQualificationParamsForApi(data.HEMCOAT_3K_QUALIFICATION.QUALIFICATION_TABLE),
-    qcReport: data.HEMCOAT_3K_QUALIFICATION.QUALIFICATION_QC_REPORT.trim() || undefined,
+    qcReport: (() => {
+      const files = toCasePrepFilesApiPayload(data.HEMCOAT_3K_QUALIFICATION.QUALIFICATION_QC_REPORT);
+      return files.length ? files : undefined;
+    })(),
   }) as InhibitionDetailsApi["qualificationDetails"],
   inhibitorBatchDetails: omitEmpty({
     batchNo: data.INHIBITION_BATCH_DETAILS.INHIBITOR_BATCH_NO.trim() || undefined,
@@ -1109,7 +1120,7 @@ const parseLooseFlapFromApi = (details: Record<string, unknown>): LooseFlapMotor
         empty.QUALIFICATION_DETAILS.QUALIFICATION_TABLE,
         qual.parameters ?? qual.qualification,
       ),
-      QUALIFICATION_QC_REPORT: str(pickField(qual, "qcReport", "QUALIFICATION_QC_REPORT", "qualificationQcReport")),
+      QUALIFICATION_QC_REPORT: parseCasePrepFileRefs(pickField(qual, "qcReport", "QUALIFICATION_QC_REPORT", "qualificationQcReport")),
     },
     LF_EPOXY_FILLING_DETAILS: {
       LF_FILLING_TABLE: fillRows.length ? fillRows : empty.LF_EPOXY_FILLING_DETAILS.LF_FILLING_TABLE,
@@ -1168,7 +1179,7 @@ const parseInhibitionFromApi = (
           empty.HEMCOAT_3K_QUALIFICATION.QUALIFICATION_TABLE,
           qual.parameters ?? qual.qualification,
         ),
-        QUALIFICATION_QC_REPORT: str(pickField(qual, "qcReport", "QUALIFICATION_QC_REPORT")),
+        QUALIFICATION_QC_REPORT: parseCasePrepFileRefs(pickField(qual, "qcReport", "QUALIFICATION_QC_REPORT")),
       },
       INHIBITION_BATCH_DETAILS: {
         INHIBITOR_BATCH_NO: str(pickField(batch, "batchNo", "INHIBITOR_BATCH_NO", "inhibitorBatchNo")),
@@ -1218,9 +1229,7 @@ const parseInhibitionFromApi = (
         empty.IR1_QUALIFICATION.QUALIFICATION_TABLE,
         qual.parameters ?? qual.qualification,
       ),
-      QUALIFICATION_QC_REPORT: str(
-        pickField(qual, "qcReport", "QUALIFICATION_QC_REPORT", "qualificationQcReport"),
-      ),
+      QUALIFICATION_QC_REPORT: parseCasePrepFileRefs(pickField(qual, "qcReport", "QUALIFICATION_QC_REPORT", "qualificationQcReport")),
     },
     INHIBITION_BATCH_DETAILS: {
       INHIBITOR_BATCH_NO: str(pickField(batch, "batchNo", "INHIBITOR_BATCH_NO", "inhibitorBatchNo")),
@@ -1285,8 +1294,10 @@ export const buildPostCureSectionsPayload = (data: PostCureMotorData): LegacySec
             data.QUALIFICATION_DETAILS.QUALIFICATION_PREPARATION_DATE,
           ),
           QUALIFICATION_TABLE: payloadQualificationRows(data.QUALIFICATION_DETAILS.QUALIFICATION_TABLE),
-          QUALIFICATION_QC_REPORT:
-            data.QUALIFICATION_DETAILS.QUALIFICATION_QC_REPORT.trim() || undefined,
+          QUALIFICATION_QC_REPORT: (() => {
+              const files = toCasePrepFilesApiPayload(data.QUALIFICATION_DETAILS.QUALIFICATION_QC_REPORT);
+              return files.length ? files : undefined;
+            })(),
         }),
         makeSection("LF_EPOXY_FILLING_DETAILS", {
           LF_FILLING_TABLE: payloadLocationQtyRows(data.LF_EPOXY_FILLING_DETAILS.LF_FILLING_TABLE),
@@ -1310,8 +1321,10 @@ export const buildPostCureSectionsPayload = (data: PostCureMotorData): LegacySec
             data.IR1_QUALIFICATION.QUALIFICATION_PREPARATION_DATE,
           ),
           QUALIFICATION_TABLE: payloadQualificationRows(data.IR1_QUALIFICATION.QUALIFICATION_TABLE),
-          QUALIFICATION_QC_REPORT:
-            data.IR1_QUALIFICATION.QUALIFICATION_QC_REPORT.trim() || undefined,
+          QUALIFICATION_QC_REPORT: (() => {
+              const files = toCasePrepFilesApiPayload(data.IR1_QUALIFICATION.QUALIFICATION_QC_REPORT);
+              return files.length ? files : undefined;
+            })(),
         }),
         makeSection("INHIBITION_BATCH_DETAILS", {
           INHIBITOR_BATCH_NO: data.INHIBITION_BATCH_DETAILS.INHIBITOR_BATCH_NO.trim() || undefined,
@@ -1352,8 +1365,10 @@ export const buildPostCureSectionsPayload = (data: PostCureMotorData): LegacySec
           QUALIFICATION_TABLE: payloadQualificationRows(
             data.HEMCOAT_3K_QUALIFICATION.QUALIFICATION_TABLE,
           ),
-          QUALIFICATION_QC_REPORT:
-            data.HEMCOAT_3K_QUALIFICATION.QUALIFICATION_QC_REPORT.trim() || undefined,
+          QUALIFICATION_QC_REPORT: (() => {
+              const files = toCasePrepFilesApiPayload(data.HEMCOAT_3K_QUALIFICATION.QUALIFICATION_QC_REPORT);
+              return files.length ? files : undefined;
+            })(),
         }),
         makeSection("INHIBITION_BATCH_DETAILS", {
           INHIBITOR_BATCH_NO: data.INHIBITION_BATCH_DETAILS.INHIBITOR_BATCH_NO.trim() || undefined,
@@ -1400,3 +1415,46 @@ export const recomputeIngredientTotal = <
       : row,
   );
 };
+
+export const collectPostCureFileRefsFromMotorData = (
+  data: PostCureMotorData | null | undefined,
+): CasePrepFileRef[] => {
+  if (!data) return [];
+  if (data.variant === "loose-flap-filling") {
+    return data.QUALIFICATION_DETAILS?.QUALIFICATION_QC_REPORT ?? [];
+  }
+  if (data.variant === "inhibition-ir1") {
+    return data.IR1_QUALIFICATION?.QUALIFICATION_QC_REPORT ?? [];
+  }
+  if (data.variant === "inhibition-hemcoat-3k") {
+    return data.HEMCOAT_3K_QUALIFICATION?.QUALIFICATION_QC_REPORT ?? [];
+  }
+  return [];
+};
+
+export const collectPostCureFileRefsFromForm = (form: {
+  motors?: Array<{ postCureData?: PostCureMotorData | null }>;
+}): CasePrepFileRef[] => {
+  const refs: CasePrepFileRef[] = [];
+  for (const motor of form?.motors ?? []) {
+    refs.push(...collectPostCureFileRefsFromMotorData(motor?.postCureData));
+  }
+  return refs;
+};
+
+export const hasIncompletePostCureUploads = (form: {
+  motors?: Array<{ postCureData?: PostCureMotorData | null }>;
+}): boolean =>
+  collectPostCureFileRefsFromForm(form).some(isCasePrepFileUploadIncomplete);
+
+export const collectTempFileIdsFromPostCureForm = (form: {
+  motors?: Array<{ postCureData?: PostCureMotorData | null }>;
+}): string[] =>
+  [
+    ...new Set(
+      collectPostCureFileRefsFromForm(form)
+        .filter((ref) => ref.isTemp !== false)
+        .map((ref) => String(ref.fileId ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];

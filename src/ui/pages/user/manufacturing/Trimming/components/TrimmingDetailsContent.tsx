@@ -4,6 +4,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Link,
   Stack,
   Table,
   TableBody,
@@ -14,7 +15,9 @@ import {
   Typography,
 } from "@mui/material";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
+import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
+import { useAuthStore } from "../../../../../../app/store/authStore";
 import getManufacturingTheme from "../../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import getTrimmingTheme from "../../../../../../app/theme/custom_themes/user/manufacturing/trimming_theme";
 import { STRINGS } from "../../../../../../app/config/strings";
@@ -24,12 +27,15 @@ import {
   type CasePrepDetailSection,
   type CasePrepDetailTable,
 } from "../../../../../../data/models/user/CasePreparationFormModel";
+import { parseCasePrepFileRefs, type CasePrepFileRef } from "../../../../../../data/models/user/CasePrepMotorDataModel";
 import { mapCastingCuringPersonLabel } from "../../../../../../data/models/user/CastingCuringFormModel";
 import {
   orderTrimmingDisplayColumns,
   type TrimmingDetailView,
   type TrimmingMotorDetailView,
 } from "../../../../../../data/models/user/TrimmingFormModel";
+import { useFilePreview } from "../../../../../../hooks/useFilePreview";
+import FilePreviewDialog from "../../../../../components/common/FilePreviewDialog";
 import { OPERATION_STATUS_UI_TO_API } from "../../../../../../hooks/operationStatus";
 
 const API_OPERATION_STATUS_LABELS = Object.fromEntries(
@@ -61,12 +67,108 @@ const formatDateTime = (value?: string | null) => {
   });
 };
 
+const looksLikeTrimmingFiles = (value: unknown): boolean => {
+  if (value == null || value === "") return false;
+  if (typeof value === "string") return false;
+  if (Array.isArray(value)) {
+    return value.some(
+      (entry) =>
+        entry &&
+        typeof entry === "object" &&
+        ("fileId" in entry || "fileName" in entry || "mimeType" in entry),
+    );
+  }
+  return (
+    typeof value === "object" &&
+    ("fileId" in (value as object) ||
+      "fileName" in (value as object) ||
+      "mimeType" in (value as object))
+  );
+};
+
+const TrimmingFileLinks = ({
+  refs,
+  subDepartmentId,
+  onOpen,
+}: {
+  refs: CasePrepFileRef[];
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
+}) => {
+  if (!refs.length) return <>{formatCasePrepCellValue(null)}</>;
+  return (
+    <Stack spacing={0.5}>
+      {refs.map((ref, index) => {
+        const fileId = String(ref.fileId ?? "").trim();
+        const name = ref.fileName || "file";
+        const canOpen = Boolean(fileId && subDepartmentId);
+        return (
+          <Stack
+            key={ref.localId ?? `${fileId || name}-${index}`}
+            direction="row"
+            alignItems="center"
+            gap={1}
+            flexWrap="wrap"
+          >
+            <Typography component="span" sx={{ fontSize: "0.75rem", fontWeight: 600 }}>
+              {name}
+            </Typography>
+            {canOpen ? (
+              <Link
+                component="button"
+                type="button"
+                onClick={() => onOpen(fileId, name)}
+                sx={{
+                  fontSize: "0.72rem",
+                  fontWeight: 700,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 0.25,
+                  cursor: "pointer",
+                }}
+              >
+                {TR.FILE_OPEN}
+                <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
+              </Link>
+            ) : null}
+          </Stack>
+        );
+      })}
+    </Stack>
+  );
+};
+
+const TrimmingCellValue = ({
+  value,
+  subDepartmentId,
+  onOpen,
+}: {
+  value: unknown;
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
+}) => {
+  if (looksLikeTrimmingFiles(value)) {
+    return (
+      <TrimmingFileLinks
+        refs={parseCasePrepFileRefs(value)}
+        subDepartmentId={subDepartmentId}
+        onOpen={onOpen}
+      />
+    );
+  }
+  return <>{formatCasePrepCellValue(value)}</>;
+};
+
 const FieldsTable = ({
   fields,
   dt,
+  subDepartmentId,
+  onOpen,
 }: {
   fields: CasePrepDetailSection["fields"];
   dt: TrimmingDetailsTheme;
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
 }) => {
   if (!fields.length) return null;
 
@@ -84,7 +186,11 @@ const FieldsTable = ({
             <TableRow key={`${field.key}-${index}`} sx={dt.tableRow(index)}>
               <TableCell sx={{ ...dt.tableCell, ...dt.specText }}>{field.label}</TableCell>
               <TableCell sx={{ ...dt.tableCell, ...dt.resultText }}>
-                {formatCasePrepCellValue(field.value)}
+                <TrimmingCellValue
+                  value={field.value}
+                  subDepartmentId={subDepartmentId}
+                  onOpen={onOpen}
+                />
               </TableCell>
             </TableRow>
           ))}
@@ -165,15 +271,19 @@ const DataTable = ({
 const SectionPanel = ({
   section,
   dt,
+  subDepartmentId,
+  onOpen,
 }: {
   section: CasePrepDetailSection;
   dt: TrimmingDetailsTheme;
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
 }) => (
   <Box sx={{ mb: 2.5 }}>
     <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: "text.primary", mb: 1 }}>
       {section.label}
     </Typography>
-    <FieldsTable fields={section.fields} dt={dt} />
+    <FieldsTable fields={section.fields} dt={dt} subDepartmentId={subDepartmentId} onOpen={onOpen} />
     {section.tables.map((table) => (
       <DataTable key={table.blockId} table={table} dt={dt} />
     ))}
@@ -184,10 +294,14 @@ export const MotorDetailPanel = ({
   motor,
   dt,
   palette,
+  subDepartmentId,
+  onOpen,
 }: {
   motor: TrimmingMotorDetailView;
   dt: TrimmingDetailsTheme;
   palette: ReturnType<typeof getManufacturingTheme>["palette"];
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
 }) => (
   <Box>
     <Stack direction="row" alignItems="center" gap={1} mb={1.5} flexWrap="wrap">
@@ -210,7 +324,15 @@ export const MotorDetailPanel = ({
     {motor.sections.length === 0 ? (
       <Typography sx={dt.emptyText}>{TR.DETAILS_NO_MOTOR_DATA}</Typography>
     ) : (
-      motor.sections.map((section) => <SectionPanel key={section.sectionId} section={section} dt={dt} />)
+      motor.sections.map((section) => (
+        <SectionPanel
+          key={section.sectionId}
+          section={section}
+          dt={dt}
+          subDepartmentId={subDepartmentId}
+          onOpen={onOpen}
+        />
+      ))
     )}
   </Box>
 );
@@ -232,6 +354,14 @@ const TrimmingDetailsContent = ({
 }: TrimmingDetailsContentProps) => {
   const dt = getTrimmingTheme(theme).details;
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
+  const subDepartmentId = useAuthStore(
+    (s) => s.user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "trimming")?.subDepartmentId,
+  );
+  const { preview, openFile, closePreview, downloadCurrent } = useFilePreview();
+  const onOpenFile = (fileId: string, fileName: string) => {
+    if (!subDepartmentId) return;
+    void openFile(fileId, subDepartmentId, fileName);
+  };
 
   const motors = detailView?.motors ?? [];
   const activeMotorIndexSafe = motors.length > 0 ? Math.min(activeMotorIndex, motors.length - 1) : 0;
@@ -350,12 +480,24 @@ const TrimmingDetailsContent = ({
           ) : null}
 
           {activeMotor ? (
-            <MotorDetailPanel motor={activeMotor} dt={dt} palette={theme.palette} />
+            <MotorDetailPanel
+              motor={activeMotor}
+              dt={dt}
+              palette={theme.palette}
+              subDepartmentId={subDepartmentId}
+              onOpen={onOpenFile}
+            />
           ) : null}
         </Box>
       ) : (
         <Typography sx={dt.emptyText}>{TR.DETAILS_NO_FORM_DATA}</Typography>
       )}
+
+      <FilePreviewDialog
+        preview={preview}
+        onClose={closePreview}
+        onDownload={downloadCurrent}
+      />
     </>
   );
 };

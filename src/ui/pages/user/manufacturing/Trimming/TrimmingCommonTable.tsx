@@ -18,10 +18,9 @@ import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import AddIcon from "@mui/icons-material/Add";
 import FormInput from "@/ui/components/common/FormInput";
 import DateField from "@/ui/components/common/DateField";
-import SchemaFileField from "@/ui/components/common/SchemaFileField";
-import { FILE_PICKER_ACCEPT } from "@/utils/FileUtils";
 import { STRINGS } from "../../../../../app/config/strings";
 import { TRIMMING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/trimming_theme";
+import TrimmingFileField from "./TrimmingFileField";
 
 const S = STRINGS.MANUFACTURING.TRIMMING;
 
@@ -824,21 +823,14 @@ export const TrimmingCommonTable = ({
                   </Typography>
                   <ReadOnlyValue value={activeMotorSession.motorRemarks} />
                 </Box>
-                <Box>
-                  <Typography
-                    sx={{
-                      fontSize: "0.65rem",
-                      fontWeight: 800,
-                      letterSpacing: "0.02em",
-                      textTransform: "uppercase",
-                      color: colors.primary,
-                      mb: 0.5,
-                    }}
-                  >
-                    Upload Report
-                  </Typography>
-                  <ReadOnlyValue value={activeMotorSession.reportLink} />
-                </Box>
+                <TrimmingFileField
+                  label="Upload Report"
+                  files={activeMotorSession.reportFiles ?? []}
+                  onChange={() => {}}
+                  multiple
+                  acceptMode="imageVideoPdf"
+                  readOnly
+                />
               </>
             ) : (
               <>
@@ -855,18 +847,18 @@ export const TrimmingCommonTable = ({
                   }
                   disabled={inputsLocked}
                 />
-                <SchemaFileField
+                <TrimmingFileField
                   label="Upload Report"
-                  disabled={inputsLocked}
-                  value={activeMotorSession.reportLink ?? ""}
-                  onChange={(val) =>
+                  files={activeMotorSession.reportFiles ?? []}
+                  onChange={(next) =>
                     onMotorSessionChange(activeMotorEntry.motorId, {
                       ...activeMotorSession,
-                      reportLink: val,
+                      reportFiles: next,
                     })
                   }
-                  accept={FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF}
                   multiple
+                  acceptMode="imageVideoPdf"
+                  disabled={inputsLocked}
                 />
               </>
             )}

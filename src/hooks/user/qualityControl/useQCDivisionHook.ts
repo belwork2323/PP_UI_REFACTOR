@@ -180,7 +180,7 @@ import {
   buildInitialPostCureValuesForMotor,
   resolvePostCureSelectionFromMotorDetails,
 } from "./qcPostCureDivisionDetails";
-import { createInitialNdtValues, hydrateNdtValuesFromSections, ndtFormValuesHaveUserData } from "./qcNdtTables";
+import { createInitialNdtValues, hydrateNdtValuesFromSections, ndtFormValuesHaveUserData, hasIncompleteQcNdtUploads, collectTempFileIdsFromQcNdtValues } from "./qcNdtTables";
 import {
   applyNdtDivisionDetailsSeed,
   buildInitialNdtValuesForMotor,
@@ -226,7 +226,29 @@ import {
 } from "./qcSchemaFetchCache";
 import { useFileService } from "../../../hooks/useFileService";
 import { discardWorkflowForm } from "../../../utils/workflowDiscard";
-import { noopTempFileExtractor } from "../../../utils/workflowTempFiles";
+
+const collectTempFileIdsFromQcForm = (form: QualityControlFormState | null | undefined): string[] => {
+  if (!form) return [];
+  const ids: string[] = [];
+  const entries = form.divisionEntries ?? [];
+  const valuesById = form.divisionEntryValues ?? {};
+  for (const entry of entries) {
+    if (entry.kind !== "NDT_MOTOR") continue;
+    ids.push(...collectTempFileIdsFromQcNdtValues(valuesById[entry.entryId]?.schemaValues));
+  }
+  return [...new Set(ids)];
+};
+
+const hasIncompleteQcFormUploads = (form: QualityControlFormState | null | undefined): boolean => {
+  if (!form) return false;
+  const entries = form.divisionEntries ?? [];
+  const valuesById = form.divisionEntryValues ?? {};
+  return entries.some(
+    (entry) =>
+      entry.kind === "NDT_MOTOR" &&
+      hasIncompleteQcNdtUploads(valuesById[entry.entryId]?.schemaValues),
+  );
+};
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -4664,8 +4686,8 @@ export const useQCDivisionHook = () => {
     await discardWorkflowForm({
       subDepartmentId,
       baselineState: null,
-      currentState: null,
-      extractTempFileIds: noopTempFileExtractor,
+      currentState: formDataRef.current,
+      extractTempFileIds: collectTempFileIdsFromQcForm,
       deleteTemp,
       resetForm: () => {
         bumpBatchRefresh();
@@ -4715,6 +4737,11 @@ export const useQCDivisionHook = () => {
 
     if (!hasAnyQualityControlValue(submitFormState)) {
       showAlert(messages.EMPTY_FORM_ERROR, "warning");
+      return false;
+    }
+
+    if (hasIncompleteQcFormUploads(submitFormState)) {
+      showAlert(STRINGS.QUALITY_CONTROL.NDT.FILE_UPLOAD_PENDING, "warning");
       return false;
     }
 

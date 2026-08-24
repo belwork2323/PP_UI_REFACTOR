@@ -19,9 +19,8 @@ import {
   Typography,
 } from "@mui/material";
 import { icons } from "../../../../../../app/theme/icons";
-import MediaUpload from "../../../../../components/common/MediaUpload";
-import { FILE_PICKER_ACCEPT } from "../../../../../../utils/FileUtils";
 import VisualInspectionMediaField from "./VisualInspectionMediaField";
+import CasingInsulationReportUpload from "./CasingInsulationReportUpload";
 import StackRow from "../../../../../components/common/StackRow";
 import { STRINGS } from "../../../../../../app/config/strings";
 import {
@@ -743,21 +742,15 @@ const MotorCasingCreateForm = ({
               />
             </FieldGrid>
             <Box sx={{ mt: 1.5, ...cf.compactMediaWrap }}>
-              <MediaUpload
-                value={form.insulationReportFile}
-                onChange={(file) => patch({ insulationReportFile: file })}
-                existingFile={form.insulationReportExisting ?? null}
-                onClearExisting={() =>
-                  patch({ insulationReportExisting: null, insulationReportUrl: null })
+              <CasingInsulationReportUpload
+                existing={form.insulationReportExisting ?? null}
+                onChange={(next) =>
+                  patch({
+                    insulationReportFile: null,
+                    insulationReportExisting: next,
+                    insulationReportUrl: next?.fileUrl ?? null,
+                  })
                 }
-                label={S.REPORT_UPLOAD}
-                description="PDF or image"
-                accept={FILE_PICKER_ACCEPT.IMAGE_PDF}
-                uploadedFileLabel={S.UPLOADED_FILE_LABEL}
-                changeFileLabel={S.CHANGE_FILE}
-                removeFileLabel={S.REMOVE_FILE}
-                openFileLabel={S.OPEN_FILE}
-                pendingUploadHint={S.PENDING_UPLOAD_HINT}
               />
             </Box>
             {mechanicalSpec.length > 0 && (
@@ -959,17 +952,16 @@ const MotorCasingCreateForm = ({
               </Box>
 
               <VisualInspectionMediaField
-                mediaFile={row.mediaFile}
                 mediaExisting={row.mediaExisting}
-                onMediaFileChange={(file) => {
-                  const next = [...form.visualInspection];
-                  next[idx] = { ...next[idx], mediaFile: file };
-                  patch({ visualInspection: next });
-                }}
-                onClearExisting={() => {
-                  const next = [...form.visualInspection];
-                  next[idx] = { ...next[idx], mediaExisting: null, mediaUrl: null };
-                  patch({ visualInspection: next });
+                onMediaExistingChange={(next) => {
+                  const rows = [...form.visualInspection];
+                  rows[idx] = {
+                    ...rows[idx],
+                    mediaFile: null,
+                    mediaExisting: next,
+                    mediaUrl: next?.fileUrl ?? null,
+                  };
+                  patch({ visualInspection: rows });
                 }}
                 theme={theme}
               />

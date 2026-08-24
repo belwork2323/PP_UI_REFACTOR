@@ -4,6 +4,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Link,
   Stack,
   Table,
   TableBody,
@@ -16,15 +17,23 @@ import {
   Typography,
 } from "@mui/material";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
+import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import getManufacturingTheme from "../../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import { STRINGS } from "../../../../../../app/config/strings";
+import { useAuthStore } from "../../../../../../app/store/authStore";
 import {
   formatCasePrepCellValue,
   formatCasePrepSectionLabel,
   type CasePrepDetailSection,
   type CasePrepDetailTable,
 } from "../../../../../../data/models/user/CasePreparationFormModel";
+import {
+  parseCasePrepFileRefs,
+  type CasePrepFileRef,
+} from "../../../../../../data/models/user/CasePrepMotorDataModel";
+import { useFilePreview } from "../../../../../../hooks/useFilePreview";
+import FilePreviewDialog from "../../../../../components/common/FilePreviewDialog";
 import {
   orderCastingCuringDisplayColumns,
   type CastingCuringDetailView,
@@ -35,6 +44,99 @@ import { alpha } from "@mui/material";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const CC = STRINGS.MANUFACTURING.CASTING_CURING;
+
+const looksLikeCastingCuringFiles = (value: unknown): boolean => {
+  if (value == null || value === "") return false;
+  if (typeof value === "string") return false;
+  if (Array.isArray(value)) {
+    return value.some(
+      (entry) =>
+        entry &&
+        typeof entry === "object" &&
+        ("fileId" in entry || "fileName" in entry || "mimeType" in entry),
+    );
+  }
+  return (
+    typeof value === "object" &&
+    ("fileId" in (value as object) ||
+      "fileName" in (value as object) ||
+      "mimeType" in (value as object))
+  );
+};
+
+const CastingCuringFileLinks = ({
+  refs,
+  subDepartmentId,
+  onOpen,
+}: {
+  refs: CasePrepFileRef[];
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
+}) => {
+  if (!refs.length) return <>{formatCasePrepCellValue(null)}</>;
+  return (
+    <Stack spacing={0.5}>
+      {refs.map((ref, index) => {
+        const fileId = String(ref.fileId ?? "").trim();
+        const name = ref.fileName || "file";
+        const canOpen = Boolean(fileId && subDepartmentId);
+        return (
+          <Stack
+            key={ref.localId ?? `${fileId || name}-${index}`}
+            direction="row"
+            alignItems="center"
+            gap={1}
+            flexWrap="wrap"
+          >
+            <Typography component="span" sx={{ fontSize: "0.75rem", fontWeight: 600 }}>
+              {name}
+            </Typography>
+            {canOpen ? (
+              <Link
+                component="button"
+                type="button"
+                onClick={() => onOpen(fileId, name)}
+                sx={{
+                  fontSize: "0.72rem",
+                  fontWeight: 700,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 0.25,
+                  cursor: "pointer",
+                }}
+              >
+                {CC.FILE_OPEN}
+                <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
+              </Link>
+            ) : null}
+          </Stack>
+        );
+      })}
+    </Stack>
+  );
+};
+
+const CastingCuringCellValue = ({
+  value,
+  subDepartmentId,
+  onOpen,
+}: {
+  value: unknown;
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
+}) => {
+  if (looksLikeCastingCuringFiles(value)) {
+    return (
+      <CastingCuringFileLinks
+        refs={parseCasePrepFileRefs(value)}
+        subDepartmentId={subDepartmentId}
+        onOpen={onOpen}
+      />
+    );
+  }
+  return <>{formatCasePrepCellValue(value)}</>;
+};
+
 
 const MOTOR_STATUS_CHIP_COLORS: Record<string, { bg: string; color: string }> = {
   TO_BE_INITIATED: { bg: "rgba(120,120,120,0.1)", color: "#757575" },
@@ -85,9 +187,13 @@ const DetailField = ({
 const FieldsTable = ({
   fields,
   dt,
+  subDepartmentId,
+  onOpen,
 }: {
   fields: CasePrepDetailSection["fields"];
   dt: CastingCuringDetailsTheme;
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
 }) => {
   if (!fields.length) return null;
 
@@ -105,7 +211,11 @@ const FieldsTable = ({
             <TableRow key={`${field.key}-${index}`} sx={dt.tableRow(index)}>
               <TableCell sx={{ ...dt.tableCell, ...dt.specText }}>{field.label}</TableCell>
               <TableCell sx={{ ...dt.tableCell, ...dt.resultText }}>
-                {formatCasePrepCellValue(field.value)}
+                <CastingCuringCellValue
+                  value={field.value}
+                  subDepartmentId={subDepartmentId}
+                  onOpen={onOpen}
+                />
               </TableCell>
             </TableRow>
           ))}
@@ -118,9 +228,13 @@ const FieldsTable = ({
 const DataTable = ({
   table,
   dt,
+  subDepartmentId,
+  onOpen,
 }: {
   table: CasePrepDetailTable;
   dt: CastingCuringDetailsTheme;
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
 }) => {
   const columns = orderCastingCuringDisplayColumns(Object.keys(table.columnLabels));
   if (!columns.length || !table.rows.length) return null;
@@ -158,7 +272,11 @@ const DataTable = ({
                 <TableRow key={rowIndex} sx={dt.tableRow(rowIndex)}>
                   {columns.map((column) => (
                     <TableCell key={column} sx={dt.tableCell}>
-                      {formatCasePrepCellValue(row[column])}
+                      <CastingCuringCellValue
+                        value={row[column]}
+                        subDepartmentId={subDepartmentId}
+                        onOpen={onOpen}
+                      />
                     </TableCell>
                   ))}
                 </TableRow>
@@ -174,17 +292,32 @@ const DataTable = ({
 const SectionPanel = ({
   section,
   dt,
+  subDepartmentId,
+  onOpen,
 }: {
   section: CasePrepDetailSection;
   dt: CastingCuringDetailsTheme;
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
 }) => (
   <Box sx={{ mb: 2.5 }}>
     <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: "text.primary", mb: 1 }}>
       {section.label}
     </Typography>
-    <FieldsTable fields={section.fields} dt={dt} />
+    <FieldsTable
+      fields={section.fields}
+      dt={dt}
+      subDepartmentId={subDepartmentId}
+      onOpen={onOpen}
+    />
     {section.tables.map((table) => (
-      <DataTable key={table.blockId} table={table} dt={dt} />
+      <DataTable
+        key={table.blockId}
+        table={table}
+        dt={dt}
+        subDepartmentId={subDepartmentId}
+        onOpen={onOpen}
+      />
     ))}
   </Box>
 );
@@ -226,11 +359,15 @@ export const MotorDetailPanel = ({
   processTab,
   dt,
   palette,
+  subDepartmentId,
+  onOpen,
 }: {
   motor: CastingCuringMotorDetailView;
   processTab: MotorProcessTab;
   dt: CastingCuringDetailsTheme;
   palette: ReturnType<typeof getManufacturingTheme>["palette"];
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
 }) => {
   const sections = processTab === "CASTING" ? motor.castingSections : motor.curingSections;
 
@@ -298,7 +435,13 @@ export const MotorDetailPanel = ({
           {processTab === "CASTING" ? CC.DETAILS_NO_CASTING : CC.DETAILS_NO_CURING}
         </Typography>
       ) : (
-        sections.map((section) => <SectionPanel key={section.sectionId} section={section} dt={dt} />)
+        sections.map((section) => <SectionPanel
+          key={section.sectionId}
+          section={section}
+          dt={dt}
+          subDepartmentId={subDepartmentId}
+          onOpen={onOpen}
+        />)
       )}
     </Box>
   );
@@ -322,6 +465,16 @@ const CastingCuringDetailsContent = ({
   const dt = theme.manufacturing.castingAndCuring.details;
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
   const [activeProcessTab, setActiveProcessTab] = useState<MotorProcessTab>("CASTING");
+  const subDepartmentId = useAuthStore(
+    (s) =>
+      s.user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "casting-and-curing")
+        ?.subDepartmentId,
+  );
+  const { preview, openFile, closePreview, downloadCurrent } = useFilePreview();
+  const onOpenFile = (fileId: string, fileName: string) => {
+    if (!subDepartmentId) return;
+    void openFile(fileId, subDepartmentId, fileName);
+  };
 
   const motors = detailView?.motors ?? [];
   const activeMotorIndexSafe = motors.length > 0 ? Math.min(activeMotorIndex, motors.length - 1) : 0;
@@ -454,12 +607,19 @@ const CastingCuringDetailsContent = ({
               processTab={activeProcessTab}
               dt={dt}
               palette={theme.palette}
+              subDepartmentId={subDepartmentId}
+              onOpen={onOpenFile}
             />
           ) : null}
         </Box>
       ) : (
         <Typography sx={dt.emptyText}>No form data recorded</Typography>
       )}
+      <FilePreviewDialog
+        preview={preview}
+        onClose={closePreview}
+        onDownload={downloadCurrent}
+      />
     </>
   );
 };

@@ -37,14 +37,11 @@ const QCTrimmingMotorPanel = ({
       motorId: resolvedMotorId,
       motorStage: Number(session.motorStage ?? 0) || 0,
       motorReceivedAt: session.motorReceivedAt,
-      schema: null,
-      formValues: {},
       trimmingDetails: session.trimmingDetails,
       commonFormatParameters: session.commonFormatParameters,
       commonFormatLocations: session.commonFormatLocations,
       motorRemarks: session.motorRemarks,
-      reportFile: session.reportFile ?? null,
-      reportLink: session.reportLink ?? "",
+      reportFiles: session.reportFiles ?? [],
     }),
     [resolvedMotorId, session],
   );
@@ -97,8 +94,7 @@ const QCTrimmingMotorPanel = ({
               commonFormatParameters: nextSession.commonFormatParameters ?? [],
               commonFormatLocations: nextSession.commonFormatLocations ?? [],
               motorRemarks: String(nextSession.motorRemarks ?? ""),
-              reportFile: nextSession.reportFile ?? null,
-              reportLink: String(nextSession.reportLink ?? ""),
+              reportFiles: nextSession.reportFiles ?? [],
             }),
           );
         }}

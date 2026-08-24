@@ -11,6 +11,7 @@ import {
   Dialog,
   DialogContent,
   IconButton,
+  Link,
   MenuItem,
   Table,
   TableBody,
@@ -22,6 +23,7 @@ import {
 } from "@mui/material";
 
 import { useThemeStore } from "../../../../app/store/themeStore";
+import { useAuthStore } from "../../../../app/store/authStore";
 import { getRocketMotorCasingApproverTheme } from "../../../../app/theme/custom_themes/approver/sourcing/rocketMotorCasingApprover_theme";
 import getApproverSourcingFilterStyles from "./approverSourcingFilterStyles";
 import DateField from "../../../components/common/DateField";
@@ -45,6 +47,9 @@ import { STRINGS } from "../../../../app/config/strings";
 import getSourcingTheme from "../../../../app/theme/custom_themes/user/sourcing/sourcing_theme";
 import DimensionalInspectionDetailTable from "../../user/sourcing/components/DimensionalInspectionDetailTable";
 import MockTrialDetailTables from "../../user/sourcing/components/MockTrialDetailTables";
+import FilePreviewDialog from "../../../components/common/FilePreviewDialog";
+import { useFilePreview } from "../../../../hooks/useFilePreview";
+import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 
@@ -83,6 +88,42 @@ const RocketCasingDetailDialog = ({
   const mode = useThemeStore((state) => state.mode);
   const sourcingTheme = useMemo(() => getSourcingTheme(mode), [mode]);
   const dimTableTheme = sourcingTheme.sourcing.rocketMotor.casingDetails;
+  const subDepartmentId = useAuthStore(
+    (s) =>
+      s.user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "rocket-motor")?.subDepartmentId,
+  );
+  const { preview, openFile, closePreview, downloadCurrent } = useFilePreview();
+
+  const renderResultCell = (row: any) => {
+    const fileId = String(row?.fileId ?? "").trim();
+    const canOpen = Boolean(fileId && subDepartmentId);
+    if (!canOpen) return row?.analysedResult || "—";
+    return (
+      <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
+        <Typography component="span" sx={theme.dialog.innerResultText}>
+          {row?.analysedResult || "—"}
+        </Typography>
+        <Link
+          component="button"
+          type="button"
+          onClick={() =>
+            void openFile(fileId, subDepartmentId!, row?.fileName || row?.analysedResult)
+          }
+          sx={{
+            fontSize: "0.75rem",
+            fontWeight: 700,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 0.25,
+            cursor: "pointer",
+          }}
+        >
+          View
+          <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
+        </Link>
+      </Stack>
+    );
+  };
 
   if (!item) return null;
 
@@ -169,7 +210,7 @@ const RocketCasingDetailDialog = ({
                                   {row.specification}
                                 </TableCell>
                                 <TableCell sx={theme.dialog.innerResultText}>
-                                  {row.analysedResult || "—"}
+                                  {renderResultCell(row)}
                                 </TableCell>
                               </TableRow>
                             ))}
@@ -204,7 +245,7 @@ const RocketCasingDetailDialog = ({
                               {row.specification}
                             </TableCell>
                             <TableCell sx={theme.dialog.innerResultText}>
-                              {row.analysedResult || "—"}
+                              {renderResultCell(row)}
                             </TableCell>
                             {row.remarks && (
                               <TableCell sx={theme.dialog.innerRemarksText}>
@@ -256,6 +297,14 @@ const RocketCasingDetailDialog = ({
           ) : null}
         </Box>
       </Dialog>
+
+      <FilePreviewDialog
+        preview={preview}
+        onClose={closePreview}
+        onDownload={downloadCurrent}
+        themeColor={sourcingTheme.palette.primary}
+        themeColorLight={sourcingTheme.palette.primaryLight}
+      />
 
       <ReportPreviewDialog
         open={pdfOpen}
