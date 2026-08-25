@@ -2,6 +2,10 @@ import type { ReactNode } from "react";
 import { Box, Button, Chip, Divider, Stack, Typography } from "@mui/material";
 import ArrowBackRoundedIcon from "@mui/icons-material/ArrowBackRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
+import {
+  resolveWorkflowFormHeaderStatus,
+  WORKFLOW_FORM_HEADER_STATUS_LABELS,
+} from "./workflowFormHeaderStatus";
 
 /** Shared header card data — create and update both pass this shape. */
 export type WorkflowFormHeaderMetaItem = {
@@ -90,14 +94,19 @@ const resolveHeaderData = (props: UserWorkflowFormHeaderProps): WorkflowFormHead
         ? String(batch.motorId).trim()
         : undefined);
 
+  const headerStatus = resolveWorkflowFormHeaderStatus(batch as Record<string, unknown>);
+  const useRejectedFallback = isEdit && !headerStatus.status;
+
   return {
     title,
     subtitle: subtitle || undefined,
-    statusLabel: isEdit
-      ? props.editLabel || "Editing Rejected Submission"
-      : props.newLabel || "New Submission",
-    statusVariant: isEdit ? "edit" : "new",
-    rejectionReason: isEdit ? batch.rejectionReason ?? null : null,
+    statusLabel: useRejectedFallback
+      ? props.editLabel || WORKFLOW_FORM_HEADER_STATUS_LABELS.rejected
+      : headerStatus.statusLabel,
+    statusVariant: useRejectedFallback ? "edit" : headerStatus.statusVariant,
+    rejectionReason: useRejectedFallback
+      ? batch.rejectionReason ?? null
+      : headerStatus.rejectionReason,
     extraChips: props.additionalChips,
   };
 };

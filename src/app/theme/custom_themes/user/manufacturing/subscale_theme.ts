@@ -1,4 +1,5 @@
 import { alpha } from "@mui/material/styles";
+import { createDataTableTheme } from "../../shared/data_table_theme";
 
 export const SUBSCALE_BRAND = {
   primary: "#1B4F72",
@@ -121,30 +122,12 @@ export const getSubscaleTheme = (baseTheme: any) => {
         background: `linear-gradient(135deg, ${palette.primary ?? SUBSCALE_BRAND.ss}, ${palette.primaryLight ?? SUBSCALE_BRAND.ssLight})`,
         color: "#fff",
       },
-      tableContainer: {
-        borderRadius: 1.5,
-        border: `1px solid ${palette.border ?? SUBSCALE_BRAND.border}`,
-        overflow: "hidden",
-      },
-      tableHeaderCell: (isLead: boolean) => ({
-        background: isLead
-          ? `linear-gradient(135deg, ${palette.primary ?? SUBSCALE_BRAND.ss}, ${palette.primaryLight ?? SUBSCALE_BRAND.ssLight})`
-          : alpha(palette.primary ?? SUBSCALE_BRAND.ss, 0.06),
-        color: isLead ? "#fff" : palette.textSub ?? SUBSCALE_BRAND.textSub,
-        fontWeight: 700,
-        fontSize: "0.72rem",
-        letterSpacing: "0.04em",
-        textTransform: "uppercase",
-        py: 1,
-        px: 1.5,
-        borderBottom: `1px solid ${palette.border ?? SUBSCALE_BRAND.border}`,
-        whiteSpace: "nowrap",
+      ...createDataTableTheme({
+        ...SUBSCALE_BRAND,
+        ...palette,
+        primary: palette.primary ?? SUBSCALE_BRAND.ss,
+        primaryLight: palette.primaryLight ?? SUBSCALE_BRAND.ssLight,
       }),
-      tableRow: (idx: number) => ({
-        background:
-          idx % 2 === 0 ? palette.pageBg ?? "#fff" : alpha(palette.surface ?? SUBSCALE_BRAND.surface, 0.5),
-      }),
-      tableCell: { fontSize: "0.78rem", py: 1.1, px: 1.5, color: palette.text ?? SUBSCALE_BRAND.text },
       specText: { fontWeight: 600 },
       resultText: { fontWeight: 600, color: palette.text ?? SUBSCALE_BRAND.text },
       remarksText: { fontSize: "0.78rem", color: palette.textSub ?? SUBSCALE_BRAND.textSub },

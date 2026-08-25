@@ -40,7 +40,7 @@ export const getRawMaterialPreparationApproverTheme = (mode = "light") => {
         overflow: "hidden",
       },
       headerCell: {
-        background: `linear-gradient(135deg, ${palette.primary}, ${palette.primaryLight})`,
+        background: `linear-gradient(180deg, ${palette.primaryLight}, ${palette.primary})`,
         color: palette.white,
         fontWeight: 700,
         fontSize: "0.68rem",
@@ -49,8 +49,8 @@ export const getRawMaterialPreparationApproverTheme = (mode = "light") => {
         padding: "10px 14px",
         whiteSpace: "nowrap",
         borderBottom: "none",
-        "&:first-of-type": { borderRadius: "6px 0 0 0" },
-        "&:last-of-type": { borderRadius: "0 6px 0 0" },
+        borderRight: `1px solid ${alpha("#fff", 0.32)}`,
+        "&:last-of-type": { borderRight: "none" },
       },
       bodyCell: {
         padding: "10px 14px",

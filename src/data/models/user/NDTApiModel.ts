@@ -11,12 +11,7 @@ import {
   type NDTVisualInspectionRow,
 } from "./NDTFormModel";
 import { mapCastingCuringPersonLabel } from "./CastingCuringFormModel";
-import {
-  parseCasePrepFileRef,
-  parseCasePrepFileRefs,
-  toCasePrepFilesApiPayload,
-  toCasePrepSingleFileApiPayload,
-} from "./CasePrepMotorDataModel";
+import { parseFileRef, parseFileRefs, toFileIdListPayload, toFileIdPayloadOrNull } from "../common/FileUploadModel";
 import { NDT_VISUAL_INSPECTION_PRESETS } from "../../../hooks/user/qualityControl/ndtFlowConfig";
 import {
   NDT_CUSTOM_OBSERVATION_TYPE,
@@ -65,7 +60,7 @@ const mergeVisualInspectionFromApi = (apiRows: any[] = []): NDTVisualInspectionR
         section: String(apiRow?.sectionNumber ?? ""),
         orientation: mapNdtOrientationFromApi(apiRow?.orientation ?? ""),
         observationNotes: apiRow?.observation ?? "",
-        files: parseCasePrepFileRefs(apiRow?.uploadedImages),
+        files: parseFileRefs(apiRow?.uploadedImages),
       };
       continue;
     }
@@ -85,7 +80,7 @@ const mergeVisualInspectionFromApi = (apiRows: any[] = []): NDTVisualInspectionR
       isPreset: false,
       section: String(apiRow?.sectionNumber ?? ""),
       orientation: mapNdtOrientationFromApi(apiRow?.orientation ?? ""),
-      files: parseCasePrepFileRefs(apiRow?.uploadedImages),
+      files: parseFileRefs(apiRow?.uploadedImages),
     });
   }
 
@@ -162,12 +157,12 @@ const mapMotorSessionFromApi = (motor: any): NDTMotorSession => {
       section: String(row.sectionNumber ?? ""),
       orientation: mapNdtOrientationFromApi(row.orientation ?? ""),
       observations: row.observation ?? "",
-      files: parseCasePrepFileRefs(row.uploadedImages),
+      files: parseFileRefs(row.uploadedImages),
     })),
     visualInspectionRows: mergeVisualInspectionFromApi(motor?.visualInspectionDetails),
-    visualInspectionMedia: parseCasePrepFileRefs(motor?.uploadedVideos),
+    visualInspectionMedia: parseFileRefs(motor?.uploadedVideos),
     signedReport:
-      parseCasePrepFileRef(
+      parseFileRef(
         motor?.signedNdtReport?.documentId ??
           motor?.signedNdtReport?.report ??
           motor?.signedNdtReport,
@@ -185,7 +180,7 @@ const mapVisualInspectionRowToApi = (row: NDTVisualInspectionRow) => {
     sectionNumber: sectionNumber ?? 0,
     orientation: mapNdtOrientationToApi(row.orientation),
     observation: row.isPreset ? (row.observationNotes ?? "") : (row.observation ?? ""),
-    uploadedImages: toCasePrepFilesApiPayload(row.files ?? []),
+    uploadedImages: toFileIdListPayload(row.files ?? []),
   };
 };
 
@@ -263,7 +258,7 @@ const mapMotorSessionToApi = (motor: NDTMotorSession) => {
         sectionNumber: parseNdtPositiveInt(row.section)!,
         orientation: mapNdtOrientationToApi(row.orientation),
         observation: row.observations ?? "",
-        uploadedImages: toCasePrepFilesApiPayload(row.files ?? []),
+        uploadedImages: toFileIdListPayload(row.files ?? []),
       })),
     visualInspectionDetails: (normalized.visualInspectionRows ?? [])
       .filter(visualInspectionRowHasValue)
@@ -272,10 +267,10 @@ const mapMotorSessionToApi = (motor: NDTMotorSession) => {
         return !sectionText || parseNdtPositiveInt(row.section) !== null;
       })
       .map(mapVisualInspectionRowToApi),
-    uploadedVideos: toCasePrepFilesApiPayload(normalized.visualInspectionMedia ?? []),
+    uploadedVideos: toFileIdListPayload(normalized.visualInspectionMedia ?? []),
     additionalRemarks: normalized.additionalRemarks ?? "",
     signedNdtReport: (() => {
-      const ready = toCasePrepSingleFileApiPayload(normalized.signedReport);
+      const ready = toFileIdPayloadOrNull(normalized.signedReport);
       if (ready) {
         return {
           documentId: ready.fileId,
@@ -314,11 +309,11 @@ const hydrateFormState = (payload: any): NDTFormState => {
     additionalExposureRows: payload?.additionalExposureRows,
     radiographyObservationRows: payload?.radiographyObservationRows,
     visualInspectionRows: payload?.visualInspectionRows,
-    visualInspectionMedia: parseCasePrepFileRefs(
+    visualInspectionMedia: parseFileRefs(
       payload?.visualInspectionMediaFilePaths ?? payload?.visualInspectionMedia,
     ),
     signedReport:
-      parseCasePrepFileRef(payload?.signedReportFilePath ?? payload?.signedReport) ?? null,
+      parseFileRef(payload?.signedReportFilePath ?? payload?.signedReport) ?? null,
     additionalRemarks: payload?.additionalRemarks,
     formLoaded: true,
   });

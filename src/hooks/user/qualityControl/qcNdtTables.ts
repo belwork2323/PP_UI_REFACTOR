@@ -1,12 +1,6 @@
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
 import { formatToUiDate } from "../../../utils/dateUtils";
-import {
-  isCasePrepFileReady,
-  isCasePrepFileUploadIncomplete,
-  parseCasePrepFileRefs,
-  toCasePrepFilesApiPayload,
-  type CasePrepFileRef,
-} from "../../../data/models/user/CasePrepMotorDataModel";
+import { isFileReady, isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileRef } from "../../../data/models/common/FileUploadModel";
 import {
   mapNdtBeamEnergiesFromApi,
   mapNdtEquipmentFromApi,
@@ -147,10 +141,10 @@ const normalizeObservationRows = (value: unknown): QcNdtRadiographyObservationRo
   });
 };
 
-const parseNdtUploadFiles = (...candidates: unknown[]): CasePrepFileRef[] => {
+const parseNdtUploadFiles = (...candidates: unknown[]): FileRef[] => {
   for (const candidate of candidates) {
     if (candidate == null || candidate === "") continue;
-    const refs = parseCasePrepFileRefs(candidate);
+    const refs = parseFileRefs(candidate);
     if (refs.length) return refs;
   }
   return [];
@@ -345,8 +339,8 @@ export const ndtFormValuesHaveUserData = (values: SchemaFormValues | null | unde
       ) {
         return value.some(
           (ref) =>
-            isCasePrepFileReady(ref as CasePrepFileRef) ||
-            String((ref as CasePrepFileRef).fileName ?? "").trim(),
+            isFileReady(ref as FileRef) ||
+            String((ref as FileRef).fileName ?? "").trim(),
         );
       }
       return value.some((row) => {
@@ -356,8 +350,8 @@ export const ndtFormValuesHaveUserData = (values: SchemaFormValues | null | unde
             return false;
           }
           if (field === "UPLOAD_IMAGE") {
-            return parseCasePrepFileRefs(fieldValue).some(
-              (ref) => isCasePrepFileReady(ref) || String(ref.fileName ?? "").trim(),
+            return parseFileRefs(fieldValue).some(
+              (ref) => isFileReady(ref) || String(ref.fileName ?? "").trim(),
             );
           }
           return String(fieldValue ?? "").trim().length > 0;
@@ -420,12 +414,12 @@ export const setNdtVisualRows = (
   [formKey(QC_NDT_SECTION_IDS.VISUAL_INSPECTION, QC_NDT_TABLE_IDS.VISUAL_INSPECTION)]: rows,
 });
 
-export const getNdtUploadMedia = (values: SchemaFormValues | null | undefined): CasePrepFileRef[] =>
-  parseCasePrepFileRefs(values?.[formKey(QC_NDT_SECTION_IDS.UPLOAD_MEDIA, "UPLOAD_VIDEO_PHOTO")]);
+export const getNdtUploadMedia = (values: SchemaFormValues | null | undefined): FileRef[] =>
+  parseFileRefs(values?.[formKey(QC_NDT_SECTION_IDS.UPLOAD_MEDIA, "UPLOAD_VIDEO_PHOTO")]);
 
 export const setNdtUploadMedia = (
   values: SchemaFormValues | null | undefined,
-  next: CasePrepFileRef[],
+  next: FileRef[],
 ): SchemaFormValues => ({
   ...(values ?? {}),
   [formKey(QC_NDT_SECTION_IDS.UPLOAD_MEDIA, "UPLOAD_VIDEO_PHOTO")]: next ?? [],
@@ -433,8 +427,8 @@ export const setNdtUploadMedia = (
 
 export const collectNdtFileRefsFromQcValues = (
   values: SchemaFormValues | null | undefined,
-): CasePrepFileRef[] => {
-  const refs: CasePrepFileRef[] = [];
+): FileRef[] => {
+  const refs: FileRef[] = [];
   for (const row of getNdtVisualRows(values)) {
     refs.push(...(row.UPLOAD_IMAGE ?? []));
   }
@@ -443,7 +437,7 @@ export const collectNdtFileRefsFromQcValues = (
 };
 
 export const hasIncompleteQcNdtUploads = (values: SchemaFormValues | null | undefined): boolean =>
-  collectNdtFileRefsFromQcValues(values).some(isCasePrepFileUploadIncomplete);
+  collectNdtFileRefsFromQcValues(values).some(isFileUploadIncomplete);
 
 export const collectTempFileIdsFromQcNdtValues = (
   values: SchemaFormValues | null | undefined,
@@ -763,7 +757,7 @@ export const buildNdtMotorDetailPayload = (
   const detailRows = getNdtRadiographyDetailRows(values);
   const firstDetail = detailRows[0];
   const machineNo = String(firstDetail?.MACHINE_NO ?? "").trim();
-  const uploadMediaPayload = toCasePrepFilesApiPayload(getNdtUploadMedia(values));
+  const uploadMediaPayload = toFileIdListPayload(getNdtUploadMedia(values));
 
   return omitEmpty({
     motorId,
@@ -794,7 +788,7 @@ export const buildNdtMotorDetailPayload = (
         observation: String(row.OBSERVATION ?? "").trim() || undefined,
         sectionNumber: row.SR_NO,
         orientation: String(row.LOCATION ?? "").trim() || undefined,
-        uploadedImages: toCasePrepFilesApiPayload(row.UPLOAD_IMAGE),
+        uploadedImages: toFileIdListPayload(row.UPLOAD_IMAGE),
       }),
     ),
     uploadedVideos: uploadMediaPayload.length ? uploadMediaPayload : undefined,
@@ -854,8 +848,8 @@ export const buildNdtSectionPayload = (
               OBSERVATION_TYPE: row.OBSERVATION_TYPE,
               OBSERVATION: String(row.OBSERVATION ?? "").trim() || undefined,
               LOCATION: String(row.LOCATION ?? "").trim() || undefined,
-              UPLOAD_IMAGE: toCasePrepFilesApiPayload(row.UPLOAD_IMAGE).length
-                ? toCasePrepFilesApiPayload(row.UPLOAD_IMAGE)
+              UPLOAD_IMAGE: toFileIdListPayload(row.UPLOAD_IMAGE).length
+                ? toFileIdListPayload(row.UPLOAD_IMAGE)
                 : undefined,
             }),
           ),
@@ -866,8 +860,8 @@ export const buildNdtSectionPayload = (
       sectionId: QC_NDT_SECTION_IDS.UPLOAD_MEDIA,
       sectionData: [
         omitEmpty({
-          UPLOAD_VIDEO_PHOTO: toCasePrepFilesApiPayload(getNdtUploadMedia(values)).length
-            ? toCasePrepFilesApiPayload(getNdtUploadMedia(values))
+          UPLOAD_VIDEO_PHOTO: toFileIdListPayload(getNdtUploadMedia(values)).length
+            ? toFileIdListPayload(getNdtUploadMedia(values))
             : undefined,
         }),
       ],

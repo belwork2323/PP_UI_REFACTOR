@@ -11,12 +11,7 @@ import {
   toUiTime,
   unwrapMotorSectionPayload,
 } from "./castingCuringFieldCodec";
-import {
-  isCasePrepFileUploadIncomplete,
-  parseCasePrepFileRefs,
-  toCasePrepFilesApiPayload,
-  type CasePrepFileRef,
-} from "./CasePrepMotorDataModel";
+import { isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileRef } from "../common/FileUploadModel";
 
 
 export type CuringOption = { value: string; label: string };
@@ -57,7 +52,7 @@ export type CuringMotorData = {
     DECORING_LOAD: string;
     DECORING_REMARKS: string;
     /** Eager file-service refs (Case Prep / RMS / RMC parity). */
-    DECORING_VISUAL_OBSERVATION: CasePrepFileRef[];
+    DECORING_VISUAL_OBSERVATION: FileRef[];
   };
 };
 
@@ -201,7 +196,7 @@ export const buildCuringSectionsPayload = (data: CuringMotorData): CuringSection
     decoringLoad: toApiNumber(data.DECORING_DETAILS.DECORING_LOAD),
     decoringRemarks: str(data.DECORING_DETAILS.DECORING_REMARKS).trim() || undefined,
     decoringVisualObservation: (() => {
-      const files = toCasePrepFilesApiPayload(
+      const files = toFileIdListPayload(
         data.DECORING_DETAILS.DECORING_VISUAL_OBSERVATION,
       );
       return files.length ? files : undefined;
@@ -302,7 +297,7 @@ export const parseCuringMotorDataFromApi = (source: unknown): CuringMotorData =>
       BUILDING_NO: str(pickField(decor, "buildingNo", "BUILDING_NO") ?? ""),
       DECORING_LOAD: str(pickField(decor, "decoringLoad", "DECORING_LOAD") ?? ""),
       DECORING_REMARKS: str(pickField(decor, "decoringRemarks", "DECORING_REMARKS") ?? ""),
-      DECORING_VISUAL_OBSERVATION: parseCasePrepFileRefs(
+      DECORING_VISUAL_OBSERVATION: parseFileRefs(
         pickField(decor, "decoringVisualObservation", "DECORING_VISUAL_OBSERVATION"),
       ),
     },
@@ -356,12 +351,12 @@ export const applyCuringCycleConfigRows = (
 
 export const collectCastingCuringFileRefsFromMotorData = (
   data: CuringMotorData | null | undefined,
-): CasePrepFileRef[] => data?.DECORING_DETAILS?.DECORING_VISUAL_OBSERVATION ?? [];
+): FileRef[] => data?.DECORING_DETAILS?.DECORING_VISUAL_OBSERVATION ?? [];
 
 export const collectCastingCuringFileRefsFromForm = (form: {
   motors?: Array<{ curingData?: CuringMotorData | null }>;
-}): CasePrepFileRef[] => {
-  const refs: CasePrepFileRef[] = [];
+}): FileRef[] => {
+  const refs: FileRef[] = [];
   for (const motor of form?.motors ?? []) {
     refs.push(...collectCastingCuringFileRefsFromMotorData(motor?.curingData));
   }
@@ -371,7 +366,7 @@ export const collectCastingCuringFileRefsFromForm = (form: {
 export const hasIncompleteCastingCuringUploads = (form: {
   motors?: Array<{ curingData?: CuringMotorData | null }>;
 }): boolean =>
-  collectCastingCuringFileRefsFromForm(form).some(isCasePrepFileUploadIncomplete);
+  collectCastingCuringFileRefsFromForm(form).some(isFileUploadIncomplete);
 
 export const collectTempFileIdsFromCastingCuringForm = (form: {
   motors?: Array<{ curingData?: CuringMotorData | null }>;

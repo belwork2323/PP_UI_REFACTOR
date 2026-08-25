@@ -3,6 +3,7 @@ import { Box } from "@mui/material";
 import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog";
 import WorkflowFormOpeningLoader from "../../../../components/common/WorkflowFormOpeningLoader";
 import UserWorkflowFormHeader from "../../../../components/custom/UserWorkflowFormHeader";
+import { resolveWorkflowFormHeaderStatus } from "../../../../components/custom/workflowFormHeaderStatus";
 import QCDivisionList from "./QCDivisionList";
 import QCForm from "./QCForm";
 import QCDivisionDetailsView from "./QCDivisionDetailsView";
@@ -189,13 +190,17 @@ const QualityControlPage = () => {
                 String(activeBatch.motorId).trim() !== "—"
                   ? String(activeBatch.motorId).trim()
                   : undefined,
-              statusLabel: isEditMode
-                ? STRINGS.QUALITY_CONTROL.FORM_HEADER.EDITING_REJECTED
-                : strings.NEW_LABEL,
-              statusVariant: isEditMode ? "edit" : "new",
-              rejectionReason: activeBatch.rejectionReason,
+              ...(() => {
+                const hs = resolveWorkflowFormHeaderStatus(activeBatch, {
+                  preferredStatusKeys: ["qcStatus"],
+                });
+                return {
+                  statusLabel: hs.statusLabel,
+                  statusVariant: hs.statusVariant,
+                  rejectionReason: hs.rejectionReason,
+                };
+              })(),
             }}
-            isEdit={isEditMode}
             onBack={handleBack}
             backLabel={STRINGS.QUALITY_CONTROL.FORM_HEADER.BACK_TO_LIST}
             rejectionTitle={STRINGS.QUALITY_CONTROL.FORM_HEADER.REJECTION_REASON}

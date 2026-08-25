@@ -14,8 +14,9 @@ import {
 } from "@mui/material";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { SchemaFormValues } from "../../../../../schema-engine";
+import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
 import DateField from "../../../../components/common/DateField";
-import SchemaFileField from "../../../../components/common/SchemaFileField";
+import NdtFileField from "../NDT/NdtFileField";
 import {
   QC_POST_CURE_FIELD_LABELS,
   QC_POST_CURE_GROUP_TITLES,
@@ -33,9 +34,11 @@ import {
 } from "../../../../../hooks/user/qualityControl/qcPostCureConfig";
 import {
   getPostCureField,
+  getPostCureFileField,
   getPostCureLocationRows,
   getPostCureQualificationRows,
   setPostCureField,
+  setPostCureFileField,
   setPostCureLocationRows,
   setPostCureQualificationRows,
 } from "../../../../../hooks/user/qualityControl/qcPostCureTables";
@@ -45,20 +48,19 @@ import {
   qcReadOnlyTableContainerSx,
   qcReadOnlyTableHeaderCellSx,
 } from "./components/QCDivisionReadOnlyValue";
+import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
 
 const BRAND = QC_DIVISION_BRAND;
 const TABLE_BORDER = alpha(BRAND.primary, 0.18);
 const HEADER_CELL_BORDER = alpha("#fff", 0.22);
 
 const TH = {
-  background: `linear-gradient(135deg, ${BRAND.primary}, ${BRAND.primaryLight})`,
-  color: "#fff",
-  fontWeight: 700,
-  fontSize: "0.68rem",
-  letterSpacing: "0.06em",
-  textTransform: "uppercase" as const,
-  padding: "10px 12px",
-  whiteSpace: "nowrap" as const,
+  ...uniformTableHeaderCellSx(BRAND.primary, BRAND.primaryLight, {
+    headerFontSize: "0.68rem",
+    headerLetterSpacing: "0.06em",
+    headerPaddingY: "10px",
+    headerPaddingX: "12px",
+  }),
   border: `1px solid ${HEADER_CELL_BORDER}`,
 };
 
@@ -307,7 +309,11 @@ const QualificationTable = ({
   const bodyCellSx = readOnly ? qcReadOnlyBodyCellSx : cellSx;
   const inputsDisabled = disabled || readOnly;
 
-  const updateCell = (index: number, field: "RESULT" | "QC_REPORT", value: string) => {
+  const updateCell = (
+    index: number,
+    field: "RESULT" | "QC_REPORT",
+    value: string | FileRef[],
+  ) => {
     onChange(
       rows.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row)),
     );
@@ -387,19 +393,17 @@ const QualificationTable = ({
                 </TableCell>
                 {showQcReport ? (
                   <TableCell sx={bodyCellSx}>
-                    {readOnly ? (
-                      <QCDivisionReadOnlyValue
-                        value={row.QC_REPORT}
-                        muted={!String(row.QC_REPORT ?? "").trim()}
-                      />
-                    ) : (
-                      <SchemaFileField
-                        value={row.QC_REPORT ?? ""}
-                        onChange={(next) => updateCell(index, "QC_REPORT", next)}
-                        disabled={inputsDisabled}
-                        emptyLabel="Upload"
-                      />
-                    )}
+                    <NdtFileField
+                      files={Array.isArray(row.QC_REPORT) ? row.QC_REPORT : []}
+                      onChange={(next) => updateCell(index, "QC_REPORT", next)}
+                      disabled={inputsDisabled}
+                      readOnly={readOnly}
+                      multiple={false}
+                      acceptMode="pdf"
+                      subDeptSlug="qc-division"
+                      compact
+                      emptyLabel="Upload"
+                    />
                   </TableCell>
                 ) : null}
               </TableRow>
@@ -466,21 +470,27 @@ const DateOrReadOnly = ({
   );
 
 const FileOrReadOnly = ({
-  value,
+  files,
   onChange,
   readOnly,
   disabled,
 }: {
-  value: string;
-  onChange: (next: string) => void;
+  files: FileRef[];
+  onChange: (next: FileRef[]) => void;
   readOnly: boolean;
   disabled: boolean;
-}) =>
-  readOnly ? (
-    <QCDivisionReadOnlyValue value={value} muted={!value.trim()} />
-  ) : (
-    <SchemaFileField value={value} onChange={onChange} disabled={disabled} emptyLabel="Upload" />
-  );
+}) => (
+  <NdtFileField
+    files={files}
+    onChange={onChange}
+    disabled={disabled}
+    readOnly={readOnly}
+    multiple={false}
+    acceptMode="pdf"
+    subDeptSlug="qc-division"
+    emptyLabel="Upload"
+  />
+);
 
 type QCPostCureMotorPanelProps = {
   motorId?: string | null;
@@ -677,9 +687,9 @@ const QCPostCureMotorPanel = ({
 
               <FieldRow label={QC_POST_CURE_FIELD_LABELS.LF_EPOXY_QC_REPORT} readOnly={readOnly}>
                 <FileOrReadOnly
-                  value={getPostCureField(values, looseSection, "LF_EPOXY_QC_REPORT")}
+                  files={getPostCureFileField(values, looseSection, "LF_EPOXY_QC_REPORT")}
                   onChange={(next) =>
-                    onChange(setPostCureField(values, looseSection, "LF_EPOXY_QC_REPORT", next))
+                    onChange(setPostCureFileField(values, looseSection, "LF_EPOXY_QC_REPORT", next))
                   }
                   readOnly={readOnly}
                   disabled={inputsDisabled}
@@ -770,9 +780,9 @@ const QCPostCureMotorPanel = ({
 
                 <FieldRow label={QC_POST_CURE_FIELD_LABELS.IR1_QC_REPORT} readOnly={readOnly}>
                   <FileOrReadOnly
-                    value={getPostCureField(values, ir1Section, "IR1_QC_REPORT")}
+                    files={getPostCureFileField(values, ir1Section, "IR1_QC_REPORT")}
                     onChange={(next) =>
-                      onChange(setPostCureField(values, ir1Section, "IR1_QC_REPORT", next))
+                      onChange(setPostCureFileField(values, ir1Section, "IR1_QC_REPORT", next))
                     }
                     readOnly={readOnly}
                     disabled={inputsDisabled}

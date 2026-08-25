@@ -1,10 +1,14 @@
 import UserWorkflowFormHeader from "../../../../components/custom/UserWorkflowFormHeader";
+import { resolveWorkflowFormHeaderStatus } from "../../../../components/custom/workflowFormHeaderStatus";
 import { STRINGS } from "../../../../../app/config/strings";
 
 const S = STRINGS.MANUFACTURING;
 
-const MixingHeader = ({ batch, isEdit, onBack, theme }: any) => {
+const MixingHeader = ({ batch, onBack, theme }: any) => {
   const motorId = String(batch?.motorId ?? "").trim();
+  const headerStatus = resolveWorkflowFormHeaderStatus(batch, {
+    preferredStatusKeys: ["mxStatus"],
+  });
 
   return (
     <UserWorkflowFormHeader
@@ -12,9 +16,9 @@ const MixingHeader = ({ batch, isEdit, onBack, theme }: any) => {
       data={{
         title: String(batch?.batchId ?? batch?.lotId ?? "—"),
         subtitle: motorId && motorId !== "—" ? motorId : undefined,
-        statusLabel: isEdit ? S.FORM_HEADER.EDITING_REJECTED : S.MIXING.NEW_LABEL,
-        statusVariant: isEdit ? "edit" : "new",
-        rejectionReason: batch?.rejectionReason,
+        statusLabel: headerStatus.statusLabel,
+        statusVariant: headerStatus.statusVariant,
+        rejectionReason: headerStatus.rejectionReason,
       }}
       onBack={onBack}
       backLabel={S.FORM_HEADER.BACK_TO_LIST}

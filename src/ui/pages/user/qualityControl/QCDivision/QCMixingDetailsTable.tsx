@@ -31,6 +31,7 @@ import {
   qcReadOnlyTableContainerSx,
   qcReadOnlyTableHeaderCellSx,
 } from "./components/QCDivisionReadOnlyValue";
+import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 const BRAND = QC_DIVISION_BRAND;
@@ -62,14 +63,12 @@ const tableDateFieldSx = {
 };
 
 const TH = {
-  background: `linear-gradient(135deg, ${BRAND.primary}, ${BRAND.primaryLight})`,
-  color: "#fff",
-  fontWeight: 700,
-  fontSize: "0.68rem",
-  letterSpacing: "0.06em",
-  textTransform: "uppercase" as const,
-  padding: "10px 12px",
-  whiteSpace: "nowrap" as const,
+  ...uniformTableHeaderCellSx(BRAND.primary, BRAND.primaryLight, {
+    headerFontSize: "0.68rem",
+    headerLetterSpacing: "0.06em",
+    headerPaddingY: "10px",
+    headerPaddingX: "12px",
+  }),
   border: `1px solid ${HEADER_CELL_BORDER}`,
 };
 

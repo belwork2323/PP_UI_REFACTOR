@@ -1,4 +1,5 @@
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import { isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileIdPayload, type FileRef } from "../../../data/models/common/FileUploadModel";
 
 export const QC_REVALIDATION_SECTION_ID = "RAW_MATERIAL_DETAILS";
 export const QC_REVALIDATION_TABLE_ID = "RAW_MATERIAL_DETAILS";
@@ -31,7 +32,7 @@ export type QcRevalidationRow = {
   ACEM_QC_RESULT?: string;
   VALIDITY?: string;
   REMARKS?: string;
-  QC_CERTIFICATE?: string;
+  QC_CERTIFICATE?: FileRef[];
   _rowRole?: "picker" | "expanded";
   _groupId?: string;
   [key: string]: unknown;
@@ -47,7 +48,7 @@ export const createEmptyRevalidationPickerRow = (srNo = 1): QcRevalidationRow =>
   ACEM_QC_RESULT: "",
   VALIDITY: "",
   REMARKS: "",
-  QC_CERTIFICATE: "",
+  QC_CERTIFICATE: [],
   _rowRole: "picker",
 });
 
@@ -135,13 +136,8 @@ export const buildRevalidationSectionPayload = (
   ];
 };
 
-const normalizeCertificateList = (value: unknown): string[] => {
-  if (Array.isArray(value)) {
-    return value.map((item) => String(item ?? "").trim()).filter(Boolean);
-  }
-  const single = String(value ?? "").trim();
-  return single ? [single] : [];
-};
+const normalizeCertificateList = (value: unknown): FileIdPayload[] =>
+  toFileIdListPayload(value);
 
 /**
  * Create/update payload shape:
@@ -159,7 +155,7 @@ export const buildRevalidationMaterialsPayload = (
     result: string;
     validity: string;
     remarks: string;
-    qcCertificate: string[];
+    qcCertificate: FileIdPayload[];
   }>;
 }> => {
   const rows = getRevalidationRows(values)
@@ -175,7 +171,7 @@ export const buildRevalidationMaterialsPayload = (
       result: string;
       validity: string;
       remarks: string;
-      qcCertificate: string[];
+      qcCertificate: FileIdPayload[];
     }>
   >();
 
@@ -222,7 +218,7 @@ const extractRowsFromSectionData = (sectionData: unknown): QcRevalidationRow[] =
             const rowCert = readQcCertificateValue(record);
             return {
               ...(row as QcRevalidationRow),
-              QC_CERTIFICATE: rowCert || tableCertificate,
+              QC_CERTIFICATE: rowCert.length ? rowCert : tableCertificate,
             };
           });
       }
@@ -287,7 +283,7 @@ export const expandRevalidationIngredient = (
     ACEM_QC_RESULT: "",
     VALIDITY: "",
     REMARKS: "",
-    QC_CERTIFICATE: "",
+    QC_CERTIFICATE: [],
     _rowRole: "expanded" as const,
     _groupId: groupId,
   }));
@@ -346,58 +342,33 @@ const readAcemQcResult = (record: Record<string, unknown>): string =>
       "",
   ).trim();
 
-const fileNameFromCertificateEntry = (entry: unknown): string => {
-  if (typeof entry === "string") return entry.trim();
-  const record = asRecord(entry);
-  if (!record) return "";
-  const direct = String(
-    record.fileName ??
-      record.filename ??
-      record.name ??
-      record.originalFileName ??
-      record.originalName ??
-      "",
-  ).trim();
-  if (direct) return direct;
-  const url = String(record.fileUrl ?? record.url ?? record.path ?? "").trim();
-  if (!url) return "";
-  try {
-    const path = url.includes("://") ? new URL(url).pathname : url;
-    const segment = path.split("/").filter(Boolean).pop() ?? "";
-    return decodeURIComponent(segment).trim();
-  } catch {
-    return url.split("/").filter(Boolean).pop()?.trim() ?? "";
-  }
-};
-
-/** Map API `certificates` / `QC_CERTIFICATE` into SchemaFileField's comma-separated names. */
-export const readQcCertificateValue = (record: Record<string, unknown> | null | undefined): string => {
-  if (!record) return "";
-  const direct = String(record.QC_CERTIFICATE ?? record.qcCertificate ?? "").trim();
-  if (direct) return direct;
+/** Map API `certificates` / `QC_CERTIFICATE` into FileRef lists. */
+export const readQcCertificateValue = (
+  record: Record<string, unknown> | null | undefined,
+): FileRef[] => {
+  if (!record) return [];
+  const direct = parseFileRefs(
+    record.QC_CERTIFICATE ?? record.qcCertificate ?? record.certificates ?? record.Certificates,
+  );
+  if (direct.length) return direct;
 
   const certs =
-    record.certificates ??
-    record.Certificates ??
     record.QC_CERTIFICATES ??
     record.qcCertificates ??
     record.certificate;
 
-  if (Array.isArray(certs)) {
-    return certs.map(fileNameFromCertificateEntry).filter(Boolean).join(", ");
-  }
-  return fileNameFromCertificateEntry(certs);
+  return parseFileRefs(certs);
 };
 
 /** Prefer a non-empty certificate already found for the group; otherwise read from the row. */
 const syncGroupCertificates = (rows: QcRevalidationRow[]): QcRevalidationRow[] => {
-  const certByGroup = new Map<string, string>();
+  const certByGroup = new Map<string, FileRef[]>();
   for (const row of rows) {
     if (row._rowRole !== "expanded") continue;
     const groupId = String(row._groupId ?? "");
     if (!groupId || certByGroup.has(groupId)) continue;
     const cert = readQcCertificateValue(row);
-    if (cert) certByGroup.set(groupId, cert);
+    if (cert.length) certByGroup.set(groupId, cert);
   }
   return rows.map((row) => {
     if (row._rowRole !== "expanded") return row;
@@ -490,10 +461,13 @@ const extractRowsFromMaterials = (materials: unknown[]): QcRevalidationRow[] => 
             RESULT: String(
               specRec.result ?? specRec.RESULT ?? specRec.analysedResult ?? row.RESULT ?? "",
             ).trim(),
-            QC_CERTIFICATE:
-              row.QC_CERTIFICATE ||
-              readQcCertificateValue(specRec) ||
-              materialCertificate,
+            QC_CERTIFICATE: (() => {
+              const fromRow = Array.isArray(row.QC_CERTIFICATE) ? row.QC_CERTIFICATE : [];
+              if (fromRow.length) return fromRow;
+              const fromSpec = readQcCertificateValue(specRec);
+              if (fromSpec.length) return fromSpec;
+              return materialCertificate;
+            })(),
           };
         }),
       );
@@ -738,7 +712,7 @@ export const buildRevalidationValuesFromDivisionDetails = async (
           ACEM_QC_RESULT: "",
           VALIDITY: "",
           REMARKS: "",
-          QC_CERTIFICATE: "",
+          QC_CERTIFICATE: [],
           _rowRole: "expanded",
           _groupId: groupId,
         });
@@ -750,4 +724,36 @@ export const buildRevalidationValuesFromDivisionDetails = async (
 
   return wrapExpandedRows(expanded) ?? createInitialRevalidationSchemaValues();
 };
+
+export const collectRevalidationFileRefsFromQcValues = (
+  values: SchemaFormValues | null | undefined,
+): FileRef[] => {
+  const refs: FileRef[] = [];
+  const seenGroups = new Set<string>();
+  for (const row of getRevalidationRows(values)) {
+    const groupId = String(row._groupId ?? "");
+    if (groupId) {
+      if (seenGroups.has(groupId)) continue;
+      seenGroups.add(groupId);
+    }
+    refs.push(...(Array.isArray(row.QC_CERTIFICATE) ? row.QC_CERTIFICATE : []));
+  }
+  return refs;
+};
+
+export const hasIncompleteQcRevalidationUploads = (
+  values: SchemaFormValues | null | undefined,
+): boolean => collectRevalidationFileRefsFromQcValues(values).some(isFileUploadIncomplete);
+
+export const collectTempFileIdsFromQcRevalidationValues = (
+  values: SchemaFormValues | null | undefined,
+): string[] =>
+  [
+    ...new Set(
+      collectRevalidationFileRefsFromQcValues(values)
+        .filter((ref) => ref.isTemp !== false)
+        .map((ref) => String(ref.fileId ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
 

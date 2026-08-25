@@ -29,7 +29,7 @@ import {
   type StfMotorSubmissionStatus,
   type StfMotorSubmissionType,
 } from "../../../data/models/user/StaticTestFacilityFormModel";
-import { buildStfMotorStaticTestingDetails, type StfMotorData } from "../../../data/models/user/StfMotorDataModel";
+import { buildStfMotorStaticTestingDetails, type StfMotorData, collectTempFileIdsFromStfForm, hasIncompleteStfUploads } from "../../../data/models/user/StfMotorDataModel";
 import { normalizeSubdepartmentBatchStatus } from "../../../data/models/user/SubdepartmentBatchModel";
 import {
   mapStfSubType,
@@ -1133,6 +1133,7 @@ export const useBaseStaticTestFacility = ({
       initialSnapshot: initialSnapshotRef.current,
       currentState: snapshotStateRef.current,
       deleteTemp,
+      extractTempFileIds: collectTempFileIdsFromStfForm,
       resetForm: () => {
         bumpBatchRefresh();
         resetFormContext();
@@ -1142,8 +1143,13 @@ export const useBaseStaticTestFacility = ({
 
   // Submit Logic
   const submitForm = async (intent: "draft" | "submit") => {
-    if (facilityType !== "OTHER_BEM" && !subDepartmentId) {
+    if (!subDepartmentId) {
       showAlert(messages.SUB_DEPARTMENT_MISSING, "error");
+      return false;
+    }
+
+    if (hasIncompleteStfUploads(formData)) {
+      showAlert(messages.FILE_UPLOAD_PENDING, "warning");
       return false;
     }
 
@@ -1170,6 +1176,7 @@ export const useBaseStaticTestFacility = ({
         // Structure single motor inside an array to match the backend payload schema
         const bemMotorsPayload = {
           motorId: bemNo as string,
+          subDepartmentId,
           subType: "BEM",
           stfTestNo: stfNo,
           staticTestingDetails,
@@ -1347,6 +1354,11 @@ export const useBaseStaticTestFacility = ({
 
       const motor = (formData.motors ?? []).find((entry) => entry.motorId === motorId);
       if (!motor) return false;
+
+      if (hasIncompleteStfUploads({ motors: [motor] })) {
+        showAlert(messages.FILE_UPLOAD_PENDING, "warning");
+        return false;
+      }
 
       const subType = motor.subType;
       if (!motor.formLoaded) {

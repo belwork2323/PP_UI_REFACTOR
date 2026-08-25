@@ -1,5 +1,6 @@
 import React, { useMemo } from "react";
 import UserWorkflowFormHeader from "../../../../components/custom/UserWorkflowFormHeader";
+import { resolveWorkflowFormHeaderStatus } from "../../../../components/custom/workflowFormHeaderStatus";
 import { STRINGS } from "../../../../../app/config/strings";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import { getManufacturingTheme } from "../../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
@@ -8,14 +9,17 @@ const S = STRINGS.MANUFACTURING;
 
 type Props = {
   batch: any;
-  isEdit: boolean;
+  isEdit?: boolean;
   onBack: () => void;
 };
 
-const CastingAndCuringHeader: React.FC<Props> = ({ batch, isEdit, onBack }) => {
+const CastingAndCuringHeader: React.FC<Props> = ({ batch, onBack }) => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getManufacturingTheme(mode), [mode]);
   const motorId = String(batch?.motorId ?? "").trim();
+  const headerStatus = resolveWorkflowFormHeaderStatus(batch, {
+    preferredStatusKeys: ["ccStatus"],
+  });
 
   return (
     <UserWorkflowFormHeader
@@ -23,9 +27,9 @@ const CastingAndCuringHeader: React.FC<Props> = ({ batch, isEdit, onBack }) => {
       data={{
         title: String(batch?.batchId ?? batch?.lotId ?? "—"),
         subtitle: motorId && motorId !== "—" ? motorId : undefined,
-        statusLabel: isEdit ? S.FORM_HEADER.EDITING_REJECTED : S.CASTING_CURING.NEW_LABEL,
-        statusVariant: isEdit ? "edit" : "new",
-        rejectionReason: batch?.rejectionReason,
+        statusLabel: headerStatus.statusLabel,
+        statusVariant: headerStatus.statusVariant,
+        rejectionReason: headerStatus.rejectionReason,
       }}
       onBack={onBack}
       backLabel={S.FORM_HEADER.BACK_TO_LIST}

@@ -21,10 +21,7 @@ import getQualityControlTheme from "../../../../../../app/theme/custom_themes/us
 import { getNdtTheme } from "../../../../../../app/theme/custom_themes/user/qualityControl/ndt_theme";
 import { STRINGS } from "../../../../../../app/config/strings";
 import { formatCasePrepCellValue } from "../../../../../../data/models/user/CasePreparationFormModel";
-import {
-  parseCasePrepFileRefs,
-  type CasePrepFileRef,
-} from "../../../../../../data/models/user/CasePrepMotorDataModel";
+import { parseFileRefs, type FileRef } from "../../../../../../data/models/common/FileUploadModel";
 import type { NDTDetailView, NDTMotorDetailView } from "../../../../../../data/models/user/NDTFormModel";
 import { NDT_FLOW_LABELS } from "../../../../../../hooks/user/qualityControl/ndtFlowConfig";
 import { NDT_ORIENTATION_OPTIONS } from "../../../../../../hooks/user/qualityControl/ndtApiMappings";
@@ -96,7 +93,7 @@ const NdtFileLinks = ({
   subDepartmentId,
   onOpen,
 }: {
-  refs: CasePrepFileRef[];
+  refs: FileRef[];
   subDepartmentId?: number;
   onOpen: (fileId: string, fileName: string) => void;
 }) => {
@@ -155,7 +152,7 @@ const NdtCellValue = ({
   if (looksLikeNdtFiles(value)) {
     return (
       <NdtFileLinks
-        refs={parseCasePrepFileRefs(value)}
+        refs={parseFileRefs(value)}
         subDepartmentId={subDepartmentId}
         onOpen={onOpen}
       />

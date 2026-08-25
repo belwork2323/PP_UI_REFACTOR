@@ -73,8 +73,6 @@ export type LotCertificate = {
 
 export type RawMaterialCertificateApiPayload = {
   fileId: string;
-  fileName: string;
-  mimeType: string;
   certificateType: string;
 };
 
@@ -850,8 +848,6 @@ export function mapCertificateToApiPayload(
   if (!fileId) return null;
   return {
     fileId,
-    fileName: String(cert.fileName ?? "").trim(),
-    mimeType: String(cert.mimeType ?? "").trim() || "application/octet-stream",
     certificateType: String(cert.certificateType ?? "").trim(),
   };
 }

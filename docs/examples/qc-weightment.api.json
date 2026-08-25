@@ -120,6 +120,21 @@
             ]
           }
         ]
+      },
+      {
+        "id": "ATTACHMENTS",
+        "title": "Attachments",
+        "ui": { "variant": "card", "padding": "md" },
+        "children": [
+          {
+            "type": "field",
+            "id": "UPLOAD_REPORT",
+            "fieldType": "file",
+            "label": "Upload Report",
+            "multiple": true,
+            "description": "Upload via /files/upload; submit as [{ fileId }]"
+          }
+        ]
       }
     ]
   }

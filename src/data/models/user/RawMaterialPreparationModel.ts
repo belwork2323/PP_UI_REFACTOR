@@ -50,6 +50,18 @@ export const isPremixLocked = (status: PremixSubmissionStatus | undefined): bool
 export const isPremixEditable = (status: PremixSubmissionStatus | undefined): boolean =>
   !status || status === "TO_BE_INITIATED" || status === "IN_PROGRESS" || status === "REJECTED";
 
+/**
+ * Weightment is shared across premixes. Lock it once any premix is submitted for
+ * approval or already approved; keep editable while all are still draftable.
+ */
+export const isWeightmentSheetEditable = (
+  premixStatusByNo: Record<number, PremixStatusMeta> | undefined | null,
+): boolean => {
+  const statuses = Object.values(premixStatusByNo ?? {});
+  if (statuses.length === 0) return true;
+  return statuses.every((meta) => isPremixEditable(meta?.premixSubmissionStatus));
+};
+
 /** True once any premix has been saved (draft/submit) — list `formId` may exist earlier. */
 export const hasRawMaterialPrepPersistedData = (
   premixStatusByNo: Record<number, PremixStatusMeta> | undefined | null,
@@ -226,6 +238,16 @@ const formatDateTimeLocal = (value: unknown): string => {
   return raw;
 };
 
+/** Opt-in flags must be explicit true — avoid Boolean("false") / truthy junk from API. */
+const parseOptInFlag = (value: unknown): boolean => {
+  if (value === true || value === 1) return true;
+  if (typeof value === "string") {
+    const normalized = value.trim().toLowerCase();
+    return normalized === "true" || normalized === "1" || normalized === "yes";
+  }
+  return false;
+};
+
 const unwrapApiScalar = (value: unknown): unknown => {
   if (value && typeof value === "object" && !Array.isArray(value)) {
     const obj = value as Record<string, unknown>;
@@ -265,8 +287,8 @@ export const mapWeightmentSheetFromApi = (value: unknown): RawMaterialPrepWeight
       mapWeightmentDetailFromApi(row as Record<string, unknown>),
     ),
     validation: {
-      compareWithIdentificationSheet: Boolean(validation.compareWithIdentificationSheet),
-      deviationFound: Boolean(validation.deviationFound),
+      compareWithIdentificationSheet: parseOptInFlag(validation.compareWithIdentificationSheet),
+      deviationFound: parseOptInFlag(validation.deviationFound),
       deviationMessage: String(validation.deviationMessage ?? ""),
     },
   };

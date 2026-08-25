@@ -31,6 +31,131 @@ export type FileDownloadData = {
   base64Content?: string;
 };
 
+/** Form-state file ref after /files/upload (name/url/mime kept for UI; submit sends fileId only). */
+export type FileRef = {
+  fileName: string;
+  fileUrl: string;
+  mimeType?: string;
+  storedFileName?: string;
+  originalFileName?: string;
+  fileId?: string | null;
+  localId?: string;
+  status?: FileAttachmentStatus;
+  uploadProgress?: number;
+  isTemp?: boolean;
+  file?: File | null;
+};
+
+/** Create/update API file field — id only; backend returns metadata on form details. */
+export type FileIdPayload = {
+  fileId: string;
+};
+
+export const newFileLocalId = (): string =>
+  `file-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
+
+export const isFileUploadIncomplete = (ref: FileRef | null | undefined): boolean =>
+  ref?.status === "uploading" || ref?.status === "failed";
+
+export const isFileReady = (ref: FileRef | null | undefined): boolean => {
+  if (!ref || isFileUploadIncomplete(ref)) return false;
+  const fileId = String(ref.fileId ?? "").trim();
+  if (fileId) return true;
+  const url = String(ref.fileUrl ?? "").trim();
+  return Boolean(url) && !/^pending-upload:\/\//i.test(url);
+};
+
+export const parseFileRef = (value: unknown): FileRef | null => {
+  if (value == null) return null;
+  if (typeof value === "string") {
+    const fileName = value.trim();
+    if (!fileName) return null;
+    // Legacy filename-only values — not openable without fileId.
+    return {
+      fileName,
+      fileUrl: "",
+      mimeType: "application/octet-stream",
+      localId: newFileLocalId(),
+      status: "uploaded",
+      isTemp: false,
+      file: null,
+    };
+  }
+  if (typeof value !== "object") return null;
+  const o = value as Record<string, unknown>;
+  const fileId = String(o.fileId ?? "").trim() || null;
+  const fileUrl = String(o.fileUrl ?? o.filePath ?? o.downloadUrl ?? fileId ?? "").trim();
+  const fileName =
+    String(o.fileName ?? o.originalFileName ?? o.name ?? "").trim() ||
+    String(fileUrl.split("/").pop() || "").trim();
+  if (!fileId && !fileName && !fileUrl) return null;
+  return {
+    fileName: fileName || "file",
+    fileUrl: fileUrl || fileId || "",
+    mimeType: String(o.mimeType ?? "").trim() || "application/octet-stream",
+    storedFileName: String(o.storedFileName ?? "").trim() || undefined,
+    originalFileName: String(o.originalFileName ?? "").trim() || undefined,
+    fileId,
+    localId: newFileLocalId(),
+    status: "uploaded",
+    isTemp: false,
+    file: null,
+  };
+};
+
+export const parseFileRefs = (value: unknown): FileRef[] => {
+  if (value == null || value === "") return [];
+  if (typeof value === "string") {
+    return value
+      .split(",")
+      .map((part) => parseFileRef(part.trim()))
+      .filter((r): r is FileRef => Boolean(r));
+  }
+  if (Array.isArray(value)) {
+    return value.map(parseFileRef).filter((r): r is FileRef => Boolean(r));
+  }
+  const single = parseFileRef(value);
+  return single ? [single] : [];
+};
+
+export const toFileIdPayload = (ref: FileRef): FileIdPayload | null => {
+  if (!ref || ref.status === "uploading" || ref.status === "failed") return null;
+  const fileId = String(ref.fileId ?? "").trim();
+  if (!fileId) return null;
+  return { fileId };
+};
+
+/**
+ * Create/update attachments from current form refs only.
+ * Files removed in the UI are omitted; the server deletes those fileIds on save.
+ * Temp delete API is only for unsaved uploads (see useFileService.removeStoredFile).
+ */
+export const fileIdsFromFormRefs = (refs: FileRef[] | null | undefined): FileIdPayload[] => {
+  if (!Array.isArray(refs) || refs.length === 0) return [];
+  return refs.map(toFileIdPayload).filter((p): p is FileIdPayload => Boolean(p));
+};
+
+export const toFileIdListPayload = (value: unknown): FileIdPayload[] => {
+  const refs = Array.isArray(value)
+    ? (value as FileRef[])
+    : value
+      ? parseFileRefs(value)
+      : [];
+  return fileIdsFromFormRefs(refs);
+};
+
+export const toFileIdPayloadOrNull = (value: unknown): FileIdPayload | null => {
+  if (value == null) return null;
+  if (Array.isArray(value)) {
+    return toFileIdListPayload(value)[0] ?? null;
+  }
+  if (typeof value === "object" && value !== null && "fileName" in (value as object)) {
+    return toFileIdPayload(value as FileRef);
+  }
+  const refs = parseFileRefs(value);
+  return refs[0] ? toFileIdPayload(refs[0]) : null;
+};
+
 export function extractUploadedFileId(payload: unknown): string {
   if (!payload || typeof payload !== "object") return "";
   const root = payload as Record<string, unknown>;

@@ -2,14 +2,17 @@ import { Chip } from "@mui/material";
 import { STRINGS } from "../../../../../app/config/strings";
 import { getBatchScaleLabel } from "../../../../../hooks/user/manufacturing/rawMaterialPrepFlowConfig";
 import UserWorkflowFormHeader from "../../../../components/custom/UserWorkflowFormHeader";
+import { resolveWorkflowFormHeaderStatus } from "../../../../components/custom/workflowFormHeaderStatus";
 
-const RM = STRINGS.MANUFACTURING.RAW_MATERIAL_PREP;
 const S = STRINGS.MANUFACTURING;
 
-const RawMaterialPreparationHeader = ({ batch, isEdit, onBack, theme }: any) => {
+const RawMaterialPreparationHeader = ({ batch, onBack, theme }: any) => {
   const rmTheme = theme.manufacturing.rawMaterialPrep;
   const scaleLabel = getBatchScaleLabel(batch.batchType);
   const motorId = String(batch.motorId ?? "").trim();
+  const headerStatus = resolveWorkflowFormHeaderStatus(batch, {
+    preferredStatusKeys: ["rmStatus"],
+  });
 
   return (
     <UserWorkflowFormHeader
@@ -17,9 +20,9 @@ const RawMaterialPreparationHeader = ({ batch, isEdit, onBack, theme }: any) => 
       data={{
         title: String(batch.batchId ?? batch.lotId ?? "—"),
         subtitle: motorId && motorId !== "—" ? motorId : undefined,
-        statusLabel: isEdit ? S.FORM_HEADER.EDITING_REJECTED : RM.NEW_LABEL,
-        statusVariant: isEdit ? "edit" : "new",
-        rejectionReason: batch.rejectionReason,
+        statusLabel: headerStatus.statusLabel,
+        statusVariant: headerStatus.statusVariant,
+        rejectionReason: headerStatus.rejectionReason,
         extraChips: batch.batchType ? (
           <Chip label={scaleLabel} size="small" sx={rmTheme.header.scaleChip(theme.palette.primary)} />
         ) : null,

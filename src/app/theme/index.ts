@@ -15,6 +15,11 @@ import layout from "./layout";
 
 export { getTokens, getAccents } from "./tokens";
 export type { ThemeMode, SemanticTokens, AccentTokens } from "./tokens";
+export { createDataTableTheme, uniformTableHeaderCellSx } from "./custom_themes/shared/data_table_theme";
+export type {
+	DataTableThemePalette,
+	DataTableThemeOptions,
+} from "./custom_themes/shared/data_table_theme";
 export {
 	APPROVER_PRIORITY_META,
 	APPROVER_STATUS_META,

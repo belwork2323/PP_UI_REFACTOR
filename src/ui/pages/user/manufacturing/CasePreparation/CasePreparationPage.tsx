@@ -1,7 +1,7 @@
 // src/ui/pages/user/manufacturing/CasePreparation/CasePreparationPage.tsx
 
 import React, { useMemo, useState } from "react";
-import { Box, Button, Stack } from "@mui/material";
+import { Box, Button, CircularProgress, Stack } from "@mui/material";
 import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog";
 import WorkflowFormOpeningLoader from "../../../../components/common/WorkflowFormOpeningLoader";
 import CasePrepList from "./CasePreparationList";
@@ -62,11 +62,14 @@ const CasePreparationPage = () => {
 
   const listLoading = loading && !loadingFormDetails && view === "list";
   const isSubscale = isSubscaleBatch(activeBatch?.batchType);
+  // Full-page opener only when leaving the list / first open — not on draft refresh.
+  const showFullPageLoader =
+    listLoading || (Boolean(loadingFormDetails) && view !== "form");
 
   return (
     <Box sx={theme.workflow.animatedContainer}>
       <WorkflowFormOpeningLoader
-        open={listLoading || Boolean(loadingFormDetails)}
+        open={showFullPageLoader}
         title={loadingFormDetails ? S.FORM_OPENING_TITLE : S.TITLE}
         message={loadingFormDetails ? S.FORM_OPENING_MESSAGE : "Loading case preparation batches…"}
         color={CASE_PREP_BRAND.cp}
@@ -84,8 +87,21 @@ const CasePreparationPage = () => {
         />
       )}
 
-      {view === "form" && activeBatch && !loadingFormDetails && (
+      {view === "form" && activeBatch && (
         <>
+          {actionLoading ? (
+            <Box
+              sx={{
+                display: "flex",
+                justifyContent: "center",
+                alignItems: "center",
+                py: 1.5,
+                mb: 1,
+              }}
+            >
+              <CircularProgress size={28} sx={{ color: CASE_PREP_BRAND.cp }} />
+            </Box>
+          ) : null}
           <CasePreparationHeader
             batch={activeBatch}
             isEdit={isEditMode}

@@ -28,10 +28,7 @@ import {
   type CasePrepMotorDetailView,
   type CasePreparationDetailView,
 } from "../../../../../../data/models/user/CasePreparationFormModel";
-import {
-  parseCasePrepFileRefs,
-  type CasePrepFileRef,
-} from "../../../../../../data/models/user/CasePrepMotorDataModel";
+import { parseFileRefs, type FileRef } from "../../../../../../data/models/common/FileUploadModel";
 import { useFilePreview } from "../../../../../../hooks/useFilePreview";
 import FilePreviewDialog from "../../../../../components/common/FilePreviewDialog";
 import {
@@ -77,7 +74,7 @@ const CasePrepFileLinks = ({
   subDepartmentId,
   onOpen,
 }: {
-  refs: CasePrepFileRef[];
+  refs: FileRef[];
   subDepartmentId?: number;
   onOpen: (fileId: string, fileName: string) => void;
 }) => {
@@ -136,7 +133,7 @@ const CasePrepCellValue = ({
   if (looksLikeCasePrepFiles(value)) {
     return (
       <CasePrepFileLinks
-        refs={parseCasePrepFileRefs(value)}
+        refs={parseFileRefs(value)}
         subDepartmentId={subDepartmentId}
         onOpen={onOpen}
       />

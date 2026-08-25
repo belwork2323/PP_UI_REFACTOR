@@ -6,6 +6,14 @@ import {
   toApiDate,
   toUiDate,
 } from "./castingCuringFieldCodec";
+import {
+  isFileUploadIncomplete,
+  parseFileRefs,
+  toFileIdListPayload,
+  toFileIdPayloadOrNull,
+  type FileIdPayload,
+  type FileRef,
+} from "../common/FileUploadModel";
 import type { DispatchMotorSetup } from "./DispatchFormModel";
 
 export type DispatchTableRowKind = "header" | "data";
@@ -62,11 +70,11 @@ export type DispatchMotorData = {
     NITROGEN_GAS_PURGING: string;
     NITROGEN_PURGING_PRESSURE: string;
     LABELLING_OF_MOTOR: string;
-    DISPATCH_PHOTOS: string;
+    DISPATCH_PHOTOS: FileRef[];
   };
   SAFETY_CLEARANCE: {
     SAFETY_CLEARANCE_STATUS: string;
-    CLEARANCE_CERTIFICATE: string;
+    CLEARANCE_CERTIFICATE: FileRef[];
   };
   DISPATCH_TEAM: {
     QA_REPRESENTATIVE: string;
@@ -157,11 +165,11 @@ export const createEmptyDispatchMotorData = (): DispatchMotorData => ({
     NITROGEN_GAS_PURGING: "",
     NITROGEN_PURGING_PRESSURE: "",
     LABELLING_OF_MOTOR: "",
-    DISPATCH_PHOTOS: "",
+    DISPATCH_PHOTOS: [],
   },
   SAFETY_CLEARANCE: {
     SAFETY_CLEARANCE_STATUS: "NO",
-    CLEARANCE_CERTIFICATE: "",
+    CLEARANCE_CERTIFICATE: [],
   },
   DISPATCH_TEAM: {
     QA_REPRESENTATIVE: "",
@@ -402,13 +410,13 @@ export const parseDispatchMotorDataFromApi = (
       NITROGEN_GAS_PURGING: packing.nitrogenPurging,
       NITROGEN_PURGING_PRESSURE: packing.nitrogenPressure,
       LABELLING_OF_MOTOR: packing.labelling,
-      DISPATCH_PHOTOS: toFilePathValue(details.uploadDispatchPhotos),
+      DISPATCH_PHOTOS: parseFileRefs(details.uploadDispatchPhotos),
     },
     SAFETY_CLEARANCE: {
       SAFETY_CLEARANCE_STATUS: str(
         pickField(safety, "accorded", "SAFETY_CLEARANCE_STATUS") || "NO",
       ),
-      CLEARANCE_CERTIFICATE: toFilePathValue(
+      CLEARANCE_CERTIFICATE: parseFileRefs(
         pickField(safety, "clearanceCertificate", "CLEARANCE_CERTIFICATE"),
       ),
     },
@@ -510,8 +518,8 @@ export type DispatchDetailsApiPayload = {
   rocketMotorInspection?: unknown[];
   vehicleDetails?: unknown[];
   rocketMotorPackingDetails?: unknown[];
-  uploadDispatchPhotos?: string[];
-  safetyClearance?: { accorded: string; clearanceCertificate?: string };
+  uploadDispatchPhotos?: FileIdPayload[];
+  safetyClearance?: { accorded: string; clearanceCertificate?: FileIdPayload };
   dispatchTeam?: {
     qaRepresentative?: string;
     safetyRepresentative?: string;
@@ -564,10 +572,10 @@ export const buildDispatchMotorDetailsPayload = (
       ...buildObservationApiRows(packing.tableRows, "NOMENCLATURE", "OBSERVATION"),
       ...buildPackingSupplementaryRows(packing),
     ],
-    uploadDispatchPhotos: toFilePathList(packing.DISPATCH_PHOTOS),
+    uploadDispatchPhotos: toFileIdListPayload(packing.DISPATCH_PHOTOS),
     safetyClearance: {
       accorded: data.SAFETY_CLEARANCE.SAFETY_CLEARANCE_STATUS || "NO",
-      clearanceCertificate: toFilePathValue(data.SAFETY_CLEARANCE.CLEARANCE_CERTIFICATE) || undefined,
+      clearanceCertificate: toFileIdPayloadOrNull(data.SAFETY_CLEARANCE.CLEARANCE_CERTIFICATE) ?? undefined,
     },
     dispatchTeam: {
       qaRepresentative: data.DISPATCH_TEAM.QA_REPRESENTATIVE.trim() || undefined,
@@ -584,6 +592,40 @@ export const nextFmColumnId = (columns: string[]): string => {
   const next = nums.length ? Math.max(...nums) + 1 : 1;
   return `${FM_COLUMN_PREFIX}_${next}`;
 };
+
+const collectDispatchFileRefsFromMotorData = (data: DispatchMotorData | null | undefined): FileRef[] => {
+  if (!data) return [];
+  return [
+    ...(data.ROCKET_MOTOR_PACKING.DISPATCH_PHOTOS ?? []),
+    ...(data.SAFETY_CLEARANCE.CLEARANCE_CERTIFICATE ?? []),
+  ];
+};
+
+export const collectDispatchFileRefsFromForm = (form: {
+  motors?: Array<{ dispatchData?: DispatchMotorData | null }>;
+}): FileRef[] => {
+  const refs: FileRef[] = [];
+  for (const motor of form?.motors ?? []) {
+    refs.push(...collectDispatchFileRefsFromMotorData(motor.dispatchData));
+  }
+  return refs;
+};
+
+export const hasIncompleteDispatchUploads = (form: {
+  motors?: Array<{ dispatchData?: DispatchMotorData | null }>;
+}): boolean => collectDispatchFileRefsFromForm(form).some(isFileUploadIncomplete);
+
+export const collectTempFileIdsFromDispatchForm = (form: {
+  motors?: Array<{ dispatchData?: DispatchMotorData | null }>;
+}): string[] =>
+  [
+    ...new Set(
+      collectDispatchFileRefsFromForm(form)
+        .filter((ref) => ref.isTemp !== false)
+        .map((ref) => String(ref.fileId ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
 
 export const dispatchMotorDataHasUserInput = (data: DispatchMotorData | null | undefined): boolean => {
   if (!data) return false;

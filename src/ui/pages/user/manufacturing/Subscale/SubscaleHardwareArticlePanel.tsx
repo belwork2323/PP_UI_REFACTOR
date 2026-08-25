@@ -121,14 +121,17 @@ const sectionTitleSx = {
 
 const tableHeaderCellSx = {
   fontFamily: fonts.family.primary,
-  fontWeight: 700,
-  fontSize: "0.72rem",
+  fontWeight: 800,
+  fontSize: "0.68rem",
   textTransform: "uppercase" as const,
-  letterSpacing: "0.04em",
-  background: "rgba(21,101,192,0.1)",
-  color: SUBSCALE_BRAND.ss,
+  letterSpacing: "0.06em",
+  background: `linear-gradient(180deg, ${SUBSCALE_BRAND.ssLight} 0%, ${SUBSCALE_BRAND.ss} 100%)`,
+  color: "#fff",
   whiteSpace: "nowrap" as const,
-  py: 1,
+  borderBottom: "none",
+  borderRight: "1px solid rgba(255,255,255,0.32)",
+  py: 1.15,
+  "&:last-of-type": { borderRight: "none" },
 };
 
 const tableBodyCellSx = {

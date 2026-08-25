@@ -6,6 +6,7 @@ import { useThemeStore } from "../../../../app/store/themeStore";
 import getSourcingTheme from "../../../../app/theme/custom_themes/user/sourcing/sourcing_theme";
 import useRawMaterialProcurementHook from "../../../../hooks/user/sourcing/useRawMaterialProcurementHook";
 import UserWorkflowFormHeader from "../../../components/custom/UserWorkflowFormHeader";
+import { resolveWorkflowFormHeaderStatus } from "../../../components/custom/workflowFormHeaderStatus";
 import RawMaterialBatchList from "./components/RawMaterialBatchList";
 import RawMaterialLotDetailsView from "./components/RawMaterialLotDetailsView";
 import SpecificationFormBuilder from "./components/SpecificationFormBuilder";
@@ -91,13 +92,17 @@ const RawMaterialProcurement = () => {
               subtitle: createLotHeaderHeading
                 ? createLotHeaderHeading.subtitle
                 : undefined,
-              statusLabel: isEditMode
-                ? "Editing Rejected Submission"
-                : strings.NEW_SUBMISSION,
-              statusVariant: isEditMode ? "edit" : "new",
-              rejectionReason: activeBatch.rejectionReason,
+              ...(() => {
+                const hs = resolveWorkflowFormHeaderStatus(activeBatch, {
+                  preferredStatusKeys: ["rmStatus"],
+                });
+                return {
+                  statusLabel: hs.statusLabel,
+                  statusVariant: hs.statusVariant,
+                  rejectionReason: hs.rejectionReason,
+                };
+              })(),
             }}
-            isEdit={isEditMode}
             onBack={handleBack}
             theme={theme}
           />

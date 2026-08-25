@@ -4,13 +4,7 @@ import {
   type SchemaSectionSubmission,
 } from "../../../schema-engine";
 import type { CasePrepDetailSection } from "./CasePreparationFormModel";
-import {
-  isCasePrepFileReady,
-  isCasePrepFileUploadIncomplete,
-  parseCasePrepFileRefs,
-  toCasePrepFilesApiPayload,
-  type CasePrepFileRef,
-} from "./CasePrepMotorDataModel";
+import { isFileReady, isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileRef } from "../common/FileUploadModel";
 import {
   mapCastingCuringPersonLabel,
   parseCastingCuringSectionData,
@@ -469,7 +463,7 @@ export type TrimmingMotorSession = {
   trimmingDetails: TrimmingDetailsRow[];
   commonFormatParameters: TrimmingCommonFormatParameter[];
   motorRemarks: string;
-  reportFiles: CasePrepFileRef[];
+  reportFiles: FileRef[];
   /** Legacy hydrate only — do not bind UI. */
   reportFile?: TrimmingReportFile | null;
   /** Legacy hydrate only — do not bind UI. */
@@ -627,7 +621,7 @@ export const mapTrimmingDetailsToFormState = (
           (commonSection?.sectionData as TrimmingCommonFormatParameter[]) ??
           createDefaultCommonFormatParameters(),
         motorRemarks: remarksData.remarks ?? "",
-        reportFiles: parseCasePrepFileRefs(
+        reportFiles: parseFileRefs(
           remarksData.reportFiles ?? remarksData.reportFile ?? remarksData.reportLink,
         ),
       };
@@ -686,7 +680,7 @@ export const mapTrimmingFormStateToPayload = (
       }
 
       // 3. Trimming Remarks & File Upload
-      const readyReportFiles = toCasePrepFilesApiPayload(motor.reportFiles ?? []);
+      const readyReportFiles = toFileIdListPayload(motor.reportFiles ?? []);
       const legacyReportLink = String(motor.reportLink ?? "").trim();
       if (
         motor.motorRemarks?.trim() ||
@@ -735,7 +729,7 @@ export const mapTrimmingFormStateToPayload = (
 
 const motorHasTrimmingValue = (motor: TrimmingMotorSession) => {
   if (motor.motorRemarks?.trim()) return true;
-  if ((motor.reportFiles ?? []).some((ref) => isCasePrepFileReady(ref) || ref.fileName?.trim())) {
+  if ((motor.reportFiles ?? []).some((ref) => isFileReady(ref) || ref.fileName?.trim())) {
     return true;
   }
   if (String(motor.reportLink ?? "").trim()) return true;
@@ -778,8 +772,8 @@ export const hasAnyTrimmingValue = (form: TrimmingFormState) =>
 
 export const collectTrimmingFileRefsFromForm = (form: {
   motors?: TrimmingMotorSession[];
-}): CasePrepFileRef[] => {
-  const refs: CasePrepFileRef[] = [];
+}): FileRef[] => {
+  const refs: FileRef[] = [];
   for (const motor of form?.motors ?? []) {
     refs.push(...(motor.reportFiles ?? []));
   }
@@ -789,7 +783,7 @@ export const collectTrimmingFileRefsFromForm = (form: {
 export const hasIncompleteTrimmingUploads = (form: {
   motors?: TrimmingMotorSession[];
 }): boolean =>
-  collectTrimmingFileRefsFromForm(form).some(isCasePrepFileUploadIncomplete);
+  collectTrimmingFileRefsFromForm(form).some(isFileUploadIncomplete);
 
 export const collectTempFileIdsFromTrimmingForm = (form: {
   motors?: TrimmingMotorSession[];

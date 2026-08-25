@@ -1,6 +1,5 @@
 import {
   Box,
-  Stack,
   Table,
   TableBody,
   TableCell,
@@ -13,10 +12,7 @@ import {
 import { STRINGS } from "../../../../../app/config/strings";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { SchemaFormValues } from "../../../../../schema-engine";
-import SchemaFileField, {
-  parseSchemaFileList,
-} from "../../../../components/common/SchemaFileField";
-import { FILE_PICKER_ACCEPT } from "../../../../../utils/FileUtils";
+import NdtFileField from "../NDT/NdtFileField";
 import {
   QC_HARDWARE_UPLOAD_GRAPH_KEY,
   QC_HARDWARE_UPLOAD_PHOTO_KEY,
@@ -32,6 +28,7 @@ import {
   qcReadOnlyTableContainerSx,
   qcReadOnlyTableHeaderCellSx,
 } from "./components/QCDivisionReadOnlyValue";
+import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 const BRAND = QC_DIVISION_BRAND;
@@ -39,14 +36,12 @@ const TABLE_BORDER = alpha(BRAND.primary, 0.18);
 const HEADER_CELL_BORDER = alpha("#fff", 0.22);
 
 const TH = {
-  background: `linear-gradient(135deg, ${BRAND.primary}, ${BRAND.primaryLight})`,
-  color: "#fff",
-  fontWeight: 700,
-  fontSize: "0.68rem",
-  letterSpacing: "0.06em",
-  textTransform: "uppercase" as const,
-  padding: "10px 12px",
-  whiteSpace: "nowrap" as const,
+  ...uniformTableHeaderCellSx(BRAND.primary, BRAND.primaryLight, {
+    headerFontSize: "0.68rem",
+    headerLetterSpacing: "0.06em",
+    headerPaddingY: "10px",
+    headerPaddingX: "12px",
+  }),
   border: `1px solid ${HEADER_CELL_BORDER}`,
 };
 
@@ -119,8 +114,7 @@ const QCHardwareAttachmentUpload = ({
           </TableHead>
           <TableBody>
             {QC_HARDWARE_UPLOAD_TYPES.map((uploadType, index) => {
-              const value = uploads[uploadType];
-              const fileNames = parseSchemaFileList(value);
+              const files = uploads[uploadType] ?? [];
 
               return (
                 <TableRow
@@ -145,31 +139,20 @@ const QCHardwareAttachmentUpload = ({
                     )}
                   </TableCell>
                   <TableCell sx={bodyCellSx}>
-                    {readOnly ? (
-                      fileNames.length ? (
-                        <Stack spacing={0.35}>
-                          {fileNames.map((name) => (
-                            <QCDivisionReadOnlyValue key={`${uploadType}-${name}`} value={name} />
-                          ))}
-                        </Stack>
-                      ) : (
-                        <QCDivisionReadOnlyValue value="" muted />
-                      )
-                    ) : (
-                      <Box sx={{ minWidth: 220, maxWidth: 420 }}>
-                        <SchemaFileField
-                          value={value}
-                          onChange={(next) =>
-                            onChange(setHardwareUploadValue(values, uploadType, next))
-                          }
-                          compact
-                          multiple
-                          accept={FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF}
-                          emptyLabel={S.HARDWARE_UPLOAD_ACTION}
-                          addLabel={S.HARDWARE_UPLOAD_ADD_MORE}
-                        />
-                      </Box>
-                    )}
+                    <Box sx={{ minWidth: 220, maxWidth: 420 }}>
+                      <NdtFileField
+                        files={files}
+                        onChange={(next) =>
+                          onChange(setHardwareUploadValue(values, uploadType, next))
+                        }
+                        readOnly={readOnly}
+                        compact
+                        multiple
+                        acceptMode="imageVideoPdf"
+                        subDeptSlug="qc-division"
+                        emptyLabel={S.HARDWARE_UPLOAD_ACTION}
+                      />
+                    </Box>
                   </TableCell>
                 </TableRow>
               );

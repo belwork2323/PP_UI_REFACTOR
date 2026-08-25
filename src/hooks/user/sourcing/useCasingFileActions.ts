@@ -180,8 +180,10 @@ export function useCasingFileActions(
       const ref = filesRef.current[index];
       if (!ref) return;
       const fileId = String(ref.fileId ?? "").trim();
-      if (fileId && subDepartmentId) {
-        const removed = await removeStoredFile(fileId, subDepartmentId, ref.isTemp !== false);
+      // Temp uploads: delete via temp API. Details files: UI-only (save omits fileId).
+      const isTempUpload = ref.isTemp !== false;
+      if (fileId && subDepartmentId && isTempUpload) {
+        const removed = await removeStoredFile(fileId, subDepartmentId, true);
         if (!removed) return;
       }
       const next = filesRef.current.filter((_, i) => i !== index);

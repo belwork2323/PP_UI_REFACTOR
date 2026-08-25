@@ -61,7 +61,7 @@ export const DISPATCH_FLOW_LABELS = {
   finalAcceptanceMomNoPlaceholder: "Enter final acceptance MOM number",
   loadForm: "Load Form",
   addMotor: "Add Motor",
-  loadingSchema: "Loading schema...",
+  loadingSchema: "Loading form...",
   setupHint: "Select a motor ID, then load the dispatch form.",
   setupHintLoaded: "Select another motor ID below to add more motors.",
   motorNavTitle: "Motor navigation",

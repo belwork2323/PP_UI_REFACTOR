@@ -18,8 +18,8 @@ import type { SchemaFormValues } from "../../../../../schema-engine";
 import { computeExpandedGroupCellSpans } from "../../../../../schema-engine/rules/tableCommitGroup";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import DateField from "../../../../components/common/DateField";
-import SchemaFileField from "../../../../components/common/SchemaFileField";
-import { FILE_PICKER_ACCEPT } from "../../../../../utils/FileUtils";
+import NdtFileField from "../NDT/NdtFileField";
+import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
 import {
   QC_REVALIDATION_COLUMNS,
   QC_REVALIDATION_MERGE_COLUMNS,
@@ -258,17 +258,18 @@ const QCRawMaterialRevalidationTable = ({
                 (!nextRow ||
                   nextRow._rowRole !== "expanded" ||
                   String(nextRow._groupId ?? "") !== groupId);
-              const groupCertificate = isLastInGroup
-                ? String(
+              const groupCertificate: FileRef[] = isLastInGroup
+                ? ((
                     rows.find(
                       (entry) =>
                         String(entry._groupId ?? "") === groupId &&
-                        String(entry.QC_CERTIFICATE ?? "").trim(),
-                    )?.QC_CERTIFICATE ??
-                      row.QC_CERTIFICATE ??
-                      "",
-                  )
-                : "";
+                        Array.isArray(entry.QC_CERTIFICATE) &&
+                        entry.QC_CERTIFICATE.length > 0,
+                    )?.QC_CERTIFICATE as FileRef[] | undefined
+                  ) ??
+                    (Array.isArray(row.QC_CERTIFICATE) ? row.QC_CERTIFICATE : []) ??
+                    [])
+                : [];
 
               const srSpan = mergeSpans.get(`${index}:SR_NO`);
               const ingredientSpan = mergeSpans.get(`${index}:INGREDIENT`);
@@ -409,7 +410,18 @@ const QCRawMaterialRevalidationTable = ({
                           <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: BRAND.textSub }}>
                             QC Certificate
                           </Typography>
-                          <ReadOnlyValue value={groupCertificate} />
+                          <Box sx={{ minWidth: { sm: 260 }, maxWidth: 420, width: "100%" }}>
+                            <NdtFileField
+                              files={groupCertificate}
+                              onChange={() => undefined}
+                              readOnly
+                              compact
+                              multiple={false}
+                              acceptMode="imageVideoPdf"
+                              subDeptSlug="qc-division"
+                              emptyLabel="Upload"
+                            />
+                          </Box>
                         </Stack>
                       ) : (
                         <Stack
@@ -422,8 +434,8 @@ const QCRawMaterialRevalidationTable = ({
                             Upload QC Certificate
                           </Typography>
                           <Box sx={{ minWidth: { sm: 260 }, maxWidth: 420, width: "100%" }}>
-                            <SchemaFileField
-                              value={groupCertificate}
+                            <NdtFileField
+                              files={groupCertificate}
                               onChange={(next) =>
                                 commitRows(
                                   rows.map((entry) =>
@@ -434,9 +446,10 @@ const QCRawMaterialRevalidationTable = ({
                                 )
                               }
                               compact
-                              accept={FILE_PICKER_ACCEPT.IMAGE_PDF}
-                              emptyLabel="Upload"
                               multiple={false}
+                              acceptMode="imageVideoPdf"
+                              subDeptSlug="qc-division"
+                              emptyLabel="Upload"
                             />
                           </Box>
                         </Stack>

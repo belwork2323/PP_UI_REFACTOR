@@ -1,22 +1,28 @@
 import { useCallback, useRef, type ChangeEvent } from "react";
 import { useAlertStore } from "@app/store/alertStore";
 import { useAuthStore } from "@app/store/authStore";
-import { STRINGS } from "@app/config/strings";
 import { useFileService } from "@hooks/useFileService";
 import { useFilePreview } from "@hooks/useFilePreview";
 import {
-  newCasePrepFileLocalId,
-  type CasePrepFileRef,
-} from "@data/models/user/CasePrepMotorDataModel";
+  newFileLocalId,
+  type FileRef,
+} from "@data/models/common/FileUploadModel";
 
-const S = STRINGS.MANUFACTURING.CASE_PREP;
 const MAX_SIZE_MB = 50;
 
-export type CasePrepFileAcceptMode = "imageVideo" | "imageVideoPdf";
+export type FileAcceptMode = "image" | "imageVideo" | "pdf" | "imageVideoPdf";
 
-const validateCasePrepUploadFile = (
+export type UseFileUploadActionsOptions = {
+  acceptMode?: FileAcceptMode;
+  /** Auth store sub-department slug used for /files/upload. */
+  subDeptSlug: string;
+  /** Shown when the signed-in user has no matching sub-department. */
+  missingSubDeptMessage?: string;
+};
+
+const validateUploadFile = (
   file: File,
-  mode: CasePrepFileAcceptMode,
+  mode: FileAcceptMode,
 ): { valid: boolean; error?: string } => {
   if (!file) return { valid: false, error: "No file selected" };
   const sizeMb = file.size / (1024 * 1024);
@@ -28,40 +34,47 @@ const validateCasePrepUploadFile = (
   const isPdf = mime === "application/pdf" || /\.pdf$/i.test(name);
   const isImage = mime.startsWith("image/") || /\.(jpe?g|png|webp|gif|bmp)$/i.test(name);
   const isVideo = mime.startsWith("video/") || /\.(mp4|webm|mov)$/i.test(name);
-  const ok =
-    mode === "imageVideoPdf" ? isPdf || isImage || isVideo : isImage || isVideo;
-  if (!ok) {
-    return {
-      valid: false,
-      error:
-        mode === "imageVideoPdf"
-          ? "Invalid format. Use image, video, or PDF."
-          : "Invalid format. Use image or video.",
-    };
+  let ok = false;
+  let error = "Invalid format.";
+  if (mode === "image") {
+    ok = isImage;
+    error = "Invalid format. Use an image file.";
+  } else if (mode === "pdf") {
+    ok = isPdf;
+    error = "Invalid format. Use a PDF file.";
+  } else if (mode === "imageVideoPdf") {
+    ok = isImage || isVideo || isPdf;
+    error = "Invalid format. Use image, video, or PDF.";
+  } else {
+    ok = isImage || isVideo;
+    error = "Invalid format. Use image or video.";
   }
+  if (!ok) return { valid: false, error };
   return { valid: true };
 };
 
-/** Eager upload / retry / remove / open for Case Prep `CasePrepFileRef` lists (RMS/RMC parity). */
-export function useCasePrepFileActions(
-  files: CasePrepFileRef[],
-  onChange: (next: CasePrepFileRef[]) => void,
-  options?: { acceptMode?: CasePrepFileAcceptMode },
+/** Upload / retry / remove / open for form `FileRef` lists. */
+export function useFileUploadActions(
+  files: FileRef[],
+  onChange: (next: FileRef[]) => void,
+  options: UseFileUploadActionsOptions,
 ) {
-  const acceptMode = options?.acceptMode ?? "imageVideoPdf";
+  const acceptMode = options.acceptMode ?? "imageVideoPdf";
+  const subDeptSlug = options.subDeptSlug;
+  const missingSubDeptMessage =
+    options.missingSubDeptMessage ?? "Sub-department is missing. Cannot upload files.";
   const filesRef = useRef(files);
   filesRef.current = files;
   const showAlert = useAlertStore((state) => state.showAlert);
   const subDepartmentId = useAuthStore(
     (s) =>
-      s.user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "case-preparation")
-        ?.subDepartmentId,
+      s.user?.allSubDepartments.find((sd) => sd.slugs?.subDept === subDeptSlug)?.subDepartmentId,
   );
   const { upload, removeStoredFile } = useFileService();
   const { preview, openFile, closePreview, downloadCurrent } = useFilePreview();
 
   const patchByLocalId = useCallback(
-    (localId: string, patch: Partial<CasePrepFileRef>) => {
+    (localId: string, patch: Partial<FileRef>) => {
       const next = filesRef.current.map((ref) =>
         ref.localId === localId ? { ...ref, ...patch } : ref,
       );
@@ -75,7 +88,7 @@ export function useCasePrepFileActions(
     async (localId: string, file: File) => {
       if (!subDepartmentId) {
         patchByLocalId(localId, { status: "failed", fileId: null, uploadProgress: undefined });
-        showAlert(S.SUB_DEPARTMENT_MISSING, "error");
+        showAlert(missingSubDeptMessage, "error");
         return;
       }
       patchByLocalId(localId, { status: "uploading", uploadProgress: 0, fileId: null });
@@ -97,7 +110,7 @@ export function useCasePrepFileActions(
         uploadProgress: undefined,
       });
     },
-    [patchByLocalId, showAlert, subDepartmentId, upload],
+    [missingSubDeptMessage, patchByLocalId, showAlert, subDepartmentId, upload],
   );
 
   const handleFilesSelected = useCallback(
@@ -106,15 +119,15 @@ export function useCasePrepFileActions(
       const incoming = input.files ? Array.from(input.files) : [];
       if (!incoming.length) return;
 
-      const accepted: CasePrepFileRef[] = [];
+      const accepted: FileRef[] = [];
       for (const file of incoming) {
-        const { valid, error } = validateCasePrepUploadFile(file, acceptMode);
+        const { valid, error } = validateUploadFile(file, acceptMode);
         if (!valid) {
           showAlert(`${file.name}: ${error ?? "Invalid file"}`, "warning");
           continue;
         }
         accepted.push({
-          localId: newCasePrepFileLocalId(),
+          localId: newFileLocalId(),
           fileId: null,
           fileName: file.name,
           fileUrl: "",
@@ -142,7 +155,6 @@ export function useCasePrepFileActions(
     [acceptMode, onChange, showAlert, uploadOne],
   );
 
-  /** Replace list with a single uploading file (TCE test report). */
   const uploadSingleFile = useCallback(
     (file: File | null) => {
       if (!file) {
@@ -150,13 +162,13 @@ export function useCasePrepFileActions(
         onChange([]);
         return;
       }
-      const { valid, error } = validateCasePrepUploadFile(file, acceptMode);
+      const { valid, error } = validateUploadFile(file, acceptMode);
       if (!valid) {
         showAlert(`${file.name}: ${error ?? "Invalid file"}`, "warning");
         return;
       }
-      const localId = newCasePrepFileLocalId();
-      const next: CasePrepFileRef[] = [
+      const localId = newFileLocalId();
+      const next: FileRef[] = [
         {
           localId,
           fileId: null,
@@ -191,8 +203,11 @@ export function useCasePrepFileActions(
       const ref = filesRef.current[index];
       if (!ref) return;
       const fileId = String(ref.fileId ?? "").trim();
-      if (fileId && subDepartmentId) {
-        const removed = await removeStoredFile(fileId, subDepartmentId, ref.isTemp !== false);
+      // Temp uploads: delete via temp API. Files loaded from form details are
+      // persisted server-side — drop from UI only; save payload omits their fileId.
+      const isTempUpload = ref.isTemp !== false;
+      if (fileId && subDepartmentId && isTempUpload) {
+        const removed = await removeStoredFile(fileId, subDepartmentId, true);
         if (!removed) return;
       }
       const next = filesRef.current.filter((_, i) => i !== index);

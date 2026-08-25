@@ -327,7 +327,8 @@
           {
             "fieldId": "PT_CURVE_FILE",
             "label": "Upload P-T Curve",
-            "type": "file"
+            "type": "file",
+            "description": "Upload via /files/upload; submit as { fileId }"
           }
         ]
       }

@@ -14,6 +14,7 @@ import ApproverActionDialog from "../../../components/custom/ApproverActionDialo
 import { icons } from "../../../../app/theme/icons";
 import { APPROVER_PRIORITY_META, APPROVER_STATUS_META, isApproverActionableStatus } from "../../../../app/theme/approver";
 import useApproverFormAction from "../../../../hooks/approver/useApproverFormAction";
+import { uniformTableHeaderCellSx } from "../../../../app/theme/custom_themes/shared/data_table_theme";
 
 const {
   approved: CheckCircleRoundedIcon,
@@ -123,12 +124,14 @@ const MOCK_RMR_SUBMISSIONS = [
 ];
 
 // ─── Styled ───────────────────────────────────────────────────────────────────
-const TH = styled(TableCell)({
-  background: `linear-gradient(135deg, ${BRAND.qc}, ${BRAND.qcLight})`,
-  color: "#fff", fontWeight: 700, fontSize: "0.68rem",
-  letterSpacing: "0.07em", textTransform: "uppercase",
-  padding: "10px 14px", whiteSpace: "nowrap", borderBottom: "none",
-});
+const TH = styled(TableCell)(
+  uniformTableHeaderCellSx(BRAND.qc, BRAND.qcLight, {
+    headerFontSize: "0.68rem",
+    headerLetterSpacing: "0.07em",
+    headerPaddingY: "10px",
+    headerPaddingX: "14px",
+  }),
+);
 
 const TD = styled(TableCell)({
   padding: "10px 14px", fontSize: "0.82rem",
@@ -136,13 +139,14 @@ const TD = styled(TableCell)({
   color: BRAND.text, verticalAlign: "middle",
 });
 
-const DTH = styled(TableCell)({
-  background: `linear-gradient(135deg, ${BRAND.qc}, ${BRAND.qcLight})`,
-  color: "#fff", fontWeight: 700, fontSize: "0.65rem",
-  letterSpacing: "0.07em", textTransform: "uppercase",
-  padding: "10px 14px", whiteSpace: "nowrap", borderBottom: "none",
-  verticalAlign: "middle",
-});
+const DTH = styled(TableCell)(
+  uniformTableHeaderCellSx(BRAND.qc, BRAND.qcLight, {
+    headerFontSize: "0.65rem",
+    headerLetterSpacing: "0.07em",
+    headerPaddingY: "10px",
+    headerPaddingX: "14px",
+  }),
+);
 
 const DTD = styled(TableCell)({
   padding: "10px 14px", fontSize: "0.78rem",

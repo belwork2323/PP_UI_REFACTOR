@@ -359,6 +359,7 @@ export const mapFormStateToUpdateStfBatchPayload = (params: {
 /** Payload structure for POST /api/v1/user/stf/bem-motor/create */
 export type CreateBemMotorPayload = {
   motorId: string;
+  subDepartmentId: number;
   subType: "BEM" | string;
   stfTestNo: string | unknown;
   formSubmissionType: "DRAFT" | "SUBMIT";
@@ -368,6 +369,7 @@ export type CreateBemMotorPayload = {
 /** Payload structure for PUT /api/v1/user/stf/bem-motor/update */
 export type UpdateBemMotorPayload = {
   motorId: string;
+  subDepartmentId: number;
   stfTestNo: string | unknown;
   subType?: "BEM" | string;
   formSubmissionType: "DRAFT" | "SUBMIT";
@@ -497,76 +499,7 @@ export interface FormSectionPayload {
   sectionData: Record<string, any>[];
 }
 
-/** @deprecated Legacy schema section wrapper — API now uses camelCase DTO fields. */
-export interface LegacyStaticTestingDetailsPayload {
-  formSections: FormSectionPayload[];
-}
-
 export type StaticTestingDetailsPayload = StfStaticTestingDetailsApi;
-
-/**
- * Recursively strips UI metadata keys (starting with '_') from object or array items
- */
-const sanitizeData = (data: any): any => {
-  if (Array.isArray(data)) {
-    return data.map(sanitizeData);
-  }
-
-  if (data !== null && typeof data === "object") {
-    const cleanObject: Record<string, any> = {};
-
-    Object.entries(data).forEach(([key, value]) => {
-      // Omit UI configuration metadata (e.g., _readonly, _readonlyColumns)
-      if (key.startsWith("_")) return;
-
-      cleanObject[key] = sanitizeData(value);
-    });
-
-    return cleanObject;
-  }
-
-  return data;
-};
-
-export const buildStaticTestingDetails = (
-  schemaValues: Record<string, any> = {},
-): LegacyStaticTestingDetailsPayload => {
-  const sectionsMap: Record<string, Record<string, any>> = {};
-
-  // Group incoming flat schemaValues (`SECTION_ID::FIELD_NAME`) by SECTION_ID
-  Object.entries(schemaValues).forEach(([key, value]) => {
-    if (!key.includes("::")) return;
-
-    const [sectionId, fieldName] = key.split("::");
-
-    if (!sectionsMap[sectionId]) {
-      sectionsMap[sectionId] = {};
-    }
-
-    // Sanitize values (removes _readonly, _readonlyColumns, etc.)
-    sectionsMap[sectionId][fieldName] = sanitizeData(value);
-  });
-
-  // Transform grouped map into the required formSections array structure
-  const formSections: FormSectionPayload[] = Object.entries(sectionsMap).map(
-    ([sectionId, fields]) => {
-      // If the section contains an array matching the sectionId (e.g., GRAIN_DIMENSION)
-      if (Array.isArray(fields[sectionId])) {
-        return {
-          sectionId,
-          sectionData: [{ [sectionId]: fields[sectionId] }],
-        };
-      }
-
-      return {
-        sectionId,
-        sectionData: [fields],
-      };
-    },
-  );
-
-  return { formSections };
-};
 
 const buildStfMotorStaticTestingDetailsFromSession = (motor: StfMotorSession) =>
   buildStfMotorStaticTestingDetails(motor.stfData);

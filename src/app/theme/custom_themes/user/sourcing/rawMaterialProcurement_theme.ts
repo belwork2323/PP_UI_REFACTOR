@@ -1,9 +1,11 @@
 import { alpha } from "@mui/material";
 import fonts from "../../../fonts";
+import { createDataTableTheme } from "../../shared/data_table_theme";
 
 export const getRawMaterialProcurementTheme = (baseTheme: any) => {
 	const palette = baseTheme?.palette ?? {};
 	const warnBase = palette.warn ?? "#D4AC0D";
+	const dataTable = createDataTableTheme(palette);
 	/** Stronger amber chips — ref range & partial-fill counts (default warn tint was too pale) */
 	const amberChipSx = {
 		background: alpha(warnBase, 0.24),
@@ -335,31 +337,17 @@ export const getRawMaterialProcurementTheme = (baseTheme: any) => {
 			},
 			metaLabel: { fontSize: "0.62rem", fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", color: palette.textSub },
 			metaValue: { fontSize: "0.88rem", fontWeight: 700, color: palette.text, mt: 0.35 },
-			tableContainer: {
-				borderRadius: 1.5,
-				border: `1px solid ${palette.border ?? "#D5D8DC"}`,
-				overflow: "hidden",
-			},
-			tableHeaderCell: {
-				background: alpha(palette.primary ?? "#1B4F72", 0.06),
-				fontWeight: 700,
-				fontSize: "0.65rem",
-				letterSpacing: "0.05em",
-				textTransform: "uppercase",
-				color: palette.textSub,
-				py: 1,
-				px: 1.5,
-				borderBottom: `1px solid ${palette.border}`,
-			},
+			...dataTable,
+			tableHeaderCell: dataTable.tableHeaderCell(),
 			tableRow: (idx: number, failed?: boolean) => ({
-				background: failed
-					? alpha(palette.danger, 0.06)
-					: idx % 2 === 0
-						? palette.pageBg ?? "#fff"
-						: alpha(palette.surface ?? "#F4F6F8", 0.5),
-				boxShadow: failed ? `inset 3px 0 0 ${palette.danger}` : "none",
+				...dataTable.tableRow(idx),
+				...(failed
+					? {
+							background: alpha(palette.danger ?? "#C0392B", 0.06),
+							boxShadow: `inset 3px 0 0 ${palette.danger ?? "#C0392B"}`,
+						}
+					: {}),
 			}),
-			tableCell: { fontSize: "0.82rem", py: 1.1, px: 1.5, color: palette.text },
 			specText: { fontWeight: 600 },
 			refChip: {
 				height: 22,

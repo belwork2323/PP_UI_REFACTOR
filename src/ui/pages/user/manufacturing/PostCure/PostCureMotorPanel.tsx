@@ -24,7 +24,7 @@ import type {
   QualificationRow,
 } from "../../../../../data/models/user/PostCureMotorDataModel";
 import { recomputeIngredientTotal } from "../../../../../data/models/user/PostCureMotorDataModel";
-import type { CasePrepFileRef } from "../../../../../data/models/user/CasePrepMotorDataModel";
+import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
 import { DateField } from "../../../../components/common/DateField";
 import PostCureFileField from "./PostCureFileField";
 import {
@@ -357,11 +357,11 @@ const QualificationSection = ({
 }: {
   batchNo: string;
   prepDate: string;
-  qcReport: CasePrepFileRef[];
+  qcReport: FileRef[];
   rows: QualificationRow[];
   onBatchNoChange: (value: string) => void;
   onPrepDateChange: (value: string) => void;
-  onQcReportChange: (value: CasePrepFileRef[]) => void;
+  onQcReportChange: (value: FileRef[]) => void;
   onRowsChange: (rows: QualificationRow[]) => void;
   disabled?: boolean;
   readOnly?: boolean;

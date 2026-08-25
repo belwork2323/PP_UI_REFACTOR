@@ -1,8 +1,8 @@
 import { alpha } from "@mui/material";
 import { keyframes } from "@mui/material/styles";
 import fonts from "../../fonts";
-import colors from "../../colors";
 import { getSharedTheme } from "./shared_theme";
+import { dataTableHeaderBackground } from "./data_table_theme";
 
 const fadeIn = keyframes`
   from { opacity: 0; transform: translateY(10px); }
@@ -115,10 +115,12 @@ export const getOperationsTheme = (mode = "light") => {
       },
     },
     batchList: {
-      // ── New table/header gradients based on Admin Dashboard standard ──
-      tableHeaderBg: colors.deptHeader?.[mode]?.cardBg ?? (isDark ? "#1a1d27" : "linear-gradient(135deg, rgba(0,75,160,0.82) 0%, rgba(25,118,210,0.78) 100%)"),
+      // Same uniform header as form data tables (vertical gradient + white column dividers).
+      tableHeaderBg: isDark
+        ? "#1a1d27"
+        : dataTableHeaderBackground(palette.primary, palette.primaryLight),
       tableHeaderText: "#fff",
-      tableHeaderBorder: isDark ? "rgba(255,255,255,0.06)" : "rgba(255,255,255,0.15)",
+      tableHeaderBorder: "transparent",
       filterInputBg: isDark ? "#121212" : "#f8fafc",
       /** Compact inputs for "Refine lot/batch list" filter panels */
       filterPanelField: {

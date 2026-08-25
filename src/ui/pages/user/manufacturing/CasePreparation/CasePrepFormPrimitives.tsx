@@ -12,6 +12,7 @@ import {
   alpha,
 } from "@mui/material";
 import { CASE_PREP_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/casePreparation_theme";
+import { uniformTableHeaderCellSx } from "../../../../../app/theme/custom_themes/shared/data_table_theme";
 
 const BRAND = CASE_PREP_BRAND;
 
@@ -66,20 +67,11 @@ export const casePrepTableContainerSx = {
   overflow: "hidden",
 };
 
-export const casePrepTableHeaderCellSx = (isLead = false) => ({
-  background: isLead
-    ? `linear-gradient(135deg, ${BRAND.primary}, ${BRAND.primaryLight})`
-    : alpha(BRAND.primary, 0.06),
-  color: isLead ? "#fff" : BRAND.textSub,
-  fontWeight: 700,
-  fontSize: "0.63rem",
-  letterSpacing: "0.05em",
-  textTransform: "uppercase" as const,
-  py: 1,
-  px: 1.5,
-  borderBottom: `1px solid ${BRAND.border}`,
-  whiteSpace: "nowrap" as const,
-});
+export const casePrepTableHeaderCellSx = (_isLead = false) =>
+  uniformTableHeaderCellSx(BRAND.primary, BRAND.primaryLight, {
+    headerFontSize: "0.63rem",
+    headerLetterSpacing: "0.05em",
+  });
 
 export const casePrepTableRowSx = (idx: number) => ({
   background: idx % 2 === 0 ? "#fff" : alpha(BRAND.surface, 0.55),

@@ -9,6 +9,10 @@ import { batchManagementController } from "../../../controllers/admin/BatchManag
 import dispatchController from "../../../controllers/user/dispatch/dispatchController";
 import { DispatchDetailsModel } from "../../../data/models/user/DispatchApiModel";
 import {
+  collectTempFileIdsFromDispatchForm,
+  hasIncompleteDispatchUploads,
+} from "../../../data/models/user/DispatchMotorDataModel";
+import {
   appendDispatchMotorToState,
   createDefaultDispatchFormState,
   createEmptyDispatchMotorSession,
@@ -472,6 +476,7 @@ export const useDispatchHook = () => {
       initialSnapshot: initialSnapshotRef.current,
       currentState: snapshotStateRef.current,
       deleteTemp,
+      extractTempFileIds: collectTempFileIdsFromDispatchForm,
       resetForm: () => {
         bumpBatchRefresh();
         resetFormContext();
@@ -533,6 +538,10 @@ export const useDispatchHook = () => {
       const motor = (formData.motors ?? []).find((entry) => entry.motorId === motorId);
       if (!motor || !isDispatchMotorSetupReady(motor) || !motor.formLoaded) {
         showAlert(messages.SCHEMA_NOT_LOADED, "warning");
+        return false;
+      }
+      if (hasIncompleteDispatchUploads(formData)) {
+        showAlert(messages.FILE_UPLOAD_PENDING, "warning");
         return false;
       }
       if (intent === "submit" && !hasMotorDispatchValue(formData, motorId)) {

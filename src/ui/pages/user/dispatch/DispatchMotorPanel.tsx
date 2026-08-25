@@ -22,8 +22,8 @@ import {
   type DispatchParameterRow,
   type DispatchPropellantRow,
 } from "../../../../data/models/user/DispatchMotorDataModel";
-import SchemaFileField from "../../../components/common/SchemaFileField";
-import { FILE_PICKER_ACCEPT } from "../../../../utils/FileUtils";
+import DispatchFileField from "./DispatchFileField";
+import { STRINGS } from "../../../../app/config/strings";
 import {
   FieldGrid,
   FieldLabel,
@@ -43,9 +43,6 @@ type Props = {
   disabled?: boolean;
   readOnly?: boolean;
   theme?: any;
-  subDepartmentId?: number;
-  batchId?: string;
-  motorId?: string;
 };
 
 const patch = <K extends keyof DispatchMotorData>(
@@ -270,9 +267,6 @@ const DispatchMotorPanel = ({
   disabled = false,
   readOnly = false,
   theme,
-  subDepartmentId,
-  batchId,
-  motorId,
 }: Props) => (
   <Box>
     <SectionCard title="Propellant Properties Details" theme={theme}>
@@ -386,19 +380,16 @@ const DispatchMotorPanel = ({
         </Box>
       </FieldGrid>
       <Box sx={{ mt: 1.5 }}>
-        <SchemaFileField
+        <DispatchFileField
           label="Upload Dispatch Photos"
-          value={value.ROCKET_MOTOR_PACKING.DISPATCH_PHOTOS}
+          files={value.ROCKET_MOTOR_PACKING.DISPATCH_PHOTOS}
           onChange={(next) =>
             onChange(patch(value, "ROCKET_MOTOR_PACKING", { DISPATCH_PHOTOS: next }))
           }
           disabled={disabled}
           readOnly={readOnly}
-          accept={FILE_PICKER_ACCEPT.IMAGE_VIDEO}
           multiple
-          subDepartmentId={subDepartmentId}
-          batchId={batchId}
-          motorId={motorId}
+          acceptMode="imageVideo"
         />
       </Box>
     </SectionCard>
@@ -418,18 +409,17 @@ const DispatchMotorPanel = ({
           />
         </Box>
         <Box sx={{ gridColumn: { xs: "1", md: "1 / -1" } }}>
-          <SchemaFileField
+          <DispatchFileField
             label="Upload Clearance Certificate"
-            value={value.SAFETY_CLEARANCE.CLEARANCE_CERTIFICATE}
+            files={value.SAFETY_CLEARANCE.CLEARANCE_CERTIFICATE}
             onChange={(next) =>
               onChange(patch(value, "SAFETY_CLEARANCE", { CLEARANCE_CERTIFICATE: next }))
             }
             disabled={disabled}
             readOnly={readOnly}
-            accept={FILE_PICKER_ACCEPT.IMAGE_VIDEO}
-            subDepartmentId={subDepartmentId}
-            batchId={batchId}
-            motorId={motorId}
+            multiple={false}
+            acceptMode="imageVideoPdf"
+            emptyLabel={STRINGS.DISPATCH.FILE_EMPTY_CERTIFICATE}
           />
         </Box>
       </FieldGrid>

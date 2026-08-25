@@ -1,6 +1,7 @@
 import dayjs from "dayjs";
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
 import { formatDateTimeForApi } from "../../../data/models/user/rawMaterialPreparationApiMapper";
+import { isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileRef } from "../../../data/models/common/FileUploadModel";
 import { formatToIsoDateInput } from "../../../utils/dateUtils";
 import type { QcDivisionEntry } from "./qcDivisionEntryTypes";
 import {
@@ -65,7 +66,7 @@ export const QC_HARDWARE_UPLOAD_TYPES = [
 
 export type QcHardwareUploadType = (typeof QC_HARDWARE_UPLOAD_TYPES)[number];
 
-export type QcHardwareUploadValues = Record<QcHardwareUploadType, string>;
+export type QcHardwareUploadValues = Record<QcHardwareUploadType, FileRef[]>;
 
 export const QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID = "FIRST_CUT";
 export const QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID = "SECOND_CUT";
@@ -82,6 +83,18 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
 const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
 
 const hasValue = (value: unknown) => Boolean(String(value ?? "").trim());
+
+const parseUploadFiles = (...candidates: unknown[]): FileRef[] => {
+  for (const candidate of candidates) {
+    if (candidate == null || candidate === "") continue;
+    const refs = parseFileRefs(candidate);
+    if (refs.length) return refs;
+  }
+  return [];
+};
+
+const uploadListHasFiles = (refs: FileRef[] | undefined) =>
+  Array.isArray(refs) && refs.length > 0;
 
 const emptyCutRow = (srNo = 1): QcHardwareCutRow => ({
   SR_NO: srNo,
@@ -116,16 +129,16 @@ const emptyLinearCoatingRow = (srNo = 1): QcHardwareLinearCoatingRow => ({
 });
 
 const emptyHardwareUploadValues = (): QcHardwareUploadValues => ({
-  [QC_HARDWARE_UPLOAD_REPORT_KEY]: "",
-  [QC_HARDWARE_UPLOAD_GRAPH_KEY]: "",
-  [QC_HARDWARE_UPLOAD_PHOTO_KEY]: "",
+  [QC_HARDWARE_UPLOAD_REPORT_KEY]: [],
+  [QC_HARDWARE_UPLOAD_GRAPH_KEY]: [],
+  [QC_HARDWARE_UPLOAD_PHOTO_KEY]: [],
 });
 
 export const createInitialHardwareUploadValues = (): SchemaFormValues =>
   Object.fromEntries(
     QC_HARDWARE_UPLOAD_TYPES.map((uploadType) => [
       formKey(QC_HARDWARE_ATTACHMENTS_SECTION_ID, uploadType),
-      "",
+      [] as FileRef[],
     ]),
   );
 
@@ -311,7 +324,7 @@ const readUploadValue = (
   values: SchemaFormValues | null | undefined,
   sectionId: string,
   uploadType: QcHardwareUploadType,
-) => String(values?.[formKey(sectionId, uploadType)] ?? "").trim();
+): FileRef[] => parseUploadFiles(values?.[formKey(sectionId, uploadType)]);
 
 export const getHardwareUploadValues = (
   values: SchemaFormValues | null | undefined,
@@ -319,18 +332,18 @@ export const getHardwareUploadValues = (
   const uploads = emptyHardwareUploadValues();
   for (const uploadType of QC_HARDWARE_UPLOAD_TYPES) {
     const shared = readUploadValue(values, QC_HARDWARE_ATTACHMENTS_SECTION_ID, uploadType);
-    if (shared) {
+    if (uploadListHasFiles(shared)) {
       uploads[uploadType] = shared;
       continue;
     }
     const abrading = readUploadValue(values, QC_HARDWARE_SECTION_IDS.ABRADING, uploadType);
-    if (abrading) {
+    if (uploadListHasFiles(abrading)) {
       uploads[uploadType] = abrading;
       continue;
     }
     for (const legacySubType of LEGACY_HARDWARE_UPLOAD_SUB_TYPES) {
       const legacy = readUploadValue(values, QC_HARDWARE_SECTION_IDS[legacySubType], uploadType);
-      if (legacy) {
+      if (uploadListHasFiles(legacy)) {
         uploads[uploadType] = legacy;
         break;
       }
@@ -347,7 +360,7 @@ export const setHardwareUploadValues = (
   ...Object.fromEntries(
     QC_HARDWARE_UPLOAD_TYPES.map((uploadType) => [
       formKey(QC_HARDWARE_ATTACHMENTS_SECTION_ID, uploadType),
-      next[uploadType] ?? "",
+      next[uploadType] ?? [],
     ]),
   ),
 });
@@ -355,11 +368,11 @@ export const setHardwareUploadValues = (
 export const setHardwareUploadValue = (
   values: SchemaFormValues | null | undefined,
   uploadType: QcHardwareUploadType,
-  value: string,
+  value: FileRef[],
 ): SchemaFormValues =>
   setHardwareUploadValues(values, {
     ...getHardwareUploadValues(values),
-    [uploadType]: value,
+    [uploadType]: value ?? [],
   });
 
 export const mergeHardwareUploadValuesIntoEntryValues = (
@@ -428,31 +441,35 @@ const sanitizeLinearCoatingRows = (rows: QcHardwareLinearCoatingRow[]) =>
     OBSERVATIONS: String(row.OBSERVATIONS ?? "").trim(),
   }));
 
-const sanitizeHardwareUploadValues = (uploads: QcHardwareUploadValues) =>
+const sanitizeHardwareUploadValues = (uploads: QcHardwareUploadValues): QcHardwareUploadValues =>
   Object.fromEntries(
     QC_HARDWARE_UPLOAD_TYPES.map((uploadType) => [
       uploadType,
-      String(uploads[uploadType] ?? "").trim(),
+      parseUploadFiles(uploads[uploadType]),
     ]),
   ) as QcHardwareUploadValues;
 
-const extractSectionScalar = (sectionData: unknown, fieldId: string): string => {
-  if (!Array.isArray(sectionData)) return "";
+const extractSectionUploadFiles = (
+  sectionData: unknown,
+  fieldId: string,
+): FileRef[] => {
+  if (!Array.isArray(sectionData)) return [];
   for (const item of sectionData) {
     const rec = asRecord(item);
     if (!rec || !(fieldId in rec)) continue;
-    return String(rec[fieldId] ?? "").trim();
+    const refs = parseUploadFiles(rec[fieldId]);
+    if (refs.length) return refs;
   }
-  return "";
+  return [];
 };
 
 const buildUploadSectionPayload = (
   uploads: QcHardwareUploadValues,
-): Record<string, string> => {
+): Record<string, ReturnType<typeof toFileIdListPayload>> => {
   const sanitized = sanitizeHardwareUploadValues(uploads);
   return Object.fromEntries(
-    QC_HARDWARE_UPLOAD_TYPES.filter((uploadType) => hasValue(sanitized[uploadType])).map(
-      (uploadType) => [uploadType, sanitized[uploadType]],
+    QC_HARDWARE_UPLOAD_TYPES.filter((uploadType) => uploadListHasFiles(sanitized[uploadType])).map(
+      (uploadType) => [uploadType, toFileIdListPayload(sanitized[uploadType])],
     ),
   );
 };
@@ -464,9 +481,9 @@ export const collectHardwareUploadValuesForMotor = (
 ): QcHardwareUploadValues => {
   const normalizedMotorId = String(motorId ?? "").trim();
   const merged: QcHardwareUploadValues = {
-    [QC_HARDWARE_UPLOAD_REPORT_KEY]: "",
-    [QC_HARDWARE_UPLOAD_GRAPH_KEY]: "",
-    [QC_HARDWARE_UPLOAD_PHOTO_KEY]: "",
+    [QC_HARDWARE_UPLOAD_REPORT_KEY]: [],
+    [QC_HARDWARE_UPLOAD_GRAPH_KEY]: [],
+    [QC_HARDWARE_UPLOAD_PHOTO_KEY]: [],
   };
   if (!normalizedMotorId) return merged;
 
@@ -474,7 +491,7 @@ export const collectHardwareUploadValuesForMotor = (
     if (String(entry.motorId ?? "").trim() !== normalizedMotorId) continue;
     const uploads = getHardwareUploadValues(valuesByEntryId[entry.entryId]?.schemaValues);
     for (const uploadType of QC_HARDWARE_UPLOAD_TYPES) {
-      if (!hasValue(merged[uploadType]) && hasValue(uploads[uploadType])) {
+      if (!uploadListHasFiles(merged[uploadType]) && uploadListHasFiles(uploads[uploadType])) {
         merged[uploadType] = uploads[uploadType];
       }
     }
@@ -677,9 +694,10 @@ export const hydrateHardwareUploadValuesFromSections = (
     const nested = asRecord(asArray(attachmentSection.sectionData)[0])?.attachmentDetails;
     const nestedRecord = asRecord(nested);
     for (const uploadType of QC_HARDWARE_UPLOAD_TYPES) {
-      uploads[uploadType] =
-        extractSectionScalar(attachmentSection.sectionData, uploadType) ||
-        String(nestedRecord?.[uploadType] ?? "").trim();
+      const fromFlat = extractSectionUploadFiles(attachmentSection.sectionData, uploadType);
+      uploads[uploadType] = uploadListHasFiles(fromFlat)
+        ? fromFlat
+        : parseUploadFiles(nestedRecord?.[uploadType]);
     }
     return uploads;
   }
@@ -699,10 +717,11 @@ export const hydrateHardwareUploadValuesFromSections = (
     const nested = asRecord(asArray(section.sectionData)[0])?.attachmentDetails;
     const nestedRecord = asRecord(nested);
     for (const uploadType of QC_HARDWARE_UPLOAD_TYPES) {
-      if (uploads[uploadType]) continue;
-      uploads[uploadType] =
-        extractSectionScalar(section.sectionData, uploadType) ||
-        String(nestedRecord?.[uploadType] ?? "").trim();
+      if (uploadListHasFiles(uploads[uploadType])) continue;
+      const fromFlat = extractSectionUploadFiles(section.sectionData, uploadType);
+      uploads[uploadType] = uploadListHasFiles(fromFlat)
+        ? fromFlat
+        : parseUploadFiles(nestedRecord?.[uploadType]);
     }
   }
 
@@ -713,8 +732,8 @@ export const hydrateHardwareUploadValuesFromSections = (
     );
     if (!section) continue;
     for (const uploadType of QC_HARDWARE_UPLOAD_TYPES) {
-      if (uploads[uploadType]) continue;
-      uploads[uploadType] = extractSectionScalar(section.sectionData, uploadType);
+      if (uploadListHasFiles(uploads[uploadType])) continue;
+      uploads[uploadType] = extractSectionUploadFiles(section.sectionData, uploadType);
     }
   }
 
@@ -854,12 +873,6 @@ const omitEmpty = <T extends Record<string, unknown>>(record: T): Record<string,
     }),
   );
 
-const splitAttachmentList = (value: string) =>
-  String(value ?? "")
-    .split(",")
-    .map((part) => part.trim())
-    .filter(Boolean);
-
 const combineUiDateTime = (date: string, time: string): string | undefined => {
   const d = String(date ?? "").trim();
   const t = String(time ?? "").trim();
@@ -932,7 +945,7 @@ const buildAbradingOperationPayload = (values: SchemaFormValues): Record<string,
       remarksObservations: undefined,
     });
   }
-  const photoFiles = splitAttachmentList(
+  const photoFiles = toFileIdListPayload(
     getHardwareUploadValues(values)[QC_HARDWARE_UPLOAD_PHOTO_KEY],
   );
 
@@ -940,7 +953,7 @@ const buildAbradingOperationPayload = (values: SchemaFormValues): Record<string,
     abradingDetails: abradingDetails.map((row, index) => ({
       ...row,
       SR_NO: index + 1,
-      attachments: index === 0 && photoFiles.length ? photoFiles.join(", ") : undefined,
+      attachments: index === 0 && photoFiles.length ? photoFiles : undefined,
     })),
   });
 };
@@ -1075,12 +1088,35 @@ const buildDispatchToCastingPayload = (values: SchemaFormValues): Record<string,
 
 const buildTceCleaningPayload = (values: SchemaFormValues): Record<string, unknown> => {
   const uploads = getHardwareUploadValues(values);
-  const report = uploads[QC_HARDWARE_UPLOAD_REPORT_KEY];
-  if (!hasValue(report)) return {};
+  const report = toFileIdListPayload(uploads[QC_HARDWARE_UPLOAD_REPORT_KEY]);
+  if (!report.length) return {};
   return omitEmpty({
     testReport: report,
   });
 };
+
+export const collectHardwareFileRefsFromQcValues = (
+  values: SchemaFormValues | null | undefined,
+): FileRef[] => {
+  const uploads = getHardwareUploadValues(values);
+  return QC_HARDWARE_UPLOAD_TYPES.flatMap((uploadType) => uploads[uploadType] ?? []);
+};
+
+export const hasIncompleteQcHardwareUploads = (
+  values: SchemaFormValues | null | undefined,
+): boolean => collectHardwareFileRefsFromQcValues(values).some(isFileUploadIncomplete);
+
+export const collectTempFileIdsFromQcHardwareValues = (
+  values: SchemaFormValues | null | undefined,
+): string[] =>
+  [
+    ...new Set(
+      collectHardwareFileRefsFromQcValues(values)
+        .filter((ref) => ref.isTemp !== false)
+        .map((ref) => String(ref.fileId ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
 
 export const mergeHardwareMotorSchemaValues = (
   hardwareEntries: QcDivisionEntry[],

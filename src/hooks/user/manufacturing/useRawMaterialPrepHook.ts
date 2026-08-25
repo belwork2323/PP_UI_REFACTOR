@@ -57,7 +57,6 @@ import {
 } from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
 import type { SchemaDocumentV2 } from "../../../schema-engine";
 import { isSchemaDocumentReady } from "../../../schema-engine/utils/schemaMessages";
-import { isManufacturingContinueFillingStatus } from "../../operationStatus";
 
 const RM_STATUS = MANUFACTURING_STATUS;
 
@@ -311,22 +310,6 @@ export const useRawMaterialPrepHook = () => {
     () => addedPremixSelectionsByBatch[activeFormBatchKey] ?? [],
     [addedPremixSelectionsByBatch, activeFormBatchKey]
   );
-
-  const clearMaterialsCacheForKey = useCallback((batchKey: string) => {
-    if (!batchKey) return;
-    setSolidMaterialsCacheByBatchKey((prev) => {
-      if (!(batchKey in prev)) return prev;
-      const next = { ...prev };
-      delete next[batchKey];
-      return next;
-    });
-    setLiquidMaterialsCacheByBatchKey((prev) => {
-      if (!(batchKey in prev)) return prev;
-      const next = { ...prev };
-      delete next[batchKey];
-      return next;
-    });
-  }, []);
 
   useEffect(() => {
     if (view !== "form") {
@@ -676,11 +659,9 @@ export const useRawMaterialPrepHook = () => {
         nextPremixStatusByNo[i] = { premixSubmissionStatus: "TO_BE_INITIATED" };
       }
 
-      const shouldFetchFormDetails =
-        editMode ||
-        isManufacturingContinueFillingStatus(String(batch.rmStatus ?? batch.status ?? ""));
+      const shouldFetchFormDetails = Boolean(String(batch.formId ?? "").trim());
 
-      if (shouldFetchFormDetails && batch.formId) {
+      if (shouldFetchFormDetails) {
         const detailsResponse = await rawMaterialPreparationController.fetchFormDetails({
           formId: batch.formId,
         });
@@ -725,7 +706,13 @@ export const useRawMaterialPrepHook = () => {
         );
         const weightmentFromBatch = sheet.metadata?.rawMaterialPreparation?.weightmentSheet;
         if (weightmentFromBatch) {
-          nextWeightmentSheet = mapWeightmentSheetFromApi(weightmentFromBatch);
+          // New form: seed rows from batch metadata, but never auto-enable compare.
+          nextWeightmentSheet = {
+            ...mapWeightmentSheetFromApi(weightmentFromBatch),
+            validation: {
+              ...createEmptyWeightmentSheet().validation,
+            },
+          };
         }
       }
 
@@ -913,13 +900,21 @@ export const useRawMaterialPrepHook = () => {
   );
 
   const handleWeightmentSheetChange = useCallback(
-    (nextSheet: RawMaterialPrepWeightmentSheet) => {
-      setWeightmentSheetByBatch((prev) => ({
-        ...prev,
-        [activeFormBatchKey]: nextSheet,
-      }));
+    (
+      nextSheet:
+        | RawMaterialPrepWeightmentSheet
+        | ((prev: RawMaterialPrepWeightmentSheet) => RawMaterialPrepWeightmentSheet),
+    ) => {
+      setWeightmentSheetByBatch((prev) => {
+        const current = prev[activeFormBatchKey] ?? createEmptyWeightmentSheet();
+        const next = typeof nextSheet === "function" ? nextSheet(current) : nextSheet;
+        return {
+          ...prev,
+          [activeFormBatchKey]: next,
+        };
+      });
     },
-    [activeFormBatchKey]
+    [activeFormBatchKey],
   );
 
   const submitPremix = useCallback(async (premixNo: number, intent: "draft" | "submit") => {
@@ -1015,7 +1010,7 @@ export const useRawMaterialPrepHook = () => {
       const weightmentValidationError = validateWeightmentSheetAgainstIdentification(
         weightmentSheet.weightmentDetails,
         identificationSheet?.materials ?? [],
-        weightmentSheet.validation.compareWithIdentificationSheet,
+        weightmentSheet.validation.compareWithIdentificationSheet === true,
         {
           materialNotInSheet: RM.WEIGHTMENT_MATERIAL_NOT_IN_SHEET,
           percentageMismatch: RM.WEIGHTMENT_PERCENTAGE_MISMATCH,
@@ -1136,11 +1131,36 @@ export const useRawMaterialPrepHook = () => {
       });
 
       if (isDraft) {
-        showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.PREMIX_SAVE_DRAFT_SUCCESS(premixNo), "success", { autoCloseMs: 2200 });
+        showAlert(
+          STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.PREMIX_SAVE_DRAFT_SUCCESS(premixNo),
+          "success",
+          { autoCloseMs: 2200 },
+        );
         setHasSavedDraft(true);
-        clearMaterialsCacheForKey(activeFormBatchKey);
-        setAvailableSolidMaterials([]);
-        setAvailableLiquidMaterials([]);
+
+        const formIdForRefresh = String(nextFormId ?? activeBatch.formId ?? "").trim();
+        if (formIdForRefresh) {
+          // Re-fetch details so the form reflects persisted server values.
+          // Keep editMode=false unless this is still a rejected resubmission —
+          // draft refresh must not show "Editing Rejected Submission".
+          const statusForBanner = String(
+            response.data?.status ?? activeBatch.rmStatus ?? activeBatch.status ?? "",
+          )
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, "_");
+          const stillRejectedEdit = statusForBanner === "REJECTED";
+
+          await openFormWithResolvedData(
+            {
+              ...activeBatch,
+              formId: formIdForRefresh,
+              rmStatus: response.data?.status ?? activeBatch.rmStatus,
+              status: response.data?.status ?? activeBatch.status,
+            },
+            stillRejectedEdit,
+          );
+        }
       } else {
         showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.PREMIX_SUBMIT_SUCCESS(premixNo), "success", { autoCloseMs: 2200 });
       }
@@ -1159,13 +1179,13 @@ export const useRawMaterialPrepHook = () => {
     showAlert,
     formSnapshot,
     weightmentSheet,
-    clearMaterialsCacheForKey,
     activeFormBatchKey,
     premixStatusByNoByBatch,
     identificationSheet,
     numberOfPremix,
     checkPremixEditable,
     getPremixStatus,
+    openFormWithResolvedData,
   ]);
 
   const handleSavePremixDraft = useCallback(

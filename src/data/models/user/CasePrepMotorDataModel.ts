@@ -1,3 +1,10 @@
+import {
+  fileIdsFromFormRefs,
+  isFileUploadIncomplete,
+  parseFileRefs,
+  type FileRef,
+} from "../common/FileUploadModel";
+
 export type CasePrepOption = { value: string; label: string };
 
 export const ABRADING_WHEEL_OPTIONS: readonly CasePrepOption[] = [
@@ -36,130 +43,6 @@ export type AbradingWheelValue = "G60" | "G36" | "";
 export type VacuumBaggingValue = "YES" | "NO" | "";
 export type LinerTypeValue = "PEDCOAT" | "HEMCOAT_3L" | "HEMCOAT_3L_M" | "OTHERS" | "";
 
-export type CasePrepFileUploadStatus = "uploading" | "uploaded" | "failed";
-
-/** Eager file-service ref (RMS/RMC parity) for Case Prep attachments / test report. */
-export type CasePrepFileRef = {
-  fileName: string;
-  fileUrl: string;
-  mimeType?: string;
-  storedFileName?: string;
-  originalFileName?: string;
-  fileId?: string | null;
-  localId?: string;
-  status?: CasePrepFileUploadStatus;
-  uploadProgress?: number;
-  isTemp?: boolean;
-  file?: File | null;
-};
-
-export const newCasePrepFileLocalId = (): string =>
-  `case-prep-file-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-
-export const isCasePrepFileUploadIncomplete = (ref: CasePrepFileRef | null | undefined): boolean =>
-  ref?.status === "uploading" || ref?.status === "failed";
-
-export const isCasePrepFileReady = (ref: CasePrepFileRef | null | undefined): boolean => {
-  if (!ref || isCasePrepFileUploadIncomplete(ref)) return false;
-  const fileId = String(ref.fileId ?? "").trim();
-  if (fileId) return true;
-  const url = String(ref.fileUrl ?? "").trim();
-  return Boolean(url) && !/^pending-upload:\/\//i.test(url);
-};
-
-export type CasePrepFileApiPayload = {
-  fileId: string;
-  fileName: string;
-  mimeType: string;
-};
-
-export const parseCasePrepFileRef = (value: unknown): CasePrepFileRef | null => {
-  if (value == null) return null;
-  if (typeof value === "string") {
-    const fileName = value.trim();
-    if (!fileName) return null;
-    // Legacy filename-only values — not openable without fileId.
-    return {
-      fileName,
-      fileUrl: "",
-      mimeType: "application/octet-stream",
-      localId: newCasePrepFileLocalId(),
-      status: "uploaded",
-      isTemp: false,
-      file: null,
-    };
-  }
-  if (typeof value !== "object") return null;
-  const o = value as Record<string, unknown>;
-  const fileId = String(o.fileId ?? "").trim() || null;
-  const fileUrl = String(o.fileUrl ?? o.filePath ?? o.downloadUrl ?? fileId ?? "").trim();
-  const fileName =
-    String(o.fileName ?? o.originalFileName ?? o.name ?? "").trim() ||
-    String(fileUrl.split("/").pop() || "").trim();
-  if (!fileId && !fileName && !fileUrl) return null;
-  return {
-    fileName: fileName || "file",
-    fileUrl: fileUrl || fileId || "",
-    mimeType: String(o.mimeType ?? "").trim() || "application/octet-stream",
-    storedFileName: String(o.storedFileName ?? "").trim() || undefined,
-    originalFileName: String(o.originalFileName ?? "").trim() || undefined,
-    fileId,
-    localId: newCasePrepFileLocalId(),
-    status: "uploaded",
-    isTemp: false,
-    file: null,
-  };
-};
-
-export const parseCasePrepFileRefs = (value: unknown): CasePrepFileRef[] => {
-  if (value == null || value === "") return [];
-  if (typeof value === "string") {
-    return value
-      .split(",")
-      .map((part) => parseCasePrepFileRef(part.trim()))
-      .filter((r): r is CasePrepFileRef => Boolean(r));
-  }
-  if (Array.isArray(value)) {
-    return value.map(parseCasePrepFileRef).filter((r): r is CasePrepFileRef => Boolean(r));
-  }
-  const single = parseCasePrepFileRef(value);
-  return single ? [single] : [];
-};
-
-export const toCasePrepFileApiPayload = (ref: CasePrepFileRef): CasePrepFileApiPayload | null => {
-  if (!isCasePrepFileReady(ref)) return null;
-  const fileId = String(ref.fileId ?? "").trim();
-  if (!fileId) return null;
-  return {
-    fileId,
-    fileName: String(ref.fileName ?? "").trim() || "file",
-    mimeType: String(ref.mimeType ?? "").trim() || "application/octet-stream",
-  };
-};
-
-export const toCasePrepFilesApiPayload = (value: unknown): CasePrepFileApiPayload[] => {
-  const refs = Array.isArray(value)
-    ? (value as CasePrepFileRef[])
-    : value
-      ? parseCasePrepFileRefs(value)
-      : [];
-  return refs.map(toCasePrepFileApiPayload).filter((p): p is CasePrepFileApiPayload => Boolean(p));
-};
-
-export const toCasePrepSingleFileApiPayload = (
-  value: unknown,
-): CasePrepFileApiPayload | null => {
-  if (value == null) return null;
-  if (Array.isArray(value)) {
-    return toCasePrepFilesApiPayload(value)[0] ?? null;
-  }
-  if (typeof value === "object" && value !== null && "fileName" in (value as object)) {
-    return toCasePrepFileApiPayload(value as CasePrepFileRef);
-  }
-  const refs = parseCasePrepFileRefs(value);
-  return refs[0] ? toCasePrepFileApiPayload(refs[0]) : null;
-};
-
 export type CasePrepAbradingHeaderRow = {
   type: "header";
   label: string;
@@ -170,7 +53,7 @@ export type CasePrepAbradingDataRow = {
   operation: string;
   value: string;
   remarksObservations: string;
-  attachments: CasePrepFileRef[];
+  attachments: FileRef[];
   valueFieldType?: string;
   readonly?: boolean;
 };
@@ -233,7 +116,7 @@ export type CasePrepTceCleaningData = {
   tceCleaningDateTime: string;
   solventUsedQtyKg: string;
   observation: string;
-  testReport: CasePrepFileRef | null;
+  testReport: FileRef | null;
 };
 
 export type CasePrepPreHeatingData = {
@@ -257,7 +140,9 @@ export type CasePrepLinerCoatingOperationData = {
   qualifyingSubscaleBatchNo: string;
   qualificationParameters: CasePrepQualificationParameterRow[];
   linerApplicationLog: CasePrepParameterRow[];
+  /** UI-only; folded into linerApplicationLog Date row on save (not an API field). */
   linerCoatingDate?: string;
+  rh?: string;
 };
 
 export type CasePrepDispatchToCastingData = {
@@ -493,6 +378,7 @@ export const createEmptyCasePrepMotorData = (): CasePrepMotorData => ({
     otherDuration: "",
     temperatureDuration: [],
     preHeatingMonitoring: createEmptyPreHeatingMonitoring(),
+    /** UI-only; folded into preHeatingMonitoring Date row on save (not an API field). */
     preHeatingDate: "",
   },
   linerCoatingOperation: {
@@ -506,6 +392,7 @@ export const createEmptyCasePrepMotorData = (): CasePrepMotorData => ({
     qualificationParameters: createEmptyQualificationParameters(),
     linerApplicationLog: createEmptyLinerApplicationLog(),
     linerCoatingDate: "",
+    rh: "",
   },
   dispatchToCasting: {
     dispatchVisualObservations: createEmptyDispatchVisualObservations(),
@@ -648,6 +535,44 @@ const toApiNumber = (value: unknown): number | undefined => {
   return Number.isFinite(n) ? n : undefined;
 };
 
+/** YYYY-MM-DD for LocalDate-style cells (monitoring / application log Date rows). */
+const toApiDateOnly = (value: unknown): string => {
+  const raw = str(value).trim();
+  if (!raw) return "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw;
+  const dmy = raw.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
+  if (dmy) {
+    const [, d, m, y] = dmy;
+    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  }
+  const isoDate = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  return isoDate ? isoDate[1] : raw;
+};
+
+/** Copy UI date into the first parameter row named "Date" when that cell is empty. */
+const applyDateToParameterRows = (
+  rows: CasePrepParameterRow[],
+  dateValue: string,
+): CasePrepParameterRow[] => {
+  if (!dateValue) return rows;
+  let applied = false;
+  return rows.map((row) => {
+    if (applied) return row;
+    if (str(row.parameter).trim().toLowerCase() !== "date") return row;
+    if (str(row.value).trim()) return row;
+    applied = true;
+    return { ...row, value: dateValue };
+  });
+};
+
+/** Instant fields: match API sample `2026-08-12T02:00:00Z` (drop millis). */
+const toApiInstant = (value: unknown): string => {
+  const raw = str(value).trim();
+  if (!raw) return "";
+  const match = raw.match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d+)?Z$/i);
+  if (match) return `${match[1]}Z`;
+  return raw;
+};
 
 const abradingRowsForPayload = (rows: CasePrepAbradingDetailsRow[]): unknown[] => {
   let srNo = 0;
@@ -655,12 +580,17 @@ const abradingRowsForPayload = (rows: CasePrepAbradingDetailsRow[]): unknown[] =
     .filter((row) => !isAbradingHeaderRow(row))
     .map((row) => {
       srNo += 1;
+      const valueRaw = str(row.value).trim();
+      const value =
+        row.valueFieldType === "datetime" || /T\d{2}:\d{2}/.test(valueRaw)
+          ? toApiInstant(valueRaw) || valueRaw
+          : valueRaw;
       return stripRowForPayload({
         SR_NO: srNo,
         operation: row.operation,
-        value: row.value,
+        value,
         remarksObservations: row.remarksObservations,
-        attachments: toCasePrepFilesApiPayload(row.attachments),
+        attachments: fileIdsFromFormRefs(row.attachments),
       });
     });
 };
@@ -681,6 +611,8 @@ const observationRowsForPayload = (rows: CasePrepObservationRow[]): unknown[] =>
       SR_NO: index + 1,
       parameter: row.parameter,
       observations: row.observations,
+      // Always include remarks (user input); null when blank so the key is not dropped.
+      remarks: str(row.remarks ?? "").trim() || null,
     }),
   );
 
@@ -688,7 +620,9 @@ const ingredientRowsForPayload = (rows: CasePrepIngredientRow[]): unknown[] =>
   rows.map((row, index) => {
     const partsByWeight = toApiNumber(row.partsByWeight);
     const quantityTaken = toApiNumber(row.quantityTaken);
-    const totalQuantity = toApiNumber(row.totalQuantity) ?? quantityTaken;
+    // Always send totalQuantity as user input only (number, or null when blank — never copy quantityTaken).
+    const totalQuantityRaw = str(row.totalQuantity).trim();
+    const totalQuantity = totalQuantityRaw ? toApiNumber(totalQuantityRaw) ?? null : null;
     return {
       srNo: row.srNo || index + 1,
       materialName: str(row.materialName).trim(),
@@ -696,7 +630,7 @@ const ingredientRowsForPayload = (rows: CasePrepIngredientRow[]): unknown[] =>
       mfgLot: str(row.mfgLot).trim(),
       ...(partsByWeight !== undefined ? { partsByWeight } : {}),
       ...(quantityTaken !== undefined ? { quantityTaken } : {}),
-      ...(totalQuantity !== undefined ? { totalQuantity } : {}),
+      totalQuantity,
     };
   });
 
@@ -741,15 +675,30 @@ export const buildCasePrepMotorDetailsPayload = (
   const numberOfSpacers = toApiNumber(synced.bellowBonding.numberOfSpacers);
   const solventUsedQtyKg = toApiNumber(synced.tceCleaning.solventUsedQtyKg);
   const vacuumApplied = toApiNumber(synced.preHeating.vacuumApplied);
-  const otherTemperature = toApiNumber(synced.preHeating.otherTemperature);
-  const otherDuration = toApiNumber(synced.preHeating.otherDuration);
   const batchSize = toApiNumber(synced.linerCoatingOperation.batchSize);
   const recipe = str(synced.preHeating.preHeatingRecipe).trim();
-  const linerType = str(synced.linerCoatingOperation.linerType).trim();
+  const linerTypeRaw = str(synced.linerCoatingOperation.linerType).trim();
+  const otherLinerType = str(synced.linerCoatingOperation.otherLinerType).trim();
+  // Backend LinerCoatingOperation has no `otherLinerType` — send the custom value as linerType.
+  const linerType =
+    linerTypeRaw.toUpperCase() === "OTHERS" && otherLinerType ? otherLinerType : linerTypeRaw;
   const vacuumBaggingApplied = str(synced.preHeating.vacuumBaggingApplied).trim();
-  const heMotorPastingDateTime = str(synced.bellowBonding.heMotorPastingDateTime).trim();
-  const neMotorPastingDateTime = str(synced.bellowBonding.neMotorPastingDateTime).trim();
-  const tceCleaningDateTime = str(synced.tceCleaning.tceCleaningDateTime).trim();
+  const heMotorPastingDateTime = toApiInstant(synced.bellowBonding.heMotorPastingDateTime);
+  const neMotorPastingDateTime = toApiInstant(synced.bellowBonding.neMotorPastingDateTime);
+  const tceCleaningDateTime = toApiInstant(synced.tceCleaning.tceCleaningDateTime);
+
+  // UI-only date fields are not on the API DTO (FAIL_ON_UNKNOWN_PROPERTIES).
+  // Fold them into the first "Date" monitoring / application-log row when that cell is empty.
+  const preHeatingDate = toApiDateOnly(synced.preHeating.preHeatingDate);
+  const linerCoatingDate = toApiDateOnly(synced.linerCoatingOperation.linerCoatingDate);
+  const preHeatingMonitoring = applyDateToParameterRows(
+    synced.preHeating.preHeatingMonitoring,
+    preHeatingDate,
+  );
+  const linerApplicationLog = applyDateToParameterRows(
+    synced.linerCoatingOperation.linerApplicationLog,
+    linerCoatingDate,
+  );
 
   return {
     abradingOperation: {
@@ -772,26 +721,21 @@ export const buildCasePrepMotorDetailsPayload = (
       ...(tceCleaningDateTime ? { tceCleaningDateTime } : {}),
       ...(solventUsedQtyKg !== undefined ? { solventUsedQtyKg } : {}),
       observation: str(synced.tceCleaning.observation).trim(),
-      testReport: toCasePrepSingleFileApiPayload(synced.tceCleaning.testReport),
+      testReport: fileIdsFromFormRefs(
+        synced.tceCleaning.testReport ? [synced.tceCleaning.testReport] : [],
+      )[0] ?? null,
     },
     preHeating: {
       vacuumBaggingApplied,
       ...(vacuumBaggingApplied === "YES" && vacuumApplied !== undefined ? { vacuumApplied } : {}),
       preHeatingRecipe: recipe,
-      ...(recipe === "OTHERS"
-        ? {
-            ...(otherTemperature !== undefined ? { otherTemperature } : {}),
-            ...(otherDuration !== undefined ? { otherDuration } : {}),
-          }
-        : {}),
+      // Do not send otherTemperature / otherDuration / preHeatingDate — not on API DTO.
       temperatureDuration: parameterRowsForPayload(synced.preHeating.temperatureDuration),
-      preHeatingMonitoring: parameterRowsForPayload(synced.preHeating.preHeatingMonitoring),
+      preHeatingMonitoring: parameterRowsForPayload(preHeatingMonitoring),
     },
     linerCoatingOperation: {
       linerType,
-      ...(linerType === "OTHERS"
-        ? { otherLinerType: str(synced.linerCoatingOperation.otherLinerType).trim() }
-        : {}),
+      // Do not send otherLinerType / linerCoatingDate — not on API DTO.
       batchNo: str(synced.linerCoatingOperation.batchNo).trim(),
       ...(batchSize !== undefined ? { batchSize } : {}),
       premixIngredients: ingredientRowsForPayload(synced.linerCoatingOperation.premixIngredients),
@@ -804,9 +748,10 @@ export const buildCasePrepMotorDetailsPayload = (
       qualificationParameters: qualificationRowsForPayload(
         synced.linerCoatingOperation.qualificationParameters,
       ),
-      linerApplicationLog: parameterRowsForPayload(
-        synced.linerCoatingOperation.linerApplicationLog,
-      ),
+      linerApplicationLog: parameterRowsForPayload(linerApplicationLog),
+      ...(str(synced.linerCoatingOperation.rh ?? "").trim()
+        ? { rh: str(synced.linerCoatingOperation.rh).trim() }
+        : {}),
     },
     dispatchToCasting: {
       dispatchVisualObservations: observationRowsForPayload(
@@ -856,42 +801,61 @@ const parseAbradingDetails = (value: unknown): CasePrepAbradingDetailsRow[] => {
   const rows = asArray(value);
   if (!rows.length) return empty;
 
-  const parsed = rows.map((item) => {
+  type SavedAbradingRow = CasePrepAbradingDataRow & { srNo: number };
+  const savedDataRows: SavedAbradingRow[] = [];
+  const parsedWithHeaders: CasePrepAbradingDetailsRow[] = [];
+
+  rows.forEach((item, index) => {
     const rec = asRecord(item) ?? {};
     if (str(rec.type).toLowerCase() === "header" || ("label" in rec && !("operation" in rec))) {
-      return {
+      parsedWithHeaders.push({
         type: "header" as const,
         label: str(rec.label ?? rec.operation ?? ""),
-      };
+      });
+      return;
     }
-    return {
+
+    const srNoRaw = Number(rec.SR_NO ?? rec.srNo ?? 0);
+    const srNo = Number.isFinite(srNoRaw) && srNoRaw > 0 ? srNoRaw : savedDataRows.length + 1;
+    const dataRow: SavedAbradingRow = {
       operation: str(rec.operation ?? ""),
       value: str(rec.value ?? ""),
       remarksObservations: str(rec.remarksObservations ?? rec.remarks ?? ""),
-      attachments: parseCasePrepFileRefs(rec.attachments),
+      attachments: parseFileRefs(rec.attachments),
       valueFieldType: str(rec.valueFieldType ?? rec.value__fieldType ?? "") || undefined,
       readonly: rec.readonly === true,
-    } as CasePrepAbradingDataRow;
+      srNo,
+    };
+    savedDataRows.push(dataRow);
+    parsedWithHeaders.push(dataRow);
   });
 
-  const hasHeaders = parsed.some((row) => isAbradingHeaderRow(row));
-  if (hasHeaders) return parsed;
+  const hasHeaders = parsedWithHeaders.some((row) => isAbradingHeaderRow(row));
+  if (hasHeaders) {
+    // API already includes section headers — keep order, drop helper srNo.
+    return parsedWithHeaders.map((row) => {
+      if (isAbradingHeaderRow(row)) return row;
+      const { srNo: _srNo, ...rest } = row as SavedAbradingRow;
+      return rest;
+    });
+  }
 
-  const byOperation = new Map(
-    parsed
-      .filter((row): row is CasePrepAbradingDataRow => !isAbradingHeaderRow(row))
-      .map((row) => [row.operation.trim().toLowerCase(), row] as const),
-  );
+  // Headerless payload (SR_NO 1..n) — merge onto UI presets by serial order so
+  // duplicate operation labels (1st vs 2nd Cut "Start Date & Time") stay distinct.
+  const bySrNo = new Map(savedDataRows.map((row) => [row.srNo, row] as const));
+  let dataOrdinal = 0;
 
   return empty.map((preset) => {
     if (isAbradingHeaderRow(preset)) return preset;
-    const saved = byOperation.get(preset.operation.trim().toLowerCase());
+    dataOrdinal += 1;
+    const saved = bySrNo.get(dataOrdinal) ?? savedDataRows[dataOrdinal - 1];
     if (!saved) return preset;
     return {
       ...preset,
       value: saved.value,
       remarksObservations: saved.remarksObservations,
       attachments: saved.attachments?.length ? saved.attachments : preset.attachments,
+      valueFieldType: saved.valueFieldType || preset.valueFieldType,
     };
   });
 };
@@ -981,7 +945,7 @@ const parseIngredientRows = (value: unknown): CasePrepIngredientRow[] =>
       const row = asRecord(item);
       if (!row) return null;
       return {
-        srNo: Number(row.srNo ?? index + 1) || index + 1,
+        srNo: Number(row.srNo ?? row.SR_NO ?? index + 1) || index + 1,
         materialName: str(row.materialName ?? ""),
         ingredient: str(row.ingredient ?? ""),
         mfgLot: str(row.mfgLot ?? ""),
@@ -1078,7 +1042,7 @@ export const parseCasePrepMotorDataFromApi = (
       tceCleaningDateTime: str(tce.tceCleaningDateTime ?? ""),
       solventUsedQtyKg: str(tce.solventUsedQtyKg ?? ""),
       observation: str(tce.observation ?? ""),
-      testReport: parseCasePrepFileRefs(tce.testReport)[0] ?? null,
+      testReport: parseFileRefs(tce.testReport)[0] ?? null,
     },
     preHeating: {
       vacuumBaggingApplied: str(preHeating.vacuumBaggingApplied ?? ""),
@@ -1107,6 +1071,7 @@ export const parseCasePrepMotorDataFromApi = (
         liner.linerApplicationLog,
       ),
       linerCoatingDate: str(liner.linerCoatingDate ?? ""),
+      rh: str(liner.rh ?? ""),
     },
     dispatchToCasting: {
       dispatchVisualObservations: parseObservationRows(
@@ -1134,9 +1099,9 @@ export const parseCasePrepMotorDataFromSections = (
   sections: Array<{ sectionId?: string; sectionData?: unknown[] }> | undefined,
 ): CasePrepMotorData => parseCasePrepMotorDataFromApi(sections);
 
-export const collectCasePrepFileRefsFromMotorData = (data: CasePrepMotorData | null | undefined): CasePrepFileRef[] => {
+export const collectCasePrepFileRefsFromMotorData = (data: CasePrepMotorData | null | undefined): FileRef[] => {
   if (!data) return [];
-  const refs: CasePrepFileRef[] = [];
+  const refs: FileRef[] = [];
   for (const row of data.abradingOperation?.abradingDetails ?? []) {
     if (row && typeof row === "object" && "attachments" in row && Array.isArray((row as CasePrepAbradingDataRow).attachments)) {
       refs.push(...((row as CasePrepAbradingDataRow).attachments ?? []));
@@ -1149,8 +1114,8 @@ export const collectCasePrepFileRefsFromMotorData = (data: CasePrepMotorData | n
 export const collectCasePrepFileRefsFromForm = (form: {
   motors?: Array<{ data?: CasePrepMotorData | null }>;
   subscaleData?: CasePrepMotorData | null;
-}): CasePrepFileRef[] => {
-  const refs: CasePrepFileRef[] = [];
+}): FileRef[] => {
+  const refs: FileRef[] = [];
   for (const motor of form?.motors ?? []) {
     refs.push(...collectCasePrepFileRefsFromMotorData(motor?.data));
   }
@@ -1161,7 +1126,7 @@ export const collectCasePrepFileRefsFromForm = (form: {
 export const hasIncompleteCasePrepUploads = (form: {
   motors?: Array<{ data?: CasePrepMotorData | null }>;
   subscaleData?: CasePrepMotorData | null;
-}): boolean => collectCasePrepFileRefsFromForm(form).some(isCasePrepFileUploadIncomplete);
+}): boolean => collectCasePrepFileRefsFromForm(form).some(isFileUploadIncomplete);
 
 export const collectTempFileIdsFromCasePrepForm = (form: {
   motors?: Array<{ data?: CasePrepMotorData | null }>;

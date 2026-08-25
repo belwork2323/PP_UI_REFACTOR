@@ -1,4 +1,5 @@
 import { alpha } from "@mui/material/styles";
+import { createDataTableTheme, uniformTableHeaderCellSx } from "../../shared/data_table_theme";
 import { NDT_BRAND } from "./tokens";
 
 export { NDT_BRAND };
@@ -107,18 +108,12 @@ export const getNdtTheme = (baseTheme: any) => {
       },
     },
     table: {
-      headerCell: {
-        background: `linear-gradient(135deg, ${NDT_BRAND.primary}, ${accentColor})`,
-        color: "#fff",
-        fontWeight: 700,
-        fontSize: "0.65rem",
-        letterSpacing: "0.06em",
-        textTransform: "uppercase" as const,
-        py: 1.1,
-        px: 1.5,
-        whiteSpace: "nowrap" as const,
-        borderBottom: "none",
-      },
+      headerCell: uniformTableHeaderCellSx(NDT_BRAND.primary, accentColor, {
+        headerFontSize: "0.65rem",
+        headerLetterSpacing: "0.06em",
+        headerPaddingY: 1.1,
+        headerPaddingX: 1.5,
+      }),
       bodyCell: {
         fontSize: "0.8rem",
         py: 1,
@@ -212,29 +207,7 @@ export const getNdtTheme = (baseTheme: any) => {
         background: `linear-gradient(135deg, ${palette.primary ?? NDT_BRAND.primary}, ${palette.primaryLight ?? NDT_BRAND.primaryLight})`,
         color: "#fff",
       },
-      tableContainer: {
-        borderRadius: 1.5,
-        border: `1px solid ${palette.border ?? NDT_BRAND.border}`,
-        overflow: "hidden",
-      },
-      tableHeaderCell: (isLead: boolean) => ({
-        background: isLead
-          ? `linear-gradient(135deg, ${palette.primary ?? NDT_BRAND.primary}, ${palette.primaryLight ?? NDT_BRAND.primaryLight})`
-          : alpha(palette.primary ?? NDT_BRAND.primary, 0.06),
-        color: isLead ? "#fff" : palette.textSub ?? NDT_BRAND.textSub,
-        fontWeight: 700,
-        fontSize: "0.63rem",
-        letterSpacing: "0.05em",
-        textTransform: "uppercase",
-        py: 1,
-        px: 1.5,
-        borderBottom: `1px solid ${palette.border ?? NDT_BRAND.border}`,
-        whiteSpace: "nowrap",
-      }),
-      tableRow: (idx: number) => ({
-        background: idx % 2 === 0 ? palette.pageBg ?? "#fff" : alpha(palette.surface ?? NDT_BRAND.surface, 0.5),
-      }),
-      tableCell: { fontSize: "0.82rem", py: 1.1, px: 1.5, color: palette.text ?? NDT_BRAND.text },
+      ...createDataTableTheme({ ...NDT_BRAND, ...palette }),
       specText: { fontWeight: 600 },
       resultText: { fontWeight: 600, color: palette.text ?? NDT_BRAND.text },
       remarksText: { fontSize: "0.8rem", color: palette.textSub ?? NDT_BRAND.textSub },

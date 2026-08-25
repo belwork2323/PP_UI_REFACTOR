@@ -3,6 +3,7 @@ import {
   Box,
   Chip,
   CircularProgress,
+  Link,
   Stack,
   Table,
   TableBody,
@@ -14,6 +15,7 @@ import {
 } from "@mui/material";
 import PremixStatusChip from "../../../manufacturing/RawMaterial/components/PremixStatusChip";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
+import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import getQualityControlTheme from "../../../../../../app/theme/custom_themes/user/qualityControl/qualityControl_theme";
 import { getStfTheme } from "../../../../../../app/theme/custom_themes/user/qualityControl/stf_theme";
@@ -24,13 +26,16 @@ import {
   type CasePrepDetailSection,
   type CasePrepDetailTable,
 } from "../../../../../../data/models/user/CasePreparationFormModel";
+import { parseFileRefs, type FileRef } from "../../../../../../data/models/common/FileUploadModel";
 import type {
   StfDetailView,
   StfMotorDetailView,
 } from "../../../../../../data/models/user/StaticTestFacilityApiModel";
 import { STF_FLOW_LABELS } from "../../../../../../hooks/user/qualityControl/stfFlowConfig";
 import { OPERATION_STATUS_UI_TO_API } from "../../../../../../hooks/operationStatus";
-import { parseSchemaFileList } from "../../../../../components/common/SchemaFileField";
+import { useFilePreview } from "../../../../../../hooks/useFilePreview";
+import { useAuthStore } from "../../../../../../app/store/authStore";
+import FilePreviewDialog from "../../../../../components/common/FilePreviewDialog";
 import {
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
@@ -66,7 +71,7 @@ const formatDateTime = (value?: string | null) => {
   });
 };
 
-const STF_UPLOAD_FIELD_KEYS = new Set(["PT_CURVE_UPLOAD", "PT_CURVE_FILE"]);
+const STF_UPLOAD_FIELD_KEYS = new Set(["PT_CURVE_UPLOAD", "PT_CURVE_FILE", "PTCURVEFILE"]);
 
 const normalizeStfFieldKey = (key?: string) => {
   const trimmed = String(key ?? "").trim();
@@ -78,45 +83,100 @@ const normalizeStfFieldKey = (key?: string) => {
 const isStfUploadFieldKey = (key?: string) => {
   const normalized = normalizeStfFieldKey(key).toUpperCase();
   if (!normalized) return false;
-  if (STF_UPLOAD_FIELD_KEYS.has(normalized)) return true;
+  if (STF_UPLOAD_FIELD_KEYS.has(normalized.replace(/[^A-Z0-9]/g, ""))) return true;
+  const compact = normalized.replace(/[^A-Z0-9]/g, "");
+  return compact.includes("PTCURVE") || compact === "PTCURVEFILE";
+};
+
+const looksLikeStfFiles = (value: unknown): boolean => {
+  if (value == null || value === "") return false;
+  if (typeof value === "string") return false;
+  if (Array.isArray(value)) {
+    return value.some(
+      (entry) =>
+        entry &&
+        typeof entry === "object" &&
+        ("fileId" in entry || "fileName" in entry || "mimeType" in entry),
+    );
+  }
   return (
-    normalized.includes("UPLOAD") || normalized.endsWith("_FILE") || normalized.endsWith("FILE")
+    typeof value === "object" &&
+    ("fileId" in (value as object) ||
+      "fileName" in (value as object) ||
+      "mimeType" in (value as object))
   );
 };
 
-const parseStfUploadFiles = (value: unknown): string[] => {
-  if (value == null || value === "") return [];
-  if (Array.isArray(value)) {
-    return value.flatMap((entry) => parseStfUploadFiles(entry));
-  }
-  if (typeof value === "object") {
-    const file = value as { name?: string; fileName?: string };
-    const name = String(file.fileName ?? file.name ?? "").trim();
-    return name ? [name] : [];
-  }
-  return parseSchemaFileList(String(value));
+const StfFileLinks = ({
+  refs,
+  subDepartmentId,
+  onOpen,
+}: {
+  refs: FileRef[];
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
+}) => {
+  if (!refs.length) return <>{formatCasePrepCellValue(null)}</>;
+  return (
+    <Stack spacing={0.5}>
+      {refs.map((ref, index) => {
+        const fileId = String(ref.fileId ?? "").trim();
+        const name = ref.fileName || "file";
+        const canOpen = Boolean(fileId && subDepartmentId);
+        return (
+          <Stack
+            key={ref.localId ?? `${fileId || name}-${index}`}
+            direction="row"
+            alignItems="center"
+            gap={1}
+            flexWrap="wrap"
+          >
+            <Typography component="span" sx={{ fontSize: "0.75rem", fontWeight: 600 }}>
+              {name}
+            </Typography>
+            {canOpen ? (
+              <Link
+                component="button"
+                type="button"
+                onClick={() => onOpen(fileId, name)}
+                sx={{
+                  fontSize: "0.72rem",
+                  fontWeight: 700,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 0.25,
+                  cursor: "pointer",
+                }}
+              >
+                {STF.FILE_OPEN}
+                <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
+              </Link>
+            ) : null}
+          </Stack>
+        );
+      })}
+    </Stack>
+  );
 };
 
 const StfCellValue = ({
   value,
   fieldKey,
-  dt,
+  subDepartmentId,
+  onOpen,
 }: {
   value: unknown;
   fieldKey?: string;
-  dt: STFDetailsTheme;
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
 }) => {
-  if (isStfUploadFieldKey(fieldKey)) {
-    const files = parseStfUploadFiles(value);
-    if (!files.length) return <>—</>;
+  if (isStfUploadFieldKey(fieldKey) || looksLikeStfFiles(value)) {
     return (
-      <Stack component="ul" spacing={0.5} sx={{ m: 0, pl: 2.25, listStyleType: "disc" }}>
-        {files.map((file) => (
-          <Box component="li" key={file} sx={{ ...dt.resultText, display: "list-item" }}>
-            {file}
-          </Box>
-        ))}
-      </Stack>
+      <StfFileLinks
+        refs={parseFileRefs(value)}
+        subDepartmentId={subDepartmentId}
+        onOpen={onOpen}
+      />
     );
   }
 
@@ -126,9 +186,13 @@ const StfCellValue = ({
 const FieldsTable = ({
   fields,
   dt,
+  subDepartmentId,
+  onOpen,
 }: {
   fields: CasePrepDetailSection["fields"];
   dt: STFDetailsTheme;
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
 }) => {
   if (!fields.length) return null;
 
@@ -146,7 +210,12 @@ const FieldsTable = ({
             <TableRow key={`${field.key}-${index}`} sx={dt.tableRow(index)}>
               <TableCell sx={{ ...dt.tableCell, ...dt.specText }}>{field.label}</TableCell>
               <TableCell sx={{ ...dt.tableCell, ...dt.resultText }}>
-                <StfCellValue value={field.value} fieldKey={field.key} dt={dt} />
+                <StfCellValue
+                  value={field.value}
+                  fieldKey={field.key}
+                  subDepartmentId={subDepartmentId}
+                  onOpen={onOpen}
+                />
               </TableCell>
             </TableRow>
           ))}
@@ -156,7 +225,17 @@ const FieldsTable = ({
   );
 };
 
-const DataTable = ({ table, dt }: { table: CasePrepDetailTable; dt: STFDetailsTheme }) => {
+const DataTable = ({
+  table,
+  dt,
+  subDepartmentId,
+  onOpen,
+}: {
+  table: CasePrepDetailTable;
+  dt: STFDetailsTheme;
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
+}) => {
   // Prefer schema / mapper insertion order from columnLabels (do not A–Z re-sort).
   const columns = Object.keys(table.columnLabels ?? {}).filter(
     (column) => !column.startsWith("_") && !column.endsWith("__fieldType"),
@@ -184,7 +263,12 @@ const DataTable = ({ table, dt }: { table: CasePrepDetailTable; dt: STFDetailsTh
               <TableRow key={rowIndex} sx={dt.tableRow(rowIndex)}>
                 {columns.map((column) => (
                   <TableCell key={column} sx={dt.tableCell}>
-                    <StfCellValue value={row[column]} fieldKey={column} dt={dt} />
+                    <StfCellValue
+                      value={row[column]}
+                      fieldKey={column}
+                      subDepartmentId={subDepartmentId}
+                      onOpen={onOpen}
+                    />
                   </TableCell>
                 ))}
               </TableRow>
@@ -196,14 +280,35 @@ const DataTable = ({ table, dt }: { table: CasePrepDetailTable; dt: STFDetailsTh
   );
 };
 
-const SectionPanel = ({ section, dt }: { section: CasePrepDetailSection; dt: STFDetailsTheme }) => (
+const SectionPanel = ({
+  section,
+  dt,
+  subDepartmentId,
+  onOpen,
+}: {
+  section: CasePrepDetailSection;
+  dt: STFDetailsTheme;
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
+}) => (
   <Box sx={{ mb: 2.5 }}>
     <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: "text.primary", mb: 1 }}>
       {section.label}
     </Typography>
-    <FieldsTable fields={section.fields} dt={dt} />
+    <FieldsTable
+      fields={section.fields}
+      dt={dt}
+      subDepartmentId={subDepartmentId}
+      onOpen={onOpen}
+    />
     {section.tables.map((table) => (
-      <DataTable key={table.blockId} table={table} dt={dt} />
+      <DataTable
+        key={table.blockId}
+        table={table}
+        dt={dt}
+        subDepartmentId={subDepartmentId}
+        onOpen={onOpen}
+      />
     ))}
   </Box>
 );
@@ -213,11 +318,15 @@ const StfMotorDetailPanel = ({
   dt,
   palette,
   statusConfig,
+  subDepartmentId,
+  onOpen,
 }: {
   motor: StfMotorDetailView;
   dt: STFDetailsTheme;
   palette: ReturnType<typeof getQualityControlTheme>["palette"];
   statusConfig: Record<string, { color: string; bg: string; border: string }>;
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
 }) => (
   <Box>
     <Stack direction="row" alignItems="center" gap={1} mb={1.5} flexWrap="wrap">
@@ -250,7 +359,13 @@ const StfMotorDetailPanel = ({
       <Typography sx={dt.emptyText}>{STF.DETAILS_NO_MOTOR_DATA}</Typography>
     ) : (
       motor.sections.map((section) => (
-        <SectionPanel key={section.sectionId} section={section} dt={dt} />
+        <SectionPanel
+          key={section.sectionId}
+          section={section}
+          dt={dt}
+          subDepartmentId={subDepartmentId}
+          onOpen={onOpen}
+        />
       ))
     )}
   </Box>
@@ -274,6 +389,18 @@ const STFDetailsContent = ({
   const dt = getStfTheme(theme).details;
   const statusConfig = dt.bannerStatusConfig ?? {};
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
+  const isBem = detailView?.batchType === "BEM";
+  // Other BEM lives under the STF sub-department (same file-service id as ACEM).
+  const subDepartmentId = useAuthStore(
+    (s) =>
+      s.user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "static-test-facility")
+        ?.subDepartmentId,
+  );
+  const { preview, openFile, closePreview, downloadCurrent } = useFilePreview();
+  const onOpenFile = (fileId: string, fileName: string) => {
+    if (!subDepartmentId) return;
+    void openFile(fileId, subDepartmentId, fileName);
+  };
 
   const motors = detailView?.motors ?? [];
   const activeMotorIndexSafe =
@@ -303,8 +430,6 @@ const STFDetailsContent = ({
   useEffect(() => {
     setActiveMotorIndex(0);
   }, [resetOnFormId]);
-
-  const isBem = detailView?.batchType === "BEM";
 
   const metaFields = [
     ...(isBem
@@ -400,12 +525,20 @@ const STFDetailsContent = ({
               dt={dt}
               palette={theme.palette}
               statusConfig={statusConfig}
+              subDepartmentId={subDepartmentId}
+              onOpen={onOpenFile}
             />
           ) : null}
         </Box>
       ) : (
         <Typography sx={dt.emptyText}>No form data recorded</Typography>
       )}
+
+      <FilePreviewDialog
+        preview={preview}
+        onClose={closePreview}
+        onDownload={downloadCurrent}
+      />
     </>
   );
 };

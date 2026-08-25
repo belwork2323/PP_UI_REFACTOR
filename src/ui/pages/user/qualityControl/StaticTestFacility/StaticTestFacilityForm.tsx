@@ -376,7 +376,6 @@ const StaticTestFacilityForm = ({
           availableBemMotorOptions={availableBemMotorOptions}
           maxMotorCount={maxMotorCount}
           approvedMotorsLoading={approvedMotorsLoading}
-          schemaLoading={false}
           lockMotorTypeToBem
           onMotorTypeChange={onMotorTypeChange}
           onMotorCountChange={onMotorCountChange}
@@ -530,6 +529,7 @@ const StaticTestFacilityForm = ({
                   onChange={(next) => onFormValuesChange(activeMotorSession.motorId, next)}
                   disabled={actionLoading || activeMotorLocked}
                   theme={theme}
+                  subDeptSlug="static-test-facility"
                   subDepartmentId={subDepartmentId}
                   batchId={batch?.batchId}
                   motorId={activeMotorSession.motorId}

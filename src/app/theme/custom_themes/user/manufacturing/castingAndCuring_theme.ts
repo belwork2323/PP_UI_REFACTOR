@@ -1,4 +1,5 @@
 import { alpha } from "@mui/material/styles";
+import { createDataTableTheme } from "../../shared/data_table_theme";
 
 export const CASTING_CURING_BRAND = {
   primary: "#1565C0",
@@ -110,35 +111,12 @@ export const getCastingAndCuringTheme = (baseTheme: any) => {
         background: `linear-gradient(135deg, ${palette.primary ?? CASTING_CURING_BRAND.cc}, ${palette.primaryLight ?? CASTING_CURING_BRAND.ccLight})`,
         color: "#fff",
       },
-      tableContainer: {
-        borderRadius: 1.5,
-        border: `1px solid ${palette.border ?? CASTING_CURING_BRAND.border}`,
-        overflow: "hidden",
-      },
-      tableHeaderCell: (isLead: boolean) => ({
-        background: isLead
-          ? `linear-gradient(135deg, ${palette.primary ?? CASTING_CURING_BRAND.cc}, ${palette.primaryLight ?? CASTING_CURING_BRAND.ccLight})`
-          : alpha(palette.primary ?? CASTING_CURING_BRAND.cc, 0.06),
-        color: isLead ? "#fff" : palette.textSub ?? CASTING_CURING_BRAND.textSub,
-        fontWeight: 700,
-        fontSize: "0.63rem",
-        letterSpacing: "0.05em",
-        textTransform: "uppercase",
-        py: 1,
-        px: 1.5,
-        borderBottom: `1px solid ${palette.border ?? CASTING_CURING_BRAND.border}`,
-        whiteSpace: "nowrap",
+      ...createDataTableTheme({
+        ...CASTING_CURING_BRAND,
+        ...palette,
+        primary: palette.primary ?? CASTING_CURING_BRAND.cc,
+        primaryLight: palette.primaryLight ?? CASTING_CURING_BRAND.ccLight,
       }),
-      tableRow: (idx: number) => ({
-        background:
-          idx % 2 === 0 ? palette.pageBg ?? "#fff" : alpha(palette.surface ?? CASTING_CURING_BRAND.surface, 0.5),
-      }),
-      tableCell: {
-        fontSize: "0.82rem",
-        py: 1.1,
-        px: 1.5,
-        color: palette.text ?? CASTING_CURING_BRAND.text,
-      },
       specText: { fontWeight: 600 },
       resultText: { fontWeight: 600, color: palette.text ?? CASTING_CURING_BRAND.text },
       emptyText: {

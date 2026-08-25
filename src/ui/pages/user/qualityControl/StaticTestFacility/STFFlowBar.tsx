@@ -1,4 +1,4 @@
-import { Box, Button, CircularProgress, Typography } from "@mui/material";
+import { Box, Button, Typography } from "@mui/material";
 import {
   STF_FLOW_LABELS,
   canAddStfBemMotor,
@@ -19,7 +19,6 @@ type STFFlowBarProps = {
   availableBemMotorOptions?: StfMotorOption[];
   maxMotorCount: number;
   approvedMotorsLoading?: boolean;
-  schemaLoading?: boolean;
   /** ACEM locks motor type to BEM; main motors come from batch navigation. */
   lockMotorTypeToBem?: boolean;
   onMotorTypeChange: (value: string) => void;
@@ -35,7 +34,6 @@ const STFFlowBar = ({
   draftBemNo,
   addedMotors,
   availableBemMotorOptions = [],
-  schemaLoading = false,
   lockMotorTypeToBem = true,
   onDraftBemNoChange,
   onAddMotors,
@@ -120,16 +118,8 @@ const STFFlowBar = ({
 
         {canAddBem ? (
           <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-            <Button
-              variant="contained"
-              size="small"
-              disabled={schemaLoading}
-              onClick={onAddMotors}
-              startIcon={
-                schemaLoading ? <CircularProgress size={14} color="inherit" /> : undefined
-              }
-            >
-              {schemaLoading ? L.loadingSchema : L.addMotors}
+            <Button variant="contained" size="small" onClick={onAddMotors}>
+              {L.addMotors}
             </Button>
           </Box>
         ) : null}

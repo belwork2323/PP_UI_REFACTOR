@@ -1,4 +1,5 @@
 import { alpha } from "@mui/material";
+import { createDataTableTheme, uniformTableHeaderCellSx } from "../../shared/data_table_theme";
 
 export const getRocketMotorCasingTheme = (baseTheme: any) => {
 	const palette = baseTheme?.palette ?? {};
@@ -396,12 +397,13 @@ export const getRocketMotorCasingTheme = (baseTheme: any) => {
 				boxShadow: `0 1px 6px ${alpha(palette.primary ?? "#1B4F72", 0.05)}`,
 			},
 			tableHeaderLead: { minWidth: 200, width: "28%" },
-			tableHeaderCell: (isRemarks = false) => ({
-				minWidth: isRemarks ? 160 : 100,
-				width: isRemarks ? "20%" : "13%",
-				...(isRemarks
-					? { background: `linear-gradient(135deg, ${palette.accent ?? "#148F77"}, ${palette.accentLight ?? "#1ABC9C"})` }
-					: {}),
+			tableHeaderCell: (_isRemarks = false) => ({
+				...uniformTableHeaderCellSx(palette.primary ?? "#1B4F72", palette.primaryLight ?? "#2E86C1", {
+					headerFontSize: "0.65rem",
+					headerLetterSpacing: "0.05em",
+				}),
+				minWidth: _isRemarks ? 160 : 100,
+				width: _isRemarks ? "20%" : "13%",
 			}),
 			dataRow: (isEven: boolean) => ({
 				background: isEven ? palette.surface : alpha(palette.surface ?? "#F4F6F8", 0.55),
@@ -552,29 +554,7 @@ export const getRocketMotorCasingTheme = (baseTheme: any) => {
 				background: `linear-gradient(135deg, ${palette.primary}, ${palette.primaryLight})`,
 				color: "#fff",
 			},
-			tableContainer: {
-				borderRadius: 1.5,
-				border: `1px solid ${palette.border ?? "#D5D8DC"}`,
-				overflow: "hidden",
-			},
-			tableHeaderCell: (isLead: boolean) => ({
-				background: isLead
-					? `linear-gradient(135deg, ${palette.primary}, ${palette.primaryLight})`
-					: alpha(palette.primary ?? "#1B4F72", 0.06),
-				color: isLead ? "#fff" : palette.textSub,
-				fontWeight: 700,
-				fontSize: "0.63rem",
-				letterSpacing: "0.05em",
-				textTransform: "uppercase",
-				py: 1,
-				px: 1.5,
-				borderBottom: `1px solid ${palette.border}`,
-				whiteSpace: "nowrap",
-			}),
-			tableRow: (idx: number) => ({
-				background: idx % 2 === 0 ? palette.pageBg ?? "#fff" : alpha(palette.surface ?? "#F4F6F8", 0.5),
-			}),
-			tableCell: { fontSize: "0.82rem", py: 1.1, px: 1.5, color: palette.text },
+			...createDataTableTheme(palette),
 			specText: { fontWeight: 600 },
 			resultText: { fontWeight: 600, color: palette.text },
 			remarksText: { fontSize: "0.8rem", color: palette.textSub },

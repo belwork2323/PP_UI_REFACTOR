@@ -325,7 +325,8 @@
             "type": "field",
             "id": "DISPATCH_PHOTOS",
             "fieldType": "file",
-            "label": "Upload Dispatch Photos"
+            "label": "Upload Dispatch Photos",
+            "description": "[{ fileId }]"
           }
         ]
       },
@@ -354,7 +355,8 @@
             "type": "field",
             "id": "CLEARANCE_CERTIFICATE",
             "fieldType": "file",
-            "label": "Upload Clearance Certificate"
+            "label": "Upload Clearance Certificate",
+            "description": "{ fileId }"
           }
         ]
       },

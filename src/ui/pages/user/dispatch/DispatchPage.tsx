@@ -3,6 +3,7 @@ import { Box } from "@mui/material";
 import ConfirmAlertDialog from "../../../components/common/ConfirmAlertDialog";
 import WorkflowFormOpeningLoader from "../../../components/common/WorkflowFormOpeningLoader";
 import UserWorkflowFormHeader from "../../../components/custom/UserWorkflowFormHeader";
+import { resolveWorkflowFormHeaderStatus } from "../../../components/custom/workflowFormHeaderStatus";
 import { STRINGS } from "../../../../app/config/strings";
 import DispatchList from "./DispatchList";
 import DispatchForm from "./DispatchForm";
@@ -146,21 +147,6 @@ const formatMotorSubtitle = (batch?: {
   return [project, motors && motors !== "—" ? motors : ""].filter(Boolean).join(" · ") || undefined;
 };
 
-const resolveStatusLabel = (batch: any, isEdit: boolean) => {
-  if (isEdit) return STRINGS.QUALITY_CONTROL.FORM_HEADER.EDITING_REJECTED;
-  const status = String(batch?.dispatchStatus ?? batch?.status ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "_");
-  const inProgress =
-    status === "in_progress" ||
-    status === "waiting_for_partial_approval" ||
-    Boolean(batch?.formId);
-  return inProgress
-    ? STRINGS.QUALITY_CONTROL.FORM_HEADER.DRAFT
-    : STRINGS.DISPATCH.NEW_LABEL;
-};
-
 const DispatchPage = () => {
   const flowBarTheme = useMemo(() => getManufacturingTheme("light"), []);
   const strings = STRINGS.DISPATCH;
@@ -236,11 +222,17 @@ const DispatchPage = () => {
             data={{
               title: String(activeBatch.batchId ?? "—"),
               subtitle: formatMotorSubtitle(activeBatch),
-              statusLabel: resolveStatusLabel(activeBatch, isEditMode),
-              statusVariant: isEditMode ? "edit" : "new",
-              rejectionReason: activeBatch.rejectionReason,
+              ...(() => {
+                const hs = resolveWorkflowFormHeaderStatus(activeBatch, {
+                  preferredStatusKeys: ["dispatchStatus"],
+                });
+                return {
+                  statusLabel: hs.statusLabel,
+                  statusVariant: hs.statusVariant,
+                  rejectionReason: hs.rejectionReason,
+                };
+              })(),
             }}
-            isEdit={isEditMode}
             onBack={handleBack}
             backLabel={STRINGS.QUALITY_CONTROL.FORM_HEADER.BACK_TO_LIST}
             rejectionTitle={STRINGS.QUALITY_CONTROL.FORM_HEADER.REJECTION_REASON}

@@ -1,4 +1,5 @@
 import { alpha } from "@mui/material";
+import { createDataTableTheme } from "../../shared/data_table_theme";
 
 export const SOLID_PREP_BRAND = {
 	primary: "#1B4F72",
@@ -432,29 +433,7 @@ export const getRawMaterialPreparationTheme = (baseTheme: any) => {
 				background: `linear-gradient(135deg, ${palette.primary}, ${palette.primaryLight})`,
 				color: "#fff",
 			},
-			tableContainer: {
-				borderRadius: 1.5,
-				border: `1px solid ${palette.border ?? "#D5D8DC"}`,
-				overflow: "hidden",
-			},
-			tableHeaderCell: (isLead: boolean) => ({
-				background: isLead
-					? `linear-gradient(135deg, ${palette.primary}, ${palette.primaryLight})`
-					: alpha(palette.primary ?? "#1B4F72", 0.06),
-				color: isLead ? "#fff" : palette.textSub,
-				fontWeight: 700,
-				fontSize: "0.72rem",
-				letterSpacing: "0.01em",
-				textTransform: "none",
-				py: 1,
-				px: 1.5,
-				borderBottom: `1px solid ${palette.border}`,
-				whiteSpace: "nowrap",
-			}),
-			tableRow: (idx: number) => ({
-				background: idx % 2 === 0 ? palette.pageBg ?? "#fff" : alpha(palette.surface ?? "#F4F6F8", 0.5),
-			}),
-			tableCell: { fontSize: "0.82rem", py: 1.1, px: 1.5, color: palette.text },
+			...createDataTableTheme(palette),
 			specText: { fontWeight: 600 },
 			resultText: { fontWeight: 600, color: palette.text },
 			remarksText: { fontSize: "0.8rem", color: palette.textSub },

@@ -18,7 +18,8 @@ import {
 } from "@mui/material";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { SchemaFormValues } from "../../../../../schema-engine";
-import SchemaFileField from "../../../../components/common/SchemaFileField";
+import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
+import NdtFileField from "../NDT/NdtFileField";
 import {
   QC_PROPELLANT_AVG_COLUMN,
   QC_PROPELLANT_ROW_UPLOAD_FIELD,
@@ -53,20 +54,19 @@ import {
   qcReadOnlyTableContainerSx,
   qcReadOnlyTableHeaderCellSx,
 } from "./components/QCDivisionReadOnlyValue";
+import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
 
 const BRAND = QC_DIVISION_BRAND;
 const TABLE_BORDER = alpha(BRAND.primary, 0.18);
 const HEADER_CELL_BORDER = alpha("#fff", 0.22);
 
 const TH = {
-  background: `linear-gradient(135deg, ${BRAND.primary}, ${BRAND.primaryLight})`,
-  color: "#fff",
-  fontWeight: 700,
-  fontSize: "0.68rem",
-  letterSpacing: "0.06em",
-  textTransform: "uppercase" as const,
-  padding: "10px 12px",
-  whiteSpace: "nowrap" as const,
+  ...uniformTableHeaderCellSx(BRAND.primary, BRAND.primaryLight, {
+    headerFontSize: "0.68rem",
+    headerLetterSpacing: "0.06em",
+    headerPaddingY: "10px",
+    headerPaddingX: "12px",
+  }),
   border: `1px solid ${HEADER_CELL_BORDER}`,
 };
 
@@ -199,12 +199,12 @@ const PropertyTable = ({
     ? rows.filter((row) => row.kind !== "mean" && row.kind !== "std")
     : rows;
 
-  const updateCell = (index: number, field: string, value: string) => {
+  const updateCell = (index: number, field: string, value: string | FileRef[]) => {
     onRowsChange(
       rows.map((row, rowIndex) => {
         if (rowIndex !== index) return row;
         const next = { ...row, [field]: value };
-        if (includeRowStats && columns.includes(field)) {
+        if (includeRowStats && typeof value === "string" && columns.includes(field)) {
           return applyPropellantRowStats(next, columns);
         }
         return next;
@@ -255,7 +255,9 @@ const PropertyTable = ({
           <TableBody>
             {displayRows.map((row) => {
               const index = rows.indexOf(row);
-              const uploadValue = String(row[QC_PROPELLANT_ROW_UPLOAD_FIELD] ?? "");
+              const uploadFiles = Array.isArray(row[QC_PROPELLANT_ROW_UPLOAD_FIELD])
+                ? (row[QC_PROPELLANT_ROW_UPLOAD_FIELD] as FileRef[])
+                : [];
               return (
                 <TableRow
                   key={`${sectionId}-${index}-${row.PROPERTY}`}
@@ -339,17 +341,19 @@ const PropertyTable = ({
                   ) : null}
                   {includeRowUpload ? (
                     <TableCell sx={bodyCellSx}>
-                      {readOnly ? (
-                        <QCDivisionReadOnlyValue value={uploadValue} muted={!uploadValue.trim()} />
-                      ) : (
-                        <SchemaFileField
-                          value={uploadValue}
-                          onChange={(next) => updateCell(index, QC_PROPELLANT_ROW_UPLOAD_FIELD, next)}
-                          disabled={inputsDisabled}
-                          multiple={false}
-                          emptyLabel="Upload"
-                        />
-                      )}
+                      <NdtFileField
+                        files={uploadFiles}
+                        onChange={(next) =>
+                          updateCell(index, QC_PROPELLANT_ROW_UPLOAD_FIELD, next)
+                        }
+                        disabled={inputsDisabled}
+                        readOnly={readOnly}
+                        multiple={false}
+                        acceptMode="image"
+                        subDeptSlug="qc-division"
+                        compact
+                        emptyLabel="Upload"
+                      />
                     </TableCell>
                   ) : null}
                 </TableRow>
@@ -629,20 +633,16 @@ const QCPropellantMotorPanel = ({
               <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.primary, mb: 0.75 }}>
                 Upload Graph
               </Typography>
-              {readOnly ? (
-                <QCDivisionReadOnlyValue
-                  value={mechanicalGraph}
-                  muted={!mechanicalGraph.trim()}
-                />
-              ) : (
-                <SchemaFileField
-                  value={mechanicalGraph}
-                  onChange={(next) => onChange(setPropellantMechanicalGraph(values, next))}
-                  disabled={inputsDisabled}
-                  multiple={false}
-                  emptyLabel="Upload Graph"
-                />
-              )}
+              <NdtFileField
+                files={mechanicalGraph}
+                onChange={(next) => onChange(setPropellantMechanicalGraph(values, next))}
+                disabled={inputsDisabled}
+                readOnly={readOnly}
+                multiple={false}
+                acceptMode="image"
+                subDeptSlug="qc-division"
+                emptyLabel="Upload Graph"
+              />
             </Box>
           </Stack>
         </SectionCard>

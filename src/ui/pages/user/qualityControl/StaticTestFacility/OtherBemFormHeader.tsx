@@ -1,12 +1,14 @@
 import React from "react";
 import UserWorkflowFormHeader from "../../../../components/custom/UserWorkflowFormHeader";
+import { resolveWorkflowFormHeaderStatus } from "../../../../components/custom/workflowFormHeaderStatus";
+import { STRINGS } from "../../../../../app/config/strings";
 
 interface OtherBemFormHeaderProps {
   theme: any;
   onBack: () => void;
   batchId?: string;
   bemNo?: string;
-  isEditMode?: boolean;
+  status?: string | null;
   rejectionReason?: string | null;
 }
 
@@ -15,21 +17,27 @@ export const OtherBemFormHeader: React.FC<OtherBemFormHeaderProps> = ({
   onBack,
   batchId,
   bemNo,
-  isEditMode = false,
+  status,
   rejectionReason,
 }) => {
+  const headerStatus = resolveWorkflowFormHeaderStatus({
+    status,
+    rejectionReason,
+  });
+
   return (
     <UserWorkflowFormHeader
       theme={theme}
       mode="update"
       onBack={onBack}
-      backLabel="Back to Other BEM List"
+      backLabel={STRINGS.MANUFACTURING.FORM_HEADER.BACK_TO_LIST}
+      rejectionTitle={STRINGS.MANUFACTURING.FORM_HEADER.REJECTION_REASON}
       data={{
         title: batchId || "Other BEM Motor",
         subtitle: bemNo ? `BEM No: ${bemNo}` : undefined,
-        statusLabel: isEditMode ? "Editing Rejected Submission" : "New Submission",
-        statusVariant: isEditMode ? "edit" : "new",
-        rejectionReason: rejectionReason,
+        statusLabel: headerStatus.statusLabel,
+        statusVariant: headerStatus.statusVariant,
+        rejectionReason: headerStatus.rejectionReason,
       }}
     />
   );

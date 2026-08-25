@@ -1,6 +1,6 @@
 import React, { useState, useRef } from "react";
 import {
-  Box, Stack, Typography, Chip, alpha, IconButton, LinearProgress, Tooltip,
+  Box, Stack, Typography, Chip, alpha, IconButton, LinearProgress, Tooltip, Link,
 } from "@mui/material";
 import { styled, keyframes } from "@mui/material/styles";
 import CloudUploadRoundedIcon from "@mui/icons-material/CloudUploadRounded";
@@ -229,18 +229,31 @@ const PreviewThumb = ({ file, previewUrl, onRemove, compact = false }) => {
 };
 
 // ─── Existing file from API ───────────────────────────────────────────────────
+const viewFileLinkSx = {
+  fontSize: "0.72rem",
+  fontWeight: 700,
+  display: "inline-flex",
+  alignItems: "center",
+  gap: 0.25,
+  cursor: "pointer",
+  color: BRAND.primaryLight,
+  textDecoration: "none",
+  whiteSpace: "nowrap",
+};
+
 const ExistingFilePreview = ({
   existingFile,
   compact,
   onChangeClick,
   onClearExisting,
+  onOpenExisting,
   uploadedFileLabel,
   changeFileLabel,
   removeFileLabel,
   openFileLabel,
   pendingUploadHint,
 }) => {
-  const canOpen = isWebUrl(existingFile.fileUrl);
+  const canOpenUrl = isWebUrl(existingFile.fileUrl);
   const isImage = isImageMimeOrName(existingFile.mimeType, existingFile.fileName);
   const isVideo = isVideoMimeOrName(existingFile.mimeType, existingFile.fileName);
   const isPdf = isPdfMimeOrName(existingFile.mimeType, existingFile.fileName);
@@ -275,7 +288,7 @@ const ExistingFilePreview = ({
             background: alpha(BRAND.accent, 0.08),
           }}
         >
-          {canOpen && isImage ? (
+          {canOpenUrl && isImage ? (
             <img
               src={existingFile.fileUrl}
               alt={existingFile.fileName}
@@ -312,28 +325,39 @@ const ExistingFilePreview = ({
                 color: BRAND.accent,
               }}
             />
-            {canOpen && (
-              <Tooltip title={openFileLabel}>
-                <IconButton
-                  size="small"
-                  component="a"
-                  href={existingFile.fileUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  sx={{ color: BRAND.primaryLight, p: 0.25 }}
-                >
-                  <OpenInNewRoundedIcon sx={{ fontSize: 17 }} />
-                </IconButton>
-              </Tooltip>
-            )}
           </Stack>
-          {!canOpen && pendingUploadHint ? (
+          {!canOpenUrl && pendingUploadHint ? (
             <Typography sx={{ fontSize: "0.65rem", color: BRAND.textSub, mt: 0.35, lineHeight: 1.3 }}>
               {pendingUploadHint}
             </Typography>
           ) : null}
         </Box>
-        <Stack direction="row" alignItems="center" gap={0.5} flexShrink={0}>
+        <Stack direction="row" alignItems="center" gap={0.75} flexShrink={0}>
+          {onOpenExisting ? (
+            <Link
+              component="button"
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenExisting();
+              }}
+              sx={viewFileLinkSx}
+            >
+              {openFileLabel}
+              <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
+            </Link>
+          ) : canOpenUrl ? (
+            <Link
+              href={existingFile.fileUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              sx={viewFileLinkSx}
+            >
+              {openFileLabel}
+              <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
+            </Link>
+          ) : null}
           <Button
             size="small"
             variant="outlined"
@@ -408,6 +432,7 @@ type MediaUploadProps = {
   removeFileLabel?: string;
   openFileLabel?: string;
   pendingUploadHint?: string;
+  onOpenExisting?: () => void;
 };
 
 const MediaUpload = ({
@@ -425,6 +450,7 @@ const MediaUpload = ({
   removeFileLabel = "Remove",
   openFileLabel = "Open file",
   pendingUploadHint = "Saved with this form. Use Change file to upload a replacement.",
+  onOpenExisting,
 }: MediaUploadProps) => {
   const isCompact = variant === "compact";
   const inputRef = useRef(null);
@@ -503,6 +529,7 @@ const MediaUpload = ({
             changeFileLabel={changeFileLabel}
             removeFileLabel={removeFileLabel}
             openFileLabel={openFileLabel}
+            onOpenExisting={onOpenExisting}
             pendingUploadHint={!isWebUrl(existingFile.fileUrl) ? pendingUploadHint : ""}
           />
         )}

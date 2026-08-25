@@ -16,7 +16,7 @@ import type {
   StfMotorData,
 } from "../../../../../data/models/user/StfMotorDataModel";
 import { DateField } from "../../../../components/common/DateField";
-import SchemaFileField from "../../../../components/common/SchemaFileField";
+import StfFileField, { type StfFileSubDeptSlug } from "./StfFileField";
 import {
   FieldGrid,
   FieldLabel,
@@ -35,6 +35,7 @@ type Props = {
   disabled?: boolean;
   readOnly?: boolean;
   theme?: any;
+  subDeptSlug?: StfFileSubDeptSlug;
   subDepartmentId?: number;
   batchId?: string;
   motorId?: string;
@@ -310,12 +311,14 @@ const MainMotorPanel = ({
   disabled,
   theme,
   readOnly,
+  subDeptSlug,
 }: {
   data: StfMainMotorData;
   onChange: (next: StfMainMotorData) => void;
   disabled?: boolean;
   readOnly?: boolean;
   theme?: any;
+  subDeptSlug?: StfFileSubDeptSlug;
 }) => (
   <Box>
     <SectionCard title="Igniter Details" theme={theme}>
@@ -386,15 +389,19 @@ const MainMotorPanel = ({
 
     <SectionCard title="Upload PT Curve" theme={theme}>
       <FieldLabel>{formatFieldLabel("PT_CURVE_FILE")}</FieldLabel>
-      <SchemaFileField
-        value={data.UPLOAD_PT_CURVE.PT_CURVE_FILE}
+      <StfFileField
+        files={data.UPLOAD_PT_CURVE.PT_CURVE_FILE}
         onChange={(next) =>
           onChange({
             ...data,
             UPLOAD_PT_CURVE: { PT_CURVE_FILE: next },
           })
         }
-        disabled={disabled} readOnly={readOnly}
+        multiple={false}
+        acceptMode="imageVideoPdf"
+        subDeptSlug={subDeptSlug}
+        disabled={disabled}
+        readOnly={readOnly}
       />
     </SectionCard>
   </Box>
@@ -406,12 +413,14 @@ const BemMotorPanel = ({
   disabled,
   theme,
   readOnly,
+  subDeptSlug,
 }: {
   data: StfBemMotorData;
   onChange: (next: StfBemMotorData) => void;
   disabled?: boolean;
   readOnly?: boolean;
   theme?: any;
+  subDeptSlug?: StfFileSubDeptSlug;
 }) => (
   <Box>
     <SectionCard title="Conditioning Details" theme={theme}>
@@ -584,15 +593,19 @@ const BemMotorPanel = ({
 
     <SectionCard title="Upload PT Curve" theme={theme}>
       <FieldLabel>{formatFieldLabel("PT_CURVE_UPLOAD")}</FieldLabel>
-      <SchemaFileField
-        value={data.UPLOAD_PT_CURVE.PT_CURVE_UPLOAD}
+      <StfFileField
+        files={data.UPLOAD_PT_CURVE.PT_CURVE_UPLOAD}
         onChange={(next) =>
           onChange({
             ...data,
             UPLOAD_PT_CURVE: { PT_CURVE_UPLOAD: next },
           })
         }
-        disabled={disabled} readOnly={readOnly}
+        multiple={false}
+        acceptMode="imageVideoPdf"
+        subDeptSlug={subDeptSlug}
+        disabled={disabled}
+        readOnly={readOnly}
       />
     </SectionCard>
   </Box>
@@ -604,6 +617,7 @@ const StfMotorPanel = ({
   disabled = false,
   readOnly = false,
   theme,
+  subDeptSlug = "static-test-facility",
   subDepartmentId: _subDepartmentId,
   batchId: _batchId,
   motorId: _motorId,
@@ -613,8 +627,10 @@ const StfMotorPanel = ({
       <MainMotorPanel
         data={value}
         onChange={onChange}
-        disabled={disabled} readOnly={readOnly}
+        disabled={disabled}
+        readOnly={readOnly}
         theme={theme}
+        subDeptSlug={subDeptSlug}
       />
     );
   }
@@ -623,8 +639,10 @@ const StfMotorPanel = ({
     <BemMotorPanel
       data={value}
       onChange={onChange}
-      disabled={disabled} readOnly={readOnly}
+      disabled={disabled}
+      readOnly={readOnly}
       theme={theme}
+      subDeptSlug={subDeptSlug}
     />
   );
 };

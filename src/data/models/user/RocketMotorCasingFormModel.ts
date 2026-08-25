@@ -692,7 +692,12 @@ const parseApiNumeric = (v: unknown): number | null => {
   return parseNum(v);
 };
 
-const str = (v: unknown) => String(v ?? "").trim();
+const str = (v: unknown) => {
+  const trimmed = String(v ?? "").trim();
+  // Placeholder dashes previously written for empty optional text — show blank in draft/edit.
+  if (trimmed === "-" || trimmed === "–" || trimmed === "—" || trimmed === "−") return "";
+  return trimmed;
+};
 
 const valueFromApiField = (v: unknown): string => {
   const n = parseApiNumeric(v);
@@ -1192,10 +1197,18 @@ export function buildCasingFormPayload(
     srNo: row.srNo,
     itemKey: row.itemKey,
     description: row.description,
-    observations: row.observations || "—",
-    remark: row.remark || "",
+    observations: str(row.observations),
+    remark: str(row.remark),
     media: fileToMediaRef(row.mediaFile, row.mediaExisting ?? null),
-    ...(row.subItems?.length ? { subItems: row.subItems } : {}),
+    ...(row.subItems?.length
+      ? {
+          subItems: row.subItems.map((s) => ({
+            ...s,
+            observations: str(s.observations),
+            remark: str(s.remark),
+          })),
+        }
+      : {}),
   }));
 
   const w1 = parseNum(form.weightWithoutHarness) ?? 0;
@@ -1223,22 +1236,22 @@ export function buildCasingFormPayload(
         itemsReceived: {
           itemType: "RUBBER_SHEET",
           description: form.itemsDescription.trim() || "Rubber Sheet",
-          dimension: form.itemsDimension.trim() || "—",
+          dimension: str(form.itemsDimension),
           unit: form.itemsUnit.trim() || "mm",
           receiptStatus: form.itemsReceiptStatus,
-          observations: form.itemsObservations.trim(),
+          observations: str(form.itemsObservations),
         },
         clearances: {
           greenCardStatus: form.greenCardStatus,
-          greenCardNo: form.greenCardNo.trim() || "—",
+          greenCardNo: str(form.greenCardNo),
           clearanceDate: toPayloadDateOrNull(form.clearanceDate),
-          authority: form.clearanceAuthority.trim() || "—",
-          detailsAndObservations: form.clearanceDetails.trim(),
+          authority: str(form.clearanceAuthority),
+          detailsAndObservations: str(form.clearanceDetails),
         },
         insulation: {
           insulationCuringDate: toPayloadDateOrNull(form.insulationCuringDate),
           type: form.insulationType,
-          reportNo: form.insulationReportNo.trim() || "—",
+          reportNo: str(form.insulationReportNo),
           receiptStatus: form.insulationReceiptStatus,
           reportUpload: fileToMediaRef(
             form.insulationReportFile,
@@ -1425,8 +1438,8 @@ export function parseSectionsToFormData(
             srNo: Number(v.srNo ?? i + 1),
             itemKey: String(v.itemKey ?? ""),
             description: String(v.description ?? ""),
-            observations: String(v.observations ?? ""),
-            remark: String(v.remark ?? ""),
+            observations: str(v.observations),
+            remark: str(v.remark),
             mediaFile: null,
             mediaExisting,
             mediaUrl: mediaExisting?.fileUrl ?? null,
@@ -1434,8 +1447,8 @@ export function parseSectionsToFormData(
               ? v.subItems.map((s: any) => ({
                   itemKey: String(s.itemKey ?? ""),
                   description: String(s.description ?? ""),
-                  observations: String(s.observations ?? ""),
-                  remark: String(s.remark ?? ""),
+                  observations: str(s.observations),
+                  remark: str(s.remark),
                 }))
               : undefined,
           };
@@ -1463,7 +1476,7 @@ export function parseSectionsToFormData(
       },
       readings: parseDimReadingsFromApi(d.readings ?? {}, d.recordedValue),
       looseFlap: parseLooseFlapFromApi(d.looseFlap),
-      remarks: String(d.remarks ?? ""),
+      remarks: str(d.remarks),
     };
   });
 

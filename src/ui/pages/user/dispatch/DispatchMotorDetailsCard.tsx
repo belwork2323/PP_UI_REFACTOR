@@ -95,9 +95,6 @@ const DispatchMotorDetailsCard = ({
         theme={theme}
         readOnly={readOnly}
         disabled={disabled}
-        subDepartmentId={subDepartmentId}
-        batchId={batchId}
-        motorId={motor.motorId}
       />
     </>
   );

@@ -8,28 +8,22 @@ import {
   type StfMotorSubmissionType,
 } from "./StaticTestFacilityFormModel";
 import { OPERATION_STATUS } from "../../../hooks/operationStatus";
-import type {
-  SchemaDocumentV2,
-  SchemaSectionSubmission,
-  SchemaTableBlock,
-} from "../../../schema-engine";
 import { mapStfSubType } from "../../../hooks/user/qualityControl/stfFlowConfig";
 import {
   parseStfMotorDataFromApi,
   type StfMotorData,
   type StfStaticTestingDetailsApi,
 } from "./StfMotorDataModel";
-import { flattenTableColumns, walkBlocks } from "../../../schema-engine/utils/schemaUtils";
 import {
   mapCastingCuringPersonLabel,
   parseCastingCuringSectionData,
 } from "./CastingCuringFormModel";
 import {
   formatCasePrepSectionLabel,
-  type CasePrepDetailField,
   type CasePrepDetailSection,
-  type CasePrepDetailTable,
 } from "./CasePreparationFormModel";
+
+type LegacySectionSubmission = { sectionId?: string; sectionData?: unknown };
 
 export type STFSubmissionType = "DRAFT" | "SUBMIT" | "UPDATE";
 
@@ -86,7 +80,7 @@ export class STFDetailsModel {
   formStatus: string;
   subType: string;
   motorIdNo: string;
-  sections: SchemaSectionSubmission[];
+  sections: LegacySectionSubmission[];
   motors: Array<{
     motorId: string;
     subType?: string;
@@ -219,9 +213,9 @@ export class BEMMotorDetailsModel implements BemMotorDetailsResponse {
   subDepartmentId: number;
   subType: string;
   status: string;
-  sections: SchemaSectionSubmission[];
+  sections: LegacySectionSubmission[];
   staticTestingDetails?: {
-    [FORM_SECTIONS_KEY]?: SchemaSectionSubmission[];
+    [FORM_SECTIONS_KEY]?: LegacySectionSubmission[];
     [key: string]: unknown;
   };
   createdBy: unknown;
@@ -303,7 +297,7 @@ const extractMotorsFromPayload = (
   }>;
 };
 
-const extractSectionsFromPayload = (payload: any): SchemaSectionSubmission[] => {
+const extractSectionsFromPayload = (payload: any): LegacySectionSubmission[] => {
   if (Array.isArray(payload?.sections) && payload.sections.length > 0) {
     return payload.sections;
   }
@@ -316,7 +310,7 @@ const extractSectionsFromPayload = (payload: any): SchemaSectionSubmission[] => 
   if (motors.length > 0) {
     const formSections = motors[0]?.staticTestingDetails?.[FORM_SECTIONS_KEY];
     if (Array.isArray(formSections) && formSections.length > 0) {
-      return formSections as SchemaSectionSubmission[];
+      return formSections as LegacySectionSubmission[];
     }
   }
 
@@ -427,290 +421,48 @@ export const canApproverActionEntireStfForm = (params: {
   return statusUpper === "WAITING_FOR_APPROVAL" || status === OPERATION_STATUS.WAITING_FOR_APPROVAL;
 };
 
-export type StfSchemaDisplayIndex = {
-  sectionOrder: string[];
-  sectionLabels: Record<string, string>;
-  blockOrderBySection: Record<string, string[]>;
-  blockLabels: Record<string, string>;
-  columnOrderByTable: Record<string, string[]>;
-  columnLabelsByTable: Record<string, Record<string, string>>;
-};
-
-export const buildStfSchemaDisplayIndex = (
-  schema: SchemaDocumentV2 | null | undefined,
-): StfSchemaDisplayIndex => {
-  const index: StfSchemaDisplayIndex = {
-    sectionOrder: [],
-    sectionLabels: {},
-    blockOrderBySection: {},
-    blockLabels: {},
-    columnOrderByTable: {},
-    columnLabelsByTable: {},
-  };
-
-  if (!schema?.data?.sections?.length) return index;
-
-  schema.data.sections.forEach((section) => {
-    const sectionId = String(section.id ?? "").trim();
-    if (!sectionId) return;
-
-    index.sectionOrder.push(sectionId);
-    index.sectionLabels[sectionId] = section.title ?? formatCasePrepSectionLabel(sectionId);
-    index.blockOrderBySection[sectionId] = [];
-
-    walkBlocks(section.children, (block) => {
-      if (block.type === "field" || block.type === "display") {
-        const blockId = String(block.id ?? "").trim();
-        if (!blockId) return;
-        index.blockOrderBySection[sectionId].push(blockId);
-        index.blockLabels[blockId] =
-          (block as { label?: string }).label ?? formatCasePrepSectionLabel(blockId);
-        return;
-      }
-
-      if (block.type === "group") {
-        const groupId = String(block.id ?? "").trim();
-        if (groupId && (block as { label?: string }).label) {
-          index.blockLabels[groupId] = String((block as { label?: string }).label);
-        }
-        return;
-      }
-
-      if (block.type === "table") {
-        const table = block as SchemaTableBlock;
-        const tableId = String(table.id ?? "").trim();
-        if (!tableId) return;
-
-        index.blockOrderBySection[sectionId].push(tableId);
-        index.blockLabels[tableId] =
-          table.title ?? table.label ?? formatCasePrepSectionLabel(tableId);
-
-        const columns = flattenTableColumns(table.columns ?? []);
-        index.columnOrderByTable[tableId] = columns.map((column) => column.id);
-        index.columnLabelsByTable[tableId] = Object.fromEntries(
-          columns.map((column) => [
-            column.id,
-            column.label ?? formatCasePrepSectionLabel(column.id),
-          ]),
-        );
-      }
-    });
-  });
-
-  return index;
-};
-
-const orderKeysByPreferred = (keys: string[], preferred: string[]): string[] => {
-  if (!preferred.length) return keys;
-  const remaining = new Set(keys);
-  const ordered: string[] = [];
-  preferred.forEach((key) => {
-    if (!remaining.has(key)) return;
-    ordered.push(key);
-    remaining.delete(key);
-  });
-  keys.forEach((key) => {
-    if (!remaining.has(key)) return;
-    ordered.push(key);
-    remaining.delete(key);
-  });
-  return ordered;
-};
-
-const resolveStfColumnOrder = (
-  sectionId: string,
-  tableId: string,
-  index: StfSchemaDisplayIndex,
-): string[] => {
-  if (index.columnOrderByTable[tableId]?.length) {
-    return index.columnOrderByTable[tableId];
-  }
-  // Flat scalar object rendered as a table uses section field order.
-  if (tableId === sectionId || !index.columnOrderByTable[tableId]) {
-    return index.blockOrderBySection[sectionId] ?? [];
-  }
-  return [];
-};
-
-const applyStfSchemaToDetailTable = (
-  sectionId: string,
-  table: CasePrepDetailTable,
-  index: StfSchemaDisplayIndex,
-): CasePrepDetailTable => {
-  const preferredColumns = resolveStfColumnOrder(sectionId, table.blockId, index);
-  const existingColumns = Object.keys(table.columnLabels ?? {});
-  const orderedColumns = orderKeysByPreferred(existingColumns, preferredColumns);
-
-  const schemaColumnLabels =
-    index.columnLabelsByTable[table.blockId] ??
-    (table.blockId === sectionId
-      ? Object.fromEntries(
-          (index.blockOrderBySection[sectionId] ?? []).map((id) => [
-            id,
-            index.blockLabels[id] ?? formatCasePrepSectionLabel(id),
-          ]),
-        )
-      : {});
-
-  const columnLabels = Object.fromEntries(
-    orderedColumns.map((column) => [
-      column,
-      schemaColumnLabels[column] ??
-        table.columnLabels[column] ??
-        formatCasePrepSectionLabel(column),
-    ]),
-  );
-
-  return {
-    ...table,
-    label:
-      index.blockLabels[table.blockId] ??
-      index.sectionLabels[sectionId] ??
-      table.label ??
-      formatCasePrepSectionLabel(table.blockId),
-    columnLabels,
-  };
-};
-
-const applyStfSchemaToDetailSection = (
-  section: CasePrepDetailSection,
-  index: StfSchemaDisplayIndex,
-): CasePrepDetailSection => {
-  const sectionId = section.sectionId;
-  const preferredBlocks = index.blockOrderBySection[sectionId] ?? [];
-
-  const orderedFields = (() => {
-    if (!preferredBlocks.length) return section.fields;
-    const byKey = new Map(section.fields.map((field) => [field.key, field]));
-    const leafKey = (key: string) => {
-      const parts = String(key).split(".");
-      return parts[parts.length - 1] ?? key;
-    };
-    const ordered: CasePrepDetailField[] = [];
-    const used = new Set<string>();
-
-    preferredBlocks.forEach((blockId) => {
-      const match =
-        byKey.get(blockId) ?? section.fields.find((field) => leafKey(field.key) === blockId);
-      if (!match || used.has(match.key)) return;
-      ordered.push({
-        ...match,
-        label: index.blockLabels[blockId] ?? match.label,
-      });
-      used.add(match.key);
-    });
-
-    section.fields.forEach((field) => {
-      if (used.has(field.key)) return;
-      ordered.push({
-        ...field,
-        label: index.blockLabels[leafKey(field.key)] ?? field.label,
-      });
-    });
-
-    return ordered;
-  })();
-
-  const orderedTables = (() => {
-    if (!preferredBlocks.length) {
-      return section.tables.map((table) => applyStfSchemaToDetailTable(sectionId, table, index));
-    }
-    const byId = new Map(section.tables.map((table) => [table.blockId, table]));
-    const ordered: CasePrepDetailTable[] = [];
-    const used = new Set<string>();
-
-    preferredBlocks.forEach((blockId) => {
-      const table = byId.get(blockId);
-      if (!table || used.has(table.blockId)) return;
-      ordered.push(applyStfSchemaToDetailTable(sectionId, table, index));
-      used.add(table.blockId);
-    });
-
-    section.tables.forEach((table) => {
-      if (used.has(table.blockId)) return;
-      ordered.push(applyStfSchemaToDetailTable(sectionId, table, index));
-    });
-
-    return ordered;
-  })();
-
-  return {
-    ...section,
-    label: index.sectionLabels[sectionId] ?? section.label,
-    fields: orderedFields,
-    tables: orderedTables,
-  };
-};
-
-export const applyStfSchemaToDetailSections = (
+const normalizeStfDetailSections = (
   sections: CasePrepDetailSection[],
-  schema?: SchemaDocumentV2 | null,
-): CasePrepDetailSection[] => {
-  if (!schema) {
-    // Without schema, preserve first-row / API key order (avoid A–Z sort from shared parser).
-    return sections.map((section) => ({
-      ...section,
-      tables: section.tables.map((table) => {
-        const preferred: string[] = [];
-        const seen = new Set<string>();
-        table.rows.forEach((row) => {
-          Object.keys(row ?? {}).forEach((key) => {
-            if (key.startsWith("_") || key.endsWith("__fieldType") || seen.has(key)) return;
-            seen.add(key);
-            preferred.push(key);
-          });
+): CasePrepDetailSection[] =>
+  // Preserve first-row / API key order (avoid A–Z sort from shared parser).
+  sections.map((section) => ({
+    ...section,
+    tables: section.tables.map((table) => {
+      const preferred: string[] = [];
+      const seen = new Set<string>();
+      table.rows.forEach((row) => {
+        Object.keys(row ?? {}).forEach((key) => {
+          if (key.startsWith("_") || key.endsWith("__fieldType") || seen.has(key)) return;
+          seen.add(key);
+          preferred.push(key);
         });
-        if (!preferred.length) return table;
-        const columnLabels = Object.fromEntries(
-          preferred.map((column) => [
-            column,
-            table.columnLabels[column] ?? formatCasePrepSectionLabel(column),
-          ]),
-        );
-        return { ...table, columnLabels };
-      }),
-    }));
-  }
-
-  const index = buildStfSchemaDisplayIndex(schema);
-  if (!index.sectionOrder.length) return sections;
-
-  const byId = new Map(sections.map((section) => [section.sectionId, section]));
-  const ordered: CasePrepDetailSection[] = [];
-  const used = new Set<string>();
-
-  index.sectionOrder.forEach((sectionId) => {
-    const section = byId.get(sectionId);
-    if (!section) return;
-    ordered.push(applyStfSchemaToDetailSection(section, index));
-    used.add(sectionId);
-  });
-
-  sections.forEach((section) => {
-    if (used.has(section.sectionId)) return;
-    ordered.push(applyStfSchemaToDetailSection(section, index));
-  });
-
-  return ordered;
-};
+      });
+      if (!preferred.length) return table;
+      const columnLabels = Object.fromEntries(
+        preferred.map((column) => [
+          column,
+          table.columnLabels[column] ?? formatCasePrepSectionLabel(column),
+        ]),
+      );
+      return { ...table, columnLabels };
+    }),
+  }));
 
 const parseStfDisplaySections = (
   sections: unknown[] | undefined,
-  schema?: SchemaDocumentV2 | null,
 ): CasePrepDetailSection[] => {
   const parsed = (sections ?? [])
     .map((section) => {
-      const block = section as { sectionId?: string; sectionData?: unknown };
+      const block = section as LegacySectionSubmission;
       return parseCastingCuringSectionData(String(block.sectionId ?? ""), block.sectionData);
     })
     .filter((section) => section.fields.length > 0 || section.tables.length > 0);
 
-  return applyStfSchemaToDetailSections(parsed, schema);
+  return normalizeStfDetailSections(parsed);
 };
 
 const parseStfStructuredDetails = (
   details: Record<string, unknown>,
-  schema?: SchemaDocumentV2 | null,
 ): CasePrepDetailSection[] => {
   const parsed = Object.entries(details)
     .filter(([key]) => key !== FORM_SECTIONS_KEY)
@@ -721,28 +473,27 @@ const parseStfStructuredDetails = (
     })
     .filter((section) => section.fields.length > 0 || section.tables.length > 0);
 
-  return applyStfSchemaToDetailSections(parsed, schema);
+  return normalizeStfDetailSections(parsed);
 };
 
 const resolveStfMotorSections = (
   motor: { staticTestingDetails?: Record<string, unknown> },
-  legacySections?: SchemaSectionSubmission[],
-  schema?: SchemaDocumentV2 | null,
+  legacySections?: LegacySectionSubmission[],
 ): CasePrepDetailSection[] => {
   const details = motor.staticTestingDetails ?? {};
   const formSections = details[FORM_SECTIONS_KEY];
 
   if (Array.isArray(formSections) && formSections.length > 0) {
-    return parseStfDisplaySections(formSections as unknown[], schema);
+    return parseStfDisplaySections(formSections as unknown[]);
   }
 
   if (legacySections?.length) {
-    return parseStfDisplaySections(legacySections as unknown[], schema);
+    return parseStfDisplaySections(legacySections as unknown[]);
   }
 
   const structuredKeys = Object.keys(details).filter((key) => key !== FORM_SECTIONS_KEY);
   if (structuredKeys.length > 0) {
-    return parseStfStructuredDetails(details, schema);
+    return parseStfStructuredDetails(details);
   }
 
   return [];
@@ -757,14 +508,13 @@ const formatStfSubTypeLabel = (subType?: string | null) => {
 
 export const mapStfDetailsForDisplay = (
   data: Record<string, unknown> | STFDetailsModel | null | undefined,
-  schemasBySubType?: Partial<Record<"BEM" | "MAIN_MOTOR", SchemaDocumentV2 | null>>,
 ): StfDetailView | null => {
   const plain = data instanceof STFDetailsModel ? STFDetailsModel.toPlainRecord(data) : data;
   if (!plain) return null;
 
   const root = plain as Record<string, unknown>;
   const legacySections = Array.isArray(root.sections)
-    ? (root.sections as SchemaSectionSubmission[])
+    ? (root.sections as LegacySectionSubmission[])
     : undefined;
   const rawMotors = Array.isArray(root.motors) ? root.motors : [];
   const rawMotorStatuses = Array.isArray(root.motorStatuses) ? root.motorStatuses : [];
@@ -785,7 +535,7 @@ export const mapStfDetailsForDisplay = (
     motorId: string,
     statusEntry: RawMotorEntry | undefined,
     dataEntry: RawMotorEntry | undefined,
-    legacySectionsForMotor?: SchemaSectionSubmission[],
+    legacySectionsForMotor?: LegacySectionSubmission[],
   ): StfMotorDetailView | null => {
     if (!motorId) return null;
 
@@ -794,7 +544,7 @@ export const mapStfDetailsForDisplay = (
     const schemaSubType = mapStfSubType(subType);
     const stfData = parseStfMotorDataFromApi(dataEntry ?? null, schemaSubType);
     const sections = dataEntry
-      ? resolveStfMotorSections(dataEntry, legacySectionsForMotor, null)
+      ? resolveStfMotorSections(dataEntry, legacySectionsForMotor)
       : [];
     const stfTestNo =
       String(
@@ -857,7 +607,7 @@ export const mapStfDetailsForDisplay = (
       motorSubmissionType: statusMeta?.motorSubmissionType,
       motorSubmissionStatus: statusMeta?.motorSubmissionStatus,
       rejectionReason: statusMeta?.rejectionReason ?? null,
-      sections: parseStfDisplaySections(legacySections as unknown[], null),
+      sections: parseStfDisplaySections(legacySections as unknown[]),
       stfData: parseStfMotorDataFromApi(
         { staticTestingDetails: { [FORM_SECTIONS_KEY]: legacySections } },
         mapStfSubType(String(root.subType ?? "")),
@@ -923,7 +673,6 @@ export const mapStfDetailsForDisplay = (
 
 export const mapBemDetailsForDisplay = (
   data: Record<string, unknown> | BEMMotorDetailsModel | null | undefined,
-  schema?: SchemaDocumentV2 | null,
 ): StfDetailView | null => {
   if (!data) return null;
 
@@ -936,7 +685,6 @@ export const mapBemDetailsForDisplay = (
 
   const displaySections = parseStfDisplaySections(
     Array.isArray(rawSections) ? rawSections : [],
-    null,
   );
   const bemMotorPayload = {
     staticTestingDetails: root.staticTestingDetails ?? { formSections: rawSections },

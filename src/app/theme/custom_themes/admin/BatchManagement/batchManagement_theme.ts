@@ -5,6 +5,7 @@ import fonts from "@app/theme/fonts";
 import general from "@app/theme/custom_themes/common/common_css_theme";
 import { getSharedTheme } from "@app/theme/custom_themes/shared/shared_theme";
 import { getAdminCommonTheme } from "@app/theme/custom_themes/admin/admin_common_theme";
+import { createDataTableTheme, uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
 
 const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
   const shared = getSharedTheme(mode);
@@ -18,6 +19,15 @@ const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
   const accentBlueMuted = adminTheme.accentBlueMuted;
 
   const skeletonBase = shared.skeletonBase;
+
+  const detailsDataTable = createDataTableTheme({
+    primary: accentBlue,
+    border: isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB",
+    text: d.textPrimary,
+    textSub: d.textSecondary,
+    surface: isDark ? "rgba(255,255,255,0.04)" : "#F4F6F8",
+    pageBg: d.cardBg,
+  });
 
   return {
     general,
@@ -277,33 +287,13 @@ const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
         mt: 0.35,
         wordBreak: "break-word",
       },
+      ...detailsDataTable,
       tableContainer: {
-        borderRadius: 1.5,
-        border: `1px solid ${isDark ? "rgba(255,255,255,0.10)" : "#E5E7EB"}`,
+        ...detailsDataTable.tableContainer,
         overflow: "auto",
       },
-      tableHeaderCell: (isLead = false) => ({
-        background: isLead
-          ? `linear-gradient(135deg, ${accentBlueDark}, ${accentBlue})`
-          : alpha(accentBlue, isDark ? 0.16 : 0.06),
-        color: isLead ? "#fff" : d.textSecondary,
-        fontWeight: 700,
-        fontSize: "0.72rem",
-        letterSpacing: "0.01em",
-        textTransform: "none",
-        py: 1,
-        px: 1.5,
-        borderBottom: `1px solid ${d.dividerColor}`,
-        whiteSpace: "nowrap",
-      }),
-      tableRow: (idx: number) => ({
-        background: idx % 2 === 0 ? d.cardBg : alpha(accentBlue, isDark ? 0.06 : 0.03),
-      }),
       tableCell: {
-        fontSize: "0.82rem",
-        py: 1.1,
-        px: 1.5,
-        color: d.textPrimary,
+        ...detailsDataTable.tableCell,
         whiteSpace: "nowrap",
       },
       emptyText: {
@@ -353,19 +343,13 @@ const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
       headerRow: {
         bgcolor: isDark ? alpha(accentBlue, 0.12) : alpha(accentBlue, 0.06),
       },
-      headerCell: {
-        bgcolor: isDark ? alpha(accentBlue, 0.12) : alpha(accentBlue, 0.06),
-        color: d.textSecondary,
-        fontWeight: 700,
-        fontSize: "0.72rem",
-        letterSpacing: "0.02em",
-        textTransform: "none" as const,
-        py: 1.1,
-        px: 1.25,
-        borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.1)" : "#E5E7EB"}`,
-        whiteSpace: "nowrap" as const,
-        lineHeight: 1.3,
-      },
+      headerCell: uniformTableHeaderCellSx(accentBlue, accentBlueDark ?? accentBlue, {
+        headerFontSize: "0.72rem",
+        headerLetterSpacing: "0.02em",
+        headerTextTransform: "none",
+        headerPaddingY: 1.1,
+        headerPaddingX: 1.25,
+      }),
       bodyCell: {
         fontSize: "0.8rem",
         py: 0.85,

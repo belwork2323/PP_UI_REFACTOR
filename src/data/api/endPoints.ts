@@ -320,7 +320,6 @@ export const USER_NDT_ENDPOINTS = {
 };
 
 export const USER_STF_ENDPOINTS = {
-  SCHEMA: `${API_BASE}/user/stf/schema`,
   CREATE_FORM: `${API_BASE}/user/stf/form/create`,
   FORM_DETAILS: `${API_BASE}/user/stf/form/details`,
   UPDATE_FORM: `${API_BASE}/user/stf/form/update`,
@@ -336,7 +335,6 @@ export const APPROVER_STF_OTHER_BEM_ENDPOINTS = {
   APPROVE: `${API_BASE}/approver/bem-motor/change-status`,
 };
 export const USER_DISPATCH_ENDPOINTS = {
-  SCHEMA: `${API_BASE}/user/dispatch/schema`,
   CREATE_FORM: `${API_BASE}/user/dispatch/form/create`,
   FORM_DETAILS: `${API_BASE}/user/dispatch/form/details`,
   UPDATE_FORM: `${API_BASE}/user/dispatch/form/update`,

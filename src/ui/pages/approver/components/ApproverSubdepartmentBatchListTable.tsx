@@ -29,6 +29,7 @@ import { useMemo } from "react";
 import getManufacturingTheme from "@/app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import { useThemeStore } from "@/app/store/themeStore";
 import { icons } from "@app/theme/icons";
+import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
 
 const BL = STRINGS.MANUFACTURING.BATCH_LIST;
 
@@ -71,17 +72,13 @@ const formatCreatedOn = (value?: string) => {
   return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
 };
 
-const headerCellSx = (accentMain: string, accentLight: string) => ({
-  background: `linear-gradient(135deg, ${accentMain}, ${accentLight})`,
-  color: "#fff",
-  fontWeight: 700,
-  fontSize: "0.68rem",
-  letterSpacing: "0.07em",
-  textTransform: "uppercase" as const,
-  padding: "10px 14px",
-  whiteSpace: "nowrap" as const,
-  borderBottom: "none",
-});
+const headerCellSx = (accentMain: string, accentLight: string) =>
+  uniformTableHeaderCellSx(accentMain, accentLight ?? accentMain, {
+    headerFontSize: "0.68rem",
+    headerLetterSpacing: "0.07em",
+    headerPaddingY: "10px",
+    headerPaddingX: "14px",
+  });
 
 const bodyCellSx = (borderColor: string) => ({
   padding: "10px 14px",

@@ -17,6 +17,7 @@ import {
 import { styled, keyframes } from "@mui/material/styles";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
+import { uniformTableHeaderCellSx } from "../../../../../app/theme/custom_themes/shared/data_table_theme";
 import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog";
 import {
   createDefaultQCDivisionFormState,
@@ -59,13 +60,14 @@ const SectionHeader = styled(Box)({
   display: "flex", alignItems: "center", gap: 12,
 });
 
-const TH = styled(TableCell)({
-  background: "linear-gradient(135deg, #1B4F72, #2E86C1)",
-  color: "#fff", fontWeight: 700, fontSize: "0.68rem",
-  letterSpacing: "0.06em", textTransform: "uppercase",
-  padding: "11px 16px", whiteSpace: "nowrap",
-  borderBottom: "none", verticalAlign: "middle",
-});
+const TH = styled(TableCell)(
+  uniformTableHeaderCellSx("#1B4F72", "#2E86C1", {
+    headerFontSize: "0.68rem",
+    headerLetterSpacing: "0.06em",
+    headerPaddingY: "11px",
+    headerPaddingX: "16px",
+  }),
+);
 
 const TD = styled(TableCell)({
   padding: "9px 16px",

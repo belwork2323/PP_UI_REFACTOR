@@ -234,17 +234,27 @@ export const useCasePreparationHook = () => {
   };
 
   const openFormWithResolvedData = useCallback(
-    async (batch: CasePrepBatch, editMode: boolean) => {
+    async (
+      batch: CasePrepBatch,
+      editMode: boolean,
+      options?: { silent?: boolean },
+    ) => {
       if (!batch.batchId) {
         showAlert(STRINGS.MANUFACTURING.CASE_PREP.BATCH_ID_MISSING, "error");
         return;
       }
 
-      setLoadingFormDetails(true);
+      const silent = Boolean(options?.silent);
+      if (!silent) setLoadingFormDetails(true);
       try {
         const status = batch.cpStatus ?? batch.status;
+        // Silent refresh after draft must always hit form/details (even if list status
+        // is still TO_BE_INITIATED right after the first create).
         const shouldFetchDetails =
-          editMode || isManufacturingContinueFillingStatus(String(status ?? ""));
+          silent ||
+          editMode ||
+          isManufacturingContinueFillingStatus(String(status ?? "")) ||
+          Boolean(String(resolveFormId(batch) ?? "").trim());
 
         const batchDetails = await batchManagementController.getBatchById(batch.batchId);
         const nextBatch = enrichBatchFromDetails(batch, batchDetails);
@@ -282,6 +292,10 @@ export const useCasePreparationHook = () => {
           nextBatch.formId = detailsResponse.data.formId || formId;
           nextBatch.batchType =
             batch.batchType ?? detailsResponse.data.batchType ?? nextBatch.batchType;
+          if (detailsResponse.data.status) {
+            nextBatch.cpStatus = String(detailsResponse.data.status);
+            nextBatch.status = String(detailsResponse.data.status);
+          }
           nextFormData = mapCasePreparationDetailsToFormState(detailsResponse.data);
 
           const merged = mergeMotorsFromBatchAndForm(nextBatch, nextFormData);
@@ -326,7 +340,7 @@ export const useCasePreparationHook = () => {
         setIsFormDirty(false);
         setView("form");
       } finally {
-        setLoadingFormDetails(false);
+        if (!silent) setLoadingFormDetails(false);
       }
     },
     [showAlert, subDepartmentId],
@@ -595,6 +609,31 @@ export const useCasePreparationHook = () => {
           "success",
           { autoCloseMs: 2200 },
         );
+
+        if (intent === "draft") {
+          const formIdForRefresh = String(nextFormId ?? activeBatch.formId ?? "").trim();
+          if (formIdForRefresh) {
+            const statusForBanner = String(
+              response.data?.status ?? activeBatch.cpStatus ?? activeBatch.status ?? "IN_PROGRESS",
+            )
+              .trim()
+              .toUpperCase()
+              .replace(/\s+/g, "_");
+            const stillRejectedEdit = statusForBanner === "REJECTED";
+
+            await openFormWithResolvedData(
+              {
+                ...activeBatch,
+                formId: formIdForRefresh,
+                cpStatus: response.data?.status ?? "IN_PROGRESS",
+                status: response.data?.status ?? "IN_PROGRESS",
+              },
+              stillRejectedEdit,
+              { silent: true },
+            );
+          }
+        }
+
         return true;
       } finally {
         setActionLoading(false);
@@ -605,6 +644,7 @@ export const useCasePreparationHook = () => {
       checkMotorEditable,
       formData,
       getMotorStatus,
+      openFormWithResolvedData,
       showAlert,
       subDepartmentId,
     ],
@@ -749,6 +789,28 @@ export const useCasePreparationHook = () => {
             { autoCloseMs: 2200 },
           );
           setHasSavedDraft(true);
+
+          const formIdForRefresh = String(nextFormId ?? activeBatch.formId ?? "").trim();
+          if (formIdForRefresh) {
+            const statusForBanner = String(
+              response.data?.status ?? activeBatch.cpStatus ?? activeBatch.status ?? "IN_PROGRESS",
+            )
+              .trim()
+              .toUpperCase()
+              .replace(/\s+/g, "_");
+            const stillRejectedEdit = statusForBanner === "REJECTED";
+
+            await openFormWithResolvedData(
+              {
+                ...activeBatch,
+                formId: formIdForRefresh,
+                cpStatus: response.data?.status ?? "IN_PROGRESS",
+                status: response.data?.status ?? "IN_PROGRESS",
+              },
+              stillRejectedEdit,
+              { silent: true },
+            );
+          }
         } else {
           showAlert(
             isCreateFlow ? S.CREATE_SUBMIT_SUCCESS : S.UPDATE_SUBMIT_SUCCESS,
@@ -763,7 +825,15 @@ export const useCasePreparationHook = () => {
         setActionLoading(false);
       }
     },
-    [activeBatch, formData, listParams, resetFormContext, showAlert, subDepartmentId],
+    [
+      activeBatch,
+      formData,
+      listParams,
+      openFormWithResolvedData,
+      resetFormContext,
+      showAlert,
+      subDepartmentId,
+    ],
   );
 
   const handleSaveDraft = useCallback(async () => submitForm("draft"), [submitForm]);

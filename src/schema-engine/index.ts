@@ -156,34 +156,6 @@ export {
   resolveTrimmingMotorStageForApi,
 } from "./adapters/trimming.adapter";
 
-export {
-  STF_SCHEMA_FUNCTIONALITY,
-  STF_SCHEMA_TYPE,
-  STF_SCHEMA_VERSION,
-  stfSchemaFetchConfig,
-  buildStfSchemaRequest,
-  mapStfSubType,
-  fetchStfSchema,
-  createStfInitialValues,
-  hydrateStfValuesFromSections,
-  buildStfSectionPayload,
-} from "./adapters/stf.adapter";
-
-export type { StfSubType } from "./adapters/stf.adapter";
-
-export {
-  DISPATCH_SCHEMA_FUNCTIONALITY,
-  DISPATCH_SCHEMA_TYPE,
-  DISPATCH_SCHEMA_VERSION,
-  dispatchSchemaFetchConfig,
-  buildDispatchSchemaRequest,
-  fetchDispatchSchema,
-  createDispatchInitialValues,
-  hydrateDispatchValuesFromSections,
-  buildDispatchSectionPayload,
-  mapDispatchDetailsToSchemaValues,
-  mapDispatchSchemaValuesToDispatchDetails,
-} from "./adapters/dispatch.adapter";
 
 export {
   QC_SCHEMA_FUNCTIONALITY,

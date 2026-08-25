@@ -414,7 +414,7 @@ const buildDispatchMotorSections = (details: Record<string, unknown>): CasePrepD
     {
       key: "uploadDispatchPhotos",
       label: "Dispatch Photos",
-      value: formatFileList(details.uploadDispatchPhotos),
+      value: details.uploadDispatchPhotos,
     },
   ]);
   if (packingTable || packingFields.length) {
@@ -432,7 +432,7 @@ const buildDispatchMotorSections = (details: Record<string, unknown>): CasePrepD
     {
       key: "clearanceCertificate",
       label: "Clearance Certificate",
-      value: formatFileList(safety.clearanceCertificate),
+      value: safety.clearanceCertificate,
     },
   ]);
   if (safetyFields.length) {

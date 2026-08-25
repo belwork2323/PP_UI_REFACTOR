@@ -3,6 +3,7 @@ import { keyframes } from "@mui/material/styles";
 
 import fonts from "../../../fonts";
 import { getSharedTheme } from "../../shared/shared_theme";
+import { uniformTableHeaderCellSx } from "../../shared/data_table_theme";
 
 const slideUp = keyframes`
   from { opacity: 0; transform: translateY(6px); }
@@ -40,7 +41,7 @@ export const getRocketMotorCasingApproverTheme = (mode = "light") => {
         overflow: "hidden",
       },
       headerCell: {
-        background: `linear-gradient(135deg, ${palette.primary}, ${palette.primaryLight})`,
+        background: `linear-gradient(180deg, ${palette.primaryLight}, ${palette.primary})`,
         color: palette.white,
         fontWeight: 700,
         fontSize: "0.68rem",
@@ -49,8 +50,8 @@ export const getRocketMotorCasingApproverTheme = (mode = "light") => {
         padding: "10px 14px",
         whiteSpace: "nowrap",
         borderBottom: "none",
-        "&:first-of-type": { borderRadius: "6px 0 0 0" },
-        "&:last-of-type": { borderRadius: "0 6px 0 0" },
+        borderRight: `1px solid ${alpha("#fff", 0.32)}`,
+        "&:last-of-type": { borderRight: "none" },
       },
       bodyCell: {
         padding: "10px 14px",
@@ -219,19 +220,13 @@ export const getRocketMotorCasingApproverTheme = (mode = "light") => {
         border: `1px solid ${palette.border}`,
         boxShadow: `0 1px 6px ${alpha(palette.primary, 0.05)}`,
       },
-      innerHeaderCell: (isLead: boolean) => ({
-        background: isLead
-          ? `linear-gradient(135deg, ${palette.primary}, ${palette.primaryLight})`
-          : alpha(palette.primary, 0.05),
-        color: isLead ? palette.white : palette.textSub,
-        fontWeight: 700,
-        fontSize: "0.63rem",
-        letterSpacing: "0.05em",
-        textTransform: "uppercase",
-        padding: "7px 10px",
-        borderBottom: `1px solid ${palette.border}`,
-        whiteSpace: "nowrap",
-      }),
+      innerHeaderCell: (_isLead = false) =>
+        uniformTableHeaderCellSx(palette.primary, palette.primaryLight, {
+          headerFontSize: "0.63rem",
+          headerLetterSpacing: "0.05em",
+          headerPaddingY: "7px",
+          headerPaddingX: "10px",
+        }),
       innerRow: (index: number) => ({
         background: index % 2 === 0 ? "#fff" : alpha(palette.surface, 0.7),
         "&:last-child td": { borderBottom: "none" },

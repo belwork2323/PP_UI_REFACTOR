@@ -14,18 +14,18 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutlined";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
-import { STRINGS } from "../../../../../app/config/strings";
-import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
-import FilePreviewDialog from "../../../../components/common/FilePreviewDialog";
-import { FILE_PICKER_ACCEPT } from "../../../../../utils/FileUtils";
+import { STRINGS } from "../../../../app/config/strings";
+import type { FileRef } from "../../../../data/models/common/FileUploadModel";
+import FilePreviewDialog from "../../../components/common/FilePreviewDialog";
+import { FILE_PICKER_ACCEPT } from "../../../../utils/FileUtils";
 import {
   useFileUploadActions,
   type FileAcceptMode,
-} from "../../../../../hooks/useFileUploadActions";
+} from "../../../../hooks/useFileUploadActions";
 
-const S = STRINGS.MANUFACTURING.TRIMMING;
+const S = STRINGS.DISPATCH;
 
-type TrimmingFileFieldProps = {
+type DispatchFileFieldProps = {
   files: FileRef[];
   onChange: (next: FileRef[]) => void;
   multiple?: boolean;
@@ -33,12 +33,15 @@ type TrimmingFileFieldProps = {
   label?: string;
   disabled?: boolean;
   readOnly?: boolean;
-  compact?: boolean;
   emptyLabel?: string;
 };
 
-const acceptForMode = (mode: FileAcceptMode) =>
-  mode === "imageVideo" ? FILE_PICKER_ACCEPT.IMAGE_VIDEO : FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF;
+const acceptForMode = (mode: FileAcceptMode) => {
+  if (mode === "image") return FILE_PICKER_ACCEPT.IMAGE;
+  if (mode === "pdf") return FILE_PICKER_ACCEPT.PDF;
+  if (mode === "imageVideoPdf") return FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF;
+  return FILE_PICKER_ACCEPT.IMAGE_VIDEO;
+};
 
 const statusLabel = (ref: FileRef) => {
   if (ref.status === "uploading") return S.FILE_UPLOADING;
@@ -46,17 +49,16 @@ const statusLabel = (ref: FileRef) => {
   return null;
 };
 
-const TrimmingFileField = ({
+const DispatchFileField = ({
   files,
   onChange,
   multiple = true,
-  acceptMode = "imageVideoPdf",
+  acceptMode = "imageVideo",
   label,
   disabled = false,
   readOnly = false,
-  compact = false,
   emptyLabel,
-}: TrimmingFileFieldProps) => {
+}: DispatchFileFieldProps) => {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const list = useMemo(() => files ?? [], [files]);
@@ -72,7 +74,7 @@ const TrimmingFileField = ({
     downloadFilePreview,
   } = useFileUploadActions(list, onChange, {
     acceptMode,
-    subDeptSlug: "trimming",
+    subDeptSlug: "dispatch",
     missingSubDeptMessage: S.SUB_DEPARTMENT_MISSING,
   });
 
@@ -95,7 +97,7 @@ const TrimmingFileField = ({
   };
 
   return (
-    <Box sx={{ minWidth: compact ? 140 : undefined }}>
+    <Box>
       {label ? (
         <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, mb: 0.5 }}>{label}</Typography>
       ) : null}
@@ -189,7 +191,7 @@ const TrimmingFileField = ({
 
         {showEmpty ? (
           <Typography sx={{ fontSize: "0.72rem", color: "text.secondary" }}>
-            {emptyLabel ?? S.FILE_EMPTY_REPORT}
+            {emptyLabel ?? S.FILE_EMPTY_PHOTOS}
           </Typography>
         ) : null}
 
@@ -214,4 +216,4 @@ const TrimmingFileField = ({
   );
 };
 
-export default TrimmingFileField;
+export default DispatchFileField;

@@ -58,6 +58,13 @@ const CASE_PREP_DATETIME_KEYS = new Set([
   "prrcClearanceDate",
 ]);
 
+/** Match API sample Instant format: `2026-08-12T02:00:00Z` (no millis). */
+const toCasePrepInstant = (value: string): string => {
+  const match = value.trim().match(/^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})(\.\d+)?Z$/i);
+  if (match) return `${match[1]}Z`;
+  return value;
+};
+
 const convertCasePrepDatesDeep = (value: unknown, keyHint = ""): unknown => {
   if (Array.isArray(value)) {
     return value.map((entry) => convertCasePrepDatesDeep(entry));
@@ -73,7 +80,23 @@ const convertCasePrepDatesDeep = (value: unknown, keyHint = ""): unknown => {
       ) {
         return;
       }
-      // Table row `value` cells that look like blank datetimes stay as "" (string ops).
+      if (
+        CASE_PREP_DATETIME_KEYS.has(key) &&
+        typeof next === "string" &&
+        key !== "prrcClearanceDate"
+      ) {
+        out[key] = toCasePrepInstant(next);
+        return;
+      }
+      // Abrading datetime cells live under generic `value`.
+      if (
+        key === "value" &&
+        typeof next === "string" &&
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}/.test(next.trim())
+      ) {
+        out[key] = toCasePrepInstant(next);
+        return;
+      }
       out[key] = next;
     });
     return out;
@@ -500,6 +523,13 @@ export class CasePreparationDetailsModel {
       subDepartmentId: Number(payload?.subDepartmentId ?? 0),
       formSubmissionType: String(payload?.formSubmissionType ?? ""),
       status: payload?.status != null ? String(payload.status) : undefined,
+      motorStatuses: Array.isArray(payload?.motorStatuses) ? payload.motorStatuses : [],
+      allMotorsApproved: Boolean(payload?.allMotorsApproved),
+      pendingMotorCount: Number(payload?.pendingMotorCount ?? 0),
+      approvedMotorCount: Number(payload?.approvedMotorCount ?? 0),
+      rejectedMotorCount: Number(payload?.rejectedMotorCount ?? 0),
+      inProgressMotorCount: Number(payload?.inProgressMotorCount ?? 0),
+      totalMotorCount: Number(payload?.totalMotorCount ?? 0),
       createdBy: mapPerson(payload?.createdBy),
       createdAt: payload?.createdAt != null ? String(payload.createdAt) : null,
       submittedBy: mapPerson(payload?.submittedBy),

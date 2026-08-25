@@ -1,4 +1,5 @@
 import { alpha } from "@mui/material/styles";
+import { createDataTableTheme } from "../../shared/data_table_theme";
 
 export const CASE_PREP_BRAND = {
 	primary: "#1B4F72",
@@ -199,29 +200,7 @@ export const getCasePreparationTheme = (baseTheme: any) => {
 				background: `linear-gradient(135deg, ${palette.primary ?? CASE_PREP_BRAND.primary}, ${palette.primaryLight ?? CASE_PREP_BRAND.primaryLight})`,
 				color: "#fff",
 			},
-			tableContainer: {
-				borderRadius: 1.5,
-				border: `1px solid ${palette.border ?? CASE_PREP_BRAND.border}`,
-				overflow: "hidden",
-			},
-			tableHeaderCell: (isLead: boolean) => ({
-				background: isLead
-					? `linear-gradient(135deg, ${palette.primary ?? CASE_PREP_BRAND.primary}, ${palette.primaryLight ?? CASE_PREP_BRAND.primaryLight})`
-					: alpha(palette.primary ?? CASE_PREP_BRAND.primary, 0.06),
-				color: isLead ? "#fff" : palette.textSub ?? CASE_PREP_BRAND.textSub,
-				fontWeight: 700,
-				fontSize: "0.63rem",
-				letterSpacing: "0.05em",
-				textTransform: "uppercase",
-				py: 1,
-				px: 1.5,
-				borderBottom: `1px solid ${palette.border ?? CASE_PREP_BRAND.border}`,
-				whiteSpace: "nowrap",
-			}),
-			tableRow: (idx: number) => ({
-				background: idx % 2 === 0 ? palette.pageBg ?? "#fff" : alpha(palette.surface ?? CASE_PREP_BRAND.surface, 0.5),
-			}),
-			tableCell: { fontSize: "0.82rem", py: 1.1, px: 1.5, color: palette.text ?? CASE_PREP_BRAND.text },
+			...createDataTableTheme({ ...CASE_PREP_BRAND, ...palette }),
 			specText: { fontWeight: 600 },
 			resultText: { fontWeight: 600, color: palette.text ?? CASE_PREP_BRAND.text },
 			remarksText: { fontSize: "0.8rem", color: palette.textSub ?? CASE_PREP_BRAND.textSub },

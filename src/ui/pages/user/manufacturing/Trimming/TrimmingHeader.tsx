@@ -1,4 +1,5 @@
 import UserWorkflowFormHeader from "../../../../components/custom/UserWorkflowFormHeader";
+import { resolveWorkflowFormHeaderStatus } from "../../../../components/custom/workflowFormHeaderStatus";
 import { STRINGS } from "../../../../../app/config/strings";
 
 const S = STRINGS.MANUFACTURING;
@@ -16,31 +17,20 @@ const formatMotorSubtitle = (batch?: {
   return motorId && motorId !== "—" ? motorId : undefined;
 };
 
-const resolveStatusLabel = (batch: any, isEdit: boolean) => {
-  if (isEdit) return S.FORM_HEADER.EDITING_REJECTED;
+const TrimmingHeader = ({ batch, onBack, theme }: any) => {
+  const headerStatus = resolveWorkflowFormHeaderStatus(batch, {
+    preferredStatusKeys: ["trStatus"],
+  });
 
-  const status = String(batch?.trStatus ?? batch?.status ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "_");
-  const inProgress =
-    status === "in_progress" ||
-    status === "waiting_for_partial_approval" ||
-    Boolean(batch?.formId);
-
-  return inProgress ? S.FORM_HEADER.DRAFT : S.TRIMMING.NEW_LABEL;
-};
-
-const TrimmingHeader = ({ batch, isEdit, onBack, theme }: any) => {
   return (
     <UserWorkflowFormHeader
       mode="update"
       data={{
         title: String(batch?.batchId ?? batch?.lotId ?? "—"),
         subtitle: formatMotorSubtitle(batch),
-        statusLabel: resolveStatusLabel(batch, isEdit),
-        statusVariant: isEdit ? "edit" : "new",
-        rejectionReason: batch?.rejectionReason,
+        statusLabel: headerStatus.statusLabel,
+        statusVariant: headerStatus.statusVariant,
+        rejectionReason: headerStatus.rejectionReason,
       }}
       onBack={onBack}
       backLabel={S.FORM_HEADER.BACK_TO_LIST}

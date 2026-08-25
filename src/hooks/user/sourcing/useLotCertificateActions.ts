@@ -122,8 +122,10 @@ export function useLotCertificateActions(
       const cert = certificatesRef.current[index];
       if (!cert) return;
       const fileId = String(cert.fileId ?? "").trim();
-      if (fileId && subDepartmentId) {
-        const removed = await removeStoredFile(fileId, subDepartmentId, cert.isTemp !== false);
+      // Temp uploads: delete via temp API. Details files: UI-only (save omits fileId).
+      const isTempUpload = cert.isTemp !== false;
+      if (fileId && subDepartmentId && isTempUpload) {
+        const removed = await removeStoredFile(fileId, subDepartmentId, true);
         if (!removed) return;
       }
       const next = certificatesRef.current.filter((_, i) => i !== index);

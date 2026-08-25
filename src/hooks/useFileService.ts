@@ -114,11 +114,13 @@ export const useFileService = () => {
 
   const removeStoredFile = useCallback(
     async (fileId: string, subDepartmentId: number, isTemp: boolean): Promise<boolean> => {
-      return isTemp
-        ? deleteTemp(fileId, subDepartmentId)
-        : deleteFile(fileId, subDepartmentId);
+      // Temp uploads: delete via temp API.
+      // Files loaded from form details (isTemp=false): UI-only removal — save/submit
+      // omits their fileId and the server handles cleanup. Do not call delete APIs.
+      if (!isTemp) return true;
+      return deleteTemp(fileId, subDepartmentId);
     },
-    [deleteFile, deleteTemp],
+    [deleteTemp],
   );
 
   return {

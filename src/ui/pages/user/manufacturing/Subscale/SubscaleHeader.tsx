@@ -1,11 +1,15 @@
 import UserWorkflowFormHeader from "../../../../components/custom/UserWorkflowFormHeader";
+import { resolveWorkflowFormHeaderStatus } from "../../../../components/custom/workflowFormHeaderStatus";
 import { STRINGS } from "../../../../../app/config/strings";
 
 const S = STRINGS.MANUFACTURING;
 
-const SubscaleHeader = ({ batch, isEdit, onBack, theme }: any) => {
+const SubscaleHeader = ({ batch, onBack, theme }: any) => {
   const articleId = String(batch?.articleId ?? "").trim();
   const motorId = String(batch?.motorId ?? "").trim();
+  const headerStatus = resolveWorkflowFormHeaderStatus(batch, {
+    preferredStatusKeys: ["ssStatus"],
+  });
 
   return (
     <UserWorkflowFormHeader
@@ -17,9 +21,9 @@ const SubscaleHeader = ({ batch, isEdit, onBack, theme }: any) => {
           : motorId && motorId !== "—"
             ? motorId
             : undefined,
-        statusLabel: isEdit ? S.FORM_HEADER.EDITING_REJECTED : S.SUBSCALE.NEW_LABEL,
-        statusVariant: isEdit ? "edit" : "new",
-        rejectionReason: batch?.rejectionReason,
+        statusLabel: headerStatus.statusLabel,
+        statusVariant: headerStatus.statusVariant,
+        rejectionReason: headerStatus.rejectionReason,
       }}
       onBack={onBack}
       backLabel={S.FORM_HEADER.BACK_TO_LIST}

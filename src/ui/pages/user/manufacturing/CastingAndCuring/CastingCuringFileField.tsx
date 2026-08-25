@@ -15,22 +15,22 @@ import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutl
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import { STRINGS } from "../../../../../app/config/strings";
-import type { CasePrepFileRef } from "../../../../../data/models/user/CasePrepMotorDataModel";
+import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
 import FilePreviewDialog from "../../../../components/common/FilePreviewDialog";
 import { FILE_PICKER_ACCEPT } from "../../../../../utils/FileUtils";
 import {
-  useCastingCuringFileActions,
-  type CastingCuringFileAcceptMode,
-} from "../../../../../hooks/user/manufacturing/useCastingCuringFileActions";
+  useFileUploadActions,
+  type FileAcceptMode,
+} from "../../../../../hooks/useFileUploadActions";
 
 const S = STRINGS.MANUFACTURING.CASTING_CURING;
 
 type CastingCuringFileFieldProps = {
-  files: CasePrepFileRef[];
-  onChange: (next: CasePrepFileRef[]) => void;
+  files: FileRef[];
+  onChange: (next: FileRef[]) => void;
   /** Multi = abrading attachments; single = TCE test report. */
   multiple?: boolean;
-  acceptMode?: CastingCuringFileAcceptMode;
+  acceptMode?: FileAcceptMode;
   label?: string;
   disabled?: boolean;
   readOnly?: boolean;
@@ -38,10 +38,10 @@ type CastingCuringFileFieldProps = {
   emptyLabel?: string;
 };
 
-const acceptForMode = (mode: CastingCuringFileAcceptMode) =>
+const acceptForMode = (mode: FileAcceptMode) =>
   mode === "imageVideo" ? FILE_PICKER_ACCEPT.IMAGE_VIDEO : FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF;
 
-const statusLabel = (ref: CasePrepFileRef) => {
+const statusLabel = (ref: FileRef) => {
   if (ref.status === "uploading") return S.FILE_UPLOADING;
   if (ref.status === "failed") return S.FILE_UPLOAD_FAILED;
   return null;
@@ -71,7 +71,11 @@ const CastingCuringFileField = ({
     filePreview,
     closeFilePreview,
     downloadFilePreview,
-  } = useCastingCuringFileActions(list, onChange, { acceptMode });
+  } = useFileUploadActions(list, onChange, {
+    acceptMode,
+    subDeptSlug: "casting-and-curing",
+    missingSubDeptMessage: S.SUB_DEPARTMENT_MISSING,
+  });
 
   const locked = disabled || readOnly;
   const showEmpty = list.length === 0;

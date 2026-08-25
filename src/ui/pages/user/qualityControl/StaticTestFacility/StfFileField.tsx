@@ -23,13 +23,17 @@ import {
   type FileAcceptMode,
 } from "../../../../../hooks/useFileUploadActions";
 
-const S = STRINGS.MANUFACTURING.TRIMMING;
+const S = STRINGS.QUALITY_CONTROL.STATIC_TEST_FACILITY;
 
-type TrimmingFileFieldProps = {
+/** STF ACEM + Other BEM both upload under the static-test-facility sub-department. */
+export type StfFileSubDeptSlug = "static-test-facility";
+
+type StfFileFieldProps = {
   files: FileRef[];
   onChange: (next: FileRef[]) => void;
   multiple?: boolean;
   acceptMode?: FileAcceptMode;
+  subDeptSlug?: StfFileSubDeptSlug;
   label?: string;
   disabled?: boolean;
   readOnly?: boolean;
@@ -37,8 +41,12 @@ type TrimmingFileFieldProps = {
   emptyLabel?: string;
 };
 
-const acceptForMode = (mode: FileAcceptMode) =>
-  mode === "imageVideo" ? FILE_PICKER_ACCEPT.IMAGE_VIDEO : FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF;
+const acceptForMode = (mode: FileAcceptMode) => {
+  if (mode === "image") return FILE_PICKER_ACCEPT.IMAGE;
+  if (mode === "pdf") return FILE_PICKER_ACCEPT.PDF;
+  if (mode === "imageVideoPdf") return FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF;
+  return FILE_PICKER_ACCEPT.IMAGE_VIDEO;
+};
 
 const statusLabel = (ref: FileRef) => {
   if (ref.status === "uploading") return S.FILE_UPLOADING;
@@ -46,17 +54,18 @@ const statusLabel = (ref: FileRef) => {
   return null;
 };
 
-const TrimmingFileField = ({
+const StfFileField = ({
   files,
   onChange,
-  multiple = true,
+  multiple = false,
   acceptMode = "imageVideoPdf",
+  subDeptSlug = "static-test-facility",
   label,
   disabled = false,
   readOnly = false,
   compact = false,
   emptyLabel,
-}: TrimmingFileFieldProps) => {
+}: StfFileFieldProps) => {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
   const list = useMemo(() => files ?? [], [files]);
@@ -72,7 +81,7 @@ const TrimmingFileField = ({
     downloadFilePreview,
   } = useFileUploadActions(list, onChange, {
     acceptMode,
-    subDeptSlug: "trimming",
+    subDeptSlug,
     missingSubDeptMessage: S.SUB_DEPARTMENT_MISSING,
   });
 
@@ -189,7 +198,7 @@ const TrimmingFileField = ({
 
         {showEmpty ? (
           <Typography sx={{ fontSize: "0.72rem", color: "text.secondary" }}>
-            {emptyLabel ?? S.FILE_EMPTY_REPORT}
+            {emptyLabel ?? S.FILE_EMPTY_PT_CURVE}
           </Typography>
         ) : null}
 
@@ -214,4 +223,4 @@ const TrimmingFileField = ({
   );
 };
 
-export default TrimmingFileField;
+export default StfFileField;

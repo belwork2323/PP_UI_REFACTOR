@@ -12,6 +12,7 @@ import {
 import { alpha } from "@mui/material/styles";
 import type { SchemaSectionSubmission } from "../../../../../../schema-engine";
 import { QC_DIVISION_BRAND } from "../../../../../../app/theme/custom_themes/user/qualityControl/tokens";
+import { uniformTableHeaderCellSx } from "../../../../../../app/theme/custom_themes/shared/data_table_theme";
 import {
   collectPrepSectionNestedTableRows,
   expandRawMaterialPrepSectionRows,
@@ -23,17 +24,11 @@ import {
 
 const BRAND = QC_DIVISION_BRAND;
 
-const headerCellSx = (isFirst: boolean) => ({
-  fontWeight: 800,
-  fontSize: "0.65rem",
-  letterSpacing: "0.02em",
-  textTransform: "uppercase" as const,
-  color: BRAND.primary,
-  background: isFirst ? alpha(BRAND.primary, 0.1) : alpha(BRAND.primaryLight, 0.08),
-  px: 1,
-  py: 0.55,
-  borderColor: alpha(BRAND.primary, 0.12),
-  whiteSpace: "nowrap" as const,
+const headerCellSx = uniformTableHeaderCellSx(BRAND.primary, BRAND.primaryLight, {
+  headerFontSize: "0.65rem",
+  headerLetterSpacing: "0.02em",
+  headerPaddingY: 0.55,
+  headerPaddingX: 1,
 });
 
 const bodyCellSx = {
@@ -84,7 +79,7 @@ const SectionDataTable = ({
         <TableHead>
           <TableRow>
             {columns.map((column, index) => (
-              <TableCell key={column} sx={headerCellSx(index === 0)}>
+              <TableCell key={column} sx={headerCellSx}>
                 {formatPrepSectionLabel(column)}
               </TableCell>
             ))}

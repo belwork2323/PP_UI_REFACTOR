@@ -17,6 +17,7 @@ import BemMotorListTable from "./BemMotorListTable";
 import StaticTestFacilityDetailsView from "./StaticTestFacilityDetailsView";
 import WorkflowCreateButton from "@/ui/components/common/WorkflowCreateButton";
 import UserWorkflowFormHeader from "@/ui/components/custom/UserWorkflowFormHeader";
+import { resolveWorkflowFormHeaderStatus } from "@/ui/components/custom/workflowFormHeaderStatus";
 import AppTextField from "@/ui/components/common/AppTextField";
 
 const strings = STRINGS.QUALITY_CONTROL.STATIC_TEST_FACILITY;
@@ -136,13 +137,14 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
       ? strings.FORM_HEADER_CREATE_OTHER_BEM_SUBTITLE
       : undefined;
 
-    const statusLabel = isEditMode
-      ? STRINGS.MANUFACTURING.FORM_HEADER.EDITING_REJECTED
-      : isExistingRecord
-        ? "Draft"
-        : STRINGS.MANUFACTURING.FORM_HEADER.NEW_SUBMISSION;
-
-    const statusVariant = isEditMode ? "edit" : "new";
+    const headerStatus = resolveWorkflowFormHeaderStatus({
+      status: isEditMode
+        ? "REJECTED"
+        : isExistingRecord
+          ? (activeBemMotor?.status ?? formData?.status ?? "IN_PROGRESS")
+          : "TO_BE_INITIATED",
+      rejectionReason,
+    });
 
     return (
       <Box sx={{ mt: 1 }}>
@@ -151,12 +153,13 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
           mode={isCreateMode ? "create" : "update"}
           onBack={handleBackFromForm || handleBemBack}
           backLabel={STRINGS.MANUFACTURING.FORM_HEADER.BACK_TO_LIST}
+          rejectionTitle={STRINGS.MANUFACTURING.FORM_HEADER.REJECTION_REASON}
           data={{
             title: headerTitle,
             subtitle: headerSubtitle,
-            statusLabel,
-            statusVariant,
-            rejectionReason: rejectionReason,
+            statusLabel: headerStatus.statusLabel,
+            statusVariant: headerStatus.statusVariant,
+            rejectionReason: headerStatus.rejectionReason,
           }}
         />
         <ConfirmAlertDialog
@@ -260,6 +263,7 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
             onChange={(next) => onFormValuesChange?.(bemMotorId, next)}
             disabled={actionLoading}
             theme={theme}
+            subDeptSlug="static-test-facility"
             subDepartmentId={subDepartmentId}
             batchId={batch?.batchId}
             motorId={bemMotorNo || bemMotorId}

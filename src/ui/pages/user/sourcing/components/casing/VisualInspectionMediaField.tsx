@@ -6,6 +6,7 @@ import {
   Chip,
   IconButton,
   LinearProgress,
+  Link,
   List,
   ListItem,
   Stack,
@@ -196,15 +197,23 @@ const VisualInspectionMediaField = ({
                   }}
                 />
                 {canOpen && !isUploading ? (
-                  <Tooltip title={S.OPEN_FILE}>
-                    <IconButton
-                      size="small"
-                      onClick={() => handleOpen(0)}
-                      sx={{ color: palette.primaryLight, p: 0.25 }}
-                    >
-                      <OpenInNewRoundedIcon sx={{ fontSize: 17 }} />
-                    </IconButton>
-                  </Tooltip>
+                  <Link
+                    component="button"
+                    type="button"
+                    onClick={() => handleOpen(0)}
+                    sx={{
+                      fontSize: "0.72rem",
+                      fontWeight: 700,
+                      display: "inline-flex",
+                      alignItems: "center",
+                      gap: 0.25,
+                      cursor: "pointer",
+                      color: palette.primaryLight,
+                    }}
+                  >
+                    {S.OPEN_FILE}
+                    <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
+                  </Link>
                 ) : null}
                 {isFailed ? (
                   <Tooltip title={S.UPLOAD_REPORT_RETRY}>

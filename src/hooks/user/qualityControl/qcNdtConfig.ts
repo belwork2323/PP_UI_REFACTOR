@@ -1,5 +1,5 @@
 import type { QcApiDivision } from "../../../schema-engine/adapters/qc.adapter";
-import type { CasePrepFileRef } from "../../../data/models/user/CasePrepMotorDataModel";
+import type { FileRef } from "../../../data/models/common/FileUploadModel";
 
 export const QC_NDT_API_DIVISION = "NDT" as const satisfies QcApiDivision;
 
@@ -63,7 +63,7 @@ export type QcNdtVisualInspectionRow = {
   OBSERVATION_TYPE: string;
   OBSERVATION: string;
   LOCATION: string;
-  UPLOAD_IMAGE: CasePrepFileRef[];
+  UPLOAD_IMAGE: FileRef[];
 };
 
 export const QC_NDT_RADIOGRAPHY_OBSERVATION_PRESET: Array<

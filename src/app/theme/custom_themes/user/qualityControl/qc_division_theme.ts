@@ -1,4 +1,5 @@
 import { alpha } from "@mui/material/styles";
+import { createDataTableTheme } from "../../shared/data_table_theme";
 import { QC_DIVISION_BRAND } from "./tokens";
 
 export { QC_DIVISION_BRAND };
@@ -108,6 +109,7 @@ export const getQcDivisionTheme = (baseTheme: any) => {
         justifyContent: "center",
         gap: 1.5,
       },
+      ...createDataTableTheme({ ...QC_DIVISION_BRAND, ...palette }),
     },
   };
 };

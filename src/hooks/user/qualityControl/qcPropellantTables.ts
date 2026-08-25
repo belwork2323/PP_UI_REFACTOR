@@ -1,4 +1,5 @@
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import { isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileRef } from "../../../data/models/common/FileUploadModel";
 import {
   QC_PROPELLANT_AVG_COLUMN,
   QC_PROPELLANT_BALLISTIC_PRESET,
@@ -44,23 +45,13 @@ const pickEditableString = (...candidates: unknown[]): string => {
   return "";
 };
 
-const fileRefToName = (value: unknown): string => {
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    if (!trimmed || trimmed.toLowerCase() === "null") return "";
-    if (trimmed.toLowerCase().startsWith("pending-upload://")) {
-      const encoded = trimmed.slice("pending-upload://".length);
-      try {
-        return decodeURIComponent(encoded);
-      } catch {
-        return encoded;
-      }
-    }
-    return trimmed;
+const parseUploadFiles = (...candidates: unknown[]): FileRef[] => {
+  for (const candidate of candidates) {
+    if (candidate == null || candidate === "") continue;
+    const refs = parseFileRefs(candidate);
+    if (refs.length) return refs;
   }
-  const rec = asRecord(value);
-  if (!rec) return "";
-  return fileRefToName(rec.documentId ?? rec.fileName ?? rec.name ?? rec.fileUrl ?? rec.url);
+  return [];
 };
 
 const normalizeKey = (value: unknown) =>
@@ -317,7 +308,7 @@ const overlayPropertyRows = (
     });
     if (options?.includeRowStats) overlayRowStats(next, savedRow, columns);
     if (options?.includeGraph) {
-      next[QC_PROPELLANT_ROW_UPLOAD_FIELD] = fileRefToName(
+      next[QC_PROPELLANT_ROW_UPLOAD_FIELD] = parseUploadFiles(
         savedRow?.[QC_PROPELLANT_ROW_UPLOAD_FIELD] ?? savedRow?.uploadGraph,
       );
     }
@@ -376,7 +367,7 @@ export const createInitialPropellantValues = (fmCount = 1): SchemaFormValues => 
   return {
     [tableKey(QC_PROPELLANT_SECTION_IDS.MECHANICAL_PROPERTIES)]: emptyMechanicalRows(fmColumns),
     [columnsKey(QC_PROPELLANT_SECTION_IDS.MECHANICAL_PROPERTIES)]: fmColumns,
-    [mechanicalGraphKey()]: "",
+    [mechanicalGraphKey()]: [] as FileRef[],
     [tableKey(QC_PROPELLANT_SECTION_IDS.INTERFACE_PROPERTIES)]: emptyInterfaceRows(fmColumns),
     [columnsKey(QC_PROPELLANT_SECTION_IDS.INTERFACE_PROPERTIES)]: fmColumns,
     [tableKey(QC_PROPELLANT_SECTION_IDS.SSBR_UBR_BURN_RATE)]: emptySsbrRows(fmColumns),
@@ -429,16 +420,48 @@ export const getPropellantBallisticRows = (
   return overlayBallisticRows(values?.[tableKey(QC_PROPELLANT_SECTION_IDS.BALLISTIC_EVALUATION)], columns);
 };
 
-export const getPropellantMechanicalGraph = (values: SchemaFormValues | undefined) =>
-  String(values?.[mechanicalGraphKey()] ?? "");
+export const getPropellantMechanicalGraph = (
+  values: SchemaFormValues | undefined,
+): FileRef[] => parseUploadFiles(values?.[mechanicalGraphKey()]);
 
 export const setPropellantMechanicalGraph = (
   values: SchemaFormValues,
-  value: string,
+  value: FileRef[],
 ): SchemaFormValues => ({
   ...values,
-  [mechanicalGraphKey()]: value,
+  [mechanicalGraphKey()]: value ?? [],
 });
+
+export const collectPropellantFileRefsFromQcValues = (
+  values: SchemaFormValues | null | undefined,
+): FileRef[] => {
+  const refs: FileRef[] = [...getPropellantMechanicalGraph(values ?? undefined)];
+  for (const sectionId of [
+    QC_PROPELLANT_SECTION_IDS.INTERFACE_PROPERTIES,
+    QC_PROPELLANT_SECTION_IDS.SSBR_UBR_BURN_RATE,
+  ]) {
+    for (const row of getPropellantPropertyRows(values ?? undefined, sectionId)) {
+      refs.push(...parseUploadFiles(row[QC_PROPELLANT_ROW_UPLOAD_FIELD]));
+    }
+  }
+  return refs;
+};
+
+export const hasIncompleteQcPropellantUploads = (
+  values: SchemaFormValues | null | undefined,
+): boolean => collectPropellantFileRefsFromQcValues(values).some(isFileUploadIncomplete);
+
+export const collectTempFileIdsFromQcPropellantValues = (
+  values: SchemaFormValues | null | undefined,
+): string[] =>
+  [
+    ...new Set(
+      collectPropellantFileRefsFromQcValues(values)
+        .filter((ref) => ref.isTemp !== false)
+        .map((ref) => String(ref.fileId ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
 
 export const setPropellantPropertyRows = (
   values: SchemaFormValues,
@@ -537,18 +560,21 @@ const extractTableRows = (section: SchemaSectionSubmission): unknown[] => {
   return asArray(firstArray);
 };
 
-const extractMechanicalGraph = (section: SchemaSectionSubmission, rows: unknown[]): string => {
+const extractMechanicalGraph = (
+  section: SchemaSectionSubmission,
+  rows: unknown[],
+): FileRef[] => {
   const data = extractSectionDataRecord(section);
-  const fromSection = fileRefToName(
+  const fromSection = parseUploadFiles(
     data?.[QC_PROPELLANT_MECHANICAL_GRAPH_FIELD] ?? data?.uploadGraph,
   );
-  if (fromSection) return fromSection;
+  if (fromSection.length) return fromSection;
   for (const row of rows) {
     const rec = asRecord(row);
-    const graph = fileRefToName(rec?.UPLOAD_GRAPH ?? rec?.uploadGraph);
-    if (graph) return graph;
+    const graph = parseUploadFiles(rec?.UPLOAD_GRAPH ?? rec?.uploadGraph);
+    if (graph.length) return graph;
   }
-  return "";
+  return [];
 };
 
 const resolveHydrateFmColumns = (
@@ -586,7 +612,7 @@ export const hydratePropellantValuesFromSections = (
       ? extractMechanicalGraph(section, rows)
       : "";
     if (!rows.length) {
-      if (graph) values[mechanicalGraphKey()] = graph;
+      if (graph.length) values[mechanicalGraphKey()] = graph;
       continue;
     }
 
@@ -681,8 +707,8 @@ const serializePropertyRow = (
     if (std !== undefined) payload[QC_PROPELLANT_STD_COLUMN] = std;
   }
   if (options?.includeGraph) {
-    const graph = fileRefToName(row[QC_PROPELLANT_ROW_UPLOAD_FIELD]);
-    if (graph) payload[QC_PROPELLANT_ROW_UPLOAD_FIELD] = graph;
+    const graph = toFileIdListPayload(row[QC_PROPELLANT_ROW_UPLOAD_FIELD]);
+    if (graph.length) payload.uploadGraph = graph;
   }
   return payload;
 };
@@ -748,7 +774,7 @@ export const buildPropellantMotorPayload = (
   motorId: string,
   motorSubmissionType: QcPropellantMotorSubmissionType = "DRAFT",
 ): Record<string, unknown> => {
-  const mechanicalGraph = fileRefToName(getPropellantMechanicalGraph(values));
+  const mechanicalGraph = toFileIdListPayload(getPropellantMechanicalGraph(values));
   return {
     motorId,
     motorSubmissionType,
@@ -759,7 +785,7 @@ export const buildPropellantMotorPayload = (
           mechanicalProperties: {
             samples: serializeMechanicalSamples(values),
             statistics: {},
-            ...(mechanicalGraph ? { uploadGraph: mechanicalGraph } : {}),
+            ...(mechanicalGraph.length ? { uploadGraph: mechanicalGraph } : {}),
           },
         },
       },
@@ -838,7 +864,7 @@ export const propellantMotorDetailToSections = (
     if (processType === QC_PROPELLANT_SECTION_IDS.MECHANICAL_PROPERTIES) {
       const mechanical = asRecord(data.mechanicalProperties) ?? data;
       const samples = readProcessRows(data, "mechanicalProperties", "samples");
-      const graph = fileRefToName(
+      const graph = parseUploadFiles(
         mechanical?.uploadGraph ?? mechanical?.UPLOAD_GRAPH ?? data.uploadGraph ?? data.UPLOAD_GRAPH,
       );
       return [
@@ -848,7 +874,7 @@ export const propellantMotorDetailToSections = (
           sectionData: [
             {
               [QC_PROPELLANT_SECTION_IDS.MECHANICAL_PROPERTIES]: samples,
-              ...(graph ? { [QC_PROPELLANT_MECHANICAL_GRAPH_FIELD]: graph } : {}),
+              ...(graph.length ? { [QC_PROPELLANT_MECHANICAL_GRAPH_FIELD]: graph } : {}),
             },
           ],
         }),

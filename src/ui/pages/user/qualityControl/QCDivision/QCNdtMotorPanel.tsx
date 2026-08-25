@@ -14,7 +14,7 @@ import {
 } from "@mui/material";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { SchemaFormValues } from "../../../../../schema-engine";
-import type { CasePrepFileRef } from "../../../../../data/models/user/CasePrepMotorDataModel";
+import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
 import { STRINGS } from "../../../../../app/config/strings";
 import NdtFileField from "../NDT/NdtFileField";
 import {
@@ -41,6 +41,7 @@ import {
   qcReadOnlyTableContainerSx,
   qcReadOnlyTableHeaderCellSx,
 } from "./components/QCDivisionReadOnlyValue";
+import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
 
 const BRAND = QC_DIVISION_BRAND;
 const NDT_S = STRINGS.QUALITY_CONTROL.NDT;
@@ -48,14 +49,12 @@ const TABLE_BORDER = alpha(BRAND.primary, 0.18);
 const HEADER_CELL_BORDER = alpha("#fff", 0.22);
 
 const TH = {
-  background: `linear-gradient(135deg, ${BRAND.primary}, ${BRAND.primaryLight})`,
-  color: "#fff",
-  fontWeight: 700,
-  fontSize: "0.68rem",
-  letterSpacing: "0.06em",
-  textTransform: "uppercase" as const,
-  padding: "10px 12px",
-  whiteSpace: "nowrap" as const,
+  ...uniformTableHeaderCellSx(BRAND.primary, BRAND.primaryLight, {
+    headerFontSize: "0.68rem",
+    headerLetterSpacing: "0.06em",
+    headerPaddingY: "10px",
+    headerPaddingX: "12px",
+  }),
   border: `1px solid ${HEADER_CELL_BORDER}`,
 };
 
@@ -321,7 +320,7 @@ const VisualInspectionTable = ({
     onChange(rows.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row)));
   };
 
-  const updateFiles = (index: number, next: CasePrepFileRef[]) => {
+  const updateFiles = (index: number, next: FileRef[]) => {
     onChange(
       rows.map((row, rowIndex) => (rowIndex === index ? { ...row, UPLOAD_IMAGE: next } : row)),
     );

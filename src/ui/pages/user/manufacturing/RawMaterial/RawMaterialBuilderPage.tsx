@@ -12,7 +12,11 @@ import {
 } from "../../../../components/custom/UserWorkflowStepPager";
 import { STRINGS } from "../../../../../app/config/strings";
 import { icons } from "../../../../../app/theme/icons";
-import { createEmptyPremixSchemaSession, type PremixStatusMeta } from "../../../../../data/models/user/RawMaterialPreparationModel";
+import {
+  createEmptyPremixSchemaSession,
+  isWeightmentSheetEditable,
+  type PremixStatusMeta,
+} from "../../../../../data/models/user/RawMaterialPreparationModel";
 import PremixStatusChip from "./components/PremixStatusChip";
 import ViewStatusButton from "../../../../components/common/ViewStatusButton";
 import FinalApprovalPremixDialog, {
@@ -164,6 +168,10 @@ const RawMaterialBuilderForm = ({
   const activePremixLocked = activePremixNo > 0 && !isPremixEditable(activePremixNo);
   const activePremixStatus = (premixStatusByNo as Record<number, PremixStatusMeta>)?.[activePremixNo]
     ?.premixSubmissionStatus;
+  const weightmentSheetEditable = useMemo(
+    () => isWeightmentSheetEditable(premixStatusByNo),
+    [premixStatusByNo],
+  );
 
   const finalApprovalRows = useMemo(
     () => buildFinalApprovalPremixRows(premixStatusByNo, premixTotal),
@@ -467,6 +475,7 @@ const RawMaterialBuilderForm = ({
           theme={theme}
           batchId={activeBatch?.batchId ?? ""}
           identificationSheet={identificationSheet}
+          disabled={!weightmentSheetEditable}
         />
       )}
 

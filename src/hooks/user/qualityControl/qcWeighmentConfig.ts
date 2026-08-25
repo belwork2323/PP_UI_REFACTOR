@@ -5,11 +5,13 @@ export const QC_WEIGHMENT_API_DIVISION = "WEIGHTMENT" as const satisfies QcApiDi
 export const QC_WEIGHMENT_SECTION_IDS = {
   WEIGHTSCALE_DETAILS: "WEIGHTSCALE_DETAILS",
   MOTOR_WEIGHT_DETAILS: "MOTOR_WEIGHT_DETAILS",
+  ATTACHMENTS: "ATTACHMENTS",
 } as const;
 
 export const QC_WEIGHMENT_SECTION_TITLES: Record<string, string> = {
   [QC_WEIGHMENT_SECTION_IDS.WEIGHTSCALE_DETAILS]: "Weighscale Details",
   [QC_WEIGHMENT_SECTION_IDS.MOTOR_WEIGHT_DETAILS]: "Weighment Details",
+  [QC_WEIGHMENT_SECTION_IDS.ATTACHMENTS]: "Attachments",
 };
 
 export const QC_WEIGHMENT_FIELD_LABELS = {
@@ -18,6 +20,7 @@ export const QC_WEIGHMENT_FIELD_LABELS = {
   SR_NO: "Sr. No.",
   WEIGHT_PARAMETER: "Rocket Motor Id. No.",
   WEIGHT_KG: "Weight (kg)",
+  UPLOAD_REPORT: "Upload Report",
 } as const;
 
 export const QC_WEIGHMENT_PROPELLANT_FORMULA = "H = G − (A − B + C + D − E + F)";

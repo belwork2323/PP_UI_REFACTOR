@@ -3,6 +3,7 @@ import type {
   QcApiSubType,
   QcInhibitorType,
 } from "../../../schema-engine/adapters/qc.adapter";
+import type { FileRef } from "../../../data/models/common/FileUploadModel";
 import { STRINGS } from "../../../app/config/strings";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
@@ -99,7 +100,7 @@ export type QcPostCureQualificationRow = {
   PARAMETER: string;
   SPECIFICATION: string;
   RESULT: string;
-  QC_REPORT?: string;
+  QC_REPORT?: FileRef[];
 };
 
 export const QC_POST_CURE_HE_NE_PRESET: Array<Pick<QcPostCureLocationRow, "SR_NO" | "LOCATION">> = [

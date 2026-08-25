@@ -26,18 +26,22 @@ import {
 } from "../../../../../hooks/user/qualityControl/qcWeighmentConfig";
 import {
   getWeighmentCalibrationDueDate,
+  getWeighmentUploadReport,
   getWeighmentWeighscaleNo,
   getWeighmentWeightRows,
   setWeighmentCalibrationDueDate,
+  setWeighmentUploadReport,
   setWeighmentWeighscaleNo,
   setWeighmentWeightRows,
 } from "../../../../../hooks/user/qualityControl/qcWeighmentTables";
+import NdtFileField from "../NDT/NdtFileField";
 import {
   QCDivisionReadOnlyValue,
   qcReadOnlyBodyCellSx,
   qcReadOnlyTableContainerSx,
   qcReadOnlyTableHeaderCellSx,
 } from "./components/QCDivisionReadOnlyValue";
+import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 const BRAND = QC_DIVISION_BRAND;
@@ -45,14 +49,12 @@ const TABLE_BORDER = alpha(BRAND.primary, 0.18);
 const HEADER_CELL_BORDER = alpha("#fff", 0.22);
 
 const TH = {
-  background: `linear-gradient(135deg, ${BRAND.primary}, ${BRAND.primaryLight})`,
-  color: "#fff",
-  fontWeight: 700,
-  fontSize: "0.68rem",
-  letterSpacing: "0.06em",
-  textTransform: "uppercase" as const,
-  padding: "10px 12px",
-  whiteSpace: "nowrap" as const,
+  ...uniformTableHeaderCellSx(BRAND.primary, BRAND.primaryLight, {
+    headerFontSize: "0.68rem",
+    headerLetterSpacing: "0.06em",
+    headerPaddingY: "10px",
+    headerPaddingX: "12px",
+  }),
   border: `1px solid ${HEADER_CELL_BORDER}`,
 };
 
@@ -234,6 +236,7 @@ const QCWeighmentMotorPanel = ({
   const weighscaleNo = getWeighmentWeighscaleNo(values);
   const calibrationDueDate = getWeighmentCalibrationDueDate(values);
   const rows = useMemo(() => getWeighmentWeightRows(values), [values]);
+  const uploadReport = useMemo(() => getWeighmentUploadReport(values), [values]);
 
   return (
     <Box
@@ -251,6 +254,7 @@ const QCWeighmentMotorPanel = ({
         </Typography>
         {headerActions}
       </Stack>
+      <Stack spacing={1.5}>
       <SectionCard title={QC_WEIGHMENT_SECTION_TITLES.MOTOR_WEIGHT_DETAILS} readOnly={readOnly}>
         <Stack spacing={1.5}>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
@@ -298,6 +302,24 @@ const QCWeighmentMotorPanel = ({
           />
         </Stack>
       </SectionCard>
+      <SectionCard title={QC_WEIGHMENT_SECTION_TITLES.ATTACHMENTS} readOnly={readOnly}>
+        <Box>
+          <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.primary, mb: 0.75 }}>
+            {QC_WEIGHMENT_FIELD_LABELS.UPLOAD_REPORT}
+          </Typography>
+          <NdtFileField
+            files={uploadReport}
+            onChange={(next) => onChange(setWeighmentUploadReport(values, next))}
+            disabled={inputsDisabled}
+            readOnly={readOnly}
+            multiple
+            acceptMode="imageVideoPdf"
+            subDeptSlug="qc-division"
+            emptyLabel="Upload"
+          />
+        </Box>
+      </SectionCard>
+      </Stack>
     </Box>
   );
 };

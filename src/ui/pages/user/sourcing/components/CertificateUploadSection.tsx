@@ -6,6 +6,7 @@ import {
   Chip,
   IconButton,
   LinearProgress,
+  Link,
   Stack,
   TextField,
   Tooltip,
@@ -264,34 +265,42 @@ const CertificateUploadSection = ({
                         />
                       ) : null}
                       {cert.fileId && onOpen ? (
-                        <Tooltip
-                          title={
-                            fileUtils.getFileKind(cert.fileName) === "video"
-                              ? "Download video"
-                              : formStrings.OPEN_CERT_LINK
-                          }
+                        <Link
+                          component="button"
+                          type="button"
+                          onClick={() => onOpen(ci)}
+                          sx={{
+                            fontSize: "0.75rem",
+                            fontWeight: 700,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 0.25,
+                            cursor: "pointer",
+                            color: primaryLight,
+                          }}
                         >
-                          <IconButton
-                            size="small"
-                            onClick={() => onOpen(ci)}
-                            sx={{ color: primaryLight, p: 0.25 }}
-                          >
-                            <OpenInNewRoundedIcon sx={{ fontSize: 18 }} />
-                          </IconButton>
-                        </Tooltip>
+                          {fileUtils.getFileKind(cert.fileName) === "video"
+                            ? "Download"
+                            : formStrings.OPEN_CERT_LINK}
+                          <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
+                        </Link>
                       ) : fileUtils.isOpenableCertificateUrl(cert.fileUrl) ? (
-                        <Tooltip title={formStrings.OPEN_CERT_LINK}>
-                          <IconButton
-                            size="small"
-                            component="a"
-                            href={cert.fileUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            sx={{ color: primaryLight, p: 0.25 }}
-                          >
-                            <OpenInNewRoundedIcon sx={{ fontSize: 18 }} />
-                          </IconButton>
-                        </Tooltip>
+                        <Link
+                          href={cert.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          sx={{
+                            fontSize: "0.75rem",
+                            fontWeight: 700,
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: 0.25,
+                            color: primaryLight,
+                          }}
+                        >
+                          {formStrings.OPEN_CERT_LINK}
+                          <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
+                        </Link>
                       ) : null}
                     </Stack>
                     {cert.status === "uploading" ? (

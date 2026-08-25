@@ -67,7 +67,8 @@
             "id": "UPLOAD_GRAPH",
             "fieldType": "file",
             "label": "Upload Graph",
-            "multiple": false
+            "multiple": false,
+            "description": "Upload via /files/upload; submit as [{ fileId }]"
           }
         ]
       }

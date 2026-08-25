@@ -3,6 +3,7 @@ import { Box } from "@mui/material";
 import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog";
 import WorkflowFormOpeningLoader from "../../../../components/common/WorkflowFormOpeningLoader";
 import UserWorkflowFormHeader from "../../../../components/custom/UserWorkflowFormHeader";
+import { resolveWorkflowFormHeaderStatus } from "../../../../components/custom/workflowFormHeaderStatus";
 import NDTList from "./NDTList";
 import NDTForm from "./NDTForm";
 import NDTDetailsView from "./NDTDetailsView";
@@ -23,21 +24,6 @@ const formatMotorSubtitle = (batch?: {
   if (ids.length > 0) return ids.join(" · ");
   const motorId = String(batch?.motorId ?? "").trim();
   return motorId && motorId !== "—" ? motorId : undefined;
-};
-
-const resolveStatusLabel = (batch: any, isEdit: boolean, strings: typeof STRINGS.QUALITY_CONTROL.NDT) => {
-  if (isEdit) return STRINGS.QUALITY_CONTROL.FORM_HEADER.EDITING_REJECTED;
-
-  const status = String(batch?.ndtStatus ?? batch?.status ?? "")
-    .trim()
-    .toLowerCase()
-    .replace(/\s+/g, "_");
-  const inProgress =
-    status === "in_progress" ||
-    status === "waiting_for_partial_approval" ||
-    Boolean(batch?.formId);
-
-  return inProgress ? STRINGS.QUALITY_CONTROL.FORM_HEADER.DRAFT : strings.NEW_LABEL;
 };
 
 const NDTPage = () => {
@@ -84,6 +70,10 @@ const NDTPage = () => {
   } = hookState;
 
   const listLoading = loading && !loadingFormDetails && view === "list";
+  const formHeaderStatus =
+    view === "form" && activeBatch
+      ? resolveWorkflowFormHeaderStatus(activeBatch, { preferredStatusKeys: ["ndtStatus"] })
+      : null;
 
   return (
     <Box sx={theme.workflow.animatedContainer}>
@@ -108,18 +98,17 @@ const NDTPage = () => {
         />
       )}
 
-      {view === "form" && activeBatch && !loadingFormDetails && (
+      {view === "form" && activeBatch && !loadingFormDetails && formHeaderStatus && (
         <>
           <UserWorkflowFormHeader
             mode="update"
             data={{
               title: String(activeBatch.lotId ?? activeBatch.batchId ?? "—"),
               subtitle: formatMotorSubtitle(activeBatch),
-              statusLabel: resolveStatusLabel(activeBatch, isEditMode, strings),
-              statusVariant: isEditMode ? "edit" : "new",
-              rejectionReason: activeBatch.rejectionReason,
+              statusLabel: formHeaderStatus.statusLabel,
+              statusVariant: formHeaderStatus.statusVariant,
+              rejectionReason: formHeaderStatus.rejectionReason,
             }}
-            isEdit={isEditMode}
             onBack={handleBack}
             backLabel={STRINGS.QUALITY_CONTROL.FORM_HEADER.BACK_TO_LIST}
             rejectionTitle={STRINGS.QUALITY_CONTROL.FORM_HEADER.REJECTION_REASON}

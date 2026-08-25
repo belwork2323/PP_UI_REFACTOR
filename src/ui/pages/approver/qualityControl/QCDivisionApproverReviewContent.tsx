@@ -22,6 +22,8 @@ import { getQcDivisionTheme } from "../../../../app/theme/custom_themes/user/qua
 import getRawMaterialPreparationApproverTheme from "../../../../app/theme/custom_themes/approver/manufacturing/rawMaterialPreparationApprover_theme";
 import { STRINGS } from "../../../../app/config/strings";
 import { icons } from "../../../../app/theme/icons";
+import { QC_DIVISION_BRAND } from "../../../../app/theme/custom_themes/user/qualityControl/tokens";
+import { uniformTableHeaderCellSx } from "../../../../app/theme/custom_themes/shared/data_table_theme";
 import type { QCDivisionDetailView } from "../../../../data/models/user/QualityControlFormModel";
 import type { QualityControlFormState } from "../../../../data/models/user/QualityControlFormModel";
 import { PremixCountsSummary } from "../../user/manufacturing/RawMaterial/components/PremixStatusChip";
@@ -253,11 +255,23 @@ const ApproverStatusOverviewRows = ({
                     }}
                   >
                     <TableHead>
-                      <TableRow sx={{ bgcolor: "action.hover" }}>
-                        <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", width: "55%" }}>
+                      <TableRow>
+                        <TableCell
+                          sx={uniformTableHeaderCellSx(QC_DIVISION_BRAND.primary, QC_DIVISION_BRAND.primaryLight, {
+                            headerFontSize: "0.72rem",
+                            headerPaddingY: 1,
+                            headerPaddingX: 1.5,
+                          })}
+                        >
                           {unitColumnLabel(group)}
                         </TableCell>
-                        <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem" }}>
+                        <TableCell
+                          sx={uniformTableHeaderCellSx(QC_DIVISION_BRAND.primary, QC_DIVISION_BRAND.primaryLight, {
+                            headerFontSize: "0.72rem",
+                            headerPaddingY: 1,
+                            headerPaddingX: 1.5,
+                          })}
+                        >
                           {S.FINAL_APPROVAL_COL_STATUS}
                         </TableCell>
                       </TableRow>

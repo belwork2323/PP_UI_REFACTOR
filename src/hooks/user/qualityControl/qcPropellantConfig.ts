@@ -1,3 +1,4 @@
+import type { FileRef } from "../../../data/models/common/FileUploadModel";
 import { STRINGS } from "../../../app/config/strings";
 import type { QcApiDivision, QcApiSubType } from "../../../schema-engine/adapters/qc.adapter";
 import type { QcDivisionEntry } from "./qcDivisionEntryTypes";
@@ -199,7 +200,8 @@ export type QcPropellantPropertyRow = {
   PROPERTY: string;
   SPECIFICATION: string;
   REMARKS?: string;
-  UPLOAD_GRAPH?: string;
+  /** Eager-upload refs (NdtFileField); not filename strings. */
+  UPLOAD_GRAPH?: FileRef[];
   kind?: "data" | "mean" | "std";
   locked?: boolean;
   [key: string]: unknown;

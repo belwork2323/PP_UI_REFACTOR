@@ -1,5 +1,6 @@
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
 import type { QcApiSubType, QcInhibitorType } from "../../../schema-engine/adapters/qc.adapter";
+import { isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileRef } from "../../../data/models/common/FileUploadModel";
 import { formatToIsoDateInput, formatToUiDate } from "../../../utils/dateUtils";
 import {
   QC_POST_CURE_FIELD_LABELS,
@@ -34,6 +35,15 @@ const pickString = (...candidates: unknown[]): string => {
     if (value && value.toLowerCase() !== "null") return value;
   }
   return "";
+};
+
+const parseUploadFiles = (...candidates: unknown[]): FileRef[] => {
+  for (const candidate of candidates) {
+    if (candidate == null || candidate === "") continue;
+    const refs = parseFileRefs(candidate);
+    if (refs.length) return refs;
+  }
+  return [];
 };
 
 /** Preserve spaces while typing; only used for free-text table cells. */
@@ -94,7 +104,7 @@ const emptyQualificationRows = (
     PARAMETER: row.PARAMETER,
     SPECIFICATION: row.SPECIFICATION,
     RESULT: "",
-    ...(withQcReport ? { QC_REPORT: "" } : null),
+    ...(withQcReport ? { QC_REPORT: [] as FileRef[] } : null),
   }));
 
 const normalizeLocationRows = (
@@ -175,7 +185,9 @@ const normalizeQualificationRows = (
       PARAMETER: fallback.PARAMETER,
       SPECIFICATION: fallback.SPECIFICATION,
       RESULT: pickEditableString(row?.RESULT, row?.result),
-      ...(withQcReport ? { QC_REPORT: pickString(row?.QC_REPORT, row?.qcReport) } : null),
+      ...(withQcReport
+        ? { QC_REPORT: parseUploadFiles(row?.QC_REPORT, row?.qcReport) }
+        : null),
     };
   });
 };
@@ -212,7 +224,7 @@ export const createInitialLooseFlapValues = (): SchemaFormValues => {
     [formKey(section, QC_POST_CURE_TABLE_IDS.LF_EPOXY_QUALIFICATION)]: emptyQualificationRows(
       QC_POST_CURE_LF_QUALIFICATION_PRESET,
     ),
-    [formKey(section, "LF_EPOXY_QC_REPORT")]: "",
+    [formKey(section, "LF_EPOXY_QC_REPORT")]: [] as FileRef[],
     [formKey(section, QC_POST_CURE_TABLE_IDS.LF_EPOXY_FILLING)]: emptyLocationRows("QTY_FILLED"),
   };
 };
@@ -226,7 +238,7 @@ export const createInitialIr1Values = (): SchemaFormValues => {
     [formKey(qual, QC_POST_CURE_TABLE_IDS.IR1_QUALIFICATION)]: emptyQualificationRows(
       QC_POST_CURE_IR1_QUALIFICATION_PRESET,
     ),
-    [formKey(qual, "IR1_QC_REPORT")]: "",
+    [formKey(qual, "IR1_QC_REPORT")]: [] as FileRef[],
     [formKey(app, QC_POST_CURE_TABLE_IDS.APPLICATION)]: emptyLocationRows("QTY_APPLIED"),
     [formKey(app, "DISPATCH_DATE")]: "",
     [formKey(app, "DISPATCH_STATION")]: "",
@@ -285,6 +297,22 @@ export const setPostCureField = (
 ): SchemaFormValues => ({
   ...(values ?? {}),
   [formKey(sectionId, field)]: value,
+});
+
+export const getPostCureFileField = (
+  values: SchemaFormValues | null | undefined,
+  sectionId: string,
+  field: string,
+): FileRef[] => parseUploadFiles(values?.[formKey(sectionId, field)]);
+
+export const setPostCureFileField = (
+  values: SchemaFormValues | null | undefined,
+  sectionId: string,
+  field: string,
+  files: FileRef[],
+): SchemaFormValues => ({
+  ...(values ?? {}),
+  [formKey(sectionId, field)]: files ?? [],
 });
 
 export const getPostCureLocationRows = (
@@ -411,7 +439,7 @@ const hydrateLooseFlapFromData = (
       normalizeQualificationRows(qualification, QC_POST_CURE_LF_QUALIFICATION_PRESET);
   }
 
-  const qcReport = pickString(
+  const qcReport = parseUploadFiles(
     data.LF_EPOXY_QC_REPORT,
     data.QUALIFICATION_QC_REPORT,
     data.lfEpoxyQcReport,
@@ -420,7 +448,7 @@ const hydrateLooseFlapFromData = (
     nestedQual?.qcReport,
     nestedQual?.LF_EPOXY_QC_REPORT,
   );
-  if (qcReport || replaceAll) {
+  if (qcReport.length || replaceAll) {
     values[formKey(section, "LF_EPOXY_QC_REPORT")] = qcReport;
   }
 
@@ -478,7 +506,7 @@ const hydrateIr1FromData = (values: SchemaFormValues, data: Record<string, unkno
       nestedQual.qualificationDetails,
     QC_POST_CURE_IR1_QUALIFICATION_PRESET,
   );
-  values[formKey(qual, "IR1_QC_REPORT")] = pickString(
+  values[formKey(qual, "IR1_QC_REPORT")] = parseUploadFiles(
     data.IR1_QC_REPORT,
     data.QUALIFICATION_QC_REPORT,
     data.ir1QcReport,
@@ -535,15 +563,23 @@ const hydrateHemcoatFromData = (values: SchemaFormValues, data: Record<string, u
     QC_POST_CURE_HEMCOAT_QUALIFICATION_PRESET,
     true,
   );
-  const sharedReport = pickString(
+  const sharedReport = parseUploadFiles(
     data.QUALIFICATION_QC_REPORT,
     data.QC_REPORT,
     data.qcReport,
     nestedQual.qcReport,
   );
-  values[formKey(qual, QC_POST_CURE_TABLE_IDS.HEMCOAT_QUALIFICATION)] = sharedReport
+  values[formKey(qual, QC_POST_CURE_TABLE_IDS.HEMCOAT_QUALIFICATION)] = sharedReport.length
     ? qualRows.map((row, index) =>
-        index === 0 ? { ...row, QC_REPORT: row.QC_REPORT || sharedReport } : row,
+        index === 0
+          ? {
+              ...row,
+              QC_REPORT:
+                Array.isArray(row.QC_REPORT) && row.QC_REPORT.length
+                  ? row.QC_REPORT
+                  : sharedReport,
+            }
+          : row,
       )
     : qualRows;
 };
@@ -755,17 +791,16 @@ const mapLocationRowsForApi = (
   );
 
 const mapQualificationRowsForApi = (rows: QcPostCureQualificationRow[], withQcReport = false) =>
-  rows.map((row) =>
-    omitEmpty({
+  rows.map((row) => {
+    const reportPayload = withQcReport ? toFileIdListPayload(row.QC_REPORT) : [];
+    return omitEmpty({
       srNo: row.SR_NO,
       parameter: row.PARAMETER || undefined,
       specification: row.SPECIFICATION || undefined,
       result: String(row.RESULT ?? "").trim() || undefined,
-      ...(withQcReport
-        ? { qcReport: row.QC_REPORT ?? undefined }
-        : null),
-    }),
-  );
+      ...(withQcReport && reportPayload.length ? { qcReport: reportPayload } : null),
+    });
+  });
 
 const mapLocationRowsFromApi = (
   value: unknown,
@@ -801,7 +836,7 @@ const mapQualificationRowsFromApi = (value: unknown, withQcReport = false): unkn
       SPECIFICATION: pickString(row.specification, row.SPECIFICATION),
       RESULT: pickEditableString(row.result, row.RESULT),
       ...(withQcReport
-        ? { QC_REPORT: row.qcReport ?? row.QC_REPORT ?? "" }
+        ? { QC_REPORT: parseUploadFiles(row.qcReport, row.QC_REPORT) }
         : null),
     };
   });
@@ -834,7 +869,12 @@ const buildLooseFlapFillingDetailsPayload = (
       batchNo: getPostCureField(values, section, "LF_EPOXY_BATCH_NO") || undefined,
       preparationDate: toApiDate(getPostCureField(values, section, "LF_EPOXY_PREPARATION_DATE")),
       parameters: mapQualificationRowsForApi(qualRows),
-      qcReport: getPostCureField(values, section, "LF_EPOXY_QC_REPORT") || undefined,
+      qcReport: (() => {
+        const files = toFileIdListPayload(
+          getPostCureFileField(values, section, "LF_EPOXY_QC_REPORT"),
+        );
+        return files.length ? files : undefined;
+      })(),
     }),
     fillingDetails: mapLocationRowsForApi(fillingRows, "QTY_FILLED"),
   });
@@ -884,7 +924,10 @@ const buildInhibitionDetailsPayload = (
           getPostCureField(values, qual, "HEMCOAT_3K_PREPARATION_DATE"),
         ),
         parameters: mapQualificationRowsForApi(qualRows, true),
-        qcReport: getPostCureField(values, qual, "HEMCOAT_3K_QC_REPORT") || undefined,
+        qcReport: (() => {
+          const fromRows = toFileIdListPayload(qualRows[0]?.QC_REPORT);
+          return fromRows.length ? fromRows : undefined;
+        })(),
       }),
       applicationDetails: mapLocationRowsForApi(applicationRows, "QTY_APPLIED"),
       ...omitEmpty({
@@ -915,7 +958,12 @@ const buildInhibitionDetailsPayload = (
       batchNo: getPostCureField(values, qual, "IR1_BATCH_NO") || undefined,
       preparationDate: toApiDate(getPostCureField(values, qual, "IR1_PREPARATION_DATE")),
       parameters: mapQualificationRowsForApi(qualRows),
-      qcReport: getPostCureField(values, qual, "IR1_QC_REPORT") || undefined,
+      qcReport: (() => {
+        const files = toFileIdListPayload(
+          getPostCureFileField(values, qual, "IR1_QC_REPORT"),
+        );
+        return files.length ? files : undefined;
+      })(),
     }),
     applicationDetails: mapLocationRowsForApi(applicationRows, "QTY_APPLIED"),
     ...omitEmpty({
@@ -1212,7 +1260,10 @@ const buildLooseFlapSection = (values: SchemaFormValues | null | undefined): Sch
           QC_POST_CURE_TABLE_IDS.LF_EPOXY_QUALIFICATION,
           QC_POST_CURE_LF_QUALIFICATION_PRESET,
         ),
-        LF_EPOXY_QC_REPORT: getPostCureField(values, section, "LF_EPOXY_QC_REPORT") || undefined,
+        LF_EPOXY_QC_REPORT: (() => {
+          const files = getPostCureFileField(values, section, "LF_EPOXY_QC_REPORT");
+          return files.length ? files : undefined;
+        })(),
         [QC_POST_CURE_TABLE_IDS.LF_EPOXY_FILLING]: getPostCureLocationRows(
           values,
           section,
@@ -1240,7 +1291,10 @@ const buildIr1Sections = (values: SchemaFormValues | null | undefined): SchemaSe
             QC_POST_CURE_TABLE_IDS.IR1_QUALIFICATION,
             QC_POST_CURE_IR1_QUALIFICATION_PRESET,
           ),
-          IR1_QC_REPORT: getPostCureField(values, qual, "IR1_QC_REPORT") || undefined,
+          IR1_QC_REPORT: (() => {
+            const files = getPostCureFileField(values, qual, "IR1_QC_REPORT");
+            return files.length ? files : undefined;
+          })(),
         }),
       ],
     },
@@ -1348,5 +1402,43 @@ export const buildPostCureSectionPayload = (
     ...(inhibitorType ? { inhibitorType: inhibitorType as QcInhibitorType } : null),
   })) as SchemaSectionSubmission[];
 };
+
+export const collectPostCureFileRefsFromQcValues = (
+  values: SchemaFormValues | null | undefined,
+): FileRef[] => {
+  if (!values) return [];
+  const refs: FileRef[] = [];
+  const loose = QC_POST_CURE_SECTION_IDS.LOOSE_FLAP_FILLING;
+  const ir1 = QC_POST_CURE_SECTION_IDS.IR1_QUALIFICATION;
+  const hemcoat = QC_POST_CURE_SECTION_IDS.HEMCOAT_QUALIFICATION;
+  refs.push(...getPostCureFileField(values, loose, "LF_EPOXY_QC_REPORT"));
+  refs.push(...getPostCureFileField(values, ir1, "IR1_QC_REPORT"));
+  for (const row of getPostCureQualificationRows(
+    values,
+    hemcoat,
+    QC_POST_CURE_TABLE_IDS.HEMCOAT_QUALIFICATION,
+    QC_POST_CURE_HEMCOAT_QUALIFICATION_PRESET,
+    true,
+  )) {
+    refs.push(...parseUploadFiles(row.QC_REPORT));
+  }
+  return refs;
+};
+
+export const hasIncompleteQcPostCureUploads = (
+  values: SchemaFormValues | null | undefined,
+): boolean => collectPostCureFileRefsFromQcValues(values).some(isFileUploadIncomplete);
+
+export const collectTempFileIdsFromQcPostCureValues = (
+  values: SchemaFormValues | null | undefined,
+): string[] =>
+  [
+    ...new Set(
+      collectPostCureFileRefsFromQcValues(values)
+        .filter((ref) => ref.isTemp !== false)
+        .map((ref) => String(ref.fileId ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
 
 export const postCureFieldLabels = QC_POST_CURE_FIELD_LABELS;

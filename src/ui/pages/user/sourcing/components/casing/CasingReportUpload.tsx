@@ -6,6 +6,7 @@ import {
   Chip,
   IconButton,
   LinearProgress,
+  Link,
   Stack,
   Table,
   TableBody,
@@ -156,15 +157,24 @@ const ReportRowFiles = ({
                     </Tooltip>
                   ) : null}
                   {canOpen && ref.status !== "uploading" ? (
-                    <Tooltip title={S.OPEN_FILE}>
-                      <IconButton
-                        size="small"
-                        onClick={() => handleOpen(index)}
-                        sx={{ color: colors.primary }}
-                      >
-                        <OpenInNewRoundedIcon sx={{ fontSize: 16 }} />
-                      </IconButton>
-                    </Tooltip>
+                    <Link
+                      component="button"
+                      type="button"
+                      onClick={() => handleOpen(index)}
+                      sx={{
+                        fontSize: "0.72rem",
+                        fontWeight: 700,
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 0.25,
+                        cursor: "pointer",
+                        color: colors.primary,
+                        flexShrink: 0,
+                      }}
+                    >
+                      {S.OPEN_FILE}
+                      <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
+                    </Link>
                   ) : null}
                   <Tooltip title={S.REMOVE_FILE}>
                     <IconButton

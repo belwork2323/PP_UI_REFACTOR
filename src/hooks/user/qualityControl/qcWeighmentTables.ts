@@ -1,4 +1,5 @@
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import { isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileRef } from "../../../data/models/common/FileUploadModel";
 import { formatToIsoDateInput, formatToUiDate } from "../../../utils/dateUtils";
 import {
   QC_WEIGHMENT_SECTION_IDS,
@@ -16,6 +17,8 @@ const calibrationKey = () =>
   formKey(QC_WEIGHMENT_SECTION_IDS.WEIGHTSCALE_DETAILS, "CALIBRATION_DUE_DATE");
 const tableKey = () =>
   formKey(QC_WEIGHMENT_SECTION_IDS.MOTOR_WEIGHT_DETAILS, QC_WEIGHMENT_SECTION_IDS.MOTOR_WEIGHT_DETAILS);
+const uploadReportKey = () =>
+  formKey(QC_WEIGHMENT_SECTION_IDS.ATTACHMENTS, "UPLOAD_REPORT");
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -30,6 +33,15 @@ const pickString = (...candidates: unknown[]): string => {
     if (value && value.toLowerCase() !== "null") return value;
   }
   return "";
+};
+
+const parseUploadFiles = (...candidates: unknown[]): FileRef[] => {
+  for (const candidate of candidates) {
+    if (candidate == null || candidate === "") continue;
+    const refs = parseFileRefs(candidate);
+    if (refs.length) return refs;
+  }
+  return [];
 };
 
 const omitEmpty = <T extends Record<string, unknown>>(record: T): Record<string, unknown> =>
@@ -78,6 +90,7 @@ export const createInitialWeighmentValues = (): SchemaFormValues => ({
   [weighscaleNoKey()]: "",
   [calibrationKey()]: "",
   [tableKey()]: emptyQcWeighmentWeightRows(),
+  [uploadReportKey()]: [] as FileRef[],
 });
 
 export const getWeighmentWeighscaleNo = (values: SchemaFormValues | undefined) =>
@@ -88,6 +101,10 @@ export const getWeighmentCalibrationDueDate = (values: SchemaFormValues | undefi
 
 export const getWeighmentWeightRows = (values: SchemaFormValues | undefined): QcWeighmentWeightRow[] =>
   normalizeWeightRows(values?.[tableKey()]);
+
+export const getWeighmentUploadReport = (
+  values: SchemaFormValues | undefined,
+): FileRef[] => parseUploadFiles(values?.[uploadReportKey()]);
 
 export const setWeighmentWeighscaleNo = (
   values: SchemaFormValues,
@@ -113,8 +130,17 @@ export const setWeighmentWeightRows = (
   [tableKey()]: applyQcWeighmentRowComputation(rows),
 });
 
+export const setWeighmentUploadReport = (
+  values: SchemaFormValues,
+  files: FileRef[],
+): SchemaFormValues => ({
+  ...values,
+  [uploadReportKey()]: files ?? [],
+});
+
 export const weighmentFormValuesHaveUserData = (values: SchemaFormValues | undefined): boolean => {
   if (getWeighmentWeighscaleNo(values) || getWeighmentCalibrationDueDate(values)) return true;
+  if (getWeighmentUploadReport(values).length) return true;
   return getWeighmentWeightRows(values).some(
     (row) => String(row.SR_NO).toUpperCase() !== "H" && String(row.WEIGHT_KG ?? "").trim(),
   );
@@ -143,6 +169,19 @@ const hydrateFromSectionData = (
     if (Array.isArray(rows) || asRecord(rows)) {
       values[tableKey()] = normalizeWeightRows(rows);
     }
+  }
+  if (
+    !upper ||
+    upper === QC_WEIGHMENT_SECTION_IDS.ATTACHMENTS ||
+    upper === QC_WEIGHMENT_SECTION_IDS.MOTOR_WEIGHT_DETAILS
+  ) {
+    const files = parseUploadFiles(
+      data.UPLOAD_REPORT,
+      data.uploadReport,
+      data.uploadedFiles,
+      data.attachments,
+    );
+    if (files.length) values[uploadReportKey()] = files;
   }
 };
 
@@ -273,12 +312,15 @@ export const buildWeighmentMotorWeightsPayload = (
   values: SchemaFormValues | null | undefined,
   motorId: string,
   motorSubmissionType?: QcWeighmentMotorSubmissionType | null,
-): Record<string, unknown> =>
-  omitEmpty({
+): Record<string, unknown> => {
+  const uploadedFiles = toFileIdListPayload(getWeighmentUploadReport(values ?? undefined));
+  return omitEmpty({
     motorId,
     ...(motorSubmissionType ? { motorSubmissionType } : {}),
     weights: getWeighmentWeightRows(values).map(buildWeighmentWeightRowPayload),
+    ...(uploadedFiles.length ? { uploadedFiles } : {}),
   });
+};
 
 /** Division `data` for QC Weighment create/update. */
 export const buildWeighmentDivisionData = (
@@ -310,3 +352,23 @@ export const buildWeighmentMotorPayload = (
   motorSubmissionType: QcWeighmentMotorSubmissionType = "DRAFT",
 ): Record<string, unknown> =>
   buildWeighmentMotorWeightsPayload(values, motorId, motorSubmissionType);
+
+export const collectWeighmentFileRefsFromQcValues = (
+  values: SchemaFormValues | null | undefined,
+): FileRef[] => getWeighmentUploadReport(values ?? undefined);
+
+export const hasIncompleteQcWeighmentUploads = (
+  values: SchemaFormValues | null | undefined,
+): boolean => collectWeighmentFileRefsFromQcValues(values).some(isFileUploadIncomplete);
+
+export const collectTempFileIdsFromQcWeighmentValues = (
+  values: SchemaFormValues | null | undefined,
+): string[] =>
+  [
+    ...new Set(
+      collectWeighmentFileRefsFromQcValues(values)
+        .filter((ref) => ref.isTemp !== false)
+        .map((ref) => String(ref.fileId ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];

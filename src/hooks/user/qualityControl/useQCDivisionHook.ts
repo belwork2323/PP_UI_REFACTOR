@@ -144,6 +144,8 @@ import {
   hydrateHardwareUploadValuesFromSections,
   isQcHardwareProcessSubType,
   mergeHardwareUploadValuesIntoEntryValues,
+  hasIncompleteQcHardwareUploads,
+  collectTempFileIdsFromQcHardwareValues,
 } from "./qcHardwareTables";
 import { applyCastingDivisionDetailsSeed } from "./qcCastingDivisionDetails";
 import {
@@ -166,6 +168,8 @@ import { createInitialTrimmingValues, hydrateTrimmingValuesFromSections } from "
 import {
   createInitialPropellantValues,
   hydratePropellantValuesFromSections,
+  hasIncompleteQcPropellantUploads,
+  collectTempFileIdsFromQcPropellantValues,
 } from "./qcPropellantTables";
 import { resolveQcPropellantPremixCount } from "./qcPropellantConfig";
 import { mapQcTrimmingSubTypeToApi, resolveQcTrimmingSubType } from "./qcTrimmingConfig";
@@ -174,6 +178,8 @@ import {
   createInitialPostCureValues,
   hydratePostCureValuesFromSections,
   postCureFormValuesHaveUserData,
+  hasIncompleteQcPostCureUploads,
+  collectTempFileIdsFromQcPostCureValues,
 } from "./qcPostCureTables";
 import {
   applyPostCureDivisionDetailsSeed,
@@ -182,12 +188,18 @@ import {
 } from "./qcPostCureDivisionDetails";
 import { createInitialNdtValues, hydrateNdtValuesFromSections, ndtFormValuesHaveUserData, hasIncompleteQcNdtUploads, collectTempFileIdsFromQcNdtValues } from "./qcNdtTables";
 import {
+  hasIncompleteQcRevalidationUploads,
+  collectTempFileIdsFromQcRevalidationValues,
+} from "./qcRawMaterialRevalidationTable";
+import {
   applyNdtDivisionDetailsSeed,
   buildInitialNdtValuesForMotor,
 } from "./qcNdtDivisionDetails";
 import {
   createInitialWeighmentValues,
   hydrateWeighmentValuesFromSections,
+  hasIncompleteQcWeighmentUploads,
+  collectTempFileIdsFromQcWeighmentValues,
 } from "./qcWeighmentTables";
 import { buildInitialWeighmentValuesForMotor } from "./qcWeighmentDivisionDetails";
 import {
@@ -233,8 +245,20 @@ const collectTempFileIdsFromQcForm = (form: QualityControlFormState | null | und
   const entries = form.divisionEntries ?? [];
   const valuesById = form.divisionEntryValues ?? {};
   for (const entry of entries) {
-    if (entry.kind !== "NDT_MOTOR") continue;
-    ids.push(...collectTempFileIdsFromQcNdtValues(valuesById[entry.entryId]?.schemaValues));
+    const values = valuesById[entry.entryId]?.schemaValues;
+    if (entry.kind === "NDT_MOTOR") {
+      ids.push(...collectTempFileIdsFromQcNdtValues(values));
+    } else if (entry.kind === "PROPELLANT_MOTOR" || entry.kind === "PROPELLANT_PROCESS") {
+      ids.push(...collectTempFileIdsFromQcPropellantValues(values));
+    } else if (entry.kind === "HARDWARE_PROCESS") {
+      ids.push(...collectTempFileIdsFromQcHardwareValues(values));
+    } else if (entry.kind === "POST_CURE_MOTOR") {
+      ids.push(...collectTempFileIdsFromQcPostCureValues(values));
+    } else if (entry.kind === "REVALIDATION") {
+      ids.push(...collectTempFileIdsFromQcRevalidationValues(values));
+    } else if (entry.kind === "WEIGHTMENT_MOTOR") {
+      ids.push(...collectTempFileIdsFromQcWeighmentValues(values));
+    }
   }
   return [...new Set(ids)];
 };
@@ -243,11 +267,18 @@ const hasIncompleteQcFormUploads = (form: QualityControlFormState | null | undef
   if (!form) return false;
   const entries = form.divisionEntries ?? [];
   const valuesById = form.divisionEntryValues ?? {};
-  return entries.some(
-    (entry) =>
-      entry.kind === "NDT_MOTOR" &&
-      hasIncompleteQcNdtUploads(valuesById[entry.entryId]?.schemaValues),
-  );
+  return entries.some((entry) => {
+    const values = valuesById[entry.entryId]?.schemaValues;
+    if (entry.kind === "NDT_MOTOR") return hasIncompleteQcNdtUploads(values);
+    if (entry.kind === "PROPELLANT_MOTOR" || entry.kind === "PROPELLANT_PROCESS") {
+      return hasIncompleteQcPropellantUploads(values);
+    }
+    if (entry.kind === "HARDWARE_PROCESS") return hasIncompleteQcHardwareUploads(values);
+    if (entry.kind === "POST_CURE_MOTOR") return hasIncompleteQcPostCureUploads(values);
+    if (entry.kind === "REVALIDATION") return hasIncompleteQcRevalidationUploads(values);
+    if (entry.kind === "WEIGHTMENT_MOTOR") return hasIncompleteQcWeighmentUploads(values);
+    return false;
+  });
 };
 
 type WorkflowView = "list" | "form" | "details";

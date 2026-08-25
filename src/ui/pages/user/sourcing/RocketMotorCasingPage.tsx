@@ -7,6 +7,7 @@ import getSourcingTheme from "../../../../app/theme/custom_themes/user/sourcing/
 import useRocketMotorCasingHook from "../../../../hooks/user/sourcing/useRocketMotorCasingHook";
 import UserWorkflowActionBar from "../../../components/custom/UserWorkflowActionBar";
 import UserWorkflowFormHeader from "../../../components/custom/UserWorkflowFormHeader";
+import { resolveWorkflowFormHeaderStatus } from "../../../components/custom/workflowFormHeaderStatus";
 import UserWorkflowStatusCell from "../../../components/custom/UserWorkflowStatusCell";
 import MotorCasingCreateForm from "./components/casing/MotorCasingCreateForm";
 import RocketMotorBatchList, {
@@ -144,10 +145,16 @@ const RocketMotorCasing = () => {
                 ? createMotorCasingHeaderHeading.subtitle
                 : `${STRINGS.SOURCING.CASING_CREATE.MOTOR_ID}: ${headerMotorId || "—"}`,
               caption: createMotorCasingHeaderHeading ? undefined : projectCaption || undefined,
-              statusLabel: isEditMode
-                ? "Editing Rejected Submission"
-                : STRINGS.SOURCING.CASING.NEW_SUBMISSION,
-              statusVariant: isEditMode ? "edit" : "new",
+              ...(() => {
+                const hs = resolveWorkflowFormHeaderStatus(activeBatch, {
+                  preferredStatusKeys: ["rmStatus"],
+                });
+                return {
+                  statusLabel: hs.statusLabel,
+                  statusVariant: hs.statusVariant,
+                  rejectionReason: hs.rejectionReason,
+                };
+              })(),
               statusNode: createMotorCasingHeaderHeading ? undefined : (
                 <UserWorkflowStatusCell
                   status={activeBatch.rmStatus}
@@ -157,9 +164,7 @@ const RocketMotorCasing = () => {
                   theme={theme}
                 />
               ),
-              rejectionReason: activeBatch.rejectionReason,
             }}
-            isEdit={isEditMode}
             onBack={handleBack}
             theme={theme}
           />

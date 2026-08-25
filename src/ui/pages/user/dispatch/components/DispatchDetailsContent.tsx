@@ -4,6 +4,7 @@ import {
   Button,
   Chip,
   CircularProgress,
+  Link,
   Stack,
   Table,
   TableBody,
@@ -14,6 +15,7 @@ import {
   Typography,
 } from "@mui/material";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
+import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import getDispatchTheme from "../../../../../app/theme/custom_themes/user/dispatch/dispatch_theme";
 import { STRINGS } from "../../../../../app/config/strings";
@@ -23,9 +25,13 @@ import {
   type CasePrepDetailSection,
   type CasePrepDetailTable,
 } from "../../../../../data/models/user/CasePreparationFormModel";
+import { parseFileRefs, type FileRef } from "../../../../../data/models/common/FileUploadModel";
 import type { DispatchDetailView, DispatchMotorDetailView } from "../../../../../data/models/user/DispatchApiModel";
 import { DISPATCH_FLOW_LABELS } from "../../../../../hooks/user/dispatch/dispatchFlowConfig";
 import { OPERATION_STATUS_UI_TO_API } from "../../../../../hooks/operationStatus";
+import { useAuthStore } from "../../../../../app/store/authStore";
+import { useFilePreview } from "../../../../../hooks/useFilePreview";
+import FilePreviewDialog from "../../../../components/common/FilePreviewDialog";
 
 const API_OPERATION_STATUS_LABELS = Object.fromEntries(
   Object.entries(OPERATION_STATUS_UI_TO_API).map(([label, apiValue]) => [apiValue, label]),
@@ -72,12 +78,117 @@ const formatDateTime = (value?: string | null) => {
   });
 };
 
+const DISPATCH_FILE_KEYS = new Set([
+  "uploadDispatchPhotos",
+  "DISPATCH_PHOTOS",
+  "clearanceCertificate",
+  "CLEARANCE_CERTIFICATE",
+  "uploadedDocuments",
+]);
+
+const looksLikeFileRefs = (value: unknown): boolean => {
+  if (value == null || value === "") return false;
+  if (Array.isArray(value)) {
+    return value.some(
+      (entry) =>
+        entry &&
+        typeof entry === "object" &&
+        ("fileId" in entry || "fileName" in entry || "mimeType" in entry),
+    );
+  }
+  return (
+    typeof value === "object" &&
+    ("fileId" in (value as object) ||
+      "fileName" in (value as object) ||
+      "mimeType" in (value as object))
+  );
+};
+
+const DispatchFileLinks = ({
+  refs,
+  subDepartmentId,
+  onOpen,
+}: {
+  refs: FileRef[];
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
+}) => {
+  if (!refs.length) return <>{formatCasePrepCellValue(null)}</>;
+  return (
+    <Stack spacing={0.5}>
+      {refs.map((ref, index) => {
+        const fileId = String(ref.fileId ?? "").trim();
+        const name = ref.fileName || "file";
+        const canOpen = Boolean(fileId && subDepartmentId);
+        return (
+          <Stack
+            key={ref.localId ?? `${fileId || name}-${index}`}
+            direction="row"
+            alignItems="center"
+            gap={1}
+            flexWrap="wrap"
+          >
+            <Typography component="span" sx={{ fontSize: "0.75rem", fontWeight: 600 }}>
+              {name}
+            </Typography>
+            {canOpen ? (
+              <Link
+                component="button"
+                type="button"
+                onClick={() => onOpen(fileId, name)}
+                sx={{
+                  fontSize: "0.72rem",
+                  fontWeight: 700,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 0.25,
+                  cursor: "pointer",
+                }}
+              >
+                {D.FILE_OPEN}
+                <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
+              </Link>
+            ) : null}
+          </Stack>
+        );
+      })}
+    </Stack>
+  );
+};
+
+const DispatchCellValue = ({
+  value,
+  fieldKey,
+  subDepartmentId,
+  onOpen,
+}: {
+  value: unknown;
+  fieldKey?: string;
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
+}) => {
+  if ((fieldKey && DISPATCH_FILE_KEYS.has(fieldKey)) || looksLikeFileRefs(value)) {
+    return (
+      <DispatchFileLinks
+        refs={parseFileRefs(value)}
+        subDepartmentId={subDepartmentId}
+        onOpen={onOpen}
+      />
+    );
+  }
+  return <>{formatCasePrepCellValue(value)}</>;
+};
+
 const FieldsTable = ({
   fields,
   dt,
+  subDepartmentId,
+  onOpen,
 }: {
   fields: CasePrepDetailSection["fields"];
   dt: DispatchDetailsTheme;
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
 }) => {
   if (!fields.length) return null;
 
@@ -95,7 +206,12 @@ const FieldsTable = ({
             <TableRow key={`${field.key}-${index}`} sx={dt.tableRow(index)}>
               <TableCell sx={{ ...dt.tableCell, ...dt.specText }}>{field.label}</TableCell>
               <TableCell sx={{ ...dt.tableCell, ...dt.resultText }}>
-                {formatCasePrepCellValue(field.value)}
+                <DispatchCellValue
+                  value={field.value}
+                  fieldKey={field.key}
+                  subDepartmentId={subDepartmentId}
+                  onOpen={onOpen}
+                />
               </TableCell>
             </TableRow>
           ))}
@@ -142,12 +258,22 @@ const DataTable = ({ table, dt }: { table: CasePrepDetailTable; dt: DispatchDeta
   );
 };
 
-const SectionPanel = ({ section, dt }: { section: CasePrepDetailSection; dt: DispatchDetailsTheme }) => (
+const SectionPanel = ({
+  section,
+  dt,
+  subDepartmentId,
+  onOpen,
+}: {
+  section: CasePrepDetailSection;
+  dt: DispatchDetailsTheme;
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
+}) => (
   <Box sx={{ mb: 2.5 }}>
     <Typography sx={{ fontSize: "0.8rem", fontWeight: 800, color: "text.primary", mb: 1 }}>
       {section.label}
     </Typography>
-    <FieldsTable fields={section.fields} dt={dt} />
+    <FieldsTable fields={section.fields} dt={dt} subDepartmentId={subDepartmentId} onOpen={onOpen} />
     {section.tables.map((table) => (
       <DataTable key={table.blockId} table={table} dt={dt} />
     ))}
@@ -158,10 +284,14 @@ export const MotorDetailPanel = ({
   motor,
   dt,
   palette,
+  subDepartmentId,
+  onOpen,
 }: {
   motor: DispatchMotorDetailView;
   dt: DispatchDetailsTheme;
   palette: DispatchPageTheme["palette"];
+  subDepartmentId?: number;
+  onOpen: (fileId: string, fileName: string) => void;
 }) => {
   const stageLabel = motor.setup.motorStage
     ? motor.setup.motorStage.toLowerCase().startsWith("stage")
@@ -192,7 +322,13 @@ export const MotorDetailPanel = ({
         <Typography sx={dt.emptyText}>{D.DETAILS_NO_MOTOR_DATA}</Typography>
       ) : (
         motor.sections.map((section) => (
-          <SectionPanel key={section.sectionId} section={section} dt={dt} />
+          <SectionPanel
+            key={section.sectionId}
+            section={section}
+            dt={dt}
+            subDepartmentId={subDepartmentId}
+            onOpen={onOpen}
+          />
         ))
       )}
     </Box>
@@ -216,6 +352,15 @@ const DispatchDetailsContent = ({
 }: DispatchDetailsContentProps) => {
   const dt = getDispatchTheme(theme).details;
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
+  const subDepartmentId = useAuthStore(
+    (s) =>
+      s.user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "dispatch")?.subDepartmentId,
+  );
+  const { preview, openFile, closePreview, downloadCurrent } = useFilePreview();
+  const onOpenFile = (fileId: string, fileName: string) => {
+    if (!subDepartmentId) return;
+    void openFile(fileId, subDepartmentId, fileName);
+  };
 
   const motors = detailView?.motors ?? [];
   const activeMotorIndexSafe = motors.length > 0 ? Math.min(activeMotorIndex, motors.length - 1) : 0;
@@ -324,12 +469,24 @@ const DispatchDetailsContent = ({
           ) : null}
 
           {activeMotor ? (
-            <MotorDetailPanel motor={activeMotor} dt={dt} palette={theme.palette} />
+            <MotorDetailPanel
+              motor={activeMotor}
+              dt={dt}
+              palette={theme.palette}
+              subDepartmentId={subDepartmentId}
+              onOpen={onOpenFile}
+            />
           ) : null}
         </Box>
       ) : (
         <Typography sx={dt.emptyText}>{D.DETAILS_NO_FORM_DATA}</Typography>
       )}
+
+      <FilePreviewDialog
+        preview={preview}
+        onClose={closePreview}
+        onDownload={downloadCurrent}
+      />
     </>
   );
 };

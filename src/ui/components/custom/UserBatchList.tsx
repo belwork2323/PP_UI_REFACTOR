@@ -65,6 +65,7 @@ import LayersRoundedIcon from "@mui/icons-material/LayersRounded";
 import { STRINGS } from "../../../app/config/strings";
 import fonts from "../../../app/theme/fonts";
 import { getBatchListShellTheme } from "../../../app/theme/custom_themes/shared/batchListShell_theme";
+import { uniformTableHeaderCellSx } from "../../../app/theme/custom_themes/shared/data_table_theme";
 import BatchListShell from "./BatchListShell";
 
 // ─── Animation ────────────────────────────────────────────────────────────────
@@ -161,15 +162,17 @@ const UserBatchList = ({
 
   const thSx = useMemo(
     () => ({
-      background: t.tableHeaderBg || p.primary,
-      color: t.tableHeaderText || "#fff",
-      fontWeight: fonts.weight.bold,
-      fontSize: fonts.size.xs,
-      letterSpacing: "0.08em",
-      textTransform: "uppercase",
-      padding: "11px 14px",
-      whiteSpace: "nowrap",
-      borderBottom: `2px solid ${t.tableHeaderBorder || "transparent"}`,
+      ...uniformTableHeaderCellSx(p.primary ?? "#1B4F72", p.primaryLight ?? "#2E86C1", {
+        headerFontSize: fonts.size.xs,
+        headerLetterSpacing: "0.08em",
+        headerPaddingY: "11px",
+        headerPaddingX: "14px",
+      }),
+      ...(t.tableHeaderBg ? { background: t.tableHeaderBg } : {}),
+      ...(t.tableHeaderText ? { color: t.tableHeaderText } : {}),
+      ...(t.tableHeaderBorder
+        ? { borderBottom: `2px solid ${t.tableHeaderBorder}` }
+        : { borderBottom: "none" }),
     }),
     [t, p],
   );

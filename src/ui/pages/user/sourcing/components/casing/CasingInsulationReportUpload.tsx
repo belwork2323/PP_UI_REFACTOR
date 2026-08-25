@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Box, Button, LinearProgress, Typography } from "@mui/material";
+import { Box, LinearProgress, Typography } from "@mui/material";
 import MediaUpload from "../../../../../components/common/MediaUpload";
 import FilePreviewDialog from "../../../../../components/common/FilePreviewDialog";
 import type { UploadedFileRef } from "../../../../../../data/models/user/RocketMotorCasingFormModel";
@@ -58,16 +58,12 @@ const CasingInsulationReportUpload = ({
         removeFileLabel={S.REMOVE_FILE}
         openFileLabel={S.OPEN_FILE}
         pendingUploadHint={S.PENDING_UPLOAD_HINT}
+        onOpenExisting={
+          existing && String(existing.fileId ?? "").trim() && existing.status === "uploaded"
+            ? () => handleOpen(0)
+            : undefined
+        }
       />
-      {existing && String(existing.fileId ?? "").trim() && existing.status === "uploaded" ? (
-        <Button
-          size="small"
-          onClick={() => handleOpen(0)}
-          sx={{ mt: 0.75, textTransform: "none", fontWeight: 700 }}
-        >
-          {S.OPEN_FILE}
-        </Button>
-      ) : null}
       {isUploading ? (
         <Box sx={{ mt: 1 }}>
           <Typography sx={{ fontSize: "0.72rem", fontWeight: 600, mb: 0.5 }}>

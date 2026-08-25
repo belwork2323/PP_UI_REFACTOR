@@ -9,6 +9,13 @@ import {
   toUiDate,
   toUiDateTime,
 } from "./castingCuringFieldCodec";
+import {
+  isFileUploadIncomplete,
+  parseFileRefs,
+  toFileIdPayloadOrNull,
+  type FileIdPayload,
+  type FileRef,
+} from "../common/FileUploadModel";
 
 export type StfMotorDataVariant = "MAIN_MOTOR" | "BEM";
 
@@ -76,7 +83,7 @@ export type StfMainMotorData = {
   TESTING_DETAILS: StfMainTestingDetails;
   SENSOR_CONFIGURATION: StfMainSensorRow[];
   STATIC_TEST_RESULT: StfMainResultRow;
-  UPLOAD_PT_CURVE: { PT_CURVE_FILE: string };
+  UPLOAD_PT_CURVE: { PT_CURVE_FILE: FileRef[] };
 };
 
 export type StfBemConditioningDetails = {
@@ -165,7 +172,7 @@ export type StfBemMotorData = {
   TESTING_DETAILS: StfBemTestingDetails;
   SENSOR_CONFIGURATION: StfBemSensorRow[];
   RESULT_DETAILS: StfBemResultRow;
-  UPLOAD_PT_CURVE: { PT_CURVE_UPLOAD: string };
+  UPLOAD_PT_CURVE: { PT_CURVE_UPLOAD: FileRef[] };
 };
 
 export type StfMotorData = StfMainMotorData | StfBemMotorData;
@@ -269,7 +276,7 @@ export type StfStaticTestingDetailsApi = {
   testingDetails?: StfTestingDetailsApi;
   sensorConfigurations?: StfSensorConfigurationApi[];
   resultDetails?: StfResultDetailsApi;
-  ptCurveFile?: string;
+  ptCurveFile?: FileIdPayload;
   conditioningDetails?: StfConditioningDetailsApi;
   grainDimensions?: StfGrainDimensionApi[];
   bemHardwareDetails?: StfBemHardwareDetailsApi;
@@ -355,7 +362,7 @@ export const createEmptyStfMainMotorData = (): StfMainMotorData => ({
     C_STAR: "",
     ISP: "",
   },
-  UPLOAD_PT_CURVE: { PT_CURVE_FILE: "" },
+  UPLOAD_PT_CURVE: { PT_CURVE_FILE: [] },
 });
 
 export const createEmptyStfBemMotorData = (): StfBemMotorData => ({
@@ -414,7 +421,7 @@ export const createEmptyStfBemMotorData = (): StfBemMotorData => ({
     C_STAR: "",
     ISP: "",
   },
-  UPLOAD_PT_CURVE: { PT_CURVE_UPLOAD: "" },
+  UPLOAD_PT_CURVE: { PT_CURVE_UPLOAD: [] },
 });
 
 export const createEmptyStfMotorData = (variant: StfMotorDataVariant): StfMotorData =>
@@ -823,7 +830,9 @@ const parseFromNestedDto = (
   const testing = asRecord(details.testingDetails);
   const sensors = details.sensorConfigurations;
   const results = asRecord(details.resultDetails);
-  const ptCurveFile = str(details.ptCurveFile ?? pickField(details, "ptCurveUpload", "PT_CURVE_FILE"));
+  const ptCurveFile = parseFileRefs(
+    details.ptCurveFile ?? pickField(details, "ptCurveUpload", "PT_CURVE_FILE"),
+  );
 
   if (variant === "MAIN_MOTOR") {
     const empty = createEmptyStfMainMotorData();
@@ -882,6 +891,12 @@ const parseFromNestedDto = (
   };
 };
 
+const collectStfFileRefsFromMotorData = (data: StfMotorData | null | undefined): FileRef[] => {
+  if (!data) return [];
+  if (data.variant === "MAIN_MOTOR") return data.UPLOAD_PT_CURVE.PT_CURVE_FILE ?? [];
+  return data.UPLOAD_PT_CURVE.PT_CURVE_UPLOAD ?? [];
+};
+
 export const parseStfMotorDataFromApi = (
   motor: Record<string, unknown> | null | undefined,
   variant: StfMotorDataVariant,
@@ -916,7 +931,7 @@ export const parseStfMotorDataFromApi = (
       ),
       STATIC_TEST_RESULT: parseMainResultDetails(empty.STATIC_TEST_RESULT, result),
       UPLOAD_PT_CURVE: {
-        PT_CURVE_FILE: str(pickField(upload, "PT_CURVE_FILE", "ptCurveFile")),
+        PT_CURVE_FILE: parseFileRefs(pickField(upload, "PT_CURVE_FILE", "ptCurveFile")),
       },
     };
   }
@@ -959,7 +974,9 @@ export const parseStfMotorDataFromApi = (
     ),
     RESULT_DETAILS: mapRowFields(empty.RESULT_DETAILS, result),
     UPLOAD_PT_CURVE: {
-      PT_CURVE_UPLOAD: str(pickField(upload, "PT_CURVE_UPLOAD", "ptCurveUpload", "PT_CURVE_FILE")),
+      PT_CURVE_UPLOAD: parseFileRefs(
+        pickField(upload, "PT_CURVE_UPLOAD", "ptCurveUpload", "PT_CURVE_FILE", "ptCurveFile"),
+      ),
     },
   };
 };
@@ -975,7 +992,7 @@ export const buildStfMotorStaticTestingDetails = (
       testingDetails: buildMainTestingDetails(data.TESTING_DETAILS),
       sensorConfigurations: sensors.length ? sensors : undefined,
       resultDetails: buildMainResultDetails(data.STATIC_TEST_RESULT),
-      ptCurveFile: str(data.UPLOAD_PT_CURVE.PT_CURVE_FILE).trim() || undefined,
+      ptCurveFile: toFileIdPayloadOrNull(data.UPLOAD_PT_CURVE.PT_CURVE_FILE) ?? undefined,
     }) as StfStaticTestingDetailsApi;
   }
 
@@ -990,6 +1007,32 @@ export const buildStfMotorStaticTestingDetails = (
     testingDetails: buildBemTestingDetails(data.TESTING_DETAILS),
     sensorConfigurations: sensors.length ? sensors : undefined,
     resultDetails: buildBemResultDetails(data.RESULT_DETAILS),
-    ptCurveFile: str(data.UPLOAD_PT_CURVE.PT_CURVE_UPLOAD).trim() || undefined,
+    ptCurveFile: toFileIdPayloadOrNull(data.UPLOAD_PT_CURVE.PT_CURVE_UPLOAD) ?? undefined,
   }) as StfStaticTestingDetailsApi;
 };
+
+export const collectStfFileRefsFromForm = (form: {
+  motors?: Array<{ stfData?: StfMotorData | null }>;
+}): FileRef[] => {
+  const refs: FileRef[] = [];
+  for (const motor of form?.motors ?? []) {
+    refs.push(...collectStfFileRefsFromMotorData(motor.stfData));
+  }
+  return refs;
+};
+
+export const hasIncompleteStfUploads = (form: {
+  motors?: Array<{ stfData?: StfMotorData | null }>;
+}): boolean => collectStfFileRefsFromForm(form).some(isFileUploadIncomplete);
+
+export const collectTempFileIdsFromStfForm = (form: {
+  motors?: Array<{ stfData?: StfMotorData | null }>;
+}): string[] =>
+  [
+    ...new Set(
+      collectStfFileRefsFromForm(form)
+        .filter((ref) => ref.isTemp !== false)
+        .map((ref) => String(ref.fileId ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
