@@ -3,6 +3,7 @@ import { keyframes } from "@mui/material/styles";
 
 import fonts from "../../../fonts";
 import { getSharedTheme } from "../../shared/shared_theme";
+import { uniformTableBodyCellSx } from "../../shared/data_table_theme";
 
 const slideUp = keyframes`
   from { opacity: 0; transform: translateY(6px); }
@@ -52,13 +53,14 @@ export const getRawMaterialPreparationApproverTheme = (mode = "light") => {
         borderRight: `1px solid ${alpha("#fff", 0.32)}`,
         "&:last-of-type": { borderRight: "none" },
       },
-      bodyCell: {
-        padding: "10px 14px",
-        fontSize: "0.82rem",
-        borderBottom: `1px solid ${alpha(palette.border, 0.55)}`,
-        color: palette.text,
-        verticalAlign: "middle",
-      },
+      bodyCell: uniformTableBodyCellSx(
+        { border: palette.border, text: palette.text },
+        {
+          bodyFontSize: "0.82rem",
+          bodyPaddingY: "10px",
+          bodyPaddingX: "14px",
+        },
+      ),
       row: (index: number) => ({
         background: index % 2 === 0 ? (isDark ? alpha(palette.white, 0.02) : "#fff") : alpha(palette.surface, 0.5),
         "&:hover": { background: alpha(palette.primaryLight, 0.04) },

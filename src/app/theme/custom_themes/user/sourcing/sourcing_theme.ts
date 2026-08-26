@@ -2,6 +2,10 @@ import { alpha } from "@mui/material";
 import { getOperationsTheme } from "../../shared/operations_theme";
 import { getRawMaterialProcurementTheme } from "./rawMaterialProcurement_theme";
 import { getRocketMotorCasingTheme } from "./rocketMotorCasing_theme";
+import {
+  dataTableHeaderDivider,
+  uniformTableBodyCellSx,
+} from "../../shared/data_table_theme";
 
 const getSourcingWorkflowTheme = (baseTheme: any, mode = "light") => {
   const isDark = mode === "dark";
@@ -110,7 +114,7 @@ const getSourcingWorkflowTheme = (baseTheme: any, mode = "light") => {
         marginBottom: "12px",
       }),
       tableHeader: {
-        background: `linear-gradient(135deg, ${palette.primary}, ${palette.primaryLight})`,
+        background: `linear-gradient(180deg, ${palette.primaryLight} 0%, ${palette.primary} 100%)`,
         color: "#fff",
         fontWeight: 700,
         fontSize: "0.65rem",
@@ -120,18 +124,18 @@ const getSourcingWorkflowTheme = (baseTheme: any, mode = "light") => {
         whiteSpace: "normal",
         lineHeight: 1.3,
         borderBottom: "none",
+        borderRight: dataTableHeaderDivider,
         verticalAlign: "middle",
-        "&:first-of-type": { borderRadius: "6px 0 0 0" },
-        "&:last-of-type": { borderRadius: "0 6px 0 0" },
+        "&:last-of-type": { borderRight: "none" },
       },
-      tableCell: {
-        padding: "8px 12px",
-        borderBottom: `1px solid ${alpha(palette.border, 0.5)}`,
-        verticalAlign: "middle",
-        fontSize: "0.82rem",
-        color: palette.text,
-        minWidth: 0,
-      },
+      tableCell: uniformTableBodyCellSx(
+        { border: palette.border, text: palette.text },
+        {
+          bodyFontSize: "0.82rem",
+          bodyPaddingY: "8px",
+          bodyPaddingX: "12px",
+        },
+      ),
       blockCard: {
         borderRadius: 3.5,
         border: `1px solid ${palette.border}`,

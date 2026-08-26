@@ -185,19 +185,18 @@ export const canApproverActionEntireCasePrepForm = (params: {
   if (
     statusUpper === "APPROVED" ||
     statusUpper === "REJECTED" ||
-    statusUpper === "FINAL_APPROVAL_COMPLETED" ||
+    statusUpper === "COMPLETELY_APPROVED" ||
     status === OPERATION_STATUS.APPROVED ||
     status === OPERATION_STATUS.REJECTED ||
-    status === OPERATION_STATUS.FINAL_APPROVAL_COMPLETED
+    status === OPERATION_STATUS.COMPLETELY_APPROVED
   ) {
     return false;
   }
 
   return (
+    statusUpper === "WAITING_FOR_APPROVAL" ||
     statusUpper === "WAITING_FOR_COMPLETE_APPROVAL" ||
-    status === OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL ||
-    status === OPERATION_STATUS.WAITING_FOR_APPROVAL ||
-    statusUpper === "WAITING_FOR_APPROVAL"
+    status === OPERATION_STATUS.WAITING_FOR_APPROVAL
   );
 };
 

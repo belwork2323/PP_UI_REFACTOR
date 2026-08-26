@@ -397,11 +397,11 @@ const RawMaterialWeightmentSheetPanel = ({
 
                   return (
                     <TableRow key={index} sx={dt.tableRow ? dt.tableRow(index) : undefined}>
-                      <TableCell sx={{ minWidth: 190, py: 1.1, verticalAlign: "top" }}>
+                      <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 190, py: 1.1, verticalAlign: "top" }}>
                         {renderMaterialCodeField(row, index)}
                         {renderExpectedHint(row)}
                       </TableCell>
-                      <TableCell sx={{ minWidth: 170, py: 1.1, verticalAlign: "top" }}>
+                      <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 170, py: 1.1, verticalAlign: "top" }}>
                         <WeightmentTableInput
                           value={row.materialName}
                           onChange={(next) => updateRow(index, { materialName: next })}
@@ -411,7 +411,7 @@ const RawMaterialWeightmentSheetPanel = ({
                           palette={palette}
                         />
                       </TableCell>
-                      <TableCell sx={{ minWidth: 120, py: 1.1, verticalAlign: "top" }}>
+                      <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 120, py: 1.1, verticalAlign: "top" }}>
                         <WeightmentTableInput
                           type="number"
                           value={row.percentage}
@@ -423,7 +423,7 @@ const RawMaterialWeightmentSheetPanel = ({
                           disabled={disabled}
                         />
                       </TableCell>
-                      <TableCell sx={{ minWidth: 150, py: 1.1, verticalAlign: "top" }}>
+                      <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 150, py: 1.1, verticalAlign: "top" }}>
                         <WeightmentTableInput
                           type="number"
                           value={row.weightTransferred}
@@ -435,7 +435,7 @@ const RawMaterialWeightmentSheetPanel = ({
                           disabled={disabled}
                         />
                       </TableCell>
-                      <TableCell sx={{ minWidth: 140, py: 1.1, verticalAlign: "top" }}>
+                      <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 140, py: 1.1, verticalAlign: "top" }}>
                         <WeightmentTableInput
                           value={row.containerType}
                           onChange={(next) => updateRow(index, { containerType: next })}
@@ -445,7 +445,7 @@ const RawMaterialWeightmentSheetPanel = ({
                           disabled={disabled}
                         />
                       </TableCell>
-                      <TableCell sx={{ minWidth: 130, py: 1.1, verticalAlign: "top" }}>
+                      <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 130, py: 1.1, verticalAlign: "top" }}>
                         <WeightmentTableInput
                           value={row.containerNumber}
                           onChange={(next) => updateRow(index, { containerNumber: next })}
@@ -454,7 +454,7 @@ const RawMaterialWeightmentSheetPanel = ({
                           disabled={disabled}
                         />
                       </TableCell>
-                      <TableCell sx={{ minWidth: 130, py: 1.1, verticalAlign: "top" }}>
+                      <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 130, py: 1.1, verticalAlign: "top" }}>
                         <WeightmentTableInput
                           value={row.weighScaleNumber}
                           onChange={(next) => updateRow(index, { weighScaleNumber: next })}
@@ -463,7 +463,7 @@ const RawMaterialWeightmentSheetPanel = ({
                           disabled={disabled}
                         />
                       </TableCell>
-                      <TableCell sx={{ minWidth: 200, py: 1.1, verticalAlign: "top" }}>
+                      <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 200, py: 1.1, verticalAlign: "top" }}>
                         <WeightmentTableInput
                           type="datetime"
                           value={row.weighingDateTime}
@@ -472,7 +472,7 @@ const RawMaterialWeightmentSheetPanel = ({
                           disabled={disabled}
                         />
                       </TableCell>
-                      <TableCell align="center" sx={{ verticalAlign: "top", py: 1.1 }}>
+                      <TableCell align="center" sx={{ ...(dt.tableCell ?? {}), verticalAlign: "top", py: 1.1 }}>
                         <IconButton
                           size="small"
                           color="error"

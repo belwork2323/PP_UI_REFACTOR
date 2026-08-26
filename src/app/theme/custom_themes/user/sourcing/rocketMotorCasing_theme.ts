@@ -489,6 +489,11 @@ export const getRocketMotorCasingTheme = (baseTheme: any) => {
 						bg: "#E8F8F5",
 						border: alpha(success, 0.5),
 					},
+					["Completely Approved"]: {
+						color: success,
+						bg: "#E8F8F5",
+						border: alpha(success, 0.5),
+					},
 					["Rejected"]: {
 						color: danger,
 						bg: "#FDEDEC",

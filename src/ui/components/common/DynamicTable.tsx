@@ -15,6 +15,10 @@ import {
 import { useCallback, useEffect, useMemo, useState } from "react";
 import DeleteOutlineIcon from "@mui/icons-material/DeleteOutline";
 import type { SxProps, Theme } from "@mui/material";
+import {
+  dataTableBodyDivider,
+  uniformTableHeaderCellSx,
+} from "../../../app/theme/custom_themes/shared/data_table_theme";
 import type { SchemaTableBlock, SchemaTableColumn, SchemaTableColumnSlot, SchemaDataSource } from "../../../schema-engine/types";
 import { applyFormulaColumns } from "../../../schema-engine/rules/formulaEval";
 import { applyRowComputations, isEditableRowComputationTarget, isRowComputationTarget } from "../../../schema-engine/rules/tableRowComputations";
@@ -137,14 +141,34 @@ const resolveColumnWidthPercent = (
   totalMinWidth: number,
 ) => `${((columnMinWidth / totalMinWidth) * 100).toFixed(4)}%`;
 
-const cellSx = (col: SchemaTableColumn) => {
+const columnWidthSx = (col: SchemaTableColumn) => {
   const minWidth = resolveColumnMinWidth(col);
   return {
     ...(col.ui?.width ? { width: col.ui.width } : { minWidth }),
     whiteSpace: "normal" as const,
     wordBreak: "break-word" as const,
-    verticalAlign: "top" as const,
   };
+};
+
+const cellSx = (col: SchemaTableColumn) => ({
+  ...columnWidthSx(col),
+  verticalAlign: "top" as const,
+  borderBottom: dataTableBodyDivider("#D5D8DC"),
+  borderRight: dataTableBodyDivider("#D5D8DC"),
+  "&:last-of-type": {
+    borderRight: "none",
+  },
+});
+
+const headerCellBaseSx = {
+  ...uniformTableHeaderCellSx("#1B4F72", "#2E86C1", {
+    headerFontSize: "0.72rem",
+    headerLetterSpacing: "0.04em",
+    headerPaddingY: "10px",
+    headerPaddingX: "12px",
+  }),
+  whiteSpace: "normal" as const,
+  wordBreak: "break-word" as const,
 };
 
 const resolveColumnToolbarSx = (config: SchemaTableBlock): SxProps<Theme> => {
@@ -182,6 +206,11 @@ const actionsColumnSx = {
   width: ACTIONS_COLUMN_WIDTH,
   minWidth: ACTIONS_COLUMN_WIDTH,
   maxWidth: ACTIONS_COLUMN_WIDTH,
+  borderBottom: dataTableBodyDivider("#D5D8DC"),
+  borderRight: dataTableBodyDivider("#D5D8DC"),
+  "&:last-of-type": {
+    borderRight: "none",
+  },
 };
 
 const commitGroupDividerSx = (theme?: SchemaThemeTokens) => ({
@@ -211,13 +240,13 @@ const renderFlatHeaderCells = (
   columns.flatMap((slot) => {
     if (isColumnGroup(slot)) {
       return slot.columns.map((col) => (
-        <TableCell key={col.id} sx={{ fontWeight: 700, fontSize: "0.72rem", ...cellSx(col) }}>
+        <TableCell key={col.id} sx={{ ...headerCellBaseSx, ...columnWidthSx(col) }}>
           {renderColumnHeaderLabel(col, options)}
         </TableCell>
       ));
     }
     return (
-      <TableCell key={slot.id} sx={{ fontWeight: 700, fontSize: "0.72rem", ...cellSx(slot) }}>
+      <TableCell key={slot.id} sx={{ ...headerCellBaseSx, ...columnWidthSx(slot) }}>
         {renderColumnHeaderLabel(slot, options)}
       </TableCell>
     );
@@ -295,14 +324,14 @@ const renderGroupedSubHeaderCells = (
   columns.flatMap((slot) => {
     if (!isColumnGroup(slot)) return [];
     return slot.columns.map((col) => (
-      <TableCell key={col.id} sx={{ fontWeight: 700, fontSize: "0.72rem", ...cellSx(col) }}>
+      <TableCell key={col.id} sx={{ ...headerCellBaseSx, ...columnWidthSx(col) }}>
         {renderColumnHeaderLabel(col, options)}
       </TableCell>
     ));
   });
 
 const renderGroupHeaderRow = (columns: SchemaTableColumnSlot[], allowDelete: boolean) => (
-  <TableRow sx={{ background: "rgba(21,101,192,0.06)" }}>
+  <TableRow>
     {columns.map((slot) => {
       if (isColumnGroup(slot)) {
         return (
@@ -310,21 +339,21 @@ const renderGroupHeaderRow = (columns: SchemaTableColumnSlot[], allowDelete: boo
             key={slot.id}
             colSpan={slot.columns.length}
             align="center"
-            sx={{ fontWeight: 700, fontSize: "0.72rem" }}
+            sx={headerCellBaseSx}
           >
             {slot.label}
           </TableCell>
         );
       }
       return (
-        <TableCell key={slot.id} rowSpan={2} sx={{ fontWeight: 700, fontSize: "0.72rem", ...cellSx(slot) }}>
+        <TableCell key={slot.id} rowSpan={2} sx={{ ...headerCellBaseSx, ...columnWidthSx(slot) }}>
           {slot.label}
           {slot.unit ? ` (${slot.unit})` : ""}
         </TableCell>
       );
     })}
     {allowDelete ? (
-      <TableCell rowSpan={2} sx={{ ...actionsColumnSx, fontWeight: 700, fontSize: "0.72rem" }}>
+      <TableCell rowSpan={2} sx={{ ...headerCellBaseSx, ...actionsColumnSx, borderBottom: "none" }}>
         Actions
       </TableCell>
     ) : null}
@@ -751,15 +780,15 @@ const DynamicTable = ({
           {hasColumnGroups ? (
             <>
               {renderGroupHeaderRow(config.columns, allowDelete)}
-              <TableRow sx={{ background: "rgba(21,101,192,0.06)" }}>
+              <TableRow>
                 {renderGroupedSubHeaderCells(config.columns, headerOptions)}
               </TableRow>
             </>
           ) : (
-            <TableRow sx={{ background: "rgba(21,101,192,0.06)" }}>
+            <TableRow>
               {renderFlatHeaderCells(config.columns, headerOptions)}
               {allowDelete ? (
-                <TableCell sx={{ ...actionsColumnSx, fontWeight: 700, fontSize: "0.72rem" }}>
+                <TableCell sx={{ ...headerCellBaseSx, ...actionsColumnSx, borderBottom: "none" }}>
                   Actions
                 </TableCell>
               ) : null}

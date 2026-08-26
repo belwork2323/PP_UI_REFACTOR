@@ -50,6 +50,7 @@ export type QcHardwareLinearCoatingRow = {
 export type QcHardwareDispatchValues = {
   HE_PUNCTURES?: string;
   NE_PUNCTURES?: string;
+  LF_PUNCTURES?: string;
   DISPATCH_DATE_TIME?: string;
   OBSERVATIONS?: string;
 };
@@ -227,6 +228,7 @@ export const createInitialHardwareProcessValues = (
   return {
     [formKey(sectionId, "HE_PUNCTURES")]: "",
     [formKey(sectionId, "NE_PUNCTURES")]: "",
+    [formKey(sectionId, "LF_PUNCTURES")]: "",
     [formKey(sectionId, "DISPATCH_DATE_TIME")]: "",
     [formKey(sectionId, "OBSERVATIONS")]: "",
   };
@@ -301,6 +303,7 @@ export const getHardwareDispatchValues = (
   return {
     HE_PUNCTURES: String(values?.[formKey(sectionId, "HE_PUNCTURES")] ?? ""),
     NE_PUNCTURES: String(values?.[formKey(sectionId, "NE_PUNCTURES")] ?? ""),
+    LF_PUNCTURES: String(values?.[formKey(sectionId, "LF_PUNCTURES")] ?? ""),
     DISPATCH_DATE_TIME: String(values?.[formKey(sectionId, "DISPATCH_DATE_TIME")] ?? ""),
     OBSERVATIONS: String(values?.[formKey(sectionId, "OBSERVATIONS")] ?? ""),
   };
@@ -315,6 +318,7 @@ export const setHardwareDispatchValues = (
     ...(values ?? {}),
     [formKey(sectionId, "HE_PUNCTURES")]: next.HE_PUNCTURES ?? "",
     [formKey(sectionId, "NE_PUNCTURES")]: next.NE_PUNCTURES ?? "",
+    [formKey(sectionId, "LF_PUNCTURES")]: next.LF_PUNCTURES ?? "",
     [formKey(sectionId, "DISPATCH_DATE_TIME")]: next.DISPATCH_DATE_TIME ?? "",
     [formKey(sectionId, "OBSERVATIONS")]: next.OBSERVATIONS ?? "",
   };
@@ -649,6 +653,7 @@ export const buildHardwareProcessSectionPayload = (
   if (
     !hasValue(dispatch.HE_PUNCTURES) &&
     !hasValue(dispatch.NE_PUNCTURES) &&
+    !hasValue(dispatch.LF_PUNCTURES) &&
     !hasValue(dispatch.DISPATCH_DATE_TIME) &&
     !hasValue(dispatch.OBSERVATIONS)
   ) {
@@ -665,6 +670,9 @@ export const buildHardwareProcessSectionPayload = (
             : {}),
           ...(hasValue(dispatch.NE_PUNCTURES)
             ? { NE_PUNCTURES: String(dispatch.NE_PUNCTURES ?? "").trim() }
+            : {}),
+          ...(hasValue(dispatch.LF_PUNCTURES)
+            ? { LF_PUNCTURES: String(dispatch.LF_PUNCTURES ?? "").trim() }
             : {}),
           ...(hasValue(dispatch.DISPATCH_DATE_TIME)
             ? { DISPATCH_DATE_TIME: String(dispatch.DISPATCH_DATE_TIME ?? "").trim() }
@@ -794,6 +802,7 @@ export const hydrateHardwareProcessValuesFromSections = (
   return {
     [formKey(sectionId, "HE_PUNCTURES")]: String(data.HE_PUNCTURES ?? ""),
     [formKey(sectionId, "NE_PUNCTURES")]: String(data.NE_PUNCTURES ?? ""),
+    [formKey(sectionId, "LF_PUNCTURES")]: String(data.LF_PUNCTURES ?? ""),
     [formKey(sectionId, "DISPATCH_DATE_TIME")]: String(data.DISPATCH_DATE_TIME ?? ""),
     [formKey(sectionId, "OBSERVATIONS")]: String(data.OBSERVATIONS ?? ""),
   };
@@ -1062,6 +1071,7 @@ const buildDispatchToCastingPayload = (values: SchemaFormValues): Record<string,
 
   pushDetail("Puncturing at HE (Nos)", dispatch.HE_PUNCTURES);
   pushDetail("Puncturing at NE (Nos)", dispatch.NE_PUNCTURES);
+  pushDetail("Puncturing at LF Extension (Nos)", dispatch.LF_PUNCTURES);
   pushDetail("Dispatch Time", combineUiDateTime("", String(dispatch.DISPATCH_DATE_TIME ?? "")));
 
   const visualObservations = String(dispatch.OBSERVATIONS ?? "")

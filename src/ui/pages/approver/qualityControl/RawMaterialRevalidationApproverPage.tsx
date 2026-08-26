@@ -14,7 +14,10 @@ import ApproverActionDialog from "../../../components/custom/ApproverActionDialo
 import { icons } from "../../../../app/theme/icons";
 import { APPROVER_PRIORITY_META, APPROVER_STATUS_META, isApproverActionableStatus } from "../../../../app/theme/approver";
 import useApproverFormAction from "../../../../hooks/approver/useApproverFormAction";
-import { uniformTableHeaderCellSx } from "../../../../app/theme/custom_themes/shared/data_table_theme";
+import {
+  uniformTableBodyCellSx,
+  uniformTableHeaderCellSx,
+} from "../../../../app/theme/custom_themes/shared/data_table_theme";
 
 const {
   approved: CheckCircleRoundedIcon,
@@ -133,11 +136,16 @@ const TH = styled(TableCell)(
   }),
 );
 
-const TD = styled(TableCell)({
-  padding: "10px 14px", fontSize: "0.82rem",
-  borderBottom: `1px solid ${alpha(BRAND.border, 0.55)}`,
-  color: BRAND.text, verticalAlign: "middle",
-});
+const TD = styled(TableCell)(
+  uniformTableBodyCellSx(
+    { border: BRAND.border, text: BRAND.text },
+    {
+      bodyFontSize: "0.82rem",
+      bodyPaddingY: "10px",
+      bodyPaddingX: "14px",
+    },
+  ),
+);
 
 const DTH = styled(TableCell)(
   uniformTableHeaderCellSx(BRAND.qc, BRAND.qcLight, {
@@ -148,11 +156,16 @@ const DTH = styled(TableCell)(
   }),
 );
 
-const DTD = styled(TableCell)({
-  padding: "10px 14px", fontSize: "0.78rem",
-  borderBottom: `1px solid ${alpha(BRAND.border, 0.5)}`,
-  color: BRAND.text, verticalAlign: "middle",
-});
+const DTD = styled(TableCell)(
+  uniformTableBodyCellSx(
+    { border: BRAND.border, text: BRAND.text },
+    {
+      bodyFontSize: "0.78rem",
+      bodyPaddingY: "10px",
+      bodyPaddingX: "14px",
+    },
+  ),
+);
 
 const rowBg = (i) => (i % 2 === 0 ? "#fff" : alpha(BRAND.surface, 0.6));
 const hov   = { "&:hover": { background: alpha(BRAND.qc, 0.025) } };

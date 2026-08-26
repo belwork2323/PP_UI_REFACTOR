@@ -17,7 +17,10 @@ import {
 import { styled, keyframes } from "@mui/material/styles";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
-import { uniformTableHeaderCellSx } from "../../../../../app/theme/custom_themes/shared/data_table_theme";
+import {
+  uniformTableBodyCellSx,
+  uniformTableHeaderCellSx,
+} from "../../../../../app/theme/custom_themes/shared/data_table_theme";
 import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog";
 import {
   createDefaultQCDivisionFormState,
@@ -69,11 +72,16 @@ const TH = styled(TableCell)(
   }),
 );
 
-const TD = styled(TableCell)({
-  padding: "9px 16px",
-  borderBottom: "1px solid rgba(213,216,220,0.5)",
-  verticalAlign: "middle",
-});
+const TD = styled(TableCell)(
+  uniformTableBodyCellSx(
+    { border: "#D5D8DC", text: "#1C2833" },
+    {
+      bodyFontSize: "0.82rem",
+      bodyPaddingY: "9px",
+      bodyPaddingX: "16px",
+    },
+  ),
+);
 
 const rowBg = (index: number) => (index % 2 === 0 ? "#fff" : "rgba(244,246,248,0.6)");
 const hoverSx = { "&:hover": { background: "rgba(27,79,114,0.022)" } };

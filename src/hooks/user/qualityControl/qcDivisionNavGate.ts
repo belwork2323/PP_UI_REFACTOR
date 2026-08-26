@@ -8,7 +8,7 @@ import {
 } from "./qcPreviousDivisionApproval";
 import type { QcDivisionCatalogNavTab } from "./qcFlowConfig";
 
-const APPROVED_STATUSES = new Set(["APPROVED", "FINAL_APPROVAL_COMPLETED"]);
+const APPROVED_STATUSES = new Set(["APPROVED", "COMPLETELY_APPROVED"]);
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)

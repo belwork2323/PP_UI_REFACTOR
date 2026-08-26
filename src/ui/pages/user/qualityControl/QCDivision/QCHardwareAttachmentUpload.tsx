@@ -12,7 +12,7 @@ import {
 import { STRINGS } from "../../../../../app/config/strings";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { SchemaFormValues } from "../../../../../schema-engine";
-import NdtFileField from "../NDT/NdtFileField";
+import QCDivisionFileField from "./QCDivisionFileField";
 import {
   QC_HARDWARE_UPLOAD_GRAPH_KEY,
   QC_HARDWARE_UPLOAD_PHOTO_KEY,
@@ -140,7 +140,7 @@ const QCHardwareAttachmentUpload = ({
                   </TableCell>
                   <TableCell sx={bodyCellSx}>
                     <Box sx={{ minWidth: 220, maxWidth: 420 }}>
-                      <NdtFileField
+                      <QCDivisionFileField
                         files={files}
                         onChange={(next) =>
                           onChange(setHardwareUploadValue(values, uploadType, next))
@@ -149,7 +149,6 @@ const QCHardwareAttachmentUpload = ({
                         compact
                         multiple
                         acceptMode="imageVideoPdf"
-                        subDeptSlug="qc-division"
                         emptyLabel={S.HARDWARE_UPLOAD_ACTION}
                       />
                     </Box>

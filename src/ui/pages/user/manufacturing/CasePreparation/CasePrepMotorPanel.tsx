@@ -28,6 +28,7 @@ import {
   type CasePrepQualificationParameterRow,
 } from "../../../../../data/models/user/CasePrepMotorDataModel";
 import { DateTimeField, TimeField } from "../../../../components/common/DateField";
+import { WorkflowReadOnlyText } from "../../../../components/common/WorkflowReadOnlyText";
 import { CASE_PREP_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/casePreparation_theme";
 import CasePrepDateField from "./CasePrepDateField";
 import CasePrepFileField from "./CasePrepFileField";
@@ -171,6 +172,43 @@ const CompactDate = ({
       disabled={disabled} readOnly={readOnly}
       theme={theme}
     />
+  </Box>
+);
+
+const MultilineNoteField = ({
+  label,
+  value,
+  onChange,
+  disabled,
+  readOnly,
+  placeholder,
+  minRows = 2,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  readOnly?: boolean;
+  placeholder?: string;
+  minRows?: number;
+}) => (
+  <Box sx={{ gridColumn: { xs: "1", md: "1 / -1" } }}>
+    <FieldLabel>{label}</FieldLabel>
+    {readOnly ? (
+      <WorkflowReadOnlyText value={value} sx={{ fontSize: "0.82rem", py: 0.75 }} />
+    ) : (
+      <TextField
+        size="small"
+        fullWidth
+        multiline
+        minRows={minRows}
+        value={value}
+        disabled={disabled}
+        placeholder={placeholder}
+        onChange={(e) => onChange(e.target.value)}
+        sx={casePrepTableInputSx}
+      />
+    )}
   </Box>
 );
 
@@ -705,34 +743,22 @@ const CasePrepMotorPanel = ({
           </Box>
         </FieldGrid>
         <FieldGrid columns={2}>
-          <Box sx={{ gridColumn: { xs: "1", md: "1 / -1" } }}>
-            <FieldLabel>Pasting Details</FieldLabel>
-            <TextField
-              size="small"
-              fullWidth
-              multiline
-              minRows={2}
-              value={bellow.pastingDetails}
-              disabled={disabled} readOnly={readOnly}
-              placeholder="Pasting details"
-              onChange={(e) => patchSection("bellowBonding", { pastingDetails: e.target.value })}
-              sx={casePrepTableInputSx}
-            />
-          </Box>
-          <Box sx={{ gridColumn: { xs: "1", md: "1 / -1" } }}>
-            <FieldLabel>Remarks</FieldLabel>
-            <TextField
-              size="small"
-              fullWidth
-              multiline
-              minRows={2}
-              value={bellow.remarks}
-              disabled={disabled} readOnly={readOnly}
-              placeholder="Remarks"
-              onChange={(e) => patchSection("bellowBonding", { remarks: e.target.value })}
-              sx={casePrepTableInputSx}
-            />
-          </Box>
+          <MultilineNoteField
+            label="Pasting Details"
+            value={bellow.pastingDetails}
+            onChange={(v) => patchSection("bellowBonding", { pastingDetails: v })}
+            disabled={disabled}
+            readOnly={readOnly}
+            placeholder="Pasting details"
+          />
+          <MultilineNoteField
+            label="Remarks"
+            value={bellow.remarks}
+            onChange={(v) => patchSection("bellowBonding", { remarks: v })}
+            disabled={disabled}
+            readOnly={readOnly}
+            placeholder="Remarks"
+          />
         </FieldGrid>
       </SectionCard>
 
@@ -756,20 +782,15 @@ const CasePrepMotorPanel = ({
             width="100%"
             placeholder="0"
           />
-          <Box sx={{ gridColumn: { xs: "1", md: "1 / -1" } }}>
-            <FieldLabel>Observation</FieldLabel>
-            <TextField
-              size="small"
-              fullWidth
-              multiline
-              minRows={3}
-              value={tce.observation}
-              disabled={disabled} readOnly={readOnly}
-              placeholder="Observation"
-              onChange={(e) => patchSection("tceCleaning", { observation: e.target.value })}
-              sx={casePrepTableInputSx}
-            />
-          </Box>
+          <MultilineNoteField
+            label="Observation"
+            value={tce.observation}
+            onChange={(v) => patchSection("tceCleaning", { observation: v })}
+            disabled={disabled}
+            readOnly={readOnly}
+            placeholder="Observation"
+            minRows={3}
+          />
           <CasePrepFileField
             label="Test Report"
             files={tce.testReport ? [tce.testReport] : []}

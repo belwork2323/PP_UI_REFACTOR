@@ -22,6 +22,10 @@ import { STRINGS } from "../../../../../app/config/strings";
 import { formatToUiDate } from "../../../../../utils/dateUtils";
 import { SUBSCALE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/subscale_theme";
 import {
+  uniformTableBodyCellSx,
+  uniformTableHeaderCellSx,
+} from "../../../../../app/theme/custom_themes/shared/data_table_theme";
+import {
   SUBSCALE_BATCH_FIELDS,
   mergeSubscaleBatchFormValues,
   normalizeSubscaleMixingCycles,
@@ -507,23 +511,23 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
       >
         {title}
       </Typography>
-      <TableContainer sx={{ border: `1px solid ${SUBSCALE_BRAND.border}`, borderRadius: 1.5 }}>
+      <TableContainer sx={{ border: `1px solid ${SUBSCALE_BRAND.border}`, borderRadius: 1.5, overflow: "hidden" }}>
         <Table size="small">
           <TableHead>
-            <TableRow sx={{ background: "rgba(21,101,192,0.08)" }}>
-              <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem" }}>
+            <TableRow>
+              <TableCell sx={uniformTableHeaderCellSx(SUBSCALE_BRAND.ss, SUBSCALE_BRAND.ssLight)}>
                 {PROCESS_S.COL_OPERATION}
               </TableCell>
-              <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", width: "18%" }}>
+              <TableCell sx={{ ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ss, SUBSCALE_BRAND.ssLight), width: "18%" }}>
                 {PROCESS_S.COL_ROTATION}
               </TableCell>
-              <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", width: "18%" }}>
+              <TableCell sx={{ ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ss, SUBSCALE_BRAND.ssLight), width: "18%" }}>
                 {PROCESS_S.COL_TIME}
               </TableCell>
-              <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", width: "18%" }}>
+              <TableCell sx={{ ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ss, SUBSCALE_BRAND.ssLight), width: "18%" }}>
                 {PROCESS_S.COL_TEMP}
               </TableCell>
-              <TableCell sx={{ fontWeight: 700, fontSize: "0.72rem", width: "18%" }}>
+              <TableCell sx={{ ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ss, SUBSCALE_BRAND.ssLight), width: "18%" }}>
                 {PROCESS_S.COL_VACUUM}
               </TableCell>
             </TableRow>
@@ -531,7 +535,7 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5}>
+                <TableCell colSpan={5} sx={uniformTableBodyCellSx({ border: SUBSCALE_BRAND.border, text: SUBSCALE_BRAND.text })}>
                   <Typography
                     sx={{
                       fontSize: "0.75rem",
@@ -547,7 +551,13 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
             ) : (
               rows.map((row, rowIndex) => (
                 <TableRow key={`${sectionKey}-${row.operationId}-${rowIndex}`}>
-                  <TableCell sx={{ fontSize: "0.78rem", fontWeight: 600 }}>
+                  <TableCell
+                    sx={{
+                      ...uniformTableBodyCellSx({ border: SUBSCALE_BRAND.border, text: SUBSCALE_BRAND.text }),
+                      fontSize: "0.78rem",
+                      fontWeight: 600,
+                    }}
+                  >
                     {row.operation}
                   </TableCell>
                   {(
@@ -558,7 +568,10 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
                       ["vacuum", "Vacuum"],
                     ] as const
                   ).map(([field, placeholder]) => (
-                    <TableCell key={field}>
+                    <TableCell
+                      key={field}
+                      sx={uniformTableBodyCellSx({ border: SUBSCALE_BRAND.border, text: SUBSCALE_BRAND.text })}
+                    >
                       <FormInput
                         value={row[field] ?? ""}
                         placeholder={placeholder}

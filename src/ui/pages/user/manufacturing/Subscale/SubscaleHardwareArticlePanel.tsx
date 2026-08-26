@@ -140,6 +140,9 @@ const tableBodyCellSx = {
   fontWeight: 500,
   color: SUBSCALE_BRAND.text,
   py: 0.75,
+  borderBottom: `1px solid ${SUBSCALE_BRAND.border}`,
+  borderRight: `1px solid ${SUBSCALE_BRAND.border}`,
+  "&:last-of-type": { borderRight: "none" },
 };
 
 const articleTypeCellSx = {

@@ -3,7 +3,7 @@ import { keyframes } from "@mui/material/styles";
 
 import fonts from "../../../fonts";
 import { getSharedTheme } from "../../shared/shared_theme";
-import { uniformTableHeaderCellSx } from "../../shared/data_table_theme";
+import { uniformTableBodyCellSx, uniformTableHeaderCellSx } from "../../shared/data_table_theme";
 
 const slideUp = keyframes`
   from { opacity: 0; transform: translateY(6px); }
@@ -53,13 +53,14 @@ export const getRocketMotorCasingApproverTheme = (mode = "light") => {
         borderRight: `1px solid ${alpha("#fff", 0.32)}`,
         "&:last-of-type": { borderRight: "none" },
       },
-      bodyCell: {
-        padding: "10px 14px",
-        fontSize: "0.82rem",
-        borderBottom: `1px solid ${alpha(palette.border, 0.55)}`,
-        color: palette.text,
-        verticalAlign: "middle",
-      },
+      bodyCell: uniformTableBodyCellSx(
+        { border: palette.border, text: palette.text },
+        {
+          bodyFontSize: "0.82rem",
+          bodyPaddingY: "10px",
+          bodyPaddingX: "14px",
+        },
+      ),
       row: (index: number) => ({
         background:
           index % 2 === 0
@@ -232,21 +233,36 @@ export const getRocketMotorCasingApproverTheme = (mode = "light") => {
         "&:last-child td": { borderBottom: "none" },
       }),
       innerSpecText: {
-        padding: "6px 10px",
-        fontSize: "0.78rem",
+        ...uniformTableBodyCellSx(
+          { border: palette.border, text: palette.text },
+          {
+            bodyFontSize: "0.78rem",
+            bodyPaddingY: "6px",
+            bodyPaddingX: "10px",
+          },
+        ),
         fontWeight: 500,
-        color: palette.text,
       },
       innerResultText: {
-        padding: "6px 10px",
-        fontSize: "0.78rem",
+        ...uniformTableBodyCellSx(
+          { border: palette.border, text: palette.accent },
+          {
+            bodyFontSize: "0.78rem",
+            bodyPaddingY: "6px",
+            bodyPaddingX: "10px",
+          },
+        ),
         fontWeight: 700,
-        color: palette.accent,
       },
       innerRemarksText: {
-        padding: "6px 10px",
-        fontSize: "0.78rem",
-        color: palette.textSub,
+        ...uniformTableBodyCellSx(
+          { border: palette.border, text: palette.textSub },
+          {
+            bodyFontSize: "0.78rem",
+            bodyPaddingY: "6px",
+            bodyPaddingX: "10px",
+          },
+        ),
       },
       footer: {
         p: "12px 20px",

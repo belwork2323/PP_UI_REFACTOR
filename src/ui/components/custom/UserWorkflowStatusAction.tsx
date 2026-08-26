@@ -3,7 +3,7 @@ import ArrowForwardRoundedIcon from "@mui/icons-material/ArrowForwardRounded";
 import EditRoundedIcon from "@mui/icons-material/EditRounded";
 import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 
-import type { OperationStatusMap } from "../../../hooks/operationStatus";
+import { toApiStatusEnum, type OperationStatusMap } from "../../../hooks/operationStatus";
 
 type UserWorkflowStatusActionProps = {
   status: string;
@@ -37,23 +37,23 @@ const UserWorkflowStatusAction = ({
   approvedLabel = "Approved",
   continueUsesPrimaryStyle = false,
 }: UserWorkflowStatusActionProps) => {
-  const isToBeInitiated = status === statusMap?.TO_BE_INITIATED || status === "TO_BE_INITIATED";
+  const apiStatus = toApiStatusEnum(status);
+
+  const isToBeInitiated =
+    apiStatus === "TO_BE_INITIATED" || !apiStatus;
 
   const isInProgress =
-    status === statusMap?.IN_PROGRESS ||
-    status === "IN_PROGRESS" ||
-    status === statusMap?.WAITING_FOR_PARTIAL_APPROVAL ||
-    status === "WAITING_FOR_PARTIAL_APPROVAL";
+    apiStatus === "IN_PROGRESS" || apiStatus === "WAITING_FOR_PARTIAL_APPROVAL";
 
-  const isRejected = status === statusMap?.REJECTED || status === "REJECTED";
+  const isRejected = apiStatus === "REJECTED";
 
   const isWaitingForApproval =
-    status === statusMap?.WAITING_FOR_APPROVAL ||
-    status === "WAITING_FOR_APPROVAL" ||
-    status === statusMap?.WAITING_FOR_COMPLETE_APPROVAL ||
-    status === "WAITING_FOR_COMPLETE_APPROVAL";
+    apiStatus === "WAITING_FOR_APPROVAL" || apiStatus === "WAITING_FOR_COMPLETE_APPROVAL";
 
-  const isApproved = status === statusMap?.APPROVED || status === "APPROVED";
+  const isApproved =
+    apiStatus === "APPROVED" ||
+    apiStatus === "COMPLETELY_APPROVED" ||
+    apiStatus === "FINAL_APPROVAL_COMPLETED";
 
   if (isToBeInitiated) {
     return (
@@ -108,6 +108,9 @@ const UserWorkflowStatusAction = ({
   }
 
   if (isApproved) {
+    const isCompletelyApproved =
+      apiStatus === "COMPLETELY_APPROVED" || apiStatus === "FINAL_APPROVAL_COMPLETED";
+
     return (
       <Chip
         icon={
@@ -118,15 +121,13 @@ const UserWorkflowStatusAction = ({
             }}
           />
         }
-        label={approvedLabel}
+        label={isCompletelyApproved ? statusMap?.COMPLETELY_APPROVED ?? "Completely Approved" : approvedLabel}
         size="small"
         sx={theme.batchList.chips.approved}
       />
     );
   }
-  if (isWaitingForApproval) {
-    <Chip label={waitingLabel} size="small" sx={theme.batchList.chips.waiting} />;
-  }
+
   return null;
 };
 

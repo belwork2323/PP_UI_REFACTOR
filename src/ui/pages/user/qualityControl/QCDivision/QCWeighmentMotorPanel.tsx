@@ -34,7 +34,7 @@ import {
   setWeighmentWeighscaleNo,
   setWeighmentWeightRows,
 } from "../../../../../hooks/user/qualityControl/qcWeighmentTables";
-import NdtFileField from "../NDT/NdtFileField";
+import QCDivisionFileField from "./QCDivisionFileField";
 import {
   QCDivisionReadOnlyValue,
   qcReadOnlyBodyCellSx,
@@ -307,14 +307,13 @@ const QCWeighmentMotorPanel = ({
           <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.primary, mb: 0.75 }}>
             {QC_WEIGHMENT_FIELD_LABELS.UPLOAD_REPORT}
           </Typography>
-          <NdtFileField
+          <QCDivisionFileField
             files={uploadReport}
             onChange={(next) => onChange(setWeighmentUploadReport(values, next))}
             disabled={inputsDisabled}
             readOnly={readOnly}
             multiple
             acceptMode="imageVideoPdf"
-            subDeptSlug="qc-division"
             emptyLabel="Upload"
           />
         </Box>

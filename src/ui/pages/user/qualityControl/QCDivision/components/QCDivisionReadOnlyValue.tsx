@@ -1,6 +1,9 @@
-import { Typography, alpha } from "@mui/material";
+import { Typography } from "@mui/material";
 import { QC_DIVISION_BRAND } from "../../../../../../app/theme/custom_themes/user/qualityControl/tokens";
-import { uniformTableHeaderCellSx } from "../../../../../../app/theme/custom_themes/shared/data_table_theme";
+import {
+  uniformTableBodyCellSx,
+  uniformTableHeaderCellSx,
+} from "../../../../../../app/theme/custom_themes/shared/data_table_theme";
 
 export const displayQcReadOnlyValue = (value: unknown) => {
   const text = String(value ?? "").trim();
@@ -49,10 +52,11 @@ export const qcReadOnlyTableContainerSx = {
   overflowX: "auto" as const,
 };
 
-export const qcReadOnlyBodyCellSx = {
-  fontSize: "0.72rem",
-  py: 0.5,
-  px: 1,
-  verticalAlign: "middle" as const,
-  borderColor: alpha("#1B4F72", 0.12),
-};
+export const qcReadOnlyBodyCellSx = uniformTableBodyCellSx(
+  { border: QC_DIVISION_BRAND.border, text: QC_DIVISION_BRAND.text },
+  {
+    bodyFontSize: "0.72rem",
+    bodyPaddingY: 0.5,
+    bodyPaddingX: 1,
+  },
+);

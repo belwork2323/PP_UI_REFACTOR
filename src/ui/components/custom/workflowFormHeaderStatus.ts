@@ -62,8 +62,8 @@ export const pickBatchWorkflowStatus = (
  * | TO_BE_INITIATED        | New Submission        |
  * | IN_PROGRESS            | Draft                 |
  * | REJECTED               | Rejected              |
- * | APPROVED               | Approved              |
- * | WAITING_FOR_APPROVAL   | Waiting for Approval  |
+ * | APPROVED / COMPLETELY_APPROVED | Approved              |
+ * | WAITING_FOR_APPROVAL (+ legacy WAITING_FOR_COMPLETE_APPROVAL) | Waiting for Approval |
  */
 export const resolveWorkflowFormHeaderStatus = (
   batch: Record<string, unknown> | null | undefined,
@@ -80,10 +80,16 @@ export const resolveWorkflowFormHeaderStatus = (
   let statusLabel = newLabel;
   if (status === "IN_PROGRESS") statusLabel = labels.draft;
   else if (status === "REJECTED") statusLabel = labels.rejected;
-  else if (status === "APPROVED") statusLabel = labels.approved;
   else if (
+    status === "APPROVED" ||
+    status === "COMPLETELY_APPROVED" ||
+    status === "FINAL_APPROVAL_COMPLETED"
+  ) {
+    statusLabel = labels.approved;
+  } else if (
     status === "WAITING_FOR_APPROVAL" ||
-    status === "WAITING_FOR_PARTIAL_APPROVAL"
+    status === "WAITING_FOR_PARTIAL_APPROVAL" ||
+    status === "WAITING_FOR_COMPLETE_APPROVAL"
   ) {
     statusLabel = labels.waitingForApproval;
   }

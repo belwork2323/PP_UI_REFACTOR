@@ -1,6 +1,6 @@
 import { alpha } from "@mui/material/styles";
 
-import { OPERATION_STATUS } from "../../hooks/operationStatus";
+import { OPERATION_STATUS, toApiStatusEnum } from "../../hooks/operationStatus";
 import colors from "./colors";
 import fonts from "./fonts";
 import spacing from "./spacing";
@@ -77,20 +77,18 @@ export const APPROVER_STATUS_META: ApproverStatusMeta = {
   [OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL]: WAITING_APPROVAL_META,
   WAITING_FOR_PARTIAL_APPROVAL: WAITING_APPROVAL_META,
   Pending: WAITING_APPROVAL_META,
-  [OPERATION_STATUS.WAITING_FOR_APPROVAL]: {
-    ...WAITING_APPROVAL_META,
-    label: OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL,
-  },
-  WAITING_FOR_APPROVAL: {
-    ...WAITING_APPROVAL_META,
-    label: OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL,
-  },
-  [OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL]: WAITING_APPROVAL_META,
+  [OPERATION_STATUS.WAITING_FOR_APPROVAL]: WAITING_APPROVAL_META,
+  WAITING_FOR_APPROVAL: WAITING_APPROVAL_META,
+  // Legacy API status (folded into Waiting for Approval)
   WAITING_FOR_COMPLETE_APPROVAL: WAITING_APPROVAL_META,
+  "Waiting for Complete Approval": WAITING_APPROVAL_META,
   [OPERATION_STATUS.APPROVED]: APPROVED_META,
   APPROVED: APPROVED_META,
-  [OPERATION_STATUS.FINAL_APPROVAL_COMPLETED]: APPROVED_META,
+  [OPERATION_STATUS.COMPLETELY_APPROVED]: APPROVED_META,
+  COMPLETELY_APPROVED: APPROVED_META,
+  // Legacy API status (renamed to Completely Approved)
   FINAL_APPROVAL_COMPLETED: APPROVED_META,
+  "Final Approval Completed": APPROVED_META,
   [OPERATION_STATUS.REJECTED]: REJECTED_META,
   REJECTED: REJECTED_META,
   "Status Unavailable": {
@@ -228,28 +226,22 @@ export const getApproverBrand = (
 ): ApproverDepartmentBrand => APPROVER_DEPARTMENT_BRANDS[department];
 
 export const isApproverActionableStatus = (status?: string | null) => {
-  const normalized = String(status ?? "").trim();
-  const upper = normalized.toUpperCase().replace(/\s+/g, "_");
+  const api = toApiStatusEnum(status);
   return (
-    normalized === "Pending" ||
-    normalized === OPERATION_STATUS.IN_PROGRESS ||
-    upper === "IN_PROGRESS" ||
-    normalized === OPERATION_STATUS.WAITING_FOR_APPROVAL ||
-    normalized === OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL ||
-    normalized === OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL ||
-    upper === "WAITING_FOR_APPROVAL" ||
-    upper === "WAITING_FOR_PARTIAL_APPROVAL" ||
-    upper === "WAITING_FOR_COMPLETE_APPROVAL"
+    api === "IN_PROGRESS" ||
+    api === "WAITING_FOR_APPROVAL" ||
+    api === "WAITING_FOR_PARTIAL_APPROVAL" ||
+    api === "WAITING_FOR_COMPLETE_APPROVAL" ||
+    String(status ?? "").trim() === "Pending"
   );
 };
 
 export const isApproverApprovedStatus = (status?: string | null) => {
-  const normalized = String(status ?? "").trim();
+  const api = toApiStatusEnum(status);
   return (
-    normalized === OPERATION_STATUS.APPROVED ||
-    normalized === "APPROVED" ||
-    normalized === OPERATION_STATUS.FINAL_APPROVAL_COMPLETED ||
-    normalized === "FINAL_APPROVAL_COMPLETED"
+    api === "APPROVED" ||
+    api === "COMPLETELY_APPROVED" ||
+    api === "FINAL_APPROVAL_COMPLETED"
   );
 };
 

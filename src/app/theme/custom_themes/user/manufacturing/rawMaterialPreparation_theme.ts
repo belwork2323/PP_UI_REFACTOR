@@ -372,7 +372,7 @@ export const getRawMaterialPreparationTheme = (baseTheme: any) => {
 					["Waiting for Approval"]: { color: "#7D6608", bg: alpha(warnBase, 0.14), border: alpha(warnBase, 0.55) },
 					["Approved"]: { color: success, bg: alpha(success, 0.1), border: alpha(success, 0.45) },
 					["Rejected"]: { color: danger, bg: alpha(danger, 0.1), border: alpha(danger, 0.45) },
-					["Final Approval Completed"]: { color: success, bg: alpha(success, 0.1), border: alpha(success, 0.45) },
+					["Completely Approved"]: { color: success, bg: alpha(success, 0.1), border: alpha(success, 0.45) },
 				} as Record<string, { color: string; bg: string; border: string }>;
 			})(),
 			page: { animation: "fadeIn 0.35s ease both" },

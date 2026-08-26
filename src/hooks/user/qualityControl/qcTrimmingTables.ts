@@ -4,7 +4,13 @@ import type {
   TrimmingDetailsRow,
   TrimmingReportFile,
 } from "../../../data/models/user/TrimmingFormModel";
-import { isFileReady, parseFileRefs, toFileIdListPayload, type FileRef } from "../../../data/models/common/FileUploadModel";
+import {
+  isFileReady,
+  isFileUploadIncomplete,
+  parseFileRefs,
+  toFileIdListPayload,
+  type FileRef,
+} from "../../../data/models/common/FileUploadModel";
 import { formatToIsoDateInput, formatToUiDate } from "../../../utils/dateUtils";
 import { QC_TRIMMING_SECTION_IDS } from "./qcTrimmingConfig";
 
@@ -584,3 +590,23 @@ export const trimmingValuesHaveData = (values: SchemaFormValues | null | undefin
   }
   return session.trimmingDetails.some(operationRowHasData);
 };
+
+export const collectTrimmingFileRefsFromQcValues = (
+  values: SchemaFormValues | null | undefined,
+): FileRef[] => getTrimmingSessionFromValues(values).reportFiles ?? [];
+
+export const hasIncompleteQcTrimmingUploads = (
+  values: SchemaFormValues | null | undefined,
+): boolean => collectTrimmingFileRefsFromQcValues(values).some(isFileUploadIncomplete);
+
+export const collectTempFileIdsFromQcTrimmingValues = (
+  values: SchemaFormValues | null | undefined,
+): string[] =>
+  [
+    ...new Set(
+      collectTrimmingFileRefsFromQcValues(values)
+        .filter((ref) => ref.isTemp !== false)
+        .map((ref) => String(ref.fileId ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];

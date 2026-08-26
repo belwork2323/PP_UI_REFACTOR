@@ -17,6 +17,9 @@ export type DataTableThemeOptions = {
   containerBorderRadius?: number | string;
   headerPaddingY?: number | string;
   headerPaddingX?: number | string;
+  bodyFontSize?: string;
+  bodyPaddingY?: number | string;
+  bodyPaddingX?: number | string;
 };
 
 const DEFAULTS = {
@@ -33,7 +36,12 @@ const DEFAULTS = {
 export const dataTableHeaderBackground = (primary: string, primaryLight: string) =>
   `linear-gradient(180deg, ${primaryLight} 0%, ${primary} 100%)`;
 
+/** White column divider on blue gradient headers. */
 export const dataTableHeaderDivider = `1px solid ${alpha("#fff", 0.32)}`;
+
+/** Light gray column divider for body cells (matches horizontal row lines). */
+export const dataTableBodyDivider = (border: string = DEFAULTS.border) =>
+  `1px solid ${alpha(border, 0.85)}`;
 
 /**
  * Drop-in header cell sx for any table (user + approver).
@@ -61,6 +69,32 @@ export const uniformTableHeaderCellSx = (
     borderRight: "none",
   },
 });
+
+/**
+ * Drop-in body cell sx — horizontal + vertical grid lines for every data table.
+ */
+export const uniformTableBodyCellSx = (
+  palette: Pick<DataTableThemePalette, "border" | "text"> = {},
+  options: DataTableThemeOptions = {},
+) => {
+  const border = palette.border ?? DEFAULTS.border;
+  const text = palette.text ?? DEFAULTS.text;
+  const divider = dataTableBodyDivider(border);
+
+  return {
+    fontSize: options.bodyFontSize ?? "0.82rem",
+    fontWeight: 500,
+    py: options.bodyPaddingY ?? 1.15,
+    px: options.bodyPaddingX ?? 1.5,
+    color: text,
+    borderBottom: divider,
+    borderRight: divider,
+    verticalAlign: "middle" as const,
+    "&:last-of-type": {
+      borderRight: "none",
+    },
+  };
+};
 
 /**
  * Shared data-table styles for form / details tables across the app.
@@ -96,19 +130,7 @@ export const createDataTableTheme = (
         borderBottom: "none",
       },
     }),
-    tableCell: {
-      fontSize: "0.82rem",
-      fontWeight: 500,
-      py: 1.15,
-      px: 1.5,
-      color: text,
-      borderBottom: `1px solid ${alpha(border, 0.85)}`,
-      borderRight: `1px solid ${alpha(border, 0.55)}`,
-      verticalAlign: "middle" as const,
-      "&:last-of-type": {
-        borderRight: "none",
-      },
-    },
+    tableCell: uniformTableBodyCellSx({ border, text }, options),
   };
 };
 

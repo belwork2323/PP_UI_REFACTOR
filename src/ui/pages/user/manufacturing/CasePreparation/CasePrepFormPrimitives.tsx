@@ -12,7 +12,8 @@ import {
   alpha,
 } from "@mui/material";
 import { CASE_PREP_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/casePreparation_theme";
-import { uniformTableHeaderCellSx } from "../../../../../app/theme/custom_themes/shared/data_table_theme";
+import { uniformTableHeaderCellSx, uniformTableBodyCellSx } from "../../../../../app/theme/custom_themes/shared/data_table_theme";
+import { WorkflowReadOnlyText } from "../../../../components/common/WorkflowReadOnlyText";
 
 const BRAND = CASE_PREP_BRAND;
 
@@ -78,11 +79,10 @@ export const casePrepTableRowSx = (idx: number) => ({
 });
 
 export const casePrepTableCellSx = {
-  fontSize: "0.82rem",
-  py: 1,
-  px: 1.25,
-  color: BRAND.text,
-  verticalAlign: "middle" as const,
+  ...uniformTableBodyCellSx(
+    { border: BRAND.border, text: BRAND.text },
+    { bodyFontSize: "0.82rem", bodyPaddingY: 1, bodyPaddingX: 1.25 },
+  ),
 };
 
 export const casePrepHeaderRowSx = {
@@ -193,23 +193,7 @@ export const ReadOnlyField = ({
 }) => (
   <Box>
     <FieldLabel>{label}</FieldLabel>
-    <Box
-      sx={{
-        px: 1.25,
-        py: 1,
-        minHeight: 40,
-        borderRadius: 1.5,
-        border: `1px solid ${BRAND.border}`,
-        bgcolor: alpha(BRAND.surface, 0.85),
-        display: "flex",
-        alignItems: "center",
-        boxSizing: "border-box",
-      }}
-    >
-      <Typography sx={{ fontSize: "0.82rem", fontWeight: 600, color: BRAND.text }}>
-        {String(value ?? "").trim() || "—"}
-      </Typography>
-    </Box>
+    <WorkflowReadOnlyText value={value} sx={{ fontSize: "0.82rem", py: 0.75 }} />
   </Box>
 );
 
@@ -218,6 +202,7 @@ export const TableTextInput = ({
   onChange,
   placeholder = "",
   disabled = false,
+  readOnly = false,
   type = "text",
   multiline = false,
   minRows,
@@ -226,23 +211,30 @@ export const TableTextInput = ({
   onChange: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  readOnly?: boolean;
   type?: string;
   multiline?: boolean;
   minRows?: number;
-}) => (
-  <TextField
-    size="small"
-    fullWidth
-    type={type}
-    multiline={multiline}
-    minRows={minRows}
-    value={value}
-    placeholder={placeholder}
-    disabled={disabled}
-    onChange={(event) => onChange(event.target.value)}
-    sx={casePrepTableInputSx}
-  />
-);
+}) => {
+  if (readOnly) {
+    return <WorkflowReadOnlyText value={value} />;
+  }
+
+  return (
+    <TextField
+      size="small"
+      fullWidth
+      type={type}
+      multiline={multiline}
+      minRows={minRows}
+      value={value}
+      placeholder={placeholder}
+      disabled={disabled}
+      onChange={(event) => onChange(event.target.value)}
+      sx={casePrepTableInputSx}
+    />
+  );
+};
 
 type ParameterTableColumn = {
   key: "parameter" | "value" | "remarks" | "observations";
@@ -267,6 +259,7 @@ type ParameterTableProps = {
   onChangeObservations?: (index: number, value: string) => void;
   renderValue?: (row: ParameterTableRow, index: number) => ReactNode;
   disabled?: boolean;
+  readOnly?: boolean;
   emptyText?: string;
 };
 
@@ -284,6 +277,7 @@ export const ParameterTable = ({
   onChangeObservations,
   renderValue,
   disabled = false,
+  readOnly = false,
   emptyText = "No rows",
 }: ParameterTableProps) => {
   if (!rows.length) {
@@ -327,6 +321,7 @@ export const ParameterTable = ({
                             value={row.value ?? ""}
                             onChange={(next) => onChangeValue?.(index, next)}
                             disabled={disabled}
+                            readOnly={readOnly || row.readonly}
                             type={row.valueFieldType === "number" ? "number" : "text"}
                             multiline={row.valueFieldType === "textarea"}
                             minRows={row.valueFieldType === "textarea" ? 2 : undefined}
@@ -343,6 +338,7 @@ export const ParameterTable = ({
                         value={row.observations ?? ""}
                         onChange={(next) => onChangeObservations?.(index, next)}
                         disabled={disabled}
+                        readOnly={readOnly}
                         multiline
                         minRows={2}
                         placeholder="Observations"
@@ -356,6 +352,7 @@ export const ParameterTable = ({
                       value={row.remarks ?? ""}
                       onChange={(next) => onChangeRemarks?.(index, next)}
                       disabled={disabled}
+                      readOnly={readOnly}
                       placeholder="Remarks"
                     />
                   </TableCell>

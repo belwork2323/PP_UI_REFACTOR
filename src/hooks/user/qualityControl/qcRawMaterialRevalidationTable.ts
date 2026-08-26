@@ -1,5 +1,5 @@
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
-import { isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileIdPayload, type FileRef } from "../../../data/models/common/FileUploadModel";
+import { isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileRef } from "../../../data/models/common/FileUploadModel";
 
 export const QC_REVALIDATION_SECTION_ID = "RAW_MATERIAL_DETAILS";
 export const QC_REVALIDATION_TABLE_ID = "RAW_MATERIAL_DETAILS";
@@ -136,13 +136,19 @@ export const buildRevalidationSectionPayload = (
   ];
 };
 
-const normalizeCertificateList = (value: unknown): FileIdPayload[] =>
-  toFileIdListPayload(value);
+const normalizeCertificateFileIds = (value: unknown): string[] =>
+  [
+    ...new Set(
+      toFileIdListPayload(value)
+        .map((entry) => String(entry.fileId ?? "").trim())
+        .filter(Boolean),
+    ),
+  ];
 
 /**
  * Create/update payload shape:
- * data.materials[{ ingredient, qcDetails: [{ lotBatchNumber, parameter, ... }] }]
- * (no schema sections)
+ * data.materials[{ ingredient, qcDetails: [{ lotBatchNumber, parameter, result, acemResult, ..., qcCertificate: string[] }] }]
+ * (no schema sections; qcCertificate is bare fileId strings)
  */
 export const buildRevalidationMaterialsPayload = (
   values: SchemaFormValues | null | undefined,
@@ -153,9 +159,10 @@ export const buildRevalidationMaterialsPayload = (
     parameter: string;
     specification: string;
     result: string;
+    acemResult: string;
     validity: string;
     remarks: string;
-    qcCertificate: FileIdPayload[];
+    qcCertificate: string[];
   }>;
 }> => {
   const rows = getRevalidationRows(values)
@@ -169,9 +176,10 @@ export const buildRevalidationMaterialsPayload = (
       parameter: string;
       specification: string;
       result: string;
+      acemResult: string;
       validity: string;
       remarks: string;
-      qcCertificate: FileIdPayload[];
+      qcCertificate: string[];
     }>
   >();
 
@@ -183,10 +191,11 @@ export const buildRevalidationMaterialsPayload = (
       lotBatchNumber: String(row.LOT_BATCH_NUMBER ?? "").trim(),
       parameter: String(row.PARAMETER ?? "").trim(),
       specification: String(row.SPECIFICATION ?? "").trim(),
-      result: String(row.RESULT ?? row.ACEM_QC_RESULT ?? "").trim(),
+      result: String(row.RESULT ?? "").trim(),
+      acemResult: String(row.ACEM_QC_RESULT ?? "").trim(),
       validity: String(row.VALIDITY ?? "").trim(),
       remarks: String(row.REMARKS ?? "").trim(),
-      qcCertificate: normalizeCertificateList(row.QC_CERTIFICATE),
+      qcCertificate: normalizeCertificateFileIds(row.QC_CERTIFICATE),
     });
     byIngredient.set(ingredient, list);
   });
@@ -310,37 +319,58 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
+/** Unwrap API scalars that may arrive as `{ source, parsedValue }` or plain values. */
+const readNumericOrTextValue = (value: unknown): string => {
+  if (value == null) return "";
+  if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  if (typeof value === "boolean") return String(value);
+  if (typeof value === "string") return value.trim();
+  const record = asRecord(value);
+  if (!record) return "";
+  if (record.parsedValue != null && record.parsedValue !== "") {
+    return readNumericOrTextValue(record.parsedValue);
+  }
+  if (record.source != null && record.source !== "") {
+    return readNumericOrTextValue(record.source);
+  }
+  if (record.value != null && record.value !== "") {
+    return readNumericOrTextValue(record.value);
+  }
+  return "";
+};
+
 const formatReferenceRangeLabel = (range: unknown): string => {
   const record = asRecord(range);
   if (!record) return "N/A";
-  const minValue = record.minValue ?? record.min ?? null;
-  const maxValue = record.maxValue ?? record.max ?? null;
+  const minValue = readNumericOrTextValue(record.minValue ?? record.min ?? null);
+  const maxValue = readNumericOrTextValue(record.maxValue ?? record.max ?? null);
   const unit = String(record.unit ?? "").trim();
   const unitSuffix = unit ? ` ${unit}` : "";
-  if (minValue != null && maxValue != null) return `${minValue} - ${maxValue}${unitSuffix}`;
-  if (minValue != null) return `>= ${minValue}${unitSuffix}`;
-  if (maxValue != null) return `<= ${maxValue}${unitSuffix}`;
+  if (minValue && maxValue) return `${minValue} - ${maxValue}${unitSuffix}`;
+  if (minValue) return `>= ${minValue}${unitSuffix}`;
+  if (maxValue) return `<= ${maxValue}${unitSuffix}`;
   return "N/A";
 };
 
 const readAnalysedResult = (record: Record<string, unknown>): string =>
-  String(
+  readNumericOrTextValue(
     record.RESULT ??
       record.result ??
       record.ANALYSED_RESULT ??
       record.analysedResult ??
       record.analyzedResult ??
       "",
-  ).trim();
+  );
 
 const readAcemQcResult = (record: Record<string, unknown>): string =>
-  String(
+  readNumericOrTextValue(
     record.ACEM_QC_RESULT ??
+      record.acemResult ??
       record.acemQcResult ??
       record.acemQCResult ??
       record.ACEM_QC ??
       "",
-  ).trim();
+  );
 
 /** Map API `certificates` / `QC_CERTIFICATE` into FileRef lists. */
 export const readQcCertificateValue = (
@@ -450,24 +480,22 @@ const extractRowsFromMaterials = (materials: unknown[]): QcRevalidationRow[] => 
 
     if (specs.length) {
       rows.push(
-        ...normalizeSpecRows(ingredient, lotId, specs, groupId).map((row) => {
-          const specRec = row as Record<string, unknown>;
+        ...normalizeSpecRows(ingredient, lotId, specs, groupId).map((row, specIndex) => {
+          const originalSpec = asRecord(specs[specIndex]) ?? {};
           const lotFromDetail = String(
-            specRec.lotBatchNumber ?? specRec.LOT_BATCH_NUMBER ?? lotId,
+            originalSpec.lotBatchNumber ??
+              originalSpec.LOT_BATCH_NUMBER ??
+              originalSpec.lotId ??
+              lotId,
           ).trim();
+          const fromRow = Array.isArray(row.QC_CERTIFICATE) ? row.QC_CERTIFICATE : [];
+          const fromSpec = readQcCertificateValue(originalSpec);
           return {
             ...row,
             LOT_BATCH_NUMBER: lotFromDetail || row.LOT_BATCH_NUMBER,
-            RESULT: String(
-              specRec.result ?? specRec.RESULT ?? specRec.analysedResult ?? row.RESULT ?? "",
-            ).trim(),
-            QC_CERTIFICATE: (() => {
-              const fromRow = Array.isArray(row.QC_CERTIFICATE) ? row.QC_CERTIFICATE : [];
-              if (fromRow.length) return fromRow;
-              const fromSpec = readQcCertificateValue(specRec);
-              if (fromSpec.length) return fromSpec;
-              return materialCertificate;
-            })(),
+            RESULT: row.RESULT || readAnalysedResult(originalSpec),
+            ACEM_QC_RESULT: row.ACEM_QC_RESULT || readAcemQcResult(originalSpec),
+            QC_CERTIFICATE: fromRow.length ? fromRow : fromSpec.length ? fromSpec : materialCertificate,
           };
         }),
       );

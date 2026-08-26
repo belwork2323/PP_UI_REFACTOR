@@ -16,7 +16,7 @@ import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/q
 import type { SchemaFormValues } from "../../../../../schema-engine";
 import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
 import DateField from "../../../../components/common/DateField";
-import NdtFileField from "../NDT/NdtFileField";
+import QCDivisionFileField from "./QCDivisionFileField";
 import {
   QC_POST_CURE_FIELD_LABELS,
   QC_POST_CURE_GROUP_TITLES,
@@ -393,14 +393,13 @@ const QualificationTable = ({
                 </TableCell>
                 {showQcReport ? (
                   <TableCell sx={bodyCellSx}>
-                    <NdtFileField
+                    <QCDivisionFileField
                       files={Array.isArray(row.QC_REPORT) ? row.QC_REPORT : []}
                       onChange={(next) => updateCell(index, "QC_REPORT", next)}
                       disabled={inputsDisabled}
                       readOnly={readOnly}
                       multiple={false}
                       acceptMode="pdf"
-                      subDeptSlug="qc-division"
                       compact
                       emptyLabel="Upload"
                     />
@@ -480,14 +479,13 @@ const FileOrReadOnly = ({
   readOnly: boolean;
   disabled: boolean;
 }) => (
-  <NdtFileField
+  <QCDivisionFileField
     files={files}
     onChange={onChange}
     disabled={disabled}
     readOnly={readOnly}
     multiple={false}
     acceptMode="pdf"
-    subDeptSlug="qc-division"
     emptyLabel="Upload"
   />
 );

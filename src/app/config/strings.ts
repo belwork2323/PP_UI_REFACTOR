@@ -1084,7 +1084,7 @@ export const STRINGS = {
       PREMIX_STATUS_WAITING_FOR_APPROVAL: "Waiting for Approval",
       PREMIX_STATUS_APPROVED: "Approved",
       PREMIX_STATUS_REJECTED: "Rejected",
-      PREMIX_STATUS_FINAL_APPROVAL_COMPLETED: "Final Approval Completed",
+      PREMIX_STATUS_COMPLETELY_APPROVED: "Completely Approved",
       PREMIX_LOCKED_WAITING: "This premix is waiting for approval and cannot be edited.",
       PREMIX_LOCKED_APPROVED: "This premix has been approved and cannot be edited.",
       NAV_BACK: "Back",

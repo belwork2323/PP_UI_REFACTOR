@@ -28,6 +28,10 @@ import {
   type RocketMotorCasingFormData,
   type UploadedFileRef,
 } from "@/data/models/user/RocketMotorCasingFormModel";
+import {
+  uniformTableBodyCellSx,
+  uniformTableHeaderCellSx,
+} from "@/app/theme/custom_themes/shared/data_table_theme";
 import { STRINGS } from "@/app/config/strings";
 import { useCasingFileActions } from "@/hooks/user/sourcing/useCasingFileActions";
 import FilePreviewDialog from "@/ui/components/common/FilePreviewDialog";
@@ -264,23 +268,26 @@ const CasingReportUpload = ({ form, patch, theme }: CasingReportUploadProps) => 
   const border = palette.border ?? "#D5D8DC";
   const surface = palette.surface ?? "#F4F6F8";
 
-  const headerCellSx = {
-    background: `linear-gradient(135deg, ${palette.primary ?? "#1B4F72"}, ${colors.primary})`,
-    color: "#fff",
-    fontWeight: 700,
-    fontSize: "0.68rem",
-    letterSpacing: "0.06em",
-    textTransform: "uppercase" as const,
-    py: 1.25,
-    px: 1.5,
-    borderBottom: "none",
-  };
+  const headerCellSx = uniformTableHeaderCellSx(
+    palette.primary ?? "#1B4F72",
+    colors.primary,
+    {
+      headerFontSize: "0.68rem",
+      headerLetterSpacing: "0.06em",
+      headerPaddingY: 1.25,
+      headerPaddingX: 1.5,
+    },
+  );
 
   const bodyCellSx = {
-    py: 1.25,
-    px: 1.5,
+    ...uniformTableBodyCellSx(
+      { border, text: colors.text },
+      {
+        bodyPaddingY: 1.25,
+        bodyPaddingX: 1.5,
+      },
+    ),
     verticalAlign: "top" as const,
-    borderBottom: `1px solid ${alpha(border, 0.55)}`,
   };
 
   return (

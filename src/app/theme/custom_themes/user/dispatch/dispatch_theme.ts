@@ -304,6 +304,12 @@ export const getDispatchTheme = (baseTheme: any) => {
             border: alpha(success, 0.5),
           },
 
+          "Completely Approved": {
+            color: success,
+            bg: "#E8F8F5",
+            border: alpha(success, 0.5),
+          },
+
           Rejected: {
             color: danger,
             bg: "#FDEDEC",

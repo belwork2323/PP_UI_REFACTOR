@@ -89,18 +89,18 @@ export const canApproverActionEntirePostCureForm = (params: {
   if (
     statusUpper === "APPROVED" ||
     statusUpper === "REJECTED" ||
-    statusUpper === "FINAL_APPROVAL_COMPLETED" ||
+    statusUpper === "COMPLETELY_APPROVED" ||
     status === OPERATION_STATUS.APPROVED ||
     status === OPERATION_STATUS.REJECTED ||
-    status === OPERATION_STATUS.FINAL_APPROVAL_COMPLETED
+    status === OPERATION_STATUS.COMPLETELY_APPROVED
   ) {
     return false;
   }
 
-  // Waiting for Complete Approval means motors are done — show Approve / Reject Form.
+  // Waiting for Approval means motors are done — show Approve / Reject Form.
   if (
-    statusUpper === "WAITING_FOR_COMPLETE_APPROVAL" ||
-    status === OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL
+    statusUpper === "WAITING_FOR_APPROVAL" ||
+    status === OPERATION_STATUS.WAITING_FOR_APPROVAL
   ) {
     return true;
   }

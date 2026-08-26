@@ -1,5 +1,6 @@
 import dayjs from "dayjs";
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import { parseFileRefs } from "../../../data/models/common/FileUploadModel";
 import { formatToUiDate, UI_DATETIME_FORMAT } from "../../../utils/dateUtils";
 import type { QcDivisionEntry } from "./qcDivisionEntryTypes";
 import type { QcHardwareProcessSubType } from "./qcHardwareConfig";
@@ -200,15 +201,12 @@ const findLogEntry = (
         : matcher.test(label);
     if (!matches) continue;
     return {
-      value: String(rec.value ?? rec.observations ?? "").trim(),
+      value: String(rec.value ?? "").trim(),
       remarks: String(rec.remarks ?? rec.remarksObservations ?? rec.observations ?? "").trim(),
     };
   }
   return { value: "", remarks: "" };
 };
-
-const joinObservations = (...parts: Array<string | undefined>) =>
-  parts.map((part) => String(part ?? "").trim()).filter(Boolean).join(" — ");
 
 const cutRowHasData = (row: Partial<QcHardwareCutRow>) =>
   hasValue(row.DATE) ||
@@ -263,24 +261,12 @@ const mapAbradingDetailsToCutRows = (abradingDetails: unknown[]): QcHardwareCutR
 
     if (/Dust Weight/i.test(operation) && !/Total/i.test(operation)) {
       current.DUST_QTY = value;
-      if (remarks) current.OBSERVATIONS = remarks;
+      // Keep Start (or End) remarks — do not overwrite with dust remarks.
     }
   }
 
   flush();
   return rows;
-};
-
-const collectAttachmentNames = (...values: unknown[]): string[] => {
-  const names = new Set<string>();
-  for (const value of values) {
-    String(value ?? "")
-      .split(",")
-      .map((entry) => entry.trim())
-      .filter(Boolean)
-      .forEach((entry) => names.add(entry));
-  }
-  return Array.from(names);
 };
 
 const mapHardwareUploadsFromDivisionDetails = (
@@ -289,18 +275,29 @@ const mapHardwareUploadsFromDivisionDetails = (
   const abrading = firstSectionRecord(sections, QC_HARDWARE_MANUFACTURING_SECTION_IDS.ABRADING);
   const tceCleaning = firstSectionRecord(sections, QC_HARDWARE_MANUFACTURING_SECTION_IDS.TCE_CLEANING);
 
-  const abradingAttachments = asArray(abrading?.abradingDetails).flatMap((row) => {
+  const photoFiles = asArray(abrading?.abradingDetails).flatMap((row) => {
     const rec = asRecord(row);
-    return rec?.attachments ? [String(rec.attachments)] : [];
+    if (!rec?.attachments) return [];
+    return parseFileRefs(rec.attachments);
   });
 
-  const reportFiles = collectAttachmentNames(tceCleaning?.testReport);
-  const photoFiles = collectAttachmentNames(...abradingAttachments);
+  const reportFiles = parseFileRefs(tceCleaning?.testReport);
+
+  // Dedupe by fileId / fileName so the same attachment is not listed twice.
+  const dedupe = (refs: ReturnType<typeof parseFileRefs>) => {
+    const seen = new Set<string>();
+    return refs.filter((ref) => {
+      const key = String(ref.fileId ?? ref.fileName ?? "").trim();
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
 
   return {
-    [QC_HARDWARE_UPLOAD_REPORT_KEY]: reportFiles.join(", "),
-    [QC_HARDWARE_UPLOAD_GRAPH_KEY]: "",
-    [QC_HARDWARE_UPLOAD_PHOTO_KEY]: photoFiles.join(", "),
+    [QC_HARDWARE_UPLOAD_REPORT_KEY]: dedupe(reportFiles),
+    [QC_HARDWARE_UPLOAD_GRAPH_KEY]: [],
+    [QC_HARDWARE_UPLOAD_PHOTO_KEY]: dedupe(photoFiles),
   };
 };
 
@@ -363,7 +360,8 @@ const mapPreheatingValues = (
     BUILDING_NO: motorMeta.buildingNo,
     TEMPERATURE: temperature,
     VACUUM_LEVEL: String(section?.vacuumApplied ?? "").trim(),
-    OBSERVATIONS: joinObservations(visual.value, visual.remarks, cycleStart.remarks, cycleEnd.remarks),
+    // Visual Observation only — do not join cycle start/end remarks.
+    OBSERVATIONS: String(visual.value || visual.remarks || "").trim(),
   };
 
   const sectionId = QC_HARDWARE_SECTION_IDS.PREHEATING;
@@ -395,7 +393,8 @@ const mapLinearCoatingValues = (
     LINER_QTY: linerQty.value,
     INSULATION_TEMP: insulation.value,
     RH: String(section.rh ?? section.RH ?? "").trim(),
-    OBSERVATIONS: joinObservations(start.remarks, end.remarks, linerQty.remarks, insulation.remarks),
+    // No clear visual/observation field in Case Prep liner log — leave empty.
+    OBSERVATIONS: "",
   };
 
   const sectionId = QC_HARDWARE_SECTION_IDS.LINEAR_COATING;
@@ -426,21 +425,14 @@ const mapDispatchValues = (
       if (!rec) return "";
       const parameter = String(rec.parameter ?? "").trim();
       const observation = String(rec.observations ?? rec.value ?? "").trim();
-      if (!parameter && !observation) return "";
-      if (parameter && observation) return `${parameter}: ${observation}`;
-      return parameter || observation;
+      const remarks = String(rec.remarks ?? "").trim();
+      const body = observation || remarks;
+      if (!parameter && !body) return "";
+      if (parameter && body) return `${parameter}: ${body}`;
+      return parameter || body;
     })
     .filter(Boolean)
     .join("\n");
-
-  const dispatchObservations = joinObservations(
-    visualObservations,
-    lf.value ? `Puncturing at LF Extension (Nos): ${lf.value}` : "",
-    lf.remarks,
-    he.remarks,
-    ne.remarks,
-    dispatchTime.remarks,
-  );
 
   const sectionId = QC_HARDWARE_SECTION_IDS.DISPATCH;
   const { dateTime } = splitDateTimeValue(dispatchTime.value);
@@ -449,8 +441,9 @@ const mapDispatchValues = (
     ...base,
     [formKey(sectionId, "HE_PUNCTURES")]: he.value,
     [formKey(sectionId, "NE_PUNCTURES")]: ne.value,
+    [formKey(sectionId, "LF_PUNCTURES")]: lf.value,
     [formKey(sectionId, "DISPATCH_DATE_TIME")]: dateTime,
-    [formKey(sectionId, "OBSERVATIONS")]: dispatchObservations,
+    [formKey(sectionId, "OBSERVATIONS")]: visualObservations,
   };
 };
 

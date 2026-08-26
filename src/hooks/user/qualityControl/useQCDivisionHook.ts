@@ -76,7 +76,11 @@ import {
   findQcFormDivisionDetail,
   groupUnitStatusesByDivisionTabKey,
   isQcStatusAwaitingInitiation,
+  mapBatchDivisionStatusesToFlowKeyMap,
+  mapFormDetailsDivisionStatusesToFlowKeyMap,
+  mergeQcDivisionStatusMaps,
   mergePartialNavItems,
+  resolveBatchDivisionIdForFlow,
   resolveMotorQcStatusFromFormDetails,
   resolveQcDivisionStatus,
   resolveQcDivisionStatusFromSources,
@@ -117,6 +121,7 @@ import {
   createInitialRevalidationSchemaValues,
   buildRevalidationValuesFromDivisionDetails,
   hydrateRevalidationValuesFromSections,
+  mapDivisionDetailsToRevalidationValues,
 } from "./qcRawMaterialRevalidationTable";
 import { operationsController } from "../../../controllers/user/operationsController";
 import { MaterialSpecificationListModel } from "../../../data/models/user/MaterialSpecificationModel";
@@ -164,7 +169,7 @@ import {
   applyTrimmingDivisionDetailsSeed,
   buildInitialTrimmingValuesForMotor,
 } from "./qcTrimmingDivisionDetails";
-import { createInitialTrimmingValues, hydrateTrimmingValuesFromSections } from "./qcTrimmingTables";
+import { createInitialTrimmingValues, hydrateTrimmingValuesFromSections, hasIncompleteQcTrimmingUploads, collectTempFileIdsFromQcTrimmingValues } from "./qcTrimmingTables";
 import {
   createInitialPropellantValues,
   hydratePropellantValuesFromSections,
@@ -258,6 +263,8 @@ const collectTempFileIdsFromQcForm = (form: QualityControlFormState | null | und
       ids.push(...collectTempFileIdsFromQcRevalidationValues(values));
     } else if (entry.kind === "WEIGHTMENT_MOTOR") {
       ids.push(...collectTempFileIdsFromQcWeighmentValues(values));
+    } else if (entry.kind === "TRIMMING_MOTOR") {
+      ids.push(...collectTempFileIdsFromQcTrimmingValues(values));
     }
   }
   return [...new Set(ids)];
@@ -277,6 +284,7 @@ const hasIncompleteQcFormUploads = (form: QualityControlFormState | null | undef
     if (entry.kind === "POST_CURE_MOTOR") return hasIncompleteQcPostCureUploads(values);
     if (entry.kind === "REVALIDATION") return hasIncompleteQcRevalidationUploads(values);
     if (entry.kind === "WEIGHTMENT_MOTOR") return hasIncompleteQcWeighmentUploads(values);
+    if (entry.kind === "TRIMMING_MOTOR") return hasIncompleteQcTrimmingUploads(values);
     return false;
   });
 };
@@ -601,6 +609,7 @@ export const useQCDivisionHook = () => {
     setPartialItemLoading(false);
     setDivisionStatusByFlowKey({});
     qcFormDetailsPayloadRef.current = null;
+    batchDetailsPayloadRef.current = null;
     setFormUnitStatuses({ premixStatuses: null, motorStatuses: null });
     setBatchStageArrays({ stageProgress: null, currentStage: null });
     partialNavSeedKeyRef.current = "";
@@ -745,13 +754,9 @@ export const useQCDivisionHook = () => {
   const loadDivisionAutoPopulate = useCallback(
     async (divisionFlowKey: string, typeValue?: string | null) => {
       const batchId = String(activeBatch?.batchId ?? "").trim();
-      const divisionId = resolveQcManufacturingDivisionDetailsId(
-        divisionCatalog,
-        divisionFlowKey,
-        typeValue,
-      );
+      const typeKey = String(typeValue ?? "").trim();
 
-      if (!batchId || !divisionFlowKey || divisionId == null) {
+      if (!batchId || !divisionFlowKey) {
         divisionAutoPopulateRequestIdRef.current += 1;
         setDivisionAutoPopulateData(null);
         setDivisionAutoPopulateLoading(false);
@@ -763,21 +768,42 @@ export const useQCDivisionHook = () => {
       setDivisionAutoPopulateLoading(true);
       clearPartialNav();
       try {
-        const typeKey = String(typeValue ?? "").trim();
-
-        // Prefer cached form details (and fetch when formId exists) before deciding the API.
-        const formDetailsForStatus =
-          qcFormDetailsPayloadRef.current ??
-          (String(activeBatch?.formId ?? "").trim() ? await ensureQcFormDetailsPayload() : null);
-        if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
-
-        const divisionStatus = resolveQcDivisionStatusFromSources({
+        // Decide API from batch-seeded status first — do not fetch form details just to
+        // learn TO_BE_INITIATED when the map (or missing key) already says awaiting initiation.
+        let divisionStatus = resolveQcDivisionStatusFromSources({
           statusByKey: divisionStatusByFlowKeyRef.current,
-          formDetails: formDetailsForStatus,
+          formDetails: qcFormDetailsPayloadRef.current,
           flowKey: divisionFlowKey,
           rawMaterialType: typeKey,
         });
-        const useFormDetails = shouldUseQcFormDetailsData(divisionStatus);
+
+        let formDetailsForStatus = qcFormDetailsPayloadRef.current;
+        const hasFormId = Boolean(String(activeBatch?.formId ?? "").trim());
+        const shouldFetchFormDetailsForStatus =
+          !formDetailsForStatus &&
+          hasFormId &&
+          (shouldUseQcFormDetailsData(divisionStatus) ||
+            Object.keys(divisionStatusByFlowKeyRef.current).length === 0);
+
+        if (shouldFetchFormDetailsForStatus) {
+          formDetailsForStatus = await ensureQcFormDetailsPayload();
+          if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
+          if (formDetailsForStatus) {
+            const fromForm = mapFormDetailsDivisionStatusesToFlowKeyMap(formDetailsForStatus);
+            if (Object.keys(fromForm).length > 0) {
+              setDivisionStatusByFlowKey((prev) => mergeQcDivisionStatusMaps(prev, fromForm));
+            }
+            divisionStatus = resolveQcDivisionStatusFromSources({
+              statusByKey: {
+                ...divisionStatusByFlowKeyRef.current,
+                ...fromForm,
+              },
+              formDetails: formDetailsForStatus,
+              flowKey: divisionFlowKey,
+              rawMaterialType: typeKey,
+            });
+          }
+        }
 
         let batchPayload: unknown = null;
         try {
@@ -786,6 +812,22 @@ export const useQCDivisionHook = () => {
             (await batchManagementController.getBatchById(batchId));
           if (batchPayload) {
             batchDetailsPayloadRef.current = batchPayload;
+            // Keep chips in sync if batch details carry divisionStatuses and map is empty.
+            if (Object.keys(divisionStatusByFlowKeyRef.current).length === 0) {
+              const fromBatch = mapBatchDivisionStatusesToFlowKeyMap(
+                batchPayload,
+                divisionCatalog,
+              );
+              if (Object.keys(fromBatch).length > 0) {
+                setDivisionStatusByFlowKey(fromBatch);
+                divisionStatus = resolveQcDivisionStatusFromSources({
+                  statusByKey: fromBatch,
+                  formDetails: formDetailsForStatus,
+                  flowKey: divisionFlowKey,
+                  rawMaterialType: typeKey,
+                });
+              }
+            }
             const stageArrays = getBatchStageProgressArrays(
               batchPayload as Record<string, unknown>,
             );
@@ -797,11 +839,24 @@ export const useQCDivisionHook = () => {
           console.error("Failed to load batch details for QC unit gating:", error);
         }
 
+        const useFormDetails = shouldUseQcFormDetailsData(divisionStatus);
+
+        const catalogDivisionId = resolveQcManufacturingDivisionDetailsId(
+          divisionCatalog,
+          divisionFlowKey,
+          typeValue,
+        );
+        const batchDivisionId = resolveBatchDivisionIdForFlow(
+          batchPayload,
+          { flowKey: divisionFlowKey, rawMaterialType: typeKey },
+          divisionCatalog,
+        );
+        const divisionId = batchDivisionId ?? catalogDivisionId;
+
         let seedRecord: Record<string, unknown> | null = null;
 
         if (useFormDetails) {
           // IN_PROGRESS / APPROVED / etc. → /qc-division/details only (all divisions).
-          // Manufacturing /division-details is lazy-loaded per TO_BE_INITIATED unit on open.
           const formDetails = formDetailsForStatus ?? (await ensureQcFormDetailsPayload());
           if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
           const matchingDetail = findQcFormDivisionDetail(formDetails, {
@@ -827,6 +882,11 @@ export const useQCDivisionHook = () => {
           };
         } else {
           // TO_BE_INITIATED → seed from /qc-division/division-details
+          if (divisionId == null) {
+            setDivisionAutoPopulateData(null);
+            clearPartialNav();
+            return null;
+          }
           seedRecord = await fetchManufacturingDivisionDetails({ batchId, divisionId });
           if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
           if (!seedRecord) {
@@ -922,6 +982,31 @@ export const useQCDivisionHook = () => {
     if (divisionCatalog.length > 0 || divisionsLoading) return;
     void loadDivisionCatalog();
   }, [divisionCatalog.length, divisionsLoading, loadDivisionCatalog, view]);
+
+  // Once the divisions catalog is ready, re-resolve batch divisionStatuses with catalog ids.
+  useEffect(() => {
+    if (view !== "form") return;
+    if (!divisionCatalog.length) return;
+    const batchPayload = batchDetailsPayloadRef.current;
+    if (!batchPayload) return;
+    const fromBatch = mapBatchDivisionStatusesToFlowKeyMap(batchPayload, divisionCatalog);
+    if (!Object.keys(fromBatch).length) return;
+    setDivisionStatusByFlowKey((prev) => {
+      // Prefer batch keys; keep non-initiated statuses already learned from form details / saves.
+      const next: Record<string, QcPartialItemStatus> = { ...fromBatch };
+      for (const [key, status] of Object.entries(prev)) {
+        if (!isQcStatusAwaitingInitiation(status)) {
+          next[key] = status;
+        } else if (!(key in next)) {
+          next[key] = status;
+        }
+      }
+      const changed =
+        Object.keys(next).length !== Object.keys(prev).length ||
+        Object.keys(next).some((key) => next[key] !== prev[key]);
+      return changed ? next : prev;
+    });
+  }, [divisionCatalog, view]);
 
   const divisionOptions = useMemo(
     () => toQcDivisionSelectOptions(divisionCatalog),
@@ -3363,11 +3448,15 @@ export const useQCDivisionHook = () => {
     async (
       batch: QCBatch,
       editMode: boolean,
-      options?: { forDetails?: boolean },
+      options?: { forDetails?: boolean; silent?: boolean },
     ): Promise<boolean> => {
+      const silent = Boolean(options?.silent);
       // Same as other subdepts: Fill Details (TO_BE_INITIATED) opens empty form;
       // any other status (or edit/view) loads /qc-division/details.
+      // Silent refresh after draft/submit must always hit form details (even if list
+      // status is still TO_BE_INITIATED right after the first create).
       const shouldFetchDetails =
+        silent ||
         Boolean(options?.forDetails) ||
         editMode ||
         !isManufacturingFillDetailsStatus(batch.qcStatus);
@@ -3381,15 +3470,32 @@ export const useQCDivisionHook = () => {
       let initialProcessingType = flowSelection.processingType;
       let fetchedDetailsPayload: Record<string, unknown> | null = null;
 
+      // Preserve tab/unit selection across silent post-save refreshes.
+      const preservedDivision = selectedDivision;
+      const preservedRawMaterialType = selectedRawMaterialType;
+      const preservedProcessingType = selectedProcessingType;
+      const preservedPartialNavIndex = activePartialNavIndex;
+
       // Load stageProgress so QC can gate units on the last manufacturing/QC subdept
       // where each premix/motor was approved (e.g. Mixing → QC Raw Material Processing).
-      setLoadingFormDetails(true);
+      // Also seed divisionStatusByFlowKey from batch details.divisionStatuses.
+      let batchStatusMap: Record<string, QcPartialItemStatus> = {};
+      if (!silent) setLoadingFormDetails(true);
       try {
         const batchId = String(batch.batchId ?? "").trim();
         if (batchId) {
           try {
             const batchDetails = await batchManagementController.getBatchById(batchId);
             if (batchDetails) batchDetailsPayloadRef.current = batchDetails;
+            batchStatusMap = mapBatchDivisionStatusesToFlowKeyMap(
+              batchDetails,
+              divisionCatalog,
+            );
+            if (Object.keys(batchStatusMap).length > 0) {
+              setDivisionStatusByFlowKey(batchStatusMap);
+            } else {
+              setDivisionStatusByFlowKey({});
+            }
             const fromDetails = getBatchStageProgressArrays(
               (batchDetails as Record<string, unknown> | null) ?? null,
             );
@@ -3405,12 +3511,14 @@ export const useQCDivisionHook = () => {
             setBatchStageArrays(
               getBatchStageProgressArrays(batch as unknown as Record<string, unknown>),
             );
+            setDivisionStatusByFlowKey({});
           }
         } else {
           setBatchStageArrays({ stageProgress: null, currentStage: null });
+          setDivisionStatusByFlowKey({});
         }
       } finally {
-        if (!shouldFetchDetails) {
+        if (!shouldFetchDetails && !silent) {
           setLoadingFormDetails(false);
         }
       }
@@ -3425,12 +3533,12 @@ export const useQCDivisionHook = () => {
           return false;
         }
 
-        setLoadingFormDetails(true);
+        if (!silent) setLoadingFormDetails(true);
         const detailsResponse = await qcDivisionController.fetchFormDetails({
           formId: resolvedFormId,
           subDepartmentId,
         });
-        setLoadingFormDetails(false);
+        if (!silent) setLoadingFormDetails(false);
 
         if (!detailsResponse?.success || !detailsResponse.data) {
           const fallback =
@@ -3626,6 +3734,24 @@ export const useQCDivisionHook = () => {
               entries.push(entry);
               return { entryId, entry, entrySections };
             };
+
+            const isRevalidationDivision =
+              division === "RAW_MATERIAL_REVALIDATION" ||
+              (division === "RAW_MATERIAL" && detailSubType === "RAW_MATERIAL_REVALIDATION");
+
+            // Materials-shaped revalidation payloads have no schema sections.
+            if (isRevalidationDivision && !sections.length) {
+              const revalidationValues = mapDivisionDetailsToRevalidationValues(detailData);
+              if (revalidationValues) {
+                const { entryId } = makeEntry(
+                  "REVALIDATION",
+                  detailSubType ?? "RAW_MATERIAL_REVALIDATION",
+                  [],
+                );
+                entryValues[entryId] = { schemaValues: revalidationValues };
+                continue;
+              }
+            }
 
             if (division === "MIXING") {
               const hydratedMixing = hydrateMixingDivisionFromFormData(detailData);
@@ -4566,59 +4692,35 @@ export const useQCDivisionHook = () => {
         subType: resolvedData.subType,
         rejectionReason,
       });
-      setSelectedDivision(initialDivision);
-      setSelectedRawMaterialType(initialRawMaterialType);
-      setSelectedProcessingType(initialProcessingType);
-      setSelectedPremixSlot(
-        initialProcessingType === "LIQUID_PROCESSING" ? "LIQUID_PROCESSING" : "SOLID_PROCESSING",
-      );
+      if (silent && preservedDivision) {
+        setSelectedDivision(preservedDivision);
+        setSelectedRawMaterialType(preservedRawMaterialType);
+        setSelectedProcessingType(preservedProcessingType);
+        setSelectedPremixSlot(
+          preservedProcessingType === "LIQUID_PROCESSING"
+            ? "LIQUID_PROCESSING"
+            : "SOLID_PROCESSING",
+        );
+        setActivePartialNavIndex(preservedPartialNavIndex);
+      } else {
+        setSelectedDivision(initialDivision);
+        setSelectedRawMaterialType(initialRawMaterialType);
+        setSelectedProcessingType(initialProcessingType);
+        setSelectedPremixSlot(
+          initialProcessingType === "LIQUID_PROCESSING" ? "LIQUID_PROCESSING" : "SOLID_PROCESSING",
+        );
+      }
       applyFullFormState(resolvedData);
       setIsFormDirty(false);
       setIsEditMode(editMode);
 
       const detailsPayload = fetchedDetailsPayload as any;
-      if (detailsPayload && Array.isArray(detailsPayload.divisionStatuses)) {
-        const nextMap: Record<string, QcPartialItemStatus> = {};
-        detailsPayload.divisionStatuses.forEach((entry: any) => {
-          const key = String(entry?.division ?? "").trim();
-          if (!key) return;
-          const status = normalizePartialItemStatus(entry?.status);
-          nextMap[key] = status;
-          // Alias contract shapes used by nav tabs / divisionDetails.
-          if (key === "RAW_MATERIAL_PROCESSING") {
-            nextMap.RAW_MATERIAL_PROCESSING = status;
-          }
-          if (key === "RAW_MATERIAL_REVALIDATION") {
-            nextMap.RAW_MATERIAL_REVALIDATION = status;
-          }
-          if (key === "PROPELLANT_PROPERTIES") {
-            nextMap.QC = status;
-          }
-          if (key === "POST_CURE" || key === "POST_CURE_OPERATION") {
-            nextMap.POST_CURE = status;
-            nextMap.POST_CURE_OPERATION = status;
-          }
-        });
-        // Also absorb status from divisionDetails when divisionStatuses uses a different key.
-        if (Array.isArray(detailsPayload.divisionDetails)) {
-          detailsPayload.divisionDetails.forEach((detail: any) => {
-            const division = String(detail?.division ?? "").trim();
-            const subType = String(detail?.subType ?? "").trim();
-            const status = normalizePartialItemStatus(
-              detail?.status ?? detail?.divisionSubmissionStatus,
-            );
-            if (!status || status === "TO_BE_INITIATED") return;
-            if (division === "RAW_MATERIAL" && subType === "RAW_MATERIAL_PROCESSING") {
-              nextMap.RAW_MATERIAL_PROCESSING = status;
-            }
-            if (division === "RAW_MATERIAL" && subType === "RAW_MATERIAL_REVALIDATION") {
-              nextMap.RAW_MATERIAL_REVALIDATION = status;
-            }
-            if (division) nextMap[division] = nextMap[division] ?? status;
-            if (subType) nextMap[subType] = nextMap[subType] ?? status;
-          });
-        }
-        setDivisionStatusByFlowKey(nextMap);
+      if (detailsPayload) {
+        const fromForm = mapFormDetailsDivisionStatusesToFlowKeyMap(detailsPayload);
+        const merged = mergeQcDivisionStatusMaps(batchStatusMap, fromForm);
+        setDivisionStatusByFlowKey(merged);
+      } else if (Object.keys(batchStatusMap).length > 0) {
+        setDivisionStatusByFlowKey(batchStatusMap);
       }
 
       setFormUnitStatuses({
@@ -4655,7 +4757,18 @@ export const useQCDivisionHook = () => {
       }
       return true;
     },
-    [fetchQcSchemaDocument, fetchQcSchemaDocumentCore, messages, showAlert, subDepartmentId],
+    [
+      activePartialNavIndex,
+      divisionCatalog,
+      fetchQcSchemaDocument,
+      fetchQcSchemaDocumentCore,
+      messages,
+      selectedDivision,
+      selectedProcessingType,
+      selectedRawMaterialType,
+      showAlert,
+      subDepartmentId,
+    ],
   );
 
   const handleFillForm = async (batch: QCBatch) => {
@@ -4844,155 +4957,30 @@ export const useQCDivisionHook = () => {
       );
       setIsFormDirty(false);
 
-      // Refresh /qc-division/details so Mixing (and other) IN_PROGRESS+ tabs read saved QC data.
-      let refreshedDetails: Record<string, unknown> | null = null;
-      if (nextFormId && subDepartmentId) {
-        try {
-          const detailsResponse = await qcDivisionController.fetchFormDetails({
-            formId: nextFormId,
-            subDepartmentId,
-          });
-          if (detailsResponse?.success && detailsResponse.data) {
-            refreshedDetails = detailsResponse.data as unknown as Record<string, unknown>;
-            qcFormDetailsPayloadRef.current = refreshedDetails;
-            if (Array.isArray((refreshedDetails as any).divisionStatuses)) {
-              const nextMap: Record<string, QcPartialItemStatus> = {};
-              (refreshedDetails as any).divisionStatuses.forEach((entry: any) => {
-                const key = String(entry?.division ?? "").trim();
-                if (!key) return;
-                nextMap[key] = normalizePartialItemStatus(entry?.status);
-              });
-              setDivisionStatusByFlowKey((prev) => ({ ...prev, ...nextMap }));
-            }
-            if (
-              (refreshedDetails as any).premixStatuses != null ||
-              (refreshedDetails as any).motorStatuses != null
-            ) {
-              setFormUnitStatuses({
-                premixStatuses: (refreshedDetails as any).premixStatuses ?? null,
-                motorStatuses: (refreshedDetails as any).motorStatuses ?? null,
-              });
-            }
-          } else {
-            qcFormDetailsPayloadRef.current = null;
-          }
-        } catch {
-          qcFormDetailsPayloadRef.current = null;
-        }
+      // Full silent refresh from /qc-division/details (Case Prep draft parity).
+      const formIdForRefresh = String(nextFormId ?? "").trim();
+      if (formIdForRefresh) {
+        const statusForBanner = String(
+          response.data?.status ?? activeBatch.qcStatus ?? "IN_PROGRESS",
+        )
+          .trim()
+          .toUpperCase()
+          .replace(/\s+/g, "_");
+        const stillRejectedEdit = statusForBanner === "REJECTED";
+        await openFormWithResolvedData(
+          {
+            ...activeBatch,
+            formId: formIdForRefresh,
+            qcStatus: response.data?.status ?? activeBatch.qcStatus ?? "IN_PROGRESS",
+            division: formData.division ?? activeBatch.division,
+            subType: formData.subType ?? activeBatch.subType,
+          },
+          stillRejectedEdit || isEditMode,
+          { silent: true },
+        );
       }
 
-      // Mixing: rehydrate the active unit from /qc-division/details after create/update.
-      const activeFlowKey = String(formData.division ?? selectedDivision ?? "").trim();
-      if (
-        refreshedDetails &&
-        activeFlowKey === "MIXING" &&
-        activePartialItem &&
-        (activePartialItem.kind === "PREMIX" || activePartialItem.kind === "FINAL_MIX")
-      ) {
-        const detailRecord =
-          resolveMixingQcFormData(refreshedDetails) ??
-          toDivisionAutoPopulateRecord(
-            findQcFormDivisionDetail(refreshedDetails, {
-              flowKey: "MIXING",
-              rawMaterialType: selectedRawMaterialType,
-            }),
-          ) ??
-          toDivisionAutoPopulateRecord(refreshedDetails);
-        const mixNo =
-          activePartialItem.kind === "FINAL_MIX"
-            ? (activePartialItem.finalMixNo ?? activePartialItem.premixNo)
-            : activePartialItem.premixNo;
-        const entryIds = resolveEntryIdsForPartialItem(
-          formDataRef.current.divisionEntries ?? [],
-          activePartialItem,
-          { flowKey: "MIXING" },
-        );
-        const entryId = entryIds[0];
-        if (mixNo != null && detailRecord && entryId) {
-          const domainEntry = findMixingPremixDomainEntry(detailRecord, mixNo);
-          const hydrated = hydrateMixingDivisionFromFormData(detailRecord);
-          updateFormData((prev) => {
-            let next = { ...prev };
-            const entryValues = { ...(prev.divisionEntryValues ?? {}) };
-            if (activePartialItem.kind === "PREMIX" && domainEntry?.premixDetails) {
-              entryValues[entryId] = {
-                ...entryValues[entryId],
-                schemaValues: hydrateMixingDetailsValuesFromDomain(
-                  domainEntry.premixDetails,
-                  "premix",
-                ),
-              };
-            }
-            if (activePartialItem.kind === "FINAL_MIX") {
-              const finalMixDetails =
-                domainEntry?.finalMixDetails &&
-                typeof domainEntry.finalMixDetails === "object" &&
-                !Array.isArray(domainEntry.finalMixDetails)
-                  ? (domainEntry.finalMixDetails as Record<string, unknown>)
-                  : null;
-              let viscosityValues: SchemaFormValues | undefined;
-              if (finalMixDetails?.viscosityBuildUp) {
-                viscosityValues = hydrateViscosityValuesFromDomain(
-                  finalMixDetails.viscosityBuildUp,
-                );
-              } else {
-                const fromHydrated = hydrated?.finalMixEntries.find(
-                  (row) => row.premixNo === mixNo,
-                );
-                if (fromHydrated) viscosityValues = fromHydrated.values;
-              }
-              const detailsValues = finalMixDetails
-                ? hydrateMixingDetailsValuesFromDomain(finalMixDetails, "finalMix")
-                : hydrated?.finalMixDetailsValues;
-              if (viscosityValues || detailsValues) {
-                entryValues[entryId] = {
-                  ...entryValues[entryId],
-                  schemaValues: mergeFinalMixEntrySchemaValues(
-                    detailsValues,
-                    viscosityValues ?? entryValues[entryId]?.schemaValues,
-                  ),
-                };
-              }
-              if (detailsValues) {
-                next = {
-                  ...next,
-                  mixingFinalMixDetailsValues: detailsValues,
-                };
-              }
-            }
-            return { ...next, divisionEntryValues: entryValues };
-          });
-        }
-      }
-
-      // Hardware: restore shared upload fields from saved /qc-division/details after create/update.
-      if (
-        refreshedDetails &&
-        activeFlowKey === "HARDWARE" &&
-        activePartialItem?.kind === "MOTOR" &&
-        activePartialItem.motorId
-      ) {
-        const detailRecord =
-          toDivisionAutoPopulateRecord(
-            findQcFormDivisionDetail(refreshedDetails, {
-              flowKey: "HARDWARE",
-              rawMaterialType: selectedRawMaterialType,
-            }),
-          ) ?? toDivisionAutoPopulateRecord(refreshedDetails);
-        const sections = expandDivisionDetailSections(
-          detailRecord && typeof detailRecord === "object"
-            ? (detailRecord as Record<string, unknown>)
-            : null,
-        );
-        updateFormData((prev) => ({
-          ...prev,
-          divisionEntryValues: applyHardwareSharedUploadsToEntryValues(
-            prev.divisionEntries ?? [],
-            prev.divisionEntryValues ?? {},
-            sections,
-          ),
-        }));
-      }
+      const refreshedDetails = qcFormDetailsPayloadRef.current;
 
       if (activePartialItem) {
         const nextStatus = intent === "draft" ? "IN_PROGRESS" : "WAITING_FOR_APPROVAL";
@@ -5113,6 +5101,12 @@ export const useQCDivisionHook = () => {
     }
 
     const submitFormState = formDataRef.current;
+
+    if (hasIncompleteQcFormUploads(submitFormState)) {
+      showAlert(STRINGS.QUALITY_CONTROL.NDT.FILE_UPLOAD_PENDING, "warning");
+      return false;
+    }
+
     let payload: ReturnType<typeof mapQualityControlPayload>;
 
     if (!hasUnits) {
@@ -5190,40 +5184,24 @@ export const useQCDivisionHook = () => {
         [String(activeDivisionTabKey || selectedDivision || division)]: "WAITING_FOR_APPROVAL",
       }));
 
-      // Refresh /qc-division/details after division submit so status/data stay in sync.
-      if (nextFormId && subDepartmentId) {
-        try {
-          const detailsResponse = await qcDivisionController.fetchFormDetails({
-            formId: nextFormId,
-            subDepartmentId,
-          });
-          if (detailsResponse?.success && detailsResponse.data) {
-            const refreshed = detailsResponse.data as unknown as Record<string, unknown>;
-            qcFormDetailsPayloadRef.current = refreshed;
-            if (Array.isArray((refreshed as any).divisionStatuses)) {
-              const nextMap: Record<string, QcPartialItemStatus> = {};
-              (refreshed as any).divisionStatuses.forEach((entry: any) => {
-                const key = String(entry?.division ?? "").trim();
-                if (!key) return;
-                nextMap[key] = normalizePartialItemStatus(entry?.status ?? "WAITING_FOR_APPROVAL");
-              });
-              setDivisionStatusByFlowKey((prev) => ({ ...prev, ...nextMap }));
-            }
-            if (
-              (refreshed as any).premixStatuses != null ||
-              (refreshed as any).motorStatuses != null
-            ) {
-              setFormUnitStatuses({
-                premixStatuses: (refreshed as any).premixStatuses ?? null,
-                motorStatuses: (refreshed as any).motorStatuses ?? null,
-              });
-            }
-          } else {
-            qcFormDetailsPayloadRef.current = null;
-          }
-        } catch {
-          qcFormDetailsPayloadRef.current = null;
-        }
+      // Full silent refresh from /qc-division/details after division submit.
+      const formIdForRefresh = String(nextFormId ?? "").trim();
+      if (formIdForRefresh) {
+        await openFormWithResolvedData(
+          {
+            ...activeBatch,
+            formId: formIdForRefresh,
+            qcStatus: response.data?.status ?? activeBatch.qcStatus ?? "WAITING_FOR_APPROVAL",
+            division: formData.division ?? activeBatch.division,
+            subType: formData.subType ?? activeBatch.subType,
+          },
+          false,
+          { silent: true },
+        );
+        setDivisionStatusByFlowKey((prev) => ({
+          ...prev,
+          [String(activeDivisionTabKey || selectedDivision || division)]: "WAITING_FOR_APPROVAL",
+        }));
       }
 
       if (Array.isArray((response.data as any)?.divisionStatuses)) {
@@ -5250,8 +5228,10 @@ export const useQCDivisionHook = () => {
     formData.subType,
     listParams,
     messages,
+    openFormWithResolvedData,
     partialNavItems,
     selectedDivision,
+    selectedRawMaterialType,
     showAlert,
     subDepartmentId,
   ]);

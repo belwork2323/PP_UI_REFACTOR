@@ -68,11 +68,24 @@ export const isFileReady = (ref: FileRef | null | undefined): boolean => {
 export const parseFileRef = (value: unknown): FileRef | null => {
   if (value == null) return null;
   if (typeof value === "string") {
-    const fileName = value.trim();
-    if (!fileName) return null;
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    // API sometimes returns bare fileId strings (e.g. "FILE_…") in certificate arrays.
+    if (/^FILE_/i.test(trimmed)) {
+      return {
+        fileName: trimmed,
+        fileUrl: trimmed,
+        mimeType: "application/octet-stream",
+        fileId: trimmed,
+        localId: newFileLocalId(),
+        status: "uploaded",
+        isTemp: false,
+        file: null,
+      };
+    }
     // Legacy filename-only values — not openable without fileId.
     return {
-      fileName,
+      fileName: trimmed,
       fileUrl: "",
       mimeType: "application/octet-stream",
       localId: newFileLocalId(),

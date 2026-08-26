@@ -21,7 +21,7 @@ const STATUS_ICONS: Record<string, typeof HourglassEmptyRoundedIcon> = {
   "Waiting for Approval": PendingActionsRoundedIcon,
   Approved: CheckCircleOutlineRoundedIcon,
   Rejected: CancelOutlinedIcon,
-  "Final Approval Completed": CheckCircleOutlineRoundedIcon,
+  "Completely Approved": CheckCircleOutlineRoundedIcon,
 };
 
 type PremixStatusChipProps = {

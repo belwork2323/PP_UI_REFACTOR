@@ -116,7 +116,7 @@ export const normalizeMixCardStatus = (status: unknown): MixCardSubmissionStatus
     normalized === "WAITING_FOR_APPROVAL" ||
     normalized === "APPROVED" ||
     normalized === "REJECTED" ||
-    normalized === "FINAL_APPROVAL_COMPLETED"
+    normalized === "COMPLETELY_APPROVED"
   ) {
     return normalized as MixCardSubmissionStatus;
   }
@@ -176,19 +176,18 @@ export const canApproverActionEntireMixingForm = (params: {
   if (
     statusUpper === "APPROVED" ||
     statusUpper === "REJECTED" ||
-    statusUpper === "FINAL_APPROVAL_COMPLETED" ||
+    statusUpper === "COMPLETELY_APPROVED" ||
     status === OPERATION_STATUS.APPROVED ||
     status === OPERATION_STATUS.REJECTED ||
-    status === OPERATION_STATUS.FINAL_APPROVAL_COMPLETED
+    status === OPERATION_STATUS.COMPLETELY_APPROVED
   ) {
     return false;
   }
 
   return (
+    statusUpper === "WAITING_FOR_APPROVAL" ||
     statusUpper === "WAITING_FOR_COMPLETE_APPROVAL" ||
-    status === OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL ||
-    status === OPERATION_STATUS.WAITING_FOR_APPROVAL ||
-    statusUpper === "WAITING_FOR_APPROVAL"
+    status === OPERATION_STATUS.WAITING_FOR_APPROVAL
   );
 };
 
@@ -204,10 +203,10 @@ export const stubMixCardStatusFromFormStatus = (formStatus: unknown): MixCardSub
   const statusUpper = status.toUpperCase().replace(/\s+/g, "_");
 
   if (
-    statusUpper === "WAITING_FOR_COMPLETE_APPROVAL" ||
-    status === OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL ||
-    statusUpper === "FINAL_APPROVAL_COMPLETED" ||
-    status === OPERATION_STATUS.FINAL_APPROVAL_COMPLETED ||
+    statusUpper === "WAITING_FOR_APPROVAL" ||
+    status === OPERATION_STATUS.WAITING_FOR_APPROVAL ||
+    statusUpper === "COMPLETELY_APPROVED" ||
+    status === OPERATION_STATUS.COMPLETELY_APPROVED ||
     statusUpper === "APPROVED" ||
     status === OPERATION_STATUS.APPROVED
   ) {

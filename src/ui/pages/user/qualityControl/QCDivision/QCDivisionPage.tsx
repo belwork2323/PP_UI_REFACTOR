@@ -140,6 +140,8 @@ const QualityControlPage = () => {
       partialNavItems.length > 0);
 
   const canOpenFinalDialog = Boolean(activeBatch?.formId);
+  /** View Status should stay available while filling — shows division/unit progress. */
+  const canViewStatus = Boolean(activeBatch);
 
   const unitActionLabels = useMemo(
     () => resolveQcUnitActionLabelsFromPartialItem(activePartialItem),
@@ -279,7 +281,7 @@ const QualityControlPage = () => {
                     actionLoading,
                     showSubmitDivision: isRevalidationDivision,
                     canSubmitDivision: canOpenDivisionDialog,
-                    canViewStatus: canOpenFinalDialog,
+                    canViewStatus,
                     showSaveDraft: isRevalidationDivision,
                     canSaveDraft: canAct,
                     onSaveDraft: () => setDraftConfirmOpen(true),

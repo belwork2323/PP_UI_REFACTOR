@@ -6,6 +6,10 @@ import {
   type QcPartialItemStatus,
   type QcPartialNavItem,
 } from "./qcDivisionApprovalUnits";
+import {
+  resolveQcDivisionFlowKeyFromName,
+  type QcDivisionCatalogItem,
+} from "./qcFlowConfig";
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -33,6 +37,183 @@ const pickString = (...values: unknown[]): string => {
 /** Unit/division still waiting for first QC entry — seed from division-details. */
 export const isQcStatusAwaitingInitiation = (status: unknown): boolean =>
   normalizePartialItemStatus(status) === "TO_BE_INITIATED";
+
+/** Apply known API key aliases onto a division status map (nav tabs / form details). */
+export const applyQcDivisionStatusAliases = (
+  map: Record<string, QcPartialItemStatus>,
+  key: string,
+  status: QcPartialItemStatus,
+): void => {
+  const normalized = String(key ?? "").trim();
+  if (!normalized) return;
+  map[normalized] = status;
+  if (normalized === "RAW_MATERIAL_PROCESSING") {
+    map.RAW_MATERIAL_PROCESSING = status;
+  }
+  if (normalized === "RAW_MATERIAL_REVALIDATION") {
+    map.RAW_MATERIAL_REVALIDATION = status;
+  }
+  if (normalized === "PROPELLANT_PROPERTIES") {
+    map.QC = status;
+  }
+  if (normalized === "POST_CURE" || normalized === "POST_CURE_OPERATION") {
+    map.POST_CURE = status;
+    map.POST_CURE_OPERATION = status;
+  }
+  if (normalized === "WEIGHTMENT" || normalized === "WEIGHMENT") {
+    map.WEIGHTMENT = status;
+    map.WEIGHMENT = status;
+  }
+};
+
+export type QcBatchDivisionStatusRow = {
+  divisionId: number | null;
+  divisionName: string;
+  divisionSubmissionType: string;
+  status: QcPartialItemStatus;
+  /** Resolved flow / type key used for tab chips. */
+  flowKey: string;
+};
+
+const resolveCatalogFlowKeyByDivisionId = (
+  catalog: QcDivisionCatalogItem[] | undefined,
+  divisionId: number | null,
+): string => {
+  if (!(divisionId != null && divisionId > 0)) return "";
+  for (const item of catalog ?? []) {
+    for (const type of item.types ?? []) {
+      if (Number(type.divisionId) === divisionId) return type.value;
+    }
+    if (Number(item.divisionId) === divisionId) return item.value;
+  }
+  return "";
+};
+
+/** Parse `/admin/batch/details` → `divisionStatuses` rows. */
+export const extractBatchDivisionStatusRows = (
+  batchPayload: unknown,
+  catalog?: QcDivisionCatalogItem[],
+): QcBatchDivisionStatusRow[] => {
+  const root = asRecord(batchPayload);
+  if (!root) return [];
+  const rows = asArray(root.divisionStatuses);
+  const out: QcBatchDivisionStatusRow[] = [];
+
+  for (const row of rows) {
+    const rec = asRecord(row);
+    if (!rec) continue;
+    const divisionName = pickString(rec.divisionName, rec.division, rec.name);
+    const divisionId = pickNumber(rec.divisionId, rec.division_id);
+    const fromCatalog = resolveCatalogFlowKeyByDivisionId(catalog, divisionId);
+    const fromName = divisionName ? resolveQcDivisionFlowKeyFromName(divisionName) : "";
+    const flowKey = fromCatalog || fromName;
+    if (!flowKey) continue;
+    out.push({
+      divisionId,
+      divisionName,
+      divisionSubmissionType: pickString(
+        rec.divisionSubmissionType,
+        rec.division_submission_type,
+        rec.submissionType,
+      ),
+      status: normalizePartialItemStatus(rec.status ?? rec.divisionStatus),
+      flowKey,
+    });
+  }
+  return out;
+};
+
+/** Map batch `divisionStatuses` → flow-key status map for nav chips / tab routing. */
+export const mapBatchDivisionStatusesToFlowKeyMap = (
+  batchPayload: unknown,
+  catalog?: QcDivisionCatalogItem[],
+): Record<string, QcPartialItemStatus> => {
+  const nextMap: Record<string, QcPartialItemStatus> = {};
+  for (const row of extractBatchDivisionStatusRows(batchPayload, catalog)) {
+    applyQcDivisionStatusAliases(nextMap, row.flowKey, row.status);
+    if (row.divisionName) {
+      applyQcDivisionStatusAliases(
+        nextMap,
+        resolveQcDivisionFlowKeyFromName(row.divisionName),
+        row.status,
+      );
+    }
+  }
+  return nextMap;
+};
+
+/** Prefer batch `divisionStatuses[].divisionId` for the selected tab; else null. */
+export const resolveBatchDivisionIdForFlow = (
+  batchPayload: unknown,
+  params: { flowKey: string; rawMaterialType?: string | null },
+  catalog?: QcDivisionCatalogItem[],
+): number | null => {
+  const lookupKey = resolveQcDivisionStatusLookupKey(params);
+  const flowKey = String(params.flowKey ?? "").trim();
+  const typeKey = String(params.rawMaterialType ?? "").trim();
+  for (const row of extractBatchDivisionStatusRows(batchPayload, catalog)) {
+    if (
+      row.flowKey === lookupKey ||
+      row.flowKey === typeKey ||
+      row.flowKey === flowKey ||
+      qcDivisionStatusKeysMatch(row.flowKey, lookupKey)
+    ) {
+      if (row.divisionId != null && row.divisionId > 0) return row.divisionId;
+    }
+  }
+  return null;
+};
+
+/** Map `/qc-division/details` divisionStatuses (+ divisionDetails fallback) → flow-key map. */
+export const mapFormDetailsDivisionStatusesToFlowKeyMap = (
+  formDetails: unknown,
+): Record<string, QcPartialItemStatus> => {
+  const detailsPayload = asRecord(formDetails);
+  if (!detailsPayload) return {};
+  const nextMap: Record<string, QcPartialItemStatus> = {};
+
+  if (Array.isArray(detailsPayload.divisionStatuses)) {
+    detailsPayload.divisionStatuses.forEach((entry) => {
+      const rec = asRecord(entry);
+      if (!rec) return;
+      const key = pickString(rec.division, rec.divisionName, rec.subType);
+      if (!key) return;
+      const status = normalizePartialItemStatus(rec.status);
+      applyQcDivisionStatusAliases(nextMap, key, status);
+    });
+  }
+
+  if (Array.isArray(detailsPayload.divisionDetails)) {
+    detailsPayload.divisionDetails.forEach((detail) => {
+      const rec = asRecord(detail);
+      if (!rec) return;
+      const division = pickString(rec.division);
+      const subType = pickString(rec.subType);
+      const status = normalizePartialItemStatus(
+        rec.status ?? rec.divisionSubmissionStatus,
+      );
+      if (!status || status === "TO_BE_INITIATED") return;
+      if (division === "RAW_MATERIAL" && subType === "RAW_MATERIAL_PROCESSING") {
+        nextMap.RAW_MATERIAL_PROCESSING = status;
+      }
+      if (division === "RAW_MATERIAL" && subType === "RAW_MATERIAL_REVALIDATION") {
+        nextMap.RAW_MATERIAL_REVALIDATION = status;
+      }
+      if (division) nextMap[division] = nextMap[division] ?? status;
+      if (subType) nextMap[subType] = nextMap[subType] ?? status;
+    });
+  }
+
+  return nextMap;
+};
+
+export const mergeQcDivisionStatusMaps = (
+  base: Record<string, QcPartialItemStatus>,
+  overlay: Record<string, QcPartialItemStatus>,
+): Record<string, QcPartialItemStatus> => ({
+  ...base,
+  ...overlay,
+});
 
 export const resolveMotorQcStatusFromFormDetails = (
   payload: unknown,

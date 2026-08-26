@@ -1,5 +1,5 @@
 import { alpha } from "@mui/material/styles";
-import { createDataTableTheme, uniformTableHeaderCellSx } from "../../shared/data_table_theme";
+import { createDataTableTheme, uniformTableBodyCellSx, uniformTableHeaderCellSx } from "../../shared/data_table_theme";
 import { NDT_BRAND } from "./tokens";
 
 export { NDT_BRAND };
@@ -114,14 +114,17 @@ export const getNdtTheme = (baseTheme: any) => {
         headerPaddingY: 1.1,
         headerPaddingX: 1.5,
       }),
-      bodyCell: {
-        fontSize: "0.8rem",
-        py: 1,
-        px: 1.5,
-        color: palette.text ?? NDT_BRAND.text,
-        borderBottom: `1px solid ${alpha(palette.border ?? NDT_BRAND.border, 0.55)}`,
-        verticalAlign: "middle" as const,
-      },
+      bodyCell: uniformTableBodyCellSx(
+        {
+          border: palette.border ?? NDT_BRAND.border,
+          text: palette.text ?? NDT_BRAND.text,
+        },
+        {
+          bodyFontSize: "0.8rem",
+          bodyPaddingY: 1,
+          bodyPaddingX: 1.5,
+        },
+      ),
       row: (index: number) => ({
         background: index % 2 === 0 ? palette.pageBg ?? "#fff" : alpha(palette.surface ?? NDT_BRAND.surface, 0.65),
       }),
@@ -138,6 +141,7 @@ export const getNdtTheme = (baseTheme: any) => {
           ["In Progress"]: { color: primary, bg: "#E8F4FC", border: alpha(primaryLight, 0.5) },
           ["Waiting for Approval"]: { color: "#7D6608", bg: "#FFF4D6", border: warnBase },
           ["Approved"]: { color: success, bg: "#E8F8F5", border: alpha(success, 0.5) },
+          ["Completely Approved"]: { color: success, bg: "#E8F8F5", border: alpha(success, 0.5) },
           ["Rejected"]: { color: danger, bg: "#FDEDEC", border: alpha(danger, 0.5) },
         } as Record<string, { color: string; bg: string; border: string }>;
       })(),

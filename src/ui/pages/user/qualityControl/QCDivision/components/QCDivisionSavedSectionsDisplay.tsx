@@ -12,7 +12,10 @@ import {
 import { alpha } from "@mui/material/styles";
 import type { SchemaSectionSubmission } from "../../../../../../schema-engine";
 import { QC_DIVISION_BRAND } from "../../../../../../app/theme/custom_themes/user/qualityControl/tokens";
-import { uniformTableHeaderCellSx } from "../../../../../../app/theme/custom_themes/shared/data_table_theme";
+import {
+  uniformTableBodyCellSx,
+  uniformTableHeaderCellSx,
+} from "../../../../../../app/theme/custom_themes/shared/data_table_theme";
 import {
   collectPrepSectionNestedTableRows,
   expandRawMaterialPrepSectionRows,
@@ -32,12 +35,15 @@ const headerCellSx = uniformTableHeaderCellSx(BRAND.primary, BRAND.primaryLight,
 });
 
 const bodyCellSx = {
-  fontSize: "0.72rem",
+  ...uniformTableBodyCellSx(
+    { border: BRAND.border, text: BRAND.text },
+    {
+      bodyFontSize: "0.72rem",
+      bodyPaddingY: 0.55,
+      bodyPaddingX: 1,
+    },
+  ),
   fontWeight: 600,
-  color: BRAND.text,
-  px: 1,
-  py: 0.55,
-  borderColor: alpha(BRAND.primary, 0.1),
   verticalAlign: "top" as const,
   whiteSpace: "pre-wrap" as const,
   wordBreak: "break-word" as const,

@@ -1,6 +1,9 @@
 import { STRINGS } from "../../../app/config/strings";
 import {
   OPERATION_STATUS,
+  formatApiStatusForDisplay,
+  mapApiStatusCountKeyToUiTab,
+  mapDisplayStatusToUiTab,
   toOperationStatusApiValue,
   type OperationStatus,
 } from "../../../hooks/operationStatus";
@@ -10,7 +13,6 @@ import {
 } from "../admin/BatchManagement/BatchManagementModel";
 
 const FILTER_ALL = STRINGS.USER_BATCH_LIST.FILTER_ALL;
-const OPERATION_STATUS_VALUES = Object.values(OPERATION_STATUS) as OperationStatus[];
 
 /** Shown when the working subdepartment is absent from currentStage and stageProgress. */
 export const BATCH_STATUS_UNAVAILABLE = "Status Unavailable";
@@ -197,60 +199,12 @@ export const SUBDEPT_STATUS_FIELD: Record<string, string> = {
   "static-test-facility": "stfStatus",
 };
 
-const compactStatusKey = (value: string) => value.replace(/[\s_-]/g, "").toLowerCase();
-
-const STATUS_KEY_ALIASES: Record<string, OperationStatus> = {
-  initiated: OPERATION_STATUS.TO_BE_INITIATED,
-  tobeinitiated: OPERATION_STATUS.TO_BE_INITIATED,
-  inprogress: OPERATION_STATUS.IN_PROGRESS,
-  waitingforpartialapproval: OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL,
-  waitingforapproval: OPERATION_STATUS.WAITING_FOR_APPROVAL,
-  waitingforcompleteapproval: OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL,
-  approved: OPERATION_STATUS.APPROVED,
-  finalapprovalcompleted: OPERATION_STATUS.FINAL_APPROVAL_COMPLETED,
-  rejected: OPERATION_STATUS.REJECTED,
-  active: OPERATION_STATUS.TO_BE_INITIATED,
-};
-
-export function normalizeSubdepartmentBatchStatus(status: unknown): OperationStatus | string {
+/** Format API status for list display — shows server value, no remapping. */
+export function normalizeSubdepartmentBatchStatus(status: unknown): string {
   const trimmed = String(status ?? "").trim();
-  if (!trimmed) return OPERATION_STATUS.TO_BE_INITIATED;
-
+  if (!trimmed) return BATCH_STATUS_UNAVAILABLE;
   if (trimmed === BATCH_STATUS_UNAVAILABLE) return BATCH_STATUS_UNAVAILABLE;
-
-  if (OPERATION_STATUS_VALUES.includes(trimmed as OperationStatus)) {
-    return trimmed as OperationStatus;
-  }
-
-  const fromAlias = STATUS_KEY_ALIASES[compactStatusKey(trimmed)];
-  if (fromAlias) return fromAlias;
-
-  const u = trimmed.toUpperCase().replace(/\s+/g, "_");
-  const map: Record<string, OperationStatus> = {
-    TO_BE_INITIATED: OPERATION_STATUS.TO_BE_INITIATED,
-    INITIATED: OPERATION_STATUS.TO_BE_INITIATED,
-    IN_PROGRESS: OPERATION_STATUS.IN_PROGRESS,
-    INPROGRESS: OPERATION_STATUS.IN_PROGRESS,
-    WAITING_FOR_PARTIAL_APPROVAL: OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL,
-    WAITINGFORPARTIALAPPROVAL: OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL,
-    WAITING_FOR_APPROVAL: OPERATION_STATUS.WAITING_FOR_APPROVAL,
-    WAITINGFORAPPROVAL: OPERATION_STATUS.WAITING_FOR_APPROVAL,
-    WAITING_FOR_COMPLETE_APPROVAL: OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL,
-    WAITINGFORCOMPLETEAPPROVAL: OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL,
-    APPROVED: OPERATION_STATUS.APPROVED,
-    FINAL_APPROVAL_COMPLETED: OPERATION_STATUS.FINAL_APPROVAL_COMPLETED,
-    FINALAPPROVALCOMPLETED: OPERATION_STATUS.FINAL_APPROVAL_COMPLETED,
-    REJECTED: OPERATION_STATUS.REJECTED,
-    ACTIVE: OPERATION_STATUS.TO_BE_INITIATED,
-  };
-
-  if (map[u]) return map[u];
-
-  // Preserve API status text — do not fall back to another workflow status.
-  return trimmed
-    .replace(/_/g, " ")
-    .toLowerCase()
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+  return formatApiStatusForDisplay(trimmed);
 }
 
 type BatchStageStatusResolution = {
@@ -507,9 +461,8 @@ const emptyStatusCountLabels = (): Record<string, number> => ({
   [OPERATION_STATUS.IN_PROGRESS]: 0,
   [OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL]: 0,
   [OPERATION_STATUS.WAITING_FOR_APPROVAL]: 0,
-  [OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL]: 0,
   [OPERATION_STATUS.APPROVED]: 0,
-  [OPERATION_STATUS.FINAL_APPROVAL_COMPLETED]: 0,
+  [OPERATION_STATUS.COMPLETELY_APPROVED]: 0,
   [OPERATION_STATUS.REJECTED]: 0,
 });
 
@@ -527,8 +480,9 @@ export function buildSubdepartmentBatchStatusCountsFromRows(
         batch.status ??
         batch.workflowStatus,
     );
-    if (status in byLabel) {
-      byLabel[status] += 1;
+    const tab = mapDisplayStatusToUiTab(status);
+    if (tab && tab in byLabel) {
+      byLabel[tab] += 1;
     }
   });
 
@@ -547,68 +501,24 @@ const isIgnorableStatusCountKey = (key: string) => {
 };
 
 /**
- * Map API `statusCounts` camelCase keys onto UI status labels.
- * Keys follow the batch-list contract, e.g. initiated, waitingForCompleteApproval.
+ * Map API `statusCounts` camelCase keys onto UI status filter tabs.
+ * Batch row statuses are not remapped — only tab counts are bucketed here.
  */
 export function mapSubdepartmentBatchStatusCounts(
   server: Record<string, number> | undefined,
   totalRecords: number,
   batches: Record<string, unknown>[] = [],
 ): Record<string, number> {
-  const pick = (...keys: string[]) => {
-    for (const key of keys) {
-      const value = server?.[key];
-      if (typeof value === "number") return value;
-    }
-    return 0;
-  };
-
   const byLabel = emptyStatusCountLabels();
 
   Object.entries(server ?? {}).forEach(([key, value]) => {
     if (typeof value !== "number" || isIgnorableStatusCountKey(key)) return;
 
-    const bucket = normalizeSubdepartmentBatchStatus(key);
-    if (bucket in byLabel) {
-      byLabel[bucket] += value;
+    const tab = mapApiStatusCountKeyToUiTab(key);
+    if (tab) {
+      byLabel[tab] += value;
     }
   });
-
-  // Fallback to legacy camelCase / label keys when present
-  if (Object.values(byLabel).every((count) => count === 0)) {
-    byLabel[OPERATION_STATUS.TO_BE_INITIATED] = pick(
-      "toBeInitiated",
-      "TO_BE_INITIATED",
-      "To Be Initiated",
-      "initiated",
-      "Initiated",
-      "INITIATED",
-    );
-    byLabel[OPERATION_STATUS.IN_PROGRESS] = pick("inProgress", "In Progress", "IN_PROGRESS");
-    byLabel[OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL] = pick(
-      "waitingForPartialApproval",
-      "Waiting for Partial Approval",
-      "WAITING_FOR_PARTIAL_APPROVAL",
-    );
-    byLabel[OPERATION_STATUS.WAITING_FOR_APPROVAL] = pick(
-      "waitingForApproval",
-      "waitingforApproval",
-      "Waiting for Approval",
-      "WAITING_FOR_APPROVAL",
-    );
-    byLabel[OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL] = pick(
-      "waitingForCompleteApproval",
-      "Waiting for Complete Approval",
-      "WAITING_FOR_COMPLETE_APPROVAL",
-    );
-    byLabel[OPERATION_STATUS.APPROVED] = pick("approved", "Approved", "APPROVED");
-    byLabel[OPERATION_STATUS.FINAL_APPROVAL_COMPLETED] = pick(
-      "finalApprovalCompleted",
-      "Final Approval Completed",
-      "FINAL_APPROVAL_COMPLETED",
-    );
-    byLabel[OPERATION_STATUS.REJECTED] = pick("rejected", "Rejected", "REJECTED");
-  }
 
   let countedTotal = Object.values(byLabel).reduce((sum, value) => sum + value, 0);
   const hasServerCounts = countedTotal > 0 || Object.keys(server ?? {}).length > 0;
@@ -617,17 +527,16 @@ export function mapSubdepartmentBatchStatusCounts(
     return buildSubdepartmentBatchStatusCountsFromRows(batches, totalRecords);
   }
 
-  // When API omits a statusCounts key that appears on the current page (e.g. approved),
-  // fill that bucket from mapped rows so tabs stay consistent with visible data.
   if (batches.length > 0 && server && typeof server === "object") {
-    const serverBuckets = new Set(
+    const serverTabs = new Set(
       Object.keys(server)
         .filter((key) => !isIgnorableStatusCountKey(key) && typeof server[key] === "number")
-        .map((key) => normalizeSubdepartmentBatchStatus(key)),
+        .map((key) => mapApiStatusCountKeyToUiTab(key))
+        .filter(Boolean),
     );
     const fromRows = buildSubdepartmentBatchStatusCountsFromRows(batches, totalRecords);
     (Object.keys(byLabel) as string[]).forEach((status) => {
-      if (!serverBuckets.has(status) && (fromRows[status] ?? 0) > 0) {
+      if (!serverTabs.has(status as OperationStatus) && (fromRows[status] ?? 0) > 0) {
         byLabel[status] = fromRows[status];
       }
     });
@@ -636,7 +545,6 @@ export function mapSubdepartmentBatchStatusCounts(
 
   return {
     ...byLabel,
-    // Prefer bucket sum; if API omitted statuses, fall back to pagination total.
     [FILTER_ALL]: countedTotal > 0 ? countedTotal : totalRecords,
   };
 }

@@ -29,7 +29,10 @@ import { useMemo } from "react";
 import getManufacturingTheme from "@/app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import { useThemeStore } from "@/app/store/themeStore";
 import { icons } from "@app/theme/icons";
-import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
+import {
+  uniformTableBodyCellSx,
+  uniformTableHeaderCellSx,
+} from "@app/theme/custom_themes/shared/data_table_theme";
 
 const BL = STRINGS.MANUFACTURING.BATCH_LIST;
 
@@ -80,13 +83,15 @@ const headerCellSx = (accentMain: string, accentLight: string) =>
     headerPaddingX: "14px",
   });
 
-const bodyCellSx = (borderColor: string) => ({
-  padding: "10px 14px",
-  fontSize: "0.82rem",
-  borderBottom: `1px solid ${alpha(borderColor, 0.55)}`,
-  color: "#1C2833",
-  verticalAlign: "middle" as const,
-});
+const bodyCellSx = (borderColor: string) =>
+  uniformTableBodyCellSx(
+    { border: borderColor, text: "#1C2833" },
+    {
+      bodyFontSize: "0.82rem",
+      bodyPaddingY: "10px",
+      bodyPaddingX: "14px",
+    },
+  );
 
 const ApproverSubdepartmentBatchListTable = ({
   rows,

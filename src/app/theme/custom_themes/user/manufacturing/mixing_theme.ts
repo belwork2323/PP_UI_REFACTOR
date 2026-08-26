@@ -143,10 +143,9 @@ export const getMixingTheme = (baseTheme: any) => {
 						border: alpha(primaryLight, 0.5),
 					},
 					["Waiting for Approval"]: { color: "#7D6608", bg: "#FFF4D6", border: warnBase },
-					["Waiting for Complete Approval"]: { color: "#7D6608", bg: "#FFF4D6", border: warnBase },
 					["Approved"]: { color: success, bg: "#E8F8F5", border: alpha(success, 0.5) },
 					["Rejected"]: { color: danger, bg: "#FDEDEC", border: alpha(danger, 0.5) },
-					["Final Approval Completed"]: { color: success, bg: "#E8F8F5", border: alpha(success, 0.5) },
+					["Completely Approved"]: { color: success, bg: "#E8F8F5", border: alpha(success, 0.5) },
 				} as Record<string, { color: string; bg: string; border: string }>;
 			})(),
 			page: { animation: "fadeIn 0.35s ease both" },

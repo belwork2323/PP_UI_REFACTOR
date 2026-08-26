@@ -5,7 +5,7 @@ import fonts from "@app/theme/fonts";
 import general from "@app/theme/custom_themes/common/common_css_theme";
 import { getSharedTheme } from "@app/theme/custom_themes/shared/shared_theme";
 import { getAdminCommonTheme } from "@app/theme/custom_themes/admin/admin_common_theme";
-import { createDataTableTheme, uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
+import { createDataTableTheme, uniformTableBodyCellSx, uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
 
 const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
   const shared = getSharedTheme(mode);
@@ -351,12 +351,17 @@ const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
         headerPaddingX: 1.25,
       }),
       bodyCell: {
-        fontSize: "0.8rem",
-        py: 0.85,
-        px: 1.25,
-        color: d.textPrimary,
-        borderBottom: `1px solid ${isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9"}`,
-        verticalAlign: "middle" as const,
+        ...uniformTableBodyCellSx(
+          {
+            border: isDark ? "rgba(255,255,255,0.06)" : "#F1F5F9",
+            text: d.textPrimary,
+          },
+          {
+            bodyFontSize: "0.8rem",
+            bodyPaddingY: 0.85,
+            bodyPaddingX: 1.25,
+          },
+        ),
       },
       textCell: {
         fontSize: "0.8rem",

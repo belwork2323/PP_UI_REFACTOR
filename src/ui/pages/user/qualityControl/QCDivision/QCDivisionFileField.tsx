@@ -23,9 +23,10 @@ import {
   type FileAcceptMode,
 } from "../../../../../hooks/useFileUploadActions";
 
-const S = STRINGS.MANUFACTURING.TRIMMING;
+/** Shared QC Division strings — Case Prep–parity upload UX under `qc-division`. */
+const S = STRINGS.QUALITY_CONTROL.NDT;
 
-type TrimmingFileFieldProps = {
+type QCDivisionFileFieldProps = {
   files: FileRef[];
   onChange: (next: FileRef[]) => void;
   multiple?: boolean;
@@ -35,12 +36,14 @@ type TrimmingFileFieldProps = {
   readOnly?: boolean;
   compact?: boolean;
   emptyLabel?: string;
-  /** Defaults to manufacturing `trimming`; QC Division passes `qc-division`. */
-  subDeptSlug?: string;
 };
 
-const acceptForMode = (mode: FileAcceptMode) =>
-  mode === "imageVideo" ? FILE_PICKER_ACCEPT.IMAGE_VIDEO : FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF;
+const acceptForMode = (mode: FileAcceptMode) => {
+  if (mode === "image") return FILE_PICKER_ACCEPT.IMAGE;
+  if (mode === "pdf") return FILE_PICKER_ACCEPT.PDF;
+  if (mode === "imageVideoPdf") return FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF;
+  return FILE_PICKER_ACCEPT.IMAGE_VIDEO;
+};
 
 const statusLabel = (ref: FileRef) => {
   if (ref.status === "uploading") return S.FILE_UPLOADING;
@@ -48,21 +51,25 @@ const statusLabel = (ref: FileRef) => {
   return null;
 };
 
-const TrimmingFileField = ({
+/**
+ * Shared QC Division file field — same rules as Case Prep:
+ * immediate upload, temp vs persisted delete, retry, fileIds-only on save.
+ * Always uses subDeptSlug `qc-division`.
+ */
+const QCDivisionFileField = ({
   files,
   onChange,
   multiple = true,
-  acceptMode = "imageVideoPdf",
+  acceptMode = "imageVideo",
   label,
   disabled = false,
   readOnly = false,
   compact = false,
   emptyLabel,
-  subDeptSlug = "trimming",
-}: TrimmingFileFieldProps) => {
+}: QCDivisionFileFieldProps) => {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const list = useMemo(() => files ?? [], [files]);
+  const list = useMemo(() => (Array.isArray(files) ? files : []), [files]);
 
   const {
     handleFilesSelected,
@@ -75,7 +82,7 @@ const TrimmingFileField = ({
     downloadFilePreview,
   } = useFileUploadActions(list, onChange, {
     acceptMode,
-    subDeptSlug,
+    subDeptSlug: "qc-division",
     missingSubDeptMessage: S.SUB_DEPARTMENT_MISSING,
   });
 
@@ -192,7 +199,7 @@ const TrimmingFileField = ({
 
         {showEmpty ? (
           <Typography sx={{ fontSize: "0.72rem", color: "text.secondary" }}>
-            {emptyLabel ?? S.FILE_EMPTY_REPORT}
+            {emptyLabel ?? S.FILE_EMPTY_MEDIA}
           </Typography>
         ) : null}
 
@@ -217,4 +224,4 @@ const TrimmingFileField = ({
   );
 };
 
-export default TrimmingFileField;
+export default QCDivisionFileField;

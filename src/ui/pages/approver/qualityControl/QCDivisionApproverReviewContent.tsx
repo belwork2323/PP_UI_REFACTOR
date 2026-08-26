@@ -23,7 +23,7 @@ import getRawMaterialPreparationApproverTheme from "../../../../app/theme/custom
 import { STRINGS } from "../../../../app/config/strings";
 import { icons } from "../../../../app/theme/icons";
 import { QC_DIVISION_BRAND } from "../../../../app/theme/custom_themes/user/qualityControl/tokens";
-import { uniformTableHeaderCellSx } from "../../../../app/theme/custom_themes/shared/data_table_theme";
+import { uniformTableBodyCellSx, uniformTableHeaderCellSx } from "../../../../app/theme/custom_themes/shared/data_table_theme";
 import type { QCDivisionDetailView } from "../../../../data/models/user/QualityControlFormModel";
 import type { QualityControlFormState } from "../../../../data/models/user/QualityControlFormModel";
 import { PremixCountsSummary } from "../../user/manufacturing/RawMaterial/components/PremixStatusChip";
@@ -279,10 +279,23 @@ const ApproverStatusOverviewRows = ({
                     <TableBody>
                       {group.units.map((unit) => (
                         <TableRow key={`${group.id}:${unit.id}`} hover>
-                          <TableCell sx={{ fontSize: "0.8rem", fontWeight: 600 }}>
+                          <TableCell
+                            sx={{
+                              ...uniformTableBodyCellSx(
+                                { border: QC_DIVISION_BRAND.border, text: QC_DIVISION_BRAND.text },
+                                { bodyFontSize: "0.8rem", bodyPaddingY: 1, bodyPaddingX: 1.5 },
+                              ),
+                              fontWeight: 600,
+                            }}
+                          >
                             {unit.label}
                           </TableCell>
-                          <TableCell>
+                          <TableCell
+                            sx={uniformTableBodyCellSx(
+                              { border: QC_DIVISION_BRAND.border, text: QC_DIVISION_BRAND.text },
+                              { bodyFontSize: "0.8rem", bodyPaddingY: 1, bodyPaddingX: 1.5 },
+                            )}
+                          >
                             <StatusChip status={unit.status} />
                           </TableCell>
                         </TableRow>

@@ -17,8 +17,12 @@ import { operationsController } from "../../../../../controllers/user/operations
 import type { SchemaFormValues } from "../../../../../schema-engine";
 import { computeExpandedGroupCellSpans } from "../../../../../schema-engine/rules/tableCommitGroup";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
+import {
+  uniformTableBodyCellSx,
+  uniformTableHeaderCellSx,
+} from "../../../../../app/theme/custom_themes/shared/data_table_theme";
 import DateField from "../../../../components/common/DateField";
-import NdtFileField from "../NDT/NdtFileField";
+import QCDivisionFileField from "./QCDivisionFileField";
 import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
 import {
   QC_REVALIDATION_COLUMNS,
@@ -38,21 +42,23 @@ type QCRawMaterialRevalidationTableProps = {
   readOnly?: boolean;
 };
 
-const cellSx = {
-  fontSize: "0.72rem",
-  py: 0.75,
-  px: 0.75,
-  verticalAlign: "top",
-  borderColor: alpha("#1B4F72", 0.12),
-};
+const cellSx = uniformTableBodyCellSx(
+  { border: QC_DIVISION_BRAND.border, text: QC_DIVISION_BRAND.text },
+  {
+    bodyFontSize: "0.72rem",
+    bodyPaddingY: 0.75,
+    bodyPaddingX: 0.75,
+  },
+);
 
-const readOnlyCellSx = {
-  fontSize: "0.72rem",
-  py: 0.5,
-  px: 1,
-  verticalAlign: "middle",
-  borderColor: alpha("#1B4F72", 0.12),
-};
+const readOnlyCellSx = uniformTableBodyCellSx(
+  { border: QC_DIVISION_BRAND.border, text: QC_DIVISION_BRAND.text },
+  {
+    bodyFontSize: "0.72rem",
+    bodyPaddingY: 0.5,
+    bodyPaddingX: 1,
+  },
+);
 
 const displayValue = (value: unknown) => {
   const text = String(value ?? "").trim();
@@ -231,16 +237,12 @@ const QCRawMaterialRevalidationTable = ({
               {QC_REVALIDATION_COLUMNS.map((column) => (
                 <TableCell
                   key={column.id}
-                  sx={{
-                    ...baseCellSx,
-                    fontWeight: 800,
-                    fontSize: readOnly ? "0.65rem" : "0.72rem",
-                    letterSpacing: readOnly ? "0.02em" : undefined,
-                    textTransform: readOnly ? "uppercase" : undefined,
-                    color: BRAND.primary,
-                    background: alpha(BRAND.primaryLight, 0.08),
-                    whiteSpace: "nowrap",
-                  }}
+                  sx={uniformTableHeaderCellSx(BRAND.primary, BRAND.primaryLight, {
+                    headerFontSize: readOnly ? "0.65rem" : "0.72rem",
+                    headerLetterSpacing: readOnly ? "0.02em" : "0.06em",
+                    headerPaddingY: readOnly ? 0.5 : 0.75,
+                    headerPaddingX: readOnly ? 1 : 0.75,
+                  })}
                 >
                   {column.label}
                 </TableCell>
@@ -411,14 +413,13 @@ const QCRawMaterialRevalidationTable = ({
                             QC Certificate
                           </Typography>
                           <Box sx={{ minWidth: { sm: 260 }, maxWidth: 420, width: "100%" }}>
-                            <NdtFileField
+                            <QCDivisionFileField
                               files={groupCertificate}
                               onChange={() => undefined}
                               readOnly
                               compact
-                              multiple={false}
+                              multiple
                               acceptMode="imageVideoPdf"
-                              subDeptSlug="qc-division"
                               emptyLabel="Upload"
                             />
                           </Box>
@@ -434,7 +435,7 @@ const QCRawMaterialRevalidationTable = ({
                             Upload QC Certificate
                           </Typography>
                           <Box sx={{ minWidth: { sm: 260 }, maxWidth: 420, width: "100%" }}>
-                            <NdtFileField
+                            <QCDivisionFileField
                               files={groupCertificate}
                               onChange={(next) =>
                                 commitRows(
@@ -446,9 +447,8 @@ const QCRawMaterialRevalidationTable = ({
                                 )
                               }
                               compact
-                              multiple={false}
+                              multiple
                               acceptMode="imageVideoPdf"
-                              subDeptSlug="qc-division"
                               emptyLabel="Upload"
                             />
                           </Box>

@@ -157,7 +157,7 @@ const UserSubdepartmentBatchListSection = ({
     [rawStatusConfig, theme],
   );
 
-  /** Tabs follow manufacturing statusCounts keys (incl. Waiting for Complete Approval). */
+  /** Tabs follow manufacturing statusCounts keys (incl. Waiting for Approval). */
   const statusTabs = useMemo(
     () => statusDropdownValues.filter((status) => status in statusConfig || status === FILTER_ALL),
     [statusConfig, statusDropdownValues],

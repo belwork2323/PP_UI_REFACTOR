@@ -16,7 +16,7 @@ import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/q
 import type { SchemaFormValues } from "../../../../../schema-engine";
 import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
 import { STRINGS } from "../../../../../app/config/strings";
-import NdtFileField from "../NDT/NdtFileField";
+import QCDivisionFileField from "./QCDivisionFileField";
 import {
   QC_NDT_FIELD_LABELS,
   QC_NDT_SECTION_TITLES,
@@ -393,12 +393,11 @@ const VisualInspectionTable = ({
                 )}
               </TableCell>
               <TableCell sx={bodyCellSx}>
-                <NdtFileField
+                <QCDivisionFileField
                   files={row.UPLOAD_IMAGE ?? []}
                   onChange={(next) => updateFiles(index, next)}
                   multiple
                   acceptMode="image"
-                  subDeptSlug="qc-division"
                   compact
                   readOnly={readOnly}
                   disabled={inputsDisabled}
@@ -478,12 +477,11 @@ const QCNdtMotorPanel = ({
           />
         </SectionCard>
         <SectionCard title={QC_NDT_SECTION_TITLES.UPLOAD_MEDIA} readOnly={readOnly}>
-          <NdtFileField
+          <QCDivisionFileField
             files={uploadMedia}
             onChange={(next) => onChange(setNdtUploadMedia(values, next))}
             multiple
             acceptMode="imageVideo"
-            subDeptSlug="qc-division"
             readOnly={readOnly}
             disabled={inputsDisabled}
             emptyLabel={QC_NDT_FIELD_LABELS.UPLOAD_VIDEO_PHOTO}

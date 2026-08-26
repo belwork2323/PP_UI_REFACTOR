@@ -19,7 +19,7 @@ import {
   mapRawMaterialProcurementApproverListItem,
   toRawMaterialApproverListApiStatus,
 } from "../../data/models/approver/RawMaterialProcurementApproverModel";
-import { toOperationStatusApiValue } from "../operationStatus";
+import { toOperationStatusApiValue, mapApiStatusCountKeyToUiTab } from "../operationStatus";
 
 const RAW_MATERIAL_PROCUREMENT_SUBDEPT = "raw-material";
 const ROCKET_MOTOR_CASING_SUBDEPT = "rocket-motor";
@@ -94,28 +94,6 @@ const DEPARTMENT_SLUGS: Record<ApproverDepartmentKey, string> = {
   qualityControl: "quality",
 };
 
-const STATUS_LABELS: Record<string, string> = {
-  toBeInitiated: "To Be Initiated",
-  initiated: "To Be Initiated",
-  approved: "Approved",
-  inProgress: "In Progress",
-  waitingForPartialApproval: "Waiting for Partial Approval",
-  waitingForApproval: "Waiting for Approval",
-  waitingForCompleteApproval: "Waiting for Approval",
-  finalApprovalCompleted: "Final Approval Completed",
-  rejected: "Rejected",
-
-  TO_BE_INITIATED: "To Be Initiated",
-  INITIATED: "To Be Initiated",
-  APPROVED: "Approved",
-  IN_PROGRESS: "In Progress",
-  WAITING_FOR_PARTIAL_APPROVAL: "Waiting for Partial Approval",
-  WAITING_FOR_APPROVAL: "Waiting for Approval",
-  WAITING_FOR_COMPLETE_APPROVAL: "Waiting for Approval",
-  FINAL_APPROVAL_COMPLETED: "Final Approval Completed",
-  REJECTED: "Rejected",
-};
-
 const createLookupKeys = (item: Record<string, unknown>) =>
   [item.batchId, item.formId, item.dispatchId]
     .filter((value): value is string => typeof value === "string" && value.trim().length > 0)
@@ -131,22 +109,21 @@ const mapStatusCounts = (
   };
 
   Object.entries(counts ?? {}).forEach(([key, value]) => {
-    const label = STATUS_LABELS[key] ?? key;
-    mapped[label] = value ?? 0;
-    mapped[allLabel] += value ?? 0;
+    const tab = mapApiStatusCountKeyToUiTab(key);
+    if (tab) {
+      mapped[tab] = (mapped[tab] ?? 0) + (value ?? 0);
+      mapped[allLabel] += value ?? 0;
+    }
   });
 
   fallbackBatches.forEach((batch) => {
     if (!batch.status) {
       return;
     }
-    const normalizedStatus =
-    STATUS_LABELS[batch.status] ?? batch.status;
-    if (mapped[normalizedStatus] === undefined) {
-    mapped[normalizedStatus] =
-      fallbackBatches.filter(
-        (item) => item.status === batch.status
-      ).length;
+    const displayStatus = String(batch.status);
+    const tab = mapApiStatusCountKeyToUiTab(displayStatus) ?? displayStatus;
+    if (mapped[tab] === undefined) {
+      mapped[tab] = fallbackBatches.filter((item) => item.status === batch.status).length;
     }
   });
 

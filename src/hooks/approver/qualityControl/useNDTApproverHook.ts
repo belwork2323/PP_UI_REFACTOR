@@ -186,7 +186,7 @@ export const useNDTApproverHook = () => {
 
     const isWaitingForComplete = (() => {
       const upper = String(nextStatus).trim().toUpperCase().replace(/\s+/g, "_");
-      return upper === "WAITING_FOR_COMPLETE_APPROVAL";
+      return upper === "WAITING_FOR_APPROVAL";
     })();
 
     const enrichedDetailView = detailView

@@ -111,6 +111,7 @@ const tableDateTimeFieldSx = {
 const DISPATCH_NUMBER_FIELDS = [
   { key: "HE_PUNCTURES", label: "No of punctures in Loose Flap at HE" },
   { key: "NE_PUNCTURES", label: "No of punctures in Loose Flap at NE" },
+  { key: "LF_PUNCTURES", label: "No of punctures at LF Extension" },
 ] as const;
 
 const normalizeTimeValue = (value: unknown) => {

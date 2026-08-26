@@ -3,9 +3,8 @@ export const OPERATION_STATUS = {
   IN_PROGRESS: "In Progress",
   WAITING_FOR_PARTIAL_APPROVAL: "Waiting for Partial Approval",
   WAITING_FOR_APPROVAL: "Waiting for Approval",
-  WAITING_FOR_COMPLETE_APPROVAL: "Waiting for Complete Approval",
   APPROVED: "Approved",
-  FINAL_APPROVAL_COMPLETED: "Final Approval Completed",
+  COMPLETELY_APPROVED: "Completely Approved",
   REJECTED: "Rejected",
 } as const;
 
@@ -21,22 +20,19 @@ export const OPERATION_STATUS_FILTER_VALUES: OperationStatus[] = [
   OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL,
   OPERATION_STATUS.WAITING_FOR_APPROVAL,
   OPERATION_STATUS.APPROVED,
-  OPERATION_STATUS.FINAL_APPROVAL_COMPLETED,
+  OPERATION_STATUS.COMPLETELY_APPROVED,
   OPERATION_STATUS.REJECTED,
 ];
 
 /**
- * Manufacturing / QC / Dispatch list tabs — matches user batch-list `statusCounts` keys:
- * initiated, inProgress, waitingForPartialApproval, waitingForCompleteApproval,
- * finalApprovalCompleted, rejected.
- * (No `approved` in this API contract.)
+ * Manufacturing / QC / Dispatch list tabs — matches user batch-list `statusCounts` keys.
+ * Waiting for Approval is not a batch-list filter (only Waiting for Partial Approval).
  */
 export const MANUFACTURING_STATUS_FILTER_VALUES: OperationStatus[] = [
   OPERATION_STATUS.TO_BE_INITIATED,
   OPERATION_STATUS.IN_PROGRESS,
   OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL,
-  OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL,
-  OPERATION_STATUS.FINAL_APPROVAL_COMPLETED,
+  OPERATION_STATUS.COMPLETELY_APPROVED,
   OPERATION_STATUS.REJECTED,
 ];
 
@@ -44,7 +40,7 @@ export const MANUFACTURING_STATUS_FILTER_VALUES: OperationStatus[] = [
 export const SOURCING_LOT_HIDDEN_STATUS_FILTERS: OperationStatus[] = [
   OPERATION_STATUS.TO_BE_INITIATED,
   OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL,
-  OPERATION_STATUS.FINAL_APPROVAL_COMPLETED,
+  OPERATION_STATUS.COMPLETELY_APPROVED,
 ];
 
 const SOURCING_LOT_SUBDEPT_SLUGS = new Set(["raw-material", "rocket-motor"]);
@@ -60,33 +56,101 @@ export const SOURCING_LOT_STATUS_FILTER_VALUES: OperationStatus[] =
 
 /**
  * Display label for status filter tabs.
- * Kept for callers that still pass WAITING_FOR_APPROVAL on non-sourcing lists.
+ * Kept for callers that pass options for sourcing vs manufacturing lists.
  */
 export const getOperationStatusFilterLabel = (
   status: string,
-  options?: { isSourcingLotSubdepartment?: boolean; subDeptSlug?: string | null },
-): string => {
-  const sourcingLot =
-    options?.isSourcingLotSubdepartment ?? isSourcingLotSubdepartment(options?.subDeptSlug);
-  if (!sourcingLot && status === OPERATION_STATUS.WAITING_FOR_APPROVAL) {
-    return OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL;
-  }
-  return status;
-};
+  _options?: { isSourcingLotSubdepartment?: boolean; subDeptSlug?: string | null },
+): string => status;
 
-/** UI status labels → uppercase API enum values for list filters */
+/** UI status filter tabs → API enum values for list requests */
 export const OPERATION_STATUS_UI_TO_API: Record<string, string> = {
   [OPERATION_STATUS.TO_BE_INITIATED]: "TO_BE_INITIATED",
   [OPERATION_STATUS.IN_PROGRESS]: "IN_PROGRESS",
   [OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL]: "WAITING_FOR_PARTIAL_APPROVAL",
   [OPERATION_STATUS.WAITING_FOR_APPROVAL]: "WAITING_FOR_APPROVAL",
-  [OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL]: "WAITING_FOR_COMPLETE_APPROVAL",
   [OPERATION_STATUS.APPROVED]: "APPROVED",
-  [OPERATION_STATUS.FINAL_APPROVAL_COMPLETED]: "FINAL_APPROVAL_COMPLETED",
+  [OPERATION_STATUS.COMPLETELY_APPROVED]: "COMPLETELY_APPROVED",
   [OPERATION_STATUS.REJECTED]: "REJECTED",
 };
 
 const OPERATION_STATUS_API_VALUES = new Set(Object.values(OPERATION_STATUS_UI_TO_API));
+
+/** Format an API status enum for display — no remapping to other statuses. */
+export const formatApiStatusForDisplay = (status: unknown): string => {
+  const trimmed = String(status ?? "").trim();
+  if (!trimmed) return "";
+
+  if (OPERATION_STATUS_FILTER_VALUES.includes(trimmed as OperationStatus)) {
+    return trimmed;
+  }
+
+  if (/^[A-Z0-9_]+$/.test(trimmed)) {
+    return trimmed
+      .replace(/_/g, " ")
+      .toLowerCase()
+      .replace(/\b\w/g, (char) => char.toUpperCase());
+  }
+
+  return trimmed;
+};
+
+const compactApiStatusKey = (value: string) => value.replace(/[\s_-]/g, "").toLowerCase();
+
+/** Uppercase API enum for action/filter helpers — no remapping between statuses. */
+export const toApiStatusEnum = (status: unknown): string => {
+  const trimmed = String(status ?? "").trim();
+  if (!trimmed) return "";
+
+  const fromUi = OPERATION_STATUS_UI_TO_API[trimmed];
+  if (fromUi) return fromUi;
+
+  const upper = trimmed.toUpperCase().replace(/\s+/g, "_");
+  if (upper === "INITIATED") return "TO_BE_INITIATED";
+  if (upper === "PENDING") return "WAITING_FOR_APPROVAL";
+  if (OPERATION_STATUS_API_VALUES.has(upper)) return upper;
+
+  return upper;
+};
+
+/** Map API statusCounts camelCase keys onto UI filter tab labels (counts only). */
+export const mapApiStatusCountKeyToUiTab = (key: string): OperationStatus | null => {
+  const normalized = compactApiStatusKey(key);
+  const map: Record<string, OperationStatus> = {
+    initiated: OPERATION_STATUS.TO_BE_INITIATED,
+    tobeinitiated: OPERATION_STATUS.TO_BE_INITIATED,
+    inprogress: OPERATION_STATUS.IN_PROGRESS,
+    waitingforpartialapproval: OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL,
+    waitingforapproval: OPERATION_STATUS.WAITING_FOR_APPROVAL,
+    approved: OPERATION_STATUS.APPROVED,
+    completelyapproved: OPERATION_STATUS.COMPLETELY_APPROVED,
+    finalapprovalcompleted: OPERATION_STATUS.COMPLETELY_APPROVED,
+    rejected: OPERATION_STATUS.REJECTED,
+  };
+  return map[normalized] ?? null;
+};
+
+/** Bucket a displayed batch status into a UI filter tab (counts only). */
+export const mapDisplayStatusToUiTab = (displayStatus: string): OperationStatus | null => {
+  if (OPERATION_STATUS_FILTER_VALUES.includes(displayStatus as OperationStatus)) {
+    return displayStatus as OperationStatus;
+  }
+
+  const api = toApiStatusEnum(displayStatus);
+  if (api === "FINAL_APPROVAL_COMPLETED" || api === "COMPLETELY_APPROVED") {
+    return OPERATION_STATUS.COMPLETELY_APPROVED;
+  }
+  if (api === "WAITING_FOR_COMPLETE_APPROVAL") {
+    return null;
+  }
+
+  const fromKey = mapApiStatusCountKeyToUiTab(api);
+  if (fromKey) return fromKey;
+
+  return OPERATION_STATUS_FILTER_VALUES.includes(displayStatus as OperationStatus)
+    ? (displayStatus as OperationStatus)
+    : null;
+};
 
 /**
  * Map UI status label to API enum (Approved → APPROVED, Waiting for Approval → WAITING_FOR_APPROVAL).
@@ -104,11 +168,7 @@ export function toOperationStatusApiValue(
   const mapped = OPERATION_STATUS_UI_TO_API[trimmed];
   if (mapped) return mapped;
 
-  const upper = trimmed.toUpperCase().replace(/\s+/g, "_");
-  if (upper === "INITIATED") return "TO_BE_INITIATED";
-  if (OPERATION_STATUS_API_VALUES.has(upper)) return upper;
-
-  return upper;
+  return toApiStatusEnum(trimmed);
 }
 
 /** New form — Fill Details; do not call subdepartment form-details. */
@@ -127,11 +187,12 @@ export const isManufacturingContinueFillingStatus = (
 
 /** View-only — eye icon + details UI, no editing. */
 export const isManufacturingViewOnlyStatus = (status: string | null | undefined): boolean => {
-  const api = toOperationStatusApiValue(status);
+  const api = toApiStatusEnum(status);
   return (
     api === "WAITING_FOR_APPROVAL" ||
     api === "WAITING_FOR_COMPLETE_APPROVAL" ||
     api === "APPROVED" ||
+    api === "COMPLETELY_APPROVED" ||
     api === "FINAL_APPROVAL_COMPLETED"
   );
 };
@@ -172,17 +233,13 @@ export const getOperationStatusConfig = (icons: OperationStatusIconMap) => ({
     Icon: icons.waitingForApproval,
     label: OPERATION_STATUS.WAITING_FOR_APPROVAL,
   },
-  [OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL]: {
-    Icon: icons.waitingForApproval,
-    label: OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL,
-  },
   [OPERATION_STATUS.APPROVED]: {
     Icon: icons.approved,
     label: OPERATION_STATUS.APPROVED,
   },
-  [OPERATION_STATUS.FINAL_APPROVAL_COMPLETED]: {
+  [OPERATION_STATUS.COMPLETELY_APPROVED]: {
     Icon: icons.approved,
-    label: OPERATION_STATUS.FINAL_APPROVAL_COMPLETED,
+    label: OPERATION_STATUS.COMPLETELY_APPROVED,
   },
   [OPERATION_STATUS.REJECTED]: {
     Icon: icons.rejected,

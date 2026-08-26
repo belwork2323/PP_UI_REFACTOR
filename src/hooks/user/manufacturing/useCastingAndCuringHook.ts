@@ -201,14 +201,21 @@ export const useCastingAndCuringHook = () => {
   };
 
   const openFormWithResolvedData = useCallback(
-    async (batch: CastingCuringBatch, editMode: boolean) => {
-      const shouldFetchDetails = Boolean(batch.formId);
+    async (
+      batch: CastingCuringBatch,
+      editMode: boolean,
+      options?: { silent?: boolean },
+    ) => {
+      const silent = Boolean(options?.silent);
+      // Silent refresh after draft must always hit form/details (even if list status
+      // is still TO_BE_INITIATED right after the first create).
+      const shouldFetchDetails = silent || Boolean(batch.formId);
 
       let nextBatch = batch;
       let nextFormData = createDefaultCastingCuringFormState();
       let detailsResponse: any = null;
 
-      setLoadingFormDetails(true);
+      if (!silent) setLoadingFormDetails(true);
       try {
         if (batch.batchId) {
           try {
@@ -230,17 +237,18 @@ export const useCastingAndCuringHook = () => {
         );
 
         if (shouldFetchDetails) {
+          const formId = String(batch.formId ?? nextBatch.formId ?? "").trim();
           if (!subDepartmentId) {
             showAlert(STRINGS.MANUFACTURING.CASTING_CURING.SUB_DEPARTMENT_MISSING, "error");
             return;
           }
-          if (!batch.formId) {
+          if (!formId) {
             showAlert(STRINGS.MANUFACTURING.CASTING_CURING.FORM_ID_MISSING, "error");
             return;
           }
 
           detailsResponse = await castingCuringController.fetchFormDetails({
-            formId: batch.formId,
+            formId,
             subDepartmentId,
           });
 
@@ -253,7 +261,16 @@ export const useCastingAndCuringHook = () => {
             return;
           }
 
-          nextBatch = { ...nextBatch, formId: detailsResponse.data.formId || batch.formId };
+          nextBatch = {
+            ...nextBatch,
+            formId: detailsResponse.data.formId || formId,
+            ...(detailsResponse.data.status
+              ? {
+                  ccStatus: String(detailsResponse.data.status),
+                  status: String(detailsResponse.data.status),
+                }
+              : {}),
+          };
           nextFormData = hydrateCastingCuringFormState(
             mapCastingCuringDetailsToFormState(
               detailsResponse.data?.castingCuringDetails ?? detailsResponse.data,
@@ -261,7 +278,7 @@ export const useCastingAndCuringHook = () => {
           );
         }
       } finally {
-        setLoadingFormDetails(false);
+        if (!silent) setLoadingFormDetails(false);
       }
 
       const formMotors = buildAddedMotorsFromForm(nextFormData);
@@ -640,7 +657,7 @@ export const useCastingAndCuringHook = () => {
 
         const nextFormId = response.data?.formId ?? activeBatch.formId ?? null;
         setActiveBatch((prev) => (prev ? { ...prev, formId: nextFormId } : prev));
-        setInitialSnapshot(formSnapshot);
+        setHasSavedDraft(intent === "draft");
 
         if (intent === "draft") {
           showAlert(
@@ -650,7 +667,30 @@ export const useCastingAndCuringHook = () => {
             "success",
             { autoCloseMs: 2200 },
           );
-          setHasSavedDraft(true);
+
+          const formIdForRefresh = String(nextFormId ?? activeBatch.formId ?? "").trim();
+          if (formIdForRefresh) {
+            const statusForBanner = String(
+              response.data?.status ?? activeBatch.ccStatus ?? activeBatch.status ?? "IN_PROGRESS",
+            )
+              .trim()
+              .toUpperCase()
+              .replace(/\s+/g, "_");
+            const stillRejectedEdit = statusForBanner === "REJECTED";
+
+            await openFormWithResolvedData(
+              {
+                ...activeBatch,
+                formId: formIdForRefresh,
+                ccStatus: response.data?.status ?? "IN_PROGRESS",
+                status: response.data?.status ?? "IN_PROGRESS",
+              },
+              stillRejectedEdit,
+              { silent: true },
+            );
+          } else {
+            setInitialSnapshot(formSnapshot);
+          }
         } else {
           showAlert(
             isCreateFlow
@@ -668,7 +708,16 @@ export const useCastingAndCuringHook = () => {
         setActionLoading(false);
       }
     },
-    [activeBatch, formData, formSnapshot, showAlert, listParams, resetFormContext, subDepartmentId],
+    [
+      activeBatch,
+      formData,
+      formSnapshot,
+      openFormWithResolvedData,
+      showAlert,
+      listParams,
+      resetFormContext,
+      subDepartmentId,
+    ],
   );
 
   const handleSaveDraft = useCallback(async () => submitForm("draft"), [submitForm]);
@@ -693,8 +742,13 @@ export const useCastingAndCuringHook = () => {
         return false;
       }
 
+      const normalizedMotorId = normalizeCastingCuringMotorId(motorId);
+      const motor = (formData.motors ?? []).find(
+        (entry) => normalizeCastingCuringMotorId(entry.motorId) === normalizedMotorId,
+      );
+      if (!motor) return false;
 
-      if (hasIncompleteCastingCuringUploads({ motors: formData.motors ?? [] })) {
+      if (hasIncompleteCastingCuringUploads({ motors: [motor] })) {
         showAlert(STRINGS.MANUFACTURING.CASTING_CURING.FILE_UPLOAD_PENDING, "warning");
         return false;
       }
@@ -748,7 +802,6 @@ export const useCastingAndCuringHook = () => {
 
         const nextFormId = response.data?.formId ?? activeBatch.formId ?? null;
         setActiveBatch((prev) => (prev ? { ...prev, formId: nextFormId } : prev));
-        setInitialSnapshot(formSnapshot);
         setHasSavedDraft(true);
 
         setMotorStatusById((prev) => {
@@ -793,6 +846,34 @@ export const useCastingAndCuringHook = () => {
           { autoCloseMs: 2200 },
         );
 
+        if (intent === "draft") {
+          const formIdForRefresh = String(nextFormId ?? activeBatch.formId ?? "").trim();
+          if (formIdForRefresh) {
+            const statusForBanner = String(
+              response.data?.status ?? activeBatch.ccStatus ?? activeBatch.status ?? "IN_PROGRESS",
+            )
+              .trim()
+              .toUpperCase()
+              .replace(/\s+/g, "_");
+            const stillRejectedEdit = statusForBanner === "REJECTED";
+
+            await openFormWithResolvedData(
+              {
+                ...activeBatch,
+                formId: formIdForRefresh,
+                ccStatus: response.data?.status ?? "IN_PROGRESS",
+                status: response.data?.status ?? "IN_PROGRESS",
+              },
+              stillRejectedEdit,
+              { silent: true },
+            );
+          } else {
+            setInitialSnapshot(formSnapshot);
+          }
+        } else {
+          setInitialSnapshot(formSnapshot);
+        }
+
         return true;
       } finally {
         setActionLoading(false);
@@ -804,6 +885,7 @@ export const useCastingAndCuringHook = () => {
       formData,
       formSnapshot,
       motorStatusById,
+      openFormWithResolvedData,
       previousStageGate,
       showAlert,
       subDepartmentId,

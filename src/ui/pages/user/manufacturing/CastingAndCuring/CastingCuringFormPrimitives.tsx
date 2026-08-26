@@ -13,7 +13,7 @@ import {
   alpha,
 } from "@mui/material";
 import { CASTING_CURING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/castingAndCuring_theme";
-import { uniformTableHeaderCellSx } from "../../../../../app/theme/custom_themes/shared/data_table_theme";
+import { uniformTableHeaderCellSx, uniformTableBodyCellSx } from "../../../../../app/theme/custom_themes/shared/data_table_theme";
 import { WorkflowReadOnlyText } from "../../../../components/common/WorkflowReadOnlyText";
 
 const BRAND = CASTING_CURING_BRAND;
@@ -80,11 +80,10 @@ export const castingCuringTableRowSx = (idx: number) => ({
 });
 
 export const castingCuringTableCellSx = {
-  fontSize: "0.82rem",
-  py: 1,
-  px: 1.25,
-  color: BRAND.text,
-  verticalAlign: "middle" as const,
+  ...uniformTableBodyCellSx(
+    { border: BRAND.border, text: BRAND.text },
+    { bodyFontSize: "0.82rem", bodyPaddingY: 1, bodyPaddingX: 1.25 },
+  ),
 };
 
 export const castingCuringHeaderRowSx = {

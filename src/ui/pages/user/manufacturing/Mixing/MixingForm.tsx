@@ -23,6 +23,7 @@ import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/m
 import getMixingTheme, {
   MIXING_BRAND,
 } from "../../../../../app/theme/custom_themes/user/manufacturing/mixing_theme";
+import { createDataTableTheme } from "../../../../../app/theme/custom_themes/shared/data_table_theme";
 import {
   BOWL_ID_OPTIONS,
   collectAssignedBowlIdsByStageType,
@@ -77,6 +78,7 @@ const {
 
 const BRAND = MIXING_BRAND;
 const S = STRINGS.MANUFACTURING.MIXING;
+const dataTable = createDataTableTheme({ ...MIXING_BRAND });
 
 const slideIn = keyframes`from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}`;
 
@@ -97,32 +99,6 @@ const SectionHeader = styled(Box)({
   alignItems: "center",
   justifyContent: "space-between",
 });
-
-const TH = styled(TableCell)({
-  background: "linear-gradient(135deg, #1565C0, #1976D2)",
-  color: "#fff",
-  fontWeight: 700,
-  fontSize: "0.7rem",
-  letterSpacing: "0.07em",
-  textTransform: "uppercase",
-  padding: "11px 14px",
-  whiteSpace: "nowrap",
-  borderBottom: "none",
-  verticalAlign: "middle",
-});
-
-const TD = styled(TableCell)({
-  padding: "10px 12px",
-  borderBottom: "1px solid rgba(213,216,220,0.5)",
-  verticalAlign: "middle",
-});
-
-const tableShellSx = {
-  overflowX: "auto" as const,
-  border: `1px solid ${alpha(BRAND.border, 0.85)}`,
-  borderRadius: 2,
-  background: "#fff",
-};
 
 const PROCESS_PLACEHOLDERS = {
   rpm: S.PLACEHOLDER_RPM,
@@ -320,21 +296,23 @@ const PremixStageCard = ({
       {/* <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub, mb: 1.2 }}>
         {S.SECTION_PROCESS_PARTICULARS_HINT}
       </Typography> */}
-      <TableContainer sx={{ ...tableShellSx, mb: 2.5 }}>
+      <TableContainer sx={{ ...dataTable.tableContainer, overflowX: "auto", mb: 2.5 }}>
         <Table size="small" sx={{ minWidth: 760 }}>
           <TableHead>
             <TableRow>
-              <TH sx={{ minWidth: 320 }}>{S.COL_OPERATION}</TH>
-              <TH>{S.COL_ROTATION}</TH>
-              <TH>{S.COL_TIME}</TH>
-              <TH>{S.COL_TEMP}</TH>
-              <TH>{S.COL_VACUUM}</TH>
+              <TableCell sx={{ ...dataTable.tableHeaderCell(true), minWidth: 320 }}>
+                {S.COL_OPERATION}
+              </TableCell>
+              <TableCell sx={dataTable.tableHeaderCell(false)}>{S.COL_ROTATION}</TableCell>
+              <TableCell sx={dataTable.tableHeaderCell(false)}>{S.COL_TIME}</TableCell>
+              <TableCell sx={dataTable.tableHeaderCell(false)}>{S.COL_TEMP}</TableCell>
+              <TableCell sx={dataTable.tableHeaderCell(false)}>{S.COL_VACUUM}</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {premix.processParticulars.length === 0 ? (
               <TableRow>
-                <TD colSpan={5}>
+                <TableCell colSpan={5} sx={dataTable.tableCell}>
                   <Typography
                     sx={{
                       fontSize: "0.78rem",
@@ -344,30 +322,17 @@ const PremixStageCard = ({
                   >
                     {S.PROCESS_PARTICULARS_EMPTY}
                   </Typography>
-                </TD>
+                </TableCell>
               </TableRow>
             ) : (
               premix.processParticulars.map((row, rowIdx) => (
-                <TableRow
-                  key={row.operationId}
-                  sx={{
-                    background: rowIdx % 2 === 0 ? "#fff" : alpha(BRAND.surface, 0.55),
-                  }}
-                >
-                  <TD>
-                    <Typography
-                      sx={{
-                        fontWeight: 700,
-                        fontSize: "0.78rem",
-                        color: BRAND.text,
-                      }}
-                    >
-                      {row.operation || `Operation ${row.operationId}`}
-                    </Typography>
-                  </TD>
+                <TableRow key={row.operationId} sx={dataTable.tableRow(rowIdx)}>
+                  <TableCell sx={{ ...dataTable.tableCell, fontWeight: 700 }}>
+                    {row.operation || `Operation ${row.operationId}`}
+                  </TableCell>
 
                   {(["rpm", "time", "temp", "vacuum"] as const).map((field) => (
-                    <TD key={field}>
+                    <TableCell key={field} sx={dataTable.tableCell}>
                       <MixingTableInput
                         value={row[field]}
                         placeholder={PROCESS_PLACEHOLDERS[field]}
@@ -376,7 +341,7 @@ const PremixStageCard = ({
                           onProcessChange(premix.premixNo, row.operationId, field, value)
                         }
                       />
-                    </TD>
+                    </TableCell>
                   ))}
                 </TableRow>
               ))
@@ -535,22 +500,24 @@ const FinalMixStageCard = ({
         {S.SECTION_PROCESS_PARTICULARS_HINT}
       </Typography> */}
 
-      <TableContainer sx={{ ...tableShellSx, mb: 2.5 }}>
+      <TableContainer sx={{ ...dataTable.tableContainer, overflowX: "auto", mb: 2.5 }}>
         <Table size="small" sx={{ minWidth: 760 }}>
           <TableHead>
             <TableRow>
-              <TH sx={{ minWidth: 320 }}>{S.COL_OPERATION}</TH>
-              <TH>{S.COL_ROTATION}</TH>
-              <TH>{S.COL_TIME}</TH>
-              <TH>{S.COL_TEMP}</TH>
-              <TH>{S.COL_VACUUM}</TH>
+              <TableCell sx={{ ...dataTable.tableHeaderCell(true), minWidth: 320 }}>
+                {S.COL_OPERATION}
+              </TableCell>
+              <TableCell sx={dataTable.tableHeaderCell(false)}>{S.COL_ROTATION}</TableCell>
+              <TableCell sx={dataTable.tableHeaderCell(false)}>{S.COL_TIME}</TableCell>
+              <TableCell sx={dataTable.tableHeaderCell(false)}>{S.COL_TEMP}</TableCell>
+              <TableCell sx={dataTable.tableHeaderCell(false)}>{S.COL_VACUUM}</TableCell>
             </TableRow>
           </TableHead>
 
           <TableBody>
             {entry.processParticulars.length === 0 ? (
               <TableRow>
-                <TD colSpan={5}>
+                <TableCell colSpan={5} sx={dataTable.tableCell}>
                   <Typography
                     sx={{
                       fontSize: "0.78rem",
@@ -560,30 +527,17 @@ const FinalMixStageCard = ({
                   >
                     {S.PROCESS_PARTICULARS_EMPTY}
                   </Typography>
-                </TD>
+                </TableCell>
               </TableRow>
             ) : (
               entry.processParticulars.map((row, rowIdx) => (
-                <TableRow
-                  key={row.operationId}
-                  sx={{
-                    background: rowIdx % 2 === 0 ? "#fff" : alpha(BRAND.surface, 0.55),
-                  }}
-                >
-                  <TD>
-                    <Typography
-                      sx={{
-                        fontWeight: 700,
-                        fontSize: "0.78rem",
-                        color: BRAND.text,
-                      }}
-                    >
-                      {row.operation || `Operation ${row.operationId}`}
-                    </Typography>
-                  </TD>
+                <TableRow key={row.operationId} sx={dataTable.tableRow(rowIdx)}>
+                  <TableCell sx={{ ...dataTable.tableCell, fontWeight: 700 }}>
+                    {row.operation || `Operation ${row.operationId}`}
+                  </TableCell>
 
                   {(["rpm", "time", "temp", "vacuum"] as const).map((field) => (
-                    <TD key={field}>
+                    <TableCell key={field} sx={dataTable.tableCell}>
                       <MixingTableInput
                         value={row[field]}
                         placeholder={PROCESS_PLACEHOLDERS[field]}
@@ -592,7 +546,7 @@ const FinalMixStageCard = ({
                           onProcessChange(entry.mixNo, row.operationId, field, value)
                         }
                       />
-                    </TD>
+                    </TableCell>
                   ))}
                 </TableRow>
               ))

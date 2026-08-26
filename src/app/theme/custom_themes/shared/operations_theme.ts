@@ -312,23 +312,29 @@ export const getOperationsTheme = (mode = "light") => {
           border: alpha(palette.warn, 0.3),
           label: "Waiting for Approval",
         },
-        ["Waiting for Complete Approval"]: {
-          color: palette.warn,
-          bg: alpha(palette.warn, 0.1),
-          border: alpha(palette.warn, 0.3),
-          label: "Waiting for Complete Approval",
-        },
         ["Approved"]: {
           color: palette.success,
           bg: alpha(palette.success, 0.1),
           border: alpha(palette.success, 0.25),
           label: "Approved",
         },
+        ["Completely Approved"]: {
+          color: palette.success,
+          bg: alpha(palette.success, 0.1),
+          border: alpha(palette.success, 0.25),
+          label: "Completely Approved",
+        },
         ["Final Approval Completed"]: {
           color: palette.success,
           bg: alpha(palette.success, 0.1),
           border: alpha(palette.success, 0.25),
           label: "Final Approval Completed",
+        },
+        ["Waiting For Complete Approval"]: {
+          color: palette.warn,
+          bg: alpha(palette.warn, 0.1),
+          border: alpha(palette.warn, 0.3),
+          label: "Waiting For Complete Approval",
         },
         ["Rejected"]: {
           color: palette.danger,

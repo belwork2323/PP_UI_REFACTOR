@@ -25,7 +25,7 @@ const MOTOR_QC_DIVISIONS = new Set([
   "WEIGHTMENT",
 ]);
 
-const APPROVED_STATUSES = new Set(["APPROVED", "FINAL_APPROVAL_COMPLETED"]);
+const APPROVED_STATUSES = new Set(["APPROVED", "COMPLETELY_APPROVED"]);
 
 type StageProgressEntry = {
   departmentName?: string | null;

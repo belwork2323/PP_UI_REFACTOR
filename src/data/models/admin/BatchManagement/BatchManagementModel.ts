@@ -405,6 +405,12 @@ export class BatchListItemModel {
   currentStage: unknown[] | null;
   stageProgress: unknown[] | null;
 
+  /**
+   * QC Division statuses from batch details (when present).
+   * Shape: { divisionId, divisionName, divisionSubmissionType, status }[]
+   */
+  divisionStatuses: unknown[] | null;
+
   constructor(data: Record<string, any>) {
     this.id = data.id ?? null;
     this.batchId = data.batchId ?? "";
@@ -485,6 +491,7 @@ export class BatchListItemModel {
       : null;
     this.currentStage = Array.isArray(data.currentStage) ? data.currentStage : null;
     this.stageProgress = Array.isArray(data.stageProgress) ? data.stageProgress : null;
+    this.divisionStatuses = Array.isArray(data.divisionStatuses) ? data.divisionStatuses : null;
     this.mixingCycle =
       data.mixingCycle && typeof data.mixingCycle === "object" ? data.mixingCycle : null;
     this.objective = data.objective ?? null;

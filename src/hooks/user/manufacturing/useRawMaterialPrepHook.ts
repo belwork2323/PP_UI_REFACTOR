@@ -624,152 +624,156 @@ export const useRawMaterialPrepHook = () => {
       liquidMaterials,
     );
 
-  const openFormWithResolvedData = useCallback(async (batch: RawMaterialPrepBatch, editMode: boolean) => {
-    if (!batch.batchId) {
-      showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.BATCH_ID_MISSING, "error");
-      return;
-    }
-
-    setLoadingFormDetails(true);
-
-    try {
-      const { identificationSheet: sheet, numberOfPremix: premixCount } =
-        await loadBatchIdentificationSheet(batch.batchId);
-
-      if (!sheet || premixCount < 1) {
-        showAlert(
-          "Identification sheet is missing or has no premix count for this batch.",
-          "error",
-        );
+  const openFormWithResolvedData = useCallback(
+    async (
+      batch: RawMaterialPrepBatch,
+      editMode: boolean,
+      options?: { silent?: boolean },
+    ) => {
+      if (!batch.batchId) {
+        showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.BATCH_ID_MISSING, "error");
         return;
       }
 
-      const batchKey = batch.batchId || "__form__";
-      const [resolvedSolidMaterials, resolvedLiquidMaterials] = await Promise.all([
-        loadMaterialsByType("SOLID", { silent: true }),
-        loadMaterialsByType("LIQUID", { silent: true }),
-      ]);
+      const silent = Boolean(options?.silent);
+      if (!silent) setLoadingFormDetails(true);
 
-      let nextBatch = batch;
-      let nextAddedPremixSelections: AddedPremixSelection[] = [];
-      let nextPremixSessions: Record<string, PremixSession> = {};
-      let nextWeightmentSheet = createEmptyWeightmentSheet();
-      let nextPremixStatusByNo: Record<number, PremixStatusMeta> = {};
-      for (let i = 1; i <= premixCount; i++) {
-        nextPremixStatusByNo[i] = { premixSubmissionStatus: "TO_BE_INITIATED" };
-      }
+      try {
+        const { identificationSheet: sheet, numberOfPremix: premixCount } =
+          await loadBatchIdentificationSheet(batch.batchId);
 
-      const shouldFetchFormDetails = Boolean(String(batch.formId ?? "").trim());
-
-      if (shouldFetchFormDetails) {
-        const detailsResponse = await rawMaterialPreparationController.fetchFormDetails({
-          formId: batch.formId,
-        });
-
-        if (!detailsResponse?.success || !detailsResponse?.data) {
-          const fallback =
-            detailsResponse?.statusCode === 404
-              ? STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.DETAILS_NOT_FOUND
-              : STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.DETAILS_FETCH_ERROR;
-          showAlert(getErrorMessage(detailsResponse, fallback), "error");
+        if (!sheet || premixCount < 1) {
+          showAlert(
+            "Identification sheet is missing or has no premix count for this batch.",
+            "error",
+          );
           return;
         }
 
-        const details = detailsResponse.data;
-        nextBatch = {
-          ...batch,
-          formId: details.formId || batch.formId,
-        };
-        const mapped = mapPreparationDetailsFromApi(
-          details,
-          sheet,
-          premixCount,
-          resolvedSolidMaterials as MaterialsListItem[],
-          resolvedLiquidMaterials as MaterialsListItem[],
-        );
-        nextAddedPremixSelections = mergePremixSelectionsWithSheet(
-          mapped.addedPremixSelections,
-          sheet,
-          premixCount,
-          resolvedSolidMaterials,
-          resolvedLiquidMaterials,
-        );
-        nextPremixSessions = mapped.premixSessions;
-        nextWeightmentSheet = mapped.weightmentSheet;
-        nextPremixStatusByNo = mapped.premixStatusByNo;
-      } else {
-        nextAddedPremixSelections = buildPremixMaterialSelectionsFromSheet(
-          sheet,
-          premixCount,
-          resolvedSolidMaterials,
-          resolvedLiquidMaterials,
-        );
-        const weightmentFromBatch = sheet.metadata?.rawMaterialPreparation?.weightmentSheet;
-        if (weightmentFromBatch) {
-          // New form: seed rows from batch metadata, but never auto-enable compare.
-          nextWeightmentSheet = {
-            ...mapWeightmentSheetFromApi(weightmentFromBatch),
-            validation: {
-              ...createEmptyWeightmentSheet().validation,
-            },
-          };
+        const batchKey = batch.batchId || "__form__";
+        const [resolvedSolidMaterials, resolvedLiquidMaterials] = await Promise.all([
+          loadMaterialsByType("SOLID", { silent: true }),
+          loadMaterialsByType("LIQUID", { silent: true }),
+        ]);
+
+        let nextBatch = batch;
+        let nextAddedPremixSelections: AddedPremixSelection[] = [];
+        let nextPremixSessions: Record<string, PremixSession> = {};
+        let nextWeightmentSheet = createEmptyWeightmentSheet();
+        let nextPremixStatusByNo: Record<number, PremixStatusMeta> = {};
+        for (let i = 1; i <= premixCount; i++) {
+          nextPremixStatusByNo[i] = { premixSubmissionStatus: "TO_BE_INITIATED" };
         }
+
+        const shouldFetchFormDetails = Boolean(String(batch.formId ?? "").trim());
+
+        if (shouldFetchFormDetails) {
+          const detailsResponse = await rawMaterialPreparationController.fetchFormDetails({
+            formId: batch.formId,
+          });
+
+          if (!detailsResponse?.success || !detailsResponse?.data) {
+            const fallback =
+              detailsResponse?.statusCode === 404
+                ? STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.DETAILS_NOT_FOUND
+                : STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.DETAILS_FETCH_ERROR;
+            showAlert(getErrorMessage(detailsResponse, fallback), "error");
+            return;
+          }
+
+          const details = detailsResponse.data;
+          nextBatch = {
+            ...batch,
+            formId: details.formId || batch.formId,
+          };
+          const mapped = mapPreparationDetailsFromApi(
+            details,
+            sheet,
+            premixCount,
+            resolvedSolidMaterials as MaterialsListItem[],
+            resolvedLiquidMaterials as MaterialsListItem[],
+          );
+          nextAddedPremixSelections = mergePremixSelectionsWithSheet(
+            mapped.addedPremixSelections,
+            sheet,
+            premixCount,
+            resolvedSolidMaterials,
+            resolvedLiquidMaterials,
+          );
+          nextPremixSessions = mapped.premixSessions;
+          nextWeightmentSheet = mapped.weightmentSheet;
+          nextPremixStatusByNo = mapped.premixStatusByNo;
+        } else {
+          nextAddedPremixSelections = buildPremixMaterialSelectionsFromSheet(
+            sheet,
+            premixCount,
+            resolvedSolidMaterials,
+            resolvedLiquidMaterials,
+          );
+          const weightmentFromBatch = sheet.metadata?.rawMaterialPreparation?.weightmentSheet;
+          if (weightmentFromBatch) {
+            // New form: seed rows from batch metadata, but never auto-enable compare.
+            nextWeightmentSheet = {
+              ...mapWeightmentSheetFromApi(weightmentFromBatch),
+              validation: {
+                ...createEmptyWeightmentSheet().validation,
+              },
+            };
+          }
+        }
+
+        nextPremixSessions = normalizePremixSessionKeys(
+          buildPremixMaterialSessionsFromSelections(
+            nextAddedPremixSelections,
+            resolvedSolidMaterials,
+            normalizePremixSessionKeys(nextPremixSessions),
+          ),
+        );
+
+        const snapshot = JSON.stringify({
+          addedPremixSelections: nextAddedPremixSelections,
+          premixSessions: nextPremixSessions,
+          weightmentSheet: nextWeightmentSheet,
+        });
+
+        setActiveBatch(nextBatch);
+        setIsEditMode(editMode);
+        setNumberOfPremix(premixCount);
+        setIdentificationSheet(sheet);
+        setAvailableSolidMaterials(resolvedSolidMaterials);
+        setAvailableLiquidMaterials(resolvedLiquidMaterials);
+        setSolidMaterialsCacheByBatchKey((prev) => ({
+          ...prev,
+          [batchKey]: resolvedSolidMaterials,
+        }));
+        setLiquidMaterialsCacheByBatchKey((prev) => ({
+          ...prev,
+          [batchKey]: resolvedLiquidMaterials,
+        }));
+        setAddedPremixSelectionsByBatch((prev) => ({
+          ...prev,
+          [batchKey]: nextAddedPremixSelections,
+        }));
+        setPremixSessionsByBatch((prev) => ({
+          ...prev,
+          [batchKey]: nextPremixSessions,
+        }));
+        setWeightmentSheetByBatch((prev) => ({
+          ...prev,
+          [batchKey]: nextWeightmentSheet,
+        }));
+        setPremixStatusByNoByBatch((prev) => ({
+          ...prev,
+          [batchKey]: nextPremixStatusByNo,
+        }));
+        setInitialSnapshot(snapshot);
+        setView("form");
+      } finally {
+        if (!silent) setLoadingFormDetails(false);
       }
-
-      nextPremixSessions = normalizePremixSessionKeys(
-        buildPremixMaterialSessionsFromSelections(
-          nextAddedPremixSelections,
-          resolvedSolidMaterials,
-          normalizePremixSessionKeys(nextPremixSessions),
-        ),
-      );
-
-      const snapshot = JSON.stringify({
-        addedPremixSelections: nextAddedPremixSelections,
-        premixSessions: nextPremixSessions,
-        weightmentSheet: nextWeightmentSheet,
-      });
-
-      setActiveBatch(nextBatch);
-      setIsEditMode(editMode);
-      setNumberOfPremix(premixCount);
-      setIdentificationSheet(sheet);
-      setAvailableSolidMaterials(resolvedSolidMaterials);
-      setAvailableLiquidMaterials(resolvedLiquidMaterials);
-      setSolidMaterialsCacheByBatchKey((prev) => ({
-        ...prev,
-        [batchKey]: resolvedSolidMaterials,
-      }));
-      setLiquidMaterialsCacheByBatchKey((prev) => ({
-        ...prev,
-        [batchKey]: resolvedLiquidMaterials,
-      }));
-      setAddedPremixSelectionsByBatch((prev) => ({
-        ...prev,
-        [batchKey]: nextAddedPremixSelections,
-      }));
-      setPremixSessionsByBatch((prev) => ({
-        ...prev,
-        [batchKey]: nextPremixSessions,
-      }));
-      setWeightmentSheetByBatch((prev) => ({
-        ...prev,
-        [batchKey]: nextWeightmentSheet,
-      }));
-      setPremixStatusByNoByBatch((prev) => ({
-        ...prev,
-        [batchKey]: nextPremixStatusByNo,
-      }));
-      setInitialSnapshot(snapshot);
-      setView("form");
-    } finally {
-      setLoadingFormDetails(false);
-    }
-  }, [
-    loadBatchIdentificationSheet,
-    loadMaterialsByType,
-    showAlert,
-  ]);
+    },
+    [loadBatchIdentificationSheet, loadMaterialsByType, showAlert],
+  );
 
   const handleFillForm = useCallback(
     async (batch: RawMaterialPrepBatch) => await openFormWithResolvedData(batch, false),
@@ -1159,6 +1163,7 @@ export const useRawMaterialPrepHook = () => {
               status: response.data?.status ?? activeBatch.status,
             },
             stillRejectedEdit,
+            { silent: true },
           );
         }
       } else {

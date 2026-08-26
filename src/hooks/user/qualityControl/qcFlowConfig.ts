@@ -128,6 +128,10 @@ const resolveDivisionFlowKey = (divisionName: string): string => {
     .replace(/[^A-Z0-9_]/g, "");
 };
 
+/** Public alias — map API divisionName (or similar) onto a QC flow key. */
+export const resolveQcDivisionFlowKeyFromName = (divisionName: string): string =>
+  resolveDivisionFlowKey(divisionName);
+
 const resolveTypeValue = (typeName: string): string => {
   const normalized = normalizeQcNameKey(typeName);
   if (QC_TYPE_NAME_TO_VALUE[normalized]) return QC_TYPE_NAME_TO_VALUE[normalized];

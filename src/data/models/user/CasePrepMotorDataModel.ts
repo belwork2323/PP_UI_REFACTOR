@@ -4,6 +4,7 @@ import {
   parseFileRefs,
   type FileRef,
 } from "../common/FileUploadModel";
+import { formatToUiDate } from "../../../utils/dateUtils";
 
 export type CasePrepOption = { value: string; label: string };
 
@@ -140,7 +141,6 @@ export type CasePrepLinerCoatingOperationData = {
   qualifyingSubscaleBatchNo: string;
   qualificationParameters: CasePrepQualificationParameterRow[];
   linerApplicationLog: CasePrepParameterRow[];
-  /** UI-only; folded into linerApplicationLog Date row on save (not an API field). */
   linerCoatingDate?: string;
   rh?: string;
 };
@@ -378,7 +378,6 @@ export const createEmptyCasePrepMotorData = (): CasePrepMotorData => ({
     otherDuration: "",
     temperatureDuration: [],
     preHeatingMonitoring: createEmptyPreHeatingMonitoring(),
-    /** UI-only; folded into preHeatingMonitoring Date row on save (not an API field). */
     preHeatingDate: "",
   },
   linerCoatingOperation: {
@@ -549,6 +548,24 @@ const toApiDateOnly = (value: unknown): string => {
   return isoDate ? isoDate[1] : raw;
 };
 
+/** Prefer dedicated date field; else first monitoring/log row named "Date". */
+const resolveSectionDateForUi = (
+  dedicatedDate: unknown,
+  parameterRows: unknown,
+): string => {
+  const fromField = formatToUiDate(str(dedicatedDate));
+  if (fromField) return fromField;
+
+  if (!Array.isArray(parameterRows)) return "";
+  for (const entry of parameterRows) {
+    if (!entry || typeof entry !== "object") continue;
+    const row = entry as Record<string, unknown>;
+    if (str(row.parameter).trim().toLowerCase() !== "date") continue;
+    return formatToUiDate(str(row.value));
+  }
+  return "";
+};
+
 /** Copy UI date into the first parameter row named "Date" when that cell is empty. */
 const applyDateToParameterRows = (
   rows: CasePrepParameterRow[],
@@ -687,8 +704,8 @@ export const buildCasePrepMotorDetailsPayload = (
   const neMotorPastingDateTime = toApiInstant(synced.bellowBonding.neMotorPastingDateTime);
   const tceCleaningDateTime = toApiInstant(synced.tceCleaning.tceCleaningDateTime);
 
-  // UI-only date fields are not on the API DTO (FAIL_ON_UNKNOWN_PROPERTIES).
-  // Fold them into the first "Date" monitoring / application-log row when that cell is empty.
+  // Fold UI dates into monitoring/application-log "Date" rows when empty (display sync).
+  // preHeatingDate / linerCoatingDate are also sent as dedicated API fields.
   const preHeatingDate = toApiDateOnly(synced.preHeating.preHeatingDate);
   const linerCoatingDate = toApiDateOnly(synced.linerCoatingOperation.linerCoatingDate);
   const preHeatingMonitoring = applyDateToParameterRows(
@@ -729,13 +746,15 @@ export const buildCasePrepMotorDetailsPayload = (
       vacuumBaggingApplied,
       ...(vacuumBaggingApplied === "YES" && vacuumApplied !== undefined ? { vacuumApplied } : {}),
       preHeatingRecipe: recipe,
-      // Do not send otherTemperature / otherDuration / preHeatingDate — not on API DTO.
+      ...(preHeatingDate ? { preHeatingDate } : {}),
+      // Do not send otherTemperature / otherDuration — not on API DTO.
       temperatureDuration: parameterRowsForPayload(synced.preHeating.temperatureDuration),
       preHeatingMonitoring: parameterRowsForPayload(preHeatingMonitoring),
     },
     linerCoatingOperation: {
       linerType,
-      // Do not send otherLinerType / linerCoatingDate — not on API DTO.
+      // Do not send otherLinerType — not on API DTO (custom value sent as linerType).
+      ...(linerCoatingDate ? { linerCoatingDate } : {}),
       batchNo: str(synced.linerCoatingOperation.batchNo).trim(),
       ...(batchSize !== undefined ? { batchSize } : {}),
       premixIngredients: ingredientRowsForPayload(synced.linerCoatingOperation.premixIngredients),
@@ -1055,7 +1074,10 @@ export const parseCasePrepMotorDataFromApi = (
         empty.preHeating.preHeatingMonitoring,
         preHeating.preHeatingMonitoring,
       ),
-      preHeatingDate: str(preHeating.preHeatingDate ?? ""),
+      preHeatingDate: resolveSectionDateForUi(
+        preHeating.preHeatingDate,
+        preHeating.preHeatingMonitoring,
+      ),
     },
     linerCoatingOperation: {
       linerType: str(liner.linerType ?? ""),
@@ -1070,7 +1092,10 @@ export const parseCasePrepMotorDataFromApi = (
         empty.linerCoatingOperation.linerApplicationLog,
         liner.linerApplicationLog,
       ),
-      linerCoatingDate: str(liner.linerCoatingDate ?? ""),
+      linerCoatingDate: resolveSectionDateForUi(
+        liner.linerCoatingDate,
+        liner.linerApplicationLog,
+      ),
       rh: str(liner.rh ?? ""),
     },
     dispatchToCasting: {

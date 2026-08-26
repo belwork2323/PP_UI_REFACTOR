@@ -101,9 +101,9 @@ const RawMaterialPreparationDetailsView = ({ row, data, loading, onBack }: RawMa
               }
               statusConfig={{
                 ...statusConfig,
-                [RM.PREMIX_STATUS_FINAL_APPROVAL_COMPLETED]: {
+                [RM.PREMIX_STATUS_COMPLETELY_APPROVED]: {
                   Icon: CheckCircleRoundedIcon,
-                  label: RM.PREMIX_STATUS_FINAL_APPROVAL_COMPLETED,
+                  label: RM.PREMIX_STATUS_COMPLETELY_APPROVED,
                   ...dt.bannerStatusConfig["Approved"],
                 },
               }}

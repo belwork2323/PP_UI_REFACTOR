@@ -19,7 +19,7 @@ import {
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { SchemaFormValues } from "../../../../../schema-engine";
 import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
-import NdtFileField from "../NDT/NdtFileField";
+import QCDivisionFileField from "./QCDivisionFileField";
 import {
   QC_PROPELLANT_AVG_COLUMN,
   QC_PROPELLANT_ROW_UPLOAD_FIELD,
@@ -341,7 +341,7 @@ const PropertyTable = ({
                   ) : null}
                   {includeRowUpload ? (
                     <TableCell sx={bodyCellSx}>
-                      <NdtFileField
+                      <QCDivisionFileField
                         files={uploadFiles}
                         onChange={(next) =>
                           updateCell(index, QC_PROPELLANT_ROW_UPLOAD_FIELD, next)
@@ -350,7 +350,6 @@ const PropertyTable = ({
                         readOnly={readOnly}
                         multiple={false}
                         acceptMode="image"
-                        subDeptSlug="qc-division"
                         compact
                         emptyLabel="Upload"
                       />
@@ -633,14 +632,13 @@ const QCPropellantMotorPanel = ({
               <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.primary, mb: 0.75 }}>
                 Upload Graph
               </Typography>
-              <NdtFileField
+              <QCDivisionFileField
                 files={mechanicalGraph}
                 onChange={(next) => onChange(setPropellantMechanicalGraph(values, next))}
                 disabled={inputsDisabled}
                 readOnly={readOnly}
                 multiple={false}
                 acceptMode="image"
-                subDeptSlug="qc-division"
                 emptyLabel="Upload Graph"
               />
             </Box>

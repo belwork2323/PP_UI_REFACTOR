@@ -17,7 +17,7 @@ import type {
 } from "../../../schema-engine";
 import { schemaValuesHaveUserData } from "../../../schema-engine/state/formState";
 import { formatToIsoDateInput } from "../../../utils/dateUtils";
-import { OPERATION_STATUS } from "../../../hooks/operationStatus";
+import { OPERATION_STATUS, formatApiStatusForDisplay } from "../../../hooks/operationStatus";
 import { normalizeSubdepartmentBatchStatus } from "./SubdepartmentBatchModel";
 import {
   formatDateTimeForApi,
@@ -107,38 +107,27 @@ export const canApproverActionEntireRawMaterialPrepForm = (params: {
   if (
     statusUpper === "APPROVED" ||
     statusUpper === "REJECTED" ||
-    statusUpper === "FINAL_APPROVAL_COMPLETED" ||
+    statusUpper === "COMPLETELY_APPROVED" ||
     status === OPERATION_STATUS.APPROVED ||
     status === OPERATION_STATUS.REJECTED ||
-    status === OPERATION_STATUS.FINAL_APPROVAL_COMPLETED
+    status === OPERATION_STATUS.COMPLETELY_APPROVED
   ) {
     return false;
   }
 
   return (
+    statusUpper === "WAITING_FOR_APPROVAL" ||
     statusUpper === "WAITING_FOR_COMPLETE_APPROVAL" ||
-    status === OPERATION_STATUS.WAITING_FOR_COMPLETE_APPROVAL ||
-    status === OPERATION_STATUS.WAITING_FOR_APPROVAL ||
-    statusUpper === "WAITING_FOR_APPROVAL"
+    status === OPERATION_STATUS.WAITING_FOR_APPROVAL
   );
 };
 
 export const getPremixStatusLabel = (
   status: PremixSubmissionStatus | string | undefined,
 ): string => {
-  const normalized = String(status ?? "")
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "_");
-  const labels: Record<string, string> = {
-    TO_BE_INITIATED: "To Be Initiated",
-    IN_PROGRESS: "In Progress",
-    WAITING_FOR_APPROVAL: "Waiting for Approval",
-    APPROVED: "Approved",
-    REJECTED: "Rejected",
-    FINAL_APPROVAL_COMPLETED: "Final Approval Completed",
-  };
-  return labels[normalized] ?? "To Be Initiated";
+  const trimmed = String(status ?? "").trim();
+  if (!trimmed) return "To Be Initiated";
+  return formatApiStatusForDisplay(trimmed) || "To Be Initiated";
 };
 
 /** Batch-level workflow status from details/list APIs (includes partial approval). */

@@ -22,7 +22,10 @@ import { STRINGS } from "@/app/config/strings";
 import { useThemeStore } from "@/app/store/themeStore";
 import getQualityControlTheme from "@/app/theme/custom_themes/user/qualityControl/qualityControl_theme";
 import { getBatchListShellTheme } from "@/app/theme/custom_themes/shared/batchListShell_theme";
-import { uniformTableHeaderCellSx } from "@/app/theme/custom_themes/shared/data_table_theme";
+import {
+  uniformTableBodyCellSx,
+  uniformTableHeaderCellSx,
+} from "@/app/theme/custom_themes/shared/data_table_theme";
 import {
   getOperationStatusConfig,
   getOperationStatusFilterLabel,
@@ -189,13 +192,15 @@ const BemMotorListTable: React.FC<BemMotorListTableProps> = ({
   );
 
   const tdSx = useMemo(
-    () => ({
-      padding: "10px 14px",
-      fontSize: fonts.size.sm,
-      borderBottom: `1px solid ${alpha(p?.border || "#000", 0.6)}`,
-      color: p?.text || "#000",
-      verticalAlign: "middle" as const,
-    }),
+    () =>
+      uniformTableBodyCellSx(
+        { border: p?.border || "#D5D8DC", text: p?.text || "#000" },
+        {
+          bodyFontSize: fonts.size.sm,
+          bodyPaddingY: "10px",
+          bodyPaddingX: "14px",
+        },
+      ),
     [p],
   );
 

@@ -72,6 +72,7 @@ const QCTrimmingMotorPanel = ({
         readOnly={readOnly}
         disabled={disabled}
         allowStructureActions={false}
+        fileSubDeptSlug="qc-division"
         theme={{
           palette: {
             primary: BRAND.primary,

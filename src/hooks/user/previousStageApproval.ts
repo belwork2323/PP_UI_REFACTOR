@@ -90,7 +90,7 @@ const PREDECESSOR_BY_SLUG: Record<
 
 const APPROVED_UNIT_STATUSES = new Set([
   "APPROVED",
-  "FINAL_APPROVAL_COMPLETED",
+  "COMPLETELY_APPROVED",
 ]);
 
 const normalizeSlug = (slug?: string | null) =>
@@ -108,7 +108,7 @@ const isApprovedUnitStatus = (status: unknown) => {
   const normalized = normalizeSubdepartmentBatchStatus(status);
   return (
     normalized === OPERATION_STATUS.APPROVED ||
-    normalized === OPERATION_STATUS.FINAL_APPROVAL_COMPLETED
+    normalized === OPERATION_STATUS.COMPLETELY_APPROVED
   );
 };
 

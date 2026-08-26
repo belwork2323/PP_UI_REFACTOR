@@ -20,6 +20,10 @@ import FormInput from "@/ui/components/common/FormInput";
 import DateField from "@/ui/components/common/DateField";
 import { STRINGS } from "../../../../../app/config/strings";
 import { TRIMMING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/trimming_theme";
+import {
+  uniformTableBodyCellSx,
+  uniformTableHeaderCellSx,
+} from "../../../../../app/theme/custom_themes/shared/data_table_theme";
 import TrimmingFileField from "./TrimmingFileField";
 
 const S = STRINGS.MANUFACTURING.TRIMMING;
@@ -41,6 +45,7 @@ const actionButtonSx = (primary: string) => ({
   },
 });
 
+/** `fileSubDeptSlug` defaults to manufacturing `trimming`; QC Division passes `qc-division`. */
 export const TrimmingCommonTable = ({
   activeMotorSession,
   activeMotorEntry,
@@ -49,6 +54,7 @@ export const TrimmingCommonTable = ({
   disabled = false,
   allowStructureActions = true,
   theme,
+  fileSubDeptSlug = "trimming",
 }) => {
   const palette = theme?.palette ?? {};
   const colors = useMemo(
@@ -99,44 +105,36 @@ export const TrimmingCommonTable = ({
 
   const thSx = readOnly
     ? {
-        fontSize: "0.65rem",
-        fontWeight: 800,
-        letterSpacing: "0.02em",
-        textTransform: "uppercase" as const,
-        color: colors.primary,
-        background: alpha(colors.primaryLight, 0.08),
-        whiteSpace: "nowrap" as const,
-        py: 0.5,
-        px: 1,
-        verticalAlign: "middle" as const,
-        border: `1px solid ${alpha(colors.primary, 0.12)}`,
+        ...uniformTableHeaderCellSx(colors.primary, colors.primaryLight, {
+          headerFontSize: "0.65rem",
+          headerLetterSpacing: "0.02em",
+          headerPaddingY: 0.5,
+          headerPaddingX: 1,
+        }),
       }
-    : {
-        background: `linear-gradient(135deg, ${colors.primary}, ${colors.primaryLight})`,
-        color: "#fff",
-        fontWeight: 700,
-        fontSize: "0.68rem",
-        letterSpacing: "0.06em",
-        textTransform: "uppercase" as const,
-        padding: "10px 12px",
-        whiteSpace: "nowrap" as const,
-        border: `1px solid ${alpha("#fff", 0.22)}`,
-        verticalAlign: "middle" as const,
-      };
+    : uniformTableHeaderCellSx(colors.primary, colors.primaryLight, {
+        headerFontSize: "0.68rem",
+        headerLetterSpacing: "0.06em",
+        headerPaddingY: "10px",
+        headerPaddingX: "12px",
+      });
 
   const tdSx = readOnly
-    ? {
-        fontSize: "0.72rem",
-        py: 0.5,
-        px: 1,
-        verticalAlign: "middle" as const,
-        border: `1px solid ${alpha(colors.primary, 0.12)}`,
-      }
-    : {
-        padding: "8px 10px",
-        border: `1px solid ${alpha(colors.primary, 0.18)}`,
-        verticalAlign: "middle" as const,
-      };
+    ? uniformTableBodyCellSx(
+        { border: colors.border, text: colors.text },
+        {
+          bodyFontSize: "0.72rem",
+          bodyPaddingY: 0.5,
+          bodyPaddingX: 1,
+        },
+      )
+    : uniformTableBodyCellSx(
+        { border: colors.border, text: colors.text },
+        {
+          bodyPaddingY: "8px",
+          bodyPaddingX: "10px",
+        },
+      );
 
   const tableShellSx = {
     border: `1px solid ${alpha(colors.primary, readOnly ? 0.12 : 0.18)}`,
@@ -830,6 +828,7 @@ export const TrimmingCommonTable = ({
                   multiple
                   acceptMode="imageVideoPdf"
                   readOnly
+                  subDeptSlug={fileSubDeptSlug}
                 />
               </>
             ) : (
@@ -859,6 +858,7 @@ export const TrimmingCommonTable = ({
                   multiple
                   acceptMode="imageVideoPdf"
                   disabled={inputsLocked}
+                  subDeptSlug={fileSubDeptSlug}
                 />
               </>
             )}

@@ -65,7 +65,10 @@ import LayersRoundedIcon from "@mui/icons-material/LayersRounded";
 import { STRINGS } from "../../../app/config/strings";
 import fonts from "../../../app/theme/fonts";
 import { getBatchListShellTheme } from "../../../app/theme/custom_themes/shared/batchListShell_theme";
-import { uniformTableHeaderCellSx } from "../../../app/theme/custom_themes/shared/data_table_theme";
+import {
+  uniformTableBodyCellSx,
+  uniformTableHeaderCellSx,
+} from "../../../app/theme/custom_themes/shared/data_table_theme";
 import BatchListShell from "./BatchListShell";
 
 // ─── Animation ────────────────────────────────────────────────────────────────
@@ -178,13 +181,15 @@ const UserBatchList = ({
   );
 
   const tdSx = useMemo(
-    () => ({
-      padding: "10px 14px",
-      fontSize: fonts.size.sm,
-      borderBottom: `1px solid ${alpha(p.border || "#000", 0.6)}`,
-      color: p.text || "#000",
-      verticalAlign: "middle",
-    }),
+    () =>
+      uniformTableBodyCellSx(
+        { border: p.border || "#D5D8DC", text: p.text || "#000" },
+        {
+          bodyFontSize: fonts.size.sm,
+          bodyPaddingY: "10px",
+          bodyPaddingX: "14px",
+        },
+      ),
     [p],
   );
 
