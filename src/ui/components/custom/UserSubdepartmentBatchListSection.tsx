@@ -1,6 +1,7 @@
 import type { ElementType } from "react";
 import { useMemo } from "react";
 import { alpha, IconButton, Stack, Tooltip } from "@mui/material";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 
 import { STRINGS } from "../../../app/config/strings";
@@ -15,6 +16,7 @@ import {
   type OperationStatusMap,
 } from "../../../hooks/operationStatus";
 import { SUBDEPARTMENT_BATCH_SEARCH_FIELDS } from "../../../data/models/user/SubdepartmentBatchModel";
+import RefreshIconButton from "../common/RefreshIconButton";
 import UserBatchList from "./UserBatchList";
 import UserWorkflowStatusAction from "./UserWorkflowStatusAction";
 import {
@@ -47,6 +49,7 @@ export type UserSubdepartmentBatchListHookState = {
   setStatusFilter: (status: string) => void;
   loading: boolean;
   isRefreshing?: boolean;
+  refreshUserBatches?: () => void | Promise<void>;
   handleFillForm: (row: Record<string, unknown>) => void;
   handleEditForm: (row: Record<string, unknown>) => void;
   advancedFilters: SubdepartmentBatchListAdvancedFilters;
@@ -87,6 +90,10 @@ export type UserSubdepartmentBatchListSectionProps = {
   hideAdvancedFilter?: boolean;
   headerActions?: React.ReactNode;
   showBemMotorIds?: boolean;
+  /** Inline overlay message while refreshing with existing rows. */
+  refreshingMessage?: string;
+  /** Hide the built-in list refresh control. */
+  hideRefresh?: boolean;
 };
 
 const defaultCanViewDetails = (status: string) => isManufacturingViewOnlyStatus(status);
@@ -114,6 +121,8 @@ const UserSubdepartmentBatchListSection = ({
   hideAdvancedFilter = false,
   headerActions = null,
   showBemMotorIds = false,
+  refreshingMessage = STRINGS.USER_BATCH_LIST.REFRESHING_MESSAGE,
+  hideRefresh = false,
 }: UserSubdepartmentBatchListSectionProps) => {
   const {
     batches,
@@ -129,6 +138,7 @@ const UserSubdepartmentBatchListSection = ({
     setStatusFilter,
     loading,
     isRefreshing = false,
+    refreshUserBatches,
     handleFillForm,
     handleEditForm,
     advancedFilters,
@@ -206,6 +216,8 @@ const UserSubdepartmentBatchListSection = ({
   });
 
   const displayRows = Array.isArray(batches) ? batches : [];
+  const isListBusy = Boolean(loading || isRefreshing);
+  const showRefresh = !hideRefresh && typeof refreshUserBatches === "function";
 
   return (
     <UserBatchList
@@ -232,11 +244,22 @@ const UserSubdepartmentBatchListSection = ({
       onSearchChange={setSearch}
       onStatusFilterChange={setStatusFilter}
       isLoading={loading || isRefreshing}
+      loadingMessage={isRefreshing ? refreshingMessage : undefined}
       emptyText={emptyText}
       searchBarEnd={
         <Stack direction="row" spacing={1} alignItems="center">
           {!hideAdvancedFilter && searchBarEnd}
           {headerActions}
+          {showRefresh ? (
+            <RefreshIconButton
+              onClick={() => {
+                void refreshUserBatches();
+              }}
+              disabled={isListBusy}
+              tooltip={STRINGS.USER_BATCH_LIST.REFRESH_TOOLTIP}
+              icon={<RefreshRoundedIcon fontSize="small" />}
+            />
+          ) : null}
         </Stack>
       }
       filterExtension={hideAdvancedFilter ? null : filterExtension}

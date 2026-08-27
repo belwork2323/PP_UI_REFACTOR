@@ -138,6 +138,7 @@ const UserBatchList = ({
   onStatusFilterChange,
   statusCounts: serverStatusCounts,
   isLoading = false,
+  loadingMessage,
   statusToolbarEnd,
   searchBarEnd,
   filterExtension,
@@ -373,6 +374,7 @@ const UserBatchList = ({
       // While first-loading with no rows, shell shows the spinner instead.
       hasItems={isLoading ? filtered.length > 0 : true}
       loading={isLoading}
+      loadingMessage={loadingMessage}
       onFilterChange={(field, value) => {
         handleDropdownChange(field)({ target: { value } });
       }}

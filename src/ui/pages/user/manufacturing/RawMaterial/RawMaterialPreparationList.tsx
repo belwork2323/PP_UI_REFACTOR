@@ -45,6 +45,7 @@ const RawMaterialPrepList = ({ hookState, rowsPerPageOptions }: any) => {
       PersonIcon={PersonRoundedIcon}
       CalendarIcon={CalendarMonthRoundedIcon}
       viewDetailsTooltip={S.RAW_MATERIAL_PREP.VIEW_DETAILS_TOOLTIP}
+      emptyText={S.RAW_MATERIAL_PREP.EMPTY_TEXT}
     />
   );
 };

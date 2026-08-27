@@ -17,12 +17,14 @@ import { icons } from "../../../../../app/theme/icons";
 import IconText from "../../../../components/common/IconText";
 import FilterPanelHeader from "@ui/components/common/FilterPanelHeader";
 import FilterToggleButton from "../../../../components/common/FilterToggleButton";
+import RefreshIconButton from "../../../../components/common/RefreshIconButton";
 import WorkflowCreateButton from "../../../../components/common/WorkflowCreateButton";
 import DateField from "../../../../components/common/DateField";
 import { formatToIsoDateInput, formatToUiDate } from "../../../../../utils/dateUtils";
 import UserBatchList from "../../../../components/custom/UserBatchList";
 import UserWorkflowStatusAction from "../../../../components/custom/UserWorkflowStatusAction";
 import UserWorkflowStatusCell from "../../../../components/custom/UserWorkflowStatusCell";
+import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import getSourcingTheme from "../../../../../app/theme/custom_themes/user/sourcing/sourcing_theme";
 import {
@@ -96,6 +98,7 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
     applyAdvancedFilters,
     clearAdvancedFilters,
     activeFilterCount,
+    refreshUserBatches,
   } = hookState;
 
   const [filterOpen, setFilterOpen] = useState(false);
@@ -348,17 +351,29 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
   };
 
   const searchBarEnd = (
-    <FilterToggleButton
-      label={STRINGS.SOURCING.BATCH_LIST.FILTERS_TOGGLE}
-      count={activeFilterCount}
-      isOpen={filterOpen}
-      onClick={() => setFilterOpen((v) => !v)}
-      sx={filterToggleSx.filterBtn(filterOpen || activeFilterCount > 0)}
-      iconSx={filterToggleSx.filterBtnIcon}
-      textSx={filterToggleSx.filterBtnText}
-      badgeSx={filterToggleSx.filterBadgePill}
-      chevronSx={filterToggleSx.filterBtnChevron}
-    />
+    <Stack direction="row" spacing={1} alignItems="center">
+      <FilterToggleButton
+        label={STRINGS.SOURCING.BATCH_LIST.FILTERS_TOGGLE}
+        count={activeFilterCount}
+        isOpen={filterOpen}
+        onClick={() => setFilterOpen((v) => !v)}
+        sx={filterToggleSx.filterBtn(filterOpen || activeFilterCount > 0)}
+        iconSx={filterToggleSx.filterBtnIcon}
+        textSx={filterToggleSx.filterBtnText}
+        badgeSx={filterToggleSx.filterBadgePill}
+        chevronSx={filterToggleSx.filterBtnChevron}
+      />
+      {typeof refreshUserBatches === "function" ? (
+        <RefreshIconButton
+          onClick={() => {
+            void refreshUserBatches();
+          }}
+          disabled={Boolean(loading || isRefreshing)}
+          tooltip={STRINGS.SOURCING.BATCH_LIST.REFRESH_TOOLTIP}
+          icon={<RefreshRoundedIcon fontSize="small" />}
+        />
+      ) : null}
+    </Stack>
   );
 
   const filterExtension = filterOpen ? (
@@ -542,6 +557,9 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         onSearchChange={setSearch}
         onStatusFilterChange={setStatusFilter}
         isLoading={loading || isRefreshing}
+        loadingMessage={
+          isRefreshing ? STRINGS.SOURCING.BATCH_LIST.REFRESHING_MESSAGE : undefined
+        }
         searchBarEnd={searchBarEnd}
         filterExtension={filterExtension}
         statusToolbarEnd={

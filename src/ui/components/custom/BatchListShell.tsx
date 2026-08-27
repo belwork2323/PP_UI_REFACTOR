@@ -81,6 +81,8 @@ type BatchListShellProps = {
   filterValues?: Record<string, string>;
   hasItems: boolean;
   loading?: boolean;
+  /** Shown over the list when refreshing with existing rows (not the empty-state spinner). */
+  loadingMessage?: string;
   onFilterChange?: (field: string, value: string) => void;
   onSearchChange: (value: string) => void;
   onStatusChange?: (value: string) => void;
@@ -110,6 +112,7 @@ const BatchListShell = ({
   filterValues = {},
   hasItems,
   loading = false,
+  loadingMessage,
   onFilterChange,
   onSearchChange,
   onStatusChange,
@@ -270,7 +273,59 @@ const BatchListShell = ({
             <Typography sx={theme.empty.subtitle}>{emptySubtitle}</Typography>
           </Box>
         ) : (
-          children
+          <Box
+            sx={{
+              position: "relative",
+              ...(loading ? { pointerEvents: "none", userSelect: "none" } : null),
+            }}
+          >
+            {loading ? (
+              <Box
+                sx={{
+                  position: "absolute",
+                  inset: 0,
+                  zIndex: 20,
+                  display: "flex",
+                  flexDirection: "column",
+                  alignItems: "center",
+                  justifyContent: "flex-start",
+                  gap: 1.25,
+                  pt: { xs: 6, sm: 8 },
+                  bgcolor: "rgba(255, 255, 255, 0.45)",
+                  "@keyframes batchListDottedSpin": {
+                    to: { transform: "rotate(360deg)" },
+                  },
+                }}
+              >
+                <Box
+                  aria-hidden
+                  sx={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: "50%",
+                    border: "3px dotted",
+                    borderColor:
+                      (theme.loading.spinner as { color?: string } | undefined)?.color ??
+                      "primary.main",
+                    borderTopColor: "transparent",
+                    animation: "batchListDottedSpin 0.85s linear infinite",
+                  }}
+                />
+                {loadingMessage ? (
+                  <Typography
+                    sx={{
+                      fontSize: "0.82rem",
+                      fontWeight: 500,
+                      color: "text.secondary",
+                    }}
+                  >
+                    {loadingMessage}
+                  </Typography>
+                ) : null}
+              </Box>
+            ) : null}
+            {children}
+          </Box>
         )}
       </Box>
     </Box>

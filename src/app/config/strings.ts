@@ -455,6 +455,8 @@ export const STRINGS = {
       FILTERS_CASING_TYPE: "Casing type",
       FILTERS_INSULATION_TYPE: "Insulation type",
       FILTERS_ALL_PROJECTS: "All projects",
+      REFRESH_TOOLTIP: "Refresh batch list",
+      REFRESHING_MESSAGE: "Refreshing batch list",
       FILTERS_ALL_STAGES: "All stages",
       FILTERS_ALL_CASING_TYPES: "All casing types",
       FILTERS_ALL_INSULATION: "All insulation types",
@@ -901,6 +903,8 @@ export const STRINGS = {
     COL_ACTION: "Action",
     COL_HASH: "#",
     FILTER_ALL: "All",
+    REFRESH_TOOLTIP: "Refresh batch list",
+    REFRESHING_MESSAGE: "Refreshing batch list",
   },
 
   ERRORS: {
@@ -963,6 +967,8 @@ export const STRINGS = {
       FILTERS_CLOSE_PANEL: "Close",
       VIEW_DETAILS: "View Details",
       VIEW_DETAILS_TOOLTIP: "View completed details",
+      REFRESH_TOOLTIP: "Refresh batch list",
+      REFRESHING_MESSAGE: "Refreshing batch list",
     },
 
     // ── Form Header Strings ─────────────────────────────────────────────────
@@ -984,6 +990,8 @@ export const STRINGS = {
       COL_RM_STATUS: "Status",
       TABLE_LABEL: "Raw material preparation batch list",
       EMPTY_TEXT: "No raw material preparation batches found",
+      REFRESH_TOOLTIP: "Refresh batch list",
+      REFRESHING_MESSAGE: "Refreshing batch list",
       NEW_LABEL: "New Submission",
       EDIT_MODE_BANNER:
         "You are editing a rejected submission. Previously submitted values are pre-loaded. Review and correct before resubmitting.",
