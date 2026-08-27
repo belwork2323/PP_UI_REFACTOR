@@ -4,6 +4,7 @@ import {
   createInitialNdtValues,
   hydrateNdtValuesFromRecord,
   hydrateNdtValuesFromSections,
+  mergeBatchRadiographyPlanIntoNdtValues,
   ndtFormValuesHaveUserData,
 } from "./qcNdtTables";
 
@@ -101,36 +102,60 @@ const collectMotorSections = (
   return sections;
 };
 
+export type NdtDivisionSeedOptions = {
+  batchPayload?: unknown;
+  onlyIfEmpty?: boolean;
+  /** QC form details reload — map radiographyObservations onto defect presets. */
+  includeRadiographyObservations?: boolean;
+};
+
 export const buildInitialNdtValuesForMotor = (
   divisionDetailPayload: unknown,
   motorId: string,
+  options?: Pick<NdtDivisionSeedOptions, "batchPayload" | "includeRadiographyObservations">,
 ): SchemaFormValues => {
   const trimmedMotorId = String(motorId ?? "").trim();
+  const hydrateOpts = {
+    includeRadiographyObservations: Boolean(options?.includeRadiographyObservations),
+  };
   const base = createInitialNdtValues();
-  if (!trimmedMotorId || !divisionDetailPayload) return base;
+  if (!trimmedMotorId || !divisionDetailPayload) {
+    return mergeBatchRadiographyPlanIntoNdtValues(base, trimmedMotorId, options?.batchPayload);
+  }
 
+  let seeded = base;
   const motor = findNdtMotorRecord(divisionDetailPayload, trimmedMotorId);
   if (motor) {
-    const nested = hydrateNdtValuesFromRecord(motor);
-    if (ndtFormValuesHaveUserData(nested)) return nested;
+    const nested = hydrateNdtValuesFromRecord(motor, hydrateOpts);
+    if (ndtFormValuesHaveUserData(nested)) {
+      seeded = nested;
+    } else {
+      const sections = collectMotorSections(divisionDetailPayload, trimmedMotorId);
+      seeded =
+        sections.length > 0
+          ? hydrateNdtValuesFromSections(sections)
+          : hydrateNdtValuesFromRecord(motor, hydrateOpts);
+    }
+  } else {
+    const sections = collectMotorSections(divisionDetailPayload, trimmedMotorId);
+    if (sections.length > 0) {
+      seeded = hydrateNdtValuesFromSections(sections);
+    }
   }
 
-  const sections = collectMotorSections(divisionDetailPayload, trimmedMotorId);
-  if (sections.length > 0) {
-    return hydrateNdtValuesFromSections(sections);
-  }
-
-  if (motor) return hydrateNdtValuesFromRecord(motor);
-  return base;
+  return mergeBatchRadiographyPlanIntoNdtValues(seeded, trimmedMotorId, options?.batchPayload);
 };
 
 export const applyNdtDivisionDetailsSeed = (
   current: SchemaFormValues,
   divisionDetailPayload: unknown,
   motorId: string,
-  options?: { onlyIfEmpty?: boolean },
+  options?: NdtDivisionSeedOptions,
 ): SchemaFormValues => {
-  const seeded = buildInitialNdtValuesForMotor(divisionDetailPayload, motorId);
+  const seeded = buildInitialNdtValuesForMotor(divisionDetailPayload, motorId, {
+    batchPayload: options?.batchPayload,
+    includeRadiographyObservations: options?.includeRadiographyObservations,
+  });
   if (!options?.onlyIfEmpty) return seeded;
 
   const next: SchemaFormValues = { ...current };

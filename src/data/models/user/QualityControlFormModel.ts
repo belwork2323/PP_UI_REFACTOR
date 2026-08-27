@@ -19,7 +19,7 @@ import { buildRevalidationMaterialsPayload, buildRevalidationSectionPayload, has
 import { buildProcessingPremixesPayload } from "../../../hooks/user/qualityControl/qcProcessingMaterials";
 import {
   buildHardwareMotorDetailPayload,
-  buildHardwareProcessSectionPayload,
+  isHardwareNestedMotorDetail,
   mergeHardwareMotorSchemaValues,
 } from "../../../hooks/user/qualityControl/qcHardwareTables";
 import { buildCastingMotorDetailPayload, castingMotorDetailToSections, isCastingNestedMotorDetail } from "../../../hooks/user/qualityControl/qcCastingTables";
@@ -52,8 +52,6 @@ import {
   propellantMotorDetailToSections,
 } from "../../../hooks/user/qualityControl/qcPropellantTables";
 import { buildWeighmentDivisionData, isWeighmentNestedMotorDetail, weighmentMotorDetailToSections } from "../../../hooks/user/qualityControl/qcWeighmentTables";
-import { isQcHardwareProcessSubType } from "../../../hooks/user/qualityControl/qcHardwareConfig";
-import { QC_HARDWARE_MANUFACTURING_SECTION_IDS } from "../../../hooks/user/qualityControl/qcHardwareDivisionDetails";
 import type {
   QcDivisionEntry,
   QcDivisionEntryValues,
@@ -366,13 +364,8 @@ const buildDivisionEntrySections = (
   }
 
   if (entry.kind === "HARDWARE_PROCESS") {
-    const subType = String(entry.subType ?? "");
-    if (!isQcHardwareProcessSubType(subType)) return [];
-    return buildHardwareProcessSectionPayload(entryValues.schemaValues, subType).map((section) => ({
-      ...section,
-      motorId: entry.motorId,
-      subType: entry.subType ?? undefined,
-    }));
+    // Hardware create/update uses nested motorDetails (not flat sections).
+    return [];
   }
 
   if (entry.kind === "CASTING_MOTOR") {
@@ -548,29 +541,11 @@ export const expandDivisionDetailSections = (
       continue;
     }
 
-    const details = asRecord(rec.details);
-    if (
-      rec.abradingOperation ||
-      rec.preHeating ||
-      rec.linerCoatingOperation ||
-      rec.dispatchToCasting ||
-      rec.tceCleaning ||
-      rec.bellowBonding ||
-      details?.abradingOperation
-    ) {
-      const nested = { ...details, ...rec };
-      for (const sectionId of Object.values(QC_HARDWARE_MANUFACTURING_SECTION_IDS)) {
-        const block = nested[sectionId];
-        if (!block || typeof block !== "object") continue;
-        expandedMotorSections.push({
-          sectionId,
-          sectionData: [block],
-          motorId,
-        });
-      }
+    if (isHardwareNestedMotorDetail(rec)) {
       continue;
     }
 
+    const details = asRecord(rec.details);
     const motorSections = asArray(details?.sections ?? rec.sections);
     motorSections.forEach((section) => {
       const sec = asRecord(section);

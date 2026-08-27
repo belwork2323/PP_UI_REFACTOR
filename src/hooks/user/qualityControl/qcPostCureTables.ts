@@ -139,7 +139,9 @@ const normalizeLocationRows = (
             QTY_FILLED: pickString(
               row?.QTY_FILLED,
               row?.qtyFilled,
+              row?.quantityFilled,
               row?.QTY,
+              typeof row?.quantityFilled === "number" ? String(row.quantityFilled) : "",
               typeof row?.qtyFilled === "number" ? String(row.qtyFilled) : "",
             ),
           }
@@ -149,7 +151,9 @@ const normalizeLocationRows = (
             QTY_APPLIED: pickString(
               row?.QTY_APPLIED,
               row?.qtyApplied,
+              row?.quantityApplied,
               row?.QTY,
+              typeof row?.quantityApplied === "number" ? String(row.quantityApplied) : "",
               typeof row?.qtyApplied === "number" ? String(row.qtyApplied) : "",
             ),
           }
@@ -253,8 +257,8 @@ export const createInitialHemcoatValues = (): SchemaFormValues => {
     [formKey(qual, "HEMCOAT_3K_PREPARATION_DATE")]: "",
     [formKey(qual, QC_POST_CURE_TABLE_IDS.HEMCOAT_QUALIFICATION)]: emptyQualificationRows(
       QC_POST_CURE_HEMCOAT_QUALIFICATION_PRESET,
-      true,
     ),
+    [formKey(qual, "HEMCOAT_3K_QC_REPORT")]: [] as FileRef[],
     [formKey(app, QC_POST_CURE_TABLE_IDS.APPLICATION)]: emptyLocationRows("QTY_APPLIED"),
     [formKey(app, "DISPATCH_DATE")]: "",
     [formKey(app, "DISPATCH_STATION")]: "",
@@ -383,9 +387,11 @@ const hydrateLooseFlapFromData = (
   const section = QC_POST_CURE_SECTION_IDS.LOOSE_FLAP_FILLING;
   const replaceAll = options?.replaceAll === true;
   const nestedQual = asRecord(data.qualificationDetails);
+  const nestedEpoxy = asRecord(data.epoxyPreparationIngredients);
 
   const bellow =
     data[QC_POST_CURE_TABLE_IDS.BELLOW_BONDING] ??
+    data.bellowRemovalDetails ??
     data.BELLOW_REMOVAL_TABLE ??
     data.BELLOW_REMOVAL_DETAILS ??
     data.bellowBondingDetails ??
@@ -394,22 +400,27 @@ const hydrateLooseFlapFromData = (
     values[formKey(section, QC_POST_CURE_TABLE_IDS.BELLOW_BONDING)] = normalizeLocationRows(bellow);
   }
 
+  // UI "Batch No" / "Date of Preparation" sit under LF Epoxy Details — prefer epoxy, then qual.
   let batchNo = pickString(
     data.LF_EPOXY_BATCH_NO,
     data.QUALIFICATION_BATCH_NO,
     data.lfEpoxyBatchNo,
-    data.batchNo,
+    nestedEpoxy?.batchNo,
+    nestedEpoxy?.LF_EPOXY_BATCH_NO,
     nestedQual?.batchNo,
     nestedQual?.LF_EPOXY_BATCH_NO,
+    data.batchNo,
   );
   let prepDate = formatToUiDate(
     pickString(
       data.LF_EPOXY_PREPARATION_DATE,
       data.QUALIFICATION_PREPARATION_DATE,
       data.lfEpoxyPreparationDate,
-      data.preparationDate,
+      nestedEpoxy?.preparationDate,
+      nestedEpoxy?.LF_EPOXY_PREPARATION_DATE,
       nestedQual?.preparationDate,
       nestedQual?.LF_EPOXY_PREPARATION_DATE,
+      data.preparationDate,
     ),
   );
   if (!batchNo && !prepDate) {
@@ -430,9 +441,10 @@ const hydrateLooseFlapFromData = (
     data[QC_POST_CURE_TABLE_IDS.LF_EPOXY_QUALIFICATION] ??
     data.QUALIFICATION_TABLE ??
     data.lfEpoxyQualification ??
-    (asArray(data.qualificationDetails).length > 0 ? data.qualificationDetails : null) ??
+    nestedQual?.parameters ??
     nestedQual?.qualification ??
     nestedQual?.QUALIFICATION_TABLE ??
+    (asArray(data.qualificationDetails).length > 0 ? data.qualificationDetails : null) ??
     data.qualification;
   if (qualification != null || replaceAll) {
     values[formKey(section, QC_POST_CURE_TABLE_IDS.LF_EPOXY_QUALIFICATION)] =
@@ -501,6 +513,7 @@ const hydrateIr1FromData = (values: SchemaFormValues, data: Record<string, unkno
     data[QC_POST_CURE_TABLE_IDS.IR1_QUALIFICATION] ??
       data.QUALIFICATION_TABLE ??
       data.ir1Qualification ??
+      nestedQual.parameters ??
       nestedQual.qualification ??
       nestedQual.IR1_QUALIFICATION ??
       nestedQual.qualificationDetails,
@@ -558,30 +571,20 @@ const hydrateHemcoatFromData = (values: SchemaFormValues, data: Record<string, u
     data[QC_POST_CURE_TABLE_IDS.HEMCOAT_QUALIFICATION] ??
       data.QUALIFICATION_TABLE ??
       data.hemcoatQualification ??
+      nestedQual.parameters ??
       nestedQual.qualification ??
       nestedQual.HEMCOAT_3K_QUALIFICATION,
     QC_POST_CURE_HEMCOAT_QUALIFICATION_PRESET,
-    true,
   );
-  const sharedReport = parseUploadFiles(
+  values[formKey(qual, QC_POST_CURE_TABLE_IDS.HEMCOAT_QUALIFICATION)] = qualRows;
+  values[formKey(qual, "HEMCOAT_3K_QC_REPORT")] = parseUploadFiles(
+    data.HEMCOAT_3K_QC_REPORT,
     data.QUALIFICATION_QC_REPORT,
     data.QC_REPORT,
     data.qcReport,
     nestedQual.qcReport,
+    nestedQual.HEMCOAT_3K_QC_REPORT,
   );
-  values[formKey(qual, QC_POST_CURE_TABLE_IDS.HEMCOAT_QUALIFICATION)] = sharedReport.length
-    ? qualRows.map((row, index) =>
-        index === 0
-          ? {
-              ...row,
-              QC_REPORT:
-                Array.isArray(row.QC_REPORT) && row.QC_REPORT.length
-                  ? row.QC_REPORT
-                  : sharedReport,
-            }
-          : row,
-      )
-    : qualRows;
 };
 
 const hydrateApplicationFromData = (values: SchemaFormValues, data: Record<string, unknown>) => {
@@ -774,14 +777,14 @@ const mapLocationRowsForApi = (
       toDate: toApiDate(String(row.TO_DATE ?? "")),
       ...(withQty === "QTY_FILLED"
         ? {
-            qtyFilled:
+            quantityFilled:
               toFiniteNumber(row.QTY_FILLED) ??
               (String(row.QTY_FILLED ?? "").trim() || undefined),
           }
         : null),
       ...(withQty === "QTY_APPLIED"
         ? {
-            qtyApplied:
+            quantityApplied:
               toFiniteNumber(row.QTY_APPLIED) ??
               (String(row.QTY_APPLIED ?? "").trim() || undefined),
           }
@@ -819,10 +822,28 @@ const mapLocationRowsFromApi = (
         pickString(row.toDate, row.TO_DATE),
       OBSERVATIONS: pickEditableString(row.observations, row.OBSERVATIONS),
       ...(withQty === "QTY_FILLED"
-        ? { QTY_FILLED: pickString(row.qtyFilled, row.QTY_FILLED, row.QTY) }
+        ? {
+            QTY_FILLED: pickString(
+              row.quantityFilled,
+              row.qtyFilled,
+              row.QTY_FILLED,
+              row.QTY,
+              typeof row.quantityFilled === "number" ? String(row.quantityFilled) : "",
+              typeof row.qtyFilled === "number" ? String(row.qtyFilled) : "",
+            ),
+          }
         : null),
       ...(withQty === "QTY_APPLIED"
-        ? { QTY_APPLIED: pickString(row.qtyApplied, row.QTY_APPLIED, row.QTY) }
+        ? {
+            QTY_APPLIED: pickString(
+              row.quantityApplied,
+              row.qtyApplied,
+              row.QTY_APPLIED,
+              row.QTY,
+              typeof row.quantityApplied === "number" ? String(row.quantityApplied) : "",
+              typeof row.qtyApplied === "number" ? String(row.qtyApplied) : "",
+            ),
+          }
         : null),
     };
   });
@@ -908,7 +929,6 @@ const buildInhibitionDetailsPayload = (
       qual,
       QC_POST_CURE_TABLE_IDS.HEMCOAT_QUALIFICATION,
       QC_POST_CURE_HEMCOAT_QUALIFICATION_PRESET,
-      true,
     );
     const applicationRows = getPostCureLocationRows(
       values,
@@ -923,10 +943,12 @@ const buildInhibitionDetailsPayload = (
         preparationDate: toApiDate(
           getPostCureField(values, qual, "HEMCOAT_3K_PREPARATION_DATE"),
         ),
-        parameters: mapQualificationRowsForApi(qualRows, true),
+        parameters: mapQualificationRowsForApi(qualRows),
         qcReport: (() => {
-          const fromRows = toFileIdListPayload(qualRows[0]?.QC_REPORT);
-          return fromRows.length ? fromRows : undefined;
+          const files = toFileIdListPayload(
+            getPostCureFileField(values, qual, "HEMCOAT_3K_QC_REPORT"),
+          );
+          return files.length ? files : undefined;
         })(),
       }),
       applicationDetails: mapLocationRowsForApi(applicationRows, "QTY_APPLIED"),
@@ -1039,28 +1061,46 @@ export const postCureMotorDetailToSections = (
     asRecord(rec.inhibitionDetails) ?? asRecord(details.inhibitionDetails);
 
   if (loose) {
+    const nestedQual = asRecord(loose.qualificationDetails);
+    const nestedEpoxy = asRecord(loose.epoxyPreparationIngredients);
     const qualification =
-      asArray(loose.qualificationDetails).length > 0
-        ? loose.qualificationDetails
-        : asArray(asRecord(loose.qualificationDetails)?.qualification).length
-          ? asRecord(loose.qualificationDetails)?.qualification
-          : loose.qualification ?? loose.lfEpoxyQualification;
+      nestedQual?.parameters ??
+      nestedQual?.qualification ??
+      nestedQual?.QUALIFICATION_TABLE ??
+      (asArray(loose.qualificationDetails).length > 0 ? loose.qualificationDetails : null) ??
+      loose.qualification ??
+      loose.lfEpoxyQualification;
 
     sections.push({
       sectionId: QC_POST_CURE_SECTION_IDS.LOOSE_FLAP_FILLING,
       sectionData: [
         omitEmpty({
           [QC_POST_CURE_TABLE_IDS.BELLOW_BONDING]: mapLocationRowsFromApi(
-            loose.bellowBondingDetails ?? loose.BELLOW_BONDING_DETAILS,
+            loose.bellowRemovalDetails ??
+              loose.bellowBondingDetails ??
+              loose.BELLOW_BONDING_DETAILS ??
+              loose.BELLOW_REMOVAL_TABLE,
           ),
-          LF_EPOXY_BATCH_NO: pickString(loose.batchNo, loose.lfEpoxyBatchNo, loose.LF_EPOXY_BATCH_NO),
+          LF_EPOXY_BATCH_NO: pickString(
+            nestedEpoxy?.batchNo,
+            nestedQual?.batchNo,
+            loose.batchNo,
+            loose.lfEpoxyBatchNo,
+            loose.LF_EPOXY_BATCH_NO,
+          ),
           LF_EPOXY_PREPARATION_DATE: pickString(
+            nestedEpoxy?.preparationDate,
+            nestedQual?.preparationDate,
             loose.preparationDate,
             loose.lfEpoxyPreparationDate,
             loose.LF_EPOXY_PREPARATION_DATE,
           ),
           [QC_POST_CURE_TABLE_IDS.LF_EPOXY_QUALIFICATION]: mapQualificationRowsFromApi(qualification),
-          LF_EPOXY_QC_REPORT: loose.qcReport ?? loose.lfEpoxyQcReport ?? loose.LF_EPOXY_QC_REPORT,
+          LF_EPOXY_QC_REPORT:
+            nestedQual?.qcReport ??
+            loose.qcReport ??
+            loose.lfEpoxyQcReport ??
+            loose.LF_EPOXY_QC_REPORT,
           [QC_POST_CURE_TABLE_IDS.LF_EPOXY_FILLING]: mapLocationRowsFromApi(
             loose.fillingDetails ?? loose.lfEpoxyFillingDetails ?? loose.LF_EPOXY_FILLING_DETAILS,
             "QTY_FILLED",
@@ -1121,11 +1161,15 @@ export const postCureMotorDetailToSections = (
               qualDetails.HEMCOAT_3K_PREPARATION_DATE,
             ),
             [QC_POST_CURE_TABLE_IDS.HEMCOAT_QUALIFICATION]: mapQualificationRowsFromApi(
-              qualDetails.qualification ??
+              qualDetails.parameters ??
+                qualDetails.qualification ??
                 qualDetails.hemcoat3kQualification ??
                 qualDetails.HEMCOAT_3K_QUALIFICATION,
-              true,
             ),
+            HEMCOAT_3K_QC_REPORT:
+              qualDetails.qcReport ??
+              qualDetails.hemcoat3kQcReport ??
+              qualDetails.HEMCOAT_3K_QC_REPORT,
           }),
         ],
         motorId,
@@ -1148,7 +1192,8 @@ export const postCureMotorDetailToSections = (
               qualDetails.IR1_PREPARATION_DATE,
             ),
             [QC_POST_CURE_TABLE_IDS.IR1_QUALIFICATION]: mapQualificationRowsFromApi(
-              qualDetails.qualification ??
+              qualDetails.parameters ??
+                qualDetails.qualification ??
                 qualDetails.ir1Qualification ??
                 qualDetails.IR1_QUALIFICATION,
             ),
@@ -1334,8 +1379,11 @@ const buildHemcoatSections = (
             qual,
             QC_POST_CURE_TABLE_IDS.HEMCOAT_QUALIFICATION,
             QC_POST_CURE_HEMCOAT_QUALIFICATION_PRESET,
-            true,
           ),
+          HEMCOAT_3K_QC_REPORT: (() => {
+            const files = getPostCureFileField(values, qual, "HEMCOAT_3K_QC_REPORT");
+            return files.length ? files : undefined;
+          })(),
         }),
       ],
     },
@@ -1413,15 +1461,7 @@ export const collectPostCureFileRefsFromQcValues = (
   const hemcoat = QC_POST_CURE_SECTION_IDS.HEMCOAT_QUALIFICATION;
   refs.push(...getPostCureFileField(values, loose, "LF_EPOXY_QC_REPORT"));
   refs.push(...getPostCureFileField(values, ir1, "IR1_QC_REPORT"));
-  for (const row of getPostCureQualificationRows(
-    values,
-    hemcoat,
-    QC_POST_CURE_TABLE_IDS.HEMCOAT_QUALIFICATION,
-    QC_POST_CURE_HEMCOAT_QUALIFICATION_PRESET,
-    true,
-  )) {
-    refs.push(...parseUploadFiles(row.QC_REPORT));
-  }
+  refs.push(...getPostCureFileField(values, hemcoat, "HEMCOAT_3K_QC_REPORT"));
   return refs;
 };
 

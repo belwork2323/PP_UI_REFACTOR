@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
 import {
   Box,
   Stack,
@@ -484,7 +484,7 @@ const FileOrReadOnly = ({
     onChange={onChange}
     disabled={disabled}
     readOnly={readOnly}
-    multiple={false}
+    multiple
     acceptMode="pdf"
     emptyLabel="Upload"
   />
@@ -495,10 +495,37 @@ type QCPostCureMotorPanelProps = {
   subType?: string | null;
   inhibitorType?: string | null;
   values: SchemaFormValues;
-  onChange: (values: SchemaFormValues) => void;
+  onChange: (
+    values: SchemaFormValues | ((prev: SchemaFormValues) => SchemaFormValues),
+  ) => void;
   readOnly?: boolean;
   disabled?: boolean;
   headerActions?: ReactNode;
+};
+
+const mergeFileRefsPreferLive = (current: FileRef[], incoming: FileRef[]): FileRef[] => {
+  const byKey = new Map<string, FileRef>();
+  const keyOf = (ref: FileRef) =>
+    String(ref.localId ?? "").trim() || String(ref.fileId ?? "").trim() || "";
+  for (const ref of current ?? []) {
+    const key = keyOf(ref);
+    if (key) byKey.set(key, ref);
+  }
+  for (const ref of incoming ?? []) {
+    const key = keyOf(ref);
+    if (!key) continue;
+    const prev = byKey.get(key);
+    byKey.set(key, prev ? { ...prev, ...ref } : ref);
+  }
+  const incomingKeys = new Set((incoming ?? []).map(keyOf).filter(Boolean));
+  for (const ref of current ?? []) {
+    const key = keyOf(ref);
+    if (!key || incomingKeys.has(key)) continue;
+    if (ref.status === "uploading" || ref.status === "failed" || ref.isTemp) {
+      byKey.set(key, ref);
+    }
+  }
+  return Array.from(byKey.values());
 };
 
 const QCPostCureMotorPanel = ({
@@ -523,6 +550,23 @@ const QCPostCureMotorPanel = ({
   const hemcoatSection = QC_POST_CURE_SECTION_IDS.HEMCOAT_QUALIFICATION;
   const appSection = QC_POST_CURE_SECTION_IDS.APPLICATION;
   const naSection = QC_POST_CURE_SECTION_IDS.NOT_APPLICABLE;
+
+  const patchValues = useCallback(
+    (patch: (prev: SchemaFormValues) => SchemaFormValues) => {
+      onChange((prev) => patch(prev ?? {}));
+    },
+    [onChange],
+  );
+
+  const patchFileField = useCallback(
+    (sectionId: string, field: string, next: FileRef[]) => {
+      patchValues((prev) => {
+        const current = getPostCureFileField(prev, sectionId, field);
+        return setPostCureFileField(prev, sectionId, field, mergeFileRefsPreferLive(current, next));
+      });
+    },
+    [patchValues],
+  );
 
   const bellowRows = useMemo(
     () => getPostCureLocationRows(values, looseSection, QC_POST_CURE_TABLE_IDS.BELLOW_BONDING),
@@ -565,7 +609,6 @@ const QCPostCureMotorPanel = ({
         hemcoatSection,
         QC_POST_CURE_TABLE_IDS.HEMCOAT_QUALIFICATION,
         QC_POST_CURE_HEMCOAT_QUALIFICATION_PRESET,
-        true,
       ),
     [hemcoatSection, values],
   );
@@ -686,9 +729,7 @@ const QCPostCureMotorPanel = ({
               <FieldRow label={QC_POST_CURE_FIELD_LABELS.LF_EPOXY_QC_REPORT} readOnly={readOnly}>
                 <FileOrReadOnly
                   files={getPostCureFileField(values, looseSection, "LF_EPOXY_QC_REPORT")}
-                  onChange={(next) =>
-                    onChange(setPostCureFileField(values, looseSection, "LF_EPOXY_QC_REPORT", next))
-                  }
+                  onChange={(next) => patchFileField(looseSection, "LF_EPOXY_QC_REPORT", next)}
                   readOnly={readOnly}
                   disabled={inputsDisabled}
                 />
@@ -779,9 +820,7 @@ const QCPostCureMotorPanel = ({
                 <FieldRow label={QC_POST_CURE_FIELD_LABELS.IR1_QC_REPORT} readOnly={readOnly}>
                   <FileOrReadOnly
                     files={getPostCureFileField(values, ir1Section, "IR1_QC_REPORT")}
-                    onChange={(next) =>
-                      onChange(setPostCureFileField(values, ir1Section, "IR1_QC_REPORT", next))
-                    }
+                    onChange={(next) => patchFileField(ir1Section, "IR1_QC_REPORT", next)}
                     readOnly={readOnly}
                     disabled={inputsDisabled}
                   />
@@ -913,10 +952,23 @@ const QCPostCureMotorPanel = ({
                       ),
                     )
                   }
-                  showQcReport
                   readOnly={readOnly}
                   disabled={inputsDisabled}
                 />
+
+                <FieldRow
+                  label={QC_POST_CURE_FIELD_LABELS.HEMCOAT_3K_QC_REPORT}
+                  readOnly={readOnly}
+                >
+                  <FileOrReadOnly
+                    files={getPostCureFileField(values, hemcoatSection, "HEMCOAT_3K_QC_REPORT")}
+                    onChange={(next) =>
+                      patchFileField(hemcoatSection, "HEMCOAT_3K_QC_REPORT", next)
+                    }
+                    readOnly={readOnly}
+                    disabled={inputsDisabled}
+                  />
+                </FieldRow>
               </Stack>
             </SectionCard>
 

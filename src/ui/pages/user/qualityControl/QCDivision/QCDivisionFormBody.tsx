@@ -33,7 +33,12 @@ import QCDivisionEntryPanel, { type QCDivisionEntryUnitActions } from "./QCDivis
 import QCProcessingMaterialsPanel from "./QCProcessingMaterialsPanel";
 import QCSchemaBufferingLoader from "./QCSchemaBufferingLoader";
 import QCHardwareAttachmentUpload from "./QCHardwareAttachmentUpload";
-import { createInitialHardwareProcessValues } from "../../../../../hooks/user/qualityControl/qcHardwareTables";
+import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
+import {
+  createInitialHardwareProcessValues,
+  setHardwareUploadValue,
+  type QcHardwareUploadType,
+} from "../../../../../hooks/user/qualityControl/qcHardwareTables";
 import { resolveHardwareUploadAnchorEntry } from "../../../../../hooks/user/qualityControl/qcHardwareConfig";
 import type { QcPartialNavItem } from "../../../../../hooks/user/qualityControl/qcDivisionApprovalUnits";
 import { resolveQcUnitActionLabels } from "../../../../../hooks/user/qualityControl/qcDivisionUnitActionLabels";
@@ -67,7 +72,10 @@ export type QCDivisionFormBodyProps = {
   schemaError?: string | null;
   onActiveDivisionGroupIndexChange: (index: number) => void;
   onActiveDivisionSubIndexChange: (index: number) => void;
-  onDivisionEntryValuesChange: (entryId: string, values: SchemaFormValues) => void;
+  onDivisionEntryValuesChange: (
+    entryId: string,
+    values: SchemaFormValues | ((prev: SchemaFormValues) => SchemaFormValues),
+  ) => void;
   onDivisionEntryLiquidValuesChange: (entryId: string, values: SchemaFormValues) => void;
   onMixingFinalMixDetailsChange: (values: SchemaFormValues) => void;
   onRemoveDivisionEntry: (entryId: string) => void;
@@ -296,9 +304,17 @@ const QCDivisionFormBody = ({
     return createInitialHardwareProcessValues("ABRADING");
   }, [formData.divisionEntryValues, hardwareUploadAnchorEntry]);
   const handleHardwareUploadChange = useCallback(
-    (values: SchemaFormValues) => {
+    (uploadType: QcHardwareUploadType, files: FileRef[]) => {
       if (!hardwareUploadAnchorEntry) return;
-      onDivisionEntryValuesChange(hardwareUploadAnchorEntry.entryId, values);
+      onDivisionEntryValuesChange(hardwareUploadAnchorEntry.entryId, (current) =>
+        setHardwareUploadValue(
+          Object.keys(current).length > 0
+            ? current
+            : createInitialHardwareProcessValues("ABRADING"),
+          uploadType,
+          files,
+        ),
+      );
     },
     [hardwareUploadAnchorEntry, onDivisionEntryValuesChange],
   );
@@ -480,7 +496,7 @@ const QCDivisionFormBody = ({
           >
             <QCHardwareAttachmentUpload
               values={hardwareUploadValues}
-              onChange={handleHardwareUploadChange}
+              onUploadChange={handleHardwareUploadChange}
               readOnly={readOnly}
             />
           </Box>

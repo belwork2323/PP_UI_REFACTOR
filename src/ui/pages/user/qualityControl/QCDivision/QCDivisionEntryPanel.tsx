@@ -35,10 +35,7 @@ import {
 } from "../../../../../hooks/user/qualityControl/qcMixingTables";
 import {
   createInitialHardwareProcessValues,
-  hydrateHardwareProcessValuesFromSections,
-  hydrateHardwareUploadValuesFromSections,
   isQcHardwareProcessSubType,
-  mergeHardwareUploadValuesIntoEntryValues,
 } from "../../../../../hooks/user/qualityControl/qcHardwareTables";
 import {
   createInitialCastingValues,
@@ -118,7 +115,10 @@ type QCDivisionEntryPanelProps = {
   fieldsDisabled?: boolean;
   schemaLoading?: boolean;
   schemaError?: string | null;
-  onEntryValuesChange: (entryId: string, values: SchemaFormValues) => void;
+  onEntryValuesChange: (
+    entryId: string,
+    values: SchemaFormValues | ((prev: SchemaFormValues) => SchemaFormValues),
+  ) => void;
   onEntryLiquidValuesChange: (entryId: string, values: SchemaFormValues) => void;
   onRemoveEntry: (entryId: string) => void;
   unitActions?: QCDivisionEntryUnitActions | null;
@@ -202,9 +202,13 @@ const QCDivisionEntryPanel = ({
   }, [entry.savedSections, entryValues.schemaValues]);
 
   const handleValuesChange = useCallback(
-    (values: SchemaFormValues) => {
+    (valuesOrUpdater: SchemaFormValues | ((prev: SchemaFormValues) => SchemaFormValues)) => {
       if (entry.kind === "MIXING_FINAL_MIX") {
         // Viscosity table may pass viscosity-only or full blob — keep details, take viscosity from `values`.
+        const values =
+          typeof valuesOrUpdater === "function"
+            ? valuesOrUpdater(entryValues.schemaValues ?? {})
+            : valuesOrUpdater;
         onEntryValuesChange(
           entry.entryId,
           mergeFinalMixEntrySchemaValues(
@@ -214,7 +218,7 @@ const QCDivisionEntryPanel = ({
         );
         return;
       }
-      onEntryValuesChange(entry.entryId, values);
+      onEntryValuesChange(entry.entryId, valuesOrUpdater);
     },
     [entry.entryId, entry.kind, entryValues.schemaValues, onEntryValuesChange],
   );
@@ -342,16 +346,6 @@ const QCDivisionEntryPanel = ({
     }
     if (entry.kind === "HARDWARE_PROCESS") {
       const subType = String(entry.subType ?? "");
-      if (entry.savedSections?.length && isQcHardwareProcessSubType(subType)) {
-        let values = hydrateHardwareProcessValuesFromSections(entry.savedSections, subType);
-        if (subType === "ABRADING") {
-          values = mergeHardwareUploadValuesIntoEntryValues(
-            values,
-            hydrateHardwareUploadValuesFromSections(entry.savedSections),
-          );
-        }
-        return values;
-      }
       if (isQcHardwareProcessSubType(subType)) {
         return createInitialHardwareProcessValues(subType);
       }

@@ -12,6 +12,7 @@ import {
 import { STRINGS } from "../../../../../app/config/strings";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { SchemaFormValues } from "../../../../../schema-engine";
+import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
 import QCDivisionFileField from "./QCDivisionFileField";
 import {
   QC_HARDWARE_UPLOAD_GRAPH_KEY,
@@ -19,7 +20,6 @@ import {
   QC_HARDWARE_UPLOAD_REPORT_KEY,
   QC_HARDWARE_UPLOAD_TYPES,
   getHardwareUploadValues,
-  setHardwareUploadValue,
   type QcHardwareUploadType,
 } from "../../../../../hooks/user/qualityControl/qcHardwareTables";
 import {
@@ -61,13 +61,14 @@ const UPLOAD_LABELS: Record<QcHardwareUploadType, string> = {
 
 type QCHardwareAttachmentUploadProps = {
   values: SchemaFormValues;
-  onChange: (values: SchemaFormValues) => void;
+  /** Merge files into latest entry values (avoids stale closure wiping fileId). */
+  onUploadChange: (uploadType: QcHardwareUploadType, files: FileRef[]) => void;
   readOnly?: boolean;
 };
 
 const QCHardwareAttachmentUpload = ({
   values,
-  onChange,
+  onUploadChange,
   readOnly = false,
 }: QCHardwareAttachmentUploadProps) => {
   const uploads = getHardwareUploadValues(values);
@@ -142,9 +143,7 @@ const QCHardwareAttachmentUpload = ({
                     <Box sx={{ minWidth: 220, maxWidth: 420 }}>
                       <QCDivisionFileField
                         files={files}
-                        onChange={(next) =>
-                          onChange(setHardwareUploadValue(values, uploadType, next))
-                        }
+                        onChange={(next) => onUploadChange(uploadType, next)}
                         readOnly={readOnly}
                         compact
                         multiple

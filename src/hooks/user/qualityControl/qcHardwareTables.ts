@@ -1,8 +1,7 @@
 import dayjs from "dayjs";
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
-import { formatDateTimeForApi } from "../../../data/models/user/rawMaterialPreparationApiMapper";
 import { isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileRef } from "../../../data/models/common/FileUploadModel";
-import { formatToIsoDateInput } from "../../../utils/dateUtils";
+import { formatToUiDate, UI_DATETIME_FORMAT } from "../../../utils/dateUtils";
 import type { QcDivisionEntry } from "./qcDivisionEntryTypes";
 import {
   QC_HARDWARE_ATTACHMENTS_SECTION_ID,
@@ -52,7 +51,15 @@ export type QcHardwareDispatchValues = {
   NE_PUNCTURES?: string;
   LF_PUNCTURES?: string;
   DISPATCH_DATE_TIME?: string;
+  /** @deprecated Prefer VISUAL_OBSERVATIONS rows; kept for legacy seed/merge. */
   OBSERVATIONS?: string;
+};
+
+export type QcHardwareVisualObservationRow = {
+  SR_NO?: number | string;
+  PARAMETER?: string;
+  OBSERVATIONS?: string;
+  REMARKS?: string;
 };
 
 export const QC_HARDWARE_UPLOAD_REPORT_KEY = "UPLOAD_REPORT";
@@ -73,6 +80,13 @@ export const QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID = "FIRST_CUT";
 export const QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID = "SECOND_CUT";
 export const QC_HARDWARE_PREHEATING_TABLE_ID = "PREHEATING_DETAILS";
 export const QC_HARDWARE_LINEAR_COATING_TABLE_ID = "LINEAR_COATING_DETAILS";
+export const QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS_TABLE_ID = "VISUAL_OBSERVATIONS";
+
+/** Same presets as Case Prep dispatch visual observations. */
+export const QC_HARDWARE_DISPATCH_VISUAL_PRESETS = [
+  "Liner Coated Rubber Surface Visual Observation",
+  "Observations Over Loose Flap / Bellow Bonding",
+] as const;
 
 const formKey = (sectionId: string, blockId: string) => `${sectionId}::${blockId}`;
 
@@ -128,6 +142,48 @@ const emptyLinearCoatingRow = (srNo = 1): QcHardwareLinearCoatingRow => ({
   RH: "",
   OBSERVATIONS: "",
 });
+
+const emptyVisualObservationRows = (): QcHardwareVisualObservationRow[] =>
+  QC_HARDWARE_DISPATCH_VISUAL_PRESETS.map((parameter, index) => ({
+    SR_NO: index + 1,
+    PARAMETER: parameter,
+    OBSERVATIONS: "",
+    REMARKS: "",
+  }));
+
+const normalizeVisualObservationRows = (
+  rows: QcHardwareVisualObservationRow[] | null | undefined,
+): QcHardwareVisualObservationRow[] => {
+  const incoming = Array.isArray(rows) ? rows : [];
+  const byParameter = new Map(
+    incoming
+      .map((row) => [String(row.PARAMETER ?? "").trim().toLowerCase(), row] as const)
+      .filter(([key]) => Boolean(key)),
+  );
+  const presets = emptyVisualObservationRows().map((preset, index) => {
+    const saved = byParameter.get(String(preset.PARAMETER ?? "").trim().toLowerCase());
+    if (!saved) return { ...preset, SR_NO: index + 1 };
+    byParameter.delete(String(preset.PARAMETER ?? "").trim().toLowerCase());
+    return {
+      SR_NO: index + 1,
+      PARAMETER: preset.PARAMETER,
+      OBSERVATIONS: String(saved.OBSERVATIONS ?? "").trim(),
+      REMARKS: String(saved.REMARKS ?? "").trim(),
+    };
+  });
+  const extras = [...byParameter.values()]
+    .filter(
+      (row) =>
+        hasValue(row.PARAMETER) || hasValue(row.OBSERVATIONS) || hasValue(row.REMARKS),
+    )
+    .map((row, index) => ({
+      SR_NO: presets.length + index + 1,
+      PARAMETER: String(row.PARAMETER ?? "").trim(),
+      OBSERVATIONS: String(row.OBSERVATIONS ?? "").trim(),
+      REMARKS: String(row.REMARKS ?? "").trim(),
+    }));
+  return [...presets, ...extras];
+};
 
 const emptyHardwareUploadValues = (): QcHardwareUploadValues => ({
   [QC_HARDWARE_UPLOAD_REPORT_KEY]: [],
@@ -230,7 +286,8 @@ export const createInitialHardwareProcessValues = (
     [formKey(sectionId, "NE_PUNCTURES")]: "",
     [formKey(sectionId, "LF_PUNCTURES")]: "",
     [formKey(sectionId, "DISPATCH_DATE_TIME")]: "",
-    [formKey(sectionId, "OBSERVATIONS")]: "",
+    [formKey(sectionId, QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS_TABLE_ID)]:
+      emptyVisualObservationRows(),
   };
 };
 
@@ -300,12 +357,61 @@ export const getHardwareDispatchValues = (
   values: SchemaFormValues | null | undefined,
 ): QcHardwareDispatchValues => {
   const sectionId = QC_HARDWARE_SECTION_IDS.DISPATCH;
+  const visualRows = getHardwareDispatchVisualObservationRows(values);
+  const legacyObservations = String(values?.[formKey(sectionId, "OBSERVATIONS")] ?? "").trim();
+  const fromRows = visualRows
+    .map((row) => {
+      const body = String(row.OBSERVATIONS ?? "").trim() || String(row.REMARKS ?? "").trim();
+      const parameter = String(row.PARAMETER ?? "").trim();
+      if (!body) return "";
+      return parameter ? `${parameter}: ${body}` : body;
+    })
+    .filter(Boolean)
+    .join("\n");
   return {
     HE_PUNCTURES: String(values?.[formKey(sectionId, "HE_PUNCTURES")] ?? ""),
     NE_PUNCTURES: String(values?.[formKey(sectionId, "NE_PUNCTURES")] ?? ""),
     LF_PUNCTURES: String(values?.[formKey(sectionId, "LF_PUNCTURES")] ?? ""),
     DISPATCH_DATE_TIME: String(values?.[formKey(sectionId, "DISPATCH_DATE_TIME")] ?? ""),
-    OBSERVATIONS: String(values?.[formKey(sectionId, "OBSERVATIONS")] ?? ""),
+    OBSERVATIONS: fromRows || legacyObservations,
+  };
+};
+
+export const getHardwareDispatchVisualObservationRows = (
+  values: SchemaFormValues | null | undefined,
+): QcHardwareVisualObservationRow[] => {
+  const sectionId = QC_HARDWARE_SECTION_IDS.DISPATCH;
+  const key = formKey(sectionId, QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS_TABLE_ID);
+  const rawRows = readRowsFromValues<QcHardwareVisualObservationRow>(
+    values,
+    key,
+    emptyVisualObservationRows(),
+  );
+  const normalized = normalizeVisualObservationRows(rawRows);
+  // Migrate legacy flat OBSERVATIONS string into the first preset row when rows are empty.
+  const legacy = String(values?.[formKey(sectionId, "OBSERVATIONS")] ?? "").trim();
+  if (
+    legacy &&
+    !normalized.some((row) => hasValue(row.OBSERVATIONS) || hasValue(row.REMARKS))
+  ) {
+    return normalized.map((row, index) =>
+      index === 0 ? { ...row, OBSERVATIONS: legacy } : row,
+    );
+  }
+  return normalized;
+};
+
+export const setHardwareDispatchVisualObservationRows = (
+  values: SchemaFormValues | null | undefined,
+  rows: QcHardwareVisualObservationRow[],
+): SchemaFormValues => {
+  const sectionId = QC_HARDWARE_SECTION_IDS.DISPATCH;
+  const next = { ...(values ?? {}) };
+  delete next[formKey(sectionId, "OBSERVATIONS")];
+  return {
+    ...next,
+    [formKey(sectionId, QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS_TABLE_ID)]:
+      normalizeVisualObservationRows(rows),
   };
 };
 
@@ -314,14 +420,33 @@ export const setHardwareDispatchValues = (
   next: QcHardwareDispatchValues,
 ): SchemaFormValues => {
   const sectionId = QC_HARDWARE_SECTION_IDS.DISPATCH;
-  return {
-    ...(values ?? {}),
+  const current = values ?? {};
+  let result: SchemaFormValues = {
+    ...current,
     [formKey(sectionId, "HE_PUNCTURES")]: next.HE_PUNCTURES ?? "",
     [formKey(sectionId, "NE_PUNCTURES")]: next.NE_PUNCTURES ?? "",
     [formKey(sectionId, "LF_PUNCTURES")]: next.LF_PUNCTURES ?? "",
     [formKey(sectionId, "DISPATCH_DATE_TIME")]: next.DISPATCH_DATE_TIME ?? "",
-    [formKey(sectionId, "OBSERVATIONS")]: next.OBSERVATIONS ?? "",
   };
+  // Preserve structured visual observations; only fall back to legacy string when needed.
+  if (
+    !result[formKey(sectionId, QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS_TABLE_ID)] &&
+    next.OBSERVATIONS != null
+  ) {
+    result = setHardwareDispatchVisualObservationRows(
+      result,
+      emptyVisualObservationRows().map((row, index) =>
+        index === 0 ? { ...row, OBSERVATIONS: next.OBSERVATIONS ?? "" } : row,
+      ),
+    );
+  } else if (!result[formKey(sectionId, QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS_TABLE_ID)]) {
+    result = {
+      ...result,
+      [formKey(sectionId, QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS_TABLE_ID)]:
+        emptyVisualObservationRows(),
+    };
+  }
+  return result;
 };
 
 const readUploadValue = (
@@ -390,6 +515,44 @@ const cutRowHasData = (row: QcHardwareCutRow) =>
   hasValue(row.END_TIME) ||
   hasValue(row.DUST_QTY) ||
   hasValue(row.OBSERVATIONS);
+
+export const hardwareAbradingCutsHaveData = (
+  firstCut: QcHardwareCutRow[],
+  secondCut: QcHardwareCutRow[],
+) => [...firstCut, ...secondCut].some(cutRowHasData);
+
+export const hardwareProcessValuesHaveUserData = (
+  values: SchemaFormValues | null | undefined,
+  subType: QcHardwareProcessSubType,
+): boolean => {
+  if (!values) return false;
+  if (subType === "ABRADING") {
+    const uploads = getHardwareUploadValues(values);
+    return (
+      hardwareAbradingCutsHaveData(
+        getHardwareAbradingRows(values, QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID),
+        getHardwareAbradingRows(values, QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID),
+      ) ||
+      QC_HARDWARE_UPLOAD_TYPES.some((uploadType) => uploadListHasFiles(uploads[uploadType]))
+    );
+  }
+  if (subType === "PREHEATING") {
+    return getHardwarePreheatingRows(values).some(preheatingRowHasData);
+  }
+  if (subType === "LINEAR_COATING") {
+    return getHardwareLinearCoatingRows(values).some(linearCoatingRowHasData);
+  }
+  const dispatch = getHardwareDispatchValues(values);
+  return (
+    hasValue(dispatch.HE_PUNCTURES) ||
+    hasValue(dispatch.NE_PUNCTURES) ||
+    hasValue(dispatch.LF_PUNCTURES) ||
+    hasValue(dispatch.DISPATCH_DATE_TIME) ||
+    getHardwareDispatchVisualObservationRows(values).some(
+      (row) => hasValue(row.OBSERVATIONS) || hasValue(row.REMARKS),
+    )
+  );
+};
 
 const preheatingRowHasData = (row: QcHardwarePreheatingRow) =>
   hasValue(row.DATE) ||
@@ -491,7 +654,14 @@ export const collectHardwareUploadValuesForMotor = (
   };
   if (!normalizedMotorId) return merged;
 
-  for (const entry of hardwareEntries) {
+  // Prefer Abrading (upload anchor) first so shared Graph/Report/Photo win.
+  const ordered = [...hardwareEntries].sort((a, b) => {
+    const aAbrading = a.subType === "ABRADING" ? 0 : 1;
+    const bAbrading = b.subType === "ABRADING" ? 0 : 1;
+    return aAbrading - bAbrading;
+  });
+
+  for (const entry of ordered) {
     if (String(entry.motorId ?? "").trim() !== normalizedMotorId) continue;
     const uploads = getHardwareUploadValues(valuesByEntryId[entry.entryId]?.schemaValues);
     for (const uploadType of QC_HARDWARE_UPLOAD_TYPES) {
@@ -650,12 +820,16 @@ export const buildHardwareProcessSectionPayload = (
   }
 
   const dispatch = getHardwareDispatchValues(values);
+  const visualRows = getHardwareDispatchVisualObservationRows(values);
+  const hasVisual = visualRows.some(
+    (row) => hasValue(row.OBSERVATIONS) || hasValue(row.REMARKS),
+  );
   if (
     !hasValue(dispatch.HE_PUNCTURES) &&
     !hasValue(dispatch.NE_PUNCTURES) &&
     !hasValue(dispatch.LF_PUNCTURES) &&
     !hasValue(dispatch.DISPATCH_DATE_TIME) &&
-    !hasValue(dispatch.OBSERVATIONS)
+    !hasVisual
   ) {
     return [];
   }
@@ -677,9 +851,7 @@ export const buildHardwareProcessSectionPayload = (
           ...(hasValue(dispatch.DISPATCH_DATE_TIME)
             ? { DISPATCH_DATE_TIME: String(dispatch.DISPATCH_DATE_TIME ?? "").trim() }
             : {}),
-          ...(hasValue(dispatch.OBSERVATIONS)
-            ? { OBSERVATIONS: String(dispatch.OBSERVATIONS ?? "").trim() }
-            : {}),
+          [QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS_TABLE_ID]: visualRows,
         },
       ],
     },
@@ -799,12 +971,26 @@ export const hydrateHardwareProcessValuesFromSections = (
   }
 
   const data = asRecord(asArray(section.sectionData)[0]) ?? {};
+  const visualFromSection = extractTableRows<QcHardwareVisualObservationRow>(
+    section.sectionData,
+    QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS_TABLE_ID,
+  );
+  const legacyObservations = String(data.OBSERVATIONS ?? "").trim();
   return {
     [formKey(sectionId, "HE_PUNCTURES")]: String(data.HE_PUNCTURES ?? ""),
     [formKey(sectionId, "NE_PUNCTURES")]: String(data.NE_PUNCTURES ?? ""),
     [formKey(sectionId, "LF_PUNCTURES")]: String(data.LF_PUNCTURES ?? ""),
     [formKey(sectionId, "DISPATCH_DATE_TIME")]: String(data.DISPATCH_DATE_TIME ?? ""),
-    [formKey(sectionId, "OBSERVATIONS")]: String(data.OBSERVATIONS ?? ""),
+    [formKey(sectionId, QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS_TABLE_ID)]:
+      normalizeVisualObservationRows(
+        visualFromSection.length
+          ? visualFromSection
+          : legacyObservations
+            ? emptyVisualObservationRows().map((row, index) =>
+                index === 0 ? { ...row, OBSERVATIONS: legacyObservations } : row,
+              )
+            : emptyVisualObservationRows(),
+      ),
   };
 };
 
@@ -882,227 +1068,500 @@ const omitEmpty = <T extends Record<string, unknown>>(record: T): Record<string,
     }),
   );
 
-const combineUiDateTime = (date: string, time: string): string | undefined => {
-  const d = String(date ?? "").trim();
-  const t = String(time ?? "").trim();
-  if (!d && !t) return undefined;
-  if (d && t) return formatDateTimeForApi(`${d} ${t}`) ?? undefined;
-  if (d) return formatToIsoDateInput(d) || undefined;
-  if (/^\d{1,2}:\d{2}/.test(t)) {
-    const parsed = dayjs(`1970-01-01 ${t}`);
-    return parsed.isValid() ? parsed.format("HH:mm") : t;
+const pickApiField = (row: Record<string, unknown>, ...keys: string[]) => {
+  for (const key of keys) {
+    const value = row[key];
+    if (value !== undefined && value !== null && String(value).trim() !== "") {
+      return String(value).trim();
+    }
   }
-  return undefined;
+  return "";
 };
 
-const cutRowToAbradingDetails = (
-  row: QcHardwareCutRow,
-  dustLabel: "A" | "B",
-  startSrNo: number,
-): Record<string, unknown>[] => {
-  const details: Record<string, unknown>[] = [];
-  let srNo = startSrNo;
-  const startValue = combineUiDateTime(String(row.DATE ?? ""), String(row.START_TIME ?? ""));
-  const endValue = combineUiDateTime(String(row.DATE ?? ""), String(row.END_TIME ?? ""));
-  const remarks = String(row.OBSERVATIONS ?? "").trim() || undefined;
+const cutRowToApiRow = (row: QcHardwareCutRow, index: number) =>
+  omitEmpty({
+    srNo: index + 1,
+    date: row.DATE,
+    startTime: row.START_TIME,
+    endTime: row.END_TIME,
+    dustQty: row.DUST_QTY,
+    observations: row.OBSERVATIONS,
+  });
 
-  if (startValue) {
-    details.push({
-      SR_NO: srNo++,
-      operation: "Start Date & Time",
-      value: startValue,
-      remarksObservations: remarks,
-    });
-  }
-  if (endValue) {
-    details.push({
-      SR_NO: srNo++,
-      operation: "End Date & Time",
-      value: endValue,
-      remarksObservations: remarks,
-    });
-  }
-  if (hasValue(row.DUST_QTY)) {
-    details.push({
-      SR_NO: srNo++,
-      operation: `Dust Weight (in gm) (${dustLabel})`,
-      value: String(row.DUST_QTY ?? "").trim(),
-      remarksObservations: remarks,
-    });
-  }
-  return details;
+const preheatingRowToApiRow = (row: QcHardwarePreheatingRow, index: number) =>
+  omitEmpty({
+    srNo: index + 1,
+    date: row.DATE,
+    startTime: row.START_TIME,
+    endTime: row.END_TIME,
+    ovenNumber: row.OVEN_NUMBER,
+    buildingNo: row.BUILDING_NO,
+    temperature: row.TEMPERATURE,
+    vacuumLevel: row.VACUUM_LEVEL,
+    observations: row.OBSERVATIONS,
+  });
+
+const linerRowToApiRow = (row: QcHardwareLinearCoatingRow, index: number) =>
+  omitEmpty({
+    srNo: index + 1,
+    date: row.DATE,
+    startTime: row.START_TIME,
+    endTime: row.END_TIME,
+    linerQty: row.LINER_QTY,
+    insulationTemp: row.INSULATION_TEMP,
+    rh: row.RH,
+    observations: row.OBSERVATIONS,
+  });
+
+const dispatchToApi = (values: SchemaFormValues | null | undefined) => {
+  const dispatch = getHardwareDispatchValues(values);
+  const visualObservations = getHardwareDispatchVisualObservationRows(values).map((row, index) => ({
+    srNo: index + 1,
+    parameter: String(row.PARAMETER ?? "").trim(),
+    observations: String(row.OBSERVATIONS ?? "").trim(),
+    remarks: String(row.REMARKS ?? "").trim() || null,
+  }));
+  return omitEmpty({
+    hePunctures: dispatch.HE_PUNCTURES,
+    nePunctures: dispatch.NE_PUNCTURES,
+    lfPunctures: dispatch.LF_PUNCTURES,
+    dispatchDateTime: dispatch.DISPATCH_DATE_TIME,
+    visualObservations,
+  });
 };
 
-const buildAbradingOperationPayload = (values: SchemaFormValues): Record<string, unknown> => {
+const buildHardwareAbradingPayload = (values: SchemaFormValues): Record<string, unknown> => {
   const firstCut = sanitizeCutRows(
     getHardwareAbradingRows(values, QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID),
-  );
+  ).map((row, index) => cutRowToApiRow(row, index));
   const secondCut = sanitizeCutRows(
     getHardwareAbradingRows(values, QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID),
-  );
-  const abradingDetails = [
-    ...cutRowToAbradingDetails(firstCut[0] ?? emptyCutRow(1), "A", 1),
-    ...cutRowToAbradingDetails(secondCut[0] ?? emptyCutRow(1), "B", 4),
-  ];
-  const dustA = Number(firstCut[0]?.DUST_QTY);
-  const dustB = Number(secondCut[0]?.DUST_QTY);
-  if (Number.isFinite(dustA) && Number.isFinite(dustB)) {
-    abradingDetails.push({
-      SR_NO: abradingDetails.length + 1,
-      operation: "Total Dust Weight (in gm) (A+B)",
-      value: String(dustA + dustB),
-      remarksObservations: undefined,
-    });
-  }
-  const photoFiles = toFileIdListPayload(
-    getHardwareUploadValues(values)[QC_HARDWARE_UPLOAD_PHOTO_KEY],
-  );
-
+  ).map((row, index) => cutRowToApiRow(row, index));
   return omitEmpty({
-    abradingDetails: abradingDetails.map((row, index) => ({
-      ...row,
-      SR_NO: index + 1,
-      attachments: index === 0 && photoFiles.length ? photoFiles : undefined,
-    })),
+    firstCut,
+    secondCut,
   });
 };
 
-const buildPreHeatingPayload = (values: SchemaFormValues): Record<string, unknown> => {
-  const rows = sanitizePreheatingRows(getHardwarePreheatingRows(values));
-  const row = rows[0];
-  if (!row) return {};
-
-  const monitoring: Record<string, unknown>[] = [];
-  let srNo = 1;
-  if (hasValue(row.DATE)) {
-    monitoring.push({
-      SR_NO: srNo++,
-      parameter: "Date",
-      value: formatToIsoDateInput(String(row.DATE)) || String(row.DATE),
-      remarks: String(row.OBSERVATIONS ?? "").trim() || undefined,
-    });
-  }
-  if (hasValue(row.START_TIME)) {
-    monitoring.push({
-      SR_NO: srNo++,
-      parameter: "Cycle Start Time",
-      value: String(row.START_TIME).trim(),
-      remarks: undefined,
-    });
-  }
-  if (hasValue(row.END_TIME)) {
-    monitoring.push({
-      SR_NO: srNo++,
-      parameter: "Cycle End Time",
-      value: String(row.END_TIME).trim(),
-      remarks: undefined,
-    });
-  }
-  if (hasValue(row.OBSERVATIONS)) {
-    monitoring.push({
-      SR_NO: srNo++,
-      parameter: "Visual Observation After Pre-heating",
-      value: String(row.OBSERVATIONS).trim(),
-      remarks: undefined,
-    });
-  }
-
-  const temperatureDuration = hasValue(row.TEMPERATURE)
-    ? [
-        {
-          SR_NO: 1,
-          parameter: "Temperature @ 1 Hour",
-          value: String(row.TEMPERATURE).trim(),
-          remarks: undefined,
-        },
-      ]
-    : [];
-
-  return omitEmpty({
-    vacuumBaggingApplied: hasValue(row.VACUUM_LEVEL) ? "YES" : undefined,
-    vacuumApplied: hasValue(row.VACUUM_LEVEL) ? Number(row.VACUUM_LEVEL) : undefined,
-    temperatureDuration,
-    preHeatingMonitoring: monitoring,
-  });
+const buildHardwarePreheatingPayload = (values: SchemaFormValues): Record<string, unknown> => {
+  const rows = sanitizePreheatingRows(getHardwarePreheatingRows(values)).map((row, index) =>
+    preheatingRowToApiRow(row, index),
+  );
+  return rows.length ? { rows } : {};
 };
 
-const buildLinerCoatingPayload = (values: SchemaFormValues): Record<string, unknown> => {
-  const rows = sanitizeLinearCoatingRows(getHardwareLinearCoatingRows(values));
-  const row = rows[0];
-  if (!row) return {};
+const buildHardwareLinerCoatingPayload = (values: SchemaFormValues): Record<string, unknown> => {
+  const rows = sanitizeLinearCoatingRows(getHardwareLinearCoatingRows(values)).map((row, index) =>
+    linerRowToApiRow(row, index),
+  );
+  return rows.length ? { rows } : {};
+};
 
-  const log: Record<string, unknown>[] = [];
-  let srNo = 1;
-  const pushLog = (parameter: string, value: unknown, remarks?: string) => {
-    if (!hasValue(value)) return;
-    log.push({
-      SR_NO: srNo++,
-      parameter,
-      value: String(value).trim(),
-      remarks: remarks?.trim() || undefined,
+const buildHardwareDispatchPayload = (values: SchemaFormValues): Record<string, unknown> =>
+  dispatchToApi(values);
+
+const buildHardwareAttachmentsPayload = (values: SchemaFormValues): Record<string, unknown> => {
+  const uploads = sanitizeHardwareUploadValues(getHardwareUploadValues(values));
+  // Always emit all three keys (including empty arrays) — matches create/update API contract.
+  return {
+    uploadReport: toFileIdListPayload(uploads[QC_HARDWARE_UPLOAD_REPORT_KEY]),
+    uploadGraph: toFileIdListPayload(uploads[QC_HARDWARE_UPLOAD_GRAPH_KEY]),
+    uploadPhoto: toFileIdListPayload(uploads[QC_HARDWARE_UPLOAD_PHOTO_KEY]),
+  };
+};
+
+const formatApiDateForUi = (value: string) => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (/^\d{4}-\d{2}-\d{2}/.test(raw)) return formatToUiDate(raw);
+  return raw;
+};
+
+const mapDispatchVisualObservationsFromApi = (
+  dispatch: Record<string, unknown>,
+): QcHardwareVisualObservationRow[] => {
+  const apiRows = asArray(dispatch.visualObservations)
+    .map((row) => {
+      const rec = asRecord(row);
+      if (!rec) return null;
+      return {
+        SR_NO: Number(rec.srNo ?? rec.SR_NO) || undefined,
+        PARAMETER: String(rec.parameter ?? rec.PARAMETER ?? "").trim(),
+        OBSERVATIONS: String(rec.observations ?? rec.OBSERVATIONS ?? "").trim(),
+        REMARKS: String(rec.remarks ?? rec.REMARKS ?? "").trim(),
+      } satisfies QcHardwareVisualObservationRow;
+    })
+    .filter((row): row is QcHardwareVisualObservationRow => Boolean(row));
+
+  if (apiRows.length) return normalizeVisualObservationRows(apiRows);
+
+  const flat = pickApiField(dispatch, "observations", "OBSERVATIONS");
+  if (!flat) return emptyVisualObservationRows();
+  return normalizeVisualObservationRows(
+    emptyVisualObservationRows().map((row, index) =>
+      index === 0 ? { ...row, OBSERVATIONS: flat } : row,
+    ),
+  );
+};
+
+export const listHardwareMotorsFromDetailData = (detailData: unknown): Record<string, unknown>[] => {
+  const root = asRecord(detailData);
+  if (!root) return [];
+  const buckets = [
+    asRecord(root.data),
+    root,
+    asRecord(root.__manufacturingDivisionData),
+    asRecord(root.__qcFormDivisionData),
+    asRecord(asRecord(root.__manufacturingDivisionData)?.data),
+    asRecord(asRecord(root.__qcFormDivisionData)?.data),
+  ].filter(Boolean) as Record<string, unknown>[];
+  const motors: Record<string, unknown>[] = [];
+  const seen = new Set<string>();
+
+  for (const bucket of buckets) {
+    const casePrep = asRecord(bucket.casePreparationDetails);
+    for (const motor of [
+      ...asArray(bucket.motorDetails),
+      ...asArray(bucket.motors),
+      ...asArray(casePrep?.motors),
+    ]) {
+      const rec = asRecord(motor);
+      if (!rec) continue;
+      const motorId = String(rec.motorId ?? rec.motorIdNo ?? rec.id ?? "").trim();
+      const key = motorId || JSON.stringify(rec);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      motors.push(rec);
+    }
+  }
+
+  return motors;
+};
+
+const splitAbradingDateTimeValue = (value: unknown): { date: string; time: string } => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return { date: "", time: "" };
+
+  if (raw.includes("T") || /^\d{4}-\d{2}-\d{2}/.test(raw)) {
+    const parsed = dayjs(raw);
+    if (parsed.isValid()) {
+      return {
+        date: parsed.format("DD-MM-YYYY"),
+        time: parsed.format("HH:mm"),
+      };
+    }
+  }
+
+  const timeMatch = raw.match(/^(\d{1,2}):(\d{2})/);
+  if (timeMatch) {
+    return {
+      date: "",
+      time: `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}`,
+    };
+  }
+
+  return { date: formatToUiDate(raw), time: "" };
+};
+
+const mapAbradingDetailItemsToCutRows = (abradingDetails: unknown[]): QcHardwareCutRow[] => {
+  const rows: QcHardwareCutRow[] = [];
+  let current: Partial<QcHardwareCutRow> = {};
+
+  const flush = () => {
+    if (!cutRowHasData(current as QcHardwareCutRow)) {
+      current = {};
+      return;
+    }
+    rows.push({
+      SR_NO: rows.length + 1,
+      DATE: String(current.DATE ?? ""),
+      START_TIME: String(current.START_TIME ?? ""),
+      END_TIME: String(current.END_TIME ?? ""),
+      DUST_QTY: String(current.DUST_QTY ?? ""),
+      OBSERVATIONS: String(current.OBSERVATIONS ?? ""),
     });
+    current = {};
   };
 
-  pushLog("Date", formatToIsoDateInput(String(row.DATE ?? "")) || row.DATE, row.OBSERVATIONS);
-  pushLog("Start Time", row.START_TIME, row.OBSERVATIONS);
-  pushLog("End Time", row.END_TIME, row.OBSERVATIONS);
-  pushLog("Rocket Motor Insulation Temp", row.INSULATION_TEMP, row.OBSERVATIONS);
-  pushLog("Liner Applied (w/o DCM)", row.LINER_QTY, row.OBSERVATIONS);
+  for (const item of abradingDetails) {
+    const rec = asRecord(item);
+    if (!rec) continue;
+    const operation = String(rec.operation ?? "").trim();
+    const value = String(rec.value ?? "").trim();
+    const remarks = String(rec.remarksObservations ?? rec.remarks ?? "").trim();
 
-  return omitEmpty({
-    rh: row.RH || undefined,
-    linerApplicationLog: log,
-  });
+    if (/^Start Date & Time$/i.test(operation)) {
+      flush();
+      const { date, time } = splitAbradingDateTimeValue(value);
+      current.DATE = date;
+      current.START_TIME = time;
+      if (remarks) current.OBSERVATIONS = remarks;
+      continue;
+    }
+
+    if (/^End Date & Time$/i.test(operation)) {
+      const { date, time } = splitAbradingDateTimeValue(value);
+      if (!current.DATE && date) current.DATE = date;
+      current.END_TIME = time;
+      if (remarks && !current.OBSERVATIONS) current.OBSERVATIONS = remarks;
+      continue;
+    }
+
+    if (/Dust Weight/i.test(operation) && !/Total/i.test(operation)) {
+      current.DUST_QTY = value;
+    }
+  }
+
+  flush();
+  return rows;
 };
 
-const buildDispatchToCastingPayload = (values: SchemaFormValues): Record<string, unknown> => {
-  const dispatch = getHardwareDispatchValues(values);
-  const details: Record<string, unknown>[] = [];
-  let srNo = 1;
-  const pushDetail = (parameter: string, value: unknown, remarks?: string) => {
-    if (!hasValue(value)) return;
-    details.push({
-      SR_NO: srNo++,
-      parameter,
-      value: String(value).trim(),
-      remarks: remarks?.trim() || undefined,
-    });
-  };
+const isAbradingHeaderRow = (rec: Record<string, unknown>) =>
+  String(rec.type ?? "").toLowerCase() === "header" ||
+  ("label" in rec && !("operation" in rec));
 
-  pushDetail("Puncturing at HE (Nos)", dispatch.HE_PUNCTURES);
-  pushDetail("Puncturing at NE (Nos)", dispatch.NE_PUNCTURES);
-  pushDetail("Puncturing at LF Extension (Nos)", dispatch.LF_PUNCTURES);
-  pushDetail("Dispatch Time", combineUiDateTime("", String(dispatch.DISPATCH_DATE_TIME ?? "")));
+const isSecondCutHeaderLabel = (label: string) => /2nd|second/i.test(label);
 
-  const visualObservations = String(dispatch.OBSERVATIONS ?? "")
-    .split("\n")
-    .map((line) => line.trim())
-    .filter(Boolean)
-    .map((line, index) => {
-      const [parameter, ...rest] = line.split(":");
-      if (rest.length) {
-        return {
-          SR_NO: index + 1,
-          parameter: parameter.trim(),
-          observations: rest.join(":").trim(),
-        };
+/** Map Case Prep / legacy `abradingDetails` rows into First Cut and Second Cut tables. */
+export const mapAbradingDetailsToFirstAndSecondCut = (
+  abradingDetails: unknown[],
+): { firstCut: QcHardwareCutRow[]; secondCut: QcHardwareCutRow[] } => {
+  const firstItems: unknown[] = [];
+  const secondItems: unknown[] = [];
+  let target = firstItems;
+
+  for (const item of abradingDetails) {
+    const rec = asRecord(item);
+    if (!rec) continue;
+    if (isAbradingHeaderRow(rec)) {
+      const label = String(rec.label ?? rec.operation ?? "").trim();
+      if (isSecondCutHeaderLabel(label)) {
+        target = secondItems;
+      } else if (/1st|first/i.test(label)) {
+        target = firstItems;
       }
-      return { SR_NO: index + 1, parameter: "Observations", observations: line };
-    });
+      continue;
+    }
+    target.push(item);
+  }
 
-  return omitEmpty({
-    dispatchVisualObservations: visualObservations,
-    dispatchToCastingDetails: details,
-  });
+  if (firstItems.length > 0 || secondItems.length > 0) {
+    return {
+      firstCut: mapAbradingDetailItemsToCutRows(firstItems),
+      secondCut: mapAbradingDetailItemsToCutRows(secondItems),
+    };
+  }
+
+  const allRows = mapAbradingDetailItemsToCutRows(abradingDetails);
+  return {
+    firstCut: allRows[0] != null ? [allRows[0]] : [],
+    secondCut: allRows[1] != null ? [allRows[1]] : [],
+  };
 };
 
-const buildTceCleaningPayload = (values: SchemaFormValues): Record<string, unknown> => {
-  const uploads = getHardwareUploadValues(values);
-  const report = toFileIdListPayload(uploads[QC_HARDWARE_UPLOAD_REPORT_KEY]);
-  if (!report.length) return {};
-  return omitEmpty({
-    testReport: report,
-  });
+export const resolveAbradingCutsFromRecord = (
+  abrading: Record<string, unknown>,
+): { firstCut: QcHardwareCutRow[]; secondCut: QcHardwareCutRow[] } => {
+  const firstFromApi = asArray(abrading.firstCut).map(apiCutRowToFormRow);
+  const secondFromApi = asArray(abrading.secondCut).map(apiCutRowToFormRow);
+  if (firstFromApi.length > 0 || secondFromApi.length > 0) {
+    return { firstCut: firstFromApi, secondCut: secondFromApi };
+  }
+
+  const firstFromSections = extractTableRows<QcHardwareCutRow>(
+    [abrading],
+    QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID,
+  );
+  const secondFromSections = extractTableRows<QcHardwareCutRow>(
+    [abrading],
+    QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID,
+  );
+  if (firstFromSections.length > 0 || secondFromSections.length > 0) {
+    return { firstCut: firstFromSections, secondCut: secondFromSections };
+  }
+
+  return mapAbradingDetailsToFirstAndSecondCut(asArray(abrading.abradingDetails));
+};
+
+const apiCutRowToFormRow = (row: unknown, index: number): QcHardwareCutRow => {
+  const rec = asRecord(row) ?? {};
+  return {
+    SR_NO: Number(pickApiField(rec, "srNo", "SR_NO")) || index + 1,
+    DATE: formatApiDateForUi(pickApiField(rec, "date", "DATE")),
+    START_TIME: pickApiField(rec, "startTime", "START_TIME"),
+    END_TIME: pickApiField(rec, "endTime", "END_TIME"),
+    DUST_QTY: pickApiField(rec, "dustQty", "DUST_QTY"),
+    OBSERVATIONS: pickApiField(rec, "observations", "OBSERVATIONS"),
+  };
+};
+
+const apiPreheatingRowToFormRow = (row: unknown, index: number): QcHardwarePreheatingRow => {
+  const rec = asRecord(row) ?? {};
+  return {
+    SR_NO: Number(pickApiField(rec, "srNo", "SR_NO")) || index + 1,
+    DATE: formatApiDateForUi(pickApiField(rec, "date", "DATE")),
+    START_TIME: pickApiField(rec, "startTime", "START_TIME"),
+    END_TIME: pickApiField(rec, "endTime", "END_TIME"),
+    OVEN_NUMBER: pickApiField(rec, "ovenNumber", "OVEN_NUMBER"),
+    BUILDING_NO: pickApiField(rec, "buildingNo", "BUILDING_NO"),
+    TEMPERATURE: pickApiField(rec, "temperature", "TEMPERATURE"),
+    VACUUM_LEVEL: pickApiField(rec, "vacuumLevel", "VACUUM_LEVEL"),
+    OBSERVATIONS: pickApiField(rec, "observations", "OBSERVATIONS"),
+  };
+};
+
+const apiLinerRowToFormRow = (row: unknown, index: number): QcHardwareLinearCoatingRow => {
+  const rec = asRecord(row) ?? {};
+  return {
+    SR_NO: Number(pickApiField(rec, "srNo", "SR_NO")) || index + 1,
+    DATE: formatApiDateForUi(pickApiField(rec, "date", "DATE")),
+    START_TIME: pickApiField(rec, "startTime", "START_TIME"),
+    END_TIME: pickApiField(rec, "endTime", "END_TIME"),
+    LINER_QTY: pickApiField(rec, "linerQty", "LINER_QTY"),
+    INSULATION_TEMP: pickApiField(rec, "insulationTemp", "INSULATION_TEMP"),
+    RH: pickApiField(rec, "rh", "RH"),
+    OBSERVATIONS: pickApiField(rec, "observations", "OBSERVATIONS"),
+  };
+};
+
+const hydrateHardwareAttachmentsFromMotorDetail = (
+  attachments: unknown,
+): QcHardwareUploadValues => {
+  const rec = asRecord(attachments) ?? {};
+  return {
+    [QC_HARDWARE_UPLOAD_REPORT_KEY]: parseFileRefs(
+      rec.uploadReport ?? rec.UPLOAD_REPORT ?? rec.upload_report,
+    ),
+    [QC_HARDWARE_UPLOAD_GRAPH_KEY]: parseFileRefs(
+      rec.uploadGraph ?? rec.UPLOAD_GRAPH ?? rec.upload_graph,
+    ),
+    [QC_HARDWARE_UPLOAD_PHOTO_KEY]: parseFileRefs(
+      rec.uploadPhoto ?? rec.UPLOAD_PHOTO ?? rec.upload_photo,
+    ),
+  };
+};
+
+export const isHardwareNestedMotorDetail = (motor: Record<string, unknown>) =>
+  Boolean(
+    motor.abrading ||
+      motor.abradingOperation ||
+      motor.preheating ||
+      motor.preHeating ||
+      motor.linerCoating ||
+      motor.linerCoatingOperation ||
+      motor.dispatch ||
+      motor.dispatchToCasting ||
+      motor.attachments ||
+      motor.tceCleaning,
+  );
+
+const resolveAbradingCutsForMotor = (
+  motor: Record<string, unknown>,
+): { firstCut: QcHardwareCutRow[]; secondCut: QcHardwareCutRow[] } => {
+  const sources = [
+    asRecord(motor.abrading),
+    asRecord(motor.abradingOperation),
+    asRecord(asRecord(motor.details)?.abradingOperation),
+  ].filter(Boolean) as Record<string, unknown>[];
+
+  for (const source of sources) {
+    const cuts = resolveAbradingCutsFromRecord(source);
+    if (hardwareAbradingCutsHaveData(cuts.firstCut, cuts.secondCut)) {
+      return cuts;
+    }
+  }
+
+  return { firstCut: [], secondCut: [] };
+};
+
+export const findHardwareMotorDetailInData = (
+  detailData: unknown,
+  motorId: string,
+): Record<string, unknown> | null => {
+  const normalizedMotorId = String(motorId ?? "").trim();
+  if (!normalizedMotorId) return null;
+
+  const root = asRecord(detailData);
+  const manufacturingRoot = asRecord(root?.__manufacturingDivisionData);
+  const candidates = [
+    detailData,
+    root?.__qcFormDivisionData,
+    root?.__manufacturingDivisionData,
+    root?.data,
+    manufacturingRoot,
+  ].filter((candidate, index, list) => candidate != null && list.indexOf(candidate) === index);
+
+  for (const candidate of candidates) {
+    for (const rec of listHardwareMotorsFromDetailData(candidate)) {
+      const id = String(rec.motorId ?? rec.motorIdNo ?? rec.id ?? "").trim();
+      if (id === normalizedMotorId && isHardwareNestedMotorDetail(rec)) return rec;
+    }
+  }
+
+  return null;
+};
+
+export const hydrateHardwareValuesFromMotorDetail = (
+  motor: Record<string, unknown>,
+): SchemaFormValues => {
+  const abradingSectionId = QC_HARDWARE_SECTION_IDS.ABRADING;
+  const preheatingSectionId = QC_HARDWARE_SECTION_IDS.PREHEATING;
+  const linerSectionId = QC_HARDWARE_SECTION_IDS.LINEAR_COATING;
+  const dispatchSectionId = QC_HARDWARE_SECTION_IDS.DISPATCH;
+
+  const { firstCut, secondCut } = resolveAbradingCutsForMotor(motor);
+
+  const preheating = asRecord(motor.preheating) ?? asRecord(motor.preHeating) ?? {};
+  const preheatingRows = asArray(preheating.rows).map(apiPreheatingRowToFormRow);
+
+  const linerCoating =
+    asRecord(motor.linerCoating) ?? asRecord(motor.linerCoatingOperation) ?? {};
+  const linerRows = asArray(linerCoating.rows).map(apiLinerRowToFormRow);
+
+  const dispatch = asRecord(motor.dispatch) ?? asRecord(motor.dispatchToCasting) ?? {};
+  const uploads = hydrateHardwareAttachmentsFromMotorDetail(motor.attachments);
+
+  let values: SchemaFormValues = {
+    ...createInitialHardwareProcessValues("ABRADING"),
+    [formKey(abradingSectionId, QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID)]:
+      firstCut.length > 0 ? normalizeCutRows(firstCut) : [emptyCutRow(1)],
+    [formKey(abradingSectionId, QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID)]:
+      secondCut.length > 0 ? normalizeCutRows(secondCut) : [emptyCutRow(1)],
+    [formKey(preheatingSectionId, QC_HARDWARE_PREHEATING_TABLE_ID)]:
+      preheatingRows.length > 0 ? normalizePreheatingRows(preheatingRows) : [emptyPreheatingRow(1)],
+    [formKey(linerSectionId, QC_HARDWARE_LINEAR_COATING_TABLE_ID)]:
+      linerRows.length > 0 ? normalizeLinearCoatingRows(linerRows) : [emptyLinearCoatingRow(1)],
+    [formKey(dispatchSectionId, "HE_PUNCTURES")]: pickApiField(dispatch, "hePunctures", "HE_PUNCTURES"),
+    [formKey(dispatchSectionId, "NE_PUNCTURES")]: pickApiField(dispatch, "nePunctures", "NE_PUNCTURES"),
+    [formKey(dispatchSectionId, "LF_PUNCTURES")]: pickApiField(dispatch, "lfPunctures", "LF_PUNCTURES"),
+    [formKey(dispatchSectionId, "DISPATCH_DATE_TIME")]: pickApiField(
+      dispatch,
+      "dispatchDateTime",
+      "DISPATCH_DATE_TIME",
+    ),
+    [formKey(dispatchSectionId, QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS_TABLE_ID)]:
+      mapDispatchVisualObservationsFromApi(dispatch),
+  };
+
+  values = mergeHardwareUploadValuesIntoEntryValues(values, uploads);
+  return values;
+};
+
+export const sliceHardwareEntrySchemaValues = (
+  merged: SchemaFormValues,
+  subType: QcHardwareProcessSubType,
+): SchemaFormValues => {
+  const initial = createInitialHardwareProcessValues(subType);
+  const sliced: SchemaFormValues = { ...initial };
+  for (const key of Object.keys(initial)) {
+    if (key in merged) {
+      sliced[key] = merged[key];
+    }
+  }
+  if (subType === "ABRADING") {
+    return mergeHardwareUploadValuesIntoEntryValues(sliced, getHardwareUploadValues(merged));
+  }
+  return sliced;
 };
 
 export const collectHardwareFileRefsFromQcValues = (
@@ -1140,24 +1599,34 @@ export const mergeHardwareMotorSchemaValues = (
     if (!values) return;
     Object.assign(merged, values);
   });
-  return merged;
+
+  // Shared uploads live on the Abrading (anchor) entry — re-apply after merge so a
+  // later process Object.assign cannot wipe HARDWARE_ATTACHMENTS::* keys.
+  const motorId = String(hardwareEntries[0]?.motorId ?? "").trim();
+  if (!motorId) return merged;
+  return mergeHardwareUploadValuesIntoEntryValues(
+    merged,
+    collectHardwareUploadValuesForMotor(motorId, hardwareEntries, valuesByEntryId),
+  );
 };
 
-/** Strict Case Preparation DTO for QC create/update (`data.motorDetails[]`). */
+/** UI-aligned QC create/update payload (`data.motorDetails[]`). */
 export const buildHardwareMotorDetailPayload = (
   values: SchemaFormValues | null | undefined,
   motorId: string,
   motorSubmissionType: QcHardwareMotorSubmissionType = "DRAFT",
 ): Record<string, unknown> => {
   const merged = values ?? createInitialHardwareProcessValues("ABRADING");
+  const attachments = buildHardwareAttachmentsPayload(merged);
   return omitEmpty({
     motorId,
     motorSubmissionType,
-    abradingOperation: buildAbradingOperationPayload(merged),
-    tceCleaning: buildTceCleaningPayload(merged),
-    preHeating: buildPreHeatingPayload(merged),
-    linerCoatingOperation: buildLinerCoatingPayload(merged),
-    dispatchToCasting: buildDispatchToCastingPayload(merged),
+    abrading: buildHardwareAbradingPayload(merged),
+    preheating: buildHardwarePreheatingPayload(merged),
+    linerCoating: buildHardwareLinerCoatingPayload(merged),
+    dispatch: buildHardwareDispatchPayload(merged),
+    // Always send attachments object (API expects uploadReport/Graph/Photo keys).
+    attachments,
   });
 };
 

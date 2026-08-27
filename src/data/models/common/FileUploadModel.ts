@@ -69,7 +69,7 @@ export const parseFileRef = (value: unknown): FileRef | null => {
   if (value == null) return null;
   if (typeof value === "string") {
     const trimmed = value.trim();
-    if (!trimmed) return null;
+    if (!trimmed || trimmed === "[object Object]") return null;
     // API sometimes returns bare fileId strings (e.g. "FILE_…") in certificate arrays.
     if (/^FILE_/i.test(trimmed)) {
       return {
@@ -94,25 +94,36 @@ export const parseFileRef = (value: unknown): FileRef | null => {
       file: null,
     };
   }
-  if (typeof value !== "object") return null;
+  if (typeof value !== "object" || Array.isArray(value)) return null;
   const o = value as Record<string, unknown>;
   const fileId = String(o.fileId ?? "").trim() || null;
   const fileUrl = String(o.fileUrl ?? o.filePath ?? o.downloadUrl ?? fileId ?? "").trim();
+  const rawName = o.fileName ?? o.originalFileName ?? o.name ?? "";
   const fileName =
-    String(o.fileName ?? o.originalFileName ?? o.name ?? "").trim() ||
+    (typeof rawName === "string" ? rawName.trim() : "") ||
     String(fileUrl.split("/").pop() || "").trim();
   if (!fileId && !fileName && !fileUrl) return null;
+  const existingLocalId = String(o.localId ?? "").trim();
+  const rawStatus = o.status;
+  const status: FileAttachmentStatus | undefined =
+    rawStatus === "uploading" || rawStatus === "uploaded" || rawStatus === "failed"
+      ? rawStatus
+      : fileId
+        ? "uploaded"
+        : undefined;
   return {
-    fileName: fileName || "file",
+    fileName: fileName || fileId || "file",
     fileUrl: fileUrl || fileId || "",
     mimeType: String(o.mimeType ?? "").trim() || "application/octet-stream",
     storedFileName: String(o.storedFileName ?? "").trim() || undefined,
-    originalFileName: String(o.originalFileName ?? "").trim() || undefined,
+    originalFileName:
+      typeof o.originalFileName === "string" ? o.originalFileName.trim() || undefined : undefined,
     fileId,
-    localId: newFileLocalId(),
-    status: "uploaded",
-    isTemp: false,
-    file: null,
+    // Preserve localId so in-flight upload patches (patchByLocalId) still match after re-parse.
+    localId: existingLocalId || newFileLocalId(),
+    status,
+    isTemp: typeof o.isTemp === "boolean" ? o.isTemp : fileId ? false : undefined,
+    file: o.file instanceof File ? o.file : null,
   };
 };
 
@@ -132,7 +143,7 @@ export const parseFileRefs = (value: unknown): FileRef[] => {
 };
 
 export const toFileIdPayload = (ref: FileRef): FileIdPayload | null => {
-  if (!ref || ref.status === "uploading" || ref.status === "failed") return null;
+  if (!ref || ref.status === "failed") return null;
   const fileId = String(ref.fileId ?? "").trim();
   if (!fileId) return null;
   return { fileId };
@@ -148,14 +159,8 @@ export const fileIdsFromFormRefs = (refs: FileRef[] | null | undefined): FileIdP
   return refs.map(toFileIdPayload).filter((p): p is FileIdPayload => Boolean(p));
 };
 
-export const toFileIdListPayload = (value: unknown): FileIdPayload[] => {
-  const refs = Array.isArray(value)
-    ? (value as FileRef[])
-    : value
-      ? parseFileRefs(value)
-      : [];
-  return fileIdsFromFormRefs(refs);
-};
+export const toFileIdListPayload = (value: unknown): FileIdPayload[] =>
+  fileIdsFromFormRefs(parseFileRefs(value));
 
 export const toFileIdPayloadOrNull = (value: unknown): FileIdPayload | null => {
   if (value == null) return null;

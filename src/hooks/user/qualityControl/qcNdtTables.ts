@@ -1,11 +1,15 @@
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
 import { formatToUiDate } from "../../../utils/dateUtils";
 import { isFileReady, isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileRef } from "../../../data/models/common/FileUploadModel";
+import { getRocketMotorCasingMotorsFromSheet, type IdentificationSheet } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
+import { mapBatchRadiographyDetailsToNdt } from "../../../data/models/user/NDTFormModel";
 import {
   mapNdtBeamEnergiesFromApi,
+  mapNdtBeamEnergiesToApi,
   mapNdtEquipmentFromApi,
+  mapNdtEquipmentToApi,
   mapNdtObservationTypeFromApi,
-  mapNdtOrientationFromApi,
+  mapNdtObservationTypeToApi,
 } from "./ndtApiMappings";
 import {
   QC_NDT_RADIOGRAPHY_OBSERVATION_PRESET,
@@ -150,13 +154,27 @@ const parseNdtUploadFiles = (...candidates: unknown[]): FileRef[] => {
   return [];
 };
 
-const formatNdtSectionLocation = (sectionNumber: unknown, orientation: unknown) => {
-  const section = pickString(sectionNumber);
-  const orientRaw = pickString(orientation);
-  const orient = mapNdtOrientationFromApi(orientRaw) || orientRaw;
-  if (section && orient) return `${section} / ${orient}`;
-  return section || orient;
+const buildMachineNoFromRadiography = (radiography: Record<string, unknown> | null) => {
+  if (!radiography) return "";
+  const equipment = mapNdtEquipmentFromApi(
+    (radiography.equipmentUtilized as string[] | string | null | undefined) ?? [],
+  );
+  const beamEnergies = mapNdtBeamEnergiesFromApi(
+    asArray(radiography.xrayBeamEnergies).map((item) => String(item)),
+  );
+  return [equipment.join(", "), beamEnergies.length ? `(${beamEnergies.join(", ")})` : ""]
+    .filter(Boolean)
+    .join(" ");
 };
+
+const radiographyPlanColumnsAreEmpty = (rows: QcNdtRadiographyDetailRow[]) =>
+  rows.every(
+    (row) =>
+      !pickString(row.NO_OF_SECTIONS) &&
+      !pickString(row.NO_OF_ORIENTATIONS) &&
+      !pickString(row.NORMAL_EXPOSURES) &&
+      !pickString(row.TANGENTIAL_EXPOSURES),
+  );
 
 const resolveQcVisualPresetType = (raw: unknown): string => {
   const text = String(raw ?? "").trim();
@@ -228,14 +246,12 @@ const normalizeVisualRows = (value: unknown): QcNdtVisualInspectionRow[] => {
           );
         }),
       ) ?? asRecord(rows[index]);
-    const location =
-      pickEditableString(row?.LOCATION, row?.location) ||
-      formatNdtSectionLocation(row?.sectionNumber, row?.orientation);
     return {
       SR_NO: fallback.SR_NO,
       OBSERVATION_TYPE: fallback.OBSERVATION_TYPE,
       OBSERVATION: pickEditableString(row?.OBSERVATION, row?.observation, row?.OBSERVATIONS),
-      LOCATION: location,
+      // Do not derive Location from sectionNumber/orientation on seed.
+      LOCATION: pickEditableString(row?.LOCATION, row?.location),
       UPLOAD_IMAGE: parseNdtUploadFiles(
         row?.UPLOAD_IMAGE,
         row?.uploadImage,
@@ -250,15 +266,7 @@ const applyManufacturingNdtDetails = (
   data: Record<string, unknown>,
 ): SchemaFormValues => {
   const radiography = asRecord(data.radiographyDetails) ?? {};
-  const equipment = mapNdtEquipmentFromApi(
-    (radiography.equipmentUtilized as string[] | string | null | undefined) ?? [],
-  );
-  const beamEnergies = mapNdtBeamEnergiesFromApi(
-    asArray(radiography.xrayBeamEnergies).map((item) => String(item)),
-  );
-  const machineNo = [equipment.join(", "), beamEnergies.length ? `(${beamEnergies.join(", ")})` : ""]
-    .filter(Boolean)
-    .join(" ");
+  const machineNo = buildMachineNoFromRadiography(radiography);
 
   const planRows = asArray(radiography.radiographyPlanDetails)
     .map((item) => asRecord(item))
@@ -290,6 +298,11 @@ const applyManufacturingNdtDetails = (
         ? [{ ...emptyNdtRadiographyDetailRow(), MACHINE_NO: machineNo }]
         : [emptyNdtRadiographyDetailRow()];
 
+  // Never seed Radiography Observations from manufacturing radiographyObservations.
+  values[
+    formKey(QC_NDT_SECTION_IDS.RADIOGRAPHY_OBSERVATIONS, QC_NDT_TABLE_IDS.RADIOGRAPHY_OBSERVATIONS)
+  ] = emptyObservationRows();
+
   const visualRows = emptyVisualRows();
   asArray(data.visualInspectionDetails).forEach((item) => {
     const rec = asRecord(item);
@@ -300,24 +313,26 @@ const applyManufacturingNdtDetails = (
     visualRows[index] = {
       ...visualRows[index],
       OBSERVATION: pickEditableString(rec.observation, rec.OBSERVATION, rec.observations),
-      LOCATION:
-        pickEditableString(rec.LOCATION, rec.location) ||
-        formatNdtSectionLocation(rec.sectionNumber, rec.orientation),
+      LOCATION: pickEditableString(rec.LOCATION, rec.location),
       UPLOAD_IMAGE: parseNdtUploadFiles(rec.uploadedImages, rec.UPLOAD_IMAGE, rec.uploadImage),
     };
   });
   values[formKey(QC_NDT_SECTION_IDS.VISUAL_INSPECTION, QC_NDT_TABLE_IDS.VISUAL_INSPECTION)] =
     visualRows;
 
-  const media = parseNdtUploadFiles(
-    data.uploadedVideos,
-    data.UPLOAD_VIDEO_PHOTO,
-    data.uploadVideoPhoto,
-    asRecord(data.signedNdtReport)?.documentId,
-    data.signedNdtReport,
-  );
+  const media = parseNdtUploadFiles(data.uploadedVideos, data.UPLOAD_VIDEO_PHOTO, data.uploadVideoPhoto);
   if (media.length) {
     values[formKey(QC_NDT_SECTION_IDS.UPLOAD_MEDIA, "UPLOAD_VIDEO_PHOTO")] = media;
+  }
+
+  const signedReport = asRecord(data.signedNdtReport);
+  const reportFiles = parseNdtUploadFiles(signedReport?.report, signedReport?.documentId);
+  if (reportFiles.length) {
+    values[formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "SIGNED_REPORT")] = reportFiles;
+  }
+  const remarks = pickEditableString(signedReport?.additionalRemarks, data.ADDITIONAL_REMARKS);
+  if (remarks) {
+    values[formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "ADDITIONAL_REMARKS")] = remarks;
   }
   return values;
 };
@@ -370,6 +385,8 @@ export const createInitialNdtValues = (): SchemaFormValues => ({
     emptyObservationRows(),
   [formKey(QC_NDT_SECTION_IDS.VISUAL_INSPECTION, QC_NDT_TABLE_IDS.VISUAL_INSPECTION)]: emptyVisualRows(),
   [formKey(QC_NDT_SECTION_IDS.UPLOAD_MEDIA, "UPLOAD_VIDEO_PHOTO")]: [],
+  [formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "SIGNED_REPORT")]: [],
+  [formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "ADDITIONAL_REMARKS")]: "",
 });
 
 export const getNdtRadiographyDetailRows = (values: SchemaFormValues | null | undefined) =>
@@ -384,6 +401,49 @@ export const setNdtRadiographyDetailRows = (
   ...(values ?? {}),
   [formKey(QC_NDT_SECTION_IDS.RADIOGRAPHY_DETAILS, QC_NDT_TABLE_IDS.RADIOGRAPHY_DETAILS)]: rows,
 });
+
+/**
+ * When manufacturing radiography plan details are empty, fill plan columns from RMS batch casing.
+ * Preserves MACHINE_NO (equipment + beams) already seeded from division-details.
+ */
+export const mergeBatchRadiographyPlanIntoNdtValues = (
+  values: SchemaFormValues,
+  motorId: string,
+  batchPayload: unknown,
+): SchemaFormValues => {
+  const trimmedMotorId = String(motorId ?? "").trim();
+  if (!trimmedMotorId || !batchPayload) return values;
+
+  const existing = getNdtRadiographyDetailRows(values);
+  if (!radiographyPlanColumnsAreEmpty(existing)) return values;
+
+  const root = asRecord(batchPayload);
+  const sheet =
+    asRecord(root?.identificationSheet) ??
+    asRecord(asRecord(root?.data)?.identificationSheet) ??
+    null;
+  if (!sheet) return values;
+
+  const casingMotor = getRocketMotorCasingMotorsFromSheet(sheet as IdentificationSheet).find(
+    (motor) => String(motor.motorId ?? "").trim() === trimmedMotorId,
+  );
+  const mapped = mapBatchRadiographyDetailsToNdt(casingMotor?.radiographyDetails);
+  if (!mapped.radiographyPlanRows.length) return values;
+
+  const machineNo = pickString(existing[0]?.MACHINE_NO);
+  return setNdtRadiographyDetailRows(
+    values,
+    mapped.radiographyPlanRows.map((row) => ({
+      MACHINE_NO: machineNo,
+      FROM_DATE: "",
+      TO_DATE: "",
+      NO_OF_SECTIONS: pickString(row.sections),
+      NO_OF_ORIENTATIONS: pickString(row.orientations),
+      NORMAL_EXPOSURES: pickString(row.normalExposures),
+      TANGENTIAL_EXPOSURES: pickString(row.tangentialExposures),
+    })),
+  );
+};
 
 export const getNdtObservationRows = (values: SchemaFormValues | null | undefined) =>
   normalizeObservationRows(
@@ -425,6 +485,28 @@ export const setNdtUploadMedia = (
   [formKey(QC_NDT_SECTION_IDS.UPLOAD_MEDIA, "UPLOAD_VIDEO_PHOTO")]: next ?? [],
 });
 
+export const getNdtSignedReport = (values: SchemaFormValues | null | undefined): FileRef[] =>
+  parseFileRefs(values?.[formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "SIGNED_REPORT")]);
+
+export const setNdtSignedReport = (
+  values: SchemaFormValues | null | undefined,
+  next: FileRef[],
+): SchemaFormValues => ({
+  ...(values ?? {}),
+  [formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "SIGNED_REPORT")]: next ?? [],
+});
+
+export const getNdtAdditionalRemarks = (values: SchemaFormValues | null | undefined): string =>
+  pickEditableString(values?.[formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "ADDITIONAL_REMARKS")]);
+
+export const setNdtAdditionalRemarks = (
+  values: SchemaFormValues | null | undefined,
+  next: string,
+): SchemaFormValues => ({
+  ...(values ?? {}),
+  [formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "ADDITIONAL_REMARKS")]: next ?? "",
+});
+
 export const collectNdtFileRefsFromQcValues = (
   values: SchemaFormValues | null | undefined,
 ): FileRef[] => {
@@ -433,6 +515,7 @@ export const collectNdtFileRefsFromQcValues = (
     refs.push(...(row.UPLOAD_IMAGE ?? []));
   }
   refs.push(...getNdtUploadMedia(values));
+  refs.push(...getNdtSignedReport(values));
   return refs;
 };
 
@@ -480,11 +563,15 @@ const hydrateFromSectionData = (values: SchemaFormValues, sectionId: string, dat
       data.RADIOGRAPHY_OBSERVATIONS;
     const looksLikeManufacturingObservations = asArray(rows).some((item) => {
       const rec = asRecord(item);
-      return Boolean(
-        rec &&
-          (rec.sectionNumber != null || rec.orientation != null) &&
-          rec.TYPE_OF_DEFECT == null &&
-          rec.typeOfDefect == null,
+      if (!rec) return false;
+      const hasQcDefect = rec.TYPE_OF_DEFECT != null || rec.typeOfDefect != null;
+      // Manufacturing radiographyObservations use section/orientation/observationType — never seed QC.
+      return (
+        !hasQcDefect &&
+        (rec.sectionNumber != null ||
+          rec.orientation != null ||
+          rec.observationType != null ||
+          rec.uploadedImages != null)
       );
     });
     // Division-details radiographyObservations is a different shape — do not seed QC rows.
@@ -525,6 +612,30 @@ const hydrateFromSectionData = (values: SchemaFormValues, sectionId: string, dat
       values[formKey(QC_NDT_SECTION_IDS.UPLOAD_MEDIA, "UPLOAD_VIDEO_PHOTO")] = media;
     }
   }
+  if (
+    normalized === QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT ||
+    data.SIGNED_REPORT != null ||
+    data.signedNdtReport != null ||
+    data.ADDITIONAL_REMARKS != null
+  ) {
+    const signedReport = asRecord(data.signedNdtReport);
+    const reportFiles = parseNdtUploadFiles(
+      data.SIGNED_REPORT,
+      signedReport?.report,
+      signedReport?.documentId,
+    );
+    if (reportFiles.length) {
+      values[formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "SIGNED_REPORT")] = reportFiles;
+    }
+    const remarks = pickEditableString(
+      data.ADDITIONAL_REMARKS,
+      data.additionalRemarks,
+      signedReport?.additionalRemarks,
+    );
+    if (remarks) {
+      values[formKey(QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT, "ADDITIONAL_REMARKS")] = remarks;
+    }
+  }
 };
 
 export const hydrateNdtValuesFromSections = (
@@ -540,11 +651,56 @@ export const hydrateNdtValuesFromSections = (
   return values;
 };
 
-export const hydrateNdtValuesFromRecord = (rec: Record<string, unknown>): SchemaFormValues => {
+/** Map API/manufacturing-shaped radiographyObservations onto QC defect presets (QC form reload). */
+const mapApiObservationsToQcRows = (value: unknown): QcNdtRadiographyObservationRow[] => {
+  const defaults = emptyObservationRows();
+  const rows = asArray(value);
+  if (!rows.length) return defaults;
+
+  rows.forEach((item, index) => {
+    const rec = asRecord(item);
+    if (!rec) return;
+    let targetIndex = -1;
+    const defect = pickString(rec.TYPE_OF_DEFECT, rec.typeOfDefect);
+    if (defect) {
+      targetIndex = defaults.findIndex((row) => defectsMatch(row.TYPE_OF_DEFECT, defect));
+    }
+    if (targetIndex < 0) {
+      const sr = Number(rec.sectionNumber ?? rec.SR_NO ?? index + 1);
+      if (Number.isFinite(sr)) {
+        targetIndex = defaults.findIndex((row) => row.SR_NO === sr);
+      }
+    }
+    if (targetIndex < 0) targetIndex = index;
+    if (targetIndex < 0 || targetIndex >= defaults.length) return;
+
+    defaults[targetIndex] = {
+      ...defaults[targetIndex],
+      OBSERVATIONS: pickEditableString(
+        rec.OBSERVATIONS,
+        rec.observations,
+        rec.observation,
+        rec.OBSERVATION,
+      ),
+      LOCATION: pickEditableString(rec.LOCATION, rec.location, rec.orientation),
+    };
+  });
+  return defaults;
+};
+
+export type NdtHydrateOptions = {
+  /** When true, map radiographyObservations onto QC defect presets (QC form details reload). */
+  includeRadiographyObservations?: boolean;
+};
+
+export const hydrateNdtValuesFromRecord = (
+  rec: Record<string, unknown>,
+  options?: NdtHydrateOptions,
+): SchemaFormValues => {
   const details = asRecord(rec.details) ?? rec;
   if (isNdtNestedMotorDetail(rec) || isNdtNestedMotorDetail(details)) {
     return hydrateNdtValuesFromSections(
-      ndtMotorDetailToSections(rec, pickString(rec.motorIdNo, rec.motorId) || "MOTOR"),
+      ndtMotorDetailToSections(rec, pickString(rec.motorIdNo, rec.motorId) || "MOTOR", options),
     );
   }
   const values = createInitialNdtValues();
@@ -559,6 +715,44 @@ const toApiNumber = (value: string) => {
   return Number.isFinite(numeric) ? numeric : trimmed;
 };
 
+/** Split QC MACHINE_NO ("Equip A, Equip B (2 MeV, 4 MeV)") into API enum lists. */
+const parseMachineNoForApi = (
+  machineNo: string,
+): { equipmentUtilized: string[]; xrayBeamEnergies: string[] } => {
+  const trimmed = String(machineNo ?? "").trim();
+  if (!trimmed) return { equipmentUtilized: [], xrayBeamEnergies: [] };
+
+  const beamMatch = trimmed.match(/\(([^)]*)\)\s*$/);
+  const equipPart = (beamMatch ? trimmed.slice(0, beamMatch.index) : trimmed).trim();
+  const beamPart = beamMatch?.[1] ?? "";
+  const splitParts = (raw: string) =>
+    raw
+      .split(",")
+      .map((part) => part.trim())
+      .filter(Boolean);
+
+  return {
+    equipmentUtilized: mapNdtEquipmentToApi(splitParts(equipPart)),
+    xrayBeamEnergies: mapNdtBeamEnergiesToApi(splitParts(beamPart)),
+  };
+};
+
+const mapQcVisualObservationTypeToApi = (label: string): string => {
+  const trimmed = String(label ?? "").trim();
+  if (!trimmed) return "";
+  if (QC_NDT_VISUAL_TYPE_BY_API[trimmed]) return trimmed;
+  const matched = Object.entries(QC_NDT_VISUAL_TYPE_BY_API).find(([, ui]) =>
+    defectsMatch(ui, trimmed),
+  );
+  if (matched) return matched[0];
+  const fromManufacturing = mapNdtObservationTypeToApi(trimmed);
+  if (fromManufacturing) return fromManufacturing;
+  return trimmed
+    .toUpperCase()
+    .replace(/[^A-Z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+};
+
 export type QcNdtMotorSubmissionType = "DRAFT" | "SUBMIT";
 
 export const isNdtNestedMotorDetail = (rec: Record<string, unknown> | null | undefined) =>
@@ -568,69 +762,77 @@ export const isNdtNestedMotorDetail = (rec: Record<string, unknown> | null | und
         rec.radiographyObservations != null ||
         rec.visualInspectionDetails != null ||
         rec.signedNdtReport != null ||
+        rec.uploadedVideos != null ||
         Array.isArray(rec.processDetails)),
   );
 
 export const ndtMotorDetailToSections = (
   rec: Record<string, unknown>,
   motorId: string,
+  options?: NdtHydrateOptions,
 ): SchemaSectionSubmission[] => {
   const source = asRecord(rec.details) ?? rec;
   if (
     source.radiographyDetails != null ||
     source.radiographyObservations != null ||
-    source.visualInspectionDetails != null
+    source.visualInspectionDetails != null ||
+    source.uploadedVideos != null ||
+    source.signedNdtReport != null
   ) {
     const sections: SchemaSectionSubmission[] = [];
     const radiographyDetails = asRecord(source.radiographyDetails);
+    const machineNo = buildMachineNoFromRadiography(radiographyDetails);
     const planDetails = asArray(radiographyDetails?.radiographyPlanDetails);
-    if (radiographyDetails) {
+    if (radiographyDetails || machineNo) {
       sections.push({
         sectionId: QC_NDT_SECTION_IDS.RADIOGRAPHY_DETAILS,
         sectionData: [
           {
             [QC_NDT_TABLE_IDS.RADIOGRAPHY_DETAILS]: planDetails.length
-              ? planDetails.map((row, index) => {
+              ? planDetails.map((row) => {
                   const recRow = asRecord(row) ?? {};
                   return {
-                    MACHINE_NO: String(
-                      asArray(radiographyDetails.equipmentUtilized)[0] ?? recRow.machineNo ?? "",
+                    MACHINE_NO: machineNo || pickString(recRow.machineNo, recRow.MACHINE_NO),
+                    FROM_DATE: "",
+                    TO_DATE: "",
+                    NO_OF_SECTIONS: pickString(
+                      recRow.numberOfSections,
+                      recRow.noOfSections,
+                      recRow.NO_OF_SECTIONS,
                     ),
-                    NO_OF_SECTIONS: String(recRow.numberOfSections ?? recRow.noOfSections ?? ""),
-                    NO_OF_ORIENTATIONS: String(
-                      recRow.numberOfOrientations ?? recRow.noOfOrientations ?? "",
+                    NO_OF_ORIENTATIONS: pickString(
+                      recRow.numberOfOrientations,
+                      recRow.noOfOrientations,
+                      recRow.NO_OF_ORIENTATIONS,
                     ),
-                    NORMAL_EXPOSURES: String(
-                      recRow.numberOfNormalExposures ?? recRow.normalExposures ?? "",
+                    NORMAL_EXPOSURES: pickString(
+                      recRow.numberOfNormalExposures,
+                      recRow.normalExposures,
+                      recRow.NORMAL_EXPOSURES,
                     ),
-                    TANGENTIAL_EXPOSURES: String(
-                      recRow.numberOfTangentialExposures ?? recRow.tangentialExposures ?? "",
+                    TANGENTIAL_EXPOSURES: pickString(
+                      recRow.numberOfTangentialExposures,
+                      recRow.tangentialExposures,
+                      recRow.TANGENTIAL_EXPOSURES,
                     ),
-                    SR_NO: recRow.srNo ?? index + 1,
                   };
                 })
-              : [],
+              : machineNo
+                ? [{ ...emptyNdtRadiographyDetailRow(), MACHINE_NO: machineNo }]
+                : [emptyNdtRadiographyDetailRow()],
           },
         ],
         motorId,
       } as SchemaSectionSubmission);
     }
 
-    const observations = asArray(source.radiographyObservations);
-    if (observations.length) {
+    if (options?.includeRadiographyObservations) {
+      const observationRows = mapApiObservationsToQcRows(source.radiographyObservations);
       sections.push({
         sectionId: QC_NDT_SECTION_IDS.RADIOGRAPHY_OBSERVATIONS,
         sectionData: [
           {
-            [QC_NDT_TABLE_IDS.RADIOGRAPHY_OBSERVATIONS]: observations.map((row, index) => {
-              const recRow = asRecord(row) ?? {};
-              return {
-                SR_NO: recRow.sectionNumber ?? recRow.srNo ?? index + 1,
-                TYPE_OF_DEFECT: recRow.typeOfDefect ?? recRow.TYPE_OF_DEFECT ?? "",
-                OBSERVATIONS: recRow.observation ?? recRow.observations ?? "",
-                LOCATION: recRow.orientation ?? recRow.location ?? "",
-              };
-            }),
+            [QC_NDT_TABLE_IDS.RADIOGRAPHY_OBSERVATIONS]: observationRows,
           },
         ],
         motorId,
@@ -643,13 +845,12 @@ export const ndtMotorDetailToSections = (
         sectionId: QC_NDT_SECTION_IDS.VISUAL_INSPECTION,
         sectionData: [
           {
-            [QC_NDT_TABLE_IDS.VISUAL_INSPECTION]: visualRows.map((row, index) => {
+            [QC_NDT_TABLE_IDS.VISUAL_INSPECTION]: visualRows.map((row) => {
               const recRow = asRecord(row) ?? {};
               return {
-                SR_NO: recRow.sectionNumber ?? recRow.srNo ?? index + 1,
                 OBSERVATION_TYPE: recRow.observationType ?? recRow.OBSERVATION_TYPE ?? "",
                 OBSERVATION: recRow.observation ?? recRow.OBSERVATION ?? "",
-                LOCATION: recRow.orientation ?? recRow.location ?? "",
+                LOCATION: pickEditableString(recRow.LOCATION, recRow.location),
                 UPLOAD_IMAGE: parseNdtUploadFiles(
                   recRow.uploadedImages,
                   recRow.uploadImage,
@@ -663,15 +864,27 @@ export const ndtMotorDetailToSections = (
       } as SchemaSectionSubmission);
     }
 
-    const uploadedVideos = parseNdtUploadFiles(
-      source.uploadedVideos,
-      asRecord(source.signedNdtReport)?.report,
-      asRecord(source.signedNdtReport)?.documentId,
-    );
+    const uploadedVideos = parseNdtUploadFiles(source.uploadedVideos);
     if (uploadedVideos.length) {
       sections.push({
         sectionId: QC_NDT_SECTION_IDS.UPLOAD_MEDIA,
         sectionData: [{ UPLOAD_VIDEO_PHOTO: uploadedVideos }],
+        motorId,
+      } as SchemaSectionSubmission);
+    }
+
+    const signedReport = asRecord(source.signedNdtReport);
+    const reportFiles = parseNdtUploadFiles(signedReport?.report, signedReport?.documentId);
+    const remarks = pickEditableString(signedReport?.additionalRemarks);
+    if (reportFiles.length || remarks) {
+      sections.push({
+        sectionId: QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT,
+        sectionData: [
+          omitEmpty({
+            SIGNED_REPORT: reportFiles.length ? reportFiles : undefined,
+            ADDITIONAL_REMARKS: remarks || undefined,
+          }),
+        ],
         motorId,
       } as SchemaSectionSubmission);
     }
@@ -691,23 +904,13 @@ export const ndtMotorDetailToSections = (
     if (!process) return;
     const kind = String(process.process ?? "").trim().toUpperCase();
 
-    if (kind === "RADIOGRAPHY" || process.radiographyDetails != null || process.radiographyObservations != null) {
+    if (kind === "RADIOGRAPHY" || process.radiographyDetails != null) {
       sections.push(
         withMotor({
           sectionId: QC_NDT_SECTION_IDS.RADIOGRAPHY_DETAILS,
           sectionData: [
             {
               radiographyDetails: process.radiographyDetails ?? [],
-            },
-          ],
-        }),
-      );
-      sections.push(
-        withMotor({
-          sectionId: QC_NDT_SECTION_IDS.RADIOGRAPHY_OBSERVATIONS,
-          sectionData: [
-            {
-              radiographyObservations: process.radiographyObservations ?? [],
             },
           ],
         }),
@@ -757,48 +960,55 @@ export const buildNdtMotorDetailPayload = (
   const detailRows = getNdtRadiographyDetailRows(values);
   const firstDetail = detailRows[0];
   const machineNo = String(firstDetail?.MACHINE_NO ?? "").trim();
+  const { equipmentUtilized, xrayBeamEnergies } = parseMachineNoForApi(machineNo);
   const uploadMediaPayload = toFileIdListPayload(getNdtUploadMedia(values));
+  const signedReportPayload = toFileIdListPayload(getNdtSignedReport(values));
+  const additionalRemarks = getNdtAdditionalRemarks(values).trim();
 
   return omitEmpty({
     motorId,
     motorSubmissionType,
     radiographyDetails: omitEmpty({
-      equipmentUtilized: machineNo ? [machineNo] : undefined,
-      radiographyPlanDetails: detailRows.map((row, index) =>
-        omitEmpty({
+      equipmentUtilized: equipmentUtilized.length ? equipmentUtilized : undefined,
+      xrayBeamEnergies: xrayBeamEnergies.length ? xrayBeamEnergies : undefined,
+      radiographyPlanDetails: detailRows.map((row, index) => ({
+        ...omitEmpty({
+          srNo: index + 1,
           numberOfSections: toApiNumber(row.NO_OF_SECTIONS),
           numberOfOrientations: toApiNumber(row.NO_OF_ORIENTATIONS),
-          normalExposures: toApiNumber(row.NORMAL_EXPOSURES),
-          tangentialExposures: toApiNumber(row.TANGENTIAL_EXPOSURES),
-          srNo: index + 1,
+          numberOfNormalExposures: toApiNumber(row.NORMAL_EXPOSURES),
+          numberOfTangentialExposures: toApiNumber(row.TANGENTIAL_EXPOSURES),
         }),
-      ),
+        sfd: null,
+        detectorType: null,
+      })),
     }),
-    radiographyObservations: getNdtObservationRows(values).map((row) =>
-      omitEmpty({
+    radiographyObservations: getNdtObservationRows(values).map((row) => ({
+      ...omitEmpty({
         sectionNumber: row.SR_NO,
+        location: String(row.LOCATION ?? "").trim() || undefined,
         observation: String(row.OBSERVATIONS ?? "").trim() || undefined,
-        orientation: String(row.LOCATION ?? "").trim() || undefined,
         typeOfDefect: row.TYPE_OF_DEFECT || undefined,
       }),
-    ),
-    visualInspectionDetails: getNdtVisualRows(values).map((row) =>
-      omitEmpty({
-        observationType: row.OBSERVATION_TYPE || undefined,
-        observation: String(row.OBSERVATION ?? "").trim() || undefined,
+      uploadedImages: [] as Array<{ fileId: string }>,
+    })),
+    visualInspectionDetails: getNdtVisualRows(values).map((row) => ({
+      ...omitEmpty({
+        observationType: mapQcVisualObservationTypeToApi(row.OBSERVATION_TYPE) || undefined,
         sectionNumber: row.SR_NO,
-        orientation: String(row.LOCATION ?? "").trim() || undefined,
-        uploadedImages: toFileIdListPayload(row.UPLOAD_IMAGE),
+        location: String(row.LOCATION ?? "").trim() || undefined,
+        observation: String(row.OBSERVATION ?? "").trim() || undefined,
       }),
-    ),
+      uploadedImages: toFileIdListPayload(row.UPLOAD_IMAGE),
+    })),
     uploadedVideos: uploadMediaPayload.length ? uploadMediaPayload : undefined,
-    signedNdtReport: uploadMediaPayload.length
-      ? omitEmpty({
-          additionalRemarks: "Uploaded from QC form",
-          report: uploadMediaPayload[0],
-          documentId: uploadMediaPayload[0]?.fileId,
-        })
-      : undefined,
+    signedNdtReport:
+      signedReportPayload.length || additionalRemarks
+        ? omitEmpty({
+            additionalRemarks: additionalRemarks || undefined,
+            report: signedReportPayload[0],
+          })
+        : undefined,
   });
 };
 
@@ -863,6 +1073,17 @@ export const buildNdtSectionPayload = (
           UPLOAD_VIDEO_PHOTO: toFileIdListPayload(getNdtUploadMedia(values)).length
             ? toFileIdListPayload(getNdtUploadMedia(values))
             : undefined,
+        }),
+      ],
+    },
+    {
+      sectionId: QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT,
+      sectionData: [
+        omitEmpty({
+          SIGNED_REPORT: toFileIdListPayload(getNdtSignedReport(values)).length
+            ? toFileIdListPayload(getNdtSignedReport(values))
+            : undefined,
+          ADDITIONAL_REMARKS: getNdtAdditionalRemarks(values).trim() || undefined,
         }),
       ],
     },

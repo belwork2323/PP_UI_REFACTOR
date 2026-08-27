@@ -64,17 +64,18 @@ export const QC_CURING_HOT_WATER_STATUS_OPTIONS = [
   { value: "NA", label: "NA" },
 ] as const;
 
+/** Optional temperature labels only — initial form rows stay empty until API seed. */
 export const QC_CURING_CYCLE_PRESET_ROWS = [
-  { SR_NO: 1, TEMPERATURE: "Amb-40", DURATION: "120" },
-  { SR_NO: 2, TEMPERATURE: "40", DURATION: "720" },
-  { SR_NO: 3, TEMPERATURE: "40-45", DURATION: "120" },
-  { SR_NO: 4, TEMPERATURE: "45", DURATION: "2880" },
-  { SR_NO: 5, TEMPERATURE: "45-50", DURATION: "120" },
-  { SR_NO: 6, TEMPERATURE: "50", DURATION: "4320" },
-  { SR_NO: 7, TEMPERATURE: "50-45", DURATION: "240" },
-  { SR_NO: 8, TEMPERATURE: "45", DURATION: "2880" },
-  { SR_NO: 9, TEMPERATURE: "45-40", DURATION: "240" },
-  { SR_NO: 10, TEMPERATURE: "40", DURATION: "720" },
+  { SR_NO: 1 },
+  { SR_NO: 2 },
+  { SR_NO: 3 },
+  { SR_NO: 4 },
+  { SR_NO: 5 },
+  { SR_NO: 6 },
+  { SR_NO: 7 },
+  { SR_NO: 8 },
+  { SR_NO: 9 },
+  { SR_NO: 10 },
 ] as const;
 
 export const QC_CURING_SUBSCALE_TEMPERATURE_PLACEHOLDER = "Enter Oven Set Temperature (°C)";
@@ -112,9 +113,14 @@ export const resolveQcSubscaleArticleColumn = (
   if (BEM_ARTICLE_TYPE_ORDER.includes(normalized as (typeof BEM_ARTICLE_TYPE_ORDER)[number])) {
     return "BEM_NO";
   }
-  if (normalized === "WHEEL_PEEL") return "WHEEL_PEEL_NO";
-  if (normalized === "CARTOONS" || normalized === "CARTONS") return "CARTON_NO";
-  if (normalized === "SBS_TBS") return "CONTROL_GRAIN_NO";
+  if (
+    normalized === "WHEEL_PEEL" ||
+    normalized === "CARTOONS" ||
+    normalized === "CARTONS" ||
+    normalized === "SBS_TBS"
+  ) {
+    return "BEM_NO";
+  }
   return null;
 };
 
@@ -184,6 +190,21 @@ export const formatQcSubscaleArticleTypeLabel = (value: unknown): string => {
   const raw = String(value ?? "").trim();
   if (!raw) return "";
   return QC_SUBSCALE_ARTICLE_TYPE_LABELS[raw] ?? raw.replace(/_/g, " ");
+};
+
+/** UI label / loose value → API articleType enum for subscale curingTable. */
+export const toQcSubscaleArticleTypeApi = (value: unknown): string => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  const upper = raw.toUpperCase().replace(/\s+/g, "_").replace(/\//g, "_");
+  if (QC_SUBSCALE_ARTICLE_TYPE_LABELS[upper] || upper === "CARTONS") {
+    return upper === "CARTONS" ? "CARTOONS" : upper;
+  }
+  const matched = Object.entries(QC_SUBSCALE_ARTICLE_TYPE_LABELS).find(
+    ([, label]) => label.toLowerCase() === raw.toLowerCase(),
+  );
+  if (matched) return matched[0] === "CARTONS" ? "CARTOONS" : matched[0];
+  return upper;
 };
 
 export const formatQcCuringMotorStageLabel = (value: unknown): string => {

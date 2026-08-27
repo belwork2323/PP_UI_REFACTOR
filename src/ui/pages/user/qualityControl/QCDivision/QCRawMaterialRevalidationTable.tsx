@@ -37,7 +37,7 @@ type Option = { value: string; label: string; materialCode?: string };
 
 type QCRawMaterialRevalidationTableProps = {
   values: SchemaFormValues;
-  onChange: (values: SchemaFormValues) => void;
+  onChange: (values: SchemaFormValues | ((prev: SchemaFormValues) => SchemaFormValues)) => void;
   batchId?: string;
   readOnly?: boolean;
 };
@@ -150,9 +150,9 @@ const QCRawMaterialRevalidationTable = ({
 
   const commitRows = useCallback(
     (nextRows: QcRevalidationRow[]) => {
-      onChange(setRevalidationRows(values, renumberRevalidationRows(nextRows)));
+      onChange((prev) => setRevalidationRows(prev, renumberRevalidationRows(nextRows)));
     },
-    [onChange, values],
+    [onChange],
   );
 
   const updateRow = useCallback(

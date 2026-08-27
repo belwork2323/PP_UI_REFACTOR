@@ -12,6 +12,7 @@ import {
   casePrepMotorDataHasUserInput,
   CASE_PREP_MOTOR_SECTION_KEYS,
   createEmptyCasePrepMotorData,
+  normalizeAbradingOperationForDisplay,
   parseCasePrepMotorDataFromApi,
   type CasePrepMotorData,
   type CasePrepMotorDetailsPayload,
@@ -581,6 +582,8 @@ export const getCasePrepStaticLabelIndex = (): CasePrepSchemaLabelIndex => ({
     typeOfInsulation: "Type of Insulation",
     abradingWheelType: "Abrading Wheel Type",
     abradingDetails: "Abrading Details",
+    firstCut: "First Cut",
+    secondCut: "Second Cut",
     adhesiveDetailsHeading: "Adhesive Details",
     adhesiveDetails: "Adhesive Details",
     heBellowDimension: "HE Bellow Dimension",
@@ -625,8 +628,24 @@ export const getCasePrepStaticLabelIndex = (): CasePrepSchemaLabelIndex => ({
     abradingDetails: {
       operation: "Operation",
       value: "Value",
-      remarksObservations: "Remarks / Observations",
+      remarksObservations: "Observations",
       attachments: "Photos / Videos",
+    },
+    firstCut: {
+      date: "Date",
+      startTime: "Start Time",
+      endTime: "End Time",
+      dustQty: "Qty of Dust (gms)",
+      observations: "Observations",
+      attachments: "Attachments",
+    },
+    secondCut: {
+      date: "Date",
+      startTime: "Start Time",
+      endTime: "End Time",
+      dustQty: "Qty of Dust (gms)",
+      observations: "Observations",
+      attachments: "Attachments",
     },
     temperatureDuration: {
       parameter: "Parameter",
@@ -753,6 +772,7 @@ export const CASE_PREP_HIDDEN_TABLE_COLUMNS = new Set([
   "fieldType",
   "_rowType",
   "_headerLabel",
+  "label",
 ]);
 
 const CASE_PREP_COLUMN_PRIORITY = [
@@ -796,7 +816,9 @@ export const orderCasePrepDisplayColumns = (columns: string[]): string[] => {
 };
 
 const isCasePrepDisplayRowEmpty = (row: Record<string, unknown>): boolean => {
-  const headerLabel = String(row._headerLabel ?? row.operation ?? row.parameter ?? "").trim();
+  const headerLabel = String(
+    row._headerLabel ?? row.label ?? row.operation ?? row.parameter ?? "",
+  ).trim();
   if (row.type === "header" && headerLabel) return false;
   if (headerLabel) return false;
 
@@ -1017,11 +1039,11 @@ export const resolveCasePrepMotorDetailSections = (
     if (!sectionObj || typeof sectionObj !== "object" || Array.isArray(sectionObj)) {
       return parseCasePrepSectionData(sectionId, [], labelIndex);
     }
-    return parseCasePrepSectionData(
-      sectionId,
-      [sectionObj as Record<string, unknown>],
-      labelIndex,
-    );
+    const normalized =
+      sectionId === "abradingOperation"
+        ? normalizeAbradingOperationForDisplay(sectionObj as Record<string, unknown>)
+        : (sectionObj as Record<string, unknown>);
+    return parseCasePrepSectionData(sectionId, [normalized], labelIndex);
   });
 };
 

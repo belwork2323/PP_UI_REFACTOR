@@ -4,7 +4,15 @@ import {
   parseFileRefs,
   type FileRef,
 } from "../common/FileUploadModel";
-import { formatToUiDate } from "../../../utils/dateUtils";
+import dayjs from "dayjs";
+import customParseFormat from "dayjs/plugin/customParseFormat";
+import {
+  formatToUiDate,
+  UI_DATE_PARSE_FORMATS,
+  UI_DATETIME_FORMAT,
+} from "../../../utils/dateUtils";
+
+dayjs.extend(customParseFormat);
 
 export type CasePrepOption = { value: string; label: string };
 
@@ -582,7 +590,6 @@ const applyDateToParameterRows = (
   });
 };
 
-/** Instant fields: match API sample `2026-08-12T02:00:00Z` (drop millis). */
 const toApiInstant = (value: unknown): string => {
   const raw = str(value).trim();
   if (!raw) return "";
@@ -591,25 +598,252 @@ const toApiInstant = (value: unknown): string => {
   return raw;
 };
 
-const abradingRowsForPayload = (rows: CasePrepAbradingDetailsRow[]): unknown[] => {
-  let srNo = 0;
-  return rows
-    .filter((row) => !isAbradingHeaderRow(row))
-    .map((row) => {
-      srNo += 1;
-      const valueRaw = str(row.value).trim();
-      const value =
-        row.valueFieldType === "datetime" || /T\d{2}:\d{2}/.test(valueRaw)
-          ? toApiInstant(valueRaw) || valueRaw
-          : valueRaw;
-      return stripRowForPayload({
-        SR_NO: srNo,
+const splitAbradingUiDateTime = (value: unknown): { date: string; time: string } => {
+  const raw = str(value).trim();
+  if (!raw) return { date: "", time: "" };
+
+  const parsed = dayjs(raw, [...UI_DATE_PARSE_FORMATS, UI_DATETIME_FORMAT, "YYYY-MM-DDTHH:mm:ssZ"], true);
+  if (parsed.isValid()) {
+    return {
+      date: parsed.format("DD-MM-YYYY"),
+      time: /[T\s]\d{1,2}:\d{2}/.test(raw) || raw.includes("T") ? parsed.format("HH:mm") : "",
+    };
+  }
+
+  const loose = dayjs(raw);
+  if (loose.isValid() && (raw.includes("T") || /^\d{4}-\d{2}-\d{2}/.test(raw))) {
+    return {
+      date: loose.format("DD-MM-YYYY"),
+      time: /[T\s]\d{1,2}:\d{2}/.test(raw) ? loose.format("HH:mm") : "",
+    };
+  }
+
+  const timeMatch = raw.match(/(\d{1,2}):(\d{2})/);
+  if (timeMatch && !/\d{4}/.test(raw)) {
+    return {
+      date: "",
+      time: `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}`,
+    };
+  }
+
+  if (timeMatch) {
+    const datePart = raw.replace(timeMatch[0], "").trim();
+    return {
+      date: formatToUiDate(datePart) || datePart,
+      time: `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}`,
+    };
+  }
+
+  return { date: formatToUiDate(raw), time: "" };
+};
+
+const combineAbradingUiDateTime = (date: string, time: string): string => {
+  const d = formatToUiDate(str(date).trim()) || str(date).trim();
+  const t = str(time).trim();
+  if (d && t) return dayjs(`${d} ${t}`, UI_DATETIME_FORMAT, true).isValid()
+    ? `${d} ${t}`
+    : `${d} ${t}`;
+  if (d) return d;
+  return t;
+};
+
+const normalizeAbradingApiTime = (value: unknown): string => {
+  const raw = str(value).trim();
+  if (!raw) return "";
+  const match = raw.match(/^(\d{1,2}):(\d{2})/);
+  if (match) return `${match[1].padStart(2, "0")}:${match[2]}`;
+  const parsed = dayjs(raw);
+  return parsed.isValid() ? parsed.format("HH:mm") : raw;
+};
+
+const splitAbradingDetailsByCut = (
+  rows: CasePrepAbradingDetailsRow[],
+): { first: CasePrepAbradingDataRow[]; second: CasePrepAbradingDataRow[] } => {
+  const first: CasePrepAbradingDataRow[] = [];
+  const second: CasePrepAbradingDataRow[] = [];
+  let target: CasePrepAbradingDataRow[] | null = null;
+
+  for (const row of rows) {
+    if (isAbradingHeaderRow(row)) {
+      const label = str(row.label).trim().toLowerCase();
+      if (/2nd|second/.test(label)) target = second;
+      else if (/1st|first/.test(label)) target = first;
+      continue;
+    }
+    if (target) target.push(row);
+  }
+
+  return { first, second };
+};
+
+const abradingSectionRowsToCutPayload = (
+  sectionRows: CasePrepAbradingDataRow[],
+  srNo: number,
+): Record<string, unknown> | null => {
+  let date = "";
+  let startTime = "";
+  let endTime = "";
+  let dustQty = "";
+  let observations = "";
+  let attachments: FileRef[] = [];
+
+  const mergeAttachments = (incoming?: FileRef[]) => {
+    if (!incoming?.length) return;
+    const seen = new Set(
+      attachments.map((ref) => String(ref.fileId ?? ref.fileName ?? "").trim()).filter(Boolean),
+    );
+    for (const ref of incoming) {
+      const key = String(ref.fileId ?? ref.fileName ?? "").trim();
+      if (key && seen.has(key)) continue;
+      if (key) seen.add(key);
+      attachments.push(ref);
+    }
+  };
+
+  for (const row of sectionRows) {
+    const operation = str(row.operation).trim();
+    if (/^Start Date & Time$/i.test(operation)) {
+      const split = splitAbradingUiDateTime(row.value);
+      if (split.date) date = split.date;
+      if (split.time) startTime = split.time;
+      // Single cut-level observation is stored on the Start row.
+      observations = str(row.remarksObservations).trim();
+      mergeAttachments(row.attachments);
+      continue;
+    }
+    if (/^End Date & Time$/i.test(operation)) {
+      const split = splitAbradingUiDateTime(row.value);
+      if (!date && split.date) date = split.date;
+      if (split.time) endTime = split.time;
+      // Legacy: if Start had no observation, fall back to End remarks.
+      if (!observations) observations = str(row.remarksObservations).trim();
+      mergeAttachments(row.attachments);
+      continue;
+    }
+    if (/Dust Weight/i.test(operation) && !/Total/i.test(operation)) {
+      dustQty = str(row.value).trim();
+    }
+  }
+
+  if (!date && !startTime && !endTime && !dustQty && !observations && !attachments.length) {
+    return null;
+  }
+
+  const apiDate = toApiDateOnly(date);
+  return stripRowForPayload({
+    srNo,
+    ...(apiDate ? { date: apiDate } : {}),
+    ...(startTime ? { startTime } : {}),
+    ...(endTime ? { endTime } : {}),
+    ...(dustQty ? { dustQty } : {}),
+    ...(observations ? { observations } : {}),
+    attachments: fileIdsFromFormRefs(attachments),
+  });
+};
+
+const abradingDetailsToFirstSecondCutPayload = (
+  rows: CasePrepAbradingDetailsRow[],
+): { firstCut: unknown[]; secondCut: unknown[] } => {
+  const { first, second } = splitAbradingDetailsByCut(rows);
+  const firstCut = abradingSectionRowsToCutPayload(first, 1);
+  const secondCut = abradingSectionRowsToCutPayload(second, 1);
+  return {
+    firstCut: firstCut ? [firstCut] : [],
+    secondCut: secondCut ? [secondCut] : [],
+  };
+};
+
+const applyApiCutToAbradingPreset = (
+  presetRows: CasePrepAbradingDetailsRow[],
+  cut: Record<string, unknown> | null,
+  dustOperation: string,
+): CasePrepAbradingDetailsRow[] => {
+  if (!cut) return presetRows;
+
+  const date = formatToUiDate(str(cut.date ?? cut.DATE));
+  const startTime = normalizeAbradingApiTime(cut.startTime ?? cut.START_TIME);
+  const endTime = normalizeAbradingApiTime(cut.endTime ?? cut.END_TIME);
+  const dustQty = str(cut.dustQty ?? cut.DUST_QTY);
+  const observations = str(cut.observations ?? cut.OBSERVATIONS ?? cut.remarksObservations);
+  const attachments = parseFileRefs(cut.attachments ?? cut.ATTACHMENTS);
+  const startValue = combineAbradingUiDateTime(date, startTime);
+  const endValue = combineAbradingUiDateTime(date, endTime);
+
+  return presetRows.map((row) => {
+    if (isAbradingHeaderRow(row)) return row;
+    const operation = str(row.operation).trim();
+    if (/^Start Date & Time$/i.test(operation)) {
+      return {
+        ...row,
+        value: startValue,
+        remarksObservations: observations,
+        attachments: attachments.length ? attachments : row.attachments,
+      };
+    }
+    if (/^End Date & Time$/i.test(operation)) {
+      return {
+        ...row,
+        value: endValue,
+        remarksObservations: "",
+      };
+    }
+    if (operation === dustOperation) {
+      return { ...row, value: dustQty, remarksObservations: "" };
+    }
+    return { ...row, remarksObservations: "" };
+  });
+};
+
+export const parseAbradingOperationFromApi = (
+  abrading: Record<string, unknown>,
+): CasePrepAbradingDetailsRow[] => {
+  const firstCuts = asArray(abrading.firstCut ?? abrading.FIRST_CUT);
+  const secondCuts = asArray(abrading.secondCut ?? abrading.SECOND_CUT);
+  if (firstCuts.length > 0 || secondCuts.length > 0) {
+    const empty = createEmptyCasePrepAbradingDetails();
+    const firstPreset = empty.slice(0, 4);
+    const secondPreset = empty.slice(4, 8);
+    const totalRows = empty.slice(8);
+    const firstApplied = applyApiCutToAbradingPreset(
+      firstPreset,
+      asRecord(firstCuts[0]),
+      ABRADING_DUST_A,
+    );
+    const secondApplied = applyApiCutToAbradingPreset(
+      secondPreset,
+      asRecord(secondCuts[0]),
+      ABRADING_DUST_B,
+    );
+    return computeAbradingTotalDustWeight([
+      ...firstApplied,
+      ...secondApplied,
+      ...totalRows,
+    ]);
+  }
+  return parseAbradingDetails(abrading.abradingDetails);
+};
+
+/** Flatten API `firstCut`/`secondCut` into the UI abradingDetails table shape for display. */
+export const normalizeAbradingOperationForDisplay = (
+  abrading: Record<string, unknown> | null | undefined,
+): Record<string, unknown> => {
+  const source = abrading ?? {};
+  return {
+    typeOfCasing: source.typeOfCasing ?? null,
+    typeOfInsulation: source.typeOfInsulation ?? null,
+    abradingWheelType: source.abradingWheelType ?? null,
+    abradingDetails: parseAbradingOperationFromApi(source).map((row) => {
+      if (isAbradingHeaderRow(row)) {
+        return { type: "header", label: row.label, _headerLabel: row.label };
+      }
+      return {
         operation: row.operation,
-        value,
+        value: row.value,
         remarksObservations: row.remarksObservations,
-        attachments: fileIdsFromFormRefs(row.attachments),
-      });
-    });
+        attachments: row.attachments ?? [],
+      };
+    }),
+  };
 };
 
 const parameterRowsForPayload = (rows: CasePrepParameterRow[]): unknown[] =>
@@ -621,6 +855,67 @@ const parameterRowsForPayload = (rows: CasePrepParameterRow[]): unknown[] =>
       remarks: row.remarks,
     }),
   );
+
+const parseAbradingDetails = (value: unknown): CasePrepAbradingDetailsRow[] => {
+  const empty = createEmptyCasePrepAbradingDetails();
+  const rows = asArray(value);
+  if (!rows.length) return empty;
+
+  type SavedAbradingRow = CasePrepAbradingDataRow & { srNo: number };
+  const savedDataRows: SavedAbradingRow[] = [];
+  const parsedWithHeaders: CasePrepAbradingDetailsRow[] = [];
+
+  rows.forEach((item) => {
+    const rec = asRecord(item) ?? {};
+    if (str(rec.type).toLowerCase() === "header" || ("label" in rec && !("operation" in rec))) {
+      parsedWithHeaders.push({
+        type: "header" as const,
+        label: str(rec.label ?? rec.operation ?? ""),
+      });
+      return;
+    }
+
+    const srNoRaw = Number(rec.SR_NO ?? rec.srNo ?? 0);
+    const srNo = Number.isFinite(srNoRaw) && srNoRaw > 0 ? srNoRaw : savedDataRows.length + 1;
+    const dataRow: SavedAbradingRow = {
+      operation: str(rec.operation ?? ""),
+      value: str(rec.value ?? ""),
+      remarksObservations: str(rec.remarksObservations ?? rec.remarks ?? ""),
+      attachments: parseFileRefs(rec.attachments),
+      valueFieldType: str(rec.valueFieldType ?? rec.value__fieldType ?? "") || undefined,
+      readonly: rec.readonly === true,
+      srNo,
+    };
+    savedDataRows.push(dataRow);
+    parsedWithHeaders.push(dataRow);
+  });
+
+  const hasHeaders = parsedWithHeaders.some((row) => isAbradingHeaderRow(row));
+  if (hasHeaders) {
+    return parsedWithHeaders.map((row) => {
+      if (isAbradingHeaderRow(row)) return row;
+      const { srNo: _srNo, ...rest } = row as SavedAbradingRow;
+      return rest;
+    });
+  }
+
+  const bySrNo = new Map(savedDataRows.map((row) => [row.srNo, row] as const));
+  let dataOrdinal = 0;
+
+  return empty.map((preset) => {
+    if (isAbradingHeaderRow(preset)) return preset;
+    dataOrdinal += 1;
+    const saved = bySrNo.get(dataOrdinal) ?? savedDataRows[dataOrdinal - 1];
+    if (!saved) return preset;
+    return {
+      ...preset,
+      value: saved.value,
+      remarksObservations: saved.remarksObservations,
+      attachments: saved.attachments?.length ? saved.attachments : preset.attachments,
+      valueFieldType: saved.valueFieldType || preset.valueFieldType,
+    };
+  });
+};
 
 const observationRowsForPayload = (rows: CasePrepObservationRow[]): unknown[] =>
   rows.map((row, index) =>
@@ -689,6 +984,7 @@ export const buildCasePrepMotorDetailsPayload = (
   const abradingDetails = computeAbradingTotalDustWeight(
     synced.abradingOperation.abradingDetails,
   );
+  const { firstCut, secondCut } = abradingDetailsToFirstSecondCutPayload(abradingDetails);
   const numberOfSpacers = toApiNumber(synced.bellowBonding.numberOfSpacers);
   const solventUsedQtyKg = toApiNumber(synced.tceCleaning.solventUsedQtyKg);
   const vacuumApplied = toApiNumber(synced.preHeating.vacuumApplied);
@@ -722,7 +1018,8 @@ export const buildCasePrepMotorDetailsPayload = (
       typeOfCasing: str(synced.abradingOperation.typeOfCasing).trim(),
       typeOfInsulation: str(synced.abradingOperation.typeOfInsulation).trim(),
       abradingWheelType: str(synced.abradingOperation.abradingWheelType).trim(),
-      abradingDetails: abradingRowsForPayload(abradingDetails),
+      firstCut,
+      secondCut,
     },
     bellowBonding: {
       adhesiveDetails: str(synced.bellowBonding.adhesiveDetails).trim(),
@@ -813,70 +1110,6 @@ const resolveSectionRecord = (
   const nested = asRecord(source?.[sectionId]);
   if (nested) return nested;
   return firstSectionRow(sections, sectionId);
-};
-
-const parseAbradingDetails = (value: unknown): CasePrepAbradingDetailsRow[] => {
-  const empty = createEmptyCasePrepAbradingDetails();
-  const rows = asArray(value);
-  if (!rows.length) return empty;
-
-  type SavedAbradingRow = CasePrepAbradingDataRow & { srNo: number };
-  const savedDataRows: SavedAbradingRow[] = [];
-  const parsedWithHeaders: CasePrepAbradingDetailsRow[] = [];
-
-  rows.forEach((item, index) => {
-    const rec = asRecord(item) ?? {};
-    if (str(rec.type).toLowerCase() === "header" || ("label" in rec && !("operation" in rec))) {
-      parsedWithHeaders.push({
-        type: "header" as const,
-        label: str(rec.label ?? rec.operation ?? ""),
-      });
-      return;
-    }
-
-    const srNoRaw = Number(rec.SR_NO ?? rec.srNo ?? 0);
-    const srNo = Number.isFinite(srNoRaw) && srNoRaw > 0 ? srNoRaw : savedDataRows.length + 1;
-    const dataRow: SavedAbradingRow = {
-      operation: str(rec.operation ?? ""),
-      value: str(rec.value ?? ""),
-      remarksObservations: str(rec.remarksObservations ?? rec.remarks ?? ""),
-      attachments: parseFileRefs(rec.attachments),
-      valueFieldType: str(rec.valueFieldType ?? rec.value__fieldType ?? "") || undefined,
-      readonly: rec.readonly === true,
-      srNo,
-    };
-    savedDataRows.push(dataRow);
-    parsedWithHeaders.push(dataRow);
-  });
-
-  const hasHeaders = parsedWithHeaders.some((row) => isAbradingHeaderRow(row));
-  if (hasHeaders) {
-    // API already includes section headers — keep order, drop helper srNo.
-    return parsedWithHeaders.map((row) => {
-      if (isAbradingHeaderRow(row)) return row;
-      const { srNo: _srNo, ...rest } = row as SavedAbradingRow;
-      return rest;
-    });
-  }
-
-  // Headerless payload (SR_NO 1..n) — merge onto UI presets by serial order so
-  // duplicate operation labels (1st vs 2nd Cut "Start Date & Time") stay distinct.
-  const bySrNo = new Map(savedDataRows.map((row) => [row.srNo, row] as const));
-  let dataOrdinal = 0;
-
-  return empty.map((preset) => {
-    if (isAbradingHeaderRow(preset)) return preset;
-    dataOrdinal += 1;
-    const saved = bySrNo.get(dataOrdinal) ?? savedDataRows[dataOrdinal - 1];
-    if (!saved) return preset;
-    return {
-      ...preset,
-      value: saved.value,
-      remarksObservations: saved.remarksObservations,
-      attachments: saved.attachments?.length ? saved.attachments : preset.attachments,
-      valueFieldType: saved.valueFieldType || preset.valueFieldType,
-    };
-  });
 };
 
 const mergeParameterPresets = (
@@ -1045,7 +1278,7 @@ export const parseCasePrepMotorDataFromApi = (
       abradingWheelType: str(
         abrading.abradingWheelType ?? empty.abradingOperation.abradingWheelType,
       ),
-      abradingDetails: parseAbradingDetails(abrading.abradingDetails),
+      abradingDetails: parseAbradingOperationFromApi(abrading),
     },
     bellowBonding: {
       adhesiveDetails: str(bellow.adhesiveDetails ?? ""),

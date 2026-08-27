@@ -1,6 +1,6 @@
 import dayjs from "dayjs";
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
-import { parseFileRefs } from "../../../data/models/common/FileUploadModel";
+import { parseFileRefs, type FileRef } from "../../../data/models/common/FileUploadModel";
 import { formatToUiDate, UI_DATETIME_FORMAT } from "../../../utils/dateUtils";
 import type { QcDivisionEntry } from "./qcDivisionEntryTypes";
 import type { QcHardwareProcessSubType } from "./qcHardwareConfig";
@@ -14,17 +14,27 @@ import {
   QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID,
   QC_HARDWARE_LINEAR_COATING_TABLE_ID,
   QC_HARDWARE_PREHEATING_TABLE_ID,
+  QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS_TABLE_ID,
   QC_HARDWARE_UPLOAD_GRAPH_KEY,
   QC_HARDWARE_UPLOAD_PHOTO_KEY,
   QC_HARDWARE_UPLOAD_REPORT_KEY,
   collectHardwareMotorSections,
   createInitialHardwareProcessValues,
+  findHardwareMotorDetailInData,
+  getHardwareDispatchVisualObservationRows,
+  getHardwareUploadValues,
   hydrateHardwareUploadValuesFromSections,
+  hydrateHardwareValuesFromMotorDetail,
+  mapAbradingDetailsToFirstAndSecondCut,
+  hardwareAbradingCutsHaveData,
   mergeHardwareUploadValuesIntoEntryValues,
+  resolveAbradingCutsFromRecord,
+  sliceHardwareEntrySchemaValues,
   type QcHardwareCutRow,
   type QcHardwareLinearCoatingRow,
   type QcHardwarePreheatingRow,
   type QcHardwareUploadValues,
+  type QcHardwareVisualObservationRow,
 } from "./qcHardwareTables";
 
 export const QC_HARDWARE_MANUFACTURING_SECTION_IDS = {
@@ -73,22 +83,32 @@ const findHardwareMotorRecord = (
   payload: unknown,
   motorId: string,
 ): Record<string, unknown> | null => {
-  const root = resolveManufacturingDivisionDetailsPayload(payload);
-  if (!root) return null;
+  const roots = [
+    resolveManufacturingDivisionDetailsPayload(payload),
+    asRecord(payload),
+    asRecord(asRecord(payload)?.__qcFormDivisionData),
+    asRecord(asRecord(payload)?.__manufacturingDivisionData),
+  ].filter(Boolean) as Record<string, unknown>[];
 
-  const data = asRecord(root.data) ?? root;
   const normalizedMotorId = String(motorId ?? "").trim();
   if (!normalizedMotorId) return null;
 
-  for (const motor of asArray(data.motors)) {
-    const rec = asRecord(motor);
-    if (!rec) continue;
-    const details = asRecord(rec.details);
-    const recordMotorId = String(
-      rec.motorId ?? rec.id ?? details?.motorId ?? "",
-    ).trim();
-    if (recordMotorId !== normalizedMotorId) continue;
-    return rec;
+  for (const root of roots) {
+    const data = asRecord(root.data) ?? root;
+    const casePrep = asRecord(data.casePreparationDetails) ?? asRecord(root.casePreparationDetails);
+    for (const motor of [
+      ...asArray(data.motors),
+      ...asArray(data.motorDetails),
+      ...asArray(casePrep?.motors),
+    ]) {
+      const rec = asRecord(motor);
+      if (!rec) continue;
+      const details = asRecord(rec.details);
+      const recordMotorId = String(
+        rec.motorId ?? rec.motorIdNo ?? rec.id ?? details?.motorId ?? "",
+      ).trim();
+      if (recordMotorId === normalizedMotorId) return rec;
+    }
   }
 
   return null;
@@ -134,6 +154,41 @@ const mapNestedHardwareMotorSections = (
   return sections;
 };
 
+const mapFlatHardwareMotorToManufacturingSections = (
+  motor: Record<string, unknown>,
+): ManufacturingSection[] => {
+  const sections: ManufacturingSection[] = [];
+  const push = (sectionId: string, block: unknown) => {
+    const rec = asRecord(block);
+    if (!rec || !Object.keys(rec).length) return;
+    sections.push({ sectionId, sectionData: [rec] });
+  };
+
+  const abradingOperation = asRecord(motor.abradingOperation);
+  const abrading = asRecord(motor.abrading);
+  if (abradingOperation) {
+    push(QC_HARDWARE_MANUFACTURING_SECTION_IDS.ABRADING, abradingOperation);
+  } else if (abrading && asArray(abrading.abradingDetails).length) {
+    push(QC_HARDWARE_MANUFACTURING_SECTION_IDS.ABRADING, abrading);
+  }
+
+  push(
+    QC_HARDWARE_MANUFACTURING_SECTION_IDS.PREHEATING,
+    motor.preHeating ?? motor.preheating,
+  );
+  push(
+    QC_HARDWARE_MANUFACTURING_SECTION_IDS.LINEAR_COATING,
+    motor.linerCoatingOperation ?? motor.linerCoating,
+  );
+  push(
+    QC_HARDWARE_MANUFACTURING_SECTION_IDS.DISPATCH,
+    motor.dispatchToCasting ?? motor.dispatch,
+  );
+  push(QC_HARDWARE_MANUFACTURING_SECTION_IDS.TCE_CLEANING, motor.tceCleaning);
+
+  return sections;
+};
+
 export const extractHardwareMotorSectionsFromDivisionDetails = (
   payload: unknown,
   motorId: string,
@@ -147,8 +202,11 @@ export const extractHardwareMotorSectionsFromDivisionDetails = (
     return mapLegacyHardwareMotorSections(legacySections);
   }
 
-  if (!details) return [];
-  return mapNestedHardwareMotorSections(details);
+  if (details) {
+    return mapNestedHardwareMotorSections(details);
+  }
+
+  return mapFlatHardwareMotorToManufacturingSections(rec);
 };
 
 const firstSectionRecord = (
@@ -208,65 +266,50 @@ const findLogEntry = (
   return { value: "", remarks: "" };
 };
 
-const cutRowHasData = (row: Partial<QcHardwareCutRow>) =>
-  hasValue(row.DATE) ||
-  hasValue(row.START_TIME) ||
-  hasValue(row.END_TIME) ||
-  hasValue(row.DUST_QTY) ||
-  hasValue(row.OBSERVATIONS);
+const mapAbradingValues = (
+  sections: ManufacturingSection[],
+  base: SchemaFormValues,
+): SchemaFormValues => {
+  const section = firstSectionRecord(sections, QC_HARDWARE_MANUFACTURING_SECTION_IDS.ABRADING);
+  if (!section) return base;
 
-const mapAbradingDetailsToCutRows = (abradingDetails: unknown[]): QcHardwareCutRow[] => {
-  const rows: QcHardwareCutRow[] = [];
-  let current: Partial<QcHardwareCutRow> = {};
-
-  const flush = () => {
-    if (!cutRowHasData(current)) {
-      current = {};
-      return;
-    }
-    rows.push({
-      SR_NO: rows.length + 1,
-      DATE: String(current.DATE ?? ""),
-      START_TIME: String(current.START_TIME ?? ""),
-      END_TIME: String(current.END_TIME ?? ""),
-      DUST_QTY: String(current.DUST_QTY ?? ""),
-      OBSERVATIONS: String(current.OBSERVATIONS ?? ""),
-    });
-    current = {};
-  };
-
-  for (const item of abradingDetails) {
-    const rec = asRecord(item);
-    if (!rec) continue;
-    const operation = String(rec.operation ?? "").trim();
-    const value = String(rec.value ?? "").trim();
-    const remarks = String(rec.remarksObservations ?? rec.remarks ?? "").trim();
-
-    if (/^Start Date & Time$/i.test(operation)) {
-      flush();
-      const { date, time } = splitDateTimeValue(value);
-      current.DATE = date;
-      current.START_TIME = time;
-      if (remarks) current.OBSERVATIONS = remarks;
-      continue;
-    }
-
-    if (/^End Date & Time$/i.test(operation)) {
-      const { date, time } = splitDateTimeValue(value);
-      if (!current.DATE && date) current.DATE = date;
-      current.END_TIME = time;
-      if (remarks && !current.OBSERVATIONS) current.OBSERVATIONS = remarks;
-      continue;
-    }
-
-    if (/Dust Weight/i.test(operation) && !/Total/i.test(operation)) {
-      current.DUST_QTY = value;
-      // Keep Start (or End) remarks — do not overwrite with dust remarks.
-    }
+  let { firstCut, secondCut } = resolveAbradingCutsFromRecord(section);
+  if (!hardwareAbradingCutsHaveData(firstCut, secondCut)) {
+    const legacy = mapAbradingDetailsToFirstAndSecondCut(asArray(section.abradingDetails));
+    firstCut = legacy.firstCut;
+    secondCut = legacy.secondCut;
   }
+  const sectionId = QC_HARDWARE_SECTION_IDS.ABRADING;
+  const uploads = mapHardwareUploadsFromDivisionDetails(sections);
+  const firstKey = formKey(sectionId, QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID);
+  const secondKey = formKey(sectionId, QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID);
+  const baseUploads = getHardwareUploadValues(base);
 
-  flush();
-  return rows;
+  return mergeHardwareUploadValuesIntoEntryValues(
+    {
+      ...base,
+      [firstKey]: firstCut.length > 0 ? firstCut : (base[firstKey] as QcHardwareCutRow[] | undefined),
+      [secondKey]:
+        secondCut.length > 0 ? secondCut : (base[secondKey] as QcHardwareCutRow[] | undefined),
+    },
+    {
+      [QC_HARDWARE_UPLOAD_REPORT_KEY]: mergeHardwareUploadFiles(
+        baseUploads[QC_HARDWARE_UPLOAD_REPORT_KEY],
+        uploads[QC_HARDWARE_UPLOAD_REPORT_KEY],
+        true,
+      ),
+      [QC_HARDWARE_UPLOAD_GRAPH_KEY]: mergeHardwareUploadFiles(
+        baseUploads[QC_HARDWARE_UPLOAD_GRAPH_KEY],
+        uploads[QC_HARDWARE_UPLOAD_GRAPH_KEY],
+        true,
+      ),
+      [QC_HARDWARE_UPLOAD_PHOTO_KEY]: mergeHardwareUploadFiles(
+        baseUploads[QC_HARDWARE_UPLOAD_PHOTO_KEY],
+        uploads[QC_HARDWARE_UPLOAD_PHOTO_KEY],
+        true,
+      ),
+    },
+  );
 };
 
 const mapHardwareUploadsFromDivisionDetails = (
@@ -275,11 +318,15 @@ const mapHardwareUploadsFromDivisionDetails = (
   const abrading = firstSectionRecord(sections, QC_HARDWARE_MANUFACTURING_SECTION_IDS.ABRADING);
   const tceCleaning = firstSectionRecord(sections, QC_HARDWARE_MANUFACTURING_SECTION_IDS.TCE_CLEANING);
 
-  const photoFiles = asArray(abrading?.abradingDetails).flatMap((row) => {
-    const rec = asRecord(row);
-    if (!rec?.attachments) return [];
-    return parseFileRefs(rec.attachments);
-  });
+  const photoFiles = [
+    ...asArray(abrading?.abradingDetails).flatMap((row) => {
+      const rec = asRecord(row);
+      if (!rec?.attachments) return [];
+      return parseFileRefs(rec.attachments);
+    }),
+    ...asArray(abrading?.firstCut).flatMap((row) => parseFileRefs(asRecord(row)?.attachments)),
+    ...asArray(abrading?.secondCut).flatMap((row) => parseFileRefs(asRecord(row)?.attachments)),
+  ];
 
   const reportFiles = parseFileRefs(tceCleaning?.testReport);
 
@@ -301,29 +348,6 @@ const mapHardwareUploadsFromDivisionDetails = (
   };
 };
 
-const mapAbradingValues = (
-  sections: ManufacturingSection[],
-  base: SchemaFormValues,
-): SchemaFormValues => {
-  const section = firstSectionRecord(sections, QC_HARDWARE_MANUFACTURING_SECTION_IDS.ABRADING);
-  if (!section) return base;
-
-  const cutRows = mapAbradingDetailsToCutRows(asArray(section.abradingDetails));
-  const sectionId = QC_HARDWARE_SECTION_IDS.ABRADING;
-  const uploads = mapHardwareUploadsFromDivisionDetails(sections);
-
-  return mergeHardwareUploadValuesIntoEntryValues(
-    {
-      ...base,
-      [formKey(sectionId, QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID)]:
-        cutRows[0] != null ? [cutRows[0]] : base[formKey(sectionId, QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID)],
-      [formKey(sectionId, QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID)]:
-        cutRows[1] != null ? [cutRows[1]] : base[formKey(sectionId, QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID)],
-    },
-    uploads,
-  );
-};
-
 const mapPreheatingValues = (
   sections: ManufacturingSection[],
   base: SchemaFormValues,
@@ -343,9 +367,10 @@ const mapPreheatingValues = (
   const temperatureRows = asArray(section?.temperatureDuration);
   const lastTemp = asRecord(temperatureRows[temperatureRows.length - 1]);
   const firstTemp = asRecord(temperatureRows[0]);
-  const peakTemp = temperatureRows.reduce((max, row) => {
-    const value = Number(asRecord(row)?.value);
-    return Number.isFinite(value) ? Math.max(max, value) : max;
+  const peakTemp = temperatureRows.reduce<number>((max, row) => {
+    const raw = Number(asRecord(row)?.value);
+    if (!Number.isFinite(raw)) return max;
+    return Math.max(max, raw);
   }, Number.NaN);
   const temperature = String(
     lastTemp?.value ?? firstTemp?.value ?? (Number.isFinite(peakTemp) ? peakTemp : ""),
@@ -412,27 +437,21 @@ const mapDispatchValues = (
   if (!section) return base;
 
   const details = asArray(section.dispatchToCastingDetails);
-  const visualRows = asArray(section.dispatchVisualObservations);
 
   const he = findLogEntry(details, /Puncturing at HE/i);
   const ne = findLogEntry(details, /Puncturing at NE/i);
   const lf = findLogEntry(details, /LF Extension/i);
   const dispatchTime = findLogEntry(details, /Dispatch Time/i);
 
-  const visualObservations = visualRows
-    .map((row) => {
-      const rec = asRecord(row);
-      if (!rec) return "";
-      const parameter = String(rec.parameter ?? "").trim();
-      const observation = String(rec.observations ?? rec.value ?? "").trim();
-      const remarks = String(rec.remarks ?? "").trim();
-      const body = observation || remarks;
-      if (!parameter && !body) return "";
-      if (parameter && body) return `${parameter}: ${body}`;
-      return parameter || body;
-    })
-    .filter(Boolean)
-    .join("\n");
+  const visualRows = asArray(section.dispatchVisualObservations).map((row, index) => {
+    const rec = asRecord(row);
+    return {
+      SR_NO: index + 1,
+      PARAMETER: String(rec?.parameter ?? "").trim(),
+      OBSERVATIONS: String(rec?.observations ?? rec?.value ?? "").trim(),
+      REMARKS: String(rec?.remarks ?? "").trim(),
+    };
+  });
 
   const sectionId = QC_HARDWARE_SECTION_IDS.DISPATCH;
   const { dateTime } = splitDateTimeValue(dispatchTime.value);
@@ -443,33 +462,10 @@ const mapDispatchValues = (
     [formKey(sectionId, "NE_PUNCTURES")]: ne.value,
     [formKey(sectionId, "LF_PUNCTURES")]: lf.value,
     [formKey(sectionId, "DISPATCH_DATE_TIME")]: dateTime,
-    [formKey(sectionId, "OBSERVATIONS")]: visualObservations,
+    [formKey(sectionId, QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS_TABLE_ID)]: visualRows.length
+      ? visualRows
+      : base[formKey(sectionId, QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS_TABLE_ID)],
   };
-};
-
-export const hydrateHardwareProcessValuesFromDivisionDetails = (
-  payload: unknown,
-  motorId: string,
-  subType: QcHardwareProcessSubType,
-): SchemaFormValues => {
-  const sections = extractHardwareMotorSectionsFromDivisionDetails(payload, motorId);
-  const motorMeta = extractHardwareMotorMetaFromDivisionDetails(payload, motorId);
-  const base = createInitialHardwareProcessValues(subType);
-  const hasMotorMeta = hasValue(motorMeta.ovenNo) || hasValue(motorMeta.buildingNo);
-  if (!sections.length && !(subType === "PREHEATING" && hasMotorMeta)) return base;
-
-  switch (subType) {
-    case "ABRADING":
-      return mapAbradingValues(sections, base);
-    case "PREHEATING":
-      return mapPreheatingValues(sections, base, motorMeta);
-    case "LINEAR_COATING":
-      return mapLinearCoatingValues(sections, base);
-    case "DISPATCH":
-      return mapDispatchValues(sections, base);
-    default:
-      return base;
-  }
 };
 
 const mergeHardwareField = (
@@ -482,6 +478,40 @@ const mergeHardwareField = (
   const existing = String(current ?? "").trim();
   if (onlyIfEmpty && existing) return existing;
   return next;
+};
+
+/** Prefer live FileRef[] (keeps localId / isTemp); fall back to parseFileRefs. */
+const asLiveFileRefs = (value: unknown): FileRef[] => {
+  if (Array.isArray(value) && value.every((item) => item && typeof item === "object")) {
+    return value as FileRef[];
+  }
+  return parseFileRefs(value);
+};
+
+/** Merge FileRef lists — never String() arrays (that yields "[object Object]"). */
+const mergeHardwareUploadFiles = (
+  current: unknown,
+  incoming: unknown,
+  onlyIfEmpty: boolean,
+): FileRef[] => {
+  const currentRefs = asLiveFileRefs(current);
+  const incomingRefs = asLiveFileRefs(incoming);
+  // Empty incoming must not wipe in-progress / newly uploaded temps (seed/hydrate paths).
+  if (!incomingRefs.length) return currentRefs;
+  if (onlyIfEmpty && currentRefs.length) return currentRefs;
+  if (onlyIfEmpty) return incomingRefs;
+
+  const seen = new Set(
+    currentRefs.map((ref) => String(ref.fileId ?? ref.localId ?? ref.fileName ?? "").trim()).filter(Boolean),
+  );
+  const merged = [...currentRefs];
+  for (const ref of incomingRefs) {
+    const key = String(ref.fileId ?? ref.localId ?? ref.fileName ?? "").trim();
+    if (key && seen.has(key)) continue;
+    if (key) seen.add(key);
+    merged.push(ref);
+  }
+  return merged;
 };
 
 const mergeCutRows = (
@@ -550,50 +580,82 @@ const mergeLinearCoatingRows = (
   ];
 };
 
-export const applyHardwareDivisionDetailsSeed = (
-  values: SchemaFormValues | null | undefined,
-  payload: unknown,
-  motorId: string,
-  subType: QcHardwareProcessSubType,
-  options?: { onlyIfEmpty?: boolean },
-): SchemaFormValues => {
-  const onlyIfEmpty = options?.onlyIfEmpty !== false;
-  const seeded = hydrateHardwareProcessValuesFromDivisionDetails(payload, motorId, subType);
-  const current = values ?? createInitialHardwareProcessValues(subType);
-  if (!onlyIfEmpty) return seeded;
+const normalizeIncomingVisualRows = (value: unknown): QcHardwareVisualObservationRow[] => {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map((row, index): QcHardwareVisualObservationRow | null => {
+      const rec = asRecord(row);
+      if (!rec) return null;
+      return {
+        SR_NO: Number(rec.SR_NO ?? rec.srNo) || index + 1,
+        PARAMETER: String(rec.PARAMETER ?? rec.parameter ?? "").trim(),
+        OBSERVATIONS: String(rec.OBSERVATIONS ?? rec.observations ?? "").trim(),
+        REMARKS: String(rec.REMARKS ?? rec.remarks ?? "").trim(),
+      };
+    })
+    .filter((row): row is QcHardwareVisualObservationRow => row != null);
+};
 
+const mergeVisualObservationRows = (
+  currentRows: QcHardwareVisualObservationRow[],
+  incomingRows: QcHardwareVisualObservationRow[],
+  onlyIfEmpty: boolean,
+): QcHardwareVisualObservationRow[] => {
+  if (!incomingRows.length) return currentRows;
+  const maxLen = Math.max(currentRows.length, incomingRows.length, 1);
+  return Array.from({ length: maxLen }, (_, index) => {
+    const current = currentRows[index] ?? { SR_NO: index + 1 };
+    const incoming = incomingRows[index];
+    if (!incoming) return { ...current, SR_NO: index + 1 };
+    return {
+      SR_NO: index + 1,
+      PARAMETER: mergeHardwareField(current.PARAMETER, incoming.PARAMETER, onlyIfEmpty),
+      OBSERVATIONS: mergeHardwareField(current.OBSERVATIONS, incoming.OBSERVATIONS, onlyIfEmpty),
+      REMARKS: mergeHardwareField(current.REMARKS, incoming.REMARKS, onlyIfEmpty),
+    };
+  });
+};
+
+const mergeHardwareProcessValues = (
+  current: SchemaFormValues,
+  incoming: SchemaFormValues,
+  subType: QcHardwareProcessSubType,
+  onlyIfEmpty: boolean,
+): SchemaFormValues => {
   switch (subType) {
     case "ABRADING": {
       const sectionId = QC_HARDWARE_SECTION_IDS.ABRADING;
       const firstKey = formKey(sectionId, QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID);
       const secondKey = formKey(sectionId, QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID);
-      const seededFirst = asArray(seeded[firstKey]) as QcHardwareCutRow[];
-      const seededSecond = asArray(seeded[secondKey]) as QcHardwareCutRow[];
       return mergeHardwareUploadValuesIntoEntryValues(
         {
           ...current,
-          [firstKey]: mergeCutRows(asArray(current[firstKey]) as QcHardwareCutRow[], seededFirst, true),
+          [firstKey]: mergeCutRows(
+            asArray(current[firstKey]) as QcHardwareCutRow[],
+            asArray(incoming[firstKey]) as QcHardwareCutRow[],
+            onlyIfEmpty,
+          ),
           [secondKey]: mergeCutRows(
             asArray(current[secondKey]) as QcHardwareCutRow[],
-            seededSecond,
-            true,
+            asArray(incoming[secondKey]) as QcHardwareCutRow[],
+            onlyIfEmpty,
           ),
         },
         {
-          [QC_HARDWARE_UPLOAD_REPORT_KEY]: mergeHardwareField(
+          [QC_HARDWARE_UPLOAD_REPORT_KEY]: mergeHardwareUploadFiles(
             current[formKey(QC_HARDWARE_ATTACHMENTS_SECTION_ID, QC_HARDWARE_UPLOAD_REPORT_KEY)],
-            seeded[formKey(QC_HARDWARE_ATTACHMENTS_SECTION_ID, QC_HARDWARE_UPLOAD_REPORT_KEY)],
-            true,
+            incoming[formKey(QC_HARDWARE_ATTACHMENTS_SECTION_ID, QC_HARDWARE_UPLOAD_REPORT_KEY)],
+            onlyIfEmpty,
           ),
-          [QC_HARDWARE_UPLOAD_GRAPH_KEY]: mergeHardwareField(
+          [QC_HARDWARE_UPLOAD_GRAPH_KEY]: mergeHardwareUploadFiles(
             current[formKey(QC_HARDWARE_ATTACHMENTS_SECTION_ID, QC_HARDWARE_UPLOAD_GRAPH_KEY)],
-            seeded[formKey(QC_HARDWARE_ATTACHMENTS_SECTION_ID, QC_HARDWARE_UPLOAD_GRAPH_KEY)],
-            true,
+            incoming[formKey(QC_HARDWARE_ATTACHMENTS_SECTION_ID, QC_HARDWARE_UPLOAD_GRAPH_KEY)],
+            onlyIfEmpty,
           ),
-          [QC_HARDWARE_UPLOAD_PHOTO_KEY]: mergeHardwareField(
+          [QC_HARDWARE_UPLOAD_PHOTO_KEY]: mergeHardwareUploadFiles(
             current[formKey(QC_HARDWARE_ATTACHMENTS_SECTION_ID, QC_HARDWARE_UPLOAD_PHOTO_KEY)],
-            seeded[formKey(QC_HARDWARE_ATTACHMENTS_SECTION_ID, QC_HARDWARE_UPLOAD_PHOTO_KEY)],
-            true,
+            incoming[formKey(QC_HARDWARE_ATTACHMENTS_SECTION_ID, QC_HARDWARE_UPLOAD_PHOTO_KEY)],
+            onlyIfEmpty,
           ),
         },
       );
@@ -605,8 +667,8 @@ export const applyHardwareDivisionDetailsSeed = (
         ...current,
         [key]: mergePreheatingRows(
           asArray(current[key]) as QcHardwarePreheatingRow[],
-          asArray(seeded[key]) as QcHardwarePreheatingRow[],
-          true,
+          asArray(incoming[key]) as QcHardwarePreheatingRow[],
+          onlyIfEmpty,
         ),
       };
     }
@@ -617,40 +679,111 @@ export const applyHardwareDivisionDetailsSeed = (
         ...current,
         [key]: mergeLinearCoatingRows(
           asArray(current[key]) as QcHardwareLinearCoatingRow[],
-          asArray(seeded[key]) as QcHardwareLinearCoatingRow[],
-          true,
+          asArray(incoming[key]) as QcHardwareLinearCoatingRow[],
+          onlyIfEmpty,
         ),
       };
     }
     case "DISPATCH": {
       const sectionId = QC_HARDWARE_SECTION_IDS.DISPATCH;
+      const visualKey = formKey(sectionId, QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS_TABLE_ID);
+      const currentVisual = getHardwareDispatchVisualObservationRows(current);
+      const incomingVisual = normalizeIncomingVisualRows(incoming[visualKey]);
       return {
         ...current,
         [formKey(sectionId, "HE_PUNCTURES")]: mergeHardwareField(
           current[formKey(sectionId, "HE_PUNCTURES")],
-          seeded[formKey(sectionId, "HE_PUNCTURES")],
-          true,
+          incoming[formKey(sectionId, "HE_PUNCTURES")],
+          onlyIfEmpty,
         ),
         [formKey(sectionId, "NE_PUNCTURES")]: mergeHardwareField(
           current[formKey(sectionId, "NE_PUNCTURES")],
-          seeded[formKey(sectionId, "NE_PUNCTURES")],
-          true,
+          incoming[formKey(sectionId, "NE_PUNCTURES")],
+          onlyIfEmpty,
+        ),
+        [formKey(sectionId, "LF_PUNCTURES")]: mergeHardwareField(
+          current[formKey(sectionId, "LF_PUNCTURES")],
+          incoming[formKey(sectionId, "LF_PUNCTURES")],
+          onlyIfEmpty,
         ),
         [formKey(sectionId, "DISPATCH_DATE_TIME")]: mergeHardwareField(
           current[formKey(sectionId, "DISPATCH_DATE_TIME")],
-          seeded[formKey(sectionId, "DISPATCH_DATE_TIME")],
-          true,
+          incoming[formKey(sectionId, "DISPATCH_DATE_TIME")],
+          onlyIfEmpty,
         ),
-        [formKey(sectionId, "OBSERVATIONS")]: mergeHardwareField(
-          current[formKey(sectionId, "OBSERVATIONS")],
-          seeded[formKey(sectionId, "OBSERVATIONS")],
-          true,
-        ),
+        [visualKey]: mergeVisualObservationRows(currentVisual, incomingVisual, onlyIfEmpty),
       };
     }
     default:
       return current;
   }
+};
+
+export const buildHardwareProcessValuesFromPayload = (
+  payload: unknown,
+  motorId: string,
+  subType: QcHardwareProcessSubType,
+): SchemaFormValues => {
+  let values = createInitialHardwareProcessValues(subType);
+
+  const uiMotor = findHardwareMotorDetailInData(payload, motorId);
+  if (uiMotor) {
+    values = sliceHardwareEntrySchemaValues(
+      hydrateHardwareValuesFromMotorDetail(uiMotor),
+      subType,
+    );
+  }
+
+  const payloadSources = [
+    payload,
+    resolveManufacturingDivisionDetailsPayload(payload),
+    asRecord(payload)?.__manufacturingDivisionData,
+    asRecord(payload)?.__qcFormDivisionData,
+  ].filter((source, index, list) => source != null && list.indexOf(source) === index);
+
+  for (const source of payloadSources) {
+    const sections = extractHardwareMotorSectionsFromDivisionDetails(source, motorId);
+    const motorMeta = extractHardwareMotorMetaFromDivisionDetails(source, motorId);
+    const hasMotorMeta = hasValue(motorMeta.ovenNo) || hasValue(motorMeta.buildingNo);
+    if (!sections.length && !(subType === "PREHEATING" && hasMotorMeta)) continue;
+
+    let sectionValues = createInitialHardwareProcessValues(subType);
+    switch (subType) {
+      case "ABRADING":
+        sectionValues = mapAbradingValues(sections, sectionValues);
+        break;
+      case "PREHEATING":
+        sectionValues = mapPreheatingValues(sections, sectionValues, motorMeta);
+        break;
+      case "LINEAR_COATING":
+        sectionValues = mapLinearCoatingValues(sections, sectionValues);
+        break;
+      case "DISPATCH":
+        sectionValues = mapDispatchValues(sections, sectionValues);
+        break;
+      default:
+        break;
+    }
+    values = mergeHardwareProcessValues(values, sectionValues, subType, true);
+  }
+
+  return values;
+};
+
+export const hydrateHardwareProcessValuesFromDivisionDetails = buildHardwareProcessValuesFromPayload;
+
+export const applyHardwareDivisionDetailsSeed = (
+  values: SchemaFormValues | null | undefined,
+  payload: unknown,
+  motorId: string,
+  subType: QcHardwareProcessSubType,
+  options?: { onlyIfEmpty?: boolean },
+): SchemaFormValues => {
+  const onlyIfEmpty = options?.onlyIfEmpty !== false;
+  const seeded = buildHardwareProcessValuesFromPayload(payload, motorId, subType);
+  const current = values ?? createInitialHardwareProcessValues(subType);
+  if (!onlyIfEmpty) return seeded;
+  return mergeHardwareProcessValues(current, seeded, subType, true);
 };
 
 export const applyHardwareSharedUploadsToEntryValues = <
@@ -674,19 +807,39 @@ export const applyHardwareSharedUploadsToEntryValues = <
 
     const motorSections = collectHardwareMotorSections(motorId, hardwareEntries, savedSections);
     const uploads = hydrateHardwareUploadValuesFromSections(motorSections);
-    const hasUploadData = Object.values(uploads).some((value) => hasValue(value));
+    const hasUploadData = Object.values(uploads).some(
+      (value) => Array.isArray(value) && value.length > 0,
+    );
     if (!hasUploadData) continue;
 
     const anchorValues =
       nextValues[anchor.entryId]?.schemaValues ??
       createInitialHardwareProcessValues("ABRADING");
+    // onlyIfEmpty per type — never replace live Graph/Report/Photo temps with empty/partial server lists.
+    const currentUploads = getHardwareUploadValues(anchorValues);
     nextValues = {
       ...nextValues,
       [anchor.entryId]: {
         ...(nextValues[anchor.entryId] ?? {}),
-        schemaValues: mergeHardwareUploadValuesIntoEntryValues(anchorValues, uploads),
+        schemaValues: mergeHardwareUploadValuesIntoEntryValues(anchorValues, {
+          [QC_HARDWARE_UPLOAD_REPORT_KEY]: mergeHardwareUploadFiles(
+            currentUploads[QC_HARDWARE_UPLOAD_REPORT_KEY],
+            uploads[QC_HARDWARE_UPLOAD_REPORT_KEY],
+            true,
+          ),
+          [QC_HARDWARE_UPLOAD_GRAPH_KEY]: mergeHardwareUploadFiles(
+            currentUploads[QC_HARDWARE_UPLOAD_GRAPH_KEY],
+            uploads[QC_HARDWARE_UPLOAD_GRAPH_KEY],
+            true,
+          ),
+          [QC_HARDWARE_UPLOAD_PHOTO_KEY]: mergeHardwareUploadFiles(
+            currentUploads[QC_HARDWARE_UPLOAD_PHOTO_KEY],
+            uploads[QC_HARDWARE_UPLOAD_PHOTO_KEY],
+            true,
+          ),
+        }),
       },
-    };
+    } as Record<string, T>;
   }
 
   return nextValues;

@@ -80,6 +80,7 @@ export const QC_POST_CURE_FIELD_LABELS = {
   IR1_QC_REPORT: "Upload QC Report",
   HEMCOAT_3K_BATCH_NO: "Batch No",
   HEMCOAT_3K_PREPARATION_DATE: "Date of Preparation",
+  HEMCOAT_3K_QC_REPORT: "Upload QC Report",
   DISPATCH_DATE: "Date of Dispatch",
   DISPATCH_STATION: "Station",
   REMARKS: "Remarks",

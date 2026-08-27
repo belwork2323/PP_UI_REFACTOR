@@ -72,14 +72,24 @@ const isDeCoringSectionId = (sectionId: string) => {
 
 const mapObservationsFromRecord = (data: Record<string, unknown>): string => {
   const observations = pickFirstValue(data.OBSERVATIONS, data.observations);
-  const remarks = pickFirstValue(data.DECORING_REMARKS, data.REMARKS, data.remarks);
-  const visual = pickFirstValue(
-    data.DECORING_VISUAL_OBSERVATION,
-    data.VISUAL_OBSERVATION,
-    data.VISUAL_OBSERVATIONS,
-    data.visualObservation,
-    data.visualObservations,
+  const remarks = pickFirstValue(
+    data.decoringRemarks,
+    data.DECORING_REMARKS,
+    data.REMARKS,
+    data.remarks,
   );
+  // Manufacturing `decoringVisualObservation` is often a file-ref array — skip non-strings.
+  const visualRaw =
+    data.decoringVisualObservation ??
+    data.DECORING_VISUAL_OBSERVATION ??
+    data.VISUAL_OBSERVATION ??
+    data.VISUAL_OBSERVATIONS ??
+    data.visualObservation ??
+    data.visualObservations;
+  const visual =
+    typeof visualRaw === "string" || typeof visualRaw === "number"
+      ? pickFirstValue(visualRaw)
+      : "";
   return [observations, remarks, visual].filter(Boolean).join("; ");
 };
 
@@ -108,22 +118,30 @@ export const mapDeCoringDetailsFromRecord = (
     pickFirstValue(
       data.DE_CORING_DATE_TIME,
       data.DECORING_DATE_TIME,
-      data.DECORING_DATE,
       data.deCoringDateTime,
       data.decoringDateTime,
       data.decoringDate,
+      data.DECORING_DATE,
     ),
   ),
   OBSERVATIONS: mapObservationsFromRecord(data),
 });
 
-/** Prefer nested manufacturing/QC `details.decoringDetails` / flat `deCoringDetails` when present. */
+/** Prefer nested curing `details.curingSections.decoringDetails` / flat `decoringDetails`. */
 export const resolveDeCoringDetailsRecord = (
   motor: Record<string, unknown> | null | undefined,
 ): Record<string, unknown> => {
   if (!motor) return {};
   const details = asRecord(motor.details) ?? {};
+  const curingSections =
+    asRecord(details.curingSections) ??
+    (!Array.isArray(motor.curingSections) ? asRecord(motor.curingSections) : null);
+  const fromCuringSections =
+    asRecord(curingSections?.decoringDetails) ??
+    asRecord(curingSections?.DECORING_DETAILS) ??
+    asRecord(curingSections?.deCoringDetails);
   const nested =
+    fromCuringSections ??
     asRecord(details.deCoringDetails) ??
     asRecord(details.decoringDetails) ??
     asRecord(motor.deCoringDetails) ??
@@ -199,18 +217,15 @@ export const buildDeCoringMotorDetailPayload = (
   const load = toDeCoringApiLoad(getDeCoringField(values, "DE_CORING_LOAD"));
   const dateTime = toDeCoringApiDateTime(getDeCoringField(values, "DE_CORING_DATE_TIME"));
   const observations = getDeCoringField(values, "OBSERVATIONS");
-  const decoringDate =
-    dateTime?.split("T")[0] ??
-    (getDeCoringField(values, "DE_CORING_DATE_TIME").split("T")[0] || undefined);
 
   return omitEmpty({
     motorId,
     motorSubmissionType,
     decoringDetails: omitEmpty({
-      decoringDate,
       decoringLoad: load,
+      // Full datetime (YYYY-MM-DDTHH:mm:ss) — same for create and update.
+      decoringDate: dateTime,
       decoringRemarks: observations || undefined,
-      decoringVisualObservation: observations || undefined,
     }),
   });
 };

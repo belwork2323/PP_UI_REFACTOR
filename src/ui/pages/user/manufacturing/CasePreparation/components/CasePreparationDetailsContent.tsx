@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   Box,
   Chip,
@@ -36,6 +36,112 @@ import {
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
 } from "../../../../../components/custom/UserWorkflowStepPager";
+
+const ABRADING_OBS_COLUMNS = new Set(["remarksObservations", "observations", "remarks"]);
+const ABRADING_ATTACH_COLUMNS = new Set(["attachments"]);
+
+const isAbradingDetailsTable = (table: CasePrepDetailTable) =>
+  table.blockId === "abradingDetails" ||
+  (Object.keys(table.columnLabels).includes("operation") &&
+    Object.keys(table.columnLabels).some((col) => ABRADING_OBS_COLUMNS.has(col)));
+
+const resolveAbradingHeaderLabel = (row: Record<string, unknown>) =>
+  String(row._headerLabel ?? row.label ?? "").trim();
+
+const isAbradingHeaderDisplayRow = (row: Record<string, unknown>) =>
+  row.type === "header" && Boolean(resolveAbradingHeaderLabel(row));
+
+const isAbradingTotalDisplayRow = (row: Record<string, unknown>) =>
+  /^Total Dust Weight/i.test(String(row.operation ?? "").trim());
+
+const isAbradingStartDisplayRow = (row: Record<string, unknown>) =>
+  /^Start Date & Time$/i.test(String(row.operation ?? "").trim());
+
+type AbradingCutDisplayGroup = {
+  headerIndex: number;
+  headerLabel: string;
+  dataIndices: number[];
+  totalIndex: number | null;
+};
+
+const groupAbradingDisplayRows = (
+  rows: Record<string, unknown>[],
+): AbradingCutDisplayGroup[] => {
+  const groups: AbradingCutDisplayGroup[] = [];
+  let current: AbradingCutDisplayGroup | null = null;
+
+  rows.forEach((row, index) => {
+    if (isAbradingHeaderDisplayRow(row)) {
+      current = {
+        headerIndex: index,
+        headerLabel: resolveAbradingHeaderLabel(row),
+        dataIndices: [],
+        totalIndex: null,
+      };
+      groups.push(current);
+      return;
+    }
+    if (!current) return;
+    if (isAbradingTotalDisplayRow(row)) {
+      current.totalIndex = index;
+      return;
+    }
+    current.dataIndices.push(index);
+  });
+
+  return groups;
+};
+
+const resolveAbradingCutObservationValue = (
+  rows: Record<string, unknown>[],
+  dataIndices: number[],
+  columns: string[],
+): unknown => {
+  const obsColumn =
+    columns.find((col) => ABRADING_OBS_COLUMNS.has(col)) ?? "remarksObservations";
+
+  for (const index of dataIndices) {
+    const row = rows[index];
+    if (!row || !isAbradingStartDisplayRow(row)) continue;
+    const value = row[obsColumn];
+    if (value != null && String(value).trim()) return value;
+  }
+  for (const index of dataIndices) {
+    const row = rows[index];
+    if (!row) continue;
+    const value = row[obsColumn];
+    if (value != null && String(value).trim()) return value;
+  }
+  return null;
+};
+
+const resolveAbradingCutAttachmentsValue = (
+  rows: Record<string, unknown>[],
+  dataIndices: number[],
+  columns: string[],
+): unknown => {
+  const attachColumn = columns.find((col) => ABRADING_ATTACH_COLUMNS.has(col)) ?? "attachments";
+  const merged: FileRef[] = [];
+  const seen = new Set<string>();
+
+  const collect = (preferStart: boolean) => {
+    for (const index of dataIndices) {
+      const row = rows[index];
+      if (!row) continue;
+      if (preferStart !== isAbradingStartDisplayRow(row)) continue;
+      for (const ref of parseFileRefs(row[attachColumn])) {
+        const key = String(ref.fileId ?? ref.fileName ?? "").trim();
+        if (key && seen.has(key)) continue;
+        if (key) seen.add(key);
+        merged.push(ref);
+      }
+    }
+  };
+
+  collect(true);
+  collect(false);
+  return merged;
+};
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const CP = STRINGS.MANUFACTURING.CASE_PREP;
@@ -196,8 +302,142 @@ const CasePrepDataTable = ({
 }) => {
   const displayRows = table.rows;
   const columns = orderCasePrepDisplayColumns(Object.keys(table.columnLabels));
+  const useAbradingCutLayout = isAbradingDetailsTable(table);
 
   if (!columns.length || !displayRows.length) return null;
+
+  const renderCell = (row: Record<string, unknown>, column: string) => (
+    <CasePrepCellValue
+      value={row[column]}
+      subDepartmentId={subDepartmentId}
+      onOpen={onOpen}
+    />
+  );
+
+  const renderAbradingBody = () => {
+    const groups = groupAbradingDisplayRows(displayRows);
+    if (!groups.length) {
+      return displayRows.map((row, rowIndex) => {
+        const headerLabel = resolveAbradingHeaderLabel(row);
+        if (row.type === "header" && headerLabel) {
+          return (
+            <TableRow key={rowIndex} sx={{ background: "rgba(21,101,192,0.06)" }}>
+              <TableCell
+                colSpan={columns.length}
+                sx={{ ...dt.tableCell, fontWeight: 700, fontSize: "0.72rem" }}
+              >
+                {headerLabel}
+              </TableCell>
+            </TableRow>
+          );
+        }
+        return (
+          <TableRow key={rowIndex} sx={dt.tableRow(rowIndex)}>
+            {columns.map((column) => (
+              <TableCell key={column} sx={dt.tableCell}>
+                {renderCell(row, column)}
+              </TableCell>
+            ))}
+          </TableRow>
+        );
+      });
+    }
+
+    return groups.map((group) => {
+      const cutObservation = resolveAbradingCutObservationValue(
+        displayRows,
+        group.dataIndices,
+        columns,
+      );
+      const cutAttachments = resolveAbradingCutAttachmentsValue(
+        displayRows,
+        group.dataIndices,
+        columns,
+      );
+      const cutRowSpan = Math.max(group.dataIndices.length, 1);
+
+      return (
+        <Fragment key={`cut-${group.headerIndex}`}>
+          <TableRow sx={{ background: "rgba(21,101,192,0.06)" }}>
+            <TableCell
+              colSpan={columns.length}
+              sx={{ ...dt.tableCell, fontWeight: 700, fontSize: "0.72rem" }}
+            >
+              {group.headerLabel}
+            </TableCell>
+          </TableRow>
+          {group.dataIndices.map((rowIndex, rowOffset) => {
+            const row = displayRows[rowIndex];
+            if (!row) return null;
+            return (
+              <TableRow key={`abr-${rowIndex}`} sx={dt.tableRow(rowIndex)}>
+                {columns.map((column) => {
+                  if (ABRADING_OBS_COLUMNS.has(column)) {
+                    if (rowOffset !== 0) return null;
+                    return (
+                      <TableCell
+                        key={column}
+                        sx={{ ...dt.tableCell, verticalAlign: "top" }}
+                        rowSpan={cutRowSpan}
+                      >
+                        <CasePrepCellValue
+                          value={cutObservation}
+                          subDepartmentId={subDepartmentId}
+                          onOpen={onOpen}
+                        />
+                      </TableCell>
+                    );
+                  }
+                  if (ABRADING_ATTACH_COLUMNS.has(column)) {
+                    if (rowOffset !== 0) return null;
+                    return (
+                      <TableCell
+                        key={column}
+                        sx={{ ...dt.tableCell, verticalAlign: "top" }}
+                        rowSpan={cutRowSpan}
+                      >
+                        <CasePrepCellValue
+                          value={cutAttachments}
+                          subDepartmentId={subDepartmentId}
+                          onOpen={onOpen}
+                        />
+                      </TableCell>
+                    );
+                  }
+                  return (
+                    <TableCell key={column} sx={dt.tableCell}>
+                      {renderCell(row, column)}
+                    </TableCell>
+                  );
+                })}
+              </TableRow>
+            );
+          })}
+          {group.totalIndex != null
+            ? (() => {
+                const totalRow = displayRows[group.totalIndex!];
+                if (!totalRow) return null;
+                return (
+                  <TableRow
+                    key={`abr-total-${group.totalIndex}`}
+                    sx={dt.tableRow(group.totalIndex!)}
+                  >
+                    {columns.map((column) => (
+                      <TableCell key={column} sx={dt.tableCell}>
+                        {ABRADING_OBS_COLUMNS.has(column) ||
+                        ABRADING_ATTACH_COLUMNS.has(column)
+                          ? formatCasePrepCellValue(null)
+                          : renderCell(totalRow, column)}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                );
+              })()
+            : null}
+        </Fragment>
+      );
+    });
+  };
 
   return (
     <Box sx={{ mb: 1.5 }}>
@@ -216,35 +456,33 @@ const CasePrepDataTable = ({
             </TableRow>
           </TableHead>
           <TableBody>
-            {displayRows.map((row, rowIndex) => {
-              const headerLabel = String(row._headerLabel ?? "").trim();
-              if (row.type === "header" && headerLabel) {
-                return (
-                  <TableRow key={rowIndex} sx={{ background: "rgba(21,101,192,0.06)" }}>
-                    <TableCell
-                      colSpan={columns.length}
-                      sx={{ ...dt.tableCell, fontWeight: 700, fontSize: "0.72rem" }}
-                    >
-                      {headerLabel}
-                    </TableCell>
-                  </TableRow>
-                );
-              }
+            {useAbradingCutLayout
+              ? renderAbradingBody()
+              : displayRows.map((row, rowIndex) => {
+                  const headerLabel = resolveAbradingHeaderLabel(row);
+                  if (row.type === "header" && headerLabel) {
+                    return (
+                      <TableRow key={rowIndex} sx={{ background: "rgba(21,101,192,0.06)" }}>
+                        <TableCell
+                          colSpan={columns.length}
+                          sx={{ ...dt.tableCell, fontWeight: 700, fontSize: "0.72rem" }}
+                        >
+                          {headerLabel}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  }
 
-              return (
-                <TableRow key={rowIndex} sx={dt.tableRow(rowIndex)}>
-                  {columns.map((column) => (
-                    <TableCell key={column} sx={dt.tableCell}>
-                      <CasePrepCellValue
-                        value={row[column]}
-                        subDepartmentId={subDepartmentId}
-                        onOpen={onOpen}
-                      />
-                    </TableCell>
-                  ))}
-                </TableRow>
-              );
-            })}
+                  return (
+                    <TableRow key={rowIndex} sx={dt.tableRow(rowIndex)}>
+                      {columns.map((column) => (
+                        <TableCell key={column} sx={dt.tableCell}>
+                          {renderCell(row, column)}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  );
+                })}
           </TableBody>
         </Table>
       </TableContainer>

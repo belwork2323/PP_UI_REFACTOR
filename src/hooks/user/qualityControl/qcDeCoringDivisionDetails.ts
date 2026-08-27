@@ -111,9 +111,36 @@ const toManufacturingSections = (sections: unknown[]): ManufacturingSection[] =>
     }))
     .filter((section) => section.sectionId);
 
+const extractCuringSectionsDeCoring = (
+  motor: Record<string, unknown>,
+): Record<string, unknown> | null => {
+  const details = asRecord(motor.details) ?? {};
+  const curingSections =
+    asRecord(details.curingSections) ??
+    (!Array.isArray(motor.curingSections) ? asRecord(motor.curingSections) : null);
+  if (!curingSections) return null;
+  const decoring =
+    asRecord(curingSections.decoringDetails) ??
+    asRecord(curingSections.DECORING_DETAILS) ??
+    asRecord(curingSections.deCoringDetails);
+  return decoring;
+};
+
 const extractMotorSections = (motor: Record<string, unknown> | null): ManufacturingSection[] => {
   if (!motor) return [];
   const details = asRecord(motor.details) ?? motor;
+
+  // Curing manufacturing division-details: details.curingSections.decoringDetails (nested object).
+  const fromCuringSections = extractCuringSectionsDeCoring(motor);
+  if (fromCuringSections) {
+    return [
+      {
+        sectionId: QC_DE_CORING_MANUFACTURING_SECTION_ID,
+        sectionData: [fromCuringSections],
+      },
+    ];
+  }
+
   const nestedObject =
     asRecord(details.deCoringDetails) ??
     asRecord(details.decoringDetails) ??
@@ -139,10 +166,8 @@ const extractMotorSections = (motor: Record<string, unknown> | null): Manufactur
     asArray(
       details.decoringSections ??
         details.sections ??
-        details.curingSections ??
         motor.decoringSections ??
-        motor.sections ??
-        motor.curingSections,
+        motor.sections,
     ),
   );
 };
@@ -175,9 +200,32 @@ const mapDeCoringFieldsFromManufacturing = (
   const source = { ...nested, ...(mfgSection ?? {}), ...(qcSection ?? {}) };
   const mapped = mapDeCoringDetailsFromRecord(source);
 
+  // Fallback date/time from curing postCuringDetails.decoringDispatchDateTime when
+  // decoringDetails only has a date (or is empty).
+  let dateTime = mapped.DE_CORING_DATE_TIME;
+  if (!hasValue(dateTime) || !/\d{1,2}:\d{2}/.test(dateTime)) {
+    const details = asRecord(motor.details) ?? {};
+    const curingSections =
+      asRecord(details.curingSections) ??
+      (!Array.isArray(motor.curingSections) ? asRecord(motor.curingSections) : null);
+    const post = asRecord(curingSections?.postCuringDetails);
+    const dispatch = pickFirstValue(
+      post?.decoringDispatchDateTime,
+      post?.DE_CORING_DISPATCH_DATE_TIME,
+      post?.DISPATCH_DATE_TIME,
+    );
+    if (hasValue(dispatch)) {
+      dateTime = formatManufacturingDateTime(dispatch);
+    } else if (hasValue(mapped.DE_CORING_DATE_TIME)) {
+      dateTime = formatManufacturingDateTime(mapped.DE_CORING_DATE_TIME);
+    }
+  } else {
+    dateTime = formatManufacturingDateTime(dateTime);
+  }
+
   return {
     DE_CORING_LOAD: mapped.DE_CORING_LOAD,
-    DE_CORING_DATE_TIME: formatManufacturingDateTime(mapped.DE_CORING_DATE_TIME),
+    DE_CORING_DATE_TIME: dateTime,
     OBSERVATIONS: mapped.OBSERVATIONS,
   };
 };

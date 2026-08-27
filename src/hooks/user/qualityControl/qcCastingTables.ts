@@ -458,13 +458,17 @@ const buildQcCastingSectionsPayload = (
   const castingRows = sanitizeCastingRows(getCastingTableRows(values));
   const weightmentRow = sanitizeWeightmentRow(getCastingWeightmentRows(values));
   const soakingDuration = getCastingPostCastField(values, "SOAKING_DURATION");
+  const pressureRequired = getCastingPostCastField(values, "PRESSURE_PLATE_ASSEMBLY_REQUIRED");
   const pressureRows =
-    getCastingPostCastField(values, "PRESSURE_PLATE_ASSEMBLY_REQUIRED") === "YES"
-      ? sanitizePressurePlateRows(getCastingPressurePlateRows(values))
-      : [];
+    pressureRequired === "YES" ? sanitizePressurePlateRows(getCastingPressurePlateRows(values)) : [];
+  const dateOfCasting = toApiDate(getCastingPropellantField(values, "DATE_OF_CASTING"));
+  const rhPercent = toFiniteNumber(getCastingPropellantField(values, "RH_PERCENT"));
+  const vacuumMaintained = toFiniteNumber(
+    getCastingPropellantField(values, "VACUUM_MAINTAINED"),
+  );
 
   const finalAssemblyDetails =
-    mandrelRows.length || hasValue(getCastingAssemblyDate(values))
+    mandrelRows.length || hasValue(getCastingAssemblyDate(values)) || weightmentRowHasData(weightmentRow)
       ? {
           motorCasing: [
             omitEmpty({
@@ -483,9 +487,11 @@ const buildQcCastingSectionsPayload = (
 
   const castingProcess =
     castingRows.length ||
-    hasValue(getCastingPropellantField(values, "RH_PERCENT")) ||
-    hasValue(getCastingPropellantField(values, "VACUUM_MAINTAINED"))
+    hasValue(dateOfCasting) ||
+    rhPercent != null ||
+    vacuumMaintained != null
       ? omitEmpty({
+          dateOfCasting: dateOfCasting || undefined,
           finalMixBowlDetails: castingRows.map((row, index) =>
             omitEmpty({
               srNo: Number(row.SR_NO) || index + 1,
@@ -493,50 +499,96 @@ const buildQcCastingSectionsPayload = (
               bowlReceiptTime: row.CASTING_START_TIME || undefined,
               initialWeight: toFiniteNumber(row.PROPELLANT_QTY),
               finalWeight: toFiniteNumber(row.SLURRY_CAST_FROM_EACH_BOWL),
+              dcOpenTime: row.CASTING_START_TIME || undefined,
+              dcCloseTime: row.CASTING_COMPLETION_TIME || undefined,
             }),
           ),
           castingFromBowlDetails: castingRows.map((row, index) =>
             omitEmpty({
               srNo: Number(row.SR_NO) || index + 1,
               bowlId: row.FINAL_MIX_BOWL_NO || undefined,
+              rh: rhPercent,
               viscosity: toFiniteNumber(row.INITIAL_UNLOADING_VISCOSITY),
               slurryCast: toFiniteNumber(row.SLURRY_CAST_FROM_EACH_BOWL),
-              motorId: row.REMARKS || undefined,
+              remarks: row.REMARKS || undefined,
             }),
           ),
-          initialVacuum: toFiniteNumber(getCastingPropellantField(values, "VACUUM_MAINTAINED")),
-          vacuumPressureCasting: toFiniteNumber(getCastingPropellantField(values, "VACUUM_MAINTAINED")),
-          vacuumPressureSoaking: toFiniteNumber(getCastingPropellantField(values, "VACUUM_MAINTAINED")),
+          initialVacuum: vacuumMaintained,
+          vacuumPressureCasting: vacuumMaintained,
+          vacuumPressureSoaking: vacuumMaintained,
         })
       : undefined;
 
   const slurryCastDetails = castingRows.length
     ? {
-        slurryCastFromBowls: castingRows.map((row, index) =>
+        slurryCastFromBowls: [
+          ...castingRows.map((row, index) =>
+            omitEmpty({
+              rowKey: String(Number(row.SR_NO) || index + 1),
+              fmMotorLabel: row.FINAL_MIX_BOWL_NO || undefined,
+              slurryCast: toFiniteNumber(row.SLURRY_CAST_FROM_EACH_BOWL),
+            }),
+          ),
           omitEmpty({
-            rowKey: String(Number(row.SR_NO) || index + 1),
-            fmMotorLabel: row.FINAL_MIX_BOWL_NO || undefined,
-            slurryCast: toFiniteNumber(row.SLURRY_CAST_FROM_EACH_BOWL),
+            rowKey: "TOTAL",
+            fmMotorLabel: "Total Slurry Cast",
+            slurryCast: castingRows.reduce((sum, row) => {
+              const n = toFiniteNumber(row.SLURRY_CAST_FROM_EACH_BOWL);
+              return sum + (n ?? 0);
+            }, 0),
           }),
-        ),
+        ],
       }
     : undefined;
 
+  const weightmentDetails = weightmentRowHasData(weightmentRow)
+    ? omitEmpty({
+        loadCellReading: omitEmpty({
+          initial: toFiniteNumber(weightmentRow.LOAD_CELL_INITIAL),
+          final: toFiniteNumber(weightmentRow.LOAD_CELL_FINAL),
+        }),
+        totalWeight: toFiniteNumber(weightmentRow.TOTAL_WEIGHT),
+      })
+    : undefined;
+
+  const firstPressure = pressureRows[0];
   const postCastOperations =
-    hasValue(soakingDuration) || pressureRows.length
+    hasValue(soakingDuration) || hasValue(pressureRequired) || pressureRows.length
       ? omitEmpty({
           postCastTable: [
             ...(hasValue(soakingDuration)
               ? [{ srNo: 1, activity: "Soaking Time", details: soakingDuration }]
               : []),
-            ...pressureRows.map((row, index) =>
-              omitEmpty({
-                srNo: (hasValue(soakingDuration) ? 2 : 1) + index,
-                activity: "Pressure Plate",
-                details: row.OBSERVATIONS || row.PRESSURE_SENSOR_USED || undefined,
-              }),
-            ),
+            ...(firstPressure?.PRESSURE_SENSOR_USED
+              ? [
+                  {
+                    srNo: hasValue(soakingDuration) ? 2 : 1,
+                    activity: "Pressure sensor details (If applicable)",
+                    details: firstPressure.PRESSURE_SENSOR_USED,
+                  },
+                ]
+              : []),
+            ...(firstPressure?.INITIAL_PRESSURE_READING
+              ? [
+                  {
+                    srNo:
+                      (hasValue(soakingDuration) ? 1 : 0) +
+                      (firstPressure.PRESSURE_SENSOR_USED ? 1 : 0) +
+                      1,
+                    activity: "Initial pressure reading (If applicable)",
+                    details: firstPressure.INITIAL_PRESSURE_READING,
+                  },
+                ]
+              : []),
           ],
+          ...(pressureRequired === "YES"
+            ? {
+                pressurePlateAssemblyRequired: "YES",
+                pressurePlateDetails: mapPressurePlateDetailsForApi(pressureRows),
+              }
+            : hasValue(pressureRequired)
+              ? { pressurePlateAssemblyRequired: pressureRequired }
+              : {}),
         })
       : undefined;
 
@@ -544,6 +596,7 @@ const buildQcCastingSectionsPayload = (
     finalAssemblyDetails,
     castingProcess,
     slurryCastDetails,
+    weightmentDetails,
     postCastOperations,
   });
 };
@@ -663,7 +716,7 @@ export const buildCastingSectionPayload = (
 
 const pickRowField = (row: Record<string, unknown>, ...keys: string[]) => {
   for (const key of keys) {
-    if (row[key] != null && String(row[key]).trim() !== "") return row[key];
+    if (row[key] != null && String(row[key]).trim() !== "") return String(row[key]).trim();
   }
   return "";
 };
@@ -674,11 +727,29 @@ const mapApiMandrelRows = (rows: unknown[]): QcCastingMandrelRow[] =>
       const rec = asRecord(row);
       if (!rec) return null;
       const withoutCup =
-        pickRowField(rec, "readingWithoutCup", "READING_WITHOUT_CUP", "aFinal", "A_FINAL", "afinal", "amock", "A_MOCK") ||
-        "";
+        pickRowField(
+          rec,
+          "readingWithoutCup",
+          "READING_WITHOUT_CUP",
+          "aFinal",
+          "A_FINAL",
+          "afinal",
+          "aMock",
+          "amock",
+          "A_MOCK",
+        ) || "";
       const withCup =
-        pickRowField(rec, "readingWithBottomCup", "READING_WITH_BOTTOM_CUP", "bFinal", "B_FINAL", "bfinal", "bmock", "B_MOCK") ||
-        "";
+        pickRowField(
+          rec,
+          "readingWithBottomCup",
+          "READING_WITH_BOTTOM_CUP",
+          "bFinal",
+          "B_FINAL",
+          "bfinal",
+          "bMock",
+          "bmock",
+          "B_MOCK",
+        ) || "";
       if (!withoutCup && !withCup) return null;
       return {
         SR_NO: Number(pickRowField(rec, "srNo", "SR_NO")) || index + 1,
@@ -687,6 +758,38 @@ const mapApiMandrelRows = (rows: unknown[]): QcCastingMandrelRow[] =>
       } satisfies QcCastingMandrelRow;
     })
     .filter(Boolean) as QcCastingMandrelRow[];
+
+/** Merge finalMixBowlDetails + castingFromBowlDetails (same bowl / srNo) into one UI row. */
+const mergeCastingProcessBowlRows = (
+  finalMixRows: unknown[],
+  fromBowlRows: unknown[],
+): Record<string, unknown>[] => {
+  const byKey = new Map<string, Record<string, unknown>>();
+
+  const keyFor = (rec: Record<string, unknown>, index: number) => {
+    const bowl = String(rec.bowlId ?? rec.BOWL_ID ?? "").trim();
+    if (bowl) return `bowl:${bowl}`;
+    return `sr:${String(rec.srNo ?? rec.SR_NO ?? index + 1)}`;
+  };
+
+  finalMixRows.forEach((row, index) => {
+    const rec = asRecord(row);
+    if (!rec) return;
+    byKey.set(keyFor(rec, index), { ...rec });
+  });
+
+  fromBowlRows.forEach((row, index) => {
+    const rec = asRecord(row);
+    if (!rec) return;
+    const key = keyFor(rec, index);
+    byKey.set(key, { ...(byKey.get(key) ?? {}), ...rec });
+  });
+
+  if (byKey.size) return Array.from(byKey.values());
+  return [...finalMixRows, ...fromBowlRows]
+    .map((row) => asRecord(row))
+    .filter(Boolean) as Record<string, unknown>[];
+};
 
 const mapApiCastingDetailRows = (rows: unknown[]): QcCastingTableRow[] =>
   rows
@@ -701,13 +804,14 @@ const mapApiCastingDetailRows = (rows: unknown[]): QcCastingTableRow[] =>
           "FINAL_MIX_BOWL_NO",
           "bowlId",
           "BOWL_ID",
+          "fmMotorLabel",
         ),
         PROPELLANT_QTY: pickRowField(
           rec,
           "propellantQty",
           "PROPELLANT_QTY",
           "initialWeight",
-          "finalWeight",
+          "INITIAL_WEIGHT",
         ),
         INITIAL_UNLOADING_VISCOSITY: pickRowField(
           rec,
@@ -734,8 +838,17 @@ const mapApiCastingDetailRows = (rows: unknown[]): QcCastingTableRow[] =>
           "SLURRY_CAST_FROM_EACH_BOWL",
           "slurryCast",
           "SLURRY_CAST",
+          "finalWeight",
         ),
-        REMARKS: pickRowField(rec, "remarks", "REMARKS"),
+        // QC payload stores remarks on castingFromBowlDetails.motorId (see buildQcCastingSectionsPayload).
+        REMARKS: (() => {
+          const direct = pickRowField(rec, "remarks", "REMARKS");
+          if (direct) return direct;
+          const maybe = pickRowField(rec, "motorId", "MOTOR_ID");
+          // Ignore values that look like real motor IDs.
+          if (!maybe || /^RMC-/i.test(maybe)) return "";
+          return maybe;
+        })(),
       } satisfies QcCastingTableRow;
     })
     .filter(Boolean) as QcCastingTableRow[];
@@ -818,53 +931,114 @@ export const castingMotorDetailToSections = (
       });
     }
 
+    const assemblyDateRaw = String(
+      motor.motorReceivedAt ??
+        motor.MOTOR_RECEIVED_AT ??
+        asRecord(motor.details)?.motorReceivedAt ??
+        "",
+    ).trim();
+    const assemblyDate = formatToUiDate(assemblyDateRaw) || assemblyDateRaw;
+
     const finalAssemblyDetails = asRecord(castingSections.finalAssemblyDetails);
     const motorCasing = asRecord(asArray(finalAssemblyDetails?.motorCasing)[0]);
-    if (motorCasing) {
+    const mandrelRows = mapApiMandrelRows(
+      asArray(motorCasing?.mandrelMeasurements ?? motorCasing?.MANDREL_MEASUREMENTS),
+    );
+    if (motorCasing || assemblyDate) {
       sections.push({
         sectionId: QC_CASTING_SECTION_IDS.FINAL_ASSEMBLY,
         ...(id ? { motorId: id } : {}),
         sectionData: [
           {
-            MANDREL_ASSEMBLY: mapApiMandrelRows(
-              asArray(motorCasing.mandrelMeasurements ?? motorCasing.MANDREL_MEASUREMENTS),
-            ),
+            ...(assemblyDate ? { ASSEMBLY_DATE: assemblyDate } : {}),
+            ...(mandrelRows.length ? { MANDREL_ASSEMBLY: mandrelRows } : {}),
           },
         ],
       });
-      const emptyWeight = pickRowField(motorCasing, "emptyMotorWeight", "EMPTY_MOTOR_WEIGHT");
-      if (emptyWeight) {
-        sections.push({
-          sectionId: QC_CASTING_SECTION_IDS.WEIGHTMENT,
-          ...(id ? { motorId: id } : {}),
-          sectionData: [{ WEIGHTMENT_DETAILS: [{ TOTAL_WEIGHT: emptyWeight }] }],
-        });
-      }
     }
 
     const castingProcess = asRecord(castingSections.castingProcess);
     if (castingProcess) {
+      const mergedBowlRows = mergeCastingProcessBowlRows(
+        asArray(castingProcess.finalMixBowlDetails ?? castingProcess.FINAL_MIX_BOWL_DETAILS),
+        asArray(
+          castingProcess.castingFromBowlDetails ?? castingProcess.CASTING_FROM_BOWL_DETAILS,
+        ),
+      );
+      // slurryCastDetails can fill slurry cast when process rows omit it
+      const slurryRows = asArray(
+        asRecord(castingSections.slurryCastDetails)?.slurryCastFromBowls,
+      );
+      slurryRows.forEach((row) => {
+        const rec = asRecord(row);
+        if (!rec) return;
+        const label = String(rec.fmMotorLabel ?? rec.bowlId ?? "").trim();
+        const slurry = pickRowField(rec, "slurryCast", "SLURRY_CAST");
+        if (!label || !slurry) return;
+        const match = mergedBowlRows.find(
+          (bowl) => String(bowl.bowlId ?? bowl.BOWL_ID ?? "").trim() === label,
+        );
+        if (match && !pickRowField(match, "slurryCast", "SLURRY_CAST")) {
+          match.slurryCast = slurry;
+        }
+      });
+
+      const firstFromBowl = asRecord(mergedBowlRows[0]) ?? {};
+      const dateRaw = String(
+        castingProcess.dateOfCasting ?? castingProcess.DATE_OF_CASTING ?? "",
+      ).trim();
       sections.push({
         sectionId: QC_CASTING_SECTION_IDS.PROPELLANT_CASTING,
         ...(id ? { motorId: id } : {}),
         sectionData: [
           {
+            ...(dateRaw
+              ? { DATE_OF_CASTING: formatToUiDate(dateRaw) || dateRaw }
+              : {}),
+            RH_PERCENT: pickRowField(firstFromBowl, "rh", "RH", "RH_PERCENT"),
             VACUUM_MAINTAINED: String(
               castingProcess.initialVacuum ??
                 castingProcess.vacuumPressureCasting ??
                 castingProcess.vacuumPressureSoaking ??
                 "",
             ),
-            CASTING_TABLE: mapApiCastingDetailRows(
-              asArray(
-                castingProcess.castingFromBowlDetails ??
-                  castingProcess.CASTING_FROM_BOWL_DETAILS ??
-                  castingProcess.finalMixBowlDetails,
-              ),
-            ),
+            CASTING_TABLE: mapApiCastingDetailRows(mergedBowlRows),
           },
         ],
       });
+    }
+
+    const weightmentDetails =
+      asRecord(castingSections.weightmentDetails) ??
+      asRecord(castingSections.WEIGHTMENT_DETAILS);
+    if (weightmentDetails) {
+      const mappedWeightment = mapApiWeightmentRow(weightmentDetails);
+      if (mappedWeightment && weightmentRowHasData(mappedWeightment)) {
+        sections.push({
+          sectionId: QC_CASTING_SECTION_IDS.WEIGHTMENT,
+          ...(id ? { motorId: id } : {}),
+          sectionData: [{ WEIGHTMENT_DETAILS: [mappedWeightment] }],
+        });
+      }
+    } else if (motorCasing) {
+      const emptyWeight = pickRowField(motorCasing, "emptyMotorWeight", "EMPTY_MOTOR_WEIGHT");
+      if (emptyWeight) {
+        sections.push({
+          sectionId: QC_CASTING_SECTION_IDS.WEIGHTMENT,
+          ...(id ? { motorId: id } : {}),
+          sectionData: [
+            {
+              WEIGHTMENT_DETAILS: [
+                {
+                  TOTAL_WEIGHT: emptyWeight,
+                  LOAD_CELL_INITIAL: "",
+                  LOAD_CELL_FINAL: "",
+                },
+              ],
+            },
+          ],
+        });
+      }
     }
 
     const postCastOperations = asRecord(castingSections.postCastOperations);
@@ -873,12 +1047,54 @@ export const castingMotorDetailToSections = (
       const soakingRow = postCastTable.find((row) =>
         /soaking/i.test(String(asRecord(row)?.activity ?? "")),
       );
+      const pressureSensorRow = postCastTable.find((row) =>
+        /pressure sensor/i.test(String(asRecord(row)?.activity ?? "")),
+      );
+      const initialPressureRow = postCastTable.find((row) =>
+        /initial pressure/i.test(String(asRecord(row)?.activity ?? "")),
+      );
+      const pressurePlateRow = postCastTable.find((row) =>
+        /pressure\s*plate/i.test(String(asRecord(row)?.activity ?? "")),
+      );
+      const pressureDetailsRows = mapApiPressurePlateRows(
+        asArray(
+          postCastOperations.pressurePlateDetails ?? postCastOperations.PRESSURE_PLATE_DETAILS,
+        ),
+      );
+      const sensor = String(asRecord(pressureSensorRow)?.details ?? "").trim();
+      const initialPressure = String(asRecord(initialPressureRow)?.details ?? "").trim();
+      const pressureObs = String(asRecord(pressurePlateRow)?.details ?? "").trim();
+      const pressureRequired = String(
+        postCastOperations.pressurePlateAssemblyRequired ??
+          postCastOperations.PRESSURE_PLATE_ASSEMBLY_REQUIRED ??
+          (pressureDetailsRows.length || sensor || initialPressure || pressureObs ? "YES" : ""),
+      ).trim();
+
       sections.push({
         sectionId: QC_CASTING_SECTION_IDS.POST_CAST,
         ...(id ? { motorId: id } : {}),
         sectionData: [
           {
-            SOAKING_DURATION: String(asRecord(soakingRow)?.details ?? ""),
+            SOAKING_DURATION: fromSoakingDurationApi(asRecord(soakingRow)?.details),
+            ...(pressureRequired
+              ? { PRESSURE_PLATE_ASSEMBLY_REQUIRED: pressureRequired }
+              : {}),
+            ...(pressureDetailsRows.length
+              ? { PRESSURE_PLATE_DETAILS: pressureDetailsRows }
+              : sensor || initialPressure || pressureObs
+                ? {
+                    PRESSURE_PLATE_DETAILS: [
+                      {
+                        SR_NO: 1,
+                        START_TIME: "",
+                        END_TIME: "",
+                        PRESSURE_SENSOR_USED: sensor,
+                        INITIAL_PRESSURE_READING: initialPressure,
+                        OBSERVATIONS: pressureObs,
+                      },
+                    ],
+                  }
+                : {}),
           },
         ],
       });

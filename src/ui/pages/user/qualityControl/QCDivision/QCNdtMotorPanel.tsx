@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
 import {
   Box,
   Stack,
@@ -26,12 +26,16 @@ import {
   type QcNdtVisualInspectionRow,
 } from "../../../../../hooks/user/qualityControl/qcNdtConfig";
 import {
+  getNdtAdditionalRemarks,
   getNdtObservationRows,
   getNdtRadiographyDetailRows,
+  getNdtSignedReport,
   getNdtUploadMedia,
   getNdtVisualRows,
+  setNdtAdditionalRemarks,
   setNdtObservationRows,
   setNdtRadiographyDetailRows,
+  setNdtSignedReport,
   setNdtUploadMedia,
   setNdtVisualRows,
 } from "../../../../../hooks/user/qualityControl/qcNdtTables";
@@ -67,6 +71,47 @@ const cellSx = {
 };
 
 const tableFieldSx = { "& .MuiOutlinedInput-root": { fontSize: "0.72rem" } };
+
+/** Same merge as Post Cure / Hardware: keep in-flight uploads without blocking deletes. */
+const mergeFileRefsPreferLive = (current: FileRef[], incoming: FileRef[]): FileRef[] => {
+  const byKey = new Map<string, FileRef>();
+  const keyOf = (ref: FileRef) =>
+    String(ref.localId ?? "").trim() || String(ref.fileId ?? "").trim() || "";
+  for (const ref of current ?? []) {
+    const key = keyOf(ref);
+    if (key) byKey.set(key, ref);
+  }
+  for (const ref of incoming ?? []) {
+    const key = keyOf(ref);
+    if (!key) continue;
+    const prev = byKey.get(key);
+    byKey.set(key, prev ? { ...prev, ...ref } : ref);
+  }
+  const incomingKeys = new Set((incoming ?? []).map(keyOf).filter(Boolean));
+  for (const ref of current ?? []) {
+    const key = keyOf(ref);
+    if (!key || incomingKeys.has(key)) continue;
+    if (ref.status === "uploading" || ref.status === "failed" || ref.isTemp) {
+      byKey.set(key, ref);
+    }
+  }
+  // Preserve incoming order; append any still in-flight refs not present in incoming.
+  const ordered: FileRef[] = [];
+  const seen = new Set<string>();
+  for (const ref of incoming ?? []) {
+    const key = keyOf(ref);
+    const merged = key ? byKey.get(key) ?? ref : ref;
+    ordered.push(merged);
+    if (key) seen.add(key);
+  }
+  for (const [key, ref] of byKey) {
+    if (seen.has(key)) continue;
+    if (ref.status === "uploading" || ref.status === "failed" || ref.isTemp) {
+      ordered.push(ref);
+    }
+  }
+  return ordered;
+};
 
 const SectionCard = ({
   title,
@@ -304,11 +349,13 @@ const ObservationTable = ({
 const VisualInspectionTable = ({
   rows,
   onChange,
+  onFilesChange,
   readOnly = false,
   disabled = false,
 }: {
   rows: QcNdtVisualInspectionRow[];
   onChange: (rows: QcNdtVisualInspectionRow[]) => void;
+  onFilesChange: (rowIndex: number, next: FileRef[]) => void;
   readOnly?: boolean;
   disabled?: boolean;
 }) => {
@@ -318,12 +365,6 @@ const VisualInspectionTable = ({
 
   const updateTextCell = (index: number, field: "OBSERVATION" | "LOCATION", value: string) => {
     onChange(rows.map((row, rowIndex) => (rowIndex === index ? { ...row, [field]: value } : row)));
-  };
-
-  const updateFiles = (index: number, next: FileRef[]) => {
-    onChange(
-      rows.map((row, rowIndex) => (rowIndex === index ? { ...row, UPLOAD_IMAGE: next } : row)),
-    );
   };
 
   return (
@@ -393,16 +434,18 @@ const VisualInspectionTable = ({
                 )}
               </TableCell>
               <TableCell sx={bodyCellSx}>
-                <QCDivisionFileField
-                  files={row.UPLOAD_IMAGE ?? []}
-                  onChange={(next) => updateFiles(index, next)}
-                  multiple
-                  acceptMode="image"
-                  compact
-                  readOnly={readOnly}
-                  disabled={inputsDisabled}
-                  emptyLabel={NDT_S.FILE_EMPTY_IMAGE}
-                />
+                <Box sx={{ minWidth: 160, maxWidth: 280 }}>
+                  <QCDivisionFileField
+                    files={row.UPLOAD_IMAGE ?? []}
+                    onChange={(next) => onFilesChange(index, next)}
+                    multiple
+                    acceptMode="imageVideoPdf"
+                    compact
+                    readOnly={readOnly}
+                    disabled={inputsDisabled}
+                    emptyLabel={NDT_S.FILE_EMPTY_IMAGE}
+                  />
+                </Box>
               </TableCell>
             </TableRow>
           ))}
@@ -415,7 +458,7 @@ const VisualInspectionTable = ({
 type QCNdtMotorPanelProps = {
   motorId?: string | null;
   values: SchemaFormValues;
-  onChange: (values: SchemaFormValues) => void;
+  onChange: (values: SchemaFormValues | ((prev: SchemaFormValues) => SchemaFormValues)) => void;
   readOnly?: boolean;
   disabled?: boolean;
   headerActions?: ReactNode;
@@ -434,6 +477,56 @@ const QCNdtMotorPanel = ({
   const observationRows = useMemo(() => getNdtObservationRows(values), [values]);
   const visualRows = useMemo(() => getNdtVisualRows(values), [values]);
   const uploadMedia = getNdtUploadMedia(values);
+  const signedReport = getNdtSignedReport(values);
+  const additionalRemarks = getNdtAdditionalRemarks(values);
+
+  const patchValues = useCallback(
+    (updater: (prev: SchemaFormValues) => SchemaFormValues) => {
+      onChange((prev) => updater(prev ?? {}));
+    },
+    [onChange],
+  );
+
+  const patchUploadMedia = useCallback(
+    (next: FileRef[]) => {
+      patchValues((prev) =>
+        setNdtUploadMedia(prev, mergeFileRefsPreferLive(getNdtUploadMedia(prev), next)),
+      );
+    },
+    [patchValues],
+  );
+
+  const patchSignedReport = useCallback(
+    (next: FileRef[]) => {
+      patchValues((prev) =>
+        setNdtSignedReport(
+          prev,
+          mergeFileRefsPreferLive(getNdtSignedReport(prev), next).slice(0, 1),
+        ),
+      );
+    },
+    [patchValues],
+  );
+
+  const patchVisualFiles = useCallback(
+    (rowIndex: number, next: FileRef[]) => {
+      patchValues((prev) => {
+        const currentRows = getNdtVisualRows(prev);
+        return setNdtVisualRows(
+          prev,
+          currentRows.map((row, index) =>
+            index === rowIndex
+              ? {
+                  ...row,
+                  UPLOAD_IMAGE: mergeFileRefsPreferLive(row.UPLOAD_IMAGE ?? [], next),
+                }
+              : row,
+          ),
+        );
+      });
+    },
+    [patchValues],
+  );
 
   return (
     <Box
@@ -455,7 +548,7 @@ const QCNdtMotorPanel = ({
         <SectionCard title={QC_NDT_SECTION_TITLES.RADIOGRAPHY_DETAILS} readOnly={readOnly}>
           <RadiographyDetailsTable
             rows={radiographyRows}
-            onChange={(rows) => onChange(setNdtRadiographyDetailRows(values, rows))}
+            onChange={(rows) => patchValues((prev) => setNdtRadiographyDetailRows(prev, rows))}
             readOnly={readOnly}
             disabled={inputsDisabled}
           />
@@ -463,7 +556,7 @@ const QCNdtMotorPanel = ({
         <SectionCard title={QC_NDT_SECTION_TITLES.RADIOGRAPHY_OBSERVATIONS} readOnly={readOnly}>
           <ObservationTable
             rows={observationRows}
-            onChange={(rows) => onChange(setNdtObservationRows(values, rows))}
+            onChange={(rows) => patchValues((prev) => setNdtObservationRows(prev, rows))}
             readOnly={readOnly}
             disabled={inputsDisabled}
           />
@@ -471,21 +564,67 @@ const QCNdtMotorPanel = ({
         <SectionCard title={QC_NDT_SECTION_TITLES.VISUAL_INSPECTION} readOnly={readOnly}>
           <VisualInspectionTable
             rows={visualRows}
-            onChange={(rows) => onChange(setNdtVisualRows(values, rows))}
+            onChange={(rows) => patchValues((prev) => setNdtVisualRows(prev, rows))}
+            onFilesChange={patchVisualFiles}
             readOnly={readOnly}
             disabled={inputsDisabled}
           />
         </SectionCard>
         <SectionCard title={QC_NDT_SECTION_TITLES.UPLOAD_MEDIA} readOnly={readOnly}>
-          <QCDivisionFileField
-            files={uploadMedia}
-            onChange={(next) => onChange(setNdtUploadMedia(values, next))}
-            multiple
-            acceptMode="imageVideo"
-            readOnly={readOnly}
-            disabled={inputsDisabled}
-            emptyLabel={QC_NDT_FIELD_LABELS.UPLOAD_VIDEO_PHOTO}
-          />
+          <Box sx={{ minWidth: 220, maxWidth: 480 }}>
+            <QCDivisionFileField
+              files={uploadMedia}
+              onChange={patchUploadMedia}
+              multiple
+              acceptMode="imageVideoPdf"
+              readOnly={readOnly}
+              disabled={inputsDisabled}
+              emptyLabel={NDT_S.FILE_EMPTY_MEDIA}
+            />
+          </Box>
+        </SectionCard>
+        <SectionCard title={QC_NDT_SECTION_TITLES.SIGNED_NDT_REPORT} readOnly={readOnly}>
+          <Stack spacing={1.25}>
+            <Box sx={{ minWidth: 220, maxWidth: 480 }}>
+              <QCDivisionFileField
+                files={signedReport}
+                onChange={patchSignedReport}
+                multiple={false}
+                acceptMode="imageVideoPdf"
+                readOnly={readOnly}
+                disabled={inputsDisabled}
+                emptyLabel={NDT_S.FILE_EMPTY_REPORT}
+              />
+            </Box>
+            {readOnly ? (
+              <Box>
+                <Typography
+                  sx={{ fontSize: "0.68rem", fontWeight: 700, color: BRAND.textSub, mb: 0.35 }}
+                >
+                  {QC_NDT_FIELD_LABELS.ADDITIONAL_REMARKS}
+                </Typography>
+                <QCDivisionReadOnlyValue
+                  value={additionalRemarks}
+                  muted={!additionalRemarks.trim()}
+                />
+              </Box>
+            ) : (
+              <TextField
+                size="small"
+                fullWidth
+                multiline
+                minRows={2}
+                label={QC_NDT_FIELD_LABELS.ADDITIONAL_REMARKS}
+                placeholder={QC_NDT_FIELD_LABELS.ADDITIONAL_REMARKS}
+                value={additionalRemarks}
+                disabled={inputsDisabled}
+                onChange={(event) =>
+                  patchValues((prev) => setNdtAdditionalRemarks(prev, event.target.value))
+                }
+                sx={tableFieldSx}
+              />
+            )}
+          </Stack>
         </SectionCard>
       </Stack>
     </Box>

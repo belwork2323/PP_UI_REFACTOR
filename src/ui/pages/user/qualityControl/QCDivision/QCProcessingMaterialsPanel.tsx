@@ -30,7 +30,10 @@ type QCProcessingMaterialsPanelProps = {
   readOnly?: boolean;
   schemaLoading?: boolean;
   schemaError?: string | null;
-  onEntryValuesChange: (entryId: string, values: SchemaFormValues) => void;
+  onEntryValuesChange: (
+    entryId: string,
+    values: SchemaFormValues | ((prev: SchemaFormValues) => SchemaFormValues),
+  ) => void;
   unitActions?: QCDivisionEntryUnitActions | null;
 };
 

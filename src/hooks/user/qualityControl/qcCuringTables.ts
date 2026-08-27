@@ -1,17 +1,18 @@
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
 import {
-  buildCuringSectionsPayload,
-  createEmptyCuringMotorData,
-} from "../../../data/models/user/CuringMotorDataModel";
+  toApiDate,
+  toApiDateTime,
+  toApiTime,
+} from "../../../data/models/user/castingCuringFieldCodec";
 import { formatToUiDate } from "../../../utils/dateUtils";
 import {
   QC_CURING_CYCLE_PRESET_ROWS,
   QC_CURING_SECTION_IDS,
   QC_CURING_SUBSCALE_PARAMETER_PRESET_ROWS,
   formatQcSubscaleArticleTypeLabel,
-  getQcCuringTypeLabel,
   subscaleArticleTypeSortOrder,
   normalizeQcCuringType,
+  toQcSubscaleArticleTypeApi,
   type QcCuringSetupField,
   type QcCuringSubType,
   curingSubTypeShowsPeakPressureAchieved,
@@ -117,8 +118,19 @@ const emptyCycleRow = (srNo: number, preset?: Partial<QcCuringCycleRow>): QcCuri
   ...preset,
 });
 
+/** Empty cycle rows only — manufacturing/API seed fills real values (no Amb-40 presets). */
 const defaultCycleRows = (): QcCuringCycleRow[] =>
-  QC_CURING_CYCLE_PRESET_ROWS.map((row) => emptyCycleRow(Number(row.SR_NO), row));
+  Array.from({ length: Math.max(1, QC_CURING_CYCLE_PRESET_ROWS.length) }, (_, index) =>
+    emptyCycleRow(index + 1),
+  );
+
+const normalizeCycleTimeValue = (value: unknown): string => {
+  const trimmed = String(value ?? "").trim();
+  if (!trimmed) return "";
+  const match = trimmed.match(/^(\d{1,2}):(\d{2})/);
+  if (!match) return trimmed;
+  return `${match[1].padStart(2, "0")}:${match[2]}`;
+};
 
 const emptyPressureRow = (): QcCuringPressureRow => ({
   PEAK_PRESSURE: "",
@@ -143,7 +155,7 @@ const defaultSubscaleParameterRows = (): QcCuringSubscaleParameterRow[] =>
     emptySubscaleParameterRow(Number(row.SR_NO), row),
   );
 
-const TEMPERATURE_API_ALIASES = ["temperature", "TEMPERATURE"] as const;
+const TEMPERATURE_API_ALIASES = ["parameter", "PARAMETER", "temperature", "TEMPERATURE"] as const;
 
 const pickApiTemperatureValue = (row: Record<string, unknown>): string => {
   for (const key of TEMPERATURE_API_ALIASES) {
@@ -165,8 +177,8 @@ const pickApiBemMouldNo = (row: Record<string, unknown>): string => {
   return "";
 };
 
-const pickApiOvenNo = (row: Record<string, unknown>): string => {
-  for (const key of ["ovenNo", "OVEN_NO", "ovenNumber", "OVEN_NUMBER"] as const) {
+const pickApiOptionalString = (row: Record<string, unknown>, keys: readonly string[]): string => {
+  for (const key of keys) {
     const value = row[key];
     if (value === null || value === undefined) continue;
     const raw = String(value).trim();
@@ -175,7 +187,7 @@ const pickApiOvenNo = (row: Record<string, unknown>): string => {
   return "";
 };
 
-/** One row per article: Oven No., Article Type, Parameter (temp), BEM No. (bemMouldNo). */
+/** One row per article: Article Type, Parameter, mould no under BEM No. only. */
 export const mapApiSubscaleCuringTableToParameterRows = (
   curingTable: unknown[],
 ): QcCuringSubscaleParameterRow[] => {
@@ -191,16 +203,20 @@ export const mapApiSubscaleCuringTableToParameterRows = (
 
   if (!articles.length) return presetRows;
 
-  const mappedRows = articles.map((article, index) => ({
-    SR_NO: index + 1,
-    OVEN_NO: pickApiOvenNo(article),
-    ARTICLE_TYPE: formatQcSubscaleArticleTypeLabel(article.articleType ?? article.ARTICLE_TYPE),
-    PARAMETER: pickApiTemperatureValue(article),
-    BEM_NO: pickApiBemMouldNo(article),
-    WHEEL_PEEL_NO: "",
-    CARTON_NO: "",
-    CONTROL_GRAIN_NO: "",
-  }));
+  const mappedRows = articles.map((article, index) => {
+    const articleType = article.articleType ?? article.ARTICLE_TYPE;
+    return {
+      SR_NO: index + 1,
+      OVEN_NO: "",
+      ARTICLE_TYPE: formatQcSubscaleArticleTypeLabel(articleType),
+      PARAMETER: pickApiTemperatureValue(article),
+      // Manufacturing sends bemMouldNo for every article — always show under BEM No.
+      BEM_NO: pickApiBemMouldNo(article),
+      WHEEL_PEEL_NO: pickApiOptionalString(article, ["wheelPeelNo", "WHEEL_PEEL_NO"]),
+      CARTON_NO: pickApiOptionalString(article, ["cartonNo", "CARTON_NO"]),
+      CONTROL_GRAIN_NO: pickApiOptionalString(article, ["controlGrainNo", "CONTROL_GRAIN_NO"]),
+    };
+  });
 
   while (mappedRows.length < presetRows.length) {
     mappedRows.push({
@@ -209,7 +225,7 @@ export const mapApiSubscaleCuringTableToParameterRows = (
     });
   }
 
-  return mappedRows.slice(0, presetRows.length);
+  return mappedRows.slice(0, Math.max(mappedRows.length, presetRows.length));
 };
 
 export const createInitialCuringValues = (_subType?: QcCuringSubType | ""): SchemaFormValues => ({
@@ -431,11 +447,11 @@ const mapCycleRowsForApi = (
     omitEmpty({
       srNo: toFiniteNumber(row.SR_NO) ?? row.SR_NO,
       temperature: toApiScalar(row.TEMPERATURE),
-      durationMinutes: toApiScalar(row.DURATION),
-      startDate: row.START_DATE || undefined,
-      startTime: row.START_TIME || undefined,
-      endDate: row.END_DATE || undefined,
-      endTime: row.END_TIME || undefined,
+      time: toApiScalar(row.DURATION),
+      startDate: toApiDate(row.START_DATE),
+      startTime: toApiTime(row.START_TIME),
+      endDate: toApiDate(row.END_DATE),
+      endTime: toApiTime(row.END_TIME),
       actualDurationMinutes: toApiScalar(row.ACTUAL_DURATION),
       propellantPressure: curingSubTypeShowsPropellantPressure(subType)
         ? toApiScalar(row.PROPELLANT_PRESSURE)
@@ -443,24 +459,21 @@ const mapCycleRowsForApi = (
       peakPressureAchieved: curingSubTypeShowsPeakPressureAchieved(subType)
         ? toApiScalar(row.PEAK_PRESSURE_ACHIEVED)
         : undefined,
-      hotWaterCirculation: row.HOT_WATER_STATUS || undefined,
+      hotWaterStatus: row.HOT_WATER_STATUS || undefined,
       remarks: row.REMARKS || undefined,
     }),
   );
 
+/** Subscale curingTable: 6 UI columns only (mould IDs always under bemNo). */
 const mapSubscaleRowsForApi = (rows: ReturnType<typeof sanitizeSubscaleRows>) =>
-  rows.map((row) =>
-    omitEmpty({
-      srNo: toFiniteNumber(row.SR_NO) ?? row.SR_NO,
-      ovenNo: row.OVEN_NO || undefined,
-      articleType: row.ARTICLE_TYPE || undefined,
-      parameter: toApiScalar(row.PARAMETER),
-      bemNo: row.BEM_NO || undefined,
-      wheelPeelNo: row.WHEEL_PEEL_NO || undefined,
-      cartonNo: row.CARTON_NO || undefined,
-      controlGrainNo: row.CONTROL_GRAIN_NO || undefined,
-    }),
-  );
+  rows.map((row) => ({
+    articleType: toQcSubscaleArticleTypeApi(row.ARTICLE_TYPE) || null,
+    parameter: toApiScalar(row.PARAMETER) ?? null,
+    bemNo: row.BEM_NO || null,
+    wheelPeelNo: row.WHEEL_PEEL_NO || null,
+    cartonNo: row.CARTON_NO || null,
+    controlGrainNo: row.CONTROL_GRAIN_NO || null,
+  }));
 
 const mapQcCuringTypeForApi = (subType: string) => {
   const normalized = normalizeQcCuringType(subType);
@@ -470,39 +483,39 @@ const mapQcCuringTypeForApi = (subType: string) => {
   return normalized || undefined;
 };
 
-const qcValuesToCuringMotorData = (values: SchemaFormValues | null | undefined) => {
-  const empty = createEmptyCuringMotorData();
-  const cycles = sanitizeCycleRows(getCuringCycleRows(values)).map((row, index) => ({
-    srNo: String(row.SR_NO ?? index + 1),
-    TEMPERATURE: String(row.TEMPERATURE ?? ""),
-    TIME: String(row.DURATION ?? row.TIME ?? ""),
-    START_DATE: String(row.START_DATE ?? ""),
-    START_TIME: String(row.START_TIME ?? ""),
-    END_DATE: String(row.END_DATE ?? ""),
-    END_TIME: String(row.END_TIME ?? ""),
-    HOT_WATER_STATUS: String(row.HOT_WATER_STATUS ?? ""),
-    PROPELLANT_PRESSURE: String(row.PROPELLANT_PRESSURE ?? ""),
-  }));
-
-  return {
-    ...empty,
-    CURING_CYCLES: {
-      CURING_TABLE: cycles.length ? cycles : empty.CURING_CYCLES.CURING_TABLE,
-    },
-    POST_CURING_DETAILS: {
-      OTHER_OBSERVATIONS: getCuringPostField(values, "VISUAL_OBSERVATIONS"),
-      VISUAL_OBSERVATION: getCuringPostField(values, "VISUAL_OBSERVATIONS"),
-      PRESSURE_PLATE_REMOVAL_DATE_TIME: getCuringPostField(
-        values,
-        "PRESSURE_PLATE_REMOVAL_DATE_TIME",
-      ),
-      SHORE_A_HARDNESS: getCuringPostField(values, "SHORE_A_HARDNESS"),
-      DE_CORING_DISPATCH_DATE_TIME: getCuringPostField(values, "DISPATCH_DATE_TIME"),
-    },
+const buildSubscaleDetailsPayload = (values: SchemaFormValues | null | undefined) => {
+  const ovenNumber =
+    getCuringSubscaleField(values, "NUMBER_OF_OVENS") ||
+    getCuringSetupField(values, "OVEN_NUMBER");
+  const curingTable = mapSubscaleRowsForApi(sanitizeSubscaleRows(getCuringSubscaleParameterRows(values)));
+  const subscale = {
+    ovenNumber: ovenNumber || null,
+    curingStartDate: toApiDate(getCuringSubscaleField(values, "CURING_START_DATE")) ?? null,
+    cycleStartTime: toApiTime(getCuringSubscaleField(values, "CYCLE_START_TIME")) ?? null,
+    curingCompleteDate: toApiDate(getCuringSubscaleField(values, "CURING_COMPLETE_DATE")) ?? null,
+    cycleEndTime: toApiTime(getCuringSubscaleField(values, "CYCLE_END_TIME")) ?? null,
+    bemAverageShoreAHardness:
+      toApiScalar(getCuringSubscaleField(values, "BEM_AVERAGE_SHORE_A_HARDNESS")) ?? null,
+    cartonAverageShoreAHardness:
+      toApiScalar(getCuringSubscaleField(values, "CARTON_AVERAGE_SHORE_A_HARDNESS")) ?? null,
+    visualObservations: getCuringSubscaleField(values, "SUBSCALE_VISUAL_OBSERVATIONS") || null,
+    curingTable,
   };
+  const hasScalar = [
+    subscale.ovenNumber,
+    subscale.curingStartDate,
+    subscale.cycleStartTime,
+    subscale.curingCompleteDate,
+    subscale.cycleEndTime,
+    subscale.bemAverageShoreAHardness,
+    subscale.cartonAverageShoreAHardness,
+    subscale.visualObservations,
+  ].some((value) => value != null && value !== "");
+  if (!hasScalar && !curingTable.length) return undefined;
+  return subscale;
 };
 
-/** Nested Casting/Curing direct DTO for QC create/update (`data.curingDetails[]`). */
+/** Nested QC create/update DTO for `data.curingDetails[]`. */
 export const buildCuringMotorDetailPayload = (
   values: SchemaFormValues | null | undefined,
   motorId: string,
@@ -512,29 +525,51 @@ export const buildCuringMotorDetailPayload = (
   const curingType = getCuringTypeFromValues(values, fallbackSubType);
   const motorStage = getCuringSetupField(values, "MOTOR_STAGE");
   const oven = getCuringSetupField(values, "OVEN");
-  const ovenNumber = getCuringSetupField(values, "OVEN_NUMBER");
+  const ovenNumber =
+    getCuringSetupField(values, "OVEN_NUMBER") ||
+    getCuringSubscaleField(values, "NUMBER_OF_OVENS");
   const motorPositioning = getCuringSetupField(values, "MOTOR_POSITIONING_DATE_TIME");
-  const motorData = qcValuesToCuringMotorData(values);
+
+  const cycleRows = mapCycleRowsForApi(sanitizeCycleRows(getCuringCycleRows(values)), curingType);
+  const visualObservation = getCuringPostField(values, "VISUAL_OBSERVATIONS");
+  const postCuringDetails = omitEmpty({
+    visualObservation: visualObservation || undefined,
+    pressurePlateRemovalDateTime: toApiDateTime(
+      getCuringPostField(values, "PRESSURE_PLATE_REMOVAL_DATE_TIME"),
+    ),
+    shoreAHardness: toApiScalar(getCuringPostField(values, "SHORE_A_HARDNESS")),
+    decoringDispatchDateTime: toApiDateTime(getCuringPostField(values, "DISPATCH_DATE_TIME")),
+  });
+
+  const subscaleDetails = buildSubscaleDetailsPayload(values);
 
   return omitEmpty({
     motorId,
     motorSubmissionType,
-    ...(motorPositioning ? { motorReceivedAt: motorPositioning } : {}),
-    curingSetup: omitEmpty({
-      oven: oven || undefined,
-      ovenNo: ovenNumber || undefined,
-      curingType: curingType ? mapQcCuringTypeForApi(curingType) : undefined,
-      configuration: motorStage || undefined,
-    }),
-    curingSections: buildCuringSectionsPayload(motorData),
+    motorStage: motorStage || undefined,
+    curingType: curingType ? mapQcCuringTypeForApi(curingType) : undefined,
+    oven: oven || undefined,
+    ovenNumber: ovenNumber || undefined,
+    motorReceivedAt: toApiDateTime(motorPositioning),
+    curingSections: {
+      curingCycles: { curingTable: cycleRows },
+      ...(Object.keys(postCuringDetails).length ? { postCuringDetails } : {}),
+    },
+    ...(subscaleDetails ? { subscaleDetails } : {}),
   });
 };
 
 export const isCuringNestedMotorDetail = (rec: Record<string, unknown>) => {
-  if (asRecord(rec.curingSetup) || asRecord(rec.curingSections)) return true;
+  if (asRecord(rec.curingSetup) || asRecord(rec.curingSections) || asRecord(rec.subscaleDetails)) {
+    return true;
+  }
   if (Array.isArray(rec.curingSections)) return true;
   const details = asRecord(rec.details);
-  return Boolean(asRecord(details?.curingSetup) || asRecord(details?.curingSections));
+  return Boolean(
+    asRecord(details?.curingSetup) ||
+      asRecord(details?.curingSections) ||
+      asRecord(details?.subscaleDetails),
+  );
 };
 
 export const mapApiCuringCycleRowToForm = (
@@ -543,19 +578,25 @@ export const mapApiCuringCycleRowToForm = (
 ): QcCuringCycleRow => ({
   SR_NO: Number(row.srNo ?? row.SR_NO ?? index + 1),
   TEMPERATURE: String(row.temperature ?? row.TEMPERATURE ?? "").trim(),
-  DURATION: String(row.durationMinutes ?? row.DURATION ?? row.TIME ?? "").trim(),
-  START_DATE: formatToUiDate(String(row.startDate ?? row.START_DATE ?? "")) ||
+  DURATION: String(
+    row.durationMinutes ?? row.time ?? row.DURATION ?? row.TIME ?? "",
+  ).trim(),
+  START_DATE:
+    formatToUiDate(String(row.startDate ?? row.START_DATE ?? "")) ||
     String(row.startDate ?? row.START_DATE ?? "").trim(),
-  START_TIME: String(row.startTime ?? row.START_TIME ?? "").trim(),
-  END_DATE: formatToUiDate(String(row.endDate ?? row.END_DATE ?? "")) ||
+  START_TIME: normalizeCycleTimeValue(row.startTime ?? row.START_TIME),
+  END_DATE:
+    formatToUiDate(String(row.endDate ?? row.END_DATE ?? "")) ||
     String(row.endDate ?? row.END_DATE ?? "").trim(),
-  END_TIME: String(row.endTime ?? row.END_TIME ?? "").trim(),
+  END_TIME: normalizeCycleTimeValue(row.endTime ?? row.END_TIME),
   ACTUAL_DURATION: String(row.actualDurationMinutes ?? row.ACTUAL_DURATION ?? "").trim(),
   PROPELLANT_PRESSURE: String(row.propellantPressure ?? row.PROPELLANT_PRESSURE ?? "").trim(),
   PEAK_PRESSURE_ACHIEVED: String(
     row.peakPressureAchieved ?? row.PEAK_PRESSURE_ACHIEVED ?? row.PEAK_PRESSURE ?? "",
   ).trim(),
-  HOT_WATER_STATUS: String(row.hotWaterCirculation ?? row.HOT_WATER_STATUS ?? "").trim(),
+  HOT_WATER_STATUS: String(
+    row.hotWaterStatus ?? row.hotWaterCirculation ?? row.HOT_WATER_STATUS ?? "",
+  ).trim(),
   REMARKS: String(row.remarks ?? row.REMARKS ?? "").trim(),
 });
 
@@ -569,19 +610,21 @@ export const curingMotorDetailToSections = (
     asRecord(rec.curingSections) ?? asRecord(asRecord(rec.details)?.curingSections);
   if (nestedSections && !Array.isArray(rec.curingSections)) {
     const curingSetup = asRecord(rec.curingSetup) ?? asRecord(asRecord(rec.details)?.curingSetup);
-    if (curingSetup) {
+    const setup = omitEmpty({
+      MOTOR_STAGE: curingSetup?.configuration ?? rec.motorStage,
+      CURING_TYPE: curingSetup?.curingType ?? rec.curingType,
+      OVEN: curingSetup?.oven ?? rec.oven,
+      OVEN_NUMBER:
+        curingSetup?.ovenNo ?? curingSetup?.ovenNumber ?? rec.ovenNumber ?? rec.ovenNo,
+      MOTOR_POSITIONING_DATE_TIME:
+        rec.motorReceivedAt ??
+        rec.motorPositioningDateTime ??
+        curingSetup?.motorPositioningDateTime,
+    });
+    if (Object.keys(setup).length) {
       sections.push({
         sectionId: QC_CURING_SECTION_IDS.MOTOR_SETUP,
-        sectionData: [
-          omitEmpty({
-            MOTOR_STAGE: curingSetup.configuration ?? rec.motorStage,
-            CURING_TYPE: curingSetup.curingType ?? rec.curingType,
-            OVEN: curingSetup.oven ?? rec.oven,
-            OVEN_NUMBER: curingSetup.ovenNo ?? curingSetup.ovenNumber ?? rec.ovenNumber,
-            MOTOR_POSITIONING_DATE_TIME:
-              rec.motorReceivedAt ?? rec.motorPositioningDateTime ?? curingSetup.motorPositioningDateTime,
-          }),
-        ],
+        sectionData: [setup],
         motorId,
       } as SchemaSectionSubmission);
     }
@@ -600,13 +643,16 @@ export const curingMotorDetailToSections = (
 
     const post = asRecord(nestedSections.postCuringDetails);
     if (post) {
+      const visual = String(post.visualObservation ?? post.VISUAL_OBSERVATION ?? "").trim();
+      const other = String(post.otherObservations ?? post.OTHER_OBSERVATIONS ?? "").trim();
+      const visualCombined = [visual, other && other.toLowerCase() !== "na" ? other : ""]
+        .filter(Boolean)
+        .join("; ");
       sections.push({
         sectionId: QC_CURING_SECTION_IDS.POST_CURING,
         sectionData: [
           {
-            VISUAL_OBSERVATIONS: String(
-              post.otherObservations ?? post.visualObservation ?? post.VISUAL_OBSERVATIONS ?? "",
-            ),
+            VISUAL_OBSERVATIONS: visualCombined,
             PRESSURE_PLATE_REMOVAL_DATE_TIME: String(
               post.pressurePlateRemovalDateTime ?? post.PRESSURE_PLATE_REMOVAL_DATE_TIME ?? "",
             ),
@@ -616,6 +662,34 @@ export const curingMotorDetailToSections = (
             ),
           },
         ],
+        motorId,
+      } as SchemaSectionSubmission);
+    }
+
+    const subscale =
+      asRecord(rec.subscaleDetails) ??
+      asRecord(asRecord(rec.details)?.subscaleDetails) ??
+      {};
+    const parameterRows = mapApiSubscaleCuringTableToParameterRows(asArray(subscale.curingTable));
+    const subscaleSection = omitEmpty({
+      NUMBER_OF_OVENS: String(
+        subscale.ovenNumber ?? subscale.numberOfOvens ?? rec.ovenNumber ?? "",
+      ),
+      CURING_START_DATE: String(subscale.curingStartDate ?? ""),
+      CYCLE_START_TIME: String(subscale.cycleStartTime ?? ""),
+      CURING_COMPLETE_DATE: String(subscale.curingCompleteDate ?? ""),
+      CYCLE_END_TIME: String(subscale.cycleEndTime ?? ""),
+      BEM_AVERAGE_SHORE_A_HARDNESS: String(subscale.bemAverageShoreAHardness ?? ""),
+      CARTON_AVERAGE_SHORE_A_HARDNESS: String(subscale.cartonAverageShoreAHardness ?? ""),
+      SUBSCALE_VISUAL_OBSERVATIONS: String(subscale.visualObservations ?? ""),
+      ...(parameterRows.some((row) => String(row.BEM_NO ?? "").trim() || String(row.PARAMETER ?? "").trim())
+        ? { CURING_PARAMETER_TABLE: parameterRows }
+        : {}),
+    });
+    if (Object.keys(subscaleSection).length) {
+      sections.push({
+        sectionId: QC_CURING_SECTION_IDS.SUBSCALE,
+        sectionData: [subscaleSection],
         motorId,
       } as SchemaSectionSubmission);
     }
@@ -709,19 +783,7 @@ export const curingMotorDetailToSections = (
             ),
             ...(table.length
               ? {
-                  CURING_PARAMETER_TABLE: table.map((row, index) => {
-                    const rec = asRecord(row) ?? {};
-                    return {
-                      SR_NO: rec.srNo ?? rec.SR_NO ?? index + 1,
-                      OVEN_NO: rec.ovenNo ?? rec.OVEN_NO ?? "",
-                      ARTICLE_TYPE: rec.articleType ?? rec.ARTICLE_TYPE ?? "",
-                      PARAMETER: rec.parameter ?? rec.PARAMETER ?? "",
-                      BEM_NO: rec.bemNo ?? rec.BEM_NO ?? "",
-                      WHEEL_PEEL_NO: rec.wheelPeelNo ?? rec.WHEEL_PEEL_NO ?? "",
-                      CARTON_NO: rec.cartonNo ?? rec.CARTON_NO ?? "",
-                      CONTROL_GRAIN_NO: rec.controlGrainNo ?? rec.CONTROL_GRAIN_NO ?? "",
-                    };
-                  }),
+                  CURING_PARAMETER_TABLE: mapApiSubscaleCuringTableToParameterRows(table),
                 }
               : {}),
           },

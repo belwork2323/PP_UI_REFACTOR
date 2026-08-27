@@ -53,6 +53,30 @@ const validateUploadFile = (
   return { valid: true };
 };
 
+const isInFlightFileRef = (ref: FileRef) =>
+  ref.status === "uploading" ||
+  ref.status === "failed" ||
+  (Boolean(ref.isTemp) && Boolean(String(ref.localId ?? "").trim()));
+
+/** Merge props into the live list without dropping in-flight uploads props have not caught up to yet. */
+const mergeFilesFromProps = (propsFiles: FileRef[], liveFiles: FileRef[]): FileRef[] => {
+  const propList = Array.isArray(propsFiles) ? propsFiles : [];
+  const propLocalIds = new Set(
+    propList.map((ref) => String(ref.localId ?? "").trim()).filter(Boolean),
+  );
+  const propFileIds = new Set(
+    propList.map((ref) => String(ref.fileId ?? "").trim()).filter(Boolean),
+  );
+  const preserved = liveFiles.filter((ref) => {
+    const localId = String(ref.localId ?? "").trim();
+    const fileId = String(ref.fileId ?? "").trim();
+    if (localId && propLocalIds.has(localId)) return false;
+    if (fileId && propFileIds.has(fileId)) return false;
+    return isInFlightFileRef(ref);
+  });
+  return preserved.length ? [...propList, ...preserved] : propList;
+};
+
 /** Upload / retry / remove / open for form `FileRef` lists. */
 export function useFileUploadActions(
   files: FileRef[],
@@ -64,7 +88,8 @@ export function useFileUploadActions(
   const missingSubDeptMessage =
     options.missingSubDeptMessage ?? "Sub-department is missing. Cannot upload files.";
   const filesRef = useRef(files);
-  filesRef.current = files;
+  // Never clobber in-flight uploads when a parent re-render still has stale props.
+  filesRef.current = mergeFilesFromProps(files, filesRef.current);
   const showAlert = useAlertStore((state) => state.showAlert);
   const subDepartmentId = useAuthStore(
     (s) =>
@@ -75,11 +100,32 @@ export function useFileUploadActions(
 
   const patchByLocalId = useCallback(
     (localId: string, patch: Partial<FileRef>) => {
-      const next = filesRef.current.map((ref) =>
-        ref.localId === localId ? { ...ref, ...patch } : ref,
-      );
-      filesRef.current = next;
-      onChange(next);
+      let found = false;
+      const next = filesRef.current.map((ref) => {
+        if (ref.localId !== localId) return ref;
+        found = true;
+        return { ...ref, ...patch };
+      });
+      // If props sync dropped the row before upload finished, re-attach so fileId is not lost.
+      const recovered =
+        found || !localId
+          ? next
+          : [
+              ...next,
+              {
+                localId,
+                fileName: String(patch.fileName ?? "file"),
+                fileUrl: String(patch.fileUrl ?? patch.fileId ?? ""),
+                mimeType: patch.mimeType,
+                fileId: patch.fileId ?? null,
+                status: patch.status ?? "uploaded",
+                isTemp: patch.isTemp ?? true,
+                file: patch.file ?? null,
+                uploadProgress: patch.uploadProgress,
+              } satisfies FileRef,
+            ];
+      filesRef.current = recovered;
+      onChange(recovered);
     },
     [onChange],
   );

@@ -8,6 +8,7 @@ export const QC_NDT_SECTION_IDS = {
   RADIOGRAPHY_OBSERVATIONS: "RADIOGRAPHY_OBSERVATIONS",
   VISUAL_INSPECTION: "VISUAL_INSPECTION",
   UPLOAD_MEDIA: "UPLOAD_MEDIA",
+  SIGNED_NDT_REPORT: "SIGNED_NDT_REPORT",
 } as const;
 
 export const QC_NDT_TABLE_IDS = {
@@ -21,6 +22,7 @@ export const QC_NDT_SECTION_TITLES: Record<string, string> = {
   [QC_NDT_SECTION_IDS.RADIOGRAPHY_OBSERVATIONS]: "Radiography Observations",
   [QC_NDT_SECTION_IDS.VISUAL_INSPECTION]: "Visual Inspection",
   [QC_NDT_SECTION_IDS.UPLOAD_MEDIA]: "Upload Videos / Photos",
+  [QC_NDT_SECTION_IDS.SIGNED_NDT_REPORT]: "Signed NDT report & remarks",
 };
 
 export const QC_NDT_FIELD_LABELS = {
@@ -39,6 +41,8 @@ export const QC_NDT_FIELD_LABELS = {
   OBSERVATION: "Observation",
   UPLOAD_IMAGE: "Upload Image",
   UPLOAD_VIDEO_PHOTO: "Upload Videos / Photos",
+  SIGNED_REPORT: "Upload PDF",
+  ADDITIONAL_REMARKS: "Additional remarks",
 } as const;
 
 export type QcNdtRadiographyDetailRow = {

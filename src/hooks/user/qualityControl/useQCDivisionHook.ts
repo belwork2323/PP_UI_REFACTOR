@@ -85,6 +85,7 @@ import {
   resolveQcDivisionStatus,
   resolveQcDivisionStatusFromSources,
   shouldUseQcFormDetailsData,
+  shouldUseQcFormDetailsForDivision,
   toDivisionAutoPopulateRecord,
 } from "./qcDivisionDataSource";
 import {
@@ -141,18 +142,22 @@ import {
 import {
   applyHardwareDivisionDetailsSeed,
   applyHardwareSharedUploadsToEntryValues,
+  buildHardwareProcessValuesFromPayload,
   resolveManufacturingDivisionDetailsPayload,
 } from "./qcHardwareDivisionDetails";
 import {
   createInitialHardwareProcessValues,
-  hydrateHardwareProcessValuesFromSections,
-  hydrateHardwareUploadValuesFromSections,
-  isQcHardwareProcessSubType,
-  mergeHardwareUploadValuesIntoEntryValues,
   hasIncompleteQcHardwareUploads,
   collectTempFileIdsFromQcHardwareValues,
+  hardwareProcessValuesHaveUserData,
+  isHardwareNestedMotorDetail,
+  isQcHardwareProcessSubType,
+  listHardwareMotorsFromDetailData,
 } from "./qcHardwareTables";
-import { applyCastingDivisionDetailsSeed } from "./qcCastingDivisionDetails";
+import {
+  applyCastingDivisionDetailsSeed,
+  buildCastingValuesFromPayload,
+} from "./qcCastingDivisionDetails";
 import {
   applyCuringDivisionDetailsSeed,
   buildInitialCuringValuesForMotor,
@@ -191,7 +196,7 @@ import {
   buildInitialPostCureValuesForMotor,
   resolvePostCureSelectionFromMotorDetails,
 } from "./qcPostCureDivisionDetails";
-import { createInitialNdtValues, hydrateNdtValuesFromSections, ndtFormValuesHaveUserData, hasIncompleteQcNdtUploads, collectTempFileIdsFromQcNdtValues } from "./qcNdtTables";
+import { createInitialNdtValues, hydrateNdtValuesFromSections, mergeBatchRadiographyPlanIntoNdtValues, ndtFormValuesHaveUserData, hasIncompleteQcNdtUploads, collectTempFileIdsFromQcNdtValues } from "./qcNdtTables";
 import {
   hasIncompleteQcRevalidationUploads,
   collectTempFileIdsFromQcRevalidationValues,
@@ -243,6 +248,11 @@ import {
 } from "./qcSchemaFetchCache";
 import { useFileService } from "../../../hooks/useFileService";
 import { discardWorkflowForm } from "../../../utils/workflowDiscard";
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
 
 const collectTempFileIdsFromQcForm = (form: QualityControlFormState | null | undefined): string[] => {
   if (!form) return [];
@@ -381,7 +391,11 @@ export const useQCDivisionHook = () => {
 
   const updateFormData = useCallback(
     (updater: (prev: QualityControlFormState) => QualityControlFormState) => {
-      applyFullFormState(updater(formDataRef.current));
+      // Prefer latest ref (kept in sync by entry-value edits) so async seeds do not
+      // overwrite uploads that have not painted yet.
+      const next = updater(formDataRef.current);
+      formDataRef.current = next;
+      applyFullFormState(next);
       markFormDirty();
     },
     [applyFullFormState, markFormDirty],
@@ -768,24 +782,13 @@ export const useQCDivisionHook = () => {
       setDivisionAutoPopulateLoading(true);
       clearPartialNav();
       try {
-        // Decide API from batch-seeded status first — do not fetch form details just to
-        // learn TO_BE_INITIATED when the map (or missing key) already says awaiting initiation.
-        let divisionStatus = resolveQcDivisionStatusFromSources({
-          statusByKey: divisionStatusByFlowKeyRef.current,
-          formDetails: qcFormDetailsPayloadRef.current,
-          flowKey: divisionFlowKey,
-          rawMaterialType: typeKey,
-        });
-
+        // Prefer refining status from /qc-division/details whenever a QC form exists.
+        // Missing map keys default to TO_BE_INITIATED and must not skip the details API
+        // (e.g. Casting IN_PROGRESS motors while divisionStatuses still lag).
         let formDetailsForStatus = qcFormDetailsPayloadRef.current;
         const hasFormId = Boolean(String(activeBatch?.formId ?? "").trim());
-        const shouldFetchFormDetailsForStatus =
-          !formDetailsForStatus &&
-          hasFormId &&
-          (shouldUseQcFormDetailsData(divisionStatus) ||
-            Object.keys(divisionStatusByFlowKeyRef.current).length === 0);
 
-        if (shouldFetchFormDetailsForStatus) {
+        if (!formDetailsForStatus && hasFormId) {
           formDetailsForStatus = await ensureQcFormDetailsPayload();
           if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
           if (formDetailsForStatus) {
@@ -793,17 +796,19 @@ export const useQCDivisionHook = () => {
             if (Object.keys(fromForm).length > 0) {
               setDivisionStatusByFlowKey((prev) => mergeQcDivisionStatusMaps(prev, fromForm));
             }
-            divisionStatus = resolveQcDivisionStatusFromSources({
-              statusByKey: {
-                ...divisionStatusByFlowKeyRef.current,
-                ...fromForm,
-              },
-              formDetails: formDetailsForStatus,
-              flowKey: divisionFlowKey,
-              rawMaterialType: typeKey,
+            setFormUnitStatuses({
+              premixStatuses: formDetailsForStatus.premixStatuses ?? null,
+              motorStatuses: formDetailsForStatus.motorStatuses ?? null,
             });
           }
         }
+
+        let divisionStatus = resolveQcDivisionStatusFromSources({
+          statusByKey: divisionStatusByFlowKeyRef.current,
+          formDetails: formDetailsForStatus,
+          flowKey: divisionFlowKey,
+          rawMaterialType: typeKey,
+        });
 
         let batchPayload: unknown = null;
         try {
@@ -839,7 +844,24 @@ export const useQCDivisionHook = () => {
           console.error("Failed to load batch details for QC unit gating:", error);
         }
 
-        const useFormDetails = shouldUseQcFormDetailsData(divisionStatus);
+        const useFormDetails =
+          shouldUseQcFormDetailsData(divisionStatus) ||
+          shouldUseQcFormDetailsForDivision(formDetailsForStatus, {
+            flowKey: divisionFlowKey,
+            rawMaterialType: typeKey,
+            statusByKey: divisionStatusByFlowKeyRef.current,
+          }) ||
+          shouldUseQcFormDetailsForDivision(
+            {
+              motorStatuses: formUnitStatusesRef.current.motorStatuses,
+              premixStatuses: formUnitStatusesRef.current.premixStatuses,
+            },
+            {
+              flowKey: divisionFlowKey,
+              rawMaterialType: typeKey,
+              statusByKey: divisionStatusByFlowKeyRef.current,
+            },
+          );
 
         const catalogDivisionId = resolveQcManufacturingDivisionDetailsId(
           divisionCatalog,
@@ -851,14 +873,30 @@ export const useQCDivisionHook = () => {
           { flowKey: divisionFlowKey, rawMaterialType: typeKey },
           divisionCatalog,
         );
-        const divisionId = batchDivisionId ?? catalogDivisionId;
+        // De-coring seeds from Curing manufacturing division-details — never use a
+        // batch DE_CORING divisionId (catalog already redirects DE_CORING → CURING).
+        const divisionId =
+          divisionFlowKey === "DE_CORING"
+            ? catalogDivisionId
+            : (batchDivisionId ?? catalogDivisionId);
 
         let seedRecord: Record<string, unknown> | null = null;
 
         if (useFormDetails) {
-          // IN_PROGRESS / APPROVED / etc. → /qc-division/details only (all divisions).
-          const formDetails = formDetailsForStatus ?? (await ensureQcFormDetailsPayload());
+          // IN_PROGRESS / APPROVED / etc. → always hit /qc-division/details on division click.
+          const formDetails =
+            (await ensureQcFormDetailsPayload({ forceRefresh: true })) ?? formDetailsForStatus;
           if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
+          if (formDetails) {
+            const fromForm = mapFormDetailsDivisionStatusesToFlowKeyMap(formDetails);
+            if (Object.keys(fromForm).length > 0) {
+              setDivisionStatusByFlowKey((prev) => mergeQcDivisionStatusMaps(prev, fromForm));
+            }
+            setFormUnitStatuses({
+              premixStatuses: formDetails.premixStatuses ?? null,
+              motorStatuses: formDetails.motorStatuses ?? null,
+            });
+          }
           const matchingDetail = findQcFormDivisionDetail(formDetails, {
             flowKey: divisionFlowKey,
             rawMaterialType: typeKey,
@@ -1306,6 +1344,7 @@ export const useQCDivisionHook = () => {
 
       let initialValues = createInitialCastingValues();
       if (shouldUseQcFormDetailsData(motorStatus)) {
+        // IN_PROGRESS+ → /qc-division/details
         const formDetails = await ensureQcFormDetailsPayload();
         const matchingDetail = findQcFormDivisionDetail(formDetails, {
           flowKey: selectedDivision,
@@ -1322,23 +1361,27 @@ export const useQCDivisionHook = () => {
         );
         if (motorSections.length) {
           initialValues = hydrateCastingValuesFromSections(motorSections);
+          initialValues = applyCastingDivisionDetailsSeed(
+            initialValues,
+            null,
+            selectedMotorId,
+            { onlyIfEmpty: true, batchPayload },
+          );
+        } else {
+          initialValues = buildCastingValuesFromPayload(
+            seedRoot ?? matchingDetail,
+            selectedMotorId,
+            { batchPayload },
+          );
         }
-        initialValues = applyCastingDivisionDetailsSeed(
-          initialValues,
-          null,
-          selectedMotorId,
-          { onlyIfEmpty: true, batchPayload },
-        );
       } else {
+        // TO_BE_INITIATED → /qc-division/division-details
         const seedPayload =
           resolveManufacturingDivisionDetailsPayload(divisionAutoPopulateDataRef.current) ??
           divisionAutoPopulateDataRef.current;
-        initialValues = applyCastingDivisionDetailsSeed(
-          initialValues,
-          seedPayload,
-          selectedMotorId,
-          { onlyIfEmpty: false, batchPayload },
-        );
+        initialValues = buildCastingValuesFromPayload(seedPayload, selectedMotorId, {
+          batchPayload,
+        });
       }
 
       const nextEntries = [...(formData.divisionEntries ?? []), entry];
@@ -1772,6 +1815,19 @@ export const useQCDivisionHook = () => {
         return fetched ?? auto;
       };
 
+      const resolveBatchPayloadForNdtSeed = async (): Promise<unknown> => {
+        if (batchDetailsPayloadRef.current) return batchDetailsPayloadRef.current;
+        const batchId = String(activeBatchRef.current?.batchId ?? "").trim();
+        if (!batchId) return null;
+        try {
+          const batchPayload = await batchManagementController.getBatchById(batchId);
+          if (batchPayload) batchDetailsPayloadRef.current = batchPayload;
+          return batchDetailsPayloadRef.current;
+        } catch {
+          return null;
+        }
+      };
+
       try {
         const currentEntries = formDataRef.current.divisionEntries ?? [];
         const existingIds = resolveEntryIdsForPartialItem(currentEntries, item, { flowKey });
@@ -1822,26 +1878,42 @@ export const useQCDivisionHook = () => {
             item.motorId &&
             shouldUseQcFormDetailsData(item.status)
           ) {
+            // Same as TO_BE_INITIATED / Casting: merge with onlyIfEmpty so unsaved
+            // HARDWARE_ATTACHMENTS::* FileRefs (new Graph/Report/Photo uploads) are not wiped.
             const seedPayload = await resolveSeedPayloadForUnit();
             if (requestId !== partialNavLoadRequestIdRef.current) return;
-            const seedRoot =
-              seedPayload && typeof seedPayload === "object"
-                ? (seedPayload as Record<string, unknown>)
-                : null;
-            updateFormData((prev) => ({
-              ...prev,
-              divisionEntryValues: applyHardwareSharedUploadsToEntryValues(
-                prev.divisionEntries ?? [],
-                prev.divisionEntryValues ?? {},
-                seedRoot ? expandDivisionDetailSections(seedRoot) : null,
-              ),
-            }));
+            updateFormData((prev) => {
+              let entryValues = { ...(prev.divisionEntryValues ?? {}) };
+              for (const entry of prev.divisionEntries ?? []) {
+                if (entry.kind !== "HARDWARE_PROCESS" || entry.motorId !== item.motorId) continue;
+                const subType = String(entry.subType ?? "");
+                if (!isQcHardwareProcessSubType(subType)) continue;
+                entryValues = {
+                  ...entryValues,
+                  [entry.entryId]: {
+                    ...entryValues[entry.entryId],
+                    schemaValues: applyHardwareDivisionDetailsSeed(
+                      entryValues[entry.entryId]?.schemaValues,
+                      seedPayload,
+                      item.motorId!,
+                      subType,
+                      { onlyIfEmpty: true },
+                    ),
+                  },
+                };
+              }
+              return {
+                ...prev,
+                divisionEntryValues: entryValues,
+              };
+            });
           } else if (
             flowKey === "CASTING" &&
             item.kind === "MOTOR" &&
             item.motorId &&
             shouldUseQcFormDetailsData(item.status)
           ) {
+            // IN_PROGRESS+ → reload from /qc-division/details
             const seedPayload = await resolveSeedPayloadForUnit();
             if (requestId !== partialNavLoadRequestIdRef.current) return;
             const batchPayload =
@@ -1863,13 +1935,17 @@ export const useQCDivisionHook = () => {
                 );
                 if (motorSections.length) {
                   schemaValues = hydrateCastingValuesFromSections(motorSections);
+                  schemaValues = applyCastingDivisionDetailsSeed(
+                    schemaValues,
+                    null,
+                    item.motorId!,
+                    { onlyIfEmpty: true, batchPayload },
+                  );
+                } else {
+                  schemaValues = buildCastingValuesFromPayload(seedPayload, item.motorId!, {
+                    batchPayload,
+                  });
                 }
-                schemaValues = applyCastingDivisionDetailsSeed(
-                  schemaValues,
-                  null,
-                  item.motorId!,
-                  { onlyIfEmpty: true, batchPayload },
-                );
                 entryValues = {
                   ...entryValues,
                   [entryId]: {
@@ -1889,6 +1965,7 @@ export const useQCDivisionHook = () => {
             item.motorId &&
             !shouldUseQcFormDetailsData(item.status)
           ) {
+            // TO_BE_INITIATED → seed from /qc-division/division-details
             const seedPayload = await resolveSeedPayloadForUnit();
             if (requestId !== partialNavLoadRequestIdRef.current) return;
             const batchPayload =
@@ -2111,6 +2188,7 @@ export const useQCDivisionHook = () => {
             shouldUseQcFormDetailsData(item.status)
           ) {
             const seedPayload = await resolveSeedPayloadForUnit();
+            const batchPayload = await resolveBatchPayloadForNdtSeed();
             if (requestId !== partialNavLoadRequestIdRef.current) return;
             updateFormData((prev) => {
               let entryValues = { ...(prev.divisionEntryValues ?? {}) };
@@ -2119,7 +2197,10 @@ export const useQCDivisionHook = () => {
                   ...entryValues,
                   [entryId]: {
                     ...entryValues[entryId],
-                    schemaValues: buildInitialNdtValuesForMotor(seedPayload, item.motorId!),
+                    schemaValues: buildInitialNdtValuesForMotor(seedPayload, item.motorId!, {
+                      batchPayload,
+                      includeRadiographyObservations: true,
+                    }),
                   },
                 };
               }
@@ -2136,6 +2217,7 @@ export const useQCDivisionHook = () => {
           ) {
             // TO_BE_INITIATED → manufacturing /qc-division/division-details
             const seedPayload = await resolveSeedPayloadForUnit();
+            const batchPayload = await resolveBatchPayloadForNdtSeed();
             if (requestId !== partialNavLoadRequestIdRef.current) return;
             updateFormData((prev) => {
               let entryValues = { ...(prev.divisionEntryValues ?? {}) };
@@ -2148,7 +2230,7 @@ export const useQCDivisionHook = () => {
                       entryValues[entryId]?.schemaValues ?? createInitialNdtValues(),
                       seedPayload,
                       item.motorId!,
-                      { onlyIfEmpty: true },
+                      { onlyIfEmpty: true, batchPayload },
                     ),
                   },
                 };
@@ -2448,40 +2530,11 @@ export const useQCDivisionHook = () => {
 
               let values = createInitialHardwareProcessValues(process.value);
               if (shouldUseQcFormDetailsData(item.status)) {
-                const expectedSectionId = getHardwareSectionIdForSubType(process.value);
-                const seedRoot =
-                  seedPayload && typeof seedPayload === "object"
-                    ? (seedPayload as Record<string, unknown>)
-                    : null;
-                const allSections = expandDivisionDetailSections(
-                  seedRoot && typeof seedRoot === "object"
-                    ? (seedRoot as Record<string, unknown>)
-                    : null,
+                values = buildHardwareProcessValuesFromPayload(
+                  seedPayload,
+                  item.motorId,
+                  process.value,
                 );
-                const processSections = allSections.filter((section) => {
-                  const sectionMotorId = String(
-                    (section as { motorId?: string }).motorId ?? "",
-                  ).trim();
-                  if (sectionMotorId && sectionMotorId !== item.motorId) return false;
-                  const sid = String(section.sectionId ?? "").trim();
-                  if (process.value === "ABRADING" && sid === QC_HARDWARE_ATTACHMENTS_SECTION_ID) {
-                    return true;
-                  }
-                  if (expectedSectionId && sid !== expectedSectionId) return false;
-                  const sectionSubType = String((section as { subType?: string }).subType ?? "")
-                    .trim()
-                    .toUpperCase();
-                  return !sectionSubType || sectionSubType === process.value;
-                });
-                if (processSections.length) {
-                  values = hydrateHardwareProcessValuesFromSections(processSections, process.value);
-                  if (process.value === "ABRADING") {
-                    values = mergeHardwareUploadValuesIntoEntryValues(
-                      values,
-                      hydrateHardwareUploadValuesFromSections(processSections),
-                    );
-                  }
-                }
               } else {
                 values = applyHardwareDivisionDetailsSeed(
                   values,
@@ -2590,36 +2643,38 @@ export const useQCDivisionHook = () => {
               (divisionAutoPopulateDataRef.current as { __batchDetails?: unknown } | null)
                 ?.__batchDetails ?? null;
 
-            if (shouldUseQcFormDetailsData(item.status)) {
-              const seedRoot =
-                seedPayload && typeof seedPayload === "object"
-                  ? (seedPayload as Record<string, unknown>)
-                  : null;
-              const sections = expandDivisionDetailSections(seedRoot);
-              const motorSections = sections.filter(
-                (section) =>
-                  String((section as { motorId?: string }).motorId ?? "").trim() === item.motorId,
-              );
-              if (motorSections.length) {
-                initialValues = hydrateCastingValuesFromSections(motorSections);
-              }
-              // Batch metadata only — saved fields already hydrated from QC form details above.
-              if (item.motorId) {
-                initialValues = applyCastingDivisionDetailsSeed(
-                  initialValues,
-                  null,
-                  item.motorId,
-                  { onlyIfEmpty: true, batchPayload },
+            if (item.motorId) {
+              if (shouldUseQcFormDetailsData(item.status)) {
+                // IN_PROGRESS+ → /qc-division/details
+                const seedRoot =
+                  seedPayload && typeof seedPayload === "object"
+                    ? (seedPayload as Record<string, unknown>)
+                    : null;
+                const sections = expandDivisionDetailSections(seedRoot);
+                const motorSections = sections.filter(
+                  (section) =>
+                    String((section as { motorId?: string }).motorId ?? "").trim() ===
+                    item.motorId,
                 );
+                if (motorSections.length) {
+                  initialValues = hydrateCastingValuesFromSections(motorSections);
+                  initialValues = applyCastingDivisionDetailsSeed(
+                    initialValues,
+                    null,
+                    item.motorId,
+                    { onlyIfEmpty: true, batchPayload },
+                  );
+                } else {
+                  initialValues = buildCastingValuesFromPayload(seedPayload, item.motorId, {
+                    batchPayload,
+                  });
+                }
+              } else {
+                // TO_BE_INITIATED → /qc-division/division-details
+                initialValues = buildCastingValuesFromPayload(seedPayload, item.motorId, {
+                  batchPayload,
+                });
               }
-            } else if (item.motorId) {
-              // TO_BE_INITIATED → division-details form seed + batch metadata casting type.
-              initialValues = applyCastingDivisionDetailsSeed(
-                initialValues,
-                seedPayload,
-                item.motorId,
-                { onlyIfEmpty: false, batchPayload },
-              );
             }
 
             const entry = buildEntryFromSelection(
@@ -2829,6 +2884,7 @@ export const useQCDivisionHook = () => {
 
           if (loader.division === "NDT") {
             const seedPayload = await resolveSeedPayloadForUnit();
+            const batchPayload = await resolveBatchPayloadForNdtSeed();
             if (requestId !== partialNavLoadRequestIdRef.current) return;
 
             let initialValues = createInitialNdtValues();
@@ -2843,12 +2899,21 @@ export const useQCDivisionHook = () => {
                   String((section as { motorId?: string }).motorId ?? "").trim() === item.motorId,
               );
               if (motorSections.length) {
-                initialValues = hydrateNdtValuesFromSections(motorSections);
+                initialValues = mergeBatchRadiographyPlanIntoNdtValues(
+                  hydrateNdtValuesFromSections(motorSections),
+                  item.motorId!,
+                  batchPayload,
+                );
               } else if (item.motorId) {
-                initialValues = buildInitialNdtValuesForMotor(seedRoot, item.motorId);
+                initialValues = buildInitialNdtValuesForMotor(seedRoot, item.motorId, {
+                  batchPayload,
+                  includeRadiographyObservations: true,
+                });
               }
             } else if (item.motorId) {
-              initialValues = buildInitialNdtValuesForMotor(seedPayload, item.motorId);
+              initialValues = buildInitialNdtValuesForMotor(seedPayload, item.motorId, {
+                batchPayload,
+              });
             }
 
             const entry = buildEntryFromSelection(
@@ -3373,14 +3438,29 @@ export const useQCDivisionHook = () => {
   }, [isPartialNavItemEnabled, loadFormForPartialItem, partialNavItems, selectedDivision]);
 
   const handleDivisionEntryValuesChange = useCallback(
-    (entryId: string, values: SchemaFormValues) => {
-      setDivisionEntryValues((prev) => ({
-        ...prev,
-        [entryId]: {
-          ...(prev[entryId] ?? { schemaValues: {} }),
-          schemaValues: values,
-        },
-      }));
+    (
+      entryId: string,
+      valuesOrUpdater: SchemaFormValues | ((prev: SchemaFormValues) => SchemaFormValues),
+    ) => {
+      setDivisionEntryValues((prev) => {
+        const current = prev[entryId]?.schemaValues ?? {};
+        const next =
+          typeof valuesOrUpdater === "function" ? valuesOrUpdater(current) : valuesOrUpdater;
+        const nextValues = {
+          ...prev,
+          [entryId]: {
+            ...(prev[entryId] ?? { schemaValues: {} }),
+            schemaValues: next,
+          },
+        };
+        // Sync immediately so concurrent updateFormData (async unit seed) cannot
+        // snapshot formDataRef without newly uploaded HARDWARE_ATTACHMENTS fileIds.
+        formDataRef.current = {
+          ...formDataRef.current,
+          divisionEntryValues: nextValues,
+        };
+        return nextValues;
+      });
       markFormDirty();
     },
     [markFormDirty],
@@ -3396,13 +3476,20 @@ export const useQCDivisionHook = () => {
 
   const handleDivisionEntryLiquidValuesChange = useCallback(
     (entryId: string, values: SchemaFormValues) => {
-      setDivisionEntryValues((prev) => ({
-        ...prev,
-        [entryId]: {
-          ...(prev[entryId] ?? { schemaValues: {} }),
-          liquidSchemaValues: values,
-        },
-      }));
+      setDivisionEntryValues((prev) => {
+        const nextValues = {
+          ...prev,
+          [entryId]: {
+            ...(prev[entryId] ?? { schemaValues: {} }),
+            liquidSchemaValues: values,
+          },
+        };
+        formDataRef.current = {
+          ...formDataRef.current,
+          divisionEntryValues: nextValues,
+        };
+        return nextValues;
+      });
       markFormDirty();
     },
     [markFormDirty],
@@ -3525,19 +3612,27 @@ export const useQCDivisionHook = () => {
 
       if (shouldFetchDetails) {
         if (!subDepartmentId) {
-          showAlert(messages.SUB_DEPARTMENT_MISSING, "error");
+          if (!silent) showAlert(messages.SUB_DEPARTMENT_MISSING, "error");
           return false;
         }
         if (!resolvedFormId) {
-          showAlert(messages.FORM_ID_MISSING, "error");
+          if (!silent) showAlert(messages.FORM_ID_MISSING, "error");
           return false;
         }
 
         if (!silent) setLoadingFormDetails(true);
-        const detailsResponse = await qcDivisionController.fetchFormDetails({
-          formId: resolvedFormId,
-          subDepartmentId,
-        });
+        let detailsResponse;
+        try {
+          detailsResponse = await qcDivisionController.fetchFormDetails({
+            formId: resolvedFormId,
+            subDepartmentId,
+          });
+        } catch (error) {
+          console.error("Failed to fetch QC form details:", error);
+          if (!silent) setLoadingFormDetails(false);
+          if (!silent) showAlert(messages.DETAILS_FETCH_ERROR, "error");
+          return false;
+        }
         if (!silent) setLoadingFormDetails(false);
 
         if (!detailsResponse?.success || !detailsResponse.data) {
@@ -3545,7 +3640,7 @@ export const useQCDivisionHook = () => {
             detailsResponse?.statusCode === 404
               ? messages.DETAILS_NOT_FOUND
               : messages.DETAILS_FETCH_ERROR;
-          showAlert(getErrorMessage(detailsResponse, fallback), "error");
+          if (!silent) showAlert(getErrorMessage(detailsResponse, fallback), "error");
           return false;
         }
 
@@ -3797,6 +3892,41 @@ export const useQCDivisionHook = () => {
               continue;
             }
 
+            if (division === "HARDWARE") {
+              const dataRec =
+                detailData && typeof detailData === "object"
+                  ? (detailData as Record<string, unknown>)
+                  : {};
+              const motors = listHardwareMotorsFromDetailData(dataRec);
+              let createdFromNested = false;
+
+              for (const motor of motors) {
+                const rec = asRecord(motor);
+                const motorId = String(rec?.motorId ?? rec?.motorIdNo ?? rec?.id ?? "").trim();
+                if (!rec || !motorId || !isHardwareNestedMotorDetail(rec)) continue;
+                for (const process of QC_HARDWARE_PROCESS_OPTIONS) {
+                  enqueueSchema(division, process.value);
+                  const { entryId } = makeEntry(
+                    "HARDWARE_PROCESS",
+                    process.value,
+                    [],
+                    undefined,
+                    motorId,
+                  );
+                  entryValues[entryId] = {
+                    schemaValues: buildHardwareProcessValuesFromPayload(
+                      dataRec,
+                      motorId,
+                      process.value,
+                    ),
+                  };
+                }
+                createdFromNested = true;
+              }
+
+              if (createdFromNested) continue;
+            }
+
             const sectionsByPremix = new Map<string, SchemaSectionSubmission[]>();
             const sectionsByMotor = new Map<string, SchemaSectionSubmission[]>();
             const simpleSections: SchemaSectionSubmission[] = [];
@@ -3969,73 +4099,35 @@ export const useQCDivisionHook = () => {
 
             if (entry.kind === "HARDWARE_PROCESS") {
               const subType = String(entry.subType ?? "");
-              const sectionsToHydrate =
-                entry.savedSections ??
-                (resolvedData.savedSections ?? []).filter((s) => {
-                  const expectedSectionId = getHardwareSectionIdForSubType(subType);
-                  if (expectedSectionId && s.sectionId !== expectedSectionId) return false;
-                  if (entry.motorId != null) {
-                    const sectionMotorId = String((s as { motorId?: string }).motorId ?? "").trim();
-                    if (sectionMotorId && sectionMotorId !== entry.motorId) return false;
-                  }
-                  const sectionSubType = String((s as { subType?: string }).subType ?? "")
-                    .trim()
-                    .toUpperCase();
-                  return !sectionSubType || sectionSubType === subType.toUpperCase();
-                });
-              if (sectionsToHydrate.length > 0 && isQcHardwareProcessSubType(subType)) {
-                let schemaValues = hydrateHardwareProcessValuesFromSections(
-                  sectionsToHydrate,
-                  subType,
-                );
-                // Abrading is the upload anchor — merge HARDWARE_ATTACHMENTS / per-section uploads.
-                if (subType === "ABRADING") {
-                  const motorSections =
-                    entry.savedSections ??
-                    (resolvedData.savedSections ?? []).filter((s) => {
-                      const sectionMotorId = String(
-                        (s as { motorId?: string }).motorId ?? "",
-                      ).trim();
-                      return !sectionMotorId || sectionMotorId === entry.motorId;
-                    });
-                  const uploads = hydrateHardwareUploadValuesFromSections([
-                    ...sectionsToHydrate,
-                    ...motorSections,
-                  ]);
-                  schemaValues = mergeHardwareUploadValuesIntoEntryValues(schemaValues, uploads);
-                }
-                entryValues[entry.entryId] = { schemaValues };
-              } else if (
+              const existingValues = entryValues[entry.entryId]?.schemaValues;
+              if (
                 isQcHardwareProcessSubType(subType) &&
-                (!entryValues[entry.entryId]?.schemaValues ||
-                  Object.keys(entryValues[entry.entryId].schemaValues).length === 0)
+                hardwareProcessValuesHaveUserData(existingValues, subType)
               ) {
-                const motorStatus =
-                  entry.motorId != null
-                    ? resolveMotorQcStatusFromFormDetails(
-                        fetchedDetailsPayload,
-                        entry.motorId,
-                        "HARDWARE",
-                      )
-                    : null;
-                // Only TO_BE_INITIATED motors seed from manufacturing /division-details.
-                const manufacturingPayload =
-                  motorStatus != null && isQcStatusAwaitingInitiation(motorStatus)
-                    ? resolveManufacturingDivisionDetailsPayload(
-                        divisionAutoPopulateDataRef.current,
-                      )
-                    : null;
+                continue;
+              }
+
+              if (isQcHardwareProcessSubType(subType)) {
+                const hardwareDetail = findQcFormDivisionDetail(fetchedDetailsPayload, {
+                  flowKey: "HARDWARE",
+                });
+                const detailData =
+                  hardwareDetail?.data && typeof hardwareDetail.data === "object"
+                    ? hardwareDetail.data
+                    : hardwareDetail;
+                const hydrationPayload = {
+                  ...(asRecord(detailData) ?? {}),
+                  __qcFormDivisionData: detailData,
+                  __manufacturingDivisionData: resolveManufacturingDivisionDetailsPayload(
+                    divisionAutoPopulateDataRef.current,
+                  ),
+                };
                 entryValues[entry.entryId] = {
-                  schemaValues:
-                    manufacturingPayload && entry.motorId
-                      ? applyHardwareDivisionDetailsSeed(
-                          createInitialHardwareProcessValues(subType),
-                          manufacturingPayload,
-                          entry.motorId,
-                          subType,
-                          { onlyIfEmpty: false },
-                        )
-                      : createInitialHardwareProcessValues(subType),
+                  schemaValues: buildHardwareProcessValuesFromPayload(
+                    hydrationPayload,
+                    String(entry.motorId ?? ""),
+                    subType,
+                  ),
                 };
               }
               continue;
@@ -4051,40 +4143,85 @@ export const useQCDivisionHook = () => {
                   }
                   return true;
                 });
+              const motorStatus =
+                entry.motorId != null
+                  ? resolveMotorQcStatusFromFormDetails(
+                      fetchedDetailsPayload,
+                      entry.motorId,
+                      "CASTING",
+                    )
+                  : null;
+              const awaitingInitiation =
+                motorStatus == null || isQcStatusAwaitingInitiation(motorStatus);
+              const batchPayload =
+                (divisionAutoPopulateDataRef.current as { __batchDetails?: unknown } | null)
+                  ?.__batchDetails ?? null;
+
+              // IN_PROGRESS+ → map from /qc-division/details
+              if (!awaitingInitiation && entry.motorId) {
+                const qcDetail = toDivisionAutoPopulateRecord(
+                  findQcFormDivisionDetail(fetchedDetailsPayload, { flowKey: "CASTING" }),
+                );
+                if (qcDetail) {
+                  const seedRoot = qcDetail as Record<string, unknown>;
+                  const sections = expandDivisionDetailSections(seedRoot);
+                  const motorSections = sections.filter(
+                    (section) =>
+                      String((section as { motorId?: string }).motorId ?? "").trim() ===
+                      entry.motorId,
+                  );
+                  entryValues[entry.entryId] = {
+                    schemaValues: motorSections.length
+                      ? applyCastingDivisionDetailsSeed(
+                          hydrateCastingValuesFromSections(motorSections),
+                          null,
+                          entry.motorId,
+                          { onlyIfEmpty: true, batchPayload },
+                        )
+                      : buildCastingValuesFromPayload(qcDetail, entry.motorId, { batchPayload }),
+                  };
+                  continue;
+                }
+              }
+
               if (sectionsToHydrate.length > 0) {
-                entryValues[entry.entryId] = {
-                  schemaValues: hydrateCastingValuesFromSections(sectionsToHydrate),
-                };
+                let schemaValues = hydrateCastingValuesFromSections(sectionsToHydrate);
+                if (awaitingInitiation) {
+                  const manufacturingPayload = resolveManufacturingDivisionDetailsPayload(
+                    divisionAutoPopulateDataRef.current,
+                  );
+                  if (manufacturingPayload && entry.motorId) {
+                    schemaValues = applyCastingDivisionDetailsSeed(
+                      schemaValues,
+                      manufacturingPayload,
+                      entry.motorId,
+                      { onlyIfEmpty: true, batchPayload },
+                    );
+                  }
+                } else {
+                  schemaValues = applyCastingDivisionDetailsSeed(
+                    schemaValues,
+                    null,
+                    entry.motorId ?? "",
+                    { onlyIfEmpty: true, batchPayload },
+                  );
+                }
+                entryValues[entry.entryId] = { schemaValues };
               } else if (
                 !entryValues[entry.entryId]?.schemaValues ||
                 Object.keys(entryValues[entry.entryId].schemaValues).length === 0
               ) {
-                const motorStatus =
-                  entry.motorId != null
-                    ? resolveMotorQcStatusFromFormDetails(
-                        fetchedDetailsPayload,
-                        entry.motorId,
-                        "CASTING",
-                      )
-                    : null;
-                const manufacturingPayload =
-                  motorStatus != null && isQcStatusAwaitingInitiation(motorStatus)
-                    ? resolveManufacturingDivisionDetailsPayload(
-                        divisionAutoPopulateDataRef.current,
-                      )
-                    : null;
-                const batchPayload =
-                  (divisionAutoPopulateDataRef.current as { __batchDetails?: unknown } | null)
-                    ?.__batchDetails ?? null;
+                const manufacturingPayload = awaitingInitiation
+                  ? resolveManufacturingDivisionDetailsPayload(
+                      divisionAutoPopulateDataRef.current,
+                    )
+                  : null;
                 entryValues[entry.entryId] = {
                   schemaValues:
                     manufacturingPayload && entry.motorId
-                      ? applyCastingDivisionDetailsSeed(
-                          createInitialCastingValues(),
-                          manufacturingPayload,
-                          entry.motorId,
-                          { onlyIfEmpty: false, batchPayload },
-                        )
+                      ? buildCastingValuesFromPayload(manufacturingPayload, entry.motorId, {
+                          batchPayload,
+                        })
                       : createInitialCastingValues(),
                 };
               }
@@ -4395,7 +4532,10 @@ export const useQCDivisionHook = () => {
                 );
                 if (qcDetail) {
                   entryValues[entry.entryId] = {
-                    schemaValues: buildInitialNdtValuesForMotor(qcDetail, entry.motorId),
+                    schemaValues: buildInitialNdtValuesForMotor(qcDetail, entry.motorId, {
+                      batchPayload: batchDetailsPayloadRef.current,
+                      includeRadiographyObservations: true,
+                    }),
                   };
                   continue;
                 }
@@ -4410,6 +4550,7 @@ export const useQCDivisionHook = () => {
                   const fromManufacturing = buildInitialNdtValuesForMotor(
                     manufacturingPayload,
                     entry.motorId,
+                    { batchPayload: batchDetailsPayloadRef.current },
                   );
                   if (ndtFormValuesHaveUserData(fromManufacturing)) {
                     entryValues[entry.entryId] = { schemaValues: fromManufacturing };
@@ -4607,11 +4748,18 @@ export const useQCDivisionHook = () => {
               ? hydrateMixingDetailsValuesFromSections(mixingFinalMixDetailSections, "finalMix")
               : undefined);
 
-          const entryValuesWithHardwareUploads = applyHardwareSharedUploadsToEntryValues(
-            entries,
-            entryValues,
-            resolvedData.savedSections,
-          );
+          const entryValuesWithHardwareUploads = (() => {
+            try {
+              return applyHardwareSharedUploadsToEntryValues(
+                entries,
+                entryValues,
+                resolvedData.savedSections,
+              );
+            } catch (error) {
+              console.error("Failed to apply hardware shared uploads after details load:", error);
+              return entryValues;
+            }
+          })();
 
           resolvedData = {
             ...resolvedData,
@@ -4733,21 +4881,41 @@ export const useQCDivisionHook = () => {
       }
 
       if (detailsPayload && Array.isArray(detailsPayload.divisionDetails)) {
-        const firstDetail = detailsPayload.divisionDetails[0];
-        const flowKey = String(initialDivision || firstDetail?.division || "").trim();
+        const preferredFlowKey = String(
+          (silent ? preservedDivision : initialDivision) || "",
+        ).trim();
+        const matchedDetail =
+          (preferredFlowKey
+            ? detailsPayload.divisionDetails.find(
+                (detail: { division?: string }) =>
+                  String(detail?.division ?? "").trim() === preferredFlowKey,
+              )
+            : null) ?? detailsPayload.divisionDetails[0];
+        const flowKey = String(
+          preferredFlowKey || matchedDetail?.division || "",
+        ).trim();
         if (flowKey) {
           const navFromDetails = buildQcDivisionPartialNav({
             flowKey,
-            rawMaterialType: initialRawMaterialType,
+            rawMaterialType: silent ? preservedRawMaterialType : initialRawMaterialType,
             autoPopulatePayload: {
-              data: firstDetail?.data ?? {},
+              data: matchedDetail?.data ?? {},
             },
             motorStatuses: detailsPayload.motorStatuses,
             premixStatuses: detailsPayload.premixStatuses,
           });
           if (navFromDetails.length) {
             setPartialNavItems(navFromDetails);
-            setActivePartialNavIndex(0);
+            if (silent) {
+              setActivePartialNavIndex(
+                Math.min(
+                  Math.max(0, preservedPartialNavIndex),
+                  Math.max(0, navFromDetails.length - 1),
+                ),
+              );
+            } else {
+              setActivePartialNavIndex(0);
+            }
           }
         }
       }
@@ -4957,7 +5125,24 @@ export const useQCDivisionHook = () => {
       );
       setIsFormDirty(false);
 
-      // Full silent refresh from /qc-division/details (Case Prep draft parity).
+      if (intent === "draft") {
+        showAlert(
+          isCreateFlow ? messages.CREATE_DRAFT_SUCCESS : messages.UPDATE_DRAFT_SUCCESS,
+          "success",
+          { autoCloseMs: 2200 },
+        );
+        setHasSavedDraft(true);
+      } else {
+        showAlert(
+          isCreateFlow ? messages.CREATE_SUBMIT_SUCCESS : messages.UPDATE_SUBMIT_SUCCESS,
+          "success",
+          { autoCloseMs: 2200 },
+        );
+        setHasSavedDraft(true);
+      }
+
+      // Full silent refresh from /qc-division/details (same order as Casting / Case Prep:
+      // success toast first, then refresh — refresh failures must not swallow the toast).
       const formIdForRefresh = String(nextFormId ?? "").trim();
       if (formIdForRefresh) {
         const statusForBanner = String(
@@ -4967,17 +5152,21 @@ export const useQCDivisionHook = () => {
           .toUpperCase()
           .replace(/\s+/g, "_");
         const stillRejectedEdit = statusForBanner === "REJECTED";
-        await openFormWithResolvedData(
-          {
-            ...activeBatch,
-            formId: formIdForRefresh,
-            qcStatus: response.data?.status ?? activeBatch.qcStatus ?? "IN_PROGRESS",
-            division: formData.division ?? activeBatch.division,
-            subType: formData.subType ?? activeBatch.subType,
-          },
-          stillRejectedEdit || isEditMode,
-          { silent: true },
-        );
+        try {
+          await openFormWithResolvedData(
+            {
+              ...activeBatch,
+              formId: formIdForRefresh,
+              qcStatus: response.data?.status ?? activeBatch.qcStatus ?? "IN_PROGRESS",
+              division: formData.division ?? activeBatch.division,
+              subType: formData.subType ?? activeBatch.subType,
+            },
+            stillRejectedEdit || isEditMode,
+            { silent: true },
+          );
+        } catch (error) {
+          console.error("Failed to silently refresh QC form after unit save:", error);
+        }
       }
 
       const refreshedDetails = qcFormDetailsPayloadRef.current;
@@ -5048,20 +5237,7 @@ export const useQCDivisionHook = () => {
         setDivisionStatusByFlowKey((prev) => ({ ...prev, ...nextMap }));
       }
 
-      if (intent === "draft") {
-        showAlert(
-          isCreateFlow ? messages.CREATE_DRAFT_SUCCESS : messages.UPDATE_DRAFT_SUCCESS,
-          "success",
-          { autoCloseMs: 2200 },
-        );
-        setHasSavedDraft(true);
-      } else {
-        showAlert(
-          isCreateFlow ? messages.CREATE_SUBMIT_SUCCESS : messages.UPDATE_SUBMIT_SUCCESS,
-          "success",
-          { autoCloseMs: 2200 },
-        );
-        setHasSavedDraft(true);
+      if (intent !== "draft") {
         await listParams.refreshUserBatches();
       }
 
@@ -5184,24 +5360,31 @@ export const useQCDivisionHook = () => {
         [String(activeDivisionTabKey || selectedDivision || division)]: "WAITING_FOR_APPROVAL",
       }));
 
-      // Full silent refresh from /qc-division/details after division submit.
+      showAlert(messages.DIVISION_SUBMIT_SUCCESS, "success", { autoCloseMs: 2200 });
+      setHasSavedDraft(true);
+
+      // Silent refresh after toast (Casting / Case Prep parity).
       const formIdForRefresh = String(nextFormId ?? "").trim();
       if (formIdForRefresh) {
-        await openFormWithResolvedData(
-          {
-            ...activeBatch,
-            formId: formIdForRefresh,
-            qcStatus: response.data?.status ?? activeBatch.qcStatus ?? "WAITING_FOR_APPROVAL",
-            division: formData.division ?? activeBatch.division,
-            subType: formData.subType ?? activeBatch.subType,
-          },
-          false,
-          { silent: true },
-        );
-        setDivisionStatusByFlowKey((prev) => ({
-          ...prev,
-          [String(activeDivisionTabKey || selectedDivision || division)]: "WAITING_FOR_APPROVAL",
-        }));
+        try {
+          await openFormWithResolvedData(
+            {
+              ...activeBatch,
+              formId: formIdForRefresh,
+              qcStatus: response.data?.status ?? activeBatch.qcStatus ?? "WAITING_FOR_APPROVAL",
+              division: formData.division ?? activeBatch.division,
+              subType: formData.subType ?? activeBatch.subType,
+            },
+            false,
+            { silent: true },
+          );
+          setDivisionStatusByFlowKey((prev) => ({
+            ...prev,
+            [String(activeDivisionTabKey || selectedDivision || division)]: "WAITING_FOR_APPROVAL",
+          }));
+        } catch (error) {
+          console.error("Failed to silently refresh QC form after division submit:", error);
+        }
       }
 
       if (Array.isArray((response.data as any)?.divisionStatuses)) {
@@ -5214,8 +5397,6 @@ export const useQCDivisionHook = () => {
         setDivisionStatusByFlowKey((prev) => ({ ...prev, ...nextMap }));
       }
 
-      showAlert(messages.DIVISION_SUBMIT_SUCCESS, "success", { autoCloseMs: 2200 });
-      setHasSavedDraft(true);
       await listParams.refreshUserBatches();
       return true;
     } finally {

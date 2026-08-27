@@ -688,7 +688,8 @@ const serializePropertyRow = (
     PROPERTY: row.PROPERTY,
   };
   if (options?.includeSampleNo && row.SAMPLE_NO !== "" && row.SAMPLE_NO != null) {
-    payload.SAMPLE_NO = row.SAMPLE_NO;
+    const sampleNo = Number(row.SAMPLE_NO);
+    payload.SAMPLE_NO = Number.isFinite(sampleNo) ? sampleNo : row.SAMPLE_NO;
   }
   const specification = String(row.SPECIFICATION ?? "").trim();
   if (specification) payload.SPECIFICATION = specification;
@@ -708,7 +709,7 @@ const serializePropertyRow = (
   }
   if (options?.includeGraph) {
     const graph = toFileIdListPayload(row[QC_PROPELLANT_ROW_UPLOAD_FIELD]);
-    if (graph.length) payload.uploadGraph = graph;
+    if (graph.length) payload[QC_PROPELLANT_ROW_UPLOAD_FIELD] = graph;
   }
   return payload;
 };

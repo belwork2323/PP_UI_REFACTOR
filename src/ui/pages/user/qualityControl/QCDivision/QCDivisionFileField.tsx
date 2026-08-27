@@ -1,4 +1,4 @@
-import { useId, useMemo, useRef, type ChangeEvent } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ChangeEvent } from "react";
 import {
   Box,
   Button,
@@ -51,6 +51,28 @@ const statusLabel = (ref: FileRef) => {
   return null;
 };
 
+const mergeOptimisticFiles = (propsFiles: FileRef[], liveFiles: FileRef[]): FileRef[] => {
+  const propList = Array.isArray(propsFiles) ? propsFiles : [];
+  const propLocalIds = new Set(
+    propList.map((ref) => String(ref.localId ?? "").trim()).filter(Boolean),
+  );
+  const propFileIds = new Set(
+    propList.map((ref) => String(ref.fileId ?? "").trim()).filter(Boolean),
+  );
+  const preserved = liveFiles.filter((ref) => {
+    const localId = String(ref.localId ?? "").trim();
+    const fileId = String(ref.fileId ?? "").trim();
+    if (localId && propLocalIds.has(localId)) return false;
+    if (fileId && propFileIds.has(fileId)) return false;
+    return (
+      ref.status === "uploading" ||
+      ref.status === "failed" ||
+      (Boolean(ref.isTemp) && Boolean(localId || fileId))
+    );
+  });
+  return preserved.length ? [...propList, ...preserved] : propList;
+};
+
 /**
  * Shared QC Division file field — same rules as Case Prep:
  * immediate upload, temp vs persisted delete, retry, fileIds-only on save.
@@ -69,7 +91,21 @@ const QCDivisionFileField = ({
 }: QCDivisionFileFieldProps) => {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const list = useMemo(() => (Array.isArray(files) ? files : []), [files]);
+  const propsList = useMemo(() => (Array.isArray(files) ? files : []), [files]);
+  // Optimistic list so fileId patches stay visible even if parent form state briefly lags/wipes.
+  const [list, setList] = useState<FileRef[]>(propsList);
+
+  useEffect(() => {
+    setList((prev) => mergeOptimisticFiles(propsList, prev));
+  }, [propsList]);
+
+  const emitChange = useCallback(
+    (next: FileRef[]) => {
+      setList(next);
+      onChange(next);
+    },
+    [onChange],
+  );
 
   const {
     handleFilesSelected,
@@ -80,7 +116,7 @@ const QCDivisionFileField = ({
     filePreview,
     closeFilePreview,
     downloadFilePreview,
-  } = useFileUploadActions(list, onChange, {
+  } = useFileUploadActions(list, emitChange, {
     acceptMode,
     subDeptSlug: "qc-division",
     missingSubDeptMessage: S.SUB_DEPARTMENT_MISSING,

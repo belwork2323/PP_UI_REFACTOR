@@ -25,6 +25,7 @@ import {
   uniformTableHeaderCellSx,
 } from "../../../../../app/theme/custom_themes/shared/data_table_theme";
 import TrimmingFileField from "./TrimmingFileField";
+import QCDivisionFileField from "../../qualityControl/QCDivision/QCDivisionFileField";
 
 const S = STRINGS.MANUFACTURING.TRIMMING;
 
@@ -55,6 +56,8 @@ export const TrimmingCommonTable = ({
   allowStructureActions = true,
   theme,
   fileSubDeptSlug = "trimming",
+  /** When true, use shared QC eager FileRef field (same as hardware / revalidation). */
+  useQcDivisionFileField = false,
 }) => {
   const palette = theme?.palette ?? {};
   const colors = useMemo(
@@ -821,15 +824,26 @@ export const TrimmingCommonTable = ({
                   </Typography>
                   <ReadOnlyValue value={activeMotorSession.motorRemarks} />
                 </Box>
-                <TrimmingFileField
-                  label="Upload Report"
-                  files={activeMotorSession.reportFiles ?? []}
-                  onChange={() => {}}
-                  multiple
-                  acceptMode="imageVideoPdf"
-                  readOnly
-                  subDeptSlug={fileSubDeptSlug}
-                />
+                {useQcDivisionFileField ? (
+                  <QCDivisionFileField
+                    label="Upload Report"
+                    files={activeMotorSession.reportFiles ?? []}
+                    onChange={() => {}}
+                    multiple
+                    acceptMode="imageVideoPdf"
+                    readOnly
+                  />
+                ) : (
+                  <TrimmingFileField
+                    label="Upload Report"
+                    files={activeMotorSession.reportFiles ?? []}
+                    onChange={() => {}}
+                    multiple
+                    acceptMode="imageVideoPdf"
+                    readOnly
+                    subDeptSlug={fileSubDeptSlug}
+                  />
+                )}
               </>
             ) : (
               <>
@@ -846,20 +860,36 @@ export const TrimmingCommonTable = ({
                   }
                   disabled={inputsLocked}
                 />
-                <TrimmingFileField
-                  label="Upload Report"
-                  files={activeMotorSession.reportFiles ?? []}
-                  onChange={(next) =>
-                    onMotorSessionChange(activeMotorEntry.motorId, {
-                      ...activeMotorSession,
-                      reportFiles: next,
-                    })
-                  }
-                  multiple
-                  acceptMode="imageVideoPdf"
-                  disabled={inputsLocked}
-                  subDeptSlug={fileSubDeptSlug}
-                />
+                {useQcDivisionFileField ? (
+                  <QCDivisionFileField
+                    label="Upload Report"
+                    files={activeMotorSession.reportFiles ?? []}
+                    onChange={(next) =>
+                      onMotorSessionChange(activeMotorEntry.motorId, {
+                        ...activeMotorSession,
+                        reportFiles: next,
+                      })
+                    }
+                    multiple
+                    acceptMode="imageVideoPdf"
+                    disabled={inputsLocked}
+                  />
+                ) : (
+                  <TrimmingFileField
+                    label="Upload Report"
+                    files={activeMotorSession.reportFiles ?? []}
+                    onChange={(next) =>
+                      onMotorSessionChange(activeMotorEntry.motorId, {
+                        ...activeMotorSession,
+                        reportFiles: next,
+                      })
+                    }
+                    multiple
+                    acceptMode="imageVideoPdf"
+                    disabled={inputsLocked}
+                    subDeptSlug={fileSubDeptSlug}
+                  />
+                )}
               </>
             )}
           </Stack>

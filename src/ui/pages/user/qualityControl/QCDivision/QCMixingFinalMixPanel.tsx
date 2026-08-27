@@ -24,7 +24,10 @@ type QCMixingFinalMixPanelProps = {
   finalMixDetailsValues: SchemaFormValues;
   entrySchemaValues?: SchemaFormValues;
   onFinalMixDetailsChange: (values: SchemaFormValues) => void;
-  onEntryValuesChange: (entryId: string, values: SchemaFormValues) => void;
+  onEntryValuesChange: (
+    entryId: string,
+    values: SchemaFormValues | ((prev: SchemaFormValues) => SchemaFormValues),
+  ) => void;
   readOnly?: boolean;
   fieldsDisabled?: boolean;
   autoSeed?: QcMixingDetailsSeed | null;

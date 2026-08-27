@@ -1,7 +1,8 @@
-import { useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
 import { Box, Stack, Typography } from "@mui/material";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { SchemaFormValues } from "../../../../../schema-engine";
+import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
 import { TrimmingCommonTable } from "../../manufacturing/Trimming/TrimmingCommonTable";
 import { getQcTrimmingMotorLabel } from "../../../../../hooks/user/qualityControl/qcTrimmingConfig";
 import {
@@ -18,6 +19,32 @@ type QCTrimmingMotorPanelProps = {
   readOnly?: boolean;
   disabled?: boolean;
   headerActions?: ReactNode;
+};
+
+const mergeReportFilesPreferLive = (current: FileRef[], incoming: FileRef[]): FileRef[] => {
+  const byKey = new Map<string, FileRef>();
+  const keyOf = (ref: FileRef) =>
+    String(ref.localId ?? "").trim() || String(ref.fileId ?? "").trim() || "";
+  for (const ref of current ?? []) {
+    const key = keyOf(ref);
+    if (key) byKey.set(key, ref);
+  }
+  for (const ref of incoming ?? []) {
+    const key = keyOf(ref);
+    if (!key) continue;
+    const prev = byKey.get(key);
+    byKey.set(key, prev ? { ...prev, ...ref } : ref);
+  }
+  // Preserve in-flight uploads from current that incoming omitted.
+  const incomingKeys = new Set((incoming ?? []).map(keyOf).filter(Boolean));
+  for (const ref of current ?? []) {
+    const key = keyOf(ref);
+    if (!key || incomingKeys.has(key)) continue;
+    if (ref.status === "uploading" || ref.status === "failed" || ref.isTemp) {
+      byKey.set(key, ref);
+    }
+  }
+  return Array.from(byKey.values());
 };
 
 const QCTrimmingMotorPanel = ({
@@ -44,6 +71,28 @@ const QCTrimmingMotorPanel = ({
       reportFiles: session.reportFiles ?? [],
     }),
     [resolvedMotorId, session],
+  );
+
+  const handleMotorSessionChange = useCallback(
+    (_id: string, nextSession: typeof activeMotorSession) => {
+      if (inputsLocked) return;
+      const nextReportFiles = mergeReportFilesPreferLive(
+        session.reportFiles ?? [],
+        nextSession.reportFiles ?? [],
+      );
+      onChange(
+        setTrimmingSessionValues({
+          motorStage: nextSession.motorStage ?? session.motorStage ?? "",
+          motorReceivedAt: String(nextSession.motorReceivedAt ?? ""),
+          trimmingDetails: nextSession.trimmingDetails ?? [],
+          commonFormatParameters: nextSession.commonFormatParameters ?? [],
+          commonFormatLocations: nextSession.commonFormatLocations ?? [],
+          motorRemarks: String(nextSession.motorRemarks ?? ""),
+          reportFiles: nextReportFiles,
+        }),
+      );
+    },
+    [inputsLocked, onChange, session],
   );
 
   return (
@@ -73,6 +122,7 @@ const QCTrimmingMotorPanel = ({
         disabled={disabled}
         allowStructureActions={false}
         fileSubDeptSlug="qc-division"
+        useQcDivisionFileField
         theme={{
           palette: {
             primary: BRAND.primary,
@@ -85,20 +135,7 @@ const QCTrimmingMotorPanel = ({
             pageBg: "#fff",
           },
         }}
-        onMotorSessionChange={(_id, nextSession) => {
-          if (inputsLocked) return;
-          onChange(
-            setTrimmingSessionValues({
-              motorStage: nextSession.motorStage ?? session.motorStage ?? "",
-              motorReceivedAt: String(nextSession.motorReceivedAt ?? ""),
-              trimmingDetails: nextSession.trimmingDetails ?? [],
-              commonFormatParameters: nextSession.commonFormatParameters ?? [],
-              commonFormatLocations: nextSession.commonFormatLocations ?? [],
-              motorRemarks: String(nextSession.motorRemarks ?? ""),
-              reportFiles: nextSession.reportFiles ?? [],
-            }),
-          );
-        }}
+        onMotorSessionChange={handleMotorSessionChange}
       />
     </Box>
   );

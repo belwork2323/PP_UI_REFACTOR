@@ -537,7 +537,6 @@ const createEmptyCycleRow = (srNo: number): QcCuringCycleRow => ({
 });
 
 const SUBSCALE_PARAMETER_COLUMNS: ColumnDef<QcCuringSubscaleParameterRow>[] = [
-  { id: "OVEN_NO", label: "Oven No.", fieldType: "text", readOnlyColumn: true },
   { id: "ARTICLE_TYPE", label: "Article Type", fieldType: "text", readOnlyColumn: true },
   { id: "PARAMETER", label: "Parameter", fieldType: "text" },
   { id: "BEM_NO", label: "BEM No.", fieldType: "text" },
@@ -764,7 +763,7 @@ const QCCuringMotorPanel = ({
           readOnly={readOnly}
         >
           <Stack spacing={1.5}>
-            <FieldRow label="No. of Ovens" readOnly>
+            <FieldRow label="Oven Number" readOnly>
               <QCDivisionReadOnlyValue value={numberOfOvens} muted={!numberOfOvens.trim()} />
             </FieldRow>
             <CuringEditableTable
@@ -774,7 +773,6 @@ const QCCuringMotorPanel = ({
               onChange={setSubscaleParameterRowsHandler}
               createEmptyRow={(srNo) => ({
                 SR_NO: srNo,
-                OVEN_NO: "",
                 ARTICLE_TYPE: "",
                 PARAMETER: "",
                 BEM_NO: "",

@@ -425,6 +425,93 @@ export const findQcFormDivisionDetail = (
   return null;
 };
 
+/**
+ * True when form details show this division (or any of its motors/premixes) has left
+ * TO_BE_INITIATED — even if divisionStatuses still lag behind motorStatuses.
+ */
+export const shouldUseQcFormDetailsForDivision = (
+  formDetails: unknown,
+  params: {
+    flowKey: string;
+    rawMaterialType?: string | null;
+    statusByKey?: Record<string, QcPartialItemStatus> | null;
+  },
+): boolean => {
+  const divisionStatus = resolveQcDivisionStatusFromSources({
+    statusByKey: params.statusByKey,
+    formDetails,
+    flowKey: params.flowKey,
+    rawMaterialType: params.rawMaterialType,
+  });
+  if (shouldUseQcFormDetailsData(divisionStatus)) return true;
+
+  const root = asRecord(formDetails);
+  if (!root) return false;
+
+  const lookupKey = resolveQcDivisionStatusLookupKey({
+    flowKey: params.flowKey,
+    rawMaterialType: params.rawMaterialType,
+  });
+  const flowKey = String(params.flowKey ?? "").trim();
+
+  for (const row of asArray(root.motorStatuses)) {
+    const rec = asRecord(row);
+    if (!rec) continue;
+    const rowDivision = pickString(rec.division);
+    // Some APIs omit division on motorStatuses — treat as matching when blank.
+    if (
+      rowDivision &&
+      !qcDivisionStatusKeysMatch(rowDivision, lookupKey) &&
+      !qcDivisionStatusKeysMatch(rowDivision, flowKey)
+    ) {
+      continue;
+    }
+    if (shouldUseQcFormDetailsData(rec.motorSubmissionStatus ?? rec.status)) {
+      return true;
+    }
+  }
+
+  for (const row of asArray(root.premixStatuses)) {
+    const rec = asRecord(row);
+    if (!rec) continue;
+    const rowDivision = pickString(rec.division, rec.subType);
+    if (
+      rowDivision &&
+      !qcDivisionStatusKeysMatch(rowDivision, lookupKey) &&
+      !qcDivisionStatusKeysMatch(rowDivision, flowKey)
+    ) {
+      continue;
+    }
+    if (shouldUseQcFormDetailsData(rec.premixSubmissionStatus ?? rec.status)) {
+      return true;
+    }
+  }
+
+  const matchingDetail = findQcFormDivisionDetail(formDetails, {
+    flowKey: params.flowKey,
+    rawMaterialType: params.rawMaterialType,
+  });
+  if (!matchingDetail) return false;
+  if (
+    shouldUseQcFormDetailsData(
+      matchingDetail.status ?? matchingDetail.divisionSubmissionStatus,
+    )
+  ) {
+    return true;
+  }
+  const data = asRecord(matchingDetail.data) ?? matchingDetail;
+  return (
+    asArray(data.motorDetails).length > 0 ||
+    asArray(data.motors).length > 0 ||
+    asArray(data.sections).length > 0 ||
+    asArray(data.curingDetails).length > 0 ||
+    asArray(data.trimmingDetails).length > 0 ||
+    asArray(data.deCoringDetails).length > 0 ||
+    asArray(data.decoringDetails).length > 0 ||
+    asArray(data.postCureMotorDetails).length > 0
+  );
+};
+
 /** Payload shape expected by processing / revalidation seed parsers. */
 export const toDivisionAutoPopulateRecord = (
   detailOrPayload: unknown,

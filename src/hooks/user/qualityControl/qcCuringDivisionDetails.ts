@@ -114,11 +114,27 @@ const findCuringMotorRecord = (
 const extractMotorSections = (motor: Record<string, unknown> | null): ManufacturingSection[] => {
   if (!motor) return [];
   const details = asRecord(motor.details) ?? motor;
+
+  // Manufacturing shape: details.curingSections is a nested object, not a section array.
+  const nested =
+    asRecord(details.curingSections) ??
+    (!Array.isArray(motor.curingSections) ? asRecord(motor.curingSections) : null);
+  if (nested) {
+    const sections: ManufacturingSection[] = [];
+    const cycles = asRecord(nested.curingCycles);
+    const cycleTable = asArray(cycles?.curingTable ?? cycles?.CURING_TABLE);
+    if (cycleTable.length) {
+      sections.push({ sectionId: "CURING_TABLE", sectionData: cycleTable });
+    }
+    const post = asRecord(nested.postCuringDetails) ?? asRecord(nested.POST_CURING_DETAILS);
+    if (post) {
+      sections.push({ sectionId: "POST_CURING_DETAILS", sectionData: [post] });
+    }
+    return sections;
+  }
+
   const sections = asArray(
-    details.curingSections ??
-      details.sections ??
-      motor.curingSections ??
-      motor.sections,
+    details.curingSections ?? details.sections ?? motor.curingSections ?? motor.sections,
   );
   return sections
     .map((section) => asRecord(section))
@@ -188,7 +204,13 @@ const mapCycleRowsFromManufacturing = (sections: ManufacturingSection[]): QcCuri
     const directRows = tableSection.sectionData
       .map((row) => asRecord(row))
       .filter((row): row is Record<string, unknown> => Boolean(row));
-    if (directRows.length && (directRows[0].temperature != null || directRows[0].TEMPERATURE != null || directRows[0].srNo != null)) {
+    if (
+      directRows.length &&
+      (directRows[0].temperature != null ||
+        directRows[0].TEMPERATURE != null ||
+        directRows[0].srNo != null ||
+        directRows[0].time != null)
+    ) {
       return directRows.map((row, index) => mapApiCuringCycleRowToForm(row, index));
     }
   }
@@ -197,11 +219,15 @@ const mapCycleRowsFromManufacturing = (sections: ManufacturingSection[]): QcCuri
     firstSectionRecord(sections, "CURING_CYCLES") ??
     firstSectionRecord(sections, QC_CURING_SECTION_IDS.CYCLE_DETAILS) ??
     firstSectionRecord(sections, "CURING_TABLE");
-  const rows = deepFindTableRows(
-    cyclesSection ?? sections,
-    cyclesSection ? "CURING_TABLE" : "CURING_CYCLE_DETAILS",
-  );
-  const sourceRows = rows.length ? rows : deepFindTableRows(sections, "CURING_CYCLE_DETAILS");
+  const rows =
+    deepFindTableRows(cyclesSection ?? sections, "curingTable").length
+      ? deepFindTableRows(cyclesSection ?? sections, "curingTable")
+      : deepFindTableRows(cyclesSection ?? sections, "CURING_TABLE").length
+        ? deepFindTableRows(cyclesSection ?? sections, "CURING_TABLE")
+        : deepFindTableRows(cyclesSection ?? sections, "CURING_CYCLE_DETAILS");
+  const sourceRows = rows.length
+    ? rows
+    : deepFindTableRows(sections, "CURING_CYCLE_DETAILS");
   if (!sourceRows.length) return [];
   return sourceRows.map((row, index) => mapApiCuringCycleRowToForm(row, index));
 };
@@ -215,9 +241,12 @@ const mapPostCuringFromManufacturing = (
   if (!post) return {};
 
   const visual = String(
-    post.VISUAL_OBSERVATIONS ?? post.VISUAL_OBSERVATION ?? "",
+    post.VISUAL_OBSERVATIONS ??
+      post.VISUAL_OBSERVATION ??
+      post.visualObservation ??
+      "",
   ).trim();
-  const other = String(post.OTHER_OBSERVATIONS ?? "").trim();
+  const other = String(post.OTHER_OBSERVATIONS ?? post.otherObservations ?? "").trim();
   const visualCombined = [visual, other && other.toLowerCase() !== "na" ? other : ""]
     .filter(Boolean)
     .join("; ");
@@ -225,11 +254,13 @@ const mapPostCuringFromManufacturing = (
   return {
     VISUAL_OBSERVATIONS: visualCombined,
     PRESSURE_PLATE_REMOVAL_DATE_TIME: formatManufacturingDateTime(
-      post.PRESSURE_PLATE_REMOVAL_DATE_TIME,
+      post.PRESSURE_PLATE_REMOVAL_DATE_TIME ?? post.pressurePlateRemovalDateTime,
     ),
-    SHORE_A_HARDNESS: String(post.SHORE_A_HARDNESS ?? "").trim(),
+    SHORE_A_HARDNESS: String(post.SHORE_A_HARDNESS ?? post.shoreAHardness ?? "").trim(),
     DISPATCH_DATE_TIME: formatManufacturingDateTime(
-      post.DE_CORING_DISPATCH_DATE_TIME ?? post.DISPATCH_DATE_TIME,
+      post.DE_CORING_DISPATCH_DATE_TIME ??
+        post.DISPATCH_DATE_TIME ??
+        post.decoringDispatchDateTime,
     ),
   };
 };
@@ -307,12 +338,18 @@ const mapMotorSetupFromManufacturing = (
 
 const mapSubscaleCuringFromManufacturing = (
   motor: Record<string, unknown>,
-): { numberOfOvens: string; parameterRows: QcCuringSubscaleParameterRow[] } => {
+): {
+  numberOfOvens: string;
+  parameterRows: QcCuringSubscaleParameterRow[];
+  curingStartDate: string;
+  curingCompleteDate: string;
+  bemAverageHardness: string;
+  cartonAverageHardness: string;
+  visualObservations: string;
+} => {
   const motorDetails = asRecord(motor.details) ?? {};
   const subscale =
-    asRecord(motorDetails.subscaleDetails) ??
-    asRecord(motor.subscaleDetails) ??
-  {};
+    asRecord(motorDetails.subscaleDetails) ?? asRecord(motor.subscaleDetails) ?? {};
   const curingTable = asArray(subscale.curingTable);
 
   const numberOfOvens = pickFirstValue(
@@ -324,9 +361,48 @@ const mapSubscaleCuringFromManufacturing = (
     subscale.noOfOvens,
   );
 
+  const articleRows = curingTable
+    .map((row) => asRecord(row))
+    .filter((row): row is Record<string, unknown> => Boolean(row));
+
+  const startDates = articleRows
+    .map((row) => formatToUiDate(String(row.curingStartDate ?? row.CURING_START_DATE ?? "")))
+    .filter(Boolean);
+  const endDates = articleRows
+    .map((row) => formatToUiDate(String(row.curingEndDate ?? row.CURING_END_DATE ?? "")))
+    .filter(Boolean);
+
+  const bemHardness = articleRows
+    .filter((row) => {
+      const type = String(row.articleType ?? row.ARTICLE_TYPE ?? "").toUpperCase();
+      return type.includes("BEM");
+    })
+    .map((row) => Number(row.hardness ?? row.HARDNESS))
+    .filter((n) => Number.isFinite(n));
+  const cartonHardness = articleRows
+    .filter((row) => {
+      const type = String(row.articleType ?? row.ARTICLE_TYPE ?? "").toUpperCase();
+      return type.includes("CARTON");
+    })
+    .map((row) => Number(row.hardness ?? row.HARDNESS))
+    .filter((n) => Number.isFinite(n));
+
+  const avg = (nums: number[]) =>
+    nums.length ? String(Number((nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2))) : "";
+
+  const visualObservations = articleRows
+    .map((row) => String(row.grainSurfaceObservations ?? row.GRAIN_SURFACE_OBSERVATIONS ?? "").trim())
+    .filter(Boolean)
+    .join("; ");
+
   return {
     numberOfOvens,
     parameterRows: mapApiSubscaleCuringTableToParameterRows(curingTable),
+    curingStartDate: startDates[0] ?? "",
+    curingCompleteDate: endDates[endDates.length - 1] ?? "",
+    bemAverageHardness: avg(bemHardness),
+    cartonAverageHardness: avg(cartonHardness),
+    visualObservations,
   };
 };
 
@@ -379,6 +455,23 @@ const applyManufacturingCuringFieldSeed = (
   if (subscale.parameterRows.length && (!onlyIfEmpty || isValueEmpty(next[subscaleTableKey]))) {
     next[subscaleTableKey] = subscale.parameterRows;
   }
+  mergeField(formKey(QC_CURING_SECTION_IDS.SUBSCALE, "CURING_START_DATE"), subscale.curingStartDate);
+  mergeField(
+    formKey(QC_CURING_SECTION_IDS.SUBSCALE, "CURING_COMPLETE_DATE"),
+    subscale.curingCompleteDate,
+  );
+  mergeField(
+    formKey(QC_CURING_SECTION_IDS.SUBSCALE, "BEM_AVERAGE_SHORE_A_HARDNESS"),
+    subscale.bemAverageHardness,
+  );
+  mergeField(
+    formKey(QC_CURING_SECTION_IDS.SUBSCALE, "CARTON_AVERAGE_SHORE_A_HARDNESS"),
+    subscale.cartonAverageHardness,
+  );
+  mergeField(
+    formKey(QC_CURING_SECTION_IDS.SUBSCALE, "SUBSCALE_VISUAL_OBSERVATIONS"),
+    subscale.visualObservations,
+  );
 
   return next;
 };

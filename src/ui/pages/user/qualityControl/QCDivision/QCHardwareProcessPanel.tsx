@@ -24,17 +24,20 @@ import {
   QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID,
   getHardwareAbradingRows,
   getHardwareDispatchValues,
+  getHardwareDispatchVisualObservationRows,
   getHardwareLinearCoatingRows,
   getHardwarePreheatingRows,
   getQcHardwareProcessLabel,
   isQcHardwareProcessSubType,
   setHardwareAbradingRows,
   setHardwareDispatchValues,
+  setHardwareDispatchVisualObservationRows,
   setHardwareLinearCoatingRows,
   setHardwarePreheatingRows,
   type QcHardwareCutRow,
   type QcHardwareLinearCoatingRow,
   type QcHardwarePreheatingRow,
+  type QcHardwareVisualObservationRow,
 } from "../../../../../hooks/user/qualityControl/qcHardwareTables";
 
 import {
@@ -309,7 +312,7 @@ const HardwareEditableTable = <T extends Record<string, unknown>>({
 type QCHardwareProcessPanelProps = {
   subType: string;
   values: SchemaFormValues;
-  onChange: (values: SchemaFormValues) => void;
+  onChange: (values: SchemaFormValues | ((prev: SchemaFormValues) => SchemaFormValues)) => void;
   readOnly?: boolean;
   headerActions?: ReactNode;
 };
@@ -362,30 +365,49 @@ const QCHardwareProcessPanel = ({
   const preheatingRows = useMemo(() => getHardwarePreheatingRows(values), [values]);
   const linearCoatingRows = useMemo(() => getHardwareLinearCoatingRows(values), [values]);
   const dispatchValues = useMemo(() => getHardwareDispatchValues(values), [values]);
+  const visualObservationRows = useMemo(
+    () => getHardwareDispatchVisualObservationRows(values),
+    [values],
+  );
 
   const setFirstCut = useCallback(
     (rows: QcHardwareCutRow[]) => {
-      onChange(setHardwareAbradingRows(values, QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID, rows));
+      onChange((prev) =>
+        setHardwareAbradingRows(prev, QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID, rows),
+      );
     },
-    [onChange, values],
+    [onChange],
   );
   const setSecondCut = useCallback(
     (rows: QcHardwareCutRow[]) => {
-      onChange(setHardwareAbradingRows(values, QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID, rows));
+      onChange((prev) =>
+        setHardwareAbradingRows(prev, QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID, rows),
+      );
     },
-    [onChange, values],
+    [onChange],
   );
   const setPreheating = useCallback(
     (rows: QcHardwarePreheatingRow[]) => {
-      onChange(setHardwarePreheatingRows(values, rows));
+      onChange((prev) => setHardwarePreheatingRows(prev, rows));
     },
-    [onChange, values],
+    [onChange],
   );
   const setLinearCoating = useCallback(
     (rows: QcHardwareLinearCoatingRow[]) => {
-      onChange(setHardwareLinearCoatingRows(values, rows));
+      onChange((prev) => setHardwareLinearCoatingRows(prev, rows));
     },
-    [onChange, values],
+    [onChange],
+  );
+  const patchVisualObservationRow = useCallback(
+    (index: number, patch: Partial<QcHardwareVisualObservationRow>) => {
+      onChange((prev) => {
+        const rows = getHardwareDispatchVisualObservationRows(prev).map((row, rowIndex) =>
+          rowIndex === index ? { ...row, ...patch } : row,
+        );
+        return setHardwareDispatchVisualObservationRows(prev, rows);
+      });
+    },
+    [onChange],
   );
 
   if (!isQcHardwareProcessSubType(subType)) return null;
@@ -523,14 +545,15 @@ const QCHardwareProcessPanel = ({
                     fullWidth
                     type="number"
                     value={dispatchValues[field.key] ?? ""}
-                    onChange={(event) =>
-                      onChange(
-                        setHardwareDispatchValues(values, {
-                          ...dispatchValues,
-                          [field.key]: event.target.value,
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+                      onChange((prev) =>
+                        setHardwareDispatchValues(prev, {
+                          ...getHardwareDispatchValues(prev),
+                          [field.key]: nextValue,
                         }),
-                      )
-                    }
+                      );
+                    }}
                     sx={tableFieldSx}
                   />
                 )}
@@ -559,9 +582,9 @@ const QCHardwareProcessPanel = ({
                   compact
                   value={dispatchValues.DISPATCH_DATE_TIME ?? ""}
                   onChange={(next) =>
-                    onChange(
-                      setHardwareDispatchValues(values, {
-                        ...dispatchValues,
+                    onChange((prev) =>
+                      setHardwareDispatchValues(prev, {
+                        ...getHardwareDispatchValues(prev),
                         DISPATCH_DATE_TIME: next,
                       }),
                     )
@@ -587,34 +610,90 @@ const QCHardwareProcessPanel = ({
                 letterSpacing: readOnly ? "0.02em" : undefined,
                 textTransform: readOnly ? "uppercase" : undefined,
                 color: readOnly ? BRAND.primary : BRAND.textSub,
-                mb: 0.5,
+                mb: 0.75,
               }}
             >
-              Observations
+              Visual Observations
             </Typography>
-            {readOnly ? (
-              <QCDivisionReadOnlyValue
-                value={dispatchValues.OBSERVATIONS}
-                muted={!String(dispatchValues.OBSERVATIONS ?? "").trim()}
-              />
-            ) : (
-              <TextField
-                size="small"
-                fullWidth
-                multiline
-                minRows={2}
-                value={dispatchValues.OBSERVATIONS ?? ""}
-                onChange={(event) =>
-                  onChange(
-                    setHardwareDispatchValues(values, {
-                      ...dispatchValues,
-                      OBSERVATIONS: event.target.value,
-                    }),
-                  )
-                }
-                sx={tableFieldSx}
-              />
-            )}
+            <TableContainer
+              sx={{
+                overflow: "hidden",
+                overflowX: "auto",
+                border: `1px solid ${TABLE_BORDER}`,
+                borderRadius: 1.5,
+              }}
+            >
+              <Table size="small" sx={{ minWidth: 560, borderCollapse: "collapse" }}>
+                <TableHead>
+                  <TableRow>
+                    <TableCell sx={{ ...TH, width: 56 }}>Sr No</TableCell>
+                    <TableCell sx={TH}>Parameter</TableCell>
+                    <TableCell sx={TH}>Observations</TableCell>
+                    <TableCell sx={TH}>Remarks</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {visualObservationRows.map((row, index) => (
+                    <TableRow key={`${row.PARAMETER ?? "row"}-${index}`}>
+                      <TableCell sx={cellSx}>{index + 1}</TableCell>
+                      <TableCell sx={cellSx}>
+                        {readOnly ? (
+                          <QCDivisionReadOnlyValue value={row.PARAMETER} />
+                        ) : (
+                          <Typography sx={{ fontSize: "0.72rem", fontWeight: 600, color: BRAND.text }}>
+                            {row.PARAMETER}
+                          </Typography>
+                        )}
+                      </TableCell>
+                      <TableCell sx={cellSx}>
+                        {readOnly ? (
+                          <QCDivisionReadOnlyValue
+                            value={row.OBSERVATIONS}
+                            muted={!String(row.OBSERVATIONS ?? "").trim()}
+                          />
+                        ) : (
+                          <TextField
+                            size="small"
+                            fullWidth
+                            multiline
+                            minRows={1}
+                            value={row.OBSERVATIONS ?? ""}
+                            onChange={(event) =>
+                              patchVisualObservationRow(index, {
+                                OBSERVATIONS: event.target.value,
+                              })
+                            }
+                            sx={tableFieldSx}
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell sx={cellSx}>
+                        {readOnly ? (
+                          <QCDivisionReadOnlyValue
+                            value={row.REMARKS}
+                            muted={!String(row.REMARKS ?? "").trim()}
+                          />
+                        ) : (
+                          <TextField
+                            size="small"
+                            fullWidth
+                            multiline
+                            minRows={1}
+                            value={row.REMARKS ?? ""}
+                            onChange={(event) =>
+                              patchVisualObservationRow(index, {
+                                REMARKS: event.target.value,
+                              })
+                            }
+                            sx={tableFieldSx}
+                          />
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
           </Box>
         </Stack>
       ) : null}

@@ -8,8 +8,10 @@ import { formatToUiDate } from "../../../utils/dateUtils";
 import { QC_CASTING_SECTION_IDS, QC_CASTING_TYPE_OPTIONS } from "./qcCastingConfig";
 import {
   calcWeightmentTotalWeight,
+  castingMotorDetailToSections,
   createInitialCastingValues,
   hydrateCastingValuesFromSections,
+  isCastingNestedMotorDetail,
   setCastingType,
   type QcCastingMandrelRow,
   type QcCastingPressurePlateRow,
@@ -82,18 +84,41 @@ const findCastingMotorRecord = (
   payload: unknown,
   motorId: string,
 ): Record<string, unknown> | null => {
-  const root = resolveManufacturingDivisionDetailsPayload(payload);
-  if (!root) return null;
+  const roots = [
+    resolveManufacturingDivisionDetailsPayload(payload),
+    asRecord(payload),
+    asRecord(asRecord(payload)?.__qcFormDivisionData),
+    asRecord(asRecord(payload)?.__manufacturingDivisionData),
+  ].filter(Boolean) as Record<string, unknown>[];
 
-  const details = asRecord(root.castingCuringDetails) ?? asRecord(root.data) ?? root;
   const normalizedMotorId = String(motorId ?? "").trim();
   if (!normalizedMotorId) return null;
 
-  for (const motor of asArray(details.motors ?? root.motors)) {
-    const rec = asRecord(motor);
-    if (!rec) continue;
-    const id = String(rec.motorId ?? rec.id ?? asRecord(rec.details)?.motorId ?? "").trim();
-    if (id === normalizedMotorId) return rec;
+  for (const root of roots) {
+    const data = asRecord(root.data) ?? root;
+    const details =
+      asRecord(data.castingCuringDetails) ??
+      asRecord(root.castingCuringDetails) ??
+      data;
+    for (const motor of [
+      ...asArray(details.motors),
+      ...asArray(data.motors),
+      ...asArray(data.motorDetails),
+      ...asArray(root.motors),
+      ...asArray(root.motorDetails),
+    ]) {
+      const rec = asRecord(motor);
+      if (!rec) continue;
+      const id = String(
+        rec.motorId ??
+          rec.motorIdNo ??
+          rec.id ??
+          asRecord(rec.details)?.motorId ??
+          asRecord(rec.details)?.motorIdNo ??
+          "",
+      ).trim();
+      if (id === normalizedMotorId) return rec;
+    }
   }
   return null;
 };
@@ -166,6 +191,35 @@ const mapNestedCastingMotorSections = (
 
 const extractMotorSections = (motor: Record<string, unknown> | null): ManufacturingSection[] => {
   if (!motor) return [];
+
+  // QC /qc-division/details motors expose castingSections/setup at the top level.
+  // Manufacturing /qc-division/division-details nests castingSections under details only —
+  // those must use the manufacturing field mappers (postCastTable activities, etc.).
+  const isQcFormShaped = Boolean(
+    motor.castingSections ||
+      motor.setup ||
+      motor.castingSelection ||
+      motor.finalAssembly ||
+      motor.propellantCasting ||
+      motor.weightmentDetails ||
+      motor.postCastOperations ||
+      motor.motorSubmissionType,
+  );
+
+  if (isQcFormShaped && isCastingNestedMotorDetail(motor)) {
+    const qcSections = castingMotorDetailToSections(motor)
+      .map((section) => ({
+        sectionId: String(section.sectionId ?? "").trim(),
+        sectionData: asArray(section.sectionData),
+      }))
+      .filter((section) => section.sectionId);
+    const hasQcSectionIds = qcSections.some((section) =>
+      Object.values(QC_CASTING_SECTION_IDS).includes(
+        section.sectionId as (typeof QC_CASTING_SECTION_IDS)[keyof typeof QC_CASTING_SECTION_IDS],
+      ),
+    );
+    if (hasQcSectionIds) return qcSections;
+  }
 
   const nestedCasting = extractCastingSectionsObject(motor);
   if (nestedCasting) {
@@ -445,34 +499,62 @@ const mapCastingTableFromManufacturing = (sections: ManufacturingSection[]): QcC
     if (slurry) slurryByLabel.set(label, slurry);
   }
 
-  return Array.from({ length: count }, (_, index) => {
-    const bowl = asRecord(bowlRows[index]) ?? {};
-    const fromBowl = asRecord(fromBowlRows[index]) ?? {};
-    const bowlId =
-      pickField(bowl, "bowlId", "BOWL_ID", "BOWL_NO") || pickField(fromBowl, "bowlId", "BOWL_ID");
-    return {
-      SR_NO: Number(pickField(bowl, "srNo", "SR_NO")) || index + 1,
-      FINAL_MIX_BOWL_NO: bowlId,
-      PROPELLANT_QTY: pickField(bowl, "initialWeight", "finalWeight", "INITIAL_WEIGHT", "FINAL_WEIGHT"),
-      INITIAL_UNLOADING_VISCOSITY: pickField(fromBowl, "viscosity", "VISCOSITY"),
-      CASTING_START_TIME: normalizeTimeValue(
-        pickField(bowl, "bowlReceiptTime", "BOWL_RECEIPT_TIME", "dcOpenTime", "DC_OPEN_TIME"),
-      ),
-      CASTING_COMPLETION_TIME: normalizeTimeValue(
-        pickField(bowl, "dcCloseTime", "DC_CLOSE_TIME", "ballValveOpenTime", "BALL_VALVE_OPEN_TIME"),
-      ),
-      SLURRY_CAST_FROM_EACH_BOWL: pickField(fromBowl, "slurryCast", "SLURRY_CAST") || slurryByLabel.get(bowlId) || "",
-      REMARKS: "",
-    } satisfies QcCastingTableRow;
-  }).filter(
-    (row) =>
-      hasValue(row.FINAL_MIX_BOWL_NO) ||
-      hasValue(row.PROPELLANT_QTY) ||
-      hasValue(row.INITIAL_UNLOADING_VISCOSITY) ||
-      hasValue(row.SLURRY_CAST_FROM_EACH_BOWL) ||
-      hasValue(row.CASTING_START_TIME) ||
-      hasValue(row.CASTING_COMPLETION_TIME),
-  );
+  const fromBowlById = new Map<string, Record<string, unknown>>();
+  fromBowlRows.forEach((row, index) => {
+    const rec = asRecord(row) ?? {};
+    const id = pickField(rec, "bowlId", "BOWL_ID") || `sr:${index + 1}`;
+    fromBowlById.set(id, rec);
+  });
+
+  const sourceRows = bowlRows.length ? bowlRows : fromBowlRows;
+  return sourceRows
+    .map((row, index) => {
+      const bowl = asRecord(row) ?? {};
+      const bowlId =
+        pickField(bowl, "bowlId", "BOWL_ID", "BOWL_NO") ||
+        pickField(asRecord(fromBowlRows[index]) ?? {}, "bowlId", "BOWL_ID");
+      const fromBowl =
+        (bowlId ? fromBowlById.get(bowlId) : null) ??
+        asRecord(fromBowlRows[index]) ??
+        (bowlRows.length ? {} : bowl);
+
+      return {
+        SR_NO: Number(pickField(bowl, "srNo", "SR_NO")) || index + 1,
+        FINAL_MIX_BOWL_NO: bowlId,
+        PROPELLANT_QTY: pickField(
+          bowl,
+          "initialWeight",
+          "INITIAL_WEIGHT",
+          "propellantQty",
+          "PROPELLANT_QTY",
+        ),
+        INITIAL_UNLOADING_VISCOSITY: pickField(fromBowl, "viscosity", "VISCOSITY"),
+        CASTING_START_TIME: normalizeTimeValue(
+          pickField(bowl, "bowlReceiptTime", "BOWL_RECEIPT_TIME", "dcOpenTime", "DC_OPEN_TIME"),
+        ),
+        CASTING_COMPLETION_TIME: normalizeTimeValue(
+          pickField(bowl, "dcCloseTime", "DC_CLOSE_TIME", "ballValveOpenTime", "BALL_VALVE_OPEN_TIME"),
+        ),
+        SLURRY_CAST_FROM_EACH_BOWL:
+          pickField(fromBowl, "slurryCast", "SLURRY_CAST") || slurryByLabel.get(bowlId) || "",
+        REMARKS: (() => {
+          const direct = pickField(fromBowl, "remarks", "REMARKS");
+          if (direct) return direct;
+          const maybe = pickField(fromBowl, "motorId", "MOTOR_ID");
+          if (!maybe || /^RMC-/i.test(maybe)) return "";
+          return maybe;
+        })(),
+      } satisfies QcCastingTableRow;
+    })
+    .filter(
+      (row) =>
+        hasValue(row.FINAL_MIX_BOWL_NO) ||
+        hasValue(row.PROPELLANT_QTY) ||
+        hasValue(row.INITIAL_UNLOADING_VISCOSITY) ||
+        hasValue(row.SLURRY_CAST_FROM_EACH_BOWL) ||
+        hasValue(row.CASTING_START_TIME) ||
+        hasValue(row.CASTING_COMPLETION_TIME),
+    );
 };
 
 const mapPropellantFieldsFromManufacturing = (sections: ManufacturingSection[]) => {
@@ -553,10 +635,15 @@ const mapPostCastFromManufacturing = (sections: ManufacturingSection[]) => {
   const post =
     firstSectionRecord(sections, "POST_CAST_OPERATIONS") ??
     firstSectionRecord(sections, QC_CASTING_SECTION_IDS.POST_CAST);
-  const tableRows =
-    deepFindTableRows(post ?? {}, "POST_CAST_TABLE").length > 0
-      ? deepFindTableRows(post ?? {}, "POST_CAST_TABLE")
-      : deepFindTableRows(sections, "POST_CAST_TABLE");
+  const tableRows = (() => {
+    const fromPostCamel = deepFindTableRows(post ?? {}, "postCastTable");
+    if (fromPostCamel.length) return fromPostCamel;
+    const fromPostUpper = deepFindTableRows(post ?? {}, "POST_CAST_TABLE");
+    if (fromPostUpper.length) return fromPostUpper;
+    const fromSectionsCamel = deepFindTableRows(sections, "postCastTable");
+    if (fromSectionsCamel.length) return fromSectionsCamel;
+    return deepFindTableRows(sections, "POST_CAST_TABLE");
+  })();
 
   const findActivityValue = (...matchers: Array<string | RegExp>) => {
     for (const row of tableRows) {
@@ -874,3 +961,20 @@ export const applyCastingDivisionDetailsSeed = (
 
   return next;
 };
+
+/**
+ * Build Casting form values from either QC form-details or manufacturing division-details.
+ * Callers must pass the payload chosen by status (`TO_BE_INITIATED` → division-details,
+ * otherwise → form details).
+ */
+export const buildCastingValuesFromPayload = (
+  payload: unknown,
+  motorId: string,
+  options?: { batchPayload?: unknown },
+): SchemaFormValues =>
+  applyCastingDivisionDetailsSeed(createInitialCastingValues(), payload, motorId, {
+    onlyIfEmpty: false,
+    batchPayload: options?.batchPayload,
+  });
+
+export const buildInitialCastingValuesForMotor = buildCastingValuesFromPayload;

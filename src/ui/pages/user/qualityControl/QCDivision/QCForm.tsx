@@ -88,7 +88,10 @@ type QCFormProps = {
   onPartialNavIndexChange?: (index: number) => void;
   onActiveDivisionGroupIndexChange: (index: number) => void;
   onActiveDivisionSubIndexChange: (index: number) => void;
-  onDivisionEntryValuesChange: (entryId: string, values: SchemaFormValues) => void;
+  onDivisionEntryValuesChange: (
+    entryId: string,
+    values: SchemaFormValues | ((prev: SchemaFormValues) => SchemaFormValues),
+  ) => void;
   onDivisionEntryLiquidValuesChange: (entryId: string, values: SchemaFormValues) => void;
   onMixingFinalMixDetailsChange: (values: SchemaFormValues) => void;
   onRemoveDivisionEntry: (entryId: string) => void;

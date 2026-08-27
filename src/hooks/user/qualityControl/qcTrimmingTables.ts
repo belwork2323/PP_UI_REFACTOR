@@ -311,12 +311,12 @@ export const buildTrimmingMeasurementDetailsPayload = (
         omitEmpty({
           SR_NO: srNo,
           DIMENSION: dimension || undefined,
-          SPECIFIED: specified || undefined,
           MEASUREMENT_STAGE: measurementStage || undefined,
-          R2T: r2t || undefined,
-          R2B: r2b || undefined,
+          SPECIFIED: specified || undefined,
           R1L: r1l || undefined,
           R1R: r1r || undefined,
+          R2B: r2b || undefined,
+          R2T: r2t || undefined,
         }),
       );
       srNo += 1;
@@ -365,20 +365,6 @@ export const hydrateCommonFormatFromMeasurementDetails = (
   return Array.from(grouped.values());
 };
 
-const resolveTrimmingReportLink = (session: QcTrimmingSessionValues): string => {
-  if (hasValue(session.reportLink)) return String(session.reportLink).trim();
-  const fromFiles = (session.reportFiles ?? [])
-    .map((ref) => String(ref.fileName ?? "").trim())
-    .filter(Boolean)
-    .join(", ");
-  if (fromFiles) return fromFiles;
-  const file = session.reportFile;
-  if (!file || typeof file !== "object") return "";
-  return String(
-    file.filePath ?? file.storedFileName ?? file.originalFileName ?? "",
-  ).trim();
-};
-
 /** Build manufacturing-compatible sections (seed/hydrate helpers). */
 export const buildTrimmingMotorSections = (
   values: SchemaFormValues | null | undefined,
@@ -401,19 +387,15 @@ export const buildTrimmingMotorSections = (
   }
 
   const readyReportFiles = toFileIdListPayload(session.reportFiles ?? []);
-  const legacyReportLink = String(session.reportLink ?? "").trim();
-  if (session.motorRemarks.trim() || readyReportFiles.length || legacyReportLink) {
-    const remarksPayload: Record<string, unknown> = {
-      remarks: session.motorRemarks || undefined,
-    };
-    if (readyReportFiles.length) {
-      remarksPayload.reportFile = readyReportFiles;
-    } else if (legacyReportLink) {
-      remarksPayload.reportLink = legacyReportLink;
-    }
+  if (session.motorRemarks.trim() || readyReportFiles.length) {
     sections.push({
       sectionId: QC_TRIMMING_SECTION_IDS.REMARKS,
-      sectionData: [omitEmpty(remarksPayload)],
+      sectionData: [
+        omitEmpty({
+          remarks: session.motorRemarks || undefined,
+          ...(readyReportFiles.length ? { reportFile: readyReportFiles } : {}),
+        }),
+      ],
     });
   }
 
@@ -424,7 +406,7 @@ export const buildTrimmingMotorSections = (
  * Flat QC Trimming motor payload for create/update (`data.trimmingDetails[]`).
  * Matches:
  * `{ motorIdNo, motorSubmissionType, motorStage, motorReceivedDate,
- *    trimmingOperationDetails, trimmingMeasurementDetails, trimmingRemarks }`
+ *    trimmingMeasurementDetails, trimmingOperationDetails, trimmingRemarks }`
  */
 export const buildTrimmingMotorDetailPayload = (
   values: SchemaFormValues | null | undefined,
@@ -439,25 +421,22 @@ export const buildTrimmingMotorDetailPayload = (
     session.commonFormatParameters,
   );
   const readyReportFiles = toFileIdListPayload(session.reportFiles ?? []);
-  const legacyReportLink = resolveTrimmingReportLink(session);
   const trimmingRemarks = omitEmpty({
     remarks: session.motorRemarks || undefined,
-    ...(readyReportFiles.length
-      ? { reportFile: readyReportFiles }
-      : legacyReportLink
-        ? { reportLink: legacyReportLink }
-        : {}),
+    ...(readyReportFiles.length ? { reportFile: readyReportFiles } : {}),
   });
 
-  return {
+  return omitEmpty({
     motorIdNo: motorId,
     motorSubmissionType,
-    ...(motorStage != null ? { motorStage } : {}),
-    ...(motorReceivedDate ? { motorReceivedDate } : {}),
-    trimmingOperationDetails,
-    trimmingMeasurementDetails,
+    motorReceivedDate: motorReceivedDate || undefined,
+    motorStage: motorStage ?? undefined,
+    trimmingMeasurementDetails:
+      trimmingMeasurementDetails.length > 0 ? trimmingMeasurementDetails : undefined,
+    trimmingOperationDetails:
+      trimmingOperationDetails.length > 0 ? trimmingOperationDetails : undefined,
     ...(Object.keys(trimmingRemarks).length ? { trimmingRemarks } : {}),
-  };
+  });
 };
 
 export const isTrimmingNestedMotorDetail = (rec: Record<string, unknown>) => {

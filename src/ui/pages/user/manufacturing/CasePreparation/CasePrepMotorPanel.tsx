@@ -1,4 +1,4 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { Fragment, useEffect, useRef, type ReactNode } from "react";
 import {
   Box,
   IconButton,
@@ -27,6 +27,7 @@ import {
   type CasePrepParameterRow,
   type CasePrepQualificationParameterRow,
 } from "../../../../../data/models/user/CasePrepMotorDataModel";
+import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
 import { DateTimeField, TimeField } from "../../../../components/common/DateField";
 import { WorkflowReadOnlyText } from "../../../../components/common/WorkflowReadOnlyText";
 import { CASE_PREP_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/casePreparation_theme";
@@ -82,6 +83,95 @@ const str = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 const isAbradingHeader = (
   row: CasePrepAbradingDetailsRow,
 ): row is Extract<CasePrepAbradingDetailsRow, { type: "header" }> => row.type === "header";
+
+const isAbradingTotalRow = (row: CasePrepAbradingDetailsRow) =>
+  !isAbradingHeader(row) && str(row.operation).trim() === ABRADING_DUST_TOTAL;
+
+const isAbradingStartRow = (row: CasePrepAbradingDetailsRow) =>
+  !isAbradingHeader(row) && /^Start Date & Time$/i.test(str(row.operation).trim());
+
+type AbradingCutRenderGroup = {
+  headerIndex: number;
+  headerLabel: string;
+  /** Data row indices in this cut (excludes total dust). */
+  dataIndices: number[];
+  totalIndex: number | null;
+};
+
+const groupAbradingDetailsForRender = (
+  rows: CasePrepAbradingDetailsRow[],
+): AbradingCutRenderGroup[] => {
+  const groups: AbradingCutRenderGroup[] = [];
+  let current: AbradingCutRenderGroup | null = null;
+
+  rows.forEach((row, index) => {
+    if (isAbradingHeader(row)) {
+      current = {
+        headerIndex: index,
+        headerLabel: row.label,
+        dataIndices: [],
+        totalIndex: null,
+      };
+      groups.push(current);
+      return;
+    }
+    if (!current) return;
+    if (isAbradingTotalRow(row)) {
+      current.totalIndex = index;
+      return;
+    }
+    current.dataIndices.push(index);
+  });
+
+  return groups;
+};
+
+const resolveAbradingCutObservation = (
+  rows: CasePrepAbradingDetailsRow[],
+  dataIndices: number[],
+): string => {
+  for (const index of dataIndices) {
+    const row = rows[index];
+    if (!row || isAbradingHeader(row)) continue;
+    if (isAbradingStartRow(row) && str(row.remarksObservations).trim()) {
+      return str(row.remarksObservations).trim();
+    }
+  }
+  for (const index of dataIndices) {
+    const row = rows[index];
+    if (!row || isAbradingHeader(row)) continue;
+    const remarks = str(row.remarksObservations).trim();
+    if (remarks) return remarks;
+  }
+  return "";
+};
+
+const resolveAbradingCutAttachments = (
+  rows: CasePrepAbradingDetailsRow[],
+  dataIndices: number[],
+): FileRef[] => {
+  const merged: FileRef[] = [];
+  const seen = new Set<string>();
+
+  const collect = (preferStart: boolean) => {
+    for (const index of dataIndices) {
+      const row = rows[index];
+      if (!row || isAbradingHeader(row)) continue;
+      if (preferStart !== isAbradingStartRow(row)) continue;
+      for (const ref of row.attachments ?? []) {
+        const key = String(ref.fileId ?? ref.fileName ?? "").trim();
+        if (key && seen.has(key)) continue;
+        if (key) seen.add(key);
+        merged.push(ref);
+      }
+    }
+  };
+
+  // Prefer Start-row uploads (canonical), then any legacy per-row uploads.
+  collect(true);
+  collect(false);
+  return merged;
+};
 
 const materialsToIngredientRows = (materials: MaterialInput[]): CasePrepIngredientRow[] =>
   materials.map((material, index) => ({
@@ -388,6 +478,30 @@ const CasePrepMotorPanel = ({
     patchSection("abradingOperation", { abradingDetails: next });
   };
 
+  /** One observation per cut — stored on the Start Date & Time row. */
+  const updateAbradingCutObservation = (dataIndices: number[], observation: string) => {
+    const next = value.abradingOperation.abradingDetails.map((row, index) => {
+      if (isAbradingHeader(row) || !dataIndices.includes(index)) return row;
+      return {
+        ...row,
+        remarksObservations: isAbradingStartRow(row) ? observation : "",
+      };
+    });
+    patchSection("abradingOperation", { abradingDetails: next });
+  };
+
+  /** One attachment list per cut — stored on the Start Date & Time row. */
+  const updateAbradingCutAttachments = (dataIndices: number[], attachments: FileRef[]) => {
+    const next = value.abradingOperation.abradingDetails.map((row, index) => {
+      if (isAbradingHeader(row) || !dataIndices.includes(index)) return row;
+      return {
+        ...row,
+        attachments: isAbradingStartRow(row) ? attachments : [],
+      };
+    });
+    patchSection("abradingOperation", { abradingDetails: next });
+  };
+
   const patchPreHeating = (partial: Partial<CasePrepMotorData["preHeating"]>) => {
     const next: CasePrepMotorData = {
       ...value,
@@ -617,7 +731,7 @@ const CasePrepMotorPanel = ({
           <Table size="small">
             <TableHead>
               <TableRow>
-                {["Operation", "Value", "Remarks / Observations", "Attachments"].map((label, idx) => (
+                {["Operation", "Value", "Observations", "Attachments"].map((label, idx) => (
                   <TableCell key={label} sx={casePrepTableHeaderCellSx(idx === 0)}>
                     {label}
                   </TableCell>
@@ -625,63 +739,121 @@ const CasePrepMotorPanel = ({
               </TableRow>
             </TableHead>
             <TableBody>
-              {abrading.abradingDetails.map((row, index) => {
-                if (isAbradingHeader(row)) {
-                  return (
-                    <TableRow key={`hdr-${index}`} sx={casePrepHeaderRowSx}>
+              {groupAbradingDetailsForRender(abrading.abradingDetails).map((group) => {
+                const cutObservation = resolveAbradingCutObservation(
+                  abrading.abradingDetails,
+                  group.dataIndices,
+                );
+                const cutAttachments = resolveAbradingCutAttachments(
+                  abrading.abradingDetails,
+                  group.dataIndices,
+                );
+                const cutRowSpan = Math.max(group.dataIndices.length, 1);
+
+                return (
+                  <Fragment key={`cut-${group.headerIndex}`}>
+                    <TableRow sx={casePrepHeaderRowSx}>
                       <TableCell
                         colSpan={4}
-                        sx={{ ...casePrepTableCellSx, fontWeight: 800, fontSize: "0.72rem", color: BRAND.cp }}
+                        sx={{
+                          ...casePrepTableCellSx,
+                          fontWeight: 800,
+                          fontSize: "0.72rem",
+                          color: BRAND.cp,
+                        }}
                       >
-                        {row.label}
+                        {group.headerLabel}
                       </TableCell>
                     </TableRow>
-                  );
-                }
-
-                const isTotal = str(row.operation).trim() === ABRADING_DUST_TOTAL;
-                return (
-                  <TableRow key={`abr-${index}`} sx={casePrepTableRowSx(index)}>
-                    <TableCell sx={{ ...casePrepTableCellSx, fontWeight: 600 }}>
-                      {row.operation}
-                    </TableCell>
-                    <TableCell sx={casePrepTableCellSx}>
-                      {isTotal ? (
-                        <Typography sx={{ fontSize: "0.82rem", fontWeight: 700 }}>
-                          {row.value || "—"}
-                        </Typography>
-                      ) : (
-                        <ValueByFieldType
-                          value={row.value}
-                          valueFieldType={row.valueFieldType}
-                          onChange={(v) => updateAbradingDataRow(index, { value: v })}
-                          disabled={disabled} readOnly={readOnly}
-                          theme={theme}
-                        />
-                      )}
-                    </TableCell>
-                    <TableCell sx={casePrepTableCellSx}>
-                      <TableTextInput
-                        value={row.remarksObservations}
-                        onChange={(v) =>
-                          updateAbradingDataRow(index, { remarksObservations: v })
-                        }
-                        disabled={disabled} readOnly={readOnly}
-                        placeholder="Remarks"
-                      />
-                    </TableCell>
-                    <TableCell sx={casePrepTableCellSx}>
-                      <CasePrepFileField
-                        files={row.attachments ?? []}
-                        onChange={(next) => updateAbradingDataRow(index, { attachments: next })}
-                        disabled={disabled}
-                        readOnly={readOnly}
-                        compact
-                        multiple
-                        acceptMode="imageVideo"
-                      />
-                    </TableCell>
-                  </TableRow>
+                    {group.dataIndices.map((index, rowOffset) => {
+                      const row = abrading.abradingDetails[index];
+                      if (!row || isAbradingHeader(row)) return null;
+                      return (
+                        <TableRow key={`abr-${index}`} sx={casePrepTableRowSx(index)}>
+                          <TableCell sx={{ ...casePrepTableCellSx, fontWeight: 600 }}>
+                            {row.operation}
+                          </TableCell>
+                          <TableCell sx={casePrepTableCellSx}>
+                            <ValueByFieldType
+                              value={row.value}
+                              valueFieldType={row.valueFieldType}
+                              onChange={(v) => updateAbradingDataRow(index, { value: v })}
+                              disabled={disabled}
+                              readOnly={readOnly}
+                              theme={theme}
+                            />
+                          </TableCell>
+                          {rowOffset === 0 ? (
+                            <TableCell
+                              sx={{ ...casePrepTableCellSx, verticalAlign: "top" }}
+                              rowSpan={cutRowSpan}
+                            >
+                              <TableTextInput
+                                value={cutObservation}
+                                onChange={(v) =>
+                                  updateAbradingCutObservation(group.dataIndices, v)
+                                }
+                                disabled={disabled}
+                                readOnly={readOnly}
+                                placeholder="Observations"
+                                multiline
+                                minRows={Math.max(cutRowSpan, 2)}
+                              />
+                            </TableCell>
+                          ) : null}
+                          {rowOffset === 0 ? (
+                            <TableCell
+                              sx={{ ...casePrepTableCellSx, verticalAlign: "top" }}
+                              rowSpan={cutRowSpan}
+                            >
+                              <CasePrepFileField
+                                files={cutAttachments}
+                                onChange={(next) =>
+                                  updateAbradingCutAttachments(group.dataIndices, next)
+                                }
+                                disabled={disabled}
+                                readOnly={readOnly}
+                                compact
+                                multiple
+                                acceptMode="imageVideo"
+                              />
+                            </TableCell>
+                          ) : null}
+                        </TableRow>
+                      );
+                    })}
+                    {group.totalIndex != null
+                      ? (() => {
+                          const totalRow = abrading.abradingDetails[group.totalIndex!];
+                          if (!totalRow || isAbradingHeader(totalRow)) return null;
+                          return (
+                            <TableRow
+                              key={`abr-total-${group.totalIndex}`}
+                              sx={casePrepTableRowSx(group.totalIndex!)}
+                            >
+                              <TableCell sx={{ ...casePrepTableCellSx, fontWeight: 600 }}>
+                                {totalRow.operation}
+                              </TableCell>
+                              <TableCell sx={casePrepTableCellSx}>
+                                <Typography sx={{ fontSize: "0.82rem", fontWeight: 700 }}>
+                                  {totalRow.value || "—"}
+                                </Typography>
+                              </TableCell>
+                              <TableCell sx={casePrepTableCellSx}>
+                                <Typography sx={{ fontSize: "0.78rem", color: "text.secondary" }}>
+                                  —
+                                </Typography>
+                              </TableCell>
+                              <TableCell sx={casePrepTableCellSx}>
+                                <Typography sx={{ fontSize: "0.78rem", color: "text.secondary" }}>
+                                  —
+                                </Typography>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })()
+                      : null}
+                  </Fragment>
                 );
               })}
             </TableBody>

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, type ReactNode } from "react";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import {
@@ -19,6 +19,7 @@ import {
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { SchemaFormValues } from "../../../../../schema-engine";
 import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
+import { parseFileRefs } from "../../../../../data/models/common/FileUploadModel";
 import QCDivisionFileField from "./QCDivisionFileField";
 import {
   QC_PROPELLANT_AVG_COLUMN,
@@ -79,6 +80,46 @@ const cellSx = {
 };
 
 const tableFieldSx = { "& .MuiOutlinedInput-root": { fontSize: "0.72rem" } };
+
+/** Same merge as Hardware / NDT: keep in-flight uploads without blocking deletes. */
+const mergeFileRefsPreferLive = (current: FileRef[], incoming: FileRef[]): FileRef[] => {
+  const byKey = new Map<string, FileRef>();
+  const keyOf = (ref: FileRef) =>
+    String(ref.localId ?? "").trim() || String(ref.fileId ?? "").trim() || "";
+  for (const ref of current ?? []) {
+    const key = keyOf(ref);
+    if (key) byKey.set(key, ref);
+  }
+  for (const ref of incoming ?? []) {
+    const key = keyOf(ref);
+    if (!key) continue;
+    const prev = byKey.get(key);
+    byKey.set(key, prev ? { ...prev, ...ref } : ref);
+  }
+  const incomingKeys = new Set((incoming ?? []).map(keyOf).filter(Boolean));
+  for (const ref of current ?? []) {
+    const key = keyOf(ref);
+    if (!key || incomingKeys.has(key)) continue;
+    if (ref.status === "uploading" || ref.status === "failed" || ref.isTemp) {
+      byKey.set(key, ref);
+    }
+  }
+  const ordered: FileRef[] = [];
+  const seen = new Set<string>();
+  for (const ref of incoming ?? []) {
+    const key = keyOf(ref);
+    const merged = key ? byKey.get(key) ?? ref : ref;
+    ordered.push(merged);
+    if (key) seen.add(key);
+  }
+  for (const [key, ref] of byKey) {
+    if (seen.has(key)) continue;
+    if (ref.status === "uploading" || ref.status === "failed" || ref.isTemp) {
+      ordered.push(ref);
+    }
+  }
+  return ordered.length ? ordered : parseFileRefs(Array.from(byKey.values()));
+};
 
 const SectionCard = ({
   title,
@@ -172,6 +213,7 @@ type PropertyTableProps = {
   rows: QcPropellantPropertyRow[];
   columns: string[];
   onRowsChange: (rows: QcPropellantPropertyRow[]) => void;
+  onRowFilesChange?: (rowIndex: number, next: FileRef[]) => void;
   readOnly?: boolean;
   disabled?: boolean;
   includeSampleNo?: boolean;
@@ -185,6 +227,7 @@ const PropertyTable = ({
   rows,
   columns,
   onRowsChange,
+  onRowFilesChange,
   readOnly = false,
   disabled = false,
   includeSampleNo = false,
@@ -341,18 +384,22 @@ const PropertyTable = ({
                   ) : null}
                   {includeRowUpload ? (
                     <TableCell sx={bodyCellSx}>
-                      <QCDivisionFileField
-                        files={uploadFiles}
-                        onChange={(next) =>
-                          updateCell(index, QC_PROPELLANT_ROW_UPLOAD_FIELD, next)
-                        }
-                        disabled={inputsDisabled}
-                        readOnly={readOnly}
-                        multiple={false}
-                        acceptMode="image"
-                        compact
-                        emptyLabel="Upload"
-                      />
+                      <Box sx={{ minWidth: 160, maxWidth: 280 }}>
+                        <QCDivisionFileField
+                          files={uploadFiles}
+                          onChange={(next) =>
+                            onRowFilesChange
+                              ? onRowFilesChange(index, next)
+                              : updateCell(index, QC_PROPELLANT_ROW_UPLOAD_FIELD, next)
+                          }
+                          disabled={inputsDisabled}
+                          readOnly={readOnly}
+                          multiple
+                          acceptMode="imageVideoPdf"
+                          compact
+                          emptyLabel="Upload"
+                        />
+                      </Box>
                     </TableCell>
                   ) : null}
                 </TableRow>
@@ -526,7 +573,9 @@ const BallisticTable = ({
 type QCPropellantMotorPanelProps = {
   motorId?: string | null;
   values: SchemaFormValues;
-  onChange: (values: SchemaFormValues) => void;
+  onChange: (
+    values: SchemaFormValues | ((prev: SchemaFormValues) => SchemaFormValues),
+  ) => void;
   readOnly?: boolean;
   disabled?: boolean;
   headerActions?: ReactNode;
@@ -555,12 +604,63 @@ const QCPropellantMotorPanel = ({
   );
   const fmCount = Math.max(premixFmCount, savedFmCount, 1);
 
+  const patchValues = useCallback(
+    (updater: (prev: SchemaFormValues) => SchemaFormValues) => {
+      onChange((prev) => updater(prev ?? {}));
+    },
+    [onChange],
+  );
+
   useEffect(() => {
     if (readOnly) return;
-    const current = getPropellantFmColumns(values, QC_PROPELLANT_SECTION_IDS.MECHANICAL_PROPERTIES).length;
+    const current = getPropellantFmColumns(values, QC_PROPELLANT_SECTION_IDS.MECHANICAL_PROPERTIES)
+      .length;
     if (current >= fmCount) return;
-    onChange(syncPropellantFmColumns(values, fmCount));
-  }, [fmCount, onChange, readOnly, values]);
+    patchValues((prev) => syncPropellantFmColumns(prev, fmCount));
+  }, [fmCount, patchValues, readOnly, values]);
+
+  const patchPropertyRows = useCallback(
+    (sectionId: string, rows: QcPropellantPropertyRow[]) => {
+      patchValues((prev) => setPropellantPropertyRows(prev, sectionId, rows));
+    },
+    [patchValues],
+  );
+
+  const patchRowFiles = useCallback(
+    (sectionId: string, rowIndex: number, next: FileRef[]) => {
+      patchValues((prev) => {
+        const currentRows = getPropellantPropertyRows(prev, sectionId);
+        return setPropellantPropertyRows(
+          prev,
+          sectionId,
+          currentRows.map((row, index) =>
+            index === rowIndex
+              ? {
+                  ...row,
+                  [QC_PROPELLANT_ROW_UPLOAD_FIELD]: mergeFileRefsPreferLive(
+                    parseFileRefs(row[QC_PROPELLANT_ROW_UPLOAD_FIELD]),
+                    next,
+                  ),
+                }
+              : row,
+          ),
+        );
+      });
+    },
+    [patchValues],
+  );
+
+  const patchMechanicalGraph = useCallback(
+    (next: FileRef[]) => {
+      patchValues((prev) =>
+        setPropellantMechanicalGraph(
+          prev,
+          mergeFileRefsPreferLive(getPropellantMechanicalGraph(prev), next),
+        ),
+      );
+    },
+    [patchValues],
+  );
 
   const mechanicalRows = useMemo(
     () => getPropellantPropertyRows(values, QC_PROPELLANT_SECTION_IDS.MECHANICAL_PROPERTIES, fmCount),
@@ -620,7 +720,7 @@ const QCPropellantMotorPanel = ({
               rows={mechanicalRows}
               columns={mechanicalColumns}
               onRowsChange={(rows) =>
-                onChange(setPropellantPropertyRows(values, QC_PROPELLANT_SECTION_IDS.MECHANICAL_PROPERTIES, rows))
+                patchPropertyRows(QC_PROPELLANT_SECTION_IDS.MECHANICAL_PROPERTIES, rows)
               }
               readOnly={readOnly}
               disabled={inputsDisabled}
@@ -632,15 +732,17 @@ const QCPropellantMotorPanel = ({
               <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.primary, mb: 0.75 }}>
                 Upload Graph
               </Typography>
-              <QCDivisionFileField
-                files={mechanicalGraph}
-                onChange={(next) => onChange(setPropellantMechanicalGraph(values, next))}
-                disabled={inputsDisabled}
-                readOnly={readOnly}
-                multiple={false}
-                acceptMode="image"
-                emptyLabel="Upload Graph"
-              />
+              <Box sx={{ minWidth: 220, maxWidth: 480 }}>
+                <QCDivisionFileField
+                  files={mechanicalGraph}
+                  onChange={patchMechanicalGraph}
+                  disabled={inputsDisabled}
+                  readOnly={readOnly}
+                  multiple
+                  acceptMode="imageVideoPdf"
+                  emptyLabel="Upload Graph"
+                />
+              </Box>
             </Box>
           </Stack>
         </SectionCard>
@@ -650,7 +752,10 @@ const QCPropellantMotorPanel = ({
             rows={interfaceRows}
             columns={interfaceColumns}
             onRowsChange={(rows) =>
-              onChange(setPropellantPropertyRows(values, QC_PROPELLANT_SECTION_IDS.INTERFACE_PROPERTIES, rows))
+              patchPropertyRows(QC_PROPELLANT_SECTION_IDS.INTERFACE_PROPERTIES, rows)
+            }
+            onRowFilesChange={(rowIndex, next) =>
+              patchRowFiles(QC_PROPELLANT_SECTION_IDS.INTERFACE_PROPERTIES, rowIndex, next)
             }
             readOnly={readOnly}
             disabled={inputsDisabled}
@@ -666,7 +771,10 @@ const QCPropellantMotorPanel = ({
             rows={ssbrRows}
             columns={ssbrColumns}
             onRowsChange={(rows) =>
-              onChange(setPropellantPropertyRows(values, QC_PROPELLANT_SECTION_IDS.SSBR_UBR_BURN_RATE, rows))
+              patchPropertyRows(QC_PROPELLANT_SECTION_IDS.SSBR_UBR_BURN_RATE, rows)
+            }
+            onRowFilesChange={(rowIndex, next) =>
+              patchRowFiles(QC_PROPELLANT_SECTION_IDS.SSBR_UBR_BURN_RATE, rowIndex, next)
             }
             readOnly={readOnly}
             disabled={inputsDisabled}
@@ -678,9 +786,13 @@ const QCPropellantMotorPanel = ({
           <BallisticTable
             rows={ballisticRows}
             columns={ballisticColumns}
-            onRowsChange={(rows) => onChange(setPropellantBallisticRows(values, rows))}
-            onAddBem={(fmIndex) => onChange(addPropellantBemColumn(values, fmIndex, fmCount))}
-            onRemoveBem={(columnId) => onChange(removePropellantBemColumn(values, columnId, fmCount))}
+            onRowsChange={(rows) => patchValues((prev) => setPropellantBallisticRows(prev, rows))}
+            onAddBem={(fmIndex) =>
+              patchValues((prev) => addPropellantBemColumn(prev, fmIndex, fmCount))
+            }
+            onRemoveBem={(columnId) =>
+              patchValues((prev) => removePropellantBemColumn(prev, columnId, fmCount))
+            }
             readOnly={readOnly}
             disabled={inputsDisabled}
           />

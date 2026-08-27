@@ -23,21 +23,26 @@ import {
   parseMotorDivisionGroupKey,
 } from "./qcDivisionEntries";
 import type { QcDivisionEntry, QcDivisionEntryValues } from "./qcDivisionEntryTypes";
-import { getHardwareSectionIdForSubType, QC_HARDWARE_ATTACHMENTS_SECTION_ID } from "./qcHardwareConfig";
+import { getHardwareSectionIdForSubType, QC_HARDWARE_ATTACHMENTS_SECTION_ID, QC_HARDWARE_PROCESS_OPTIONS } from "./qcHardwareConfig";
 import {
   applyHardwareSharedUploadsToEntryValues,
+  buildHardwareProcessValuesFromPayload,
 } from "./qcHardwareDivisionDetails";
 import {
   createInitialHardwareProcessValues,
   hydrateHardwareProcessValuesFromSections,
   hydrateHardwareUploadValuesFromSections,
+  isHardwareNestedMotorDetail,
   isQcHardwareProcessSubType,
+  listHardwareMotorsFromDetailData,
   mergeHardwareUploadValuesIntoEntryValues,
 } from "./qcHardwareTables";
 import {
   createInitialCastingValues,
   hydrateCastingValuesFromSections,
+  isCastingNestedMotorDetail,
 } from "./qcCastingTables";
+import { buildCastingValuesFromPayload } from "./qcCastingDivisionDetails";
 import {
   createInitialCuringValues,
   hydrateCuringValuesFromSections,
@@ -156,7 +161,7 @@ const getEntryKind = (
   if (division === "PROPELLANT_PROPERTIES" || division === "QC") {
     return { flowKey: "QC", kind: "PROPELLANT_MOTOR" };
   }
-  if (division === "WEIGHTMENT" || division === "WEIGHMENT") {
+  if (division === "WEIGHTMENT") {
     return { flowKey: "WEIGHTMENT", kind: "WEIGHTMENT_MOTOR" };
   }
   if (division === "STATIC_TEST_FACILITY") return { flowKey: "STATIC_TEST_FACILITY", kind: "STF" };
@@ -226,7 +231,10 @@ export async function hydrateQcDivisionFormFromDetails(
 
   for (const detail of rawDivisionDetails) {
     try {
-    const division = detail.division as QcApiDivision;
+    const divisionRaw = String(detail.division ?? "")
+      .trim()
+      .toUpperCase();
+    const division = (divisionRaw === "WEIGHMENT" ? "WEIGHTMENT" : divisionRaw) as QcApiDivision;
     const detailSubType = detail.subType as QcApiSubType;
     const detailData = detail.data ?? detail;
     const processingSeeds =
@@ -376,6 +384,56 @@ export async function hydrateQcDivisionFormFromDetails(
       continue;
     }
 
+    if (division === "HARDWARE") {
+      const dataRec = asRecord(detailData) ?? {};
+      const motors = listHardwareMotorsFromDetailData(dataRec);
+      let createdFromNested = false;
+
+      for (const motor of motors) {
+        const rec = asRecord(motor);
+        const motorId = pickMotorIdFromUnknown(rec);
+        if (!rec || !motorId || !isHardwareNestedMotorDetail(rec)) continue;
+
+        for (const process of QC_HARDWARE_PROCESS_OPTIONS) {
+          enqueueSchema(division, process.value);
+          const { entryId } = makeEntry(
+            "HARDWARE_PROCESS",
+            process.value,
+            [],
+            undefined,
+            motorId,
+          );
+          entryValues[entryId] = {
+            schemaValues: buildHardwareProcessValuesFromPayload(dataRec, motorId, process.value),
+          };
+        }
+        createdFromNested = true;
+      }
+
+      if (createdFromNested) continue;
+    }
+
+    if (division === "CASTING") {
+      const dataRec = asRecord(detailData) ?? {};
+      const motors = [...asArray(dataRec.motorDetails), ...asArray(dataRec.motors)];
+      let createdFromNested = false;
+
+      for (const motor of motors) {
+        const rec = asRecord(motor);
+        const motorId = pickMotorIdFromUnknown(rec);
+        if (!rec || !motorId || !isCastingNestedMotorDetail(rec)) continue;
+
+        enqueueSchema(division, detailSubType);
+        const { entryId } = makeEntry("CASTING_MOTOR", detailSubType, [], undefined, motorId);
+        entryValues[entryId] = {
+          schemaValues: buildCastingValuesFromPayload(dataRec, motorId),
+        };
+        createdFromNested = true;
+      }
+
+      if (createdFromNested) continue;
+    }
+
     if (division === "POST_CURE" || division === "POST_CURE_OPERATION") {
       const dataRec = asRecord(detailData) ?? {};
       const motors = [
@@ -425,7 +483,7 @@ export async function hydrateQcDivisionFormFromDetails(
       if (createdFromNested) continue;
     }
 
-    if (division === "WEIGHTMENT" || division === "WEIGHMENT") {
+    if (division === "WEIGHTMENT") {
       const dataRec = asRecord(detailData) ?? {};
       const scale = asRecord(dataRec.weighscaleDetails);
       const motors = [
