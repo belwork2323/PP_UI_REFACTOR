@@ -1,12 +1,11 @@
 import React, { useMemo } from "react";
-import { Box, Typography, Chip } from "@mui/material";
+import { Box, Typography, Chip, IconButton, Tooltip } from "@mui/material";
 
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
 import UserAvatar from "@ui/components/common/UserAvatar";
 import RoleChip from "@ui/components/custom/RoleChip";
 import StatusChip from "@ui/components/common/StatusChip";
-import UserActions from "@ui/components/common/UserActions";
 import SubDeptChips from "@ui/components/custom/SubDeptChips";
 import AdminManagementDataTable from "@ui/components/custom/admin/AdminManagementDataTable";
 import type { AdminManagementColumn } from "@ui/components/custom/admin/AdminManagementDataTable";
@@ -56,7 +55,7 @@ const UserListTable = ({
           const name = getDisplayName(user);
           return (
             <Box sx={tableCell.userBox}>
-              <UserAvatar name={name} />
+              <UserAvatar name={name} size={30} sx={tableCell.avatar} />
               <Typography sx={tableCell.userName}>{name}</Typography>
             </Box>
           );
@@ -102,7 +101,18 @@ const UserListTable = ({
         label: S.TABLE_COLS[5],
         isActions: true,
         render: (user) => (
-          <UserActions onEdit={() => onEdit(user)} onDelete={() => onDelete(user)} />
+          <Box sx={tableCell.actionsBox}>
+            <Tooltip title="Edit user">
+              <IconButton size="small" onClick={() => onEdit(user)} sx={tableCell.editButton}>
+                <icons.Edit sx={tableCell.editIcon} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete user">
+              <IconButton size="small" onClick={() => onDelete(user)} sx={tableCell.deleteButton}>
+                <icons.Delete sx={tableCell.deleteIcon} />
+              </IconButton>
+            </Tooltip>
+          </Box>
         ),
       },
     ],

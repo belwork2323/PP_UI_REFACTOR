@@ -1,9 +1,14 @@
-import { useCallback, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 
 import { useAlertStore } from "../../../app/store/alertStore";
+import { useAuthStore } from "../../../app/store/authStore";
 import { STRINGS } from "../../../app/config/strings";
-import { normalizeApproverBatchStatus } from "../../../data/models/approver/ApproverBatchListModel";
+import subscaleApproverController from "../../../controllers/approver/subscaleApproverController";
 import subscaleController from "../../../controllers/user/manufacturing/subscaleController";
+import type { ApproverChangeStatusPayload } from "../../../data/api/approver/approverApi";
+import {
+  resolveApproverChangeStatusFromResponse,
+} from "../../../data/models/approver/ApproverBatchListModel";
 import {
   mapSubscaleDetailsForDisplay,
   type SubscaleDetailView,
@@ -24,41 +29,64 @@ type ApproverListRow = Record<string, unknown> & {
 
 export const useSubscaleApproverHook = () => {
   const showAlert = useAlertStore((state) => state.showAlert);
+  const user = useAuthStore((state) => state.user);
   const [items, setItems] = useState<ApproverListRow[]>([]);
   const [selected, setSelected] = useState<ApproverListRow | null>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
   const [detailView, setDetailView] = useState<SubscaleDetailView | null>(null);
 
-  const refreshSelectedDetails = useCallback(async (formId: string) => {
-    const response = await subscaleController.fetchFormDetails({
-      formId,
-      subDepartmentId: 0,
-    });
-    if (!response?.success || !response?.data) return null;
-    return mapSubscaleDetailsForDisplay(response.data);
-  }, []);
+  const subDepartmentId = useMemo(() => {
+    const match =
+      user?.allSubDepartments?.find(
+        (item) => item.slugs?.dept === "manufacturing" && item.slugs?.subDept === SUB_DEPARTMENT,
+      ) ??
+      user?.allSubDepartments?.find((item) => item.slugs?.subDept === SUB_DEPARTMENT);
+    return match?.subDepartmentId ?? null;
+  }, [user]);
+
+  const refreshSelectedDetails = useCallback(
+    async (formId: string) => {
+      if (!subDepartmentId) return null;
+      const response = await subscaleController.fetchFormDetails({
+        formId,
+        subDepartmentId,
+      });
+      if (!response?.success || !response?.data) return null;
+      return mapSubscaleDetailsForDisplay(response.data);
+    },
+    [subDepartmentId],
+  );
+
+  const submitFormChangeStatus = useCallback(
+    async (payload: Record<string, unknown>) =>
+      subscaleApproverController.submitFormStatusChange({
+        formId: String(payload.formId ?? ""),
+        subDepartmentId: Number(payload.subDepartmentId ?? 0),
+        actionType: payload.actionType as ApproverChangeStatusPayload["actionType"],
+        remarks: (payload.remarks as string | null | undefined) ?? null,
+        rejectionReason: (payload.rejectionReason as string | null | undefined) ?? null,
+      }),
+    [],
+  );
 
   const { dialogProps, requestApprove, requestReject } = useApproverFormAction({
     department: DEPARTMENT,
     setItems,
     setSelected,
     subDepartment: SUB_DEPARTMENT,
-    onStatusChangeSuccess: async (item, response) => {
+    statusField: "ssStatus",
+    submitChangeStatus: submitFormChangeStatus,
+    onStatusChangeSuccess: async (item, response, actionType) => {
       const formId = String(item.formId ?? "").trim();
       if (!formId) return;
 
       setDetailsLoading(true);
       try {
         const refreshed = await refreshSelectedDetails(formId);
-        if (!refreshed) return;
+        const batchStatus = resolveApproverChangeStatusFromResponse(response, actionType);
 
-        const batchStatus = normalizeApproverBatchStatus(
-          (response.data as { batchStatus?: string })?.batchStatus ??
-            (response.data as { status?: string })?.status ??
-            refreshed.status,
-        );
+        if (refreshed) setDetailView(refreshed);
 
-        setDetailView(refreshed);
         setSelected((current) =>
           current
             ? {
@@ -67,20 +95,6 @@ export const useSubscaleApproverHook = () => {
                 ssStatus: batchStatus || current.ssStatus,
               }
             : current,
-        );
-        setItems((current) =>
-          current.map((row) => {
-            const isMatch =
-              row.id === item.id ||
-              (row.formId && item.formId && row.formId === item.formId) ||
-              (row.batchId && item.batchId && row.batchId === item.batchId);
-            if (!isMatch) return row;
-            return {
-              ...row,
-              status: batchStatus || row.status,
-              ssStatus: batchStatus || row.ssStatus,
-            };
-          }),
         );
       } finally {
         setDetailsLoading(false);
@@ -103,9 +117,16 @@ export const useSubscaleApproverHook = () => {
       return;
     }
 
+    if (!subDepartmentId) {
+      setDetailsLoading(false);
+      setSelected(null);
+      showAlert(S.SUB_DEPARTMENT_MISSING, "error", { autoCloseMs: 3000 });
+      return;
+    }
+
     const response = await subscaleController.fetchFormDetails({
       formId,
-      subDepartmentId: 0,
+      subDepartmentId,
     });
 
     setDetailsLoading(false);
@@ -117,7 +138,15 @@ export const useSubscaleApproverHook = () => {
       return;
     }
 
-    setDetailView(mapSubscaleDetailsForDisplay(response.data));
+    const mapped = mapSubscaleDetailsForDisplay(response.data);
+    setDetailView(mapped);
+    setSelected({
+      ...row,
+      formId: mapped?.formId || formId,
+      batchId: mapped?.batchId || row.batchId,
+      status: mapped?.status ?? row.ssStatus ?? row.status,
+      ssStatus: mapped?.status ?? row.ssStatus ?? row.status,
+    });
   };
 
   const handleCloseDetail = () => {

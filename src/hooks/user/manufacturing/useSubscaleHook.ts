@@ -5,20 +5,27 @@ import { useAuthStore } from "../../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshStore";
 import subscaleController from "../../../controllers/user/manufacturing/subscaleController";
 import {
+  buildSubscalePayloadSnapshot,
   createDefaultSubscaleFormState,
   hasAnySubscaleValue,
   mapSubscaleDetailsToFormState,
   mapSubscaleFormStateToPayload,
   type SubscaleFormState,
 } from "../../../data/models/user/SubscaleFormModel";
-import { normalizeBatchTypeCode } from "../../../data/models/user/SubdepartmentBatchModel";
+import {
+  normalizeBatchTypeCode,
+  resolveSubdepartmentBatchDisplayStatus,
+} from "../../../data/models/user/SubdepartmentBatchModel";
 import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
+import { isManufacturingContinueFillingStatus } from "../../../hooks/operationStatus";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import type { SchemaFormValues } from "../../../schema-engine";
 import { batchManagementController } from "@/controllers/admin/BatchManagement/batchManagementController";
 import { fetchMixingCycleDetailsApi } from "@/data/api/common/generalAPI";
 import { useFileService } from "../../../hooks/useFileService";
-import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
+import { discardWorkflowForm } from "../../../utils/workflowDiscard";
+import { noopTempFileExtractor } from "../../../utils/workflowTempFiles";
+import { flushSubscalePendingDrafts } from "../../../ui/pages/user/manufacturing/Subscale/utils/subscalePendingDrafts";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -59,16 +66,35 @@ export const useSubscaleHook = () => {
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
   const [formData, setFormData] = useState<SubscaleFormState>(createDefaultSubscaleFormState());
-  const [initialSnapshot, setInitialSnapshot] = useState("{}");
-  const [isFormDirty, setIsFormDirty] = useState(false);
+  const [initialPayloadSnapshot, setInitialPayloadSnapshot] = useState(
+    buildSubscalePayloadSnapshot(createDefaultSubscaleFormState()),
+  );
   const [detailsRow, setDetailsRow] = useState<SubscaleBatch | null>(null);
   const [detailsData, setDetailsData] = useState<any>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
 
   const snapshotStateRef = useRef(formData);
   snapshotStateRef.current = formData;
-  const initialSnapshotRef = useRef(initialSnapshot);
-  initialSnapshotRef.current = initialSnapshot;
+  const baselineFormStateRef = useRef<SubscaleFormState>(createDefaultSubscaleFormState());
+  const initialPayloadSnapshotRef = useRef(initialPayloadSnapshot);
+  initialPayloadSnapshotRef.current = initialPayloadSnapshot;
+  const activeBatchType = activeBatch?.batchType;
+
+  const isFormDirtyNow = useCallback(() => {
+    if (view !== "form") return false;
+    return (
+      buildSubscalePayloadSnapshot(snapshotStateRef.current, activeBatchType) !==
+      initialPayloadSnapshotRef.current
+    );
+  }, [view, activeBatchType]);
+
+  const syncBaselineFromFormState = useCallback(
+    (state: SubscaleFormState, batchType?: string | null) => {
+      baselineFormStateRef.current = state;
+      setInitialPayloadSnapshot(buildSubscalePayloadSnapshot(state, batchType));
+    },
+    [],
+  );
 
   const resetFormContext = useCallback(() => {
     const defaults = createDefaultSubscaleFormState();
@@ -81,9 +107,8 @@ export const useSubscaleHook = () => {
     setBackConfirmOpen(false);
     setHasSavedDraft(false);
     setFormData(defaults);
-    setInitialSnapshot(JSON.stringify(defaults));
-    setIsFormDirty(false);
-  }, []);
+    syncBaselineFromFormState(defaults);
+  }, [syncBaselineFromFormState]);
 
   const getErrorMessage = (response: any, fallbackMessage: string) => {
     if (response?.error?.details) return response.error.details;
@@ -114,33 +139,57 @@ export const useSubscaleHook = () => {
   }, []);
 
   const openFormWithResolvedData = useCallback(
-    async (batch: SubscaleBatch, editMode: boolean) => {
-      const status = parseStatus(batch.ssStatus);
-      const existingFormId = resolveFormId(batch);
+    async (
+      batch: SubscaleBatch,
+      editMode: boolean,
+      options?: { silent?: boolean },
+    ) => {
+      if (!batch.batchId) {
+        showAlert(STRINGS.MANUFACTURING.SUBSCALE.BATCH_ID_MISSING, "error");
+        return;
+      }
+
+      const silent = Boolean(options?.silent);
+      const status = batch.ssStatus ?? batch.status;
       const shouldFetchDetails =
-        Boolean(existingFormId) &&
-        (editMode ||
-          status === parseStatus(SS_STATUS.IN_PROGRESS) ||
-          status === parseStatus(SS_STATUS.REJECTED) ||
-          status === parseStatus(SS_STATUS.TO_BE_INITIATED));
+        silent ||
+        editMode ||
+        isManufacturingContinueFillingStatus(String(status ?? "")) ||
+        Boolean(String(resolveFormId(batch) ?? "").trim());
 
       let nextBatch = batch;
       let nextFormData = createDefaultSubscaleFormState();
+      let batchDetailsResponse: Record<string, unknown> | null = null;
+      let detailsResponse: Awaited<
+        ReturnType<typeof subscaleController.fetchFormDetails>
+      > | null = null;
 
-      setLoadingFormDetails(true);
+      if (!silent) setLoadingFormDetails(true);
       try {
+        if (batch.batchId) {
+          try {
+            const response = await batchManagementController.getBatchById(batch.batchId);
+            batchDetailsResponse = (response ?? null) as Record<string, unknown> | null;
+            setBatchDetails(response);
+          } catch (error) {
+            console.error("Unable to resolve subscale batch details", error);
+          }
+        }
+
         if (shouldFetchDetails) {
           if (!subDepartmentId) {
             showAlert(STRINGS.MANUFACTURING.SUBSCALE.SUB_DEPARTMENT_MISSING, "error");
             return;
           }
-          if (!existingFormId) {
+
+          const formId = resolveFormId(batch);
+          if (!formId) {
             showAlert(STRINGS.MANUFACTURING.SUBSCALE.FORM_ID_MISSING, "error");
             return;
           }
 
-          const detailsResponse = await subscaleController.fetchFormDetails({
-            formId: existingFormId,
+          detailsResponse = await subscaleController.fetchFormDetails({
+            formId,
             subDepartmentId,
           });
 
@@ -153,25 +202,36 @@ export const useSubscaleHook = () => {
             return;
           }
 
-          nextBatch = { ...batch, formId: detailsResponse.data.formId || existingFormId };
           nextFormData = mapSubscaleDetailsToFormState(detailsResponse.data);
         }
-
-        if (batch.batchId) {
-          await fetchBatchDetailsData(batch.batchId);
-        }
       } finally {
-        setLoadingFormDetails(false);
+        if (!silent) setLoadingFormDetails(false);
       }
+
+      const resolvedStatus = resolveSubdepartmentBatchDisplayStatus(
+        batchDetailsResponse ?? batch,
+        subDepartmentId,
+        {
+          formStatus: detailsResponse?.data?.status,
+          formSubmissionType: detailsResponse?.data?.formSubmissionType,
+          statusFallback: batch.ssStatus ?? batch.status,
+        },
+      );
+
+      nextBatch = {
+        ...batch,
+        formId: detailsResponse?.data?.formId || resolveFormId(batch) || batch.formId,
+        ssStatus: resolvedStatus,
+        status: resolvedStatus,
+      };
 
       setActiveBatch(nextBatch);
       setIsEditMode(editMode);
       setFormData(nextFormData);
-      setInitialSnapshot(JSON.stringify(nextFormData));
-      setIsFormDirty(false);
+      syncBaselineFromFormState(nextFormData, nextBatch.batchType);
       setView("form");
     },
-    [showAlert, subDepartmentId, fetchBatchDetailsData],
+    [showAlert, subDepartmentId, fetchBatchDetailsData, syncBaselineFromFormState],
   );
 
   const handleFillForm = useCallback(
@@ -184,53 +244,67 @@ export const useSubscaleHook = () => {
     [openFormWithResolvedData],
   );
 
-  const handleBack = useCallback(() => {
-    if (view === "form" && isFormDirty) {
+  const handleBack = useCallback(async () => {
+    flushSubscalePendingDrafts();
+    if (isFormDirtyNow()) {
       setBackConfirmOpen(true);
       return;
     }
-    bumpBatchRefresh();
+    await listParams.refreshUserBatches();
     resetFormContext();
-  }, [view, isFormDirty, resetFormContext, bumpBatchRefresh]);
+  }, [isFormDirtyNow, listParams, resetFormContext]);
 
   const handleDiscardAndBack = useCallback(async () => {
     setBackConfirmOpen(false);
-    await discardWorkflowSnapshotForm({
+    flushSubscalePendingDrafts();
+    await discardWorkflowForm({
       subDepartmentId,
-      initialSnapshot: initialSnapshotRef.current,
+      baselineState: baselineFormStateRef.current,
       currentState: snapshotStateRef.current,
+      extractTempFileIds: noopTempFileExtractor,
       deleteTemp,
-      resetForm: () => {
-        bumpBatchRefresh();
-        resetFormContext();
-      },
+      resetForm: () => {},
     });
-  }, [bumpBatchRefresh, deleteTemp, resetFormContext, subDepartmentId]);
+    await listParams.refreshUserBatches();
+    resetFormContext();
+  }, [deleteTemp, listParams, resetFormContext, subDepartmentId]);
 
   const handleFormValuesChange = useCallback((values: SchemaFormValues) => {
-    setFormData((prev) => ({
-      ...prev,
-      schemaFormValues: values,
-      schemaFormLoaded: Boolean(values.IS_PROCESS_FORM_LOADED) || prev.schemaFormLoaded,
-    }));
-    setIsFormDirty(true);
+    setFormData((prev) => {
+      const next = {
+        ...prev,
+        schemaFormValues: values,
+        schemaFormLoaded: Boolean(values.IS_PROCESS_FORM_LOADED) || prev.schemaFormLoaded,
+      };
+      snapshotStateRef.current = next;
+      return next;
+    });
   }, []);
 
   const submitForm = useCallback(
     async (intent: "draft" | "submit") => {
       if (!activeBatch) return false;
 
+      flushSubscalePendingDrafts();
+
       if (!subDepartmentId) {
         showAlert(STRINGS.MANUFACTURING.SUBSCALE.SUB_DEPARTMENT_MISSING, "error");
         return false;
       }
 
-      if (!hasAnySubscaleValue(formData)) {
+      flushSubscalePendingDrafts();
+
+      const currentFormData = snapshotStateRef.current;
+
+      if (!hasAnySubscaleValue(currentFormData)) {
         showAlert(STRINGS.MANUFACTURING.SUBSCALE.EMPTY_FORM_ERROR, "warning");
         return false;
       }
 
-      if (!formData.schemaFormValues?.IS_PROCESS_FORM_LOADED && !formData.schemaFormLoaded) {
+      if (
+        !currentFormData.schemaFormValues?.IS_PROCESS_FORM_LOADED &&
+        !currentFormData.schemaFormLoaded
+      ) {
         showAlert(STRINGS.MANUFACTURING.SUBSCALE.LOAD_FORM_REQUIRED, "warning");
         return false;
       }
@@ -248,7 +322,7 @@ export const useSubscaleHook = () => {
       }
 
       const apiBatchType = normalizeBatchTypeCode(activeBatch.batchType);
-      const payloadBody = mapSubscaleFormStateToPayload(formData, activeBatch.batchType);
+      const payloadBody = mapSubscaleFormStateToPayload(currentFormData, activeBatch.batchType);
 
       setActionLoading(true);
       try {
@@ -285,21 +359,7 @@ export const useSubscaleHook = () => {
           return false;
         }
 
-        const nextFormId = response.data?.formId ?? existingFormId ?? null;
-        setActiveBatch((prev) =>
-          prev
-            ? {
-                ...prev,
-                formId: nextFormId,
-                ssStatus:
-                  intent === "draft" && isToBeInitiated
-                    ? SS_STATUS.IN_PROGRESS
-                    : prev.ssStatus,
-              }
-            : prev,
-        );
-        setInitialSnapshot(JSON.stringify(formData));
-        setIsFormDirty(false);
+        const nextFormId = String(response.data?.formId ?? existingFormId ?? "").trim();
 
         if (intent === "draft") {
           showAlert(
@@ -310,6 +370,35 @@ export const useSubscaleHook = () => {
             { autoCloseMs: 2200 },
           );
           setHasSavedDraft(true);
+
+          if (nextFormId) {
+            const statusForBanner = String(
+              response.data?.status ?? activeBatch.ssStatus ?? activeBatch.status ?? "IN_PROGRESS",
+            )
+              .trim()
+              .toUpperCase()
+              .replace(/\s+/g, "_");
+            const stillRejectedEdit = statusForBanner === "REJECTED";
+
+            await openFormWithResolvedData(
+              {
+                ...activeBatch,
+                formId: nextFormId,
+                ssStatus:
+                  response.data?.batchStatus ??
+                  response.data?.status ??
+                  activeBatch.ssStatus,
+                status:
+                  response.data?.batchStatus ??
+                  response.data?.status ??
+                  activeBatch.status,
+              },
+              stillRejectedEdit,
+              { silent: true },
+            );
+          } else {
+            syncBaselineFromFormState(snapshotStateRef.current, activeBatch.batchType);
+          }
         } else {
           showAlert(
             useCreate
@@ -319,6 +408,7 @@ export const useSubscaleHook = () => {
             { autoCloseMs: 2200 },
           );
           await listParams.refreshUserBatches();
+          bumpBatchRefresh();
           resetFormContext();
         }
 
@@ -327,7 +417,17 @@ export const useSubscaleHook = () => {
         setActionLoading(false);
       }
     },
-    [activeBatch, subDepartmentId, formData, showAlert, listParams, resetFormContext],
+    [
+      activeBatch,
+      subDepartmentId,
+      formData,
+      showAlert,
+      listParams,
+      bumpBatchRefresh,
+      resetFormContext,
+      openFormWithResolvedData,
+      syncBaselineFromFormState,
+    ],
   );
 
   const handleSaveDraft = useCallback(async () => submitForm("draft"), [submitForm]);
@@ -380,7 +480,6 @@ export const useSubscaleHook = () => {
     fetchBatchDetailsData,
     isEditMode,
     formData,
-    isFormDirty,
     actionLoading,
     backConfirmOpen,
     setBackConfirmOpen,

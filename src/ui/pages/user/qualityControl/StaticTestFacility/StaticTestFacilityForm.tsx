@@ -31,6 +31,7 @@ import {
 } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
 import type { PreviousStageApprovedUnits } from "../../../../../hooks/user/previousStageApproval";
 import PremixStatusChip from "../../manufacturing/RawMaterial/components/PremixStatusChip";
+import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
 import ViewStatusButton from "../../../../components/common/ViewStatusButton";
 import FinalApprovalMotorDialog, {
   areAllMotorsApproved,
@@ -428,15 +429,11 @@ const StaticTestFacilityForm = ({
             >
               {S.SAVE_MOTOR_DRAFT(activeMotorEntry.motorId)}
             </Button>
-            <Button
-              variant="contained"
-              size="small"
+            <SubmitForApprovalButton
               disabled={actionLoading || activeMotorLocked || !isCurrentMotorFormReady}
               onClick={() => onSubmitMotor?.(activeMotorEntry.motorId)}
-              sx={{ textTransform: "none", fontWeight: 700 }}
-            >
-              {S.SUBMIT_MOTOR(activeMotorEntry.motorId)}
-            </Button>
+              label={S.SUBMIT_MOTOR(activeMotorEntry.motorId)}
+            />
             <ViewStatusButton
               disabled={actionLoading}
               onClick={() => setFinalApprovalOpen(true)}

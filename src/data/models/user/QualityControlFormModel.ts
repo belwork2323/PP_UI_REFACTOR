@@ -404,7 +404,7 @@ const buildDivisionEntrySections = (
   }
 
   if (entry.kind === "WEIGHTMENT_MOTOR") {
-    // Weighment create/update uses nested motors[] (not schema sections).
+    // Weighment create/update uses nested motorWeightDetails + weighscaleDetails (not schema sections).
     return [];
   }
 

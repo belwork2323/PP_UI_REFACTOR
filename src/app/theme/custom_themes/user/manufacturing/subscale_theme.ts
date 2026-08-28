@@ -19,6 +19,9 @@ export const SUBSCALE_BRAND = {
   textSub: "#5D6D7E",
   ss: "#1565C0",
   ssLight: "#1976D2",
+  /** One shade lighter than ss/ssLight — used for in-form tables and section accordions. */
+  ssTable: "#1976D2",
+  ssTableLight: "#42A5F5",
 } as const;
 
 export const getSubscaleTheme = (baseTheme: any) => {

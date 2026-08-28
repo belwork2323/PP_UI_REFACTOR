@@ -10,7 +10,7 @@ import {
   normalizeSubDepartmentIds,
   resolveUserUuid,
 } from "@data/models/admin/UserManagement/UserManagementModel";
-import { getDateRange } from "@/utils/dateUtils";
+import { getDateRange, toDashboardApiFilterType } from "@/utils/dateUtils";
 import { DEFAULT_DATE_FILTER_TYPE } from "@/ui/components/custom/dashboard/DashboardDateFilter";
 
 const S = STRINGS.USER_MANAGEMENT;
@@ -200,7 +200,11 @@ function useUserStatsSection() {
       return { filterType: "custom", startDate: "", endDate: "" };
     }
     const { startDate, endDate } = getDateRange(filterType);
-    return { filterType, startDate, endDate };
+    return {
+      filterType: toDashboardApiFilterType(filterType),
+      startDate,
+      endDate,
+    };
   }, [filterType, appliedCustomStart, appliedCustomEnd]);
 
   const loadStats = useCallback(async () => {

@@ -1,18 +1,31 @@
-import { alpha } from "@mui/material";
 import colors from "@app/theme/colors";
 import fonts from "@app/theme/fonts";
 import general from "@app/theme/custom_themes/common/common_css_theme";
 import layout from "@app/theme/layout";
 import { getSharedTheme } from "@app/theme/custom_themes/shared/shared_theme";
-import { getAdminCommonTheme } from "@app/theme/custom_themes/admin/admin_common_theme";
+import { getAdminCommonTheme, getAdminManagementTableCellActions, getAdminManagementTableTheme } from "@app/theme/custom_themes/admin/admin_common_theme";
 
 const getProjectManagementTheme = (mode: "light" | "dark" = "light") => {
   const shared = getSharedTheme(mode);
   const adminTheme = getAdminCommonTheme(mode);
   const d = colors.dashboard[mode as "light" | "dark"];
-
   const isDark = mode === "dark";
+
   const skeletonBase = shared.skeletonBase;
+  const accentBlue = adminTheme.accentBlue;
+  const accentBlueDark = adminTheme.accentBlueDark;
+  const accentBlueMuted = adminTheme.accentBlueMuted;
+
+  const table = getAdminManagementTableTheme({
+    mode,
+    accentBlue,
+    accentBlueDark,
+    cardBg: d.cardBg,
+    textPrimary: d.textPrimary,
+    textSecondary: d.textSecondary,
+    textDisabled: d.textDisabled,
+    skeletonBase,
+  });
 
   return {
     general,
@@ -49,12 +62,9 @@ const getProjectManagementTheme = (mode: "light" | "dark" = "light") => {
 
     menuPaper: adminTheme.menuPaper,
 
-    table: {
-      ...adminTheme.table,
-      skeletonRow: skeletonBase,
-      skeletonRowDefault: { ...skeletonBase, width: "80%" },
-      skeletonRowAction: { ...skeletonBase, width: 60 },
-    },
+    table,
+
+    tableCell: getAdminManagementTableCellActions(mode, accentBlue, accentBlueMuted),
 
     modal: {
       ...adminTheme.modal,

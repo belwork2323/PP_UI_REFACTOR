@@ -14,6 +14,7 @@ import {
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
 } from "../../../../components/custom/UserWorkflowStepPager";
+import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
 import QCSchemaPanel from "./QCSchemaPanel";
 import QCSchemaBufferingLoader from "./QCSchemaBufferingLoader";
 import QCDivisionSavedSectionsDisplay from "./components/QCDivisionSavedSectionsDisplay";
@@ -203,15 +204,11 @@ const QCProcessingMaterialsPanel = ({
             >
               {unitActions?.saveDraftLabel ?? S.SAVE_UNIT_DRAFT}
             </Button>
-            <Button
-              size="small"
-              variant="contained"
+            <SubmitForApprovalButton
               disabled={readOnly || !unitActions?.canAct || unitActions?.actionLoading}
               onClick={unitActions?.onSubmit}
-              sx={{ textTransform: "none", whiteSpace: "nowrap" }}
-            >
-              {unitActions?.submitLabel ?? S.SUBMIT_UNIT}
-            </Button>
+              label={unitActions?.submitLabel ?? S.SUBMIT_UNIT}
+            />
         </Stack>
       ) : null}
 

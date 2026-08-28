@@ -23,7 +23,11 @@ import type {
   PostCureMotorData,
   QualificationRow,
 } from "../../../../../data/models/user/PostCureMotorDataModel";
-import { recomputeIngredientTotal } from "../../../../../data/models/user/PostCureMotorDataModel";
+import {
+  isIngredientTotalRow,
+  POST_CURE_INGREDIENT_TOTAL_SR_LABEL,
+  recomputeIngredientTotal,
+} from "../../../../../data/models/user/PostCureMotorDataModel";
 import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
 import { DateField } from "../../../../components/common/DateField";
 import PostCureFileField from "./PostCureFileField";
@@ -255,17 +259,17 @@ const IngredientQuantityTable = ({
       </TableHead>
       <TableBody>
         {rows.map((row, index) => {
-          const isTotal = String(row.srNo).toUpperCase() === "TOTAL";
+          const isTotal = isIngredientTotalRow(row.srNo, row.INGREDIENT);
           return (
             <TableRow key={`ing-${row.srNo}-${index}`} sx={postCureTableRowSx(index)}>
-              <TableCell sx={{ ...postCureTableCellSx, fontWeight: 600 }}>{row.srNo}</TableCell>
+              <TableCell sx={{ ...postCureTableCellSx, fontWeight: isTotal ? 700 : 600 }}>
+                {isTotal ? POST_CURE_INGREDIENT_TOTAL_SR_LABEL : row.srNo}
+              </TableCell>
               <TableCell sx={{ ...postCureTableCellSx, fontWeight: isTotal ? 700 : 500 }}>
-                {row.INGREDIENT}
+                {isTotal ? "" : row.INGREDIENT}
               </TableCell>
               <TableCell sx={postCureTableCellSx}>
-                {isTotal ? (
-                  <Typography sx={{ fontSize: "0.82rem", color: "text.secondary" }}>—</Typography>
-                ) : (
+                {isTotal ? null : (
                   <TableTextInput
                     value={row.MFG_LOT}
                     onChange={(next) => {

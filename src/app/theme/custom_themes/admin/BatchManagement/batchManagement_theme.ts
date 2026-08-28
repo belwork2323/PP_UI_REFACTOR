@@ -4,7 +4,7 @@ import colors from "@app/theme/colors";
 import fonts from "@app/theme/fonts";
 import general from "@app/theme/custom_themes/common/common_css_theme";
 import { getSharedTheme } from "@app/theme/custom_themes/shared/shared_theme";
-import { getAdminCommonTheme } from "@app/theme/custom_themes/admin/admin_common_theme";
+import { getAdminCommonTheme, getAdminManagementTableCellActions, getAdminManagementTableTheme } from "@app/theme/custom_themes/admin/admin_common_theme";
 import { createDataTableTheme, uniformTableBodyCellSx, uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
 
 const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
@@ -19,6 +19,20 @@ const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
   const accentBlueMuted = adminTheme.accentBlueMuted;
 
   const skeletonBase = shared.skeletonBase;
+
+  const table = getAdminManagementTableTheme({
+    mode,
+    accentBlue,
+    accentBlueDark,
+    cardBg: d.cardBg,
+    textPrimary: d.textPrimary,
+    textSecondary: d.textSecondary,
+    textDisabled: d.textDisabled,
+    skeletonBase,
+    cellVariants: {
+      cellNotes: { maxWidth: 200 },
+    },
+  });
 
   const detailsDataTable = createDataTableTheme({
     primary: accentBlue,
@@ -51,14 +65,10 @@ const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
 
     menuPaper: adminTheme.menuPaper,
 
-    table: {
-      ...adminTheme.table,
-      cellNotes: { borderBottom: `1px solid ${d.dividerColor}`, py: 1.5, maxWidth: 200 },
-      skeletonRowDefault: { ...skeletonBase, width: "80%" },
-      skeletonRowAction: { ...skeletonBase, width: 60 },
-    },
+    table,
 
     tableCell: {
+      ...getAdminManagementTableCellActions(mode, accentBlue, accentBlueMuted),
       batchIdBox: { display: "flex", alignItems: "center", gap: 0.8 },
       motorIdBox: { display: "flex", alignItems: "center", gap: 0.6 },
       assignedToBox: { display: "flex", alignItems: "center", gap: 1 },
@@ -191,25 +201,6 @@ const getBatchManagementTheme = (mode: "light" | "dark" = "light") => {
         ...general.noWrap,
       },
       createdByEmpty: { ...fonts.typography.bodyMuted, color: d.textDisabled },
-
-      editButton: {
-        color: accentBlue,
-        bgcolor: accentBlueMuted,
-        borderRadius: general.borderRadius.sm,
-        width: 30,
-        height: 30,
-        "&:hover": { bgcolor: alpha(accentBlue, 0.2) },
-      },
-      editIcon: { fontSize: 14 },
-      deleteButton: {
-        color: colors.error.main,
-        bgcolor: alpha(colors.error.main, isDark ? 0.1 : 0.06),
-        borderRadius: general.borderRadius.sm,
-        width: 30,
-        height: 30,
-        "&:hover": { bgcolor: alpha(colors.error.main, 0.18) },
-      },
-      deleteIcon: { fontSize: 14 },
     },
 
     details: {

@@ -55,6 +55,7 @@ import MixingCardNavigation from "./MixingCardNavigation";
 import MixingQualityChecksTable from "./MixingQualityChecksTable";
 import { MixingSelectField, MixingTableInput, MixingTextField } from "./MixingFormFields";
 import PremixStatusChip from "../RawMaterial/components/PremixStatusChip";
+import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
 import ViewStatusButton from "../../../../components/common/ViewStatusButton";
 import FinalApprovalMixCardDialog, {
   areAllMixCardsApproved,
@@ -979,15 +980,11 @@ const MixingForm = ({
                   >
                     {S.SAVE_PREMIX_DRAFT(activePremix.premixNo)}
                   </Button>
-                  <Button
-                    variant="contained"
-                    size="small"
+                  <SubmitForApprovalButton
                     disabled={actionLoading || activeMixCardLocked}
                     onClick={() => onSubmitMixCard?.("PREMIX", activePremix.premixNo)}
-                    sx={{ textTransform: "none", fontWeight: 700 }}
-                  >
-                    {S.SUBMIT_PREMIX(activePremix.premixNo)}
-                  </Button>
+                    label={S.SUBMIT_PREMIX(activePremix.premixNo)}
+                  />
                 </>
               ) : activeFinalMix ? (
                 <>
@@ -1000,15 +997,11 @@ const MixingForm = ({
                   >
                     {S.SAVE_FINAL_MIX_DRAFT(activeFinalMix.mixNo)}
                   </Button>
-                  <Button
-                    variant="contained"
-                    size="small"
+                  <SubmitForApprovalButton
                     disabled={actionLoading || activeMixCardLocked}
                     onClick={() => onSubmitMixCard?.("FINAL_MIX", activeFinalMix.mixNo)}
-                    sx={{ textTransform: "none", fontWeight: 700 }}
-                  >
-                    {S.SUBMIT_FINAL_MIX(activeFinalMix.mixNo)}
-                  </Button>
+                    label={S.SUBMIT_FINAL_MIX(activeFinalMix.mixNo)}
+                  />
                 </>
               ) : null}
               <ViewStatusButton

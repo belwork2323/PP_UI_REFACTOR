@@ -3,7 +3,6 @@ import { Box, Typography, Chip, Button, Tooltip, IconButton } from "@mui/materia
 
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
-import UserActions from "@ui/components/common/UserActions";
 import AdminManagementDataTable from "@ui/components/custom/admin/AdminManagementDataTable";
 import type { AdminManagementColumn } from "@ui/components/custom/admin/AdminManagementDataTable";
 
@@ -185,15 +184,7 @@ const BatchListTable = ({
           const sheetCompleted = isIdentificationSheetCompleted(batch);
           const canDelete = canDeleteAdminBatch(batch);
           return (
-            <Box
-              sx={{
-                display: "flex",
-                gap: 0.5,
-                alignItems: "center",
-                flexWrap: "wrap",
-                justifyContent: "flex-end",
-              }}
-            >
+            <Box sx={tableCell.actionsBox}>
               {sheetDraft && onCompleteImplementation && (
                 <Tooltip title={TA.COMPLETE_IMPLEMENTATION_TOOLTIP}>
                   <Button
@@ -220,18 +211,25 @@ const BatchListTable = ({
                 </Tooltip>
               )}
               {sheetCompleted && (
-                <UserActions
-                  onEdit={() => onEdit(batch)}
-                  onDelete={() => onDelete(batch)}
-                  editTooltip={TA.EDIT_BATCH}
-                  deleteTooltip={TA.DELETE_BATCH}
-                  showDelete={canDelete}
-                />
+                <>
+                  <Tooltip title={TA.EDIT_BATCH}>
+                    <IconButton size="small" onClick={() => onEdit(batch)} sx={tableCell.editButton}>
+                      <icons.Edit sx={tableCell.editIcon} />
+                    </IconButton>
+                  </Tooltip>
+                  {canDelete ? (
+                    <Tooltip title={TA.DELETE_BATCH}>
+                      <IconButton size="small" onClick={() => onDelete(batch)} sx={tableCell.deleteButton}>
+                        <icons.Delete sx={tableCell.deleteIcon} />
+                      </IconButton>
+                    </Tooltip>
+                  ) : null}
+                </>
               )}
               {sheetDraft && canDelete && (
                 <Tooltip title={TA.DELETE_BATCH}>
-                  <IconButton size="small" onClick={() => onDelete(batch)} color="error">
-                    <icons.Delete fontSize="small" />
+                  <IconButton size="small" onClick={() => onDelete(batch)} sx={tableCell.deleteButton}>
+                    <icons.Delete sx={tableCell.deleteIcon} />
                   </IconButton>
                 </Tooltip>
               )}

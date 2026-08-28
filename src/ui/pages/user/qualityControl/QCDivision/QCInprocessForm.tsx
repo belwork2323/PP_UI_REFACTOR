@@ -22,6 +22,7 @@ import {
   uniformTableHeaderCellSx,
 } from "../../../../../app/theme/custom_themes/shared/data_table_theme";
 import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog";
+import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
 import {
   createDefaultQCDivisionFormState,
   type QCDivisionFormState,
@@ -30,7 +31,6 @@ import {
 const {
   factCheck: FactCheckRoundedIcon,
   save: SaveOutlinedIcon,
-  send: SendRoundedIcon,
   warning: WarningAmberRoundedIcon,
 } = icons.user.qualityControl.qcDivision.form;
 
@@ -411,23 +411,12 @@ const QCInProcessForm = ({
 
             <Tooltip title={!canSubmit ? strings.EMPTY_FORM_ERROR : ""} arrow placement="top">
               <span>
-                <Button
-                  variant="contained"
-                  startIcon={<SendRoundedIcon />}
+                <SubmitForApprovalButton
                   disabled={!canSubmit || actionLoading}
                   onClick={() => setSubmitConfirm(true)}
-                  sx={{
-                    borderRadius: 2.5, fontWeight: 800, fontSize: "0.82rem",
-                    textTransform: "none", px: 2.5, py: 1,
-                    background: `linear-gradient(135deg, ${BRAND.accent}, #1aaf8f)`,
-                    boxShadow: `0 4px 14px ${alpha(BRAND.accent, 0.35)}`,
-                    "&:hover": { boxShadow: `0 6px 18px ${alpha(BRAND.accent, 0.45)}`, transform: "translateY(-1px)" },
-                    "&:disabled": { background: BRAND.border, boxShadow: "none", color: "#fff" },
-                    transition: "all 0.2s",
-                  }}
-                >
-                  {isEditMode ? strings.RESUBMIT_LABEL : strings.SUBMIT_LABEL}
-                </Button>
+                  label={isEditMode ? strings.RESUBMIT_LABEL : strings.SUBMIT_LABEL}
+                  sx={{ borderRadius: 2.5, fontSize: "0.82rem", px: 2.5, py: 1 }}
+                />
               </span>
             </Tooltip>
           </Stack>

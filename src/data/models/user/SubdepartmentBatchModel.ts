@@ -4,6 +4,7 @@ import {
   formatApiStatusForDisplay,
   mapApiStatusCountKeyToUiTab,
   mapDisplayStatusToUiTab,
+  toApiStatusEnum,
   toOperationStatusApiValue,
   type OperationStatus,
 } from "../../../hooks/operationStatus";
@@ -375,6 +376,79 @@ const resolveAssignedTo = (batch: Record<string, unknown>) => {
   return resolveSystemManager(batch);
 };
 
+const isPrematureApprovedStageStatus = (status: unknown): boolean => {
+  const api = toApiStatusEnum(status);
+  return (
+    api === "APPROVED" ||
+    api === "COMPLETELY_APPROVED" ||
+    api === "FINAL_APPROVAL_COMPLETED"
+  );
+};
+
+const stageEntryAwaitingApproval = (stageEntry: Record<string, unknown> | null): boolean => {
+  if (!stageEntry) return false;
+  const hasSubmitted = Boolean(String(stageEntry.submittedAt ?? "").trim());
+  const hasApproved = Boolean(
+    String(stageEntry.approvedAt ?? "").trim() || stageEntry.approvedBy,
+  );
+  return hasSubmitted && !hasApproved;
+};
+
+/**
+ * Resolve the user-facing batch-list / form-header status for a subdepartment row.
+ * Prefers stageProgress/currentStage, then corrects premature APPROVED labels
+ * when the stage is submitted but not yet approved.
+ */
+export function resolveSubdepartmentBatchDisplayStatus(
+  batch: Record<string, unknown>,
+  subDepartmentId?: number | null,
+  options?: {
+    formStatus?: unknown;
+    formSubmissionType?: unknown;
+    statusFallback?: unknown;
+  },
+): string {
+  const stageResolution = resolveWorkflowStatusFromBatchStages(batch, subDepartmentId);
+  const fallbackStatus =
+    options?.statusFallback ??
+    batch.status ??
+    batch.workflowStatus ??
+    batch.subDepartmentStatus ??
+    batch.formStatus ??
+    batch.currentStatus;
+
+  let displayStatus = normalizeSubdepartmentBatchStatus(
+    stageResolution.status ?? fallbackStatus,
+  );
+
+  if (
+    stageEntryAwaitingApproval(stageResolution.stageEntry) &&
+    isPrematureApprovedStageStatus(displayStatus)
+  ) {
+    displayStatus = OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL;
+  } else if (
+    displayStatus === BATCH_STATUS_UNAVAILABLE ||
+    !String(stageResolution.status ?? "").trim()
+  ) {
+    const submission = String(options?.formSubmissionType ?? "").trim().toUpperCase();
+    const formStatus = normalizeSubdepartmentBatchStatus(
+      options?.formStatus ?? options?.statusFallback,
+    );
+    const formApi = toApiStatusEnum(formStatus);
+
+    if (
+      submission === "SUBMIT" &&
+      isPrematureApprovedStageStatus(formApi)
+    ) {
+      displayStatus = OPERATION_STATUS.WAITING_FOR_PARTIAL_APPROVAL;
+    } else if (formStatus && formStatus !== BATCH_STATUS_UNAVAILABLE) {
+      displayStatus = formStatus;
+    }
+  }
+
+  return displayStatus;
+}
+
 export function mapSubdepartmentBatchListRow(
   batch: Record<string, unknown>,
   targetSlug?: string,
@@ -382,17 +456,10 @@ export function mapSubdepartmentBatchListRow(
 ) {
   const statusField = (targetSlug && SUBDEPT_STATUS_FIELD[targetSlug]) || "rmStatus";
   const stageResolution = resolveWorkflowStatusFromBatchStages(batch, subDepartmentId);
-  const statusFieldFallback =
-    batch[statusField] ??
-    batch.status ??
-    batch.rmStatus ??
-    batch.workflowStatus ??
-    batch.subDepartmentStatus ??
-    batch.formStatus ??
-    batch.currentStatus;
-  const workflowStatus = normalizeSubdepartmentBatchStatus(
-    stageResolution.status ?? statusFieldFallback,
-  );
+  const statusFieldFallback = batch[statusField] ?? batch.status ?? batch.rmStatus;
+  const workflowStatus = resolveSubdepartmentBatchDisplayStatus(batch, subDepartmentId, {
+    statusFallback: statusFieldFallback,
+  });
 
   const systemManager = resolveSystemManager(batch);
   const createdBy = resolveCreatedBy(batch);

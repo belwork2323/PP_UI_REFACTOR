@@ -18,6 +18,7 @@ import {
   type PremixStatusMeta,
 } from "../../../../../data/models/user/RawMaterialPreparationModel";
 import PremixStatusChip from "./components/PremixStatusChip";
+import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
 import ViewStatusButton from "../../../../components/common/ViewStatusButton";
 import FinalApprovalPremixDialog, {
   buildFinalApprovalPremixRows,
@@ -216,15 +217,11 @@ const RawMaterialBuilderForm = ({
             >
               {RM.SAVE_PREMIX_DRAFT(activeMaterialEntry.premix)}
             </Button>
-            <Button
-              variant="contained"
-              size="small"
+            <SubmitForApprovalButton
               disabled={actionLoading || activePremixLocked}
               onClick={() => onSubmitPremix(activeMaterialEntry.premix)}
-              sx={{ textTransform: "none", fontWeight: 700 }}
-            >
-              {RM.SUBMIT_PREMIX(activeMaterialEntry.premix)}
-            </Button>
+              label={RM.SUBMIT_PREMIX(activeMaterialEntry.premix)}
+            />
             <ViewStatusButton
               disabled={actionLoading}
               onClick={() => setFinalApprovalOpen(true)}

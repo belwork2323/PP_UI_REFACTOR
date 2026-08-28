@@ -1162,40 +1162,38 @@ export const buildMixingPremixesPayload = (
         payload.premixDetails = buildMixingDetailsWithSubmissionType(baseDetails, submissionType);
       }
 
-      const entrySchemaValues = bucket.finalMixEntryId
-        ? form.divisionEntryValues?.[bucket.finalMixEntryId]?.schemaValues
-        : undefined;
-      // Prefer per-unit Final Mix Details on the entry; shared form values are legacy fallback.
-      const finalMixDetailsSource = pickFinalMixDetailsSchemaValues(
-        entrySchemaValues,
-        form.mixingFinalMixDetailsValues,
-      );
-      const perUnitFinalMixDetails = buildMixingDetailsDomainPayload(
-        finalMixDetailsSource,
-        "finalMix",
-      );
-      const viscosityBuildUp = entrySchemaValues
-        ? buildViscosityDomainPayload(entrySchemaValues)
-        : [];
-
-      if (perUnitFinalMixDetails || viscosityBuildUp.length || bucket.finalMixEntryId) {
-        const baseFinalMixDetails: QcMixingDomainDetails = {
-          ...(perUnitFinalMixDetails ?? {
-            bowlNo: "",
-            dateOfFinalMix: "",
-            mixerBuildingNo: "",
-            premixQty: "",
-            parameters: [],
-          }),
-          viscosityBuildUp,
-        };
-        // Final-mix unit saves also expect submission type nested under finalMixDetails.
-        payload.finalMixDetails = buildMixingDetailsWithSubmissionType(
-          baseFinalMixDetails,
-          submissionType && bucket.finalMixEntryId && !bucket.premixEntryId
-            ? submissionType
-            : null,
+      if (bucket.finalMixEntryId) {
+        const entrySchemaValues = form.divisionEntryValues?.[bucket.finalMixEntryId]?.schemaValues;
+        // Prefer per-unit Final Mix Details on the entry; shared form values are legacy fallback.
+        const finalMixDetailsSource = pickFinalMixDetailsSchemaValues(
+          entrySchemaValues,
+          form.mixingFinalMixDetailsValues,
         );
+        const perUnitFinalMixDetails = buildMixingDetailsDomainPayload(
+          finalMixDetailsSource,
+          "finalMix",
+        );
+        const viscosityBuildUp = entrySchemaValues
+          ? buildViscosityDomainPayload(entrySchemaValues)
+          : [];
+
+        if (perUnitFinalMixDetails || viscosityBuildUp.length) {
+          const baseFinalMixDetails: QcMixingDomainDetails = {
+            ...(perUnitFinalMixDetails ?? {
+              bowlNo: "",
+              dateOfFinalMix: "",
+              mixerBuildingNo: "",
+              premixQty: "",
+              parameters: [],
+            }),
+            viscosityBuildUp,
+          };
+          // Final-mix unit saves also expect submission type nested under finalMixDetails.
+          payload.finalMixDetails = buildMixingDetailsWithSubmissionType(
+            baseFinalMixDetails,
+            submissionType && !bucket.premixEntryId ? submissionType : null,
+          );
+        }
       }
 
       return payload;

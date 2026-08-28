@@ -8,6 +8,7 @@ import { useAuthStore } from "../../../app/store/authStore";
 import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshStore";
 import { STRINGS } from "../../../app/config/strings";
 import type { IdentificationSheet } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
+import { isManufacturingContinueFillingStatus } from "../../operationStatus";
 import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
 import { ManufacturingBatch, WorkflowView } from "./useManufacturingWorkflow";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
@@ -17,7 +18,6 @@ import rawMaterialPreparationController from "../../../controllers/user/manufact
 import {
   createEmptyPremixSchemaSession,
   createEmptyWeightmentSheet,
-  hasRawMaterialPrepPersistedData,
   isPremixEditable,
   mapPreparationDetailsFromApi,
   mapPreparationDetailsFromSavedForm,
@@ -57,6 +57,7 @@ import {
 } from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
 import type { SchemaDocumentV2 } from "../../../schema-engine";
 import { isSchemaDocumentReady } from "../../../schema-engine/utils/schemaMessages";
+import { schemaValuesHaveUserData } from "../../../schema-engine/state/formState";
 
 const RM_STATUS = MANUFACTURING_STATUS;
 
@@ -82,6 +83,24 @@ export type RawMaterialPrepBatch = ManufacturingBatch & {
   rmStatus?: string;
   material?: string;
   formId?: string | null;
+};
+
+const enrichRmpBatchFromDetails = (
+  batch: RawMaterialPrepBatch,
+  batchDetails: Awaited<ReturnType<typeof batchManagementController.getBatchById>>,
+): RawMaterialPrepBatch | null => {
+  if (!batchDetails) return null;
+
+  return {
+    ...batch,
+    batchType: batch.batchType ?? batchDetails.batchType ?? batch.batchType,
+    material: batch.material ?? batchDetails.material ?? batch.material,
+    identificationSheet: batchDetails.identificationSheet ?? batch.identificationSheet,
+    stageProgress:
+      (batchDetails as { stageProgress?: unknown }).stageProgress ?? batch.stageProgress,
+    currentStage:
+      (batchDetails as { currentStage?: unknown }).currentStage ?? batch.currentStage,
+  };
 };
 
 const normalizePremixSession = (session?: Partial<PremixSession> | null): PremixSession => {
@@ -195,6 +214,63 @@ const ensurePremixSchemasLoaded = async (
 
 const parseStatus = (status: string | undefined) => String(status ?? "").toLowerCase();
 
+const resolveRmpFormId = (batch: RawMaterialPrepBatch | null | undefined) =>
+  String(batch?.formId ?? "").trim();
+
+const mergePremixSessionsPreservingLocalInput = (
+  previous: Record<string, PremixSession>,
+  next: Record<string, PremixSession>,
+): Record<string, PremixSession> => {
+  const merged: Record<string, PremixSession> = {};
+
+  Object.entries(next).forEach(([key, session]) => {
+    const prev = previous[key];
+    if (!prev) {
+      merged[key] = session;
+      return;
+    }
+
+    merged[key] = {
+      ...session,
+      pendingSolidSections:
+        session.pendingSolidSections?.length
+          ? session.pendingSolidSections
+          : prev.pendingSolidSections,
+      pendingLiquidSections:
+        session.pendingLiquidSections?.length
+          ? session.pendingLiquidSections
+          : prev.pendingLiquidSections,
+      solid: {
+        ...session.solid,
+        schema: session.solid.schema ?? prev.solid.schema,
+        schemaLoading:
+          session.solid.schema || prev.solid.schema ? false : session.solid.schemaLoading,
+        schemaError: session.solid.schemaError ?? prev.solid.schemaError,
+        formValues: schemaValuesHaveUserData(session.solid.formValues)
+          ? session.solid.formValues
+          : prev.solid.formValues,
+      },
+      liquid: {
+        ...session.liquid,
+        schema: session.liquid.schema ?? prev.liquid.schema,
+        schemaLoading:
+          session.liquid.schema || prev.liquid.schema ? false : session.liquid.schemaLoading,
+        schemaError: session.liquid.schemaError ?? prev.liquid.schemaError,
+        formValues: schemaValuesHaveUserData(session.liquid.formValues)
+          ? session.liquid.formValues
+          : prev.liquid.formValues,
+      },
+    };
+  });
+
+  Object.entries(previous).forEach(([key, prev]) => {
+    if (merged[key] || !premixSessionHasData(prev)) return;
+    merged[key] = prev;
+  });
+
+  return merged;
+};
+
 export const useRawMaterialPrepHook = () => {
   const listParams = useSubdepartmentBatches("raw-material-prep");
   const showAlert = useAlertStore((state) => state.showAlert);
@@ -223,6 +299,8 @@ export const useRawMaterialPrepHook = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
+  const [formHydrationKey, setFormHydrationKey] = useState(0);
+  const skipSessionRebuildRef = useRef(false);
   const [numberOfPremix, setNumberOfPremix] = useState(0);
   const [identificationSheet, setIdentificationSheet] = useState<IdentificationSheet | null>(null);
 
@@ -265,13 +343,6 @@ export const useRawMaterialPrepHook = () => {
     () => mergeMaterialsLists(availableSolidMaterials, availableLiquidMaterials),
     [availableSolidMaterials, availableLiquidMaterials],
   );
-
-  const loadBatchIdentificationSheet = useCallback(async (batchId: string) => {
-    const details = await batchManagementController.getBatchById(batchId);
-    const sheet = (details?.identificationSheet ?? null) as IdentificationSheet | null;
-    const premixCount = Number(sheet?.numberOfPremix) || 0;
-    return { identificationSheet: sheet, numberOfPremix: premixCount };
-  }, []);
 
   const loadMaterialsByType = useCallback(
     async (materialType: "SOLID" | "LIQUID", options?: { silent?: boolean }) => {
@@ -425,7 +496,7 @@ export const useRawMaterialPrepHook = () => {
   ]);
 
   useEffect(() => {
-    if (view !== "form") return;
+    if (view !== "form" || skipSessionRebuildRef.current) return;
 
     const selections = addedPremixSelectionsByBatch[activeFormBatchKey] ?? [];
     if (selections.length === 0) return;
@@ -628,7 +699,7 @@ export const useRawMaterialPrepHook = () => {
     async (
       batch: RawMaterialPrepBatch,
       editMode: boolean,
-      options?: { silent?: boolean },
+      options?: { silent?: boolean; preserveLocalSessions?: Record<string, PremixSession> },
     ) => {
       if (!batch.batchId) {
         showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.BATCH_ID_MISSING, "error");
@@ -636,11 +707,19 @@ export const useRawMaterialPrepHook = () => {
       }
 
       const silent = Boolean(options?.silent);
+      const preserveLocalSessions = options?.preserveLocalSessions ?? {};
       if (!silent) setLoadingFormDetails(true);
 
       try {
-        const { identificationSheet: sheet, numberOfPremix: premixCount } =
-          await loadBatchIdentificationSheet(batch.batchId);
+        const batchDetails = await batchManagementController.getBatchById(batch.batchId);
+        const enrichedBatch = enrichRmpBatchFromDetails(batch, batchDetails);
+        if (!enrichedBatch) {
+          showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.DETAILS_FETCH_ERROR, "error");
+          return;
+        }
+
+        const sheet = (batchDetails?.identificationSheet ?? null) as IdentificationSheet | null;
+        const premixCount = Number(sheet?.numberOfPremix) || 0;
 
         if (!sheet || premixCount < 1) {
           showAlert(
@@ -656,7 +735,7 @@ export const useRawMaterialPrepHook = () => {
           loadMaterialsByType("LIQUID", { silent: true }),
         ]);
 
-        let nextBatch = batch;
+        let nextBatch = enrichedBatch;
         let nextAddedPremixSelections: AddedPremixSelection[] = [];
         let nextPremixSessions: Record<string, PremixSession> = {};
         let nextWeightmentSheet = createEmptyWeightmentSheet();
@@ -665,11 +744,24 @@ export const useRawMaterialPrepHook = () => {
           nextPremixStatusByNo[i] = { premixSubmissionStatus: "TO_BE_INITIATED" };
         }
 
-        const shouldFetchFormDetails = Boolean(String(batch.formId ?? "").trim());
+        const status = batch.rmStatus ?? batch.status;
+        // Silent refresh after save must always hit form/details (even if list status
+        // is still TO_BE_INITIATED right after the first create).
+        const shouldFetchFormDetails =
+          silent ||
+          editMode ||
+          isManufacturingContinueFillingStatus(String(status ?? "")) ||
+          Boolean(resolveRmpFormId(batch));
 
         if (shouldFetchFormDetails) {
+          const formId = resolveRmpFormId(batch);
+          if (!formId) {
+            showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.FORM_ID_MISSING, "error");
+            return;
+          }
+
           const detailsResponse = await rawMaterialPreparationController.fetchFormDetails({
-            formId: batch.formId,
+            formId,
           });
 
           if (!detailsResponse?.success || !detailsResponse?.data) {
@@ -683,9 +775,14 @@ export const useRawMaterialPrepHook = () => {
 
           const details = detailsResponse.data;
           nextBatch = {
-            ...batch,
-            formId: details.formId || batch.formId,
+            ...enrichedBatch,
+            formId: details.formId || formId,
+            batchType: batch.batchType ?? details.batchType ?? enrichedBatch.batchType,
           };
+          if (details.status) {
+            nextBatch.rmStatus = String(details.status);
+            nextBatch.status = String(details.status);
+          }
           const mapped = mapPreparationDetailsFromApi(
             details,
             sheet,
@@ -730,12 +827,20 @@ export const useRawMaterialPrepHook = () => {
           ),
         );
 
+        if (silent && Object.keys(preserveLocalSessions).length > 0) {
+          nextPremixSessions = mergePremixSessionsPreservingLocalInput(
+            preserveLocalSessions,
+            nextPremixSessions,
+          );
+        }
+
         const snapshot = JSON.stringify({
           addedPremixSelections: nextAddedPremixSelections,
           premixSessions: nextPremixSessions,
           weightmentSheet: nextWeightmentSheet,
         });
 
+        skipSessionRebuildRef.current = true;
         setActiveBatch(nextBatch);
         setIsEditMode(editMode);
         setNumberOfPremix(premixCount);
@@ -768,11 +873,17 @@ export const useRawMaterialPrepHook = () => {
         }));
         setInitialSnapshot(snapshot);
         setView("form");
+        if (silent) {
+          setFormHydrationKey((value) => value + 1);
+        }
+        window.setTimeout(() => {
+          skipSessionRebuildRef.current = false;
+        }, 0);
       } finally {
         if (!silent) setLoadingFormDetails(false);
       }
     },
-    [loadBatchIdentificationSheet, loadMaterialsByType, showAlert],
+    [loadMaterialsByType, showAlert],
   );
 
   const handleFillForm = useCallback(
@@ -1031,8 +1142,7 @@ export const useRawMaterialPrepHook = () => {
       }
     }
 
-    const currentPremixStatuses = premixStatusByNoByBatch[activeFormBatchKey] ?? {};
-    const isCreateFlow = !hasRawMaterialPrepPersistedData(currentPremixStatuses);
+    const isCreateFlow = !resolveRmpFormId(activeBatch);
     // Premix type follows Save Draft / Submit Premix.
     // Form stays DRAFT until "Proceed for Approval" (final approval).
     const premixSubmissionType = isDraft ? "DRAFT" : "SUBMIT";
@@ -1092,82 +1202,42 @@ export const useRawMaterialPrepHook = () => {
         return false;
       }
 
-      const nextFormId = response.data?.formId ?? activeBatch.formId ?? null;
-      setActiveBatch((prev) => (prev ? { ...prev, formId: nextFormId } : prev));
-      setInitialSnapshot(formSnapshot);
+      const nextFormId = String(response.data?.formId ?? activeBatch.formId ?? "").trim();
+      const refreshedBatch: RawMaterialPrepBatch = {
+        ...activeBatch,
+        formId: nextFormId || activeBatch.formId,
+        rmStatus: response.data?.status ?? activeBatch.rmStatus,
+        status: response.data?.status ?? activeBatch.status,
+      };
 
-      const nextStatus: PremixSubmissionStatus =
-        intent === "draft" ? "IN_PROGRESS" : "WAITING_FOR_APPROVAL";
-
-      setPremixStatusByNoByBatch((prev) => {
-        const current = prev[activeFormBatchKey] ?? {};
-        const updated: Record<number, PremixStatusMeta> = {
-          ...current,
-          [premixNo]: {
-            ...current[premixNo],
-            premixSubmissionType,
-            premixSubmissionStatus: nextStatus,
-          },
-        };
-
-        if (Array.isArray(response.data?.premixStatuses)) {
-          response.data.premixStatuses.forEach(
-            (entry: {
-              premixNo: number;
-              premixSubmissionStatus: PremixSubmissionStatus;
-              premixSubmissionType?: PremixSubmissionType;
-            }) => {
-              if (!entry?.premixNo) return;
-              updated[entry.premixNo] = {
-                ...updated[entry.premixNo],
-                premixSubmissionStatus: entry.premixSubmissionStatus,
-                premixSubmissionType:
-                  entry.premixSubmissionType ??
-                  (entry.premixNo === premixNo
-                    ? premixSubmissionType
-                    : updated[entry.premixNo]?.premixSubmissionType),
-              };
-            },
-          );
-        }
-
-        return { ...prev, [activeFormBatchKey]: updated };
-      });
-
+      setActiveBatch(refreshedBatch);
       if (isDraft) {
-        showAlert(
-          STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.PREMIX_SAVE_DRAFT_SUCCESS(premixNo),
-          "success",
-          { autoCloseMs: 2200 },
-        );
         setHasSavedDraft(true);
+      }
 
-        const formIdForRefresh = String(nextFormId ?? activeBatch.formId ?? "").trim();
-        if (formIdForRefresh) {
-          // Re-fetch details so the form reflects persisted server values.
-          // Keep editMode=false unless this is still a rejected resubmission —
-          // draft refresh must not show "Editing Rejected Submission".
-          const statusForBanner = String(
-            response.data?.status ?? activeBatch.rmStatus ?? activeBatch.status ?? "",
-          )
-            .trim()
-            .toUpperCase()
-            .replace(/\s+/g, "_");
-          const stillRejectedEdit = statusForBanner === "REJECTED";
+      showAlert(
+        isDraft
+          ? STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.PREMIX_SAVE_DRAFT_SUCCESS(premixNo)
+          : STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.PREMIX_SUBMIT_SUCCESS(premixNo),
+        "success",
+        { autoCloseMs: 2200 },
+      );
 
-          await openFormWithResolvedData(
-            {
-              ...activeBatch,
-              formId: formIdForRefresh,
-              rmStatus: response.data?.status ?? activeBatch.rmStatus,
-              status: response.data?.status ?? activeBatch.status,
-            },
-            stillRejectedEdit,
-            { silent: true },
-          );
-        }
+      if (nextFormId) {
+        const statusForBanner = String(
+          response.data?.status ?? activeBatch.rmStatus ?? activeBatch.status ?? "",
+        )
+          .trim()
+          .toUpperCase()
+          .replace(/\s+/g, "_");
+        const stillRejectedEdit = statusForBanner === "REJECTED";
+
+        await openFormWithResolvedData(refreshedBatch, stillRejectedEdit, {
+          silent: true,
+          preserveLocalSessions: premixSessionsByBatch[activeFormBatchKey] ?? {},
+        });
       } else {
-        showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.PREMIX_SUBMIT_SUCCESS(premixNo), "success", { autoCloseMs: 2200 });
+        setInitialSnapshot(formSnapshot);
       }
 
       return true;
@@ -1185,11 +1255,9 @@ export const useRawMaterialPrepHook = () => {
     formSnapshot,
     weightmentSheet,
     activeFormBatchKey,
-    premixStatusByNoByBatch,
+    premixSessionsByBatch,
     identificationSheet,
-    numberOfPremix,
     checkPremixEditable,
-    getPremixStatus,
     openFormWithResolvedData,
   ]);
 
@@ -1328,6 +1396,7 @@ export const useRawMaterialPrepHook = () => {
     handleViewDetails,
     handleViewPreparationDetails: handleViewDetails,
     handleBackFromDetails,
+    formHydrationKey,
   };
 };
 

@@ -1891,6 +1891,7 @@ export const STRINGS = {
         MAIN_SCALE_PANEL_HINT:
           "Load the main scale processing form. Hardware preparation details are captured first.",
         LOAD_FORM: "Load Subscale Form",
+        DELETE_TABLES: "Delete Tables",
         LOADING_FORM_TITLE: "Loading Subscale Form",
         LOADING_FORM_MESSAGE: "Preparing article and process tables…",
         SAVE_DRAFT: "Save as Draft",
@@ -1917,6 +1918,7 @@ export const STRINGS = {
         MOTOR_STAGES_LOADING: "Loading motor stages...",
         ADD_MIXING_CYCLE: "Add Mixing Cycle",
         PROCESS_PARTICULARS_EMPTY: "Select a mixing cycle stage to load process particulars.",
+        PROCESS_PARTICULARS_LOADING: "Loading process particulars…",
       },
     },
   },

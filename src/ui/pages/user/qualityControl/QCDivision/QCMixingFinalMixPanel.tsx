@@ -12,6 +12,7 @@ import {
   pickViscositySchemaValues,
   type QcMixingDetailsSeed,
 } from "../../../../../hooks/user/qualityControl/qcMixingTables";
+import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
 import QCMixingDetailsTable from "./QCMixingDetailsTable";
 import QCMixingViscosityTable from "./QCMixingViscosityTable";
 import type { QCDivisionEntryUnitActions } from "./QCDivisionEntryPanel";
@@ -124,17 +125,15 @@ const QCMixingFinalMixPanel = ({
                 >
                   {actionLabels?.saveDraftLabel ?? unitActions?.saveDraftLabel ?? S.SAVE_UNIT_DRAFT}
                 </Button>
-                <Button
-                  size="small"
-                  variant="contained"
+                <SubmitForApprovalButton
                   disabled={
                     readOnly || fieldsDisabled || !unitActions?.canAct || unitActions?.actionLoading
                   }
                   onClick={unitActions?.onSubmit}
-                  sx={{ textTransform: "none", whiteSpace: "nowrap" }}
-                >
-                  {actionLabels?.submitLabel ?? unitActions?.submitLabel ?? S.SUBMIT_UNIT}
-                </Button>
+                  label={
+                    actionLabels?.submitLabel ?? unitActions?.submitLabel ?? S.SUBMIT_UNIT
+                  }
+                />
               </>
             ) : null}
             {showViewDetails ? (

@@ -7,6 +7,7 @@ import {
   toOperationStatusApiValue,
   type OperationStatus,
 } from "../../../hooks/operationStatus";
+import type { ApproverFormActionType } from "../../api/approver/approverApi";
 import { motorStageForApi, normalizeMotorStage } from "../admin/BatchManagement/BatchManagementModel";
 import {
   BATCH_STATUS_UNAVAILABLE,
@@ -57,6 +58,25 @@ export function normalizeApproverBatchStatus(status: unknown): string {
   if (!raw) return BATCH_STATUS_UNAVAILABLE;
   if (raw === BATCH_STATUS_UNAVAILABLE) return BATCH_STATUS_UNAVAILABLE;
   return formatApiStatusForDisplay(raw);
+}
+
+/** Resolve batch status after approver change-status — avoid using form `status` when batchStatus is absent. */
+export function resolveApproverChangeStatusFromResponse(
+  response: { data?: unknown } | null | undefined,
+  actionType: ApproverFormActionType,
+): string {
+  const data = (response?.data ?? {}) as Record<string, unknown>;
+  const batchStatus = data.batchStatus ?? data.batchStageStatus;
+  if (batchStatus != null && String(batchStatus).trim()) {
+    return normalizeApproverBatchStatus(batchStatus);
+  }
+
+  const responseAction = String(data.actionType ?? "").trim().toUpperCase();
+  if (responseAction === "REJECTED" || responseAction === "APPROVED") {
+    return normalizeApproverBatchStatus(responseAction);
+  }
+
+  return normalizeApproverBatchStatus(actionType === "REJECTED" ? "REJECTED" : "APPROVED");
 }
 
 /** Display label for approver status tabs / chips (matches user batch list). */

@@ -6,7 +6,7 @@ import spacing     from "@app/theme/spacing";
 import layout      from "@app/theme/layout";
 import general     from "@app/theme/custom_themes/common/common_css_theme";
 import { getSharedTheme } from "@app/theme/custom_themes/shared/shared_theme";
-import { getAdminCommonTheme } from "@app/theme/custom_themes/admin/admin_common_theme";
+import { getAdminCommonTheme, getAdminManagementTableCellActions, getAdminManagementTableTheme } from "@app/theme/custom_themes/admin/admin_common_theme";
 
 const getUserManagementTheme = (mode: "light" | "dark" = "light") => {
   const shared  = getSharedTheme(mode);
@@ -23,6 +23,19 @@ const getUserManagementTheme = (mode: "light" | "dark" = "light") => {
 
   const skeletonBase = shared.skeletonBase;
 
+  const table = getAdminManagementTableTheme({
+    mode,
+    accentBlue,
+    accentBlueDark,
+    cardBg: d.cardBg,
+    textPrimary: d.textPrimary,
+    textSecondary: d.textSecondary,
+    textDisabled: d.textDisabled,
+    skeletonBase,
+    cellVariants: {
+      cellSubDepts: { maxWidth: 280 },
+    },
+  });
 
   return {
 
@@ -47,30 +60,27 @@ const getUserManagementTheme = (mode: "light" | "dark" = "light") => {
 
     menuPaper: adminTheme.menuPaper,
 
-    table: {
-      ...adminTheme.table,
-      cellSubDepts: {
-        borderBottom: `1px solid ${d.dividerColor}`,
-        py:           1.5,
-        maxWidth:     240,
-      },
-      skeletonRow: skeletonBase,
-      skeletonRowDefault: { ...skeletonBase, width: "80%" },
-      skeletonRowAction:  { ...skeletonBase, width: 60 },
-    },
+    table,
 
     tableCell: {
-      userBox:       { display: "flex", alignItems: "center", gap: 1.5 },
-      usernameBox:   { display: "flex", alignItems: "center", gap: 0.6 },
+      ...getAdminManagementTableCellActions(mode, accentBlue, accentBlueMuted),
+      userBox:       { display: "flex", alignItems: "center", gap: 1 },
+      usernameBox:   { display: "flex", alignItems: "center", gap: 0.5 },
       createdByBox:  { display: "flex", alignItems: "center", gap: 0.6, mb: 0.4 },
-      actionsBox:    { display: "flex", gap: 0.5, justifyContent: "flex-end" },
       avatar: {
-        width: 34, height: 34,
-        fontSize: fonts.size.dense, fontWeight: fonts.weight.bold, flexShrink: 0,
+        width: 30,
+        height: 30,
+        fontSize: "0.68rem",
+        fontWeight: fonts.weight.bold,
+        flexShrink: 0,
+        border: `1.5px solid ${alpha(accentBlue, isDark ? 0.22 : 0.12)}`,
+        boxShadow: `0 1px 4px ${alpha(accentBlue, 0.08)}`,
       },
       userName: {
-        fontSize: fonts.size.sm, fontWeight: fonts.weight.semibold,
-        color: d.textPrimary, ...general.noWrap,
+        fontSize: fonts.size.sm,
+        fontWeight: fonts.weight.bold,
+        color: d.textPrimary,
+        ...general.noWrap,
       },
       usernameIcon:  { fontSize: 13, color: d.textDisabled },
       usernameText: {
@@ -87,13 +97,13 @@ const getUserManagementTheme = (mode: "light" | "dark" = "light") => {
         fontSize: fonts.size.compact, border: `1px solid ${alpha(dc.color, 0.25)}`, height: 24,
       }),
       subDeptChip: {
-        height: 20,
+        height: 22,
         fontSize: fonts.typography.chipSm.fontSize,
         fontWeight: fonts.typography.chipSm.fontWeight,
-        color: semantic.subDeptChipColor,
-        bgcolor: semantic.subDeptChipBg,
-        border: `1px solid ${semantic.subDeptChipBorder}`,
-        "& .MuiChip-label": { px: 1 },
+        color: accentBlueDark,
+        bgcolor: isDark ? alpha(accentBlue, 0.14) : alpha(accentBlue, 0.07),
+        border: `1px solid ${alpha(accentBlue, isDark ? 0.28 : 0.16)}`,
+        "& .MuiChip-label": { px: 1.1 },
       },
       statusChip: (sc) => ({
         bgcolor: sc.bg, color: sc.color, fontWeight: fonts.weight.semibold,
@@ -116,19 +126,6 @@ const getUserManagementTheme = (mode: "light" | "dark" = "light") => {
         "& .MuiChip-label": { px: 0.9 },
       }),
       createdByEmpty: { ...fonts.typography.bodyMuted, color: d.textDisabled },
-      editButton: {
-        color: accentBlue, bgcolor: accentBlueMuted,
-        borderRadius: general.borderRadius.sm, width: 30, height: 30,
-        "&:hover": { bgcolor: alpha(accentBlue, 0.2) },
-      },
-      editIcon:  { fontSize: 14 },
-      deleteButton: {
-        color: colors.error.main,
-        bgcolor: alpha(colors.error.main, isDark ? 0.10 : 0.06),
-        borderRadius: general.borderRadius.sm, width: 30, height: 30,
-        "&:hover": { bgcolor: alpha(colors.error.main, 0.18) },
-      },
-      deleteIcon: { fontSize: 14 },
     },
 
     modal: {

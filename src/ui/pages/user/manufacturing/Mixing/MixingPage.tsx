@@ -46,6 +46,7 @@ const MixingPage = () => {
     handleBack,
     handleDiscardAndBack,
     handleFormChange,
+    formHydrationKey,
     handleSaveMixCardDraft,
     handleSubmitMixCard,
     detailsRow,
@@ -83,6 +84,7 @@ const MixingPage = () => {
         <>
           <MixingHeader batch={activeBatch} isEdit={isEditMode} onBack={handleBack} theme={theme} />
           <MixingForm
+            key={formHydrationKey}
             initialData={formData}
             numberOfPremix={numberOfPremix}
             motorStage={motorStage}

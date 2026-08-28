@@ -572,10 +572,10 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         renderAction={(row: any) => (
           <Stack
             direction="row"
-            spacing={1}
+            spacing={0.75}
             alignItems="center"
             justifyContent="center"
-            flexWrap="wrap"
+            flexWrap="nowrap"
           >
             {canViewLotDetails(row.rmStatus) ? (
               <Tooltip
@@ -628,6 +628,7 @@ const RawMaterialBatchList = ({ hookState, rowsPerPageOptions }: any) => {
                   size="small"
                   onClick={() => handleDeleteLotFromList(row)}
                   sx={{
+                    flexShrink: 0,
                     color: theme.palette.danger,
                     border: `1px solid ${alpha(theme.palette.danger, 0.35)}`,
                     borderRadius: 1.5,

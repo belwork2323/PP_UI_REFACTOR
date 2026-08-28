@@ -11,6 +11,7 @@ import { resolveBemMotorStatusTabs } from "../../../../../hooks/user/qualityCont
 import { createEmptyStfMotorSession, normalizeStfMotorSession } from "../../../../../data/models/user/StaticTestFacilityFormModel";
 import StfMotorPanel from "./StfMotorPanel";
 import ConfirmAlertDialog from "@/ui/components/common/ConfirmAlertDialog";
+import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
 import UserWorkflowStatusAction from "../../../../components/custom/UserWorkflowStatusAction";
 import UserWorkflowFormDetailsHeader from "../../../../components/custom/UserWorkflowFormDetailsHeader";
 import BemMotorListTable from "./BemMotorListTable";
@@ -216,14 +217,11 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
             >
               {strings.SAVE_DRAFT_LABEL}
             </Button>
-            <Button
-              variant="contained"
+            <SubmitForApprovalButton
               disabled={(!isExistingRecord && !canSubmitActions) || actionLoading}
               onClick={() => setSubmitConfirmOpen(true)}
-              startIcon={actionLoading ? <CircularProgress size={16} color="inherit" /> : null}
-            >
-              {isEditMode ? strings.RESUBMIT_LABEL : strings.SUBMIT_LABEL}
-            </Button>
+              label={isEditMode ? strings.RESUBMIT_LABEL : strings.SUBMIT_LABEL}
+            />
           </Stack>
           <Box
             sx={{

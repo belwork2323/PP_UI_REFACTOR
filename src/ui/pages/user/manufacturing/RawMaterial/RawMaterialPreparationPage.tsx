@@ -51,6 +51,7 @@ const RawMaterialPreparationPage = () => {
     handlePremixSlotChange,
     handleBack,
     handleDiscardAndBack,
+    formHydrationKey,
     handleSavePremixDraft,
     handleSubmitPremix,
   } = hookState;
@@ -96,6 +97,7 @@ const RawMaterialPreparationPage = () => {
           />
 
           <RawMaterialBuilderForm
+            key={formHydrationKey}
             activeBatch={activeBatch}
             isEditMode={isEditMode}
             numberOfPremix={numberOfPremix}

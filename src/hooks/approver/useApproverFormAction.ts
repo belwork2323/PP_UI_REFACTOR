@@ -5,7 +5,7 @@ import { useApproverListRefreshStore } from "../../app/store/approverListRefresh
 import { useAuthStore } from "../../app/store/authStore";
 import type { ApproverDepartmentKey } from "../../app/theme/approver";
 import { isApproverActionableStatus } from "../../app/theme/approver";
-import { normalizeApproverBatchStatus } from "../../data/models/approver/ApproverBatchListModel";
+import { mirrorApproverSubdepartmentStatusFields, resolveApproverChangeStatusFromResponse } from "../../data/models/approver/ApproverBatchListModel";
 import { useAlertStore } from "../../app/store/alertStore";
 import type { ApproverChangeStatusPayload, ApproverFormActionType } from "../../data/api/approver/approverApi";
 import { submitApproverFormStatusChange } from "../../controllers/approver/approverController";
@@ -36,6 +36,7 @@ type UseApproverFormActionArgs<T extends ActionableApproverItem> = {
   onStatusChangeSuccess?: (
     item: T,
     response: ApiResponseModel<unknown>,
+    actionType: ApproverFormActionType,
   ) => void | Promise<void>;
   closeSelectedOnSuccess?: boolean;
 };
@@ -151,12 +152,12 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
     );
 
     const payload: ApproverChangeStatusRequest = {
-      actionType,
       formId: dialogItem.formId,
       subDepartmentId: selectedSubDepartment.subDepartmentId,
+      ...(buildChangeStatusPayload?.(dialogItem) ?? {}),
+      actionType,
       remarks: actionType === "APPROVED" ? (trimmedValue || null) : null,
       rejectionReason: actionType === "REJECTED" ? trimmedValue : null,
-      ...(buildChangeStatusPayload?.(dialogItem) ?? {}),
     };
 
     const response = submitChangeStatus
@@ -166,8 +167,8 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
     setSubmitting(false);
 
     if (response.success) {
-      const nextStatus =
-        actionType === "APPROVED" ? "Approved" : "Rejected";
+      const resolvedStatus = resolveApproverChangeStatusFromResponse(response, actionType);
+      const statusMirrors = mirrorApproverSubdepartmentStatusFields(resolvedStatus);
 
       setItems((current) =>
         current.map((item) => {
@@ -182,11 +183,8 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
 
           return {
             ...item,
-            status: normalizeApproverBatchStatus(
-              (response.data as { status?: string; batchStatus?: string })?.batchStatus ??
-                (response.data as { status?: string })?.status ??
-                nextStatus,
-            ),
+            status: resolvedStatus,
+            ...statusMirrors,
             remarks: actionType === "APPROVED" ? (trimmedValue || null) : item.remarks ?? null,
             rejectionReason: actionType === "REJECTED" ? trimmedValue : null,
           };
@@ -194,7 +192,7 @@ export const useApproverFormAction = <T extends ActionableApproverItem>({
       );
 
       try {
-        await onStatusChangeSuccess?.(dialogItem, response);
+        await onStatusChangeSuccess?.(dialogItem, response, actionType);
       } catch (error) {
         console.error("Approver post-action details refresh failed", error);
       }

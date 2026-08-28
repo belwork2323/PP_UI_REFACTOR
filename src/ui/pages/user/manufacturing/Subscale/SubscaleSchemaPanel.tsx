@@ -11,6 +11,7 @@ import {
 import { applySubscaleHardwareRowGeneration } from "../../../../../data/models/user/subscaleApiPayloadMapper";
 import { SUBSCALE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/subscale_theme";
 import { mergeSubscaleBatchFormValues } from "../../../../../hooks/user/manufacturing/subscaleBatchConfig";
+import { canSubscaleManageProcessTables } from "../../../../../hooks/operationStatus";
 import {
   HARDWARE_SECTION_ID,
   isMainScaleSubscaleBatch,
@@ -19,6 +20,7 @@ import {
 } from "../../../../../hooks/user/manufacturing/subscaleHardwareConfig";
 import SubscaleMainScaleHardwarePanel from "./SubscaleMainScaleHardwarePanel";
 import SubscaleSubscaleBatchPanel from "./SubscaleSubscaleBatchPanel";
+import SubscaleHardwareArticlePanel from "./SubscaleHardwareArticlePanel";
 
 type SubscaleSchemaPanelProps = {
   schema: SchemaDocumentV2 | null;
@@ -27,14 +29,11 @@ type SubscaleSchemaPanelProps = {
   subDepartmentId?: number;
   batchId?: string;
   batchType?: string | null;
+  batchStatus?: string | null;
   onChange: (values: SchemaFormValues) => void;
   loading?: boolean;
   error?: string | null;
   batchDetails;
-  actionLoading?: boolean;
-  isEditMode?: boolean;
-  onRequestSaveDraft?: () => void;
-  onRequestSubmit?: () => void;
 };
 
 const mergeFormValuesForBatchType = (
@@ -53,18 +52,16 @@ const SubscaleSchemaPanel = ({
   subDepartmentId,
   batchId,
   batchType,
+  batchStatus,
   onChange,
   loading = false,
   error = null,
   batchDetails,
-  actionLoading,
-  isEditMode,
-  onRequestSaveDraft,
-  onRequestSubmit,
 }: SubscaleSchemaPanelProps) => {
   const hydratedRef = useRef(false);
   const showMainScaleSetup = isMainScaleSubscaleBatch(batchType);
   const showSubscaleBatchSetup = isSubscaleProcessingBatch(batchType);
+  const canManageProcessTables = canSubscaleManageProcessTables(batchStatus);
 
   const processingSchema = useMemo(() => {
     if (!schema || (!showMainScaleSetup && !showSubscaleBatchSetup)) return schema;
@@ -152,24 +149,25 @@ const SubscaleSchemaPanel = ({
             values={formValues}
             onChange={handleHardwareChange}
             batchType={batchType}
-            actionLoading={actionLoading}
-            isEditMode={isEditMode}
-            onRequestSaveDraft={onRequestSaveDraft}
-            onRequestSubmit={onRequestSubmit}
+            canManageProcessTables={canManageProcessTables}
           />
         </Box>
       ) : null}
 
       {showSubscaleBatchSetup ? (
-        <SubscaleSubscaleBatchPanel
-          values={formValues}
-          onChange={handleBatchSetupChange}
-          batchDetails={batchDetails}
-          actionLoading={actionLoading}
-          isEditMode={isEditMode}
-          onRequestSaveDraft={onRequestSaveDraft}
-          onRequestSubmit={onRequestSubmit}
-        />
+        <>
+          <SubscaleSubscaleBatchPanel
+            values={formValues}
+            onChange={handleBatchSetupChange}
+            batchDetails={batchDetails}
+          />
+          <SubscaleHardwareArticlePanel
+            values={formValues}
+            onChange={handleBatchSetupChange}
+            batchType={batchType}
+            canManageProcessTables={canManageProcessTables}
+          />
+        </>
       ) : null}
       {/* <SubscaleProcessingUIForm /> */}
       {/* <SchemaUI

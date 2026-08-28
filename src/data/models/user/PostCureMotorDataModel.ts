@@ -229,7 +229,7 @@ const lfIngredientRows = (): IngredientQuantityRow[] => [
   { srNo: 2, INGREDIENT: "GX-257 Resin", MFG_LOT: "", PARTS_BY_WEIGHT: "40 ±1", QUANTITY: "" },
   { srNo: 3, INGREDIENT: "HY-960 Accelerator", MFG_LOT: "", PARTS_BY_WEIGHT: "6 ±0.5", QUANTITY: "" },
   { srNo: 4, INGREDIENT: "DY-026 Diluent", MFG_LOT: "", PARTS_BY_WEIGHT: "10 ±0.5", QUANTITY: "" },
-  { srNo: "TOTAL", INGREDIENT: "Total Quantity", MFG_LOT: "", PARTS_BY_WEIGHT: "", QUANTITY: "" },
+  { srNo: "Total Quanity", INGREDIENT: "", MFG_LOT: "", PARTS_BY_WEIGHT: "", QUANTITY: "" },
 ];
 
 const ir1PremixRows = (): IngredientTakenRow[] => [
@@ -237,7 +237,7 @@ const ir1PremixRows = (): IngredientTakenRow[] => [
   { srNo: 2, INGREDIENT: "Asbestos Powder", MFG_LOT: "", PARTS_BY_WEIGHT: "38.5±1.0", QTY_TAKEN: "" },
   { srNo: 3, INGREDIENT: "Nonox-D", MFG_LOT: "", PARTS_BY_WEIGHT: "1.0±0.1", QTY_TAKEN: "" },
   { srNo: 4, INGREDIENT: "Ferric Oxide", MFG_LOT: "", PARTS_BY_WEIGHT: "0.5±0.05", QTY_TAKEN: "" },
-  { srNo: "TOTAL", INGREDIENT: "Total Quantity", MFG_LOT: "", PARTS_BY_WEIGHT: "", QTY_TAKEN: "" },
+  { srNo: "Total Quanity", INGREDIENT: "", MFG_LOT: "", PARTS_BY_WEIGHT: "", QTY_TAKEN: "" },
 ];
 
 const ir1FinalMixRows = (): IngredientTakenRow[] => [
@@ -250,7 +250,7 @@ const ir1FinalMixRows = (): IngredientTakenRow[] => [
     PARTS_BY_WEIGHT: "2 ml",
     QTY_TAKEN: "",
   },
-  { srNo: "TOTAL", INGREDIENT: "Total Quantity", MFG_LOT: "", PARTS_BY_WEIGHT: "", QTY_TAKEN: "" },
+  { srNo: "Total Quanity", INGREDIENT: "", MFG_LOT: "", PARTS_BY_WEIGHT: "", QTY_TAKEN: "" },
 ];
 
 const hemcoatPremixRows = (): IngredientTakenRow[] => [
@@ -259,7 +259,7 @@ const hemcoatPremixRows = (): IngredientTakenRow[] => [
   { srNo: 3, INGREDIENT: "HT", MFG_LOT: "", PARTS_BY_WEIGHT: "2.15", QTY_TAKEN: "" },
   { srNo: 4, INGREDIENT: "Kaolin", MFG_LOT: "", PARTS_BY_WEIGHT: "15.00", QTY_TAKEN: "" },
   { srNo: 5, INGREDIENT: "Nonox-D", MFG_LOT: "", PARTS_BY_WEIGHT: "0.05", QTY_TAKEN: "" },
-  { srNo: "TOTAL", INGREDIENT: "Total Quantity", MFG_LOT: "", PARTS_BY_WEIGHT: "", QTY_TAKEN: "" },
+  { srNo: "Total Quanity", INGREDIENT: "", MFG_LOT: "", PARTS_BY_WEIGHT: "", QTY_TAKEN: "" },
 ];
 
 const hemcoatFinalMixRows = (): IngredientTakenRow[] => [
@@ -272,7 +272,7 @@ const hemcoatFinalMixRows = (): IngredientTakenRow[] => [
     PARTS_BY_WEIGHT: "2 ml",
     QTY_TAKEN: "",
   },
-  { srNo: "TOTAL", INGREDIENT: "Total Quantity", MFG_LOT: "", PARTS_BY_WEIGHT: "", QTY_TAKEN: "" },
+  { srNo: "Total Quanity", INGREDIENT: "", MFG_LOT: "", PARTS_BY_WEIGHT: "", QTY_TAKEN: "" },
 ];
 
 const qualificationRows = (
@@ -424,24 +424,54 @@ const parseLocationAppliedRows = (rows: unknown): LocationAppliedRow[] =>
     };
   });
 
+export const POST_CURE_INGREDIENT_TOTAL_SR_LABEL = "Total Quanity";
+
+export const isIngredientTotalRow = (
+  srNo: string | number | undefined,
+  ingredient: string | undefined,
+): boolean => {
+  const sr = String(srNo ?? "").trim().toLowerCase();
+  const ing = String(ingredient ?? "").trim().toLowerCase();
+  return (
+    sr === "total" ||
+    sr === POST_CURE_INGREDIENT_TOTAL_SR_LABEL.toLowerCase() ||
+    ing === "total quantity"
+  );
+};
+
+const findSavedIngredientRow = (
+  savedRows: unknown[],
+  presetRow: { srNo: string | number; INGREDIENT: string },
+  index: number,
+): Record<string, unknown> => {
+  if (isIngredientTotalRow(presetRow.srNo, presetRow.INGREDIENT)) {
+    const totalSaved = savedRows.find((entry) => {
+      const rec = asRecord(entry);
+      if (!rec) return false;
+      const sr = str(pickField(rec, "srNo", "rowKey", "SR_NO"));
+      const ing = str(pickField(rec, "INGREDIENT", "ingredient"));
+      return isIngredientTotalRow(sr, ing);
+    });
+    return asRecord(totalSaved) ?? asRecord(savedRows[savedRows.length - 1]) ?? {};
+  }
+
+  const savedRow = savedRows.find((entry) => {
+    const rec = asRecord(entry);
+    if (!rec) return false;
+    const key = str(pickField(rec, "srNo", "rowKey", "SR_NO")).trim();
+    const presetKey = str(presetRow.srNo).trim();
+    return key && presetKey && key.toUpperCase() === presetKey.toUpperCase();
+  });
+  return asRecord(savedRow) ?? asRecord(savedRows[index]) ?? {};
+};
+
 const mergeIngredientQuantityRows = (
   preset: IngredientQuantityRow[],
   saved: unknown,
 ): IngredientQuantityRow[] => {
   const savedRows = asArray(saved);
   return preset.map((presetRow, index) => {
-    const savedRow =
-      asRecord(
-        savedRows.find((entry) => {
-          const rec = asRecord(entry);
-          if (!rec) return false;
-          const key = str(pickField(rec, "srNo", "rowKey", "SR_NO")).trim();
-          const presetKey = str(presetRow.srNo).trim();
-          return key && presetKey && key.toUpperCase() === presetKey.toUpperCase();
-        }),
-      ) ??
-      asRecord(savedRows[index]) ??
-      {};
+    const savedRow = findSavedIngredientRow(savedRows, presetRow, index);
     return {
       ...presetRow,
       MFG_LOT: str(pickField(savedRow, "MFG_LOT", "mfgLot", "Mfg Lot")) || presetRow.MFG_LOT,
@@ -456,18 +486,7 @@ const mergeIngredientTakenRows = (
 ): IngredientTakenRow[] => {
   const savedRows = asArray(saved);
   return preset.map((presetRow, index) => {
-    const savedRow =
-      asRecord(
-        savedRows.find((entry) => {
-          const rec = asRecord(entry);
-          if (!rec) return false;
-          const key = str(pickField(rec, "srNo", "rowKey", "SR_NO")).trim();
-          const presetKey = str(presetRow.srNo).trim();
-          return key && presetKey && key.toUpperCase() === presetKey.toUpperCase();
-        }),
-      ) ??
-      asRecord(savedRows[index]) ??
-      {};
+    const savedRow = findSavedIngredientRow(savedRows, presetRow, index);
     return {
       ...presetRow,
       MFG_LOT: str(pickField(savedRow, "MFG_LOT", "mfgLot", "Mfg Lot")) || presetRow.MFG_LOT,
@@ -900,10 +919,6 @@ const mapLocationAppliedRowsForApi = (rows: LocationAppliedRow[]) =>
 
 const ingredientRowKey = (srNo: string | number | undefined, index: number): string =>
   String(srNo ?? index + 1);
-
-const isIngredientTotalRow = (srNo: string | number | undefined, ingredient: string): boolean =>
-  String(srNo ?? "").trim().toUpperCase() === "TOTAL" ||
-  String(ingredient ?? "").trim().toLowerCase() === "total quantity";
 
 const mapIngredientQuantityRowsForApi = (rows: IngredientQuantityRow[]) =>
   rows.map((row, index) => {
@@ -1396,7 +1411,7 @@ export const recomputeIngredientTotal = <
   rows: T[],
   qtyKey: "QTY_TAKEN" | "QUANTITY",
 ): T[] => {
-  const totalIndex = rows.findIndex((row) => String(row.srNo).toUpperCase() === "TOTAL");
+  const totalIndex = rows.findIndex((row) => isIngredientTotalRow(row.srNo, row.INGREDIENT));
   if (totalIndex < 0) return rows;
   const sum = rows.reduce((acc, row, index) => {
     if (index === totalIndex) return acc;

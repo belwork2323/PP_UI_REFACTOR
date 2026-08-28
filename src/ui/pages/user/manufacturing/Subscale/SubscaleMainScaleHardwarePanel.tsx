@@ -5,29 +5,20 @@ type SubscaleMainScaleHardwarePanelProps = {
   values: SchemaFormValues;
   onChange: (values: SchemaFormValues) => void;
   batchType?: string | null;
-  actionLoading?: boolean;
-  isEditMode?: boolean;
-  onRequestSaveDraft?: () => void;
-  onRequestSubmit?: () => void;
+  canManageProcessTables?: boolean;
 };
 
 const SubscaleMainScaleHardwarePanel = ({
   values,
   onChange,
   batchType = "MAIN_SCALE",
-  actionLoading,
-  isEditMode,
-  onRequestSaveDraft,
-  onRequestSubmit,
+  canManageProcessTables = true,
 }: SubscaleMainScaleHardwarePanelProps) => (
   <SubscaleHardwareArticlePanel
     values={values}
     onChange={onChange}
     batchType={batchType}
-    actionLoading={actionLoading}
-    isEditMode={isEditMode}
-    onRequestSaveDraft={onRequestSaveDraft}
-    onRequestSubmit={onRequestSubmit}
+    canManageProcessTables={canManageProcessTables}
   />
 );
 

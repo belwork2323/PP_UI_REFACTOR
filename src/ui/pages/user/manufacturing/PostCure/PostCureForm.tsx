@@ -13,6 +13,7 @@ import type {
 import type { PostCureAddedMotor } from "../../../../../hooks/user/manufacturing/postCureFlowConfig";
 import RemoveProcessButton from "../../../../components/common/RemoveProcessButton";
 import PremixStatusChip from "../RawMaterial/components/PremixStatusChip";
+import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
 import ViewStatusButton from "../../../../components/common/ViewStatusButton";
 import FinalApprovalMotorDialog, {
   areAllMotorsApproved,
@@ -272,15 +273,11 @@ const PostCureForm = ({
                 >
                   {S.SAVE_MOTOR_DRAFT(activeMotorEntry.motorId)}
                 </Button>
-                <Button
-                  variant="contained"
-                  size="small"
+                <SubmitForApprovalButton
                   disabled={actionLoading || activeMotorLocked}
                   onClick={() => onSubmitMotor?.(activeMotorEntry.motorId)}
-                  sx={{ textTransform: "none", fontWeight: 700 }}
-                >
-                  {S.SUBMIT_MOTOR(activeMotorEntry.motorId)}
-                </Button>
+                  label={S.SUBMIT_MOTOR(activeMotorEntry.motorId)}
+                />
               </>
             ) : null}
             <ViewStatusButton

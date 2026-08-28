@@ -8,6 +8,187 @@ import { getSharedTheme } from "@app/theme/custom_themes/shared/shared_theme";
 import { getBatchListShellTheme, getFilterToggleSx } from "@app/theme/custom_themes/shared/batchListShell_theme";
 import { getTokens } from "@app/theme/tokens/semantics";
 
+export type AdminManagementTableThemeParams = {
+  mode: "light" | "dark";
+  accentBlue: string;
+  accentBlueDark: string;
+  cardBg: string;
+  textPrimary: string;
+  textSecondary: string;
+  textDisabled: string;
+  skeletonBase: object;
+  cellVariants?: Record<string, object>;
+};
+
+/** Shared edit/delete action buttons for admin management list tables. */
+export const getAdminManagementTableCellActions = (
+  mode: "light" | "dark",
+  accentBlue: string,
+  accentBlueMuted: string,
+) => {
+  const isDark = mode === "dark";
+  return {
+    actionsBox: {
+      display: "flex",
+      gap: 0.5,
+      justifyContent: "flex-end",
+      alignItems: "center",
+      flexWrap: "wrap" as const,
+    },
+    editButton: {
+      color: accentBlue,
+      bgcolor: accentBlueMuted,
+      borderRadius: general.borderRadius.sm,
+      width: 28,
+      height: 28,
+      border: `1px solid ${alpha(accentBlue, 0.14)}`,
+      "&:hover": { bgcolor: alpha(accentBlue, 0.16) },
+    },
+    editIcon: { fontSize: 14 },
+    deleteButton: {
+      color: colors.error.main,
+      bgcolor: alpha(colors.error.main, isDark ? 0.1 : 0.06),
+      borderRadius: general.borderRadius.sm,
+      width: 28,
+      height: 28,
+      border: `1px solid ${alpha(colors.error.main, 0.16)}`,
+      "&:hover": { bgcolor: alpha(colors.error.main, 0.14) },
+    },
+    deleteIcon: { fontSize: 14 },
+  };
+};
+
+/** Shared list-table chrome for User / Project / Batch management pages. */
+export const getAdminManagementTableTheme = ({
+  mode,
+  accentBlue,
+  accentBlueDark,
+  cardBg,
+  textPrimary,
+  textSecondary,
+  textDisabled,
+  skeletonBase,
+  cellVariants = {},
+}: AdminManagementTableThemeParams) => {
+  const isDark = mode === "dark";
+  const tableHeaderBg = isDark
+    ? `linear-gradient(180deg, ${alpha(accentBlue, 0.26)} 0%, ${alpha(accentBlueDark, 0.18)} 100%)`
+    : `linear-gradient(180deg, ${alpha(accentBlue, 0.13)} 0%, ${alpha(accentBlueDark, 0.07)} 100%)`;
+  const tableBorderColor = isDark ? alpha(accentBlue, 0.2) : alpha(accentBlue, 0.13);
+  const tableBorder = `1px solid ${tableBorderColor}`;
+  const tableBodyBg = isDark ? cardBg : "#fff";
+
+  const tableBodyCellBase = {
+    fontSize: "0.8rem",
+    fontWeight: 500,
+    py: 0.65,
+    px: 1.5,
+    color: textPrimary,
+    border: tableBorder,
+    bgcolor: tableBodyBg,
+    verticalAlign: "middle" as const,
+  };
+
+  const variantCells = Object.fromEntries(
+    Object.entries(cellVariants).map(([key, extra]) => [key, { ...tableBodyCellBase, ...extra }]),
+  );
+
+  return {
+    tableRoot: {
+      borderCollapse: "collapse" as const,
+      width: "100%",
+    },
+    paper: {
+      bgcolor: cardBg,
+      border: `1px solid ${alpha(accentBlue, isDark ? 0.22 : 0.14)}`,
+      borderRadius: general.borderRadius.lg,
+      boxShadow: isDark
+        ? `0 8px 32px ${alpha("#000", 0.35)}`
+        : `0 4px 24px ${alpha(accentBlue, 0.08)}, 0 1px 3px ${alpha(accentBlueDark, 0.05)}`,
+      overflow: "hidden",
+    },
+    headerRow: {
+      background: tableHeaderBg,
+    },
+    headerCell: {
+      fontSize: "0.68rem",
+      fontWeight: fonts.weight.bold,
+      color: isDark ? alpha("#fff", 0.95) : accentBlueDark,
+      letterSpacing: "0.08em",
+      textTransform: "uppercase" as const,
+      borderBottom: tableBorder,
+      borderRight: tableBorder,
+      borderTop: tableBorder,
+      borderLeft: tableBorder,
+      py: 1,
+      px: 1.5,
+      bgcolor: "transparent",
+      whiteSpace: "nowrap" as const,
+      lineHeight: 1.35,
+      verticalAlign: "middle" as const,
+    },
+    headerCellActions: {
+      textAlign: "right" as const,
+      pr: 2.5,
+    },
+    row: {
+      bgcolor: tableBodyBg,
+      "&:hover": {
+        bgcolor: isDark ? alpha(accentBlue, 0.08) : alpha(accentBlue, 0.04),
+      },
+      transition: "background 0.15s ease",
+    },
+    cell: tableBodyCellBase,
+    cellActionsWrapper: {
+      ...tableBodyCellBase,
+      py: 0.5,
+      textAlign: "right" as const,
+      pr: 2,
+    },
+    bodyText: {
+      fontSize: "0.8rem",
+      fontWeight: 500,
+      color: textPrimary,
+      lineHeight: 1.35,
+    },
+    emptyCell: {
+      textAlign: "center" as const,
+      py: 6,
+    },
+    emptyText: {
+      fontSize: fonts.size.sm,
+      color: textDisabled,
+    },
+    emptyIcon: {
+      fontSize: 40,
+      mb: spacing.sm,
+      display: "block",
+      mx: "auto",
+      opacity: 0.35,
+      color: accentBlue,
+    },
+    divider: {
+      borderColor: tableBorderColor,
+    },
+    pagination: {
+      px: 1.5,
+      py: 0.35,
+      color: textSecondary,
+      bgcolor: isDark ? alpha(accentBlue, 0.05) : alpha(accentBlue, 0.025),
+      borderTop: tableBorder,
+      "& .MuiTablePagination-select": { color: textPrimary },
+      "& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows": {
+        fontSize: fonts.size.xs,
+      },
+      "& .MuiSvgIcon-root": { color: accentBlue },
+    },
+    skeletonRow: skeletonBase,
+    skeletonRowDefault: { ...skeletonBase, width: "80%" },
+    skeletonRowAction: { ...skeletonBase, width: 60 },
+    ...variantCells,
+  };
+};
+
 const getAdminModalTheme = (
   mode: "light" | "dark",
   tokens: { accentBlue: string; accentBlueDark: string }

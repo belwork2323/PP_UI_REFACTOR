@@ -12,8 +12,6 @@ import {
   mapPostCureDetailsToFormState,
   mapPostCureFormStateToPayload,
   mapPostCureMotorStatusesFromApi,
-  normalizePostCureMotorStatus,
-  normalizePostCureMotorSubmissionType,
   type PostCureFormState,
   type PostCureMotorSession,
   type PostCureMotorStatusMeta,
@@ -152,25 +150,36 @@ export const usePostCureHook = () => {
   };
 
   const openFormWithResolvedData = useCallback(
-    async (batch: PostCureBatch, editMode: boolean) => {
+    async (
+      batch: PostCureBatch,
+      editMode: boolean,
+      options?: { silent?: boolean; preserveActiveMotorId?: string },
+    ) => {
+      if (!batch.batchId) {
+        showAlert(STRINGS.MANUFACTURING.POST_CURE.BATCH_ID_MISSING, "error");
+        return;
+      }
+
+      const silent = Boolean(options?.silent);
+      const preserveActiveMotorId = options?.preserveActiveMotorId;
       const shouldFetchDetails =
+        silent ||
         editMode ||
         isManufacturingContinueFillingStatus(batch.pcStatus) ||
-        parseStatus(batch.pcStatus) === parseStatus(PC_STATUS.REJECTED);
+        parseStatus(batch.pcStatus) === parseStatus(PC_STATUS.REJECTED) ||
+        Boolean(String(batch.formId ?? "").trim());
 
       let nextBatch = batch;
       let nextFormData = createDefaultPostCureFormState();
       let detailsResponse: any = null;
 
-      setLoadingFormDetails(true);
+      if (!silent) setLoadingFormDetails(true);
       try {
-        if (batch.batchId) {
-          try {
-            const batchDetails = await batchManagementController.getBatchById(batch.batchId);
-            nextBatch = enrichPostCureBatchFromDetails(batch, batchDetails);
-          } catch (error) {
-            console.error("Unable to resolve post-cure batch motor details", error);
-          }
+        try {
+          const batchDetails = await batchManagementController.getBatchById(batch.batchId);
+          nextBatch = enrichPostCureBatchFromDetails(batch, batchDetails);
+        } catch (error) {
+          console.error("Unable to resolve post-cure batch motor details", error);
         }
 
         const gate = resolvePreviousStageApprovedUnits({
@@ -187,13 +196,15 @@ export const usePostCureHook = () => {
             showAlert(STRINGS.MANUFACTURING.POST_CURE.SUB_DEPARTMENT_MISSING, "error");
             return;
           }
-          if (!batch.formId) {
+
+          const formId = String(batch.formId ?? nextBatch.formId ?? "").trim();
+          if (!formId) {
             showAlert(STRINGS.MANUFACTURING.POST_CURE.FORM_ID_MISSING, "error");
             return;
           }
 
           detailsResponse = await postCureController.fetchFormDetails({
-            formId: batch.formId,
+            formId,
           });
 
           if (!detailsResponse?.success || !detailsResponse?.data) {
@@ -205,7 +216,11 @@ export const usePostCureHook = () => {
             return;
           }
 
-          nextBatch = { ...nextBatch, formId: detailsResponse.data.formId || batch.formId };
+          nextBatch = {
+            ...nextBatch,
+            formId: detailsResponse.data.formId || formId,
+            pcStatus: detailsResponse.data.status ?? nextBatch.pcStatus,
+          };
           nextFormData = mapPostCureDetailsToFormState(detailsResponse.data);
         }
 
@@ -227,17 +242,21 @@ export const usePostCureHook = () => {
             ? nextAddedMotors
             : resolvePostCureMotorsFromBatch(nextBatch);
 
+        const nextActiveMotorId =
+          preserveActiveMotorId &&
+          motorsForTabs.some((motor) => motor.motorId === preserveActiveMotorId)
+            ? preserveActiveMotorId
+            : pickFirstPreviousStageEnabledMotorId(
+                motorsForTabs.map((motor) => motor.motorId),
+                gate,
+              );
+
         setActiveBatch(nextBatch);
         setIsEditMode(editMode);
         setFormData(nextFormData);
         setInitialSnapshot(JSON.stringify(nextFormData));
         setAddedMotors(motorsForTabs);
-        setActiveMotorId(
-          pickFirstPreviousStageEnabledMotorId(
-            motorsForTabs.map((motor) => motor.motorId),
-            gate,
-          ),
-        );
+        setActiveMotorId(nextActiveMotorId);
         setMotorStatusById(
           detailsResponse?.data
             ? mapPostCureMotorStatusesFromApi(detailsResponse.data)
@@ -248,10 +267,12 @@ export const usePostCureHook = () => {
                 ]),
               ),
         );
-        clearSetupDrafts();
+        if (!silent) {
+          clearSetupDrafts();
+        }
         setView("form");
       } finally {
-        setLoadingFormDetails(false);
+        if (!silent) setLoadingFormDetails(false);
       }
     },
     [showAlert, subDepartmentId, clearSetupDrafts, user?.allSubDepartments],
@@ -535,54 +556,15 @@ export const usePostCureHook = () => {
           return false;
         }
 
-        const nextFormId = response.data?.formId ?? activeBatch.formId ?? null;
-        setActiveBatch((prev) =>
-          prev
-            ? {
-                ...prev,
-                formId: nextFormId,
-                ...(intent === "draft"
-                  ? { pcStatus: PC_STATUS.IN_PROGRESS }
-                  : {}),
-              }
-            : prev,
-        );
-        setInitialSnapshot(formSnapshot);
+        const nextFormId = String(response.data?.formId ?? activeBatch.formId ?? "").trim();
+        const refreshedBatch: PostCureBatch = {
+          ...activeBatch,
+          formId: nextFormId || activeBatch.formId,
+          pcStatus: response.data?.status ?? activeBatch.pcStatus,
+        };
+
+        setActiveBatch(refreshedBatch);
         setHasSavedDraft(true);
-
-        setMotorStatusById((prev) => {
-          const nextStatus: PostCureMotorSubmissionStatus =
-            intent === "draft" ? "IN_PROGRESS" : "WAITING_FOR_APPROVAL";
-          const updated: Record<string, PostCureMotorStatusMeta> = {
-            ...prev,
-            [motorId]: {
-              ...prev[motorId],
-              motorSubmissionType,
-              motorSubmissionStatus: nextStatus,
-            },
-          };
-
-          const responseStatuses =
-            response.data?.motorStatuses ??
-            (response.data as { motorStatuses?: unknown[] } | undefined)?.motorStatuses;
-          if (Array.isArray(responseStatuses)) {
-            responseStatuses.forEach((entry: any) => {
-              const id = String(entry?.motorId ?? "").trim();
-              if (!id) return;
-              updated[id] = {
-                ...updated[id],
-                motorSubmissionType:
-                  normalizePostCureMotorSubmissionType(entry?.motorSubmissionType) ??
-                  updated[id]?.motorSubmissionType,
-                motorSubmissionStatus: normalizePostCureMotorStatus(
-                  entry?.motorSubmissionStatus ?? updated[id]?.motorSubmissionStatus,
-                ),
-              };
-            });
-          }
-
-          return updated;
-        });
 
         showAlert(
           intent === "draft"
@@ -591,6 +573,23 @@ export const usePostCureHook = () => {
           "success",
           { autoCloseMs: 2200 },
         );
+
+        if (nextFormId) {
+          const statusForBanner = String(
+            response.data?.status ?? activeBatch.pcStatus ?? "IN_PROGRESS",
+          )
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, "_");
+          const stillRejectedEdit = statusForBanner === "REJECTED";
+
+          await openFormWithResolvedData(refreshedBatch, stillRejectedEdit, {
+            silent: true,
+            preserveActiveMotorId: motorId,
+          });
+        } else {
+          setInitialSnapshot(formSnapshot);
+        }
 
         return true;
       } finally {
@@ -602,6 +601,7 @@ export const usePostCureHook = () => {
       formData,
       formSnapshot,
       motorStatusById,
+      openFormWithResolvedData,
       previousStageGate,
       resolveRootOperationFields,
       showAlert,

@@ -3,7 +3,6 @@ import { Box, Typography, Chip, Button, Tooltip, IconButton } from "@mui/materia
 
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
-import UserActions from "@ui/components/common/UserActions";
 import AdminManagementDataTable from "@ui/components/custom/admin/AdminManagementDataTable";
 import type { AdminManagementColumn } from "@ui/components/custom/admin/AdminManagementDataTable";
 
@@ -188,15 +187,7 @@ const BatchListTable = ({
           const sheetCompleted = isIdentificationSheetCompleted(batch);
           const canDelete = canDeleteAdminBatch(batch);
           return (
-            <Box
-              sx={{
-                display: "flex",
-                gap: 0.5,
-                alignItems: "center",
-                flexWrap: "wrap",
-                justifyContent: "flex-end",
-              }}
-            >
+            <Box sx={tableCell.actionsBox}>
               {/* {sheetDraft && onCompleteImplementation && (
                 <Tooltip title={TA.COMPLETE_IMPLEMENTATION_TOOLTIP}>
                   <Button

@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { Box, Button, CircularProgress, Stack } from "@mui/material";
 import ConfirmAlertDialog from "../../../../components/common/ConfirmAlertDialog";
+import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
 import WorkflowFormOpeningLoader from "../../../../components/common/WorkflowFormOpeningLoader";
 import CasePrepList from "./CasePreparationList";
 import CasePreparationForm from "./CasePreparationForm";
@@ -147,13 +148,13 @@ const CasePreparationPage = () => {
               >
                 {actionStrings.SAVE_DRAFT}
               </Button>
-              <Button
-                variant="contained"
+              <SubmitForApprovalButton
                 disabled={actionLoading}
                 onClick={() => setSubmitConfirmOpen(true)}
-              >
-                {isEditMode ? actionStrings.RESUBMIT_APPROVAL : actionStrings.SUBMIT_APPROVAL}
-              </Button>
+                label={
+                  isEditMode ? actionStrings.RESUBMIT_APPROVAL : actionStrings.SUBMIT_APPROVAL
+                }
+              />
             </Stack>
           ) : null}
         </>

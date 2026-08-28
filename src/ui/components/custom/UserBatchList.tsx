@@ -418,7 +418,7 @@ const UserBatchList = ({
                   </TableCell>
                 ))}
                 {showActionCol && (
-                  <TableCell sx={{ ...thSx, textAlign: "center" }}>
+                  <TableCell sx={{ ...thSx, textAlign: "center", minWidth: 200, whiteSpace: "nowrap" }}>
                     {STRINGS.USER_BATCH_LIST.COL_ACTION}
                   </TableCell>
                 )}
@@ -494,13 +494,14 @@ const UserBatchList = ({
 
                     {/* Action cell */}
                     {showActionCol && (
-                      <TableCell sx={{ ...tdSx, textAlign: "center" }}>
+                      <TableCell sx={{ ...tdSx, textAlign: "center", minWidth: 200, whiteSpace: "nowrap" }}>
                         <Box
                           sx={{
                             display: "flex",
                             justifyContent: "center",
                             alignItems: "center",
                             width: "100%",
+                            flexWrap: "nowrap",
                           }}
                         >
                           {renderAction(row)}

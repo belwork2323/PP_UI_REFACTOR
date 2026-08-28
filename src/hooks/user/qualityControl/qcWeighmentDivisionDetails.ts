@@ -1,4 +1,5 @@
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import { shouldPreserveQcDivisionFileRefsOnSeed } from "./qcDivisionFileUpload";
 import { resolveManufacturingDivisionDetailsPayload } from "./qcHardwareDivisionDetails";
 import {
   createInitialWeighmentValues,
@@ -164,6 +165,7 @@ export const applyWeighmentDivisionDetailsSeed = (
   const next: SchemaFormValues = { ...current };
   Object.entries(seeded).forEach(([key, value]) => {
     const existing = next[key];
+    if (shouldPreserveQcDivisionFileRefsOnSeed(existing, options?.onlyIfEmpty)) return;
     const empty =
       existing == null ||
       existing === "" ||

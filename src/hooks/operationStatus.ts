@@ -197,6 +197,19 @@ export const isManufacturingViewOnlyStatus = (status: string | null | undefined)
   );
 };
 
+/** Subscale — load or delete process tables while filling or after rejection. */
+export const canSubscaleManageProcessTables = (
+  status: string | null | undefined,
+): boolean => {
+  const api = toApiStatusEnum(status);
+  return (
+    !api ||
+    api === "TO_BE_INITIATED" ||
+    api === "IN_PROGRESS" ||
+    api === "REJECTED"
+  );
+};
+
 /** Normalize list request `status` array values to uppercase API enums. */
 export function normalizeListStatusFilter(status: string[] | undefined): string[] | undefined {
   if (!status?.length) return status;

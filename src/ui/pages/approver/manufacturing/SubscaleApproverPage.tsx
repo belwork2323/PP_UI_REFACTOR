@@ -41,6 +41,7 @@ const SubscaleApproverPage = () => {
       department="manufacturing"
       subDepartment="subscale"
       items={items}
+      statusField="ssStatus"
       statusMeta={SS_STATUS_META}
       onViewDetails={handleViewDetails}
       allowViewDetailsWhenApproved

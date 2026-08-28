@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import {
   Box,
+  CircularProgress,
   MenuItem,
   Stack,
   Table,
@@ -35,10 +36,8 @@ import {
   type ProcessParticularRow,
 } from "../../../../../hooks/user/manufacturing/subscaleBatchConfig";
 import type { SchemaFormValues } from "../../../../../schema-engine";
-import SubscaleHardwareArticlePanel, {
-  sectionCardSx,
-  sectionHeaderSx,
-} from "./SubscaleHardwareArticlePanel";
+import { sectionCardSx, sectionHeaderSx } from "./utils/subscaleHardwareTableStyles";
+import { SubscaleProcessParticularRow } from "./components/SubscaleTableCells";
 import {
   fetchMixingCycleDetailsApi,
   type MixingCycleMasterItem,
@@ -130,10 +129,6 @@ type SubscaleSubscaleBatchPanelProps = {
   values: SchemaFormValues;
   onChange: (values: SchemaFormValues) => void;
   batchDetails: any;
-  actionLoading?: boolean;
-  isEditMode?: boolean;
-  onRequestSaveDraft?: () => void;
-  onRequestSubmit?: () => void;
 };
 
 const normalizeSubBatchType = (value: unknown) =>
@@ -162,10 +157,6 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
   values,
   onChange,
   batchDetails,
-  actionLoading,
-  isEditMode,
-  onRequestSaveDraft,
-  onRequestSubmit,
 }) => {
   const mixingCyclesRaw = values[SUBSCALE_BATCH_FIELDS.MIXING_CYCLES];
   const mixingCycles = useMemo(
@@ -173,7 +164,6 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
     [mixingCyclesRaw],
   );
   const isExperimental = isExperimentalSubscaleBatch(batchDetails);
-  const batchType = batchDetails?.batchType ?? batchDetails?.batch_type ?? null;
 
   const [motorStageOptions, setMotorStageOptions] = useState<MotorStageOption[]>([]);
   const [motorStagesLoading, setMotorStagesLoading] = useState(false);
@@ -183,9 +173,15 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
   const [mixingCyclesLoadingByStage, setMixingCyclesLoadingByStage] = useState<
     Record<string, boolean>
   >({});
+  const [mixingCycleDetailsLoadingByIndex, setMixingCycleDetailsLoadingByIndex] = useState<
+    Record<number, boolean>
+  >({});
 
   const valuesRef = useRef(values);
+  const mixingCycleDetailsRequestIdRef = useRef<Record<number, number>>({});
+  const mixingCyclesRef = useRef(mixingCycles);
   valuesRef.current = values;
+  mixingCyclesRef.current = mixingCycles;
 
   const patchValues = useCallback((patch: SchemaFormValues) => {
     const next = { ...valuesRef.current, ...patch };
@@ -338,8 +334,13 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
       const currentCycle = currentCycles[cycleIndex];
       if (hasMixingCycleParticulars(currentCycle)) return;
 
+      const requestId = (mixingCycleDetailsRequestIdRef.current[cycleIndex] ?? 0) + 1;
+      mixingCycleDetailsRequestIdRef.current[cycleIndex] = requestId;
+      setMixingCycleDetailsLoadingByIndex((prev) => ({ ...prev, [cycleIndex]: true }));
+
       try {
         const resData = await fetchMixingCycleDetailsDeduped(code);
+        if (mixingCycleDetailsRequestIdRef.current[cycleIndex] !== requestId) return;
         if (!resData || typeof resData !== "object") return;
 
         const { premixOperations, finalMixOperations } = resolveMixingCycleOperations(
@@ -372,6 +373,10 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
         updateMixingCycles(next);
       } catch (error) {
         console.error("Failed to fetch mixing cycle details:", error);
+      } finally {
+        if (mixingCycleDetailsRequestIdRef.current[cycleIndex] === requestId) {
+          setMixingCycleDetailsLoadingByIndex((prev) => ({ ...prev, [cycleIndex]: false }));
+        }
       }
     },
     [updateMixingCycles],
@@ -436,6 +441,9 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
       };
     });
     updateMixingCycles(next);
+    mixingCycleDetailsRequestIdRef.current[cycleIndex] =
+      (mixingCycleDetailsRequestIdRef.current[cycleIndex] ?? 0) + 1;
+    setMixingCycleDetailsLoadingByIndex((prev) => ({ ...prev, [cycleIndex]: false }));
     if (stage) void fetchMixingCyclesForStage(stage);
   };
 
@@ -461,22 +469,26 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
     if (code) void applyMixingCycleDetails(cycleIndex, code, stage);
   };
 
-  const updateProcessField = (
-    cycleIndex: number,
-    sectionKey: "premixParticulars" | "finalMixParticulars",
-    rowIndex: number,
-    field: keyof ProcessParticularRow,
-    raw: string,
-  ) => {
-    const next = mixingCycles.map((cycle, index) => {
-      if (index !== cycleIndex) return cycle;
-      const rows = (cycle[sectionKey] || []).map((row, rIndex) =>
-        rIndex === rowIndex ? { ...row, [field]: raw } : row,
-      );
-      return { ...cycle, [sectionKey]: rows };
-    });
-    updateMixingCycles(next);
-  };
+  const updateProcessField = useCallback(
+    (
+      cycleIndex: number,
+      sectionKey: "premixParticulars" | "finalMixParticulars",
+      rowIndex: number,
+      field: keyof ProcessParticularRow,
+      raw: string,
+    ) => {
+      const currentCycles = mixingCyclesRef.current;
+      const next = currentCycles.map((cycle, index) => {
+        if (index !== cycleIndex) return cycle;
+        const rows = (cycle[sectionKey] || []).map((row, rIndex) =>
+          rIndex === rowIndex ? { ...row, [field]: raw } : row,
+        );
+        return { ...cycle, [sectionKey]: rows };
+      });
+      updateMixingCycles(next);
+    },
+    [updateMixingCycles],
+  );
 
   const qualificationStageLabel = useMemo(() => {
     const stage = mixingCycles[0]?.stage || batchDetails?.mixingCycle?.motorStage;
@@ -515,19 +527,19 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell sx={uniformTableHeaderCellSx(SUBSCALE_BRAND.ss, SUBSCALE_BRAND.ssLight)}>
+              <TableCell sx={uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight)}>
                 {PROCESS_S.COL_OPERATION}
               </TableCell>
-              <TableCell sx={{ ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ss, SUBSCALE_BRAND.ssLight), width: "18%" }}>
+              <TableCell sx={{ ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight), width: "18%" }}>
                 {PROCESS_S.COL_ROTATION}
               </TableCell>
-              <TableCell sx={{ ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ss, SUBSCALE_BRAND.ssLight), width: "18%" }}>
+              <TableCell sx={{ ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight), width: "18%" }}>
                 {PROCESS_S.COL_TIME}
               </TableCell>
-              <TableCell sx={{ ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ss, SUBSCALE_BRAND.ssLight), width: "18%" }}>
+              <TableCell sx={{ ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight), width: "18%" }}>
                 {PROCESS_S.COL_TEMP}
               </TableCell>
-              <TableCell sx={{ ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ss, SUBSCALE_BRAND.ssLight), width: "18%" }}>
+              <TableCell sx={{ ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight), width: "18%" }}>
                 {PROCESS_S.COL_VACUUM}
               </TableCell>
             </TableRow>
@@ -550,44 +562,16 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
               </TableRow>
             ) : (
               rows.map((row, rowIndex) => (
-                <TableRow key={`${sectionKey}-${row.operationId}-${rowIndex}`}>
-                  <TableCell
-                    sx={{
-                      ...uniformTableBodyCellSx({ border: SUBSCALE_BRAND.border, text: SUBSCALE_BRAND.text }),
-                      fontSize: "0.78rem",
-                      fontWeight: 600,
-                    }}
-                  >
-                    {row.operation}
-                  </TableCell>
-                  {(
-                    [
-                      ["rpm", "RPM"],
-                      ["time", "Time"],
-                      ["temp", "Temp"],
-                      ["vacuum", "Vacuum"],
-                    ] as const
-                  ).map(([field, placeholder]) => (
-                    <TableCell
-                      key={field}
-                      sx={uniformTableBodyCellSx({ border: SUBSCALE_BRAND.border, text: SUBSCALE_BRAND.text })}
-                    >
-                      <FormInput
-                        value={row[field] ?? ""}
-                        placeholder={placeholder}
-                        onChange={(event) =>
-                          updateProcessField(
-                            cycleIndex,
-                            sectionKey,
-                            rowIndex,
-                            field,
-                            event.target.value,
-                          )
-                        }
-                      />
-                    </TableCell>
-                  ))}
-                </TableRow>
+                <SubscaleProcessParticularRow
+                  key={`${sectionKey}-${row.operationId}-${rowIndex}`}
+                  row={row}
+                  rowIndex={rowIndex}
+                  cycleIndex={cycleIndex}
+                  sectionKey={sectionKey}
+                  onFieldChange={updateProcessField}
+                  border={SUBSCALE_BRAND.border}
+                  text={SUBSCALE_BRAND.text}
+                />
               ))
             )}
           </TableBody>
@@ -671,6 +655,7 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
               const stage = String(cycle.stage ?? "").trim();
               const cycleOptions = mixingCycleOptionsByStage[stage] ?? [];
               const cyclesLoading = Boolean(mixingCyclesLoadingByStage[stage]);
+              const particularsLoading = Boolean(mixingCycleDetailsLoadingByIndex[cycleIndex]);
               const mixingCyclePlaceholder = !stage
                 ? S.MIXING_CYCLE_SELECT_STAGE_FIRST
                 : cyclesLoading
@@ -797,18 +782,47 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
                       )}
                     </Stack>
 
-                    {renderParticularsTable(
-                      "Premix Cycle Process Particulars",
-                      cycle.premixParticulars || cycle.processParticulars || [],
-                      cycleIndex,
-                      "premixParticulars",
-                    )}
+                    {particularsLoading ? (
+                      <Box
+                        sx={{
+                          minHeight: 220,
+                          display: "flex",
+                          flexDirection: "column",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          gap: 1.5,
+                          borderRadius: 1.5,
+                          border: `1px solid ${SUBSCALE_BRAND.border}`,
+                          background: "rgba(21,101,192,0.04)",
+                        }}
+                      >
+                        <CircularProgress size={36} sx={{ color: SUBSCALE_BRAND.ss }} />
+                        <Typography
+                          sx={{
+                            fontSize: "0.8rem",
+                            fontWeight: 600,
+                            color: SUBSCALE_BRAND.text,
+                          }}
+                        >
+                          {S.PROCESS_PARTICULARS_LOADING}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <>
+                        {renderParticularsTable(
+                          "Premix Cycle Process Particulars",
+                          cycle.premixParticulars || cycle.processParticulars || [],
+                          cycleIndex,
+                          "premixParticulars",
+                        )}
 
-                    {renderParticularsTable(
-                      "Final Mix Cycle Process Particulars",
-                      cycle.finalMixParticulars || [],
-                      cycleIndex,
-                      "finalMixParticulars",
+                        {renderParticularsTable(
+                          "Final Mix Cycle Process Particulars",
+                          cycle.finalMixParticulars || [],
+                          cycleIndex,
+                          "finalMixParticulars",
+                        )}
+                      </>
                     )}
                   </Box>
                 </Box>
@@ -817,18 +831,8 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
           </Stack>
         </Box>
       </Box>
-
-      <SubscaleHardwareArticlePanel
-        values={values}
-        onChange={onChange}
-        batchType={batchType}
-        actionLoading={actionLoading}
-        isEditMode={isEditMode}
-        onRequestSaveDraft={onRequestSaveDraft}
-        onRequestSubmit={onRequestSubmit}
-      />
     </Stack>
   );
 };
 
-export default SubscaleSubscaleBatchPanel;
+export default React.memo(SubscaleSubscaleBatchPanel);

@@ -23,6 +23,7 @@ import {
   type SubscaleDetailsResponse,
 } from "./subscaleApiPayloadMapper";
 import { SUBSCALE_BATCH_FIELDS } from "../../../hooks/user/manufacturing/subscaleBatchConfig";
+import { stableStringify } from "../../../utils/workflowFormSnapshot";
 
 const SS = STRINGS.MANUFACTURING.SUBSCALE;
 const HW = SS.HARDWARE;
@@ -398,6 +399,12 @@ export const mapSubscaleFormStateToPayload = (
 ): SubscaleApiPayloadBody =>
   mapSubscaleFormValuesToApiPayload(formState.schemaFormValues || {}, batchType);
 
+/** Stable API payload snapshot for dirty tracking (baseline from details vs current edits). */
+export const buildSubscalePayloadSnapshot = (
+  formState: SubscaleFormState,
+  batchType?: string | null,
+): string => stableStringify(mapSubscaleFormStateToPayload(formState, batchType));
+
 export const hasAnySubscaleValue = (form: SubscaleFormState) => {
   const values = form.schemaFormValues ?? {};
   return Object.entries(values).some(([key, value]) => {
@@ -415,12 +422,16 @@ export class SubscaleSubmitResponseModel {
   formId: string;
   batchId: string;
   status: string;
+  batchStatus: string;
+  formSubmissionType: string;
 
   constructor(data: any = {}) {
     const payload = data?.data ?? data;
     this.formId = String(payload?.formId ?? payload?.subscaleProcessingId ?? "");
     this.batchId = String(payload?.batchId ?? "");
     this.status = String(payload?.formStatus ?? payload?.status ?? "");
+    this.batchStatus = String(payload?.batchStatus ?? payload?.batchStageStatus ?? "");
+    this.formSubmissionType = String(payload?.formSubmissionType ?? "");
   }
 
   static fromApi(data: any) {

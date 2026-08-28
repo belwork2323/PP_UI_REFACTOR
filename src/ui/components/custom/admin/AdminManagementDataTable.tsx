@@ -25,6 +25,8 @@ export type AdminManagementColumn<T> = {
 
 export type AdminManagementTableTheme = {
   paper?: object;
+  tableRoot?: object;
+  headerRow?: object;
   headerCell?: object;
   headerCellActions?: object;
   row?: object;
@@ -71,9 +73,9 @@ const AdminManagementDataTable = <T,>({
   return (
     <Paper elevation={0} sx={table.paper}>
       <TableContainer>
-        <Table>
+        <Table size="small" sx={{ ...(table.tableRoot ?? {}), borderSpacing: 0 }}>
           <TableHead>
-            <TableRow>
+            <TableRow sx={table.headerRow}>
               {columns.map((col) => (
                 <TableCell
                   key={col.id}

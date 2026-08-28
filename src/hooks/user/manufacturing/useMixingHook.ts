@@ -16,19 +16,20 @@ import {
   createEmptyPremixEntry,
   hasMixCardValue,
   isMixCardEditable,
-  mapMixingDetailsForDisplay,
   mapMixingDetailsToFormState,
   mapMixingFormStateToPayload,
   mergeProcessParticularsWithOperations,
   resolveApiMixingCycleDisplayValue,
   resolveMixingCycleOperations,
+  type FinalMixEntry,
   type MixCardStageType,
   type MixCardStatusMeta,
   type MixCardSubmissionStatus,
   type MixingFormState,
+  type PremixEntry,
 } from "../../../data/models/user/MixingFormModel";
 import type { PremixSubmissionType } from "../../../data/models/user/RawMaterialPreparationModel";
-import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
+import { isManufacturingContinueFillingStatus } from "../../operationStatus";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import {
   isPremixEnabledByPreviousStage,
@@ -48,8 +49,77 @@ type MixingBatch = {
   [key: string]: any;
 };
 
-const MX_STATUS = MANUFACTURING_STATUS;
-const parseStatus = (status: string | undefined) => String(status ?? "").toLowerCase();
+const resolveMixFormId = (batch: MixingBatch | null | undefined) =>
+  String(batch?.formId ?? "").trim();
+
+const mergeMixingFormPreservingLocalInput = (
+  previous: MixingFormState,
+  next: MixingFormState,
+): MixingFormState => {
+  const pickCard = <T extends PremixEntry | FinalMixEntry>(
+    cardNo: string,
+    stageType: MixCardStageType,
+    localCards: T[],
+    apiCards: T[],
+    cardNoKey: keyof T,
+  ): T | undefined => {
+    const normalizedNo = cardNo.trim();
+    const local = localCards.find((card) => String(card[cardNoKey] ?? "").trim() === normalizedNo);
+    const api = apiCards.find((card) => String(card[cardNoKey] ?? "").trim() === normalizedNo);
+    if (!local) return api;
+    if (!api) return local;
+
+    const apiForm: MixingFormState =
+      stageType === "PREMIX"
+        ? { premixCards: [api as PremixEntry], finalMixCards: [] }
+        : { premixCards: [], finalMixCards: [api as FinalMixEntry] };
+    const localForm: MixingFormState =
+      stageType === "PREMIX"
+        ? { premixCards: [local as PremixEntry], finalMixCards: [] }
+        : { premixCards: [], finalMixCards: [local as FinalMixEntry] };
+
+    if (hasMixCardValue(apiForm, stageType, normalizedNo)) return api;
+    if (hasMixCardValue(localForm, stageType, normalizedNo)) return local;
+    return api;
+  };
+
+  const premixNos = new Set([
+    ...(previous.premixCards ?? []).map((card) => String(card.premixNo).trim()),
+    ...(next.premixCards ?? []).map((card) => String(card.premixNo).trim()),
+  ]);
+  const finalMixNos = new Set([
+    ...(previous.finalMixCards ?? []).map((card) => String(card.mixNo).trim()),
+    ...(next.finalMixCards ?? []).map((card) => String(card.mixNo).trim()),
+  ]);
+
+  const premixCards = Array.from(premixNos)
+    .sort((left, right) => Number(left) - Number(right))
+    .map((premixNo) =>
+      pickCard(
+        premixNo,
+        "PREMIX",
+        previous.premixCards ?? [],
+        next.premixCards ?? [],
+        "premixNo",
+      ),
+    )
+    .filter(Boolean) as PremixEntry[];
+
+  const finalMixCards = Array.from(finalMixNos)
+    .sort((left, right) => Number(left) - Number(right))
+    .map((mixNo) =>
+      pickCard(
+        mixNo,
+        "FINAL_MIX",
+        previous.finalMixCards ?? [],
+        next.finalMixCards ?? [],
+        "mixNo",
+      ),
+    )
+    .filter(Boolean) as FinalMixEntry[];
+
+  return { premixCards, finalMixCards };
+};
 
 export const useMixingHook = () => {
   const listParams = useSubdepartmentBatches("mixing");
@@ -73,6 +143,7 @@ export const useMixingHook = () => {
   const [actionLoading, setActionLoading] = useState(false);
   const [backConfirmOpen, setBackConfirmOpen] = useState(false);
   const [hasSavedDraft, setHasSavedDraft] = useState(false);
+  const [formHydrationKey, setFormHydrationKey] = useState(0);
   const resolvePremixCount = (batch?: MixingBatch | null) =>
     Number(batch?.numberOfPremix ?? batch?.identificationSheet?.numberOfPremix ?? 1) || 1;
   const resolveMotorStage = (batch?: MixingBatch | null) => Number(batch?.motorStage);
@@ -130,17 +201,28 @@ export const useMixingHook = () => {
   };
 
   const openFormWithResolvedData = useCallback(
-    async (batch: MixingBatch, editMode: boolean) => {
+    async (
+      batch: MixingBatch,
+      editMode: boolean,
+      options?: { silent?: boolean; preserveLocalFormData?: MixingFormState },
+    ) => {
       if (!batch.batchId) {
         showAlert(STRINGS.MANUFACTURING.MIXING.BATCH_ID_MISSING, "error");
         return;
       }
 
-      // Always hydrate from saved form details whenever a formId exists (draft, rejected,
-      // waiting for approval, etc.). New batches without formId use identification defaults.
-      const shouldFetchDetails = Boolean(String(batch.formId ?? "").trim());
+      const silent = Boolean(options?.silent);
+      const preserveLocalFormData = options?.preserveLocalFormData;
+      const status = batch.mxStatus ?? batch.status;
+      // Silent refresh after save must always hit form/details (even if list status
+      // is still TO_BE_INITIATED right after the first create).
+      const shouldFetchDetails =
+        silent ||
+        editMode ||
+        isManufacturingContinueFillingStatus(String(status ?? "")) ||
+        Boolean(resolveMixFormId(batch));
 
-      setLoadingFormDetails(true);
+      if (!silent) setLoadingFormDetails(true);
 
       try {
         const { identificationSheet, numberOfPremix, mixingCycle, stageProgress, currentStage } =
@@ -212,13 +294,14 @@ export const useMixingHook = () => {
             showAlert(STRINGS.MANUFACTURING.MIXING.SUB_DEPARTMENT_MISSING, "error");
             return;
           }
-          if (!batch.formId) {
+          const formId = resolveMixFormId(batch);
+          if (!formId) {
             showAlert(STRINGS.MANUFACTURING.MIXING.FORM_ID_MISSING, "error");
             return;
           }
 
           const detailsResponse = await mixingController.fetchFormDetails({
-            formId: batch.formId,
+            formId,
             subDepartmentId,
           });
 
@@ -234,8 +317,12 @@ export const useMixingHook = () => {
           detailsPayload = detailsResponse.data as unknown as Record<string, unknown>;
           nextBatch = {
             ...nextBatch,
-            formId: detailsResponse.data.formId || batch.formId,
+            formId: detailsResponse.data.formId || formId,
           };
+          if (detailsResponse.data.status) {
+            nextBatch.mxStatus = String(detailsResponse.data.status);
+            nextBatch.status = String(detailsResponse.data.status);
+          }
           nextFormData = mapMixingDetailsToFormState(detailsResponse.data);
           nextFormData = {
             ...nextFormData,
@@ -276,6 +363,10 @@ export const useMixingHook = () => {
           };
         }
 
+        if (silent && preserveLocalFormData) {
+          nextFormData = mergeMixingFormPreservingLocalInput(preserveLocalFormData, nextFormData);
+        }
+
         setActiveBatch(nextBatch);
         setIsEditMode(editMode);
         setFormData(nextFormData);
@@ -286,6 +377,9 @@ export const useMixingHook = () => {
             : buildMixCardStatusMapFromForm(nextFormData),
         );
         setView("form");
+        if (silent) {
+          setFormHydrationKey((value) => value + 1);
+        }
 
         // Enrich process particulars with operation names from the mixing cycle, preserving saved values.
         try {
@@ -331,7 +425,7 @@ export const useMixingHook = () => {
           console.warn("Failed to fetch mixing cycle details", err);
         }
       } finally {
-        setLoadingFormDetails(false);
+        if (!silent) setLoadingFormDetails(false);
       }
     },
     [loadBatchIdentificationSheet, showAlert, subDepartmentId, user?.allSubDepartments],
@@ -504,8 +598,7 @@ export const useMixingHook = () => {
 
       const premixSubmissionType: PremixSubmissionType = intent === "draft" ? "DRAFT" : "SUBMIT";
       const formSubmissionType = "DRAFT" as const;
-      const status = parseStatus(activeBatch.mxStatus);
-      const isCreateFlow = status === parseStatus(MX_STATUS.TO_BE_INITIATED) && !activeBatch.formId;
+      const isCreateFlow = !resolveMixFormId(activeBatch);
       const mixingDetails = mapMixingFormStateToPayload(formData, {
         targetMixCardId: mixCardId,
         premixSubmissionType,
@@ -547,56 +640,18 @@ export const useMixingHook = () => {
           return false;
         }
 
-        const nextFormId = response.data?.formId ?? activeBatch.formId ?? null;
-        setActiveBatch((prev) => (prev ? { ...prev, formId: nextFormId } : prev));
-        setInitialSnapshot(JSON.stringify(formData));
-        setHasSavedDraft(true);
+        const nextFormId = String(response.data?.formId ?? activeBatch.formId ?? "").trim();
+        const refreshedBatch: MixingBatch = {
+          ...activeBatch,
+          formId: nextFormId || activeBatch.formId,
+          mxStatus: response.data?.status ?? activeBatch.mxStatus,
+          status: response.data?.status ?? activeBatch.status,
+        };
 
-        const nextStatus: MixCardSubmissionStatus =
-          intent === "draft" ? "IN_PROGRESS" : "WAITING_FOR_APPROVAL";
-
-        setMixCardStatusById((prev) => {
-          const updated: Record<string, MixCardStatusMeta> = {
-            ...prev,
-            [mixCardId]: {
-              ...prev[mixCardId],
-              premixSubmissionType,
-              mixCardSubmissionStatus: nextStatus,
-            },
-          };
-
-          const responseStatuses =
-            (response.data as { mixCardStatuses?: any[] } | undefined)?.mixCardStatuses ??
-            (response.data as { premixStatuses?: any[] } | undefined)?.premixStatuses;
-          if (Array.isArray(responseStatuses)) {
-            responseStatuses.forEach((entry: any) => {
-              const entryStage = String(entry?.stageType ?? "PREMIX")
-                .trim()
-                .toUpperCase() as MixCardStageType;
-              const entryNo = String(entry?.premixNo ?? entry?.mixNo ?? "").trim();
-              if (!entryNo) return;
-              const id = buildMixCardId(
-                entryStage === "FINAL_MIX" ? "FINAL_MIX" : "PREMIX",
-                entryNo,
-              );
-              updated[id] = {
-                ...updated[id],
-                premixSubmissionType:
-                  entry.premixSubmissionType ??
-                  entry.mixCardSubmissionType ??
-                  updated[id]?.premixSubmissionType,
-                mixCardSubmissionStatus:
-                  (String(entry.mixCardSubmissionStatus ?? entry.status ?? "")
-                    .toUpperCase()
-                    .replace(/\s+/g, "_") as MixCardSubmissionStatus) ||
-                  updated[id]?.mixCardSubmissionStatus ||
-                  "TO_BE_INITIATED",
-              };
-            });
-          }
-
-          return updated;
-        });
+        setActiveBatch(refreshedBatch);
+        if (intent === "draft") {
+          setHasSavedDraft(true);
+        }
 
         showAlert(
           intent === "draft"
@@ -605,6 +660,24 @@ export const useMixingHook = () => {
           "success",
           { autoCloseMs: 2200 },
         );
+
+        if (nextFormId) {
+          const statusForBanner = String(
+            response.data?.status ?? activeBatch.mxStatus ?? activeBatch.status ?? "",
+          )
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, "_");
+          const stillRejectedEdit = statusForBanner === "REJECTED";
+
+          await openFormWithResolvedData(refreshedBatch, stillRejectedEdit, {
+            silent: true,
+            preserveLocalFormData: formData,
+          });
+        } else {
+          setInitialSnapshot(JSON.stringify(formData));
+        }
+
         return true;
       } finally {
         setActionLoading(false);
@@ -620,6 +693,7 @@ export const useMixingHook = () => {
       previousStageGate,
       showAlert,
       subDepartmentId,
+      openFormWithResolvedData,
     ],
   );
 
@@ -737,6 +811,7 @@ export const useMixingHook = () => {
     detailsLoading,
     handleViewMixingDetails,
     handleBackFromDetails,
+    formHydrationKey,
   };
 };
 

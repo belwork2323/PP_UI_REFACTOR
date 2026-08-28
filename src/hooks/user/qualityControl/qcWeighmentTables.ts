@@ -241,7 +241,16 @@ export const weighmentMotorDetailToSections = (
   const withMotor = (section: SchemaSectionSubmission): SchemaSectionSubmission =>
     (trimmedMotorId ? { ...section, motorId: trimmedMotorId } : section) as SchemaSectionSubmission;
 
-  return [
+  const uploadedFiles = parseUploadFiles(
+    source.uploadedFiles,
+    source.uploadReport,
+    source.UPLOAD_REPORT,
+    rec.uploadedFiles,
+    rec.uploadReport,
+    rec.UPLOAD_REPORT,
+  );
+
+  const sections: SchemaSectionSubmission[] = [
     withMotor({
       sectionId: QC_WEIGHMENT_SECTION_IDS.WEIGHTSCALE_DETAILS,
       sectionData: [
@@ -259,11 +268,22 @@ export const weighmentMotorDetailToSections = (
       sectionId: QC_WEIGHMENT_SECTION_IDS.MOTOR_WEIGHT_DETAILS,
       sectionData: [
         {
-          MOTOR_WEIGHT_DETAILS: resolveWeightRows(source, trimmedMotorId),
+          weights: resolveWeightRows(source, trimmedMotorId),
         },
       ],
     }),
   ];
+
+  if (uploadedFiles.length) {
+    sections.push(
+      withMotor({
+        sectionId: QC_WEIGHMENT_SECTION_IDS.ATTACHMENTS,
+        sectionData: [{ uploadedFiles }],
+      }),
+    );
+  }
+
+  return sections;
 };
 
 export const hydrateWeighmentValuesFromRecord = (rec: Record<string, unknown>): SchemaFormValues => {

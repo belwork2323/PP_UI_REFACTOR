@@ -1,8 +1,7 @@
 import React, { useMemo } from "react";
-import { Box, Typography } from "@mui/material";
+import { Box, Typography, IconButton, Tooltip } from "@mui/material";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
-import UserActions from "@ui/components/common/UserActions";
 import AdminManagementDataTable from "@ui/components/custom/admin/AdminManagementDataTable";
 import type { AdminManagementColumn } from "@ui/components/custom/admin/AdminManagementDataTable";
 import {
@@ -39,7 +38,7 @@ const ProjectManagementList = ({
   onPageChange,
   onRowsPerPageChange,
 }: ProjectManagementListProps) => {
-  const { table } = t;
+  const { table, tableCell } = t;
 
   const columns = useMemo<AdminManagementColumn<any>[]>(
     () => [
@@ -84,14 +83,22 @@ const ProjectManagementList = ({
         label: S.TABLE_COLS[4],
         isActions: true,
         render: (project) => (
-          <UserActions
-            onEdit={() => onEdit(project)}
-            onDelete={() => onDelete(project)}
-          />
+          <Box sx={tableCell.actionsBox}>
+            <Tooltip title="Edit project">
+              <IconButton size="small" onClick={() => onEdit(project)} sx={tableCell.editButton}>
+                <icons.Edit sx={tableCell.editIcon} />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Delete project">
+              <IconButton size="small" onClick={() => onDelete(project)} sx={tableCell.deleteButton}>
+                <icons.Delete sx={tableCell.deleteIcon} />
+              </IconButton>
+            </Tooltip>
+          </Box>
         ),
       },
     ],
-    [onDelete, onEdit]
+    [onDelete, onEdit, table.bodyText, tableCell],
   );
 
   return (

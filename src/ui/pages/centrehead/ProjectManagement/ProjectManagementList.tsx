@@ -1,8 +1,7 @@
 import React, { useMemo } from "react";
-import { Box, Typography } from "@mui/material";
+import { Box, Typography, IconButton, Tooltip } from "@mui/material";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
-import UserActions from "@ui/components/common/UserActions";
 import AdminManagementDataTable from "@ui/components/custom/admin/AdminManagementDataTable";
 import type { AdminManagementColumn } from "@ui/components/custom/admin/AdminManagementDataTable";
 import {

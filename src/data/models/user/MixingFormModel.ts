@@ -105,6 +105,19 @@ export type MixCardCounts = {
 export const buildMixCardId = (stageType: MixCardStageType, cardNo: string | number) =>
   `${stageType}-${String(cardNo).trim()}`;
 
+export const parseTargetMixCardId = (
+  targetMixCardId: string | null | undefined,
+): { stageType: MixCardStageType; cardNo: string } | null => {
+  const normalized = String(targetMixCardId ?? "").trim();
+  if (!normalized) return null;
+  const dashIdx = normalized.indexOf("-");
+  if (dashIdx <= 0) return null;
+  const stageRaw = normalized.slice(0, dashIdx).trim().toUpperCase();
+  const cardNo = normalized.slice(dashIdx + 1).trim();
+  if (!cardNo || (stageRaw !== "PREMIX" && stageRaw !== "FINAL_MIX")) return null;
+  return { stageType: stageRaw as MixCardStageType, cardNo };
+};
+
 export const normalizeMixCardStatus = (status: unknown): MixCardSubmissionStatus => {
   const normalized = String(status ?? "")
     .trim()
@@ -963,6 +976,7 @@ export const mapMixingFormStateToPayload = (
   },
 ) => {
   const targetMixCardId = String(options?.targetMixCardId ?? "").trim();
+  const targetMixCard = parseTargetMixCardId(targetMixCardId);
   const intentType = options?.premixSubmissionType ?? null;
   const statusById = options?.mixCardStatusById ?? {};
 
@@ -973,77 +987,96 @@ export const mapMixingFormStateToPayload = (
     return statusById[mixCardId]?.premixSubmissionType ?? null;
   };
 
-  const payload = {
+  const premixCardsToSend = (() => {
+    const cards = form.premixCards ?? [];
+    if (!targetMixCard) return cards;
+    if (targetMixCard.stageType !== "PREMIX") return [];
+    return cards.filter((card) => String(card.premixNo).trim() === targetMixCard.cardNo);
+  })();
+
+  const finalMixCardsToSend = (() => {
+    const cards = form.finalMixCards ?? [];
+    if (!targetMixCard) return cards;
+    if (targetMixCard.stageType !== "FINAL_MIX") return [];
+    return cards.filter((card) => String(card.mixNo).trim() === targetMixCard.cardNo);
+  })();
+
+  const stages: Array<{
+    stageType: MixCardStageType;
+    premixes: Array<Record<string, unknown>>;
+  }> = [];
+
+  if (!targetMixCard || targetMixCard.stageType === "PREMIX") {
+    stages.push({
+      stageType: "PREMIX",
+      premixes: premixCardsToSend.map((premix) => {
+        const mixCardId = buildMixCardId("PREMIX", premix.premixNo);
+        return {
+          premixNo: Number(premix.premixNo) || 0,
+          premixSubmissionType: resolvePremixSubmissionType(mixCardId),
+
+          mixerConfiguration: {
+            mixerId: premix.mixerType,
+            bldgNo: premix.bldgNo,
+            bowlId: premix.bowlId,
+          },
+
+          trialDetails: {
+            trialDate: premix.bowlTrialDate || null,
+            observations: premix.bowlTrialObservations,
+          },
+
+          mixDetails: {
+            mixDate: premix.premixDate || null,
+            mixQuantity: premix.premixQuantity || null,
+          },
+
+          mixingCycle: {
+            mixingCycleCode: premix.mixingCycleCode,
+            mixingCycleName: premix.mixingCycle || null,
+          },
+
+          processParticulars: mapProcessRowsToApi(premix.processParticulars ?? []),
+          qualityChecks: mapQualityChecksToApi(premix.qualityChecks),
+        };
+      }),
+    });
+  }
+
+  if (!targetMixCard || targetMixCard.stageType === "FINAL_MIX") {
+    stages.push({
+      stageType: "FINAL_MIX",
+      premixes: finalMixCardsToSend.map((entry) => {
+        const mixCardId = buildMixCardId("FINAL_MIX", entry.mixNo);
+        return {
+          premixNo: Number(entry.mixNo) || 0,
+          premixSubmissionType: resolvePremixSubmissionType(mixCardId),
+
+          finalMixNo: Number(entry.finalMixNo) || null,
+
+          mixerConfiguration: {
+            mixerId: entry.mixerType,
+            bldgNo: entry.bldgNo,
+            bowlId: entry.bowlId,
+          },
+
+          mixingCycle: {
+            mixingCycleCode: entry.mixingCycleCode || entry.mixingCycle || null,
+            mixingCycleName: entry.mixingCycle || null,
+          },
+
+          processParticulars: mapProcessRowsToApi(entry.processParticulars ?? []),
+          qualityChecks: mapQualityChecksToApi(entry.qualityChecks),
+        };
+      }),
+    });
+  }
+
+  return {
     mixingDetails: {
-      stages: [
-        {
-          stageType: "PREMIX",
-
-          premixes: (form.premixCards ?? []).map((premix) => {
-            const mixCardId = buildMixCardId("PREMIX", premix.premixNo);
-            return {
-              premixNo: Number(premix.premixNo) || 0,
-              premixSubmissionType: resolvePremixSubmissionType(mixCardId),
-
-              mixerConfiguration: {
-                mixerId: premix.mixerType,
-                bldgNo: premix.bldgNo,
-                bowlId: premix.bowlId,
-              },
-
-              trialDetails: {
-                trialDate: premix.bowlTrialDate || null,
-                observations: premix.bowlTrialObservations,
-              },
-
-              mixDetails: {
-                mixDate: premix.premixDate || null,
-                mixQuantity: premix.premixQuantity || null,
-              },
-
-              mixingCycle: {
-                mixingCycleCode: premix.mixingCycleCode,
-                mixingCycleName: premix.mixingCycle || null,
-              },
-
-              processParticulars: mapProcessRowsToApi(premix.processParticulars ?? []),
-              qualityChecks: mapQualityChecksToApi(premix.qualityChecks),
-            };
-          }),
-        },
-
-        {
-          stageType: "FINAL_MIX",
-
-          premixes: (form.finalMixCards ?? []).map((entry) => {
-            const mixCardId = buildMixCardId("FINAL_MIX", entry.mixNo);
-            return {
-              premixNo: Number(entry.mixNo) || 0,
-              premixSubmissionType: resolvePremixSubmissionType(mixCardId),
-
-              finalMixNo: Number(entry.finalMixNo) || null,
-
-              mixerConfiguration: {
-                mixerId: entry.mixerType,
-                bldgNo: entry.bldgNo,
-                bowlId: entry.bowlId,
-              },
-
-              mixingCycle: {
-                mixingCycleCode: entry.mixingCycleCode || entry.mixingCycle || null,
-                mixingCycleName: entry.mixingCycle || null,
-              },
-
-              processParticulars: mapProcessRowsToApi(entry.processParticulars ?? []),
-              qualityChecks: mapQualityChecksToApi(entry.qualityChecks),
-            };
-          }),
-        },
-      ],
+      stages,
     },
   };
-
-  return payload;
 };
 
 const hasValue = (value: unknown) => String(value ?? "").trim().length > 0;

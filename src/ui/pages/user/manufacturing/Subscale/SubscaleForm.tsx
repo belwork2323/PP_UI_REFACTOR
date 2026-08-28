@@ -1,4 +1,5 @@
-import { Box, Chip, Stack, Typography } from "@mui/material";
+import { Box, Button, Chip, CircularProgress, Stack, Typography } from "@mui/material";
+import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import { SUBSCALE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/subscale_theme";
@@ -13,7 +14,7 @@ const S = STRINGS.MANUFACTURING.SUBSCALE;
 const { scale: ScaleRoundedIcon } = icons.user.manufacturing.subscale.form;
 
 type SubscaleFormProps = {
-  batch?: { batchId?: string; articleId?: string; batchType?: string | null } | null;
+  batch?: { batchId?: string; articleId?: string; batchType?: string | null; ssStatus?: string; status?: string } | null;
   formData: SubscaleFormState;
   subDepartmentId?: number;
   schemaLoading?: boolean;
@@ -42,6 +43,8 @@ const SubscaleForm = ({
   const BRAND = SUBSCALE_BRAND;
   const isMainScale = isMainScaleSubscaleBatch(batch?.batchType);
   const processingLabel = getSubscaleProcessingLabel(batch?.batchType);
+  const isFormLoaded = Boolean(formData.schemaFormValues?.IS_PROCESS_FORM_LOADED);
+  const batchStatus = batch?.ssStatus ?? batch?.status;
 
   return (
     <Box>
@@ -97,6 +100,33 @@ const SubscaleForm = ({
         </Stack>
       </Box>
 
+      {isFormLoaded && onRequestSaveDraft && onRequestSubmit ? (
+        <Stack
+          direction={{ xs: "column", sm: "row" }}
+          gap={1.25}
+          justifyContent="flex-end"
+          sx={{ mb: 2.5 }}
+        >
+          <Button
+            variant="outlined"
+            size="small"
+            disabled={actionLoading}
+            onClick={onRequestSaveDraft}
+            startIcon={
+              actionLoading ? <CircularProgress size={14} color="inherit" /> : undefined
+            }
+            sx={{ whiteSpace: "nowrap" }}
+          >
+            {S.HARDWARE.SAVE_DRAFT}
+          </Button>
+          <SubmitForApprovalButton
+            disabled={actionLoading}
+            onClick={onRequestSubmit}
+            label={isEditMode ? S.HARDWARE.RESUBMIT : S.HARDWARE.SUBMIT}
+          />
+        </Stack>
+      ) : null}
+
       {/* {!isReady ? (
         <Box
           sx={{
@@ -137,12 +167,9 @@ const SubscaleForm = ({
           subDepartmentId={subDepartmentId}
           batchId={batch?.batchId}
           batchType={batch?.batchType}
+          batchStatus={batchStatus}
           onChange={onFormValuesChange}
           batchDetails={batchDetails}
-          actionLoading={actionLoading}
-          isEditMode={isEditMode}
-          onRequestSaveDraft={onRequestSaveDraft}
-          onRequestSubmit={onRequestSubmit}
         />
       </Box>
     </Box>

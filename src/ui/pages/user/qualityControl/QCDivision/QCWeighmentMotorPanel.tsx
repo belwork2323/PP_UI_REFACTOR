@@ -1,4 +1,4 @@
-import { useMemo, type ReactNode } from "react";
+import { useCallback, useMemo, type ReactNode } from "react";
 import {
   Box,
   Stack,
@@ -16,6 +16,7 @@ import DateField from "../../../../components/common/DateField";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import { STRINGS } from "../../../../../app/config/strings";
 import type { SchemaFormValues } from "../../../../../schema-engine";
+import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
 import {
   QC_WEIGHMENT_FIELD_LABELS,
   QC_WEIGHMENT_PROPELLANT_FORMULA,
@@ -218,7 +219,7 @@ const WeightDetailsTable = ({
 type QCWeighmentMotorPanelProps = {
   motorId?: string | null;
   values: SchemaFormValues;
-  onChange: (values: SchemaFormValues) => void;
+  onChange: (values: SchemaFormValues | ((prev: SchemaFormValues) => SchemaFormValues)) => void;
   readOnly?: boolean;
   disabled?: boolean;
   headerActions?: ReactNode;
@@ -237,6 +238,20 @@ const QCWeighmentMotorPanel = ({
   const calibrationDueDate = getWeighmentCalibrationDueDate(values);
   const rows = useMemo(() => getWeighmentWeightRows(values), [values]);
   const uploadReport = useMemo(() => getWeighmentUploadReport(values), [values]);
+
+  const patchValues = useCallback(
+    (updater: (prev: SchemaFormValues) => SchemaFormValues) => {
+      onChange((prev) => updater(prev ?? {}));
+    },
+    [onChange],
+  );
+
+  const patchUploadReport = useCallback(
+    (next: FileRef[]) => {
+      patchValues((prev) => setWeighmentUploadReport(prev, next));
+    },
+    [patchValues],
+  );
 
   return (
     <Box
@@ -271,7 +286,9 @@ const QCWeighmentMotorPanel = ({
                   value={weighscaleNo}
                   placeholder={S.WEIGHMENT_WEIGHSCALE_NO_PLACEHOLDER}
                   disabled={inputsDisabled}
-                  onChange={(event) => onChange(setWeighmentWeighscaleNo(values, event.target.value))}
+                  onChange={(event) =>
+                    patchValues((prev) => setWeighmentWeighscaleNo(prev, event.target.value))
+                  }
                   sx={tableFieldSx}
                 />
               )}
@@ -288,7 +305,9 @@ const QCWeighmentMotorPanel = ({
                   value={calibrationDueDate}
                   disabled={inputsDisabled}
                   placeholder="DD-MM-YYYY"
-                  onChange={(next) => onChange(setWeighmentCalibrationDueDate(values, next))}
+                  onChange={(next) =>
+                    patchValues((prev) => setWeighmentCalibrationDueDate(prev, next))
+                  }
                   inputSx={tableDateFieldSx}
                 />
               )}
@@ -296,7 +315,7 @@ const QCWeighmentMotorPanel = ({
           </Stack>
           <WeightDetailsTable
             rows={rows}
-            onChange={(next) => onChange(setWeighmentWeightRows(values, next))}
+            onChange={(next) => patchValues((prev) => setWeighmentWeightRows(prev, next))}
             readOnly={readOnly}
             disabled={inputsDisabled}
           />
@@ -309,7 +328,7 @@ const QCWeighmentMotorPanel = ({
           </Typography>
           <QCDivisionFileField
             files={uploadReport}
-            onChange={(next) => onChange(setWeighmentUploadReport(values, next))}
+            onChange={patchUploadReport}
             disabled={inputsDisabled}
             readOnly={readOnly}
             multiple
