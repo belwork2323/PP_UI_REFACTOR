@@ -19,7 +19,6 @@ import {
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { SchemaFormValues } from "../../../../../schema-engine";
 import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
-import { parseFileRefs } from "../../../../../data/models/common/FileUploadModel";
 import QCDivisionFileField from "./QCDivisionFileField";
 import {
   QC_PROPELLANT_AVG_COLUMN,
@@ -80,46 +79,6 @@ const cellSx = {
 };
 
 const tableFieldSx = { "& .MuiOutlinedInput-root": { fontSize: "0.72rem" } };
-
-/** Same merge as Hardware / NDT: keep in-flight uploads without blocking deletes. */
-const mergeFileRefsPreferLive = (current: FileRef[], incoming: FileRef[]): FileRef[] => {
-  const byKey = new Map<string, FileRef>();
-  const keyOf = (ref: FileRef) =>
-    String(ref.localId ?? "").trim() || String(ref.fileId ?? "").trim() || "";
-  for (const ref of current ?? []) {
-    const key = keyOf(ref);
-    if (key) byKey.set(key, ref);
-  }
-  for (const ref of incoming ?? []) {
-    const key = keyOf(ref);
-    if (!key) continue;
-    const prev = byKey.get(key);
-    byKey.set(key, prev ? { ...prev, ...ref } : ref);
-  }
-  const incomingKeys = new Set((incoming ?? []).map(keyOf).filter(Boolean));
-  for (const ref of current ?? []) {
-    const key = keyOf(ref);
-    if (!key || incomingKeys.has(key)) continue;
-    if (ref.status === "uploading" || ref.status === "failed" || ref.isTemp) {
-      byKey.set(key, ref);
-    }
-  }
-  const ordered: FileRef[] = [];
-  const seen = new Set<string>();
-  for (const ref of incoming ?? []) {
-    const key = keyOf(ref);
-    const merged = key ? byKey.get(key) ?? ref : ref;
-    ordered.push(merged);
-    if (key) seen.add(key);
-  }
-  for (const [key, ref] of byKey) {
-    if (seen.has(key)) continue;
-    if (ref.status === "uploading" || ref.status === "failed" || ref.isTemp) {
-      ordered.push(ref);
-    }
-  }
-  return ordered.length ? ordered : parseFileRefs(Array.from(byKey.values()));
-};
 
 const SectionCard = ({
   title,
@@ -637,10 +596,7 @@ const QCPropellantMotorPanel = ({
             index === rowIndex
               ? {
                   ...row,
-                  [QC_PROPELLANT_ROW_UPLOAD_FIELD]: mergeFileRefsPreferLive(
-                    parseFileRefs(row[QC_PROPELLANT_ROW_UPLOAD_FIELD]),
-                    next,
-                  ),
+                  [QC_PROPELLANT_ROW_UPLOAD_FIELD]: next,
                 }
               : row,
           ),
@@ -652,12 +608,7 @@ const QCPropellantMotorPanel = ({
 
   const patchMechanicalGraph = useCallback(
     (next: FileRef[]) => {
-      patchValues((prev) =>
-        setPropellantMechanicalGraph(
-          prev,
-          mergeFileRefsPreferLive(getPropellantMechanicalGraph(prev), next),
-        ),
-      );
+      patchValues((prev) => setPropellantMechanicalGraph(prev, next));
     },
     [patchValues],
   );

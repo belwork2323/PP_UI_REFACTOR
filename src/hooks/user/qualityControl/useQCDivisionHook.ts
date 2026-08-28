@@ -247,6 +247,7 @@ import {
   mapWithConcurrency,
 } from "./qcSchemaFetchCache";
 import { useFileService } from "../../../hooks/useFileService";
+import { markPersistedFileRefsDeep } from "../../../data/models/common/FileUploadModel";
 import { discardWorkflowForm } from "../../../utils/workflowDiscard";
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
@@ -279,6 +280,32 @@ const collectTempFileIdsFromQcForm = (form: QualityControlFormState | null | und
   }
   return [...new Set(ids)];
 };
+
+const markQcDivisionEntryFilesPersisted = (
+  entryValues: Record<string, QcDivisionEntryValues>,
+): Record<string, QcDivisionEntryValues> =>
+  Object.fromEntries(
+    Object.entries(entryValues).map(([entryId, entryValue]) => [
+      entryId,
+      {
+        ...entryValue,
+        ...(entryValue.schemaValues
+          ? {
+              schemaValues: markPersistedFileRefsDeep(
+                entryValue.schemaValues,
+              ) as SchemaFormValues,
+            }
+          : {}),
+        ...(entryValue.liquidSchemaValues
+          ? {
+              liquidSchemaValues: markPersistedFileRefsDeep(
+                entryValue.liquidSchemaValues,
+              ) as SchemaFormValues,
+            }
+          : {}),
+      },
+    ]),
+  );
 
 const hasIncompleteQcFormUploads = (form: QualityControlFormState | null | undefined): boolean => {
   if (!form) return false;
@@ -5124,6 +5151,11 @@ export const useQCDivisionHook = () => {
           : prev,
       );
       setIsFormDirty(false);
+
+      updateFormData((prev) => ({
+        ...prev,
+        divisionEntryValues: markQcDivisionEntryFilesPersisted(prev.divisionEntryValues ?? {}),
+      }));
 
       if (intent === "draft") {
         showAlert(

@@ -1,5 +1,5 @@
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
-import type { FileRef } from "../../../data/models/common/FileUploadModel";
+import { mergeQcDivisionFileRefsForSeed } from "./qcDivisionFileUpload";
 import { resolveManufacturingDivisionDetailsPayload } from "./qcHardwareDivisionDetails";
 import {
   createInitialTrimmingValues,
@@ -130,38 +130,6 @@ const isTrimmingSection = (sectionId: string) => {
   );
 };
 
-const mergeReportFilesPreferLive = (
-  current: FileRef[] | undefined,
-  incoming: FileRef[] | undefined,
-): FileRef[] => {
-  const curr = current ?? [];
-  const next = incoming ?? [];
-  if (!curr.length) return next;
-  if (!next.length) return curr;
-  const byKey = new Map<string, FileRef>();
-  const keyOf = (ref: FileRef) =>
-    String(ref.localId ?? "").trim() || String(ref.fileId ?? "").trim() || "";
-  for (const ref of curr) {
-    const key = keyOf(ref);
-    if (key) byKey.set(key, ref);
-  }
-  for (const ref of next) {
-    const key = keyOf(ref);
-    if (!key) continue;
-    const prev = byKey.get(key);
-    byKey.set(key, prev ? { ...prev, ...ref } : ref);
-  }
-  const nextKeys = new Set(next.map(keyOf).filter(Boolean));
-  for (const ref of curr) {
-    const key = keyOf(ref);
-    if (!key || nextKeys.has(key)) continue;
-    if (ref.status === "uploading" || ref.status === "failed" || ref.isTemp) {
-      byKey.set(key, ref);
-    }
-  }
-  return Array.from(byKey.values());
-};
-
 const mergeTrimmingSessions = (
   current: ReturnType<typeof getTrimmingSessionFromValues>,
   incoming: ReturnType<typeof getTrimmingSessionFromValues>,
@@ -185,7 +153,11 @@ const mergeTrimmingSessions = (
       ? current.commonFormatLocations
       : incoming.commonFormatLocations,
     motorRemarks: current.motorRemarks || incoming.motorRemarks,
-    reportFiles: mergeReportFilesPreferLive(current.reportFiles, incoming.reportFiles),
+    reportFiles: mergeQcDivisionFileRefsForSeed(
+      current.reportFiles,
+      incoming.reportFiles,
+      true,
+    ),
   });
 
 export const applyTrimmingDivisionDetailsSeed = (

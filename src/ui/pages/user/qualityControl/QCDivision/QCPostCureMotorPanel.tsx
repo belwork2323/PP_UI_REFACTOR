@@ -503,31 +503,6 @@ type QCPostCureMotorPanelProps = {
   headerActions?: ReactNode;
 };
 
-const mergeFileRefsPreferLive = (current: FileRef[], incoming: FileRef[]): FileRef[] => {
-  const byKey = new Map<string, FileRef>();
-  const keyOf = (ref: FileRef) =>
-    String(ref.localId ?? "").trim() || String(ref.fileId ?? "").trim() || "";
-  for (const ref of current ?? []) {
-    const key = keyOf(ref);
-    if (key) byKey.set(key, ref);
-  }
-  for (const ref of incoming ?? []) {
-    const key = keyOf(ref);
-    if (!key) continue;
-    const prev = byKey.get(key);
-    byKey.set(key, prev ? { ...prev, ...ref } : ref);
-  }
-  const incomingKeys = new Set((incoming ?? []).map(keyOf).filter(Boolean));
-  for (const ref of current ?? []) {
-    const key = keyOf(ref);
-    if (!key || incomingKeys.has(key)) continue;
-    if (ref.status === "uploading" || ref.status === "failed" || ref.isTemp) {
-      byKey.set(key, ref);
-    }
-  }
-  return Array.from(byKey.values());
-};
-
 const QCPostCureMotorPanel = ({
   motorId,
   subType,
@@ -560,10 +535,7 @@ const QCPostCureMotorPanel = ({
 
   const patchFileField = useCallback(
     (sectionId: string, field: string, next: FileRef[]) => {
-      patchValues((prev) => {
-        const current = getPostCureFileField(prev, sectionId, field);
-        return setPostCureFileField(prev, sectionId, field, mergeFileRefsPreferLive(current, next));
-      });
+      patchValues((prev) => setPostCureFileField(prev, sectionId, field, next));
     },
     [patchValues],
   );

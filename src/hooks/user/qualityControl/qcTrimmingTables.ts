@@ -153,6 +153,16 @@ export const setTrimmingSessionValues = (
     reportFiles: session.reportFiles ?? [],
   }) as SchemaFormValues;
 
+/** Hardware-aligned: assign report file list directly from QCDivisionFileField onChange. */
+export const setTrimmingReportFiles = (
+  values: SchemaFormValues | null | undefined,
+  reportFiles: FileRef[],
+): SchemaFormValues =>
+  setTrimmingSessionValues({
+    ...getTrimmingSessionFromValues(values),
+    reportFiles: reportFiles ?? [],
+  });
+
 const findSectionData = (
   sections: SchemaSectionSubmission[] | null | undefined,
   sectionId: string,

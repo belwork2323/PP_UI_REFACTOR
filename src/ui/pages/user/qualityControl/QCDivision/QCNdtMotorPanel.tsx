@@ -72,47 +72,6 @@ const cellSx = {
 
 const tableFieldSx = { "& .MuiOutlinedInput-root": { fontSize: "0.72rem" } };
 
-/** Same merge as Post Cure / Hardware: keep in-flight uploads without blocking deletes. */
-const mergeFileRefsPreferLive = (current: FileRef[], incoming: FileRef[]): FileRef[] => {
-  const byKey = new Map<string, FileRef>();
-  const keyOf = (ref: FileRef) =>
-    String(ref.localId ?? "").trim() || String(ref.fileId ?? "").trim() || "";
-  for (const ref of current ?? []) {
-    const key = keyOf(ref);
-    if (key) byKey.set(key, ref);
-  }
-  for (const ref of incoming ?? []) {
-    const key = keyOf(ref);
-    if (!key) continue;
-    const prev = byKey.get(key);
-    byKey.set(key, prev ? { ...prev, ...ref } : ref);
-  }
-  const incomingKeys = new Set((incoming ?? []).map(keyOf).filter(Boolean));
-  for (const ref of current ?? []) {
-    const key = keyOf(ref);
-    if (!key || incomingKeys.has(key)) continue;
-    if (ref.status === "uploading" || ref.status === "failed" || ref.isTemp) {
-      byKey.set(key, ref);
-    }
-  }
-  // Preserve incoming order; append any still in-flight refs not present in incoming.
-  const ordered: FileRef[] = [];
-  const seen = new Set<string>();
-  for (const ref of incoming ?? []) {
-    const key = keyOf(ref);
-    const merged = key ? byKey.get(key) ?? ref : ref;
-    ordered.push(merged);
-    if (key) seen.add(key);
-  }
-  for (const [key, ref] of byKey) {
-    if (seen.has(key)) continue;
-    if (ref.status === "uploading" || ref.status === "failed" || ref.isTemp) {
-      ordered.push(ref);
-    }
-  }
-  return ordered;
-};
-
 const SectionCard = ({
   title,
   children,
@@ -489,21 +448,14 @@ const QCNdtMotorPanel = ({
 
   const patchUploadMedia = useCallback(
     (next: FileRef[]) => {
-      patchValues((prev) =>
-        setNdtUploadMedia(prev, mergeFileRefsPreferLive(getNdtUploadMedia(prev), next)),
-      );
+      patchValues((prev) => setNdtUploadMedia(prev, next));
     },
     [patchValues],
   );
 
   const patchSignedReport = useCallback(
     (next: FileRef[]) => {
-      patchValues((prev) =>
-        setNdtSignedReport(
-          prev,
-          mergeFileRefsPreferLive(getNdtSignedReport(prev), next).slice(0, 1),
-        ),
-      );
+      patchValues((prev) => setNdtSignedReport(prev, next.slice(0, 1)));
     },
     [patchValues],
   );
@@ -515,12 +467,7 @@ const QCNdtMotorPanel = ({
         return setNdtVisualRows(
           prev,
           currentRows.map((row, index) =>
-            index === rowIndex
-              ? {
-                  ...row,
-                  UPLOAD_IMAGE: mergeFileRefsPreferLive(row.UPLOAD_IMAGE ?? [], next),
-                }
-              : row,
+            index === rowIndex ? { ...row, UPLOAD_IMAGE: next } : row,
           ),
         );
       });

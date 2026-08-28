@@ -1,6 +1,10 @@
 import dayjs from "dayjs";
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
-import { parseFileRefs, type FileRef } from "../../../data/models/common/FileUploadModel";
+import {
+  parseFileRefs,
+  type FileRef,
+} from "../../../data/models/common/FileUploadModel";
+import { mergeQcDivisionFileRefsForSeed } from "./qcDivisionFileUpload";
 import { formatToUiDate, UI_DATETIME_FORMAT } from "../../../utils/dateUtils";
 import type { QcDivisionEntry } from "./qcDivisionEntryTypes";
 import type { QcHardwareProcessSubType } from "./qcHardwareConfig";
@@ -480,39 +484,12 @@ const mergeHardwareField = (
   return next;
 };
 
-/** Prefer live FileRef[] (keeps localId / isTemp); fall back to parseFileRefs. */
-const asLiveFileRefs = (value: unknown): FileRef[] => {
-  if (Array.isArray(value) && value.every((item) => item && typeof item === "object")) {
-    return value as FileRef[];
-  }
-  return parseFileRefs(value);
-};
-
 /** Merge FileRef lists — never String() arrays (that yields "[object Object]"). */
 const mergeHardwareUploadFiles = (
   current: unknown,
   incoming: unknown,
   onlyIfEmpty: boolean,
-): FileRef[] => {
-  const currentRefs = asLiveFileRefs(current);
-  const incomingRefs = asLiveFileRefs(incoming);
-  // Empty incoming must not wipe in-progress / newly uploaded temps (seed/hydrate paths).
-  if (!incomingRefs.length) return currentRefs;
-  if (onlyIfEmpty && currentRefs.length) return currentRefs;
-  if (onlyIfEmpty) return incomingRefs;
-
-  const seen = new Set(
-    currentRefs.map((ref) => String(ref.fileId ?? ref.localId ?? ref.fileName ?? "").trim()).filter(Boolean),
-  );
-  const merged = [...currentRefs];
-  for (const ref of incomingRefs) {
-    const key = String(ref.fileId ?? ref.localId ?? ref.fileName ?? "").trim();
-    if (key && seen.has(key)) continue;
-    if (key) seen.add(key);
-    merged.push(ref);
-  }
-  return merged;
-};
+): FileRef[] => mergeQcDivisionFileRefsForSeed(current, incoming, onlyIfEmpty);
 
 const mergeCutRows = (
   currentRows: QcHardwareCutRow[],

@@ -159,6 +159,92 @@ export const fileIdsFromFormRefs = (refs: FileRef[] | null | undefined): FileIdP
   return refs.map(toFileIdPayload).filter((p): p is FileIdPayload => Boolean(p));
 };
 
+/**
+ * Merge file-ref lists for seed/hydration only — NOT for QCDivisionFileField onChange.
+ * File-field onChange should assign the incoming list directly (Hardware pattern).
+ * Only preserves actively uploading/failed refs missing from incoming.
+ */
+export const mergeFileRefsPreferLive = (
+  current: FileRef[] | null | undefined,
+  incoming: FileRef[] | null | undefined,
+): FileRef[] => {
+  const curr = Array.isArray(current) ? current : [];
+  const next = Array.isArray(incoming) ? incoming : [];
+  const byKey = new Map<string, FileRef>();
+  const keyOf = (ref: FileRef) =>
+    String(ref.localId ?? "").trim() || String(ref.fileId ?? "").trim() || "";
+
+  for (const ref of curr) {
+    const key = keyOf(ref);
+    if (key) byKey.set(key, ref);
+  }
+  for (const ref of next) {
+    const key = keyOf(ref);
+    if (!key) continue;
+    const prev = byKey.get(key);
+    byKey.set(key, prev ? { ...prev, ...ref } : ref);
+  }
+
+  const incomingKeys = new Set(next.map(keyOf).filter(Boolean));
+  for (const ref of curr) {
+    const key = keyOf(ref);
+    if (!key || incomingKeys.has(key)) continue;
+    if (ref.status === "uploading" || ref.status === "failed") {
+      byKey.set(key, ref);
+    }
+  }
+
+  const ordered: FileRef[] = [];
+  const seen = new Set<string>();
+  for (const ref of next) {
+    const key = keyOf(ref);
+    const merged = key ? byKey.get(key) ?? ref : ref;
+    ordered.push(merged);
+    if (key) seen.add(key);
+  }
+  for (const [key, ref] of byKey) {
+    if (seen.has(key)) continue;
+    if (ref.status === "uploading" || ref.status === "failed") {
+      ordered.push(ref);
+    }
+  }
+  return ordered;
+};
+
+/** After a successful save, mark uploaded fileIds as persisted (UI-only delete until next save). */
+export const markFileRefsPersisted = (refs: FileRef[] | null | undefined): FileRef[] => {
+  if (!Array.isArray(refs)) return [];
+  return refs.map((ref) => {
+    const fileId = String(ref.fileId ?? "").trim();
+    if (!fileId || ref.status === "uploading" || ref.status === "failed") return ref;
+    return ref.isTemp === false ? ref : { ...ref, isTemp: false };
+  });
+};
+
+/** Walk nested form values and mark any FileRef lists as persisted. */
+export const markPersistedFileRefsDeep = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    if (
+      value.length > 0 &&
+      value.every(
+        (item) => item && typeof item === "object" && ("fileName" in item || "fileId" in item),
+      )
+    ) {
+      return markFileRefsPersisted(value as FileRef[]);
+    }
+    return value.map(markPersistedFileRefsDeep);
+  }
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value as Record<string, unknown>).map(([key, child]) => [
+        key,
+        markPersistedFileRefsDeep(child),
+      ]),
+    );
+  }
+  return value;
+};
+
 export const toFileIdListPayload = (value: unknown): FileIdPayload[] =>
   fileIdsFromFormRefs(parseFileRefs(value));
 

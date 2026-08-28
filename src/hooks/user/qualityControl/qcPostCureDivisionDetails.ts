@@ -1,4 +1,5 @@
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import { shouldPreserveQcDivisionFileRefsOnSeed } from "./qcDivisionFileUpload";
 import {
   resolveQcPostCureSchemaSelection,
   type QcPostCureSchemaSelection,
@@ -236,6 +237,7 @@ export const applyPostCureDivisionDetailsSeed = (
   const next: SchemaFormValues = { ...current };
   Object.entries(seeded).forEach(([key, value]) => {
     const existing = next[key];
+    if (shouldPreserveQcDivisionFileRefsOnSeed(existing, options?.onlyIfEmpty)) return;
     const empty =
       existing == null ||
       existing === "" ||
