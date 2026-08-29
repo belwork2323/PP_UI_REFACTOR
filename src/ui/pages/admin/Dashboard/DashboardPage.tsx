@@ -9,6 +9,9 @@ import DashboardChartsSection from "./components/DashboardChartsSection";
 import DashboardBlockchainSection from "./components/DashboardBlockchainSection";
 import DashboardActiveBatchesSection from "./components/DashboardActiveBatchesSection";
 
+/** Admin dashboard: hide Weekly Batch Activity, Motors Processed, QC Pass Rate charts (keep markup). */
+const SHOW_ADMIN_DASHBOARD_CHARTS = false;
+
 export default function DashboardPage() {
   const mode = useThemeStore((s) => s.mode);
   const th = getDashboardTheme(mode);
@@ -103,14 +106,16 @@ export default function DashboardPage() {
           clearDateFilter={clearDateFilter}
         />
 
-        <DashboardChartsSection
-          th={th}
-          t={t}
-          weeklyActivity={weeklyActivity}
-          motorsProcessed={motorsProcessed}
-          qcPassRate={qcPassRate}
-          chartUpdatedAt={chartUpdatedAt}
-        />
+        {SHOW_ADMIN_DASHBOARD_CHARTS ? (
+          <DashboardChartsSection
+            th={th}
+            t={t}
+            weeklyActivity={weeklyActivity}
+            motorsProcessed={motorsProcessed}
+            qcPassRate={qcPassRate}
+            chartUpdatedAt={chartUpdatedAt}
+          />
+        ) : null}
 
         <DashboardActiveBatchesSection
           th={th}

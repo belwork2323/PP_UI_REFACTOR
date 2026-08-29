@@ -1,27 +1,28 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { Box, Typography, Chip, Button, Tooltip, IconButton } from "@mui/material";
+import TrackChangesRoundedIcon from "@mui/icons-material/TrackChangesRounded";
+import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
 import AdminManagementDataTable from "@ui/components/custom/admin/AdminManagementDataTable";
 import type { AdminManagementColumn } from "@ui/components/custom/admin/AdminManagementDataTable";
 
-import { stageConfig, batchStatusConfig, getSubDeptChipConfig, getBatchTypeChipConfig } from "@app/theme/roleConfig";
+import { getBatchTypeChipConfig } from "@app/theme/roleConfig";
 import {
   getBatchId,
   getBatchTypeChipLabel,
   getMotorId,
   getMotorStage,
-  getStage,
-  getStatus,
-  getSubDept,
   getSystemManagerName,
   getSystemManagerId,
   isIdentificationSheetDraft,
   isIdentificationSheetCompleted,
   canDeleteAdminBatch,
+  canEditAdminBatch,
   getProjectId,
 } from "@utils/batchManagementUtils";
+import BatchTrackingPopover from "./BatchTrackingPopover";
 
 const S = STRINGS.BATCH_MANAGEMENT;
 const TA = S.TABLE_ACTIONS;
@@ -36,6 +37,7 @@ type BatchListTableProps = {
   onEdit: (batch: any) => void;
   onDelete: (batch: any) => void;
   onCompleteImplementation?: (batch: any) => void;
+  onViewStatus?: (batch: any) => void;
   onViewDetails?: (batch: any) => void;
   onPageChange: (event: unknown, page: number) => void;
   onRowsPerPageChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
@@ -51,11 +53,16 @@ const BatchListTable = ({
   onEdit,
   onDelete,
   onCompleteImplementation,
+  onViewStatus,
   onViewDetails,
   onPageChange,
   onRowsPerPageChange,
 }: BatchListTableProps) => {
   const { table, tableCell } = t;
+  const [trackingTarget, setTrackingTarget] = useState<{
+    anchor: HTMLElement;
+    batchId: string;
+  } | null>(null);
 
   const columns = useMemo<AdminManagementColumn<any>[]>(
     () => [
@@ -124,43 +131,27 @@ const BatchListTable = ({
       },
 
       {
-        id: "stage",
+        id: "status",
         label: S.TABLE_COLS[5],
         render: (batch) => {
-          const stage = getStage(batch);
-          const subDept = getSubDept(batch);
-          const stageLabel = subDept !== "—" ? subDept : stage;
-          const scStage = stageConfig[stage] ?? stageConfig[stageLabel];
-          const subDeptCfg = getSubDeptChipConfig(stageLabel);
+          const batchId = getBatchId(batch);
           return (
-            <Chip
-              icon={scStage ? <scStage.Icon /> : undefined}
-              label={stageLabel}
-              size="small"
-              sx={tableCell.stageChip(subDeptCfg)}
-            />
-          );
-        },
-      },
-      {
-        id: "status",
-        label: S.TABLE_COLS[6],
-        render: (batch) => {
-          const status = getStatus(batch);
-          const scStatus = batchStatusConfig[status];
-          return (
-            <Chip
-              icon={scStatus?.Icon ? <scStatus.Icon /> : undefined}
-              label={status.replace(/_/g, " ").toUpperCase()}
-              size="small"
-              sx={tableCell.statusChip(scStatus)}
-            />
+            <Tooltip title={TA.TRACK_BATCH_TOOLTIP} arrow placement="top">
+              <IconButton
+                size="small"
+                onClick={(event) => setTrackingTarget({ anchor: event.currentTarget, batchId })}
+                sx={tableCell.editButton}
+                aria-label={TA.TRACK_BATCH}
+              >
+                <TrackChangesRoundedIcon sx={tableCell.editIcon} />
+              </IconButton>
+            </Tooltip>
           );
         },
       },
       {
         id: "systemManager",
-        label: S.TABLE_COLS[7],
+        label: S.TABLE_COLS[6],
         headerSx: { minWidth: 180 },
         cellSx: { minWidth: 180 },
         render: (batch) => (
@@ -177,7 +168,7 @@ const BatchListTable = ({
       },
       {
         id: "actions",
-        label: S.TABLE_COLS[8],
+        label: S.TABLE_COLS[7],
         isActions: true,
         render: (batch) => {
           const sheetDraft = isIdentificationSheetDraft(batch);
@@ -185,6 +176,17 @@ const BatchListTable = ({
           const canDelete = canDeleteAdminBatch(batch);
           return (
             <Box sx={tableCell.actionsBox}>
+              {onViewStatus && (
+                <Tooltip title={TA.VIEW_STATUS_TOOLTIP} arrow placement="top">
+                  <IconButton
+                    size="small"
+                    onClick={() => onViewStatus(batch)}
+                    sx={tableCell.editButton}
+                  >
+                    <VisibilityRoundedIcon sx={tableCell.editIcon} />
+                  </IconButton>
+                </Tooltip>
+              )}
               {sheetDraft && onCompleteImplementation && (
                 <Tooltip title={TA.COMPLETE_IMPLEMENTATION_TOOLTIP}>
                   <Button
@@ -210,21 +212,19 @@ const BatchListTable = ({
                   </Button>
                 </Tooltip>
               )}
-              {sheetCompleted && (
-                <>
-                  <Tooltip title={TA.EDIT_BATCH}>
-                    <IconButton size="small" onClick={() => onEdit(batch)} sx={tableCell.editButton}>
-                      <icons.Edit sx={tableCell.editIcon} />
-                    </IconButton>
-                  </Tooltip>
-                  {canDelete ? (
-                    <Tooltip title={TA.DELETE_BATCH}>
-                      <IconButton size="small" onClick={() => onDelete(batch)} sx={tableCell.deleteButton}>
-                        <icons.Delete sx={tableCell.deleteIcon} />
-                      </IconButton>
-                    </Tooltip>
-                  ) : null}
-                </>
+              {canEditAdminBatch(batch) && (
+                <Tooltip title={TA.EDIT_BATCH}>
+                  <IconButton size="small" onClick={() => onEdit(batch)} sx={tableCell.editButton}>
+                    <icons.Edit sx={tableCell.editIcon} />
+                  </IconButton>
+                </Tooltip>
+              )}
+              {sheetCompleted && canDelete && (
+                <Tooltip title={TA.DELETE_BATCH}>
+                  <IconButton size="small" onClick={() => onDelete(batch)} sx={tableCell.deleteButton}>
+                    <icons.Delete sx={tableCell.deleteIcon} />
+                  </IconButton>
+                </Tooltip>
               )}
               {sheetDraft && canDelete && (
                 <Tooltip title={TA.DELETE_BATCH}>
@@ -238,26 +238,35 @@ const BatchListTable = ({
         },
       },
     ],
-    [tableCell, onEdit, onDelete, onCompleteImplementation, onViewDetails],
+    [tableCell, onEdit, onDelete, onCompleteImplementation, onViewStatus, onViewDetails],
   );
 
   return (
-    <AdminManagementDataTable
-      columns={columns}
-      rows={paginated}
-      rowKey={(batch) => batch.id || batch.batchId}
-      loading={loading}
-      page={page}
-      rowsPerPage={rowsPerPage}
-      totalCount={totalCount}
-      onPageChange={onPageChange}
-      onRowsPerPageChange={onRowsPerPageChange}
-      emptyState={{
-        icon: <icons.batchMgmt.emptyBatch sx={table.emptyIcon} />,
-        message: S.TABLE.EMPTY,
-      }}
-      theme={t}
-    />
+    <>
+      <AdminManagementDataTable
+        columns={columns}
+        rows={paginated}
+        rowKey={(batch) => batch.id || batch.batchId}
+        loading={loading}
+        page={page}
+        rowsPerPage={rowsPerPage}
+        totalCount={totalCount}
+        onPageChange={onPageChange}
+        onRowsPerPageChange={onRowsPerPageChange}
+        emptyState={{
+          icon: <icons.batchMgmt.emptyBatch sx={table.emptyIcon} />,
+          message: S.TABLE.EMPTY,
+        }}
+        theme={t}
+      />
+
+      <BatchTrackingPopover
+        open={Boolean(trackingTarget)}
+        anchorEl={trackingTarget?.anchor ?? null}
+        batchId={trackingTarget?.batchId ?? ""}
+        onClose={() => setTrackingTarget(null)}
+      />
+    </>
   );
 };
 

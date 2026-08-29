@@ -206,14 +206,66 @@ const extractBatchPremixCount = (batchPayload: unknown): number => {
   const batch = asRecord(batchPayload);
   if (!batch) return 0;
   const sheet = asRecord(batch.identificationSheet);
-  return (
+  const count =
     pickNumber(
       sheet?.numberOfPremix,
       sheet?.number_of_premix,
       batch.numberOfPremix,
       batch.premixCount,
-    ) ?? 0
-  );
+    ) ?? 0;
+  if (count > 0) return count;
+  if (asArray(sheet?.materials).length > 0) return 1;
+  return 0;
+};
+
+/** Motor IDs from batch details when division-details returns no motors. */
+export const extractBatchMotorIds = (
+  batchPayload: unknown,
+): Array<{ motorId: string; status?: unknown }> => {
+  const root = asRecord(batchPayload);
+  if (!root) return [];
+  const batch = asRecord(root.__batchDetails) ?? root;
+
+  const fromArray = Array.isArray(batch.motorIds)
+    ? batch.motorIds.map((id) => String(id).trim()).filter(Boolean)
+    : [];
+
+  if (fromArray.length > 0) {
+    const unique = Array.from(new Set(fromArray.filter((id) => !id.includes(","))));
+    return unique.map((motorId) => ({ motorId }));
+  }
+
+  const singleId = String(batch.motorId ?? "").trim();
+  if (!singleId) return [];
+
+  const parsed = singleId
+    .split(",")
+    .map((id) => id.trim())
+    .filter(Boolean);
+
+  if (parsed.length > 1) {
+    return parsed.map((motorId) => ({ motorId }));
+  }
+
+  return [{ motorId: singleId }];
+};
+
+/** True when /qc-division/division-details returned no unit rows (empty premixes/motors/stages). */
+export const isEmptyManufacturingDivisionDetailsPayload = (payload: unknown): boolean => {
+  if (!payload || typeof payload !== "object") return true;
+  const root = payload as Record<string, unknown>;
+  if (root.__qcFormDivisionData) return false;
+
+  const manufacturing = asRecord(root.__manufacturingDivisionData) ?? root;
+  const data = asRecord(manufacturing.data) ?? manufacturing;
+
+  if (asArray(data.premixes).length > 0) return false;
+  if (extractMotorIds(data).length > 0) return false;
+
+  const mixingUnits = extractMixingStagesUnits(data);
+  if (mixingUnits.premixes.length > 0 || mixingUnits.finalMixes.length > 0) return false;
+
+  return true;
 };
 
 const extractPremixes = (
@@ -467,7 +519,11 @@ export const mapDivisionDetailsToPartialNav = (
   const isRawMaterialProcessing =
     String(options.rawMaterialType ?? "").trim() === "RAW_MATERIAL_PROCESSING";
 
-  const motors = extractMotorIds(data);
+  const motorsFromDetails = extractMotorIds(data);
+  let motors =
+    motorsFromDetails.length > 0 || !isMotorBasedPartialFlow(flowKey)
+      ? motorsFromDetails
+      : extractBatchMotorIds(options.batchPayload);
   let premixes = extractPremixes(data);
   let finalMixes = extractFinalMixes(data);
 
@@ -478,6 +534,21 @@ export const mapDivisionDetailsToPartialNav = (
     }
     if (!finalMixes.length && fromStages.finalMixes.length) {
       finalMixes = fromStages.finalMixes;
+    }
+    if (!premixes.length || !finalMixes.length) {
+      const batchCount = extractBatchPremixCount(options.batchPayload);
+      if (batchCount > 0) {
+        if (!premixes.length) {
+          premixes = Array.from({ length: batchCount }, (_, index) => ({
+            premixNo: index + 1,
+          }));
+        }
+        if (!finalMixes.length) {
+          finalMixes = Array.from({ length: batchCount }, (_, index) => ({
+            finalMixNo: index + 1,
+          }));
+        }
+      }
     }
   }
 

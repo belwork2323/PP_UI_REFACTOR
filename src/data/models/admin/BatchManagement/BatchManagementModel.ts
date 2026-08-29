@@ -7,6 +7,7 @@ import { icons } from "@app/theme/icons";
 import type { MaterialsListGrade, MaterialsListItem } from "../../user/MaterialsListModel";
 import type { RawMaterialLotListRow } from "../../user/RawMaterialProcurementModel";
 import { formatToIsoDateInput, formatToUiDate } from "../../../../utils/dateUtils";
+import type { AdminBatchEditMode } from "@utils/batchManagementUtils";
 
 /** Map display / list labels to form/API enum values */
 function normalizeBatchTypeForForm(raw: string | undefined | null): string {
@@ -462,13 +463,26 @@ export class BatchListItemModel {
           ? dept.subDepartment
           : [];
 
-    this.subDepartments =
-      nestedSubDepartments.length > 0
-        ? nestedSubDepartments.map((sd: any) => ({
-            subDepartmentId: sd.subDepartmentId,
-            subDepartmentName: sd.subDepartmentName ?? "",
-          }))
-        : [];
+    if (nestedSubDepartments.length > 0) {
+      this.subDepartments = nestedSubDepartments.map((sd: any) => ({
+        subDepartmentId: sd.subDepartmentId,
+        subDepartmentName: sd.subDepartmentName ?? "",
+      }));
+    } else {
+      const stageSubDept = stageRoot?.subDepartment ?? dept?.subDepartment;
+      if (typeof stageSubDept === "string" && stageSubDept.trim()) {
+        this.subDepartments = [{ subDepartmentId: 0, subDepartmentName: stageSubDept.trim() }];
+      } else if (stageSubDept?.subDepartmentName) {
+        this.subDepartments = [
+          {
+            subDepartmentId: Number(stageSubDept.subDepartmentId ?? 0),
+            subDepartmentName: String(stageSubDept.subDepartmentName),
+          },
+        ];
+      } else {
+        this.subDepartments = [];
+      }
+    }
 
     // Audit fields
     this.createdOn = data.createdOn ?? null;
@@ -1125,8 +1139,8 @@ export const mapBatchToFormState = (batch: any): BatchFormState => {
     projectId: batch?.projectId ?? batch?.project?.projectId ?? "",
     motorStage,
     mixingCycleCode: mixingCycle?.mixingCycleCode ?? "",
-    // Draft "how many to add" input — keep empty; actual count comes from motorIds.
-    numberOfMotors: batch?.numberOfMotors ?? 0,
+    // Draft "how many to add" input — always empty on load; actual motors are in motorIds.
+    numberOfMotors: 0,
     motorIds: Array.isArray(batch?.motorIds) && batch.motorIds.length > 0 ? batch.motorIds : [""],
     priority: batch?.priority ?? "Medium",
     systemManagerId: batch?.systemManager?.id ?? batch?.systemManagerId ?? "",
@@ -1174,21 +1188,40 @@ export const hasAdditionalBatchDetailsChanges = (
 export const buildAdditionalBatchDetailsUpdatePayload = (
   existingBatch: Record<string, any>,
   batchForm: BatchFormState,
+  options?: { mode?: AdminBatchEditMode; baselineForm?: BatchFormState },
 ): Record<string, any> => {
   const base = mapBatchToFormState(existingBatch);
+  const mode = options?.mode ?? "full";
+  const baselineForm = options?.baselineForm ?? base;
+
+  let nextForm = { ...batchForm };
+
+  if (mode === "append_only") {
+    nextForm = {
+      ...nextForm,
+      projectId: baselineForm.projectId,
+      motorStage: baselineForm.motorStage,
+      mixingCycleCode: baselineForm.mixingCycleCode,
+      systemManagerId: baselineForm.systemManagerId,
+      objective: baselineForm.objective,
+      articles: baselineForm.articles,
+      motorIds: mergeAppendOnlyMotorIds(baselineForm.motorIds, batchForm.motorIds),
+    };
+  }
+
   return {
     ...base,
-    batchType: batchForm.batchType,
-    subBatchType: batchForm.subBatchType,
-    projectId: batchForm.projectId,
-    motorStage: batchForm.motorStage,
-    mixingCycleCode: batchForm.mixingCycleCode,
-    numberOfMotors: batchForm.numberOfMotors,
-    motorIds: batchForm.motorIds,
-    priority: batchForm.priority,
-    systemManagerId: batchForm.systemManagerId,
-    objective: batchForm.objective,
-    articles: batchForm.articles,
+    batchType: nextForm.batchType,
+    subBatchType: nextForm.subBatchType,
+    projectId: nextForm.projectId,
+    motorStage: nextForm.motorStage,
+    mixingCycleCode: nextForm.mixingCycleCode,
+    numberOfMotors: nextForm.numberOfMotors,
+    motorIds: nextForm.motorIds,
+    priority: nextForm.priority,
+    systemManagerId: nextForm.systemManagerId,
+    objective: nextForm.objective,
+    articles: nextForm.articles,
     identificationSheet: base.identificationSheet,
     identificationSheetStatus: base.identificationSheetStatus,
   };
@@ -1198,13 +1231,172 @@ export const buildAdditionalBatchDetailsUpdatePayload = (
 export const buildIdentificationUpdatePayload = (
   existingBatch: Record<string, any>,
   implForm: ImplementationFormState,
+  options?: { mode?: AdminBatchEditMode; baselineImpl?: ImplementationFormState },
 ): Record<string, any> => {
   const base = mapBatchToFormState(existingBatch);
+  const mode = options?.mode ?? "full";
+  const baselineImpl = options?.baselineImpl;
+
+  let identificationSheet = implForm.identificationSheet;
+  if (mode === "append_only" && baselineImpl) {
+    identificationSheet = mergeAppendOnlyIdentificationSheet(
+      baselineImpl.identificationSheet,
+      implForm.identificationSheet,
+    );
+  }
+
   return {
     ...base,
-    identificationSheet: implForm.identificationSheet,
+    identificationSheet,
     identificationSheetStatus: IDENTIFICATION_SHEET_STATUS.COMPLETED,
     objective: implForm.objective ?? base.objective,
     articles: Array.isArray(implForm.articles) ? implForm.articles : base.articles,
   };
+};
+
+const APPEND_ONLY_LOCKED_BATCH_FIELDS = [
+  "projectId",
+  "motorStage",
+  "mixingCycleCode",
+  "systemManagerId",
+  "objective",
+  "articles",
+] as const satisfies ReadonlyArray<keyof BatchFormState>;
+
+const IDENTIFICATION_HEADER_FIELDS = [
+  "date",
+  "batchSize",
+  "bondingSheetNo",
+  "mixerType",
+  "BldgNo",
+  "remarks",
+  "prcApprovalDate",
+] as const satisfies ReadonlyArray<keyof IdentificationSheet>;
+
+export type AdminBatchEditValidationResult = {
+  valid: boolean;
+  errors: string[];
+};
+
+const materialRowKey = (material: MaterialItem): string =>
+  `${material.srNo}-${normalizeMaterialCodeKey(material.materialCode)}`;
+
+const serializeMaterialForCompare = (material: MaterialItem): string =>
+  JSON.stringify({
+    srNo: material.srNo,
+    materialCode: material.materialCode,
+    materialName: material.materialName,
+    gradeCode: material.gradeCode ?? "",
+    gradeName: material.gradeName ?? "",
+    lotId: material.lotId ?? "",
+    manufacturerName: material.manufacturerName ?? material.make ?? "",
+    requiredComposition: material.requiredComposition ?? 0,
+    quantityPerPremix: material.quantityPerPremix ?? 0,
+    revalidationFromDate: material.revalidationFromDate ?? "",
+    revalidationToDate: material.revalidationToDate ?? "",
+  });
+
+export const mergeAppendOnlyMotorIds = (
+  baselineMotorIds: string[],
+  currentMotorIds: string[],
+): string[] => {
+  const baseline = (baselineMotorIds ?? []).filter((id) => String(id ?? "").trim());
+  const current = currentMotorIds ?? [];
+  const prefixMatches = baseline.every((id, index) => current[index] === id);
+  if (!prefixMatches || current.length < baseline.length) {
+    return baseline;
+  }
+  return current;
+};
+
+export const mergeAppendOnlyIdentificationSheet = (
+  baselineSheet: IdentificationSheet,
+  currentSheet: IdentificationSheet,
+): IdentificationSheet => {
+  const baselineMaterials = baselineSheet.materials ?? [];
+  const baselineKeys = new Set(baselineMaterials.map((material) => materialRowKey(material)));
+  const addedMaterials = (currentSheet.materials ?? []).filter(
+    (material) => !baselineKeys.has(materialRowKey(material)),
+  );
+
+  const baselinePremix = Number(baselineSheet.numberOfPremix) || 1;
+  const currentPremix = Number(currentSheet.numberOfPremix) || baselinePremix;
+
+  const merged: IdentificationSheet = {
+    ...baselineSheet,
+    numberOfPremix: Math.max(baselinePremix, currentPremix),
+    materials: [...baselineMaterials, ...addedMaterials],
+  };
+
+  return merged;
+};
+
+export const validateAdminBatchEdit = (
+  mode: AdminBatchEditMode,
+  baselineForm: BatchFormState,
+  currentForm: BatchFormState,
+  baselineImpl?: ImplementationFormState | null,
+  currentImpl?: ImplementationFormState | null,
+): AdminBatchEditValidationResult => {
+  if (mode !== "append_only") {
+    return { valid: true, errors: [] };
+  }
+
+  const errors: string[] = [];
+
+  for (const field of APPEND_ONLY_LOCKED_BATCH_FIELDS) {
+    if (JSON.stringify(currentForm[field]) !== JSON.stringify(baselineForm[field])) {
+      errors.push("LOCKED_FIELD_CHANGED");
+      break;
+    }
+  }
+
+  const baselineMotors = (baselineForm.motorIds ?? []).filter((id) => String(id ?? "").trim());
+  const currentMotors = currentForm.motorIds ?? [];
+  if (currentMotors.length < baselineMotors.length) {
+    errors.push("MOTOR_REMOVED");
+  } else {
+    const motorChanged = baselineMotors.some((id, index) => currentMotors[index] !== id);
+    if (motorChanged) {
+      errors.push("MOTOR_CHANGED");
+    }
+  }
+
+  if (baselineImpl && currentImpl) {
+    const baselineSheet = baselineImpl.identificationSheet;
+    const currentSheet = currentImpl.identificationSheet;
+
+    for (const field of IDENTIFICATION_HEADER_FIELDS) {
+      if (JSON.stringify(currentSheet[field]) !== JSON.stringify(baselineSheet[field])) {
+        errors.push("IDENTIFICATION_HEADER_CHANGED");
+        break;
+      }
+    }
+
+    const baselinePremix = Number(baselineSheet.numberOfPremix) || 1;
+    const currentPremix = Number(currentSheet.numberOfPremix) || baselinePremix;
+    if (currentPremix < baselinePremix) {
+      errors.push("PREMIX_REDUCED");
+    }
+
+    const baselineMaterialMap = new Map<string, string>();
+    (baselineSheet.materials ?? []).forEach((material) => {
+      baselineMaterialMap.set(materialRowKey(material), serializeMaterialForCompare(material));
+    });
+
+    for (const [key, serialized] of baselineMaterialMap.entries()) {
+      const currentMaterials = currentSheet.materials ?? [];
+      const match = currentMaterials.find((material) => materialRowKey(material) === key);
+      if (!match) {
+        errors.push("MATERIAL_REMOVED");
+        break;
+      }
+      if (serializeMaterialForCompare(match) !== serialized) {
+        errors.push("MATERIAL_CHANGED");
+        break;
+      }
+    }
+  }
+
+  return { valid: errors.length === 0, errors: [...new Set(errors)] };
 };

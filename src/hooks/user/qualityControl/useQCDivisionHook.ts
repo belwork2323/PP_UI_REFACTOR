@@ -46,6 +46,7 @@ import {
 } from "./qcFlowConfig";
 import {
   hasPartialChildNav,
+  isEmptyManufacturingDivisionDetailsPayload,
   isQcUnitApproved,
   isQcUnitLocked,
   resolveEntryIdsForPartialItem,
@@ -100,6 +101,8 @@ import {
   getProcessingMaterialsForPremix,
   hydrateProcessingMaterialValuesFromSeed,
   parseProcessingMaterialsFromDivisionDetails,
+  resolveProcessingMaterialSeedsForPremix,
+  type QcProcessingMaterialCatalog,
 } from "./qcProcessingMaterials";
 import {
   resolveDivisionSchemaRequest,
@@ -137,7 +140,6 @@ import {
   getHardwareSectionIdForSubType,
   QC_HARDWARE_ATTACHMENTS_SECTION_ID,
   QC_HARDWARE_PROCESS_OPTIONS,
-  resolveQcMotorIdOptions,
 } from "./qcHardwareConfig";
 import {
   applyHardwareDivisionDetailsSeed,
@@ -438,6 +440,7 @@ export const useQCDivisionHook = () => {
   const divisionAutoPopulateDataRef = useRef(divisionAutoPopulateData);
   divisionAutoPopulateDataRef.current = divisionAutoPopulateData;
   const batchDetailsPayloadRef = useRef<unknown>(null);
+  const processingMaterialCatalogRef = useRef<QcProcessingMaterialCatalog | null>(null);
   const resolvePropellantFmCount = useCallback(
     () =>
       resolveQcPropellantPremixCount(
@@ -792,6 +795,40 @@ export const useQCDivisionHook = () => {
     [messages.DETAILS_FETCH_ERROR, showAlert],
   );
 
+  const resolveProcessingBatchPayload = useCallback(
+    () =>
+      (divisionAutoPopulateDataRef.current as { __batchDetails?: unknown } | null)?.__batchDetails ??
+      batchDetailsPayloadRef.current ??
+      activeBatchRef.current,
+    [],
+  );
+
+  const ensureProcessingMaterialCatalog = useCallback(async () => {
+    if (processingMaterialCatalogRef.current) {
+      return processingMaterialCatalogRef.current;
+    }
+    const [solidResp, liquidResp] = await Promise.all([
+      operationsController.fetchMaterialsList({ materialType: "SOLID" }),
+      operationsController.fetchMaterialsList({ materialType: "LIQUID" }),
+    ]);
+    const catalog: QcProcessingMaterialCatalog = {
+      solidMaterials: solidResp?.success ? (solidResp.data ?? []) : [],
+      liquidMaterials: liquidResp?.success ? (liquidResp.data ?? []) : [],
+    };
+    processingMaterialCatalogRef.current = catalog;
+    return catalog;
+  }, []);
+
+  const resolveProcessingSeedsForPremix = useCallback(
+    async (seedPayload: unknown, premixNo: number, processingType?: string) =>
+      resolveProcessingMaterialSeedsForPremix(seedPayload, premixNo, {
+        batchPayload: resolveProcessingBatchPayload(),
+        processingType,
+        materialCatalog: await ensureProcessingMaterialCatalog(),
+      }),
+    [ensureProcessingMaterialCatalog, resolveProcessingBatchPayload],
+  );
+
   const loadDivisionAutoPopulate = useCallback(
     async (divisionFlowKey: string, typeValue?: string | null) => {
       const batchId = String(activeBatch?.batchId ?? "").trim();
@@ -946,21 +983,16 @@ export const useQCDivisionHook = () => {
             ...(batchPayload ? { __batchDetails: batchPayload } : {}),
           };
         } else {
-          // TO_BE_INITIATED → seed from /qc-division/division-details
-          if (divisionId == null) {
-            setDivisionAutoPopulateData(null);
-            clearPartialNav();
-            return null;
+          // TO_BE_INITIATED → seed from /qc-division/division-details (empty response is valid).
+          let manufacturingPayload: Record<string, unknown> | null = null;
+          if (divisionId != null) {
+            manufacturingPayload = await fetchManufacturingDivisionDetails({ batchId, divisionId });
+            if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
           }
-          seedRecord = await fetchManufacturingDivisionDetails({ batchId, divisionId });
-          if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
-          if (!seedRecord) {
-            setDivisionAutoPopulateData(null);
-            return null;
-          }
+          manufacturingPayload = manufacturingPayload ?? { premixes: [] };
           seedRecord = {
-            ...seedRecord,
-            __manufacturingDivisionData: seedRecord,
+            ...manufacturingPayload,
+            __manufacturingDivisionData: manufacturingPayload,
             ...(batchPayload ? { __batchDetails: batchPayload } : {}),
           };
         }
@@ -975,15 +1007,11 @@ export const useQCDivisionHook = () => {
           motorStatuses: formUnitStatusesRef.current.motorStatuses,
           premixStatuses: formUnitStatusesRef.current.premixStatuses,
         });
-        if (isBatchMotorSeededQcFlow(divisionFlowKey)) {
-          const fromBatch = resolveQcMotorIdOptions(activeBatch).map((option) => ({
-            id: `motor:${option.value}`,
-            kind: "MOTOR" as const,
-            label: option.value,
-            motorId: option.value,
-            status: "TO_BE_INITIATED" as const,
-          }));
-          withStatuses = mergePartialNavItems(withStatuses, fromBatch);
+        if (
+          divisionFlowKey === "RAW_MATERIAL" &&
+          typeKey === "RAW_MATERIAL_PROCESSING"
+        ) {
+          void ensureProcessingMaterialCatalog();
         }
         setPartialNavItems(withStatuses);
         setActivePartialNavIndex(0);
@@ -1005,6 +1033,7 @@ export const useQCDivisionHook = () => {
       activeBatch,
       clearPartialNav,
       divisionCatalog,
+      ensureProcessingMaterialCatalog,
       ensureQcFormDetailsPayload,
       fetchManufacturingDivisionDetails,
       messages.DETAILS_FETCH_ERROR,
@@ -1499,8 +1528,7 @@ export const useQCDivisionHook = () => {
       let seedPayload =
         resolveManufacturingDivisionDetailsPayload(divisionAutoPopulateData) ??
         divisionAutoPopulateData;
-      const materialSeeds = getProcessingMaterialsForPremix(seedPayload, premixNo);
-      if (!materialSeeds.length) {
+      if (!getProcessingMaterialsForPremix(seedPayload, premixNo).length) {
         const divisionId = resolveQcManufacturingDivisionDetailsId(
           divisionCatalog,
           selectedDivision,
@@ -1522,7 +1550,13 @@ export const useQCDivisionHook = () => {
         }
       }
 
-      const resolvedSeeds = getProcessingMaterialsForPremix(seedPayload, premixNo);
+      const processingType =
+        premixNavItem?.processingType || selectedProcessingType || "SOLID_PROCESSING";
+      const resolvedSeeds = await resolveProcessingSeedsForPremix(
+        seedPayload,
+        premixNo,
+        processingType,
+      );
       if (!resolvedSeeds.length || !subDepartmentId) {
         showAlert(messages.SCHEMA_FETCH_ERROR, "error");
         return;
@@ -3172,7 +3206,11 @@ export const useQCDivisionHook = () => {
             const seedPayload = await resolveSeedPayloadForUnit();
             if (requestId !== partialNavLoadRequestIdRef.current) return;
 
-            const materialSeeds = getProcessingMaterialsForPremix(seedPayload, item.premixNo);
+            const materialSeeds = await resolveProcessingSeedsForPremix(
+              seedPayload,
+              item.premixNo,
+              processingType,
+            );
             if (!materialSeeds.length || !subDepartmentId) {
               showAlert(messages.SCHEMA_FETCH_ERROR, "error");
               return;
@@ -3348,38 +3386,47 @@ export const useQCDivisionHook = () => {
     ],
   );
 
-  const qcPreviousDivisionGate = useMemo(
-    () =>
-      resolveQcPreviousDivisionApprovedUnits({
-        currentDivisionKey: resolveQcGateDivisionKey({
-          flowKey: selectedDivision,
-          rawMaterialType: selectedRawMaterialType,
-          tabKey: activeDivisionTabKey,
-        }),
-        stageProgress: batchStageArrays.stageProgress,
-        currentStage: batchStageArrays.currentStage,
-        premixStatuses: formUnitStatuses.premixStatuses,
-        motorStatuses: formUnitStatuses.motorStatuses,
-        candidateMotorIds: partialNavItems
-          .filter((item) => item.kind === "MOTOR")
-          .map((item) => item.motorId)
-          .filter((id): id is string => Boolean(id)),
-        candidatePremixNos: partialNavItems
-          .filter((item) => item.kind === "PREMIX" || item.kind === "FINAL_MIX")
-          .map((item) => item.premixNo ?? item.finalMixNo)
-          .filter((no): no is number => no != null),
+  const qcPreviousDivisionGate = useMemo(() => {
+    if (isEmptyManufacturingDivisionDetailsPayload(divisionAutoPopulateData)) {
+      return {
+        enableAll: true,
+        kind: null,
+        previousSubDepartmentId: null,
+        previousSubDepartmentName: null,
+        approvedPremixNos: new Set<number>(),
+        approvedMotorIds: new Set<string>(),
+      };
+    }
+    return resolveQcPreviousDivisionApprovedUnits({
+      currentDivisionKey: resolveQcGateDivisionKey({
+        flowKey: selectedDivision,
+        rawMaterialType: selectedRawMaterialType,
+        tabKey: activeDivisionTabKey,
       }),
-    [
-      activeDivisionTabKey,
-      batchStageArrays.currentStage,
-      batchStageArrays.stageProgress,
-      formUnitStatuses.motorStatuses,
-      formUnitStatuses.premixStatuses,
-      partialNavItems,
-      selectedDivision,
-      selectedRawMaterialType,
-    ],
-  );
+      stageProgress: batchStageArrays.stageProgress,
+      currentStage: batchStageArrays.currentStage,
+      premixStatuses: formUnitStatuses.premixStatuses,
+      motorStatuses: formUnitStatuses.motorStatuses,
+      candidateMotorIds: partialNavItems
+        .filter((item) => item.kind === "MOTOR")
+        .map((item) => item.motorId)
+        .filter((id): id is string => Boolean(id)),
+      candidatePremixNos: partialNavItems
+        .filter((item) => item.kind === "PREMIX" || item.kind === "FINAL_MIX")
+        .map((item) => item.premixNo ?? item.finalMixNo)
+        .filter((no): no is number => no != null),
+    });
+  }, [
+    activeDivisionTabKey,
+    batchStageArrays.currentStage,
+    batchStageArrays.stageProgress,
+    divisionAutoPopulateData,
+    formUnitStatuses.motorStatuses,
+    formUnitStatuses.premixStatuses,
+    partialNavItems,
+    selectedDivision,
+    selectedRawMaterialType,
+  ]);
 
   const isPartialNavItemEnabled = useCallback(
     (item: QcPartialNavItem | undefined) => {

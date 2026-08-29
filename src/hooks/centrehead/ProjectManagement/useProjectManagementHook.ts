@@ -7,7 +7,7 @@ import {
   mapProjectToFormState,
   getProjectManagementErrorMessage,
 } from "@data/models/centrehead/ProjectManagement/ProjectManagementModel";
-import { getDateRange } from "@/utils/dateUtils";
+import { getDashboardFilterBounds, getDateRange, toDashboardApiFilterType } from "@/utils/dateUtils";
 import { DEFAULT_DATE_FILTER_TYPE } from "@/ui/components/custom/dashboard/DashboardDateFilter";
 
 const S = STRINGS.PROJECT_MANAGEMENT;
@@ -152,16 +152,16 @@ function useProjectStatsSection(
   const getStatsPayload = useCallback(() => {
     if (filterType === "custom") {
       return {
-        filterType,
+        filterType: "custom",
         startDate: appliedCustomStart,
         endDate: appliedCustomEnd,
       };
     }
 
-    const { startDate, endDate } = getDateRange(filterType);
+    const { startDate, endDate } = getDashboardFilterBounds(filterType);
 
     return {
-      filterType,
+      filterType: toDashboardApiFilterType(filterType),
       startDate,
       endDate,
     };
@@ -203,7 +203,7 @@ function useProjectStatsSection(
       setAppliedCustomStart("");
       setAppliedCustomEnd("");
 
-      const { startDate, endDate } = getDateRange(value);
+      const { startDate, endDate } = getDashboardFilterBounds(value);
 
       setDashboardDateFilter({
         startDate,

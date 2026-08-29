@@ -67,11 +67,34 @@ export const getDept = (b: any): string => b.department?.departmentName || "—"
 
 export const getSubDept = (b: any): string => {
   if (Array.isArray(b.subDepartments) && b.subDepartments.length > 0) {
-    return b.subDepartments[0]?.subDepartmentName || "—";
+    const name = b.subDepartments[0]?.subDepartmentName;
+    if (name && String(name).trim()) return String(name).trim();
   }
+
+  const stage = b.stage && typeof b.stage === "object" ? b.stage : null;
+  const dept =
+    stage?.department && typeof stage.department === "object"
+      ? stage.department
+      : stage?.departmentId != null || stage?.departmentName
+        ? stage
+        : null;
+  const stageSubDept = stage?.subDepartment ?? dept?.subDepartment;
+
+  if (typeof stageSubDept === "string" && stageSubDept.trim()) {
+    return stageSubDept.trim();
+  }
+  if (stageSubDept?.subDepartmentName) {
+    return String(stageSubDept.subDepartmentName).trim();
+  }
+
+  const rootSubDept = b.subDepartmentName ?? b.firstSubDept ?? b.subDepartment ?? b.subDept;
+  if (rootSubDept && String(rootSubDept).trim()) {
+    return String(rootSubDept).trim();
+  }
+
   // When identification sheet is DRAFT, API sends stage.departmentName = "Yet to Assign"
   // with empty subDepartments — fall back to department name.
-  return b.subDepartment || b.subDept || b.department?.departmentName || "—";
+  return b.department?.departmentName || "—";
 };
 
 export const getSystemManagerLabel = (b: any): string =>
@@ -102,7 +125,7 @@ export const isIdentificationSheetDraft = (b: any): boolean => {
 
 export const isIdentificationSheetCompleted = (b: any): boolean => {
   const status = getIdentificationSheetStatus(b);
-  if (status === "COMPLETED") return true;
+  if (status === "COMPLETED" || status === "COMPLETE") return true;
   if (status === "DRAFT") return false;
   return Boolean(b.identificationSheet && Object.keys(b.identificationSheet).length > 0);
 };
@@ -134,6 +157,35 @@ export const isToBeInitiatedBatchStatus = (b: any): boolean => {
   const status = normalizeWorkflowStatus(getStatus(b));
   return status === "TO_BE_INITIATED" || status === "TO_BE_INTIATED" || status === "INITIATED";
 };
+
+/** Batch workflow status is In Progress in the current stage. */
+export const isInProgressBatchStatus = (b: any): boolean =>
+  normalizeWorkflowStatus(getStatus(b)) === "IN_PROGRESS";
+
+/** Batch has not yet been assigned to a processing sub-department. */
+export const isYetToAssignStage = (b: any): boolean => {
+  const subDept = getSubDept(b).trim().toLowerCase();
+  const dept = String(b.department?.departmentName ?? getDept(b) ?? "")
+    .trim()
+    .toLowerCase();
+  return subDept === "yet to assign" || dept === "yet to assign";
+};
+
+/** First workflow sub-department for this batch type (RMP for MAIN, Subscale for SUBSCALE). */
+export const isFirstSubDepartmentStage = (b: any): boolean =>
+  isSubscaleBatchType(b) ? isSubscaleStage(b) : isRawMaterialPreparationStage(b);
+
+export type AdminBatchEditMode = "none" | "full" | "append_only";
+
+/** Resolve admin batch edit permissions from list/detail row. */
+export const getAdminBatchEditMode = (b: any): AdminBatchEditMode => {
+  if (!isIdentificationSheetCompleted(b)) return "none";
+  if (isYetToAssignStage(b)) return "full";
+  if (isFirstSubDepartmentStage(b) && isToBeInitiatedBatchStatus(b)) return "full";
+  return "append_only";
+};
+
+export const canEditAdminBatch = (b: any): boolean => getAdminBatchEditMode(b) !== "none";
 
 /**
  * Admin batch list delete is allowed only when:

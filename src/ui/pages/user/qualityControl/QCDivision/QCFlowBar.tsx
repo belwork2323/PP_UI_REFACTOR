@@ -124,7 +124,8 @@ const QCFlowBar = ({
   const L = QC_FLOW_LABELS;
   const panelType = getQcDivisionPanelType(selectedDivision);
   const showRawMaterialType = panelType === "RAW_MATERIAL";
-  const hideRawMaterialProcessingPickers = isRawMaterialProcessingType(selectedRawMaterialType);
+  const hideRawMaterialProcessingPickers =
+    isRawMaterialProcessingType(selectedRawMaterialType) && partialNavActive;
   const showProcessingType =
     showRawMaterialType &&
     isRawMaterialProcessingType(selectedRawMaterialType) &&

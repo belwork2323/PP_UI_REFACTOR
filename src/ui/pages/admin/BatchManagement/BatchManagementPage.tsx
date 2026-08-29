@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useMemo } from "react";
 import {
   Box,
   Button,
@@ -24,7 +24,9 @@ import { getBatchId, getMotorId } from "@utils/batchManagementUtils";
 import BatchManagementList from "./BatchManagementList";
 import CreateBatchManagementForm from "./CreateBatchManagementForm";
 import BatchImplementationForm from "./BatchImplementationForm";
+import BatchDetailPopup from "@ui/pages/systemManager/components/BatchDetails";
 import BatchDetailsView from "./BatchDetailsView";
+import getSystemManagerTheme from "@app/theme/custom_themes/system_manager/sysDashboard_theme";
 import FilterToggleButton from "@/ui/components/common/FilterToggleButton";
 import DashboardDateFilter, {
   getDateFilterDisplayLabel,
@@ -46,6 +48,7 @@ const STAT_ICONS: Record<string, React.ReactNode> = {
 const BatchManagementPage = () => {
   const mode = useThemeStore((s) => s.mode);
   const t = getBatchManagementTheme(mode);
+  const smTheme = useMemo(() => getSystemManagerTheme(mode), [mode]);
   const {
     list,
     stats,
@@ -259,6 +262,7 @@ const BatchManagementPage = () => {
           onEdit={form.openEdit}
           onDelete={deleteSection.openDelete}
           onCompleteImplementation={form.openCompleteImplementation}
+          onViewStatus={form.openViewStatus}
           onViewDetails={form.openViewDetails}
           onPageChange={(_, p) => list.setPage(p)}
           onRowsPerPageChange={(e) => {
@@ -294,6 +298,8 @@ const BatchManagementPage = () => {
         articlesLoading={lookups.subscaleArticlesLoading}
         saving={form.saving}
         canSaveBatchChanges={form.canSaveBatchChanges}
+        editMode={form.editMode}
+        baselineMotorIds={form.baselineMotorIds}
         t={t}
       />
 
@@ -306,6 +312,8 @@ const BatchManagementPage = () => {
         onFormChange={form.handleImplFormChange}
         onMaterialsChange={form.handleMaterialsChange}
         readOnly={form.implViewOnly}
+        editMode={form.editMode}
+        baselineImplForm={form.implBaselineSnapshot}
         isBatchEditMode={form.implFromBatchEdit}
         saving={form.implSaving}
         t={t}
@@ -319,6 +327,15 @@ const BatchManagementPage = () => {
         getLotOptionsForRow={implementation.getLotOptionsForRow}
         setConfirmOpen={form.setConfirmOpen}
       />
+
+      {form.statusBatch && (
+        <BatchDetailPopup
+          batch={form.statusBatch}
+          stageConfig={smTheme.dashboardConfig.stageConfig}
+          onClose={form.closeViewStatus}
+          t={smTheme}
+        />
+      )}
 
       <BatchDetailsView
         open={form.detailsOpen}

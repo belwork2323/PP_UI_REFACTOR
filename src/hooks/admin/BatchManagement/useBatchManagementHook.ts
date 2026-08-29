@@ -15,6 +15,7 @@ import {
   buildAdditionalBatchDetailsUpdatePayload,
   buildIdentificationUpdatePayload,
   hasAdditionalBatchDetailsChanges,
+  validateAdminBatchEdit,
   normalizeMaterialCodeKey,
   groupLotsByMaterialCode,
   toBatchMaterialOptions,
@@ -27,7 +28,16 @@ import {
 } from "@data/models/user/RawMaterialProcurementModel";
 import { useAlertStore } from "@app/store/alertStore";
 import { STRINGS } from "@app/config/strings";
-import { canDeleteAdminBatch } from "@utils/batchManagementUtils";
+import {
+  canDeleteAdminBatch,
+  canEditAdminBatch,
+  getAdminBatchEditMode,
+  getBatchId,
+  getMotorId,
+  getStage,
+  getStatus,
+  getSubDept,
+} from "@utils/batchManagementUtils";
 import { getDashboardFilterBounds, toDashboardApiFilterType } from "@utils/dateUtils";
 import { DEFAULT_DATE_FILTER_TYPE } from "@/ui/components/custom/dashboard/DashboardDateFilter";
 import { OPERATION_STATUS } from "@hooks/operationStatus";
@@ -38,6 +48,16 @@ import type {
 } from "@data/api/common/generalAPI";
 
 const S = STRINGS.BATCH_MANAGEMENT;
+
+const resolveEditValidationMessage = (errorCode: string): string => {
+  const messages = S.EDIT.VALIDATION_ERRORS as Record<string, string>;
+  return messages[errorCode] ?? S.EDIT.VALIDATION_GENERIC;
+};
+
+const showEditValidationErrors = (errors: string[]) => {
+  const message = errors.map(resolveEditValidationMessage).join(" ");
+  useAlertStore.getState().showAlert(message, "warning");
+};
 
 const DEFAULT_BATCH_FILTERS = {
   search: "",
@@ -447,8 +467,12 @@ function useBatchFormSection(onRefresh: () => void) {
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [detailsBatch, setDetailsBatch] = useState<any>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
+  const [statusBatch, setStatusBatch] = useState<any>(null);
   const batchFormBaselineRef = useRef("");
   const implFormBaselineRef = useRef("");
+  const [implBaselineSnapshot, setImplBaselineSnapshot] = useState(
+    createEmptyImplementationFormState(),
+  );
   const batchModalCloseCallbackRef = useRef<(() => void) | undefined>();
 
   const serializeFormSnapshot = (value: unknown) => JSON.stringify(value);
@@ -459,6 +483,7 @@ function useBatchFormSection(onRefresh: () => void) {
 
   const setImplFormBaseline = (form: ReturnType<typeof createEmptyImplementationFormState>) => {
     implFormBaselineRef.current = serializeFormSnapshot(form);
+    setImplBaselineSnapshot(form);
   };
 
   const isBatchFormDirty = () =>
@@ -529,6 +554,11 @@ function useBatchFormSection(onRefresh: () => void) {
   };
 
   const openEdit = async (batch: any) => {
+    if (!canEditAdminBatch(batch)) {
+      useAlertStore.getState().showAlert(S.EDIT.BLOCKED, "warning");
+      return;
+    }
+
     setSaving(true);
     setModalOpen(true);
     setEditTarget(batch);
@@ -584,6 +614,24 @@ function useBatchFormSection(onRefresh: () => void) {
     await loadImplementationForm(batch, false);
   };
 
+  const openViewStatus = (batch: any) => {
+    setStatusBatch({
+      id: getBatchId(batch),
+      batchId: getBatchId(batch),
+      motorId: getMotorId(batch),
+      stage: getStage(batch),
+      substage: getSubDept(batch),
+      status: getStatus(batch),
+      batchType: batch.batchType ?? batch.motorType,
+      projectName: batch.projectName,
+      completion: batch.completion ?? batch.overallProgress ?? 0,
+    });
+  };
+
+  const closeViewStatus = () => {
+    setStatusBatch(null);
+  };
+
   const openViewDetails = async (batch: any) => {
     setDetailsOpen(true);
     setDetailsLoading(true);
@@ -630,6 +678,29 @@ function useBatchFormSection(onRefresh: () => void) {
     setImplForm(nextImpl);
     setImplFormBaseline(nextImpl);
     setImplModalOpen(true);
+  };
+
+  const editMode = useMemo(
+    () => (editTarget ? getAdminBatchEditMode(editTarget) : "full"),
+    [editTarget],
+  );
+
+  const getBatchFormBaseline = (): ReturnType<typeof createEmptyBatchFormState> => {
+    try {
+      return JSON.parse(batchFormBaselineRef.current) as ReturnType<typeof createEmptyBatchFormState>;
+    } catch {
+      return createEmptyBatchFormState();
+    }
+  };
+
+  const getImplFormBaseline = (): ReturnType<typeof createEmptyImplementationFormState> => {
+    try {
+      return JSON.parse(implFormBaselineRef.current) as ReturnType<
+        typeof createEmptyImplementationFormState
+      >;
+    } catch {
+      return createEmptyImplementationFormState();
+    }
   };
 
   const handleSaveBatch = async () => {
@@ -680,10 +751,14 @@ function useBatchFormSection(onRefresh: () => void) {
       : { ...batchForm, numberOfMotors: motorIds.length };
 
     if (editTarget) {
-      const baseline = JSON.parse(batchFormBaselineRef.current) as ReturnType<
-        typeof createEmptyBatchFormState
-      >;
+      const baseline = getBatchFormBaseline();
       if (!hasAdditionalBatchDetailsChanges(baseline, batchForm)) {
+        return;
+      }
+
+      const validation = validateAdminBatchEdit(editMode, baseline, batchForm);
+      if (!validation.valid) {
+        showEditValidationErrors(validation.errors);
         return;
       }
     }
@@ -694,7 +769,10 @@ function useBatchFormSection(onRefresh: () => void) {
     const ok = editTarget
       ? await batchManagementController.updateBatch(
           editTarget.batchId,
-          buildAdditionalBatchDetailsUpdatePayload(editTarget, batchForm),
+          buildAdditionalBatchDetailsUpdatePayload(editTarget, batchForm, {
+            mode: editMode,
+            baselineForm: getBatchFormBaseline(),
+          }),
         )
       : await batchManagementController.createBatch(payload);
 
@@ -714,7 +792,25 @@ function useBatchFormSection(onRefresh: () => void) {
     useAlertStore.getState().showAlert(S.MESSAGES.SAVING_IDENTIFICATION, "info", { loading: true });
 
     if (implFromBatchEdit && editTarget) {
-      const payload = buildIdentificationUpdatePayload(editTarget, implForm);
+      const baselineForm = getBatchFormBaseline();
+      const baselineImpl = getImplFormBaseline();
+      const validation = validateAdminBatchEdit(
+        editMode,
+        baselineForm,
+        batchForm,
+        baselineImpl,
+        implForm,
+      );
+      if (!validation.valid) {
+        setImplSaving(false);
+        showEditValidationErrors(validation.errors);
+        return;
+      }
+
+      const payload = buildIdentificationUpdatePayload(editTarget, implForm, {
+        mode: editMode,
+        baselineImpl,
+      });
       const ok = await batchManagementController.updateBatch(editTarget.batchId, payload);
 
       if (ok) {
@@ -866,15 +962,19 @@ function useBatchFormSection(onRefresh: () => void) {
 
   const canSaveBatchChanges =
     !editTarget ||
-    hasAdditionalBatchDetailsChanges(
-      JSON.parse(batchFormBaselineRef.current) as ReturnType<typeof createEmptyBatchFormState>,
-      batchForm,
-    );
+    hasAdditionalBatchDetailsChanges(getBatchFormBaseline(), batchForm);
+
+  const baselineMotorIds = useMemo(() => {
+    if (!editTarget || editMode !== "append_only") return [];
+    return (getBatchFormBaseline().motorIds ?? []).filter((id) => String(id ?? "").trim());
+  }, [editTarget, editMode, batchForm]);
 
   return {
     modalOpen,
     setModalOpen,
     editTarget,
+    editMode,
+    baselineMotorIds,
     batchForm,
     saving,
     canSaveBatchChanges,
@@ -888,11 +988,15 @@ function useBatchFormSection(onRefresh: () => void) {
     setImplModalOpen,
     editImplTarget,
     implForm,
+    implBaselineSnapshot,
     implSaving,
     implViewOnly,
     setImplViewOnly,
     implFromBatchEdit,
     openCompleteImplementation,
+    openViewStatus,
+    statusBatch,
+    closeViewStatus,
     openViewDetails,
     detailsOpen,
     detailsBatch,

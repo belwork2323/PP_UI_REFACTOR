@@ -16,6 +16,12 @@ import {
   serializeProcessSubmissionForApi,
 } from "../../../data/models/user/rawMaterialPreparationApiMapper";
 import { formatToIsoDateInput } from "../../../utils/dateUtils";
+import type { MaterialItem } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
+import type { MaterialsListItem } from "../../../data/models/user/MaterialsListModel";
+import {
+  buildPremixMaterialOptions,
+  type RawMaterialPrepMaterialOption,
+} from "../manufacturing/rawMaterialPrepFlowConfig";
 import type { QcDivisionEntry } from "./qcDivisionEntryTypes";
 
 const createProcessingEntryId = () =>
@@ -279,6 +285,115 @@ export const getProcessingMaterialsForPremix = (
   premixNo: number,
 ): QcProcessingMaterialSeed[] =>
   parseProcessingMaterialsFromDivisionDetails(payload).filter((seed) => seed.premixNo === premixNo);
+
+export type QcProcessingMaterialCatalog = {
+  solidMaterials: RawMaterialPrepMaterialOption[];
+  liquidMaterials: RawMaterialPrepMaterialOption[];
+};
+
+const resolveBatchPayloadRoot = (batchPayload: unknown): Record<string, unknown> | null => {
+  const batch = asRecord(batchPayload);
+  if (!batch) return null;
+  return asRecord(batch.__batchDetails) ?? batch;
+};
+
+const normalizeNavProcessingType = (
+  value?: string,
+): "SOLID_PROCESSING" | "LIQUID_PROCESSING" | "BOTH" => {
+  const raw = String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+  if (raw === "LIQUID_PROCESSING" || raw === "LIQUID") return "LIQUID_PROCESSING";
+  if (raw === "BOTH") return "BOTH";
+  return "SOLID_PROCESSING";
+};
+
+/** Build empty processing material seeds from batch identification sheet when division-details is empty. */
+export const buildProcessingMaterialSeedsFromBatchSheet = (
+  batchPayload: unknown,
+  premixNo: number,
+  processingType: string | undefined,
+  catalog: QcProcessingMaterialCatalog,
+): QcProcessingMaterialSeed[] => {
+  const batch = resolveBatchPayloadRoot(batchPayload);
+  if (!batch) return [];
+
+  const sheet = asRecord(batch.identificationSheet);
+  const sheetMaterials = asArray(sheet?.materials).filter(
+    (row): row is MaterialItem => row != null && typeof row === "object",
+  );
+  if (!sheetMaterials.length) return [];
+
+  const navType = normalizeNavProcessingType(processingType);
+  const options = buildPremixMaterialOptions(
+    sheetMaterials,
+    catalog.solidMaterials,
+    catalog.liquidMaterials,
+  );
+
+  const seeds: QcProcessingMaterialSeed[] = [];
+  options.forEach((option) => {
+    const materialId = Number(option.materialId ?? 0);
+    const materialCode = String(option.materialCode ?? "").trim();
+    if (!materialId || !materialCode) return;
+
+    const gradeCode = pickString(option.gradeCode) || null;
+    const gradeId = option.gradeId ?? null;
+    const includeSolid = navType === "BOTH" || navType === "SOLID_PROCESSING";
+    const includeLiquid = navType === "BOTH" || navType === "LIQUID_PROCESSING";
+
+    if (includeSolid && (option.processType === "solid" || option.processType === "both")) {
+      seeds.push({
+        premixNo,
+        processSlot: "solid",
+        materialId,
+        materialCode,
+        materialName: pickString(option.materialName) || materialCode,
+        gradeId,
+        gradeCode,
+        sections: [],
+      });
+    }
+    if (includeLiquid && (option.processType === "liquid" || option.processType === "both")) {
+      seeds.push({
+        premixNo,
+        processSlot: "liquid",
+        materialId,
+        materialCode,
+        materialName: pickString(option.materialName) || materialCode,
+        gradeId,
+        gradeCode,
+        sections: [],
+      });
+    }
+  });
+
+  return seeds;
+};
+
+/** Prefer division-details seeds; fall back to batch identification sheet with empty sections. */
+export const resolveProcessingMaterialSeedsForPremix = (
+  payload: unknown,
+  premixNo: number,
+  options?: {
+    batchPayload?: unknown;
+    processingType?: string;
+    materialCatalog?: QcProcessingMaterialCatalog | null;
+  },
+): QcProcessingMaterialSeed[] => {
+  const fromDetails = getProcessingMaterialsForPremix(payload, premixNo);
+  if (fromDetails.length) return fromDetails;
+
+  if (!options?.materialCatalog) return [];
+
+  return buildProcessingMaterialSeedsFromBatchSheet(
+    options.batchPayload,
+    premixNo,
+    options.processingType,
+    options.materialCatalog,
+  );
+};
 
 export const fetchQcProcessingMaterialSchema = async (params: {
   subDepartmentId: number;

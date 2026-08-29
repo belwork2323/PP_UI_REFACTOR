@@ -3192,7 +3192,6 @@ export const STRINGS = {
       "Project",
       "Motor Stage",
       "Motor ID",
-      "Processing Stage",
       "Status",
       "System Manager",
       "Actions",
@@ -3205,8 +3204,21 @@ export const STRINGS = {
       COMPLETE_IMPLEMENTATION_TOOLTIP: "Complete identification sheet",
       VIEW_DETAILS: "View Details",
       VIEW_DETAILS_TOOLTIP: "View details",
+      VIEW_STATUS: "View Status",
+      VIEW_STATUS_TOOLTIP: "View batch status and progress",
+      TRACK_BATCH: "Track batch",
+      TRACK_BATCH_TOOLTIP: "Track sub-department progress",
       EDIT_BATCH: "Edit batch",
       DELETE_BATCH: "Delete batch",
+    },
+    TRACKING: {
+      TITLE: "Batch Tracking",
+      CLOSE: "Close tracking",
+      OVERALL_PROGRESS: "Overall progress",
+      EMPTY: "No tracking data available.",
+      NO_STAGES: "No department stages found.",
+      NO_SUBDEPARTMENTS: "No sub-departments available.",
+      LOADING: "Loading batch tracking...",
     },
     FORM: {
       IDENTIFICATION_LABEL: "Identification",
@@ -3369,6 +3381,23 @@ export const STRINGS = {
       ARTICLES_REQUIRED: "Select at least one subscale article.",
       DELETE_BATCH_NOT_ALLOWED:
         "This batch can only be deleted while identification is in draft, when it is in Raw Material Preparation with status To Be Initiated (main batches), or when it is in Subscale with status To Be Initiated (subscale batches).",
+    },
+    EDIT: {
+      BLOCKED:
+        "This batch cannot be edited at its current stage. Editing is allowed only in Yet to Assign, or in the first sub-department while status is To Be Initiated or In Progress (additions only).",
+      APPEND_ONLY_BANNER:
+        "Batch is in progress. Existing motors, materials, premix count, and project details are locked. You may only add new motors, materials, or increase premix count.",
+      VALIDATION_GENERIC: "Save blocked: this change is not allowed while the batch is in progress.",
+      VALIDATION_ERRORS: {
+        LOCKED_FIELD_CHANGED: "Project, stage, system manager, and related details cannot be changed while the batch is in progress.",
+        MOTOR_REMOVED: "Existing motors cannot be removed while the batch is in progress.",
+        MOTOR_CHANGED: "Existing motor assignments cannot be changed while the batch is in progress.",
+        IDENTIFICATION_HEADER_CHANGED:
+          "Identification sheet header details cannot be changed while the batch is in progress.",
+        PREMIX_REDUCED: "Premix count cannot be reduced while the batch is in progress.",
+        MATERIAL_REMOVED: "Existing materials cannot be removed while the batch is in progress.",
+        MATERIAL_CHANGED: "Existing material rows cannot be modified while the batch is in progress.",
+      },
     },
     ERRORS: {
       LOAD_LIST_FAILED: "Failed to load batch list.",

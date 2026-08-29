@@ -28,12 +28,17 @@ import AppTextField from "@ui/components/common/AppTextField";
 import AppDropdown from "@ui/components/common/AppDropdown";
 import AdminManagementFormHeader from "@ui/components/custom/admin/AdminManagementFormHeader";
 import type { BatchMaterialOption } from "@data/models/admin/BatchManagement/BatchManagementModel";
+import { normalizeMaterialCodeKey } from "@data/models/admin/BatchManagement/BatchManagementModel";
 import type { SystemMasterOption } from "@data/api/common/generalAPI";
 import DateField from "@ui/components/common/DateField";
 import { formatToUiDate } from "@utils/dateUtils";
 import { appDenseControlSx } from "@ui/components/common/fieldStyles";
 
 const S = STRINGS.BATCH_MANAGEMENT.FORM;
+const S_EDIT = STRINGS.BATCH_MANAGEMENT.EDIT;
+
+const materialTrackingKey = (material: Material) =>
+  `${material.srNo}-${normalizeMaterialCodeKey(material.materialCode)}`;
 
 interface Material {
   srNo: number;
@@ -103,6 +108,8 @@ export default function BatchImplementationForm({
   onFormChange,
   onMaterialsChange,
   readOnly = false,
+  editMode = "full",
+  baselineImplForm = null,
   isBatchEditMode = false,
   saving,
   t,
@@ -123,6 +130,20 @@ export default function BatchImplementationForm({
   const [compositionDrafts, setCompositionDrafts] = useState<Record<string, string>>({});
 
   const fieldDisabled = readOnly || saving;
+  const isAppendOnlyEdit = editMode === "append_only" && Boolean(baselineImplForm);
+  const baselinePremix = Number(baselineImplForm?.identificationSheet?.numberOfPremix) || 1;
+  const baselineMaterialKeys = useMemo(() => {
+    if (!isAppendOnlyEdit) return new Set<string>();
+    return new Set(
+      (baselineImplForm?.identificationSheet?.materials ?? []).map((material: Material) =>
+        materialTrackingKey(material),
+      ),
+    );
+  }, [baselineImplForm, isAppendOnlyEdit]);
+
+  const isBaselineMaterial = (material: Material) =>
+    isAppendOnlyEdit && baselineMaterialKeys.has(materialTrackingKey(material));
+  const headerFieldDisabled = fieldDisabled || isAppendOnlyEdit;
 
   const currentMixerValue = String(
     form.identificationSheet?.mixerType ?? form.identificationSheet?.mixerDetails ?? "",
@@ -253,6 +274,8 @@ export default function BatchImplementationForm({
   };
 
   const handleRemoveMaterial = (index: number) => {
+    const material = (form.identificationSheet?.materials ?? [])[index] as Material | undefined;
+    if (material && isBaselineMaterial(material)) return;
     const newMaterials =
       form.identificationSheet?.materials?.filter((_: any, i: number) => i !== index) ?? [];
     onMaterialsChange(newMaterials);
@@ -396,6 +419,23 @@ export default function BatchImplementationForm({
       <DialogContent sx={modal.content}>
         <Box sx={modal.headerGap} />
         <Stack spacing={modal.stackSpacing}>
+          {isAppendOnlyEdit && (
+            <Box
+              sx={{
+                px: 1.5,
+                py: 1.2,
+                borderRadius: "8px",
+                bgcolor: "info.50",
+                border: "1px dashed",
+                borderColor: "info.light",
+              }}
+            >
+              <Typography sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
+                {S_EDIT.APPEND_ONLY_BANNER}
+              </Typography>
+            </Box>
+          )}
+
           {/* Identification Sheet Details */}
           <Box>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={modal.fieldRowSpacing}>
@@ -406,7 +446,7 @@ export default function BatchImplementationForm({
                   const newIdent = { ...form.identificationSheet, date };
                   onFormChange("identificationSheet", newIdent);
                 }}
-                disabled={readOnly}
+                disabled={headerFieldDisabled}
                 sx={{ mb: 0, ...input }}
               />
               <FormInput
@@ -430,7 +470,7 @@ export default function BatchImplementationForm({
                 }}
                 required
                 inputProps={{ min: 0, step: "any" }}
-                disabled={readOnly}
+                disabled={headerFieldDisabled}
                 sx={{
                   mb: 0,
                   ...input,
@@ -455,7 +495,7 @@ export default function BatchImplementationForm({
                   const newIdent = { ...form.identificationSheet, bondingSheetNo: e.target.value };
                   onFormChange("identificationSheet", newIdent);
                 }}
-                disabled={fieldDisabled}
+                disabled={headerFieldDisabled}
                 sx={{ mb: 0, ...input }}
               />
               <AppDropdown
@@ -467,7 +507,7 @@ export default function BatchImplementationForm({
                     mixerType: value,
                   });
                 }}
-                disabled={fieldDisabled || loadingMasterLookups}
+                disabled={headerFieldDisabled || loadingMasterLookups}
                 placeholder={
                   loadingMasterLookups
                     ? "Loading mixers..."
@@ -502,7 +542,7 @@ export default function BatchImplementationForm({
                     BldgNo: value,
                   });
                 }}
-                disabled={fieldDisabled || loadingMasterLookups}
+                disabled={headerFieldDisabled || loadingMasterLookups}
                 placeholder={
                   loadingMasterLookups
                     ? "Loading buildings..."
@@ -530,26 +570,25 @@ export default function BatchImplementationForm({
                 value={form.identificationSheet?.numberOfPremix ?? ""}
                 onChange={(e) => {
                   const value = e.target.value;
+                  const parsed = value === "" ? "" : Math.max(baselinePremix, Number(value));
 
                   const newIdent = {
                     ...form.identificationSheet,
-                    numberOfPremix: value === "" ? "" : Math.max(1, Number(value)),
+                    numberOfPremix: parsed,
                   };
 
                   onFormChange("identificationSheet", newIdent);
                 }}
                 onBlur={() => {
-                  if (
-                    !form.identificationSheet?.numberOfPremix ||
-                    Number(form.identificationSheet.numberOfPremix) < 1
-                  ) {
+                  const currentPremix = Number(form.identificationSheet?.numberOfPremix);
+                  if (!currentPremix || currentPremix < baselinePremix) {
                     onFormChange("identificationSheet", {
                       ...form.identificationSheet,
-                      numberOfPremix: 1,
+                      numberOfPremix: baselinePremix,
                     });
                   }
                 }}
-                inputProps={{ min: 1 }}
+                inputProps={{ min: isAppendOnlyEdit ? baselinePremix : 1 }}
                 disabled={fieldDisabled}
                 sx={{ mb: 0, ...input }}
               />
@@ -561,7 +600,7 @@ export default function BatchImplementationForm({
                   const newIdent = { ...form.identificationSheet, remarks: e.target.value };
                   onFormChange("identificationSheet", newIdent);
                 }}
-                disabled={fieldDisabled}
+                disabled={headerFieldDisabled}
                 sx={{ mb: 0, ...input }}
               />
             </Stack>
@@ -706,6 +745,7 @@ export default function BatchImplementationForm({
                   </TableHead>
                   <TableBody>
                     {form.identificationSheet?.materials?.map((material: Material, idx: number) => {
+                      const rowLocked = isBaselineMaterial(material);
                       const lotOptionsForRow = getLotOptionsForRow(
                         material.materialCode,
                         material.lotId,
@@ -744,7 +784,7 @@ export default function BatchImplementationForm({
                             <AppDropdown
                               value={material.lotId ?? ""}
                               onChange={(value) => handleLotIdChange(idx, value)}
-                              disabled={fieldDisabled || loadingLots || !material.materialCode}
+                              disabled={fieldDisabled || rowLocked || loadingLots || !material.materialCode}
                               loading={loadingLots}
                               placeholder={lotPlaceholder}
                               compact
@@ -781,7 +821,7 @@ export default function BatchImplementationForm({
                                 handleCompositionInputChange(idx, material, e.target.value)
                               }
                               onBlur={() => commitCompositionInput(idx, material)}
-                              disabled={fieldDisabled}
+                              disabled={fieldDisabled || rowLocked}
                               compact
                               sx={materialsTable?.compositionControl}
                             />
@@ -797,7 +837,7 @@ export default function BatchImplementationForm({
                               onChange={(date) =>
                                 handleMaterialChange(idx, "revalidationFromDate", date)
                               }
-                              disabled={fieldDisabled}
+                              disabled={fieldDisabled || rowLocked}
                               compact
                               placeholder="DD-MM-YYYY"
                               sx={materialsTable?.dateControl}
@@ -809,7 +849,7 @@ export default function BatchImplementationForm({
                               onChange={(date) =>
                                 handleMaterialChange(idx, "revalidationToDate", date)
                               }
-                              disabled={fieldDisabled}
+                              disabled={fieldDisabled || rowLocked}
                               compact
                               placeholder="DD-MM-YYYY"
                               sx={materialsTable?.dateControl}
@@ -817,20 +857,22 @@ export default function BatchImplementationForm({
                           </TableCell>
                           {!readOnly && (
                             <TableCell sx={{ ...cellSx, width: 80 }}>
-                              <Button
-                                size="small"
-                                color="error"
-                                onClick={() => handleRemoveMaterial(idx)}
-                                sx={{
-                                  textTransform: "none",
-                                  fontWeight: 700,
-                                  minWidth: 0,
-                                  px: 1,
-                                  fontSize: "0.75rem",
-                                }}
-                              >
-                                Remove
-                              </Button>
+                              {!rowLocked && (
+                                <Button
+                                  size="small"
+                                  color="error"
+                                  onClick={() => handleRemoveMaterial(idx)}
+                                  sx={{
+                                    textTransform: "none",
+                                    fontWeight: 700,
+                                    minWidth: 0,
+                                    px: 1,
+                                    fontSize: "0.75rem",
+                                  }}
+                                >
+                                  Remove
+                                </Button>
+                              )}
                             </TableCell>
                           )}
                         </TableRow>
@@ -874,7 +916,7 @@ export default function BatchImplementationForm({
 
                       onFormChange("identificationSheet", newIdent);
                     }}
-                    disabled={fieldDisabled}
+                    disabled={headerFieldDisabled}
                     sx={materialsTable?.prcDateField ?? { mb: 0, maxWidth: 280, ...input }}
                   />
                 </Box>

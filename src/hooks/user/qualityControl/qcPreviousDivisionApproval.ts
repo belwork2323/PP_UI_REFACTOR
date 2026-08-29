@@ -9,9 +9,6 @@ import {
   type QcPartialNavItem,
 } from "./qcDivisionApprovalUnits";
 
-/** QC divisions that gate premix units on the latest subdepartment with premix statuses. */
-const PREMIX_QC_DIVISIONS = new Set(["RAW_MATERIAL_PROCESSING", "MIXING"]);
-
 /** QC divisions that gate motor units on the previous motor subdepartment (typically NDT). */
 const MOTOR_QC_DIVISIONS = new Set([
   "HARDWARE",
@@ -223,6 +220,11 @@ export const formatQcDivisionGateLabel = (divisionKey: string | null | undefined
 const isMixingStage = (stage: StageProgressEntry): boolean =>
   normalizeNameKey(stage.subDepartmentName) === "mixing";
 
+const isRawMaterialPrepStage = (stage: StageProgressEntry): boolean => {
+  const sub = normalizeNameKey(stage.subDepartmentName);
+  return sub === "rawmaterialpreparation" || sub === "rawmaterialprep" || sub.includes("rawmaterialprep");
+};
+
 const isNdtStage = (stage: StageProgressEntry): boolean =>
   normalizeNameKey(stage.subDepartmentName) === "ndt";
 
@@ -326,7 +328,7 @@ const gateFromPredecessor = (
   approvedFinalMixNos: extras.approvedFinalMixNos,
 });
 
-/** Premix / final mix: previous subdepartment is Mixing only (RMP is the starter). */
+/** Premix QC for Mixing: previous subdepartment is Mixing manufacturing. */
 const resolvePreviousSubDepartmentPremixGate = (params: {
   stageProgress?: unknown;
   currentStage?: unknown;
@@ -342,6 +344,24 @@ const resolvePreviousSubDepartmentPremixGate = (params: {
       approvedFinalMixNos: collectApprovedPremixNos(mixing, true),
     },
     "Mixing",
+  );
+};
+
+/** Raw Material Processing QC: previous subdepartment is Raw Material Preparation. */
+const resolvePreviousSubDepartmentRmpProcessingGate = (params: {
+  stageProgress?: unknown;
+  currentStage?: unknown;
+}): PreviousStageApprovedUnits => {
+  const stages = mergeStageProgress(params.stageProgress, params.currentStage);
+  const rmp = findRequiredStage(stages, isRawMaterialPrepStage);
+  return gateFromPredecessor(
+    "premix",
+    rmp,
+    {
+      approvedPremixNos: collectApprovedPremixNos(rmp, false),
+      approvedMotorIds: new Set(),
+    },
+    "Raw Material Preparation",
   );
 };
 
@@ -385,7 +405,11 @@ export const resolveQcPreviousDivisionApprovedUnits = (params: {
     return emptyGate(null, true);
   }
 
-  if (PREMIX_QC_DIVISIONS.has(currentKey)) {
+  if (currentKey === "RAW_MATERIAL_PROCESSING") {
+    return resolvePreviousSubDepartmentRmpProcessingGate(params);
+  }
+
+  if (currentKey === "MIXING") {
     return resolvePreviousSubDepartmentPremixGate(params);
   }
 

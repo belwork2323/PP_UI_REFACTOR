@@ -71,6 +71,9 @@ const KPI_ICON_MAP = {
   Error: ErrorIconMUI,
 };
 
+/** Centre Head: hide Stage Status, Motors Processed, and Weekly Activity cards (keep markup). */
+const SHOW_CENTREHEAD_MIDDLE_DASHBOARD_ROW = false;
+
 function resolveKpiIcon(iconKey) {
   return KPI_ICON_MAP[iconKey] ?? Inventory2;
 }
@@ -274,7 +277,8 @@ export default function CHDashboard() {
         })}
       </Box>
 
-      {/* ── Middle Row: Stage Status + Charts ── */}
+      {/* ── Middle Row: Stage Status + Charts (hidden via SHOW_CENTREHEAD_MIDDLE_DASHBOARD_ROW) ── */}
+      {SHOW_CENTREHEAD_MIDDLE_DASHBOARD_ROW ? (
       <Box sx={t.dashboardLayout.middleGrid}>
         <Panel t={t}>
           <PanelHeader
@@ -424,6 +428,7 @@ export default function CHDashboard() {
           />
         </DashboardChartCard>
       </Box>
+      ) : null}
 
       {/* ── Bottom Row: In Progress Batches ── */}
       <Box sx={t.dashboardLayout.bottomGrid}>

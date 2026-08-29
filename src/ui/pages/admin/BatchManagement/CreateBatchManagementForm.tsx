@@ -28,6 +28,7 @@ import AdminManagementFormHeader from "@ui/components/custom/admin/AdminManageme
 import MultiSelect from "@/ui/components/common/MultiSelectCheckbox";
 
 const S = STRINGS.BATCH_MANAGEMENT.FORM;
+const S_EDIT = STRINGS.BATCH_MANAGEMENT.EDIT;
 const MAX_MOTORS_PER_BATCH = 10;
 
 const BATCH_TYPE_OPTIONS = [
@@ -63,9 +64,13 @@ const BatchFormModal = ({
   articlesLoading = false,
   saving,
   canSaveBatchChanges = true,
+  editMode = "full",
+  baselineMotorIds = [],
   t,
 }: any) => {
   const { modal, input } = t;
+  const isAppendOnlyEdit = Boolean(editTarget) && editMode === "append_only";
+  const appendOnlyLocked = isAppendOnlyEdit;
 
   const isMain = form.batchType === "MAIN";
   const isSubscale = form.batchType === "SUBSCALE";
@@ -345,6 +350,7 @@ const BatchFormModal = ({
   };
 
   const removeMotorIdField = (index: number) => {
+    if (appendOnlyLocked && index < baselineMotorIds.length) return;
     const nextMotorIds = (form.motorIds ?? []).filter((_: string, idx: number) => idx !== index);
     onMotorIdsChange(nextMotorIds);
   };
@@ -418,6 +424,23 @@ const BatchFormModal = ({
 
           {canShowBatchDetails && (
             <>
+              {isAppendOnlyEdit && (
+                <Box
+                  sx={(theme) => ({
+                    px: 1.5,
+                    py: 1.2,
+                    borderRadius: "8px",
+                    bgcolor: alpha(theme.palette.info.main, 0.08),
+                    border: "1px dashed",
+                    borderColor: "info.light",
+                  })}
+                >
+                  <Typography sx={{ fontSize: "0.8rem", color: "text.secondary" }}>
+                    {S_EDIT.APPEND_ONLY_BANNER}
+                  </Typography>
+                </Box>
+              )}
+
               {/* Project / Purpose / Motor Information */}
               <Box>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={modal.fieldRowSpacing}>
@@ -427,7 +450,7 @@ const BatchFormModal = ({
                     onChange={handleProjectChange}
                     placeholder={projectsLoading ? "Loading projects..." : S.SELECT_PROJECT}
                     loading={projectsLoading}
-                    disabled={projectsLoading}
+                    disabled={projectsLoading || appendOnlyLocked}
                     renderValue={renderProjectValue}
                     sx={{ mb: 0, flex: 1, ...input }}
                     MenuProps={t.menuPaper}
@@ -449,7 +472,7 @@ const BatchFormModal = ({
                       onChange={handleMotorStageChange}
                       placeholder={motorStagesLoading ? "Loading motor stages..." : S.SELECT_MOTOR_STAGE}
                       loading={motorStagesLoading}
-                      disabled={motorStagesLoading}
+                      disabled={motorStagesLoading || appendOnlyLocked}
                       renderValue={renderMotorStageValue}
                       sx={{ mb: 0, flex: 1, ...input }}
                       MenuProps={t.menuPaper}
@@ -479,6 +502,7 @@ const BatchFormModal = ({
                       onChange={(value) => onFormChange("systemManagerId")({ target: { value } })}
                       placeholder={S.SELECT_SYSTEM_MANAGER}
                       renderValue={renderSystemManagerValue}
+                      disabled={appendOnlyLocked}
                       sx={{ mb: 0, flex: 1, ...input }}
                       MenuProps={t.menuPaper}
                     >
@@ -505,7 +529,7 @@ const BatchFormModal = ({
                         onChange={handleMixingCycleChange}
                         placeholder={getMixingCyclePlaceholder()}
                         loading={mixingCyclesLoading}
-                        disabled={mixingCycleDisabled}
+                        disabled={mixingCycleDisabled || appendOnlyLocked}
                         renderValue={renderMixingCycleValue}
                         sx={{ mb: 0, flex: 1, ...input }}
                         MenuProps={t.menuPaper}
@@ -543,6 +567,7 @@ const BatchFormModal = ({
                       onChange={(value) => onFormChange("systemManagerId")({ target: { value } })}
                       placeholder={S.SELECT_SYSTEM_MANAGER}
                       renderValue={renderSystemManagerValue}
+                      disabled={appendOnlyLocked}
                       sx={{ mb: 0, flex: 1, ...input }}
                       MenuProps={t.menuPaper}
                     >
@@ -566,6 +591,7 @@ const BatchFormModal = ({
                     value={form.objective}
                     onChange={onFormChange("objective")}
                     placeholder="Enter objective"
+                    disabled={appendOnlyLocked}
                     sx={{ mb: 0, ...input }}
                   />
                 </Box>
@@ -587,7 +613,7 @@ const BatchFormModal = ({
                       options={articleOptions}
                       value={getArticleSelectionCodes(form.articles)}
                       onChange={handleArticleChange}
-                      disabled={articlesLoading || articleOptions.length === 0}
+                      disabled={articlesLoading || articleOptions.length === 0 || appendOnlyLocked}
                       sx={{ mb: 0, flex: 1, ...input }}
                       MenuProps={t.menuPaper}
                     />
@@ -601,9 +627,11 @@ const BatchFormModal = ({
                 <>
                   <Box>
                     <Typography sx={modal.fieldLabel}>{S.NUMBER_OF_MOTORS_LABEL}</Typography>
-                    <Typography sx={{ fontSize: "0.85rem", color: "text.secondary", mb: 1 }}>
-                      {S.NUMBER_OF_MOTORS_COUNT(form.motorIds?.length ?? 0)}
-                    </Typography>
+                    {!appendOnlyLocked && (
+                      <Typography sx={{ fontSize: "0.85rem", color: "text.secondary", mb: 1 }}>
+                        {S.NUMBER_OF_MOTORS_COUNT(form.motorIds?.length ?? 0)}
+                      </Typography>
+                    )}
                     <Stack direction="row" spacing={1.25} alignItems="flex-end">
                       <AppTextField
                         label={S.NUMBER_OF_MOTORS_PLACEHOLDER}
@@ -651,6 +679,8 @@ const BatchFormModal = ({
                     <Stack spacing={1}>
                       {(form.motorIds ?? []).map((motorId: string, index: number) => {
                         const slotOptions = getMotorOptionsForSlot(index);
+                        const isBaselineMotor =
+                          appendOnlyLocked && index < baselineMotorIds.length;
                         return (
                           <Box
                             key={`motor-slot-${index}`}
@@ -662,7 +692,11 @@ const BatchFormModal = ({
                               onChange={(value) => handleMotorIdChange(index, value)}
                               placeholder={motorsEmptyHint}
                               loading={availableMotorsLoading}
-                              disabled={!motorIdsPrerequisitesMet || availableMotorsLoading}
+                              disabled={
+                                isBaselineMotor ||
+                                !motorIdsPrerequisitesMet ||
+                                availableMotorsLoading
+                              }
                               renderValue={(value) => {
                                 const match = availableMotorOptions.find(
                                   (m: { motorId: string }) => m.motorId === value,
@@ -683,14 +717,16 @@ const BatchFormModal = ({
                                 ),
                               )}
                             </AppDropdown>
-                            <Button
-                              size="small"
-                              color="error"
-                              onClick={() => removeMotorIdField(index)}
-                              sx={{ mt: 3.25, flexShrink: 0, textTransform: "none", fontWeight: 700 }}
-                            >
-                              {S.REMOVE_MOTOR_ID}
-                            </Button>
+                            {!isBaselineMotor && (
+                              <Button
+                                size="small"
+                                color="error"
+                                onClick={() => removeMotorIdField(index)}
+                                sx={{ mt: 3.25, flexShrink: 0, textTransform: "none", fontWeight: 700 }}
+                              >
+                                {S.REMOVE_MOTOR_ID}
+                              </Button>
+                            )}
                           </Box>
                         );
                       })}
