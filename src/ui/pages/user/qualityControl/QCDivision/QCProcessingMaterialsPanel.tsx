@@ -29,6 +29,7 @@ type QCProcessingMaterialsPanelProps = {
   subDepartmentId?: number;
   batchId?: string;
   readOnly?: boolean;
+  fieldsDisabled?: boolean;
   schemaLoading?: boolean;
   schemaError?: string | null;
   onEntryValuesChange: (
@@ -45,6 +46,7 @@ const QCProcessingMaterialsPanel = ({
   subDepartmentId,
   batchId,
   readOnly = false,
+  fieldsDisabled = false,
   schemaLoading = false,
   schemaError = null,
   onEntryValuesChange,
@@ -141,6 +143,7 @@ const QCProcessingMaterialsPanel = ({
   );
 
   const showUnitActions = Boolean(unitActions?.show);
+  const inputsLocked = readOnly || fieldsDisabled;
 
   if (!materialEntries.length) {
     return (
@@ -198,14 +201,14 @@ const QCProcessingMaterialsPanel = ({
           <Button
             size="small"
             variant="outlined"
-            disabled={readOnly || !unitActions?.canAct || unitActions?.actionLoading}
+            disabled={inputsLocked || !unitActions?.canAct || unitActions?.actionLoading}
               onClick={unitActions?.onSaveDraft}
               sx={{ textTransform: "none", whiteSpace: "nowrap" }}
             >
               {unitActions?.saveDraftLabel ?? S.SAVE_UNIT_DRAFT}
             </Button>
             <SubmitForApprovalButton
-              disabled={readOnly || !unitActions?.canAct || unitActions?.actionLoading}
+              disabled={inputsLocked || !unitActions?.canAct || unitActions?.actionLoading}
               onClick={unitActions?.onSubmit}
               label={unitActions?.submitLabel ?? S.SUBMIT_UNIT}
             />
@@ -254,7 +257,7 @@ const QCProcessingMaterialsPanel = ({
               subDepartmentId={subDepartmentId}
               batchId={batchId}
               onChange={(values) => onEntryValuesChange(activeEntry.entryId, values)}
-              readOnly={readOnly}
+              readOnly={inputsLocked}
               lockStructure
               loading={false}
               error={schemaError}

@@ -27,6 +27,20 @@ export const useQcDivisionNav = () => {
     [resolveSetupKey],
   );
 
+  const clearSetupLoaded = useCallback(
+    (flowKey: string, rawMaterialType?: string | null) => {
+      const key = resolveSetupKey(flowKey, rawMaterialType);
+      setSetupLoadedByKey((prev) => {
+        if (!prev[key]) return prev;
+        const next = { ...prev };
+        delete next[key];
+        return next;
+      });
+      setDivisionUiMode("SETUP");
+    },
+    [resolveSetupKey],
+  );
+
   const resetDivisionNavState = useCallback(() => {
     setDivisionUiMode("FORM");
     setSetupLoadedByKey({});
@@ -39,9 +53,16 @@ export const useQcDivisionNav = () => {
       rawMaterialType?: string | null;
       hasManufacturingData: boolean;
       hasQcSavedData: boolean;
+      hasBatchUnitData?: boolean;
+      requiresManualSetup?: boolean;
     }): QcDivisionUiMode => {
       if (params.blocked) return "BLOCKED";
-      if (params.hasQcSavedData || params.hasManufacturingData) return "FORM";
+      if (params.requiresManualSetup && !isSetupLoaded(params.flowKey, params.rawMaterialType)) {
+        return "SETUP";
+      }
+      if (params.hasQcSavedData || params.hasManufacturingData || params.hasBatchUnitData) {
+        return "FORM";
+      }
       const entry = getQcDivisionSetupRegistryEntry(params.flowKey, params.rawMaterialType);
       if (entry.hasSetup && !isSetupLoaded(params.flowKey, params.rawMaterialType)) {
         return "SETUP";
@@ -56,6 +77,7 @@ export const useQcDivisionNav = () => {
     setDivisionUiMode,
     isSetupLoaded,
     markSetupLoaded,
+    clearSetupLoaded,
     resetDivisionNavState,
     resolveInitialUiMode,
   };

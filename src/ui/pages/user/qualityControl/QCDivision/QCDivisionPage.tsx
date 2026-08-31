@@ -46,6 +46,7 @@ const QualityControlPage = () => {
     selectedHardwareProcesses,
     selectedTrimmingMotorCount,
     trimmingMotorReceivedDate,
+    postCureMotorReceiptDate,
     selectedPostCureOperation,
     selectedInhibitorType,
     selectedPropellantProcess,
@@ -54,21 +55,23 @@ const QualityControlPage = () => {
     activeDivisionGroupIndex,
     activeDivisionSubIndex,
     loadingFormDetails,
-    batchBootstrapLoading,
     divisionUiMode,
     divisionBlockedReason,
     divisionSetupDefinition,
     canLoadSetupForm,
+    canResetPostCureSetup,
+    postCureSetupOperationLabel,
     schemaLoading,
+    divisionAutoPopulateLoading,
     schemaError,
     divisionAutoPopulateData,
     mixingQualityChecksByStage,
     actionLoading,
-    backConfirmOpen,
+    divisionSwitchConfirmOpen,
     subDepartmentId,
-    setBackConfirmOpen,
     handleBack,
-    handleDiscardAndBack,
+    handleDivisionSwitchStay,
+    handleDivisionSwitchDiscard,
     handleDivisionNavTabChange,
     handleProcessingTypeChange,
     handlePremixChange,
@@ -78,11 +81,13 @@ const QualityControlPage = () => {
     handleHardwareProcessesChange,
     handleTrimmingMotorCountChange,
     handleTrimmingMotorReceivedDateChange,
+    handlePostCureMotorReceiptDateChange,
     handlePostCureOperationChange,
     handleInhibitorTypeChange,
     handlePropellantProcessChange,
     handleLoadQcForm,
     handleLoadQcSetupForm,
+    handleResetPostCureSetup,
     handlePartialNavIndexChange,
     handleDivisionEntryValuesChange,
     handleDivisionEntryLiquidValuesChange,
@@ -155,7 +160,7 @@ const QualityControlPage = () => {
   );
 
   const listLoading = loading && !loadingFormDetails && view === "list";
-  const formOpening = Boolean(loadingFormDetails || batchBootstrapLoading);
+  const formOpening = Boolean(loadingFormDetails);
 
   return (
     <Box sx={theme.workflow.animatedContainer}>
@@ -236,6 +241,7 @@ const QualityControlPage = () => {
             selectedHardwareProcesses={selectedHardwareProcesses}
             selectedTrimmingMotorCount={selectedTrimmingMotorCount}
             trimmingMotorReceivedDate={trimmingMotorReceivedDate}
+            postCureMotorReceiptDate={postCureMotorReceiptDate}
             selectedPostCureOperation={selectedPostCureOperation}
             selectedInhibitorType={selectedInhibitorType}
             selectedPropellantProcess={selectedPropellantProcess}
@@ -262,7 +268,10 @@ const QualityControlPage = () => {
             divisionBlockedReason={divisionBlockedReason}
             divisionSetupDefinition={divisionSetupDefinition}
             canLoadSetupForm={canLoadSetupForm}
+            canResetPostCureSetup={canResetPostCureSetup}
+            postCureSetupOperationLabel={postCureSetupOperationLabel}
             schemaLoading={schemaLoading}
+            divisionAutoPopulateLoading={divisionAutoPopulateLoading}
             schemaError={schemaError}
             flowBarTheme={flowBarTheme}
             onDivisionNavTabChange={handleDivisionNavTabChange}
@@ -274,11 +283,13 @@ const QualityControlPage = () => {
             onHardwareProcessesChange={handleHardwareProcessesChange}
             onTrimmingMotorCountChange={handleTrimmingMotorCountChange}
             onTrimmingMotorReceivedDateChange={handleTrimmingMotorReceivedDateChange}
+            onPostCureMotorReceiptDateChange={handlePostCureMotorReceiptDateChange}
             onPostCureOperationChange={handlePostCureOperationChange}
             onInhibitorTypeChange={handleInhibitorTypeChange}
             onPropellantProcessChange={handlePropellantProcessChange}
             onLoadForm={handleLoadQcForm}
             onLoadSetupForm={handleLoadQcSetupForm}
+            onResetPostCureSetup={handleResetPostCureSetup}
             onPartialNavIndexChange={handlePartialNavIndexChange}
             onActiveDivisionGroupIndexChange={setActiveDivisionGroupIndex}
             onActiveDivisionSubIndexChange={setActiveDivisionSubIndex}
@@ -395,14 +406,14 @@ const QualityControlPage = () => {
       )}
 
       <ConfirmAlertDialog
-        open={backConfirmOpen}
+        open={divisionSwitchConfirmOpen}
         severity="warning"
         title={strings.UNSAVED_BACK_TITLE}
         message={strings.UNSAVED_BACK_MESSAGE}
         confirmLabel={strings.UNSAVED_BACK_DISCARD}
         cancelLabel={strings.UNSAVED_BACK_CONFIRM}
-        onConfirm={handleDiscardAndBack}
-        onCancel={() => setBackConfirmOpen(false)}
+        onConfirm={handleDivisionSwitchDiscard}
+        onCancel={handleDivisionSwitchStay}
       />
     </Box>
   );

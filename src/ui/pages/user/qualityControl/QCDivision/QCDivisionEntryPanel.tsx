@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, type ReactNode } from "react";
-import { Box, Button, Stack, Typography } from "@mui/material";
+import { Box, Button, Stack, Typography, alpha } from "@mui/material";
 import type { QcDivisionEntry, QcDivisionEntryValues } from "../../../../../data/models/user/QualityControlFormModel";
 import { createQcInitialValues } from "../../../../../schema-engine/adapters/qc.adapter";
 import type { SchemaDocumentV2, SchemaFormValues } from "../../../../../schema-engine";
@@ -123,6 +123,8 @@ type QCDivisionEntryPanelProps = {
   onEntryLiquidValuesChange: (entryId: string, values: SchemaFormValues) => void;
   onRemoveEntry: (entryId: string) => void;
   unitActions?: QCDivisionEntryUnitActions | null;
+  canResetPostCureSetup?: boolean;
+  onResetPostCureSetup?: () => void;
 };
 
 const QCDivisionEntryPanel = ({
@@ -144,6 +146,8 @@ const QCDivisionEntryPanel = ({
   onEntryLiquidValuesChange,
   onRemoveEntry,
   unitActions = null,
+  canResetPostCureSetup = false,
+  onResetPostCureSetup,
 }: QCDivisionEntryPanelProps) => {
   const BRAND = QC_DIVISION_BRAND;
 
@@ -280,7 +284,12 @@ const QCDivisionEntryPanel = ({
       entry.kind !== "PROPELLANT_MOTOR" &&
       entry.kind !== "PROPELLANT_PROCESS" &&
       entry.kind !== "WEIGHTMENT_MOTOR";
-    if (!showUnitActions && !showRemove) return null;
+    const showResetPostCureSetup =
+      !readOnly &&
+      !fieldsDisabled &&
+      entry.kind === "POST_CURE_MOTOR" &&
+      canResetPostCureSetup;
+    if (!showUnitActions && !showRemove && !showResetPostCureSetup) return null;
 
     return (
       <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap" justifyContent="flex-end">
@@ -304,6 +313,13 @@ const QCDivisionEntryPanel = ({
               onClick={unitActions?.onSubmit}
               label={unitActions?.submitLabel ?? S.SUBMIT_UNIT}
             />
+            {showResetPostCureSetup ? (
+              <RemoveProcessButton
+                onClick={onResetPostCureSetup ?? (() => undefined)}
+                dangerColor={BRAND.danger}
+                tooltip={S.POST_CURE_CHANGE_OPERATION_TOOLTIP}
+              />
+            ) : null}
           </>
         ) : null}
         {showRemove ? (
@@ -315,7 +331,16 @@ const QCDivisionEntryPanel = ({
         ) : null}
       </Stack>
     );
-  }, [BRAND.danger, entry.kind, fieldsDisabled, handleRemove, readOnly, unitActions]);
+  }, [
+    BRAND.danger,
+    canResetPostCureSetup,
+    entry.kind,
+    fieldsDisabled,
+    handleRemove,
+    onResetPostCureSetup,
+    readOnly,
+    unitActions,
+  ]);
 
   const formValues = useMemo(() => {
     const saved = entryValues.schemaValues;
@@ -570,7 +595,7 @@ const QCDivisionEntryPanel = ({
         sx={{
           borderRadius: 2.5,
           border: `1px solid ${BRAND.border}`,
-          background: BRAND.surface,
+          background: "#fff",
           px: 1.5,
           py: 1.25,
           ...(fieldsDisabled && !readOnly
@@ -578,7 +603,17 @@ const QCDivisionEntryPanel = ({
             : null),
         }}
       >
-        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1} gap={1}>
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="center"
+          mb={1.25}
+          gap={1}
+          sx={{
+            pb: 1,
+            borderBottom: `1px solid ${alpha(BRAND.border, 0.55)}`,
+          }}
+        >
           <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: BRAND.primary }}>
             {entry.label}
           </Typography>
@@ -588,7 +623,7 @@ const QCDivisionEntryPanel = ({
           values={formValues}
           onChange={handleValuesChange}
           batchId={batchId}
-          readOnly={readOnly}
+          readOnly={readOnly || fieldsDisabled}
         />
       </Box>
     );

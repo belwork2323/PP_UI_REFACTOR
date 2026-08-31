@@ -13,6 +13,7 @@ import {
 import { isRawMaterialProcessingType } from "./qcProcessingConfig";
 import { buildDivisionEntryDedupKey, resolveDivisionEntryKind } from "./qcDivisionEntries";
 import { isQcMixingStage, mapQcMixingStageToSubType } from "./qcMixingConfig";
+import { canLoadQcPostCureSetupForm } from "./qcPostCureDivisionDetails";
 
 export type QcDivisionPanelType =
   | "RAW_MATERIAL"
@@ -145,6 +146,7 @@ export type QcDivisionFlowState = {
   selectedHardwareProcesses: string[];
   selectedTrimmingMotorCount: number | "";
   trimmingMotorReceivedDate: string;
+  postCureMotorReceiptDate: string;
   selectedPostCureOperation: string;
   selectedInhibitorType: string;
   selectedPropellantProcess: string;
@@ -307,8 +309,11 @@ export const canLoadDivisionSchema = (divisionFlowKey: string, state: QcDivision
   }
 
   if (panelType === "POST_CURE") {
-    // Motor Navigation seeds from manufacturing operationType — no FlowBar pickers / Load Form.
-    return false;
+    return canLoadQcPostCureSetupForm({
+      selectedPostCureOperation: state.selectedPostCureOperation,
+      selectedInhibitorType: state.selectedInhibitorType,
+      postCureMotorReceiptDate: state.postCureMotorReceiptDate,
+    });
   }
 
   if (panelType === "NDT") {

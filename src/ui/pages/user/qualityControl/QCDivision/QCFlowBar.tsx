@@ -37,16 +37,22 @@ import {
 } from "../../../../../hooks/user/qualityControl/qcProcessingConfig";
 import { resolveQcTrimmingMotorCountOptions } from "../../../../../hooks/user/qualityControl/qcTrimmingConfig";
 import {
+  QC_POST_CURE_OPERATION_OPTIONS,
+  QC_INHIBITOR_TYPE_OPTIONS,
+  isQcPostCureInhibitionOperation,
+} from "../../../../../hooks/user/qualityControl/qcPostCureConfig";
+import { STF_FLOW_LABELS } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
+import { STRINGS } from "../../../../../app/config/strings";
+import { Box, Button, CircularProgress, Typography } from "@mui/material";
+import CasePrepMultiSelect from "../../manufacturing/CasePreparation/CasePrepMultiSelect";
+import CasePrepDateField from "../../manufacturing/CasePreparation/CasePrepDateField";
+import { DateTimeField } from "../../../../components/common/DateField";
+import { buildDivisionEntryDedupKey } from "../../../../../hooks/user/qualityControl/qcDivisionEntries";
+import type { QcApiSubType } from "../../../../../schema-engine/adapters/qc.adapter";
+import {
   QC_PROPELLANT_PROCESS_OPTIONS,
   mapQcPropellantProcessToApi,
 } from "../../../../../hooks/user/qualityControl/qcPropellantConfig";
-import { STF_FLOW_LABELS } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
-import { STRINGS } from "../../../../../app/config/strings";
-import { Box, Button, CircularProgress } from "@mui/material";
-import CasePrepMultiSelect from "../../manufacturing/CasePreparation/CasePrepMultiSelect";
-import CasePrepDateField from "../../manufacturing/CasePreparation/CasePrepDateField";
-import { buildDivisionEntryDedupKey } from "../../../../../hooks/user/qualityControl/qcDivisionEntries";
-import type { QcApiSubType } from "../../../../../schema-engine/adapters/qc.adapter";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 
@@ -62,6 +68,7 @@ type QCFlowBarProps = {
   selectedHardwareProcesses: string[];
   selectedTrimmingMotorCount: number | "";
   trimmingMotorReceivedDate: string;
+  postCureMotorReceiptDate: string;
   selectedPostCureOperation: string;
   selectedInhibitorType: string;
   selectedPropellantProcess: string;
@@ -73,6 +80,8 @@ type QCFlowBarProps = {
   partialNavActive?: boolean;
   /** Hide the Load Form button (e.g. when setup panel provides its own load action). */
   hideLoadAction?: boolean;
+  /** Show Post Cure operation / inhibitor / receipt pickers (subscale qualification setup). */
+  postCureSetupMode?: boolean;
   onProcessingTypeChange: (value: string) => void;
   onPremixChange: (value: number | "") => void;
   onMixingStageChange: (value: string) => void;
@@ -81,6 +90,7 @@ type QCFlowBarProps = {
   onHardwareProcessesChange: (values: string[]) => void;
   onTrimmingMotorCountChange: (value: number | "") => void;
   onTrimmingMotorReceivedDateChange: (value: string) => void;
+  onPostCureMotorReceiptDateChange: (value: string) => void;
   onPostCureOperationChange: (value: string) => void;
   onInhibitorTypeChange: (value: string) => void;
   onPropellantProcessChange: (value: string) => void;
@@ -100,6 +110,7 @@ const QCFlowBar = ({
   selectedHardwareProcesses,
   selectedTrimmingMotorCount,
   trimmingMotorReceivedDate,
+  postCureMotorReceiptDate,
   selectedPostCureOperation,
   selectedInhibitorType,
   selectedPropellantProcess,
@@ -109,6 +120,7 @@ const QCFlowBar = ({
   schemaLoading = false,
   partialNavActive = false,
   hideLoadAction = false,
+  postCureSetupMode = false,
   onProcessingTypeChange,
   onPremixChange,
   onMixingStageChange,
@@ -117,6 +129,7 @@ const QCFlowBar = ({
   onHardwareProcessesChange,
   onTrimmingMotorCountChange,
   onTrimmingMotorReceivedDateChange,
+  onPostCureMotorReceiptDateChange,
   onPostCureOperationChange,
   onInhibitorTypeChange,
   onPropellantProcessChange,
@@ -168,9 +181,12 @@ const QCFlowBar = ({
   const showMotorIdSelect = false;
   const showPropellantProcess = false;
   const showHardwareProcesses = false;
-  // Post Cure is Motor-Nav seeded from manufacturing operationType — no FlowBar pickers.
-  const showPostCureOperation = false;
-  const showInhibitorType = false;
+  const showPostCureOperation = postCureSetupMode && isPostCureFlow;
+  const showInhibitorType =
+    postCureSetupMode &&
+    isPostCureFlow &&
+    isQcPostCureInhibitionOperation(selectedPostCureOperation);
+  const showPostCureMotorReceipt = postCureSetupMode && isPostCureFlow;
   const showPostCureMotorId = false;
   const showTrimmingMotorCount = false;
   const showTrimmingMotorId = false;
@@ -271,6 +287,7 @@ const QCFlowBar = ({
     selectedHardwareProcesses,
     selectedTrimmingMotorCount,
     trimmingMotorReceivedDate,
+    postCureMotorReceiptDate,
     selectedPostCureOperation,
     selectedInhibitorType,
     selectedPropellantProcess,
@@ -311,6 +328,7 @@ const QCFlowBar = ({
     showTrimmingMotorCount ||
     showTrimmingMotorId ||
     showTrimmingReceivedDate ||
+    showPostCureMotorReceipt ||
     showPostCureOperation ||
     showPostCureMotorId ||
     (showMotorIdSelect && !isTrimmingFlow) ||
@@ -435,6 +453,45 @@ const QCFlowBar = ({
               placeholder={S.TRIMMING_MOTOR_RECEIVED_DATE_PLACEHOLDER}
               theme={theme}
               onChange={onTrimmingMotorReceivedDateChange}
+            />
+          ) : null}
+
+          {showPostCureMotorReceipt ? (
+            <Box sx={flowBar.selectField?.(280)}>
+              <Typography component="label" sx={flowBar.selectLabel}>
+                {S.POST_CURE_MOTOR_RECEIPT_DATE_LABEL}
+              </Typography>
+              <DateTimeField
+                value={postCureMotorReceiptDate}
+                onChange={onPostCureMotorReceiptDateChange}
+                placeholder={S.POST_CURE_MOTOR_RECEIPT_DATE_PLACEHOLDER}
+                compact
+                sx={flowBar.selectInput?.(Boolean(postCureMotorReceiptDate))}
+              />
+            </Box>
+          ) : null}
+
+          {showPostCureOperation ? (
+            <CasePrepSelect
+              label={S.POST_CURE_OPERATION_LABEL}
+              value={selectedPostCureOperation}
+              placeholder={S.POST_CURE_OPERATION_PLACEHOLDER}
+              options={QC_POST_CURE_OPERATION_OPTIONS}
+              width={240}
+              theme={theme}
+              onChange={onPostCureOperationChange}
+            />
+          ) : null}
+
+          {showInhibitorType ? (
+            <CasePrepSelect
+              label={S.INHIBITOR_TYPE_LABEL}
+              value={selectedInhibitorType}
+              placeholder={S.INHIBITOR_TYPE_PLACEHOLDER}
+              options={QC_INHIBITOR_TYPE_OPTIONS}
+              width={240}
+              theme={theme}
+              onChange={onInhibitorTypeChange}
             />
           ) : null}
 

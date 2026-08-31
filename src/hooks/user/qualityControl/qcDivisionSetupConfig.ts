@@ -28,19 +28,6 @@ const MOTOR_ONLY_SETUP: QcDivisionSetupDefinition = {
 };
 
 export const QC_DIVISION_SETUP_DEFINITIONS: Record<string, QcDivisionSetupDefinition> = {
-  RAW_MATERIAL_REVALIDATION: {
-    flowKey: "RAW_MATERIAL",
-    title: "Raw Material Revalidation Setup",
-    loadLabel: S.LOAD_FORM_LABEL,
-    fields: [
-      {
-        id: "processingType",
-        label: S.PROCESSING_TYPE_LABEL,
-        type: "select",
-        required: true,
-      },
-    ],
-  },
   RAW_MATERIAL_PROCESSING: {
     flowKey: "RAW_MATERIAL",
     title: "Raw Material Processing Setup",

@@ -1,13 +1,16 @@
 import {
+  buildRawMaterialSchemaRequest,
   buildRawMaterialSchemaRequestFromCodes,
   createInitialValues,
+  findGradeInMaterial,
+  findMaterialInList,
   hydrateValuesFromProcess,
   rawMaterialPrepSchemaFetchConfig,
   RMP_SCHEMA_TYPE,
   RMP_SCHEMA_VERSION,
   type SchemaProcessSubmission,
 } from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
-import { schemaEngineController, toSectionSubmissions } from "../../../schema-engine";
+import schemaEngineController, { toSectionSubmissions } from "../../../schema-engine";
 import { isSchemaDocumentReady } from "../../../schema-engine/utils/schemaMessages";
 import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
 import {
@@ -17,11 +20,14 @@ import {
 } from "../../../data/models/user/rawMaterialPreparationApiMapper";
 import { formatToIsoDateInput } from "../../../utils/dateUtils";
 import type { MaterialItem } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
-import type { MaterialsListItem } from "../../../data/models/user/MaterialsListModel";
+import { operationsController } from "../../../controllers/user/operationsController";
 import {
-  buildPremixMaterialOptions,
+  buildMaterialSelectionFromSheetRow,
+  findPrepMaterialByCode,
+  mergeMaterialsLists,
   type RawMaterialPrepMaterialOption,
 } from "../manufacturing/rawMaterialPrepFlowConfig";
+import { resolveBatchDetailsRoot } from "./qcBatchContext";
 import type { QcDivisionEntry } from "./qcDivisionEntryTypes";
 
 const createProcessingEntryId = () =>
@@ -291,29 +297,107 @@ export type QcProcessingMaterialCatalog = {
   liquidMaterials: RawMaterialPrepMaterialOption[];
 };
 
-const resolveBatchPayloadRoot = (batchPayload: unknown): Record<string, unknown> | null => {
-  const batch = asRecord(batchPayload);
-  if (!batch) return null;
-  return asRecord(batch.__batchDetails) ?? batch;
+const resolveBatchPayloadRoot = (batchPayload: unknown): Record<string, unknown> | null =>
+  resolveBatchDetailsRoot(batchPayload);
+
+export const fetchProcessingMaterialCatalog = async (): Promise<QcProcessingMaterialCatalog> => {
+  const [solidResp, liquidResp] = await Promise.all([
+    operationsController.fetchMaterialsList({ materialType: "SOLID" }),
+    operationsController.fetchMaterialsList({ materialType: "LIQUID" }),
+  ]);
+  return {
+    solidMaterials: solidResp?.success ? (solidResp.data ?? []) : [],
+    liquidMaterials: liquidResp?.success ? (liquidResp.data ?? []) : [],
+  };
 };
 
-const normalizeNavProcessingType = (
-  value?: string,
-): "SOLID_PROCESSING" | "LIQUID_PROCESSING" | "BOTH" => {
-  const raw = String(value ?? "")
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "_");
-  if (raw === "LIQUID_PROCESSING" || raw === "LIQUID") return "LIQUID_PROCESSING";
-  if (raw === "BOTH") return "BOTH";
-  return "SOLID_PROCESSING";
+const processingMaterialSeedKey = (seed: Pick<
+  QcProcessingMaterialSeed,
+  "premixNo" | "materialCode" | "processSlot"
+>) =>
+  `${seed.premixNo}:${String(seed.materialCode ?? "").trim().toUpperCase()}:${seed.processSlot}`;
+
+const resolveCatalogMaterialId = (
+  materialCode: string,
+  preferredId: number | undefined | null,
+  catalog: QcProcessingMaterialCatalog,
+): number | null => {
+  const preferred = Number(preferredId ?? 0);
+  if (Number.isFinite(preferred) && preferred > 0) return preferred;
+  const all = mergeMaterialsLists(catalog.solidMaterials, catalog.liquidMaterials);
+  const match = findPrepMaterialByCode(all, materialCode);
+  const id = Number(match?.materialId ?? 0);
+  return id > 0 ? id : null;
 };
 
-/** Build empty processing material seeds from batch identification sheet when division-details is empty. */
+const sortProcessingSeedsBySheetOrder = (
+  seeds: QcProcessingMaterialSeed[],
+  batchPayload: unknown,
+): QcProcessingMaterialSeed[] => {
+  const batch = resolveBatchPayloadRoot(batchPayload);
+  const sheet = asRecord(batch?.identificationSheet);
+  const sheetMaterials = asArray(sheet?.materials);
+  const order = new Map<string, number>();
+  sheetMaterials.forEach((row, index) => {
+    const rec = asRecord(row);
+    const code = pickString(rec?.materialCode, rec?.material_code);
+    if (code) order.set(code.toUpperCase(), index);
+  });
+  return [...seeds].sort((a, b) => {
+    const ao = order.get(a.materialCode.toUpperCase()) ?? 999;
+    const bo = order.get(b.materialCode.toUpperCase()) ?? 999;
+    if (ao !== bo) return ao - bo;
+    return a.processSlot.localeCompare(b.processSlot);
+  });
+};
+
+/** @deprecated Prefer status-aware resolveProcessingMaterialSeedsForPremix — no cross-source merge. */
+export const mergeProcessingMaterialSeeds = (
+  sheetSeeds: QcProcessingMaterialSeed[],
+  detailSeeds: QcProcessingMaterialSeed[],
+): QcProcessingMaterialSeed[] => {
+  if (!sheetSeeds.length) return detailSeeds;
+  if (!detailSeeds.length) return sheetSeeds;
+
+  const detailByKey = new Map(
+    detailSeeds.map((seed) => [processingMaterialSeedKey(seed), seed] as const),
+  );
+  const seen = new Set<string>();
+  const merged: QcProcessingMaterialSeed[] = [];
+
+  for (const sheetSeed of sheetSeeds) {
+    const key = processingMaterialSeedKey(sheetSeed);
+    seen.add(key);
+    const detail = detailByKey.get(key);
+    merged.push(
+      detail
+        ? {
+            ...sheetSeed,
+            ...detail,
+            sections: detail.sections.length ? detail.sections : sheetSeed.sections,
+            premixDate: detail.premixDate ?? sheetSeed.premixDate,
+            materialType: detail.materialType ?? sheetSeed.materialType,
+          }
+        : sheetSeed,
+    );
+  }
+
+  for (const detail of detailSeeds) {
+    const key = processingMaterialSeedKey(detail);
+    if (!seen.has(key)) merged.push(detail);
+  }
+
+  return merged;
+};
+
+/**
+ * Build processing material seeds from batch identification sheet — one tab per sheet row
+ * per premix (solid and/or liquid slot from material master), independent of premix nav type.
+ */
 export const buildProcessingMaterialSeedsFromBatchSheet = (
   batchPayload: unknown,
   premixNo: number,
-  processingType: string | undefined,
+  _processingType: string | undefined,
   catalog: QcProcessingMaterialCatalog,
 ): QcProcessingMaterialSeed[] => {
   const batch = resolveBatchPayloadRoot(batchPayload);
@@ -325,88 +409,140 @@ export const buildProcessingMaterialSeedsFromBatchSheet = (
   );
   if (!sheetMaterials.length) return [];
 
-  const navType = normalizeNavProcessingType(processingType);
-  const options = buildPremixMaterialOptions(
-    sheetMaterials,
-    catalog.solidMaterials,
-    catalog.liquidMaterials,
-  );
-
   const seeds: QcProcessingMaterialSeed[] = [];
-  options.forEach((option) => {
-    const materialId = Number(option.materialId ?? 0);
-    const materialCode = String(option.materialCode ?? "").trim();
-    if (!materialId || !materialCode) return;
 
-    const gradeCode = pickString(option.gradeCode) || null;
-    const gradeId = option.gradeId ?? null;
-    const includeSolid = navType === "BOTH" || navType === "SOLID_PROCESSING";
-    const includeLiquid = navType === "BOTH" || navType === "LIQUID_PROCESSING";
+  sheetMaterials.forEach((row) => {
+    const selection = buildMaterialSelectionFromSheetRow(
+      row,
+      premixNo,
+      catalog.solidMaterials,
+      catalog.liquidMaterials,
+    );
 
-    if (includeSolid && (option.processType === "solid" || option.processType === "both")) {
-      seeds.push({
-        premixNo,
-        processSlot: "solid",
-        materialId,
-        materialCode,
-        materialName: pickString(option.materialName) || materialCode,
-        gradeId,
-        gradeCode,
-        sections: [],
-      });
+    if (selection.selectedProcesses.solid && selection.solidMaterialCode) {
+      const materialId = resolveCatalogMaterialId(
+        selection.solidMaterialCode,
+        selection.solidMaterialId,
+        catalog,
+      );
+      if (materialId) {
+        seeds.push({
+          premixNo,
+          processSlot: "solid",
+          materialId,
+          materialCode: selection.solidMaterialCode,
+          materialName: selection.materialName,
+          gradeId: selection.solidGradeId ?? null,
+          gradeCode: selection.solidGradeCode || null,
+          sections: [],
+        });
+      }
     }
-    if (includeLiquid && (option.processType === "liquid" || option.processType === "both")) {
-      seeds.push({
-        premixNo,
-        processSlot: "liquid",
-        materialId,
-        materialCode,
-        materialName: pickString(option.materialName) || materialCode,
-        gradeId,
-        gradeCode,
-        sections: [],
-      });
+
+    if (selection.selectedProcesses.liquid && selection.liquidMaterialCode) {
+      const materialId = resolveCatalogMaterialId(
+        selection.liquidMaterialCode,
+        selection.liquidMaterialId,
+        catalog,
+      );
+      if (materialId) {
+        seeds.push({
+          premixNo,
+          processSlot: "liquid",
+          materialId,
+          materialCode: selection.liquidMaterialCode,
+          materialName: selection.materialName,
+          gradeId: null,
+          gradeCode: null,
+          sections: [],
+        });
+      }
     }
   });
 
-  return seeds;
+  return sortProcessingSeedsBySheetOrder(seeds, batchPayload);
 };
 
-/** Prefer division-details seeds; fall back to batch identification sheet with empty sections. */
-export const resolveProcessingMaterialSeedsForPremix = (
+/**
+ * QC data-source rule (all divisions, all batch types):
+ * - TO_BE_INITIATED → manufacturing `/qc-division/division-details` (identification sheet
+ *   only when division-details has no material rows yet).
+ * - IN_PROGRESS+ → saved `/qc-division/details` only — never merge with division-details/sheet.
+ */
+export const resolveProcessingMaterialSeedsForPremix = async (
   payload: unknown,
   premixNo: number,
   options?: {
     batchPayload?: unknown;
     processingType?: string;
-    materialCatalog?: QcProcessingMaterialCatalog | null;
+    catalog?: QcProcessingMaterialCatalog;
+    useFormDetails?: boolean;
   },
-): QcProcessingMaterialSeed[] => {
-  const fromDetails = getProcessingMaterialsForPremix(payload, premixNo);
-  if (fromDetails.length) return fromDetails;
+): Promise<{ seeds: QcProcessingMaterialSeed[]; catalog: QcProcessingMaterialCatalog }> => {
+  const catalog = options?.catalog ?? (await fetchProcessingMaterialCatalog());
 
-  if (!options?.materialCatalog) return [];
+  if (options?.useFormDetails) {
+    return {
+      seeds: getProcessingMaterialsForPremix(payload, premixNo),
+      catalog,
+    };
+  }
 
-  return buildProcessingMaterialSeedsFromBatchSheet(
-    options.batchPayload,
-    premixNo,
-    options.processingType,
-    options.materialCatalog,
-  );
+  const fromDivisionDetails = getProcessingMaterialsForPremix(payload, premixNo);
+  if (fromDivisionDetails.length) {
+    return {
+      seeds: sortProcessingSeedsBySheetOrder(fromDivisionDetails, options?.batchPayload),
+      catalog,
+    };
+  }
+
+  return {
+    seeds: buildProcessingMaterialSeedsFromBatchSheet(
+      options?.batchPayload,
+      premixNo,
+      options?.processingType,
+      catalog,
+    ),
+    catalog,
+  };
 };
 
+/** Same schema fetch path as manufacturing Raw Material Preparation premix slots. */
 export const fetchQcProcessingMaterialSchema = async (params: {
   subDepartmentId: number;
   seed: QcProcessingMaterialSeed;
+  catalog?: QcProcessingMaterialCatalog;
 }): Promise<SchemaDocumentV2 | null> => {
-  if (params.subDepartmentId <= 0) return null;
-  const requestBody = buildRawMaterialSchemaRequestFromCodes({
-    subDepartmentId: params.subDepartmentId,
-    materialId: params.seed.materialId,
-    materialCode: params.seed.materialCode,
-    gradeId: params.seed.gradeId,
-    gradeCode: params.seed.gradeCode,
-  });
+  const { subDepartmentId, seed } = params;
+  if (subDepartmentId <= 0) return null;
+
+  const isSolid = seed.processSlot === "solid";
+  const materialCode = pickString(seed.materialCode);
+  if (!materialCode) return null;
+
+  const catalog = params.catalog ?? (await fetchProcessingMaterialCatalog());
+  const allMaterials = mergeMaterialsLists(
+    catalog.solidMaterials,
+    catalog.liquidMaterials,
+  ) as RawMaterialPrepMaterialOption[];
+  const material = findMaterialInList(allMaterials, materialCode);
+  const materialId = material?.materialId ?? seed.materialId;
+  if (!materialId) return null;
+
+  const requestBody = material
+    ? buildRawMaterialSchemaRequest({
+        subDepartmentId,
+        material,
+        grade: isSolid ? findGradeInMaterial(material, seed.gradeCode ?? "") : null,
+      })
+    : buildRawMaterialSchemaRequestFromCodes({
+        subDepartmentId,
+        materialId,
+        materialCode,
+        gradeId: isSolid ? seed.gradeId : null,
+        gradeCode: isSolid ? seed.gradeCode || null : null,
+      });
+
   const response = await schemaEngineController.fetchSchema(
     rawMaterialPrepSchemaFetchConfig,
     requestBody,

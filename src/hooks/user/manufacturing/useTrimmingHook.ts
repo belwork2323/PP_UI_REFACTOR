@@ -327,13 +327,21 @@ export const useTrimmingHook = () => {
   };
 
   const openFormWithResolvedData = useCallback(
-    async (batch: TrimmingBatch, editMode: boolean) => {
+    async (
+      batch: TrimmingBatch,
+      editMode: boolean,
+      options?: { silent?: boolean },
+    ) => {
+      const silent = Boolean(options?.silent);
+      const formId = resolveTrimmingFormId(batch);
       const shouldFetchDetails =
+        silent ||
         editMode ||
         isManufacturingContinueFillingStatus(batch.trStatus) ||
         String(batch.trStatus ?? "")
           .toLowerCase()
-          .includes("reject");
+          .includes("reject") ||
+        Boolean(formId);
 
       let nextBatch = batch;
       let nextFormData = createDefaultTrimmingFormState();
@@ -341,7 +349,7 @@ export const useTrimmingHook = () => {
       let autoMotorEntries: TrimmingAddedMotor[] = [];
       let nextStatuses: Record<string, TrimmingMotorStatusMeta> = {};
 
-      setLoadingFormDetails(true);
+      if (!silent) setLoadingFormDetails(true);
       try {
         if (batch.batchId) {
           try {
@@ -379,13 +387,13 @@ export const useTrimmingHook = () => {
             showAlert(S.SUB_DEPARTMENT_MISSING, "error");
             return;
           }
-          if (!batch.formId) {
+          if (!formId) {
             showAlert(S.FORM_ID_MISSING, "error");
             return;
           }
 
           const detailsResponse = await trimmingController.fetchFormDetails({
-            formId: batch.formId,
+            formId,
           });
 
           if (!detailsResponse?.success || !detailsResponse?.data) {
@@ -395,12 +403,16 @@ export const useTrimmingHook = () => {
             return;
           }
 
-          nextBatch = { ...nextBatch, formId: detailsResponse.data.formId || batch.formId };
+          nextBatch = {
+            ...nextBatch,
+            formId: detailsResponse.data.formId || formId,
+            trStatus: detailsResponse.data.status ?? nextBatch.trStatus,
+          };
           nextFormData = mapTrimmingDetailsToFormState(detailsResponse.data);
           nextStatuses = mapTrimmingMotorStatusesFromApi(detailsResponse.data);
         }
       } finally {
-        setLoadingFormDetails(false);
+        if (!silent) setLoadingFormDetails(false);
       }
 
       const merged = mergeMotorsFromBatchAndForm(autoMotorEntries, nextFormData, initialStage);
@@ -697,6 +709,28 @@ export const useTrimmingHook = () => {
           "success",
           { autoCloseMs: 2200 },
         );
+
+        const formIdForRefresh = String(nextFormId ?? activeBatch.formId ?? "").trim();
+        if (formIdForRefresh) {
+          const statusForBanner = String(
+            response.data?.status ?? activeBatch.trStatus ?? "IN_PROGRESS",
+          )
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, "_");
+          const stillRejectedEdit = statusForBanner === "REJECTED";
+
+          await openFormWithResolvedData(
+            {
+              ...activeBatch,
+              formId: formIdForRefresh,
+              trStatus: response.data?.status ?? activeBatch.trStatus ?? "IN_PROGRESS",
+            },
+            stillRejectedEdit,
+            { silent: true },
+          );
+        }
+
         return true;
       } finally {
         setActionLoading(false);
@@ -709,6 +743,7 @@ export const useTrimmingHook = () => {
       formData,
       getMotorStatus,
       motorStatusById,
+      openFormWithResolvedData,
       previousStageGate,
       selectedMotorStage,
       showAlert,

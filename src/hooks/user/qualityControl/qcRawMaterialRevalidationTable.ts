@@ -457,8 +457,8 @@ const extractRowsFromMaterials = (materials: unknown[]): QcRevalidationRow[] => 
     if (!record) return;
     const ingredient = String(
       record.INGREDIENT ??
-        record.materialCode ??
         record.materialName ??
+        record.materialCode ??
         record.ingredient ??
         "",
     ).trim();
@@ -603,6 +603,33 @@ const wrapExpandedRows = (expanded: QcRevalidationRow[]): SchemaFormValues | nul
   return setRevalidationRows({}, renumberRevalidationRows(expanded));
 };
 
+/** Materials / ingredients from division-details or saved QC form payloads. */
+export const extractRevalidationMaterialsFromPayload = (payload: unknown): unknown[] => {
+  if (payload == null) return [];
+  const root = asRecord(payload) ?? {};
+  const data = asRecord(root.data) ?? root;
+  const qcFormData = asRecord(root.__qcFormDivisionData);
+
+  const candidates = [
+    data.materials,
+    data.ingredients,
+    root.materials,
+    root.ingredients,
+    qcFormData?.materials,
+    qcFormData?.ingredients,
+  ];
+
+  for (const candidate of candidates) {
+    if (Array.isArray(candidate) && candidate.length > 0) {
+      return candidate;
+    }
+  }
+  return [];
+};
+
+export const hasRevalidationSeedMaterials = (payload: unknown): boolean =>
+  extractRevalidationMaterialsFromPayload(payload).length > 0;
+
 /**
  * Map `/qc-division/division-details` auto-populate payload into revalidation table values.
  * Returns null when the payload has no usable initial rows.
@@ -623,15 +650,7 @@ export const mapDivisionDetailsToRevalidationValues = (
   }
 
   // 2) Materials / ingredients collections
-  const materials = Array.isArray(data.materials)
-    ? data.materials
-    : Array.isArray(data.ingredients)
-      ? data.ingredients
-      : Array.isArray(root.materials)
-        ? root.materials
-        : Array.isArray(root.ingredients)
-          ? root.ingredients
-          : [];
+  const materials = extractRevalidationMaterialsFromPayload(payload);
   if (materials.length) {
     const wrapped = wrapExpandedRows(extractRowsFromMaterials(materials));
     if (wrapped) return wrapped;
@@ -672,18 +691,7 @@ export type QcRevalidationMaterialSeed = {
 export const extractRevalidationMaterialSeeds = (
   payload: unknown,
 ): QcRevalidationMaterialSeed[] => {
-  if (payload == null) return [];
-  const root = asRecord(payload) ?? {};
-  const data = asRecord(root.data) ?? root;
-  const materials = Array.isArray(data.materials)
-    ? data.materials
-    : Array.isArray(data.ingredients)
-      ? data.ingredients
-      : Array.isArray(root.materials)
-        ? root.materials
-        : Array.isArray(root.ingredients)
-          ? root.ingredients
-          : [];
+  const materials = extractRevalidationMaterialsFromPayload(payload);
 
   const seeds: QcRevalidationMaterialSeed[] = [];
   const seen = new Set<string>();

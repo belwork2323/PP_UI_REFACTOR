@@ -348,7 +348,11 @@ export const resolvePremixQcStatusFromFormDetails = (
   return null;
 };
 
-/** Once past initiation, show saved QC form data from /qc-division/details (all divisions). */
+/**
+ * Data-source gate for all QC divisions and batch types:
+ * - TO_BE_INITIATED → seed from `/qc-division/division-details`
+ * - IN_PROGRESS / WAITING_FOR_APPROVAL / APPROVED / REJECTED → load `/qc-division/details`
+ */
 export const shouldUseQcFormDetailsData = (status: unknown): boolean =>
   !isQcStatusAwaitingInitiation(status);
 
@@ -973,6 +977,8 @@ export const buildQcDivisionPartialNav = (params: {
   premixStatuses?: unknown;
 }): QcPartialNavItem[] => {
   const typeKey = String(params.rawMaterialType ?? "").trim();
+  if (typeKey === "RAW_MATERIAL_REVALIDATION") return [];
+
   const statusDivisionKey =
     params.flowKey === "RAW_MATERIAL" && typeKey
       ? typeKey

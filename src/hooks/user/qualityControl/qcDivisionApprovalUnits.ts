@@ -203,8 +203,9 @@ const normalizeProcessingType = (value: unknown): string | undefined => {
 };
 
 const extractBatchPremixCount = (batchPayload: unknown): number => {
-  const batch = asRecord(batchPayload);
-  if (!batch) return 0;
+  const root = asRecord(batchPayload);
+  if (!root) return 0;
+  const batch = asRecord(root.__batchDetails) ?? root;
   const sheet = asRecord(batch.identificationSheet);
   const count =
     pickNumber(
@@ -323,6 +324,8 @@ export const isEmptyManufacturingDivisionDetailsPayload = (payload: unknown): bo
   const data = asRecord(manufacturing.data) ?? manufacturing;
 
   if (asArray(data.premixes).length > 0) return false;
+  if (asArray(data.materials).length > 0) return false;
+  if (asArray(data.ingredients).length > 0) return false;
   if (extractMotorIds(data).length > 0) return false;
 
   const mixingUnits = extractMixingStagesUnits(data);

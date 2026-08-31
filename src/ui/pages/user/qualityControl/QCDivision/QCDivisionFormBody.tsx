@@ -31,7 +31,7 @@ import {
 } from "../../../../components/custom/UserWorkflowStepPager";
 import QCDivisionEntryPanel, { type QCDivisionEntryUnitActions } from "./QCDivisionEntryPanel";
 import QCProcessingMaterialsPanel from "./QCProcessingMaterialsPanel";
-import QCSchemaBufferingLoader from "./QCSchemaBufferingLoader";
+import QCDivisionInlineLoader from "./QCDivisionInlineLoader";
 import QCHardwareAttachmentUpload from "./QCHardwareAttachmentUpload";
 import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
 import {
@@ -69,6 +69,7 @@ export type QCDivisionFormBodyProps = {
   /** Block field edits (Waiting / Approved) without forcing details theme. */
   fieldsDisabled?: boolean;
   schemaLoading?: boolean;
+  divisionAutoPopulateLoading?: boolean;
   schemaError?: string | null;
   onActiveDivisionGroupIndexChange: (index: number) => void;
   onActiveDivisionSubIndexChange: (index: number) => void;
@@ -83,6 +84,8 @@ export type QCDivisionFormBodyProps = {
   hideEntryGroupNav?: boolean;
   activePartialItem?: QcPartialNavItem | null;
   unitActions?: QCDivisionEntryUnitActions | null;
+  canResetPostCureSetup?: boolean;
+  onResetPostCureSetup?: () => void;
   theme: any;
 };
 
@@ -97,6 +100,7 @@ const QCDivisionFormBody = ({
   readOnly = false,
   fieldsDisabled = false,
   schemaLoading = false,
+  divisionAutoPopulateLoading = false,
   schemaError = null,
   hideEntryGroupNav = false,
   activePartialItem = null,
@@ -107,6 +111,8 @@ const QCDivisionFormBody = ({
   onMixingFinalMixDetailsChange,
   onRemoveDivisionEntry,
   unitActions = null,
+  canResetPostCureSetup = false,
+  onResetPostCureSetup,
   theme,
 }: QCDivisionFormBodyProps) => {
   const BRAND = QC_DIVISION_BRAND;
@@ -347,8 +353,12 @@ const QCDivisionFormBody = ({
     text: BRAND.text,
   };
 
+  if (divisionAutoPopulateLoading && !hasDivisionEntries) {
+    return <QCDivisionInlineLoader />;
+  }
+
   if (schemaLoading && !hasDivisionEntries) {
-    return <QCSchemaBufferingLoader />;
+    return <QCDivisionInlineLoader />;
   }
 
   if (!hasDivisionEntries || navGroups.length === 0) {
@@ -424,13 +434,6 @@ const QCDivisionFormBody = ({
         ) : null}
 
         {showProcessingMaterialsPanel ? (
-          <Box
-            sx={
-              fieldsDisabled && !readOnly
-                ? { pointerEvents: "none", userSelect: "none", opacity: 0.92 }
-                : undefined
-            }
-          >
             <QCProcessingMaterialsPanel
               key={`processing-materials-${processingMaterialEntries[0]?.premixNo ?? "all"}`}
               formData={formData}
@@ -439,12 +442,12 @@ const QCDivisionFormBody = ({
               subDepartmentId={subDepartmentId}
               batchId={batch?.batchId}
               readOnly={readOnly}
+              fieldsDisabled={fieldsDisabled}
               schemaLoading={schemaLoading}
               schemaError={schemaError}
               onEntryValuesChange={onDivisionEntryValuesChange}
               unitActions={resolveEntryUnitActions(processingMaterialEntries[0] ?? null)}
             />
-          </Box>
         ) : (
           entriesToRender.map((entry) => {
             const entryValues = formData.divisionEntryValues?.[entry.entryId];
@@ -481,6 +484,8 @@ const QCDivisionFormBody = ({
                     ? { ...resolveEntryUnitActions(entry)!, show: false }
                     : resolveEntryUnitActions(entry)
                 }
+                canResetPostCureSetup={canResetPostCureSetup}
+                onResetPostCureSetup={onResetPostCureSetup}
               />
             );
           })

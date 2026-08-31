@@ -44,6 +44,8 @@ export type FileRef = {
   uploadProgress?: number;
   isTemp?: boolean;
   file?: File | null;
+  /** When true (from division/form details API), file must not be removed in QC UI. */
+  readOnly?: boolean;
 };
 
 /** Create/update API file field — id only; backend returns metadata on form details. */
@@ -56,6 +58,10 @@ export const newFileLocalId = (): string =>
 
 export const isFileUploadIncomplete = (ref: FileRef | null | undefined): boolean =>
   ref?.status === "uploading" || ref?.status === "failed";
+
+/** API-seeded attachment flagged read-only — hide delete in QC sub-department UI. */
+export const isApiReadOnlyFileRef = (ref: FileRef | null | undefined): boolean =>
+  Boolean(ref?.readOnly);
 
 export const isFileReady = (ref: FileRef | null | undefined): boolean => {
   if (!ref || isFileUploadIncomplete(ref)) return false;
@@ -111,6 +117,7 @@ export const parseFileRef = (value: unknown): FileRef | null => {
       : fileId
         ? "uploaded"
         : undefined;
+  const readOnly = o.readOnly === true || o.read_only === true;
   return {
     fileName: fileName || fileId || "file",
     fileUrl: fileUrl || fileId || "",
@@ -124,6 +131,7 @@ export const parseFileRef = (value: unknown): FileRef | null => {
     status,
     isTemp: typeof o.isTemp === "boolean" ? o.isTemp : fileId ? false : undefined,
     file: o.file instanceof File ? o.file : null,
+    readOnly: readOnly || undefined,
   };
 };
 

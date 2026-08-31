@@ -49,8 +49,15 @@ const pickNumber = (...values: unknown[]): number => {
   return 0;
 };
 
+/** Unwrap batch details from bootstrap payload, list row, or nested `__batchDetails`. */
+export const resolveBatchDetailsRoot = (batchPayload: unknown): Record<string, unknown> | null => {
+  const root = asRecord(batchPayload);
+  if (!root) return null;
+  return asRecord(root.__batchDetails) ?? root;
+};
+
 export const extractBatchPremixCount = (batchPayload: unknown): number => {
-  const batch = asRecord(batchPayload);
+  const batch = resolveBatchDetailsRoot(batchPayload);
   if (!batch) return 0;
   const sheet = asRecord(batch.identificationSheet);
   const count =
@@ -67,7 +74,7 @@ export const extractBatchPremixCount = (batchPayload: unknown): number => {
 
 export const extractQcBatchUnits = (batchPayload: unknown): QcBatchUnits => {
   const motorIds = extractBatchMotorIds(batchPayload).map((row) => row.motorId);
-  const batch = asRecord(batchPayload);
+  const batch = resolveBatchDetailsRoot(batchPayload);
   const sheet = asRecord(batch?.identificationSheet);
   const materials = asArray(sheet?.materials).filter(
     (row): row is MaterialItem => row != null && typeof row === "object",
@@ -93,8 +100,10 @@ export const getQcDivisionUnitRequirements = (
   const key = String(flowKey ?? "").trim().toUpperCase();
   const typeKey = String(rawMaterialType ?? "").trim().toUpperCase();
 
+  if (key === "RAW_MATERIAL_REVALIDATION") return ["NONE"];
+
   if (key === "RAW_MATERIAL") {
-    if (typeKey === "RAW_MATERIAL_REVALIDATION") return ["MATERIAL"];
+    if (typeKey === "RAW_MATERIAL_REVALIDATION") return ["NONE"];
     if (typeKey === "RAW_MATERIAL_PROCESSING") return ["PREMIX", "MATERIAL"];
     return ["MATERIAL"];
   }

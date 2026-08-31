@@ -336,8 +336,18 @@ export const useNDTHook = () => {
   );
 
   const openFormWithResolvedData = useCallback(
-    async (batch: NDTBatch, editMode: boolean) => {
-      const shouldFetchDetails = editMode || isNdtContinueFillingStatus(batch.ndtStatus);
+    async (
+      batch: NDTBatch,
+      editMode: boolean,
+      options?: { silent?: boolean },
+    ) => {
+      const silent = Boolean(options?.silent);
+      const formId = resolveNDTFormId(batch);
+      const shouldFetchDetails =
+        silent ||
+        editMode ||
+        isNdtContinueFillingStatus(batch.ndtStatus) ||
+        Boolean(formId);
 
       let nextBatch = batch;
       let nextFormData = normalizeNDTFormState(createDefaultNDTFormState(batch.batchId));
@@ -346,7 +356,7 @@ export const useNDTHook = () => {
       let rejectionReason = batch.rejectionReason ?? null;
       let nextCasingMotorsById: Record<string, BatchMotorMetadataItem> = {};
 
-      setLoadingFormDetails(true);
+      if (!silent) setLoadingFormDetails(true);
       try {
         if (batch.batchId) {
           try {
@@ -395,8 +405,6 @@ export const useNDTHook = () => {
             showAlert(messages.SUB_DEPARTMENT_MISSING, "error");
             return;
           }
-
-          const formId = resolveNDTFormId(batch);
           if (!formId) {
             showAlert(messages.FORM_ID_MISSING, "error");
             return;
@@ -422,6 +430,7 @@ export const useNDTHook = () => {
           nextBatch = {
             ...nextBatch,
             formId: detailsResponse.data.formId || formId,
+            ndtStatus: detailsResponse.data.formStatus ?? nextBatch.ndtStatus,
           };
           rejectionReason =
             detailsResponse.data.workflowInsights?.rejectionReason ?? rejectionReason;
@@ -432,7 +441,7 @@ export const useNDTHook = () => {
               : mapNDTMotorStatusesFromApi(detailsResponse.data);
         }
       } finally {
-        setLoadingFormDetails(false);
+        if (!silent) setLoadingFormDetails(false);
       }
 
       nextFormData = normalizeNDTFormState({
@@ -777,6 +786,28 @@ export const useNDTHook = () => {
           "success",
           { autoCloseMs: 2200 },
         );
+
+        const formIdForRefresh = String(nextFormId ?? activeBatch.formId ?? "").trim();
+        if (formIdForRefresh) {
+          const statusForBanner = String(
+            response.data?.status ?? activeBatch.ndtStatus ?? "IN_PROGRESS",
+          )
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, "_");
+          const stillRejectedEdit = statusForBanner === "REJECTED";
+
+          await openFormWithResolvedData(
+            {
+              ...activeBatch,
+              formId: formIdForRefresh,
+              ndtStatus: response.data?.status ?? activeBatch.ndtStatus ?? "IN_PROGRESS",
+            },
+            stillRejectedEdit,
+            { silent: true },
+          );
+        }
+
         return true;
       } finally {
         setActionLoading(false);
@@ -789,6 +820,7 @@ export const useNDTHook = () => {
       formData,
       getMotorStatus,
       motorStatusById,
+      openFormWithResolvedData,
       previousStageGate,
       showAlert,
       subDepartmentId,

@@ -1,9 +1,15 @@
 import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import { isEmptyManufacturingDivisionDetailsPayload } from "./qcDivisionApprovalUnits";
 import { shouldPreserveQcDivisionFileRefsOnSeed } from "./qcDivisionFileUpload";
 import {
+  isQcPostCureInhibitionOperation,
   resolveQcPostCureSchemaSelection,
   type QcPostCureSchemaSelection,
 } from "./qcPostCureConfig";
+import {
+  isQcQualificationSubBatch,
+  isQcSubscaleBatch,
+} from "./qcBatchType";
 import {
   createInitialPostCureValues,
   hydratePostCureValuesFromMotorDetail,
@@ -84,8 +90,35 @@ export const findPostCureMotorRecord = (
   return null;
 };
 
-/** Resolve Loose Flap / Inhibition (+ inhibitor) from manufacturing or QC motor details. */
-export const resolvePostCureSelectionFromMotorDetails = (
+export type QcPostCureManualSetup = {
+  operation: string;
+  inhibitorType?: string;
+  motorReceiptDate: string;
+};
+
+export const QC_POST_CURE_MANUAL_SETUP_KEY = "__postCureManualSetup";
+
+export const resolvePostCureManualSetup = (payload: unknown): QcPostCureManualSetup | null => {
+  const root = asRecord(payload);
+  if (!root) return null;
+  const setup = asRecord(root[QC_POST_CURE_MANUAL_SETUP_KEY]);
+  if (!setup) return null;
+  const operation = pickString(setup.operation);
+  if (!operation) return null;
+  return {
+    operation,
+    inhibitorType: pickString(setup.inhibitorType) || undefined,
+    motorReceiptDate: pickString(setup.motorReceiptDate),
+  };
+};
+
+export const buildPostCureManualSetupPayload = (
+  setup: QcPostCureManualSetup,
+): Record<string, unknown> => ({
+  [QC_POST_CURE_MANUAL_SETUP_KEY]: setup,
+});
+
+const resolvePostCureSelectionFromManufacturingMotor = (
   payload: unknown,
   motorId: string,
 ): QcPostCureSchemaSelection | null => {
@@ -102,7 +135,11 @@ export const resolvePostCureSelectionFromMotorDetails = (
   }
 
   if (inhibition && Object.keys(inhibition).length > 0) {
-    const inhibitorType = pickString(inhibition.inhibitorType, details.inhibitorType, motor.inhibitorType);
+    const inhibitorType = pickString(
+      inhibition.inhibitorType,
+      details.inhibitorType,
+      motor.inhibitorType,
+    );
     return resolveQcPostCureSchemaSelection("INHIBITION", inhibitorType);
   }
 
@@ -115,6 +152,69 @@ export const resolvePostCureSelectionFromMotorDetails = (
   const inhibitorType = pickString(details.inhibitorType, motor.inhibitorType);
 
   return resolveQcPostCureSchemaSelection(operationType, inhibitorType);
+};
+
+/** Subscale qualification batches may have no manufacturing post-cure operation until setup. */
+export const needsQcPostCureManualSetup = (params: {
+  flowKey: string;
+  batchType?: string | null;
+  subBatchType?: string | null;
+  manufacturingPayload?: unknown;
+  hasQcSavedData?: boolean;
+  manualSetup?: QcPostCureManualSetup | null;
+  motorIds?: string[];
+}): boolean => {
+  if (String(params.flowKey ?? "").trim().toUpperCase() !== "POST_CURE") return false;
+  if (params.hasQcSavedData) return false;
+  if (params.manualSetup) return false;
+  if (!isQcSubscaleBatch(params.batchType) || !isQcQualificationSubBatch(params.subBatchType)) {
+    return false;
+  }
+
+  const motors = (params.motorIds ?? []).map((id) => String(id ?? "").trim()).filter(Boolean);
+  if (!motors.length) {
+    return isEmptyManufacturingDivisionDetailsPayload(params.manufacturingPayload);
+  }
+
+  return !motors.some((motorId) =>
+    Boolean(resolvePostCureSelectionFromManufacturingMotor(params.manufacturingPayload, motorId)),
+  );
+};
+
+export const canLoadQcPostCureSetupForm = (state: {
+  selectedPostCureOperation: string;
+  selectedInhibitorType: string;
+  postCureMotorReceiptDate: string;
+}): boolean => {
+  if (!String(state.selectedPostCureOperation ?? "").trim()) return false;
+  if (
+    isQcPostCureInhibitionOperation(state.selectedPostCureOperation) &&
+    !String(state.selectedInhibitorType ?? "").trim()
+  ) {
+    return false;
+  }
+  if (!String(state.postCureMotorReceiptDate ?? "").trim()) return false;
+  return Boolean(
+    resolveQcPostCureSchemaSelection(
+      state.selectedPostCureOperation,
+      state.selectedInhibitorType ?? "",
+    ),
+  );
+};
+
+/** Resolve Loose Flap / Inhibition (+ inhibitor) from manufacturing, QC, or manual setup. */
+export const resolvePostCureSelectionFromMotorDetails = (
+  payload: unknown,
+  motorId: string,
+): QcPostCureSchemaSelection | null => {
+  const manualSetup = resolvePostCureManualSetup(payload);
+  if (manualSetup) {
+    return resolveQcPostCureSchemaSelection(
+      manualSetup.operation,
+      manualSetup.inhibitorType ?? "",
+    );
+  }
+  return resolvePostCureSelectionFromManufacturingMotor(payload, motorId);
 };
 
 const collectMotorSections = (

@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { Box, Chip, Stack, Typography } from "@mui/material";
+import { Box, Chip, CircularProgress, Stack, Typography } from "@mui/material";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
@@ -15,12 +15,14 @@ import QCDivisionNavPanel, { type QCDivisionNavApprovalActions } from "./QCDivis
 import type { QCDivisionEntryUnitActions } from "./QCDivisionEntryPanel";
 import QCFlowBar from "./QCFlowBar";
 import QCPartialItemNavigation from "./QCPartialItemNavigation";
-import QCSchemaBufferingLoader from "./QCSchemaBufferingLoader";
 import type { QcMixingQualityCheckDefinition } from "../../../../../hooks/user/qualityControl/qcMixingTables";
 import type { QcDivisionUiMode } from "../../../../../hooks/user/qualityControl/qcDivisionLoadPipeline";
 import type { QcDivisionSetupDefinition } from "../../../../../hooks/user/qualityControl/qcDivisionSetupConfig";
+import { isRawMaterialRevalidationType } from "../../../../../hooks/user/qualityControl/qcProcessingConfig";
 import QCDivisionBlockedState from "./QCDivisionBlockedState";
 import QcDivisionSetupPanel from "./setup/QcDivisionSetupPanel";
+import QCDivisionInlineLoader from "./QCDivisionInlineLoader";
+import { isPostCureDivisionFlow } from "../../../../../hooks/user/qualityControl/qcDivisionRegistry";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 const { science: ScienceRoundedIcon } = icons.user.qualityControl.qcDivision.form;
@@ -45,6 +47,7 @@ type QCFormProps = {
   selectedHardwareProcesses: string[];
   selectedTrimmingMotorCount: number | "";
   trimmingMotorReceivedDate: string;
+  postCureMotorReceiptDate: string;
   selectedPostCureOperation: string;
   selectedInhibitorType: string;
   selectedPropellantProcess: string;
@@ -74,11 +77,14 @@ type QCFormProps = {
   canEditDivisionStructure?: boolean;
   formLockMessage?: string | null;
   schemaLoading?: boolean;
+  divisionAutoPopulateLoading?: boolean;
   schemaError?: string | null;
   divisionUiMode?: QcDivisionUiMode;
   divisionBlockedReason?: string | null;
   divisionSetupDefinition?: QcDivisionSetupDefinition | null;
   canLoadSetupForm?: boolean;
+  canResetPostCureSetup?: boolean;
+  postCureSetupOperationLabel?: string | null;
   flowBarTheme: any;
   onDivisionNavTabChange: (tabKey: string) => void;
   onProcessingTypeChange: (value: string) => void;
@@ -89,11 +95,13 @@ type QCFormProps = {
   onHardwareProcessesChange: (values: string[]) => void;
   onTrimmingMotorCountChange: (value: number | "") => void;
   onTrimmingMotorReceivedDateChange: (value: string) => void;
+  onPostCureMotorReceiptDateChange: (value: string) => void;
   onPostCureOperationChange: (value: string) => void;
   onInhibitorTypeChange: (value: string) => void;
   onPropellantProcessChange: (value: string) => void;
   onLoadForm?: () => void;
   onLoadSetupForm?: () => void;
+  onResetPostCureSetup?: () => void;
   onPartialNavIndexChange?: (index: number) => void;
   onActiveDivisionGroupIndexChange: (index: number) => void;
   onActiveDivisionSubIndexChange: (index: number) => void;
@@ -126,6 +134,7 @@ const QCForm = ({
   selectedHardwareProcesses,
   selectedTrimmingMotorCount,
   trimmingMotorReceivedDate,
+  postCureMotorReceiptDate,
   selectedPostCureOperation,
   selectedInhibitorType,
   selectedPropellantProcess,
@@ -152,11 +161,14 @@ const QCForm = ({
   canEditDivisionStructure = true,
   formLockMessage = null,
   schemaLoading = false,
+  divisionAutoPopulateLoading = false,
   schemaError = null,
   divisionUiMode = "FORM",
   divisionBlockedReason = null,
   divisionSetupDefinition = null,
   canLoadSetupForm = false,
+  canResetPostCureSetup = false,
+  postCureSetupOperationLabel = null,
   flowBarTheme,
   onDivisionNavTabChange,
   onProcessingTypeChange,
@@ -167,11 +179,13 @@ const QCForm = ({
   onHardwareProcessesChange,
   onTrimmingMotorCountChange,
   onTrimmingMotorReceivedDateChange,
+  onPostCureMotorReceiptDateChange,
   onPostCureOperationChange,
   onInhibitorTypeChange,
   onPropellantProcessChange,
   onLoadForm,
   onLoadSetupForm,
+  onResetPostCureSetup,
   onPartialNavIndexChange,
   onActiveDivisionGroupIndexChange,
   onActiveDivisionSubIndexChange,
@@ -198,6 +212,9 @@ const QCForm = ({
   const isBlocked = divisionUiMode === "BLOCKED";
   const isSetup = divisionUiMode === "SETUP";
   const showFormBody = divisionUiMode === "FORM";
+  const postCureSetupMode = isSetup && isPostCureDivisionFlow(selectedDivision);
+  const isRevalidationDivision = isRawMaterialRevalidationType(selectedRawMaterialType);
+  const showFlowBar = canEditDivisionStructure && !isRevalidationDivision;
 
   const flowBarProps = {
     batch,
@@ -211,6 +228,7 @@ const QCForm = ({
     selectedHardwareProcesses,
     selectedTrimmingMotorCount,
     trimmingMotorReceivedDate,
+    postCureMotorReceiptDate,
     selectedPostCureOperation,
     selectedInhibitorType,
     selectedPropellantProcess,
@@ -220,6 +238,7 @@ const QCForm = ({
     schemaLoading,
     partialNavActive,
     hideLoadAction: isSetup,
+    postCureSetupMode,
     onProcessingTypeChange,
     onPremixChange,
     onMixingStageChange,
@@ -228,6 +247,7 @@ const QCForm = ({
     onHardwareProcessesChange,
     onTrimmingMotorCountChange,
     onTrimmingMotorReceivedDateChange,
+    onPostCureMotorReceiptDateChange,
     onPostCureOperationChange,
     onInhibitorTypeChange,
     onPropellantProcessChange,
@@ -331,7 +351,7 @@ const QCForm = ({
         tabs={divisionNavTabs}
         activeTabKey={activeDivisionTabKey}
         statusByTabKey={divisionGroupStatusByFlowKey}
-        loading={divisionsLoading}
+        loading={divisionsLoading || divisionAutoPopulateLoading}
         onTabChange={onDivisionNavTabChange}
         approvalActions={navApprovalActions}
         isTabEnabled={isDivisionNavTabEnabled}
@@ -359,7 +379,7 @@ const QCForm = ({
         <QCDivisionBlockedState reason={divisionBlockedReason} theme={theme} />
       ) : null}
 
-      {!isBlocked && canEditDivisionStructure && isSetup && divisionSetupDefinition ? (
+      {!isBlocked && showFlowBar && isSetup && divisionSetupDefinition ? (
         <QcDivisionSetupPanel
           definition={divisionSetupDefinition}
           canLoad={canLoadSetupForm}
@@ -371,11 +391,32 @@ const QCForm = ({
         </QcDivisionSetupPanel>
       ) : null}
 
-      {!isBlocked && canEditDivisionStructure && !isSetup ? (
+      {!isBlocked && showFlowBar && !isSetup ? (
         <QCFlowBar {...flowBarProps} />
       ) : null}
 
-      {!isBlocked && partialNavActive ? (
+      {!isBlocked && canResetPostCureSetup ? (
+        <Box
+          sx={{
+            mb: 1.5,
+            px: 1.25,
+            py: 1,
+            borderRadius: 2,
+            border: `1px solid ${BRAND.border}`,
+            bgcolor: BRAND.surface,
+          }}
+        >
+          <Typography sx={{ fontSize: "0.78rem", color: BRAND.textSub, fontWeight: 600 }}>
+            {S.POST_CURE_SETUP_OPERATION_LABEL}
+            {": "}
+            <Box component="span" sx={{ color: BRAND.text, fontWeight: 700 }}>
+              {postCureSetupOperationLabel || "—"}
+            </Box>
+          </Typography>
+        </Box>
+      ) : null}
+
+      {!isBlocked && partialNavActive && !postCureSetupMode ? (
         <QCPartialItemNavigation
           items={partialNavItems}
           activeIndex={activePartialNavIndex}
@@ -387,13 +428,32 @@ const QCForm = ({
       ) : null}
 
       {showFormBody ? (
+      divisionAutoPopulateLoading ? (
+        <QCDivisionInlineLoader />
+      ) : (
       <Box
         sx={{
           position: "relative",
           ...(schemaLoading ? { pointerEvents: "none", userSelect: "none", minHeight: 160 } : null),
         }}
       >
-        {schemaLoading ? <QCSchemaBufferingLoader overlay /> : null}
+        {schemaLoading ? (
+          <Box
+            sx={{
+              position: "absolute",
+              inset: 0,
+              zIndex: 20,
+              display: "flex",
+              justifyContent: "center",
+              alignItems: "flex-start",
+              pt: { xs: 4, sm: 6 },
+              bgcolor: "rgba(255, 255, 255, 0.45)",
+              borderRadius: "inherit",
+            }}
+          >
+            <CircularProgress size={36} sx={{ color: BRAND.primary }} />
+          </Box>
+        ) : null}
         <QCDivisionFormBody
           batch={batch}
           divisionAutoPopulateData={divisionAutoPopulateData}
@@ -402,9 +462,10 @@ const QCForm = ({
           subDepartmentId={subDepartmentId}
           activeDivisionGroupIndex={activeDivisionGroupIndex}
           activeDivisionSubIndex={activeDivisionSubIndex}
-          readOnly={readOnly || fieldsReadOnly}
+          readOnly={readOnly || fieldsReadOnly || fieldsDisabled}
           fieldsDisabled={readOnly || fieldsDisabled}
           schemaLoading={schemaLoading}
+          divisionAutoPopulateLoading={divisionAutoPopulateLoading}
           schemaError={schemaError}
           hideEntryGroupNav
           onActiveDivisionGroupIndexChange={onActiveDivisionGroupIndexChange}
@@ -415,9 +476,12 @@ const QCForm = ({
           onRemoveDivisionEntry={onRemoveDivisionEntry}
           activePartialItem={activePartialItem}
           unitActions={unitActions}
+          canResetPostCureSetup={canResetPostCureSetup}
+          onResetPostCureSetup={onResetPostCureSetup}
           theme={theme}
         />
       </Box>
+      )
       ) : null}
     </Box>
   );

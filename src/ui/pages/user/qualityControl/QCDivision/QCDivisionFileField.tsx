@@ -15,7 +15,10 @@ import InsertDriveFileOutlinedIcon from "@mui/icons-material/InsertDriveFileOutl
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import { STRINGS } from "../../../../../app/config/strings";
-import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
+import {
+  isApiReadOnlyFileRef,
+  type FileRef,
+} from "../../../../../data/models/common/FileUploadModel";
 import FilePreviewDialog from "../../../../components/common/FilePreviewDialog";
 import { FILE_PICKER_ACCEPT } from "../../../../../utils/FileUtils";
 import {
@@ -127,6 +130,7 @@ const QCDivisionFileField = ({
           const canOpen =
             Boolean(String(ref.fileId ?? "").trim()) ||
             /^https?:\/\//i.test(String(ref.fileUrl ?? ""));
+          const canRemove = !locked && !isApiReadOnlyFileRef(ref);
           return (
             <Box
               key={ref.localId ?? `${ref.fileName}-${index}`}
@@ -176,7 +180,7 @@ const QCDivisionFileField = ({
                     </IconButton>
                   </Tooltip>
                 ) : null}
-                {!locked ? (
+                {canRemove ? (
                   <Tooltip title={S.FILE_REMOVE}>
                     <IconButton size="small" onClick={() => void handleRemove(index)}>
                       <DeleteOutlineRoundedIcon sx={{ fontSize: 16 }} />
