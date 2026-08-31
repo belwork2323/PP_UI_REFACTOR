@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
+  CircularProgress,
   Stack,
   Typography,
   alpha,
@@ -37,19 +38,18 @@ import {
   buildMixCardId,
   createDefaultMixingFormState,
   isMixCardLocked,
-  mapBackendQualityChecksToRows,
   type MixCardStageType,
   type MixCardStatusMeta,
   type MixCardSubmissionStatus,
 } from "../../../../../data/models/user/MixingFormModel";
 import type { FinalMixEntry, PremixEntry } from "../../../../../data/models/user/MixingFormModel";
 import { useMixingFormHook } from "../../../../../hooks/user/manufacturing/useMixingFormHook";
+import { useMixingQualityChecks } from "../../../../../hooks/user/manufacturing/useMixingQualityChecks";
 import {
   isPremixEnabledForWorkflow,
   getPremixNavTabDisabledReason,
   type PreviousStageApprovedUnits,
 } from "../../../../../hooks/user/previousStageApproval";
-import { mixingController } from "../../../../../controllers/user/manufacturing/mixingController";
 import MixingDateField from "./MixingDateField";
 import MixingCardNavigation from "./MixingCardNavigation";
 import MixingQualityChecksTable from "./MixingQualityChecksTable";
@@ -128,6 +128,8 @@ type PremixStageCardProps = {
   statusChip?: React.ReactNode;
   headerActions?: React.ReactNode;
   lockedMessage?: string | null;
+  qualityChecksLoading?: boolean;
+  qualityChecksError?: string | null;
   onRemove: (premixNo: string) => void;
   onPremixFieldChange: (
     premixNo: string,
@@ -155,6 +157,8 @@ const PremixStageCard = ({
   statusChip,
   headerActions,
   lockedMessage,
+  qualityChecksLoading = false,
+  qualityChecksError = null,
   onRemove,
   onPremixFieldChange,
   onProcessChange,
@@ -355,6 +359,19 @@ const PremixStageCard = ({
         {S.SECTION_QUALITY_CHECKS}
       </Typography>
 
+      {qualityChecksLoading ? (
+        <Stack direction="row" alignItems="center" gap={1} sx={{ py: 1.5 }}>
+          <CircularProgress size={18} sx={{ color: BRAND.mx }} />
+          <Typography sx={{ fontSize: "0.78rem", color: BRAND.textSub }}>
+            Loading quality checks…
+          </Typography>
+        </Stack>
+      ) : qualityChecksError ? (
+        <Typography sx={{ fontSize: "0.78rem", color: "error.main", mb: 1 }}>
+          {qualityChecksError}
+        </Typography>
+      ) : null}
+
       <MixingQualityChecksTable
         rows={premix.qualityChecks}
         readOnly={readOnly}
@@ -373,6 +390,8 @@ const FinalMixStageCard = ({
   statusChip,
   headerActions,
   lockedMessage,
+  qualityChecksLoading = false,
+  qualityChecksError = null,
   onRemove,
   onFieldChange,
   onProcessChange,
@@ -384,6 +403,8 @@ const FinalMixStageCard = ({
   statusChip?: React.ReactNode;
   headerActions?: React.ReactNode;
   lockedMessage?: string | null;
+  qualityChecksLoading?: boolean;
+  qualityChecksError?: string | null;
   onRemove: (mixNo: string) => void;
   onFieldChange: (
     mixNo: string,
@@ -559,6 +580,19 @@ const FinalMixStageCard = ({
         {S.SECTION_QUALITY_CHECKS}
       </Typography>
 
+      {qualityChecksLoading ? (
+        <Stack direction="row" alignItems="center" gap={1} sx={{ py: 1.5 }}>
+          <CircularProgress size={18} sx={{ color: BRAND.mx }} />
+          <Typography sx={{ fontSize: "0.78rem", color: BRAND.textSub }}>
+            Loading quality checks…
+          </Typography>
+        </Stack>
+      ) : qualityChecksError ? (
+        <Typography sx={{ fontSize: "0.78rem", color: "error.main", mb: 1 }}>
+          {qualityChecksError}
+        </Typography>
+      ) : null}
+
       <MixingQualityChecksTable
         rows={entry.qualityChecks}
         readOnly={readOnly}
@@ -636,6 +670,9 @@ const MixingForm = ({
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [finalApprovalOpen, setFinalApprovalOpen] = useState(false);
 
+  const { loadingMixType, errorByMixType, ensureQualityChecks } =
+    useMixingQualityChecks(motorStage);
+
   const batchMixingStages = useMemo(
     () => identificationSheet?.metadata?.mixing?.stages ?? [],
     [identificationSheet?.metadata?.mixing?.stages],
@@ -687,41 +724,32 @@ const MixingForm = ({
     return [...premixItems, ...finalMixItems];
   }, [premixCards, finalMixCards]);
 
+  const activeNavItem = combinedNavItems[activeCardIndex] ?? null;
+
   useEffect(() => {
     let isMounted = true;
+    const mixType = activeNavItem?.kind;
+    if (mixType !== "PREMIX" && mixType !== "FINAL_MIX") return;
 
-    const loadQualityChecks = async () => {
-      try {
-        const [premixResponse, finalMixResponse] = await Promise.all([
-          mixingController.fetchQualityChecks("PREMIX", motorStage),
-          mixingController.fetchQualityChecks("FINAL_MIX", motorStage),
-        ]);
-
-        if (!isMounted) return;
-
-        const mapRows = (response: any) => {
-          const definitions =
-            (Array.isArray(response?.data?.data?.qualityChecks) &&
-              response.data.data.qualityChecks) ||
-            (Array.isArray(response?.data?.qualityChecks) && response.data.qualityChecks) ||
-            (Array.isArray(response?.qualityChecks) && response.qualityChecks) ||
-            [];
-          return mapBackendQualityChecksToRows(definitions);
-        };
-
-        applyPremixQualityChecks(mapRows(premixResponse));
-        applyFinalMixQualityChecks(mapRows(finalMixResponse));
-      } catch (error) {
-        console.warn("Failed to fetch quality checks", error);
+    void ensureQualityChecks(mixType).then((rows) => {
+      if (!isMounted || !rows.length) return;
+      if (mixType === "PREMIX") {
+        applyPremixQualityChecks(rows);
+      } else {
+        applyFinalMixQualityChecks(rows);
       }
-    };
-
-    void loadQualityChecks();
+    });
 
     return () => {
       isMounted = false;
     };
-  }, [motorStage, applyPremixQualityChecks, applyFinalMixQualityChecks]);
+  }, [
+    activeNavItem?.kind,
+    applyFinalMixQualityChecks,
+    applyPremixQualityChecks,
+    ensureQualityChecks,
+    motorStage,
+  ]);
 
   const handleRemovePremix = useCallback(
     (premixNo: string) => {
@@ -757,7 +785,6 @@ const MixingForm = ({
     [combinedNavItems, finalMixCards, removeFinalMixCard],
   );
 
-  const activeNavItem = combinedNavItems[activeCardIndex] ?? null;
   const activePremix =
     activeNavItem?.kind === "PREMIX" ? (premixCards[activeNavItem.cardIndex] ?? null) : null;
   const activeFinalMix =
@@ -1037,6 +1064,8 @@ const MixingForm = ({
                 onPremixFieldChange={updatePremixField}
                 onProcessChange={updateProcessParticular}
                 onQualityChange={updateQualityCheck}
+                qualityChecksLoading={loadingMixType === "PREMIX"}
+                qualityChecksError={errorByMixType.PREMIX ?? null}
               />
             ) : activeFinalMix ? (
               <FinalMixStageCard
@@ -1064,6 +1093,8 @@ const MixingForm = ({
                 onFieldChange={updateFinalMixField}
                 onQualityChange={updateFinalMixQualityCheck}
                 onProcessChange={updateFinalMixProcessParticular}
+                qualityChecksLoading={loadingMixType === "FINAL_MIX"}
+                qualityChecksError={errorByMixType.FINAL_MIX ?? null}
               />
             ) : null}
           </Stack>

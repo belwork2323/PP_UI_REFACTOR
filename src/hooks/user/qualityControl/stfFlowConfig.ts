@@ -49,54 +49,15 @@ export type StfMotorOption = { value: string; label: string; disabled?: boolean 
 
 export type StfAddedMotor = { motorId: string; subType: StfSubType };
 
-export const isStfMainMotorBatch = (batchType?: string | null) =>
-  normalizeBatchTypeCode(batchType) === "MAIN";
-
-export const isStfSubscaleBatch = (batchType?: string | null) =>
-  normalizeBatchTypeCode(batchType) === "SUBSCALE";
-
-export const normalizeStfSubBatchType = (raw?: string | null): string => {
-  const s = String(raw ?? "")
-    .trim()
-    .toUpperCase()
-    .replace(/\s+/g, "_");
-  if (!s) return "";
-  if (s.includes("QUALIFICATION")) return "QUALIFICATION";
-  if (s.includes("EXPERIMENTAL")) return "EXPERIMENTAL";
-  return s;
-};
-
-export const isStfQualificationSubBatch = (subBatchType?: string | null) =>
-  normalizeStfSubBatchType(subBatchType) === "QUALIFICATION";
-
-export const isStfExperimentalSubBatch = (subBatchType?: string | null) =>
-  normalizeStfSubBatchType(subBatchType) === "EXPERIMENTAL";
-
-/**
- * Prefer an explicit Subscale from list or details. Batch details may default empty
- * batchType to MAIN, which must not wipe a Subscale list row.
- */
-export const resolveStfWorkingBatchType = (
-  listBatchType?: string | null,
-  detailsBatchType?: string | null,
-): string => {
-  const listCode = normalizeBatchTypeCode(listBatchType);
-  const detailsCode = normalizeBatchTypeCode(detailsBatchType);
-  if (listCode === "SUBSCALE" || detailsCode === "SUBSCALE") return "SUBSCALE";
-  if (listCode === "MAIN" || detailsCode === "MAIN") return "MAIN";
-  return listCode || detailsCode || "";
-};
-
-export const resolveStfWorkingSubBatchType = (
-  listSubBatchType?: string | null,
-  detailsSubBatchType?: string | null,
-): string => {
-  const listCode = normalizeStfSubBatchType(listSubBatchType);
-  const detailsCode = normalizeStfSubBatchType(detailsSubBatchType);
-  if (listCode === "EXPERIMENTAL" || detailsCode === "EXPERIMENTAL") return "EXPERIMENTAL";
-  if (listCode === "QUALIFICATION" || detailsCode === "QUALIFICATION") return "QUALIFICATION";
-  return listCode || detailsCode || "";
-};
+export {
+  isQcMainBatch as isStfMainMotorBatch,
+  isQcSubscaleBatch as isStfSubscaleBatch,
+  normalizeQcSubBatchType as normalizeStfSubBatchType,
+  isQcQualificationSubBatch as isStfQualificationSubBatch,
+  isQcExperimentalSubBatch as isStfExperimentalSubBatch,
+  resolveQcWorkingBatchType as resolveStfWorkingBatchType,
+  resolveQcWorkingSubBatchType as resolveStfWorkingSubBatchType,
+} from "./qcBatchType";
 
 /**
  * ACEM: seed batch-linked main motors for Main batches and Subscale Qualification.

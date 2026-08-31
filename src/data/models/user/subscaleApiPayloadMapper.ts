@@ -19,7 +19,8 @@ import {
   SUBSCALE_BATCH_FIELDS,
   normalizeSubscaleMixingCycles,
 } from "../../../hooks/user/manufacturing/subscaleBatchConfig";
-import { formatToIsoDateInput } from "../../../utils/dateUtils";
+import { formatToUiDate } from "../../../utils/dateUtils";
+import { parseFileRefs, type FileRef } from "../common/FileUploadModel";
 
 /** Mirrors backend `SubscaleDetailsDTO.MixParticular` */
 export type SubscaleMixParticularDTO = {
@@ -166,6 +167,15 @@ export type InhibitionDetailsDTO = {
   inhibitionTable?: InhibitionTableDTO[];
 };
 
+/** Static-test graph attachment as expected by create/update API */
+export type SubscaleGraphFileDTO = {
+  fileId?: string;
+  fileName?: string;
+  status?: string;
+  mimeType?: string;
+  readOnly?: boolean;
+};
+
 /** Mirrors backend `StaticTestingTableDTO` (API may return `nvalue` lowercase) */
 export type StaticTestingTableDTO = {
   articleType?: string | null;
@@ -178,6 +188,9 @@ export type StaticTestingTableDTO = {
   pressureAvg?: number | null;
   thrustAvg?: number | null;
   burnRate?: number | null;
+  /** Preferred create/update shape */
+  graph?: SubscaleGraphFileDTO | null;
+  /** Legacy details responses may still return document id only */
   graphDocumentId?: string | null;
 };
 
@@ -268,25 +281,65 @@ const HARDWARE_COUNT_TO_API: Record<string, string> = {
   NO_OF_CARTOONS: "numberOfCartoons",
 };
 
+/** UI article labels → API `articleType` values (create/update contract). */
 const ARTICLE_TYPE_TO_API: Record<string, string> = {
-  "40 kg BEM": "40_KG_BEM",
-  "10 kg BEM": "10_KG_BEM",
-  "2 kg BEM": "2_KG_BEM",
-  "Wheel Peel": "WHEEL_PEEL",
-  "SBS/TBS": "SBS_TBS",
-  Cartoons: "CARTOONS",
-  Cartons: "CARTOONS",
-  "40_KG_BEM": "40_KG_BEM",
-  "10_KG_BEM": "10_KG_BEM",
-  "2_KG_BEM": "2_KG_BEM",
-  WHEEL_PEEL: "WHEEL_PEEL",
-  SBS_TBS: "SBS_TBS",
-  CARTOONS: "CARTOONS",
+  "40 kg BEM": "BEM 40KG",
+  "10 kg BEM": "BEM 10KG",
+  "2 kg BEM": "BEM 2KG",
+  "Wheel Peel": "Wheel Peel",
+  "SBS/TBS": "SBS/TBS",
+  Cartoons: "Cartoons",
+  Cartons: "Cartoons",
+  "BEM 40KG": "BEM 40KG",
+  "BEM 10KG": "BEM 10KG",
+  "BEM 2KG": "BEM 2KG",
+  // Legacy enum codes still accepted from older drafts/details
+  "40_KG_BEM": "BEM 40KG",
+  "10_KG_BEM": "BEM 10KG",
+  "2_KG_BEM": "BEM 2KG",
+  WHEEL_PEEL: "Wheel Peel",
+  SBS_TBS: "SBS/TBS",
+  CARTOONS: "Cartoons",
 };
 
 const TABLE_FIELD_TO_API: Record<string, string> = {
-  GRAPH_FILE: "graphDocumentId",
-  GRAPH_UPLOAD: "graphDocumentId",
+  GRAPH_FILE: "graph",
+  GRAPH_UPLOAD: "graph",
+};
+
+const mapGraphFileToApi = (value: unknown): SubscaleGraphFileDTO | undefined => {
+  const refs = parseFileRefs(value);
+  const ref: FileRef | undefined =
+    refs.find((item) => String(item.fileId ?? "").trim()) ?? refs[0];
+  if (!ref) {
+    // Bare fileId string from legacy storage
+    const bareId = String(value ?? "").trim();
+    if (bareId && !bareId.includes("{") && bareId !== "[object Object]") {
+      return { fileId: bareId, fileName: bareId, status: "SUCCESS", readOnly: false };
+    }
+    return undefined;
+  }
+
+  const fileId = String(ref.fileId ?? "").trim();
+  if (!fileId) return undefined;
+
+  const fileName =
+    String(ref.originalFileName ?? ref.fileName ?? "").trim() || fileId;
+  const mimeType = String(ref.mimeType ?? "").trim();
+  const status =
+    ref.status === "uploaded" || ref.status === "uploading" || ref.status === "failed"
+      ? ref.status === "uploaded"
+        ? "SUCCESS"
+        : String(ref.status).toUpperCase()
+      : "SUCCESS";
+
+  return {
+    fileId,
+    fileName,
+    status,
+    ...(mimeType ? { mimeType } : {}),
+    readOnly: false,
+  };
 };
 
 const SUBSCALE_SCHEMA_SECTIONS = {
@@ -356,14 +409,18 @@ const parseBoolean = (value: unknown): boolean | undefined => {
 
 const isRuntimeRowKey = (key: string) => key.startsWith("_") || RUNTIME_ROW_KEYS.has(key);
 
-const getScopedValue = (values: SchemaFormValues, sectionId: string, fieldId: string) =>
-  values[scopedFormKey(sectionId, fieldId)] ?? values[fieldId];
-
-const getFieldValue = (values: SchemaFormValues, sectionId: string, fieldId: string) =>
-  getScopedValue(values, sectionId, fieldId) ?? values[fieldId];
+/** Hardware article panel writes unscoped keys; details hydration also sets scoped keys. */
+const getFieldValue = (values: SchemaFormValues, sectionId: string, fieldId: string) => {
+  if (Object.prototype.hasOwnProperty.call(values, fieldId)) {
+    return values[fieldId];
+  }
+  return values[scopedFormKey(sectionId, fieldId)];
+};
 
 const getTableRows = (values: SchemaFormValues, sectionId: string, tableId: string) => {
-  const raw = getScopedValue(values, sectionId, tableId) ?? values[tableId];
+  const unscoped = values[tableId];
+  const scoped = values[scopedFormKey(sectionId, tableId)];
+  const raw = Array.isArray(unscoped) ? unscoped : scoped;
   if (Array.isArray(raw)) return raw as Record<string, unknown>[];
   if (raw && typeof raw === "object" && Array.isArray((raw as { rows?: unknown[] }).rows)) {
     return (raw as { rows: Record<string, unknown>[] }).rows;
@@ -376,19 +433,33 @@ const mapTableRowToApi = (row: Record<string, unknown>): Record<string, unknown>
 
   Object.entries(row).forEach(([key, value]) => {
     if (isRuntimeRowKey(key) || TABLE_ROW_EXCLUDED_KEYS.has(key)) return;
-    const apiKey = TABLE_FIELD_TO_API[key] ?? toCamelCase(key);
     if (value === null || value === undefined || value === "") return;
 
     if (key === "ARTICLE_TYPE") {
       const raw = String(value).trim();
       mapped.articleType =
-        ARTICLE_TYPE_TO_API[raw] ?? raw.replace(/\s+/g, "_").toUpperCase();
+        ARTICLE_TYPE_TO_API[raw] ?? raw.replace(/\s+/g, " ").trim();
       return;
     }
 
     if (key === "LINER_APPLIED") {
       const bool = parseBoolean(value);
-      if (bool !== undefined) mapped[apiKey] = bool;
+      if (bool !== undefined) mapped.linerApplied = bool;
+      return;
+    }
+
+    if (key === "GRAPH_FILE" || key === "GRAPH_UPLOAD") {
+      const graph = mapGraphFileToApi(value);
+      if (graph) mapped.graph = graph;
+      return;
+    }
+
+    const apiKey = TABLE_FIELD_TO_API[key] ?? toCamelCase(key);
+
+    // Date columns → DD-MM-YYYY for API
+    if (/DATE/i.test(key) && typeof value === "string") {
+      const formatted = formatToUiDate(value);
+      if (formatted) mapped[apiKey] = formatted;
       return;
     }
 
@@ -462,7 +533,7 @@ const mapHardwarePreparationDetails = (
   const linerBatchNo = String(values[LINER_BATCH_NO_FIELD.id] ?? "").trim();
   if (linerBatchNo) details.linerBatchNo = linerBatchNo;
 
-  const linerBatchDate = formatToIsoDateInput(
+  const linerBatchDate = formatToUiDate(
     String(values[LINER_BATCH_DATE_FIELD.id] ?? "").trim(),
   );
   if (linerBatchDate) details.linerBatchDate = linerBatchDate;
@@ -477,12 +548,8 @@ const mapHardwarePreparationTable = (values: SchemaFormValues): HardwarePreparat
 
   return rows
     .map((row) => {
-      const articleType =
-        ARTICLE_TYPE_TO_API[String(row.ARTICLE_TYPE ?? "").trim()] ??
-        String(row.ARTICLE_TYPE ?? "")
-          .trim()
-          .replace(/\s+/g, "_")
-          .toUpperCase();
+      const rawType = String(row.ARTICLE_TYPE ?? "").trim();
+      const articleType = ARTICLE_TYPE_TO_API[rawType] ?? rawType;
 
       const mapped: HardwarePreparationTableDTO = {};
       if (articleType) mapped.articleType = articleType;
@@ -590,12 +657,12 @@ export const mapSubscaleDetails = (values: SchemaFormValues): SubscaleDetailsDTO
   const mixerType = String(values.mixerType ?? values.MIXER_TYPE ?? "").trim();
   if (mixerType) payload.mixerType = mixerType;
 
-  const premixDate = formatToIsoDateInput(
+  const premixDate = formatToUiDate(
     String(values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ?? "").trim(),
   );
   if (premixDate) payload.premixDate = premixDate;
 
-  const finalMixDate = formatToIsoDateInput(
+  const finalMixDate = formatToUiDate(
     String(values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] ?? "").trim(),
   );
   if (finalMixDate) payload.finalMixDate = finalMixDate;
@@ -684,7 +751,7 @@ export const mapSubscaleFormValuesToApiPayload = (
   const hardwarePreparationDetails = mapHardwarePreparationDetails(values);
   const hardwarePreparationTable = mapHardwarePreparationTable(values);
 
-  const castingDate = formatToIsoDateInput(
+  const castingDate = formatToUiDate(
     String(getFieldValue(values, "CASTING_DETAILS", "DATE_OF_CASTING") ?? "").trim(),
   );
   const castingDetails = buildSectionTablePayload(
@@ -716,7 +783,7 @@ export const mapSubscaleFormValuesToApiPayload = (
       "",
   ).trim();
   if (irBatchNo) inhibitionFields.irBatchNo = irBatchNo;
-  const dateOfMfg = formatToIsoDateInput(
+  const dateOfMfg = formatToUiDate(
     String(
       getFieldValue(
         values,
@@ -729,7 +796,7 @@ export const mapSubscaleFormValuesToApiPayload = (
     ).trim(),
   );
   if (dateOfMfg) inhibitionFields.dateOfManufacturing = dateOfMfg;
-  const dateOfApplication = formatToIsoDateInput(
+  const dateOfApplication = formatToUiDate(
     String(
       getFieldValue(
         values,
@@ -798,6 +865,7 @@ const toScreamingSnake = (key: string) =>
     .toUpperCase();
 
 const API_TO_TABLE_FIELD: Record<string, string> = {
+  graph: "GRAPH_FILE",
   graphDocumentId: "GRAPH_FILE",
   bemNo: "BEM_NO",
   bemMouldNo: "BEM_MOULD_NO",
@@ -806,13 +874,19 @@ const API_TO_TABLE_FIELD: Record<string, string> = {
 };
 
 const ARTICLE_TYPE_FROM_API: Record<string, string> = {
+  "BEM 40KG": "40 kg BEM",
+  "BEM 10KG": "10 kg BEM",
+  "BEM 2KG": "2 kg BEM",
   "40_KG_BEM": "40 kg BEM",
   "10_KG_BEM": "10 kg BEM",
   "2_KG_BEM": "2 kg BEM",
   WHEEL_PEEL: "Wheel Peel",
+  "Wheel Peel": "Wheel Peel",
   SBS_TBS: "SBS/TBS",
+  "SBS/TBS": "SBS/TBS",
   CARTOONS: "Cartoons",
   CARTONS: "Cartoons",
+  Cartoons: "Cartoons",
 };
 
 const formatUiCellValue = (value: unknown): unknown => {
@@ -837,6 +911,31 @@ const mapApiTableRowToUi = (row: Record<string, unknown>, index: number) => {
         return;
       }
       mapped[uiKey] = value == null ? "" : formatUiCellValue(value);
+      return;
+    }
+    if (uiKey === "GRAPH_FILE") {
+      if (value == null || value === "") {
+        mapped[uiKey] = "";
+        return;
+      }
+      // Prefer graph file object; legacy graphDocumentId is a bare id string
+      if (typeof value === "string") {
+        const fileId = value.trim();
+        mapped[uiKey] = fileId
+          ? [
+              {
+                fileId,
+                fileName: fileId,
+                fileUrl: fileId,
+                status: "uploaded",
+                isTemp: false,
+              },
+            ]
+          : "";
+        return;
+      }
+      const refs = parseFileRefs(value);
+      mapped[uiKey] = refs.length > 0 ? refs : "";
       return;
     }
     // Keep null/empty keys so details tables always render the full column set.

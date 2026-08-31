@@ -17,6 +17,10 @@ import QCFlowBar from "./QCFlowBar";
 import QCPartialItemNavigation from "./QCPartialItemNavigation";
 import QCSchemaBufferingLoader from "./QCSchemaBufferingLoader";
 import type { QcMixingQualityCheckDefinition } from "../../../../../hooks/user/qualityControl/qcMixingTables";
+import type { QcDivisionUiMode } from "../../../../../hooks/user/qualityControl/qcDivisionLoadPipeline";
+import type { QcDivisionSetupDefinition } from "../../../../../hooks/user/qualityControl/qcDivisionSetupConfig";
+import QCDivisionBlockedState from "./QCDivisionBlockedState";
+import QcDivisionSetupPanel from "./setup/QcDivisionSetupPanel";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 const { science: ScienceRoundedIcon } = icons.user.qualityControl.qcDivision.form;
@@ -71,6 +75,10 @@ type QCFormProps = {
   formLockMessage?: string | null;
   schemaLoading?: boolean;
   schemaError?: string | null;
+  divisionUiMode?: QcDivisionUiMode;
+  divisionBlockedReason?: string | null;
+  divisionSetupDefinition?: QcDivisionSetupDefinition | null;
+  canLoadSetupForm?: boolean;
   flowBarTheme: any;
   onDivisionNavTabChange: (tabKey: string) => void;
   onProcessingTypeChange: (value: string) => void;
@@ -85,6 +93,7 @@ type QCFormProps = {
   onInhibitorTypeChange: (value: string) => void;
   onPropellantProcessChange: (value: string) => void;
   onLoadForm?: () => void;
+  onLoadSetupForm?: () => void;
   onPartialNavIndexChange?: (index: number) => void;
   onActiveDivisionGroupIndexChange: (index: number) => void;
   onActiveDivisionSubIndexChange: (index: number) => void;
@@ -144,6 +153,10 @@ const QCForm = ({
   formLockMessage = null,
   schemaLoading = false,
   schemaError = null,
+  divisionUiMode = "FORM",
+  divisionBlockedReason = null,
+  divisionSetupDefinition = null,
+  canLoadSetupForm = false,
   flowBarTheme,
   onDivisionNavTabChange,
   onProcessingTypeChange,
@@ -158,6 +171,7 @@ const QCForm = ({
   onInhibitorTypeChange,
   onPropellantProcessChange,
   onLoadForm,
+  onLoadSetupForm,
   onPartialNavIndexChange,
   onActiveDivisionGroupIndexChange,
   onActiveDivisionSubIndexChange,
@@ -180,6 +194,46 @@ const QCForm = ({
       "Division",
     [activeDivisionTabKey, divisionNavTabs, selectedDivision],
   );
+
+  const isBlocked = divisionUiMode === "BLOCKED";
+  const isSetup = divisionUiMode === "SETUP";
+  const showFormBody = divisionUiMode === "FORM";
+
+  const flowBarProps = {
+    batch,
+    selectedDivision,
+    selectedRawMaterialType,
+    selectedProcessingType,
+    selectedPremix,
+    selectedMixingStage,
+    selectedStfMotorType,
+    selectedMotorId,
+    selectedHardwareProcesses,
+    selectedTrimmingMotorCount,
+    trimmingMotorReceivedDate,
+    selectedPostCureOperation,
+    selectedInhibitorType,
+    selectedPropellantProcess,
+    addedPremixNumbers,
+    addedDivisionEntryKeys,
+    hasDivisionEntries,
+    schemaLoading,
+    partialNavActive,
+    hideLoadAction: isSetup,
+    onProcessingTypeChange,
+    onPremixChange,
+    onMixingStageChange,
+    onStfMotorTypeChange,
+    onMotorIdChange,
+    onHardwareProcessesChange,
+    onTrimmingMotorCountChange,
+    onTrimmingMotorReceivedDateChange,
+    onPostCureOperationChange,
+    onInhibitorTypeChange,
+    onPropellantProcessChange,
+    onLoadForm: onLoadForm ?? (() => undefined),
+    theme: flowBarTheme,
+  };
 
   return (
     <Box sx={{ fontFamily: "'DM Sans', sans-serif" }}>
@@ -301,44 +355,27 @@ const QCForm = ({
         </Box>
       ) : null}
 
-      {canEditDivisionStructure ? (
-        <QCFlowBar
-          batch={batch}
-          selectedDivision={selectedDivision}
-          selectedRawMaterialType={selectedRawMaterialType}
-          selectedProcessingType={selectedProcessingType}
-          selectedPremix={selectedPremix}
-          selectedMixingStage={selectedMixingStage}
-          selectedStfMotorType={selectedStfMotorType}
-          selectedMotorId={selectedMotorId}
-          selectedHardwareProcesses={selectedHardwareProcesses}
-          selectedTrimmingMotorCount={selectedTrimmingMotorCount}
-          trimmingMotorReceivedDate={trimmingMotorReceivedDate}
-          selectedPostCureOperation={selectedPostCureOperation}
-          selectedInhibitorType={selectedInhibitorType}
-          selectedPropellantProcess={selectedPropellantProcess}
-          addedPremixNumbers={addedPremixNumbers}
-          addedDivisionEntryKeys={addedDivisionEntryKeys}
-          hasDivisionEntries={hasDivisionEntries}
-          schemaLoading={schemaLoading}
-          partialNavActive={partialNavActive}
-          onProcessingTypeChange={onProcessingTypeChange}
-          onPremixChange={onPremixChange}
-          onMixingStageChange={onMixingStageChange}
-          onStfMotorTypeChange={onStfMotorTypeChange}
-          onMotorIdChange={onMotorIdChange}
-          onHardwareProcessesChange={onHardwareProcessesChange}
-          onTrimmingMotorCountChange={onTrimmingMotorCountChange}
-          onTrimmingMotorReceivedDateChange={onTrimmingMotorReceivedDateChange}
-          onPostCureOperationChange={onPostCureOperationChange}
-          onInhibitorTypeChange={onInhibitorTypeChange}
-          onPropellantProcessChange={onPropellantProcessChange}
-          onLoadForm={onLoadForm ?? (() => undefined)}
-          theme={flowBarTheme}
-        />
+      {isBlocked ? (
+        <QCDivisionBlockedState reason={divisionBlockedReason} theme={theme} />
       ) : null}
 
-      {partialNavActive ? (
+      {!isBlocked && canEditDivisionStructure && isSetup && divisionSetupDefinition ? (
+        <QcDivisionSetupPanel
+          definition={divisionSetupDefinition}
+          canLoad={canLoadSetupForm}
+          loading={schemaLoading}
+          onLoad={onLoadSetupForm ?? onLoadForm ?? (() => undefined)}
+          theme={theme}
+        >
+          <QCFlowBar {...flowBarProps} />
+        </QcDivisionSetupPanel>
+      ) : null}
+
+      {!isBlocked && canEditDivisionStructure && !isSetup ? (
+        <QCFlowBar {...flowBarProps} />
+      ) : null}
+
+      {!isBlocked && partialNavActive ? (
         <QCPartialItemNavigation
           items={partialNavItems}
           activeIndex={activePartialNavIndex}
@@ -349,6 +386,7 @@ const QCForm = ({
         />
       ) : null}
 
+      {showFormBody ? (
       <Box
         sx={{
           position: "relative",
@@ -380,6 +418,7 @@ const QCForm = ({
           theme={theme}
         />
       </Box>
+      ) : null}
     </Box>
   );
 };

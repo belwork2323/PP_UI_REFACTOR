@@ -54,6 +54,11 @@ const QualityControlPage = () => {
     activeDivisionGroupIndex,
     activeDivisionSubIndex,
     loadingFormDetails,
+    batchBootstrapLoading,
+    divisionUiMode,
+    divisionBlockedReason,
+    divisionSetupDefinition,
+    canLoadSetupForm,
     schemaLoading,
     schemaError,
     divisionAutoPopulateData,
@@ -77,6 +82,7 @@ const QualityControlPage = () => {
     handleInhibitorTypeChange,
     handlePropellantProcessChange,
     handleLoadQcForm,
+    handleLoadQcSetupForm,
     handlePartialNavIndexChange,
     handleDivisionEntryValuesChange,
     handleDivisionEntryLiquidValuesChange,
@@ -149,14 +155,15 @@ const QualityControlPage = () => {
   );
 
   const listLoading = loading && !loadingFormDetails && view === "list";
+  const formOpening = Boolean(loadingFormDetails || batchBootstrapLoading);
 
   return (
     <Box sx={theme.workflow.animatedContainer}>
       <WorkflowFormOpeningLoader
-        open={listLoading || Boolean(loadingFormDetails)}
-        title={loadingFormDetails ? strings.FORM_OPENING_TITLE : strings.TITLE}
+        open={listLoading || formOpening}
+        title={formOpening ? strings.FORM_OPENING_TITLE : strings.TITLE}
         message={
-          loadingFormDetails ? strings.FORM_OPENING_MESSAGE : "Loading quality control batches…"
+          formOpening ? strings.FORM_OPENING_MESSAGE : "Loading quality control batches…"
         }
         color={QC_DIVISION_BRAND.primary}
         accentColor={QC_DIVISION_BRAND.primaryLight}
@@ -181,7 +188,7 @@ const QualityControlPage = () => {
         />
       )}
 
-      {view === "form" && activeBatch && !loadingFormDetails && (
+      {view === "form" && activeBatch && !formOpening && (
         <>
           <UserWorkflowFormHeader
             mode="update"
@@ -251,6 +258,10 @@ const QualityControlPage = () => {
             fieldsDisabled={formFieldsDisabled}
             canEditDivisionStructure={!readOnly && (partialNavActive || !isActiveDivisionReadOnly)}
             formLockMessage={formLockMessage}
+            divisionUiMode={divisionUiMode}
+            divisionBlockedReason={divisionBlockedReason}
+            divisionSetupDefinition={divisionSetupDefinition}
+            canLoadSetupForm={canLoadSetupForm}
             schemaLoading={schemaLoading}
             schemaError={schemaError}
             flowBarTheme={flowBarTheme}
@@ -267,6 +278,7 @@ const QualityControlPage = () => {
             onInhibitorTypeChange={handleInhibitorTypeChange}
             onPropellantProcessChange={handlePropellantProcessChange}
             onLoadForm={handleLoadQcForm}
+            onLoadSetupForm={handleLoadQcSetupForm}
             onPartialNavIndexChange={handlePartialNavIndexChange}
             onActiveDivisionGroupIndexChange={setActiveDivisionGroupIndex}
             onActiveDivisionSubIndexChange={setActiveDivisionSubIndex}

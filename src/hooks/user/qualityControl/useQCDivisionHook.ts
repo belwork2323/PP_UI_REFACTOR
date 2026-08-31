@@ -89,6 +89,13 @@ import {
   shouldUseQcFormDetailsForDivision,
   toDivisionAutoPopulateRecord,
 } from "./qcDivisionDataSource";
+import { fetchFreshQcFormDetails } from "./qcBatchBootstrap";
+import { getQcDivisionBlockedReason } from "./qcBatchContext";
+import { getQcDivisionSetupDefinition } from "./qcDivisionSetupRegistry";
+import { useQcBatchBootstrap } from "./useQcBatchBootstrap";
+import { useQcDivisionFormLoader } from "./useQcDivisionFormLoader";
+import { useQcDivisionNav } from "./useQcDivisionNav";
+import { useQcUnitNav } from "./useQcUnitNav";
 import {
   isBothProcessingType,
   isRawMaterialProcessingType,
@@ -439,14 +446,14 @@ export const useQCDivisionHook = () => {
   > | null>(null);
   const divisionAutoPopulateDataRef = useRef(divisionAutoPopulateData);
   divisionAutoPopulateDataRef.current = divisionAutoPopulateData;
-  const batchDetailsPayloadRef = useRef<unknown>(null);
+  const latestBatchDetailsRef = useRef<unknown>(null);
   const processingMaterialCatalogRef = useRef<QcProcessingMaterialCatalog | null>(null);
   const resolvePropellantFmCount = useCallback(
     () =>
       resolveQcPropellantPremixCount(
-        (divisionAutoPopulateDataRef.current as { __batchDetails?: unknown } | null)?.__batchDetails,
+        null,
         divisionAutoPopulateDataRef.current,
-        batchDetailsPayloadRef.current,
+        latestBatchDetailsRef.current,
         activeBatchRef.current,
       ),
     [],
@@ -508,8 +515,6 @@ export const useQCDivisionHook = () => {
   >({});
   const divisionStatusByFlowKeyRef = useRef(divisionStatusByFlowKey);
   divisionStatusByFlowKeyRef.current = divisionStatusByFlowKey;
-  /** Cached /qc-division/details payload — used once a division/unit leaves TO_BE_INITIATED. */
-  const qcFormDetailsPayloadRef = useRef<Record<string, unknown> | null>(null);
   /** Cross-division unit statuses from form details — used for previous-division gating. */
   const [formUnitStatuses, setFormUnitStatuses] = useState<{
     premixStatuses: unknown;
@@ -522,6 +527,37 @@ export const useQCDivisionHook = () => {
     stageProgress: unknown;
     currentStage: unknown;
   }>({ stageProgress: null, currentStage: null });
+
+  const {
+    batchContext,
+    batchBootstrapLoading,
+    lastBootstrap,
+    runBatchBootstrap,
+  } = useQcBatchBootstrap({
+    subDepartmentId,
+    divisionCatalog,
+    setDivisionStatusByFlowKey,
+    setBatchStageArrays,
+  });
+
+  const {
+    divisionUiMode,
+    setDivisionUiMode,
+    isSetupLoaded,
+    markSetupLoaded,
+    resetDivisionNavState,
+    resolveInitialUiMode,
+  } = useQcDivisionNav();
+
+  const { getBlockedReason } = useQcUnitNav();
+  useQcDivisionFormLoader({
+    subDepartmentId,
+    divisionCatalog,
+  });
+
+  useEffect(() => {
+    latestBatchDetailsRef.current = lastBootstrap?.batchDetails ?? null;
+  }, [lastBootstrap]);
   const partialNavLoadRequestIdRef = useRef(0);
   const partialNavSeedKeyRef = useRef("");
   const autoLoadRequestKeyRef = useRef("");
@@ -652,12 +688,12 @@ export const useQCDivisionHook = () => {
     setActivePartialNavIndex(0);
     setPartialItemLoading(false);
     setDivisionStatusByFlowKey({});
-    qcFormDetailsPayloadRef.current = null;
-    batchDetailsPayloadRef.current = null;
+    latestBatchDetailsRef.current = null;
+    resetDivisionNavState();
     setFormUnitStatuses({ premixStatuses: null, motorStatuses: null });
     setBatchStageArrays({ stageProgress: null, currentStage: null });
     partialNavSeedKeyRef.current = "";
-  }, [applyFullFormState]);
+  }, [applyFullFormState, resetDivisionNavState]);
 
   const getErrorMessage = (response: any, fallbackMessage: string) => {
     if (response?.error?.details) return response.error.details;
@@ -750,29 +786,16 @@ export const useQCDivisionHook = () => {
     setPartialItemLoading(false);
   }, []);
 
-  const ensureQcFormDetailsPayload = useCallback(
-    async (options?: { forceRefresh?: boolean }): Promise<Record<string, unknown> | null> => {
-      if (!options?.forceRefresh && qcFormDetailsPayloadRef.current) {
-        return qcFormDetailsPayloadRef.current;
-      }
-      const formId = String(activeBatch?.formId ?? "").trim();
-      if (!formId || !subDepartmentId) return null;
-      try {
-        const detailsResponse = await qcDivisionController.fetchFormDetails({
-          formId,
-          subDepartmentId,
-        });
-        if (!detailsResponse?.success || !detailsResponse.data) return null;
-        const payload = detailsResponse.data as unknown as Record<string, unknown>;
-        qcFormDetailsPayloadRef.current = payload;
-        return payload;
-      } catch (error) {
-        console.error("Failed to load QC form details for division data:", error);
-        return null;
-      }
-    },
-    [activeBatch?.formId, subDepartmentId],
-  );
+  const ensureQcFormDetailsPayload = useCallback(async (): Promise<Record<string, unknown> | null> => {
+    const formId = String(activeBatch?.formId ?? "").trim();
+    if (!formId || !subDepartmentId) return null;
+    try {
+      return await fetchFreshQcFormDetails({ formId, subDepartmentId });
+    } catch (error) {
+      console.error("Failed to load QC form details for division data:", error);
+      return null;
+    }
+  }, [activeBatch?.formId, subDepartmentId]);
 
   const fetchManufacturingDivisionDetails = useCallback(
     async (params: {
@@ -796,10 +819,7 @@ export const useQCDivisionHook = () => {
   );
 
   const resolveProcessingBatchPayload = useCallback(
-    () =>
-      (divisionAutoPopulateDataRef.current as { __batchDetails?: unknown } | null)?.__batchDetails ??
-      batchDetailsPayloadRef.current ??
-      activeBatchRef.current,
+    () => latestBatchDetailsRef.current ?? activeBatchRef.current,
     [],
   );
 
@@ -846,25 +866,35 @@ export const useQCDivisionHook = () => {
       setDivisionAutoPopulateLoading(true);
       clearPartialNav();
       try {
-        // Prefer refining status from /qc-division/details whenever a QC form exists.
-        // Missing map keys default to TO_BE_INITIATED and must not skip the details API
-        // (e.g. Casting IN_PROGRESS motors while divisionStatuses still lag).
-        let formDetailsForStatus = qcFormDetailsPayloadRef.current;
-        const hasFormId = Boolean(String(activeBatch?.formId ?? "").trim());
+        const formId = String(activeBatch?.formId ?? "").trim();
+        const bootstrap = await runBatchBootstrap({
+          batchId,
+          listRow: activeBatch as unknown as Record<string, unknown>,
+          formId: formId || null,
+        });
+        if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
 
-        if (!formDetailsForStatus && hasFormId) {
+        const batchPayload = bootstrap?.batchDetails ?? null;
+        let formDetailsForStatus = bootstrap?.qcFormDetails ?? null;
+
+        if (formId && !formDetailsForStatus) {
           formDetailsForStatus = await ensureQcFormDetailsPayload();
           if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
-          if (formDetailsForStatus) {
-            const fromForm = mapFormDetailsDivisionStatusesToFlowKeyMap(formDetailsForStatus);
-            if (Object.keys(fromForm).length > 0) {
-              setDivisionStatusByFlowKey((prev) => mergeQcDivisionStatusMaps(prev, fromForm));
-            }
-            setFormUnitStatuses({
-              premixStatuses: formDetailsForStatus.premixStatuses ?? null,
-              motorStatuses: formDetailsForStatus.motorStatuses ?? null,
-            });
-          }
+        }
+
+        if (formDetailsForStatus) {
+          setFormUnitStatuses({
+            premixStatuses: formDetailsForStatus.premixStatuses ?? null,
+            motorStatuses: formDetailsForStatus.motorStatuses ?? null,
+          });
+        }
+
+        const blockedReason = getBlockedReason(divisionFlowKey, bootstrap?.context ?? null, typeKey);
+        if (blockedReason) {
+          setDivisionUiMode("BLOCKED");
+          setDivisionAutoPopulateData(null);
+          setPartialNavItems([]);
+          return null;
         }
 
         let divisionStatus = resolveQcDivisionStatusFromSources({
@@ -873,40 +903,6 @@ export const useQCDivisionHook = () => {
           flowKey: divisionFlowKey,
           rawMaterialType: typeKey,
         });
-
-        let batchPayload: unknown = null;
-        try {
-          batchPayload =
-            batchDetailsPayloadRef.current ??
-            (await batchManagementController.getBatchById(batchId));
-          if (batchPayload) {
-            batchDetailsPayloadRef.current = batchPayload;
-            // Keep chips in sync if batch details carry divisionStatuses and map is empty.
-            if (Object.keys(divisionStatusByFlowKeyRef.current).length === 0) {
-              const fromBatch = mapBatchDivisionStatusesToFlowKeyMap(
-                batchPayload,
-                divisionCatalog,
-              );
-              if (Object.keys(fromBatch).length > 0) {
-                setDivisionStatusByFlowKey(fromBatch);
-                divisionStatus = resolveQcDivisionStatusFromSources({
-                  statusByKey: fromBatch,
-                  formDetails: formDetailsForStatus,
-                  flowKey: divisionFlowKey,
-                  rawMaterialType: typeKey,
-                });
-              }
-            }
-            const stageArrays = getBatchStageProgressArrays(
-              batchPayload as Record<string, unknown>,
-            );
-            if (stageArrays.stageProgress || stageArrays.currentStage) {
-              setBatchStageArrays(stageArrays);
-            }
-          }
-        } catch (error) {
-          console.error("Failed to load batch details for QC unit gating:", error);
-        }
 
         const useFormDetails =
           shouldUseQcFormDetailsData(divisionStatus) ||
@@ -937,19 +933,16 @@ export const useQCDivisionHook = () => {
           { flowKey: divisionFlowKey, rawMaterialType: typeKey },
           divisionCatalog,
         );
-        // De-coring seeds from Curing manufacturing division-details — never use a
-        // batch DE_CORING divisionId (catalog already redirects DE_CORING → CURING).
         const divisionId =
           divisionFlowKey === "DE_CORING"
             ? catalogDivisionId
             : (batchDivisionId ?? catalogDivisionId);
 
         let seedRecord: Record<string, unknown> | null = null;
+        let hasManufacturingData = false;
 
         if (useFormDetails) {
-          // IN_PROGRESS / APPROVED / etc. → always hit /qc-division/details on division click.
-          const formDetails =
-            (await ensureQcFormDetailsPayload({ forceRefresh: true })) ?? formDetailsForStatus;
+          const formDetails = (await ensureQcFormDetailsPayload()) ?? formDetailsForStatus;
           if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
           if (formDetails) {
             const fromForm = mapFormDetailsDivisionStatusesToFlowKeyMap(formDetails);
@@ -965,7 +958,6 @@ export const useQCDivisionHook = () => {
             flowKey: divisionFlowKey,
             rawMaterialType: typeKey,
           });
-          // Mixing QC details split PREMIX + FINAL_MIX across divisionDetails — merge by premixNo.
           const qcData =
             (divisionFlowKey === "MIXING" ? resolveMixingQcFormData(formDetails) : null) ??
             toDivisionAutoPopulateRecord(matchingDetail) ??
@@ -975,29 +967,38 @@ export const useQCDivisionHook = () => {
           seedRecord = {
             ...(qcData ?? {}),
             ...(qcData ? { __qcFormDivisionData: qcData } : {}),
-            ...(batchPayload ? { __batchDetails: batchPayload } : {}),
           };
+          hasManufacturingData = Boolean(qcData);
+          markSetupLoaded(divisionFlowKey, typeKey);
         } else if (isBatchMotorSeededQcFlow(divisionFlowKey)) {
-          // QC / Weighment have no manufacturing seed — load empty motor UI from batch motors.
-          seedRecord = {
-            ...(batchPayload ? { __batchDetails: batchPayload } : {}),
-          };
+          seedRecord = {};
         } else {
-          // TO_BE_INITIATED → seed from /qc-division/division-details (empty response is valid).
           let manufacturingPayload: Record<string, unknown> | null = null;
           if (divisionId != null) {
             manufacturingPayload = await fetchManufacturingDivisionDetails({ batchId, divisionId });
             if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
           }
           manufacturingPayload = manufacturingPayload ?? { premixes: [] };
+          hasManufacturingData = !isEmptyManufacturingDivisionDetailsPayload(manufacturingPayload);
           seedRecord = {
             ...manufacturingPayload,
             __manufacturingDivisionData: manufacturingPayload,
-            ...(batchPayload ? { __batchDetails: batchPayload } : {}),
           };
+          if (hasManufacturingData) {
+            markSetupLoaded(divisionFlowKey, typeKey);
+          }
         }
 
         setDivisionAutoPopulateData(seedRecord);
+
+        const uiMode = resolveInitialUiMode({
+          blocked: false,
+          flowKey: divisionFlowKey,
+          rawMaterialType: typeKey,
+          hasManufacturingData,
+          hasQcSavedData: useFormDetails,
+        });
+        setDivisionUiMode(uiMode);
 
         let withStatuses = buildQcDivisionPartialNav({
           flowKey: divisionFlowKey,
@@ -1036,9 +1037,19 @@ export const useQCDivisionHook = () => {
       ensureProcessingMaterialCatalog,
       ensureQcFormDetailsPayload,
       fetchManufacturingDivisionDetails,
+      getBlockedReason,
+      markSetupLoaded,
       messages.DETAILS_FETCH_ERROR,
+      resolveInitialUiMode,
+      runBatchBootstrap,
+      setDivisionUiMode,
       showAlert,
     ],
+  );
+
+  const divisionBlockedReason = useMemo(
+    () => getBlockedReason(selectedDivision, batchContext, selectedRawMaterialType),
+    [batchContext, getBlockedReason, selectedDivision, selectedRawMaterialType],
   );
 
   const handleDivisionChange = useCallback(
@@ -1077,16 +1088,16 @@ export const useQCDivisionHook = () => {
     void loadDivisionCatalog();
   }, [divisionCatalog.length, divisionsLoading, loadDivisionCatalog, view]);
 
-  // Once the divisions catalog is ready, re-resolve batch divisionStatuses with catalog ids.
+  // Re-resolve batch divisionStatuses when catalog loads — pre-formId only.
   useEffect(() => {
     if (view !== "form") return;
     if (!divisionCatalog.length) return;
-    const batchPayload = batchDetailsPayloadRef.current;
+    if (String(activeBatch?.formId ?? "").trim()) return;
+    const batchPayload = latestBatchDetailsRef.current;
     if (!batchPayload) return;
     const fromBatch = mapBatchDivisionStatusesToFlowKeyMap(batchPayload, divisionCatalog);
     if (!Object.keys(fromBatch).length) return;
     setDivisionStatusByFlowKey((prev) => {
-      // Prefer batch keys; keep non-initiated statuses already learned from form details / saves.
       const next: Record<string, QcPartialItemStatus> = { ...fromBatch };
       for (const [key, status] of Object.entries(prev)) {
         if (!isQcStatusAwaitingInitiation(status)) {
@@ -1100,7 +1111,7 @@ export const useQCDivisionHook = () => {
         Object.keys(next).some((key) => next[key] !== prev[key]);
       return changed ? next : prev;
     });
-  }, [divisionCatalog, view]);
+  }, [activeBatch?.formId, divisionCatalog, view]);
 
   const divisionOptions = useMemo(
     () => toQcDivisionSelectOptions(divisionCatalog),
@@ -1301,6 +1312,16 @@ export const useQCDivisionHook = () => {
     ],
   );
 
+  const divisionSetupDefinition = useMemo(
+    () => getQcDivisionSetupDefinition(selectedDivision, selectedRawMaterialType),
+    [selectedDivision, selectedRawMaterialType],
+  );
+
+  const canLoadSetupForm = useMemo(
+    () => canLoadDivisionSchema(selectedDivision, divisionFlowState),
+    [divisionFlowState, selectedDivision],
+  );
+
   const buildEntryFromSelection = useCallback(
     (
       kind: NonNullable<ReturnType<typeof resolveDivisionEntryKind>>,
@@ -1391,8 +1412,7 @@ export const useQCDivisionHook = () => {
         selectedMotorId,
       );
       const batchPayload =
-        (divisionAutoPopulateDataRef.current as { __batchDetails?: unknown } | null)
-          ?.__batchDetails ?? null;
+        latestBatchDetailsRef.current ?? null;
       const motorNavItem = partialNavItems.find(
         (nav) => nav.kind === "MOTOR" && nav.motorId === selectedMotorId,
       );
@@ -1772,9 +1792,22 @@ export const useQCDivisionHook = () => {
     partialNavItems,
   ]);
 
+  const handleLoadQcSetupForm = useCallback(() => {
+    markSetupLoaded(selectedDivision, selectedRawMaterialType);
+    setDivisionUiMode("FORM");
+    void handleLoadQcForm();
+  }, [
+    handleLoadQcForm,
+    markSetupLoaded,
+    selectedDivision,
+    selectedRawMaterialType,
+    setDivisionUiMode,
+  ]);
+
   // Tab / picker selection auto-loads the form UI — no separate Load Form click.
   useEffect(() => {
     if (view !== "form" || readOnly) return;
+    if (divisionUiMode !== "FORM") return;
     if (hasPartialChildNav(partialNavItems)) return;
     if (!selectedDivision) return;
     if (!canLoadDivisionSchema(selectedDivision, divisionFlowState)) return;
@@ -1800,6 +1833,7 @@ export const useQCDivisionHook = () => {
   }, [
     activeDivisionTabKey,
     divisionFlowState,
+    divisionUiMode,
     handleLoadQcForm,
     partialNavItems,
     readOnly,
@@ -1826,6 +1860,26 @@ export const useQCDivisionHook = () => {
       const requestId = ++partialNavLoadRequestIdRef.current;
       setPartialItemLoading(true);
       setSchemaError(null);
+
+      const batchId = String(activeBatch?.batchId ?? "").trim();
+      if (batchId) {
+        const bootstrap = await runBatchBootstrap({
+          batchId,
+          listRow: activeBatch as unknown as Record<string, unknown>,
+          formId: String(activeBatch?.formId ?? "").trim() || null,
+        });
+        if (requestId !== partialNavLoadRequestIdRef.current) return;
+        const blockedReason = getBlockedReason(
+          flowKey,
+          bootstrap?.context ?? null,
+          selectedRawMaterialType,
+        );
+        if (blockedReason) {
+          setDivisionUiMode("BLOCKED");
+          setPartialItemLoading(false);
+          return;
+        }
+      }
 
       const resolveSeedPayloadForUnit = async (): Promise<unknown> => {
         const auto = divisionAutoPopulateDataRef.current;
@@ -1877,13 +1931,12 @@ export const useQCDivisionHook = () => {
       };
 
       const resolveBatchPayloadForNdtSeed = async (): Promise<unknown> => {
-        if (batchDetailsPayloadRef.current) return batchDetailsPayloadRef.current;
         const batchId = String(activeBatchRef.current?.batchId ?? "").trim();
         if (!batchId) return null;
         try {
           const batchPayload = await batchManagementController.getBatchById(batchId);
-          if (batchPayload) batchDetailsPayloadRef.current = batchPayload;
-          return batchDetailsPayloadRef.current;
+          if (batchPayload) latestBatchDetailsRef.current = batchPayload;
+          return batchPayload;
         } catch {
           return null;
         }
@@ -1978,8 +2031,7 @@ export const useQCDivisionHook = () => {
             const seedPayload = await resolveSeedPayloadForUnit();
             if (requestId !== partialNavLoadRequestIdRef.current) return;
             const batchPayload =
-              (divisionAutoPopulateDataRef.current as { __batchDetails?: unknown } | null)
-                ?.__batchDetails ?? null;
+              latestBatchDetailsRef.current ?? null;
             const seedRoot =
               seedPayload && typeof seedPayload === "object"
                 ? (seedPayload as Record<string, unknown>)
@@ -2030,8 +2082,7 @@ export const useQCDivisionHook = () => {
             const seedPayload = await resolveSeedPayloadForUnit();
             if (requestId !== partialNavLoadRequestIdRef.current) return;
             const batchPayload =
-              (divisionAutoPopulateDataRef.current as { __batchDetails?: unknown } | null)
-                ?.__batchDetails ?? null;
+              latestBatchDetailsRef.current ?? null;
             updateFormData((prev) => {
               let entryValues = { ...(prev.divisionEntryValues ?? {}) };
               for (const entryId of existingIds) {
@@ -2439,7 +2490,7 @@ export const useQCDivisionHook = () => {
             if (mixNo == null) return;
 
             if (shouldUseQcFormDetailsData(item.status)) {
-              const formDetails = await ensureQcFormDetailsPayload({ forceRefresh: true });
+              const formDetails = await ensureQcFormDetailsPayload();
               if (requestId !== partialNavLoadRequestIdRef.current) return;
               const formData =
                 resolveMixingQcFormData(formDetails) ??
@@ -2701,8 +2752,7 @@ export const useQCDivisionHook = () => {
             const seedPayload = await resolveSeedPayloadForUnit();
             if (requestId !== partialNavLoadRequestIdRef.current) return;
             const batchPayload =
-              (divisionAutoPopulateDataRef.current as { __batchDetails?: unknown } | null)
-                ?.__batchDetails ?? null;
+              latestBatchDetailsRef.current ?? null;
 
             if (item.motorId) {
               if (shouldUseQcFormDetailsData(item.status)) {
@@ -3117,7 +3167,7 @@ export const useQCDivisionHook = () => {
             if (requestId !== partialNavLoadRequestIdRef.current) return;
             let initialValues = buildSeededPremixDetailsValues(item.premixNo, seedPayload);
             if (shouldUseQcFormDetailsData(item.status)) {
-              const formDetails = await ensureQcFormDetailsPayload({ forceRefresh: true });
+              const formDetails = await ensureQcFormDetailsPayload();
               if (requestId !== partialNavLoadRequestIdRef.current) return;
               const formData =
                 resolveMixingQcFormData(formDetails) ??
@@ -3271,7 +3321,7 @@ export const useQCDivisionHook = () => {
           if (requestId !== partialNavLoadRequestIdRef.current) return;
 
           if (shouldUseQcFormDetailsData(item.status)) {
-            const formDetails = await ensureQcFormDetailsPayload({ forceRefresh: true });
+            const formDetails = await ensureQcFormDetailsPayload();
             if (requestId !== partialNavLoadRequestIdRef.current) return;
             const formData =
               resolveMixingQcFormData(formDetails) ??
@@ -3368,18 +3418,21 @@ export const useQCDivisionHook = () => {
       }
     },
     [
-      activeBatch?.batchId,
+      activeBatch,
       buildEntryFromSelection,
       divisionCatalog,
       ensureQcFormDetailsPayload,
       fetchManufacturingDivisionDetails,
       fetchQcSchemaDocument,
+      getBlockedReason,
       messages.SCHEMA_FETCH_ERROR,
       navigateToEntry,
       resolvePropellantFmCount,
+      runBatchBootstrap,
       selectedDivision,
       selectedProcessingType,
       selectedRawMaterialType,
+      setDivisionUiMode,
       showAlert,
       subDepartmentId,
       updateFormData,
@@ -3646,27 +3699,24 @@ export const useQCDivisionHook = () => {
         const batchId = String(batch.batchId ?? "").trim();
         if (batchId) {
           try {
-            const batchDetails = await batchManagementController.getBatchById(batchId);
-            if (batchDetails) batchDetailsPayloadRef.current = batchDetails;
-            batchStatusMap = mapBatchDivisionStatusesToFlowKeyMap(
-              batchDetails,
-              divisionCatalog,
-            );
-            if (Object.keys(batchStatusMap).length > 0) {
-              setDivisionStatusByFlowKey(batchStatusMap);
-            } else {
+            const bootstrap = await runBatchBootstrap({
+              batchId,
+              listRow: batch as unknown as Record<string, unknown>,
+              formId: resolvedFormId,
+            });
+            batchStatusMap = bootstrap?.context.divisionStatuses ?? {};
+            if (Object.keys(batchStatusMap).length === 0) {
               setDivisionStatusByFlowKey({});
             }
-            const fromDetails = getBatchStageProgressArrays(
-              (batchDetails as Record<string, unknown> | null) ?? null,
-            );
             const fromList = getBatchStageProgressArrays(
               batch as unknown as Record<string, unknown>,
             );
-            setBatchStageArrays({
-              stageProgress: fromDetails.stageProgress ?? fromList.stageProgress ?? null,
-              currentStage: fromDetails.currentStage ?? fromList.currentStage ?? null,
-            });
+            if (!bootstrap?.context.stageProgress && !bootstrap?.context.currentStage) {
+              setBatchStageArrays({
+                stageProgress: fromList.stageProgress ?? null,
+                currentStage: fromList.currentStage ?? null,
+              });
+            }
           } catch (error) {
             console.error("Unable to load batch stage progress for QC gating:", error);
             setBatchStageArrays(
@@ -3723,7 +3773,6 @@ export const useQCDivisionHook = () => {
         }
 
         fetchedDetailsPayload = detailsResponse.data as unknown as Record<string, unknown>;
-        qcFormDetailsPayloadRef.current = fetchedDetailsPayload;
 
         const rawDivisionDetails = detailsResponse.data?.divisionDetails;
         const hasDivisionDetails =
@@ -4228,8 +4277,7 @@ export const useQCDivisionHook = () => {
               const awaitingInitiation =
                 motorStatus == null || isQcStatusAwaitingInitiation(motorStatus);
               const batchPayload =
-                (divisionAutoPopulateDataRef.current as { __batchDetails?: unknown } | null)
-                  ?.__batchDetails ?? null;
+                latestBatchDetailsRef.current ?? null;
 
               // IN_PROGRESS+ → map from /qc-division/details
               if (!awaitingInitiation && entry.motorId) {
@@ -4607,7 +4655,7 @@ export const useQCDivisionHook = () => {
                 if (qcDetail) {
                   entryValues[entry.entryId] = {
                     schemaValues: buildInitialNdtValuesForMotor(qcDetail, entry.motorId, {
-                      batchPayload: batchDetailsPayloadRef.current,
+                      batchPayload: latestBatchDetailsRef.current,
                       includeRadiographyObservations: true,
                     }),
                   };
@@ -4624,7 +4672,7 @@ export const useQCDivisionHook = () => {
                   const fromManufacturing = buildInitialNdtValuesForMotor(
                     manufacturingPayload,
                     entry.motorId,
-                    { batchPayload: batchDetailsPayloadRef.current },
+                    { batchPayload: latestBatchDetailsRef.current },
                   );
                   if (ndtFormValuesHaveUserData(fromManufacturing)) {
                     entryValues[entry.entryId] = { schemaValues: fromManufacturing };
@@ -4950,10 +4998,6 @@ export const useQCDivisionHook = () => {
         motorStatuses: detailsPayload?.motorStatuses ?? null,
       });
 
-      if (detailsPayload) {
-        qcFormDetailsPayloadRef.current = detailsPayload as Record<string, unknown>;
-      }
-
       if (detailsPayload && Array.isArray(detailsPayload.divisionDetails)) {
         const preferredFlowKey = String(
           (silent ? preservedDivision : initialDivision) || "",
@@ -5248,7 +5292,7 @@ export const useQCDivisionHook = () => {
         }
       }
 
-      const refreshedDetails = qcFormDetailsPayloadRef.current;
+      const refreshedDetails = await ensureQcFormDetailsPayload();
 
       if (activePartialItem) {
         const nextStatus = intent === "draft" ? "IN_PROGRESS" : "WAITING_FOR_APPROVAL";
@@ -5677,15 +5721,8 @@ export const useQCDivisionHook = () => {
             rawMaterialType: "",
           }));
 
-    const cachedDetails = qcFormDetailsPayloadRef.current;
-    const premixStatuses =
-      formUnitStatuses.premixStatuses ??
-      (cachedDetails as { premixStatuses?: unknown } | null)?.premixStatuses ??
-      null;
-    const motorStatuses =
-      formUnitStatuses.motorStatuses ??
-      (cachedDetails as { motorStatuses?: unknown } | null)?.motorStatuses ??
-      null;
+    const premixStatuses = formUnitStatuses.premixStatuses ?? null;
+    const motorStatuses = formUnitStatuses.motorStatuses ?? null;
     const unitsByTabKey = groupUnitStatusesByDivisionTabKey({
       premixStatuses,
       motorStatuses,
@@ -5817,7 +5854,13 @@ export const useQCDivisionHook = () => {
     addedDivisionEntryKeys,
     activeDivisionGroupIndex,
     activeDivisionSubIndex,
-    loadingFormDetails,
+    loadingFormDetails: loadingFormDetails || batchBootstrapLoading,
+    batchBootstrapLoading,
+    batchContext,
+    divisionUiMode,
+    divisionBlockedReason,
+    divisionSetupDefinition,
+    canLoadSetupForm,
     schemaLoading: schemaLoading || partialItemLoading || divisionAutoPopulateLoading,
     schemaError,
     divisionAutoPopulateData,
@@ -5869,6 +5912,7 @@ export const useQCDivisionHook = () => {
     handleInhibitorTypeChange,
     handlePropellantProcessChange,
     handleLoadQcForm,
+    handleLoadQcSetupForm,
     handlePartialNavIndexChange,
     handleDivisionEntryValuesChange,
     handleDivisionEntryLiquidValuesChange,

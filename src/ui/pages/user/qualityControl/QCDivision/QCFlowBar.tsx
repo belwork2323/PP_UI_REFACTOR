@@ -71,6 +71,8 @@ type QCFlowBarProps = {
   schemaLoading?: boolean;
   /** When division-details seeded motor/premix nav, hide redundant pickers for auto-loaded flows. */
   partialNavActive?: boolean;
+  /** Hide the Load Form button (e.g. when setup panel provides its own load action). */
+  hideLoadAction?: boolean;
   onProcessingTypeChange: (value: string) => void;
   onPremixChange: (value: number | "") => void;
   onMixingStageChange: (value: string) => void;
@@ -106,6 +108,7 @@ const QCFlowBar = ({
   hasDivisionEntries,
   schemaLoading = false,
   partialNavActive = false,
+  hideLoadAction = false,
   onProcessingTypeChange,
   onPremixChange,
   onMixingStageChange,
@@ -279,6 +282,7 @@ const QCFlowBar = ({
   const isPremixAction = isRawMaterialPremixFlow || isMixingFlow;
 
   const showLoadAction =
+    !hideLoadAction &&
     !autoSeededPartialFlow &&
     Boolean(selectedDivision) &&
     !(hasDivisionEntries && !isPremixAction) &&

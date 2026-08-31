@@ -250,6 +250,69 @@ export const extractBatchMotorIds = (
   return [{ motorId: singleId }];
 };
 
+export { extractBatchPremixCount };
+
+/** Build unit tabs strictly from batch details (motorIds, premix count). */
+export const mapBatchUnitsToPartialNav = (params: {
+  flowKey: string;
+  rawMaterialType?: string;
+  batchPayload?: unknown;
+}): QcPartialNavItem[] => {
+  const flowKey = String(params.flowKey ?? "").trim();
+  const isRawMaterialProcessing =
+    String(params.rawMaterialType ?? "").trim() === "RAW_MATERIAL_PROCESSING";
+  const items: QcPartialNavItem[] = [];
+
+  const motors = extractBatchMotorIds(params.batchPayload);
+  const premixCount = extractBatchPremixCount(params.batchPayload);
+
+  if (motors.length > 0 && isMotorBasedPartialFlow(flowKey)) {
+    motors.forEach((motor) => {
+      items.push({
+        id: `motor:${motor.motorId}`,
+        kind: "MOTOR",
+        label: motor.motorId,
+        status: "TO_BE_INITIATED",
+        motorId: motor.motorId,
+      });
+    });
+  }
+
+  if (flowKey === "MIXING" && premixCount > 0) {
+    Array.from({ length: premixCount }, (_, index) => index + 1).forEach((premixNo) => {
+      items.push({
+        id: `premix:${premixNo}`,
+        kind: "PREMIX",
+        label: `Premix ${premixNo}`,
+        status: "TO_BE_INITIATED",
+        premixNo,
+        processingType: "SOLID_PROCESSING",
+      });
+      items.push({
+        id: `final-mix:${premixNo}`,
+        kind: "FINAL_MIX",
+        label: `Final Mix ${premixNo}`,
+        status: "TO_BE_INITIATED",
+        finalMixNo: premixNo,
+        premixNo,
+      });
+    });
+  } else if (isRawMaterialProcessing && flowKey === "RAW_MATERIAL" && premixCount > 0) {
+    Array.from({ length: premixCount }, (_, index) => index + 1).forEach((premixNo) => {
+      items.push({
+        id: `premix:${premixNo}`,
+        kind: "PREMIX",
+        label: `Premix ${premixNo}`,
+        status: "TO_BE_INITIATED",
+        premixNo,
+        processingType: "SOLID_PROCESSING",
+      });
+    });
+  }
+
+  return items;
+};
+
 /** True when /qc-division/division-details returned no unit rows (empty premixes/motors/stages). */
 export const isEmptyManufacturingDivisionDetailsPayload = (payload: unknown): boolean => {
   if (!payload || typeof payload !== "object") return true;

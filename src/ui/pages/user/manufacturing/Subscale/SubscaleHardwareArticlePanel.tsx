@@ -45,6 +45,10 @@ import {
   StaticTestingTableSection,
   TrimmingTableSection,
 } from "./components/SubscaleHardwareTableSections";
+import {
+  applySubscaleFormScopePatch,
+  syncProcessTableScope,
+} from "./utils/subscaleFormScopeSync";
 import { SubscaleTableTextCell } from "./components/SubscaleTableCells";
 import SubscaleProcessSection from "./components/SubscaleProcessSection";
 import { hasProcessTableData, scheduleIdleWork } from "./utils/subscaleTableUtils";
@@ -102,12 +106,12 @@ const syncBemNoAcrossProcessTables = (
   rowIndex: number,
   bemNo: string,
 ): SchemaFormValues => {
-  const next: SchemaFormValues = { ...values };
+  let next: SchemaFormValues = { ...values };
   BEM_NO_SYNC_TARGETS.forEach(({ tableId, fieldId }) => {
     const rows = Array.isArray(next[tableId]) ? [...(next[tableId] as Record<string, unknown>[])] : [];
     if (!rows[rowIndex]) return;
     rows[rowIndex] = { ...rows[rowIndex], [fieldId]: bemNo };
-    next[tableId] = rows;
+    next = syncProcessTableScope(next, tableId, rows);
   });
   return next;
 };
@@ -193,7 +197,7 @@ const SubscaleHardwareArticlePanel = ({
 
   const patchFormValues = useCallback(
     (patch: Partial<SchemaFormValues>) => {
-      const next = { ...pendingValuesRef.current, ...patch };
+      const next = applySubscaleFormScopePatch(pendingValuesRef.current, patch);
       pendingValuesRef.current = next;
       onChange(next);
     },
@@ -396,7 +400,11 @@ const SubscaleHardwareArticlePanel = ({
       }
 
       tableData[rowIndex] = targetRow;
-      let nextValues: SchemaFormValues = { ...currentValues, [tableId]: tableData };
+      let nextValues: SchemaFormValues = syncProcessTableScope(
+        { ...currentValues },
+        tableId,
+        tableData,
+      );
 
       if (tableId === "CASTING_TABLE" && fieldId === "BEM_MOULD_NO") {
         nextValues = syncBemNoAcrossProcessTables(nextValues, rowIndex, String(value ?? ""));

@@ -1,5 +1,6 @@
 import {
   applyStatusMapsToPartialNav,
+  mapBatchUnitsToPartialNav,
   mapDivisionDetailsToPartialNav,
   normalizePartialItemStatus,
   qcDivisionStatusKeysMatch,
@@ -89,38 +90,88 @@ const resolveCatalogFlowKeyByDivisionId = (
   return "";
 };
 
-/** Parse `/admin/batch/details` → `divisionStatuses` rows. */
+/** Parse `/admin/batch/details` → `divisionStatuses` rows (root + currentStage / stageProgress). */
 export const extractBatchDivisionStatusRows = (
   batchPayload: unknown,
   catalog?: QcDivisionCatalogItem[],
 ): QcBatchDivisionStatusRow[] => {
   const root = asRecord(batchPayload);
   if (!root) return [];
-  const rows = asArray(root.divisionStatuses);
-  const out: QcBatchDivisionStatusRow[] = [];
 
-  for (const row of rows) {
-    const rec = asRecord(row);
-    if (!rec) continue;
-    const divisionName = pickString(rec.divisionName, rec.division, rec.name);
-    const divisionId = pickNumber(rec.divisionId, rec.division_id);
-    const fromCatalog = resolveCatalogFlowKeyByDivisionId(catalog, divisionId);
-    const fromName = divisionName ? resolveQcDivisionFlowKeyFromName(divisionName) : "";
-    const flowKey = fromCatalog || fromName;
-    if (!flowKey) continue;
-    out.push({
-      divisionId,
-      divisionName,
-      divisionSubmissionType: pickString(
-        rec.divisionSubmissionType,
-        rec.division_submission_type,
-        rec.submissionType,
-      ),
-      status: normalizePartialItemStatus(rec.status ?? rec.divisionStatus),
-      flowKey,
+  const parseRows = (source: unknown[]): QcBatchDivisionStatusRow[] => {
+    const out: QcBatchDivisionStatusRow[] = [];
+    for (const row of source) {
+      const rec = asRecord(row);
+      if (!rec) continue;
+      const divisionName = pickString(rec.divisionName, rec.division, rec.name);
+      const divisionId = pickNumber(rec.divisionId, rec.division_id);
+      const fromCatalog = resolveCatalogFlowKeyByDivisionId(catalog, divisionId);
+      const fromName = divisionName ? resolveQcDivisionFlowKeyFromName(divisionName) : "";
+      const flowKey = fromCatalog || fromName;
+      if (!flowKey) continue;
+      out.push({
+        divisionId,
+        divisionName,
+        divisionSubmissionType: pickString(
+          rec.divisionSubmissionType,
+          rec.division_submission_type,
+          rec.submissionType,
+        ),
+        status: normalizePartialItemStatus(rec.status ?? rec.divisionStatus),
+        flowKey,
+      });
+    }
+    return out;
+  };
+
+  const collected: QcBatchDivisionStatusRow[] = [];
+  const seen = new Set<string>();
+
+  const pushUnique = (rows: QcBatchDivisionStatusRow[]) => {
+    rows.forEach((row) => {
+      const key = `${row.flowKey}:${row.divisionId ?? row.divisionName}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      collected.push(row);
     });
+  };
+
+  pushUnique(parseRows(asArray(root.divisionStatuses)));
+
+  const currentStage = asArray(root.currentStage);
+  currentStage.forEach((stage) => {
+    const stageRec = asRecord(stage);
+    if (!stageRec) return;
+    pushUnique(parseRows(asArray(stageRec.divisionStatuses)));
+  });
+
+  const stageProgress = asArray(root.stageProgress);
+  stageProgress.forEach((stage) => {
+    const stageRec = asRecord(stage);
+    if (!stageRec) return;
+    pushUnique(parseRows(asArray(stageRec.divisionStatuses)));
+  });
+
+  return collected;
+};
+
+/** Division statuses from batch details only (pre-formId). */
+export const extractQcDivisionStatusesFromBatch = (
+  batchPayload: unknown,
+  catalog?: QcDivisionCatalogItem[],
+): Record<string, QcPartialItemStatus> => mapBatchDivisionStatusesToFlowKeyMap(batchPayload, catalog);
+
+/** Gate on formId: QC form details when present, else batch details. */
+export const resolveQcDivisionStatusSource = (params: {
+  formId?: string | null;
+  batchDetails: unknown;
+  qcFormDetails?: unknown;
+  catalog?: QcDivisionCatalogItem[];
+}): Record<string, QcPartialItemStatus> => {
+  if (String(params.formId ?? "").trim()) {
+    return mapFormDetailsDivisionStatusesToFlowKeyMap(params.qcFormDetails);
   }
-  return out;
+  return extractQcDivisionStatusesFromBatch(params.batchDetails, params.catalog);
 };
 
 /** Map batch `divisionStatuses` → flow-key status map for nav chips / tab routing. */
@@ -927,17 +978,22 @@ export const buildQcDivisionPartialNav = (params: {
       ? typeKey
       : typeKey || params.flowKey;
 
-  const fromPayload = mapDivisionDetailsToPartialNav(params.autoPopulatePayload, {
+  // Primary nav from batch details units only.
+  const fromBatchUnits = mapBatchUnitsToPartialNav({
     flowKey: params.flowKey,
     rawMaterialType: typeKey,
     batchPayload: params.batchPayload,
   });
+
   const fromStatuses = buildPartialNavFromUnitStatusMaps({
     motorStatuses: params.motorStatuses,
     premixStatuses: params.premixStatuses,
     division: statusDivisionKey,
   });
-  const merged = mergePartialNavItems(fromStatuses, fromPayload);
+
+  const merged = mergePartialNavItems(fromBatchUnits, fromStatuses);
+
+  // Manufacturing division-details attaches prerequisite status only — not tab creation.
   const withManufacturingPrerequisites = applyManufacturingPrerequisiteStatuses(
     merged,
     params.autoPopulatePayload,
@@ -947,6 +1003,7 @@ export const buildQcDivisionPartialNav = (params: {
       batchPayload: params.batchPayload,
     },
   );
+
   return applyStatusMapsToPartialNav(withManufacturingPrerequisites, {
     motorStatuses: params.motorStatuses,
     premixStatuses: params.premixStatuses,

@@ -92,8 +92,9 @@ export const mixingController = {
         return await fetchQualityCheck(mixType, motorStage);
       } catch (error) {
         console.error("Failed to fetch quality checks:", error);
-        qualityChecksInflight.delete(cacheKey);
         return new ApiResponseModel(error);
+      } finally {
+        qualityChecksInflight.delete(cacheKey);
       }
     })();
 
