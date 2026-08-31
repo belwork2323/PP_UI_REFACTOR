@@ -81,6 +81,7 @@ export type QcDivisionApproverUnitChangeStatusResponse = {
   divisionStatuses?: unknown[];
   motorStatuses?: unknown[];
   premixStatuses?: unknown[];
+  finalMixStatuses?: unknown[];
   actionBy?: string;
   actionAt?: string;
   remarks?: string | null;

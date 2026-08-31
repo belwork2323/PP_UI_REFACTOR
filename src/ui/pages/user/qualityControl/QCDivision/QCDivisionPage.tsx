@@ -103,7 +103,6 @@ const QualityControlPage = () => {
     finalApprovalGroups,
     finalApprovalRows,
     handleBackFromDetails,
-    handleViewDetails,
     detailsRow,
     detailsData,
     detailsLoading,
@@ -150,7 +149,6 @@ const QualityControlPage = () => {
       scopedFormData.schemaFormLoaded ||
       partialNavItems.length > 0);
 
-  const canOpenFinalDialog = Boolean(activeBatch?.formId);
   /** View Status should stay available while filling — shows division/unit progress. */
   const canViewStatus = Boolean(activeBatch);
 
@@ -326,14 +324,8 @@ const QualityControlPage = () => {
                     draftConfirmMessage: unitActionLabels.draftConfirmMessage,
                     submitConfirmTitle: unitActionLabels.submitConfirmTitle,
                     submitConfirmMessage: unitActionLabels.submitConfirmMessage,
-                    showViewDetails: true,
-                    canViewDetails: canOpenFinalDialog,
-                    viewDetailsLabel: strings.VIEW_DETAILS,
                     onSaveDraft: () => setDraftConfirmOpen(true),
                     onSubmit: () => setSubmitConfirmOpen(true),
-                    onViewDetails: () => {
-                      if (activeBatch) void handleViewDetails(activeBatch);
-                    },
                   }
                 : null
             }

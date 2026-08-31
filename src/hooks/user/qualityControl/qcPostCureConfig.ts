@@ -136,8 +136,26 @@ export const isQcPostCureOperation = (value: string): value is QcPostCureOperati
 export const isQcPostCureInhibitionOperation = (operation: string) =>
   operation === QC_POST_CURE_OPERATION_INHIBITION;
 
+/**
+ * Canonicalize inhibitor codes from QC / manufacturing APIs.
+ * Backend may send HEMCOAT_3K; UI / schema use HEMCOAT-3K.
+ */
+export const normalizeQcInhibitorType = (
+  value: string | null | undefined,
+): QcInhibitorType | null => {
+  const raw = String(value ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+  if (!raw) return null;
+  if (raw === "IR1" || raw === "IR_1") return "IR1";
+  if (raw === "HEMCOAT_3K" || raw === "HEMCOAT3K") return "HEMCOAT-3K";
+  if (raw === "NOT_APPLICABLE" || raw === "N_A" || raw === "NA") return "NOT_APPLICABLE";
+  return null;
+};
+
 export const isQcInhibitorType = (value: string): value is QcInhibitorType =>
-  value === "IR1" || value === "HEMCOAT-3K" || value === "NOT_APPLICABLE";
+  normalizeQcInhibitorType(value) != null;
 
 export const resolveQcPostCureSchemaSelection = (
   operation: string,
@@ -163,10 +181,8 @@ export const resolveQcPostCureSchemaSelection = (
   return null;
 };
 
-export const mapQcInhibitorTypeToApi = (value: string): QcInhibitorType | null => {
-  if (isQcInhibitorType(value)) return value;
-  return null;
-};
+export const mapQcInhibitorTypeToApi = (value: string): QcInhibitorType | null =>
+  normalizeQcInhibitorType(value);
 
 export const resolveQcSectionInhibitorType = (
   division: QcApiDivision,
@@ -183,8 +199,10 @@ export const resolveQcSectionInhibitorType = (
   return mapQcInhibitorTypeToApi(inhibitorType) ?? undefined;
 };
 
-export const getQcInhibitorTypeLabel = (value: string) =>
-  QC_INHIBITOR_TYPE_OPTIONS.find((option) => option.value === value)?.label ?? value;
+export const getQcInhibitorTypeLabel = (value: string) => {
+  const normalized = normalizeQcInhibitorType(value) ?? value;
+  return QC_INHIBITOR_TYPE_OPTIONS.find((option) => option.value === normalized)?.label ?? value;
+};
 
 export const getQcPostCureOperationLabel = (value: string) =>
   QC_POST_CURE_OPERATION_OPTIONS.find((option) => option.value === value)?.label ?? value;
@@ -199,7 +217,10 @@ export const getQcPostCureMotorLabel = (
     return `${motor} — ${S.POST_CURE_OPERATION_LOOSE_FLAP}`;
   }
   if (subType === QC_POST_CURE_SUB_TYPE_INHIBITION) {
-    const inhibitor = inhibitorType ? getQcInhibitorTypeLabel(inhibitorType) : S.POST_CURE_OPERATION_INHIBITION;
+    const normalized = normalizeQcInhibitorType(inhibitorType);
+    const inhibitor = normalized
+      ? getQcInhibitorTypeLabel(normalized)
+      : S.POST_CURE_OPERATION_INHIBITION;
     return `${motor} — ${S.POST_CURE_OPERATION_INHIBITION} (${inhibitor})`;
   }
   return motor;

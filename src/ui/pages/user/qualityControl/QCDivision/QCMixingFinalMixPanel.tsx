@@ -85,7 +85,8 @@ const QCMixingFinalMixPanel = ({
   );
 
   const showUnitActions = Boolean(unitActions?.show);
-  const showViewDetails = unitActions?.showViewDetails ?? showUnitActions;
+  // Match Premix: View Details is not part of the unit fill action bar.
+  const showViewDetails = Boolean(unitActions?.showViewDetails);
 
   return (
     <Box

@@ -512,10 +512,13 @@ export const useQCDivisionHook = () => {
   /** Cross-division unit statuses from form details — used for previous-division gating. */
   const [formUnitStatuses, setFormUnitStatuses] = useState<{
     premixStatuses: unknown;
+    finalMixStatuses: unknown;
     motorStatuses: unknown;
-  }>({ premixStatuses: null, motorStatuses: null });
+  }>({ premixStatuses: null, finalMixStatuses: null, motorStatuses: null });
   const formUnitStatusesRef = useRef(formUnitStatuses);
   formUnitStatusesRef.current = formUnitStatuses;
+  /** Latest /qc-division/details payload — keeps finalMixStatuses + divisionDetails for nav. */
+  const latestQcFormDetailsRef = useRef<Record<string, unknown> | null>(null);
   /** Batch stageProgress / currentStage — manufacturing + QC last-used unit approvals. */
   const [batchStageArrays, setBatchStageArrays] = useState<{
     stageProgress: unknown;
@@ -700,7 +703,8 @@ export const useQCDivisionHook = () => {
     latestBatchDetailsRef.current = null;
     postCureManualSetupRef.current = null;
     resetDivisionNavState();
-    setFormUnitStatuses({ premixStatuses: null, motorStatuses: null });
+    setFormUnitStatuses({ premixStatuses: null, finalMixStatuses: null, motorStatuses: null });
+    latestQcFormDetailsRef.current = null;
     setBatchStageArrays({ stageProgress: null, currentStage: null });
     partialNavSeedKeyRef.current = "";
   }, [applyFullFormState, resetDivisionNavState]);
@@ -802,7 +806,9 @@ export const useQCDivisionHook = () => {
       const formId = String(formIdOverride ?? activeBatchRef.current?.formId ?? "").trim();
       if (!formId || !subDepartmentId) return null;
       try {
-        return await fetchFreshQcFormDetails({ formId, subDepartmentId });
+        const details = await fetchFreshQcFormDetails({ formId, subDepartmentId });
+        if (details) latestQcFormDetailsRef.current = details;
+        return details;
       } catch (error) {
         console.error("Failed to load QC form details for division data:", error);
         return null;
@@ -812,13 +818,22 @@ export const useQCDivisionHook = () => {
   );
 
   const refreshPartialNavFromStatusMaps = useCallback(
-    (motorStatuses: unknown, premixStatuses: unknown) => {
+    (
+      motorStatuses: unknown,
+      premixStatuses: unknown,
+      finalMixStatuses?: unknown,
+      divisionDetails?: unknown,
+    ) => {
       const flowKey = selectedDivisionRef.current;
       const typeKey = selectedRawMaterialTypeRef.current;
       if (!flowKey || isRawMaterialRevalidationType(typeKey)) return;
 
       const statusDivisionKey =
-        flowKey === "RAW_MATERIAL" && typeKey ? typeKey : typeKey || flowKey;
+        flowKey === "RAW_MATERIAL" && typeKey ? typeKey : flowKey || typeKey;
+      const details =
+        divisionDetails ??
+        (latestQcFormDetailsRef.current?.divisionDetails as unknown) ??
+        null;
 
       setPartialNavItems((prev) => {
         const base =
@@ -831,11 +846,15 @@ export const useQCDivisionHook = () => {
                 batchPayload: latestBatchDetailsRef.current,
                 motorStatuses,
                 premixStatuses,
+                finalMixStatuses,
+                divisionDetails: details,
               });
         if (!base.length) return prev;
         return applyStatusMapsToPartialNav(base, {
           motorStatuses,
           premixStatuses,
+          finalMixStatuses,
+          divisionDetails: details,
           division: statusDivisionKey,
         });
       });
@@ -854,14 +873,32 @@ export const useQCDivisionHook = () => {
 
       const premixStatuses =
         payload.premixStatuses ?? formUnitStatusesRef.current.premixStatuses ?? null;
+      const finalMixStatuses =
+        payload.finalMixStatuses ?? formUnitStatusesRef.current.finalMixStatuses ?? null;
       const motorStatuses =
         payload.motorStatuses ?? formUnitStatusesRef.current.motorStatuses ?? null;
 
-      if (payload.premixStatuses != null || payload.motorStatuses != null) {
-        setFormUnitStatuses({ premixStatuses, motorStatuses });
+      if (
+        payload.premixStatuses != null ||
+        payload.finalMixStatuses != null ||
+        payload.motorStatuses != null ||
+        payload.divisionDetails != null
+      ) {
+        latestQcFormDetailsRef.current = {
+          ...(latestQcFormDetailsRef.current ?? {}),
+          ...payload,
+        };
+        const nextUnitStatuses = { premixStatuses, finalMixStatuses, motorStatuses };
+        formUnitStatusesRef.current = nextUnitStatuses;
+        setFormUnitStatuses(nextUnitStatuses);
       }
 
-      refreshPartialNavFromStatusMaps(motorStatuses, premixStatuses);
+      refreshPartialNavFromStatusMaps(
+        motorStatuses,
+        premixStatuses,
+        finalMixStatuses,
+        payload.divisionDetails ?? latestQcFormDetailsRef.current?.divisionDetails,
+      );
     },
     [refreshPartialNavFromStatusMaps],
   );
@@ -988,10 +1025,14 @@ export const useQCDivisionHook = () => {
         }
 
         if (formDetailsForStatus) {
-          setFormUnitStatuses({
+          latestQcFormDetailsRef.current = formDetailsForStatus;
+          const nextUnitStatuses = {
             premixStatuses: formDetailsForStatus.premixStatuses ?? null,
+            finalMixStatuses: formDetailsForStatus.finalMixStatuses ?? null,
             motorStatuses: formDetailsForStatus.motorStatuses ?? null,
-          });
+          };
+          formUnitStatusesRef.current = nextUnitStatuses;
+          setFormUnitStatuses(nextUnitStatuses);
         }
 
         const blockedReason = getBlockedReason(divisionFlowKey, bootstrap?.context ?? null, typeKey);
@@ -1020,6 +1061,7 @@ export const useQCDivisionHook = () => {
             {
               motorStatuses: formUnitStatusesRef.current.motorStatuses,
               premixStatuses: formUnitStatusesRef.current.premixStatuses,
+              finalMixStatuses: formUnitStatusesRef.current.finalMixStatuses,
             },
             {
               flowKey: divisionFlowKey,
@@ -1045,19 +1087,37 @@ export const useQCDivisionHook = () => {
 
         let seedRecord: Record<string, unknown> | null = null;
         let hasManufacturingData = false;
+        let unitStatusesForNav = {
+          premixStatuses: formUnitStatusesRef.current.premixStatuses,
+          finalMixStatuses: formUnitStatusesRef.current.finalMixStatuses,
+          motorStatuses: formUnitStatusesRef.current.motorStatuses,
+          divisionDetails:
+            latestQcFormDetailsRef.current?.divisionDetails ??
+            formDetailsForStatus?.divisionDetails ??
+            null,
+        };
 
         if (useFormDetails) {
           const formDetails = (await ensureQcFormDetailsPayload()) ?? formDetailsForStatus;
           if (requestId !== divisionAutoPopulateRequestIdRef.current) return null;
           if (formDetails) {
+            latestQcFormDetailsRef.current = formDetails;
             const fromForm = mapFormDetailsDivisionStatusesToFlowKeyMap(formDetails);
             if (Object.keys(fromForm).length > 0) {
               setDivisionStatusByFlowKey((prev) => mergeQcDivisionStatusMaps(prev, fromForm));
             }
-            setFormUnitStatuses({
+            unitStatusesForNav = {
               premixStatuses: formDetails.premixStatuses ?? null,
+              finalMixStatuses: formDetails.finalMixStatuses ?? null,
               motorStatuses: formDetails.motorStatuses ?? null,
-            });
+              divisionDetails: formDetails.divisionDetails ?? null,
+            };
+            formUnitStatusesRef.current = {
+              premixStatuses: unitStatusesForNav.premixStatuses,
+              finalMixStatuses: unitStatusesForNav.finalMixStatuses,
+              motorStatuses: unitStatusesForNav.motorStatuses,
+            };
+            setFormUnitStatuses(formUnitStatusesRef.current);
           }
           const matchingDetail = findQcFormDivisionDetail(formDetails, {
             flowKey: divisionFlowKey,
@@ -1140,8 +1200,10 @@ export const useQCDivisionHook = () => {
           rawMaterialType: typeKey,
           autoPopulatePayload: seedRecord,
           batchPayload,
-          motorStatuses: formUnitStatusesRef.current.motorStatuses,
-          premixStatuses: formUnitStatusesRef.current.premixStatuses,
+          motorStatuses: unitStatusesForNav.motorStatuses,
+          premixStatuses: unitStatusesForNav.premixStatuses,
+          finalMixStatuses: unitStatusesForNav.finalMixStatuses,
+          divisionDetails: unitStatusesForNav.divisionDetails,
         });
         setPartialNavItems(withStatuses);
         setActivePartialNavIndex(0);
@@ -3887,7 +3949,10 @@ export const useQCDivisionHook = () => {
       stageProgress: batchStageArrays.stageProgress,
       currentStage: batchStageArrays.currentStage,
       premixStatuses: formUnitStatuses.premixStatuses,
+      finalMixStatuses: formUnitStatuses.finalMixStatuses,
       motorStatuses: formUnitStatuses.motorStatuses,
+      batchType: batchContext?.batchType,
+      subBatchType: batchContext?.subBatchType,
       candidateMotorIds: partialNavItems
         .filter((item) => item.kind === "MOTOR")
         .map((item) => item.motorId)
@@ -3899,9 +3964,12 @@ export const useQCDivisionHook = () => {
     });
   }, [
     activeDivisionTabKey,
+    batchContext?.batchType,
+    batchContext?.subBatchType,
     batchStageArrays.currentStage,
     batchStageArrays.stageProgress,
     divisionAutoPopulateData,
+    formUnitStatuses.finalMixStatuses,
     formUnitStatuses.motorStatuses,
     formUnitStatuses.premixStatuses,
     partialNavItems,
@@ -5435,10 +5503,16 @@ export const useQCDivisionHook = () => {
         setDivisionStatusByFlowKey(batchStatusMap);
       }
 
-      setFormUnitStatuses({
+      const nextUnitStatuses = {
         premixStatuses: detailsPayload?.premixStatuses ?? null,
+        finalMixStatuses: detailsPayload?.finalMixStatuses ?? null,
         motorStatuses: detailsPayload?.motorStatuses ?? null,
-      });
+      };
+      if (detailsPayload) {
+        latestQcFormDetailsRef.current = detailsPayload as Record<string, unknown>;
+      }
+      formUnitStatusesRef.current = nextUnitStatuses;
+      setFormUnitStatuses(nextUnitStatuses);
 
       if (detailsPayload && Array.isArray(detailsPayload.divisionDetails)) {
         const preferredFlowKey = String(
@@ -5461,8 +5535,11 @@ export const useQCDivisionHook = () => {
             autoPopulatePayload: {
               data: matchedDetail?.data ?? {},
             },
+            batchPayload: latestBatchDetailsRef.current,
             motorStatuses: detailsPayload.motorStatuses,
             premixStatuses: detailsPayload.premixStatuses,
+            finalMixStatuses: detailsPayload.finalMixStatuses,
+            divisionDetails: detailsPayload.divisionDetails,
           });
           if (navFromDetails.length) {
             setPartialNavItems(navFromDetails);
@@ -6127,10 +6204,13 @@ export const useQCDivisionHook = () => {
           }));
 
     const premixStatuses = formUnitStatuses.premixStatuses ?? null;
+    const finalMixStatuses = formUnitStatuses.finalMixStatuses ?? null;
     const motorStatuses = formUnitStatuses.motorStatuses ?? null;
     const unitsByTabKey = groupUnitStatusesByDivisionTabKey({
       premixStatuses,
+      finalMixStatuses,
       motorStatuses,
+      divisionDetails: latestQcFormDetailsRef.current?.divisionDetails,
     });
 
     const divisions = tabs.map((tab) => {
@@ -6174,6 +6254,7 @@ export const useQCDivisionHook = () => {
     divisionNavTabs,
     divisionOptions,
     divisionStatusByFlowKey,
+    formUnitStatuses.finalMixStatuses,
     formUnitStatuses.motorStatuses,
     formUnitStatuses.premixStatuses,
     partialNavItems,

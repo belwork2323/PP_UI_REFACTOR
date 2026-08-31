@@ -169,10 +169,11 @@ export const mapOtherBemListRow = (row: OtherBemApiListRecord): OtherBemApprover
   motorCode: row.motorCode ?? "",
   subType: row.subType ?? "",
   stfTestNo: row.stfTestNo ?? "",
-  status: row.status ?? "SUBMITTED",
-  bemStatus: row.status ?? "SUBMITTED",
+  status: row.status ?? "WAITING_FOR_APPROVAL",
+  bemStatus: row.status ?? "WAITING_FOR_APPROVAL",
   createdBy: row.createdBy ?? "",
   createdOn: row.createdOn || row.createdAt || "",
+  createdAt: row.createdAt || row.createdOn || "",
   raw: row,
 });
 

@@ -40,6 +40,8 @@ import {
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
 } from "../../../../../components/custom/UserWorkflowStepPager";
+import StfMotorPanel from "../StfMotorPanel";
+import { stfMotorDataHasUserInput } from "../../../../../../data/models/user/StfMotorDataModel";
 
 const API_OPERATION_STATUS_LABELS = Object.fromEntries(
   Object.entries(OPERATION_STATUS_UI_TO_API).map(([label, apiValue]) => [apiValue, label]),
@@ -318,6 +320,7 @@ const StfMotorDetailPanel = ({
   dt,
   palette,
   statusConfig,
+  theme,
   subDepartmentId,
   onOpen,
 }: {
@@ -325,6 +328,7 @@ const StfMotorDetailPanel = ({
   dt: STFDetailsTheme;
   palette: ReturnType<typeof getQualityControlTheme>["palette"];
   statusConfig: Record<string, { color: string; bg: string; border: string }>;
+  theme: ReturnType<typeof getQualityControlTheme>;
   subDepartmentId?: number;
   onOpen: (fileId: string, fileName: string) => void;
 }) => (
@@ -355,9 +359,7 @@ const StfMotorDetailPanel = ({
       ) : null}
     </Stack>
 
-    {motor.sections.length === 0 ? (
-      <Typography sx={dt.emptyText}>{STF.DETAILS_NO_MOTOR_DATA}</Typography>
-    ) : (
+    {motor.sections.length > 0 ? (
       motor.sections.map((section) => (
         <SectionPanel
           key={section.sectionId}
@@ -367,6 +369,17 @@ const StfMotorDetailPanel = ({
           onOpen={onOpen}
         />
       ))
+    ) : stfMotorDataHasUserInput(motor.stfData) ? (
+      <StfMotorPanel
+        value={motor.stfData}
+        onChange={() => undefined}
+        readOnly
+        theme={theme}
+        motorId={motor.motorId}
+        subDepartmentId={subDepartmentId}
+      />
+    ) : (
+      <Typography sx={dt.emptyText}>{STF.DETAILS_NO_MOTOR_DATA}</Typography>
     )}
   </Box>
 );
@@ -525,6 +538,7 @@ const STFDetailsContent = ({
               dt={dt}
               palette={theme.palette}
               statusConfig={statusConfig}
+              theme={theme}
               subDepartmentId={subDepartmentId}
               onOpen={onOpenFile}
             />

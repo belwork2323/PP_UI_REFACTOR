@@ -139,6 +139,8 @@ export const buildQcApproverPartialState = (
   const root = detailsPayload ?? {};
   const motorStatuses = root.motorStatuses;
   const premixStatuses = root.premixStatuses;
+  const finalMixStatuses = root.finalMixStatuses;
+  const divisionDetails = root.divisionDetails;
   const divisionStatuses = Array.isArray(root.divisionStatuses) ? root.divisionStatuses : [];
 
   const divisionStatusByFlowKey: Record<string, QcPartialItemStatus> = {};
@@ -154,10 +156,13 @@ export const buildQcApproverPartialState = (
     divisionStatusByFlowKey[key] = toPartialStatus(rec.status);
   });
 
-  // Unit chips from motorStatuses / premixStatuses; Weighment also from divisionDetails.motorWeightDetails.
+  // Unit chips from motorStatuses / premixStatuses / finalMixStatuses;
+  // Mixing FINAL_MIX may also be backfilled from split MIXING divisionDetails.
   const unitsByTabKey = groupUnitStatusesByDivisionTabKey({
     premixStatuses,
+    finalMixStatuses,
     motorStatuses,
+    divisionDetails,
   });
   const weighmentMotors = extractWeighmentMotorNavFromFormDetails(root);
   if (weighmentMotors.length) {

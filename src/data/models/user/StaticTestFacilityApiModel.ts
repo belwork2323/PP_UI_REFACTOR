@@ -676,23 +676,52 @@ export const mapBemDetailsForDisplay = (
 ): StfDetailView | null => {
   if (!data) return null;
 
-  const root = data as Record<string, unknown>;
+  const root =
+    data instanceof BEMMotorDetailsModel
+      ? ({
+          bemMotorId: data.bemMotorId,
+          bemNo: data.bemNo,
+          motorId: data.bemNo,
+          motorCode: data.motorCode,
+          stfTestNo: data.stfTestNo,
+          status: data.status,
+          sections: data.sections,
+          staticTestingDetails: data.staticTestingDetails,
+          createdBy: data.createdBy,
+          createdAt: data.createdAt,
+          createdOn: data.createdAt,
+          submittedBy: data.submittedBy,
+          submittedAt: data.submittedAt,
+          lastUpdatedBy: data.lastUpdatedBy,
+          lastUpdatedAt: data.lastUpdatedAt,
+          updatedBy: data.lastUpdatedBy,
+          updatedOn: data.lastUpdatedAt,
+          workflowInsights: data.workflowInsights,
+        } as Record<string, unknown>)
+      : (data as Record<string, unknown>);
+
   const bemNo = String(root.bemNo ?? root.motorId ?? root.motorCode ?? "BEM Motor").trim();
   const stfTestNo = String(root.stfTestNo ?? "").trim() || undefined;
-  const rawSections = Array.isArray(root.sections)
-    ? root.sections
-    : (root.staticTestingDetails as Record<string, unknown> | undefined)?.formSections;
+  const legacySections = Array.isArray(root.sections)
+    ? (root.sections as LegacySectionSubmission[])
+    : undefined;
+  const staticTestingDetails =
+    (root.staticTestingDetails as Record<string, unknown> | undefined) ??
+    (legacySections?.length ? { [FORM_SECTIONS_KEY]: legacySections } : undefined);
 
-  const displaySections = parseStfDisplaySections(
-    Array.isArray(rawSections) ? rawSections : [],
-  );
   const bemMotorPayload = {
-    staticTestingDetails: root.staticTestingDetails ?? { formSections: rawSections },
-    sections: rawSections,
+    staticTestingDetails: staticTestingDetails ?? {},
+    sections: legacySections,
   };
 
+  // Same section resolution as ACEM motors — supports formSections and nested DTO shapes.
+  const displaySections = resolveStfMotorSections(
+    { staticTestingDetails: staticTestingDetails ?? {} },
+    legacySections,
+  );
+
   return {
-    formId: String(root.bemMotorId ?? root.id ?? ""),
+    formId: String(root.bemMotorId ?? root.id ?? root.motorId ?? bemNo),
     batchId: "",
     batchType: "BEM",
     bemNo,
@@ -731,6 +760,10 @@ export const mapBemDetailsForDisplay = (
         subType: "BEM",
         subTypeLabel: "BEM",
         stfTestNo,
+        motorSubmissionStatus: (String(root.status ?? "")
+          .trim()
+          .toUpperCase()
+          .replace(/\s+/g, "_") || undefined) as StfMotorSubmissionStatus | undefined,
         sections: displaySections,
         stfData: parseStfMotorDataFromApi(bemMotorPayload, "BEM"),
       },

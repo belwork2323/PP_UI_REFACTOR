@@ -23,6 +23,20 @@ export const isQcQualificationSubBatch = (subBatchType?: string | null) =>
 export const isQcExperimentalSubBatch = (subBatchType?: string | null) =>
   normalizeQcSubBatchType(subBatchType) === "EXPERIMENTAL";
 
+/** Subscale Qualification or Experimental — manufacturing skips RMP / Mixing / NDT unit approvals. */
+export const isQcSubscaleQualOrExperimentalBatch = (
+  batchType?: string | null,
+  subBatchType?: string | null,
+): boolean =>
+  isQcSubscaleBatch(batchType) &&
+  (isQcQualificationSubBatch(subBatchType) || isQcExperimentalSubBatch(subBatchType));
+
+/** QC premix / final mix / motor tabs should not wait on prior subdepartment approvals. */
+export const shouldSkipQcManufacturingUnitPrerequisiteGate = (
+  batchType?: string | null,
+  subBatchType?: string | null,
+): boolean => isQcSubscaleQualOrExperimentalBatch(batchType, subBatchType);
+
 /** Prefer explicit Subscale from list or details — details may default empty batchType to MAIN. */
 export const resolveQcWorkingBatchType = (
   listBatchType?: string | null,

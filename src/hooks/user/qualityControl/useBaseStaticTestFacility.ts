@@ -54,7 +54,7 @@ import {
   resolveBatchProjectId,
   resolveBemMotorOptionsFromBatchDetails,
   resolveBemMotorStatusTabs,
-  resolveStfBatchMotorEntries,
+  resolveStfSeededNavigationMotors,
   resolveStfMotorCountLimit,
   resolveStfMotorOptions,
   resolveStfWorkingBatchType,
@@ -270,52 +270,48 @@ export const useBaseStaticTestFacility = ({
   const [statusFilter, setStatusFilter] = useState(STRINGS.USER_BATCH_LIST.FILTER_ALL);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
   const [totalRecords, setTotalRecords] = useState(0);
-  // Fetch Listing Data
+  // OTHER_BEM owns its motor list fetch. ACEM uses useSubdepartmentBatches synchronously
+  // (same pattern as QC Division) — do not copy into local state or the table can stay
+  // empty while statusCounts/totalRecords from listParams already show data.
   const loadListItems = useCallback(async () => {
-    if (!enabled) return;
+    if (!enabled || facilityType !== "OTHER_BEM") return;
 
     setListLoading(true);
 
     try {
-      if (facilityType === "OTHER_BEM") {
-        const apiStatus = toOperationStatusApiValue(
-          statusFilter,
-          STRINGS.USER_BATCH_LIST.FILTER_ALL,
-        );
-        const response = await stfController.listBemMotors({
-          page: page + 1,
-          limit: rowsPerPage,
-          status: apiStatus ? [apiStatus] : [],
-          search,
-        });
+      const apiStatus = toOperationStatusApiValue(
+        statusFilter,
+        STRINGS.USER_BATCH_LIST.FILTER_ALL,
+      );
+      const response = await stfController.listBemMotors({
+        page: page + 1,
+        limit: rowsPerPage,
+        status: apiStatus ? [apiStatus] : [],
+        search,
+      });
 
-        if (response?.success && Array.isArray(response?.data?.motors)) {
-          setFetchedBemMotors(response.data.motors.map(normalizeBemMotor));
-        } else {
-          setFetchedBemMotors([]);
-        }
-
-        const pagination = response?.data?.pagination;
-        const nextTotal =
-          Number(pagination?.totalRecords ?? pagination?.total ?? response?.data?.totalRecords) ||
-          (Array.isArray(response?.data?.motors) ? response.data.motors.length : 0);
-        setTotalRecords(nextTotal);
-
-        const serverCounts = response?.data?.statusCounts;
-        setStatusCounts(
-          mapBemMotorStatusCountsForUi(
-            serverCounts && typeof serverCounts === "object"
-              ? (serverCounts as Record<string, number>)
-              : undefined,
-            nextTotal,
-          ),
-        );
-        setFetchedBatches([]);
+      if (response?.success && Array.isArray(response?.data?.motors)) {
+        setFetchedBemMotors(response.data.motors.map(normalizeBemMotor));
       } else {
-        const incoming = (listParams?.batches ?? []).map(normalizeBatch);
-        setFetchedBatches(incoming);
         setFetchedBemMotors([]);
       }
+
+      const pagination = response?.data?.pagination;
+      const nextTotal =
+        Number(pagination?.totalRecords ?? pagination?.total ?? response?.data?.totalRecords) ||
+        (Array.isArray(response?.data?.motors) ? response.data.motors.length : 0);
+      setTotalRecords(nextTotal);
+
+      const serverCounts = response?.data?.statusCounts;
+      setStatusCounts(
+        mapBemMotorStatusCountsForUi(
+          serverCounts && typeof serverCounts === "object"
+            ? (serverCounts as Record<string, number>)
+            : undefined,
+          nextTotal,
+        ),
+      );
+      setFetchedBatches([]);
     } catch (error) {
       console.error("Failed to load facility list:", error);
       setFetchedBatches([]);
@@ -323,7 +319,7 @@ export const useBaseStaticTestFacility = ({
     } finally {
       setListLoading(false);
     }
-  }, [enabled, facilityType, page, rowsPerPage, search, statusFilter, listParams?.batches]);
+  }, [enabled, facilityType, page, rowsPerPage, search, statusFilter]);
 
   useEffect(() => {
     if (enabled) {
@@ -332,7 +328,12 @@ export const useBaseStaticTestFacility = ({
   }, [loadListItems, refreshVersion, enabled]);
 
   // Computed Values
-  const batches = useMemo(() => mergeStfMockBatches(fetchedBatches), [fetchedBatches]);
+  const batches = useMemo(() => {
+    if (facilityType === "ACEM") {
+      return mergeStfMockBatches((listParams?.batches ?? []).map(normalizeBatch));
+    }
+    return mergeStfMockBatches(fetchedBatches);
+  }, [facilityType, listParams?.batches, fetchedBatches]);
   const bemMotors = useMemo(() => fetchedBemMotors, [fetchedBemMotors]);
   const bemStatusTabs = useMemo(() => resolveBemMotorStatusTabs(statusCounts), [statusCounts]);
   const batchMotorOptions = useMemo(() => resolveStfMotorOptions(activeBatch), [activeBatch]);
@@ -815,15 +816,27 @@ export const useBaseStaticTestFacility = ({
 
   // Main Form Initialization & Detail Fetch
   const openFormWithResolvedData = useCallback(
-    async (batch: STFBatch | BemMotor, editMode: boolean) => {
+    async (
+      batch: STFBatch | BemMotor,
+      editMode: boolean,
+      options?: { silent?: boolean },
+    ) => {
       const isOtherBem = facilityType === "OTHER_BEM";
       const bemMotorObj = batch as BemMotor;
       const stfBatchObj = batch as STFBatch;
+      const silent = Boolean(options?.silent);
 
       let resolvedFormId = stfBatchObj.formId || null;
       let resolvedData = createDefaultStaticTestFacilityFormState();
       let rejectionReason = batch.rejectionReason ?? null;
-      let fetchedBemNo = stfBatchObj.motorIdNo ?? bemMotorObj.motorId ?? "";
+      let fetchedBemNo =
+        String(
+          bemMotorObj.bemNo ??
+            stfBatchObj.motorIdNo ??
+            bemMotorObj.motorId ??
+            bemMotorObj.motorCode ??
+            "",
+        ).trim();
       let detailsResponse: any = null;
       let autoMotorEntries: StfAddedMotor[] = [];
       let nextStatuses: Record<string, StfMotorStatusMeta> = {};
@@ -834,16 +847,22 @@ export const useBaseStaticTestFacility = ({
       const initialMotorType: StfSubType =
         (batch.subType as StfSubType) || defaultMotorType || "BEM";
 
+      // Silent refresh after save/submit must always hit details (even if list status
+      // is still TO_BE_INITIATED right after the first create).
       const shouldFetchDetails = isOtherBem
-        ? editMode ||
+        ? silent ||
+          editMode ||
           isStfContinueFillingStatus(bemMotorObj.status) ||
           String(bemMotorObj.status ?? "")
             .trim()
             .toUpperCase()
             .replace(/\s+/g, "_") === "IN_PROGRESS"
-        : editMode || isStfContinueFillingStatus(stfBatchObj.stfStatus);
+        : silent ||
+          editMode ||
+          isStfContinueFillingStatus(stfBatchObj.stfStatus) ||
+          Boolean(String(resolvedFormId ?? "").trim());
 
-      setLoadingFormDetails(true);
+      if (!silent) setLoadingFormDetails(true);
       try {
         if (!isOtherBem && stfBatchObj.batchId) {
           try {
@@ -865,13 +884,27 @@ export const useBaseStaticTestFacility = ({
               resolvedSubBatchType,
             );
 
-            // Main / Subscale Qualification: seed batch-linked main motors + BEM selection.
-            // Subscale Experimental: BEM selection only.
-            autoMotorEntries = seedMainMotors
-              ? resolveStfBatchMotorEntries(stfBatchObj, batchDetails)
-              : [];
+            // Main / Subscale Qualification: seed batch-linked main motors + BEM motors.
+            // Subscale Experimental: BEM motors only.
+            autoMotorEntries = resolveStfSeededNavigationMotors(stfBatchObj, {
+              ...batchDetails,
+              batchType: resolvedBatchType,
+              subBatchType: resolvedSubBatchType,
+              bemMotorIds:
+                (batchDetails as { bemMotorIds?: unknown } | null)?.bemMotorIds ??
+                stfBatchObj.bemMotorIds,
+            });
             setAvailableBemMotorOptions(
-              showBemSelection ? resolveBemMotorOptionsFromBatchDetails(batchDetails) : [],
+              showBemSelection
+                ? resolveBemMotorOptionsFromBatchDetails({
+                    identificationSheet: batchDetails?.identificationSheet ?? null,
+                    bemMotors: (batchDetails as { bemMotors?: unknown } | null)?.bemMotors,
+                    bemMotorIds:
+                      (batchDetails as { bemMotorIds?: unknown } | null)?.bemMotorIds ??
+                      stfBatchObj.bemMotorIds,
+                    metadata: (batchDetails as { metadata?: unknown } | null)?.metadata,
+                  })
+                : [],
             );
             nextBatch = {
               ...stfBatchObj,
@@ -880,6 +913,16 @@ export const useBaseStaticTestFacility = ({
               motorIds: batchDetails?.motorIds?.length
                 ? batchDetails.motorIds.map(String)
                 : stfBatchObj.motorIds,
+              bemMotorIds: (() => {
+                const seededBemIds = autoMotorEntries
+                  .filter((entry) => entry.subType === "BEM")
+                  .map((entry) => entry.motorId);
+                if (seededBemIds.length > 0) return seededBemIds;
+                if (Array.isArray(stfBatchObj.bemMotorIds) && stfBatchObj.bemMotorIds.length > 0) {
+                  return stfBatchObj.bemMotorIds.map(String);
+                }
+                return stfBatchObj.bemMotorIds;
+              })(),
               motorId:
                 batchDetails?.motorIds?.length > 0
                   ? batchDetails.motorIds.join(", ")
@@ -893,24 +936,24 @@ export const useBaseStaticTestFacility = ({
             };
           } catch (error) {
             console.error("Unable to resolve batch motor details", error);
-            const seedMainMotors = shouldSeedStfMainMotors(
-              stfBatchObj.batchType,
-              stfBatchObj.subBatchType,
+            autoMotorEntries = resolveStfSeededNavigationMotors(stfBatchObj, null);
+            setAvailableBemMotorOptions(
+              shouldShowStfBemMotorSelection(stfBatchObj.batchType, stfBatchObj.subBatchType)
+                ? resolveBemMotorOptionsFromBatchDetails({
+                    bemMotorIds: stfBatchObj.bemMotorIds,
+                  })
+                : [],
             );
-            autoMotorEntries = seedMainMotors
-              ? resolveStfBatchMotorEntries(stfBatchObj, null)
-              : [];
-            setAvailableBemMotorOptions([]);
           }
         } else if (!isOtherBem) {
-          const seedMainMotors = shouldSeedStfMainMotors(
-            stfBatchObj.batchType,
-            stfBatchObj.subBatchType,
+          autoMotorEntries = resolveStfSeededNavigationMotors(stfBatchObj, null);
+          setAvailableBemMotorOptions(
+            shouldShowStfBemMotorSelection(stfBatchObj.batchType, stfBatchObj.subBatchType)
+              ? resolveBemMotorOptionsFromBatchDetails({
+                  bemMotorIds: stfBatchObj.bemMotorIds,
+                })
+              : [],
           );
-          autoMotorEntries = seedMainMotors
-            ? resolveStfBatchMotorEntries(stfBatchObj, null)
-            : [];
-          setAvailableBemMotorOptions([]);
         }
 
         if (isOtherBem) {
@@ -999,7 +1042,7 @@ export const useBaseStaticTestFacility = ({
         showAlert(messages.DETAILS_FETCH_ERROR, "error");
         return;
       } finally {
-        setLoadingFormDetails(false);
+        if (!silent) setLoadingFormDetails(false);
       }
 
       let nextFormData = resolvedData;
@@ -1047,8 +1090,18 @@ export const useBaseStaticTestFacility = ({
       if (isOtherBem) {
         setActiveBemMotor({
           ...bemMotorObj,
-          motorId: fetchedBemNo,
+          motorId: String(
+            resolvedData.motorId ?? bemMotorObj.motorId ?? fetchedBemNo,
+          ).trim(),
           bemNo: fetchedBemNo,
+          stfTestNo:
+            resolvedData.motors?.[0]?.stfTestNo ??
+            resolvedData.stfTestNo ??
+            bemMotorObj.stfTestNo ??
+            "",
+          status:
+            bemMotorObj.status ??
+            QUALITY_CONTROL_STATUS.IN_PROGRESS,
         });
       } else {
         setActiveBatch({
@@ -1056,6 +1109,11 @@ export const useBaseStaticTestFacility = ({
           formId: resolvedFormId,
           subType: nextMotorType,
           rejectionReason,
+          ...(detailsResponse?.data?.status
+            ? {
+                stfStatus: normalizeSubdepartmentBatchStatus(detailsResponse.data.status),
+              }
+            : {}),
         });
         setBatchMotorEntries(autoMotorEntries);
         setMotorStatusById(nextStatuses);
@@ -1280,21 +1338,58 @@ export const useBaseStaticTestFacility = ({
           const bemNo = draftBemNo?.trim() || formData.bemNo || formData.motors?.[0]?.motorId || "";
           const stfNo = formData.motors?.[0]?.stfTestNo ?? formData.stfTestNo ?? "";
           lockStfTestNoForMotor(String(bemNo), String(stfNo));
-          const returnedMotorId = String(response.data?.bemMotorId ?? response.data?.motorId ?? response.data?.formId ?? bemNo);
-          setActiveBemMotor((prev) => ({
-            ...(prev ?? {}),
-            motorId: returnedMotorId,
-            bemNo: bemNo,
-            stfTestNo: stfNo,
-            status: "In Progress",
-          } as BemMotor));
-          setDraftBemNo(String(bemNo));
-          setFormData((prev) => ({
-            ...prev,
-            motorId: returnedMotorId,
-          }));
-        } else {
+          const returnedMotorId = String(
+            response.data?.bemMotorId ??
+              response.data?.motorId ??
+              response.data?.formId ??
+              bemNo,
+          );
+          const statusForBanner = String(
+            response.data?.status ?? activeBemMotor?.status ?? "IN_PROGRESS",
+          )
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, "_");
+          const stillRejectedEdit = statusForBanner === "REJECTED";
+
+          await openFormWithResolvedData(
+            {
+              motorId: bemNo || returnedMotorId,
+              bemNo: bemNo,
+              motorCode: bemNo || returnedMotorId,
+              stfTestNo: stfNo,
+              status: response.data?.status ?? "IN_PROGRESS",
+              createdBy: activeBemMotor?.createdBy ?? "",
+              createdOn: activeBemMotor?.createdOn ?? "",
+              formId: returnedMotorId || activeBemMotor?.formId || null,
+              subType: "BEM",
+              rejectionReason: activeBemMotor?.rejectionReason ?? null,
+            },
+            stillRejectedEdit,
+            { silent: true },
+          );
+        } else if (activeBatch) {
           lockStfTestNoFromMotors(formData.motors ?? []);
+          const formIdForRefresh = String(nextFormId ?? activeBatch.formId ?? "").trim();
+          if (formIdForRefresh) {
+            const statusForBanner = String(
+              response.data?.status ?? activeBatch.stfStatus ?? "IN_PROGRESS",
+            )
+              .trim()
+              .toUpperCase()
+              .replace(/\s+/g, "_");
+            const stillRejectedEdit = statusForBanner === "REJECTED";
+
+            await openFormWithResolvedData(
+              {
+                ...activeBatch,
+                formId: formIdForRefresh,
+                stfStatus: response.data?.status ?? "IN_PROGRESS",
+              },
+              stillRejectedEdit,
+              { silent: true },
+            );
+          }
         }
       } else {
         showAlert(messages.CREATE_SUBMIT_SUCCESS, "success", { autoCloseMs: 2200 });
@@ -1475,6 +1570,28 @@ export const useBaseStaticTestFacility = ({
           "success",
           { autoCloseMs: 2200 },
         );
+
+        const formIdForRefresh = String(nextFormId ?? activeBatch.formId ?? "").trim();
+        if (formIdForRefresh) {
+          const statusForBanner = String(
+            response.data?.status ?? activeBatch.stfStatus ?? "IN_PROGRESS",
+          )
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, "_");
+          const stillRejectedEdit = statusForBanner === "REJECTED";
+
+          await openFormWithResolvedData(
+            {
+              ...activeBatch,
+              formId: formIdForRefresh,
+              stfStatus: response.data?.status ?? activeBatch.stfStatus ?? "IN_PROGRESS",
+            },
+            stillRejectedEdit,
+            { silent: true },
+          );
+        }
+
         return true;
       } finally {
         setActionLoading(false);
@@ -1492,6 +1609,7 @@ export const useBaseStaticTestFacility = ({
       lockStfTestNoForMotor,
       motorStatusById,
       navigationMotors,
+      openFormWithResolvedData,
       previousStageGate,
       showAlert,
       subDepartmentId,

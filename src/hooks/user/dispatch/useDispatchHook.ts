@@ -29,6 +29,7 @@ import {
   type DispatchMotorSubmissionType,
 } from "../../../data/models/user/DispatchFormModel";
 import type { DispatchMotorData } from "../../../data/models/user/DispatchMotorDataModel";
+import { normalizeSubdepartmentBatchStatus } from "../../../data/models/user/SubdepartmentBatchModel";
 import {
   type DispatchAddedMotor,
   type DispatchBatch,
@@ -283,15 +284,22 @@ export const useDispatchHook = () => {
   }, []);
 
   const openFormWithResolvedData = useCallback(
-    async (batch: DispatchBatch, editMode: boolean) => {
+    async (
+      batch: DispatchBatch,
+      editMode: boolean,
+      options?: { silent?: boolean },
+    ) => {
+      const silent = Boolean(options?.silent);
+      const formId = resolveDispatchFormId(batch);
       const shouldFetchDetails =
+        silent ||
         editMode ||
         batch.dispatchStatus === OPERATION_STATUS.IN_PROGRESS ||
         batch.dispatchStatus === OPERATION_STATUS.REJECTED ||
         String(batch.dispatchStatus ?? "")
           .toLowerCase()
           .includes("partial") ||
-        !!batch.formId;
+        Boolean(String(formId ?? "").trim());
 
       let nextBatch = batch;
       let resolvedData = createDefaultDispatchFormState();
@@ -299,7 +307,7 @@ export const useDispatchHook = () => {
       let nextStatuses: Record<string, DispatchMotorStatusMeta> = {};
       let rejectionReason = batch.rejectionReason ?? null;
 
-      setLoadingFormDetails(true);
+      if (!silent) setLoadingFormDetails(true);
       try {
         if (batch.batchId) {
           try {
@@ -340,13 +348,15 @@ export const useDispatchHook = () => {
             showAlert(messages.SUB_DEPARTMENT_MISSING, "error");
             return;
           }
-          const formId = resolveDispatchFormId(batch);
-          if (!formId) {
+          const resolvedFormId = resolveDispatchFormId(batch);
+          if (!resolvedFormId) {
             showAlert(messages.FORM_ID_MISSING, "error");
             return;
           }
 
-          const detailsResponse = await dispatchController.fetchFormDetails({ formId });
+          const detailsResponse = await dispatchController.fetchFormDetails({
+            formId: resolvedFormId,
+          });
           if (!detailsResponse?.success || !detailsResponse.data) {
             const fallback =
               detailsResponse?.statusCode === 404
@@ -359,7 +369,14 @@ export const useDispatchHook = () => {
           resolvedData = DispatchDetailsModel.toFormState(detailsResponse.data);
           nextBatch = {
             ...nextBatch,
-            formId: detailsResponse.data.formId || formId,
+            formId: detailsResponse.data.formId || resolvedFormId,
+            ...(detailsResponse.data.status
+              ? {
+                  dispatchStatus: normalizeSubdepartmentBatchStatus(
+                    detailsResponse.data.status,
+                  ),
+                }
+              : {}),
           };
           rejectionReason =
             detailsResponse.data.workflowInsights?.rejectionReason ?? rejectionReason;
@@ -375,7 +392,7 @@ export const useDispatchHook = () => {
           };
         }
       } finally {
-        setLoadingFormDetails(false);
+        if (!silent) setLoadingFormDetails(false);
       }
 
       const merged = mergeMotorsFromBatchAndForm(autoMotorEntries, resolvedData);
@@ -665,6 +682,28 @@ export const useDispatchHook = () => {
           "success",
           { autoCloseMs: 2200 },
         );
+
+        const formIdForRefresh = String(nextFormId ?? activeBatch.formId ?? "").trim();
+        if (formIdForRefresh) {
+          const statusForBanner = String(
+            response.data?.status ?? activeBatch.dispatchStatus ?? "IN_PROGRESS",
+          )
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, "_");
+          const stillRejectedEdit = statusForBanner === "REJECTED";
+
+          await openFormWithResolvedData(
+            {
+              ...activeBatch,
+              formId: formIdForRefresh,
+              dispatchStatus: response.data?.status ?? activeBatch.dispatchStatus ?? "IN_PROGRESS",
+            },
+            stillRejectedEdit,
+            { silent: true },
+          );
+        }
+
         return true;
       } finally {
         setActionLoading(false);
@@ -677,6 +716,7 @@ export const useDispatchHook = () => {
       formData,
       getMotorStatus,
       motorStatusById,
+      openFormWithResolvedData,
       previousStageGate,
       showAlert,
       subDepartmentId,

@@ -14,6 +14,7 @@ import {
   QC_POST_CURE_SUB_TYPE_INHIBITION,
   QC_POST_CURE_SUB_TYPE_LOOSE_FLAP,
   QC_POST_CURE_TABLE_IDS,
+  normalizeQcInhibitorType,
   type QcPostCureLocationRow,
   type QcPostCureQualificationRow,
 } from "./qcPostCureConfig";
@@ -280,9 +281,10 @@ export const createInitialPostCureValues = (
 ): SchemaFormValues => {
   if (subType === QC_POST_CURE_SUB_TYPE_LOOSE_FLAP) return createInitialLooseFlapValues();
   if (subType === QC_POST_CURE_SUB_TYPE_INHIBITION) {
-    if (inhibitorType === "IR1") return createInitialIr1Values();
-    if (inhibitorType === "HEMCOAT-3K") return createInitialHemcoatValues();
-    if (inhibitorType === "NOT_APPLICABLE") return createInitialNotApplicableValues();
+    const inhibitor = normalizeQcInhibitorType(inhibitorType);
+    if (inhibitor === "IR1") return createInitialIr1Values();
+    if (inhibitor === "HEMCOAT-3K") return createInitialHemcoatValues();
+    if (inhibitor === "NOT_APPLICABLE") return createInitialNotApplicableValues();
   }
   return {};
 };
@@ -650,7 +652,7 @@ export const hydratePostCureValuesFromSections = (
 ): SchemaFormValues => {
   const values = createInitialPostCureValues(subType, inhibitorType);
   const resolvedSubType = String(subType ?? "").trim().toUpperCase();
-  const resolvedInhibitor = String(inhibitorType ?? "").trim().toUpperCase();
+  const resolvedInhibitor = normalizeQcInhibitorType(inhibitorType) ?? "";
 
   for (const section of sections ?? []) {
     const sectionId = String(section.sectionId ?? "").trim();
@@ -906,7 +908,7 @@ const buildInhibitionDetailsPayload = (
   inhibitorType: string,
 ): Record<string, unknown> => {
   const app = QC_POST_CURE_SECTION_IDS.APPLICATION;
-  const resolvedInhibitor = String(inhibitorType ?? "").trim().toUpperCase();
+  const resolvedInhibitor = normalizeQcInhibitorType(inhibitorType) ?? "";
 
   if (resolvedInhibitor === "NOT_APPLICABLE") {
     const section = QC_POST_CURE_SECTION_IDS.NOT_APPLICABLE;
@@ -1006,7 +1008,7 @@ export const buildPostCureMotorDetailPayload = (
   inhibitorType?: string | null,
 ): Record<string, unknown> => {
   const resolvedSubType = String(subType ?? "").trim().toUpperCase();
-  const resolvedInhibitor = String(inhibitorType ?? "").trim().toUpperCase();
+  const resolvedInhibitor = normalizeQcInhibitorType(inhibitorType) ?? "";
   const operationType =
     resolvedSubType === QC_POST_CURE_SUB_TYPE_INHIBITION
       ? QC_POST_CURE_OPERATION_INHIBITION
@@ -1113,7 +1115,8 @@ export const postCureMotorDetailToSections = (
   }
 
   if (inhibition) {
-    const inhibitor = pickString(inhibition.inhibitorType, rec.inhibitorType).toUpperCase();
+    const inhibitor =
+      normalizeQcInhibitorType(pickString(inhibition.inhibitorType, rec.inhibitorType)) ?? "";
     const qualDetails = asRecord(inhibition.qualificationDetails) ?? {};
     const applicationRows = mapLocationRowsFromApi(
       inhibition.applicationDetails ?? inhibition.INHIBITION_APPLICATION_DETAILS,
@@ -1248,8 +1251,9 @@ export const hydratePostCureValuesFromMotorDetail = (
   const hasLoose = Boolean(loose && Object.keys(loose).length > 0);
   const hasInhibition = Boolean(inhibition && Object.keys(inhibition).length > 0);
   const resolvedInhibitor =
-    String(inhibitorType ?? "").trim() ||
-    pickString(inhibition?.inhibitorType, rec.inhibitorType);
+    normalizeQcInhibitorType(inhibitorType) ??
+    normalizeQcInhibitorType(pickString(inhibition?.inhibitorType, rec.inhibitorType)) ??
+    "";
   const resolvedSubType =
     String(subType ?? "").trim() ||
     (hasLoose
@@ -1264,10 +1268,9 @@ export const hydratePostCureValuesFromMotorDetail = (
       hydrateLooseFlapFromData(values, loose, { replaceAll: true });
     }
     if (hasInhibition && inhibition) {
-      const inhibitor = pickString(inhibition.inhibitorType, rec.inhibitorType).toUpperCase();
-      if (inhibitor === "NOT_APPLICABLE") {
+      if (resolvedInhibitor === "NOT_APPLICABLE") {
         hydrateNotApplicableFromData(values, inhibition);
-      } else if (inhibitor === "HEMCOAT-3K") {
+      } else if (resolvedInhibitor === "HEMCOAT-3K") {
         hydrateHemcoatFromData(values, inhibition);
         hydrateApplicationFromData(values, inhibition);
       } else {
@@ -1435,19 +1438,21 @@ export const buildPostCureSectionPayload = (
   if (subType === QC_POST_CURE_SUB_TYPE_LOOSE_FLAP) {
     sections = [buildLooseFlapSection(values)];
   } else if (subType === QC_POST_CURE_SUB_TYPE_INHIBITION) {
-    if (inhibitorType === "IR1") sections = buildIr1Sections(values);
-    else if (inhibitorType === "HEMCOAT-3K") sections = buildHemcoatSections(values);
-    else if (inhibitorType === "NOT_APPLICABLE") sections = [buildNotApplicableSection(values)];
+    const inhibitor = normalizeQcInhibitorType(inhibitorType);
+    if (inhibitor === "IR1") sections = buildIr1Sections(values);
+    else if (inhibitor === "HEMCOAT-3K") sections = buildHemcoatSections(values);
+    else if (inhibitor === "NOT_APPLICABLE") sections = [buildNotApplicableSection(values)];
   }
 
   const trimmedMotorId = String(motorId ?? "").trim();
   if (!trimmedMotorId) return sections;
 
+  const normalizedInhibitor = normalizeQcInhibitorType(inhibitorType);
   return sections.map((section) => ({
     ...section,
     motorId: trimmedMotorId,
     subType: (subType as QcApiSubType) ?? undefined,
-    ...(inhibitorType ? { inhibitorType: inhibitorType as QcInhibitorType } : null),
+    ...(normalizedInhibitor ? { inhibitorType: normalizedInhibitor } : null),
   })) as SchemaSectionSubmission[];
 };
 

@@ -8,6 +8,9 @@ import {
   normalizePartialItemStatus,
   type QcPartialNavItem,
 } from "./qcDivisionApprovalUnits";
+import {
+  shouldSkipQcManufacturingUnitPrerequisiteGate,
+} from "./qcBatchType";
 
 /** QC divisions that gate motor units on the previous motor subdepartment (typically NDT). */
 const MOTOR_QC_DIVISIONS = new Set([
@@ -396,10 +399,19 @@ export const resolveQcPreviousDivisionApprovedUnits = (params: {
   stageProgress?: unknown;
   currentStage?: unknown;
   premixStatuses?: unknown;
+  finalMixStatuses?: unknown;
   motorStatuses?: unknown;
   candidatePremixNos?: Array<number | string>;
   candidateMotorIds?: string[];
+  batchType?: string | null;
+  subBatchType?: string | null;
 }): PreviousStageApprovedUnits => {
+  if (
+    shouldSkipQcManufacturingUnitPrerequisiteGate(params.batchType, params.subBatchType)
+  ) {
+    return emptyGate(null, true);
+  }
+
   const currentKey = normalizeQcDivisionKey(params.currentDivisionKey);
   if (!currentKey || currentKey === "RAW_MATERIAL_REVALIDATION") {
     return emptyGate(null, true);

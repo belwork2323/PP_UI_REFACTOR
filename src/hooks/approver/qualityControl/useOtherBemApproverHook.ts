@@ -8,11 +8,14 @@ import {
   OtherBemApproverListRow,
 } from "@/data/models/approver/OtherBemApiModel";
 import {
+  BEMMotorDetailsModel,
   mapBemDetailsForDisplay,
   StfDetailView,
 } from "@/data/models/user/StaticTestFacilityApiModel";
+import { toOperationStatusApiValue } from "../../operationStatus";
 
 const S = STRINGS.QUALITY_CONTROL.STATIC_TEST_FACILITY;
+const FILTER_ALL = STRINGS.USER_BATCH_LIST.FILTER_ALL;
 
 export const useOtherBemApproverHook = () => {
   const showAlert = useAlertStore((state) => state.showAlert);
@@ -31,7 +34,7 @@ export const useOtherBemApproverHook = () => {
   const [totalRecords, setTotalRecords] = useState(0);
   const [totalPages, setTotalPages] = useState(0);
   const [statusCounts, setStatusCounts] = useState<Record<string, number>>({});
-  const [statusFilter, setStatusFilter] = useState("SUBMITTED");
+  const [statusFilter, setStatusFilter] = useState(FILTER_ALL);
   const [search, setSearch] = useState("");
 
   // Confirmation dialog state for Approve / Reject actions
@@ -45,16 +48,27 @@ export const useOtherBemApproverHook = () => {
     item: null,
   });
 
+  const mapDetailsPayload = (payload: unknown): StfDetailView | null => {
+    const model =
+      payload instanceof BEMMotorDetailsModel
+        ? payload
+        : BEMMotorDetailsModel.fromApi({ data: payload });
+    return mapBemDetailsForDisplay(model);
+  };
+
   // Fetch List
   const fetchList = useCallback(
     async (params?: { page?: number; limit?: number; search?: string; status?: string }) => {
       setListLoading(true);
 
+      const nextStatus = params?.status ?? statusFilter;
+      const apiStatus = toOperationStatusApiValue(nextStatus, FILTER_ALL);
+
       const response = await otherBemController.fetchOtherBemList({
         page: params?.page ?? page,
         limit: params?.limit ?? limit,
         filters: {
-          status: params?.status ?? statusFilter,
+          status: apiStatus || undefined,
           search: params?.search ?? search,
         },
         sort: {
@@ -67,11 +81,14 @@ export const useOtherBemApproverHook = () => {
 
       if (response?.success && Array.isArray(response?.data?.motors)) {
         setItems(response.data.motors.map(mapOtherBemListRow));
-        const pagination = response.data.pagination ?? response.data;
-        setTotalRecords(pagination.totalRecords ?? 0);
-        setTotalPages(pagination.totalPages ?? 0);
-        if (response.data.statusCounts) {
-          setStatusCounts(response.data.statusCounts);
+        const pagination = (response.data as { pagination?: Record<string, number> }).pagination
+          ? (response.data as { pagination: Record<string, number> }).pagination
+          : (response.data as unknown as Record<string, number>);
+        setTotalRecords(Number(pagination?.totalRecords ?? response.data.totalRecords ?? 0));
+        setTotalPages(Number(pagination?.totalPages ?? response.data.totalPages ?? 0));
+        const counts = (response.data as { statusCounts?: Record<string, number> }).statusCounts;
+        if (counts) {
+          setStatusCounts(counts);
         }
       } else {
         showAlert(response?.message || "Failed to fetch list", "error", { autoCloseMs: 3000 });
@@ -110,7 +127,7 @@ export const useOtherBemApproverHook = () => {
       return;
     }
 
-    setDetailView(mapBemDetailsForDisplay(response.data as unknown as Record<string, unknown>));
+    setDetailView(mapDetailsPayload(response.data));
   };
 
   const handleCloseDetail = () => {
@@ -177,15 +194,14 @@ export const useOtherBemApproverHook = () => {
       setDetailsLoading(false);
 
       if (detailsResponse?.success && detailsResponse?.data) {
-        const refreshed = mapBemDetailsForDisplay(
-          detailsResponse.data as unknown as Record<string, unknown>,
-        );
+        const refreshed = mapDetailsPayload(detailsResponse.data);
         setDetailView(refreshed);
         setSelected((current) =>
           current
             ? {
                 ...current,
                 status: refreshed?.status || current.status,
+                bemStatus: refreshed?.status || current.bemStatus,
               }
             : current,
         );

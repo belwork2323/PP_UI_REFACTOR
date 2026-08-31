@@ -274,7 +274,10 @@ const StaticTestFacilityForm = ({
           "TO_BE_INITIATED") as StfMotorSubmissionStatus;
         return {
           id: entry.motorId,
-          label: entry.motorId,
+          label:
+            entry.subType === "BEM"
+              ? `${STF_FLOW_LABELS.bemCardTitle} · ${entry.motorId}`
+              : entry.motorId,
           endAdornment: (
             <PremixStatusChip
               status={status as any}

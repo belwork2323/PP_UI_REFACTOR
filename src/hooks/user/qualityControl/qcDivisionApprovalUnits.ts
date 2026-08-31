@@ -937,16 +937,111 @@ export const areAllFinalApprovalGroupsApproved = (groups: QcFinalApprovalDivisio
       : group.divisionStatus === "APPROVED",
   );
 
+/**
+ * Merge `/qc-division/details` premixStatuses + finalMixStatuses.
+ * Final mix is a separate array; force stageType FINAL_MIX when missing.
+ * Also backfills from split MIXING divisionDetails (PREMIX / FINAL_MIX subTypes).
+ */
+export const collectQcMixUnitStatusRows = (payload: {
+  premixStatuses?: unknown;
+  finalMixStatuses?: unknown;
+  divisionDetails?: unknown;
+}): Record<string, unknown>[] => {
+  const rows: Record<string, unknown>[] = [];
+
+  asArray(payload.premixStatuses).forEach((row) => {
+    const rec = asRecord(row);
+    if (rec) rows.push(rec);
+  });
+
+  asArray(payload.finalMixStatuses).forEach((row) => {
+    const rec = asRecord(row);
+    if (!rec) return;
+    const stage = String(rec.stageType ?? rec.stage_type ?? "")
+      .trim()
+      .toUpperCase();
+    if (stage === "FINAL_MIX") {
+      rows.push(rec);
+      return;
+    }
+    rows.push({
+      ...rec,
+      stageType: "FINAL_MIX",
+      stage_type: "FINAL_MIX",
+    });
+  });
+
+  // Fallback: split Mixing divisionDetails carry per-unit submission status on nested details.
+  asArray(payload.divisionDetails).forEach((detail) => {
+    const rec = asRecord(detail);
+    if (!rec) return;
+    const division = String(rec.division ?? "")
+      .trim()
+      .toUpperCase();
+    if (division !== "MIXING") return;
+    const subType = String(rec.subType ?? rec.sub_type ?? "")
+      .trim()
+      .toUpperCase();
+    const data = asRecord(rec.data) ?? rec;
+
+    asArray(data.premixes).forEach((item) => {
+      const premix = asRecord(item);
+      if (!premix) return;
+      const premixNo = pickNumber(premix.premixNo, premix.premix_no, premix.finalMixNo);
+      if (premixNo == null) return;
+
+      const premixDetails = asRecord(premix.premixDetails);
+      const finalMixDetails = asRecord(premix.finalMixDetails);
+
+      if (subType === "FINAL_MIX" || finalMixDetails) {
+        const status =
+          finalMixDetails?.premixSubmissionStatus ??
+          finalMixDetails?.status ??
+          premix.premixSubmissionStatus ??
+          premix.status;
+        if (status != null && String(status).trim()) {
+          rows.push({
+            division: "MIXING",
+            stageType: "FINAL_MIX",
+            premixNo,
+            premixSubmissionStatus: status,
+          });
+        }
+      }
+
+      if (subType === "PREMIX" || premixDetails) {
+        const status =
+          premixDetails?.premixSubmissionStatus ??
+          premixDetails?.status ??
+          premix.premixSubmissionStatus ??
+          premix.status;
+        if (status != null && String(status).trim()) {
+          rows.push({
+            division: "MIXING",
+            stageType: "PREMIX",
+            premixNo,
+            premixSubmissionStatus: status,
+          });
+        }
+      }
+    });
+  });
+
+  return rows;
+};
+
 export const applyStatusMapsToPartialNav = (
   items: QcPartialNavItem[],
   payload: {
     motorStatuses?: unknown;
     premixStatuses?: unknown;
+    finalMixStatuses?: unknown;
+    divisionDetails?: unknown;
     division?: string;
   },
 ): QcPartialNavItem[] => {
   const motors = asArray(payload.motorStatuses);
-  const premixes = asArray(payload.premixStatuses);
+  const premixes = collectQcMixUnitStatusRows(payload);
   const divisionFilter = String(payload.division ?? "").trim();
 
   const motorStatusById = new Map<string, QcPartialItemStatus>();
@@ -966,10 +1061,23 @@ export const applyStatusMapsToPartialNav = (
     motorStatusById.set(motorId, normalizeStatus(rec.motorSubmissionStatus ?? rec.status));
   });
 
+  const statusRank = (status: QcPartialItemStatus): number => {
+    switch (status) {
+      case "APPROVED":
+        return 5;
+      case "WAITING_FOR_APPROVAL":
+        return 4;
+      case "REJECTED":
+        return 3;
+      case "IN_PROGRESS":
+        return 2;
+      default:
+        return 1;
+    }
+  };
+
   const premixStatusByKey = new Map<string, QcPartialItemStatus>();
-  premixes.forEach((row) => {
-    const rec = asRecord(row);
-    if (!rec) return;
+  premixes.forEach((rec) => {
     const division = String(rec.division ?? "").trim();
     const subType = String(rec.subType ?? rec.sub_type ?? "").trim();
     if (divisionFilter) {
@@ -990,10 +1098,11 @@ export const applyStatusMapsToPartialNav = (
       .trim()
       .toUpperCase();
     const key = stage === "FINAL_MIX" ? `final-mix:${premixNo}` : `premix:${premixNo}`;
-    premixStatusByKey.set(
-      key,
-      normalizeStatus(rec.premixSubmissionStatus ?? rec.status),
-    );
+    const nextStatus = normalizeStatus(rec.premixSubmissionStatus ?? rec.status);
+    const existing = premixStatusByKey.get(key);
+    if (!existing || statusRank(nextStatus) >= statusRank(existing)) {
+      premixStatusByKey.set(key, nextStatus);
+    }
   });
 
   return items.map((item) => {

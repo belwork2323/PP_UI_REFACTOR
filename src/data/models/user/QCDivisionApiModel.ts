@@ -36,6 +36,8 @@ export class QCDivisionDetailsModel {
   divisionDetails?: any[];
   motorStatuses?: unknown;
   premixStatuses?: unknown;
+  /** Mixing final-mix unit statuses (separate from premixStatuses). */
+  finalMixStatuses?: unknown;
   divisionStatuses?: unknown;
   workflowInsights: {
     currentStatus: string;
@@ -54,6 +56,7 @@ export class QCDivisionDetailsModel {
     this.createdAt = payload?.createdAt ?? null;
     this.motorStatuses = payload?.motorStatuses;
     this.premixStatuses = payload?.premixStatuses;
+    this.finalMixStatuses = payload?.finalMixStatuses;
     this.divisionStatuses = payload?.divisionStatuses;
 
     this.workflowInsights = {
@@ -101,6 +104,7 @@ export class QCDivisionDetailsModel {
       divisionDetails: model.divisionDetails,
       motorStatuses: model.motorStatuses,
       premixStatuses: model.premixStatuses,
+      finalMixStatuses: model.finalMixStatuses,
       divisionStatuses: model.divisionStatuses,
       workflowInsights: model.workflowInsights,
     };

@@ -14,6 +14,15 @@ import {
   type PreviousStageApprovedUnits,
 } from "../previousStageApproval";
 import { mapApprovedMotorsToOptions as mapTrimmingApprovedMotorsToOptions } from "../manufacturing/trimmingFlowConfig";
+import {
+  isQcExperimentalSubBatch as isStfExperimentalSubBatch,
+  isQcMainBatch as isStfMainMotorBatch,
+  isQcQualificationSubBatch as isStfQualificationSubBatch,
+  isQcSubscaleBatch as isStfSubscaleBatch,
+  normalizeQcSubBatchType as normalizeStfSubBatchType,
+  resolveQcWorkingBatchType as resolveStfWorkingBatchType,
+  resolveQcWorkingSubBatchType as resolveStfWorkingSubBatchType,
+} from "./qcBatchType";
 
 export type STFBatch = {
   id: number | string;
@@ -50,25 +59,30 @@ export type StfMotorOption = { value: string; label: string; disabled?: boolean 
 export type StfAddedMotor = { motorId: string; subType: StfSubType };
 
 export {
-  isQcMainBatch as isStfMainMotorBatch,
-  isQcSubscaleBatch as isStfSubscaleBatch,
-  normalizeQcSubBatchType as normalizeStfSubBatchType,
-  isQcQualificationSubBatch as isStfQualificationSubBatch,
-  isQcExperimentalSubBatch as isStfExperimentalSubBatch,
-  resolveQcWorkingBatchType as resolveStfWorkingBatchType,
-  resolveQcWorkingSubBatchType as resolveStfWorkingSubBatchType,
-} from "./qcBatchType";
+  isStfExperimentalSubBatch,
+  isStfMainMotorBatch,
+  isStfQualificationSubBatch,
+  isStfSubscaleBatch,
+  normalizeStfSubBatchType,
+  resolveStfWorkingBatchType,
+  resolveStfWorkingSubBatchType,
+};
 
 /**
  * ACEM: seed batch-linked main motors for Main batches and Subscale Qualification.
- * Subscale Experimental is BEM-only.
+ * Subscale Experimental is BEM-only. Missing subBatchType on SUBSCALE is treated like
+ * Qualification when the list/details still carry motorIds (common API shape).
  */
 export const shouldSeedStfMainMotors = (
   batchType?: string | null,
   subBatchType?: string | null,
 ): boolean => {
   if (isStfMainMotorBatch(batchType)) return true;
-  return isStfSubscaleBatch(batchType) && isStfQualificationSubBatch(subBatchType);
+  if (!isStfSubscaleBatch(batchType)) return false;
+  if (isStfExperimentalSubBatch(subBatchType)) return false;
+  return (
+    isStfQualificationSubBatch(subBatchType) || !normalizeStfSubBatchType(subBatchType)
+  );
 };
 
 /**
@@ -148,14 +162,14 @@ export const STF_FLOW_LABELS = {
   addBem: "Add Motor",
   approvedMotorsLoading: "Loading approved motors...",
   setupHint:
-    "Main motors are listed below. Select a BEM number from the batch to add BEM motors.",
+    "Main and BEM motors from this batch are listed below. Open a tab to fill static testing details.",
   setupHintMainMotor: "Select approved motor ID(s), then load or add main motors.",
   setupHintMainMotorLoaded: "Select more main motor IDs below to add additional motors.",
-  setupHintBem: "Select a BEM number, then click Add Motor to open its form.",
+  setupHintBem: "Batch BEM motors are listed in navigation. Use Add Motor for any extra BEM numbers.",
   setupHintBemLoaded: "Select another BEM number to add more motors.",
   setupHintBemEmpty: "No BEM motors found on this batch identification sheet.",
   motorNavTitle: "Motor navigation",
-  motorNavHint: "Switch between motors to fill static testing details.",
+  motorNavHint: "Switch between main motors and BEM motors to fill static testing details.",
   motorCardTitle: "Motor",
   bemCardTitle: "BEM",
   navBack: "Back",
@@ -263,6 +277,93 @@ export const resolveBemMotorOptionsFromBatchDetails = (
   pushFromMeta(meta);
 
   return Array.from(ids).map((value) => ({ value, label: value }));
+};
+
+/**
+ * ACEM: seed batch-linked BEM motors into navigation (same flow as main motors).
+ * IDs come from list `bemMotorIds` and/or batch-details identification sheet metadata.
+ */
+export const resolveStfBatchBemMotorEntries = (
+  batch?: {
+    bemMotorId?: string | string[] | null;
+    bemMotorIds?: Array<string | number> | null;
+    bemMotors?: unknown;
+  } | null,
+  batchDetails?: {
+    identificationSheet?: IdentificationSheet | null;
+    bemMotors?: unknown;
+    bemMotorIds?: unknown;
+    metadata?: unknown;
+  } | null,
+): StfAddedMotor[] => {
+  const fromDetails = resolveBemMotorOptionsFromBatchDetails({
+    identificationSheet: batchDetails?.identificationSheet ?? null,
+    bemMotors: batchDetails?.bemMotors ?? batch?.bemMotors,
+    bemMotorIds: batchDetails?.bemMotorIds ?? batch?.bemMotorIds,
+    metadata: batchDetails?.metadata,
+  });
+
+  if (fromDetails.length > 0) {
+    return fromDetails.map((option) => ({
+      motorId: option.value,
+      subType: "BEM" as const,
+    }));
+  }
+
+  const listIds: string[] = [];
+  const pushList = (value: unknown) => {
+    const normalized = String(value ?? "").trim();
+    if (normalized) listIds.push(normalized);
+  };
+
+  if (Array.isArray(batch?.bemMotorIds)) batch.bemMotorIds.forEach(pushList);
+  if (batch?.bemMotorId != null) {
+    if (Array.isArray(batch.bemMotorId)) batch.bemMotorId.forEach(pushList);
+    else
+      String(batch.bemMotorId)
+        .split(",")
+        .map((id) => id.trim())
+        .filter(Boolean)
+        .forEach(pushList);
+  }
+
+  return listIds
+    .filter((id, index, arr) => arr.indexOf(id) === index)
+    .map((motorId) => ({ motorId, subType: "BEM" as const }));
+};
+
+/** Seed main motors and/or BEM motors for ACEM navigation from batch + details. */
+export const resolveStfSeededNavigationMotors = (
+  batch?: STFBatch | null,
+  batchDetails?: {
+    batchType?: string | null;
+    subBatchType?: string | null;
+    motorId?: string | null;
+    motorIds?: Array<string | number> | null;
+    identificationSheet?: IdentificationSheet | null;
+    bemMotors?: unknown;
+    bemMotorIds?: unknown;
+    metadata?: unknown;
+  } | null,
+): StfAddedMotor[] => {
+  const batchType = batchDetails?.batchType ?? batch?.batchType;
+  const subBatchType = batchDetails?.subBatchType ?? batch?.subBatchType;
+  const main = shouldSeedStfMainMotors(batchType, subBatchType)
+    ? resolveStfBatchMotorEntries(batch, batchDetails)
+    : [];
+  const bem = shouldShowStfBemMotorSelection(batchType, subBatchType)
+    ? resolveStfBatchBemMotorEntries(batch, batchDetails)
+    : [];
+
+  const seen = new Set<string>();
+  const merged: StfAddedMotor[] = [];
+  for (const entry of [...main, ...bem]) {
+    const id = String(entry.motorId ?? "").trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    merged.push(entry);
+  }
+  return merged;
 };
 
 export const mapApprovedMotorsToOptions = mapTrimmingApprovedMotorsToOptions;

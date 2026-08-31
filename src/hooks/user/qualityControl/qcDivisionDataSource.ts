@@ -1,5 +1,6 @@
 import {
   applyStatusMapsToPartialNav,
+  collectQcMixUnitStatusRows,
   mapBatchUnitsToPartialNav,
   mapDivisionDetailsToPartialNav,
   normalizePartialItemStatus,
@@ -333,15 +334,26 @@ export const resolveMotorQcStatusFromFormDetails = (
 export const resolvePremixQcStatusFromFormDetails = (
   payload: unknown,
   premixNo: number,
+  options?: { stageType?: "PREMIX" | "FINAL_MIX" },
 ): QcPartialItemStatus | null => {
   const root = asRecord(payload);
   if (!root || !Number.isFinite(premixNo)) return null;
 
-  for (const row of asArray(root.premixStatuses)) {
-    const rec = asRecord(row);
-    if (!rec) continue;
+  const wantedStage = String(options?.stageType ?? "PREMIX")
+    .trim()
+    .toUpperCase();
+
+  for (const rec of collectQcMixUnitStatusRows(root)) {
     const rowPremixNo = pickNumber(rec.premixNo, rec.premix_no);
     if (rowPremixNo !== premixNo) continue;
+    const stage = String(rec.stageType ?? rec.stage_type ?? "")
+      .trim()
+      .toUpperCase();
+    if (wantedStage === "FINAL_MIX") {
+      if (stage !== "FINAL_MIX") continue;
+    } else if (stage === "FINAL_MIX") {
+      continue;
+    }
     return normalizePartialItemStatus(rec.status ?? rec.premixSubmissionStatus);
   }
 
@@ -542,6 +554,22 @@ export const shouldUseQcFormDetailsForDivision = (
     }
   }
 
+  for (const row of asArray(root.finalMixStatuses)) {
+    const rec = asRecord(row);
+    if (!rec) continue;
+    const rowDivision = pickString(rec.division, rec.subType);
+    if (
+      rowDivision &&
+      !qcDivisionStatusKeysMatch(rowDivision, lookupKey) &&
+      !qcDivisionStatusKeysMatch(rowDivision, flowKey)
+    ) {
+      continue;
+    }
+    if (shouldUseQcFormDetailsData(rec.premixSubmissionStatus ?? rec.status)) {
+      return true;
+    }
+  }
+
   const matchingDetail = findQcFormDivisionDetail(formDetails, {
     flowKey: params.flowKey,
     rawMaterialType: params.rawMaterialType,
@@ -707,6 +735,8 @@ export const compareQcPartialNavItems = (
 export const groupUnitStatusesByDivisionTabKey = (payload: {
   motorStatuses?: unknown;
   premixStatuses?: unknown;
+  finalMixStatuses?: unknown;
+  divisionDetails?: unknown;
 }): Record<string, QcPartialNavItem[]> => {
   const grouped: Record<string, QcPartialNavItem[]> = {};
 
@@ -742,9 +772,7 @@ export const groupUnitStatusesByDivisionTabKey = (payload: {
     });
   });
 
-  asArray(payload.premixStatuses).forEach((row) => {
-    const rec = asRecord(row);
-    if (!rec) return;
+  collectQcMixUnitStatusRows(payload).forEach((rec) => {
     const premixNo = pickNumber(rec.premixNo, rec.premix_no);
     if (premixNo == null) return;
     const division = String(rec.division ?? "").trim();
@@ -828,6 +856,8 @@ export const extractWeighmentMotorNavFromFormDetails = (
 export const buildPartialNavFromUnitStatusMaps = (payload: {
   motorStatuses?: unknown;
   premixStatuses?: unknown;
+  finalMixStatuses?: unknown;
+  divisionDetails?: unknown;
   division: string;
 }): QcPartialNavItem[] => {
   const divisionFilter = String(payload.division ?? "").trim();
@@ -854,9 +884,7 @@ export const buildPartialNavFromUnitStatusMaps = (payload: {
     });
   });
 
-  asArray(payload.premixStatuses).forEach((row) => {
-    const rec = asRecord(row);
-    if (!rec) return;
+  collectQcMixUnitStatusRows(payload).forEach((rec) => {
     const division = String(rec.division ?? "").trim();
     const subType = String(rec.subType ?? rec.sub_type ?? "").trim();
     // Skip mixing-stage rows when resolving raw-material processing units.
@@ -876,7 +904,15 @@ export const buildPartialNavFromUnitStatusMaps = (payload: {
     if (premixNo == null) return;
     if (stage === "FINAL_MIX") {
       const id = `final-mix:${premixNo}`;
-      if (seen.has(id)) return;
+      if (seen.has(id)) {
+        // Prefer non-initiated when duplicate rows appear.
+        const idx = items.findIndex((row) => row.id === id);
+        const nextStatus = normalizePartialItemStatus(rec.premixSubmissionStatus ?? rec.status);
+        if (idx >= 0 && items[idx].status === "TO_BE_INITIATED" && nextStatus !== "TO_BE_INITIATED") {
+          items[idx] = { ...items[idx], status: nextStatus };
+        }
+        return;
+      }
       seen.add(id);
       items.push({
         id,
@@ -893,7 +929,14 @@ export const buildPartialNavFromUnitStatusMaps = (payload: {
       return;
     }
     const id = `premix:${premixNo}`;
-    if (seen.has(id)) return;
+    if (seen.has(id)) {
+      const idx = items.findIndex((row) => row.id === id);
+      const nextStatus = normalizePartialItemStatus(rec.premixSubmissionStatus ?? rec.status);
+      if (idx >= 0 && items[idx].status === "TO_BE_INITIATED" && nextStatus !== "TO_BE_INITIATED") {
+        items[idx] = { ...items[idx], status: nextStatus };
+      }
+      return;
+    }
     seen.add(id);
     items.push({
       id,
@@ -912,6 +955,15 @@ export const mergePartialNavItems = (
   primary: QcPartialNavItem[],
   secondary: QcPartialNavItem[],
 ): QcPartialNavItem[] => {
+  const preferStatus = (
+    left: QcPartialItemStatus,
+    right: QcPartialItemStatus,
+  ): QcPartialItemStatus => {
+    if (!left || left === "TO_BE_INITIATED") return right || left;
+    if (!right || right === "TO_BE_INITIATED") return left;
+    return left;
+  };
+
   const byId = new Map<string, QcPartialNavItem>();
   secondary.forEach((item) => byId.set(item.id, item));
   primary.forEach((item) => {
@@ -922,12 +974,12 @@ export const mergePartialNavItems = (
         ? {
             ...existing,
             ...item,
-            status: item.status || existing.status,
+            // Keep real QC unit status from status maps over batch-seed TO_BE_INITIATED.
+            status: preferStatus(item.status, existing.status),
             divisionDetailsStatus:
               item.divisionDetailsStatus ??
               existing.divisionDetailsStatus ??
-              item.status ??
-              existing.status,
+              preferStatus(item.status, existing.status),
           }
         : item,
     );
@@ -975,14 +1027,18 @@ export const buildQcDivisionPartialNav = (params: {
   batchPayload?: unknown;
   motorStatuses?: unknown;
   premixStatuses?: unknown;
+  finalMixStatuses?: unknown;
+  divisionDetails?: unknown;
 }): QcPartialNavItem[] => {
   const typeKey = String(params.rawMaterialType ?? "").trim();
   if (typeKey === "RAW_MATERIAL_REVALIDATION") return [];
 
+  // Unit status rows are keyed by division (MIXING / HARDWARE / …).
+  // Never filter Mixing/motor divisions by a leftover RAW_MATERIAL_* type key.
   const statusDivisionKey =
-    params.flowKey === "RAW_MATERIAL" && typeKey
-      ? typeKey
-      : typeKey || params.flowKey;
+    params.flowKey === "RAW_MATERIAL"
+      ? typeKey || "RAW_MATERIAL"
+      : String(params.flowKey ?? "").trim() || typeKey;
 
   // Primary nav from batch details units only.
   const fromBatchUnits = mapBatchUnitsToPartialNav({
@@ -994,6 +1050,8 @@ export const buildQcDivisionPartialNav = (params: {
   const fromStatuses = buildPartialNavFromUnitStatusMaps({
     motorStatuses: params.motorStatuses,
     premixStatuses: params.premixStatuses,
+    finalMixStatuses: params.finalMixStatuses,
+    divisionDetails: params.divisionDetails,
     division: statusDivisionKey,
   });
 
@@ -1013,6 +1071,8 @@ export const buildQcDivisionPartialNav = (params: {
   return applyStatusMapsToPartialNav(withManufacturingPrerequisites, {
     motorStatuses: params.motorStatuses,
     premixStatuses: params.premixStatuses,
+    finalMixStatuses: params.finalMixStatuses,
+    divisionDetails: params.divisionDetails,
     division: statusDivisionKey,
   });
 };

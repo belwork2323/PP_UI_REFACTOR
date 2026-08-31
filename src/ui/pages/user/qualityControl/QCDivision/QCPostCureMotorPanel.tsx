@@ -29,6 +29,7 @@ import {
   QC_POST_CURE_SUB_TYPE_LOOSE_FLAP,
   QC_POST_CURE_TABLE_IDS,
   getQcPostCureMotorLabel,
+  normalizeQcInhibitorType,
   type QcPostCureLocationRow,
   type QcPostCureQualificationRow,
 } from "../../../../../hooks/user/qualityControl/qcPostCureConfig";
@@ -516,9 +517,10 @@ const QCPostCureMotorPanel = ({
   const inputsDisabled = disabled || readOnly;
   const isLooseFlap = subType === QC_POST_CURE_SUB_TYPE_LOOSE_FLAP;
   const isInhibition = subType === QC_POST_CURE_SUB_TYPE_INHIBITION;
-  const isIr1 = isInhibition && inhibitorType === "IR1";
-  const isHemcoat = isInhibition && inhibitorType === "HEMCOAT-3K";
-  const isNotApplicable = isInhibition && inhibitorType === "NOT_APPLICABLE";
+  const normalizedInhibitor = normalizeQcInhibitorType(inhibitorType);
+  const isIr1 = isInhibition && normalizedInhibitor === "IR1";
+  const isHemcoat = isInhibition && normalizedInhibitor === "HEMCOAT-3K";
+  const isNotApplicable = isInhibition && normalizedInhibitor === "NOT_APPLICABLE";
 
   const looseSection = QC_POST_CURE_SECTION_IDS.LOOSE_FLAP_FILLING;
   const ir1Section = QC_POST_CURE_SECTION_IDS.IR1_QUALIFICATION;
