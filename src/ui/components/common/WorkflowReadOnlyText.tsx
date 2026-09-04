@@ -15,11 +15,7 @@ type WorkflowReadOnlyTextProps = {
 };
 
 /** Plain read-only text for workflow tables and fields (approver / details views). */
-export const WorkflowReadOnlyText = ({
-  value,
-  muted = false,
-  sx,
-}: WorkflowReadOnlyTextProps) => (
+export const WorkflowReadOnlyText = ({ value, muted = false, sx }: WorkflowReadOnlyTextProps) => (
   <Typography
     sx={{
       fontSize: "0.72rem",

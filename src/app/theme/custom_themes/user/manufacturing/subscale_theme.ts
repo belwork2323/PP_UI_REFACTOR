@@ -178,7 +178,9 @@ export const getSubscaleTheme = (baseTheme: any) => {
         },
         "& .MuiSelect-select": {
           fontWeight: hasValue ? 600 : 500,
-          color: hasValue ? palette.text ?? SUBSCALE_BRAND.text : palette.textSub ?? SUBSCALE_BRAND.textSub,
+          color: hasValue
+            ? (palette.text ?? SUBSCALE_BRAND.text)
+            : (palette.textSub ?? SUBSCALE_BRAND.textSub),
         },
       }),
     },

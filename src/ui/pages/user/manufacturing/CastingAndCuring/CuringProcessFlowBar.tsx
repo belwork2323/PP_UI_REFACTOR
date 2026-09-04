@@ -111,6 +111,7 @@ const CuringProcessFlowBar = ({
             options={ovenOptions}
             width={200}
             theme={theme}
+            required
             onChange={(value) => {
               onChange("oven", value);
               onChange("ovenNo", "");
@@ -125,6 +126,7 @@ const CuringProcessFlowBar = ({
               options={ovenNoOptions}
               width={220}
               theme={theme}
+              required
               onChange={(value) => onChange("ovenNo", value)}
             />
           ) : null}

@@ -704,6 +704,15 @@ const valueFromApiField = (v: unknown): string => {
   return n != null ? String(n) : v != null && typeof v !== "object" ? String(v) : "";
 };
 
+const formatReferenceRangeLabel = (range: unknown): string => {
+  if (!range || typeof range !== "object") return "";
+  const r = range as Record<string, unknown>;
+  const min = valueFromApiField(r.minValue);
+  const max = valueFromApiField(r.maxValue);
+  if (!min && !max) return "";
+  return `${min || "—"} - ${max || "—"}`;
+};
+
 export const parseUploadedFileRef = (value: unknown): UploadedFileRef | null => {
   if (!value || typeof value !== "object") return null;
   const o = value as Record<string, unknown>;
@@ -1396,7 +1405,8 @@ export function parseSectionsToFormData(
   };
   const insulationType = parseInsulationType(ins.type);
 
-  // Specifications are loaded separately from the specification API.
+  // Specifications + labels come from form/details (backend-enriched). Create mode loads
+  // the type template via specification-list when the user selects insulation type.
   const mechanicalProperties: Record<string, MechPropFormRow> = {};
   const thermalProperties: Record<string, ThermalPropFormRow> = {};
   const insulationSpecification = (ins.insulationSpecification ?? {}) as Record<string, unknown>;
@@ -1409,17 +1419,18 @@ export function parseSectionsToFormData(
     const categoryName = String(category.category ?? "").toLowerCase();
 
     (category.parameters ?? []).forEach((param: any) => {
+      const unit = String(param.referenceRange?.unit ?? "").trim();
       const row = {
-        specification: "",
+        specification: formatReferenceRangeLabel(param.referenceRange),
         reported: valueFromApiField(param.reported),
         acemSpec: valueFromApiField(param.acemSpec),
-        unit: "",
+        unit,
       };
 
       if (categoryName.includes("mechanical")) {
         mechanicalProperties[param.specificationCode] = {
           paramKey: param.specificationCode,
-          paramName: param.specificationCode,
+          paramName: String(param.specificationName ?? param.specificationCode ?? "").trim(),
           ...row,
         };
       } else if (categoryName.includes("thermal")) {
@@ -1429,6 +1440,14 @@ export function parseSectionsToFormData(
       }
     });
   });
+
+  const insulationSpecifications =
+    insulationType && specificationCategories.length > 0
+      ? InsulationSpecificationModel.fromApi({
+          insulationType,
+          specifications: specificationCategories,
+        })
+      : null;
   const visualApi = Array.isArray(sections.visualInspection) ? sections.visualInspection : [];
   const visualInspection =
     visualApi.length > 0
@@ -1511,6 +1530,7 @@ export function parseSectionsToFormData(
     insulationReportFile: null,
     insulationReportExisting: parseUploadedFileRef(insReport),
     insulationReportUrl: parseUploadedFileRef(insReport)?.fileUrl ?? null,
+    insulationSpecifications,
     mechanicalProperties,
     thermalProperties,
     postPptUtDate: str(ndt.postPptUtDate).slice(0, 10),
@@ -1604,29 +1624,10 @@ export function parseSectionsToFormData(
 export const CASING_FORM_STEP_COUNT = 6;
 
 const validateIdentification = (form: RocketMotorCasingFormData): string | null => {
-  if (!form.projectId.trim()) return "Project is required.";
-  if (!form.motorStageApi.trim()) return "Motor stage is required.";
+  if (!form.projectId.trim() || !form.projectName.trim()) return "Project Name is required.";
+  if (!form.motorStageApi.trim()) return "Rocket Motor Name/Stage is required.";
   if (!form.motorId.trim()) return "Motor ID is required.";
-  return null;
-};
-
-const validateReceiptAndInsulation = (form: RocketMotorCasingFormData): string | null => {
-  if (!form.casingType) return "Casing type is required.";
-  if (!form.receivingDate.trim()) return "Receiving date is required.";
-  if (!form.itemsDimension.trim()) return "Rubber sheet dimension is required.";
-  if (!form.itemsReceiptStatus) return "Rubber sheet receipt status is required.";
-  if (!form.greenCardStatus) return "Green card status is required.";
-  if (!form.greenCardNo.trim()) return "Green card no. is required.";
-  if (!form.insulationType) return "Insulation type is required.";
-  if (!form.insulationReceiptStatus) return "Insulation receipt status is required.";
-  if (!form.insulationReportNo.trim()) return "Insulation report no. is required.";
-
-  const mechKeys = form.insulationType === "EPDM" ? EPDM_MECH_KEYS : ROCASIN_MECH_KEYS;
-  for (const k of mechKeys) {
-    const row = form.mechanicalProperties[k.paramKey];
-    if (!String(row?.reported ?? "").trim()) return `${k.paramName} (reported) is required.`;
-  }
-
+  if (!/^[A-Za-z0-9][A-Za-z0-9 /_-]*$/.test(form.motorId.trim())) return "Motor ID must be alphanumeric.";
   return null;
 };
 
@@ -1635,52 +1636,8 @@ export function validateCasingFormStep(
   form: RocketMotorCasingFormData,
   step: number,
 ): string | null {
-  switch (step) {
-    case 0:
-      return validateIdentification(form);
-    case 1:
-    case 2:
-    case 3:
-      return null;
-    case 4:
-      return null;
-    default:
-      return null;
-  }
-}
-
-export function isCasingIdentificationComplete(form: RocketMotorCasingFormData): boolean {
-  return validateIdentification(form) === null;
-}
-
-export function canSaveCasingDraft(form: RocketMotorCasingFormData): boolean {
-  return isCasingIdentificationComplete(form);
-}
-
-export function isCasingFormComplete(form: RocketMotorCasingFormData): boolean {
-  for (let step = 0; step < CASING_FORM_STEP_COUNT; step += 1) {
-    const err = validateCasingFormStep(form, step);
-    if (err) return false;
-  }
-  return validateCasingFormForSubmit(form, "SUBMIT") === null;
-}
-
-export function validateCasingFormForSubmit(
-  form: RocketMotorCasingFormData,
-  intent: FormSubmissionType,
-): string | null {
-  const identificationErr = validateIdentification(form);
-  if (identificationErr) return identificationErr;
-
-  if (intent === "DRAFT") return null;
-
-  const receiptErr = validateReceiptAndInsulation(form);
-  if (receiptErr) return receiptErr;
-  if (!form.weightWithoutHarness.trim() || !form.weightWithHarness.trim()) {
-    return "Weighment values are required.";
-  }
-  if (form.dimensionalData.length === 0) {
-    return "Dimensional inspection parameters are required for the selected motor stage.";
+  if (step === 0) {
+    return validateIdentification(form);
   }
   return null;
 }
@@ -1825,15 +1782,21 @@ export class InsulationSpecificationModel {
         data?.specifications?.map((category: any) => ({
           category: category.category,
           parameters:
-            category.parameters?.map((param: any) => ({
-              specificationCode: param.specificationCode,
-              specificationName: param.specificationName,
-              referenceRange: {
-                minValue: param.referenceRange?.minValue,
-                maxValue: param.referenceRange?.maxValue,
-                unit: param.referenceRange?.unit,
-              },
-            })) ?? [],
+            category.parameters?.map((param: any) => {
+              const minRaw = valueFromApiField(param.referenceRange?.minValue);
+              const maxRaw = valueFromApiField(param.referenceRange?.maxValue);
+              const minNum = minRaw !== "" ? Number(minRaw) : Number.NaN;
+              const maxNum = maxRaw !== "" ? Number(maxRaw) : Number.NaN;
+              return {
+                specificationCode: param.specificationCode,
+                specificationName: param.specificationName ?? param.specificationCode ?? "",
+                referenceRange: {
+                  minValue: Number.isFinite(minNum) ? minNum : (param.referenceRange?.minValue as number),
+                  maxValue: Number.isFinite(maxNum) ? maxNum : (param.referenceRange?.maxValue as number),
+                  unit: param.referenceRange?.unit ?? "",
+                },
+              };
+            }) ?? [],
         })) ?? [],
     };
   }

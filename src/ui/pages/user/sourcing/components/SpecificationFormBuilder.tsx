@@ -18,7 +18,6 @@ import MaterialFormGroupCard from "./MaterialFormGroupCard";
 import useRawMaterialSpecificationForm, {
   SpecificationBlock,
 } from "../../../../../hooks/user/sourcing/useRawMaterialSpecificationForm";
-import type { MandatoryValidationMessages } from "../../../../../data/models/user/rawMaterialProcurementValidation";
 
 const {
   add: AddRoundedIcon,
@@ -60,7 +59,8 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
     blocks,
     canSubmit,
     canSaveDraft,
-    showFieldErrors,
+    validationErrors,
+    validationAttempt,
     closeDraftConfirm,
     closeSubmitConfirm,
     createLotMode,
@@ -76,6 +76,7 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
     handleRemoveLot,
     handleRemoveMaterial,
     handleUpdateBlock,
+    getAnalysedResultError,
     handleUpdateLot,
     handleUpdateMaterial,
     hasBlocks,
@@ -108,13 +109,6 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
   const addSelectionKey = `${selectedMaterial}${selectedGrade ? `::${selectedGrade}` : ""}`;
   /** Bulk material picker only for create-lot flow; fill/edit open a single existing lot. */
   const showMaterialSelector = createLotMode && !allMaterialsAdded;
-
-  const validationMessages: MandatoryValidationMessages = {
-    supplyOrderNo: formStrings.FIELD_REQUIRED_SUPPLY_ORDER,
-    receiptDate: formStrings.FIELD_REQUIRED_RECEIPT_DATE,
-    manufacturerName: formStrings.FIELD_REQUIRED_MANUFACTURER,
-    lotNo: formStrings.FIELD_REQUIRED_LOT_ID,
-  };
 
   return (
     <Box>
@@ -313,14 +307,16 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
               <MaterialFormGroupCard
                 key={`${group.material}-${materialIndex}`}
                 group={group}
+                materialGroups={materialGroups}
                 materialIndex={materialIndex}
                 onUpdateMaterial={handleUpdateMaterial}
                 onUpdateLot={handleUpdateLot}
                 onAddLot={handleAddLot}
                 onRemoveMaterial={handleRemoveMaterial}
                 onRemoveLot={handleRemoveLot}
-                showFieldErrors={showFieldErrors}
-                validationMessages={validationMessages}
+                errors={validationErrors}
+                validationAttempt={validationAttempt}
+                getAnalysedResultError={getAnalysedResultError}
                 theme={theme}
               />
             ))
@@ -336,8 +332,9 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
                 deleteLoading={deleteLoading}
                 onUpdate={handleUpdateBlock}
                 onRemove={handleRemoveBlock}
-                showFieldErrors={showFieldErrors}
-                validationMessages={validationMessages}
+                errors={validationErrors}
+                validationAttempt={validationAttempt}
+                getAnalysedResultError={getAnalysedResultError}
                 theme={theme}
               />
             ))}
@@ -365,6 +362,7 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
         resubmitLabel={formStrings.RESUBMIT_APPROVAL}
         saveTooltip={!canSaveDraft ? formStrings.MANDATORY_FIELDS_PENDING : formStrings.SAVE_CONTINUE}
         disableActions={disableActionBar || deleteLoading}
+        allowInvalidSubmitAttempt
       />
 
       <ConfirmAlertDialog

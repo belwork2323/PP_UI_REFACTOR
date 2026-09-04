@@ -42,6 +42,7 @@ import FinalApprovalMotorDialog, {
 import CastingCuringFlowBar from "./CastingCuringFlowBar";
 import CastingMotorPanel from "./CastingMotorPanel";
 import CuringMotorPanel from "./CuringMotorPanel";
+import { validateCastingCuring } from "../../../../../data/validation/adapters/castingCuring.validation";
 import CastingCuringSetupHeaderCard from "./CastingCuringSetupHeaderCard";
 import CuringProcessFlowBar from "./CuringProcessFlowBar";
 import CuringSetupHeaderCard from "./CuringSetupHeaderCard";
@@ -145,6 +146,7 @@ const CastingAndCuringForm = ({
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
   const [activeProcessTab, setActiveProcessTab] = useState<MotorProcessTab>("CASTING");
   const [finalApprovalOpen, setFinalApprovalOpen] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [ovenOptions, setOvenOptions] = useState<
     Array<{ value: string; label: string; noOfOvenAvailable?: number }>
   >([]);
@@ -239,6 +241,11 @@ const CastingAndCuringForm = ({
       ) ?? null
     );
   }, [activeMotorEntry, formData.motors]);
+
+  useEffect(() => {
+    // clear validation errors when switching motors
+    setValidationErrors({});
+  }, [activeMotorEntry?.motorId]);
 
   const curingFormLoaded = Boolean(activeMotorSession?.curingFormLoaded);
   const curingSetupDraft = activeMotorEntry ? getCuringSetupDraft(activeMotorEntry.motorId) : null;
@@ -444,7 +451,23 @@ const CastingAndCuringForm = ({
                 </Button>
                 <SubmitForApprovalButton
                   disabled={actionLoading || activeMotorLocked}
-                  onClick={() => onSubmitMotor?.(activeMotorEntry.motorId)}
+                  onClick={async () => {
+                    if (!activeMotorEntry) return;
+                    const motor = activeMotorSession;
+                    if (!motor) return;
+                    console.log(motor);
+
+                    const castingErrors = validateCastingCuring(motor.castingData, "SUBMIT");
+                    const curingErrors = validateCastingCuring(motor.curingData, "SUBMIT");
+                    const errors = { ...(castingErrors ?? {}), ...(curingErrors ?? {}) };
+
+                    if (Object.keys(errors).length > 0) {
+                      setValidationErrors(errors);
+                      return;
+                    }
+                    setValidationErrors({});
+                    onSubmitMotor?.(activeMotorEntry.motorId);
+                  }}
                   label={S.SUBMIT_MOTOR(activeMotorEntry.motorId)}
                 />
               </>
@@ -618,6 +641,16 @@ const CastingAndCuringForm = ({
                     excludedBowlLabels={excludedBowlLabels}
                     disabled={activeMotorLocked}
                     theme={theme}
+                    validationErrors={validationErrors}
+                    clearFieldError={(path: string, ruleKey?: string) =>
+                      setValidationErrors((prev) => {
+                        const next = { ...prev };
+                        // Clear by exact path or ruleKey if your engine uses them
+                        delete next[path];
+                        if (ruleKey) delete next[ruleKey];
+                        return next;
+                      })
+                    }
                   />
                 </Box>
               ) : null}
@@ -679,6 +712,16 @@ const CastingAndCuringForm = ({
                         buildingNo={String(batch?.identificationSheet?.BldgNo ?? "")}
                         disabled={activeMotorLocked}
                         theme={theme}
+                        validationErrors={validationErrors}
+                        clearFieldError={(path: string) =>
+                          setValidationErrors((prev) => {
+                            const next = { ...prev };
+                            for (const key of Object.keys(next)) {
+                              if (key === path || key.startsWith(path)) delete next[key];
+                            }
+                            return next;
+                          })
+                        }
                         showPropellantPressure={curingCycleConfig?.showPropellantPressure !== false}
                       />
                     </Box>

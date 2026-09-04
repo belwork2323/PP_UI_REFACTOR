@@ -33,11 +33,7 @@ export type PostCureMotorSession = {
 
 export type PostCureMotorSubmissionType = "DRAFT" | "SUBMIT";
 export type PostCureMotorSubmissionStatus =
-  | "TO_BE_INITIATED"
-  | "IN_PROGRESS"
-  | "WAITING_FOR_APPROVAL"
-  | "APPROVED"
-  | "REJECTED";
+  "TO_BE_INITIATED" | "IN_PROGRESS" | "WAITING_FOR_APPROVAL" | "APPROVED" | "REJECTED";
 
 export type PostCureMotorStatusMeta = {
   motorSubmissionType?: PostCureMotorSubmissionType;
@@ -98,10 +94,7 @@ export const canApproverActionEntirePostCureForm = (params: {
   }
 
   // Waiting for Approval means motors are done — show Approve / Reject Form.
-  if (
-    statusUpper === "WAITING_FOR_APPROVAL" ||
-    status === OPERATION_STATUS.WAITING_FOR_APPROVAL
-  ) {
+  if (statusUpper === "WAITING_FOR_APPROVAL" || status === OPERATION_STATUS.WAITING_FOR_APPROVAL) {
     return true;
   }
 
@@ -515,10 +508,7 @@ const resolvePostCureMotorSections = (motor: Record<string, unknown>): CasePrepD
     String(motor.inhibitorType ?? "").trim();
   const variant = resolvePostCureDataVariant(operation, inhibitorType);
 
-  if (
-    variant &&
-    (motor.looseFlapFillingDetails || motor.inhibitionDetails || motor.details)
-  ) {
+  if (variant && (motor.looseFlapFillingDetails || motor.inhibitionDetails || motor.details)) {
     const apiMotor = {
       ...((motor.details as Record<string, unknown> | undefined) ?? {}),
       looseFlapFillingDetails:
@@ -573,10 +563,7 @@ export const mapPostCureDetailsForDisplay = (
           entry.inhibitionDetails ?? (src.inhibitionDetails as Record<string, unknown> | undefined),
         sections: entry.sections ?? src.sections,
       };
-      const postCureData = parsePostCureMotorDataFromApi(
-        apiMotor,
-        variant ?? "loose-flap-filling",
-      );
+      const postCureData = parsePostCureMotorDataFromApi(apiMotor, variant ?? "loose-flap-filling");
 
       return {
         motorId,
@@ -612,8 +599,7 @@ export const mapPostCureDetailsForDisplay = (
   });
 
   const motorCountsFromApi = (data.motorCounts ?? details.motorCounts) as
-    | Partial<PostCureMotorCounts>
-    | undefined;
+    Partial<PostCureMotorCounts> | undefined;
 
   return {
     formId: String(data.formId ?? details.formId ?? ""),

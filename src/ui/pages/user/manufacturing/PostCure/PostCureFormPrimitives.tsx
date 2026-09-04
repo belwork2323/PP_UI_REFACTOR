@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
-import { Box, Typography, alpha } from "@mui/material";
+import { Box, TextField, Typography, alpha } from "@mui/material";
 import { POST_CURE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/postCure_theme";
+import { Controller, useFormContext } from "react-hook-form";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 export {
   FieldGrid,
@@ -9,7 +11,6 @@ export {
   ReadOnlyField,
   SubsectionHeading,
   TableSelectInput,
-  TableTextInput,
   postCureTableCellSx,
   postCureTableContainerSx,
   postCureTableHeaderCellSx,
@@ -60,3 +61,47 @@ export const SectionCard = ({ title, children, theme, mb = 3 }: SectionCardProps
     </Box>
   );
 };
+
+export const TableTextInput = ({
+  value,
+  onChange,
+  disabled,
+  readOnly,
+  type = "text",
+  multiline = false,
+  minRows,
+  error = false,
+  helperText,
+  placeholder,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  disabled?: boolean;
+  readOnly?: boolean;
+  type?: string;
+  multiline?: boolean;
+  minRows?: number;
+  error?: boolean;
+  helperText?: string;
+  placeholder?: string;
+}) => (
+  <Box sx={{ width: "100%" }}>
+    <TextField
+      size="small"
+      fullWidth
+      type={type}
+      value={value ?? ""}
+      disabled={disabled || readOnly}
+      multiline={multiline}
+      minRows={minRows}
+      placeholder={placeholder}
+      error={error}
+      helperText={helperText}
+      onChange={(e) => onChange(e.target.value)}
+      sx={{
+        "& .MuiInputBase-root": { fontSize: "0.82rem" },
+        "& .MuiFormHelperText-root": { mx: 0, mt: 0.5 },
+      }}
+    />
+  </Box>
+);

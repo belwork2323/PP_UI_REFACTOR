@@ -29,6 +29,8 @@ export type SchemaUIProps = {
   batch?: { batchId?: string; projectName?: string; projectId?: string };
   motorId?: string;
   hideRepeatInstanceLabels?: boolean;
+  /** Field path → message; shown in red under schema fields (no toast). */
+  errors?: Record<string, string>;
 };
 
 const SchemaUI = ({
@@ -45,6 +47,7 @@ const SchemaUI = ({
   batch,
   motorId,
   hideRepeatInstanceLabels,
+  errors,
 }: SchemaUIProps) => {
   const theme = mergeThemeFromDesignSystem(
     { ...defaultThemeTokens, ...themeTokens },
@@ -88,6 +91,7 @@ const SchemaUI = ({
       batch={batch}
       motorId={motorId}
       hideRepeatInstanceLabels={hideRepeatInstanceLabels}
+      errors={errors}
     />
   );
 };

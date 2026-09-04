@@ -161,7 +161,11 @@ export function formatReferenceRangeLabel(ref: ReferenceRangeShape): string {
   return "N/A";
 }
 
-export function isSpecRowFailed(row: Pick<SpecRow, "status" | "isOutOfRange">): boolean {
+export function isSpecRowFailed(
+  row: Pick<SpecRow, "status" | "isOutOfRange" | "analysedResult">,
+): boolean {
+  const hasResult = String(row.analysedResult ?? "").trim() !== "";
+  if (!hasResult) return false;
   if (
     String(row.status ?? "")
       .trim()
@@ -169,6 +173,30 @@ export function isSpecRowFailed(row: Pick<SpecRow, "status" | "isOutOfRange">): 
   )
     return true;
   return Boolean(row.isOutOfRange);
+}
+
+/** Clear stale API quality flags when no analysed result is entered yet (draft / continue filling). */
+export function normalizeSpecRowQualityState(row: SpecRow): SpecRow {
+  const analysedResult = String(row.analysedResult ?? "").trim();
+  if (!analysedResult) {
+    return { ...row, analysedResult: "", status: null, isOutOfRange: false };
+  }
+  return {
+    ...row,
+    analysedResult,
+    isOutOfRange:
+      String(row.status ?? "")
+        .trim()
+        .toLowerCase() === "failed" ||
+      computeIsOutOfRange(analysedResult, row.referenceRange),
+  };
+}
+
+export function normalizeMaterialBlockQualityState(block: MaterialBlock): MaterialBlock {
+  return {
+    ...block,
+    rows: (block.rows ?? []).map(normalizeSpecRowQualityState),
+  };
 }
 
 /** UI label for specification row status (API may return "failed" for out-of-range values). */
@@ -222,12 +250,61 @@ export type ReferenceRangeShape = {
   unit: string | null;
 };
 
+export function isReferenceRangeNotApplicable(
+  referenceRange?: ReferenceRangeShape | null,
+): boolean {
+  if (!referenceRange) return true;
+  return referenceRange.minValue == null && referenceRange.maxValue == null;
+}
+
+/** Outbound API value: numeric specs send numbers; N/A specs send trimmed text. */
+export function mapAnalysedResultForApi(
+  row: Pick<SpecRow, "analysedResult" | "referenceRange">,
+): string | number | null {
+  const trimmed = String(row.analysedResult ?? "").trim();
+  if (!trimmed) return null;
+  if (isReferenceRangeNotApplicable(row.referenceRange)) {
+    return trimmed;
+  }
+  const numeric = Number(trimmed.replace(/,/g, ""));
+  return Number.isFinite(numeric) ? numeric : null;
+}
+
+/** Restrict numeric spec inputs to digits, one decimal point, and optional leading minus. */
+export function sanitizeNumericAnalysedResultInput(value: string): string {
+  const raw = String(value ?? "");
+  if (!raw) return "";
+
+  let result = "";
+  let hasDecimal = false;
+  let index = 0;
+
+  if (raw[0] === "-") {
+    result = "-";
+    index = 1;
+  }
+
+  for (; index < raw.length; index += 1) {
+    const char = raw[index];
+    if (char >= "0" && char <= "9") {
+      result += char;
+      continue;
+    }
+    if (char === "." && !hasDecimal) {
+      hasDecimal = true;
+      result += char;
+    }
+  }
+
+  return result;
+}
+
 export function computeIsOutOfRange(
   analysedResult: string,
   referenceRange?: ReferenceRangeShape,
 ): boolean {
   const trimmed = String(analysedResult ?? "").trim();
-  if (!trimmed || !referenceRange) return false;
+  if (!trimmed || !referenceRange || isReferenceRangeNotApplicable(referenceRange)) return false;
   const value = Number(trimmed);
   if (Number.isNaN(value)) return false;
   const { minValue, maxValue } = referenceRange;
@@ -411,7 +488,7 @@ export type RawMaterialProcurementSubmissionType = "DRAFT" | "SUBMIT" | "UPDATE"
 
 export type RawMaterialLotSpecificationPayload = {
   specificationCode: string;
-  analysedResult: number | null;
+  analysedResult: string | number | null;
   isOutOfRange: boolean;
   acemQcResult: string;
 };
@@ -454,7 +531,7 @@ export type RawMaterialLotUpdatePayload = {
       maxValue: number | null;
       unit: string | null;
     };
-    analysedResult: number | null;
+    analysedResult: string | number | null;
     acemQcResult: string;
     status: string | null;
   }>;
@@ -564,7 +641,7 @@ export class RawMaterialProcurementDetailsModel {
         maxValue: number | null;
         unit: string | null;
       };
-      analysedResult: number | null;
+      analysedResult: string | number | null;
       acemQcResult: string;
       status: string | null;
     }>;
@@ -591,7 +668,7 @@ export class RawMaterialProcurementDetailsModel {
           spec.analysedResult as ApiNumericValue,
         );
         const status = spec.status ?? null;
-        return {
+        return normalizeSpecRowQualityState({
           specificationCode: spec.specificationCode,
           specification: spec.specificationName,
           specificationName: spec.specificationName,
@@ -604,7 +681,7 @@ export class RawMaterialProcurementDetailsModel {
               .trim()
               .toLowerCase() === "failed" || computeIsOutOfRange(analysedResult, referenceRange),
           referenceRange,
-        };
+        });
       }),
     }));
   }
@@ -628,7 +705,7 @@ export class RawMaterialLotDetailsModel {
       maxValue: number | null;
       unit: string | null;
     };
-    analysedResult: number | null;
+    analysedResult: string | number | null;
     acemQcResult: string;
     status: string | null;
   }>;
@@ -681,7 +758,7 @@ export class RawMaterialLotDetailsModel {
             spec.analysedResult as ApiNumericValue,
           );
           const status = spec.status ?? null;
-          return {
+          return normalizeSpecRowQualityState({
             specificationCode: spec.specificationCode,
             specification: spec.specificationName,
             specificationName: spec.specificationName,
@@ -694,7 +771,7 @@ export class RawMaterialLotDetailsModel {
                 .trim()
                 .toLowerCase() === "failed" || computeIsOutOfRange(analysedResult, referenceRange),
             referenceRange,
-          };
+          });
         }),
       },
     ];
@@ -810,11 +887,57 @@ export function newCertificateLocalId(): string {
   return `cert-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+const decodeStoredFileName = (name: string): string => {
+  const trimmed = String(name ?? "").trim();
+  if (!trimmed) return "";
+  try {
+    return decodeURIComponent(trimmed);
+  } catch {
+    return trimmed;
+  }
+};
+
+/** Human-readable certificate file name for lot details and previews. */
+export function resolveLotCertificateDisplayFileName(
+  cert: Pick<LotCertificate, "fileName" | "fileUrl" | "fileId">,
+): string {
+  const fileId = String(cert.fileId ?? "").trim();
+  const apiName = decodeStoredFileName(cert.fileName ?? "");
+  const looksLikeStorageKey =
+    !apiName ||
+    apiName === fileId ||
+    apiName.startsWith("FILE_") ||
+    /^FILE_[0-9a-f-]{36}_/i.test(apiName);
+
+  if (!looksLikeStorageKey) {
+    return apiName;
+  }
+
+  const fromUrl = decodeStoredFileName(String(cert.fileUrl ?? "").split(/[/\\]/).pop() ?? "");
+  if (fromUrl) {
+    if (fileId && fromUrl.startsWith(`${fileId}_`)) {
+      const trimmed = fromUrl.slice(fileId.length + 1).trim();
+      if (trimmed) return trimmed;
+    }
+    const prefixed = fromUrl.match(/^FILE_[0-9a-f-]{36}_(.+)$/i);
+    if (prefixed?.[1]?.trim()) {
+      return prefixed[1].trim();
+    }
+    if (fromUrl !== fileId) return fromUrl;
+  }
+
+  return apiName || "Document";
+}
+
 export function normalizeLotCertificate(raw: unknown): LotCertificate {
   const source = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   const fileId = String(source.fileId ?? "").trim() || null;
-  const fileName = String(source.fileName ?? "").trim();
   const fileUrl = String(source.fileUrl ?? "").trim();
+  const fileName = resolveLotCertificateDisplayFileName({
+    fileName: String(source.fileName ?? "").trim(),
+    fileUrl,
+    fileId,
+  });
   return {
     localId: String(source.localId ?? "").trim() || newCertificateLocalId(),
     fileId,
@@ -865,12 +988,7 @@ function mapLotBlockToCreatePayload(lot: MaterialLotBlock): RawMaterialLotCreate
       .filter((row) => (row.specificationCode ?? "").trim())
       .map((row) => ({
         specificationCode: (row.specificationCode ?? "").trim(),
-        analysedResult:
-          row.analysedResult === "" ||
-          row.analysedResult === null ||
-          row.analysedResult === undefined
-            ? null
-            : Number(row.analysedResult),
+        analysedResult: mapAnalysedResultForApi(row),
         isOutOfRange: Boolean(row.isOutOfRange),
         acemQcResult: row.acemQcResult ?? "",
       })),
@@ -924,12 +1042,7 @@ export function mapFirstBlockToLotUpdatePayload(
           maxValue: row.referenceRange?.maxValue ?? null,
           unit: row.referenceRange?.unit ?? null,
         },
-        analysedResult:
-          row.analysedResult === "" ||
-          row.analysedResult === null ||
-          row.analysedResult === undefined
-            ? null
-            : Number(row.analysedResult),
+        analysedResult: mapAnalysedResultForApi(row),
         acemQcResult: row.acemQcResult ?? "",
         status: null,
       })),
@@ -944,10 +1057,7 @@ export const mapBlocksToMaterialsPayload = (blocks: MaterialBlock[]) => {
     lotNo: block.lotNo ?? "",
     specifications: (block.rows ?? []).map((row) => ({
       specificationCode: row.specificationCode ?? "",
-      analysedResult:
-        row.analysedResult === "" || row.analysedResult === null || row.analysedResult === undefined
-          ? null
-          : Number(row.analysedResult),
+      analysedResult: mapAnalysedResultForApi(row),
       acemQcResult: row.acemQcResult ?? "",
     })),
   }));

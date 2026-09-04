@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   alpha,
   Box,
@@ -23,16 +23,20 @@ import FilePreviewDialog from "../../../../components/common/FilePreviewDialog";
 import type { LotCertificate, MaterialLotBlock, SpecRow } from "../../../../../data/models/user/RawMaterialProcurementModel";
 import {
   computeIsOutOfRange,
+  isReferenceRangeNotApplicable,
   isSpecRowFailed,
+  sanitizeNumericAnalysedResultInput,
 } from "../../../../../data/models/user/RawMaterialProcurementModel";
 import { useLotCertificateActions } from "../../../../../hooks/user/sourcing/useLotCertificateActions";
 import MandatoryFormField, { mandatoryAsteriskSx, mandatoryFieldInputSx } from "./MandatoryFormField";
 import {
-  getLotFieldErrors,
-  isAnalyzedResultMissing,
-  type MandatoryValidationMessages,
-} from "../../../../../data/models/user/rawMaterialProcurementValidation";
-
+  blockLotPath,
+  blockCertTypePath,
+} from "../../../../../data/validation/adapters/rawMaterialSourcing.validation";
+import type { ValidationErrors } from "../../../../../data/validation/submissionIntent";
+import useValidationDisplay, {
+  type ValidationAttemptFlags,
+} from "../../../../components/validation/useValidationDisplay";
 const {
   delete: DeleteOutlineRoundedIcon,
   checkCircleOutline: CheckCircleOutlineRoundedIcon,
@@ -41,33 +45,42 @@ const {
 type MaterialLotSectionProps = {
   lot: MaterialLotBlock;
   lotIndex: number;
+  blockIndex: number;
   lotCount: number;
-  onUpdate: (lot: MaterialLotBlock) => void;
+  onUpdate: (updater: MaterialLotBlock | ((prev: MaterialLotBlock) => MaterialLotBlock)) => void;
   onRemove: () => void;
-  showFieldErrors?: boolean;
-  validationMessages: MandatoryValidationMessages;
+  errors: ValidationErrors;
+  validationAttempt: ValidationAttemptFlags;
+  getAnalysedResultError: (blockIndex: number, rowIndex: number, touched: boolean) => string | undefined;
   theme: any;
 };
 
 const MaterialLotSection = ({
   lot,
   lotIndex,
+  blockIndex,
   lotCount,
   onUpdate,
   onRemove,
-  showFieldErrors = false,
-  validationMessages,
+  errors,
+  validationAttempt,
+  getAnalysedResultError,
   theme,
 }: MaterialLotSectionProps) => {
   const formStrings = STRINGS.SOURCING.SPECIFICATION_FORM;
   const specStyles = theme.sourcing.rawMaterial.specificationForm;
-  const lotErrors = getLotFieldErrors(lot, validationMessages, showFieldErrors);
-  const lotRef = useRef(lot);
-  lotRef.current = lot;
+  const { visibleError } = useValidationDisplay(errors, validationAttempt);
+  const [touchedAnalysedRows, setTouchedAnalysedRows] = useState(() => new Set<number>());
+  const lotNoError = visibleError(blockLotPath(blockIndex, "lotNo"));
+  const certificateError = visibleError(blockLotPath(blockIndex, "certificates"));
+
+  useEffect(() => {
+    setTouchedAnalysedRows(new Set());
+  }, [lot.lotNo]);
 
   const handleCertificatesChange = useCallback(
     (certificates: LotCertificate[]) => {
-      onUpdate({ ...lotRef.current, certificates });
+      onUpdate((current) => ({ ...current, certificates }));
     },
     [onUpdate],
   );
@@ -99,34 +112,45 @@ const MaterialLotSection = ({
 
   const handleCellChange = useCallback(
     (rowIndex: number, field: keyof SpecRow, value: string) => {
-      const updatedRows = lot.rows.map((row, currentIndex) => {
-        if (currentIndex !== rowIndex) return row;
-        const next = { ...row, [field]: value };
-        if (field === "analysedResult") {
-          next.status = null;
-          next.isOutOfRange = computeIsOutOfRange(value, row.referenceRange);
-        }
-        return next;
+      if (field === "analysedResult") {
+        setTouchedAnalysedRows((previous) => new Set(previous).add(rowIndex));
+      }
+      onUpdate((current) => {
+        const updatedRows = current.rows.map((row, currentIndex) => {
+          if (currentIndex !== rowIndex) return row;
+          const nextValue =
+            field === "analysedResult" && !isReferenceRangeNotApplicable(row.referenceRange)
+              ? sanitizeNumericAnalysedResultInput(value)
+              : value;
+          const next = { ...row, [field]: nextValue };
+          if (field === "analysedResult") {
+            next.status = null;
+            next.isOutOfRange = computeIsOutOfRange(nextValue, row.referenceRange);
+          }
+          return next;
+        });
+        return { ...current, rows: updatedRows };
       });
-      onUpdate({ ...lot, rows: updatedRows });
     },
-    [lot, onUpdate]
+    [onUpdate],
   );
 
   const handleLotNoChange = useCallback(
     (value: string) => {
-      onUpdate({ ...lot, lotNo: value });
+      onUpdate((current) => ({ ...current, lotNo: value }));
     },
-    [lot, onUpdate]
+    [onUpdate],
   );
 
   const handleCertChange = useCallback(
     (certIndex: number, field: keyof LotCertificate, value: string) => {
-      const certs = [...(lot.certificates ?? [])];
-      certs[certIndex] = { ...certs[certIndex], [field]: value };
-      onUpdate({ ...lot, certificates: certs });
+      onUpdate((current) => {
+        const certs = [...(current.certificates ?? [])];
+        certs[certIndex] = { ...certs[certIndex], [field]: value };
+        return { ...current, certificates: certs };
+      });
     },
-    [lot, onUpdate]
+    [onUpdate],
   );
 
   return (
@@ -178,15 +202,15 @@ const MaterialLotSection = ({
       </Box>
 
       <Box sx={{ px: 2, py: 1.5, maxWidth: 360 }}>
-        <MandatoryFormField label={formStrings.TABLE_HEADERS.LOT_ID} error={lotErrors.lotNo} theme={theme}>
+        <MandatoryFormField label={formStrings.TABLE_HEADERS.LOT_ID} error={lotNoError} theme={theme}>
           <TextField
             size="small"
             fullWidth
             value={lot.lotNo}
             onChange={(event) => handleLotNoChange(event.target.value)}
             placeholder={formStrings.LOT_PLACEHOLDER}
-            error={Boolean(lotErrors.lotNo)}
-            sx={mandatoryFieldInputSx(theme.workflow.formElements.textField, Boolean(lotErrors.lotNo), theme)}
+            error={Boolean(lotNoError)}
+            sx={mandatoryFieldInputSx(theme.workflow.formElements.textField, Boolean(lotNoError), theme)}
           />
         </MandatoryFormField>
       </Box>
@@ -229,7 +253,11 @@ const MaterialLotSection = ({
             <TableBody>
               {lot.rows.map((row, rowIndex) => {
                 const rowFailed = isSpecRowFailed(row);
-                const analyzedMissing = isAnalyzedResultMissing(row, showFieldErrors);
+                const analyzedError = getAnalysedResultError(
+                  blockIndex,
+                  rowIndex,
+                  touchedAnalysedRows.has(rowIndex),
+                );
                 return (
                   <TableRow key={rowIndex} sx={specStyles.dataRow(rowIndex, rowFailed)}>
                     <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.specCell }}>
@@ -254,15 +282,16 @@ const MaterialLotSection = ({
                         value={row.analysedResult || ""}
                         onChange={(event) => handleCellChange(rowIndex, "analysedResult", event.target.value)}
                         placeholder={formStrings.ANALYZED_RESULT_PLACEHOLDER}
-                        type="number"
-                        inputProps={{ step: "any" }}
-                        error={analyzedMissing}
-                        helperText={analyzedMissing ? formStrings.FIELD_REQUIRED_ANALYZED_RESULT : undefined}
+                        inputMode={
+                          isReferenceRangeNotApplicable(row.referenceRange) ? "text" : "decimal"
+                        }
+                        error={Boolean(analyzedError)}
+                        helperText={analyzedError}
                         FormHelperTextProps={{ sx: { mx: 0, fontSize: "0.65rem" } }}
                         sx={{
                           ...theme.workflow.formElements.cellField,
                           ...specStyles.analyzedField,
-                          ...(rowFailed || analyzedMissing ? specStyles.failedAnalyzedField : {}),
+                          ...(rowFailed || analyzedError ? specStyles.failedAnalyzedField : {}),
                         }}
                       />
                     </TableCell>
@@ -296,6 +325,8 @@ const MaterialLotSection = ({
         onRemove={handleRemove}
         onRetry={handleRetry}
         onOpen={handleOpen}
+        error={certificateError}
+        certificateTypeError={(ci) => visibleError(blockCertTypePath(blockIndex, ci))}
       />
 
       <FilePreviewDialog

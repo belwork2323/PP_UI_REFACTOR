@@ -85,7 +85,7 @@ export function useFilePreview() {
             id,
             subDepartmentId,
           );
-          triggerBrowserDownload(blob, downloadedName || name);
+          triggerBrowserDownload(blob, downloadedName && downloadedName !== id ? downloadedName : name);
         } catch {
           showAlert("Failed to download video.", "error");
         }
@@ -109,7 +109,7 @@ export function useFilePreview() {
           id,
           subDepartmentId,
         );
-        const displayName = downloadedName || name;
+        const displayName = downloadedName && downloadedName !== id ? downloadedName : name;
         const typedBlob =
           blob.type && blob.type !== "application/octet-stream"
             ? blob

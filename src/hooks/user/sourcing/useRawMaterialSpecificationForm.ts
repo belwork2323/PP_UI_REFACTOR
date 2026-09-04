@@ -38,8 +38,16 @@ import {
 import {
   areAllAnalyzedResultsFilled,
   areBlocksMandatoryComplete,
+  areBlocksUnitComplete,
   areMaterialGroupsMandatoryComplete,
-} from "../../../data/models/user/rawMaterialProcurementValidation";
+  areMaterialGroupsUnitComplete,
+  blockRowPath,
+  isMaterialMetaComplete,
+  validateRawMaterialSourcing,
+} from "../../../data/validation/adapters/rawMaterialSourcing.validation";
+import { fieldError, hasValidationErrors } from "../../../data/validation/validationErrors";
+import type { ValidationErrors } from "../../../data/validation/submissionIntent";
+import type { ValidationAttemptFlags } from "../../../ui/components/validation/useValidationDisplay";
 import {
   rmCertDebug,
   summarizeBlocks,
@@ -49,6 +57,9 @@ import {
 
 export type SpecificationRow = SpecRow;
 export type SpecificationBlock = MaterialBlock;
+export type SpecificationBlockUpdater =
+  | SpecificationBlock
+  | ((previous: SpecificationBlock) => SpecificationBlock);
 
 type MaterialOption = MaterialsListItem;
 
@@ -158,7 +169,12 @@ export const useRawMaterialSpecificationForm = ({
   const [selectedGrade, setSelectedGrade] = useState("");
   const [submitConfirm, setSubmitConfirm] = useState(false);
   const [draftConfirm, setDraftConfirm] = useState(false);
-  const [showFieldErrors, setShowFieldErrors] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
+  const [validationAttempt, setValidationAttempt] = useState<ValidationAttemptFlags>({
+    format: false,
+    unit: false,
+    submit: false,
+  });
   const [availableMaterials, setAvailableMaterials] = useState<MaterialOption[]>([]);
   const [loadingMaterials, setLoadingMaterials] = useState(true);
   const [addingMaterial, setAddingMaterial] = useState(false);
@@ -299,9 +315,15 @@ export const useRawMaterialSpecificationForm = ({
       blocks: summarizeBlocks(initialBlocks),
     });
     if (incomingSig === lastSyncedBlocksSigRef.current) return;
+    const localSig = blocksSignature(flatBlocks);
+    if (localSig !== incomingSig && lastSyncedBlocksSigRef.current === localSig) {
+      return;
+    }
     lastSyncedBlocksSigRef.current = incomingSig;
     setFlatBlocks(initialBlocks);
-  }, [createLotMode, initialBlocks]);
+    setValidationErrors({});
+    setValidationAttempt({ format: false, unit: false, submit: false });
+  }, [createLotMode, flatBlocks, initialBlocks]);
 
   const blocksRef = useRef<SpecificationBlock[]>([]);
   blocksRef.current = blocks;
@@ -401,6 +423,14 @@ export const useRawMaterialSpecificationForm = ({
   );
   const hasBlocks = createLotMode ? materialGroups.length > 0 : blocks.length > 0;
 
+  const unitComplete = useMemo(
+    () =>
+      createLotMode
+        ? areMaterialGroupsUnitComplete(materialGroups)
+        : areBlocksUnitComplete(blocks),
+    [blocks, createLotMode, materialGroups],
+  );
+
   const mandatoryComplete = useMemo(
     () =>
       createLotMode
@@ -411,16 +441,43 @@ export const useRawMaterialSpecificationForm = ({
 
   const allAnalyzedFilled = useMemo(() => areAllAnalyzedResultsFilled(blocks), [blocks]);
 
+  const activeValidationTier = validationAttempt.submit
+    ? "SUBMIT"
+    : validationAttempt.unit
+      ? "UNIT"
+      : validationAttempt.format
+        ? "FORMAT"
+        : null;
+
+  useEffect(() => {
+    if (!activeValidationTier) return;
+    setValidationErrors(validateRawMaterialSourcing(blocks, activeValidationTier));
+  }, [activeValidationTier, blocks]);
+
+  const formatErrors = useMemo(
+    () => validateRawMaterialSourcing(blocks, "FORMAT"),
+    [blocks],
+  );
+
   const canSaveDraft = useMemo(
     () =>
       hasBlocks &&
-      mandatoryComplete &&
-      allAnalyzedFilled &&
+      unitComplete &&
+      !hasValidationErrors(formatErrors) &&
       !hasIncompleteCertificateUploads(blocks),
-    [allAnalyzedFilled, blocks, hasBlocks, mandatoryComplete],
+    [blocks, formatErrors, hasBlocks, unitComplete],
   );
 
-  const canSubmit = canSaveDraft;
+  const canSubmit = useMemo(() => {
+    const submitErrors = validateRawMaterialSourcing(blocks, "SUBMIT");
+    return (
+      hasBlocks &&
+      mandatoryComplete &&
+      allAnalyzedFilled &&
+      !hasValidationErrors(submitErrors) &&
+      !hasIncompleteCertificateUploads(blocks)
+    );
+  }, [allAnalyzedFilled, blocks, hasBlocks, mandatoryComplete]);
   const allMaterialsAdded =
     createLotMode &&
     !loadingMaterials &&
@@ -437,7 +494,7 @@ export const useRawMaterialSpecificationForm = ({
     if (!hasBlocks) {
       return formStrings.NOT_READY_TITLE;
     }
-    if (!mandatoryComplete || !allAnalyzedFilled) {
+    if (!unitComplete) {
       return formStrings.MANDATORY_FIELDS_PENDING;
     }
 
@@ -458,8 +515,7 @@ export const useRawMaterialSpecificationForm = ({
     formStrings.RESULTS_ENTERED_SUFFIX,
     hasBlocks,
     lotCount,
-    allAnalyzedFilled,
-    mandatoryComplete,
+    unitComplete,
     materialCount,
     totalRows,
     formStrings.MANDATORY_FIELDS_PENDING,
@@ -514,15 +570,21 @@ export const useRawMaterialSpecificationForm = ({
 
   const handleAddLot = useCallback(
     (materialIndex: number) => {
+      const group = materialGroups[materialIndex];
+      if (!group || !isMaterialMetaComplete(group)) {
+        setValidationAttempt((previous) => ({ ...previous, format: true, unit: true }));
+        setValidationErrors(validateRawMaterialSourcing(blocks, "UNIT"));
+        return;
+      }
       updateMaterialGroups((previous) =>
-        previous.map((group, idx) => {
-          if (idx !== materialIndex) return group;
-          const template = group.lots[0]?.rows ?? [];
-          return { ...group, lots: [...group.lots, cloneLotTemplate(template)] };
+        previous.map((item, idx) => {
+          if (idx !== materialIndex) return item;
+          const template = item.lots[0]?.rows ?? [];
+          return { ...item, lots: [...item.lots, cloneLotTemplate(template)] };
         }),
       );
     },
-    [updateMaterialGroups],
+    [blocks, materialGroups, updateMaterialGroups],
   );
 
   const handleUpdateMaterial = useCallback(
@@ -532,6 +594,7 @@ export const useRawMaterialSpecificationForm = ({
         Pick<MaterialFormGroup, "supplyOrderNo" | "receiptDate" | "manufacturerName">
       >,
     ) => {
+      setValidationAttempt((previous) => ({ ...previous, format: true }));
       updateMaterialGroups((previous) =>
         previous.map((group, idx) => (idx === materialIndex ? { ...group, ...partial } : group)),
       );
@@ -540,19 +603,25 @@ export const useRawMaterialSpecificationForm = ({
   );
 
   const handleUpdateLot = useCallback(
-    (materialIndex: number, lotIndex: number, lot: MaterialLotBlock) => {
-      rmCertDebug("4.handleUpdateLot", {
-        materialIndex,
-        lotIndex,
-        createLotMode,
-        lot: summarizeLotCerts(lot),
-      });
+    (materialIndex: number, lotIndex: number, updater: MaterialLotBlock | ((prev: MaterialLotBlock) => MaterialLotBlock)) => {
+      setValidationAttempt((previous) => ({ ...previous, format: true }));
       updateMaterialGroups((previous) => {
         const nextGroups = previous.map((group, gIdx) => {
           if (gIdx !== materialIndex) return group;
           return {
             ...group,
-            lots: group.lots.map((existing, lIdx) => (lIdx === lotIndex ? lot : existing)),
+            lots: group.lots.map((existing, lIdx) => {
+              if (lIdx !== lotIndex) return existing;
+              const updatedLot = typeof updater === "function" ? updater(existing) : updater;
+              const rowsWithRange = updatedLot.rows.map((row) => {
+                if (row.analysedResult === undefined) return row;
+                return {
+                  ...row,
+                  isOutOfRange: computeIsOutOfRange(row.analysedResult, row.referenceRange),
+                };
+              });
+              return { ...updatedLot, rows: rowsWithRange };
+            }),
           };
         });
         rmCertDebug("4.handleUpdateLot.state", {
@@ -589,21 +658,41 @@ export const useRawMaterialSpecificationForm = ({
   );
 
   const handleUpdateBlock = useCallback(
-    (index: number, updatedBlock: SpecificationBlock) => {
-      const rowsWithRange = updatedBlock.rows.map((row) => {
-        if (row.analysedResult === undefined) return row;
-        return {
-          ...row,
-          isOutOfRange: computeIsOutOfRange(row.analysedResult, row.referenceRange),
-        };
-      });
+    (index: number, updater: SpecificationBlockUpdater) => {
+      setValidationAttempt((previous) => ({ ...previous, format: true }));
       updateBlocks((previous) =>
-        previous.map((block, currentIndex) =>
-          currentIndex === index ? { ...updatedBlock, rows: rowsWithRange } : block,
-        ),
+        previous.map((block, currentIndex) => {
+          if (currentIndex !== index) return block;
+          const updatedBlock = typeof updater === "function" ? updater(block) : updater;
+          const rowsWithRange = updatedBlock.rows.map((row) => {
+            if (row.analysedResult === undefined) return row;
+            return {
+              ...row,
+              isOutOfRange: computeIsOutOfRange(row.analysedResult, row.referenceRange),
+            };
+          });
+          return { ...updatedBlock, rows: rowsWithRange };
+        }),
       );
     },
     [updateBlocks],
+  );
+
+  const getAnalysedResultError = useCallback(
+    (blockIndex: number, rowIndex: number, touched: boolean) => {
+      const path = blockRowPath(blockIndex, rowIndex, "analysedResult");
+      if (validationAttempt.submit) {
+        return fieldError(validateRawMaterialSourcing(blocks, "SUBMIT"), path);
+      }
+      if (validationAttempt.unit) {
+        return fieldError(validateRawMaterialSourcing(blocks, "UNIT"), path);
+      }
+      if (touched) {
+        return fieldError(validateRawMaterialSourcing(blocks, "FORMAT"), path);
+      }
+      return undefined;
+    },
+    [blocks, validationAttempt.submit, validationAttempt.unit],
   );
 
   const handleRemoveBlock = useCallback(
@@ -615,8 +704,13 @@ export const useRawMaterialSpecificationForm = ({
 
   const openDraftConfirm = useCallback(() => {
     if (actionLoading || !hasBlocks) return;
+    setValidationAttempt((previous) => ({ ...previous, format: true, unit: true }));
+    const unitErrors = validateRawMaterialSourcing(blocks, "UNIT");
+    setValidationErrors(unitErrors);
+    if (hasValidationErrors(unitErrors)) {
+      return;
+    }
     if (!canSaveDraft) {
-      setShowFieldErrors(true);
       if (hasIncompleteCertificateUploads(blocks)) {
         showAlert(formStrings.CERT_UPLOAD_PENDING, "warning");
       }
@@ -627,8 +721,13 @@ export const useRawMaterialSpecificationForm = ({
 
   const openSubmitConfirm = useCallback(() => {
     if (actionLoading) return;
+    setValidationAttempt({ format: true, unit: true, submit: true });
+    const submitErrors = validateRawMaterialSourcing(blocks, "SUBMIT");
+    setValidationErrors(submitErrors);
+    if (hasValidationErrors(submitErrors)) {
+      return;
+    }
     if (!canSubmit) {
-      setShowFieldErrors(true);
       if (hasIncompleteCertificateUploads(blocks)) {
         showAlert(formStrings.CERT_UPLOAD_PENDING, "warning");
       }
@@ -665,7 +764,12 @@ export const useRawMaterialSpecificationForm = ({
     blocks,
     canSubmit,
     canSaveDraft,
-    showFieldErrors,
+    validationErrors,
+    validationAttempt,
+    /** @deprecated Use validationAttempt.format */
+    showTypeErrors: validationAttempt.format,
+    /** @deprecated Use validationAttempt.submit */
+    showFieldErrors: validationAttempt.submit,
     mandatoryComplete,
     closeDraftConfirm,
     closeSubmitConfirm,
@@ -682,6 +786,7 @@ export const useRawMaterialSpecificationForm = ({
     handleRemoveLot,
     handleRemoveMaterial,
     handleUpdateBlock,
+    getAnalysedResultError,
     handleUpdateLot,
     handleUpdateMaterial,
     hasBlocks,

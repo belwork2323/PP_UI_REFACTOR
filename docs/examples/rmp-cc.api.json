@@ -2,7 +2,9 @@
   "request": {
     "schemaVersion": "1.0",
     "schemaType": "RAW_MATERIALS",
-    "layout": { "type": "flat" },
+    "layout": {
+      "type": "flat"
+    },
     "materialId": 4,
     "materialCode": "CC",
     "gradeId": null,
@@ -41,7 +43,11 @@
       {
         "id": "DRYING_TRAY_OVEN",
         "title": "Drying in Tray Oven",
-        "ui": { "direction": "row", "wrap": true, "gap": "md" },
+        "ui": {
+          "direction": "row",
+          "wrap": true,
+          "gap": "md"
+        },
         "children": [
           {
             "type": "field",
@@ -51,100 +57,154 @@
             "dataSource": {
               "type": "static",
               "options": [
-                { "label": "Water Heated", "value": "WATER_HEATED" },
-                { "label": "Air Heated", "value": "AIR_HEATED" }
+                {
+                  "label": "Water Heated",
+                  "value": "WATER_HEATED"
+                },
+                {
+                  "label": "Air Heated",
+                  "value": "AIR_HEATED"
+                }
               ]
+            },
+            "validation": {
+              "required": false
             }
           },
           {
             "type": "field",
             "id": "OVEN_NUMBER",
             "fieldType": "text",
-            "label": "Oven No."
+            "label": "Oven No.",
+            "validation": {
+              "required": false
+            }
           },
           {
             "type": "field",
             "id": "OVEN_SET_TEMPERATURE",
             "fieldType": "number",
             "label": "Oven Set Temp",
-            "unit": "°C"
+            "unit": "°C",
+            "validation": {
+              "required": false
+            }
           },
           {
             "type": "field",
             "id": "START_DATETIME",
             "fieldType": "datetime",
-            "label": "Start Date/Time"
+            "label": "Start Date/Time",
+            "validation": {
+              "required": false
+            }
           },
           {
             "type": "field",
             "id": "END_DATETIME",
             "fieldType": "datetime",
-            "label": "End Date/Time"
+            "label": "End Date/Time",
+            "validation": {
+              "required": false
+            }
           },
           {
             "type": "field",
             "id": "MOISTURE",
             "fieldType": "number",
             "label": "Moisture",
-            "unit": "%"
+            "unit": "%",
+            "validation": {
+              "required": false
+            }
           },
           {
             "type": "field",
             "id": "OBSERVATION",
             "fieldType": "textarea",
-            "label": "Any Other Observation"
+            "label": "Any Other Observation",
+            "validation": {
+              "required": false
+            }
           }
         ]
       },
       {
         "id": "SIEVING",
         "title": "Sieving",
-        "ui": { "direction": "row", "wrap": true, "gap": "md" },
+        "ui": {
+          "direction": "row",
+          "wrap": true,
+          "gap": "md"
+        },
         "children": [
           {
             "type": "field",
             "id": "SIEVING_DISPATCH_DATETIME",
             "fieldType": "datetime",
-            "label": "Date of Sieving/Dispatch"
+            "label": "Date of Sieving/Dispatch",
+            "validation": {
+              "required": false
+            }
           },
           {
             "type": "field",
             "id": "SIEVED_QUANTITY",
             "fieldType": "number",
             "label": "Sieved Quantity",
-            "unit": "kg"
+            "unit": "kg",
+            "validation": {
+              "required": false
+            }
           },
           {
             "type": "field",
             "id": "SIEVE_MESH_SIZE",
             "fieldType": "text",
-            "label": "Sieve Mesh Size"
+            "label": "Sieve Mesh Size",
+            "validation": {
+              "required": false
+            }
           },
           {
             "type": "field",
             "id": "OBSERVATION",
             "fieldType": "textarea",
-            "label": "Any Observation"
+            "label": "Any Observation",
+            "validation": {
+              "required": false
+            }
           }
         ]
       },
       {
         "id": "SHIFTING_TO_MIXING",
         "title": "Shifting of Material to Mixing",
-        "ui": { "direction": "row", "wrap": true, "gap": "md" },
+        "ui": {
+          "direction": "row",
+          "wrap": true,
+          "gap": "md"
+        },
         "children": [
           {
             "type": "field",
             "id": "NUMBER_OF_DRUMS",
             "fieldType": "number",
-            "label": "No. of Drums"
+            "label": "No. of Drums",
+            "validation": {
+              "required": false
+            }
           },
           {
             "type": "field",
             "id": "AMOUNT_OF_MATERIAL",
             "fieldType": "number",
             "label": "Amount of Material",
-            "unit": "kg"
+            "unit": "kg",
+            "validation": {
+              "required": true,
+              "min": 0
+            }
           }
         ]
       }

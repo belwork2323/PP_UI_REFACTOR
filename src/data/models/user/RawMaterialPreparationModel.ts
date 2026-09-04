@@ -879,8 +879,12 @@ export const mapPreparationDetailsFromApi = (
         solidMaterialCode: selection.solidMaterialCode,
         solidGradeCode: selection.solidGradeCode,
         liquidMaterialCode: selection.liquidMaterialCode,
-        pendingSolidSections: solidEntry?.sections,
-        pendingLiquidSections: liquidEntry?.sections,
+        pendingSolidSections: solidEntry?.sections
+          ? (JSON.parse(JSON.stringify(solidEntry.sections)) as typeof solidEntry.sections)
+          : undefined,
+        pendingLiquidSections: liquidEntry?.sections
+          ? (JSON.parse(JSON.stringify(liquidEntry.sections)) as typeof liquidEntry.sections)
+          : undefined,
       };
     });
 
@@ -899,7 +903,7 @@ export const mapPreparationDetailsFromApi = (
         }),
         solidMaterialCode: premixSessions[sessionKey]?.solidMaterialCode || code,
         solidGradeCode: premixSessions[sessionKey]?.solidGradeCode || grade,
-        pendingSolidSections: process.sections,
+        pendingSolidSections: JSON.parse(JSON.stringify(process.sections)) as typeof process.sections,
       };
     });
 
@@ -916,7 +920,7 @@ export const mapPreparationDetailsFromApi = (
           liquidMaterialCode: code,
         }),
         liquidMaterialCode: premixSessions[sessionKey]?.liquidMaterialCode || code,
-        pendingLiquidSections: process.sections,
+        pendingLiquidSections: JSON.parse(JSON.stringify(process.sections)) as typeof process.sections,
       };
     });
   });

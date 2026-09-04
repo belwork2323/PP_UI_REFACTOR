@@ -14,6 +14,7 @@ const SubmitForApprovalButton = ({
   ...buttonProps
 }: SubmitForApprovalButtonProps) => (
   <Button
+    type="submit"
     variant="outlined"
     size={size}
     disabled={disabled}

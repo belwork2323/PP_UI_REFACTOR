@@ -25,6 +25,12 @@ import { useRawMaterialLotList } from "./useRawMaterialLotList";
 import { rmCertDebug, summarizeBlocks } from "../../../utils/rawMaterialCertUploadDebug";
 import { discardWorkflowForm } from "../../../utils/workflowDiscard";
 import { extractTempFileIdsFromMaterialBlocks } from "../../../utils/workflowTempFiles";
+import {
+  hasRawMaterialDraftData,
+  validateRawMaterialSourcing,
+} from "../../../data/validation/adapters/rawMaterialSourcing.validation";
+import { hasValidationErrors } from "../../../data/validation/validationErrors";
+import type { ValidationErrors, ValidationTier } from "../../../data/validation/submissionIntent";
 
 type WorkflowView = "list" | "form" | "details";
 type FormEntryMode = "create" | "fill" | "edit";
@@ -46,6 +52,7 @@ export const useRawMaterialProcurementHook = () => {
   const [detailsRow, setDetailsRow] = useState<RawMaterialLotDetailsContext | null>(null);
   const [detailsBlocks, setDetailsBlocks] = useState<MaterialBlock[]>([]);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
 
   const listParams = useRawMaterialLotList();
   const user = useAuthStore((s) => s.user);
@@ -92,6 +99,7 @@ export const useRawMaterialProcurementHook = () => {
     setDetailsRow(null);
     setDetailsBlocks([]);
     setLoadingDetails(false);
+    setValidationErrors({});
   };
 
   const getErrorMessage = (response: any, fallbackMessage: string) => {
@@ -345,6 +353,12 @@ export const useRawMaterialProcurementHook = () => {
     });
   }, [bumpBatchRefresh, deleteTemp, parseBaselineBlocks, subDepartmentId]);
 
+  const validateBlocks = useCallback((blocks: MaterialBlock[], tier: ValidationTier) => {
+    const errors = validateRawMaterialSourcing(blocks, tier);
+    setValidationErrors(errors);
+    return errors;
+  }, []);
+
   const submitForm = async (blocks: MaterialBlock[], intent: "draft" | "submit") => {
     if (!activeBatch) {
       return false;
@@ -360,26 +374,12 @@ export const useRawMaterialProcurementHook = () => {
       return false;
     }
 
-    const hasAnyDraftData = (blocks ?? []).some((block) => {
-      if ((block?.lotNo ?? "").trim().length > 0) return true;
-      if ((block?.supplyOrderNo ?? "").trim().length > 0) return true;
-      if ((block?.manufacturerName ?? "").trim().length > 0) return true;
-      if (
-        (block?.certificates ?? []).some(
-          (c) =>
-            String(c.fileName ?? "").trim().length > 0 ||
-            Boolean(c.file) ||
-            Boolean(String(c.fileId ?? "").trim()),
-        )
-      ) {
-        return true;
-      }
-      return (block?.rows ?? []).some((row) => {
-        const analysedResult = String(row?.analysedResult ?? "").trim();
-        const acemQcResult = String(row?.acemQcResult ?? "").trim();
-        return analysedResult.length > 0 || acemQcResult.length > 0;
-      });
-    });
+    const errors = validateBlocks(blocks, intent === "submit" ? "SUBMIT" : "UNIT");
+    if (hasValidationErrors(errors)) {
+      return false;
+    }
+
+    const hasAnyDraftData = hasRawMaterialDraftData(blocks);
 
     if (formEntryMode === "create") {
       rmCertDebug("8.submitForm.create.start", {
@@ -421,7 +421,6 @@ export const useRawMaterialProcurementHook = () => {
             lotId: l.lotId,
             certCount: (l.certificates ?? []).length,
             certificates: (l.certificates ?? []).map((c) => ({
-              fileName: c.fileName,
               fileId: c.fileId,
               certificateType: c.certificateType,
             })),
@@ -678,6 +677,8 @@ export const useRawMaterialProcurementHook = () => {
     setBackConfirmOpen,
     handleSaveDraft,
     handleSubmit,
+    validationErrors,
+    validateBlocks,
   };
 };
 

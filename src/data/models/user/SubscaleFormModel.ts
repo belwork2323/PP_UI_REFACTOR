@@ -4,10 +4,7 @@ import type {
   SchemaSectionSubmission,
 } from "../../../schema-engine";
 import { STRINGS } from "../../../app/config/strings";
-import type {
-  CasePrepDetailSection,
-  CasePrepDetailTable,
-} from "./CasePreparationFormModel";
+import type { CasePrepDetailSection, CasePrepDetailTable } from "./CasePreparationFormModel";
 import {
   mapCastingCuringPersonLabel,
   parseCastingCuringSectionData,
@@ -343,7 +340,26 @@ export const mapSubscaleDetailsForDisplay = (
 export const createSubscaleData = () => ({
   schemaFormLoaded: false,
   subscaleSchema: null as SchemaDocumentV2 | null,
-  schemaFormValues: {} as SchemaFormValues,
+  schemaFormValues: {
+    NO_OF_40KG_BEMS: "",
+    NO_OF_10KG_BEMS: "",
+    NO_OF_2KG_BEMS: "",
+    NO_OF_WHEEL_PEEL: "",
+    NO_OF_SBS_TBS: "",
+    NO_OF_CARTOONS: "",
+    LINER_TYPE: "",
+    LINER_BATCH_NO: "",
+    LINER_BATCH_DATE: "",
+    ARTICLE_TYPE_TABLE: [],
+    CASTING_TABLE: [],
+    CURING_TABLE: [],
+    NDT_TABLE: [],
+    TRIMMING_TABLE: [],
+    INHIBITION_TABLE: [],
+    STATIC_TESTING_TABLE: [],
+    MECHANICAL_PROPERTIES_TABLE: [],
+    SUBSCALE_MIXING_CYCLES: [],
+  },
   savedSections: undefined as SchemaSectionSubmission[] | undefined,
 });
 

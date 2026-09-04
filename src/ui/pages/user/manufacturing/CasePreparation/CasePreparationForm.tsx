@@ -23,6 +23,7 @@ import {
   createEmptyCasePrepMotorData,
   type CasePrepMotorData,
 } from "../../../../../data/models/user/CasePrepMotorDataModel";
+import type { CasePrepValidationErrors } from "../../../../../data/models/user/casePrepValidation";
 import PremixStatusChip from "../RawMaterial/components/PremixStatusChip";
 import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
 import ViewStatusButton from "../../../../components/common/ViewStatusButton";
@@ -67,6 +68,8 @@ type CasePreparationFormProps = {
   onSubscaleValuesChange: (values: CasePrepMotorData) => void;
   onSaveMotorDraft?: (motorId: string) => void;
   onSubmitMotor?: (motorId: string) => void;
+  /** Per-motor field validation errors (motorId → path → message). */
+  motorValidationErrors?: Record<string, CasePrepValidationErrors>;
   theme: any;
 };
 
@@ -84,6 +87,7 @@ const CasePreparationForm = ({
   onSubscaleValuesChange,
   onSaveMotorDraft,
   onSubmitMotor,
+  motorValidationErrors = {},
   theme,
 }: CasePreparationFormProps) => {
   const BRAND = CASE_PREP_BRAND;
@@ -272,6 +276,7 @@ const CasePreparationForm = ({
             onChange={onSubscaleValuesChange}
             motorId="SUBSCALE"
             batchId={batch?.batchId}
+            validationErrors={motorValidationErrors.SUBSCALE}
             theme={theme}
           />
         </Box>
@@ -397,6 +402,11 @@ const CasePreparationForm = ({
                   placeholder={S.PRRC_CLEARANCE_DATE_PLACEHOLDER}
                   theme={theme}
                 />
+                {motorValidationErrors[activeMotorEntry.motorId]?.prrcClearanceDate ? (
+                  <Typography sx={{ fontSize: "0.7rem", color: "error.main", mt: 0.5 }}>
+                    {motorValidationErrors[activeMotorEntry.motorId].prrcClearanceDate}
+                  </Typography>
+                ) : null}
               </Box>
 
               <CasePrepMotorPanel
@@ -413,6 +423,7 @@ const CasePreparationForm = ({
                 insulationType={activeMotorMeta.insulationType}
                 materials={sheetMaterials}
                 disabled={activeMotorLocked}
+                validationErrors={motorValidationErrors[activeMotorEntry.motorId]}
                 theme={theme}
               />
             </Box>

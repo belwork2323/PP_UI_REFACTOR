@@ -2,7 +2,9 @@
   "request": {
     "schemaVersion": "1.0",
     "schemaType": "RAW_MATERIALS",
-    "layout": { "type": "flat" },
+    "layout": {
+      "type": "flat"
+    },
     "materialId": 1,
     "materialCode": "AP",
     "gradeId": 101,
@@ -52,7 +54,11 @@
             "type": "group",
             "id": "FEED_LOTS",
             "label": "Material Lots",
-            "ui": { "direction": "row", "wrap": true, "gap": "md" },
+            "ui": {
+              "direction": "row",
+              "wrap": true,
+              "gap": "md"
+            },
             "repeat": {
               "defaultCount": 1,
               "min": 1,
@@ -84,7 +90,19 @@
                     }
                   }
                 },
-                "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 }, "maxWidth": "240px" }
+                "ui": {
+                  "colSpan": {
+                    "xs": 12,
+                    "sm": 6,
+                    "md": 4
+                  },
+                  "maxWidth": "240px"
+                },
+                "validation": {
+                  "required": true,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9 /_-]*$",
+                  "message": "Must be alphanumeric."
+                }
               },
               {
                 "type": "field",
@@ -92,7 +110,18 @@
                 "fieldType": "number",
                 "label": "Quantity",
                 "unit": "kg",
-                "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 }, "maxWidth": "200px" }
+                "ui": {
+                  "colSpan": {
+                    "xs": 12,
+                    "sm": 6,
+                    "md": 4
+                  },
+                  "maxWidth": "200px"
+                },
+                "validation": {
+                  "required": true,
+                  "min": 0
+                }
               }
             ]
           }
@@ -124,7 +153,12 @@
               ]
             },
             "columns": [
-              { "type": "column", "id": "srNo", "fieldType": "serial", "label": "Sr No." },
+              {
+                "type": "column",
+                "id": "srNo",
+                "fieldType": "serial",
+                "label": "Sr No."
+              },
               {
                 "type": "column",
                 "id": "OPERATION",
@@ -143,7 +177,11 @@
                 "type": "column",
                 "id": "ACTUAL_PARAMETER",
                 "fieldType": "text",
-                "label": "Actual Parameter"
+                "label": "Actual Parameter",
+                "validation": {
+                  "required": true,
+                  "min": 0
+                }
               }
             ]
           }
@@ -175,7 +213,12 @@
               ]
             },
             "columns": [
-              { "type": "column", "id": "srNo", "fieldType": "serial", "label": "Sr No." },
+              {
+                "type": "column",
+                "id": "srNo",
+                "fieldType": "serial",
+                "label": "Sr No."
+              },
               {
                 "type": "column",
                 "id": "OPERATION",
@@ -194,15 +237,30 @@
                 "type": "column",
                 "id": "ACTUAL_PARAMETER",
                 "fieldType": "text",
-                "label": "Actual Parameter"
+                "label": "Actual Parameter",
+                "validation": {
+                  "required": true,
+                  "min": 0
+                }
               },
               {
                 "type": "column",
                 "id": "START_TIME",
                 "fieldType": "datetime",
-                "label": "Start Time"
+                "label": "Start Time",
+                "validation": {
+                  "required": true
+                }
               },
-              { "type": "column", "id": "END_TIME", "fieldType": "datetime", "label": "End Time" }
+              {
+                "type": "column",
+                "id": "END_TIME",
+                "fieldType": "datetime",
+                "label": "End Time",
+                "validation": {
+                  "required": true
+                }
+              }
             ]
           }
         ]
@@ -214,7 +272,11 @@
           {
             "type": "group",
             "id": "DISPATCH_BINS",
-            "ui": { "direction": "row", "wrap": true, "gap": "md" },
+            "ui": {
+              "direction": "row",
+              "wrap": true,
+              "gap": "md"
+            },
             "repeat": {
               "defaultCount": 1,
               "min": 1,
@@ -228,7 +290,19 @@
                 "id": "BIN_NUMBER",
                 "fieldType": "text",
                 "label": "Bin Number",
-                "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 }, "maxWidth": "200px" }
+                "ui": {
+                  "colSpan": {
+                    "xs": 12,
+                    "sm": 6,
+                    "md": 4
+                  },
+                  "maxWidth": "200px"
+                },
+                "validation": {
+                  "required": true,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9 /_-]*$",
+                  "message": "Must be alphanumeric."
+                }
               },
               {
                 "type": "field",
@@ -236,7 +310,17 @@
                 "fieldType": "number",
                 "label": "Bin Capacity",
                 "unit": "kg",
-                "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 }, "maxWidth": "200px" }
+                "ui": {
+                  "colSpan": {
+                    "xs": 12,
+                    "sm": 6,
+                    "md": 4
+                  },
+                  "maxWidth": "200px"
+                },
+                "validation": {
+                  "required": false
+                }
               },
               {
                 "type": "field",
@@ -244,7 +328,18 @@
                 "fieldType": "number",
                 "label": "Material Filled Quantity",
                 "unit": "kg",
-                "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 }, "maxWidth": "200px" }
+                "ui": {
+                  "colSpan": {
+                    "xs": 12,
+                    "sm": 6,
+                    "md": 4
+                  },
+                  "maxWidth": "200px"
+                },
+                "validation": {
+                  "required": true,
+                  "min": 0
+                }
               }
             ]
           }
@@ -267,10 +362,26 @@
                   "PSD_REQUIREMENT": "Above 500 µm, % max",
                   "SPECIFICATION": "5"
                 },
-                { "readonly": true, "PSD_REQUIREMENT": "500-355 µm, %", "SPECIFICATION": "27±5" },
-                { "readonly": true, "PSD_REQUIREMENT": "355-300 µm, %", "SPECIFICATION": "32±5" },
-                { "readonly": true, "PSD_REQUIREMENT": "300-45 µm, %", "SPECIFICATION": "33±5" },
-                { "readonly": true, "PSD_REQUIREMENT": "Less than 45 µm, %", "SPECIFICATION": "1" }
+                {
+                  "readonly": true,
+                  "PSD_REQUIREMENT": "500-355 µm, %",
+                  "SPECIFICATION": "27±5"
+                },
+                {
+                  "readonly": true,
+                  "PSD_REQUIREMENT": "355-300 µm, %",
+                  "SPECIFICATION": "32±5"
+                },
+                {
+                  "readonly": true,
+                  "PSD_REQUIREMENT": "300-45 µm, %",
+                  "SPECIFICATION": "33±5"
+                },
+                {
+                  "readonly": true,
+                  "PSD_REQUIREMENT": "Less than 45 µm, %",
+                  "SPECIFICATION": "1"
+                }
               ]
             },
             "columns": [
@@ -286,7 +397,16 @@
                 "fieldType": "static",
                 "label": "Specification"
               },
-              { "type": "column", "id": "RESULT", "fieldType": "number", "label": "Result" }
+              {
+                "type": "column",
+                "id": "RESULT",
+                "fieldType": "number",
+                "label": "Result",
+                "validation": {
+                  "required": true,
+                  "min": 0
+                }
+              }
             ]
           }
         ]

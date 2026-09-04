@@ -1,8 +1,9 @@
 import { forwardRef, type ChangeEvent, type Ref } from "react";
 
-/** Match prior accept list; keep broad for OS that omit MIME on pick. */
-export const CERTIFICATE_FILE_ACCEPT =
-  ".pdf,.doc,.docx,.xls,.xlsx,.jpg,.jpeg,.png,.zip,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,application/zip,application/x-zip-compressed";
+import { FILE_PICKER_ACCEPT } from "../../../../../utils/FileUtils";
+
+/** RMS lot certificates: PDF, images, and video only. */
+export const CERTIFICATE_FILE_ACCEPT = FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF;
 
 type CertificateFileInputProps = {
   id: string;

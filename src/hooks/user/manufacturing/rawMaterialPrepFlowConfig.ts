@@ -452,10 +452,38 @@ export const alignPremixSessionsToSelections = (
       solidMaterialCode: selection.solidMaterialCode || orphan.solidMaterialCode,
       solidGradeCode: selection.solidGradeCode || orphan.solidGradeCode,
       liquidMaterialCode: selection.liquidMaterialCode || orphan.liquidMaterialCode,
-      pendingSolidSections: orphan.pendingSolidSections ?? current?.pendingSolidSections,
-      pendingLiquidSections: orphan.pendingLiquidSections ?? current?.pendingLiquidSections,
-      solid: current?.solid ?? orphan.solid,
-      liquid: current?.liquid ?? orphan.liquid,
+      pendingSolidSections: orphan.pendingSolidSections
+        ? orphan.pendingSolidSections.map((section) => ({
+            ...section,
+            sectionData: Array.isArray(section.sectionData)
+              ? section.sectionData.map((row) =>
+                  row && typeof row === "object" ? { ...(row as Record<string, unknown>) } : row,
+                )
+              : section.sectionData,
+          }))
+        : current?.pendingSolidSections,
+      pendingLiquidSections: orphan.pendingLiquidSections
+        ? orphan.pendingLiquidSections.map((section) => ({
+            ...section,
+            sectionData: Array.isArray(section.sectionData)
+              ? section.sectionData.map((row) =>
+                  row && typeof row === "object" ? { ...(row as Record<string, unknown>) } : row,
+                )
+              : section.sectionData,
+          }))
+        : current?.pendingLiquidSections,
+      solid: current?.solid
+        ? { ...current.solid, formValues: { ...(current.solid.formValues ?? {}) } }
+        : {
+            ...orphan.solid,
+            formValues: { ...(orphan.solid?.formValues ?? {}) },
+          },
+      liquid: current?.liquid
+        ? { ...current.liquid, formValues: { ...(current.liquid.formValues ?? {}) } }
+        : {
+            ...orphan.liquid,
+            formValues: { ...(orphan.liquid?.formValues ?? {}) },
+          },
     };
   });
 

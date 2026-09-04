@@ -2,7 +2,9 @@
   "request": {
     "schemaVersion": "1.0",
     "schemaType": "RAW_MATERIALS",
-    "layout": { "type": "flat" },
+    "layout": {
+      "type": "flat"
+    },
     "materialId": 1,
     "materialCode": "AP",
     "gradeId": 102,
@@ -70,10 +72,30 @@
               ]
             },
             "columns": [
-              { "type": "column", "id": "srNo", "fieldType": "serial", "label": "Sr No." },
-              { "type": "column", "id": "OPERATION", "fieldType": "static", "label": "Operation" },
-              { "type": "column", "id": "SET_PARAMETER", "fieldType": "static", "label": "Set Parameter" },
-              { "type": "column", "id": "ACTUAL_PARAMETER", "fieldType": "text", "label": "Actual Parameter" }
+              {
+                "type": "column",
+                "id": "srNo",
+                "fieldType": "serial",
+                "label": "Sr No."
+              },
+              {
+                "type": "column",
+                "id": "OPERATION",
+                "fieldType": "static",
+                "label": "Operation"
+              },
+              {
+                "type": "column",
+                "id": "SET_PARAMETER",
+                "fieldType": "static",
+                "label": "Set Parameter"
+              },
+              {
+                "type": "column",
+                "id": "ACTUAL_PARAMETER",
+                "fieldType": "text",
+                "label": "Actual Parameter"
+              }
             ]
           }
         ]
@@ -109,12 +131,48 @@
               ]
             },
             "columns": [
-              { "type": "column", "id": "srNo", "fieldType": "serial", "label": "Sr No." },
-              { "type": "column", "id": "OPERATION", "fieldType": "static", "label": "Operation" },
-              { "type": "column", "id": "SET_PARAMETER", "fieldType": "static", "label": "Set Parameter" },
-              { "type": "column", "id": "ACTUAL_PARAMETER", "fieldType": "text", "label": "Actual Parameter" },
-              { "type": "column", "id": "START_TIME", "fieldType": "datetime", "label": "Start Time" },
-              { "type": "column", "id": "END_TIME", "fieldType": "datetime", "label": "End Time" }
+              {
+                "type": "column",
+                "id": "srNo",
+                "fieldType": "serial",
+                "label": "Sr No."
+              },
+              {
+                "type": "column",
+                "id": "OPERATION",
+                "fieldType": "static",
+                "label": "Operation"
+              },
+              {
+                "type": "column",
+                "id": "SET_PARAMETER",
+                "fieldType": "static",
+                "label": "Set Parameter"
+              },
+              {
+                "type": "column",
+                "id": "ACTUAL_PARAMETER",
+                "fieldType": "text",
+                "label": "Actual Parameter"
+              },
+              {
+                "type": "column",
+                "id": "START_TIME",
+                "fieldType": "datetime",
+                "label": "Start Time",
+                "validation": {
+                  "required": false
+                }
+              },
+              {
+                "type": "column",
+                "id": "END_TIME",
+                "fieldType": "datetime",
+                "label": "End Time",
+                "validation": {
+                  "required": false
+                }
+              }
             ]
           }
         ]
@@ -135,14 +193,22 @@
               "allowDelete": true,
               "label": "Lot {index}"
             },
-            "ui": { "direction": "row", "wrap": true, "gap": "md" },
+            "ui": {
+              "direction": "row",
+              "wrap": true,
+              "gap": "md"
+            },
             "children": [
               {
                 "type": "field",
                 "id": "LOT_NUMBER",
                 "fieldType": "dropdown",
                 "label": "Enter Lot No.",
-                "validation": { "required": true },
+                "validation": {
+                  "required": true,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9 /_-]*$",
+                  "message": "Must be alphanumeric."
+                },
                 "dataSource": {
                   "type": "api",
                   "api": {
@@ -151,9 +217,13 @@
                     "requestBody": {
                       "limit": 500,
                       "page": 1,
-                      "status": ["APPROVED"],
+                      "status": [
+                        "APPROVED"
+                      ],
                       "subDepartmentId": 1,
-                      "materialCode": ["{{materialCode}}"]
+                      "materialCode": [
+                        "{{materialCode}}"
+                      ]
                     },
                     "responsePath": "data.lots",
                     "displayKey": "lotId",
@@ -167,13 +237,21 @@
                 "fieldType": "number",
                 "label": "Total Qty to be Ground",
                 "unit": "kg",
-                "validation": { "required": true }
+                "validation": {
+                  "required": true,
+                  "min": 0
+                }
               },
               {
                 "type": "field",
                 "id": "EQUIPMENT_ID",
                 "fieldType": "text",
-                "label": "Enter ACM Equipment Id."
+                "label": "Enter ACM Equipment Id.",
+                "validation": {
+                  "required": true,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9 /_-]*$",
+                  "message": "Must be alphanumeric."
+                }
               },
               {
                 "type": "table",
@@ -184,40 +262,79 @@
                   "allowAdd": false,
                   "allowDelete": false,
                   "presetRows": [
-                    { "readonly": true, "PARAMETER": "Mill RPM" },
-                    { "readonly": true, "PARAMETER": "Classifier RPM" },
-                    { "readonly": true, "PARAMETER": "Screw Feeder RPM" },
-                    { "readonly": true, "PARAMETER": "ID Fan RPM" }
+                    {
+                      "readonly": true,
+                      "PARAMETER": "Mill RPM"
+                    },
+                    {
+                      "readonly": true,
+                      "PARAMETER": "Classifier RPM"
+                    },
+                    {
+                      "readonly": true,
+                      "PARAMETER": "Screw Feeder RPM"
+                    },
+                    {
+                      "readonly": true,
+                      "PARAMETER": "ID Fan RPM"
+                    }
                   ]
                 },
                 "columns": [
-                  { "type": "column", "id": "PARAMETER", "fieldType": "static", "label": "Parameter" },
-                  { "type": "column", "id": "VALUE", "fieldType": "number", "label": "RPM" }
+                  {
+                    "type": "column",
+                    "id": "PARAMETER",
+                    "fieldType": "static",
+                    "label": "Parameter"
+                  },
+                  {
+                    "type": "column",
+                    "id": "VALUE",
+                    "fieldType": "number",
+                    "label": "RPM",
+                    "validation": {
+                      "required": true,
+                      "min": 0
+                    }
+                  }
                 ]
               },
               {
                 "type": "field",
                 "id": "SET_PRESSURE",
                 "fieldType": "text",
-                "label": "Set Pressure"
+                "label": "Set Pressure",
+                "validation": {
+                  "required": true,
+                  "min": 0
+                }
               },
               {
                 "type": "field",
                 "id": "START_DATETIME",
                 "fieldType": "datetime",
-                "label": "Start Date/Time"
+                "label": "Start Date/Time",
+                "validation": {
+                  "required": true
+                }
               },
               {
                 "type": "field",
                 "id": "END_DATETIME",
                 "fieldType": "datetime",
-                "label": "End Date/Time"
+                "label": "End Date/Time",
+                "validation": {
+                  "required": true
+                }
               },
               {
                 "type": "field",
                 "id": "OBSERVATION",
                 "fieldType": "textarea",
-                "label": "Any Other Observation"
+                "label": "Any Other Observation",
+                "validation": {
+                  "required": false
+                }
               },
               {
                 "type": "table",
@@ -228,15 +345,46 @@
                   "allowAdd": false,
                   "allowDelete": false,
                   "presetRows": [
-                    { "readonly": true, "SIZE_RANGE": "+105", "SPECIFICATION": "0-5%" },
-                    { "readonly": true, "SIZE_RANGE": "75+105", "SPECIFICATION": "25-35%" },
-                    { "readonly": true, "SIZE_RANGE": "<75", "SPECIFICATION": "60-70%" }
+                    {
+                      "readonly": true,
+                      "SIZE_RANGE": "+105",
+                      "SPECIFICATION": "0-5%"
+                    },
+                    {
+                      "readonly": true,
+                      "SIZE_RANGE": "75+105",
+                      "SPECIFICATION": "25-35%"
+                    },
+                    {
+                      "readonly": true,
+                      "SIZE_RANGE": "<75",
+                      "SPECIFICATION": "60-70%"
+                    }
                   ]
                 },
                 "columns": [
-                  { "type": "column", "id": "SIZE_RANGE", "fieldType": "static", "label": "Particle Size Distribution" },
-                  { "type": "column", "id": "SPECIFICATION", "fieldType": "static", "label": "Specification" },
-                  { "type": "column", "id": "RESULT", "fieldType": "number", "label": "Result" }
+                  {
+                    "type": "column",
+                    "id": "SIZE_RANGE",
+                    "fieldType": "static",
+                    "label": "Particle Size Distribution"
+                  },
+                  {
+                    "type": "column",
+                    "id": "SPECIFICATION",
+                    "fieldType": "static",
+                    "label": "Specification"
+                  },
+                  {
+                    "type": "column",
+                    "id": "RESULT",
+                    "fieldType": "number",
+                    "label": "Result",
+                    "validation": {
+                      "required": true,
+                      "min": 0
+                    }
+                  }
                 ]
               },
               {
@@ -253,7 +401,11 @@
       {
         "id": "STORAGE_TRAY_OVEN",
         "title": "Storage in Tray Oven",
-        "ui": { "direction": "row", "wrap": true, "gap": "md" },
+        "ui": {
+          "direction": "row",
+          "wrap": true,
+          "gap": "md"
+        },
         "children": [
           {
             "type": "field",
@@ -263,18 +415,45 @@
             "dataSource": {
               "type": "static",
               "options": [
-                { "label": "Water Heated", "value": "WATER_HEATED" },
-                { "label": "Air Heated", "value": "AIR_HEATED" }
+                {
+                  "label": "Water Heated",
+                  "value": "WATER_HEATED"
+                },
+                {
+                  "label": "Air Heated",
+                  "value": "AIR_HEATED"
+                }
               ]
             },
-            "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 3 }, "maxWidth": "220px" }
+            "ui": {
+              "colSpan": {
+                "xs": 12,
+                "sm": 6,
+                "md": 3
+              },
+              "maxWidth": "220px"
+            },
+            "validation": {
+              "required": true
+            }
           },
           {
             "type": "field",
             "id": "OVEN_NUMBER",
             "fieldType": "text",
             "label": "Oven Number",
-            "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 3 }, "maxWidth": "220px" }
+            "ui": {
+              "colSpan": {
+                "xs": 12,
+                "sm": 6,
+                "md": 3
+              },
+              "maxWidth": "220px"
+            },
+            "validation": {
+              "required": true,
+              "min": 0
+            }
           },
           {
             "type": "field",
@@ -282,21 +461,52 @@
             "fieldType": "number",
             "label": "Oven Set Temp",
             "unit": "°C",
-            "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 3 }, "maxWidth": "220px" }
+            "ui": {
+              "colSpan": {
+                "xs": 12,
+                "sm": 6,
+                "md": 3
+              },
+              "maxWidth": "220px"
+            },
+            "validation": {
+              "required": true,
+              "min": 0
+            }
           },
           {
             "type": "field",
             "id": "START_DATETIME",
             "fieldType": "datetime",
             "label": "Start Date/Time",
-            "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 3 }, "maxWidth": "220px" }
+            "ui": {
+              "colSpan": {
+                "xs": 12,
+                "sm": 6,
+                "md": 3
+              },
+              "maxWidth": "220px"
+            },
+            "validation": {
+              "required": true
+            }
           },
           {
             "type": "field",
             "id": "END_DATETIME",
             "fieldType": "datetime",
             "label": "End Date/Time",
-            "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 3 }, "maxWidth": "220px" }
+            "ui": {
+              "colSpan": {
+                "xs": 12,
+                "sm": 6,
+                "md": 3
+              },
+              "maxWidth": "220px"
+            },
+            "validation": {
+              "required": true
+            }
           },
           {
             "type": "field",
@@ -304,28 +514,63 @@
             "fieldType": "number",
             "label": "Moisture",
             "unit": "%",
-            "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 3 }, "maxWidth": "220px" }
+            "ui": {
+              "colSpan": {
+                "xs": 12,
+                "sm": 6,
+                "md": 3
+              },
+              "maxWidth": "220px"
+            },
+            "validation": {
+              "required": true,
+              "min": 0
+            }
           },
           {
             "type": "field",
             "id": "OBSERVATION",
             "fieldType": "textarea",
             "label": "Any Other Observation",
-            "ui": { "colSpan": { "xs": 12, "sm": 12, "md": 6 }, "maxWidth": "450px" }
+            "ui": {
+              "colSpan": {
+                "xs": 12,
+                "sm": 12,
+                "md": 6
+              },
+              "maxWidth": "450px"
+            },
+            "validation": {
+              "required": false
+            }
           }
         ]
       },
       {
         "id": "SIEVING",
         "title": "Sieving",
-        "ui": { "direction": "row", "wrap": true, "gap": "md" },
+        "ui": {
+          "direction": "row",
+          "wrap": true,
+          "gap": "md"
+        },
         "children": [
           {
             "type": "field",
             "id": "SIEVING_DISPATCH_DATETIME",
             "fieldType": "datetime",
             "label": "Date of Sieving/Dispatch",
-            "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 3 }, "minWidth": "240px" }
+            "ui": {
+              "colSpan": {
+                "xs": 12,
+                "sm": 6,
+                "md": 3
+              },
+              "minWidth": "240px"
+            },
+            "validation": {
+              "required": true
+            }
           },
           {
             "type": "field",
@@ -333,14 +578,37 @@
             "fieldType": "number",
             "label": "Sieved Quantity",
             "unit": "kg",
-            "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 3 }, "minWidth": "200px" }
+            "ui": {
+              "colSpan": {
+                "xs": 12,
+                "sm": 6,
+                "md": 3
+              },
+              "minWidth": "200px"
+            },
+            "validation": {
+              "required": true,
+              "min": 0
+            }
           },
           {
             "type": "field",
             "id": "SIEVE_MESH_SIZE",
             "fieldType": "text",
             "label": "Sieve Mesh Size",
-            "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 3 }, "minWidth": "220px" }
+            "ui": {
+              "colSpan": {
+                "xs": 12,
+                "sm": 6,
+                "md": 3
+              },
+              "minWidth": "220px"
+            },
+            "validation": {
+              "required": true,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9 /_-]*$",
+              "message": "Must be alphanumeric."
+            }
           },
           {
             "type": "field",
@@ -348,7 +616,18 @@
             "fieldType": "number",
             "label": "Oversize Quantity",
             "unit": "kg",
-            "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 3 }, "minWidth": "200px" }
+            "ui": {
+              "colSpan": {
+                "xs": 12,
+                "sm": 6,
+                "md": 3
+              },
+              "minWidth": "200px"
+            },
+            "validation": {
+              "required": true,
+              "min": 0
+            }
           },
           {
             "type": "field",
@@ -356,14 +635,35 @@
             "fieldType": "number",
             "label": "Undersize Quantity",
             "unit": "kg",
-            "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 3 }, "minWidth": "200px" }
+            "ui": {
+              "colSpan": {
+                "xs": 12,
+                "sm": 6,
+                "md": 3
+              },
+              "minWidth": "200px"
+            },
+            "validation": {
+              "required": true,
+              "min": 0
+            }
           },
           {
             "type": "field",
             "id": "OBSERVATION",
             "fieldType": "textarea",
             "label": "Any Observation",
-            "ui": { "colSpan": { "xs": 12, "sm": 12, "md": 6 }, "minWidth": "400px" }
+            "ui": {
+              "colSpan": {
+                "xs": 12,
+                "sm": 12,
+                "md": 6
+              },
+              "minWidth": "400px"
+            },
+            "validation": {
+              "required": false
+            }
           }
         ]
       },
@@ -375,7 +675,11 @@
             "type": "group",
             "id": "DRUM_DETAILS",
             "label": "Drum Details",
-            "ui": { "direction": "row", "wrap": true, "gap": "md" },
+            "ui": {
+              "direction": "row",
+              "wrap": true,
+              "gap": "md"
+            },
             "repeat": {
               "defaultCount": 1,
               "min": 1,
@@ -390,7 +694,17 @@
                 "id": "DRUM_NUMBER",
                 "fieldType": "text",
                 "label": "Drum Number",
-                "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 }, "maxWidth": "220px" }
+                "ui": {
+                  "colSpan": {
+                    "xs": 12,
+                    "sm": 6,
+                    "md": 4
+                  },
+                  "maxWidth": "220px"
+                },
+                "validation": {
+                  "required": false
+                }
               },
               {
                 "type": "field",
@@ -398,7 +712,14 @@
                 "fieldType": "number",
                 "label": "Quantity",
                 "unit": "kg",
-                "ui": { "colSpan": { "xs": 12, "sm": 6, "md": 4 }, "maxWidth": "200px" }
+                "ui": {
+                  "colSpan": {
+                    "xs": 12,
+                    "sm": 6,
+                    "md": 4
+                  },
+                  "maxWidth": "200px"
+                }
               }
             ]
           }

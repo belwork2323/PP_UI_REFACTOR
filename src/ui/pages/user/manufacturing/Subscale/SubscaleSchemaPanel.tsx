@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useCallback } from "react";
+import { useFormContext } from "react-hook-form";
 import { Box } from "@mui/material";
 import {
   SchemaUI,
@@ -34,6 +35,7 @@ type SubscaleSchemaPanelProps = {
   loading?: boolean;
   error?: string | null;
   batchDetails;
+  validationErrors?: Record<string, string> | null;
 };
 
 const mergeFormValuesForBatchType = (
@@ -57,11 +59,13 @@ const SubscaleSchemaPanel = ({
   loading = false,
   error = null,
   batchDetails,
+  validationErrors = null,
 }: SubscaleSchemaPanelProps) => {
   const hydratedRef = useRef(false);
   const showMainScaleSetup = isMainScaleSubscaleBatch(batchType);
   const showSubscaleBatchSetup = isSubscaleProcessingBatch(batchType);
   const canManageProcessTables = canSubscaleManageProcessTables(batchStatus);
+  const form = useFormContext();
 
   const processingSchema = useMemo(() => {
     if (!schema || (!showMainScaleSetup && !showSubscaleBatchSetup)) return schema;
@@ -77,32 +81,39 @@ const SubscaleSchemaPanel = ({
   // SchemaRenderer already runs row-generation sync on processingSchema; do not re-sync here.
   const emitChange = useCallback(
     (next: SchemaFormValues) => {
+      // Update external state and keep react-hook-form in sync
+      if (form && typeof form.setValue === "function") {
+        form.setValue("schemaFormValues", next, { shouldDirty: true, shouldValidate: true });
+        if (next.IS_PROCESS_FORM_LOADED) {
+          form.setValue("schemaFormLoaded", true, { shouldDirty: true });
+        }
+      }
       onChange(next);
     },
-    [onChange],
+    [onChange, form],
   );
 
   const handleHardwareChange = useCallback(
     (next: SchemaFormValues) => {
       if (next.IS_PROCESS_FORM_LOADED) {
-        onChange(next);
+        emitChange(next);
         return;
       }
       const merged = mergeHardwareFormValues(next);
-      onChange(applySubscaleHardwareRowGeneration(schema, merged));
+      emitChange(applySubscaleHardwareRowGeneration(schema, merged));
     },
-    [onChange, schema],
+    [emitChange, schema],
   );
 
   const handleBatchSetupChange = useCallback(
     (next: SchemaFormValues) => {
       if (next.IS_PROCESS_FORM_LOADED) {
-        onChange(next);
+        emitChange(next);
         return;
       }
-      onChange(mergeSubscaleBatchFormValues(next));
+      emitChange(mergeSubscaleBatchFormValues(next));
     },
-    [onChange],
+    [emitChange],
   );
 
   useEffect(() => {
@@ -160,25 +171,17 @@ const SubscaleSchemaPanel = ({
             values={formValues}
             onChange={handleBatchSetupChange}
             batchDetails={batchDetails}
+            validationErrors={validationErrors}
           />
           <SubscaleHardwareArticlePanel
             values={formValues}
             onChange={handleBatchSetupChange}
             batchType={batchType}
             canManageProcessTables={canManageProcessTables}
+            validationErrors={validationErrors}
           />
         </>
       ) : null}
-      {/* <SubscaleProcessingUIForm /> */}
-      {/* <SchemaUI
-        schema={processingSchema}
-        value={formValues}
-        onChange={emitChange}
-        loading={loading}
-        error={error}
-        themeTokens={themeTokens}
-        apiContext={{ subDepartmentId, batchId }}
-      /> */}
     </Box>
   );
 };

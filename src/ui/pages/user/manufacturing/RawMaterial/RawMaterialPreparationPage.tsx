@@ -54,6 +54,9 @@ const RawMaterialPreparationPage = () => {
     formHydrationKey,
     handleSavePremixDraft,
     handleSubmitPremix,
+    premixFieldErrors,
+    weightmentErrors,
+    validationAttempt,
   } = hookState;
 
   const listLoading = loading && !loadingFormDetails && view === "list";
@@ -125,6 +128,9 @@ const RawMaterialPreparationPage = () => {
               setSubmitConfirmOpen(true);
             }}
             actionLoading={actionLoading}
+            premixFieldErrors={premixFieldErrors}
+            weightmentErrors={weightmentErrors}
+            validationAttempt={validationAttempt}
           />
         </Box>
       )}

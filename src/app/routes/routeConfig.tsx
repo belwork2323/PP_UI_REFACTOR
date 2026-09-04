@@ -16,6 +16,7 @@ const BatchManagementPage = lazy(
 const ProjectManagementPage = lazy(
   () => import("@ui/pages/admin/ProjectManagement/ProjectManagementPage"),
 );
+const MasterDataPage = lazy(() => import("@ui/pages/admin/MasterData/MasterDataPage"));
 
 const SystemManagerDashboard = lazy(
   () => import("../../ui/pages/systemManager/SystemManagerDashboard"),
@@ -88,6 +89,12 @@ export const routes = [
     roles: ["ADMIN"],
   },
   {
+    path: "/admin/master-data",
+    element: <MasterDataPage />,
+    isProtected: true,
+    roles: ["ADMIN"],
+  },
+  {
     path: "/centre-head",
     element: <CHDashboard />,
     isProtected: true,
@@ -109,6 +116,12 @@ export const routes = [
   {
     path: "/centre-head/projects",
     element: <CHProjectManagementPage />,
+    isProtected: true,
+    roles: ["CENTRE_HEAD"],
+  },
+  {
+    path: "/centre-head/master-data",
+    element: <MasterDataPage />,
     isProtected: true,
     roles: ["CENTRE_HEAD"],
   },

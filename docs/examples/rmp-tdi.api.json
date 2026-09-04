@@ -2,7 +2,9 @@
   "request": {
     "schemaVersion": "1.0",
     "schemaType": "RAW_MATERIALS",
-    "layout": { "type": "flat" },
+    "layout": {
+      "type": "flat"
+    },
     "materialId": 8,
     "materialCode": "TDI",
     "gradeId": null,
@@ -46,7 +48,11 @@
             "type": "group",
             "id": "PROCESSING_LOTS",
             "label": "Lot {index}",
-            "ui": { "direction": "row", "wrap": true, "gap": "md" },
+            "ui": {
+              "direction": "row",
+              "wrap": true,
+              "gap": "md"
+            },
             "repeat": {
               "defaultCount": 1,
               "min": 1,
@@ -61,7 +67,9 @@
                 "id": "MFG_BATCH_LOT_NUMBER",
                 "fieldType": "text",
                 "label": "Enter Mfg/Batch Lot Nos",
-                "validation": { "required": true }
+                "validation": {
+                  "required": false
+                }
               },
               {
                 "type": "field",
@@ -69,26 +77,38 @@
                 "fieldType": "number",
                 "label": "Quantity",
                 "unit": "kg",
-                "validation": { "required": true }
+                "validation": {
+                  "required": false
+                }
               },
               {
                 "type": "field",
                 "id": "DISPATCH_DATETIME",
                 "fieldType": "datetime",
-                "label": "Date/Time of Dispatch"
+                "label": "Date/Time of Dispatch",
+                "validation": {
+                  "required": false
+                }
               },
               {
                 "type": "field",
                 "id": "OBSERVATION",
                 "fieldType": "textarea",
-                "label": "Any Other Observation"
+                "label": "Any Other Observation",
+                "validation": {
+                  "required": false
+                }
               },
               {
                 "type": "field",
                 "id": "TOTAL_QUANTITY_SENT_FOR_PREMIX",
                 "fieldType": "number",
                 "label": "Total Quantity sent for premix",
-                "unit": "kg"
+                "unit": "kg",
+                "validation": {
+                  "required": true,
+                  "min": 0
+                }
               }
             ]
           }

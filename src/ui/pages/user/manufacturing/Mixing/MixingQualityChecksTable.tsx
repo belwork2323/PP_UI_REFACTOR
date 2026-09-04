@@ -1,53 +1,63 @@
+import React from "react";
 import {
+  Box,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Typography,
   alpha,
 } from "@mui/material";
+import { Controller, useFormContext, get } from "react-hook-form";
+import { MixingTableInput } from "./MixingFormFields";
 import { STRINGS } from "../../../../../app/config/strings";
 import { MIXING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/mixing_theme";
 import { createDataTableTheme } from "../../../../../app/theme/custom_themes/shared/data_table_theme";
 import type { QualityCheckRow } from "../../../../../data/models/user/MixingFormModel";
-import { MixingTableInput } from "./MixingFormFields";
 
 const S = STRINGS.MANUFACTURING.MIXING;
 const BRAND = MIXING_BRAND;
 const dt = createDataTableTheme({ ...MIXING_BRAND });
-const observedGroupBorder = `2px solid ${alpha(BRAND.mx, 0.22)}`;
-const OBSERVED_FIELDS = ["observed1", "observed2", "observed3", "observed4"] as const;
 
-type QualityCheckObservedField = (typeof OBSERVED_FIELDS)[number];
+const observedGroupBorder = `1px solid ${alpha("#fff", 0.55)}`;
 
 type MixingQualityChecksTableProps = {
   rows: QualityCheckRow[];
   readOnly?: boolean;
-  onChange?: (parameterId: string, field: QualityCheckObservedField, value: string) => void;
+  /** Pass full path like `premixes.${cardIdx}.qualityChecks` or `finalMixes.${cardIdx}.qualityChecks` */
+  arrayName?: string;
+  onChange?: (parameterId: string | number, index: number, value: string) => void;
 };
 
 const resolveRowSampleCount = (row: QualityCheckRow): number => {
-  const parsed = Number(row.sampleCount);
-  if (Number.isFinite(parsed) && parsed > 0) {
-    return Math.max(1, Math.min(4, Math.floor(parsed)));
+  const rawCount = Number(row.noOfSamples);
+  if (Number.isFinite(rawCount) && rawCount > 0) {
+    return Math.floor(rawCount);
   }
-  return row.observedLayout === "quad" ? 4 : 1;
+  if (Array.isArray(row.observedValues) && row.observedValues.length > 0) {
+    return row.observedValues.length;
+  }
+  return 1;
 };
 
-const displayValue = (value: string | undefined, emptyFallback = "—") => {
-  const trimmed = String(value ?? "").trim();
-  return trimmed || emptyFallback;
+const displayValue = (value: any, fallback = "—") => {
+  if (value === null || value === undefined || value === "") return fallback;
+  return String(value);
 };
 
-const MixingQualityChecksTable = ({
-  rows,
+export const MixingQualityChecksTable = ({
+  rows = [],
   readOnly = false,
+  arrayName = "qualityChecks",
   onChange,
 }: MixingQualityChecksTableProps) => {
-  const columnCount = Math.max(1, ...rows.map(resolveRowSampleCount), 1);
-  const observedFields = OBSERVED_FIELDS.slice(0, columnCount);
+  const formContext = useFormContext?.() ?? null;
+  const control = formContext?.control;
+  const errors = formContext?.formState?.errors;
+
+  const maxSampleCount = Math.max(1, ...rows.map(resolveRowSampleCount), 1);
+  const sampleIndices = Array.from({ length: maxSampleCount }, (_, i) => i);
 
   return (
     <TableContainer sx={{ ...dt.tableContainer, overflowX: "auto" }}>
@@ -55,26 +65,27 @@ const MixingQualityChecksTable = ({
         <colgroup>
           <col style={{ width: "22%" }} />
           <col style={{ width: "16%" }} />
-          {observedFields.map((field) => (
-            <col key={field} style={{ width: `${62 / columnCount}%` }} />
+          {sampleIndices.map((idx) => (
+            <col key={idx} style={{ width: `${62 / maxSampleCount}%` }} />
           ))}
         </colgroup>
+
         <TableHead>
           <TableRow>
             <TableCell
-              rowSpan={columnCount > 1 ? 2 : 1}
+              rowSpan={maxSampleCount > 1 ? 2 : 1}
               sx={{ ...dt.tableHeaderCell(true), minWidth: 140 }}
             >
               {S.COL_PARAMETER}
             </TableCell>
             <TableCell
-              rowSpan={columnCount > 1 ? 2 : 1}
+              rowSpan={maxSampleCount > 1 ? 2 : 1}
               sx={{ ...dt.tableHeaderCell(false), minWidth: 120 }}
             >
               {S.COL_SPECIFICATION}
             </TableCell>
             <TableCell
-              colSpan={columnCount}
+              colSpan={maxSampleCount}
               align="center"
               sx={{
                 ...dt.tableHeaderCell(false),
@@ -84,29 +95,54 @@ const MixingQualityChecksTable = ({
               {S.COL_OBSERVED_VALUES}
             </TableCell>
           </TableRow>
-          {columnCount > 1 ? (
+
+          {maxSampleCount > 1 ? (
             <TableRow>
-              {observedFields.map((field, index) => (
+              {sampleIndices.map((sampleIdx) => (
                 <TableCell
-                  key={field}
+                  key={sampleIdx}
                   align="center"
                   sx={{
                     ...dt.tableHeaderCell(false),
                     borderLeft:
-                      index === 0 ? observedGroupBorder : `1px solid ${alpha("#fff", 0.32)}`,
+                      sampleIdx === 0 ? observedGroupBorder : `1px solid ${alpha("#fff", 0.32)}`,
                     fontSize: "0.65rem",
                     letterSpacing: "0.04em",
                   }}
                 >
-                  {index + 1}
+                  {sampleIdx + 1}{" "}
+                  <Box component="span" sx={{ color: "error.main", ml: 0.5 }}>
+                    *
+                  </Box>
                 </TableCell>
               ))}
             </TableRow>
           ) : null}
         </TableHead>
+
         <TableBody>
           {rows.map((row, rowIdx) => {
-            const rowObservedFieldCount = resolveRowSampleCount(row);
+            const rowSampleCount = resolveRowSampleCount(row);
+
+            const spec = row.specification;
+            let specText = "NA";
+            if (spec && typeof spec === "object") {
+              const { minValue, maxValue, unit } = spec as {
+                minValue?: number;
+                maxValue?: number;
+                unit?: string;
+              };
+              if (minValue != null || maxValue != null) {
+                const unitStr = unit ? ` ${unit}` : "";
+                if (minValue != null && maxValue != null) {
+                  specText = `${minValue} – ${maxValue}${unitStr}`;
+                } else if (minValue != null) {
+                  specText = `≥ ${minValue}${unitStr}`;
+                } else if (maxValue != null) {
+                  specText = `≤ ${maxValue}${unitStr}`;
+                }
+              }
+            }
 
             return (
               <TableRow
@@ -114,33 +150,60 @@ const MixingQualityChecksTable = ({
                 sx={dt.tableRow(rowIdx)}
               >
                 <TableCell sx={{ ...dt.tableCell, fontWeight: 700 }}>
-                  {row.parameter}
+                  {row.parameter || row.parameterName}
                 </TableCell>
-                <TableCell sx={dt.tableCell}>
-                  {displayValue(row.specification, S.PLACEHOLDER_SPEC_NA)}
-                </TableCell>
-                {observedFields.map((field, index) => {
-                  const shouldRenderValue = index < rowObservedFieldCount;
+
+                <TableCell sx={dt.tableCell}>{specText}</TableCell>
+
+                {sampleIndices.map((sampleIdx) => {
+                  const shouldRenderValue = sampleIdx < rowSampleCount;
+                  const value = row.observedValues?.[sampleIdx] ?? "";
+                  const fieldPath = `${arrayName}.${rowIdx}.observedValues.${sampleIdx}`;
 
                   return (
                     <TableCell
-                      key={field}
+                      key={sampleIdx}
                       sx={{
                         ...dt.tableCell,
                         borderLeft:
-                          index === 0
+                          sampleIdx === 0
                             ? observedGroupBorder
                             : `1px solid ${alpha(BRAND.border, 0.45)}`,
                       }}
                     >
                       {shouldRenderValue ? (
                         readOnly ? (
-                          displayValue(row[field])
+                          displayValue(value)
+                        ) : control ? (
+                          <Controller
+                            name={fieldPath}
+                            control={control}
+                            render={({ field: rhfField, fieldState: { error } }) => {
+                              // Safely extract deep nested Zod/RHF error messages across card tabs
+                              const nestedError = error?.message || get(errors, fieldPath)?.message;
+
+                              return (
+                                <MixingTableInput
+                                  inputRef={rhfField.ref}
+                                  value={rhfField.value ?? ""}
+                                  placeholder={S.PLACEHOLDER_OBSERVED_VALUE}
+                                  error={!!nestedError}
+                                  helperText={nestedError}
+                                  onChange={(val: string) => {
+                                    rhfField.onChange(val);
+                                    onChange?.(row.parameterId, sampleIdx, val);
+                                  }}
+                                  required
+                                />
+                              );
+                            }}
+                          />
                         ) : (
                           <MixingTableInput
-                            value={row[field]}
+                            value={value}
                             placeholder={S.PLACEHOLDER_OBSERVED_VALUE}
-                            onChange={(value) => onChange?.(row.parameterId, field, value)}
+                            onChange={(val: string) => onChange?.(row.parameterId, sampleIdx, val)}
+                            required
                           />
                         )
                       ) : null}

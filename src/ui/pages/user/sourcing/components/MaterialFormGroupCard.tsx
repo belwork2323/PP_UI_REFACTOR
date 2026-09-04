@@ -14,13 +14,21 @@ import ReceiptDateField from "./ReceiptDateField";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import StackRow from "../../../../components/common/StackRow";
-import type { MaterialFormGroup } from "../../../../../data/models/user/RawMaterialProcurementModel";
+import type {
+  MaterialFormGroup,
+  MaterialLotBlock,
+} from "../../../../../data/models/user/RawMaterialProcurementModel";
 import MaterialLotSection from "./MaterialLotSection";
 import MandatoryFormField, { mandatoryFieldInputSx } from "./MandatoryFormField";
 import {
-  getMaterialMetaErrors,
-  type MandatoryValidationMessages,
-} from "../../../../../data/models/user/rawMaterialProcurementValidation";
+  blockMetaPath,
+  flatBlockIndexFromGroup,
+} from "../../../../../data/validation/adapters/rawMaterialSourcing.validation";
+import type { ValidationErrors } from "../../../../../data/validation/submissionIntent";
+import useValidationDisplay, {
+  type ValidationAttemptFlags,
+} from "../../../../components/validation/useValidationDisplay";
+import { isMaterialMetaComplete } from "../../../../../data/models/user/rawMaterialProcurementValidation";
 
 const {
   delete: DeleteOutlineRoundedIcon,
@@ -31,35 +39,48 @@ const {
 
 type MaterialFormGroupCardProps = {
   group: MaterialFormGroup;
+  materialGroups: MaterialFormGroup[];
   materialIndex: number;
   onUpdateMaterial: (
     materialIndex: number,
     partial: Partial<Pick<MaterialFormGroup, "supplyOrderNo" | "receiptDate" | "manufacturerName">>
   ) => void;
-  onUpdateLot: (materialIndex: number, lotIndex: number, lot: MaterialFormGroup["lots"][number]) => void;
+  onUpdateLot: (
+    materialIndex: number,
+    lotIndex: number,
+    lot: MaterialLotBlock | ((prev: MaterialLotBlock) => MaterialLotBlock)
+  ) => void;
   onAddLot: (materialIndex: number) => void;
   onRemoveMaterial: (materialIndex: number) => void;
   onRemoveLot: (materialIndex: number, lotIndex: number) => void;
-  showFieldErrors?: boolean;
-  validationMessages: MandatoryValidationMessages;
+  errors: ValidationErrors;
+  validationAttempt: ValidationAttemptFlags;
+  getAnalysedResultError: (blockIndex: number, rowIndex: number, touched: boolean) => string | undefined;
   theme: any;
 };
 
 const MaterialFormGroupCard = ({
   group,
+  materialGroups,
   materialIndex,
   onUpdateMaterial,
   onUpdateLot,
   onAddLot,
   onRemoveMaterial,
   onRemoveLot,
-  showFieldErrors = false,
-  validationMessages,
+  errors,
+  validationAttempt,
+  getAnalysedResultError,
   theme,
 }: MaterialFormGroupCardProps) => {
   const formStrings = STRINGS.SOURCING.SPECIFICATION_FORM;
   const specStyles = theme.sourcing.rawMaterial.specificationForm;
-  const metaErrors = getMaterialMetaErrors(group, validationMessages, showFieldErrors);
+  const { visibleError } = useValidationDisplay(errors, validationAttempt);
+  const metaBlockIndex = flatBlockIndexFromGroup(materialGroups, materialIndex, 0);
+  const supplyOrderError = visibleError(blockMetaPath(metaBlockIndex, "supplyOrderNo"));
+  const receiptDateError = visibleError(blockMetaPath(metaBlockIndex, "receiptDate"));
+  const manufacturerError = visibleError(blockMetaPath(metaBlockIndex, "manufacturerName"));
+  const canAddLot = isMaterialMetaComplete(group);
 
   const { filledCount, totalCount, allFilled } = useMemo(() => {
     const allRows = group.lots.flatMap((lot) => lot.rows);
@@ -117,36 +138,46 @@ const MaterialFormGroupCard = ({
       </Box>
 
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ px: 2, py: 1.5 }}>
-        <MandatoryFormField label={formStrings.SUPPLY_ORDER_LABEL} error={metaErrors.supplyOrderNo} theme={theme}>
+        <MandatoryFormField
+          label={formStrings.SUPPLY_ORDER_LABEL}
+          error={supplyOrderError}
+          theme={theme}
+          required={false}
+        >
           <TextField
             size="small"
             fullWidth
             variant="outlined"
             value={group.supplyOrderNo}
             onChange={(e) => onUpdateMaterial(materialIndex, { supplyOrderNo: e.target.value })}
-            error={Boolean(metaErrors.supplyOrderNo)}
-            sx={mandatoryFieldInputSx(theme.workflow.formElements.metaRowTextField, Boolean(metaErrors.supplyOrderNo), theme)}
+            error={Boolean(supplyOrderError)}
+            sx={mandatoryFieldInputSx(theme.workflow.formElements.metaRowTextField, Boolean(supplyOrderError), theme)}
           />
         </MandatoryFormField>
-        <MandatoryFormField label={formStrings.RECEIPT_DATE_LABEL} error={metaErrors.receiptDate} theme={theme}>
+        <MandatoryFormField
+          label={formStrings.RECEIPT_DATE_LABEL}
+          error={receiptDateError}
+          theme={theme}
+          required={false}
+        >
           <ReceiptDateField
             value={group.receiptDate}
             onChange={(next) => onUpdateMaterial(materialIndex, { receiptDate: next })}
             theme={theme}
-            error={Boolean(metaErrors.receiptDate)}
+            error={Boolean(receiptDateError)}
           />
         </MandatoryFormField>
-        <MandatoryFormField label={formStrings.MANUFACTURER_LABEL} error={metaErrors.manufacturerName} theme={theme}>
+        <MandatoryFormField label={formStrings.MANUFACTURER_LABEL} error={manufacturerError} theme={theme}>
           <TextField
             size="small"
             fullWidth
             variant="outlined"
             value={group.manufacturerName}
             onChange={(e) => onUpdateMaterial(materialIndex, { manufacturerName: e.target.value })}
-            error={Boolean(metaErrors.manufacturerName)}
+            error={Boolean(manufacturerError)}
             sx={mandatoryFieldInputSx(
               theme.workflow.formElements.metaRowTextField,
-              Boolean(metaErrors.manufacturerName),
+              Boolean(manufacturerError),
               theme
             )}
           />
@@ -159,11 +190,13 @@ const MaterialFormGroupCard = ({
             key={`${group.material}-lot-${lotIndex}`}
             lot={lot}
             lotIndex={lotIndex}
+            blockIndex={flatBlockIndexFromGroup(materialGroups, materialIndex, lotIndex)}
             lotCount={group.lots.length}
             onUpdate={(updated) => onUpdateLot(materialIndex, lotIndex, updated)}
             onRemove={() => onRemoveLot(materialIndex, lotIndex)}
-            showFieldErrors={showFieldErrors}
-            validationMessages={validationMessages}
+            errors={errors}
+            validationAttempt={validationAttempt}
+            getAnalysedResultError={getAnalysedResultError}
             theme={theme}
           />
         ))}
@@ -173,6 +206,7 @@ const MaterialFormGroupCard = ({
           size="small"
           startIcon={<AddRoundedIcon />}
           onClick={() => onAddLot(materialIndex)}
+          disabled={!canAddLot}
           sx={{
             textTransform: "none",
             fontWeight: 700,

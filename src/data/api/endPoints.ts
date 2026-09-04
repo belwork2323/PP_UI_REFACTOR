@@ -58,6 +58,49 @@ export const ADMIN_ENDPOINTS = {
     UPDATE: `${API_BASE}/admin/project/update`,
     DELETE: `${API_BASE}/admin/project/delete`,
   },
+  MASTER_DATA: {
+    TYPES: `${API_BASE}/admin/master-data/types`,
+    LIST: (type: string) => `${API_BASE}/admin/master-data/${type}/list`,
+    CREATE: (type: string) => `${API_BASE}/admin/master-data/${type}/create`,
+    UPDATE: (type: string) => `${API_BASE}/admin/master-data/${type}/update`,
+    DELETE: (type: string) => `${API_BASE}/admin/master-data/${type}/delete`,
+    MATERIALS: {
+      LIST: `${API_BASE}/admin/master-data/materials/list`,
+      CREATE: `${API_BASE}/admin/master-data/materials/create`,
+      UPDATE: `${API_BASE}/admin/master-data/materials/update`,
+      DELETE: `${API_BASE}/admin/master-data/materials/delete`,
+    },
+    INSULATION: {
+      LIST: `${API_BASE}/admin/master-data/insulation-specifications/list`,
+      CREATE: `${API_BASE}/admin/master-data/insulation-specifications/create`,
+      UPDATE: `${API_BASE}/admin/master-data/insulation-specifications/update`,
+      DELETE: `${API_BASE}/admin/master-data/insulation-specifications/delete`,
+    },
+    MIXING_CYCLES: {
+      LIST: `${API_BASE}/admin/master-data/mixing-cycles/list`,
+      CREATE: `${API_BASE}/admin/master-data/mixing-cycles/create`,
+      UPDATE: `${API_BASE}/admin/master-data/mixing-cycles/update`,
+      DELETE: `${API_BASE}/admin/master-data/mixing-cycles/delete`,
+    },
+    CURING_CYCLES: {
+      LIST: `${API_BASE}/admin/master-data/curing-cycles/list`,
+      CREATE: `${API_BASE}/admin/master-data/curing-cycles/create`,
+      UPDATE: `${API_BASE}/admin/master-data/curing-cycles/update`,
+      DELETE: `${API_BASE}/admin/master-data/curing-cycles/delete`,
+    },
+    QUALITY_CHECKS: {
+      LIST: `${API_BASE}/admin/master-data/quality-checks/list`,
+      CREATE: `${API_BASE}/admin/master-data/quality-checks/create`,
+      UPDATE: `${API_BASE}/admin/master-data/quality-checks/update`,
+      DELETE: `${API_BASE}/admin/master-data/quality-checks/delete`,
+    },
+    QC_DIVISIONS: {
+      LIST: `${API_BASE}/admin/master-data/qc-divisions/list`,
+      CREATE: `${API_BASE}/admin/master-data/qc-divisions/create`,
+      UPDATE: `${API_BASE}/admin/master-data/qc-divisions/update`,
+      DELETE: `${API_BASE}/admin/master-data/qc-divisions/delete`,
+    },
+  },
 };
 
 export const USER_SOURCING_ENDPOINTS = {

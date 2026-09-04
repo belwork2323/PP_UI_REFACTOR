@@ -163,10 +163,10 @@ const ProcessParticularsTable = ({
               <TableCell sx={{ ...dt.tableCell, fontWeight: 700 }}>
                 {displayValue(row.operation || `Operation ${row.operationId}`)}
               </TableCell>
-              <TableCell sx={dt.tableCell}>{displayValue(row.rpm)}</TableCell>
-              <TableCell sx={dt.tableCell}>{displayValue(row.time)}</TableCell>
-              <TableCell sx={dt.tableCell}>{displayValue(row.temp)}</TableCell>
-              <TableCell sx={dt.tableCell}>{displayValue(row.vacuum)}</TableCell>
+              <TableCell sx={dt.tableCell}>{row.rpm}</TableCell>
+              <TableCell sx={dt.tableCell}>{row.time}</TableCell>
+              <TableCell sx={dt.tableCell}>{row.temp}</TableCell>
+              <TableCell sx={dt.tableCell}>{row.vacuum}</TableCell>
             </TableRow>
           ))
         )}
@@ -175,7 +175,13 @@ const ProcessParticularsTable = ({
   </TableContainer>
 );
 
-export const PremixDetailPanel = ({ premix, dt }: { premix: PremixEntry; dt: MixingDetailsTheme }) => (
+export const PremixDetailPanel = ({
+  premix,
+  dt,
+}: {
+  premix: PremixEntry;
+  dt: MixingDetailsTheme;
+}) => (
   <SectionCard
     title={`${S.SECTION_PREMIX_STAGE} — ${getPremixNoLabel(Number(premix.premixNo))}`}
     icon={ChecklistRoundedIcon}
@@ -220,7 +226,13 @@ export const PremixDetailPanel = ({ premix, dt }: { premix: PremixEntry; dt: Mix
   </SectionCard>
 );
 
-export const FinalMixDetailPanel = ({ entry, dt }: { entry: FinalMixEntry; dt: MixingDetailsTheme }) => (
+export const FinalMixDetailPanel = ({
+  entry,
+  dt,
+}: {
+  entry: FinalMixEntry;
+  dt: MixingDetailsTheme;
+}) => (
   <SectionCard
     title={`${S.SECTION_FINAL_MIX_STAGE} — ${getFinalMixNoLabel(Number(entry.mixNo))}`}
     icon={BlenderRoundedIcon}
@@ -300,14 +312,12 @@ const MixingDetailsContent = ({
   }, [premixCards, finalMixCards]);
 
   const activeCardIndexSafe =
-    combinedNavItems.length > 0
-      ? Math.min(activeCardIndex, combinedNavItems.length - 1)
-      : 0;
+    combinedNavItems.length > 0 ? Math.min(activeCardIndex, combinedNavItems.length - 1) : 0;
   const activeNavItem = combinedNavItems[activeCardIndexSafe] ?? null;
   const activePremix =
-    activeNavItem?.kind === "PREMIX" ? premixCards[activeNavItem.cardIndex] ?? null : null;
+    activeNavItem?.kind === "PREMIX" ? (premixCards[activeNavItem.cardIndex] ?? null) : null;
   const activeFinalMix =
-    activeNavItem?.kind === "FINAL_MIX" ? finalMixCards[activeNavItem.cardIndex] ?? null : null;
+    activeNavItem?.kind === "FINAL_MIX" ? (finalMixCards[activeNavItem.cardIndex] ?? null) : null;
 
   const combinedNavTabs = useMemo(
     () => combinedNavItems.map((item) => ({ id: item.id, label: item.label })),

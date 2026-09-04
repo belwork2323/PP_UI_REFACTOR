@@ -1,4 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
 import {
   Box,
   CircularProgress,
@@ -45,6 +52,9 @@ import {
 import { generalController } from "@/controllers/admin/common/generalController";
 import { operationsController } from "@/controllers/user/operationsController";
 import { isSubscaleProcessingBatch } from "@/hooks/user/manufacturing/subscaleHardwareConfig";
+import { subscaleHardwareSchema } from "@/data/schemavalidation/SubscaleSchema";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import { Controller, useFormContext } from "react-hook-form";
 
 type MotorStageOption = {
   motorStage: string;
@@ -129,6 +139,7 @@ type SubscaleSubscaleBatchPanelProps = {
   values: SchemaFormValues;
   onChange: (values: SchemaFormValues) => void;
   batchDetails: any;
+  validationErrors?: Record<string, string> | null;
 };
 
 const normalizeSubBatchType = (value: unknown) =>
@@ -183,14 +194,17 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
   valuesRef.current = values;
   mixingCyclesRef.current = mixingCycles;
 
-  const patchValues = useCallback((patch: SchemaFormValues) => {
-    const next = { ...valuesRef.current, ...patch };
-    if (next.IS_PROCESS_FORM_LOADED) {
-      onChange(next);
-      return;
-    }
-    onChange(mergeSubscaleBatchFormValues(next));
-  }, [onChange]);
+  const patchValues = useCallback(
+    (patch: SchemaFormValues) => {
+      const next = { ...valuesRef.current, ...patch };
+      if (next.IS_PROCESS_FORM_LOADED) {
+        onChange(next);
+        return;
+      }
+      onChange(mergeSubscaleBatchFormValues(next));
+    },
+    [onChange],
+  );
 
   const updateMixingCycles = useCallback(
     (cycles: SubscaleMixingCycleEntry[]) => {
@@ -523,31 +537,80 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
       >
         {title}
       </Typography>
-      <TableContainer sx={{ border: `1px solid ${SUBSCALE_BRAND.border}`, borderRadius: 1.5, overflow: "hidden" }}>
+      <TableContainer
+        sx={{ border: `1px solid ${SUBSCALE_BRAND.border}`, borderRadius: 1.5, overflow: "hidden" }}
+      >
         <Table size="small">
           <TableHead>
             <TableRow>
-              <TableCell sx={uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight)}>
-                {PROCESS_S.COL_OPERATION}
+              <TableCell
+                sx={uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight)}
+              >
+                <FieldLabelWithAsterisk
+                  label={PROCESS_S.COL_OPERATION}
+                  sx={uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight)}
+                />
               </TableCell>
-              <TableCell sx={{ ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight), width: "18%" }}>
-                {PROCESS_S.COL_ROTATION}
+              <TableCell
+                sx={{
+                  ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight),
+                  width: "18%",
+                }}
+              >
+                <FieldLabelWithAsterisk
+                  label={PROCESS_S.COL_ROTATION}
+                  required
+                  sx={uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight)}
+                />
               </TableCell>
-              <TableCell sx={{ ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight), width: "18%" }}>
-                {PROCESS_S.COL_TIME}
+              <TableCell
+                sx={{
+                  ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight),
+                  width: "18%",
+                }}
+              >
+                <FieldLabelWithAsterisk
+                  label={PROCESS_S.COL_TIME}
+                  required
+                  sx={uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight)}
+                />
               </TableCell>
-              <TableCell sx={{ ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight), width: "18%" }}>
-                {PROCESS_S.COL_TEMP}
+              <TableCell
+                sx={{
+                  ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight),
+                  width: "18%",
+                }}
+              >
+                <FieldLabelWithAsterisk
+                  label={PROCESS_S.COL_TEMP}
+                  required
+                  sx={uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight)}
+                />
               </TableCell>
-              <TableCell sx={{ ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight), width: "18%" }}>
-                {PROCESS_S.COL_VACUUM}
+              <TableCell
+                sx={{
+                  ...uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight),
+                  width: "18%",
+                }}
+              >
+                <FieldLabelWithAsterisk
+                  label={PROCESS_S.COL_VACUUM}
+                  required
+                  sx={uniformTableHeaderCellSx(SUBSCALE_BRAND.ssTable, SUBSCALE_BRAND.ssTableLight)}
+                />
               </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
             {rows.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={5} sx={uniformTableBodyCellSx({ border: SUBSCALE_BRAND.border, text: SUBSCALE_BRAND.text })}>
+                <TableCell
+                  colSpan={5}
+                  sx={uniformTableBodyCellSx({
+                    border: SUBSCALE_BRAND.border,
+                    text: SUBSCALE_BRAND.text,
+                  })}
+                >
                   <Typography
                     sx={{
                       fontSize: "0.75rem",
@@ -597,7 +660,7 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
         >
           <FormInput
             disabled
-            label={S.BATCH_SIZE}
+            label={<FieldLabelWithAsterisk label={S.BATCH_SIZE} required />}
             type="number"
             value={
               values[SUBSCALE_BATCH_FIELDS.BATCH_SIZE] ||
@@ -608,13 +671,13 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
 
           <FormInput
             disabled
-            label="Mixer Type"
+            label={<FieldLabelWithAsterisk label="Mixer Type" required />}
             value={values.mixerType || batchDetails?.identificationSheet?.mixerType || ""}
           />
 
           <FormInput
             disabled
-            label={S.MIXER_BLDG_NO}
+            label={<FieldLabelWithAsterisk label={S.MIXER_BLDG_NO} required />}
             value={
               values[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO] ||
               batchDetails?.identificationSheet?.BldgNo ||
@@ -623,18 +686,44 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
             }
           />
 
-          <DateField
-            label={S.PREMIX_DATE}
-            value={formatToUiDate(String(values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ?? ""))}
-            onChange={(next) => patchValues({ [SUBSCALE_BATCH_FIELDS.PREMIX_DATE]: next })}
-            placeholder="DD-MM-YYYY"
+          <Controller
+            name={`schemaFormValues.${SUBSCALE_BATCH_FIELDS.PREMIX_DATE}`}
+            control={useFormContext().control}
+            render={({ field: { onChange, value }, fieldState: { error } }) => (
+              <DateField
+                label={<FieldLabelWithAsterisk label={S.PREMIX_DATE} required />}
+                value={formatToUiDate(
+                  String(value ?? values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ?? ""),
+                )}
+                onChange={(next) => {
+                  onChange(next);
+                  patchValues({ [SUBSCALE_BATCH_FIELDS.PREMIX_DATE]: next });
+                }}
+                placeholder="DD-MM-YYYY"
+                error={!!error}
+                helperText={error?.message || ""}
+              />
+            )}
           />
 
-          <DateField
-            label={S.FINAL_MIX_DATE}
-            value={formatToUiDate(String(values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] ?? ""))}
-            onChange={(next) => patchValues({ [SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE]: next })}
-            placeholder="DD-MM-YYYY"
+          <Controller
+            name={`schemaFormValues.${SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE}`}
+            control={useFormContext().control}
+            render={({ field: { onChange, value }, fieldState: { error } }) => (
+              <DateField
+                label={<FieldLabelWithAsterisk label={S.FINAL_MIX_DATE} required />}
+                value={formatToUiDate(
+                  String(value ?? values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] ?? ""),
+                )}
+                onChange={(next) => {
+                  onChange(next);
+                  patchValues({ [SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE]: next });
+                }}
+                placeholder="DD-MM-YYYY"
+                error={!!error}
+                helperText={error?.message || ""}
+              />
+            )}
           />
         </Box>
 
@@ -694,7 +783,7 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
                         <>
                           <FormInput
                             select
-                            label={S.MIXING_CYCLE_STAGE}
+                            label={<FieldLabelWithAsterisk label={S.MIXING_CYCLE_STAGE} required />}
                             value={stage}
                             onChange={(event) =>
                               handleMotorStageChange(cycleIndex, event.target.value)
@@ -730,7 +819,12 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
 
                           <FormInput
                             select
-                            label={S.MIXING_CYCLE_SELECT_LABEL}
+                            label={
+                              <FieldLabelWithAsterisk
+                                label={S.MIXING_CYCLE_SELECT_LABEL}
+                                required
+                              />
+                            }
                             value={cycle.mixingCycleCode ?? ""}
                             onChange={(event) =>
                               handleMixingCycleChange(cycleIndex, event.target.value)
@@ -766,7 +860,7 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
                         <>
                           <FormInput
                             disabled
-                            label={S.MIXING_CYCLE_STAGE}
+                            label={<FieldLabelWithAsterisk label={S.MIXING_CYCLE_STAGE} required />}
                             value={
                               cycle.stage ? `Motor Stage ${cycle.stage}` : qualificationStageLabel
                             }
@@ -774,7 +868,12 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
                           />
                           <FormInput
                             disabled
-                            label={S.MIXING_CYCLE_SELECT_LABEL}
+                            label={
+                              <FieldLabelWithAsterisk
+                                label={S.MIXING_CYCLE_SELECT_LABEL}
+                                required
+                              />
+                            }
                             value={formatMixingCycleLabel(cycle) || qualificationCycleLabel}
                             sx={{ flex: 1 }}
                           />
@@ -804,7 +903,7 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
                             color: SUBSCALE_BRAND.text,
                           }}
                         >
-                          {S.PROCESS_PARTICULARS_LOADING}
+                          {(S as any).PROCESS_PARTICULARS_LOADING}
                         </Typography>
                       </Box>
                     ) : (

@@ -556,11 +556,53 @@ export const STRINGS = {
       FIELD_REQUIRED_RECEIPT_DATE: "Receipt date is required",
       FIELD_REQUIRED_MANUFACTURER: "Manufacturer is required",
       FIELD_REQUIRED_LOT_ID: "Lot ID is required",
+      FIELD_INVALID_SUPPLY_ORDER:
+        "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+      FIELD_INVALID_RECEIPT_DATE: "Enter a valid receipt date",
+      FIELD_INVALID_MANUFACTURER:
+        "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+      FIELD_INVALID_LOT_ID: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+      VALIDATION: {
+        supplyOrderNo: {
+          required: "Supply order no. is required",
+          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+        },
+        receiptDate: {
+          required: "Receipt date is required",
+          invalid: "Enter a valid receipt date",
+        },
+        manufacturerName: {
+          required: "Manufacturer is required",
+          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+        },
+        lotNo: {
+          required: "Lot ID is required",
+          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+        },
+        analysedResult: {
+          required: "Analyze Result @ Source is required",
+          invalid: "Analyze Result @ Source must be a valid number",
+        },
+        analysedResultAlphanumeric: {
+          required: "Analyze Result @ Source is required",
+          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+        },
+        certificates: {
+          required: "Upload at least one certificate for this lot",
+          invalid: "Upload at least one certificate for this lot",
+        },
+        certificateType: {
+          required: "Certificate type is required",
+          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+        },
+      },
       MANDATORY_FIELDS_PENDING:
-        "Complete all required fields (supply order, receipt date, manufacturer, lot ID) and fill every analyzed result before saving or submitting.",
+        "Complete manufacturer, lot ID, every analyzed result, and upload a certificate for each lot before submitting.",
       FIELD_REQUIRED_ANALYZED_RESULT: "Analyze Result @ Source is required",
+      FIELD_INVALID_ANALYZED_RESULT: "Analyze Result @ Source must be a valid number",
+      FIELD_REQUIRED_CERTIFICATES: "Upload at least one certificate for this lot",
       CERTIFICATES_TITLE: "Certificates",
-      CERTIFICATES_SUBTITLE: "Upload PDF, Office, images, or ZIP. Multiple files allowed.",
+      CERTIFICATES_SUBTITLE: "Upload PDF, images, or video. Multiple files allowed.",
       CERT_FILE_NAME: "File name",
       CERT_TYPE: "Certificate type",
       UPLOAD_CERTIFICATES: "Upload files",
@@ -573,7 +615,7 @@ export const STRINGS = {
       REUPLOAD_CERTIFICATE: "Retry upload",
       CERT_UPLOAD_PENDING:
         "Wait for file uploads to finish, or retry failed uploads, before saving or submitting.",
-      CERT_INVALID_FILE: "Invalid file type. Use PDF, Word, Excel, images, or ZIP.",
+      CERT_INVALID_FILE: "Invalid file type. Use PDF, images, or video only.",
       TABLE_HEADERS: {
         MATERIAL: "Material",
         LOT_ID: "Lot ID",
@@ -721,6 +763,162 @@ export const STRINGS = {
       DELETE_SUCCESS: "Rocket motor casing record deleted successfully",
       DELETE_FAILED: "Failed to delete casing form. Please try again.",
       DELETE_NOT_ALLOWED: "Only casing forms with an 'In Progress' status can be deleted.",
+      VALIDATION: {
+        projectName: { required: "Project Name is required.", invalid: "Project Name is invalid." },
+        motorStageApi: {
+          required: "Rocket Motor Name/Stage is required.",
+          invalid: "Rocket Motor Name/Stage is invalid.",
+        },
+        motorId: {
+          required: "Motor ID is required.",
+          invalid: "Motor ID must be alphanumeric.",
+        },
+        casingType: { required: "Casing type is required.", invalid: "Casing type is invalid." },
+        receivingDate: {
+          required: "Receiving date is required and must be valid.",
+          invalid: "Receiving date must be a valid date.",
+        },
+        itemsDimension: {
+          required: "Rubber sheet dimension is required.",
+          invalid: "Rubber sheet dimension must be alphanumeric.",
+        },
+        itemsUnit: {
+          required: "Rubber sheet unit is required.",
+          invalid: "Rubber sheet unit must be alphanumeric.",
+        },
+        itemsObservations: {
+          required: "Rubber sheet observations are required.",
+          invalid: "Rubber sheet observations must be alphanumeric.",
+        },
+        greenCardNo: {
+          required: "Green Card No. is required.",
+          invalid: "Green Card No. must be alphanumeric.",
+        },
+        clearanceDate: {
+          required: "Clearance date is required.",
+          invalid: "Clearance date must be a valid date.",
+        },
+        clearanceAuthority: {
+          required: "Clearance authority is required.",
+          invalid: "Clearance authority must be alphanumeric.",
+        },
+        clearanceDetails: {
+          required: "Clearance details are required.",
+          invalid: "Clearance details must be alphanumeric.",
+        },
+        insulationCuringDate: {
+          required: "Date of insulation curing is required and must be valid.",
+          invalid: "Date of insulation curing must be a valid date.",
+        },
+        insulationType: {
+          required: "Insulation type is required.",
+          invalid: "Insulation type is invalid.",
+        },
+        insulationReportNo: {
+          required: "Rubber properties report no. is required.",
+          invalid: "Rubber properties report no. must be alphanumeric.",
+        },
+        mechanicalReported: { invalid: "Reported value must be numeric." },
+        mechanicalAcemSpec: {
+          required: "Test Result @ ACEM is required and must be numeric.",
+          outOfRange: "Test Result @ ACEM must be within specification.",
+        },
+        thermalReported: { invalid: "Reported value must be numeric." },
+        thermalAcemSpec: {
+          invalid: "Test Result @ ACEM must be numeric.",
+          outOfRange: "Test Result @ ACEM must be within specification.",
+        },
+        postPptUtDate: {
+          required: "Date of Post PPT UT is required.",
+          invalid: "Date of Post PPT UT must be a valid date.",
+        },
+        ndtDate: {
+          required: "Date of NDT is required.",
+          invalid: "Date of NDT must be a valid date.",
+        },
+        ndtObservations: {
+          required: "NDT observations are required.",
+          invalid: "NDT observations must be alphanumeric.",
+        },
+        acemNdtObservations: {
+          required: "ACEM NDT observations are required.",
+          invalid: "ACEM NDT observations must be alphanumeric.",
+        },
+        projectRubberSurfaceObservations: {
+          required: "Project rubber surface observations are required.",
+          invalid: "Project rubber surface observations must be alphanumeric.",
+        },
+        otherDetails: {
+          required: "Other details are required.",
+          invalid: "Other details must be alphanumeric.",
+        },
+        radiographyPlanId: {
+          invalid:
+            "Radiography Plan ID may contain only letters, numbers, hyphens, and underscores.",
+        },
+        radiographyPlanName: {
+          required: "Radiography Plan Name is required.",
+          invalid: "Radiography Plan Name is invalid.",
+        },
+        radiographyPlanRow: { invalid: "Value must be numeric." },
+        visualObservation: {
+          required: "Visual observation is required.",
+          invalid: "Visual observation must be alphanumeric.",
+        },
+        visualRemark: { invalid: "Remark must be alphanumeric." },
+        weightWithoutHarness: {
+          required: "Weight Without Harness is required and must be numeric.",
+          invalid: "Weight Without Harness must be numeric.",
+        },
+        weightWithHarness: {
+          required: "Weight With Harness is required and must be numeric.",
+          invalid: "Weight With Harness must be numeric.",
+        },
+        weighscaleEquipment: {
+          required: "Weighscale Details is required.",
+          invalid: "Weighscale Details must be alphanumeric.",
+        },
+        calibrationDueDate: {
+          required: "Calibration Due Date is required and must be valid.",
+          invalid: "Calibration Due Date must be a valid date.",
+        },
+        dimensionalReading: {
+          required: "Dimensional reading is required and must be numeric.",
+          outOfRange: "Dimensional reading must be within specification.",
+        },
+        dimensionalData: {
+          required: "Dimensional inspection parameters are required for the selected motor stage.",
+        },
+        mockTrialCastingStation: {
+          required: "Casting Station is required.",
+          invalid: "Casting Station must be alphanumeric.",
+        },
+        mockTrialMandrelId: {
+          required: "Mandrel Identification Number is required.",
+          invalid: "Mandrel Identification Number must be alphanumeric.",
+        },
+        mockTrialBottomCupId: {
+          required: "Bottom Cup Identification Number is required and must be numeric.",
+          invalid: "Bottom Cup Identification Number must be numeric.",
+        },
+        mockTrialNumber: {
+          required: "Mock trial measurement is required and must be numeric.",
+          invalid: "Mock trial measurement must be numeric.",
+        },
+        mockTrialMeasurements: { required: "Mock trial measurements are required." },
+        visualInspectionReport: {
+          required: "Visual Inspection Report is required.",
+          invalid: "Visual Inspection Report is required.",
+        },
+        dimensionalInspectionReport: {
+          required: "Dimension Inspection Report is required.",
+          invalid: "Dimension Inspection Report is required.",
+        },
+        mockTrialReport: {
+          required: "Mock Trial Report is required.",
+          invalid: "Mock Trial Report is required.",
+        },
+      },
     },
     CASING_CREATE: {
       TITLE: "Motor Casing Receipt",
@@ -1156,6 +1354,172 @@ export const STRINGS = {
         "You have unsaved raw material preparation changes. Save as draft to avoid losing your data.",
       UNSAVED_BACK_CONFIRM: "Go back to Form",
       UNSAVED_BACK_DISCARD: "Discard Changes",
+      VALIDATION: {
+        lotNumber: {
+          required: "Lot number is required",
+          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+        },
+        mfgBatchLotNumber: {
+          required: "Manufacturer lot/batch number is required",
+          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+        },
+        quantity: {
+          required: "Quantity is required",
+          invalid: "Enter a valid number",
+        },
+        totalQuantity: {
+          required: "Total quantity is required",
+          invalid: "Enter a valid number",
+        },
+        actualParameter: {
+          required: "Actual parameter is required",
+          invalid: "Enter a valid number",
+        },
+        startTime: {
+          required: "Start time is required",
+          invalid: "Enter a valid date and time",
+        },
+        endTime: {
+          required: "End time is required",
+          invalid: "Enter a valid date and time",
+        },
+        startDatetime: {
+          required: "Start date and time is required",
+          invalid: "Enter a valid date and time",
+        },
+        endDatetime: {
+          required: "End date and time is required",
+          invalid: "Enter a valid date and time",
+        },
+        binNumber: {
+          required: "Bin number is required",
+          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+        },
+        filledQuantity: {
+          required: "Filled quantity is required",
+          invalid: "Enter a valid number",
+        },
+        result: {
+          required: "Result is required",
+          invalid: "Enter a valid number",
+        },
+        equipmentId: {
+          required: "Equipment ID is required",
+          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+        },
+        rpm: {
+          required: "RPM is required",
+          invalid: "Enter a valid number",
+        },
+        setPressure: {
+          required: "Set pressure is required",
+          invalid: "Enter a valid number",
+        },
+        ovenType: {
+          required: "Oven type is required",
+          invalid: "Enter a valid oven type",
+        },
+        ovenNumber: {
+          required: "Oven number is required",
+          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+        },
+        ovenSetTemperature: {
+          required: "Oven set temperature is required",
+          invalid: "Enter a valid number",
+        },
+        moisture: {
+          required: "Moisture is required",
+          invalid: "Enter a valid number",
+        },
+        sievingDatetime: {
+          required: "Sieving date and time is required",
+          invalid: "Enter a valid date and time",
+        },
+        sievedQuantity: {
+          required: "Sieved quantity is required",
+          invalid: "Enter a valid number",
+        },
+        oversizeQuantity: {
+          required: "Oversize quantity is required",
+          invalid: "Enter a valid number",
+        },
+        undersizeQuantity: {
+          required: "Undersize quantity is required",
+          invalid: "Enter a valid number",
+        },
+        sieveMeshSize: {
+          required: "Sieve mesh size is required",
+          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+        },
+        amountOfMaterial: {
+          required: "Amount of material is required",
+          invalid: "Enter a valid number",
+        },
+        totalQuantitySentForPremix: {
+          required: "Total quantity sent for premix is required",
+          invalid: "Enter a valid number",
+        },
+        particleSize: {
+          required: "Particle size is required",
+          invalid: "Enter a valid number",
+        },
+        qualifiedQuantity: {
+          required: "Qualified quantity is required",
+          invalid: "Enter a valid number",
+        },
+        numberOfDrums: {
+          required: "Number of drums is required",
+          invalid: "Enter a valid number",
+        },
+        agitatorRpm: {
+          required: "Agitator RPM is required",
+          invalid: "Enter a valid number",
+        },
+        processTemperature: {
+          required: "Process temperature is required",
+          invalid: "Enter a valid number",
+        },
+        jacketTemperature: {
+          required: "Jacket temperature is required",
+          invalid: "Enter a valid number",
+        },
+        dispatchDatetime: {
+          required: "Dispatch date and time is required",
+          invalid: "Enter a valid date and time",
+        },
+        mixerBuildingNumber: {
+          required: "Mixer building number is required",
+          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+        },
+        weightmentMaterialCode: {
+          required: "Material code is required",
+          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+        },
+        weightmentPercentage: {
+          required: "Percentage is required",
+          invalid: "Enter a valid number",
+        },
+        weightmentWeight: {
+          required: "Weight transferred is required",
+          invalid: "Enter a valid number",
+        },
+        weightmentContainerType: {
+          required: "Container type is required",
+          invalid: "Container type is required",
+        },
+        weightmentContainerNumber: {
+          required: "Container number is required",
+          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+        },
+        weightmentWeighScale: {
+          required: "Weigh scale number is required",
+          invalid: "Use letters, numbers, spaces, hyphens, underscores, or slashes only",
+        },
+        weightmentWeighingDatetime: {
+          required: "Weighing date and time is required",
+          invalid: "Enter a valid date and time",
+        },
+      },
     },
     CASE_PREP: {
       TITLE: "Case Preparation",
@@ -1219,8 +1583,7 @@ export const STRINGS = {
       SCHEMA_LOAD_ERROR: "Failed to load case preparation form. Please try again.",
       BATCH_DETAILS_LOADING: "Loading batch details from identification sheet...",
       FORM_OPENING_TITLE: "Opening Case Preparation",
-      FORM_OPENING_MESSAGE:
-        "Loading batch details and form data. This will only take a moment…",
+      FORM_OPENING_MESSAGE: "Loading batch details and form data. This will only take a moment…",
       BATCH_MOTOR_DETAILS_MISSING:
         "Motor details are missing from the batch identification sheet. Complete the identification sheet before filling this form.",
       BATCH_MOTOR_COUNT_LABEL: "No. of Motors",
@@ -1439,6 +1802,31 @@ export const STRINGS = {
       MIX_CARD_EMPTY_ERROR: "Add at least one value on this card before submitting.",
       MIX_CARD_SAVE_DRAFT_SUCCESS: (label: string) => `${label} saved as draft successfully.`,
       MIX_CARD_SUBMIT_SUCCESS: (label: string) => `${label} submitted for approval successfully.`,
+      VALIDATION: {
+        BOWL_ID_REQUIRED: "Please select a Bowl",
+        BOWL_ID_INVALID: "Invalid Bowl ID",
+        BOWL_TRIAL_DATE_REQUIRED: "Please select a Trial Date",
+        BOWL_TRIAL_DATE_INVALID: "Invalid trial date",
+        BOWL_TRIAL_OBS_REQUIRED: "Trial observations are required",
+        BOWL_TRIAL_OBS_INVALID: "Invalid trial observations",
+        OPERATION_REQUIRED: "Operation is required",
+        OPERATION_INVALID: "Invalid operation",
+        RPM_REQUIRED: "RPM is required and must be a number",
+        RPM_INVALID: "Invalid RPM",
+        TIME_REQUIRED: "Time is required and must be a number",
+        TIME_INVALID: "Invalid time",
+        TEMP_REQUIRED: "Temperature is required and must be a number",
+        TEMP_INVALID: "Invalid temperature",
+        VACUUM_REQUIRED: "Vacuum is required and must be a number",
+        VACUUM_INVALID: "Invalid vacuum",
+        QUALITY_CHECKS_REQUIRED: "At least one quality check is required",
+        QUALITY_CHECKS_INVALID: "Invalid quality checks",
+        OBSERVED_VALUE_REQUIRED: "Observed value is required",
+        OBSERVED_VALUE_INVALID: "Must be a valid number",
+        OBSERVED_VALUE_RANGE: "Value must be between {min} and {max}",
+        OBSERVED_VALUE_MIN: "Value must be ≥ {min}",
+        OBSERVED_VALUE_MAX: "Value must be ≤ {max}",
+      },
     },
     CASTING_CURING: {
       TITLE: "Casting and Curing",
@@ -1570,6 +1958,40 @@ export const STRINGS = {
       CURING_STAGES_LOADING: "Loading motor stages…",
       ADD_MOTORS_ACTION: "Add",
       MOTOR_CARD_TITLE: "Motor",
+      // Add these strings to your config mapping:
+      VALIDATION: {
+        REQUIRED: "This field is required.",
+        INVALID: "Invalid value.",
+        BOWL_ID_REQUIRED: "Bowl Id is required.",
+        BOWL_ID_INVALID: "Invalid bowl id.",
+        READING_REQUIRED: "Reading is required.",
+        READING_INVALID: "Reading must be a number.",
+        SLURRY_CAST_REQUIRED: "Slurry cast is required.",
+        SLURRY_CAST_INVALID: "Slurry cast must be a number.",
+        POST_DETAIL_REQUIRED: "Post-cast detail is required.",
+
+        // Custom specific messages added below:
+        CURING_TEMP_REQUIRED: "Curing temperature is required.",
+        CURING_TIME_REQUIRED: "Curing time is required.",
+        START_DATE_REQUIRED: "Start date is required.",
+        START_TIME_REQUIRED: "Start time is required.",
+        END_DATE_REQUIRED: "End date is required.",
+        END_TIME_REQUIRED: "End time is required.",
+        HOT_WATER_STATUS_REQUIRED: "Hot water status is required.",
+        POST_OTHER_OBS_REQUIRED: "Other observations are required.",
+        POST_VISUAL_OBS_REQUIRED: "Visual observation is required.",
+        HARDNESS_REQUIRED: "Shore A hardness is required.",
+        DISPATCH_DATE_REQUIRED: "De-coring dispatch date & time is required.",
+        DE_CORING_DATE_REQUIRED: "De-coring date is required.",
+        BUILDING_NO_REQUIRED: "Building number is required.",
+        BUILDING_NO_INVALID: "Invalid building number.",
+        DE_CORING_LOAD_REQUIRED: "De-coring load is required.",
+        REMARKS_REQUIRED: "Remarks are required.",
+        FILE_REQUIRED: "De-coring visual observation file is required.",
+        DATE_INVALID: "Invalid date format.",
+        TIME_INVALID: "Invalid time format.",
+        DATE_REQUIRED: "Date is required",
+      },
       DETAILS_BATCH_SECTION: "Batch information",
       DETAILS_FORM_SECTION: "Casting and curing form details",
       MOTOR_NAV_TITLE: "Motor Navigation",
@@ -1895,8 +2317,8 @@ export const STRINGS = {
         LOADING_FORM_TITLE: "Loading Subscale Form",
         LOADING_FORM_MESSAGE: "Preparing article and process tables…",
         SAVE_DRAFT: "Save as Draft",
-        SUBMIT: "Submit for Approval",
-        RESUBMIT: "Resubmit for Approval",
+        SUBMIT: "SUBMIT FOR APPROVAL",
+        RESUBMIT: "RESUBMIT FOR APPROVAL",
         HARDWARE_LOCKED:
           "Complete the general batch information above to enable hardware preparation.",
       },
@@ -3153,6 +3575,70 @@ export const STRINGS = {
     },
   },
 
+  /* -------- ADMIN MASTER DATA -------- */
+  MASTER_DATA: {
+    PAGE: {
+      TITLE: "Master Data",
+      SUBTITLE: "Manage equipment and facility lookup values used across forms",
+      NEW_BUTTON: "Add record",
+      LOADING_PLACEHOLDER: "…",
+      TYPE_LABEL: "Master type",
+      TYPE_PLACEHOLDER: "Select master type",
+      STAT_TOTAL: (noun: string, count: number | string) => `Total ${noun}: ${count}`,
+      STAT_ACTIVE: (noun: string, count: number | string) => `Active ${noun}: ${count}`,
+      STAT_INACTIVE: (noun: string, count: number | string) => `Inactive ${noun}: ${count}`,
+    },
+    TOOLBAR: {
+      SEARCH_PLACEHOLDER: "Search by code or name…",
+      FILTER_STATUS_LABEL: "Status",
+      FILTER_ALL: "All",
+      FILTER_ACTIVE: "Active",
+      FILTER_INACTIVE: "Inactive",
+    },
+    TABLE: {
+      EMPTY: "No master data records found",
+      COL_CODE: "Code",
+      COL_NAME: "Name",
+      COL_ACTIVE: "Active",
+      COL_ACTIONS: "Actions",
+      YES: "Yes",
+      NO: "No",
+      EDIT: "Edit",
+      DISABLE: "Disable",
+    },
+    DISABLE_DIALOG: {
+      TITLE: "Disable master record?",
+      BODY: (name: string) =>
+        `"${name}" will be hidden from dropdowns. Existing forms that already use this code are unchanged. You can re-enable it later by editing the record.`,
+      CANCEL: "Cancel",
+      CONFIRM: "Disable",
+      DISABLING: "Disabling…",
+    },
+    FORM: {
+      CREATE_TITLE: "Add master record",
+      EDIT_TITLE: "Edit master record",
+      CREATE_SUBTITLE: "Enter values below. Code cannot be changed after save.",
+      EDIT_SUBTITLE: (name: string) => `Updating: ${name}`,
+      CANCEL: "Cancel",
+      SAVE: "Save",
+      SAVING: "Saving…",
+      ACTIVE_LABEL: "Active",
+    },
+    MESSAGES: {
+      CREATING: "Creating master record…",
+      UPDATING: "Updating master record…",
+      CREATE_SUCCESS: "Master record created successfully",
+      UPDATE_SUCCESS: "Master record updated successfully",
+      DISABLING: "Disabling master record…",
+      DISABLE_SUCCESS: "Master record disabled successfully",
+    },
+    ERRORS: {
+      LOAD_TYPES_FAILED: "Failed to load master data types",
+      LOAD_LIST_FAILED: "Failed to load master data list",
+      OPERATION_FAILED: "An error occurred on server",
+    },
+  },
+
   /* -------- ADMIN BATCH MANAGEMENT -------- */
   BATCH_MANAGEMENT: {
     PAGE: {
@@ -3391,16 +3877,20 @@ export const STRINGS = {
         "This batch cannot be edited at its current stage. Editing is allowed only in Yet to Assign, or in the first sub-department while status is To Be Initiated or In Progress (additions only).",
       APPEND_ONLY_BANNER:
         "Batch is in progress. Existing motors, materials, premix count, and project details are locked. You may only add new motors, materials, or increase premix count.",
-      VALIDATION_GENERIC: "Save blocked: this change is not allowed while the batch is in progress.",
+      VALIDATION_GENERIC:
+        "Save blocked: this change is not allowed while the batch is in progress.",
       VALIDATION_ERRORS: {
-        LOCKED_FIELD_CHANGED: "Project, stage, system manager, and related details cannot be changed while the batch is in progress.",
+        LOCKED_FIELD_CHANGED:
+          "Project, stage, system manager, and related details cannot be changed while the batch is in progress.",
         MOTOR_REMOVED: "Existing motors cannot be removed while the batch is in progress.",
-        MOTOR_CHANGED: "Existing motor assignments cannot be changed while the batch is in progress.",
+        MOTOR_CHANGED:
+          "Existing motor assignments cannot be changed while the batch is in progress.",
         IDENTIFICATION_HEADER_CHANGED:
           "Identification sheet header details cannot be changed while the batch is in progress.",
         PREMIX_REDUCED: "Premix count cannot be reduced while the batch is in progress.",
         MATERIAL_REMOVED: "Existing materials cannot be removed while the batch is in progress.",
-        MATERIAL_CHANGED: "Existing material rows cannot be modified while the batch is in progress.",
+        MATERIAL_CHANGED:
+          "Existing material rows cannot be modified while the batch is in progress.",
       },
     },
     ERRORS: {

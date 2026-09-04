@@ -34,7 +34,19 @@ import {
 } from "@/app/theme/custom_themes/shared/data_table_theme";
 import { STRINGS } from "@/app/config/strings";
 import { useCasingFileActions } from "@/hooks/user/sourcing/useCasingFileActions";
+import { isCasingFieldRequired } from "@/data/validation/adapters/rocketMotorCasing.validation";
 import FilePreviewDialog from "@/ui/components/common/FilePreviewDialog";
+import { RequiredMark } from "./CasingFormPrimitives";
+
+const SUBMIT_REQUIRED_REPORT_KEYS = new Set([
+  "visualInspectionReport",
+  "dimensionalInspectionReport",
+  "mockTrialReport",
+]);
+
+const isReportUploadRequired = (key: string) =>
+  SUBMIT_REQUIRED_REPORT_KEYS.has(key) &&
+  isCasingFieldRequired(key as "visualInspectionReport");
 
 const S = STRINGS.SOURCING.CASING_CREATE;
 
@@ -43,6 +55,7 @@ type ReportEntry = (typeof REPORT_UPLOADS)[number];
 type CasingReportUploadProps = {
   form: RocketMotorCasingFormData;
   patch: (value: Partial<RocketMotorCasingFormData>) => void;
+  validationErrors?: Record<string, string>;
   theme: any;
 };
 
@@ -71,11 +84,13 @@ const ReportRowFiles = ({
   form,
   patch,
   colors,
+  validationErrors = {},
 }: {
   entry: ReportEntry;
   form: RocketMotorCasingFormData;
   patch: (value: Partial<RocketMotorCasingFormData>) => void;
   colors: ThemeColors;
+  validationErrors?: Record<string, string>;
 }) => {
   const files = ((form[entry.existingField] as UploadedFileRef[]) ?? []).slice();
   const {
@@ -98,7 +113,7 @@ const ReportRowFiles = ({
 
   return (
     <>
-      <Stack spacing={0.75}>
+      <Stack spacing={0.75} sx={validationErrors[entry.key] ? { border: "1px solid", borderColor: "error.main", borderRadius: 1.5, p: 0.75 } : undefined}>
         {files.length === 0 ? (
           <Typography sx={{ fontSize: "0.75rem", color: alpha(colors.textSub, 0.85) }}>
             {S.UPLOAD_REPORT_EMPTY}
@@ -256,7 +271,7 @@ const ReportRowFiles = ({
   );
 };
 
-const CasingReportUpload = ({ form, patch, theme }: CasingReportUploadProps) => {
+const CasingReportUpload = ({ form, patch, validationErrors = {}, theme }: CasingReportUploadProps) => {
   const palette = theme?.palette ?? {};
   const colors: ThemeColors = {
     primary: palette.primaryLight ?? "#2E86C1",
@@ -327,13 +342,15 @@ const CasingReportUpload = ({ form, patch, theme }: CasingReportUploadProps) => 
                 <TableCell sx={bodyCellSx}>
                   <Typography sx={{ fontSize: "0.82rem", fontWeight: 600, color: colors.text }}>
                     {entry.label}
+                    {isReportUploadRequired(entry.key) ? <RequiredMark theme={theme} /> : null}
                   </Typography>
                   <Typography sx={{ fontSize: "0.65rem", color: colors.textSub, mt: 0.25 }}>
                     PDF, Image or Video · ≤50MB · multiple allowed
                   </Typography>
                 </TableCell>
                 <TableCell sx={bodyCellSx}>
-                  <ReportRowFiles entry={entry} form={form} patch={patch} colors={colors} />
+                  <ReportRowFiles entry={entry} form={form} patch={patch} colors={colors} validationErrors={validationErrors} />
+                  {validationErrors[entry.key] ? <Typography color="error" variant="caption">{validationErrors[entry.key]}</Typography> : null}
                 </TableCell>
               </TableRow>
             ))}

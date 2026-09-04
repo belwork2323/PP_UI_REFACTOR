@@ -50,6 +50,8 @@ import {
   casePrepTableInputSx,
   casePrepTableRowSx,
 } from "./CasePrepFormPrimitives";
+import type { CasePrepValidationErrors } from "../../../../../data/models/user/casePrepValidation";
+import { casePrepFieldError } from "../../../../../data/models/user/casePrepValidation";
 
 type MaterialInput = {
   materialCode?: string;
@@ -70,8 +72,17 @@ type Props = {
   materials?: MaterialInput[];
   disabled?: boolean;
   readOnly?: boolean;
+  /** Field path → message from validateCasePrepMotorData */
+  validationErrors?: CasePrepValidationErrors;
   theme?: any;
 };
+
+const FieldErrorText = ({ message }: { message?: string }) =>
+  message ? (
+    <Typography sx={{ fontSize: "0.68rem", color: "error.main", mt: 0.35, lineHeight: 1.3 }}>
+      {message}
+    </Typography>
+  ) : null;
 
 const BRAND = CASE_PREP_BRAND;
 const ABRADING_DUST_A = "Dust Weight (in gm) (A)";
@@ -370,8 +381,10 @@ const CasePrepMotorPanel = ({
   materials,
   disabled = false,
   readOnly = false,
+  validationErrors,
   theme,
 }: Props) => {
+  const err = (path: string) => casePrepFieldError(validationErrors, path);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const valueRef = useRef(value);
@@ -715,15 +728,18 @@ const CasePrepMotorPanel = ({
             label="Type of Insulation"
             value={abrading.typeOfInsulation || insulationType}
           />
-          <CasePrepSelect
-            label="Abrading Wheel Type"
-            value={abrading.abradingWheelType}
-            placeholder="Select wheel type"
-            options={[...ABRADING_WHEEL_OPTIONS]}
-            onChange={(v) => patchSection("abradingOperation", { abradingWheelType: v })}
-            disabled={disabled} readOnly={readOnly}
-            theme={theme}
-          />
+          <Box>
+            <CasePrepSelect
+              label="Abrading Wheel Type"
+              value={abrading.abradingWheelType}
+              placeholder="Select wheel type"
+              options={[...ABRADING_WHEEL_OPTIONS]}
+              onChange={(v) => patchSection("abradingOperation", { abradingWheelType: v })}
+              disabled={disabled} readOnly={readOnly}
+              theme={theme}
+            />
+            <FieldErrorText message={err("abradingOperation.abradingWheelType")} />
+          </Box>
         </FieldGrid>
 
         <SubsectionHeading>Abrading Details</SubsectionHeading>
@@ -781,6 +797,9 @@ const CasePrepMotorPanel = ({
                               disabled={disabled}
                               readOnly={readOnly}
                               theme={theme}
+                            />
+                            <FieldErrorText
+                              message={err(`abradingOperation.abradingDetails.${index}.value`)}
                             />
                           </TableCell>
                           {rowOffset === 0 ? (
@@ -873,22 +892,28 @@ const CasePrepMotorPanel = ({
             theme={theme}
             width="100%"
           />
-          <CasePrepTextField
-            label="Number of Spacers"
-            value={bellow.numberOfSpacers}
-            onChange={(v) => patchSection("bellowBonding", { numberOfSpacers: v })}
-            disabled={disabled} readOnly={readOnly}
-            theme={theme}
-            width="100%"
-          />
-          <CasePrepTextField
-            label="HE Bellow Dimension"
-            value={bellow.heBellowDimension}
-            onChange={(v) => patchSection("bellowBonding", { heBellowDimension: v })}
-            disabled={disabled} readOnly={readOnly}
-            theme={theme}
-            width="100%"
-          />
+          <Box>
+            <CasePrepTextField
+              label="Number of Spacers"
+              value={bellow.numberOfSpacers}
+              onChange={(v) => patchSection("bellowBonding", { numberOfSpacers: v })}
+              disabled={disabled} readOnly={readOnly}
+              theme={theme}
+              width="100%"
+            />
+            <FieldErrorText message={err("bellowBonding.numberOfSpacers")} />
+          </Box>
+          <Box>
+            <CasePrepTextField
+              label="HE Bellow Dimension"
+              value={bellow.heBellowDimension}
+              onChange={(v) => patchSection("bellowBonding", { heBellowDimension: v })}
+              disabled={disabled} readOnly={readOnly}
+              theme={theme}
+              width="100%"
+            />
+            <FieldErrorText message={err("bellowBonding.heBellowDimension")} />
+          </Box>
           <Box>
             <FieldLabel>HE Motor Pasting Date & Time</FieldLabel>
             <CompactDateTime
@@ -896,15 +921,19 @@ const CasePrepMotorPanel = ({
               onChange={(v) => patchSection("bellowBonding", { heMotorPastingDateTime: v })}
               disabled={disabled} readOnly={readOnly}
             />
+            <FieldErrorText message={err("bellowBonding.heMotorPastingDateTime")} />
           </Box>
-          <CasePrepTextField
-            label="NE Bellow Dimension"
-            value={bellow.neBellowDimension}
-            onChange={(v) => patchSection("bellowBonding", { neBellowDimension: v })}
-            disabled={disabled} readOnly={readOnly}
-            theme={theme}
-            width="100%"
-          />
+          <Box>
+            <CasePrepTextField
+              label="NE Bellow Dimension"
+              value={bellow.neBellowDimension}
+              onChange={(v) => patchSection("bellowBonding", { neBellowDimension: v })}
+              disabled={disabled} readOnly={readOnly}
+              theme={theme}
+              width="100%"
+            />
+            <FieldErrorText message={err("bellowBonding.neBellowDimension")} />
+          </Box>
           <Box>
             <FieldLabel>NE Motor Pasting Date & Time</FieldLabel>
             <CompactDateTime
@@ -912,6 +941,7 @@ const CasePrepMotorPanel = ({
               onChange={(v) => patchSection("bellowBonding", { neMotorPastingDateTime: v })}
               disabled={disabled} readOnly={readOnly}
             />
+            <FieldErrorText message={err("bellowBonding.neMotorPastingDateTime")} />
           </Box>
         </FieldGrid>
         <FieldGrid columns={2}>
@@ -944,25 +974,32 @@ const CasePrepMotorPanel = ({
               onChange={(v) => patchSection("tceCleaning", { tceCleaningDateTime: v })}
               disabled={disabled} readOnly={readOnly}
             />
+            <FieldErrorText message={err("tceCleaning.tceCleaningDateTime")} />
           </Box>
-          <CasePrepTextField
-            label="Solvent Used Qty (kg)"
-            value={tce.solventUsedQtyKg}
-            onChange={(v) => patchSection("tceCleaning", { solventUsedQtyKg: v })}
-            disabled={disabled} readOnly={readOnly}
-            theme={theme}
-            width="100%"
-            placeholder="0"
-          />
-          <MultilineNoteField
-            label="Observation"
-            value={tce.observation}
-            onChange={(v) => patchSection("tceCleaning", { observation: v })}
-            disabled={disabled}
-            readOnly={readOnly}
-            placeholder="Observation"
-            minRows={3}
-          />
+          <Box>
+            <CasePrepTextField
+              label="Solvent Used Qty (kg)"
+              value={tce.solventUsedQtyKg}
+              onChange={(v) => patchSection("tceCleaning", { solventUsedQtyKg: v })}
+              disabled={disabled} readOnly={readOnly}
+              theme={theme}
+              width="100%"
+              placeholder="0"
+            />
+            <FieldErrorText message={err("tceCleaning.solventUsedQtyKg")} />
+          </Box>
+          <Box sx={{ gridColumn: { xs: "1", md: "1 / -1" } }}>
+            <MultilineNoteField
+              label="Observation"
+              value={tce.observation}
+              onChange={(v) => patchSection("tceCleaning", { observation: v })}
+              disabled={disabled}
+              readOnly={readOnly}
+              placeholder="Observation"
+              minRows={3}
+            />
+            <FieldErrorText message={err("tceCleaning.observation")} />
+          </Box>
           <CasePrepFileField
             label="Test Report"
             files={tce.testReport ? [tce.testReport] : []}
@@ -980,46 +1017,55 @@ const CasePrepMotorPanel = ({
       {/* 4. Pre-heating */}
       <SectionCard title="Pre-heating" theme={theme}>
         <FieldGrid columns={3}>
-          <CasePrepSelect
-            label="Vacuum Bagging Applied"
-            value={preHeating.vacuumBaggingApplied}
-            placeholder="Select"
-            options={[...VACUUM_BAGGING_OPTIONS]}
-            onChange={(v) =>
-              patchPreHeating({
-                vacuumBaggingApplied: v,
-                ...(v.toUpperCase() !== "YES" ? { vacuumApplied: "" } : {}),
-              })
-            }
-            disabled={disabled} readOnly={readOnly}
-            theme={theme}
-          />
-          {showVacuumApplied ? (
-            <CasePrepTextField
-              label="Vacuum Applied"
-              value={preHeating.vacuumApplied}
-              onChange={(v) => patchPreHeating({ vacuumApplied: v })}
+          <Box>
+            <CasePrepSelect
+              label="Vacuum Bagging Applied"
+              value={preHeating.vacuumBaggingApplied}
+              placeholder="Select"
+              options={[...VACUUM_BAGGING_OPTIONS]}
+              onChange={(v) =>
+                patchPreHeating({
+                  vacuumBaggingApplied: v,
+                  ...(v.toUpperCase() !== "YES" ? { vacuumApplied: "" } : {}),
+                })
+              }
               disabled={disabled} readOnly={readOnly}
               theme={theme}
-              width="100%"
             />
+            <FieldErrorText message={err("preHeating.vacuumBaggingApplied")} />
+          </Box>
+          {showVacuumApplied ? (
+            <Box>
+              <CasePrepTextField
+                label="Vacuum Applied"
+                value={preHeating.vacuumApplied}
+                onChange={(v) => patchPreHeating({ vacuumApplied: v })}
+                disabled={disabled} readOnly={readOnly}
+                theme={theme}
+                width="100%"
+              />
+              <FieldErrorText message={err("preHeating.vacuumApplied")} />
+            </Box>
           ) : null}
-          <CasePrepSelect
-            label="Pre-heating Recipe"
-            value={preHeating.preHeatingRecipe}
-            placeholder="Select recipe"
-            options={[...PRE_HEATING_RECIPE_OPTIONS]}
-            onChange={(v) =>
-              patchPreHeating({
-                preHeatingRecipe: v,
-                ...(v.toUpperCase() !== "OTHERS"
-                  ? { otherTemperature: "", otherDuration: "" }
-                  : {}),
-              })
-            }
-            disabled={disabled} readOnly={readOnly}
-            theme={theme}
-          />
+          <Box>
+            <CasePrepSelect
+              label="Pre-heating Recipe"
+              value={preHeating.preHeatingRecipe}
+              placeholder="Select recipe"
+              options={[...PRE_HEATING_RECIPE_OPTIONS]}
+              onChange={(v) =>
+                patchPreHeating({
+                  preHeatingRecipe: v,
+                  ...(v.toUpperCase() !== "OTHERS"
+                    ? { otherTemperature: "", otherDuration: "" }
+                    : {}),
+                })
+              }
+              disabled={disabled} readOnly={readOnly}
+              theme={theme}
+            />
+            <FieldErrorText message={err("preHeating.preHeatingRecipe")} />
+          </Box>
           {showOtherRecipe ? (
             <>
               <CasePrepTextField
@@ -1093,49 +1139,61 @@ const CasePrepMotorPanel = ({
       {/* 5. Liner Coating */}
       <SectionCard title="Liner Coating Operation" theme={theme}>
         <FieldGrid columns={3}>
-          <CasePrepSelect
-            label="Liner Type"
-            value={liner.linerType}
-            placeholder="Select liner type"
-            options={[...LINER_TYPE_OPTIONS]}
-            onChange={(v) =>
-              patchSection("linerCoatingOperation", {
-                linerType: v,
-                ...(v.toUpperCase() !== "OTHERS" ? { otherLinerType: "" } : {}),
-              })
-            }
-            disabled={disabled} readOnly={readOnly}
-            theme={theme}
-          />
+          <Box>
+            <CasePrepSelect
+              label="Liner Type"
+              value={liner.linerType}
+              placeholder="Select liner type"
+              options={[...LINER_TYPE_OPTIONS]}
+              onChange={(v) =>
+                patchSection("linerCoatingOperation", {
+                  linerType: v,
+                  ...(v.toUpperCase() !== "OTHERS" ? { otherLinerType: "" } : {}),
+                })
+              }
+              disabled={disabled} readOnly={readOnly}
+              theme={theme}
+            />
+            <FieldErrorText message={err("linerCoatingOperation.linerType")} />
+          </Box>
           {showOtherLiner ? (
+            <Box>
+              <CasePrepTextField
+                label="Other Liner Type"
+                value={liner.otherLinerType}
+                onChange={(v) => patchSection("linerCoatingOperation", { otherLinerType: v })}
+                disabled={disabled} readOnly={readOnly}
+                theme={theme}
+                width="100%"
+              />
+              <FieldErrorText message={err("linerCoatingOperation.otherLinerType")} />
+            </Box>
+          ) : null}
+          <Box>
             <CasePrepTextField
-              label="Other Liner Type"
-              value={liner.otherLinerType}
-              onChange={(v) => patchSection("linerCoatingOperation", { otherLinerType: v })}
+              label="Batch No"
+              value={liner.batchNo}
+              onChange={(v) => patchSection("linerCoatingOperation", { batchNo: v })}
               disabled={disabled} readOnly={readOnly}
               theme={theme}
               width="100%"
             />
-          ) : null}
-          <CasePrepTextField
-            label="Batch No"
-            value={liner.batchNo}
-            onChange={(v) => patchSection("linerCoatingOperation", { batchNo: v })}
-            disabled={disabled} readOnly={readOnly}
-            theme={theme}
-            width="100%"
-          />
+            <FieldErrorText message={err("linerCoatingOperation.batchNo")} />
+          </Box>
           <ReadOnlyField label="Batch Size" value={liner.batchSize} />
-          <CasePrepTextField
-            label="Qualifying Subscale Batch No"
-            value={liner.qualifyingSubscaleBatchNo}
-            onChange={(v) =>
-              patchSection("linerCoatingOperation", { qualifyingSubscaleBatchNo: v })
-            }
-            disabled={disabled} readOnly={readOnly}
-            theme={theme}
-            width="100%"
-          />
+          <Box>
+            <CasePrepTextField
+              label="Qualifying Subscale Batch No"
+              value={liner.qualifyingSubscaleBatchNo}
+              onChange={(v) =>
+                patchSection("linerCoatingOperation", { qualifyingSubscaleBatchNo: v })
+              }
+              disabled={disabled} readOnly={readOnly}
+              theme={theme}
+              width="100%"
+            />
+            <FieldErrorText message={err("linerCoatingOperation.qualifyingSubscaleBatchNo")} />
+          </Box>
           <CasePrepDateField
             label="Liner Coating Date"
             value={liner.linerCoatingDate ?? ""}
@@ -1219,6 +1277,11 @@ const CasePrepMotorPanel = ({
                         onChange={(v) => updateQualificationRow(index, { result: v })}
                         disabled={disabled} readOnly={readOnly}
                         placeholder="Result"
+                      />
+                      <FieldErrorText
+                        message={err(
+                          `linerCoatingOperation.qualificationParameters.${index}.result`,
+                        )}
                       />
                     </TableCell>
                     <TableCell sx={casePrepTableCellSx}>

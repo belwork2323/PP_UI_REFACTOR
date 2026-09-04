@@ -18,25 +18,37 @@ import {
   normalizeSubdepartmentBatchStatus,
 } from "./SubdepartmentBatchModel";
 
-export type ProcessParticularRow = {
+export interface ProcessParticularRow {
   operationId: number;
   operation?: string;
-  rpm: string;
-  time: string;
-  temp: string;
-  vacuum: string;
-};
+  rpm: number; // Changed from string
+  time: number; // Changed from string
+  temp: number; // Changed from string
+  vacuum: number; // Changed from string
+}
+export const createEmptyProcessParticularRow = (operationId?: number): ProcessParticularRow => ({
+  operationId,
+  operation: "",
+  rpm: 0,
+  time: 0,
+  temp: 0,
+  vacuum: 0,
+});
 
 export type QualityCheckRow = {
-  parameter: string;
   parameterId: string;
-  specification: string;
-  observedLayout: QualityObservedLayout;
-  observed1: string;
-  observed2: string;
-  observed3: string;
-  observed4: string;
-  sampleCount?: number;
+  parameter: string;
+  parameterName?: string;
+  specification?:
+    | {
+        minValue?: number;
+        maxValue?: number;
+        unit?: string;
+      }
+    | Record<string, never>
+    | string; // keep string for backward compatibility if needed
+  noOfSamples?: number;
+  observedValues?: string[];
 };
 
 export type PremixEntry = {
@@ -342,23 +354,20 @@ const coerceFieldValue = (value: unknown) => {
   return String(value).trim();
 };
 
-const formatSpecificationValue = (specification: any) => {
+export const formatSpecificationValue = (specification: any) => {
   if (!specification || typeof specification !== "object") {
-    return coerceFieldValue(specification);
+    return {
+      minValue: null,
+      maxValue: null,
+      unit: specification ? String(specification) : "",
+    };
   }
-  const minValue = coerceFieldValue(specification?.minValue);
-  const maxValue = coerceFieldValue(specification?.maxValue);
-  const unit = coerceFieldValue(specification?.unit);
-  if (!minValue && !maxValue && !unit) {
-    return "";
-  }
-  if (minValue && maxValue) {
-    return `${minValue} - ${maxValue}${unit ? ` ${unit}` : ""}`.trim();
-  }
-  if (minValue || maxValue) {
-    return `${minValue || maxValue}${unit ? ` ${unit}` : ""}`.trim();
-  }
-  return unit;
+
+  return {
+    minValue: specification.minValue ?? null,
+    maxValue: specification.maxValue ?? null,
+    unit: specification.unit ?? "",
+  };
 };
 
 const resolveSampleCount = (value: unknown, fallback = 1) => {
@@ -383,10 +392,10 @@ const mapApiProcessRows = (rows: any[]): ProcessParticularRow[] =>
     return {
       operationId,
       operation: resolveOperationLabel(row, operationId),
-      rpm: String(row.rpm ?? ""),
-      time: String(row.time ?? ""),
-      temp: String(row.temp ?? ""),
-      vacuum: String(row.vacuum ?? ""),
+      rpm: row.rpm,
+      time: row.time,
+      temp: row.temp,
+      vacuum: row.vacuum,
     };
   });
 
@@ -401,10 +410,10 @@ const normalizeProcessRow = (
     operation:
       String(row?.operation ?? row?.operationLabel ?? fallbackOperation).trim() ||
       resolveOperationLabel(row, operationId),
-    rpm: String(row?.rpm ?? ""),
-    time: String(row?.time ?? ""),
-    temp: String(row?.temp ?? ""),
-    vacuum: String(row?.vacuum ?? ""),
+    rpm: row?.rpm,
+    time: row?.time,
+    temp: row?.temp,
+    vacuum: row?.vacuum,
   };
 };
 
@@ -448,10 +457,10 @@ export const mergeProcessParticularsWithOperations = (
           existing?.operation ??
           resolveOperationLabel(operation, operation.operationId),
       ),
-      rpm: String(existing?.rpm ?? ""),
-      time: String(existing?.time ?? ""),
-      temp: String(existing?.temp ?? ""),
-      vacuum: String(existing?.vacuum ?? ""),
+      rpm: existing?.rpm,
+      time: existing?.time,
+      temp: existing?.temp,
+      vacuum: existing?.vacuum,
     };
   });
 };
@@ -491,24 +500,6 @@ export const resolveMixingCycleOperations = (
         cycles.finalMix?.operations ??
         root.finalMixOperations,
     ),
-  };
-};
-
-const normalizeQualityRow = (row: any, fallback: QualityCheckRow): QualityCheckRow => {
-  const sampleCount = resolveSampleCount(
-    row?.sampleCount ?? row?.noOfSamples,
-    fallback.sampleCount ?? (fallback.observedLayout === "quad" ? 4 : 1),
-  );
-  return {
-    parameter: String(row?.parameter ?? fallback.parameter),
-    parameterId: String(row?.parameterId ?? fallback.parameterId),
-    specification: String(row?.specification ?? fallback.specification),
-    observedLayout: sampleCount > 1 ? "quad" : "single",
-    sampleCount,
-    observed1: String(row?.observed1 ?? ""),
-    observed2: String(row?.observed2 ?? ""),
-    observed3: String(row?.observed3 ?? ""),
-    observed4: String(row?.observed4 ?? ""),
   };
 };
 
@@ -857,20 +848,14 @@ const mapProcessRowsToApi = (rows: ProcessParticularRow[]) =>
     temp: row.temp,
     vacuum: row.vacuum,
   }));
-const mapQualityChecksToApi = (rows: QualityCheckRow[]) =>
+export const mapQualityChecksToApi = (rows: QualityCheckRow[]) =>
   rows.map((row) => {
-    const observations: Array<{ value: string }> = [];
-    const sampleCount = resolveSampleCount(
-      row.sampleCount,
-      isQuadObservedLayout(row.observedLayout) ? 4 : 1,
-    );
-    const observedValues = [row.observed1, row.observed2, row.observed3, row.observed4];
+    const sampleCount = Number(row.noOfSamples) || 1;
+    const values = row.observedValues ?? [];
 
-    for (let index = 0; index < sampleCount; index += 1) {
-      const value = String(observedValues[index] ?? "").trim();
-      if (!value) continue;
-      observations.push({ value });
-    }
+    const observations = values.slice(0, sampleCount).map((val) => ({
+      value: String(val ?? "").trim(),
+    }));
 
     return {
       parameterId: row.parameterId,
@@ -910,38 +895,47 @@ const mapProcessRows = (
     return {
       operationId: Number(operation.operationId),
       operation: operation.operationName,
-      rpm: String(apiRow?.rpm ?? ""),
-      time: String(apiRow?.time ?? ""),
-      temp: String(apiRow?.temp ?? ""),
-      vacuum: String(apiRow?.vacuum ?? ""),
+      rpm: apiRow?.rpm,
+      time: apiRow?.time,
+      temp: apiRow?.temp,
+      vacuum: apiRow?.vacuum,
     };
   });
 };
 
 const mapApiQualityChecksToRows = (apiRows: any[] = []): QualityCheckRow[] =>
   apiRows.map((row) => {
-    const observations = Array.isArray(row?.observations) ? row.observations : [];
-    const values = readObservationValues(observations);
-    const filledSlots = values.reduce(
-      (count, value, index) =>
-        value != null && String(value).trim() ? Math.max(count, index + 1) : count,
+    const rawObservations: Array<{ value?: string | number }> = Array.isArray(row?.observations)
+      ? row.observations
+      : [];
+
+    // Count filled slots to resolve minimum sample count if noOfSamples is missing
+    const filledSlots = rawObservations.reduce(
+      (count, item, index) =>
+        item?.value != null && String(item.value).trim() !== ""
+          ? Math.max(count, index + 1)
+          : count,
       0,
     );
-    const sampleCount = resolveSampleCount(
-      row?.noOfSamples ?? row?.sampleCount,
-      Math.max(1, filledSlots),
+
+    // Dynamic sample count resolution
+    const sampleCount = Math.max(
+      1,
+      Number(row?.noOfSamples ?? row?.sampleCount) || filledSlots || 1,
     );
+
+    // Build dynamic observedValues array matching sampleCount index order
+    const observedValues = Array.from({ length: sampleCount }, (_, index) => {
+      const item = rawObservations[index];
+      return item?.value !== undefined && item?.value !== null ? String(item.value).trim() : "";
+    });
 
     return {
       parameterId: String(row?.parameterId ?? "").trim(),
       parameter: String(row?.parameterName ?? row?.parameter ?? row?.parameterId ?? "").trim(),
-      specification: formatSpecificationValue(row?.specification),
-      observedLayout: sampleCount > 1 ? "quad" : "single",
-      sampleCount,
-      observed1: String(values[0] ?? ""),
-      observed2: String(values[1] ?? ""),
-      observed3: String(values[2] ?? ""),
-      observed4: String(values[3] ?? ""),
+      specification: formatSpecificationValue(row?.specification), // Returns full object { minValue, maxValue, unit }
+      noOfSamples: sampleCount,
+      observedValues,
     };
   });
 
@@ -955,14 +949,32 @@ const mergeQualityChecks = (
 
   return masterRows.map((master) => {
     const api = apiRows.find((row) => row.parameterId === master.parameterId);
-    const values = readObservationValues(Array.isArray(api?.observations) ? api.observations : []);
+
+    // Resolve dynamic sample count from master or API
+    const sampleCount = Math.max(
+      1,
+      Number(master.noOfSamples ?? api?.noOfSamples ?? api?.sampleCount) || 1,
+    );
+
+    // Extract raw observation objects from API if present
+    const rawObservations: Array<{ value?: string | number }> = Array.isArray(api?.observations)
+      ? api.observations
+      : [];
+
+    // Map values dynamically according to sampleCount while preserving original index positions
+    const observedValues = Array.from({ length: sampleCount }, (_, index) => {
+      const item = rawObservations[index];
+      if (item?.value !== undefined && item?.value !== null) {
+        return String(item.value).trim();
+      }
+      // Fallback to existing master values if present, else empty string
+      return master.observedValues?.[index] ?? "";
+    });
 
     return {
       ...master,
-      observed1: String(values[0] ?? ""),
-      observed2: String(values[1] ?? ""),
-      observed3: String(values[2] ?? ""),
-      observed4: String(values[3] ?? ""),
+      noOfSamples: sampleCount,
+      observedValues,
     };
   });
 };
@@ -1096,12 +1108,9 @@ const premixHasValue = (premix: PremixEntry) => {
     [row.rpm, row.time, row.temp, row.vacuum].some(hasValue),
   );
 
-  const qualityFilled = (premix.qualityChecks ?? []).some((row) => {
-    if (isQuadObservedLayout(row.observedLayout)) {
-      return [row.observed1, row.observed2, row.observed3, row.observed4].some(hasValue);
-    }
-    return hasValue(row.observed1);
-  });
+  const qualityFilled = (premix.qualityChecks ?? []).some(
+    (row) => Array.isArray(row.observedValues) && row.observedValues.some(hasValue),
+  );
 
   return headerFilled || processFilled || qualityFilled;
 };
@@ -1118,12 +1127,9 @@ const finalMixHasValue = (entry: FinalMixEntry) => {
     [row.rpm, row.time, row.temp, row.vacuum].some(hasValue),
   );
 
-  const qualityFilled = (entry.qualityChecks ?? []).some((row) => {
-    if (isQuadObservedLayout(row.observedLayout)) {
-      return [row.observed1, row.observed2, row.observed3, row.observed4].some(hasValue);
-    }
-    return hasValue(row.observed1);
-  });
+  const qualityFilled = (entry.qualityChecks ?? []).some(
+    (row) => Array.isArray(row.observedValues) && row.observedValues.some(hasValue),
+  );
 
   return headerFilled || processFilled || qualityFilled;
 };
@@ -1248,8 +1254,7 @@ const mapMixCardStatusesFromApi = (
 
   const stages = ((
     data.mixingDetails as
-      | { stages?: Array<{ stageType?: string; premixes?: Record<string, unknown>[] }> }
-      | undefined
+      { stages?: Array<{ stageType?: string; premixes?: Record<string, unknown>[] }> } | undefined
   )?.stages ?? []) as Array<{ stageType?: string; premixes?: Record<string, unknown>[] }>;
 
   stages.forEach((stage) => {
@@ -1377,8 +1382,7 @@ export const mapMixingDetailsForDisplay = (
   const mixCards = buildMixingApproverCards({ premixCards, finalMixCards });
   const mixCardCountsFromApi = (data.mixCardCounts ??
     (data.mixingDetails as Record<string, unknown> | undefined)?.mixCardCounts) as
-    | Partial<MixCardCounts>
-    | undefined;
+    Partial<MixCardCounts> | undefined;
 
   const derivedCounts: MixCardCounts = {
     pendingMixCardCount: 0,
@@ -1475,24 +1479,19 @@ export class MixingDetailsModel {
   }
 }
 
-export const mapBackendQualityChecksToRows = (qualityChecks: any): QualityCheckRow[] => {
-  const definitions = Array.isArray(qualityChecks) ? qualityChecks : [];
-  return definitions.map((entry: any) => {
-    const parameterId = String(entry?.parameterId ?? "").trim();
-    const parameter = String(entry?.parameterName ?? entry?.parameter ?? "").trim();
-    const specification = formatSpecificationValue(entry?.specification);
-    const sampleCount = resolveSampleCount(entry?.noOfSamples ?? entry?.sampleCount, 1);
+export const mapBackendQualityChecksToRows = (definitions: any[]): QualityCheckRow[] => {
+  if (!Array.isArray(definitions)) return [];
 
-    return {
-      parameterId,
-      parameter,
-      specification,
-      observedLayout: sampleCount > 1 ? "quad" : "single",
-      sampleCount,
-      observed1: "",
-      observed2: "",
-      observed3: "",
-      observed4: "",
-    };
-  });
+  return definitions.map((item, index) => ({
+    id: item.id || `qc-${index}`,
+    parameterId: item.parameterId ?? item.id ?? index,
+    parameter: item.parameter || item.parameterName || "",
+    parameterName: item.parameterName || item.parameter || "",
+    specification: item.specification ?? {},
+    noOfSamples: Number(item.noOfSamples) || 1,
+    observedValues: Array.isArray(item.observedValues)
+      ? item.observedValues
+      : Array.from({ length: Number(item.noOfSamples) || 1 }, () => ""),
+    disabled: Boolean(item.disabled),
+  }));
 };

@@ -7,6 +7,7 @@ import {
 } from "../../../../../hooks/user/manufacturing/castingCuringFlowConfig";
 import { DateTimeField } from "../../../../components/common/DateField";
 import CasePrepSelect from "../CasePreparation/CasePrepSelect";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 type CastingCuringFlowBarProps = {
   motorId: string;
@@ -43,10 +44,16 @@ const CastingCuringFlowBar = ({
     void fetchCastingStationsApi()
       .then((response: any) => {
         if (!active) return;
-        const list = Array.isArray(response?.data) ? response.data : Array.isArray(response) ? response : [];
+        const list = Array.isArray(response?.data)
+          ? response.data
+          : Array.isArray(response)
+            ? response
+            : [];
         const mapped = list
           .map((item: Record<string, unknown>) => {
-            const value = String(item.stationCode ?? item.stationId ?? item.stationName ?? item.code ?? "");
+            const value = String(
+              item.stationCode ?? item.stationId ?? item.stationName ?? item.code ?? "",
+            );
             const label = String(item.stationName ?? item.stationCode ?? value);
             return { value, label };
           })
@@ -106,9 +113,12 @@ const CastingCuringFlowBar = ({
                 theme={theme}
                 disabled={disabled}
                 onChange={onCastingStationChange}
+                required
               />
               {stationLoadError ? (
-                <Typography sx={{ fontSize: "0.72rem", color: theme.palette?.danger ?? "#C0392B", mt: 0.5 }}>
+                <Typography
+                  sx={{ fontSize: "0.72rem", color: theme.palette?.danger ?? "#C0392B", mt: 0.5 }}
+                >
                   {stationLoadError}
                 </Typography>
               ) : null}
@@ -116,7 +126,7 @@ const CastingCuringFlowBar = ({
 
             <Box sx={flowBar.selectField?.(260)}>
               <Typography component="label" sx={flowBar.selectLabel}>
-                {L.motorReceivedAt}
+                <FieldLabelWithAsterisk label={L.motorReceivedAt} required />
               </Typography>
               <DateTimeField
                 value={motorReceivedAt}
@@ -127,6 +137,7 @@ const CastingCuringFlowBar = ({
                   mb: 0,
                   ...(flowBar.selectInput?.(Boolean(motorReceivedAt)) as object),
                 }}
+                required
               />
             </Box>
           </Box>

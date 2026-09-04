@@ -1,14 +1,9 @@
-import {
-  Box,
-  InputAdornment,
-  MenuItem,
-  TextField,
-  Typography,
-} from "@mui/material";
+import { Box, InputAdornment, MenuItem, TextField, Typography } from "@mui/material";
 import ExpandMoreRoundedIcon from "@mui/icons-material/ExpandMoreRounded";
 import { useMemo } from "react";
 import { icons } from "../../../../../app/theme/icons";
 import { WorkflowReadOnlyText } from "../../../../components/common/WorkflowReadOnlyText";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 const { input: InputRoundedIcon } = icons.user.manufacturing.casePreparation.form;
 
@@ -28,6 +23,7 @@ type CasePrepSelectProps = {
   readOnly?: boolean;
   width?: number | string;
   theme: any;
+  required?: boolean;
 };
 
 const CasePrepSelect = ({
@@ -40,6 +36,7 @@ const CasePrepSelect = ({
   readOnly = false,
   width = "100%",
   theme,
+  required = false,
 }: CasePrepSelectProps) => {
   const cpTheme = theme.manufacturing?.casePreparation;
   const flowBar = cpTheme?.flowBar ?? {};
@@ -49,13 +46,13 @@ const CasePrepSelect = ({
 
   const selectedOption = useMemo(
     () => safeOptions.find((o) => o.value === value),
-    [safeOptions, value]
+    [safeOptions, value],
   );
 
   return (
     <Box sx={flowBar.selectField?.(width)}>
       <Typography component="label" sx={flowBar.selectLabel}>
-        {label}
+        {required ? <FieldLabelWithAsterisk label={label} required /> : label}
       </Typography>
       {readOnly ? (
         <WorkflowReadOnlyText
@@ -63,49 +60,50 @@ const CasePrepSelect = ({
           sx={{ fontSize: "0.82rem", py: 0.75 }}
         />
       ) : (
-      <TextField
-        select
-        fullWidth
-        size="small"
-        value={value}
-        disabled={disabled}
-        onChange={(e) => onChange(String(e.target.value))}
-        sx={flowBar.selectInput?.(hasValue)}
-        SelectProps={{
-          displayEmpty: true,
-          IconComponent: ExpandMoreRoundedIcon,
-          renderValue: (selected) => {
-            if (!selected) {
-              return <Typography sx={flowBar.selectPlaceholder}>{placeholder}</Typography>;
-            }
-            return selectedOption?.label ?? String(selected);
-          },
-          MenuProps: {
-            PaperProps: { sx: flowBar.selectMenuPaper },
-          },
-        }}
-        InputProps={{
-          startAdornment: (
-            <InputAdornment position="start">
-              <InputRoundedIcon sx={{ color: "rgba(21,101,192,0.55)", fontSize: 16 }} />
-            </InputAdornment>
-          ),
-        }}
-      >
-        <MenuItem value="" disabled>
-          <Typography sx={flowBar.selectPlaceholder}>{placeholder}</Typography>
-        </MenuItem>
-        {safeOptions.map((option) => (
-          <MenuItem
-            key={option.value}
-            value={option.value}
-            disabled={option.disabled}
-            sx={flowBar.menuItem?.(option.value === value)}
-          >
-            {option.label}
+        <TextField
+          select
+          fullWidth
+          size="small"
+          value={value}
+          disabled={disabled}
+          required={required}
+          onChange={(e) => onChange(String(e.target.value))}
+          sx={flowBar.selectInput?.(hasValue)}
+          SelectProps={{
+            displayEmpty: true,
+            IconComponent: ExpandMoreRoundedIcon,
+            renderValue: (selected) => {
+              if (!selected) {
+                return <Typography sx={flowBar.selectPlaceholder}>{placeholder}</Typography>;
+              }
+              return selectedOption?.label ?? String(selected);
+            },
+            MenuProps: {
+              PaperProps: { sx: flowBar.selectMenuPaper },
+            },
+          }}
+          InputProps={{
+            startAdornment: (
+              <InputAdornment position="start">
+                <InputRoundedIcon sx={{ color: "rgba(21,101,192,0.55)", fontSize: 16 }} />
+              </InputAdornment>
+            ),
+          }}
+        >
+          <MenuItem value="" disabled>
+            <Typography sx={flowBar.selectPlaceholder}>{placeholder}</Typography>
           </MenuItem>
-        ))}
-      </TextField>
+          {safeOptions.map((option) => (
+            <MenuItem
+              key={option.value}
+              value={option.value}
+              disabled={option.disabled}
+              sx={flowBar.menuItem?.(option.value === value)}
+            >
+              {option.label}
+            </MenuItem>
+          ))}
+        </TextField>
       )}
     </Box>
   );

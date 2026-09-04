@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   alpha,
   Box,
@@ -25,21 +25,27 @@ import StackRow from "../../../../components/common/StackRow";
 import type { LotCertificate } from "../../../../../data/models/user/RawMaterialProcurementModel";
 import {
   computeIsOutOfRange,
+  isReferenceRangeNotApplicable,
   isSpecRowFailed,
+  sanitizeNumericAnalysedResultInput,
 } from "../../../../../data/models/user/RawMaterialProcurementModel";
 import { useLotCertificateActions } from "../../../../../hooks/user/sourcing/useLotCertificateActions";
 import {
   SpecificationBlock,
+  SpecificationBlockUpdater,
   SpecificationRow,
 } from "../../../../../hooks/user/sourcing/useRawMaterialSpecificationForm";
 import ReceiptDateField from "./ReceiptDateField";
 import MandatoryFormField, { mandatoryAsteriskSx, mandatoryFieldInputSx } from "./MandatoryFormField";
 import {
-  getLotFieldErrors,
-  getMaterialMetaErrors,
-  isAnalyzedResultMissing,
-  type MandatoryValidationMessages,
-} from "../../../../../data/models/user/rawMaterialProcurementValidation";
+  blockLotPath,
+  blockMetaPath,
+  blockCertTypePath,
+} from "../../../../../data/validation/adapters/rawMaterialSourcing.validation";
+import type { ValidationErrors } from "../../../../../data/validation/submissionIntent";
+import useValidationDisplay, {
+  type ValidationAttemptFlags,
+} from "../../../../components/validation/useValidationDisplay";
 
 const {
   delete: DeleteOutlineRoundedIcon,
@@ -55,60 +61,71 @@ type MaterialSpecificationBlockProps = {
   showDeleteLot?: boolean;
   onDeleteLot?: () => void;
   deleteLoading?: boolean;
-  onUpdate: (index: number, updatedBlock: SpecificationBlock) => void;
+  onUpdate: (index: number, updater: SpecificationBlockUpdater) => void;
   onRemove: (index: number) => void;
-  showFieldErrors?: boolean;
-  validationMessages: MandatoryValidationMessages;
+  errors: ValidationErrors;
+  validationAttempt: ValidationAttemptFlags;
+  getAnalysedResultError: (blockIndex: number, rowIndex: number, touched: boolean) => string | undefined;
   theme: any;
 };
 
 function useMaterialBlockState(
   block: SpecificationBlock,
   index: number,
-  onUpdate: (index: number, updatedBlock: SpecificationBlock) => void
+  onUpdate: (index: number, updater: SpecificationBlockUpdater) => void,
+  onCellEdit?: (rowIndex: number, field: keyof SpecificationRow) => void,
 ) {
   const handleCellChange = useCallback(
     (rowIndex: number, field: keyof SpecificationRow, value: string) => {
-      const updatedRows = block.rows.map((row, currentIndex) => {
-        if (currentIndex !== rowIndex) return row;
-        const next = { ...row, [field]: value };
-        if (field === "analysedResult") {
-          next.status = null;
-          next.isOutOfRange = computeIsOutOfRange(value, row.referenceRange);
-        }
-        return next;
+      onCellEdit?.(rowIndex, field);
+      onUpdate(index, (current) => {
+        const updatedRows = current.rows.map((row, currentIndex) => {
+          if (currentIndex !== rowIndex) return row;
+          const nextValue =
+            field === "analysedResult" && !isReferenceRangeNotApplicable(row.referenceRange)
+              ? sanitizeNumericAnalysedResultInput(value)
+              : value;
+          const next = { ...row, [field]: nextValue };
+          if (field === "analysedResult") {
+            next.status = null;
+            next.isOutOfRange = computeIsOutOfRange(nextValue, row.referenceRange);
+          }
+          return next;
+        });
+        return { ...current, rows: updatedRows };
       });
-      onUpdate(index, { ...block, rows: updatedRows });
     },
-    [block, index, onUpdate]
+    [index, onCellEdit, onUpdate],
   );
 
   const handleLotNoChange = useCallback(
     (value: string) => {
-      onUpdate(index, { ...block, lotNo: value });
+      onUpdate(index, (current) => ({ ...current, lotNo: value }));
     },
-    [block, index, onUpdate]
+    [index, onUpdate],
   );
 
   const handleBlockMeta = useCallback(
     (field: "supplyOrderNo" | "receiptDate" | "manufacturerName", value: string) => {
-      onUpdate(index, { ...block, [field]: value });
+      onUpdate(index, (current) => ({ ...current, [field]: value }));
     },
-    [block, index, onUpdate]
+    [index, onUpdate],
   );
 
   const handleCertChange = useCallback(
     (certIndex: number, field: keyof LotCertificate, value: string) => {
-      const certs = [...(block.certificates ?? [])];
-      certs[certIndex] = { ...certs[certIndex], [field]: value };
-      onUpdate(index, { ...block, certificates: certs });
+      onUpdate(index, (current) => {
+        const certs = [...(current.certificates ?? [])];
+        certs[certIndex] = { ...certs[certIndex], [field]: value };
+        return { ...current, certificates: certs };
+      });
     },
-    [block, index, onUpdate]
+    [index, onUpdate],
   );
 
   const filledCount = useMemo(
     () => block.rows.filter((row) => row.analysedResult.trim() !== "").length,
-    [block.rows]
+    [block.rows],
   );
   const totalCount = block.rows.length;
   const allFilled = totalCount > 0 && filledCount === totalCount;
@@ -134,14 +151,20 @@ const MaterialSpecificationBlock = ({
   deleteLoading = false,
   onUpdate,
   onRemove,
-  showFieldErrors = false,
-  validationMessages,
+  errors,
+  validationAttempt,
+  getAnalysedResultError,
   theme,
 }: MaterialSpecificationBlockProps) => {
   const formStrings = STRINGS.SOURCING.SPECIFICATION_FORM;
   const specStyles = theme.sourcing.rawMaterial.specificationForm;
-  const metaErrors = getMaterialMetaErrors(block, validationMessages, showFieldErrors);
-  const lotErrors = getLotFieldErrors(block, validationMessages, showFieldErrors);
+  const { visibleError } = useValidationDisplay(errors, validationAttempt);
+  const [touchedAnalysedRows, setTouchedAnalysedRows] = useState(() => new Set<number>());
+
+  useEffect(() => {
+    setTouchedAnalysedRows(new Set());
+  }, [block.lotNo, block.material]);
+
   const {
     allFilled,
     filledCount,
@@ -150,13 +173,21 @@ const MaterialSpecificationBlock = ({
     handleBlockMeta,
     handleCertChange,
     totalCount,
-  } = useMaterialBlockState(block, index, onUpdate);
+  } = useMaterialBlockState(block, index, onUpdate, (rowIndex, field) => {
+    if (field === "analysedResult") {
+      setTouchedAnalysedRows((previous) => new Set(previous).add(rowIndex));
+    }
+  });
 
-  const blockRef = useRef(block);
-  blockRef.current = block;
+  const supplyOrderError = visibleError(blockMetaPath(index, "supplyOrderNo"));
+  const receiptDateError = visibleError(blockMetaPath(index, "receiptDate"));
+  const manufacturerError = visibleError(blockMetaPath(index, "manufacturerName"));
+  const lotNoError = visibleError(blockLotPath(index, "lotNo"));
+  const certificateError = visibleError(blockLotPath(index, "certificates"));
+
   const handleCertificatesChange = useCallback(
     (certificates: LotCertificate[]) => {
-      onUpdate(index, { ...blockRef.current, certificates });
+      onUpdate(index, (current) => ({ ...current, certificates }));
     },
     [index, onUpdate],
   );
@@ -225,36 +256,46 @@ const MaterialSpecificationBlock = ({
       </Box>
 
       <Stack direction={{ xs: "column", sm: "row" }} spacing={2} sx={{ px: 2, py: 1.5 }}>
-        <MandatoryFormField label={formStrings.SUPPLY_ORDER_LABEL} error={metaErrors.supplyOrderNo} theme={theme}>
+        <MandatoryFormField
+          label={formStrings.SUPPLY_ORDER_LABEL}
+          error={supplyOrderError}
+          theme={theme}
+          required={false}
+        >
           <TextField
             size="small"
             fullWidth
             variant="outlined"
             value={block.supplyOrderNo ?? ""}
             onChange={(e) => handleBlockMeta("supplyOrderNo", e.target.value)}
-            error={Boolean(metaErrors.supplyOrderNo)}
-            sx={mandatoryFieldInputSx(theme.workflow.formElements.metaRowTextField, Boolean(metaErrors.supplyOrderNo), theme)}
+            error={Boolean(supplyOrderError)}
+            sx={mandatoryFieldInputSx(theme.workflow.formElements.metaRowTextField, Boolean(supplyOrderError), theme)}
           />
         </MandatoryFormField>
-        <MandatoryFormField label={formStrings.RECEIPT_DATE_LABEL} error={metaErrors.receiptDate} theme={theme}>
+        <MandatoryFormField
+          label={formStrings.RECEIPT_DATE_LABEL}
+          error={receiptDateError}
+          theme={theme}
+          required={false}
+        >
           <ReceiptDateField
             value={block.receiptDate ?? ""}
             onChange={(next) => handleBlockMeta("receiptDate", next)}
             theme={theme}
-            error={Boolean(metaErrors.receiptDate)}
+            error={Boolean(receiptDateError)}
           />
         </MandatoryFormField>
-        <MandatoryFormField label={formStrings.MANUFACTURER_LABEL} error={metaErrors.manufacturerName} theme={theme}>
+        <MandatoryFormField label={formStrings.MANUFACTURER_LABEL} error={manufacturerError} theme={theme}>
           <TextField
             size="small"
             fullWidth
             variant="outlined"
             value={block.manufacturerName ?? ""}
             onChange={(e) => handleBlockMeta("manufacturerName", e.target.value)}
-            error={Boolean(metaErrors.manufacturerName)}
+            error={Boolean(manufacturerError)}
             sx={mandatoryFieldInputSx(
               theme.workflow.formElements.metaRowTextField,
-              Boolean(metaErrors.manufacturerName),
+              Boolean(manufacturerError),
               theme
             )}
           />
@@ -305,7 +346,11 @@ const MaterialSpecificationBlock = ({
           <TableBody>
             {block.rows.map((row, rowIndex) => {
               const rowFailed = isSpecRowFailed(row);
-              const analyzedMissing = isAnalyzedResultMissing(row, showFieldErrors);
+                const analyzedError = getAnalysedResultError(
+                  index,
+                  rowIndex,
+                  touchedAnalysedRows.has(rowIndex),
+                );
               return (
               <TableRow key={rowIndex} sx={specStyles.dataRow(rowIndex, rowFailed)}>
                 <TableCell sx={{ ...theme.workflow.formElements.tableCell, ...specStyles.specCell }}>
@@ -324,11 +369,11 @@ const MaterialSpecificationBlock = ({
                         onChange={(event) => handleLotNoChange(event.target.value)}
                         placeholder={formStrings.LOT_PLACEHOLDER}
                         disabled={lockLotNo}
-                        error={Boolean(lotErrors.lotNo)}
+                        error={Boolean(lotNoError)}
                         sx={{
                           ...mandatoryFieldInputSx(
                             { ...theme.workflow.formElements.cellField, ...specStyles.lotField },
-                            Boolean(lotErrors.lotNo),
+                            Boolean(lotNoError),
                             theme
                           ),
                           ...(lockLotNo
@@ -346,9 +391,9 @@ const MaterialSpecificationBlock = ({
                             : {}),
                         }}
                       />
-                      {lotErrors.lotNo ? (
+                      {lotNoError ? (
                         <FormHelperText error sx={{ mx: 0, mt: 0.5, fontSize: "0.68rem" }}>
-                          {lotErrors.lotNo}
+                          {lotNoError}
                         </FormHelperText>
                       ) : lockLotNo ? (
                         <FormHelperText sx={{ mx: 0, mt: 0.5, fontSize: "0.68rem", color: theme.palette.textSub }}>
@@ -379,15 +424,16 @@ const MaterialSpecificationBlock = ({
                     value={row.analysedResult || ""}
                     onChange={(event) => handleCellChange(rowIndex, "analysedResult", event.target.value)}
                     placeholder={formStrings.ANALYZED_RESULT_PLACEHOLDER}
-                    type="number"
-                    inputProps={{ step: "any" }}
-                    error={analyzedMissing}
-                    helperText={analyzedMissing ? formStrings.FIELD_REQUIRED_ANALYZED_RESULT : undefined}
+                    inputMode={
+                      isReferenceRangeNotApplicable(row.referenceRange) ? "text" : "decimal"
+                    }
+                    error={Boolean(analyzedError)}
+                    helperText={analyzedError}
                     FormHelperTextProps={{ sx: { mx: 0, fontSize: "0.65rem" } }}
                     sx={{
                       ...theme.workflow.formElements.cellField,
                       ...specStyles.analyzedField,
-                      ...(rowFailed || analyzedMissing ? specStyles.failedAnalyzedField : {}),
+                      ...(rowFailed || analyzedError ? specStyles.failedAnalyzedField : {}),
                     }}
                   />
                 </TableCell>
@@ -422,6 +468,8 @@ const MaterialSpecificationBlock = ({
         onRemove={handleRemove}
         onRetry={handleRetry}
         onOpen={handleOpen}
+        error={certificateError}
+        certificateTypeError={(ci) => visibleError(blockCertTypePath(index, ci))}
       />
 
       <FilePreviewDialog

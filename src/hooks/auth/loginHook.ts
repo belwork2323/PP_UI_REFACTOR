@@ -4,15 +4,17 @@ import { useAuthStore } from "../../app/store/authStore";
 import { getRouteByRole } from "../../utils/roleMapper";
 import { STRINGS } from "../../app/config/strings";
 import { useAlertStore } from "../../app/store/alertStore";
-import { fetchDepartments, fetchRoles, fetchSubDepartments } from "../../data/api/common/generalAPI";
+import {
+  fetchDepartments,
+  fetchRoles,
+  fetchSubDepartments,
+} from "../../data/api/common/generalAPI";
 
 const DEPT_REQUIRED_ROLES = /User|Approver/i;
 
 const roleNeedsDept = (roleId, roles) =>
   Boolean(
-    roles
-      .find((r) => Number(r.roleId) === Number(roleId))
-      ?.roleName?.match(DEPT_REQUIRED_ROLES),
+    roles.find((r) => Number(r.roleId) === Number(roleId))?.roleName?.match(DEPT_REQUIRED_ROLES),
   );
 
 const INITIAL_CREDS = {
@@ -82,14 +84,9 @@ export function useLoginForm({ navigate }) {
   }));
 
   const roleDropdownDisabled = systemLookupsLoading || rolesEmpty;
-  const subDeptDropdownDisabled =
-    systemLookupsLoading ||
-    !showDeptDropdown ||
-    subDeptsEmpty;
+  const subDeptDropdownDisabled = systemLookupsLoading || !showDeptDropdown || subDeptsEmpty;
 
-  const roleHelperText =
-    errors.roleId ||
-    (rolesEmpty ? STRINGS.AUTH.NO_ROLES_AVAILABLE : "");
+  const roleHelperText = errors.roleId || (rolesEmpty ? STRINGS.AUTH.NO_ROLES_AVAILABLE : "");
 
   const subDeptHelperText =
     errors.subDepartmentId ||
@@ -104,10 +101,6 @@ export function useLoginForm({ navigate }) {
       setSystemLookupsLoading(true);
 
       try {
-        console.log(STRINGS.AUTH.LOGS.LOAD_START);
-        console.log(STRINGS.AUTH.LOGS.API_ROLES);
-        console.log(STRINGS.AUTH.LOGS.API_DEPTS);
-
         const [rolesSettled, depsSettled] = await Promise.allSettled([
           fetchRoles(),
           fetchDepartments(),
@@ -118,10 +111,9 @@ export function useLoginForm({ navigate }) {
         let rolesData = [];
         if (rolesSettled.status === "fulfilled") {
           rolesData = Array.isArray(rolesSettled.value) ? rolesSettled.value : [];
-          console.log(STRINGS.AUTH.LOGS.ROLES_LOADED, rolesData);
-          if (rolesData.length === 0) showAlert(STRINGS.AUTH.NO_ROLES_AVAILABLE, "warning", { autoCloseMs: 2000 });
+          if (rolesData.length === 0)
+            showAlert(STRINGS.AUTH.NO_ROLES_AVAILABLE, "warning", { autoCloseMs: 2000 });
         } else {
-          console.error(STRINGS.AUTH.ERRORS.FETCH_ROLES_FAILED, rolesSettled.reason);
           showAlert(rejectedMessage(rolesSettled.reason), "error", { autoCloseMs: 2000 });
         }
 
@@ -133,19 +125,14 @@ export function useLoginForm({ navigate }) {
             : [];
 
         if (depsSettled.status === "rejected") {
-          console.error(STRINGS.AUTH.ERRORS.FETCH_DEPTS_FAILED, depsSettled.reason);
           showAlert(rejectedMessage(depsSettled.reason), "error", { autoCloseMs: 2000 });
         }
 
         // Preferred path: fetch sub-departments per departmentId, then flatten.
         if (depsData.length > 0) {
-          console.log(`${STRINGS.AUTH.LOGS.DEPTS_LOADED_PREFIX}${depsData.length}`);
-          console.log(STRINGS.AUTH.LOGS.API_SUB_DEPTS);
-
           const settledSubs = await Promise.allSettled(
             depsData.map((d) => {
               const departmentId = d.departmentId;
-              console.log(STRINGS.AUTH.LOGS.FETCH_SUB_FOR, departmentId);
               return fetchSubDepartments(departmentId);
             }),
           );
@@ -153,28 +140,19 @@ export function useLoginForm({ navigate }) {
           settledSubs.forEach((res, idx) => {
             if (res.status === "fulfilled") {
               const list = Array.isArray(res.value) ? res.value : [];
-              console.log(
-                `${STRINGS.AUTH.LOGS.SUB_DEPTS_IDX}${idx}:`,
-                list.length,
-              );
+
               subData = subData.concat(list);
             } else {
-              console.warn(
-                `${STRINGS.AUTH.LOGS.SUB_DEPTS_FAIL_IDX}${idx}:`,
-                res.reason,
-              );
             }
           });
         }
 
         if (subData.length === 0) {
-          console.log(STRINGS.AUTH.LOGS.FB_FETCH_ALL);
           const subAllSettled = await Promise.allSettled([fetchSubDepartments()]);
           const subAll = subAllSettled[0];
 
           if (subAll.status === "fulfilled") {
             subData = Array.isArray(subAll.value) ? subAll.value : [];
-            console.log(STRINGS.AUTH.LOGS.SUB_ALL_LOADED, subData.length);
           } else {
             console.error(STRINGS.AUTH.ERRORS.FETCH_SUB_DEPTS_FAILED, subAll.reason);
           }
@@ -216,9 +194,7 @@ export function useLoginForm({ navigate }) {
         }
         return {
           ...prev,
-          password: isPasswordValid(String(value))
-            ? ""
-            : STRINGS.AUTH.VALIDATION.PASSWORD_INVALID,
+          password: isPasswordValid(String(value)) ? "" : STRINGS.AUTH.VALIDATION.PASSWORD_INVALID,
         };
       }
 
@@ -226,18 +202,20 @@ export function useLoginForm({ navigate }) {
     });
   }, []);
 
-  const handleRoleChange = useCallback((selectedRaw) => {
-    const selectedId =
-      selectedRaw === "" ? "" : Number(selectedRaw);
-    const selected = roles.find((r) => Number(r.roleId) === selectedId);
-    setCredentials((prev) => ({
-      ...prev,
-      roleId: selectedId === "" ? "" : selectedId,
-      roleName: selected?.roleName ?? "",
-      subDepartmentId: "",
-    }));
-    setErrors((prev) => ({ ...prev, roleId: "", subDepartmentId: "" }));
-  }, [roles]);
+  const handleRoleChange = useCallback(
+    (selectedRaw) => {
+      const selectedId = selectedRaw === "" ? "" : Number(selectedRaw);
+      const selected = roles.find((r) => Number(r.roleId) === selectedId);
+      setCredentials((prev) => ({
+        ...prev,
+        roleId: selectedId === "" ? "" : selectedId,
+        roleName: selected?.roleName ?? "",
+        subDepartmentId: "",
+      }));
+      setErrors((prev) => ({ ...prev, roleId: "", subDepartmentId: "" }));
+    },
+    [roles],
+  );
 
   const handleCaptchaChange = useCallback((value, isValid) => {
     setCaptchaValue(value);
@@ -259,8 +237,7 @@ export function useLoginForm({ navigate }) {
     }
     if (
       showDeptDropdown &&
-      (credentials.subDepartmentId === "" ||
-        credentials.subDepartmentId == null)
+      (credentials.subDepartmentId === "" || credentials.subDepartmentId == null)
     ) {
       if (subDeptsEmpty) {
         next.subDepartmentId = STRINGS.AUTH.NO_SUBDEPARTMENTS_FOR_LOGIN;
@@ -336,17 +313,16 @@ export function useLoginForm({ navigate }) {
     const response = await loginController(requestPayload);
 
     if (!response.success || !response.data) {
-      showAlert(response.message || STRINGS.SYSTEM.UNEXPECTED_ERROR, "error", { autoCloseMs: 2000 });
+      showAlert(response.message || STRINGS.SYSTEM.UNEXPECTED_ERROR, "error", {
+        autoCloseMs: 2000,
+      });
       setCaptchaValue("");
       setCaptchaValid(false);
       setCaptchaId(null);
       setCaptchaReloadTrigger((prev) => prev + 1);
     } else {
       const user = response.data;
-      if (
-        showDeptDropdown &&
-        !user.hasSubDeptAccess(credentials.subDepartmentId)
-      ) {
+      if (showDeptDropdown && !user.hasSubDeptAccess(credentials.subDepartmentId)) {
         showAlert(STRINGS.AUTH.ACCESS_DENIED_DEPT, "error", { autoCloseMs: 2000 });
         setCaptchaValue("");
         setCaptchaValid(false);
@@ -379,8 +355,7 @@ export function useLoginForm({ navigate }) {
   const roleSelected = credentials.roleId !== "" && credentials.roleId != null;
   const subDeptSelected =
     !showDeptDropdown ||
-    (credentials.subDepartmentId !== "" &&
-      credentials.subDepartmentId != null);
+    (credentials.subDepartmentId !== "" && credentials.subDepartmentId != null);
   const captchaIdValid = captchaId != null && String(captchaId).trim().length > 0;
   const captchaFilled = captchaValue.trim().length > 0;
 

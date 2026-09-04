@@ -1,4 +1,5 @@
 import { Box, Button, Typography } from "@mui/material";
+import type { ReactNode } from "react";
 import type { SchemaBlock, SchemaFieldBlock, SchemaGroupBlock, SchemaSectionBlock } from "./types";
 import type { SchemaApiContext } from "./rules/apiDependency";
 import type { SchemaThemeTokens } from "./utils/schemaUtils";
@@ -7,7 +8,6 @@ import { setBlockValue, buildRepeatInstanceChildValues, buildTableRows, scopedFo
 import { isBlockVisible } from "./rules/visibility";
 import { resolveSchemaCountToken, type SchemaSetupContext } from "./utils/setupContext";
 import { resolveBlockLayoutSx, resolveFullWidthBlockLayoutSx, resolveGridGap } from "./utils/blockLayout";
-import { sanitizeNumericInput } from "./utils/numericInput";
 import {
   createNextPrefixedTableColumn,
   isDeletablePrefixedColumn,
@@ -46,10 +46,21 @@ export type BlockRenderContext = {
   valueScope?: string;
   /** When true, repeat-section instance titles (e.g. "Rocket Motor Casing 1") are hidden. */
   hideRepeatInstanceLabels?: boolean;
+  /** Field path → message (keys match scopedFormKey / table cell paths). */
+  errors?: Record<string, string>;
 };
 
+const FieldErrorText = ({ message }: { message?: string }) =>
+  message ? (
+    <Typography sx={{ fontSize: "0.68rem", color: "error.main", mt: 0.35, lineHeight: 1.3 }}>
+      {message}
+    </Typography>
+  ) : null;
+
 const renderField = (block: SchemaFieldBlock, ctx: BlockRenderContext) => {
-  const value = String(ctx.values[scopedFormKey(ctx.valueScope, block.id)] ?? "");
+  const path = scopedFormKey(ctx.valueScope, block.id);
+  const value = String(ctx.values[path] ?? "");
+  const errorMsg = ctx.errors?.[path];
   const onFieldChange = (next: string) =>
     ctx.onChange(setBlockValue(ctx.values, block.id, next, ctx.valueScope), {
       changedBlockId: block.id,
@@ -57,9 +68,16 @@ const renderField = (block: SchemaFieldBlock, ctx: BlockRenderContext) => {
     });
   const disabled = ctx.readOnly || block.readonly;
 
+  const withError = (node: ReactNode) => (
+    <Box>
+      {node}
+      <FieldErrorText message={errorMsg} />
+    </Box>
+  );
+
   switch (block.fieldType) {
     case "textarea":
-      return (
+      return withError(
         <FormInput
           label={block.label}
           value={value}
@@ -68,10 +86,11 @@ const renderField = (block: SchemaFieldBlock, ctx: BlockRenderContext) => {
           minRows={2}
           disabled={disabled}
           required={block.validation?.required}
-        />
+        />,
       );
     case "dropdown":
-      return (
+      // SchemaApiDropdown has no error/helperText props — red message via withError only.
+      return withError(
         <SchemaApiDropdown
           label={block.label}
           value={value}
@@ -80,17 +99,23 @@ const renderField = (block: SchemaFieldBlock, ctx: BlockRenderContext) => {
           apiContext={ctx.apiContext}
           disabled={disabled}
           required={block.validation?.required}
-        />
+        />,
       );
     case "date":
-      return <DateField label={block.label} value={value} onChange={onFieldChange} disabled={disabled} />;
+      return withError(
+        <DateField label={block.label} value={value} onChange={onFieldChange} disabled={disabled} />,
+      );
     case "time":
-      return <TimeField label={block.label} value={value} onChange={onFieldChange} disabled={disabled} />;
+      return withError(
+        <TimeField label={block.label} value={value} onChange={onFieldChange} disabled={disabled} />,
+      );
     case "datetime":
-      return <DateTimeField label={block.label} value={value} onChange={onFieldChange} disabled={disabled} />;
+      return withError(
+        <DateTimeField label={block.label} value={value} onChange={onFieldChange} disabled={disabled} />,
+      );
     case "file":
     case "image":
-      return (
+      return withError(
         <SchemaFileField
           label={block.label}
           value={value}
@@ -103,30 +128,32 @@ const renderField = (block: SchemaFieldBlock, ctx: BlockRenderContext) => {
           }
           helperText={block.ui?.placeholder}
           multiple
-        />
+        />,
       );
     case "number":
     case "decimal":
-      return (
+      // Keep raw keystrokes (do not sanitize) so non-numeric input stays in state
+      // and DRAFT validation can show red "must be numeric" under the field.
+      return withError(
         <FormInput
           label={block.label ? `${block.label}${block.unit ? ` (${block.unit})` : ""}` : undefined}
           value={value}
           type="text"
           inputMode="decimal"
-          onChange={(e) => onFieldChange(sanitizeNumericInput(e.target.value))}
+          onChange={(e) => onFieldChange(e.target.value)}
           disabled={disabled}
           required={block.validation?.required}
-        />
+        />,
       );
     default:
-      return (
+      return withError(
         <FormInput
           label={block.label}
           value={value}
           onChange={(e) => onFieldChange(e.target.value)}
           disabled={disabled}
           required={block.validation?.required}
-        />
+        />,
       );
   }
 };
@@ -361,6 +388,15 @@ export const BlockRenderer = ({ block, ctx }: { block: SchemaBlock; ctx: BlockRe
 
       const canMutateColumns = Boolean(block.allowAddColumn || block.allowDeleteColumn) && !ctx.lockStructure;
 
+      const tablePath = scopedFormKey(ctx.valueScope, block.id);
+      const tableErrorList = ctx.errors
+        ? Object.entries(ctx.errors)
+            .filter(([k]) => k === tablePath || k.startsWith(`${tablePath}.`) || k === block.id || k.startsWith(`${block.id}.`))
+            .map(([, msg]) => msg)
+        : [];
+      // de-dupe messages
+      const uniqueTableErrors = [...new Set(tableErrorList)];
+
       return (
         <Box sx={resolveFullWidthBlockLayoutSx(block.ui)} data-custom-flex>
           <DynamicTable
@@ -371,12 +407,31 @@ export const BlockRenderer = ({ block, ctx }: { block: SchemaBlock; ctx: BlockRe
             lockStructure={ctx.lockStructure}
             theme={ctx.theme}
             apiContext={ctx.apiContext}
+            tablePath={tablePath}
+            cellErrors={ctx.errors}
             allowAddColumn={canMutateColumns && Boolean(block.allowAddColumn)}
             onAddColumn={canMutateColumns && block.allowAddColumn ? handleAddColumn : undefined}
             allowDeleteColumn={canMutateColumns && Boolean(block.allowDeleteColumn)}
             deletableColumnIds={deletableColumnIds}
             onDeleteColumn={canMutateColumns && block.allowDeleteColumn ? handleDeleteColumn : undefined}
           />
+          {uniqueTableErrors.length > 0 ? (
+            <Box sx={{ mt: 0.75 }}>
+              {uniqueTableErrors.slice(0, 8).map((msg, i) => (
+                <Typography
+                  key={`${msg}-${i}`}
+                  sx={{ fontSize: "0.68rem", color: "error.main", lineHeight: 1.35 }}
+                >
+                  {msg}
+                </Typography>
+              ))}
+              {uniqueTableErrors.length > 8 ? (
+                <Typography sx={{ fontSize: "0.68rem", color: "error.main" }}>
+                  +{uniqueTableErrors.length - 8} more…
+                </Typography>
+              ) : null}
+            </Box>
+          ) : null}
         </Box>
       );
     }

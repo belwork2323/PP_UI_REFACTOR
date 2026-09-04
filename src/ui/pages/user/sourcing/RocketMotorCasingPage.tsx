@@ -47,6 +47,9 @@ const RocketMotorCasing = () => {
     backConfirmOpen,
     canSubmit,
     canSaveDraft,
+    validationErrors,
+    validateBeforeDraft,
+    validateBeforeSubmit,
     submitConfirm,
     draftConfirm,
     setBackConfirmOpen,
@@ -105,11 +108,12 @@ const RocketMotorCasing = () => {
     .join(" · ");
 
   const listLoading = loading && !loadingFormDetails && view === "list";
+  const showFormOpeningLoader = listLoading || (Boolean(loadingFormDetails) && view !== "form");
 
   return (
     <Box sx={theme.workflow.animatedContainer}>
       <WorkflowFormOpeningLoader
-        open={listLoading || Boolean(loadingFormDetails)}
+        open={showFormOpeningLoader}
         title={loadingFormDetails ? strings.FORM_OPENING_TITLE : strings.TITLE}
         message={
           loadingFormDetails
@@ -133,7 +137,7 @@ const RocketMotorCasing = () => {
         />
       )}
 
-      {view === "form" && activeBatch && !loadingFormDetails && (
+      {view === "form" && activeBatch && (
         <Box>
           <UserWorkflowFormHeader
             mode={createMotorCasingHeaderHeading ? "create" : "update"}
@@ -184,6 +188,7 @@ const RocketMotorCasing = () => {
               showDeleteCasing={canDeleteActiveCasing}
               onDeleteCasing={handleDeleteCasingFromForm}
               deleteLoading={deleteLoading}
+              validationErrors={validationErrors}
               theme={theme}
             />
           </Box>
@@ -200,9 +205,14 @@ const RocketMotorCasing = () => {
             resubmitLabel={STRINGS.SOURCING.CASING_FORM.RESUBMIT_APPROVAL}
             saveTooltip={STRINGS.SOURCING.CASING_FORM.SAVE_TOOLTIP}
             disableActions={actionLoading}
+            allowInvalidSubmitAttempt
             disableSubmit={actionLoading || loadingDimensionalParams}
-            onSaveDraft={() => setDraftConfirm(true)}
-            onSubmitClick={() => setSubmitConfirm(true)}
+            onSaveDraft={() => {
+              if (validateBeforeDraft()) setDraftConfirm(true);
+            }}
+            onSubmitClick={() => {
+              if (validateBeforeSubmit()) setSubmitConfirm(true);
+            }}
             theme={theme}
           />
         </Box>

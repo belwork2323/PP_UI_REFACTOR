@@ -33,11 +33,11 @@ import {
   createEmptyRadiographyPlanRow,
   isLooseFlapDimensionalParam,
   validateCasingFormStep,
-  isCasingIdentificationComplete,
   createEmptyMockTrialSlot,
   createInitialThermalProperties,
   createInitialMechanicalProperties,
 } from "../../../../../../data/models/user/RocketMotorCasingFormModel";
+import { isCasingIdentificationComplete, isCasingFieldRequired } from "../../../../../../data/validation/adapters/rocketMotorCasing.validation";
 import CasingFormStepNav from "./CasingFormStepNav";
 import RocketMotorCasingMockTrialPanel from "./RocketMotorCasingMockTrialPanel";
 import type { useRocketMotorCasingLookups } from "../../../../../../hooks/user/sourcing/useRocketMotorCasingLookups";
@@ -52,6 +52,8 @@ import {
   SpecRangeChip,
   SubsectionTitle,
   TextFieldField,
+  CasingDeferredInput,
+  RequiredMark,
 } from "./CasingFormPrimitives";
 import CasingReportUpload from "./CasingReportUpload";
 import rocketMotorCasingController from "@/controllers/user/sourcing/rocketMotorCasingController";
@@ -92,6 +94,7 @@ type Props = {
   showDeleteCasing?: boolean;
   onDeleteCasing?: () => void;
   deleteLoading?: boolean;
+  validationErrors?: Record<string, string>;
   theme: any;
 };
 
@@ -108,8 +111,10 @@ const MotorCasingCreateForm = ({
   showDeleteCasing = false,
   onDeleteCasing,
   deleteLoading = false,
+  validationErrors = {},
   theme,
 }: Props) => {
+  const req = isCasingFieldRequired;
   const casingTheme = theme.sourcing.rocketMotor.casingForm;
   const cf = theme.sourcing.rocketMotor.createForm;
   const sectionColors = casingTheme.sectionColors;
@@ -127,36 +132,42 @@ const MotorCasingCreateForm = ({
     }));
   };
   useEffect(() => {
-    if (!form.insulationType) return;
+    const insulationType = form.insulationType;
+    if (!insulationType) return;
+    if (form.insulationSpecifications?.insulationType === insulationType) return;
+
+    let cancelled = false;
 
     const loadSpecifications = async () => {
-      const response = await rocketMotorCasingController.fetchSpecification(form.insulationType);
+      const response = await rocketMotorCasingController.fetchSpecification(insulationType);
+      if (cancelled || !response.success) return;
 
-      if (response.success) {
-        setForm((prev) => {
-          const spec = response.data;
-          // If the form already has saved mechanical/thermal values, preserve them.
-          const hasMech =
-            prev.mechanicalProperties && Object.keys(prev.mechanicalProperties).length > 0;
-          const hasThermal =
-            prev.thermalProperties && Object.keys(prev.thermalProperties).length > 0;
+      setForm((prev) => {
+        const spec = response.data;
+        const hasMech =
+          prev.mechanicalProperties && Object.keys(prev.mechanicalProperties).length > 0;
+        const hasThermal =
+          prev.thermalProperties && Object.keys(prev.thermalProperties).length > 0;
 
-          return {
-            ...prev,
-            insulationSpecifications: spec,
-            mechanicalProperties: hasMech
-              ? prev.mechanicalProperties
-              : createInitialMechanicalProperties(spec),
-            thermalProperties: hasThermal
-              ? prev.thermalProperties
-              : createInitialThermalProperties(spec),
-          };
-        });
-      }
+        return {
+          ...prev,
+          insulationSpecifications: spec,
+          mechanicalProperties: hasMech
+            ? prev.mechanicalProperties
+            : createInitialMechanicalProperties(spec),
+          thermalProperties: hasThermal
+            ? prev.thermalProperties
+            : createInitialThermalProperties(spec),
+        };
+      });
     };
 
-    loadSpecifications();
-  }, [form.insulationType]);
+    void loadSpecifications();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [form.insulationType, form.insulationSpecifications, setForm]);
   const updateMech = (
     paramKey: string,
     field: "specification" | "reported" | "acemSpec",
@@ -265,10 +276,6 @@ const MotorCasingCreateForm = ({
   };
 
   useEffect(() => {
-    setStepError(null);
-  }, [form]);
-
-  useEffect(() => {
     if (!identificationComplete && step > 0) {
       setStep(0);
       setStepError(null);
@@ -334,6 +341,7 @@ const MotorCasingCreateForm = ({
             <FieldGrid theme={theme} cf={cf}>
               <ProjectSelectField
                 label={S.PROJECT}
+                required={req("projectName")}
                 value={form.projectId}
                 onChange={(v) => {
                   if (lockIdentification) return;
@@ -349,9 +357,11 @@ const MotorCasingCreateForm = ({
                 disabled={lockIdentification}
                 theme={theme}
                 cf={cf}
+                error={validationErrors.projectName}
               />
               <SelectField
                 label={S.MOTOR_STAGE}
+                required={req("motorStageApi")}
                 value={form.motorStageApi}
                 onChange={(v) => {
                   if (lockIdentification) return;
@@ -365,9 +375,11 @@ const MotorCasingCreateForm = ({
                 placeholder={S.SELECT_STAGE}
                 disabled={lockIdentification || lookups.loading || loadingDimensionalParams}
                 theme={theme}
+                error={validationErrors.motorStageApi}
               />
               <TextFieldField
                 label={S.MOTOR_ID}
+                required={req("motorId")}
                 value={form.motorId}
                 onChange={(v) => {
                   if (lockIdentification) return;
@@ -376,6 +388,7 @@ const MotorCasingCreateForm = ({
                 placeholder={S.MOTOR_ID_PH}
                 disabled={lockIdentification}
                 theme={theme}
+                error={validationErrors.motorId}
               />
               {form.motorCasingId || lockIdentification ? (
                 <TextFieldField
@@ -437,14 +450,17 @@ const MotorCasingCreateForm = ({
                 placeholder={S.RADIOGRAPHY_PLAN_ID_PH}
                 disabled={!identificationComplete}
                 theme={theme}
+                error={validationErrors.radiographyPlanId}
               />
               <TextFieldField
                 label={S.RADIOGRAPHY_PLAN_NAME}
+                required={req("radiographyPlanName")}
                 value={form.radiographyPlanName}
                 onChange={(v) => patch({ radiographyPlanName: v })}
                 placeholder={S.RADIOGRAPHY_PLAN_NAME_PH}
                 disabled={!identificationComplete}
                 theme={theme}
+                error={validationErrors.radiographyPlanName}
               />
             </FieldGrid>
             <TableContainer sx={{ ...casingTheme.tableContainer, mt: 1.5, overflowX: "auto" }}>
@@ -503,6 +519,8 @@ const MotorCasingCreateForm = ({
                               });
                             }}
                             disabled={!identificationComplete}
+                            error={Boolean(validationErrors[`radiographyPlanRows.${index}.${field}`])}
+                            helperText={validationErrors[`radiographyPlanRows.${index}.${field}`]}
                             inputProps={{ inputMode: "decimal" }}
                             sx={{
                               ...theme.workflow.formElements.cellField,
@@ -608,6 +626,7 @@ const MotorCasingCreateForm = ({
             <FieldGrid theme={theme} cf={cf}>
               <SelectField
                 label={S.CASING_TYPE}
+                required={req("casingType")}
                 value={form.casingType}
                 onChange={(v) =>
                   patch({
@@ -621,12 +640,15 @@ const MotorCasingCreateForm = ({
                 ]}
                 placeholder={S.SELECT_CASING_TYPE}
                 theme={theme}
+                error={validationErrors.casingType}
               />
               <DateField
                 label={S.RECEIVING_DATE}
+                required={req("receivingDate")}
                 value={form.receivingDate}
                 onChange={(v) => patch({ receivingDate: v })}
                 theme={theme}
+                error={validationErrors.receivingDate}
               />
             </FieldGrid>
 
@@ -640,12 +662,14 @@ const MotorCasingCreateForm = ({
                 value={form.itemsDimension}
                 onChange={(v) => patch({ itemsDimension: v })}
                 theme={theme}
+                error={validationErrors.itemsDimension}
               />
               <TextFieldField
                 label={S.UNIT}
                 value={form.itemsUnit}
                 onChange={(v) => patch({ itemsUnit: v })}
                 theme={theme}
+                error={validationErrors.itemsUnit}
               />
               <ReceiptStatusField
                 label={S.RECEIPT_STATUS}
@@ -661,6 +685,7 @@ const MotorCasingCreateForm = ({
                 value={form.itemsObservations}
                 onChange={(v) => patch({ itemsObservations: v })}
                 theme={theme}
+                error={validationErrors.itemsObservations}
               />
             </FieldGrid>
 
@@ -681,18 +706,21 @@ const MotorCasingCreateForm = ({
                 value={form.greenCardNo}
                 onChange={(v) => patch({ greenCardNo: v })}
                 theme={theme}
+                error={validationErrors.greenCardNo}
               />
               <DateField
                 label={S.CLEARANCE_DATE}
                 value={form.clearanceDate}
                 onChange={(v) => patch({ clearanceDate: v })}
                 theme={theme}
+                error={validationErrors.clearanceDate}
               />
               <TextFieldField
                 label={S.CLEARANCE_AUTHORITY}
                 value={form.clearanceAuthority}
                 onChange={(v) => patch({ clearanceAuthority: v })}
                 theme={theme}
+                error={validationErrors.clearanceAuthority}
               />
               <TextFieldField
                 label={S.CLEARANCE_DETAILS}
@@ -702,6 +730,7 @@ const MotorCasingCreateForm = ({
                 rows={2}
                 fullWidth
                 theme={theme}
+                error={validationErrors.clearanceDetails}
               />
             </FieldGrid>
 
@@ -710,12 +739,15 @@ const MotorCasingCreateForm = ({
             <FieldGrid theme={theme} cf={cf}>
               <DateField
                 label={S.CURING_DATE}
+                required={req("insulationCuringDate")}
                 value={form.insulationCuringDate}
                 onChange={(v) => patch({ insulationCuringDate: v })}
                 theme={theme}
+                error={validationErrors.insulationCuringDate}
               />
               <SelectField
                 label={S.INSULATION_TYPE}
+                required={req("insulationType")}
                 value={form.insulationType}
                 onChange={onInsulationTypeChange}
                 options={[
@@ -724,12 +756,15 @@ const MotorCasingCreateForm = ({
                 ]}
                 placeholder={S.SELECT_INSULATION_TYPE}
                 theme={theme}
+                error={validationErrors.insulationType}
               />
               <TextFieldField
                 label={S.REPORT_NO}
+                required={req("insulationReportNo")}
                 value={form.insulationReportNo}
                 onChange={(v) => patch({ insulationReportNo: v })}
                 theme={theme}
+                error={validationErrors.insulationReportNo}
               />
               <ReceiptStatusField
                 label={S.INSULATION_RECEIPT}
@@ -759,40 +794,47 @@ const MotorCasingCreateForm = ({
                 <SubsectionTitle cf={cf}>{S.MECH_PROPERTIES}</SubsectionTitle>
                 <PropertiesTable
                   theme={theme}
-                  columns={[S.COL_PARAMETER, S.COL_SPECIFICATION, S.REPORTED, S.TEST_RESULT_ACEM]}
+                  columns={[
+                    S.COL_PARAMETER,
+                    S.COL_SPECIFICATION,
+                    S.REPORTED,
+                    { label: S.TEST_RESULT_ACEM, required: true },
+                  ]}
                   rows={mechanicalSpec.map((item) => (
                     <tr key={item.specificationCode}>
-                      <td>{`${item.specificationName} (${item.referenceRange.unit})`}</td>
+                      <td>{`${item.specificationName ?? item.specificationCode ?? "—"} (${item.referenceRange?.unit ?? "—"})`}</td>
                       <td>
                         <Chip
                           size="small"
-                          label={`${item.referenceRange.minValue} - ${item.referenceRange.maxValue}`}
+                          label={`${item.referenceRange?.minValue ?? "—"} - ${item.referenceRange?.maxValue ?? "—"}`}
                           sx={theme.workflow.formElements.cellField}
                         />
                       </td>
 
                       <td>
-                        <TextField
+                        <CasingDeferredInput
                           size="small"
                           fullWidth
                           type="number"
                           value={form.mechanicalProperties[item.specificationCode]?.reported ?? ""}
-                          onChange={(e) =>
-                            updateMech(item.specificationCode, "reported", e.target.value)
+                          onChange={(value) =>
+                            updateMech(item.specificationCode, "reported", value)
                           }
+                          error={Boolean(validationErrors[`mechanicalProperties.${item.specificationCode}.reported`])}
                           sx={theme.workflow.formElements.cellField}
                         />
                       </td>
 
                       <td>
-                        <TextField
+                        <CasingDeferredInput
                           size="small"
                           fullWidth
                           type="number"
                           value={form.mechanicalProperties[item.specificationCode]?.acemSpec ?? ""}
-                          onChange={(e) =>
-                            updateMech(item.specificationCode, "acemSpec", e.target.value)
+                          onChange={(value) =>
+                            updateMech(item.specificationCode, "acemSpec", value)
                           }
+                          error={Boolean(validationErrors[`mechanicalProperties.${item.specificationCode}.acemSpec`])}
                           sx={theme.workflow.formElements.cellField}
                         />
                       </td>
@@ -810,38 +852,40 @@ const MotorCasingCreateForm = ({
                   columns={[S.COL_PARAMETER, S.COL_SPECIFICATION, S.REPORTED, S.TEST_RESULT_ACEM]}
                   rows={thermalSpec.map((item) => (
                     <tr key={item.specificationCode}>
-                      <td>{`${item.specificationName} (${item.referenceRange.unit})`}</td>
+                      <td>{`${item.specificationName ?? item.specificationCode ?? "—"} (${item.referenceRange?.unit ?? "—"})`}</td>
 
                       <td>
                         <Chip
                           size="small"
-                          label={`${item.referenceRange.minValue} - ${item.referenceRange.maxValue}`}
+                          label={`${item.referenceRange?.minValue ?? "—"} - ${item.referenceRange?.maxValue ?? "—"}`}
                           sx={theme.workflow.formElements.cellField}
                         />
                       </td>
 
                       <td>
-                        <TextField
+                        <CasingDeferredInput
                           size="small"
                           fullWidth
                           type="number"
                           value={form.thermalProperties[item.specificationCode]?.reported ?? ""}
-                          onChange={(e) =>
-                            updateThermal(item.specificationCode, "reported", e.target.value)
+                          onChange={(value) =>
+                            updateThermal(item.specificationCode, "reported", value)
                           }
+                          error={Boolean(validationErrors[`thermalProperties.${item.specificationCode}.reported`])}
                           sx={theme.workflow.formElements.cellField}
                         />
                       </td>
 
                       <td>
-                        <TextField
+                        <CasingDeferredInput
                           size="small"
                           fullWidth
                           type="number"
                           value={form.thermalProperties[item.specificationCode]?.acemSpec ?? ""}
-                          onChange={(e) =>
-                            updateThermal(item.specificationCode, "acemSpec", e.target.value)
+                          onChange={(value) =>
+                            updateThermal(item.specificationCode, "acemSpec", value)
                           }
+                          error={Boolean(validationErrors[`thermalProperties.${item.specificationCode}.acemSpec`])}
                           sx={theme.workflow.formElements.cellField}
                         />
                       </td>
@@ -860,12 +904,14 @@ const MotorCasingCreateForm = ({
                   value={form.postPptUtDate}
                   onChange={(v) => patch({ postPptUtDate: v })}
                   theme={theme}
+                  error={validationErrors.postPptUtDate}
                 />
                 <DateField
                   label={S.NDT_DATE}
                   value={form.ndtDate}
                   onChange={(v) => patch({ ndtDate: v })}
                   theme={theme}
+                  error={validationErrors.ndtDate}
                 />
               </Box>
               <Box sx={cf.ndtObservationsGrid}>
@@ -876,6 +922,7 @@ const MotorCasingCreateForm = ({
                   multiline
                   rows={3}
                   theme={theme}
+                  error={validationErrors.ndtObservations}
                 />
                 <TextFieldField
                   label={S.ACEM_NDT}
@@ -884,6 +931,7 @@ const MotorCasingCreateForm = ({
                   multiline
                   rows={3}
                   theme={theme}
+                  error={validationErrors.acemNdtObservations}
                 />
                 <TextFieldField
                   label={S.PROJECT_RUBBER}
@@ -892,6 +940,7 @@ const MotorCasingCreateForm = ({
                   multiline
                   rows={3}
                   theme={theme}
+                  error={validationErrors.projectRubberSurfaceObservations}
                 />
                 <TextFieldField
                   label={S.OTHER_DETAILS}
@@ -900,6 +949,7 @@ const MotorCasingCreateForm = ({
                   multiline
                   rows={3}
                   theme={theme}
+                  error={validationErrors.otherDetails}
                 />
               </Box>
             </Box>
@@ -931,12 +981,14 @@ const MotorCasingCreateForm = ({
               <Box sx={cf.visualInspectionGrid}>
                 <TextFieldField
                   label={S.COL_OBSERVATIONS}
+                  required
                   value={row.observations}
                   onChange={(v) => {
                     const next = [...form.visualInspection];
                     next[idx] = { ...next[idx], observations: v };
                     patch({ visualInspection: next });
                   }}
+                  error={validationErrors[`visualInspection.${idx}.observations`]}
                   theme={theme}
                 />
                 <TextFieldField
@@ -947,6 +999,7 @@ const MotorCasingCreateForm = ({
                     next[idx] = { ...next[idx], remark: v };
                     patch({ visualInspection: next });
                   }}
+                  error={validationErrors[`visualInspection.${idx}.remark`]}
                   theme={theme}
                 />
               </Box>
@@ -973,6 +1026,7 @@ const MotorCasingCreateForm = ({
                       <Typography sx={cf.visualSubLabel}>{sub.description}</Typography>
                       <TextFieldField
                         label={S.COL_OBSERVATIONS}
+                        required
                         value={sub.observations}
                         onChange={(v) => {
                           const next = [...form.visualInspection];
@@ -981,6 +1035,7 @@ const MotorCasingCreateForm = ({
                           next[idx] = { ...next[idx], subItems: subs };
                           patch({ visualInspection: next });
                         }}
+                        error={validationErrors[`visualInspection.${idx}.subItems.${si}.observations`]}
                         theme={theme}
                       />
                       <TextFieldField
@@ -993,6 +1048,7 @@ const MotorCasingCreateForm = ({
                           next[idx] = { ...next[idx], subItems: subs };
                           patch({ visualInspection: next });
                         }}
+                        error={validationErrors[`visualInspection.${idx}.subItems.${si}.remark`]}
                         theme={theme}
                       />
                     </React.Fragment>
@@ -1016,10 +1072,12 @@ const MotorCasingCreateForm = ({
           <FieldGrid theme={theme} cf={cf}>
             <TextFieldField
               label={S.WEIGHT_WITHOUT}
+              required={req("weightWithoutHarness")}
               value={form.weightWithoutHarness}
               onChange={(v) => patch({ weightWithoutHarness: v })}
               type="number"
               theme={theme}
+              error={validationErrors.weightWithoutHarness}
             />
             <TextFieldField
               label={S.WEIGHT_WITH}
@@ -1027,18 +1085,23 @@ const MotorCasingCreateForm = ({
               onChange={(v) => patch({ weightWithHarness: v })}
               type="number"
               theme={theme}
+              error={validationErrors.weightWithHarness}
             />
             <TextFieldField
               label={S.WEIGHSCALE}
+              required={req("weighscaleEquipment")}
               value={form.weighscaleEquipment}
               onChange={(v) => patch({ weighscaleEquipment: v })}
               theme={theme}
+              error={validationErrors.weighscaleEquipment}
             />
             <DateField
               label={S.CALIBRATION_DUE}
+              required={req("calibrationDueDate")}
               value={form.calibrationDueDate}
               onChange={(v) => patch({ calibrationDueDate: v })}
               theme={theme}
+              error={validationErrors.calibrationDueDate}
             />
           </FieldGrid>
         </SectionCard>
@@ -1053,6 +1116,11 @@ const MotorCasingCreateForm = ({
           theme={theme}
           cf={cf}
         >
+          {validationErrors.dimensionalData ? (
+            <Typography color="error" variant="caption" sx={{ display: "block", mb: 1 }}>
+              {validationErrors.dimensionalData}
+            </Typography>
+          ) : null}
           {!motorStage ? (
             <Box sx={theme.workflow.formElements.emptyStateBox}>
               <Typography sx={casingTheme.emptyStateSubtitle}>{SF.EMPTY_DIM_SUBTITLE}</Typography>
@@ -1096,6 +1164,7 @@ const MotorCasingCreateForm = ({
                         sx={theme.workflow.formElements.tableHeader}
                       >
                         {col.label}
+                        <RequiredMark theme={theme} />
                       </TableCell>
                     ))}
                   </TableRow>
@@ -1129,23 +1198,24 @@ const MotorCasingCreateForm = ({
                         {isLooseFlap ? (
                           <>
                             <TableCell colSpan={2} sx={theme.workflow.formElements.tableCell}>
-                              <TextField
+                              <CasingDeferredInput
                                 size="small"
                                 fullWidth
                                 type="number"
                                 placeholder={S.COL_ARC_LENGTH}
                                 value={row.looseFlap?.arcLength ?? ""}
-                                onChange={(e) => {
+                                onChange={(value) => {
                                   const next = [...form.dimensionalData];
                                   next[idx] = {
                                     ...next[idx],
                                     looseFlap: {
                                       ...(next[idx].looseFlap ?? EMPTY_LOOSE_FLAP()),
-                                      arcLength: e.target.value,
+                                      arcLength: value,
                                     },
                                   };
                                   patch({ dimensionalData: next });
                                 }}
+                                error={Boolean(validationErrors[`dimensionalData.${idx}.looseFlap.arcLength`])}
                                 sx={{
                                   ...theme.workflow.formElements.cellField,
                                   ...casingTheme.dimInput,
@@ -1153,23 +1223,24 @@ const MotorCasingCreateForm = ({
                               />
                             </TableCell>
                             <TableCell colSpan={2} sx={theme.workflow.formElements.tableCell}>
-                              <TextField
+                              <CasingDeferredInput
                                 size="small"
                                 fullWidth
                                 type="number"
                                 placeholder={S.COL_AXIAL_LENGTH}
                                 value={row.looseFlap?.axialLength ?? ""}
-                                onChange={(e) => {
+                                onChange={(value) => {
                                   const next = [...form.dimensionalData];
                                   next[idx] = {
                                     ...next[idx],
                                     looseFlap: {
                                       ...(next[idx].looseFlap ?? EMPTY_LOOSE_FLAP()),
-                                      axialLength: e.target.value,
+                                      axialLength: value,
                                     },
                                   };
                                   patch({ dimensionalData: next });
                                 }}
+                                error={Boolean(validationErrors[`dimensionalData.${idx}.looseFlap.axialLength`])}
                                 sx={{
                                   ...theme.workflow.formElements.cellField,
                                   ...casingTheme.dimInput,
@@ -1180,20 +1251,21 @@ const MotorCasingCreateForm = ({
                         ) : (
                           DIM_COLUMNS.map((col) => (
                             <TableCell key={col.key} sx={theme.workflow.formElements.tableCell}>
-                              <TextField
+                              <CasingDeferredInput
                                 size="small"
                                 fullWidth
                                 type="number"
                                 placeholder={col.label}
                                 value={row.readings[col.key]}
-                                onChange={(e) => {
+                                onChange={(value) => {
                                   const next = [...form.dimensionalData];
                                   next[idx] = {
                                     ...next[idx],
-                                    readings: { ...next[idx].readings, [col.key]: e.target.value },
+                                    readings: { ...next[idx].readings, [col.key]: value },
                                   };
                                   patch({ dimensionalData: next });
                                 }}
+                                error={Boolean(validationErrors[`dimensionalData.${idx}.readings.${col.key}`])}
                                 sx={{
                                   ...theme.workflow.formElements.cellField,
                                   ...casingTheme.dimInput,
@@ -1226,6 +1298,7 @@ const MotorCasingCreateForm = ({
             value={form.mockTrial}
             onChange={(mockTrial) => patch({ mockTrial })}
             disabled={!String(form.motorStageApi ?? "").trim()}
+            validationErrors={validationErrors}
             theme={theme}
             cf={cf}
           />
@@ -1241,7 +1314,7 @@ const MotorCasingCreateForm = ({
           theme={theme}
           cf={cf}
         >
-          <CasingReportUpload form={form} patch={patch} theme={theme} />
+            <CasingReportUpload form={form} patch={patch} validationErrors={validationErrors} theme={theme} />
         </SectionCard>
       )}
     </Box>

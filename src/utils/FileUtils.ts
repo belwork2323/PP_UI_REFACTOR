@@ -1,13 +1,15 @@
-const CERTIFICATE_EXTENSION_FALLBACK = [
+const RMS_CERTIFICATE_EXTENSIONS = [
   ".pdf",
-  ".doc",
-  ".docx",
-  ".xls",
-  ".xlsx",
   ".jpg",
   ".jpeg",
   ".png",
-  ".zip",
+  ".webp",
+  ".gif",
+  ".bmp",
+  ".mp4",
+  ".webm",
+  ".mov",
+  ".m4v",
 ] as const;
 
 /**
@@ -55,14 +57,11 @@ export const fileUtils = {
     ],
     CERTIFICATES: [
       "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/vnd.ms-excel",
       "image/jpeg",
       "image/png",
-      "application/zip",
-      "application/x-zip-compressed",
+      "image/webp",
+      "image/gif",
+      "image/bmp",
       "video/mp4",
       "video/webm",
       "video/quicktime",
@@ -92,18 +91,21 @@ export const fileUtils = {
   /** Extension fallback when OS reports empty/wrong MIME (common on Windows). */
   hasAllowedCertificateExtension(fileName: string): boolean {
     const name = String(fileName ?? "").toLowerCase();
-    return CERTIFICATE_EXTENSION_FALLBACK.some((ext) => name.endsWith(ext));
+    return RMS_CERTIFICATE_EXTENSIONS.some((ext) => name.endsWith(ext));
   },
 
   validateCertificateFile(file: File, maxSizeMB = fileUtils.CERTIFICATE_MAX_MB) {
-    const primary = fileUtils.validateFile(file, fileUtils.ALLOWED_TYPES.CERTIFICATES, maxSizeMB);
-    if (primary.valid) return { valid: true as const };
     const sizeMb = file.size / (1024 * 1024);
-    if (sizeMb > maxSizeMB) return { valid: false as const, error: primary.error };
-    if (fileUtils.hasAllowedCertificateExtension(file.name)) {
+    if (sizeMb > maxSizeMB) {
+      return { valid: false as const, error: `File size exceeds ${maxSizeMB}MB` };
+    }
+    if (
+      fileUtils.ALLOWED_TYPES.CERTIFICATES.includes(file.type) ||
+      fileUtils.hasAllowedCertificateExtension(file.name)
+    ) {
       return { valid: true as const };
     }
-    return { valid: false as const, error: primary.error };
+    return { valid: false as const, error: undefined };
   },
 
   /** True when URL can be opened in browser (not blob/pending/placeholder). */

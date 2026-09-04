@@ -16,19 +16,6 @@ export type FlowBarDateFieldTheme = {
   selectInput?: (hasValue: boolean, accentColor?: string) => object;
 };
 
-export type FlowBarDateFieldProps = {
-  label: string;
-  value: string;
-  onChange: (value: string) => void;
-  disabled?: boolean;
-  placeholder?: string;
-  width?: number | string;
-  flowBar?: FlowBarDateFieldTheme;
-  accentColor?: string;
-  inputSx?: SxProps<Theme>;
-  sx?: SxProps<Theme>;
-};
-
 const resolveInputSx = (
   flowBar: FlowBarDateFieldTheme | undefined,
   hasValue: boolean,
@@ -54,7 +41,23 @@ const resolveInputSx = (
   ] as SxProps<Theme>;
 };
 
-const FlowBarDateField = ({
+export interface FlowBarDateFieldProps {
+  label?: string;
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  placeholder?: string;
+  width?: number | string;
+  flowBar?: any;
+  accentColor?: string;
+  inputSx?: SxProps<Theme>;
+  sx?: SxProps<Theme>;
+  error?: boolean;
+  helperText?: string;
+  required?: boolean;
+}
+
+export const FlowBarDateField = ({
   label,
   value,
   onChange,
@@ -65,25 +68,52 @@ const FlowBarDateField = ({
   accentColor = "#2E86C1",
   inputSx,
   sx,
+  error = false,
+  helperText,
+  required = false,
 }: FlowBarDateFieldProps) => {
   const hasValue = Boolean(String(value ?? "").trim());
 
+  // Merge error and helperText into DatePicker slotProps
+  const baseSlotProps = buildAppDatePickerSlotProps({
+    placeholder,
+    sx,
+    inputSx: resolveInputSx(flowBar, hasValue, accentColor, inputSx),
+  });
+
+  const slotProps = {
+    ...baseSlotProps,
+    textField: {
+      ...baseSlotProps?.textField,
+      error,
+      helperText,
+      required,
+    },
+  };
+
   return (
     <Box sx={flowBar?.selectField?.(width) ?? { width, flexShrink: 0 }}>
-      <Typography
-        component="label"
-        sx={
-          flowBar?.selectLabel ?? {
-            fontSize: "0.72rem",
-            fontWeight: 700,
-            letterSpacing: "0.03em",
-            mb: 0.65,
-            display: "block",
+      {label ? (
+        <Typography
+          component="label"
+          sx={
+            flowBar?.selectLabel ?? {
+              fontSize: "0.72rem",
+              fontWeight: 700,
+              letterSpacing: "0.03em",
+              mb: 0.65,
+              display: "block",
+            }
           }
-        }
-      >
-        {label}
-      </Typography>
+        >
+          {label}
+          {required && (
+            <Box component="span" sx={{ color: "error.main", ml: 0.5 }}>
+              *
+            </Box>
+          )}
+        </Typography>
+      ) : null}
       <AppDatePickerProvider>
         <DatePicker
           {...appDatePickerFieldSlots}
@@ -91,11 +121,7 @@ const FlowBarDateField = ({
           disabled={disabled}
           value={parseUiDate(value)}
           onChange={(picked) => onChange(picked?.format(UI_DATE_FORMAT) || "")}
-          slotProps={buildAppDatePickerSlotProps({
-            placeholder,
-            sx,
-            inputSx: resolveInputSx(flowBar, hasValue, accentColor, inputSx),
-          })}
+          slotProps={slotProps}
           sx={{ width: "100%" }}
         />
       </AppDatePickerProvider>

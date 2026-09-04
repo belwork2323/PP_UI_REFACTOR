@@ -59,6 +59,7 @@ const CasePreparationPage = () => {
     handleSubmitMotor,
     handleSaveDraft,
     handleSubmit,
+    motorValidationErrors,
   } = hookState;
 
   const listLoading = loading && !loadingFormDetails && view === "list";
@@ -121,6 +122,7 @@ const CasePreparationPage = () => {
             schemaError={schemaError}
             subDepartmentId={subDepartmentId}
             actionLoading={actionLoading}
+            motorValidationErrors={motorValidationErrors}
             onMotorSessionChange={handleMotorSessionChange}
             onSubscaleValuesChange={handleSubscaleValuesChange}
             onSaveMotorDraft={(motorId) => {
@@ -259,3 +261,4 @@ const CasePreparationPage = () => {
 };
 
 export default CasePreparationPage;
+

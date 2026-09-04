@@ -54,20 +54,45 @@ const renderSelectValue = (
   return match?.label ?? value;
 };
 
-export const MixingFieldLabel = ({ children }: { children: ReactNode }) => (
-  <Typography sx={{ fontWeight: 700, fontSize: "0.72rem", color: BRAND.textSub, mb: 0.6 }}>
+export const MixingFieldLabel = ({
+  children,
+  required = false,
+  sx = {},
+}: {
+  children: React.ReactNode;
+  required?: boolean;
+  sx?: object;
+}) => (
+  <Typography
+    sx={{
+      fontWeight: 700,
+      fontSize: "0.72rem",
+      color: MIXING_BRAND.textSub,
+      mb: 0.6,
+      display: "block",
+      ...sx,
+    }}
+  >
     {children}
+    {required && (
+      <Box component="span" sx={{ color: "error.main", ml: 0.5 }}>
+        *
+      </Box>
+    )}
   </Typography>
 );
 
-type MixingSelectFieldProps = {
+export interface MixingSelectFieldProps {
   label?: string;
   value: string;
-  onChange: (value: string) => void;
+  onChange: (value: any) => void;
   options: { value: string; label: string }[] | string[];
-  placeholder: string;
+  placeholder?: string;
   disabled?: boolean;
-};
+  error?: boolean;
+  helperText?: string;
+  required?: boolean;
+}
 
 export const MixingSelectField = ({
   label,
@@ -76,6 +101,9 @@ export const MixingSelectField = ({
   options,
   placeholder,
   disabled = false,
+  error = false,
+  helperText,
+  required = false,
 }: MixingSelectFieldProps) => {
   const normalized = options.map((option) =>
     typeof option === "string" ? { value: option, label: option } : option,
@@ -83,7 +111,7 @@ export const MixingSelectField = ({
 
   return (
     <Box>
-      {label ? <MixingFieldLabel>{label}</MixingFieldLabel> : null}
+      {label ? <MixingFieldLabel required={required}>{label}</MixingFieldLabel> : null}
       <AppDropdown
         value={value}
         onChange={onChange}
@@ -91,13 +119,37 @@ export const MixingSelectField = ({
         disabled={disabled}
         options={normalized}
         renderValue={(selected) => renderSelectValue(selected, placeholder, normalized)}
-        sx={{ mb: 0, ...mixingFieldSx }}
+        error={error}
+        sx={{
+          mb: 0,
+          ...mixingFieldSx,
+          ...(error && {
+            "& .MuiOutlinedInput-notchedOutline": {
+              borderColor: "error.main",
+            },
+          }),
+        }}
       />
+      {error && helperText ? (
+        <Typography
+          variant="caption"
+          sx={{
+            color: "error.main",
+            fontSize: "0.72rem",
+            mt: 0.5,
+            ml: 0.25,
+            display: "block",
+            fontWeight: 500,
+          }}
+        >
+          {helperText}
+        </Typography>
+      ) : null}
     </Box>
   );
 };
 
-type MixingTextFieldProps = {
+export type MixingTextFieldProps = {
   label?: string;
   value: string;
   onChange: (value: string) => void;
@@ -106,6 +158,9 @@ type MixingTextFieldProps = {
   multiline?: boolean;
   minRows?: number;
   type?: string;
+  error?: boolean;
+  helperText?: string;
+  required?: boolean;
 };
 
 export const MixingTextField = ({
@@ -117,9 +172,12 @@ export const MixingTextField = ({
   multiline = false,
   minRows,
   type = "text",
+  error = false,
+  helperText,
+  required = false,
 }: MixingTextFieldProps) => (
   <Box>
-    {label ? <MixingFieldLabel>{label}</MixingFieldLabel> : null}
+    {label ? <MixingFieldLabel required={required}>{label}</MixingFieldLabel> : null}
     <TextField
       size="small"
       fullWidth
@@ -129,6 +187,8 @@ export const MixingTextField = ({
       type={type}
       value={value}
       placeholder={placeholder}
+      error={error}
+      helperText={helperText}
       onChange={(event) => onChange(event.target.value)}
       sx={mixingFieldSx}
     />
@@ -136,15 +196,23 @@ export const MixingTextField = ({
 );
 
 export const MixingTableInput = ({
+  inputRef,
   value,
   onChange,
   placeholder,
   disabled = false,
+  error = false,
+  helperText,
+  required = false,
 }: {
-  value: string;
-  onChange: (value: string) => void;
+  inputRef?: React.Ref<HTMLInputElement>;
+  value: string | number;
+  onChange: (value: string | number) => void;
   placeholder: string;
   disabled?: boolean;
+  error?: boolean;
+  helperText?: string;
+  required?: boolean;
 }) => (
   <TextField
     size="small"
@@ -152,7 +220,11 @@ export const MixingTableInput = ({
     value={value}
     placeholder={placeholder}
     disabled={disabled}
+    error={error}
+    helperText={helperText}
     onChange={(event) => onChange(event.target.value)}
     sx={mixingTableInputSx}
+    required={required}
+    inputRef={inputRef}
   />
 );

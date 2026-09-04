@@ -24,6 +24,7 @@ import { getOperationStatusConfig, OPERATION_STATUS } from "../../../../../hooks
 import UserWorkflowStatusCell from "../../../../components/custom/UserWorkflowStatusCell";
 import {
   formatSpecStatusDisplayLabel,
+  resolveLotCertificateDisplayFileName,
   type MaterialBlock,
   type RawMaterialLotDetailsContext,
 } from "../../../../../data/models/user/RawMaterialProcurementModel";
@@ -34,6 +35,7 @@ import FilePreviewDialog from "../../../../components/common/FilePreviewDialog";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const FH = STRINGS.MANUFACTURING.FORM_HEADER;
+const SF = STRINGS.SOURCING.SPECIFICATION_FORM;
 
 const {
   visibility: VisibilityRoundedIcon,
@@ -276,33 +278,38 @@ const RawMaterialLotDetailsView = ({
                   <Stack spacing={1}>
                     {block.certificates.map((cert, ci) => {
                       const fileId = String(cert.fileId ?? "").trim();
+                      const displayFileName = resolveLotCertificateDisplayFileName(cert);
+                      const isVideo =
+                        fileUtils.getFileKind(displayFileName, cert.mimeType) === "video";
                       const canOpenStored = Boolean(fileId && subDepartmentId);
                       const canOpenUrl = fileUtils.isOpenableCertificateUrl(cert.fileUrl);
                       return (
-                      <Box key={`${cert.fileId || cert.fileName}-${ci}`} sx={rmTheme.certRow}>
+                      <Box key={`${cert.fileId || displayFileName}-${ci}`} sx={rmTheme.certRow}>
                         <InsertDriveFileOutlinedIcon
                           sx={{ fontSize: 20, color: theme.palette.primaryLight }}
                         />
                         <Box flex={1} minWidth={0}>
                           <Typography
                             sx={{ fontSize: "0.82rem", fontWeight: 700, color: theme.palette.text }}
+                            title={displayFileName}
                           >
-                            {cert.fileName || "Document"}
+                            {displayFileName}
                           </Typography>
-                          {cert.certificateType ? (
-                            <Typography sx={{ fontSize: "0.72rem", color: theme.palette.textSub }}>
-                              {cert.certificateType}
-                            </Typography>
-                          ) : null}
+                          <Typography sx={{ fontSize: "0.72rem", color: theme.palette.textSub, mt: 0.25 }}>
+                            <Box component="span" sx={{ fontWeight: 700, color: theme.palette.text }}>
+                              {SF.CERT_TYPE}:
+                            </Box>{" "}
+                            {cert.certificateType?.trim() || "—"}
+                          </Typography>
                         </Box>
                         {canOpenStored ? (
                           <Link
                             component="button"
                             type="button"
-                            onClick={() => void openFile(fileId, subDepartmentId!, cert.fileName)}
+                            onClick={() => void openFile(fileId, subDepartmentId!, displayFileName)}
                             sx={rmTheme.certLink}
                           >
-                            {fileUtils.getFileKind(cert.fileName) === "video" ? "Download" : "View"}
+                            {isVideo ? "Download" : SF.OPEN_CERT_LINK}
                             <OpenInNewRoundedIcon
                               sx={{ fontSize: 14, ml: 0.3, verticalAlign: "middle" }}
                             />
@@ -314,7 +321,7 @@ const RawMaterialLotDetailsView = ({
                             rel="noopener noreferrer"
                             sx={rmTheme.certLink}
                           >
-                            View
+                            {SF.OPEN_CERT_LINK}
                             <OpenInNewRoundedIcon
                               sx={{ fontSize: 14, ml: 0.3, verticalAlign: "middle" }}
                             />

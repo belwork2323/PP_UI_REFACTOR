@@ -79,8 +79,7 @@ const AppDropdown = ({
   compact = false,
   filterPanel = false,
 }: AppDropdownProps) => {
-  const resolvedPlaceholder =
-    loading && loadingPlaceholder ? loadingPlaceholder : placeholder;
+  const resolvedPlaceholder = loading && loadingPlaceholder ? loadingPlaceholder : placeholder;
   const hasPlaceholder = Boolean(resolvedPlaceholder);
 
   const resolveRenderValue = (selected: unknown) => {
@@ -123,9 +122,7 @@ const AppDropdown = ({
       InputLabelProps={
         filterPanel ? InputLabelProps : { ...appDropdownLabelProps, ...InputLabelProps }
       }
-      inputProps={
-        filterPanel ? { style: { fontSize: "0.72rem" } } : appDropdownInputProps
-      }
+      inputProps={filterPanel ? { style: { fontSize: "0.72rem" } } : appDropdownInputProps}
       SelectProps={{
         displayEmpty: hasPlaceholder,
         renderValue: resolveRenderValue,
@@ -146,12 +143,7 @@ const AppDropdown = ({
       ) : null}
       {children ??
         options?.map((option) => (
-          <MenuItem
-            key={option.value}
-            value={option.value}
-            disabled={option.disabled}
-            sx={itemSx}
-          >
+          <MenuItem key={option.value} value={option.value} disabled={option.disabled} sx={itemSx}>
             {option.label}
           </MenuItem>
         ))}

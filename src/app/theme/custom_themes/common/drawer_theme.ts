@@ -39,6 +39,13 @@ export const DRAWER_NAV = [
     Icon: icons.drawerDepartments,
     allowedRoles: ["ADMIN", "CENTRE_HEAD"],
   },
+  {
+    key: "master-data",
+    label: "Master Data",
+    route: "/master-data",
+    Icon: icons.Inventory,
+    allowedRoles: ["ADMIN", "CENTRE_HEAD"],
+  },
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

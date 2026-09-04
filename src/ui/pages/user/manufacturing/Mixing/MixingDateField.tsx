@@ -2,22 +2,28 @@ import FlowBarDateField from "../../../../components/common/FlowBarDateField";
 import { MIXING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/mixing_theme";
 import { mixingFieldSx } from "./MixingFormFields";
 
-type MixingDateFieldProps = {
-  label: string;
+export interface MixingDateFieldProps {
+  label?: string;
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   placeholder?: string;
-  fullWidth?: string;
-};
+  fullWidth?: number | string;
+  error?: boolean;
+  helperText?: string;
+  required?: boolean;
+}
 
-const MixingDateField = ({
+export const MixingDateField = ({
   label,
   value,
   onChange,
   disabled = false,
   placeholder = "DD-MM-YYYY",
   fullWidth,
+  error = false,
+  helperText,
+  required = false,
 }: MixingDateFieldProps) => (
   <FlowBarDateField
     label={label}
@@ -27,6 +33,9 @@ const MixingDateField = ({
     placeholder={placeholder}
     accentColor={MIXING_BRAND.primaryLight}
     width={fullWidth ?? 220}
+    error={error}
+    helperText={helperText}
+    required={required}
     inputSx={{
       ...mixingFieldSx,
       "& .MuiFormLabel-root": {

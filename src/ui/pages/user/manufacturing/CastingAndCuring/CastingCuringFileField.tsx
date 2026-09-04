@@ -36,6 +36,9 @@ type CastingCuringFileFieldProps = {
   readOnly?: boolean;
   compact?: boolean;
   emptyLabel?: string;
+  required?: boolean;
+  error?: boolean;
+  helperText?: string;
 };
 
 const acceptForMode = (mode: FileAcceptMode) =>
@@ -57,6 +60,9 @@ const CastingCuringFileField = ({
   readOnly = false,
   compact = false,
   emptyLabel,
+  required = false,
+  error,
+  helperText,
 }: CastingCuringFileFieldProps) => {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -110,6 +116,9 @@ const CastingCuringFileField = ({
         accept={acceptForMode(acceptMode)}
         onChange={onInputChange}
         disabled={locked}
+        required={required}
+        // error={error}
+        // helperText={helperText}
       />
 
       <Stack spacing={0.75}>
@@ -177,21 +186,26 @@ const CastingCuringFileField = ({
               </Stack>
               {ref.status === "uploading" ? (
                 <LinearProgress
-                  variant={
-                    typeof ref.uploadProgress === "number" ? "determinate" : "indeterminate"
-                  }
+                  variant={typeof ref.uploadProgress === "number" ? "determinate" : "indeterminate"}
                   value={ref.uploadProgress ?? 0}
                   sx={{ mt: 0.75, height: 3, borderRadius: 1 }}
                 />
               ) : null}
+              {/* REMOVED error check from inside the loop map item */}
             </Box>
           );
         })}
 
         {showEmpty ? (
           <Typography sx={{ fontSize: "0.72rem", color: "text.secondary" }}>
-            {emptyLabel ??
-              (multiple ? S.FILE_EMPTY_ATTACHMENTS : S.FILE_EMPTY_ATTACHMENTS)}
+            {emptyLabel ?? (multiple ? S.FILE_EMPTY_ATTACHMENTS : S.FILE_EMPTY_ATTACHMENTS)}
+          </Typography>
+        ) : null}
+
+        {/* ADDED error message here so it always renders when an error exists */}
+        {error && helperText ? (
+          <Typography sx={{ fontSize: "0.72rem", color: "error.main", mt: 0.25 }}>
+            {helperText}
           </Typography>
         ) : null}
 

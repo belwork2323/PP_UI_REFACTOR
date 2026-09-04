@@ -11,6 +11,7 @@ import {
   type SchemaFormValues,
   type SchemaSectionSubmission,
 } from "../../../../../schema-engine";
+import { cloneValue } from "../../../../../schema-engine/state/formState";
 import {
   findGradeInMaterial,
   findMaterialInList,
@@ -49,6 +50,9 @@ const normalizeSavedSectionsForSchema = (
   ).sections;
 
 type RawMaterialPremixSchemaPanelProps = {
+  /** Unique premix+material session key — keeps form state isolated across premixes. */
+  sessionKey: string;
+  premixNo: number;
   slot: "solid" | "liquid";
   materialCode: string;
   materialId?: number;
@@ -61,9 +65,13 @@ type RawMaterialPremixSchemaPanelProps = {
   savedSections?: SchemaSectionSubmission[];
   onSlotChange: (next: RawMaterialPrepMaterialSchemaSlot) => void;
   readOnly?: boolean;
+  /** Field path → message from schemaFormValidation (red under fields). */
+  validationErrors?: Record<string, string>;
 };
 
 const RawMaterialPremixSchemaPanel = ({
+  sessionKey,
+  premixNo,
   slot,
   materialCode,
   materialId,
@@ -76,8 +84,15 @@ const RawMaterialPremixSchemaPanel = ({
   savedSections,
   onSlotChange,
   readOnly = false,
+  validationErrors,
 }: RawMaterialPremixSchemaPanelProps) => {
   const appliedSavedSectionsRef = useRef<string | null>(null);
+  const initializedSessionRef = useRef<string | null>(null);
+  const slotStateRef = useRef(slotState);
+  const onSlotChangeRef = useRef(onSlotChange);
+  slotStateRef.current = slotState;
+  onSlotChangeRef.current = onSlotChange;
+
   const material = findMaterialInList(materials, materialCode);
   const grade = findGradeInMaterial(material, gradeCode);
   const resolvedSubDepartmentId = Number(subDepartmentId ?? 0);
@@ -134,46 +149,51 @@ const RawMaterialPremixSchemaPanel = ({
 
   useEffect(() => {
     appliedSavedSectionsRef.current = null;
-  }, [materialCode, gradeCode, slot, resolvedMaterialId, savedSectionsSignature]);
+    initializedSessionRef.current = null;
+  }, [sessionKey, materialCode, gradeCode, slot, resolvedMaterialId, savedSectionsSignature]);
 
   useEffect(() => {
+    const currentSlot = slotStateRef.current;
     if (loading) {
-      if (!slotState.schemaLoading) {
-        onSlotChange({
-          schema: slotState.schema,
+      if (!currentSlot.schemaLoading) {
+        onSlotChangeRef.current({
+          schema: currentSlot.schema,
           schemaLoading: true,
           schemaError: null,
-          formValues: slotState.formValues,
+          formValues: cloneValue(currentSlot.formValues ?? {}),
         });
       }
       return;
     }
 
     if (error || !schema) {
-      onSlotChange({
+      onSlotChangeRef.current({
         schema: null,
         schemaLoading: false,
         schemaError: error,
-        formValues: slotState.formValues,
+        formValues: cloneValue(currentSlot.formValues ?? {}),
       });
       return;
     }
 
-    if (slotState.schema !== schema || slotState.schemaLoading || slotState.schemaError) {
-      onSlotChange({
+    if (currentSlot.schema !== schema || currentSlot.schemaLoading || currentSlot.schemaError) {
+      onSlotChangeRef.current({
         schema,
         schemaLoading: false,
         schemaError: null,
-        formValues: slotState.formValues,
+        formValues: cloneValue(currentSlot.formValues ?? {}),
       });
     }
-  }, [schema, loading, error]);
+  }, [schema, loading, error, sessionKey]);
 
   useEffect(() => {
     if (loading || error || !schema) return;
 
+    const currentSlot = slotStateRef.current;
+
     if (savedSections?.length) {
-      if (appliedSavedSectionsRef.current === savedSectionsSignature) return;
+      const applyKey = `${sessionKey}:${savedSectionsSignature}`;
+      if (appliedSavedSectionsRef.current === applyKey) return;
 
       const normalizedSections = normalizeSavedSectionsForSchema(schema, savedSections, {
         materialId: resolvedMaterialId,
@@ -183,23 +203,28 @@ const RawMaterialPremixSchemaPanel = ({
         gradeCode: slot === "solid" ? gradeCode || null : null,
       });
 
-      onSlotChange({
+      onSlotChangeRef.current({
         schema,
         schemaLoading: false,
         schemaError: null,
-        formValues: hydrateValuesFromProcess(schema, normalizedSections),
+        formValues: cloneValue(hydrateValuesFromProcess(schema, normalizedSections)),
       });
-      appliedSavedSectionsRef.current = savedSectionsSignature;
+      appliedSavedSectionsRef.current = applyKey;
+      initializedSessionRef.current = sessionKey;
       return;
     }
 
-    if (Object.keys(slotState.formValues).length === 0) {
-      onSlotChange({
+    if (
+      Object.keys(currentSlot.formValues ?? {}).length === 0 &&
+      initializedSessionRef.current !== sessionKey
+    ) {
+      onSlotChangeRef.current({
         schema,
         schemaLoading: false,
         schemaError: null,
-        formValues: createInitialValues(schema),
+        formValues: cloneValue(createInitialValues(schema)),
       });
+      initializedSessionRef.current = sessionKey;
     }
   }, [
     schema,
@@ -207,6 +232,7 @@ const RawMaterialPremixSchemaPanel = ({
     error,
     savedSections,
     savedSectionsSignature,
+    sessionKey,
     materialCode,
     gradeCode,
     slot,
@@ -217,11 +243,12 @@ const RawMaterialPremixSchemaPanel = ({
 
   const handleValuesChange = (values: SchemaFormValues) => {
     if (readOnly) return;
-    onSlotChange({
+    onSlotChangeRef.current({
       schema: error || loading ? null : schema,
       schemaLoading: loading,
       schemaError: error,
-      formValues: values,
+      // Always clone so Premix N never shares a mutable object with Premix M.
+      formValues: cloneValue(values),
     });
   };
 
@@ -264,6 +291,7 @@ const RawMaterialPremixSchemaPanel = ({
         error={error}
         readOnly={readOnly}
         themeTokens={themeTokens}
+        errors={validationErrors}
         apiContext={{
           subDepartmentId: resolvedSubDepartmentId,
           batchId,
@@ -271,6 +299,8 @@ const RawMaterialPremixSchemaPanel = ({
           gradeCode: slot === "solid" ? gradeCode || undefined : undefined,
           materialId: resolvedMaterialId,
           gradeId: resolvedGradeId ?? undefined,
+          premixNo,
+          sessionKey,
         }}
       />
     </Box>

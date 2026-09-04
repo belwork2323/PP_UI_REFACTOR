@@ -27,6 +27,11 @@ import {
   type CasePrepMotorData,
 } from "../../../data/models/user/CasePrepMotorDataModel";
 import {
+  validateCasePrepMotorData,
+  validateCasePrepMotorSession,
+  type CasePrepValidationErrors,
+} from "../../../data/models/user/casePrepValidation";
+import {
   isMainMotorBatch,
   isSubscaleBatch,
   resolveCasePrepBatchMotorCount,
@@ -204,6 +209,9 @@ export const useCasePreparationHook = () => {
 
   const [addedMotors, setAddedMotors] = useState<CasePrepAddedMotor[]>([]);
   const [motorStatusById, setMotorStatusById] = useState<Record<string, MotorStatusMeta>>({});
+  const [motorValidationErrors, setMotorValidationErrors] = useState<
+    Record<string, CasePrepValidationErrors>
+  >({});
 
   const resetFlowDraft = useCallback(() => {
     setAddedMotors([]);
@@ -224,6 +232,7 @@ export const useCasePreparationHook = () => {
     setHasSavedDraft(false);
     setIsFormDirty(false);
     setFormData(defaults);
+    setMotorValidationErrors({});
     resetFlowDraft();
   }, [resetFlowDraft]);
 
@@ -442,11 +451,32 @@ export const useCasePreparationHook = () => {
       });
       return changed ? next : prev;
     });
+    // Live type/format validation only (no required) — red messages under fields, no popup
+    const liveErrors = validateCasePrepMotorSession(nextMotor, "DRAFT");
+    setMotorValidationErrors((prev) => {
+      if (Object.keys(liveErrors).length === 0) {
+        if (!prev[motorId]) return prev;
+        const next = { ...prev };
+        delete next[motorId];
+        return next;
+      }
+      return { ...prev, [motorId]: liveErrors };
+    });
     setIsFormDirty(true);
   }, []);
 
   const handleSubscaleValuesChange = useCallback((data: CasePrepMotorData) => {
     setFormData((prev) => ({ ...prev, subscaleData: data }));
+    const liveErrors = validateCasePrepMotorData(data, "DRAFT");
+    setMotorValidationErrors((prev) => {
+      if (Object.keys(liveErrors).length === 0) {
+        if (!prev.SUBSCALE) return prev;
+        const next = { ...prev };
+        delete next.SUBSCALE;
+        return next;
+      }
+      return { ...prev, SUBSCALE: liveErrors };
+    });
     setIsFormDirty(true);
   }, []);
 
@@ -505,16 +535,19 @@ export const useCasePreparationHook = () => {
         return false;
       }
 
-      if (intent === "submit") {
-        if (!String(motor.prrcClearanceDate ?? "").trim()) {
-          showAlert(S.MOTOR_PRRC_REQUIRED, "warning");
-          return false;
-        }
-        if (!hasMotorCasePreparationValue(formData, motorId)) {
-          showAlert(S.MOTOR_EMPTY_ERROR, "warning");
-          return false;
-        }
+      // SUBMIT → mandatory + type; DRAFT → type/format only. Errors show under fields (no popup).
+      const submissionIntent = intent === "draft" ? "DRAFT" : "SUBMIT";
+      const fieldErrors = validateCasePrepMotorSession(motor, submissionIntent);
+      if (Object.keys(fieldErrors).length > 0) {
+        setMotorValidationErrors((prev) => ({ ...prev, [motorId]: fieldErrors }));
+        return false;
       }
+      setMotorValidationErrors((prev) => {
+        if (!prev[motorId]) return prev;
+        const next = { ...prev };
+        delete next[motorId];
+        return next;
+      });
 
       const isDraft = intent === "draft";
       const motorSubmissionType = isDraft ? "DRAFT" : "SUBMIT";
@@ -745,6 +778,21 @@ export const useCasePreparationHook = () => {
         return false;
       }
 
+      const submissionIntent = intent === "draft" ? "DRAFT" : "SUBMIT";
+      if (formData.subscaleData) {
+        const fieldErrors = validateCasePrepMotorData(formData.subscaleData, submissionIntent);
+        if (Object.keys(fieldErrors).length > 0) {
+          setMotorValidationErrors((prev) => ({ ...prev, SUBSCALE: fieldErrors }));
+          return false;
+        }
+        setMotorValidationErrors((prev) => {
+          if (!prev.SUBSCALE) return prev;
+          const next = { ...prev };
+          delete next.SUBSCALE;
+          return next;
+        });
+      }
+
       const isCreateFlow = !resolveFormId(activeBatch);
       const payloadBody = buildCasePreparationFormBody(formData);
 
@@ -881,6 +929,7 @@ export const useCasePreparationHook = () => {
     handleSaveDraft,
     handleSubmit,
     hasSavedDraft,
+    motorValidationErrors,
   };
 };
 

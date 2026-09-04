@@ -11,6 +11,7 @@ import {
   Dialog,
   DialogContent,
   IconButton,
+  Link,
   MenuItem,
   Table,
   TableBody,
@@ -36,10 +37,16 @@ import ApproverList from "../components/ApproverList";
 import ApproverActionDialog from "../../../components/custom/ApproverActionDialog";
 import FilterPanelHeader from "@ui/components/common/FilterPanelHeader";
 import FilterToggleButton from "../../../components/common/FilterToggleButton";
+import FilePreviewDialog from "../../../components/common/FilePreviewDialog";
 import { ReportPreviewDialog } from "../components/ReportPdf";
 import { STRINGS } from "../../../../app/config/strings";
+import { useAuthStore } from "../../../../app/store/authStore";
+import { useFilePreview } from "../../../../hooks/useFilePreview";
+import { fileUtils } from "../../../../utils/FileUtils";
+import type { LotCertificate } from "../../../../data/models/user/RawMaterialProcurementModel";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
+const SF = STRINGS.SOURCING.SPECIFICATION_FORM;
 
 const {
   approved: CheckCircleRoundedIcon,
@@ -49,6 +56,11 @@ const {
   inventory: InventoryRoundedIcon,
   pdf: PictureAsPdfRoundedIcon,
 } = icons.approver.sourcing.rawMaterialProcurement;
+
+const {
+  insertDriveFile: InsertDriveFileOutlinedIcon,
+  openInNew: OpenInNewRoundedIcon,
+} = icons.user.sourcing.rawMaterialBatchList;
 
 // ─── Dialog ───────────────────────────────────────────────────────────────────
 
@@ -72,6 +84,21 @@ const RawMaterialDetailDialog = ({
   theme,
 }: DetailDialogProps) => {
   const [pdfOpen, setPdfOpen] = useState(false);
+  const subDepartmentId = useAuthStore(
+    (s) =>
+      s.user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "raw-material")?.subDepartmentId,
+  );
+  const { preview, openFile, closePreview, downloadCurrent } = useFilePreview();
+
+  const handleOpenCertificate = useCallback(
+    (cert: LotCertificate) => {
+      const fileId = String(cert.fileId ?? "").trim();
+      if (!fileId || !subDepartmentId) return;
+      void openFile(fileId, subDepartmentId, cert.fileName);
+    },
+    [openFile, subDepartmentId],
+  );
+
   if (!item) return null;
 
   const canApproveOrReject = isApproverActionableStatus(item.status);
@@ -177,6 +204,115 @@ const RawMaterialDetailDialog = ({
                     </TableBody>
                   </Table>
                 </TableContainer>
+
+                {(block.certificates ?? []).length ? (
+                  <Box sx={{ mt: 2 }}>
+                    <Typography
+                      sx={{
+                        fontSize: "0.72rem",
+                        fontWeight: 800,
+                        letterSpacing: "0.06em",
+                        textTransform: "uppercase",
+                        color: theme.palette.textSub,
+                        mb: 1,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 0.75,
+                      }}
+                    >
+                      <InsertDriveFileOutlinedIcon sx={{ fontSize: 16 }} />
+                      {BL.LOT_DETAILS_CERTIFICATES_SECTION}
+                    </Typography>
+                    <Stack spacing={1}>
+                      {(block.certificates as LotCertificate[]).map((cert, ci) => {
+                        const fileId = String(cert.fileId ?? "").trim();
+                        const canOpenStored = Boolean(fileId && subDepartmentId);
+                        const canOpenUrl = fileUtils.isOpenableCertificateUrl(cert.fileUrl);
+                        const isVideo = fileUtils.getFileKind(cert.fileName, cert.mimeType) === "video";
+                        return (
+                          <Box
+                            key={`${cert.fileId || cert.fileName}-${ci}`}
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                              p: 1,
+                              borderRadius: 1.5,
+                              border: `1px solid ${alpha(theme.palette.border, 0.8)}`,
+                              background: alpha(theme.palette.white ?? "#fff", 0.9),
+                              "&:hover": { background: alpha(theme.palette.primaryLight, 0.05) },
+                            }}
+                          >
+                            <InsertDriveFileOutlinedIcon
+                              sx={{ fontSize: 20, color: theme.palette.primaryLight }}
+                            />
+                            <Box flex={1} minWidth={0}>
+                              <Typography
+                                sx={{
+                                  fontSize: "0.82rem",
+                                  fontWeight: 700,
+                                  color: theme.palette.text,
+                                  overflow: "hidden",
+                                  textOverflow: "ellipsis",
+                                  whiteSpace: "nowrap",
+                                }}
+                              >
+                                {cert.fileName || "Document"}
+                              </Typography>
+                              <Typography
+                                sx={{ fontSize: "0.72rem", color: theme.palette.textSub, mt: 0.25 }}
+                              >
+                                <Box component="span" sx={{ fontWeight: 700, color: theme.palette.text }}>
+                                  {SF.CERT_TYPE}:
+                                </Box>{" "}
+                                {cert.certificateType?.trim() || "—"}
+                              </Typography>
+                            </Box>
+                            {canOpenStored ? (
+                              <Link
+                                component="button"
+                                type="button"
+                                onClick={() => handleOpenCertificate(cert)}
+                                sx={{
+                                  fontSize: "0.82rem",
+                                  fontWeight: 600,
+                                  color: theme.palette.primaryLight,
+                                  textDecoration: "none",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 0.25,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {isVideo ? "Download" : "View"}
+                                <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
+                              </Link>
+                            ) : canOpenUrl ? (
+                              <Link
+                                href={cert.fileUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                sx={{
+                                  fontSize: "0.82rem",
+                                  fontWeight: 600,
+                                  color: theme.palette.primaryLight,
+                                  textDecoration: "none",
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                  gap: 0.25,
+                                  flexShrink: 0,
+                                }}
+                              >
+                                View
+                                <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
+                              </Link>
+                            ) : null}
+                          </Box>
+                        );
+                      })}
+                    </Stack>
+                  </Box>
+                ) : null}
               </Box>
             ))
           ) : (
@@ -214,6 +350,14 @@ const RawMaterialDetailDialog = ({
           ) : null}
         </Box>
       </Dialog>
+
+      <FilePreviewDialog
+        preview={preview}
+        onClose={closePreview}
+        onDownload={downloadCurrent}
+        themeColor={theme.palette.primary}
+        themeColorLight={theme.palette.primaryLight}
+      />
 
       <ReportPreviewDialog
         open={pdfOpen}

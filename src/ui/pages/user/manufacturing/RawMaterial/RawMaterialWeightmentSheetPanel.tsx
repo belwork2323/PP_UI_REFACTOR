@@ -35,6 +35,14 @@ import {
   weightmentRowsHaveSheetDeviations,
   type WeightmentRowFieldErrors,
 } from "../../../../../data/models/user/rawMaterialWeightmentValidation";
+import {
+  weightmentMixerBuildingPath,
+  weightmentPath,
+} from "../../../../../data/validation/adapters/rawMaterialPreparation.validation";
+import type { ValidationErrors } from "../../../../../data/validation/submissionIntent";
+import useValidationDisplay, {
+  type ValidationAttemptFlags,
+} from "../../../../components/validation/useValidationDisplay";
 import IdentificationSheetCollapsible from "./components/IdentificationSheetCollapsible";
 import {
   WeightmentTableInput,
@@ -80,6 +88,8 @@ type RawMaterialWeightmentSheetPanelProps = {
   identificationSheet?: IdentificationSheet | null;
   /** Shared across premixes — false when any premix is waiting for approval / approved. */
   disabled?: boolean;
+  weightmentErrors?: ValidationErrors;
+  validationAttempt?: ValidationAttemptFlags;
 };
 
 const RawMaterialWeightmentSheetPanel = ({
@@ -89,7 +99,13 @@ const RawMaterialWeightmentSheetPanel = ({
   batchId = "",
   identificationSheet = null,
   disabled = false,
+  weightmentErrors = {},
+  validationAttempt = { format: false, unit: false, submit: false },
 }: RawMaterialWeightmentSheetPanelProps) => {
+  const { visibleError: submitVisibleError } = useValidationDisplay(
+    weightmentErrors,
+    validationAttempt,
+  );
   const [identificationViewOpen, setIdentificationViewOpen] = useState(false);
   const compareEnabled = value.validation.compareWithIdentificationSheet === true;
   const sheetMaterials = identificationSheet?.materials ?? [];
@@ -125,6 +141,17 @@ const RawMaterialWeightmentSheetPanel = ({
       validateWeightmentRowAgainstSheet(row, sheetMaterials, validationMessages),
     );
   }, [compareEnabled, sheetMaterials, value.weightmentDetails]);
+
+  const getRowFieldError = (
+    rowIndex: number,
+    field: keyof RawMaterialPrepWeightmentDetail,
+  ): string | undefined => {
+    const submitError = submitVisibleError(weightmentPath(rowIndex, field));
+    if (submitError) return submitError;
+    return rowErrors[rowIndex]?.[field];
+  };
+
+  const mixerBuildingError = submitVisibleError(weightmentMixerBuildingPath());
 
   const hasSheetDeviations = useMemo(
     () =>
@@ -222,7 +249,7 @@ const RawMaterialWeightmentSheetPanel = ({
   const containerOptions = CONTAINER_TYPES.map((type) => ({ value: type, label: type }));
 
   const renderMaterialCodeField = (row: RawMaterialPrepWeightmentDetail, index: number) => {
-    const errors = rowErrors[index] ?? {};
+    const materialCodeError = getRowFieldError(index, "materialCode");
 
     // Dropdown + sheet matching only when the user checked "Compare with identification sheet".
     if (compareEnabled === true && sheetMaterials.length > 0) {
@@ -231,8 +258,8 @@ const RawMaterialWeightmentSheetPanel = ({
           value={getWeightmentRowSheetKey(row, sheetMaterials)}
           onChange={(next) => handleMaterialSelect(index, next)}
           placeholder={RM.WEIGHTMENT_SELECT_MATERIAL}
-          error={Boolean(errors.materialCode)}
-          helperText={errors.materialCode}
+          error={Boolean(materialCodeError)}
+          helperText={materialCodeError}
           palette={palette}
           selectOptions={getMaterialSelectOptionsForRow(index)}
           disabled={disabled}
@@ -245,8 +272,8 @@ const RawMaterialWeightmentSheetPanel = ({
         value={row.materialCode}
         onChange={(next) => updateRow(index, { materialCode: next })}
         placeholder={RM.WEIGHTMENT_PLACEHOLDER_MATERIAL_CODE}
-        error={Boolean(errors.materialCode)}
-        helperText={errors.materialCode}
+        error={Boolean(materialCodeError)}
+        helperText={materialCodeError}
         palette={palette}
         disabled={disabled}
       />
@@ -315,6 +342,8 @@ const RawMaterialWeightmentSheetPanel = ({
           palette={palette}
           width={{ xs: "100%", sm: 360 }}
           disabled={disabled}
+          error={Boolean(mixerBuildingError)}
+          helperText={mixerBuildingError}
         />
 
         {value.weightmentDetails.length === 0 ? (
@@ -393,8 +422,6 @@ const RawMaterialWeightmentSheetPanel = ({
               </TableHead>
               <TableBody>
                 {value.weightmentDetails.map((row, index) => {
-                  const errors = rowErrors[index] ?? {};
-
                   return (
                     <TableRow key={index} sx={dt.tableRow ? dt.tableRow(index) : undefined}>
                       <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 190, py: 1.1, verticalAlign: "top" }}>
@@ -417,8 +444,8 @@ const RawMaterialWeightmentSheetPanel = ({
                           value={row.percentage}
                           onChange={(next) => updateRow(index, { percentage: next })}
                           placeholder={RM.WEIGHTMENT_PLACEHOLDER_PERCENTAGE}
-                          error={Boolean(errors.percentage)}
-                          helperText={errors.percentage}
+                          error={Boolean(getRowFieldError(index, "percentage"))}
+                          helperText={getRowFieldError(index, "percentage")}
                           palette={palette}
                           disabled={disabled}
                         />
@@ -429,8 +456,8 @@ const RawMaterialWeightmentSheetPanel = ({
                           value={row.weightTransferred}
                           onChange={(next) => updateRow(index, { weightTransferred: next })}
                           placeholder={RM.WEIGHTMENT_PLACEHOLDER_WEIGHT}
-                          error={Boolean(errors.weightTransferred)}
-                          helperText={errors.weightTransferred}
+                          error={Boolean(getRowFieldError(index, "weightTransferred"))}
+                          helperText={getRowFieldError(index, "weightTransferred")}
                           palette={palette}
                           disabled={disabled}
                         />
@@ -443,6 +470,8 @@ const RawMaterialWeightmentSheetPanel = ({
                           palette={palette}
                           selectOptions={containerOptions}
                           disabled={disabled}
+                          error={Boolean(getRowFieldError(index, "containerType"))}
+                          helperText={getRowFieldError(index, "containerType")}
                         />
                       </TableCell>
                       <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 130, py: 1.1, verticalAlign: "top" }}>
@@ -452,6 +481,8 @@ const RawMaterialWeightmentSheetPanel = ({
                           placeholder={RM.WEIGHTMENT_PLACEHOLDER_CONTAINER_NO}
                           palette={palette}
                           disabled={disabled}
+                          error={Boolean(getRowFieldError(index, "containerNumber"))}
+                          helperText={getRowFieldError(index, "containerNumber")}
                         />
                       </TableCell>
                       <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 130, py: 1.1, verticalAlign: "top" }}>
@@ -461,6 +492,8 @@ const RawMaterialWeightmentSheetPanel = ({
                           placeholder={RM.WEIGHTMENT_PLACEHOLDER_WEIGH_SCALE}
                           palette={palette}
                           disabled={disabled}
+                          error={Boolean(getRowFieldError(index, "weighScaleNumber"))}
+                          helperText={getRowFieldError(index, "weighScaleNumber")}
                         />
                       </TableCell>
                       <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 200, py: 1.1, verticalAlign: "top" }}>
@@ -470,6 +503,8 @@ const RawMaterialWeightmentSheetPanel = ({
                           onChange={(next) => updateRow(index, { weighingDateTime: next })}
                           palette={palette}
                           disabled={disabled}
+                          error={Boolean(getRowFieldError(index, "weighingDateTime"))}
+                          helperText={getRowFieldError(index, "weighingDateTime")}
                         />
                       </TableCell>
                       <TableCell align="center" sx={{ ...(dt.tableCell ?? {}), verticalAlign: "top", py: 1.1 }}>

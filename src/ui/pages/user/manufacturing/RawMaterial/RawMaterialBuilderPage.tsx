@@ -1,5 +1,3 @@
-// src/ui/pages/user/manufacturing/RawMaterial/RawMaterialBuilderPage.tsx
-
 import React, { useEffect, useMemo, useState } from "react";
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
 import RawMaterialPremixSchemaPanel from "./RawMaterialPremixSchemaPanel";
@@ -65,6 +63,9 @@ const RawMaterialBuilderForm = ({
   premixStatusByNo,
   isPremixEditable,
   actionLoading,
+  premixFieldErrors = {},
+  weightmentErrors = {},
+  validationAttempt = { format: false, unit: false, submit: false },
 }: any) => {
   const rmTheme = theme.manufacturing.rawMaterialPrep;
   const groups = Array.isArray(premixGroups) ? premixGroups : [];
@@ -397,6 +398,11 @@ const RawMaterialBuilderForm = ({
                 </Box>
                 <RawMaterialPremixSchemaPanel
                   key={`schema-solid-${activeMaterialEntry.premix}-${activeMaterialEntry.materialKey}`}
+                  sessionKey={getPremixMaterialSessionKey(
+                    activeMaterialEntry.premix,
+                    activeMaterialEntry.materialKey,
+                  )}
+                  premixNo={activeMaterialEntry.premix}
                   slot="solid"
                   materialCode={activeMaterialEntry.solidMaterialCode}
                   materialId={activeMaterialEntry.solidMaterialId}
@@ -416,6 +422,11 @@ const RawMaterialBuilderForm = ({
                     )
                   }
                   readOnly={activePremixLocked}
+                  validationErrors={
+                    premixFieldErrors[
+                      `${activeMaterialEntry.premix}:${activeMaterialEntry.materialKey}:solid`
+                    ]
+                  }
                 />
               </Box>
               )}
@@ -441,6 +452,11 @@ const RawMaterialBuilderForm = ({
                 ) : null}
                 <RawMaterialPremixSchemaPanel
                   key={`schema-liquid-${activeMaterialEntry.premix}-${activeMaterialEntry.materialKey}`}
+                  sessionKey={getPremixMaterialSessionKey(
+                    activeMaterialEntry.premix,
+                    activeMaterialEntry.materialKey,
+                  )}
+                  premixNo={activeMaterialEntry.premix}
                   slot="liquid"
                   materialCode={activeMaterialEntry.liquidMaterialCode}
                   materialId={activeMaterialEntry.liquidMaterialId}
@@ -458,6 +474,11 @@ const RawMaterialBuilderForm = ({
                     )
                   }
                   readOnly={activePremixLocked}
+                  validationErrors={
+                    premixFieldErrors[
+                      `${activeMaterialEntry.premix}:${activeMaterialEntry.materialKey}:liquid`
+                    ]
+                  }
                 />
               </Box>
             )}
@@ -473,6 +494,8 @@ const RawMaterialBuilderForm = ({
           batchId={activeBatch?.batchId ?? ""}
           identificationSheet={identificationSheet}
           disabled={!weightmentSheetEditable}
+          weightmentErrors={weightmentErrors}
+          validationAttempt={validationAttempt}
         />
       )}
 

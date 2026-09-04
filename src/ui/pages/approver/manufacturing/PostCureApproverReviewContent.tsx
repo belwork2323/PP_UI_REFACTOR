@@ -1,11 +1,5 @@
 import { useMemo } from "react";
-import {
-  Box,
-  Button,
-  CircularProgress,
-  Stack,
-  Typography,
-} from "@mui/material";
+import { Box, Button, CircularProgress, Stack, Typography } from "@mui/material";
 import getManufacturingTheme from "../../../../app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import getRawMaterialPreparationApproverTheme from "../../../../app/theme/custom_themes/approver/manufacturing/rawMaterialPreparationApprover_theme";
 import { STRINGS } from "../../../../app/config/strings";
@@ -27,10 +21,7 @@ import {
 } from "../../../components/custom/UserWorkflowStepPager";
 
 const PC = STRINGS.MANUFACTURING.POST_CURE;
-const {
-  approved: ApproveIcon,
-  rejected: RejectIcon,
-} = icons.approver.manufacturing.postCure;
+const { approved: ApproveIcon, rejected: RejectIcon } = icons.approver.manufacturing.postCure;
 
 type PostCureApproverReviewContentProps = {
   detailView: PostCureDetailView | null;
@@ -95,7 +86,8 @@ const PostCureApproverReviewContent = ({
   }, [detailView?.motorCounts?.totalMotorCount, motors]);
 
   const enabledMotors = useMemo(
-    () => motors.filter((motor) => !isPostCureMotorApproverTabDisabled(motor.motorSubmissionStatus)),
+    () =>
+      motors.filter((motor) => !isPostCureMotorApproverTabDisabled(motor.motorSubmissionStatus)),
     [motors],
   );
 
@@ -141,10 +133,7 @@ const PostCureApproverReviewContent = ({
       0,
       enabledMotors.findIndex((motor) => motor.motorId === activeMotorId),
     );
-    const nextIndex = Math.min(
-      enabledMotors.length - 1,
-      Math.max(0, currentIndex + direction),
-    );
+    const nextIndex = Math.min(enabledMotors.length - 1, Math.max(0, currentIndex + direction));
     onActiveMotorChange(enabledMotors[nextIndex].motorId);
   };
 
@@ -195,9 +184,7 @@ const PostCureApproverReviewContent = ({
           onStepBack={() => goToEnabledMotor(-1)}
           onStepNext={() => goToEnabledMotor(1)}
           disableStepBack={enabledMotorIndex <= 0}
-          disableStepNext={
-            enabledMotorIndex < 0 || enabledMotorIndex >= enabledMotors.length - 1
-          }
+          disableStepNext={enabledMotorIndex < 0 || enabledMotorIndex >= enabledMotors.length - 1}
           isTabDisabled={(_, index) =>
             isPostCureMotorApproverTabDisabled(motors[index]?.motorSubmissionStatus)
           }
@@ -243,7 +230,12 @@ const PostCureApproverReviewContent = ({
           ) : null}
 
           {canApproveOrReject ? (
-            <Stack direction={{ xs: "column", sm: "row" }} gap={1} mb={1.25} justifyContent="flex-end">
+            <Stack
+              direction={{ xs: "column", sm: "row" }}
+              gap={1}
+              mb={1.25}
+              justifyContent="flex-end"
+            >
               <Button
                 variant="contained"
                 size="small"
@@ -266,7 +258,6 @@ const PostCureApproverReviewContent = ({
               </Button>
             </Stack>
           ) : null}
-
           <PostCureMotorPanel
             value={activeMotor.postCureData}
             onChange={() => undefined}

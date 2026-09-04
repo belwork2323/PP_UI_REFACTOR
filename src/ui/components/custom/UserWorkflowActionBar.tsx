@@ -20,6 +20,8 @@ type UserWorkflowActionBarProps = {
   canSaveDraft?: boolean;
   /** When true, only Submit is disabled (defaults to disableActions). */
   disableSubmit?: boolean;
+  /** Keep Submit clickable so the form can surface every validation error at once. */
+  allowInvalidSubmitAttempt?: boolean;
   /** When true, only Save as Draft is disabled (defaults to disableActions). */
   disableSaveDraft?: boolean;
 };
@@ -40,6 +42,7 @@ const UserWorkflowActionBar = ({
   disableActions = false,
   canSaveDraft,
   disableSubmit,
+  allowInvalidSubmitAttempt = false,
   disableSaveDraft,
 }: UserWorkflowActionBarProps) => {
   const saveEnabled = canSaveDraft ?? canSubmit;
@@ -73,7 +76,7 @@ const UserWorkflowActionBar = ({
               <Button
                 variant="contained"
                 startIcon={<SendRoundedIcon />}
-                disabled={!canSubmit || submitDisabled}
+                disabled={(!canSubmit && !allowInvalidSubmitAttempt) || submitDisabled}
                 onClick={onSubmitClick}
                 sx={theme.workflow.actionBar.submitButton}
               >

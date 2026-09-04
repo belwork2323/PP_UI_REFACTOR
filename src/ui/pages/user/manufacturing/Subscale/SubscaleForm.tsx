@@ -14,7 +14,13 @@ const S = STRINGS.MANUFACTURING.SUBSCALE;
 const { scale: ScaleRoundedIcon } = icons.user.manufacturing.subscale.form;
 
 type SubscaleFormProps = {
-  batch?: { batchId?: string; articleId?: string; batchType?: string | null; ssStatus?: string; status?: string } | null;
+  batch?: {
+    batchId?: string;
+    articleId?: string;
+    batchType?: string | null;
+    ssStatus?: string;
+    status?: string;
+  } | null;
   formData: SubscaleFormState;
   subDepartmentId?: number;
   schemaLoading?: boolean;
@@ -38,7 +44,7 @@ const SubscaleForm = ({
   actionLoading,
   isEditMode,
   onRequestSaveDraft,
-  onRequestSubmit,
+  // onRequestSubmit,
 }: SubscaleFormProps) => {
   const BRAND = SUBSCALE_BRAND;
   const isMainScale = isMainScaleSubscaleBatch(batch?.batchType);
@@ -100,7 +106,7 @@ const SubscaleForm = ({
         </Stack>
       </Box>
 
-      {isFormLoaded && onRequestSaveDraft && onRequestSubmit ? (
+      {isFormLoaded && onRequestSaveDraft ? (
         <Stack
           direction={{ xs: "column", sm: "row" }}
           gap={1.25}
@@ -112,16 +118,14 @@ const SubscaleForm = ({
             size="small"
             disabled={actionLoading}
             onClick={onRequestSaveDraft}
-            startIcon={
-              actionLoading ? <CircularProgress size={14} color="inherit" /> : undefined
-            }
+            startIcon={actionLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
             sx={{ whiteSpace: "nowrap" }}
           >
             {S.HARDWARE.SAVE_DRAFT}
           </Button>
           <SubmitForApprovalButton
             disabled={actionLoading}
-            onClick={onRequestSubmit}
+            // onClick={onRequestSubmit}
             label={isEditMode ? S.HARDWARE.RESUBMIT : S.HARDWARE.SUBMIT}
           />
         </Stack>

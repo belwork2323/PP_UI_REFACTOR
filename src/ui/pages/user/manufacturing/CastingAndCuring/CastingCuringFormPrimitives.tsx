@@ -13,8 +13,13 @@ import {
   alpha,
 } from "@mui/material";
 import { CASTING_CURING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/castingAndCuring_theme";
-import { uniformTableHeaderCellSx, uniformTableBodyCellSx } from "../../../../../app/theme/custom_themes/shared/data_table_theme";
+import {
+  uniformTableHeaderCellSx,
+  uniformTableBodyCellSx,
+} from "../../../../../app/theme/custom_themes/shared/data_table_theme";
 import { WorkflowReadOnlyText } from "../../../../components/common/WorkflowReadOnlyText";
+import React from "react";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 const BRAND = CASTING_CURING_BRAND;
 
@@ -185,13 +190,7 @@ export const FieldGrid = ({
   </Box>
 );
 
-export const ReadOnlyField = ({
-  label,
-  value,
-}: {
-  label: string;
-  value?: string | null;
-}) => (
+export const ReadOnlyField = ({ label, value }: { label: string; value?: string | null }) => (
   <Box>
     <FieldLabel>{label}</FieldLabel>
     <Box
@@ -214,41 +213,63 @@ export const ReadOnlyField = ({
   </Box>
 );
 
-export const TableTextInput = ({
-  value,
-  onChange,
-  placeholder = "",
-  disabled = false,
-  readOnly = false,
-  type = "text",
-  multiline = false,
-  minRows,
-}: {
-  value: string;
-  onChange: (value: string) => void;
+export interface TableTextInputProps {
+  value?: string | number;
+  onChange?: (value: string) => void;
   placeholder?: string;
   disabled?: boolean;
   readOnly?: boolean;
   type?: string;
   multiline?: boolean;
   minRows?: number;
-}) =>
-  readOnly ? (
-    <WorkflowReadOnlyText value={value} />
-  ) : (
-    <TextField
-      size="small"
-      fullWidth
-      type={type}
-      multiline={multiline}
-      minRows={minRows}
-      value={value}
-      placeholder={placeholder}
-      disabled={disabled}
-      onChange={(event) => onChange(event.target.value)}
-      sx={castingCuringTableInputSx}
-    />
-  );
+  error?: boolean;
+  helperText?: ReactNode;
+  name?: string;
+  required?: boolean;
+}
+
+export const TableTextInput = React.forwardRef<HTMLInputElement, TableTextInputProps>(
+  (
+    {
+      value = "",
+      onChange,
+      placeholder = "",
+      disabled = false,
+      readOnly = false,
+      type = "text",
+      multiline = false,
+      minRows,
+      helperText,
+      error = false,
+      required = false,
+      ...rest
+    },
+    ref,
+  ) =>
+    readOnly ? (
+      <WorkflowReadOnlyText value={String(value ?? "")} />
+    ) : (
+      <TextField
+        {...rest}
+        inputRef={ref}
+        size="small"
+        fullWidth
+        type={type}
+        multiline={multiline}
+        minRows={minRows}
+        value={value ?? ""}
+        placeholder={placeholder}
+        disabled={disabled}
+        error={error}
+        helperText={helperText}
+        onChange={(event) => onChange?.(event.target.value)}
+        sx={castingCuringTableInputSx}
+        required
+      />
+    ),
+);
+
+TableTextInput.displayName = "TableTextInput";
 
 export const TableSelectInput = ({
   value,
@@ -257,6 +278,9 @@ export const TableSelectInput = ({
   placeholder = "Select",
   disabled = false,
   readOnly = false,
+  error = false, // 1. Added error prop
+  helperText, // 2. Added helperText prop
+  required = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -264,6 +288,9 @@ export const TableSelectInput = ({
   placeholder?: string;
   disabled?: boolean;
   readOnly?: boolean;
+  error?: boolean; // Type definition for error
+  helperText?: string; // Type definition for helperText
+  required?: boolean;
 }) => {
   if (readOnly) {
     const label = options.find((option) => option.value === value)?.label ?? value;
@@ -278,8 +305,11 @@ export const TableSelectInput = ({
       value={value}
       disabled={disabled}
       onChange={(event) => onChange(event.target.value)}
+      error={error} // 3. Passed error down to TextField
+      helperText={helperText} // 4. Passed helperText down to TextField so the message shows!
       sx={castingCuringTableInputSx}
       SelectProps={{ displayEmpty: true }}
+      required={required}
     >
       <MenuItem value="">
         <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub }}>{placeholder}</Typography>
@@ -351,7 +381,10 @@ export const ParameterTable = ({
         <TableHead>
           <TableRow>
             {columns.map((col, idx) => (
-              <TableCell key={col.key} sx={{ ...castingCuringTableHeaderCellSx(idx === 0), width: col.width }}>
+              <TableCell
+                key={col.key}
+                sx={{ ...castingCuringTableHeaderCellSx(idx === 0), width: col.width }}
+              >
                 {col.label}
               </TableCell>
             ))}
@@ -371,20 +404,20 @@ export const ParameterTable = ({
                 if (col.key === "value") {
                   return (
                     <TableCell key={col.key} sx={castingCuringTableCellSx}>
-                      {renderValue
-                        ? renderValue(row, index)
-                        : (
-                          <TableTextInput
-                            value={row.value ?? ""}
-                            onChange={(next) => onChangeValue?.(index, next)}
-                            disabled={disabled}
-                            readOnly={readOnly}
-                            type={row.valueFieldType === "number" ? "number" : "text"}
-                            multiline={row.valueFieldType === "textarea"}
-                            minRows={row.valueFieldType === "textarea" ? 2 : undefined}
-                            placeholder="Enter value"
-                          />
-                        )}
+                      {renderValue ? (
+                        renderValue(row, index)
+                      ) : (
+                        <TableTextInput
+                          value={row.value ?? ""}
+                          onChange={(next) => onChangeValue?.(index, next)}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          type={row.valueFieldType === "number" ? "number" : "text"}
+                          multiline={row.valueFieldType === "textarea"}
+                          minRows={row.valueFieldType === "textarea" ? 2 : undefined}
+                          placeholder="Enter value"
+                        />
+                      )}
                     </TableCell>
                   );
                 }

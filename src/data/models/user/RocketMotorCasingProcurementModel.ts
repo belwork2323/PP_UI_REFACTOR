@@ -37,15 +37,13 @@ export {
   buildCasingFormPayload,
   parseSectionsToFormData,
   INITIAL_ROCKET_MOTOR_CASING_FORM,
-  validateCasingFormForSubmit,
   validateCasingFormStep,
-  isCasingFormComplete,
-  canSaveCasingDraft,
   CASING_FORM_STEP_COUNT,
   serializeCasingForm,
   dimensionalRowFromParameter,
   normalizeDimensionalRow,
   createInitialMechanicalProperties,
+  createInitialThermalProperties,
   createInitialVisualInspection,
   ROCASIN_MECH_KEYS,
   EPDM_MECH_KEYS,
@@ -53,6 +51,17 @@ export {
   hasIncompleteCasingUploads,
   collectTempFileIdsFromCasingForm,
 } from "./RocketMotorCasingFormModel";
+
+export {
+  validateCasingFormForSubmit,
+  validateCasingFormErrors,
+  validateRocketMotorCasing,
+  isCasingFormComplete,
+  canSaveCasingDraft,
+  isCasingSubmitComplete,
+  isCasingUnitComplete,
+  isCasingIdentificationComplete,
+} from "../../validation/adapters/rocketMotorCasing.validation";
 
 type DimensionalRow = {
   paramId?: string;

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import { STRINGS } from "../../app/config/strings";
 import { operationsController } from "../../controllers/user/operationsController";
 import { DimensionalParameterModel } from "../../data/models/user/SubdepartmentCommonModel";
@@ -11,7 +11,7 @@ type FetchDimensionalParamsResult = {
 };
 
 export const useDimensionalParametersHook = () => {
-  const [cache, setCache] = useState<ParameterCache>({});
+  const cacheRef = useRef<ParameterCache>({});
   const [loadingByMotorType, setLoadingByMotorType] = useState<LoadingMap>({});
 
   const isLoading = useCallback(
@@ -26,8 +26,8 @@ export const useDimensionalParametersHook = () => {
         return { parameters: [], errorMessage: null };
       }
 
-      if (cache[mt]) {
-        return { parameters: cache[mt], errorMessage: null };
+      if (cacheRef.current[mt]) {
+        return { parameters: cacheRef.current[mt], errorMessage: null };
       }
 
       setLoadingByMotorType((prev) => ({ ...prev, [mt]: true }));
@@ -40,7 +40,7 @@ export const useDimensionalParametersHook = () => {
         }
 
         const params = response.data.parameters ?? [];
-        setCache((prev) => ({ ...prev, [mt]: params }));
+        cacheRef.current = { ...cacheRef.current, [mt]: params };
         return { parameters: params, errorMessage: null };
       } catch (error) {
         return {
@@ -51,7 +51,7 @@ export const useDimensionalParametersHook = () => {
         setLoadingByMotorType((prev) => ({ ...prev, [mt]: false }));
       }
     },
-    [cache]
+    [],
   );
 
   return {

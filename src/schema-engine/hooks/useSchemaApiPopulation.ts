@@ -24,14 +24,28 @@ export const useSchemaApiPopulation = (
 
   const batchId = String(apiContext?.batchId ?? "").trim();
   const motorId = String(apiContext?.motorId ?? "").trim();
+  const premixNo = String(apiContext?.premixNo ?? "").trim();
+  const materialCode = String(apiContext?.materialCode ?? "").trim();
+  const gradeCode = String(apiContext?.gradeCode ?? "").trim();
+  const sessionKey = String(apiContext?.sessionKey ?? "").trim();
+  // Include premix + material so the same schema (e.g. TDI) does not share
+  // populateFromApi results across Premix 1 / Premix 2 sessions.
   const populationKey =
     schema && batchId
-      ? `${schema.schemaType}:${schema.schemaVersion}:${batchId}:${motorId}`
+      ? [
+          schema.schemaType,
+          schema.schemaVersion,
+          batchId,
+          motorId,
+          sessionKey || premixNo,
+          materialCode,
+          gradeCode,
+        ].join(":")
       : null;
 
   useEffect(() => {
     populatedKeyRef.current = null;
-  }, [schema?.schemaVersion, schema?.schemaType, batchId, motorId]);
+  }, [schema?.schemaVersion, schema?.schemaType, batchId, motorId, sessionKey, premixNo, materialCode, gradeCode]);
 
   useEffect(() => {
     if (readOnly || !schema || !populationKey || !schemaHasPopulateFromApi(schema)) return;

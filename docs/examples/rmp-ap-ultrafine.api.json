@@ -2,7 +2,9 @@
   "request": {
     "schemaVersion": "1.0",
     "schemaType": "RAW_MATERIALS",
-    "layout": { "type": "flat" },
+    "layout": {
+      "type": "flat"
+    },
     "materialId": 1,
     "materialCode": "AP",
     "gradeId": 103,
@@ -52,7 +54,11 @@
             "type": "group",
             "id": "GRINDING_LOTS",
             "label": "Lot {index}",
-            "ui": { "direction": "row", "wrap": true, "gap": "md" },
+            "ui": {
+              "direction": "row",
+              "wrap": true,
+              "gap": "md"
+            },
             "repeat": {
               "defaultCount": 1,
               "min": 1,
@@ -67,7 +73,11 @@
                 "id": "LOT_NUMBER",
                 "fieldType": "dropdown",
                 "label": "Enter Lot No. of AP Coarse",
-                "validation": { "required": true },
+                "validation": {
+                  "required": true,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9 /_-]*$",
+                  "message": "Must be alphanumeric."
+                },
                 "dataSource": {
                   "type": "api",
                   "api": {
@@ -76,9 +86,13 @@
                     "requestBody": {
                       "limit": 500,
                       "page": 1,
-                      "status": ["APPROVED"],
+                      "status": [
+                        "APPROVED"
+                      ],
                       "subDepartmentId": 1,
-                      "materialCode": ["{{materialCode}}"]
+                      "materialCode": [
+                        "{{materialCode}}"
+                      ]
                     },
                     "responsePath": "data.lots",
                     "displayKey": "lotId",
@@ -92,62 +106,99 @@
                 "fieldType": "number",
                 "label": "Total Qty of AP Coarse to be ground",
                 "unit": "kg",
-                "validation": { "required": true }
+                "validation": {
+                  "required": true,
+                  "min": 0
+                }
               },
               {
                 "type": "field",
                 "id": "EQUIPMENT_ID",
                 "fieldType": "text",
-                "label": "Enter Equipment Id."
+                "label": "Enter Equipment Id.",
+                "validation": {
+                  "required": true,
+                  "pattern": "^[A-Za-z0-9][A-Za-z0-9 /_-]*$",
+                  "message": "Must be alphanumeric."
+                }
               },
               {
                 "type": "field",
                 "id": "SCREW_FEEDER_RPM",
                 "fieldType": "number",
-                "label": "Set Screw Feeder RPM"
+                "label": "Set Screw Feeder RPM",
+                "validation": {
+                  "required": true,
+                  "min": 0
+                }
               },
               {
                 "type": "field",
                 "id": "FEED_PRESSURE",
                 "fieldType": "text",
-                "label": "Set Feed Pressure"
+                "label": "Set Feed Pressure",
+                "validation": {
+                  "required": true,
+                  "min": 0
+                }
               },
               {
                 "type": "field",
                 "id": "GRINDING_PRESSURE",
                 "fieldType": "text",
-                "label": "Set Grinding Pressure"
+                "label": "Set Grinding Pressure",
+                "validation": {
+                  "required": true,
+                  "min": 0
+                }
               },
               {
                 "type": "field",
                 "id": "START_DATETIME",
                 "fieldType": "datetime",
-                "label": "Start Date/Time"
+                "label": "Start Date/Time",
+                "validation": {
+                  "required": true
+                }
               },
               {
                 "type": "field",
                 "id": "END_DATETIME",
                 "fieldType": "datetime",
-                "label": "End Date/Time"
+                "label": "End Date/Time",
+                "validation": {
+                  "required": true
+                }
               },
               {
                 "type": "field",
                 "id": "OBSERVATION",
                 "fieldType": "textarea",
-                "label": "Any Other Observation"
+                "label": "Any Other Observation",
+                "validation": {
+                  "required": false
+                }
               },
               {
                 "type": "field",
                 "id": "PARTICLE_SIZE",
                 "fieldType": "number",
-                "label": "Particle Size (≤1µm)"
+                "label": "Particle Size (≤1µm)",
+                "validation": {
+                  "required": true,
+                  "min": 0
+                }
               },
               {
                 "type": "field",
                 "id": "QUALIFIED_QUANTITY",
                 "fieldType": "number",
                 "label": "Qty. Qualified",
-                "unit": "kg"
+                "unit": "kg",
+                "validation": {
+                  "required": true,
+                  "min": 0
+                }
               }
             ]
           }
@@ -156,7 +207,11 @@
       {
         "id": "DRYING_TRAY_OVEN",
         "title": "Drying in Tray Oven",
-        "ui": { "direction": "row", "wrap": true, "gap": "md" },
+        "ui": {
+          "direction": "row",
+          "wrap": true,
+          "gap": "md"
+        },
         "children": [
           {
             "type": "field",
@@ -166,80 +221,129 @@
             "dataSource": {
               "type": "static",
               "options": [
-                { "label": "Water Heated", "value": "WATER_HEATED" },
-                { "label": "Air Heated", "value": "AIR_HEATED" }
+                {
+                  "label": "Water Heated",
+                  "value": "WATER_HEATED"
+                },
+                {
+                  "label": "Air Heated",
+                  "value": "AIR_HEATED"
+                }
               ]
+            },
+            "validation": {
+              "required": true
             }
           },
           {
             "type": "field",
             "id": "OVEN_NUMBER",
             "fieldType": "text",
-            "label": "Oven No."
+            "label": "Oven No.",
+            "validation": {
+              "required": true,
+              "min": 0
+            }
           },
           {
             "type": "field",
             "id": "OVEN_SET_TEMPERATURE",
             "fieldType": "number",
             "label": "Oven Set Temp",
-            "unit": "°C"
+            "unit": "°C",
+            "validation": {
+              "required": true,
+              "min": 0
+            }
           },
           {
             "type": "field",
             "id": "START_DATETIME",
             "fieldType": "datetime",
-            "label": "Start Date/Time"
+            "label": "Start Date/Time",
+            "validation": {
+              "required": true
+            }
           },
           {
             "type": "field",
             "id": "END_DATETIME",
             "fieldType": "datetime",
-            "label": "End Date/Time"
+            "label": "End Date/Time",
+            "validation": {
+              "required": true
+            }
           },
           {
             "type": "field",
             "id": "MOISTURE",
             "fieldType": "number",
             "label": "Moisture",
-            "unit": "%"
+            "unit": "%",
+            "validation": {
+              "required": true,
+              "min": 0
+            }
           },
           {
             "type": "field",
             "id": "OBSERVATION",
             "fieldType": "textarea",
-            "label": "Any Other Observation"
+            "label": "Any Other Observation",
+            "validation": {
+              "required": false
+            }
           }
         ]
       },
       {
         "id": "SIEVING",
         "title": "Sieving",
-        "ui": { "direction": "row", "wrap": true, "gap": "md" },
+        "ui": {
+          "direction": "row",
+          "wrap": true,
+          "gap": "md"
+        },
         "children": [
           {
             "type": "field",
             "id": "SIEVING_DISPATCH_DATETIME",
             "fieldType": "datetime",
-            "label": "Date of Sieving/Dispatch"
+            "label": "Date of Sieving/Dispatch",
+            "validation": {
+              "required": true
+            }
           },
           {
             "type": "field",
             "id": "SIEVED_QUANTITY",
             "fieldType": "number",
             "label": "Sieved Quantity",
-            "unit": "kg"
+            "unit": "kg",
+            "validation": {
+              "required": true,
+              "min": 0
+            }
           },
           {
             "type": "field",
             "id": "SIEVE_MESH_SIZE",
             "fieldType": "text",
-            "label": "Sieve Mesh Size"
+            "label": "Sieve Mesh Size",
+            "validation": {
+              "required": true,
+              "pattern": "^[A-Za-z0-9][A-Za-z0-9 /_-]*$",
+              "message": "Must be alphanumeric."
+            }
           },
           {
             "type": "field",
             "id": "OBSERVATION",
             "fieldType": "textarea",
-            "label": "Any Observation"
+            "label": "Any Observation",
+            "validation": {
+              "required": false
+            }
           }
         ]
       },
@@ -251,7 +355,10 @@
             "type": "field",
             "id": "NUMBER_OF_DRUMS",
             "fieldType": "number",
-            "label": "No. of Drums"
+            "label": "No. of Drums",
+            "validation": {
+              "required": false
+            }
           }
         ]
       }

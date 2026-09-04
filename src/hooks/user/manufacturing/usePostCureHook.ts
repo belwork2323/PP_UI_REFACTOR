@@ -102,9 +102,12 @@ export const usePostCureHook = () => {
   const [detailsRow, setDetailsRow] = useState<any>(null);
   const [detailsData, setDetailsData] = useState<any>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
-  const [motorStatusById, setMotorStatusById] = useState<Record<string, PostCureMotorStatusMeta>>({});
-  const [previousStageGate, setPreviousStageGate] =
-    useState<PreviousStageApprovedUnits | null>(null);
+  const [motorStatusById, setMotorStatusById] = useState<Record<string, PostCureMotorStatusMeta>>(
+    {},
+  );
+  const [previousStageGate, setPreviousStageGate] = useState<PreviousStageApprovedUnits | null>(
+    null,
+  );
 
   const clearSetupDrafts = useCallback(() => {
     setDraftMotorReceiptDate("");
@@ -238,9 +241,7 @@ export const usePostCureHook = () => {
         }
 
         const motorsForTabs =
-          nextAddedMotors.length > 0
-            ? nextAddedMotors
-            : resolvePostCureMotorsFromBatch(nextBatch);
+          nextAddedMotors.length > 0 ? nextAddedMotors : resolvePostCureMotorsFromBatch(nextBatch);
 
         const nextActiveMotorId =
           preserveActiveMotorId &&
@@ -356,8 +357,7 @@ export const usePostCureHook = () => {
 
   const handleRemoveMotor = useCallback(
     (motorIdToRemove: string) => {
-      const status =
-        motorStatusById[motorIdToRemove]?.motorSubmissionStatus ?? "TO_BE_INITIATED";
+      const status = motorStatusById[motorIdToRemove]?.motorSubmissionStatus ?? "TO_BE_INITIATED";
       if (status !== "TO_BE_INITIATED") {
         showAlert(STRINGS.MANUFACTURING.POST_CURE.MOTOR_LOCKED_WAITING, "warning");
         return;
@@ -457,15 +457,14 @@ export const usePostCureHook = () => {
   const resolveRootOperationFields = useCallback((motors: PostCureMotorSession[]) => {
     const firstMotor = motors[0];
     if (!firstMotor) {
-      return { operationType: null as "LOOSE_FLAP_FILLING" | "INHIBITION" | null, inhibitorType: undefined as
-        | "IR1"
-        | "HEMCOAT_3K"
-        | "NOT_APPLICABLE"
-        | undefined };
+      return {
+        operationType: null as "LOOSE_FLAP_FILLING" | "INHIBITION" | null,
+        inhibitorType: undefined as "IR1" | "HEMCOAT_3K" | "NOT_APPLICABLE" | undefined,
+      };
     }
     const operationType = mapPostCureOperationToApi(firstMotor.operation);
     const inhibitorType = isPostCureInhibitionOperation(firstMotor.operation)
-      ? mapPostCureInhibitorTypeToApi(firstMotor.inhibitorType) ?? undefined
+      ? (mapPostCureInhibitorTypeToApi(firstMotor.inhibitorType) ?? undefined)
       : undefined;
     return { operationType, inhibitorType };
   }, []);
@@ -549,23 +548,22 @@ export const usePostCureHook = () => {
         }
 
         if (!response?.success) {
-          showAlert(
-            getErrorMessage(response, `Failed to ${intent} motor ${motorId}.`),
-            "error",
-          );
+          showAlert(getErrorMessage(response, `Failed to ${intent} motor ${motorId}.`), "error");
           return false;
         }
-
         const nextFormId = String(response.data?.formId ?? activeBatch.formId ?? "").trim();
         const refreshedBatch: PostCureBatch = {
           ...activeBatch,
           formId: nextFormId || activeBatch.formId,
-          pcStatus: response.data?.status ?? activeBatch.pcStatus,
+          pcStatus:
+            intent === "draft"
+              ? PC_STATUS.IN_PROGRESS
+              : (response.data?.status ?? activeBatch.pcStatus),
         };
 
         setActiveBatch(refreshedBatch);
+        setInitialSnapshot(formSnapshot);
         setHasSavedDraft(true);
-
         showAlert(
           intent === "draft"
             ? `Motor ${motorId} draft saved successfully.`
@@ -662,7 +660,8 @@ export const usePostCureHook = () => {
       const rawMotors = Array.isArray(latestPayload?.motors) ? latestPayload.motors : [];
       const rootOperationType =
         mapPostCureOperationToApi(String(latestPayload?.operation ?? "")) ||
-        (String(latestPayload?.operationType ?? "").trim() as "LOOSE_FLAP_FILLING" | "INHIBITION") ||
+        (String(latestPayload?.operationType ?? "").trim() as
+          "LOOSE_FLAP_FILLING" | "INHIBITION") ||
         mapPostCureOperationToApi(String(rawMotors[0]?.operation ?? "")) ||
         (String(rawMotors[0]?.operationType ?? "").trim() as "LOOSE_FLAP_FILLING" | "INHIBITION");
 
@@ -696,7 +695,9 @@ export const usePostCureHook = () => {
         return false;
       }
 
-      showAlert("Form submitted for final approval successfully.", "success", { autoCloseMs: 2200 });
+      showAlert("Form submitted for final approval successfully.", "success", {
+        autoCloseMs: 2200,
+      });
       await listParams.refreshUserBatches();
       resetFormContext();
       return true;

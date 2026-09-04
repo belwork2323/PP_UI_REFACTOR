@@ -48,6 +48,7 @@ import {
   castingCuringTableInputSx,
   castingCuringTableRowSx,
 } from "./CastingCuringFormPrimitives";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 type BowlSeedRow = {
   premixNo?: string | number;
@@ -66,6 +67,8 @@ type Props = {
   disabled?: boolean;
   readOnly?: boolean;
   theme?: any;
+  validationErrors?: Record<string, string>;
+  clearFieldError?: (path: string) => void;
 };
 
 const BRAND = CASTING_CURING_BRAND;
@@ -101,18 +104,25 @@ const CompactTime = ({
   onChange,
   disabled,
   readOnly,
+  error,
+  helperText,
 }: {
   value: string;
   onChange: (value: string) => void;
   disabled?: boolean;
   readOnly?: boolean;
+  error?: boolean;
+  helperText?: string | null;
 }) => (
   <TimeField
     value={value}
     onChange={onChange}
-    disabled={disabled} readOnly={readOnly}
+    disabled={disabled}
+    readOnly={readOnly}
     compact
     inputSx={castingCuringTableInputSx}
+    error={error}
+    helperText={helperText}
   />
 );
 
@@ -130,7 +140,8 @@ const CompactDateTime = ({
   <DateTimeField
     value={value}
     onChange={onChange}
-    disabled={disabled} readOnly={readOnly}
+    disabled={disabled}
+    readOnly={readOnly}
     compact
     placeholder="DD-MM-YYYY HH:mm"
     inputSx={castingCuringTableInputSx}
@@ -152,17 +163,22 @@ const ValueByFieldType = ({
 }) => {
   const type = String(fieldType ?? "text").toLowerCase();
   if (type === "time") {
-    return <CompactTime value={value} onChange={onChange} disabled={disabled} readOnly={readOnly} />;
+    return (
+      <CompactTime value={value} onChange={onChange} disabled={disabled} readOnly={readOnly} />
+    );
   }
   if (type === "datetime") {
-    return <CompactDateTime value={value} onChange={onChange} disabled={disabled} readOnly={readOnly} />;
+    return (
+      <CompactDateTime value={value} onChange={onChange} disabled={disabled} readOnly={readOnly} />
+    );
   }
   if (type === "number") {
     return (
       <TableTextInput
         value={value}
         onChange={onChange}
-        disabled={disabled} readOnly={readOnly}
+        disabled={disabled}
+        readOnly={readOnly}
         type="number"
         placeholder="0"
       />
@@ -173,7 +189,8 @@ const ValueByFieldType = ({
       <TableTextInput
         value={value}
         onChange={onChange}
-        disabled={disabled} readOnly={readOnly}
+        disabled={disabled}
+        readOnly={readOnly}
         multiline
         minRows={2}
         placeholder="Enter value"
@@ -184,7 +201,8 @@ const ValueByFieldType = ({
     <TableTextInput
       value={value}
       onChange={onChange}
-      disabled={disabled} readOnly={readOnly}
+      disabled={disabled}
+      readOnly={readOnly}
       placeholder="Enter value"
     />
   );
@@ -206,6 +224,8 @@ const CastingMotorPanel = ({
   disabled = false,
   readOnly = false,
   theme,
+  validationErrors,
+  clearFieldError,
 }: Props) => {
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
@@ -216,9 +236,7 @@ const CastingMotorPanel = ({
     onChange({ ...value, ...partial });
   };
 
-  const patchCastingProcess = (
-    partial: Partial<CastingMotorData["CASTING_PROCESS"]>,
-  ) => {
+  const patchCastingProcess = (partial: Partial<CastingMotorData["CASTING_PROCESS"]>) => {
     onChange({
       ...value,
       CASTING_PROCESS: {
@@ -249,7 +267,8 @@ const CastingMotorPanel = ({
     );
     const selectedKey = str(selected).trim().toLowerCase();
     const options = bowlChoices.filter(
-      (option) => option.value.toLowerCase() === selectedKey || !used.has(option.value.toLowerCase()),
+      (option) =>
+        option.value.toLowerCase() === selectedKey || !used.has(option.value.toLowerCase()),
     );
     if (selected && !options.some((option) => option.value === selected)) {
       return [{ value: selected, label: selected }, ...options];
@@ -285,7 +304,12 @@ const CastingMotorPanel = ({
   }, []);
 
   const updateMotorCasing = (patch: Partial<CastingMotorCasingInstance>) => {
-    const casing = value.FINAL_ASSEMBLY_DETAILS.motorCasing?.[0] ?? createEmptyMotorCasingInstance();
+    const casing =
+      value.FINAL_ASSEMBLY_DETAILS.motorCasing?.[0] ?? createEmptyMotorCasingInstance();
+    clearFieldError?.(
+      `FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.EMPTY_MOTOR_WEIGHT`,
+    );
+
     patchRoot({
       FINAL_ASSEMBLY_DETAILS: {
         motorCasing: [{ ...casing, ...patch }],
@@ -294,7 +318,8 @@ const CastingMotorPanel = ({
   };
 
   const updateMandrelRow = (rowIndex: number, patch: Partial<MandrelMeasurementRow>) => {
-    const casing = value.FINAL_ASSEMBLY_DETAILS.motorCasing?.[0] ?? createEmptyMotorCasingInstance();
+    const casing =
+      value.FINAL_ASSEMBLY_DETAILS.motorCasing?.[0] ?? createEmptyMotorCasingInstance();
     const rows = casing.MANDREL_MEASUREMENTS.map((row, i) => {
       if (i !== rowIndex) return row;
       return applyMandrelFormulas({ ...row, ...patch });
@@ -303,7 +328,8 @@ const CastingMotorPanel = ({
   };
 
   const addMandrelRow = () => {
-    const casing = value.FINAL_ASSEMBLY_DETAILS.motorCasing?.[0] ?? createEmptyMotorCasingInstance();
+    const casing =
+      value.FINAL_ASSEMBLY_DETAILS.motorCasing?.[0] ?? createEmptyMotorCasingInstance();
     const nextNo = casing.MANDREL_MEASUREMENTS.length + 1;
     updateMotorCasing({
       MANDREL_MEASUREMENTS: [
@@ -314,21 +340,25 @@ const CastingMotorPanel = ({
   };
 
   const deleteMandrelRow = (rowIndex: number) => {
-    const casing = value.FINAL_ASSEMBLY_DETAILS.motorCasing?.[0] ?? createEmptyMotorCasingInstance();
+    const casing =
+      value.FINAL_ASSEMBLY_DETAILS.motorCasing?.[0] ?? createEmptyMotorCasingInstance();
     if (casing.MANDREL_MEASUREMENTS.length <= 1) return;
     updateMotorCasing({
-      MANDREL_MEASUREMENTS: casing.MANDREL_MEASUREMENTS
-        .filter((_, i) => i !== rowIndex)
-        .map((row, i) => ({ ...row, srNo: String(i + 1) })),
+      MANDREL_MEASUREMENTS: casing.MANDREL_MEASUREMENTS.filter((_, i) => i !== rowIndex).map(
+        (row, i) => ({ ...row, srNo: String(i + 1) }),
+      ),
     });
   };
 
   const updateFeedPipe = (patch: Partial<FeedPipeDistanceRow>) => {
-    const casing = value.FINAL_ASSEMBLY_DETAILS.motorCasing?.[0] ?? createEmptyMotorCasingInstance();
+    const casing =
+      value.FINAL_ASSEMBLY_DETAILS.motorCasing?.[0] ?? createEmptyMotorCasingInstance();
     const existing = casing.FEED_PIPE_DISTANCE[0] ?? createEmptyFeedPipeDistanceRow();
-    updateMotorCasing({
-      FEED_PIPE_DISTANCE: [{ ...existing, ...patch }],
-    });
+    const next = { ...existing, ...patch };
+    // clear validation for feed readings
+    clearFieldError?.(`FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.READING_1`);
+    clearFieldError?.(`FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.READING_2`);
+    updateMotorCasing({ FEED_PIPE_DISTANCE: [next] });
   };
 
   const updateBowlDetail = (index: number, patch: Partial<CastingBowlDetailRow>) => {
@@ -482,13 +512,12 @@ const CastingMotorPanel = ({
         Add row
       </Typography>
     ) : null;
+  console.log(validationErrors);
 
   const renderMandrelTable = () => (
     <Box sx={{ mb: 2 }}>
       <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{ mb: 1 }}>
-        <SubsectionHeading>
-          Distance between centering top to mandrel top (mm)
-        </SubsectionHeading>
+        <SubsectionHeading>Distance between centering top to mandrel top (mm)</SubsectionHeading>
         {!disabled && !readOnly ? (
           <Typography
             component="button"
@@ -533,26 +562,37 @@ const CastingMotorPanel = ({
               </TableCell>
               <TableCell
                 rowSpan={2}
-                sx={{ ...groupHeaderSx, verticalAlign: "middle", maxWidth: 110 }}
+                sx={{ ...groupHeaderSx, verticalAlign: "middle", maxWidth: 120 }}
               >
-                Bellow thickness (D)
+                <FieldLabelWithAsterisk
+                  label="Bellow thickness (D)"
+                  required
+                  sx={castingCuringTableHeaderCellSx(false)}
+                />
               </TableCell>
               <TableCell colSpan={2} sx={groupHeaderSx}>
                 Mandrel lift E=(C-D)
               </TableCell>
-              <TableCell
-                rowSpan={2}
-                sx={{ ...castingCuringTableHeaderCellSx(false), width: 48 }}
-              />
+              <TableCell rowSpan={2} sx={{ ...castingCuringTableHeaderCellSx(false), width: 48 }} />
             </TableRow>
             <TableRow>
-              {["Mock assy.", "Mock assy.", "Final assy.", "Mock assy.", "Final assy.", "Mock assy.", "Final assy."].map(
-                (label, idx) => (
-                  <TableCell key={`sub-${idx}`} sx={castingCuringTableHeaderCellSx(false)}>
-                    {label}
-                  </TableCell>
-                ),
-              )}
+              {[
+                "Mock assy.",
+                "Mock assy.",
+                "Final assy.",
+                "Mock assy.",
+                "Final assy.",
+                "Mock assy.",
+                "Final assy.",
+              ].map((label, idx) => (
+                <TableCell key={`sub-${idx}`} sx={castingCuringTableHeaderCellSx(false)}>
+                  <FieldLabelWithAsterisk
+                    label={label}
+                    required
+                    sx={castingCuringTableHeaderCellSx(false)}
+                  />
+                </TableCell>
+              ))}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -564,25 +604,76 @@ const CastingMotorPanel = ({
                 <TableCell sx={castingCuringTableCellSx}>
                   <TableTextInput
                     value={row.A_MOCK}
-                    onChange={(v) => updateMandrelRow(rowIndex, { A_MOCK: v })}
-                    disabled={disabled} readOnly={readOnly}
+                    onChange={(v) => {
+                      clearFieldError?.(
+                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.A_MOCK`,
+                      );
+                      updateMandrelRow(rowIndex, { A_MOCK: v });
+                    }}
+                    disabled={disabled}
+                    readOnly={readOnly}
                     type="number"
+                    required
+                    error={Boolean(
+                      validationErrors?.[
+                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.A_MOCK`
+                      ],
+                    )}
+                    helperText={
+                      validationErrors?.[
+                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.A_MOCK`
+                      ]
+                    }
                   />
                 </TableCell>
                 <TableCell sx={castingCuringTableCellSx}>
                   <TableTextInput
                     value={row.B_MOCK}
-                    onChange={(v) => updateMandrelRow(rowIndex, { B_MOCK: v })}
-                    disabled={disabled} readOnly={readOnly}
+                    onChange={(v) => {
+                      clearFieldError?.(
+                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.B_MOCK`,
+                      );
+                      updateMandrelRow(rowIndex, { B_MOCK: v });
+                    }}
+                    disabled={disabled}
+                    readOnly={readOnly}
                     type="number"
+                    required
+                    error={Boolean(
+                      validationErrors?.[
+                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.B_MOCK`
+                      ],
+                    )}
+                    helperText={
+                      validationErrors?.[
+                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.B_MOCK`
+                      ]
+                    }
                   />
                 </TableCell>
                 <TableCell sx={castingCuringTableCellSx}>
                   <TableTextInput
                     value={row.B_FINAL}
-                    onChange={(v) => updateMandrelRow(rowIndex, { B_FINAL: v })}
-                    disabled={disabled} readOnly={readOnly}
+                    onChange={(v) => {
+                      clearFieldError?.(
+                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.B_FINAL`,
+                      );
+                      updateMandrelRow(rowIndex, { B_FINAL: v });
+                    }}
+                    disabled={disabled}
+                    readOnly={readOnly}
                     type="number"
+                    required
+                    error={Boolean(
+                      validationErrors?.[
+                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.B_FINAL`
+                      ],
+                    )}
+                    helperText={
+                      validationErrors?.[
+                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.B_FINAL`
+                      ]
+                    }
                   />
                 </TableCell>
                 <TableCell sx={castingCuringTableCellSx}>
@@ -598,9 +689,26 @@ const CastingMotorPanel = ({
                 <TableCell sx={castingCuringTableCellSx}>
                   <TableTextInput
                     value={row.BELLOWS_THICKNESS_D}
-                    onChange={(v) => updateMandrelRow(rowIndex, { BELLOWS_THICKNESS_D: v })}
-                    disabled={disabled} readOnly={readOnly}
+                    onChange={(v) => {
+                      clearFieldError?.(
+                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.BELLOWS_THICKNESS_D`,
+                      );
+                      updateMandrelRow(rowIndex, { BELLOWS_THICKNESS_D: v });
+                    }}
+                    disabled={disabled}
+                    readOnly={readOnly}
                     type="number"
+                    required
+                    error={Boolean(
+                      validationErrors?.[
+                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.BELLOWS_THICKNESS_D`
+                      ],
+                    )}
+                    helperText={
+                      validationErrors?.[
+                        `FINAL_ASSEMBLY_DETAILS.motorCasing.0.MANDREL_MEASUREMENTS.${rowIndex}.BELLOWS_THICKNESS_D`
+                      ]
+                    }
                   />
                 </TableCell>
                 <TableCell sx={castingCuringTableCellSx}>
@@ -649,23 +757,45 @@ const CastingMotorPanel = ({
           </SubsectionHeading>
           <FieldGrid columns={2}>
             <Box>
-              <FieldLabel>Reading 1 (mm)</FieldLabel>
+              <FieldLabelWithAsterisk label="Reading 1 (mm)" required />
               <TableTextInput
                 value={feed.READING_1}
                 onChange={(v) => updateFeedPipe({ READING_1: v })}
-                disabled={disabled} readOnly={readOnly}
+                disabled={disabled}
+                readOnly={readOnly}
                 type="number"
                 placeholder="0"
+                error={Boolean(
+                  validationErrors?.[
+                    `FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.READING_1`
+                  ],
+                )}
+                helperText={
+                  validationErrors?.[
+                    `FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.READING_1`
+                  ]
+                }
               />
             </Box>
             <Box>
-              <FieldLabel>Reading 2 (mm)</FieldLabel>
+              <FieldLabelWithAsterisk label="Reading 2 (mm)" required />
               <TableTextInput
                 value={feed.READING_2}
                 onChange={(v) => updateFeedPipe({ READING_2: v })}
-                disabled={disabled} readOnly={readOnly}
+                disabled={disabled}
+                readOnly={readOnly}
                 type="number"
                 placeholder="0"
+                error={Boolean(
+                  validationErrors?.[
+                    `FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.READING_2`
+                  ],
+                )}
+                helperText={
+                  validationErrors?.[
+                    `FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.READING_2`
+                  ]
+                }
               />
             </Box>
           </FieldGrid>
@@ -674,11 +804,20 @@ const CastingMotorPanel = ({
         <CasePrepTextField
           label="Weight of assembled empty motor casing (kg)"
           value={casing.EMPTY_MOTOR_WEIGHT}
-          onChange={(v) => updateMotorCasing({ EMPTY_MOTOR_WEIGHT: v })}
-          disabled={disabled} readOnly={readOnly}
+          onChange={(v) => {
+            clearFieldError?.(`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`);
+            updateMotorCasing({ EMPTY_MOTOR_WEIGHT: v });
+          }}
+          disabled={disabled}
+          readOnly={readOnly}
           theme={theme}
           width="100%"
           placeholder="0"
+          required
+          error={Boolean(
+            validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`],
+          )}
+          helperText={validationErrors?.[`FINAL_ASSEMBLY_DETAILS.motorCasing.0.EMPTY_MOTOR_WEIGHT`]}
         />
       </SectionCard>
 
@@ -694,109 +833,269 @@ const CastingMotorPanel = ({
               <TableHead>
                 <TableRow>
                   {[
-                    "Bowl Id",
-                    "Bowl Receipt Time",
-                    "Initial Weight",
-                    "Final Weight",
-                    "Initial Slurry Depth",
-                    "Bowl D/C Valve Opening Time",
-                    "Bowl D/C Valve Closing Time",
-                    "Depth of Slurry after Opening of D/C Valve",
-                    "Ball Valve Opening Time",
-                    "",
-                  ].map((label, idx) => (
-                    <TableCell key={`${label}-${idx}`} sx={castingCuringTableHeaderCellSx(idx === 0)}>
-                      {label}
+                    { label: "Bowl Id", required: true },
+                    { label: "Bowl Receipt Time", required: true },
+                    { label: "Initial Weight", required: true },
+                    { label: "Final Weight", required: true },
+                    { label: "Initial Slurry Depth", required: false },
+                    { label: "Bowl D/C Valve Opening Time", required: true },
+                    { label: "Bowl D/C Valve Closing Time", required: true },
+                    { label: "Depth of Slurry after Opening of D/C Valve", required: true },
+                    { label: "Ball Valve Opening Time", required: true },
+                    { label: "", required: false },
+                  ].map((col, idx) => (
+                    <TableCell
+                      key={`${col.label}-${idx}`}
+                      sx={castingCuringTableHeaderCellSx(idx === 0)}
+                    >
+                      {col.required ? (
+                        <FieldLabelWithAsterisk
+                          label={col.label}
+                          required
+                          sx={castingCuringTableHeaderCellSx(idx === 0)}
+                        />
+                      ) : (
+                        col.label
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
               </TableHead>
               <TableBody>
-                {(mixBowlRows.length ? mixBowlRows : [createEmptyBowlDetailRow()]).map((row, index) => (
-                  <TableRow key={`bowl-${index}`} sx={castingCuringTableRowSx(index)}>
-                    <TableCell sx={{ ...castingCuringTableCellSx, minWidth: 240 }}>
-                      <TableSelectInput
-                        value={row.BOWL_ID}
-                        onChange={(v) => selectBowlDetail(index, v)}
-                        options={bowlOptionsForRow(row.BOWL_ID, usedMixBowlIds.filter((_, i) => i !== index))}
-                        placeholder={BOWL_ID_PLACEHOLDER}
-                        disabled={disabled} readOnly={readOnly}
-                      />
-                    </TableCell>
-                    <TableCell sx={castingCuringTableCellSx}>
-                      <CompactTime
-                        value={row.BOWL_RECEIPT_TIME}
-                        onChange={(v) => updateBowlDetail(index, { BOWL_RECEIPT_TIME: v })}
-                        disabled={disabled} readOnly={readOnly}
-                      />
-                    </TableCell>
-                    <TableCell sx={castingCuringTableCellSx}>
-                      <TableTextInput
-                        value={row.INITIAL_WEIGHT}
-                        onChange={(v) => updateBowlDetail(index, { INITIAL_WEIGHT: v })}
-                        disabled={disabled} readOnly={readOnly}
-                        type="number"
-                      />
-                    </TableCell>
-                    <TableCell sx={castingCuringTableCellSx}>
-                      <TableTextInput
-                        value={row.FINAL_WEIGHT}
-                        onChange={(v) => updateBowlDetail(index, { FINAL_WEIGHT: v })}
-                        disabled={disabled} readOnly={readOnly}
-                        type="number"
-                      />
-                    </TableCell>
-                    <TableCell sx={castingCuringTableCellSx}>
-                      <TableTextInput
-                        value={row.INITIAL_SLURRY_DEPTH}
-                        onChange={(v) => updateBowlDetail(index, { INITIAL_SLURRY_DEPTH: v })}
-                        disabled={disabled} readOnly={readOnly}
-                        type="number"
-                      />
-                    </TableCell>
-                    <TableCell sx={castingCuringTableCellSx}>
-                      <CompactTime
-                        value={row.DC_OPEN_TIME}
-                        onChange={(v) => updateBowlDetail(index, { DC_OPEN_TIME: v })}
-                        disabled={disabled} readOnly={readOnly}
-                      />
-                    </TableCell>
-                    <TableCell sx={castingCuringTableCellSx}>
-                      <CompactTime
-                        value={row.DC_CLOSE_TIME}
-                        onChange={(v) => updateBowlDetail(index, { DC_CLOSE_TIME: v })}
-                        disabled={disabled} readOnly={readOnly}
-                      />
-                    </TableCell>
-                    <TableCell sx={castingCuringTableCellSx}>
-                      <TableTextInput
-                        value={row.SLURRY_DEPTH_AFTER_DC}
-                        onChange={(v) => updateBowlDetail(index, { SLURRY_DEPTH_AFTER_DC: v })}
-                        disabled={disabled} readOnly={readOnly}
-                        type="number"
-                      />
-                    </TableCell>
-                    <TableCell sx={castingCuringTableCellSx}>
-                      <CompactTime
-                        value={row.BALL_VALVE_OPEN_TIME}
-                        onChange={(v) => updateBowlDetail(index, { BALL_VALVE_OPEN_TIME: v })}
-                        disabled={disabled} readOnly={readOnly}
-                      />
-                    </TableCell>
-                    <TableCell sx={castingCuringTableCellSx}>
-                      {!disabled && !readOnly && mixBowlRows.length > 1 ? (
-                        <IconButton
-                          size="small"
-                          onClick={() => deleteBowlDetailRow(index)}
-                          aria-label="Delete bowl row"
-                          sx={{ color: BRAND.danger }}
-                        >
-                          <DeleteOutlineRoundedIcon fontSize="small" />
-                        </IconButton>
-                      ) : null}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {(mixBowlRows.length ? mixBowlRows : [createEmptyBowlDetailRow()]).map(
+                  (row, index) => (
+                    <TableRow key={`bowl-${index}`} sx={castingCuringTableRowSx(index)}>
+                      <TableCell sx={{ ...castingCuringTableCellSx, minWidth: 240 }}>
+                        <TableSelectInput
+                          value={row.BOWL_ID}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BOWL_ID`,
+                            );
+                            selectBowlDetail(index, v);
+                          }}
+                          options={bowlOptionsForRow(
+                            row.BOWL_ID,
+                            usedMixBowlIds.filter((_, i) => i !== index),
+                          )}
+                          placeholder={BOWL_ID_PLACEHOLDER}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          error={Boolean(
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BOWL_ID`
+                            ],
+                          )}
+                          helperText={
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BOWL_ID`
+                            ]
+                          }
+                        />
+                      </TableCell>
+                      <TableCell sx={castingCuringTableCellSx}>
+                        <CompactTime
+                          value={row.BOWL_RECEIPT_TIME}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BOWL_RECEIPT_TIME`,
+                            );
+                            updateBowlDetail(index, { BOWL_RECEIPT_TIME: v });
+                          }}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          error={Boolean(
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BOWL_RECEIPT_TIME`
+                            ],
+                          )}
+                          helperText={
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BOWL_RECEIPT_TIME`
+                            ]
+                          }
+                        />
+                      </TableCell>
+                      <TableCell sx={castingCuringTableCellSx}>
+                        <TableTextInput
+                          value={row.INITIAL_WEIGHT}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.INITIAL_WEIGHT`,
+                            );
+                            updateBowlDetail(index, { INITIAL_WEIGHT: v });
+                          }}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          type="number"
+                          error={Boolean(
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.INITIAL_WEIGHT`
+                            ],
+                          )}
+                          helperText={
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.INITIAL_WEIGHT`
+                            ]
+                          }
+                        />
+                      </TableCell>
+                      <TableCell sx={castingCuringTableCellSx}>
+                        <TableTextInput
+                          value={row.FINAL_WEIGHT}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.FINAL_WEIGHT`,
+                            );
+                            updateBowlDetail(index, { FINAL_WEIGHT: v });
+                          }}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          type="number"
+                          error={Boolean(
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.FINAL_WEIGHT`
+                            ],
+                          )}
+                          helperText={
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.FINAL_WEIGHT`
+                            ]
+                          }
+                        />
+                      </TableCell>
+                      <TableCell sx={castingCuringTableCellSx}>
+                        <TableTextInput
+                          value={row.INITIAL_SLURRY_DEPTH}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.INITIAL_SLURRY_DEPTH`,
+                            );
+                            updateBowlDetail(index, { INITIAL_SLURRY_DEPTH: v });
+                          }}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          type="number"
+                          // error={Boolean(
+                          //   validationErrors?.[
+                          //     `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.INITIAL_SLURRY_DEPTH`
+                          //   ],
+                          // )}
+                          // helperText={
+                          //   validationErrors?.[
+                          //     `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.INITIAL_SLURRY_DEPTH`
+                          //   ]
+                          // }
+                        />
+                      </TableCell>
+                      <TableCell sx={castingCuringTableCellSx}>
+                        <CompactTime
+                          value={row.DC_OPEN_TIME}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_OPEN_TIME`,
+                            );
+                            updateBowlDetail(index, { DC_OPEN_TIME: v });
+                          }}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          error={Boolean(
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_OPEN_TIME`
+                            ],
+                          )}
+                          helperText={
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_OPEN_TIME`
+                            ]
+                          }
+                        />
+                      </TableCell>
+                      <TableCell sx={castingCuringTableCellSx}>
+                        <CompactTime
+                          value={row.DC_CLOSE_TIME}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_CLOSE_TIME`,
+                            );
+                            updateBowlDetail(index, { DC_CLOSE_TIME: v });
+                          }}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          error={Boolean(
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_CLOSE_TIME`
+                            ],
+                          )}
+                          helperText={
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.DC_CLOSE_TIME`
+                            ]
+                          }
+                        />
+                      </TableCell>
+                      <TableCell sx={castingCuringTableCellSx}>
+                        <TableTextInput
+                          value={row.SLURRY_DEPTH_AFTER_DC}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.SLURRY_DEPTH_AFTER_DC`,
+                            );
+                            updateBowlDetail(index, { SLURRY_DEPTH_AFTER_DC: v });
+                          }}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          type="number"
+                          error={Boolean(
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.SLURRY_DEPTH_AFTER_DC`
+                            ],
+                          )}
+                          helperText={
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.SLURRY_DEPTH_AFTER_DC`
+                            ]
+                          }
+                        />
+                      </TableCell>
+                      <TableCell sx={castingCuringTableCellSx}>
+                        <CompactTime
+                          value={row.BALL_VALVE_OPEN_TIME}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BALL_VALVE_OPEN_TIME`,
+                            );
+                            updateBowlDetail(index, { BALL_VALVE_OPEN_TIME: v });
+                          }}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          error={Boolean(
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BALL_VALVE_OPEN_TIME`
+                            ],
+                          )}
+                          helperText={
+                            validationErrors?.[
+                              `CASTING_PROCESS.FINAL_MIX_BOWL_DETAILS.${index}.BALL_VALVE_OPEN_TIME`
+                            ]
+                          }
+                        />
+                      </TableCell>
+                      <TableCell sx={castingCuringTableCellSx}>
+                        {!disabled && !readOnly && mixBowlRows.length > 1 ? (
+                          <IconButton
+                            size="small"
+                            onClick={() => deleteBowlDetailRow(index)}
+                            aria-label="Delete bowl row"
+                            sx={{ color: BRAND.danger }}
+                          >
+                            <DeleteOutlineRoundedIcon fontSize="small" />
+                          </IconButton>
+                        ) : null}
+                      </TableCell>
+                    </TableRow>
+                  ),
+                )}
               </TableBody>
             </Table>
           </TableContainer>
@@ -812,20 +1111,31 @@ const CastingMotorPanel = ({
               <TableHead>
                 <TableRow>
                   {[
-                    "Bowl Id",
-                    "Time Interval (hrs)",
-                    "RH (%)",
-                    "Viscosity (Poise)",
-                    "Motor Id No.",
-                    "Slurry Depth (cm)",
-                    "Slurry Cast (kg)",
-                    "Flow Rate (kg/min)",
-                    "Valve Opening (%)",
-                    "Vacuum Level (torr)",
-                    "",
-                  ].map((label, idx) => (
-                    <TableCell key={`${label}-${idx}`} sx={castingCuringTableHeaderCellSx(idx === 0)}>
-                      {label}
+                    { label: "Bowl Id", required: true },
+                    { label: "Time Interval (hrs)", required: true },
+                    { label: "RH (%)", required: true },
+                    { label: "Viscosity (Poise)", required: false },
+                    { label: "Motor Id No.", required: true },
+                    { label: "Slurry Depth (cm)", required: false },
+                    { label: "Slurry Cast (kg)", required: true },
+                    { label: "Flow Rate (kg/min)", required: true },
+                    { label: "Valve Opening (%)", required: true },
+                    { label: "Vacuum Level (torr)", required: true },
+                    { label: "", required: false },
+                  ].map((col, idx) => (
+                    <TableCell
+                      key={`${col.label}-${idx}`}
+                      sx={castingCuringTableHeaderCellSx(idx === 0)}
+                    >
+                      {col.required ? (
+                        <FieldLabelWithAsterisk
+                          label={col.label}
+                          required
+                          sx={castingCuringTableHeaderCellSx(idx === 0)}
+                        />
+                      ) : (
+                        col.label
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -837,37 +1147,101 @@ const CastingMotorPanel = ({
                       <TableCell sx={{ ...castingCuringTableCellSx, minWidth: 240 }}>
                         <TableSelectInput
                           value={row.BOWL_ID}
-                          onChange={(v) => selectCastingFromBowl(index, v)}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.BOWL_ID`,
+                            );
+                            selectCastingFromBowl(index, v);
+                          }}
                           options={bowlOptionsForRow(
                             row.BOWL_ID,
                             usedCastingBowlIds.filter((_, i) => i !== index),
                           )}
                           placeholder={BOWL_ID_PLACEHOLDER}
-                          disabled={disabled} readOnly={readOnly}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          error={Boolean(
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.BOWL_ID`
+                            ],
+                          )}
+                          helperText={
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.BOWL_ID`
+                            ]
+                          }
                         />
                       </TableCell>
                       <TableCell sx={castingCuringTableCellSx}>
                         <TableTextInput
                           value={row.TIME_INTERVAL}
-                          onChange={(v) => updateCastingFromBowl(index, { TIME_INTERVAL: v })}
-                          disabled={disabled} readOnly={readOnly}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.TIME_INTERVAL`,
+                            );
+                            updateCastingFromBowl(index, { TIME_INTERVAL: v });
+                          }}
+                          disabled={disabled}
+                          readOnly={readOnly}
                           type="number"
+                          error={Boolean(
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.TIME_INTERVAL`
+                            ],
+                          )}
+                          helperText={
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.TIME_INTERVAL`
+                            ]
+                          }
                         />
                       </TableCell>
                       <TableCell sx={castingCuringTableCellSx}>
                         <TableTextInput
                           value={row.RH}
-                          onChange={(v) => updateCastingFromBowl(index, { RH: v })}
-                          disabled={disabled} readOnly={readOnly}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.RH`,
+                            );
+                            updateCastingFromBowl(index, { RH: v });
+                          }}
+                          disabled={disabled}
+                          readOnly={readOnly}
                           type="number"
+                          error={Boolean(
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.RH`
+                            ],
+                          )}
+                          helperText={
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.RH`
+                            ]
+                          }
                         />
                       </TableCell>
                       <TableCell sx={castingCuringTableCellSx}>
                         <TableTextInput
                           value={row.VISCOSITY}
-                          onChange={(v) => updateCastingFromBowl(index, { VISCOSITY: v })}
-                          disabled={disabled} readOnly={readOnly}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VISCOSITY`,
+                            );
+                            updateCastingFromBowl(index, { VISCOSITY: v });
+                          }}
+                          disabled={disabled}
+                          readOnly={readOnly}
                           type="number"
+                          error={Boolean(
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VISCOSITY`
+                            ],
+                          )}
+                          helperText={
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VISCOSITY`
+                            ]
+                          }
                         />
                       </TableCell>
                       <TableCell sx={{ ...castingCuringTableCellSx, fontWeight: 600 }}>
@@ -876,41 +1250,121 @@ const CastingMotorPanel = ({
                       <TableCell sx={castingCuringTableCellSx}>
                         <TableTextInput
                           value={row.SLURRY_DEPTH}
-                          onChange={(v) => updateCastingFromBowl(index, { SLURRY_DEPTH: v })}
-                          disabled={disabled} readOnly={readOnly}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.SLURRY_DEPTH`,
+                            );
+                            updateCastingFromBowl(index, { SLURRY_DEPTH: v });
+                          }}
+                          disabled={disabled}
+                          readOnly={readOnly}
                           type="number"
+                          error={Boolean(
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.SLURRY_DEPTH`
+                            ],
+                          )}
+                          helperText={
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.SLURRY_DEPTH`
+                            ]
+                          }
                         />
                       </TableCell>
                       <TableCell sx={castingCuringTableCellSx}>
                         <TableTextInput
                           value={row.SLURRY_CAST}
-                          onChange={(v) => updateCastingFromBowl(index, { SLURRY_CAST: v })}
-                          disabled={disabled} readOnly={readOnly}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.SLURRY_CAST`,
+                            );
+                            updateCastingFromBowl(index, { SLURRY_CAST: v });
+                          }}
+                          disabled={disabled}
+                          readOnly={readOnly}
                           type="number"
+                          error={Boolean(
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.SLURRY_CAST`
+                            ],
+                          )}
+                          helperText={
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.SLURRY_CAST`
+                            ]
+                          }
                         />
                       </TableCell>
                       <TableCell sx={castingCuringTableCellSx}>
                         <TableTextInput
                           value={row.FLOW_RATE}
-                          onChange={(v) => updateCastingFromBowl(index, { FLOW_RATE: v })}
-                          disabled={disabled} readOnly={readOnly}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.FLOW_RATE`,
+                            );
+                            updateCastingFromBowl(index, { FLOW_RATE: v });
+                          }}
+                          disabled={disabled}
+                          readOnly={readOnly}
                           type="number"
+                          error={Boolean(
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.FLOW_RATE`
+                            ],
+                          )}
+                          helperText={
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.FLOW_RATE`
+                            ]
+                          }
                         />
                       </TableCell>
                       <TableCell sx={castingCuringTableCellSx}>
                         <TableTextInput
                           value={row.VALVE_OPENING}
-                          onChange={(v) => updateCastingFromBowl(index, { VALVE_OPENING: v })}
-                          disabled={disabled} readOnly={readOnly}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VALVE_OPENING`,
+                            );
+                            updateCastingFromBowl(index, { VALVE_OPENING: v });
+                          }}
+                          disabled={disabled}
+                          readOnly={readOnly}
                           type="number"
+                          error={Boolean(
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VALVE_OPENING`
+                            ],
+                          )}
+                          helperText={
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VALVE_OPENING`
+                            ]
+                          }
                         />
                       </TableCell>
                       <TableCell sx={castingCuringTableCellSx}>
                         <TableTextInput
                           value={row.VACUUM_LEVEL}
-                          onChange={(v) => updateCastingFromBowl(index, { VACUUM_LEVEL: v })}
-                          disabled={disabled} readOnly={readOnly}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VACUUM_LEVEL`,
+                            );
+                            updateCastingFromBowl(index, { VACUUM_LEVEL: v });
+                          }}
+                          disabled={disabled}
+                          readOnly={readOnly}
                           type="number"
+                          error={Boolean(
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VACUUM_LEVEL`
+                            ],
+                          )}
+                          helperText={
+                            validationErrors?.[
+                              `CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS.${index}.VACUUM_LEVEL`
+                            ]
+                          }
                         />
                       </TableCell>
                       <TableCell sx={castingCuringTableCellSx}>
@@ -935,31 +1389,60 @@ const CastingMotorPanel = ({
 
         <FieldGrid columns={3}>
           <CasePrepTextField
-            label="Initial Vacuum"
+            label={(<FieldLabelWithAsterisk label="Initial Vacuum" required />) as any}
             value={value.CASTING_PROCESS.INITIAL_VACUUM}
-            onChange={(v) => patchCastingProcess({ INITIAL_VACUUM: v })}
-            disabled={disabled} readOnly={readOnly}
+            onChange={(e: any) => {
+              const val = typeof e === "string" ? e : (e?.target?.value ?? "");
+              clearFieldError?.(`CASTING_PROCESS.INITIAL_VACUUM`);
+              patchCastingProcess({ INITIAL_VACUUM: val });
+            }}
+            disabled={disabled}
+            readOnly={readOnly}
             theme={theme}
             width="100%"
             placeholder="Enter value"
+            error={Boolean(validationErrors?.[`CASTING_PROCESS.INITIAL_VACUUM`])}
+            helperText={validationErrors?.[`CASTING_PROCESS.INITIAL_VACUUM`]}
           />
           <CasePrepTextField
-            label="Vacuum Pressure Created for Casting"
+            label={
+              (
+                <FieldLabelWithAsterisk label="Vacuum Pressure Created for Casting" required />
+              ) as any
+            }
             value={value.CASTING_PROCESS.VACUUM_PRESSURE_CASTING}
-            onChange={(v) => patchCastingProcess({ VACUUM_PRESSURE_CASTING: v })}
-            disabled={disabled} readOnly={readOnly}
+            onChange={(e: any) => {
+              const val = typeof e === "string" ? e : (e?.target?.value ?? "");
+              clearFieldError?.(`CASTING_PROCESS.VACUUM_PRESSURE_CASTING`);
+              patchCastingProcess({ VACUUM_PRESSURE_CASTING: val });
+            }}
+            disabled={disabled}
+            readOnly={readOnly}
             theme={theme}
             width="100%"
             placeholder="Enter value"
+            error={Boolean(validationErrors?.[`CASTING_PROCESS.VACUUM_PRESSURE_CASTING`])}
+            helperText={validationErrors?.[`CASTING_PROCESS.VACUUM_PRESSURE_CASTING`]}
           />
           <CasePrepTextField
-            label="Vacuum Pressure Created for Soaking"
+            label={
+              (
+                <FieldLabelWithAsterisk label="Vacuum Pressure Created for Soaking" required />
+              ) as any
+            }
             value={value.CASTING_PROCESS.VACUUM_PRESSURE_SOAKING}
-            onChange={(v) => patchCastingProcess({ VACUUM_PRESSURE_SOAKING: v })}
-            disabled={disabled} readOnly={readOnly}
+            onChange={(e: any) => {
+              const val = typeof e === "string" ? e : (e?.target?.value ?? "");
+              clearFieldError?.(`CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`);
+              patchCastingProcess({ VACUUM_PRESSURE_SOAKING: val });
+            }}
+            disabled={disabled}
+            readOnly={readOnly}
             theme={theme}
             width="100%"
             placeholder="Enter value"
+            error={Boolean(validationErrors?.[`CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`])}
+            helperText={validationErrors?.[`CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`]}
           />
         </FieldGrid>
       </SectionCard>
@@ -974,9 +1457,20 @@ const CastingMotorPanel = ({
           <Table size="small">
             <TableHead>
               <TableRow>
-                {["FM/Motor Id", "Slurry Cast (kg)", ""].map((label, idx) => (
-                  <TableCell key={`${label}-${idx}`} sx={castingCuringTableHeaderCellSx(idx === 0)}>
-                    {label}
+                {[
+                  { label: "FM/Motor Id", required: true },
+                  { label: "Slurry Cast (kg)", required: true },
+                  { label: "", required: false },
+                ].map((col, idx) => (
+                  <TableCell
+                    key={`${col.label}-${idx}`}
+                    sx={castingCuringTableHeaderCellSx(idx === 0)}
+                  >
+                    {col.required ? (
+                      <FieldLabelWithAsterisk label={col.label} required />
+                    ) : (
+                      col.label
+                    )}
                   </TableCell>
                 ))}
               </TableRow>
@@ -986,13 +1480,24 @@ const CastingMotorPanel = ({
                 const isTotal = isSlurryTotalRow(row);
                 return (
                   <TableRow key={`slurry-${index}`} sx={castingCuringTableRowSx(index)}>
-                    <TableCell sx={{ ...castingCuringTableCellSx, fontWeight: isTotal ? 800 : 600, minWidth: 240 }}>
+                    <TableCell
+                      sx={{
+                        ...castingCuringTableCellSx,
+                        fontWeight: isTotal ? 800 : 600,
+                        minWidth: 240,
+                      }}
+                    >
                       {isTotal ? (
                         row.FM_MOTOR_LABEL || "—"
                       ) : (
                         <TableSelectInput
                           value={row.FM_MOTOR_LABEL}
-                          onChange={(v) => selectSlurryBowl(index, v)}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS.${index}.FM_MOTOR_LABEL`,
+                            );
+                            selectSlurryBowl(index, v);
+                          }}
                           options={bowlOptionsForRow(
                             row.FM_MOTOR_LABEL,
                             slurryRows
@@ -1000,7 +1505,18 @@ const CastingMotorPanel = ({
                               .map((entry) => entry.FM_MOTOR_LABEL),
                           )}
                           placeholder={BOWL_ID_PLACEHOLDER}
-                          disabled={disabled} readOnly={readOnly}
+                          disabled={disabled}
+                          readOnly={readOnly}
+                          error={Boolean(
+                            validationErrors?.[
+                              `SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS.${index}.FM_MOTOR_LABEL`
+                            ],
+                          )}
+                          helperText={
+                            validationErrors?.[
+                              `SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS.${index}.FM_MOTOR_LABEL`
+                            ]
+                          }
                         />
                       )}
                     </TableCell>
@@ -1012,14 +1528,33 @@ const CastingMotorPanel = ({
                       ) : (
                         <TableTextInput
                           value={row.SLURRY_CAST}
-                          onChange={(v) => updateSlurryCast(index, { SLURRY_CAST: v })}
-                          disabled={disabled} readOnly={readOnly}
+                          onChange={(v) => {
+                            clearFieldError?.(
+                              `SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS.${index}.SLURRY_CAST`,
+                            );
+                            updateSlurryCast(index, { SLURRY_CAST: v });
+                          }}
+                          disabled={disabled}
+                          readOnly={readOnly}
                           type="number"
+                          error={Boolean(
+                            validationErrors?.[
+                              `SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS.${index}.SLURRY_CAST`
+                            ],
+                          )}
+                          helperText={
+                            validationErrors?.[
+                              `SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS.${index}.SLURRY_CAST`
+                            ]
+                          }
                         />
                       )}
                     </TableCell>
                     <TableCell sx={castingCuringTableCellSx}>
-                      {!disabled && !readOnly && !isTotal && slurryRows.filter((entry) => !isSlurryTotalRow(entry)).length > 1 ? (
+                      {!disabled &&
+                      !readOnly &&
+                      !isTotal &&
+                      slurryRows.filter((entry) => !isSlurryTotalRow(entry)).length > 1 ? (
                         <IconButton
                           size="small"
                           onClick={() => deleteSlurryRow(index)}
@@ -1044,9 +1579,16 @@ const CastingMotorPanel = ({
           <Table size="small">
             <TableHead>
               <TableRow>
-                {["Activity", "Post Cast Operation Details"].map((label, idx) => (
-                  <TableCell key={label} sx={castingCuringTableHeaderCellSx(idx === 0)}>
-                    {label}
+                {[
+                  { label: "Activity", required: true },
+                  { label: "Post Cast Operation Details", required: true },
+                ].map((col, idx) => (
+                  <TableCell key={col.label} sx={castingCuringTableHeaderCellSx(idx === 0)}>
+                    {col.required ? (
+                      <FieldLabelWithAsterisk label={col.label} required />
+                    ) : (
+                      col.label
+                    )}
                   </TableCell>
                 ))}
               </TableRow>
@@ -1064,9 +1606,23 @@ const CastingMotorPanel = ({
                     <ValueByFieldType
                       value={row.DETAILS}
                       fieldType={row.detailsFieldType}
-                      onChange={(v) => updatePostCast(index, { DETAILS: v })}
-                      disabled={disabled} readOnly={readOnly}
+                      onChange={(v) => {
+                        clearFieldError?.(`POST_CAST_OPERATIONS.POST_CAST_TABLE.${index}.DETAILS`);
+                        updatePostCast(index, { DETAILS: v });
+                      }}
+                      disabled={disabled}
+                      readOnly={readOnly}
+                      // pass helper via wrapper prop if ValueByFieldType supports it; otherwise ValueByFieldType
                     />
+                    {validationErrors?.[`POST_CAST_OPERATIONS.POST_CAST_TABLE.${index}.DETAILS`] ? (
+                      <Typography sx={{ color: "#d32f2f", fontSize: "0.75rem", mt: 0.5 }}>
+                        {
+                          validationErrors?.[
+                            `POST_CAST_OPERATIONS.POST_CAST_TABLE.${index}.DETAILS`
+                          ]
+                        }
+                      </Typography>
+                    ) : null}
                   </TableCell>
                 </TableRow>
               ))}

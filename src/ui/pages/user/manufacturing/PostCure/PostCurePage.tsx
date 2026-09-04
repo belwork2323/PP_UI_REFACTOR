@@ -69,16 +69,13 @@ const PostCurePage = () => {
         open={listLoading || Boolean(loadingFormDetails)}
         title={loadingFormDetails ? S.FORM_OPENING_TITLE : S.TITLE}
         message={
-          loadingFormDetails
-            ? S.FORM_OPENING_MESSAGE
-            : "Loading post-cure operation batches…"
+          loadingFormDetails ? S.FORM_OPENING_MESSAGE : "Loading post-cure operation batches…"
         }
         color={POST_CURE_BRAND.pc}
         accentColor={POST_CURE_BRAND.pcLight}
       />
 
       {view === "list" && !listLoading && <PostCureList hookState={hookState} />}
-
       {view === "details" && detailsRow && (
         <PostCureDetailsView
           row={detailsRow}
@@ -90,7 +87,12 @@ const PostCurePage = () => {
 
       {view === "form" && activeBatch && !loadingFormDetails && (
         <>
-          <PostCureHeader batch={activeBatch} isEdit={isEditMode} onBack={handleBack} theme={theme} />
+          <PostCureHeader
+            batch={activeBatch}
+            isEdit={isEditMode}
+            onBack={handleBack}
+            theme={theme}
+          />
           <PostCureForm
             batch={activeBatch}
             formData={formData}

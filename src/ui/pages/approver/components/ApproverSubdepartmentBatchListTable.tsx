@@ -143,7 +143,6 @@ const ApproverSubdepartmentBatchListTable = ({
                 allowWhenApproved: allowViewDetailsWhenApproved,
               });
               const meta = statusMeta[status];
-              console.log(row);
 
               return (
                 <TableRow

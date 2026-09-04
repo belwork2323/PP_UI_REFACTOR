@@ -245,10 +245,24 @@ export const isApproverApprovedStatus = (status?: string | null) => {
   );
 };
 
+export const isApproverRejectedStatus = (status?: string | null) =>
+  toApiStatusEnum(status) === "REJECTED";
+
+export const isApproverToBeInitiatedStatus = (status?: string | null) => {
+  const api = toApiStatusEnum(status);
+  return !api || api === "TO_BE_INITIATED";
+};
+
 /** Whether the approver batch list should show a View Details action for this row. */
 export const canApproverViewBatchDetails = (
   status?: string | null,
   { allowWhenApproved = false } = {},
-) =>
-  isApproverActionableStatus(status) ||
-  (allowWhenApproved && isApproverApprovedStatus(status));
+) => {
+  if (isApproverToBeInitiatedStatus(status)) return false;
+
+  return (
+    isApproverActionableStatus(status) ||
+    isApproverRejectedStatus(status) ||
+    (allowWhenApproved && isApproverApprovedStatus(status))
+  );
+};

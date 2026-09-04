@@ -139,11 +139,7 @@ export const useSubscaleHook = () => {
   }, []);
 
   const openFormWithResolvedData = useCallback(
-    async (
-      batch: SubscaleBatch,
-      editMode: boolean,
-      options?: { silent?: boolean },
-    ) => {
+    async (batch: SubscaleBatch, editMode: boolean, options?: { silent?: boolean }) => {
       if (!batch.batchId) {
         showAlert(STRINGS.MANUFACTURING.SUBSCALE.BATCH_ID_MISSING, "error");
         return;
@@ -160,9 +156,8 @@ export const useSubscaleHook = () => {
       let nextBatch = batch;
       let nextFormData = createDefaultSubscaleFormState();
       let batchDetailsResponse: Record<string, unknown> | null = null;
-      let detailsResponse: Awaited<
-        ReturnType<typeof subscaleController.fetchFormDetails>
-      > | null = null;
+      let detailsResponse: Awaited<ReturnType<typeof subscaleController.fetchFormDetails>> | null =
+        null;
 
       if (!silent) setLoadingFormDetails(true);
       try {
@@ -385,13 +380,8 @@ export const useSubscaleHook = () => {
                 ...activeBatch,
                 formId: nextFormId,
                 ssStatus:
-                  response.data?.batchStatus ??
-                  response.data?.status ??
-                  activeBatch.ssStatus,
-                status:
-                  response.data?.batchStatus ??
-                  response.data?.status ??
-                  activeBatch.status,
+                  response.data?.batchStatus ?? response.data?.status ?? activeBatch.ssStatus,
+                status: response.data?.batchStatus ?? response.data?.status ?? activeBatch.status,
               },
               stillRejectedEdit,
               { silent: true },

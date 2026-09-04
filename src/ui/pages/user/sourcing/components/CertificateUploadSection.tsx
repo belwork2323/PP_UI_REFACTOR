@@ -4,6 +4,7 @@ import {
   Box,
   Button,
   Chip,
+  FormHelperText,
   IconButton,
   LinearProgress,
   Link,
@@ -16,6 +17,7 @@ import { icons } from "../../../../../app/theme/icons";
 import { fileUtils } from "../../../../../utils/FileUtils";
 import CertificateFileInput from "./CertificateFileInput";
 import type { LotCertificate } from "../../../../../data/models/user/RawMaterialProcurementModel";
+import { mandatoryAsteriskSx, mandatoryFieldInputSx } from "./MandatoryFormField";
 
 const {
   delete: DeleteOutlineRoundedIcon,
@@ -65,6 +67,8 @@ type CertificateUploadSectionProps = {
   onRemove: (certIndex: number) => void;
   onRetry?: (certIndex: number) => void;
   onOpen?: (certIndex: number) => void;
+  error?: string;
+  certificateTypeError?: (certIndex: number) => string | undefined;
 };
 
 function fileExtensionLabel(fileName: string) {
@@ -83,10 +87,19 @@ const CertificateUploadSection = ({
   onRemove,
   onRetry,
   onOpen,
+  error,
+  certificateTypeError,
 }: CertificateUploadSectionProps) => {
   const certFileInputId = useId();
   const primaryLight = theme.palette.primaryLight ?? "#2E86C1";
   const hasCerts = certificates.length > 0;
+  const sectionErrorSx = {
+    fontSize: "0.85rem",
+    fontWeight: 500,
+    color: theme.palette.danger,
+    mt: 0.5,
+    lineHeight: 1.45,
+  };
 
   const uploadBtnSx = {
     textTransform: "none" as const,
@@ -169,6 +182,9 @@ const CertificateUploadSection = ({
           <Typography sx={{ fontSize: "0.72rem", color: theme.palette.textSub, lineHeight: 1.45, maxWidth: 520 }}>
             {formStrings.CERTIFICATES_SUBTITLE}
           </Typography>
+          {error ? (
+            <Typography sx={sectionErrorSx}>{error}</Typography>
+          ) : null}
         </Box>
         {hasCerts ? (
           <Button
@@ -196,7 +212,9 @@ const CertificateUploadSection = ({
         </Box>
       ) : (
         <Stack spacing={1}>
-          {certificates.map((cert, ci) => (
+          {certificates.map((cert, ci) => {
+            const typeError = certificateTypeError?.(ci);
+            return (
             <Box
               key={cert.localId || `${cert.fileName}-${ci}-${cert.fileId ?? ""}`}
               sx={certCardSx}
@@ -343,6 +361,10 @@ const CertificateUploadSection = ({
                 <Box sx={{ width: { xs: "100%", sm: 200 }, flexShrink: 0 }}>
                   <Typography sx={{ ...theme.workflow.formElements.fieldLabel, mb: "4px" }}>
                     {formStrings.CERT_TYPE}
+                    <Box component="span" sx={mandatoryAsteriskSx(theme)}>
+                      {" "}
+                      *
+                    </Box>
                   </Typography>
                   <TextField
                     size="small"
@@ -350,8 +372,18 @@ const CertificateUploadSection = ({
                     value={cert.certificateType}
                     onChange={(e) => onCertChange(ci, "certificateType", e.target.value)}
                     placeholder={formStrings.CERT_TYPE}
-                    sx={theme.workflow.formElements.textField}
+                    error={Boolean(typeError)}
+                    sx={mandatoryFieldInputSx(
+                      theme.workflow.formElements.textField,
+                      Boolean(typeError),
+                      theme,
+                    )}
                   />
+                  {typeError ? (
+                    <FormHelperText error sx={{ mx: 0, mt: 0.5, fontSize: "0.85rem", fontWeight: 500 }}>
+                      {typeError}
+                    </FormHelperText>
+                  ) : null}
                 </Box>
 
                 <Tooltip title={formStrings.REMOVE_CERTIFICATE}>
@@ -391,7 +423,8 @@ const CertificateUploadSection = ({
                 ) : null}
               </Stack>
             </Box>
-          ))}
+            );
+          })}
 
           <Box component="label" htmlFor={certFileInputId} sx={addMoreSx}>
             <UploadFileRoundedIcon sx={{ fontSize: 17, color: alpha(primaryLight, 0.75) }} />

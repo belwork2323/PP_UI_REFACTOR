@@ -45,10 +45,7 @@ import {
   StaticTestingTableSection,
   TrimmingTableSection,
 } from "./components/SubscaleHardwareTableSections";
-import {
-  applySubscaleFormScopePatch,
-  syncProcessTableScope,
-} from "./utils/subscaleFormScopeSync";
+import { applySubscaleFormScopePatch, syncProcessTableScope } from "./utils/subscaleFormScopeSync";
 import { SubscaleTableTextCell } from "./components/SubscaleTableCells";
 import SubscaleProcessSection from "./components/SubscaleProcessSection";
 import { hasProcessTableData, scheduleIdleWork } from "./utils/subscaleTableUtils";
@@ -88,6 +85,8 @@ import {
   isMainScaleSubscaleBatch,
 } from "../../../../../hooks/user/manufacturing/subscaleHardwareConfig";
 import type { SchemaFormValues } from "../../../../../schema-engine";
+import { Controller, useFormContext } from "react-hook-form";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 const S = STRINGS.MANUFACTURING.SUBSCALE.HARDWARE;
 
@@ -108,7 +107,9 @@ const syncBemNoAcrossProcessTables = (
 ): SchemaFormValues => {
   let next: SchemaFormValues = { ...values };
   BEM_NO_SYNC_TARGETS.forEach(({ tableId, fieldId }) => {
-    const rows = Array.isArray(next[tableId]) ? [...(next[tableId] as Record<string, unknown>[])] : [];
+    const rows = Array.isArray(next[tableId])
+      ? [...(next[tableId] as Record<string, unknown>[])]
+      : [];
     if (!rows[rowIndex]) return;
     rows[rowIndex] = { ...rows[rowIndex], [fieldId]: bemNo };
     next = syncProcessTableScope(next, tableId, rows);
@@ -180,6 +181,7 @@ type SubscaleHardwareArticlePanelProps = {
   /** When MAIN / MAIN_SCALE, Static Testing + Mechanical tables are hidden. */
   batchType?: string | null;
   canManageProcessTables?: boolean;
+  validationErrors?: Record<string, string> | null;
 };
 
 const SubscaleHardwareArticlePanel = ({
@@ -388,8 +390,7 @@ const SubscaleHardwareArticlePanel = ({
       if (tableId === "INHIBITION_TABLE") {
         const aRaw = targetRow.LINER_COATED_SLEEVE_WEIGHT;
         const bRaw = targetRow.WEIGHT_BEFORE_INHIBITION;
-        const hasInputs =
-          String(aRaw ?? "").trim() !== "" || String(bRaw ?? "").trim() !== "";
+        const hasInputs = String(aRaw ?? "").trim() !== "" || String(bRaw ?? "").trim() !== "";
         if (!hasInputs) {
           targetRow.PROPELLANT_WEIGHT = "";
         } else {
@@ -432,7 +433,7 @@ const SubscaleHardwareArticlePanel = ({
 
   // Only disable the Hardware Details section when loaded or explicitly disabled
   const isHardwareSectionLocked = hardwareFieldsDisabled || isFormLoaded;
-
+  const { control } = useFormContext();
   return (
     <AppDatePickerProvider>
       <Stack
@@ -484,208 +485,291 @@ const SubscaleHardwareArticlePanel = ({
           </Box>
         ) : null}
 
-      {/* SECTION 1: HARDWARE PREPARATION COUNTS (DISABLED ON LOAD) */}
-      <Box
-        sx={{
-          ...sectionCardSx,
-          ...(isHardwareSectionLocked ? { opacity: 0.65, pointerEvents: "none" } : {}),
-        }}
-      >
-        <Box sx={sectionHeaderSx}>
-          <BuildRoundedIcon sx={{ fontSize: 18 }} />
-          <Typography sx={sectionTitleSx}>
-            {S.PREPARATION_TITLE}
-          </Typography>
-        </Box>
+        {/* SECTION 1: HARDWARE PREPARATION COUNTS (DISABLED ON LOAD) */}
         <Box
           sx={{
-            p: 2,
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "repeat(3, 1fr)" },
-            gap: 2,
+            ...sectionCardSx,
+            ...(isHardwareSectionLocked ? { opacity: 0.65, pointerEvents: "none" } : {}),
           }}
         >
-          {HARDWARE_COUNT_FIELDS.map((field) => (
-            <FormInput
-              key={field.id}
-              label={field.label}
-              type="number"
-              inputProps={{ min: 0, step: 1 }}
-              value={values[field.id] ?? ""}
-              onChange={(e) => updateCountField(field.id, e.target.value)}
-            />
-          ))}
-
-          <FormInput
-            select
-            label={LINER_TYPE_FIELD.label}
-            value={values[LINER_TYPE_FIELD.id] ?? ""}
-            onChange={(e) => handleLinerFieldChange(LINER_TYPE_FIELD.id, e.target.value)}
-            SelectProps={{ displayEmpty: true, MenuProps: appDropdownMenuProps }}
+          <Box sx={sectionHeaderSx}>
+            <BuildRoundedIcon sx={{ fontSize: 18 }} />
+            <Typography sx={sectionTitleSx}>{S.PREPARATION_TITLE}</Typography>
+          </Box>
+          <Box
+            sx={{
+              p: 2,
+              display: "grid",
+              gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr", lg: "repeat(3, 1fr)" },
+              gap: 2,
+            }}
           >
-            <MenuItem value="">
-              <em style={{ ...appDropdownPlaceholderSx, fontStyle: "normal" } as CSSProperties}>
-                Select Liner Type
-              </em>
-            </MenuItem>
-            {LINER_TYPE_OPTIONS.map((option) => (
-              <MenuItem key={option.value} value={option.value} sx={{ fontSize: APP_CONTROL_FONT_SIZE }}>
-                {option.label}
-              </MenuItem>
+            {HARDWARE_COUNT_FIELDS.map((field) => (
+              <Controller
+                key={field.id}
+                name={`schemaFormValues.${field.id}`}
+                control={control}
+                render={({ field: { onChange, value }, fieldState: { error } }) => (
+                  <FormInput
+                    label={<FieldLabelWithAsterisk label={field.label} required />}
+                    type="number"
+                    inputProps={{ min: 0, step: 1 }}
+                    value={value ?? ""}
+                    onChange={(e) => {
+                      onChange(e); // Updates React Hook Form state
+                      updateCountField(field.id, e.target.value); // Maintains your existing table sync logic
+                    }}
+                    error={!!error}
+                    helperText={error?.message || ""}
+                  />
+                )}
+              />
             ))}
-          </FormInput>
 
-          <FormInput
-            label={LINER_BATCH_NO_FIELD.label}
-            value={values[LINER_BATCH_NO_FIELD.id] ?? ""}
-            onChange={(e) => handleLinerFieldChange(LINER_BATCH_NO_FIELD.id, e.target.value)}
-          />
+            <Controller
+              name={`schemaFormValues.${LINER_TYPE_FIELD.id}`}
+              control={control}
+              render={({ field: { onChange, value }, fieldState: { error } }) => (
+                <FormInput
+                  select
+                  label={<FieldLabelWithAsterisk label={LINER_TYPE_FIELD.label} required />}
+                  value={value ?? ""}
+                  onChange={(e) => {
+                    onChange(e);
+                    handleLinerFieldChange(LINER_TYPE_FIELD.id, e.target.value);
+                  }}
+                  error={!!error}
+                  helperText={error?.message || ""}
+                  SelectProps={{ displayEmpty: true, MenuProps: appDropdownMenuProps }}
+                >
+                  <MenuItem value="">
+                    <em
+                      style={{ ...appDropdownPlaceholderSx, fontStyle: "normal" } as CSSProperties}
+                    >
+                      Select Liner Type
+                    </em>
+                  </MenuItem>
+                  {LINER_TYPE_OPTIONS.map((option) => (
+                    <MenuItem
+                      key={option.value}
+                      value={option.value}
+                      sx={{ fontSize: APP_CONTROL_FONT_SIZE }}
+                    >
+                      {option.label}
+                    </MenuItem>
+                  ))}
+                </FormInput>
+              )}
+            />
 
-          <DateField
-            label={LINER_BATCH_DATE_FIELD.label}
-            value={formatToUiDate(String(values[LINER_BATCH_DATE_FIELD.id] ?? ""))}
-            onChange={(next) => handleLinerFieldChange(LINER_BATCH_DATE_FIELD.id, next)}
-            placeholder="DD-MM-YYYY"
-          />
+            {/* 2. Liner Batch No Field */}
+            <Controller
+              name={`schemaFormValues.${LINER_BATCH_NO_FIELD.id}`}
+              control={control}
+              render={({ field: { onChange, value }, fieldState: { error } }) => (
+                <FormInput
+                  label={<FieldLabelWithAsterisk label={LINER_BATCH_NO_FIELD.label} required />}
+                  value={value ?? ""}
+                  onChange={(e) => {
+                    onChange(e);
+                    handleLinerFieldChange(LINER_BATCH_NO_FIELD.id, e.target.value);
+                  }}
+                  error={!!error}
+                  helperText={error?.message || ""}
+                />
+              )}
+            />
+
+            {/* 3. Liner Batch Date Field */}
+            <Controller
+              name={`schemaFormValues.${LINER_BATCH_DATE_FIELD.id}`}
+              control={control}
+              render={({ field: { onChange, value }, fieldState: { error } }) => (
+                <DateField
+                  label={<FieldLabelWithAsterisk label={LINER_BATCH_DATE_FIELD.label} required />}
+                  value={formatToUiDate(String(value ?? ""))}
+                  onChange={(next) => {
+                    onChange(next);
+                    handleLinerFieldChange(LINER_BATCH_DATE_FIELD.id, next);
+                  }}
+                  placeholder="DD-MM-YYYY"
+                  error={!!error}
+                  helperText={error?.message || ""}
+                />
+              )}
+            />
+          </Box>
         </Box>
-      </Box>
 
-      <Box
-        sx={{
-          display: "flex",
-          justifyContent: "flex-end",
-          gap: 1.25,
-          px: 1,
-        }}
-      >
-        {isFormLoaded ? (
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 1.25,
+            px: 1,
+          }}
+        >
+          {isFormLoaded ? (
+            <Button
+              variant="outlined"
+              color="error"
+              size="small"
+              disabled={!canManageProcessTables}
+              onClick={handleResetForm}
+              startIcon={<DeleteOutlineRoundedIcon />}
+            >
+              {S.DELETE_TABLES}
+            </Button>
+          ) : null}
           <Button
             variant="outlined"
-            color="error"
             size="small"
-            disabled={!canManageProcessTables}
-            onClick={handleResetForm}
-            startIcon={<DeleteOutlineRoundedIcon />}
+            disabled={!hardwareComplete || isFormLoaded || isLoading || !canManageProcessTables}
+            onClick={handleLoadForm}
+            startIcon={isLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
           >
-            {S.DELETE_TABLES}
+            {isLoading ? S.LOADING_FORM_TITLE : S.LOAD_FORM}
           </Button>
-        ) : null}
-        <Button
-          variant="outlined"
-          size="small"
-          disabled={
-            !hardwareComplete || isFormLoaded || isLoading || !canManageProcessTables
-          }
-          onClick={handleLoadForm}
-          startIcon={isLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
-        >
-          {isLoading ? S.LOADING_FORM_TITLE : S.LOAD_FORM}
-        </Button>
-      </Box>
+        </Box>
 
-      {/* PROCESS & ARTICLE TABLES (DISPLAY ONLY WHEN FORM IS LOADED) */}
-      {isFormLoaded && (
-        <>
-          {/* SECTION 2: HARDWARE ARTICLE TABLE (ENABLED FOR EDITING) */}
-          <Box sx={sectionCardSx}>
-            <Box sx={sectionHeaderSx}>
-              <TableChartRoundedIcon sx={{ fontSize: 18 }} />
-              <Typography sx={sectionTitleSx}>
-                {S.ARTICLE_TABLE_TITLE}
-              </Typography>
+        {/* PROCESS & ARTICLE TABLES (DISPLAY ONLY WHEN FORM IS LOADED) */}
+        {isFormLoaded && (
+          <>
+            {/* SECTION 2: HARDWARE ARTICLE TABLE (ENABLED FOR EDITING) */}
+            <Box sx={sectionCardSx}>
+              <Box sx={sectionHeaderSx}>
+                <TableChartRoundedIcon sx={{ fontSize: 18 }} />
+                <Typography sx={sectionTitleSx}>{S.ARTICLE_TABLE_TITLE}</Typography>
+              </Box>
+              <Box sx={{ p: 2 }}>
+                <ArticleTypeTableSection
+                  rows={(values[ARTICLE_TYPE_TABLE_ID] as []) ?? []}
+                  onCellChange={updateTableRowCell}
+                />
+              </Box>
             </Box>
-            <Box sx={{ p: 2 }}>
-              <ArticleTypeTableSection
-                rows={(values[ARTICLE_TYPE_TABLE_ID] as []) ?? []}
-                onCellChange={updateTableRowCell}
-              />
-            </Box>
-          </Box>
 
-          {/* SECTION 3: CASTING DETAILS TABLE */}
-          <SubscaleProcessSection
-            id="casting"
-            title="Casting Details"
-            icon={PrecisionManufacturingIcon}
-            defaultExpanded={hasProcessTableData(values.CASTING_TABLE as unknown[])}
-            lazyMount
-          >
+            {/* SECTION 3: CASTING DETAILS TABLE */}
+            <SubscaleProcessSection
+              id="casting"
+              title="Casting Details"
+              icon={PrecisionManufacturingIcon}
+              defaultExpanded={hasProcessTableData(values.CASTING_TABLE as unknown[])}
+              lazyMount
+            >
               <Box sx={{ mb: 2, maxWidth: 280 }}>
-                <DateField
-                  label="Date Of Casting"
-                  value={formatToUiDate(String(values.DATE_OF_CASTING ?? ""))}
-                  onChange={(next) => patchFormValues({ DATE_OF_CASTING: next })}
-                  placeholder="DD-MM-YYYY"
+                <Controller
+                  name={`schemaFormValues.DATE_OF_CASTING`}
+                  control={control}
+                  render={({ field: { onChange, value }, fieldState: { error } }) => (
+                    <DateField
+                      required
+                      label={<FieldLabelWithAsterisk label="Date Of Casting" required />}
+                      value={formatToUiDate(String(value ?? values.DATE_OF_CASTING ?? ""))}
+                      onChange={(next) => {
+                        onChange(next);
+                        patchFormValues({ DATE_OF_CASTING: next });
+                      }}
+                      placeholder="DD-MM-YYYY"
+                      error={!!error}
+                      helperText={error?.message || ""}
+                    />
+                  )}
                 />
               </Box>
               <CastingTableSection
                 rows={(values.CASTING_TABLE as []) ?? []}
                 onCellChange={updateTableRowCell}
               />
-          </SubscaleProcessSection>
+            </SubscaleProcessSection>
 
-          {/* SECTION 4: CURING DETAILS TABLE */}
-          <SubscaleProcessSection
-            id="curing"
-            title="Curing Details"
-            icon={ThermostatIcon}
-            defaultExpanded={hasProcessTableData(values.CURING_TABLE as unknown[])}
-            lazyMount
-          >
+            {/* SECTION 4: CURING DETAILS TABLE */}
+            <SubscaleProcessSection
+              id="curing"
+              title="Curing Details"
+              icon={ThermostatIcon}
+              defaultExpanded={hasProcessTableData(values.CURING_TABLE as unknown[])}
+              lazyMount
+            >
               <CuringTableSection
                 rows={(values.CURING_TABLE as []) ?? []}
                 onCellChange={updateTableRowCell}
                 getSyncedBemNo={getSyncedBemNo}
               />
-          </SubscaleProcessSection>
+            </SubscaleProcessSection>
 
-          {/* SECTION 5: NDT DETAILS TABLE */}
-          <SubscaleProcessSection
-            id="ndt"
-            title="NDT Details"
-            icon={ShieldIcon}
-            defaultExpanded={hasProcessTableData(values.NDT_TABLE as unknown[])}
-            lazyMount
-          >
+            {/* SECTION 5: NDT DETAILS TABLE */}
+            <SubscaleProcessSection
+              id="ndt"
+              title="NDT Details"
+              icon={ShieldIcon}
+              defaultExpanded={hasProcessTableData(values.NDT_TABLE as unknown[])}
+              lazyMount
+            >
               <NdtTableSection
                 rows={(values.NDT_TABLE as []) ?? []}
                 onCellChange={updateTableRowCell}
                 getSyncedBemNo={getSyncedBemNo}
               />
-          </SubscaleProcessSection>
+            </SubscaleProcessSection>
 
-          {/* SECTION 6: TRIMMING DETAILS TABLE */}
-          <SubscaleProcessSection
-            id="trimming"
-            title="Trimming Details"
-            icon={ContentCutIcon}
-            defaultExpanded={hasProcessTableData(values.TRIMMING_TABLE as unknown[])}
-            lazyMount
-          >
+            {/* SECTION 6: TRIMMING DETAILS TABLE */}
+            <SubscaleProcessSection
+              id="trimming"
+              title="Trimming Details"
+              icon={ContentCutIcon}
+              defaultExpanded={hasProcessTableData(values.TRIMMING_TABLE as unknown[])}
+              lazyMount
+            >
               <TrimmingTableSection
                 rows={(values.TRIMMING_TABLE as []) ?? []}
                 onCellChange={updateTableRowCell}
                 getSyncedBemNo={getSyncedBemNo}
               />
-          </SubscaleProcessSection>
-          <SubscaleProcessSection
-            id="inhibition"
-            title="Inhibition Details"
-            icon={ScienceIcon}
-            defaultExpanded={hasProcessTableData(values.INHIBITION_TABLE as unknown[])}
-            lazyMount
-          >
+            </SubscaleProcessSection>
+            <SubscaleProcessSection
+              id="inhibition"
+              title="Inhibition Details"
+              icon={ScienceIcon}
+              defaultExpanded={hasProcessTableData(values.INHIBITION_TABLE as unknown[])}
+              lazyMount
+            >
               <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-                <FormInput
-                  label="IR Batch No"
-                  value={values.IR_BATCH_NO ?? ""}
-                  onChange={(e) => patchFormValues({ IR_BATCH_NO: e.target.value })}
+                <Controller
+                  name={`schemaFormValues.IR_BATCH_NO`}
+                  control={control}
+                  render={({ field: { onChange, value }, fieldState: { error } }) => (
+                    <FormInput
+                      required
+                      label={<FieldLabelWithAsterisk label="IR Batch No" required />}
+                      value={value ?? values.IR_BATCH_NO ?? ""}
+                      onChange={(e) => {
+                        onChange(e.target.value);
+                        patchFormValues({ IR_BATCH_NO: e.target.value });
+                      }}
+                      error={!!error}
+                      helperText={error?.message || ""}
+                    />
+                  )}
                 />
-                <DateField
-                  label="Date Of Manufacturing"
-                  value={formatToUiDate(String(values.DATE_OF_MFG ?? ""))}
-                  onChange={(next) => patchFormValues({ DATE_OF_MFG: next })}
-                  placeholder="DD-MM-YYYY"
+
+                <Controller
+                  name={`schemaFormValues.DATE_OF_MFG`}
+                  control={control}
+                  render={({ field: { onChange, value }, fieldState: { error } }) => (
+                    <DateField
+                      required
+                      label={<FieldLabelWithAsterisk label="Date Of Manufacturing" required />}
+                      value={formatToUiDate(String(value ?? values.DATE_OF_MFG ?? ""))}
+                      onChange={(next) => {
+                        onChange(next);
+                        patchFormValues({ DATE_OF_MFG: next });
+                      }}
+                      placeholder="DD-MM-YYYY"
+                      error={!!error}
+                      helperText={error?.message || ""}
+                    />
+                  )}
                 />
               </Stack>
               <TableContainer
@@ -695,14 +779,34 @@ const SubscaleHardwareArticlePanel = ({
                   <TableHead>
                     <TableRow>
                       <TableCell sx={tableHeaderCellSx}>Sr No</TableCell>
-                      <TableCell sx={tableHeaderCellSx}>Article Type</TableCell>
-                      <TableCell sx={tableHeaderCellSx}>BEM No</TableCell>
-                      <TableCell sx={tableHeaderCellSx}>Liner Coated Sleeve Wt (A)</TableCell>
+                      <TableCell sx={tableHeaderCellSx}>
+                        <FieldLabelWithAsterisk
+                          label="Article Type"
+                          required
+                          sx={tableHeaderCellSx}
+                        />
+                      </TableCell>
+                      <TableCell sx={tableHeaderCellSx}>
+                        <FieldLabelWithAsterisk label="BEM No" required sx={tableHeaderCellSx} />
+                      </TableCell>
+                      <TableCell sx={tableHeaderCellSx}>
+                        <FieldLabelWithAsterisk
+                          label="Liner Coated Sleeve Wt (A)"
+
+                          sx={tableHeaderCellSx}
+                        />
+                      </TableCell>
                       <TableCell sx={tableHeaderCellSx}>Wt Before Inhib. (B)</TableCell>
                       <TableCell sx={tableHeaderCellSx}>Wt After Inhib.</TableCell>
                       <TableCell sx={tableHeaderCellSx}>Wt Of IR Applied</TableCell>
                       <TableCell sx={tableHeaderCellSx}>Propellant Wt (C-B-A)</TableCell>
-                      <TableCell sx={tableHeaderCellSx}>Date of Application</TableCell>
+                      <TableCell sx={tableHeaderCellSx}>
+                        <FieldLabelWithAsterisk
+                          label="Date of Application"
+
+                          sx={tableHeaderCellSx}
+                        />
+                      </TableCell>
                       <TableCell sx={tableHeaderCellSx}>Remarks</TableCell>
                     </TableRow>
                   </TableHead>
@@ -762,13 +866,30 @@ const SubscaleHardwareArticlePanel = ({
                           <FormInput compact disabled value={row.PROPELLANT_WEIGHT ?? ""} />
                         </TableCell>
                         <TableCell sx={tableBodyCellSx}>
-                          <DateField
-                            compact
-                            value={formatToUiDate(String(row.DATE_OF_APPLICATION ?? ""))}
-                            onChange={(next) =>
-                              updateTableRowCell("INHIBITION_TABLE", idx, "DATE_OF_APPLICATION", next)
-                            }
-                            placeholder="DD-MM-YYYY"
+                          <Controller
+                            name={`schemaFormValues.INHIBITION_TABLE.${idx}.DATE_OF_APPLICATION`}
+                            control={control}
+                            render={({ field: { onChange, value }, fieldState: { error } }) => (
+                              <DateField
+                                compact
+                                required
+                                value={formatToUiDate(
+                                  String(value ?? row.DATE_OF_APPLICATION ?? ""),
+                                )}
+                                onChange={(next) => {
+                                  onChange(next);
+                                  updateTableRowCell(
+                                    "INHIBITION_TABLE",
+                                    idx,
+                                    "DATE_OF_APPLICATION",
+                                    next,
+                                  );
+                                }}
+                                placeholder="DD-MM-YYYY"
+                                error={!!error}
+                                helperText={error?.message || ""}
+                              />
+                            )}
                           />
                         </TableCell>
                         <TableCell sx={tableBodyCellSx}>
@@ -786,49 +907,50 @@ const SubscaleHardwareArticlePanel = ({
                   </TableBody>
                 </Table>
               </TableContainer>
-          </SubscaleProcessSection>
+            </SubscaleProcessSection>
 
-          {showBemTestingTables ? (
-            <>
-          {/* SECTION 8: STATIC TESTING TABLE */}
-          <SubscaleProcessSection
-            id="static-testing"
-            title="Static Testing Of BEM"
-            icon={SpeedIcon}
-            defaultExpanded={hasProcessTableData(values.STATIC_TESTING_TABLE as unknown[])}
-            lazyMount
-          >
-              <StaticTestingTableSection
-                rows={(values.STATIC_TESTING_TABLE as []) ?? []}
-                onCellChange={updateTableRowCell}
-                getSyncedBemNo={getSyncedBemNo}
-                FileUploadButton={FileUploadButton}
-                onFileUpload={(idx, file) =>
-                  updateTableRowCell("STATIC_TESTING_TABLE", idx, "GRAPH_UPLOAD", file)
-                }
-              />
-          </SubscaleProcessSection>
+            {showBemTestingTables ? (
+              <>
+                {/* SECTION 8: STATIC TESTING TABLE */}
+                <SubscaleProcessSection
+                  id="static-testing"
+                  title="Static Testing Of BEM"
+                  icon={SpeedIcon}
+                  defaultExpanded={hasProcessTableData(values.STATIC_TESTING_TABLE as unknown[])}
+                  lazyMount
+                >
+                  <StaticTestingTableSection
+                    rows={(values.STATIC_TESTING_TABLE as []) ?? []}
+                    onCellChange={updateTableRowCell}
+                    getSyncedBemNo={getSyncedBemNo}
+                    FileUploadButton={FileUploadButton}
+                    onFileUpload={(idx, file) =>
+                      updateTableRowCell("STATIC_TESTING_TABLE", idx, "GRAPH_UPLOAD", file)
+                    }
+                  />
+                </SubscaleProcessSection>
 
-          {/* SECTION 9: MECHANICAL INTERFACE PROPERTIES TABLE */}
-          <SubscaleProcessSection
-            id="mechanical"
-            title="Mechanical Interface Properties"
-            icon={FitnessCenterIcon}
-            defaultExpanded={hasProcessTableData(values.MECHANICAL_PROPERTIES_TABLE as unknown[])}
-            lazyMount
-          >
-              <MechanicalPropertiesTableSection
-                rows={(values.MECHANICAL_PROPERTIES_TABLE as []) ?? []}
-                onCellChange={updateTableRowCell}
-                getSyncedBemNo={getSyncedBemNo}
-              />
-          </SubscaleProcessSection>
-            </>
-          ) : null}
-
-        </>
-      )}
-    </Stack>
+                {/* SECTION 9: MECHANICAL INTERFACE PROPERTIES TABLE */}
+                <SubscaleProcessSection
+                  id="mechanical"
+                  title="Mechanical Interface Properties"
+                  icon={FitnessCenterIcon}
+                  defaultExpanded={hasProcessTableData(
+                    values.MECHANICAL_PROPERTIES_TABLE as unknown[],
+                  )}
+                  lazyMount
+                >
+                  <MechanicalPropertiesTableSection
+                    rows={(values.MECHANICAL_PROPERTIES_TABLE as []) ?? []}
+                    onCellChange={updateTableRowCell}
+                    getSyncedBemNo={getSyncedBemNo}
+                  />
+                </SubscaleProcessSection>
+              </>
+            ) : null}
+          </>
+        )}
+      </Stack>
     </AppDatePickerProvider>
   );
 };

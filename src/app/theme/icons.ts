@@ -356,6 +356,8 @@ export const icons = {
   // ─── Project Management ─────────────────────────────────────────────────────
   projectMgmt: {
     add: AddIcon,
+    edit: EditRoundedIcon,
+    delete: DeleteOutlineRoundedIcon,
     search: SearchIcon,
     filter: FilterListIcon,
     close: CloseIcon,

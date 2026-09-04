@@ -23,7 +23,6 @@ import type { SchemaTableBlock, SchemaTableColumn, SchemaTableColumnSlot, Schema
 import { applyFormulaColumns } from "../../../schema-engine/rules/formulaEval";
 import { applyRowComputations, isEditableRowComputationTarget, isRowComputationTarget } from "../../../schema-engine/rules/tableRowComputations";
 import { flattenTableColumns, isColumnGroup } from "../../../schema-engine/utils/schemaUtils";
-import { sanitizeNumericInput } from "../../../schema-engine/utils/numericInput";
 import {
   buildRowApiContext,
   getDependentColumnIds,
@@ -85,6 +84,13 @@ type DynamicTableProps = {
   allowDeleteColumn?: boolean;
   deletableColumnIds?: string[];
   onDeleteColumn?: (columnId: string) => void;
+  /**
+   * Cell-level errors: keys are either `rowIndex.columnId` or full paths
+   * `tablePath.rowIndex.columnId`. Matched flexibly against row/col.
+   */
+  cellErrors?: Record<string, string>;
+  /** Optional table path prefix used when matching full error keys from schema validation. */
+  tablePath?: string;
 };
 
 const spacingMap: Record<string, number> = { xs: 0.5, sm: 1, md: 1.5, lg: 2, xl: 3 };
@@ -372,6 +378,7 @@ const renderCellEditor = (
   onOptionsCountChange?: (count: number) => void,
   excludedValues?: string[],
   emptyPlaceholder?: string,
+  errorMsg?: string,
 ) => {
   const isBowlSelection = isCastingBowlSelectionColumn(col);
   if (readOnly && col.fieldType === "dropdown" && col.dataSource) {
@@ -413,27 +420,61 @@ const renderCellEditor = (
   switch (col.fieldType) {
     case "dropdown":
       return (
-        <SchemaApiDropdown
-          value={value}
-          onChange={onChange}
-          dataSource={col.dataSource}
-          apiContext={apiContext}
-          disabled={cellDisabled}
-          compact
-          compactWrap={isCompactWrapDropdown(col)}
-          placeholder={col.ui?.placeholder}
-          emptyPlaceholder={emptyPlaceholder}
-          excludedValues={excludedValues}
-          prefetch={isBowlSelection}
-          onOptionsCountChange={onOptionsCountChange}
-        />
+        <Box>
+          <SchemaApiDropdown
+            value={value}
+            onChange={onChange}
+            dataSource={col.dataSource}
+            apiContext={apiContext}
+            disabled={cellDisabled}
+            compact
+            compactWrap={isCompactWrapDropdown(col)}
+            placeholder={col.ui?.placeholder}
+            emptyPlaceholder={emptyPlaceholder}
+            excludedValues={excludedValues}
+            prefetch={isBowlSelection}
+            onOptionsCountChange={onOptionsCountChange}
+          />
+          {errorMsg ? (
+            <Typography sx={{ fontSize: "0.65rem", color: "error.main", mt: 0.35, lineHeight: 1.25 }}>
+              {errorMsg}
+            </Typography>
+          ) : null}
+        </Box>
       );
     case "date":
-      return <DateField value={value} onChange={onChange} disabled={cellDisabled} compact />;
+      return (
+        <Box>
+          <DateField value={value} onChange={onChange} disabled={cellDisabled} compact />
+          {errorMsg ? (
+            <Typography sx={{ fontSize: "0.65rem", color: "error.main", mt: 0.35, lineHeight: 1.25 }}>
+              {errorMsg}
+            </Typography>
+          ) : null}
+        </Box>
+      );
     case "time":
-      return <TimeField value={value} onChange={onChange} disabled={cellDisabled} compact />;
+      return (
+        <Box>
+          <TimeField value={value} onChange={onChange} disabled={cellDisabled} compact />
+          {errorMsg ? (
+            <Typography sx={{ fontSize: "0.65rem", color: "error.main", mt: 0.35, lineHeight: 1.25 }}>
+              {errorMsg}
+            </Typography>
+          ) : null}
+        </Box>
+      );
     case "datetime":
-      return <DateTimeField value={value} onChange={onChange} disabled={cellDisabled} compact />;
+      return (
+        <Box>
+          <DateTimeField value={value} onChange={onChange} disabled={cellDisabled} compact />
+          {errorMsg ? (
+            <Typography sx={{ fontSize: "0.65rem", color: "error.main", mt: 0.35, lineHeight: 1.25 }}>
+              {errorMsg}
+            </Typography>
+          ) : null}
+        </Box>
+      );
     case "textarea":
       return (
         <TextField
@@ -443,8 +484,11 @@ const renderCellEditor = (
           minRows={2}
           value={value}
           disabled={cellDisabled}
+          error={Boolean(errorMsg)}
+          helperText={errorMsg || undefined}
           onChange={(e) => onChange(e.target.value)}
           inputProps={{ style: { fontSize: "0.78rem" } }}
+          FormHelperTextProps={{ sx: { mx: 0, mt: 0.35, fontSize: "0.65rem", lineHeight: 1.25 } }}
           sx={{ minWidth: 140 }}
         />
       );
@@ -467,6 +511,7 @@ const renderCellEditor = (
       );
     case "number":
     case "decimal":
+      // Keep raw input so non-numeric values can be validated and shown in red under the cell.
       return (
         <TextField
           size="small"
@@ -474,24 +519,58 @@ const renderCellEditor = (
           type="text"
           value={value}
           disabled={cellDisabled}
-          onChange={(e) => onChange(sanitizeNumericInput(e.target.value))}
+          error={Boolean(errorMsg)}
+          helperText={errorMsg || undefined}
+          onChange={(e) => onChange(e.target.value)}
           inputProps={{ inputMode: "decimal", style: { fontSize: "0.78rem" } }}
+          FormHelperTextProps={{ sx: { mx: 0, mt: 0.35, fontSize: "0.65rem", lineHeight: 1.25 } }}
           sx={{ minWidth: 80 }}
         />
       );
     default:
       return (
-        <TextField
-          size="small"
-          fullWidth
-          value={value}
-          disabled={cellDisabled}
-          onChange={(e) => onChange(e.target.value)}
-          inputProps={{ style: { fontSize: "0.78rem" } }}
-          sx={{ minWidth: 120 }}
-        />
+        <Box>
+          <TextField
+            size="small"
+            fullWidth
+            value={value}
+            disabled={cellDisabled}
+            error={Boolean(errorMsg)}
+            helperText={errorMsg || undefined}
+            onChange={(e) => onChange(e.target.value)}
+            inputProps={{ style: { fontSize: "0.78rem" } }}
+            FormHelperTextProps={{ sx: { mx: 0, mt: 0.35, fontSize: "0.65rem", lineHeight: 1.25 } }}
+            sx={{ minWidth: 120 }}
+          />
+        </Box>
       );
   }
+};
+
+const resolveCellError = (
+  cellErrors: Record<string, string> | undefined,
+  tablePath: string | undefined,
+  tableId: string,
+  rowIndex: number,
+  colId: string,
+): string | undefined => {
+  if (!cellErrors) return undefined;
+  const candidates = [
+    `${rowIndex}.${colId}`,
+    tablePath ? `${tablePath}.${rowIndex}.${colId}` : "",
+    `${tableId}.${rowIndex}.${colId}`,
+  ].filter(Boolean);
+  for (const key of candidates) {
+    if (cellErrors[key]) return cellErrors[key];
+  }
+  // suffix match for scoped paths like sectionId::tableId.0.col
+  const suffix = `.${rowIndex}.${colId}`;
+  for (const [k, v] of Object.entries(cellErrors)) {
+    if (k.endsWith(suffix) && (k.includes(tableId) || (tablePath && k.includes(tablePath)))) {
+      return v;
+    }
+  }
+  return undefined;
 };
 
 const DynamicTable = ({
@@ -507,6 +586,8 @@ const DynamicTable = ({
   allowDeleteColumn = false,
   deletableColumnIds = [],
   onDeleteColumn,
+  cellErrors,
+  tablePath,
 }: DynamicTableProps) => {
   const flatColumns = flattenTableColumns(config.columns);
   const hasColumnGroups = config.columns.some(isColumnGroup);
@@ -992,6 +1073,13 @@ const DynamicTable = ({
                                 )
                               : undefined,
                             isCastingBowlSelectionColumn(resolvedCol) ? noBowlsPlaceholder : undefined,
+                            resolveCellError(
+                              cellErrors,
+                              tablePath,
+                              config.id,
+                              rowIndex,
+                              col.id,
+                            ),
                           )
                         )}
                         {showGroupRemove ? (

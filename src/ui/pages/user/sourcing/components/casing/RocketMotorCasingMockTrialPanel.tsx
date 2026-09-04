@@ -25,8 +25,10 @@ import {
   type MockTrialMotorDimensionRow,
   type RocketMotorCasingMockTrialData,
 } from "../../../../../../data/models/user/RocketMotorCasingFormModel";
+import { isCasingFieldRequired } from "../../../../../../data/validation/adapters/rocketMotorCasing.validation";
 import {
   FieldGrid,
+  RequiredMark,
   SelectField,
   SubsectionTitle,
   TextFieldField,
@@ -36,6 +38,7 @@ type RocketMotorCasingMockTrialPanelProps = {
   value: RocketMotorCasingMockTrialData;
   onChange: (next: RocketMotorCasingMockTrialData) => void;
   disabled?: boolean;
+  validationErrors?: Record<string, string>;
   theme: any;
   cf: any;
 };
@@ -59,15 +62,20 @@ const MANDREL_A_B_KEYS: Array<keyof Omit<MockTrialMandrelAssemblyRow, "srNo">> =
   "mandrelRestOnBottomCupB",
 ];
 
+const mockTrialMotorDimRequired = (key: string) =>
+  key === "heBossWidthWithoutLfRubber" || key === "heDiaId";
+
 const RocketMotorCasingMockTrialPanel = ({
   value,
   onChange,
   disabled = false,
+  validationErrors = {},
   theme,
   cf,
 }: RocketMotorCasingMockTrialPanelProps) => {
   const casingTheme = theme.sourcing.rocketMotor.casingForm;
   const S = STRINGS.SOURCING.CASING_CREATE;
+  const req = isCasingFieldRequired;
   const [stationOptions, setStationOptions] = useState<Array<{ value: string; label: string }>>(
     [],
   );
@@ -146,19 +154,19 @@ const RocketMotorCasingMockTrialPanel = ({
     opacity: disabled ? 0.5 : 1,
   };
 
-  const motorDimLabels: Record<(typeof MOTOR_DIM_KEYS)[number], string> = {
+  const motorDimLabels: Partial<Record<(typeof MOTOR_DIM_KEYS)[number], string>> = {
     lfRubberThicknessHe: S.MOCK_TRIAL_COL_LF_RUBBER,
     heBossWidthWithoutLfRubber: S.MOCK_TRIAL_COL_HE_BOSS_WIDTH,
     heDiaId: S.MOCK_TRIAL_COL_HE_DIA_ID,
   };
 
-  const motorLengthLabels: Record<(typeof MOTOR_LENGTH_KEYS)[number], string> = {
+  const motorLengthLabels: Partial<Record<(typeof MOTOR_LENGTH_KEYS)[number], string>> = {
     heOuterToNeOuter: S.MOCK_TRIAL_COL_HE_OUTER_NE_OUTER,
     heInnerToNeInner: S.MOCK_TRIAL_COL_HE_INNER_NE_INNER,
     neOuterToHeInner: S.MOCK_TRIAL_COL_NE_OUTER_HE_INNER,
   };
 
-  const mandrelLabels: Record<(typeof MANDREL_A_B_KEYS)[number], string> = {
+  const mandrelLabels: Partial<Record<(typeof MANDREL_A_B_KEYS)[number], string>> = {
     mandrelRestOnDomeA: S.MOCK_TRIAL_COL_MANDREL_A,
     mandrelRestOnBottomCupB: S.MOCK_TRIAL_COL_MANDREL_B,
   };
@@ -169,19 +177,23 @@ const RocketMotorCasingMockTrialPanel = ({
       <FieldGrid theme={theme} cf={cf}>
         <SelectField
           label={S.MOCK_TRIAL_CASTING_STATION}
+          required={req("mockTrialCastingStation")}
           value={value.castingStation}
           onChange={(v) => patch({ castingStation: v })}
           options={stationOptions}
           placeholder={S.MOCK_TRIAL_CASTING_STATION_PH}
           disabled={disabled}
+          error={validationErrors["mockTrial.castingStation"]}
           theme={theme}
         />
         <TextFieldField
           label={S.MOCK_TRIAL_MANDREL_ID}
+          required={req("mockTrialMandrelId")}
           value={value.mandrelId}
           onChange={(v) => patch({ mandrelId: v })}
           placeholder={S.MOCK_TRIAL_MANDREL_ID_PH}
           disabled={disabled}
+          error={validationErrors["mockTrial.mandrelId"]}
           theme={theme}
         />
         <TextFieldField
@@ -190,12 +202,18 @@ const RocketMotorCasingMockTrialPanel = ({
           onChange={(v) => patch({ bottomCupId: v })}
           placeholder={S.MOCK_TRIAL_BOTTOM_CUP_ID_PH}
           disabled={disabled}
+          error={validationErrors["mockTrial.bottomCupId"]}
           theme={theme}
         />
       </FieldGrid>
 
       <Box sx={{ mt: 2.5 }}>
         <SubsectionTitle cf={cf}>{S.MOCK_TRIAL_MOTOR_DIMS}</SubsectionTitle>
+        {validationErrors["mockTrial.motorDimensions"] ? (
+          <Typography color="error" variant="caption" sx={{ display: "block", mb: 0.5 }}>
+            {validationErrors["mockTrial.motorDimensions"]}
+          </Typography>
+        ) : null}
         <TableContainer sx={{ ...casingTheme.tableContainer, mt: 1, overflowX: "auto" }}>
           <Table size="small" sx={{ minWidth: 1100 }}>
             <TableHead>
@@ -209,6 +227,7 @@ const RocketMotorCasingMockTrialPanel = ({
                 {MOTOR_DIM_KEYS.map((key) => (
                   <TableCell key={key} rowSpan={2} sx={theme.workflow.formElements.tableHeader}>
                     {motorDimLabels[key]}
+                    {mockTrialMotorDimRequired(key) ? <RequiredMark theme={theme} /> : null}
                   </TableCell>
                 ))}
                 <TableCell
@@ -246,6 +265,8 @@ const RocketMotorCasingMockTrialPanel = ({
                         value={row[key]}
                         onChange={(e) => updateMotorDimension(index, key, e.target.value)}
                         disabled={disabled}
+                        error={Boolean(validationErrors[`mockTrial.motorDimensions.${index}.${key}`])}
+                        helperText={validationErrors[`mockTrial.motorDimensions.${index}.${key}`]}
                         inputProps={{ inputMode: "decimal" }}
                         sx={cellFieldSx}
                       />
@@ -296,6 +317,11 @@ const RocketMotorCasingMockTrialPanel = ({
 
       <Box sx={{ mt: 2.5 }}>
         <SubsectionTitle cf={cf}>{S.MOCK_TRIAL_MANDREL_ASSEMBLY}</SubsectionTitle>
+        {validationErrors["mockTrial.mandrelAssemblyMeasurements"] ? (
+          <Typography color="error" variant="caption" sx={{ display: "block", mb: 0.5 }}>
+            {validationErrors["mockTrial.mandrelAssemblyMeasurements"]}
+          </Typography>
+        ) : null}
         <TableContainer sx={{ ...casingTheme.tableContainer, mt: 1, overflowX: "auto" }}>
           <Table size="small" sx={{ minWidth: 980 }}>
             <TableHead>
@@ -306,6 +332,7 @@ const RocketMotorCasingMockTrialPanel = ({
                 {MANDREL_A_B_KEYS.map((key) => (
                   <TableCell key={key} sx={theme.workflow.formElements.tableHeader}>
                     {mandrelLabels[key]}
+                    <RequiredMark theme={theme} />
                   </TableCell>
                 ))}
                 <TableCell sx={theme.workflow.formElements.tableHeader}>
@@ -313,6 +340,7 @@ const RocketMotorCasingMockTrialPanel = ({
                 </TableCell>
                 <TableCell sx={theme.workflow.formElements.tableHeader}>
                   {S.MOCK_TRIAL_COL_BELLOW_D}
+                  <RequiredMark theme={theme} />
                 </TableCell>
                 <TableCell sx={theme.workflow.formElements.tableHeader}>
                   {S.MOCK_TRIAL_COL_LIFT_E}
@@ -338,6 +366,8 @@ const RocketMotorCasingMockTrialPanel = ({
                           value={row[key]}
                           onChange={(e) => updateMandrelRow(index, key, e.target.value)}
                           disabled={disabled}
+                          error={Boolean(validationErrors[`mockTrial.mandrelAssemblyMeasurements.${index}.${key}`])}
+                          helperText={validationErrors[`mockTrial.mandrelAssemblyMeasurements.${index}.${key}`]}
                           inputProps={{ inputMode: "decimal" }}
                           sx={cellFieldSx}
                         />
@@ -357,6 +387,8 @@ const RocketMotorCasingMockTrialPanel = ({
                           updateMandrelRow(index, "bellowThicknessD", e.target.value)
                         }
                         disabled={disabled}
+                        error={Boolean(validationErrors[`mockTrial.mandrelAssemblyMeasurements.${index}.bellowThicknessD`])}
+                        helperText={validationErrors[`mockTrial.mandrelAssemblyMeasurements.${index}.bellowThicknessD`]}
                         inputProps={{ inputMode: "decimal" }}
                         sx={cellFieldSx}
                       />
