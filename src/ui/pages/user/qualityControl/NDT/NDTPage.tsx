@@ -67,6 +67,7 @@ const NDTPage = () => {
     handleSetupChange,
     handleMotorSessionChange,
     handleLoadNDTForm,
+    motorValidationErrors,
   } = hookState;
 
   const listLoading = loading && !loadingFormDetails && view === "list";
@@ -138,6 +139,7 @@ const NDTPage = () => {
               setPendingMotorId(motorId);
               setMotorSubmitConfirmOpen(true);
             }}
+            motorValidationErrors={motorValidationErrors}
           />
         </>
       )}

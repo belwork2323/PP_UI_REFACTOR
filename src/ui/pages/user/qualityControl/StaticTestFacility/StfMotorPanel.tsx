@@ -28,6 +28,11 @@ import {
   postCureTableInputSx,
   postCureTableRowSx,
 } from "./STFFormPrimitives";
+import FieldErrorText from "@/ui/components/validation/FieldErrorText";
+import {
+  fieldError,
+  type ValidationErrors,
+} from "@/data/validation/adapters/stf.validation";
 
 type Props = {
   value: StfMotorData;
@@ -39,6 +44,7 @@ type Props = {
   subDepartmentId?: number;
   batchId?: string;
   motorId?: string;
+  validationErrors?: ValidationErrors;
 };
 
 const patchSection = <T extends Record<string, string>>(section: T, key: keyof T, val: string) => ({
@@ -73,6 +79,8 @@ const ScalarFields = <T extends Record<string, string>>({
   readOnly,
   columns = 2,
   multilineKeys = ["REMARKS", "OBSERVATION"],
+  pathPrefix,
+  validationErrors,
 }: {
   section: T;
   fields: Array<keyof T & string>;
@@ -81,19 +89,25 @@ const ScalarFields = <T extends Record<string, string>>({
   readOnly?: boolean;
   columns?: 2 | 3 | 4;
   multilineKeys?: string[];
+  pathPrefix?: string;
+  validationErrors?: ValidationErrors;
 }) => (
   <FieldGrid columns={columns}>
     {fields.map((key) => {
       const multiline = multilineKeys.includes(key);
+      const path = pathPrefix ? `${pathPrefix}.${key}` : key;
+      const message = fieldError(validationErrors, path);
       return (
         <Box key={key} sx={multiline ? { gridColumn: { xs: "1", md: "1 / -1" } } : undefined}>
           <FieldLabel>{formatFieldLabel(key)}</FieldLabel>
           <TableTextInput
             value={section[key]}
             onChange={(val) => onChange(patchSection(section, key, val))}
-            disabled={disabled} readOnly={readOnly}
+            disabled={disabled}
+            readOnly={readOnly}
             {...(multiline ? { multiline: true, minRows: 2 } : {})}
           />
+          <FieldErrorText message={message} />
         </Box>
       );
     })}
@@ -105,11 +119,13 @@ const MainSensorTable = ({
   onChange,
   disabled,
   readOnly,
+  validationErrors,
 }: {
   rows: StfMainSensorRow[];
   onChange: (rows: StfMainSensorRow[]) => void;
   disabled?: boolean;
   readOnly?: boolean;
+  validationErrors?: ValidationErrors;
 }) => {
   const columns: Array<{ key: keyof StfMainSensorRow; readonly?: boolean }> = [
     { key: "CHANNEL", readonly: true },
@@ -151,11 +167,20 @@ const MainSensorTable = ({
                   {readonly ? (
                     row.CHANNEL
                   ) : (
-                    <TableTextInput
-                      value={row[key]}
-                      onChange={(val) => updateRow(index, key, val)}
-                      disabled={disabled} readOnly={readOnly}
-                    />
+                    <Box>
+                      <TableTextInput
+                        value={row[key]}
+                        onChange={(val) => updateRow(index, key, val)}
+                        disabled={disabled}
+                        readOnly={readOnly}
+                      />
+                      <FieldErrorText
+                        message={fieldError(
+                          validationErrors,
+                          `SENSOR_CONFIGURATION.${index}.${key}`,
+                        )}
+                      />
+                    </Box>
                   )}
                 </TableCell>
               ))}
@@ -172,11 +197,13 @@ const BemSensorTable = ({
   onChange,
   disabled,
   readOnly,
+  validationErrors,
 }: {
   rows: StfBemSensorRow[];
   onChange: (rows: StfBemSensorRow[]) => void;
   disabled?: boolean;
   readOnly?: boolean;
+  validationErrors?: ValidationErrors;
 }) => {
   const columns: Array<{ key: keyof StfBemSensorRow; readonly?: boolean }> = [
     { key: "CHANNEL", readonly: true },
@@ -218,11 +245,20 @@ const BemSensorTable = ({
                   {readonly ? (
                     row.CHANNEL
                   ) : (
-                    <TableTextInput
-                      value={row[key]}
-                      onChange={(val) => updateRow(index, key, val)}
-                      disabled={disabled} readOnly={readOnly}
-                    />
+                    <Box>
+                      <TableTextInput
+                        value={row[key]}
+                        onChange={(val) => updateRow(index, key, val)}
+                        disabled={disabled}
+                        readOnly={readOnly}
+                      />
+                      <FieldErrorText
+                        message={fieldError(
+                          validationErrors,
+                          `SENSOR_CONFIGURATION.${index}.${key}`,
+                        )}
+                      />
+                    </Box>
                   )}
                 </TableCell>
               ))}
@@ -239,11 +275,13 @@ const GrainDimensionTable = ({
   onChange,
   disabled,
   readOnly,
+  validationErrors,
 }: {
   rows: StfBemGrainRow[];
   onChange: (rows: StfBemGrainRow[]) => void;
   disabled?: boolean;
   readOnly?: boolean;
+  validationErrors?: ValidationErrors;
 }) => {
   const columns: Array<{ key: keyof StfBemGrainRow; readonly?: boolean }> = [
     { key: "SIDE", readonly: true },
@@ -281,11 +319,20 @@ const GrainDimensionTable = ({
                   {readonly ? (
                     row.SIDE
                   ) : (
-                    <TableTextInput
-                      value={row[key]}
-                      onChange={(val) => updateRow(index, key, val)}
-                      disabled={disabled} readOnly={readOnly}
-                    />
+                    <Box>
+                      <TableTextInput
+                        value={row[key]}
+                        onChange={(val) => updateRow(index, key, val)}
+                        disabled={disabled}
+                        readOnly={readOnly}
+                      />
+                      <FieldErrorText
+                        message={fieldError(
+                          validationErrors,
+                          `GRAIN_DIMENSION.${index}.${key}`,
+                        )}
+                      />
+                    </Box>
                   )}
                 </TableCell>
               ))}
@@ -312,6 +359,7 @@ const MainMotorPanel = ({
   theme,
   readOnly,
   subDeptSlug,
+  validationErrors,
 }: {
   data: StfMainMotorData;
   onChange: (next: StfMainMotorData) => void;
@@ -319,6 +367,7 @@ const MainMotorPanel = ({
   readOnly?: boolean;
   theme?: any;
   subDeptSlug?: StfFileSubDeptSlug;
+  validationErrors?: ValidationErrors;
 }) => (
   <Box>
     <SectionCard title="Igniter Details" theme={theme}>
@@ -328,6 +377,9 @@ const MainMotorPanel = ({
         onChange={(next) => onChange({ ...data, IGNITER_DETAILS: next })}
         disabled={disabled} readOnly={readOnly}
         columns={3}
+
+        pathPrefix="IGNITER_DETAILS"
+        validationErrors={validationErrors}
       />
     </SectionCard>
 
@@ -347,6 +399,9 @@ const MainMotorPanel = ({
         onChange={(next) => onChange({ ...data, NOZZLE_DETAILS: next })}
         disabled={disabled} readOnly={readOnly}
         columns={3}
+
+        pathPrefix="NOZZLE_DETAILS"
+        validationErrors={validationErrors}
       />
     </SectionCard>
 
@@ -365,6 +420,9 @@ const MainMotorPanel = ({
         onChange={(next) => onChange({ ...data, TESTING_DETAILS: next })}
         disabled={disabled} readOnly={readOnly}
         columns={3}
+
+        pathPrefix="TESTING_DETAILS"
+        validationErrors={validationErrors}
       />
     </SectionCard>
 
@@ -372,7 +430,9 @@ const MainMotorPanel = ({
       <MainSensorTable
         rows={data.SENSOR_CONFIGURATION}
         onChange={(rows) => onChange({ ...data, SENSOR_CONFIGURATION: rows })}
-        disabled={disabled} readOnly={readOnly}
+        disabled={disabled}
+        readOnly={readOnly}
+        validationErrors={validationErrors}
       />
     </SectionCard>
 
@@ -384,6 +444,9 @@ const MainMotorPanel = ({
         disabled={disabled} readOnly={readOnly}
         columns={3}
         multilineKeys={[]}
+
+        pathPrefix="STATIC_TEST_RESULT"
+        validationErrors={validationErrors}
       />
     </SectionCard>
 
@@ -403,6 +466,7 @@ const MainMotorPanel = ({
         disabled={disabled}
         readOnly={readOnly}
       />
+      <FieldErrorText message={fieldError(validationErrors, "UPLOAD_PT_CURVE.PT_CURVE_FILE")} />
     </SectionCard>
   </Box>
 );
@@ -414,6 +478,7 @@ const BemMotorPanel = ({
   theme,
   readOnly,
   subDeptSlug,
+  validationErrors,
 }: {
   data: StfBemMotorData;
   onChange: (next: StfBemMotorData) => void;
@@ -421,6 +486,7 @@ const BemMotorPanel = ({
   readOnly?: boolean;
   theme?: any;
   subDeptSlug?: StfFileSubDeptSlug;
+  validationErrors?: ValidationErrors;
 }) => (
   <Box>
     <SectionCard title="Conditioning Details" theme={theme}>
@@ -435,7 +501,11 @@ const BemMotorPanel = ({
                 CONDITIONING_DETAILS: patchSection(data.CONDITIONING_DETAILS, "FROM_DATE_TIME", next),
               })
             }
-            disabled={disabled} readOnly={readOnly}
+            disabled={disabled}
+            readOnly={readOnly}
+          />
+          <FieldErrorText
+            message={fieldError(validationErrors, "CONDITIONING_DETAILS.FROM_DATE_TIME")}
           />
         </Box>
         <Box>
@@ -448,7 +518,11 @@ const BemMotorPanel = ({
                 CONDITIONING_DETAILS: patchSection(data.CONDITIONING_DETAILS, "TO_DATE_TIME", next),
               })
             }
-            disabled={disabled} readOnly={readOnly}
+            disabled={disabled}
+            readOnly={readOnly}
+          />
+          <FieldErrorText
+            message={fieldError(validationErrors, "CONDITIONING_DETAILS.TO_DATE_TIME")}
           />
         </Box>
         <Box>
@@ -461,7 +535,11 @@ const BemMotorPanel = ({
                 CONDITIONING_DETAILS: patchSection(data.CONDITIONING_DETAILS, "TEMPERATURE", next),
               })
             }
-            disabled={disabled} readOnly={readOnly}
+            disabled={disabled}
+            readOnly={readOnly}
+          />
+          <FieldErrorText
+            message={fieldError(validationErrors, "CONDITIONING_DETAILS.TEMPERATURE")}
           />
         </Box>
         <Box>
@@ -474,8 +552,10 @@ const BemMotorPanel = ({
                 CONDITIONING_DETAILS: patchSection(data.CONDITIONING_DETAILS, "RH", next),
               })
             }
-            disabled={disabled} readOnly={readOnly}
+            disabled={disabled}
+            readOnly={readOnly}
           />
+          <FieldErrorText message={fieldError(validationErrors, "CONDITIONING_DETAILS.RH")} />
         </Box>
         <Box sx={{ gridColumn: { xs: "1", md: "1 / -1" } }}>
           <FieldLabel>{formatFieldLabel("OBSERVATION")}</FieldLabel>
@@ -487,9 +567,13 @@ const BemMotorPanel = ({
                 CONDITIONING_DETAILS: patchSection(data.CONDITIONING_DETAILS, "OBSERVATION", next),
               })
             }
-            disabled={disabled} readOnly={readOnly}
+            disabled={disabled}
+            readOnly={readOnly}
             multiline
             minRows={2}
+          />
+          <FieldErrorText
+            message={fieldError(validationErrors, "CONDITIONING_DETAILS.OBSERVATION")}
           />
         </Box>
       </FieldGrid>
@@ -499,7 +583,9 @@ const BemMotorPanel = ({
       <GrainDimensionTable
         rows={data.GRAIN_DIMENSION}
         onChange={(rows) => onChange({ ...data, GRAIN_DIMENSION: rows })}
-        disabled={disabled} readOnly={readOnly}
+        disabled={disabled}
+        readOnly={readOnly}
+        validationErrors={validationErrors}
       />
     </SectionCard>
 
@@ -520,6 +606,9 @@ const BemMotorPanel = ({
         disabled={disabled} readOnly={readOnly}
         columns={3}
         multilineKeys={[]}
+
+        pathPrefix="BEM_HARDWARE_DETAILS"
+        validationErrors={validationErrors}
       />
     </SectionCard>
 
@@ -530,6 +619,9 @@ const BemMotorPanel = ({
         onChange={(next) => onChange({ ...data, IGNITER_DETAILS: next })}
         disabled={disabled} readOnly={readOnly}
         columns={3}
+
+        pathPrefix="IGNITER_DETAILS"
+        validationErrors={validationErrors}
       />
     </SectionCard>
 
@@ -550,6 +642,9 @@ const BemMotorPanel = ({
         onChange={(next) => onChange({ ...data, NOZZLE_DETAILS: next })}
         disabled={disabled} readOnly={readOnly}
         columns={3}
+
+        pathPrefix="NOZZLE_DETAILS"
+        validationErrors={validationErrors}
       />
     </SectionCard>
 
@@ -569,6 +664,9 @@ const BemMotorPanel = ({
         disabled={disabled} readOnly={readOnly}
         columns={3}
         multilineKeys={[]}
+
+        pathPrefix="TESTING_DETAILS"
+        validationErrors={validationErrors}
       />
     </SectionCard>
 
@@ -576,7 +674,9 @@ const BemMotorPanel = ({
       <BemSensorTable
         rows={data.SENSOR_CONFIGURATION}
         onChange={(rows) => onChange({ ...data, SENSOR_CONFIGURATION: rows })}
-        disabled={disabled} readOnly={readOnly}
+        disabled={disabled}
+        readOnly={readOnly}
+        validationErrors={validationErrors}
       />
     </SectionCard>
 
@@ -588,6 +688,9 @@ const BemMotorPanel = ({
         disabled={disabled} readOnly={readOnly}
         columns={3}
         multilineKeys={[]}
+
+        pathPrefix="RESULT_DETAILS"
+        validationErrors={validationErrors}
       />
     </SectionCard>
 
@@ -607,6 +710,9 @@ const BemMotorPanel = ({
         disabled={disabled}
         readOnly={readOnly}
       />
+      <FieldErrorText
+        message={fieldError(validationErrors, "UPLOAD_PT_CURVE.PT_CURVE_UPLOAD")}
+      />
     </SectionCard>
   </Box>
 );
@@ -621,6 +727,7 @@ const StfMotorPanel = ({
   subDepartmentId: _subDepartmentId,
   batchId: _batchId,
   motorId: _motorId,
+  validationErrors,
 }: Props) => {
   if (value.variant === "MAIN_MOTOR") {
     return (
@@ -631,6 +738,7 @@ const StfMotorPanel = ({
         readOnly={readOnly}
         theme={theme}
         subDeptSlug={subDeptSlug}
+        validationErrors={validationErrors}
       />
     );
   }
@@ -643,6 +751,7 @@ const StfMotorPanel = ({
       readOnly={readOnly}
       theme={theme}
       subDeptSlug={subDeptSlug}
+      validationErrors={validationErrors}
     />
   );
 };

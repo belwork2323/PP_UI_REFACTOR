@@ -181,6 +181,7 @@ const DispatchPage = () => {
     handleMotorDataChange,
     handleSaveMotorDraft,
     handleSubmitMotor,
+    motorValidationErrors,
     detailsRow,
     detailsData,
     detailsLoading,
@@ -266,6 +267,7 @@ const DispatchPage = () => {
                 setPendingMotorId(motorId);
                 setMotorSubmitConfirmOpen(true);
               }}
+              motorValidationErrors={motorValidationErrors}
               theme={dispatchTheme}
             />
         </>

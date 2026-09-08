@@ -30,6 +30,10 @@ import {
   type StfMotorSubmissionType,
 } from "../../../data/models/user/StaticTestFacilityFormModel";
 import { buildStfMotorStaticTestingDetails, type StfMotorData, collectTempFileIdsFromStfForm, hasIncompleteStfUploads } from "../../../data/models/user/StfMotorDataModel";
+import {
+  validateStfMotorSession,
+  type ValidationErrors as StfValidationErrors,
+} from "../../../data/validation/adapters/stf.validation";
 import { normalizeSubdepartmentBatchStatus } from "../../../data/models/user/SubdepartmentBatchModel";
 import {
   mapStfSubType,
@@ -244,6 +248,9 @@ export const useBaseStaticTestFacility = ({
   const [addedMotors, setAddedMotors] = useState<StfAddedMotor[]>([]);
   const [batchMotorEntries, setBatchMotorEntries] = useState<StfAddedMotor[]>([]);
   const [motorStatusById, setMotorStatusById] = useState<Record<string, StfMotorStatusMeta>>({});
+  const [motorValidationErrors, setMotorValidationErrors] = useState<
+    Record<string, StfValidationErrors>
+  >({});
   const [previousStageGate, setPreviousStageGate] =
     useState<PreviousStageApprovedUnits | null>(null);
   const [savedStfTestNoByMotorId, setSavedStfTestNoByMotorId] = useState<Record<string, string>>(
@@ -417,6 +424,7 @@ export const useBaseStaticTestFacility = ({
     setAddedMotors([]);
     setBatchMotorEntries([]);
     setMotorStatusById({});
+    setMotorValidationErrors({});
     setPreviousStageGate(null);
     setSavedStfTestNoByMotorId({});
     setApprovedMotorOptions([]);
@@ -581,20 +589,35 @@ export const useBaseStaticTestFacility = ({
     if (facilityType === "OTHER_BEM") {
       setFormData((prev) => {
         const motors = prev.motors ?? [];
+        let nextMotors: StfMotorSession[];
         if (!motors.length) {
-          return {
-            ...prev,
-            bemNo: value,
-            motors: [createEmptyStfMotorSession(value, "BEM")],
-            formLoaded: true,
-          };
+          nextMotors = [createEmptyStfMotorSession(value, "BEM")];
+        } else {
+          nextMotors = motors.map((motor, index) =>
+            index === 0 ? { ...motor, motorId: value } : motor,
+          );
+        }
+        const updated = nextMotors[0];
+        if (updated) {
+          const key = String(updated.motorId ?? "").trim() || "BEM_FORM";
+          const live = validateStfMotorSession(updated, "FORMAT");
+          setMotorValidationErrors((errs) => {
+            // Drop stale BEM_FORM key when motorId is assigned
+            const next = { ...errs };
+            delete next["BEM_FORM"];
+            if (Object.keys(live).length === 0) {
+              delete next[key];
+              return next;
+            }
+            next[key] = live;
+            return next;
+          });
         }
         return {
           ...prev,
           bemNo: value,
-          motors: motors.map((motor, index) =>
-            index === 0 ? { ...motor, motorId: value } : motor,
-          ),
+          motors: nextMotors,
+          formLoaded: nextMotors.length > 0,
         };
       });
     }
@@ -604,13 +627,30 @@ export const useBaseStaticTestFacility = ({
     setFormData((prev) => {
       if (!prev.motors?.length) return prev;
 
+      const nextMotors = prev.motors.map((motor, index) =>
+        motor.motorId === motorId || (motorId === "BEM_FORM" && index === 0)
+          ? { ...motor, stfData, formLoaded: true }
+          : motor,
+      );
+      const updated =
+        nextMotors.find((m) => m.motorId === motorId) ??
+        (motorId === "BEM_FORM" ? nextMotors[0] : undefined);
+      if (updated) {
+        const key = updated.motorId || motorId;
+        const live = validateStfMotorSession(updated, "FORMAT");
+        setMotorValidationErrors((errs) => {
+          if (Object.keys(live).length === 0) {
+            if (!errs[key]) return errs;
+            const copy = { ...errs };
+            delete copy[key];
+            return copy;
+          }
+          return { ...errs, [key]: live };
+        });
+      }
       return {
         ...prev,
-        motors: prev.motors.map((motor, index) =>
-          motor.motorId === motorId || (motorId === "BEM_FORM" && index === 0)
-            ? { ...motor, stfData, formLoaded: true }
-            : motor,
-        ),
+        motors: nextMotors,
       };
     });
   }, []);
@@ -776,14 +816,31 @@ export const useBaseStaticTestFacility = ({
         };
       }
 
+      const nextMotors = prev.motors.map((motor, index) =>
+        motor.motorId === id || (id === "BEM_FORM" && index === 0)
+          ? { ...motor, stfTestNo }
+          : motor,
+      );
+      const updated =
+        nextMotors.find((m) => m.motorId === id) ??
+        (id === "BEM_FORM" ? nextMotors[0] : undefined);
+      if (updated) {
+        const key = updated.motorId || id;
+        const live = validateStfMotorSession(updated, "FORMAT");
+        setMotorValidationErrors((errs) => {
+          if (Object.keys(live).length === 0) {
+            if (!errs[key]) return errs;
+            const copy = { ...errs };
+            delete copy[key];
+            return copy;
+          }
+          return { ...errs, [key]: live };
+        });
+      }
       return {
         ...prev,
         stfTestNo,
-        motors: prev.motors.map((motor, index) =>
-          motor.motorId === id || (id === "BEM_FORM" && index === 0)
-            ? { ...motor, stfTestNo }
-            : motor,
-        ),
+        motors: nextMotors,
       };
     });
   }, [savedStfTestNoByMotorId]);
@@ -931,9 +988,12 @@ export const useBaseStaticTestFacility = ({
               motorStage: batchDetails?.motorStage ?? stfBatchObj.motorStage,
               numberOfMotors: batchDetails?.numberOfMotors ?? stfBatchObj.numberOfMotors,
               subType: seedMainMotors ? "MAIN_MOTOR" : "BEM",
-              stageProgress: batchDetails?.stageProgress ?? stfBatchObj.stageProgress,
-              currentStage: batchDetails?.currentStage ?? stfBatchObj.currentStage,
-            };
+              // stageProgress / currentStage used for previous-stage gate (may be absent on STFBatch type)
+              stageProgress:
+                batchDetails?.stageProgress ?? (stfBatchObj as { stageProgress?: unknown }).stageProgress,
+              currentStage:
+                batchDetails?.currentStage ?? (stfBatchObj as { currentStage?: unknown }).currentStage,
+            } as STFBatch;
           } catch (error) {
             console.error("Unable to resolve batch motor details", error);
             autoMotorEntries = resolveStfSeededNavigationMotors(stfBatchObj, null);
@@ -968,8 +1028,12 @@ export const useBaseStaticTestFacility = ({
         } else {
           setPreviousStageGate(
             resolvePreviousStageApprovedUnits({
-              stageProgress: nextBatch.stageProgress ?? stfBatchObj.stageProgress,
-              currentStage: nextBatch.currentStage ?? stfBatchObj.currentStage,
+              stageProgress:
+                (nextBatch as { stageProgress?: unknown }).stageProgress ??
+                (stfBatchObj as { stageProgress?: unknown }).stageProgress,
+              currentStage:
+                (nextBatch as { currentStage?: unknown }).currentStage ??
+                (stfBatchObj as { currentStage?: unknown }).currentStage,
               currentSlug: "static-test-facility",
               currentSubDepartmentId: subDepartmentId,
               subDepartments: user?.allSubDepartments,
@@ -1134,6 +1198,7 @@ export const useBaseStaticTestFacility = ({
       setAddedMotors(nextAddedMotors);
       setSavedStfTestNoByMotorId(nextSavedStfTestNoByMotorId);
       setIsEditMode(editMode);
+      setMotorValidationErrors({});
       setView("form");
       resetFlowDraft();
 
@@ -1191,7 +1256,7 @@ export const useBaseStaticTestFacility = ({
       initialSnapshot: initialSnapshotRef.current,
       currentState: snapshotStateRef.current,
       deleteTemp,
-      extractTempFileIds: collectTempFileIdsFromStfForm,
+      extractTempFileIds: (state) => collectTempFileIdsFromStfForm(state.formData),
       resetForm: () => {
         bumpBatchRefresh();
         resetFormContext();
@@ -1209,6 +1274,21 @@ export const useBaseStaticTestFacility = ({
     if (hasIncompleteStfUploads(formData)) {
       showAlert(messages.FILE_UPLOAD_PENDING, "warning");
       return false;
+    }
+
+    // Field validation for active motors (OTHER_BEM single session or all ACEM motors on full submit)
+    {
+      const tier = intent === "draft" ? "UNIT" : "SUBMIT";
+      const nextErrors: Record<string, StfValidationErrors> = {};
+      for (const motor of formData.motors ?? []) {
+        const id = String(motor.motorId ?? "").trim() || "BEM_FORM";
+        const errs = validateStfMotorSession(motor, tier);
+        if (Object.keys(errs).length > 0) nextErrors[id] = errs;
+      }
+      if (Object.keys(nextErrors).length > 0) {
+        setMotorValidationErrors((prev) => ({ ...prev, ...nextErrors }));
+        return false;
+      }
     }
 
     setActionLoading(true);
@@ -1464,6 +1544,21 @@ export const useBaseStaticTestFacility = ({
       if (!hasMotorStaticTestFacilityValue(formData, motorId)) {
         showAlert(messages.EMPTY_FORM_ERROR, "warning");
         return false;
+      }
+
+      {
+        const tier = intent === "draft" ? "UNIT" : "SUBMIT";
+        const fieldErrors = validateStfMotorSession(motor, tier);
+        if (Object.keys(fieldErrors).length > 0) {
+          setMotorValidationErrors((prev) => ({ ...prev, [motorId]: fieldErrors }));
+          return false;
+        }
+        setMotorValidationErrors((prev) => {
+          if (!prev[motorId]) return prev;
+          const copy = { ...prev };
+          delete copy[motorId];
+          return copy;
+        });
       }
 
       const motorSubmissionType: StfMotorSubmissionType =
@@ -1741,6 +1836,7 @@ export const useBaseStaticTestFacility = ({
     handleSubmit,
     handleSaveMotorDraft,
     handleSubmitMotor,
+    motorValidationErrors,
     detailsRow,
     detailsData,
     detailsLoading,

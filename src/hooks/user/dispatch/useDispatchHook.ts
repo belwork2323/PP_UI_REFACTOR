@@ -29,6 +29,10 @@ import {
   type DispatchMotorSubmissionType,
 } from "../../../data/models/user/DispatchFormModel";
 import type { DispatchMotorData } from "../../../data/models/user/DispatchMotorDataModel";
+import {
+  validateDispatchMotorSession,
+  type ValidationErrors as DispatchValidationErrors,
+} from "../../../data/validation/adapters/dispatch.validation";
 import { normalizeSubdepartmentBatchStatus } from "../../../data/models/user/SubdepartmentBatchModel";
 import {
   type DispatchAddedMotor,
@@ -39,7 +43,6 @@ import {
 import { OPERATION_STATUS } from "../../operationStatus";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import {
-  isMotorEnabledByPreviousStage,
   isMotorEnabledForWorkflow,
   resolvePreviousStageApprovedUnits,
   type PreviousStageApprovedUnits,
@@ -49,6 +52,19 @@ type WorkflowView = "list" | "form" | "details";
 
 const messages = STRINGS.DISPATCH;
 
+const asOptionalStageString = (value: unknown): string | null => {
+  if (value == null) return null;
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    return trimmed || null;
+  }
+  if (typeof value === "number" || typeof value === "boolean") {
+    return String(value);
+  }
+  return null;
+};
+
+
 const normalizeBatch = (batch: any): DispatchBatch => {
   const motorIds = Array.isArray(batch?.motorIds)
     ? batch.motorIds.map((id: unknown) => String(id).trim()).filter(Boolean)
@@ -56,14 +72,22 @@ const normalizeBatch = (batch: any): DispatchBatch => {
 
   return {
     ...batch,
+    id: batch?.id ?? batch?.batchId ?? "",
+    batchId: String(batch?.batchId ?? "").trim(),
     projectId: batch?.projectId ?? batch?.projectName ?? "",
     projectName: batch?.projectName ?? batch?.projectId ?? "",
     dispatchStatus: batch?.dispatchStatus ?? batch?.status ?? OPERATION_STATUS.TO_BE_INITIATED,
     formId: batch?.formId ?? null,
     motorIds,
     motorId: motorIds.length > 0 ? motorIds.join(", ") : String(batch?.motorId ?? "").trim(),
+    motorType: String(batch?.motorType ?? batch?.motorStage ?? ""),
     motorStage: normalizeDispatchMotorStage(batch?.motorStage ?? batch?.motorType),
+    priority: String(batch?.priority ?? ""),
+    assignedTo: batch?.assignedTo ?? null,
+    createdOn: String(batch?.createdOn ?? ""),
     rejectionReason: batch?.rejectionReason ?? null,
+    stageProgress: batch?.stageProgress,
+    currentStage: batch?.currentStage ?? null,
   };
 };
 
@@ -176,6 +200,9 @@ export const useDispatchHook = () => {
   );
   const [previousStageGate, setPreviousStageGate] =
     useState<PreviousStageApprovedUnits | null>(null);
+  const [motorValidationErrors, setMotorValidationErrors] = useState<
+    Record<string, DispatchValidationErrors>
+  >({});
 
   const resetFlowDraft = useCallback(() => {
     setDraftMotorId("");
@@ -220,6 +247,7 @@ export const useDispatchHook = () => {
     setBatchMotorEntries([]);
     setMotorStatusById({});
     setPreviousStageGate(null);
+    setMotorValidationErrors({});
     resetFlowDraft();
   }, [resetFlowDraft]);
 
@@ -275,12 +303,25 @@ export const useDispatchHook = () => {
   }, []);
 
   const handleMotorDataChange = useCallback((motorId: string, dispatchData: DispatchMotorData) => {
-    setFormData((prev) => ({
-      ...prev,
-      motors: (prev.motors ?? []).map((motor) =>
+    setFormData((prev) => {
+      const nextMotors = (prev.motors ?? []).map((motor) =>
         motor.motorId === motorId ? { ...motor, dispatchData } : motor,
-      ),
-    }));
+      );
+      const motor = nextMotors.find((m) => m.motorId === motorId);
+      if (motor) {
+        const live = validateDispatchMotorSession(motor, "FORMAT");
+        setMotorValidationErrors((errs) => {
+          if (Object.keys(live).length === 0) {
+            if (!errs[motorId]) return errs;
+            const next = { ...errs };
+            delete next[motorId];
+            return next;
+          }
+          return { ...errs, [motorId]: live };
+        });
+      }
+      return { ...prev, motors: nextMotors };
+    });
   }, []);
 
   const openFormWithResolvedData = useCallback(
@@ -301,7 +342,7 @@ export const useDispatchHook = () => {
           .includes("partial") ||
         Boolean(String(formId ?? "").trim());
 
-      let nextBatch = batch;
+      let nextBatch: DispatchBatch = { ...batch };
       let resolvedData = createDefaultDispatchFormState();
       let autoMotorEntries: DispatchAddedMotor[] = [];
       let nextStatuses: Record<string, DispatchMotorStatusMeta> = {};
@@ -322,8 +363,13 @@ export const useDispatchHook = () => {
                 batchDetails?.motorIds?.length > 0
                   ? batchDetails.motorIds.join(", ")
                   : batch.motorId,
-              stageProgress: batchDetails?.stageProgress ?? batch.stageProgress,
-              currentStage: batchDetails?.currentStage ?? batch.currentStage,
+              stageProgress:
+                (batchDetails as { stageProgress?: unknown } | null | undefined)?.stageProgress ??
+                batch.stageProgress,
+              currentStage: asOptionalStageString(
+                (batchDetails as { currentStage?: unknown } | null | undefined)?.currentStage ??
+                  batch.currentStage,
+              ),
             };
           } catch (error) {
             console.error("Unable to resolve batch motor details", error);
@@ -425,6 +471,7 @@ export const useDispatchHook = () => {
       setMotorStatusById(nextStatuses);
       setIsEditMode(editMode);
       setView("form");
+      setMotorValidationErrors({});
       resetFlowDraft();
       setInitialSnapshot(
         JSON.stringify({
@@ -493,7 +540,7 @@ export const useDispatchHook = () => {
       initialSnapshot: initialSnapshotRef.current,
       currentState: snapshotStateRef.current,
       deleteTemp,
-      extractTempFileIds: collectTempFileIdsFromDispatchForm,
+      extractTempFileIds: (state) => collectTempFileIdsFromDispatchForm(state.formData),
       resetForm: () => {
         bumpBatchRefresh();
         resetFormContext();
@@ -568,6 +615,22 @@ export const useDispatchHook = () => {
       if (intent === "draft" && !hasMotorDispatchValue(formData, motorId)) {
         showAlert(messages.EMPTY_FORM_ERROR, "warning");
         return false;
+      }
+
+      // UNIT on draft; SUBMIT on submit. Red under fields; no field toast.
+      {
+        const tier = intent === "draft" ? "UNIT" : "SUBMIT";
+        const fieldErrors = validateDispatchMotorSession(motor, tier);
+        if (Object.keys(fieldErrors).length > 0) {
+          setMotorValidationErrors((prev) => ({ ...prev, [motorId]: fieldErrors }));
+          return false;
+        }
+        setMotorValidationErrors((prev) => {
+          if (!prev[motorId]) return prev;
+          const next = { ...prev };
+          delete next[motorId];
+          return next;
+        });
       }
 
       const motorSubmissionType: DispatchMotorSubmissionType =
@@ -753,6 +816,7 @@ export const useDispatchHook = () => {
     actionLoading,
     backConfirmOpen,
     subDepartmentId,
+    motorValidationErrors,
     handleFillForm,
     handleEditForm,
     handleBack,

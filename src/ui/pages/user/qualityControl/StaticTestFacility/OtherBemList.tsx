@@ -77,6 +77,7 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
     hasSavedDraft = false,
     activeBemMotor,
     isStfTestNoLocked,
+    motorValidationErrors = {},
   } = hookState;
 
   const bemMotorSession = useMemo(() => {
@@ -95,6 +96,11 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
   const bemMotorNo = String(draftBemNo || formData?.bemNo || bemMotorSession.motorId || "").trim();
   const stfTestNoValue = String(bemMotorSession.stfTestNo || formData?.stfTestNo || "").trim();
   const canSubmitActions = bemMotorNo.length > 0 && stfTestNoValue.length > 0;
+  const activeValidationErrors =
+    motorValidationErrors[bemMotorId] ??
+    motorValidationErrors[bemMotorNo] ??
+    motorValidationErrors["BEM_FORM"] ??
+    {};
   const stfTestNoLocked = [activeBemMotor?.motorId, bemMotorNo, draftBemNo, bemMotorId]
     .map((id) => String(id ?? "").trim())
     .filter(Boolean)
@@ -238,6 +244,12 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
                 value={draftBemNo || formData?.bemNo || bemMotorSession.motorId || ""}
                 placeholder={strings.OTHER_BEM_MOTOR_NO_PLACEHOLDER}
                 disabled={isExistingRecord}
+                error={Boolean(activeValidationErrors.motorId || activeValidationErrors.bemMotorNo)}
+                helperText={
+                  activeValidationErrors.motorId ||
+                  activeValidationErrors.bemMotorNo ||
+                  " "
+                }
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                   handleDraftBemNoChange?.(e.target.value);
                 }}
@@ -249,6 +261,8 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
                 value={stfTestNoValue}
                 placeholder={strings.STF_TEST_NO_PLACEHOLDER}
                 disabled={stfTestNoLocked || actionLoading}
+                error={Boolean(activeValidationErrors.stfTestNo)}
+                helperText={activeValidationErrors.stfTestNo || " "}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                   if (stfTestNoLocked) return;
                   handleStfTestNoChange?.(bemMotorId, e.target.value);
@@ -265,6 +279,7 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
             subDepartmentId={subDepartmentId}
             batchId={batch?.batchId}
             motorId={bemMotorNo || bemMotorId}
+            validationErrors={activeValidationErrors}
           />
         </Box>
       </Box>

@@ -62,6 +62,7 @@ type DispatchFormProps = {
   onSaveMotorDraft?: (motorId: string) => void;
   onSubmitMotor?: (motorId: string) => void;
   theme: any;
+  motorValidationErrors?: Record<string, Record<string, string>>;
 };
 
 const DispatchForm: React.FC<DispatchFormProps> = ({
@@ -86,6 +87,7 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
   onSaveMotorDraft,
   onSubmitMotor,
   theme,
+  motorValidationErrors = {},
 }) => {
   const dispatchTheme = getDispatchTheme(theme);
   const panel = dispatchTheme.panel;
@@ -170,13 +172,13 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
     : false;
 
   const finalApprovalRows = useMemo(
-    () =>
-      buildFinalApprovalMotorRows(
-        motorStatusById as Record<string, { motorSubmissionStatus: string }>,
-        motorCards.map((m) => m.motorId),
-      ),
-    [motorCards, motorStatusById],
-  );
+  () =>
+    buildFinalApprovalMotorRows(
+      motorStatusById as Record<string,{ motorSubmissionStatus: DispatchMotorSubmissionStatus }>,
+      motorCards.map((m) => m.motorId),
+    ),
+  [motorCards, motorStatusById],
+);
   const allMotorsApproved = areAllMotorsApproved(finalApprovalRows);
 
   const navPalette = {
@@ -385,6 +387,7 @@ const DispatchForm: React.FC<DispatchFormProps> = ({
                     theme={theme}
                     readOnly={activeMotorLocked}
                     disabled={activeMotorLocked}
+                    validationErrors={motorValidationErrors[activeMotorEntry.motorId]}
                     onMotorDataChange={(data) =>
                       onMotorDataChange(activeMotorEntry.motorId, data)
                     }

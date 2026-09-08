@@ -62,6 +62,7 @@ type Props = {
   onLoadNDTForm: (motorId?: string) => void;
   onSaveMotorDraft?: (motorId: string) => void;
   onSubmitMotor?: (motorId: string) => void;
+  motorValidationErrors?: Record<string, Record<string, string>>;
 };
 
 const NDTForm = ({
@@ -82,6 +83,7 @@ const NDTForm = ({
   onLoadNDTForm,
   onSaveMotorDraft,
   onSubmitMotor,
+  motorValidationErrors = {},
 }: Props) => {
   const ndtTheme = theme.qualityControl.ndt;
   const brand = ndtTheme.brand;
@@ -481,6 +483,7 @@ const NDTForm = ({
                     motor={activeMotorSession}
                     theme={theme}
                     onChange={(patch) => onMotorSessionChange(activeMotorEntry.motorId, patch)}
+                    validationErrors={motorValidationErrors[activeMotorEntry.motorId]}
                   />
                 </Box>
               )

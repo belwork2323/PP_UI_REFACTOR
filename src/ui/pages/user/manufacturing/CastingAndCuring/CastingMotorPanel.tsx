@@ -1393,8 +1393,8 @@ const CastingMotorPanel = ({
             value={value.CASTING_PROCESS.INITIAL_VACUUM}
             onChange={(e: any) => {
               const val = typeof e === "string" ? e : (e?.target?.value ?? "");
-              clearFieldError?.(`CASTING_PROCESS.INITIAL_VACUUM`);
               patchCastingProcess({ INITIAL_VACUUM: val });
+              clearFieldError?.(`CASTING_PROCESS.INITIAL_VACUUM`);
             }}
             disabled={disabled}
             readOnly={readOnly}
@@ -1413,8 +1413,8 @@ const CastingMotorPanel = ({
             value={value.CASTING_PROCESS.VACUUM_PRESSURE_CASTING}
             onChange={(e: any) => {
               const val = typeof e === "string" ? e : (e?.target?.value ?? "");
-              clearFieldError?.(`CASTING_PROCESS.VACUUM_PRESSURE_CASTING`);
               patchCastingProcess({ VACUUM_PRESSURE_CASTING: val });
+              clearFieldError?.(`CASTING_PROCESS.VACUUM_PRESSURE_CASTING`);
             }}
             disabled={disabled}
             readOnly={readOnly}
@@ -1433,8 +1433,8 @@ const CastingMotorPanel = ({
             value={value.CASTING_PROCESS.VACUUM_PRESSURE_SOAKING}
             onChange={(e: any) => {
               const val = typeof e === "string" ? e : (e?.target?.value ?? "");
-              clearFieldError?.(`CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`);
               patchCastingProcess({ VACUUM_PRESSURE_SOAKING: val });
+              clearFieldError?.(`CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`);
             }}
             disabled={disabled}
             readOnly={readOnly}
@@ -1580,7 +1580,7 @@ const CastingMotorPanel = ({
             <TableHead>
               <TableRow>
                 {[
-                  { label: "Activity", required: true },
+                  { label: "Activity", required: false },
                   { label: "Post Cast Operation Details", required: true },
                 ].map((col, idx) => (
                   <TableCell key={col.label} sx={castingCuringTableHeaderCellSx(idx === 0)}>

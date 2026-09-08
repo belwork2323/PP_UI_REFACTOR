@@ -11,20 +11,17 @@ import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/m
 import { SUBSCALE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/subscale_theme";
 import useSubscaleHook from "../../../../../hooks/user/manufacturing/useSubscaleHook";
 import { STRINGS } from "../../../../../app/config/strings";
-import { FormProvider, useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import {
-  rootSubscaleFormSchema,
-  subscaleHardwareSchema,
-} from "@/data/schemavalidation/SubscaleSchema";
+import validateSubscale from "@/data/validation/adapters/subscale.validation";
 
 const SubscalePage = () => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getManufacturingTheme(mode), [mode]);
   const actionStrings = STRINGS.SOURCING.SPECIFICATION_FORM;
   const S = STRINGS.MANUFACTURING.SUBSCALE;
+
   const [draftConfirmOpen, setDraftConfirmOpen] = useState(false);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   const hookState = useSubscaleHook();
 
@@ -52,21 +49,25 @@ const SubscalePage = () => {
   } = hookState;
 
   const listLoading = loading && !loadingFormDetails && view === "list";
-  const methods = useForm({
-    resolver: zodResolver(rootSubscaleFormSchema),
-    defaultValues: formData || {},
-    mode: "onChange",
-  });
 
-  const { handleSubmit } = methods;
-
-  const handlePreSubmitValid = (data: any) => {
-    console.log("Validation passed, opening confirmation:", data);
+  const handleFormSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const errors = validateSubscale(
+      {
+        ...formData.schemaFormValues,
+        batchType: activeBatch.batchType,
+        subBatchType: batchDetails.subBatchType,
+      },
+      "UNIT",
+    );
+    if (errors && Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      console.warn("Validation failed. Dialog will not open.", errors);
+      return;
+    }
+    setValidationErrors({});
+    console.log("Validation passed, opening confirmation:", formData);
     setSubmitConfirmOpen(true);
-  };
-
-  const handlePreSubmitInvalid = (errs: any) => {
-    console.warn("Validation failed. Dialog will not open.", errs);
   };
 
   const handleFinalSubmit = async () => {
@@ -75,8 +76,37 @@ const SubscalePage = () => {
   };
 
   const handleFinalDraft = async () => {
-    setDraftConfirmOpen(false);
     await handleSaveDraft();
+    setDraftConfirmOpen(false);
+  };
+
+  const handleDraftValidation = async () => {
+    const errors = validateSubscale(
+      {
+        ...formData.schemaFormValues,
+        batchType: activeBatch.batchType,
+        subBatchType: batchDetails.subBatchType,
+      },
+      "UNIT",
+    );
+    if (errors && Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      console.warn("Draft validation failed. Dialog will not open.", errors);
+      return;
+    }
+    setValidationErrors({});
+    console.log("Draft validation passed, opening confirmation:", formData);
+    setDraftConfirmOpen(true);
+  };
+  const clearFieldError = (ruleKey: string) => {
+    setValidationErrors((prev) => {
+      if (!prev || !Object.prototype.hasOwnProperty.call(prev, ruleKey)) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[ruleKey];
+      return next;
+    });
   };
   return (
     <Box sx={theme.workflow.animatedContainer}>
@@ -87,89 +117,92 @@ const SubscalePage = () => {
         color={SUBSCALE_BRAND.ss}
         accentColor={SUBSCALE_BRAND.ssLight}
       />
-      <FormProvider {...methods}>
-        <form onSubmit={handleSubmit(handlePreSubmitValid, handlePreSubmitInvalid)}>
-          {view === "list" && !listLoading && <SubscaleList hookState={hookState} />}
 
-          {view === "details" && detailsRow && (
-            <SubscaleDetailsView
-              row={detailsRow}
-              data={detailsData}
-              loading={detailsLoading}
-              onBack={handleBackFromDetails}
+      <form onSubmit={handleFormSubmit}>
+        {view === "list" && !listLoading && <SubscaleList hookState={hookState} />}
+
+        {view === "details" && detailsRow && (
+          <SubscaleDetailsView
+            row={detailsRow}
+            data={detailsData}
+            loading={detailsLoading}
+            onBack={handleBackFromDetails}
+          />
+        )}
+
+        {view === "form" && activeBatch && !loadingFormDetails && (
+          <>
+            <SubscaleHeader
+              batch={activeBatch}
+              isEdit={isEditMode}
+              onBack={handleBack}
+              theme={theme}
             />
-          )}
+            <SubscaleForm
+              batch={activeBatch}
+              formData={formData}
+              subDepartmentId={subDepartmentId}
+              onFormValuesChange={handleFormValuesChange}
+              theme={theme}
+              batchDetails={batchDetails}
+              actionLoading={actionLoading}
+              isEditMode={isEditMode}
+              errors={validationErrors}
+              clearFieldError={clearFieldError}
+              onRequestSaveDraft={handleDraftValidation}
+            />
 
-          {view === "form" && activeBatch && !loadingFormDetails && (
-            <>
-              <SubscaleHeader
-                batch={activeBatch}
-                isEdit={isEditMode}
-                onBack={handleBack}
-                theme={theme}
-              />
-              <SubscaleForm
-                batch={activeBatch}
-                formData={formData}
-                subDepartmentId={subDepartmentId}
-                onFormValuesChange={handleFormValuesChange}
-                theme={theme}
-                batchDetails={batchDetails}
-                actionLoading={actionLoading}
-                isEditMode={isEditMode}
-                onRequestSaveDraft={() => setDraftConfirmOpen(true)}
-                // onRequestSubmit={() => setSubmitConfirmOpen(true)}
-              />
+            <ConfirmAlertDialog
+              open={backConfirmOpen}
+              severity="warning"
+              title={S.UNSAVED_BACK_TITLE}
+              message={S.UNSAVED_BACK_MESSAGE}
+              confirmLabel={S.UNSAVED_BACK_DISCARD}
+              cancelLabel={S.UNSAVED_BACK_CONFIRM}
+              onConfirm={() => {
+                handleDiscardAndBack();
+                setValidationErrors({});
+              }}
+              onCancel={() => setBackConfirmOpen(false)}
+            />
 
-              <ConfirmAlertDialog
-                open={backConfirmOpen}
-                severity="warning"
-                title={S.UNSAVED_BACK_TITLE}
-                message={S.UNSAVED_BACK_MESSAGE}
-                confirmLabel={S.UNSAVED_BACK_DISCARD}
-                cancelLabel={S.UNSAVED_BACK_CONFIRM}
-                onConfirm={handleDiscardAndBack}
-                onCancel={() => setBackConfirmOpen(false)}
-              />
+            <ConfirmAlertDialog
+              open={draftConfirmOpen}
+              severity="warning"
+              title={actionStrings.CONFIRM_DRAFT_TITLE}
+              message={actionStrings.CONFIRM_DRAFT_MESSAGE}
+              confirmLabel={actionStrings.CONFIRM_DRAFT_ACTION}
+              cancelLabel={actionStrings.CONFIRM_DRAFT_CANCEL_ACTION}
+              onConfirm={handleFinalDraft}
+              onCancel={() => setDraftConfirmOpen(false)}
+            />
 
-              <ConfirmAlertDialog
-                open={draftConfirmOpen}
-                severity="warning"
-                title={actionStrings.CONFIRM_DRAFT_TITLE}
-                message={actionStrings.CONFIRM_DRAFT_MESSAGE}
-                confirmLabel={actionStrings.CONFIRM_DRAFT_ACTION}
-                cancelLabel={actionStrings.CONFIRM_DRAFT_CANCEL_ACTION}
-                onConfirm={handleFinalDraft}
-                onCancel={() => setDraftConfirmOpen(false)}
-              />
-
-              {/* Submit Confirmation Dialog */}
-              <ConfirmAlertDialog
-                open={submitConfirmOpen}
-                severity="warning"
-                title={
-                  isEditMode
-                    ? actionStrings.CONFIRM_RESUBMIT_TITLE
-                    : actionStrings.CONFIRM_SUBMIT_TITLE
-                }
-                message={
-                  isEditMode
-                    ? actionStrings.CONFIRM_RESUBMIT_MESSAGE
-                    : actionStrings.CONFIRM_SUBMIT_MESSAGE
-                }
-                confirmLabel={
-                  isEditMode
-                    ? actionStrings.CONFIRM_RESUBMIT_ACTION
-                    : actionStrings.CONFIRM_SUBMIT_ACTION
-                }
-                cancelLabel={actionStrings.CONFIRM_CANCEL_ACTION}
-                onConfirm={handleFinalSubmit}
-                onCancel={() => setSubmitConfirmOpen(false)}
-              />
-            </>
-          )}
-        </form>
-      </FormProvider>
+            {/* Submit Confirmation Dialog */}
+            <ConfirmAlertDialog
+              open={submitConfirmOpen}
+              severity="warning"
+              title={
+                isEditMode
+                  ? actionStrings.CONFIRM_RESUBMIT_TITLE
+                  : actionStrings.CONFIRM_SUBMIT_TITLE
+              }
+              message={
+                isEditMode
+                  ? actionStrings.CONFIRM_RESUBMIT_MESSAGE
+                  : actionStrings.CONFIRM_SUBMIT_MESSAGE
+              }
+              confirmLabel={
+                isEditMode
+                  ? actionStrings.CONFIRM_RESUBMIT_ACTION
+                  : actionStrings.CONFIRM_SUBMIT_ACTION
+              }
+              cancelLabel={actionStrings.CONFIRM_CANCEL_ACTION}
+              onConfirm={handleFinalSubmit}
+              onCancel={() => setSubmitConfirmOpen(false)}
+            />
+          </>
+        )}
+      </form>
     </Box>
   );
 };

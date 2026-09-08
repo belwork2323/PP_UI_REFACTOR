@@ -2,60 +2,61 @@ import { STRINGS } from "@/app/config/strings";
 import type { CastingMotorData } from "@/data/models/user/CastingMotorDataModel";
 import type { SubDeptValidationConfig } from "../runValidation";
 import type { ValidationTier } from "../submissionIntent";
+import { VALIDATIONSTRING } from "./validationString";
 
-const S = STRINGS.MANUFACTURING.CASTING_CURING.VALIDATION;
+const S = VALIDATIONSTRING;
 
 export const castingCuringFieldRules = {
   feedReading: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.READING_REQUIRED, invalid: S.READING_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   // Mandrel measurements (assembly details)
   mandrelAMock: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.READING_REQUIRED, invalid: S.READING_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   mandrelBMock: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.READING_REQUIRED, invalid: S.READING_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   mandrelBFinal: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.READING_REQUIRED, invalid: S.READING_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   mandrelBellowsThicknessD: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.READING_REQUIRED, invalid: S.READING_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   emptyMotorWeight: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.READING_REQUIRED, invalid: S.READING_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   bowlId: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.BOWL_ID_REQUIRED, invalid: S.BOWL_ID_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   bowlReceiptTime: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.READING_REQUIRED, invalid: S.INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   initialWeight: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.READING_REQUIRED, invalid: S.READING_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   finalWeight: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.READING_REQUIRED, invalid: S.READING_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   //  -----------------------
   ballValveOpenTime: {
@@ -63,7 +64,7 @@ export const castingCuringFieldRules = {
     requiredIn: ["UNIT", "SUBMIT"],
     messages: {
       required: S.REQUIRED,
-      invalid: S.TIME_INVALID,
+      invalid: S.INVALID,
     },
   },
 
@@ -81,7 +82,7 @@ export const castingCuringFieldRules = {
     requiredIn: ["UNIT", "SUBMIT"],
     messages: {
       required: S.REQUIRED,
-      invalid: S.TIME_INVALID,
+      invalid: S.INVALID,
     },
   },
 
@@ -90,166 +91,166 @@ export const castingCuringFieldRules = {
     requiredIn: ["UNIT", "SUBMIT"],
     messages: {
       required: S.REQUIRED,
-      invalid: S.TIME_INVALID,
+      invalid: S.INVALID,
     },
   },
   timeInterval: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.READING_REQUIRED, invalid: S.READING_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   rh: {
     valueType: "number" as const,
     requiredIn: ["SUBMIT"],
-    messages: { required: S.READING_REQUIRED, invalid: S.READING_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   viscosity: {
     valueType: "number" as const,
     requiredIn: ["SUBMIT"],
-    messages: { required: S.READING_REQUIRED, invalid: S.READING_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   slurryCast: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.SLURRY_CAST_REQUIRED, invalid: S.SLURRY_CAST_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   flowRate: {
     valueType: "number" as const,
     requiredIn: ["SUBMIT"],
-    messages: { required: S.READING_REQUIRED, invalid: S.READING_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   valveOpening: {
     valueType: "number" as const,
     requiredIn: ["SUBMIT"],
-    messages: { required: S.READING_REQUIRED, invalid: S.READING_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   vacuumLevel: {
     valueType: "number" as const,
     requiredIn: ["SUBMIT"],
-    messages: { required: S.READING_REQUIRED, invalid: S.READING_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   initialVacuum: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"],
-    messages: { required: S.READING_REQUIRED, invalid: S.READING_INVALID },
+    valueType: "text" as const,
+    requiredIn: ["UNIT", "SUBMIT"],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   vacuumPressureCasting: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"],
-    messages: { required: S.READING_REQUIRED, invalid: S.READING_INVALID },
+    valueType: "text" as const,
+    requiredIn: ["UNIT", "SUBMIT"],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   vacuumPressureSoaking: {
-    valueType: "number" as const,
-    requiredIn: ["SUBMIT"],
-    messages: { required: S.READING_REQUIRED, invalid: S.READING_INVALID },
+    valueType: "text" as const,
+    requiredIn: ["UNIT", "SUBMIT"],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   fmMotorLabel: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.BOWL_ID_REQUIRED, invalid: S.BOWL_ID_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   postActivity: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.POST_DETAIL_REQUIRED, invalid: S.INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   postDetails: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.POST_DETAIL_REQUIRED, invalid: S.INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   // Curing — cycle rows (with specific custom messages)
   curingTemperature: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.CURING_TEMP_REQUIRED, invalid: S.READING_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   curingTime: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.CURING_TIME_REQUIRED, invalid: S.READING_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   curingStartDate: {
     valueType: "date" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.START_DATE_REQUIRED, invalid: S.DATE_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   curingStartTime: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.START_TIME_REQUIRED, invalid: S.TIME_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   curingEndDate: {
     valueType: "date" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.END_DATE_REQUIRED, invalid: S.DATE_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   curingEndTime: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.END_TIME_REQUIRED, invalid: S.TIME_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   propellantPressure: {
     valueType: "number" as const,
     requiredIn: [],
-    messages: { required: S.READING_REQUIRED, invalid: S.READING_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   hotWaterStatus: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.HOT_WATER_STATUS_REQUIRED, invalid: S.INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   // Post-curing details
   postOtherObservations: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.POST_OTHER_OBS_REQUIRED, invalid: S.INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   postVisualObservation: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.POST_VISUAL_OBS_REQUIRED, invalid: S.INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   pressurePlateRemovalDateTime: {
-    valueType: "date" as const,
+    valueType: "text" as const,
     requiredIn: [],
-    messages: { required: S.DATE_REQUIRED, invalid: S.DATE_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   shoreAHardness: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.HARDNESS_REQUIRED, invalid: S.READING_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   deCoringDispatchDateTime: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.DISPATCH_DATE_REQUIRED, invalid: S.DATE_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   // De-coring details
   deCoringDate: {
     valueType: "date" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.DE_CORING_DATE_REQUIRED, invalid: S.DATE_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   buildingNo: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.BUILDING_NO_REQUIRED, invalid: S.BUILDING_NO_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   deCoringLoad: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.DE_CORING_LOAD_REQUIRED, invalid: S.READING_INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   deCoringRemarks: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.REMARKS_REQUIRED, invalid: S.INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   deCoringVisualObservation: {
     valueType: "file" as const,
     requiredIn: ["UNIT", "SUBMIT"],
-    messages: { required: S.FILE_REQUIRED, invalid: S.INVALID },
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
 };
 
@@ -299,11 +300,11 @@ function resolveFieldPaths(data: any) {
         value: feed.READING_2,
         ruleKey: "feedReading",
       });
-      paths.push({
-        path: `FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.EMPTY_MOTOR_WEIGHT`,
-        value: feed.EMPTY_MOTOR_WEIGHT,
-        ruleKey: "emptyMotorWeight",
-      });
+      // paths.push({
+      //   path: `FINAL_ASSEMBLY_DETAILS.motorCasing.0.FEED_PIPE_DISTANCE.0.EMPTY_MOTOR_WEIGHT`,
+      //   value: feed.EMPTY_MOTOR_WEIGHT,
+      //   ruleKey: "emptyMotorWeight",
+      // });
     }
   }
 
@@ -404,22 +405,24 @@ function resolveFieldPaths(data: any) {
       ruleKey: "vacuumLevel",
     });
   });
+  // console.log("check error ", data);
+
   // casting process level fields
-  paths.push({
-    path: `CASTING_PROCESS.INITIAL_VACUUM`,
-    value: data.CASTING_PROCESS?.INITIAL_VACUUM,
-    ruleKey: "initialVacuum",
-  });
-  paths.push({
-    path: `CASTING_PROCESS.VACUUM_PRESSURE_CASTING`,
-    value: data.CASTING_PROCESS?.VACUUM_PRESSURE_CASTING,
-    ruleKey: "vacuumPressureCasting",
-  });
-  paths.push({
-    path: `CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`,
-    value: data.CASTING_PROCESS?.VACUUM_PRESSURE_SOAKING,
-    ruleKey: "vacuumPressureSoaking",
-  });
+  // paths.push({
+  //   path: `CASTING_PROCESS.INITIAL_VACUUM`,
+  //   value: data.CASTING_PROCESS?.INITIAL_VACUUM,
+  //   ruleKey: "initialVacuum",
+  // });
+  // paths.push({
+  //   path: `CASTING_PROCESS.VACUUM_PRESSURE_CASTING`,
+  //   value: data.CASTING_PROCESS?.VACUUM_PRESSURE_CASTING,
+  //   ruleKey: "vacuumPressureCasting",
+  // });
+  // paths.push({
+  //   path: `CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`,
+  //   value: data.CASTING_PROCESS?.VACUUM_PRESSURE_SOAKING,
+  //   ruleKey: "vacuumPressureSoaking",
+  // });
 
   // slurry cast rows
   (data.SLURRY_CAST_DETAILS?.SLURRY_CAST_FROM_BOWLS ?? []).forEach((row, i) => {

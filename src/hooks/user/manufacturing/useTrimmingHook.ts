@@ -22,6 +22,10 @@ import {
   type TrimmingMotorSubmissionType,
 } from "../../../data/models/user/TrimmingFormModel";
 import {
+  validateTrimmingMotorSession,
+  type ValidationErrors as TrimmingValidationErrors,
+} from "../../../data/validation/adapters/trimming.validation";
+import {
   isManufacturingContinueFillingStatus,
 } from "../../operationStatus";
 import {
@@ -224,6 +228,9 @@ export const useTrimmingHook = () => {
   );
   const [previousStageGate, setPreviousStageGate] =
     useState<PreviousStageApprovedUnits | null>(null);
+  const [motorValidationErrors, setMotorValidationErrors] = useState<
+    Record<string, TrimmingValidationErrors>
+  >({});
   const [approvedMotorOptions] = useState<ReturnType<typeof resolveTrimmingMotorOptions>>([]);
 
   const projectId = useMemo(() => resolveBatchProjectId(activeBatch), [activeBatch]);
@@ -309,6 +316,7 @@ export const useTrimmingHook = () => {
     setHasSavedDraft(false);
     setFormData(defaults);
     setPreviousStageGate(null);
+    setMotorValidationErrors({});
     resetFlowDraft();
     setInitialSnapshot(
       JSON.stringify({
@@ -449,6 +457,7 @@ export const useTrimmingHook = () => {
           motorStatusById: nextStatuses,
         }),
       );
+      setMotorValidationErrors({});
       setView("form");
     },
     [clearFlowBarDrafts, showAlert, subDepartmentId, user?.allSubDepartments],
@@ -506,7 +515,7 @@ export const useTrimmingHook = () => {
       initialSnapshot: initialSnapshotRef.current,
       currentState: snapshotStateRef.current,
       deleteTemp,
-      extractTempFileIds: collectTempFileIdsFromTrimmingForm,
+      extractTempFileIds: (state) => collectTempFileIdsFromTrimmingForm(state.formData),
       resetForm: () => {
         bumpBatchRefresh();
         resetFormContext();
@@ -529,6 +538,16 @@ export const useTrimmingHook = () => {
       ...prev,
       motors: (prev.motors ?? []).map((motor) => (motor.motorId === motorId ? next : motor)),
     }));
+    const live = validateTrimmingMotorSession(next, "FORMAT");
+    setMotorValidationErrors((errs) => {
+      if (Object.keys(live).length === 0) {
+        if (!errs[motorId]) return errs;
+        const copy = { ...errs };
+        delete copy[motorId];
+        return copy;
+      }
+      return { ...errs, [motorId]: live };
+    });
   }, []);
 
   const getMotorStatus = useCallback(
@@ -592,14 +611,26 @@ export const useTrimmingHook = () => {
       }
 
       if (intent === "submit") {
-        if (!String(motor.motorReceivedAt ?? "").trim()) {
-          showAlert(S.MOTOR_RECEIVED_REQUIRED, "warning");
-          return false;
-        }
         if (!hasMotorTrimmingValue(formData, motorId)) {
           showAlert(S.EMPTY_FORM_ERROR, "warning");
           return false;
         }
+      }
+
+      // UNIT on draft; SUBMIT on submit — red under fields, no field toast
+      {
+        const tier = intent === "draft" ? "UNIT" : "SUBMIT";
+        const fieldErrors = validateTrimmingMotorSession(motor, tier);
+        if (Object.keys(fieldErrors).length > 0) {
+          setMotorValidationErrors((prev) => ({ ...prev, [motorId]: fieldErrors }));
+          return false;
+        }
+        setMotorValidationErrors((prev) => {
+          if (!prev[motorId]) return prev;
+          const copy = { ...prev };
+          delete copy[motorId];
+          return copy;
+        });
       }
 
       const motorSubmissionType: TrimmingMotorSubmissionType =
@@ -798,6 +829,7 @@ export const useTrimmingHook = () => {
     handleMotorSessionChange,
     handleSaveMotorDraft,
     handleSubmitMotor,
+    motorValidationErrors,
     detailsRow,
     detailsData,
     detailsLoading,

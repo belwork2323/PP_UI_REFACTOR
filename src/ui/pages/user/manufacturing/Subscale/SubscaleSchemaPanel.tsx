@@ -35,7 +35,8 @@ type SubscaleSchemaPanelProps = {
   loading?: boolean;
   error?: string | null;
   batchDetails;
-  validationErrors?: Record<string, string> | null;
+  errors?: Record<string, string>;
+  clearFieldError?: (path: string) => void; // <-- Add this
 };
 
 const mergeFormValuesForBatchType = (
@@ -51,15 +52,12 @@ const SubscaleSchemaPanel = ({
   schema,
   formValues,
   savedSections,
-  subDepartmentId,
-  batchId,
   batchType,
   batchStatus,
   onChange,
-  loading = false,
-  error = null,
   batchDetails,
-  validationErrors = null,
+  errors = null,
+  clearFieldError,
 }: SubscaleSchemaPanelProps) => {
   const hydratedRef = useRef(false);
   const showMainScaleSetup = isMainScaleSubscaleBatch(batchType);
@@ -161,6 +159,7 @@ const SubscaleSchemaPanel = ({
             onChange={handleHardwareChange}
             batchType={batchType}
             canManageProcessTables={canManageProcessTables}
+            clearFieldError={clearFieldError}
           />
         </Box>
       ) : null}
@@ -171,14 +170,16 @@ const SubscaleSchemaPanel = ({
             values={formValues}
             onChange={handleBatchSetupChange}
             batchDetails={batchDetails}
-            validationErrors={validationErrors}
+            errors={errors}
+            clearFieldError={clearFieldError}
           />
           <SubscaleHardwareArticlePanel
             values={formValues}
             onChange={handleBatchSetupChange}
             batchType={batchType}
             canManageProcessTables={canManageProcessTables}
-            validationErrors={validationErrors}
+            errors={errors}
+            clearFieldError={clearFieldError}
           />
         </>
       ) : null}

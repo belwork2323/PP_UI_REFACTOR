@@ -27,13 +27,16 @@ import {
   normalizeNDTFormState,
   normalizeNDTMotorSession,
   resolveRadiographyPlanRows,
-  validateNDTMotorsForApi,
   type NDTFormState,
   type NDTMotorSession,
   type NDTMotorStatusMeta,
   type NDTMotorSubmissionStatus,
   type NDTMotorSubmissionType,
 } from "../../../data/models/user/NDTFormModel";
+import {
+  validateNDTMotorSession,
+  type ValidationErrors as NDTValidationErrors,
+} from "../../../data/validation/adapters/ndt.validation";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import {
   isMotorEnabledByPreviousStage,
@@ -188,6 +191,9 @@ export const useNDTHook = () => {
   const [motorStatusById, setMotorStatusById] = useState<Record<string, NDTMotorStatusMeta>>({});
   const [previousStageGate, setPreviousStageGate] =
     useState<PreviousStageApprovedUnits | null>(null);
+  const [motorValidationErrors, setMotorValidationErrors] = useState<
+    Record<string, NDTValidationErrors>
+  >({});
 
   const listParams = useSubdepartmentBatches("ndt");
   const user = useAuthStore((state) => state.user);
@@ -264,6 +270,7 @@ export const useNDTHook = () => {
     setCasingMotorsById({});
     setMotorStatusById({});
     setPreviousStageGate(null);
+    setMotorValidationErrors({});
     resetFlowDraft();
   }, [resetFlowDraft]);
 
@@ -379,9 +386,9 @@ export const useNDTHook = () => {
                 batchDetails?.motorIds?.length > 0
                   ? batchDetails.motorIds.join(", ")
                   : batch.motorId,
-              stageProgress: batchDetails?.stageProgress ?? batch.stageProgress,
-              currentStage: batchDetails?.currentStage ?? batch.currentStage,
-            };
+              stageProgress: batchDetails?.stageProgress ?? (batch as any).stageProgress,
+              currentStage: batchDetails?.currentStage ?? (batch as any).currentStage,
+            } as NDTBatch;
           } catch (error) {
             console.error("Unable to resolve batch motor details", error);
             autoMotorEntries = resolveBatchMotorEntries(batch, null);
@@ -508,6 +515,7 @@ export const useNDTHook = () => {
         }),
       );
       setIsEditMode(editMode);
+      setMotorValidationErrors({});
       setView("form");
       resetFlowDraft();
     },
@@ -540,19 +548,33 @@ export const useNDTHook = () => {
 
   const handleMotorSessionChange = useCallback(
     (motorId: string, patch: Partial<NDTMotorSession>) => {
-      setFormData((prev) =>
-        normalizeNDTFormState({
-          ...prev,
-          motors: (prev.motors ?? []).map((motor) => {
-            if (motor.motorId !== motorId) return normalizeNDTMotorSession(motor);
-            const merged = { ...motor, ...patch, motorId };
-            if (patch.radiographyPlan && patch.radiographyPlan !== motor.radiographyPlan) {
-              merged.radiographyPlanRows = resolveRadiographyPlanRows(patch.radiographyPlan);
+      setFormData((prev) => {
+        const nextMotors = (prev.motors ?? []).map((motor) => {
+          if (motor.motorId !== motorId) return normalizeNDTMotorSession(motor);
+          const merged = { ...motor, ...patch, motorId };
+          if (patch.radiographyPlan && patch.radiographyPlan !== motor.radiographyPlan) {
+            merged.radiographyPlanRows = resolveRadiographyPlanRows(patch.radiographyPlan);
+          }
+          return normalizeNDTMotorSession(merged);
+        });
+        const updated = nextMotors.find((m) => m.motorId === motorId);
+        if (updated) {
+          const live = validateNDTMotorSession(updated, "FORMAT");
+          setMotorValidationErrors((errs) => {
+            if (Object.keys(live).length === 0) {
+              if (!errs[motorId]) return errs;
+              const copy = { ...errs };
+              delete copy[motorId];
+              return copy;
             }
-            return normalizeNDTMotorSession(merged);
-          }),
-        }),
-      );
+            return { ...errs, [motorId]: live };
+          });
+        }
+        return normalizeNDTFormState({
+          ...prev,
+          motors: nextMotors,
+        });
+      });
     },
     [],
   );
@@ -590,7 +612,7 @@ export const useNDTHook = () => {
       initialSnapshot: initialSnapshotRef.current,
       currentState: snapshotStateRef.current,
       deleteTemp,
-      extractTempFileIds: collectTempFileIdsFromNdtForm,
+      extractTempFileIds: (state) => collectTempFileIdsFromNdtForm(state.formData),
       resetForm: () => {
         bumpBatchRefresh();
         resetFormContext();
@@ -665,14 +687,25 @@ export const useNDTHook = () => {
           showAlert(messages.EMPTY_FORM_ERROR, "warning");
           return false;
         }
-        const validationError = validateNDTMotorsForApi([motor]);
-        if (validationError) {
-          showAlert(validationError, "warning");
-          return false;
-        }
       } else if (!isNDTMotorSetupReady(motor) && !hasMotorNDTValue(formData, motorId)) {
         showAlert(messages.EMPTY_FORM_ERROR, "warning");
         return false;
+      }
+
+      // UNIT on draft; SUBMIT on submit — red under fields, no field toast
+      {
+        const tier = intent === "draft" ? "UNIT" : "SUBMIT";
+        const fieldErrors = validateNDTMotorSession(motor, tier);
+        if (Object.keys(fieldErrors).length > 0) {
+          setMotorValidationErrors((prev) => ({ ...prev, [motorId]: fieldErrors }));
+          return false;
+        }
+        setMotorValidationErrors((prev) => {
+          if (!prev[motorId]) return prev;
+          const copy = { ...prev };
+          delete copy[motorId];
+          return copy;
+        });
       }
 
       const motorSubmissionType: NDTMotorSubmissionType =
@@ -914,6 +947,7 @@ export const useNDTHook = () => {
     setBackConfirmOpen,
     handleSaveMotorDraft,
     handleSubmitMotor,
+    motorValidationErrors,
     handleViewDetails,
     handleBackFromDetails,
   };

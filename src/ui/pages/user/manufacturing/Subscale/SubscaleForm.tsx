@@ -1,3 +1,4 @@
+import React from "react";
 import { Box, Button, Chip, CircularProgress, Stack, Typography } from "@mui/material";
 import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
 import { icons } from "../../../../../app/theme/icons";
@@ -27,11 +28,13 @@ type SubscaleFormProps = {
   schemaError?: string | null;
   onFormValuesChange: (values: import("../../../../../schema-engine").SchemaFormValues) => void;
   theme: any;
-  batchDetails;
+  batchDetails: any;
   actionLoading?: boolean;
   isEditMode?: boolean;
   onRequestSaveDraft?: () => void;
   onRequestSubmit?: () => void;
+  errors?: Record<string, string>;
+  clearFieldError?: (path: string) => void; // <-- Add this
 };
 
 const SubscaleForm = ({
@@ -44,7 +47,8 @@ const SubscaleForm = ({
   actionLoading,
   isEditMode,
   onRequestSaveDraft,
-  // onRequestSubmit,
+  errors,
+  clearFieldError,
 }: SubscaleFormProps) => {
   const BRAND = SUBSCALE_BRAND;
   const isMainScale = isMainScaleSubscaleBatch(batch?.batchType);
@@ -98,7 +102,7 @@ const SubscaleForm = ({
               fontWeight: 700,
               fontSize: "0.72rem",
               alignSelf: { xs: "flex-start", sm: "center" },
-              background: isMainScale ? "rgba(21,101,192,0.1)" : "rgba(21,101,192,0.1)",
+              background: "rgba(21,101,192,0.1)",
               color: isMainScale ? BRAND.primary : BRAND.ss,
               border: `1px solid ${isMainScale ? `${BRAND.primaryLight}44` : `${BRAND.ss}44`}`,
             }}
@@ -120,40 +124,17 @@ const SubscaleForm = ({
             onClick={onRequestSaveDraft}
             startIcon={actionLoading ? <CircularProgress size={14} color="inherit" /> : undefined}
             sx={{ whiteSpace: "nowrap" }}
+            type="button"
           >
             {S.HARDWARE.SAVE_DRAFT}
           </Button>
           <SubmitForApprovalButton
             disabled={actionLoading}
-            // onClick={onRequestSubmit}
+            type="submit"
             label={isEditMode ? S.HARDWARE.RESUBMIT : S.HARDWARE.SUBMIT}
           />
         </Stack>
       ) : null}
-
-      {/* {!isReady ? (
-        <Box
-          sx={{
-            borderRadius: 2.5,
-            border: `1px solid ${theme.palette.border}`,
-            background: theme.palette.surface,
-            px: 2,
-            py: 5,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 1.5,
-          }}
-        >
-          <CircularProgress size={28} sx={{ color: BRAND.ss }} />
-          <Typography sx={{ fontWeight: 600, fontSize: "0.85rem", color: BRAND.text }}>
-            {S.SCHEMA_LOADING}
-          </Typography>
-          <Typography sx={{ fontSize: "0.75rem", color: BRAND.textSub, textAlign: "center" }}>
-            {S.SCHEMA_LOADING_HINT}
-          </Typography>
-        </Box>
-      ) : null} */}
 
       <Box
         sx={{
@@ -174,6 +155,8 @@ const SubscaleForm = ({
           batchStatus={batchStatus}
           onChange={onFormValuesChange}
           batchDetails={batchDetails}
+          errors={errors}
+          clearFieldError={clearFieldError}
         />
       </Box>
     </Box>

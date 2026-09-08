@@ -23,6 +23,7 @@ type DispatchMotorDetailsCardProps = {
   onMotorDataChange: (data: DispatchMotorData) => void;
   readOnly?: boolean;
   disabled?: boolean;
+  validationErrors?: Record<string, string>;
 };
 
 const formatStageLabel = (stage: string) => {
@@ -42,6 +43,7 @@ const DispatchMotorDetailsCard = ({
   subDepartmentId,
   batchId,
   theme,
+  validationErrors,
   onMotorDataChange,
   readOnly = false,
   disabled = false,
@@ -95,6 +97,7 @@ const DispatchMotorDetailsCard = ({
         theme={theme}
         readOnly={readOnly}
         disabled={disabled}
+        validationErrors={validationErrors}
       />
     </>
   );

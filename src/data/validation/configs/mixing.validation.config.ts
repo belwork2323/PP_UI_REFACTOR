@@ -3,68 +3,69 @@ import type { FinalMixEntry, PremixEntry } from "@/data/models/user/MixingFormMo
 import { validateFieldState } from "../fieldValidators";
 import type { SubDeptValidationConfig } from "../runValidation";
 import type { ValidationTier } from "../submissionIntent";
+import { VALIDATIONSTRING } from "./validationString";
 
-const M = STRINGS.MANUFACTURING.MIXING.VALIDATION;
+const M = VALIDATIONSTRING;
 
 export const mixingFieldRules = {
   bowlId: {
     valueType: "text" as const,
     pattern: undefined,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: M.BOWL_ID_REQUIRED, invalid: M.BOWL_ID_INVALID },
+    messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   bowlTrialDate: {
     valueType: "date" as const,
     pattern: undefined,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: M.BOWL_TRIAL_DATE_REQUIRED, invalid: M.BOWL_TRIAL_DATE_INVALID },
+    messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   bowlTrialObservations: {
     valueType: "text" as const,
     pattern: undefined,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: M.BOWL_TRIAL_OBS_REQUIRED, invalid: M.BOWL_TRIAL_OBS_INVALID },
+    messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   // process particulars
   operation: {
     valueType: "text" as const,
     pattern: undefined,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: M.OPERATION_REQUIRED, invalid: M.OPERATION_INVALID },
+    messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   rpm: {
     valueType: "number" as const,
     pattern: undefined,
     requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: M.RPM_REQUIRED, invalid: M.RPM_INVALID },
+    messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   time: {
     valueType: "number" as const,
     pattern: undefined,
     requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: M.TIME_REQUIRED, invalid: M.TIME_INVALID },
+    messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   temp: {
     valueType: "number" as const,
     pattern: undefined,
     requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: M.TEMP_REQUIRED, invalid: M.TEMP_INVALID },
+    messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   vacuum: {
     valueType: "number" as const,
     pattern: undefined,
     requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: M.VACUUM_REQUIRED, invalid: M.VACUUM_INVALID },
+    messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   qualityChecks: {
     valueType: "file" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: M.QUALITY_CHECKS_REQUIRED, invalid: M.QUALITY_CHECKS_INVALID },
+    messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   observedValue: {
     valueType: "number" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
-    messages: { required: M.OBSERVED_VALUE_REQUIRED, invalid: M.OBSERVED_VALUE_INVALID },
+    messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
 };
 

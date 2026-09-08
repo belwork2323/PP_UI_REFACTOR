@@ -92,6 +92,7 @@ type StaticTestFacilityFormProps = {
   onRemoveMotor?: (motorId: string) => void;
   onSaveMotorDraft?: (motorId: string) => void;
   onSubmitMotor?: (motorId: string) => void;
+  motorValidationErrors?: Record<string, Record<string, string>>;
   theme: any;
 };
 
@@ -128,6 +129,7 @@ const StaticTestFacilityForm = ({
   onRemoveMotor,
   onSaveMotorDraft,
   onSubmitMotor,
+  motorValidationErrors = {},
   theme,
 }: StaticTestFacilityFormProps) => {
   const BRAND = STATIC_TEST_FACILITY_BRAND;
@@ -250,7 +252,7 @@ const StaticTestFacilityForm = ({
   const finalApprovalRows = useMemo(
     () =>
       buildFinalApprovalMotorRows(
-        motorStatusById as Record<string, { motorSubmissionStatus: string }>,
+        motorStatusById as Parameters<typeof buildFinalApprovalMotorRows>[0],
         motorCards.map((m) => m.motorId),
       ),
     [motorCards, motorStatusById],
@@ -515,6 +517,10 @@ const StaticTestFacilityForm = ({
                 value={activeMotorSession?.stfTestNo || ""}
                 placeholder={S.STF_TEST_NO_PLACEHOLDER}
                 disabled={actionLoading || activeMotorLocked || activeStfTestNoLocked}
+                error={Boolean(
+                  motorValidationErrors[activeMotorId]?.stfTestNo,
+                )}
+                helperText={motorValidationErrors[activeMotorId]?.stfTestNo || " "}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                   if (!activeMotorEntry?.motorId) return;
                   onStfTestNoChange?.(activeMotorEntry.motorId, e.target.value);
@@ -533,6 +539,7 @@ const StaticTestFacilityForm = ({
                   subDepartmentId={subDepartmentId}
                   batchId={batch?.batchId}
                   motorId={activeMotorSession.motorId}
+                  validationErrors={motorValidationErrors[activeMotorSession.motorId]}
                 />
               </Box>
             ) : (

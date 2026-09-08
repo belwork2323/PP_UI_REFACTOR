@@ -39,17 +39,21 @@ const PROCESS_PARTICULAR_FIELDS = [
   ["vacuum", "Vacuum"],
 ] as const;
 
+/**
+ * Deferred table text cell — local draft for instant typing; parent commits debounced + on blur.
+ */
 type SubscaleTableTextCellProps = Omit<FormInputProps, "value" | "onChange" | "defaultValue"> & {
   tableId: string;
   rowIndex: number;
   fieldId: string;
   value: string;
   onCellChange: SubscaleCellChangeHandler;
-  control?: Control<SchemaFormValues>; // <-- Type for control
+  errorMessage?: string; // Accepts the dynamic path error message directly
 };
 
 /**
  * Deferred table text cell — local draft for instant typing; parent commits debounced + on blur.
+ * Completely independent of React Hook Form (RHF) and control props.
  */
 export const SubscaleTableTextCell = memo(function SubscaleTableTextCell({
   tableId,
@@ -58,7 +62,7 @@ export const SubscaleTableTextCell = memo(function SubscaleTableTextCell({
   value,
   onCellChange,
   disabled,
-  control: propControl,
+  errorMessage,
   ...rest
 }: SubscaleTableTextCellProps) {
   const [draft, setDraft] = useState(value ?? "");
@@ -110,122 +114,23 @@ export const SubscaleTableTextCell = memo(function SubscaleTableTextCell({
     debouncedCommit.cancel();
     commit(draftRef.current);
   }, [commit, debouncedCommit]);
-  const contextControl = useFormContext()?.control;
-  const control = propControl || contextControl;
-  const fieldName = `schemaFormValues.${tableId}.${rowIndex}.${fieldId}`;
-  return control ? (
-    // If control is available, wrap with Controller to handle validation errors
-    <Controller
-      name={fieldName}
-      control={control}
-      render={({ field: { onChange: rhfOnChange, value: rhfValue }, fieldState: { error } }) => {
-        // Keep your draft state synchronization working inside the controller
-        const currentVal = rhfValue ?? value ?? "";
 
-        return (
-          <FormInput
-            {...({
-              inputRef,
-              value: currentVal,
-              onChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-                const nextValue = event.target.value;
-                rhfOnChange(nextValue); // Update React Hook Form state
-                onCellChange(tableId, rowIndex, fieldId, nextValue); // Sync with existing custom cell handler
-              },
-              disabled,
-              error: !!error,
-              helperText: error?.message || "",
-              ...rest,
-            } as any)}
-          />
-        );
-      }}
-    />
-  ) : (
-    <UncontrolledSubscaleTableTextCell
-      tableId={tableId}
-      rowIndex={rowIndex}
-      fieldId={fieldId}
-      value={value}
-      onCellChange={onCellChange}
-      disabled={disabled}
+  const hasError = Boolean(errorMessage);
+
+  return (
+    <FormInput
       inputRef={inputRef}
+      value={draft}
+      disabled={disabled}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      error={hasError}
+      helperText={errorMessage || ""}
       {...rest}
     />
   );
 });
-const UncontrolledSubscaleTableTextCell = ({
-  tableId,
-  rowIndex,
-  fieldId,
-  value,
-  onCellChange,
-  disabled,
-  inputRef,
-  ...rest
-}: any) => {
-  const [draft, setDraft] = useState(value ?? "");
-  const draftRef = useRef(draft);
-  const committedRef = useRef(value ?? "");
-  draftRef.current = draft;
 
-  useEffect(() => {
-    if (document.activeElement === inputRef.current) return;
-    const next = value ?? "";
-    setDraft(next);
-    committedRef.current = next;
-  }, [value, inputRef]);
-
-  const commit = useCallback(
-    (nextValue: string) => {
-      if (disabled) return;
-      if (nextValue === committedRef.current) return;
-      committedRef.current = nextValue;
-      onCellChange(tableId, rowIndex, fieldId, nextValue);
-    },
-    [disabled, onCellChange, tableId, rowIndex, fieldId],
-  );
-
-  const debouncedCommit = useDebouncedCallback(
-    (nextValue: string) => commit(nextValue),
-    DEFERRED_COMMIT_MS,
-  );
-
-  useEffect(() => {
-    const flush = () => {
-      debouncedCommit.cancel();
-      commit(draftRef.current);
-    };
-    return registerSubscalePendingDraft(flush);
-  }, [commit, debouncedCommit]);
-
-  const handleChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-      const nextValue = event.target.value;
-      setDraft(nextValue);
-      debouncedCommit(nextValue);
-    },
-    [debouncedCommit],
-  );
-
-  const handleBlur = useCallback(() => {
-    debouncedCommit.cancel();
-    commit(draftRef.current);
-  }, [commit, debouncedCommit]);
-
-  return (
-    <FormInput
-      {...({
-        inputRef,
-        value: draft,
-        onChange: handleChange,
-        onBlur: handleBlur,
-        disabled,
-        ...rest,
-      } as any)}
-    />
-  );
-};
 type SubscaleProcessParticularRowProps = {
   row: ProcessParticularRow;
   rowIndex: number;
@@ -235,6 +140,7 @@ type SubscaleProcessParticularRowProps = {
   border: string;
   text: string;
   getFieldError?: SubscaleFieldErrorGetter;
+  clearFieldError?: (path: string) => void; // <-- Add this
 };
 
 /** Memoized process particulars row — only re-renders when its row data changes. */
@@ -247,6 +153,7 @@ export const SubscaleProcessParticularRow = memo(function SubscaleProcessParticu
   border,
   text,
   getFieldError,
+  clearFieldError,
 }: SubscaleProcessParticularRowProps) {
   return (
     <TableRow key={`${sectionKey}-${row.operationId}-${rowIndex}`}>
@@ -274,6 +181,7 @@ export const SubscaleProcessParticularRow = memo(function SubscaleProcessParticu
           errorMessage={
             getFieldError ? getFieldError(cycleIndex, sectionKey, rowIndex, field) : undefined
           }
+          clearFieldError={clearFieldError}
         />
       ))}
     </TableRow>
@@ -291,6 +199,7 @@ type ProcessParticularFieldCellProps = {
   border: string;
   text: string;
   errorMessage?: string | undefined;
+  clearFieldError?: (path: string) => void;
 };
 
 const ProcessParticularFieldCell = memo(function ProcessParticularFieldCell({
@@ -304,6 +213,7 @@ const ProcessParticularFieldCell = memo(function ProcessParticularFieldCell({
   border,
   text,
   errorMessage,
+  clearFieldError,
 }: ProcessParticularFieldCellProps) {
   const [draft, setDraft] = useState(value);
   const draftRef = useRef(draft);
@@ -339,13 +249,16 @@ const ProcessParticularFieldCell = memo(function ProcessParticularFieldCell({
     return registerSubscalePendingDraft(flush);
   }, [commit, debouncedCommit]);
 
+  const fieldName = `SUBSCALE_MIXING_CYCLES.${cycleIndex}.${sectionKey}.${rowIndex}.${field}`;
+
   const handleChange = useCallback(
     (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const nextValue = event.target.value;
       setDraft(nextValue);
       debouncedCommit(nextValue);
+      clearFieldError?.(fieldName); // Clear the error for this field when user types
     },
-    [debouncedCommit],
+    [debouncedCommit, clearFieldError, fieldName],
   );
 
   const handleBlur = useCallback(() => {
@@ -353,41 +266,7 @@ const ProcessParticularFieldCell = memo(function ProcessParticularFieldCell({
     commit(draftRef.current);
   }, [commit, debouncedCommit]);
 
-  const hasError = Boolean(errorMessage);
-  const contextControl = useFormContext()?.control;
-  const control = contextControl;
-  const fieldName = `schemaFormValues.SUBSCALE_MIXING_CYCLES.${cycleIndex}.${sectionKey}.${rowIndex}.${field}`;
-
-  return control ? (
-    <TableCell sx={uniformTableBodyCellSx({ border, text })}>
-      <Controller
-        name={fieldName}
-        control={control}
-        render={({ field: { onChange: rhfOnChange, value: rhfValue }, fieldState: { error } }) => {
-          const currentVal = rhfValue ?? draft ?? "";
-          return (
-            <FormInput
-              inputRef={inputRef}
-              value={currentVal}
-              placeholder={placeholder}
-              onChange={(e) => {
-                const next = e.target.value;
-                rhfOnChange(next);
-                setDraft(next);
-                debouncedCommit(next);
-              }}
-              onBlur={() => {
-                debouncedCommit.cancel();
-                commit(draftRef.current);
-              }}
-              error={!!error}
-              helperText={error?.message || errorMessage}
-            />
-          );
-        }}
-      />
-    </TableCell>
-  ) : (
+  return (
     <TableCell sx={uniformTableBodyCellSx({ border, text })}>
       <FormInput
         inputRef={inputRef}
@@ -395,7 +274,7 @@ const ProcessParticularFieldCell = memo(function ProcessParticularFieldCell({
         placeholder={placeholder}
         onChange={handleChange}
         onBlur={handleBlur}
-        error={hasError}
+        error={Boolean(errorMessage)}
         helperText={errorMessage}
       />
     </TableCell>

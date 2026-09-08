@@ -7,6 +7,7 @@ import {
 } from "../../../../../hooks/user/manufacturing/postCureConfig";
 import { DateTimeField } from "../../../../components/common/DateField";
 import CasePrepSelect from "../CasePreparation/CasePrepSelect";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 const S = STRINGS.MANUFACTURING.POST_CURE;
 
@@ -73,7 +74,7 @@ const PostCureFlowBar = ({
         >
           <Box sx={flowBar.selectField?.(280)}>
             <Typography component="label" sx={flowBar.selectLabel}>
-              {S.MOTOR_RECEIVED_AT_LABEL}
+              <FieldLabelWithAsterisk label={S.MOTOR_RECEIVED_AT_LABEL} required />
             </Typography>
             <DateTimeField
               value={draftMotorReceiptDate}
@@ -91,6 +92,7 @@ const PostCureFlowBar = ({
             options={POST_CURE_OPERATION_OPTIONS}
             width={240}
             theme={theme}
+            required
             onChange={onDraftOperationChange}
           />
         </Box>
@@ -128,12 +130,7 @@ const PostCureFlowBar = ({
         ) : null}
 
         <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
-          <Button
-            variant="contained"
-            size="small"
-            onClick={onLoadForm}
-            disabled={!canLoadForm}
-          >
+          <Button variant="contained" size="small" onClick={onLoadForm} disabled={!canLoadForm}>
             {S.LOAD_FORM}
           </Button>
         </Box>

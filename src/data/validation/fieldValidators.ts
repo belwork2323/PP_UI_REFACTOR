@@ -94,3 +94,53 @@ export const stateToMessage = (
   if (state === "required" && required) return requiredMessage;
   return undefined;
 };
+export const parseNumber = (value: unknown): number | null => {
+  const text = str(value).replace(/,/g, "");
+  if (!text) return null;
+  const n = Number(text);
+  return Number.isFinite(n) ? n : null;
+};
+
+/**
+ * Spec formats supported:
+ * - "10" / "10.5"           → exact
+ * - "10-20" / "10 – 20"     → inclusive range
+ * - "≥10" / ">=10" / "≤10" / "<=10" / ">10" / "<10"
+ * - "±0.5 of 10" is not parsed; treat as free text → pass
+ */
+export const meetsSpecification = (value: number, specification: string): boolean => {
+  const spec = str(specification);
+  if (!spec) return true;
+
+  // range: 10-20 or 10 – 20
+  const range = spec.match(/^(-?\d+(?:\.\d+)?)\s*[-–—]\s*(-?\d+(?:\.\d+)?)$/);
+  if (range) {
+    const lo = Number(range[1]);
+    const hi = Number(range[2]);
+    if (!Number.isFinite(lo) || !Number.isFinite(hi)) return true;
+    return value >= Math.min(lo, hi) && value <= Math.max(lo, hi);
+  }
+
+  // comparison operators
+  const cmp = spec.match(/^(>=|≤|<=|≥|>|<)\s*(-?\d+(?:\.\d+)?)$/);
+  if (cmp) {
+    const op = cmp[1];
+    const n = Number(cmp[2]);
+    if (!Number.isFinite(n)) return true;
+    if (op === ">=") return value >= n;
+    if (op === "≥") return value >= n;
+    if (op === "<=") return value <= n;
+    if (op === "≤") return value <= n;
+    if (op === ">") return value > n;
+    if (op === "<") return value < n;
+  }
+
+  // exact numeric
+  if (isFiniteNumber(spec)) {
+    const n = Number(str(spec).replace(/,/g, ""));
+    return value === n;
+  }
+
+  // unknown free-text spec → do not fail
+  return true;
+};

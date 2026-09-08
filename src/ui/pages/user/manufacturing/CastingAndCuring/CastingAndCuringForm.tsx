@@ -444,7 +444,23 @@ const CastingAndCuringForm = ({
                   variant="outlined"
                   size="small"
                   disabled={actionLoading || activeMotorLocked}
-                  onClick={() => onSaveMotorDraft?.(activeMotorEntry.motorId)}
+                  onClick={async () => {
+                    if (!activeMotorEntry) return;
+                    const motor = activeMotorSession;
+                    if (!motor) return;
+                    const castingErrors = validateCastingCuring(motor.castingData, "UNIT");
+                    const curingErrors = validateCastingCuring(motor.curingData, "UNIT");
+                    const errors = { ...(castingErrors ?? {}), ...(curingErrors ?? {}) };
+
+                    if (Object.keys(errors).length > 0) {
+                      setValidationErrors(errors);
+                      return;
+                    }
+                    setValidationErrors({});
+                    onSaveMotorDraft?.(activeMotorEntry.motorId);
+                  }}
+
+                  // onClick={() => onSaveMotorDraft?.(activeMotorEntry.motorId)}
                   sx={{ textTransform: "none", fontWeight: 700 }}
                 >
                   {S.SAVE_MOTOR_DRAFT(activeMotorEntry.motorId)}
@@ -645,8 +661,9 @@ const CastingAndCuringForm = ({
                     clearFieldError={(path: string, ruleKey?: string) =>
                       setValidationErrors((prev) => {
                         const next = { ...prev };
-                        // Clear by exact path or ruleKey if your engine uses them
-                        delete next[path];
+                        for (const key of Object.keys(next)) {
+                          if (key === path || key.startsWith(path)) delete next[key];
+                        }
                         if (ruleKey) delete next[ruleKey];
                         return next;
                       })
@@ -713,12 +730,13 @@ const CastingAndCuringForm = ({
                         disabled={activeMotorLocked}
                         theme={theme}
                         validationErrors={validationErrors}
-                        clearFieldError={(path: string) =>
+                        clearFieldError={(path: string, ruleKey?: string) =>
                           setValidationErrors((prev) => {
                             const next = { ...prev };
                             for (const key of Object.keys(next)) {
                               if (key === path || key.startsWith(path)) delete next[key];
                             }
+                            if (ruleKey) delete next[ruleKey];
                             return next;
                           })
                         }

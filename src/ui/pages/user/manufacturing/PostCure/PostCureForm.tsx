@@ -32,13 +32,9 @@ import {
 } from "../../../../components/custom/UserWorkflowStepPager";
 import PostCureFlowBar from "./PostCureFlowBar";
 import PostCureMotorPanel from "./PostCureMotorPanel";
-import {
-  PostCureFormValues,
-  postCureSchema,
-  type PostCureFormInput,
-} from "@/data/schemavalidation/PostCureSchema";
-import { toCamelCase } from "@/utils/caseConverter";
 import { PostCureMotorData } from "@/data/models/user/PostCureMotorDataModel";
+import { validatePostCure } from "@/data/validation/adapters/postCure.validation";
+import { ValidationErrors, ValidationTier } from "@/data/validation/submissionIntent";
 
 const S = STRINGS.MANUFACTURING.POST_CURE;
 const { handyman: HandymanRoundedIcon } = icons.user.manufacturing.postCure.form;
@@ -124,62 +120,70 @@ export const PostCureForm = ({
   }, [activeMotorEntry, formData.motors]);
 
   const resolvedActiveMotorId = activeMotorEntry?.motorId ?? "";
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
 
-  // ==========================================
-  // 3. DRAFT & SUBMIT ACTIONS
-  // ==========================================
-  // Saves draft without validating mandatory empty fields
+  const [formValues, setFormValues] = useState<PostCureMotorData>(
+    activeMotorSession?.postCureData ??
+      ({
+        variant: "loose-flap-filling",
+      } as PostCureMotorData),
+  );
+  // Sync active motor session → form values
+  useEffect(() => {
+    if (activeMotorSession?.postCureData) {
+      setFormValues(activeMotorSession.postCureData);
+      setValidationErrors({}); // Clear errors on session switch
+    }
+  }, [resolvedActiveMotorId, activeMotorSession]);
+
+  const clearFieldError = (ruleKey: string) => {
+    setValidationErrors((prev) => {
+      if (!prev || !Object.prototype.hasOwnProperty.call(prev, ruleKey)) {
+        return prev;
+      }
+      const next = { ...prev };
+      delete next[ruleKey];
+      return next;
+    });
+  };
+
   const handleSaveDraft = async () => {
     if (!activeMotorEntry) return;
-
-    const currentValues = getValues();
 
     if (onMotorSessionChange && activeMotorSession) {
       onMotorSessionChange(activeMotorEntry.motorId, {
         ...activeMotorSession,
-        postCureData: currentValues,
+        postCureData: formValues,
       });
     }
 
     onSaveMotorDraft?.(activeMotorEntry.motorId);
   };
-  const methods = useForm<PostCureMotorData>({
-    resolver: zodResolver(postCureSchema),
-    shouldUnregister: false,
-    defaultValues: {
-      variant: "loose-flap-filling",
-    },
-  });
 
-  const { handleSubmit, reset, getValues, control } = methods;
-  if (!methods) {
-    console.warn(`ControlledField "${name}" was rendered outside of a FormProvider.`);
-    return null; // or render children without controller if appropriate
-  }
-  // Sync active motor session → form (data is already camelCase from model)
-  useEffect(() => {
-    if (activeMotorSession?.postCureData) {
-      reset(activeMotorSession.postCureData);
+  const handleSubmitForm = () => {
+    if (!activeMotorEntry) return;
+
+    // Run validation for the SUBMIT tier
+    const errors = validatePostCure(formValues, "SUBMIT");
+
+    if (Object.keys(errors).length > 0) {
+      console.warn("PostCure Form Validation Failed:", errors);
+      setValidationErrors(errors);
+      return;
     }
-  }, [resolvedActiveMotorId, reset, activeMotorSession]);
 
-  const handleSubmitForm = handleSubmit(
-    (data) => {
-      if (!activeMotorEntry) return;
-      if (onMotorSessionChange && activeMotorSession) {
-        onMotorSessionChange(activeMotorEntry.motorId, {
-          ...activeMotorSession,
-          postCureData: data,
-        });
-      }
-      onSubmitMotor?.(activeMotorEntry.motorId);
-    },
-    (validationErrors) => {
-      console.warn("PostCure Form Validation Failed:", validationErrors);
-      console.warn("CURRENT VALUES:", getValues());
-      console.warn("variant value:", getValues("variant"));
-    },
-  );
+    setValidationErrors({});
+
+    if (onMotorSessionChange && activeMotorSession) {
+      onMotorSessionChange(activeMotorEntry.motorId, {
+        ...activeMotorSession,
+        postCureData: formValues,
+      });
+    }
+
+    onSubmitMotor?.(activeMotorEntry.motorId);
+  };
+
   // ==========================================
   // 4. NAVIGATION & WORKFLOW GATES
   // ==========================================
@@ -267,242 +271,240 @@ export const PostCureForm = ({
 
   return (
     <Box sx={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <FormProvider {...methods}>
-        <Stack
-          direction="row"
-          alignItems="center"
-          justifyContent="space-between"
-          gap={1.5}
-          mb={2.5}
-          flexWrap="wrap"
-        >
-          <Stack direction="row" alignItems="center" gap={1.5}>
-            <Box
-              sx={{
-                width: 36,
-                height: 36,
-                borderRadius: "11px",
-                background: `linear-gradient(135deg, ${BRAND.pc}, ${BRAND.pcLight})`,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 4px 12px rgba(21,101,192,0.3)",
-              }}
-            >
-              <HandymanRoundedIcon sx={{ color: "#fff", fontSize: 19 }} />
-            </Box>
-            <Box>
-              <Typography sx={{ fontWeight: 800, fontSize: "0.98rem", color: BRAND.text }}>
-                {S.FORM_TITLE}
-              </Typography>
-              <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub, mt: 0.15 }}>
-                {batch?.batchId ? `${batch.batchId}` : S.FORM_SUBTITLE}
-              </Typography>
-            </Box>
-          </Stack>
-        </Stack>
-
-        {motorCards.length > 0 ? (
-          <Stack spacing={1.25} sx={{ mb: 1.5 }}>
-            <UserWorkflowNavPanel palette={navPalette}>
-              <UserWorkflowTabNav
-                title={S.MOTOR_NAV_TITLE}
-                hint={S.MOTOR_NAV_HINT}
-                tabs={motorTabs}
-                activeIndex={activeMotorIndex}
-                onActiveIndexChange={(index) => {
-                  const next = motorCards[index];
-                  if (next) onActiveMotorChange(next.motorId);
-                }}
-                isTabDisabled={(_, index) => !motorNavGate.isMotorTabEnabled(index)}
-                tabTooltip={(_, index) => motorNavGate.getMotorTabTooltip(index)}
-                palette={navPalette}
-                showStepArrows
-                titleEndAdornment={
-                  <Chip
-                    label={`${S.BATCH_MOTOR_COUNT_LABEL}: ${batchMotorCount}`}
-                    size="small"
-                    sx={{
-                      fontWeight: 800,
-                      fontSize: "0.72rem",
-                      height: 24,
-                      background: BRAND.pc,
-                      color: "#fff",
-                      "& .MuiChip-label": { px: 1 },
-                    }}
-                  />
-                }
-              />
-            </UserWorkflowNavPanel>
-
-            <Stack direction="row" justifyContent="flex-end" spacing={1}>
-              {activeMotorLoaded && activeMotorEntry ? (
-                <>
-                  <Button
-                    variant="outlined"
-                    size="small"
-                    disabled={actionLoading || activeMotorLocked}
-                    onClick={handleSaveDraft}
-                    sx={{ textTransform: "none", fontWeight: 700 }}
-                  >
-                    {S.SAVE_MOTOR_DRAFT(activeMotorEntry.motorId)}
-                  </Button>
-
-                  <Button
-                    variant="contained"
-                    size="small"
-                    disabled={actionLoading || activeMotorLocked}
-                    onClick={handleSubmitForm}
-                    sx={{ textTransform: "none", fontWeight: 700 }}
-                  >
-                    {S.SUBMIT_MOTOR(activeMotorEntry.motorId)}
-                  </Button>
-                </>
-              ) : null}
-              <ViewStatusButton
-                disabled={actionLoading}
-                onClick={() => setFinalApprovalOpen(true)}
-                label={S.VIEW_STATUS}
-              />
-            </Stack>
-          </Stack>
-        ) : null}
-
-        {!activeMotorLoaded && resolvedActiveMotorId ? (
-          <Box sx={{ mb: 1.5 }}>
-            <PostCureFlowBar
-              activeMotorId={resolvedActiveMotorId}
-              draftMotorReceiptDate={draftMotorReceiptDate}
-              draftOperation={draftOperation}
-              draftInhibitorType={draftInhibitorType}
-              canLoadForm={canLoadForm}
-              onDraftMotorReceiptDateChange={onDraftMotorReceiptDateChange}
-              onDraftOperationChange={onDraftOperationChange}
-              onDraftInhibitorTypeChange={onDraftInhibitorTypeChange}
-              onLoadForm={onLoadForm ?? (() => undefined)}
-              theme={theme}
-            />
-          </Box>
-        ) : null}
-
-        {activeMotorLoaded && activeMotorEntry && activeMotorSession ? (
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        gap={1.5}
+        mb={2.5}
+        flexWrap="wrap"
+      >
+        <Stack direction="row" alignItems="center" gap={1.5}>
           <Box
             sx={{
-              borderRadius: 2.5,
-              border: `1px solid ${theme.palette.border}`,
-              background: theme.palette.surface,
-              px: 1.5,
-              py: 1.25,
+              width: 36,
+              height: 36,
+              borderRadius: "11px",
+              background: `linear-gradient(135deg, ${BRAND.pc}, ${BRAND.pcLight})`,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 4px 12px rgba(21,101,192,0.3)",
             }}
           >
-            <Stack
-              direction={{ xs: "column", sm: "row" }}
-              alignItems={{ sm: "center" }}
-              justifyContent="space-between"
-              gap={1}
-              mb={1}
-            >
-              <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
-                <Typography
-                  sx={{ fontSize: "0.8rem", fontWeight: 700, color: theme.palette.primary }}
-                >
-                  {S.MOTOR_CARD_TITLE} - {activeMotorEntry.motorId}
-                </Typography>
-                <PremixStatusChip
-                  status={activeMotorStatus as any}
-                  statusConfig={statusConfig}
-                  variant="embedded"
-                />
-              </Stack>
+            <HandymanRoundedIcon sx={{ color: "#fff", fontSize: 19 }} />
+          </Box>
+          <Box>
+            <Typography sx={{ fontWeight: 800, fontSize: "0.98rem", color: BRAND.text }}>
+              {S.FORM_TITLE}
+            </Typography>
+            <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub, mt: 0.15 }}>
+              {batch?.batchId ? `${batch.batchId}` : S.FORM_SUBTITLE}
+            </Typography>
+          </Box>
+        </Stack>
+      </Stack>
 
-              {activeMotorStatus === "TO_BE_INITIATED" ? (
-                <RemoveProcessButton
-                  onClick={() => onRemoveMotor(activeMotorEntry.motorId)}
-                  dangerColor={BRAND.danger}
-                  tooltip={S.DELETE_MOTOR_TOOLTIP}
+      {motorCards.length > 0 ? (
+        <Stack spacing={1.25} sx={{ mb: 1.5 }}>
+          <UserWorkflowNavPanel palette={navPalette}>
+            <UserWorkflowTabNav
+              title={S.MOTOR_NAV_TITLE}
+              hint={S.MOTOR_NAV_HINT}
+              tabs={motorTabs}
+              activeIndex={activeMotorIndex}
+              onActiveIndexChange={(index) => {
+                const next = motorCards[index];
+                if (next) onActiveMotorChange(next.motorId);
+              }}
+              isTabDisabled={(_, index) => !motorNavGate.isMotorTabEnabled(index)}
+              tabTooltip={(_, index) => motorNavGate.getMotorTabTooltip(index)}
+              palette={navPalette}
+              showStepArrows
+              titleEndAdornment={
+                <Chip
+                  label={`${S.BATCH_MOTOR_COUNT_LABEL}: ${batchMotorCount}`}
+                  size="small"
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: "0.72rem",
+                    height: 24,
+                    background: BRAND.pc,
+                    color: "#fff",
+                    "& .MuiChip-label": { px: 1 },
+                  }}
                 />
-              ) : null}
+              }
+            />
+          </UserWorkflowNavPanel>
+
+          <Stack direction="row" justifyContent="flex-end" spacing={1}>
+            {activeMotorLoaded && activeMotorEntry ? (
+              <>
+                <Button
+                  variant="outlined"
+                  size="small"
+                  disabled={actionLoading || activeMotorLocked}
+                  onClick={handleSaveDraft}
+                  sx={{ textTransform: "none", fontWeight: 700 }}
+                >
+                  {S.SAVE_MOTOR_DRAFT(activeMotorEntry.motorId)}
+                </Button>
+
+                <Button
+                  variant="contained"
+                  size="small"
+                  disabled={actionLoading || activeMotorLocked}
+                  onClick={handleSubmitForm}
+                  sx={{ textTransform: "none", fontWeight: 700 }}
+                >
+                  {S.SUBMIT_MOTOR(activeMotorEntry.motorId)}
+                </Button>
+              </>
+            ) : null}
+            <ViewStatusButton
+              disabled={actionLoading}
+              onClick={() => setFinalApprovalOpen(true)}
+              label={S.VIEW_STATUS}
+            />
+          </Stack>
+        </Stack>
+      ) : null}
+
+      {!activeMotorLoaded && resolvedActiveMotorId ? (
+        <Box sx={{ mb: 1.5 }}>
+          <PostCureFlowBar
+            activeMotorId={resolvedActiveMotorId}
+            draftMotorReceiptDate={draftMotorReceiptDate}
+            draftOperation={draftOperation}
+            draftInhibitorType={draftInhibitorType}
+            canLoadForm={canLoadForm}
+            onDraftMotorReceiptDateChange={onDraftMotorReceiptDateChange}
+            onDraftOperationChange={onDraftOperationChange}
+            onDraftInhibitorTypeChange={onDraftInhibitorTypeChange}
+            onLoadForm={onLoadForm ?? (() => undefined)}
+            theme={theme}
+          />
+        </Box>
+      ) : null}
+
+      {activeMotorLoaded && activeMotorEntry && activeMotorSession ? (
+        <Box
+          sx={{
+            borderRadius: 2.5,
+            border: `1px solid ${theme.palette.border}`,
+            background: theme.palette.surface,
+            px: 1.5,
+            py: 1.25,
+          }}
+        >
+          <Stack
+            direction={{ xs: "column", sm: "row" }}
+            alignItems={{ sm: "center" }}
+            justifyContent="space-between"
+            gap={1}
+            mb={1}
+          >
+            <Stack direction="row" alignItems="center" gap={1} flexWrap="wrap">
+              <Typography
+                sx={{ fontSize: "0.8rem", fontWeight: 700, color: theme.palette.primary }}
+              >
+                {S.MOTOR_CARD_TITLE} - {activeMotorEntry.motorId}
+              </Typography>
+              <PremixStatusChip
+                status={activeMotorStatus as any}
+                statusConfig={statusConfig}
+                variant="embedded"
+              />
             </Stack>
 
-            {activeMotorLocked ? (
-              <Box
-                sx={{
-                  mb: 1.25,
-                  px: 1.25,
-                  py: 0.75,
-                  borderRadius: 1.5,
-                  border: `1px solid ${theme.palette.border}`,
-                  bgcolor: theme.palette.background ?? BRAND.surface,
-                }}
-              >
-                <Typography
-                  sx={{ fontSize: "0.72rem", color: theme.palette.textSub, fontWeight: 600 }}
-                >
-                  {!activeMotorPriorEnabled
-                    ? STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED
-                    : activeMotorStatus === "APPROVED"
-                      ? S.MOTOR_LOCKED_APPROVED
-                      : S.MOTOR_LOCKED_WAITING}
-                </Typography>
-              </Box>
-            ) : null}
-
-            {activeMotorStatus === "REJECTED" &&
-            motorStatusById[resolvedActiveMotorId]?.rejectionReason ? (
-              <Alert severity="error" sx={{ fontSize: "0.78rem", mb: 1.25 }}>
-                {motorStatusById[resolvedActiveMotorId]?.rejectionReason}
-              </Alert>
-            ) : null}
-
-            <Typography sx={{ fontSize: "0.74rem", color: theme.palette.textSub, mb: 0.35 }}>
-              {S.MOTOR_RECEIVED_AT_LABEL}: {activeMotorEntry.motorReceiptDate || "?"}
-            </Typography>
-            <Typography sx={{ fontSize: "0.74rem", color: theme.palette.textSub, mb: 1.25 }}>
-              {S.OPERATION_LABEL}:{" "}
-              {formatPostCureMotorOperationLabel(
-                activeMotorSession.operation,
-                activeMotorSession.inhibitorType,
-              )}
-            </Typography>
-            <form onSubmit={handleSubmitForm}>
-              <PostCureMotorPanel
-                value={activeMotorSession.postCureData}
-                onChange={(postCureData) =>
-                  onMotorSessionChange(activeMotorEntry.motorId, {
-                    ...activeMotorSession,
-                    postCureData,
-                  })
-                }
-                disabled={activeMotorLocked}
-                theme={theme}
-                subDepartmentId={subDepartmentId}
-                batchId={batch?.batchId}
-                motorId={activeMotorEntry.motorId}
-                isSubmitMode={isSubmitMode}
+            {activeMotorStatus === "TO_BE_INITIATED" ? (
+              <RemoveProcessButton
+                onClick={() => onRemoveMotor(activeMotorEntry.motorId)}
+                dangerColor={BRAND.danger}
+                tooltip={S.DELETE_MOTOR_TOOLTIP}
               />
-            </form>
-          </Box>
-        ) : null}
+            ) : null}
+          </Stack>
 
-        <FinalApprovalMotorDialog
-          open={finalApprovalOpen}
-          rows={finalApprovalRows}
-          statusConfig={statusConfig}
-          allMotorsApproved={allMotorsApproved}
-          hideConfirm
-          copy={{
-            title: S.FINAL_APPROVAL_DIALOG_TITLE,
-            info: S.FINAL_APPROVAL_DIALOG_INFO,
-            proceed: S.FINAL_APPROVAL_PROCEED,
-            close: S.FINAL_APPROVAL_CLOSE,
-            notReady: S.FINAL_APPROVAL_NOT_READY,
-            colMotor: S.FINAL_APPROVAL_COL_MOTOR,
-            colType: S.FINAL_APPROVAL_COL_TYPE,
-            colStatus: S.FINAL_APPROVAL_COL_STATUS,
-          }}
-          onClose={() => setFinalApprovalOpen(false)}
-        />
-      </FormProvider>
+          {activeMotorLocked ? (
+            <Box
+              sx={{
+                mb: 1.25,
+                px: 1.25,
+                py: 0.75,
+                borderRadius: 1.5,
+                border: `1px solid ${theme.palette.border}`,
+                bgcolor: theme.palette.background ?? BRAND.surface,
+              }}
+            >
+              <Typography
+                sx={{ fontSize: "0.72rem", color: theme.palette.textSub, fontWeight: 600 }}
+              >
+                {!activeMotorPriorEnabled
+                  ? STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED
+                  : activeMotorStatus === "APPROVED"
+                    ? S.MOTOR_LOCKED_APPROVED
+                    : S.MOTOR_LOCKED_WAITING}
+              </Typography>
+            </Box>
+          ) : null}
+
+          {activeMotorStatus === "REJECTED" &&
+          motorStatusById[resolvedActiveMotorId]?.rejectionReason ? (
+            <Alert severity="error" sx={{ fontSize: "0.78rem", mb: 1.25 }}>
+              {motorStatusById[resolvedActiveMotorId]?.rejectionReason}
+            </Alert>
+          ) : null}
+
+          <Typography sx={{ fontSize: "0.74rem", color: theme.palette.textSub, mb: 0.35 }}>
+            {S.MOTOR_RECEIVED_AT_LABEL}: {activeMotorEntry.motorReceiptDate || "?"}
+          </Typography>
+          <Typography sx={{ fontSize: "0.74rem", color: theme.palette.textSub, mb: 1.25 }}>
+            {S.OPERATION_LABEL}:{" "}
+            {formatPostCureMotorOperationLabel(
+              activeMotorSession.operation,
+              activeMotorSession.inhibitorType,
+            )}
+          </Typography>
+          <PostCureMotorPanel
+            value={activeMotorSession.postCureData}
+            onChange={(postCureData) =>
+              onMotorSessionChange(activeMotorEntry.motorId, {
+                ...activeMotorSession,
+                postCureData,
+              })
+            }
+            validationErrors={validationErrors}
+            clearFieldError={clearFieldError}
+            disabled={activeMotorLocked}
+            theme={theme}
+            subDepartmentId={subDepartmentId}
+            batchId={batch?.batchId}
+            motorId={activeMotorEntry.motorId}
+            isSubmitMode={isSubmitMode}
+          />
+        </Box>
+      ) : null}
+
+      <FinalApprovalMotorDialog
+        open={finalApprovalOpen}
+        rows={finalApprovalRows}
+        statusConfig={statusConfig}
+        allMotorsApproved={allMotorsApproved}
+        hideConfirm
+        copy={{
+          title: S.FINAL_APPROVAL_DIALOG_TITLE,
+          info: S.FINAL_APPROVAL_DIALOG_INFO,
+          proceed: S.FINAL_APPROVAL_PROCEED,
+          close: S.FINAL_APPROVAL_CLOSE,
+          notReady: S.FINAL_APPROVAL_NOT_READY,
+          colMotor: S.FINAL_APPROVAL_COL_MOTOR,
+          colType: S.FINAL_APPROVAL_COL_TYPE,
+          colStatus: S.FINAL_APPROVAL_COL_STATUS,
+        }}
+        onClose={() => setFinalApprovalOpen(false)}
+      />
     </Box>
   );
 };

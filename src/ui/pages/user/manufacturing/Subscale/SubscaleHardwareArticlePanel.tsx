@@ -24,7 +24,6 @@ import {
   type ButtonProps,
 } from "@mui/material";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import UploadFileIcon from "@mui/icons-material/UploadFile";
 import FitnessCenterIcon from "@mui/icons-material/FitnessCenter";
 import SpeedIcon from "@mui/icons-material/Speed";
 import ShieldIcon from "@mui/icons-material/Shield";
@@ -59,7 +58,7 @@ import {
   bemNoTextSx,
   formatArticleTypeLabel,
 } from "./utils/subscaleHardwareTableStyles";
-import DateField, { TimeField } from "../../../../components/common/DateField";
+import DateField from "../../../../components/common/DateField";
 import { AppDatePickerProvider } from "../../../../components/common/datePickerShared";
 import {
   APP_CONTROL_FONT_SIZE,
@@ -68,7 +67,6 @@ import {
 } from "../../../../components/common/fieldStyles";
 import { STRINGS } from "../../../../../app/config/strings";
 import { formatToUiDate } from "../../../../../utils/dateUtils";
-import { FILE_PICKER_ACCEPT } from "../../../../../utils/FileUtils";
 import { SUBSCALE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/subscale_theme";
 import fonts from "../../../../../app/theme/fonts";
 import {
@@ -76,7 +74,6 @@ import {
   ARTICLE_TYPE_SPECS,
   HARDWARE_COUNT_FIELDS,
   LINER_TYPE_FIELD,
-  RUBBER_MATERIAL_OPTIONS,
   isHardwarePreparationComplete,
   syncHardwareArticleTable,
   LINER_BATCH_NO_FIELD,
@@ -85,12 +82,9 @@ import {
   isMainScaleSubscaleBatch,
 } from "../../../../../hooks/user/manufacturing/subscaleHardwareConfig";
 import type { SchemaFormValues } from "../../../../../schema-engine";
-import { Controller, useFormContext } from "react-hook-form";
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 const S = STRINGS.MANUFACTURING.SUBSCALE.HARDWARE;
-
-/** When Casting BEM Mould No changes, mirror it into matching row fields on other process tables. */
 const BEM_NO_SYNC_TARGETS = [
   { tableId: "CURING_TABLE", fieldId: "BEM_MOULD_NO" },
   { tableId: "NDT_TABLE", fieldId: "BEM_NO" },
@@ -181,7 +175,8 @@ type SubscaleHardwareArticlePanelProps = {
   /** When MAIN / MAIN_SCALE, Static Testing + Mechanical tables are hidden. */
   batchType?: string | null;
   canManageProcessTables?: boolean;
-  validationErrors?: Record<string, string> | null;
+  errors?: Record<string, string> | null;
+  clearFieldError?: (path: string) => void; // <-- Add this
 };
 
 const SubscaleHardwareArticlePanel = ({
@@ -190,6 +185,8 @@ const SubscaleHardwareArticlePanel = ({
   hardwareFieldsDisabled = false,
   batchType,
   canManageProcessTables = true,
+  errors,
+  clearFieldError,
 }: SubscaleHardwareArticlePanelProps) => {
   const [isLoading, setIsLoading] = useState(false);
   const valuesRef = useRef(values);
@@ -382,6 +379,11 @@ const SubscaleHardwareArticlePanel = ({
   // Row Cell Updater Helper
   const updateTableRowCell = useCallback(
     (tableId: string, rowIndex: number, fieldId: string, value: any) => {
+      console.log(tableId);
+      console.log(rowIndex);
+      console.log(fieldId);
+      console.log(value);
+
       const currentValues = valuesRef.current;
       const sourceTable = Array.isArray(currentValues[tableId]) ? currentValues[tableId] : [];
       const tableData = sourceTable.slice();
@@ -410,7 +412,7 @@ const SubscaleHardwareArticlePanel = ({
       if (tableId === "CASTING_TABLE" && fieldId === "BEM_MOULD_NO") {
         nextValues = syncBemNoAcrossProcessTables(nextValues, rowIndex, String(value ?? ""));
       }
-
+      clearFieldError?.(`${tableId}.${rowIndex}.${fieldId}`);
       onChange(nextValues);
     },
     [onChange],
@@ -424,16 +426,17 @@ const SubscaleHardwareArticlePanel = ({
     );
 
   const updateCountField = (fieldId: string, raw: string) => {
+    clearFieldError?.(fieldId);
     onChange(syncHardwareArticleTable({ ...values, [fieldId]: raw }));
   };
 
   const handleLinerFieldChange = (fieldId: string, value: string) => {
+    clearFieldError?.(fieldId);
     onChange(syncHardwareArticleTable({ ...values, [fieldId]: value }));
   };
 
   // Only disable the Hardware Details section when loaded or explicitly disabled
   const isHardwareSectionLocked = hardwareFieldsDisabled || isFormLoaded;
-  const { control } = useFormContext();
   return (
     <AppDatePickerProvider>
       <Stack
@@ -504,42 +507,38 @@ const SubscaleHardwareArticlePanel = ({
               gap: 2,
             }}
           >
-            {HARDWARE_COUNT_FIELDS.map((field) => (
-              <Controller
-                key={field.id}
-                name={`schemaFormValues.${field.id}`}
-                control={control}
-                render={({ field: { onChange, value }, fieldState: { error } }) => (
-                  <FormInput
-                    label={<FieldLabelWithAsterisk label={field.label} required />}
-                    type="number"
-                    inputProps={{ min: 0, step: 1 }}
-                    value={value ?? ""}
-                    onChange={(e) => {
-                      onChange(e); // Updates React Hook Form state
-                      updateCountField(field.id, e.target.value); // Maintains your existing table sync logic
-                    }}
-                    error={!!error}
-                    helperText={error?.message || ""}
-                  />
-                )}
-              />
-            ))}
+            {HARDWARE_COUNT_FIELDS.map((field) => {
+              const errKey = `${field.id}`;
+              const errorMessage = errors?.[errKey];
+              return (
+                <FormInput
+                  key={field.id}
+                  label={<FieldLabelWithAsterisk label={field.label} required />}
+                  type="number"
+                  inputProps={{ min: 0, step: 1 }}
+                  value={values[field.id] ?? ""}
+                  onChange={(e) => {
+                    updateCountField(field.id, e.target.value);
+                  }}
+                  error={Boolean(errorMessage)}
+                  helperText={errorMessage || ""}
+                />
+              );
+            })}
 
-            <Controller
-              name={`schemaFormValues.${LINER_TYPE_FIELD.id}`}
-              control={control}
-              render={({ field: { onChange, value }, fieldState: { error } }) => (
+            {(() => {
+              const errKey = `${LINER_TYPE_FIELD.id}`;
+              const errorMessage = errors?.[errKey];
+              return (
                 <FormInput
                   select
                   label={<FieldLabelWithAsterisk label={LINER_TYPE_FIELD.label} required />}
-                  value={value ?? ""}
+                  value={values[LINER_TYPE_FIELD.id] ?? ""}
                   onChange={(e) => {
-                    onChange(e);
                     handleLinerFieldChange(LINER_TYPE_FIELD.id, e.target.value);
                   }}
-                  error={!!error}
-                  helperText={error?.message || ""}
+                  error={Boolean(errorMessage)}
+                  helperText={errorMessage || ""}
                   SelectProps={{ displayEmpty: true, MenuProps: appDropdownMenuProps }}
                 >
                   <MenuItem value="">
@@ -559,45 +558,43 @@ const SubscaleHardwareArticlePanel = ({
                     </MenuItem>
                   ))}
                 </FormInput>
-              )}
-            />
+              );
+            })()}
 
             {/* 2. Liner Batch No Field */}
-            <Controller
-              name={`schemaFormValues.${LINER_BATCH_NO_FIELD.id}`}
-              control={control}
-              render={({ field: { onChange, value }, fieldState: { error } }) => (
+            {(() => {
+              const errKey = `${LINER_BATCH_NO_FIELD.id}`;
+              const errorMessage = errors?.[errKey];
+              return (
                 <FormInput
                   label={<FieldLabelWithAsterisk label={LINER_BATCH_NO_FIELD.label} required />}
-                  value={value ?? ""}
+                  value={values[LINER_BATCH_NO_FIELD.id] ?? ""}
                   onChange={(e) => {
-                    onChange(e);
                     handleLinerFieldChange(LINER_BATCH_NO_FIELD.id, e.target.value);
                   }}
-                  error={!!error}
-                  helperText={error?.message || ""}
+                  error={Boolean(errorMessage)}
+                  helperText={errorMessage || ""}
                 />
-              )}
-            />
+              );
+            })()}
 
             {/* 3. Liner Batch Date Field */}
-            <Controller
-              name={`schemaFormValues.${LINER_BATCH_DATE_FIELD.id}`}
-              control={control}
-              render={({ field: { onChange, value }, fieldState: { error } }) => (
+            {(() => {
+              const errKey = `${LINER_BATCH_DATE_FIELD.id}`;
+              const errorMessage = errors?.[errKey];
+              return (
                 <DateField
                   label={<FieldLabelWithAsterisk label={LINER_BATCH_DATE_FIELD.label} required />}
-                  value={formatToUiDate(String(value ?? ""))}
+                  value={formatToUiDate(String(values[LINER_BATCH_DATE_FIELD.id] ?? ""))}
                   onChange={(next) => {
-                    onChange(next);
                     handleLinerFieldChange(LINER_BATCH_DATE_FIELD.id, next);
                   }}
                   placeholder="DD-MM-YYYY"
-                  error={!!error}
-                  helperText={error?.message || ""}
+                  error={Boolean(errorMessage)}
+                  helperText={errorMessage || ""}
                 />
-              )}
-            />
+              );
+            })()}
           </Box>
         </Box>
 
@@ -645,6 +642,8 @@ const SubscaleHardwareArticlePanel = ({
                 <ArticleTypeTableSection
                   rows={(values[ARTICLE_TYPE_TABLE_ID] as []) ?? []}
                   onCellChange={updateTableRowCell}
+                  errors={errors}
+                  clearFieldError={clearFieldError}
                 />
               </Box>
             </Box>
@@ -658,28 +657,29 @@ const SubscaleHardwareArticlePanel = ({
               lazyMount
             >
               <Box sx={{ mb: 2, maxWidth: 280 }}>
-                <Controller
-                  name={`schemaFormValues.DATE_OF_CASTING`}
-                  control={control}
-                  render={({ field: { onChange, value }, fieldState: { error } }) => (
+                {(() => {
+                  const errKey = "DATE_OF_CASTING";
+                  const errorMessage = errors?.[errKey];
+                  return (
                     <DateField
                       required
                       label={<FieldLabelWithAsterisk label="Date Of Casting" required />}
-                      value={formatToUiDate(String(value ?? values.DATE_OF_CASTING ?? ""))}
+                      value={formatToUiDate(String(values.DATE_OF_CASTING ?? ""))}
                       onChange={(next) => {
-                        onChange(next);
+                        clearFieldError?.("DATE_OF_CASTING");
                         patchFormValues({ DATE_OF_CASTING: next });
                       }}
                       placeholder="DD-MM-YYYY"
-                      error={!!error}
-                      helperText={error?.message || ""}
+                      error={Boolean(errorMessage)}
+                      helperText={errorMessage || ""}
                     />
-                  )}
-                />
+                  );
+                })()}
               </Box>
               <CastingTableSection
                 rows={(values.CASTING_TABLE as []) ?? []}
                 onCellChange={updateTableRowCell}
+                errors={errors}
               />
             </SubscaleProcessSection>
 
@@ -695,6 +695,7 @@ const SubscaleHardwareArticlePanel = ({
                 rows={(values.CURING_TABLE as []) ?? []}
                 onCellChange={updateTableRowCell}
                 getSyncedBemNo={getSyncedBemNo}
+                errors={errors}
               />
             </SubscaleProcessSection>
 
@@ -710,6 +711,7 @@ const SubscaleHardwareArticlePanel = ({
                 rows={(values.NDT_TABLE as []) ?? []}
                 onCellChange={updateTableRowCell}
                 getSyncedBemNo={getSyncedBemNo}
+                errors={errors}
               />
             </SubscaleProcessSection>
 
@@ -725,6 +727,7 @@ const SubscaleHardwareArticlePanel = ({
                 rows={(values.TRIMMING_TABLE as []) ?? []}
                 onCellChange={updateTableRowCell}
                 getSyncedBemNo={getSyncedBemNo}
+                errors={errors}
               />
             </SubscaleProcessSection>
             <SubscaleProcessSection
@@ -735,42 +738,42 @@ const SubscaleHardwareArticlePanel = ({
               lazyMount
             >
               <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-                <Controller
-                  name={`schemaFormValues.IR_BATCH_NO`}
-                  control={control}
-                  render={({ field: { onChange, value }, fieldState: { error } }) => (
+                {(() => {
+                  const errKey = "IR_BATCH_NO";
+                  const errorMessage = errors?.[errKey];
+                  return (
                     <FormInput
                       required
                       label={<FieldLabelWithAsterisk label="IR Batch No" required />}
-                      value={value ?? values.IR_BATCH_NO ?? ""}
+                      value={values.IR_BATCH_NO ?? ""}
                       onChange={(e) => {
-                        onChange(e.target.value);
+                        clearFieldError?.("IR_BATCH_NO");
                         patchFormValues({ IR_BATCH_NO: e.target.value });
                       }}
-                      error={!!error}
-                      helperText={error?.message || ""}
+                      error={Boolean(errorMessage)}
+                      helperText={errorMessage || ""}
                     />
-                  )}
-                />
+                  );
+                })()}
 
-                <Controller
-                  name={`schemaFormValues.DATE_OF_MFG`}
-                  control={control}
-                  render={({ field: { onChange, value }, fieldState: { error } }) => (
+                {(() => {
+                  const errKey = "DATE_OF_MFG";
+                  const errorMessage = errors?.[errKey];
+                  return (
                     <DateField
                       required
                       label={<FieldLabelWithAsterisk label="Date Of Manufacturing" required />}
-                      value={formatToUiDate(String(value ?? values.DATE_OF_MFG ?? ""))}
+                      value={formatToUiDate(String(values.DATE_OF_MFG ?? ""))}
                       onChange={(next) => {
-                        onChange(next);
+                        clearFieldError?.("DATE_OF_MFG");
                         patchFormValues({ DATE_OF_MFG: next });
                       }}
                       placeholder="DD-MM-YYYY"
-                      error={!!error}
-                      helperText={error?.message || ""}
+                      error={Boolean(errorMessage)}
+                      helperText={errorMessage || ""}
                     />
-                  )}
-                />
+                  );
+                })()}
               </Stack>
               <TableContainer
                 sx={{ border: `1px solid ${SUBSCALE_BRAND.border}`, borderRadius: 2 }}
@@ -792,7 +795,6 @@ const SubscaleHardwareArticlePanel = ({
                       <TableCell sx={tableHeaderCellSx}>
                         <FieldLabelWithAsterisk
                           label="Liner Coated Sleeve Wt (A)"
-
                           sx={tableHeaderCellSx}
                         />
                       </TableCell>
@@ -803,7 +805,6 @@ const SubscaleHardwareArticlePanel = ({
                       <TableCell sx={tableHeaderCellSx}>
                         <FieldLabelWithAsterisk
                           label="Date of Application"
-
                           sx={tableHeaderCellSx}
                         />
                       </TableCell>
@@ -811,99 +812,94 @@ const SubscaleHardwareArticlePanel = ({
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {((values.INHIBITION_TABLE as []) ?? []).map((row: any, idx: number) => (
-                      <TableRow key={idx}>
-                        <TableCell sx={tableBodyCellSx}>{idx + 1}</TableCell>
-                        <TableCell sx={articleTypeCellSx}>
-                          {formatArticleTypeLabel(row.ARTICLE_TYPE)}
-                        </TableCell>
-                        <TableCell sx={bemNoTextSx}>{getSyncedBemNo(idx) || "—"}</TableCell>
-                        <TableCell sx={tableBodyCellSx}>
-                          <SubscaleTableTextCell
-                            compact
-                            type="number"
-                            tableId="INHIBITION_TABLE"
-                            rowIndex={idx}
-                            fieldId="LINER_COATED_SLEEVE_WEIGHT"
-                            value={row.LINER_COATED_SLEEVE_WEIGHT ?? ""}
-                            onCellChange={updateTableRowCell}
-                          />
-                        </TableCell>
-                        <TableCell sx={tableBodyCellSx}>
-                          <SubscaleTableTextCell
-                            compact
-                            type="number"
-                            tableId="INHIBITION_TABLE"
-                            rowIndex={idx}
-                            fieldId="WEIGHT_BEFORE_INHIBITION"
-                            value={row.WEIGHT_BEFORE_INHIBITION ?? ""}
-                            onCellChange={updateTableRowCell}
-                          />
-                        </TableCell>
-                        <TableCell sx={tableBodyCellSx}>
-                          <SubscaleTableTextCell
-                            compact
-                            type="number"
-                            tableId="INHIBITION_TABLE"
-                            rowIndex={idx}
-                            fieldId="WEIGHT_AFTER_INHIBITION"
-                            value={row.WEIGHT_AFTER_INHIBITION ?? ""}
-                            onCellChange={updateTableRowCell}
-                          />
-                        </TableCell>
-                        <TableCell sx={tableBodyCellSx}>
-                          <SubscaleTableTextCell
-                            compact
-                            type="number"
-                            tableId="INHIBITION_TABLE"
-                            rowIndex={idx}
-                            fieldId="IR_APPLIED_WEIGHT"
-                            value={row.IR_APPLIED_WEIGHT ?? ""}
-                            onCellChange={updateTableRowCell}
-                          />
-                        </TableCell>
-                        <TableCell sx={tableBodyCellSx}>
-                          <FormInput compact disabled value={row.PROPELLANT_WEIGHT ?? ""} />
-                        </TableCell>
-                        <TableCell sx={tableBodyCellSx}>
-                          <Controller
-                            name={`schemaFormValues.INHIBITION_TABLE.${idx}.DATE_OF_APPLICATION`}
-                            control={control}
-                            render={({ field: { onChange, value }, fieldState: { error } }) => (
-                              <DateField
-                                compact
-                                required
-                                value={formatToUiDate(
-                                  String(value ?? row.DATE_OF_APPLICATION ?? ""),
-                                )}
-                                onChange={(next) => {
-                                  onChange(next);
-                                  updateTableRowCell(
-                                    "INHIBITION_TABLE",
-                                    idx,
-                                    "DATE_OF_APPLICATION",
-                                    next,
-                                  );
-                                }}
-                                placeholder="DD-MM-YYYY"
-                                error={!!error}
-                                helperText={error?.message || ""}
-                              />
-                            )}
-                          />
-                        </TableCell>
-                        <TableCell sx={tableBodyCellSx}>
-                          <SubscaleTableTextCell
-                            compact
-                            tableId="INHIBITION_TABLE"
-                            rowIndex={idx}
-                            fieldId="REMARKS"
-                            value={row.REMARKS ?? ""}
-                            onCellChange={updateTableRowCell}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ))}
+                    {((values.INHIBITION_TABLE as []) ?? []).map((row: any, idx: number) => {
+                      const errKey = `INHIBITION_TABLE.${idx}.DATE_OF_APPLICATION`;
+                      const errorMessage = errors?.[errKey];
+                      return (
+                        <TableRow key={idx}>
+                          <TableCell sx={tableBodyCellSx}>{idx + 1}</TableCell>
+                          <TableCell sx={articleTypeCellSx}>
+                            {formatArticleTypeLabel(row.ARTICLE_TYPE)}
+                          </TableCell>
+                          <TableCell sx={bemNoTextSx}>{getSyncedBemNo(idx) || "—"}</TableCell>
+                          <TableCell sx={tableBodyCellSx}>
+                            <SubscaleTableTextCell
+                              compact
+                              type="number"
+                              tableId="INHIBITION_TABLE"
+                              rowIndex={idx}
+                              fieldId="LINER_COATED_SLEEVE_WEIGHT"
+                              value={row.LINER_COATED_SLEEVE_WEIGHT ?? ""}
+                              onCellChange={updateTableRowCell}
+                            />
+                          </TableCell>
+                          <TableCell sx={tableBodyCellSx}>
+                            <SubscaleTableTextCell
+                              compact
+                              type="number"
+                              tableId="INHIBITION_TABLE"
+                              rowIndex={idx}
+                              fieldId="WEIGHT_BEFORE_INHIBITION"
+                              value={row.WEIGHT_BEFORE_INHIBITION ?? ""}
+                              onCellChange={updateTableRowCell}
+                            />
+                          </TableCell>
+                          <TableCell sx={tableBodyCellSx}>
+                            <SubscaleTableTextCell
+                              compact
+                              type="number"
+                              tableId="INHIBITION_TABLE"
+                              rowIndex={idx}
+                              fieldId="WEIGHT_AFTER_INHIBITION"
+                              value={row.WEIGHT_AFTER_INHIBITION ?? ""}
+                              onCellChange={updateTableRowCell}
+                            />
+                          </TableCell>
+                          <TableCell sx={tableBodyCellSx}>
+                            <SubscaleTableTextCell
+                              compact
+                              type="number"
+                              tableId="INHIBITION_TABLE"
+                              rowIndex={idx}
+                              fieldId="IR_APPLIED_WEIGHT"
+                              value={row.IR_APPLIED_WEIGHT ?? ""}
+                              onCellChange={updateTableRowCell}
+                            />
+                          </TableCell>
+                          <TableCell sx={tableBodyCellSx}>
+                            <FormInput compact disabled value={row.PROPELLANT_WEIGHT ?? ""} />
+                          </TableCell>
+                          <TableCell sx={tableBodyCellSx}>
+                            <DateField
+                              compact
+                              required
+                              value={formatToUiDate(String(row.DATE_OF_APPLICATION ?? ""))}
+                              onChange={(next) => {
+                                updateTableRowCell(
+                                  "INHIBITION_TABLE",
+                                  idx,
+                                  "DATE_OF_APPLICATION",
+                                  next,
+                                );
+                              }}
+                              placeholder="DD-MM-YYYY"
+                              error={Boolean(errorMessage)}
+                              helperText={errorMessage || ""}
+                            />
+                          </TableCell>
+                          <TableCell sx={tableBodyCellSx}>
+                            <SubscaleTableTextCell
+                              compact
+                              tableId="INHIBITION_TABLE"
+                              rowIndex={idx}
+                              fieldId="REMARKS"
+                              value={row.REMARKS ?? ""}
+                              onCellChange={updateTableRowCell}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
                   </TableBody>
                 </Table>
               </TableContainer>

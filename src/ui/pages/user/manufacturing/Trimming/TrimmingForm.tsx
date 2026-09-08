@@ -52,6 +52,7 @@ type TrimmingFormProps = {
   onSaveMotorDraft?: (motorId: string) => void;
   onSubmitMotor?: (motorId: string) => void;
   theme: any;
+  motorValidationErrors?: Record<string, Record<string, string>>;
 };
 
 const TrimmingForm = ({
@@ -68,6 +69,7 @@ const TrimmingForm = ({
   onSaveMotorDraft,
   onSubmitMotor,
   theme,
+  motorValidationErrors = {},
 }: TrimmingFormProps) => {
   const BRAND = TRIMMING_BRAND;
   const primaryColor = theme.palette.primary;
@@ -152,7 +154,10 @@ const TrimmingForm = ({
   const finalApprovalRows = useMemo(
     () =>
       buildFinalApprovalMotorRows(
-        motorStatusById as Record<string, { motorSubmissionStatus: string }>,
+        motorStatusById as Record<
+          string,
+          { motorSubmissionStatus: TrimmingMotorSubmissionStatus }
+        >,
         motorCards.map((m) => m.motorId),
       ),
     [motorCards, motorStatusById],
@@ -372,6 +377,7 @@ const TrimmingForm = ({
               onMotorSessionChange={onMotorSessionChange}
               readOnly={activeMotorLocked}
               theme={theme}
+              validationErrors={motorValidationErrors[activeMotorEntry.motorId]}
             />
           </Box>
         </Stack>

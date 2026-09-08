@@ -52,9 +52,7 @@ import {
 import { generalController } from "@/controllers/admin/common/generalController";
 import { operationsController } from "@/controllers/user/operationsController";
 import { isSubscaleProcessingBatch } from "@/hooks/user/manufacturing/subscaleHardwareConfig";
-import { subscaleHardwareSchema } from "@/data/schemavalidation/SubscaleSchema";
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
-import { Controller, useFormContext } from "react-hook-form";
 
 type MotorStageOption = {
   motorStage: string;
@@ -139,7 +137,8 @@ type SubscaleSubscaleBatchPanelProps = {
   values: SchemaFormValues;
   onChange: (values: SchemaFormValues) => void;
   batchDetails: any;
-  validationErrors?: Record<string, string> | null;
+  errors?: Record<string, string> | null;
+  clearFieldError?: (path: string) => void; // <-- Add this
 };
 
 const normalizeSubBatchType = (value: unknown) =>
@@ -168,6 +167,8 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
   values,
   onChange,
   batchDetails,
+  errors,
+  clearFieldError,
 }) => {
   const mixingCyclesRaw = values[SUBSCALE_BATCH_FIELDS.MIXING_CYCLES];
   const mixingCycles = useMemo(
@@ -524,6 +525,7 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
     rows: ProcessParticularRow[] = [],
     cycleIndex: number,
     sectionKey: "premixParticulars" | "finalMixParticulars",
+    clearFieldError?: (path: string) => void,
   ) => (
     <Box sx={{ mb: 2.5 }}>
       <Typography
@@ -634,6 +636,10 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
                   onFieldChange={updateProcessField}
                   border={SUBSCALE_BRAND.border}
                   text={SUBSCALE_BRAND.text}
+                  getFieldError={(cIdx, sKey, rIdx, field) =>
+                    getSubscaleError(errors, cIdx, sKey, rIdx, field)
+                  }
+                  clearFieldError={clearFieldError}
                 />
               ))
             )}
@@ -686,45 +692,45 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
             }
           />
 
-          <Controller
-            name={`schemaFormValues.${SUBSCALE_BATCH_FIELDS.PREMIX_DATE}`}
-            control={useFormContext().control}
-            render={({ field: { onChange, value }, fieldState: { error } }) => (
+          {(() => {
+            const premixErrorMsg =
+              errors?.[`${SUBSCALE_BATCH_FIELDS.PREMIX_DATE}`] ||
+              errors?.[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ||
+              "";
+            return (
               <DateField
                 label={<FieldLabelWithAsterisk label={S.PREMIX_DATE} required />}
-                value={formatToUiDate(
-                  String(value ?? values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ?? ""),
-                )}
+                value={formatToUiDate(String(values[SUBSCALE_BATCH_FIELDS.PREMIX_DATE] ?? ""))}
                 onChange={(next) => {
-                  onChange(next);
+                  clearFieldError?.(SUBSCALE_BATCH_FIELDS.PREMIX_DATE);
                   patchValues({ [SUBSCALE_BATCH_FIELDS.PREMIX_DATE]: next });
                 }}
                 placeholder="DD-MM-YYYY"
-                error={!!error}
-                helperText={error?.message || ""}
+                error={Boolean(premixErrorMsg)}
+                helperText={premixErrorMsg}
               />
-            )}
-          />
+            );
+          })()}
 
-          <Controller
-            name={`schemaFormValues.${SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE}`}
-            control={useFormContext().control}
-            render={({ field: { onChange, value }, fieldState: { error } }) => (
+          {(() => {
+            const finalMixErrorMsg =
+              errors?.[`${SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE}`] ||
+              errors?.[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] ||
+              "";
+            return (
               <DateField
                 label={<FieldLabelWithAsterisk label={S.FINAL_MIX_DATE} required />}
-                value={formatToUiDate(
-                  String(value ?? values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] ?? ""),
-                )}
+                value={formatToUiDate(String(values[SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE] ?? ""))}
                 onChange={(next) => {
-                  onChange(next);
+                  clearFieldError?.(SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE);
                   patchValues({ [SUBSCALE_BATCH_FIELDS.FINAL_MIX_DATE]: next });
                 }}
                 placeholder="DD-MM-YYYY"
-                error={!!error}
-                helperText={error?.message || ""}
+                error={Boolean(finalMixErrorMsg)}
+                helperText={finalMixErrorMsg}
               />
-            )}
-          />
+            );
+          })()}
         </Box>
 
         <Box sx={{ px: 2, pb: 2 }}>
@@ -785,12 +791,16 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
                             select
                             label={<FieldLabelWithAsterisk label={S.MIXING_CYCLE_STAGE} required />}
                             value={stage}
-                            onChange={(event) =>
-                              handleMotorStageChange(cycleIndex, event.target.value)
-                            }
+                            onChange={(event) => {
+                              clearFieldError?.(`SUBSCALE_MIXING_CYCLES.${cycleIndex}.stage`);
+                              handleMotorStageChange(cycleIndex, event.target.value);
+                            }}
                             SelectProps={{ displayEmpty: true, MenuProps: appDropdownMenuProps }}
                             sx={{ flex: 1 }}
                             disabled={motorStagesLoading}
+                            helperText={
+                              errors?.[`SUBSCALE_MIXING_CYCLES.${cycleIndex}.stage`] || ""
+                            }
                           >
                             <MenuItem value="">
                               <em
@@ -826,12 +836,18 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
                               />
                             }
                             value={cycle.mixingCycleCode ?? ""}
-                            onChange={(event) =>
-                              handleMixingCycleChange(cycleIndex, event.target.value)
-                            }
+                            onChange={(event) => {
+                              handleMixingCycleChange(cycleIndex, event.target.value);
+                              clearFieldError?.(
+                                `SUBSCALE_MIXING_CYCLES.${cycleIndex}.mixingCycleCode`,
+                              );
+                            }}
                             SelectProps={{ displayEmpty: true, MenuProps: appDropdownMenuProps }}
                             sx={{ flex: 1 }}
                             disabled={!stage || cyclesLoading || cycleOptions.length === 0}
+                            helperText={
+                              errors?.[`SUBSCALE_MIXING_CYCLES.${cycleIndex}.mixingCycleCode`] || ""
+                            }
                           >
                             <MenuItem value="">
                               <em
@@ -913,6 +929,7 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
                           cycle.premixParticulars || cycle.processParticulars || [],
                           cycleIndex,
                           "premixParticulars",
+                          clearFieldError,
                         )}
 
                         {renderParticularsTable(
@@ -920,6 +937,7 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
                           cycle.finalMixParticulars || [],
                           cycleIndex,
                           "finalMixParticulars",
+                          clearFieldError,
                         )}
                       </>
                     )}
@@ -933,5 +951,15 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
     </Stack>
   );
 };
-
+const getSubscaleError = (
+  errors: Record<string, string> | undefined,
+  cycleIndex: number,
+  sectionKey: string,
+  rowIndex: number,
+  field: string,
+) => {
+  if (!errors) return "";
+  const path = `SUBSCALE_MIXING_CYCLES.${cycleIndex}.${sectionKey}.${rowIndex}.${field}`;
+  return errors[path] || "";
+};
 export default React.memo(SubscaleSubscaleBatchPanel);

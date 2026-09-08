@@ -31,6 +31,11 @@ import {
 } from "../../../../../hooks/user/qualityControl/ndtApiMappings";
 import { STRINGS } from "../../../../../app/config/strings";
 import NdtFileField from "./NdtFileField";
+import FieldErrorText from "@/ui/components/validation/FieldErrorText";
+import {
+  fieldError,
+  type ValidationErrors,
+} from "@/data/validation/adapters/ndt.validation";
 
 const S = STRINGS.QUALITY_CONTROL.NDT;
 
@@ -106,6 +111,7 @@ type Props = {
   motor: NDTMotorSession;
   theme: NDTMotorTablesTheme;
   onChange: (patch: Partial<NDTMotorSession>) => void;
+  validationErrors?: ValidationErrors;
 };
 
 const CInput = ({
@@ -194,11 +200,12 @@ const NDT_DETECTOR_OPTIONS = [
   { value: "Film", label: "Film" },
 ] as const;
 
-const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
+const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: Props) => {
   const motor = normalizeNDTMotorSession(rawMotor);
   const ndtTheme = theme.qualityControl.ndt;
   const brand = ndtTheme.brand;
   const fieldSx = buildFieldSx(brand.border, brand.primaryLight);
+  const err = (path: string) => fieldError(validationErrors, path);
   const L = NDT_FLOW_LABELS;
   const safeBeamEnergies = Array.isArray(motor.beamEnergies) ? motor.beamEnergies : [];
   const safePlanRows = Array.isArray(motor.radiographyPlanRows) ? motor.radiographyPlanRows : [];
@@ -331,53 +338,79 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
                   <TableRow key={`${row.srNo}-${index}`} sx={rowBg(index)}>
                     <TableCell sx={TD}>{row.srNo}</TableCell>
                     <TableCell sx={TD}>
-                      <CNumericInput
-                        fieldSx={fieldSx}
-                        value={row.sections}
-                        placeholder="Sections"
-                        onChange={(v) => updatePlanRow(index, { sections: v })}
-                      />
+                      <Box>
+                        <CNumericInput
+                          fieldSx={fieldSx}
+                          value={row.sections}
+                          placeholder="Sections"
+                          onChange={(v) => updatePlanRow(index, { sections: v })}
+                        />
+                        <FieldErrorText message={err(`radiographyPlanRows.${index}.sections`)} />
+                      </Box>
                     </TableCell>
                     <TableCell sx={TD}>
-                      <CNumericInput
-                        fieldSx={fieldSx}
-                        value={row.orientations}
-                        placeholder="Orientations"
-                        onChange={(v) => updatePlanRow(index, { orientations: v })}
-                      />
+                      <Box>
+                        <CNumericInput
+                          fieldSx={fieldSx}
+                          value={row.orientations}
+                          placeholder="Orientations"
+                          onChange={(v) => updatePlanRow(index, { orientations: v })}
+                        />
+                        <FieldErrorText
+                          message={err(`radiographyPlanRows.${index}.orientations`)}
+                        />
+                      </Box>
                     </TableCell>
                     <TableCell sx={TD}>
-                      <CNumericInput
-                        fieldSx={fieldSx}
-                        value={row.sfd}
-                        placeholder="SFD"
-                        onChange={(v) => updatePlanRow(index, { sfd: v })}
-                      />
+                      <Box>
+                        <CNumericInput
+                          fieldSx={fieldSx}
+                          value={row.sfd}
+                          placeholder="SFD"
+                          onChange={(v) => updatePlanRow(index, { sfd: v })}
+                        />
+                        <FieldErrorText message={err(`radiographyPlanRows.${index}.sfd`)} />
+                      </Box>
                     </TableCell>
                     <TableCell sx={TD}>
-                      <CNumericInput
-                        fieldSx={fieldSx}
-                        value={row.normalExposures}
-                        placeholder="Normal"
-                        onChange={(v) => updatePlanRow(index, { normalExposures: v })}
-                      />
+                      <Box>
+                        <CNumericInput
+                          fieldSx={fieldSx}
+                          value={row.normalExposures}
+                          placeholder="Normal"
+                          onChange={(v) => updatePlanRow(index, { normalExposures: v })}
+                        />
+                        <FieldErrorText
+                          message={err(`radiographyPlanRows.${index}.normalExposures`)}
+                        />
+                      </Box>
                     </TableCell>
                     <TableCell sx={TD}>
-                      <CNumericInput
-                        fieldSx={fieldSx}
-                        value={row.tangentialExposures}
-                        placeholder="Tangential"
-                        onChange={(v) => updatePlanRow(index, { tangentialExposures: v })}
-                      />
+                      <Box>
+                        <CNumericInput
+                          fieldSx={fieldSx}
+                          value={row.tangentialExposures}
+                          placeholder="Tangential"
+                          onChange={(v) => updatePlanRow(index, { tangentialExposures: v })}
+                        />
+                        <FieldErrorText
+                          message={err(`radiographyPlanRows.${index}.tangentialExposures`)}
+                        />
+                      </Box>
                     </TableCell>
                     <TableCell sx={TD}>
-                      <CSelect
-                        fieldSx={fieldSx}
-                        value={row.detectorType}
-                        options={NDT_DETECTOR_OPTIONS}
-                        placeholder="Select detector"
-                        onChange={(v) => updatePlanRow(index, { detectorType: v })}
-                      />
+                      <Box>
+                        <CSelect
+                          fieldSx={fieldSx}
+                          value={row.detectorType}
+                          options={NDT_DETECTOR_OPTIONS}
+                          placeholder="Select detector"
+                          onChange={(v) => updatePlanRow(index, { detectorType: v })}
+                        />
+                        <FieldErrorText
+                          message={err(`radiographyPlanRows.${index}.detectorType`)}
+                        />
+                      </Box>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -407,35 +440,43 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
               {motor.additionalExposureRows.map((row, index) => (
                 <TableRow key={index} sx={rowBg(index)}>
                   <TableCell sx={TD}>
-                    <CNumericInput
-                      fieldSx={fieldSx}
-                      value={row.sectionNumber}
-                      placeholder="Section no."
-                      onChange={(v) => updateExposure(index, { sectionNumber: v })}
-                    />
+                    <Box>
+                      <CNumericInput
+                        fieldSx={fieldSx}
+                        value={row.sectionNumber}
+                        placeholder="Section no."
+                        onChange={(v) => updateExposure(index, { sectionNumber: v })}
+                      />
+                      <FieldErrorText
+                        message={err(`additionalExposureRows.${index}.sectionNumber`)}
+                      />
+                    </Box>
                   </TableCell>
                   <TableCell sx={TD}>
-                    {/* <CSelect
-                      fieldSx={fieldSx}
-                      value={row.orientation}
-                      options={NDT_ORIENTATION_OPTIONS}
-                      placeholder="Select orientation"
-                      onChange={(v) => updateExposure(index, { orientation: v })}
-                    /> */}
-                    <CInput
-                      fieldSx={fieldSx}
-                      value={row.orientation}
-                      placeholder="Orientation"
-                      onChange={(v) => updateExposure(index, { orientation: v })}
-                    />
+                    <Box>
+                      <CInput
+                        fieldSx={fieldSx}
+                        value={row.orientation}
+                        placeholder="Orientation"
+                        onChange={(v) => updateExposure(index, { orientation: v })}
+                      />
+                      <FieldErrorText
+                        message={err(`additionalExposureRows.${index}.orientation`)}
+                      />
+                    </Box>
                   </TableCell>
                   <TableCell sx={TD}>
-                    <CNumericInput
-                      fieldSx={fieldSx}
-                      value={row.exposureCount}
-                      placeholder="Count"
-                      onChange={(v) => updateExposure(index, { exposureCount: v })}
-                    />
+                    <Box>
+                      <CNumericInput
+                        fieldSx={fieldSx}
+                        value={row.exposureCount}
+                        placeholder="Count"
+                        onChange={(v) => updateExposure(index, { exposureCount: v })}
+                      />
+                      <FieldErrorText
+                        message={err(`additionalExposureRows.${index}.exposureCount`)}
+                      />
+                    </Box>
                   </TableCell>
                   <TableCell sx={TD}>
                     {motor.additionalExposureRows.length > 1 ? (
@@ -503,36 +544,43 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
                 <TableRow key={index} sx={rowBg(index)}>
                   <TableCell sx={TD}>{index + 1}</TableCell>
                   <TableCell sx={TD}>
-                    <CNumericInput
-                      fieldSx={fieldSx}
-                      value={row.section}
-                      placeholder="Section no."
-                      onChange={(v) => updateObservation(index, { section: v })}
-                    />
+                    <Box>
+                      <CNumericInput
+                        fieldSx={fieldSx}
+                        value={row.section}
+                        placeholder="Section no."
+                        onChange={(v) => updateObservation(index, { section: v })}
+                      />
+                      <FieldErrorText
+                        message={err(`radiographyObservationRows.${index}.section`)}
+                      />
+                    </Box>
                   </TableCell>
                   <TableCell sx={TD}>
-                    {/* <CSelect
-                      fieldSx={fieldSx}
-                      value={row.orientation}
-                      options={NDT_ORIENTATION_OPTIONS}
-                      placeholder="Select orientation"
-                      onChange={(v) => updateObservation(index, { orientation: v })}
-                    /> */}
-
-                    <CInput
-                      fieldSx={fieldSx}
-                      value={row.orientation}
-                      placeholder="Orientation"
-                      onChange={(v) => updateObservation(index, { orientation: v })}
-                    />
+                    <Box>
+                      <CInput
+                        fieldSx={fieldSx}
+                        value={row.orientation}
+                        placeholder="Orientation"
+                        onChange={(v) => updateObservation(index, { orientation: v })}
+                      />
+                      <FieldErrorText
+                        message={err(`radiographyObservationRows.${index}.orientation`)}
+                      />
+                    </Box>
                   </TableCell>
                   <TableCell sx={TD}>
-                    <CInput
-                      fieldSx={fieldSx}
-                      value={row.observations}
-                      onChange={(v) => updateObservation(index, { observations: v })}
-                      multiline
-                    />
+                    <Box>
+                      <CInput
+                        fieldSx={fieldSx}
+                        value={row.observations}
+                        onChange={(v) => updateObservation(index, { observations: v })}
+                        multiline
+                      />
+                      <FieldErrorText
+                        message={err(`radiographyObservationRows.${index}.observations`)}
+                      />
+                    </Box>
                   </TableCell>
                   <TableCell sx={TD}>
                     <NdtFileField
@@ -612,21 +660,31 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
                         <Typography sx={{ fontSize: "0.8rem", fontWeight: 600 }}>
                           {row.observation}
                         </Typography>
-                        <CInput
-                          fieldSx={fieldSx}
-                          value={row.observationNotes ?? ""}
-                          onChange={(v) => updateVisual(index, { observationNotes: v })}
-                          placeholder="Observation"
-                          multiline
-                        />
+                        <Box>
+                          <CInput
+                            fieldSx={fieldSx}
+                            value={row.observationNotes ?? ""}
+                            onChange={(v) => updateVisual(index, { observationNotes: v })}
+                            placeholder="Observation"
+                            multiline
+                          />
+                          <FieldErrorText
+                            message={err(`visualInspectionRows.${index}.observationNotes`)}
+                          />
+                        </Box>
                       </Stack>
                     ) : (
-                      <CInput
-                        fieldSx={fieldSx}
-                        value={row.observation}
-                        onChange={(v) => updateVisual(index, { observation: v })}
-                        placeholder="Enter observation"
-                      />
+                      <Box>
+                        <CInput
+                          fieldSx={fieldSx}
+                          value={row.observation}
+                          onChange={(v) => updateVisual(index, { observation: v })}
+                          placeholder="Enter observation"
+                        />
+                        <FieldErrorText
+                          message={err(`visualInspectionRows.${index}.observation`)}
+                        />
+                      </Box>
                     )}
                   </TableCell>
                   <TableCell sx={TD}>
@@ -722,15 +780,18 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange }: Props) => {
           theme={theme}
         />
         <Box sx={{ px: 1.75, py: 1.25 }}>
-          <NdtFileField
-            files={motor.signedReport ? [motor.signedReport] : []}
-            onChange={(next) => onChange({ signedReport: next[0] ?? null })}
-            multiple={false}
-            acceptMode="pdf"
-            subDeptSlug="ndt"
-            label="Upload PDF"
-            emptyLabel={S.FILE_EMPTY_REPORT}
-          />
+          <Box>
+            <NdtFileField
+              files={motor.signedReport ? [motor.signedReport] : []}
+              onChange={(next) => onChange({ signedReport: next[0] ?? null })}
+              multiple={false}
+              acceptMode="pdf"
+              subDeptSlug="ndt"
+              label="Upload PDF"
+              emptyLabel={S.FILE_EMPTY_REPORT}
+            />
+            <FieldErrorText message={err("signedReport")} />
+          </Box>
           <Box sx={{ mt: 1.25 }}>
             <CInput
               fieldSx={fieldSx}

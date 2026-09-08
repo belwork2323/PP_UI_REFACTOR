@@ -47,6 +47,7 @@ const TrimmingPage = () => {
     handleMotorSessionChange,
     handleSaveMotorDraft,
     handleSubmitMotor,
+    motorValidationErrors,
   } = hookState;
 
   const listLoading = loading && !loadingFormDetails && view === "list";
@@ -96,6 +97,7 @@ const TrimmingPage = () => {
               setPendingMotorId(motorId);
               setMotorSubmitConfirmOpen(true);
             }}
+            motorValidationErrors={motorValidationErrors}
             theme={theme}
           />
 

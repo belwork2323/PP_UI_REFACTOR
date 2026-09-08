@@ -16,6 +16,9 @@ export type DispatchBatch = {
   dispatchStatus: string;
   formId?: string | null;
   rejectionReason?: string | null;
+  /** Used by previous-stage gate when opening the form. */
+  stageProgress?: unknown;
+  currentStage?: string | null;
 };
 
 export type DispatchStageOption = {
@@ -162,10 +165,8 @@ export const canLoadDispatchMotor = ({
   usedMotorIds: string[];
   hasMotors?: boolean;
 }) => {
-  // 1. Verify shared setup completion
   if (!canCompleteDispatchSetup(setup)) return false;
 
-  // 2. Check if active motor ID is valid and NOT already loaded
   const motorId = String(draftMotorId ?? "").trim();
   if (!motorId || usedMotorIds.includes(motorId)) return false;
 

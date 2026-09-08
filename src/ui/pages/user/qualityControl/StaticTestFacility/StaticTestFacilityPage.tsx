@@ -77,6 +77,7 @@ const STFPage = () => {
     handleRemoveMotor,
     handleSaveMotorDraft,
     handleSubmitMotor,
+    motorValidationErrors,
     detailsRow,
     detailsData,
     detailsLoading,
@@ -211,6 +212,7 @@ const STFPage = () => {
               setPendingMotorId(motorId);
               setMotorSubmitConfirmOpen(true);
             }}
+            motorValidationErrors={motorValidationErrors}
             theme={theme}
           />
         </>

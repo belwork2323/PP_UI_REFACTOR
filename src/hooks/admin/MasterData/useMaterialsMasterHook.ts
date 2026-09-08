@@ -52,7 +52,6 @@ export default function useMaterialsMasterHook({
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const [inlineMode, setInlineMode] = useState<"create" | "edit" | null>(null);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [form, setForm] = useState<MaterialsMasterFormState>(createEmptyMaterialsForm());
   const [saving, setSaving] = useState(false);
   const [disableTarget, setDisableTarget] = useState<MaterialsMasterRecord | null>(null);
@@ -99,7 +98,6 @@ export default function useMaterialsMasterHook({
   useEffect(() => {
     setPage(0);
     setInlineMode(null);
-    setExpandedId(null);
     void loadList();
   }, [loadList, refreshKey]);
 
@@ -115,13 +113,11 @@ export default function useMaterialsMasterHook({
   };
 
   const openCreate = () => {
-    setExpandedId(null);
     setForm(createEmptyMaterialsForm());
     setInlineMode("create");
   };
 
   const openEdit = (record: MaterialsMasterRecord) => {
-    setExpandedId(record.materialId);
     setForm(mapMaterialRecordToForm(record));
     setInlineMode("edit");
   };
@@ -206,8 +202,6 @@ export default function useMaterialsMasterHook({
       setPage(0);
     },
     inlineMode,
-    expandedId,
-    setExpandedId,
     form,
     setForm,
     saving,

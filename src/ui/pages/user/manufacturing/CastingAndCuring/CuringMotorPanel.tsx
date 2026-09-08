@@ -211,10 +211,8 @@ const CuringMotorPanel = ({
     "Status Of Hot Water Circulation",
   ];
   useEffect(() => {
-    if (cycles && cycles.length > 0) {
-      validateCastingCuring(value, "SUBMIT");
-    }
-  }, [cycles]);
+    validateCastingCuring(value, "SUBMIT");
+  }, []);
   return (
     <Box>
       <SectionCard title="Curing Cycles" theme={theme}>

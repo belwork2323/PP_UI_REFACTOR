@@ -15,6 +15,8 @@ export type NDTBatch = {
   formId?: string | null;
   draftData?: NDTFormState | null;
   rejectionReason?: string | null;
+  stageProgress?: unknown;
+  currentStage?: string | null;
 };
 
 export const NDT_EQUIPMENT_OPTIONS = [

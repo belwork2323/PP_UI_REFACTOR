@@ -26,6 +26,9 @@ import {
 } from "../../../../../app/theme/custom_themes/shared/data_table_theme";
 import TrimmingFileField from "./TrimmingFileField";
 import QCDivisionFileField from "../../qualityControl/QCDivision/QCDivisionFileField";
+import FieldErrorText from "@/ui/components/validation/FieldErrorText";
+import type { ValidationErrors } from "@/data/validation/submissionIntent";
+import { fieldError } from "@/data/validation/adapters/trimming.validation";
 
 const S = STRINGS.MANUFACTURING.TRIMMING;
 
@@ -58,6 +61,18 @@ export const TrimmingCommonTable = ({
   fileSubDeptSlug = "trimming",
   /** When true, use shared QC eager FileRef field (same as hardware / revalidation). */
   useQcDivisionFileField = false,
+  validationErrors,
+}: {
+  activeMotorSession: any;
+  activeMotorEntry: { motorId: string; motorStage?: string };
+  onMotorSessionChange: (motorId: string, next: any) => void;
+  readOnly?: boolean;
+  disabled?: boolean;
+  allowStructureActions?: boolean;
+  theme?: any;
+  fileSubDeptSlug?: string;
+  useQcDivisionFileField?: boolean;
+  validationErrors?: ValidationErrors;
 }) => {
   const palette = theme?.palette ?? {};
   const colors = useMemo(
@@ -75,6 +90,7 @@ export const TrimmingCommonTable = ({
   );
 
   const inputsLocked = Boolean(readOnly || disabled);
+  const err = (path: string) => fieldError(validationErrors, path);
   const showStructureActions = Boolean(allowStructureActions && !inputsLocked);
 
   const sectionCardSx = {
@@ -272,18 +288,21 @@ export const TrimmingCommonTable = ({
           {readOnly ? (
             <ReadOnlyValue value={activeMotorSession.motorReceivedAt} />
           ) : (
-            <DateField
-              value={activeMotorSession.motorReceivedAt ?? ""}
-              onChange={(value) =>
-                onMotorSessionChange(activeMotorEntry.motorId, {
-                  ...activeMotorSession,
-                  motorReceivedAt: value,
-                })
-              }
-              placeholder={S.MOTOR_RECEIVED_AT_PLACEHOLDER}
-              compact
-              disabled={inputsLocked}
-            />
+            <Box>
+              <DateField
+                value={activeMotorSession.motorReceivedAt ?? ""}
+                onChange={(value) =>
+                  onMotorSessionChange(activeMotorEntry.motorId, {
+                    ...activeMotorSession,
+                    motorReceivedAt: value,
+                  })
+                }
+                placeholder={S.MOTOR_RECEIVED_AT_PLACEHOLDER}
+                compact
+                disabled={inputsLocked}
+              />
+              <FieldErrorText message={err("motorReceivedAt")} />
+            </Box>
           )}
         </Box>
       </Box>
@@ -323,101 +342,123 @@ export const TrimmingCommonTable = ({
                       {readOnly ? (
                         <ReadOnlyValue value={row.machineDetails} />
                       ) : (
-                        <FormInput
-                          value={row.machineDetails}
-                          size="small"
-                          onChange={(e) => {
-                            const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
-                            nextRows[rowIndex] = {
-                              ...nextRows[rowIndex],
-                              machineDetails: e.target.value,
-                            };
-                            onMotorSessionChange(activeMotorEntry.motorId, {
-                              ...activeMotorSession,
-                              trimmingDetails: nextRows,
-                            });
-                          }}
-                          disabled={inputsLocked}
-                        />
+                        <Box>
+                          <FormInput
+                            value={row.machineDetails}
+                            size="small"
+                            onChange={(e) => {
+                              const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
+                              nextRows[rowIndex] = {
+                                ...nextRows[rowIndex],
+                                machineDetails: e.target.value,
+                              };
+                              onMotorSessionChange(activeMotorEntry.motorId, {
+                                ...activeMotorSession,
+                                trimmingDetails: nextRows,
+                              });
+                            }}
+                            disabled={inputsLocked}
+                          />
+                          <FieldErrorText
+                            message={err(`trimmingDetails.${rowIndex}.machineDetails`)}
+                          />
+                        </Box>
                       )}
                     </TableCell>
                     <TableCell sx={tdSx}>
                       {readOnly ? (
                         <ReadOnlyValue value={row.startDate} />
                       ) : (
-                        <DateField
-                          value={row.startDate}
-                          compact
-                          onChange={(val) => {
-                            const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
-                            nextRows[rowIndex] = { ...nextRows[rowIndex], startDate: val };
-                            onMotorSessionChange(activeMotorEntry.motorId, {
-                              ...activeMotorSession,
-                              trimmingDetails: nextRows,
-                            });
-                          }}
-                          disabled={inputsLocked}
-                        />
+                        <Box>
+                          <DateField
+                            value={row.startDate}
+                            compact
+                            onChange={(val) => {
+                              const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
+                              nextRows[rowIndex] = { ...nextRows[rowIndex], startDate: val };
+                              onMotorSessionChange(activeMotorEntry.motorId, {
+                                ...activeMotorSession,
+                                trimmingDetails: nextRows,
+                              });
+                            }}
+                            disabled={inputsLocked}
+                          />
+                          <FieldErrorText message={err(`trimmingDetails.${rowIndex}.startDate`)} />
+                        </Box>
                       )}
                     </TableCell>
                     <TableCell sx={tdSx}>
                       {readOnly ? (
                         <ReadOnlyValue value={row.completionDate} />
                       ) : (
-                        <DateField
-                          value={row.completionDate}
-                          compact
-                          onChange={(val) => {
-                            const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
-                            nextRows[rowIndex] = { ...nextRows[rowIndex], completionDate: val };
-                            onMotorSessionChange(activeMotorEntry.motorId, {
-                              ...activeMotorSession,
-                              trimmingDetails: nextRows,
-                            });
-                          }}
-                          disabled={inputsLocked}
-                        />
+                        <Box>
+                          <DateField
+                            value={row.completionDate}
+                            compact
+                            onChange={(val) => {
+                              const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
+                              nextRows[rowIndex] = { ...nextRows[rowIndex], completionDate: val };
+                              onMotorSessionChange(activeMotorEntry.motorId, {
+                                ...activeMotorSession,
+                                trimmingDetails: nextRows,
+                              });
+                            }}
+                            disabled={inputsLocked}
+                          />
+                          <FieldErrorText
+                            message={err(`trimmingDetails.${rowIndex}.completionDate`)}
+                          />
+                        </Box>
                       )}
                     </TableCell>
                     <TableCell sx={tdSx}>
                       {readOnly ? (
                         <ReadOnlyValue value={row.arborSize} />
                       ) : (
-                        <FormInput
-                          value={row.arborSize}
-                          inputMode="decimal"
-                          onChange={(e) => {
-                            const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
-                            nextRows[rowIndex] = { ...nextRows[rowIndex], arborSize: e.target.value };
-                            onMotorSessionChange(activeMotorEntry.motorId, {
-                              ...activeMotorSession,
-                              trimmingDetails: nextRows,
-                            });
-                          }}
-                          disabled={inputsLocked}
-                        />
+                        <Box>
+                          <FormInput
+                            value={row.arborSize}
+                            inputMode="decimal"
+                            onChange={(e) => {
+                              const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
+                              nextRows[rowIndex] = {
+                                ...nextRows[rowIndex],
+                                arborSize: e.target.value,
+                              };
+                              onMotorSessionChange(activeMotorEntry.motorId, {
+                                ...activeMotorSession,
+                                trimmingDetails: nextRows,
+                              });
+                            }}
+                            disabled={inputsLocked}
+                          />
+                          <FieldErrorText message={err(`trimmingDetails.${rowIndex}.arborSize`)} />
+                        </Box>
                       )}
                     </TableCell>
                     <TableCell sx={tdSx}>
                       {readOnly ? (
                         <ReadOnlyValue value={row.cutterSize} />
                       ) : (
-                        <FormInput
-                          value={row.cutterSize}
-                          inputMode="decimal"
-                          onChange={(e) => {
-                            const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
-                            nextRows[rowIndex] = {
-                              ...nextRows[rowIndex],
-                              cutterSize: e.target.value,
-                            };
-                            onMotorSessionChange(activeMotorEntry.motorId, {
-                              ...activeMotorSession,
-                              trimmingDetails: nextRows,
-                            });
-                          }}
-                          disabled={inputsLocked}
-                        />
+                        <Box>
+                          <FormInput
+                            value={row.cutterSize}
+                            inputMode="decimal"
+                            onChange={(e) => {
+                              const nextRows = [...(activeMotorSession.trimmingDetails ?? [])];
+                              nextRows[rowIndex] = {
+                                ...nextRows[rowIndex],
+                                cutterSize: e.target.value,
+                              };
+                              onMotorSessionChange(activeMotorEntry.motorId, {
+                                ...activeMotorSession,
+                                trimmingDetails: nextRows,
+                              });
+                            }}
+                            disabled={inputsLocked}
+                          />
+                          <FieldErrorText message={err(`trimmingDetails.${rowIndex}.cutterSize`)} />
+                        </Box>
                       )}
                     </TableCell>
                     <TableCell sx={tdSx}>
@@ -619,7 +660,7 @@ export const TrimmingCommonTable = ({
                                 commonFormatParameters: nextParams,
                               });
                             }}
-                          
+
                         disabled={inputsLocked}
                       />
                       )}
@@ -656,7 +697,7 @@ export const TrimmingCommonTable = ({
                               commonFormatParameters: nextParams,
                             });
                           }}
-                        
+
                         disabled={inputsLocked}
                       />
                       )}
@@ -667,31 +708,41 @@ export const TrimmingCommonTable = ({
                           {readOnly ? (
                             <ReadOnlyValue value={stage.readings[location] ?? ""} />
                           ) : (
-                            <FormInput
-                              value={stage.readings[location] ?? ""}
-                              inputMode="decimal"
-                              onChange={(e) => {
-                                const nextParams = [
-                                  ...(activeMotorSession.commonFormatParameters ?? []),
-                                ];
-                                nextParams[paramIndex] = {
-                                  ...nextParams[paramIndex],
-                                  stages: nextParams[paramIndex].stages.map((s, idx) =>
-                                    idx === stageIndex
-                                      ? {
-                                          ...s,
-                                          readings: { ...s.readings, [location]: e.target.value },
-                                        }
-                                      : s,
-                                  ),
-                                };
-                                onMotorSessionChange(activeMotorEntry.motorId, {
-                                  ...activeMotorSession,
-                                  commonFormatParameters: nextParams,
-                                });
-                              }}
-                              disabled={inputsLocked}
-                            />
+                            <Box>
+                              <FormInput
+                                value={stage.readings[location] ?? ""}
+                                inputMode="decimal"
+                                onChange={(e) => {
+                                  const nextParams = [
+                                    ...(activeMotorSession.commonFormatParameters ?? []),
+                                  ];
+                                  nextParams[paramIndex] = {
+                                    ...nextParams[paramIndex],
+                                    stages: nextParams[paramIndex].stages.map((s, idx) =>
+                                      idx === stageIndex
+                                        ? {
+                                            ...s,
+                                            readings: {
+                                              ...s.readings,
+                                              [location]: e.target.value,
+                                            },
+                                          }
+                                        : s,
+                                    ),
+                                  };
+                                  onMotorSessionChange(activeMotorEntry.motorId, {
+                                    ...activeMotorSession,
+                                    commonFormatParameters: nextParams,
+                                  });
+                                }}
+                                disabled={inputsLocked}
+                              />
+                              <FieldErrorText
+                                message={err(
+                                  `commonFormatParameters.${paramIndex}.stages.${stageIndex}.readings.${location}`,
+                                )}
+                              />
+                            </Box>
                           )}
                         </TableCell>
                       ))}
@@ -701,31 +752,41 @@ export const TrimmingCommonTable = ({
                           {readOnly ? (
                             <ReadOnlyValue value={stage.readings[location] ?? ""} />
                           ) : (
-                            <FormInput
-                              value={stage.readings[location] ?? ""}
-                              inputMode="decimal"
-                              onChange={(e) => {
-                                const nextParams = [
-                                  ...(activeMotorSession.commonFormatParameters ?? []),
-                                ];
-                                nextParams[paramIndex] = {
-                                  ...nextParams[paramIndex],
-                                  stages: nextParams[paramIndex].stages.map((s, idx) =>
-                                    idx === stageIndex
-                                      ? {
-                                          ...s,
-                                          readings: { ...s.readings, [location]: e.target.value },
-                                        }
-                                      : s,
-                                  ),
-                                };
-                                onMotorSessionChange(activeMotorEntry.motorId, {
-                                  ...activeMotorSession,
-                                  commonFormatParameters: nextParams,
-                                });
-                              }}
-                              disabled={inputsLocked}
-                            />
+                            <Box>
+                              <FormInput
+                                value={stage.readings[location] ?? ""}
+                                inputMode="decimal"
+                                onChange={(e) => {
+                                  const nextParams = [
+                                    ...(activeMotorSession.commonFormatParameters ?? []),
+                                  ];
+                                  nextParams[paramIndex] = {
+                                    ...nextParams[paramIndex],
+                                    stages: nextParams[paramIndex].stages.map((s, idx) =>
+                                      idx === stageIndex
+                                        ? {
+                                            ...s,
+                                            readings: {
+                                              ...s.readings,
+                                              [location]: e.target.value,
+                                            },
+                                          }
+                                        : s,
+                                    ),
+                                  };
+                                  onMotorSessionChange(activeMotorEntry.motorId, {
+                                    ...activeMotorSession,
+                                    commonFormatParameters: nextParams,
+                                  });
+                                }}
+                                disabled={inputsLocked}
+                              />
+                              <FieldErrorText
+                                message={err(
+                                  `commonFormatParameters.${paramIndex}.stages.${stageIndex}.readings.${location}`,
+                                )}
+                              />
+                            </Box>
                           )}
                         </TableCell>
                       ))}

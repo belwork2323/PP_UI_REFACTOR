@@ -52,7 +52,6 @@ export default function useInsulationSpecMasterHook({
   const [rowsPerPage, setRowsPerPage] = useState(10);
 
   const [inlineMode, setInlineMode] = useState<"create" | "edit" | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [form, setForm] = useState<InsulationSpecFormState>(createEmptyInsulationForm());
   const [saving, setSaving] = useState(false);
   const [disableTarget, setDisableTarget] = useState<InsulationSpecRecord | null>(null);
@@ -99,7 +98,6 @@ export default function useInsulationSpecMasterHook({
   useEffect(() => {
     setPage(0);
     setInlineMode(null);
-    setExpandedId(null);
     void loadList();
   }, [loadList, refreshKey]);
 
@@ -115,13 +113,11 @@ export default function useInsulationSpecMasterHook({
   };
 
   const openCreate = () => {
-    setExpandedId(null);
     setForm(createEmptyInsulationForm());
     setInlineMode("create");
   };
 
   const openEdit = (record: InsulationSpecRecord) => {
-    setExpandedId(record.id);
     setForm(mapInsulationRecordToForm(record));
     setInlineMode("edit");
   };
@@ -206,8 +202,6 @@ export default function useInsulationSpecMasterHook({
       setPage(0);
     },
     inlineMode,
-    expandedId,
-    setExpandedId,
     form,
     setForm,
     saving,
