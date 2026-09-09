@@ -5,6 +5,88 @@ import {
   type OperationStatus,
 } from "../../../hooks/operationStatus";
 import { materialSelectionKey } from "./MaterialsListModel";
+import type { RawMaterialTypeValue, PreparationTypeValue } from "../admin/MasterData/MaterialsMasterModel";
+
+export type AdductPreparationDetails = {
+  adductBatchPrepDate: string;
+  tmpMfgLotNo: string;
+  tmpTotalQtyGm: number | null;
+  nbdMfgLotNo: string;
+  nbdTotalQtyGm: number | null;
+  rpm: number | null;
+  processTemp: number | null;
+  jacketTemp: number | null;
+  processStartTime: string;
+  processEndTime: string;
+  finalAdductQty: number | null;
+  dispatchDateTime: string;
+};
+
+export const emptyAdductPreparationDetails = (): AdductPreparationDetails => ({
+  adductBatchPrepDate: "",
+  tmpMfgLotNo: "",
+  tmpTotalQtyGm: null,
+  nbdMfgLotNo: "",
+  nbdTotalQtyGm: null,
+  rpm: null,
+  processTemp: null,
+  jacketTemp: null,
+  processStartTime: "",
+  processEndTime: "",
+  finalAdductQty: null,
+  dispatchDateTime: "",
+});
+
+export const isAcemAdductMaterial = (
+  rawMaterialType?: string | null,
+  preparationType?: string | null,
+): boolean =>
+  String(rawMaterialType ?? "").trim().toUpperCase() === "ACEM" &&
+  String(preparationType ?? "").trim() === "ADDUCT";
+
+const parseAdductNumeric = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === "") return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+export const parseAdductPreparationDetails = (raw: unknown): AdductPreparationDetails => {
+  const source = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  return {
+    adductBatchPrepDate: String(source.adductBatchPrepDate ?? "").trim(),
+    tmpMfgLotNo: String(source.tmpMfgLotNo ?? "").trim(),
+    tmpTotalQtyGm: parseAdductNumeric(source.tmpTotalQtyGm),
+    nbdMfgLotNo: String(source.nbdMfgLotNo ?? "").trim(),
+    nbdTotalQtyGm: parseAdductNumeric(source.nbdTotalQtyGm),
+    rpm: parseAdductNumeric(source.rpm),
+    processTemp: parseAdductNumeric(source.processTemp),
+    jacketTemp: parseAdductNumeric(source.jacketTemp),
+    processStartTime: String(source.processStartTime ?? "").trim(),
+    processEndTime: String(source.processEndTime ?? "").trim(),
+    finalAdductQty: parseAdductNumeric(source.finalAdductQty),
+    dispatchDateTime: String(source.dispatchDateTime ?? "").trim(),
+  };
+};
+
+export const serializeAdductPreparationDetails = (
+  details: AdductPreparationDetails | null | undefined,
+): AdductPreparationDetails | undefined => {
+  if (!details) return undefined;
+  return {
+    adductBatchPrepDate: details.adductBatchPrepDate.trim(),
+    tmpMfgLotNo: details.tmpMfgLotNo.trim(),
+    tmpTotalQtyGm: details.tmpTotalQtyGm,
+    nbdMfgLotNo: details.nbdMfgLotNo.trim(),
+    nbdTotalQtyGm: details.nbdTotalQtyGm,
+    rpm: details.rpm,
+    processTemp: details.processTemp,
+    jacketTemp: details.jacketTemp,
+    processStartTime: details.processStartTime.trim(),
+    processEndTime: details.processEndTime.trim(),
+    finalAdductQty: details.finalAdductQty,
+    dispatchDateTime: details.dispatchDateTime.trim(),
+  };
+};
 
 /** Re-export for sourcing pages that previously imported from sourcingWorkflowData */
 export const SOURCING_STATUS = OPERATION_STATUS;
@@ -219,16 +301,20 @@ export function formatSpecStatusDisplayLabel(
 export type MaterialBlock = {
   material: string;
   gradeCode?: string;
+  rawMaterialType?: RawMaterialTypeValue;
+  preparationType?: PreparationTypeValue | "" | null;
   lotNo: string;
   supplyOrderNo?: string;
   receiptDate?: string;
   manufacturerName?: string;
+  adductPreparation?: AdductPreparationDetails;
   certificates?: LotCertificate[];
   rows: SpecRow[];
 };
 
 export type MaterialLotBlock = {
   lotNo: string;
+  adductPreparation?: AdductPreparationDetails;
   certificates: LotCertificate[];
   rows: SpecRow[];
 };
@@ -238,6 +324,8 @@ export type MaterialFormGroup = {
   gradeCode?: string;
   gradeId?: number;
   gradeName?: string;
+  rawMaterialType?: RawMaterialTypeValue;
+  preparationType?: PreparationTypeValue | "" | null;
   supplyOrderNo: string;
   receiptDate: string;
   manufacturerName: string;
@@ -334,12 +422,15 @@ export function flattenMaterialGroups(groups: MaterialFormGroup[]): MaterialBloc
     (group.lots ?? []).map((lot) => ({
       material: group.material,
       ...(group.gradeCode ? { gradeCode: group.gradeCode } : {}),
+      rawMaterialType: group.rawMaterialType,
+      preparationType: group.preparationType,
       lotNo: lot.lotNo,
       supplyOrderNo: group.supplyOrderNo,
       receiptDate: group.receiptDate,
       manufacturerName: group.manufacturerName,
       certificates: lot.certificates ?? [],
       rows: lot.rows ?? [],
+      ...(lot.adductPreparation ? { adductPreparation: lot.adductPreparation } : {}),
     })),
   );
 }
@@ -360,6 +451,8 @@ export function groupBlocksToMaterialGroups(blocks: MaterialBlock[]): MaterialFo
     return {
       material: (head.material ?? "").trim(),
       ...(gradeCode ? { gradeCode } : {}),
+      rawMaterialType: head.rawMaterialType,
+      preparationType: head.preparationType,
       supplyOrderNo: head.supplyOrderNo ?? "",
       receiptDate: head.receiptDate ?? "",
       manufacturerName: head.manufacturerName ?? "",
@@ -367,6 +460,7 @@ export function groupBlocksToMaterialGroups(blocks: MaterialBlock[]): MaterialFo
         lotNo: block.lotNo ?? "",
         certificates: block.certificates ?? [],
         rows: block.rows ?? [],
+        ...(block.adductPreparation ? { adductPreparation: block.adductPreparation } : {}),
       })),
     };
   });
@@ -497,6 +591,7 @@ export type RawMaterialLotCreatePayload = {
   lotId: string;
   specifications: RawMaterialLotSpecificationPayload[];
   certificates: RawMaterialCertificateApiPayload[];
+  adductPreparation?: AdductPreparationDetails;
 };
 
 export type RawMaterialMaterialCreatePayload = {
@@ -536,6 +631,7 @@ export type RawMaterialLotUpdatePayload = {
     status: string | null;
   }>;
   certificates: RawMaterialCertificateApiPayload[];
+  adductPreparation?: AdductPreparationDetails;
 };
 
 export type RawMaterialLotListRequest = {
@@ -710,6 +806,9 @@ export class RawMaterialLotDetailsModel {
     status: string | null;
   }>;
   certificates: LotCertificate[];
+  adductPreparation?: AdductPreparationDetails;
+  rawMaterialType?: RawMaterialTypeValue;
+  preparationType?: PreparationTypeValue | "" | null;
   progressInsights?: Record<string, unknown>;
   qualityInsights?: Record<string, unknown>;
   workflowInsights?: {
@@ -733,6 +832,17 @@ export class RawMaterialLotDetailsModel {
     this.certificates = Array.isArray(payload?.certificates)
       ? payload.certificates.map(normalizeLotCertificate)
       : [];
+    this.adductPreparation = payload?.adductPreparation
+      ? parseAdductPreparationDetails(payload.adductPreparation)
+      : undefined;
+    this.rawMaterialType =
+      String(payload?.rawMaterialType ?? "NORMAL").trim().toUpperCase() === "ACEM"
+        ? "ACEM"
+        : "NORMAL";
+    this.preparationType =
+      payload?.preparationType == null || payload?.preparationType === ""
+        ? null
+        : String(payload.preparationType).trim();
     this.progressInsights = payload?.progressInsights;
     this.qualityInsights = payload?.qualityInsights;
     this.workflowInsights = payload?.workflowInsights;
@@ -747,11 +857,14 @@ export class RawMaterialLotDetailsModel {
       {
         material: model.materialCode,
         ...(model.grade ? { gradeCode: model.grade } : {}),
+        rawMaterialType: model.rawMaterialType,
+        preparationType: model.preparationType,
         lotNo: model.lotId,
         supplyOrderNo: model.supplyOrderNo,
         receiptDate: model.receiptDate,
         manufacturerName: model.manufacturerName,
         certificates: [...(model.certificates ?? [])],
+        ...(model.adductPreparation ? { adductPreparation: model.adductPreparation } : {}),
         rows: (model.specifications ?? []).map((spec) => {
           const referenceRange = parseApiReferenceRange(spec.referenceRange);
           const analysedResult = parseApiAnalysedResultDisplay(
@@ -982,7 +1095,7 @@ function mapCertificatesForApi(certs: LotCertificate[] | undefined): RawMaterial
 }
 
 function mapLotBlockToCreatePayload(lot: MaterialLotBlock): RawMaterialLotCreatePayload {
-  return {
+  const payload: RawMaterialLotCreatePayload = {
     lotId: (lot.lotNo ?? "").trim(),
     specifications: (lot.rows ?? [])
       .filter((row) => (row.specificationCode ?? "").trim())
@@ -994,6 +1107,11 @@ function mapLotBlockToCreatePayload(lot: MaterialLotBlock): RawMaterialLotCreate
       })),
     certificates: mapCertificatesForApi(lot.certificates),
   };
+  const adductPreparation = serializeAdductPreparationDetails(lot.adductPreparation);
+  if (adductPreparation) {
+    payload.adductPreparation = adductPreparation;
+  }
+  return payload;
 }
 
 export function mapMaterialGroupsToCreateMaterials(
@@ -1047,6 +1165,9 @@ export function mapFirstBlockToLotUpdatePayload(
         status: null,
       })),
     certificates: mapCertificatesForApi(block.certificates),
+    ...(serializeAdductPreparationDetails(block.adductPreparation)
+      ? { adductPreparation: serializeAdductPreparationDetails(block.adductPreparation) }
+      : {}),
   };
 }
 

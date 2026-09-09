@@ -22,9 +22,13 @@ import CasePrepSelect from "@ui/pages/user/manufacturing/CasePreparation/CasePre
 import {
   emptyMaterialGrade,
   emptyMaterialSpec,
+  PREPARATION_TYPE_OPTIONS,
+  RAW_MATERIAL_TYPE_OPTIONS,
   type MaterialGradeForm,
   type MaterialSpecForm,
   type MaterialsMasterFormState,
+  type PreparationTypeValue,
+  type RawMaterialTypeValue,
 } from "@data/models/admin/MasterData/MaterialsMasterModel";
 import type { MasterDataReferenceRange } from "@data/models/admin/MasterData/nestedMasterDataTypes";
 
@@ -283,6 +287,10 @@ const MaterialsMasterFormDialog = ({
   const flowBar = fieldTheme.manufacturing?.casePreparation?.flowBar ?? {};
   const { modal } = t;
   const recordLabel = form.materialName.trim() || form.materialCode.trim() || "record";
+  const showMaterialFields =
+    isEdit ||
+    form.rawMaterialType === "NORMAL" ||
+    (form.rawMaterialType === "ACEM" && Boolean(form.preparationType));
 
   return (
     <Dialog
@@ -307,6 +315,47 @@ const MaterialsMasterFormDialog = ({
       <DialogContent sx={modal.content}>
         <Box sx={modal.headerGap} />
         <Stack spacing={modal.stackSpacing}>
+          <Box>
+            <Typography sx={modal.fieldLabel}>Raw material category</Typography>
+            <Box sx={flowBar.topRow}>
+              <CasePrepSelect
+                label="Raw material type"
+                value={form.rawMaterialType}
+                placeholder="Select raw material type"
+                options={RAW_MATERIAL_TYPE_OPTIONS}
+                disabled={saving || isEdit}
+                required
+                width={240}
+                theme={fieldTheme}
+                onChange={(value) => {
+                  const rawMaterialType = value as RawMaterialTypeValue;
+                  onChange({
+                    ...form,
+                    rawMaterialType,
+                    preparationType: rawMaterialType === "ACEM" ? form.preparationType : "",
+                  });
+                }}
+              />
+              {form.rawMaterialType === "ACEM" ? (
+                <CasePrepSelect
+                  label="Preparation type"
+                  value={form.preparationType}
+                  placeholder="Select preparation type"
+                  options={PREPARATION_TYPE_OPTIONS}
+                  disabled={saving || isEdit}
+                  required
+                  width={220}
+                  theme={fieldTheme}
+                  onChange={(value) =>
+                    onChange({ ...form, preparationType: value as PreparationTypeValue })
+                  }
+                />
+              ) : null}
+            </Box>
+          </Box>
+
+          {showMaterialFields ? (
+            <>
           <Box>
             <Typography sx={modal.fieldLabel}>Material details</Typography>
             <Box sx={flowBar.topRow}>
@@ -370,6 +419,8 @@ const MaterialsMasterFormDialog = ({
               onChange={(specifications) => onChange({ ...form, specifications })}
             />
           </Box>
+            </>
+          ) : null}
         </Stack>
       </DialogContent>
 

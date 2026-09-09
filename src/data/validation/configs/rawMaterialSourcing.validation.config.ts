@@ -1,6 +1,11 @@
 import { STRINGS } from "@/app/config/strings";
 import type { MaterialBlock, SpecRow } from "@/data/models/user/RawMaterialProcurementModel";
-import { isReferenceRangeNotApplicable } from "@/data/models/user/RawMaterialProcurementModel";
+import {
+  emptyAdductPreparationDetails,
+  isAcemAdductMaterial,
+  isReferenceRangeNotApplicable,
+  type AdductPreparationDetails,
+} from "@/data/models/user/RawMaterialProcurementModel";
 import {
   ALPHA_NUM,
   type FieldValidationState,
@@ -10,6 +15,7 @@ import type { SubDeptValidationConfig } from "../runValidation";
 import type { ValidationTier } from "../submissionIntent";
 
 const M = STRINGS.SOURCING.SPECIFICATION_FORM.VALIDATION;
+const A = STRINGS.SOURCING.SPECIFICATION_FORM.ADDUCT_PREPARATION;
 
 export const rawMaterialSourcingFieldRules = {
   supplyOrderNo: {
@@ -59,6 +65,71 @@ export const rawMaterialSourcingFieldRules = {
     pattern: ALPHA_NUM,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: M.certificateType.required, invalid: M.certificateType.invalid },
+  },
+  adductBatchPrepDate: {
+    valueType: "date" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: A.adductBatchPrepDate.required, invalid: A.adductBatchPrepDate.invalid },
+  },
+  tmpMfgLotNo: {
+    valueType: "text" as const,
+    pattern: ALPHA_NUM,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: A.tmpMfgLotNo.required, invalid: A.tmpMfgLotNo.invalid },
+  },
+  tmpTotalQtyGm: {
+    valueType: "number" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: A.tmpTotalQtyGm.required, invalid: A.tmpTotalQtyGm.invalid },
+  },
+  nbdMfgLotNo: {
+    valueType: "text" as const,
+    pattern: ALPHA_NUM,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: A.nbdMfgLotNo.required, invalid: A.nbdMfgLotNo.invalid },
+  },
+  nbdTotalQtyGm: {
+    valueType: "number" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: A.nbdTotalQtyGm.required, invalid: A.nbdTotalQtyGm.invalid },
+  },
+  rpm: {
+    valueType: "number" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: A.rpm.required, invalid: A.rpm.invalid },
+  },
+  processTemp: {
+    valueType: "number" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: A.processTemp.required, invalid: A.processTemp.invalid },
+  },
+  jacketTemp: {
+    valueType: "number" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: A.jacketTemp.required, invalid: A.jacketTemp.invalid },
+  },
+  processStartTime: {
+    valueType: "text" as const,
+    pattern: ALPHA_NUM,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: A.processStartTime.required, invalid: A.processStartTime.invalid },
+  },
+  processEndTime: {
+    valueType: "text" as const,
+    pattern: ALPHA_NUM,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: A.processEndTime.required, invalid: A.processEndTime.invalid },
+  },
+  finalAdductQty: {
+    valueType: "number" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: A.finalAdductQty.required, invalid: A.finalAdductQty.invalid },
+  },
+  dispatchDateTime: {
+    valueType: "text" as const,
+    pattern: ALPHA_NUM,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: A.dispatchDateTime.required, invalid: A.dispatchDateTime.invalid },
   },
 };
 
@@ -133,6 +204,32 @@ function resolveBlockFieldPaths(blocks: MaterialBlock[]) {
         ruleKey: analysedResultRuleKey(row),
       });
     });
+
+    if (isAcemAdductMaterial(block.rawMaterialType, block.preparationType)) {
+      const adduct = block.adductPreparation ?? emptyAdductPreparationDetails();
+      (
+        [
+          "adductBatchPrepDate",
+          "tmpMfgLotNo",
+          "tmpTotalQtyGm",
+          "nbdMfgLotNo",
+          "nbdTotalQtyGm",
+          "rpm",
+          "processTemp",
+          "jacketTemp",
+          "processStartTime",
+          "processEndTime",
+          "finalAdductQty",
+          "dispatchDateTime",
+        ] as Array<keyof AdductPreparationDetails>
+      ).forEach((field) => {
+        paths.push({
+          path: `blocks.${blockIndex}.adductPreparation.${field}`,
+          value: adduct[field],
+          ruleKey: field,
+        });
+      });
+    }
   });
 
   return paths;
@@ -175,6 +272,36 @@ export const isBlockUnitComplete = (block: MaterialBlock): boolean => {
   return metaOk && lotOk;
 };
 
+const isAdductSubmitComplete = (block: MaterialBlock): boolean => {
+  if (!isAcemAdductMaterial(block.rawMaterialType, block.preparationType)) return true;
+  const fields = rawMaterialSourcingFieldRules;
+  const adduct = block.adductPreparation ?? emptyAdductPreparationDetails();
+  const entries: Array<[keyof AdductPreparationDetails, keyof typeof rawMaterialSourcingFieldRules]> = [
+    ["adductBatchPrepDate", "adductBatchPrepDate"],
+    ["tmpMfgLotNo", "tmpMfgLotNo"],
+    ["tmpTotalQtyGm", "tmpTotalQtyGm"],
+    ["nbdMfgLotNo", "nbdMfgLotNo"],
+    ["nbdTotalQtyGm", "nbdTotalQtyGm"],
+    ["rpm", "rpm"],
+    ["processTemp", "processTemp"],
+    ["jacketTemp", "jacketTemp"],
+    ["processStartTime", "processStartTime"],
+    ["processEndTime", "processEndTime"],
+    ["finalAdductQty", "finalAdductQty"],
+    ["dispatchDateTime", "dispatchDateTime"],
+  ];
+  return entries.every(([field, ruleKey]) => {
+    const rule = fields[ruleKey];
+    return (
+      validateFieldState(adduct[field], {
+        valueType: rule.valueType,
+        required: true,
+        pattern: "pattern" in rule ? rule.pattern : undefined,
+      }) === "valid"
+    );
+  });
+};
+
 /** Submit for approval: manufacturer, lot ID, certificates, and every analysed result. */
 export const isBlockSubmitComplete = (block: MaterialBlock): boolean => {
   const fields = rawMaterialSourcingFieldRules;
@@ -195,7 +322,7 @@ export const isBlockSubmitComplete = (block: MaterialBlock): boolean => {
   const rowsOk =
     (block.rows ?? []).length > 0 &&
     (block.rows ?? []).every((row) => validateAnalysedResultState(row, true) === "valid");
-  return certOk && certTypesOk && rowsOk;
+  return certOk && certTypesOk && rowsOk && isAdductSubmitComplete(block);
 };
 
 export const areBlocksUnitComplete = (blocks: MaterialBlock[]): boolean =>

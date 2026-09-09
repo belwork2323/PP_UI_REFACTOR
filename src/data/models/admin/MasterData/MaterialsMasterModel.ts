@@ -12,6 +12,39 @@ import { MASTER_DATA_CODE_PATTERN, MASTER_DATA_CODE_FORMAT_MESSAGE } from "@data
 
 export type MaterialTypeValue = "SOLID" | "LIQUID";
 
+export type RawMaterialTypeValue = "NORMAL" | "ACEM";
+
+export type PreparationTypeValue =
+  | "ADDUCT"
+  | "HTPB Blending"
+  | "AP Fine"
+  | "AP ultrafine";
+
+export const RAW_MATERIAL_TYPE_OPTIONS: { value: RawMaterialTypeValue; label: string }[] = [
+  { value: "NORMAL", label: "Normal raw material" },
+  { value: "ACEM", label: "ACEM raw material" },
+];
+
+export const PREPARATION_TYPE_OPTIONS: { value: PreparationTypeValue; label: string }[] = [
+  { value: "ADDUCT", label: "ADDUCT" },
+  { value: "HTPB Blending", label: "HTPB Blending" },
+  { value: "AP Fine", label: "AP Fine" },
+  { value: "AP ultrafine", label: "AP ultrafine" },
+];
+
+const PREPARATION_TYPE_VALUES = new Set<string>(PREPARATION_TYPE_OPTIONS.map((o) => o.value));
+
+export const parseRawMaterialType = (raw: unknown): RawMaterialTypeValue => {
+  const value = String(raw ?? "NORMAL").trim().toUpperCase();
+  return value === "ACEM" ? "ACEM" : "NORMAL";
+};
+
+export const parsePreparationType = (raw: unknown): PreparationTypeValue | "" => {
+  const value = String(raw ?? "").trim();
+  if (PREPARATION_TYPE_VALUES.has(value)) return value as PreparationTypeValue;
+  return "";
+};
+
 export type MaterialSpecForm = {
   specificationCode: string;
   specificationName: string;
@@ -30,6 +63,8 @@ export type MaterialsMasterRecord = {
   materialCode: string;
   materialName: string;
   materialType: MaterialTypeValue;
+  rawMaterialType: RawMaterialTypeValue;
+  preparationType: PreparationTypeValue | "";
   isActive: boolean;
   grades: MaterialGradeForm[];
   specifications: MaterialSpecForm[];
@@ -45,6 +80,8 @@ export type MaterialsMasterFormState = {
   materialCode: string;
   materialName: string;
   materialType: MaterialTypeValue;
+  rawMaterialType: RawMaterialTypeValue | "";
+  preparationType: PreparationTypeValue | "";
   isActive: boolean;
   grades: MaterialGradeForm[];
   specifications: MaterialSpecForm[];
@@ -68,6 +105,8 @@ export const createEmptyMaterialsForm = (): MaterialsMasterFormState => ({
   materialCode: "",
   materialName: "",
   materialType: "SOLID",
+  rawMaterialType: "",
+  preparationType: "",
   isActive: true,
   grades: [],
   specifications: [],
@@ -92,6 +131,8 @@ export const MaterialsMasterRecordModel = {
     materialCode: String(raw?.materialCode ?? ""),
     materialName: String(raw?.materialName ?? ""),
     materialType: String(raw?.materialType ?? "SOLID").toUpperCase() === "LIQUID" ? "LIQUID" : "SOLID",
+    rawMaterialType: parseRawMaterialType(raw?.rawMaterialType),
+    preparationType: parsePreparationType(raw?.preparationType),
     isActive: raw?.isActive !== false,
     grades: Array.isArray(raw?.grades) ? raw.grades.map(mapGrade) : [],
     specifications: Array.isArray(raw?.specifications) ? raw.specifications.map(mapSpec) : [],
@@ -117,6 +158,8 @@ export const mapMaterialRecordToForm = (record: MaterialsMasterRecord): Material
   materialCode: record.materialCode,
   materialName: record.materialName,
   materialType: record.materialType,
+  rawMaterialType: record.rawMaterialType,
+  preparationType: record.preparationType,
   isActive: record.isActive,
   grades: record.grades.map((g) => ({
     ...g,
@@ -144,23 +187,29 @@ const serializeGrade = (g: MaterialGradeForm) => ({
   specifications: (g.specifications ?? []).map(serializeSpec),
 });
 
-export const buildMaterialsCreatePayload = (form: MaterialsMasterFormState) => ({
-  materialCode: form.materialCode.trim(),
-  materialName: form.materialName.trim(),
-  materialType: form.materialType,
-  isActive: form.isActive,
-  grades: form.grades.map(serializeGrade),
-  specifications: form.specifications.map(serializeSpec),
-});
+const buildMaterialsPayloadBody = (form: MaterialsMasterFormState) => {
+  const rawMaterialType = form.rawMaterialType === "ACEM" ? "ACEM" : "NORMAL";
+  const body: Record<string, unknown> = {
+    materialCode: form.materialCode.trim(),
+    materialName: form.materialName.trim(),
+    materialType: form.materialType,
+    rawMaterialType,
+    isActive: form.isActive,
+    grades: form.grades.map(serializeGrade),
+    specifications: form.specifications.map(serializeSpec),
+  };
+  if (rawMaterialType === "ACEM") {
+    body.preparationType = form.preparationType;
+  }
+  return body;
+};
+
+export const buildMaterialsCreatePayload = (form: MaterialsMasterFormState) =>
+  buildMaterialsPayloadBody(form);
 
 export const buildMaterialsUpdatePayload = (form: MaterialsMasterFormState) => ({
   materialId: form.materialId,
-  materialCode: form.materialCode.trim(),
-  materialName: form.materialName.trim(),
-  materialType: form.materialType,
-  isActive: form.isActive,
-  grades: form.grades.map(serializeGrade),
-  specifications: form.specifications.map(serializeSpec),
+  ...buildMaterialsPayloadBody(form),
 });
 
 export const buildMaterialsDeletePayload = (materialId: number) => ({ materialId });
@@ -172,6 +221,14 @@ export const validateMaterialsForm = (form: MaterialsMasterFormState, isEdit: bo
     if (!MASTER_DATA_CODE_PATTERN.test(code)) return MASTER_DATA_CODE_FORMAT_MESSAGE;
   }
   if (!form.materialName.trim()) return "Material name is required";
+  if (form.rawMaterialType !== "NORMAL" && form.rawMaterialType !== "ACEM") {
+    return "Raw material type is required";
+  }
+  if (form.rawMaterialType === "ACEM") {
+    if (!form.preparationType || !PREPARATION_TYPE_VALUES.has(form.preparationType)) {
+      return "Preparation type is required for ACEM raw materials";
+    }
+  }
   if (form.materialType !== "SOLID" && form.materialType !== "LIQUID") {
     return "Material type must be SOLID or LIQUID";
   }

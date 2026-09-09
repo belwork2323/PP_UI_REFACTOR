@@ -12,11 +12,14 @@ export const postCureFieldRules = {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHANUMERIC,
+    maxLength: 50,
   },
   inhibitorBatchSize: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   dispatchDate: {
     valueType: "date" as const,
@@ -27,6 +30,8 @@ export const postCureFieldRules = {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
+    maxLength: S.LENGTH.MAX_STANDARD,
   },
 
   // Location / Table shared fields
@@ -34,6 +39,8 @@ export const postCureFieldRules = {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
+    maxLength: S.LENGTH.MAX_STANDARD,
   },
   fromDate: {
     valueType: "date" as const,
@@ -49,16 +56,20 @@ export const postCureFieldRules = {
     valueType: "text" as const,
     requiredIn: ["SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
+    maxLength: S.LENGTH.MAX_LONG_TEXT,
   },
   qtyFilled: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   qtyApplied: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
 
   // Ingredient table fields
@@ -66,21 +77,27 @@ export const postCureFieldRules = {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHANUMERIC,
+    maxLength: 50,
   },
   partsByWeight: {
     valueType: "text" as const,
     requiredIn: [],
     messages: { required: S.REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
+    maxLength: 20,
   },
   quantity: {
     valueType: "number" as const,
     requiredIn: ["SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   qtyTaken: {
     valueType: "number" as const,
     requiredIn: ["SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
 
   // Qualification section fields
@@ -88,6 +105,8 @@ export const postCureFieldRules = {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHANUMERIC,
+    maxLength: 50,
   },
   qualificationPreparationDate: {
     valueType: "date" as const,
@@ -98,6 +117,8 @@ export const postCureFieldRules = {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
+    maxLength: S.LENGTH.MAX_STANDARD,
   },
 
   // Loose Flap Specific
@@ -105,6 +126,8 @@ export const postCureFieldRules = {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHANUMERIC,
+    maxLength: 50,
   },
   epoxyPreparationDate: {
     valueType: "date" as const,
@@ -117,6 +140,8 @@ export const postCureFieldRules = {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHANUMERIC,
+    maxLength: 50,
   },
   ir1PremixDate: {
     valueType: "date" as const,
@@ -127,6 +152,8 @@ export const postCureFieldRules = {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHANUMERIC,
+    maxLength: 50,
   },
   ir1FinalMixDate: {
     valueType: "date" as const,
@@ -139,6 +166,8 @@ export const postCureFieldRules = {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHANUMERIC,
+    maxLength: 50,
   },
   hemcoatPremixDate: {
     valueType: "date" as const,
@@ -149,6 +178,8 @@ export const postCureFieldRules = {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHANUMERIC,
+    maxLength: 50,
   },
   hemcoatFinalMixDate: {
     valueType: "date" as const,
@@ -161,6 +192,8 @@ export const postCureFieldRules = {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
+    maxLength: S.LENGTH.MAX_LONG_TEXT,
   },
 };
 

@@ -3,7 +3,8 @@ export const ALPHA_NUM_LOOSE = /^[A-Za-z0-9][A-Za-z0-9 \-_/.,()]*$/i;
 
 export type FieldValueType = "text" | "date" | "number" | "file";
 
-export type FieldValidationState = "valid" | "required" | "invalid";
+export type FieldValidationState =
+  "valid" | "required" | "invalid" | "minLength" | "maxLength" | "minVal" | "maxVal";
 
 export const str = (v: unknown) => (v == null ? "" : String(v)).trim();
 
@@ -65,6 +66,10 @@ export const validateFieldState = (
     valueType: FieldValueType;
     required: boolean;
     pattern?: RegExp;
+    minLength?: number;
+    maxLength?: number;
+    minVal?: number;
+    maxVal?: number;
   },
 ): FieldValidationState => {
   if (options.valueType === "file") {
@@ -74,13 +79,25 @@ export const validateFieldState = (
   const text = str(value);
   if (!text) return options.required ? "required" : "valid";
 
+  // 1. Number Validation (Validates numerical value)
   if (options.valueType === "number") {
-    return isFiniteNumber(text) ? "valid" : "invalid";
+    if (!isFiniteNumber(text)) return "invalid";
+    const num = Number(text.replace(/,/g, ""));
+    if (options.minVal !== undefined && num < options.minVal) return "minVal";
+    if (options.maxVal !== undefined && num > options.maxVal) return "maxVal";
+    return "valid";
   }
+
+  // 2. Date Validation
   if (options.valueType === "date") {
     return isValidUiDate(text) ? "valid" : "invalid";
   }
+
+  // 3. Text / String Validation (Validates pattern and character length)
   if (options.pattern && !options.pattern.test(text)) return "invalid";
+  if (options.minLength !== undefined && text.length < options.minLength) return "minLength";
+  if (options.maxLength !== undefined && text.length > options.maxLength) return "maxLength";
+
   return "valid";
 };
 
@@ -89,11 +106,49 @@ export const stateToMessage = (
   required: boolean,
   requiredMessage: string,
   invalidMessage: string,
+  messages?: {
+    minLength?: string;
+    maxLength?: string;
+    minVal?: string;
+    maxVal?: string;
+  },
+  bounds?: {
+    minLength?: number;
+    maxLength?: number;
+    minVal?: number;
+    maxVal?: number;
+  },
 ): string | undefined => {
-  if (state === "invalid") return invalidMessage;
-  if (state === "required" && required) return requiredMessage;
+  if (state === "valid") return undefined;
+  if (state === "required" && required) return requiredMessage || "Field is required";
+
+  if (state === "minLength") {
+    const template = messages?.minLength || `Minimum required characters: {min}`;
+    return template.replace("{min}", String(bounds?.minLength ?? ""));
+  }
+
+  if (state === "maxLength") {
+    const template = messages?.maxLength || `Maximum characters allowed: {max}`;
+    return template.replace("{max}", String(bounds?.maxLength ?? ""));
+  }
+
+  if (state === "minVal") {
+    const template = messages?.minVal || `Value must be ≥ {min}`;
+    return template.replace("{min}", String(bounds?.minVal ?? ""));
+  }
+
+  if (state === "maxVal") {
+    const template = messages?.maxVal || `Value must be ≤ {max}`;
+    return template.replace("{max}", String(bounds?.maxVal ?? ""));
+  }
+
+  if (state === "invalid") {
+    return invalidMessage || "Invalid value";
+  }
+
   return undefined;
 };
+
 export const parseNumber = (value: unknown): number | null => {
   const text = str(value).replace(/,/g, "");
   if (!text) return null;
@@ -103,8 +158,8 @@ export const parseNumber = (value: unknown): number | null => {
 
 /**
  * Spec formats supported:
- * - "10" / "10.5"           → exact
- * - "10-20" / "10 – 20"     → inclusive range
+ * - "10" / "10.5"         → exact
+ * - "10-20" / "10 – 20"    → inclusive range
  * - "≥10" / ">=10" / "≤10" / "<=10" / ">10" / "<10"
  * - "±0.5 of 10" is not parsed; treat as free text → pass
  */

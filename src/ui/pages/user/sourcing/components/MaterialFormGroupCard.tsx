@@ -29,6 +29,7 @@ import useValidationDisplay, {
   type ValidationAttemptFlags,
 } from "../../../../components/validation/useValidationDisplay";
 import { isMaterialMetaComplete } from "../../../../../data/models/user/rawMaterialProcurementValidation";
+import { isAcemAdductMaterial } from "../../../../../data/models/user/RawMaterialProcurementModel";
 
 const {
   delete: DeleteOutlineRoundedIcon,
@@ -81,6 +82,7 @@ const MaterialFormGroupCard = ({
   const receiptDateError = visibleError(blockMetaPath(metaBlockIndex, "receiptDate"));
   const manufacturerError = visibleError(blockMetaPath(metaBlockIndex, "manufacturerName"));
   const canAddLot = isMaterialMetaComplete(group);
+  const showAdductPreparation = isAcemAdductMaterial(group.rawMaterialType, group.preparationType);
 
   const { filledCount, totalCount, allFilled } = useMemo(() => {
     const allRows = group.lots.flatMap((lot) => lot.rows);
@@ -197,6 +199,7 @@ const MaterialFormGroupCard = ({
             errors={errors}
             validationAttempt={validationAttempt}
             getAnalysedResultError={getAnalysedResultError}
+            showAdductPreparation={showAdductPreparation}
             theme={theme}
           />
         ))}

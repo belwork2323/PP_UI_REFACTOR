@@ -91,6 +91,7 @@ const MaterialsMasterPanel = ({
                 <TableCell sx={table.headerCell}>Code</TableCell>
                 <TableCell sx={table.headerCell}>Name</TableCell>
                 <TableCell sx={table.headerCell}>Type</TableCell>
+                <TableCell sx={table.headerCell}>Raw type</TableCell>
                 <TableCell sx={table.headerCell}>Grades</TableCell>
                 <TableCell sx={table.headerCell}>Specs</TableCell>
                 <TableCell sx={table.headerCell}>{S.TABLE.COL_ACTIVE}</TableCell>
@@ -99,10 +100,10 @@ const MaterialsMasterPanel = ({
             </TableHead>
             <TableBody>
               {hook.loading ? (
-                <SkeletonRow columns={7} />
+                <SkeletonRow columns={8} />
               ) : hook.paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
+                  <TableCell colSpan={8} align="center">
                     <Typography sx={table.emptyText}>{S.TABLE.EMPTY}</Typography>
                   </TableCell>
                 </TableRow>
@@ -117,6 +118,16 @@ const MaterialsMasterPanel = ({
                     </TableCell>
                     <TableCell sx={table.cell}>
                       <Chip size="small" label={row.materialType} variant="outlined" />
+                    </TableCell>
+                    <TableCell sx={table.cell}>
+                      <Typography sx={table.bodyText}>
+                        {row.rawMaterialType === "ACEM" ? "ACEM" : "Normal"}
+                      </Typography>
+                      {row.rawMaterialType === "ACEM" && row.preparationType ? (
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          {row.preparationType}
+                        </Typography>
+                      ) : null}
                     </TableCell>
                     <TableCell sx={table.cell}>{row.grades.length}</TableCell>
                     <TableCell sx={table.cell}>{row.specifications.length}</TableCell>

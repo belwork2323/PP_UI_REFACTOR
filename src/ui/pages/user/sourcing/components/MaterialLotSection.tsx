@@ -23,10 +23,12 @@ import FilePreviewDialog from "../../../../components/common/FilePreviewDialog";
 import type { LotCertificate, MaterialLotBlock, SpecRow } from "../../../../../data/models/user/RawMaterialProcurementModel";
 import {
   computeIsOutOfRange,
+  emptyAdductPreparationDetails,
   isReferenceRangeNotApplicable,
   isSpecRowFailed,
   sanitizeNumericAnalysedResultInput,
 } from "../../../../../data/models/user/RawMaterialProcurementModel";
+import AdductPreparationSection from "./AdductPreparationSection";
 import { useLotCertificateActions } from "../../../../../hooks/user/sourcing/useLotCertificateActions";
 import MandatoryFormField, { mandatoryAsteriskSx, mandatoryFieldInputSx } from "./MandatoryFormField";
 import {
@@ -52,6 +54,7 @@ type MaterialLotSectionProps = {
   errors: ValidationErrors;
   validationAttempt: ValidationAttemptFlags;
   getAnalysedResultError: (blockIndex: number, rowIndex: number, touched: boolean) => string | undefined;
+  showAdductPreparation?: boolean;
   theme: any;
 };
 
@@ -65,6 +68,7 @@ const MaterialLotSection = ({
   errors,
   validationAttempt,
   getAnalysedResultError,
+  showAdductPreparation = false,
   theme,
 }: MaterialLotSectionProps) => {
   const formStrings = STRINGS.SOURCING.SPECIFICATION_FORM;
@@ -214,6 +218,17 @@ const MaterialLotSection = ({
           />
         </MandatoryFormField>
       </Box>
+
+      {showAdductPreparation ? (
+        <AdductPreparationSection
+          details={lot.adductPreparation ?? emptyAdductPreparationDetails()}
+          blockIndex={blockIndex}
+          onChange={(next) => onUpdate((current) => ({ ...current, adductPreparation: next }))}
+          errors={errors}
+          validationAttempt={validationAttempt}
+          theme={theme}
+        />
+      ) : null}
 
       <Box sx={specStyles.specsTableWrap}>
         <TableContainer

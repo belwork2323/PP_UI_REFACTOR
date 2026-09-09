@@ -54,6 +54,9 @@ export const blockRowPath = (blockIndex: number, rowIndex: number, field: string
 export const blockCertTypePath = (blockIndex: number, certIndex: number) =>
   `blocks.${blockIndex}.lots.0.certificates.${certIndex}.certificateType`;
 
+export const blockAdductPath = (blockIndex: number, field: string) =>
+  `blocks.${blockIndex}.adductPreparation.${field}`;
+
 export const flatBlockIndexFromGroup = (
   groups: MaterialFormGroup[],
   materialIndex: number,

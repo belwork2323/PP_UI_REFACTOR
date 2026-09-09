@@ -25,10 +25,13 @@ import StackRow from "../../../../components/common/StackRow";
 import type { LotCertificate } from "../../../../../data/models/user/RawMaterialProcurementModel";
 import {
   computeIsOutOfRange,
+  emptyAdductPreparationDetails,
+  isAcemAdductMaterial,
   isReferenceRangeNotApplicable,
   isSpecRowFailed,
   sanitizeNumericAnalysedResultInput,
 } from "../../../../../data/models/user/RawMaterialProcurementModel";
+import AdductPreparationSection from "./AdductPreparationSection";
 import { useLotCertificateActions } from "../../../../../hooks/user/sourcing/useLotCertificateActions";
 import {
   SpecificationBlock,
@@ -184,6 +187,7 @@ const MaterialSpecificationBlock = ({
   const manufacturerError = visibleError(blockMetaPath(index, "manufacturerName"));
   const lotNoError = visibleError(blockLotPath(index, "lotNo"));
   const certificateError = visibleError(blockLotPath(index, "certificates"));
+  const showAdductPreparation = isAcemAdductMaterial(block.rawMaterialType, block.preparationType);
 
   const handleCertificatesChange = useCallback(
     (certificates: LotCertificate[]) => {
@@ -301,6 +305,17 @@ const MaterialSpecificationBlock = ({
           />
         </MandatoryFormField>
       </Stack>
+
+      {showAdductPreparation ? (
+        <AdductPreparationSection
+          details={block.adductPreparation ?? emptyAdductPreparationDetails()}
+          blockIndex={index}
+          onChange={(next) => onUpdate(index, (current) => ({ ...current, adductPreparation: next }))}
+          errors={errors}
+          validationAttempt={validationAttempt}
+          theme={theme}
+        />
+      ) : null}
 
       <Box sx={specStyles.specsTableWrap}>
         <TableContainer

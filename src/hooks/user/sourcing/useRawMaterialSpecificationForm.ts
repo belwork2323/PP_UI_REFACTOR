@@ -17,6 +17,7 @@ import type {
   MaterialsListItem,
 } from "../../../data/models/user/MaterialsListModel";
 import {
+  findMaterialByCode,
   getMaterialGrades,
   isMaterialSelectionUsed,
   materialRequiresGradeSelection,
@@ -31,8 +32,10 @@ import type {
 } from "../../../data/models/user/RawMaterialProcurementModel";
 import {
   computeIsOutOfRange,
+  emptyAdductPreparationDetails,
   flattenMaterialGroups,
   hasIncompleteCertificateUploads,
+  isAcemAdductMaterial,
   serializeMaterialBlocks,
 } from "../../../data/models/user/RawMaterialProcurementModel";
 import {
@@ -92,25 +95,47 @@ function specRowsFromApi(targetSpecs: MaterialSpecificationItemModel[] = []): Sp
   }));
 }
 
-function createLotFromSpecs(targetSpecs: MaterialSpecificationItemModel[] = []): MaterialLotBlock {
+function resolveMaterialMeta(material?: MaterialsListItem) {
+  const rawMaterialType = material?.rawMaterialType ?? "NORMAL";
+  const preparationType = material?.preparationType ?? null;
+  const isAcemAdduct = isAcemAdductMaterial(rawMaterialType, preparationType);
+
+  return {
+    rawMaterialType,
+    preparationType: preparationType ?? undefined,
+    manufacturerName: rawMaterialType === "ACEM" ? "ACEM" : "",
+    adductPreparation: isAcemAdduct ? emptyAdductPreparationDetails() : undefined,
+  };
+}
+
+function createLotFromSpecs(
+  targetSpecs: MaterialSpecificationItemModel[] = [],
+  adductPreparation?: MaterialLotBlock["adductPreparation"],
+): MaterialLotBlock {
   return {
     lotNo: "",
     certificates: [],
     rows: specRowsFromApi(targetSpecs),
+    ...(adductPreparation ? { adductPreparation } : {}),
   };
 }
 
 function createBlock(
   material: string,
   targetSpecs: MaterialSpecificationItemModel[] = [],
+  materialMeta?: MaterialsListItem,
 ): SpecificationBlock {
-  const lot = createLotFromSpecs(targetSpecs);
+  const meta = resolveMaterialMeta(materialMeta);
+  const lot = createLotFromSpecs(targetSpecs, meta.adductPreparation);
   return {
     material,
+    rawMaterialType: meta.rawMaterialType,
+    preparationType: meta.preparationType,
     lotNo: lot.lotNo,
     supplyOrderNo: "",
     receiptDate: "",
-    manufacturerName: "",
+    manufacturerName: meta.manufacturerName,
+    ...(lot.adductPreparation ? { adductPreparation: lot.adductPreparation } : {}),
     certificates: lot.certificates,
     rows: lot.rows,
   };
@@ -120,20 +145,27 @@ function createMaterialGroup(
   material: string,
   targetSpecs: MaterialSpecificationItemModel[] = [],
   grade?: MaterialsListGrade | null,
+  materialMeta?: MaterialsListItem,
 ): MaterialFormGroup {
+  const meta = resolveMaterialMeta(materialMeta);
   return {
     material,
     gradeCode: grade?.gradeCode,
     gradeId: grade?.gradeId,
     gradeName: grade?.gradeName,
+    rawMaterialType: meta.rawMaterialType,
+    preparationType: meta.preparationType,
     supplyOrderNo: "",
     receiptDate: "",
-    manufacturerName: "",
-    lots: [createLotFromSpecs(targetSpecs)],
+    manufacturerName: meta.manufacturerName,
+    lots: [createLotFromSpecs(targetSpecs, meta.adductPreparation)],
   };
 }
 
-function cloneLotTemplate(templateRows: SpecRow[]): MaterialLotBlock {
+function cloneLotTemplate(
+  templateRows: SpecRow[],
+  adductPreparation?: MaterialLotBlock["adductPreparation"],
+): MaterialLotBlock {
   return {
     lotNo: "",
     certificates: [],
@@ -144,6 +176,7 @@ function cloneLotTemplate(templateRows: SpecRow[]): MaterialLotBlock {
       status: null,
       isOutOfRange: false,
     })),
+    ...(adductPreparation ? { adductPreparation: emptyAdductPreparationDetails() } : {}),
   };
 }
 
@@ -536,6 +569,7 @@ export const useRawMaterialSpecificationForm = ({
             (item) => item.gradeCode === selectedGrade,
           )
         : null;
+      const materialMeta = findMaterialByCode(availableMaterials, selectedMaterial);
       const specifications = await fetchMaterialSpecifications(
         selectedMaterial,
         grade?.gradeCode,
@@ -545,10 +579,13 @@ export const useRawMaterialSpecificationForm = ({
       if (createLotMode) {
         updateMaterialGroups((previous) => [
           ...previous,
-          createMaterialGroup(selectedMaterial, specifications, grade),
+          createMaterialGroup(selectedMaterial, specifications, grade, materialMeta),
         ]);
       } else {
-        updateBlocks((previous) => [...previous, createBlock(selectedMaterial, specifications)]);
+        updateBlocks((previous) => [
+          ...previous,
+          createBlock(selectedMaterial, specifications, materialMeta),
+        ]);
       }
       setSelectedMaterial("");
       setSelectedGrade("");
@@ -580,7 +617,13 @@ export const useRawMaterialSpecificationForm = ({
         previous.map((item, idx) => {
           if (idx !== materialIndex) return item;
           const template = item.lots[0]?.rows ?? [];
-          return { ...item, lots: [...item.lots, cloneLotTemplate(template)] };
+          const adductPreparation = isAcemAdductMaterial(item.rawMaterialType, item.preparationType)
+            ? item.lots[0]?.adductPreparation ?? emptyAdductPreparationDetails()
+            : undefined;
+          return {
+            ...item,
+            lots: [...item.lots, cloneLotTemplate(template, adductPreparation)],
+          };
         }),
       );
     },

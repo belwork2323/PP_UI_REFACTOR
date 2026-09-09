@@ -1,6 +1,5 @@
 import { STRINGS } from "@/app/config/strings";
 import type { FinalMixEntry, PremixEntry } from "@/data/models/user/MixingFormModel";
-import { validateFieldState } from "../fieldValidators";
 import type { SubDeptValidationConfig } from "../runValidation";
 import type { ValidationTier } from "../submissionIntent";
 import { VALIDATIONSTRING } from "./validationString";
@@ -10,7 +9,7 @@ const M = VALIDATIONSTRING;
 export const mixingFieldRules = {
   bowlId: {
     valueType: "text" as const,
-    pattern: undefined,
+    pattern: M.PATTERNS.ALPHANUMERIC,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
@@ -22,7 +21,9 @@ export const mixingFieldRules = {
   },
   bowlTrialObservations: {
     valueType: "text" as const,
-    pattern: undefined,
+    pattern: M.PATTERNS.ALPHABET_WITH_SPECIAL, // Big string with special characters allowed
+    minLength: 1,
+    maxLength: M.LENGTH.MAX_LONG_TEXT,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
@@ -35,30 +36,30 @@ export const mixingFieldRules = {
   },
   rpm: {
     valueType: "number" as const,
-    pattern: undefined,
+    pattern: M.PATTERNS.ONLY_DIGITS,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   time: {
     valueType: "number" as const,
-    pattern: undefined,
+    pattern: M.PATTERNS.ONLY_DIGITS,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   temp: {
     valueType: "number" as const,
-    pattern: undefined,
+    pattern: M.PATTERNS.ONLY_DIGITS,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   vacuum: {
     valueType: "number" as const,
-    pattern: undefined,
+    pattern: M.PATTERNS.ONLY_DIGITS,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   qualityChecks: {
-    valueType: "file" as const,
+    valueType: "text" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },

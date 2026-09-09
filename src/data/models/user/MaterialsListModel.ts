@@ -14,6 +14,8 @@ export type MaterialsListItem = {
   materialId: number;
   materialCode: string;
   materialName: string;
+  rawMaterialType: "NORMAL" | "ACEM";
+  preparationType: string | null;
   specCount: number;
   grades: MaterialsListGrade[];
 };
@@ -70,10 +72,17 @@ export const normalizeMaterialsListResponse = (data: unknown): MaterialsListItem
         }))
         .filter((g) => g.gradeCode.length > 0);
 
+      const rawType = String(item?.rawMaterialType ?? "NORMAL").trim().toUpperCase();
+
       return {
         materialId: Number(item?.materialId ?? 0),
         materialCode: String(item?.materialCode ?? "").trim(),
         materialName: String(item?.materialName ?? "").trim(),
+        rawMaterialType: rawType === "ACEM" ? "ACEM" : "NORMAL",
+        preparationType:
+          item?.preparationType == null || item?.preparationType === ""
+            ? null
+            : String(item.preparationType).trim(),
         specCount: Number(item?.specCount ?? 0),
         grades,
       };

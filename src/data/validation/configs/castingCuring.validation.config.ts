@@ -11,54 +11,67 @@ export const castingCuringFieldRules = {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   // Mandrel measurements (assembly details)
   mandrelAMock: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   mandrelBMock: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   mandrelBFinal: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   mandrelBellowsThicknessD: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   emptyMotorWeight: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   bowlId: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHANUMERIC,
+    minLength: 1,
+    maxLength: 50,
   },
   bowlReceiptTime: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    minLength: 4,
+    maxLength: 20,
   },
   initialWeight: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   finalWeight: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
-  //  -----------------------
+  // -----------------------
   ballValveOpenTime: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
@@ -66,6 +79,8 @@ export const castingCuringFieldRules = {
       required: S.REQUIRED,
       invalid: S.INVALID,
     },
+    minLength: 4,
+    maxLength: 20,
   },
 
   slurryDepthAfterDc: {
@@ -75,6 +90,7 @@ export const castingCuringFieldRules = {
       required: S.REQUIRED,
       invalid: S.INVALID,
     },
+    pattern: S.PATTERNS.FLOAT,
   },
 
   dcCloseTime: {
@@ -84,6 +100,8 @@ export const castingCuringFieldRules = {
       required: S.REQUIRED,
       invalid: S.INVALID,
     },
+    minLength: 4,
+    maxLength: 20,
   },
 
   dcOpenTime: {
@@ -93,82 +111,103 @@ export const castingCuringFieldRules = {
       required: S.REQUIRED,
       invalid: S.INVALID,
     },
+    minLength: 4,
+    maxLength: 20,
   },
   timeInterval: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   rh: {
     valueType: "number" as const,
     requiredIn: ["SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   viscosity: {
     valueType: "number" as const,
     requiredIn: ["SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   slurryCast: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   flowRate: {
     valueType: "number" as const,
     requiredIn: ["SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   valveOpening: {
     valueType: "number" as const,
     requiredIn: ["SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   vacuumLevel: {
     valueType: "number" as const,
     requiredIn: ["SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   initialVacuum: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    maxLength: S.LENGTH.MAX_STANDARD,
   },
   vacuumPressureCasting: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    maxLength: S.LENGTH.MAX_STANDARD,
   },
   vacuumPressureSoaking: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    maxLength: S.LENGTH.MAX_STANDARD,
   },
   fmMotorLabel: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHANUMERIC,
+    minLength: 1,
+    maxLength: S.LENGTH.MAX_STANDARD,
   },
   postActivity: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
+    maxLength: S.LENGTH.MAX_STANDARD,
   },
   postDetails: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
+    maxLength: S.LENGTH.MAX_LONG_TEXT,
   },
   // Curing — cycle rows (with specific custom messages)
   curingTemperature: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   curingTime: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   curingStartDate: {
     valueType: "date" as const,
@@ -179,6 +218,7 @@ export const castingCuringFieldRules = {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    maxLength: 20,
   },
   curingEndDate: {
     valueType: "date" as const,
@@ -189,42 +229,52 @@ export const castingCuringFieldRules = {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    maxLength: 20,
   },
   propellantPressure: {
     valueType: "number" as const,
     requiredIn: [],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   hotWaterStatus: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    maxLength: S.LENGTH.MAX_STANDARD,
   },
   // Post-curing details
   postOtherObservations: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
+    maxLength: S.LENGTH.MAX_LONG_TEXT,
   },
   postVisualObservation: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
+    maxLength: S.LENGTH.MAX_LONG_TEXT,
   },
   pressurePlateRemovalDateTime: {
     valueType: "text" as const,
     requiredIn: [],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    maxLength: 30,
   },
   shoreAHardness: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   deCoringDispatchDateTime: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    maxLength: 30,
   },
   // De-coring details
   deCoringDate: {
@@ -236,16 +286,21 @@ export const castingCuringFieldRules = {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHANUMERIC,
+    maxLength: 50,
   },
   deCoringLoad: {
     valueType: "number" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
   },
   deCoringRemarks: {
     valueType: "text" as const,
     requiredIn: ["UNIT", "SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
+    maxLength: S.LENGTH.MAX_LONG_TEXT,
   },
   deCoringVisualObservation: {
     valueType: "file" as const,
@@ -253,7 +308,6 @@ export const castingCuringFieldRules = {
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
 };
-
 function resolveFieldPaths(data: any) {
   const paths: Array<{ path: string; value: unknown; ruleKey: string }> = [];
 
