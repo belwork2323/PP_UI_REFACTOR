@@ -187,7 +187,9 @@ export const applyMandrelFormulas = (row: MandrelMeasurementRow): MandrelMeasure
   };
 };
 
-export const createEmptyMandrelMeasurementRow = (srNo: number | string = 1): MandrelMeasurementRow =>
+export const createEmptyMandrelMeasurementRow = (
+  srNo: number | string = 1,
+): MandrelMeasurementRow =>
   applyMandrelFormulas({
     srNo: String(srNo),
     A_MOCK: "",
@@ -436,9 +438,7 @@ const postCastRowsForPayload = (rows: PostCastRow[]): Record<string, unknown>[] 
  * Nested camelCase casting payload matching create/update API (`motors[].castingSections`).
  */
 export const buildCastingSectionsPayload = (data: CastingMotorData): CastingSectionsPayload => {
-  const slurryRows = syncSlurryCastTotalRow(
-    data.SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS ?? [],
-  );
+  const slurryRows = syncSlurryCastTotalRow(data.SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS ?? []);
   const motorCasing =
     data.FINAL_ASSEMBLY_DETAILS.motorCasing?.[0] ?? createEmptyMotorCasingInstance();
 
@@ -459,9 +459,9 @@ export const buildCastingSectionsPayload = (data: CastingMotorData): CastingSect
       castingFromBowlDetails: castingFromBowlRowsForPayload(
         data.CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS ?? [],
       ),
-      initialVacuum: toApiNumber(data.CASTING_PROCESS.INITIAL_VACUUM),
-      vacuumPressureCasting: toApiNumber(data.CASTING_PROCESS.VACUUM_PRESSURE_CASTING),
-      vacuumPressureSoaking: toApiNumber(data.CASTING_PROCESS.VACUUM_PRESSURE_SOAKING),
+      initialVacuum: str(data.CASTING_PROCESS.INITIAL_VACUUM),
+      vacuumPressureCasting: str(data.CASTING_PROCESS.VACUUM_PRESSURE_CASTING),
+      vacuumPressureSoaking: str(data.CASTING_PROCESS.VACUUM_PRESSURE_SOAKING),
     }),
     slurryCastDetails: {
       slurryCastFromBowls: slurryRowsForPayload(slurryRows),
@@ -523,9 +523,9 @@ const parseFeedPipeRow = (item: unknown): FeedPipeDistanceRow => {
 
 const parseMotorCasingInstance = (item: unknown): CastingMotorCasingInstance => {
   const row = asRecord(item) ?? {};
-  const mandrelRows = asArray(
-    pickField(row, "mandrelMeasurements", "MANDREL_MEASUREMENTS"),
-  ).map(parseMandrelRow);
+  const mandrelRows = asArray(pickField(row, "mandrelMeasurements", "MANDREL_MEASUREMENTS")).map(
+    parseMandrelRow,
+  );
   const feedRows = asArray(pickField(row, "feedPipeDistance", "FEED_PIPE_DISTANCE")).map(
     parseFeedPipeRow,
   );
@@ -550,9 +550,7 @@ const parseBowlDetailRow = (item: unknown): CastingBowlDetailRow => {
     INITIAL_SLURRY_DEPTH: str(pickField(row, "initialSlurryDepth", "INITIAL_SLURRY_DEPTH") ?? ""),
     DC_OPEN_TIME: toUiTime(pickField(row, "dcOpenTime", "DC_OPEN_TIME") ?? ""),
     DC_CLOSE_TIME: toUiTime(pickField(row, "dcCloseTime", "DC_CLOSE_TIME") ?? ""),
-    SLURRY_DEPTH_AFTER_DC: str(
-      pickField(row, "slurryDepthAfterDc", "SLURRY_DEPTH_AFTER_DC") ?? "",
-    ),
+    SLURRY_DEPTH_AFTER_DC: str(pickField(row, "slurryDepthAfterDc", "SLURRY_DEPTH_AFTER_DC") ?? ""),
     BALL_VALVE_OPEN_TIME: toUiTime(
       pickField(row, "ballValveOpenTime", "BALL_VALVE_OPEN_TIME") ?? "",
     ),
@@ -604,7 +602,15 @@ const parsePostCastTable = (value: unknown): PostCastRow[] => {
   if (!rows.length) return presets;
 
   const byActivity = new Map(
-    rows.map((row) => [str(row.ACTIVITY ?? row.activity ?? "").trim().toLowerCase(), row] as const),
+    rows.map(
+      (row) =>
+        [
+          str(row.ACTIVITY ?? row.activity ?? "")
+            .trim()
+            .toLowerCase(),
+          row,
+        ] as const,
+    ),
   );
 
   const merged = presets.map((preset) => {
@@ -617,18 +623,21 @@ const parsePostCastTable = (value: unknown): PostCastRow[] => {
           ? toUiTime(saved.DETAILS ?? saved.details ?? saved.value ?? "")
           : str(saved.DETAILS ?? saved.details ?? saved.value ?? ""),
       detailsFieldType:
-        str(
-          saved.detailsFieldType ??
-            saved.DETAILS__fieldType ??
-            saved.DETAILS_fieldType ??
-            "",
-        ) || preset.detailsFieldType,
+        str(saved.detailsFieldType ?? saved.DETAILS__fieldType ?? saved.DETAILS_fieldType ?? "") ||
+        preset.detailsFieldType,
     };
   });
 
   const presetKeys = new Set(presets.map((row) => row.ACTIVITY.trim().toLowerCase()));
   const extras = rows
-    .filter((row) => !presetKeys.has(str(row.ACTIVITY ?? row.activity ?? "").trim().toLowerCase()))
+    .filter(
+      (row) =>
+        !presetKeys.has(
+          str(row.ACTIVITY ?? row.activity ?? "")
+            .trim()
+            .toLowerCase(),
+        ),
+    )
     .map((row) => ({
       ACTIVITY: str(row.ACTIVITY ?? row.activity ?? ""),
       DETAILS: str(row.DETAILS ?? row.details ?? row.value ?? ""),
@@ -689,9 +698,7 @@ export const parseCastingMotorDataFromApi = (source: unknown): CastingMotorData 
       CASTING_FROM_BOWL_DETAILS: castingRows.length
         ? castingRows
         : empty.CASTING_PROCESS.CASTING_FROM_BOWL_DETAILS,
-      INITIAL_VACUUM: str(
-        pickField(castingProcess, "initialVacuum", "INITIAL_VACUUM") ?? "",
-      ),
+      INITIAL_VACUUM: str(pickField(castingProcess, "initialVacuum", "INITIAL_VACUUM") ?? ""),
       VACUUM_PRESSURE_CASTING: str(
         pickField(castingProcess, "vacuumPressureCasting", "VACUUM_PRESSURE_CASTING") ?? "",
       ),
@@ -705,9 +712,7 @@ export const parseCastingMotorDataFromApi = (source: unknown): CastingMotorData 
       ),
     },
     POST_CAST_OPERATIONS: {
-      POST_CAST_TABLE: parsePostCastTable(
-        pickField(postCast, "postCastTable", "POST_CAST_TABLE"),
-      ),
+      POST_CAST_TABLE: parsePostCastTable(pickField(postCast, "postCastTable", "POST_CAST_TABLE")),
     },
   };
 };

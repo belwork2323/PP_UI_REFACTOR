@@ -11,8 +11,12 @@ import {
   toUiTime,
   unwrapMotorSectionPayload,
 } from "./castingCuringFieldCodec";
-import { isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileRef } from "../common/FileUploadModel";
-
+import {
+  isFileUploadIncomplete,
+  parseFileRefs,
+  toFileIdListPayload,
+  type FileRef,
+} from "../common/FileUploadModel";
 
 export type CuringOption = { value: string; label: string };
 
@@ -89,7 +93,6 @@ const str = (value: unknown): string => {
   return String(value);
 };
 
-
 export const createEmptyCuringCycleRow = (srNo: number | string = 1): CuringCycleRow => ({
   srNo: String(srNo),
   TEMPERATURE: "",
@@ -152,8 +155,7 @@ const hasUserContent = (value: unknown): boolean => {
   return false;
 };
 
-export const curingMotorDataHasUserInput = (data: CuringMotorData): boolean =>
-  hasUserContent(data);
+export const curingMotorDataHasUserInput = (data: CuringMotorData): boolean => hasUserContent(data);
 
 const rowHasPayloadValues = (row: Record<string, unknown>): boolean =>
   Object.entries(row).some(([key, value]) => key !== "srNo" && value !== undefined && value !== "");
@@ -185,10 +187,8 @@ export const buildCuringSectionsPayload = (data: CuringMotorData): CuringSection
     pressurePlateRemovalDateTime: toApiDateTime(
       data.POST_CURING_DETAILS.PRESSURE_PLATE_REMOVAL_DATE_TIME,
     ),
-    shoreAHardness: toApiNumber(data.POST_CURING_DETAILS.SHORE_A_HARDNESS),
-    decoringDispatchDateTime: toApiDateTime(
-      data.POST_CURING_DETAILS.DE_CORING_DISPATCH_DATE_TIME,
-    ),
+    shoreAHardness: str(data.POST_CURING_DETAILS.SHORE_A_HARDNESS),
+    decoringDispatchDateTime: toApiDateTime(data.POST_CURING_DETAILS.DE_CORING_DISPATCH_DATE_TIME),
   }),
   decoringDetails: compactRecord({
     decoringDate: toApiDate(data.DECORING_DETAILS.DECORING_DATE),
@@ -196,9 +196,7 @@ export const buildCuringSectionsPayload = (data: CuringMotorData): CuringSection
     decoringLoad: toApiNumber(data.DECORING_DETAILS.DECORING_LOAD),
     decoringRemarks: str(data.DECORING_DETAILS.DECORING_REMARKS).trim() || undefined,
     decoringVisualObservation: (() => {
-      const files = toFileIdListPayload(
-        data.DECORING_DETAILS.DECORING_VISUAL_OBSERVATION,
-      );
+      const files = toFileIdListPayload(data.DECORING_DETAILS.DECORING_VISUAL_OBSERVATION);
       return files.length ? files : undefined;
     })(),
   }),
@@ -240,9 +238,7 @@ const parseCuringCycleRow = (item: unknown, index: number): CuringCycleRow => {
     START_TIME: toUiTime(pickField(row, "startTime", "START_TIME") ?? ""),
     END_DATE: toUiDate(pickField(row, "endDate", "END_DATE") ?? ""),
     END_TIME: toUiTime(pickField(row, "endTime", "END_TIME") ?? ""),
-    PROPELLANT_PRESSURE: str(
-      pickField(row, "propellantPressure", "PROPELLANT_PRESSURE") ?? "",
-    ),
+    PROPELLANT_PRESSURE: str(pickField(row, "propellantPressure", "PROPELLANT_PRESSURE") ?? ""),
     HOT_WATER_STATUS: str(
       pickField(row, "hotWaterStatus", "HOT_WATER_STATUS", "hotWaterCirculation") ?? "",
     ),
@@ -272,15 +268,10 @@ export const parseCuringMotorDataFromApi = (source: unknown): CuringMotorData =>
       CURING_TABLE: tableRows.length ? tableRows : empty.CURING_CYCLES.CURING_TABLE,
     },
     POST_CURING_DETAILS: {
-      OTHER_OBSERVATIONS: str(
-        pickField(post, "otherObservations", "OTHER_OBSERVATIONS") ?? "",
-      ),
-      VISUAL_OBSERVATION: str(
-        pickField(post, "visualObservation", "VISUAL_OBSERVATION") ?? "",
-      ),
+      OTHER_OBSERVATIONS: str(pickField(post, "otherObservations", "OTHER_OBSERVATIONS") ?? ""),
+      VISUAL_OBSERVATION: str(pickField(post, "visualObservation", "VISUAL_OBSERVATION") ?? ""),
       PRESSURE_PLATE_REMOVAL_DATE_TIME: toUiDateTime(
-        pickField(post, "pressurePlateRemovalDateTime", "PRESSURE_PLATE_REMOVAL_DATE_TIME") ??
-          "",
+        pickField(post, "pressurePlateRemovalDateTime", "PRESSURE_PLATE_REMOVAL_DATE_TIME") ?? "",
       ),
       SHORE_A_HARDNESS: str(pickField(post, "shoreAHardness", "SHORE_A_HARDNESS") ?? ""),
       DE_CORING_DISPATCH_DATE_TIME: toUiDateTime(
@@ -348,7 +339,6 @@ export const applyCuringCycleConfigRows = (
   };
 };
 
-
 export const collectCastingCuringFileRefsFromMotorData = (
   data: CuringMotorData | null | undefined,
 ): FileRef[] => data?.DECORING_DETAILS?.DECORING_VISUAL_OBSERVATION ?? [];
@@ -365,17 +355,15 @@ export const collectCastingCuringFileRefsFromForm = (form: {
 
 export const hasIncompleteCastingCuringUploads = (form: {
   motors?: Array<{ curingData?: CuringMotorData | null }>;
-}): boolean =>
-  collectCastingCuringFileRefsFromForm(form).some(isFileUploadIncomplete);
+}): boolean => collectCastingCuringFileRefsFromForm(form).some(isFileUploadIncomplete);
 
 export const collectTempFileIdsFromCastingCuringForm = (form: {
   motors?: Array<{ curingData?: CuringMotorData | null }>;
-}): string[] =>
-  [
-    ...new Set(
-      collectCastingCuringFileRefsFromForm(form)
-        .filter((ref) => ref.isTemp !== false)
-        .map((ref) => String(ref.fileId ?? "").trim())
-        .filter(Boolean),
-    ),
-  ];
+}): string[] => [
+  ...new Set(
+    collectCastingCuringFileRefsFromForm(form)
+      .filter((ref) => ref.isTemp !== false)
+      .map((ref) => String(ref.fileId ?? "").trim())
+      .filter(Boolean),
+  ),
+];

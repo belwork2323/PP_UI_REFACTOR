@@ -12,6 +12,10 @@ import {
   motorStageForApi,
   normalizeMotorStage,
 } from "../admin/BatchManagement/BatchManagementModel";
+import {
+  normalizeStageProgressArray,
+  parseParallelFlowEnabled,
+} from "../../../utils/batchStageUtils";
 
 const FILTER_ALL = STRINGS.USER_BATCH_LIST.FILTER_ALL;
 
@@ -487,6 +491,9 @@ export function mapSubdepartmentBatchListRow(
     ...batch,
     id: batch.id,
     batchId: batch.batchId,
+    parallelFlowEnabled: parseParallelFlowEnabled(batch.parallelFlowEnabled),
+    currentStage: normalizeStageProgressArray(batch.currentStage),
+    stageProgress: normalizeStageProgressArray(batch.stageProgress),
     motorIds: Array.isArray(batch.motorIds) ? batch.motorIds.map((id) => String(id)) : [],
     motorId: resolveMotorId(batch),
     numberOfMotors: Number(batch.numberOfMotors ?? 0) || undefined,

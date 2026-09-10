@@ -38,7 +38,15 @@ import {
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
 } from "../../../../components/custom/UserWorkflowStepPager";
-import { buildMotorNavGateHelpers } from "../../../../../hooks/user/previousStageApproval";
+import { buildMotorNavGateHelpers, type PreviousStageApprovedUnits } from "../../../../../hooks/user/previousStageApproval";
+import {
+  findMotorUnit,
+  getActiveStage,
+  isMotorDisabled,
+  SUB_DEPT,
+  usesParallelUnitLocks,
+} from "../../../../../utils/batchStageUtils";
+import type { BatchView } from "../../../../../data/models/user/BatchStageTypes";
 
 const S = STRINGS.MANUFACTURING.CASE_PREP;
 const { cleaningServices: CleaningServicesRoundedIcon } =
@@ -60,6 +68,7 @@ type CasePreparationFormProps = {
   motorStatusById?: Record<string, MotorStatusMeta>;
   getMotorStatus?: (motorId: string) => MotorSubmissionStatus;
   isMotorEditable?: (motorId: string) => boolean;
+  previousStageGate?: PreviousStageApprovedUnits | null;
   schemaLoading?: boolean;
   schemaError?: string | null;
   subDepartmentId?: number;
@@ -81,7 +90,9 @@ const CasePreparationForm = ({
   motorStatusById = {},
   getMotorStatus,
   isMotorEditable,
+  previousStageGate = null,
   schemaError = null,
+  subDepartmentId,
   actionLoading = false,
   onMotorSessionChange,
   onSubscaleValuesChange,
@@ -99,17 +110,17 @@ const CasePreparationForm = ({
       "TO_BE_INITIATED";
     return buildMotorNavGateHelpers(
       motorCards,
-      {
-        enableAll: true,
-        kind: "motor",
-        previousSubDepartmentId: null,
-        previousSubDepartmentName: null,
-        approvedPremixNos: new Set(),
-        approvedMotorIds: new Set(),
-      },
+      previousStageGate,
       resolveMotorStatus,
+      {
+        previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
+        sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
+        notYetUnlocked: STRINGS.MANUFACTURING.NOT_YET_UNLOCKED,
+      },
+      batch,
+      subDepartmentId ?? SUB_DEPT.CP,
     );
-  }, [motorCards, getMotorStatus, motorStatusById]);
+  }, [batch, motorCards, getMotorStatus, motorStatusById, previousStageGate, subDepartmentId]);
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
   const [finalApprovalOpen, setFinalApprovalOpen] = useState(false);
 
@@ -136,6 +147,14 @@ const CasePreparationForm = ({
   const activeMotorStatus = (getMotorStatus?.(activeMotorId) ??
     motorStatusById[activeMotorId]?.motorSubmissionStatus ??
     "TO_BE_INITIATED") as MotorSubmissionStatus;
+  const activeMotorParallelLocked = useMemo(() => {
+    if (!activeMotorId || !batch || !usesParallelUnitLocks(batch as BatchView)) return false;
+    const unit = findMotorUnit(
+      getActiveStage(batch as BatchView, subDepartmentId ?? SUB_DEPT.CP),
+      activeMotorId,
+    );
+    return isMotorDisabled(unit);
+  }, [activeMotorId, batch, subDepartmentId]);
   const activeMotorLocked = activeMotorId
     ? !motorNavGate.isMotorWorkflowEnabled(activeMotorId) ||
       !(isMotorEditable?.(activeMotorId) ?? true)
@@ -381,9 +400,11 @@ const CasePreparationForm = ({
                   <Typography
                     sx={{ fontSize: "0.72rem", color: theme.palette.textSub, fontWeight: 600 }}
                   >
-                    {activeMotorStatus === "APPROVED"
-                      ? S.MOTOR_LOCKED_APPROVED
-                      : S.MOTOR_LOCKED_WAITING}
+                    {activeMotorParallelLocked
+                      ? STRINGS.MANUFACTURING.NOT_YET_UNLOCKED
+                      : activeMotorStatus === "APPROVED"
+                        ? S.MOTOR_LOCKED_APPROVED
+                        : S.MOTOR_LOCKED_WAITING}
                   </Typography>
                 </Box>
               ) : null}

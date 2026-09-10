@@ -45,9 +45,16 @@ import {
 } from "../../operationStatus";
 import {
   isMotorEnabledByPreviousStage,
+  isMotorEnabledForWorkflowWithBatch,
   resolvePreviousStageApprovedUnits,
   type PreviousStageApprovedUnits,
 } from "../previousStageApproval";
+import {
+  fetchEnrichedBatchStageFields,
+  mergeBatchStageFields,
+  SUB_DEPT,
+} from "../../../utils/batchStageUtils";
+import { handleBatchInvalidState } from "../../../utils/batchInvalidStateHandler";
 import {
   BemMotor,
   mapApprovedMotorsToOptions,
@@ -65,7 +72,6 @@ import {
   resolveStfWorkingSubBatchType,
   shouldSeedStfMainMotors,
   shouldShowStfBemMotorSelection,
-  isStfMotorEnabledForWorkflow,
   type STFBatch,
   type StfAddedMotor,
   type StfMotorOption,
@@ -715,6 +721,43 @@ export const useBaseStaticTestFacility = ({
     [addedMotors, batchMotorEntries],
   );
 
+  const isStfMotorWorkflowEnabled = useCallback(
+    (motorId: string, subType?: StfSubType | string | null) => {
+      if (facilityType === "OTHER_BEM") return true;
+      if (String(subType ?? "").toUpperCase() === "BEM") return true;
+
+      const mainMotorIds = navigationMotors
+        .filter((entry) => String(entry.subType ?? "").toUpperCase() !== "BEM")
+        .map((entry) => String(entry.motorId ?? "").trim())
+        .filter(Boolean);
+
+      return isMotorEnabledForWorkflowWithBatch(
+        activeBatch,
+        subDepartmentId ?? SUB_DEPT.STF,
+        motorId,
+        mainMotorIds,
+        previousStageGate,
+        getMotorStatus,
+      );
+    },
+    [
+      activeBatch,
+      facilityType,
+      getMotorStatus,
+      navigationMotors,
+      previousStageGate,
+      subDepartmentId,
+    ],
+  );
+
+  const refreshUserBatches = useCallback(async () => {
+    const refresh = (listParams as { refreshUserBatches?: () => Promise<void> } | undefined)
+      ?.refreshUserBatches;
+    if (typeof refresh === "function") {
+      await refresh();
+    }
+  }, [listParams]);
+
   const checkMotorEditable = useCallback(
     (motorId: string) => {
       const navEntry =
@@ -723,12 +766,7 @@ export const useBaseStaticTestFacility = ({
       const sessionSubType = (formData.motors ?? []).find((motor) => motor.motorId === motorId)
         ?.subType;
       const subType = navEntry?.subType ?? sessionSubType;
-      if (
-        !isStfMotorEnabledForWorkflow(motorId, navigationMotors, previousStageGate, getMotorStatus, {
-          facilityType,
-          subType,
-        })
-      ) {
+      if (!isStfMotorWorkflowEnabled(motorId, subType)) {
         return false;
       }
       return isStfMotorEditable(getMotorStatus(motorId));
@@ -736,11 +774,9 @@ export const useBaseStaticTestFacility = ({
     [
       addedMotors,
       batchMotorEntries,
-      facilityType,
       formData.motors,
       getMotorStatus,
-      navigationMotors,
-      previousStageGate,
+      isStfMotorWorkflowEnabled,
     ],
   );
 
@@ -963,37 +999,38 @@ export const useBaseStaticTestFacility = ({
                   })
                 : [],
             );
-            nextBatch = {
-              ...stfBatchObj,
-              batchType: resolvedBatchType || stfBatchObj.batchType || null,
-              subBatchType: resolvedSubBatchType || stfBatchObj.subBatchType || null,
-              motorIds: batchDetails?.motorIds?.length
-                ? batchDetails.motorIds.map(String)
-                : stfBatchObj.motorIds,
-              bemMotorIds: (() => {
-                const seededBemIds = autoMotorEntries
-                  .filter((entry) => entry.subType === "BEM")
-                  .map((entry) => entry.motorId);
-                if (seededBemIds.length > 0) return seededBemIds;
-                if (Array.isArray(stfBatchObj.bemMotorIds) && stfBatchObj.bemMotorIds.length > 0) {
-                  return stfBatchObj.bemMotorIds.map(String);
-                }
-                return stfBatchObj.bemMotorIds;
-              })(),
-              motorId:
-                batchDetails?.motorIds?.length > 0
-                  ? batchDetails.motorIds.join(", ")
-                  : stfBatchObj.motorId,
-              projectId: batchDetails?.projectId ?? stfBatchObj.projectId,
-              motorStage: batchDetails?.motorStage ?? stfBatchObj.motorStage,
-              numberOfMotors: batchDetails?.numberOfMotors ?? stfBatchObj.numberOfMotors,
-              subType: seedMainMotors ? "MAIN_MOTOR" : "BEM",
-              // stageProgress / currentStage used for previous-stage gate (may be absent on STFBatch type)
-              stageProgress:
-                batchDetails?.stageProgress ?? (stfBatchObj as { stageProgress?: unknown }).stageProgress,
-              currentStage:
-                batchDetails?.currentStage ?? (stfBatchObj as { currentStage?: unknown }).currentStage,
-            } as STFBatch;
+            nextBatch = mergeBatchStageFields(
+              {
+                ...stfBatchObj,
+                batchType: resolvedBatchType || stfBatchObj.batchType || null,
+                subBatchType: resolvedSubBatchType || stfBatchObj.subBatchType || null,
+                motorIds: batchDetails?.motorIds?.length
+                  ? batchDetails.motorIds.map(String)
+                  : stfBatchObj.motorIds,
+                bemMotorIds: (() => {
+                  const seededBemIds = autoMotorEntries
+                    .filter((entry) => entry.subType === "BEM")
+                    .map((entry) => entry.motorId);
+                  if (seededBemIds.length > 0) return seededBemIds;
+                  if (
+                    Array.isArray(stfBatchObj.bemMotorIds) &&
+                    stfBatchObj.bemMotorIds.length > 0
+                  ) {
+                    return stfBatchObj.bemMotorIds.map(String);
+                  }
+                  return stfBatchObj.bemMotorIds;
+                })(),
+                motorId:
+                  batchDetails?.motorIds?.length > 0
+                    ? batchDetails.motorIds.join(", ")
+                    : stfBatchObj.motorId,
+                projectId: batchDetails?.projectId ?? stfBatchObj.projectId,
+                motorStage: batchDetails?.motorStage ?? stfBatchObj.motorStage,
+                numberOfMotors: batchDetails?.numberOfMotors ?? stfBatchObj.numberOfMotors,
+                subType: seedMainMotors ? "MAIN_MOTOR" : "BEM",
+              },
+              batchDetails as Record<string, unknown>,
+            ) as STFBatch;
           } catch (error) {
             console.error("Unable to resolve batch motor details", error);
             autoMotorEntries = resolveStfSeededNavigationMotors(stfBatchObj, null);
@@ -1478,6 +1515,37 @@ export const useBaseStaticTestFacility = ({
       }
 
       return true;
+    } catch (error) {
+      const handled = await handleBatchInvalidState(
+        error,
+        async () => {
+          await refreshUserBatches();
+          const batchSnapshot = activeBatch;
+          if (batchSnapshot?.batchId) {
+            const stageFields = await fetchEnrichedBatchStageFields(batchSnapshot.batchId);
+            if (stageFields) {
+              setActiveBatch((prev) => (prev ? mergeBatchStageFields(prev, stageFields) : prev));
+              setPreviousStageGate(
+                resolvePreviousStageApprovedUnits({
+                  stageProgress: stageFields.stageProgress ?? batchSnapshot.stageProgress,
+                  currentStage: stageFields.currentStage ?? batchSnapshot.currentStage,
+                  currentSlug: "static-test-facility",
+                  currentSubDepartmentId: subDepartmentId,
+                  subDepartments: user?.allSubDepartments,
+                }),
+              );
+            }
+          }
+          if (batchSnapshot) {
+            await openFormWithResolvedData(batchSnapshot, isEditMode, { silent: true });
+          }
+          bumpBatchRefresh();
+        },
+        showAlert,
+      );
+      if (handled) return false;
+      showAlert(getErrorMessage(error, messages.CREATE_FAILED), "error");
+      return false;
     } finally {
       setActionLoading(false);
     }
@@ -1502,12 +1570,7 @@ export const useBaseStaticTestFacility = ({
         ?.subType;
       const gateSubType = navEntry?.subType ?? sessionSubType;
 
-      if (
-        !isStfMotorEnabledForWorkflow(motorId, navigationMotors, previousStageGate, getMotorStatus, {
-          facilityType,
-          subType: gateSubType,
-        })
-      ) {
+      if (!isStfMotorWorkflowEnabled(motorId, gateSubType)) {
         showAlert(
           isMotorEnabledByPreviousStage(motorId, previousStageGate)
             ? STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED
@@ -1666,6 +1729,29 @@ export const useBaseStaticTestFacility = ({
           { autoCloseMs: 2200 },
         );
 
+        await refreshUserBatches();
+        let batchForRefresh: STFBatch = {
+          ...activeBatch,
+          formId: nextFormId,
+        };
+        if (activeBatch.batchId) {
+          const stageFields = await fetchEnrichedBatchStageFields(activeBatch.batchId);
+          if (stageFields) {
+            batchForRefresh = mergeBatchStageFields(batchForRefresh, stageFields) as STFBatch;
+            setActiveBatch((prev) => (prev ? mergeBatchStageFields(prev, stageFields) : prev));
+            setPreviousStageGate(
+              resolvePreviousStageApprovedUnits({
+                stageProgress: stageFields.stageProgress ?? activeBatch.stageProgress,
+                currentStage: stageFields.currentStage ?? activeBatch.currentStage,
+                currentSlug: "static-test-facility",
+                currentSubDepartmentId: subDepartmentId,
+                subDepartments: user?.allSubDepartments,
+              }),
+            );
+          }
+        }
+        bumpBatchRefresh();
+
         const formIdForRefresh = String(nextFormId ?? activeBatch.formId ?? "").trim();
         if (formIdForRefresh) {
           const statusForBanner = String(
@@ -1678,7 +1764,7 @@ export const useBaseStaticTestFacility = ({
 
           await openFormWithResolvedData(
             {
-              ...activeBatch,
+              ...batchForRefresh,
               formId: formIdForRefresh,
               stfStatus: response.data?.status ?? activeBatch.stfStatus ?? "IN_PROGRESS",
             },
@@ -1688,6 +1774,43 @@ export const useBaseStaticTestFacility = ({
         }
 
         return true;
+      } catch (error) {
+        const handled = await handleBatchInvalidState(
+          error,
+          async () => {
+            await refreshUserBatches();
+            const batchSnapshot = activeBatch;
+            if (batchSnapshot?.batchId) {
+              const stageFields = await fetchEnrichedBatchStageFields(batchSnapshot.batchId);
+              if (stageFields) {
+                setActiveBatch((prev) => (prev ? mergeBatchStageFields(prev, stageFields) : prev));
+                setPreviousStageGate(
+                  resolvePreviousStageApprovedUnits({
+                    stageProgress: stageFields.stageProgress ?? batchSnapshot.stageProgress,
+                    currentStage: stageFields.currentStage ?? batchSnapshot.currentStage,
+                    currentSlug: "static-test-facility",
+                    currentSubDepartmentId: subDepartmentId,
+                    subDepartments: user?.allSubDepartments,
+                  }),
+                );
+              }
+            }
+            if (batchSnapshot) {
+              await openFormWithResolvedData(batchSnapshot, isEditMode, { silent: true });
+            }
+            bumpBatchRefresh();
+          },
+          showAlert,
+        );
+        if (handled) return false;
+        showAlert(
+          getErrorMessage(
+            error,
+            isCreateFlow ? messages.CREATE_FAILED : messages.UPDATE_FAILED,
+          ),
+          "error",
+        );
+        return false;
       } finally {
         setActionLoading(false);
       }
@@ -1696,18 +1819,22 @@ export const useBaseStaticTestFacility = ({
       activeBatch,
       addedMotors,
       batchMotorEntries,
+      bumpBatchRefresh,
       checkMotorEditable,
       facilityType,
       formData,
       formSnapshot,
       getMotorStatus,
+      isEditMode,
+      isStfMotorWorkflowEnabled,
       lockStfTestNoForMotor,
       motorStatusById,
-      navigationMotors,
       openFormWithResolvedData,
       previousStageGate,
+      refreshUserBatches,
       showAlert,
       subDepartmentId,
+      user?.allSubDepartments,
     ],
   );
 

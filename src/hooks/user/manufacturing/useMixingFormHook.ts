@@ -234,11 +234,7 @@ export const useMixingFormHook = (
       field: keyof ProcessParticularRow,
       value: string | number,
     ) => {
-      const parsedValue = NUMERIC_PROCESS_FIELDS.has(field)
-        ? typeof value === "number"
-          ? value
-          : Number(value) || ""
-        : value;
+      const parsedValue = value;
 
       setPremixCards((prev) =>
         prev.map((premix) => {
@@ -322,11 +318,7 @@ export const useMixingFormHook = (
 
   const updateFinalMixProcessParticular = useCallback(
     (mixNo: string, rowId: number, field: keyof ProcessParticularRow, value: string | number) => {
-      const parsedValue = NUMERIC_PROCESS_FIELDS.has(field)
-        ? typeof value === "number"
-          ? value
-          : Number(value) || 0
-        : value;
+      const parsedValue = value;
 
       setFinalMixCards((prev) =>
         prev.map((card) =>

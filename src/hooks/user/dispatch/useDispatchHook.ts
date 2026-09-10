@@ -43,27 +43,20 @@ import {
 import { OPERATION_STATUS } from "../../operationStatus";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import {
-  isMotorEnabledForWorkflow,
+  isMotorEnabledForWorkflowWithBatch,
   resolvePreviousStageApprovedUnits,
   type PreviousStageApprovedUnits,
 } from "../previousStageApproval";
+import {
+  fetchEnrichedBatchStageFields,
+  mergeBatchStageFields,
+  SUB_DEPT,
+} from "../../../utils/batchStageUtils";
+import { handleBatchInvalidState } from "../../../utils/batchInvalidStateHandler";
 
 type WorkflowView = "list" | "form" | "details";
 
 const messages = STRINGS.DISPATCH;
-
-const asOptionalStageString = (value: unknown): string | null => {
-  if (value == null) return null;
-  if (typeof value === "string") {
-    const trimmed = value.trim();
-    return trimmed || null;
-  }
-  if (typeof value === "number" || typeof value === "boolean") {
-    return String(value);
-  }
-  return null;
-};
-
 
 const normalizeBatch = (batch: any): DispatchBatch => {
   const motorIds = Array.isArray(batch?.motorIds)
@@ -354,23 +347,19 @@ export const useDispatchHook = () => {
           try {
             const batchDetails = await batchManagementController.getBatchById(batch.batchId);
             autoMotorEntries = resolveBatchMotorEntries(batch, batchDetails);
-            nextBatch = {
-              ...batch,
-              motorIds: batchDetails?.motorIds?.length
-                ? batchDetails.motorIds.map(String)
-                : batch.motorIds,
-              motorId:
-                batchDetails?.motorIds?.length > 0
-                  ? batchDetails.motorIds.join(", ")
-                  : batch.motorId,
-              stageProgress:
-                (batchDetails as { stageProgress?: unknown } | null | undefined)?.stageProgress ??
-                batch.stageProgress,
-              currentStage: asOptionalStageString(
-                (batchDetails as { currentStage?: unknown } | null | undefined)?.currentStage ??
-                  batch.currentStage,
-              ),
-            };
+            nextBatch = mergeBatchStageFields(
+              {
+                ...batch,
+                motorIds: batchDetails?.motorIds?.length
+                  ? batchDetails.motorIds.map(String)
+                  : batch.motorIds,
+                motorId:
+                  batchDetails?.motorIds?.length > 0
+                    ? batchDetails.motorIds.join(", ")
+                    : batch.motorId,
+              },
+              batchDetails as Record<string, unknown>,
+            );
           } catch (error) {
             console.error("Unable to resolve batch motor details", error);
             autoMotorEntries = resolveBatchMotorEntries(batch, null);
@@ -557,7 +546,9 @@ export const useDispatchHook = () => {
   const checkMotorEditable = useCallback(
     (motorId: string) => {
       if (
-        !isMotorEnabledForWorkflow(
+        !isMotorEnabledForWorkflowWithBatch(
+          activeBatch,
+          subDepartmentId ?? SUB_DEPT.DISPATCH,
           motorId,
           addedMotors.map((motor) => motor.motorId),
           previousStageGate,
@@ -568,7 +559,7 @@ export const useDispatchHook = () => {
       }
       return isDispatchMotorEditable(getMotorStatus(motorId));
     },
-    [addedMotors, getMotorStatus, previousStageGate],
+    [activeBatch, addedMotors, getMotorStatus, previousStageGate, subDepartmentId],
   );
 
   const submitMotor = useCallback(
@@ -579,7 +570,9 @@ export const useDispatchHook = () => {
         return false;
       }
       if (
-        !isMotorEnabledForWorkflow(
+        !isMotorEnabledForWorkflowWithBatch(
+          activeBatch,
+          subDepartmentId ?? SUB_DEPT.DISPATCH,
           motorId,
           addedMotors.map((motor) => motor.motorId),
           previousStageGate,
@@ -746,6 +739,29 @@ export const useDispatchHook = () => {
           { autoCloseMs: 2200 },
         );
 
+        await listParams.refreshUserBatches();
+        let batchForRefresh: DispatchBatch = {
+          ...activeBatch,
+          formId: nextFormId,
+        };
+        if (activeBatch.batchId) {
+          const stageFields = await fetchEnrichedBatchStageFields(activeBatch.batchId);
+          if (stageFields) {
+            batchForRefresh = mergeBatchStageFields(batchForRefresh, stageFields);
+            setActiveBatch((prev) => (prev ? mergeBatchStageFields(prev, stageFields) : prev));
+            setPreviousStageGate(
+              resolvePreviousStageApprovedUnits({
+                stageProgress: stageFields.stageProgress ?? activeBatch.stageProgress,
+                currentStage: stageFields.currentStage ?? activeBatch.currentStage,
+                currentSlug: "dispatch",
+                currentSubDepartmentId: subDepartmentId,
+                subDepartments: user?.allSubDepartments,
+              }),
+            );
+          }
+        }
+        bumpBatchRefresh();
+
         const formIdForRefresh = String(nextFormId ?? activeBatch.formId ?? "").trim();
         if (formIdForRefresh) {
           const statusForBanner = String(
@@ -758,7 +774,7 @@ export const useDispatchHook = () => {
 
           await openFormWithResolvedData(
             {
-              ...activeBatch,
+              ...batchForRefresh,
               formId: formIdForRefresh,
               dispatchStatus: response.data?.status ?? activeBatch.dispatchStatus ?? "IN_PROGRESS",
             },
@@ -768,6 +784,37 @@ export const useDispatchHook = () => {
         }
 
         return true;
+      } catch (error) {
+        const handled = await handleBatchInvalidState(
+          error,
+          async () => {
+            await listParams.refreshUserBatches();
+            const batchSnapshot = activeBatch;
+            if (batchSnapshot?.batchId) {
+              const stageFields = await fetchEnrichedBatchStageFields(batchSnapshot.batchId);
+              if (stageFields) {
+                setActiveBatch((prev) => (prev ? mergeBatchStageFields(prev, stageFields) : prev));
+                setPreviousStageGate(
+                  resolvePreviousStageApprovedUnits({
+                    stageProgress: stageFields.stageProgress ?? batchSnapshot.stageProgress,
+                    currentStage: stageFields.currentStage ?? batchSnapshot.currentStage,
+                    currentSlug: "dispatch",
+                    currentSubDepartmentId: subDepartmentId,
+                    subDepartments: user?.allSubDepartments,
+                  }),
+                );
+              }
+            }
+            if (batchSnapshot) {
+              await openFormWithResolvedData(batchSnapshot, isEditMode, { silent: true });
+            }
+            bumpBatchRefresh();
+          },
+          showAlert,
+        );
+        if (handled) return false;
+        showAlert(getErrorMessage(error, messages.UPDATE_FAILED), "error");
+        return false;
       } finally {
         setActionLoading(false);
       }
@@ -775,14 +822,18 @@ export const useDispatchHook = () => {
     [
       activeBatch,
       addedMotors,
+      bumpBatchRefresh,
       checkMotorEditable,
       formData,
       getMotorStatus,
+      isEditMode,
+      listParams,
       motorStatusById,
       openFormWithResolvedData,
       previousStageGate,
       showAlert,
       subDepartmentId,
+      user?.allSubDepartments,
     ],
   );
 

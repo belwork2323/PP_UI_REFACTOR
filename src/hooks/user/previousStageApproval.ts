@@ -2,7 +2,21 @@ import {
   findStageEntryForSubDepartment,
   normalizeSubdepartmentBatchStatus,
 } from "../../data/models/user/SubdepartmentBatchModel";
+import type { BatchView } from "../../data/models/user/BatchStageTypes";
+import {
+  findMotorUnit,
+  findPremixUnit,
+  getActiveStage,
+  isMotorDisabled,
+  isPremixDisabled,
+  usesParallelUnitLocks,
+} from "../../utils/batchStageUtils";
 import { OPERATION_STATUS } from "../operationStatus";
+
+export type BatchStageContext = Pick<
+  BatchView,
+  "parallelFlowEnabled" | "currentStage" | "stageProgress"
+>;
 
 export type PartialFlowUnitKind = "premix" | "motor";
 
@@ -11,9 +25,13 @@ export type StageProgressUnitStatus = {
   motorId?: string | null;
   division?: string | null;
   subType?: string | null;
+  stageType?: "PREMIX" | "FINAL_MIX" | string | null;
+  premixSubmissionType?: string | null;
   premixSubmissionStatus?: string | null;
+  motorSubmissionType?: string | null;
   motorSubmissionStatus?: string | null;
   status?: string | null;
+  locked?: boolean | null;
 };
 
 export type StageProgressEntry = {
@@ -565,35 +583,138 @@ export const buildMotorNavGateHelpers = (
   resolveMotorStatus: (motorId: string) => string | undefined | null,
   messages: {
     previousStage?: string;
+    notYetUnlocked?: string;
     sequential?: string;
   } = {},
+  batchContext?: BatchStageContext | null,
+  subDepartmentId?: number | null,
 ) => {
   const orderedMotorIds = motorCards
     .map((motor) => String(motor.motorId ?? "").trim())
     .filter(Boolean);
 
+  const legacyMotorEnabled = (motorId: string | null | undefined) =>
+    isMotorEnabledForWorkflow(motorId, orderedMotorIds, previousStageGate, resolveMotorStatus);
+
+  const parallelMotorEnabled = (motorId: string | null | undefined) => {
+    const id = String(motorId ?? "").trim();
+    if (!id || subDepartmentId == null || !batchContext) return legacyMotorEnabled(motorId);
+    const unit = findMotorUnit(getActiveStage(batchContext, subDepartmentId), id);
+    return !isMotorDisabled(unit);
+  };
+
+  const isMotorWorkflowEnabledForBatch = (motorId: string | null | undefined) =>
+    batchContext && usesParallelUnitLocks(batchContext)
+      ? parallelMotorEnabled(motorId)
+      : legacyMotorEnabled(motorId);
+
+  const getMotorTabTooltipForBatch = (index: number) => {
+    const motorId = motorCards[index]?.motorId;
+    if (batchContext && usesParallelUnitLocks(batchContext) && subDepartmentId != null) {
+      const unit = findMotorUnit(getActiveStage(batchContext, subDepartmentId), String(motorId ?? ""));
+      if (isMotorDisabled(unit)) {
+        return messages.notYetUnlocked ?? messages.previousStage;
+      }
+      return undefined;
+    }
+    return getMotorNavTabDisabledReason(
+      motorId,
+      index,
+      orderedMotorIds,
+      previousStageGate,
+      resolveMotorStatus,
+      messages,
+    );
+  };
+
   return {
     orderedMotorIds,
-    isMotorTabEnabled: (index: number) =>
-      isMotorEnabledForWorkflow(
-        motorCards[index]?.motorId,
-        orderedMotorIds,
-        previousStageGate,
-        resolveMotorStatus,
-      ),
-    getMotorTabTooltip: (index: number) =>
-      getMotorNavTabDisabledReason(
-        motorCards[index]?.motorId,
-        index,
-        orderedMotorIds,
-        previousStageGate,
-        resolveMotorStatus,
-        messages,
-      ),
+    isMotorTabEnabled: (index: number) => isMotorWorkflowEnabledForBatch(motorCards[index]?.motorId),
+    getMotorTabTooltip: getMotorTabTooltipForBatch,
     isMotorWorkflowEnabled: (motorId: string | null | undefined) =>
-      isMotorEnabledForWorkflow(motorId, orderedMotorIds, previousStageGate, resolveMotorStatus),
+      isMotorWorkflowEnabledForBatch(motorId),
   };
 };
+
+export const isMotorEnabledForWorkflowWithBatch = (
+  batchContext: BatchStageContext | null | undefined,
+  subDepartmentId: number | null | undefined,
+  motorId: string | null | undefined,
+  orderedMotorIds: string[],
+  gate: PreviousStageApprovedUnits | null | undefined,
+  getStatus?: (motorId: string) => string | undefined | null,
+): boolean => {
+  if (batchContext && usesParallelUnitLocks(batchContext) && subDepartmentId != null) {
+    const unit = findMotorUnit(getActiveStage(batchContext, subDepartmentId), String(motorId ?? ""));
+    return !isMotorDisabled(unit);
+  }
+  return isMotorEnabledForWorkflow(motorId, orderedMotorIds, gate, getStatus);
+};
+
+export const isPremixEnabledForWorkflowWithBatch = (
+  batchContext: BatchStageContext | null | undefined,
+  subDepartmentId: number | null | undefined,
+  premixNo: number | string | null | undefined,
+  orderedPremixNos: Array<number | string>,
+  gate: PreviousStageApprovedUnits | null | undefined,
+  getStatus: (premixNo: number | string) => string | undefined | null,
+  stageType: "PREMIX" | "FINAL_MIX" = "PREMIX",
+): boolean => {
+  if (batchContext && usesParallelUnitLocks(batchContext) && subDepartmentId != null) {
+    const unit = findPremixUnit(getActiveStage(batchContext, subDepartmentId), premixNo ?? "", stageType);
+    return !isPremixDisabled(unit);
+  }
+  return isPremixEnabledForWorkflow(premixNo, orderedPremixNos, gate, getStatus);
+};
+
+export const getPremixNavTabDisabledReasonWithBatch = (
+  batchContext: BatchStageContext | null | undefined,
+  subDepartmentId: number | null | undefined,
+  premixNo: number | string | undefined,
+  premixIndex: number,
+  orderedPremixNos: Array<number | string>,
+  gate: PreviousStageApprovedUnits | null | undefined,
+  getStatus: (premixNo: number | string) => string | undefined | null,
+  messages: {
+    previousStage?: string;
+    notYetUnlocked?: string;
+    sequential?: string;
+  } = {},
+  stageType: "PREMIX" | "FINAL_MIX" = "PREMIX",
+): string | undefined => {
+  if (batchContext && usesParallelUnitLocks(batchContext) && subDepartmentId != null) {
+    const unit = findPremixUnit(getActiveStage(batchContext, subDepartmentId), premixNo ?? "", stageType);
+    if (isPremixDisabled(unit)) {
+      return messages.notYetUnlocked ?? messages.previousStage;
+    }
+    return undefined;
+  }
+  return getPremixNavTabDisabledReason(
+    premixNo,
+    premixIndex,
+    orderedPremixNos,
+    gate,
+    getStatus,
+    messages,
+  );
+};
+
+export const resolveBatchStageContext = (
+  batch: Record<string, unknown> | null | undefined,
+): BatchStageContext => ({
+  parallelFlowEnabled:
+    batch?.parallelFlowEnabled === true
+      ? true
+      : batch?.parallelFlowEnabled === false
+        ? false
+        : null,
+  currentStage: Array.isArray(batch?.currentStage)
+    ? (batch?.currentStage as BatchView["currentStage"])
+    : undefined,
+  stageProgress: Array.isArray(batch?.stageProgress)
+    ? (batch?.stageProgress as BatchView["stageProgress"])
+    : undefined,
+});
 
 const asStageArraySource = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)

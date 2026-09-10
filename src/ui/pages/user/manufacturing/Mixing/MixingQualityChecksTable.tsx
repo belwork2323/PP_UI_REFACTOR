@@ -9,7 +9,6 @@ import {
   TableRow,
   alpha,
 } from "@mui/material";
-import { Controller, useFormContext, get } from "react-hook-form";
 import { MixingTableInput } from "./MixingFormFields";
 import { STRINGS } from "../../../../../app/config/strings";
 import { MIXING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/mixing_theme";
@@ -25,6 +24,8 @@ const observedGroupBorder = `1px solid ${alpha("#fff", 0.55)}`;
 type MixingQualityChecksTableProps = {
   rows: QualityCheckRow[];
   readOnly?: boolean;
+  errors: Record<string, string> | null;
+
   /** Pass full path like `premixes.${cardIdx}.qualityChecks` or `finalMixes.${cardIdx}.qualityChecks` */
   arrayName?: string;
   onChange?: (parameterId: string | number, index: number, value: string) => void;
@@ -50,14 +51,14 @@ export const MixingQualityChecksTable = ({
   rows = [],
   readOnly = false,
   arrayName = "qualityChecks",
+  errors = {},
   onChange,
 }: MixingQualityChecksTableProps) => {
-  const formContext = useFormContext?.() ?? null;
-  const control = formContext?.control;
-  const errors = formContext?.formState?.errors;
-
   const maxSampleCount = Math.max(1, ...rows.map(resolveRowSampleCount), 1);
   const sampleIndices = Array.from({ length: maxSampleCount }, (_, i) => i);
+
+  // Helper to retrieve error message for a given path
+  const getFieldError = (fieldPath: string) => errors?.[fieldPath];
 
   return (
     <TableContainer sx={{ ...dt.tableContainer, overflowX: "auto" }}>
@@ -159,6 +160,7 @@ export const MixingQualityChecksTable = ({
                   const shouldRenderValue = sampleIdx < rowSampleCount;
                   const value = row.observedValues?.[sampleIdx] ?? "";
                   const fieldPath = `${arrayName}.${rowIdx}.observedValues.${sampleIdx}`;
+                  const fieldError = getFieldError(fieldPath);
 
                   return (
                     <TableCell
@@ -174,35 +176,21 @@ export const MixingQualityChecksTable = ({
                       {shouldRenderValue ? (
                         readOnly ? (
                           displayValue(value)
-                        ) : control ? (
-                          <Controller
-                            name={fieldPath}
-                            control={control}
-                            render={({ field: rhfField, fieldState: { error } }) => {
-                              // Safely extract deep nested Zod/RHF error messages across card tabs
-                              const nestedError = error?.message || get(errors, fieldPath)?.message;
-
-                              return (
-                                <MixingTableInput
-                                  inputRef={rhfField.ref}
-                                  value={rhfField.value ?? ""}
-                                  placeholder={S.PLACEHOLDER_OBSERVED_VALUE}
-                                  error={!!nestedError}
-                                  helperText={nestedError}
-                                  onChange={(val: string) => {
-                                    rhfField.onChange(val);
-                                    onChange?.(row.parameterId, sampleIdx, val);
-                                  }}
-                                  required
-                                />
-                              );
-                            }}
-                          />
                         ) : (
                           <MixingTableInput
                             value={value}
                             placeholder={S.PLACEHOLDER_OBSERVED_VALUE}
-                            onChange={(val: string) => onChange?.(row.parameterId, sampleIdx, val)}
+                            error={!!fieldError}
+                            helperText={fieldError}
+                            onChange={(val: string) => {
+                              // Trigger value change update
+                              onChange?.(row.parameterId, sampleIdx, val);
+
+                              // Clear the error for this exact path immediately if it exists
+                              if (fieldError && errors && fieldPath in errors) {
+                                delete errors[fieldPath];
+                              }
+                            }}
                             required
                           />
                         )

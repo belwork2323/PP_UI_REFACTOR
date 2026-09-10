@@ -1,6 +1,7 @@
 import {
   type PartialFlowUnitKind,
   type PreviousStageApprovedUnits,
+  type StageProgressEntry,
   isMotorEnabledByPreviousStage,
   isPremixEnabledByPreviousStage,
 } from "../previousStageApproval";
@@ -26,16 +27,6 @@ const MOTOR_QC_DIVISIONS = new Set([
 ]);
 
 const APPROVED_STATUSES = new Set(["APPROVED", "COMPLETELY_APPROVED"]);
-
-type StageProgressEntry = {
-  departmentName?: string | null;
-  subDepartmentId?: number | null;
-  subDepartmentName?: string | null;
-  status?: string | null;
-  premixStatuses?: unknown;
-  finalMixStatuses?: unknown;
-  motorStatuses?: unknown;
-};
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)

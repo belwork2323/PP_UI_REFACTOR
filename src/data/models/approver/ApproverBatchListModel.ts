@@ -15,6 +15,10 @@ import {
   resolveWorkflowStatusFromBatchStages,
   SUBDEPT_STATUS_FIELD,
 } from "../user/SubdepartmentBatchModel";
+import {
+  normalizeStageProgressArray,
+  parseParallelFlowEnabled,
+} from "../../../utils/batchStageUtils";
 
 /** API status values returned by POST /approver/subdepartment/batch-list */
 export const APPROVER_BATCH_STATUS = {
@@ -434,6 +438,9 @@ export function mapApproverBatchListRow(
     ...statusMirrors,
     id: batch.id ?? batch.formId ?? batch.batchId,
     batchId: batch.batchId,
+    parallelFlowEnabled: parseParallelFlowEnabled(batch.parallelFlowEnabled),
+    currentStage: normalizeStageProgressArray(batch.currentStage),
+    stageProgress: normalizeStageProgressArray(batch.stageProgress),
     formId: batch.formId ?? null,
     batchType: batch.batchType,
     motorId: resolveMotorId(batch),

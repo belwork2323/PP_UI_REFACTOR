@@ -64,6 +64,21 @@ import {
 } from "@/data/validation/adapters/rawMaterialPreparation.validation";
 import { hasValidationErrors } from "@/data/validation/validationErrors";
 import type { ValidationAttemptFlags } from "@/ui/components/validation/useValidationDisplay";
+import {
+  isPremixEnabledForWorkflowWithBatch,
+  resolvePreviousStageApprovedUnits,
+  type PreviousStageApprovedUnits,
+} from "../previousStageApproval";
+import {
+  fetchEnrichedBatchStageFields,
+  findPremixUnit,
+  getActiveStage,
+  isPremixDisabled,
+  mergeBatchStageFields,
+  SUB_DEPT,
+  usesParallelUnitLocks,
+} from "../../../utils/batchStageUtils";
+import { handleBatchInvalidState } from "../../../utils/batchInvalidStateHandler";
 
 const RM_STATUS = MANUFACTURING_STATUS;
 
@@ -101,15 +116,15 @@ const enrichRmpBatchFromDetails = (
 ): RawMaterialPrepBatch | null => {
   if (!batchDetails) return null;
 
-  return {
-    ...batch,
-    batchType: batch.batchType ?? batchDetails.batchType ?? batch.batchType,
-    material: batch.material ?? batchDetails.material ?? batch.material,
-    identificationSheet: batchDetails.identificationSheet ?? batch.identificationSheet,
-    stageProgress:
-      (batchDetails as { stageProgress?: unknown }).stageProgress ?? batch.stageProgress,
-    currentStage: (batchDetails as { currentStage?: unknown }).currentStage ?? batch.currentStage,
-  };
+  return mergeBatchStageFields(
+    {
+      ...batch,
+      batchType: batch.batchType ?? batchDetails.batchType ?? batch.batchType,
+      material: batch.material ?? batchDetails.material ?? batch.material,
+      identificationSheet: batchDetails.identificationSheet ?? batch.identificationSheet,
+    },
+    batchDetails as Record<string, unknown>,
+  );
 };
 
 const normalizePremixSession = (session?: Partial<PremixSession> | null): PremixSession => {
@@ -356,6 +371,8 @@ export const useRawMaterialPrepHook = () => {
     unit: false,
     submit: false,
   });
+  const [previousStageGate, setPreviousStageGate] =
+    useState<PreviousStageApprovedUnits | null>(null);
 
   const [initialSnapshot, setInitialSnapshot] = useState("{}");
 
@@ -577,9 +594,24 @@ export const useRawMaterialPrepHook = () => {
     [premixStatusByNo],
   );
 
+  const orderedPremixNos = useMemo(
+    () => Array.from({ length: numberOfPremix }, (_, index) => index + 1),
+    [numberOfPremix],
+  );
+
   const checkPremixEditable = useCallback(
-    (premixNo: number): boolean => isPremixEditable(getPremixStatus(premixNo)),
-    [getPremixStatus],
+    (premixNo: number): boolean => {
+      if (!isPremixEditable(getPremixStatus(premixNo))) return false;
+      if (activeBatch && usesParallelUnitLocks(activeBatch)) {
+        const unit = findPremixUnit(
+          getActiveStage(activeBatch, subDepartmentId ?? SUB_DEPT.RMP),
+          premixNo,
+        );
+        if (isPremixDisabled(unit)) return false;
+      }
+      return true;
+    },
+    [activeBatch, getPremixStatus, subDepartmentId],
   );
 
   const premixGroups = useMemo(
@@ -698,6 +730,7 @@ export const useRawMaterialPrepHook = () => {
     setPremixFieldErrorsByBatch({});
     setWeightmentErrorsByBatch({});
     setValidationAttempt({ format: false, unit: false, submit: false });
+    setPreviousStageGate(null);
     setInitialSnapshot(
       JSON.stringify({
         addedPremixSelections: [],
@@ -744,6 +777,16 @@ export const useRawMaterialPrepHook = () => {
           showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.DETAILS_FETCH_ERROR, "error");
           return;
         }
+
+        setPreviousStageGate(
+          resolvePreviousStageApprovedUnits({
+            stageProgress: enrichedBatch.stageProgress,
+            currentStage: enrichedBatch.currentStage,
+            currentSlug: "raw-material-prep",
+            currentSubDepartmentId: subDepartmentId,
+            subDepartments: user?.allSubDepartments,
+          }),
+        );
 
         const sheet = (batchDetails?.identificationSheet ?? null) as IdentificationSheet | null;
         const premixCount = Number(sheet?.numberOfPremix) || 0;
@@ -910,7 +953,7 @@ export const useRawMaterialPrepHook = () => {
         if (!silent) setLoadingFormDetails(false);
       }
     },
-    [loadMaterialsByType, showAlert],
+    [loadMaterialsByType, showAlert, subDepartmentId, user?.allSubDepartments],
   );
 
   const handleFillForm = useCallback(
@@ -1104,6 +1147,20 @@ export const useRawMaterialPrepHook = () => {
 
       if (!subDepartmentId) {
         showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.SUB_DEPARTMENT_MISSING, "error");
+        return false;
+      }
+
+      if (
+        !isPremixEnabledForWorkflowWithBatch(
+          activeBatch,
+          subDepartmentId ?? SUB_DEPT.RMP,
+          premixNo,
+          orderedPremixNos,
+          previousStageGate,
+          (no) => getPremixStatus(Number(no)),
+        )
+      ) {
+        showAlert(STRINGS.MANUFACTURING.NOT_YET_UNLOCKED, "warning");
         return false;
       }
 
@@ -1344,6 +1401,26 @@ export const useRawMaterialPrepHook = () => {
           { autoCloseMs: 2200 },
         );
 
+        await listParams.refreshUserBatches();
+        let batchForRefresh = refreshedBatch;
+        if (activeBatch.batchId) {
+          const stageFields = await fetchEnrichedBatchStageFields(activeBatch.batchId);
+          if (stageFields) {
+            batchForRefresh = mergeBatchStageFields(refreshedBatch, stageFields);
+            setActiveBatch((prev) => (prev ? mergeBatchStageFields(prev, stageFields) : prev));
+            setPreviousStageGate(
+              resolvePreviousStageApprovedUnits({
+                stageProgress: stageFields.stageProgress ?? activeBatch.stageProgress,
+                currentStage: stageFields.currentStage ?? activeBatch.currentStage,
+                currentSlug: "raw-material-prep",
+                currentSubDepartmentId: subDepartmentId,
+                subDepartments: user?.allSubDepartments,
+              }),
+            );
+          }
+        }
+        bumpBatchRefresh();
+
         if (nextFormId) {
           const statusForBanner = String(
             response.data?.status ?? activeBatch.rmStatus ?? activeBatch.status ?? "",
@@ -1353,7 +1430,7 @@ export const useRawMaterialPrepHook = () => {
             .replace(/\s+/g, "_");
           const stillRejectedEdit = statusForBanner === "REJECTED";
 
-          await openFormWithResolvedData(refreshedBatch, stillRejectedEdit, {
+          await openFormWithResolvedData(batchForRefresh, stillRejectedEdit, {
             silent: true,
             preserveLocalSessions: premixSessionsByBatch[activeFormBatchKey] ?? {},
           });
@@ -1362,25 +1439,69 @@ export const useRawMaterialPrepHook = () => {
         }
 
         return true;
+      } catch (error) {
+        const handled = await handleBatchInvalidState(
+          error,
+          async () => {
+            await listParams.refreshUserBatches();
+            const batchSnapshot = activeBatch;
+            if (batchSnapshot?.batchId) {
+              const stageFields = await fetchEnrichedBatchStageFields(batchSnapshot.batchId);
+              if (stageFields) {
+                setActiveBatch((prev) => (prev ? mergeBatchStageFields(prev, stageFields) : prev));
+                setPreviousStageGate(
+                  resolvePreviousStageApprovedUnits({
+                    stageProgress: stageFields.stageProgress ?? batchSnapshot.stageProgress,
+                    currentStage: stageFields.currentStage ?? batchSnapshot.currentStage,
+                    currentSlug: "raw-material-prep",
+                    currentSubDepartmentId: subDepartmentId,
+                    subDepartments: user?.allSubDepartments,
+                  }),
+                );
+              }
+            }
+            if (batchSnapshot) {
+              await openFormWithResolvedData(batchSnapshot, isEditMode, {
+                silent: true,
+                preserveLocalSessions: premixSessionsByBatch[activeFormBatchKey] ?? {},
+              });
+            }
+            bumpBatchRefresh();
+          },
+          showAlert,
+        );
+        if (handled) return false;
+        showAlert(
+          getErrorMessage(error, STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.UPDATE_FAILED),
+          "error",
+        );
+        return false;
       } finally {
         setActionLoading(false);
       }
     },
     [
       activeBatch,
-      subDepartmentId,
-      addedPremixSelections,
-      premixSessions,
-      availableSolidMaterials,
-      availableLiquidMaterials,
-      showAlert,
-      formSnapshot,
-      weightmentSheet,
       activeFormBatchKey,
-      premixSessionsByBatch,
-      identificationSheet,
+      addedPremixSelections,
+      availableLiquidMaterials,
+      availableSolidMaterials,
+      bumpBatchRefresh,
       checkPremixEditable,
+      formSnapshot,
+      getPremixStatus,
+      identificationSheet,
+      isEditMode,
+      listParams,
       openFormWithResolvedData,
+      orderedPremixNos,
+      premixSessions,
+      premixSessionsByBatch,
+      previousStageGate,
+      showAlert,
+      subDepartmentId,
+      user?.allSubDepartments,
+      weightmentSheet,
     ],
   );
 
@@ -1583,6 +1704,7 @@ export const useRawMaterialPrepHook = () => {
     handleWeightmentSheetChange,
     premixStatusByNo,
     isPremixEditable: checkPremixEditable,
+    previousStageGate,
     handleFillForm,
     handleEditForm,
     handleBack,

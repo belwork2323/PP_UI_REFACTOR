@@ -69,7 +69,23 @@ import {
   resolveQcGateDivisionKey,
   resolveQcPreviousDivisionApprovedUnits,
 } from "./qcPreviousDivisionApproval";
-import { getBatchStageProgressArrays } from "../previousStageApproval";
+import {
+  getBatchStageProgressArrays,
+  resolveBatchStageContext,
+  type BatchStageContext,
+} from "../previousStageApproval";
+import type { BatchView } from "../../../data/models/user/BatchStageTypes";
+import {
+  findMotorUnit,
+  findPremixUnit,
+  getStage,
+  isMotorDisabled,
+  isPremixDisabled,
+  usesParallelUnitLocks,
+  SUB_DEPT,
+  fetchEnrichedBatchStageFields,
+} from "../../../utils/batchStageUtils";
+import { handleBatchInvalidState } from "../../../utils/batchInvalidStateHandler";
 import {
   buildQcDivisionPartialNav,
   buildPartialNavFromUnitStatusMaps,
@@ -945,6 +961,23 @@ export const useQCDivisionHook = () => {
       }
     },
     [applyWorkflowStatusPayload, runBatchBootstrap, subDepartmentId],
+  );
+
+  const refreshBatchLocks = useCallback(
+    async (batchId: string) => {
+      await listParams.refreshUserBatches();
+      const enriched = await fetchEnrichedBatchStageFields(batchId);
+      if (enriched) {
+        setActiveBatch((prev) => (prev?.batchId === batchId ? { ...prev, ...enriched } : prev));
+        setBatchStageArrays({
+          stageProgress: enriched.stageProgress ?? null,
+          currentStage: enriched.currentStage ?? null,
+        });
+      }
+      bumpBatchRefresh();
+      return enriched;
+    },
+    [bumpBatchRefresh, listParams],
   );
 
   const fetchManufacturingDivisionDetails = useCallback(
@@ -3929,6 +3962,25 @@ export const useQCDivisionHook = () => {
     ],
   );
 
+  const qcBatchStageContext = useMemo((): BatchStageContext => {
+    const fromBootstrap = resolveBatchStageContext(
+      lastBootstrap?.batchDetails as Record<string, unknown> | null | undefined,
+    );
+    return {
+      parallelFlowEnabled: fromBootstrap.parallelFlowEnabled,
+      currentStage:
+        (batchStageArrays.currentStage as BatchStageContext["currentStage"]) ??
+        fromBootstrap.currentStage,
+      stageProgress:
+        (batchStageArrays.stageProgress as BatchStageContext["stageProgress"]) ??
+        fromBootstrap.stageProgress,
+    };
+  }, [
+    batchStageArrays.currentStage,
+    batchStageArrays.stageProgress,
+    lastBootstrap?.batchDetails,
+  ]);
+
   const qcPreviousDivisionGate = useMemo(() => {
     if (isEmptyManufacturingDivisionDetailsPayload(divisionAutoPopulateData)) {
       return {
@@ -3982,9 +4034,31 @@ export const useQCDivisionHook = () => {
       if (!item) return false;
       const qcStatus = normalizePartialItemStatus(item.status);
       if (qcStatus !== "TO_BE_INITIATED" && qcStatus !== "REJECTED") return true;
+
+      if (usesParallelUnitLocks(qcBatchStageContext)) {
+        const qcStage = getStage(qcBatchStageContext as BatchView, SUB_DEPT.QC);
+        if (item.kind === "MOTOR") {
+          const unit = findMotorUnit(qcStage, String(item.motorId ?? ""));
+          return !isMotorDisabled(unit);
+        }
+        if (item.kind === "FINAL_MIX") {
+          const unit = findPremixUnit(
+            qcStage,
+            item.finalMixNo ?? item.premixNo ?? "",
+            "FINAL_MIX",
+          );
+          return !isPremixDisabled(unit);
+        }
+        if (item.kind === "PREMIX") {
+          const unit = findPremixUnit(qcStage, item.premixNo ?? "", "PREMIX");
+          return !isPremixDisabled(unit);
+        }
+        return true;
+      }
+
       return isQcPartialItemEnabledByPreviousDivision(item, qcPreviousDivisionGate);
     },
-    [qcPreviousDivisionGate],
+    [qcBatchStageContext, qcPreviousDivisionGate],
   );
 
   loadFormForPartialItemRef.current = loadFormForPartialItem;
@@ -3999,6 +4073,11 @@ export const useQCDivisionHook = () => {
     (index: number) => {
       const item = partialNavItems[index];
       if (!item || isPartialNavItemEnabled(item)) return undefined;
+
+      if (usesParallelUnitLocks(qcBatchStageContext)) {
+        return STRINGS.MANUFACTURING.NOT_YET_UNLOCKED;
+      }
+
       return getQcPartialNavTabDisabledReason(item, index, partialNavItems, qcPreviousDivisionGate, {
         previousStage:
           item.kind === "PREMIX" || item.kind === "FINAL_MIX"
@@ -4011,6 +4090,7 @@ export const useQCDivisionHook = () => {
       messages.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
       messages.PREVIOUS_STAGE_PREMIX_TAB_DISABLED,
       partialNavItems,
+      qcBatchStageContext,
       qcPreviousDivisionGate,
     ],
   );
@@ -5643,6 +5723,16 @@ export const useQCDivisionHook = () => {
       return false;
     }
 
+    if (activePartialItem && !isPartialNavItemEnabled(activePartialItem)) {
+      showAlert(
+        usesParallelUnitLocks(qcBatchStageContext)
+          ? STRINGS.MANUFACTURING.NOT_YET_UNLOCKED
+          : STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED,
+        "warning",
+      );
+      return false;
+    }
+
     const activeDivisionKey = String(activeDivisionTabKey || selectedDivision || "").trim();
     const divisionLocked = isQcUnitLocked(
       divisionStatusByFlowKey[activeDivisionKey] ??
@@ -5728,12 +5818,22 @@ export const useQCDivisionHook = () => {
       }
 
       if (!response?.success) {
+        const handled = await handleBatchInvalidState(
+          response,
+          () => refreshBatchLocks(activeBatch.batchId),
+          showAlert,
+        );
+        if (handled) return false;
         const fallback = isCreateFlow ? messages.CREATE_FAILED : messages.UPDATE_FAILED;
         showAlert(getErrorMessage(response, fallback), "error");
         return false;
       }
 
       const nextFormId = response.data?.formId ?? activeBatch.formId ?? null;
+      const enriched =
+        intent === "submit" && activeBatch.batchId
+          ? await refreshBatchLocks(activeBatch.batchId)
+          : null;
       setActiveBatch((prev) =>
         prev
           ? {
@@ -5741,6 +5841,7 @@ export const useQCDivisionHook = () => {
               formId: nextFormId,
               division: formData.division,
               subType: formData.subType,
+              ...(enriched ?? {}),
             }
           : prev,
       );
@@ -5803,11 +5904,15 @@ export const useQCDivisionHook = () => {
         console.error("Failed to refresh QC statuses after unit save:", error);
       }
 
-      if (intent !== "draft") {
-        await listParams.refreshUserBatches();
-      }
-
       return true;
+    } catch (error) {
+      const handled = await handleBatchInvalidState(
+        error,
+        () => refreshBatchLocks(activeBatch.batchId),
+        showAlert,
+      );
+      if (handled) return false;
+      throw error;
     } finally {
       setActionLoading(false);
     }
@@ -5907,11 +6012,20 @@ export const useQCDivisionHook = () => {
           });
 
       if (!response?.success) {
+        const handled = await handleBatchInvalidState(
+          response,
+          () => refreshBatchLocks(activeBatch.batchId),
+          showAlert,
+        );
+        if (handled) return false;
         showAlert(getErrorMessage(response, messages.DIVISION_SUBMIT_FAILED), "error");
         return false;
       }
 
       const nextFormId = response.data?.formId ?? activeBatch.formId ?? null;
+      const enriched = activeBatch.batchId
+        ? await refreshBatchLocks(activeBatch.batchId)
+        : null;
       setActiveBatch((prev) =>
         prev
           ? {
@@ -5919,6 +6033,7 @@ export const useQCDivisionHook = () => {
               formId: nextFormId,
               division: formData.division,
               subType: formData.subType,
+              ...(enriched ?? {}),
             }
           : prev,
       );
@@ -5960,8 +6075,15 @@ export const useQCDivisionHook = () => {
         console.error("Failed to refresh QC statuses after division submit:", error);
       }
 
-      await listParams.refreshUserBatches();
       return true;
+    } catch (error) {
+      const handled = await handleBatchInvalidState(
+        error,
+        () => refreshBatchLocks(activeBatch.batchId),
+        showAlert,
+      );
+      if (handled) return false;
+      throw error;
     } finally {
       setActionLoading(false);
     }
@@ -5975,6 +6097,7 @@ export const useQCDivisionHook = () => {
     messages,
     openFormWithResolvedData,
     partialNavItems,
+    refreshBatchLocks,
     refreshDivisionAndUnitStatuses,
     selectedDivision,
     selectedRawMaterialType,
@@ -6008,18 +6131,43 @@ export const useQCDivisionHook = () => {
       });
 
       if (!response?.success) {
+        const handled = await handleBatchInvalidState(
+          response,
+          () => refreshBatchLocks(activeBatch.batchId),
+          showAlert,
+        );
+        if (handled) return false;
         showAlert(getErrorMessage(response, messages.FINAL_APPROVAL_FAILED), "error");
         return false;
       }
 
+      if (activeBatch.batchId) {
+        await refreshBatchLocks(activeBatch.batchId);
+      }
+
       showAlert(messages.FINAL_APPROVAL_SUCCESS, "success", { autoCloseMs: 2200 });
-      await listParams.refreshUserBatches();
       resetFormContext();
       return true;
+    } catch (error) {
+      const handled = await handleBatchInvalidState(
+        error,
+        () => refreshBatchLocks(activeBatch.batchId),
+        showAlert,
+      );
+      if (handled) return false;
+      throw error;
     } finally {
       setActionLoading(false);
     }
-  }, [activeBatch, listParams, messages, resetFormContext, showAlert, subDepartmentId]);
+  }, [
+    activeBatch,
+    listParams,
+    messages,
+    refreshBatchLocks,
+    resetFormContext,
+    showAlert,
+    subDepartmentId,
+  ]);
 
   const partialNavActive = hasPartialChildNav(partialNavItems);
   const activePartialItem = partialNavActive

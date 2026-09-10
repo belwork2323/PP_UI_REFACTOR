@@ -28,8 +28,6 @@ import {
   castingCuringTableRowSx,
 } from "./CastingCuringFormPrimitives";
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
-import { runValidation } from "@/data/validation/runValidation";
-import validateCastingCuring from "@/data/validation/adapters/castingCuring.validation";
 
 const str = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 
@@ -165,7 +163,6 @@ const CuringMotorPanel = ({
   onChangeRef.current = onChange;
   const valueRef = useRef(value);
   valueRef.current = value;
-  console.log(validationErrors);
 
   // Seed Building No from batch identification sheet when empty
   useEffect(() => {
@@ -210,9 +207,6 @@ const CuringMotorPanel = ({
     ...(showPropellantPressure ? (["Propellant Pressure (bar)"] as const) : []),
     "Status Of Hot Water Circulation",
   ];
-  useEffect(() => {
-    validateCastingCuring(value, "SUBMIT");
-  }, []);
   return (
     <Box>
       <SectionCard title="Curing Cycles" theme={theme}>
@@ -440,7 +434,7 @@ const CuringMotorPanel = ({
               }}
               disabled={disabled}
               readOnly={readOnly}
-              type="number"
+              type="text"
               placeholder="0"
               required
               error={Boolean(validationErrors?.["POST_CURING_DETAILS.SHORE_A_HARDNESS"])}

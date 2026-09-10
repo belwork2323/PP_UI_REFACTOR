@@ -29,6 +29,7 @@ import {
 import {
   validateCasePrepMotorData,
   validateCasePrepMotorSession,
+  firstCasePrepValidationError,
   type CasePrepValidationErrors,
 } from "../../../data/models/user/casePrepValidation";
 import {
@@ -40,9 +41,23 @@ import {
 } from "./casePreparationFlowConfig";
 import { isManufacturingContinueFillingStatus } from "../../operationStatus";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
-import { isMotorEnabledForWorkflow } from "../previousStageApproval";
+import {
+  isMotorEnabledForWorkflowWithBatch,
+  resolvePreviousStageApprovedUnits,
+  type PreviousStageApprovedUnits,
+} from "../previousStageApproval";
 import { useFileService } from "../../../hooks/useFileService";
 import { discardWorkflowForm } from "../../../utils/workflowDiscard";
+import {
+  fetchEnrichedBatchStageFields,
+  findMotorUnit,
+  getActiveStage,
+  isMotorDisabled,
+  mergeBatchStageFields,
+  SUB_DEPT,
+  usesParallelUnitLocks,
+} from "../../../utils/batchStageUtils";
+import { handleBatchInvalidState } from "../../../utils/batchInvalidStateHandler";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -129,21 +144,20 @@ const enrichBatchFromDetails = (
 ): CasePrepBatch | null => {
   if (!batchDetails) return null;
 
-  return {
-    ...batch,
-    batchType: batch.batchType ?? batchDetails.batchType ?? batch.batchType,
-    motorIds: batchDetails.motorIds?.length ? batchDetails.motorIds : batch.motorIds,
-    numberOfMotors: batchDetails.numberOfMotors ?? batch.numberOfMotors,
-    motorId:
-      batchDetails.motorIds?.length > 0
-        ? batchDetails.motorIds.join(", ")
-        : batch.motorId,
-    identificationSheet: batchDetails.identificationSheet,
-    stageProgress:
-      (batchDetails as { stageProgress?: unknown }).stageProgress ?? batch.stageProgress,
-    currentStage:
-      (batchDetails as { currentStage?: unknown }).currentStage ?? batch.currentStage,
-  };
+  return mergeBatchStageFields(
+    {
+      ...batch,
+      batchType: batch.batchType ?? batchDetails.batchType ?? batch.batchType,
+      motorIds: batchDetails.motorIds?.length ? batchDetails.motorIds : batch.motorIds,
+      numberOfMotors: batchDetails.numberOfMotors ?? batch.numberOfMotors,
+      motorId:
+        batchDetails.motorIds?.length > 0
+          ? batchDetails.motorIds.join(", ")
+          : batch.motorId,
+      identificationSheet: batchDetails.identificationSheet,
+    },
+    batchDetails as Record<string, unknown>,
+  );
 };
 
 /** Create motor shells with empty typed data — no schema. */
@@ -209,6 +223,8 @@ export const useCasePreparationHook = () => {
 
   const [addedMotors, setAddedMotors] = useState<CasePrepAddedMotor[]>([]);
   const [motorStatusById, setMotorStatusById] = useState<Record<string, MotorStatusMeta>>({});
+  const [previousStageGate, setPreviousStageGate] =
+    useState<PreviousStageApprovedUnits | null>(null);
   const [motorValidationErrors, setMotorValidationErrors] = useState<
     Record<string, CasePrepValidationErrors>
   >({});
@@ -233,6 +249,7 @@ export const useCasePreparationHook = () => {
     setIsFormDirty(false);
     setFormData(defaults);
     setMotorValidationErrors({});
+    setPreviousStageGate(null);
     resetFlowDraft();
   }, [resetFlowDraft]);
 
@@ -268,6 +285,16 @@ export const useCasePreparationHook = () => {
         const batchDetails = await batchManagementController.getBatchById(batch.batchId);
         const nextBatch = enrichBatchFromDetails(batch, batchDetails);
         if (!nextBatch) return;
+
+        setPreviousStageGate(
+          resolvePreviousStageApprovedUnits({
+            stageProgress: nextBatch.stageProgress,
+            currentStage: nextBatch.currentStage,
+            currentSlug: "case-preparation",
+            currentSubDepartmentId: subDepartmentId,
+            subDepartments: user?.allSubDepartments,
+          }),
+        );
 
         let nextFormData = createDefaultCasePreparationFormState();
         let nextAddedMotors: CasePrepAddedMotor[] = [];
@@ -352,7 +379,7 @@ export const useCasePreparationHook = () => {
         if (!silent) setLoadingFormDetails(false);
       }
     },
-    [showAlert, subDepartmentId],
+    [showAlert, subDepartmentId, user?.allSubDepartments],
   );
 
   const handleViewCasePrepDetails = useCallback(
@@ -489,17 +516,12 @@ export const useCasePreparationHook = () => {
   const checkMotorEditable = useCallback(
     (motorId: string) => {
       if (
-        !isMotorEnabledForWorkflow(
+        !isMotorEnabledForWorkflowWithBatch(
+          activeBatch,
+          subDepartmentId ?? SUB_DEPT.CP,
           motorId,
           addedMotors.map((motor) => motor.motorId),
-          {
-            enableAll: true,
-            kind: "motor",
-            previousSubDepartmentId: null,
-            previousSubDepartmentName: null,
-            approvedPremixNos: new Set(),
-            approvedMotorIds: new Set(),
-          },
+          previousStageGate,
           getMotorStatus,
         )
       ) {
@@ -507,7 +529,7 @@ export const useCasePreparationHook = () => {
       }
       return isMotorEditable(getMotorStatus(motorId));
     },
-    [addedMotors, getMotorStatus],
+    [activeBatch, addedMotors, getMotorStatus, previousStageGate, subDepartmentId],
   );
 
   const submitMotor = useCallback(
@@ -520,8 +542,22 @@ export const useCasePreparationHook = () => {
         return false;
       }
       if (!checkMotorEditable(motorId)) {
+        const parallelLocked =
+          activeBatch &&
+          usesParallelUnitLocks(activeBatch) &&
+          subDepartmentId != null &&
+          isMotorDisabled(
+            findMotorUnit(
+              getActiveStage(activeBatch, subDepartmentId ?? SUB_DEPT.CP),
+              motorId,
+            ),
+          );
         showAlert(
-          getMotorStatus(motorId) === "APPROVED" ? S.MOTOR_LOCKED_APPROVED : S.MOTOR_LOCKED_WAITING,
+          parallelLocked
+            ? STRINGS.MANUFACTURING.NOT_YET_UNLOCKED
+            : getMotorStatus(motorId) === "APPROVED"
+              ? S.MOTOR_LOCKED_APPROVED
+              : S.MOTOR_LOCKED_WAITING,
           "warning",
         );
         return false;
@@ -540,6 +576,10 @@ export const useCasePreparationHook = () => {
       const fieldErrors = validateCasePrepMotorSession(motor, submissionIntent);
       if (Object.keys(fieldErrors).length > 0) {
         setMotorValidationErrors((prev) => ({ ...prev, [motorId]: fieldErrors }));
+        const firstError = firstCasePrepValidationError(fieldErrors);
+        if (firstError) {
+          showAlert(firstError, "warning");
+        }
         return false;
       }
       setMotorValidationErrors((prev) => {
@@ -643,43 +683,100 @@ export const useCasePreparationHook = () => {
           { autoCloseMs: 2200 },
         );
 
-        if (intent === "draft") {
-          const formIdForRefresh = String(nextFormId ?? activeBatch.formId ?? "").trim();
-          if (formIdForRefresh) {
-            const statusForBanner = String(
-              response.data?.status ?? activeBatch.cpStatus ?? activeBatch.status ?? "IN_PROGRESS",
-            )
-              .trim()
-              .toUpperCase()
-              .replace(/\s+/g, "_");
-            const stillRejectedEdit = statusForBanner === "REJECTED";
-
-            await openFormWithResolvedData(
-              {
-                ...activeBatch,
-                formId: formIdForRefresh,
-                cpStatus: response.data?.status ?? "IN_PROGRESS",
-                status: response.data?.status ?? "IN_PROGRESS",
-              },
-              stillRejectedEdit,
-              { silent: true },
+        await listParams.refreshUserBatches();
+        let batchForRefresh: CasePrepBatch = {
+          ...activeBatch,
+          formId: nextFormId,
+        };
+        if (activeBatch.batchId) {
+          const stageFields = await fetchEnrichedBatchStageFields(activeBatch.batchId);
+          if (stageFields) {
+            batchForRefresh = mergeBatchStageFields(batchForRefresh, stageFields);
+            setActiveBatch((prev) => (prev ? mergeBatchStageFields(prev, stageFields) : prev));
+            setPreviousStageGate(
+              resolvePreviousStageApprovedUnits({
+                stageProgress: stageFields.stageProgress ?? activeBatch.stageProgress,
+                currentStage: stageFields.currentStage ?? activeBatch.currentStage,
+                currentSlug: "case-preparation",
+                currentSubDepartmentId: subDepartmentId,
+                subDepartments: user?.allSubDepartments,
+              }),
             );
           }
         }
+        bumpBatchRefresh();
+
+        const formIdForRefresh = String(nextFormId ?? activeBatch.formId ?? "").trim();
+        if (formIdForRefresh) {
+          const statusForBanner = String(
+            response.data?.status ?? activeBatch.cpStatus ?? activeBatch.status ?? "IN_PROGRESS",
+          )
+            .trim()
+            .toUpperCase()
+            .replace(/\s+/g, "_");
+          const stillRejectedEdit = statusForBanner === "REJECTED";
+
+          await openFormWithResolvedData(
+            {
+              ...batchForRefresh,
+              formId: formIdForRefresh,
+              cpStatus: response.data?.status ?? "IN_PROGRESS",
+              status: response.data?.status ?? "IN_PROGRESS",
+            },
+            stillRejectedEdit,
+            { silent: true },
+          );
+        }
 
         return true;
+      } catch (error) {
+        const handled = await handleBatchInvalidState(
+          error,
+          async () => {
+            await listParams.refreshUserBatches();
+            const batchSnapshot = activeBatch;
+            if (batchSnapshot?.batchId) {
+              const stageFields = await fetchEnrichedBatchStageFields(batchSnapshot.batchId);
+              if (stageFields) {
+                setActiveBatch((prev) => (prev ? mergeBatchStageFields(prev, stageFields) : prev));
+                setPreviousStageGate(
+                  resolvePreviousStageApprovedUnits({
+                    stageProgress: stageFields.stageProgress ?? batchSnapshot.stageProgress,
+                    currentStage: stageFields.currentStage ?? batchSnapshot.currentStage,
+                    currentSlug: "case-preparation",
+                    currentSubDepartmentId: subDepartmentId,
+                    subDepartments: user?.allSubDepartments,
+                  }),
+                );
+              }
+            }
+            if (batchSnapshot) {
+              await openFormWithResolvedData(batchSnapshot, isEditMode, { silent: true });
+            }
+            bumpBatchRefresh();
+          },
+          showAlert,
+        );
+        if (handled) return false;
+        showAlert(getErrorMessage(error, S.UPDATE_FAILED), "error");
+        return false;
       } finally {
         setActionLoading(false);
       }
     },
     [
       activeBatch,
+      bumpBatchRefresh,
       checkMotorEditable,
       formData,
       getMotorStatus,
+      isEditMode,
+      listParams,
       openFormWithResolvedData,
+      previousStageGate,
       showAlert,
       subDepartmentId,
+      user?.allSubDepartments,
     ],
   );
 
@@ -869,13 +966,37 @@ export const useCasePreparationHook = () => {
           resetFormContext();
         }
         return true;
+      } catch (error) {
+        const handled = await handleBatchInvalidState(
+          error,
+          async () => {
+            await listParams.refreshUserBatches();
+            const batchSnapshot = activeBatch;
+            if (batchSnapshot?.batchId) {
+              const stageFields = await fetchEnrichedBatchStageFields(batchSnapshot.batchId);
+              if (stageFields) {
+                setActiveBatch((prev) => (prev ? mergeBatchStageFields(prev, stageFields) : prev));
+              }
+            }
+            if (batchSnapshot) {
+              await openFormWithResolvedData(batchSnapshot, isEditMode, { silent: true });
+            }
+            bumpBatchRefresh();
+          },
+          showAlert,
+        );
+        if (handled) return false;
+        showAlert(getErrorMessage(error, S.UPDATE_FAILED), "error");
+        return false;
       } finally {
         setActionLoading(false);
       }
     },
     [
       activeBatch,
+      bumpBatchRefresh,
       formData,
+      isEditMode,
       listParams,
       openFormWithResolvedData,
       resetFormContext,
@@ -898,6 +1019,7 @@ export const useCasePreparationHook = () => {
     motorStatusById,
     getMotorStatus,
     isMotorEditable: checkMotorEditable,
+    previousStageGate,
     /** Compatibility stubs — schema fetch removed for typed Case Prep form. */
     schemaLoading: false,
     schemaError: null as string | null,

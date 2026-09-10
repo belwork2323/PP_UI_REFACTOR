@@ -51,10 +51,12 @@ import type {
 import { useMixingFormHook } from "../../../../../hooks/user/manufacturing/useMixingFormHook";
 import { useMixingQualityChecks } from "../../../../../hooks/user/manufacturing/useMixingQualityChecks";
 import {
-  isPremixEnabledForWorkflow,
-  getPremixNavTabDisabledReason,
+  isPremixEnabledForWorkflowWithBatch,
+  getPremixNavTabDisabledReasonWithBatch,
+  type BatchStageContext,
   type PreviousStageApprovedUnits,
 } from "../../../../../hooks/user/previousStageApproval";
+import { SUB_DEPT } from "../../../../../utils/batchStageUtils";
 import MixingDateField from "./MixingDateField";
 import MixingCardNavigation from "./MixingCardNavigation";
 import MixingQualityChecksTable from "./MixingQualityChecksTable";
@@ -71,13 +73,10 @@ import FinalApprovalMixCardDialog, {
   areAllMixCardsApproved,
   buildFinalApprovalMixCardRows,
 } from "./components/FinalApprovalMixCardDialog";
-import { Controller, FieldErrors, FormProvider, useForm } from "react-hook-form";
 import validateMixing from "@/data/validation/adapters/mixing.validation";
 import { hasValidationErrors } from "@/data/validation/validationErrors";
 
-import { useFieldArray, useFormContext } from "react-hook-form";
 import mixingController from "@/controllers/user/manufacturing/mixingController";
-import { RootFormInput } from "@/data/schemavalidation/mixingSchema";
 
 type CombinedStageKind = "PREMIX" | "FINAL_MIX";
 
@@ -166,6 +165,7 @@ type PremixStageCardProps = {
     value: string,
   ) => void;
   onClearFieldError?: (path: string) => void;
+  errors: Record<string, string> | null;
 };
 
 const PremixStageCard = ({
@@ -183,14 +183,12 @@ const PremixStageCard = ({
   onProcessChange,
   onQualityChange,
   onClearFieldError,
+  errors = {},
 }: PremixStageCardProps) => {
-  const {
-    control,
-    formState: { errors },
-  } = useFormContext<RootFormInput>();
-
-  const cardErrors = errors.premixes?.[cardIdx];
   const processParticularsList = premix.processParticulars || [];
+
+  // Helper to construct path keys matching your validation structure
+  const getFieldError = (fieldPath: string) => errors[fieldPath];
 
   const handleQualityCheckChange = (parameterId: string | number, index: number, value: string) => {
     onQualityChange(premix.premixNo, parameterId, index, value);
@@ -308,70 +306,69 @@ const PremixStageCard = ({
               gap: 2,
             }}
           >
-            <Controller
-              name={`premixes.${cardIdx}.bowlId`}
-              control={control}
-              render={({ field, fieldState: { error } }) => (
+            {(() => {
+              const bowlIdPath = `premixes.${cardIdx}.bowlId`;
+              const errorMsg = getFieldError(bowlIdPath);
+              return (
                 <MixingSelectField
                   label={S.LABEL_BOWL_ID}
-                  value={field.value ?? ""}
+                  value={premix.bowlId ?? ""}
                   placeholder={S.PLACEHOLDER_BOWL_ID}
                   options={bowlIdOptions}
                   disabled={readOnly}
-                  error={!!error}
-                  helperText={error?.message}
+                  error={!!errorMsg}
+                  helperText={errorMsg}
                   onChange={(value) => {
-                    field.onChange(value);
                     onPremixFieldChange(premix.premixNo, "bowlId", value);
-                    onClearFieldError?.(`premixes.${cardIdx}.bowlId`);
+                    onClearFieldError?.(bowlIdPath);
                   }}
                   required
                 />
-              )}
-            />
-            <Controller
-              name={`premixes.${cardIdx}.bowlTrialDate`}
-              control={control}
-              render={({ field, fieldState: { error } }) => (
+              );
+            })()}
+
+            {(() => {
+              const bowlTrialDatePath = `premixes.${cardIdx}.bowlTrialDate`;
+              const errorMsg = getFieldError(bowlTrialDatePath);
+              return (
                 <MixingDateField
                   label={S.LABEL_BOWL_TRIAL_DATE}
-                  value={field.value ?? ""}
+                  value={premix.bowlTrialDate ?? ""}
                   placeholder="DD-MM-YYYY"
                   fullWidth="100%"
                   disabled={readOnly}
-                  error={!!error}
-                  helperText={error?.message}
+                  error={!!errorMsg}
+                  helperText={errorMsg}
                   onChange={(value) => {
-                    field.onChange(value);
                     onPremixFieldChange(premix.premixNo, "bowlTrialDate", value);
-                    onClearFieldError?.(`premixes.${cardIdx}.bowlTrialDate`);
+                    onClearFieldError?.(bowlTrialDatePath);
                   }}
                   required
                 />
-              )}
-            />
-            <Controller
-              name={`premixes.${cardIdx}.bowlTrialObservations`}
-              control={control}
-              render={({ field, fieldState: { error } }) => (
+              );
+            })()}
+
+            {(() => {
+              const bowlTrialObsPath = `premixes.${cardIdx}.bowlTrialObservations`;
+              const errorMsg = getFieldError(bowlTrialObsPath);
+              return (
                 <MixingTextField
                   label={S.LABEL_BOWL_TRIAL_OBS}
-                  value={field.value ?? ""}
+                  value={premix.bowlTrialObservations ?? ""}
                   placeholder={S.PLACEHOLDER_BOWL_TRIAL_OBS}
                   multiline
                   minRows={2}
                   disabled={readOnly}
-                  error={!!error}
-                  helperText={error?.message}
+                  error={!!errorMsg}
+                  helperText={errorMsg}
                   onChange={(value) => {
-                    field.onChange(value);
                     onPremixFieldChange(premix.premixNo, "bowlTrialObservations", value);
-                    onClearFieldError?.(`premixes.${cardIdx}.bowlTrialObservations`);
+                    onClearFieldError?.(bowlTrialObsPath);
                   }}
                   required
                 />
-              )}
-            />
+              );
+            })()}
           </Box>
         </Box>
 
@@ -379,9 +376,9 @@ const PremixStageCard = ({
           {S.SECTION_PROCESS_PARTICULARS}
         </Typography>
 
-        {cardErrors?.processParticulars?.root && (
+        {getFieldError(`premixes.${cardIdx}.processParticulars.root`) && (
           <Typography color="error" variant="caption" sx={{ display: "block", mb: 1 }}>
-            {cardErrors.processParticulars.root.message}
+            {getFieldError(`premixes.${cardIdx}.processParticulars.root`)}
           </Typography>
         )}
 
@@ -431,50 +428,46 @@ const PremixStageCard = ({
                       {processRow.operation || `Operation ${processRow.operationId}`}
                     </TableCell>
 
-                    {(["rpm", "time", "temp", "vacuum"] as const).map((fieldName) => (
-                      <TableCell key={fieldName} sx={dataTable.tableCell}>
-                        <Controller
-                          name={`premixes.${cardIdx}.processParticulars.${rowIdx}.${fieldName}`}
-                          control={control}
-                          render={({ field, fieldState: { error } }) => (
-                            <MixingTableInput
-                              inputRef={field.ref}
-                              value={field.value ?? ""}
-                              placeholder={PROCESS_PLACEHOLDERS[fieldName]}
-                              disabled={readOnly}
-                              error={!!error}
-                              helperText={error?.message}
-                              onChange={(newValue: string) => {
-                                field.onChange(newValue);
-                                onProcessChange(
-                                  premix.premixNo,
-                                  processRow.operationId,
-                                  fieldName,
-                                  newValue,
-                                );
-                                onClearFieldError?.(
-                                  `premixes.${cardIdx}.processParticulars.${rowIdx}.${fieldName}`,
-                                );
-                              }}
-                              required
-                            />
-                          )}
-                        />
-                      </TableCell>
-                    ))}
+                    {(["rpm", "time", "temp", "vacuum"] as const).map((fieldName) => {
+                      const fieldPath = `premixes.${cardIdx}.processParticulars.${rowIdx}.${fieldName}`;
+                      const errorMsg = getFieldError(fieldPath);
+
+                      return (
+                        <TableCell key={fieldName} sx={dataTable.tableCell}>
+                          <MixingTableInput
+                            value={processRow[fieldName] ?? ""}
+                            placeholder={PROCESS_PLACEHOLDERS[fieldName]}
+                            disabled={readOnly}
+                            error={!!errorMsg}
+                            helperText={errorMsg}
+                            onChange={(newValue: string) => {
+                              onProcessChange(
+                                premix.premixNo,
+                                processRow.operationId,
+                                fieldName,
+                                newValue,
+                              );
+                              onClearFieldError?.(fieldPath);
+                            }}
+                            required
+                          />
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 ))
               )}
             </TableBody>
           </Table>
         </TableContainer>
+
         <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: BRAND.text, mb: 1 }}>
           {S.SECTION_QUALITY_CHECKS}
         </Typography>
 
-        {cardErrors?.qualityChecks?.root && (
+        {getFieldError(`premixes.${cardIdx}.qualityChecks.root`) && (
           <Typography color="error" variant="caption" sx={{ display: "block", mb: 1 }}>
-            {cardErrors.qualityChecks.root.message}
+            {getFieldError(`premixes.${cardIdx}.qualityChecks.root`)}
           </Typography>
         )}
 
@@ -496,6 +489,7 @@ const PremixStageCard = ({
           readOnly={readOnly}
           onChange={handleQualityCheckChange}
           arrayName={`premixes.${cardIdx}.qualityChecks`}
+          errors={errors}
         />
       </Box>
     </SectionCard>
@@ -531,6 +525,7 @@ type FinalMixStageCardProps = {
     value: string,
   ) => void;
   onClearFieldError?: (path: string) => void;
+  errors: Record<string, string> | null;
 };
 
 const FinalMixStageCard = ({
@@ -548,13 +543,12 @@ const FinalMixStageCard = ({
   onProcessChange,
   onQualityChange,
   onClearFieldError,
+  errors = {},
 }: FinalMixStageCardProps) => {
-  const {
-    control,
-    formState: { errors },
-  } = useFormContext<RootFormInput>();
-  const cardErrors = errors.finalMixes?.[cardIdx];
   const processParticularsList = entry.processParticulars || [];
+
+  // Helper to construct path keys matching your validation structure
+  const getFieldError = (fieldPath: string) => errors[fieldPath];
 
   return (
     <SectionCard>
@@ -642,36 +636,36 @@ const FinalMixStageCard = ({
             onChange={() => undefined}
             required
           />
-          <Controller
-            name={`finalMixes.${cardIdx}.bowlId`}
-            control={control}
-            render={({ field, fieldState: { error } }) => (
+
+          {(() => {
+            const bowlIdPath = `finalMixes.${cardIdx}.bowlId`;
+            const errorMsg = getFieldError(bowlIdPath);
+            return (
               <MixingSelectField
                 label={S.LABEL_BOWL_ID}
-                value={field.value ?? ""}
+                value={entry.bowlId ?? ""}
                 placeholder={S.PLACEHOLDER_BOWL_ID}
                 options={bowlIdOptions}
                 disabled={readOnly}
-                error={!!error}
-                helperText={error?.message}
+                error={!!errorMsg}
+                helperText={errorMsg}
                 onChange={(value) => {
-                  field.onChange(value);
                   onFieldChange(entry.mixNo, "bowlId", value);
-                  onClearFieldError?.(`finalMixes.${cardIdx}.bowlId`);
+                  onClearFieldError?.(bowlIdPath);
                 }}
                 required
               />
-            )}
-          />
+            );
+          })()}
         </Box>
 
         <Typography sx={{ fontWeight: 800, fontSize: "0.84rem", color: BRAND.text, mb: 0.4 }}>
           {S.SECTION_PROCESS_PARTICULARS}
         </Typography>
 
-        {cardErrors?.processParticulars?.root && (
+        {getFieldError(`finalMixes.${cardIdx}.processParticulars.root`) && (
           <Typography color="error" variant="caption" sx={{ display: "block", mb: 1 }}>
-            {cardErrors.processParticulars.root.message}
+            {getFieldError(`finalMixes.${cardIdx}.processParticulars.root`)}
           </Typography>
         )}
 
@@ -721,37 +715,32 @@ const FinalMixStageCard = ({
                       {processRow.operation || `Operation ${processRow.operationId}`}
                     </TableCell>
 
-                    {(["rpm", "time", "temp", "vacuum"] as const).map((fieldName) => (
-                      <TableCell key={fieldName} sx={dataTable.tableCell}>
-                        <Controller
-                          name={`finalMixes.${cardIdx}.processParticulars.${rowIdx}.${fieldName}`}
-                          control={control}
-                          render={({ field, fieldState: { error } }) => (
-                            <MixingTableInput
-                              inputRef={field.ref}
-                              value={field.value ?? ""}
-                              placeholder={PROCESS_PLACEHOLDERS[fieldName]}
-                              disabled={readOnly}
-                              error={!!error}
-                              helperText={error?.message}
-                              onChange={(newValue: string) => {
-                                field.onChange(newValue);
-                                onProcessChange(
-                                  entry.mixNo,
-                                  processRow.operationId,
-                                  fieldName,
-                                  newValue,
-                                );
-                                onClearFieldError?.(
-                                  `finalMixes.${cardIdx}.processParticulars.${rowIdx}.${fieldName}`,
-                                );
-                              }}
-                              required
-                            />
-                          )}
-                        />
-                      </TableCell>
-                    ))}
+                    {(["rpm", "time", "temp", "vacuum"] as const).map((fieldName) => {
+                      const fieldPath = `finalMixes.${cardIdx}.processParticulars.${rowIdx}.${fieldName}`;
+                      const errorMsg = getFieldError(fieldPath);
+
+                      return (
+                        <TableCell key={fieldName} sx={dataTable.tableCell}>
+                          <MixingTableInput
+                            value={processRow[fieldName] ?? ""}
+                            placeholder={PROCESS_PLACEHOLDERS[fieldName]}
+                            disabled={readOnly}
+                            error={!!errorMsg}
+                            helperText={errorMsg}
+                            onChange={(newValue: string) => {
+                              onProcessChange(
+                                entry.mixNo,
+                                processRow.operationId,
+                                fieldName,
+                                newValue,
+                              );
+                              onClearFieldError?.(fieldPath);
+                            }}
+                            required
+                          />
+                        </TableCell>
+                      );
+                    })}
                   </TableRow>
                 ))
               )}
@@ -763,9 +752,9 @@ const FinalMixStageCard = ({
           {S.SECTION_QUALITY_CHECKS}
         </Typography>
 
-        {cardErrors?.qualityChecks?.root && (
+        {getFieldError(`finalMixes.${cardIdx}.qualityChecks.root`) && (
           <Typography color="error" variant="caption" sx={{ display: "block", mb: 1 }}>
-            {cardErrors.qualityChecks.root.message}
+            {getFieldError(`finalMixes.${cardIdx}.qualityChecks.root`)}
           </Typography>
         )}
 
@@ -776,6 +765,7 @@ const FinalMixStageCard = ({
             onQualityChange(entry.mixNo, parameterId, index, value)
           }
           arrayName={`finalMixes.${cardIdx}.qualityChecks`}
+          errors={errors}
         />
       </Box>
     </SectionCard>
@@ -799,6 +789,7 @@ type MixingFormProps = {
   getMixCardStatus?: (mixCardId: string) => MixCardSubmissionStatus;
   isMixCardEditable?: (mixCardId: string) => boolean;
   previousStageGate?: PreviousStageApprovedUnits | null;
+  batchStageContext?: BatchStageContext | null;
   actionLoading?: boolean;
   onSaveMixCardDraft?: (stageType: MixCardStageType, cardNo: string) => void;
   onSubmitMixCard?: (stageType: MixCardStageType, cardNo: string) => void;
@@ -814,6 +805,7 @@ const MixingForm = ({
   getMixCardStatus,
   isMixCardEditable: checkMixCardEditable,
   previousStageGate = null,
+  batchStageContext = null,
   actionLoading = false,
   onSaveMixCardDraft,
   onSubmitMixCard,
@@ -847,18 +839,6 @@ const MixingForm = ({
 
   const [activeCardIndex, setActiveCardIndex] = useState(0);
   const [finalApprovalOpen, setFinalApprovalOpen] = useState(false);
-  const methods = useForm<any>({
-    mode: "onBlur",
-    reValidateMode: "onChange",
-    shouldUnregister: false,
-    defaultValues: {
-      premixes: premixCards,
-      finalMixes: finalMixCards,
-    },
-  });
-
-  const { reset, handleSubmit, setError, clearErrors } = methods;
-
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   const mapAndSetErrors = (errors: Record<string, string>, indexMap: (p: string) => string) => {
@@ -866,39 +846,17 @@ const MixingForm = ({
     for (const [path, message] of Object.entries(errors)) {
       const mappedPath = indexMap(path);
       mapped[mappedPath] = message;
-      try {
-        setError(mappedPath as any, { type: "manual", message });
-      } catch (err) {
-        // ignore invalid paths
-      }
     }
     setValidationErrors((prev) => ({ ...prev, ...mapped }));
   };
 
-  const clearFieldError = useCallback(
-    (path: string) => {
-      try {
-        clearErrors(path as any);
-      } catch (err) {
-        // ignore
-      }
-      setValidationErrors((prev) => {
-        const copy = { ...prev };
-        delete copy[path];
-        return copy;
-      });
-    },
-    [clearErrors],
-  );
-
-  // Sync React Hook Form ONLY when external initialData updates (prevent reset loop on typing)
-  useEffect(() => {
-    reset({
-      premixes: premixCards,
-      finalMixes: finalMixCards,
+  const clearFieldError = useCallback((path: string) => {
+    setValidationErrors((prev) => {
+      const copy = { ...prev };
+      delete copy[path];
+      return copy;
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialData, reset]);
+  }, []);
 
   const { loadingMixType, errorByMixType, ensureQualityChecks } =
     useMixingQualityChecks(motorStage);
@@ -1046,21 +1004,27 @@ const MixingForm = ({
   const isMixCardWorkflowEnabled = useCallback(
     (stageType: MixCardStageType, cardNo: string | number) => {
       if (stageType === "PREMIX") {
-        return isPremixEnabledForWorkflow(
+        return isPremixEnabledForWorkflowWithBatch(
+          batchStageContext,
+          SUB_DEPT.MIXING,
           cardNo,
           premixCards.map((card) => card.premixNo),
           previousStageGate,
           (premixNo) => resolveStatus("PREMIX", String(premixNo)),
+          "PREMIX",
         );
       }
-      return isPremixEnabledForWorkflow(
+      return isPremixEnabledForWorkflowWithBatch(
+        batchStageContext,
+        SUB_DEPT.MIXING,
         cardNo,
         finalMixCards.map((card) => card.mixNo),
         previousStageGate,
         (mixNo) => resolveStatus("FINAL_MIX", String(mixNo)),
+        "FINAL_MIX",
       );
     },
-    [finalMixCards, premixCards, previousStageGate, resolveStatus],
+    [batchStageContext, finalMixCards, premixCards, previousStageGate, resolveStatus],
   );
 
   useEffect(() => {
@@ -1148,10 +1112,6 @@ const MixingForm = ({
   );
   const allMixCardsApproved = areAllMixCardsApproved(finalApprovalRows);
 
-  const handleCardSubmit = async () => {
-    // kept for compatibility; prefer explicit handlers below
-  };
-
   const handleSaveDraftClick = async (
     stageType: "PREMIX" | "FINAL_MIX",
     cardNo: string | number,
@@ -1203,215 +1163,231 @@ const MixingForm = ({
     }
   };
 
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      const errs = validateMixing({ premixes: [activePremix] }, "UNIT");
+    }, 300);
+
+    return () => clearTimeout(handler);
+  }, [activePremix]);
+
   return (
     <Box sx={{ fontFamily: "'DM Sans', sans-serif" }}>
-      <FormProvider {...methods}>
-        <Stack
-          direction="row"
-          alignItems="center"
-          justifyContent="space-between"
-          gap={1.5}
-          mb={2.5}
-          flexWrap="wrap"
-        >
-          <Stack direction="row" alignItems="center" gap={1.5}>
-            <Box
-              sx={{
-                width: 36,
-                height: 36,
-                borderRadius: "11px",
-                background: "linear-gradient(135deg,#1565C0,#1976D2)",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                boxShadow: "0 4px 12px rgba(21,101,192,0.3)",
-              }}
-            >
-              <BlenderRoundedIcon sx={{ color: "#fff", fontSize: 19 }} />
-            </Box>
-            <Box>
-              <Typography sx={{ fontWeight: 800, fontSize: "0.98rem", color: BRAND.text }}>
-                {S.FORM_TITLE}
-              </Typography>
-              <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub, mt: 0.15 }}>
-                {S.FORM_SUBTITLE}
-              </Typography>
-            </Box>
-          </Stack>
-        </Stack>
-
-        {combinedNavItems.length === 0 || (!activePremix && !activeFinalMix) ? (
-          <EmptySectionState message={S.NO_STAGE_CARDS} />
-        ) : (
-          <MixingCardNavigation
-            sectionTitle={S.STAGE_NAV_TITLE}
-            sectionHint={S.STAGE_NAV_HINT}
-            tabs={combinedNavTabs}
-            activeIndex={activeCardIndex}
-            onActiveIndexChange={setActiveCardIndex}
-            isTabDisabled={(_, index) => {
-              const item = combinedNavItems[index];
-              if (!item) return true;
-              const cardNo =
-                item.kind === "PREMIX"
-                  ? premixCards[item.cardIndex]?.premixNo
-                  : finalMixCards[item.cardIndex]?.mixNo;
-              if (cardNo == null || cardNo === "") return true;
-              return !isMixCardWorkflowEnabled(item.kind, cardNo);
-            }}
-            tabTooltip={(_, index) => {
-              const item = combinedNavItems[index];
-              if (!item) return undefined;
-              if (item.kind === "PREMIX") {
-                const orderedPremixNos = premixCards.map((card) => card.premixNo);
-                const premixIndex = item.cardIndex;
-                return getPremixNavTabDisabledReason(
-                  premixCards[premixIndex]?.premixNo,
-                  premixIndex,
-                  orderedPremixNos,
-                  previousStageGate,
-                  (premixNo) => resolveStatus("PREMIX", String(premixNo)),
-                  {
-                    previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_PREMIX_TAB_DISABLED,
-                    sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
-                  },
-                );
-              }
-              const orderedFinalMixNos = finalMixCards.map((card) => card.mixNo);
-              const finalMixIndex = item.cardIndex;
-              return getPremixNavTabDisabledReason(
-                finalMixCards[finalMixIndex]?.mixNo,
-                finalMixIndex,
-                orderedFinalMixNos,
-                previousStageGate,
-                (mixNo) => resolveStatus("FINAL_MIX", String(mixNo)),
-                {
-                  previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_PREMIX_TAB_DISABLED,
-                  sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
-                },
-              );
+      <Stack
+        direction="row"
+        alignItems="center"
+        justifyContent="space-between"
+        gap={1.5}
+        mb={2.5}
+        flexWrap="wrap"
+      >
+        <Stack direction="row" alignItems="center" gap={1.5}>
+          <Box
+            sx={{
+              width: 36,
+              height: 36,
+              borderRadius: "11px",
+              background: "linear-gradient(135deg,#1565C0,#1976D2)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              boxShadow: "0 4px 12px rgba(21,101,192,0.3)",
             }}
           >
-            <Stack spacing={1.25}>
-              <Stack direction="row" justifyContent="flex-end" spacing={1}>
-                {activePremix ? (
-                  <>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      disabled={actionLoading || activeMixCardLocked}
-                      onClick={() => handleSaveDraftClick("PREMIX", activePremix.premixNo)}
-                      sx={{ textTransform: "none", fontWeight: 700 }}
-                    >
-                      {S.SAVE_PREMIX_DRAFT(activePremix.premixNo)}
-                    </Button>
-                    <SubmitForApprovalButton
-                      disabled={actionLoading || activeMixCardLocked}
-                      onClick={() => handleSubmitClick("PREMIX", activePremix.premixNo)}
-                      label={S.SUBMIT_PREMIX(activePremix.premixNo)}
-                    />
-                  </>
-                ) : activeFinalMix ? (
-                  <>
-                    <Button
-                      variant="outlined"
-                      size="small"
-                      disabled={actionLoading || activeMixCardLocked}
-                      onClick={() => handleSaveDraftClick("FINAL_MIX", activeFinalMix.mixNo)}
-                      sx={{ textTransform: "none", fontWeight: 700 }}
-                    >
-                      {S.SAVE_FINAL_MIX_DRAFT(activeFinalMix.mixNo)}
-                    </Button>
-                    <SubmitForApprovalButton
-                      disabled={actionLoading || activeMixCardLocked}
-                      onClick={() => handleSubmitClick("FINAL_MIX", activeFinalMix.mixNo)}
-                      label={S.SUBMIT_FINAL_MIX(activeFinalMix.mixNo)}
-                    />
-                  </>
-                ) : null}
-                <ViewStatusButton
-                  disabled={actionLoading}
-                  onClick={() => setFinalApprovalOpen(true)}
-                  label={S.VIEW_STATUS}
-                />
-              </Stack>
+            <BlenderRoundedIcon sx={{ color: "#fff", fontSize: 19 }} />
+          </Box>
+          <Box>
+            <Typography sx={{ fontWeight: 800, fontSize: "0.98rem", color: BRAND.text }}>
+              {S.FORM_TITLE}
+            </Typography>
+            <Typography sx={{ fontSize: "0.72rem", color: BRAND.textSub, mt: 0.15 }}>
+              {S.FORM_SUBTITLE}
+            </Typography>
+          </Box>
+        </Stack>
+      </Stack>
 
+      {combinedNavItems.length === 0 || (!activePremix && !activeFinalMix) ? (
+        <EmptySectionState message={S.NO_STAGE_CARDS} />
+      ) : (
+        <MixingCardNavigation
+          sectionTitle={S.STAGE_NAV_TITLE}
+          sectionHint={S.STAGE_NAV_HINT}
+          tabs={combinedNavTabs}
+          activeIndex={activeCardIndex}
+          onActiveIndexChange={setActiveCardIndex}
+          isTabDisabled={(_, index) => {
+            const item = combinedNavItems[index];
+            if (!item) return true;
+            const cardNo =
+              item.kind === "PREMIX"
+                ? premixCards[item.cardIndex]?.premixNo
+                : finalMixCards[item.cardIndex]?.mixNo;
+            if (cardNo == null || cardNo === "") return true;
+            return !isMixCardWorkflowEnabled(item.kind, cardNo);
+          }}
+          tabTooltip={(_, index) => {
+            const item = combinedNavItems[index];
+            if (!item) return undefined;
+            if (item.kind === "PREMIX") {
+              const orderedPremixNos = premixCards.map((card) => card.premixNo);
+              const premixIndex = item.cardIndex;
+              return getPremixNavTabDisabledReasonWithBatch(
+                batchStageContext,
+                SUB_DEPT.MIXING,
+                premixCards[premixIndex]?.premixNo,
+                premixIndex,
+                orderedPremixNos,
+                previousStageGate,
+                (premixNo) => resolveStatus("PREMIX", String(premixNo)),
+                {
+                  previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_PREMIX_TAB_DISABLED,
+                  notYetUnlocked: STRINGS.MANUFACTURING.NOT_YET_UNLOCKED,
+                  sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
+                },
+                "PREMIX",
+              );
+            }
+            const orderedFinalMixNos = finalMixCards.map((card) => card.mixNo);
+            const finalMixIndex = item.cardIndex;
+            return getPremixNavTabDisabledReasonWithBatch(
+              batchStageContext,
+              SUB_DEPT.MIXING,
+              finalMixCards[finalMixIndex]?.mixNo,
+              finalMixIndex,
+              orderedFinalMixNos,
+              previousStageGate,
+              (mixNo) => resolveStatus("FINAL_MIX", String(mixNo)),
+              {
+                previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_PREMIX_TAB_DISABLED,
+                notYetUnlocked: STRINGS.MANUFACTURING.NOT_YET_UNLOCKED,
+                sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
+              },
+              "FINAL_MIX",
+            );
+          }}
+        >
+          <Stack spacing={1.25}>
+            <Stack direction="row" justifyContent="flex-end" spacing={1}>
               {activePremix ? (
-                <PremixStageCard
-                  key={`premix-card-${activePremix.premixNo}`}
-                  cardIdx={premixCards.findIndex((p) => p.premixNo === activePremix.premixNo)}
-                  premix={activePremix}
-                  bowlIdOptions={getPremixBowlIdOptions(activePremix.bowlId)}
-                  readOnly={activeMixCardLocked}
-                  statusChip={
-                    <PremixStatusChip
-                      status={activeMixCardStatus as any}
-                      statusConfig={statusConfig}
-                      variant="embedded"
-                    />
-                  }
-                  lockedMessage={
-                    !activeUnitEnabled
-                      ? STRINGS.MANUFACTURING.PREVIOUS_STAGE_PREMIX_TAB_DISABLED
-                      : activeMixCardLocked
-                        ? activeMixCardStatus === "APPROVED"
-                          ? S.MIX_CARD_LOCKED_APPROVED
-                          : S.MIX_CARD_LOCKED_WAITING
-                        : null
-                  }
-                  onRemove={handleRemovePremix}
-                  onPremixFieldChange={updatePremixField}
-                  onProcessChange={updateProcessParticular}
-                  onQualityChange={updateQualityCheck}
-                  onClearFieldError={clearFieldError}
-                  qualityChecksLoading={loadingMixType === "PREMIX"}
-                  qualityChecksError={errorByMixType.PREMIX ?? null}
-                />
+                <>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    disabled={actionLoading || activeMixCardLocked}
+                    onClick={() => handleSaveDraftClick("PREMIX", activePremix.premixNo)}
+                    sx={{ textTransform: "none", fontWeight: 700 }}
+                  >
+                    {S.SAVE_PREMIX_DRAFT(activePremix.premixNo)}
+                  </Button>
+                  <SubmitForApprovalButton
+                    disabled={actionLoading || activeMixCardLocked}
+                    onClick={() => handleSubmitClick("PREMIX", activePremix.premixNo)}
+                    label={S.SUBMIT_PREMIX(activePremix.premixNo)}
+                  />
+                </>
               ) : activeFinalMix ? (
-                <FinalMixStageCard
-                  key={`final-mix-card-${activeFinalMix.mixNo}`}
-                  cardIdx={finalMixCards.findIndex((f) => f.mixNo === activeFinalMix.mixNo)}
-                  entry={activeFinalMix}
-                  bowlIdOptions={getFinalMixBowlIdOptions(activeFinalMix.bowlId)}
-                  readOnly={activeMixCardLocked}
-                  statusChip={
-                    <PremixStatusChip
-                      status={activeMixCardStatus as any}
-                      statusConfig={statusConfig}
-                      variant="embedded"
-                    />
-                  }
-                  lockedMessage={
-                    !activeUnitEnabled
-                      ? STRINGS.MANUFACTURING.PREVIOUS_STAGE_PREMIX_TAB_DISABLED
-                      : activeMixCardLocked
-                        ? activeMixCardStatus === "APPROVED"
-                          ? S.MIX_CARD_LOCKED_APPROVED
-                          : S.MIX_CARD_LOCKED_WAITING
-                        : null
-                  }
-                  onRemove={handleRemoveFinalMix}
-                  onFieldChange={updateFinalMixField}
-                  onQualityChange={updateFinalMixQualityCheck}
-                  onProcessChange={updateFinalMixProcessParticular}
-                  onClearFieldError={clearFieldError}
-                  qualityChecksLoading={loadingMixType === "FINAL_MIX"}
-                  qualityChecksError={errorByMixType.FINAL_MIX ?? null}
-                />
+                <>
+                  <Button
+                    variant="outlined"
+                    size="small"
+                    disabled={actionLoading || activeMixCardLocked}
+                    onClick={() => handleSaveDraftClick("FINAL_MIX", activeFinalMix.mixNo)}
+                    sx={{ textTransform: "none", fontWeight: 700 }}
+                  >
+                    {S.SAVE_FINAL_MIX_DRAFT(activeFinalMix.mixNo)}
+                  </Button>
+                  <SubmitForApprovalButton
+                    disabled={actionLoading || activeMixCardLocked}
+                    onClick={() => handleSubmitClick("FINAL_MIX", activeFinalMix.mixNo)}
+                    label={S.SUBMIT_FINAL_MIX(activeFinalMix.mixNo)}
+                  />
+                </>
               ) : null}
+              <ViewStatusButton
+                disabled={actionLoading}
+                onClick={() => setFinalApprovalOpen(true)}
+                label={S.VIEW_STATUS}
+              />
             </Stack>
-          </MixingCardNavigation>
-        )}
 
-        <FinalApprovalMixCardDialog
-          open={finalApprovalOpen}
-          rows={finalApprovalRows}
-          statusConfig={statusConfig}
-          allMixCardsApproved={allMixCardsApproved}
-          hideConfirm
-          onClose={() => setFinalApprovalOpen(false)}
-        />
-      </FormProvider>
+            {activePremix ? (
+              <PremixStageCard
+                key={`premix-card-${activePremix.premixNo}`}
+                cardIdx={premixCards.findIndex((p) => p.premixNo === activePremix.premixNo)}
+                premix={activePremix}
+                bowlIdOptions={getPremixBowlIdOptions(activePremix.bowlId)}
+                readOnly={activeMixCardLocked}
+                statusChip={
+                  <PremixStatusChip
+                    status={activeMixCardStatus as any}
+                    statusConfig={statusConfig}
+                    variant="embedded"
+                  />
+                }
+                lockedMessage={
+                  !activeUnitEnabled
+                    ? STRINGS.MANUFACTURING.PREVIOUS_STAGE_PREMIX_TAB_DISABLED
+                    : activeMixCardLocked
+                      ? activeMixCardStatus === "APPROVED"
+                        ? S.MIX_CARD_LOCKED_APPROVED
+                        : S.MIX_CARD_LOCKED_WAITING
+                      : null
+                }
+                onRemove={handleRemovePremix}
+                onPremixFieldChange={updatePremixField}
+                onProcessChange={updateProcessParticular}
+                onQualityChange={updateQualityCheck}
+                onClearFieldError={clearFieldError}
+                qualityChecksLoading={loadingMixType === "PREMIX"}
+                qualityChecksError={errorByMixType.PREMIX ?? null}
+                errors={validationErrors}
+              />
+            ) : activeFinalMix ? (
+              <FinalMixStageCard
+                key={`final-mix-card-${activeFinalMix.mixNo}`}
+                cardIdx={finalMixCards.findIndex((f) => f.mixNo === activeFinalMix.mixNo)}
+                entry={activeFinalMix}
+                bowlIdOptions={getFinalMixBowlIdOptions(activeFinalMix.bowlId)}
+                readOnly={activeMixCardLocked}
+                statusChip={
+                  <PremixStatusChip
+                    status={activeMixCardStatus as any}
+                    statusConfig={statusConfig}
+                    variant="embedded"
+                  />
+                }
+                lockedMessage={
+                  !activeUnitEnabled
+                    ? STRINGS.MANUFACTURING.PREVIOUS_STAGE_PREMIX_TAB_DISABLED
+                    : activeMixCardLocked
+                      ? activeMixCardStatus === "APPROVED"
+                        ? S.MIX_CARD_LOCKED_APPROVED
+                        : S.MIX_CARD_LOCKED_WAITING
+                      : null
+                }
+                onRemove={handleRemoveFinalMix}
+                onFieldChange={updateFinalMixField}
+                onQualityChange={updateFinalMixQualityCheck}
+                onProcessChange={updateFinalMixProcessParticular}
+                qualityChecksLoading={loadingMixType === "FINAL_MIX"}
+                qualityChecksError={errorByMixType.FINAL_MIX ?? null}
+                errors={validationErrors}
+                onClearFieldError={clearFieldError}
+              />
+            ) : null}
+          </Stack>
+        </MixingCardNavigation>
+      )}
+
+      <FinalApprovalMixCardDialog
+        open={finalApprovalOpen}
+        rows={finalApprovalRows}
+        statusConfig={statusConfig}
+        allMixCardsApproved={allMixCardsApproved}
+        hideConfirm
+        onClose={() => setFinalApprovalOpen(false)}
+      />
     </Box>
   );
 };

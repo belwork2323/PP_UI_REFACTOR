@@ -32,17 +32,25 @@ import type { PremixSubmissionType } from "../../../data/models/user/RawMaterial
 import { isManufacturingContinueFillingStatus } from "../../operationStatus";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import {
-  isPremixEnabledByPreviousStage,
-  isPremixEnabledForWorkflow,
+  getPremixNavTabDisabledReasonWithBatch,
+  isPremixEnabledForWorkflowWithBatch,
   resolvePreviousStageApprovedUnits,
+  type BatchStageContext,
   type PreviousStageApprovedUnits,
 } from "../previousStageApproval";
+import { handleBatchInvalidState } from "../../../utils/batchInvalidStateHandler";
+import {
+  fetchEnrichedBatchStageFields,
+  normalizeStageProgressArray,
+  parseParallelFlowEnabled,
+  SUB_DEPT,
+} from "../../../utils/batchStageUtils";
 import { useFileService } from "../../../hooks/useFileService";
 import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
 
 type WorkflowView = "list" | "form" | "details";
 
-type MixingBatch = {
+type MixingBatch = BatchStageContext & {
   batchId: string;
   mxStatus?: string;
   formId?: string | null;
@@ -95,26 +103,14 @@ const mergeMixingFormPreservingLocalInput = (
   const premixCards = Array.from(premixNos)
     .sort((left, right) => Number(left) - Number(right))
     .map((premixNo) =>
-      pickCard(
-        premixNo,
-        "PREMIX",
-        previous.premixCards ?? [],
-        next.premixCards ?? [],
-        "premixNo",
-      ),
+      pickCard(premixNo, "PREMIX", previous.premixCards ?? [], next.premixCards ?? [], "premixNo"),
     )
     .filter(Boolean) as PremixEntry[];
 
   const finalMixCards = Array.from(finalMixNos)
     .sort((left, right) => Number(left) - Number(right))
     .map((mixNo) =>
-      pickCard(
-        mixNo,
-        "FINAL_MIX",
-        previous.finalMixCards ?? [],
-        next.finalMixCards ?? [],
-        "mixNo",
-      ),
+      pickCard(mixNo, "FINAL_MIX", previous.finalMixCards ?? [], next.finalMixCards ?? [], "mixNo"),
     )
     .filter(Boolean) as FinalMixEntry[];
 
@@ -152,18 +148,24 @@ export const useMixingHook = () => {
     const identificationSheet = (details?.identificationSheet ??
       null) as IdentificationSheet | null;
     const numberOfPremix = Number(identificationSheet?.numberOfPremix) || 1;
-    const mixingCycle = (details as { mixingCycle?: unknown } | null | undefined)?.mixingCycle;
-    const stageProgress = (details as { stageProgress?: unknown } | null | undefined)?.stageProgress;
-    const currentStage = (details as { currentStage?: unknown } | null | undefined)?.currentStage;
+    const mixingCycle = details?.mixingCycle ?? null;
+    const parallelFlowEnabled = parseParallelFlowEnabled(details?.parallelFlowEnabled);
+    const stageProgress = normalizeStageProgressArray(details?.stageProgress);
+    const currentStage = normalizeStageProgressArray(details?.currentStage);
 
-    return { identificationSheet, numberOfPremix, mixingCycle, stageProgress, currentStage };
+    return {
+      identificationSheet,
+      numberOfPremix,
+      mixingCycle,
+      parallelFlowEnabled,
+      stageProgress,
+      currentStage,
+    };
   }, []);
 
   const [formData, setFormData] = useState<MixingFormState>(() => createDefaultMixingFormState());
   const [initialSnapshot, setInitialSnapshot] = useState("{}");
-  const [mixCardStatusById, setMixCardStatusById] = useState<Record<string, MixCardStatusMeta>>(
-    {},
-  );
+  const [mixCardStatusById, setMixCardStatusById] = useState<Record<string, MixCardStatusMeta>>({});
   const [previousStageGate, setPreviousStageGate] = useState<PreviousStageApprovedUnits | null>(
     null,
   );
@@ -225,8 +227,14 @@ export const useMixingHook = () => {
       if (!silent) setLoadingFormDetails(true);
 
       try {
-        const { identificationSheet, numberOfPremix, mixingCycle, stageProgress, currentStage } =
-          await loadBatchIdentificationSheet(batch.batchId);
+        const {
+          identificationSheet,
+          numberOfPremix,
+          mixingCycle,
+          parallelFlowEnabled,
+          stageProgress,
+          currentStage,
+        } = await loadBatchIdentificationSheet(batch.batchId);
 
         const nextGate = resolvePreviousStageApprovedUnits({
           stageProgress: stageProgress ?? batch.stageProgress,
@@ -242,6 +250,7 @@ export const useMixingHook = () => {
           identificationSheet,
           numberOfPremix,
           mixingCycle,
+          parallelFlowEnabled,
           stageProgress: stageProgress ?? batch.stageProgress,
           currentStage: currentStage ?? batch.currentStage,
         };
@@ -385,7 +394,8 @@ export const useMixingHook = () => {
         try {
           const mixingCycleCode = String(
             nextFormData.premixCards[0]?.mixingCycleCode ??
-              (nextBatch?.mixingCycle as { mixingCycleCode?: string } | undefined)?.mixingCycleCode ??
+              (nextBatch?.mixingCycle as { mixingCycleCode?: string } | undefined)
+                ?.mixingCycleCode ??
               "",
           ).trim();
 
@@ -528,23 +538,36 @@ export const useMixingHook = () => {
 
   const isMixCardWorkflowEnabled = useCallback(
     (stageType: MixCardStageType, cardNo: string | number) => {
-      const cardNoStr = String(cardNo);
+      const mixingSubDeptId = subDepartmentId ?? SUB_DEPT.MIXING;
       if (stageType === "PREMIX") {
-        return isPremixEnabledForWorkflow(
+        return isPremixEnabledForWorkflowWithBatch(
+          activeBatch,
+          mixingSubDeptId,
           cardNo,
           orderedPremixNos,
           previousStageGate,
           (premixNo) => getMixCardStatus(buildMixCardId("PREMIX", String(premixNo))),
+          "PREMIX",
         );
       }
-      return isPremixEnabledForWorkflow(
+      return isPremixEnabledForWorkflowWithBatch(
+        activeBatch,
+        mixingSubDeptId,
         cardNo,
         orderedFinalMixNos,
         previousStageGate,
         (mixNo) => getMixCardStatus(buildMixCardId("FINAL_MIX", String(mixNo))),
+        "FINAL_MIX",
       );
     },
-    [getMixCardStatus, orderedFinalMixNos, orderedPremixNos, previousStageGate],
+    [
+      activeBatch,
+      getMixCardStatus,
+      orderedFinalMixNos,
+      orderedPremixNos,
+      previousStageGate,
+      subDepartmentId,
+    ],
   );
 
   const checkMixCardEditable = useCallback(
@@ -582,10 +605,28 @@ export const useMixingHook = () => {
       }
 
       if (!isMixCardWorkflowEnabled(stageType, cardNo)) {
+        const orderedNos = stageType === "PREMIX" ? orderedPremixNos : orderedFinalMixNos;
+        const cardIndex = orderedNos.findIndex((entry) => String(entry) === String(cardNo));
+        const disabledReason = getPremixNavTabDisabledReasonWithBatch(
+          activeBatch,
+          subDepartmentId ?? SUB_DEPT.MIXING,
+          cardNo,
+          cardIndex,
+          orderedNos,
+          previousStageGate,
+          (unitNo) => getMixCardStatus(buildMixCardId(stageType, String(unitNo))),
+          {
+            previousStage:
+              stageType === "PREMIX"
+                ? STRINGS.MANUFACTURING.PREVIOUS_STAGE_PREMIX_TAB_DISABLED
+                : STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED,
+            sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
+            notYetUnlocked: STRINGS.MANUFACTURING.NOT_YET_UNLOCKED,
+          },
+          stageType,
+        );
         showAlert(
-          isPremixEnabledByPreviousStage(cardNo, previousStageGate)
-            ? STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED
-            : STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED,
+          disabledReason ?? STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED,
           "warning",
         );
         return false;
@@ -641,12 +682,30 @@ export const useMixingHook = () => {
         }
 
         const nextFormId = String(response.data?.formId ?? activeBatch.formId ?? "").trim();
-        const refreshedBatch: MixingBatch = {
+        let refreshedBatch: MixingBatch = {
           ...activeBatch,
           formId: nextFormId || activeBatch.formId,
           mxStatus: response.data?.status ?? activeBatch.mxStatus,
           status: response.data?.status ?? activeBatch.status,
         };
+
+        if (intent === "submit" && activeBatch.batchId) {
+          await listParams.refreshUserBatches();
+          const enrichedStageFields = await fetchEnrichedBatchStageFields(activeBatch.batchId);
+          if (enrichedStageFields) {
+            refreshedBatch = { ...refreshedBatch, ...enrichedStageFields };
+            setPreviousStageGate(
+              resolvePreviousStageApprovedUnits({
+                stageProgress: enrichedStageFields.stageProgress ?? refreshedBatch.stageProgress,
+                currentStage: enrichedStageFields.currentStage ?? refreshedBatch.currentStage,
+                currentSlug: "mixing",
+                currentSubDepartmentId: subDepartmentId,
+                subDepartments: user?.allSubDepartments,
+              }),
+            );
+          }
+          bumpBatchRefresh();
+        }
 
         setActiveBatch(refreshedBatch);
         if (intent === "draft") {
@@ -679,20 +738,62 @@ export const useMixingHook = () => {
         }
 
         return true;
+      } catch (error) {
+        if (
+          await handleBatchInvalidState(
+            error,
+            async () => {
+              if (!activeBatch.batchId) return;
+              await listParams.refreshUserBatches();
+              const enrichedStageFields = await fetchEnrichedBatchStageFields(activeBatch.batchId);
+              const batchToReopen: MixingBatch = enrichedStageFields
+                ? { ...activeBatch, ...enrichedStageFields }
+                : activeBatch;
+              if (enrichedStageFields) {
+                setActiveBatch(batchToReopen);
+                setPreviousStageGate(
+                  resolvePreviousStageApprovedUnits({
+                    stageProgress:
+                      enrichedStageFields.stageProgress ?? batchToReopen.stageProgress,
+                    currentStage: enrichedStageFields.currentStage ?? batchToReopen.currentStage,
+                    currentSlug: "mixing",
+                    currentSubDepartmentId: subDepartmentId,
+                    subDepartments: user?.allSubDepartments,
+                  }),
+                );
+              }
+              bumpBatchRefresh();
+              await openFormWithResolvedData(batchToReopen, isEditMode, {
+                silent: true,
+                preserveLocalFormData: formData,
+              });
+            },
+            showAlert,
+          )
+        ) {
+          return false;
+        }
+        throw error;
       } finally {
         setActionLoading(false);
       }
     },
     [
       activeBatch,
+      bumpBatchRefresh,
       checkMixCardEditable,
       formData,
       getMixCardStatus,
+      isEditMode,
       isMixCardWorkflowEnabled,
+      listParams,
       mixCardStatusById,
+      orderedFinalMixNos,
+      orderedPremixNos,
       previousStageGate,
       showAlert,
       subDepartmentId,
+      user?.allSubDepartments,
       openFormWithResolvedData,
     ],
   );

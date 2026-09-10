@@ -9,7 +9,7 @@ const M = VALIDATIONSTRING;
 export const mixingFieldRules = {
   bowlId: {
     valueType: "text" as const,
-    pattern: M.PATTERNS.ALPHANUMERIC,
+    pattern: M.PATTERNS.BOWL_ID,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
@@ -21,7 +21,7 @@ export const mixingFieldRules = {
   },
   bowlTrialObservations: {
     valueType: "text" as const,
-    pattern: M.PATTERNS.ALPHABET_WITH_SPECIAL, // Big string with special characters allowed
+    pattern: M.PATTERNS.ALPHABET_WITH_SPECIAL,
     minLength: 1,
     maxLength: M.LENGTH.MAX_LONG_TEXT,
     requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
@@ -36,25 +36,25 @@ export const mixingFieldRules = {
   },
   rpm: {
     valueType: "number" as const,
-    pattern: M.PATTERNS.ONLY_DIGITS,
+    pattern: M.PATTERNS.FLOAT,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   time: {
     valueType: "number" as const,
-    pattern: M.PATTERNS.ONLY_DIGITS,
+    pattern: M.PATTERNS.FLOAT,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   temp: {
     valueType: "number" as const,
-    pattern: M.PATTERNS.ONLY_DIGITS,
+    pattern: M.PATTERNS.FLOAT,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
   vacuum: {
     valueType: "number" as const,
-    pattern: M.PATTERNS.ONLY_DIGITS,
+    pattern: M.PATTERNS.FLOAT,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
   },
@@ -227,11 +227,18 @@ export const mixingValidationConfig: SubDeptValidationConfig<MixingData> = {
               if (val === undefined || val === null || String(val).trim() === "") continue;
             }
 
+            // Coerce and validate as number (supports both integers and decimals)
             const num = Number(val);
             if (Number.isNaN(num)) {
               errors[path] = mixingFieldRules.observedValue.messages.invalid;
               continue;
             }
+
+            // Optionally ensure the stored entry is treated as a number
+            if (typeof values[o] === "string" && values[o].trim() !== "") {
+              values[o] = num;
+            }
+
             if (min !== undefined && max !== undefined) {
               if (num < min || num > max) {
                 errors[path] = M.OBSERVED_VALUE_RANGE.replace("{min}", String(min)).replace(

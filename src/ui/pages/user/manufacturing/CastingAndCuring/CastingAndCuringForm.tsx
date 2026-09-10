@@ -7,6 +7,7 @@ import {
   Stack,
   ToggleButton,
   ToggleButtonGroup,
+  Tooltip,
   Typography,
   alpha,
 } from "@mui/material";
@@ -31,6 +32,25 @@ import {
 } from "../../../../../data/models/user/CastingCuringFormModel";
 import { createEmptyCastingMotorData } from "../../../../../data/models/user/CastingMotorDataModel";
 import { createEmptyCuringMotorData } from "../../../../../data/models/user/CuringMotorDataModel";
+
+const CURING_VALIDATION_PREFIXES = [
+  "CURING_CYCLES.",
+  "POST_CURING_DETAILS.",
+  "DECORING_DETAILS.",
+] as const;
+
+const stripValidationErrorsByPrefix = (
+  errors: Record<string, string>,
+  prefixes: readonly string[],
+) => {
+  const next = { ...errors };
+  Object.keys(next).forEach((key) => {
+    if (prefixes.some((prefix) => key.startsWith(prefix))) {
+      delete next[key];
+    }
+  });
+  return next;
+};
 import type { CuringCycleConfig } from "../../../../../data/models/user/CuringCycleConfigModel";
 import PremixStatusChip from "../RawMaterial/components/PremixStatusChip";
 import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
@@ -51,6 +71,8 @@ import {
   buildMotorNavGateHelpers,
   type PreviousStageApprovedUnits,
 } from "../../../../../hooks/user/previousStageApproval";
+import { SUB_DEPT, findMotorUnit, getActiveStage, getCastingUpstreamMixingGate, isMotorDisabled, usesParallelUnitLocks } from "../../../../../utils/batchStageUtils";
+import type { BatchView } from "../../../../../data/models/user/BatchStageTypes";
 import {
   UserWorkflowNavPanel,
   UserWorkflowTabNav,
@@ -138,8 +160,9 @@ const CastingAndCuringForm = ({
       buildMotorNavGateHelpers(motorCards, previousStageGate, resolveMotorStatus, {
         previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
         sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
-      }),
-    [motorCards, previousStageGate, resolveMotorStatus],
+        notYetUnlocked: STRINGS.MANUFACTURING.NOT_YET_UNLOCKED,
+      }, batch, SUB_DEPT.CC),
+    [batch, motorCards, previousStageGate, resolveMotorStatus],
   );
   const prevMotorCountRef = useRef(0);
   const formSessionKey = `${batch?.batchId ?? ""}`;
@@ -260,6 +283,13 @@ const CastingAndCuringForm = ({
     if (activeProcessTab !== "CURING") return;
     void onFetchCuringCycleConfig?.();
   }, [activeProcessTab, onFetchCuringCycleConfig, batch?.batchId, batch?.motorStage]);
+
+  useEffect(() => {
+    if (!curingFormLoaded) return;
+    setValidationErrors((prev) =>
+      stripValidationErrorsByPrefix(prev, CURING_VALIDATION_PREFIXES),
+    );
+  }, [curingFormLoaded, activeMotorEntry?.motorId]);
   const showMotorNav = motorCards.length > 0;
   const showMotorWorkspace = Boolean(activeMotorEntry && activeMotorSession);
 
@@ -294,9 +324,42 @@ const CastingAndCuringForm = ({
     motorStatusById[activeMotorId]?.motorSubmissionStatus ??
     "TO_BE_INITIATED") as CastingCuringMotorSubmissionStatus;
   const activeMotorPriorEnabled = motorNavGate.isMotorWorkflowEnabled(activeMotorId);
+  const upstreamMixingGate = useMemo(
+    () => getCastingUpstreamMixingGate(batch as BatchView | null | undefined),
+    [batch],
+  );
+  const activeMotorParallelLocked = useMemo(() => {
+    if (!activeMotorId || !batch || !usesParallelUnitLocks(batch as BatchView)) return false;
+    const unit = findMotorUnit(getActiveStage(batch as BatchView, SUB_DEPT.CC), activeMotorId);
+    return isMotorDisabled(unit);
+  }, [activeMotorId, batch]);
   const activeMotorLocked = activeMotorId
     ? !activeMotorPriorEnabled || !(isMotorEditable?.(activeMotorId) ?? true)
     : false;
+  const motorSubmitDisabledReason = useMemo(() => {
+    if (!upstreamMixingGate.submitEnabled) {
+      return upstreamMixingGate.disabledReason;
+    }
+    if (activeMotorParallelLocked) {
+      return STRINGS.MANUFACTURING.NOT_YET_UNLOCKED;
+    }
+    if (!activeMotorPriorEnabled) {
+      return STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED;
+    }
+    if (!(isMotorEditable?.(activeMotorId) ?? true)) {
+      return activeMotorStatus === "APPROVED" ? S.MOTOR_LOCKED_APPROVED : S.MOTOR_LOCKED_WAITING;
+    }
+    return undefined;
+  }, [
+    activeMotorId,
+    activeMotorParallelLocked,
+    activeMotorPriorEnabled,
+    activeMotorStatus,
+    isMotorEditable,
+    upstreamMixingGate.disabledReason,
+    upstreamMixingGate.submitEnabled,
+  ]);
+  const motorSubmitDisabled = actionLoading || Boolean(motorSubmitDisabledReason);
 
   const finalApprovalRows = useMemo(
     () =>
@@ -444,48 +507,43 @@ const CastingAndCuringForm = ({
                   variant="outlined"
                   size="small"
                   disabled={actionLoading || activeMotorLocked}
-                  onClick={async () => {
-                    if (!activeMotorEntry) return;
-                    const motor = activeMotorSession;
-                    if (!motor) return;
-                    const castingErrors = validateCastingCuring(motor.castingData, "UNIT");
-                    const curingErrors = validateCastingCuring(motor.curingData, "UNIT");
-                    const errors = { ...(castingErrors ?? {}), ...(curingErrors ?? {}) };
-
-                    if (Object.keys(errors).length > 0) {
-                      setValidationErrors(errors);
-                      return;
-                    }
-                    setValidationErrors({});
-                    onSaveMotorDraft?.(activeMotorEntry.motorId);
-                  }}
-
-                  // onClick={() => onSaveMotorDraft?.(activeMotorEntry.motorId)}
+                  onClick={() => onSaveMotorDraft?.(activeMotorEntry.motorId)}
                   sx={{ textTransform: "none", fontWeight: 700 }}
                 >
                   {S.SAVE_MOTOR_DRAFT(activeMotorEntry.motorId)}
                 </Button>
-                <SubmitForApprovalButton
-                  disabled={actionLoading || activeMotorLocked}
-                  onClick={async () => {
-                    if (!activeMotorEntry) return;
-                    const motor = activeMotorSession;
-                    if (!motor) return;
-                    console.log(motor);
+                <Tooltip
+                  title={motorSubmitDisabledReason ?? ""}
+                  disableHoverListener={!motorSubmitDisabledReason}
+                >
+                  <span>
+                    <SubmitForApprovalButton
+                      disabled={motorSubmitDisabled}
+                      onClick={async () => {
+                        if (!activeMotorEntry) return;
+                        const motor = activeMotorSession;
+                        if (!motor) return;
 
-                    const castingErrors = validateCastingCuring(motor.castingData, "SUBMIT");
-                    const curingErrors = validateCastingCuring(motor.curingData, "SUBMIT");
-                    const errors = { ...(castingErrors ?? {}), ...(curingErrors ?? {}) };
+                        const castingErrors = validateCastingCuring(motor.castingData, "SUBMIT");
+                        const curingErrors = curingFormLoaded
+                          ? validateCastingCuring(
+                              motor.curingData ?? createEmptyCuringMotorData(),
+                              "SUBMIT",
+                            )
+                          : {};
+                        const errors = { ...(castingErrors ?? {}), ...(curingErrors ?? {}) };
 
-                    if (Object.keys(errors).length > 0) {
-                      setValidationErrors(errors);
-                      return;
-                    }
-                    setValidationErrors({});
-                    onSubmitMotor?.(activeMotorEntry.motorId);
-                  }}
-                  label={S.SUBMIT_MOTOR(activeMotorEntry.motorId)}
-                />
+                        if (Object.keys(errors).length > 0) {
+                          setValidationErrors(errors);
+                          return;
+                        }
+                        setValidationErrors({});
+                        onSubmitMotor?.(activeMotorEntry.motorId);
+                      }}
+                      label={S.SUBMIT_MOTOR(activeMotorEntry.motorId)}
+                    />
+                  </span>
+                </Tooltip>
               </>
             ) : null}
             <ViewStatusButton
@@ -563,6 +621,25 @@ const CastingAndCuringForm = ({
                 </Stack>
               </Stack>
 
+              {!upstreamMixingGate.submitEnabled ? (
+                <Box
+                  sx={{
+                    mb: 1.25,
+                    px: 1.25,
+                    py: 0.75,
+                    borderRadius: 1.5,
+                    border: `1px solid ${theme.palette.border}`,
+                    bgcolor: theme.palette.background ?? BRAND.surface,
+                  }}
+                >
+                  <Typography
+                    sx={{ fontSize: "0.72rem", color: theme.palette.textSub, fontWeight: 600 }}
+                  >
+                    {upstreamMixingGate.disabledReason}
+                  </Typography>
+                </Box>
+              ) : null}
+
               {activeMotorLocked ? (
                 <Box
                   sx={{
@@ -577,11 +654,13 @@ const CastingAndCuringForm = ({
                   <Typography
                     sx={{ fontSize: "0.72rem", color: theme.palette.textSub, fontWeight: 600 }}
                   >
-                    {!activeMotorPriorEnabled
-                      ? STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED
-                      : activeMotorStatus === "APPROVED"
-                        ? S.MOTOR_LOCKED_APPROVED
-                        : S.MOTOR_LOCKED_WAITING}
+                    {activeMotorParallelLocked
+                      ? STRINGS.MANUFACTURING.NOT_YET_UNLOCKED
+                      : !activeMotorPriorEnabled
+                        ? STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED
+                        : activeMotorStatus === "APPROVED"
+                          ? S.MOTOR_LOCKED_APPROVED
+                          : S.MOTOR_LOCKED_WAITING}
                   </Typography>
                 </Box>
               ) : null}

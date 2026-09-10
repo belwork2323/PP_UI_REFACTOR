@@ -41,7 +41,7 @@ export const DRAWER_NAV = [
   },
   {
     key: "master-data",
-    label: "Master Data",
+    label: "Master Data Management",
     route: "/master-data",
     Icon: icons.Inventory,
     allowedRoles: ["ADMIN", "CENTRE_HEAD"],

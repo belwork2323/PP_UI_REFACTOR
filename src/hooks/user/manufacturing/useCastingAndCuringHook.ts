@@ -42,11 +42,19 @@ import {
 } from "../../../data/models/user/CastingMotorDataModel";
 import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
 import {
+  buildMotorNavGateHelpers,
   isMotorEnabledByPreviousStage,
-  isMotorEnabledForWorkflow,
+  isMotorEnabledForWorkflowWithBatch,
   resolvePreviousStageApprovedUnits,
   type PreviousStageApprovedUnits,
 } from "../previousStageApproval";
+import { handleBatchInvalidState } from "../../../utils/batchInvalidStateHandler";
+import {
+  fetchEnrichedBatchStageFields,
+  getCastingUpstreamMixingGate,
+  mergeBatchStageFields,
+  SUB_DEPT,
+} from "../../../utils/batchStageUtils";
 import {
   enrichCastingCuringBatchFromDetails,
   getCastingCuringOrderedMotorIds,
@@ -220,7 +228,10 @@ export const useCastingAndCuringHook = () => {
         if (batch.batchId) {
           try {
             const batchDetails = await batchManagementController.getBatchById(batch.batchId);
-            nextBatch = enrichCastingCuringBatchFromDetails(batch, batchDetails);
+            nextBatch = mergeBatchStageFields(
+              enrichCastingCuringBatchFromDetails(batch, batchDetails),
+              batchDetails as Record<string, unknown>,
+            );
           } catch (error) {
             console.error("Unable to resolve batch motor details", error);
           }
@@ -726,10 +737,20 @@ export const useCastingAndCuringHook = () => {
   const submitMotor = useCallback(
     async (motorId: string, intent: "draft" | "submit") => {
       if (!activeBatch) return false;
+      const orderedMotorIds = getCastingCuringOrderedMotorIds(activeBatch, addedMotors);
+
+      const upstreamMixingGate = getCastingUpstreamMixingGate(activeBatch);
+      if (intent === "submit" && !upstreamMixingGate.submitEnabled) {
+        showAlert(upstreamMixingGate.disabledReason ?? STRINGS.MANUFACTURING.NOT_YET_UNLOCKED, "warning");
+        return false;
+      }
+
       if (
-        !isMotorEnabledForWorkflow(
+        !isMotorEnabledForWorkflowWithBatch(
+          activeBatch,
+          subDepartmentId ?? SUB_DEPT.CC,
           motorId,
-          getCastingCuringOrderedMotorIds(activeBatch, addedMotors),
+          orderedMotorIds,
           previousStageGate,
           (id) => motorStatusById[id]?.motorSubmissionStatus ?? "TO_BE_INITIATED",
         )
@@ -871,10 +892,60 @@ export const useCastingAndCuringHook = () => {
             setInitialSnapshot(formSnapshot);
           }
         } else {
+          if (intent === "submit" && activeBatch.batchId) {
+            await listParams.refreshUserBatches();
+            const enrichedStageFields = await fetchEnrichedBatchStageFields(activeBatch.batchId);
+            if (enrichedStageFields) {
+              setActiveBatch((prev) => (prev ? { ...prev, ...enrichedStageFields } : prev));
+              setPreviousStageGate(
+                resolvePreviousStageApprovedUnits({
+                  stageProgress: enrichedStageFields.stageProgress,
+                  currentStage: enrichedStageFields.currentStage,
+                  currentSlug: "casting-and-curing",
+                  currentSubDepartmentId: subDepartmentId,
+                  subDepartments: user?.allSubDepartments,
+                }),
+              );
+            }
+            bumpBatchRefresh();
+          }
           setInitialSnapshot(formSnapshot);
         }
 
         return true;
+      } catch (error) {
+        if (
+          await handleBatchInvalidState(
+            error,
+            async () => {
+              if (!activeBatch.batchId) return;
+              await listParams.refreshUserBatches();
+              const enrichedStageFields = await fetchEnrichedBatchStageFields(activeBatch.batchId);
+              const batchToReopen: CastingCuringBatch = enrichedStageFields
+                ? { ...activeBatch, ...enrichedStageFields }
+                : activeBatch;
+              if (enrichedStageFields) {
+                setActiveBatch(batchToReopen);
+                setPreviousStageGate(
+                  resolvePreviousStageApprovedUnits({
+                    stageProgress:
+                      enrichedStageFields.stageProgress ?? batchToReopen.stageProgress,
+                    currentStage: enrichedStageFields.currentStage ?? batchToReopen.currentStage,
+                    currentSlug: "casting-and-curing",
+                    currentSubDepartmentId: subDepartmentId,
+                    subDepartments: user?.allSubDepartments,
+                  }),
+                );
+              }
+              bumpBatchRefresh();
+              await openFormWithResolvedData(batchToReopen, isEditMode, { silent: true });
+            },
+            showAlert,
+          )
+        ) {
+          return false;
+        }
+        throw error;
       } finally {
         setActionLoading(false);
       }
@@ -882,13 +953,17 @@ export const useCastingAndCuringHook = () => {
     [
       activeBatch,
       addedMotors,
+      bumpBatchRefresh,
       formData,
       formSnapshot,
+      isEditMode,
+      listParams,
       motorStatusById,
       openFormWithResolvedData,
       previousStageGate,
       showAlert,
       subDepartmentId,
+      user?.allSubDepartments,
     ],
   );
 
@@ -921,7 +996,9 @@ export const useCastingAndCuringHook = () => {
   const checkMotorEditable = useCallback(
     (motorId: string) => {
       if (
-        !isMotorEnabledForWorkflow(
+        !isMotorEnabledForWorkflowWithBatch(
+          activeBatch,
+          subDepartmentId ?? SUB_DEPT.CC,
           motorId,
           orderedMotorIds,
           previousStageGate,
@@ -932,7 +1009,29 @@ export const useCastingAndCuringHook = () => {
       }
       return isCastingCuringMotorEditable(getMotorStatus(motorId));
     },
-    [getMotorStatus, orderedMotorIds, previousStageGate],
+    [activeBatch, getMotorStatus, orderedMotorIds, previousStageGate, subDepartmentId],
+  );
+
+  const motorCards = useMemo(
+    () => orderedMotorIds.map((motorId) => ({ motorId })),
+    [orderedMotorIds],
+  );
+
+  const motorNavGate = useMemo(
+    () =>
+      buildMotorNavGateHelpers(
+        motorCards,
+        previousStageGate,
+        getMotorStatus,
+        {
+          previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
+          sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
+          notYetUnlocked: STRINGS.MANUFACTURING.NOT_YET_UNLOCKED,
+        },
+        activeBatch,
+        subDepartmentId ?? SUB_DEPT.CC,
+      ),
+    [activeBatch, getMotorStatus, motorCards, previousStageGate, subDepartmentId],
   );
 
   const handleSubmitForFinalApproval = useCallback(async () => {
@@ -1069,6 +1168,7 @@ export const useCastingAndCuringHook = () => {
     motorStatusById,
     previousStageGate,
     getMotorStatus,
+    motorNavGate,
     isMotorEditable: checkMotorEditable,
     detailsRow,
     detailsData,

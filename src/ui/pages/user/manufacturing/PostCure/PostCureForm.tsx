@@ -25,6 +25,7 @@ import {
   buildMotorNavGateHelpers,
   type PreviousStageApprovedUnits,
 } from "../../../../../hooks/user/previousStageApproval";
+import { SUB_DEPT } from "../../../../../utils/batchStageUtils";
 import {
   UserWorkflowNavPanel,
   UserWorkflowTabNav,
@@ -195,8 +196,9 @@ export const PostCureForm = ({
     return buildMotorNavGateHelpers(motorCards, previousStageGate, resolveMotorStatus, {
       previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
       sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
-    });
-  }, [motorCards, previousStageGate, getMotorStatus, motorStatusById]);
+      notYetUnlocked: STRINGS.MANUFACTURING.NOT_YET_UNLOCKED,
+    }, batch, SUB_DEPT.POST_CURE);
+  }, [batch, motorCards, previousStageGate, getMotorStatus, motorStatusById]);
 
   const [finalApprovalOpen, setFinalApprovalOpen] = useState(false);
   const batchMotorCount = Math.max(motorCards.length, 0);

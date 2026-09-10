@@ -54,7 +54,7 @@ export default function useMasterDataHook() {
       const resp = await masterDataController.getTypes();
       if (resp.success && Array.isArray(resp.data)) {
         setTypes(resp.data);
-        setSelectedType((prev) => prev || resp.data![0]?.type || "");
+        setSelectedType((prev) => prev || "");
       } else {
         setTypes([]);
         useAlertStore
@@ -121,8 +121,16 @@ export default function useMasterDataHook() {
     setPage(0);
     setInlineMode(null);
     setEditTarget(null);
+    if (!selectedType) {
+      setListPayload(null);
+      setItems([]);
+      setStats(emptyMasterDataStats());
+      setSchema(null);
+      setLoadingList(false);
+      return;
+    }
     void loadList();
-  }, [loadList]);
+  }, [loadList, selectedType, activeFilter, types]);
 
   const paginated = useMemo(() => {
     const start = page * rowsPerPage;
@@ -264,6 +272,7 @@ export default function useMasterDataHook() {
     disabling,
     confirmDisable,
     refresh: () => {
+      if (!selectedType) return;
       if (isNestedMasterDataType(selectedType)) {
         setNestedRefreshKey((k) => k + 1);
         return;

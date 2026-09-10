@@ -1,5 +1,6 @@
 import { OPERATION_STATUS } from "../../operationStatus";
 import { normalizeMotorStage } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
+import type { StageProgress } from "../../../data/models/user/BatchStageTypes";
 
 export type DispatchBatch = {
   id: number | string;
@@ -17,8 +18,9 @@ export type DispatchBatch = {
   formId?: string | null;
   rejectionReason?: string | null;
   /** Used by previous-stage gate when opening the form. */
-  stageProgress?: unknown;
-  currentStage?: string | null;
+  stageProgress?: StageProgress[] | null;
+  currentStage?: StageProgress[] | null;
+  parallelFlowEnabled?: boolean | null;
 };
 
 export type DispatchStageOption = {

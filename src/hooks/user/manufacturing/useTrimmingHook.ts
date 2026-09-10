@@ -39,12 +39,19 @@ import { useCuringMotorStages } from "./useCuringMotorStages";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import {
   isMotorEnabledByPreviousStage,
-  isMotorEnabledForWorkflow,
+  isMotorEnabledForWorkflowWithBatch,
   resolvePreviousStageApprovedUnits,
   type PreviousStageApprovedUnits,
 } from "../previousStageApproval";
 import { useFileService } from "../../../hooks/useFileService";
 import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
+import { handleBatchInvalidState } from "../../../utils/batchInvalidStateHandler";
+import {
+  fetchEnrichedBatchStageFields,
+  mergeBatchStageFields,
+  SUB_DEPT,
+  usesParallelUnitLocks,
+} from "../../../utils/batchStageUtils";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -334,6 +341,19 @@ export const useTrimmingHook = () => {
     return fallbackMessage;
   };
 
+  const refreshBatchLocks = useCallback(
+    async (batchId: string) => {
+      await listParams.refreshUserBatches();
+      const enriched = await fetchEnrichedBatchStageFields(batchId);
+      if (enriched) {
+        setActiveBatch((prev) => (prev?.batchId === batchId ? { ...prev, ...enriched } : prev));
+      }
+      bumpBatchRefresh();
+      return enriched;
+    },
+    [bumpBatchRefresh, listParams],
+  );
+
   const openFormWithResolvedData = useCallback(
     async (
       batch: TrimmingBatch,
@@ -363,18 +383,21 @@ export const useTrimmingHook = () => {
           try {
             const batchDetails = await batchManagementController.getBatchById(batch.batchId);
             autoMotorEntries = resolveBatchMotorEntries(batch, batchDetails);
-            nextBatch = {
-              ...batch,
-              motorIds: batchDetails?.motorIds?.length
-                ? batchDetails.motorIds.map(String)
-                : batch.motorIds,
-              motorId:
-                batchDetails?.motorIds?.length > 0
-                  ? batchDetails.motorIds.join(", ")
-                  : batch.motorId,
-              stageProgress: batchDetails?.stageProgress ?? batch.stageProgress,
-              currentStage: batchDetails?.currentStage ?? batch.currentStage,
-            };
+            nextBatch = mergeBatchStageFields(
+              {
+                ...batch,
+                motorIds: batchDetails?.motorIds?.length
+                  ? batchDetails.motorIds.map(String)
+                  : batch.motorIds,
+                motorId:
+                  batchDetails?.motorIds?.length > 0
+                    ? batchDetails.motorIds.join(", ")
+                    : batch.motorId,
+                stageProgress: batchDetails?.stageProgress ?? batch.stageProgress,
+                currentStage: batchDetails?.currentStage ?? batch.currentStage,
+              },
+              batchDetails as Record<string, unknown>,
+            );
           } catch (error) {
             console.error("Unable to resolve batch motor details", error);
           }
@@ -559,7 +582,9 @@ export const useTrimmingHook = () => {
   const checkMotorEditable = useCallback(
     (motorId: string) => {
       if (
-        !isMotorEnabledForWorkflow(
+        !isMotorEnabledForWorkflowWithBatch(
+          activeBatch,
+          subDepartmentId ?? SUB_DEPT.TRIMMING,
           motorId,
           addedMotors.map((motor) => motor.motorId),
           previousStageGate,
@@ -570,7 +595,7 @@ export const useTrimmingHook = () => {
       }
       return isTrimmingMotorEditable(getMotorStatus(motorId));
     },
-    [addedMotors, getMotorStatus, previousStageGate],
+    [activeBatch, addedMotors, getMotorStatus, previousStageGate, subDepartmentId],
   );
 
   const submitMotor = useCallback(
@@ -583,14 +608,21 @@ export const useTrimmingHook = () => {
       }
 
       if (
-        !isMotorEnabledForWorkflow(
+        !isMotorEnabledForWorkflowWithBatch(
+          activeBatch,
+          subDepartmentId ?? SUB_DEPT.TRIMMING,
           motorId,
           addedMotors.map((motor) => motor.motorId),
           previousStageGate,
           getMotorStatus,
         )
       ) {
-        showAlert(STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED, "warning");
+        showAlert(
+          activeBatch && usesParallelUnitLocks(activeBatch)
+            ? STRINGS.MANUFACTURING.NOT_YET_UNLOCKED
+            : STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED,
+          "warning",
+        );
         return false;
       }
 
@@ -677,6 +709,12 @@ export const useTrimmingHook = () => {
         }
 
         if (!response?.success) {
+          const handled = await handleBatchInvalidState(
+            response,
+            () => refreshBatchLocks(activeBatch.batchId),
+            showAlert,
+          );
+          if (handled) return false;
           showAlert(
             getErrorMessage(response, isCreateFlow ? S.CREATE_FAILED : S.UPDATE_FAILED),
             "error",
@@ -685,7 +723,16 @@ export const useTrimmingHook = () => {
         }
 
         const nextFormId = response.data?.formId ?? activeBatch.formId ?? null;
-        setActiveBatch((prev) => (prev ? { ...prev, formId: nextFormId } : prev));
+        const enriched = await refreshBatchLocks(activeBatch.batchId);
+        setActiveBatch((prev) =>
+          prev
+            ? {
+                ...prev,
+                formId: nextFormId,
+                ...(enriched ?? {}),
+              }
+            : prev,
+        );
         setHasSavedDraft(true);
 
         const nextStatus: TrimmingMotorSubmissionStatus =
@@ -763,6 +810,14 @@ export const useTrimmingHook = () => {
         }
 
         return true;
+      } catch (error) {
+        const handled = await handleBatchInvalidState(
+          error,
+          () => refreshBatchLocks(activeBatch.batchId),
+          showAlert,
+        );
+        if (handled) return false;
+        throw error;
       } finally {
         setActionLoading(false);
       }
@@ -776,6 +831,7 @@ export const useTrimmingHook = () => {
       motorStatusById,
       openFormWithResolvedData,
       previousStageGate,
+      refreshBatchLocks,
       selectedMotorStage,
       showAlert,
       subDepartmentId,

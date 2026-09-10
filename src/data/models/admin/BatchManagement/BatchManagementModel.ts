@@ -5,9 +5,14 @@
 
 import { icons } from "@app/theme/icons";
 import type { MaterialsListGrade, MaterialsListItem } from "../../user/MaterialsListModel";
+import type { StageProgress } from "../../user/BatchStageTypes";
 import type { RawMaterialLotListRow } from "../../user/RawMaterialProcurementModel";
 import { formatToIsoDateInput, formatToUiDate } from "../../../../utils/dateUtils";
 import type { AdminBatchEditMode } from "@utils/batchManagementUtils";
+import {
+  normalizeStageProgressArray,
+  parseParallelFlowEnabled,
+} from "../../../../utils/batchStageUtils";
 
 /** Map display / list labels to form/API enum values */
 function normalizeBatchTypeForForm(raw: string | undefined | null): string {
@@ -403,8 +408,9 @@ export class BatchListItemModel {
   articles: SubscaleArticleRead[];
 
   /** Workflow stage arrays from batch details / list (partial-approval gating). */
-  currentStage: unknown[] | null;
-  stageProgress: unknown[] | null;
+  currentStage: StageProgress[] | null;
+  stageProgress: StageProgress[] | null;
+  parallelFlowEnabled: boolean | null;
 
   /**
    * QC Division statuses from batch details (when present).
@@ -503,8 +509,9 @@ export class BatchListItemModel {
     this.identificationSheet = data.identificationSheet
       ? parseIdentificationSheetFromApi(data.identificationSheet)
       : null;
-    this.currentStage = Array.isArray(data.currentStage) ? data.currentStage : null;
-    this.stageProgress = Array.isArray(data.stageProgress) ? data.stageProgress : null;
+    this.currentStage = normalizeStageProgressArray(data.currentStage);
+    this.stageProgress = normalizeStageProgressArray(data.stageProgress);
+    this.parallelFlowEnabled = parseParallelFlowEnabled(data.parallelFlowEnabled);
     this.divisionStatuses = Array.isArray(data.divisionStatuses) ? data.divisionStatuses : null;
     this.mixingCycle =
       data.mixingCycle && typeof data.mixingCycle === "object" ? data.mixingCycle : null;

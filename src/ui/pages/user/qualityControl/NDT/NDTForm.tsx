@@ -24,6 +24,7 @@ import {
   buildMotorNavGateHelpers,
   type PreviousStageApprovedUnits,
 } from "../../../../../hooks/user/previousStageApproval";
+import { SUB_DEPT } from "../../../../../utils/batchStageUtils";
 import { generalController } from "../../../../../controllers/admin/common/generalController";
 import PremixStatusChip from "../../manufacturing/RawMaterial/components/PremixStatusChip";
 import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
@@ -115,8 +116,9 @@ const NDTForm = ({
     return buildMotorNavGateHelpers(motorCards, previousStageGate, resolveMotorStatus, {
       previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
       sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
-    });
-  }, [motorCards, previousStageGate, getMotorStatus, motorStatusById]);
+      notYetUnlocked: STRINGS.MANUFACTURING.NOT_YET_UNLOCKED,
+    }, batch, SUB_DEPT.NDT);
+  }, [batch, motorCards, previousStageGate, getMotorStatus, motorStatusById]);
 
   const safeBeamEnergies = Array.isArray(formData.beamEnergies) ? formData.beamEnergies : [];
   const safeEquipment = useMemo(() => {

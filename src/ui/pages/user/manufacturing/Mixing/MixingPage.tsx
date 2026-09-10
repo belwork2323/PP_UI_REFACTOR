@@ -94,6 +94,7 @@ const MixingPage = () => {
             getMixCardStatus={getMixCardStatus}
             isMixCardEditable={isMixCardEditable}
             previousStageGate={previousStageGate}
+            batchStageContext={activeBatch}
             actionLoading={actionLoading}
             onSaveMixCardDraft={(stageType, cardNo) => {
               setPendingMixCard({ stageType, cardNo });

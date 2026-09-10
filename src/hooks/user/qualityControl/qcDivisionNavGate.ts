@@ -2,6 +2,7 @@ import {
   normalizePartialItemStatus,
   type QcPartialItemStatus,
 } from "./qcDivisionApprovalUnits";
+import type { StageProgressEntry } from "../previousStageApproval";
 import {
   formatQcDivisionGateLabel,
   normalizeQcDivisionKey,
@@ -52,13 +53,6 @@ const normalizeNameKey = (value: unknown) =>
 const isQcDivisionStageName = (subDepartmentName: string) => {
   const name = normalizeNameKey(subDepartmentName);
   return name === "qualitycontrol" || name === "qcdivision" || name === "qc";
-};
-
-type StageProgressEntry = {
-  subDepartmentName?: string | null;
-  premixStatuses?: unknown;
-  finalMixStatuses?: unknown;
-  motorStatuses?: unknown;
 };
 
 const asStageEntries = (stages: unknown): StageProgressEntry[] => {

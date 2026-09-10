@@ -40,10 +40,17 @@ import {
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import {
   isMotorEnabledByPreviousStage,
-  isMotorEnabledForWorkflow,
+  isMotorEnabledForWorkflowWithBatch,
   resolvePreviousStageApprovedUnits,
   type PreviousStageApprovedUnits,
 } from "../previousStageApproval";
+import { handleBatchInvalidState } from "../../../utils/batchInvalidStateHandler";
+import {
+  fetchEnrichedBatchStageFields,
+  mergeBatchStageFields,
+  SUB_DEPT,
+  usesParallelUnitLocks,
+} from "../../../utils/batchStageUtils";
 import { QUALITY_CONTROL_STATUS } from "./qualityControlWorkflowData";
 import {
   resolveNDTMotorCountLimit,
@@ -287,6 +294,19 @@ export const useNDTHook = () => {
     return fallbackMessage;
   };
 
+  const refreshBatchLocks = useCallback(
+    async (batchId: string) => {
+      await listParams.refreshUserBatches();
+      const enriched = await fetchEnrichedBatchStageFields(batchId);
+      if (enriched) {
+        setActiveBatch((prev) => (prev?.batchId === batchId ? { ...prev, ...enriched } : prev));
+      }
+      bumpBatchRefresh();
+      return enriched;
+    },
+    [bumpBatchRefresh, listParams],
+  );
+
   const handleLoadNDTForm = useCallback(
     (targetMotorId?: string) => {
       if (!activeBatch || !targetMotorId) return false;
@@ -377,18 +397,21 @@ export const useNDTHook = () => {
                 .filter((motor) => String(motor.motorId ?? "").trim())
                 .map((motor) => [motor.motorId, motor]),
             );
-            nextBatch = {
-              ...batch,
-              motorIds: batchDetails?.motorIds?.length
-                ? batchDetails.motorIds.map(String)
-                : (batch as any).motorIds,
-              motorId:
-                batchDetails?.motorIds?.length > 0
-                  ? batchDetails.motorIds.join(", ")
-                  : batch.motorId,
-              stageProgress: batchDetails?.stageProgress ?? (batch as any).stageProgress,
-              currentStage: batchDetails?.currentStage ?? (batch as any).currentStage,
-            } as NDTBatch;
+            nextBatch = mergeBatchStageFields(
+              {
+                ...batch,
+                motorIds: batchDetails?.motorIds?.length
+                  ? batchDetails.motorIds.map(String)
+                  : (batch as any).motorIds,
+                motorId:
+                  batchDetails?.motorIds?.length > 0
+                    ? batchDetails.motorIds.join(", ")
+                    : batch.motorId,
+                stageProgress: batchDetails?.stageProgress ?? (batch as any).stageProgress,
+                currentStage: batchDetails?.currentStage ?? (batch as any).currentStage,
+              },
+              batchDetails as Record<string, unknown>,
+            ) as NDTBatch;
           } catch (error) {
             console.error("Unable to resolve batch motor details", error);
             autoMotorEntries = resolveBatchMotorEntries(batch, null);
@@ -629,7 +652,9 @@ export const useNDTHook = () => {
   const checkMotorEditable = useCallback(
     (motorId: string) => {
       if (
-        !isMotorEnabledForWorkflow(
+        !isMotorEnabledForWorkflowWithBatch(
+          activeBatch,
+          subDepartmentId ?? SUB_DEPT.NDT,
           motorId,
           addedMotors.map((motor) => motor.motorId),
           previousStageGate,
@@ -640,7 +665,7 @@ export const useNDTHook = () => {
       }
       return isNDTMotorEditable(getMotorStatus(motorId));
     },
-    [addedMotors, getMotorStatus, previousStageGate],
+    [activeBatch, addedMotors, getMotorStatus, previousStageGate, subDepartmentId],
   );
 
   const submitMotor = useCallback(
@@ -653,14 +678,21 @@ export const useNDTHook = () => {
       }
 
       if (
-        !isMotorEnabledForWorkflow(
+        !isMotorEnabledForWorkflowWithBatch(
+          activeBatch,
+          subDepartmentId ?? SUB_DEPT.NDT,
           motorId,
           addedMotors.map((motor) => motor.motorId),
           previousStageGate,
           getMotorStatus,
         )
       ) {
-        showAlert(STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED, "warning");
+        showAlert(
+          activeBatch && usesParallelUnitLocks(activeBatch)
+            ? STRINGS.MANUFACTURING.NOT_YET_UNLOCKED
+            : STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED,
+          "warning",
+        );
         return false;
       }
 
@@ -752,6 +784,12 @@ export const useNDTHook = () => {
         }
 
         if (!response?.success) {
+          const handled = await handleBatchInvalidState(
+            response,
+            () => refreshBatchLocks(activeBatch.batchId),
+            showAlert,
+          );
+          if (handled) return false;
           showAlert(
             getErrorMessage(
               response,
@@ -763,7 +801,16 @@ export const useNDTHook = () => {
         }
 
         const nextFormId = response.data?.formId ?? activeBatch.formId ?? null;
-        setActiveBatch((prev) => (prev ? { ...prev, formId: nextFormId } : prev));
+        const enriched = await refreshBatchLocks(activeBatch.batchId);
+        setActiveBatch((prev) =>
+          prev
+            ? {
+                ...prev,
+                formId: nextFormId,
+                ...(enriched ?? {}),
+              }
+            : prev,
+        );
         setHasSavedDraft(true);
 
         const nextStatus: NDTMotorSubmissionStatus =
@@ -842,6 +889,14 @@ export const useNDTHook = () => {
         }
 
         return true;
+      } catch (error) {
+        const handled = await handleBatchInvalidState(
+          error,
+          () => refreshBatchLocks(activeBatch.batchId),
+          showAlert,
+        );
+        if (handled) return false;
+        throw error;
       } finally {
         setActionLoading(false);
       }
@@ -855,6 +910,7 @@ export const useNDTHook = () => {
       motorStatusById,
       openFormWithResolvedData,
       previousStageGate,
+      refreshBatchLocks,
       showAlert,
       subDepartmentId,
     ],

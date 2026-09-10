@@ -11,8 +11,11 @@ import { OPERATION_STATUS } from "../../operationStatus";
 import {
   buildMotorNavGateHelpers,
   isMotorEnabledForWorkflow,
+  isMotorEnabledForWorkflowWithBatch,
+  type BatchStageContext,
   type PreviousStageApprovedUnits,
 } from "../previousStageApproval";
+import { SUB_DEPT } from "../../../utils/batchStageUtils";
 import { mapApprovedMotorsToOptions as mapTrimmingApprovedMotorsToOptions } from "../manufacturing/trimmingFlowConfig";
 import {
   isQcExperimentalSubBatch as isStfExperimentalSubBatch,
@@ -583,6 +586,8 @@ export const isStfMotorEnabledForWorkflow = (
   options: {
     facilityType: "ACEM" | "OTHER_BEM";
     subType?: StfSubType | string | null;
+    batchContext?: BatchStageContext | null;
+    subDepartmentId?: number | null;
   },
 ): boolean => {
   if (options.facilityType === "OTHER_BEM") return true;
@@ -593,7 +598,14 @@ export const isStfMotorEnabledForWorkflow = (
     .map((entry) => String(entry.motorId ?? "").trim())
     .filter(Boolean);
 
-  return isMotorEnabledForWorkflow(motorId, mainMotorIds, gate, getStatus);
+  return isMotorEnabledForWorkflowWithBatch(
+    options.batchContext,
+    options.subDepartmentId ?? SUB_DEPT.STF,
+    motorId,
+    mainMotorIds,
+    gate,
+    getStatus,
+  );
 };
 
 export const buildStfMotorNavGateHelpers = (
@@ -603,8 +615,11 @@ export const buildStfMotorNavGateHelpers = (
   facilityType: "ACEM" | "OTHER_BEM",
   messages: {
     previousStage?: string;
+    notYetUnlocked?: string;
     sequential?: string;
   } = {},
+  batchContext?: BatchStageContext | null,
+  subDepartmentId?: number | null,
 ) => {
   const mainMotorCards = motorCards.filter(
     (entry) => String(entry.subType ?? "").toUpperCase() !== "BEM",
@@ -614,6 +629,8 @@ export const buildStfMotorNavGateHelpers = (
     previousStageGate,
     resolveMotorStatus,
     messages,
+    batchContext,
+    subDepartmentId ?? SUB_DEPT.STF,
   );
 
   const resolveMainMotorIndex = (index: number) => {

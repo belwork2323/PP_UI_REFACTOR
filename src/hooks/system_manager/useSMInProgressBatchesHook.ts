@@ -8,6 +8,10 @@ import {
 } from "../../data/models/approver/ApproverBatchListModel";
 import { STRINGS } from "../../app/config/strings";
 import { BatchTab } from "../admin/Dashboard/useDashboardHook";
+import {
+  formatCurrentStageLabels,
+  normalizeStageProgressArray,
+} from "../../utils/batchStageUtils";
 
 type ActiveBatchLike = Record<string, any>;
 
@@ -63,6 +67,7 @@ const mapActiveBatchToRow = (
   const stageKey = toStageKey(department);
   const subDeptName = String(
     batch.firstSubDept ||
+      formatCurrentStageLabels(normalizeStageProgressArray(batch.currentStage)) ||
       (Array.isArray(batch.subDepartments) && batch.subDepartments[0]?.subDepartmentName) ||
       "",
   ).trim();

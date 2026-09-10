@@ -1,5 +1,6 @@
 import type { NDTRadiographyPlanRow } from "../../../data/models/user/NDTFormModel";
 import type { NDTFormState } from "../../../data/models/user/NDTFormModel";
+import type { StageProgress } from "../../../data/models/user/BatchStageTypes";
 
 export type NDTBatch = {
   id: number | string;
@@ -15,8 +16,9 @@ export type NDTBatch = {
   formId?: string | null;
   draftData?: NDTFormState | null;
   rejectionReason?: string | null;
-  stageProgress?: unknown;
-  currentStage?: string | null;
+  stageProgress?: StageProgress[] | null;
+  currentStage?: StageProgress[] | null;
+  parallelFlowEnabled?: boolean | null;
 };
 
 export const NDT_EQUIPMENT_OPTIONS = [

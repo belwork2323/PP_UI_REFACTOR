@@ -30,6 +30,7 @@ import {
   STF_FLOW_LABELS,
 } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
 import type { PreviousStageApprovedUnits } from "../../../../../hooks/user/previousStageApproval";
+import { SUB_DEPT } from "../../../../../utils/batchStageUtils";
 import PremixStatusChip from "../../manufacturing/RawMaterial/components/PremixStatusChip";
 import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
 import ViewStatusButton from "../../../../components/common/ViewStatusButton";
@@ -157,9 +158,10 @@ const StaticTestFacilityForm = ({
     () =>
       buildStfMotorNavGateHelpers(motorCards, previousStageGate, resolveMotorStatus, "ACEM", {
         previousStage: S.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
+        notYetUnlocked: STRINGS.MANUFACTURING.NOT_YET_UNLOCKED,
         sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
-      }),
-    [motorCards, previousStageGate, resolveMotorStatus],
+      }, batch, SUB_DEPT.STF),
+    [batch, motorCards, previousStageGate, resolveMotorStatus],
   );
 
   const hasMotors = motorCards.length > 0;

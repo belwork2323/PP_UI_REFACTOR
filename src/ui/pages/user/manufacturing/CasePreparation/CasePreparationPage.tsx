@@ -40,6 +40,7 @@ const CasePreparationPage = () => {
     motorStatusById,
     getMotorStatus,
     isMotorEditable,
+    previousStageGate,
     schemaLoading,
     schemaError,
     subDepartmentId,
@@ -118,6 +119,7 @@ const CasePreparationPage = () => {
             motorStatusById={motorStatusById}
             getMotorStatus={getMotorStatus}
             isMotorEditable={isMotorEditable}
+            previousStageGate={previousStageGate}
             schemaLoading={schemaLoading}
             schemaError={schemaError}
             subDepartmentId={subDepartmentId}

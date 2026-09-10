@@ -38,11 +38,9 @@ const TYPE_NOUN: Record<string, string> = {
   "qc-divisions": "QC divisions",
 };
 
-const FILTER_OPTIONS = [
-  { value: "ALL", label: S.TOOLBAR.FILTER_ALL },
-  { value: "ACTIVE", label: S.TOOLBAR.FILTER_ACTIVE },
-  { value: "INACTIVE", label: S.TOOLBAR.FILTER_INACTIVE },
-];
+const stripMasterTypeSuffix = (label: string) => label.replace(/\s+Master$/i, "").trim();
+
+type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE";
 
 const MasterDataPage = () => {
   const mode = useThemeStore((s) => s.mode);
@@ -55,15 +53,35 @@ const MasterDataPage = () => {
   );
 
   const isNested = isNestedMasterDataType(hook.selectedType);
+  const typeSelected = Boolean(hook.selectedType);
   const noun = TYPE_NOUN[hook.selectedType] || "records";
   const total = hook.loadingList && !isNested ? S.PAGE.LOADING_PLACEHOLDER : hook.stats.total;
   const active = hook.loadingList && !isNested ? S.PAGE.LOADING_PLACEHOLDER : hook.stats.active;
   const inactive = hook.loadingList && !isNested ? S.PAGE.LOADING_PLACEHOLDER : hook.stats.inactive;
 
   const typeOptions = useMemo(
-    () => hook.types.map((type) => ({ value: type.type, label: type.label })),
+    () =>
+      hook.types.map((type) => ({
+        value: type.type,
+        label: stripMasterTypeSuffix(type.label),
+      })),
     [hook.types],
   );
+
+  const statusChipProps = (filter: StatusFilter, color?: "success" | "default") => {
+    const selected = hook.activeFilter === filter;
+    return {
+      size: "small" as const,
+      variant: selected ? ("filled" as const) : ("outlined" as const),
+      color,
+      onClick: () => hook.setActiveFilter(filter),
+      sx: {
+        ...t.statusChip,
+        cursor: "pointer",
+        ...(selected ? { boxShadow: 1 } : { opacity: 0.9 }),
+      },
+    };
+  };
 
   return (
     <Box sx={t.page}>
@@ -77,44 +95,31 @@ const MasterDataPage = () => {
             options={typeOptions}
             disabled={hook.loadingTypes}
             onChange={(value) => hook.setSelectedType(value)}
-            placeholder={S.PAGE.TYPE_LABEL}
-          />
-        </Box>
-
-        <Box sx={t.toolbarFilterSelect}>
-          <AppDropdown
-            label={S.TOOLBAR.FILTER_STATUS_LABEL}
-            value={hook.activeFilter}
-            options={FILTER_OPTIONS}
-            onChange={(value) =>
-              hook.setActiveFilter(value as "ALL" | "ACTIVE" | "INACTIVE")
-            }
+            placeholder={S.PAGE.TYPE_PLACEHOLDER}
           />
         </Box>
 
         <RefreshIconButton
           onClick={hook.refresh}
-          disabled={hook.loadingList}
+          disabled={!typeSelected || hook.loadingList}
           tooltip="Refresh"
           icon={<icons.projectMgmt.refresh />}
         />
       </Box>
 
+      {typeSelected ? (
       <Box sx={t.content}>
         <Box sx={t.statusRowAboveTable}>
-          <Chip size="small" variant="outlined" sx={t.statusChip} label={S.PAGE.STAT_TOTAL(noun, total)} />
           <Chip
-            size="small"
-            color="success"
-            variant="outlined"
-            sx={t.statusChip}
+            {...statusChipProps("ALL")}
+            label={S.PAGE.STAT_TOTAL(noun, total)}
+          />
+          <Chip
+            {...statusChipProps("ACTIVE", "success")}
             label={S.PAGE.STAT_ACTIVE(noun, active)}
           />
           <Chip
-            size="small"
-            color="default"
-            variant="outlined"
-            sx={t.statusChip}
+            {...statusChipProps("INACTIVE", "default")}
             label={S.PAGE.STAT_INACTIVE(noun, inactive)}
           />
         </Box>
@@ -201,6 +206,7 @@ const MasterDataPage = () => {
           </>
         )}
       </Box>
+      ) : null}
 
       {!isNested ? (
         <ConfirmAlertDialog

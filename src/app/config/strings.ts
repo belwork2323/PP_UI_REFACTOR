@@ -1181,6 +1181,7 @@ export const STRINGS = {
       "Select a process below to view detailed information and manage its operations.",
     PREVIOUS_STAGE_UNIT_DISABLED:
       "This unit was not approved in the previous stage and cannot be filled yet.",
+    NOT_YET_UNLOCKED: "This unit is not yet unlocked.",
     PREVIOUS_STAGE_PREMIX_TAB_DISABLED: "This premix was not approved in Raw Material Preparation.",
     PREVIOUS_STAGE_MOTOR_TAB_DISABLED: "This motor was not approved in the previous stage.",
     SEQUENTIAL_UNIT_TAB_DISABLED: "Complete approval for the previous unit before continuing.",
@@ -2015,6 +2016,8 @@ export const STRINGS = {
       SUBMIT_FOR_FINAL_APPROVAL: "Submit for Final Approval",
       MOTOR_LOCKED_WAITING: "This motor is waiting for approval and cannot be edited.",
       MOTOR_LOCKED_APPROVED: "This motor has been approved and cannot be edited.",
+      UPSTREAM_MIXING_SUBMIT_DISABLED: (pending: string) =>
+        `Submit is disabled until all Raw Material Preparation premixes and Mixing premix/final mix units are approved. Pending: ${pending}.`,
       MOTOR_DRAFT_CONFIRM_TITLE: "Save motor as draft?",
       MOTOR_DRAFT_CONFIRM_MESSAGE: (motorId: string) =>
         `Save draft for motor ${motorId}? You can continue editing later.`,
@@ -3583,19 +3586,20 @@ export const STRINGS = {
   /* -------- ADMIN MASTER DATA -------- */
   MASTER_DATA: {
     PAGE: {
-      TITLE: "Master Data",
-      SUBTITLE: "Manage equipment and facility lookup values used across forms",
+      TITLE: "Master Data Management",
+      SUBTITLE: "Manage all types of Master Data",
       NEW_BUTTON: "Add record",
       LOADING_PLACEHOLDER: "…",
-      TYPE_LABEL: "Master type",
-      TYPE_PLACEHOLDER: "Select master type",
+      TYPE_LABEL: "Select Master Type",
+      TYPE_PLACEHOLDER: "Select Master Type",
       STAT_TOTAL: (noun: string, count: number | string) => `Total ${noun}: ${count}`,
       STAT_ACTIVE: (noun: string, count: number | string) => `Active ${noun}: ${count}`,
       STAT_INACTIVE: (noun: string, count: number | string) => `Inactive ${noun}: ${count}`,
     },
     TOOLBAR: {
       SEARCH_PLACEHOLDER: "Search by code or name…",
-      FILTER_STATUS_LABEL: "Status",
+      FILTER_STATUS_LABEL: "Select Status",
+      STATUS_PLACEHOLDER: "Select Status",
       FILTER_ALL: "All",
       FILTER_ACTIVE: "Active",
       FILTER_INACTIVE: "Inactive",

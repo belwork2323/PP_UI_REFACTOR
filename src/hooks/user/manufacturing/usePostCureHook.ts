@@ -40,13 +40,20 @@ import { isManufacturingContinueFillingStatus } from "../../../hooks/operationSt
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import {
   isMotorEnabledByPreviousStage,
-  isMotorEnabledForWorkflow,
+  isMotorEnabledForWorkflowWithBatch,
   pickFirstPreviousStageEnabledMotorId,
   resolvePreviousStageApprovedUnits,
   type PreviousStageApprovedUnits,
 } from "../previousStageApproval";
 import { useFileService } from "../../../hooks/useFileService";
 import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
+import { handleBatchInvalidState } from "../../../utils/batchInvalidStateHandler";
+import {
+  fetchEnrichedBatchStageFields,
+  mergeBatchStageFields,
+  SUB_DEPT,
+  usesParallelUnitLocks,
+} from "../../../utils/batchStageUtils";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -152,6 +159,19 @@ export const usePostCureHook = () => {
     return fallbackMessage;
   };
 
+  const refreshBatchLocks = useCallback(
+    async (batchId: string) => {
+      await listParams.refreshUserBatches();
+      const enriched = await fetchEnrichedBatchStageFields(batchId);
+      if (enriched) {
+        setActiveBatch((prev) => (prev?.batchId === batchId ? { ...prev, ...enriched } : prev));
+      }
+      bumpBatchRefresh();
+      return enriched;
+    },
+    [bumpBatchRefresh, listParams],
+  );
+
   const openFormWithResolvedData = useCallback(
     async (
       batch: PostCureBatch,
@@ -180,7 +200,10 @@ export const usePostCureHook = () => {
       try {
         try {
           const batchDetails = await batchManagementController.getBatchById(batch.batchId);
-          nextBatch = enrichPostCureBatchFromDetails(batch, batchDetails);
+          nextBatch = mergeBatchStageFields(
+            enrichPostCureBatchFromDetails(batch, batchDetails),
+            batchDetails as Record<string, unknown>,
+          );
         } catch (error) {
           console.error("Unable to resolve post-cure batch motor details", error);
         }
@@ -478,8 +501,25 @@ export const usePostCureHook = () => {
         return false;
       }
 
-      if (!isMotorEnabledByPreviousStage(motorId, previousStageGate)) {
-        showAlert(STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED, "warning");
+      const resolveMotorStatus = (targetMotorId: string) =>
+        motorStatusById[targetMotorId]?.motorSubmissionStatus ?? "TO_BE_INITIATED";
+
+      if (
+        !isMotorEnabledForWorkflowWithBatch(
+          activeBatch,
+          subDepartmentId ?? SUB_DEPT.POST_CURE,
+          motorId,
+          addedMotors.map((motor) => motor.motorId),
+          previousStageGate,
+          resolveMotorStatus,
+        )
+      ) {
+        showAlert(
+          activeBatch && usesParallelUnitLocks(activeBatch)
+            ? STRINGS.MANUFACTURING.NOT_YET_UNLOCKED
+            : STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED,
+          "warning",
+        );
         return false;
       }
 
@@ -548,11 +588,17 @@ export const usePostCureHook = () => {
         }
 
         if (!response?.success) {
+          const handled = await handleBatchInvalidState(
+            response,
+            () => refreshBatchLocks(activeBatch.batchId),
+            showAlert,
+          );
+          if (handled) return false;
           showAlert(getErrorMessage(response, `Failed to ${intent} motor ${motorId}.`), "error");
           return false;
         }
         const nextFormId = String(response.data?.formId ?? activeBatch.formId ?? "").trim();
-        const refreshedBatch: PostCureBatch = {
+        let refreshedBatch: PostCureBatch = {
           ...activeBatch,
           formId: nextFormId || activeBatch.formId,
           pcStatus:
@@ -560,6 +606,11 @@ export const usePostCureHook = () => {
               ? PC_STATUS.IN_PROGRESS
               : (response.data?.status ?? activeBatch.pcStatus),
         };
+
+        const enriched = await refreshBatchLocks(activeBatch.batchId);
+        if (enriched) {
+          refreshedBatch = { ...refreshedBatch, ...enriched };
+        }
 
         setActiveBatch(refreshedBatch);
         setInitialSnapshot(formSnapshot);
@@ -590,17 +641,27 @@ export const usePostCureHook = () => {
         }
 
         return true;
+      } catch (error) {
+        const handled = await handleBatchInvalidState(
+          error,
+          () => refreshBatchLocks(activeBatch.batchId),
+          showAlert,
+        );
+        if (handled) return false;
+        throw error;
       } finally {
         setActionLoading(false);
       }
     },
     [
       activeBatch,
+      addedMotors,
       formData,
       formSnapshot,
       motorStatusById,
       openFormWithResolvedData,
       previousStageGate,
+      refreshBatchLocks,
       resolveRootOperationFields,
       showAlert,
       subDepartmentId,
@@ -626,7 +687,9 @@ export const usePostCureHook = () => {
   const checkMotorEditable = useCallback(
     (motorId: string) => {
       if (
-        !isMotorEnabledForWorkflow(
+        !isMotorEnabledForWorkflowWithBatch(
+          activeBatch,
+          subDepartmentId ?? SUB_DEPT.POST_CURE,
           motorId,
           addedMotors.map((motor) => motor.motorId),
           previousStageGate,
@@ -637,7 +700,7 @@ export const usePostCureHook = () => {
       }
       return isPostCureMotorEditable(getMotorStatus(motorId));
     },
-    [addedMotors, getMotorStatus, previousStageGate],
+    [activeBatch, addedMotors, getMotorStatus, previousStageGate, subDepartmentId],
   );
 
   const handleSubmitForFinalApproval = useCallback(async () => {
