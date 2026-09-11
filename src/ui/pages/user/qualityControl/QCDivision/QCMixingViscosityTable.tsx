@@ -30,6 +30,9 @@ import {
   qcReadOnlyTableHeaderCellSx,
 } from "./components/QCDivisionReadOnlyValue";
 import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import FieldErrorText from "@/ui/components/validation/FieldErrorText";
+import { fieldError } from "@/data/validation/adapters/qcMixing.validation";
 
 const BRAND = QC_DIVISION_BRAND;
 
@@ -58,14 +61,20 @@ type QCMixingViscosityTableProps = {
   values: SchemaFormValues;
   onChange: (values: SchemaFormValues) => void;
   readOnly?: boolean;
+  validationErrors?: Record<string, string> | null;
 };
 
 const QCMixingViscosityTable = ({
   values,
   onChange,
   readOnly = false,
+  validationErrors = null,
 }: QCMixingViscosityTableProps) => {
   const rows = useMemo(() => getViscosityRows(values), [values]);
+  const err = useCallback(
+    (path: string) => fieldError(validationErrors ?? undefined, path),
+    [validationErrors],
+  );
   const baseCellSx = readOnly ? qcReadOnlyBodyCellSx : cellSx;
 
   const updateRows = useCallback(
@@ -102,7 +111,11 @@ const QCMixingViscosityTable = ({
     [rows, updateRows],
   );
 
-  const headerColumns = ["S. No", "Time (min)", "Viscosity Value (P @ 40°C)"];
+  const headerColumns: Array<{ label: string; required?: boolean }> = [
+    { label: "S. No" },
+    { label: "Time (min)", required: true },
+    { label: "Viscosity Value (P @ 40°C)", required: true },
+  ];
 
   return (
     <Box>
@@ -143,17 +156,26 @@ const QCMixingViscosityTable = ({
         >
           <TableHead>
             <TableRow>
-              {headerColumns.map((label) =>
-                readOnly ? (
+              {headerColumns.map(({ label, required }) => {
+                const content = required ? (
+                  <FieldLabelWithAsterisk
+                    label={label}
+                    required
+                    sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+                  />
+                ) : (
+                  label
+                );
+                return readOnly ? (
                   <TableCell key={label} sx={qcReadOnlyTableHeaderCellSx}>
-                    {label}
+                    {content}
                   </TableCell>
                 ) : (
                   <TableCell key={label} sx={TH}>
-                    {label}
+                    {content}
                   </TableCell>
-                ),
-              )}
+                );
+              })}
               {!readOnly ? <TableCell sx={TH} align="center" /> : null}
             </TableRow>
           </TableHead>
@@ -175,28 +197,36 @@ const QCMixingViscosityTable = ({
                   {readOnly ? (
                     <QCDivisionReadOnlyValue value={row.TIME} />
                   ) : (
-                    <TextField
-                      size="small"
-                      fullWidth
-                      type="number"
-                      value={row.TIME ?? ""}
-                      onChange={(event) => updateRow(index, "TIME", event.target.value)}
-                      sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.72rem" } }}
-                    />
+                    <Box>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        type="number"
+                        value={row.TIME ?? ""}
+                        onChange={(event) => updateRow(index, "TIME", event.target.value)}
+                        sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.72rem" } }}
+                        error={Boolean(err(`viscosityRows.${index}.TIME`))}
+                      />
+                      <FieldErrorText message={err(`viscosityRows.${index}.TIME`)} />
+                    </Box>
                   )}
                 </TableCell>
                 <TableCell sx={baseCellSx}>
                   {readOnly ? (
                     <QCDivisionReadOnlyValue value={row.VISCOSITY_VALUE} />
                   ) : (
-                    <TextField
-                      size="small"
-                      fullWidth
-                      type="number"
-                      value={row.VISCOSITY_VALUE ?? ""}
-                      onChange={(event) => updateRow(index, "VISCOSITY_VALUE", event.target.value)}
-                      sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.72rem" } }}
-                    />
+                    <Box>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        type="number"
+                        value={row.VISCOSITY_VALUE ?? ""}
+                        onChange={(event) => updateRow(index, "VISCOSITY_VALUE", event.target.value)}
+                        sx={{ "& .MuiOutlinedInput-root": { fontSize: "0.72rem" } }}
+                        error={Boolean(err(`viscosityRows.${index}.VISCOSITY_VALUE`))}
+                      />
+                      <FieldErrorText message={err(`viscosityRows.${index}.VISCOSITY_VALUE`)} />
+                    </Box>
                   )}
                 </TableCell>
                 {!readOnly ? (

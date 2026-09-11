@@ -71,6 +71,7 @@ export type QCDivisionFormBodyProps = {
   schemaLoading?: boolean;
   divisionAutoPopulateLoading?: boolean;
   schemaError?: string | null;
+  validationErrorsByEntryId?: Record<string, Record<string, string>>;
   onActiveDivisionGroupIndexChange: (index: number) => void;
   onActiveDivisionSubIndexChange: (index: number) => void;
   onDivisionEntryValuesChange: (
@@ -102,6 +103,7 @@ const QCDivisionFormBody = ({
   schemaLoading = false,
   divisionAutoPopulateLoading = false,
   schemaError = null,
+  validationErrorsByEntryId = {},
   hideEntryGroupNav = false,
   activePartialItem = null,
   onActiveDivisionGroupIndexChange,
@@ -476,6 +478,7 @@ const QCDivisionFormBody = ({
                 fieldsDisabled={fieldsDisabled}
                 schemaLoading={schemaLoading}
                 schemaError={schemaError}
+                validationErrors={validationErrorsByEntryId[entry.entryId]}
                 onEntryValuesChange={onDivisionEntryValuesChange}
                 onEntryLiquidValuesChange={onDivisionEntryLiquidValuesChange}
                 onRemoveEntry={onRemoveDivisionEntry}

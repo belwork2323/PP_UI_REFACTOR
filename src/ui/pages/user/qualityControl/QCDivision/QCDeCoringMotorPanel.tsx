@@ -14,6 +14,9 @@ import {
   setDeCoringField,
 } from "../../../../../hooks/user/qualityControl/qcDeCoringTables";
 import { QCDivisionReadOnlyValue } from "./components/QCDivisionReadOnlyValue";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import FieldErrorText from "@/ui/components/validation/FieldErrorText";
+import { fieldError } from "@/data/validation/adapters/qcDeCoring.validation";
 
 const BRAND = QC_DIVISION_BRAND;
 const TABLE_BORDER = alpha(BRAND.primary, 0.18);
@@ -36,11 +39,14 @@ type FieldRowProps = {
   label: string;
   children: ReactNode;
   readOnly?: boolean;
+  required?: boolean;
+  error?: string;
 };
 
-const FieldRow = ({ label, children, readOnly = false }: FieldRowProps) => (
+const FieldRow = ({ label, children, readOnly = false, required = false, error }: FieldRowProps) => (
   <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
     <Typography
+      component="div"
       sx={{
         fontSize: readOnly ? "0.65rem" : "0.72rem",
         fontWeight: readOnly ? 800 : 700,
@@ -50,9 +56,20 @@ const FieldRow = ({ label, children, readOnly = false }: FieldRowProps) => (
         minWidth: { sm: 200 },
       }}
     >
-      {label}
+      {required ? (
+        <FieldLabelWithAsterisk
+          label={label}
+          required
+          sx={{ fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+        />
+      ) : (
+        label
+      )}
     </Typography>
-    <Box sx={{ flex: 1, minWidth: 0 }}>{children}</Box>
+    <Box sx={{ flex: 1, minWidth: 0 }}>
+      {children}
+      {!readOnly ? <FieldErrorText message={error} /> : null}
+    </Box>
   </Stack>
 );
 
@@ -110,6 +127,7 @@ type QCDeCoringMotorPanelProps = {
   readOnly?: boolean;
   disabled?: boolean;
   headerActions?: ReactNode;
+  validationErrors?: Record<string, string> | null;
 };
 
 const QCDeCoringMotorPanel = ({
@@ -119,11 +137,13 @@ const QCDeCoringMotorPanel = ({
   readOnly = false,
   disabled = false,
   headerActions,
+  validationErrors = null,
 }: QCDeCoringMotorPanelProps) => {
   const load = useMemo(() => getDeCoringField(values, "DE_CORING_LOAD"), [values]);
   const dateTime = useMemo(() => getDeCoringField(values, "DE_CORING_DATE_TIME"), [values]);
   const observations = useMemo(() => getDeCoringField(values, "OBSERVATIONS"), [values]);
   const inputsDisabled = disabled || readOnly;
+  const err = (path: string) => fieldError(validationErrors ?? undefined, path);
 
   return (
     <Box
@@ -147,7 +167,12 @@ const QCDeCoringMotorPanel = ({
         readOnly={readOnly}
       >
         <Stack spacing={1.5}>
-          <FieldRow label={QC_DE_CORING_FIELD_LABELS.DE_CORING_LOAD} readOnly={readOnly}>
+          <FieldRow
+            label={QC_DE_CORING_FIELD_LABELS.DE_CORING_LOAD}
+            readOnly={readOnly}
+            required
+            error={err("DE_CORING_LOAD")}
+          >
             {readOnly ? (
               <QCDivisionReadOnlyValue value={load} muted={!load.trim()} />
             ) : (
@@ -161,10 +186,16 @@ const QCDeCoringMotorPanel = ({
                   onChange(setDeCoringField(values, "DE_CORING_LOAD", event.target.value))
                 }
                 sx={tableFieldSx}
+                error={Boolean(err("DE_CORING_LOAD"))}
               />
             )}
           </FieldRow>
-          <FieldRow label={QC_DE_CORING_FIELD_LABELS.DE_CORING_DATE_TIME} readOnly={readOnly}>
+          <FieldRow
+            label={QC_DE_CORING_FIELD_LABELS.DE_CORING_DATE_TIME}
+            readOnly={readOnly}
+            required
+            error={err("DE_CORING_DATE_TIME")}
+          >
             {readOnly ? (
               <QCDivisionReadOnlyValue value={dateTime} muted={!dateTime.trim()} />
             ) : (
@@ -178,7 +209,11 @@ const QCDeCoringMotorPanel = ({
               />
             )}
           </FieldRow>
-          <FieldRow label={QC_DE_CORING_FIELD_LABELS.OBSERVATIONS} readOnly={readOnly}>
+          <FieldRow
+            label={QC_DE_CORING_FIELD_LABELS.OBSERVATIONS}
+            readOnly={readOnly}
+            error={err("OBSERVATIONS")}
+          >
             {readOnly ? (
               <QCDivisionReadOnlyValue value={observations} muted={!observations.trim()} />
             ) : (
@@ -193,6 +228,7 @@ const QCDeCoringMotorPanel = ({
                   onChange(setDeCoringField(values, "OBSERVATIONS", event.target.value))
                 }
                 sx={tableFieldSx}
+                error={Boolean(err("OBSERVATIONS"))}
               />
             )}
           </FieldRow>

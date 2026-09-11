@@ -209,8 +209,13 @@ export const SYSTEM = {
   OVENS: `${API_BASE}/system/ovens`,
   /** GET — NDT / radiography equipment master */
   EQUIPMENT_LIST: `${API_BASE}/system/equipment-list`,
+  EQUIPMENT_TYPE_LIST: `${API_BASE}/system/equipment-type-list`,
   /** GET — NDT / radiography beam energy master */
   ENERGY_BEAM_LIST: `${API_BASE}/system/energy-beam-list`,
+  /** GET — unit master; optional ?category= */
+  UNIT_LIST: `${API_BASE}/system/unit-list`,
+  /** GET — backward-compat alias for ENERGY category */
+  ENERGY_UNIT_LIST: `${API_BASE}/system/energy-unit-list`,
   MIXING_CYCLES: `${API_BASE}/system/mixing-cycles`,
   /** POST body: `{ motorStage: "0" | "1" | "2" | "3" | "ALL" }` (string) */
   MIXING_CYCLE_LIST: `${API_BASE}/system/mixing-cycle-list`,

@@ -35,6 +35,7 @@ type PostCureFileFieldProps = {
   readOnly?: boolean;
   compact?: boolean;
   emptyLabel?: string;
+  required?: boolean;
 };
 
 const acceptForMode = (mode: FileAcceptMode) =>
@@ -56,6 +57,7 @@ const PostCureFileField = ({
   readOnly = false,
   compact = false,
   emptyLabel,
+  required = false,
 }: PostCureFileFieldProps) => {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -109,6 +111,7 @@ const PostCureFileField = ({
         accept={acceptForMode(acceptMode)}
         onChange={onInputChange}
         disabled={locked}
+        required={required}
       />
 
       <Stack spacing={0.75}>
@@ -176,9 +179,7 @@ const PostCureFileField = ({
               </Stack>
               {ref.status === "uploading" ? (
                 <LinearProgress
-                  variant={
-                    typeof ref.uploadProgress === "number" ? "determinate" : "indeterminate"
-                  }
+                  variant={typeof ref.uploadProgress === "number" ? "determinate" : "indeterminate"}
                   value={ref.uploadProgress ?? 0}
                   sx={{ mt: 0.75, height: 3, borderRadius: 1 }}
                 />

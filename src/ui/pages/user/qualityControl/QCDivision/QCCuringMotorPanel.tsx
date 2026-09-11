@@ -53,6 +53,9 @@ import {
   qcReadOnlyTableHeaderCellSx,
 } from "./components/QCDivisionReadOnlyValue";
 import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import FieldErrorText from "@/ui/components/validation/FieldErrorText";
+import { fieldError } from "@/data/validation/adapters/qcCuring.validation";
 
 const BRAND = QC_DIVISION_BRAND;
 const TABLE_BORDER = alpha(BRAND.primary, 0.18);
@@ -119,6 +122,7 @@ type ColumnDef<T> = {
   options?: readonly { value: string; label: string }[];
   placeholder?: string;
   readOnlyColumn?: boolean;
+  required?: boolean;
 };
 
 type EditableTableProps<T extends Record<string, unknown>> = {
@@ -131,6 +135,8 @@ type EditableTableProps<T extends Record<string, unknown>> = {
   allowAdd?: boolean;
   allowDelete?: boolean;
   showSerialNumber?: boolean;
+  validationErrors?: Record<string, string> | null;
+  errorPrefix?: string;
 };
 
 const CuringEditableTable = <T extends Record<string, unknown>>({
@@ -143,6 +149,8 @@ const CuringEditableTable = <T extends Record<string, unknown>>({
   allowAdd = false,
   allowDelete = false,
   showSerialNumber = true,
+  validationErrors = null,
+  errorPrefix = "",
 }: EditableTableProps<T>) => {
   const headerSx = readOnly ? qcReadOnlyTableHeaderCellSx : TH;
   const bodyCellSx = readOnly ? qcReadOnlyBodyCellSx : cellSx;
@@ -292,7 +300,15 @@ const CuringEditableTable = <T extends Record<string, unknown>>({
               {showSerialNumber ? <TableCell sx={headerSx}>S. No</TableCell> : null}
               {columns.map((column) => (
                 <TableCell key={column.id} sx={headerSx}>
-                  {column.label}
+                  {column.required ? (
+                    <FieldLabelWithAsterisk
+                      label={column.label}
+                      required
+                      sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+                    />
+                  ) : (
+                    column.label
+                  )}
                 </TableCell>
               ))}
               {!readOnly && allowDelete ? <TableCell sx={headerSx} align="center" /> : null}
@@ -317,11 +333,18 @@ const CuringEditableTable = <T extends Record<string, unknown>>({
                     {readOnly ? <QCDivisionReadOnlyValue value={index + 1} /> : index + 1}
                   </TableCell>
                 ) : null}
-                {columns.map((column) => (
-                  <TableCell key={column.id} sx={bodyCellSx}>
-                    {renderInput(row, index, column)}
-                  </TableCell>
-                ))}
+                {columns.map((column) => {
+                  const path = errorPrefix
+                    ? `${errorPrefix}.${index}.${column.id}`
+                    : `${index}.${column.id}`;
+                  const message = fieldError(validationErrors ?? undefined, path);
+                  return (
+                    <TableCell key={column.id} sx={bodyCellSx}>
+                      {renderInput(row, index, column)}
+                      {!readOnly ? <FieldErrorText message={message} /> : null}
+                    </TableCell>
+                  );
+                })}
                 {!readOnly && allowDelete ? (
                   <TableCell sx={bodyCellSx} align="center">
                     <IconButton
@@ -372,11 +395,14 @@ type FieldRowProps = {
   label: string;
   children: ReactNode;
   readOnly?: boolean;
+  required?: boolean;
+  error?: string;
 };
 
-const FieldRow = ({ label, children, readOnly = false }: FieldRowProps) => (
+const FieldRow = ({ label, children, readOnly = false, required = false, error }: FieldRowProps) => (
   <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
     <Typography
+      component="div"
       sx={{
         fontSize: readOnly ? "0.65rem" : "0.72rem",
         fontWeight: readOnly ? 800 : 700,
@@ -386,9 +412,20 @@ const FieldRow = ({ label, children, readOnly = false }: FieldRowProps) => (
         minWidth: { sm: 200 },
       }}
     >
-      {label}
+      {required ? (
+        <FieldLabelWithAsterisk
+          label={label}
+          required
+          sx={{ fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+        />
+      ) : (
+        label
+      )}
     </Typography>
-    <Box sx={{ flex: 1, minWidth: 0 }}>{children}</Box>
+    <Box sx={{ flex: 1, minWidth: 0 }}>
+      {children}
+      {!readOnly ? <FieldErrorText message={error} /> : null}
+    </Box>
   </Stack>
 );
 
@@ -492,13 +529,18 @@ const CYCLE_COLUMN_DEFS: Record<
   QcCuringCycleColumnId,
   ColumnDef<QcCuringCycleRow>
 > = {
-  TEMPERATURE: { id: "TEMPERATURE", label: "Temp (°C)", fieldType: "text" },
-  DURATION: { id: "DURATION", label: "Duration (Min.)", fieldType: "number" },
-  START_DATE: { id: "START_DATE", label: "Start Date", fieldType: "date" },
-  START_TIME: { id: "START_TIME", label: "Start Time", fieldType: "time" },
-  END_DATE: { id: "END_DATE", label: "End Date", fieldType: "date" },
-  END_TIME: { id: "END_TIME", label: "End Time", fieldType: "time" },
-  ACTUAL_DURATION: { id: "ACTUAL_DURATION", label: "Actual Duration (Min.)", fieldType: "number" },
+  TEMPERATURE: { id: "TEMPERATURE", label: "Temp (°C)", fieldType: "text", required: true },
+  DURATION: { id: "DURATION", label: "Duration (Min.)", fieldType: "number", required: true },
+  START_DATE: { id: "START_DATE", label: "Start Date", fieldType: "date", required: true },
+  START_TIME: { id: "START_TIME", label: "Start Time", fieldType: "time", required: true },
+  END_DATE: { id: "END_DATE", label: "End Date", fieldType: "date", required: true },
+  END_TIME: { id: "END_TIME", label: "End Time", fieldType: "time", required: true },
+  ACTUAL_DURATION: {
+    id: "ACTUAL_DURATION",
+    label: "Actual Duration (Min.)",
+    fieldType: "number",
+    required: true,
+  },
   PROPELLANT_PRESSURE: {
     id: "PROPELLANT_PRESSURE",
     label: "Propellant Pressure",
@@ -538,11 +580,11 @@ const createEmptyCycleRow = (srNo: number): QcCuringCycleRow => ({
 
 const SUBSCALE_PARAMETER_COLUMNS: ColumnDef<QcCuringSubscaleParameterRow>[] = [
   { id: "ARTICLE_TYPE", label: "Article Type", fieldType: "text", readOnlyColumn: true },
-  { id: "PARAMETER", label: "Parameter", fieldType: "text" },
-  { id: "BEM_NO", label: "BEM No.", fieldType: "text" },
-  { id: "WHEEL_PEEL_NO", label: "Wheel Peel No.", fieldType: "number" },
-  { id: "CARTON_NO", label: "Carton No.", fieldType: "number" },
-  { id: "CONTROL_GRAIN_NO", label: "Control Grain No.", fieldType: "number" },
+  { id: "PARAMETER", label: "Parameter", fieldType: "text", required: true },
+  { id: "BEM_NO", label: "BEM No.", fieldType: "text", required: true },
+  { id: "WHEEL_PEEL_NO", label: "Wheel Peel No.", fieldType: "number", required: true },
+  { id: "CARTON_NO", label: "Carton No.", fieldType: "number", required: true },
+  { id: "CONTROL_GRAIN_NO", label: "Control Grain No.", fieldType: "number", required: true },
 ];
 
 type QCCuringMotorPanelProps = {
@@ -552,6 +594,7 @@ type QCCuringMotorPanelProps = {
   onChange: (values: SchemaFormValues) => void;
   readOnly?: boolean;
   headerActions?: ReactNode;
+  validationErrors?: Record<string, string> | null;
 };
 
 const QCCuringMotorPanel = ({
@@ -561,7 +604,9 @@ const QCCuringMotorPanel = ({
   onChange,
   readOnly = false,
   headerActions,
+  validationErrors = null,
 }: QCCuringMotorPanelProps) => {
+  const err = (path: string) => fieldError(validationErrors ?? undefined, path);
   const curingType = useMemo(
     () => getCuringTypeFromValues(values, curingSubType),
     [curingSubType, values],
@@ -684,20 +729,30 @@ const QCCuringMotorPanel = ({
               label="Date & Time of positioning of rocket motor in Oven"
               readOnly={readOnly}
             >
+              {!readOnly ? (
+                <FieldLabelWithAsterisk
+                  label=""
+                  required
+                  sx={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
+                />
+              ) : null}
               {readOnly ? (
                 <QCDivisionReadOnlyValue
                   value={motorPositioningDateTime}
                   muted={!motorPositioningDateTime.trim()}
                 />
               ) : (
-                <DateTimeField
-                  compact
-                  value={motorPositioningDateTime}
-                  onChange={(next) =>
-                    onChange(setCuringSetupField(values, "MOTOR_POSITIONING_DATE_TIME", next))
-                  }
-                  inputSx={setupDateTimeFieldSx}
-                />
+                <>
+                  <DateTimeField
+                    compact
+                    value={motorPositioningDateTime}
+                    onChange={(next) =>
+                      onChange(setCuringSetupField(values, "MOTOR_POSITIONING_DATE_TIME", next))
+                    }
+                    inputSx={setupDateTimeFieldSx}
+                  />
+                  <FieldErrorText message={err("MOTOR_POSITIONING_DATE_TIME")} />
+                </>
               )}
             </SetupFieldCell>
           </Stack>
@@ -716,6 +771,7 @@ const QCCuringMotorPanel = ({
             readOnly={readOnly}
             allowAdd={!readOnly}
             allowDelete={!readOnly}
+            validationErrors={validationErrors}
           />
         </SectionCard>
 
@@ -724,7 +780,7 @@ const QCCuringMotorPanel = ({
           readOnly={readOnly}
         >
           <Stack spacing={1.5}>
-            <FieldRow label="Visual Observations of cured motor" readOnly={readOnly}>
+            <FieldRow label="Visual Observations of cured motor" readOnly={readOnly} required error={err("VISUAL_OBSERVATIONS")}>
               {renderTextField(
                 visualObservations,
                 (next) => onChange(setCuringPostField(values, "VISUAL_OBSERVATIONS", next)),
@@ -740,7 +796,7 @@ const QCCuringMotorPanel = ({
                 readOnly,
               )}
             </FieldRow>
-            <FieldRow label="Shore A Hardness" readOnly={readOnly}>
+            <FieldRow label="Shore A Hardness" readOnly={readOnly} required error={err("SHORE_A_HARDNESS")}>
               {renderTextField(
                 shoreAHardness,
                 (next) => onChange(setCuringPostField(values, "SHORE_A_HARDNESS", next)),
@@ -748,7 +804,7 @@ const QCCuringMotorPanel = ({
                 { number: true },
               )}
             </FieldRow>
-            <FieldRow label="Date/Time of Dispatch of motor for De-coring" readOnly={readOnly}>
+            <FieldRow label="Date/Time of Dispatch of motor for De-coring" readOnly={readOnly} required error={err("DISPATCH_DATE_TIME")}>
               {renderTextField(
                 dispatchDateTime,
                 (next) => onChange(setCuringPostField(values, "DISPATCH_DATE_TIME", next)),
@@ -784,8 +840,9 @@ const QCCuringMotorPanel = ({
               showSerialNumber={false}
               allowAdd={false}
               allowDelete={false}
+              validationErrors={validationErrors}
             />
-            <FieldRow label="Curing Start Date" readOnly={readOnly}>
+            <FieldRow label="Curing Start Date" readOnly={readOnly} required error={err("CURING_START_DATE")}>
               {readOnly ? (
                 <QCDivisionReadOnlyValue
                   value={curingStartDate}
@@ -803,7 +860,7 @@ const QCCuringMotorPanel = ({
                 />
               )}
             </FieldRow>
-            <FieldRow label="Cycle Start Time" readOnly={readOnly}>
+            <FieldRow label="Cycle Start Time" readOnly={readOnly} required error={err("CYCLE_START_TIME")}>
               {readOnly ? (
                 <QCDivisionReadOnlyValue
                   value={normalizeTimeValue(cycleStartTime)}
@@ -821,7 +878,7 @@ const QCCuringMotorPanel = ({
                 />
               )}
             </FieldRow>
-            <FieldRow label="Curing Complete Date" readOnly={readOnly}>
+            <FieldRow label="Curing Complete Date" readOnly={readOnly} required error={err("CURING_COMPLETE_DATE")}>
               {readOnly ? (
                 <QCDivisionReadOnlyValue
                   value={curingCompleteDate}
@@ -839,7 +896,7 @@ const QCCuringMotorPanel = ({
                 />
               )}
             </FieldRow>
-            <FieldRow label="Cycle End Time" readOnly={readOnly}>
+            <FieldRow label="Cycle End Time" readOnly={readOnly} required error={err("CYCLE_END_TIME")}>
               {readOnly ? (
                 <QCDivisionReadOnlyValue
                   value={normalizeTimeValue(cycleEndTime)}
@@ -857,7 +914,7 @@ const QCCuringMotorPanel = ({
                 />
               )}
             </FieldRow>
-            <FieldRow label="All BEM Average Shore A Hardness" readOnly={readOnly}>
+            <FieldRow label="All BEM Average Shore A Hardness" readOnly={readOnly} required error={err("BEM_AVERAGE_SHORE_A_HARDNESS")}>
               {renderTextField(
                 bemAverageShoreAHardness,
                 (next) =>
@@ -866,7 +923,7 @@ const QCCuringMotorPanel = ({
                 { number: true },
               )}
             </FieldRow>
-            <FieldRow label="All Carton Average Shore A Hardness" readOnly={readOnly}>
+            <FieldRow label="All Carton Average Shore A Hardness" readOnly={readOnly} required error={err("CARTON_AVERAGE_SHORE_A_HARDNESS")}>
               {renderTextField(
                 cartonAverageShoreAHardness,
                 (next) =>
@@ -877,7 +934,7 @@ const QCCuringMotorPanel = ({
                 { number: true },
               )}
             </FieldRow>
-            <FieldRow label="Visual Observations (if any)" readOnly={readOnly}>
+            <FieldRow label="Visual Observations (if any)" readOnly={readOnly} required error={err("SUBSCALE_VISUAL_OBSERVATIONS")}>
               {renderTextField(
                 subscaleVisualObservations,
                 (next) =>

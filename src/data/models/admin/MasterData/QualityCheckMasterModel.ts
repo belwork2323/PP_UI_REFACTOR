@@ -1,5 +1,7 @@
 import {
   emptyMasterDataStats,
+  parseMasterDataAuditFields,
+  type MasterDataAuditFields,
   type MasterDataStats,
 } from "@data/models/admin/MasterData/MasterDataModel";
 import {
@@ -16,7 +18,7 @@ export type QualityCheckParamForm = {
   noOfSamples: number | "";
 };
 
-export type QualityCheckRecord = {
+export type QualityCheckRecord = MasterDataAuditFields & {
   id: string;
   mixType: string;
   motorStage: number;
@@ -61,6 +63,7 @@ const mapParam = (raw: any): QualityCheckParamForm => ({
 
 export const QualityCheckRecordModel = {
   fromApi: (raw: any): QualityCheckRecord => ({
+    ...parseMasterDataAuditFields(raw),
     id: String(raw?.id ?? ""),
     mixType: String(raw?.mixType ?? ""),
     motorStage: Number(raw?.motorStage ?? 0),

@@ -43,6 +43,9 @@ import {
   qcReadOnlyTableHeaderCellSx,
 } from "./components/QCDivisionReadOnlyValue";
 import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import FieldErrorText from "@/ui/components/validation/FieldErrorText";
+import { fieldError } from "@/data/validation/adapters/qcWeighment.validation";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 const BRAND = QC_DIVISION_BRAND;
@@ -134,11 +137,13 @@ const WeightDetailsTable = ({
   onChange,
   readOnly = false,
   disabled = false,
+  validationErrors = null,
 }: {
   rows: QcWeighmentWeightRow[];
   onChange: (rows: QcWeighmentWeightRow[]) => void;
   readOnly?: boolean;
   disabled?: boolean;
+  validationErrors?: Record<string, string> | null;
 }) => {
   const headerSx = readOnly ? qcReadOnlyTableHeaderCellSx : TH;
   const bodyCellSx = readOnly ? qcReadOnlyBodyCellSx : cellSx;
@@ -161,7 +166,13 @@ const WeightDetailsTable = ({
           <TableHead>
             <TableRow>
               <TableCell sx={headerSx}>{QC_WEIGHMENT_FIELD_LABELS.WEIGHT_PARAMETER}</TableCell>
-              <TableCell sx={{ ...headerSx, width: 168 }}>{QC_WEIGHMENT_FIELD_LABELS.WEIGHT_KG}</TableCell>
+              <TableCell sx={{ ...headerSx, width: 168 }}>
+                <FieldLabelWithAsterisk
+                  label={QC_WEIGHMENT_FIELD_LABELS.WEIGHT_KG}
+                  required
+                  sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+                />
+              </TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -194,16 +205,24 @@ const WeightDetailsTable = ({
                     {readOnly || computed ? (
                       <QCDivisionReadOnlyValue value={row.WEIGHT_KG} muted={!row.WEIGHT_KG.trim()} />
                     ) : (
-                      <TextField
-                        size="small"
-                        fullWidth
-                        type="number"
-                        value={row.WEIGHT_KG}
-                        disabled={inputsDisabled}
-                        onChange={(event) => updateWeight(index, event.target.value)}
-                        inputProps={{ step: "any" }}
-                        sx={tableFieldSx}
-                      />
+                      <Box>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          type="number"
+                          value={row.WEIGHT_KG}
+                          disabled={inputsDisabled}
+                          onChange={(event) => updateWeight(index, event.target.value)}
+                          inputProps={{ step: "any" }}
+                          sx={tableFieldSx}
+                          error={Boolean(
+                            fieldError(validationErrors ?? undefined, `${index}.WEIGHT_KG`),
+                          )}
+                        />
+                        <FieldErrorText
+                          message={fieldError(validationErrors ?? undefined, `${index}.WEIGHT_KG`)}
+                        />
+                      </Box>
                     )}
                   </TableCell>
                 </TableRow>
@@ -223,6 +242,7 @@ type QCWeighmentMotorPanelProps = {
   readOnly?: boolean;
   disabled?: boolean;
   headerActions?: ReactNode;
+  validationErrors?: Record<string, string> | null;
 };
 
 const QCWeighmentMotorPanel = ({
@@ -232,8 +252,10 @@ const QCWeighmentMotorPanel = ({
   readOnly = false,
   disabled = false,
   headerActions,
+  validationErrors = null,
 }: QCWeighmentMotorPanelProps) => {
   const inputsDisabled = disabled || readOnly;
+  const err = (path: string) => fieldError(validationErrors ?? undefined, path);
   const weighscaleNo = getWeighmentWeighscaleNo(values);
   const calibrationDueDate = getWeighmentCalibrationDueDate(values);
   const rows = useMemo(() => getWeighmentWeightRows(values), [values]);
@@ -274,42 +296,58 @@ const QCWeighmentMotorPanel = ({
         <Stack spacing={1.5}>
           <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
             <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: BRAND.textSub, mb: 0.4 }}>
-                {S.WEIGHMENT_WEIGHSCALE_NO_LABEL}
+              <Typography component="div" sx={{ fontSize: "0.7rem", fontWeight: 700, color: BRAND.textSub, mb: 0.4 }}>
+                <FieldLabelWithAsterisk
+                  label={S.WEIGHMENT_WEIGHSCALE_NO_LABEL}
+                  required
+                  sx={{ fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+                />
               </Typography>
               {readOnly ? (
                 <QCDivisionReadOnlyValue value={weighscaleNo} muted={!weighscaleNo.trim()} />
               ) : (
-                <TextField
-                  size="small"
-                  fullWidth
-                  value={weighscaleNo}
-                  placeholder={S.WEIGHMENT_WEIGHSCALE_NO_PLACEHOLDER}
-                  disabled={inputsDisabled}
-                  onChange={(event) =>
-                    patchValues((prev) => setWeighmentWeighscaleNo(prev, event.target.value))
-                  }
-                  sx={tableFieldSx}
-                />
+                <Box>
+                  <TextField
+                    size="small"
+                    fullWidth
+                    value={weighscaleNo}
+                    placeholder={S.WEIGHMENT_WEIGHSCALE_NO_PLACEHOLDER}
+                    disabled={inputsDisabled}
+                    onChange={(event) =>
+                      patchValues((prev) => setWeighmentWeighscaleNo(prev, event.target.value))
+                    }
+                    sx={tableFieldSx}
+                    error={Boolean(err("WEIGHSCALE_NO"))}
+                  />
+                  <FieldErrorText message={err("WEIGHSCALE_NO")} />
+                </Box>
               )}
             </Box>
             <Box sx={{ flex: 1 }}>
-              <Typography sx={{ fontSize: "0.7rem", fontWeight: 700, color: BRAND.textSub, mb: 0.4 }}>
-                {S.WEIGHMENT_CALIBRATION_DUE_DATE_LABEL}
+              <Typography component="div" sx={{ fontSize: "0.7rem", fontWeight: 700, color: BRAND.textSub, mb: 0.4 }}>
+                <FieldLabelWithAsterisk
+                  label={S.WEIGHMENT_CALIBRATION_DUE_DATE_LABEL}
+                  required
+                  sx={{ fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+                />
               </Typography>
               {readOnly ? (
                 <QCDivisionReadOnlyValue value={calibrationDueDate} muted={!calibrationDueDate.trim()} />
               ) : (
-                <DateField
-                  compact
-                  value={calibrationDueDate}
-                  disabled={inputsDisabled}
-                  placeholder="DD-MM-YYYY"
-                  onChange={(next) =>
-                    patchValues((prev) => setWeighmentCalibrationDueDate(prev, next))
-                  }
-                  inputSx={tableDateFieldSx}
-                />
+                <Box>
+                  <DateField
+                    compact
+                    value={calibrationDueDate}
+                    disabled={inputsDisabled}
+                    placeholder="DD-MM-YYYY"
+                    onChange={(next) =>
+                      patchValues((prev) => setWeighmentCalibrationDueDate(prev, next))
+                    }
+                    inputSx={tableDateFieldSx}
+                    error={Boolean(err("CALIBRATION_DUE_DATE"))}
+                  />
+                  <FieldErrorText message={err("CALIBRATION_DUE_DATE")} />
+                </Box>
               )}
             </Box>
           </Stack>
@@ -318,6 +356,7 @@ const QCWeighmentMotorPanel = ({
             onChange={(next) => patchValues((prev) => setWeighmentWeightRows(prev, next))}
             readOnly={readOnly}
             disabled={inputsDisabled}
+            validationErrors={validationErrors}
           />
         </Stack>
       </SectionCard>

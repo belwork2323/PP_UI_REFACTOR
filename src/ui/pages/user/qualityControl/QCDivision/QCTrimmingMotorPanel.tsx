@@ -18,6 +18,7 @@ type QCTrimmingMotorPanelProps = {
   readOnly?: boolean;
   disabled?: boolean;
   headerActions?: ReactNode;
+  validationErrors?: Record<string, string> | null;
 };
 
 const QCTrimmingMotorPanel = ({
@@ -27,6 +28,7 @@ const QCTrimmingMotorPanel = ({
   readOnly = false,
   disabled = false,
   headerActions,
+  validationErrors = null,
 }: QCTrimmingMotorPanelProps) => {
   const session = useMemo(() => getTrimmingSessionFromValues(values), [values]);
   const resolvedMotorId = String(motorId ?? "").trim() || "MOTOR";
@@ -106,6 +108,7 @@ const QCTrimmingMotorPanel = ({
           },
         }}
         onMotorSessionChange={handleMotorSessionChange}
+        validationErrors={validationErrors ?? undefined}
       />
     </Box>
   );

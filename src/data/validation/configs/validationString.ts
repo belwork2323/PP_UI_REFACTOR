@@ -18,6 +18,7 @@ export const VALIDATIONSTRING = {
     /** Casting bowl dropdown labels, e.g. "FINAL_MIX 1 / Bowl No.3" */
     CASTING_BOWL_LABEL: /^FINAL[_\s]MIX\s+\S+\s+\/\s*.+$/i,
     ALPHABET_WITH_SPECIAL: /^[A-Za-z0-9\s.,-_()#/:]+$/, // Text, numbers, spaces, and common punctuation for remarks/observations
+    SPECIFICATION_WITH_TOLERANCE: /^[A-Za-z0-9\s.,_()#/:+±-]+$/, // like +-12
   },
 
   LENGTH: {

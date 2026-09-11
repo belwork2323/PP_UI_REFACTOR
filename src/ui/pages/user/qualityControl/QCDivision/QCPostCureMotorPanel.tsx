@@ -50,6 +50,9 @@ import {
   qcReadOnlyTableHeaderCellSx,
 } from "./components/QCDivisionReadOnlyValue";
 import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import FieldErrorText from "@/ui/components/validation/FieldErrorText";
+import { fieldError } from "@/data/validation/adapters/qcPostCure.validation";
 
 const BRAND = QC_DIVISION_BRAND;
 const TABLE_BORDER = alpha(BRAND.primary, 0.18);
@@ -92,11 +95,14 @@ type FieldRowProps = {
   label: string;
   children: ReactNode;
   readOnly?: boolean;
+  required?: boolean;
+  error?: string;
 };
 
-const FieldRow = ({ label, children, readOnly = false }: FieldRowProps) => (
+const FieldRow = ({ label, children, readOnly = false, required = false, error }: FieldRowProps) => (
   <Stack spacing={0.5} sx={{ width: "100%" }}>
     <Typography
+      component="div"
       sx={{
         fontSize: readOnly ? "0.65rem" : "0.72rem",
         fontWeight: readOnly ? 800 : 700,
@@ -105,9 +111,20 @@ const FieldRow = ({ label, children, readOnly = false }: FieldRowProps) => (
         color: readOnly ? BRAND.primary : BRAND.textSub,
       }}
     >
-      {label}
+      {required ? (
+        <FieldLabelWithAsterisk
+          label={label}
+          required
+          sx={{ fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+        />
+      ) : (
+        label
+      )}
     </Typography>
-    <Box sx={{ width: "100%", minWidth: 0 }}>{children}</Box>
+    <Box sx={{ width: "100%", minWidth: 0 }}>
+      {children}
+      {!readOnly ? <FieldErrorText message={error} /> : null}
+    </Box>
   </Stack>
 );
 
@@ -167,13 +184,17 @@ const LocationTable = ({
   columns,
   readOnly = false,
   disabled = false,
+  validationErrors = null,
+  errorPrefix = "",
 }: {
   title: string;
   rows: QcPostCureLocationRow[];
   onChange: (rows: QcPostCureLocationRow[]) => void;
-  columns: Array<{ id: LocationColumnId; label: string }>;
+  columns: Array<{ id: LocationColumnId; label: string; required?: boolean }>;
   readOnly?: boolean;
   disabled?: boolean;
+  validationErrors?: Record<string, string> | null;
+  errorPrefix?: string;
 }) => {
   const headerSx = readOnly ? qcReadOnlyTableHeaderCellSx : TH;
   const bodyCellSx = readOnly ? qcReadOnlyBodyCellSx : cellSx;
@@ -218,7 +239,15 @@ const LocationTable = ({
               <TableCell sx={headerSx}>Sr No</TableCell>
               {columns.map((column) => (
                 <TableCell key={column.id} sx={headerSx}>
-                  {column.label}
+                  {column.required ? (
+                    <FieldLabelWithAsterisk
+                      label={column.label}
+                      required
+                      sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+                    />
+                  ) : (
+                    column.label
+                  )}
                 </TableCell>
               ))}
             </TableRow>
@@ -241,6 +270,10 @@ const LocationTable = ({
                 {columns.map((column) => {
                   const value = String(row[column.id] ?? "");
                   const isStatic = column.id === "LOCATION";
+                  const path = errorPrefix
+                    ? `${errorPrefix}.${index}.${column.id}`
+                    : `${index}.${column.id}`;
+                  const message = fieldError(validationErrors ?? undefined, path);
                   return (
                     <TableCell key={column.id} sx={bodyCellSx}>
                       {readOnly || isStatic ? (
@@ -279,6 +312,7 @@ const LocationTable = ({
                           sx={tableFieldSx}
                         />
                       )}
+                      {!readOnly && !isStatic ? <FieldErrorText message={message} /> : null}
                     </TableCell>
                   );
                 })}
@@ -298,6 +332,8 @@ const QualificationTable = ({
   showQcReport = false,
   readOnly = false,
   disabled = false,
+  validationErrors = null,
+  errorPrefix = "",
 }: {
   title?: string;
   rows: QcPostCureQualificationRow[];
@@ -305,6 +341,8 @@ const QualificationTable = ({
   showQcReport?: boolean;
   readOnly?: boolean;
   disabled?: boolean;
+  validationErrors?: Record<string, string> | null;
+  errorPrefix?: string;
 }) => {
   const headerSx = readOnly ? qcReadOnlyTableHeaderCellSx : TH;
   const bodyCellSx = readOnly ? qcReadOnlyBodyCellSx : cellSx;
@@ -352,9 +390,29 @@ const QualificationTable = ({
             <TableRow>
               <TableCell sx={headerSx}>Sr No</TableCell>
               <TableCell sx={headerSx}>Parameter</TableCell>
-              <TableCell sx={headerSx}>Specification</TableCell>
-              <TableCell sx={headerSx}>Result</TableCell>
-              {showQcReport ? <TableCell sx={headerSx}>Upload QC Report</TableCell> : null}
+              <TableCell sx={headerSx}>
+                <FieldLabelWithAsterisk
+                  label="Specification"
+                  required
+                  sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+                />
+              </TableCell>
+              <TableCell sx={headerSx}>
+                <FieldLabelWithAsterisk
+                  label="Result"
+                  required
+                  sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+                />
+              </TableCell>
+              {showQcReport ? (
+                <TableCell sx={headerSx}>
+                  <FieldLabelWithAsterisk
+                    label="Upload QC Report"
+                    required
+                    sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+                  />
+                </TableCell>
+              ) : null}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -382,14 +440,32 @@ const QualificationTable = ({
                   {readOnly ? (
                     <QCDivisionReadOnlyValue value={row.RESULT} muted={!row.RESULT.trim()} />
                   ) : (
-                    <TextField
-                      size="small"
-                      fullWidth
-                      value={row.RESULT}
-                      disabled={inputsDisabled}
-                      onChange={(event) => updateCell(index, "RESULT", event.target.value)}
-                      sx={tableFieldSx}
-                    />
+                    <Box>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        value={row.RESULT}
+                        disabled={inputsDisabled}
+                        onChange={(event) => updateCell(index, "RESULT", event.target.value)}
+                        sx={tableFieldSx}
+                        error={Boolean(
+                          fieldError(
+                            validationErrors ?? undefined,
+                            errorPrefix
+                              ? `${errorPrefix}.${index}.RESULT`
+                              : `${index}.RESULT`,
+                          ),
+                        )}
+                      />
+                      <FieldErrorText
+                        message={fieldError(
+                          validationErrors ?? undefined,
+                          errorPrefix
+                            ? `${errorPrefix}.${index}.RESULT`
+                            : `${index}.RESULT`,
+                        )}
+                      />
+                    </Box>
                   )}
                 </TableCell>
                 {showQcReport ? (
@@ -502,6 +578,7 @@ type QCPostCureMotorPanelProps = {
   readOnly?: boolean;
   disabled?: boolean;
   headerActions?: ReactNode;
+  validationErrors?: Record<string, string> | null;
 };
 
 const QCPostCureMotorPanel = ({
@@ -513,8 +590,10 @@ const QCPostCureMotorPanel = ({
   readOnly = false,
   disabled = false,
   headerActions,
+  validationErrors = null,
 }: QCPostCureMotorPanelProps) => {
   const inputsDisabled = disabled || readOnly;
+  const err = (path: string) => fieldError(validationErrors ?? undefined, path);
   const isLooseFlap = subType === QC_POST_CURE_SUB_TYPE_LOOSE_FLAP;
   const isInhibition = subType === QC_POST_CURE_SUB_TYPE_INHIBITION;
   const normalizedInhibitor = normalizeQcInhibitorType(inhibitorType);
@@ -631,10 +710,11 @@ const QCPostCureMotorPanel = ({
                 }
                 columns={[
                   { id: "LOCATION", label: "Location" },
-                  { id: "FROM_DATE", label: "From Date" },
-                  { id: "TO_DATE", label: "To Date" },
+                  { id: "FROM_DATE", label: "From Date", required: true },
+                  { id: "TO_DATE", label: "To Date", required: true },
                   { id: "OBSERVATIONS", label: "Observations" },
                 ]}
+                validationErrors={validationErrors}
                 readOnly={readOnly}
                 disabled={inputsDisabled}
               />
@@ -653,7 +733,7 @@ const QCPostCureMotorPanel = ({
 
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
                 <Box sx={{ flex: 1 }}>
-                  <FieldRow label={QC_POST_CURE_FIELD_LABELS.LF_EPOXY_BATCH_NO} readOnly={readOnly}>
+                  <FieldRow label={QC_POST_CURE_FIELD_LABELS.LF_EPOXY_BATCH_NO} readOnly={readOnly} required error={err("LF_EPOXY_BATCH_NO")}>
                     <TextOrReadOnly
                       value={getPostCureField(values, looseSection, "LF_EPOXY_BATCH_NO")}
                       onChange={(next) =>
@@ -698,9 +778,10 @@ const QCPostCureMotorPanel = ({
                 }
                 readOnly={readOnly}
                 disabled={inputsDisabled}
+                validationErrors={validationErrors}
               />
 
-              <FieldRow label={QC_POST_CURE_FIELD_LABELS.LF_EPOXY_QC_REPORT} readOnly={readOnly}>
+              <FieldRow label={QC_POST_CURE_FIELD_LABELS.LF_EPOXY_QC_REPORT} readOnly={readOnly} required error={err("LF_EPOXY_QC_REPORT")}>
                 <FileOrReadOnly
                   files={getPostCureFileField(values, looseSection, "LF_EPOXY_QC_REPORT")}
                   onChange={(next) => patchFileField(looseSection, "LF_EPOXY_QC_REPORT", next)}
@@ -724,11 +805,12 @@ const QCPostCureMotorPanel = ({
                 }
                 columns={[
                   { id: "LOCATION", label: "Location" },
-                  { id: "FROM_DATE", label: "From Date" },
-                  { id: "TO_DATE", label: "To Date" },
-                  { id: "QTY_FILLED", label: "Qty Filled (g)" },
+                  { id: "FROM_DATE", label: "From Date", required: true },
+                  { id: "TO_DATE", label: "To Date", required: true },
+                  { id: "QTY_FILLED", label: "Qty Filled (g)", required: true },
                   { id: "OBSERVATIONS", label: "Observations" },
                 ]}
+                validationErrors={validationErrors}
                 readOnly={readOnly}
                 disabled={inputsDisabled}
               />
@@ -745,7 +827,7 @@ const QCPostCureMotorPanel = ({
               <Stack spacing={1.5}>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
                   <Box sx={{ flex: 1 }}>
-                    <FieldRow label={QC_POST_CURE_FIELD_LABELS.IR1_BATCH_NO} readOnly={readOnly}>
+                    <FieldRow label={QC_POST_CURE_FIELD_LABELS.IR1_BATCH_NO} readOnly={readOnly} required error={err("IR1_BATCH_NO")}>
                       <TextOrReadOnly
                         value={getPostCureField(values, ir1Section, "IR1_BATCH_NO")}
                         onChange={(next) =>
@@ -791,7 +873,7 @@ const QCPostCureMotorPanel = ({
                   disabled={inputsDisabled}
                 />
 
-                <FieldRow label={QC_POST_CURE_FIELD_LABELS.IR1_QC_REPORT} readOnly={readOnly}>
+                <FieldRow label={QC_POST_CURE_FIELD_LABELS.IR1_QC_REPORT} readOnly={readOnly} required error={err("IR1_QC_REPORT")}>
                   <FileOrReadOnly
                     files={getPostCureFileField(values, ir1Section, "IR1_QC_REPORT")}
                     onChange={(next) => patchFileField(ir1Section, "IR1_QC_REPORT", next)}
@@ -822,17 +904,18 @@ const QCPostCureMotorPanel = ({
                   }
                   columns={[
                     { id: "LOCATION", label: "Location" },
-                    { id: "FROM_DATE", label: "From Date" },
-                    { id: "TO_DATE", label: "To Date" },
-                    { id: "QTY_APPLIED", label: "Qty Applied (g)" },
+                    { id: "FROM_DATE", label: "From Date", required: true },
+                    { id: "TO_DATE", label: "To Date", required: true },
+                    { id: "QTY_APPLIED", label: "Qty Applied (g)", required: true },
                     { id: "OBSERVATIONS", label: "Observations" },
                   ]}
+                  validationErrors={validationErrors}
                   readOnly={readOnly}
                   disabled={inputsDisabled}
                 />
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
                   <Box sx={{ flex: 1 }}>
-                    <FieldRow label={QC_POST_CURE_FIELD_LABELS.DISPATCH_DATE} readOnly={readOnly}>
+                    <FieldRow label={QC_POST_CURE_FIELD_LABELS.DISPATCH_DATE} readOnly={readOnly} required error={err("DISPATCH_DATE")}>
                       <DateOrReadOnly
                         value={getPostCureField(values, appSection, "DISPATCH_DATE")}
                         onChange={(next) =>
@@ -844,7 +927,7 @@ const QCPostCureMotorPanel = ({
                     </FieldRow>
                   </Box>
                   <Box sx={{ flex: 1 }}>
-                    <FieldRow label={QC_POST_CURE_FIELD_LABELS.DISPATCH_STATION} readOnly={readOnly}>
+                    <FieldRow label={QC_POST_CURE_FIELD_LABELS.DISPATCH_STATION} readOnly={readOnly} required error={err("DISPATCH_STATION")}>
                       <TextOrReadOnly
                         value={getPostCureField(values, appSection, "DISPATCH_STATION")}
                         onChange={(next) =>
@@ -966,17 +1049,18 @@ const QCPostCureMotorPanel = ({
                   }
                   columns={[
                     { id: "LOCATION", label: "Location" },
-                    { id: "FROM_DATE", label: "From Date" },
-                    { id: "TO_DATE", label: "To Date" },
-                    { id: "QTY_APPLIED", label: "Qty Applied (g)" },
+                    { id: "FROM_DATE", label: "From Date", required: true },
+                    { id: "TO_DATE", label: "To Date", required: true },
+                    { id: "QTY_APPLIED", label: "Qty Applied (g)", required: true },
                     { id: "OBSERVATIONS", label: "Observations" },
                   ]}
+                  validationErrors={validationErrors}
                   readOnly={readOnly}
                   disabled={inputsDisabled}
                 />
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
                   <Box sx={{ flex: 1 }}>
-                    <FieldRow label={QC_POST_CURE_FIELD_LABELS.DISPATCH_DATE} readOnly={readOnly}>
+                    <FieldRow label={QC_POST_CURE_FIELD_LABELS.DISPATCH_DATE} readOnly={readOnly} required error={err("DISPATCH_DATE")}>
                       <DateOrReadOnly
                         value={getPostCureField(values, appSection, "DISPATCH_DATE")}
                         onChange={(next) =>
@@ -988,7 +1072,7 @@ const QCPostCureMotorPanel = ({
                     </FieldRow>
                   </Box>
                   <Box sx={{ flex: 1 }}>
-                    <FieldRow label={QC_POST_CURE_FIELD_LABELS.DISPATCH_STATION} readOnly={readOnly}>
+                    <FieldRow label={QC_POST_CURE_FIELD_LABELS.DISPATCH_STATION} readOnly={readOnly} required error={err("DISPATCH_STATION")}>
                       <TextOrReadOnly
                         value={getPostCureField(values, appSection, "DISPATCH_STATION")}
                         onChange={(next) =>
@@ -1013,7 +1097,7 @@ const QCPostCureMotorPanel = ({
             <Stack spacing={1.5}>
               <Stack direction={{ xs: "column", sm: "row" }} spacing={1.25}>
                 <Box sx={{ flex: 1 }}>
-                  <FieldRow label={QC_POST_CURE_FIELD_LABELS.DISPATCH_DATE} readOnly={readOnly}>
+                  <FieldRow label={QC_POST_CURE_FIELD_LABELS.DISPATCH_DATE} readOnly={readOnly} required error={err("DISPATCH_DATE")}>
                     <DateOrReadOnly
                       value={getPostCureField(values, naSection, "DISPATCH_DATE")}
                       onChange={(next) =>
@@ -1025,7 +1109,7 @@ const QCPostCureMotorPanel = ({
                   </FieldRow>
                 </Box>
                 <Box sx={{ flex: 1 }}>
-                  <FieldRow label={QC_POST_CURE_FIELD_LABELS.DISPATCH_STATION} readOnly={readOnly}>
+                  <FieldRow label={QC_POST_CURE_FIELD_LABELS.DISPATCH_STATION} readOnly={readOnly} required error={err("DISPATCH_STATION")}>
                     <TextOrReadOnly
                       value={getPostCureField(values, naSection, "DISPATCH_STATION")}
                       onChange={(next) =>

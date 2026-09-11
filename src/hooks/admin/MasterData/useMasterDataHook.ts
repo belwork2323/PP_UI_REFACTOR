@@ -14,7 +14,10 @@ import {
   type MasterDataRecord,
   type MasterDataTypeDescriptor,
 } from "@data/models/admin/MasterData/MasterDataModel";
-import { isNestedMasterDataType } from "@data/models/admin/MasterData/nestedMasterDataTypes";
+import {
+  EXCLUDED_MASTER_DATA_TYPES,
+  isNestedMasterDataType,
+} from "@data/models/admin/MasterData/nestedMasterDataTypes";
 
 const S = STRINGS.MASTER_DATA;
 
@@ -40,6 +43,7 @@ export default function useMasterDataHook() {
 
   const [disableTarget, setDisableTarget] = useState<MasterDataRecord | null>(null);
   const [disabling, setDisabling] = useState(false);
+  const [enabling, setEnabling] = useState(false);
 
   const closeInline = useCallback(() => {
     if (saving) return;
@@ -53,8 +57,13 @@ export default function useMasterDataHook() {
     try {
       const resp = await masterDataController.getTypes();
       if (resp.success && Array.isArray(resp.data)) {
-        setTypes(resp.data);
-        setSelectedType((prev) => prev || "");
+        const visibleTypes = resp.data.filter(
+          (type) => !(EXCLUDED_MASTER_DATA_TYPES as readonly string[]).includes(type.type),
+        );
+        setTypes(visibleTypes);
+        setSelectedType((prev) =>
+          prev && !(EXCLUDED_MASTER_DATA_TYPES as readonly string[]).includes(prev) ? prev : "",
+        );
       } else {
         setTypes([]);
         useAlertStore
@@ -194,6 +203,38 @@ export default function useMasterDataHook() {
     }
   };
 
+  const enableRecord = async (record: MasterDataRecord) => {
+    setEnabling(true);
+    useAlertStore.getState().showAlert(S.MESSAGES.ENABLING, "loading");
+    try {
+      const nextForm = { ...mapRecordToForm(record, schema), isActive: true };
+      const resp = await masterDataController.update(selectedType, nextForm, schema);
+      if (resp.success) {
+        useAlertStore.getState().showAlert(S.MESSAGES.ENABLE_SUCCESS, "success");
+        await loadList();
+      } else {
+        useAlertStore
+          .getState()
+          .showAlert(getMasterDataErrorMessage(resp, S.ERRORS.OPERATION_FAILED), "error");
+      }
+    } catch (e: any) {
+      useAlertStore
+        .getState()
+        .showAlert(getMasterDataErrorMessage(e?.response?.data, S.ERRORS.OPERATION_FAILED), "error");
+    } finally {
+      setEnabling(false);
+    }
+  };
+
+  const handleToggleActive = (record: MasterDataRecord, nextActive: boolean) => {
+    if (inlineMode != null || saving || disabling || enabling) return;
+    if (nextActive) {
+      void enableRecord(record);
+      return;
+    }
+    setDisableTarget(record);
+  };
+
   const confirmDisable = async () => {
     if (!disableTarget) return;
     setDisabling(true);
@@ -270,6 +311,8 @@ export default function useMasterDataHook() {
     disableTarget,
     setDisableTarget,
     disabling,
+    enabling,
+    handleToggleActive,
     confirmDisable,
     refresh: () => {
       if (!selectedType) return;

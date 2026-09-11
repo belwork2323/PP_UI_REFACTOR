@@ -4,11 +4,12 @@ import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
 import { useThemeStore } from "@app/store/themeStore";
 import ConfirmAlertDialog from "@ui/components/common/ConfirmAlertDialog";
-import RefreshIconButton from "@ui/components/common/RefreshIconButton";
 import AppDropdown from "@ui/components/common/AppDropdown";
 import AdminManagementPageHeader from "@ui/components/custom/admin/AdminManagementPageHeader";
 import getMasterDataTheme from "@app/theme/custom_themes/admin/MasterData/masterData_theme";
 import useMasterDataHook from "@hooks/admin/MasterData/useMasterDataHook";
+import useEquipmentTypeOptions from "@hooks/admin/MasterData/useEquipmentTypeOptions";
+import useEnergyUnitOptions from "@hooks/admin/MasterData/useEnergyUnitOptions";
 import { isNestedMasterDataType } from "@data/models/admin/MasterData/nestedMasterDataTypes";
 import MasterDataList from "./MasterDataList";
 import MaterialsMasterPanel from "./MaterialsMasterPanel";
@@ -16,7 +17,8 @@ import InsulationSpecMasterPanel from "./InsulationSpecMasterPanel";
 import MixingCycleMasterPanel from "./MixingCycleMasterPanel";
 import CuringCycleMasterPanel from "./CuringCycleMasterPanel";
 import QualityCheckMasterPanel from "./QualityCheckMasterPanel";
-import QcDivisionMasterPanel from "./QcDivisionMasterPanel";
+import { getMasterDataAddButtonLabel, stripMasterTypeSuffix } from "./masterDataLabels";
+import { masterDataStatusFilterChipProps } from "./components/masterDataStatusStyles";
 
 const S = STRINGS.MASTER_DATA;
 
@@ -25,7 +27,9 @@ const TYPE_NOUN: Record<string, string> = {
   buildings: "buildings",
   ovens: "ovens",
   equipment: "equipment",
+  "equipment-types": "equipment types",
   "beam-energy": "beam energies",
+  units: "units",
   "casting-stations": "casting stations",
   "subscale-articles": "subscale articles",
   materials: "materials",
@@ -35,17 +39,25 @@ const TYPE_NOUN: Record<string, string> = {
   "mixing-cycles": "mixing cycles",
   "curing-cycles": "curing cycles",
   "quality-checks": "quality checks",
-  "qc-divisions": "QC divisions",
 };
-
-const stripMasterTypeSuffix = (label: string) => label.replace(/\s+Master$/i, "").trim();
-
-type StatusFilter = "ALL" | "ACTIVE" | "INACTIVE";
 
 const MasterDataPage = () => {
   const mode = useThemeStore((s) => s.mode);
   const t = getMasterDataTheme(mode);
   const hook = useMasterDataHook();
+  const equipmentTypeOptions = useEquipmentTypeOptions(hook.selectedType === "equipment");
+  const energyUnitOptions = useEnergyUnitOptions(hook.selectedType === "beam-energy");
+
+  const dynamicAttributeOptions = useMemo(() => {
+    const options: Record<string, typeof equipmentTypeOptions.options> = {};
+    if (hook.selectedType === "equipment" && equipmentTypeOptions.options.length > 0) {
+      options.equipmentType = equipmentTypeOptions.options;
+    }
+    if (hook.selectedType === "beam-energy" && energyUnitOptions.options.length > 0) {
+      options.energyUnit = energyUnitOptions.options;
+    }
+    return Object.keys(options).length > 0 ? options : undefined;
+  }, [hook.selectedType, equipmentTypeOptions.options, energyUnitOptions.options]);
 
   const attributeFields = useMemo(
     () => (hook.schema?.fields ?? []).filter((f) => f.attribute),
@@ -68,20 +80,10 @@ const MasterDataPage = () => {
     [hook.types],
   );
 
-  const statusChipProps = (filter: StatusFilter, color?: "success" | "default") => {
-    const selected = hook.activeFilter === filter;
-    return {
-      size: "small" as const,
-      variant: selected ? ("filled" as const) : ("outlined" as const),
-      color,
-      onClick: () => hook.setActiveFilter(filter),
-      sx: {
-        ...t.statusChip,
-        cursor: "pointer",
-        ...(selected ? { boxShadow: 1 } : { opacity: 0.9 }),
-      },
-    };
-  };
+  const addButtonLabel = useMemo(
+    () => getMasterDataAddButtonLabel(hook.selectedType, hook.types),
+    [hook.selectedType, hook.types],
+  );
 
   return (
     <Box sx={t.page}>
@@ -98,28 +100,21 @@ const MasterDataPage = () => {
             placeholder={S.PAGE.TYPE_PLACEHOLDER}
           />
         </Box>
-
-        <RefreshIconButton
-          onClick={hook.refresh}
-          disabled={!typeSelected || hook.loadingList}
-          tooltip="Refresh"
-          icon={<icons.projectMgmt.refresh />}
-        />
       </Box>
 
       {typeSelected ? (
       <Box sx={t.content}>
         <Box sx={t.statusRowAboveTable}>
           <Chip
-            {...statusChipProps("ALL")}
+            {...masterDataStatusFilterChipProps("ALL", hook.activeFilter === "ALL", () => hook.setActiveFilter("ALL"), t.statusChip)}
             label={S.PAGE.STAT_TOTAL(noun, total)}
           />
           <Chip
-            {...statusChipProps("ACTIVE", "success")}
+            {...masterDataStatusFilterChipProps("ACTIVE", hook.activeFilter === "ACTIVE", () => hook.setActiveFilter("ACTIVE"), t.statusChip)}
             label={S.PAGE.STAT_ACTIVE(noun, active)}
           />
           <Chip
-            {...statusChipProps("INACTIVE", "default")}
+            {...masterDataStatusFilterChipProps("INACTIVE", hook.activeFilter === "INACTIVE", () => hook.setActiveFilter("INACTIVE"), t.statusChip)}
             label={S.PAGE.STAT_INACTIVE(noun, inactive)}
           />
         </Box>
@@ -128,43 +123,51 @@ const MasterDataPage = () => {
           <MaterialsMasterPanel
             activeFilter={hook.activeFilter}
             refreshKey={hook.nestedRefreshKey}
+            addButtonLabel={addButtonLabel}
             t={t}
             onStatsChange={hook.setStats}
+            onRefresh={hook.refresh}
+            refreshDisabled={hook.loadingList}
           />
         ) : hook.selectedType === "insulation-specifications" ? (
           <InsulationSpecMasterPanel
             activeFilter={hook.activeFilter}
             refreshKey={hook.nestedRefreshKey}
+            addButtonLabel={addButtonLabel}
             t={t}
             onStatsChange={hook.setStats}
+            onRefresh={hook.refresh}
+            refreshDisabled={hook.loadingList}
           />
         ) : hook.selectedType === "mixing-cycles" ? (
           <MixingCycleMasterPanel
             activeFilter={hook.activeFilter}
             refreshKey={hook.nestedRefreshKey}
+            addButtonLabel={addButtonLabel}
             t={t}
             onStatsChange={hook.setStats}
+            onRefresh={hook.refresh}
+            refreshDisabled={hook.loadingList}
           />
         ) : hook.selectedType === "curing-cycles" ? (
           <CuringCycleMasterPanel
             activeFilter={hook.activeFilter}
             refreshKey={hook.nestedRefreshKey}
+            addButtonLabel={addButtonLabel}
             t={t}
             onStatsChange={hook.setStats}
+            onRefresh={hook.refresh}
+            refreshDisabled={hook.loadingList}
           />
         ) : hook.selectedType === "quality-checks" ? (
           <QualityCheckMasterPanel
             activeFilter={hook.activeFilter}
             refreshKey={hook.nestedRefreshKey}
+            addButtonLabel={addButtonLabel}
             t={t}
             onStatsChange={hook.setStats}
-          />
-        ) : hook.selectedType === "qc-divisions" ? (
-          <QcDivisionMasterPanel
-            activeFilter={hook.activeFilter}
-            refreshKey={hook.nestedRefreshKey}
-            t={t}
-            onStatsChange={hook.setStats}
+            onRefresh={hook.refresh}
+            refreshDisabled={hook.loadingList}
           />
         ) : (
           <>
@@ -176,20 +179,23 @@ const MasterDataPage = () => {
               rowsPerPage={hook.rowsPerPage}
               attributeFields={attributeFields}
               schema={hook.schema}
+              selectedType={hook.selectedType}
               inlineMode={hook.inlineMode}
-              editTarget={hook.editTarget}
               form={hook.form}
               saving={hook.saving}
+              togglingStatus={hook.disabling || hook.enabling}
               search={hook.search}
               onSearchChange={hook.setSearch}
+              onRefresh={hook.refresh}
+              refreshDisabled={hook.loadingList}
               t={t}
               onFormChange={hook.onFormChange}
-              onEdit={hook.openEdit}
-              onDisable={hook.setDisableTarget}
+              onToggleActive={hook.handleToggleActive}
               onSaveInline={hook.saveForm}
               onCancelInline={hook.closeInline}
               onPageChange={(_e, page) => hook.setPage(page)}
               onRowsPerPageChange={(e) => hook.setRowsPerPage(Number(e.target.value))}
+              dynamicAttributeOptions={dynamicAttributeOptions}
             />
 
             <Box sx={t.addRowBar}>
@@ -200,7 +206,7 @@ const MasterDataPage = () => {
                 disabled={hook.loadingList || !hook.selectedType || hook.inlineMode != null || isNested}
                 sx={t.pageHeader.newProjectButton}
               >
-                {S.PAGE.NEW_BUTTON}
+                {addButtonLabel}
               </Button>
             </Box>
           </>

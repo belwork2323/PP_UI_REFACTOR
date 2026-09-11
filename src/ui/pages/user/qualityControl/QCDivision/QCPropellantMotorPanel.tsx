@@ -55,6 +55,9 @@ import {
   qcReadOnlyTableHeaderCellSx,
 } from "./components/QCDivisionReadOnlyValue";
 import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import FieldErrorText from "@/ui/components/validation/FieldErrorText";
+import { fieldError } from "@/data/validation/adapters/qcPropellant.validation";
 
 const BRAND = QC_DIVISION_BRAND;
 const TABLE_BORDER = alpha(BRAND.primary, 0.18);
@@ -179,6 +182,7 @@ type PropertyTableProps = {
   includeRemarks?: boolean;
   includeRowStats?: boolean;
   includeRowUpload?: boolean;
+  validationErrors?: Record<string, string> | null;
 };
 
 const PropertyTable = ({
@@ -193,6 +197,7 @@ const PropertyTable = ({
   includeRemarks = false,
   includeRowStats = false,
   includeRowUpload = false,
+  validationErrors = null,
 }: PropertyTableProps) => {
   const headerSx = readOnly ? qcReadOnlyTableHeaderCellSx : TH;
   const bodyCellSx = readOnly ? qcReadOnlyBodyCellSx : cellSx;
@@ -237,17 +242,41 @@ const PropertyTable = ({
               {includeSampleNo ? <TableCell sx={headerSx}>Sample No</TableCell> : null}
               <TableCell sx={headerSx}>Property</TableCell>
               <TableCell sx={headerSx}>
-                {sectionId === QC_PROPELLANT_SECTION_IDS.MECHANICAL_PROPERTIES ? "Spec." : "Specification"}
+                <FieldLabelWithAsterisk
+                  label={
+                    sectionId === QC_PROPELLANT_SECTION_IDS.MECHANICAL_PROPERTIES
+                      ? "Spec."
+                      : "Specification"
+                  }
+                  required
+                  sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+                />
               </TableCell>
               {columns.map((columnId) => (
                 <TableCell key={columnId} sx={headerSx}>
-                  {getQcPropellantFmColumnLabel(columnId)}
+                  <FieldLabelWithAsterisk
+                    label={getQcPropellantFmColumnLabel(columnId)}
+                    required
+                    sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+                  />
                 </TableCell>
               ))}
               {includeRowStats ? (
                 <>
-                  <TableCell sx={headerSx}>Avg</TableCell>
-                  <TableCell sx={headerSx}>Std Dev</TableCell>
+                  <TableCell sx={headerSx}>
+                    <FieldLabelWithAsterisk
+                      label="Avg"
+                      required
+                      sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+                    />
+                  </TableCell>
+                  <TableCell sx={headerSx}>
+                    <FieldLabelWithAsterisk
+                      label="Std Dev"
+                      required
+                      sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+                    />
+                  </TableCell>
                 </>
               ) : null}
               {includeRemarks ? <TableCell sx={headerSx}>Remarks</TableCell> : null}
@@ -296,6 +325,14 @@ const PropertyTable = ({
                       disabled={inputsDisabled}
                       readOnly={readOnly}
                     />
+                    {!readOnly ? (
+                      <FieldErrorText
+                        message={fieldError(
+                          validationErrors ?? undefined,
+                          `${sectionId}.${index}.SPECIFICATION`,
+                        )}
+                      />
+                    ) : null}
                   </TableCell>
                   {columns.map((columnId) => (
                     <TableCell key={columnId} sx={bodyCellSx}>
@@ -306,6 +343,14 @@ const PropertyTable = ({
                         readOnly={readOnly}
                         type="number"
                       />
+                      {!readOnly ? (
+                        <FieldErrorText
+                          message={fieldError(
+                            validationErrors ?? undefined,
+                            `${sectionId}.${index}.${columnId}`,
+                          )}
+                        />
+                      ) : null}
                     </TableCell>
                   ))}
                   {includeRowStats ? (
@@ -539,6 +584,7 @@ type QCPropellantMotorPanelProps = {
   disabled?: boolean;
   headerActions?: ReactNode;
   batchPayload?: unknown;
+  validationErrors?: Record<string, string> | null;
 };
 
 const QCPropellantMotorPanel = ({
@@ -549,6 +595,7 @@ const QCPropellantMotorPanel = ({
   disabled = false,
   headerActions,
   batchPayload = null,
+  validationErrors = null,
 }: QCPropellantMotorPanelProps) => {
   const inputsDisabled = disabled || readOnly;
   const premixFmCount = resolveQcPropellantPremixCount(batchPayload);
@@ -678,6 +725,7 @@ const QCPropellantMotorPanel = ({
               includeSampleNo
               includeRemarks
               includeRowStats
+              validationErrors={validationErrors}
             />
             <Box>
               <Typography sx={{ fontSize: "0.72rem", fontWeight: 700, color: BRAND.primary, mb: 0.75 }}>
@@ -714,6 +762,7 @@ const QCPropellantMotorPanel = ({
             includeRemarks
             includeRowStats
             includeRowUpload
+            validationErrors={validationErrors}
           />
         </SectionCard>
         <SectionCard title={QC_PROPELLANT_SECTION_TITLES.SSBR_UBR_BURN_RATE} readOnly={readOnly}>
@@ -731,6 +780,7 @@ const QCPropellantMotorPanel = ({
             disabled={inputsDisabled}
             includeRowStats
             includeRowUpload
+            validationErrors={validationErrors}
           />
         </SectionCard>
         <SectionCard title={QC_PROPELLANT_SECTION_TITLES.BALLISTIC_EVALUATION} readOnly={readOnly}>

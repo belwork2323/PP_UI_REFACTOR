@@ -1,5 +1,7 @@
 import {
   emptyMasterDataStats,
+  parseMasterDataAuditFields,
+  type MasterDataAuditFields,
   type MasterDataStats,
 } from "@data/models/admin/MasterData/MasterDataModel";
 import {
@@ -58,7 +60,7 @@ export type MaterialGradeForm = {
   specifications: MaterialSpecForm[];
 };
 
-export type MaterialsMasterRecord = {
+export type MaterialsMasterRecord = MasterDataAuditFields & {
   materialId: number;
   materialCode: string;
   materialName: string;
@@ -127,6 +129,7 @@ const mapGrade = (raw: any): MaterialGradeForm => ({
 
 export const MaterialsMasterRecordModel = {
   fromApi: (raw: any): MaterialsMasterRecord => ({
+    ...parseMasterDataAuditFields(raw),
     materialId: Number(raw?.materialId),
     materialCode: String(raw?.materialCode ?? ""),
     materialName: String(raw?.materialName ?? ""),

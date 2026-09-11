@@ -4,8 +4,6 @@ import {
   Button,
   Chip,
   Divider,
-  IconButton,
-  InputAdornment,
   Paper,
   Table,
   TableBody,
@@ -14,11 +12,8 @@ import {
   TableHead,
   TablePagination,
   TableRow,
-  TextField,
-  Tooltip,
   Typography,
 } from "@mui/material";
-import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
 import ConfirmAlertDialog from "@ui/components/common/ConfirmAlertDialog";
@@ -26,12 +21,23 @@ import SkeletonRow from "@ui/components/common/SkeletonRow";
 import useMaterialsMasterHook from "@hooks/admin/MasterData/useMaterialsMasterHook";
 import type { MaterialsMasterListPayload } from "@data/models/admin/MasterData/MaterialsMasterModel";
 import MaterialsMasterFormDialog from "./MaterialsMasterFormDialog";
+import MasterDataTableToolbar from "./components/MasterDataTableToolbar";
+import MasterDataActiveSwitch from "./components/MasterDataActiveSwitch";
+import MasterDataActiveStatusChip from "./components/MasterDataActiveStatusChip";
+import {
+  MASTER_DATA_AUDIT_COLUMN_COUNT,
+  MasterDataAuditHeaderCells,
+  MasterDataAuditRowCells,
+} from "./components/MasterDataAuditColumns";
 
 const S = STRINGS.MASTER_DATA;
 
 type Props = {
   activeFilter: "ALL" | "ACTIVE" | "INACTIVE";
   refreshKey?: number;
+  addButtonLabel: string;
+  onRefresh: () => void;
+  refreshDisabled?: boolean;
   t: any;
   onListPayloadChange?: (payload: MaterialsMasterListPayload | null) => void;
   onStatsChange?: (stats: { total: number; active: number; inactive: number }) => void;
@@ -40,6 +46,9 @@ type Props = {
 const MaterialsMasterPanel = ({
   activeFilter,
   refreshKey,
+  addButtonLabel,
+  onRefresh,
+  refreshDisabled = false,
   t,
   onListPayloadChange,
   onStatsChange,
@@ -51,38 +60,19 @@ const MaterialsMasterPanel = ({
     onStatsChange,
   });
   const { table, tableCell } = t;
-  const searchTheme = t.batchListShell?.inputs;
   const formOpen = hook.inlineMode != null;
-  const isEdit = hook.inlineMode === "edit";
+  const columnCount = 8 + MASTER_DATA_AUDIT_COLUMN_COUNT;
 
   return (
     <Box>
       <Paper elevation={0} sx={table.paper}>
-        <Box sx={t.tableSearchBar}>
-          <TextField
-            size="small"
-            fullWidth
-            margin="none"
-            value={hook.search}
-            onChange={(e) => hook.setSearch(e.target.value)}
-            placeholder={S.TOOLBAR.SEARCH_PLACEHOLDER}
-            sx={{
-              ...(searchTheme?.search ?? t.searchField),
-              m: 0,
-              mb: 0,
-              mt: 0,
-              flex: 1,
-              minWidth: 0,
-            }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchRoundedIcon sx={searchTheme?.startIcon?.search} />
-                </InputAdornment>
-              ),
-            }}
-          />
-        </Box>
+        <MasterDataTableToolbar
+          search={hook.search}
+          onSearchChange={hook.setSearch}
+          onRefresh={onRefresh}
+          refreshDisabled={refreshDisabled || hook.loading}
+          t={t}
+        />
         <Divider sx={table.divider} />
         <TableContainer>
           <Table size="small">
@@ -94,16 +84,17 @@ const MaterialsMasterPanel = ({
                 <TableCell sx={table.headerCell}>Raw type</TableCell>
                 <TableCell sx={table.headerCell}>Grades</TableCell>
                 <TableCell sx={table.headerCell}>Specs</TableCell>
+                <MasterDataAuditHeaderCells table={table} />
                 <TableCell sx={table.headerCell}>{S.TABLE.COL_ACTIVE}</TableCell>
                 <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>{S.TABLE.COL_ACTIONS}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {hook.loading ? (
-                <SkeletonRow columns={8} />
+                <SkeletonRow columns={columnCount} />
               ) : hook.paginated.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={8} align="center">
+                  <TableCell colSpan={columnCount} align="center">
                     <Typography sx={table.emptyText}>{S.TABLE.EMPTY}</Typography>
                   </TableCell>
                 </TableRow>
@@ -131,40 +122,17 @@ const MaterialsMasterPanel = ({
                     </TableCell>
                     <TableCell sx={table.cell}>{row.grades.length}</TableCell>
                     <TableCell sx={table.cell}>{row.specifications.length}</TableCell>
+                    <MasterDataAuditRowCells record={row} table={table} />
                     <TableCell sx={table.cell}>
-                      <Chip
-                        size="small"
-                        label={row.isActive ? S.TABLE.YES : S.TABLE.NO}
-                        color={row.isActive ? "success" : "default"}
-                        variant={row.isActive ? "filled" : "outlined"}
-                      />
+                      <MasterDataActiveStatusChip isActive={row.isActive} />
                     </TableCell>
                     <TableCell sx={table.cellActionsWrapper}>
                       <Box sx={tableCell.actionsBox}>
-                        <Tooltip title={S.TABLE.EDIT}>
-                          <span>
-                            <IconButton
-                              size="small"
-                              disabled={hook.saving || formOpen}
-                              onClick={() => hook.openEdit(row)}
-                              sx={tableCell.editButton}
-                            >
-                              <icons.Edit sx={tableCell.editIcon} />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                        <Tooltip title={S.TABLE.DISABLE}>
-                          <span>
-                            <IconButton
-                              size="small"
-                              disabled={!row.isActive || hook.saving || formOpen}
-                              onClick={() => hook.setDisableTarget(row)}
-                              sx={tableCell.deleteButton}
-                            >
-                              <icons.Delete sx={tableCell.deleteIcon} />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
+                        <MasterDataActiveSwitch
+                          isActive={row.isActive}
+                          disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
+                          onToggle={(nextActive) => hook.handleToggleActive(row, nextActive)}
+                        />
                       </Box>
                     </TableCell>
                   </TableRow>
@@ -192,13 +160,13 @@ const MaterialsMasterPanel = ({
           disabled={hook.loading || formOpen}
           sx={t.pageHeader.newProjectButton}
         >
-          {S.PAGE.NEW_BUTTON}
+          {addButtonLabel}
         </Button>
       </Box>
 
       <MaterialsMasterFormDialog
         open={formOpen}
-        isEdit={isEdit}
+        isEdit={false}
         form={hook.form}
         saving={hook.saving}
         onClose={hook.closeInline}

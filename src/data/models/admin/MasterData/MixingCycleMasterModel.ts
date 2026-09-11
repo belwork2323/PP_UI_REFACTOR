@@ -1,5 +1,7 @@
 import {
   emptyMasterDataStats,
+  parseMasterDataAuditFields,
+  type MasterDataAuditFields,
   type MasterDataStats,
 } from "@data/models/admin/MasterData/MasterDataModel";
 
@@ -14,7 +16,7 @@ export type MixingCycleGroupForm = {
   finalMixOperations: MixingOperationForm[];
 };
 
-export type MixingCycleRecord = {
+export type MixingCycleRecord = MasterDataAuditFields & {
   id: number;
   mixingCycleCode: string;
   mixingCycleName: string;
@@ -68,6 +70,7 @@ const mapCycles = (raw: any): MixingCycleGroupForm => ({
 
 export const MixingCycleRecordModel = {
   fromApi: (raw: any): MixingCycleRecord => ({
+    ...parseMasterDataAuditFields(raw),
     id: Number(raw?.id),
     mixingCycleCode: String(raw?.mixingCycleCode ?? ""),
     mixingCycleName: String(raw?.mixingCycleName ?? ""),

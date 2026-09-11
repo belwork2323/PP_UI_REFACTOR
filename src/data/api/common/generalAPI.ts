@@ -201,6 +201,44 @@ export const fetchOvens = async (): Promise<OvenMasterOption[]> => {
   return ovensRequestPromise;
 };
 
+export type EquipmentTypeMasterOption = {
+  id: number;
+  code: string;
+  name: string;
+  typeCode: string;
+  description: string;
+};
+
+const mapEquipmentTypeMasterOption = (row: Record<string, unknown>): EquipmentTypeMasterOption => ({
+  id: Number(row.id ?? 0),
+  code: String(row.code ?? "").trim(),
+  name: String(row.name ?? "").trim(),
+  typeCode: String(row.typeCode ?? "").trim(),
+  description: String(row.description ?? "").trim(),
+});
+
+let equipmentTypeListRequestPromise: Promise<EquipmentTypeMasterOption[]> | null = null;
+
+export const fetchEquipmentTypeList = async (): Promise<EquipmentTypeMasterOption[]> => {
+  if (equipmentTypeListRequestPromise) return equipmentTypeListRequestPromise;
+
+  equipmentTypeListRequestPromise = (async () => {
+    try {
+      const body = await get(SYSTEM.EQUIPMENT_TYPE_LIST);
+      assertSuccessEnvelope(body);
+      return asList(body)
+        .map(mapEquipmentTypeMasterOption)
+        .filter((item) => Boolean(item.typeCode || item.name));
+    } catch (error) {
+      equipmentTypeListRequestPromise = null;
+      wrapLookupError(error);
+      return [];
+    }
+  })();
+
+  return equipmentTypeListRequestPromise;
+};
+
 export type EquipmentMasterOption = {
   equipmentId: number;
   equipmentCode: string;
@@ -281,6 +319,64 @@ export const fetchBeamEnergyList = async (): Promise<BeamEnergyMasterOption[]> =
   return beamEnergyListRequestPromise;
 };
 
+export type UnitMasterOption = {
+  id: number;
+  code: string;
+  name: string;
+  unitCode: string;
+  symbol: string;
+  category: string;
+  description: string;
+};
+
+/** @deprecated Use UnitMasterOption */
+export type EnergyUnitMasterOption = UnitMasterOption;
+
+const mapUnitMasterOption = (row: Record<string, unknown>): UnitMasterOption => ({
+  id: Number(row.id ?? 0),
+  code: String(row.code ?? "").trim(),
+  name: String(row.name ?? "").trim(),
+  unitCode: String(row.unitCode ?? "").trim(),
+  symbol: String(row.symbol ?? "").trim(),
+  category: String(row.category ?? "").trim(),
+  description: String(row.description ?? "").trim(),
+});
+
+const unitListCache = new Map<string, Promise<UnitMasterOption[]>>();
+
+/**
+ * Unit master — GET api/v1/system/unit-list (authenticated)
+ */
+export const fetchUnitList = async (category?: string): Promise<UnitMasterOption[]> => {
+  const cacheKey = category?.trim().toUpperCase() || "__ALL__";
+  const cached = unitListCache.get(cacheKey);
+  if (cached) return cached;
+
+  const request = (async () => {
+    try {
+      const url = category?.trim()
+        ? `${SYSTEM.UNIT_LIST}?category=${encodeURIComponent(category.trim())}`
+        : SYSTEM.UNIT_LIST;
+      const body = await get(url);
+      assertSuccessEnvelope(body);
+      return asList(body)
+        .map(mapUnitMasterOption)
+        .filter((item) => Boolean(item.code || item.name || item.unitCode));
+    } catch (error) {
+      unitListCache.delete(cacheKey);
+      wrapLookupError(error);
+      return [];
+    }
+  })();
+
+  unitListCache.set(cacheKey, request);
+  return request;
+};
+
+/** Backward-compatible wrapper for energy-only consumers. */
+export const fetchEnergyUnitList = async (): Promise<UnitMasterOption[]> =>
+  fetchUnitList("ENERGY");
+
 /** motorStage filter for mixing cycle master — always sent as string ("0" | "1" | "2" | "3" | "ALL") */
 export type MixingCycleMotorStage = 0 | 1 | 2 | 3 | "ALL" | number | string;
 
@@ -335,7 +431,6 @@ export type SubscaleArticleOption = {
   subscaleArticleId: number;
   subscaleArticleCode: string;
   subscaleArticleName: string;
-  displayOrder: number;
   isActive: boolean;
 };
 
@@ -347,7 +442,6 @@ const mapSubscaleArticleOption = (row: Record<string, unknown>): SubscaleArticle
   subscaleArticleId: Number(row.subscaleArticleId ?? row.id ?? 0),
   subscaleArticleCode: String(row.subscaleArticleCode ?? row.code ?? "").trim(),
   subscaleArticleName: String(row.subscaleArticleName ?? row.name ?? "").trim(),
-  displayOrder: Number(row.displayOrder ?? 0),
   isActive: row.isActive !== false,
 });
 
@@ -366,11 +460,7 @@ export const fetchSubscaleArticles = async (
     assertSuccessEnvelope(body);
     return asList(body)
       .map(mapSubscaleArticleOption)
-      .filter((item) => Boolean(item.subscaleArticleName))
-      .sort((a, b) => {
-        if (a.displayOrder !== b.displayOrder) return a.displayOrder - b.displayOrder;
-        return a.subscaleArticleName.localeCompare(b.subscaleArticleName);
-      });
+      .filter((item) => Boolean(item.subscaleArticleName));
   } catch (error) {
     wrapLookupError(error);
     return [];

@@ -1,3 +1,4 @@
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 import {
   Box,
   IconButton,
@@ -319,16 +320,24 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
               <TableHead>
                 <TableRow>
                   {[
-                    "Sr.",
-                    "Sections",
-                    "Orientations",
-                    "SFD",
-                    "No. of Normal Exposure",
-                    "No. of Tangential Exposure",
-                    "Type of Detector",
-                  ].map((label) => (
+                    { label: "Sr.", required: false },
+                    { label: "Sections", required: true },
+                    { label: "Orientations", required: true },
+                    { label: "SFD", required: true },
+                    { label: "No. of Normal Exposure", required: true },
+                    { label: "No. of Tangential Exposure", required: true },
+                    { label: "Type of Detector", required: true },
+                  ].map(({ label, required }) => (
                     <TableCell key={label} sx={TH}>
-                      {label}
+                      {required ? (
+                        <FieldLabelWithAsterisk
+                          label={label}
+                          required
+                          sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit" }}
+                        />
+                      ) : (
+                        label
+                      )}
                     </TableCell>
                   ))}
                 </TableRow>
@@ -534,7 +543,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                 <TableCell sx={{ ...TH, width: 44 }}>#</TableCell>
                 <TableCell sx={TH}>Section</TableCell>
                 <TableCell sx={TH}>Orientation</TableCell>
-                <TableCell sx={TH}>Observations</TableCell>
+                <TableCell sx={TH}><FieldLabelWithAsterisk label="Observations" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
                 <TableCell sx={TH}>Image</TableCell>
                 <TableCell sx={{ ...TH, width: 44 }} />
               </TableRow>
@@ -643,7 +652,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
             <TableHead>
               <TableRow>
                 <TableCell sx={{ ...TH, width: 44 }}>#</TableCell>
-                <TableCell sx={{ ...TH, minWidth: 180 }}>Observation</TableCell>
+                <TableCell sx={{ ...TH, minWidth: 180 }}><FieldLabelWithAsterisk label="Observation" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
                 <TableCell sx={TH}>Section</TableCell>
                 <TableCell sx={TH}>Orientation</TableCell>
                 <TableCell sx={TH}>Media</TableCell>
@@ -787,7 +796,7 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
               multiple={false}
               acceptMode="pdf"
               subDeptSlug="ndt"
-              label="Upload PDF"
+              label="Upload PDF *"
               emptyLabel={S.FILE_EMPTY_REPORT}
             />
             <FieldErrorText message={err("signedReport")} />

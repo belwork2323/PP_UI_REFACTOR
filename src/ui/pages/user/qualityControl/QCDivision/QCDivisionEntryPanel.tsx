@@ -125,6 +125,8 @@ type QCDivisionEntryPanelProps = {
   unitActions?: QCDivisionEntryUnitActions | null;
   canResetPostCureSetup?: boolean;
   onResetPostCureSetup?: () => void;
+  /** Per-entry field errors (REVALIDATION paths: rows.{i}.RESULT, …). */
+  validationErrors?: Record<string, string> | null;
 };
 
 const QCDivisionEntryPanel = ({
@@ -148,6 +150,7 @@ const QCDivisionEntryPanel = ({
   unitActions = null,
   canResetPostCureSetup = false,
   onResetPostCureSetup,
+  validationErrors = null,
 }: QCDivisionEntryPanelProps) => {
   const BRAND = QC_DIVISION_BRAND;
 
@@ -387,7 +390,13 @@ const QCDivisionEntryPanel = ({
         }
         return hydrated;
       }
-      return createInitialCuringValues(entry.subType);
+      return createInitialCuringValues(
+        (entry.subType === "NORMAL" ||
+        entry.subType === "CONFINED" ||
+        entry.subType === "N2_PRESSURE"
+          ? entry.subType
+          : "") as "" | "NORMAL" | "CONFINED" | "N2_PRESSURE",
+      );
     }
     if (entry.kind === "DE_CORING_MOTOR") {
       if (entry.savedSections?.length) {
@@ -462,6 +471,7 @@ const QCDivisionEntryPanel = ({
           onChange={handleValuesChange}
           readOnly={readOnly}
           headerActions={headerActions}
+          validationErrors={validationErrors}
         />
       </Box>
     );
@@ -482,6 +492,7 @@ const QCDivisionEntryPanel = ({
           onChange={handleValuesChange}
           readOnly={readOnly}
           headerActions={headerActions}
+          validationErrors={validationErrors}
         />
       </Box>
     );
@@ -503,6 +514,7 @@ const QCDivisionEntryPanel = ({
           onChange={handleValuesChange}
           readOnly={readOnly}
           headerActions={headerActions}
+          validationErrors={validationErrors}
         />
       </Box>
     );
@@ -517,6 +529,7 @@ const QCDivisionEntryPanel = ({
         readOnly={readOnly}
         disabled={fieldsDisabled}
         headerActions={headerActions}
+        validationErrors={validationErrors}
       />
     );
   }
@@ -530,6 +543,7 @@ const QCDivisionEntryPanel = ({
         readOnly={readOnly}
         disabled={fieldsDisabled}
         headerActions={headerActions}
+        validationErrors={validationErrors}
       />
     );
   }
@@ -545,6 +559,7 @@ const QCDivisionEntryPanel = ({
         readOnly={readOnly}
         disabled={fieldsDisabled}
         headerActions={headerActions}
+        validationErrors={validationErrors}
       />
     );
   }
@@ -558,6 +573,7 @@ const QCDivisionEntryPanel = ({
         readOnly={readOnly}
         disabled={fieldsDisabled}
         headerActions={headerActions}
+        validationErrors={validationErrors}
       />
     );
   }
@@ -572,6 +588,7 @@ const QCDivisionEntryPanel = ({
         disabled={fieldsDisabled}
         headerActions={headerActions}
         batchPayload={divisionAutoPopulateData ?? batchPayload}
+        validationErrors={validationErrors}
       />
     );
   }
@@ -585,6 +602,7 @@ const QCDivisionEntryPanel = ({
         readOnly={readOnly}
         disabled={fieldsDisabled}
         headerActions={headerActions}
+        validationErrors={validationErrors}
       />
     );
   }
@@ -624,6 +642,7 @@ const QCDivisionEntryPanel = ({
           onChange={handleValuesChange}
           batchId={batchId}
           readOnly={readOnly || fieldsDisabled}
+          validationErrors={validationErrors}
         />
       </Box>
     );
@@ -655,6 +674,7 @@ const QCDivisionEntryPanel = ({
           onChange={handleValuesChange}
           readOnly={readOnly}
           autoSeed={premixAutoSeed}
+          validationErrors={validationErrors}
         />
       </Box>
     );
@@ -846,16 +866,10 @@ const QCDivisionEntryPanel = ({
     );
   }
 
-  const showEntryHeader =
-    entry.kind !== "TRIMMING_MOTOR" &&
-    entry.kind !== "DE_CORING_MOTOR" &&
-    entry.kind !== "POST_CURE_MOTOR" &&
-    entry.kind !== "NDT_MOTOR" &&
-    entry.kind !== "PROPELLANT_MOTOR" &&
-    entry.kind !== "PROPELLANT_PROCESS" &&
-    entry.kind !== "WEIGHTMENT_MOTOR";
-  const isTrimmingMotor = false;
-
+  // Motor kinds (TRIMMING / NDT / PROPELLANT / etc.) already early-return above
+  // with their own panels + headers. Code below only runs for remaining kinds
+  // (SIMPLE / STF / SOLID_PREMIX / LIQUID_PREMIX / PROCESSING_MATERIAL / …),
+  // so always show the entry header here.
   return (
     <Box
       sx={{
@@ -866,30 +880,12 @@ const QCDivisionEntryPanel = ({
         py: 1.25,
       }}
     >
-      {isTrimmingMotor ? (
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start" mb={1.25} gap={1}>
-          <Box>
-            <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: BRAND.primary }}>
-              {entry.motorId}
-            </Typography>
-            <Typography sx={{ fontSize: "0.74rem", color: BRAND.textSub, mt: 0.25 }}>
-              {S.TRIMMING_MOTOR_RECEIVED_DATE_LABEL}: {entry.motorReceivedDate?.trim() || "—"}
-            </Typography>
-          </Box>
-          {headerActions}
-        </Stack>
-      ) : showEntryHeader ? (
-        <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1} gap={1}>
-          <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: BRAND.primary }}>
-            {entry.label}
-          </Typography>
-          {headerActions}
-        </Stack>
-      ) : (
-        <Stack direction="row" justifyContent="flex-end" alignItems="center" mb={1}>
-          {headerActions}
-        </Stack>
-      )}
+      <Stack direction="row" justifyContent="space-between" alignItems="center" mb={1} gap={1}>
+        <Typography sx={{ fontSize: "0.84rem", fontWeight: 800, color: BRAND.primary }}>
+          {entry.label}
+        </Typography>
+        {headerActions}
+      </Stack>
 
       <QCSchemaPanel
         schema={resolvedSchema}

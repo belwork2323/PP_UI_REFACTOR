@@ -1,5 +1,7 @@
 import {
   emptyMasterDataStats,
+  parseMasterDataAuditFields,
+  type MasterDataAuditFields,
   type MasterDataStats,
 } from "@data/models/admin/MasterData/MasterDataModel";
 
@@ -15,7 +17,7 @@ export type CuringCycleStepForm = {
   hotWaterCirculation: string;
 };
 
-export type CuringCycleRecord = {
+export type CuringCycleRecord = MasterDataAuditFields & {
   id: string;
   motorStage: number;
   motorStageName: string;
@@ -76,6 +78,7 @@ const mapStep = (raw: any): CuringCycleStepForm => ({
 
 export const CuringCycleRecordModel = {
   fromApi: (raw: any): CuringCycleRecord => ({
+    ...parseMasterDataAuditFields(raw),
     id: String(raw?.id ?? ""),
     motorStage: Number(raw?.motorStage ?? 0),
     motorStageName: String(raw?.motorStageName ?? ""),

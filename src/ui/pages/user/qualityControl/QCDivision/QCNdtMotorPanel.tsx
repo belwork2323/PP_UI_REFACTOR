@@ -46,6 +46,9 @@ import {
   qcReadOnlyTableHeaderCellSx,
 } from "./components/QCDivisionReadOnlyValue";
 import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import FieldErrorText from "@/ui/components/validation/FieldErrorText";
+import { fieldError } from "@/data/validation/adapters/qcNdtDivision.validation";
 
 const BRAND = QC_DIVISION_BRAND;
 const NDT_S = STRINGS.QUALITY_CONTROL.NDT;
@@ -124,11 +127,13 @@ const RadiographyDetailsTable = ({
   onChange,
   readOnly = false,
   disabled = false,
+  validationErrors = null,
 }: {
   rows: QcNdtRadiographyDetailRow[];
   onChange: (rows: QcNdtRadiographyDetailRow[]) => void;
   readOnly?: boolean;
   disabled?: boolean;
+  validationErrors?: Record<string, string> | null;
 }) => {
   const headerSx = readOnly ? qcReadOnlyTableHeaderCellSx : TH;
   const bodyCellSx = readOnly ? qcReadOnlyBodyCellSx : cellSx;
@@ -137,12 +142,33 @@ const RadiographyDetailsTable = ({
     id: keyof QcNdtRadiographyDetailRow;
     label: string;
     kind: "text" | "number";
+    required?: boolean;
   }> = [
-    { id: "MACHINE_NO", label: QC_NDT_FIELD_LABELS.MACHINE_NO, kind: "text" },
-    { id: "NO_OF_SECTIONS", label: QC_NDT_FIELD_LABELS.NO_OF_SECTIONS, kind: "number" },
-    { id: "NO_OF_ORIENTATIONS", label: QC_NDT_FIELD_LABELS.NO_OF_ORIENTATIONS, kind: "number" },
-    { id: "NORMAL_EXPOSURES", label: QC_NDT_FIELD_LABELS.NORMAL_EXPOSURES, kind: "number" },
-    { id: "TANGENTIAL_EXPOSURES", label: QC_NDT_FIELD_LABELS.TANGENTIAL_EXPOSURES, kind: "number" },
+    { id: "MACHINE_NO", label: QC_NDT_FIELD_LABELS.MACHINE_NO, kind: "text", required: true },
+    {
+      id: "NO_OF_SECTIONS",
+      label: QC_NDT_FIELD_LABELS.NO_OF_SECTIONS,
+      kind: "number",
+      required: true,
+    },
+    {
+      id: "NO_OF_ORIENTATIONS",
+      label: QC_NDT_FIELD_LABELS.NO_OF_ORIENTATIONS,
+      kind: "number",
+      required: true,
+    },
+    {
+      id: "NORMAL_EXPOSURES",
+      label: QC_NDT_FIELD_LABELS.NORMAL_EXPOSURES,
+      kind: "number",
+      required: true,
+    },
+    {
+      id: "TANGENTIAL_EXPOSURES",
+      label: QC_NDT_FIELD_LABELS.TANGENTIAL_EXPOSURES,
+      kind: "number",
+      required: true,
+    },
   ];
 
   const updateCell = (index: number, field: keyof QcNdtRadiographyDetailRow, value: string) => {
@@ -164,7 +190,15 @@ const RadiographyDetailsTable = ({
               <TableCell sx={headerSx}>{QC_NDT_FIELD_LABELS.SR_NO}</TableCell>
               {columns.map((column) => (
                 <TableCell key={column.id} sx={headerSx}>
-                  {column.label}
+                  {column.required ? (
+                    <FieldLabelWithAsterisk
+                      label={column.label}
+                      required
+                      sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+                    />
+                  ) : (
+                    column.label
+                  )}
                 </TableCell>
               ))}
             </TableRow>
@@ -186,20 +220,28 @@ const RadiographyDetailsTable = ({
                 </TableCell>
                 {columns.map((column) => {
                   const value = String(row[column.id] ?? "");
+                  const message = fieldError(
+                    validationErrors ?? undefined,
+                    `${index}.${column.id}`,
+                  );
                   return (
                     <TableCell key={column.id} sx={bodyCellSx}>
                       {readOnly ? (
                         <QCDivisionReadOnlyValue value={value} muted={!value.trim()} />
                       ) : (
-                        <TextField
-                          size="small"
-                          fullWidth
-                          type={column.kind === "number" ? "number" : "text"}
-                          value={value}
-                          disabled={inputsDisabled}
-                          onChange={(event) => updateCell(index, column.id, event.target.value)}
-                          sx={tableFieldSx}
-                        />
+                        <Box>
+                          <TextField
+                            size="small"
+                            fullWidth
+                            type={column.kind === "number" ? "number" : "text"}
+                            value={value}
+                            disabled={inputsDisabled}
+                            onChange={(event) => updateCell(index, column.id, event.target.value)}
+                            sx={tableFieldSx}
+                            error={Boolean(message)}
+                          />
+                          <FieldErrorText message={message} />
+                        </Box>
                       )}
                     </TableCell>
                   );
@@ -421,6 +463,7 @@ type QCNdtMotorPanelProps = {
   readOnly?: boolean;
   disabled?: boolean;
   headerActions?: ReactNode;
+  validationErrors?: Record<string, string> | null;
 };
 
 const QCNdtMotorPanel = ({
@@ -430,6 +473,7 @@ const QCNdtMotorPanel = ({
   readOnly = false,
   disabled = false,
   headerActions,
+  validationErrors = null,
 }: QCNdtMotorPanelProps) => {
   const inputsDisabled = disabled || readOnly;
   const radiographyRows = useMemo(() => getNdtRadiographyDetailRows(values), [values]);
@@ -498,6 +542,7 @@ const QCNdtMotorPanel = ({
             onChange={(rows) => patchValues((prev) => setNdtRadiographyDetailRows(prev, rows))}
             readOnly={readOnly}
             disabled={inputsDisabled}
+            validationErrors={validationErrors}
           />
         </SectionCard>
         <SectionCard title={QC_NDT_SECTION_TITLES.RADIOGRAPHY_OBSERVATIONS} readOnly={readOnly}>

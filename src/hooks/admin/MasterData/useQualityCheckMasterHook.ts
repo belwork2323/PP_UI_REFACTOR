@@ -56,6 +56,7 @@ export default function useQualityCheckMasterHook({
   const [saving, setSaving] = useState(false);
   const [disableTarget, setDisableTarget] = useState<QualityCheckRecord | null>(null);
   const [disabling, setDisabling] = useState(false);
+  const [enabling, setEnabling] = useState(false);
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -156,6 +157,36 @@ export default function useQualityCheckMasterHook({
     }
   };
 
+  const enableRecord = async (record: QualityCheckRecord) => {
+    setEnabling(true);
+    useAlertStore.getState().showAlert(S.MESSAGES.ENABLING, "loading");
+    try {
+      const nextForm = { ...mapQualityCheckRecordToForm(record), isActive: true };
+      const resp = new ApiResponseModel(await updateQualityCheckMaster(buildQualityCheckUpdatePayload(nextForm)));
+      if (resp.success) {
+        useAlertStore.getState().showAlert(S.MESSAGES.ENABLE_SUCCESS, "success");
+        await loadList();
+      } else {
+        useAlertStore.getState().showAlert(getMasterDataErrorMessage(resp, S.ERRORS.OPERATION_FAILED), "error");
+      }
+    } catch (e: any) {
+      useAlertStore
+        .getState()
+        .showAlert(getMasterDataErrorMessage(e?.response?.data, S.ERRORS.OPERATION_FAILED), "error");
+    } finally {
+      setEnabling(false);
+    }
+  };
+
+  const handleToggleActive = (record: QualityCheckRecord, nextActive: boolean) => {
+    if (inlineMode != null || saving || disabling || enabling) return;
+    if (nextActive) {
+      void enableRecord(record);
+      return;
+    }
+    setDisableTarget(record);
+  };
+
   const confirmDisable = async () => {
     if (!disableTarget) return;
     setDisabling(true);
@@ -211,6 +242,8 @@ export default function useQualityCheckMasterHook({
     disableTarget,
     setDisableTarget,
     disabling,
+    enabling,
+    handleToggleActive,
     confirmDisable,
     refresh: loadList,
   };

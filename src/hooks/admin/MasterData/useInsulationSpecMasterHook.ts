@@ -56,6 +56,7 @@ export default function useInsulationSpecMasterHook({
   const [saving, setSaving] = useState(false);
   const [disableTarget, setDisableTarget] = useState<InsulationSpecRecord | null>(null);
   const [disabling, setDisabling] = useState(false);
+  const [enabling, setEnabling] = useState(false);
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -157,6 +158,38 @@ export default function useInsulationSpecMasterHook({
     }
   };
 
+  const enableRecord = async (record: InsulationSpecRecord) => {
+    setEnabling(true);
+    useAlertStore.getState().showAlert(S.MESSAGES.ENABLING, "loading");
+    try {
+      const nextForm = { ...mapInsulationRecordToForm(record), isActive: true };
+      const resp = new ApiResponseModel(await updateInsulationSpecMaster(buildInsulationUpdatePayload(nextForm)));
+      if (resp.success) {
+        useAlertStore.getState().showAlert(S.MESSAGES.ENABLE_SUCCESS, "success");
+        await loadList();
+      } else {
+        useAlertStore
+          .getState()
+          .showAlert(getMasterDataErrorMessage(resp, S.ERRORS.OPERATION_FAILED), "error");
+      }
+    } catch (e: any) {
+      useAlertStore
+        .getState()
+        .showAlert(getMasterDataErrorMessage(e?.response?.data, S.ERRORS.OPERATION_FAILED), "error");
+    } finally {
+      setEnabling(false);
+    }
+  };
+
+  const handleToggleActive = (record: InsulationSpecRecord, nextActive: boolean) => {
+    if (inlineMode != null || saving || disabling || enabling) return;
+    if (nextActive) {
+      void enableRecord(record);
+      return;
+    }
+    setDisableTarget(record);
+  };
+
   const confirmDisable = async () => {
     if (!disableTarget) return;
     setDisabling(true);
@@ -212,6 +245,8 @@ export default function useInsulationSpecMasterHook({
     disableTarget,
     setDisableTarget,
     disabling,
+    enabling,
+    handleToggleActive,
     confirmDisable,
     refresh: loadList,
   };

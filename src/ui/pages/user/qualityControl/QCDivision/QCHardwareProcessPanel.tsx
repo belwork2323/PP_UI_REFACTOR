@@ -47,6 +47,9 @@ import {
   qcReadOnlyTableHeaderCellSx,
 } from "./components/QCDivisionReadOnlyValue";
 import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import FieldErrorText from "@/ui/components/validation/FieldErrorText";
+import { fieldError } from "@/data/validation/adapters/qcHardware.validation";
 
 const BRAND = QC_DIVISION_BRAND;
 const TABLE_BORDER = alpha(BRAND.primary, 0.18);
@@ -129,6 +132,7 @@ type ColumnDef<T> = {
   id: keyof T & string;
   label: string;
   fieldType?: "text" | "number" | "date" | "time" | "textarea";
+  required?: boolean;
 };
 
 type EditableTableProps<T extends Record<string, unknown>> = {
@@ -138,6 +142,9 @@ type EditableTableProps<T extends Record<string, unknown>> = {
   onChange: (rows: T[]) => void;
   createEmptyRow: (srNo: number) => T;
   readOnly?: boolean;
+  /** Paths: {errorPrefix}.{rowIndex}.{FIELD_ID} */
+  validationErrors?: Record<string, string> | null;
+  errorPrefix?: string;
 };
 
 const HardwareEditableTable = <T extends Record<string, unknown>>({
@@ -147,6 +154,8 @@ const HardwareEditableTable = <T extends Record<string, unknown>>({
   onChange,
   createEmptyRow,
   readOnly = false,
+  validationErrors = null,
+  errorPrefix = "",
 }: EditableTableProps<T>) => {
   const headerSx = readOnly ? qcReadOnlyTableHeaderCellSx : TH;
   const bodyCellSx = readOnly ? qcReadOnlyBodyCellSx : cellSx;
@@ -247,7 +256,15 @@ const HardwareEditableTable = <T extends Record<string, unknown>>({
               <TableCell sx={headerSx}>S. No</TableCell>
               {columns.map((column) => (
                 <TableCell key={column.id} sx={headerSx}>
-                  {column.label}
+                  {column.required ? (
+                    <FieldLabelWithAsterisk
+                      label={column.label}
+                      required
+                      sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+                    />
+                  ) : (
+                    column.label
+                  )}
                 </TableCell>
               ))}
               {!readOnly ? <TableCell sx={headerSx} align="center" /> : null}
@@ -270,11 +287,18 @@ const HardwareEditableTable = <T extends Record<string, unknown>>({
                 <TableCell sx={bodyCellSx}>
                   {readOnly ? <QCDivisionReadOnlyValue value={index + 1} /> : index + 1}
                 </TableCell>
-                {columns.map((column) => (
-                  <TableCell key={column.id} sx={bodyCellSx}>
-                    {renderInput(row, index, column)}
-                  </TableCell>
-                ))}
+                {columns.map((column) => {
+                  const path = errorPrefix
+                    ? `${errorPrefix}.${index}.${column.id}`
+                    : `${index}.${column.id}`;
+                  const message = fieldError(validationErrors ?? undefined, path);
+                  return (
+                    <TableCell key={column.id} sx={bodyCellSx}>
+                      {renderInput(row, index, column)}
+                      {!readOnly ? <FieldErrorText message={message} /> : null}
+                    </TableCell>
+                  );
+                })}
                 {!readOnly ? (
                   <TableCell sx={bodyCellSx} align="center">
                     <IconButton
@@ -315,13 +339,14 @@ type QCHardwareProcessPanelProps = {
   onChange: (values: SchemaFormValues | ((prev: SchemaFormValues) => SchemaFormValues)) => void;
   readOnly?: boolean;
   headerActions?: ReactNode;
+  validationErrors?: Record<string, string> | null;
 };
 
 const ABRADING_COLUMNS: ColumnDef<QcHardwareCutRow>[] = [
-  { id: "DATE", label: "Date", fieldType: "date" },
-  { id: "START_TIME", label: "Start Time", fieldType: "time" },
-  { id: "END_TIME", label: "End Time", fieldType: "time" },
-  { id: "DUST_QTY", label: "Qty of Dust (gms)", fieldType: "number" },
+  { id: "DATE", label: "Date", fieldType: "date", required: true },
+  { id: "START_TIME", label: "Start Time", fieldType: "time", required: true },
+  { id: "END_TIME", label: "End Time", fieldType: "time", required: true },
+  { id: "DUST_QTY", label: "Qty of Dust (gms)", fieldType: "number", required: true },
   { id: "OBSERVATIONS", label: "Observations", fieldType: "textarea" },
 ];
 
@@ -352,6 +377,7 @@ const QCHardwareProcessPanel = ({
   onChange,
   readOnly = false,
   headerActions,
+  validationErrors = null,
 }: QCHardwareProcessPanelProps) => {
   const processLabel = getQcHardwareProcessLabel(subType);
   const firstCutRows = useMemo(
@@ -446,6 +472,8 @@ const QCHardwareProcessPanel = ({
               OBSERVATIONS: "",
             })}
             readOnly={readOnly}
+            validationErrors={validationErrors}
+            errorPrefix={QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID}
           />
           <HardwareEditableTable
             title="Second Cut"
@@ -461,6 +489,8 @@ const QCHardwareProcessPanel = ({
               OBSERVATIONS: "",
             })}
             readOnly={readOnly}
+            validationErrors={validationErrors}
+            errorPrefix={QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID}
           />
         </Stack>
       ) : null}

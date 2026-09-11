@@ -34,21 +34,26 @@ import {
   setRevalidationRows,
   type QcRevalidationRow,
 } from "../../../../../hooks/user/qualityControl/qcRawMaterialRevalidationTable";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import FieldErrorText from "@/ui/components/validation/FieldErrorText";
+import { fieldError } from "@/data/validation/adapters/qcRawMaterial.validation";
 
 type QCRawMaterialRevalidationTableProps = {
   values: SchemaFormValues;
   onChange: (values: SchemaFormValues | ((prev: SchemaFormValues) => SchemaFormValues)) => void;
   batchId?: string;
   readOnly?: boolean;
+  /** Path keys: rows.{index}.RESULT | ACEM_QC_RESULT | VALIDITY | REMARKS | LOT_BATCH_NUMBER */
+  validationErrors?: Record<string, string> | null;
 };
 
 const COMPACT_TABLE_COLUMNS = [
-  { id: "PARAMETER", label: "Parameter" },
-  { id: "SPECIFICATION", label: "Specs" },
-  { id: "RESULT", label: "Analysed Result" },
-  { id: "ACEM_QC_RESULT", label: "ACEM QC Result" },
-  { id: "VALIDITY", label: "Validity" },
-  { id: "REMARKS", label: "Remarks" },
+  { id: "PARAMETER", label: "Parameter", required: false },
+  { id: "SPECIFICATION", label: "Specs", required: false },
+  { id: "RESULT", label: "Analysed Result", required: true },
+  { id: "ACEM_QC_RESULT", label: "ACEM QC Result", required: true },
+  { id: "VALIDITY", label: "Validity", required: true },
+  { id: "REMARKS", label: "Remarks", required: false },
 ] as const;
 
 const FIELD_HEIGHT = 36;
@@ -114,12 +119,18 @@ const QCRawMaterialRevalidationTable = ({
   values,
   onChange,
   readOnly = false,
+  validationErrors = null,
 }: QCRawMaterialRevalidationTableProps) => {
   const BRAND = QC_DIVISION_BRAND;
   const baseCellSx = readOnly ? qcReadOnlyBodyCellSx : cellSx;
   const rows = useMemo(
     () => getRevalidationRows(values).filter((row) => row._rowRole !== "picker"),
     [values],
+  );
+
+  const err = useCallback(
+    (path: string) => fieldError(validationErrors ?? undefined, path),
+    [validationErrors],
   );
 
   const groups = useMemo(() => {
@@ -197,13 +208,16 @@ const QCRawMaterialRevalidationTable = ({
     label,
     children,
     minWidth = 140,
+    required = false,
   }: {
     label: string;
     children: ReactNode;
     minWidth?: number | { xs?: number; sm?: number };
+    required?: boolean;
   }) => (
     <Box sx={{ minWidth, flex: { xs: "1 1 100%", sm: "1 1 0" } }}>
       <Typography
+        component="div"
         sx={{
           fontSize: "0.62rem",
           fontWeight: 700,
@@ -213,7 +227,22 @@ const QCRawMaterialRevalidationTable = ({
           mb: 0.4,
         }}
       >
-        {label}
+        {required ? (
+          <FieldLabelWithAsterisk
+            label={label}
+            required
+            sx={{
+              fontSize: "inherit",
+              fontWeight: "inherit",
+              letterSpacing: "inherit",
+              textTransform: "inherit",
+              color: "inherit",
+              mb: 0,
+            }}
+          />
+        ) : (
+          label
+        )}
       </Typography>
       {children}
     </Box>
@@ -248,6 +277,9 @@ const QCRawMaterialRevalidationTable = ({
               entry.QC_CERTIFICATE.length > 0,
           )?.QC_CERTIFICATE as FileRef[] | undefined) ?? [];
 
+        const firstIdx = group.rowIndices[0] ?? 0;
+        const lotError = err(`rows.${firstIdx}.LOT_BATCH_NUMBER`);
+
         return (
           <Box
             key={group.groupId}
@@ -276,8 +308,9 @@ const QCRawMaterialRevalidationTable = ({
               <MetaField label="Ingredient" minWidth={{ xs: "100%", sm: 160 }}>
                 <ReadOnlyValue value={group.ingredient} />
               </MetaField>
-              <MetaField label="Lot Number" minWidth={{ xs: "100%", sm: 220 }}>
+              <MetaField label="Lot Number" minWidth={{ xs: "100%", sm: 220 }} required>
                 <ReadOnlyValue value={group.lotBatchNumber} />
+                <FieldErrorText message={lotError} />
               </MetaField>
             </Stack>
 
@@ -293,7 +326,21 @@ const QCRawMaterialRevalidationTable = ({
                   <TableRow>
                     {COMPACT_TABLE_COLUMNS.map((column) => (
                       <TableCell key={column.id} sx={headerCellSx}>
-                        {column.label}
+                        {column.required ? (
+                          <FieldLabelWithAsterisk
+                            label={column.label}
+                            required
+                            sx={{
+                              display: "inline",
+                              fontSize: "inherit",
+                              fontWeight: "inherit",
+                              color: "inherit",
+                              mb: 0,
+                            }}
+                          />
+                        ) : (
+                          column.label
+                        )}
                       </TableCell>
                     ))}
                   </TableRow>
@@ -317,7 +364,13 @@ const QCRawMaterialRevalidationTable = ({
                             : {}),
                         }}
                       >
-                        <TableCell sx={{ ...baseCellSx, background: readOnly ? "transparent" : "#fff", minWidth: 140 }}>
+                        <TableCell
+                          sx={{
+                            ...baseCellSx,
+                            background: readOnly ? "transparent" : "#fff",
+                            minWidth: 140,
+                          }}
+                        >
                           <ReadOnlyValue value={row.PARAMETER} muted />
                         </TableCell>
                         <TableCell sx={{ ...baseCellSx, background: "#fff", minWidth: 90 }}>
@@ -328,11 +381,14 @@ const QCRawMaterialRevalidationTable = ({
                             readOnly ? (
                               <ReadOnlyValue value={row.RESULT} />
                             ) : (
-                              renderText(
-                                String(row.RESULT ?? ""),
-                                (next) => updateRow(rowIndex, { RESULT: next }),
-                                "Analysed Result",
-                              )
+                              <Box>
+                                {renderText(
+                                  String(row.RESULT ?? ""),
+                                  (next) => updateRow(rowIndex, { RESULT: next }),
+                                  "Analysed Result",
+                                )}
+                                <FieldErrorText message={err(`rows.${rowIndex}.RESULT`)} />
+                              </Box>
                             )
                           ) : null}
                         </TableCell>
@@ -341,11 +397,14 @@ const QCRawMaterialRevalidationTable = ({
                             readOnly ? (
                               <ReadOnlyValue value={row.ACEM_QC_RESULT} />
                             ) : (
-                              renderText(
-                                String(row.ACEM_QC_RESULT ?? ""),
-                                (next) => updateRow(rowIndex, { ACEM_QC_RESULT: next }),
-                                "ACEM QC Result",
-                              )
+                              <Box>
+                                {renderText(
+                                  String(row.ACEM_QC_RESULT ?? ""),
+                                  (next) => updateRow(rowIndex, { ACEM_QC_RESULT: next }),
+                                  "ACEM QC Result",
+                                )}
+                                <FieldErrorText message={err(`rows.${rowIndex}.ACEM_QC_RESULT`)} />
+                              </Box>
                             )
                           ) : null}
                         </TableCell>
@@ -354,13 +413,17 @@ const QCRawMaterialRevalidationTable = ({
                             readOnly ? (
                               <ReadOnlyValue value={row.VALIDITY} />
                             ) : (
-                              <DateField
-                                value={String(row.VALIDITY ?? "")}
-                                onChange={(next) => updateRow(rowIndex, { VALIDITY: next })}
-                                placeholder="Validity"
-                                compact
-                                inputSx={uniformInputSx}
-                              />
+                              <Box>
+                                <DateField
+                                  value={String(row.VALIDITY ?? "")}
+                                  onChange={(next) => updateRow(rowIndex, { VALIDITY: next })}
+                                  placeholder="Validity"
+                                  compact
+                                  inputSx={uniformInputSx}
+                                  error={Boolean(err(`rows.${rowIndex}.VALIDITY`))}
+                                />
+                                <FieldErrorText message={err(`rows.${rowIndex}.VALIDITY`)} />
+                              </Box>
                             )
                           ) : null}
                         </TableCell>
@@ -369,11 +432,14 @@ const QCRawMaterialRevalidationTable = ({
                             readOnly ? (
                               <ReadOnlyValue value={row.REMARKS} muted />
                             ) : (
-                              renderText(
-                                String(row.REMARKS ?? ""),
-                                (next) => updateRow(rowIndex, { REMARKS: next }),
-                                "Remarks",
-                              )
+                              <Box>
+                                {renderText(
+                                  String(row.REMARKS ?? ""),
+                                  (next) => updateRow(rowIndex, { REMARKS: next }),
+                                  "Remarks",
+                                )}
+                                <FieldErrorText message={err(`rows.${rowIndex}.REMARKS`)} />
+                              </Box>
                             )
                           ) : null}
                         </TableCell>
@@ -429,6 +495,7 @@ const QCRawMaterialRevalidationTable = ({
                             acceptMode="imageVideoPdf"
                             emptyLabel="Upload"
                           />
+                          <FieldErrorText message={err(`rows.${firstIdx}.QC_CERTIFICATE`)} />
                         </Box>
                       </Stack>
                     </TableCell>

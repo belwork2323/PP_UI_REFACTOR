@@ -73,6 +73,7 @@ export const TableTextInput = ({
   error = false,
   helperText,
   placeholder,
+  required,
 }: {
   value: string;
   onChange: (val: string) => void;
@@ -84,6 +85,7 @@ export const TableTextInput = ({
   error?: boolean;
   helperText?: string;
   placeholder?: string;
+  required?: boolean;
 }) => (
   <Box sx={{ width: "100%" }}>
     <TextField
@@ -97,6 +99,7 @@ export const TableTextInput = ({
       placeholder={placeholder}
       error={error}
       helperText={helperText}
+      required={required}
       onChange={(e) => onChange(e.target.value)}
       sx={{
         "& .MuiInputBase-root": { fontSize: "0.82rem" },

@@ -69,23 +69,7 @@ import {
   resolveQcGateDivisionKey,
   resolveQcPreviousDivisionApprovedUnits,
 } from "./qcPreviousDivisionApproval";
-import {
-  getBatchStageProgressArrays,
-  resolveBatchStageContext,
-  type BatchStageContext,
-} from "../previousStageApproval";
-import type { BatchView } from "../../../data/models/user/BatchStageTypes";
-import {
-  findMotorUnit,
-  findPremixUnit,
-  getStage,
-  isMotorDisabled,
-  isPremixDisabled,
-  usesParallelUnitLocks,
-  SUB_DEPT,
-  fetchEnrichedBatchStageFields,
-} from "../../../utils/batchStageUtils";
-import { handleBatchInvalidState } from "../../../utils/batchInvalidStateHandler";
+import { getBatchStageProgressArrays } from "../previousStageApproval";
 import {
   buildQcDivisionPartialNav,
   buildPartialNavFromUnitStatusMaps,
@@ -283,6 +267,13 @@ import {
 import { useFileService } from "../../../hooks/useFileService";
 import { markPersistedFileRefsDeep } from "../../../data/models/common/FileUploadModel";
 import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
+
+import type { ValidationErrors, ValidationTier } from "../../../data/validation/submissionIntent";
+import {
+  validateQcDivisionEntry,
+  validateQcDivisionEntries,
+} from "../../../data/validation/adapters/qcDivisionValidation";
+
 import {
   collectTempFileIdsFromDivisionScope,
   entryMatchesDivisionTab,
@@ -412,6 +403,10 @@ export const useQCDivisionHook = () => {
   const [divisionEntryValues, setDivisionEntryValues] = useState<
     Record<string, QcDivisionEntryValues>
   >(defaultSplit.divisionEntryValues);
+  /** Per-entry field validation errors (FORMAT / UNIT / SUBMIT). */
+  const [entryValidationErrors, setEntryValidationErrors] = useState<
+    Record<string, ValidationErrors>
+  >({});
   const [mixingFinalMixDetailsValues, setMixingFinalMixDetailsValues] = useState<
     SchemaFormValues | undefined
   >(defaultSplit.mixingFinalMixDetailsValues);
@@ -704,6 +699,7 @@ export const useQCDivisionHook = () => {
     setDivisionSwitchConfirmOpen(false);
     setPendingDivisionTabKey(null);
     setHasSavedDraft(false);
+    setEntryValidationErrors({});
     setReadOnly(false);
     setDetailsRow(null);
     setDetailsData(null);
@@ -961,23 +957,6 @@ export const useQCDivisionHook = () => {
       }
     },
     [applyWorkflowStatusPayload, runBatchBootstrap, subDepartmentId],
-  );
-
-  const refreshBatchLocks = useCallback(
-    async (batchId: string) => {
-      await listParams.refreshUserBatches();
-      const enriched = await fetchEnrichedBatchStageFields(batchId);
-      if (enriched) {
-        setActiveBatch((prev) => (prev?.batchId === batchId ? { ...prev, ...enriched } : prev));
-        setBatchStageArrays({
-          stageProgress: enriched.stageProgress ?? null,
-          currentStage: enriched.currentStage ?? null,
-        });
-      }
-      bumpBatchRefresh();
-      return enriched;
-    },
-    [bumpBatchRefresh, listParams],
   );
 
   const fetchManufacturingDivisionDetails = useCallback(
@@ -3962,25 +3941,6 @@ export const useQCDivisionHook = () => {
     ],
   );
 
-  const qcBatchStageContext = useMemo((): BatchStageContext => {
-    const fromBootstrap = resolveBatchStageContext(
-      lastBootstrap?.batchDetails as Record<string, unknown> | null | undefined,
-    );
-    return {
-      parallelFlowEnabled: fromBootstrap.parallelFlowEnabled,
-      currentStage:
-        (batchStageArrays.currentStage as BatchStageContext["currentStage"]) ??
-        fromBootstrap.currentStage,
-      stageProgress:
-        (batchStageArrays.stageProgress as BatchStageContext["stageProgress"]) ??
-        fromBootstrap.stageProgress,
-    };
-  }, [
-    batchStageArrays.currentStage,
-    batchStageArrays.stageProgress,
-    lastBootstrap?.batchDetails,
-  ]);
-
   const qcPreviousDivisionGate = useMemo(() => {
     if (isEmptyManufacturingDivisionDetailsPayload(divisionAutoPopulateData)) {
       return {
@@ -4034,31 +3994,9 @@ export const useQCDivisionHook = () => {
       if (!item) return false;
       const qcStatus = normalizePartialItemStatus(item.status);
       if (qcStatus !== "TO_BE_INITIATED" && qcStatus !== "REJECTED") return true;
-
-      if (usesParallelUnitLocks(qcBatchStageContext)) {
-        const qcStage = getStage(qcBatchStageContext as BatchView, SUB_DEPT.QC);
-        if (item.kind === "MOTOR") {
-          const unit = findMotorUnit(qcStage, String(item.motorId ?? ""));
-          return !isMotorDisabled(unit);
-        }
-        if (item.kind === "FINAL_MIX") {
-          const unit = findPremixUnit(
-            qcStage,
-            item.finalMixNo ?? item.premixNo ?? "",
-            "FINAL_MIX",
-          );
-          return !isPremixDisabled(unit);
-        }
-        if (item.kind === "PREMIX") {
-          const unit = findPremixUnit(qcStage, item.premixNo ?? "", "PREMIX");
-          return !isPremixDisabled(unit);
-        }
-        return true;
-      }
-
       return isQcPartialItemEnabledByPreviousDivision(item, qcPreviousDivisionGate);
     },
-    [qcBatchStageContext, qcPreviousDivisionGate],
+    [qcPreviousDivisionGate],
   );
 
   loadFormForPartialItemRef.current = loadFormForPartialItem;
@@ -4073,11 +4011,6 @@ export const useQCDivisionHook = () => {
     (index: number) => {
       const item = partialNavItems[index];
       if (!item || isPartialNavItemEnabled(item)) return undefined;
-
-      if (usesParallelUnitLocks(qcBatchStageContext)) {
-        return STRINGS.MANUFACTURING.NOT_YET_UNLOCKED;
-      }
-
       return getQcPartialNavTabDisabledReason(item, index, partialNavItems, qcPreviousDivisionGate, {
         previousStage:
           item.kind === "PREMIX" || item.kind === "FINAL_MIX"
@@ -4090,7 +4023,6 @@ export const useQCDivisionHook = () => {
       messages.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
       messages.PREVIOUS_STAGE_PREMIX_TAB_DISABLED,
       partialNavItems,
-      qcBatchStageContext,
       qcPreviousDivisionGate,
     ],
   );
@@ -4148,15 +4080,17 @@ export const useQCDivisionHook = () => {
       entryId: string,
       valuesOrUpdater: SchemaFormValues | ((prev: SchemaFormValues) => SchemaFormValues),
     ) => {
+      const current =
+        formDataRef.current.divisionEntryValues?.[entryId]?.schemaValues ?? {};
+      const nextValuesResolved =
+        typeof valuesOrUpdater === "function" ? valuesOrUpdater(current) : valuesOrUpdater;
+
       setDivisionEntryValues((prev) => {
-        const current = prev[entryId]?.schemaValues ?? {};
-        const next =
-          typeof valuesOrUpdater === "function" ? valuesOrUpdater(current) : valuesOrUpdater;
         const nextValues = {
           ...prev,
           [entryId]: {
             ...(prev[entryId] ?? { schemaValues: {} }),
-            schemaValues: next,
+            schemaValues: nextValuesResolved,
           },
         };
         // Sync immediately so concurrent updateFormData (async unit seed) cannot
@@ -4167,6 +4101,27 @@ export const useQCDivisionHook = () => {
         };
         return nextValues;
       });
+
+      // Live FORMAT validation for the edited entry (path keys must match FieldErrorText lookups)
+      const entry = formDataRef.current.divisionEntries?.find((e) => e.entryId === entryId);
+      if (entry) {
+        try {
+          const formatErrors = validateQcDivisionEntry(entry, nextValuesResolved, "FORMAT", {
+            finalMixDetailsValues: formDataRef.current.mixingFinalMixDetailsValues,
+            viscosityValues: nextValuesResolved,
+          });
+          setEntryValidationErrors((prev) => {
+            if (Object.keys(formatErrors).length === 0) {
+              if (!prev[entryId]) return prev;
+              const { [entryId]: _removed, ...rest } = prev;
+              return rest;
+            }
+            return { ...prev, [entryId]: formatErrors };
+          });
+        } catch (error) {
+          console.error("QC FORMAT validation failed", entry.kind, entryId, error);
+        }
+      }
     },
     [],
   );
@@ -5719,17 +5674,7 @@ export const useQCDivisionHook = () => {
       : null;
 
     if (activePartialItem && isQcUnitLocked(activePartialItem.status)) {
-      showAlert(messages.EMPTY_FORM_ERROR, "warning");
-      return false;
-    }
-
-    if (activePartialItem && !isPartialNavItemEnabled(activePartialItem)) {
-      showAlert(
-        usesParallelUnitLocks(qcBatchStageContext)
-          ? STRINGS.MANUFACTURING.NOT_YET_UNLOCKED
-          : STRINGS.MANUFACTURING.PREVIOUS_STAGE_UNIT_DISABLED,
-        "warning",
-      );
+      showAlert(messages.UNIT_LOCKED_WAITING ?? messages.DIVISION_LOCKED_WAITING, "warning");
       return false;
     }
 
@@ -5754,19 +5699,83 @@ export const useQCDivisionHook = () => {
         : formDataRef.current;
 
     if (!hasDivisionEntries(submitFormState) && !submitFormState.schemaFormLoaded) {
-      showAlert(messages.EMPTY_FORM_ERROR, "warning");
       return false;
     }
 
-    if (!hasAnyQualityControlValue(submitFormState)) {
-      showAlert(messages.EMPTY_FORM_ERROR, "warning");
-      return false;
-    }
+    // Do not yellow-toast "enter at least one QC value" — field-level red errors handle mandatory checks.
 
     if (hasIncompleteQcFormUploads(submitFormState)) {
       showAlert(STRINGS.QUALITY_CONTROL.NDT.FILE_UPLOAD_PENDING, "warning");
       return false;
     }
+
+    // Field validation: UNIT on draft, SUBMIT on final unit submit
+    const validationTier: ValidationTier = intent === "draft" ? "UNIT" : "SUBMIT";
+    // Prefer scoped entries; fall back to full form so validation never no-ops.
+    const liveForm = formDataRef.current;
+    let entriesToValidate = submitFormState.divisionEntries ?? [];
+    if (!entriesToValidate.length) {
+      entriesToValidate = liveForm.divisionEntries ?? [];
+    }
+    // If partial unit is active, validate only that unit's entries when present in scope
+    if (activePartialItem) {
+      const scopedIds = new Set(
+        (submitFormState.divisionEntries ?? []).map((e) => e.entryId),
+      );
+      if (scopedIds.size > 0) {
+        entriesToValidate = entriesToValidate.filter((e) => scopedIds.has(e.entryId));
+      }
+    }
+    const valuesForValidation = {
+      ...(liveForm.divisionEntryValues ?? {}),
+      ...(submitFormState.divisionEntryValues ?? {}),
+    };
+    let validationOk = true;
+    let errorsByEntryId: Record<
+      string,
+      import("../../../data/validation/submissionIntent").ValidationErrors
+    > = {};
+    try {
+      const result = validateQcDivisionEntries(
+        entriesToValidate,
+        valuesForValidation,
+        validationTier,
+        {
+          mixingFinalMixDetailsValues:
+            submitFormState.mixingFinalMixDetailsValues ??
+            liveForm.mixingFinalMixDetailsValues,
+        },
+      );
+      validationOk = result.ok;
+      errorsByEntryId = result.errorsByEntryId;
+      console.info(
+        "[QC validation]",
+        intent,
+        validationTier,
+        "entries",
+        entriesToValidate.map((e) => e.kind + ":" + e.entryId),
+        "ok",
+        validationOk,
+        "errorKeys",
+        Object.keys(errorsByEntryId),
+      );
+    } catch (error) {
+      console.error("QC submit validation failed", error);
+      return false;
+    }
+    if (!validationOk) {
+      setEntryValidationErrors((prev) => ({ ...prev, ...errorsByEntryId }));
+      // Field-level red errors only — no yellow "enter at least one value" popup
+      return false;
+    }
+    // Clear errors for entries that passed
+    setEntryValidationErrors((prev) => {
+      const next = { ...prev };
+      entriesToValidate.forEach((e) => {
+        if (!errorsByEntryId[e.entryId]) delete next[e.entryId];
+      });
+      return next;
+    });
 
     const unitSubmissionType = intent === "draft" ? "DRAFT" : "SUBMIT";
     // Unit saves always keep root formSubmissionType as DRAFT (Case Prep / RMP pattern).
@@ -5818,22 +5827,12 @@ export const useQCDivisionHook = () => {
       }
 
       if (!response?.success) {
-        const handled = await handleBatchInvalidState(
-          response,
-          () => refreshBatchLocks(activeBatch.batchId),
-          showAlert,
-        );
-        if (handled) return false;
         const fallback = isCreateFlow ? messages.CREATE_FAILED : messages.UPDATE_FAILED;
         showAlert(getErrorMessage(response, fallback), "error");
         return false;
       }
 
       const nextFormId = response.data?.formId ?? activeBatch.formId ?? null;
-      const enriched =
-        intent === "submit" && activeBatch.batchId
-          ? await refreshBatchLocks(activeBatch.batchId)
-          : null;
       setActiveBatch((prev) =>
         prev
           ? {
@@ -5841,7 +5840,6 @@ export const useQCDivisionHook = () => {
               formId: nextFormId,
               division: formData.division,
               subType: formData.subType,
-              ...(enriched ?? {}),
             }
           : prev,
       );
@@ -5904,15 +5902,11 @@ export const useQCDivisionHook = () => {
         console.error("Failed to refresh QC statuses after unit save:", error);
       }
 
+      if (intent !== "draft") {
+        await listParams.refreshUserBatches();
+      }
+
       return true;
-    } catch (error) {
-      const handled = await handleBatchInvalidState(
-        error,
-        () => refreshBatchLocks(activeBatch.batchId),
-        showAlert,
-      );
-      if (handled) return false;
-      throw error;
     } finally {
       setActionLoading(false);
     }
@@ -5965,10 +5959,8 @@ export const useQCDivisionHook = () => {
         showAlert(messages.EMPTY_FORM_ERROR, "warning");
         return false;
       }
-      if (!hasAnyQualityControlValue(submitFormState)) {
-        showAlert(messages.EMPTY_FORM_ERROR, "warning");
-        return false;
-      }
+      // Field validation below replaces the yellow "enter at least one QC value" gate.
+
       payload = mapQualityControlPayload(submitFormState, {
         unitSubmissionType: "SUBMIT",
         divisionSubmissionType: "SUBMIT",
@@ -6012,20 +6004,11 @@ export const useQCDivisionHook = () => {
           });
 
       if (!response?.success) {
-        const handled = await handleBatchInvalidState(
-          response,
-          () => refreshBatchLocks(activeBatch.batchId),
-          showAlert,
-        );
-        if (handled) return false;
         showAlert(getErrorMessage(response, messages.DIVISION_SUBMIT_FAILED), "error");
         return false;
       }
 
       const nextFormId = response.data?.formId ?? activeBatch.formId ?? null;
-      const enriched = activeBatch.batchId
-        ? await refreshBatchLocks(activeBatch.batchId)
-        : null;
       setActiveBatch((prev) =>
         prev
           ? {
@@ -6033,7 +6016,6 @@ export const useQCDivisionHook = () => {
               formId: nextFormId,
               division: formData.division,
               subType: formData.subType,
-              ...(enriched ?? {}),
             }
           : prev,
       );
@@ -6075,15 +6057,8 @@ export const useQCDivisionHook = () => {
         console.error("Failed to refresh QC statuses after division submit:", error);
       }
 
+      await listParams.refreshUserBatches();
       return true;
-    } catch (error) {
-      const handled = await handleBatchInvalidState(
-        error,
-        () => refreshBatchLocks(activeBatch.batchId),
-        showAlert,
-      );
-      if (handled) return false;
-      throw error;
     } finally {
       setActionLoading(false);
     }
@@ -6097,7 +6072,6 @@ export const useQCDivisionHook = () => {
     messages,
     openFormWithResolvedData,
     partialNavItems,
-    refreshBatchLocks,
     refreshDivisionAndUnitStatuses,
     selectedDivision,
     selectedRawMaterialType,
@@ -6131,43 +6105,18 @@ export const useQCDivisionHook = () => {
       });
 
       if (!response?.success) {
-        const handled = await handleBatchInvalidState(
-          response,
-          () => refreshBatchLocks(activeBatch.batchId),
-          showAlert,
-        );
-        if (handled) return false;
         showAlert(getErrorMessage(response, messages.FINAL_APPROVAL_FAILED), "error");
         return false;
       }
 
-      if (activeBatch.batchId) {
-        await refreshBatchLocks(activeBatch.batchId);
-      }
-
       showAlert(messages.FINAL_APPROVAL_SUCCESS, "success", { autoCloseMs: 2200 });
+      await listParams.refreshUserBatches();
       resetFormContext();
       return true;
-    } catch (error) {
-      const handled = await handleBatchInvalidState(
-        error,
-        () => refreshBatchLocks(activeBatch.batchId),
-        showAlert,
-      );
-      if (handled) return false;
-      throw error;
     } finally {
       setActionLoading(false);
     }
-  }, [
-    activeBatch,
-    listParams,
-    messages,
-    refreshBatchLocks,
-    resetFormContext,
-    showAlert,
-    subDepartmentId,
-  ]);
+  }, [activeBatch, listParams, messages, resetFormContext, showAlert, subDepartmentId]);
 
   const partialNavActive = hasPartialChildNav(partialNavItems);
   const activePartialItem = partialNavActive
@@ -6555,6 +6504,9 @@ export const useQCDivisionHook = () => {
     postCureSetupOperationLabel,
     handlePartialNavIndexChange,
     handleDivisionEntryValuesChange,
+    /** Pass to QCForm as validationErrorsByEntryId */
+    validationErrorsByEntryId: entryValidationErrors,
+    entryValidationErrors,
     handleDivisionEntryLiquidValuesChange,
     handleMixingFinalMixDetailsChange,
     handleRemoveDivisionEntry,

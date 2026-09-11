@@ -1,48 +1,32 @@
-/**
- * Trimming — Excel sheet rules (FORMAT / UNIT / SUBMIT).
- */
-
 import type { TrimmingMotorSession } from "@/data/models/user/TrimmingFormModel";
 import type { FieldRuleConfig, SubDeptValidationConfig } from "../runValidation";
-import type { ValidationErrors, ValidationTier } from "../submissionIntent";
-import {
-  str,
-  ALPHA_NUM,
-  isFiniteNumber,
-  parseNumber,
-  meetsSpecification,
-} from "../fieldValidators";
+import type { ValidationTier } from "../submissionIntent";
+import { str } from "../fieldValidators";
+import { VALIDATIONSTRING } from "./validationString";
 
-const required = (label: string) => `${label} is required.`;
-const invalidNumber = (label: string) => `${label} must be numeric.`;
-const invalidDate = (label: string) => `${label} must be a valid date.`;
-const invalidText = (label: string) => `${label} must be alphanumeric.`;
-const invalidVsSpec = (label: string) => `${label} does not meet specification.`;
+const S = VALIDATIONSTRING;
 
-const textRule = (
-  label: string,
+const text = (
   requiredIn: ValidationTier[],
-  options?: { pattern?: RegExp; invalidMessage?: string },
+  pattern?: RegExp,
 ): FieldRuleConfig => ({
   valueType: "text",
   requiredIn,
-  pattern: options?.pattern,
-  messages: {
-    required: required(label),
-    invalid: options?.invalidMessage ?? invalidText(label),
-  },
+  pattern,
+  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
 
-const numberRule = (label: string, requiredIn: ValidationTier[]): FieldRuleConfig => ({
+const number = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
   valueType: "number",
   requiredIn,
-  messages: { required: required(label), invalid: invalidNumber(label) },
+  pattern: S.PATTERNS.FLOAT,
+  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
 
-const dateRule = (label: string, requiredIn: ValidationTier[]): FieldRuleConfig => ({
+const date = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
   valueType: "date",
   requiredIn,
-  messages: { required: required(label), invalid: invalidDate(label) },
+  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
 
 export type TrimmingValidationTarget = TrimmingMotorSession;
@@ -50,16 +34,14 @@ export type TrimmingValidationTarget = TrimmingMotorSession;
 const DEFAULT_READING_KEYS = ["R2T", "R2B", "R1R", "R1L"] as const;
 
 export const trimmingValidationFields: Record<string, FieldRuleConfig> = {
-  motorReceivedAt: dateRule("Motor Received Date", ["UNIT", "SUBMIT"]),
-  machineDetails: textRule("Machine Details", ["SUBMIT"], {
-    pattern: ALPHA_NUM,
-    invalidMessage: "Machine Details must be alphanumeric.",
-  }),
-  startDate: dateRule("Start Date", ["SUBMIT"]),
-  completionDate: dateRule("Completion Date", ["SUBMIT"]),
-  arborSize: numberRule("Arbor Size", ["SUBMIT"]),
-  cutterSize: numberRule("Cutter Size", ["SUBMIT"]),
-  reading: numberRule("Reading", ["SUBMIT"]),
+  motorReceivedAt: date(["UNIT", "SUBMIT"]),
+  machineDetails: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  startDate: date(["SUBMIT"]),
+  completionDate: date(["SUBMIT"]),
+  arborSize: number(["SUBMIT"]),
+  cutterSize: number(["SUBMIT"]),
+  reading: number(["SUBMIT"]),
+  remarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 };
 
 const resolveReadingKeys = (motor: TrimmingMotorSession): string[] => {
@@ -109,12 +91,17 @@ export const trimmingValidationConfig: SubDeptValidationConfig<TrimmingValidatio
           value: row.cutterSize,
           ruleKey: "cutterSize",
         },
+        {
+          path: `trimmingDetails.${index}.remarks`,
+          value: row.remarks,
+          ruleKey: "remarks",
+        },
       );
     });
 
     const readingKeys = resolveReadingKeys(motor);
     (motor.commonFormatParameters ?? []).forEach((param, pIndex) => {
-      param.stages?.forEach((stage, sIndex) => {
+      (param.stages ?? []).forEach((stage, sIndex) => {
         readingKeys.forEach((key) => {
           fields.push({
             path: `commonFormatParameters.${pIndex}.stages.${sIndex}.readings.${key}`,
@@ -127,51 +114,7 @@ export const trimmingValidationConfig: SubDeptValidationConfig<TrimmingValidatio
 
     return fields;
   },
-  customRules: [
-    (motor, _tier, errors) => {
-      (motor.trimmingDetails ?? []).forEach((row, index) => {
-        const start = str(row.startDate);
-        const end = str(row.completionDate);
-        if (!start || !end) return;
-        const toTime = (v: string) => {
-          if (/^\d{1,2}-\d{1,2}-\d{4}$/.test(v)) {
-            const [d, m, y] = v.split("-").map(Number);
-            return new Date(y, m - 1, d).getTime();
-          }
-          return Date.parse(v);
-        };
-        const t0 = toTime(start);
-        const t1 = toTime(end);
-        if (Number.isFinite(t0) && Number.isFinite(t1) && t1 < t0) {
-          errors[`trimmingDetails.${index}.completionDate`] =
-            "Completion Date cannot be before Start Date.";
-        }
-      });
-    },
-    (motor, tier, errors) => {
-      if (tier !== "SUBMIT" && tier !== "FORMAT") return;
-      (motor.commonFormatParameters ?? []).forEach((param, pIndex) => {
-        param.stages?.forEach((stage, sIndex) => {
-          const stageAny = stage as {
-            specification?: string;
-            readings?: Record<string, string>;
-          };
-          const specText = str(stageAny.specification);
-          Object.entries(stageAny.readings ?? {}).forEach(([key, value]) => {
-            const path = `commonFormatParameters.${pIndex}.stages.${sIndex}.readings.${key}`;
-            const text = str(value);
-            if (!text || !isFiniteNumber(text)) return;
-            if (tier === "SUBMIT" && specText) {
-              const n = parseNumber(text);
-              if (n != null && !meetsSpecification(n, specText)) {
-                errors[path] = invalidVsSpec(key);
-              }
-            }
-          });
-        });
-      });
-    },
-  ],
+  customRules: [],
   isUnitComplete: (motor) => Boolean(str(motor.motorReceivedAt)),
 };
 

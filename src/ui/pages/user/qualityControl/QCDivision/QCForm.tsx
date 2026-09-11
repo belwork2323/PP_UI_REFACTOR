@@ -79,6 +79,8 @@ type QCFormProps = {
   schemaLoading?: boolean;
   divisionAutoPopulateLoading?: boolean;
   schemaError?: string | null;
+  /** Per-entry field validation errors from the hook. */
+  validationErrorsByEntryId?: Record<string, Record<string, string>>;
   divisionUiMode?: QcDivisionUiMode;
   divisionBlockedReason?: string | null;
   divisionSetupDefinition?: QcDivisionSetupDefinition | null;
@@ -163,6 +165,7 @@ const QCForm = ({
   schemaLoading = false,
   divisionAutoPopulateLoading = false,
   schemaError = null,
+  validationErrorsByEntryId = {},
   divisionUiMode = "FORM",
   divisionBlockedReason = null,
   divisionSetupDefinition = null,
@@ -467,6 +470,7 @@ const QCForm = ({
           schemaLoading={schemaLoading}
           divisionAutoPopulateLoading={divisionAutoPopulateLoading}
           schemaError={schemaError}
+        validationErrorsByEntryId={validationErrorsByEntryId}
           hideEntryGroupNav
           onActiveDivisionGroupIndexChange={onActiveDivisionGroupIndexChange}
           onActiveDivisionSubIndexChange={onActiveDivisionSubIndexChange}

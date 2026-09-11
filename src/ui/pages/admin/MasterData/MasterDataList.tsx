@@ -2,10 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
-  Chip,
   Divider,
-  IconButton,
-  InputAdornment,
   Paper,
   Switch,
   Table,
@@ -15,15 +12,27 @@ import {
   TableHead,
   TablePagination,
   TableRow,
-  TextField,
-  Tooltip,
   Typography,
 } from "@mui/material";
-import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
 import SkeletonRow from "@ui/components/common/SkeletonRow";
 import AppTextField from "@ui/components/common/AppTextField";
+import AppDropdown from "@ui/components/common/AppDropdown";
+import MasterDataTableToolbar from "./components/MasterDataTableToolbar";
+import MasterDataActiveSwitch, { masterDataActiveSwitchSx } from "./components/MasterDataActiveSwitch";
+import MasterDataActiveStatusChip from "./components/MasterDataActiveStatusChip";
+import {
+  MASTER_DATA_AUDIT_COLUMN_COUNT,
+  MasterDataAuditHeaderCells,
+  MasterDataAuditRowCells,
+} from "./components/MasterDataAuditColumns";
+import type { AppDropdownOption } from "@ui/components/common/AppDropdown";
+import {
+  formatMasterDataAttributeValue,
+  getMasterDataAttributeOptions,
+} from "./masterDataAttributeOptions";
+import { getMasterDataFieldLabel } from "./masterDataLabels";
 import {
   getMasterDataFieldErrors,
   type MasterDataFieldDef,
@@ -42,20 +51,23 @@ type Props = {
   rowsPerPage: number;
   attributeFields: MasterDataFieldDef[];
   schema: MasterDataTypeDescriptor | null;
+  selectedType?: string;
   inlineMode: "create" | "edit" | null;
-  editTarget: MasterDataRecord | null;
   form: MasterDataFormState;
   saving: boolean;
+  togglingStatus?: boolean;
   search: string;
   onSearchChange: (value: string) => void;
+  onRefresh: () => void;
+  refreshDisabled?: boolean;
   t: any;
   onFormChange: (key: string, value: string | number | boolean, isAttribute?: boolean) => void;
-  onEdit: (row: MasterDataRecord) => void;
-  onDisable: (row: MasterDataRecord) => void;
+  onToggleActive: (row: MasterDataRecord, nextActive: boolean) => void;
   onSaveInline: () => void;
   onCancelInline: () => void;
   onPageChange: (event: unknown, page: number) => void;
   onRowsPerPageChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  dynamicAttributeOptions?: Record<string, AppDropdownOption[]>;
 };
 
 const MasterDataList = ({
@@ -66,23 +78,25 @@ const MasterDataList = ({
   rowsPerPage,
   attributeFields,
   schema,
+  selectedType = "",
   inlineMode,
-  editTarget,
   form,
   saving,
+  togglingStatus = false,
   search,
   onSearchChange,
+  onRefresh,
+  refreshDisabled = false,
   t,
   onFormChange,
-  onEdit,
-  onDisable,
+  onToggleActive,
   onSaveInline,
   onCancelInline,
   onPageChange,
   onRowsPerPageChange,
+  dynamicAttributeOptions,
 }: Props) => {
   const { table, tableCell } = t;
-  const searchTheme = t.batchListShell?.inputs;
   const cellSx = t.inlineFormCell ?? {
     "& .MuiOutlinedInput-root": {
       fontSize: "0.8rem",
@@ -94,15 +108,14 @@ const MasterDataList = ({
     },
   };
   const [showErrors, setShowErrors] = useState(false);
-  const isEdit = inlineMode === "edit";
 
   useEffect(() => {
     if (inlineMode) setShowErrors(false);
-  }, [inlineMode, editTarget?.id]);
+  }, [inlineMode]);
 
   const fieldErrors = useMemo(
-    () => getMasterDataFieldErrors(form, schema, isEdit),
-    [form, schema, isEdit],
+    () => getMasterDataFieldErrors(form, schema, false),
+    [form, schema],
   );
 
   const visibleError = (key: string): string | undefined => {
@@ -120,31 +133,79 @@ const MasterDataList = ({
     onSaveInline();
   };
 
-  const colCount = 3 + attributeFields.length + 1; // code, name, attrs..., active, actions
+  const hideCodeColumn =
+    selectedType === "mixers" ||
+    Boolean(schema?.fields?.find((f) => f.key === "code")?.serverGenerated);
+  const colCount =
+    2 + attributeFields.length + 1 + MASTER_DATA_AUDIT_COLUMN_COUNT + (hideCodeColumn ? 0 : 1); // name, attrs..., active, audit, actions, [code]
+
+  const renderAttributeInput = (field: MasterDataFieldDef) => {
+    const dropdownOptions = getMasterDataAttributeOptions(selectedType, field, dynamicAttributeOptions);
+    if (dropdownOptions) {
+      return (
+        <AppDropdown
+          compact
+          fullWidth
+          placeholder={`Select ${getMasterDataFieldLabel(selectedType, field)}`}
+          value={String(form.attributes[field.key] ?? "")}
+          onChange={(value) => onFormChange(field.key, value, true)}
+          disabled={saving}
+          error={Boolean(visibleError(field.key))}
+          helperText={visibleError(field.key)}
+          options={dropdownOptions}
+          sx={cellSx}
+        />
+      );
+    }
+
+    const isNumeric =
+      field.dataType === "INTEGER" || field.dataType === "NUMBER" || field.dataType === "DOUBLE";
+    return (
+      <AppTextField
+        compact
+        fullWidth
+        type={isNumeric ? "number" : "text"}
+        placeholder={getMasterDataFieldLabel(selectedType, field)}
+        value={form.attributes[field.key] ?? ""}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (isNumeric) {
+            onFormChange(field.key, v === "" ? "" : Number(v), true);
+          } else {
+            onFormChange(field.key, v, true);
+          }
+        }}
+        disabled={saving}
+        error={Boolean(visibleError(field.key))}
+        helperText={visibleError(field.key)}
+        sx={cellSx}
+        inputProps={{
+          min: field.min ?? undefined,
+          max: field.max ?? undefined,
+          step: field.dataType === "INTEGER" ? 1 : "any",
+        }}
+      />
+    );
+  };
 
   const renderInlineFields = () => {
-    const codeServerGenerated = Boolean(schema?.fields?.find((f) => f.key === "code")?.serverGenerated);
     return (
     <TableRow sx={{ ...table.row, bgcolor: (theme) => theme.palette.action.hover }}>
-      <TableCell sx={table.cell}>
-        {codeServerGenerated ? (
-          <Typography sx={{ ...table.bodyText, color: isEdit ? "text.primary" : "text.secondary", fontStyle: isEdit ? "normal" : "italic" }}>
-            {isEdit ? form.code || "—" : "Auto"}
-          </Typography>
-        ) : (
+      {!hideCodeColumn ? (
+        <TableCell sx={table.cell}>
           <AppTextField
             compact
             fullWidth
             placeholder={S.TABLE.COL_CODE}
             value={form.code}
             onChange={(e) => onFormChange("code", e.target.value)}
-            disabled={saving || isEdit}
+            disabled={saving}
             error={Boolean(visibleError("code"))}
             helperText={visibleError("code")}
             sx={cellSx}
           />
-        )}
-      </TableCell>
+        </TableCell>
+      ) : null}
       <TableCell sx={table.cell}>
         <AppTextField
           compact
@@ -158,44 +219,19 @@ const MasterDataList = ({
           sx={cellSx}
         />
       </TableCell>
-      {attributeFields.map((field) => {
-        const isNumeric = field.dataType === "INTEGER" || field.dataType === "NUMBER" || field.dataType === "DOUBLE";
-        const readOnly = Boolean(isEdit && field.readOnlyOnUpdate);
-        return (
+      {attributeFields.map((field) => (
         <TableCell key={field.key} sx={table.cell}>
-          <AppTextField
-            compact
-            fullWidth
-            type={isNumeric ? "number" : "text"}
-            placeholder={field.label}
-            value={form.attributes[field.key] ?? ""}
-            onChange={(e) => {
-              const v = e.target.value;
-              if (isNumeric) {
-                onFormChange(field.key, v === "" ? "" : Number(v), true);
-              } else {
-                onFormChange(field.key, v, true);
-              }
-            }}
-            disabled={saving || readOnly}
-            error={Boolean(visibleError(field.key))}
-            helperText={visibleError(field.key)}
-            sx={cellSx}
-            inputProps={{
-              min: field.min ?? undefined,
-              max: field.max ?? undefined,
-              step: field.dataType === "INTEGER" ? 1 : "any",
-            }}
-          />
+          {renderAttributeInput(field)}
         </TableCell>
-        );
-      })}
+      ))}
+      <MasterDataAuditRowCells table={table} />
       <TableCell sx={table.cell}>
         <Switch
           size="small"
           checked={Boolean(form.isActive)}
           onChange={(e) => onFormChange("isActive", e.target.checked)}
           disabled={saving}
+          sx={masterDataActiveSwitchSx(Boolean(form.isActive))}
         />
       </TableCell>
       <TableCell sx={table.cellActionsWrapper}>
@@ -220,43 +256,28 @@ const MasterDataList = ({
 
   return (
     <Paper elevation={0} sx={table.paper}>
-      <Box sx={t.tableSearchBar}>
-        <TextField
-          size="small"
-          fullWidth
-          margin="none"
-          value={search}
-          onChange={(e) => onSearchChange(e.target.value)}
-          placeholder={S.TOOLBAR.SEARCH_PLACEHOLDER}
-          sx={{
-            ...(searchTheme?.search ?? t.searchField),
-            m: 0,
-            mb: 0,
-            mt: 0,
-            flex: 1,
-            minWidth: 0,
-          }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchRoundedIcon sx={searchTheme?.startIcon?.search} />
-              </InputAdornment>
-            ),
-          }}
-        />
-      </Box>
+      <MasterDataTableToolbar
+        search={search}
+        onSearchChange={onSearchChange}
+        onRefresh={onRefresh}
+        refreshDisabled={refreshDisabled}
+        t={t}
+      />
       <Divider sx={table.divider} />
       <TableContainer>
         <Table size="small" sx={{ ...(table.tableRoot ?? {}), borderSpacing: 0 }}>
           <TableHead>
             <TableRow sx={table.headerRow}>
-              <TableCell sx={table.headerCell}>{S.TABLE.COL_CODE}</TableCell>
+              {!hideCodeColumn ? (
+                <TableCell sx={table.headerCell}>{S.TABLE.COL_CODE}</TableCell>
+              ) : null}
               <TableCell sx={table.headerCell}>{S.TABLE.COL_NAME}</TableCell>
               {attributeFields.map((field) => (
                 <TableCell key={field.key} sx={table.headerCell}>
-                  {field.label}
+                  {getMasterDataFieldLabel(selectedType, field)}
                 </TableCell>
               ))}
+              <MasterDataAuditHeaderCells table={table} />
               <TableCell sx={table.headerCell}>{S.TABLE.COL_ACTIVE}</TableCell>
               <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>
                 {S.TABLE.COL_ACTIONS}
@@ -277,63 +298,43 @@ const MasterDataList = ({
                 </TableCell>
               </TableRow>
             ) : (
-              rows.map((row) =>
-                inlineMode === "edit" && editTarget?.id === row.id ? (
-                  <React.Fragment key={row.id}>{renderInlineFields()}</React.Fragment>
-                ) : (
-                  <TableRow key={row.id} sx={table.row}>
+              rows.map((row) => (
+                <TableRow key={row.id} sx={table.row}>
+                  {!hideCodeColumn ? (
                     <TableCell sx={table.cell}>
                       <Typography sx={table.bodyText}>{row.code}</Typography>
                     </TableCell>
-                    <TableCell sx={table.cell}>
-                      <Typography sx={table.bodyText}>{row.name}</Typography>
+                  ) : null}
+                  <TableCell sx={table.cell}>
+                    <Typography sx={table.bodyText}>{row.name}</Typography>
+                  </TableCell>
+                  {attributeFields.map((field) => (
+                    <TableCell key={field.key} sx={table.cell}>
+                      <Typography sx={table.bodyText}>
+                        {formatMasterDataAttributeValue(
+                          selectedType,
+                          field,
+                          row.attributes?.[field.key],
+                          dynamicAttributeOptions,
+                        )}
+                      </Typography>
                     </TableCell>
-                    {attributeFields.map((field) => (
-                      <TableCell key={field.key} sx={table.cell}>
-                        <Typography sx={table.bodyText}>
-                          {row.attributes?.[field.key] == null || row.attributes?.[field.key] === ""
-                            ? "—"
-                            : String(row.attributes[field.key])}
-                        </Typography>
-                      </TableCell>
-                    ))}
-                    <TableCell sx={table.cell}>
-                      <Chip
-                        size="small"
-                        label={row.isActive ? S.TABLE.YES : S.TABLE.NO}
-                        color={row.isActive ? "success" : "default"}
-                        variant={row.isActive ? "filled" : "outlined"}
+                  ))}
+                  <MasterDataAuditRowCells record={row} table={table} />
+                  <TableCell sx={table.cell}>
+                    <MasterDataActiveStatusChip isActive={row.isActive} />
+                  </TableCell>
+                  <TableCell sx={table.cellActionsWrapper}>
+                    <Box sx={tableCell.actionsBox}>
+                      <MasterDataActiveSwitch
+                        isActive={row.isActive}
+                        disabled={inlineMode != null || saving || togglingStatus}
+                        onToggle={(nextActive) => onToggleActive(row, nextActive)}
                       />
-                    </TableCell>
-                    <TableCell sx={table.cellActionsWrapper}>
-                      <Box sx={tableCell.actionsBox}>
-                        <Tooltip title={S.TABLE.EDIT}>
-                          <IconButton
-                            size="small"
-                            onClick={() => onEdit(row)}
-                            disabled={inlineMode != null}
-                            sx={tableCell.editButton}
-                          >
-                            <icons.Edit sx={tableCell.editIcon} />
-                          </IconButton>
-                        </Tooltip>
-                        <Tooltip title={S.TABLE.DISABLE}>
-                          <span>
-                            <IconButton
-                              size="small"
-                              disabled={!row.isActive || inlineMode != null}
-                              onClick={() => onDisable(row)}
-                              sx={tableCell.deleteButton}
-                            >
-                              <icons.Delete sx={tableCell.deleteIcon} />
-                            </IconButton>
-                          </span>
-                        </Tooltip>
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ),
-              )
+                    </Box>
+                  </TableCell>
+                </TableRow>
+              ))
             )}
 
             {inlineMode === "create" && !loading ? renderInlineFields() : null}

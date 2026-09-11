@@ -34,6 +34,8 @@ type QCMixingFinalMixPanelProps = {
   autoSeed?: QcMixingDetailsSeed | null;
   unitActions?: QCDivisionEntryUnitActions | null;
   actionLabels?: Pick<QCDivisionEntryUnitActions, "saveDraftLabel" | "submitLabel" | "viewDetailsLabel">;
+  detailsValidationErrors?: Record<string, string> | null;
+  viscosityValidationErrors?: Record<string, string> | null;
 };
 
 const QCMixingFinalMixPanel = ({
@@ -47,6 +49,8 @@ const QCMixingFinalMixPanel = ({
   autoSeed = null,
   unitActions = null,
   actionLabels = null,
+  detailsValidationErrors = null,
+  viscosityValidationErrors = null,
 }: QCMixingFinalMixPanelProps) => {
   const viscosityValues = useMemo(() => {
     const saved = entrySchemaValues;
@@ -166,11 +170,13 @@ const QCMixingFinalMixPanel = ({
           onChange={handleFinalMixDetailsChange}
           readOnly={readOnly}
           autoSeed={autoSeed}
+          validationErrors={detailsValidationErrors}
         />
         <QCMixingViscosityTable
           values={viscosityValues}
           onChange={handleViscosityChange}
           readOnly={readOnly}
+          validationErrors={viscosityValidationErrors}
         />
       </Stack>
     </Box>

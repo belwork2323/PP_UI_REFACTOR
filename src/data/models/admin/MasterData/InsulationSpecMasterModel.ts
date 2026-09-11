@@ -1,5 +1,7 @@
 import {
   emptyMasterDataStats,
+  parseMasterDataAuditFields,
+  type MasterDataAuditFields,
   type MasterDataStats,
 } from "@data/models/admin/MasterData/MasterDataModel";
 import {
@@ -22,7 +24,7 @@ export type InsulationCategoryForm = {
   parameters: InsulationParameterForm[];
 };
 
-export type InsulationSpecRecord = {
+export type InsulationSpecRecord = MasterDataAuditFields & {
   id: string;
   insulationType: InsulationTypeValue;
   isActive: boolean;
@@ -72,6 +74,7 @@ const mapCategory = (raw: any): InsulationCategoryForm => ({
 
 export const InsulationSpecRecordModel = {
   fromApi: (raw: any): InsulationSpecRecord => ({
+    ...parseMasterDataAuditFields(raw),
     id: String(raw?.id ?? raw?.insulationType ?? ""),
     insulationType: String(raw?.insulationType ?? ""),
     isActive: raw?.isActive !== false,

@@ -32,6 +32,9 @@ import {
   qcReadOnlyTableHeaderCellSx,
 } from "./components/QCDivisionReadOnlyValue";
 import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import FieldErrorText from "@/ui/components/validation/FieldErrorText";
+import { fieldError } from "@/data/validation/adapters/qcMixing.validation";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 const BRAND = QC_DIVISION_BRAND;
@@ -78,6 +81,8 @@ type QCMixingDetailsTableProps = {
   onChange: (values: SchemaFormValues) => void;
   readOnly?: boolean;
   autoSeed?: QcMixingDetailsSeed | null;
+  /** Paths: details.{i}.BOWL_NO | DATE_OF_PREMIX | SPECIFICATION | VALUE… */
+  validationErrors?: Record<string, string> | null;
 };
 
 const QCMixingDetailsTable = ({
@@ -86,12 +91,19 @@ const QCMixingDetailsTable = ({
   onChange,
   readOnly = false,
   autoSeed = null,
+  validationErrors = null,
 }: QCMixingDetailsTableProps) => {
   const rows = useMemo(() => getMixingDetailsRows(values, variant), [values, variant]);
+  const err = useCallback(
+    (path: string) => fieldError(validationErrors ?? undefined, path),
+    [validationErrors],
+  );
   const valueFields = useMemo(() => getMixingValueFields(variant), [variant]);
-  const mergeColumns =
+  const mergeColumns: readonly string[] =
     variant === "premix" ? QC_MIXING_PREMIX_MERGE_COLUMNS : QC_MIXING_FINAL_MIX_MERGE_COLUMNS;
-  const dateKey = variant === "premix" ? "DATE_OF_PREMIX" : "DATE_OF_FINAL_MIX";
+  const dateKey = (variant === "premix" ? "DATE_OF_PREMIX" : "DATE_OF_FINAL_MIX") as
+    | "DATE_OF_PREMIX"
+    | "DATE_OF_FINAL_MIX";
   const title =
     variant === "premix" ? "Premix Details" : S.MIXING_FINAL_MIX_SHARED_DETAILS_TITLE;
   const dateLabel = variant === "premix" ? "Date of Premix" : "Date of Final Mix";
@@ -100,20 +112,23 @@ const QCMixingDetailsTable = ({
 
   const headerColumns = useMemo(
     () => [
-      { key: "bowl", label: "Bowl No", show: mergeColumns.includes("BOWL_NO") },
-      { key: "date", label: dateLabel, show: mergeColumns.includes(dateKey) },
-      { key: "mixer", label: "Mixer & Bldg No.", show: mergeColumns.includes("MIXER_BLDG_NO") },
-      { key: "qty", label: "Batch size (KG)", show: mergeColumns.includes("PREMIX_QTY") },
-      { key: "parameter", label: "Parameter", show: true },
-      { key: "spec", label: "Specification", show: true },
-      { key: "value", label: "Value", show: true, colSpan: valueFields.length },
-      { key: "remarks", label: "Remarks", show: true },
+      { key: "bowl", label: "Bowl No", show: mergeColumns.includes("BOWL_NO"), required: true },
+      { key: "date", label: dateLabel, show: mergeColumns.includes(dateKey), required: true },
+      { key: "mixer", label: "Mixer & Bldg No.", show: mergeColumns.includes("MIXER_BLDG_NO"), required: true },
+      { key: "qty", label: "Batch size (KG)", show: mergeColumns.includes("PREMIX_QTY"), required: true },
+      { key: "parameter", label: "Parameter", show: true, required: false },
+      { key: "spec", label: "Specification", show: true, required: true },
+      { key: "value", label: "Value", show: true, colSpan: valueFields.length, required: true },
+      { key: "remarks", label: "Remarks", show: true, required: false },
     ],
     [dateKey, dateLabel, mergeColumns, valueFields.length],
   );
 
   const isSharedFieldLocked = useCallback(
-    (field: keyof QcMixingDetailsSeed) => Boolean(String(autoSeed?.[field] ?? "").trim()),
+    (field: string) => {
+      if (!autoSeed || !(field in autoSeed)) return false;
+      return Boolean(String((autoSeed as Record<string, unknown>)[field] ?? "").trim());
+    },
     [autoSeed],
   );
 
@@ -150,7 +165,7 @@ const QCMixingDetailsTable = ({
   const renderSharedField = (
     field: keyof QcMixingDetailsRow,
     row: QcMixingDetailsRow,
-    seedField: keyof QcMixingDetailsSeed,
+    seedField: keyof QcMixingDetailsSeed | "DATE_OF_PREMIX" | "DATE_OF_FINAL_MIX",
     input: ReactNode,
   ) => {
     if (readOnly || isSharedFieldLocked(seedField)) {
@@ -159,16 +174,26 @@ const QCMixingDetailsTable = ({
     return input;
   };
 
-  const renderHeaderCell = (label: string, colSpan = 1, align?: "center") =>
-    readOnly ? (
+  const renderHeaderCell = (label: string, colSpan = 1, align?: "center", required = false) => {
+    const content = required ? (
+      <FieldLabelWithAsterisk
+        label={label}
+        required
+        sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+      />
+    ) : (
+      label
+    );
+    return readOnly ? (
       <TableCell key={label} colSpan={colSpan} align={align} sx={qcReadOnlyTableHeaderCellSx}>
-        {label}
+        {content}
       </TableCell>
     ) : (
       <TableCell key={label} colSpan={colSpan} align={align} sx={TH}>
-        {label}
+        {content}
       </TableCell>
     );
+  };
 
   return (
     <Box>
@@ -208,6 +233,7 @@ const QCMixingDetailsTable = ({
                     column.label,
                     column.colSpan,
                     column.key === "value" ? "center" : undefined,
+                    Boolean((column as { required?: boolean }).required),
                   ),
                 )}
             </TableRow>
@@ -232,13 +258,17 @@ const QCMixingDetailsTable = ({
                         "BOWL_NO",
                         row,
                         "BOWL_NO",
-                        <TextField
-                          size="small"
-                          fullWidth
-                          value={row.BOWL_NO ?? ""}
-                          onChange={(event) => updateSharedField("BOWL_NO", event.target.value)}
-                          sx={tableFieldSx}
-                        />,
+                        <Box>
+                          <TextField
+                            size="small"
+                            fullWidth
+                            value={row.BOWL_NO ?? ""}
+                            onChange={(event) => updateSharedField("BOWL_NO", event.target.value)}
+                            sx={tableFieldSx}
+                            error={Boolean(err("details.0.BOWL_NO"))}
+                          />
+                          <FieldErrorText message={err("details.0.BOWL_NO")} />
+                        </Box>,
                       ),
                     )
                   : null}
@@ -249,13 +279,29 @@ const QCMixingDetailsTable = ({
                         dateKey,
                         row,
                         dateKey,
-                        <DateField
-                          compact
-                          value={String(row[dateKey] ?? "")}
-                          onChange={(value) => updateSharedField(dateKey, value)}
-                          placeholder="DD-MM-YYYY"
-                          inputSx={tableDateFieldSx}
-                        />,
+                        <Box>
+                          <DateField
+                            compact
+                            value={String(row[dateKey] ?? "")}
+                            onChange={(value) => updateSharedField(dateKey, value)}
+                            placeholder="DD-MM-YYYY"
+                            inputSx={tableDateFieldSx}
+                            error={Boolean(
+                              err(
+                                variant === "premix"
+                                  ? "details.0.DATE_OF_PREMIX"
+                                  : "details.0.DATE_OF_FINAL_MIX",
+                              ),
+                            )}
+                          />
+                          <FieldErrorText
+                            message={err(
+                              variant === "premix"
+                                ? "details.0.DATE_OF_PREMIX"
+                                : "details.0.DATE_OF_FINAL_MIX",
+                            )}
+                          />
+                        </Box>,
                       ),
                     )
                   : null}
@@ -266,15 +312,19 @@ const QCMixingDetailsTable = ({
                         "MIXER_BLDG_NO",
                         row,
                         "MIXER_BLDG_NO",
-                        <TextField
-                          size="small"
-                          fullWidth
-                          value={row.MIXER_BLDG_NO ?? ""}
-                          onChange={(event) =>
-                            updateSharedField("MIXER_BLDG_NO", event.target.value)
-                          }
-                          sx={tableFieldSx}
-                        />,
+                        <Box>
+                          <TextField
+                            size="small"
+                            fullWidth
+                            value={row.MIXER_BLDG_NO ?? ""}
+                            onChange={(event) =>
+                              updateSharedField("MIXER_BLDG_NO", event.target.value)
+                            }
+                            sx={tableFieldSx}
+                            error={Boolean(err("details.0.MIXER_BLDG_NO"))}
+                          />
+                          <FieldErrorText message={err("details.0.MIXER_BLDG_NO")} />
+                        </Box>,
                       ),
                     )
                   : null}
@@ -285,14 +335,18 @@ const QCMixingDetailsTable = ({
                         "PREMIX_QTY",
                         row,
                         "PREMIX_QTY",
-                        <TextField
-                          size="small"
-                          fullWidth
-                          type="number"
-                          value={row.PREMIX_QTY ?? ""}
-                          onChange={(event) => updateSharedField("PREMIX_QTY", event.target.value)}
-                          sx={tableFieldSx}
-                        />,
+                        <Box>
+                          <TextField
+                            size="small"
+                            fullWidth
+                            type="number"
+                            value={row.PREMIX_QTY ?? ""}
+                            onChange={(event) => updateSharedField("PREMIX_QTY", event.target.value)}
+                            sx={tableFieldSx}
+                            error={Boolean(err("details.0.PREMIX_QTY"))}
+                          />
+                          <FieldErrorText message={err("details.0.PREMIX_QTY")} />
+                        </Box>,
                       ),
                     )
                   : null}
@@ -309,15 +363,19 @@ const QCMixingDetailsTable = ({
                   {readOnly ? (
                     <QCDivisionReadOnlyValue value={row.SPECIFICATION} muted />
                   ) : (
-                    <TextField
-                      size="small"
-                      fullWidth
-                      value={row.SPECIFICATION ?? ""}
-                      onChange={(event) =>
-                        updateRowField(rowIndex, "SPECIFICATION", event.target.value)
-                      }
-                      sx={tableFieldSx}
-                    />
+                    <Box>
+                      <TextField
+                        size="small"
+                        fullWidth
+                        value={row.SPECIFICATION ?? ""}
+                        onChange={(event) =>
+                          updateRowField(rowIndex, "SPECIFICATION", event.target.value)
+                        }
+                        sx={tableFieldSx}
+                        error={Boolean(err(`details.${rowIndex}.SPECIFICATION`))}
+                      />
+                      <FieldErrorText message={err(`details.${rowIndex}.SPECIFICATION`)} />
+                    </Box>
                   )}
                 </TableCell>
                 {valueFields.map((field) => (
@@ -325,14 +383,18 @@ const QCMixingDetailsTable = ({
                     {readOnly ? (
                       <QCDivisionReadOnlyValue value={row[field]} />
                     ) : (
-                      <TextField
-                        size="small"
-                        fullWidth
-                        type="number"
-                        value={row[field] ?? ""}
-                        onChange={(event) => updateRowField(rowIndex, field, event.target.value)}
-                        sx={tableFieldSx}
-                      />
+                      <Box>
+                        <TextField
+                          size="small"
+                          fullWidth
+                          type="number"
+                          value={row[field] ?? ""}
+                          onChange={(event) => updateRowField(rowIndex, field, event.target.value)}
+                          sx={tableFieldSx}
+                          error={Boolean(err(`details.${rowIndex}.${field}`))}
+                        />
+                        <FieldErrorText message={err(`details.${rowIndex}.${field}`)} />
+                      </Box>
                     )}
                   </TableCell>
                 ))}

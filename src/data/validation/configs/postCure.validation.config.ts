@@ -10,25 +10,25 @@ export const postCureFieldRules = {
   // Common / Shared fields
   inhibitorBatchNo: {
     valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.ALPHANUMERIC,
     maxLength: 50,
   },
   inhibitorBatchSize: {
     valueType: "number" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.FLOAT,
   },
   dispatchDate: {
     valueType: "date" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   dispatchStation: {
     valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
     maxLength: S.LENGTH.MAX_STANDARD,
@@ -37,19 +37,19 @@ export const postCureFieldRules = {
   // Location / Table shared fields
   location: {
     valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
     maxLength: S.LENGTH.MAX_STANDARD,
   },
   fromDate: {
     valueType: "date" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   toDate: {
     valueType: "date" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   observations: {
@@ -61,13 +61,13 @@ export const postCureFieldRules = {
   },
   qtyFilled: {
     valueType: "number" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.FLOAT,
   },
   qtyApplied: {
     valueType: "number" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.FLOAT,
   },
@@ -75,16 +75,16 @@ export const postCureFieldRules = {
   // Ingredient table fields
   mfgLot: {
     valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.ALPHANUMERIC,
     maxLength: 50,
   },
   partsByWeight: {
     valueType: "text" as const,
-    requiredIn: [],
+    requiredIn: ["SUBMIT"],
     messages: { required: S.REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.FLOAT,
+    pattern: S.PATTERNS.SPECIFICATION_WITH_TOLERANCE,
     maxLength: 20,
   },
   quantity: {
@@ -103,97 +103,101 @@ export const postCureFieldRules = {
   // Qualification section fields
   qualificationBatchNo: {
     valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.ALPHANUMERIC,
     maxLength: 50,
   },
   qualificationPreparationDate: {
     valueType: "date" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
-  qualificationSpecification: {
-    valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
-    messages: { required: S.REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
-    maxLength: S.LENGTH.MAX_STANDARD,
-  },
 
+  result: {
+    valueType: "number" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: S.REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
+  },
   // Loose Flap Specific
   epoxyBatchNo: {
     valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.ALPHANUMERIC,
     maxLength: 50,
   },
   epoxyPreparationDate: {
     valueType: "date" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
 
   // IR1 Specific
   ir1PremixBatchNo: {
     valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.ALPHANUMERIC,
     maxLength: 50,
   },
   ir1PremixDate: {
     valueType: "date" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   ir1FinalMixBatchNo: {
     valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.ALPHANUMERIC,
     maxLength: 50,
   },
   ir1FinalMixDate: {
     valueType: "date" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
 
   // Hemcoat 3K Specific
   hemcoatPremixBatchNo: {
     valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.ALPHANUMERIC,
     maxLength: 50,
   },
   hemcoatPremixDate: {
     valueType: "date" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   hemcoatFinalMixBatchNo: {
     valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.ALPHANUMERIC,
     maxLength: 50,
   },
   hemcoatFinalMixDate: {
     valueType: "date" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
 
   // Not Applicable Variant
   inhibitionNotApplicableRemarks: {
     valueType: "text" as const,
-    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.ALPHABET_WITH_SPECIAL,
     maxLength: S.LENGTH.MAX_LONG_TEXT,
+  },
+  qualificationQcReport: {
+    valueType: "file" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
 };
 
@@ -287,22 +291,17 @@ function resolveFieldPaths(data: any) {
       if (Array.isArray(qual.qualificationTable)) {
         qual.qualificationTable.forEach((row: any, i: number) => {
           paths.push({
-            path: `${qualPath}.qualificationTable.${i}.specification`,
-            value: row.specification,
-            ruleKey: "qualificationSpecification",
+            path: `${qualPath}.qualificationTable.${i}.result`,
+            value: row.result,
+            ruleKey: "result",
           });
         });
       }
-
-      if (Array.isArray(qual.qualificationQcReport)) {
-        qual.qualificationQcReport.forEach((file: any, i: number) => {
-          paths.push({
-            path: `${qualPath}.qualificationQcReport.${i}`,
-            value: file,
-            ruleKey: "qualificationQcReport",
-          });
-        });
-      }
+      paths.push({
+        path: `${qualPath}.qualificationQcReport`,
+        value: qual.qualificationQcReport,
+        ruleKey: "qualificationQcReport",
+      });
     }
   };
 

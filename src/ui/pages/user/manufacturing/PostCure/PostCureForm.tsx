@@ -150,7 +150,16 @@ export const PostCureForm = ({
 
   const handleSaveDraft = async () => {
     if (!activeMotorEntry) return;
+    // Run validation for the SUBMIT tier
+    const errors = validatePostCure(formValues, "UNIT");
 
+    if (Object.keys(errors).length > 0) {
+      console.warn("PostCure Form Validation Failed:", errors);
+      setValidationErrors(errors);
+      return;
+    }
+
+    setValidationErrors({});
     if (onMotorSessionChange && activeMotorSession) {
       onMotorSessionChange(activeMotorEntry.motorId, {
         ...activeMotorSession,

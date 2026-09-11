@@ -3,7 +3,6 @@ import {
   USER_OPERATIONS_ENDPOINTS,
   ADMIN_ENDPOINTS,
   USER_CASTING_CURING_FORM_ENDPOINTS,
-  APPROVER_ENDPOINTS,
 } from "@data/api/endPoints";
 import { generalController } from "@controllers/admin/common/generalController";
 import { fetchCastingStationsApi } from "@data/api/users/operationsApi";
@@ -11,8 +10,6 @@ import { operationsController } from "@controllers/user/operationsController";
 import { fetchSpecificationForSubdepartment } from "@data/api/users/sourcing/rocketMotorCasingProcurementApi";
 import { fetchCuringCyclesApi } from "@data/api/users/manufacturing/castingCuringFormApi";
 import { fetchQualityCheck } from "@data/api/users/manufacturing/mixingFormApi";
-import { fetchQcDivisionCatalogApi } from "@data/api/approver/qcDivisionApproverApi";
-
 export type MasterDataApiSource = "admin" | "system";
 
 export type MasterDataApiDetails = {
@@ -74,6 +71,16 @@ const SYSTEM_API_BY_TYPE: Record<string, SystemApiMeta> = {
       const resp = await generalController.getEquipmentList();
       if (!resp.success) throw new Error(resp.message || "Failed to load equipment");
       return resp.data;
+    },
+  },
+  "equipment-types": {
+    name: "Equipment type master list",
+    method: "GET",
+    endpoint: SYSTEM.EQUIPMENT_TYPE_LIST,
+    request: null,
+    fetch: async () => {
+      const { fetchEquipmentTypeList } = await import("@data/api/common/generalAPI");
+      return fetchEquipmentTypeList();
     },
   },
   "beam-energy": {
@@ -182,16 +189,6 @@ const SYSTEM_API_BY_TYPE: Record<string, SystemApiMeta> = {
       return (body as any)?.data ?? body;
     },
   },
-  "qc-divisions": {
-    name: "QC division catalog (ops)",
-    method: "GET",
-    endpoint: APPROVER_ENDPOINTS.QC_DIVISIONS,
-    request: null,
-    fetch: async () => {
-      const body = await fetchQcDivisionCatalogApi();
-      return (body as any)?.data ?? body;
-    },
-  },
 };
 
 const NESTED_ADMIN_LIST: Record<string, string> = {
@@ -200,7 +197,6 @@ const NESTED_ADMIN_LIST: Record<string, string> = {
   "mixing-cycles": ADMIN_ENDPOINTS.MASTER_DATA.MIXING_CYCLES.LIST,
   "curing-cycles": ADMIN_ENDPOINTS.MASTER_DATA.CURING_CYCLES.LIST,
   "quality-checks": ADMIN_ENDPOINTS.MASTER_DATA.QUALITY_CHECKS.LIST,
-  "qc-divisions": ADMIN_ENDPOINTS.MASTER_DATA.QC_DIVISIONS.LIST,
 };
 
 export const getAdminListApiDetails = (

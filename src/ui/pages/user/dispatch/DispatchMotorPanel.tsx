@@ -37,8 +37,9 @@ import {
   dispatchTableInputSx,
   dispatchTableRowSx,
 } from "./DispatchFormPrimitives";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 import type { ValidationErrors as DispatchValidationErrors } from "@/data/validation/adapters/dispatch.validation";
-import FieldErrorText from "../../../../ui/components/validation/FieldErrorText";
+import FieldErrorText from "@/ui/components/validation/FieldErrorText";
 
 type Props = {
   value: DispatchMotorData;
@@ -236,7 +237,7 @@ const ObservationTable = ({
           <TableRow>
             <TableCell sx={dispatchTableHeaderCellSx(true)}>Sr. No.</TableCell>
             <TableCell sx={dispatchTableHeaderCellSx(false)}>{labelHeader}</TableCell>
-            <TableCell sx={dispatchTableHeaderCellSx(false)}>Observations</TableCell>
+            <TableCell sx={dispatchTableHeaderCellSx(false)}><FieldLabelWithAsterisk label="Observations" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit" }} /></TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -373,7 +374,7 @@ const DispatchMotorPanel = ({
       />
       <FieldGrid columns={2}>
         <Box>
-          <FieldLabel>Nitrogen gas purging</FieldLabel>
+          <FieldLabelWithAsterisk label="Nitrogen gas purging" required />
           {withFieldError(
             <TableSelectInput
               value={value.ROCKET_MOTOR_PACKING.NITROGEN_GAS_PURGING}
@@ -395,7 +396,7 @@ const DispatchMotorPanel = ({
         </Box>
         {value.ROCKET_MOTOR_PACKING.NITROGEN_GAS_PURGING === "YES" ? (
           <Box>
-            <FieldLabel>If Yes — Enter Pressure</FieldLabel>
+            <FieldLabelWithAsterisk label="If Yes — Enter Pressure" required />
             {withFieldError(
               <TableTextInput
                 value={value.ROCKET_MOTOR_PACKING.NITROGEN_PURGING_PRESSURE}
@@ -410,7 +411,7 @@ const DispatchMotorPanel = ({
           </Box>
         ) : null}
         <Box>
-          <FieldLabel>Labelling of motor</FieldLabel>
+          <FieldLabelWithAsterisk label="Labelling of motor" required />
           {withFieldError(
             <TableSelectInput
               value={value.ROCKET_MOTOR_PACKING.LABELLING_OF_MOTOR}
@@ -446,7 +447,7 @@ const DispatchMotorPanel = ({
     <SectionCard title="Safety Clearance" theme={theme}>
       <FieldGrid columns={2}>
         <Box>
-          <FieldLabel>Safety Clearance for Dispatch Accorded</FieldLabel>
+          <FieldLabelWithAsterisk label="Safety Clearance for Dispatch Accorded" required />
           {withFieldError(
             <TableSelectInput
               value={value.SAFETY_CLEARANCE.SAFETY_CLEARANCE_STATUS}
@@ -483,7 +484,7 @@ const DispatchMotorPanel = ({
     <SectionCard title="Dispatch Team" theme={theme} mb={0}>
       <FieldGrid columns={3}>
         <Box>
-          <FieldLabel>QA Rep.</FieldLabel>
+          <FieldLabelWithAsterisk label="QA Rep." required />
           {withFieldError(
             <TableTextInput
               value={value.DISPATCH_TEAM.QA_REPRESENTATIVE}
@@ -497,7 +498,7 @@ const DispatchMotorPanel = ({
           )}
         </Box>
         <Box>
-          <FieldLabel>Safety Rep.</FieldLabel>
+          <FieldLabelWithAsterisk label="Safety Rep." required />
           {withFieldError(
             <TableTextInput
               value={value.DISPATCH_TEAM.SAFETY_REPRESENTATIVE}
@@ -511,7 +512,7 @@ const DispatchMotorPanel = ({
           )}
         </Box>
         <Box>
-          <FieldLabel>Project Rep.</FieldLabel>
+          <FieldLabelWithAsterisk label="Project Rep." required />
           {withFieldError(
             <TableTextInput
               value={value.DISPATCH_TEAM.PROJECT_REPRESENTATIVE}

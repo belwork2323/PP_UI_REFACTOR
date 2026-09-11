@@ -18,7 +18,30 @@ export type MasterDataTypeDescriptor = {
   fields: MasterDataFieldDef[];
 };
 
-export type MasterDataRecord = {
+export type MasterDataPersonInfo = {
+  id: string;
+  fullName: string;
+};
+
+export type MasterDataAuditFields = {
+  createdBy?: MasterDataPersonInfo | null;
+  createdOn?: string | null;
+  updatedBy?: MasterDataPersonInfo | null;
+  updatedOn?: string | null;
+};
+
+export const parseMasterDataAuditFields = (raw: any): MasterDataAuditFields => ({
+  createdBy: raw?.createdBy
+    ? { id: String(raw.createdBy.id ?? ""), fullName: String(raw.createdBy.fullName ?? "") }
+    : null,
+  createdOn: raw?.createdOn ?? null,
+  updatedBy: raw?.updatedBy
+    ? { id: String(raw.updatedBy.id ?? ""), fullName: String(raw.updatedBy.fullName ?? "") }
+    : null,
+  updatedOn: raw?.updatedOn ?? null,
+});
+
+export type MasterDataRecord = MasterDataAuditFields & {
   id: number;
   code: string;
   name: string;
@@ -55,6 +78,7 @@ export const emptyMasterDataStats = (): MasterDataStats => ({
 
 export const MasterDataRecordModel = {
   fromApi: (raw: any): MasterDataRecord => ({
+    ...parseMasterDataAuditFields(raw),
     id: Number(raw?.id),
     code: String(raw?.code ?? ""),
     name: String(raw?.name ?? ""),
@@ -141,9 +165,12 @@ export const getMasterDataErrorMessage = (resp: any, fallback: string) =>
   resp?.message || resp?.error?.message || fallback;
 
 /** Same wording as backend MasterDataValidation. */
-export const MASTER_DATA_CODE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/-]*$/;
+export const MASTER_DATA_CODE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/\\-]*$/;
 export const MASTER_DATA_CODE_FORMAT_MESSAGE =
-  "Code must start with a letter or digit and contain only letters, digits, . _ / -";
+  "Code must start with a letter or digit and contain only letters, digits, . _ / \\ -";
+export const MASTER_DATA_NAME_PATTERN = /^[A-Za-z0-9][A-Za-z0-9 _/\\-]*$/;
+export const MASTER_DATA_NAME_FORMAT_MESSAGE =
+  "Name must start with a letter or digit and contain only letters, digits, spaces, hyphen, underscore, / and \\";
 
 export type MasterDataFieldErrors = Record<string, string>;
 
@@ -155,10 +182,16 @@ const fieldErrorForCode = (codeRaw: string, maxLength?: number | null): string |
   return null;
 };
 
-const fieldErrorForName = (nameRaw: string, maxLength?: number | null): string | null => {
+const fieldErrorForName = (
+  nameRaw: string,
+  maxLength?: number | null,
+  pattern?: string | null,
+): string | null => {
   const name = nameRaw.trim();
   if (!name) return "Name is required";
   if (maxLength && name.length > maxLength) return "Name must not exceed 255 characters";
+  const namePattern = pattern ? new RegExp(pattern) : MASTER_DATA_NAME_PATTERN;
+  if (!namePattern.test(name)) return MASTER_DATA_NAME_FORMAT_MESSAGE;
   return null;
 };
 
@@ -222,7 +255,7 @@ export const getMasterDataFieldErrors = (
       continue;
     }
     if (field.key === "name") {
-      const err = fieldErrorForName(form.name, field.maxLength);
+      const err = fieldErrorForName(form.name, field.maxLength, field.pattern);
       if (err) errors.name = err;
       continue;
     }

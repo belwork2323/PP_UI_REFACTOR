@@ -2,11 +2,9 @@ import React from "react";
 import {
   Box,
   Button,
-  Chip,
   Collapse,
   Divider,
   IconButton,
-  InputAdornment,
   Paper,
   Switch,
   Table,
@@ -16,11 +14,8 @@ import {
   TableHead,
   TablePagination,
   TableRow,
-  TextField,
-  Tooltip,
   Typography,
 } from "@mui/material";
-import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import { icons } from "@app/theme/icons";
@@ -29,6 +24,14 @@ import ConfirmAlertDialog from "@ui/components/common/ConfirmAlertDialog";
 import SkeletonRow from "@ui/components/common/SkeletonRow";
 import AppTextField from "@ui/components/common/AppTextField";
 import useMixingCycleMasterHook from "@hooks/admin/MasterData/useMixingCycleMasterHook";
+import MasterDataTableToolbar from "./components/MasterDataTableToolbar";
+import MasterDataActiveSwitch, { masterDataActiveSwitchSx } from "./components/MasterDataActiveSwitch";
+import MasterDataActiveStatusChip from "./components/MasterDataActiveStatusChip";
+import {
+  MASTER_DATA_AUDIT_COLUMN_COUNT,
+  MasterDataAuditHeaderCells,
+  MasterDataAuditRowCells,
+} from "./components/MasterDataAuditColumns";
 import {
   emptyMixingOperation,
   type MixingCycleFormState,
@@ -41,6 +44,9 @@ const S = STRINGS.MASTER_DATA;
 type Props = {
   activeFilter: "ALL" | "ACTIVE" | "INACTIVE";
   refreshKey?: number;
+  addButtonLabel: string;
+  onRefresh: () => void;
+  refreshDisabled?: boolean;
   t: any;
   onListPayloadChange?: (payload: MixingCycleListPayload | null) => void;
   onStatsChange?: (stats: { total: number; active: number; inactive: number }) => void;
@@ -135,6 +141,7 @@ const MixingFormFields = ({
           checked={form.isActive}
           disabled={saving}
           onChange={(e) => onChange({ ...form, isActive: e.target.checked })}
+          sx={masterDataActiveSwitchSx(form.isActive)}
         />
       </Box>
     </Box>
@@ -165,6 +172,9 @@ const MixingFormFields = ({
 const MixingCycleMasterPanel = ({
   activeFilter,
   refreshKey,
+  addButtonLabel,
+  onRefresh,
+  refreshDisabled = false,
   t,
   onListPayloadChange,
   onStatsChange,
@@ -176,36 +186,18 @@ const MixingCycleMasterPanel = ({
     onStatsChange,
   });
   const { table, tableCell } = t;
-  const searchTheme = t.batchListShell?.inputs;
+  const columnCount = 7 + MASTER_DATA_AUDIT_COLUMN_COUNT;
 
   return (
     <Box>
       <Paper elevation={0} sx={table.paper}>
-        <Box sx={t.tableSearchBar}>
-          <TextField
-            size="small"
-            fullWidth
-            margin="none"
-            value={hook.search}
-            onChange={(e) => hook.setSearch(e.target.value)}
-            placeholder="Search mixing cycles…"
-            sx={{
-              ...(searchTheme?.search ?? t.searchField),
-              m: 0,
-              mb: 0,
-              mt: 0,
-              flex: 1,
-              minWidth: 0,
-            }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <SearchRoundedIcon sx={searchTheme?.startIcon?.search} />
-                </InputAdornment>
-              ),
-            }}
-          />
-        </Box>
+        <MasterDataTableToolbar
+          search={hook.search}
+          onSearchChange={hook.setSearch}
+          onRefresh={onRefresh}
+          refreshDisabled={refreshDisabled || hook.loading}
+          t={t}
+        />
         <Divider sx={table.divider} />
         <TableContainer>
           <Table size="small">
@@ -216,26 +208,26 @@ const MixingCycleMasterPanel = ({
                 <TableCell sx={table.headerCell}>Name</TableCell>
                 <TableCell sx={table.headerCell}>Stage</TableCell>
                 <TableCell sx={table.headerCell}>Ops</TableCell>
+                <MasterDataAuditHeaderCells table={table} />
                 <TableCell sx={table.headerCell}>Active</TableCell>
-                <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>Actions</TableCell>
+                <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>{S.TABLE.COL_ACTIONS}</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {hook.loading ? (
                 Array.from({ length: hook.rowsPerPage }).map((_, i) => (
-                  <SkeletonRow key={i} columns={7} sx={table.cell} />
+                  <SkeletonRow key={i} columns={columnCount} sx={table.cell} />
                 ))
               ) : hook.paginated.length === 0 && hook.inlineMode !== "create" ? (
                 <TableRow>
-                  <TableCell colSpan={7} sx={table.emptyCell}>
+                  <TableCell colSpan={columnCount} sx={table.emptyCell}>
                     <icons.Inventory sx={table.emptyIcon} />
                     <Typography sx={table.emptyText}>{S.TABLE.EMPTY}</Typography>
                   </TableCell>
                 </TableRow>
               ) : (
                 hook.paginated.map((row) => {
-                  const expanded =
-                    hook.expandedId === row.id || (hook.inlineMode === "edit" && hook.form.id === row.id);
+                  const expanded = hook.expandedId === row.id;
                   const opCount =
                     (row.cycles.premixOperations?.length ?? 0) + (row.cycles.finalMixOperations?.length ?? 0);
                   return (
@@ -244,9 +236,7 @@ const MixingCycleMasterPanel = ({
                         <TableCell sx={table.cell}>
                           <IconButton
                             size="small"
-                            onClick={() =>
-                              hook.setExpandedId(expanded && hook.inlineMode !== "edit" ? null : row.id)
-                            }
+                            onClick={() => hook.setExpandedId(expanded ? null : row.id)}
                             disabled={hook.inlineMode === "create"}
                           >
                             {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
@@ -264,92 +254,46 @@ const MixingCycleMasterPanel = ({
                         <TableCell sx={table.cell}>
                           <Typography sx={table.bodyText}>{opCount}</Typography>
                         </TableCell>
+                        <MasterDataAuditRowCells record={row} table={table} />
                         <TableCell sx={table.cell}>
-                          <Chip
-                            size="small"
-                            label={row.isActive ? S.TABLE.YES : S.TABLE.NO}
-                            color={row.isActive ? "success" : "default"}
-                            variant={row.isActive ? "filled" : "outlined"}
-                          />
+                          <MasterDataActiveStatusChip isActive={row.isActive} />
                         </TableCell>
                         <TableCell sx={table.cellActionsWrapper}>
                           <Box sx={tableCell.actionsBox}>
-                            <Tooltip title={S.TABLE.EDIT}>
-                              <IconButton
-                                size="small"
-                                onClick={() => hook.openEdit(row)}
-                                disabled={hook.inlineMode != null}
-                                sx={tableCell.editButton}
-                              >
-                                <icons.Edit sx={tableCell.editIcon} />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title={S.TABLE.DISABLE}>
-                              <span>
-                                <IconButton
-                                  size="small"
-                                  disabled={!row.isActive || hook.inlineMode != null}
-                                  onClick={() => hook.setDisableTarget(row)}
-                                  sx={tableCell.deleteButton}
-                                >
-                                  <icons.Delete sx={tableCell.deleteIcon} />
-                                </IconButton>
-                              </span>
-                            </Tooltip>
+                            <MasterDataActiveSwitch
+                              isActive={row.isActive}
+                              disabled={hook.inlineMode != null || hook.saving || hook.disabling || hook.enabling}
+                              onToggle={(nextActive) => hook.handleToggleActive(row, nextActive)}
+                            />
                           </Box>
                         </TableCell>
                       </TableRow>
                       <TableRow>
-                        <TableCell colSpan={7} sx={{ p: 0, border: 0 }}>
+                        <TableCell colSpan={columnCount} sx={{ p: 0, border: 0 }}>
                           <Collapse in={expanded} timeout="auto" unmountOnExit>
-                            {hook.inlineMode === "edit" && hook.form.id === row.id ? (
-                              <>
-                                <MixingFormFields
-                                  form={hook.form}
-                                  isEdit
-                                  saving={hook.saving}
-                                  onChange={hook.setForm}
-                                />
-                                <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", p: 1.5, pt: 0 }}>
-                                  <Button size="small" onClick={hook.closeInline} disabled={hook.saving}>
-                                    {S.FORM.CANCEL}
-                                  </Button>
-                                  <Button
-                                    size="small"
-                                    variant="contained"
-                                    onClick={() => void hook.saveForm()}
-                                    disabled={hook.saving}
-                                    sx={t.pageHeader?.newProjectButton}
-                                  >
-                                    {hook.saving ? S.FORM.SAVING : S.FORM.SAVE}
-                                  </Button>
-                                </Box>
-                              </>
-                            ) : (
-                              <Box sx={{ p: 1.5 }}>
-                                {row.description ? (
-                                  <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                                    {row.description}
-                                  </Typography>
-                                ) : null}
-                                <Typography variant="subtitle2">Premix</Typography>
-                                {row.cycles.premixOperations.map((o, i) => (
-                                  <Typography key={`p-${i}`} variant="body2" color="text.secondary">
-                                    {o.sequenceNo != null ? `${o.sequenceNo}. ` : ""}
-                                    {o.operationName}
-                                  </Typography>
-                                ))}
-                                <Typography variant="subtitle2" sx={{ mt: 1 }}>
-                                  Final mix
+                            <Box sx={{ p: 1.5 }}>
+                              {row.description ? (
+                                <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                                  {row.description}
                                 </Typography>
-                                {row.cycles.finalMixOperations.map((o, i) => (
-                                  <Typography key={`f-${i}`} variant="body2" color="text.secondary">
-                                    {o.sequenceNo != null ? `${o.sequenceNo}. ` : ""}
-                                    {o.operationName}
-                                  </Typography>
-                                ))}
-                              </Box>
-                            )}
+                              ) : null}
+                              <Typography variant="subtitle2">Premix</Typography>
+                              {row.cycles.premixOperations.map((o, i) => (
+                                <Typography key={`p-${i}`} variant="body2" color="text.secondary">
+                                  {o.sequenceNo != null ? `${o.sequenceNo}. ` : ""}
+                                  {o.operationName}
+                                </Typography>
+                              ))}
+                              <Typography variant="subtitle2" sx={{ mt: 1 }}>
+                                Final mix
+                              </Typography>
+                              {row.cycles.finalMixOperations.map((o, i) => (
+                                <Typography key={`f-${i}`} variant="body2" color="text.secondary">
+                                  {o.sequenceNo != null ? `${o.sequenceNo}. ` : ""}
+                                  {o.operationName}
+                                </Typography>
+                              ))}
+                            </Box>
                           </Collapse>
                         </TableCell>
                       </TableRow>
@@ -406,7 +350,7 @@ const MixingCycleMasterPanel = ({
           disabled={hook.loading || hook.inlineMode != null}
           sx={t.pageHeader.newProjectButton}
         >
-          {S.PAGE.NEW_BUTTON}
+          {addButtonLabel}
         </Button>
       </Box>
 

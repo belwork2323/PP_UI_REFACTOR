@@ -1,8 +1,3 @@
-/**
- * Static Test Facility — Excel sheet rules (FORMAT / UNIT / SUBMIT).
- * Target = one StfMotorSession (stfData + stfTestNo / BEM number).
- */
-
 import type { StfMotorSession } from "@/data/models/user/StaticTestFacilityFormModel";
 import type {
   StfBemMotorData,
@@ -11,139 +6,116 @@ import type {
 } from "@/data/models/user/StfMotorDataModel";
 import type { FieldRuleConfig, SubDeptValidationConfig } from "../runValidation";
 import type { ValidationTier } from "../submissionIntent";
-import { str, ALPHA_NUM } from "../fieldValidators";
+import { str } from "../fieldValidators";
+import { VALIDATIONSTRING } from "./validationString";
 
-const required = (label: string) => `${label} is required.`;
-const invalidNumber = (label: string) => `${label} must be numeric.`;
-const invalidText = (label: string) => `${label} must be alphanumeric.`;
-const invalidDate = (label: string) => `${label} must be a valid date/time.`;
+const S = VALIDATIONSTRING;
 
-const textRule = (
-  label: string,
+const text = (
   requiredIn: ValidationTier[],
-  options?: { pattern?: RegExp; invalidMessage?: string },
+  pattern?: RegExp,
 ): FieldRuleConfig => ({
   valueType: "text",
   requiredIn,
-  pattern: options?.pattern,
-  messages: {
-    required: required(label),
-    invalid: options?.invalidMessage ?? invalidText(label),
-  },
+  pattern,
+  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
 
-const numberRule = (label: string, requiredIn: ValidationTier[]): FieldRuleConfig => ({
+const number = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
   valueType: "number",
   requiredIn,
-  messages: { required: required(label), invalid: invalidNumber(label) },
+  pattern: S.PATTERNS.FLOAT,
+  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
 
-const dateRule = (label: string, requiredIn: ValidationTier[]): FieldRuleConfig => ({
+const date = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
   valueType: "date",
   requiredIn,
-  messages: { required: required(label), invalid: invalidDate(label) },
+  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
 
-const fileRule = (label: string, requiredIn: ValidationTier[]): FieldRuleConfig => ({
+const file = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
   valueType: "file",
   requiredIn,
-  messages: { required: required(label), invalid: required(label) },
+  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
 
 export type StfValidationTarget = StfMotorSession;
 
-/** Shared + BEM + Main field rules (paths resolved per variant). */
 export const stfValidationFields: Record<string, FieldRuleConfig> = {
-  // Setup
-  bemMotorNo: textRule("BEM Number", ["UNIT", "SUBMIT"], {
-    pattern: ALPHA_NUM,
-    invalidMessage: "BEM Number must be alphanumeric.",
-  }),
-  stfTestNo: textRule("BEM / STF Test No", ["UNIT", "SUBMIT"], {
-    pattern: ALPHA_NUM,
-    invalidMessage: "BEM / STF Test No must be alphanumeric.",
-  }),
+  bemMotorNo: text(["UNIT", "SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  stfTestNo: text(["UNIT", "SUBMIT"], S.PATTERNS.ALPHANUMERIC),
 
-  // BEM Conditioning
-  fromDateTime: dateRule("From (Date & Time)", ["SUBMIT"]),
-  toDateTime: dateRule("To (Date & Time)", ["SUBMIT"]),
-  conditioningTemp: numberRule("Temperature (°C)", ["SUBMIT"]),
-  conditioningRh: numberRule("RH (%)", ["SUBMIT"]),
-  conditioningObservation: textRule("Observation", []),
+  fromDateTime: date(["SUBMIT"]),
+  toDateTime: date(["SUBMIT"]),
+  conditioningTemp: number(["SUBMIT"]),
+  conditioningRh: number(["SUBMIT"]),
+  conditioningObservation: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 
-  // Grain dimension (per row)
-  grainOd: numberRule("OD", ["SUBMIT"]),
-  grainA: numberRule("A", ["SUBMIT"]),
-  grainB: numberRule("B", ["SUBMIT"]),
-  grainC: numberRule("C", ["SUBMIT"]),
-  grainLength: numberRule("Length", ["SUBMIT"]),
-  grainWeight: numberRule("Weight (Kg)", ["SUBMIT"]),
+  grainOd: number(["SUBMIT"]),
+  grainA: number(["SUBMIT"]),
+  grainB: number(["SUBMIT"]),
+  grainC: number(["SUBMIT"]),
+  grainLength: number(["SUBMIT"]),
+  grainWeight: number(["SUBMIT"]),
 
-  // BEM hardware
-  headEndNo: textRule("Head End No", ["SUBMIT"], { pattern: ALPHA_NUM }),
-  nozzleEndNo: textRule("Nozzle End No", ["SUBMIT"], { pattern: ALPHA_NUM }),
-  retainerRingNo: textRule("Retainer Ring No", ["SUBMIT"], { pattern: ALPHA_NUM }),
-  casingNo: textRule("Casing No", ["SUBMIT"], { pattern: ALPHA_NUM }),
-  casingOd: numberRule("Casing OD", ["SUBMIT"]),
-  casingId: numberRule("Casing ID", ["SUBMIT"]),
-  casingLength: numberRule("Casing Length", ["SUBMIT"]),
-  firingNo: textRule("Firing No", ["SUBMIT"], { pattern: ALPHA_NUM }),
+  headEndNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  nozzleEndNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  retainerRingNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  casingNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  casingOd: number(["SUBMIT"]),
+  casingId: number(["SUBMIT"]),
+  casingLength: number(["SUBMIT"]),
+  firingNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
 
-  // Igniter (shared)
-  containerType: textRule("Container Type", ["SUBMIT"], { pattern: ALPHA_NUM }),
-  composition: textRule("Composition", ["SUBMIT"], { pattern: ALPHA_NUM }),
-  weightOfComposition: numberRule("Weight of Composition (g)", ["SUBMIT"]),
-  squibResistance: numberRule("Squib Resistance (Ω)", ["SUBMIT"]),
-  igniterRemarks: textRule("Remarks", []),
+  containerType: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  composition: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  weightOfComposition: number(["SUBMIT"]),
+  squibResistance: number(["SUBMIT"]),
+  igniterRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 
-  // Nozzle — BEM
-  nozzleClosureMaterial: textRule("Nozzle Closure Material", ["SUBMIT"]),
-  throatMaterial: numberRule("Throat Material", ["SUBMIT"]),
-  motherGraphite: textRule("Mother Graphite", ["SUBMIT"]),
-  nozzleInsert: textRule("Nozzle Insert", ["SUBMIT"]),
-  beforeD1: numberRule("Before Firing D1 (mm)", ["SUBMIT"]),
-  beforeD2: numberRule("Before Firing D2 (mm)", ["SUBMIT"]),
-  afterD1: numberRule("After Firing D1 (mm)", ["SUBMIT"]),
-  afterD2: numberRule("After Firing D2 (mm)", ["SUBMIT"]),
-  nozzleRemarks: textRule("Remarks", []),
+  nozzleClosureMaterial: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  throatMaterial: number(["SUBMIT"]),
+  motherGraphite: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  nozzleInsert: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  beforeD1: number(["SUBMIT"]),
+  beforeD2: number(["SUBMIT"]),
+  afterD1: number(["SUBMIT"]),
+  afterD2: number(["SUBMIT"]),
+  nozzleRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 
-  // Nozzle — Main
-  dtBefore: numberRule("DT Before", ["SUBMIT"]),
-  deBefore: numberRule("DE Before", ["SUBMIT"]),
-  dtAfter: numberRule("DT After", ["SUBMIT"]),
-  deAfter: numberRule("DE After", ["SUBMIT"]),
+  dtBefore: number(["SUBMIT"]),
+  deBefore: number(["SUBMIT"]),
+  dtAfter: number(["SUBMIT"]),
+  deAfter: number(["SUBMIT"]),
 
-  // Testing
-  throatDiameter: numberRule("Throat Diameter", ["SUBMIT"]),
-  propellantWeight: numberRule("Wt of Propellant", ["SUBMIT"]),
-  webThickness: numberRule("Web Thickness", ["SUBMIT"]),
-  nValue: numberRule("n Value", ["SUBMIT"]),
-  testingCondTemp: numberRule("Conditioning Temp", ["SUBMIT"]),
-  ambientTemp: numberRule("Ambient Temp", ["SUBMIT"]),
-  testingRh: numberRule("RH", ["SUBMIT"]),
+  throatDiameter: number(["SUBMIT"]),
+  propellantWeight: number(["SUBMIT"]),
+  webThickness: number(["SUBMIT"]),
+  nValue: number(["SUBMIT"]),
+  testingCondTemp: number(["SUBMIT"]),
+  ambientTemp: number(["SUBMIT"]),
+  testingRh: number(["SUBMIT"]),
 
-  // Sensor row
-  sensor: textRule("Sensor", ["SUBMIT"], { pattern: ALPHA_NUM }),
-  sensitivity: textRule("Sensitivity", ["SUBMIT"]),
-  maxRange: textRule("Range Max", ["SUBMIT"]),
-  sensorRange: textRule("Range Sensor", ["SUBMIT"]),
-  filterHz: textRule("Filter (Hz)", ["SUBMIT"]),
-  iaNo: textRule("IA No", ["SUBMIT"], { pattern: ALPHA_NUM }),
-  iaGain: numberRule("IA Gain", ["SUBMIT"]),
-  extV: numberRule("Ext (V)", ["SUBMIT"]),
-  offsetValue: numberRule("Offset Value", ["SUBMIT"]),
-  preloading: numberRule("Preloading", ["SUBMIT"]),
+  sensor: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  sensitivity: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  maxRange: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  sensorRange: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  filterHz: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  iaNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  iaGain: number(["SUBMIT"]),
+  extV: number(["SUBMIT"]),
+  offsetValue: number(["SUBMIT"]),
+  preloading: number(["SUBMIT"]),
 
-  // Results
-  avgPressure: numberRule("Avg Pressure (ksc)", ["SUBMIT"]),
-  peakPressure: numberRule("Peak Pressure (ksc)", ["SUBMIT"]),
-  tb: numberRule("Tb (s)", ["SUBMIT"]),
-  burnRate: numberRule("Burn Rate (mm/s)", ["SUBMIT"]),
-  cStar: numberRule("C star (m/s)", ["SUBMIT"]),
-  isp: numberRule("Isp (s)", ["SUBMIT"]),
+  avgPressure: number(["SUBMIT"]),
+  peakPressure: number(["SUBMIT"]),
+  tb: number(["SUBMIT"]),
+  burnRate: number(["SUBMIT"]),
+  cStar: number(["SUBMIT"]),
+  isp: number(["SUBMIT"]),
 
-  // PT curve
-  ptCurve: fileRule("Upload P-T Curve", ["SUBMIT"]),
+  ptCurve: file(["SUBMIT"]),
 };
 
 const push = (
@@ -220,20 +192,21 @@ const resolveBemFields = (
     push(fields, `SENSOR_CONFIGURATION.${i}.FILTER_HZ`, row.FILTER_HZ, "filterHz");
     push(fields, `SENSOR_CONFIGURATION.${i}.IA_NO`, row.IA_NO, "iaNo");
     push(fields, `SENSOR_CONFIGURATION.${i}.IA_GAIN`, row.IA_GAIN, "iaGain");
-    push(fields, `SENSOR_CONFIGURATION.${i}.EXT_V`, row.EXT_V, "extV");
+    push(fields, `SENSOR_CONFIGURATION.${i}.EXT_V`, (row as any).EXT_V ?? (row as any).EXT_VOLTAGE, "extV");
     push(fields, `SENSOR_CONFIGURATION.${i}.OFFSET_VALUE`, row.OFFSET_VALUE, "offsetValue");
     push(fields, `SENSOR_CONFIGURATION.${i}.PRELOADING`, row.PRELOADING, "preloading");
   });
 
-  const r = data.RESULT_DETAILS;
-  push(fields, "RESULT_DETAILS.AVG_PRESSURE", r.AVG_PRESSURE, "avgPressure");
+  const r = (data as any).RESULT_DETAILS ?? (data as any).STATIC_TEST_RESULT ?? {};
+  push(fields, "RESULT_DETAILS.AVG_PRESSURE", r.AVG_PRESSURE ?? r.AVERAGE_PRESSURE, "avgPressure");
   push(fields, "RESULT_DETAILS.PEAK_PRESSURE", r.PEAK_PRESSURE, "peakPressure");
   push(fields, "RESULT_DETAILS.TB", r.TB, "tb");
   push(fields, "RESULT_DETAILS.BURN_RATE", r.BURN_RATE, "burnRate");
   push(fields, "RESULT_DETAILS.C_STAR", r.C_STAR, "cStar");
   push(fields, "RESULT_DETAILS.ISP", r.ISP, "isp");
 
-  push(fields, "UPLOAD_PT_CURVE.PT_CURVE_UPLOAD", data.UPLOAD_PT_CURVE.PT_CURVE_UPLOAD, "ptCurve");
+  const pt = data.UPLOAD_PT_CURVE as any;
+  push(fields, "UPLOAD_PT_CURVE.PT_CURVE_UPLOAD", pt?.PT_CURVE_UPLOAD ?? pt?.PT_CURVE_FILE, "ptCurve");
 };
 
 const resolveMainFields = (
@@ -247,7 +220,7 @@ const resolveMainFields = (
   push(fields, "IGNITER_DETAILS.SQUIB_RESISTANCE", ig.SQUIB_RESISTANCE, "squibResistance");
   push(fields, "IGNITER_DETAILS.REMARKS", ig.REMARKS, "igniterRemarks");
 
-  const n = data.NOZZLE_DETAILS;
+  const n = data.NOZZLE_DETAILS as any;
   push(fields, "NOZZLE_DETAILS.NOZZLE_CLOSURE_MATERIAL", n.NOZZLE_CLOSURE_MATERIAL, "nozzleClosureMaterial");
   push(fields, "NOZZLE_DETAILS.MOTHER_GRAPHITE", n.MOTHER_GRAPHITE, "motherGraphite");
   push(fields, "NOZZLE_DETAILS.NOZZLE_INSERT", n.NOZZLE_INSERT, "nozzleInsert");
@@ -257,37 +230,38 @@ const resolveMainFields = (
   push(fields, "NOZZLE_DETAILS.DE_AFTER", n.DE_AFTER, "deAfter");
   push(fields, "NOZZLE_DETAILS.REMARKS", n.REMARKS, "nozzleRemarks");
 
-  const t = data.TESTING_DETAILS;
+  const t = data.TESTING_DETAILS as any;
   push(fields, "TESTING_DETAILS.THROAT_DIAMETER", t.THROAT_DIAMETER, "throatDiameter");
-  push(fields, "TESTING_DETAILS.PROPELLANT_WEIGHT", t.PROPELLANT_WEIGHT, "propellantWeight");
+  push(fields, "TESTING_DETAILS.PROPELLANT_WEIGHT", t.PROPELLANT_WEIGHT ?? t.WT_OF_PROPELLANT, "propellantWeight");
   push(fields, "TESTING_DETAILS.WEB_THICKNESS", t.WEB_THICKNESS, "webThickness");
   push(fields, "TESTING_DETAILS.N_VALUE", t.N_VALUE, "nValue");
-  push(fields, "TESTING_DETAILS.CONDITIONING_TEMPERATURE", t.CONDITIONING_TEMPERATURE, "testingCondTemp");
-  push(fields, "TESTING_DETAILS.AMBIENT_TEMPERATURE", t.AMBIENT_TEMPERATURE, "ambientTemp");
-  push(fields, "TESTING_DETAILS.RH_PERCENT", t.RH_PERCENT, "testingRh");
+  push(fields, "TESTING_DETAILS.CONDITIONING_TEMP", t.CONDITIONING_TEMP, "testingCondTemp");
+  push(fields, "TESTING_DETAILS.AMBIENT_TEMP", t.AMBIENT_TEMP, "ambientTemp");
+  push(fields, "TESTING_DETAILS.RH", t.RH, "testingRh");
 
-  (data.SENSOR_CONFIGURATION ?? []).forEach((row, i) => {
+  (data.SENSOR_CONFIGURATION ?? []).forEach((row: any, i) => {
     push(fields, `SENSOR_CONFIGURATION.${i}.SENSOR`, row.SENSOR, "sensor");
     push(fields, `SENSOR_CONFIGURATION.${i}.SENSITIVITY`, row.SENSITIVITY, "sensitivity");
-    push(fields, `SENSOR_CONFIGURATION.${i}.MAX_EXPECTED`, row.MAX_EXPECTED, "maxRange");
+    push(fields, `SENSOR_CONFIGURATION.${i}.MAX_RANGE`, row.MAX_RANGE, "maxRange");
     push(fields, `SENSOR_CONFIGURATION.${i}.SENSOR_RANGE`, row.SENSOR_RANGE, "sensorRange");
     push(fields, `SENSOR_CONFIGURATION.${i}.FILTER_HZ`, row.FILTER_HZ, "filterHz");
     push(fields, `SENSOR_CONFIGURATION.${i}.IA_NO`, row.IA_NO, "iaNo");
     push(fields, `SENSOR_CONFIGURATION.${i}.IA_GAIN`, row.IA_GAIN, "iaGain");
-    push(fields, `SENSOR_CONFIGURATION.${i}.EXT_VOLTAGE`, row.EXT_VOLTAGE, "extV");
+    push(fields, `SENSOR_CONFIGURATION.${i}.EXT_V`, row.EXT_V ?? row.EXT_VOLTAGE, "extV");
     push(fields, `SENSOR_CONFIGURATION.${i}.OFFSET_VALUE`, row.OFFSET_VALUE, "offsetValue");
     push(fields, `SENSOR_CONFIGURATION.${i}.PRELOADING`, row.PRELOADING, "preloading");
   });
 
-  const r = data.STATIC_TEST_RESULT;
-  push(fields, "STATIC_TEST_RESULT.AVERAGE_PRESSURE", r.AVERAGE_PRESSURE, "avgPressure");
+  const r = (data as any).STATIC_TEST_RESULT ?? (data as any).RESULT_DETAILS ?? {};
+  push(fields, "STATIC_TEST_RESULT.AVERAGE_PRESSURE", r.AVERAGE_PRESSURE ?? r.AVG_PRESSURE, "avgPressure");
   push(fields, "STATIC_TEST_RESULT.PEAK_PRESSURE", r.PEAK_PRESSURE, "peakPressure");
   push(fields, "STATIC_TEST_RESULT.TB", r.TB, "tb");
   push(fields, "STATIC_TEST_RESULT.BURN_RATE", r.BURN_RATE, "burnRate");
   push(fields, "STATIC_TEST_RESULT.C_STAR", r.C_STAR, "cStar");
   push(fields, "STATIC_TEST_RESULT.ISP", r.ISP, "isp");
 
-  push(fields, "UPLOAD_PT_CURVE.PT_CURVE_FILE", data.UPLOAD_PT_CURVE.PT_CURVE_FILE, "ptCurve");
+  const pt = data.UPLOAD_PT_CURVE as any;
+  push(fields, "UPLOAD_PT_CURVE.PT_CURVE_FILE", pt?.PT_CURVE_FILE ?? pt?.PT_CURVE_UPLOAD, "ptCurve");
 };
 
 export const stfValidationConfig: SubDeptValidationConfig<StfValidationTarget> = {
@@ -305,7 +279,7 @@ export const stfValidationConfig: SubDeptValidationConfig<StfValidationTarget> =
     if (data.variant === "BEM") {
       resolveBemFields(data, fields);
     } else {
-      resolveMainFields(data, fields);
+      resolveMainFields(data as StfMainMotorData, fields);
     }
 
     return fields;
@@ -315,14 +289,13 @@ export const stfValidationConfig: SubDeptValidationConfig<StfValidationTarget> =
       if (tier !== "SUBMIT") return;
       const data = motor.stfData;
       if (!data || data.variant !== "BEM") return;
-      const from = str(data.CONDITIONING_DETAILS.FROM_DATE_TIME);
-      const to = str(data.CONDITIONING_DETAILS.TO_DATE_TIME);
+      const from = str((data as StfBemMotorData).CONDITIONING_DETAILS.FROM_DATE_TIME);
+      const to = str((data as StfBemMotorData).CONDITIONING_DETAILS.TO_DATE_TIME);
       if (!from || !to) return;
       const t0 = Date.parse(from);
       const t1 = Date.parse(to);
       if (Number.isFinite(t0) && Number.isFinite(t1) && t1 < t0) {
-        errors["CONDITIONING_DETAILS.TO_DATE_TIME"] =
-          "To (Date & Time) cannot be before From (Date & Time).";
+        errors["CONDITIONING_DETAILS.TO_DATE_TIME"] = S.INVALID;
       }
     },
   ],

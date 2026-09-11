@@ -1,3 +1,4 @@
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 import React, { useMemo, useState } from "react";
 import {
   Box,
@@ -27,7 +28,7 @@ import {
 import TrimmingFileField from "./TrimmingFileField";
 import QCDivisionFileField from "../../qualityControl/QCDivision/QCDivisionFileField";
 import FieldErrorText from "@/ui/components/validation/FieldErrorText";
-import type { ValidationErrors } from "@/data/validation/submissionIntent";
+import type { ValidationErrors } from "@/data/validation/adapters/trimming.validation";
 import { fieldError } from "@/data/validation/adapters/trimming.validation";
 
 const S = STRINGS.MANUFACTURING.TRIMMING;
@@ -280,8 +281,12 @@ export const TrimmingCommonTable = ({
     >
       <Box sx={sectionCardSx}>
         <Box sx={sectionHeaderSx}>
-          <Typography sx={sectionTitleStyle}>
-            {S.MOTOR_RECEIVED_AT_LABEL}
+          <Typography sx={sectionTitleStyle} component="div">
+            <FieldLabelWithAsterisk
+              label={S.MOTOR_RECEIVED_AT_LABEL}
+              required
+              sx={{ fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+            />
           </Typography>
         </Box>
         <Box sx={{ p: 1.5, maxWidth: 320 }}>
@@ -317,11 +322,11 @@ export const TrimmingCommonTable = ({
             <Table size="small" sx={{ borderCollapse: "collapse", minWidth: 720 }}>
               <TableHead>
                 <TableRow>
-                  <TableCell sx={thSx}>Machine Details</TableCell>
-                  <TableCell sx={thSx}>Start Date</TableCell>
-                  <TableCell sx={thSx}>Completion Date</TableCell>
-                  <TableCell sx={thSx}>Arbor Size</TableCell>
-                  <TableCell sx={thSx}>Cutter Size</TableCell>
+                  <TableCell sx={thSx}><FieldLabelWithAsterisk label="Machine Details" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
+                  <TableCell sx={thSx}><FieldLabelWithAsterisk label="Start Date" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
+                  <TableCell sx={thSx}><FieldLabelWithAsterisk label="Completion Date" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
+                  <TableCell sx={thSx}><FieldLabelWithAsterisk label="Arbor Size" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
+                  <TableCell sx={thSx}><FieldLabelWithAsterisk label="Cutter Size" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
                   <TableCell sx={thSx}>Remarks</TableCell>
                   {showStructureActions ? (
                     <TableCell align="center" sx={{ ...thSx, width: 50 }}>
@@ -563,10 +568,10 @@ export const TrimmingCommonTable = ({
                   <TableCell sx={{ ...thSx, minWidth: 160 }}>Parameter</TableCell>
                   <TableCell sx={{ ...thSx, minWidth: 110 }}>Stage</TableCell>
                   <TableCell sx={{ ...thSx, minWidth: 110 }}>Specification</TableCell>
-                  <TableCell sx={{ ...thSx, minWidth: 80 }}>R2T</TableCell>
-                  <TableCell sx={{ ...thSx, minWidth: 80 }}>R2B</TableCell>
-                  <TableCell sx={{ ...thSx, minWidth: 80 }}>R1R</TableCell>
-                  <TableCell sx={{ ...thSx, minWidth: 80 }}>R1L</TableCell>
+                  <TableCell sx={{ ...thSx, minWidth: 80 }}><FieldLabelWithAsterisk label="R2T" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
+                  <TableCell sx={{ ...thSx, minWidth: 80 }}><FieldLabelWithAsterisk label="R2B" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
+                  <TableCell sx={{ ...thSx, minWidth: 80 }}><FieldLabelWithAsterisk label="R1R" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
+                  <TableCell sx={{ ...thSx, minWidth: 80 }}><FieldLabelWithAsterisk label="R1L" required sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }} /></TableCell>
                   {dynamicLocations.map((loc) => (
                     <TableCell key={`col-head-${loc}`} sx={{ ...thSx, minWidth: 100 }}>
                       <Stack

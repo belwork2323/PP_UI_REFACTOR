@@ -18,6 +18,7 @@ import { STRINGS } from "@app/config/strings";
 import { useThemeStore } from "@app/store/themeStore";
 import getManufacturingTheme from "@app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import AdminManagementFormHeader from "@ui/components/custom/admin/AdminManagementFormHeader";
+import { masterDataActiveSwitchSx } from "./components/MasterDataActiveSwitch";
 import CasePrepTextField from "@ui/pages/user/manufacturing/CasePreparation/CasePrepTextField";
 import {
   emptyInsulationCategory,
@@ -304,6 +305,7 @@ const InsulationSpecMasterFormDialog = ({
                   checked={form.isActive}
                   disabled={saving}
                   onChange={(e) => onChange({ ...form, isActive: e.target.checked })}
+                  sx={masterDataActiveSwitchSx(form.isActive)}
                 />
               </Box>
             </Box>

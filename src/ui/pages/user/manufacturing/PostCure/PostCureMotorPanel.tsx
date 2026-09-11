@@ -71,7 +71,7 @@ export const LocationDateTable = ({
           <TableRow>
             {["Location", "From Date", "To Date", "Observations"].map((label, idx) => (
               <TableCell key={label} sx={postCureTableHeaderCellSx(idx === 0)}>
-                <FieldLabelWithAsterisk label={label} required={idx < 3 && !readOnly} />
+                <FieldLabelWithAsterisk label={label} required={!readOnly} />
               </TableCell>
             ))}
           </TableRow>
@@ -198,10 +198,7 @@ export const LocationQtyTable = ({
           <TableRow>
             {["Location", "From Date", "To Date", qtyLabel, "Observations"].map((label, idx) => (
               <TableCell key={label} sx={postCureTableHeaderCellSx(idx === 0)}>
-                <FieldLabelWithAsterisk
-                  label={label}
-                  required={idx >= 1 && idx <= 3 && !readOnly}
-                />
+                <FieldLabelWithAsterisk label={label} required={idx >= 1 && !readOnly} />
               </TableCell>
             ))}
           </TableRow>
@@ -531,10 +528,7 @@ export const QualificationSection = ({
             <TableRow>
               {["Parameter", "Specification", "Result"].map((label, idx) => (
                 <TableCell key={label} sx={postCureTableHeaderCellSx(idx === 0)}>
-                  <FieldLabelWithAsterisk
-                    label={label}
-                    required={!readOnly && label !== "Result"}
-                  />
+                  <FieldLabelWithAsterisk label={label} required={!readOnly} />
                 </TableCell>
               ))}
             </TableRow>
@@ -564,6 +558,7 @@ export const QualificationSection = ({
                         helperText={validationErrors[resultErrKey]}
                         disabled={disabled}
                         readOnly={readOnly}
+                        required
                       />
                     )}
                   </TableCell>
@@ -575,7 +570,7 @@ export const QualificationSection = ({
       </TableContainer>
 
       <Box sx={{ mt: 1.5 }}>
-        <FieldLabelWithAsterisk label="QC Report" />
+        <FieldLabelWithAsterisk label="QC Report" required />
         <Box sx={{ mt: 1 }}>
           <PostCureFileField
             files={value?.qualificationQcReport || []}
@@ -584,6 +579,7 @@ export const QualificationSection = ({
             acceptMode="imageVideoPdf"
             disabled={disabled}
             readOnly={readOnly}
+            required
           />
           {validationErrors[qcReportErrKey] && (
             <Typography variant="caption" color="error" sx={{ mt: 0.5, display: "block" }}>

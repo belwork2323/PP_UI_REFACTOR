@@ -56,6 +56,9 @@ import {
   qcReadOnlyTableHeaderCellSx,
 } from "./components/QCDivisionReadOnlyValue";
 import { uniformTableHeaderCellSx } from "@app/theme/custom_themes/shared/data_table_theme";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import FieldErrorText from "@/ui/components/validation/FieldErrorText";
+import { fieldError } from "@/data/validation/adapters/qcCasting.validation";
 
 const BRAND = QC_DIVISION_BRAND;
 const TABLE_BORDER = alpha(BRAND.primary, 0.18);
@@ -120,6 +123,7 @@ type ColumnDef<T> = {
   label: string;
   fieldType?: "text" | "number" | "date" | "time" | "textarea" | "select" | "computed";
   options?: readonly { value: string; label: string }[];
+  required?: boolean;
 };
 
 type EditableTableProps<T extends Record<string, unknown>> = {
@@ -131,6 +135,8 @@ type EditableTableProps<T extends Record<string, unknown>> = {
   readOnly?: boolean;
   allowAdd?: boolean;
   allowDelete?: boolean;
+  validationErrors?: Record<string, string> | null;
+  errorPrefix?: string;
 };
 
 const CastingEditableTable = <T extends Record<string, unknown>>({
@@ -142,6 +148,8 @@ const CastingEditableTable = <T extends Record<string, unknown>>({
   readOnly = false,
   allowAdd = false,
   allowDelete = false,
+  validationErrors = null,
+  errorPrefix = "",
 }: EditableTableProps<T>) => {
   const headerSx = readOnly ? qcReadOnlyTableHeaderCellSx : TH;
   const bodyCellSx = readOnly ? qcReadOnlyBodyCellSx : cellSx;
@@ -150,17 +158,17 @@ const CastingEditableTable = <T extends Record<string, unknown>>({
     onChange(
       rows.map((row, rowIndex) => {
         if (rowIndex !== index) {
-          return ({ ...row, SR_NO: rowIndex + 1 } as T);
+          return { ...row, SR_NO: rowIndex + 1 } as unknown as T;
         }
         if (field === "LOAD_CELL_INITIAL" || field === "LOAD_CELL_FINAL" || field === "TOTAL_WEIGHT") {
           const updated = applyWeightmentFieldChange(
-            row as QcCastingWeightmentRow,
+            row as unknown as QcCastingWeightmentRow,
             field as keyof QcCastingWeightmentRow,
             value,
           );
-          return ({ ...updated, SR_NO: rowIndex + 1 } as T);
+          return { ...updated, SR_NO: rowIndex + 1 } as unknown as T;
         }
-        return ({ ...row, [field]: value, SR_NO: rowIndex + 1 } as T);
+        return { ...row, [field]: value, SR_NO: rowIndex + 1 } as unknown as T;
       }),
     );
   };
@@ -174,7 +182,7 @@ const CastingEditableTable = <T extends Record<string, unknown>>({
     onChange(
       rows
         .filter((_, rowIndex) => rowIndex !== index)
-        .map((row, rowIndex) => ({ ...row, SR_NO: rowIndex + 1 }) as T),
+        .map((row, rowIndex) => ({ ...row, SR_NO: rowIndex + 1 }) as unknown as T),
     );
   };
 
@@ -280,7 +288,15 @@ const CastingEditableTable = <T extends Record<string, unknown>>({
               <TableCell sx={headerSx}>S. No</TableCell>
               {columns.map((column) => (
                 <TableCell key={column.id} sx={headerSx}>
-                  {column.label}
+                  {column.required ? (
+                    <FieldLabelWithAsterisk
+                      label={column.label}
+                      required
+                      sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+                    />
+                  ) : (
+                    column.label
+                  )}
                 </TableCell>
               ))}
               {!readOnly && allowDelete ? <TableCell sx={headerSx} align="center" /> : null}
@@ -303,11 +319,18 @@ const CastingEditableTable = <T extends Record<string, unknown>>({
                 <TableCell sx={bodyCellSx}>
                   {readOnly ? <QCDivisionReadOnlyValue value={index + 1} /> : index + 1}
                 </TableCell>
-                {columns.map((column) => (
-                  <TableCell key={column.id} sx={bodyCellSx}>
-                    {renderInput(row, index, column)}
-                  </TableCell>
-                ))}
+                {columns.map((column) => {
+                  const path = errorPrefix
+                    ? `${errorPrefix}.${index}.${column.id}`
+                    : `${index}.${column.id}`;
+                  const message = fieldError(validationErrors ?? undefined, path);
+                  return (
+                    <TableCell key={column.id} sx={bodyCellSx}>
+                      {renderInput(row, index, column)}
+                      {!readOnly ? <FieldErrorText message={message} /> : null}
+                    </TableCell>
+                  );
+                })}
                 {!readOnly && allowDelete ? (
                   <TableCell sx={bodyCellSx} align="center">
                     <IconButton
@@ -346,11 +369,14 @@ type FieldRowProps = {
   label: string;
   children: ReactNode;
   readOnly?: boolean;
+  required?: boolean;
+  error?: string;
 };
 
-const FieldRow = ({ label, children, readOnly = false }: FieldRowProps) => (
+const FieldRow = ({ label, children, readOnly = false, required = false, error }: FieldRowProps) => (
   <Stack direction={{ xs: "column", sm: "row" }} spacing={1} alignItems={{ sm: "center" }}>
     <Typography
+      component="div"
       sx={{
         fontSize: readOnly ? "0.65rem" : "0.72rem",
         fontWeight: readOnly ? 800 : 700,
@@ -360,9 +386,20 @@ const FieldRow = ({ label, children, readOnly = false }: FieldRowProps) => (
         minWidth: { sm: 200 },
       }}
     >
-      {label}
+      {required ? (
+        <FieldLabelWithAsterisk
+          label={label}
+          required
+          sx={{ fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
+        />
+      ) : (
+        label
+      )}
     </Typography>
-    <Box sx={{ flex: 1, minWidth: 0 }}>{children}</Box>
+    <Box sx={{ flex: 1, minWidth: 0 }}>
+      {children}
+      {!readOnly ? <FieldErrorText message={error} /> : null}
+    </Box>
   </Stack>
 );
 
@@ -451,11 +488,13 @@ const MANDREL_COLUMNS: ColumnDef<QcCastingMandrelRow>[] = [
     id: "READING_WITHOUT_CUP",
     label: "Reading without cup (Mandrel resting on motor dome) mm",
     fieldType: "number",
+    required: true,
   },
   {
     id: "READING_WITH_BOTTOM_CUP",
     label: "Reading with bottom cup & gasket after tightening bottom cup mm",
     fieldType: "number",
+    required: true,
   },
 ];
 
@@ -464,23 +503,35 @@ const CASTING_TABLE_COLUMNS: ColumnDef<QcCastingTableRow>[] = [
     id: "FINAL_MIX_BOWL_NO",
     label: "Final Mix Bowl No",
     fieldType: "text",
+    required: true,
   },
-  { id: "PROPELLANT_QTY", label: "Qty of Propellant (Kg)", fieldType: "number" },
+  { id: "PROPELLANT_QTY", label: "Qty of Propellant (Kg)", fieldType: "number", required: true },
   {
     id: "INITIAL_UNLOADING_VISCOSITY",
     label: "Initial unloading viscosity P@°C",
     fieldType: "number",
+    required: true,
   },
-  { id: "CASTING_START_TIME", label: "Time of start of casting", fieldType: "time" },
-  { id: "CASTING_COMPLETION_TIME", label: "Time of completion of casting", fieldType: "time" },
-  { id: "SLURRY_CAST_FROM_EACH_BOWL", label: "Slurry cast from Bowl (kg)", fieldType: "number" },
+  { id: "CASTING_START_TIME", label: "Time of start of casting", fieldType: "time", required: true },
+  {
+    id: "CASTING_COMPLETION_TIME",
+    label: "Time of completion of casting",
+    fieldType: "time",
+    required: true,
+  },
+  {
+    id: "SLURRY_CAST_FROM_EACH_BOWL",
+    label: "Slurry cast from Bowl (kg)",
+    fieldType: "number",
+    required: true,
+  },
   { id: "REMARKS", label: "Remarks", fieldType: "textarea" },
 ];
 
 const WEIGHTMENT_COLUMNS: ColumnDef<QcCastingWeightmentRow>[] = [
-  { id: "LOAD_CELL_INITIAL", label: "Load Cell Reading Initial", fieldType: "number" },
-  { id: "LOAD_CELL_FINAL", label: "Load Cell Reading Final", fieldType: "number" },
-  { id: "TOTAL_WEIGHT", label: "Total Weight (Kg)", fieldType: "number" },
+  { id: "LOAD_CELL_INITIAL", label: "Load Cell Reading Initial", fieldType: "number", required: true },
+  { id: "LOAD_CELL_FINAL", label: "Load Cell Reading Final", fieldType: "number", required: true },
+  { id: "TOTAL_WEIGHT", label: "Total Weight (Kg)", fieldType: "number", required: true },
 ];
 
 const PRESSURE_PLATE_COLUMNS: ColumnDef<QcCastingPressurePlateRow>[] = [
@@ -494,9 +545,13 @@ const PRESSURE_PLATE_COLUMNS: ColumnDef<QcCastingPressurePlateRow>[] = [
 type QCCastingMotorPanelProps = {
   motorId?: string | null;
   values: SchemaFormValues;
-  onChange: (values: SchemaFormValues) => void;
+  onChange: (
+    values: SchemaFormValues | ((prev: SchemaFormValues) => SchemaFormValues),
+  ) => void;
   readOnly?: boolean;
+  disabled?: boolean;
   headerActions?: ReactNode;
+  validationErrors?: Record<string, string> | null;
 };
 
 const QCCastingMotorPanel = ({
@@ -505,7 +560,9 @@ const QCCastingMotorPanel = ({
   onChange,
   readOnly = false,
   headerActions,
+  validationErrors = null,
 }: QCCastingMotorPanelProps) => {
+  const err = (path: string) => fieldError(validationErrors ?? undefined, path);
   const castingType = useMemo(() => getCastingType(values), [values]);
   const assemblyDate = useMemo(() => getCastingAssemblyDate(values), [values]);
   const mandrelRows = useMemo(() => getCastingMandrelRows(values), [values]);
@@ -601,7 +658,7 @@ const QCCastingMotorPanel = ({
           readOnly={readOnly}
         >
           <Stack spacing={1.5}>
-            <FieldRow label="Date" readOnly={readOnly}>
+            <FieldRow label="Date" readOnly={readOnly} required error={err("ASSEMBLY_DATE")}>
               {readOnly ? (
                 <QCDivisionReadOnlyValue value={assemblyDate} muted={!assemblyDate.trim()} />
               ) : (
@@ -611,6 +668,7 @@ const QCCastingMotorPanel = ({
                   onChange={(next) => onChange(setCastingAssemblyDate(values, next))}
                   placeholder="DD-MM-YYYY"
                   inputSx={tableDateFieldSx}
+                  error={Boolean(err("ASSEMBLY_DATE"))}
                 />
               )}
             </FieldRow>
@@ -625,6 +683,7 @@ const QCCastingMotorPanel = ({
                 READING_WITH_BOTTOM_CUP: "",
               })}
               readOnly={readOnly}
+              validationErrors={validationErrors}
             />
           </Stack>
         </SectionCard>
@@ -634,7 +693,7 @@ const QCCastingMotorPanel = ({
           readOnly={readOnly}
         >
           <Stack spacing={1.5}>
-            <FieldRow label="Date of Casting" readOnly={readOnly}>
+            <FieldRow label="Date of Casting" readOnly={readOnly} required error={err("DATE_OF_CASTING")}>
               {readOnly ? (
                 <QCDivisionReadOnlyValue value={dateOfCasting} muted={!dateOfCasting.trim()} />
               ) : (
@@ -646,10 +705,11 @@ const QCCastingMotorPanel = ({
                   }
                   placeholder="DD-MM-YYYY"
                   inputSx={tableDateFieldSx}
+                  error={Boolean(err("DATE_OF_CASTING"))}
                 />
               )}
             </FieldRow>
-            <FieldRow label="RH %" readOnly={readOnly}>
+            <FieldRow label="RH %" readOnly={readOnly} required error={err("RH_PERCENT")}>
               {readOnly ? (
                 <QCDivisionReadOnlyValue value={rhPercent} muted={!rhPercent.trim()} />
               ) : (
@@ -662,10 +722,11 @@ const QCCastingMotorPanel = ({
                     onChange(setCastingPropellantField(values, "RH_PERCENT", event.target.value))
                   }
                   sx={tableFieldSx}
+                  error={Boolean(err("RH_PERCENT"))}
                 />
               )}
             </FieldRow>
-            <FieldRow label="Vacuum Maintained" readOnly={readOnly}>
+            <FieldRow label="Vacuum Maintained" readOnly={readOnly} required error={err("VACUUM_MAINTAINED")}>
               {readOnly ? (
                 <QCDivisionReadOnlyValue value={vacuumMaintained} muted={!vacuumMaintained.trim()} />
               ) : (
@@ -680,6 +741,7 @@ const QCCastingMotorPanel = ({
                     )
                   }
                   sx={tableFieldSx}
+                  error={Boolean(err("VACUUM_MAINTAINED"))}
                 />
               )}
             </FieldRow>
@@ -699,6 +761,7 @@ const QCCastingMotorPanel = ({
                 REMARKS: "",
               })}
               readOnly={readOnly}
+              validationErrors={validationErrors}
             />
           </Stack>
         </SectionCard>
@@ -712,12 +775,16 @@ const QCCastingMotorPanel = ({
             columns={WEIGHTMENT_COLUMNS}
             rows={weightmentRows}
             onChange={setWeightmentRows}
-            createEmptyRow={() => ({
-              LOAD_CELL_INITIAL: "",
-              LOAD_CELL_FINAL: "",
-              TOTAL_WEIGHT: "",
-            })}
+            createEmptyRow={(srNo) =>
+              ({
+                SR_NO: srNo,
+                LOAD_CELL_INITIAL: "",
+                LOAD_CELL_FINAL: "",
+                TOTAL_WEIGHT: "",
+              }) as QcCastingWeightmentRow
+            }
             readOnly={readOnly}
+            validationErrors={validationErrors}
           />
         </SectionCard>
 
@@ -726,7 +793,7 @@ const QCCastingMotorPanel = ({
           readOnly={readOnly}
         >
           <Stack spacing={1.5}>
-            <FieldRow label="Soaking Duration" readOnly={readOnly}>
+            <FieldRow label="Soaking Duration" readOnly={readOnly} required error={err("SOAKING_DURATION")}>
               {readOnly ? (
                 <QCDivisionReadOnlyValue value={soakingDuration} muted={!soakingDuration.trim()} />
               ) : (
@@ -741,7 +808,7 @@ const QCCastingMotorPanel = ({
                 />
               )}
             </FieldRow>
-            <FieldRow label="Pressure Plate Assembly Applicable" readOnly={readOnly}>
+            <FieldRow label="Pressure Plate Assembly Applicable" readOnly={readOnly} required error={err("PRESSURE_PLATE_ASSEMBLY_REQUIRED")}>
               {renderSelectField(
                 pressureRequired,
                 QC_CASTING_YES_NO_OPTIONS,

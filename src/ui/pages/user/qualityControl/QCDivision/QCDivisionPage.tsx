@@ -90,6 +90,8 @@ const QualityControlPage = () => {
     handleResetPostCureSetup,
     handlePartialNavIndexChange,
     handleDivisionEntryValuesChange,
+    validationErrorsByEntryId,
+    entryValidationErrors,
     handleDivisionEntryLiquidValuesChange,
     handleMixingFinalMixDetailsChange,
     handleRemoveDivisionEntry,
@@ -271,6 +273,9 @@ const QualityControlPage = () => {
             schemaLoading={schemaLoading}
             divisionAutoPopulateLoading={divisionAutoPopulateLoading}
             schemaError={schemaError}
+            validationErrorsByEntryId={
+              validationErrorsByEntryId ?? entryValidationErrors ?? {}
+            }
             flowBarTheme={flowBarTheme}
             onDivisionNavTabChange={handleDivisionNavTabChange}
             onProcessingTypeChange={handleProcessingTypeChange}
