@@ -10,7 +10,13 @@ import {
   serializeReferenceRange,
   type MasterDataReferenceRange,
 } from "@data/models/admin/MasterData/nestedMasterDataTypes";
-import { MASTER_DATA_CODE_PATTERN, MASTER_DATA_CODE_FORMAT_MESSAGE } from "@data/models/admin/MasterData/MasterDataModel";
+import {
+  firstFieldErrorMessage,
+  validateMasterDataCodeField,
+  validateMasterDataNameField,
+  validateReferenceRangeFields,
+  type ReferenceRangeFieldErrors,
+} from "@data/models/admin/MasterData/masterDataFieldValidators";
 
 export type MaterialTypeValue = "SOLID" | "LIQUID";
 
@@ -54,6 +60,8 @@ export type MaterialSpecForm = {
   specificationCode: string;
   specificationName: string;
   referenceRange: MasterDataReferenceRange;
+  isActive: boolean;
+  isExisting?: boolean;
 };
 
 export type MaterialGradeForm = {
@@ -61,6 +69,9 @@ export type MaterialGradeForm = {
   gradeCode: string;
   gradeName: string;
   specifications: MaterialSpecForm[];
+  isActive: boolean;
+  /** Present only in UI state for rows loaded from the server. */
+  isExisting?: boolean;
 };
 
 export type MaterialsMasterRecord = MasterDataAuditFields & {
@@ -96,6 +107,8 @@ export const emptyMaterialSpec = (): MaterialSpecForm => ({
   specificationCode: "",
   specificationName: "",
   referenceRange: emptyReferenceRange(),
+  isActive: true,
+  isExisting: false,
 });
 
 export const emptyMaterialGrade = (): MaterialGradeForm => ({
@@ -103,6 +116,8 @@ export const emptyMaterialGrade = (): MaterialGradeForm => ({
   gradeCode: "",
   gradeName: "",
   specifications: [],
+  isActive: true,
+  isExisting: false,
 });
 
 export const createEmptyMaterialsForm = (): MaterialsMasterFormState => ({
@@ -121,6 +136,7 @@ const mapSpec = (raw: any): MaterialSpecForm => ({
   specificationCode: String(raw?.specificationCode ?? ""),
   specificationName: String(raw?.specificationName ?? ""),
   referenceRange: parseReferenceRange(raw?.referenceRange),
+  isActive: raw?.isActive !== false,
 });
 
 const mapGrade = (raw: any): MaterialGradeForm => ({
@@ -128,6 +144,7 @@ const mapGrade = (raw: any): MaterialGradeForm => ({
   gradeCode: String(raw?.gradeCode ?? ""),
   gradeName: String(raw?.gradeName ?? ""),
   specifications: Array.isArray(raw?.specifications) ? raw.specifications.map(mapSpec) : [],
+  isActive: raw?.isActive !== false,
 });
 
 export const MaterialsMasterRecordModel = {
@@ -169,45 +186,81 @@ export const mapMaterialRecordToForm = (record: MaterialsMasterRecord): Material
   isActive: record.isActive,
   grades: record.grades.map((g) => ({
     ...g,
+    isActive: g.isActive,
+    isExisting: true,
     specifications: g.specifications.map((s) => ({
       ...s,
       referenceRange: { ...s.referenceRange },
+      isActive: s.isActive,
+      isExisting: true,
     })),
   })),
   specifications: record.specifications.map((s) => ({
     ...s,
     referenceRange: { ...s.referenceRange },
+    isActive: s.isActive,
+    isExisting: true,
   })),
 });
 
-const validateSpecReferenceRange = (range: MaterialSpecForm["referenceRange"]): string | null => {
-  const hasRange = range.minValue != null || range.maxValue != null;
-  if (hasRange && range.unitId == null && !String(range.unit ?? "").trim()) {
-    return "Unit is required when min or max is provided";
-  }
-  return null;
+export type MaterialSpecFieldErrors = ReferenceRangeFieldErrors & {
+  specificationName?: string;
 };
 
-const serializeSpec = (s: MaterialSpecForm, isEdit: boolean) => {
+export type MaterialGradeFieldErrors = {
+  gradeCode?: string;
+  gradeName?: string;
+  specifications?: MaterialSpecFieldErrors[];
+};
+
+export type MaterialsFormFieldErrors = {
+  materialCode?: string;
+  materialName?: string;
+  rawMaterialType?: string;
+  preparationType?: string;
+  materialType?: string;
+  form?: string;
+  grades?: MaterialGradeFieldErrors[];
+  specifications?: MaterialSpecFieldErrors[];
+};
+
+const mapSpecFieldErrors = (
+  spec: MaterialSpecForm,
+  isEdit: boolean,
+): MaterialSpecFieldErrors => {
+  if (isEdit && spec.isExisting) {
+    return {};
+  }
+  const errors: MaterialSpecFieldErrors = {};
+  const nameError = validateMasterDataNameField(spec.specificationName, "Specification name");
+  if (nameError) errors.specificationName = nameError;
+  const label = spec.specificationName.trim() || "specification";
+  const rangeErrors = validateReferenceRangeFields(spec.referenceRange, label, false);
+  return { ...errors, ...rangeErrors };
+};
+
+const serializeSpec = (s: MaterialSpecForm) => {
   const payload: Record<string, unknown> = {
     specificationName: s.specificationName.trim(),
     referenceRange: serializeReferenceRange(s.referenceRange),
+    isActive: s.isActive,
   };
   const code = s.specificationCode.trim();
-  if (isEdit || code) {
+  if (code) {
     payload.specificationCode = code;
   }
   return payload;
 };
 
-const serializeGrade = (g: MaterialGradeForm, isEdit: boolean) => ({
+const serializeGrade = (g: MaterialGradeForm) => ({
   gradeId: g.gradeId.trim() || undefined,
   gradeCode: g.gradeCode.trim(),
   gradeName: g.gradeName.trim(),
-  specifications: (g.specifications ?? []).map((s) => serializeSpec(s, isEdit)),
+  isActive: g.isActive,
+  specifications: (g.specifications ?? []).map(serializeSpec),
 });
 
-const buildMaterialsPayloadBody = (form: MaterialsMasterFormState, isEdit: boolean) => {
+const buildMaterialsPayloadBody = (form: MaterialsMasterFormState) => {
   const rawMaterialType = form.rawMaterialType === "ACEM" ? "ACEM" : "NORMAL";
   const body: Record<string, unknown> = {
     materialCode: form.materialCode.trim(),
@@ -215,8 +268,8 @@ const buildMaterialsPayloadBody = (form: MaterialsMasterFormState, isEdit: boole
     materialType: form.materialType,
     rawMaterialType,
     isActive: form.isActive,
-    grades: form.grades.map((g) => serializeGrade(g, isEdit)),
-    specifications: form.specifications.map((s) => serializeSpec(s, isEdit)),
+    grades: form.grades.map(serializeGrade),
+    specifications: form.specifications.map(serializeSpec),
   };
   if (rawMaterialType === "ACEM") {
     body.preparationType = form.preparationType;
@@ -225,51 +278,91 @@ const buildMaterialsPayloadBody = (form: MaterialsMasterFormState, isEdit: boole
 };
 
 export const buildMaterialsCreatePayload = (form: MaterialsMasterFormState) =>
-  buildMaterialsPayloadBody(form, false);
+  buildMaterialsPayloadBody(form);
 
 export const buildMaterialsUpdatePayload = (form: MaterialsMasterFormState) => ({
   materialId: form.materialId,
-  ...buildMaterialsPayloadBody(form, true),
+  ...buildMaterialsPayloadBody(form),
 });
 
 export const buildMaterialsDeletePayload = (materialId: number) => ({ materialId });
 
-export const validateMaterialsForm = (form: MaterialsMasterFormState, isEdit: boolean): string | null => {
-  if (!isEdit) {
-    const code = form.materialCode.trim();
-    if (!code) return "Material code is required";
-    if (!MASTER_DATA_CODE_PATTERN.test(code)) return MASTER_DATA_CODE_FORMAT_MESSAGE;
-  }
-  if (!form.materialName.trim()) return "Material name is required";
+export const getMaterialsFormFieldErrors = (
+  form: MaterialsMasterFormState,
+  isEdit: boolean,
+  existingCodes: string[] = [],
+): MaterialsFormFieldErrors => {
+  const errors: MaterialsFormFieldErrors = {};
   if (form.rawMaterialType !== "NORMAL" && form.rawMaterialType !== "ACEM") {
-    return "Category is required";
+    errors.rawMaterialType = "Category is required";
   }
   if (form.rawMaterialType === "ACEM") {
     if (!form.preparationType || !PREPARATION_TYPE_VALUES.has(form.preparationType)) {
-      return "Preparation type is required for ACEM raw materials";
+      errors.preparationType = "Preparation type is required for ACEM raw materials";
     }
   }
+
+  const showMaterialFields =
+    isEdit ||
+    form.rawMaterialType === "NORMAL" ||
+    (form.rawMaterialType === "ACEM" && Boolean(form.preparationType));
+  if (!showMaterialFields) return errors;
+
+  if (!isEdit) {
+    const codeError = validateMasterDataCodeField(form.materialCode, "Material code");
+    if (codeError) {
+      errors.materialCode = codeError;
+    } else {
+      const code = form.materialCode.trim().toLowerCase();
+      if (existingCodes.some((existing) => existing.trim().toLowerCase() === code)) {
+        errors.materialCode = `Material code already exists: ${form.materialCode.trim()}`;
+      }
+    }
+  }
+
+  const nameError = validateMasterDataNameField(form.materialName, "Material name");
+  if (nameError) errors.materialName = nameError;
   if (form.materialType !== "SOLID" && form.materialType !== "LIQUID") {
-    return "Material type must be SOLID or LIQUID";
+    errors.materialType = "Material type must be SOLID or LIQUID";
   }
   if (form.grades.length === 0 && form.specifications.length === 0) {
-    return "Add at least one grade or top-level specification";
+    errors.form = "Add at least one grade or top-level specification";
+    return errors;
   }
-  for (const g of form.grades) {
-    if (!g.gradeCode.trim()) return "Grade code is required";
-    if (!g.gradeName.trim()) return "Grade name is required";
-    for (const s of g.specifications) {
-      if (!s.specificationName.trim()) return "Specification name is required";
-      const rangeErr = validateSpecReferenceRange(s.referenceRange);
-      if (rangeErr) return rangeErr;
+
+  const gradeCodes = new Set<string>();
+  errors.grades = form.grades.map((grade) => {
+    const gradeErrors: MaterialGradeFieldErrors = {};
+    const locked = isEdit && Boolean(grade.isExisting);
+    if (!locked) {
+      const gradeCodeError = validateMasterDataCodeField(grade.gradeCode, "Grade code");
+      if (gradeCodeError) {
+        gradeErrors.gradeCode = gradeCodeError;
+      } else {
+        const key = grade.gradeCode.trim().toLowerCase();
+        if (gradeCodes.has(key)) {
+          gradeErrors.gradeCode = `Duplicate grade code: ${grade.gradeCode.trim()}`;
+        }
+        gradeCodes.add(key);
+      }
+      const gradeNameError = validateMasterDataNameField(grade.gradeName, "Grade name");
+      if (gradeNameError) gradeErrors.gradeName = gradeNameError;
     }
-  }
-  for (const s of form.specifications) {
-    if (!s.specificationName.trim()) return "Specification name is required";
-    const rangeErr = validateSpecReferenceRange(s.referenceRange);
-    if (rangeErr) return rangeErr;
-  }
-  return null;
+    gradeErrors.specifications = grade.specifications.map((spec) => mapSpecFieldErrors(spec, isEdit));
+    return gradeErrors;
+  });
+  errors.specifications = form.specifications.map((spec) => mapSpecFieldErrors(spec, isEdit));
+  return errors;
 };
+
+export const getMaterialsFormValidationMessage = (errors: MaterialsFormFieldErrors): string | null =>
+  firstFieldErrorMessage(errors);
+
+export const validateMaterialsForm = (
+  form: MaterialsMasterFormState,
+  isEdit: boolean,
+  existingCodes: string[] = [],
+): string | null =>
+  getMaterialsFormValidationMessage(getMaterialsFormFieldErrors(form, isEdit, existingCodes));
 
 export { emptyMasterDataStats };

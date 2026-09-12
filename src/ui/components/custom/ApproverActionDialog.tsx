@@ -11,6 +11,8 @@ import {
 
 import type { ApproverFormActionType } from "../../../data/api/approver/approverApi";
 import { STRINGS } from "../../../app/config/strings";
+import { FieldLabelWithAsterisk } from "../common/FieldLabelWithAsterisk";
+import { useState } from "react";
 
 type ApproverActionDialogProps = {
   actionType: ApproverFormActionType | null;
@@ -42,6 +44,16 @@ const ApproverActionDialog = ({
 }: ApproverActionDialogProps) => {
   const isReject = actionType === "REJECTED";
 
+  const [errorMsg, setErrorMsg] = useState("");
+
+  const handleConfirmation = () => {
+    if (!value.trim()) {
+      setErrorMsg("This field is required");
+      return; // Stop execution here
+    }
+    setErrorMsg("");
+    onConfirm();
+  };
   return (
     <Dialog open={open} onClose={submitting ? undefined : onCancel} maxWidth="sm" fullWidth>
       <DialogTitle>
@@ -74,9 +86,14 @@ const ApproverActionDialog = ({
           multiline
           minRows={4}
           label={
-            isReject
-              ? STRINGS.APPROVER.ACTION.REJECTION_REASON_LABEL
-              : STRINGS.APPROVER.ACTION.REMARKS_LABEL
+            <FieldLabelWithAsterisk
+              label={
+                isReject
+                  ? STRINGS.APPROVER.ACTION.REJECTION_REASON_LABEL
+                  : STRINGS.APPROVER.ACTION.REMARKS_LABEL
+              }
+              required
+            />
           }
           placeholder={
             isReject
@@ -84,16 +101,21 @@ const ApproverActionDialog = ({
               : STRINGS.APPROVER.ACTION.REMARKS_PLACEHOLDER
           }
           value={value}
-          onChange={(event) => onValueChange(event.target.value)}
-          required={isReject}
-          error={Boolean(helperText)}
-          helperText={helperText}
+          onChange={(event) => {
+            onValueChange(event.target.value);
+            if (errorMsg) setErrorMsg("");
+          }}
+          error={Boolean(helperText) || Boolean(errorMsg)}
+          helperText={helperText || errorMsg}
           disabled={submitting}
         />
       </DialogContent>
       <DialogActions sx={{ px: 3, pb: 3 }}>
         <Button
-          onClick={onCancel}
+          onClick={() => {
+            setErrorMsg("");
+            onCancel();
+          }}
           disabled={submitting}
           variant="outlined"
           sx={{ textTransform: "none" }}
@@ -101,7 +123,7 @@ const ApproverActionDialog = ({
           {STRINGS.APPROVER.ACTION.CANCEL_LABEL}
         </Button>
         <Button
-          onClick={onConfirm}
+          onClick={handleConfirmation}
           disabled={confirmDisabled || submitting}
           variant="contained"
           color={isReject ? "error" : "primary"}

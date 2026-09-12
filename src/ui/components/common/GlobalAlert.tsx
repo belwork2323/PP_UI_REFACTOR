@@ -46,7 +46,11 @@ const ALERT_CONFIG = {
 };
 
 const GlobalAlertDialog = () => {
-  const { open, message, severity, loading } = useAlertStore();
+  const { open, message, severity, loading, display } = useAlertStore();
+
+  if (display === "snackbar") {
+    return null;
+  }
 
   // Prevent this global dialog from rendering on the login route
   // because LoginPage has a custom positioned Snackbar that uses the exact same store.

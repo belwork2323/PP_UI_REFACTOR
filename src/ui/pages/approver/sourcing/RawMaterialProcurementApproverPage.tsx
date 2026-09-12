@@ -28,7 +28,10 @@ import getApproverSourcingFilterStyles from "./approverSourcingFilterStyles";
 import DateField from "../../../components/common/DateField";
 import { formatToIsoDateInput, formatToUiDate } from "../../../../utils/dateUtils";
 import dayjs from "dayjs";
-import { canApproverViewBatchDetails, isApproverActionableStatus } from "../../../../app/theme/approver";
+import {
+  canApproverViewBatchDetails,
+  isApproverActionableStatus,
+} from "../../../../app/theme/approver";
 import { icons } from "../../../../app/theme/icons";
 import useRawMaterialApproverHook, {
   type RawMaterialApproverAppliedFilters,
@@ -57,10 +60,8 @@ const {
   pdf: PictureAsPdfRoundedIcon,
 } = icons.approver.sourcing.rawMaterialProcurement;
 
-const {
-  insertDriveFile: InsertDriveFileOutlinedIcon,
-  openInNew: OpenInNewRoundedIcon,
-} = icons.user.sourcing.rawMaterialBatchList;
+const { insertDriveFile: InsertDriveFileOutlinedIcon, openInNew: OpenInNewRoundedIcon } =
+  icons.user.sourcing.rawMaterialBatchList;
 
 // ─── Dialog ───────────────────────────────────────────────────────────────────
 
@@ -108,7 +109,7 @@ const RawMaterialDetailDialog = ({
       <Dialog
         open={open}
         onClose={onClose}
-        maxWidth="md"
+        maxWidth="lg"
         fullWidth
         PaperProps={{ sx: theme.dialog.paper }}
       >
@@ -116,7 +117,7 @@ const RawMaterialDetailDialog = ({
           <Stack direction="row" alignItems="center" gap={1.5}>
             <InventoryRoundedIcon sx={theme.dialog.headerIcon} />
             <Box>
-              <Typography sx={theme.dialog.headerTitle}>Raw Material Submission</Typography>
+              {/* <Typography sx={theme.dialog.headerTitle}>Raw Material Submission</Typography> */}
               <Typography sx={theme.dialog.headerSubtitle}>
                 {item.lotId ?? item.batchId} · {item.materialName ?? item.materialCode}
               </Typography>
@@ -137,8 +138,35 @@ const RawMaterialDetailDialog = ({
             </IconButton>
           </Stack>
         </Box>
-
         <DialogContent sx={theme.dialog.content}>
+          {item.status === "Rejected" && (
+            <Box sx={theme.dialog.errorBanner}>
+              <Stack direction="row" alignItems="center" gap={1} mb={0.5}>
+                <CancelRoundedIcon sx={{ color: theme.palette.danger, fontSize: 20 }} />
+                <Typography
+                  sx={{ fontSize: "0.85rem", fontWeight: 700, color: theme.palette.danger }}
+                >
+                  <Chip
+                    label={item.status}
+                    size="small"
+                    sx={{
+                      fontSize: "0.85rem",
+                      fontWeight: 700,
+                      color: theme.palette.danger,
+                      bgcolor: theme.palette.errorBg,
+                    }}
+                  />
+                </Typography>
+              </Stack>
+              <Typography sx={{ fontSize: "0.8rem", color: theme.palette.text, pl: 3.25 }}>
+                <Box component="span" sx={{ fontWeight: 600 }}>
+                  Reason:{" "}
+                </Box>
+                {item.rejectionReason || item.remarks || ""}
+              </Typography>
+            </Box>
+          )}
+          {console.log(item)}
           {loading ? (
             <Box sx={theme.dialog.loadingContainer}>
               <CircularProgress size={32} sx={theme.dialog.loadingSpinner} />
@@ -153,6 +181,37 @@ const RawMaterialDetailDialog = ({
                     Man. Lot/Batch No.:{" "}
                     <Box component="span" sx={theme.dialog.blockMetaStrong}>
                       {block.lotNo || "—"}
+                    </Box>
+                  </Typography>
+                </Stack>
+                <Stack
+                  direction="row"
+                  alignItems="center"
+                  justifyContent="space-between"
+                  gap={2}
+                  mb={1}
+                >
+                  {/* Column 1: Supply Order No */}
+                  <Typography sx={theme.dialog.blockMeta}>
+                    SUPPLY ORDER NO:{" "}
+                    <Box component="span" sx={theme.dialog.blockMetaStrong}>
+                      {block.supplyOrderNo || "-"}
+                    </Box>
+                  </Typography>
+
+                  {/* Column 2: Manufacture Date */}
+                  <Typography sx={theme.dialog.blockMeta}>
+                    MANUFACTURER:{" "}
+                    <Box component="span" sx={theme.dialog.blockMetaStrong}>
+                      {block.manufacturerName || "-"}
+                    </Box>
+                  </Typography>
+
+                  {/* Column 3: Receipt Date */}
+                  <Typography sx={theme.dialog.blockMeta}>
+                    RECEIPT DATE :{" "}
+                    <Box component="span" sx={theme.dialog.blockMetaStrong}>
+                      {block.receiptDate || "-"}
                     </Box>
                   </Typography>
                 </Stack>
@@ -228,7 +287,8 @@ const RawMaterialDetailDialog = ({
                         const fileId = String(cert.fileId ?? "").trim();
                         const canOpenStored = Boolean(fileId && subDepartmentId);
                         const canOpenUrl = fileUtils.isOpenableCertificateUrl(cert.fileUrl);
-                        const isVideo = fileUtils.getFileKind(cert.fileName, cert.mimeType) === "video";
+                        const isVideo =
+                          fileUtils.getFileKind(cert.fileName, cert.mimeType) === "video";
                         return (
                           <Box
                             key={`${cert.fileId || cert.fileName}-${ci}`}
@@ -262,7 +322,10 @@ const RawMaterialDetailDialog = ({
                               <Typography
                                 sx={{ fontSize: "0.72rem", color: theme.palette.textSub, mt: 0.25 }}
                               >
-                                <Box component="span" sx={{ fontWeight: 700, color: theme.palette.text }}>
+                                <Box
+                                  component="span"
+                                  sx={{ fontWeight: 700, color: theme.palette.text }}
+                                >
                                   {SF.CERT_TYPE}:
                                 </Box>{" "}
                                 {cert.certificateType?.trim() || "—"}
@@ -400,6 +463,7 @@ const RawMaterialApproverPage = () => {
     statusDropdownValues,
     filterAllLabel,
   } = useRawMaterialApproverHook();
+  console.log(selected, " f");
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftMaterial, setDraftMaterial] = useState(filterAllLabel);
@@ -708,69 +772,71 @@ const RawMaterialApproverPage = () => {
                       allowWhenApproved: true,
                     });
                     return (
-                    <TableRow
-                      key={row.lotId ?? row.id ?? row.formId ?? idx}
-                      sx={theme.table.row(idx)}
-                    >
-                      <TableCell sx={theme.table.bodyCell}>
-                        <Typography sx={theme.table.batchIdText}>
-                          {row.lotId ?? row.batchId}
-                        </Typography>
-                      </TableCell>
-                      <TableCell sx={theme.table.bodyCell}>
-                        <Typography sx={theme.table.subtleText}>{row.sourcingId ?? "—"}</Typography>
-                      </TableCell>
-                      <TableCell sx={theme.table.bodyCell}>
-                        <Chip
-                          label={row.materialCode ?? row.batchType}
-                          size="small"
-                          sx={theme.chips.type}
-                        />
-                      </TableCell>
-                      <TableCell sx={theme.table.bodyCell}>
-                        <Typography sx={{ fontSize: "0.82rem" }}>
-                          {row.materialName ?? "—"}
-                        </Typography>
-                      </TableCell>
-                      <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.subtleText }}>
-                        {row.supplyOrderNo ?? "—"}
-                      </TableCell>
-                      <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.dateText }}>
-                        {formatReceiptDate(row.receiptDate)}
-                      </TableCell>
-                      <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.subtleText }}>
-                        {row.manufacturerName ?? "—"}
-                      </TableCell>
-                      <TableCell sx={theme.table.bodyCell}>{row.submittedBy}</TableCell>
-                      <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.dateText }}>
-                        {new Date(row.createdOn).toLocaleDateString("en-IN", {
-                          day: "2-digit",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </TableCell>
-                      <TableCell sx={theme.table.bodyCell}>
-                        <Chip
-                          label={row.status}
-                          size="small"
-                          sx={theme.chips.status(statusMeta[row.status])}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.actionCell }}>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={
-                            <VisibilityRoundedIcon sx={{ fontSize: "13px !important" }} />
-                          }
-                          onClick={() => handleViewDetails(row)}
-                          disabled={!canViewDetails}
-                          sx={theme.table.actionButton(canViewDetails)}
-                        >
-                          View Details
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+                      <TableRow
+                        key={row.lotId ?? row.id ?? row.formId ?? idx}
+                        sx={theme.table.row(idx)}
+                      >
+                        <TableCell sx={theme.table.bodyCell}>
+                          <Typography sx={theme.table.batchIdText}>
+                            {row.lotId ?? row.batchId}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={theme.table.bodyCell}>
+                          <Typography sx={theme.table.subtleText}>
+                            {row.sourcingId ?? "—"}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={theme.table.bodyCell}>
+                          <Chip
+                            label={row.materialCode ?? row.batchType}
+                            size="small"
+                            sx={theme.chips.type}
+                          />
+                        </TableCell>
+                        <TableCell sx={theme.table.bodyCell}>
+                          <Typography sx={{ fontSize: "0.82rem" }}>
+                            {row.materialName ?? "—"}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.subtleText }}>
+                          {row.supplyOrderNo ?? "—"}
+                        </TableCell>
+                        <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.dateText }}>
+                          {formatReceiptDate(row.receiptDate)}
+                        </TableCell>
+                        <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.subtleText }}>
+                          {row.manufacturerName ?? "—"}
+                        </TableCell>
+                        <TableCell sx={theme.table.bodyCell}>{row.submittedBy}</TableCell>
+                        <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.dateText }}>
+                          {new Date(row.createdOn).toLocaleDateString("en-IN", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric",
+                          })}
+                        </TableCell>
+                        <TableCell sx={theme.table.bodyCell}>
+                          <Chip
+                            label={row.status}
+                            size="small"
+                            sx={theme.chips.status(statusMeta[row.status])}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.actionCell }}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={
+                              <VisibilityRoundedIcon sx={{ fontSize: "13px !important" }} />
+                            }
+                            onClick={() => handleViewDetails(row)}
+                            disabled={!canViewDetails}
+                            sx={theme.table.actionButton(canViewDetails)}
+                          >
+                            View Details
+                          </Button>
+                        </TableCell>
+                      </TableRow>
                     );
                   })}
                 </TableBody>

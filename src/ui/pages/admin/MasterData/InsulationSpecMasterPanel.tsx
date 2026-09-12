@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   Box,
   Button,
   Divider,
+  IconButton,
   Paper,
   Table,
   TableBody,
@@ -11,15 +12,20 @@ import {
   TableHead,
   TablePagination,
   TableRow,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
-import ConfirmAlertDialog from "@ui/components/common/ConfirmAlertDialog";
+import MasterDataToggleConfirmDialog from "./components/MasterDataToggleConfirmDialog";
 import SkeletonRow from "@ui/components/common/SkeletonRow";
 import useInsulationSpecMasterHook from "@hooks/admin/MasterData/useInsulationSpecMasterHook";
-import type { InsulationSpecListPayload } from "@data/models/admin/MasterData/InsulationSpecMasterModel";
+import type {
+  InsulationSpecListPayload,
+  InsulationSpecRecord,
+} from "@data/models/admin/MasterData/InsulationSpecMasterModel";
 import InsulationSpecMasterFormDialog from "./InsulationSpecMasterFormDialog";
+import InsulationSpecViewDialog from "./InsulationSpecViewDialog";
 import MasterDataTableToolbar from "./components/MasterDataTableToolbar";
 import MasterDataActiveSwitch from "./components/MasterDataActiveSwitch";
 import MasterDataActiveStatusChip from "./components/MasterDataActiveStatusChip";
@@ -61,6 +67,12 @@ const InsulationSpecMasterPanel = ({
   const { table, tableCell } = t;
   const formOpen = hook.inlineMode != null;
   const columnCount = 5 + MASTER_DATA_AUDIT_COLUMN_COUNT;
+  const [viewTarget, setViewTarget] = useState<InsulationSpecRecord | null>(null);
+
+  const formatCategoryNames = (row: InsulationSpecRecord) => {
+    const names = row.specifications.map((c) => c.category.trim()).filter(Boolean);
+    return names.length > 0 ? names.join(", ") : "—";
+  };
 
   return (
     <Box>
@@ -70,6 +82,7 @@ const InsulationSpecMasterPanel = ({
           onSearchChange={hook.setSearch}
           onRefresh={onRefresh}
           refreshDisabled={refreshDisabled || hook.loading}
+          searchPlaceholder={S.INSULATION_SPEC.SEARCH_PLACEHOLDER}
           t={t}
         />
         <Divider sx={table.divider} />
@@ -77,12 +90,12 @@ const InsulationSpecMasterPanel = ({
           <Table size="small">
             <TableHead>
               <TableRow sx={table.headerRow}>
-                <TableCell sx={table.headerCell}>Type</TableCell>
+                <TableCell sx={table.headerCell}>{S.INSULATION_SPEC.COL_INSULATION_TYPE}</TableCell>
                 <TableCell sx={table.headerCell}>Categories</TableCell>
                 <TableCell sx={table.headerCell}>Parameters</TableCell>
                 <MasterDataAuditHeaderCells table={table} />
-                <TableCell sx={table.headerCell}>Active</TableCell>
-                <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>{S.TABLE.COL_ACTIONS}</TableCell>
+                <TableCell sx={table.headerCell}>{S.TABLE.COL_ACTIVE}</TableCell>
+                <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -102,12 +115,16 @@ const InsulationSpecMasterPanel = ({
                     0,
                   );
                   return (
-                    <TableRow key={row.id} sx={table.row}>
+                    <TableRow key={row.insulationSpecId || row.insulationType} sx={table.row}>
                       <TableCell sx={table.cell}>
                         <Typography sx={table.bodyText}>{row.insulationType}</Typography>
                       </TableCell>
                       <TableCell sx={table.cell}>
-                        <Typography sx={table.bodyText}>{row.specifications.length}</Typography>
+                        <Tooltip title={formatCategoryNames(row)} placement="top-start">
+                          <Typography sx={table.bodyText} noWrap>
+                            {formatCategoryNames(row)}
+                          </Typography>
+                        </Tooltip>
                       </TableCell>
                       <TableCell sx={table.cell}>
                         <Typography sx={table.bodyText}>{paramCount}</Typography>
@@ -118,6 +135,26 @@ const InsulationSpecMasterPanel = ({
                       </TableCell>
                       <TableCell sx={table.cellActionsWrapper}>
                         <Box sx={tableCell.actionsBox}>
+                          <Tooltip title={S.TABLE.VIEW}>
+                            <IconButton
+                              size="small"
+                              onClick={() => setViewTarget(row)}
+                              disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
+                              aria-label={S.TABLE.VIEW}
+                            >
+                              <icons.visibility fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
+                          <Tooltip title={S.TABLE.EDIT}>
+                            <IconButton
+                              size="small"
+                              onClick={() => hook.openEdit(row)}
+                              disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
+                              aria-label={S.TABLE.EDIT}
+                            >
+                              <icons.Edit fontSize="small" />
+                            </IconButton>
+                          </Tooltip>
                           <MasterDataActiveSwitch
                             isActive={row.isActive}
                             disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
@@ -157,28 +194,35 @@ const InsulationSpecMasterPanel = ({
 
       <InsulationSpecMasterFormDialog
         open={formOpen}
-        isEdit={false}
+        isEdit={hook.inlineMode === "edit"}
         form={hook.form}
         saving={hook.saving}
+        existingTypes={hook.items.map((item) => item.insulationType)}
         onClose={hook.closeInline}
         onSave={() => void hook.saveForm()}
         onChange={hook.setForm}
         t={t}
       />
 
-      <ConfirmAlertDialog
-        open={!!hook.disableTarget}
-        title={S.DISABLE_DIALOG.TITLE}
-        message={
-          hook.disableTarget
-            ? S.DISABLE_DIALOG.BODY(String(hook.disableTarget.insulationType))
-            : ""
+      <InsulationSpecViewDialog
+        open={viewTarget != null}
+        record={viewTarget}
+        onClose={() => setViewTarget(null)}
+        t={t}
+      />
+
+      <MasterDataToggleConfirmDialog
+        target={
+          hook.toggleTarget
+            ? {
+                name: String(hook.toggleTarget.record.insulationType),
+                nextActive: hook.toggleTarget.nextActive,
+              }
+            : null
         }
-        confirmLabel={hook.disabling ? S.DISABLE_DIALOG.DISABLING : S.DISABLE_DIALOG.CONFIRM}
-        cancelLabel={S.DISABLE_DIALOG.CANCEL}
-        onConfirm={hook.confirmDisable}
-        onCancel={() => !hook.disabling && hook.setDisableTarget(null)}
-        confirmDisabled={hook.disabling}
+        busy={hook.disabling || hook.enabling}
+        onConfirm={() => void hook.confirmToggle()}
+        onCancel={hook.cancelToggle}
       />
     </Box>
   );

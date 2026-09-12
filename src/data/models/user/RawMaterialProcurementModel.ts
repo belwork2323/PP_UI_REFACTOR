@@ -5,7 +5,10 @@ import {
   type OperationStatus,
 } from "../../../hooks/operationStatus";
 import { materialSelectionKey } from "./MaterialsListModel";
-import type { RawMaterialTypeValue, PreparationTypeValue } from "../admin/MasterData/MaterialsMasterModel";
+import type {
+  RawMaterialTypeValue,
+  PreparationTypeValue,
+} from "../admin/MasterData/MaterialsMasterModel";
 
 export type AdductPreparationDetails = {
   adductBatchPrepDate: string;
@@ -41,8 +44,9 @@ export const isAcemAdductMaterial = (
   rawMaterialType?: string | null,
   preparationType?: string | null,
 ): boolean =>
-  String(rawMaterialType ?? "").trim().toUpperCase() === "ACEM" &&
-  String(preparationType ?? "").trim() === "ADDUCT";
+  String(rawMaterialType ?? "")
+    .trim()
+    .toUpperCase() === "ACEM" && String(preparationType ?? "").trim() === "ADDUCT";
 
 const parseAdductNumeric = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "") return null;
@@ -272,8 +276,7 @@ export function normalizeSpecRowQualityState(row: SpecRow): SpecRow {
     isOutOfRange:
       String(row.status ?? "")
         .trim()
-        .toLowerCase() === "failed" ||
-      computeIsOutOfRange(analysedResult, row.referenceRange),
+        .toLowerCase() === "failed" || computeIsOutOfRange(analysedResult, row.referenceRange),
   };
 }
 
@@ -546,6 +549,7 @@ export type RawMaterialLotListRow = {
   createdOn: string;
   rmStatus: string;
   formId?: string | null;
+  rejectionReason?: string;
 };
 
 /** Read-only lot details page context (from list row + details API) */
@@ -822,6 +826,8 @@ export class RawMaterialLotDetailsModel {
     reworkRequired?: boolean;
     resubmissionCount?: number;
   };
+  status: string;
+  rejectionReason?: string;
 
   constructor(payload: any) {
     this.lotId = payload?.lotId ?? "";
@@ -840,7 +846,9 @@ export class RawMaterialLotDetailsModel {
       ? parseAdductPreparationDetails(payload.adductPreparation)
       : undefined;
     this.rawMaterialType =
-      String(payload?.rawMaterialType ?? "NORMAL").trim().toUpperCase() === "ACEM"
+      String(payload?.rawMaterialType ?? "NORMAL")
+        .trim()
+        .toUpperCase() === "ACEM"
         ? "ACEM"
         : "NORMAL";
     this.preparationType =
@@ -850,6 +858,8 @@ export class RawMaterialLotDetailsModel {
     this.progressInsights = payload?.progressInsights;
     this.qualityInsights = payload?.qualityInsights;
     this.workflowInsights = payload?.workflowInsights;
+    this.status = payload?.status;
+    this.rejectionReason = payload?.rejectionReason;
   }
 
   static fromApi(apiResponse: any): RawMaterialLotDetailsModel {
@@ -1030,7 +1040,11 @@ export function resolveLotCertificateDisplayFileName(
     return apiName;
   }
 
-  const fromUrl = decodeStoredFileName(String(cert.fileUrl ?? "").split(/[/\\]/).pop() ?? "");
+  const fromUrl = decodeStoredFileName(
+    String(cert.fileUrl ?? "")
+      .split(/[/\\]/)
+      .pop() ?? "",
+  );
   if (fromUrl) {
     if (fileId && fromUrl.startsWith(`${fileId}_`)) {
       const trimmed = fromUrl.slice(fileId.length + 1).trim();
@@ -1092,7 +1106,9 @@ export function mapCertificateToApiPayload(
   };
 }
 
-function mapCertificatesForApi(certs: LotCertificate[] | undefined): RawMaterialCertificateApiPayload[] {
+function mapCertificatesForApi(
+  certs: LotCertificate[] | undefined,
+): RawMaterialCertificateApiPayload[] {
   return (certs ?? [])
     .map(mapCertificateToApiPayload)
     .filter((item): item is RawMaterialCertificateApiPayload => item != null);

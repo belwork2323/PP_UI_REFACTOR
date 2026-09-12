@@ -137,7 +137,6 @@ export const useRawMaterialProcurementHook = () => {
     setLoadingFormDetails(true);
     try {
       const detailsResponse = await rawMaterialProcurementController.fetchLotDetails({ lotId: id });
-
       if (!detailsResponse?.success || !detailsResponse.data) {
         const fallback =
           detailsResponse?.statusCode === 404
@@ -189,6 +188,7 @@ export const useRawMaterialProcurementHook = () => {
     const detailsResponse = await rawMaterialProcurementController.fetchLotDetails({
       lotId: row.lotId,
     });
+
     setLoadingFormDetails(false);
 
     let blocks: MaterialBlock[] = [];
@@ -197,7 +197,7 @@ export const useRawMaterialProcurementHook = () => {
       blocks = RawMaterialLotDetailsModel.toMaterialBlocks(detailsResponse.data);
       const wf = detailsResponse.data.workflowInsights;
       const batch = lotListRowToFormBatch(row, blocks);
-      batch.rejectionReason = wf?.rejectionReason ?? null;
+      batch.rejectionReason = detailsResponse.data?.rejectionReason ?? null;
       batch.rmStatus = normalizeRawMaterialLotListStatus(wf?.currentStatus || row.rmStatus);
       setActiveBatch(batch);
     } else if (detailsResponse?.statusCode === 404) {
@@ -260,7 +260,7 @@ export const useRawMaterialProcurementHook = () => {
       rmStatus: row.rmStatus,
       createdBy: row.createdBy,
       createdOn: row.createdOn,
-      rejectionReason: null,
+      rejectionReason: row?.rejectionReason,
     });
     setDetailsBlocks([]);
     setView("details");
@@ -268,7 +268,6 @@ export const useRawMaterialProcurementHook = () => {
 
     try {
       const detailsResponse = await rawMaterialProcurementController.fetchLotDetails({ lotId });
-
       if (!detailsResponse?.success || !detailsResponse.data) {
         const fallback =
           detailsResponse?.statusCode === 404

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMasterDataActiveToggle } from "@hooks/admin/MasterData/useMasterDataActiveToggle";
 import { useAlertStore } from "@app/store/alertStore";
 import { STRINGS } from "@app/config/strings";
 import { ApiResponseModel } from "@data/models/common/ApiResponseModel";
@@ -19,6 +20,7 @@ import {
 import {
   createInsulationSpecMaster,
   deleteInsulationSpecMaster,
+  enableInsulationSpecMaster,
   fetchInsulationSpecMasterList,
   updateInsulationSpecMaster,
 } from "@data/api/admin/MasterData/insulationSpecMasterApi";
@@ -54,7 +56,6 @@ export default function useInsulationSpecMasterHook({
   const [inlineMode, setInlineMode] = useState<"create" | "edit" | null>(null);
   const [form, setForm] = useState<InsulationSpecFormState>(createEmptyInsulationForm());
   const [saving, setSaving] = useState(false);
-  const [disableTarget, setDisableTarget] = useState<InsulationSpecRecord | null>(null);
   const [disabling, setDisabling] = useState(false);
   const [enabling, setEnabling] = useState(false);
 
@@ -125,9 +126,13 @@ export default function useInsulationSpecMasterHook({
 
   const saveForm = async () => {
     const isEdit = inlineMode === "edit";
-    const err = validateInsulationForm(form, isEdit);
+    const err = validateInsulationForm(
+      form,
+      isEdit,
+      items.map((item) => item.insulationType),
+    );
     if (err) {
-      useAlertStore.getState().showAlert(err, "error");
+      useAlertStore.getState().showValidationAlert(err);
       return;
     }
     setSaving(true);
@@ -158,12 +163,13 @@ export default function useInsulationSpecMasterHook({
     }
   };
 
-  const enableRecord = async (record: InsulationSpecRecord) => {
+  const enableRecord = useCallback(async (record: InsulationSpecRecord) => {
     setEnabling(true);
     useAlertStore.getState().showAlert(S.MESSAGES.ENABLING, "loading");
     try {
-      const nextForm = { ...mapInsulationRecordToForm(record), isActive: true };
-      const resp = new ApiResponseModel(await updateInsulationSpecMaster(buildInsulationUpdatePayload(nextForm)));
+      const resp = new ApiResponseModel(
+        await enableInsulationSpecMaster(buildInsulationDeletePayload(record.insulationSpecId)),
+      );
       if (resp.success) {
         useAlertStore.getState().showAlert(S.MESSAGES.ENABLE_SUCCESS, "success");
         await loadList();
@@ -179,28 +185,17 @@ export default function useInsulationSpecMasterHook({
     } finally {
       setEnabling(false);
     }
-  };
+  }, [loadList]);
 
-  const handleToggleActive = (record: InsulationSpecRecord, nextActive: boolean) => {
-    if (inlineMode != null || saving || disabling || enabling) return;
-    if (nextActive) {
-      void enableRecord(record);
-      return;
-    }
-    setDisableTarget(record);
-  };
-
-  const confirmDisable = async () => {
-    if (!disableTarget) return;
+  const disableRecord = useCallback(async (record: InsulationSpecRecord) => {
     setDisabling(true);
     useAlertStore.getState().showAlert(S.MESSAGES.DISABLING, "loading");
     try {
       const resp = new ApiResponseModel(
-        await deleteInsulationSpecMaster(buildInsulationDeletePayload(disableTarget.id)),
+        await deleteInsulationSpecMaster(buildInsulationDeletePayload(record.insulationSpecId)),
       );
       if (resp.success) {
         useAlertStore.getState().showAlert(S.MESSAGES.DISABLE_SUCCESS, "success");
-        setDisableTarget(null);
         await loadList();
       } else {
         useAlertStore
@@ -214,7 +209,23 @@ export default function useInsulationSpecMasterHook({
     } finally {
       setDisabling(false);
     }
-  };
+  }, [loadList]);
+
+  const canToggle = useCallback(
+    () => inlineMode == null && !saving && !disabling && !enabling,
+    [inlineMode, saving, disabling, enabling],
+  );
+
+  const {
+    toggleTarget,
+    handleToggleActive,
+    confirmToggle,
+    cancelToggle,
+  } = useMasterDataActiveToggle({
+    canToggle,
+    enableRecord,
+    disableRecord,
+  });
 
   return {
     items,
@@ -242,12 +253,12 @@ export default function useInsulationSpecMasterHook({
     openEdit,
     closeInline,
     saveForm,
-    disableTarget,
-    setDisableTarget,
+    toggleTarget,
     disabling,
     enabling,
     handleToggleActive,
-    confirmDisable,
+    confirmToggle,
+    cancelToggle,
     refresh: loadList,
   };
 }

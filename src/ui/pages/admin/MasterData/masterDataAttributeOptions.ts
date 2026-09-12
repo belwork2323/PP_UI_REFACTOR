@@ -6,37 +6,9 @@ export const CASTING_STATION_TYPE_OPTIONS: AppDropdownOption[] = [
   { value: "VERTICAL_CASTING", label: "Vertical Casting" },
 ];
 
-const UNIT_CATEGORY_OPTIONS: AppDropdownOption[] = [
-  { value: "ENERGY", label: "Energy" },
-  { value: "LENGTH", label: "Length" },
-  { value: "MASS_AREA", label: "Mass Area" },
-  { value: "MASS_VOLUME", label: "Mass Volume" },
-  { value: "DENSITY", label: "Density" },
-  { value: "CONCENTRATION", label: "Concentration" },
-  { value: "SPEED", label: "Speed" },
-  { value: "ROTATIONAL_SPEED", label: "Rotational Speed" },
-  { value: "FLOW_RATE", label: "Flow Rate" },
-  { value: "DOSE_RATE", label: "Dose Rate" },
-  { value: "ACTIVITY_CONCENTRATION", label: "Activity Concentration" },
-  { value: "POWER_AREA", label: "Power Area" },
-  { value: "POWER_VOLUME", label: "Power Volume" },
-  { value: "SPECIFIC_ENERGY", label: "Specific Energy" },
-  { value: "DOSE_AREA", label: "Dose Area" },
-  { value: "PRESSURE", label: "Pressure" },
-  { value: "VISCOSITY", label: "Viscosity" },
-  { value: "ELECTRIC_FIELD", label: "Electric Field" },
-  { value: "CURRENT_DENSITY", label: "Current Density" },
-  { value: "RESISTIVITY", label: "Resistivity" },
-  { value: "ENERGY_AREA", label: "Energy Area" },
-  { value: "ENERGY_GRADIENT", label: "Energy Gradient" },
-];
-
 const ATTRIBUTE_OPTIONS_BY_TYPE: Record<string, Record<string, AppDropdownOption[]>> = {
   "casting-stations": {
     stationType: CASTING_STATION_TYPE_OPTIONS,
-  },
-  units: {
-    category: UNIT_CATEGORY_OPTIONS,
   },
 };
 

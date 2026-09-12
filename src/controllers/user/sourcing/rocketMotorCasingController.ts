@@ -103,7 +103,7 @@ export const rocketMotorCasingController = {
       return new ApiResponseModel(error);
     }
   },
-  fetchSpecification: async (insulationType: "ROCASIN" | "EPDM") => {
+  fetchSpecification: async (insulationType: string) => {
     try {
       const response = await fetchSpecificationForSubdepartment({
         insulationType,

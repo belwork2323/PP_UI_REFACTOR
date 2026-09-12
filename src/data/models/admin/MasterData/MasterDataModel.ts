@@ -255,6 +255,7 @@ export const getMasterDataFieldErrors = (
       continue;
     }
     if (field.key === "name") {
+      if (field.serverGenerated) continue;
       const err = fieldErrorForName(form.name, field.maxLength, field.pattern);
       if (err) errors.name = err;
       continue;
@@ -289,11 +290,14 @@ export const buildCreatePayload = (form: MasterDataFormState, schema: MasterData
       }
     });
   const codeField = schema?.fields?.find((f) => f.key === "code");
+  const nameField = schema?.fields?.find((f) => f.key === "name");
   const payload: Record<string, unknown> = {
-    name: form.name.trim(),
     isActive: form.isActive,
     attributes,
   };
+  if (!nameField?.serverGenerated && form.name.trim()) {
+    payload.name = form.name.trim();
+  }
   if (!codeField?.serverGenerated && form.code.trim()) {
     payload.code = form.code.trim();
   }

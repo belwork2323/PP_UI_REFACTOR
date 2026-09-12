@@ -246,19 +246,23 @@ export const useRawMaterialApproverHook = () => {
 
       if (detailsResponse?.success && detailsResponse.data) {
         const model = detailsResponse.data as RawMaterialLotDetailsModel;
-        setSelected((current) =>
-          current
+        setSelected((current) => {
+          const updated = current
             ? {
                 ...current,
                 status: nextStatus,
+                rejectionReason: model?.rejectionReason,
                 lotId: model.lotId || lotIdForRefresh,
                 batchId: lotIdForRefresh,
                 formId: current.lotId ?? lotIdForRefresh,
                 materialCode: model.materialCode || current.materialCode,
                 qcBlocks: RawMaterialLotDetailsModel.toMaterialBlocks(model),
               }
-            : current,
-        );
+            : current;
+
+          console.log("Computed next state:", updated);
+          return updated;
+        });
       } else {
         setSelected((current) => (current ? { ...current, status: nextStatus } : current));
       }
@@ -272,7 +276,7 @@ export const useRawMaterialApproverHook = () => {
   };
 
   const handleViewDetails = async (row: any) => {
-    setSelected({ ...row, qcBlocks: [] });
+    setSelected({ ...row, qcBlocks: [], rejectionReason: row?.rejectionReason });
     setDetailsLoading(true);
 
     if (!subDepartmentId) {
@@ -309,6 +313,7 @@ export const useRawMaterialApproverHook = () => {
       formId: row.lotId,
       materialCode: model.materialCode || row.materialCode,
       materialName: row.materialName,
+      rejectionReason: model?.rejectionReason,
       qcBlocks: RawMaterialLotDetailsModel.toMaterialBlocks(model),
     });
   };

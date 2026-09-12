@@ -11,7 +11,7 @@ const toPayloadDateOrNull = (value: string | null | undefined): string | null =>
 };
 export type ReceiptStatus = "RECEIVED" | "NOT_RECEIVED";
 export type CasingType = "COMPOSITE" | "METALLIC";
-export type InsulationType = "ROCASIN" | "EPDM";
+export type InsulationType = string;
 export type FormSubmissionType = "DRAFT" | "SUBMIT";
 
 export type MechPropFormRow = {
@@ -872,46 +872,58 @@ export const VISUAL_INSPECTION_TEMPLATE: Omit<
   { srNo: 12, itemKey: "OTHER", description: "Other observation if any" },
 ];
 
+export const isThermalSpecificationCategory = (category: string): boolean =>
+  category.toLowerCase().includes("thermal");
+
+const formatSpecificationRange = (spec: SpecificationParameter): string =>
+  `${spec.referenceRange.minValue} - ${spec.referenceRange.maxValue}`;
+
 export function createInitialMechanicalProperties(
   specificationModel: InsulationSpecificationModel,
 ): Record<string, MechPropFormRow> {
-  const mechanicalCategory = specificationModel.specifications.find(
-    (x) => x.category === "Rubber Mechanical Properties",
-  );
+  const entries: [string, MechPropFormRow][] = [];
 
-  return Object.fromEntries(
-    (mechanicalCategory?.parameters ?? []).map((spec) => [
-      spec.specificationCode,
-      {
-        paramKey: spec.specificationCode,
-        paramName: spec.specificationName,
-        specification: `${spec.referenceRange.minValue} - ${spec.referenceRange.maxValue}`,
-        reported: "",
-        acemSpec: "",
-        unit: spec.referenceRange.unit ?? "",
-      },
-    ]),
-  );
+  for (const category of specificationModel.specifications) {
+    if (isThermalSpecificationCategory(category.category)) continue;
+    for (const spec of category.parameters ?? []) {
+      entries.push([
+        spec.specificationCode,
+        {
+          paramKey: spec.specificationCode,
+          paramName: spec.specificationName,
+          specification: formatSpecificationRange(spec),
+          reported: "",
+          acemSpec: "",
+          unit: spec.referenceRange.unit ?? "",
+        },
+      ]);
+    }
+  }
+
+  return Object.fromEntries(entries);
 }
 
 export function createInitialThermalProperties(
   specificationModel: InsulationSpecificationModel,
 ): Record<string, ThermalPropFormRow> {
-  const thermalCategory = specificationModel.specifications.find(
-    (x) => x.category === "Rubber Thermal Properties",
-  );
+  const entries: [string, ThermalPropFormRow][] = [];
 
-  return Object.fromEntries(
-    (thermalCategory?.parameters ?? []).map((spec) => [
-      spec.specificationCode,
-      {
-        specification: `${spec.referenceRange.minValue} - ${spec.referenceRange.maxValue}`,
-        reported: "",
-        acemSpec: "",
-        unit: spec.referenceRange.unit ?? "",
-      },
-    ]),
-  );
+  for (const category of specificationModel.specifications) {
+    if (!isThermalSpecificationCategory(category.category)) continue;
+    for (const spec of category.parameters ?? []) {
+      entries.push([
+        spec.specificationCode,
+        {
+          specification: formatSpecificationRange(spec),
+          reported: "",
+          acemSpec: "",
+          unit: spec.referenceRange.unit ?? "",
+        },
+      ]);
+    }
+  }
+
+  return Object.fromEntries(entries);
 }
 
 export function createInitialVisualInspection(): VisualInspectionFormRow[] {
@@ -1063,7 +1075,7 @@ export const INITIAL_ROCKET_MOTOR_CASING_FORM: RocketMotorCasingFormData = {
   receivingDate: "",
   itemsDescription: "Rubber Sheet",
   itemsDimension: "",
-  itemsUnit: "mm",
+  itemsUnit: "",
   itemsReceiptStatus: "",
   itemsObservations: "",
   greenCardStatus: "",
@@ -1168,10 +1180,6 @@ export function buildCasingFormPayload(
   formSubmissionType: FormSubmissionType,
   options?: { includeMotorCasingId?: boolean; motorCasingId?: string },
 ): RocketMotorCasingFormPayload {
-  const mechKeys = form.insulationType === "EPDM" ? EPDM_MECH_KEYS : ROCASIN_MECH_KEYS;
-  const mechanicalProperties = buildMechRows(form, mechKeys);
-  const thermalProperties = buildThermalProperties(form);
-
   const dimensionalInspection = form.dimensionalData.map((row) => {
     const min = row.referenceRange.minValue;
     const max = row.referenceRange.maxValue;
@@ -1246,7 +1254,7 @@ export function buildCasingFormPayload(
           itemType: "RUBBER_SHEET",
           description: form.itemsDescription.trim() || "Rubber Sheet",
           dimension: str(form.itemsDimension),
-          unit: form.itemsUnit.trim() || "mm",
+          unit: form.itemsUnit.trim(),
           receiptStatus: form.itemsReceiptStatus,
           observations: str(form.itemsObservations),
         },
@@ -1397,12 +1405,7 @@ export function parseSectionsToFormData(
       .toUpperCase();
     return v === "RECEIVED" || v === "NOT_RECEIVED" ? v : "";
   };
-  const parseInsulationType = (raw: unknown): InsulationType | "" => {
-    const v = String(raw ?? "")
-      .trim()
-      .toUpperCase();
-    return v === "ROCASIN" || v === "EPDM" ? v : "";
-  };
+  const parseInsulationType = (raw: unknown): InsulationType | "" => String(raw ?? "").trim();
   const insulationType = parseInsulationType(ins.type);
 
   // Specifications + labels come from form/details (backend-enriched). Create mode loads
@@ -1427,14 +1430,14 @@ export function parseSectionsToFormData(
         unit,
       };
 
-      if (categoryName.includes("mechanical")) {
+      if (categoryName.includes("thermal")) {
+        thermalProperties[param.specificationCode] = {
+          ...row,
+        };
+      } else {
         mechanicalProperties[param.specificationCode] = {
           paramKey: param.specificationCode,
           paramName: String(param.specificationName ?? param.specificationCode ?? "").trim(),
-          ...row,
-        };
-      } else if (categoryName.includes("thermal")) {
-        thermalProperties[param.specificationCode] = {
           ...row,
         };
       }
@@ -1515,7 +1518,7 @@ export function parseSectionsToFormData(
     receivingDate: str(mr.receivingDate).slice(0, 10),
     itemsDescription: str(items.description) || "Rubber Sheet",
     itemsDimension: str(items.dimension),
-    itemsUnit: str(items.unit) || "mm",
+    itemsUnit: str(items.unit),
     itemsReceiptStatus: parseReceiptStatus(items.receiptStatus || clear.status),
     itemsObservations: str(items.observations),
     greenCardStatus: parseReceiptStatus(clear.greenCardStatus || clear.status),
@@ -1746,7 +1749,7 @@ export const collectTempFileIdsFromCasingForm = (form: RocketMotorCasingFormData
   ];
 
 export interface InsulationSpecificationRequest {
-  insulationType: "ROCASIN" | "EPDM";
+  insulationType: string;
 }
 
 export interface ReferenceRange {
@@ -1767,37 +1770,42 @@ export interface SpecificationCategory {
 }
 
 export interface InsulationSpecificationModel {
-  insulationType: "ROCASIN" | "EPDM";
+  insulationType: string;
   specifications: SpecificationCategory[];
 }
 
 export class InsulationSpecificationModel {
-  insulationType: "ROCASIN" | "EPDM" = "ROCASIN";
+  insulationType: string = "";
   specifications: SpecificationCategory[] = [];
 
   static fromApi(data: any): InsulationSpecificationModel {
     return {
       insulationType: data?.insulationType ?? "ROCASIN",
       specifications:
-        data?.specifications?.map((category: any) => ({
-          category: category.category,
-          parameters:
-            category.parameters?.map((param: any) => {
-              const minRaw = valueFromApiField(param.referenceRange?.minValue);
-              const maxRaw = valueFromApiField(param.referenceRange?.maxValue);
-              const minNum = minRaw !== "" ? Number(minRaw) : Number.NaN;
-              const maxNum = maxRaw !== "" ? Number(maxRaw) : Number.NaN;
-              return {
-                specificationCode: param.specificationCode,
-                specificationName: param.specificationName ?? param.specificationCode ?? "",
-                referenceRange: {
-                  minValue: Number.isFinite(minNum) ? minNum : (param.referenceRange?.minValue as number),
-                  maxValue: Number.isFinite(maxNum) ? maxNum : (param.referenceRange?.maxValue as number),
-                  unit: param.referenceRange?.unit ?? "",
-                },
-              };
-            }) ?? [],
-        })) ?? [],
+        data?.specifications
+          ?.filter((category: any) => category?.isActive !== false)
+          ?.map((category: any) => ({
+            category: category.category,
+            parameters:
+              category.parameters
+                ?.filter((param: any) => param?.isActive !== false)
+                ?.map((param: any) => {
+                  const minRaw = valueFromApiField(param.referenceRange?.minValue);
+                  const maxRaw = valueFromApiField(param.referenceRange?.maxValue);
+                  const minNum = minRaw !== "" ? Number(minRaw) : Number.NaN;
+                  const maxNum = maxRaw !== "" ? Number(maxRaw) : Number.NaN;
+                  return {
+                    specificationCode: param.specificationCode,
+                    specificationName: param.specificationName ?? param.specificationCode ?? "",
+                    referenceRange: {
+                      minValue: Number.isFinite(minNum) ? minNum : (param.referenceRange?.minValue as number),
+                      maxValue: Number.isFinite(maxNum) ? maxNum : (param.referenceRange?.maxValue as number),
+                      unit: param.referenceRange?.unit ?? "",
+                    },
+                  };
+                }) ?? [],
+          }))
+          ?.filter((category: SpecificationCategory) => (category.parameters?.length ?? 0) > 0) ?? [],
     };
   }
 }

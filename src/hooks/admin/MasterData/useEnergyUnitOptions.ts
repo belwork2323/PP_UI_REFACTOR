@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { fetchEnergyUnitList } from "@data/api/common/generalAPI";
+import { fetchUnitList } from "@data/api/common/generalAPI";
 import type { AppDropdownOption } from "@ui/components/common/AppDropdown";
 
 export default function useEnergyUnitOptions(enabled: boolean) {
@@ -14,7 +14,7 @@ export default function useEnergyUnitOptions(enabled: boolean) {
 
     let cancelled = false;
     setLoading(true);
-    fetchEnergyUnitList()
+    fetchUnitList()
       .then((items) => {
         if (cancelled) return;
         setOptions(

@@ -325,7 +325,6 @@ export type UnitMasterOption = {
   name: string;
   unitCode: string;
   symbol: string;
-  category: string;
   description: string;
 };
 
@@ -338,44 +337,36 @@ const mapUnitMasterOption = (row: Record<string, unknown>): UnitMasterOption => 
   name: String(row.name ?? "").trim(),
   unitCode: String(row.unitCode ?? "").trim(),
   symbol: String(row.symbol ?? "").trim(),
-  category: String(row.category ?? "").trim(),
   description: String(row.description ?? "").trim(),
 });
 
-const unitListCache = new Map<string, Promise<UnitMasterOption[]>>();
+let unitListRequestPromise: Promise<UnitMasterOption[]> | null = null;
 
 /**
  * Unit master — GET api/v1/system/unit-list (authenticated)
  */
-export const fetchUnitList = async (category?: string): Promise<UnitMasterOption[]> => {
-  const cacheKey = category?.trim().toUpperCase() || "__ALL__";
-  const cached = unitListCache.get(cacheKey);
-  if (cached) return cached;
+export const fetchUnitList = async (): Promise<UnitMasterOption[]> => {
+  if (unitListRequestPromise) return unitListRequestPromise;
 
-  const request = (async () => {
+  unitListRequestPromise = (async () => {
     try {
-      const url = category?.trim()
-        ? `${SYSTEM.UNIT_LIST}?category=${encodeURIComponent(category.trim())}`
-        : SYSTEM.UNIT_LIST;
-      const body = await get(url);
+      const body = await get(SYSTEM.UNIT_LIST);
       assertSuccessEnvelope(body);
       return asList(body)
         .map(mapUnitMasterOption)
         .filter((item) => Boolean(item.code || item.name || item.unitCode));
     } catch (error) {
-      unitListCache.delete(cacheKey);
+      unitListRequestPromise = null;
       wrapLookupError(error);
       return [];
     }
   })();
 
-  unitListCache.set(cacheKey, request);
-  return request;
+  return unitListRequestPromise;
 };
 
-/** Backward-compatible wrapper for energy-only consumers. */
-export const fetchEnergyUnitList = async (): Promise<UnitMasterOption[]> =>
-  fetchUnitList("ENERGY");
+/** @deprecated Use fetchUnitList — all units are returned from a single master list. */
+export const fetchEnergyUnitList = async (): Promise<UnitMasterOption[]> => fetchUnitList();
 
 /** motorStage filter for mixing cycle master — always sent as string ("0" | "1" | "2" | "3" | "ALL") */
 export type MixingCycleMotorStage = 0 | 1 | 2 | 3 | "ALL" | number | string;

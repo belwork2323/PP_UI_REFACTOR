@@ -3,7 +3,7 @@ import { Box, Button, Chip } from "@mui/material";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
 import { useThemeStore } from "@app/store/themeStore";
-import ConfirmAlertDialog from "@ui/components/common/ConfirmAlertDialog";
+import MasterDataToggleConfirmDialog from "./components/MasterDataToggleConfirmDialog";
 import AppDropdown from "@ui/components/common/AppDropdown";
 import AdminManagementPageHeader from "@ui/components/custom/admin/AdminManagementPageHeader";
 import getMasterDataTheme from "@app/theme/custom_themes/admin/MasterData/masterData_theme";
@@ -215,19 +215,18 @@ const MasterDataPage = () => {
       ) : null}
 
       {!isNested ? (
-        <ConfirmAlertDialog
-          open={!!hook.disableTarget}
-          title={S.DISABLE_DIALOG.TITLE}
-          message={
-            hook.disableTarget
-              ? S.DISABLE_DIALOG.BODY(hook.disableTarget.name || hook.disableTarget.code)
-              : ""
+        <MasterDataToggleConfirmDialog
+          target={
+            hook.toggleTarget
+              ? {
+                  name: hook.toggleTarget.record.name || hook.toggleTarget.record.code,
+                  nextActive: hook.toggleTarget.nextActive,
+                }
+              : null
           }
-          confirmLabel={hook.disabling ? S.DISABLE_DIALOG.DISABLING : S.DISABLE_DIALOG.CONFIRM}
-          cancelLabel={S.DISABLE_DIALOG.CANCEL}
-          onConfirm={hook.confirmDisable}
-          onCancel={() => !hook.disabling && hook.setDisableTarget(null)}
-          confirmDisabled={hook.disabling}
+          busy={hook.disabling || hook.enabling}
+          onConfirm={() => void hook.confirmToggle()}
+          onCancel={hook.cancelToggle}
         />
       ) : null}
     </Box>

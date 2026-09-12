@@ -1,20 +1,28 @@
 import { useCallback, useMemo, useState } from "react";
 import { projectManagementController } from "@controllers/admin/ProjectManagement/projectManagementController";
-import { operationsController } from "../../../controllers/user/operationsController";
+import { fetchUnitList } from "@data/api/common/generalAPI";
+import {
+  operationsController,
+  type InsulationTypeOption,
+} from "../../../controllers/user/operationsController";
 
 export type ProjectOption = { projectId: string; projectName: string };
 export type MotorStageOption = { motorStage: string; noOfmotors: number };
+export type UnitOption = { value: string; label: string };
+export type { InsulationTypeOption };
 
 export const useRocketMotorCasingLookups = () => {
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [motorStages, setMotorStages] = useState<MotorStageOption[]>([]);
+  const [insulationTypes, setInsulationTypes] = useState<InsulationTypeOption[]>([]);
+  const [unitOptions, setUnitOptions] = useState<UnitOption[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
 
   const loadLookups = useCallback(async () => {
     setLoading(true);
     try {
-      const [projectResp, motorStageResp] = await Promise.all([
+      const [projectResp, motorStageResp, insulationTypeResp, units] = await Promise.all([
         projectManagementController.getAllProjects({
           page: 1,
           limit: 1000,
@@ -22,6 +30,8 @@ export const useRocketMotorCasingLookups = () => {
           sortOrder: "desc",
         }),
         operationsController.fetchMotorsStageList(),
+        operationsController.fetchInsulationTypeList(),
+        fetchUnitList(),
       ]);
 
       if (projectResp?.success && projectResp.data) {
@@ -46,6 +56,23 @@ export const useRocketMotorCasingLookups = () => {
       } else {
         setMotorStages([]);
       }
+
+      if (insulationTypeResp?.success && insulationTypeResp.data) {
+        setInsulationTypes(insulationTypeResp.data);
+      } else {
+        setInsulationTypes([]);
+      }
+
+      setUnitOptions(
+        units.map((item) => {
+          const symbol = String(item.symbol || item.unitCode || "").trim();
+          const name = String(item.name || "").trim();
+          const value = symbol || name || String(item.unitCode || "").trim();
+          const label =
+            symbol && name ? `${symbol} — ${name}` : name || symbol || String(item.unitCode || "").trim();
+          return { value, label };
+        }).filter((item) => Boolean(item.value)),
+      );
       setHasLoaded(true);
     } finally {
       setLoading(false);
@@ -71,13 +98,15 @@ export const useRocketMotorCasingLookups = () => {
     () => ({
       projects,
       motorStages,
+      insulationTypes,
+      unitOptions,
       loading,
       hasLoaded,
       motorNoOptions,
       reload: loadLookups,
       ensureLoaded,
     }),
-    [projects, motorStages, loading, hasLoaded, motorNoOptions, loadLookups, ensureLoaded],
+    [projects, motorStages, insulationTypes, unitOptions, loading, hasLoaded, motorNoOptions, loadLookups, ensureLoaded],
   );
 };
 

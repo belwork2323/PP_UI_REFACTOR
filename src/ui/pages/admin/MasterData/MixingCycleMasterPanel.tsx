@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useAlertStore } from "@app/store/alertStore";
 import {
   Box,
   Button,
@@ -6,7 +7,6 @@ import {
   Divider,
   IconButton,
   Paper,
-  Switch,
   Table,
   TableBody,
   TableCell,
@@ -20,12 +20,13 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
-import ConfirmAlertDialog from "@ui/components/common/ConfirmAlertDialog";
+import MasterDataToggleConfirmDialog from "./components/MasterDataToggleConfirmDialog";
 import SkeletonRow from "@ui/components/common/SkeletonRow";
 import AppTextField from "@ui/components/common/AppTextField";
 import useMixingCycleMasterHook from "@hooks/admin/MasterData/useMixingCycleMasterHook";
 import MasterDataTableToolbar from "./components/MasterDataTableToolbar";
-import MasterDataActiveSwitch, { masterDataActiveSwitchSx } from "./components/MasterDataActiveSwitch";
+import MasterDataActiveSwitch from "./components/MasterDataActiveSwitch";
+import MasterDataEnableDisableField from "./components/MasterDataEnableDisableField";
 import MasterDataActiveStatusChip from "./components/MasterDataActiveStatusChip";
 import {
   MASTER_DATA_AUDIT_COLUMN_COUNT,
@@ -34,10 +35,14 @@ import {
 } from "./components/MasterDataAuditColumns";
 import {
   emptyMixingOperation,
+  getMixingCycleFieldErrors,
+  getMixingCycleValidationMessage,
+  type MixingCycleFieldErrors,
   type MixingCycleFormState,
   type MixingCycleListPayload,
   type MixingOperationForm,
 } from "@data/models/admin/MasterData/MixingCycleMasterModel";
+import { visibleValidationError } from "./masterDataValidationUtils";
 
 const S = STRINGS.MASTER_DATA;
 
@@ -56,22 +61,34 @@ const OpEditor = ({
   title,
   ops,
   disabled,
+  showErrors,
+  operationErrors,
   onChange,
 }: {
   title: string;
   ops: MixingOperationForm[];
   disabled?: boolean;
+  showErrors: boolean;
+  operationErrors?: MixingCycleFieldErrors["premixOperations"];
   onChange: (next: MixingOperationForm[]) => void;
 }) => (
   <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
     <Typography variant="subtitle2">{title}</Typography>
-    {ops.map((op, idx) => (
+    {ops.map((op, idx) => {
+      const opError = visibleValidationError(
+        operationErrors?.[idx]?.operationName,
+        op.operationName.trim().length > 0,
+        showErrors,
+      );
+      return (
       <Box key={idx} sx={{ display: "flex", gap: 1, flexWrap: "wrap", alignItems: "center" }}>
         <AppTextField
           compact
           label="Operation"
           value={op.operationName}
           disabled={disabled}
+          error={Boolean(opError)}
+          helperText={opError}
           onChange={(e) => {
             const next = [...ops];
             next[idx] = { ...op, operationName: e.target.value };
@@ -83,7 +100,8 @@ const OpEditor = ({
           Remove
         </Button>
       </Box>
-    ))}
+    );
+    })}
     <Button
       size="small"
       startIcon={<icons.projectMgmt.add />}
@@ -99,13 +117,29 @@ const MixingFormFields = ({
   form,
   isEdit,
   saving,
+  showErrors,
+  fieldErrors,
   onChange,
 }: {
   form: MixingCycleFormState;
   isEdit: boolean;
   saving: boolean;
+  showErrors: boolean;
+  fieldErrors: MixingCycleFieldErrors;
   onChange: (next: MixingCycleFormState) => void;
-}) => (
+}) => {
+  const nameError = visibleValidationError(
+    fieldErrors.mixingCycleName,
+    form.mixingCycleName.trim().length > 0,
+    showErrors,
+  );
+  const stageError = visibleValidationError(
+    fieldErrors.motorStage,
+    form.motorStage !== "",
+    showErrors,
+  );
+
+  return (
   <Box sx={{ p: 1.5, display: "flex", flexDirection: "column", gap: 1.5 }}>
     <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
       <AppTextField
@@ -120,6 +154,8 @@ const MixingFormFields = ({
         label="Name"
         value={form.mixingCycleName}
         disabled={saving}
+        error={Boolean(nameError)}
+        helperText={nameError}
         onChange={(e) => onChange({ ...form, mixingCycleName: e.target.value })}
         sx={{ minWidth: 200, flex: 1 }}
       />
@@ -129,21 +165,19 @@ const MixingFormFields = ({
         label="Motor stage"
         value={form.motorStage}
         disabled={saving}
+        error={Boolean(stageError)}
+        helperText={stageError}
         onChange={(e) =>
           onChange({ ...form, motorStage: e.target.value === "" ? "" : Number(e.target.value) })
         }
         sx={{ width: 120 }}
       />
-      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-        <Typography variant="body2">Active</Typography>
-        <Switch
-          size="small"
-          checked={form.isActive}
-          disabled={saving}
-          onChange={(e) => onChange({ ...form, isActive: e.target.checked })}
-          sx={masterDataActiveSwitchSx(form.isActive)}
-        />
-      </Box>
+      <MasterDataEnableDisableField
+        checked={form.isActive}
+        disabled={saving}
+        confirmName={form.mixingCycleName || form.mixingCycleCode}
+        onChange={(isActive) => onChange({ ...form, isActive })}
+      />
     </Box>
     <AppTextField
       compact
@@ -158,16 +192,21 @@ const MixingFormFields = ({
       title="Premix operations"
       ops={form.cycles.premixOperations}
       disabled={saving}
+      showErrors={showErrors}
+      operationErrors={fieldErrors.premixOperations}
       onChange={(premixOperations) => onChange({ ...form, cycles: { ...form.cycles, premixOperations } })}
     />
     <OpEditor
       title="Final mix operations"
       ops={form.cycles.finalMixOperations}
       disabled={saving}
+      showErrors={showErrors}
+      operationErrors={fieldErrors.finalMixOperations}
       onChange={(finalMixOperations) => onChange({ ...form, cycles: { ...form.cycles, finalMixOperations } })}
     />
   </Box>
-);
+  );
+};
 
 const MixingCycleMasterPanel = ({
   activeFilter,
@@ -187,6 +226,25 @@ const MixingCycleMasterPanel = ({
   });
   const { table, tableCell } = t;
   const columnCount = 7 + MASTER_DATA_AUDIT_COLUMN_COUNT;
+  const [showErrors, setShowErrors] = useState(false);
+  const fieldErrors = useMemo(
+    () => getMixingCycleFieldErrors(hook.form),
+    [hook.form],
+  );
+
+  useEffect(() => {
+    if (hook.inlineMode) setShowErrors(false);
+  }, [hook.inlineMode]);
+
+  const handleSave = () => {
+    setShowErrors(true);
+    const err = getMixingCycleValidationMessage(getMixingCycleFieldErrors(hook.form));
+    if (err) {
+      useAlertStore.getState().showValidationAlert(err);
+      return;
+    }
+    void hook.saveForm();
+  };
 
   return (
     <Box>
@@ -209,7 +267,7 @@ const MixingCycleMasterPanel = ({
                 <TableCell sx={table.headerCell}>Stage</TableCell>
                 <TableCell sx={table.headerCell}>Ops</TableCell>
                 <MasterDataAuditHeaderCells table={table} />
-                <TableCell sx={table.headerCell}>Active</TableCell>
+                <TableCell sx={table.headerCell}>{S.TABLE.COL_ACTIVE}</TableCell>
                 <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>{S.TABLE.COL_ACTIONS}</TableCell>
               </TableRow>
             </TableHead>
@@ -309,6 +367,8 @@ const MixingCycleMasterPanel = ({
                       form={hook.form}
                       isEdit={false}
                       saving={hook.saving}
+                      showErrors={showErrors}
+                      fieldErrors={fieldErrors}
                       onChange={hook.setForm}
                     />
                     <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", p: 1.5, pt: 0 }}>
@@ -318,7 +378,7 @@ const MixingCycleMasterPanel = ({
                       <Button
                         size="small"
                         variant="contained"
-                        onClick={() => void hook.saveForm()}
+                        onClick={handleSave}
                         disabled={hook.saving}
                         sx={t.pageHeader?.newProjectButton}
                       >
@@ -354,19 +414,19 @@ const MixingCycleMasterPanel = ({
         </Button>
       </Box>
 
-      <ConfirmAlertDialog
-        open={!!hook.disableTarget}
-        title={S.DISABLE_DIALOG.TITLE}
-        message={
-          hook.disableTarget
-            ? S.DISABLE_DIALOG.BODY(hook.disableTarget.mixingCycleName || hook.disableTarget.mixingCycleCode)
-            : ""
+      <MasterDataToggleConfirmDialog
+        target={
+          hook.toggleTarget
+            ? {
+                name:
+                  hook.toggleTarget.record.mixingCycleName || hook.toggleTarget.record.mixingCycleCode,
+                nextActive: hook.toggleTarget.nextActive,
+              }
+            : null
         }
-        confirmLabel={hook.disabling ? S.DISABLE_DIALOG.DISABLING : S.DISABLE_DIALOG.CONFIRM}
-        cancelLabel={S.DISABLE_DIALOG.CANCEL}
-        onConfirm={hook.confirmDisable}
-        onCancel={() => !hook.disabling && hook.setDisableTarget(null)}
-        confirmDisabled={hook.disabling}
+        busy={hook.disabling || hook.enabling}
+        onConfirm={() => void hook.confirmToggle()}
+        onCancel={hook.cancelToggle}
       />
     </Box>
   );

@@ -5,12 +5,9 @@ import {
 } from "../../../hooks/user/sourcing/sourcingWorkflowData";
 import { OPERATION_STATUS, type OperationStatus } from "../../../hooks/operationStatus";
 import {
-  EPDM_MECH_KEYS,
   buildMockTrialPayload,
   isLooseFlapDimensionalParam,
   parseSectionsToFormData,
-  ROCASIN_MECH_KEYS,
-  THERMAL_PROP_KEYS,
   type RocketMotorCasingFormData,
   type RocketMotorCasingMockTrialData,
   type RocketMotorCasingMockTrialPayload,
@@ -311,7 +308,7 @@ export function mergeApiSectionsIntoFormData(
     receivingDate: String(mr.receivingDate ?? "").slice(0, 10),
     itemsDescription: String(items.description ?? ""),
     itemsDimension: String(items.dimension ?? ""),
-    itemsUnit: String(items.unit ?? "mm"),
+    itemsUnit: String(items.unit ?? ""),
     greenCardNo: String(clear.greenCardNo ?? ""),
     clearanceAuthority: String(clear.authority ?? ""),
     clearanceStatus: String(clear.status ?? "RECEIVED"),
@@ -392,7 +389,7 @@ export function buildRocketMotorCasingSectionsPayload(
   const itemsDescription =
     (formData.itemsDescription || formData.motorIdDetails || "").trim() || "—";
   const itemsDimension = (formData.itemsDimension || "—").trim();
-  const itemsUnit = (formData.itemsUnit || "mm").trim();
+  const itemsUnit = String(formData.itemsUnit ?? "").trim();
 
   const greenCardNo = (formData.greenCardNo || formData.motorClearanceDetails || "").trim() || "—";
   const authority = (formData.clearanceAuthority || "—").trim();
@@ -773,34 +770,35 @@ const buildMockTrialDetailContent = (
 export function mapCasingFormDataToDetailBlocks(
   form: RocketMotorCasingFormData,
 ): CasingDetailBlock[] {
-  const mechKeyDefs = form.insulationType === "EPDM" ? EPDM_MECH_KEYS : ROCASIN_MECH_KEYS;
-  const mechRows = mechKeyDefs
-    .map((def) => {
-      const r = form.mechanicalProperties[def.paramKey];
-      if (!r) return null;
+  const mechRows = Object.values(form.mechanicalProperties)
+    .map((r) => {
       const specification = (r.specification ?? "").trim();
       const reported = (r.reported ?? "").trim();
       const acem = (r.acemSpec ?? "").trim();
       if (!specification && !reported && !acem) return null;
       return detailRow(
-        r.paramName || def.paramName,
-        formatMechDetail(specification, reported, acem, r.unit || def.unit) || "—",
+        r.paramName || r.paramKey,
+        formatMechDetail(specification, reported, acem, r.unit) || "—",
       );
     })
     .filter((r): r is NonNullable<typeof r> => r != null);
 
-  const thermalRows = THERMAL_PROP_KEYS.map((def) => {
-    const r = form.thermalProperties[def.key];
-    if (!r) return null;
-    const specification = (r.specification ?? "").trim();
-    const reported = (r.reported ?? "").trim();
-    const acem = (r.acemSpec ?? "").trim();
-    if (!specification && !reported && !acem) return null;
-    return detailRow(
-      def.label,
-      formatMechDetail(specification, reported, acem, r.unit || def.unit) || "—",
-    );
-  }).filter((r): r is NonNullable<typeof r> => r != null);
+  const thermalRows = Object.entries(form.thermalProperties)
+    .map(([key, r]) => {
+      const specification = (r.specification ?? "").trim();
+      const reported = (r.reported ?? "").trim();
+      const acem = (r.acemSpec ?? "").trim();
+      if (!specification && !reported && !acem) return null;
+      const label =
+        form.insulationSpecifications?.specifications
+          .flatMap((category) => category.parameters)
+          .find((param) => param.specificationCode === key)?.specificationName ?? key;
+      return detailRow(
+        label,
+        formatMechDetail(specification, reported, acem, r.unit) || "—",
+      );
+    })
+    .filter((r): r is NonNullable<typeof r> => r != null);
 
   const insulationRows: CasingDetailBlock["rows"] = [
     detailRow("Insulation curing date", form.insulationCuringDate),

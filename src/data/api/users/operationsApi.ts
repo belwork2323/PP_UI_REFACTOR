@@ -44,3 +44,7 @@ export const fetchCastingStationsApi = async () => {
 export const fetchMaterialLotsApi = async (payload: { batchId: string }) => {
   return await post(USER_OPERATIONS_ENDPOINTS.MATERIAL_LOTS, payload);
 };
+
+export const fetchInsulationTypeListApi = async () => {
+  return await get(USER_OPERATIONS_ENDPOINTS.INSULATION_TYPE_LIST);
+};

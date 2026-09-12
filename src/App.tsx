@@ -5,6 +5,7 @@ import { useAlertStore } from "./app/store/alertStore";
 import FullPageLoader from "./ui/components/common/FullPageLoader";
 
 import GlobalAlertDialog from "./ui/components/common/GlobalAlert";
+import GlobalValidationSnackbar from "./ui/components/common/GlobalValidationSnackbar";
 
 const App = () => {
   const { loading } = useAlertStore();
@@ -13,6 +14,7 @@ const App = () => {
       <CssBaseline />
       <FullPageLoader open={loading} />
       <GlobalAlertDialog />
+      <GlobalValidationSnackbar />
       <AppRoutes />
     </ThemeProvider>
   );

@@ -4,6 +4,10 @@ import {
   type MasterDataAuditFields,
   type MasterDataStats,
 } from "@data/models/admin/MasterData/MasterDataModel";
+import {
+  firstFieldErrorMessage,
+  validateMasterDataNameField,
+} from "@data/models/admin/MasterData/masterDataFieldValidators";
 
 export type CuringCycleStepForm = {
   sequenceNo: number | null;
@@ -146,12 +150,52 @@ export const buildCuringCycleUpdatePayload = (form: CuringCycleFormState) => ({
 
 export const buildCuringCycleDeletePayload = (id: string) => ({ id });
 
-export const validateCuringCycleForm = (form: CuringCycleFormState, isEdit: boolean): string | null => {
-  if (!isEdit && (form.motorStage === "" || Number.isNaN(Number(form.motorStage)))) {
-    return "Motor stage is required";
-  }
-  if (!form.curingType.trim()) return "Curing type is required";
-  return null;
+export type CuringCycleFieldErrors = {
+  motorStage?: string;
+  motorStageName?: string;
+  curingType?: string;
 };
+
+export const getCuringCycleFieldErrors = (
+  form: CuringCycleFormState,
+  isEdit: boolean,
+  existing: CuringCycleRecord[] = [],
+): CuringCycleFieldErrors => {
+  const errors: CuringCycleFieldErrors = {};
+  if (!isEdit && (form.motorStage === "" || Number.isNaN(Number(form.motorStage)))) {
+    errors.motorStage = "Motor stage is required";
+  }
+  const curingTypeError = validateMasterDataNameField(form.curingType, "Curing type");
+  if (curingTypeError) errors.curingType = curingTypeError;
+  if (form.motorStageName.trim()) {
+    const stageNameError = validateMasterDataNameField(
+      form.motorStageName,
+      "Stage name",
+      false,
+      255,
+    );
+    if (stageNameError) errors.motorStageName = stageNameError;
+  }
+  if (!isEdit && form.motorStage !== "" && !errors.motorStage && !errors.curingType) {
+    const stage = Number(form.motorStage);
+    const type = form.curingType.trim().toLowerCase();
+    const duplicate = existing.some(
+      (item) => item.motorStage === stage && item.curingType.trim().toLowerCase() === type,
+    );
+    if (duplicate) {
+      errors.curingType = `Curing cycle already exists for stage ${stage} and type ${form.curingType.trim()}`;
+    }
+  }
+  return errors;
+};
+
+export const getCuringCycleValidationMessage = (errors: CuringCycleFieldErrors): string | null =>
+  firstFieldErrorMessage(errors);
+
+export const validateCuringCycleForm = (
+  form: CuringCycleFormState,
+  isEdit: boolean,
+  existing: CuringCycleRecord[] = [],
+): string | null => getCuringCycleValidationMessage(getCuringCycleFieldErrors(form, isEdit, existing));
 
 export { emptyMasterDataStats };

@@ -5,6 +5,11 @@ import {
   type MasterDataStats,
 } from "@data/models/admin/MasterData/MasterDataModel";
 import {
+  firstFieldErrorMessage,
+  validateMasterDataNameField,
+  validateReferenceRangeFields,
+} from "@data/models/admin/MasterData/masterDataFieldValidators";
+import {
   emptyReferenceRange,
   parseReferenceRange,
   serializeReferenceRange,
@@ -121,16 +126,76 @@ export const buildQualityCheckUpdatePayload = (form: QualityCheckFormState) => (
 
 export const buildQualityCheckDeletePayload = (id: string) => ({ id });
 
-export const validateQualityCheckForm = (form: QualityCheckFormState, isEdit: boolean): string | null => {
-  if (!form.mixType.trim()) return "Mix type is required";
-  if (!isEdit && (form.motorStage === "" || Number.isNaN(Number(form.motorStage)))) {
-    return "Motor stage is required";
-  }
-  if (form.qualityChecks.length === 0) return "Add at least one quality check parameter";
-  for (const p of form.qualityChecks) {
-    if (!p.parameterName.trim()) return "Parameter name is required";
-  }
-  return null;
+export type QualityCheckParamFieldErrors = {
+  parameterName?: string;
+  minValue?: string;
+  maxValue?: string;
+  unit?: string;
 };
+
+export type QualityCheckFieldErrors = {
+  mixType?: string;
+  motorStage?: string;
+  form?: string;
+  qualityChecks?: QualityCheckParamFieldErrors[];
+};
+
+export const getQualityCheckFieldErrors = (
+  form: QualityCheckFormState,
+  isEdit: boolean,
+  existing: QualityCheckRecord[] = [],
+): QualityCheckFieldErrors => {
+  const errors: QualityCheckFieldErrors = {};
+  const mixTypeError = validateMasterDataNameField(form.mixType, "Mix type");
+  if (mixTypeError) errors.mixType = mixTypeError;
+  if (!isEdit && (form.motorStage === "" || Number.isNaN(Number(form.motorStage)))) {
+    errors.motorStage = "Motor stage is required";
+  }
+  if (!isEdit && !errors.mixType && !errors.motorStage) {
+    const mix = form.mixType.trim().toLowerCase();
+    const stage = Number(form.motorStage);
+    const duplicate = existing.some(
+      (item) => item.mixType.trim().toLowerCase() === mix && item.motorStage === stage,
+    );
+    if (duplicate) {
+      errors.mixType = `Quality check already exists for mix type ${form.mixType.trim()} and stage ${stage}`;
+    }
+  }
+  if (form.qualityChecks.length === 0) {
+    errors.form = "Add at least one quality check parameter";
+    return errors;
+  }
+  const paramIds = new Set<string>();
+  errors.qualityChecks = form.qualityChecks.map((param) => {
+    const paramErrors: QualityCheckParamFieldErrors = {};
+    const nameError = validateMasterDataNameField(param.parameterName, "Parameter name");
+    if (nameError) paramErrors.parameterName = nameError;
+    const label = param.parameterName.trim() || "parameter";
+    const rangeErrors = validateReferenceRangeFields(param.specification, label, false);
+    if (rangeErrors.minValue) paramErrors.minValue = rangeErrors.minValue;
+    if (rangeErrors.maxValue) paramErrors.maxValue = rangeErrors.maxValue;
+    if (rangeErrors.unit) paramErrors.unit = rangeErrors.unit;
+    const paramId = param.parameterId.trim().toLowerCase();
+    if (paramId) {
+      if (paramIds.has(paramId)) {
+        paramErrors.parameterName =
+          paramErrors.parameterName ?? `Duplicate parameter ID: ${param.parameterId.trim()}`;
+      }
+      paramIds.add(paramId);
+    }
+    return paramErrors;
+  });
+  return errors;
+};
+
+export const getQualityCheckValidationMessage = (errors: QualityCheckFieldErrors): string | null =>
+  firstFieldErrorMessage(errors);
+
+export const validateQualityCheckForm = (
+  form: QualityCheckFormState,
+  isEdit: boolean,
+  existing: QualityCheckRecord[] = [],
+): string | null =>
+  getQualityCheckValidationMessage(getQualityCheckFieldErrors(form, isEdit, existing));
 
 export { emptyMasterDataStats };

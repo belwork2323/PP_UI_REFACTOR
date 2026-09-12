@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMasterDataActiveToggle } from "@hooks/admin/MasterData/useMasterDataActiveToggle";
 import { useAlertStore } from "@app/store/alertStore";
 import { STRINGS } from "@app/config/strings";
 import { ApiResponseModel } from "@data/models/common/ApiResponseModel";
@@ -19,6 +20,7 @@ import {
 import {
   createMaterialsMaster,
   deleteMaterialsMaster,
+  enableMaterialsMaster,
   fetchMaterialsMasterList,
   updateMaterialsMaster,
 } from "@data/api/admin/MasterData/materialsMasterApi";
@@ -54,11 +56,8 @@ export default function useMaterialsMasterHook({
   const [inlineMode, setInlineMode] = useState<"create" | "edit" | null>(null);
   const [form, setForm] = useState<MaterialsMasterFormState>(createEmptyMaterialsForm());
   const [saving, setSaving] = useState(false);
-  const [disableTarget, setDisableTarget] = useState<MaterialsMasterRecord | null>(null);
   const [disabling, setDisabling] = useState(false);
   const [enabling, setEnabling] = useState(false);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
-
   const loadList = useCallback(async () => {
     setLoading(true);
     try {
@@ -126,9 +125,13 @@ export default function useMaterialsMasterHook({
 
   const saveForm = async () => {
     const isEdit = inlineMode === "edit";
-    const err = validateMaterialsForm(form, isEdit);
+    const err = validateMaterialsForm(
+      form,
+      isEdit,
+      items.map((item) => item.materialCode),
+    );
     if (err) {
-      useAlertStore.getState().showAlert(err, "error");
+      useAlertStore.getState().showValidationAlert(err);
       return;
     }
     setSaving(true);
@@ -159,12 +162,13 @@ export default function useMaterialsMasterHook({
     }
   };
 
-  const enableRecord = async (record: MaterialsMasterRecord) => {
+  const enableRecord = useCallback(async (record: MaterialsMasterRecord) => {
     setEnabling(true);
     useAlertStore.getState().showAlert(S.MESSAGES.ENABLING, "loading");
     try {
-      const nextForm = { ...mapMaterialRecordToForm(record), isActive: true };
-      const resp = new ApiResponseModel(await updateMaterialsMaster(buildMaterialsUpdatePayload(nextForm)));
+      const resp = new ApiResponseModel(
+        await enableMaterialsMaster(buildMaterialsDeletePayload(record.materialId)),
+      );
       if (resp.success) {
         useAlertStore.getState().showAlert(S.MESSAGES.ENABLE_SUCCESS, "success");
         await loadList();
@@ -180,28 +184,17 @@ export default function useMaterialsMasterHook({
     } finally {
       setEnabling(false);
     }
-  };
+  }, [loadList]);
 
-  const handleToggleActive = (record: MaterialsMasterRecord, nextActive: boolean) => {
-    if (inlineMode != null || saving || disabling || enabling) return;
-    if (nextActive) {
-      void enableRecord(record);
-      return;
-    }
-    setDisableTarget(record);
-  };
-
-  const confirmDisable = async () => {
-    if (!disableTarget) return;
+  const disableRecord = useCallback(async (record: MaterialsMasterRecord) => {
     setDisabling(true);
     useAlertStore.getState().showAlert(S.MESSAGES.DISABLING, "loading");
     try {
       const resp = new ApiResponseModel(
-        await deleteMaterialsMaster(buildMaterialsDeletePayload(disableTarget.materialId)),
+        await deleteMaterialsMaster(buildMaterialsDeletePayload(record.materialId)),
       );
       if (resp.success) {
         useAlertStore.getState().showAlert(S.MESSAGES.DISABLE_SUCCESS, "success");
-        setDisableTarget(null);
         await loadList();
       } else {
         useAlertStore
@@ -215,7 +208,23 @@ export default function useMaterialsMasterHook({
     } finally {
       setDisabling(false);
     }
-  };
+  }, [loadList]);
+
+  const canToggle = useCallback(
+    () => inlineMode == null && !saving && !disabling && !enabling,
+    [inlineMode, saving, disabling, enabling],
+  );
+
+  const {
+    toggleTarget,
+    handleToggleActive,
+    confirmToggle,
+    cancelToggle,
+  } = useMasterDataActiveToggle({
+    canToggle,
+    enableRecord,
+    disableRecord,
+  });
 
   return {
     items,
@@ -243,14 +252,12 @@ export default function useMaterialsMasterHook({
     openEdit,
     closeInline,
     saveForm,
-    disableTarget,
-    setDisableTarget,
+    toggleTarget,
     disabling,
     enabling,
-    expandedId,
-    setExpandedId,
     handleToggleActive,
-    confirmDisable,
+    confirmToggle,
+    cancelToggle,
     refresh: loadList,
   };
 }

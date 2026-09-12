@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMasterDataActiveToggle } from "@hooks/admin/MasterData/useMasterDataActiveToggle";
 import { useAlertStore } from "@app/store/alertStore";
 import { STRINGS } from "@app/config/strings";
 import { ApiResponseModel } from "@data/models/common/ApiResponseModel";
@@ -54,7 +55,6 @@ export default function useCuringCycleMasterHook({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [form, setForm] = useState<CuringCycleFormState>(createEmptyCuringCycleForm());
   const [saving, setSaving] = useState(false);
-  const [disableTarget, setDisableTarget] = useState<CuringCycleRecord | null>(null);
   const [disabling, setDisabling] = useState(false);
   const [enabling, setEnabling] = useState(false);
 
@@ -126,9 +126,9 @@ export default function useCuringCycleMasterHook({
 
   const saveForm = async () => {
     const isEdit = inlineMode === "edit";
-    const err = validateCuringCycleForm(form, isEdit);
+    const err = validateCuringCycleForm(form, isEdit, items);
     if (err) {
-      useAlertStore.getState().showAlert(err, "error");
+      useAlertStore.getState().showValidationAlert(err);
       return;
     }
     setSaving(true);
@@ -157,7 +157,7 @@ export default function useCuringCycleMasterHook({
     }
   };
 
-  const enableRecord = async (record: CuringCycleRecord) => {
+  const enableRecord = useCallback(async (record: CuringCycleRecord) => {
     setEnabling(true);
     useAlertStore.getState().showAlert(S.MESSAGES.ENABLING, "loading");
     try {
@@ -176,28 +176,17 @@ export default function useCuringCycleMasterHook({
     } finally {
       setEnabling(false);
     }
-  };
+  }, [loadList]);
 
-  const handleToggleActive = (record: CuringCycleRecord, nextActive: boolean) => {
-    if (inlineMode != null || saving || disabling || enabling) return;
-    if (nextActive) {
-      void enableRecord(record);
-      return;
-    }
-    setDisableTarget(record);
-  };
-
-  const confirmDisable = async () => {
-    if (!disableTarget) return;
+  const disableRecord = useCallback(async (record: CuringCycleRecord) => {
     setDisabling(true);
     useAlertStore.getState().showAlert(S.MESSAGES.DISABLING, "loading");
     try {
       const resp = new ApiResponseModel(
-        await deleteCuringCycleMaster(buildCuringCycleDeletePayload(disableTarget.id)),
+        await deleteCuringCycleMaster(buildCuringCycleDeletePayload(record.id)),
       );
       if (resp.success) {
         useAlertStore.getState().showAlert(S.MESSAGES.DISABLE_SUCCESS, "success");
-        setDisableTarget(null);
         await loadList();
       } else {
         useAlertStore.getState().showAlert(getMasterDataErrorMessage(resp, S.ERRORS.OPERATION_FAILED), "error");
@@ -209,7 +198,23 @@ export default function useCuringCycleMasterHook({
     } finally {
       setDisabling(false);
     }
-  };
+  }, [loadList]);
+
+  const canToggle = useCallback(
+    () => inlineMode == null && !saving && !disabling && !enabling,
+    [inlineMode, saving, disabling, enabling],
+  );
+
+  const {
+    toggleTarget,
+    handleToggleActive,
+    confirmToggle,
+    cancelToggle,
+  } = useMasterDataActiveToggle({
+    canToggle,
+    enableRecord,
+    disableRecord,
+  });
 
   return {
     items,
@@ -239,12 +244,12 @@ export default function useCuringCycleMasterHook({
     openEdit,
     closeInline,
     saveForm,
-    disableTarget,
-    setDisableTarget,
+    toggleTarget,
     disabling,
     enabling,
     handleToggleActive,
-    confirmDisable,
+    confirmToggle,
+    cancelToggle,
     refresh: loadList,
   };
 }

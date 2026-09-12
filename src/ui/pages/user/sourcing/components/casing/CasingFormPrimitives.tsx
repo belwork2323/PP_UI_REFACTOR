@@ -1,5 +1,6 @@
-import React, { memo, useCallback, useEffect, useRef, useState, type ChangeEvent } from "react";
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState, type ChangeEvent } from "react";
 import {
+  Autocomplete,
   Box,
   Chip,
   FormControl,
@@ -429,6 +430,72 @@ export const SelectField = ({
     {error ? <FormHelperText error sx={{ mx: 0 }}>{error}</FormHelperText> : null}
   </Field>
 );
+
+export const SearchableSelectField = ({
+  label,
+  value,
+  onChange,
+  options,
+  placeholder,
+  disabled,
+  loading = false,
+  error,
+  theme,
+  required,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+  options: Array<{ value: string; label: string; meta?: string }>;
+  placeholder?: string;
+  disabled?: boolean;
+  loading?: boolean;
+  error?: string;
+  theme: any;
+  required?: boolean;
+}) => {
+  const selectedOption = useMemo(
+    () => options.find((option) => option.value === value) ?? null,
+    [options, value],
+  );
+
+  return (
+    <Field label={label} theme={theme} required={required}>
+      <Autocomplete
+        size="small"
+        fullWidth
+        disabled={disabled || loading}
+        options={options}
+        value={selectedOption}
+        onChange={(_event, option) => onChange(option?.value ?? "")}
+        getOptionLabel={(option) => String(option.label ?? "")}
+        isOptionEqualToValue={(option, current) => option.value === current.value}
+        filterOptions={(opts, state) => {
+          const query = state.inputValue.trim().toLowerCase();
+          if (!query) return opts;
+          return opts.filter(
+            (option) =>
+              option.label.toLowerCase().includes(query) ||
+              option.value.toLowerCase().includes(query),
+          );
+        }}
+        renderInput={(params) => (
+          <TextField
+            {...params}
+            placeholder={loading ? "Loading..." : placeholder}
+            error={Boolean(error)}
+            sx={theme.workflow.formElements.metaRowTextField}
+          />
+        )}
+        slotProps={{
+          listbox: { sx: { maxHeight: 280 } },
+        }}
+        noOptionsText="No matches"
+      />
+      {error ? <FormHelperText error sx={{ mx: 0 }}>{error}</FormHelperText> : null}
+    </Field>
+  );
+};
 
 export const ReceiptStatusField = ({
   label,

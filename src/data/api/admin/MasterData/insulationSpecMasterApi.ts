@@ -10,5 +10,8 @@ export const createInsulationSpecMaster = (payload: Record<string, unknown>) =>
 export const updateInsulationSpecMaster = (payload: Record<string, unknown>) =>
   post(ADMIN_ENDPOINTS.MASTER_DATA.INSULATION.UPDATE, payload);
 
-export const deleteInsulationSpecMaster = (payload: { id: string }) =>
+export const deleteInsulationSpecMaster = (payload: { insulationSpecId: number }) =>
   post(ADMIN_ENDPOINTS.MASTER_DATA.INSULATION.DELETE, payload);
+
+export const enableInsulationSpecMaster = (payload: { insulationSpecId: number }) =>
+  post(ADMIN_ENDPOINTS.MASTER_DATA.INSULATION.ENABLE, payload);

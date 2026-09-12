@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useAlertStore } from "@app/store/alertStore";
 import {
   Box,
   Button,
@@ -6,7 +7,6 @@ import {
   Divider,
   IconButton,
   Paper,
-  Switch,
   Table,
   TableBody,
   TableCell,
@@ -20,12 +20,13 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
-import ConfirmAlertDialog from "@ui/components/common/ConfirmAlertDialog";
+import MasterDataToggleConfirmDialog from "./components/MasterDataToggleConfirmDialog";
 import SkeletonRow from "@ui/components/common/SkeletonRow";
 import AppTextField from "@ui/components/common/AppTextField";
 import useQualityCheckMasterHook from "@hooks/admin/MasterData/useQualityCheckMasterHook";
 import MasterDataTableToolbar from "./components/MasterDataTableToolbar";
-import MasterDataActiveSwitch, { masterDataActiveSwitchSx } from "./components/MasterDataActiveSwitch";
+import MasterDataActiveSwitch from "./components/MasterDataActiveSwitch";
+import MasterDataEnableDisableField from "./components/MasterDataEnableDisableField";
 import MasterDataActiveStatusChip from "./components/MasterDataActiveStatusChip";
 import {
   MASTER_DATA_AUDIT_COLUMN_COUNT,
@@ -34,11 +35,15 @@ import {
 } from "./components/MasterDataAuditColumns";
 import {
   emptyQualityCheckParam,
+  getQualityCheckFieldErrors,
+  getQualityCheckValidationMessage,
+  type QualityCheckFieldErrors,
   type QualityCheckFormState,
   type QualityCheckListPayload,
   type QualityCheckParamForm,
 } from "@data/models/admin/MasterData/QualityCheckMasterModel";
 import type { MasterDataReferenceRange } from "@data/models/admin/MasterData/nestedMasterDataTypes";
+import { visibleValidationError } from "./masterDataValidationUtils";
 
 const S = STRINGS.MASTER_DATA;
 
@@ -56,12 +61,33 @@ type Props = {
 const RangeFields = ({
   range,
   disabled,
+  showErrors,
+  rangeErrors,
   onChange,
 }: {
   range: MasterDataReferenceRange;
   disabled?: boolean;
+  showErrors: boolean;
+  rangeErrors?: { minValue?: string; maxValue?: string; unit?: string };
   onChange: (next: MasterDataReferenceRange) => void;
-}) => (
+}) => {
+  const minError = visibleValidationError(
+    rangeErrors?.minValue,
+    range.minValue != null,
+    showErrors,
+  );
+  const maxError = visibleValidationError(
+    rangeErrors?.maxValue,
+    range.maxValue != null,
+    showErrors,
+  );
+  const unitError = visibleValidationError(
+    rangeErrors?.unit,
+    String(range.unit ?? "").trim().length > 0 || range.unitId != null,
+    showErrors,
+  );
+
+  return (
   <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
     <AppTextField
       compact
@@ -69,6 +95,8 @@ const RangeFields = ({
       label="Min"
       value={range.minValue ?? ""}
       disabled={disabled}
+      error={Boolean(minError)}
+      helperText={minError}
       onChange={(e) =>
         onChange({ ...range, minValue: e.target.value === "" ? null : Number(e.target.value) })
       }
@@ -80,6 +108,8 @@ const RangeFields = ({
       label="Max"
       value={range.maxValue ?? ""}
       disabled={disabled}
+      error={Boolean(maxError)}
+      helperText={maxError}
       onChange={(e) =>
         onChange({ ...range, maxValue: e.target.value === "" ? null : Number(e.target.value) })
       }
@@ -90,23 +120,39 @@ const RangeFields = ({
       label="Unit"
       value={range.unit}
       disabled={disabled}
+      error={Boolean(unitError)}
+      helperText={unitError}
       onChange={(e) => onChange({ ...range, unit: e.target.value })}
       sx={{ width: 110 }}
     />
   </Box>
-);
+  );
+};
 
 const ParamEditor = ({
   params,
   disabled,
+  showErrors,
+  paramErrors,
   onChange,
 }: {
   params: QualityCheckParamForm[];
   disabled?: boolean;
+  showErrors: boolean;
+  paramErrors?: QualityCheckFieldErrors["qualityChecks"];
   onChange: (next: QualityCheckParamForm[]) => void;
 }) => (
   <Box sx={{ display: "flex", flexDirection: "column", gap: 1.25 }}>
-    {params.map((p, idx) => (
+    {params.map((p, idx) => {
+      const rawErr = paramErrors?.[idx];
+      const nameError = visibleValidationError(
+        rawErr?.parameterName,
+        p.parameterName.trim().length > 0,
+        showErrors,
+      );
+      const hasFieldError = Boolean(nameError || rawErr?.minValue || rawErr?.maxValue || rawErr?.unit);
+
+      return (
       <Box
         key={idx}
         sx={{
@@ -115,7 +161,7 @@ const ParamEditor = ({
           gap: 1,
           p: 1,
           border: "1px solid",
-          borderColor: "divider",
+          borderColor: hasFieldError ? "error.main" : "divider",
           borderRadius: 1,
         }}
       >
@@ -124,6 +170,8 @@ const ParamEditor = ({
           label="Parameter name"
           value={p.parameterName}
           disabled={disabled}
+          error={Boolean(nameError)}
+          helperText={nameError}
           onChange={(e) => {
             const next = [...params];
             next[idx] = { ...p, parameterName: e.target.value };
@@ -149,6 +197,8 @@ const ParamEditor = ({
           <RangeFields
             range={p.specification}
             disabled={disabled}
+            showErrors={showErrors}
+            rangeErrors={rawErr}
             onChange={(specification) => {
               const next = [...params];
               next[idx] = { ...p, specification };
@@ -157,7 +207,8 @@ const ParamEditor = ({
           />
         </Box>
       </Box>
-    ))}
+    );
+    })}
     <Button
       size="small"
       startIcon={<icons.projectMgmt.add />}
@@ -173,13 +224,29 @@ const QualityFormFields = ({
   form,
   isEdit,
   saving,
+  showErrors,
+  fieldErrors,
   onChange,
 }: {
   form: QualityCheckFormState;
   isEdit: boolean;
   saving: boolean;
+  showErrors: boolean;
+  fieldErrors: QualityCheckFieldErrors;
   onChange: (next: QualityCheckFormState) => void;
-}) => (
+}) => {
+  const mixTypeError = visibleValidationError(
+    fieldErrors.mixType,
+    form.mixType.trim().length > 0,
+    showErrors,
+  );
+  const stageError = visibleValidationError(
+    fieldErrors.motorStage,
+    form.motorStage !== "",
+    showErrors,
+  );
+
+  return (
   <Box sx={{ p: 1.5, display: "flex", flexDirection: "column", gap: 1.5 }}>
     <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
       <AppTextField
@@ -187,6 +254,8 @@ const QualityFormFields = ({
         label="Mix type"
         value={form.mixType}
         disabled={saving || isEdit}
+        error={Boolean(mixTypeError)}
+        helperText={mixTypeError}
         onChange={(e) => onChange({ ...form, mixType: e.target.value })}
         sx={{ minWidth: 160 }}
       />
@@ -196,31 +265,35 @@ const QualityFormFields = ({
         label="Motor stage"
         value={form.motorStage}
         disabled={saving || isEdit}
+        error={Boolean(stageError)}
+        helperText={stageError}
         onChange={(e) =>
           onChange({ ...form, motorStage: e.target.value === "" ? "" : Number(e.target.value) })
         }
         sx={{ width: 120 }}
       />
-      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-        <Typography variant="body2">Active</Typography>
-        <Switch
-          size="small"
-          checked={form.isActive}
-          disabled={saving}
-          onChange={(e) => onChange({ ...form, isActive: e.target.checked })}
-          sx={masterDataActiveSwitchSx(form.isActive)}
-        />
-      </Box>
+      <MasterDataEnableDisableField
+        checked={form.isActive}
+        disabled={saving}
+        confirmName={`${form.mixType} (stage ${form.motorStage})`}
+        onChange={(isActive) => onChange({ ...form, isActive })}
+      />
     </Box>
     <Divider />
+    {showErrors && fieldErrors.form ? (
+      <Typography variant="body2" color="error">{fieldErrors.form}</Typography>
+    ) : null}
     <Typography variant="subtitle2">Parameters</Typography>
     <ParamEditor
       params={form.qualityChecks}
       disabled={saving}
+      showErrors={showErrors}
+      paramErrors={fieldErrors.qualityChecks}
       onChange={(qualityChecks) => onChange({ ...form, qualityChecks })}
     />
   </Box>
-);
+  );
+};
 
 const QualityCheckMasterPanel = ({
   activeFilter,
@@ -240,6 +313,27 @@ const QualityCheckMasterPanel = ({
   });
   const { table, tableCell } = t;
   const columnCount = 6 + MASTER_DATA_AUDIT_COLUMN_COUNT;
+  const [showErrors, setShowErrors] = useState(false);
+  const fieldErrors = useMemo(
+    () => getQualityCheckFieldErrors(hook.form, false, hook.items),
+    [hook.form, hook.items],
+  );
+
+  useEffect(() => {
+    if (hook.inlineMode) setShowErrors(false);
+  }, [hook.inlineMode]);
+
+  const handleSave = () => {
+    setShowErrors(true);
+    const err = getQualityCheckValidationMessage(
+      getQualityCheckFieldErrors(hook.form, false, hook.items),
+    );
+    if (err) {
+      useAlertStore.getState().showValidationAlert(err);
+      return;
+    }
+    void hook.saveForm();
+  };
 
   return (
     <Box>
@@ -261,7 +355,7 @@ const QualityCheckMasterPanel = ({
                 <TableCell sx={table.headerCell}>Stage</TableCell>
                 <TableCell sx={table.headerCell}>Params</TableCell>
                 <MasterDataAuditHeaderCells table={table} />
-                <TableCell sx={table.headerCell}>Active</TableCell>
+                <TableCell sx={table.headerCell}>{S.TABLE.COL_ACTIVE}</TableCell>
                 <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>{S.TABLE.COL_ACTIONS}</TableCell>
               </TableRow>
             </TableHead>
@@ -343,6 +437,8 @@ const QualityCheckMasterPanel = ({
                       form={hook.form}
                       isEdit={false}
                       saving={hook.saving}
+                      showErrors={showErrors}
+                      fieldErrors={fieldErrors}
                       onChange={hook.setForm}
                     />
                     <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", p: 1.5, pt: 0 }}>
@@ -352,7 +448,7 @@ const QualityCheckMasterPanel = ({
                       <Button
                         size="small"
                         variant="contained"
-                        onClick={() => void hook.saveForm()}
+                        onClick={handleSave}
                         disabled={hook.saving}
                         sx={t.pageHeader?.newProjectButton}
                       >
@@ -388,21 +484,18 @@ const QualityCheckMasterPanel = ({
         </Button>
       </Box>
 
-      <ConfirmAlertDialog
-        open={!!hook.disableTarget}
-        title={S.DISABLE_DIALOG.TITLE}
-        message={
-          hook.disableTarget
-            ? S.DISABLE_DIALOG.BODY(
-                `${hook.disableTarget.mixType} (stage ${hook.disableTarget.motorStage})`,
-              )
-            : ""
+      <MasterDataToggleConfirmDialog
+        target={
+          hook.toggleTarget
+            ? {
+                name: `${hook.toggleTarget.record.mixType} (stage ${hook.toggleTarget.record.motorStage})`,
+                nextActive: hook.toggleTarget.nextActive,
+              }
+            : null
         }
-        confirmLabel={hook.disabling ? S.DISABLE_DIALOG.DISABLING : S.DISABLE_DIALOG.CONFIRM}
-        cancelLabel={S.DISABLE_DIALOG.CANCEL}
-        onConfirm={hook.confirmDisable}
-        onCancel={() => !hook.disabling && hook.setDisableTarget(null)}
-        confirmDisabled={hook.disabling}
+        busy={hook.disabling || hook.enabling}
+        onConfirm={() => void hook.confirmToggle()}
+        onCancel={hook.cancelToggle}
       />
     </Box>
   );

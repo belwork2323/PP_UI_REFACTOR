@@ -26,6 +26,8 @@ export const getRawMaterialApproverTheme = (mode = "light") => {
     text: shared.tokens.textPrimary,
     textSub: shared.tokens.textSecondary,
     white: "#fff",
+    errorBg: isDark ? alpha("#ef5350", 0.12) : alpha("#C0392B", 0.08),
+    errorBorder: isDark ? alpha("#ef5350", 0.35) : alpha("#C0392B", 0.3),
   };
 
   return {
@@ -62,7 +64,12 @@ export const getRawMaterialApproverTheme = (mode = "light") => {
         },
       ),
       row: (index: number) => ({
-        background: index % 2 === 0 ? (isDark ? alpha(palette.white, 0.02) : "#fff") : alpha(palette.surface, 0.5),
+        background:
+          index % 2 === 0
+            ? isDark
+              ? alpha(palette.white, 0.02)
+              : "#fff"
+            : alpha(palette.surface, 0.5),
         "&:hover": { background: alpha(palette.primaryLight, 0.04) },
         "&:last-child td": { borderBottom: "none" },
         animation: `${slideUp} 0.3s ease ${index * 0.04}s both`,
@@ -151,6 +158,13 @@ export const getRawMaterialApproverTheme = (mode = "light") => {
         display: "flex",
         flexDirection: "column",
         m: 2,
+      },
+      errorBanner: {
+        mb: 2.5,
+        p: 2,
+        borderRadius: 1.5,
+        backgroundColor: palette.errorBg,
+        border: `1px solid ${palette.errorBorder}`,
       },
       header: {
         p: "14px 20px",

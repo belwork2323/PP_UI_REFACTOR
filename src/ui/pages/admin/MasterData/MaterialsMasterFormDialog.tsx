@@ -1,4 +1,5 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useAlertStore } from "@app/store/alertStore";
 import {
   Box,
   Button,
@@ -7,8 +8,8 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  IconButton,
   Stack,
-  Switch,
   Typography,
   Zoom,
 } from "@mui/material";
@@ -17,20 +18,27 @@ import { STRINGS } from "@app/config/strings";
 import { useThemeStore } from "@app/store/themeStore";
 import getManufacturingTheme from "@app/theme/custom_themes/user/manufacturing/manufacturing_theme";
 import AdminManagementFormHeader from "@ui/components/custom/admin/AdminManagementFormHeader";
-import { masterDataActiveSwitchSx } from "./components/MasterDataActiveSwitch";
+import MasterDataEnableDisableField from "./components/MasterDataEnableDisableField";
 import CasePrepTextField from "@ui/pages/user/manufacturing/CasePreparation/CasePrepTextField";
 import CasePrepSelect from "@ui/pages/user/manufacturing/CasePreparation/CasePrepSelect";
+import CasePrepSearchableSelect from "@ui/pages/user/manufacturing/CasePreparation/CasePrepSearchableSelect";
 import {
   emptyMaterialGrade,
   emptyMaterialSpec,
+  getMaterialsFormFieldErrors,
+  getMaterialsFormValidationMessage,
   PREPARATION_TYPE_OPTIONS,
   RAW_MATERIAL_TYPE_OPTIONS,
+  type MaterialGradeFieldErrors,
+  type MaterialSpecFieldErrors,
+  type MaterialsFormFieldErrors,
   type MaterialGradeForm,
   type MaterialSpecForm,
   type MaterialsMasterFormState,
   type PreparationTypeValue,
   type RawMaterialTypeValue,
 } from "@data/models/admin/MasterData/MaterialsMasterModel";
+import { visibleValidationError } from "./masterDataValidationUtils";
 import useUnitMasterOptions from "@hooks/admin/MasterData/useUnitMasterOptions";
 import type { MasterDataReferenceRange } from "@data/models/admin/MasterData/nestedMasterDataTypes";
 import type { AppDropdownOption } from "@ui/components/common/AppDropdown";
@@ -47,75 +55,19 @@ type Props = {
   isEdit: boolean;
   form: MaterialsMasterFormState;
   saving: boolean;
+  existingCodes?: string[];
   onClose: () => void;
   onSave: () => void;
   onChange: (next: MaterialsMasterFormState) => void;
   t: any;
 };
 
-const RangeFields = ({
-  range,
-  disabled,
-  theme,
-  unitOptions,
-  onChange,
-}: {
-  range: MasterDataReferenceRange;
-  disabled?: boolean;
-  theme: any;
-  unitOptions: AppDropdownOption[];
-  onChange: (next: MasterDataReferenceRange) => void;
-}) => {
-  const flowBar = theme?.manufacturing?.casePreparation?.flowBar ?? {};
-  const hasRange = range.minValue != null || range.maxValue != null;
-
-  return (
-    <Box sx={flowBar.topRow}>
-      <CasePrepTextField
-        label="Min"
-        value={range.minValue != null ? String(range.minValue) : ""}
-        disabled={disabled}
-        width={120}
-        theme={theme}
-        onChange={(value) =>
-          onChange({ ...range, minValue: value === "" ? null : Number(value) })
-        }
-      />
-      <CasePrepTextField
-        label="Max"
-        value={range.maxValue != null ? String(range.maxValue) : ""}
-        disabled={disabled}
-        width={120}
-        theme={theme}
-        onChange={(value) =>
-          onChange({ ...range, maxValue: value === "" ? null : Number(value) })
-        }
-      />
-      <CasePrepSelect
-        label="Unit"
-        value={range.unitId != null ? String(range.unitId) : ""}
-        placeholder="Select unit"
-        options={unitOptions}
-        disabled={disabled}
-        required={hasRange}
-        width={180}
-        theme={theme}
-        onChange={(value) =>
-          onChange({
-            ...range,
-            unitId: value ? Number(value) : null,
-            unit: "",
-          })
-        }
-      />
-    </Box>
-  );
-};
-
 const SpecEditor = ({
   specs,
   disabled,
   isEdit,
+  showErrors,
+  specErrors,
   theme,
   unitOptions,
   onChange,
@@ -123,72 +75,166 @@ const SpecEditor = ({
   specs: MaterialSpecForm[];
   disabled?: boolean;
   isEdit: boolean;
+  showErrors: boolean;
+  specErrors?: MaterialSpecFieldErrors[];
   theme: any;
   unitOptions: AppDropdownOption[];
   onChange: (next: MaterialSpecForm[]) => void;
 }) => (
   <Stack spacing={1.5}>
-    {specs.map((spec, idx) => (
-      <Box
-        key={idx}
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "1fr 1fr auto" },
-          gap: 1.5,
-          alignItems: "flex-start",
-          p: 1.5,
-          border: "1px solid",
-          borderColor: "divider",
-          borderRadius: 1.5,
-          bgcolor: "background.paper",
-        }}
-      >
-        {isEdit ? (
+    {specs.map((spec, idx) => {
+      const locked = isEdit && Boolean(spec.isExisting);
+      const editable = !locked;
+      const rawErr = editable ? specErrors?.[idx] : undefined;
+      const nameVisibleErr = visibleValidationError(
+        rawErr?.specificationName,
+        spec.specificationName.trim().length > 0,
+        showErrors,
+      );
+      const minVisibleErr = visibleValidationError(
+        rawErr?.minValue,
+        spec.referenceRange.minValue != null,
+        showErrors,
+      );
+      const maxVisibleErr = visibleValidationError(
+        rawErr?.maxValue,
+        spec.referenceRange.maxValue != null,
+        showErrors,
+      );
+      const unitVisibleErr = visibleValidationError(
+        rawErr?.unit,
+        spec.referenceRange.unitId != null || String(spec.referenceRange.unit ?? "").trim().length > 0,
+        showErrors,
+      );
+      const nameError = Boolean(nameVisibleErr);
+      const minError = Boolean(minVisibleErr);
+      const maxError = Boolean(maxVisibleErr);
+      const unitError = Boolean(unitVisibleErr);
+
+      const updateRange = (referenceRange: MasterDataReferenceRange) => {
+        const next = [...specs];
+        next[idx] = { ...spec, referenceRange };
+        onChange(next);
+      };
+
+      return (
+        <Box
+          key={spec.specificationCode || `spec-${idx}`}
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+              xs: "1fr",
+              md: "minmax(160px, 1fr) 100px 100px minmax(160px, 200px) auto",
+            },
+            gap: 1.5,
+            alignItems: "flex-end",
+            p: 1.5,
+            border: "1px solid",
+            borderColor: nameError || minError || maxError || unitError ? "error.main" : "divider",
+            borderRadius: 1.5,
+            bgcolor: locked ? "action.hover" : "background.paper",
+            opacity: locked && !spec.isActive ? 0.72 : 1,
+          }}
+        >
           <CasePrepTextField
-            label="Spec code"
-            value={spec.specificationCode}
-            disabled
+            label="Name"
+            value={spec.specificationName}
+            disabled={disabled || locked}
+            required={editable}
+            error={nameError}
+            helperText={nameVisibleErr ?? null}
             width="100%"
             theme={theme}
-            onChange={() => {}}
-          />
-        ) : null}
-        <CasePrepTextField
-          label="Spec name"
-          value={spec.specificationName}
-          disabled={disabled}
-          width="100%"
-          theme={theme}
-          onChange={(value) => {
-            const next = [...specs];
-            next[idx] = { ...spec, specificationName: value };
-            onChange(next);
-          }}
-        />
-        <Button
-          size="small"
-          color="inherit"
-          disabled={disabled}
-          onClick={() => onChange(specs.filter((_, i) => i !== idx))}
-          sx={{ alignSelf: { md: "center" } }}
-        >
-          Remove
-        </Button>
-        <Box sx={{ gridColumn: { xs: "1", md: "1 / -1" } }}>
-          <RangeFields
-            range={spec.referenceRange}
-            disabled={disabled}
-            theme={theme}
-            unitOptions={unitOptions}
-            onChange={(referenceRange) => {
+            onChange={(value) => {
               const next = [...specs];
-              next[idx] = { ...spec, referenceRange };
+              next[idx] = { ...spec, specificationName: value };
               onChange(next);
             }}
           />
+          <CasePrepTextField
+            label="Min"
+            value={spec.referenceRange.minValue != null ? String(spec.referenceRange.minValue) : ""}
+            disabled={disabled || locked}
+            required={editable}
+            error={minError}
+            helperText={minVisibleErr ?? null}
+            width="100%"
+            theme={theme}
+            onChange={(value) =>
+              updateRange({
+                ...spec.referenceRange,
+                minValue: value === "" ? null : Number(value),
+              })
+            }
+          />
+          <CasePrepTextField
+            label="Max"
+            value={spec.referenceRange.maxValue != null ? String(spec.referenceRange.maxValue) : ""}
+            disabled={disabled || locked}
+            required={editable}
+            error={maxError}
+            helperText={maxVisibleErr ?? null}
+            width="100%"
+            theme={theme}
+            onChange={(value) =>
+              updateRange({
+                ...spec.referenceRange,
+                maxValue: value === "" ? null : Number(value),
+              })
+            }
+          />
+          <CasePrepSearchableSelect
+            label="Unit"
+            value={spec.referenceRange.unitId != null ? String(spec.referenceRange.unitId) : ""}
+            placeholder="Select unit"
+            options={unitOptions}
+            disabled={disabled || locked}
+            required={editable}
+            width="100%"
+            theme={theme}
+            onChange={(value) =>
+              updateRange({
+                ...spec.referenceRange,
+                unitId: value ? Number(value) : null,
+                unit: "",
+              })
+            }
+          />
+          {locked ? (
+            <MasterDataEnableDisableField
+              checked={spec.isActive}
+              disabled={disabled}
+              labelVariant="caption"
+              confirmName={spec.specificationName || "specification"}
+              onChange={(isActive) => {
+                const next = [...specs];
+                next[idx] = { ...spec, isActive };
+                onChange(next);
+              }}
+            />
+          ) : (
+            <IconButton
+              size="small"
+              disabled={disabled}
+              onClick={() => onChange(specs.filter((_, i) => i !== idx))}
+              sx={{ mb: 0.5 }}
+              aria-label="Remove specification"
+            >
+              <icons.Delete fontSize="small" />
+            </IconButton>
+          )}
+          {unitVisibleErr ? (
+            <Typography
+              variant="caption"
+              color="error"
+              sx={{ gridColumn: { md: "1 / -1" }, mt: -0.5 }}
+            >
+              {unitVisibleErr}
+            </Typography>
+          ) : null}
         </Box>
-      </Box>
-    ))}
+      );
+    })}
     <Button
       size="small"
       startIcon={<icons.projectMgmt.add />}
@@ -205,6 +251,8 @@ const GradeEditor = ({
   grades,
   disabled,
   isEdit,
+  showErrors,
+  gradeErrors,
   theme,
   unitOptions,
   onChange,
@@ -212,6 +260,8 @@ const GradeEditor = ({
   grades: MaterialGradeForm[];
   disabled?: boolean;
   isEdit: boolean;
+  showErrors: boolean;
+  gradeErrors?: MaterialGradeFieldErrors[];
   theme: any;
   unitOptions: AppDropdownOption[];
   onChange: (next: MaterialGradeForm[]) => void;
@@ -220,22 +270,42 @@ const GradeEditor = ({
 
   return (
     <Stack spacing={1.5}>
-      {grades.map((grade, idx) => (
+      {grades.map((grade, idx) => {
+        const locked = isEdit && Boolean(grade.isExisting);
+        const editable = !locked;
+        const rawErr = editable ? gradeErrors?.[idx] : undefined;
+        const codeError = visibleValidationError(
+          rawErr?.gradeCode,
+          grade.gradeCode.trim().length > 0,
+          showErrors,
+        );
+        const nameError = visibleValidationError(
+          rawErr?.gradeName,
+          grade.gradeName.trim().length > 0,
+          showErrors,
+        );
+        const hasError = Boolean(codeError || nameError);
+
+        return (
         <Box
-          key={idx}
+          key={grade.gradeId || grade.gradeCode || `grade-${idx}`}
           sx={{
             p: 1.5,
             border: "1px solid",
-            borderColor: "divider",
+            borderColor: hasError ? "error.main" : "divider",
             borderRadius: 1.5,
             bgcolor: "action.hover",
+            opacity: locked && !grade.isActive ? 0.72 : 1,
           }}
         >
           <Box sx={flowBar.topRow} mb={1.5}>
             <CasePrepTextField
               label="Grade code"
               value={grade.gradeCode}
-              disabled={disabled}
+              disabled={disabled || locked}
+              required={editable}
+              error={Boolean(codeError)}
+              helperText={codeError ?? null}
               width={180}
               theme={theme}
               onChange={(value) => {
@@ -247,7 +317,10 @@ const GradeEditor = ({
             <CasePrepTextField
               label="Grade name"
               value={grade.gradeName}
-              disabled={disabled}
+              disabled={disabled || locked}
+              required={editable}
+              error={Boolean(nameError)}
+              helperText={nameError ?? null}
               width={280}
               theme={theme}
               onChange={(value) => {
@@ -256,15 +329,28 @@ const GradeEditor = ({
                 onChange(next);
               }}
             />
-            <Button
-              size="small"
-              color="inherit"
-              disabled={disabled}
-              onClick={() => onChange(grades.filter((_, i) => i !== idx))}
-              sx={{ alignSelf: "flex-end" }}
-            >
-              Remove grade
-            </Button>
+            {locked ? (
+              <MasterDataEnableDisableField
+                checked={grade.isActive}
+                disabled={disabled}
+                confirmName={grade.gradeName || grade.gradeCode || "grade"}
+                onChange={(isActive) => {
+                  const next = [...grades];
+                  next[idx] = { ...grade, isActive };
+                  onChange(next);
+                }}
+              />
+            ) : (
+              <IconButton
+                size="small"
+                disabled={disabled}
+                onClick={() => onChange(grades.filter((_, i) => i !== idx))}
+                sx={{ alignSelf: "flex-end" }}
+                aria-label="Remove grade"
+              >
+                <icons.Delete fontSize="small" />
+              </IconButton>
+            )}
           </Box>
           <Typography variant="caption" color="text.secondary" sx={{ display: "block", mb: 1 }}>
             Grade specifications
@@ -273,6 +359,8 @@ const GradeEditor = ({
             specs={grade.specifications}
             disabled={disabled}
             isEdit={isEdit}
+            showErrors={showErrors}
+            specErrors={rawErr?.specifications}
             theme={theme}
             unitOptions={unitOptions}
             onChange={(specifications) => {
@@ -282,7 +370,8 @@ const GradeEditor = ({
             }}
           />
         </Box>
-      ))}
+      );
+      })}
       <Button
         size="small"
         startIcon={<icons.projectMgmt.add />}
@@ -301,6 +390,7 @@ const MaterialsMasterFormDialog = ({
   isEdit,
   form,
   saving,
+  existingCodes = [],
   onClose,
   onSave,
   onChange,
@@ -311,11 +401,42 @@ const MaterialsMasterFormDialog = ({
   const flowBar = fieldTheme.manufacturing?.casePreparation?.flowBar ?? {};
   const { options: unitOptions } = useUnitMasterOptions(open);
   const { modal } = t;
+  const [showErrors, setShowErrors] = useState(false);
   const recordLabel = form.materialName.trim() || form.materialCode.trim() || "record";
   const showMaterialFields =
     isEdit ||
     form.rawMaterialType === "NORMAL" ||
     (form.rawMaterialType === "ACEM" && Boolean(form.preparationType));
+  const fieldErrors = useMemo(
+    () => getMaterialsFormFieldErrors(form, isEdit, existingCodes),
+    [form, isEdit, existingCodes],
+  );
+  const materialCodeError = visibleValidationError(
+    fieldErrors.materialCode,
+    form.materialCode.trim().length > 0,
+    showErrors,
+  );
+  const materialNameError = visibleValidationError(
+    fieldErrors.materialName,
+    form.materialName.trim().length > 0,
+    showErrors,
+  );
+
+  useEffect(() => {
+    if (!open) setShowErrors(false);
+  }, [open]);
+
+  const handleSave = () => {
+    setShowErrors(true);
+    const err = getMaterialsFormValidationMessage(
+      getMaterialsFormFieldErrors(form, isEdit, existingCodes),
+    );
+    if (err) {
+      useAlertStore.getState().showValidationAlert(err);
+      return;
+    }
+    onSave();
+  };
 
   return (
     <Dialog
@@ -389,6 +510,8 @@ const MaterialsMasterFormDialog = ({
                 value={form.materialCode}
                 disabled={saving || isEdit}
                 required
+                error={Boolean(materialCodeError)}
+                helperText={materialCodeError ?? null}
                 width={180}
                 theme={fieldTheme}
                 onChange={(value) => onChange({ ...form, materialCode: value })}
@@ -398,6 +521,8 @@ const MaterialsMasterFormDialog = ({
                 value={form.materialName}
                 disabled={saving}
                 required
+                error={Boolean(materialNameError)}
+                helperText={materialNameError ?? null}
                 width={320}
                 theme={fieldTheme}
                 onChange={(value) => onChange({ ...form, materialName: value })}
@@ -413,25 +538,32 @@ const MaterialsMasterFormDialog = ({
                 theme={fieldTheme}
                 onChange={(value) => onChange({ ...form, materialType: value as "SOLID" | "LIQUID" })}
               />
-              <Box sx={{ display: "flex", alignItems: "center", gap: 1, pt: 2.5, minWidth: 120 }}>
-                <Typography variant="body2">{S.FORM.ACTIVE_LABEL}</Typography>
-                <Switch
-                  size="small"
-                  checked={form.isActive}
-                  disabled={saving}
-                  onChange={(e) => onChange({ ...form, isActive: e.target.checked })}
-                  sx={masterDataActiveSwitchSx(form.isActive)}
-                />
-              </Box>
+              <MasterDataEnableDisableField
+                checked={form.isActive}
+                disabled={saving}
+                minWidth={120}
+                confirmName={form.materialName || form.materialCode || "material"}
+                onChange={(isActive) => onChange({ ...form, isActive })}
+              />
             </Box>
           </Box>
 
           <Box>
             <Typography sx={modal.fieldLabel}>Grades</Typography>
+            {isEdit ? (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                {S.MATERIALS.EDIT_NESTED_HINT}
+              </Typography>
+            ) : null}
+            {showErrors && fieldErrors.form ? (
+              <Typography variant="body2" color="error" sx={{ mb: 1 }}>{fieldErrors.form}</Typography>
+            ) : null}
             <GradeEditor
               grades={form.grades}
               disabled={saving}
               isEdit={isEdit}
+              showErrors={showErrors}
+              gradeErrors={fieldErrors.grades}
               theme={fieldTheme}
               unitOptions={unitOptions}
               onChange={(grades) => onChange({ ...form, grades })}
@@ -439,11 +571,13 @@ const MaterialsMasterFormDialog = ({
           </Box>
 
           <Box>
-            <Typography sx={modal.fieldLabel}>Top-level specifications</Typography>
+            <Typography sx={modal.fieldLabel}>Specifications</Typography>
             <SpecEditor
               specs={form.specifications}
               disabled={saving}
               isEdit={isEdit}
+              showErrors={showErrors}
+              specErrors={fieldErrors.specifications}
               theme={fieldTheme}
               unitOptions={unitOptions}
               onChange={(specifications) => onChange({ ...form, specifications })}
@@ -458,7 +592,7 @@ const MaterialsMasterFormDialog = ({
         <Button onClick={() => !saving && onClose()} sx={modal.cancelButton}>
           {S.FORM.CANCEL}
         </Button>
-        <Button variant="contained" onClick={onSave} disabled={saving} sx={modal.saveButton}>
+        <Button variant="contained" onClick={handleSave} disabled={saving} sx={modal.saveButton}>
           {saving ? (
             <>
               <CircularProgress size={14} sx={modal.savingSpinner} />

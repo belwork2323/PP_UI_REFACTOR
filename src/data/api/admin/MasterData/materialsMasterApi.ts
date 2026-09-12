@@ -12,3 +12,6 @@ export const updateMaterialsMaster = (payload: Record<string, unknown>) =>
 
 export const deleteMaterialsMaster = (payload: { materialId: number }) =>
   post(ADMIN_ENDPOINTS.MASTER_DATA.MATERIALS.DELETE, payload);
+
+export const enableMaterialsMaster = (payload: { materialId: number }) =>
+  post(ADMIN_ENDPOINTS.MASTER_DATA.MATERIALS.ENABLE, payload);

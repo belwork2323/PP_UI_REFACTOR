@@ -4,6 +4,10 @@ import {
   type MasterDataAuditFields,
   type MasterDataStats,
 } from "@data/models/admin/MasterData/MasterDataModel";
+import {
+  firstFieldErrorMessage,
+  validateMasterDataNameField,
+} from "@data/models/admin/MasterData/masterDataFieldValidators";
 
 export type MixingOperationForm = {
   operationId: number | null;
@@ -140,15 +144,37 @@ export const buildMixingCycleUpdatePayload = (form: MixingCycleFormState) => ({
 
 export const buildMixingCycleDeletePayload = (id: number) => ({ id });
 
-export const validateMixingCycleForm = (form: MixingCycleFormState): string | null => {
-  if (!form.mixingCycleName.trim()) return "Mixing cycle name is required";
-  if (form.motorStage === "" || Number.isNaN(Number(form.motorStage))) {
-    return "Motor stage is required";
-  }
-  for (const o of [...form.cycles.premixOperations, ...form.cycles.finalMixOperations]) {
-    if (!o.operationName.trim()) return "Operation name is required";
-  }
-  return null;
+export type MixingOperationFieldErrors = { operationName?: string };
+
+export type MixingCycleFieldErrors = {
+  mixingCycleName?: string;
+  motorStage?: string;
+  premixOperations?: MixingOperationFieldErrors[];
+  finalMixOperations?: MixingOperationFieldErrors[];
 };
+
+const mapOperationErrors = (ops: MixingOperationForm[]): MixingOperationFieldErrors[] =>
+  ops.map((op) => {
+    const err = validateMasterDataNameField(op.operationName, "Operation name");
+    return err ? { operationName: err } : {};
+  });
+
+export const getMixingCycleFieldErrors = (form: MixingCycleFormState): MixingCycleFieldErrors => {
+  const errors: MixingCycleFieldErrors = {};
+  const nameError = validateMasterDataNameField(form.mixingCycleName, "Mixing cycle name");
+  if (nameError) errors.mixingCycleName = nameError;
+  if (form.motorStage === "" || Number.isNaN(Number(form.motorStage))) {
+    errors.motorStage = "Motor stage is required";
+  }
+  errors.premixOperations = mapOperationErrors(form.cycles.premixOperations);
+  errors.finalMixOperations = mapOperationErrors(form.cycles.finalMixOperations);
+  return errors;
+};
+
+export const getMixingCycleValidationMessage = (errors: MixingCycleFieldErrors): string | null =>
+  firstFieldErrorMessage(errors);
+
+export const validateMixingCycleForm = (form: MixingCycleFormState): string | null =>
+  getMixingCycleValidationMessage(getMixingCycleFieldErrors(form));
 
 export { emptyMasterDataStats };

@@ -2,10 +2,13 @@ import { create } from "zustand";
 
 export type AlertSeverity = "info" | "success" | "warning" | "error";
 
+export type AlertDisplay = "dialog" | "snackbar";
+
 export type AlertShowOptions = {
   loading?: boolean;
   onCloseAction?: (() => void) | null;
   autoCloseMs?: number;
+  display?: AlertDisplay;
 };
 
 export type AlertState = {
@@ -13,12 +16,14 @@ export type AlertState = {
   message: string;
   severity: AlertSeverity;
   loading: boolean;
+  display: AlertDisplay;
   onCloseAction: (() => void) | null;
   showAlert: (
     message: string,
     severity?: AlertSeverity,
     options?: AlertShowOptions,
   ) => void;
+  showValidationAlert: (message: string) => void;
   hideAlert: () => void;
 };
 
@@ -29,10 +34,15 @@ export const useAlertStore = create<AlertState>()((set, get) => ({
   message: "",
   severity: "info",
   loading: false,
+  display: "dialog",
   onCloseAction: null,
 
   showAlert: (message, severity = "info", options = {}) => {
-    const effectiveOptions = { autoCloseMs: 2000, ...options };
+    const effectiveOptions = {
+      autoCloseMs: 2000,
+      display: "dialog" as AlertDisplay,
+      ...options,
+    };
 
     if (alertTimer) {
       clearTimeout(alertTimer);
@@ -44,6 +54,7 @@ export const useAlertStore = create<AlertState>()((set, get) => ({
       message,
       severity,
       loading: effectiveOptions.loading || false,
+      display: effectiveOptions.display,
       onCloseAction: effectiveOptions.onCloseAction || null,
     });
 
@@ -60,12 +71,17 @@ export const useAlertStore = create<AlertState>()((set, get) => ({
           message: "",
           severity: "info",
           loading: false,
+          display: "dialog",
           onCloseAction: null,
         });
 
         alertTimer = null;
       }, effectiveOptions.autoCloseMs);
     }
+  },
+
+  showValidationAlert: (message) => {
+    get().showAlert(message, "error", { display: "snackbar", autoCloseMs: 4000 });
   },
 
   hideAlert: () => {
@@ -85,6 +101,7 @@ export const useAlertStore = create<AlertState>()((set, get) => ({
       message: "",
       severity: "info",
       loading: false,
+      display: "dialog",
       onCloseAction: null,
     });
   },

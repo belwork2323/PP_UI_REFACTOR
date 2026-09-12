@@ -24,6 +24,10 @@ export const getMasterDataFieldLabel = (
 
 export const stripMasterTypeSuffix = (label: string) => label.replace(/\s+Master$/i, "").trim();
 
+/** Appends a trailing asterisk for required field labels in master data tables. */
+export const requiredFieldLabel = (label: string, required = false): string =>
+  required ? `${label} *` : label;
+
 export const getMasterDataAddButtonLabel = (
   selectedType: string,
   types: Array<{ type: string; label: string }>,

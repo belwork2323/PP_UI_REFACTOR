@@ -7,6 +7,7 @@ import {
   fetchMotorsStageListApi,
   fetchApprovedMotorsListApi,
   fetchMaterialLotsApi,
+  fetchInsulationTypeListApi,
 } from "../../data/api/users/operationsApi";
 import { ApiResponseModel } from "../../data/models/common/ApiResponseModel";
 import { normalizeListStatusFilter } from "../../hooks/operationStatus";
@@ -42,6 +43,11 @@ export type SolidProcessesPayload = {
 
 export type MaterialLotsPayload = {
   batchId: string;
+};
+
+export type InsulationTypeOption = {
+  insulationSpecId: number;
+  insulationType: string;
 };
 
 export const operationsController = {
@@ -160,6 +166,25 @@ export const operationsController = {
       );
     } catch (error) {
       console.error("Failed to fetch approved motors list:", error);
+      return new ApiResponseModel(error);
+    }
+  },
+
+  /** Active insulation types from master data (subdepartment insulation type-list API). */
+  fetchInsulationTypeList: async () => {
+    try {
+      const response = await fetchInsulationTypeListApi();
+      return new ApiResponseModel<InsulationTypeOption[]>(response, (res) => {
+        const rows = Array.isArray(res?.data) ? res.data : [];
+        return rows
+          .map((row: Record<string, unknown>) => ({
+            insulationSpecId: Number(row.insulationSpecId ?? 0),
+            insulationType: String(row.insulationType ?? "").trim(),
+          }))
+          .filter((row) => Boolean(row.insulationType));
+      });
+    } catch (error) {
+      console.error("Failed to fetch insulation type list:", error);
       return new ApiResponseModel(error);
     }
   },

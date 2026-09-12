@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useMasterDataActiveToggle } from "@hooks/admin/MasterData/useMasterDataActiveToggle";
 import { useAlertStore } from "@app/store/alertStore";
 import { STRINGS } from "@app/config/strings";
 import { ApiResponseModel } from "@data/models/common/ApiResponseModel";
@@ -54,7 +55,6 @@ export default function useMixingCycleMasterHook({
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [form, setForm] = useState<MixingCycleFormState>(createEmptyMixingCycleForm());
   const [saving, setSaving] = useState(false);
-  const [disableTarget, setDisableTarget] = useState<MixingCycleRecord | null>(null);
   const [disabling, setDisabling] = useState(false);
   const [enabling, setEnabling] = useState(false);
 
@@ -128,7 +128,7 @@ export default function useMixingCycleMasterHook({
     const isEdit = inlineMode === "edit";
     const err = validateMixingCycleForm(form);
     if (err) {
-      useAlertStore.getState().showAlert(err, "error");
+      useAlertStore.getState().showValidationAlert(err);
       return;
     }
     setSaving(true);
@@ -157,7 +157,7 @@ export default function useMixingCycleMasterHook({
     }
   };
 
-  const enableRecord = async (record: MixingCycleRecord) => {
+  const enableRecord = useCallback(async (record: MixingCycleRecord) => {
     setEnabling(true);
     useAlertStore.getState().showAlert(S.MESSAGES.ENABLING, "loading");
     try {
@@ -176,28 +176,17 @@ export default function useMixingCycleMasterHook({
     } finally {
       setEnabling(false);
     }
-  };
+  }, [loadList]);
 
-  const handleToggleActive = (record: MixingCycleRecord, nextActive: boolean) => {
-    if (inlineMode != null || saving || disabling || enabling) return;
-    if (nextActive) {
-      void enableRecord(record);
-      return;
-    }
-    setDisableTarget(record);
-  };
-
-  const confirmDisable = async () => {
-    if (!disableTarget) return;
+  const disableRecord = useCallback(async (record: MixingCycleRecord) => {
     setDisabling(true);
     useAlertStore.getState().showAlert(S.MESSAGES.DISABLING, "loading");
     try {
       const resp = new ApiResponseModel(
-        await deleteMixingCycleMaster(buildMixingCycleDeletePayload(disableTarget.id)),
+        await deleteMixingCycleMaster(buildMixingCycleDeletePayload(record.id)),
       );
       if (resp.success) {
         useAlertStore.getState().showAlert(S.MESSAGES.DISABLE_SUCCESS, "success");
-        setDisableTarget(null);
         await loadList();
       } else {
         useAlertStore.getState().showAlert(getMasterDataErrorMessage(resp, S.ERRORS.OPERATION_FAILED), "error");
@@ -209,7 +198,23 @@ export default function useMixingCycleMasterHook({
     } finally {
       setDisabling(false);
     }
-  };
+  }, [loadList]);
+
+  const canToggle = useCallback(
+    () => inlineMode == null && !saving && !disabling && !enabling,
+    [inlineMode, saving, disabling, enabling],
+  );
+
+  const {
+    toggleTarget,
+    handleToggleActive,
+    confirmToggle,
+    cancelToggle,
+  } = useMasterDataActiveToggle({
+    canToggle,
+    enableRecord,
+    disableRecord,
+  });
 
   return {
     items,
@@ -239,12 +244,12 @@ export default function useMixingCycleMasterHook({
     openEdit,
     closeInline,
     saveForm,
-    disableTarget,
-    setDisableTarget,
+    toggleTarget,
     disabling,
     enabling,
     handleToggleActive,
-    confirmDisable,
+    confirmToggle,
+    cancelToggle,
     refresh: loadList,
   };
 }

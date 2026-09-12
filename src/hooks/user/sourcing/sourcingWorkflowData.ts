@@ -134,7 +134,7 @@ export const INITIAL_ROCKET_FORM: RocketFormData = {
   receivingDate: "",
   itemsDescription: "",
   itemsDimension: "",
-  itemsUnit: "mm",
+  itemsUnit: "",
   greenCardNo: "",
   clearanceAuthority: "",
   clearanceStatus: "RECEIVED",

@@ -46,7 +46,6 @@ export const rocketMotorCasingFieldRules = {
   },
   itemsUnit: {
     valueType: "text" as const,
-    pattern: ALPHA_NUM,
     requiredIn: [] as ValidationTier[],
     messages: { required: M.itemsUnit.required, invalid: M.itemsUnit.invalid },
   },
@@ -279,15 +278,12 @@ function applyCasingNestedRules(
         c.parameters.some((p) => p.specificationCode === code),
       )?.category ?? "",
     ).toLowerCase();
-    const isMechanical = category.includes("mechanical");
     const isThermal = category.includes("thermal");
-    const row = isMechanical
-      ? form.mechanicalProperties[code]
-      : isThermal
-        ? form.thermalProperties[code]
-        : form.mechanicalProperties[code] ?? form.thermalProperties[code];
+    const row = isThermal
+      ? form.thermalProperties[code]
+      : form.mechanicalProperties[code] ?? form.thermalProperties[code];
 
-    if (isMechanical) {
+    if (!isThermal) {
       const reportedPath = `mechanicalProperties.${code}.reported`;
       const acemPath = `mechanicalProperties.${code}.acemSpec`;
       if (String(row?.reported ?? "").trim() && !isFiniteNumber(row?.reported)) {

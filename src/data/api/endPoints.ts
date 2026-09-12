@@ -69,12 +69,14 @@ export const ADMIN_ENDPOINTS = {
       CREATE: `${API_BASE}/admin/master-data/materials/create`,
       UPDATE: `${API_BASE}/admin/master-data/materials/update`,
       DELETE: `${API_BASE}/admin/master-data/materials/delete`,
+      ENABLE: `${API_BASE}/admin/master-data/materials/enable`,
     },
     INSULATION: {
       LIST: `${API_BASE}/admin/master-data/insulation-specifications/list`,
       CREATE: `${API_BASE}/admin/master-data/insulation-specifications/create`,
       UPDATE: `${API_BASE}/admin/master-data/insulation-specifications/update`,
       DELETE: `${API_BASE}/admin/master-data/insulation-specifications/delete`,
+      ENABLE: `${API_BASE}/admin/master-data/insulation-specifications/enable`,
     },
     MIXING_CYCLES: {
       LIST: `${API_BASE}/admin/master-data/mixing-cycles/list`,
@@ -212,10 +214,8 @@ export const SYSTEM = {
   EQUIPMENT_TYPE_LIST: `${API_BASE}/system/equipment-type-list`,
   /** GET — NDT / radiography beam energy master */
   ENERGY_BEAM_LIST: `${API_BASE}/system/energy-beam-list`,
-  /** GET — unit master; optional ?category= */
+  /** GET — unit master */
   UNIT_LIST: `${API_BASE}/system/unit-list`,
-  /** GET — backward-compat alias for ENERGY category */
-  ENERGY_UNIT_LIST: `${API_BASE}/system/energy-unit-list`,
   MIXING_CYCLES: `${API_BASE}/system/mixing-cycles`,
   /** POST body: `{ motorStage: "0" | "1" | "2" | "3" | "ALL" }` (string) */
   MIXING_CYCLE_LIST: `${API_BASE}/system/mixing-cycle-list`,
@@ -275,6 +275,7 @@ export const USER_OPERATIONS_ENDPOINTS = {
   APPROVED_MOTORS_LIST: `${API_BASE}/user/subdepartment/approved-motors-list`,
   CASTING_STATION_LIST: `${API_BASE}/user/subdepartment/casting-station`,
   MATERIAL_LOTS: `${API_BASE}/user/subdepartment/material-lots`,
+  INSULATION_TYPE_LIST: `${API_BASE}/user/subdepartment/insulation/type-list`,
   FETCH_SPECIFICATION: `${API_BASE}/user/subdepartment/insulation/specification-list`,
 };
 

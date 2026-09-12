@@ -4,7 +4,6 @@ import {
   Button,
   Divider,
   Paper,
-  Switch,
   Table,
   TableBody,
   TableCell,
@@ -18,9 +17,10 @@ import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
 import SkeletonRow from "@ui/components/common/SkeletonRow";
 import AppTextField from "@ui/components/common/AppTextField";
-import AppDropdown from "@ui/components/common/AppDropdown";
+import AppSearchableDropdown from "@ui/components/common/AppSearchableDropdown";
 import MasterDataTableToolbar from "./components/MasterDataTableToolbar";
-import MasterDataActiveSwitch, { masterDataActiveSwitchSx } from "./components/MasterDataActiveSwitch";
+import MasterDataActiveSwitch from "./components/MasterDataActiveSwitch";
+import MasterDataEnableDisableField from "./components/MasterDataEnableDisableField";
 import MasterDataActiveStatusChip from "./components/MasterDataActiveStatusChip";
 import {
   MASTER_DATA_AUDIT_COLUMN_COUNT,
@@ -32,14 +32,17 @@ import {
   formatMasterDataAttributeValue,
   getMasterDataAttributeOptions,
 } from "./masterDataAttributeOptions";
-import { getMasterDataFieldLabel } from "./masterDataLabels";
+import { getMasterDataFieldLabel, requiredFieldLabel } from "./masterDataLabels";
+import { visibleValidationError } from "./masterDataValidationUtils";
 import {
   getMasterDataFieldErrors,
+  validateMasterDataForm,
   type MasterDataFieldDef,
   type MasterDataFormState,
   type MasterDataRecord,
   type MasterDataTypeDescriptor,
 } from "@data/models/admin/MasterData/MasterDataModel";
+import { useAlertStore } from "@app/store/alertStore";
 
 const S = STRINGS.MASTER_DATA;
 
@@ -120,33 +123,41 @@ const MasterDataList = ({
 
   const visibleError = (key: string): string | undefined => {
     const err = fieldErrors[key];
-    if (!err) return undefined;
     const raw = key === "code" || key === "name" ? form[key] : form.attributes[key];
-    const hasValue = String(raw ?? "").trim() !== "";
-    const isRequiredOnly = err.endsWith(" is required");
-    if (isRequiredOnly) return showErrors ? err : undefined;
-    return hasValue || showErrors ? err : undefined;
+    return visibleValidationError(err, String(raw ?? "").trim() !== "", showErrors);
   };
 
   const handleSave = () => {
     setShowErrors(true);
+    const err = validateMasterDataForm(form, schema, false);
+    if (err) {
+      useAlertStore.getState().showValidationAlert(err);
+      return;
+    }
     onSaveInline();
   };
 
+  const codeField = schema?.fields?.find((f) => f.key === "code");
+  const nameField = schema?.fields?.find((f) => f.key === "name");
   const hideCodeColumn =
-    selectedType === "mixers" ||
-    Boolean(schema?.fields?.find((f) => f.key === "code")?.serverGenerated);
+    selectedType === "mixers" || Boolean(codeField?.serverGenerated);
+  const hideNameColumn = Boolean(nameField?.serverGenerated);
+  const codeRequired = !hideCodeColumn && !codeField?.serverGenerated;
   const colCount =
-    2 + attributeFields.length + 1 + MASTER_DATA_AUDIT_COLUMN_COUNT + (hideCodeColumn ? 0 : 1); // name, attrs..., active, audit, actions, [code]
+    (hideCodeColumn ? 0 : 1) +
+    (hideNameColumn ? 0 : 1) +
+    attributeFields.length +
+    MASTER_DATA_AUDIT_COLUMN_COUNT +
+    2;
 
   const renderAttributeInput = (field: MasterDataFieldDef) => {
     const dropdownOptions = getMasterDataAttributeOptions(selectedType, field, dynamicAttributeOptions);
     if (dropdownOptions) {
       return (
-        <AppDropdown
+        <AppSearchableDropdown
           compact
           fullWidth
-          placeholder={`Select ${getMasterDataFieldLabel(selectedType, field)}`}
+          placeholder={`Select ${requiredFieldLabel(getMasterDataFieldLabel(selectedType, field), Boolean(field.required))}`}
           value={String(form.attributes[field.key] ?? "")}
           onChange={(value) => onFormChange(field.key, value, true)}
           disabled={saving}
@@ -165,12 +176,24 @@ const MasterDataList = ({
         compact
         fullWidth
         type={isNumeric ? "number" : "text"}
-        placeholder={getMasterDataFieldLabel(selectedType, field)}
+        placeholder={requiredFieldLabel(
+          getMasterDataFieldLabel(selectedType, field),
+          Boolean(field.required),
+        )}
         value={form.attributes[field.key] ?? ""}
         onChange={(e) => {
           const v = e.target.value;
           if (isNumeric) {
-            onFormChange(field.key, v === "" ? "" : Number(v), true);
+            if (v === "") {
+              onFormChange(field.key, "", true);
+              return;
+            }
+            const num = Number(v);
+            if (!Number.isFinite(num)) return;
+            if (field.dataType === "INTEGER" && !Number.isInteger(num)) return;
+            if (field.min != null && num < field.min) return;
+            if (field.max != null && num > field.max) return;
+            onFormChange(field.key, num, true);
           } else {
             onFormChange(field.key, v, true);
           }
@@ -196,7 +219,7 @@ const MasterDataList = ({
           <AppTextField
             compact
             fullWidth
-            placeholder={S.TABLE.COL_CODE}
+            placeholder={requiredFieldLabel(S.TABLE.COL_CODE, codeRequired)}
             value={form.code}
             onChange={(e) => onFormChange("code", e.target.value)}
             disabled={saving}
@@ -206,19 +229,21 @@ const MasterDataList = ({
           />
         </TableCell>
       ) : null}
-      <TableCell sx={table.cell}>
-        <AppTextField
-          compact
-          fullWidth
-          placeholder={S.TABLE.COL_NAME}
-          value={form.name}
-          onChange={(e) => onFormChange("name", e.target.value)}
-          disabled={saving}
-          error={Boolean(visibleError("name"))}
-          helperText={visibleError("name")}
-          sx={cellSx}
-        />
-      </TableCell>
+      {!hideNameColumn ? (
+        <TableCell sx={table.cell}>
+          <AppTextField
+            compact
+            fullWidth
+            placeholder={requiredFieldLabel(S.TABLE.COL_NAME, true)}
+            value={form.name}
+            onChange={(e) => onFormChange("name", e.target.value)}
+            disabled={saving}
+            error={Boolean(visibleError("name"))}
+            helperText={visibleError("name")}
+            sx={cellSx}
+          />
+        </TableCell>
+      ) : null}
       {attributeFields.map((field) => (
         <TableCell key={field.key} sx={table.cell}>
           {renderAttributeInput(field)}
@@ -226,12 +251,17 @@ const MasterDataList = ({
       ))}
       <MasterDataAuditRowCells table={table} />
       <TableCell sx={table.cell}>
-        <Switch
-          size="small"
+        <MasterDataEnableDisableField
           checked={Boolean(form.isActive)}
-          onChange={(e) => onFormChange("isActive", e.target.checked)}
           disabled={saving}
-          sx={masterDataActiveSwitchSx(Boolean(form.isActive))}
+          confirmName={
+            hideNameColumn && form.attributes.motorStage !== "" && form.attributes.motorStage != null
+              ? `Stage ${form.attributes.motorStage}`
+              : form.name || form.code || "record"
+          }
+          labelVariant="caption"
+          minWidth={72}
+          onChange={(isActive) => onFormChange("isActive", isActive)}
         />
       </TableCell>
       <TableCell sx={table.cellActionsWrapper}>
@@ -269,12 +299,21 @@ const MasterDataList = ({
           <TableHead>
             <TableRow sx={table.headerRow}>
               {!hideCodeColumn ? (
-                <TableCell sx={table.headerCell}>{S.TABLE.COL_CODE}</TableCell>
+                <TableCell sx={table.headerCell}>
+                  {requiredFieldLabel(S.TABLE.COL_CODE, codeRequired)}
+                </TableCell>
               ) : null}
-              <TableCell sx={table.headerCell}>{S.TABLE.COL_NAME}</TableCell>
+              {!hideNameColumn ? (
+                <TableCell sx={table.headerCell}>
+                  {requiredFieldLabel(S.TABLE.COL_NAME, true)}
+                </TableCell>
+              ) : null}
               {attributeFields.map((field) => (
                 <TableCell key={field.key} sx={table.headerCell}>
-                  {getMasterDataFieldLabel(selectedType, field)}
+                  {requiredFieldLabel(
+                    getMasterDataFieldLabel(selectedType, field),
+                    Boolean(field.required),
+                  )}
                 </TableCell>
               ))}
               <MasterDataAuditHeaderCells table={table} />
@@ -305,9 +344,11 @@ const MasterDataList = ({
                       <Typography sx={table.bodyText}>{row.code}</Typography>
                     </TableCell>
                   ) : null}
-                  <TableCell sx={table.cell}>
-                    <Typography sx={table.bodyText}>{row.name}</Typography>
-                  </TableCell>
+                  {!hideNameColumn ? (
+                    <TableCell sx={table.cell}>
+                      <Typography sx={table.bodyText}>{row.name}</Typography>
+                    </TableCell>
+                  ) : null}
                   {attributeFields.map((field) => (
                     <TableCell key={field.key} sx={table.cell}>
                       <Typography sx={table.bodyText}>

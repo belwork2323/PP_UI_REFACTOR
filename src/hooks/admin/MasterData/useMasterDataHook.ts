@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useMasterDataActiveToggle } from "@hooks/admin/MasterData/useMasterDataActiveToggle";
 import { masterDataController } from "@controllers/admin/MasterData/masterDataController";
 import { useAlertStore } from "@app/store/alertStore";
 import { STRINGS } from "@app/config/strings";
@@ -41,7 +42,6 @@ export default function useMasterDataHook() {
   const [form, setForm] = useState<MasterDataFormState>(createEmptyMasterDataForm(null));
   const [saving, setSaving] = useState(false);
 
-  const [disableTarget, setDisableTarget] = useState<MasterDataRecord | null>(null);
   const [disabling, setDisabling] = useState(false);
   const [enabling, setEnabling] = useState(false);
 
@@ -173,7 +173,10 @@ export default function useMasterDataHook() {
   const saveForm = async () => {
     const isEdit = inlineMode === "edit";
     const err = validateMasterDataForm(form, schema, isEdit);
-    if (err) return;
+    if (err) {
+      useAlertStore.getState().showValidationAlert(err);
+      return;
+    }
 
     setSaving(true);
     useAlertStore.getState().showAlert(isEdit ? S.MESSAGES.UPDATING : S.MESSAGES.CREATING, "loading");
@@ -203,7 +206,7 @@ export default function useMasterDataHook() {
     }
   };
 
-  const enableRecord = async (record: MasterDataRecord) => {
+  const enableRecord = useCallback(async (record: MasterDataRecord) => {
     setEnabling(true);
     useAlertStore.getState().showAlert(S.MESSAGES.ENABLING, "loading");
     try {
@@ -224,26 +227,15 @@ export default function useMasterDataHook() {
     } finally {
       setEnabling(false);
     }
-  };
+  }, [loadList, schema, selectedType]);
 
-  const handleToggleActive = (record: MasterDataRecord, nextActive: boolean) => {
-    if (inlineMode != null || saving || disabling || enabling) return;
-    if (nextActive) {
-      void enableRecord(record);
-      return;
-    }
-    setDisableTarget(record);
-  };
-
-  const confirmDisable = async () => {
-    if (!disableTarget) return;
+  const disableRecord = useCallback(async (record: MasterDataRecord) => {
     setDisabling(true);
     useAlertStore.getState().showAlert(S.MESSAGES.DISABLING, "loading");
     try {
-      const resp = await masterDataController.disable(selectedType, disableTarget.id);
+      const resp = await masterDataController.disable(selectedType, record.id);
       if (resp.success) {
         useAlertStore.getState().showAlert(S.MESSAGES.DISABLE_SUCCESS, "success");
-        setDisableTarget(null);
         await loadList();
       } else {
         useAlertStore
@@ -257,7 +249,23 @@ export default function useMasterDataHook() {
     } finally {
       setDisabling(false);
     }
-  };
+  }, [loadList, selectedType]);
+
+  const canToggle = useCallback(
+    () => inlineMode == null && !saving && !disabling && !enabling,
+    [inlineMode, saving, disabling, enabling],
+  );
+
+  const {
+    toggleTarget,
+    handleToggleActive,
+    confirmToggle,
+    cancelToggle,
+  } = useMasterDataActiveToggle({
+    canToggle,
+    enableRecord,
+    disableRecord,
+  });
 
   const canSave = isMasterDataFormComplete(form, schema, inlineMode === "edit");
 
@@ -308,12 +316,12 @@ export default function useMasterDataHook() {
     closeInline,
     onFormChange,
     saveForm,
-    disableTarget,
-    setDisableTarget,
+    toggleTarget,
     disabling,
     enabling,
     handleToggleActive,
-    confirmDisable,
+    confirmToggle,
+    cancelToggle,
     refresh: () => {
       if (!selectedType) return;
       if (isNestedMasterDataType(selectedType)) {

@@ -1,4 +1,5 @@
-import React from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useAlertStore } from "@app/store/alertStore";
 import {
   Box,
   Button,
@@ -20,12 +21,13 @@ import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
-import ConfirmAlertDialog from "@ui/components/common/ConfirmAlertDialog";
+import MasterDataToggleConfirmDialog from "./components/MasterDataToggleConfirmDialog";
 import SkeletonRow from "@ui/components/common/SkeletonRow";
 import AppTextField from "@ui/components/common/AppTextField";
 import useCuringCycleMasterHook from "@hooks/admin/MasterData/useCuringCycleMasterHook";
 import MasterDataTableToolbar from "./components/MasterDataTableToolbar";
-import MasterDataActiveSwitch, { masterDataActiveSwitchSx } from "./components/MasterDataActiveSwitch";
+import MasterDataActiveSwitch from "./components/MasterDataActiveSwitch";
+import MasterDataEnableDisableField from "./components/MasterDataEnableDisableField";
 import MasterDataActiveStatusChip from "./components/MasterDataActiveStatusChip";
 import {
   MASTER_DATA_AUDIT_COLUMN_COUNT,
@@ -34,10 +36,14 @@ import {
 } from "./components/MasterDataAuditColumns";
 import {
   emptyCuringCycleStep,
+  getCuringCycleFieldErrors,
+  getCuringCycleValidationMessage,
+  type CuringCycleFieldErrors,
   type CuringCycleFormState,
   type CuringCycleListPayload,
   type CuringCycleStepForm,
 } from "@data/models/admin/MasterData/CuringCycleMasterModel";
+import { visibleValidationError } from "./masterDataValidationUtils";
 
 const S = STRINGS.MASTER_DATA;
 
@@ -131,13 +137,30 @@ const CuringFormFields = ({
   form,
   isEdit,
   saving,
+  showErrors,
+  fieldErrors,
   onChange,
 }: {
   form: CuringCycleFormState;
   isEdit: boolean;
   saving: boolean;
+  showErrors: boolean;
+  fieldErrors: CuringCycleFieldErrors;
   onChange: (next: CuringCycleFormState) => void;
-}) => (
+}) => {
+  const stageError = visibleValidationError(fieldErrors.motorStage, form.motorStage !== "", showErrors);
+  const stageNameError = visibleValidationError(
+    fieldErrors.motorStageName,
+    form.motorStageName.trim().length > 0,
+    showErrors,
+  );
+  const curingTypeError = visibleValidationError(
+    fieldErrors.curingType,
+    form.curingType.trim().length > 0,
+    showErrors,
+  );
+
+  return (
   <Box sx={{ p: 1.5, display: "flex", flexDirection: "column", gap: 1.5 }}>
     <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
       <AppTextField
@@ -146,6 +169,8 @@ const CuringFormFields = ({
         label="Motor stage"
         value={form.motorStage}
         disabled={saving || isEdit}
+        error={Boolean(stageError)}
+        helperText={stageError}
         onChange={(e) =>
           onChange({ ...form, motorStage: e.target.value === "" ? "" : Number(e.target.value) })
         }
@@ -156,6 +181,8 @@ const CuringFormFields = ({
         label="Stage name"
         value={form.motorStageName}
         disabled={saving}
+        error={Boolean(stageNameError)}
+        helperText={stageNameError}
         onChange={(e) => onChange({ ...form, motorStageName: e.target.value })}
         sx={{ minWidth: 160 }}
       />
@@ -164,6 +191,8 @@ const CuringFormFields = ({
         label="Curing type"
         value={form.curingType}
         disabled={saving}
+        error={Boolean(curingTypeError)}
+        helperText={curingTypeError}
         onChange={(e) => onChange({ ...form, curingType: e.target.value })}
         sx={{ minWidth: 180, flex: 1 }}
       />
@@ -176,16 +205,12 @@ const CuringFormFields = ({
           onChange={(e) => onChange({ ...form, showPropellantPressure: e.target.checked })}
         />
       </Box>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-        <Typography variant="body2">Active</Typography>
-        <Switch
-          size="small"
-          checked={form.isActive}
-          disabled={saving}
-          onChange={(e) => onChange({ ...form, isActive: e.target.checked })}
-          sx={masterDataActiveSwitchSx(form.isActive)}
-        />
-      </Box>
+      <MasterDataEnableDisableField
+        checked={form.isActive}
+        disabled={saving}
+        confirmName={`${form.curingType} (stage ${form.motorStage})`}
+        onChange={(isActive) => onChange({ ...form, isActive })}
+      />
     </Box>
     <Divider />
     <Typography variant="subtitle2">Cycle steps</Typography>
@@ -195,7 +220,8 @@ const CuringFormFields = ({
       onChange={(cycles) => onChange({ ...form, cycles })}
     />
   </Box>
-);
+  );
+};
 
 const CuringCycleMasterPanel = ({
   activeFilter,
@@ -215,6 +241,27 @@ const CuringCycleMasterPanel = ({
   });
   const { table, tableCell } = t;
   const columnCount = 6 + MASTER_DATA_AUDIT_COLUMN_COUNT;
+  const [showErrors, setShowErrors] = useState(false);
+  const fieldErrors = useMemo(
+    () => getCuringCycleFieldErrors(hook.form, false, hook.items),
+    [hook.form, hook.items],
+  );
+
+  useEffect(() => {
+    if (hook.inlineMode) setShowErrors(false);
+  }, [hook.inlineMode]);
+
+  const handleSave = () => {
+    setShowErrors(true);
+    const err = getCuringCycleValidationMessage(
+      getCuringCycleFieldErrors(hook.form, false, hook.items),
+    );
+    if (err) {
+      useAlertStore.getState().showValidationAlert(err);
+      return;
+    }
+    void hook.saveForm();
+  };
 
   return (
     <Box>
@@ -236,7 +283,7 @@ const CuringCycleMasterPanel = ({
                 <TableCell sx={table.headerCell}>Type</TableCell>
                 <TableCell sx={table.headerCell}>Steps</TableCell>
                 <MasterDataAuditHeaderCells table={table} />
-                <TableCell sx={table.headerCell}>Active</TableCell>
+                <TableCell sx={table.headerCell}>{S.TABLE.COL_ACTIVE}</TableCell>
                 <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>{S.TABLE.COL_ACTIONS}</TableCell>
               </TableRow>
             </TableHead>
@@ -318,6 +365,8 @@ const CuringCycleMasterPanel = ({
                       form={hook.form}
                       isEdit={false}
                       saving={hook.saving}
+                      showErrors={showErrors}
+                      fieldErrors={fieldErrors}
                       onChange={hook.setForm}
                     />
                     <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", p: 1.5, pt: 0 }}>
@@ -327,7 +376,7 @@ const CuringCycleMasterPanel = ({
                       <Button
                         size="small"
                         variant="contained"
-                        onClick={() => void hook.saveForm()}
+                        onClick={handleSave}
                         disabled={hook.saving}
                         sx={t.pageHeader?.newProjectButton}
                       >
@@ -363,21 +412,18 @@ const CuringCycleMasterPanel = ({
         </Button>
       </Box>
 
-      <ConfirmAlertDialog
-        open={!!hook.disableTarget}
-        title={S.DISABLE_DIALOG.TITLE}
-        message={
-          hook.disableTarget
-            ? S.DISABLE_DIALOG.BODY(
-                `${hook.disableTarget.curingType} (stage ${hook.disableTarget.motorStage})`,
-              )
-            : ""
+      <MasterDataToggleConfirmDialog
+        target={
+          hook.toggleTarget
+            ? {
+                name: `${hook.toggleTarget.record.curingType} (stage ${hook.toggleTarget.record.motorStage})`,
+                nextActive: hook.toggleTarget.nextActive,
+              }
+            : null
         }
-        confirmLabel={hook.disabling ? S.DISABLE_DIALOG.DISABLING : S.DISABLE_DIALOG.CONFIRM}
-        cancelLabel={S.DISABLE_DIALOG.CANCEL}
-        onConfirm={hook.confirmDisable}
-        onCancel={() => !hook.disabling && hook.setDisableTarget(null)}
-        confirmDisabled={hook.disabling}
+        busy={hook.disabling || hook.enabling}
+        onConfirm={() => void hook.confirmToggle()}
+        onCancel={hook.cancelToggle}
       />
     </Box>
   );

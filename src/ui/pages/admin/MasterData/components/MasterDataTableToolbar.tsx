@@ -11,6 +11,7 @@ type Props = {
   onSearchChange: (value: string) => void;
   onRefresh: () => void;
   refreshDisabled?: boolean;
+  searchPlaceholder?: string;
   t: any;
 };
 
@@ -19,6 +20,7 @@ const MasterDataTableToolbar = ({
   onSearchChange,
   onRefresh,
   refreshDisabled = false,
+  searchPlaceholder,
   t,
 }: Props) => {
   const searchTheme = t.batchListShell?.inputs;
@@ -38,7 +40,7 @@ const MasterDataTableToolbar = ({
         margin="none"
         value={search}
         onChange={(e) => onSearchChange(e.target.value)}
-        placeholder={S.TOOLBAR.SEARCH_PLACEHOLDER}
+        placeholder={searchPlaceholder ?? S.TOOLBAR.SEARCH_PLACEHOLDER}
         sx={{
           ...(searchTheme?.search ?? t.searchField),
           m: 0,

@@ -24,7 +24,6 @@ import CasingInsulationReportUpload from "./CasingInsulationReportUpload";
 import StackRow from "../../../../../components/common/StackRow";
 import { STRINGS } from "../../../../../../app/config/strings";
 import {
-  type InsulationType,
   CASING_DETECTOR_TYPE_OPTIONS,
   DIM_READING_KEYS,
   type RocketMotorCasingFormData,
@@ -36,6 +35,7 @@ import {
   createEmptyMockTrialSlot,
   createInitialThermalProperties,
   createInitialMechanicalProperties,
+  isThermalSpecificationCategory,
 } from "../../../../../../data/models/user/RocketMotorCasingFormModel";
 import { isCasingIdentificationComplete, isCasingFieldRequired } from "../../../../../../data/validation/adapters/rocketMotorCasing.validation";
 import CasingFormStepNav from "./CasingFormStepNav";
@@ -48,6 +48,7 @@ import {
   ReceiptStatusField,
   SectionCard,
   ProjectSelectField,
+  SearchableSelectField,
   SelectField,
   SpecRangeChip,
   SubsectionTitle,
@@ -121,14 +122,32 @@ const MotorCasingCreateForm = ({
   const patch = (partial: Partial<RocketMotorCasingFormData>) =>
     setForm((prev) => ({ ...prev, ...partial }));
 
+  const insulationTypeOptions = useMemo(
+    () =>
+      lookups.insulationTypes.map((item) => ({
+        value: item.insulationType,
+        label: item.insulationType,
+      })),
+    [lookups.insulationTypes],
+  );
+
+  const itemsUnitOptions = useMemo(() => {
+    const current = form.itemsUnit.trim();
+    const base = lookups.unitOptions;
+    if (current && !base.some((option) => option.value === current)) {
+      return [{ value: current, label: current }, ...base];
+    }
+    return base;
+  }, [lookups.unitOptions, form.itemsUnit]);
+
   const onInsulationTypeChange = (type: string) => {
-    const next = type === "ROCASIN" || type === "EPDM" ? (type as InsulationType) : ("" as const);
+    const next = type.trim();
     setForm((prev) => ({
       ...prev,
       insulationType: next,
-      ...(next
-        ? {}
-        : { mechanicalProperties: {}, thermalProperties: {}, insulationSpecifications: null }),
+      insulationSpecifications: null,
+      mechanicalProperties: {},
+      thermalProperties: {},
     }));
   };
   useEffect(() => {
@@ -244,11 +263,9 @@ const MotorCasingCreateForm = ({
   const canAdvanceFromStep = step !== 0 || identificationComplete;
   const specifications = form.insulationSpecifications?.specifications ?? [];
 
-  const mechanicalSpec =
-    specifications.find((x) => x.category === "Rubber Mechanical Properties")?.parameters ?? [];
-
-  const thermalSpec =
-    specifications.find((x) => x.category === "Rubber Thermal Properties")?.parameters ?? [];
+  const specificationCategories = specifications.filter(
+    (category) => (category.parameters ?? []).length > 0,
+  );
   const handleStepBack = () => {
     setStepError(null);
     setStep((s) => Math.max(0, s - 1));
@@ -664,10 +681,13 @@ const MotorCasingCreateForm = ({
                 theme={theme}
                 error={validationErrors.itemsDimension}
               />
-              <TextFieldField
+              <SearchableSelectField
                 label={S.UNIT}
                 value={form.itemsUnit}
                 onChange={(v) => patch({ itemsUnit: v })}
+                options={itemsUnitOptions}
+                placeholder={S.SELECT_UNIT}
+                loading={lookups.loading}
                 theme={theme}
                 error={validationErrors.itemsUnit}
               />
@@ -750,10 +770,7 @@ const MotorCasingCreateForm = ({
                 required={req("insulationType")}
                 value={form.insulationType}
                 onChange={onInsulationTypeChange}
-                options={[
-                  { value: "ROCASIN", label: S.ROCASIN },
-                  { value: "EPDM", label: S.EPDM },
-                ]}
+                options={insulationTypeOptions}
                 placeholder={S.SELECT_INSULATION_TYPE}
                 theme={theme}
                 error={validationErrors.insulationType}
@@ -788,112 +805,85 @@ const MotorCasingCreateForm = ({
                 }
               />
             </Box>
-            {mechanicalSpec.length > 0 && (
-              <>
-                <Box sx={cf.divider} />
-                <SubsectionTitle cf={cf}>{S.MECH_PROPERTIES}</SubsectionTitle>
-                <PropertiesTable
-                  theme={theme}
-                  columns={[
-                    S.COL_PARAMETER,
-                    S.COL_SPECIFICATION,
-                    S.REPORTED,
-                    { label: S.TEST_RESULT_ACEM, required: true },
-                  ]}
-                  rows={mechanicalSpec.map((item) => (
-                    <tr key={item.specificationCode}>
-                      <td>{`${item.specificationName ?? item.specificationCode ?? "—"} (${item.referenceRange?.unit ?? "—"})`}</td>
-                      <td>
-                        <Chip
-                          size="small"
-                          label={`${item.referenceRange?.minValue ?? "—"} - ${item.referenceRange?.maxValue ?? "—"}`}
-                          sx={theme.workflow.formElements.cellField}
-                        />
-                      </td>
+            {specificationCategories.map((category) => {
+              const thermal = isThermalSpecificationCategory(category.category);
+              const propertyPrefix = thermal ? "thermalProperties" : "mechanicalProperties";
+              const parameters = category.parameters ?? [];
 
-                      <td>
-                        <CasingDeferredInput
-                          size="small"
-                          fullWidth
-                          type="number"
-                          value={form.mechanicalProperties[item.specificationCode]?.reported ?? ""}
-                          onChange={(value) =>
-                            updateMech(item.specificationCode, "reported", value)
-                          }
-                          error={Boolean(validationErrors[`mechanicalProperties.${item.specificationCode}.reported`])}
-                          sx={theme.workflow.formElements.cellField}
-                        />
-                      </td>
+              return (
+                <React.Fragment key={category.category}>
+                  <Box sx={cf.divider} />
+                  <SubsectionTitle cf={cf}>{category.category}</SubsectionTitle>
+                  <PropertiesTable
+                    theme={theme}
+                    columns={[
+                      S.COL_PARAMETER,
+                      S.COL_SPECIFICATION,
+                      S.REPORTED,
+                      thermal
+                        ? { label: S.TEST_RESULT_ACEM, required: false }
+                        : { label: S.TEST_RESULT_ACEM, required: true },
+                    ]}
+                    rows={parameters.map((item) => (
+                      <tr key={item.specificationCode}>
+                        <td>{`${item.specificationName ?? item.specificationCode ?? "—"} (${item.referenceRange?.unit ?? "—"})`}</td>
+                        <td>
+                          <Chip
+                            size="small"
+                            label={`${item.referenceRange?.minValue ?? "—"} - ${item.referenceRange?.maxValue ?? "—"}`}
+                            sx={theme.workflow.formElements.cellField}
+                          />
+                        </td>
 
-                      <td>
-                        <CasingDeferredInput
-                          size="small"
-                          fullWidth
-                          type="number"
-                          value={form.mechanicalProperties[item.specificationCode]?.acemSpec ?? ""}
-                          onChange={(value) =>
-                            updateMech(item.specificationCode, "acemSpec", value)
-                          }
-                          error={Boolean(validationErrors[`mechanicalProperties.${item.specificationCode}.acemSpec`])}
-                          sx={theme.workflow.formElements.cellField}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                />
-              </>
-            )}
-            {thermalSpec.length > 0 && (
-              <>
-                <Box sx={{ mt: 2 }} />
-                <SubsectionTitle cf={cf}>{S.THERMAL_PROPERTIES}</SubsectionTitle>
-                <PropertiesTable
-                  theme={theme}
-                  columns={[S.COL_PARAMETER, S.COL_SPECIFICATION, S.REPORTED, S.TEST_RESULT_ACEM]}
-                  rows={thermalSpec.map((item) => (
-                    <tr key={item.specificationCode}>
-                      <td>{`${item.specificationName ?? item.specificationCode ?? "—"} (${item.referenceRange?.unit ?? "—"})`}</td>
+                        <td>
+                          <CasingDeferredInput
+                            size="small"
+                            fullWidth
+                            type="number"
+                            value={
+                              thermal
+                                ? form.thermalProperties[item.specificationCode]?.reported ?? ""
+                                : form.mechanicalProperties[item.specificationCode]?.reported ?? ""
+                            }
+                            onChange={(value) =>
+                              thermal
+                                ? updateThermal(item.specificationCode, "reported", value)
+                                : updateMech(item.specificationCode, "reported", value)
+                            }
+                            error={Boolean(
+                              validationErrors[`${propertyPrefix}.${item.specificationCode}.reported`],
+                            )}
+                            sx={theme.workflow.formElements.cellField}
+                          />
+                        </td>
 
-                      <td>
-                        <Chip
-                          size="small"
-                          label={`${item.referenceRange?.minValue ?? "—"} - ${item.referenceRange?.maxValue ?? "—"}`}
-                          sx={theme.workflow.formElements.cellField}
-                        />
-                      </td>
-
-                      <td>
-                        <CasingDeferredInput
-                          size="small"
-                          fullWidth
-                          type="number"
-                          value={form.thermalProperties[item.specificationCode]?.reported ?? ""}
-                          onChange={(value) =>
-                            updateThermal(item.specificationCode, "reported", value)
-                          }
-                          error={Boolean(validationErrors[`thermalProperties.${item.specificationCode}.reported`])}
-                          sx={theme.workflow.formElements.cellField}
-                        />
-                      </td>
-
-                      <td>
-                        <CasingDeferredInput
-                          size="small"
-                          fullWidth
-                          type="number"
-                          value={form.thermalProperties[item.specificationCode]?.acemSpec ?? ""}
-                          onChange={(value) =>
-                            updateThermal(item.specificationCode, "acemSpec", value)
-                          }
-                          error={Boolean(validationErrors[`thermalProperties.${item.specificationCode}.acemSpec`])}
-                          sx={theme.workflow.formElements.cellField}
-                        />
-                      </td>
-                    </tr>
-                  ))}
-                />
-              </>
-            )}
+                        <td>
+                          <CasingDeferredInput
+                            size="small"
+                            fullWidth
+                            type="number"
+                            value={
+                              thermal
+                                ? form.thermalProperties[item.specificationCode]?.acemSpec ?? ""
+                                : form.mechanicalProperties[item.specificationCode]?.acemSpec ?? ""
+                            }
+                            onChange={(value) =>
+                              thermal
+                                ? updateThermal(item.specificationCode, "acemSpec", value)
+                                : updateMech(item.specificationCode, "acemSpec", value)
+                            }
+                            error={Boolean(
+                              validationErrors[`${propertyPrefix}.${item.specificationCode}.acemSpec`],
+                            )}
+                            sx={theme.workflow.formElements.cellField}
+                          />
+                        </td>
+                      </tr>
+                    ))}
+                  />
+                </React.Fragment>
+              );
+            })}
 
             <Box sx={cf.divider} />
             <Box sx={cf.ndtSection}>
