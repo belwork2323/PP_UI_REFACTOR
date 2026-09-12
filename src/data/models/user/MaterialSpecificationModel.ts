@@ -1,6 +1,7 @@
 export type ReferenceRangeModel = {
   minValue: number | null;
   maxValue: number | null;
+  unitId: number | null;
   unit: string | null;
 };
 
@@ -26,10 +27,14 @@ export class MaterialSpecificationItemModel {
     this.specificationName = String(
       payload.specificationName ?? raw.specification_name ?? raw.name ?? ""
     ).trim();
+    const rawRange = (payload.referenceRange ?? raw.referenceRange) as Record<string, unknown> | undefined;
     this.referenceRange = {
-      minValue: payload.referenceRange?.minValue ?? null,
-      maxValue: payload.referenceRange?.maxValue ?? null,
-      unit: payload.referenceRange?.unit ?? null,
+      minValue: payload.referenceRange?.minValue ?? (rawRange?.minValue as number | null) ?? null,
+      maxValue: payload.referenceRange?.maxValue ?? (rawRange?.maxValue as number | null) ?? null,
+      unitId:
+        payload.referenceRange?.unitId ??
+        (rawRange?.unitId == null || rawRange?.unitId === "" ? null : Number(rawRange.unitId)),
+      unit: (payload.referenceRange?.unit ?? rawRange?.unit ?? null) as string | null,
     };
   }
 

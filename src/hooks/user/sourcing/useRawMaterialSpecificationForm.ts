@@ -90,6 +90,7 @@ function specRowsFromApi(targetSpecs: MaterialSpecificationItemModel[] = []): Sp
     referenceRange: {
       minValue: specification.referenceRange.minValue,
       maxValue: specification.referenceRange.maxValue,
+      unitId: specification.referenceRange.unitId,
       unit: specification.referenceRange.unit,
     },
   }));

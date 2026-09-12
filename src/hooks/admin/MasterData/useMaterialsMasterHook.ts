@@ -57,6 +57,7 @@ export default function useMaterialsMasterHook({
   const [disableTarget, setDisableTarget] = useState<MaterialsMasterRecord | null>(null);
   const [disabling, setDisabling] = useState(false);
   const [enabling, setEnabling] = useState(false);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -246,6 +247,8 @@ export default function useMaterialsMasterHook({
     setDisableTarget,
     disabling,
     enabling,
+    expandedId,
+    setExpandedId,
     handleToggleActive,
     confirmDisable,
     refresh: loadList,

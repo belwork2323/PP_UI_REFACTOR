@@ -23,9 +23,12 @@ export type PreparationTypeValue =
   | "AP ultrafine";
 
 export const RAW_MATERIAL_TYPE_OPTIONS: { value: RawMaterialTypeValue; label: string }[] = [
-  { value: "NORMAL", label: "Normal raw material" },
-  { value: "ACEM", label: "ACEM raw material" },
+  { value: "NORMAL", label: "Non ACEM" },
+  { value: "ACEM", label: "ACEM materials" },
 ];
+
+export const getRawMaterialCategoryLabel = (type: RawMaterialTypeValue): string =>
+  type === "ACEM" ? "ACEM materials" : "Non ACEM";
 
 export const PREPARATION_TYPE_OPTIONS: { value: PreparationTypeValue; label: string }[] = [
   { value: "ADDUCT", label: "ADDUCT" },
@@ -177,20 +180,34 @@ export const mapMaterialRecordToForm = (record: MaterialsMasterRecord): Material
   })),
 });
 
-const serializeSpec = (s: MaterialSpecForm) => ({
-  specificationCode: s.specificationCode.trim(),
-  specificationName: s.specificationName.trim(),
-  referenceRange: serializeReferenceRange(s.referenceRange),
-});
+const validateSpecReferenceRange = (range: MaterialSpecForm["referenceRange"]): string | null => {
+  const hasRange = range.minValue != null || range.maxValue != null;
+  if (hasRange && range.unitId == null && !String(range.unit ?? "").trim()) {
+    return "Unit is required when min or max is provided";
+  }
+  return null;
+};
 
-const serializeGrade = (g: MaterialGradeForm) => ({
+const serializeSpec = (s: MaterialSpecForm, isEdit: boolean) => {
+  const payload: Record<string, unknown> = {
+    specificationName: s.specificationName.trim(),
+    referenceRange: serializeReferenceRange(s.referenceRange),
+  };
+  const code = s.specificationCode.trim();
+  if (isEdit || code) {
+    payload.specificationCode = code;
+  }
+  return payload;
+};
+
+const serializeGrade = (g: MaterialGradeForm, isEdit: boolean) => ({
   gradeId: g.gradeId.trim() || undefined,
   gradeCode: g.gradeCode.trim(),
   gradeName: g.gradeName.trim(),
-  specifications: (g.specifications ?? []).map(serializeSpec),
+  specifications: (g.specifications ?? []).map((s) => serializeSpec(s, isEdit)),
 });
 
-const buildMaterialsPayloadBody = (form: MaterialsMasterFormState) => {
+const buildMaterialsPayloadBody = (form: MaterialsMasterFormState, isEdit: boolean) => {
   const rawMaterialType = form.rawMaterialType === "ACEM" ? "ACEM" : "NORMAL";
   const body: Record<string, unknown> = {
     materialCode: form.materialCode.trim(),
@@ -198,8 +215,8 @@ const buildMaterialsPayloadBody = (form: MaterialsMasterFormState) => {
     materialType: form.materialType,
     rawMaterialType,
     isActive: form.isActive,
-    grades: form.grades.map(serializeGrade),
-    specifications: form.specifications.map(serializeSpec),
+    grades: form.grades.map((g) => serializeGrade(g, isEdit)),
+    specifications: form.specifications.map((s) => serializeSpec(s, isEdit)),
   };
   if (rawMaterialType === "ACEM") {
     body.preparationType = form.preparationType;
@@ -208,11 +225,11 @@ const buildMaterialsPayloadBody = (form: MaterialsMasterFormState) => {
 };
 
 export const buildMaterialsCreatePayload = (form: MaterialsMasterFormState) =>
-  buildMaterialsPayloadBody(form);
+  buildMaterialsPayloadBody(form, false);
 
 export const buildMaterialsUpdatePayload = (form: MaterialsMasterFormState) => ({
   materialId: form.materialId,
-  ...buildMaterialsPayloadBody(form),
+  ...buildMaterialsPayloadBody(form, true),
 });
 
 export const buildMaterialsDeletePayload = (materialId: number) => ({ materialId });
@@ -225,7 +242,7 @@ export const validateMaterialsForm = (form: MaterialsMasterFormState, isEdit: bo
   }
   if (!form.materialName.trim()) return "Material name is required";
   if (form.rawMaterialType !== "NORMAL" && form.rawMaterialType !== "ACEM") {
-    return "Raw material type is required";
+    return "Category is required";
   }
   if (form.rawMaterialType === "ACEM") {
     if (!form.preparationType || !PREPARATION_TYPE_VALUES.has(form.preparationType)) {
@@ -242,13 +259,15 @@ export const validateMaterialsForm = (form: MaterialsMasterFormState, isEdit: bo
     if (!g.gradeCode.trim()) return "Grade code is required";
     if (!g.gradeName.trim()) return "Grade name is required";
     for (const s of g.specifications) {
-      if (!s.specificationCode.trim()) return "Specification code is required";
       if (!s.specificationName.trim()) return "Specification name is required";
+      const rangeErr = validateSpecReferenceRange(s.referenceRange);
+      if (rangeErr) return rangeErr;
     }
   }
   for (const s of form.specifications) {
-    if (!s.specificationCode.trim()) return "Specification code is required";
     if (!s.specificationName.trim()) return "Specification name is required";
+    const rangeErr = validateSpecReferenceRange(s.referenceRange);
+    if (rangeErr) return rangeErr;
   }
   return null;
 };

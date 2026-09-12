@@ -18,29 +18,57 @@ export const isNestedMasterDataType = (type: string): type is NestedMasterDataTy
 export type MasterDataReferenceRange = {
   minValue: number | null;
   maxValue: number | null;
+  unitId: number | null;
   unit: string;
 };
 
 export const emptyReferenceRange = (): MasterDataReferenceRange => ({
   minValue: null,
   maxValue: null,
+  unitId: null,
   unit: "",
 });
 
 export const parseReferenceRange = (raw: any): MasterDataReferenceRange => ({
   minValue: raw?.minValue == null || raw?.minValue === "" ? null : Number(raw.minValue),
   maxValue: raw?.maxValue == null || raw?.maxValue === "" ? null : Number(raw.maxValue),
+  unitId: raw?.unitId == null || raw?.unitId === "" ? null : Number(raw.unitId),
   unit: String(raw?.unit ?? ""),
 });
+
+export const formatMasterDataReferenceRangeLabel = (
+  range: MasterDataReferenceRange | null | undefined,
+): string => {
+  if (!range) return "N/A";
+  const unitSuffix = range.unit ? ` ${range.unit}` : "";
+  if (range.minValue != null && range.maxValue != null) {
+    return `${range.minValue} - ${range.maxValue}${unitSuffix}`;
+  }
+  if (range.minValue != null) {
+    return `>= ${range.minValue}${unitSuffix}`;
+  }
+  if (range.maxValue != null) {
+    return `<= ${range.maxValue}${unitSuffix}`;
+  }
+  return unitSuffix.trim() || "N/A";
+};
 
 export const serializeReferenceRange = (range: MasterDataReferenceRange | null | undefined) => {
   if (!range) return null;
   const hasAny =
-    range.minValue != null || range.maxValue != null || String(range.unit ?? "").trim() !== "";
+    range.minValue != null ||
+    range.maxValue != null ||
+    range.unitId != null ||
+    String(range.unit ?? "").trim() !== "";
   if (!hasAny) return null;
-  return {
+  const payload: Record<string, unknown> = {
     minValue: range.minValue,
     maxValue: range.maxValue,
-    unit: String(range.unit ?? "").trim() || null,
   };
+  if (range.unitId != null) {
+    payload.unitId = range.unitId;
+  } else if (String(range.unit ?? "").trim()) {
+    payload.unit = String(range.unit).trim();
+  }
+  return payload;
 };

@@ -3,7 +3,9 @@ import {
   Box,
   Button,
   Chip,
+  Collapse,
   Divider,
+  IconButton,
   Paper,
   Table,
   TableBody,
@@ -14,12 +16,20 @@ import {
   TableRow,
   Typography,
 } from "@mui/material";
+import ExpandLessIcon from "@mui/icons-material/ExpandLess";
+import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
 import ConfirmAlertDialog from "@ui/components/common/ConfirmAlertDialog";
 import SkeletonRow from "@ui/components/common/SkeletonRow";
 import useMaterialsMasterHook from "@hooks/admin/MasterData/useMaterialsMasterHook";
-import type { MaterialsMasterListPayload } from "@data/models/admin/MasterData/MaterialsMasterModel";
+import {
+  getRawMaterialCategoryLabel,
+  type MaterialsMasterListPayload,
+  type MaterialsMasterRecord,
+  type MaterialSpecForm,
+} from "@data/models/admin/MasterData/MaterialsMasterModel";
+import { formatMasterDataReferenceRangeLabel } from "@data/models/admin/MasterData/nestedMasterDataTypes";
 import MaterialsMasterFormDialog from "./MaterialsMasterFormDialog";
 import MasterDataTableToolbar from "./components/MasterDataTableToolbar";
 import MasterDataActiveSwitch from "./components/MasterDataActiveSwitch";
@@ -31,6 +41,52 @@ import {
 } from "./components/MasterDataAuditColumns";
 
 const S = STRINGS.MASTER_DATA;
+
+const renderSpecDetail = (spec: MaterialSpecForm) => (
+  <Typography key={spec.specificationCode || spec.specificationName} variant="body2" color="text.secondary">
+    {spec.specificationCode ? `${spec.specificationCode} — ` : ""}
+    {spec.specificationName}
+    {spec.referenceRange
+      ? ` (${formatMasterDataReferenceRangeLabel(spec.referenceRange)})`
+      : ""}
+  </Typography>
+);
+
+const MaterialExpandedDetails = ({
+  row,
+  onEdit,
+  disabled,
+}: {
+  row: MaterialsMasterRecord;
+  onEdit: () => void;
+  disabled?: boolean;
+}) => (
+  <Box sx={{ p: 1.5 }}>
+    {row.specifications.length > 0 ? (
+      <>
+        <Typography variant="subtitle2">Top-level specifications</Typography>
+        {row.specifications.map(renderSpecDetail)}
+      </>
+    ) : null}
+    {row.grades.map((grade) => (
+      <Box key={grade.gradeId || grade.gradeCode} sx={{ mt: row.specifications.length > 0 || grade !== row.grades[0] ? 1 : 0 }}>
+        <Typography variant="subtitle2">
+          {grade.gradeCode} — {grade.gradeName}
+        </Typography>
+        {grade.specifications.length > 0
+          ? grade.specifications.map(renderSpecDetail)
+          : (
+            <Typography variant="body2" color="text.secondary">
+              No specifications
+            </Typography>
+          )}
+      </Box>
+    ))}
+    <Button size="small" sx={{ mt: 1.5 }} disabled={disabled} onClick={onEdit}>
+      Edit
+    </Button>
+  </Box>
+);
 
 type Props = {
   activeFilter: "ALL" | "ACTIVE" | "INACTIVE";
@@ -61,7 +117,7 @@ const MaterialsMasterPanel = ({
   });
   const { table, tableCell } = t;
   const formOpen = hook.inlineMode != null;
-  const columnCount = 8 + MASTER_DATA_AUDIT_COLUMN_COUNT;
+  const columnCount = 9 + MASTER_DATA_AUDIT_COLUMN_COUNT;
 
   return (
     <Box>
@@ -78,10 +134,11 @@ const MaterialsMasterPanel = ({
           <Table size="small">
             <TableHead>
               <TableRow sx={table.headerRow}>
+                <TableCell sx={table.headerCell} />
                 <TableCell sx={table.headerCell}>Code</TableCell>
                 <TableCell sx={table.headerCell}>Name</TableCell>
                 <TableCell sx={table.headerCell}>Type</TableCell>
-                <TableCell sx={table.headerCell}>Raw type</TableCell>
+                <TableCell sx={table.headerCell}>Category</TableCell>
                 <TableCell sx={table.headerCell}>Grades</TableCell>
                 <TableCell sx={table.headerCell}>Specs</TableCell>
                 <MasterDataAuditHeaderCells table={table} />
@@ -99,44 +156,69 @@ const MaterialsMasterPanel = ({
                   </TableCell>
                 </TableRow>
               ) : (
-                hook.paginated.map((row) => (
-                  <TableRow key={row.materialId} sx={table.row}>
-                    <TableCell sx={table.cell}>
-                      <Typography sx={table.bodyText}>{row.materialCode}</Typography>
-                    </TableCell>
-                    <TableCell sx={table.cell}>
-                      <Typography sx={table.bodyText}>{row.materialName}</Typography>
-                    </TableCell>
-                    <TableCell sx={table.cell}>
-                      <Chip size="small" label={row.materialType} variant="outlined" />
-                    </TableCell>
-                    <TableCell sx={table.cell}>
-                      <Typography sx={table.bodyText}>
-                        {row.rawMaterialType === "ACEM" ? "ACEM" : "Normal"}
-                      </Typography>
-                      {row.rawMaterialType === "ACEM" && row.preparationType ? (
-                        <Typography variant="caption" color="text.secondary" display="block">
-                          {row.preparationType}
-                        </Typography>
-                      ) : null}
-                    </TableCell>
-                    <TableCell sx={table.cell}>{row.grades.length}</TableCell>
-                    <TableCell sx={table.cell}>{row.specifications.length}</TableCell>
-                    <MasterDataAuditRowCells record={row} table={table} />
-                    <TableCell sx={table.cell}>
-                      <MasterDataActiveStatusChip isActive={row.isActive} />
-                    </TableCell>
-                    <TableCell sx={table.cellActionsWrapper}>
-                      <Box sx={tableCell.actionsBox}>
-                        <MasterDataActiveSwitch
-                          isActive={row.isActive}
-                          disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
-                          onToggle={(nextActive) => hook.handleToggleActive(row, nextActive)}
-                        />
-                      </Box>
-                    </TableCell>
-                  </TableRow>
-                ))
+                hook.paginated.map((row) => {
+                  const expanded = hook.expandedId === row.materialId;
+                  return (
+                    <React.Fragment key={row.materialId}>
+                      <TableRow sx={table.row}>
+                        <TableCell sx={table.cell}>
+                          <IconButton
+                            size="small"
+                            onClick={() => hook.setExpandedId(expanded ? null : row.materialId)}
+                            disabled={formOpen}
+                          >
+                            {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                          </IconButton>
+                        </TableCell>
+                        <TableCell sx={table.cell}>
+                          <Typography sx={table.bodyText}>{row.materialCode}</Typography>
+                        </TableCell>
+                        <TableCell sx={table.cell}>
+                          <Typography sx={table.bodyText}>{row.materialName}</Typography>
+                        </TableCell>
+                        <TableCell sx={table.cell}>
+                          <Chip size="small" label={row.materialType} variant="outlined" />
+                        </TableCell>
+                        <TableCell sx={table.cell}>
+                          <Typography sx={table.bodyText}>
+                            {getRawMaterialCategoryLabel(row.rawMaterialType)}
+                          </Typography>
+                          {row.rawMaterialType === "ACEM" && row.preparationType ? (
+                            <Typography variant="caption" color="text.secondary" display="block">
+                              {row.preparationType}
+                            </Typography>
+                          ) : null}
+                        </TableCell>
+                        <TableCell sx={table.cell}>{row.grades.length}</TableCell>
+                        <TableCell sx={table.cell}>{row.specifications.length}</TableCell>
+                        <MasterDataAuditRowCells record={row} table={table} />
+                        <TableCell sx={table.cell}>
+                          <MasterDataActiveStatusChip isActive={row.isActive} />
+                        </TableCell>
+                        <TableCell sx={table.cellActionsWrapper}>
+                          <Box sx={tableCell.actionsBox}>
+                            <MasterDataActiveSwitch
+                              isActive={row.isActive}
+                              disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
+                              onToggle={(nextActive) => hook.handleToggleActive(row, nextActive)}
+                            />
+                          </Box>
+                        </TableCell>
+                      </TableRow>
+                      <TableRow>
+                        <TableCell colSpan={columnCount} sx={{ p: 0, border: 0 }}>
+                          <Collapse in={expanded} timeout="auto" unmountOnExit>
+                            <MaterialExpandedDetails
+                              row={row}
+                              disabled={hook.saving || formOpen}
+                              onEdit={() => hook.openEdit(row)}
+                            />
+                          </Collapse>
+                        </TableCell>
+                      </TableRow>
+                    </React.Fragment>
+                  );
+                })
               )}
             </TableBody>
           </Table>
@@ -166,7 +248,7 @@ const MaterialsMasterPanel = ({
 
       <MaterialsMasterFormDialog
         open={formOpen}
-        isEdit={false}
+        isEdit={hook.inlineMode === "edit"}
         form={hook.form}
         saving={hook.saving}
         onClose={hook.closeInline}

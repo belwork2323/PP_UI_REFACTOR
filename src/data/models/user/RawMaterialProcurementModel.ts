@@ -170,6 +170,7 @@ export type SpecRow = {
   referenceRange?: {
     minValue: number | null;
     maxValue: number | null;
+    unitId: number | null;
     unit: string | null;
   };
 };
@@ -217,6 +218,7 @@ export function parseApiReferenceRange(
     | {
         minValue?: ApiNumericValue;
         maxValue?: ApiNumericValue;
+        unitId?: number | null;
         unit?: string | null;
       }
     | null
@@ -225,6 +227,7 @@ export function parseApiReferenceRange(
   return {
     minValue: parseApiNumericValue(ref?.minValue ?? null),
     maxValue: parseApiNumericValue(ref?.maxValue ?? null),
+    unitId: ref?.unitId ?? null,
     unit: ref?.unit ?? null,
   };
 }
@@ -335,6 +338,7 @@ export type MaterialFormGroup = {
 export type ReferenceRangeShape = {
   minValue: number | null;
   maxValue: number | null;
+  unitId: number | null;
   unit: string | null;
 };
 
@@ -1158,6 +1162,7 @@ export function mapFirstBlockToLotUpdatePayload(
         referenceRange: {
           minValue: row.referenceRange?.minValue ?? null,
           maxValue: row.referenceRange?.maxValue ?? null,
+          unitId: row.referenceRange?.unitId ?? null,
           unit: row.referenceRange?.unit ?? null,
         },
         analysedResult: mapAnalysedResultForApi(row),

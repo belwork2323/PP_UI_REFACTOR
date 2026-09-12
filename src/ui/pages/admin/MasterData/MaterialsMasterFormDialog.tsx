@@ -31,7 +31,9 @@ import {
   type PreparationTypeValue,
   type RawMaterialTypeValue,
 } from "@data/models/admin/MasterData/MaterialsMasterModel";
+import useUnitMasterOptions from "@hooks/admin/MasterData/useUnitMasterOptions";
 import type { MasterDataReferenceRange } from "@data/models/admin/MasterData/nestedMasterDataTypes";
+import type { AppDropdownOption } from "@ui/components/common/AppDropdown";
 
 const S = STRINGS.MASTER_DATA;
 
@@ -55,14 +57,17 @@ const RangeFields = ({
   range,
   disabled,
   theme,
+  unitOptions,
   onChange,
 }: {
   range: MasterDataReferenceRange;
   disabled?: boolean;
   theme: any;
+  unitOptions: AppDropdownOption[];
   onChange: (next: MasterDataReferenceRange) => void;
 }) => {
   const flowBar = theme?.manufacturing?.casePreparation?.flowBar ?? {};
+  const hasRange = range.minValue != null || range.maxValue != null;
 
   return (
     <Box sx={flowBar.topRow}>
@@ -86,13 +91,22 @@ const RangeFields = ({
           onChange({ ...range, maxValue: value === "" ? null : Number(value) })
         }
       />
-      <CasePrepTextField
+      <CasePrepSelect
         label="Unit"
-        value={range.unit}
+        value={range.unitId != null ? String(range.unitId) : ""}
+        placeholder="Select unit"
+        options={unitOptions}
         disabled={disabled}
-        width={140}
+        required={hasRange}
+        width={180}
         theme={theme}
-        onChange={(value) => onChange({ ...range, unit: value })}
+        onChange={(value) =>
+          onChange({
+            ...range,
+            unitId: value ? Number(value) : null,
+            unit: "",
+          })
+        }
       />
     </Box>
   );
@@ -101,12 +115,16 @@ const RangeFields = ({
 const SpecEditor = ({
   specs,
   disabled,
+  isEdit,
   theme,
+  unitOptions,
   onChange,
 }: {
   specs: MaterialSpecForm[];
   disabled?: boolean;
+  isEdit: boolean;
   theme: any;
+  unitOptions: AppDropdownOption[];
   onChange: (next: MaterialSpecForm[]) => void;
 }) => (
   <Stack spacing={1.5}>
@@ -125,18 +143,16 @@ const SpecEditor = ({
           bgcolor: "background.paper",
         }}
       >
-        <CasePrepTextField
-          label="Spec code"
-          value={spec.specificationCode}
-          disabled={disabled}
-          width="100%"
-          theme={theme}
-          onChange={(value) => {
-            const next = [...specs];
-            next[idx] = { ...spec, specificationCode: value };
-            onChange(next);
-          }}
-        />
+        {isEdit ? (
+          <CasePrepTextField
+            label="Spec code"
+            value={spec.specificationCode}
+            disabled
+            width="100%"
+            theme={theme}
+            onChange={() => {}}
+          />
+        ) : null}
         <CasePrepTextField
           label="Spec name"
           value={spec.specificationName}
@@ -163,6 +179,7 @@ const SpecEditor = ({
             range={spec.referenceRange}
             disabled={disabled}
             theme={theme}
+            unitOptions={unitOptions}
             onChange={(referenceRange) => {
               const next = [...specs];
               next[idx] = { ...spec, referenceRange };
@@ -187,12 +204,16 @@ const SpecEditor = ({
 const GradeEditor = ({
   grades,
   disabled,
+  isEdit,
   theme,
+  unitOptions,
   onChange,
 }: {
   grades: MaterialGradeForm[];
   disabled?: boolean;
+  isEdit: boolean;
   theme: any;
+  unitOptions: AppDropdownOption[];
   onChange: (next: MaterialGradeForm[]) => void;
 }) => {
   const flowBar = theme?.manufacturing?.casePreparation?.flowBar ?? {};
@@ -251,7 +272,9 @@ const GradeEditor = ({
           <SpecEditor
             specs={grade.specifications}
             disabled={disabled}
+            isEdit={isEdit}
             theme={theme}
+            unitOptions={unitOptions}
             onChange={(specifications) => {
               const next = [...grades];
               next[idx] = { ...grade, specifications };
@@ -286,6 +309,7 @@ const MaterialsMasterFormDialog = ({
   const mode = useThemeStore((s) => s.mode);
   const fieldTheme = useMemo(() => getManufacturingTheme(mode), [mode]);
   const flowBar = fieldTheme.manufacturing?.casePreparation?.flowBar ?? {};
+  const { options: unitOptions } = useUnitMasterOptions(open);
   const { modal } = t;
   const recordLabel = form.materialName.trim() || form.materialCode.trim() || "record";
   const showMaterialFields =
@@ -317,12 +341,12 @@ const MaterialsMasterFormDialog = ({
         <Box sx={modal.headerGap} />
         <Stack spacing={modal.stackSpacing}>
           <Box>
-            <Typography sx={modal.fieldLabel}>Raw material category</Typography>
+            <Typography sx={modal.fieldLabel}>Category</Typography>
             <Box sx={flowBar.topRow}>
               <CasePrepSelect
-                label="Raw material type"
+                label="Category"
                 value={form.rawMaterialType}
-                placeholder="Select raw material type"
+                placeholder="Select category"
                 options={RAW_MATERIAL_TYPE_OPTIONS}
                 disabled={saving || isEdit}
                 required
@@ -407,7 +431,9 @@ const MaterialsMasterFormDialog = ({
             <GradeEditor
               grades={form.grades}
               disabled={saving}
+              isEdit={isEdit}
               theme={fieldTheme}
+              unitOptions={unitOptions}
               onChange={(grades) => onChange({ ...form, grades })}
             />
           </Box>
@@ -417,7 +443,9 @@ const MaterialsMasterFormDialog = ({
             <SpecEditor
               specs={form.specifications}
               disabled={saving}
+              isEdit={isEdit}
               theme={fieldTheme}
+              unitOptions={unitOptions}
               onChange={(specifications) => onChange({ ...form, specifications })}
             />
           </Box>
