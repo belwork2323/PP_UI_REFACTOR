@@ -4,13 +4,15 @@ import {
   type MasterDataAuditFields,
   type MasterDataStats,
 } from "@data/models/admin/MasterData/MasterDataModel";
+import { formatMotorStageLabel } from "@data/models/admin/MasterData/MixingCycleMasterModel";
 import {
-  firstFieldErrorMessage,
-  validateMasterDataNameField,
-  validateReferenceRangeFields,
-} from "@data/models/admin/MasterData/masterDataFieldValidators";
+  isMixTypeValue,
+  MIX_TYPE_OPTIONS,
+} from "@data/models/admin/MasterData/mixTypeOptions";
+import { firstFieldErrorMessage } from "@data/models/admin/MasterData/masterDataFieldValidators";
 import {
   emptyReferenceRange,
+  formatMasterDataReferenceRangeLabel,
   parseReferenceRange,
   serializeReferenceRange,
   type MasterDataReferenceRange,
@@ -21,10 +23,13 @@ export type QualityCheckParamForm = {
   parameterName: string;
   specification: MasterDataReferenceRange;
   noOfSamples: number | "";
+  isActive: boolean;
+  isExisting?: boolean;
 };
 
 export type QualityCheckRecord = MasterDataAuditFields & {
-  id: string;
+  id: number;
+  qualityCheckCode: string;
   mixType: string;
   motorStage: number;
   isActive: boolean;
@@ -37,7 +42,8 @@ export type QualityCheckListPayload = {
 };
 
 export type QualityCheckFormState = {
-  id: string | null;
+  id: number | null;
+  qualityCheckCode: string;
   mixType: string;
   motorStage: number | "";
   isActive: boolean;
@@ -49,10 +55,13 @@ export const emptyQualityCheckParam = (): QualityCheckParamForm => ({
   parameterName: "",
   specification: emptyReferenceRange(),
   noOfSamples: "",
+  isActive: true,
+  isExisting: false,
 });
 
 export const createEmptyQualityCheckForm = (): QualityCheckFormState => ({
   id: null,
+  qualityCheckCode: "",
   mixType: "",
   motorStage: "",
   isActive: true,
@@ -64,12 +73,14 @@ const mapParam = (raw: any): QualityCheckParamForm => ({
   parameterName: String(raw?.parameterName ?? ""),
   specification: parseReferenceRange(raw?.specification),
   noOfSamples: raw?.noOfSamples != null ? Number(raw.noOfSamples) : "",
+  isActive: raw?.isActive !== false,
 });
 
 export const QualityCheckRecordModel = {
   fromApi: (raw: any): QualityCheckRecord => ({
     ...parseMasterDataAuditFields(raw),
-    id: String(raw?.id ?? ""),
+    id: Number(raw?.id),
+    qualityCheckCode: String(raw?.qualityCheckCode ?? ""),
     mixType: String(raw?.mixType ?? ""),
     motorStage: Number(raw?.motorStage ?? 0),
     isActive: raw?.isActive !== false,
@@ -93,12 +104,14 @@ export const QualityCheckListModel = {
 
 export const mapQualityCheckRecordToForm = (record: QualityCheckRecord): QualityCheckFormState => ({
   id: record.id,
+  qualityCheckCode: record.qualityCheckCode,
   mixType: record.mixType,
   motorStage: record.motorStage,
   isActive: record.isActive,
   qualityChecks: record.qualityChecks.map((p) => ({
     ...p,
     specification: { ...p.specification },
+    isExisting: true,
   })),
 });
 
@@ -107,6 +120,7 @@ const serializeParam = (p: QualityCheckParamForm) => ({
   parameterName: p.parameterName.trim(),
   specification: serializeReferenceRange(p.specification),
   noOfSamples: p.noOfSamples === "" ? undefined : Number(p.noOfSamples),
+  isActive: p.isActive,
 });
 
 export const buildQualityCheckCreatePayload = (form: QualityCheckFormState) => ({
@@ -124,13 +138,14 @@ export const buildQualityCheckUpdatePayload = (form: QualityCheckFormState) => (
   qualityChecks: form.qualityChecks.map(serializeParam),
 });
 
-export const buildQualityCheckDeletePayload = (id: string) => ({ id });
+export const buildQualityCheckDeletePayload = (id: number) => ({ id });
 
 export type QualityCheckParamFieldErrors = {
   parameterName?: string;
   minValue?: string;
   maxValue?: string;
   unit?: string;
+  noOfSamples?: string;
 };
 
 export type QualityCheckFieldErrors = {
@@ -146,35 +161,51 @@ export const getQualityCheckFieldErrors = (
   existing: QualityCheckRecord[] = [],
 ): QualityCheckFieldErrors => {
   const errors: QualityCheckFieldErrors = {};
-  const mixTypeError = validateMasterDataNameField(form.mixType, "Mix type");
-  if (mixTypeError) errors.mixType = mixTypeError;
+  if (!form.mixType.trim()) {
+    errors.mixType = "Mix type is required";
+  } else if (!isMixTypeValue(form.mixType.trim())) {
+    errors.mixType = "Select a valid mix type";
+  }
   if (!isEdit && (form.motorStage === "" || Number.isNaN(Number(form.motorStage)))) {
     errors.motorStage = "Motor stage is required";
   }
   if (!isEdit && !errors.mixType && !errors.motorStage) {
-    const mix = form.mixType.trim().toLowerCase();
+    const mix = form.mixType.trim();
     const stage = Number(form.motorStage);
-    const duplicate = existing.some(
-      (item) => item.mixType.trim().toLowerCase() === mix && item.motorStage === stage,
-    );
+    const duplicate = existing.some((item) => item.mixType.trim() === mix && item.motorStage === stage);
     if (duplicate) {
-      errors.mixType = `Quality check already exists for mix type ${form.mixType.trim()} and stage ${stage}`;
+      errors.mixType = `Quality check already exists for ${mix} and stage ${stage}`;
     }
   }
-  if (form.qualityChecks.length === 0) {
+  if (!isEdit && form.qualityChecks.length === 0) {
     errors.form = "Add at least one quality check parameter";
     return errors;
   }
   const paramIds = new Set<string>();
   errors.qualityChecks = form.qualityChecks.map((param) => {
+    if (isEdit && param.isExisting) return {};
     const paramErrors: QualityCheckParamFieldErrors = {};
-    const nameError = validateMasterDataNameField(param.parameterName, "Parameter name");
-    if (nameError) paramErrors.parameterName = nameError;
-    const label = param.parameterName.trim() || "parameter";
-    const rangeErrors = validateReferenceRangeFields(param.specification, label, false);
-    if (rangeErrors.minValue) paramErrors.minValue = rangeErrors.minValue;
-    if (rangeErrors.maxValue) paramErrors.maxValue = rangeErrors.maxValue;
-    if (rangeErrors.unit) paramErrors.unit = rangeErrors.unit;
+    const name = param.parameterName.trim();
+    if (!name) {
+      paramErrors.parameterName = "Parameter name is required";
+    }
+    const label = name || "parameter";
+    const { minValue, maxValue, unitId, unit } = param.specification;
+    if (minValue == null) paramErrors.minValue = `Min value is required for "${label}"`;
+    if (maxValue == null) paramErrors.maxValue = `Max value is required for "${label}"`;
+    if (minValue != null && maxValue != null && minValue > maxValue) {
+      paramErrors.minValue = `Min value cannot exceed max value for "${label}"`;
+    }
+    if (unitId == null && !String(unit ?? "").trim()) {
+      paramErrors.unit = `Unit is required for "${label}"`;
+    }
+    if (
+      param.noOfSamples === "" ||
+      Number.isNaN(Number(param.noOfSamples)) ||
+      Number(param.noOfSamples) < 1
+    ) {
+      paramErrors.noOfSamples = `No of samples is required for "${label}"`;
+    }
     const paramId = param.parameterId.trim().toLowerCase();
     if (paramId) {
       if (paramIds.has(paramId)) {
@@ -198,4 +229,9 @@ export const validateQualityCheckForm = (
 ): string | null =>
   getQualityCheckValidationMessage(getQualityCheckFieldErrors(form, isEdit, existing));
 
-export { emptyMasterDataStats };
+export {
+  emptyMasterDataStats,
+  formatMotorStageLabel,
+  formatMasterDataReferenceRangeLabel,
+  MIX_TYPE_OPTIONS,
+};

@@ -38,9 +38,9 @@ export const trimmingValidationFields: Record<string, FieldRuleConfig> = {
   machineDetails: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
   startDate: date(["SUBMIT"]),
   completionDate: date(["SUBMIT"]),
-  arborSize: number(["SUBMIT"]),
-  cutterSize: number(["SUBMIT"]),
-  reading: number(["SUBMIT"]),
+  arborSize: number(["FORMAT", "SUBMIT"]),
+  cutterSize: number(["FORMAT", "SUBMIT"]),
+  reading: number(["FORMAT", "SUBMIT"]),
   remarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 };
 

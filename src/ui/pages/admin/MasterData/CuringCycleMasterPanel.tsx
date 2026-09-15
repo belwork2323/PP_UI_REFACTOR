@@ -1,13 +1,10 @@
-import React, { useEffect, useMemo, useState } from "react";
-import { useAlertStore } from "@app/store/alertStore";
+import React, { useState } from "react";
 import {
   Box,
   Button,
-  Collapse,
   Divider,
   IconButton,
   Paper,
-  Switch,
   Table,
   TableBody,
   TableCell,
@@ -15,35 +12,32 @@ import {
   TableHead,
   TablePagination,
   TableRow,
+  Tooltip,
   Typography,
 } from "@mui/material";
-import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
-import ExpandLessIcon from "@mui/icons-material/ExpandLess";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
 import MasterDataToggleConfirmDialog from "./components/MasterDataToggleConfirmDialog";
 import SkeletonRow from "@ui/components/common/SkeletonRow";
-import AppTextField from "@ui/components/common/AppTextField";
 import useCuringCycleMasterHook from "@hooks/admin/MasterData/useCuringCycleMasterHook";
-import MasterDataTableToolbar from "./components/MasterDataTableToolbar";
+import useMotorStageOptions from "@hooks/admin/MasterData/useMotorStageOptions";
+import useCuringTypeOptions from "@hooks/admin/MasterData/useCuringTypeOptions";
+import {
+  formatMotorStageLabel,
+  type CuringCycleListPayload,
+  type CuringCycleRecord,
+} from "@data/models/admin/MasterData/CuringCycleMasterModel";
+import { formatCuringTypeLabel } from "@hooks/user/manufacturing/castingCuringFlowConfig";
+import CuringCycleMasterFormDialog from "./CuringCycleMasterFormDialog";
+import CuringCycleMasterViewDialog from "./CuringCycleMasterViewDialog";
+import CuringCycleMasterTableToolbar from "./components/CuringCycleMasterTableToolbar";
 import MasterDataActiveSwitch from "./components/MasterDataActiveSwitch";
-import MasterDataEnableDisableField from "./components/MasterDataEnableDisableField";
 import MasterDataActiveStatusChip from "./components/MasterDataActiveStatusChip";
 import {
   MASTER_DATA_AUDIT_COLUMN_COUNT,
   MasterDataAuditHeaderCells,
   MasterDataAuditRowCells,
 } from "./components/MasterDataAuditColumns";
-import {
-  emptyCuringCycleStep,
-  getCuringCycleFieldErrors,
-  getCuringCycleValidationMessage,
-  type CuringCycleFieldErrors,
-  type CuringCycleFormState,
-  type CuringCycleListPayload,
-  type CuringCycleStepForm,
-} from "@data/models/admin/MasterData/CuringCycleMasterModel";
-import { visibleValidationError } from "./masterDataValidationUtils";
 
 const S = STRINGS.MASTER_DATA;
 
@@ -58,171 +52,6 @@ type Props = {
   onStatsChange?: (stats: { total: number; active: number; inactive: number }) => void;
 };
 
-const CycleEditor = ({
-  cycles,
-  disabled,
-  onChange,
-}: {
-  cycles: CuringCycleStepForm[];
-  disabled?: boolean;
-  onChange: (next: CuringCycleStepForm[]) => void;
-}) => (
-  <Box sx={{ display: "flex", flexDirection: "column", gap: 1 }}>
-    {cycles.map((c, idx) => (
-      <Box
-        key={idx}
-        sx={{
-          display: "grid",
-          gridTemplateColumns: { xs: "1fr", md: "1fr 1fr 1fr auto" },
-          gap: 1,
-          p: 1,
-          border: "1px solid",
-          borderColor: "divider",
-          borderRadius: 1,
-        }}
-      >
-        <AppTextField
-          compact
-          type="number"
-          label="Temp"
-          value={c.temperature}
-          disabled={disabled}
-          onChange={(e) => {
-            const next = [...cycles];
-            next[idx] = { ...c, temperature: e.target.value === "" ? "" : Number(e.target.value) };
-            onChange(next);
-          }}
-        />
-        <AppTextField
-          compact
-          type="number"
-          label="Duration (min)"
-          value={c.durationMinutes}
-          disabled={disabled}
-          onChange={(e) => {
-            const next = [...cycles];
-            next[idx] = { ...c, durationMinutes: e.target.value === "" ? "" : Number(e.target.value) };
-            onChange(next);
-          }}
-        />
-        <AppTextField
-          compact
-          type="number"
-          label="Pressure"
-          value={c.propellantPressure}
-          disabled={disabled}
-          onChange={(e) => {
-            const next = [...cycles];
-            next[idx] = { ...c, propellantPressure: e.target.value === "" ? "" : Number(e.target.value) };
-            onChange(next);
-          }}
-        />
-        <Button size="small" color="inherit" disabled={disabled} onClick={() => onChange(cycles.filter((_, i) => i !== idx))}>
-          Remove
-        </Button>
-      </Box>
-    ))}
-    <Button
-      size="small"
-      startIcon={<icons.projectMgmt.add />}
-      disabled={disabled}
-      onClick={() => onChange([...cycles, emptyCuringCycleStep()])}
-    >
-      Add cycle step
-    </Button>
-  </Box>
-);
-
-const CuringFormFields = ({
-  form,
-  isEdit,
-  saving,
-  showErrors,
-  fieldErrors,
-  onChange,
-}: {
-  form: CuringCycleFormState;
-  isEdit: boolean;
-  saving: boolean;
-  showErrors: boolean;
-  fieldErrors: CuringCycleFieldErrors;
-  onChange: (next: CuringCycleFormState) => void;
-}) => {
-  const stageError = visibleValidationError(fieldErrors.motorStage, form.motorStage !== "", showErrors);
-  const stageNameError = visibleValidationError(
-    fieldErrors.motorStageName,
-    form.motorStageName.trim().length > 0,
-    showErrors,
-  );
-  const curingTypeError = visibleValidationError(
-    fieldErrors.curingType,
-    form.curingType.trim().length > 0,
-    showErrors,
-  );
-
-  return (
-  <Box sx={{ p: 1.5, display: "flex", flexDirection: "column", gap: 1.5 }}>
-    <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap", alignItems: "center" }}>
-      <AppTextField
-        compact
-        type="number"
-        label="Motor stage"
-        value={form.motorStage}
-        disabled={saving || isEdit}
-        error={Boolean(stageError)}
-        helperText={stageError}
-        onChange={(e) =>
-          onChange({ ...form, motorStage: e.target.value === "" ? "" : Number(e.target.value) })
-        }
-        sx={{ width: 120 }}
-      />
-      <AppTextField
-        compact
-        label="Stage name"
-        value={form.motorStageName}
-        disabled={saving}
-        error={Boolean(stageNameError)}
-        helperText={stageNameError}
-        onChange={(e) => onChange({ ...form, motorStageName: e.target.value })}
-        sx={{ minWidth: 160 }}
-      />
-      <AppTextField
-        compact
-        label="Curing type"
-        value={form.curingType}
-        disabled={saving}
-        error={Boolean(curingTypeError)}
-        helperText={curingTypeError}
-        onChange={(e) => onChange({ ...form, curingType: e.target.value })}
-        sx={{ minWidth: 180, flex: 1 }}
-      />
-      <Box sx={{ display: "flex", alignItems: "center", gap: 0.5 }}>
-        <Typography variant="body2">Show pressure</Typography>
-        <Switch
-          size="small"
-          checked={form.showPropellantPressure}
-          disabled={saving}
-          onChange={(e) => onChange({ ...form, showPropellantPressure: e.target.checked })}
-        />
-      </Box>
-      <MasterDataEnableDisableField
-        checked={form.isActive}
-        disabled={saving}
-        confirmName={`${form.curingType} (stage ${form.motorStage})`}
-        onChange={(isActive) => onChange({ ...form, isActive })}
-      />
-    </Box>
-    <Divider />
-    <Typography variant="subtitle2">Cycle steps</Typography>
-    <CycleEditor
-      cycles={form.cycles}
-      disabled={saving}
-      onChange={(cycles) => onChange({ ...form, cycles })}
-    />
-  </Box>
-  );
-};
-
 const CuringCycleMasterPanel = ({
   activeFilter,
   refreshKey,
@@ -233,6 +62,8 @@ const CuringCycleMasterPanel = ({
   onListPayloadChange,
   onStatsChange,
 }: Props) => {
+  const { options: motorStageOptions, loading: motorStageLoading } = useMotorStageOptions(true);
+  const { options: curingTypeOptions } = useCuringTypeOptions();
   const hook = useCuringCycleMasterHook({
     activeFilter,
     refreshKey,
@@ -240,35 +71,20 @@ const CuringCycleMasterPanel = ({
     onStatsChange,
   });
   const { table, tableCell } = t;
-  const columnCount = 6 + MASTER_DATA_AUDIT_COLUMN_COUNT;
-  const [showErrors, setShowErrors] = useState(false);
-  const fieldErrors = useMemo(
-    () => getCuringCycleFieldErrors(hook.form, false, hook.items),
-    [hook.form, hook.items],
-  );
-
-  useEffect(() => {
-    if (hook.inlineMode) setShowErrors(false);
-  }, [hook.inlineMode]);
-
-  const handleSave = () => {
-    setShowErrors(true);
-    const err = getCuringCycleValidationMessage(
-      getCuringCycleFieldErrors(hook.form, false, hook.items),
-    );
-    if (err) {
-      useAlertStore.getState().showValidationAlert(err);
-      return;
-    }
-    void hook.saveForm();
-  };
+  const formOpen = hook.inlineMode != null;
+  const columnCount = 3 + MASTER_DATA_AUDIT_COLUMN_COUNT + 2;
+  const [viewTarget, setViewTarget] = useState<CuringCycleRecord | null>(null);
 
   return (
     <Box>
       <Paper elevation={0} sx={table.paper}>
-        <MasterDataTableToolbar
+        <CuringCycleMasterTableToolbar
           search={hook.search}
           onSearchChange={hook.setSearch}
+          motorStageFilter={hook.motorStageFilter}
+          onMotorStageFilterChange={hook.setMotorStageFilter}
+          motorStageOptions={motorStageOptions}
+          motorStageLoading={motorStageLoading}
           onRefresh={onRefresh}
           refreshDisabled={refreshDisabled || hook.loading}
           t={t}
@@ -278,21 +94,18 @@ const CuringCycleMasterPanel = ({
           <Table size="small">
             <TableHead>
               <TableRow sx={table.headerRow}>
-                <TableCell sx={table.headerCell} width={48} />
-                <TableCell sx={table.headerCell}>Stage</TableCell>
-                <TableCell sx={table.headerCell}>Type</TableCell>
-                <TableCell sx={table.headerCell}>Steps</TableCell>
+                <TableCell sx={table.headerCell}>{S.CURING_CYCLES.COL_MOTOR_STAGE}</TableCell>
+                <TableCell sx={table.headerCell}>{S.CURING_CYCLES.COL_CURING_TYPE}</TableCell>
+                <TableCell sx={table.headerCell}>{S.CURING_CYCLES.COL_STEPS}</TableCell>
                 <MasterDataAuditHeaderCells table={table} />
                 <TableCell sx={table.headerCell}>{S.TABLE.COL_ACTIVE}</TableCell>
-                <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>{S.TABLE.COL_ACTIONS}</TableCell>
+                <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>Actions</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {hook.loading ? (
-                Array.from({ length: hook.rowsPerPage }).map((_, i) => (
-                  <SkeletonRow key={i} columns={columnCount} sx={table.cell} />
-                ))
-              ) : hook.paginated.length === 0 && hook.inlineMode !== "create" ? (
+                <SkeletonRow columns={columnCount} />
+              ) : hook.paginated.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={columnCount} sx={table.emptyCell}>
                     <icons.Inventory sx={table.emptyIcon} />
@@ -300,92 +113,55 @@ const CuringCycleMasterPanel = ({
                   </TableCell>
                 </TableRow>
               ) : (
-                hook.paginated.map((row) => {
-                  const expanded = hook.expandedId === row.id;
-                  return (
-                    <React.Fragment key={row.id}>
-                      <TableRow sx={table.row}>
-                        <TableCell sx={table.cell}>
+                hook.paginated.map((row) => (
+                  <TableRow key={row.id} sx={table.row}>
+                    <TableCell sx={table.cell}>
+                      <Typography sx={table.bodyText}>
+                        {formatMotorStageLabel(row.motorStage, motorStageOptions)}
+                      </Typography>
+                    </TableCell>
+                    <TableCell sx={table.cell}>
+                      <Typography sx={table.bodyText}>{formatCuringTypeLabel(row.curingType)}</Typography>
+                    </TableCell>
+                    <TableCell sx={table.cell}>
+                      <Typography sx={table.bodyText}>{row.cycles.length}</Typography>
+                    </TableCell>
+                    <MasterDataAuditRowCells record={row} table={table} />
+                    <TableCell sx={table.cell}>
+                      <MasterDataActiveStatusChip isActive={row.isActive} />
+                    </TableCell>
+                    <TableCell sx={table.cellActionsWrapper}>
+                      <Box sx={tableCell.actionsBox}>
+                        <Tooltip title={S.TABLE.VIEW}>
                           <IconButton
                             size="small"
-                            onClick={() => hook.setExpandedId(expanded ? null : row.id)}
-                            disabled={hook.inlineMode === "create"}
+                            onClick={() => setViewTarget(row)}
+                            disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
+                            aria-label={S.TABLE.VIEW}
                           >
-                            {expanded ? <ExpandLessIcon /> : <ExpandMoreIcon />}
+                            <icons.visibility fontSize="small" />
                           </IconButton>
-                        </TableCell>
-                        <TableCell sx={table.cell}>
-                          <Typography sx={table.bodyText}>
-                            {row.motorStageName || `Stage ${row.motorStage}`}
-                          </Typography>
-                        </TableCell>
-                        <TableCell sx={table.cell}>
-                          <Typography sx={table.bodyText}>{row.curingType}</Typography>
-                        </TableCell>
-                        <TableCell sx={table.cell}>
-                          <Typography sx={table.bodyText}>{row.cycles.length}</Typography>
-                        </TableCell>
-                        <MasterDataAuditRowCells record={row} table={table} />
-                        <TableCell sx={table.cell}>
-                          <MasterDataActiveStatusChip isActive={row.isActive} />
-                        </TableCell>
-                        <TableCell sx={table.cellActionsWrapper}>
-                          <Box sx={tableCell.actionsBox}>
-                            <MasterDataActiveSwitch
-                              isActive={row.isActive}
-                              disabled={hook.inlineMode != null || hook.saving || hook.disabling || hook.enabling}
-                              onToggle={(nextActive) => hook.handleToggleActive(row, nextActive)}
-                            />
-                          </Box>
-                        </TableCell>
-                      </TableRow>
-                      <TableRow>
-                        <TableCell colSpan={columnCount} sx={{ p: 0, border: 0 }}>
-                          <Collapse in={expanded} timeout="auto" unmountOnExit>
-                            <Box sx={{ p: 1.5 }}>
-                              {row.cycles.map((c, i) => (
-                                <Typography key={i} variant="body2" color="text.secondary">
-                                  Step {c.sequenceNo ?? i + 1}: {c.temperature ?? "—"}° /{" "}
-                                  {c.durationMinutes ?? "—"} min
-                                </Typography>
-                              ))}
-                            </Box>
-                          </Collapse>
-                        </TableCell>
-                      </TableRow>
-                    </React.Fragment>
-                  );
-                })
+                        </Tooltip>
+                        <Tooltip title={S.TABLE.EDIT}>
+                          <IconButton
+                            size="small"
+                            onClick={() => hook.openEdit(row)}
+                            disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
+                            aria-label={S.TABLE.EDIT}
+                          >
+                            <icons.Edit fontSize="small" />
+                          </IconButton>
+                        </Tooltip>
+                        <MasterDataActiveSwitch
+                          isActive={row.isActive}
+                          disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
+                          onToggle={(nextActive) => hook.handleToggleActive(row, nextActive)}
+                        />
+                      </Box>
+                    </TableCell>
+                  </TableRow>
+                ))
               )}
-
-              {hook.inlineMode === "create" && !hook.loading ? (
-                <TableRow sx={{ bgcolor: (theme) => theme.palette.action.hover }}>
-                  <TableCell colSpan={6} sx={{ p: 0 }}>
-                    <CuringFormFields
-                      form={hook.form}
-                      isEdit={false}
-                      saving={hook.saving}
-                      showErrors={showErrors}
-                      fieldErrors={fieldErrors}
-                      onChange={hook.setForm}
-                    />
-                    <Box sx={{ display: "flex", gap: 1, justifyContent: "flex-end", p: 1.5, pt: 0 }}>
-                      <Button size="small" onClick={hook.closeInline} disabled={hook.saving}>
-                        {S.FORM.CANCEL}
-                      </Button>
-                      <Button
-                        size="small"
-                        variant="contained"
-                        onClick={handleSave}
-                        disabled={hook.saving}
-                        sx={t.pageHeader?.newProjectButton}
-                      >
-                        {hook.saving ? S.FORM.SAVING : S.FORM.SAVE}
-                      </Button>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ) : null}
             </TableBody>
           </Table>
         </TableContainer>
@@ -405,18 +181,43 @@ const CuringCycleMasterPanel = ({
           variant="contained"
           startIcon={<icons.projectMgmt.add />}
           onClick={hook.openCreate}
-          disabled={hook.loading || hook.inlineMode != null}
+          disabled={hook.loading || formOpen}
           sx={t.pageHeader.newProjectButton}
         >
           {addButtonLabel}
         </Button>
       </Box>
 
+      <CuringCycleMasterFormDialog
+        open={formOpen}
+        isEdit={hook.inlineMode === "edit"}
+        form={hook.form}
+        saving={hook.saving}
+        motorStageOptions={motorStageOptions}
+        motorStageLoading={motorStageLoading}
+        curingTypeOptions={curingTypeOptions}
+        existingRecords={hook.items}
+        onClose={hook.closeInline}
+        onSave={() => void hook.saveForm()}
+        onChange={hook.setForm}
+        t={t}
+      />
+
+      <CuringCycleMasterViewDialog
+        open={viewTarget != null}
+        record={viewTarget}
+        motorStageOptions={motorStageOptions}
+        onClose={() => setViewTarget(null)}
+        t={t}
+      />
+
       <MasterDataToggleConfirmDialog
         target={
           hook.toggleTarget
             ? {
-                name: `${hook.toggleTarget.record.curingType} (stage ${hook.toggleTarget.record.motorStage})`,
+                name:
+                  hook.toggleTarget.record.curingCycleCode ||
+                  `${formatCuringTypeLabel(hook.toggleTarget.record.curingType)} (stage ${hook.toggleTarget.record.motorStage})`,
                 nextActive: hook.toggleTarget.nextActive,
               }
             : null

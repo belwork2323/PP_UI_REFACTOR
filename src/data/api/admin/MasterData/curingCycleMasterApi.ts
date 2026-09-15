@@ -10,5 +10,8 @@ export const createCuringCycleMaster = (payload: Record<string, unknown>) =>
 export const updateCuringCycleMaster = (payload: Record<string, unknown>) =>
   post(ADMIN_ENDPOINTS.MASTER_DATA.CURING_CYCLES.UPDATE, payload);
 
-export const deleteCuringCycleMaster = (payload: { id: string }) =>
+export const deleteCuringCycleMaster = (payload: { id: number }) =>
   post(ADMIN_ENDPOINTS.MASTER_DATA.CURING_CYCLES.DELETE, payload);
+
+export const enableCuringCycleMaster = (payload: { id: number }) =>
+  post(ADMIN_ENDPOINTS.MASTER_DATA.CURING_CYCLES.ENABLE, payload);

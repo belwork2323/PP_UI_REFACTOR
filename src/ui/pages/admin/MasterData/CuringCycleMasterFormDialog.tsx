@@ -10,7 +10,7 @@ import {
   Divider,
   IconButton,
   Stack,
-  TextField,
+  Switch,
   Typography,
   Zoom,
 } from "@mui/material";
@@ -25,14 +25,15 @@ import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAst
 import CasePrepTextField from "@ui/pages/user/manufacturing/CasePreparation/CasePrepTextField";
 import MasterDataEnableDisableField from "./components/MasterDataEnableDisableField";
 import {
-  emptyMixingOperation,
+  emptyCuringCycleStep,
   formatMotorStageLabel,
-  getMixingCycleFieldErrors,
-  getMixingCycleValidationMessage,
-  type MixingCycleFieldErrors,
-  type MixingCycleFormState,
-  type MixingOperationForm,
-} from "@data/models/admin/MasterData/MixingCycleMasterModel";
+  getCuringCycleFieldErrors,
+  getCuringCycleValidationMessage,
+  type CuringCycleFieldErrors,
+  type CuringCycleFormState,
+  type CuringCycleRecord,
+  type CuringCycleStepForm,
+} from "@data/models/admin/MasterData/CuringCycleMasterModel";
 import { visibleValidationError } from "./masterDataValidationUtils";
 import type { AppDropdownOption } from "@ui/components/common/AppDropdown";
 
@@ -41,85 +42,139 @@ const S = STRINGS.MASTER_DATA;
 type Props = {
   open: boolean;
   isEdit: boolean;
-  form: MixingCycleFormState;
+  form: CuringCycleFormState;
   saving: boolean;
   motorStageOptions: AppDropdownOption[];
   motorStageLoading?: boolean;
+  curingTypeOptions: AppDropdownOption[];
+  existingRecords?: CuringCycleRecord[];
   onClose: () => void;
   onSave: () => void;
-  onChange: (next: MixingCycleFormState) => void;
+  onChange: (next: CuringCycleFormState) => void;
   t: any;
 };
 
-const OperationsEditor = ({
-  title,
-  ops,
+const StepsEditor = ({
+  steps,
   disabled,
   isEdit,
   showErrors,
-  operationErrors,
+  showPressure,
+  stepErrors,
   theme,
   onChange,
 }: {
-  title: string;
-  ops: MixingOperationForm[];
+  steps: CuringCycleStepForm[];
   disabled?: boolean;
   isEdit: boolean;
   showErrors: boolean;
-  operationErrors?: MixingCycleFieldErrors["premixOperations"];
+  showPressure: boolean;
+  stepErrors?: CuringCycleFieldErrors["cycles"];
   theme: any;
-  onChange: (next: MixingOperationForm[]) => void;
+  onChange: (next: CuringCycleStepForm[]) => void;
 }) => (
   <Stack spacing={1.5}>
-    <Typography variant="subtitle2">{title}</Typography>
-    {ops.map((op, idx) => {
-      const locked = isEdit && Boolean(op.isExisting);
-      const opError = visibleValidationError(
-        operationErrors?.[idx]?.operationName,
-        op.operationName.trim().length > 0,
+    <Typography variant="subtitle2">{S.CURING_CYCLES.CYCLE_STEPS}</Typography>
+    {steps.map((step, idx) => {
+      const locked = isEdit && Boolean(step.isExisting);
+      const tempError = visibleValidationError(
+        stepErrors?.[idx]?.temperature,
+        step.temperature !== "",
+        showErrors,
+      );
+      const durationError = visibleValidationError(
+        stepErrors?.[idx]?.durationMinutes,
+        step.durationMinutes !== "",
         showErrors,
       );
       return (
         <Box
-          key={`${op.operationId ?? "new"}-${idx}`}
+          key={`${step.stepId ?? "new"}-${idx}`}
           sx={{
             display: "flex",
             gap: 1,
             alignItems: "flex-start",
             p: 1.5,
             border: "1px solid",
-            borderColor: opError ? "error.main" : "divider",
+            borderColor: tempError || durationError ? "error.main" : "divider",
             borderRadius: 1.5,
             bgcolor: locked ? "action.hover" : "background.paper",
-            opacity: !op.isActive ? 0.72 : 1,
+            opacity: !step.isActive ? 0.72 : 1,
           }}
         >
-          <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Box
+            sx={{
+              flex: 1,
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                md: showPressure ? "1fr 1fr 1fr" : "1fr 1fr",
+              },
+              gap: 1,
+            }}
+          >
             <CasePrepTextField
-              label={S.MIXING_CYCLES.COL_NAME}
-              value={op.operationName}
+              label={S.CURING_CYCLES.STEP_TEMPERATURE}
+              value={step.temperature === "" ? "" : String(step.temperature)}
               disabled={disabled || locked}
-              error={Boolean(opError)}
-              helperText={opError ?? null}
+              error={Boolean(tempError)}
+              helperText={tempError ?? null}
               width="100%"
               theme={theme}
               onChange={(value) => {
-                const next = [...ops];
-                next[idx] = { ...op, operationName: value };
+                const next = [...steps];
+                next[idx] = {
+                  ...step,
+                  temperature: value === "" ? "" : Number(value),
+                };
                 onChange(next);
               }}
             />
+            <CasePrepTextField
+              label={S.CURING_CYCLES.STEP_DURATION}
+              value={step.durationMinutes === "" ? "" : String(step.durationMinutes)}
+              disabled={disabled || locked}
+              error={Boolean(durationError)}
+              helperText={durationError ?? null}
+              width="100%"
+              theme={theme}
+              onChange={(value) => {
+                const next = [...steps];
+                next[idx] = {
+                  ...step,
+                  durationMinutes: value === "" ? "" : Number(value),
+                };
+                onChange(next);
+              }}
+            />
+            {showPressure ? (
+              <CasePrepTextField
+                label={S.CURING_CYCLES.STEP_PRESSURE}
+                value={step.propellantPressure === "" ? "" : String(step.propellantPressure)}
+                disabled={disabled || locked}
+                width="100%"
+                theme={theme}
+                onChange={(value) => {
+                  const next = [...steps];
+                  next[idx] = {
+                    ...step,
+                    propellantPressure: value === "" ? "" : Number(value),
+                  };
+                  onChange(next);
+                }}
+              />
+            ) : null}
           </Box>
           <MasterDataEnableDisableField
-            checked={op.isActive}
+            checked={step.isActive}
             disabled={disabled}
             labelVariant="caption"
             minWidth={96}
             requireConfirmation={locked}
-            confirmName={op.operationName || "operation"}
+            confirmName={`step ${step.sequenceNo ?? idx + 1}`}
             onChange={(isActive) => {
-              const next = [...ops];
-              next[idx] = { ...op, isActive };
+              const next = [...steps];
+              next[idx] = { ...step, isActive };
               onChange(next);
             }}
           />
@@ -127,8 +182,8 @@ const OperationsEditor = ({
             <IconButton
               size="small"
               disabled={disabled}
-              onClick={() => onChange(ops.filter((_, i) => i !== idx))}
-              aria-label={S.MIXING_CYCLES.REMOVE_OPERATION}
+              onClick={() => onChange(steps.filter((_, i) => i !== idx))}
+              aria-label={S.CURING_CYCLES.REMOVE_STEP}
               sx={{ mt: 2.75, flexShrink: 0 }}
             >
               <icons.Delete fontSize="small" />
@@ -141,20 +196,22 @@ const OperationsEditor = ({
       size="small"
       startIcon={<icons.projectMgmt.add />}
       disabled={disabled}
-      onClick={() => onChange([...ops, emptyMixingOperation()])}
+      onClick={() => onChange([...steps, emptyCuringCycleStep()])}
     >
-      {S.MIXING_CYCLES.ADD_OPERATION}
+      {S.CURING_CYCLES.ADD_STEP}
     </Button>
   </Stack>
 );
 
-const MixingCycleMasterFormDialog = ({
+const CuringCycleMasterFormDialog = ({
   open,
   isEdit,
   form,
   saving,
   motorStageOptions,
   motorStageLoading = false,
+  curingTypeOptions,
+  existingRecords = [],
   onClose,
   onSave,
   onChange,
@@ -164,22 +221,21 @@ const MixingCycleMasterFormDialog = ({
   const mode = useThemeStore((state) => state.mode);
   const fieldTheme = getManufacturingTheme(mode);
   const flowBar = fieldTheme.manufacturing?.casePreparation?.flowBar ?? {};
-  const palette = fieldTheme.palette ?? {};
-  const descriptionHasValue = form.description.trim().length > 0;
   const [showErrors, setShowErrors] = useState(false);
-  const recordLabel = form.mixingCycleName.trim() || form.mixingCycleCode || "record";
+  const recordLabel =
+    form.curingCycleCode || formatMotorStageLabel(form.motorStage, motorStageOptions) || "record";
   const fieldErrors = useMemo(
-    () => getMixingCycleFieldErrors(form, isEdit),
-    [form, isEdit],
-  );
-  const nameError = visibleValidationError(
-    fieldErrors.mixingCycleName,
-    form.mixingCycleName.trim().length > 0,
-    showErrors,
+    () => getCuringCycleFieldErrors(form, isEdit, existingRecords),
+    [form, isEdit, existingRecords],
   );
   const stageError = visibleValidationError(
     fieldErrors.motorStage,
     form.motorStage !== "",
+    showErrors,
+  );
+  const curingTypeError = visibleValidationError(
+    fieldErrors.curingType,
+    form.curingType.trim().length > 0,
     showErrors,
   );
 
@@ -189,7 +245,9 @@ const MixingCycleMasterFormDialog = ({
 
   const handleSave = () => {
     setShowErrors(true);
-    const err = getMixingCycleValidationMessage(getMixingCycleFieldErrors(form, isEdit));
+    const err = getCuringCycleValidationMessage(
+      getCuringCycleFieldErrors(form, isEdit, existingRecords),
+    );
     if (err) {
       useAlertStore.getState().showValidationAlert(err);
       return;
@@ -211,7 +269,7 @@ const MixingCycleMasterFormDialog = ({
           icon={<icons.Inventory sx={modal.header.icon} />}
           title={isEdit ? S.FORM.EDIT_TITLE : S.FORM.CREATE_TITLE}
           subtitle={
-            isEdit ? S.MIXING_CYCLES.EDIT_SUBTITLE(recordLabel) : S.MIXING_CYCLES.CREATE_SUBTITLE
+            isEdit ? S.CURING_CYCLES.EDIT_SUBTITLE(recordLabel) : S.CURING_CYCLES.CREATE_SUBTITLE
           }
           onClose={() => !saving && onClose()}
           closeDisabled={saving}
@@ -223,32 +281,21 @@ const MixingCycleMasterFormDialog = ({
         <Box sx={modal.headerGap} />
         <Stack spacing={modal.stackSpacing}>
           <Box>
-            <Typography sx={modal.fieldLabel}>Mixing cycle details</Typography>
+            <Typography sx={modal.fieldLabel}>Curing cycle details</Typography>
             <Box
               sx={{
                 display: "grid",
                 gridTemplateColumns: {
                   xs: "1fr",
-                  md: "minmax(180px, 200px) minmax(150px, 160px) minmax(220px, 1fr) auto",
+                  md: "minmax(180px, 200px) minmax(220px, 1fr) minmax(220px, 1fr) auto auto",
                 },
                 gap: 2,
                 alignItems: "start",
               }}
             >
-              <CasePrepTextField
-                label={S.MIXING_CYCLES.COL_NAME}
-                value={form.mixingCycleName}
-                disabled={saving}
-                required
-                error={Boolean(nameError)}
-                helperText={nameError ?? null}
-                width="100%"
-                theme={fieldTheme}
-                onChange={(value) => onChange({ ...form, mixingCycleName: value })}
-              />
               {isEdit ? (
                 <CasePrepTextField
-                  label={S.MIXING_CYCLES.COL_MOTOR_STAGE}
+                  label={S.CURING_CYCLES.COL_MOTOR_STAGE}
                   value={formatMotorStageLabel(form.motorStage, motorStageOptions)}
                   disabled
                   width="100%"
@@ -258,7 +305,7 @@ const MixingCycleMasterFormDialog = ({
               ) : (
                 <Box sx={flowBar.selectField?.("100%")}>
                   <Typography component="label" sx={flowBar.selectLabel}>
-                    <FieldLabelWithAsterisk label={S.MIXING_CYCLES.COL_MOTOR_STAGE} required />
+                    <FieldLabelWithAsterisk label={S.CURING_CYCLES.COL_MOTOR_STAGE} required />
                   </Typography>
                   <AppDropdown
                     value={form.motorStage === "" ? "" : String(form.motorStage)}
@@ -270,7 +317,7 @@ const MixingCycleMasterFormDialog = ({
                     }
                     options={motorStageOptions}
                     loading={motorStageLoading}
-                    placeholder={S.MIXING_CYCLES.MOTOR_STAGE_SELECT_PLACEHOLDER}
+                    placeholder={S.CURING_CYCLES.MOTOR_STAGE_SELECT_PLACEHOLDER}
                     disabled={saving}
                     error={Boolean(stageError)}
                     helperText={stageError}
@@ -282,36 +329,39 @@ const MixingCycleMasterFormDialog = ({
                   />
                 </Box>
               )}
-              <Box sx={{ minWidth: 0 }}>
-                <Box sx={flowBar.selectField?.("100%")}>
-                  <Typography component="label" sx={flowBar.selectLabel}>
-                    {S.MIXING_CYCLES.LABEL_DESCRIPTION}
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    multiline
-                    minRows={3}
-                    size="small"
-                    variant="outlined"
-                    value={form.description}
-                    disabled={saving}
-                    onChange={(event) => onChange({ ...form, description: event.target.value })}
-                    sx={{
-                      ...flowBar.selectInput?.(descriptionHasValue),
-                      "& .MuiInputBase-input": {
-                        fontWeight: descriptionHasValue ? 600 : 500,
-                        color: descriptionHasValue ? palette.text : palette.textSub,
-                        fontSize: "0.82rem",
-                      },
-                    }}
-                  />
-                </Box>
+              <Box sx={flowBar.selectField?.("100%")}>
+                <Typography component="label" sx={flowBar.selectLabel}>
+                  <FieldLabelWithAsterisk label={S.CURING_CYCLES.COL_CURING_TYPE} required />
+                </Typography>
+                <AppDropdown
+                  value={form.curingType}
+                  onChange={(value) => onChange({ ...form, curingType: value })}
+                  options={curingTypeOptions}
+                  placeholder={S.CURING_CYCLES.CURING_TYPE_SELECT_PLACEHOLDER}
+                  disabled={saving}
+                  error={Boolean(curingTypeError)}
+                  helperText={curingTypeError}
+                  fullWidth
+                  sx={{
+                    mb: 0,
+                    ...flowBar.selectInput?.(form.curingType.trim().length > 0),
+                  }}
+                />
+              </Box>
+              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, pt: 2.5 }}>
+                <Typography variant="body2">{S.CURING_CYCLES.LABEL_SHOW_PRESSURE}</Typography>
+                <Switch
+                  size="small"
+                  checked={form.showPropellantPressure}
+                  disabled={saving}
+                  onChange={(e) => onChange({ ...form, showPropellantPressure: e.target.checked })}
+                />
               </Box>
               <MasterDataEnableDisableField
                 checked={form.isActive}
                 disabled={saving}
                 minWidth={120}
-                confirmName={form.mixingCycleName || form.mixingCycleCode || "mixing cycle"}
+                confirmName={recordLabel}
                 onChange={(isActive) => onChange({ ...form, isActive })}
               />
             </Box>
@@ -320,7 +370,7 @@ const MixingCycleMasterFormDialog = ({
           <Box>
             {isEdit ? (
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
-                {S.MIXING_CYCLES.EDIT_NESTED_HINT}
+                {S.CURING_CYCLES.EDIT_NESTED_HINT}
               </Typography>
             ) : null}
             {showErrors && fieldErrors.form ? (
@@ -329,30 +379,15 @@ const MixingCycleMasterFormDialog = ({
               </Typography>
             ) : null}
             <Divider sx={{ mb: 1.5 }} />
-            <OperationsEditor
-              title={S.MIXING_CYCLES.PREMIX_OPERATIONS}
-              ops={form.cycles.premixOperations}
+            <StepsEditor
+              steps={form.cycles}
               disabled={saving}
               isEdit={isEdit}
               showErrors={showErrors}
-              operationErrors={fieldErrors.premixOperations}
+              showPressure={form.showPropellantPressure}
+              stepErrors={fieldErrors.cycles}
               theme={fieldTheme}
-              onChange={(premixOperations) =>
-                onChange({ ...form, cycles: { ...form.cycles, premixOperations } })
-              }
-            />
-            <Box sx={{ mt: 2 }} />
-            <OperationsEditor
-              title={S.MIXING_CYCLES.FINAL_MIX_OPERATIONS}
-              ops={form.cycles.finalMixOperations}
-              disabled={saving}
-              isEdit={isEdit}
-              showErrors={showErrors}
-              operationErrors={fieldErrors.finalMixOperations}
-              theme={fieldTheme}
-              onChange={(finalMixOperations) =>
-                onChange({ ...form, cycles: { ...form.cycles, finalMixOperations } })
-              }
+              onChange={(cycles) => onChange({ ...form, cycles })}
             />
           </Box>
         </Stack>
@@ -374,4 +409,4 @@ const MixingCycleMasterFormDialog = ({
   );
 };
 
-export default MixingCycleMasterFormDialog;
+export default CuringCycleMasterFormDialog;

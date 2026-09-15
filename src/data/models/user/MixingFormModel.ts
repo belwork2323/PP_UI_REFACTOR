@@ -634,6 +634,33 @@ const resolveApiMixingCycleValue = (value: unknown): string => {
   ).trim();
 };
 
+/** Send only mixingCycleCode (preferred) or mixingCycleId — backend resolves full cycle details. */
+export const resolveMixingCycleForApi = (
+  entry: Pick<PremixEntry | FinalMixEntry, "mixingCycleCode" | "mixingCycleId" | "mixingCycle">,
+): { mixingCycleCode: string } | { mixingCycleId: number } | null => {
+  const code = String(entry.mixingCycleCode ?? "").trim();
+  if (code) {
+    return { mixingCycleCode: code };
+  }
+
+  const idRaw = entry.mixingCycleId;
+  const id =
+    idRaw !== undefined && idRaw !== null && String(idRaw).trim() !== ""
+      ? Number(idRaw)
+      : null;
+  if (id != null && !Number.isNaN(id)) {
+    return { mixingCycleId: id };
+  }
+
+  const display = String(entry.mixingCycle ?? "").trim();
+  const codeFromDisplay = display.match(/\(([A-Za-z0-9._/-]+)\)\s*$/)?.[1]?.trim();
+  if (codeFromDisplay) {
+    return { mixingCycleCode: codeFromDisplay };
+  }
+
+  return null;
+};
+
 export const resolveApiMixingCycleDisplayValue = (value: unknown): string => {
   if (typeof value === "string") {
     return value.trim();
@@ -853,7 +880,8 @@ export const mapQualityChecksToApi = (rows: QualityCheckRow[]) =>
     const sampleCount = Number(row.noOfSamples) || 1;
     const values = row.observedValues ?? [];
 
-    const observations = values.slice(0, sampleCount).map((val) => ({
+    const observations = values.slice(0, sampleCount).map((val, index) => ({
+      sampleNo: index + 1,
       value: String(val ?? "").trim(),
     }));
 
@@ -1043,10 +1071,7 @@ export const mapMixingFormStateToPayload = (
             mixQuantity: premix.premixQuantity || null,
           },
 
-          mixingCycle: {
-            mixingCycleCode: premix.mixingCycleCode,
-            mixingCycleName: premix.mixingCycle || null,
-          },
+          mixingCycle: resolveMixingCycleForApi(premix),
 
           processParticulars: mapProcessRowsToApi(premix.processParticulars ?? []),
           qualityChecks: mapQualityChecksToApi(premix.qualityChecks),
@@ -1072,10 +1097,7 @@ export const mapMixingFormStateToPayload = (
             bowlId: entry.bowlId,
           },
 
-          mixingCycle: {
-            mixingCycleCode: entry.mixingCycleCode || entry.mixingCycle || null,
-            mixingCycleName: entry.mixingCycle || null,
-          },
+          mixingCycle: resolveMixingCycleForApi(entry),
 
           processParticulars: mapProcessRowsToApi(entry.processParticulars ?? []),
           qualityChecks: mapQualityChecksToApi(entry.qualityChecks),

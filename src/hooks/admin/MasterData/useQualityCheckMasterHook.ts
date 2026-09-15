@@ -20,6 +20,7 @@ import {
 import {
   createQualityCheckMaster,
   deleteQualityCheckMaster,
+  enableQualityCheckMaster,
   fetchQualityCheckMasterList,
   updateQualityCheckMaster,
 } from "@data/api/admin/MasterData/qualityCheckMasterApi";
@@ -49,10 +50,11 @@ export default function useQualityCheckMasterHook({
   const [stats, setStats] = useState(emptyMasterDataStats());
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [motorStageFilter, setMotorStageFilter] = useState("");
+  const [mixTypeFilter, setMixTypeFilter] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [inlineMode, setInlineMode] = useState<"create" | "edit" | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [form, setForm] = useState<QualityCheckFormState>(createEmptyQualityCheckForm());
   const [saving, setSaving] = useState(false);
   const [disabling, setDisabling] = useState(false);
@@ -65,6 +67,8 @@ export default function useQualityCheckMasterHook({
       if (search.trim()) body.search = search.trim();
       if (activeFilter === "ACTIVE") body.isActive = true;
       if (activeFilter === "INACTIVE") body.isActive = false;
+      if (motorStageFilter) body.motorStage = Number(motorStageFilter);
+      if (mixTypeFilter) body.mixType = mixTypeFilter;
       const resp = new ApiResponseModel(await fetchQualityCheckMasterList(body), QualityCheckListModel.fromApi);
       if (resp.success && resp.data) {
         setListPayload(resp.data);
@@ -92,12 +96,11 @@ export default function useQualityCheckMasterHook({
     } finally {
       setLoading(false);
     }
-  }, [activeFilter, search]);
+  }, [activeFilter, mixTypeFilter, motorStageFilter, search]);
 
   useEffect(() => {
     setPage(0);
     setInlineMode(null);
-    setExpandedId(null);
     void loadList();
   }, [loadList, refreshKey]);
 
@@ -113,13 +116,11 @@ export default function useQualityCheckMasterHook({
   };
 
   const openCreate = () => {
-    setExpandedId(null);
     setForm(createEmptyQualityCheckForm());
     setInlineMode("create");
   };
 
   const openEdit = (record: QualityCheckRecord) => {
-    setExpandedId(record.id);
     setForm(mapQualityCheckRecordToForm(record));
     setInlineMode("edit");
   };
@@ -161,8 +162,9 @@ export default function useQualityCheckMasterHook({
     setEnabling(true);
     useAlertStore.getState().showAlert(S.MESSAGES.ENABLING, "loading");
     try {
-      const nextForm = { ...mapQualityCheckRecordToForm(record), isActive: true };
-      const resp = new ApiResponseModel(await updateQualityCheckMaster(buildQualityCheckUpdatePayload(nextForm)));
+      const resp = new ApiResponseModel(
+        await enableQualityCheckMaster(buildQualityCheckDeletePayload(record.id)),
+      );
       if (resp.success) {
         useAlertStore.getState().showAlert(S.MESSAGES.ENABLE_SUCCESS, "success");
         await loadList();
@@ -227,6 +229,16 @@ export default function useQualityCheckMasterHook({
       setSearch(v);
       setPage(0);
     },
+    motorStageFilter,
+    setMotorStageFilter: (v: string) => {
+      setMotorStageFilter(v);
+      setPage(0);
+    },
+    mixTypeFilter,
+    setMixTypeFilter: (v: string) => {
+      setMixTypeFilter(v);
+      setPage(0);
+    },
     page,
     setPage,
     rowsPerPage,
@@ -235,8 +247,6 @@ export default function useQualityCheckMasterHook({
       setPage(0);
     },
     inlineMode,
-    expandedId,
-    setExpandedId,
     form,
     setForm,
     saving,

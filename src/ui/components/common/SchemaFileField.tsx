@@ -58,6 +58,7 @@ type SchemaFileFieldProps = {
   /** Used for post-pick filtering only — not set on the native input (keeps picker fast). */
   accept?: string;
   helperText?: string;
+  required?: boolean;
   compact?: boolean;
   multiple?: boolean;
   addLabel?: string;
@@ -152,6 +153,7 @@ const SchemaFileField = ({
   readOnly = false,
   accept = FILE_PICKER_ACCEPT.IMAGE_VIDEO,
   helperText,
+  required = false,
   compact = false,
   multiple = true,
   addLabel,
@@ -200,6 +202,7 @@ const SchemaFileField = ({
           }}
         >
           {label}
+          {required ? " *" : ""}
         </Typography>
       ) : null}
 

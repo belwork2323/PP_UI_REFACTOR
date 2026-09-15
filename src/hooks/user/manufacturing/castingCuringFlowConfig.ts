@@ -543,7 +543,9 @@ export const formatCuringTypeLabel = (curingType: string) => {
     .toUpperCase();
   if (normalized === "NORMAL_CURING") return S.CURING_TYPE_NORMAL;
   if (normalized === "CONFINED_CURING") return S.CURING_TYPE_CONFINED;
-  if (normalized === "NITROGEN_PRESSURE_CURING") return S.CURING_TYPE_NITROGEN_PRESSURE;
+  if (normalized === "NITROGEN_PRESSURE_CURING" || normalized === "N2_PRESSURE_CURING") {
+    return S.CURING_TYPE_NITROGEN_PRESSURE;
+  }
   return curingType || "—";
 };
 

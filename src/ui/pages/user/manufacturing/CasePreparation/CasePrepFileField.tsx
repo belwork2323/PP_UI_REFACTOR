@@ -22,6 +22,7 @@ import {
   useFileUploadActions,
   type FileAcceptMode,
 } from "../../../../../hooks/useFileUploadActions";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 const S = STRINGS.MANUFACTURING.CASE_PREP;
 
@@ -36,6 +37,8 @@ type CasePrepFileFieldProps = {
   readOnly?: boolean;
   compact?: boolean;
   emptyLabel?: string;
+  required?: boolean;
+  error?: string | null;
 };
 
 const acceptForMode = (mode: FileAcceptMode) =>
@@ -57,6 +60,8 @@ const CasePrepFileField = ({
   readOnly = false,
   compact = false,
   emptyLabel,
+  required = false,
+  error,
 }: CasePrepFileFieldProps) => {
   const inputId = useId();
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -98,7 +103,9 @@ const CasePrepFileField = ({
   return (
     <Box sx={{ minWidth: compact ? 140 : undefined }}>
       {label ? (
-        <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, mb: 0.5 }}>{label}</Typography>
+        <Typography sx={{ fontSize: "0.75rem", fontWeight: 700, mb: 0.5 }}>
+          {required ? <FieldLabelWithAsterisk label={label} required /> : label}
+        </Typography>
       ) : null}
 
       <input
@@ -175,6 +182,11 @@ const CasePrepFileField = ({
                   </Tooltip>
                 ) : null}
               </Stack>
+              {error ? (
+                <Typography sx={{ fontSize: "0.68rem", color: "error.main", mt: 0.35 }}>
+                  {error}
+                </Typography>
+              ) : null}
               {ref.status === "uploading" ? (
                 <LinearProgress
                   variant={

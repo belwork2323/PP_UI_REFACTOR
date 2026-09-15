@@ -439,6 +439,7 @@ const QCForm = ({
           position: "relative",
           ...(schemaLoading ? { pointerEvents: "none", userSelect: "none", minHeight: 160 } : null),
         }}
+        data-testid="qc-form-container"
       >
         {schemaLoading ? (
           <Box

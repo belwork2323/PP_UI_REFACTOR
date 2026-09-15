@@ -20,6 +20,7 @@ import {
 import {
   createCuringCycleMaster,
   deleteCuringCycleMaster,
+  enableCuringCycleMaster,
   fetchCuringCycleMasterList,
   updateCuringCycleMaster,
 } from "@data/api/admin/MasterData/curingCycleMasterApi";
@@ -49,10 +50,10 @@ export default function useCuringCycleMasterHook({
   const [stats, setStats] = useState(emptyMasterDataStats());
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [motorStageFilter, setMotorStageFilter] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [inlineMode, setInlineMode] = useState<"create" | "edit" | null>(null);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const [form, setForm] = useState<CuringCycleFormState>(createEmptyCuringCycleForm());
   const [saving, setSaving] = useState(false);
   const [disabling, setDisabling] = useState(false);
@@ -65,6 +66,7 @@ export default function useCuringCycleMasterHook({
       if (search.trim()) body.search = search.trim();
       if (activeFilter === "ACTIVE") body.isActive = true;
       if (activeFilter === "INACTIVE") body.isActive = false;
+      if (motorStageFilter) body.motorStage = Number(motorStageFilter);
       const resp = new ApiResponseModel(await fetchCuringCycleMasterList(body), CuringCycleListModel.fromApi);
       if (resp.success && resp.data) {
         setListPayload(resp.data);
@@ -92,12 +94,11 @@ export default function useCuringCycleMasterHook({
     } finally {
       setLoading(false);
     }
-  }, [activeFilter, search]);
+  }, [activeFilter, motorStageFilter, search]);
 
   useEffect(() => {
     setPage(0);
     setInlineMode(null);
-    setExpandedId(null);
     void loadList();
   }, [loadList, refreshKey]);
 
@@ -113,13 +114,11 @@ export default function useCuringCycleMasterHook({
   };
 
   const openCreate = () => {
-    setExpandedId(null);
     setForm(createEmptyCuringCycleForm());
     setInlineMode("create");
   };
 
   const openEdit = (record: CuringCycleRecord) => {
-    setExpandedId(record.id);
     setForm(mapCuringRecordToForm(record));
     setInlineMode("edit");
   };
@@ -161,8 +160,9 @@ export default function useCuringCycleMasterHook({
     setEnabling(true);
     useAlertStore.getState().showAlert(S.MESSAGES.ENABLING, "loading");
     try {
-      const nextForm = { ...mapCuringRecordToForm(record), isActive: true };
-      const resp = new ApiResponseModel(await updateCuringCycleMaster(buildCuringCycleUpdatePayload(nextForm)));
+      const resp = new ApiResponseModel(
+        await enableCuringCycleMaster(buildCuringCycleDeletePayload(record.id)),
+      );
       if (resp.success) {
         useAlertStore.getState().showAlert(S.MESSAGES.ENABLE_SUCCESS, "success");
         await loadList();
@@ -227,6 +227,11 @@ export default function useCuringCycleMasterHook({
       setSearch(v);
       setPage(0);
     },
+    motorStageFilter,
+    setMotorStageFilter: (v: string) => {
+      setMotorStageFilter(v);
+      setPage(0);
+    },
     page,
     setPage,
     rowsPerPage,
@@ -235,8 +240,6 @@ export default function useCuringCycleMasterHook({
       setPage(0);
     },
     inlineMode,
-    expandedId,
-    setExpandedId,
     form,
     setForm,
     saving,

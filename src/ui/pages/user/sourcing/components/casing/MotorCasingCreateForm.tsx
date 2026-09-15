@@ -486,12 +486,12 @@ const MotorCasingCreateForm = ({
                   <TableRow>
                     {[
                       S.COL_RADIOGRAPHY_SR,
-                      S.COL_RADIOGRAPHY_SECTIONS,
-                      S.COL_RADIOGRAPHY_ORIENTATIONS,
-                      S.COL_RADIOGRAPHY_SFD,
-                      S.COL_RADIOGRAPHY_NORMAL,
-                      S.COL_RADIOGRAPHY_TANGENTIAL,
-                      S.COL_RADIOGRAPHY_DETECTOR,
+                      `${S.COL_RADIOGRAPHY_SECTIONS} *`,
+                      `${S.COL_RADIOGRAPHY_ORIENTATIONS} *`,
+                      `${S.COL_RADIOGRAPHY_SFD} *`,
+                      `${S.COL_RADIOGRAPHY_NORMAL} *`,
+                      `${S.COL_RADIOGRAPHY_TANGENTIAL} *`,
+                      `${S.COL_RADIOGRAPHY_DETECTOR} *`,
                       "",
                     ].map((label, headerIndex) => (
                       <TableCell

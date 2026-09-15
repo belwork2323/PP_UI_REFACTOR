@@ -78,6 +78,7 @@ import {
   createInitialRevalidationSchemaValues,
   hydrateRevalidationValuesFromSections,
 } from "../../../../../hooks/user/qualityControl/qcRawMaterialRevalidationTable";
+import { mergeValidationRequirementsIntoSchema } from "../../../../../data/validation/utils/validationToSchemaMapper";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 
@@ -171,8 +172,11 @@ const QCDivisionEntryPanel = ({
     ) {
       return null;
     }
-    return schema;
-  }, [entry.kind, schema]);
+
+    // Merge validation requirements into the schema to show asterisks on required fields
+    const schemaWithValidation = mergeValidationRequirementsIntoSchema(schema, entry, "SUBMIT");
+    return schemaWithValidation;
+  }, [entry.kind, schema, entry.entryId]);
 
   const mixingPremixValues = useMemo(() => {
     const saved = entryValues.schemaValues;

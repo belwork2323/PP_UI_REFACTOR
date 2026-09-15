@@ -1,4 +1,4 @@
-import { STRINGS } from "@/app/config/strings";
+import { pickField } from "@/data/models/user/castingCuringFieldCodec";
 import type { CastingMotorData } from "@/data/models/user/CastingMotorDataModel";
 import type { SubDeptValidationConfig } from "../runValidation";
 import type { ValidationTier } from "../submissionIntent";
@@ -134,6 +134,12 @@ export const castingCuringFieldRules = {
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
     pattern: S.PATTERNS.FLOAT,
   },
+  slurryDepth: {
+    valueType: "number" as const,
+    requiredIn: ["SUBMIT"],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+    pattern: S.PATTERNS.FLOAT,
+  },
   flowRate: {
     valueType: "number" as const,
     requiredIn: ["SUBMIT"],
@@ -153,22 +159,22 @@ export const castingCuringFieldRules = {
     pattern: S.PATTERNS.FLOAT,
   },
   initialVacuum: {
-    valueType: "text" as const,
+    valueType: "number" as const,
     requiredIn: ["SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    maxLength: S.LENGTH.MAX_STANDARD,
+    pattern: S.PATTERNS.FLOAT,
   },
   vacuumPressureCasting: {
-    valueType: "text" as const,
+    valueType: "number" as const,
     requiredIn: ["SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    maxLength: S.LENGTH.MAX_STANDARD,
+    pattern: S.PATTERNS.FLOAT,
   },
   vacuumPressureSoaking: {
-    valueType: "text" as const,
+    valueType: "number" as const,
     requiredIn: ["SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    maxLength: S.LENGTH.MAX_STANDARD,
+    pattern: S.PATTERNS.FLOAT,
   },
   fmMotorLabel: {
     valueType: "text" as const,
@@ -313,8 +319,20 @@ export const castingCuringFieldRules = {
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
 };
-function resolveFieldPaths(data: any) {
-  const paths: Array<{ path: string; value: unknown; ruleKey: string }> = [];
+const isSlurryTotalValidationRow = (row: { ROW_KEY?: unknown; FM_MOTOR_LABEL?: unknown }) => {
+  const rowKey = String(row?.ROW_KEY ?? "").trim().toUpperCase();
+  const label = String(row?.FM_MOTOR_LABEL ?? "").trim().toLowerCase();
+  return rowKey === "TOTAL" || label === "total slurry cast";
+};
+
+type ResolvedFieldPath = { path: string; value: unknown; ruleKey: string };
+
+function resolveCastingFieldPaths(data: any): ResolvedFieldPath[] {
+  const paths: ResolvedFieldPath[] = [];
+  const castingProcess =
+    (data?.CASTING_PROCESS as Record<string, unknown> | undefined) ??
+    (data?.castingProcess as Record<string, unknown> | undefined) ??
+    {};
 
   // feed readings
   const casing = data.FINAL_ASSEMBLY_DETAILS?.motorCasing?.[0];
@@ -466,25 +484,25 @@ function resolveFieldPaths(data: any) {
   });
   // console.log("check error ", data);
 
-  // casting process level fields
-  // paths.push({
-  //   path: `CASTING_PROCESS.INITIAL_VACUUM`,
-  //   value: data.CASTING_PROCESS?.INITIAL_VACUUM,
-  //   ruleKey: "initialVacuum",
-  // });
-  // paths.push({
-  //   path: `CASTING_PROCESS.VACUUM_PRESSURE_CASTING`,
-  //   value: data.CASTING_PROCESS?.VACUUM_PRESSURE_CASTING,
-  //   ruleKey: "vacuumPressureCasting",
-  // });
-  // paths.push({
-  //   path: `CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`,
-  //   value: data.CASTING_PROCESS?.VACUUM_PRESSURE_SOAKING,
-  //   ruleKey: "vacuumPressureSoaking",
-  // });
+  paths.push({
+    path: `CASTING_PROCESS.INITIAL_VACUUM`,
+    value: pickField(castingProcess, "initialVacuum", "INITIAL_VACUUM"),
+    ruleKey: "initialVacuum",
+  });
+  paths.push({
+    path: `CASTING_PROCESS.VACUUM_PRESSURE_CASTING`,
+    value: pickField(castingProcess, "vacuumPressureCasting", "VACUUM_PRESSURE_CASTING"),
+    ruleKey: "vacuumPressureCasting",
+  });
+  paths.push({
+    path: `CASTING_PROCESS.VACUUM_PRESSURE_SOAKING`,
+    value: pickField(castingProcess, "vacuumPressureSoaking", "VACUUM_PRESSURE_SOAKING"),
+    ruleKey: "vacuumPressureSoaking",
+  });
 
   // slurry cast rows
   (data.SLURRY_CAST_DETAILS?.SLURRY_CAST_FROM_BOWLS ?? []).forEach((row, i) => {
+    if (isSlurryTotalValidationRow(row)) return;
     paths.push({
       path: `SLURRY_CAST_DETAILS.SLURRY_CAST_FROM_BOWLS.${i}.FM_MOTOR_LABEL`,
       value: row.FM_MOTOR_LABEL,
@@ -510,6 +528,12 @@ function resolveFieldPaths(data: any) {
       ruleKey: "postDetails",
     });
   });
+
+  return paths;
+}
+
+function resolveCuringFieldPaths(data: any): ResolvedFieldPath[] {
+  const paths: ResolvedFieldPath[] = [];
 
   // curing cycles table
   (data.CURING_CYCLES?.CURING_TABLE ?? []).forEach((row: any, i: number) => {
@@ -617,11 +641,21 @@ function resolveFieldPaths(data: any) {
   return paths;
 }
 
-export const castingCuringValidationConfig: SubDeptValidationConfig<CastingMotorData> = {
-  id: "castingCuring",
+export const castingMotorValidationConfig: SubDeptValidationConfig<CastingMotorData> = {
+  id: "castingMotor",
   fields: castingCuringFieldRules as any,
-  resolveFieldPaths,
+  resolveFieldPaths: resolveCastingFieldPaths,
   customRules: [],
 };
 
-export default castingCuringValidationConfig;
+export const curingMotorValidationConfig: SubDeptValidationConfig<unknown> = {
+  id: "curingMotor",
+  fields: castingCuringFieldRules as any,
+  resolveFieldPaths: resolveCuringFieldPaths,
+  customRules: [],
+};
+
+/** @deprecated Use castingMotorValidationConfig or curingMotorValidationConfig */
+export const castingCuringValidationConfig = castingMotorValidationConfig;
+
+export default castingMotorValidationConfig;

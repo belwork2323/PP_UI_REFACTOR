@@ -1,9 +1,7 @@
 import React from "react";
 import {
   Box,
-  Button,
   Dialog,
-  DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
@@ -129,12 +127,6 @@ const InsulationSpecViewDialog = ({ open, record, onClose, t }: Props) => {
           </Stack>
         )}
       </DialogContent>
-
-      <DialogActions sx={modal.actions}>
-        <Button onClick={onClose} sx={modal.cancelButton}>
-          {S.FORM.CANCEL}
-        </Button>
-      </DialogActions>
     </Dialog>
   );
 };

@@ -273,6 +273,7 @@ import {
   validateQcDivisionEntry,
   validateQcDivisionEntries,
 } from "../../../data/validation/adapters/qcDivisionValidation";
+import { focusFieldByPath } from "@/data/validation/utils/fieldPathResolver";
 
 import {
   collectTempFileIdsFromDivisionScope,
@@ -5765,6 +5766,27 @@ export const useQCDivisionHook = () => {
     }
     if (!validationOk) {
       setEntryValidationErrors((prev) => ({ ...prev, ...errorsByEntryId }));
+
+      // Focus on the first invalid field
+      const container = document.querySelector('[data-testid="qc-form-container"]');
+      if (container) {
+        // Find the first field with an error
+        let firstFieldPath = null;
+        for (const entryId in errorsByEntryId) {
+          const entryErrors = errorsByEntryId[entryId];
+          if (entryErrors && Object.keys(entryErrors).length > 0) {
+            const firstErrorField = Object.keys(entryErrors)[0];
+            if (firstErrorField) {
+              firstFieldPath = firstErrorField;
+              break;
+            }
+          }
+        }
+        if (firstFieldPath) {
+          focusFieldByPath(firstFieldPath, container);
+        }
+      }
+
       // Field-level red errors only — no yellow "enter at least one value" popup
       return false;
     }
@@ -5951,12 +5973,50 @@ export const useQCDivisionHook = () => {
       return false;
     }
 
+    // Division-level SUBMIT must run field validation (was bypassing adapters).
+    {
+      const entries = submitFormState.divisionEntries ?? [];
+      const validation = validateQcDivisionEntries(
+        entries,
+        submitFormState.divisionEntryValues ?? {},
+        "SUBMIT",
+        {
+          mixingFinalMixDetailsValues: submitFormState.mixingFinalMixDetailsValues,
+        },
+      );
+      if (!validation.ok) {
+        setEntryValidationErrors((prev) => ({
+          ...prev,
+          ...validation.errorsByEntryId,
+        }));
+        // Focus on the first invalid field
+        const containerElement = document.querySelector('[data-testid="qc-form-container"]');
+        if (containerElement && containerElement instanceof HTMLElement) {
+          // Find the first field with an error
+          let firstFieldPath = null;
+          for (const entryId in validation.errorsByEntryId) {
+            const entryErrors = validation.errorsByEntryId[entryId];
+            if (entryErrors && Object.keys(entryErrors).length > 0) {
+              const firstErrorField = Object.keys(entryErrors)[0];
+              if (firstErrorField) {
+                firstFieldPath = firstErrorField;
+                break;
+              }
+            }
+          }
+          if (firstFieldPath) {
+            focusFieldByPath(firstFieldPath, containerElement);
+          }
+        }
+        return false;
+      }
+    }
+
     let payload: ReturnType<typeof mapQualityControlPayload>;
 
     if (!hasUnits) {
       // Divisions without unit nav (e.g. Raw Material Revalidation): send active tab only.
       if (!hasDivisionEntries(submitFormState) && !submitFormState.schemaFormLoaded) {
-        showAlert(messages.EMPTY_FORM_ERROR, "warning");
         return false;
       }
       // Field validation below replaces the yellow "enter at least one QC value" gate.

@@ -34,10 +34,10 @@ export type QcNdtDivisionValidationTarget = {
 
 export const qcNdtDivisionValidationFields: Record<string, FieldRuleConfig> = {
   machineNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
-  noOfSections: number(["SUBMIT"]),
-  noOfOrientations: number(["SUBMIT"]),
-  normalExposures: number(["SUBMIT"]),
-  tangentialExposures: number(["SUBMIT"]),
+  noOfSections: number(["FORMAT", "SUBMIT"]),
+  noOfOrientations: number(["FORMAT", "SUBMIT"]),
+  normalExposures: number(["FORMAT", "SUBMIT"]),
+  tangentialExposures: number(["FORMAT", "SUBMIT"]),
   typeOfDefect: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
   observations: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   location: text([], S.PATTERNS.ALPHANUMERIC),

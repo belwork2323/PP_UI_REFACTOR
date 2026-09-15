@@ -7,6 +7,8 @@ import {
   toSectionSubmissions,
 } from "../state/formState";
 import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "../types";
+import { mergeValidationRequirementsIntoSchema } from "@/data/validation/utils/validationToSchemaMapper";
+import type { QcDivisionEntry } from "@/hooks/user/qualityControl/qcDivisionEntryTypes";
 
 export const QC_SCHEMA_FUNCTIONALITY = "CREATE_QC_FORM";
 export const QC_SCHEMA_TYPE = "QC";
@@ -601,6 +603,8 @@ export const fetchQcSchema = async (params: {
   division: QcApiDivision;
   subType?: QcApiSubType;
   inhibitorType?: QcInhibitorType | null;
+  // Optional: QC division entry for validation requirements merging
+  entry?: QcDivisionEntry;
 }) => {
   const request = buildQcSchemaRequest(params);
   const response = await schemaEngineController.fetchSchema(qcSchemaFetchConfig, request);
@@ -621,6 +625,16 @@ export const fetchQcSchema = async (params: {
       params.inhibitorType === "NOT_APPLICABLE"
     ) {
       response.data = normalizeQcInhibitionNotApplicableSchema(response.data);
+    }
+
+    // Merge validation requirements into the schema for QC division entries
+    // This adds the required property to field blocks based on validation configs
+    if (params.entry) {
+      response.data = mergeValidationRequirementsIntoSchema(
+        response.data,
+        params.entry,
+        "SUBMIT" // We want to mark fields as required for form submission validation
+      );
     }
   }
   return response;

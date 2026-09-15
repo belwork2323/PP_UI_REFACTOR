@@ -38,10 +38,10 @@ export type QcTrimmingValidationTarget = {
 
 export const qcTrimmingValidationFields: Record<string, FieldRuleConfig> = {
   motorReceivedAt: date(["UNIT", "SUBMIT"]),
-  dimension: number(["SUBMIT"]),
-  specified: number(["SUBMIT"]),
+  dimension: number(["FORMAT", "SUBMIT"]),
+  specified: number(["FORMAT", "SUBMIT"]),
   measurementStage: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
-  reading: number(["SUBMIT"]), // R2T, R2B, R1R, R1L — cross-check with spec on SUBMIT via custom optional
+  reading: number(["FORMAT", "SUBMIT"]), // R2T, R2B, R1R, R1L — cross-check with spec on SUBMIT via custom optional
 };
 
 const asRecord = (v: unknown): Record<string, unknown> | null =>
@@ -60,6 +60,24 @@ export const qcTrimmingValidationConfig: SubDeptValidationConfig<QcTrimmingValid
       path: "motorReceivedAt",
       value: values.motorReceivedAt ?? values.MOTOR_RECEIVED_AT,
       ruleKey: "motorReceivedAt",
+    });
+
+    fields.push({
+      path: "machineDetails",
+      value: values.machineDetails ?? values.MACHINE_DETAILS,
+      ruleKey: "machineDetails",
+    });
+
+    fields.push({
+      path: "startDate",
+      value: values.startDate ?? values.START_DATE,
+      ruleKey: "startDate",
+    });
+
+    fields.push({
+      path: "completionDate",
+      value: values.completionDate ?? values.COMPLETION_DATE,
+      ruleKey: "completionDate",
     });
 
     const details = asArray(values.trimmingDetails ?? values.TRIMMING_DETAILS);

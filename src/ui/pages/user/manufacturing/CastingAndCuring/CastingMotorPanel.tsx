@@ -233,14 +233,16 @@ const CastingMotorPanel = ({
   valueRef.current = value;
 
   const patchRoot = (partial: Partial<CastingMotorData>) => {
-    onChange({ ...value, ...partial });
+    const current = valueRef.current;
+    onChangeRef.current({ ...current, ...partial });
   };
 
   const patchCastingProcess = (partial: Partial<CastingMotorData["CASTING_PROCESS"]>) => {
-    onChange({
-      ...value,
+    const current = valueRef.current;
+    onChangeRef.current({
+      ...current,
       CASTING_PROCESS: {
-        ...value.CASTING_PROCESS,
+        ...current.CASTING_PROCESS,
         ...partial,
       },
     });
@@ -512,7 +514,6 @@ const CastingMotorPanel = ({
         Add row
       </Typography>
     ) : null;
-  console.log(validationErrors);
 
   const renderMandrelTable = () => (
     <Box sx={{ mb: 2 }}>

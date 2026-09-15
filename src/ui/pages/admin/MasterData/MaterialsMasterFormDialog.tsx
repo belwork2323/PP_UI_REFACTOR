@@ -574,9 +574,6 @@ const MaterialsMasterFormDialog = ({
       </DialogContent>
 
       <DialogActions sx={modal.actions}>
-        <Button onClick={() => !saving && onClose()} sx={modal.cancelButton}>
-          {S.FORM.CANCEL}
-        </Button>
         <Button variant="contained" onClick={handleSave} disabled={saving} sx={modal.saveButton}>
           {saving ? (
             <>

@@ -1,8 +1,6 @@
 import {
   Box,
-  Button,
   Dialog,
-  DialogActions,
   DialogContent,
   DialogTitle,
   Typography,
@@ -100,10 +98,6 @@ const DimensionalParametersMasterViewDialog = ({
           </Box>
         ) : null}
       </DialogContent>
-
-      <DialogActions sx={modal.actions}>
-        <Button onClick={onClose}>{S.FORM.CANCEL}</Button>
-      </DialogActions>
     </Dialog>
   );
 };

@@ -103,15 +103,39 @@ const renderField = (block: SchemaFieldBlock, ctx: BlockRenderContext) => {
       );
     case "date":
       return withError(
-        <DateField label={block.label} value={value} onChange={onFieldChange} disabled={disabled} />,
+        <DateField
+          label={block.label}
+          value={value}
+          onChange={onFieldChange}
+          disabled={disabled}
+          required={block.validation?.required}
+          error={Boolean(errorMsg)}
+          helperText={errorMsg}
+        />,
       );
     case "time":
       return withError(
-        <TimeField label={block.label} value={value} onChange={onFieldChange} disabled={disabled} />,
+        <TimeField
+          label={block.label}
+          value={value}
+          onChange={onFieldChange}
+          disabled={disabled}
+          required={block.validation?.required}
+          error={Boolean(errorMsg)}
+          helperText={errorMsg}
+        />,
       );
     case "datetime":
       return withError(
-        <DateTimeField label={block.label} value={value} onChange={onFieldChange} disabled={disabled} />,
+        <DateTimeField
+          label={block.label}
+          value={value}
+          onChange={onFieldChange}
+          disabled={disabled}
+          required={block.validation?.required}
+          error={Boolean(errorMsg)}
+          helperText={errorMsg}
+        />,
       );
     case "file":
     case "image":
@@ -127,6 +151,7 @@ const renderField = (block: SchemaFieldBlock, ctx: BlockRenderContext) => {
               : FILE_PICKER_ACCEPT.IMAGE_VIDEO_PDF
           }
           helperText={block.ui?.placeholder}
+          required={block.validation?.required}
           multiple
         />,
       );

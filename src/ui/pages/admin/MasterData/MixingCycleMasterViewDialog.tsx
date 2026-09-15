@@ -1,8 +1,6 @@
 import {
   Box,
-  Button,
   Dialog,
-  DialogActions,
   DialogContent,
   DialogTitle,
   Divider,
@@ -130,12 +128,6 @@ const MixingCycleMasterViewDialog = ({ open, record, motorStageOptions, onClose,
           </Stack>
         ) : null}
       </DialogContent>
-
-      <DialogActions sx={modal.actions}>
-        <Button onClick={onClose} sx={modal.cancelButton}>
-          {S.FORM.CANCEL}
-        </Button>
-      </DialogActions>
     </Dialog>
   );
 };

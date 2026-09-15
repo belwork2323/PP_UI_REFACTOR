@@ -260,7 +260,10 @@ const parseMixingPremixFromApi = (item: unknown): IdentificationSheetMixingPremi
     mixQuantity: (row.mixQuantity as number | string | null | undefined) ?? null,
     mixingCycle: cycle
       ? {
-          mixingCycleId: Number(cycle.mixingCycleId ?? 0) || undefined,
+          mixingCycleId:
+            Number(cycle.mixingCycleId ?? cycle.id ?? 0) > 0
+              ? Number(cycle.mixingCycleId ?? cycle.id)
+              : undefined,
           mixingCycleCode: String(cycle.mixingCycleCode ?? "").trim() || undefined,
           mixingCycleName: String(cycle.mixingCycleName ?? "").trim() || undefined,
         }

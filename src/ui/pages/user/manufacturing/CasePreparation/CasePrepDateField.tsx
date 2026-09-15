@@ -1,6 +1,7 @@
 import { Box, Typography } from "@mui/material";
 import DateField from "../../../../components/common/DateField";
 import { WorkflowReadOnlyText } from "../../../../components/common/WorkflowReadOnlyText";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 type CasePrepDateFieldProps = {
   label: string;
@@ -10,6 +11,9 @@ type CasePrepDateFieldProps = {
   readOnly?: boolean;
   placeholder?: string;
   theme: any;
+  required?: boolean;
+  error?: boolean;
+  helperText?: string;
 };
 
 const CasePrepDateField = ({
@@ -20,6 +24,9 @@ const CasePrepDateField = ({
   readOnly = false,
   placeholder = "DD-MM-YYYY",
   theme,
+  required = false,
+  error = false,
+  helperText,
 }: CasePrepDateFieldProps) => {
   const accentColor = theme?.palette?.primaryLight ?? theme?.palette?.primary ?? "#2E86C1";
   const labelSx = theme?.manufacturing?.casePreparation?.flowBar?.selectLabel;
@@ -36,7 +43,7 @@ const CasePrepDateField = ({
             ...(labelSx ?? {}),
           }}
         >
-          {label}
+          {required ? <FieldLabelWithAsterisk label={label} required /> : label}
         </Typography>
       ) : null}
       {readOnly ? (
@@ -47,6 +54,9 @@ const CasePrepDateField = ({
         onChange={onChange}
         disabled={disabled}
         placeholder={placeholder}
+        required={required}
+        error={error}
+        helperText={helperText}
         compact
         inputSx={{
           "& .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline": {

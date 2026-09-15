@@ -375,7 +375,6 @@ const DimensionalParametersMasterFormDialog = ({
       </DialogContent>
 
       <DialogActions sx={modal.actions}>
-        <Button onClick={handleClose} disabled={saving}>{S.FORM.CANCEL}</Button>
         <Button
           variant="contained"
           onClick={handleSave}

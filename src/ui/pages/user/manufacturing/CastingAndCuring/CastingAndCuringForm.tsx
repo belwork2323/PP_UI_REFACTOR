@@ -13,6 +13,11 @@ import {
 } from "@mui/material";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
+import { useAlertStore } from "../../../../../app/store/alertStore";
+import {
+  firstValidationError,
+  hasValidationErrors,
+} from "../../../../../data/validation/validationErrors";
 import { CASTING_CURING_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/castingAndCuring_theme";
 import {
   CASTING_CURING_FLOW_LABELS,
@@ -39,6 +44,21 @@ const CURING_VALIDATION_PREFIXES = [
   "DECORING_DETAILS.",
 ] as const;
 
+const isCuringValidationPath = (path: string) =>
+  CURING_VALIDATION_PREFIXES.some((prefix) => path.startsWith(prefix));
+
+const resolveProcessTabForValidationErrors = (
+  errors: Record<string, string>,
+): MotorProcessTab | null => {
+  const keys = Object.keys(errors);
+  if (keys.length === 0) return null;
+  const hasCuring = keys.some(isCuringValidationPath);
+  const hasCasting = keys.some((key) => !isCuringValidationPath(key));
+  if (hasCuring && !hasCasting) return "CURING";
+  if (hasCasting) return "CASTING";
+  return "CURING";
+};
+
 const stripValidationErrorsByPrefix = (
   errors: Record<string, string>,
   prefixes: readonly string[],
@@ -62,7 +82,10 @@ import FinalApprovalMotorDialog, {
 import CastingCuringFlowBar from "./CastingCuringFlowBar";
 import CastingMotorPanel from "./CastingMotorPanel";
 import CuringMotorPanel from "./CuringMotorPanel";
-import { validateCastingCuring } from "../../../../../data/validation/adapters/castingCuring.validation";
+import {
+  validateCastingMotor,
+  validateCuringMotor,
+} from "../../../../../data/validation/adapters/castingCuring.validation";
 import CastingCuringSetupHeaderCard from "./CastingCuringSetupHeaderCard";
 import CuringProcessFlowBar from "./CuringProcessFlowBar";
 import CuringSetupHeaderCard from "./CuringSetupHeaderCard";
@@ -144,6 +167,7 @@ const CastingAndCuringForm = ({
   theme,
 }: CastingAndCuringFormProps) => {
   const BRAND = CASTING_CURING_BRAND;
+  const showAlert = useAlertStore((state) => state.showAlert);
   const motorCards = useMemo(() => {
     const formMotors = Array.isArray(addedMotors) ? addedMotors : [];
     return mergeCastingCuringMotorsFromBatchAndForm(batch, formMotors);
@@ -524,17 +548,30 @@ const CastingAndCuringForm = ({
                         const motor = activeMotorSession;
                         if (!motor) return;
 
-                        const castingErrors = validateCastingCuring(motor.castingData, "SUBMIT");
-                        const curingErrors = curingFormLoaded
-                          ? validateCastingCuring(
-                              motor.curingData ?? createEmptyCuringMotorData(),
-                              "SUBMIT",
-                            )
-                          : {};
+                        if (!curingFormLoaded) {
+                          showAlert(S.CURING_REQUIRED_BEFORE_SUBMIT, "warning");
+                          setActiveProcessTab("CURING");
+                          return;
+                        }
+
+                        const castingErrors = validateCastingMotor(motor.castingData, "SUBMIT");
+                        const curingErrors = validateCuringMotor(
+                          motor.curingData ?? createEmptyCuringMotorData(),
+                          "SUBMIT",
+                        );
                         const errors = { ...(castingErrors ?? {}), ...(curingErrors ?? {}) };
 
-                        if (Object.keys(errors).length > 0) {
+                        if (hasValidationErrors(errors)) {
                           setValidationErrors(errors);
+                          const nextTab = resolveProcessTabForValidationErrors(errors);
+                          if (nextTab) setActiveProcessTab(nextTab);
+                          const firstError = firstValidationError(errors);
+                          showAlert(
+                            firstError
+                              ? `${S.SUBMIT_VALIDATION_FAILED} (${firstError})`
+                              : S.SUBMIT_VALIDATION_FAILED,
+                            "warning",
+                          );
                           return;
                         }
                         setValidationErrors({});

@@ -91,12 +91,14 @@ export const ADMIN_ENDPOINTS = {
       CREATE: `${API_BASE}/admin/master-data/curing-cycles/create`,
       UPDATE: `${API_BASE}/admin/master-data/curing-cycles/update`,
       DELETE: `${API_BASE}/admin/master-data/curing-cycles/delete`,
+      ENABLE: `${API_BASE}/admin/master-data/curing-cycles/enable`,
     },
     QUALITY_CHECKS: {
       LIST: `${API_BASE}/admin/master-data/quality-checks/list`,
       CREATE: `${API_BASE}/admin/master-data/quality-checks/create`,
       UPDATE: `${API_BASE}/admin/master-data/quality-checks/update`,
       DELETE: `${API_BASE}/admin/master-data/quality-checks/delete`,
+      ENABLE: `${API_BASE}/admin/master-data/quality-checks/enable`,
     },
     QC_DIVISIONS: {
       LIST: `${API_BASE}/admin/master-data/qc-divisions/list`,

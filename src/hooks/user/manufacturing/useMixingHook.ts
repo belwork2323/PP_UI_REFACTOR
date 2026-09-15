@@ -272,6 +272,10 @@ export const useMixingHook = () => {
                   (mixingCycle as any)?.mixingCycleCode ??
                   "",
               ),
+              mixingCycleId: String(
+                (mixingCycle as any)?.id ?? (mixingCycle as any)?.mixingCycleId ?? "",
+              ),
+              mixingCycleName: String((mixingCycle as any)?.mixingCycleName ?? ""),
             }),
           );
 
@@ -287,6 +291,9 @@ export const useMixingHook = () => {
               mixingCycle: resolveApiMixingCycleDisplayValue(mixingCycle) || "",
               mixingCycleCode: String(
                 (mixingCycle as any)?.mixingCycleCode ?? (mixingCycle as any)?.id ?? "",
+              ),
+              mixingCycleId: String(
+                (mixingCycle as any)?.id ?? (mixingCycle as any)?.mixingCycleId ?? "",
               ),
               mixingCycleName: String((mixingCycle as any)?.mixingCycleName ?? ""),
             }),

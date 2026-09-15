@@ -14,6 +14,7 @@ import {
 import { CASE_PREP_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/casePreparation_theme";
 import { uniformTableHeaderCellSx, uniformTableBodyCellSx } from "../../../../../app/theme/custom_themes/shared/data_table_theme";
 import { WorkflowReadOnlyText } from "../../../../components/common/WorkflowReadOnlyText";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 const BRAND = CASE_PREP_BRAND;
 
@@ -146,7 +147,13 @@ export const SubsectionHeading = ({ children }: { children: ReactNode }) => (
   </Typography>
 );
 
-export const FieldLabel = ({ children }: { children: ReactNode }) => (
+export const FieldLabel = ({
+  children,
+  required = false,
+}: {
+  children: ReactNode;
+  required?: boolean;
+}) => (
   <Typography
     sx={{
       fontSize: "0.72rem",
@@ -157,7 +164,11 @@ export const FieldLabel = ({ children }: { children: ReactNode }) => (
       display: "block",
     }}
   >
-    {children}
+    {required && typeof children === "string" ? (
+      <FieldLabelWithAsterisk label={children} required />
+    ) : (
+      children
+    )}
   </Typography>
 );
 
@@ -261,6 +272,7 @@ type ParameterTableProps = {
   disabled?: boolean;
   readOnly?: boolean;
   emptyText?: string;
+  requiredValue?: boolean;
 };
 
 const DEFAULT_PARAM_COLUMNS: ParameterTableColumn[] = [
@@ -279,6 +291,7 @@ export const ParameterTable = ({
   disabled = false,
   readOnly = false,
   emptyText = "No rows",
+  requiredValue = false,
 }: ParameterTableProps) => {
   if (!rows.length) {
     return (
@@ -296,6 +309,7 @@ export const ParameterTable = ({
             {columns.map((col, idx) => (
               <TableCell key={col.key} sx={{ ...casePrepTableHeaderCellSx(idx === 0), width: col.width }}>
                 {col.label}
+                {requiredValue && (col.key === "value" || col.key === "observations") ? " *" : ""}
               </TableCell>
             ))}
           </TableRow>

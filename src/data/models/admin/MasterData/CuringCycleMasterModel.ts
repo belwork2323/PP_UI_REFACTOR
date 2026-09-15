@@ -4,12 +4,15 @@ import {
   type MasterDataAuditFields,
   type MasterDataStats,
 } from "@data/models/admin/MasterData/MasterDataModel";
+import { formatMotorStageLabel } from "@data/models/admin/MasterData/MixingCycleMasterModel";
 import {
-  firstFieldErrorMessage,
-  validateMasterDataNameField,
-} from "@data/models/admin/MasterData/masterDataFieldValidators";
+  CURING_TYPE_OPTIONS,
+  isCuringTypeValue,
+} from "@data/models/admin/MasterData/curingTypeOptions";
+import { firstFieldErrorMessage } from "@data/models/admin/MasterData/masterDataFieldValidators";
 
 export type CuringCycleStepForm = {
+  stepId: number | null;
   sequenceNo: number | null;
   temperature: number | "";
   durationMinutes: number | "";
@@ -19,10 +22,13 @@ export type CuringCycleStepForm = {
   endTime: string;
   propellantPressure: number | "";
   hotWaterCirculation: string;
+  isActive: boolean;
+  isExisting?: boolean;
 };
 
 export type CuringCycleRecord = MasterDataAuditFields & {
-  id: string;
+  id: number;
+  curingCycleCode: string;
   motorStage: number;
   motorStageName: string;
   curingType: string;
@@ -37,7 +43,8 @@ export type CuringCycleListPayload = {
 };
 
 export type CuringCycleFormState = {
-  id: string | null;
+  id: number | null;
+  curingCycleCode: string;
   motorStage: number | "";
   motorStageName: string;
   curingType: string;
@@ -47,6 +54,7 @@ export type CuringCycleFormState = {
 };
 
 export const emptyCuringCycleStep = (): CuringCycleStepForm => ({
+  stepId: null,
   sequenceNo: null,
   temperature: "",
   durationMinutes: "",
@@ -56,10 +64,13 @@ export const emptyCuringCycleStep = (): CuringCycleStepForm => ({
   endTime: "",
   propellantPressure: "",
   hotWaterCirculation: "",
+  isActive: true,
+  isExisting: false,
 });
 
 export const createEmptyCuringCycleForm = (): CuringCycleFormState => ({
   id: null,
+  curingCycleCode: "",
   motorStage: "",
   motorStageName: "",
   curingType: "",
@@ -69,6 +80,7 @@ export const createEmptyCuringCycleForm = (): CuringCycleFormState => ({
 });
 
 const mapStep = (raw: any): CuringCycleStepForm => ({
+  stepId: raw?.stepId != null ? Number(raw.stepId) : null,
   sequenceNo: raw?.sequenceNo != null ? Number(raw.sequenceNo) : null,
   temperature: raw?.temperature != null ? Number(raw.temperature) : "",
   durationMinutes: raw?.durationMinutes != null ? Number(raw.durationMinutes) : "",
@@ -78,12 +90,14 @@ const mapStep = (raw: any): CuringCycleStepForm => ({
   endTime: String(raw?.endTime ?? ""),
   propellantPressure: raw?.propellantPressure != null ? Number(raw.propellantPressure) : "",
   hotWaterCirculation: String(raw?.hotWaterCirculation ?? ""),
+  isActive: raw?.isActive !== false,
 });
 
 export const CuringCycleRecordModel = {
   fromApi: (raw: any): CuringCycleRecord => ({
     ...parseMasterDataAuditFields(raw),
-    id: String(raw?.id ?? ""),
+    id: Number(raw?.id),
+    curingCycleCode: String(raw?.curingCycleCode ?? ""),
     motorStage: Number(raw?.motorStage ?? 0),
     motorStageName: String(raw?.motorStageName ?? ""),
     curingType: String(raw?.curingType ?? ""),
@@ -109,15 +123,17 @@ export const CuringCycleListModel = {
 
 export const mapCuringRecordToForm = (record: CuringCycleRecord): CuringCycleFormState => ({
   id: record.id,
+  curingCycleCode: record.curingCycleCode,
   motorStage: record.motorStage,
   motorStageName: record.motorStageName,
   curingType: record.curingType,
   showPropellantPressure: record.showPropellantPressure,
   isActive: record.isActive,
-  cycles: record.cycles.map((c) => ({ ...c })),
+  cycles: record.cycles.map((c) => ({ ...c, isExisting: true })),
 });
 
 const serializeStep = (c: CuringCycleStepForm) => ({
+  stepId: c.stepId ?? undefined,
   sequenceNo: c.sequenceNo ?? undefined,
   temperature: c.temperature === "" ? undefined : Number(c.temperature),
   durationMinutes: c.durationMinutes === "" ? undefined : Number(c.durationMinutes),
@@ -127,11 +143,11 @@ const serializeStep = (c: CuringCycleStepForm) => ({
   endTime: c.endTime.trim() || undefined,
   propellantPressure: c.propellantPressure === "" ? undefined : Number(c.propellantPressure),
   hotWaterCirculation: c.hotWaterCirculation.trim() || undefined,
+  isActive: c.isActive,
 });
 
 export const buildCuringCycleCreatePayload = (form: CuringCycleFormState) => ({
   motorStage: Number(form.motorStage),
-  motorStageName: form.motorStageName.trim() || undefined,
   curingType: form.curingType.trim(),
   showPropellantPressure: form.showPropellantPressure,
   isActive: form.isActive,
@@ -141,19 +157,24 @@ export const buildCuringCycleCreatePayload = (form: CuringCycleFormState) => ({
 export const buildCuringCycleUpdatePayload = (form: CuringCycleFormState) => ({
   id: form.id,
   motorStage: Number(form.motorStage),
-  motorStageName: form.motorStageName.trim() || undefined,
   curingType: form.curingType.trim(),
   showPropellantPressure: form.showPropellantPressure,
   isActive: form.isActive,
   cycles: form.cycles.map(serializeStep),
 });
 
-export const buildCuringCycleDeletePayload = (id: string) => ({ id });
+export const buildCuringCycleDeletePayload = (id: number) => ({ id });
+
+export type CuringCycleStepFieldErrors = {
+  temperature?: string;
+  durationMinutes?: string;
+};
 
 export type CuringCycleFieldErrors = {
   motorStage?: string;
-  motorStageName?: string;
   curingType?: string;
+  cycles?: CuringCycleStepFieldErrors[];
+  form?: string;
 };
 
 export const getCuringCycleFieldErrors = (
@@ -165,27 +186,33 @@ export const getCuringCycleFieldErrors = (
   if (!isEdit && (form.motorStage === "" || Number.isNaN(Number(form.motorStage)))) {
     errors.motorStage = "Motor stage is required";
   }
-  const curingTypeError = validateMasterDataNameField(form.curingType, "Curing type");
-  if (curingTypeError) errors.curingType = curingTypeError;
-  if (form.motorStageName.trim()) {
-    const stageNameError = validateMasterDataNameField(
-      form.motorStageName,
-      "Stage name",
-      false,
-      255,
-    );
-    if (stageNameError) errors.motorStageName = stageNameError;
+  if (!form.curingType.trim()) {
+    errors.curingType = "Curing type is required";
+  } else if (!isCuringTypeValue(form.curingType.trim())) {
+    errors.curingType = "Select a valid curing type";
   }
-  if (!isEdit && form.motorStage !== "" && !errors.motorStage && !errors.curingType) {
+  if (!isEdit && form.motorStage !== "" && !errors.motorStage) {
     const stage = Number(form.motorStage);
-    const type = form.curingType.trim().toLowerCase();
-    const duplicate = existing.some(
-      (item) => item.motorStage === stage && item.curingType.trim().toLowerCase() === type,
-    );
+    const duplicate = existing.some((item) => item.motorStage === stage);
     if (duplicate) {
-      errors.curingType = `Curing cycle already exists for stage ${stage} and type ${form.curingType.trim()}`;
+      errors.motorStage = `Curing cycle already exists for stage ${stage}`;
     }
   }
+  if (!isEdit && form.cycles.length === 0) {
+    errors.form = "Add at least one cycle step";
+    return errors;
+  }
+  errors.cycles = form.cycles.map((step) => {
+    if (isEdit && step.isExisting) return {};
+    const stepErrors: CuringCycleStepFieldErrors = {};
+    if (step.temperature === "" || Number.isNaN(Number(step.temperature))) {
+      stepErrors.temperature = "Temperature is required";
+    }
+    if (step.durationMinutes === "" || Number.isNaN(Number(step.durationMinutes))) {
+      stepErrors.durationMinutes = "Duration is required";
+    }
+    return stepErrors;
+  });
   return errors;
 };
 
@@ -198,4 +225,4 @@ export const validateCuringCycleForm = (
   existing: CuringCycleRecord[] = [],
 ): string | null => getCuringCycleValidationMessage(getCuringCycleFieldErrors(form, isEdit, existing));
 
-export { emptyMasterDataStats };
+export { emptyMasterDataStats, formatMotorStageLabel, CURING_TYPE_OPTIONS };
