@@ -103,6 +103,7 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
     submitConfirm,
     theme,
     totalRows,
+    approvedPreparationLots,
   } = useRawMaterialSpecificationForm(formProps);
 
   const materialsForDropdown = selectableMaterials;
@@ -317,6 +318,7 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
                 errors={validationErrors}
                 validationAttempt={validationAttempt}
                 getAnalysedResultError={getAnalysedResultError}
+                approvedPreparationLots={approvedPreparationLots}
                 theme={theme}
               />
             ))
@@ -335,6 +337,7 @@ const SpecificationFormBuilder = (props: SpecificationFormBuilderProps) => {
                 errors={validationErrors}
                 validationAttempt={validationAttempt}
                 getAnalysedResultError={getAnalysedResultError}
+                approvedPreparationLots={approvedPreparationLots}
                 theme={theme}
               />
             ))}

@@ -46,7 +46,11 @@ import { STRINGS } from "../../../../app/config/strings";
 import { useAuthStore } from "../../../../app/store/authStore";
 import { useFilePreview } from "../../../../hooks/useFilePreview";
 import { fileUtils } from "../../../../utils/FileUtils";
-import type { LotCertificate } from "../../../../data/models/user/RawMaterialProcurementModel";
+import type {
+  LotCertificate,
+  MaterialBlock,
+} from "../../../../data/models/user/RawMaterialProcurementModel";
+import RawMaterialPreparationDetailsView from "./components/RawMaterialPreparationDetailsView";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const SF = STRINGS.SOURCING.SPECIFICATION_FORM;
@@ -166,14 +170,13 @@ const RawMaterialDetailDialog = ({
               </Typography>
             </Box>
           )}
-          {console.log(item)}
           {loading ? (
             <Box sx={theme.dialog.loadingContainer}>
               <CircularProgress size={32} sx={theme.dialog.loadingSpinner} />
               <Typography sx={theme.dialog.loadingText}>Loading raw material details...</Typography>
             </Box>
           ) : item.qcBlocks?.length ? (
-            item.qcBlocks.map((block: any, bi: number) => (
+            item.qcBlocks.map((block: MaterialBlock, bi: number) => (
               <Box key={bi} sx={theme.dialog.blockWrapper(bi === item.qcBlocks.length - 1)}>
                 <Stack direction="row" alignItems="center" gap={1} mb={1}>
                   <Chip label={block.material} size="small" sx={theme.chips.material} />
@@ -215,6 +218,7 @@ const RawMaterialDetailDialog = ({
                     </Box>
                   </Typography>
                 </Stack>
+                <RawMaterialPreparationDetailsView block={block} palette={theme.palette} />
                 <TableContainer sx={theme.dialog.innerTableContainer}>
                   <Table size="small">
                     <TableHead>
@@ -463,7 +467,6 @@ const RawMaterialApproverPage = () => {
     statusDropdownValues,
     filterAllLabel,
   } = useRawMaterialApproverHook();
-  console.log(selected, " f");
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftMaterial, setDraftMaterial] = useState(filterAllLabel);

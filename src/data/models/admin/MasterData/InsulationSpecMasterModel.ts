@@ -276,7 +276,7 @@ export const getInsulationFormFieldErrors = (
       if (nameError) parameterErrors.specificationName = nameError;
 
       const label = parameter.specificationName.trim() || "parameter";
-      const rangeErrors = validateReferenceRangeFields(parameter.referenceRange, label, true);
+      const rangeErrors = validateReferenceRangeFields(parameter.referenceRange, label, false);
       if (rangeErrors.minValue) parameterErrors.minValue = rangeErrors.minValue;
       if (rangeErrors.maxValue) parameterErrors.maxValue = rangeErrors.maxValue;
       if (rangeErrors.unit) parameterErrors.unit = rangeErrors.unit;

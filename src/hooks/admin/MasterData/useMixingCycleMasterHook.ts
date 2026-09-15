@@ -20,6 +20,7 @@ import {
 import {
   createMixingCycleMaster,
   deleteMixingCycleMaster,
+  enableMixingCycleMaster,
   fetchMixingCycleMasterList,
   updateMixingCycleMaster,
 } from "@data/api/admin/MasterData/mixingCycleMasterApi";
@@ -49,10 +50,11 @@ export default function useMixingCycleMasterHook({
   const [stats, setStats] = useState(emptyMasterDataStats());
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [motorStageFilter, setMotorStageFilter] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
+
   const [inlineMode, setInlineMode] = useState<"create" | "edit" | null>(null);
-  const [expandedId, setExpandedId] = useState<number | null>(null);
   const [form, setForm] = useState<MixingCycleFormState>(createEmptyMixingCycleForm());
   const [saving, setSaving] = useState(false);
   const [disabling, setDisabling] = useState(false);
@@ -65,6 +67,7 @@ export default function useMixingCycleMasterHook({
       if (search.trim()) body.search = search.trim();
       if (activeFilter === "ACTIVE") body.isActive = true;
       if (activeFilter === "INACTIVE") body.isActive = false;
+      if (motorStageFilter) body.motorStage = Number(motorStageFilter);
       const resp = new ApiResponseModel(await fetchMixingCycleMasterList(body), MixingCycleListModel.fromApi);
       if (resp.success && resp.data) {
         setListPayload(resp.data);
@@ -92,12 +95,11 @@ export default function useMixingCycleMasterHook({
     } finally {
       setLoading(false);
     }
-  }, [activeFilter, search]);
+  }, [activeFilter, motorStageFilter, search]);
 
   useEffect(() => {
     setPage(0);
     setInlineMode(null);
-    setExpandedId(null);
     void loadList();
   }, [loadList, refreshKey]);
 
@@ -113,20 +115,18 @@ export default function useMixingCycleMasterHook({
   };
 
   const openCreate = () => {
-    setExpandedId(null);
     setForm(createEmptyMixingCycleForm());
     setInlineMode("create");
   };
 
   const openEdit = (record: MixingCycleRecord) => {
-    setExpandedId(record.id);
     setForm(mapMixingRecordToForm(record));
     setInlineMode("edit");
   };
 
   const saveForm = async () => {
     const isEdit = inlineMode === "edit";
-    const err = validateMixingCycleForm(form);
+    const err = validateMixingCycleForm(form, isEdit);
     if (err) {
       useAlertStore.getState().showValidationAlert(err);
       return;
@@ -161,8 +161,9 @@ export default function useMixingCycleMasterHook({
     setEnabling(true);
     useAlertStore.getState().showAlert(S.MESSAGES.ENABLING, "loading");
     try {
-      const nextForm = { ...mapMixingRecordToForm(record), isActive: true };
-      const resp = new ApiResponseModel(await updateMixingCycleMaster(buildMixingCycleUpdatePayload(nextForm)));
+      const resp = new ApiResponseModel(
+        await enableMixingCycleMaster(buildMixingCycleDeletePayload(record.id)),
+      );
       if (resp.success) {
         useAlertStore.getState().showAlert(S.MESSAGES.ENABLE_SUCCESS, "success");
         await loadList();
@@ -227,6 +228,11 @@ export default function useMixingCycleMasterHook({
       setSearch(v);
       setPage(0);
     },
+    motorStageFilter,
+    setMotorStageFilter: (v: string) => {
+      setMotorStageFilter(v);
+      setPage(0);
+    },
     page,
     setPage,
     rowsPerPage,
@@ -235,8 +241,6 @@ export default function useMixingCycleMasterHook({
       setPage(0);
     },
     inlineMode,
-    expandedId,
-    setExpandedId,
     form,
     setForm,
     saving,

@@ -2,6 +2,7 @@
 export const NESTED_MASTER_DATA_TYPES = [
   "materials",
   "insulation-specifications",
+  "dimensional-parameters",
   "mixing-cycles",
   "curing-cycles",
   "quality-checks",

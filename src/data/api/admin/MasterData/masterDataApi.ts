@@ -14,3 +14,6 @@ export const updateMasterData = (type: string, payload: Record<string, unknown>)
 
 export const deleteMasterData = (type: string, payload: { id: number }) =>
   post(ADMIN_ENDPOINTS.MASTER_DATA.DELETE(type), payload);
+
+export const enableMasterData = (type: string, payload: { id: number }) =>
+  post(ADMIN_ENDPOINTS.MASTER_DATA.ENABLE(type), payload);

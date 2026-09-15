@@ -141,11 +141,12 @@ const MasterDataList = ({
   const nameField = schema?.fields?.find((f) => f.key === "name");
   const hideCodeColumn =
     selectedType === "mixers" || Boolean(codeField?.serverGenerated);
-  const hideNameColumn = Boolean(nameField?.serverGenerated);
+  const showNameInput = !nameField?.serverGenerated;
+  const showNameColumn = showNameInput || selectedType === "motor-stages";
   const codeRequired = !hideCodeColumn && !codeField?.serverGenerated;
   const colCount =
     (hideCodeColumn ? 0 : 1) +
-    (hideNameColumn ? 0 : 1) +
+    (showNameColumn ? 1 : 0) +
     attributeFields.length +
     MASTER_DATA_AUDIT_COLUMN_COUNT +
     2;
@@ -169,13 +170,16 @@ const MasterDataList = ({
       );
     }
 
+    const isInteger = field.dataType === "INTEGER";
     const isNumeric =
-      field.dataType === "INTEGER" || field.dataType === "NUMBER" || field.dataType === "DOUBLE";
+      isInteger || field.dataType === "NUMBER" || field.dataType === "DOUBLE";
+    const allowNegativeInteger = field.min == null || field.min < 0;
+    const integerInputPattern = allowNegativeInteger ? /^-?\d*$/ : /^\d*$/;
     return (
       <AppTextField
         compact
         fullWidth
-        type={isNumeric ? "number" : "text"}
+        type={isInteger ? "text" : isNumeric ? "number" : "text"}
         placeholder={requiredFieldLabel(
           getMasterDataFieldLabel(selectedType, field),
           Boolean(field.required),
@@ -183,14 +187,24 @@ const MasterDataList = ({
         value={form.attributes[field.key] ?? ""}
         onChange={(e) => {
           const v = e.target.value;
-          if (isNumeric) {
+          if (isInteger) {
+            if (v === "") {
+              onFormChange(field.key, "", true);
+              return;
+            }
+            if (!integerInputPattern.test(v)) return;
+            const num = Number(v);
+            if (!Number.isInteger(num)) return;
+            if (field.min != null && num < field.min) return;
+            if (field.max != null && num > field.max) return;
+            onFormChange(field.key, num, true);
+          } else if (isNumeric) {
             if (v === "") {
               onFormChange(field.key, "", true);
               return;
             }
             const num = Number(v);
             if (!Number.isFinite(num)) return;
-            if (field.dataType === "INTEGER" && !Number.isInteger(num)) return;
             if (field.min != null && num < field.min) return;
             if (field.max != null && num > field.max) return;
             onFormChange(field.key, num, true);
@@ -203,8 +217,10 @@ const MasterDataList = ({
         helperText={visibleError(field.key)}
         sx={cellSx}
         inputProps={{
-          min: field.min ?? undefined,
-          max: field.max ?? undefined,
+          inputMode: isInteger ? "numeric" : undefined,
+          pattern: isInteger ? (allowNegativeInteger ? "[0-9-]*" : "[0-9]*") : undefined,
+          min: !isInteger && field.min != null ? field.min : undefined,
+          max: !isInteger && field.max != null ? field.max : undefined,
           step: field.dataType === "INTEGER" ? 1 : "any",
         }}
       />
@@ -229,7 +245,7 @@ const MasterDataList = ({
           />
         </TableCell>
       ) : null}
-      {!hideNameColumn ? (
+      {showNameInput ? (
         <TableCell sx={table.cell}>
           <AppTextField
             compact
@@ -243,6 +259,8 @@ const MasterDataList = ({
             sx={cellSx}
           />
         </TableCell>
+      ) : showNameColumn ? (
+        <TableCell sx={table.cell} />
       ) : null}
       {attributeFields.map((field) => (
         <TableCell key={field.key} sx={table.cell}>
@@ -255,7 +273,7 @@ const MasterDataList = ({
           checked={Boolean(form.isActive)}
           disabled={saving}
           confirmName={
-            hideNameColumn && form.attributes.motorStage !== "" && form.attributes.motorStage != null
+            !showNameInput && form.attributes.motorStage !== "" && form.attributes.motorStage != null
               ? `Stage ${form.attributes.motorStage}`
               : form.name || form.code || "record"
           }
@@ -303,9 +321,9 @@ const MasterDataList = ({
                   {requiredFieldLabel(S.TABLE.COL_CODE, codeRequired)}
                 </TableCell>
               ) : null}
-              {!hideNameColumn ? (
+              {showNameColumn ? (
                 <TableCell sx={table.headerCell}>
-                  {requiredFieldLabel(S.TABLE.COL_NAME, true)}
+                  {requiredFieldLabel(S.TABLE.COL_NAME, showNameInput)}
                 </TableCell>
               ) : null}
               {attributeFields.map((field) => (
@@ -344,7 +362,7 @@ const MasterDataList = ({
                       <Typography sx={table.bodyText}>{row.code}</Typography>
                     </TableCell>
                   ) : null}
-                  {!hideNameColumn ? (
+                  {showNameColumn ? (
                     <TableCell sx={table.cell}>
                       <Typography sx={table.bodyText}>{row.name}</Typography>
                     </TableCell>

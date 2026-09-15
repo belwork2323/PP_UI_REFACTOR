@@ -204,6 +204,7 @@ export const mapMaterialRecordToForm = (record: MaterialsMasterRecord): Material
 });
 
 export type MaterialSpecFieldErrors = ReferenceRangeFieldErrors & {
+  specificationCode?: string;
   specificationName?: string;
 };
 
@@ -229,7 +230,12 @@ const mapSpecFieldErrors = (
   isEdit: boolean,
 ): MaterialSpecFieldErrors => {
   if (isEdit && spec.isExisting) {
-    return {};
+    const errors: MaterialSpecFieldErrors = {};
+    if (!spec.specificationCode.trim()) {
+      errors.specificationCode =
+        "Specification code is missing for an existing record. Refresh the list or fix the data in the database.";
+    }
+    return errors;
   }
   const errors: MaterialSpecFieldErrors = {};
   const nameError = validateMasterDataNameField(spec.specificationName, "Specification name");
@@ -246,7 +252,9 @@ const serializeSpec = (s: MaterialSpecForm) => {
     isActive: s.isActive,
   };
   const code = s.specificationCode.trim();
-  if (code) {
+  if (s.isExisting) {
+    payload.specificationCode = code;
+  } else if (code) {
     payload.specificationCode = code;
   }
   return payload;

@@ -12,3 +12,6 @@ export const updateMixingCycleMaster = (payload: Record<string, unknown>) =>
 
 export const deleteMixingCycleMaster = (payload: { id: number }) =>
   post(ADMIN_ENDPOINTS.MASTER_DATA.MIXING_CYCLES.DELETE, payload);
+
+export const enableMixingCycleMaster = (payload: { id: number }) =>
+  post(ADMIN_ENDPOINTS.MASTER_DATA.MIXING_CYCLES.ENABLE, payload);

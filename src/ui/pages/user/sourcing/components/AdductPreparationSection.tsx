@@ -1,7 +1,11 @@
 import { alpha, Box, Stack, TextField, Typography } from "@mui/material";
 import { STRINGS } from "@app/config/strings";
 import { DateTimeField } from "@ui/components/common/DateField";
-import type { AdductPreparationDetails } from "@data/models/user/RawMaterialProcurementModel";
+import AppDropdown from "@ui/components/common/AppDropdown";
+import type {
+  AdductPreparationDetails,
+  PreparationLotDropdownOption,
+} from "@data/models/user/RawMaterialProcurementModel";
 import MandatoryFormField, { mandatoryFieldInputSx } from "./MandatoryFormField";
 import ReceiptDateField from "./ReceiptDateField";
 import type { ValidationErrors } from "@/data/validation/submissionIntent";
@@ -11,10 +15,14 @@ import useValidationDisplay, {
 import { blockAdductPath } from "@/data/validation/adapters/rawMaterialSourcing.validation";
 
 const L = STRINGS.SOURCING.SPECIFICATION_FORM.ADDUCT_PREPARATION;
+const FORM_STRINGS = STRINGS.SOURCING.SPECIFICATION_FORM;
 
 type Props = {
   details: AdductPreparationDetails;
   blockIndex: number;
+  tmpLotOptions: PreparationLotDropdownOption[];
+  nbdLotOptions: PreparationLotDropdownOption[];
+  loadingLots?: boolean;
   onChange: (next: AdductPreparationDetails) => void;
   errors: ValidationErrors;
   validationAttempt: ValidationAttemptFlags;
@@ -22,9 +30,18 @@ type Props = {
   disabled?: boolean;
 };
 
+const getLotPlaceholder = (loadingLots: boolean, optionCount: number): string => {
+  if (loadingLots) return FORM_STRINGS.LOADING_APPROVED_LOTS;
+  if (optionCount > 0) return FORM_STRINGS.SELECT_LOT_PLACEHOLDER;
+  return FORM_STRINGS.NO_APPROVED_LOTS;
+};
+
 const AdductPreparationSection = ({
   details,
   blockIndex,
+  tmpLotOptions,
+  nbdLotOptions,
+  loadingLots = false,
   onChange,
   errors,
   validationAttempt,
@@ -83,12 +100,13 @@ const AdductPreparationSection = ({
             error={visibleError(blockAdductPath(blockIndex, "tmpMfgLotNo"))}
             theme={theme}
           >
-            <TextField
-              size="small"
-              fullWidth
+            <AppDropdown
               value={details.tmpMfgLotNo}
+              onChange={(value) => updateField("tmpMfgLotNo", value)}
               disabled={disabled}
-              onChange={(e) => updateField("tmpMfgLotNo", e.target.value)}
+              loading={loadingLots}
+              placeholder={getLotPlaceholder(loadingLots, tmpLotOptions.length)}
+              options={tmpLotOptions}
               error={Boolean(visibleError(blockAdductPath(blockIndex, "tmpMfgLotNo")))}
               sx={fieldSx("tmpMfgLotNo", Boolean(visibleError(blockAdductPath(blockIndex, "tmpMfgLotNo"))))}
             />
@@ -117,12 +135,13 @@ const AdductPreparationSection = ({
             error={visibleError(blockAdductPath(blockIndex, "nbdMfgLotNo"))}
             theme={theme}
           >
-            <TextField
-              size="small"
-              fullWidth
+            <AppDropdown
               value={details.nbdMfgLotNo}
+              onChange={(value) => updateField("nbdMfgLotNo", value)}
               disabled={disabled}
-              onChange={(e) => updateField("nbdMfgLotNo", e.target.value)}
+              loading={loadingLots}
+              placeholder={getLotPlaceholder(loadingLots, nbdLotOptions.length)}
+              options={nbdLotOptions}
               error={Boolean(visibleError(blockAdductPath(blockIndex, "nbdMfgLotNo")))}
               sx={fieldSx("nbdMfgLotNo", Boolean(visibleError(blockAdductPath(blockIndex, "nbdMfgLotNo"))))}
             />

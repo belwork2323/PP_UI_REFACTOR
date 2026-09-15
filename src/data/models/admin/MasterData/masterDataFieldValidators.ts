@@ -46,18 +46,11 @@ export const validateReferenceRangeFields = (
   requireAll = false,
 ): ReferenceRangeFieldErrors => {
   const errors: ReferenceRangeFieldErrors = {};
-  const { minValue, maxValue, unitId, unit } = range;
-  const hasUnit = unitId != null || String(unit ?? "").trim().length > 0;
+  const { minValue, maxValue } = range;
 
   if (requireAll) {
     if (minValue == null) errors.minValue = `Min value is required for "${label}"`;
     if (maxValue == null) errors.maxValue = `Max value is required for "${label}"`;
-    if (!hasUnit) errors.unit = `Unit is required for "${label}"`;
-  } else {
-    const hasRange = minValue != null || maxValue != null;
-    if (hasRange && !hasUnit) {
-      errors.unit = "Unit is required when min or max is provided";
-    }
   }
 
   if (minValue != null && maxValue != null && minValue > maxValue) {

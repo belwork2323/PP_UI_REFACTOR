@@ -2,9 +2,16 @@ import { STRINGS } from "@/app/config/strings";
 import type { MaterialBlock, SpecRow } from "@/data/models/user/RawMaterialProcurementModel";
 import {
   emptyAdductPreparationDetails,
+  emptyApFinePreparationDetails,
+  emptyApUltrafinePreparationDetails,
+  emptyHtpbBlendingPreparationDetails,
   isAcemAdductMaterial,
+  isAcemApFineMaterial,
+  isAcemApUltrafineMaterial,
+  isAcemHtpbBlendingMaterial,
   isReferenceRangeNotApplicable,
   type AdductPreparationDetails,
+  type BlendingStylePreparationDetails,
 } from "@/data/models/user/RawMaterialProcurementModel";
 import {
   ALPHA_NUM,
@@ -16,6 +23,7 @@ import type { ValidationTier } from "../submissionIntent";
 
 const M = STRINGS.SOURCING.SPECIFICATION_FORM.VALIDATION;
 const A = STRINGS.SOURCING.SPECIFICATION_FORM.ADDUCT_PREPARATION;
+const H = STRINGS.SOURCING.SPECIFICATION_FORM.HTPB_BLENDING_PREPARATION;
 
 export const rawMaterialSourcingFieldRules = {
   supplyOrderNo: {
@@ -131,6 +139,50 @@ export const rawMaterialSourcingFieldRules = {
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: A.dispatchDateTime.required, invalid: A.dispatchDateTime.invalid },
   },
+  mfgBatchLotNo: {
+    valueType: "text" as const,
+    pattern: ALPHA_NUM,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: H.mfgBatchLotNo.required, invalid: H.mfgBatchLotNo.invalid },
+  },
+  totalQty: {
+    valueType: "number" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: H.totalQty.required, invalid: H.totalQty.invalid },
+  },
+  equipmentId: {
+    valueType: "text" as const,
+    pattern: ALPHA_NUM,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: H.equipmentId.required, invalid: H.equipmentId.invalid },
+  },
+  agitatorRpm: {
+    valueType: "number" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: H.agitatorRpm.required, invalid: H.agitatorRpm.invalid },
+  },
+  htpbProcessTemp: {
+    valueType: "number" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: H.processTemp.required, invalid: H.processTemp.invalid },
+  },
+  htpbJacketTemp: {
+    valueType: "number" as const,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: H.jacketTemp.required, invalid: H.jacketTemp.invalid },
+  },
+  htpbProcessStartTime: {
+    valueType: "text" as const,
+    pattern: ALPHA_NUM,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: H.processStartTime.required, invalid: H.processStartTime.invalid },
+  },
+  htpbProcessEndTime: {
+    valueType: "text" as const,
+    pattern: ALPHA_NUM,
+    requiredIn: ["SUBMIT"] as ValidationTier[],
+    messages: { required: H.processEndTime.required, invalid: H.processEndTime.invalid },
+  },
 };
 
 export function analysedResultRuleKey(row: Pick<SpecRow, "referenceRange">): string {
@@ -230,6 +282,51 @@ function resolveBlockFieldPaths(blocks: MaterialBlock[]) {
         });
       });
     }
+
+    const blendingStyleFieldRules: Array<[keyof BlendingStylePreparationDetails, string]> = [
+      ["mfgBatchLotNo", "mfgBatchLotNo"],
+      ["totalQty", "totalQty"],
+      ["equipmentId", "equipmentId"],
+      ["agitatorRpm", "agitatorRpm"],
+      ["processTemp", "htpbProcessTemp"],
+      ["jacketTemp", "htpbJacketTemp"],
+      ["processStartTime", "htpbProcessStartTime"],
+      ["processEndTime", "htpbProcessEndTime"],
+    ];
+
+    const appendBlendingStylePaths = (
+      preparationKey: string,
+      details: BlendingStylePreparationDetails,
+    ) => {
+      blendingStyleFieldRules.forEach(([field, ruleKey]) => {
+        paths.push({
+          path: `blocks.${blockIndex}.${preparationKey}.${field}`,
+          value: details[field],
+          ruleKey,
+        });
+      });
+    };
+
+    if (isAcemHtpbBlendingMaterial(block.rawMaterialType, block.preparationType)) {
+      appendBlendingStylePaths(
+        "htpbBlendingPreparation",
+        block.htpbBlendingPreparation ?? emptyHtpbBlendingPreparationDetails(),
+      );
+    }
+
+    if (isAcemApFineMaterial(block.rawMaterialType, block.preparationType)) {
+      appendBlendingStylePaths(
+        "apFinePreparation",
+        block.apFinePreparation ?? emptyApFinePreparationDetails(),
+      );
+    }
+
+    if (isAcemApUltrafineMaterial(block.rawMaterialType, block.preparationType)) {
+      appendBlendingStylePaths(
+        "apUltrafinePreparation",
+        block.apUltrafinePreparation ?? emptyApUltrafinePreparationDetails(),
+      );
+    }
   });
 
   return paths;
@@ -302,6 +399,55 @@ const isAdductSubmitComplete = (block: MaterialBlock): boolean => {
   });
 };
 
+const blendingStyleSubmitEntries: Array<
+  [keyof BlendingStylePreparationDetails, keyof typeof rawMaterialSourcingFieldRules]
+> = [
+  ["mfgBatchLotNo", "mfgBatchLotNo"],
+  ["totalQty", "totalQty"],
+  ["equipmentId", "equipmentId"],
+  ["agitatorRpm", "agitatorRpm"],
+  ["processTemp", "htpbProcessTemp"],
+  ["jacketTemp", "htpbJacketTemp"],
+  ["processStartTime", "htpbProcessStartTime"],
+  ["processEndTime", "htpbProcessEndTime"],
+];
+
+const isBlendingStyleSubmitComplete = (
+  enabled: boolean,
+  details: BlendingStylePreparationDetails,
+): boolean => {
+  if (!enabled) return true;
+  const fields = rawMaterialSourcingFieldRules;
+  return blendingStyleSubmitEntries.every(([field, ruleKey]) => {
+    const rule = fields[ruleKey];
+    return (
+      validateFieldState(details[field], {
+        valueType: rule.valueType,
+        required: true,
+        pattern: "pattern" in rule ? rule.pattern : undefined,
+      }) === "valid"
+    );
+  });
+};
+
+const isHtpbBlendingSubmitComplete = (block: MaterialBlock): boolean =>
+  isBlendingStyleSubmitComplete(
+    isAcemHtpbBlendingMaterial(block.rawMaterialType, block.preparationType),
+    block.htpbBlendingPreparation ?? emptyHtpbBlendingPreparationDetails(),
+  );
+
+const isApFineSubmitComplete = (block: MaterialBlock): boolean =>
+  isBlendingStyleSubmitComplete(
+    isAcemApFineMaterial(block.rawMaterialType, block.preparationType),
+    block.apFinePreparation ?? emptyApFinePreparationDetails(),
+  );
+
+const isApUltrafineSubmitComplete = (block: MaterialBlock): boolean =>
+  isBlendingStyleSubmitComplete(
+    isAcemApUltrafineMaterial(block.rawMaterialType, block.preparationType),
+    block.apUltrafinePreparation ?? emptyApUltrafinePreparationDetails(),
+  );
+
 /** Submit for approval: manufacturer, lot ID, certificates, and every analysed result. */
 export const isBlockSubmitComplete = (block: MaterialBlock): boolean => {
   const fields = rawMaterialSourcingFieldRules;
@@ -322,7 +468,15 @@ export const isBlockSubmitComplete = (block: MaterialBlock): boolean => {
   const rowsOk =
     (block.rows ?? []).length > 0 &&
     (block.rows ?? []).every((row) => validateAnalysedResultState(row, true) === "valid");
-  return certOk && certTypesOk && rowsOk && isAdductSubmitComplete(block);
+  return (
+    certOk &&
+    certTypesOk &&
+    rowsOk &&
+    isAdductSubmitComplete(block) &&
+    isHtpbBlendingSubmitComplete(block) &&
+    isApFineSubmitComplete(block) &&
+    isApUltrafineSubmitComplete(block)
+  );
 };
 
 export const areBlocksUnitComplete = (blocks: MaterialBlock[]): boolean =>

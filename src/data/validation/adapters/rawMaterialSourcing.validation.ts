@@ -57,6 +57,21 @@ export const blockCertTypePath = (blockIndex: number, certIndex: number) =>
 export const blockAdductPath = (blockIndex: number, field: string) =>
   `blocks.${blockIndex}.adductPreparation.${field}`;
 
+export const blockBlendingStylePreparationPath = (
+  blockIndex: number,
+  preparationKey: string,
+  field: string,
+) => `blocks.${blockIndex}.${preparationKey}.${field}`;
+
+export const blockHtpbBlendingPath = (blockIndex: number, field: string) =>
+  blockBlendingStylePreparationPath(blockIndex, "htpbBlendingPreparation", field);
+
+export const blockApFinePath = (blockIndex: number, field: string) =>
+  blockBlendingStylePreparationPath(blockIndex, "apFinePreparation", field);
+
+export const blockApUltrafinePath = (blockIndex: number, field: string) =>
+  blockBlendingStylePreparationPath(blockIndex, "apUltrafinePreparation", field);
+
 export const flatBlockIndexFromGroup = (
   groups: MaterialFormGroup[],
   materialIndex: number,

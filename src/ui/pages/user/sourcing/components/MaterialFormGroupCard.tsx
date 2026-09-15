@@ -15,6 +15,7 @@ import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import StackRow from "../../../../components/common/StackRow";
 import type {
+  ApprovedPreparationLotLookups,
   MaterialFormGroup,
   MaterialLotBlock,
 } from "../../../../../data/models/user/RawMaterialProcurementModel";
@@ -29,7 +30,12 @@ import useValidationDisplay, {
   type ValidationAttemptFlags,
 } from "../../../../components/validation/useValidationDisplay";
 import { isMaterialMetaComplete } from "../../../../../data/models/user/rawMaterialProcurementValidation";
-import { isAcemAdductMaterial } from "../../../../../data/models/user/RawMaterialProcurementModel";
+import {
+  isAcemAdductMaterial,
+  isAcemApFineMaterial,
+  isAcemApUltrafineMaterial,
+  isAcemHtpbBlendingMaterial,
+} from "../../../../../data/models/user/RawMaterialProcurementModel";
 
 const {
   delete: DeleteOutlineRoundedIcon,
@@ -57,6 +63,7 @@ type MaterialFormGroupCardProps = {
   errors: ValidationErrors;
   validationAttempt: ValidationAttemptFlags;
   getAnalysedResultError: (blockIndex: number, rowIndex: number, touched: boolean) => string | undefined;
+  approvedPreparationLots: ApprovedPreparationLotLookups;
   theme: any;
 };
 
@@ -72,6 +79,7 @@ const MaterialFormGroupCard = ({
   errors,
   validationAttempt,
   getAnalysedResultError,
+  approvedPreparationLots,
   theme,
 }: MaterialFormGroupCardProps) => {
   const formStrings = STRINGS.SOURCING.SPECIFICATION_FORM;
@@ -83,6 +91,15 @@ const MaterialFormGroupCard = ({
   const manufacturerError = visibleError(blockMetaPath(metaBlockIndex, "manufacturerName"));
   const canAddLot = isMaterialMetaComplete(group);
   const showAdductPreparation = isAcemAdductMaterial(group.rawMaterialType, group.preparationType);
+  const showHtpbBlendingPreparation = isAcemHtpbBlendingMaterial(
+    group.rawMaterialType,
+    group.preparationType,
+  );
+  const showApFinePreparation = isAcemApFineMaterial(group.rawMaterialType, group.preparationType);
+  const showApUltrafinePreparation = isAcemApUltrafineMaterial(
+    group.rawMaterialType,
+    group.preparationType,
+  );
 
   const { filledCount, totalCount, allFilled } = useMemo(() => {
     const allRows = group.lots.flatMap((lot) => lot.rows);
@@ -200,6 +217,10 @@ const MaterialFormGroupCard = ({
             validationAttempt={validationAttempt}
             getAnalysedResultError={getAnalysedResultError}
             showAdductPreparation={showAdductPreparation}
+            showHtpbBlendingPreparation={showHtpbBlendingPreparation}
+            showApFinePreparation={showApFinePreparation}
+            showApUltrafinePreparation={showApUltrafinePreparation}
+            approvedPreparationLots={approvedPreparationLots}
             theme={theme}
           />
         ))}

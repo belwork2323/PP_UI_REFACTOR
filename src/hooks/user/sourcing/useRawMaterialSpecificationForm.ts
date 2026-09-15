@@ -31,13 +31,21 @@ import type {
   SpecRow,
 } from "../../../data/models/user/RawMaterialProcurementModel";
 import {
+  blocksRequireApprovedPreparationLots,
   computeIsOutOfRange,
   emptyAdductPreparationDetails,
+  emptyApFinePreparationDetails,
+  emptyApUltrafinePreparationDetails,
+  emptyHtpbBlendingPreparationDetails,
   flattenMaterialGroups,
   hasIncompleteCertificateUploads,
   isAcemAdductMaterial,
+  isAcemApFineMaterial,
+  isAcemApUltrafineMaterial,
+  isAcemHtpbBlendingMaterial,
   serializeMaterialBlocks,
 } from "../../../data/models/user/RawMaterialProcurementModel";
+import { useApprovedPreparationLots } from "./useApprovedPreparationLots";
 import {
   areAllAnalyzedResultsFilled,
   areBlocksMandatoryComplete,
@@ -100,24 +108,40 @@ function resolveMaterialMeta(material?: MaterialsListItem) {
   const rawMaterialType = material?.rawMaterialType ?? "NORMAL";
   const preparationType = material?.preparationType ?? null;
   const isAcemAdduct = isAcemAdductMaterial(rawMaterialType, preparationType);
+  const isAcemHtpbBlending = isAcemHtpbBlendingMaterial(rawMaterialType, preparationType);
+  const isAcemApFine = isAcemApFineMaterial(rawMaterialType, preparationType);
+  const isAcemApUltrafine = isAcemApUltrafineMaterial(rawMaterialType, preparationType);
 
   return {
     rawMaterialType,
     preparationType: preparationType ?? undefined,
     manufacturerName: rawMaterialType === "ACEM" ? "ACEM" : "",
     adductPreparation: isAcemAdduct ? emptyAdductPreparationDetails() : undefined,
+    htpbBlendingPreparation: isAcemHtpbBlending ? emptyHtpbBlendingPreparationDetails() : undefined,
+    apFinePreparation: isAcemApFine ? emptyApFinePreparationDetails() : undefined,
+    apUltrafinePreparation: isAcemApUltrafine ? emptyApUltrafinePreparationDetails() : undefined,
   };
 }
 
 function createLotFromSpecs(
   targetSpecs: MaterialSpecificationItemModel[] = [],
-  adductPreparation?: MaterialLotBlock["adductPreparation"],
+  preparation?: Pick<
+    MaterialLotBlock,
+    "adductPreparation" | "htpbBlendingPreparation" | "apFinePreparation" | "apUltrafinePreparation"
+  >,
 ): MaterialLotBlock {
   return {
     lotNo: "",
     certificates: [],
     rows: specRowsFromApi(targetSpecs),
-    ...(adductPreparation ? { adductPreparation } : {}),
+    ...(preparation?.adductPreparation ? { adductPreparation: preparation.adductPreparation } : {}),
+    ...(preparation?.htpbBlendingPreparation
+      ? { htpbBlendingPreparation: preparation.htpbBlendingPreparation }
+      : {}),
+    ...(preparation?.apFinePreparation ? { apFinePreparation: preparation.apFinePreparation } : {}),
+    ...(preparation?.apUltrafinePreparation
+      ? { apUltrafinePreparation: preparation.apUltrafinePreparation }
+      : {}),
   };
 }
 
@@ -127,7 +151,7 @@ function createBlock(
   materialMeta?: MaterialsListItem,
 ): SpecificationBlock {
   const meta = resolveMaterialMeta(materialMeta);
-  const lot = createLotFromSpecs(targetSpecs, meta.adductPreparation);
+  const lot = createLotFromSpecs(targetSpecs, meta);
   return {
     material,
     rawMaterialType: meta.rawMaterialType,
@@ -137,6 +161,9 @@ function createBlock(
     receiptDate: "",
     manufacturerName: meta.manufacturerName,
     ...(lot.adductPreparation ? { adductPreparation: lot.adductPreparation } : {}),
+    ...(lot.htpbBlendingPreparation ? { htpbBlendingPreparation: lot.htpbBlendingPreparation } : {}),
+    ...(lot.apFinePreparation ? { apFinePreparation: lot.apFinePreparation } : {}),
+    ...(lot.apUltrafinePreparation ? { apUltrafinePreparation: lot.apUltrafinePreparation } : {}),
     certificates: lot.certificates,
     rows: lot.rows,
   };
@@ -159,13 +186,16 @@ function createMaterialGroup(
     supplyOrderNo: "",
     receiptDate: "",
     manufacturerName: meta.manufacturerName,
-    lots: [createLotFromSpecs(targetSpecs, meta.adductPreparation)],
+    lots: [createLotFromSpecs(targetSpecs, meta)],
   };
 }
 
 function cloneLotTemplate(
   templateRows: SpecRow[],
-  adductPreparation?: MaterialLotBlock["adductPreparation"],
+  preparation?: Pick<
+    MaterialLotBlock,
+    "adductPreparation" | "htpbBlendingPreparation" | "apFinePreparation" | "apUltrafinePreparation"
+  >,
 ): MaterialLotBlock {
   return {
     lotNo: "",
@@ -177,7 +207,14 @@ function cloneLotTemplate(
       status: null,
       isOutOfRange: false,
     })),
-    ...(adductPreparation ? { adductPreparation: emptyAdductPreparationDetails() } : {}),
+    ...(preparation?.adductPreparation ? { adductPreparation: emptyAdductPreparationDetails() } : {}),
+    ...(preparation?.htpbBlendingPreparation
+      ? { htpbBlendingPreparation: emptyHtpbBlendingPreparationDetails() }
+      : {}),
+    ...(preparation?.apFinePreparation ? { apFinePreparation: emptyApFinePreparationDetails() } : {}),
+    ...(preparation?.apUltrafinePreparation
+      ? { apUltrafinePreparation: emptyApUltrafinePreparationDetails() }
+      : {}),
   };
 }
 
@@ -232,6 +269,12 @@ export const useRawMaterialSpecificationForm = ({
     () => (createLotMode ? flattenMaterialGroups(materialGroups) : flatBlocks),
     [createLotMode, flatBlocks, materialGroups],
   );
+
+  const needsApprovedPreparationLots = useMemo(
+    () => blocksRequireApprovedPreparationLots(blocks),
+    [blocks],
+  );
+  const approvedPreparationLots = useApprovedPreparationLots(needsApprovedPreparationLots);
 
   const isMaterialLoading = useCallback(
     (materialCode: string) => Boolean(loadingByMaterial[materialCode]),
@@ -618,12 +661,35 @@ export const useRawMaterialSpecificationForm = ({
         previous.map((item, idx) => {
           if (idx !== materialIndex) return item;
           const template = item.lots[0]?.rows ?? [];
-          const adductPreparation = isAcemAdductMaterial(item.rawMaterialType, item.preparationType)
-            ? item.lots[0]?.adductPreparation ?? emptyAdductPreparationDetails()
-            : undefined;
+          const preparation = {
+            ...(isAcemAdductMaterial(item.rawMaterialType, item.preparationType)
+              ? {
+                  adductPreparation:
+                    item.lots[0]?.adductPreparation ?? emptyAdductPreparationDetails(),
+                }
+              : {}),
+            ...(isAcemHtpbBlendingMaterial(item.rawMaterialType, item.preparationType)
+              ? {
+                  htpbBlendingPreparation:
+                    item.lots[0]?.htpbBlendingPreparation ?? emptyHtpbBlendingPreparationDetails(),
+                }
+              : {}),
+            ...(isAcemApFineMaterial(item.rawMaterialType, item.preparationType)
+              ? {
+                  apFinePreparation:
+                    item.lots[0]?.apFinePreparation ?? emptyApFinePreparationDetails(),
+                }
+              : {}),
+            ...(isAcemApUltrafineMaterial(item.rawMaterialType, item.preparationType)
+              ? {
+                  apUltrafinePreparation:
+                    item.lots[0]?.apUltrafinePreparation ?? emptyApUltrafinePreparationDetails(),
+                }
+              : {}),
+          };
           return {
             ...item,
-            lots: [...item.lots, cloneLotTemplate(template, adductPreparation)],
+            lots: [...item.lots, cloneLotTemplate(template, preparation)],
           };
         }),
       );
@@ -857,6 +923,7 @@ export const useRawMaterialSpecificationForm = ({
     submitConfirm,
     theme,
     totalRows,
+    approvedPreparationLots,
   };
 };
 

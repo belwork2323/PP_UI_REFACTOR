@@ -32,7 +32,7 @@ const CasePrepSearchableSelect = ({
   theme,
   required = false,
 }: CasePrepSearchableSelectProps) => {
-  const cpTheme = theme.manufacturing?.casePreparation;
+  const cpTheme = theme?.manufacturing?.casePreparation;
   const flowBar = cpTheme?.flowBar ?? {};
   const safeOptions = Array.isArray(options) ? options : [];
 

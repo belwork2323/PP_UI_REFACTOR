@@ -20,8 +20,18 @@ import {
   type MaterialsMasterRecord,
 } from "@data/models/admin/MasterData/MaterialsMasterModel";
 import { formatMasterDataReferenceRangeLabel } from "@data/models/admin/MasterData/nestedMasterDataTypes";
+import MasterDataActiveStatusChip from "./components/MasterDataActiveStatusChip";
 
 const S = STRINGS.MASTER_DATA;
+
+const ActiveStatusField = ({ isActive }: { isActive: boolean }) => (
+  <Box sx={{ display: "flex", alignItems: "center", gap: 1, flexWrap: "wrap" }}>
+    <Typography variant="body2" component="span">
+      <strong>{S.TABLE.COL_ACTIVE}:</strong>
+    </Typography>
+    <MasterDataActiveStatusChip isActive={isActive} />
+  </Box>
+);
 
 type Props = {
   open: boolean;
@@ -30,7 +40,12 @@ type Props = {
   t: any;
 };
 
-const renderSpecRow = (spec: MaterialSpecForm, index: number, total: number) => (
+const renderSpecRow = (
+  spec: MaterialSpecForm,
+  index: number,
+  total: number,
+  showActive = true,
+) => (
   <Box
     key={`${spec.specificationCode}-${spec.specificationName}-${index}`}
     sx={{
@@ -43,17 +58,17 @@ const renderSpecRow = (spec: MaterialSpecForm, index: number, total: number) => 
     }}
   >
     <Typography variant="body2">
-      <strong>{S.MATERIALS.VIEW_COL_NAME}:</strong>{" "}
-      {spec.specificationCode ? `${spec.specificationCode} — ` : ""}
-      {spec.specificationName || "—"}
+      <strong>{S.MATERIALS.VIEW_COL_NAME}:</strong> {spec.specificationName || "—"}
     </Typography>
     <Typography variant="body2">
       <strong>{S.MATERIALS.VIEW_COL_RANGE}:</strong>{" "}
       {formatMasterDataReferenceRangeLabel(spec.referenceRange)}
     </Typography>
-    <Typography variant="body2" sx={{ gridColumn: { sm: "1 / -1" } }}>
-      <strong>{S.MATERIALS.VIEW_COL_STATUS}:</strong> {spec.isActive ? S.TABLE.YES : S.TABLE.NO}
-    </Typography>
+    {showActive ? (
+      <Box sx={{ gridColumn: { sm: "1 / -1" } }}>
+        <ActiveStatusField isActive={spec.isActive} />
+      </Box>
+    ) : null}
   </Box>
 );
 
@@ -84,7 +99,7 @@ const MaterialsMasterViewDialog = ({ open, record, onClose, t }: Props) => {
 
       <DialogContent sx={modal.content}>
         <Box sx={modal.headerGap} />
-        {!record || !hasContent ? (
+        {!record ? (
           <Typography color="text.secondary">{S.MATERIALS.VIEW_EMPTY}</Typography>
         ) : (
           <Stack spacing={2}>
@@ -103,7 +118,12 @@ const MaterialsMasterViewDialog = ({ open, record, onClose, t }: Props) => {
                   <strong>Preparation:</strong> {record.preparationType}
                 </Typography>
               ) : null}
+              <ActiveStatusField isActive={record.isActive} />
             </Box>
+
+            {!hasContent ? (
+              <Typography color="text.secondary">{S.MATERIALS.VIEW_EMPTY}</Typography>
+            ) : null}
 
             {record.specifications.length > 0 ? (
               <Box
@@ -151,16 +171,13 @@ const MaterialsMasterViewDialog = ({ open, record, onClose, t }: Props) => {
                   <Typography variant="subtitle2">
                     {grade.gradeCode} — {grade.gradeName}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    <strong>{S.MATERIALS.VIEW_COL_STATUS}:</strong>{" "}
-                    {grade.isActive ? S.TABLE.YES : S.TABLE.NO}
-                  </Typography>
+                  <ActiveStatusField isActive={grade.isActive} />
                 </Box>
                 <Divider />
                 <Stack spacing={0} sx={{ px: 2, py: 1.5 }}>
                   {grade.specifications.length > 0 ? (
                     grade.specifications.map((spec, index) =>
-                      renderSpecRow(spec, index, grade.specifications.length),
+                      renderSpecRow(spec, index, grade.specifications.length, true),
                     )
                   ) : (
                     <Typography variant="body2" color="text.secondary">

@@ -32,6 +32,7 @@ type Options = {
   refreshKey?: number;
   onListPayloadChange?: (payload: MaterialsMasterListPayload | null) => void;
   onStatsChange?: (stats: { total: number; active: number; inactive: number }) => void;
+  onRefresh?: () => void;
 };
 
 export default function useMaterialsMasterHook({
@@ -39,11 +40,14 @@ export default function useMaterialsMasterHook({
   refreshKey = 0,
   onListPayloadChange,
   onStatsChange,
+  onRefresh,
 }: Options) {
   const onListPayloadChangeRef = useRef(onListPayloadChange);
   const onStatsChangeRef = useRef(onStatsChange);
+  const onRefreshRef = useRef(onRefresh);
   onListPayloadChangeRef.current = onListPayloadChange;
   onStatsChangeRef.current = onStatsChange;
+  onRefreshRef.current = onRefresh;
 
   const [items, setItems] = useState<MaterialsMasterRecord[]>([]);
   const [listPayload, setListPayload] = useState<MaterialsMasterListPayload | null>(null);
@@ -123,7 +127,12 @@ export default function useMaterialsMasterHook({
     setInlineMode("edit");
   };
 
-  const saveForm = async () => {
+  const refreshAfterMutation = useCallback(async () => {
+    await loadList();
+    onRefreshRef.current?.();
+  }, [loadList]);
+
+  const saveForm = async (): Promise<boolean> => {
     const isEdit = inlineMode === "edit";
     const err = validateMaterialsForm(
       form,
@@ -132,7 +141,7 @@ export default function useMaterialsMasterHook({
     );
     if (err) {
       useAlertStore.getState().showValidationAlert(err);
-      return;
+      return false;
     }
     setSaving(true);
     useAlertStore.getState().showAlert(isEdit ? S.MESSAGES.UPDATING : S.MESSAGES.CREATING, "loading");
@@ -141,22 +150,27 @@ export default function useMaterialsMasterHook({
         ? await updateMaterialsMaster(buildMaterialsUpdatePayload(form))
         : await createMaterialsMaster(buildMaterialsCreatePayload(form));
       const resp = new ApiResponseModel(raw);
-      if (resp.success) {
+      const succeeded =
+        resp.success || resp.statusCode === 200 || resp.statusCode === 201;
+      if (succeeded) {
         useAlertStore
           .getState()
           .showAlert(isEdit ? S.MESSAGES.UPDATE_SUCCESS : S.MESSAGES.CREATE_SUCCESS, "success");
         setInlineMode(null);
         setForm(createEmptyMaterialsForm());
-        await loadList();
+        await refreshAfterMutation();
+        return true;
       } else {
         useAlertStore
           .getState()
           .showAlert(getMasterDataErrorMessage(resp, S.ERRORS.OPERATION_FAILED), "error");
+        return false;
       }
     } catch (e: any) {
       useAlertStore
         .getState()
         .showAlert(getMasterDataErrorMessage(e?.response?.data, S.ERRORS.OPERATION_FAILED), "error");
+      return false;
     } finally {
       setSaving(false);
     }
@@ -171,7 +185,7 @@ export default function useMaterialsMasterHook({
       );
       if (resp.success) {
         useAlertStore.getState().showAlert(S.MESSAGES.ENABLE_SUCCESS, "success");
-        await loadList();
+        await refreshAfterMutation();
       } else {
         useAlertStore
           .getState()
@@ -184,7 +198,7 @@ export default function useMaterialsMasterHook({
     } finally {
       setEnabling(false);
     }
-  }, [loadList]);
+  }, [refreshAfterMutation]);
 
   const disableRecord = useCallback(async (record: MaterialsMasterRecord) => {
     setDisabling(true);
@@ -195,7 +209,7 @@ export default function useMaterialsMasterHook({
       );
       if (resp.success) {
         useAlertStore.getState().showAlert(S.MESSAGES.DISABLE_SUCCESS, "success");
-        await loadList();
+        await refreshAfterMutation();
       } else {
         useAlertStore
           .getState()
@@ -208,7 +222,7 @@ export default function useMaterialsMasterHook({
     } finally {
       setDisabling(false);
     }
-  }, [loadList]);
+  }, [refreshAfterMutation]);
 
   const canToggle = useCallback(
     () => inlineMode == null && !saving && !disabling && !enabling,
@@ -258,6 +272,6 @@ export default function useMaterialsMasterHook({
     handleToggleActive,
     confirmToggle,
     cancelToggle,
-    refresh: loadList,
+    refresh: refreshAfterMutation,
   };
 }

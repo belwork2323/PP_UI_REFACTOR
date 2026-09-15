@@ -64,6 +64,7 @@ export const ADMIN_ENDPOINTS = {
     CREATE: (type: string) => `${API_BASE}/admin/master-data/${type}/create`,
     UPDATE: (type: string) => `${API_BASE}/admin/master-data/${type}/update`,
     DELETE: (type: string) => `${API_BASE}/admin/master-data/${type}/delete`,
+    ENABLE: (type: string) => `${API_BASE}/admin/master-data/${type}/enable`,
     MATERIALS: {
       LIST: `${API_BASE}/admin/master-data/materials/list`,
       CREATE: `${API_BASE}/admin/master-data/materials/create`,
@@ -83,6 +84,7 @@ export const ADMIN_ENDPOINTS = {
       CREATE: `${API_BASE}/admin/master-data/mixing-cycles/create`,
       UPDATE: `${API_BASE}/admin/master-data/mixing-cycles/update`,
       DELETE: `${API_BASE}/admin/master-data/mixing-cycles/delete`,
+      ENABLE: `${API_BASE}/admin/master-data/mixing-cycles/enable`,
     },
     CURING_CYCLES: {
       LIST: `${API_BASE}/admin/master-data/curing-cycles/list`,

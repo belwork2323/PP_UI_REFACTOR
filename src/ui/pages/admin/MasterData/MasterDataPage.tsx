@@ -17,6 +17,7 @@ import InsulationSpecMasterPanel from "./InsulationSpecMasterPanel";
 import MixingCycleMasterPanel from "./MixingCycleMasterPanel";
 import CuringCycleMasterPanel from "./CuringCycleMasterPanel";
 import QualityCheckMasterPanel from "./QualityCheckMasterPanel";
+import DimensionalParametersMasterPanel from "./DimensionalParametersMasterPanel";
 import { getMasterDataAddButtonLabel, stripMasterTypeSuffix } from "./masterDataLabels";
 import { masterDataStatusFilterChipProps } from "./components/masterDataStatusStyles";
 
@@ -131,6 +132,16 @@ const MasterDataPage = () => {
           />
         ) : hook.selectedType === "insulation-specifications" ? (
           <InsulationSpecMasterPanel
+            activeFilter={hook.activeFilter}
+            refreshKey={hook.nestedRefreshKey}
+            addButtonLabel={addButtonLabel}
+            t={t}
+            onStatsChange={hook.setStats}
+            onRefresh={hook.refresh}
+            refreshDisabled={hook.loadingList}
+          />
+        ) : hook.selectedType === "dimensional-parameters" ? (
+          <DimensionalParametersMasterPanel
             activeFilter={hook.activeFilter}
             refreshKey={hook.nestedRefreshKey}
             addButtonLabel={addButtonLabel}

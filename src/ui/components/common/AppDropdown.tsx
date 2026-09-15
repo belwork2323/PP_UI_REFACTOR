@@ -120,7 +120,9 @@ const AppDropdown = ({
       helperText={helperText}
       error={error}
       InputLabelProps={
-        filterPanel ? InputLabelProps : { ...appDropdownLabelProps, ...InputLabelProps }
+        filterPanel
+          ? { shrink: true, ...InputLabelProps }
+          : { ...appDropdownLabelProps, ...InputLabelProps }
       }
       inputProps={filterPanel ? { style: { fontSize: "0.72rem" } } : appDropdownInputProps}
       SelectProps={{

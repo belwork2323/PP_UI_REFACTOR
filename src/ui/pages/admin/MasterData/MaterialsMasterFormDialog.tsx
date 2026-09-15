@@ -101,15 +101,9 @@ const SpecEditor = ({
         spec.referenceRange.maxValue != null,
         showErrors,
       );
-      const unitVisibleErr = visibleValidationError(
-        rawErr?.unit,
-        spec.referenceRange.unitId != null || String(spec.referenceRange.unit ?? "").trim().length > 0,
-        showErrors,
-      );
       const nameError = Boolean(nameVisibleErr);
       const minError = Boolean(minVisibleErr);
       const maxError = Boolean(maxVisibleErr);
-      const unitError = Boolean(unitVisibleErr);
 
       const updateRange = (referenceRange: MasterDataReferenceRange) => {
         const next = [...specs];
@@ -130,7 +124,7 @@ const SpecEditor = ({
             alignItems: "flex-end",
             p: 1.5,
             border: "1px solid",
-            borderColor: nameError || minError || maxError || unitError ? "error.main" : "divider",
+            borderColor: nameError || minError || maxError ? "error.main" : "divider",
             borderRadius: 1.5,
             bgcolor: locked ? "action.hover" : "background.paper",
             opacity: locked && !spec.isActive ? 0.72 : 1,
@@ -155,7 +149,7 @@ const SpecEditor = ({
             label="Min"
             value={spec.referenceRange.minValue != null ? String(spec.referenceRange.minValue) : ""}
             disabled={disabled || locked}
-            required={editable}
+            required={false}
             error={minError}
             helperText={minVisibleErr ?? null}
             width="100%"
@@ -171,7 +165,7 @@ const SpecEditor = ({
             label="Max"
             value={spec.referenceRange.maxValue != null ? String(spec.referenceRange.maxValue) : ""}
             disabled={disabled || locked}
-            required={editable}
+            required={false}
             error={maxError}
             helperText={maxVisibleErr ?? null}
             width="100%"
@@ -189,7 +183,7 @@ const SpecEditor = ({
             placeholder="Select unit"
             options={unitOptions}
             disabled={disabled || locked}
-            required={editable}
+            required={false}
             width="100%"
             theme={theme}
             onChange={(value) =>
@@ -223,15 +217,6 @@ const SpecEditor = ({
               <icons.Delete fontSize="small" />
             </IconButton>
           )}
-          {unitVisibleErr ? (
-            <Typography
-              variant="caption"
-              color="error"
-              sx={{ gridColumn: { md: "1 / -1" }, mt: -0.5 }}
-            >
-              {unitVisibleErr}
-            </Typography>
-          ) : null}
         </Box>
       );
     })}
@@ -288,7 +273,7 @@ const GradeEditor = ({
 
         return (
         <Box
-          key={grade.gradeId || grade.gradeCode || `grade-${idx}`}
+          key={grade.gradeId || `grade-${idx}`}
           sx={{
             p: 1.5,
             border: "1px solid",

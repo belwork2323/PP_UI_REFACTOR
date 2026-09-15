@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import {
   Box,
   Button,
-  Chip,
   Divider,
   IconButton,
   Paper,
@@ -20,15 +19,17 @@ import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
 import MasterDataToggleConfirmDialog from "./components/MasterDataToggleConfirmDialog";
 import SkeletonRow from "@ui/components/common/SkeletonRow";
-import useMaterialsMasterHook from "@hooks/admin/MasterData/useMaterialsMasterHook";
+import useDimensionalParametersMasterHook from "@hooks/admin/MasterData/useDimensionalParametersMasterHook";
+import useMotorStageOptions from "@hooks/admin/MasterData/useMotorStageOptions";
+import useUnitMasterOptions from "@hooks/admin/MasterData/useUnitMasterOptions";
 import {
-  getRawMaterialCategoryLabel,
-  type MaterialsMasterListPayload,
-  type MaterialsMasterRecord,
-} from "@data/models/admin/MasterData/MaterialsMasterModel";
-import MaterialsMasterFormDialog from "./MaterialsMasterFormDialog";
-import MaterialsMasterViewDialog from "./MaterialsMasterViewDialog";
-import MasterDataTableToolbar from "./components/MasterDataTableToolbar";
+  formatDimensionalRangeLabel,
+  formatMotorStageLabel,
+  type DimensionalParametersMasterRecord,
+} from "@data/models/admin/MasterData/DimensionalParametersMasterModel";
+import DimensionalParametersMasterFormDialog from "./DimensionalParametersMasterFormDialog";
+import DimensionalParametersMasterViewDialog from "./DimensionalParametersMasterViewDialog";
+import DimensionalParametersTableToolbar from "./components/DimensionalParametersTableToolbar";
 import MasterDataActiveSwitch from "./components/MasterDataActiveSwitch";
 import MasterDataActiveStatusChip from "./components/MasterDataActiveStatusChip";
 import {
@@ -39,12 +40,6 @@ import {
 
 const S = STRINGS.MASTER_DATA;
 
-const countSpecifications = (row: MaterialsMasterRecord) => {
-  const topLevel = row.specifications.length;
-  const inGrades = row.grades.reduce((sum, grade) => sum + (grade.specifications?.length ?? 0), 0);
-  return topLevel + inGrades;
-};
-
 type Props = {
   activeFilter: "ALL" | "ACTIVE" | "INACTIVE";
   refreshKey?: number;
@@ -52,47 +47,50 @@ type Props = {
   onRefresh: () => void;
   refreshDisabled?: boolean;
   t: any;
-  onListPayloadChange?: (payload: MaterialsMasterListPayload | null) => void;
   onStatsChange?: (stats: { total: number; active: number; inactive: number }) => void;
 };
 
-const MaterialsMasterPanel = ({
+const DimensionalParametersMasterPanel = ({
   activeFilter,
   refreshKey,
   addButtonLabel,
   onRefresh,
   refreshDisabled = false,
   t,
-  onListPayloadChange,
   onStatsChange,
 }: Props) => {
-  const hook = useMaterialsMasterHook({
+  const { options: motorStageOptions, loading: motorStageLoading } = useMotorStageOptions(true);
+  const { options: unitOptions, loading: unitLoading } = useUnitMasterOptions(true);
+  const hook = useDimensionalParametersMasterHook({
     activeFilter,
     refreshKey,
-    onListPayloadChange,
+    unitOptions,
     onStatsChange,
     onRefresh,
   });
   const { table, tableCell } = t;
   const formOpen = hook.inlineMode != null;
-  const columnCount = 7 + MASTER_DATA_AUDIT_COLUMN_COUNT;
-  const [viewTarget, setViewTarget] = useState<MaterialsMasterRecord | null>(null);
+  const columnCount = 5 + MASTER_DATA_AUDIT_COLUMN_COUNT + 2;
+  const [viewTarget, setViewTarget] = useState<DimensionalParametersMasterRecord | null>(null);
 
   useEffect(() => {
     if (!viewTarget) return;
-    const updated = hook.items.find((item) => item.materialId === viewTarget.materialId);
+    const updated = hook.items.find((item) => item.parameterId === viewTarget.parameterId);
     if (updated && updated !== viewTarget) setViewTarget(updated);
   }, [hook.items, viewTarget]);
 
   return (
     <Box>
       <Paper elevation={0} sx={table.paper}>
-        <MasterDataTableToolbar
+        <DimensionalParametersTableToolbar
           search={hook.search}
           onSearchChange={hook.setSearch}
+          motorStageFilter={hook.motorStageFilter}
+          onMotorStageFilterChange={hook.setMotorStageFilter}
+          motorStageOptions={motorStageOptions}
+          motorStageLoading={motorStageLoading}
           onRefresh={onRefresh}
           refreshDisabled={refreshDisabled || hook.loading}
-          searchPlaceholder={S.MATERIALS.SEARCH_PLACEHOLDER}
           t={t}
         />
         <Divider sx={table.divider} />
@@ -100,12 +98,11 @@ const MaterialsMasterPanel = ({
           <Table size="small">
             <TableHead>
               <TableRow sx={table.headerRow}>
-                <TableCell sx={table.headerCell}>Code</TableCell>
-                <TableCell sx={table.headerCell}>Name</TableCell>
-                <TableCell sx={table.headerCell}>Type</TableCell>
-                <TableCell sx={table.headerCell}>Category</TableCell>
-                <TableCell sx={table.headerCell}>Grades</TableCell>
-                <TableCell sx={table.headerCell}>Specs</TableCell>
+                <TableCell sx={table.headerCell}>{S.DIMENSIONAL_PARAMETERS.COL_NAME}</TableCell>
+                <TableCell sx={table.headerCell}>{S.DIMENSIONAL_PARAMETERS.COL_MOTOR_STAGE}</TableCell>
+                <TableCell sx={table.headerCell}>{S.DIMENSIONAL_PARAMETERS.COL_MIN}</TableCell>
+                <TableCell sx={table.headerCell}>{S.DIMENSIONAL_PARAMETERS.COL_MAX}</TableCell>
+                <TableCell sx={table.headerCell}>{S.DIMENSIONAL_PARAMETERS.COL_UNIT}</TableCell>
                 <MasterDataAuditHeaderCells table={table} />
                 <TableCell sx={table.headerCell}>{S.TABLE.COL_ACTIVE}</TableCell>
                 <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>Actions</TableCell>
@@ -123,28 +120,24 @@ const MaterialsMasterPanel = ({
                 </TableRow>
               ) : (
                 hook.paginated.map((row) => (
-                  <TableRow key={row.materialId} sx={table.row}>
+                  <TableRow key={row.parameterId} sx={table.row}>
                     <TableCell sx={table.cell}>
-                      <Typography sx={table.bodyText}>{row.materialCode}</Typography>
-                    </TableCell>
-                    <TableCell sx={table.cell}>
-                      <Typography sx={table.bodyText}>{row.materialName}</Typography>
-                    </TableCell>
-                    <TableCell sx={table.cell}>
-                      <Chip size="small" label={row.materialType} variant="outlined" />
+                      <Typography sx={table.bodyText}>{row.paramName}</Typography>
                     </TableCell>
                     <TableCell sx={table.cell}>
                       <Typography sx={table.bodyText}>
-                        {getRawMaterialCategoryLabel(row.rawMaterialType)}
+                        {formatMotorStageLabel(row.motorType, motorStageOptions)}
                       </Typography>
-                      {row.rawMaterialType === "ACEM" && row.preparationType ? (
-                        <Typography variant="caption" color="text.secondary" display="block">
-                          {row.preparationType}
-                        </Typography>
-                      ) : null}
                     </TableCell>
-                    <TableCell sx={table.cell}>{row.grades.length}</TableCell>
-                    <TableCell sx={table.cell}>{countSpecifications(row)}</TableCell>
+                    <TableCell sx={table.cell}>
+                      <Typography sx={table.bodyText}>{row.minValue ?? "—"}</Typography>
+                    </TableCell>
+                    <TableCell sx={table.cell}>
+                      <Typography sx={table.bodyText}>{row.maxValue ?? "—"}</Typography>
+                    </TableCell>
+                    <TableCell sx={table.cell}>
+                      <Typography sx={table.bodyText}>{row.unit || "—"}</Typography>
+                    </TableCell>
                     <MasterDataAuditRowCells record={row} table={table} />
                     <TableCell sx={table.cell}>
                       <MasterDataActiveStatusChip isActive={row.isActive} />
@@ -188,9 +181,9 @@ const MaterialsMasterPanel = ({
           component="div"
           count={hook.items.length}
           page={hook.page}
-          onPageChange={(_e, p) => hook.setPage(p)}
+          onPageChange={(_event, nextPage) => hook.setPage(nextPage)}
           rowsPerPage={hook.rowsPerPage}
-          onRowsPerPageChange={(e) => hook.setRowsPerPage(Number(e.target.value))}
+          onRowsPerPageChange={(event) => hook.setRowsPerPage(Number(event.target.value))}
           rowsPerPageOptions={[5, 10, 25]}
         />
       </Paper>
@@ -207,23 +200,29 @@ const MaterialsMasterPanel = ({
         </Button>
       </Box>
 
-      <MaterialsMasterFormDialog
+      <DimensionalParametersMasterFormDialog
         open={formOpen}
         isEdit={hook.inlineMode === "edit"}
-        form={hook.form}
+        createForm={hook.createForm}
+        editForm={hook.editForm}
         saving={hook.saving}
-        existingCodes={hook.items.map((item) => item.materialCode)}
+        motorStageOptions={motorStageOptions}
+        motorStageLoading={motorStageLoading}
+        unitOptions={unitOptions}
+        unitLoading={unitLoading}
         onClose={hook.closeInline}
         onSave={() => {
           void hook.saveForm();
         }}
-        onChange={hook.setForm}
+        onCreateFormChange={hook.setCreateForm}
+        onEditFormChange={hook.setEditForm}
         t={t}
       />
 
-      <MaterialsMasterViewDialog
+      <DimensionalParametersMasterViewDialog
         open={viewTarget != null}
         record={viewTarget}
+        motorStageOptions={motorStageOptions}
         onClose={() => setViewTarget(null)}
         t={t}
       />
@@ -232,7 +231,7 @@ const MaterialsMasterPanel = ({
         target={
           hook.toggleTarget
             ? {
-                name: hook.toggleTarget.record.materialName || hook.toggleTarget.record.materialCode,
+                name: hook.toggleTarget.record.paramName,
                 nextActive: hook.toggleTarget.nextActive,
               }
             : null
@@ -245,4 +244,4 @@ const MaterialsMasterPanel = ({
   );
 };
 
-export default MaterialsMasterPanel;
+export default DimensionalParametersMasterPanel;

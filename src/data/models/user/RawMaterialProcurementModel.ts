@@ -40,13 +40,80 @@ export const emptyAdductPreparationDetails = (): AdductPreparationDetails => ({
   dispatchDateTime: "",
 });
 
+const normalizePreparationType = (preparationType?: string | null): string =>
+  String(preparationType ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/[\s-]+/g, "_");
+
 export const isAcemAdductMaterial = (
   rawMaterialType?: string | null,
   preparationType?: string | null,
 ): boolean =>
   String(rawMaterialType ?? "")
     .trim()
-    .toUpperCase() === "ACEM" && String(preparationType ?? "").trim() === "ADDUCT";
+    .toUpperCase() === "ACEM" && normalizePreparationType(preparationType) === "ADDUCT";
+
+export type BlendingStylePreparationDetails = {
+  mfgBatchLotNo: string;
+  totalQty: number | null;
+  equipmentId: string;
+  agitatorRpm: number | null;
+  processTemp: number | null;
+  jacketTemp: number | null;
+  processStartTime: string;
+  processEndTime: string;
+  otherObservations: string;
+};
+
+export type HtpbBlendingPreparationDetails = BlendingStylePreparationDetails;
+export type ApFinePreparationDetails = BlendingStylePreparationDetails;
+export type ApUltrafinePreparationDetails = BlendingStylePreparationDetails;
+
+export const emptyBlendingStylePreparationDetails = (): BlendingStylePreparationDetails => ({
+  mfgBatchLotNo: "",
+  totalQty: null,
+  equipmentId: "",
+  agitatorRpm: null,
+  processTemp: null,
+  jacketTemp: null,
+  processStartTime: "",
+  processEndTime: "",
+  otherObservations: "",
+});
+
+export const emptyHtpbBlendingPreparationDetails = (): HtpbBlendingPreparationDetails =>
+  emptyBlendingStylePreparationDetails();
+
+export const emptyApFinePreparationDetails = (): ApFinePreparationDetails =>
+  emptyBlendingStylePreparationDetails();
+
+export const emptyApUltrafinePreparationDetails = (): ApUltrafinePreparationDetails =>
+  emptyBlendingStylePreparationDetails();
+
+export const isAcemHtpbBlendingMaterial = (
+  rawMaterialType?: string | null,
+  preparationType?: string | null,
+): boolean =>
+  String(rawMaterialType ?? "")
+    .trim()
+    .toUpperCase() === "ACEM" && normalizePreparationType(preparationType) === "HTPB_BLENDING";
+
+export const isAcemApFineMaterial = (
+  rawMaterialType?: string | null,
+  preparationType?: string | null,
+): boolean =>
+  String(rawMaterialType ?? "")
+    .trim()
+    .toUpperCase() === "ACEM" && normalizePreparationType(preparationType) === "AP_FINE";
+
+export const isAcemApUltrafineMaterial = (
+  rawMaterialType?: string | null,
+  preparationType?: string | null,
+): boolean =>
+  String(rawMaterialType ?? "")
+    .trim()
+    .toUpperCase() === "ACEM" && normalizePreparationType(preparationType) === "AP_ULTRAFINE";
 
 const parseAdductNumeric = (value: unknown): number | null => {
   if (value === null || value === undefined || value === "") return null;
@@ -91,6 +158,45 @@ export const serializeAdductPreparationDetails = (
     dispatchDateTime: details.dispatchDateTime.trim(),
   };
 };
+
+export const parseBlendingStylePreparationDetails = (raw: unknown): BlendingStylePreparationDetails => {
+  const source = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
+  return {
+    mfgBatchLotNo: String(source.mfgBatchLotNo ?? "").trim(),
+    totalQty: parseAdductNumeric(source.totalQty),
+    equipmentId: String(source.equipmentId ?? "").trim(),
+    agitatorRpm: parseAdductNumeric(source.agitatorRpm),
+    processTemp: parseAdductNumeric(source.processTemp),
+    jacketTemp: parseAdductNumeric(source.jacketTemp),
+    processStartTime: String(source.processStartTime ?? "").trim(),
+    processEndTime: String(source.processEndTime ?? "").trim(),
+    otherObservations: String(source.otherObservations ?? "").trim(),
+  };
+};
+
+export const serializeBlendingStylePreparationDetails = (
+  details: BlendingStylePreparationDetails | null | undefined,
+): BlendingStylePreparationDetails | undefined => {
+  if (!details) return undefined;
+  return {
+    mfgBatchLotNo: details.mfgBatchLotNo.trim(),
+    totalQty: details.totalQty,
+    equipmentId: details.equipmentId.trim(),
+    agitatorRpm: details.agitatorRpm,
+    processTemp: details.processTemp,
+    jacketTemp: details.jacketTemp,
+    processStartTime: details.processStartTime.trim(),
+    processEndTime: details.processEndTime.trim(),
+    otherObservations: details.otherObservations.trim(),
+  };
+};
+
+export const parseHtpbBlendingPreparationDetails = parseBlendingStylePreparationDetails;
+export const serializeHtpbBlendingPreparationDetails = serializeBlendingStylePreparationDetails;
+export const parseApFinePreparationDetails = parseBlendingStylePreparationDetails;
+export const serializeApFinePreparationDetails = serializeBlendingStylePreparationDetails;
+export const parseApUltrafinePreparationDetails = parseBlendingStylePreparationDetails;
+export const serializeApUltrafinePreparationDetails = serializeBlendingStylePreparationDetails;
 
 /** Re-export for sourcing pages that previously imported from sourcingWorkflowData */
 export const SOURCING_STATUS = OPERATION_STATUS;
@@ -314,6 +420,9 @@ export type MaterialBlock = {
   receiptDate?: string;
   manufacturerName?: string;
   adductPreparation?: AdductPreparationDetails;
+  htpbBlendingPreparation?: HtpbBlendingPreparationDetails;
+  apFinePreparation?: ApFinePreparationDetails;
+  apUltrafinePreparation?: ApUltrafinePreparationDetails;
   certificates?: LotCertificate[];
   rows: SpecRow[];
 };
@@ -321,6 +430,9 @@ export type MaterialBlock = {
 export type MaterialLotBlock = {
   lotNo: string;
   adductPreparation?: AdductPreparationDetails;
+  htpbBlendingPreparation?: HtpbBlendingPreparationDetails;
+  apFinePreparation?: ApFinePreparationDetails;
+  apUltrafinePreparation?: ApUltrafinePreparationDetails;
   certificates: LotCertificate[];
   rows: SpecRow[];
 };
@@ -438,6 +550,9 @@ export function flattenMaterialGroups(groups: MaterialFormGroup[]): MaterialBloc
       certificates: lot.certificates ?? [],
       rows: lot.rows ?? [],
       ...(lot.adductPreparation ? { adductPreparation: lot.adductPreparation } : {}),
+      ...(lot.htpbBlendingPreparation ? { htpbBlendingPreparation: lot.htpbBlendingPreparation } : {}),
+      ...(lot.apFinePreparation ? { apFinePreparation: lot.apFinePreparation } : {}),
+      ...(lot.apUltrafinePreparation ? { apUltrafinePreparation: lot.apUltrafinePreparation } : {}),
     })),
   );
 }
@@ -468,6 +583,13 @@ export function groupBlocksToMaterialGroups(blocks: MaterialBlock[]): MaterialFo
         certificates: block.certificates ?? [],
         rows: block.rows ?? [],
         ...(block.adductPreparation ? { adductPreparation: block.adductPreparation } : {}),
+        ...(block.htpbBlendingPreparation
+          ? { htpbBlendingPreparation: block.htpbBlendingPreparation }
+          : {}),
+        ...(block.apFinePreparation ? { apFinePreparation: block.apFinePreparation } : {}),
+        ...(block.apUltrafinePreparation
+          ? { apUltrafinePreparation: block.apUltrafinePreparation }
+          : {}),
       })),
     };
   });
@@ -552,6 +674,93 @@ export type RawMaterialLotListRow = {
   rejectionReason?: string;
 };
 
+export const PREPARATION_SOURCE_MATERIAL = {
+  HTPB: "HTPB",
+  TMP: "TMP",
+  NBD: "NBD",
+  AP: "AP",
+} as const;
+
+export const normalizePreparationSourceMaterialCode = (code: string | undefined | null): string =>
+  String(code ?? "")
+    .trim()
+    .toUpperCase();
+
+export const groupPreparationSourceLotsByMaterialCode = (
+  lots: RawMaterialLotListRow[],
+): Record<string, RawMaterialLotListRow[]> => {
+  const grouped: Record<string, RawMaterialLotListRow[]> = {};
+  for (const lot of lots) {
+    const code = normalizePreparationSourceMaterialCode(lot.materialCode);
+    if (!code) continue;
+    if (!grouped[code]) grouped[code] = [];
+    grouped[code].push(lot);
+  }
+  return grouped;
+};
+
+export const getPreparationSourceLotsForMaterial = (
+  lotsByMaterialCode: Record<string, RawMaterialLotListRow[]>,
+  materialCode: string,
+): RawMaterialLotListRow[] => {
+  const key = normalizePreparationSourceMaterialCode(materialCode);
+  return key ? (lotsByMaterialCode[key] ?? []) : [];
+};
+
+export const isApPreparationSourceLot = (lot: RawMaterialLotListRow): boolean => {
+  if (normalizePreparationSourceMaterialCode(lot.materialCode) !== PREPARATION_SOURCE_MATERIAL.AP) {
+    return false;
+  }
+  const grade = String(lot.grade?.gradeCode ?? "").trim().toUpperCase();
+  return !grade || grade === "COARSE";
+};
+
+export type PreparationLotDropdownOption = {
+  value: string;
+  label: string;
+};
+
+export const formatPreparationLotDropdownLabel = (lot: RawMaterialLotListRow): string => {
+  const gradeLabel = lot.grade?.gradeName || lot.grade?.gradeCode;
+  return gradeLabel ? `${lot.lotId} · ${gradeLabel}` : lot.lotId;
+};
+
+export const buildPreparationLotDropdownOptions = (
+  lots: RawMaterialLotListRow[],
+  currentValue?: string,
+): PreparationLotDropdownOption[] => {
+  const trimmed = String(currentValue ?? "").trim();
+  let options = lots.map((lot) => ({
+    value: lot.lotId,
+    label: formatPreparationLotDropdownLabel(lot),
+  }));
+
+  if (trimmed && !options.some((option) => option.value === trimmed)) {
+    options = [{ value: trimmed, label: trimmed }, ...options];
+  }
+
+  return options;
+};
+
+export type ApprovedPreparationLotLookups = {
+  loadingLots: boolean;
+  getHtpbLotOptions: (currentValue?: string) => PreparationLotDropdownOption[];
+  getTmpLotOptions: (currentValue?: string) => PreparationLotDropdownOption[];
+  getNbdLotOptions: (currentValue?: string) => PreparationLotDropdownOption[];
+  getApSourceLotOptions: (currentValue?: string) => PreparationLotDropdownOption[];
+};
+
+export const blocksRequireApprovedPreparationLots = (
+  blocks: Array<Pick<MaterialBlock, "rawMaterialType" | "preparationType">>,
+): boolean =>
+  blocks.some(
+    (block) =>
+      isAcemAdductMaterial(block.rawMaterialType, block.preparationType) ||
+      isAcemHtpbBlendingMaterial(block.rawMaterialType, block.preparationType) ||
+      isAcemApFineMaterial(block.rawMaterialType, block.preparationType) ||
+      isAcemApUltrafineMaterial(block.rawMaterialType, block.preparationType),
+  );
+
 /** Read-only lot details page context (from list row + details API) */
 export type RawMaterialLotDetailsContext = {
   lotId: string;
@@ -600,6 +809,9 @@ export type RawMaterialLotCreatePayload = {
   specifications: RawMaterialLotSpecificationPayload[];
   certificates: RawMaterialCertificateApiPayload[];
   adductPreparation?: AdductPreparationDetails;
+  htpbBlendingPreparation?: HtpbBlendingPreparationDetails;
+  apFinePreparation?: ApFinePreparationDetails;
+  apUltrafinePreparation?: ApUltrafinePreparationDetails;
 };
 
 export type RawMaterialMaterialCreatePayload = {
@@ -640,6 +852,9 @@ export type RawMaterialLotUpdatePayload = {
   }>;
   certificates: RawMaterialCertificateApiPayload[];
   adductPreparation?: AdductPreparationDetails;
+  htpbBlendingPreparation?: HtpbBlendingPreparationDetails;
+  apFinePreparation?: ApFinePreparationDetails;
+  apUltrafinePreparation?: ApUltrafinePreparationDetails;
 };
 
 export type RawMaterialLotListRequest = {
@@ -815,6 +1030,9 @@ export class RawMaterialLotDetailsModel {
   }>;
   certificates: LotCertificate[];
   adductPreparation?: AdductPreparationDetails;
+  htpbBlendingPreparation?: HtpbBlendingPreparationDetails;
+  apFinePreparation?: ApFinePreparationDetails;
+  apUltrafinePreparation?: ApUltrafinePreparationDetails;
   rawMaterialType?: RawMaterialTypeValue;
   preparationType?: PreparationTypeValue | "" | null;
   progressInsights?: Record<string, unknown>;
@@ -844,6 +1062,15 @@ export class RawMaterialLotDetailsModel {
       : [];
     this.adductPreparation = payload?.adductPreparation
       ? parseAdductPreparationDetails(payload.adductPreparation)
+      : undefined;
+    this.htpbBlendingPreparation = payload?.htpbBlendingPreparation
+      ? parseHtpbBlendingPreparationDetails(payload.htpbBlendingPreparation)
+      : undefined;
+    this.apFinePreparation = payload?.apFinePreparation
+      ? parseApFinePreparationDetails(payload.apFinePreparation)
+      : undefined;
+    this.apUltrafinePreparation = payload?.apUltrafinePreparation
+      ? parseApUltrafinePreparationDetails(payload.apUltrafinePreparation)
       : undefined;
     this.rawMaterialType =
       String(payload?.rawMaterialType ?? "NORMAL")
@@ -879,6 +1106,13 @@ export class RawMaterialLotDetailsModel {
         manufacturerName: model.manufacturerName,
         certificates: [...(model.certificates ?? [])],
         ...(model.adductPreparation ? { adductPreparation: model.adductPreparation } : {}),
+        ...(model.htpbBlendingPreparation
+          ? { htpbBlendingPreparation: model.htpbBlendingPreparation }
+          : {}),
+        ...(model.apFinePreparation ? { apFinePreparation: model.apFinePreparation } : {}),
+        ...(model.apUltrafinePreparation
+          ? { apUltrafinePreparation: model.apUltrafinePreparation }
+          : {}),
         rows: (model.specifications ?? []).map((spec) => {
           const referenceRange = parseApiReferenceRange(spec.referenceRange);
           const analysedResult = parseApiAnalysedResultDisplay(
@@ -1131,6 +1365,18 @@ function mapLotBlockToCreatePayload(lot: MaterialLotBlock): RawMaterialLotCreate
   if (adductPreparation) {
     payload.adductPreparation = adductPreparation;
   }
+  const htpbBlendingPreparation = serializeHtpbBlendingPreparationDetails(lot.htpbBlendingPreparation);
+  if (htpbBlendingPreparation) {
+    payload.htpbBlendingPreparation = htpbBlendingPreparation;
+  }
+  const apFinePreparation = serializeApFinePreparationDetails(lot.apFinePreparation);
+  if (apFinePreparation) {
+    payload.apFinePreparation = apFinePreparation;
+  }
+  const apUltrafinePreparation = serializeApUltrafinePreparationDetails(lot.apUltrafinePreparation);
+  if (apUltrafinePreparation) {
+    payload.apUltrafinePreparation = apUltrafinePreparation;
+  }
   return payload;
 }
 
@@ -1188,6 +1434,15 @@ export function mapFirstBlockToLotUpdatePayload(
     certificates: mapCertificatesForApi(block.certificates),
     ...(serializeAdductPreparationDetails(block.adductPreparation)
       ? { adductPreparation: serializeAdductPreparationDetails(block.adductPreparation) }
+      : {}),
+    ...(serializeHtpbBlendingPreparationDetails(block.htpbBlendingPreparation)
+      ? { htpbBlendingPreparation: serializeHtpbBlendingPreparationDetails(block.htpbBlendingPreparation) }
+      : {}),
+    ...(serializeApFinePreparationDetails(block.apFinePreparation)
+      ? { apFinePreparation: serializeApFinePreparationDetails(block.apFinePreparation) }
+      : {}),
+    ...(serializeApUltrafinePreparationDetails(block.apUltrafinePreparation)
+      ? { apUltrafinePreparation: serializeApUltrafinePreparationDetails(block.apUltrafinePreparation) }
       : {}),
   };
 }

@@ -96,15 +96,9 @@ const ParameterEditor = ({
         param.referenceRange.maxValue != null,
         showErrors,
       );
-      const unitVisibleErr = visibleValidationError(
-        rawErr?.unit,
-        param.referenceRange.unitId != null || String(param.referenceRange.unit ?? "").trim().length > 0,
-        showErrors,
-      );
       const nameError = Boolean(nameVisibleErr);
       const minError = Boolean(minVisibleErr);
       const maxError = Boolean(maxVisibleErr);
-      const unitError = Boolean(unitVisibleErr);
 
       return (
         <Box
@@ -119,7 +113,7 @@ const ParameterEditor = ({
             alignItems: "flex-end",
             p: 1.5,
             border: "1px solid",
-            borderColor: nameError || minError || maxError || unitError ? "error.main" : "divider",
+            borderColor: nameError || minError || maxError ? "error.main" : "divider",
             borderRadius: 1.5,
             bgcolor: locked ? "action.hover" : "background.paper",
             opacity: locked && !param.isActive ? 0.72 : 1,
@@ -144,7 +138,7 @@ const ParameterEditor = ({
             label="Min"
             value={param.referenceRange.minValue != null ? String(param.referenceRange.minValue) : ""}
             disabled={disabled || locked}
-            required={editable}
+            required={false}
             error={minError}
             helperText={minVisibleErr ?? null}
             width="100%"
@@ -160,7 +154,7 @@ const ParameterEditor = ({
             label="Max"
             value={param.referenceRange.maxValue != null ? String(param.referenceRange.maxValue) : ""}
             disabled={disabled || locked}
-            required={editable}
+            required={false}
             error={maxError}
             helperText={maxVisibleErr ?? null}
             width="100%"
@@ -178,7 +172,7 @@ const ParameterEditor = ({
             placeholder="Select unit"
             options={unitOptions}
             disabled={disabled || locked}
-            required={editable}
+            required={false}
             width="100%"
             theme={theme}
             onChange={(value) =>
@@ -211,15 +205,6 @@ const ParameterEditor = ({
               <icons.Delete fontSize="small" />
             </IconButton>
           )}
-          {unitError ? (
-            <Typography
-              variant="caption"
-              color="error"
-              sx={{ gridColumn: { md: "1 / -1" }, mt: -0.5 }}
-            >
-              {unitVisibleErr}
-            </Typography>
-          ) : null}
         </Box>
       );
     })}

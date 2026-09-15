@@ -195,19 +195,39 @@ const fieldErrorForName = (
   return null;
 };
 
+const INTEGER_INPUT_PATTERN = /^\d+$/;
+const INTEGER_INPUT_PATTERN_SIGNED = /^-?\d+$/;
+
+const parseIntegerAttribute = (
+  raw: string | number | boolean | undefined,
+  allowNegative: boolean,
+): number | null => {
+  if (raw === "" || raw === null || raw === undefined) return null;
+  if (typeof raw === "boolean") return null;
+  if (typeof raw === "number") {
+    return Number.isInteger(raw) ? raw : null;
+  }
+  const trimmed = raw.trim();
+  if (!trimmed) return null;
+  const pattern = allowNegative ? INTEGER_INPUT_PATTERN_SIGNED : INTEGER_INPUT_PATTERN;
+  if (!pattern.test(trimmed)) return null;
+  const num = Number(trimmed);
+  return Number.isInteger(num) ? num : null;
+};
+
 const fieldErrorForAttribute = (
   field: MasterDataFieldDef,
   raw: string | number | boolean | undefined,
 ): string | null => {
   if (field.dataType === "INTEGER") {
-    if (raw === "" || raw === null || raw === undefined) {
-      return field.required ? `${field.label} is required` : null;
+    const allowNegative = field.min == null || field.min < 0;
+    const num = parseIntegerAttribute(raw, allowNegative);
+    if (num == null) {
+      if (raw === "" || raw === null || raw === undefined) {
+        return field.required ? `${field.label} is required` : null;
+      }
+      return `${field.label} must be a whole number`;
     }
-    if (typeof raw === "string" || typeof raw === "boolean") {
-      return `${field.label} must be an integer`;
-    }
-    const num = Number(raw);
-    if (!Number.isInteger(num)) return `${field.label} must be an integer`;
     if (field.min != null && num < field.min) {
       return `${field.label} must be at least ${field.min}`;
     }
@@ -284,6 +304,7 @@ export const buildCreatePayload = (form: MasterDataFormState, schema: MasterData
     .forEach((f) => {
       const raw = form.attributes[f.key];
       if (f.dataType === "INTEGER" || f.dataType === "NUMBER" || f.dataType === "DOUBLE") {
+        if (raw === "" || raw === null || raw === undefined) return;
         attributes[f.key] = Number(raw);
       } else {
         attributes[f.key] = String(raw ?? "").trim();
