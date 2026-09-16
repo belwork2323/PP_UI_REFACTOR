@@ -46,6 +46,13 @@ export const DRAWER_NAV = [
     Icon: icons.Inventory,
     allowedRoles: ["ADMIN", "CENTRE_HEAD"],
   },
+  {
+  key: "blockchain-explorer",
+  label: "Explore Blockchain",
+  route: "/blockchain-explorer",
+  Icon: icons.drawerBlockchainExplorer,
+  allowedRoles: ["ADMIN"],
+},
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────

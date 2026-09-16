@@ -1074,6 +1074,12 @@ export const useBaseStaticTestFacility = ({
               currentSlug: "static-test-facility",
               currentSubDepartmentId: subDepartmentId,
               subDepartments: user?.allSubDepartments,
+              batchType:
+                (nextBatch as { batchType?: string | null }).batchType ??
+                (stfBatchObj as { batchType?: string | null }).batchType,
+              parallelFlowEnabled:
+                (nextBatch as { parallelFlowEnabled?: boolean | null }).parallelFlowEnabled ??
+                (stfBatchObj as { parallelFlowEnabled?: boolean | null }).parallelFlowEnabled,
             }),
           );
         }
@@ -1532,6 +1538,8 @@ export const useBaseStaticTestFacility = ({
                   currentSlug: "static-test-facility",
                   currentSubDepartmentId: subDepartmentId,
                   subDepartments: user?.allSubDepartments,
+                  batchType: batchSnapshot.batchType,
+                  parallelFlowEnabled: batchSnapshot.parallelFlowEnabled,
                 }),
               );
             }
@@ -1572,9 +1580,10 @@ export const useBaseStaticTestFacility = ({
 
       if (!isStfMotorWorkflowEnabled(motorId, gateSubType)) {
         showAlert(
-          isMotorEnabledByPreviousStage(motorId, previousStageGate)
-            ? STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED
-            : messages.PREVIOUS_STAGE_UNIT_DISABLED,
+          previousStageGate?.blockedMessage
+            ?? (isMotorEnabledByPreviousStage(motorId, previousStageGate)
+              ? STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED
+              : messages.PREVIOUS_STAGE_UNIT_DISABLED),
           "warning",
         );
         return false;
@@ -1746,6 +1755,8 @@ export const useBaseStaticTestFacility = ({
                 currentSlug: "static-test-facility",
                 currentSubDepartmentId: subDepartmentId,
                 subDepartments: user?.allSubDepartments,
+                batchType: activeBatch.batchType,
+                parallelFlowEnabled: activeBatch.parallelFlowEnabled,
               }),
             );
           }
@@ -1791,6 +1802,8 @@ export const useBaseStaticTestFacility = ({
                     currentSlug: "static-test-facility",
                     currentSubDepartmentId: subDepartmentId,
                     subDepartments: user?.allSubDepartments,
+                    batchType: batchSnapshot.batchType,
+                    parallelFlowEnabled: batchSnapshot.parallelFlowEnabled,
                   }),
                 );
               }

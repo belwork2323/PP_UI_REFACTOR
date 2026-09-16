@@ -43,8 +43,10 @@ export function mapToAppError(error: unknown) {
         status,
         message: backendMessage(data) ?? STRINGS.SYSTEM.INVALID_REQUEST,
         details: typeof data === "object" && data !== null ? (
+          // Nested field errors from AcemValidationException
+          (data as { errorDetails?: unknown }).errorDetails ??
           // Field-level validation errors are in the "data" field
-          (data as { data?: unknown }).data ||
+          (data as { data?: unknown }).data ??
           // General error code is in the "error" field
           ((data as { error: unknown }).error ?? null)
         ) : null,

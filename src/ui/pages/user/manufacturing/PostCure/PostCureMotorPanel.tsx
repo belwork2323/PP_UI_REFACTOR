@@ -25,6 +25,9 @@ import {
   postCureTableRowSx,
 } from "./PostCureFormPrimitives";
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import { WorkflowReadOnlyText } from "@/ui/components/common/WorkflowReadOnlyText";
+
+const postCureTableHeaderLabelSx = postCureTableHeaderCellSx(false);
 
 const formatLocation = (location?: string) => {
   if (!location) return "";
@@ -71,7 +74,11 @@ export const LocationDateTable = ({
           <TableRow>
             {["Location", "From Date", "To Date", "Observations"].map((label, idx) => (
               <TableCell key={label} sx={postCureTableHeaderCellSx(idx === 0)}>
-                <FieldLabelWithAsterisk label={label} required={!readOnly} />
+                <FieldLabelWithAsterisk
+                  label={label}
+                  required={!readOnly}
+                  sx={postCureTableHeaderLabelSx}
+                />
               </TableCell>
             ))}
           </TableRow>
@@ -91,7 +98,7 @@ export const LocationDateTable = ({
                   </TableCell>
                   <TableCell sx={postCureTableCellSx}>
                     {readOnly ? (
-                      <Typography sx={{ fontSize: "0.82rem" }}>{row.fromDate || "—"}</Typography>
+                      <WorkflowReadOnlyText value={row.fromDate} />
                     ) : (
                       <DateField
                         value={row.fromDate ?? ""}
@@ -106,7 +113,7 @@ export const LocationDateTable = ({
                   </TableCell>
                   <TableCell sx={postCureTableCellSx}>
                     {readOnly ? (
-                      <Typography sx={{ fontSize: "0.82rem" }}>{row.toDate || "—"}</Typography>
+                      <WorkflowReadOnlyText value={row.toDate} />
                     ) : (
                       <DateField
                         value={row.toDate ?? ""}
@@ -121,9 +128,7 @@ export const LocationDateTable = ({
                   </TableCell>
                   <TableCell sx={postCureTableCellSx}>
                     {readOnly ? (
-                      <Typography sx={{ fontSize: "0.82rem" }}>
-                        {row.observations || "—"}
-                      </Typography>
+                      <WorkflowReadOnlyText value={row.observations} />
                     ) : (
                       <TableTextInput
                         value={row.observations ?? ""}
@@ -143,7 +148,7 @@ export const LocationDateTable = ({
           ) : (
             <TableRow>
               <TableCell colSpan={4} align="center" sx={{ py: 2 }}>
-                <Typography variant="body2" color="text.secondary">
+                <Typography sx={{ fontSize: "0.72rem", color: "text.secondary" }}>
                   No data available.
                 </Typography>
               </TableCell>
@@ -198,7 +203,11 @@ export const LocationQtyTable = ({
           <TableRow>
             {["Location", "From Date", "To Date", qtyLabel, "Observations"].map((label, idx) => (
               <TableCell key={label} sx={postCureTableHeaderCellSx(idx === 0)}>
-                <FieldLabelWithAsterisk label={label} required={idx >= 1 && !readOnly} />
+                <FieldLabelWithAsterisk
+                  label={label}
+                  required={idx >= 1 && !readOnly}
+                  sx={postCureTableHeaderLabelSx}
+                />
               </TableCell>
             ))}
           </TableRow>
@@ -219,7 +228,7 @@ export const LocationQtyTable = ({
                   </TableCell>
                   <TableCell sx={postCureTableCellSx}>
                     {readOnly ? (
-                      <Typography sx={{ fontSize: "0.82rem" }}>{row.fromDate || "—"}</Typography>
+                      <WorkflowReadOnlyText value={row.fromDate} />
                     ) : (
                       <DateField
                         value={row.fromDate ?? ""}
@@ -234,7 +243,7 @@ export const LocationQtyTable = ({
                   </TableCell>
                   <TableCell sx={postCureTableCellSx}>
                     {readOnly ? (
-                      <Typography sx={{ fontSize: "0.82rem" }}>{row.toDate || "—"}</Typography>
+                      <WorkflowReadOnlyText value={row.toDate} />
                     ) : (
                       <DateField
                         value={row.toDate ?? ""}
@@ -249,7 +258,7 @@ export const LocationQtyTable = ({
                   </TableCell>
                   <TableCell sx={postCureTableCellSx}>
                     {readOnly ? (
-                      <Typography sx={{ fontSize: "0.82rem" }}>{row[qtyKey] || "—"}</Typography>
+                      <WorkflowReadOnlyText value={row[qtyKey]} />
                     ) : (
                       <TableTextInput
                         value={String(row[qtyKey] ?? "")}
@@ -264,9 +273,7 @@ export const LocationQtyTable = ({
                   </TableCell>
                   <TableCell sx={postCureTableCellSx}>
                     {readOnly ? (
-                      <Typography sx={{ fontSize: "0.82rem" }}>
-                        {row.observations || "—"}
-                      </Typography>
+                      <WorkflowReadOnlyText value={row.observations} />
                     ) : (
                       <TableTextInput
                         value={row.observations ?? ""}
@@ -286,7 +293,7 @@ export const LocationQtyTable = ({
           ) : (
             <TableRow>
               <TableCell colSpan={5} align="center" sx={{ py: 2 }}>
-                <Typography variant="body2" color="text.secondary">
+                <Typography sx={{ fontSize: "0.72rem", color: "text.secondary" }}>
                   No data available.
                 </Typography>
               </TableCell>
@@ -371,7 +378,11 @@ export const IngredientQuantityTable = ({
               qtyKey === "quantity" ? "Quantity (g)" : "Qty Taken (g)",
             ].map((label, idx) => (
               <TableCell key={label} sx={postCureTableHeaderCellSx(idx === 0)}>
-                <FieldLabelWithAsterisk label={label} required={!readOnly} />
+                <FieldLabelWithAsterisk
+                  label={label}
+                  required={!readOnly}
+                  sx={postCureTableHeaderLabelSx}
+                />
               </TableCell>
             ))}
           </TableRow>
@@ -395,9 +406,7 @@ export const IngredientQuantityTable = ({
                   </TableCell>
                   <TableCell sx={postCureTableCellSx}>
                     {isTotal || readOnly ? (
-                      <Typography sx={{ fontSize: "0.82rem", color: "text.secondary" }}>
-                        {row.mfgLot || "—"}
-                      </Typography>
+                      <WorkflowReadOnlyText value={row.mfgLot} muted />
                     ) : (
                       <TableTextInput
                         value={row.mfgLot ?? ""}
@@ -414,7 +423,7 @@ export const IngredientQuantityTable = ({
                   </TableCell>
                   <TableCell sx={postCureTableCellSx}>
                     {readOnly ? (
-                      <Typography sx={{ fontSize: "0.82rem" }}>{row[qtyKey] || "—"}</Typography>
+                      <WorkflowReadOnlyText value={row[qtyKey]} />
                     ) : (
                       <TableTextInput
                         value={String(row[qtyKey] ?? "")}
@@ -433,7 +442,7 @@ export const IngredientQuantityTable = ({
           ) : (
             <TableRow>
               <TableCell colSpan={5} align="center" sx={{ py: 2 }}>
-                <Typography variant="body2" color="text.secondary">
+                <Typography sx={{ fontSize: "0.72rem", color: "text.secondary" }}>
                   No data available.
                 </Typography>
               </TableCell>
@@ -528,7 +537,11 @@ export const QualificationSection = ({
             <TableRow>
               {["Parameter", "Specification", "Result"].map((label, idx) => (
                 <TableCell key={label} sx={postCureTableHeaderCellSx(idx === 0)}>
-                  <FieldLabelWithAsterisk label={label} required={!readOnly} />
+                  <FieldLabelWithAsterisk
+                    label={label}
+                    required={!readOnly}
+                    sx={postCureTableHeaderLabelSx}
+                  />
                 </TableCell>
               ))}
             </TableRow>
@@ -549,7 +562,7 @@ export const QualificationSection = ({
                   </TableCell>
                   <TableCell sx={postCureTableCellSx}>
                     {readOnly ? (
-                      <Typography sx={{ fontSize: "0.82rem" }}>{row.result || "—"}</Typography>
+                      <WorkflowReadOnlyText value={row.result} />
                     ) : (
                       <TableTextInput
                         value={row.result ?? ""}

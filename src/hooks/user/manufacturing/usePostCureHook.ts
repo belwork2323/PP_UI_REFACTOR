@@ -24,11 +24,6 @@ import {
 } from "../../../data/models/user/PostCureMotorDataModel";
 import { batchManagementController } from "../../../controllers/admin/BatchManagement/batchManagementController";
 import {
-  isPostCureInhibitionOperation,
-  mapPostCureInhibitorTypeToApi,
-  mapPostCureOperationToApi,
-} from "./postCureConfig";
-import {
   canLoadPostCureMotorForm,
   enrichPostCureBatchFromDetails,
   mergePostCureMotorsFromBatchAndForm,
@@ -54,6 +49,11 @@ import {
   SUB_DEPT,
   usesParallelUnitLocks,
 } from "../../../utils/batchStageUtils";
+import {
+  extractApiErrorDetails,
+  mapPostCureApiErrorsToUi,
+} from "../../../data/validation/adapters/postCureApiErrorMap";
+import type { ValidationErrors } from "../../../data/validation/submissionIntent";
 
 type WorkflowView = "list" | "form" | "details";
 
@@ -74,9 +74,6 @@ const mapMotorsToAdded = (motors: PostCureMotorSession[]): PostCureAddedMotor[] 
     motorId: motor.motorId,
     motorReceiptDate: motor.motorReceiptDate,
   }));
-
-const resolveInhibitorType = (operation: string, inhibitorType: string) =>
-  isPostCureInhibitionOperation(operation) ? inhibitorType : "";
 
 export const usePostCureHook = () => {
   const listParams = useSubdepartmentBatches("post-cure-operations");
@@ -104,8 +101,6 @@ export const usePostCureHook = () => {
   const [addedMotors, setAddedMotors] = useState<PostCureAddedMotor[]>([]);
   const [activeMotorId, setActiveMotorId] = useState("");
   const [draftMotorReceiptDate, setDraftMotorReceiptDate] = useState("");
-  const [draftOperation, setDraftOperation] = useState("");
-  const [draftInhibitorType, setDraftInhibitorType] = useState("");
   const [detailsRow, setDetailsRow] = useState<any>(null);
   const [detailsData, setDetailsData] = useState<any>(null);
   const [detailsLoading, setDetailsLoading] = useState(false);
@@ -115,11 +110,10 @@ export const usePostCureHook = () => {
   const [previousStageGate, setPreviousStageGate] = useState<PreviousStageApprovedUnits | null>(
     null,
   );
+  const [serverValidationErrors, setServerValidationErrors] = useState<ValidationErrors>({});
 
   const clearSetupDrafts = useCallback(() => {
     setDraftMotorReceiptDate("");
-    setDraftOperation("");
-    setDraftInhibitorType("");
   }, []);
 
   const formSnapshot = useMemo(() => JSON.stringify(formData), [formData]);
@@ -360,17 +354,6 @@ export const usePostCureHook = () => {
     });
   }, [bumpBatchRefresh, deleteTemp, resetFormContext, subDepartmentId]);
 
-  const handleDraftOperationChange = useCallback((operation: string) => {
-    setDraftOperation(operation);
-    if (!isPostCureInhibitionOperation(operation)) {
-      setDraftInhibitorType("");
-    }
-  }, []);
-
-  const handleDraftInhibitorTypeChange = useCallback((inhibitorType: string) => {
-    setDraftInhibitorType(inhibitorType);
-  }, []);
-
   const handleMotorSessionChange = useCallback((motorId: string, next: PostCureMotorSession) => {
     setFormData((prev) => ({
       ...prev,
@@ -410,6 +393,7 @@ export const usePostCureHook = () => {
   const handleActiveMotorChange = useCallback(
     (motorId: string) => {
       setActiveMotorId(motorId);
+      setServerValidationErrors({});
       const entry = addedMotors.find((motor) => motor.motorId === motorId);
       const session = (formData.motors ?? []).find((motor) => motor.motorId === motorId);
       if (session?.formLoaded) {
@@ -417,15 +401,12 @@ export const usePostCureHook = () => {
         return;
       }
       setDraftMotorReceiptDate(entry?.motorReceiptDate || "");
-      setDraftOperation(session?.operation || "");
-      setDraftInhibitorType(session?.inhibitorType || "");
     },
     [addedMotors, clearSetupDrafts, formData.motors],
   );
 
   const handleLoadForm = useCallback(() => {
     const motorId = String(activeMotorId ?? "").trim();
-    const inhibitorType = resolveInhibitorType(draftOperation, draftInhibitorType);
     const alreadyLoaded = Boolean(
       (formData.motors ?? []).find((motor) => motor.motorId === motorId)?.formLoaded,
     );
@@ -434,24 +415,13 @@ export const usePostCureHook = () => {
       !canLoadPostCureMotorForm({
         motorId,
         motorReceiptDate: draftMotorReceiptDate,
-        operation: draftOperation,
-        inhibitorType,
         alreadyLoaded,
       })
     ) {
       return;
     }
 
-    const motorSession = createEmptyPostCureMotorSession(
-      motorId,
-      draftMotorReceiptDate.trim(),
-      draftOperation,
-      inhibitorType,
-    );
-    if (!motorSession) {
-      showAlert(STRINGS.MANUFACTURING.POST_CURE.OPERATION_MISSING, "warning");
-      return;
-    }
+    const motorSession = createEmptyPostCureMotorSession(motorId, draftMotorReceiptDate.trim());
 
     setFormData((prev) => {
       const others = (prev.motors ?? []).filter((motor) => motor.motorId !== motorId);
@@ -468,29 +438,7 @@ export const usePostCureHook = () => {
       ),
     );
     clearSetupDrafts();
-  }, [
-    activeMotorId,
-    draftMotorReceiptDate,
-    draftOperation,
-    draftInhibitorType,
-    formData.motors,
-    clearSetupDrafts,
-    showAlert,
-  ]);
-  const resolveRootOperationFields = useCallback((motors: PostCureMotorSession[]) => {
-    const firstMotor = motors[0];
-    if (!firstMotor) {
-      return {
-        operationType: null as "LOOSE_FLAP_FILLING" | "INHIBITION" | null,
-        inhibitorType: undefined as "IR1" | "HEMCOAT_3K" | "NOT_APPLICABLE" | undefined,
-      };
-    }
-    const operationType = mapPostCureOperationToApi(firstMotor.operation);
-    const inhibitorType = isPostCureInhibitionOperation(firstMotor.operation)
-      ? (mapPostCureInhibitorTypeToApi(firstMotor.inhibitorType) ?? undefined)
-      : undefined;
-    return { operationType, inhibitorType };
-  }, []);
+  }, [activeMotorId, draftMotorReceiptDate, formData.motors, clearSetupDrafts]);
 
   const submitMotor = useCallback(
     async (motorId: string, intent: "draft" | "submit") => {
@@ -545,11 +493,6 @@ export const usePostCureHook = () => {
         targetMotorIds: [motorId],
         motorSubmissionType,
       });
-      const { operationType, inhibitorType } = resolveRootOperationFields([targetMotor]);
-      if (!operationType) {
-        showAlert(STRINGS.MANUFACTURING.POST_CURE.OPERATION_MISSING, "warning");
-        return false;
-      }
 
       const status = parseStatus(activeBatch.pcStatus);
       const isCreateFlow = status === parseStatus(PC_STATUS.TO_BE_INITIATED) && !activeBatch.formId;
@@ -567,8 +510,6 @@ export const usePostCureHook = () => {
             batchId: activeBatch.batchId,
             subDepartmentId,
             formSubmissionType: "DRAFT",
-            operationType,
-            ...(inhibitorType ? { inhibitorType } : {}),
             motors: body.motors,
           });
         } else {
@@ -581,8 +522,6 @@ export const usePostCureHook = () => {
             batchId: activeBatch.batchId,
             subDepartmentId,
             formSubmissionType: "DRAFT",
-            operationType,
-            ...(inhibitorType ? { inhibitorType } : {}),
             motors: body.motors,
           });
         }
@@ -594,9 +533,15 @@ export const usePostCureHook = () => {
             showAlert,
           );
           if (handled) return false;
+          const fieldErrors = mapPostCureApiErrorsToUi(extractApiErrorDetails(response), {
+            motorIndex: 0,
+            inhibitorType: targetMotor.inhibitorType,
+          });
+          setServerValidationErrors(fieldErrors);
           showAlert(getErrorMessage(response, `Failed to ${intent} motor ${motorId}.`), "error");
           return false;
         }
+        setServerValidationErrors({});
         const nextFormId = String(response.data?.formId ?? activeBatch.formId ?? "").trim();
         let refreshedBatch: PostCureBatch = {
           ...activeBatch,
@@ -662,7 +607,6 @@ export const usePostCureHook = () => {
       openFormWithResolvedData,
       previousStageGate,
       refreshBatchLocks,
-      resolveRootOperationFields,
       showAlert,
       subDepartmentId,
     ],
@@ -719,25 +663,6 @@ export const usePostCureHook = () => {
         return false;
       }
 
-      const latestPayload = detailsRes.data?.postCureDetails ?? detailsRes.data;
-      const rawMotors = Array.isArray(latestPayload?.motors) ? latestPayload.motors : [];
-      const rootOperationType =
-        mapPostCureOperationToApi(String(latestPayload?.operation ?? "")) ||
-        (String(latestPayload?.operationType ?? "").trim() as
-          "LOOSE_FLAP_FILLING" | "INHIBITION") ||
-        mapPostCureOperationToApi(String(rawMotors[0]?.operation ?? "")) ||
-        (String(rawMotors[0]?.operationType ?? "").trim() as "LOOSE_FLAP_FILLING" | "INHIBITION");
-
-      if (!rootOperationType) {
-        showAlert(STRINGS.MANUFACTURING.POST_CURE.OPERATION_MISSING, "warning");
-        return false;
-      }
-
-      const rootInhibitorType =
-        mapPostCureInhibitorTypeToApi(String(latestPayload?.inhibitorType ?? "")) ||
-        mapPostCureInhibitorTypeToApi(String(rawMotors[0]?.inhibitorType ?? "")) ||
-        undefined;
-
       const formState = mapPostCureDetailsToFormState(detailsRes.data);
       const payloadBody = mapPostCureFormStateToPayload(formState, {
         motorSubmissionType: "SUBMIT",
@@ -748,8 +673,6 @@ export const usePostCureHook = () => {
         batchId: activeBatch.batchId,
         subDepartmentId,
         formSubmissionType: "SUBMIT",
-        operationType: rootOperationType as "LOOSE_FLAP_FILLING" | "INHIBITION",
-        ...(rootInhibitorType ? { inhibitorType: rootInhibitorType } : {}),
         motors: payloadBody.motors,
       });
 
@@ -770,7 +693,6 @@ export const usePostCureHook = () => {
   }, [activeBatch, listParams, motorStatusById, resetFormContext, showAlert, subDepartmentId]);
 
   const usedMotorIds = useMemo(() => addedMotors.map((motor) => motor.motorId), [addedMotors]);
-  const draftInhibitor = resolveInhibitorType(draftOperation, draftInhibitorType);
   const activeMotorAlreadyLoaded = useMemo(
     () =>
       Boolean((formData.motors ?? []).find((motor) => motor.motorId === activeMotorId)?.formLoaded),
@@ -782,17 +704,9 @@ export const usePostCureHook = () => {
       canLoadPostCureMotorForm({
         motorId: activeMotorId,
         motorReceiptDate: draftMotorReceiptDate,
-        operation: draftOperation,
-        inhibitorType: draftInhibitor,
         alreadyLoaded: activeMotorAlreadyLoaded,
       }),
-    [
-      activeMotorId,
-      draftMotorReceiptDate,
-      draftOperation,
-      draftInhibitor,
-      activeMotorAlreadyLoaded,
-    ],
+    [activeMotorId, draftMotorReceiptDate, activeMotorAlreadyLoaded],
   );
 
   return {
@@ -806,8 +720,6 @@ export const usePostCureHook = () => {
     addedMotors,
     activeMotorId,
     draftMotorReceiptDate,
-    draftOperation,
-    draftInhibitorType,
     isFormDirty,
     actionLoading,
     canLoadForm,
@@ -820,8 +732,6 @@ export const usePostCureHook = () => {
     handleEditForm,
     handleBack,
     handleDiscardAndBack,
-    handleDraftOperationChange,
-    handleDraftInhibitorTypeChange,
     handleMotorSessionChange,
     handleRemoveMotor,
     handleActiveMotorChange,
@@ -831,6 +741,7 @@ export const usePostCureHook = () => {
     handleSubmitForFinalApproval,
     motorStatusById,
     previousStageGate,
+    serverValidationErrors,
     getMotorStatus,
     isMotorEditable: checkMotorEditable,
     detailsRow,

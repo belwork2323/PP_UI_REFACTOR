@@ -195,7 +195,6 @@ import { resolveQcPropellantPremixCount } from "./qcPropellantConfig";
 import { mapQcTrimmingSubTypeToApi, resolveQcTrimmingSubType } from "./qcTrimmingConfig";
 import {
   getQcInhibitorTypeLabel,
-  getQcPostCureOperationLabel,
   resolveQcSectionInhibitorType,
 } from "./qcPostCureConfig";
 import {
@@ -2180,8 +2179,7 @@ export const useQCDivisionHook = () => {
   const handleLoadQcSetupForm = useCallback(() => {
     if (selectedDivision === "POST_CURE") {
       const manualSetup = {
-        operation: selectedPostCureOperation,
-        inhibitorType: selectedInhibitorType || undefined,
+        inhibitorType: selectedInhibitorType,
         motorReceiptDate: postCureMotorReceiptDate,
       };
       postCureManualSetupRef.current = manualSetup;
@@ -2241,7 +2239,7 @@ export const useQCDivisionHook = () => {
     setPartialItemLoading(false);
 
     if (previousSetup) {
-      setSelectedPostCureOperation(previousSetup.operation);
+      setSelectedPostCureOperation(previousSetup.operation ?? "");
       setSelectedInhibitorType(previousSetup.inhibitorType ?? "");
       setPostCureMotorReceiptDate(previousSetup.motorReceiptDate);
     }
@@ -3455,8 +3453,6 @@ export const useQCDivisionHook = () => {
               flowKey,
               kind: "POST_CURE_MOTOR",
               motorId: item.motorId,
-              subType: selection.subType,
-              inhibitorType: selection.inhibitorType,
             });
             if (
               getAddedDivisionEntryKeys(formDataRef.current.divisionEntries ?? []).includes(
@@ -3469,7 +3465,7 @@ export const useQCDivisionHook = () => {
             const initialValues = buildInitialPostCureValuesForMotor(
               valuePayload,
               item.motorId,
-              selection.subType,
+              null,
               selection.inhibitorType,
             );
 
@@ -6254,15 +6250,8 @@ export const useQCDivisionHook = () => {
   );
 
   const postCureSetupOperationLabel = useMemo(() => {
-    if (!postCureManualSetup?.operation) return null;
-    const operationLabel = getQcPostCureOperationLabel(postCureManualSetup.operation);
-    if (
-      postCureManualSetup.inhibitorType &&
-      String(postCureManualSetup.inhibitorType).trim()
-    ) {
-      return `${operationLabel} (${getQcInhibitorTypeLabel(postCureManualSetup.inhibitorType)})`;
-    }
-    return operationLabel;
+    if (!postCureManualSetup?.inhibitorType) return null;
+    return getQcInhibitorTypeLabel(postCureManualSetup.inhibitorType);
   }, [postCureManualSetup]);
 
   const canResetPostCureSetup = useMemo(() => {

@@ -2,8 +2,7 @@ import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-
 import { isEmptyManufacturingDivisionDetailsPayload } from "./qcDivisionApprovalUnits";
 import { shouldPreserveQcDivisionFileRefsOnSeed } from "./qcDivisionFileUpload";
 import {
-  isQcPostCureInhibitionOperation,
-  resolveQcPostCureSchemaSelection,
+  resolveQcPostCureDualSelection,
   type QcPostCureSchemaSelection,
 } from "./qcPostCureConfig";
 import {
@@ -11,7 +10,7 @@ import {
   isQcSubscaleBatch,
 } from "./qcBatchType";
 import {
-  createInitialPostCureValues,
+  createInitialDualPostCureValues,
   hydratePostCureValuesFromMotorDetail,
   hydratePostCureValuesFromSections,
   isPostCureNestedMotorDetail,
@@ -91,8 +90,9 @@ export const findPostCureMotorRecord = (
 };
 
 export type QcPostCureManualSetup = {
-  operation: string;
-  inhibitorType?: string;
+  /** @deprecated Dual mode no longer uses exclusive operation; kept for legacy hydrate. */
+  operation?: string;
+  inhibitorType: string;
   motorReceiptDate: string;
 };
 
@@ -103,12 +103,13 @@ export const resolvePostCureManualSetup = (payload: unknown): QcPostCureManualSe
   if (!root) return null;
   const setup = asRecord(root[QC_POST_CURE_MANUAL_SETUP_KEY]);
   if (!setup) return null;
-  const operation = pickString(setup.operation);
-  if (!operation) return null;
+  const inhibitorType = pickString(setup.inhibitorType);
+  const motorReceiptDate = pickString(setup.motorReceiptDate);
+  if (!inhibitorType || !motorReceiptDate) return null;
   return {
-    operation,
-    inhibitorType: pickString(setup.inhibitorType) || undefined,
-    motorReceiptDate: pickString(setup.motorReceiptDate),
+    operation: pickString(setup.operation) || undefined,
+    inhibitorType,
+    motorReceiptDate,
   };
 };
 
@@ -118,6 +119,22 @@ export const buildPostCureManualSetupPayload = (
   [QC_POST_CURE_MANUAL_SETUP_KEY]: setup,
 });
 
+const resolveInhibitorFromMotor = (motor: Record<string, unknown>): string => {
+  const details = asRecord(motor.details) ?? {};
+  const inhibition =
+    asRecord(motor.inhibitionDetails) ?? asRecord(details.inhibitionDetails) ?? {};
+  return pickString(
+    motor.inhibitorType,
+    details.inhibitorType,
+    inhibition.inhibitorType,
+  );
+};
+
+/**
+ * Resolve dual Loose Flap + Inhibition selection from a manufacturing / QC motor.
+ * Prefers inhibitor from the motor; returns dual selection whenever the motor exists
+ * with any nested details or inhibitor metadata.
+ */
 const resolvePostCureSelectionFromManufacturingMotor = (
   payload: unknown,
   motorId: string,
@@ -129,29 +146,13 @@ const resolvePostCureSelectionFromManufacturingMotor = (
   const loose =
     asRecord(motor.looseFlapFillingDetails) ?? asRecord(details.looseFlapFillingDetails);
   const inhibition = asRecord(motor.inhibitionDetails) ?? asRecord(details.inhibitionDetails);
+  const inhibitorType = resolveInhibitorFromMotor(motor);
 
-  if (loose && Object.keys(loose).length > 0) {
-    return resolveQcPostCureSchemaSelection("LOOSE_FLAP_FILLING", "");
+  if (!hasLoose && !hasInhibition && !inhibitorType) {
+    return null;
   }
 
-  if (inhibition && Object.keys(inhibition).length > 0) {
-    const inhibitorType = pickString(
-      inhibition.inhibitorType,
-      details.inhibitorType,
-      motor.inhibitorType,
-    );
-    return resolveQcPostCureSchemaSelection("INHIBITION", inhibitorType);
-  }
-
-  const operationType = pickString(
-    details.operationType,
-    details.subType,
-    motor.operationType,
-    motor.subType,
-  );
-  const inhibitorType = pickString(details.inhibitorType, motor.inhibitorType);
-
-  return resolveQcPostCureSchemaSelection(operationType, inhibitorType);
+  return resolveQcPostCureDualSelection(inhibitorType);
 };
 
 /** Subscale qualification batches may have no manufacturing post-cure operation until setup. */
@@ -182,37 +183,23 @@ export const needsQcPostCureManualSetup = (params: {
 };
 
 export const canLoadQcPostCureSetupForm = (state: {
-  selectedPostCureOperation: string;
+  selectedPostCureOperation?: string;
   selectedInhibitorType: string;
   postCureMotorReceiptDate: string;
 }): boolean => {
-  if (!String(state.selectedPostCureOperation ?? "").trim()) return false;
-  if (
-    isQcPostCureInhibitionOperation(state.selectedPostCureOperation) &&
-    !String(state.selectedInhibitorType ?? "").trim()
-  ) {
-    return false;
-  }
+  if (!String(state.selectedInhibitorType ?? "").trim()) return false;
   if (!String(state.postCureMotorReceiptDate ?? "").trim()) return false;
-  return Boolean(
-    resolveQcPostCureSchemaSelection(
-      state.selectedPostCureOperation,
-      state.selectedInhibitorType ?? "",
-    ),
-  );
+  return Boolean(resolveQcPostCureDualSelection(state.selectedInhibitorType));
 };
 
-/** Resolve Loose Flap / Inhibition (+ inhibitor) from manufacturing, QC, or manual setup. */
+/** Resolve dual selection from manufacturing, QC, or manual setup. */
 export const resolvePostCureSelectionFromMotorDetails = (
   payload: unknown,
   motorId: string,
 ): QcPostCureSchemaSelection | null => {
   const manualSetup = resolvePostCureManualSetup(payload);
   if (manualSetup) {
-    return resolveQcPostCureSchemaSelection(
-      manualSetup.operation,
-      manualSetup.inhibitorType ?? "",
-    );
+    return resolveQcPostCureDualSelection(manualSetup.inhibitorType);
   }
   return resolvePostCureSelectionFromManufacturingMotor(payload, motorId);
 };
@@ -227,12 +214,6 @@ const collectMotorSections = (
   const sections: SchemaSectionSubmission[] = [];
   const motor = findPostCureMotorRecord(root, motorId);
   const details = asRecord(motor?.details) ?? {};
-  const operationType = pickString(
-    details.operationType,
-    details.subType,
-    motor?.operationType,
-    motor?.subType,
-  );
   const inhibitorType = pickString(details.inhibitorType, motor?.inhibitorType);
 
   for (const section of asArray(data.sections)) {
@@ -243,7 +224,6 @@ const collectMotorSections = (
     sections.push({
       ...sec,
       motorId,
-      ...(operationType ? { subType: operationType } : null),
       ...(inhibitorType ? { inhibitorType } : null),
     } as unknown as SchemaSectionSubmission);
   }
@@ -256,11 +236,6 @@ const collectMotorSections = (
       sections.push({
         ...sec,
         motorId,
-        ...(sec.subType != null
-          ? { subType: sec.subType }
-          : operationType
-            ? { subType: operationType }
-            : null),
         ...(sec.inhibitorType != null
           ? { inhibitorType: sec.inhibitorType }
           : inhibitorType
@@ -275,44 +250,38 @@ const collectMotorSections = (
 
 /**
  * Seed Post Cure form values from manufacturing / QC division-details payload
- * for a motor + operation (+ inhibitor). Prefers nested postCureMotorDetails shape.
+ * for a motor. Always scaffolds both Loose Flap and Inhibition.
  */
 export const buildInitialPostCureValuesForMotor = (
   divisionDetailPayload: unknown,
   motorId: string,
-  subType?: string | null,
+  _subType?: string | null,
   inhibitorType?: string | null,
 ): SchemaFormValues => {
   const trimmedMotorId = String(motorId ?? "").trim();
   const selection =
-    subType
-      ? resolveQcPostCureSchemaSelection(String(subType), String(inhibitorType ?? ""))
-      : resolvePostCureSelectionFromMotorDetails(divisionDetailPayload, trimmedMotorId);
+    resolvePostCureSelectionFromMotorDetails(divisionDetailPayload, trimmedMotorId) ??
+    resolveQcPostCureDualSelection(inhibitorType);
 
-  const resolvedSubType = selection?.subType ?? subType ?? null;
   const resolvedInhibitor = selection?.inhibitorType ?? inhibitorType ?? null;
-  const base = createInitialPostCureValues(resolvedSubType, resolvedInhibitor);
+  const base = createInitialDualPostCureValues(resolvedInhibitor);
 
   if (!trimmedMotorId || !divisionDetailPayload) return base;
 
   const motor = findPostCureMotorRecord(divisionDetailPayload, trimmedMotorId);
   if (motor && isPostCureNestedMotorDetail(motor)) {
-    const nested = hydratePostCureValuesFromMotorDetail(motor, resolvedSubType, resolvedInhibitor);
+    const nested = hydratePostCureValuesFromMotorDetail(motor, null, resolvedInhibitor);
     if (postCureFormValuesHaveUserData(nested)) return nested;
   }
 
   const sections = collectMotorSections(divisionDetailPayload, trimmedMotorId);
   if (sections.length > 0) {
-    const fromSections = hydratePostCureValuesFromSections(
-      sections,
-      resolvedSubType,
-      resolvedInhibitor,
-    );
+    const fromSections = hydratePostCureValuesFromSections(sections, null, resolvedInhibitor);
     if (postCureFormValuesHaveUserData(fromSections)) return fromSections;
   }
 
   if (motor && isPostCureNestedMotorDetail(motor)) {
-    return hydratePostCureValuesFromMotorDetail(motor, resolvedSubType, resolvedInhibitor);
+    return hydratePostCureValuesFromMotorDetail(motor, null, resolvedInhibitor);
   }
 
   return base;

@@ -53,6 +53,8 @@ export type PreviousStageApprovedUnits = {
   approvedMotorIds: Set<string>;
   /** Mixing final-mix units, when gated separately from premix. */
   approvedFinalMixNos?: Set<number>;
+  /** Optional tooltip/alert when this gate disables motors (e.g. Subscale wait). */
+  blockedMessage?: string | null;
 };
 
 type SubDeptRef = {
@@ -83,11 +85,12 @@ const PREDECESSOR_BY_SLUG: Record<
   },
   trimming: {
     kind: "motor",
-    predecessors: ["post-cure-operations"],
+    predecessors: ["casting-and-curing"],
   },
   ndt: {
     kind: "motor",
-    predecessors: ["trimming", "post-cure-operations", "casting-and-curing"],
+    // Both Post Cure and Trimming must approve the motor (AND) — see resolveNdt…
+    predecessors: ["post-cure-operations", "trimming"],
   },
   "static-test-facility": {
     kind: "motor",
@@ -299,20 +302,104 @@ const collectMotorsApprovedInAllQcMotorDivisions = (
   return ids;
 };
 
+const isCompletelyApprovedStageStatus = (status: unknown): boolean => {
+  const upper = String(status ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/\s+/g, "_");
+  if (upper === "COMPLETELY_APPROVED") return true;
+  return normalizeSubdepartmentBatchStatus(status) === OPERATION_STATUS.COMPLETELY_APPROVED;
+};
+
+const findSubscaleStageEntry = (stages: StageProgressEntry[]): StageProgressEntry | null => {
+  const byId = stages.find((stage) => Number(stage.subDepartmentId) === 8);
+  if (byId) return byId;
+  return (
+    stages.find((stage) => normalizeStageNameKey(stage.subDepartmentName) === "subscale") ?? null
+  );
+};
+
+const DEFAULT_STF_SUBSCALE_BLOCKED_MESSAGE =
+  "Wait until Subscale is completely approved before starting Static Test.";
+
 const resolveStfPreviousStageApprovedUnits = (
   stages: StageProgressEntry[],
   fallback: PreviousStageApprovedUnits,
+  options?: {
+    batchType?: string | null;
+    parallelFlowEnabled?: boolean | null;
+  },
 ): PreviousStageApprovedUnits => {
   const qcStage = findQcQualityControlStage(stages);
   if (!qcStage) return fallback;
 
-  return {
+  const qcGate: PreviousStageApprovedUnits = {
     enableAll: false,
     kind: "motor",
     previousSubDepartmentId: Number(qcStage.subDepartmentId ?? 0) || null,
     previousSubDepartmentName: String(qcStage.subDepartmentName ?? "").trim() || "Quality Control",
     approvedPremixNos: new Set(),
     approvedMotorIds: collectMotorsApprovedInAllQcMotorDivisions(qcStage),
+  };
+
+  const batchType = String(options?.batchType ?? "")
+    .trim()
+    .toUpperCase();
+  const isMainParallel =
+    batchType === "MAIN" && options?.parallelFlowEnabled === true;
+  if (!isMainParallel) return qcGate;
+
+  const subscaleStage = findSubscaleStageEntry(stages);
+  if (!subscaleStage || isCompletelyApprovedStageStatus(subscaleStage.status)) {
+    return qcGate;
+  }
+
+  return {
+    enableAll: false,
+    kind: "motor",
+    previousSubDepartmentId: Number(subscaleStage.subDepartmentId ?? 0) || null,
+    previousSubDepartmentName: String(subscaleStage.subDepartmentName ?? "").trim() || "Subscale",
+    approvedPremixNos: new Set(),
+    // Keep QC motors empty until Subscale is completely approved (ACEM diagram).
+    approvedMotorIds: new Set(),
+    blockedMessage: DEFAULT_STF_SUBSCALE_BLOCKED_MESSAGE,
+  };
+};
+
+/** NDT unlocks only when the motor is approved in both Post Cure and Trimming. */
+const resolveNdtPreviousStageApprovedUnits = (
+  stages: StageProgressEntry[],
+  subDepartments: SubDeptRef[] | undefined | null,
+): PreviousStageApprovedUnits => {
+  const postCure = findPredecessorStageEntry(
+    stages,
+    resolveSubDepartmentIdsForSlugs(["post-cure-operations"], subDepartments),
+    ["post-cure-operations"],
+  );
+  const trimming = findPredecessorStageEntry(
+    stages,
+    resolveSubDepartmentIdsForSlugs(["trimming"], subDepartments),
+    ["trimming"],
+  );
+
+  if (!postCure || !trimming) {
+    return emptyResult("motor", false);
+  }
+
+  const postCureApproved = collectApprovedMotorIds(postCure);
+  const trimmingApproved = collectApprovedMotorIds(trimming);
+  const approvedMotorIds = new Set<string>();
+  postCureApproved.forEach((motorId) => {
+    if (trimmingApproved.has(motorId)) approvedMotorIds.add(motorId);
+  });
+
+  return {
+    enableAll: false,
+    kind: "motor",
+    previousSubDepartmentId: Number(trimming.subDepartmentId ?? postCure.subDepartmentId ?? 0) || null,
+    previousSubDepartmentName: "Post Cure and Trimming",
+    approvedPremixNos: new Set(),
+    approvedMotorIds,
   };
 };
 
@@ -370,6 +457,8 @@ export const resolvePreviousStageApprovedUnits = (params: {
   currentSlug?: string | null;
   currentSubDepartmentId?: number | null;
   subDepartments?: SubDeptRef[] | null;
+  batchType?: string | null;
+  parallelFlowEnabled?: boolean | null;
 }): PreviousStageApprovedUnits => {
   const slug = normalizeSlug(params.currentSlug);
   const stages = mergeStageProgress(params.stageProgress, params.currentStage);
@@ -388,10 +477,21 @@ export const resolvePreviousStageApprovedUnits = (params: {
   }
 
   if (slug === "static-test-facility") {
-    const qcGate = resolveStfPreviousStageApprovedUnits(stages, emptyResult("motor", false));
+    const qcGate = resolveStfPreviousStageApprovedUnits(
+      stages,
+      emptyResult("motor", false),
+      {
+        batchType: params.batchType,
+        parallelFlowEnabled: params.parallelFlowEnabled,
+      },
+    );
     if (qcGate.previousSubDepartmentId || qcGate.previousSubDepartmentName) {
       return qcGate;
     }
+  }
+
+  if (slug === "ndt") {
+    return resolveNdtPreviousStageApprovedUnits(stages, params.subDepartments);
   }
 
   const predecessorIds = resolveSubDepartmentIdsForSlugs(
@@ -530,7 +630,7 @@ export const getMotorNavTabDisabledReason = (
   if (!id) return undefined;
 
   if (!isMotorEnabledByPreviousStage(id, gate)) {
-    return messages.previousStage;
+    return gate?.blockedMessage ?? messages.previousStage;
   }
 
   return undefined;
@@ -613,7 +713,9 @@ export const buildMotorNavGateHelpers = (
     if (batchContext && usesParallelUnitLocks(batchContext) && subDepartmentId != null) {
       const unit = findMotorUnit(getActiveStage(batchContext, subDepartmentId), String(motorId ?? ""));
       if (isMotorDisabled(unit)) {
-        return messages.notYetUnlocked ?? messages.previousStage;
+        return previousStageGate?.blockedMessage
+          ?? messages.notYetUnlocked
+          ?? messages.previousStage;
       }
       return undefined;
     }

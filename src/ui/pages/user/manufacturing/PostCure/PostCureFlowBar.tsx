@@ -1,12 +1,6 @@
 import { Box, Button, Stack, Typography } from "@mui/material";
 import { STRINGS } from "../../../../../app/config/strings";
-import {
-  isPostCureInhibitionOperation,
-  POST_CURE_INHIBITOR_TYPE_OPTIONS,
-  POST_CURE_OPERATION_OPTIONS,
-} from "../../../../../hooks/user/manufacturing/postCureConfig";
 import { DateTimeField } from "../../../../components/common/DateField";
-import CasePrepSelect from "../CasePreparation/CasePrepSelect";
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 const S = STRINGS.MANUFACTURING.POST_CURE;
@@ -14,12 +8,8 @@ const S = STRINGS.MANUFACTURING.POST_CURE;
 type PostCureFlowBarProps = {
   activeMotorId: string;
   draftMotorReceiptDate: string;
-  draftOperation: string;
-  draftInhibitorType: string;
   canLoadForm: boolean;
   onDraftMotorReceiptDateChange: (value: string) => void;
-  onDraftOperationChange: (value: string) => void;
-  onDraftInhibitorTypeChange: (value: string) => void;
   onLoadForm: () => void;
   theme: any;
 };
@@ -27,18 +17,13 @@ type PostCureFlowBarProps = {
 const PostCureFlowBar = ({
   activeMotorId,
   draftMotorReceiptDate,
-  draftOperation,
-  draftInhibitorType,
   canLoadForm,
   onDraftMotorReceiptDateChange,
-  onDraftOperationChange,
-  onDraftInhibitorTypeChange,
   onLoadForm,
   theme,
 }: PostCureFlowBarProps) => {
   const flowBar =
     theme.manufacturing?.postCure?.flowBar ?? theme.manufacturing?.casePreparation?.flowBar ?? {};
-  const showInhibitionFields = isPostCureInhibitionOperation(draftOperation);
 
   return (
     <Box
@@ -70,6 +55,7 @@ const PostCureFlowBar = ({
             flexWrap: "wrap",
             gap: 2,
             alignItems: { md: "flex-end" },
+            justifyContent: "space-between",
           }}
         >
           <Box sx={flowBar.selectField?.(280)}>
@@ -85,51 +71,6 @@ const PostCureFlowBar = ({
             />
           </Box>
 
-          <CasePrepSelect
-            label={S.OPERATION_LABEL}
-            value={draftOperation}
-            placeholder={S.OPERATION_PLACEHOLDER}
-            options={POST_CURE_OPERATION_OPTIONS}
-            width={240}
-            theme={theme}
-            required
-            onChange={onDraftOperationChange}
-          />
-        </Box>
-
-        {showInhibitionFields ? (
-          <Box
-            sx={{
-              borderRadius: 2,
-              border: `1px solid ${theme.palette.border}`,
-              background: "rgba(21,101,192,0.03)",
-              px: 1.25,
-              py: 1.25,
-            }}
-          >
-            <Typography
-              sx={{
-                fontSize: "0.78rem",
-                fontWeight: 700,
-                color: theme.palette.primary,
-                mb: 1.25,
-              }}
-            >
-              {S.INHIBITION_SECTION_TITLE}
-            </Typography>
-            <CasePrepSelect
-              label={S.INHIBITOR_TYPE_LABEL}
-              value={draftInhibitorType}
-              placeholder={S.INHIBITOR_TYPE_PLACEHOLDER}
-              options={POST_CURE_INHIBITOR_TYPE_OPTIONS}
-              width={260}
-              theme={theme}
-              onChange={onDraftInhibitorTypeChange}
-            />
-          </Box>
-        ) : null}
-
-        <Box sx={{ display: "flex", justifyContent: "flex-end" }}>
           <Button variant="contained" size="small" onClick={onLoadForm} disabled={!canLoadForm}>
             {S.LOAD_FORM}
           </Button>

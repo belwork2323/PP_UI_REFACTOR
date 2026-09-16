@@ -200,7 +200,10 @@ export const getPostCureTheme = (baseTheme: any) => {
 				background: `linear-gradient(135deg, ${palette.primary ?? POST_CURE_BRAND.primary}, ${palette.primaryLight ?? POST_CURE_BRAND.primaryLight})`,
 				color: "#fff",
 			},
-			...createDataTableTheme({ ...POST_CURE_BRAND, ...palette }),
+			...createDataTableTheme(
+				{ ...POST_CURE_BRAND, ...palette },
+				{ headerFontSize: "0.63rem", bodyFontSize: "0.72rem", bodyPaddingY: 1, bodyPaddingX: 1.25 },
+			),
 			specText: { fontWeight: 600 },
 			resultText: { fontWeight: 600, color: palette.text ?? POST_CURE_BRAND.text },
 			remarksText: { fontSize: "0.8rem", color: palette.textSub ?? POST_CURE_BRAND.textSub },

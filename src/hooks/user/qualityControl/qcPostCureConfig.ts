@@ -157,25 +157,37 @@ export const normalizeQcInhibitorType = (
 export const isQcInhibitorType = (value: string): value is QcInhibitorType =>
   normalizeQcInhibitorType(value) != null;
 
+/**
+ * Dual Post Cure selection: one motor carries both Loose Flap and Inhibition.
+ * `subType` is null; `inhibitorType` drives the Inhibition tab.
+ */
+export const resolveQcPostCureDualSelection = (
+  inhibitorType?: string | null,
+): QcPostCureSchemaSelection => {
+  const resolvedInhibitorType = mapQcInhibitorTypeToApi(String(inhibitorType ?? ""));
+  return {
+    division: QC_POST_CURE_API_DIVISION,
+    subType: null,
+    ...(resolvedInhibitorType ? { inhibitorType: resolvedInhibitorType } : {}),
+  };
+};
+
+/** @deprecated Prefer {@link resolveQcPostCureDualSelection} — exclusive op selection is legacy. */
 export const resolveQcPostCureSchemaSelection = (
   operation: string,
   inhibitorType: string,
 ): QcPostCureSchemaSelection | null => {
-  if (operation === QC_POST_CURE_OPERATION_LOOSE_FLAP) {
-    return {
-      division: QC_POST_CURE_API_DIVISION,
-      subType: QC_POST_CURE_SUB_TYPE_LOOSE_FLAP,
-    };
-  }
-
-  if (operation === QC_POST_CURE_OPERATION_INHIBITION) {
-    const resolvedInhibitorType = mapQcInhibitorTypeToApi(inhibitorType);
-    if (!resolvedInhibitorType) return null;
-    return {
-      division: QC_POST_CURE_API_DIVISION,
-      subType: QC_POST_CURE_SUB_TYPE_INHIBITION,
-      inhibitorType: resolvedInhibitorType,
-    };
+  // Dual mode: any recognized operation (or empty) resolves to dual + inhibitor.
+  if (
+    !operation ||
+    operation === QC_POST_CURE_OPERATION_LOOSE_FLAP ||
+    operation === QC_POST_CURE_OPERATION_INHIBITION
+  ) {
+    const dual = resolveQcPostCureDualSelection(inhibitorType);
+    if (operation === QC_POST_CURE_OPERATION_INHIBITION && !dual.inhibitorType) {
+      return null;
+    }
+    return dual;
   }
 
   return null;
@@ -209,19 +221,13 @@ export const getQcPostCureOperationLabel = (value: string) =>
 
 export const getQcPostCureMotorLabel = (
   motorId?: string | null,
-  subType?: string | null,
+  _subType?: string | null,
   inhibitorType?: string | null,
 ) => {
   const motor = motorId?.trim() || "Motor";
-  if (subType === QC_POST_CURE_SUB_TYPE_LOOSE_FLAP) {
-    return `${motor} — ${S.POST_CURE_OPERATION_LOOSE_FLAP}`;
-  }
-  if (subType === QC_POST_CURE_SUB_TYPE_INHIBITION) {
-    const normalized = normalizeQcInhibitorType(inhibitorType);
-    const inhibitor = normalized
-      ? getQcInhibitorTypeLabel(normalized)
-      : S.POST_CURE_OPERATION_INHIBITION;
-    return `${motor} — ${S.POST_CURE_OPERATION_INHIBITION} (${inhibitor})`;
+  const normalized = normalizeQcInhibitorType(inhibitorType);
+  if (normalized) {
+    return `${motor} — ${getQcInhibitorTypeLabel(normalized)}`;
   }
   return motor;
 };

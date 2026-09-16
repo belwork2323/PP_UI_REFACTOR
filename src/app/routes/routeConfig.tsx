@@ -50,6 +50,10 @@ const DispatchApproverDashboard = lazy(
   () => import("../../ui/pages/approver/dispatch/DispatchApproverDashboard"),
 );
 
+const BlockchainExplorerPage = lazy(
+  () => import("../../ui/pages/admin/ExploreBlockchain/BlockchainExplorerPage"),
+);
+
 export const routes = [
   /* ---------- AUTH (PUBLIC) ---------- */
   {
@@ -91,6 +95,12 @@ export const routes = [
   {
     path: "/admin/master-data",
     element: <MasterDataPage />,
+    isProtected: true,
+    roles: ["ADMIN"],
+  },
+  {
+    path: "/admin/blockchain-explorer",
+    element: <BlockchainExplorerPage />,
     isProtected: true,
     roles: ["ADMIN"],
   },

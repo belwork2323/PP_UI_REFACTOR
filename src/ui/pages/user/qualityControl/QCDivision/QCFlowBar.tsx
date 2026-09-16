@@ -37,9 +37,7 @@ import {
 } from "../../../../../hooks/user/qualityControl/qcProcessingConfig";
 import { resolveQcTrimmingMotorCountOptions } from "../../../../../hooks/user/qualityControl/qcTrimmingConfig";
 import {
-  QC_POST_CURE_OPERATION_OPTIONS,
   QC_INHIBITOR_TYPE_OPTIONS,
-  isQcPostCureInhibitionOperation,
 } from "../../../../../hooks/user/qualityControl/qcPostCureConfig";
 import { STF_FLOW_LABELS } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
 import { STRINGS } from "../../../../../app/config/strings";
@@ -181,11 +179,8 @@ const QCFlowBar = ({
   const showMotorIdSelect = false;
   const showPropellantProcess = false;
   const showHardwareProcesses = false;
-  const showPostCureOperation = postCureSetupMode && isPostCureFlow;
-  const showInhibitorType =
-    postCureSetupMode &&
-    isPostCureFlow &&
-    isQcPostCureInhibitionOperation(selectedPostCureOperation);
+  const showPostCureOperation = false;
+  const showInhibitorType = postCureSetupMode && isPostCureFlow;
   const showPostCureMotorReceipt = postCureSetupMode && isPostCureFlow;
   const showPostCureMotorId = false;
   const showTrimmingMotorCount = false;
@@ -249,7 +244,9 @@ const QCFlowBar = ({
         }),
       )) ||
     (isPostCureFlow &&
-      addedDivisionEntryKeys.some((key) => key.startsWith(`POST_CURE:${motorId}:`)));
+      addedDivisionEntryKeys.some(
+        (key) => key === `POST_CURE:${motorId}` || key.startsWith(`POST_CURE:${motorId}:`),
+      ));
 
   const motorIdOptions = resolveQcMotorIdOptions(batch).map((option) => ({
     ...option,

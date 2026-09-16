@@ -33,16 +33,12 @@ const PostCurePage = () => {
     addedMotors,
     activeMotorId,
     draftMotorReceiptDate,
-    draftOperation,
-    draftInhibitorType,
     actionLoading,
     backConfirmOpen,
     setBackConfirmOpen,
     handleBack,
     handleDiscardAndBack,
     setDraftMotorReceiptDate,
-    handleDraftOperationChange,
-    handleDraftInhibitorTypeChange,
     handleMotorSessionChange,
     handleRemoveMotor,
     handleActiveMotorChange,
@@ -59,6 +55,7 @@ const PostCurePage = () => {
     detailsData,
     detailsLoading,
     handleBackFromDetails,
+    serverValidationErrors,
   } = hookState;
 
   const listLoading = loading && !loadingFormDetails && view === "list";
@@ -99,14 +96,10 @@ const PostCurePage = () => {
             addedMotors={addedMotors}
             activeMotorId={activeMotorId}
             draftMotorReceiptDate={draftMotorReceiptDate}
-            draftOperation={draftOperation}
-            draftInhibitorType={draftInhibitorType}
             subDepartmentId={subDepartmentId}
             canLoadForm={canLoadForm}
             onActiveMotorChange={handleActiveMotorChange}
             onDraftMotorReceiptDateChange={setDraftMotorReceiptDate}
-            onDraftOperationChange={handleDraftOperationChange}
-            onDraftInhibitorTypeChange={handleDraftInhibitorTypeChange}
             onLoadForm={handleLoadForm}
             onRemoveMotor={handleRemoveMotor}
             onMotorSessionChange={handleMotorSessionChange}
@@ -123,6 +116,7 @@ const PostCurePage = () => {
             isMotorEditable={isMotorEditable}
             previousStageGate={previousStageGate}
             actionLoading={actionLoading}
+            serverValidationErrors={serverValidationErrors}
             theme={theme}
           />
 

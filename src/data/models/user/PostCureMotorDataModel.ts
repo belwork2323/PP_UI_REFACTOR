@@ -1049,14 +1049,45 @@ export const buildPostCureMotorDetailsPayload = (
     case "inhibition-hemcoat-3k":
       return { inhibitionDetails: buildInhibitionHemcoatDetailsPayload(data) };
     case "inhibition-not-applicable":
-      return {
-        inhibitionDetails: {
-          notApplicableRemarks: data.inhibitionNotApplicable.remarks.trim() || undefined,
-        },
-      };
+      return {};
     default:
       return {};
   }
+};
+
+export type DualPostCureMotorPayload = PostCureMotorDetailsPayload & {
+  inhibitorType?: "IR1" | "HEMCOAT_3K" | "NOT_APPLICABLE";
+};
+
+export const buildDualPostCureMotorPayload = (session: {
+  inhibitorType: string;
+  looseFlapData: LooseFlapMotorData;
+  inhibitionData: PostCureMotorData | null;
+}): DualPostCureMotorPayload => {
+  const payload: DualPostCureMotorPayload = {
+    looseFlapFillingDetails: buildLooseFlapFillingDetailsPayload(session.looseFlapData),
+  };
+
+  const inhibitor = String(session.inhibitorType ?? "").trim();
+  const upper = inhibitor.toUpperCase().replace(/[-\s]/g, "_");
+  let apiInhibitor: DualPostCureMotorPayload["inhibitorType"];
+  if (inhibitor === "IR1" || upper === "IR1") apiInhibitor = "IR1";
+  else if (inhibitor === "Hemcoat-3K" || upper === "HEMCOAT_3K") apiInhibitor = "HEMCOAT_3K";
+  else if (inhibitor === "not-applicable" || upper === "NOT_APPLICABLE")
+    apiInhibitor = "NOT_APPLICABLE";
+
+  if (apiInhibitor) {
+    payload.inhibitorType = apiInhibitor;
+  }
+
+  if (apiInhibitor && apiInhibitor !== "NOT_APPLICABLE" && session.inhibitionData) {
+    const inhibitionPayload = buildPostCureMotorDetailsPayload(session.inhibitionData);
+    if (inhibitionPayload.inhibitionDetails) {
+      payload.inhibitionDetails = inhibitionPayload.inhibitionDetails;
+    }
+  }
+
+  return payload;
 };
 
 const parseQualificationParamsFromApi = (
@@ -1434,22 +1465,45 @@ export const collectPostCureFileRefsFromMotorData = (
   return [];
 };
 
+export type PostCureMotorFileSource = {
+  looseFlapData?: LooseFlapMotorData | null;
+  inhibitionData?: PostCureMotorData | null;
+  postCureData?: PostCureMotorData | null;
+};
+
+export const collectPostCureFileRefsFromMotorSession = (
+  motor: PostCureMotorFileSource | null | undefined,
+): FileRef[] => {
+  if (!motor) return [];
+  const refs: FileRef[] = [];
+  if (motor.looseFlapData) {
+    refs.push(...collectPostCureFileRefsFromMotorData(motor.looseFlapData));
+  }
+  if (motor.inhibitionData) {
+    refs.push(...collectPostCureFileRefsFromMotorData(motor.inhibitionData));
+  }
+  if (motor.postCureData) {
+    refs.push(...collectPostCureFileRefsFromMotorData(motor.postCureData));
+  }
+  return refs;
+};
+
 export const collectPostCureFileRefsFromForm = (form: {
-  motors?: Array<{ postCureData?: PostCureMotorData | null }>;
+  motors?: Array<PostCureMotorFileSource | null | undefined>;
 }): FileRef[] => {
   const refs: FileRef[] = [];
   for (const motor of form?.motors ?? []) {
-    refs.push(...collectPostCureFileRefsFromMotorData(motor?.postCureData));
+    refs.push(...collectPostCureFileRefsFromMotorSession(motor));
   }
   return refs;
 };
 
 export const hasIncompletePostCureUploads = (form: {
-  motors?: Array<{ postCureData?: PostCureMotorData | null }>;
+  motors?: Array<PostCureMotorFileSource | null | undefined>;
 }): boolean => collectPostCureFileRefsFromForm(form).some(isFileUploadIncomplete);
 
 export const collectTempFileIdsFromPostCureForm = (form: {
-  motors?: Array<{ postCureData?: PostCureMotorData | null }>;
+  motors?: Array<PostCureMotorFileSource | null | undefined>;
 }): string[] => [
   ...new Set(
     collectPostCureFileRefsFromForm(form)
@@ -1489,6 +1543,12 @@ export const resolvePostCureDataVariant = (
     .toLowerCase();
   if (op === "loose-flap-filling") return "loose-flap-filling";
   if (op !== "inhibition") return null;
+  return resolveInhibitionVariantFromInhibitorType(inhibitorType);
+};
+
+export const resolveInhibitionVariantFromInhibitorType = (
+  inhibitorType: string,
+): PostCureDataVariant | null => {
   const inhibitor = String(inhibitorType ?? "").trim();
   const upper = inhibitor.toUpperCase().replace(/[-\s]/g, "_");
   if (inhibitor === "IR1" || upper === "IR1") return "inhibition-ir1";
@@ -1496,4 +1556,28 @@ export const resolvePostCureDataVariant = (
   if (inhibitor === "not-applicable" || upper === "NOT_APPLICABLE")
     return "inhibition-not-applicable";
   return null;
+};
+
+export const isPostCureInhibitionDetailsRequired = (inhibitorType: string): boolean => {
+  const variant = resolveInhibitionVariantFromInhibitorType(inhibitorType);
+  return variant === "inhibition-ir1" || variant === "inhibition-hemcoat-3k";
+};
+
+export const parseLooseFlapMotorDataFromApi = (
+  motor: Record<string, unknown> | null | undefined,
+): LooseFlapMotorData => {
+  const parsed = parsePostCureMotorDataFromApi(motor, "loose-flap-filling");
+  return parsed.variant === "loose-flap-filling"
+    ? parsed
+    : (createEmptyPostCureMotorData("loose-flap-filling") as LooseFlapMotorData);
+};
+
+export const parseInhibitionMotorDataFromApi = (
+  motor: Record<string, unknown> | null | undefined,
+  inhibitorType: string,
+): PostCureMotorData | null => {
+  const variant = resolveInhibitionVariantFromInhibitorType(inhibitorType);
+  if (!variant || variant === "inhibition-not-applicable") return null;
+  if (!motor?.inhibitionDetails) return null;
+  return parsePostCureMotorDataFromApi(motor, variant);
 };

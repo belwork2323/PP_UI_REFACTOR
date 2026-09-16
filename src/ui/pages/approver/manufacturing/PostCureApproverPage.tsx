@@ -31,9 +31,12 @@ const PostCureApproverPage = () => {
     detailsLoading,
     activeMotorId,
     dialogProps,
+    formDialogProps,
     actionLoading,
     requestApprove,
     requestReject,
+    requestFormApprove,
+    requestFormReject,
     handleViewDetails,
     handleCloseDetail,
     handleActiveMotorChange,
@@ -66,10 +69,13 @@ const PostCureApproverPage = () => {
         onActiveMotorChange={handleActiveMotorChange}
         onApprove={requestApprove}
         onReject={requestReject}
+        onFormApprove={requestFormApprove}
+        onFormReject={requestFormReject}
         actionLoading={actionLoading}
         theme={approverTheme}
       />
       <ApproverActionDialog {...dialogProps} />
+      <ApproverActionDialog {...formDialogProps} />
     </ApproverSubdepartmentBatchListSection>
   );
 };

@@ -2197,7 +2197,7 @@ export const STRINGS = {
       VIEW_DETAILS_TOOLTIP: "View completed details",
       FORM_TITLE: "Post-Cure Operations",
       FORM_SUBTITLE:
-        "Select a motor tab, enter received date & time and operation, then load the form",
+        "Select a motor tab, enter received date & time, then load the form",
       PANEL_TITLE: "Post-Cure Setup",
       MOTOR_ID_LABEL: "Select Motor Id No.",
       MOTOR_ID_PLACEHOLDER: "Choose motor ID",
@@ -2218,11 +2218,15 @@ export const STRINGS = {
       INHIBITOR_TYPE_LABEL: "Select type of Inhibitor to be applied",
       INHIBITOR_TYPE_PLACEHOLDER: "Choose inhibitor type",
       INHIBITOR_TYPE_NOT_APPLICABLE: "Not Applicable",
+      EDIT_INHIBITION_TYPE: "Edit",
+      EDIT_INHIBITION_TYPE_TOOLTIP: "Change inhibitor type",
+      DELETE_INHIBITION_SETUP: "Delete",
+      DELETE_INHIBITION_SETUP_TOOLTIP: "Clear inhibitor type and inhibition details",
       LOAD_FORM: "Load Post Cure Form",
       ADD_MOTOR_ACTION: "Add Motor",
       MOTOR_NAV_TITLE: "Motor Navigation",
       MOTOR_NAV_HINT:
-        "Select a motor tab, enter received date & time and operation, then load the form.",
+        "Select a motor tab, enter received date & time, then load the form.",
       BATCH_MOTOR_DETAILS_MISSING:
         "Motor details are missing from the batch identification sheet. Complete the identification sheet before filling this form.",
       MOTOR_CARD_TITLE: "Motor",
@@ -2255,6 +2259,10 @@ export const STRINGS = {
       FILE_ADD_MORE: "Add more files",
       FILE_EMPTY_QC_REPORT: "No QC report uploaded",
       EMPTY_FORM_ERROR: "Add at least one value before saving or submitting.",
+      SUBMIT_VALIDATION_FAILED:
+        "Complete all required fields before submitting. Check the Loose Flap and Inhibition tabs for highlighted errors.",
+      DRAFT_VALIDATION_FAILED:
+        "Fix the highlighted field errors before saving the draft.",
       CREATE_FAILED: "Failed to create post-cure form.",
       UPDATE_FAILED: "Failed to update post-cure form.",
       CREATE_DRAFT_SUCCESS: "Post-cure form saved as draft successfully.",
@@ -2745,8 +2753,10 @@ export const STRINGS = {
       POST_CURE_OPERATION_INHIBITION: "Inhibition Details",
       POST_CURE_MOTOR_RECEIPT_DATE_LABEL: "Motor Received Date/Time",
       POST_CURE_MOTOR_RECEIPT_DATE_PLACEHOLDER: "Select date and time",
-      POST_CURE_CHANGE_OPERATION_TOOLTIP: "Change operation",
-      POST_CURE_SETUP_OPERATION_LABEL: "Selected operation",
+      POST_CURE_CHANGE_OPERATION_TOOLTIP: "Change inhibitor / receipt setup",
+      POST_CURE_SETUP_OPERATION_LABEL: "Selected inhibitor",
+      POST_CURE_PROCESS_LOOSE_FLAP: "Loose Flap",
+      POST_CURE_PROCESS_INHIBITION: "Inhibition",
       INHIBITOR_TYPE_LABEL: "Inhibitor Type",
       INHIBITOR_TYPE_PLACEHOLDER: "Select inhibitor type",
       INHIBITOR_TYPE_IR1: "IR-1",
@@ -3086,6 +3096,8 @@ export const STRINGS = {
         "This motor was not approved in all Quality Control motor divisions.",
       PREVIOUS_STAGE_UNIT_DISABLED:
         "This motor was not approved in all Quality Control motor divisions and cannot be filled yet.",
+      PREVIOUS_STAGE_SUBSCALE_DISABLED:
+        "Wait until Subscale is completely approved before starting Static Test.",
       MOTOR_CARD_TITLE: "Motor",
       BEM_CARD_TITLE: "BEM",
       BATCH_MOTOR_COUNT_LABEL: "No. of Motors",
@@ -3940,6 +3952,54 @@ export const STRINGS = {
       LOAD_TYPES_FAILED: "Failed to load master data types",
       LOAD_LIST_FAILED: "Failed to load master data list",
       OPERATION_FAILED: "An error occurred on server",
+    },
+  },
+
+    /* -------- ADMIN EXPLORE BLOCKCHAIN -------- */
+  BLOCKCHAIN_EXPLORER: {
+    PAGE: {
+      TITLE: "Explore Blockchain",
+      SUBTITLE: "Real-time view of Hyperledger Fabric network activity",
+      LOADING_PLACEHOLDER: "…",
+      CHANNEL_LABEL: "Channel",
+      CHANNEL_PLACEHOLDER: "Select channel",
+      REFRESH_TOOLTIP: "Refresh Data",
+    },
+    STATS: [
+      { label: "Blocks", subLabel: "Latest block height", variant: "blocks" },
+      { label: "Transactions", subLabel: "Total transactions", variant: "transactions" },
+      { label: "Nodes", subLabel: "Active peers", variant: "nodes" },
+      { label: "Chaincodes", subLabel: "Deployed chaincodes", variant: "chaincodes" },
+    ],
+    PEERS: {
+      TITLE: "Peers",
+      TABLE: {
+        PEER_NAME: "Peer Name",
+        STATUS: "Status",
+      },
+      EMPTY: "No peers available for this channel",
+    },
+    TRANSACTIONS_BY_ORG: {
+      TITLE: "Transactions by Organisation",
+      EMPTY: "No transaction distribution data",
+    },
+    CHARTS: {
+      BLOCKS_HOUR: "Blocks / Hour",
+      BLOCKS_MIN: "Blocks / Min",
+      TX_HOUR: "Tx / Hour",
+      TX_MIN: "Tx / Min",
+      EMPTY: "No chart data available",
+    },
+    MESSAGES: {
+      LOADING: "Loading blockchain data…",
+      CHANNEL_REQUIRED: "Please select a channel",
+    },
+    ERRORS: {
+      LOAD_CHANNELS_FAILED: "Failed to load channels",
+      LOAD_STATS_FAILED: "Failed to load blockchain statistics",
+      LOAD_PEERS_FAILED: "Failed to load peers",
+      LOAD_CHART_FAILED: "Failed to load chart data",
+      OPERATION_FAILED: "An error occurred while fetching blockchain data",
     },
   },
 

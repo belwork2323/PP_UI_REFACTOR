@@ -179,6 +179,7 @@ import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
 import UploadFileRoundedIcon from "@mui/icons-material/UploadFileRounded";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
 import VerifiedRoundedIcon from "@mui/icons-material/VerifiedRounded";
+import ViewInArIcon from "@mui/icons-material/ViewInAr";
 import VisibilityRoundedIcon from "@mui/icons-material/VisibilityRounded";
 import WaterRoundedIcon from "@mui/icons-material/WaterRounded";
 import Project from "@mui/icons-material/AccountTreeRounded";
@@ -256,6 +257,7 @@ export const icons = {
   drawerUsers: PeopleIcon,
   drawerBatch: BatchPredictionIcon,
   drawerDepartments: Project,
+  drawerBlockchainExplorer: ViewInArIcon,
   drawerLogout: LogoutIcon,
 
   // Dashboard

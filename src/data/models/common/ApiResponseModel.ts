@@ -11,6 +11,8 @@ export class ApiResponseModel<T = any> {
   errorCode: string | null;
   /** Original API `error` object (e.g. `{ code, details }`) when present */
   error: unknown;
+  /** Nested field-level validation tree from `errorDetails` (INVALID_REQUEST) */
+  errorDetails: unknown;
   timestamp?: string;
   data: T | null;
 
@@ -21,6 +23,7 @@ export class ApiResponseModel<T = any> {
       this.message = STRINGS.SYSTEM.SERVER_ERROR;
       this.errorCode = "UNKNOWN_ERROR";
       this.error = null;
+      this.errorDetails = null;
       this.data = null;
       return;
     }
@@ -30,8 +33,15 @@ export class ApiResponseModel<T = any> {
       this.success = false;
       this.statusCode = apiResponse.status || apiResponse.statusCode || 500;
       this.message = apiResponse.message || STRINGS.SYSTEM.SERVER_ERROR;
-      this.errorCode = apiResponse.details?.errorCode || apiResponse.details || "INTERNAL_SERVER_ERROR";
-      this.error = apiResponse.details ?? null;
+      const details = apiResponse.details ?? null;
+      this.errorDetails = details;
+      this.error = details;
+      this.errorCode =
+        typeof apiResponse.errorCode === "string"
+          ? apiResponse.errorCode
+          : typeof details === "string"
+            ? details
+            : "INTERNAL_SERVER_ERROR";
       this.data = null;
     } else {
       // Direct API response
@@ -39,12 +49,15 @@ export class ApiResponseModel<T = any> {
       this.statusCode = apiResponse.statusCode ?? apiResponse.code ?? (this.success ? 200 : 400);
       this.message = apiResponse.message ?? (this.success ? "Success" : "Failed");
       this.error = apiResponse.error ?? null;
+      this.errorDetails = apiResponse.errorDetails ?? null;
       this.errorCode =
-        typeof apiResponse.error === "object" && apiResponse.error && "code" in apiResponse.error
-          ? String((apiResponse.error as { code: unknown }).code)
-          : typeof apiResponse.error === "string"
-            ? apiResponse.error
-            : null;
+        typeof apiResponse.errorCode === "string"
+          ? apiResponse.errorCode
+          : typeof apiResponse.error === "object" && apiResponse.error && "code" in apiResponse.error
+            ? String((apiResponse.error as { code: unknown }).code)
+            : typeof apiResponse.error === "string"
+              ? apiResponse.error
+              : null;
       this.timestamp = apiResponse.timestamp ?? undefined;
       
       let parsedData = apiResponse.data ?? null;

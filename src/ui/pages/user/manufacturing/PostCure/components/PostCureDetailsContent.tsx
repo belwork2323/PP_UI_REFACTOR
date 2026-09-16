@@ -12,6 +12,8 @@ import {
   TableContainer,
   TableHead,
   TableRow,
+  ToggleButton,
+  ToggleButtonGroup,
   Typography,
 } from "@mui/material";
 import DescriptionRoundedIcon from "@mui/icons-material/DescriptionRounded";
@@ -50,6 +52,8 @@ const formatStatusLabel = (status?: string | null) => {
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const PC = STRINGS.MANUFACTURING.POST_CURE;
+
+type MotorProcessTab = "LOOSE_FLAP" | "INHIBITION";
 
 export type PostCureDetailsTheme = ReturnType<typeof getPostCureTheme>["details"];
 
@@ -302,50 +306,57 @@ const SectionPanel = ({
 
 export const MotorDetailPanel = ({
   motor,
+  processTab,
   dt,
   palette,
   subDepartmentId,
   onOpen,
 }: {
   motor: PostCureMotorDetailView;
+  processTab: MotorProcessTab;
   dt: PostCureDetailsTheme;
   palette: ReturnType<typeof getManufacturingTheme>["palette"];
   subDepartmentId?: number;
   onOpen: (fileId: string, fileName: string) => void;
-}) => (
-  <Box>
-    <Stack direction="row" alignItems="center" gap={1} mb={1.5} flexWrap="wrap">
-      <Chip label={PC.MOTOR_CARD_TITLE} size="small" sx={dt.materialChip} />
-      <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: palette.text }}>
-        {motor.motorId}
-      </Typography>
-      {motor.motorReceiptDate ? (
-        <Typography sx={{ fontSize: "0.72rem", color: palette.textSub }}>
-          {PC.MOTOR_RECEIPT_DATE_LABEL}: {motor.motorReceiptDate}
-        </Typography>
-      ) : null}
-      {motor.operationLabel ? (
-        <Typography sx={{ fontSize: "0.72rem", color: palette.textSub }}>
-          {PC.OPERATION_LABEL}: {motor.operationLabel}
-        </Typography>
-      ) : null}
-    </Stack>
+}) => {
+  const sections =
+    processTab === "LOOSE_FLAP" ? motor.looseFlapSections : motor.inhibitionSections;
 
-    {motor.sections.length === 0 ? (
-      <Typography sx={dt.emptyText}>{PC.DETAILS_NO_MOTOR_DATA}</Typography>
-    ) : (
-      motor.sections.map((section) => (
-        <SectionPanel
-          key={section.sectionId}
-          section={section}
-          dt={dt}
-          subDepartmentId={subDepartmentId}
-          onOpen={onOpen}
-        />
-      ))
-    )}
-  </Box>
-);
+  return (
+    <Box>
+      <Stack direction="row" alignItems="center" gap={1} mb={1.5} flexWrap="wrap">
+        <Chip label={PC.MOTOR_CARD_TITLE} size="small" sx={dt.materialChip} />
+        <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: palette.text }}>
+          {motor.motorId}
+        </Typography>
+        {motor.motorReceiptDate ? (
+          <Typography sx={{ fontSize: "0.72rem", color: palette.textSub }}>
+            {PC.MOTOR_RECEIPT_DATE_LABEL}: {motor.motorReceiptDate}
+          </Typography>
+        ) : null}
+        {motor.inhibitorType ? (
+          <Typography sx={{ fontSize: "0.72rem", color: palette.textSub }}>
+            {PC.INHIBITOR_TYPE_LABEL}: {motor.inhibitorType}
+          </Typography>
+        ) : null}
+      </Stack>
+
+      {sections.length === 0 ? (
+        <Typography sx={dt.emptyText}>{PC.DETAILS_NO_MOTOR_DATA}</Typography>
+      ) : (
+        sections.map((section) => (
+          <SectionPanel
+            key={section.sectionId}
+            section={section}
+            dt={dt}
+            subDepartmentId={subDepartmentId}
+            onOpen={onOpen}
+          />
+        ))
+      )}
+    </Box>
+  );
+};
 
 export type PostCureDetailsContentProps = {
   detailView: PostCureDetailView | null;
@@ -364,6 +375,7 @@ const PostCureDetailsContent = ({
 }: PostCureDetailsContentProps) => {
   const dt = getPostCureTheme(theme).details;
   const [activeMotorIndex, setActiveMotorIndex] = useState(0);
+  const [activeProcessTab, setActiveProcessTab] = useState<MotorProcessTab>("LOOSE_FLAP");
   const subDepartmentId = useAuthStore(
     (s) =>
       s.user?.allSubDepartments.find((sd) => sd.slugs?.subDept === "post-cure-operations")
@@ -382,6 +394,7 @@ const PostCureDetailsContent = ({
 
   useEffect(() => {
     setActiveMotorIndex(0);
+    setActiveProcessTab("LOOSE_FLAP");
   }, [resetOnFormId]);
 
   const metaFields = [
@@ -409,7 +422,9 @@ const PostCureDetailsContent = ({
     );
   }
 
-  const hasMotorData = motors.some((motor) => motor.sections.length > 0);
+  const hasMotorData = motors.some(
+    (motor) => motor.looseFlapSections.length > 0 || motor.inhibitionSections.length > 0,
+  );
 
   return (
     <>
@@ -479,9 +494,22 @@ const PostCureDetailsContent = ({
             </Box>
           ) : null}
 
+          <ToggleButtonGroup
+            exclusive
+            fullWidth
+            size="small"
+            value={activeProcessTab}
+            onChange={(_, value: MotorProcessTab | null) => value && setActiveProcessTab(value)}
+            sx={{ mb: 2 }}
+          >
+            <ToggleButton value="LOOSE_FLAP">{PC.OPERATION_LOOSE_FLAP_FILLING}</ToggleButton>
+            <ToggleButton value="INHIBITION">{PC.OPERATION_INHIBITION}</ToggleButton>
+          </ToggleButtonGroup>
+
           {activeMotor ? (
             <MotorDetailPanel
               motor={activeMotor}
+              processTab={activeProcessTab}
               dt={dt}
               palette={theme.palette}
               subDepartmentId={subDepartmentId}

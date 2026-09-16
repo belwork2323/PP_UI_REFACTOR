@@ -54,7 +54,7 @@ export const qcPostCureValidationFields: Record<string, FieldRuleConfig> = {
   qcReport: file(["SUBMIT"]),
   dispatchDate: date(["SUBMIT"]),
   dispatchStation: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
-  remarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  remarks: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 };
 
 const asRecord = (v: unknown): Record<string, unknown> | null =>
@@ -92,6 +92,15 @@ const walk = (
   });
 
   Object.entries(rec).forEach(([key, val]) => {
+    const shortKey = key.includes("::") ? (key.split("::").pop() ?? key) : key;
+    if (shortKey in scalarMap && !Array.isArray(val) && !asRecord(val)) {
+      fields.push({
+        path: shortKey,
+        value: val,
+        ruleKey: scalarMap[shortKey],
+      });
+    }
+
     const arr = asArray(val);
     if (!arr.length) {
       if (asRecord(val)) walk(val, path ? `${path}.${key}` : key, fields);

@@ -57,6 +57,8 @@ import {
   hydrateTrimmingValuesFromSections,
 } from "../../../../../hooks/user/qualityControl/qcTrimmingTables";
 import {
+  createInitialDualPostCureValues,
+  createInitialDualPostCureValues,
   createInitialPostCureValues,
   hydratePostCureValuesFromSections,
   postCureFormValuesHaveUserData,
@@ -364,7 +366,7 @@ const QCDivisionEntryPanel = ({
         );
       }
       if (hasSavedValues) return saved!;
-      return createInitialPostCureValues(entry.subType, entry.inhibitorType);
+      return createInitialDualPostCureValues(entry.inhibitorType);
     }
     if (hasSavedValues) return saved!;
     if (entry.kind === "REVALIDATION") {

@@ -157,8 +157,10 @@ const StaticTestFacilityForm = ({
   const stfMotorNavGate = useMemo(
     () =>
       buildStfMotorNavGateHelpers(motorCards, previousStageGate, resolveMotorStatus, "ACEM", {
-        previousStage: S.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
-        notYetUnlocked: STRINGS.MANUFACTURING.NOT_YET_UNLOCKED,
+        previousStage:
+          previousStageGate?.blockedMessage ?? S.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
+        notYetUnlocked:
+          previousStageGate?.blockedMessage ?? STRINGS.MANUFACTURING.NOT_YET_UNLOCKED,
         sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
       }, batch, SUB_DEPT.STF),
     [batch, motorCards, previousStageGate, resolveMotorStatus],

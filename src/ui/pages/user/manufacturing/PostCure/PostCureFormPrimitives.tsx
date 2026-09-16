@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 import { Box, TextField, Typography, alpha } from "@mui/material";
 import { POST_CURE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/postCure_theme";
-import { Controller, useFormContext } from "react-hook-form";
-import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import { WorkflowReadOnlyText } from "../../../../components/common/WorkflowReadOnlyText";
+import { postCureTableInputSx } from "./postCureFormPrimitivesShared";
 
 export {
   FieldGrid,
@@ -86,25 +86,28 @@ export const TableTextInput = ({
   helperText?: string;
   placeholder?: string;
   required?: boolean;
-}) => (
-  <Box sx={{ width: "100%" }}>
-    <TextField
-      size="small"
-      fullWidth
-      type={type}
-      value={value ?? ""}
-      disabled={disabled || readOnly}
-      multiline={multiline}
-      minRows={minRows}
-      placeholder={placeholder}
-      error={error}
-      helperText={helperText}
-      required={required}
-      onChange={(e) => onChange(e.target.value)}
-      sx={{
-        "& .MuiInputBase-root": { fontSize: "0.82rem" },
-        "& .MuiFormHelperText-root": { mx: 0, mt: 0.5 },
-      }}
-    />
-  </Box>
-);
+}) => {
+  if (readOnly) {
+    return <WorkflowReadOnlyText value={value} />;
+  }
+
+  return (
+    <Box sx={{ width: "100%" }}>
+      <TextField
+        size="small"
+        fullWidth
+        type={type}
+        value={value ?? ""}
+        disabled={disabled}
+        multiline={multiline}
+        minRows={minRows}
+        placeholder={placeholder}
+        error={error}
+        helperText={helperText}
+        required={required}
+        onChange={(e) => onChange(e.target.value)}
+        sx={postCureTableInputSx}
+      />
+    </Box>
+  );
+};

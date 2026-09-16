@@ -1,21 +1,22 @@
 import { useEffect, useMemo, useState } from "react";
-import { Alert, Box, Button, Chip, Stack, Typography } from "@mui/material";
-import { FieldErrors, FormProvider, Resolver, useForm, useWatch } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+import { Alert, Box, Button, Chip, Stack, ToggleButton, ToggleButtonGroup, Typography } from "@mui/material";
+import { alpha } from "@mui/material/styles";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import { POST_CURE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/postCure_theme";
-import { formatPostCureMotorOperationLabel } from "../../../../../hooks/user/manufacturing/postCureConfig";
+import {
+  POST_CURE_INHIBITOR_TYPE_OPTIONS,
+} from "../../../../../hooks/user/manufacturing/postCureConfig";
 import type {
   PostCureFormState,
   PostCureMotorSession,
   PostCureMotorStatusMeta,
   PostCureMotorSubmissionStatus,
 } from "../../../../../data/models/user/PostCureFormModel";
+import { createInhibitionDataForType } from "../../../../../data/models/user/PostCureFormModel";
 import type { PostCureAddedMotor } from "../../../../../hooks/user/manufacturing/postCureFlowConfig";
 import RemoveProcessButton from "../../../../components/common/RemoveProcessButton";
 import PremixStatusChip from "../RawMaterial/components/PremixStatusChip";
-import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
 import ViewStatusButton from "../../../../components/common/ViewStatusButton";
 import FinalApprovalMotorDialog, {
   areAllMotorsApproved,
@@ -33,12 +34,23 @@ import {
 } from "../../../../components/custom/UserWorkflowStepPager";
 import PostCureFlowBar from "./PostCureFlowBar";
 import PostCureMotorPanel from "./PostCureMotorPanel";
-import { PostCureMotorData } from "@/data/models/user/PostCureMotorDataModel";
-import { validatePostCure } from "@/data/validation/adapters/postCure.validation";
-import { ValidationErrors, ValidationTier } from "@/data/validation/submissionIntent";
+import CasePrepSelect from "../CasePreparation/CasePrepSelect";
+import {
+  isPostCureInhibitionDetailsRequired,
+  type PostCureMotorData,
+} from "@/data/models/user/PostCureMotorDataModel";
+import { validatePostCureMotorSession } from "@/data/validation/adapters/postCure.validation";
+import {
+  firstValidationError,
+  hasValidationErrors,
+} from "@/data/validation/validationErrors";
+import { ValidationErrors } from "@/data/validation/submissionIntent";
+import { useAlertStore } from "../../../../../app/store/alertStore";
 
 const S = STRINGS.MANUFACTURING.POST_CURE;
 const { handyman: HandymanRoundedIcon } = icons.user.manufacturing.postCure.form;
+
+type MotorProcessTab = "LOOSE_FLAP" | "INHIBITION";
 
 type PostCureFormProps = {
   batch?: {
@@ -51,14 +63,10 @@ type PostCureFormProps = {
   addedMotors: PostCureAddedMotor[];
   activeMotorId: string;
   draftMotorReceiptDate: string;
-  draftOperation: string;
-  draftInhibitorType: string;
   subDepartmentId?: number;
   canLoadForm?: boolean;
   onActiveMotorChange: (motorId: string) => void;
   onDraftMotorReceiptDateChange: (value: string) => void;
-  onDraftOperationChange: (value: string) => void;
-  onDraftInhibitorTypeChange: (value: string) => void;
   onLoadForm?: () => void;
   onRemoveMotor: (motorId: string) => void;
   onMotorSessionChange: (motorId: string, next: PostCureMotorSession) => void;
@@ -69,7 +77,50 @@ type PostCureFormProps = {
   isMotorEditable?: (motorId: string) => boolean;
   previousStageGate?: PreviousStageApprovedUnits | null;
   actionLoading?: boolean;
+  /** Field errors mapped from API `errorDetails` (e.g. after save/submit). */
+  serverValidationErrors?: ValidationErrors;
   theme: any;
+};
+
+const isLooseFlapErrorKey = (key: string) =>
+  key === "looseFlapFillingDetails" ||
+  key.startsWith("bellowRemovalDetails") ||
+  key.startsWith("looseFlapEpoxyPreparation") ||
+  key.startsWith("qualificationDetails") ||
+  key.startsWith("lfEpoxyFillingDetails");
+
+const isInhibitionErrorKey = (key: string) =>
+  key === "inhibitorType" ||
+  key.startsWith("ir1") ||
+  key.startsWith("hemcoat") ||
+  key.startsWith("inhibition") ||
+  key.startsWith("dispatch");
+
+const resolveValidationTab = (
+  errors: ValidationErrors,
+  currentTab: MotorProcessTab = "LOOSE_FLAP",
+): MotorProcessTab => {
+  const keys = Object.keys(errors);
+  const hasLooseFlapError = keys.some(isLooseFlapErrorKey);
+  const hasInhibitionError = keys.some(isInhibitionErrorKey);
+
+  // Prefer staying on the tab the user is already viewing when it has errors,
+  // so highlighted fields remain visible instead of silently switching away.
+  if (currentTab === "LOOSE_FLAP" && hasLooseFlapError) return "LOOSE_FLAP";
+  if (currentTab === "INHIBITION" && hasInhibitionError) return "INHIBITION";
+  if (hasLooseFlapError) return "LOOSE_FLAP";
+  if (hasInhibitionError) return "INHIBITION";
+  return currentTab;
+};
+
+const scrollToFirstInvalidField = () => {
+  if (typeof document === "undefined") return;
+  window.requestAnimationFrame(() => {
+    const invalid = document.querySelector<HTMLElement>(
+      '[aria-invalid="true"], .Mui-error input, .MuiFormHelperText-root.Mui-error',
+    );
+    invalid?.scrollIntoView({ behavior: "smooth", block: "center" });
+  });
 };
 
 export const PostCureForm = ({
@@ -78,14 +129,10 @@ export const PostCureForm = ({
   addedMotors,
   activeMotorId,
   draftMotorReceiptDate,
-  draftOperation,
-  draftInhibitorType,
   subDepartmentId,
   canLoadForm = false,
   onActiveMotorChange,
   onDraftMotorReceiptDateChange,
-  onDraftOperationChange,
-  onDraftInhibitorTypeChange,
   onLoadForm,
   onRemoveMotor,
   onMotorSessionChange,
@@ -96,15 +143,17 @@ export const PostCureForm = ({
   isMotorEditable,
   previousStageGate = null,
   actionLoading = false,
+  serverValidationErrors,
   isSubmitMode = false,
   theme,
 }: PostCureFormProps & { isSubmitMode?: boolean }) => {
   const BRAND = POST_CURE_BRAND;
+  const showAlert = useAlertStore((state) => state.showAlert);
   const motorCards = Array.isArray(addedMotors) ? addedMotors : [];
+  const [activeProcessTab, setActiveProcessTab] = useState<MotorProcessTab>("LOOSE_FLAP");
+  const [inhibitionTypeEditing, setInhibitionTypeEditing] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
 
-  // ==========================================
-  // 2. ACTIVE MOTOR COMPUTATIONS
-  // ==========================================
   const activeMotorIndex = useMemo(() => {
     const index = motorCards.findIndex((entry) => entry.motorId === activeMotorId);
     return index >= 0 ? index : 0;
@@ -121,21 +170,32 @@ export const PostCureForm = ({
   }, [activeMotorEntry, formData.motors]);
 
   const resolvedActiveMotorId = activeMotorEntry?.motorId ?? "";
-  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({});
 
-  const [formValues, setFormValues] = useState<PostCureMotorData>(
-    activeMotorSession?.postCureData ??
-      ({
-        variant: "loose-flap-filling",
-      } as PostCureMotorData),
-  );
-  // Sync active motor session → form values
   useEffect(() => {
-    if (activeMotorSession?.postCureData) {
-      setFormValues(activeMotorSession.postCureData);
-      setValidationErrors({}); // Clear errors on session switch
+    setValidationErrors({});
+    setActiveProcessTab("LOOSE_FLAP");
+    setInhibitionTypeEditing(false);
+  }, [resolvedActiveMotorId]);
+
+  const applyValidationErrors = (
+    errors: ValidationErrors,
+    message: string,
+  ) => {
+    setValidationErrors(errors);
+    setActiveProcessTab((current) => resolveValidationTab(errors, current));
+    const firstError = firstValidationError(errors);
+    showAlert(firstError ? `${message} (${firstError})` : message, "warning");
+    scrollToFirstInvalidField();
+  };
+
+  useEffect(() => {
+    if (!serverValidationErrors || Object.keys(serverValidationErrors).length === 0) {
+      return;
     }
-  }, [resolvedActiveMotorId, activeMotorSession]);
+    applyValidationErrors(serverValidationErrors, S.SUBMIT_VALIDATION_FAILED);
+    // applyValidationErrors intentionally omitted from deps — only react to new server errors
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [serverValidationErrors]);
 
   const clearFieldError = (ruleKey: string) => {
     setValidationErrors((prev) => {
@@ -148,55 +208,55 @@ export const PostCureForm = ({
     });
   };
 
-  const handleSaveDraft = async () => {
+  const persistSession = (session: PostCureMotorSession) => {
     if (!activeMotorEntry) return;
-    // Run validation for the SUBMIT tier
-    const errors = validatePostCure(formValues, "UNIT");
+    onMotorSessionChange(activeMotorEntry.motorId, session);
+  };
 
-    if (Object.keys(errors).length > 0) {
-      console.warn("PostCure Form Validation Failed:", errors);
-      setValidationErrors(errors);
+  const handleSaveDraft = async () => {
+    if (!activeMotorEntry || !activeMotorSession) return;
+    const errors = validatePostCureMotorSession(activeMotorSession, "UNIT");
+    if (hasValidationErrors(errors)) {
+      applyValidationErrors(errors, S.DRAFT_VALIDATION_FAILED);
       return;
     }
-
     setValidationErrors({});
-    if (onMotorSessionChange && activeMotorSession) {
-      onMotorSessionChange(activeMotorEntry.motorId, {
-        ...activeMotorSession,
-        postCureData: formValues,
-      });
-    }
-
     onSaveMotorDraft?.(activeMotorEntry.motorId);
   };
 
   const handleSubmitForm = () => {
-    if (!activeMotorEntry) return;
-
-    // Run validation for the SUBMIT tier
-    const errors = validatePostCure(formValues, "SUBMIT");
-
-    if (Object.keys(errors).length > 0) {
-      console.warn("PostCure Form Validation Failed:", errors);
-      setValidationErrors(errors);
+    if (!activeMotorEntry || !activeMotorSession) return;
+    const errors = validatePostCureMotorSession(activeMotorSession, "SUBMIT");
+    if (hasValidationErrors(errors)) {
+      applyValidationErrors(errors, S.SUBMIT_VALIDATION_FAILED);
       return;
     }
-
     setValidationErrors({});
-
-    if (onMotorSessionChange && activeMotorSession) {
-      onMotorSessionChange(activeMotorEntry.motorId, {
-        ...activeMotorSession,
-        postCureData: formValues,
-      });
-    }
-
     onSubmitMotor?.(activeMotorEntry.motorId);
   };
 
-  // ==========================================
-  // 4. NAVIGATION & WORKFLOW GATES
-  // ==========================================
+  const handleInhibitorTypeChange = (inhibitorType: string) => {
+    if (!activeMotorSession) return;
+    persistSession({
+      ...activeMotorSession,
+      inhibitorType,
+      inhibitionData: createInhibitionDataForType(inhibitorType),
+    });
+    setInhibitionTypeEditing(false);
+    clearFieldError("inhibitorType");
+  };
+
+  const handleClearInhibitionSetup = () => {
+    if (!activeMotorSession) return;
+    persistSession({
+      ...activeMotorSession,
+      inhibitorType: "",
+      inhibitionData: null,
+    });
+    setInhibitionTypeEditing(false);
+    clearFieldError("inhibitorType");
+  };
+
   const motorNavGate = useMemo(() => {
     const resolveMotorStatus = (motorId: string) =>
       getMotorStatus?.(motorId) ??
@@ -234,6 +294,16 @@ export const PostCureForm = ({
     ? !activeMotorPriorEnabled || !(isMotorEditable?.(resolvedActiveMotorId) ?? true)
     : false;
   const activeMotorLoaded = Boolean(activeMotorSession?.formLoaded);
+  const inhibitionTypeSelected = Boolean(String(activeMotorSession?.inhibitorType ?? "").trim());
+  const inhibitionTypeLocked = inhibitionTypeSelected && !inhibitionTypeEditing;
+  const canChangeInhibitionSetup = inhibitionTypeSelected && !activeMotorLocked;
+  const showInhibitionDelete =
+    canChangeInhibitionSetup && activeMotorStatus === "IN_PROGRESS";
+  const showInhibitionEdit =
+    canChangeInhibitionSetup && activeMotorStatus !== "IN_PROGRESS";
+  const showInhibitionPanel =
+    inhibitionTypeSelected &&
+    isPostCureInhibitionDetailsRequired(activeMotorSession?.inhibitorType ?? "");
 
   const finalApprovalRows = useMemo(
     () =>
@@ -256,6 +326,26 @@ export const PostCureForm = ({
     }),
     [theme.palette],
   );
+
+  const sectionToggleSx = {
+    width: "100%",
+    mb: 1.5,
+    display: "flex",
+    "& .MuiToggleButtonGroup-grouped": { flex: 1 },
+    "& .MuiToggleButton-root": {
+      flex: 1,
+      px: 2.5,
+      py: 0.9,
+      fontWeight: 700,
+      fontSize: "0.82rem",
+      textTransform: "none" as const,
+      borderColor: alpha(BRAND.pc, 0.35),
+      "&.Mui-selected": {
+        background: alpha(BRAND.pc, 0.12),
+        color: BRAND.pc,
+      },
+    },
+  };
 
   const motorTabs = useMemo<UserWorkflowNavTab[]>(
     () =>
@@ -387,12 +477,8 @@ export const PostCureForm = ({
           <PostCureFlowBar
             activeMotorId={resolvedActiveMotorId}
             draftMotorReceiptDate={draftMotorReceiptDate}
-            draftOperation={draftOperation}
-            draftInhibitorType={draftInhibitorType}
             canLoadForm={canLoadForm}
             onDraftMotorReceiptDateChange={onDraftMotorReceiptDateChange}
-            onDraftOperationChange={onDraftOperationChange}
-            onDraftInhibitorTypeChange={onDraftInhibitorTypeChange}
             onLoadForm={onLoadForm ?? (() => undefined)}
             theme={theme}
           />
@@ -468,33 +554,159 @@ export const PostCureForm = ({
             </Alert>
           ) : null}
 
-          <Typography sx={{ fontSize: "0.74rem", color: theme.palette.textSub, mb: 0.35 }}>
+          <Typography sx={{ fontSize: "0.74rem", color: theme.palette.textSub, mb: 1.25 }}>
             {S.MOTOR_RECEIVED_AT_LABEL}: {activeMotorEntry.motorReceiptDate || "?"}
           </Typography>
-          <Typography sx={{ fontSize: "0.74rem", color: theme.palette.textSub, mb: 1.25 }}>
-            {S.OPERATION_LABEL}:{" "}
-            {formatPostCureMotorOperationLabel(
-              activeMotorSession.operation,
-              activeMotorSession.inhibitorType,
-            )}
-          </Typography>
-          <PostCureMotorPanel
-            value={activeMotorSession.postCureData}
-            onChange={(postCureData) =>
-              onMotorSessionChange(activeMotorEntry.motorId, {
-                ...activeMotorSession,
-                postCureData,
-              })
-            }
-            validationErrors={validationErrors}
-            clearFieldError={clearFieldError}
-            disabled={activeMotorLocked}
-            theme={theme}
-            subDepartmentId={subDepartmentId}
-            batchId={batch?.batchId}
-            motorId={activeMotorEntry.motorId}
-            isSubmitMode={isSubmitMode}
-          />
+
+          {hasValidationErrors(validationErrors) ? (
+            <Alert severity="warning" sx={{ mb: 1.25, py: 0.5, fontSize: "0.78rem" }}>
+              {S.SUBMIT_VALIDATION_FAILED}
+            </Alert>
+          ) : null}
+
+          <ToggleButtonGroup
+            exclusive
+            fullWidth
+            size="small"
+            value={activeProcessTab}
+            onChange={(_, value: MotorProcessTab | null) => {
+              if (!value) return;
+              setActiveProcessTab(value);
+            }}
+            sx={sectionToggleSx}
+          >
+            <ToggleButton
+              value="LOOSE_FLAP"
+              sx={
+                Object.keys(validationErrors).some(isLooseFlapErrorKey)
+                  ? { color: `${BRAND.danger} !important`, borderColor: `${BRAND.danger} !important` }
+                  : undefined
+              }
+            >
+              {S.OPERATION_LOOSE_FLAP_FILLING}
+            </ToggleButton>
+            <ToggleButton
+              value="INHIBITION"
+              sx={
+                Object.keys(validationErrors).some(isInhibitionErrorKey)
+                  ? { color: `${BRAND.danger} !important`, borderColor: `${BRAND.danger} !important` }
+                  : undefined
+              }
+            >
+              {S.OPERATION_INHIBITION}
+            </ToggleButton>
+          </ToggleButtonGroup>
+
+          {activeProcessTab === "LOOSE_FLAP" ? (
+            <PostCureMotorPanel
+              value={activeMotorSession.looseFlapData}
+              onChange={(looseFlapData) =>
+                persistSession({
+                  ...activeMotorSession,
+                  looseFlapData,
+                })
+              }
+              validationErrors={validationErrors}
+              clearFieldError={clearFieldError}
+              disabled={activeMotorLocked}
+              theme={theme}
+              subDepartmentId={subDepartmentId}
+              batchId={batch?.batchId}
+              motorId={activeMotorEntry.motorId}
+              isSubmitMode={isSubmitMode}
+            />
+          ) : null}
+
+          {activeProcessTab === "INHIBITION" ? (
+            <Stack spacing={1.25}>
+              <Box
+                sx={{
+                  borderRadius: 2,
+                  border: `1px solid ${theme.palette.border}`,
+                  background: "rgba(21,101,192,0.03)",
+                  px: 1.25,
+                  py: 1.25,
+                }}
+              >
+                <Stack
+                  direction="row"
+                  alignItems="flex-start"
+                  justifyContent="space-between"
+                  gap={1}
+                  mb={1.25}
+                >
+                  <Typography
+                    sx={{
+                      fontSize: "0.78rem",
+                      fontWeight: 700,
+                      color: theme.palette.primary,
+                    }}
+                  >
+                    {S.INHIBITION_SECTION_TITLE}
+                  </Typography>
+                  <Stack direction="row" spacing={0.75}>
+                    {showInhibitionEdit ? (
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        onClick={() => setInhibitionTypeEditing(true)}
+                        sx={{ textTransform: "none", fontWeight: 700, minWidth: 64 }}
+                      >
+                        {S.EDIT_INHIBITION_TYPE}
+                      </Button>
+                    ) : null}
+                    {showInhibitionDelete ? (
+                      <Button
+                        variant="outlined"
+                        size="small"
+                        color="error"
+                        onClick={handleClearInhibitionSetup}
+                        sx={{ textTransform: "none", fontWeight: 700, minWidth: 64 }}
+                      >
+                        {S.DELETE_INHIBITION_SETUP}
+                      </Button>
+                    ) : null}
+                  </Stack>
+                </Stack>
+                <CasePrepSelect
+                  label={S.INHIBITOR_TYPE_LABEL}
+                  value={activeMotorSession.inhibitorType}
+                  placeholder={S.INHIBITOR_TYPE_PLACEHOLDER}
+                  options={POST_CURE_INHIBITOR_TYPE_OPTIONS}
+                  width={260}
+                  theme={theme}
+                  disabled={!activeMotorLocked && inhibitionTypeLocked}
+                  readOnly={activeMotorLocked}
+                  onChange={handleInhibitorTypeChange}
+                />
+                {validationErrors.inhibitorType ? (
+                  <Typography sx={{ fontSize: "0.72rem", color: BRAND.danger, mt: 0.75 }}>
+                    {String(validationErrors.inhibitorType)}
+                  </Typography>
+                ) : null}
+              </Box>
+
+              {showInhibitionPanel && activeMotorSession.inhibitionData ? (
+                <PostCureMotorPanel
+                  value={activeMotorSession.inhibitionData}
+                  onChange={(inhibitionData: PostCureMotorData) =>
+                    persistSession({
+                      ...activeMotorSession,
+                      inhibitionData,
+                    })
+                  }
+                  validationErrors={validationErrors}
+                  clearFieldError={clearFieldError}
+                  disabled={activeMotorLocked}
+                  theme={theme}
+                  subDepartmentId={subDepartmentId}
+                  batchId={batch?.batchId}
+                  motorId={activeMotorEntry.motorId}
+                  isSubmitMode={isSubmitMode}
+                />
+              ) : null}
+            </Stack>
+          ) : null}
         </Box>
       ) : null}
 

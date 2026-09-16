@@ -14,8 +14,6 @@ export type PostCureCreatePayload = {
   batchId: string;
   subDepartmentId: number;
   formSubmissionType: "DRAFT" | "SUBMIT";
-  operationType: "LOOSE_FLAP_FILLING" | "INHIBITION";
-  inhibitorType?: "IR1" | "HEMCOAT_3K" | "NOT_APPLICABLE";
 } & PostCureFormBody;
 
 export type PostCureUpdatePayload = {
@@ -23,8 +21,6 @@ export type PostCureUpdatePayload = {
   batchId: string;
   subDepartmentId: number;
   formSubmissionType: "DRAFT" | "SUBMIT";
-  operationType: "LOOSE_FLAP_FILLING" | "INHIBITION";
-  inhibitorType?: "IR1" | "HEMCOAT_3K" | "NOT_APPLICABLE";
 } & PostCureFormBody;
 
 

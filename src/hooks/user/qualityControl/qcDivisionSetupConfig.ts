@@ -92,7 +92,7 @@ export const QC_DIVISION_SETUP_DEFINITIONS: Record<string, QcDivisionSetupDefini
     title: "Post Cure Setup",
     loadLabel: S.LOAD_FORM_LABEL,
     fields: [
-      { id: "operation", label: "Operation", type: "select", required: true },
+      { id: "inhibitorType", label: S.INHIBITOR_TYPE_LABEL, type: "select", required: true },
       { id: "motorReceiptDate", label: "Motor Receipt Date/Time", type: "datetime", required: true },
     ],
   },

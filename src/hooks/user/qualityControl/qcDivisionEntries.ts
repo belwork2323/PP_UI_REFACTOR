@@ -14,9 +14,6 @@ import {
 } from "./qcHardwareConfig";
 import { getQcPropellantProcessLabel } from "./qcPropellantConfig";
 import {
-  QC_POST_CURE_SUB_TYPE_INHIBITION,
-} from "./qcPostCureConfig";
-import {
   getQcMixingNumberLabel,
   getQcMixingStageLabel,
   isQcMixingStage,
@@ -88,7 +85,8 @@ export const buildDivisionEntryDedupKey = (params: {
     return `DE_CORING:${params.motorId ?? "NONE"}`;
   }
   if (params.kind === "POST_CURE_MOTOR") {
-    return `POST_CURE:${params.motorId ?? "NONE"}:${params.subType ?? "NONE"}:${params.inhibitorType ?? "NONE"}`;
+    // One entry per motor — Loose Flap + Inhibition live on the same session.
+    return `POST_CURE:${params.motorId ?? "NONE"}`;
   }
   if (params.kind === "NDT_MOTOR") {
     return `NDT:${params.motorId ?? "NONE"}`;
@@ -113,15 +111,8 @@ export const buildMotorDivisionGroupKey = (
   const division = String(options?.division ?? "").trim().toUpperCase();
   const isPostCure = division === "POST_CURE" || division === "POST_CURE_OPERATION";
   const isPropellant = division === "PROPELLANT_PROPERTIES" || division === "QC";
-  if (isPropellant) {
+  if (isPropellant || isPostCure) {
     return motorId;
-  }
-  if (
-    isPostCure &&
-    subType === QC_POST_CURE_SUB_TYPE_INHIBITION &&
-    options?.inhibitorType
-  ) {
-    return `${motorId}:${subType}:${options.inhibitorType}`;
   }
   if (subType) return `${motorId}:${subType}`;
   return motorId;
@@ -131,13 +122,6 @@ export const parseMotorDivisionGroupKey = (
   groupKey: string,
 ): { motorId: string; subType: QcApiSubType; inhibitorType?: string } => {
   const parts = groupKey.split(":");
-  if (parts.length >= 3 && parts[parts.length - 2] === QC_POST_CURE_SUB_TYPE_INHIBITION) {
-    return {
-      motorId: parts.slice(0, -2).join(":"),
-      subType: parts[parts.length - 2] as QcApiSubType,
-      inhibitorType: parts[parts.length - 1],
-    };
-  }
   if (parts.length >= 2) {
     return {
       motorId: parts.slice(0, -1).join(":"),

@@ -392,3 +392,11 @@ export const USER_DISPATCH_ENDPOINTS = {
   FORM_DETAILS: `${API_BASE}/user/dispatch/form/details`,
   UPDATE_FORM: `${API_BASE}/user/dispatch/form/update`,
 };
+
+export const BLOCKCHAIN_EXPLORER = {
+  CHANNELS: `${API_BASE}/admin/blockchain/channels`,
+  STATS: `${API_BASE}/admin/blockchain/stats`,
+  PEERS: `${API_BASE}/admin/blockchain/peers`,
+  TX_BY_ORG: `${API_BASE}/admin/blockchain/tx-by-org`,
+  CHART: `${API_BASE}/admin/blockchain/chart`,
+};
