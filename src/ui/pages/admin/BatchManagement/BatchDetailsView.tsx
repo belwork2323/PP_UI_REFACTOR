@@ -172,7 +172,6 @@ const BatchDetailsView = ({ open, loading, batch, onClose, t }: BatchDetailsView
         { label: S.BATCH_SIZE, value: displayValue(sheet.batchSize) },
         { label: S.BONDING_SHEET_NO, value: displayValue(sheet.bondingSheetNo) },
         { label: S.MIXER_TYPE, value: displayValue(sheet.mixerType ?? sheet.mixerDetails) },
-        { label: S.BUILDING_NO, value: displayValue(sheet.BldgNo) },
         { label: S.NUMBER_OF_PREMIX, value: displayValue(sheet.numberOfPremix) },
         { label: S.PRC_APPROVAL_DATE, value: formatDate(sheet.prcApprovalDate) },
         { label: S.REMARKS, value: displayValue(sheet.remarks) },

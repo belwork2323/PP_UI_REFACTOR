@@ -20,6 +20,7 @@ import {
   Typography,
 } from "@mui/material";
 import FormInput from "../../../../components/common/FormInput";
+import AppDropdown from "../../../../components/common/AppDropdown";
 import DateField from "../../../../components/common/DateField";
 import {
   APP_CONTROL_FONT_SIZE,
@@ -42,6 +43,7 @@ import {
   type SubscaleMixingCycleEntry,
   type ProcessParticularRow,
 } from "../../../../../hooks/user/manufacturing/subscaleBatchConfig";
+import { useBuildingOptions } from "../../../../../hooks/user/useBuildingOptions";
 import type { SchemaFormValues } from "../../../../../schema-engine";
 import { sectionCardSx, sectionHeaderSx } from "./utils/subscaleHardwareTableStyles";
 import { SubscaleProcessParticularRow } from "./components/SubscaleTableCells";
@@ -170,6 +172,7 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
   errors,
   clearFieldError,
 }) => {
+  const { dropdownOptions: buildingOptions, loadingBuildings } = useBuildingOptions(true);
   const mixingCyclesRaw = values[SUBSCALE_BATCH_FIELDS.MIXING_CYCLES];
   const mixingCycles = useMemo(
     () => normalizeSubscaleMixingCycles(mixingCyclesRaw),
@@ -220,16 +223,13 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
     const sheet = batchDetails.identificationSheet;
     const batchSize = sheet.batchSize;
     const mixerType = sheet.mixerType;
-    const bldgNo = sheet.BldgNo ?? sheet.bldgNo ?? "";
 
     const nextBatchSize = String(values[SUBSCALE_BATCH_FIELDS.BATCH_SIZE] ?? "").trim();
     const nextMixerType = String(values.mixerType ?? "").trim();
-    const nextBldg = String(values[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO] ?? "").trim();
 
     patchValues({
       [SUBSCALE_BATCH_FIELDS.BATCH_SIZE]: nextBatchSize || batchSize || "",
       mixerType: nextMixerType || mixerType || "",
-      [SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO]: nextBldg || bldgNo || "",
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [batchDetails]);
@@ -681,15 +681,31 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
             value={values.mixerType || batchDetails?.identificationSheet?.mixerType || ""}
           />
 
-          <FormInput
-            disabled
-            label={<FieldLabelWithAsterisk label={S.MIXER_BLDG_NO} required />}
-            value={
-              values[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO] ||
-              batchDetails?.identificationSheet?.BldgNo ||
-              batchDetails?.identificationSheet?.bldgNo ||
-              ""
+          <AppDropdown
+            label={S.MIXER_BLDG_NO}
+            required
+            value={String(values[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO] ?? "").trim()}
+            onChange={(value) => {
+              clearFieldError?.(SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO);
+              patchValues({ [SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO]: value });
+            }}
+            disabled={loadingBuildings}
+            placeholder={
+              loadingBuildings
+                ? "Loading buildings..."
+                : buildingOptions.length
+                  ? "Select building"
+                  : "No buildings available"
             }
+            options={buildingOptions}
+            renderValue={(selected) => {
+              const value = String(selected ?? "").trim();
+              if (!value) return null;
+              const opt = buildingOptions.find((o) => o.value === value);
+              return opt?.label || value;
+            }}
+            error={Boolean(errors?.[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO])}
+            helperText={errors?.[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO]}
           />
 
           {(() => {

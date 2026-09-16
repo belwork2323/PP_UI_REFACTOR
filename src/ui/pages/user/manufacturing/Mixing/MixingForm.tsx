@@ -50,6 +50,7 @@ import type {
 } from "../../../../../data/models/user/MixingFormModel";
 import { useMixingFormHook } from "../../../../../hooks/user/manufacturing/useMixingFormHook";
 import { useMixingQualityChecks } from "../../../../../hooks/user/manufacturing/useMixingQualityChecks";
+import { useBuildingOptions } from "../../../../../hooks/user/useBuildingOptions";
 import {
   isPremixEnabledForWorkflowWithBatch,
   getPremixNavTabDisabledReasonWithBatch,
@@ -140,6 +141,8 @@ type PremixStageCardProps = {
   cardIdx: number;
   premix: PremixEntry;
   bowlIdOptions: string[];
+  buildingOptions: { value: string; label: string }[];
+  loadingBuildings?: boolean;
   readOnly?: boolean;
   statusChip?: React.ReactNode;
   headerActions?: React.ReactNode;
@@ -172,6 +175,8 @@ const PremixStageCard = ({
   cardIdx,
   premix,
   bowlIdOptions,
+  buildingOptions,
+  loadingBuildings = false,
   readOnly = false,
   statusChip,
   headerActions,
@@ -263,13 +268,25 @@ const PremixStageCard = ({
               onChange={() => undefined}
               required
             />
-            <MixingTextField
+            <MixingSelectField
               label="Building No"
               value={premix.bldgNo}
-              placeholder="Building No"
-              disabled
-              onChange={() => undefined}
+              placeholder={
+                loadingBuildings
+                  ? "Loading buildings..."
+                  : buildingOptions.length
+                    ? "Select building"
+                    : "No buildings available"
+              }
+              options={buildingOptions}
+              disabled={readOnly || loadingBuildings}
+              onChange={(value) => {
+                onClearFieldError?.(`premixes.${cardIdx}.mixerConfiguration.bldgNo`);
+                onPremixFieldChange(premix.premixNo, "bldgNo", value);
+              }}
               required
+              error={Boolean(getFieldError(`premixes.${cardIdx}.mixerConfiguration.bldgNo`))}
+              helperText={getFieldError(`premixes.${cardIdx}.mixerConfiguration.bldgNo`)}
             />
             <MixingDateField
               label={S.LABEL_PREMIX_DATE}
@@ -500,6 +517,8 @@ type FinalMixStageCardProps = {
   cardIdx: number;
   entry: FinalMixEntry;
   bowlIdOptions: string[];
+  buildingOptions: { value: string; label: string }[];
+  loadingBuildings?: boolean;
   readOnly?: boolean;
   statusChip?: React.ReactNode;
   headerActions?: React.ReactNode;
@@ -532,6 +551,8 @@ const FinalMixStageCard = ({
   cardIdx,
   entry,
   bowlIdOptions,
+  buildingOptions,
+  loadingBuildings = false,
   readOnly = false,
   statusChip,
   headerActions,
@@ -620,13 +641,25 @@ const FinalMixStageCard = ({
             onChange={() => undefined}
             required
           />
-          <MixingTextField
+          <MixingSelectField
             label="Building No"
             value={entry.bldgNo}
-            placeholder="Building No"
-            disabled
-            onChange={() => undefined}
+            placeholder={
+              loadingBuildings
+                ? "Loading buildings..."
+                : buildingOptions.length
+                  ? "Select building"
+                  : "No buildings available"
+            }
+            options={buildingOptions}
+            disabled={readOnly || loadingBuildings}
+            onChange={(value) => {
+              onClearFieldError?.(`finalMixes.${cardIdx}.mixerConfiguration.bldgNo`);
+              onFieldChange(entry.mixNo, "bldgNo", value);
+            }}
             required
+            error={Boolean(getFieldError(`finalMixes.${cardIdx}.mixerConfiguration.bldgNo`))}
+            helperText={getFieldError(`finalMixes.${cardIdx}.mixerConfiguration.bldgNo`)}
           />
           <MixingTextField
             label={S.LABEL_MIXING_CYCLE}
@@ -829,6 +862,8 @@ const MixingForm = ({
     numberOfPremix,
     identificationSheet,
   );
+
+  const { dropdownOptions: buildingOptions, loadingBuildings } = useBuildingOptions(true);
 
   const mode = useThemeStore((state) => state.mode);
   const manufacturingTheme = useMemo(() => getManufacturingTheme(mode), [mode]);
@@ -1317,6 +1352,8 @@ const MixingForm = ({
                 cardIdx={premixCards.findIndex((p) => p.premixNo === activePremix.premixNo)}
                 premix={activePremix}
                 bowlIdOptions={getPremixBowlIdOptions(activePremix.bowlId)}
+                buildingOptions={buildingOptions}
+                loadingBuildings={loadingBuildings}
                 readOnly={activeMixCardLocked}
                 statusChip={
                   <PremixStatusChip
@@ -1349,6 +1386,8 @@ const MixingForm = ({
                 cardIdx={finalMixCards.findIndex((f) => f.mixNo === activeFinalMix.mixNo)}
                 entry={activeFinalMix}
                 bowlIdOptions={getFinalMixBowlIdOptions(activeFinalMix.bowlId)}
+                buildingOptions={buildingOptions}
+                loadingBuildings={loadingBuildings}
                 readOnly={activeMixCardLocked}
                 statusChip={
                   <PremixStatusChip

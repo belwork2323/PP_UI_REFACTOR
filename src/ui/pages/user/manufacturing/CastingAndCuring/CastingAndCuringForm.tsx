@@ -842,7 +842,6 @@ const CastingAndCuringForm = ({
                           })
                         }
                         motorId={activeMotorSession.motorId}
-                        buildingNo={String(batch?.identificationSheet?.BldgNo ?? "")}
                         disabled={activeMotorLocked}
                         theme={theme}
                         validationErrors={validationErrors}

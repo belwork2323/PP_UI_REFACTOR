@@ -789,7 +789,7 @@ export const mapMixingDetailsToFormState = (details: Partial<MixingDetails>): Mi
           mixerType: String(
             premix?.mixerConfiguration?.mixerId ?? identificationSheet?.mixerType ?? "",
           ),
-          bldgNo: String(premix?.mixerConfiguration?.bldgNo ?? identificationSheet?.bldgNo ?? ""),
+          bldgNo: String(premix?.mixerConfiguration?.bldgNo ?? ""),
           bowlId: premix?.mixerConfiguration?.bowlId ?? "",
 
           bowlTrialDate: premix?.trialDetails?.trialDate ?? "",
@@ -843,7 +843,7 @@ export const mapMixingDetailsToFormState = (details: Partial<MixingDetails>): Mi
           mixerType: String(
             entry?.mixerConfiguration?.mixerId ?? identificationSheet?.mixerType ?? "",
           ),
-          bldgNo: String(entry?.mixerConfiguration?.bldgNo ?? identificationSheet?.bldgNo ?? ""),
+          bldgNo: String(entry?.mixerConfiguration?.bldgNo ?? ""),
           bowlId: entry?.mixerConfiguration?.bowlId ?? "",
 
           mixingCycle: resolveApiMixingCycleDisplayValue(

@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useRef } from "react";
 import {
   Box,
   Table,
@@ -27,6 +27,7 @@ import {
   castingCuringTableInputSx,
   castingCuringTableRowSx,
 } from "./CastingCuringFormPrimitives";
+import { useBuildingOptions } from "../../../../../hooks/user/useBuildingOptions";
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 const str = (v: unknown) => (v === null || v === undefined ? "" : String(v));
@@ -35,8 +36,6 @@ type Props = {
   value: CuringMotorData;
   onChange: (next: CuringMotorData) => void;
   motorId: string;
-  /** Building no from batch identification sheet (`BldgNo`). */
-  buildingNo?: string;
   disabled?: boolean;
   readOnly?: boolean;
   theme?: any;
@@ -151,7 +150,6 @@ const CuringMotorPanel = ({
   value,
   onChange,
   motorId: _motorId,
-  buildingNo = "",
   disabled = false,
   readOnly = false,
   theme,
@@ -163,20 +161,7 @@ const CuringMotorPanel = ({
   onChangeRef.current = onChange;
   const valueRef = useRef(value);
   valueRef.current = value;
-
-  // Seed Building No from batch identification sheet when empty
-  useEffect(() => {
-    const fromBatch = str(buildingNo).trim();
-    if (!fromBatch) return;
-    if (str(valueRef.current.DECORING_DETAILS.BUILDING_NO).trim()) return;
-    onChangeRef.current({
-      ...valueRef.current,
-      DECORING_DETAILS: {
-        ...valueRef.current.DECORING_DETAILS,
-        BUILDING_NO: fromBatch,
-      },
-    });
-  }, [buildingNo]);
+  const { dropdownOptions: buildingOptions, loadingBuildings } = useBuildingOptions(true);
 
   const patchSection = <K extends keyof CuringMotorData>(
     sectionKey: K,
@@ -480,13 +465,21 @@ const CuringMotorPanel = ({
           </Box>
           <Box>
             <FieldLabelWithAsterisk label="Building No" required />
-            <TableTextInput
+            <TableSelectInput
               value={decor.BUILDING_NO}
               onChange={(v) => {
                 clearFieldError?.("DECORING_DETAILS.BUILDING_NO");
                 patchSection("DECORING_DETAILS", { BUILDING_NO: v });
               }}
-              disabled={disabled}
+              options={buildingOptions}
+              placeholder={
+                loadingBuildings
+                  ? "Loading buildings..."
+                  : buildingOptions.length
+                    ? "Select building"
+                    : "No buildings available"
+              }
+              disabled={disabled || loadingBuildings}
               readOnly={readOnly}
               required
               error={Boolean(validationErrors?.["DECORING_DETAILS.BUILDING_NO"])}

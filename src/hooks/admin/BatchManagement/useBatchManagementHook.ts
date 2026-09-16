@@ -1027,7 +1027,6 @@ function useBatchImplementationSection(implModalOpen: boolean) {
     Record<string, RawMaterialLotListRow[]>
   >({});
   const [mixerOptions, setMixerOptions] = useState<SystemMasterOption[]>([]);
-  const [buildingOptions, setBuildingOptions] = useState<SystemMasterOption[]>([]);
   const [loadingMaterials, setLoadingMaterials] = useState(false);
   const [loadingLots, setLoadingLots] = useState(false);
   const [loadingMasterLookups, setLoadingMasterLookups] = useState(false);
@@ -1072,22 +1071,15 @@ function useBatchImplementationSection(implModalOpen: boolean) {
     }
   }, []);
 
-  const loadMixerAndBuildingOptions = useCallback(async () => {
+  const loadMixerOptions = useCallback(async () => {
     setLoadingMasterLookups(true);
     try {
-      const [mixersRes, buildingsRes] = await Promise.all([
-        generalController.getMixers(),
-        generalController.getBuildings(),
-      ]);
+      const mixersRes = await generalController.getMixers();
       setMixerOptions(
         mixersRes?.success && Array.isArray(mixersRes.data) ? mixersRes.data : [],
       );
-      setBuildingOptions(
-        buildingsRes?.success && Array.isArray(buildingsRes.data) ? buildingsRes.data : [],
-      );
     } catch {
       setMixerOptions([]);
-      setBuildingOptions([]);
     } finally {
       setLoadingMasterLookups(false);
     }
@@ -1097,8 +1089,8 @@ function useBatchImplementationSection(implModalOpen: boolean) {
     if (!implModalOpen) return;
     void loadMaterials();
     void loadApprovedLots();
-    void loadMixerAndBuildingOptions();
-  }, [implModalOpen, loadMaterials, loadApprovedLots, loadMixerAndBuildingOptions]);
+    void loadMixerOptions();
+  }, [implModalOpen, loadMaterials, loadApprovedLots, loadMixerOptions]);
 
   const getLotsForMaterial = useCallback(
     (materialCode: string): RawMaterialLotListRow[] => {
@@ -1164,7 +1156,6 @@ function useBatchImplementationSection(implModalOpen: boolean) {
     materialOptions,
     lotsByMaterialCode,
     mixerOptions,
-    buildingOptions,
     loadingMaterials,
     loadingLots,
     loadingMasterLookups,

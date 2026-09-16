@@ -54,8 +54,6 @@ export const useMixingFormHook = (
   maxStageCount = 4,
   identificationSheet?: {
     mixerType?: string | null;
-    bldgNo?: string | null;
-    BldgNo?: string | null;
     batchSize?: string;
     date?: string;
   } | null,
@@ -66,7 +64,7 @@ export const useMixingFormHook = (
       : buildInitialPremixCardsWithDefaults(
           maxStageCount,
           identificationSheet?.mixerType,
-          identificationSheet?.bldgNo,
+          null,
           identificationSheet?.batchSize,
           identificationSheet?.date,
         ),
@@ -78,7 +76,7 @@ export const useMixingFormHook = (
       : buildInitialFinalMixCardsWithDefaults(
           maxStageCount,
           identificationSheet?.mixerType,
-          identificationSheet?.bldgNo,
+          null,
           identificationSheet?.batchSize,
           identificationSheet?.date,
         ),
@@ -124,7 +122,7 @@ export const useMixingFormHook = (
           : buildInitialFinalMixCardsWithDefaults(
               initialData.premixCards.length,
               identificationSheet?.mixerType,
-              identificationSheet?.bldgNo ?? identificationSheet?.BldgNo,
+              null,
               identificationSheet?.batchSize,
               identificationSheet?.date,
             ),

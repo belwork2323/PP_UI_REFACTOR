@@ -572,7 +572,6 @@ export interface IdentificationSheet {
   batchSize: number;
   bondingSheetNo: string;
   mixerType: string;
-  BldgNo: string;
   numberOfPremix: number;
   remarks: string;
   materials: MaterialItem[];
@@ -660,8 +659,6 @@ export function serializeIdentificationSheetForApi(
     !sheet.bondingSheetNo &&
     !sheet.mixerType &&
     !sheet.mixerDetails &&
-    !sheet.BldgNo &&
-    !sheet.bldgNo &&
     !sheet.prcApprovalDate &&
     (sheet.numberOfPremix === 1 || sheet.numberOfPremix == null) &&
     !sheet.remarks &&
@@ -674,7 +671,6 @@ export function serializeIdentificationSheetForApi(
     batchSize: Number(sheet.batchSize) || 0,
     bondingSheetNo: sheet.bondingSheetNo ?? "",
     mixerType: String(sheet.mixerType ?? sheet.mixerDetails ?? "").trim(),
-    BldgNo: String(sheet.BldgNo ?? sheet.bldgNo ?? "").trim(),
     numberOfPremix: sheet.numberOfPremix ?? 0,
     remarks: sheet.remarks ?? "",
     prcApprovalDate: formatToIsoDateInput(sheet.prcApprovalDate),
@@ -698,7 +694,6 @@ export function parseIdentificationSheetFromApi(
       batchSize: 0,
       bondingSheetNo: "",
       mixerType: "",
-      BldgNo: "",
       numberOfPremix: 1,
       remarks: "",
       materials: [],
@@ -728,7 +723,6 @@ export function parseIdentificationSheetFromApi(
     batchSize: sheet.batchSize ?? 0,
     bondingSheetNo: sheet.bondingSheetNo ?? "",
     mixerType: sheet.mixerType ?? sheet.mixerDetails ?? "",
-    BldgNo: sheet.BldgNo ?? sheet.bldgNo ?? "",
     numberOfPremix: sheet.numberOfPremix ?? 1,
     remarks: sheet.remarks ?? "",
     materials,
@@ -1077,7 +1071,6 @@ const emptyIdentificationSheet = (): IdentificationSheet => ({
   batchSize: 0,
   bondingSheetNo: "",
   mixerType: "",
-  BldgNo: "",
   numberOfPremix: 1,
   remarks: "",
   materials: [],
@@ -1278,7 +1271,6 @@ const IDENTIFICATION_HEADER_FIELDS = [
   "batchSize",
   "bondingSheetNo",
   "mixerType",
-  "BldgNo",
   "remarks",
   "prcApprovalDate",
 ] as const satisfies ReadonlyArray<keyof IdentificationSheet>;

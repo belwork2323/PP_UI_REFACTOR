@@ -261,9 +261,7 @@ export const useMixingHook = () => {
             (_, index) => ({
               ...createEmptyPremixEntry(index + 1),
               mixerType: String(identificationSheet?.mixerType ?? ""),
-              bldgNo: String(
-                (identificationSheet as any)?.bldgNo ?? (identificationSheet as any)?.BldgNo ?? "",
-              ),
+              bldgNo: "",
               premixDate: String(identificationSheet?.date ?? ""),
               premixQuantity: String(identificationSheet?.batchSize ?? ""),
               mixingCycle: resolveApiMixingCycleDisplayValue(mixingCycle) || "",
@@ -285,9 +283,7 @@ export const useMixingHook = () => {
               ...createEmptyFinalMixEntry(index + 1),
               finalMixNo: String(index + 1),
               mixerType: String(identificationSheet?.mixerType ?? ""),
-              bldgNo: String(
-                (identificationSheet as any)?.bldgNo ?? (identificationSheet as any)?.BldgNo ?? "",
-              ),
+              bldgNo: "",
               mixingCycle: resolveApiMixingCycleDisplayValue(mixingCycle) || "",
               mixingCycleCode: String(
                 (mixingCycle as any)?.mixingCycleCode ?? (mixingCycle as any)?.id ?? "",
@@ -345,13 +341,7 @@ export const useMixingHook = () => {
             premixCards: (nextFormData.premixCards ?? []).map((card) => ({
               ...card,
               mixerType: card.mixerType || String(identificationSheet?.mixerType ?? ""),
-              bldgNo:
-                card.bldgNo ||
-                String(
-                  (identificationSheet as any)?.bldgNo ??
-                    (identificationSheet as any)?.BldgNo ??
-                    "",
-                ),
+              bldgNo: card.bldgNo || "",
               premixDate: card.premixDate || String(identificationSheet?.date ?? ""),
               premixQuantity: card.premixQuantity || String(identificationSheet?.batchSize ?? ""),
               mixingCycle: card.mixingCycle || resolveApiMixingCycleDisplayValue(mixingCycle) || "",
@@ -363,13 +353,7 @@ export const useMixingHook = () => {
             finalMixCards: (nextFormData.finalMixCards ?? []).map((card) => ({
               ...card,
               mixerType: card.mixerType || String(identificationSheet?.mixerType ?? ""),
-              bldgNo:
-                card.bldgNo ||
-                String(
-                  (identificationSheet as any)?.bldgNo ??
-                    (identificationSheet as any)?.BldgNo ??
-                    "",
-                ),
+              bldgNo: card.bldgNo || "",
               mixingCycle: card.mixingCycle || resolveApiMixingCycleDisplayValue(mixingCycle) || "",
               mixingCycleCode:
                 card.mixingCycleCode || String((mixingCycle as any)?.mixingCycleCode ?? ""),

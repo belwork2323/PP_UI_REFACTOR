@@ -115,7 +115,6 @@ export default function BatchImplementationForm({
   t,
   materialOptions = [],
   mixerOptions = [],
-  buildingOptions = [],
   loadingMaterials = false,
   loadingLots = false,
   loadingMasterLookups = false,
@@ -148,15 +147,10 @@ export default function BatchImplementationForm({
   const currentMixerValue = String(
     form.identificationSheet?.mixerType ?? form.identificationSheet?.mixerDetails ?? "",
   ).trim();
-  const currentBuildingValue = String(form.identificationSheet?.BldgNo ?? "").trim();
 
   const mixerSelectOptions = useMemo(
     () => withCurrentMasterOption(mixerOptions as SystemMasterOption[], currentMixerValue),
     [mixerOptions, currentMixerValue],
-  );
-  const buildingSelectOptions = useMemo(
-    () => withCurrentMasterOption(buildingOptions as SystemMasterOption[], currentBuildingValue),
-    [buildingOptions, currentBuildingValue],
   );
 
   useEffect(() => {
@@ -533,36 +527,6 @@ export default function BatchImplementationForm({
 
           <Box>
             <Stack direction={{ xs: "column", sm: "row" }} spacing={modal.fieldRowSpacing}>
-              <AppDropdown
-                label={S.BUILDING_NO}
-                value={currentBuildingValue}
-                onChange={(value) => {
-                  onFormChange("identificationSheet", {
-                    ...form.identificationSheet,
-                    BldgNo: value,
-                  });
-                }}
-                disabled={headerFieldDisabled || loadingMasterLookups}
-                placeholder={
-                  loadingMasterLookups
-                    ? "Loading buildings..."
-                    : buildingSelectOptions.length
-                      ? "Select building"
-                      : "No buildings available"
-                }
-                options={buildingSelectOptions.map((opt) => ({
-                  value: opt.code,
-                  label: opt.name || opt.code,
-                }))}
-                renderValue={(selected) => {
-                  const value = String(selected ?? "").trim();
-                  if (!value) return null;
-                  const opt = buildingSelectOptions.find((o) => o.code === value);
-                  return opt?.name || opt?.code || value;
-                }}
-                sx={{ mb: 0, ...input }}
-                MenuProps={t.menuPaper}
-              />
               <FormInput
                 fullWidth
                 label="Number of Premix"

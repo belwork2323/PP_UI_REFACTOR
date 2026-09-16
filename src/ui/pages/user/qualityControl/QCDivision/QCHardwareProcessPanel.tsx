@@ -19,6 +19,8 @@ import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { SchemaFormValues } from "../../../../../schema-engine";
 import DateField, { DateTimeField, TimeField } from "../../../../components/common/DateField";
+import AppDropdown from "../../../../components/common/AppDropdown";
+import { useBuildingOptions } from "../../../../../hooks/user/useBuildingOptions";
 import {
   QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID,
   QC_HARDWARE_ABRADING_SECOND_CUT_TABLE_ID,
@@ -131,8 +133,10 @@ const normalizeTimeValue = (value: unknown) => {
 type ColumnDef<T> = {
   id: keyof T & string;
   label: string;
-  fieldType?: "text" | "number" | "date" | "time" | "textarea";
+  fieldType?: "text" | "number" | "date" | "time" | "textarea" | "select";
   required?: boolean;
+  options?: Array<{ value: string; label: string }>;
+  loadingOptions?: boolean;
 };
 
 type EditableTableProps<T extends Record<string, unknown>> = {
@@ -186,6 +190,13 @@ const HardwareEditableTable = <T extends Record<string, unknown>>({
   const renderInput = (row: T, index: number, column: ColumnDef<T>): ReactNode => {
     const value = String(row[column.id] ?? "");
     if (readOnly) {
+      if (column.fieldType === "select") {
+        const label =
+          column.options?.find((option) => option.value === value)?.label ?? value;
+        return (
+          <QCDivisionReadOnlyValue value={label} muted={!String(value ?? "").trim()} />
+        );
+      }
       return (
         <QCDivisionReadOnlyValue
           value={column.fieldType === "time" ? normalizeTimeValue(value) : value}
@@ -214,6 +225,32 @@ const HardwareEditableTable = <T extends Record<string, unknown>>({
           onChange={(next) => updateRow(index, column.id, next)}
           placeholder="HH:mm"
           inputSx={tableTimeFieldSx}
+        />
+      );
+    }
+
+    if (column.fieldType === "select") {
+      const options = column.options ?? [];
+      return (
+        <AppDropdown
+          compact
+          value={value}
+          onChange={(next) => updateRow(index, column.id, next)}
+          options={options}
+          disabled={Boolean(column.loadingOptions)}
+          placeholder={
+            column.loadingOptions
+              ? "Loading..."
+              : options.length
+                ? "Select"
+                : "No options"
+          }
+          renderValue={(selected) => {
+            const code = String(selected ?? "").trim();
+            if (!code) return null;
+            return options.find((option) => option.value === code)?.label || code;
+          }}
+          sx={tableFieldSx}
         />
       );
     }
@@ -350,12 +387,12 @@ const ABRADING_COLUMNS: ColumnDef<QcHardwareCutRow>[] = [
   { id: "OBSERVATIONS", label: "Observations", fieldType: "textarea" },
 ];
 
-const PREHEATING_COLUMNS: ColumnDef<QcHardwarePreheatingRow>[] = [
+const PREHEATING_COLUMNS_BASE: ColumnDef<QcHardwarePreheatingRow>[] = [
   { id: "DATE", label: "Date", fieldType: "date" },
   { id: "START_TIME", label: "Start Time", fieldType: "time" },
   { id: "END_TIME", label: "End Time", fieldType: "time" },
   { id: "OVEN_NUMBER", label: "Oven Number", fieldType: "text" },
-  { id: "BUILDING_NO", label: "Building No", fieldType: "text" },
+  { id: "BUILDING_NO", label: "Building No", fieldType: "select" },
   { id: "TEMPERATURE", label: "Temperature (°C)", fieldType: "number" },
   { id: "VACUUM_LEVEL", label: "Vacuum Level (Torr)", fieldType: "number" },
   { id: "OBSERVATIONS", label: "Observations", fieldType: "textarea" },
@@ -380,6 +417,20 @@ const QCHardwareProcessPanel = ({
   validationErrors = null,
 }: QCHardwareProcessPanelProps) => {
   const processLabel = getQcHardwareProcessLabel(subType);
+  const { dropdownOptions: buildingOptions, loadingBuildings } = useBuildingOptions(true);
+  const preheatingColumns = useMemo(
+    () =>
+      PREHEATING_COLUMNS_BASE.map((column) =>
+        column.id === "BUILDING_NO"
+          ? {
+              ...column,
+              options: buildingOptions,
+              loadingOptions: loadingBuildings,
+            }
+          : column,
+      ),
+    [buildingOptions, loadingBuildings],
+  );
   const firstCutRows = useMemo(
     () => getHardwareAbradingRows(values, QC_HARDWARE_ABRADING_FIRST_CUT_TABLE_ID),
     [values],
@@ -498,7 +549,7 @@ const QCHardwareProcessPanel = ({
       {subType === "PREHEATING" ? (
         <HardwareEditableTable
           title="Preheating Details"
-          columns={PREHEATING_COLUMNS}
+          columns={preheatingColumns}
           rows={preheatingRows}
           onChange={setPreheating}
           createEmptyRow={(srNo) => ({

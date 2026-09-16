@@ -293,7 +293,6 @@ const CHBatchManagementPage = () => {
         t={t}
         materialOptions={implementation.materialOptions}
         mixerOptions={implementation.mixerOptions}
-        buildingOptions={implementation.buildingOptions}
         loadingMaterials={implementation.loadingMaterials}
         loadingLots={implementation.loadingLots}
         loadingMasterLookups={implementation.loadingMasterLookups}
