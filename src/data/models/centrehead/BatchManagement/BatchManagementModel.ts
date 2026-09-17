@@ -278,6 +278,7 @@ export interface IdentificationSheet {
   batchSize: number;
   bondingSheetNo: string;
   mixerType: string;
+  mixerTypeName?: string;
   numberOfPremix: number;
   remarks: string;
   materials: MaterialItem[];
@@ -285,6 +286,25 @@ export interface IdentificationSheet {
   mixerDetails?: string;
   prcApprovalDate: string;
 }
+
+const resolveMasterDataCode = (value: unknown): string => {
+  if (value == null) return "";
+  if (typeof value === "string") return value.trim();
+  if (typeof value === "object") {
+    return String((value as { code?: string }).code ?? "").trim();
+  }
+  return "";
+};
+
+export const formatMasterDataLabel = (value: {
+  mixerType?: string;
+  mixerTypeName?: string;
+  mixerDetails?: string;
+}): string => {
+  const name = String(value.mixerTypeName ?? "").trim();
+  if (name) return name;
+  return String(value.mixerType ?? value.mixerDetails ?? "").trim();
+};
 
 function serializeMaterialForApi(material: Record<string, any>): Record<string, unknown> {
   const fromDate = formatToIsoDateInput(
@@ -315,12 +335,13 @@ export function serializeIdentificationSheetForApi(
 ): Record<string, unknown> {
   if (!sheet || typeof sheet !== "object") return {};
 
+  const mixerCode = resolveMasterDataCode(sheet.mixerType ?? sheet.mixerDetails);
+
   const isDefaultEmpty =
     !sheet.date &&
     (!sheet.batchSize || sheet.batchSize === 0) &&
     !sheet.bondingSheetNo &&
-    !sheet.mixerType &&
-    !sheet.mixerDetails &&
+    !mixerCode &&
     !sheet.prcApprovalDate &&
     (sheet.numberOfPremix === 1 || sheet.numberOfPremix == null) &&
     !sheet.remarks &&
@@ -332,7 +353,7 @@ export function serializeIdentificationSheetForApi(
     date: formatToIsoDateInput(sheet.date ?? ""),
     batchSize: Number(sheet.batchSize) || 0,
     bondingSheetNo: sheet.bondingSheetNo ?? "",
-    mixerType: String(sheet.mixerType ?? sheet.mixerDetails ?? "").trim(),
+    mixerType: mixerCode ? { code: mixerCode } : null,
     numberOfPremix: sheet.numberOfPremix ?? 0,
     remarks: sheet.remarks ?? "",
     prcApprovalDate: formatToIsoDateInput(sheet.prcApprovalDate),
@@ -384,7 +405,11 @@ export function parseIdentificationSheetFromApi(
     date: formatToUiDate(sheet.date ?? ""),
     batchSize: sheet.batchSize ?? 0,
     bondingSheetNo: sheet.bondingSheetNo ?? "",
-    mixerType: sheet.mixerType ?? sheet.mixerDetails ?? "",
+    mixerType: resolveMasterDataCode(sheet.mixerType ?? sheet.mixerDetails),
+    mixerTypeName:
+      sheet.mixerType && typeof sheet.mixerType === "object"
+        ? String(sheet.mixerType.name ?? "").trim()
+        : "",
     numberOfPremix: sheet.numberOfPremix ?? 1,
     remarks: sheet.remarks ?? "",
     materials,
@@ -756,6 +781,9 @@ export const buildAdditionalBatchDetailsUpdatePayload = (
   batchForm: BatchFormState,
 ): Record<string, any> => {
   const base = mapBatchToFormState(existingBatch);
+  const motorIds = Array.isArray(batchForm.motorIds)
+    ? batchForm.motorIds.filter((id) => String(id ?? "").trim())
+    : [];
   return {
     ...base,
     batchType: batchForm.batchType,
@@ -763,8 +791,8 @@ export const buildAdditionalBatchDetailsUpdatePayload = (
     projectId: batchForm.projectId,
     motorStage: batchForm.motorStage,
     mixingCycleCode: batchForm.mixingCycleCode,
-    numberOfMotors: Array.isArray(batchForm.motorIds) ? batchForm.motorIds.length : 0,
-    motorIds: batchForm.motorIds,
+    numberOfMotors: motorIds.length,
+    motorIds,
     priority: batchForm.priority,
     systemManagerId: batchForm.systemManagerId,
     objective: batchForm.objective,
@@ -780,8 +808,13 @@ export const buildIdentificationUpdatePayload = (
   implForm: ImplementationFormState,
 ): Record<string, any> => {
   const base = mapBatchToFormState(existingBatch);
+  const motorIds = Array.isArray(base.motorIds)
+    ? base.motorIds.filter((id) => String(id ?? "").trim())
+    : [];
   return {
     ...base,
+    numberOfMotors: motorIds.length,
+    motorIds,
     identificationSheet: implForm.identificationSheet,
     identificationSheetStatus: IDENTIFICATION_SHEET_STATUS.COMPLETED,
     objective: implForm.objective ?? base.objective,

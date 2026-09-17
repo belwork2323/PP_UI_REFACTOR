@@ -66,10 +66,12 @@ export const serializeReferenceRange = (range: MasterDataReferenceRange | null |
     minValue: range.minValue,
     maxValue: range.maxValue,
   };
+  // Always persist display unit when known. unitId alone is ignored by specs that only store `unit`.
+  if (String(range.unit ?? "").trim()) {
+    payload.unit = String(range.unit).trim();
+  }
   if (range.unitId != null) {
     payload.unitId = range.unitId;
-  } else if (String(range.unit ?? "").trim()) {
-    payload.unit = String(range.unit).trim();
   }
   return payload;
 };

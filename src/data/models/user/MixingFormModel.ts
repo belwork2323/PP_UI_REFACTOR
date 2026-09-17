@@ -8,6 +8,7 @@ import {
 } from "../../../hooks/user/manufacturing/mixingConfig";
 import { OPERATION_STATUS } from "../../../hooks/operationStatus";
 import { normalizeApproverBatchStatus } from "../approver/ApproverBatchListModel";
+import { resolveMasterDataCode, resolveMasterDataName } from "../admin/BatchManagement/BatchManagementModel";
 import {
   getPremixStatusLabel,
   type PremixSubmissionStatus,
@@ -159,7 +160,7 @@ export const isMixCardApproverActionable = (
     .trim()
     .toUpperCase()
     .replace(/\s+/g, "_");
-  return normalized === "WAITING_FOR_APPROVAL" || normalized === "IN_PROGRESS";
+  return normalized === "WAITING_FOR_APPROVAL";
 };
 
 export type MixCardStatusMeta = {
@@ -786,9 +787,13 @@ export const mapMixingDetailsToFormState = (details: Partial<MixingDetails>): Mi
         {
           premixNo: premix.premixNo,
 
-          mixerType: String(
-            premix?.mixerConfiguration?.mixerId ?? identificationSheet?.mixerType ?? "",
-          ),
+          mixerType: (() => {
+            const saved = String(premix?.mixerConfiguration?.mixerId ?? "").trim();
+            const sheetCode = resolveMasterDataCode(identificationSheet?.mixerType);
+            const sheetName = resolveMasterDataName(identificationSheet?.mixerType);
+            if (saved && sheetCode && saved === sheetCode && sheetName) return sheetName;
+            return saved || sheetName || "";
+          })(),
           bldgNo: String(premix?.mixerConfiguration?.bldgNo ?? ""),
           bowlId: premix?.mixerConfiguration?.bowlId ?? "",
 
@@ -840,9 +845,13 @@ export const mapMixingDetailsToFormState = (details: Partial<MixingDetails>): Mi
 
           finalMixNo: resolveApiFinalMixNo(entry),
 
-          mixerType: String(
-            entry?.mixerConfiguration?.mixerId ?? identificationSheet?.mixerType ?? "",
-          ),
+          mixerType: (() => {
+            const saved = String(entry?.mixerConfiguration?.mixerId ?? "").trim();
+            const sheetCode = resolveMasterDataCode(identificationSheet?.mixerType);
+            const sheetName = resolveMasterDataName(identificationSheet?.mixerType);
+            if (saved && sheetCode && saved === sheetCode && sheetName) return sheetName;
+            return saved || sheetName || "";
+          })(),
           bldgNo: String(entry?.mixerConfiguration?.bldgNo ?? ""),
           bowlId: entry?.mixerConfiguration?.bowlId ?? "",
 

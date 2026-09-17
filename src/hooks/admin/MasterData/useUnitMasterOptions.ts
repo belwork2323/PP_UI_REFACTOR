@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
 import { fetchUnitList } from "@data/api/common/generalAPI";
-import type { AppDropdownOption } from "@ui/components/common/AppDropdown";
+
+/** Unit dropdown options always use string labels (compatible with AppDropdown and CasePrep selects). */
+export type UnitMasterOption = {
+  value: string;
+  label: string;
+};
 
 export default function useUnitMasterOptions(enabled: boolean) {
-  const [options, setOptions] = useState<AppDropdownOption[]>([]);
+  const [options, setOptions] = useState<UnitMasterOption[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {

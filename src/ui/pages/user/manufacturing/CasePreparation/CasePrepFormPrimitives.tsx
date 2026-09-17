@@ -198,13 +198,30 @@ export const FieldGrid = ({
 export const ReadOnlyField = ({
   label,
   value,
+  error,
 }: {
   label: string;
   value?: string | null;
+  error?: string;
 }) => (
   <Box>
     <FieldLabel>{label}</FieldLabel>
-    <WorkflowReadOnlyText value={value} sx={{ fontSize: "0.82rem", py: 0.75 }} />
+    <WorkflowReadOnlyText
+      value={value}
+      sx={{
+        fontSize: "0.82rem",
+        py: 0.75,
+        ...(error
+          ? {
+              borderColor: "error.main",
+              bgcolor: "rgba(211, 47, 47, 0.04)",
+            }
+          : null),
+      }}
+    />
+    {error ? (
+      <Typography sx={{ fontSize: "0.7rem", color: "error.main", mt: 0.5 }}>{error}</Typography>
+    ) : null}
   </Box>
 );
 

@@ -571,7 +571,10 @@ export interface IdentificationSheet {
   date: string;
   batchSize: number;
   bondingSheetNo: string;
+  /** Mixer master code (dropdown value). */
   mixerType: string;
+  /** Mixer display name from API object, when available. */
+  mixerTypeName?: string;
   numberOfPremix: number;
   remarks: string;
   materials: MaterialItem[];
@@ -647,18 +650,45 @@ function serializeMaterialForApi(material: Record<string, any>): Record<string, 
   };
 }
 
+/** API mixerType may be a code string or `{ id, code, name }`. */
+export type MasterDataRef =
+  | string
+  | { id?: number | null; code?: string | null; name?: string | null }
+  | null
+  | undefined;
+
+export const resolveMasterDataCode = (value: MasterDataRef): string => {
+  if (value == null) return "";
+  if (typeof value === "string") return value.trim();
+  return String(value.code ?? "").trim();
+};
+
+/** Prefer mixer/master display name; fall back to code when name is missing. */
+export const resolveMasterDataName = (value: MasterDataRef): string => {
+  if (value == null) return "";
+  if (typeof value === "string") return value.trim();
+  const name = String(value.name ?? "").trim();
+  if (name) return name;
+  return String(value.code ?? "").trim();
+};
+
+/** Display label for mixer/master refs — name only (never "Name (CODE)"). */
+export const formatMasterDataLabel = (value: MasterDataRef): string =>
+  resolveMasterDataName(value);
+
 /** Map form identification sheet to API request body */
 export function serializeIdentificationSheetForApi(
   sheet: Record<string, any> | null | undefined,
 ): Record<string, unknown> {
   if (!sheet || typeof sheet !== "object") return {};
 
+  const mixerCode = resolveMasterDataCode(sheet.mixerType ?? sheet.mixerDetails);
+
   const isDefaultEmpty =
     !sheet.date &&
     (!sheet.batchSize || sheet.batchSize === 0) &&
     !sheet.bondingSheetNo &&
-    !sheet.mixerType &&
-    !sheet.mixerDetails &&
+    !mixerCode &&
     !sheet.prcApprovalDate &&
     (sheet.numberOfPremix === 1 || sheet.numberOfPremix == null) &&
     !sheet.remarks &&
@@ -670,7 +700,8 @@ export function serializeIdentificationSheetForApi(
     date: formatToIsoDateInput(sheet.date ?? ""),
     batchSize: Number(sheet.batchSize) || 0,
     bondingSheetNo: sheet.bondingSheetNo ?? "",
-    mixerType: String(sheet.mixerType ?? sheet.mixerDetails ?? "").trim(),
+    // Backend accepts string or object; send object so code/name round-trip cleanly.
+    mixerType: mixerCode ? { code: mixerCode } : null,
     numberOfPremix: sheet.numberOfPremix ?? 0,
     remarks: sheet.remarks ?? "",
     prcApprovalDate: formatToIsoDateInput(sheet.prcApprovalDate),
@@ -722,7 +753,11 @@ export function parseIdentificationSheetFromApi(
     date: formatToUiDate(sheet.date ?? ""),
     batchSize: sheet.batchSize ?? 0,
     bondingSheetNo: sheet.bondingSheetNo ?? "",
-    mixerType: sheet.mixerType ?? sheet.mixerDetails ?? "",
+    mixerType: resolveMasterDataCode(sheet.mixerType ?? sheet.mixerDetails),
+    mixerTypeName:
+      sheet.mixerType && typeof sheet.mixerType === "object"
+        ? String(sheet.mixerType.name ?? "").trim()
+        : "",
     numberOfPremix: sheet.numberOfPremix ?? 1,
     remarks: sheet.remarks ?? "",
     materials,
@@ -1212,6 +1247,10 @@ export const buildAdditionalBatchDetailsUpdatePayload = (
     };
   }
 
+  const motorIds = Array.isArray(nextForm.motorIds)
+    ? nextForm.motorIds.filter((id) => String(id ?? "").trim())
+    : [];
+
   return {
     ...base,
     batchType: nextForm.batchType,
@@ -1219,8 +1258,9 @@ export const buildAdditionalBatchDetailsUpdatePayload = (
     projectId: nextForm.projectId,
     motorStage: nextForm.motorStage,
     mixingCycleCode: nextForm.mixingCycleCode,
-    numberOfMotors: nextForm.numberOfMotors,
-    motorIds: nextForm.motorIds,
+    // Form numberOfMotors is only a draft "add count" input — persist real motorIds length.
+    numberOfMotors: motorIds.length,
+    motorIds,
     priority: nextForm.priority,
     systemManagerId: nextForm.systemManagerId,
     objective: nextForm.objective,
@@ -1248,8 +1288,14 @@ export const buildIdentificationUpdatePayload = (
     );
   }
 
+  const motorIds = Array.isArray(base.motorIds)
+    ? base.motorIds.filter((id) => String(id ?? "").trim())
+    : [];
+
   return {
     ...base,
+    numberOfMotors: motorIds.length,
+    motorIds,
     identificationSheet,
     identificationSheetStatus: IDENTIFICATION_SHEET_STATUS.COMPLETED,
     objective: implForm.objective ?? base.objective,

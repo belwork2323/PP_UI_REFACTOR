@@ -46,7 +46,11 @@ import useRocketMotorCasingLookups from "./useRocketMotorCasingLookups";
 import { OPERATION_STATUS } from "../../operationStatus";
 import { useFileService } from "../../../hooks/useFileService";
 import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
-import { hasValidationErrors } from "../../../data/validation/validationErrors";
+import {
+  firstValidationError,
+  formatValidationDetailsMessage,
+  hasValidationErrors,
+} from "../../../data/validation/validationErrors";
 import type { ValidationAttemptFlags } from "../../../ui/components/validation/useValidationDisplay";
 import { flushCasingPendingDrafts } from "../../../ui/pages/user/sourcing/components/casing/casingPendingDrafts";
 
@@ -100,6 +104,7 @@ export const useRocketMotorCasingHook = () => {
   });
 
   const showAlert = useAlertStore.getState().showAlert;
+  const showValidationAlert = useAlertStore.getState().showValidationAlert;
   const user = useAuthStore((s) => s.user);
   const bumpBatchRefresh = useUserBatchRefreshStore((s) => s.bumpVersion);
   const { deleteTemp } = useFileService();
@@ -315,6 +320,18 @@ export const useRocketMotorCasingHook = () => {
       return STRINGS.SOURCING.CASING_FORM.FORM_NOT_FOUND;
     }
 
+    const fieldSummary =
+      formatValidationDetailsMessage(response?.errorDetails) ||
+      formatValidationDetailsMessage(response?.error) ||
+      formatValidationDetailsMessage(response?.data);
+    if (fieldSummary) {
+      const base =
+        response?.message && String(response.message).toLowerCase() !== "validation failed"
+          ? String(response.message)
+          : STRINGS.SOURCING.CASING_FORM.VALIDATION_FAILED;
+      return `${base} (${fieldSummary})`;
+    }
+
     return fromDetails || response?.message || fallback;
   };
 
@@ -403,6 +420,8 @@ export const useRocketMotorCasingHook = () => {
     setCasingForm(resolvedForm);
     setInitialSnapshot(serializeCasingForm(resolvedForm));
     setView("form");
+    // Always refresh lookups so master-data insulation type changes appear on edit/update.
+    void lookups.reload();
   };
 
   const batchToDetailsContext = (batch: RocketMotorBatch): RocketMotorCasingDetailsContext => ({
@@ -493,7 +512,8 @@ export const useRocketMotorCasingHook = () => {
     setDimensionalParametersErrorMessage("");
     setFetchingMotorParams(false);
     setView("form");
-    void lookups.ensureLoaded();
+    // Always refresh so newly added/updated insulation types from master data appear.
+    void lookups.reload();
   };
 
   useEffect(() => {
@@ -582,6 +602,19 @@ export const useRocketMotorCasingHook = () => {
     const nextValidationErrors = validateCasingFormErrors(formState, submissionType);
     if (Object.keys(nextValidationErrors).length > 0) {
       setValidationErrors(nextValidationErrors);
+      setValidationAttempt({ format: true, unit: true, submit: intent === "submit" });
+      const firstError = firstValidationError(nextValidationErrors);
+      showValidationAlert(
+        firstError
+          ? `${
+              intent === "draft"
+                ? STRINGS.SOURCING.CASING_FORM.DRAFT_VALIDATION_FAILED
+                : STRINGS.SOURCING.CASING_FORM.SUBMIT_VALIDATION_FAILED
+            } (${firstError})`
+          : intent === "draft"
+            ? STRINGS.SOURCING.CASING_FORM.DRAFT_VALIDATION_FAILED
+            : STRINGS.SOURCING.CASING_FORM.SUBMIT_VALIDATION_FAILED,
+      );
       return false;
     }
     setValidationErrors({});
@@ -775,16 +808,34 @@ export const useRocketMotorCasingHook = () => {
     setValidationAttempt((previous) => ({ ...previous, format: true, unit: true }));
     const unitErrors = validateRocketMotorCasing(formState, "UNIT");
     setValidationErrors(unitErrors);
-    return !hasValidationErrors(unitErrors);
-  }, []);
+    if (hasValidationErrors(unitErrors)) {
+      const firstError = firstValidationError(unitErrors);
+      showValidationAlert(
+        firstError
+          ? `${STRINGS.SOURCING.CASING_FORM.DRAFT_VALIDATION_FAILED} (${firstError})`
+          : STRINGS.SOURCING.CASING_FORM.DRAFT_VALIDATION_FAILED,
+      );
+      return false;
+    }
+    return true;
+  }, [showValidationAlert]);
   const validateBeforeSubmit = useCallback(() => {
     flushCasingPendingDrafts();
     const formState = snapshotStateRef.current;
     setValidationAttempt({ format: true, unit: true, submit: true });
     const submitErrors = validateRocketMotorCasing(formState, "SUBMIT");
     setValidationErrors(submitErrors);
-    return !hasValidationErrors(submitErrors);
-  }, []);
+    if (hasValidationErrors(submitErrors)) {
+      const firstError = firstValidationError(submitErrors);
+      showValidationAlert(
+        firstError
+          ? `${STRINGS.SOURCING.CASING_FORM.SUBMIT_VALIDATION_FAILED} (${firstError})`
+          : STRINGS.SOURCING.CASING_FORM.SUBMIT_VALIDATION_FAILED,
+      );
+      return false;
+    }
+    return true;
+  }, [showValidationAlert]);
 
   const canDeleteActiveCasing =
     formEntryMode !== "create" && canDeleteRocketMotorCasing(activeBatch?.rmStatus);

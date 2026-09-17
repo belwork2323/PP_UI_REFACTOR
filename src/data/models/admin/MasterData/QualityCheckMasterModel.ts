@@ -183,7 +183,13 @@ export const getQualityCheckFieldErrors = (
   }
   const paramIds = new Set<string>();
   errors.qualityChecks = form.qualityChecks.map((param) => {
-    if (isEdit && param.isExisting) return {};
+    if (isEdit && param.isExisting) {
+      const unitMissing =
+        param.specification.unitId == null && !String(param.specification.unit ?? "").trim();
+      if (!unitMissing) return {};
+      const label = param.parameterName.trim() || "parameter";
+      return { unit: `Unit is required for "${label}"` };
+    }
     const paramErrors: QualityCheckParamFieldErrors = {};
     const name = param.parameterName.trim();
     if (!name) {

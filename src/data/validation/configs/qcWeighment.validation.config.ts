@@ -34,7 +34,7 @@ export type QcWeighmentValidationTarget = {
 
 export const qcWeighmentValidationFields: Record<string, FieldRuleConfig> = {
   // Sheet: alphanumeric (letters, digits, - _ only)
-  weighscaleNo: text(["UNIT", "SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  weighscaleNo: text(["UNIT", "SUBMIT"], S.PATTERNS.MASTER_CODE),
   calibrationDueDate: date(["UNIT", "SUBMIT"]),
   weightKg: number(["SUBMIT"]),
 };

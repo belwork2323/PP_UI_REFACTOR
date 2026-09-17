@@ -35,8 +35,10 @@ import {
 } from "../../../data/models/user/NDTFormModel";
 import {
   validateNDTMotorSession,
+  firstNdtValidationError,
   type ValidationErrors as NDTValidationErrors,
 } from "../../../data/validation/adapters/ndt.validation";
+import { formatValidationDetailsMessage } from "../../../data/validation/validationErrors";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import {
   isMotorEnabledByPreviousStage,
@@ -205,6 +207,7 @@ export const useNDTHook = () => {
   const listParams = useSubdepartmentBatches("ndt");
   const user = useAuthStore((state) => state.user);
   const showAlert = useAlertStore((state) => state.showAlert);
+  const showValidationAlert = useAlertStore((state) => state.showValidationAlert);
   const bumpBatchRefresh = useUserBatchRefreshStore((state) => state.bumpVersion);
   const { deleteTemp } = useFileService();
 
@@ -282,6 +285,17 @@ export const useNDTHook = () => {
   }, [resetFlowDraft]);
 
   const getErrorMessage = (response: any, fallbackMessage: string) => {
+    const fieldSummary =
+      formatValidationDetailsMessage(response?.errorDetails) ||
+      formatValidationDetailsMessage(response?.error) ||
+      formatValidationDetailsMessage(response?.data);
+    if (fieldSummary) {
+      const base =
+        response?.message && String(response.message).toLowerCase() !== "validation failed"
+          ? String(response.message)
+          : messages.VALIDATION_FAILED;
+      return `${base} (${fieldSummary})`;
+    }
     const details = response?.error?.details;
     if (Array.isArray(details)) {
       const detailMessages = details
@@ -292,6 +306,16 @@ export const useNDTHook = () => {
     if (typeof details === "string" && details.trim()) return details;
     if (response?.message) return response.message;
     return fallbackMessage;
+  };
+
+  const notifyNdtValidationErrors = (
+    fieldErrors: NDTValidationErrors,
+    intent: "draft" | "submit",
+  ) => {
+    const firstError = firstNdtValidationError(fieldErrors);
+    const base =
+      intent === "draft" ? messages.DRAFT_VALIDATION_FAILED : messages.SUBMIT_VALIDATION_FAILED;
+    showValidationAlert(firstError ? `${base} (${firstError})` : base);
   };
 
   const refreshBatchLocks = useCallback(
@@ -724,12 +748,13 @@ export const useNDTHook = () => {
         return false;
       }
 
-      // UNIT on draft; SUBMIT on submit — red under fields, no field toast
+      // FORMAT on draft (type/pattern of filled fields); SUBMIT on submit — highlight + snackbar
       {
-        const tier = intent === "draft" ? "UNIT" : "SUBMIT";
+        const tier = intent === "draft" ? "FORMAT" : "SUBMIT";
         const fieldErrors = validateNDTMotorSession(motor, tier);
         if (Object.keys(fieldErrors).length > 0) {
           setMotorValidationErrors((prev) => ({ ...prev, [motorId]: fieldErrors }));
+          notifyNdtValidationErrors(fieldErrors, intent);
           return false;
         }
         setMotorValidationErrors((prev) => {
@@ -912,6 +937,7 @@ export const useNDTHook = () => {
       previousStageGate,
       refreshBatchLocks,
       showAlert,
+      showValidationAlert,
       subDepartmentId,
     ],
   );

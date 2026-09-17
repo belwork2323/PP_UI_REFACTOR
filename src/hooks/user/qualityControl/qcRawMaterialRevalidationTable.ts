@@ -159,7 +159,7 @@ export const buildRevalidationMaterialsPayload = (
     parameter: string;
     specification: string;
     result: string;
-    acemResult: string;
+    acemResult?: number | null;
     validity: string;
     remarks: string;
     qcCertificate: string[];
@@ -169,6 +169,13 @@ export const buildRevalidationMaterialsPayload = (
     .filter((row) => row._rowRole !== "picker")
     .filter((row) => !isEmptyRevalidationRow(row));
 
+  const toOptionalAcemNumber = (value: unknown): number | null | undefined => {
+    const text = String(value ?? "").trim();
+    if (!text) return null; // omit empty string — backend acemQcResult is Double
+    const num = Number(text.replace(/,/g, ""));
+    return Number.isFinite(num) ? num : undefined;
+  };
+
   const byIngredient = new Map<
     string,
     Array<{
@@ -176,27 +183,57 @@ export const buildRevalidationMaterialsPayload = (
       parameter: string;
       specification: string;
       result: string;
-      acemResult: string;
+      acemResult?: number | null;
       validity: string;
       remarks: string;
       qcCertificate: string[];
     }>
   >();
 
+  // Carry ingredient/lot across merged parameter rows in the same group.
+  const ingredientByGroup = new Map<string, string>();
+  const lotByGroup = new Map<string, string>();
   rows.forEach((row) => {
+    const groupId = String(row._groupId ?? "");
     const ingredient = String(row.INGREDIENT ?? "").trim();
+    const lot = String(row.LOT_BATCH_NUMBER ?? "").trim();
+    if (groupId && ingredient) ingredientByGroup.set(groupId, ingredient);
+    if (groupId && lot) lotByGroup.set(groupId, lot);
+  });
+
+  rows.forEach((row) => {
+    const groupId = String(row._groupId ?? "");
+    const ingredient =
+      String(row.INGREDIENT ?? "").trim() ||
+      (groupId ? ingredientByGroup.get(groupId) ?? "" : "");
     if (!ingredient) return;
     const list = byIngredient.get(ingredient) ?? [];
-    list.push({
-      lotBatchNumber: String(row.LOT_BATCH_NUMBER ?? "").trim(),
+    const acemResult = toOptionalAcemNumber(row.ACEM_QC_RESULT);
+    const detail: {
+      lotBatchNumber: string;
+      parameter: string;
+      specification: string;
+      result: string;
+      acemResult?: number | null;
+      validity: string;
+      remarks: string;
+      qcCertificate: string[];
+    } = {
+      lotBatchNumber:
+        String(row.LOT_BATCH_NUMBER ?? "").trim() ||
+        (groupId ? lotByGroup.get(groupId) ?? "" : ""),
       parameter: String(row.PARAMETER ?? "").trim(),
       specification: String(row.SPECIFICATION ?? "").trim(),
       result: String(row.RESULT ?? "").trim(),
-      acemResult: String(row.ACEM_QC_RESULT ?? "").trim(),
       validity: String(row.VALIDITY ?? "").trim(),
       remarks: String(row.REMARKS ?? "").trim(),
       qcCertificate: normalizeCertificateFileIds(row.QC_CERTIFICATE),
-    });
+    };
+    // Send null (not "") so Jackson can bind Double; skip non-numeric on draft.
+    if (acemResult !== undefined) {
+      detail.acemResult = acemResult;
+    }
+    list.push(detail);
     byIngredient.set(ingredient, list);
   });
 

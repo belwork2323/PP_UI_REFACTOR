@@ -33,15 +33,15 @@ export type QcNdtDivisionValidationTarget = {
 };
 
 export const qcNdtDivisionValidationFields: Record<string, FieldRuleConfig> = {
-  machineNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  machineNo: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
   noOfSections: number(["FORMAT", "SUBMIT"]),
   noOfOrientations: number(["FORMAT", "SUBMIT"]),
   normalExposures: number(["FORMAT", "SUBMIT"]),
   tangentialExposures: number(["FORMAT", "SUBMIT"]),
-  typeOfDefect: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  typeOfDefect: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   observations: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
-  location: text([], S.PATTERNS.ALPHANUMERIC),
-  visualObservation: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  location: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  visualObservation: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   uploadImage: file([]),
   signedReport: file(["SUBMIT"]),
   additionalRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),

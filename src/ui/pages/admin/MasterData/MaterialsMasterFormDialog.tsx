@@ -20,11 +20,13 @@ import getManufacturingTheme from "@app/theme/custom_themes/user/manufacturing/m
 import AdminManagementFormHeader from "@ui/components/custom/admin/AdminManagementFormHeader";
 import MasterDataEnableDisableField from "./components/MasterDataEnableDisableField";
 import CasePrepTextField from "@ui/pages/user/manufacturing/CasePreparation/CasePrepTextField";
-import CasePrepSelect from "@ui/pages/user/manufacturing/CasePreparation/CasePrepSelect";
+import CasePrepSelect, {
+  type CasePrepSelectOption,
+} from "@ui/pages/user/manufacturing/CasePreparation/CasePrepSelect";
 import CasePrepSearchableSelect from "@ui/pages/user/manufacturing/CasePreparation/CasePrepSearchableSelect";
 import {
+  createMaterialSpecForAdd,
   emptyMaterialGrade,
-  emptyMaterialSpec,
   getMaterialsFormFieldErrors,
   getMaterialsFormValidationMessage,
   PREPARATION_TYPE_OPTIONS,
@@ -41,7 +43,6 @@ import {
 import { visibleValidationError } from "./masterDataValidationUtils";
 import useUnitMasterOptions from "@hooks/admin/MasterData/useUnitMasterOptions";
 import type { MasterDataReferenceRange } from "@data/models/admin/MasterData/nestedMasterDataTypes";
-import type { AppDropdownOption } from "@ui/components/common/AppDropdown";
 
 const S = STRINGS.MASTER_DATA;
 
@@ -78,7 +79,7 @@ const SpecEditor = ({
   showErrors: boolean;
   specErrors?: MaterialSpecFieldErrors[];
   theme: any;
-  unitOptions: AppDropdownOption[];
+  unitOptions: CasePrepSelectOption[];
   onChange: (next: MaterialSpecForm[]) => void;
 }) => (
   <Stack spacing={1.5}>
@@ -224,7 +225,7 @@ const SpecEditor = ({
       size="small"
       startIcon={<icons.projectMgmt.add />}
       disabled={disabled}
-      onClick={() => onChange([...specs, emptyMaterialSpec()])}
+      onClick={() => onChange([...specs, createMaterialSpecForAdd(specs)])}
       sx={{ alignSelf: "flex-start" }}
     >
       Add specification
@@ -248,7 +249,7 @@ const GradeEditor = ({
   showErrors: boolean;
   gradeErrors?: MaterialGradeFieldErrors[];
   theme: any;
-  unitOptions: AppDropdownOption[];
+  unitOptions: CasePrepSelectOption[];
   onChange: (next: MaterialGradeForm[]) => void;
 }) => {
   const flowBar = theme?.manufacturing?.casePreparation?.flowBar ?? {};
@@ -383,7 +384,7 @@ const MaterialsMasterFormDialog = ({
 }: Props) => {
   const mode = useThemeStore((s) => s.mode);
   const fieldTheme = useMemo(() => getManufacturingTheme(mode), [mode]);
-  const flowBar = fieldTheme.manufacturing?.casePreparation?.flowBar ?? {};
+  const flowBar = fieldTheme.manufacturing.casePreparation.flowBar;
   const { options: unitOptions } = useUnitMasterOptions(open);
   const { modal } = t;
   const [showErrors, setShowErrors] = useState(false);
@@ -392,6 +393,12 @@ const MaterialsMasterFormDialog = ({
     isEdit ||
     form.rawMaterialType === "NORMAL" ||
     (form.rawMaterialType === "ACEM" && Boolean(form.preparationType));
+  const hasGrades = form.grades.length > 0;
+  const hasTopSpecs = form.specifications.length > 0;
+  // Mutual exclusivity: lock the empty side when the other has rows.
+  // If both somehow exist (legacy), keep both editable so one side can be cleared.
+  const gradesDisabled = saving || (hasTopSpecs && !hasGrades);
+  const specsDisabled = saving || (hasGrades && !hasTopSpecs);
   const fieldErrors = useMemo(
     () => getMaterialsFormFieldErrors(form, isEdit, existingCodes),
     [form, isEdit, existingCodes],
@@ -539,34 +546,52 @@ const MaterialsMasterFormDialog = ({
               <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
                 {S.MATERIALS.EDIT_NESTED_HINT}
               </Typography>
+            ) : (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1.5 }}>
+                {S.MATERIALS.STRUCTURE_HINT}
+              </Typography>
+            )}
+            {gradesDisabled && !saving ? (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                {S.MATERIALS.GRADES_LOCKED_HINT}
+              </Typography>
             ) : null}
             {showErrors && fieldErrors.form ? (
               <Typography variant="body2" color="error" sx={{ mb: 1 }}>{fieldErrors.form}</Typography>
             ) : null}
-            <GradeEditor
-              grades={form.grades}
-              disabled={saving}
-              isEdit={isEdit}
-              showErrors={showErrors}
-              gradeErrors={fieldErrors.grades}
-              theme={fieldTheme}
-              unitOptions={unitOptions}
-              onChange={(grades) => onChange({ ...form, grades })}
-            />
+            <Box sx={{ opacity: gradesDisabled && !saving ? 0.55 : 1, pointerEvents: gradesDisabled ? "none" : "auto" }}>
+              <GradeEditor
+                grades={form.grades}
+                disabled={gradesDisabled}
+                isEdit={isEdit}
+                showErrors={showErrors}
+                gradeErrors={fieldErrors.grades}
+                theme={fieldTheme}
+                unitOptions={unitOptions}
+                onChange={(grades) => onChange({ ...form, grades })}
+              />
+            </Box>
           </Box>
 
           <Box>
             <Typography sx={modal.fieldLabel}>Specifications</Typography>
-            <SpecEditor
-              specs={form.specifications}
-              disabled={saving}
-              isEdit={isEdit}
-              showErrors={showErrors}
-              specErrors={fieldErrors.specifications}
-              theme={fieldTheme}
-              unitOptions={unitOptions}
-              onChange={(specifications) => onChange({ ...form, specifications })}
-            />
+            {specsDisabled && !saving ? (
+              <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
+                {S.MATERIALS.SPECS_LOCKED_HINT}
+              </Typography>
+            ) : null}
+            <Box sx={{ opacity: specsDisabled && !saving ? 0.55 : 1, pointerEvents: specsDisabled ? "none" : "auto" }}>
+              <SpecEditor
+                specs={form.specifications}
+                disabled={specsDisabled}
+                isEdit={isEdit}
+                showErrors={showErrors}
+                specErrors={fieldErrors.specifications}
+                theme={fieldTheme}
+                unitOptions={unitOptions}
+                onChange={(specifications) => onChange({ ...form, specifications })}
+              />
+            </Box>
           </Box>
             </>
           ) : null}

@@ -18,10 +18,12 @@ export default function useEquipmentTypeOptions(enabled: boolean) {
       .then((items) => {
         if (cancelled) return;
         setOptions(
-          items.map((item) => ({
-            value: item.typeCode,
-            label: item.name || item.typeCode,
-          })),
+          items
+            .filter((item) => Boolean(item.typeCode))
+            .map((item) => ({
+              value: item.typeCode,
+              label: item.name || item.typeCode,
+            })),
         );
       })
       .finally(() => {

@@ -42,11 +42,16 @@ export type QcRawMaterialValidationTarget = {
 };
 
 export const qcRawMaterialValidationFields: Record<string, FieldRuleConfig> = {
-  lotBatchNumber: text(["UNIT", "SUBMIT"], S.PATTERNS.ALPHANUMERIC),
-  parameter: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
-  specification: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
-  result: number(["FORMAT", "SUBMIT"]),
-  acemQcResult: number(["FORMAT", "SUBMIT"]),
+  // Read-only lot ids from master (e.g. LOT-17) — allow hyphens
+  // Read-only lot from master — required on submit; draft allows empty via FORMAT tier
+  lotBatchNumber: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
+  // Parameter / Specs come from material master (may include °C, @, µ, etc.) — no format pattern
+  parameter: text(["SUBMIT"]),
+  specification: text(["SUBMIT"]),
+  // Analysed / ACEM results: require on submit only. Do not run number FORMAT checks on
+  // draft — analysed values may be non-numeric placeholders, and empty ACEM must not block.
+  result: text(["SUBMIT"]),
+  acemQcResult: number(["SUBMIT"]),
   validity: date(["SUBMIT"]),
   remarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   qcCertificate: file([]),

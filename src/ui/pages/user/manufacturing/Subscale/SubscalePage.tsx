@@ -11,13 +11,17 @@ import getManufacturingTheme from "../../../../../app/theme/custom_themes/user/m
 import { SUBSCALE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/subscale_theme";
 import useSubscaleHook from "../../../../../hooks/user/manufacturing/useSubscaleHook";
 import { STRINGS } from "../../../../../app/config/strings";
-import validateSubscale from "@/data/validation/adapters/subscale.validation";
+import validateSubscale, {
+  firstSubscaleValidationError,
+} from "@/data/validation/adapters/subscale.validation";
+import { useAlertStore } from "../../../../../app/store/alertStore";
 
 const SubscalePage = () => {
   const mode = useThemeStore((state) => state.mode);
   const theme = useMemo(() => getManufacturingTheme(mode), [mode]);
   const actionStrings = STRINGS.SOURCING.SPECIFICATION_FORM;
   const S = STRINGS.MANUFACTURING.SUBSCALE;
+  const showValidationAlert = useAlertStore((state) => state.showValidationAlert);
 
   const [draftConfirmOpen, setDraftConfirmOpen] = useState(false);
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
@@ -50,23 +54,31 @@ const SubscalePage = () => {
 
   const listLoading = loading && !loadingFormDetails && view === "list";
 
+  const notifySubscaleValidationErrors = (
+    errors: Record<string, string>,
+    intent: "draft" | "submit",
+  ) => {
+    const firstError = firstSubscaleValidationError(errors);
+    const base =
+      intent === "draft" ? S.DRAFT_VALIDATION_FAILED : S.SUBMIT_VALIDATION_FAILED;
+    showValidationAlert(firstError ? `${base} (${firstError})` : base);
+  };
+
+  const buildValidationPayload = () => ({
+    ...formData.schemaFormValues,
+    batchType: activeBatch.batchType,
+    subBatchType: batchDetails.subBatchType,
+  });
+
   const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const errors = validateSubscale(
-      {
-        ...formData.schemaFormValues,
-        batchType: activeBatch.batchType,
-        subBatchType: batchDetails.subBatchType,
-      },
-      "UNIT",
-    );
+    const errors = validateSubscale(buildValidationPayload(), "SUBMIT");
     if (errors && Object.keys(errors).length > 0) {
       setValidationErrors(errors);
-      console.warn("Validation failed. Dialog will not open.", errors);
+      notifySubscaleValidationErrors(errors, "submit");
       return;
     }
     setValidationErrors({});
-    console.log("Validation passed, opening confirmation:", formData);
     setSubmitConfirmOpen(true);
   };
 
@@ -81,21 +93,14 @@ const SubscalePage = () => {
   };
 
   const handleDraftValidation = async () => {
-    const errors = validateSubscale(
-      {
-        ...formData.schemaFormValues,
-        batchType: activeBatch.batchType,
-        subBatchType: batchDetails.subBatchType,
-      },
-      "UNIT",
-    );
+    // FORMAT: only validate filled values; empty fields do not block draft save.
+    const errors = validateSubscale(buildValidationPayload(), "FORMAT");
     if (errors && Object.keys(errors).length > 0) {
       setValidationErrors(errors);
-      console.warn("Draft validation failed. Dialog will not open.", errors);
+      notifySubscaleValidationErrors(errors, "draft");
       return;
     }
     setValidationErrors({});
-    console.log("Draft validation passed, opening confirmation:", formData);
     setDraftConfirmOpen(true);
   };
   const clearFieldError = (ruleKey: string) => {

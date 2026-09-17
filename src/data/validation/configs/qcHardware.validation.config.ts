@@ -50,8 +50,8 @@ export const qcHardwareValidationFields: Record<string, FieldRuleConfig> = {
   cutObservations: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 
   // Preheating (extra process)
-  ovenNumber: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
-  buildingNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  ovenNumber: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
+  buildingNo: text(["SUBMIT"], S.PATTERNS.BUILDING_CODE),
   temperature: number(["SUBMIT"]),
   vacuumLevel: number(["SUBMIT"]),
 
@@ -73,10 +73,29 @@ const asRecord = (v: unknown): Record<string, unknown> | null =>
 
 const asArray = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
+/** Resolve bare or section-scoped keys (`DISPATCH_DETAILS::HE_PUNCTURES`). */
+const pickValue = (values: Record<string, unknown>, ...fieldIds: string[]): unknown => {
+  for (const id of fieldIds) {
+    if (values[id] !== undefined && values[id] !== null) return values[id];
+  }
+  for (const [key, value] of Object.entries(values)) {
+    for (const id of fieldIds) {
+      if (key === id || key.endsWith(`::${id}`)) return value;
+    }
+  }
+  return undefined;
+};
+
 const findTableRows = (values: Record<string, unknown>, tableIds: string[]): Record<string, unknown>[] => {
   for (const id of tableIds) {
-    const arr = asArray(values[id]);
-    if (arr.length) return arr.map((r) => asRecord(r) ?? {});
+    const direct = asArray(values[id]);
+    if (direct.length) return direct.map((r) => asRecord(r) ?? {});
+    for (const [key, value] of Object.entries(values)) {
+      if (key === id || key.endsWith(`::${id}`)) {
+        const arr = asArray(value);
+        if (arr.length) return arr.map((r) => asRecord(r) ?? {});
+      }
+    }
   }
   return [];
 };
@@ -172,16 +191,40 @@ export const qcHardwareValidationConfig: SubDeptValidationConfig<QcHardwareValid
     }
 
     if (sub === "DISPATCH") {
-      fields.push({ path: "HE_PUNCTURES", value: values.HE_PUNCTURES, ruleKey: "hePunctures" });
-      fields.push({ path: "NE_PUNCTURES", value: values.NE_PUNCTURES, ruleKey: "nePunctures" });
-      fields.push({ path: "LF_PUNCTURES", value: values.LF_PUNCTURES, ruleKey: "lfPunctures" });
+      const hePunctures = pickValue(values, "HE_PUNCTURES");
+      const nePunctures = pickValue(values, "NE_PUNCTURES");
+      const lfPunctures = pickValue(values, "LF_PUNCTURES");
+      const dispatchDateTime = pickValue(values, "DISPATCH_DATE_TIME");
+      fields.push({ path: "HE_PUNCTURES", value: hePunctures, ruleKey: "hePunctures" });
+      fields.push({ path: "NE_PUNCTURES", value: nePunctures, ruleKey: "nePunctures" });
+      fields.push({ path: "LF_PUNCTURES", value: lfPunctures, ruleKey: "lfPunctures" });
       fields.push({
         path: "DISPATCH_DATE_TIME",
-        value: values.DISPATCH_DATE_TIME,
+        value: dispatchDateTime,
         ruleKey: "dispatchDateTime",
       });
-      const vis = asArray(values.VISUAL_OBSERVATIONS ?? values.visualObservations);
-      vis.forEach((item, i) => {
+      const vis = findTableRows(values, [
+        "VISUAL_OBSERVATIONS",
+        "DISPATCH_VISUAL_OBSERVATIONS",
+        "QC_HARDWARE_DISPATCH_VISUAL_OBSERVATIONS",
+      ]);
+      // Also accept any ::-scoped visual observation table
+      const scopedVis =
+        vis.length > 0
+          ? vis
+          : (() => {
+              for (const [key, value] of Object.entries(values)) {
+                if (!key.toUpperCase().includes("VISUAL")) continue;
+                const arr = asArray(value);
+                if (!arr.length) continue;
+                const sample = asRecord(arr[0]);
+                if (sample && ("OBSERVATIONS" in sample || "PARAMETER" in sample)) {
+                  return arr.map((r) => asRecord(r) ?? {});
+                }
+              }
+              return [] as Record<string, unknown>[];
+            })();
+      scopedVis.forEach((item, i) => {
         const row = asRecord(item) ?? {};
         fields.push({
           path: `VISUAL_OBSERVATIONS.${i}.OBSERVATIONS`,
@@ -201,7 +244,9 @@ export const qcHardwareValidationConfig: SubDeptValidationConfig<QcHardwareValid
         return true;
       }
     }
-    return Boolean(str(values.DISPATCH_DATE_TIME) || str(values.HE_PUNCTURES));
+    return Boolean(
+      str(pickValue(values, "DISPATCH_DATE_TIME")) || str(pickValue(values, "HE_PUNCTURES")),
+    );
   },
 };
 

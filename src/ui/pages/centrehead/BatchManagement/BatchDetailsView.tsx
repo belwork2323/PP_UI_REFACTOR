@@ -26,6 +26,10 @@ import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
 import type { BatchListItemModel } from "@data/models/centrehead/BatchManagement/BatchManagementModel";
 import {
+  formatMasterDataLabel,
+  mixingCycleLabel,
+} from "@data/models/centrehead/BatchManagement/BatchManagementModel";
+import {
   getBatchId,
   getMotorId,
   getMotorStage,
@@ -33,7 +37,6 @@ import {
   getStatus,
   getSystemManagerLabel,
 } from "@utils/batchManagementUtils";
-import { mixingCycleLabel } from "@data/models/centrehead/BatchManagement/BatchManagementModel";
 
 const S = STRINGS.BATCH_MANAGEMENT.DETAILS;
 
@@ -179,7 +182,7 @@ const BatchDetailsView = ({ open, loading, batch, onClose, t }: BatchDetailsView
         { label: S.SHEET_DATE, value: formatDate(sheet.date) },
         { label: S.BATCH_SIZE, value: displayValue(sheet.batchSize) },
         { label: S.BONDING_SHEET_NO, value: displayValue(sheet.bondingSheetNo) },
-        { label: S.MIXER_TYPE, value: displayValue(sheet.mixerType ?? sheet.mixerDetails) },
+        { label: S.MIXER_TYPE, value: displayValue(formatMasterDataLabel(sheet)) },
         { label: S.NUMBER_OF_PREMIX, value: displayValue(sheet.numberOfPremix) },
         { label: S.PRC_APPROVAL_DATE, value: formatDate(sheet.prcApprovalDate) },
         { label: S.REMARKS, value: displayValue(sheet.remarks) },

@@ -81,6 +81,21 @@ const ParametersEditor = ({
     <Typography variant="subtitle2">{S.QUALITY_CHECKS.PARAMETERS}</Typography>
     {params.map((param, idx) => {
       const locked = isEdit && Boolean(param.isExisting);
+      const unitMissing =
+        param.specification.unitId == null && !String(param.specification.unit ?? "").trim();
+      // Allow selecting unit when it was never saved; other fields stay locked.
+      const unitLocked = locked && !unitMissing;
+      const resolvedUnitValue = (() => {
+        if (param.specification.unitId != null) {
+          return String(param.specification.unitId);
+        }
+        const unitLabel = String(param.specification.unit ?? "").trim().toLowerCase();
+        if (!unitLabel) return "";
+        const match = unitOptions.find(
+          (item) => String(item.label ?? "").trim().toLowerCase() === unitLabel,
+        );
+        return match ? String(match.value) : "";
+      })();
       const rawErr = paramErrors?.[idx];
       const nameError = visibleValidationError(
         rawErr?.parameterName,
@@ -218,9 +233,9 @@ const ParametersEditor = ({
               <Box>
                 <CasePrepSearchableSelect
                   label={S.QUALITY_CHECKS.PARAM_UNIT}
-                  value={param.specification.unitId != null ? String(param.specification.unitId) : ""}
+                  value={resolvedUnitValue}
                   placeholder="Select unit"
-                  disabled={disabled || locked || unitLoading}
+                  disabled={disabled || unitLocked || unitLoading}
                   options={unitOptions}
                   width="100%"
                   theme={theme}

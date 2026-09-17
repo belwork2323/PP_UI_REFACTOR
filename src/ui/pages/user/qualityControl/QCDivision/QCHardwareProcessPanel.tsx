@@ -636,8 +636,10 @@ const QCHardwareProcessPanel = ({
                       );
                     }}
                     sx={tableFieldSx}
+                    error={Boolean(fieldError(validationErrors ?? undefined, field.key))}
                   />
                 )}
+                <FieldErrorText message={fieldError(validationErrors ?? undefined, field.key)} />
               </Box>
             ))}
             <Box sx={{ flex: "1 1 280px", minWidth: 240 }}>
@@ -672,8 +674,12 @@ const QCHardwareProcessPanel = ({
                   }
                   placeholder="DD-MM-YYYY HH:mm"
                   inputSx={tableDateTimeFieldSx}
+                  error={Boolean(fieldError(validationErrors ?? undefined, "DISPATCH_DATE_TIME"))}
                 />
               )}
+              <FieldErrorText
+                message={fieldError(validationErrors ?? undefined, "DISPATCH_DATE_TIME")}
+              />
             </Box>
           </Stack>
           <Box

@@ -112,96 +112,104 @@ const ParameterRowsEditor = ({
             opacity: locked && !row.isActive ? 0.72 : 1,
           }}
         >
-          <Stack spacing={1.25}>
-            <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <Typography variant="subtitle2">
-                {locked
-                  ? `${S.DIMENSIONAL_PARAMETERS.EXISTING_PARAMETER_LABEL}: ${row.paramName}`
-                  : S.DIMENSIONAL_PARAMETERS.PARAMETER_ROW_LABEL(index + 1)}
-              </Typography>
-              {!locked && (!isEditMode ? rows.length > 1 : true) ? (
-                <IconButton
-                  size="small"
-                  disabled={disabled}
-                  onClick={() => onChange(rows.filter((_, idx) => idx !== index))}
-                  aria-label={S.DIMENSIONAL_PARAMETERS.REMOVE_PARAMETER}
-                >
-                  <icons.Delete fontSize="small" />
-                </IconButton>
-              ) : null}
-            </Box>
-
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+                md: "minmax(160px, 1.4fr) 90px 90px minmax(120px, 160px) auto auto",
+              },
+              gap: 1.25,
+              alignItems: "flex-end",
+            }}
+          >
+            {locked ? (
+              <Box sx={{ pb: 0.5 }}>
+                <Typography variant="caption" color="text.secondary" display="block">
+                  {S.DIMENSIONAL_PARAMETERS.EXISTING_PARAMETER_LABEL}
+                </Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                  {row.paramName}
+                </Typography>
+              </Box>
+            ) : (
+              <CasePrepTextField
+                label={S.DIMENSIONAL_PARAMETERS.COL_NAME}
+                required={editable}
+                value={row.paramName}
+                disabled={disabled || locked}
+                error={Boolean(nameError)}
+                helperText={nameError}
+                width="100%"
+                theme={theme}
+                onChange={(value) => updateRow({ paramName: value })}
+              />
+            )}
             <CasePrepTextField
-              label={S.DIMENSIONAL_PARAMETERS.COL_NAME}
-              required={editable}
-              value={row.paramName}
+              label={S.DIMENSIONAL_PARAMETERS.COL_MIN}
+              value={row.minValue != null ? String(row.minValue) : ""}
               disabled={disabled || locked}
-              error={Boolean(nameError)}
-              helperText={nameError}
+              error={Boolean(minError)}
+              helperText={minError}
               width="100%"
               theme={theme}
-              onChange={(value) => updateRow({ paramName: value })}
+              onChange={(value) =>
+                updateRow({
+                  minValue: value === "" ? null : Number(value),
+                })
+              }
             />
-
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", sm: "1fr 1fr 1fr" },
-                gap: 1.25,
+            <CasePrepTextField
+              label={S.DIMENSIONAL_PARAMETERS.COL_MAX}
+              value={row.maxValue != null ? String(row.maxValue) : ""}
+              disabled={disabled || locked}
+              error={Boolean(maxError)}
+              helperText={maxError}
+              width="100%"
+              theme={theme}
+              onChange={(value) =>
+                updateRow({
+                  maxValue: value === "" ? null : Number(value),
+                })
+              }
+            />
+            <CasePrepSearchableSelect
+              label={S.DIMENSIONAL_PARAMETERS.COL_UNIT}
+              value={row.unitId}
+              placeholder="Select unit"
+              disabled={disabled || locked || unitLoading}
+              options={unitOptions}
+              width="100%"
+              theme={theme}
+              onChange={(value) => {
+                const option = unitOptions.find((item) => item.value === value);
+                updateRow({
+                  unitId: value,
+                  unit: option ? String(option.label ?? "") : "",
+                });
               }}
-            >
-              <CasePrepTextField
-                label={S.DIMENSIONAL_PARAMETERS.COL_MIN}
-                value={row.minValue != null ? String(row.minValue) : ""}
-                disabled={disabled || locked}
-                error={Boolean(minError)}
-                helperText={minError}
-                width="100%"
-                theme={theme}
-                onChange={(value) =>
-                  updateRow({
-                    minValue: value === "" ? null : Number(value),
-                  })
-                }
-              />
-              <CasePrepTextField
-                label={S.DIMENSIONAL_PARAMETERS.COL_MAX}
-                value={row.maxValue != null ? String(row.maxValue) : ""}
-                disabled={disabled || locked}
-                error={Boolean(maxError)}
-                helperText={maxError}
-                width="100%"
-                theme={theme}
-                onChange={(value) =>
-                  updateRow({
-                    maxValue: value === "" ? null : Number(value),
-                  })
-                }
-              />
-              <CasePrepSearchableSelect
-                label={S.DIMENSIONAL_PARAMETERS.COL_UNIT}
-                value={row.unitId}
-                placeholder="Select unit"
-                disabled={disabled || locked || unitLoading}
-                options={unitOptions}
-                width="100%"
-                theme={theme}
-                onChange={(value) => {
-                  const option = unitOptions.find((item) => item.value === value);
-                  updateRow({
-                    unitId: value,
-                    unit: option ? String(option.label ?? "") : "",
-                  });
-                }}
-              />
-            </Box>
-
+            />
             <MasterDataEnableDisableField
               checked={row.isActive}
               disabled={disabled}
+              labelVariant="caption"
+              confirmName={row.paramName || "parameter"}
               onChange={(checked) => updateRow({ isActive: checked })}
             />
-          </Stack>
+            {!locked && (!isEditMode ? rows.length > 1 : true) ? (
+              <IconButton
+                size="small"
+                disabled={disabled}
+                onClick={() => onChange(rows.filter((_, idx) => idx !== index))}
+                aria-label={S.DIMENSIONAL_PARAMETERS.REMOVE_PARAMETER}
+                sx={{ mb: 0.5 }}
+              >
+                <icons.Delete fontSize="small" />
+              </IconButton>
+            ) : (
+              <Box sx={{ width: 40 }} />
+            )}
+          </Box>
         </Box>
       );
     })}

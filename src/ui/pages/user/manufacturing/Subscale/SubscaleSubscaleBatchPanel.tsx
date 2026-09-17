@@ -44,6 +44,7 @@ import {
   type ProcessParticularRow,
 } from "../../../../../hooks/user/manufacturing/subscaleBatchConfig";
 import { useBuildingOptions } from "../../../../../hooks/user/useBuildingOptions";
+import { resolveMasterDataName } from "../../../../../data/models/admin/BatchManagement/BatchManagementModel";
 import type { SchemaFormValues } from "../../../../../schema-engine";
 import { sectionCardSx, sectionHeaderSx } from "./utils/subscaleHardwareTableStyles";
 import { SubscaleProcessParticularRow } from "./components/SubscaleTableCells";
@@ -222,7 +223,7 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
     if (!batchDetails?.identificationSheet) return;
     const sheet = batchDetails.identificationSheet;
     const batchSize = sheet.batchSize;
-    const mixerType = sheet.mixerType;
+    const mixerType = resolveMasterDataName(sheet.mixerType);
 
     const nextBatchSize = String(values[SUBSCALE_BATCH_FIELDS.BATCH_SIZE] ?? "").trim();
     const nextMixerType = String(values.mixerType ?? "").trim();
@@ -678,7 +679,11 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
           <FormInput
             disabled
             label={<FieldLabelWithAsterisk label="Mixer Type" required />}
-            value={values.mixerType || batchDetails?.identificationSheet?.mixerType || ""}
+            value={
+              values.mixerType ||
+              resolveMasterDataName(batchDetails?.identificationSheet?.mixerType) ||
+              ""
+            }
           />
 
           <AppDropdown

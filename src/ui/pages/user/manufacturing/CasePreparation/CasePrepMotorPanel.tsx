@@ -728,10 +728,12 @@ const CasePrepMotorPanel = ({
           <ReadOnlyField
             label="Type of Casing"
             value={abrading.typeOfCasing || casingType}
+            error={err("abradingOperation.typeOfCasing")}
           />
           <ReadOnlyField
             label="Type of Insulation"
             value={abrading.typeOfInsulation || insulationType}
+            error={err("abradingOperation.typeOfInsulation")}
           />
           <Box>
             <CasePrepSelect
@@ -743,6 +745,7 @@ const CasePrepMotorPanel = ({
               disabled={disabled} readOnly={readOnly}
               required
               theme={theme}
+              error={Boolean(err("abradingOperation.abradingWheelType"))}
             />
             <FieldErrorText message={err("abradingOperation.abradingWheelType")} />
           </Box>

@@ -185,16 +185,22 @@ export const buildDimensionalParameterCreatePayload = (
   motorType: number,
   row: DimensionalParameterRowForm,
   unitOptions: AppDropdownOption[],
-) => ({
-  name: row.paramName.trim(),
-  isActive: row.isActive,
-  attributes: {
+) => {
+  const unit = resolveUnitSymbol(row.unitId, row.unit, unitOptions);
+  const attributes: Record<string, unknown> = {
     motorType,
     minValue: row.minValue,
     maxValue: row.maxValue,
-    unit: resolveUnitSymbol(row.unitId, row.unit, unitOptions),
-  },
-});
+  };
+  if (unit) {
+    attributes.unit = unit;
+  }
+  return {
+    name: row.paramName.trim(),
+    isActive: row.isActive,
+    attributes,
+  };
+};
 
 export const buildDimensionalParameterActiveUpdatePayload = (
   motorType: number,

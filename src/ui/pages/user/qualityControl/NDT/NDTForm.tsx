@@ -117,8 +117,8 @@ const NDTForm = ({
       previousStage: STRINGS.MANUFACTURING.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
       sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
       notYetUnlocked: STRINGS.MANUFACTURING.NOT_YET_UNLOCKED,
-    }, batch, SUB_DEPT.NDT);
-  }, [batch, motorCards, previousStageGate, getMotorStatus, motorStatusById]);
+    }, activeBatch, SUB_DEPT.NDT);
+  }, [activeBatch, motorCards, previousStageGate, getMotorStatus, motorStatusById]);
 
   const safeBeamEnergies = Array.isArray(formData.beamEnergies) ? formData.beamEnergies : [];
   const safeEquipment = useMemo(() => {

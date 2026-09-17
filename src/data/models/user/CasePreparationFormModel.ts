@@ -578,7 +578,7 @@ export const getCasePrepStaticLabelIndex = (): CasePrepSchemaLabelIndex => ({
   },
   blocks: {
     abradingConfigurationHeading: "Abrading Configuration",
-    typeOfCasing: "Type of Casting",
+    typeOfCasing: "Type of Casing",
     typeOfInsulation: "Type of Insulation",
     abradingWheelType: "Abrading Wheel Type",
     abradingDetails: "Abrading Details",

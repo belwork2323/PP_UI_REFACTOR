@@ -380,9 +380,59 @@ export const useQCDivisionHook = () => {
   const listParams = useSubdepartmentBatches("qc-division");
   const user = useAuthStore((state) => state.user);
   const showAlert = useAlertStore((state) => state.showAlert);
+  const showValidationAlert = useAlertStore((state) => state.showValidationAlert);
   const bumpBatchRefresh = useUserBatchRefreshStore((state) => state.bumpVersion);
   const { deleteTemp } = useFileService();
   const messages = STRINGS.QUALITY_CONTROL.QC_DIVISION;
+
+  const notifyQcValidationErrors = (
+    errorsByEntryId: Record<string, ValidationErrors>,
+    intent: "draft" | "submit" | "division",
+  ) => {
+    let firstPath = "";
+    let firstMessage = "";
+    for (const entryErrors of Object.values(errorsByEntryId)) {
+      const keys = Object.keys(entryErrors ?? {});
+      if (!keys.length) continue;
+      firstPath = keys[0];
+      firstMessage = String(entryErrors[keys[0]] ?? "").trim();
+      break;
+    }
+    const base =
+      intent === "draft"
+        ? messages.DRAFT_VALIDATION_FAILED
+        : intent === "division"
+          ? messages.DIVISION_VALIDATION_FAILED
+          : messages.SUBMIT_VALIDATION_FAILED;
+    const detail =
+      firstPath && firstMessage
+        ? `${firstPath}: ${firstMessage}`
+        : firstMessage || firstPath;
+    showValidationAlert(detail ? `${base} (${detail})` : base);
+  };
+
+  const applyQcValidationFailure = (
+    errorsByEntryId: Record<string, ValidationErrors>,
+    intent: "draft" | "submit" | "division",
+  ) => {
+    setEntryValidationErrors((prev) => ({ ...prev, ...errorsByEntryId }));
+    notifyQcValidationErrors(errorsByEntryId, intent);
+
+    const container = document.querySelector('[data-testid="qc-form-container"]');
+    if (!(container instanceof HTMLElement)) return;
+
+    let firstFieldPath: string | null = null;
+    for (const entryErrors of Object.values(errorsByEntryId)) {
+      const keys = Object.keys(entryErrors ?? {});
+      if (keys.length) {
+        firstFieldPath = keys[0];
+        break;
+      }
+    }
+    if (firstFieldPath) {
+      focusFieldByPath(firstFieldPath, container);
+    }
+  };
 
   const subDepartmentId = useMemo(
     () =>
@@ -5696,18 +5746,20 @@ export const useQCDivisionHook = () => {
         : formDataRef.current;
 
     if (!hasDivisionEntries(submitFormState) && !submitFormState.schemaFormLoaded) {
+      showAlert(messages.EMPTY_FORM_ERROR, "warning");
       return false;
     }
 
     // Do not yellow-toast "enter at least one QC value" — field-level red errors handle mandatory checks.
 
-    if (hasIncompleteQcFormUploads(submitFormState)) {
+    // Optional certificate uploads must not block Save as Draft (failed/uploading).
+    if (intent !== "draft" && hasIncompleteQcFormUploads(submitFormState)) {
       showAlert(STRINGS.QUALITY_CONTROL.NDT.FILE_UPLOAD_PENDING, "warning");
       return false;
     }
 
-    // Field validation: UNIT on draft, SUBMIT on final unit submit
-    const validationTier: ValidationTier = intent === "draft" ? "UNIT" : "SUBMIT";
+    // FORMAT on draft (filled values only); SUBMIT on unit / division submit
+    const validationTier: ValidationTier = intent === "draft" ? "FORMAT" : "SUBMIT";
     // Prefer scoped entries; fall back to full form so validation never no-ops.
     const liveForm = formDataRef.current;
     let entriesToValidate = submitFormState.divisionEntries ?? [];
@@ -5761,29 +5813,7 @@ export const useQCDivisionHook = () => {
       return false;
     }
     if (!validationOk) {
-      setEntryValidationErrors((prev) => ({ ...prev, ...errorsByEntryId }));
-
-      // Focus on the first invalid field
-      const container = document.querySelector('[data-testid="qc-form-container"]');
-      if (container) {
-        // Find the first field with an error
-        let firstFieldPath = null;
-        for (const entryId in errorsByEntryId) {
-          const entryErrors = errorsByEntryId[entryId];
-          if (entryErrors && Object.keys(entryErrors).length > 0) {
-            const firstErrorField = Object.keys(entryErrors)[0];
-            if (firstErrorField) {
-              firstFieldPath = firstErrorField;
-              break;
-            }
-          }
-        }
-        if (firstFieldPath) {
-          focusFieldByPath(firstFieldPath, container);
-        }
-      }
-
-      // Field-level red errors only — no yellow "enter at least one value" popup
+      applyQcValidationFailure(errorsByEntryId, intent === "draft" ? "draft" : "submit");
       return false;
     }
     // Clear errors for entries that passed
@@ -5805,6 +5835,10 @@ export const useQCDivisionHook = () => {
       unitSubmissionType,
       divisionSubmissionType,
     });
+    if (!payload.divisionDetails?.length) {
+      showAlert(messages.EMPTY_FORM_ERROR, "warning");
+      return false;
+    }
     const isCreateFlow =
       activeBatch.qcStatus === QUALITY_CONTROL_STATUS.TO_BE_INITIATED && !activeBatch.formId;
 
@@ -5981,29 +6015,7 @@ export const useQCDivisionHook = () => {
         },
       );
       if (!validation.ok) {
-        setEntryValidationErrors((prev) => ({
-          ...prev,
-          ...validation.errorsByEntryId,
-        }));
-        // Focus on the first invalid field
-        const containerElement = document.querySelector('[data-testid="qc-form-container"]');
-        if (containerElement && containerElement instanceof HTMLElement) {
-          // Find the first field with an error
-          let firstFieldPath = null;
-          for (const entryId in validation.errorsByEntryId) {
-            const entryErrors = validation.errorsByEntryId[entryId];
-            if (entryErrors && Object.keys(entryErrors).length > 0) {
-              const firstErrorField = Object.keys(entryErrors)[0];
-              if (firstErrorField) {
-                firstFieldPath = firstErrorField;
-                break;
-              }
-            }
-          }
-          if (firstFieldPath) {
-            focusFieldByPath(firstFieldPath, containerElement);
-          }
-        }
+        applyQcValidationFailure(validation.errorsByEntryId, "division");
         return false;
       }
     }
@@ -6013,6 +6025,7 @@ export const useQCDivisionHook = () => {
     if (!hasUnits) {
       // Divisions without unit nav (e.g. Raw Material Revalidation): send active tab only.
       if (!hasDivisionEntries(submitFormState) && !submitFormState.schemaFormLoaded) {
+        showAlert(messages.EMPTY_FORM_ERROR, "warning");
         return false;
       }
       // Field validation below replaces the yellow "enter at least one QC value" gate.

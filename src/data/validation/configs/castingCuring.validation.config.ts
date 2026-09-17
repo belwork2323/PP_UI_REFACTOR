@@ -297,7 +297,8 @@ export const castingCuringFieldRules = {
     valueType: "text" as const,
     requiredIn: ["SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.ALPHANUMERIC,
+    // Dropdown stores building code (e.g. BLD-1), not display name (14G)
+    pattern: S.PATTERNS.BUILDING_CODE,
     maxLength: 50,
   },
   deCoringLoad: {

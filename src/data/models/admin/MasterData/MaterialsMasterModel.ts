@@ -111,6 +111,21 @@ export const emptyMaterialSpec = (): MaterialSpecForm => ({
   isExisting: false,
 });
 
+/** Next SPEC-N code for a new row, based on codes already present in the same list. */
+export const resolveNextSpecificationCode = (specs: MaterialSpecForm[]): string => {
+  const maxNum = specs.reduce((max, spec) => {
+    const match = spec.specificationCode.trim().match(/^SPEC-(\d+)$/i);
+    if (!match) return max;
+    return Math.max(max, Number(match[1]));
+  }, 0);
+  return `SPEC-${maxNum + 1}`;
+};
+
+export const createMaterialSpecForAdd = (existingSpecs: MaterialSpecForm[] = []): MaterialSpecForm => ({
+  ...emptyMaterialSpec(),
+  specificationCode: resolveNextSpecificationCode(existingSpecs),
+});
+
 export const emptyMaterialGrade = (): MaterialGradeForm => ({
   gradeId: "",
   gradeCode: "",
@@ -246,15 +261,21 @@ const mapSpecFieldErrors = (
 };
 
 const serializeSpec = (s: MaterialSpecForm) => {
+  const code = s.specificationCode.trim();
+  if (s.isExisting) {
+    // Existing specs are readonly except isActive; omit name/range so the backend
+    // does not reject updates when display labels differ from stored values.
+    return {
+      specificationCode: code,
+      isActive: s.isActive,
+    };
+  }
   const payload: Record<string, unknown> = {
     specificationName: s.specificationName.trim(),
     referenceRange: serializeReferenceRange(s.referenceRange),
     isActive: s.isActive,
   };
-  const code = s.specificationCode.trim();
-  if (s.isExisting) {
-    payload.specificationCode = code;
-  } else if (code) {
+  if (code) {
     payload.specificationCode = code;
   }
   return payload;
@@ -335,6 +356,10 @@ export const getMaterialsFormFieldErrors = (
   }
   if (form.grades.length === 0 && form.specifications.length === 0) {
     errors.form = "Add at least one grade or top-level specification";
+    return errors;
+  }
+  if (form.grades.length > 0 && form.specifications.length > 0) {
+    errors.form = "Use either grades or top-level specifications, not both";
     return errors;
   }
 

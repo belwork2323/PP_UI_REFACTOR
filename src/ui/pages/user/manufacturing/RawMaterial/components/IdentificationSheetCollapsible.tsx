@@ -124,7 +124,11 @@ const IdentificationSheetCollapsible = ({
             { label: BD.BONDING_SHEET_NO, value: displayValue(resolvedSheet.bondingSheetNo) },
             {
               label: BD.MIXER_TYPE,
-              value: displayValue(resolvedSheet.mixerType ?? resolvedSheet.mixerDetails),
+              value: displayValue(
+                resolvedSheet.mixerTypeName ||
+                  resolvedSheet.mixerType ||
+                  resolvedSheet.mixerDetails,
+              ),
             },
             { label: BD.NUMBER_OF_PREMIX, value: displayValue(resolvedSheet.numberOfPremix) },
             { label: BD.PRC_APPROVAL_DATE, value: formatDate(resolvedSheet.prcApprovalDate) },

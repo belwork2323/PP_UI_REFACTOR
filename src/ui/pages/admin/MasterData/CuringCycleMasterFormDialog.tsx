@@ -155,10 +155,12 @@ const StepsEditor = ({
                 width="100%"
                 theme={theme}
                 onChange={(value) => {
+                  // Keep in-progress decimals (e.g. "2.") — Number("2.") would drop the dot.
+                  if (value !== "" && !/^-?\d*\.?\d*$/.test(value)) return;
                   const next = [...steps];
                   next[idx] = {
                     ...step,
-                    propellantPressure: value === "" ? "" : Number(value),
+                    propellantPressure: value,
                   };
                   onChange(next);
                 }}

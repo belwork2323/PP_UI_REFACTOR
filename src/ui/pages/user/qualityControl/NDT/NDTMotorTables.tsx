@@ -55,6 +55,9 @@ const buildFieldSx = (border: string, primaryLight: string) => ({
     "& fieldset": { borderColor: border },
     "&:hover fieldset": { borderColor: alpha(primaryLight, 0.55) },
     "&.Mui-focused fieldset": { borderColor: primaryLight },
+    "&.Mui-error fieldset": { borderColor: "#d32f2f" },
+    "&.Mui-error:hover fieldset": { borderColor: "#d32f2f" },
+    "&.Mui-error.Mui-focused fieldset": { borderColor: "#d32f2f" },
   },
 });
 
@@ -121,12 +124,14 @@ const CInput = ({
   placeholder = "",
   multiline = false,
   fieldSx,
+  error = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   multiline?: boolean;
   fieldSx: ReturnType<typeof buildFieldSx>;
+  error?: boolean;
 }) => (
   <TextField
     size="small"
@@ -136,6 +141,7 @@ const CInput = ({
     value={value}
     onChange={(e) => onChange(e.target.value)}
     placeholder={placeholder}
+    error={error}
     sx={fieldSx}
   />
 );
@@ -145,11 +151,13 @@ const CNumericInput = ({
   onChange,
   placeholder = "",
   fieldSx,
+  error = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   fieldSx: ReturnType<typeof buildFieldSx>;
+  error?: boolean;
 }) => (
   <TextField
     size="small"
@@ -158,6 +166,7 @@ const CNumericInput = ({
     onChange={(e) => onChange(sanitizeNdtNumericInput(e.target.value))}
     placeholder={placeholder}
     inputProps={{ inputMode: "numeric", pattern: "[0-9]*" }}
+    error={error}
     sx={fieldSx}
   />
 );
@@ -168,12 +177,14 @@ const CSelect = ({
   placeholder = "Select",
   options,
   fieldSx,
+  error = false,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
   options: readonly { value: string; label: string }[];
   fieldSx: ReturnType<typeof buildFieldSx>;
+  error?: boolean;
 }) => (
   <TextField
     select
@@ -182,6 +193,7 @@ const CSelect = ({
     value={value}
     onChange={(e) => onChange(e.target.value)}
     SelectProps={{ displayEmpty: true }}
+    error={error}
     sx={fieldSx}
   >
     <MenuItem value="">
@@ -343,7 +355,14 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                 </TableRow>
               </TableHead>
               <TableBody>
-                {safePlanRows.map((row, index) => (
+                {safePlanRows.map((row, index) => {
+                  const sectionsErr = err(`radiographyPlanRows.${index}.sections`);
+                  const orientationsErr = err(`radiographyPlanRows.${index}.orientations`);
+                  const sfdErr = err(`radiographyPlanRows.${index}.sfd`);
+                  const normalErr = err(`radiographyPlanRows.${index}.normalExposures`);
+                  const tangentialErr = err(`radiographyPlanRows.${index}.tangentialExposures`);
+                  const detectorErr = err(`radiographyPlanRows.${index}.detectorType`);
+                  return (
                   <TableRow key={`${row.srNo}-${index}`} sx={rowBg(index)}>
                     <TableCell sx={TD}>{row.srNo}</TableCell>
                     <TableCell sx={TD}>
@@ -352,9 +371,10 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                           fieldSx={fieldSx}
                           value={row.sections}
                           placeholder="Sections"
+                          error={Boolean(sectionsErr)}
                           onChange={(v) => updatePlanRow(index, { sections: v })}
                         />
-                        <FieldErrorText message={err(`radiographyPlanRows.${index}.sections`)} />
+                        <FieldErrorText message={sectionsErr} />
                       </Box>
                     </TableCell>
                     <TableCell sx={TD}>
@@ -363,11 +383,10 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                           fieldSx={fieldSx}
                           value={row.orientations}
                           placeholder="Orientations"
+                          error={Boolean(orientationsErr)}
                           onChange={(v) => updatePlanRow(index, { orientations: v })}
                         />
-                        <FieldErrorText
-                          message={err(`radiographyPlanRows.${index}.orientations`)}
-                        />
+                        <FieldErrorText message={orientationsErr} />
                       </Box>
                     </TableCell>
                     <TableCell sx={TD}>
@@ -376,9 +395,10 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                           fieldSx={fieldSx}
                           value={row.sfd}
                           placeholder="SFD"
+                          error={Boolean(sfdErr)}
                           onChange={(v) => updatePlanRow(index, { sfd: v })}
                         />
-                        <FieldErrorText message={err(`radiographyPlanRows.${index}.sfd`)} />
+                        <FieldErrorText message={sfdErr} />
                       </Box>
                     </TableCell>
                     <TableCell sx={TD}>
@@ -387,11 +407,10 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                           fieldSx={fieldSx}
                           value={row.normalExposures}
                           placeholder="Normal"
+                          error={Boolean(normalErr)}
                           onChange={(v) => updatePlanRow(index, { normalExposures: v })}
                         />
-                        <FieldErrorText
-                          message={err(`radiographyPlanRows.${index}.normalExposures`)}
-                        />
+                        <FieldErrorText message={normalErr} />
                       </Box>
                     </TableCell>
                     <TableCell sx={TD}>
@@ -400,11 +419,10 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                           fieldSx={fieldSx}
                           value={row.tangentialExposures}
                           placeholder="Tangential"
+                          error={Boolean(tangentialErr)}
                           onChange={(v) => updatePlanRow(index, { tangentialExposures: v })}
                         />
-                        <FieldErrorText
-                          message={err(`radiographyPlanRows.${index}.tangentialExposures`)}
-                        />
+                        <FieldErrorText message={tangentialErr} />
                       </Box>
                     </TableCell>
                     <TableCell sx={TD}>
@@ -414,15 +432,15 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                           value={row.detectorType}
                           options={NDT_DETECTOR_OPTIONS}
                           placeholder="Select detector"
+                          error={Boolean(detectorErr)}
                           onChange={(v) => updatePlanRow(index, { detectorType: v })}
                         />
-                        <FieldErrorText
-                          message={err(`radiographyPlanRows.${index}.detectorType`)}
-                        />
+                        <FieldErrorText message={detectorErr} />
                       </Box>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </TableContainer>
@@ -446,7 +464,11 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
               </TableRow>
             </TableHead>
             <TableBody>
-              {motor.additionalExposureRows.map((row, index) => (
+              {motor.additionalExposureRows.map((row, index) => {
+                const sectionErr = err(`additionalExposureRows.${index}.sectionNumber`);
+                const orientationErr = err(`additionalExposureRows.${index}.orientation`);
+                const countErr = err(`additionalExposureRows.${index}.exposureCount`);
+                return (
                 <TableRow key={index} sx={rowBg(index)}>
                   <TableCell sx={TD}>
                     <Box>
@@ -454,11 +476,10 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                         fieldSx={fieldSx}
                         value={row.sectionNumber}
                         placeholder="Section no."
+                        error={Boolean(sectionErr)}
                         onChange={(v) => updateExposure(index, { sectionNumber: v })}
                       />
-                      <FieldErrorText
-                        message={err(`additionalExposureRows.${index}.sectionNumber`)}
-                      />
+                      <FieldErrorText message={sectionErr} />
                     </Box>
                   </TableCell>
                   <TableCell sx={TD}>
@@ -467,11 +488,10 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                         fieldSx={fieldSx}
                         value={row.orientation}
                         placeholder="Orientation"
+                        error={Boolean(orientationErr)}
                         onChange={(v) => updateExposure(index, { orientation: v })}
                       />
-                      <FieldErrorText
-                        message={err(`additionalExposureRows.${index}.orientation`)}
-                      />
+                      <FieldErrorText message={orientationErr} />
                     </Box>
                   </TableCell>
                   <TableCell sx={TD}>
@@ -480,11 +500,10 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                         fieldSx={fieldSx}
                         value={row.exposureCount}
                         placeholder="Count"
+                        error={Boolean(countErr)}
                         onChange={(v) => updateExposure(index, { exposureCount: v })}
                       />
-                      <FieldErrorText
-                        message={err(`additionalExposureRows.${index}.exposureCount`)}
-                      />
+                      <FieldErrorText message={countErr} />
                     </Box>
                   </TableCell>
                   <TableCell sx={TD}>
@@ -505,7 +524,8 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                     ) : null}
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>
@@ -549,7 +569,11 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
               </TableRow>
             </TableHead>
             <TableBody>
-              {motor.radiographyObservationRows.map((row, index) => (
+              {motor.radiographyObservationRows.map((row, index) => {
+                const sectionErr = err(`radiographyObservationRows.${index}.section`);
+                const orientationErr = err(`radiographyObservationRows.${index}.orientation`);
+                const observationsErr = err(`radiographyObservationRows.${index}.observations`);
+                return (
                 <TableRow key={index} sx={rowBg(index)}>
                   <TableCell sx={TD}>{index + 1}</TableCell>
                   <TableCell sx={TD}>
@@ -558,11 +582,10 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                         fieldSx={fieldSx}
                         value={row.section}
                         placeholder="Section no."
+                        error={Boolean(sectionErr)}
                         onChange={(v) => updateObservation(index, { section: v })}
                       />
-                      <FieldErrorText
-                        message={err(`radiographyObservationRows.${index}.section`)}
-                      />
+                      <FieldErrorText message={sectionErr} />
                     </Box>
                   </TableCell>
                   <TableCell sx={TD}>
@@ -571,11 +594,10 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                         fieldSx={fieldSx}
                         value={row.orientation}
                         placeholder="Orientation"
+                        error={Boolean(orientationErr)}
                         onChange={(v) => updateObservation(index, { orientation: v })}
                       />
-                      <FieldErrorText
-                        message={err(`radiographyObservationRows.${index}.orientation`)}
-                      />
+                      <FieldErrorText message={orientationErr} />
                     </Box>
                   </TableCell>
                   <TableCell sx={TD}>
@@ -583,12 +605,11 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                       <CInput
                         fieldSx={fieldSx}
                         value={row.observations}
+                        error={Boolean(observationsErr)}
                         onChange={(v) => updateObservation(index, { observations: v })}
                         multiline
                       />
-                      <FieldErrorText
-                        message={err(`radiographyObservationRows.${index}.observations`)}
-                      />
+                      <FieldErrorText message={observationsErr} />
                     </Box>
                   </TableCell>
                   <TableCell sx={TD}>
@@ -620,7 +641,8 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                     ) : null}
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>
@@ -660,7 +682,12 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
               </TableRow>
             </TableHead>
             <TableBody>
-              {motor.visualInspectionRows.map((row, index) => (
+              {motor.visualInspectionRows.map((row, index) => {
+                const observationPath = row.isPreset
+                  ? `visualInspectionRows.${index}.observationNotes`
+                  : `visualInspectionRows.${index}.observation`;
+                const observationErr = err(observationPath);
+                return (
                 <TableRow key={`${row.observation}-${index}`} sx={rowBg(index)}>
                   <TableCell sx={TD}>{index + 1}</TableCell>
                   <TableCell sx={TD}>
@@ -676,10 +703,9 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                             onChange={(v) => updateVisual(index, { observationNotes: v })}
                             placeholder="Observation"
                             multiline
+                            error={Boolean(observationErr)}
                           />
-                          <FieldErrorText
-                            message={err(`visualInspectionRows.${index}.observationNotes`)}
-                          />
+                          <FieldErrorText message={observationErr} />
                         </Box>
                       </Stack>
                     ) : (
@@ -689,10 +715,9 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                           value={row.observation}
                           onChange={(v) => updateVisual(index, { observation: v })}
                           placeholder="Enter observation"
+                          error={Boolean(observationErr)}
                         />
-                        <FieldErrorText
-                          message={err(`visualInspectionRows.${index}.observation`)}
-                        />
+                        <FieldErrorText message={observationErr} />
                       </Box>
                     )}
                   </TableCell>
@@ -748,7 +773,8 @@ const NDTMotorTables = ({ motor: rawMotor, theme, onChange, validationErrors }: 
                     ) : null}
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         </TableContainer>

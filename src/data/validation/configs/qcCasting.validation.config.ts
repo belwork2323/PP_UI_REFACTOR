@@ -49,7 +49,7 @@ export const qcCastingValidationFields: Record<string, FieldRuleConfig> = {
   rhPercent: number(["SUBMIT"]),
   vacuumMaintained: number(["SUBMIT"]),
 
-  finalMixBowlNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  finalMixBowlNo: text(["SUBMIT"], S.PATTERNS.CASTING_BOWL_LABEL),
   propellantQty: number(["SUBMIT"]),
   initialUnloadingViscosity: number(["SUBMIT"]),
   castingStartTime: time(["SUBMIT"]),
@@ -65,7 +65,7 @@ export const qcCastingValidationFields: Record<string, FieldRuleConfig> = {
   pressurePlateApplicable: text(["SUBMIT"]),
   pressureStartTime: time(["SUBMIT"]),
   pressureEndTime: time(["SUBMIT"]),
-  pressureSensorId: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  pressureSensorId: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
   initialPressureReading: number(["SUBMIT"]),
   pressureObservations: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 };

@@ -123,6 +123,11 @@ const DimensionalParametersMasterPanel = ({
                   <TableRow key={row.parameterId} sx={table.row}>
                     <TableCell sx={table.cell}>
                       <Typography sx={table.bodyText}>{row.paramName}</Typography>
+                      {row.paramId ? (
+                        <Typography variant="caption" color="text.secondary" display="block">
+                          {row.paramId}
+                        </Typography>
+                      ) : null}
                     </TableCell>
                     <TableCell sx={table.cell}>
                       <Typography sx={table.bodyText}>

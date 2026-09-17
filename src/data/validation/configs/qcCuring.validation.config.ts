@@ -41,7 +41,7 @@ export type QcCuringValidationTarget = {
 export const qcCuringValidationFields: Record<string, FieldRuleConfig> = {
   // Motor setup (sheet: type, oven no, positioning datetime)
   curingType: text(["UNIT", "SUBMIT"]),
-  ovenNumber: text(["UNIT", "SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  ovenNumber: text(["UNIT", "SUBMIT"], S.PATTERNS.MASTER_CODE),
   motorPositioningDateTime: text(["SUBMIT"]),
 
   // Cycle details
@@ -58,14 +58,14 @@ export const qcCuringValidationFields: Record<string, FieldRuleConfig> = {
   // Post curing
   visualObservations: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   pressurePlateRemovalDateTime: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
-  shoreAHardness: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  shoreAHardness: number(["SUBMIT"]),
   dispatchDateTime: text(["SUBMIT"]),
 
   // Subscale parameters
-  bemNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
-  wheelPeelNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
-  cartonNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
-  controlGrainNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  bemNo: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
+  wheelPeelNo: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
+  cartonNo: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
+  controlGrainNo: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
   curingStartDate: date(["SUBMIT"]),
   cycleStartTime: time(["SUBMIT"]),
   curingCompleteDate: date(["SUBMIT"]),

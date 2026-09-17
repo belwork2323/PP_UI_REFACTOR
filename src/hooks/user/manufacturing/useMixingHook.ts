@@ -6,6 +6,7 @@ import { useUserBatchRefreshStore } from "../../../app/store/userBatchRefreshSto
 import { batchManagementController } from "../../../controllers/admin/BatchManagement/batchManagementController";
 import { mixingController } from "../../../controllers/user/manufacturing/mixingController";
 import type { IdentificationSheet } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
+import { resolveMasterDataName } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
 import {
   buildMixCardId,
   buildMixCardStatusMapFromDetails,
@@ -260,7 +261,7 @@ export const useMixingHook = () => {
             { length: Math.max(1, Number(numberOfPremix) || 1) },
             (_, index) => ({
               ...createEmptyPremixEntry(index + 1),
-              mixerType: String(identificationSheet?.mixerType ?? ""),
+              mixerType: resolveMasterDataName(identificationSheet?.mixerType),
               bldgNo: "",
               premixDate: String(identificationSheet?.date ?? ""),
               premixQuantity: String(identificationSheet?.batchSize ?? ""),
@@ -282,7 +283,7 @@ export const useMixingHook = () => {
             (_, index) => ({
               ...createEmptyFinalMixEntry(index + 1),
               finalMixNo: String(index + 1),
-              mixerType: String(identificationSheet?.mixerType ?? ""),
+              mixerType: resolveMasterDataName(identificationSheet?.mixerType),
               bldgNo: "",
               mixingCycle: resolveApiMixingCycleDisplayValue(mixingCycle) || "",
               mixingCycleCode: String(
@@ -340,7 +341,7 @@ export const useMixingHook = () => {
             ...nextFormData,
             premixCards: (nextFormData.premixCards ?? []).map((card) => ({
               ...card,
-              mixerType: card.mixerType || String(identificationSheet?.mixerType ?? ""),
+              mixerType: card.mixerType || resolveMasterDataName(identificationSheet?.mixerType),
               bldgNo: card.bldgNo || "",
               premixDate: card.premixDate || String(identificationSheet?.date ?? ""),
               premixQuantity: card.premixQuantity || String(identificationSheet?.batchSize ?? ""),
@@ -352,7 +353,7 @@ export const useMixingHook = () => {
             })),
             finalMixCards: (nextFormData.finalMixCards ?? []).map((card) => ({
               ...card,
-              mixerType: card.mixerType || String(identificationSheet?.mixerType ?? ""),
+              mixerType: card.mixerType || resolveMasterDataName(identificationSheet?.mixerType),
               bldgNo: card.bldgNo || "",
               mixingCycle: card.mixingCycle || resolveApiMixingCycleDisplayValue(mixingCycle) || "",
               mixingCycleCode:

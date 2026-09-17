@@ -209,13 +209,29 @@ export type EquipmentTypeMasterOption = {
   description: string;
 };
 
-const mapEquipmentTypeMasterOption = (row: Record<string, unknown>): EquipmentTypeMasterOption => ({
-  id: Number(row.id ?? 0),
-  code: String(row.code ?? "").trim(),
-  name: String(row.name ?? "").trim(),
-  typeCode: String(row.typeCode ?? "").trim(),
-  description: String(row.description ?? "").trim(),
-});
+/** Resolve equipment type code from list row (top-level or nested attributes). */
+export const resolveEquipmentTypeCode = (row: Record<string, unknown>): string => {
+  const attrs =
+    row.attributes && typeof row.attributes === "object"
+      ? (row.attributes as Record<string, unknown>)
+      : {};
+  return String(row.typeCode ?? attrs.typeCode ?? row.code ?? "").trim();
+};
+
+const mapEquipmentTypeMasterOption = (row: Record<string, unknown>): EquipmentTypeMasterOption => {
+  const attrs =
+    row.attributes && typeof row.attributes === "object"
+      ? (row.attributes as Record<string, unknown>)
+      : {};
+  const typeCode = resolveEquipmentTypeCode(row);
+  return {
+    id: Number(row.id ?? 0),
+    code: String(row.code ?? "").trim(),
+    name: String(row.name ?? "").trim(),
+    typeCode,
+    description: String(row.description ?? attrs.description ?? row.description ?? "").trim(),
+  };
+};
 
 let equipmentTypeListRequestPromise: Promise<EquipmentTypeMasterOption[]> | null = null;
 
@@ -228,7 +244,7 @@ export const fetchEquipmentTypeList = async (): Promise<EquipmentTypeMasterOptio
       assertSuccessEnvelope(body);
       return asList(body)
         .map(mapEquipmentTypeMasterOption)
-        .filter((item) => Boolean(item.typeCode || item.name));
+        .filter((item) => Boolean(item.typeCode));
     } catch (error) {
       equipmentTypeListRequestPromise = null;
       wrapLookupError(error);

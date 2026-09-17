@@ -12,6 +12,7 @@ import {
   type ProcessParticularRow,
   type QualityCheckRow,
 } from "../../../data/models/user/MixingFormModel";
+import { resolveMasterDataName } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
 
 const buildInitialPremixCardsWithDefaults = (
   count: number,
@@ -53,17 +54,18 @@ export const useMixingFormHook = (
   onBlocksChange?: (payload: MixingFormState) => void,
   maxStageCount = 4,
   identificationSheet?: {
-    mixerType?: string | null;
+    mixerType?: string | { code?: string | null; name?: string | null } | null;
     batchSize?: string;
     date?: string;
   } | null,
 ) => {
+  const sheetMixerType = resolveMasterDataName(identificationSheet?.mixerType);
   const [premixCards, setPremixCards] = useState<PremixEntry[]>(
     initialData?.premixCards?.length
       ? initialData.premixCards
       : buildInitialPremixCardsWithDefaults(
           maxStageCount,
-          identificationSheet?.mixerType,
+          sheetMixerType,
           null,
           identificationSheet?.batchSize,
           identificationSheet?.date,
@@ -75,7 +77,7 @@ export const useMixingFormHook = (
       ? initialData.finalMixCards
       : buildInitialFinalMixCardsWithDefaults(
           maxStageCount,
-          identificationSheet?.mixerType,
+          sheetMixerType,
           null,
           identificationSheet?.batchSize,
           identificationSheet?.date,
@@ -121,7 +123,7 @@ export const useMixingFormHook = (
           ? initialData.finalMixCards
           : buildInitialFinalMixCardsWithDefaults(
               initialData.premixCards.length,
-              identificationSheet?.mixerType,
+              resolveMasterDataName(identificationSheet?.mixerType),
               null,
               identificationSheet?.batchSize,
               identificationSheet?.date,

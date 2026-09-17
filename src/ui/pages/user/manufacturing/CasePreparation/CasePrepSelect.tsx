@@ -24,6 +24,7 @@ type CasePrepSelectProps = {
   width?: number | string;
   theme: any;
   required?: boolean;
+  error?: boolean;
 };
 
 const CasePrepSelect = ({
@@ -37,6 +38,7 @@ const CasePrepSelect = ({
   width = "100%",
   theme,
   required = false,
+  error = false,
 }: CasePrepSelectProps) => {
   const cpTheme = theme.manufacturing?.casePreparation;
   const flowBar = cpTheme?.flowBar ?? {};
@@ -67,6 +69,7 @@ const CasePrepSelect = ({
           value={value}
           disabled={disabled}
           required={required}
+          error={error}
           onChange={(e) => onChange(String(e.target.value))}
           sx={flowBar.selectInput?.(hasValue)}
           SelectProps={{

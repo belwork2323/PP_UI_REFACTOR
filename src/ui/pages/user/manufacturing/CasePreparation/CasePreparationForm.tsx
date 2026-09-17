@@ -191,7 +191,9 @@ const CasePreparationForm = ({
     const motors = getRocketMotorCasingMotorsFromSheet(sheet);
     const match = motors.find((m) => String(m.motorId ?? "").trim() === motorId);
     return {
-      casingType: String(match?.castingType ?? "").trim(),
+      casingType: String(
+        match?.castingType ?? (match as { casingType?: string } | undefined)?.casingType ?? "",
+      ).trim(),
       insulationType: String(match?.insulationType ?? "").trim(),
     };
   }, [activeMotorEntry?.motorId, sheet]);

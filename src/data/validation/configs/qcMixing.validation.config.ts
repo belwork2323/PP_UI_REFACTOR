@@ -38,14 +38,16 @@ export type QcMixingValidationTarget = {
 
 export const qcMixingValidationFields: Record<string, FieldRuleConfig> = {
   // Shared header (Premix / Final Mix details)
-  bowlNo: number(["UNIT", "SUBMIT"]),
+  // Bowl may be "Bowl No.2", numeric id, or master code from mixer config
+  bowlNo: text(["UNIT", "SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   dateOfPremix: date(["UNIT", "SUBMIT"]),
   dateOfFinalMix: date(["UNIT", "SUBMIT"]),
-  mixerBldgNo: text(["UNIT", "SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  // Auto-seeded as "MX-1 & BLD-1" (mixer + building), not a bare building code
+  mixerBldgNo: text(["UNIT", "SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   batchSize: number(["UNIT", "SUBMIT"]),
 
-  // Per-parameter row
-  specification: number(["SUBMIT"]),
+  // Specs from quality-check master (e.g. "NA", "0 - 0.08 %") — not numeric
+  specification: text(["SUBMIT"], S.PATTERNS.SPECIFICATION_WITH_TOLERANCE),
   value: number(["SUBMIT"]),
   remarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 
@@ -104,13 +106,13 @@ const extractViscosityRows = (values: Record<string, unknown>): Record<string, u
 };
 
 const valueFieldKeys = (row: Record<string, unknown>): string[] => {
-  // Common value columns from mixing tables
-  const candidates = ["VALUE", "VALUE_1", "VALUE_2", "VALUE_3", "HOMOGENEITY", "MOISTURE"];
-  const found = candidates.filter((k) => k in row);
+  // Premix uses VALUE_1..VALUE_5; final mix uses VALUE_1. Prefer ordered VALUE_* keys.
+  const ordered = ["VALUE_1", "VALUE_2", "VALUE_3", "VALUE_4", "VALUE_5", "VALUE"];
+  const found = ordered.filter((k) => k in row);
   if (found.length) return found;
   return Object.keys(row).filter(
     (k) =>
-      !["SR_NO", "PARAMETER", "SPECIFICATION", "REMARKS", "BOWL_NO", "DATE_OF_PREMIX", "DATE_OF_FINAL_MIX", "MIXER_BLDG_NO", "PREMIX_QTY", "_rowId"].includes(
+      !["SR_NO", "PARAMETER", "PARAMETER_ID", "SPECIFICATION", "REMARKS", "BOWL_NO", "DATE_OF_PREMIX", "DATE_OF_FINAL_MIX", "MIXER_BLDG_NO", "PREMIX_QTY", "_rowId"].includes(
         k,
       ) && typeof row[k] !== "object",
   );
@@ -183,13 +185,28 @@ export const qcMixingValidationConfig: SubDeptValidationConfig<QcMixingValidatio
         value: row.SPECIFICATION,
         ruleKey: "specification",
       });
-      valueFieldKeys(row).forEach((vf) => {
+
+      // Premix rows always carry VALUE_1..VALUE_5 keys (often empty). Match API payload:
+      // trailing empty samples are allowed; only filled samples are format-checked.
+      // On SUBMIT, require at least one sample value (VALUE_1 if none filled).
+      const valueKeys = valueFieldKeys(row);
+      const filledValueKeys = valueKeys.filter((vf) => Boolean(str(row[vf])));
+      if (filledValueKeys.length) {
+        filledValueKeys.forEach((vf) => {
+          fields.push({
+            path: `details.${i}.${vf}`,
+            value: row[vf],
+            ruleKey: "value",
+          });
+        });
+      } else if (valueKeys.length) {
         fields.push({
-          path: `details.${i}.${vf}`,
-          value: row[vf],
+          path: `details.${i}.${valueKeys[0]}`,
+          value: "",
           ruleKey: "value",
         });
-      });
+      }
+
       fields.push({
         path: `details.${i}.REMARKS`,
         value: row.REMARKS,

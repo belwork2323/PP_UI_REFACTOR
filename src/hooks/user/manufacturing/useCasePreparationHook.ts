@@ -32,6 +32,7 @@ import {
   firstCasePrepValidationError,
   type CasePrepValidationErrors,
 } from "../../../data/models/user/casePrepValidation";
+import { formatValidationDetailsMessage } from "../../../data/validation/validationErrors";
 import {
   isMainMotorBatch,
   isSubscaleBatch,
@@ -196,6 +197,7 @@ export const useCasePreparationHook = () => {
   const listParams = useSubdepartmentBatches("case-preparation");
   const user = useAuthStore((s) => s.user);
   const showAlert = useAlertStore((state) => state.showAlert);
+  const showValidationAlert = useAlertStore((state) => state.showValidationAlert);
   const bumpBatchRefresh = useUserBatchRefreshStore((state) => state.bumpVersion);
   const { deleteTemp } = useFileService();
 
@@ -254,9 +256,32 @@ export const useCasePreparationHook = () => {
   }, [resetFlowDraft]);
 
   const getErrorMessage = (response: any, fallbackMessage: string) => {
-    if (response?.error?.details) return response.error.details;
-    if (response?.message) return response.message;
+    const fieldSummary =
+      formatValidationDetailsMessage(response?.errorDetails) ||
+      formatValidationDetailsMessage(response?.error) ||
+      formatValidationDetailsMessage(response?.data);
+    if (fieldSummary) {
+      const base =
+        response?.message && String(response.message).toLowerCase() !== "validation failed"
+          ? String(response.message)
+          : STRINGS.MANUFACTURING.CASE_PREP.VALIDATION_FAILED;
+      return `${base} (${fieldSummary})`;
+    }
+    if (response?.error?.details) return String(response.error.details);
+    if (response?.message) return String(response.message);
     return fallbackMessage;
+  };
+
+  const notifyCasePrepValidationErrors = (
+    fieldErrors: CasePrepValidationErrors,
+    intent: "draft" | "submit",
+  ) => {
+    const firstError = firstCasePrepValidationError(fieldErrors);
+    const base =
+      intent === "draft"
+        ? STRINGS.MANUFACTURING.CASE_PREP.DRAFT_VALIDATION_FAILED
+        : STRINGS.MANUFACTURING.CASE_PREP.SUBMIT_VALIDATION_FAILED;
+    showValidationAlert(firstError ? `${base} (${firstError})` : base);
   };
 
   const openFormWithResolvedData = useCallback(
@@ -571,15 +596,12 @@ export const useCasePreparationHook = () => {
         return false;
       }
 
-      // SUBMIT → mandatory + type; DRAFT → type/format only. Errors show under fields (no popup).
+      // SUBMIT → mandatory + type; DRAFT → type/format only. Highlight fields + snackbar.
       const submissionIntent = intent === "draft" ? "DRAFT" : "SUBMIT";
       const fieldErrors = validateCasePrepMotorSession(motor, submissionIntent);
       if (Object.keys(fieldErrors).length > 0) {
         setMotorValidationErrors((prev) => ({ ...prev, [motorId]: fieldErrors }));
-        const firstError = firstCasePrepValidationError(fieldErrors);
-        if (firstError) {
-          showAlert(firstError, "warning");
-        }
+        notifyCasePrepValidationErrors(fieldErrors, intent);
         return false;
       }
       setMotorValidationErrors((prev) => {
@@ -880,6 +902,7 @@ export const useCasePreparationHook = () => {
         const fieldErrors = validateCasePrepMotorData(formData.subscaleData, submissionIntent);
         if (Object.keys(fieldErrors).length > 0) {
           setMotorValidationErrors((prev) => ({ ...prev, SUBSCALE: fieldErrors }));
+          notifyCasePrepValidationErrors(fieldErrors, intent);
           return false;
         }
         setMotorValidationErrors((prev) => {

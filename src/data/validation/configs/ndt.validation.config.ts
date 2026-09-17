@@ -87,14 +87,17 @@ export const ndtValidationConfig: SubDeptValidationConfig<NdtValidationTarget> =
         },
         { path: `radiographyPlanRows.${index}.sfd`, value: row.sfd, ruleKey: "sfd" },
         {
-          path: `radiographyPlanRows.${index}.normalExposure`,
-          value: (row as { normalExposure?: unknown }).normalExposure ??
+          path: `radiographyPlanRows.${index}.normalExposures`,
+          value:
+            (row as { normalExposures?: unknown }).normalExposures ??
+            (row as { normalExposure?: unknown }).normalExposure ??
             (row as { noOfNormalExposure?: unknown }).noOfNormalExposure,
           ruleKey: "normalExposure",
         },
         {
-          path: `radiographyPlanRows.${index}.tangentialExposure`,
+          path: `radiographyPlanRows.${index}.tangentialExposures`,
           value:
+            (row as { tangentialExposures?: unknown }).tangentialExposures ??
             (row as { tangentialExposure?: unknown }).tangentialExposure ??
             (row as { noOfTangentialExposure?: unknown }).noOfTangentialExposure,
           ruleKey: "tangentialExposure",
@@ -150,11 +153,20 @@ export const ndtValidationConfig: SubDeptValidationConfig<NdtValidationTarget> =
     });
 
     (motor.visualInspectionRows ?? []).forEach((row, index) => {
-      fields.push({
-        path: `visualInspectionRows.${index}.observation`,
-        value: (row as { observation?: unknown }).observation,
-        ruleKey: "visualObservation",
-      });
+      // Preset rows use a fixed label in `observation`; the user edits `observationNotes`.
+      if (row.isPreset) {
+        fields.push({
+          path: `visualInspectionRows.${index}.observationNotes`,
+          value: row.observationNotes,
+          ruleKey: "visualObservation",
+        });
+      } else {
+        fields.push({
+          path: `visualInspectionRows.${index}.observation`,
+          value: row.observation,
+          ruleKey: "visualObservation",
+        });
+      }
     });
 
     fields.push({

@@ -862,14 +862,14 @@ export const mapQualityControlPayload = (
         const values = form.divisionEntryValues?.[entry.entryId]?.schemaValues;
         return buildRevalidationMaterialsPayload(values);
       });
-      if (materials.length > 0) {
-        divisionDetails.push({
-          division: "RAW_MATERIAL",
-          subType: "RAW_MATERIAL_REVALIDATION",
-          divisionSubmissionType,
-          data: { materials },
-        });
-      }
+      // Always include the division on draft/submit when the entry exists so the API
+      // never receives an empty divisionDetails array (backend requires ≥1 division).
+      divisionDetails.push({
+        division: "RAW_MATERIAL",
+        subType: "RAW_MATERIAL_REVALIDATION",
+        divisionSubmissionType,
+        data: { materials },
+      });
     }
 
     // RAW_MATERIAL · PROCESSING → data.premixes[{ solidProcess, liquidProcess }] (RMP-style sections)

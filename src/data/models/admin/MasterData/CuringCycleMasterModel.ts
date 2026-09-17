@@ -20,7 +20,7 @@ export type CuringCycleStepForm = {
   startTime: string;
   endDate: string;
   endTime: string;
-  propellantPressure: number | "";
+  propellantPressure: number | string;
   hotWaterCirculation: string;
   isActive: boolean;
   isExisting?: boolean;
@@ -141,7 +141,10 @@ const serializeStep = (c: CuringCycleStepForm) => ({
   startTime: c.startTime.trim() || undefined,
   endDate: c.endDate.trim() || undefined,
   endTime: c.endTime.trim() || undefined,
-  propellantPressure: c.propellantPressure === "" ? undefined : Number(c.propellantPressure),
+  propellantPressure:
+    c.propellantPressure === "" || c.propellantPressure == null
+      ? undefined
+      : Number(c.propellantPressure),
   hotWaterCirculation: c.hotWaterCirculation.trim() || undefined,
   isActive: c.isActive,
 });
