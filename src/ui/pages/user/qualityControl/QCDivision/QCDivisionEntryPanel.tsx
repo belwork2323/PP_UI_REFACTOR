@@ -58,7 +58,6 @@ import {
 } from "../../../../../hooks/user/qualityControl/qcTrimmingTables";
 import {
   createInitialDualPostCureValues,
-  createInitialDualPostCureValues,
   createInitialPostCureValues,
   hydratePostCureValuesFromSections,
   postCureFormValuesHaveUserData,

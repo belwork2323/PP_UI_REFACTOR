@@ -1436,7 +1436,7 @@ export const STRINGS = {
       SUB_DEPARTMENT_MISSING: "Unable to proceed. Sub-department context is missing.",
       EMPTY_FORM_ERROR: "Add at least one value before saving or submitting.",
       SCHEMA_LOAD_REQUIRED:
-        "All premix forms must load their schema successfully before saving or submitting.",
+        "Complete preparation details for each material, or fill weightment for materials with no schema, before saving or submitting.",
       DELETE_PREMIX_TOOLTIP: "Remove this premix",
       WEIGHTMENT_SHEET_TITLE: "Weightment Sheet for Dispatch of Material to Mixing Station",
       WEIGHTMENT_SHEET_SUBTITLE:

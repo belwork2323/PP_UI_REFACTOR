@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import generalController from "../../controllers/admin/common/generalController";
+import { generalController } from "../../controllers/admin/common/generalController";
 import type { SystemMasterOption } from "../../data/api/common/generalAPI";
 
 export type BuildingDropdownOption = { value: string; label: string };

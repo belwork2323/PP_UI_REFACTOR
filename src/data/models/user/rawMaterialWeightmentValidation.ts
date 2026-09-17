@@ -10,6 +10,56 @@ export type WeightmentRowFieldErrors = {
 const PERCENTAGE_TOLERANCE = 0.01;
 const WEIGHT_TOLERANCE_KG = 0.001;
 
+const str = (value: unknown) => (value == null ? "" : String(value)).trim();
+
+const isFiniteNumber = (value: unknown): boolean => {
+  const text = str(value).replace(/,/g, "");
+  return Boolean(text) && Number.isFinite(Number(text));
+};
+
+const WEIGHTMENT_ROW_REQUIRED_FIELDS: Array<keyof RawMaterialPrepWeightmentDetail> = [
+  "materialCode",
+  "percentage",
+  "weightTransferred",
+  "containerType",
+  "containerNumber",
+  "weighScaleNumber",
+  "weighingDateTime",
+];
+
+/** True when a weightment row has every required field filled with valid values. */
+export const weightmentRowHasCompleteData = (row: RawMaterialPrepWeightmentDetail): boolean => {
+  const hasAny =
+    WEIGHTMENT_ROW_REQUIRED_FIELDS.some((key) => str(row[key])) || str(row.materialName);
+  if (!hasAny) return false;
+
+  return WEIGHTMENT_ROW_REQUIRED_FIELDS.every((key) => {
+    const text = str(row[key]);
+    if (!text) return false;
+    if (key === "percentage" || key === "weightTransferred") {
+      return isFiniteNumber(text);
+    }
+    return true;
+  });
+};
+
+/** True when the shared weightment sheet has a complete row for the material code. */
+export const weightmentHasMaterialData = (
+  sheet: RawMaterialPrepWeightmentDetail[] | { weightmentDetails?: RawMaterialPrepWeightmentDetail[] },
+  materialCode: string,
+): boolean => {
+  const code = str(materialCode).toUpperCase();
+  if (!code) return false;
+  const rows = Array.isArray(sheet)
+    ? sheet
+    : Array.isArray(sheet.weightmentDetails)
+      ? sheet.weightmentDetails
+      : [];
+  return rows.some(
+    (row) => str(row.materialCode).toUpperCase() === code && weightmentRowHasCompleteData(row),
+  );
+};
+
 export const numbersApproximatelyEqual = (
   a: number,
   b: number,

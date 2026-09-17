@@ -96,4 +96,5 @@ export {
   ReadOnlyField,
   SubsectionHeading,
   TableSelectInput,
+  TableTextInput,
 } from "../CastingAndCuring/CastingCuringFormPrimitives";

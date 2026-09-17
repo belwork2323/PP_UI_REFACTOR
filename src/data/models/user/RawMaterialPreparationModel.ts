@@ -25,6 +25,7 @@ import {
   serializeProcessSubmissionForApi,
   toCamelCaseKey,
 } from "./rawMaterialPreparationApiMapper";
+import { weightmentHasMaterialData } from "./rawMaterialWeightmentValidation";
 
 export type PremixSubmissionType = "DRAFT" | "SUBMIT";
 export type PremixSubmissionStatus =
@@ -505,6 +506,29 @@ const buildProcessFromPendingSections = (
   };
 };
 
+/** Materials with no preparation schema still appear on the premix when weightment is recorded. */
+const buildWeightmentOnlyProcessEntry = (fallback: {
+  materialId?: number;
+  materialCode?: string;
+  materialName?: string;
+  gradeId?: number;
+  gradeCode?: string;
+}): PreparationProcessEntry | null => {
+  const materialCode = String(fallback.materialCode ?? "").trim();
+  if (!materialCode) return null;
+
+  return {
+    materialId: Number(fallback.materialId ?? 0),
+    materialCode,
+    materialName: String(fallback.materialName ?? materialCode).trim() || materialCode,
+    gradeId: fallback.gradeId ?? null,
+    gradeCode: fallback.gradeCode?.trim() ? fallback.gradeCode : null,
+    schemaVersion: RMP_SCHEMA_VERSION,
+    schemaType: RMP_SCHEMA_TYPE,
+    sections: [],
+  };
+};
+
 /**
  * Rebuild update/create preparationDetails from a fetched form-details response.
  * Used for final approval so we do not drop solid/liquid data that was never hydrated in local sessions.
@@ -586,6 +610,7 @@ export const mapPreparationDetailsPayload = (params: {
     if (params.targetPremixNos?.length && !params.targetPremixNos.includes(premixNo)) return;
     const solidProcess: PreparationProcessEntry[] = [];
     const liquidProcess: PreparationProcessEntry[] = [];
+    const weightmentSheet = params.weightmentSheet ?? createEmptyWeightmentSheet();
 
     entries.forEach((entry) => {
       const sessionKey = `${entry.premix}:${entry.materialKey}`;
@@ -594,6 +619,13 @@ export const mapPreparationDetailsPayload = (params: {
       const liquidMaterial = findMaterialInList(params.liquidMaterials, entry.liquidMaterialCode);
 
       if (entry.selectedProcesses.solid) {
+        const solidFallback = {
+          materialId: entry.solidMaterialId ?? solidMaterial?.materialId,
+          materialCode: entry.solidMaterialCode,
+          materialName: solidMaterial?.materialName ?? entry.materialName,
+          gradeId: entry.solidGradeId,
+          gradeCode: entry.solidGradeCode,
+        };
         const process =
           buildProcessForSlot(
             session.solid.schema,
@@ -612,13 +644,10 @@ export const mapPreparationDetailsPayload = (params: {
             },
             { allowEmptyValues: params.allowPartialProcesses },
           ) ??
-          buildProcessFromPendingSections(session.pendingSolidSections, {
-            materialId: entry.solidMaterialId ?? solidMaterial?.materialId,
-            materialCode: entry.solidMaterialCode,
-            materialName: solidMaterial?.materialName ?? entry.materialName,
-            gradeId: entry.solidGradeId,
-            gradeCode: entry.solidGradeCode,
-          });
+          buildProcessFromPendingSections(session.pendingSolidSections, solidFallback) ??
+          (weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode)
+            ? buildWeightmentOnlyProcessEntry(solidFallback)
+            : null);
 
         if (process) {
           solidProcess.push(
@@ -630,6 +659,11 @@ export const mapPreparationDetailsPayload = (params: {
       }
 
       if (entry.selectedProcesses.liquid) {
+        const liquidFallback = {
+          materialId: entry.liquidMaterialId ?? liquidMaterial?.materialId,
+          materialCode: entry.liquidMaterialCode,
+          materialName: liquidMaterial?.materialName ?? entry.materialName,
+        };
         const process =
           buildProcessForSlot(
             session.liquid.schema,
@@ -647,11 +681,10 @@ export const mapPreparationDetailsPayload = (params: {
             },
             { allowEmptyValues: params.allowPartialProcesses },
           ) ??
-          buildProcessFromPendingSections(session.pendingLiquidSections, {
-            materialId: entry.liquidMaterialId ?? liquidMaterial?.materialId,
-            materialCode: entry.liquidMaterialCode,
-            materialName: liquidMaterial?.materialName ?? entry.materialName,
-          });
+          buildProcessFromPendingSections(session.pendingLiquidSections, liquidFallback) ??
+          (weightmentHasMaterialData(weightmentSheet, entry.liquidMaterialCode)
+            ? buildWeightmentOnlyProcessEntry(liquidFallback)
+            : null);
 
         if (process) {
           liquidProcess.push(

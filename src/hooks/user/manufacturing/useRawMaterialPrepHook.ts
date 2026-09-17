@@ -60,6 +60,8 @@ import { isSchemaDocumentReady } from "../../../schema-engine/utils/schemaMessag
 import { validateSchemaFormValues } from "@/data/models/user/schemaFormValidation";
 import {
   getWeightmentIdentificationError,
+  isPremixSelectionSchemaReady,
+  premixSelectionHasSubmitData,
   validateRawMaterialPreparation,
 } from "@/data/validation/adapters/rawMaterialPreparation.validation";
 import { hasValidationErrors } from "@/data/validation/validationErrors";
@@ -203,32 +205,42 @@ const ensurePremixSchemasLoaded = async (
 
     if (entry.selectedProcesses.solid && entry.solidMaterialCode && !current.solid.schema) {
       const schema = await fetchPremixSlotSchema(entry, "solid", allMaterials, subDepartmentId);
-      if (schema) {
-        nextSession = {
-          ...nextSession,
-          solid: {
-            ...current.solid,
-            schema,
-            schemaLoading: false,
-            schemaError: null,
-          },
-        };
-      }
+      nextSession = {
+        ...nextSession,
+        solid: schema
+          ? {
+              ...current.solid,
+              schema,
+              schemaLoading: false,
+              schemaError: null,
+            }
+          : {
+              ...current.solid,
+              schema: null,
+              schemaLoading: false,
+              schemaError: null,
+            },
+      };
     }
 
     if (entry.selectedProcesses.liquid && entry.liquidMaterialCode && !nextSession.liquid.schema) {
       const schema = await fetchPremixSlotSchema(entry, "liquid", allMaterials, subDepartmentId);
-      if (schema) {
-        nextSession = {
-          ...nextSession,
-          liquid: {
-            ...nextSession.liquid,
-            schema,
-            schemaLoading: false,
-            schemaError: null,
-          },
-        };
-      }
+      nextSession = {
+        ...nextSession,
+        liquid: schema
+          ? {
+              ...nextSession.liquid,
+              schema,
+              schemaLoading: false,
+              schemaError: null,
+            }
+          : {
+              ...nextSession.liquid,
+              schema: null,
+              schemaLoading: false,
+              schemaError: null,
+            },
+      };
     }
 
     nextSessions[sessionKey] = nextSession;
@@ -677,23 +689,9 @@ export const useRawMaterialPrepHook = () => {
         const session =
           premixSessions[getPremixMaterialSessionKey(entry.premix, entry.materialKey)];
         if (!session) return false;
-        if (entry.selectedProcesses.solid) {
-          if (session.solid.schemaLoading || session.solid.schemaError || !session.solid.schema) {
-            return false;
-          }
-        }
-        if (entry.selectedProcesses.liquid) {
-          if (
-            session.liquid.schemaLoading ||
-            session.liquid.schemaError ||
-            !session.liquid.schema
-          ) {
-            return false;
-          }
-        }
-        return true;
+        return isPremixSelectionSchemaReady(entry, session, weightmentSheet);
       }),
-    [addedPremixSelections, premixSessions],
+    [addedPremixSelections, premixSessions, weightmentSheet],
   );
 
   const isFormDirty = useMemo(
@@ -1246,21 +1244,7 @@ export const useRawMaterialPrepHook = () => {
           const session =
             sessionsForPayload[getPremixMaterialSessionKey(entry.premix, entry.materialKey)];
           if (!session) return false;
-          if (entry.selectedProcesses.solid) {
-            if (session.solid.schemaLoading || session.solid.schemaError || !session.solid.schema) {
-              return false;
-            }
-          }
-          if (entry.selectedProcesses.liquid) {
-            if (
-              session.liquid.schemaLoading ||
-              session.liquid.schemaError ||
-              !session.liquid.schema
-            ) {
-              return false;
-            }
-          }
-          return true;
+          return isPremixSelectionSchemaReady(entry, session, weightmentSheet);
         });
 
         if (!premixSchemasReady) {
@@ -1271,7 +1255,9 @@ export const useRawMaterialPrepHook = () => {
         const premixHasData = premixSelections.some((entry) => {
           const session =
             sessionsForPayload[getPremixMaterialSessionKey(entry.premix, entry.materialKey)];
-          return session ? isSessionFilled(session) : false;
+          return session
+            ? premixSelectionHasSubmitData(entry, session, weightmentSheet)
+            : false;
         });
 
         if (!premixHasData) {
@@ -1619,23 +1605,15 @@ export const useRawMaterialPrepHook = () => {
       const premixSchemasReady = premixSelections.every((entry) => {
         const session = premixSessions[getPremixMaterialSessionKey(entry.premix, entry.materialKey)];
         if (!session) return false;
-        if (entry.selectedProcesses.solid) {
-          if (session.solid.schemaLoading || session.solid.schemaError || !session.solid.schema) {
-            return false;
-          }
-        }
-        if (entry.selectedProcesses.liquid) {
-          if (session.liquid.schemaLoading || session.liquid.schemaError || !session.liquid.schema) {
-            return false;
-          }
-        }
-        return true;
+        return isPremixSelectionSchemaReady(entry, session, weightmentSheet);
       });
       if (!premixSchemasReady) return false;
 
       const premixHasData = premixSelections.some((entry) => {
         const session = premixSessions[getPremixMaterialSessionKey(entry.premix, entry.materialKey)];
-        return session ? isSessionFilled(session) : false;
+        return session
+          ? premixSelectionHasSubmitData(entry, session, weightmentSheet)
+          : false;
       });
       if (!premixHasData) return false;
 

@@ -117,14 +117,12 @@ export const rawMaterialSourcingFieldRules = {
     messages: { required: A.jacketTemp.required, invalid: A.jacketTemp.invalid },
   },
   processStartTime: {
-    valueType: "text" as const,
-    pattern: ALPHA_NUM,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: A.processStartTime.required, invalid: A.processStartTime.invalid },
   },
   processEndTime: {
-    valueType: "text" as const,
-    pattern: ALPHA_NUM,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: A.processEndTime.required, invalid: A.processEndTime.invalid },
   },
@@ -134,8 +132,7 @@ export const rawMaterialSourcingFieldRules = {
     messages: { required: A.finalAdductQty.required, invalid: A.finalAdductQty.invalid },
   },
   dispatchDateTime: {
-    valueType: "text" as const,
-    pattern: ALPHA_NUM,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: A.dispatchDateTime.required, invalid: A.dispatchDateTime.invalid },
   },
@@ -172,14 +169,12 @@ export const rawMaterialSourcingFieldRules = {
     messages: { required: H.jacketTemp.required, invalid: H.jacketTemp.invalid },
   },
   htpbProcessStartTime: {
-    valueType: "text" as const,
-    pattern: ALPHA_NUM,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: H.processStartTime.required, invalid: H.processStartTime.invalid },
   },
   htpbProcessEndTime: {
-    valueType: "text" as const,
-    pattern: ALPHA_NUM,
+    valueType: "datetime" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: H.processEndTime.required, invalid: H.processEndTime.invalid },
   },

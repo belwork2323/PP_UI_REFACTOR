@@ -1,7 +1,7 @@
 export const ALPHA_NUM = /^[A-Za-z0-9][A-Za-z0-9 /_-]*$/;
 export const ALPHA_NUM_LOOSE = /^[A-Za-z0-9][A-Za-z0-9 \-_/.,()]*$/i;
 
-export type FieldValueType = "text" | "date" | "number" | "file";
+export type FieldValueType = "text" | "date" | "datetime" | "number" | "file";
 
 export type FieldValidationState =
   "valid" | "required" | "invalid" | "minLength" | "maxLength" | "minVal" | "maxVal";
@@ -38,6 +38,28 @@ export const isValidUiDate = (value: unknown): boolean => {
     return !Number.isNaN(Date.parse(text.slice(0, 10)));
   }
   return false;
+};
+
+export const isValidUiDateTime = (value: unknown): boolean => {
+  const text = str(value);
+  if (!text) return false;
+  if (/^\d{1,2}-\d{1,2}-\d{4}[ T]\d{1,2}:\d{2}/.test(text)) {
+    const [datePart, timePart] = text.split(/[T ]/);
+    if (!isValidUiDate(datePart)) return false;
+    const tm = timePart.match(/^(\d{1,2}):(\d{2})/);
+    if (!tm) return false;
+    const h = Number(tm[1]);
+    const mi = Number(tm[2]);
+    return h >= 0 && h <= 23 && mi >= 0 && mi <= 59;
+  }
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(text)) {
+    return !Number.isNaN(Date.parse(text));
+  }
+  if (/^\d{1,2}:\d{2}$/.test(text)) {
+    const [h, m] = text.split(":").map(Number);
+    return h >= 0 && h <= 23 && m >= 0 && m <= 59;
+  }
+  return isValidUiDate(text);
 };
 
 const hasFileValue = (value: unknown): boolean => {
@@ -91,6 +113,11 @@ export const validateFieldState = (
   // 2. Date Validation
   if (options.valueType === "date") {
     return isValidUiDate(text) ? "valid" : "invalid";
+  }
+
+  // 2b. DateTime Validation (DD-MM-YYYY HH:mm from DateTimeField)
+  if (options.valueType === "datetime") {
+    return isValidUiDateTime(text) ? "valid" : "invalid";
   }
 
   // 3. Text / String Validation (Validates pattern and character length)

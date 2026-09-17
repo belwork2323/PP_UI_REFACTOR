@@ -9,7 +9,9 @@ import { validateSchemaFormValues } from "@/data/models/user/schemaFormValidatio
 import {
   validateWeightmentSheetAgainstIdentification,
   validateWeightmentRowAgainstSheet,
+  weightmentHasMaterialData,
 } from "@/data/models/user/rawMaterialWeightmentValidation";
+import { schemaValuesHaveUserData } from "@/schema-engine/state/formState";
 import { getPremixMaterialSessionKey } from "@/hooks/user/manufacturing/rawMaterialPrepFlowConfig";
 import type { SchemaDocumentV2 } from "@/schema-engine/types";
 import { ALPHA_NUM, validateFieldState } from "../fieldValidators";
@@ -49,6 +51,73 @@ export const weightmentPath = (rowIndex: number, field: string): string =>
 export const weightmentMixerBuildingPath = (): string => "weightment.mixerBuildingNumber";
 
 const str = (v: unknown) => (v == null ? "" : String(v)).trim();
+
+type PremixProcessSlotState = RawMaterialPrepPremixSession["solid"];
+
+/** Schema loaded, or no schema and weightment covers this material. */
+export const isPremixProcessSlotSchemaReady = (
+  selected: boolean,
+  slot: PremixProcessSlotState,
+  materialCode: string | undefined,
+  weightmentSheet: RawMaterialPrepWeightmentSheet,
+): boolean => {
+  if (!selected) return true;
+  if (!str(materialCode)) return false;
+  if (slot.schemaLoading) return false;
+  if (slot.schema) return true;
+  return weightmentHasMaterialData(weightmentSheet, materialCode);
+};
+
+/** Process has schema form data, or weightment-only coverage when no schema exists. */
+export const premixProcessSlotHasSubmitData = (
+  selected: boolean,
+  slot: PremixProcessSlotState,
+  materialCode: string | undefined,
+  weightmentSheet: RawMaterialPrepWeightmentSheet,
+): boolean => {
+  if (!selected) return false;
+  if (!str(materialCode)) return false;
+  if (slot.schema) {
+    return schemaValuesHaveUserData(slot.formValues);
+  }
+  return weightmentHasMaterialData(weightmentSheet, materialCode);
+};
+
+export const isPremixSelectionSchemaReady = (
+  entry: AddedPremixSelection,
+  session: RawMaterialPrepPremixSession,
+  weightmentSheet: RawMaterialPrepWeightmentSheet,
+): boolean =>
+  isPremixProcessSlotSchemaReady(
+    Boolean(entry.selectedProcesses.solid),
+    session.solid,
+    entry.solidMaterialCode,
+    weightmentSheet,
+  ) &&
+  isPremixProcessSlotSchemaReady(
+    Boolean(entry.selectedProcesses.liquid),
+    session.liquid,
+    entry.liquidMaterialCode,
+    weightmentSheet,
+  );
+
+export const premixSelectionHasSubmitData = (
+  entry: AddedPremixSelection,
+  session: RawMaterialPrepPremixSession,
+  weightmentSheet: RawMaterialPrepWeightmentSheet,
+): boolean =>
+  premixProcessSlotHasSubmitData(
+    Boolean(entry.selectedProcesses.solid),
+    session.solid,
+    entry.solidMaterialCode,
+    weightmentSheet,
+  ) ||
+  premixProcessSlotHasSubmitData(
+    Boolean(entry.selectedProcesses.liquid),
+    session.liquid,
+    entry.liquidMaterialCode,
+    weightmentSheet,
+  );
 
 const isFiniteNumber = (value: unknown): boolean => {
   const text = str(value).replace(/,/g, "");
