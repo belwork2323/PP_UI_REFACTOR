@@ -58,10 +58,7 @@ export const mapProjectToFormState = (project: any): ProjectFormState => ({
   projectDescription: project?.projectDescription || "",
 });
 
-export const getProjectManagementErrorMessage = (
-  response: any,
-  fallback: string
-): string => {
+export const getProjectManagementErrorMessage = (response: any, fallback: string): string => {
   if (response?.error?.details) return response.error.details;
   if (response?.message) return response.message;
   return fallback;

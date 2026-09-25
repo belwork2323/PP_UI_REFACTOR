@@ -1,4 +1,3 @@
-
 import type {
   CasePrepAbradingDetailsRow,
   CasePrepIngredientRow,
@@ -101,7 +100,13 @@ const meetsSpecification = (result: number, specification: string): boolean => {
 
 type AddHelpers = {
   required: boolean;
-  addText: (path: string, value: unknown, label: string, mandatory: boolean, alpha?: boolean) => void;
+  addText: (
+    path: string,
+    value: unknown,
+    label: string,
+    mandatory: boolean,
+    alpha?: boolean,
+  ) => void;
   addNumber: (path: string, value: unknown, label: string, mandatory: boolean) => void;
   addDate: (path: string, value: unknown, label: string, mandatory: boolean) => void;
   addDateTime: (path: string, value: unknown, label: string, mandatory: boolean) => void;
@@ -281,6 +286,7 @@ export function validateCasePrepMotorData(
   const preHeating = data.preHeating ?? ({} as CasePrepMotorData["preHeating"]);
   const liner = data.linerCoatingOperation ?? ({} as CasePrepMotorData["linerCoatingOperation"]);
   const dispatch = data.dispatchToCasting ?? ({} as CasePrepMotorData["dispatchToCasting"]);
+  console.log(data);
 
   h.addText("abradingOperation.typeOfCasing", abrading.typeOfCasing, "Type of Casing", true);
   h.addText(
@@ -299,14 +305,24 @@ export function validateCasePrepMotorData(
   validateAbradingDetails(abrading.abradingDetails ?? [], h);
 
   h.addText("bellowBonding.adhesiveDetails", bellow.adhesiveDetails, "Adhesive Details", false);
-  h.addText("bellowBonding.heBellowDimension", bellow.heBellowDimension, "HE Bellow Dimension", true);
+  h.addText(
+    "bellowBonding.heBellowDimension",
+    bellow.heBellowDimension,
+    "HE Bellow Dimension",
+    true,
+  );
   h.addDateTime(
     "bellowBonding.heMotorPastingDateTime",
     bellow.heMotorPastingDateTime,
     "HE Motor Pasting Date & Time",
     true,
   );
-  h.addText("bellowBonding.neBellowDimension", bellow.neBellowDimension, "NE Bellow Dimension", true);
+  h.addText(
+    "bellowBonding.neBellowDimension",
+    bellow.neBellowDimension,
+    "NE Bellow Dimension",
+    true,
+  );
   h.addDateTime(
     "bellowBonding.neMotorPastingDateTime",
     bellow.neMotorPastingDateTime,
@@ -337,7 +353,12 @@ export function validateCasePrepMotorData(
   }
   h.addText("preHeating.preHeatingRecipe", preHeating.preHeatingRecipe, "Pre-heating Recipe", true);
   if (str(preHeating.preHeatingRecipe).toUpperCase() === "OTHERS") {
-    h.addText("preHeating.otherTemperature", preHeating.otherTemperature, "Other Temperature", true);
+    h.addText(
+      "preHeating.otherTemperature",
+      preHeating.otherTemperature,
+      "Other Temperature",
+      true,
+    );
     h.addNumber("preHeating.otherDuration", preHeating.otherDuration, "Other Duration (hrs)", true);
   }
   h.addDate("preHeating.preHeatingDate", preHeating.preHeatingDate, "Pre-heating Date", false);

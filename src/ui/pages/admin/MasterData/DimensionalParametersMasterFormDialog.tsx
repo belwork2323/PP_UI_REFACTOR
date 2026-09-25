@@ -18,9 +18,11 @@ import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
 import AdminManagementFormHeader from "@ui/components/custom/admin/AdminManagementFormHeader";
 import AppDropdown from "@ui/components/common/AppDropdown";
+import AppSearchableDropdown from "@ui/components/common/AppSearchableDropdown";
 import CasePrepTextField from "@ui/pages/user/manufacturing/CasePreparation/CasePrepTextField";
 import CasePrepSearchableSelect from "@ui/pages/user/manufacturing/CasePreparation/CasePrepSearchableSelect";
 import MasterDataEnableDisableField from "./components/MasterDataEnableDisableField";
+import getBatchManagementTheme from "@app/theme/custom_themes/admin/BatchManagement/batchManagement_theme";
 import {
   emptyDimensionalParameterRow,
   formatMotorStageLabel,
@@ -41,6 +43,9 @@ type Props = {
   createForm: DimensionalParametersCreateFormState;
   editForm: DimensionalParametersStageEditFormState | null;
   saving: boolean;
+  togglingActive?: boolean;
+  projectOptions: AppDropdownOption[];
+  projectLoading?: boolean;
   motorStageOptions: AppDropdownOption[];
   motorStageLoading?: boolean;
   unitOptions: AppDropdownOption[];
@@ -49,6 +54,7 @@ type Props = {
   onSave: () => void;
   onCreateFormChange: (next: DimensionalParametersCreateFormState) => void;
   onEditFormChange: (next: DimensionalParametersStageEditFormState) => void;
+  onExistingActiveChange?: (parameterId: number, nextActive: boolean) => void;
   t: any;
 };
 
@@ -62,6 +68,7 @@ const ParameterRowsEditor = ({
   unitLoading,
   theme,
   onChange,
+  onExistingActiveChange,
 }: {
   rows: DimensionalParameterRowForm[];
   disabled?: boolean;
@@ -72,6 +79,7 @@ const ParameterRowsEditor = ({
   unitLoading?: boolean;
   theme: any;
   onChange: (next: DimensionalParameterRowForm[]) => void;
+  onExistingActiveChange?: (parameterId: number, nextActive: boolean) => void;
 }) => (
   <Stack spacing={1.5}>
     {rows.map((row, index) => {
@@ -194,7 +202,13 @@ const ParameterRowsEditor = ({
               disabled={disabled}
               labelVariant="caption"
               confirmName={row.paramName || "parameter"}
-              onChange={(checked) => updateRow({ isActive: checked })}
+              onChange={(checked) => {
+                if (locked && row.parameterId != null && onExistingActiveChange) {
+                  onExistingActiveChange(row.parameterId, checked);
+                  return;
+                }
+                updateRow({ isActive: checked });
+              }}
             />
             {!locked && (!isEditMode ? rows.length > 1 : true) ? (
               <IconButton
@@ -239,6 +253,9 @@ const DimensionalParametersMasterFormDialog = ({
   createForm,
   editForm,
   saving,
+  togglingActive = false,
+  projectOptions,
+  projectLoading = false,
   motorStageOptions,
   motorStageLoading = false,
   unitOptions,
@@ -247,12 +264,16 @@ const DimensionalParametersMasterFormDialog = ({
   onSave,
   onCreateFormChange,
   onEditFormChange,
+  onExistingActiveChange,
   t,
 }: Props) => {
   const mode = useThemeStore((s) => s.mode);
   const fieldTheme = useMemo(() => getManufacturingTheme(mode), [mode]);
+  const batchTheme = useMemo(() => getBatchManagementTheme(mode), [mode]);
   const { modal } = t;
+  const batchModal = batchTheme.modal;
   const [showErrors, setShowErrors] = useState(false);
+  const busy = saving || togglingActive;
 
   const createFieldErrors = useMemo(
     () => getDimensionalCreateFormFieldErrors(createForm),
@@ -263,6 +284,11 @@ const DimensionalParametersMasterFormDialog = ({
     [editForm],
   );
 
+  const projectError = visibleValidationError(
+    createFieldErrors.projectId,
+    Boolean(createForm.projectId.trim()),
+    showErrors,
+  );
   const motorStageError = visibleValidationError(
     createFieldErrors.motorType,
     createForm.motorType !== "",
@@ -275,13 +301,20 @@ const DimensionalParametersMasterFormDialog = ({
   };
 
   const handleClose = () => {
-    if (saving) return;
+    if (busy) return;
     setShowErrors(false);
     onClose();
   };
 
   const stageLabel = editForm
     ? formatMotorStageLabel(editForm.motorType, motorStageOptions)
+    : "";
+  const projectLabel = editForm
+    ? String(
+        projectOptions.find((o) => o.value === editForm.projectId)?.label ||
+          editForm.projectId ||
+          "—",
+      )
     : "";
 
   return (
@@ -311,7 +344,7 @@ const DimensionalParametersMasterFormDialog = ({
               : S.DIMENSIONAL_PARAMETERS.CREATE_SUBTITLE
           }
           onClose={handleClose}
-          closeDisabled={saving}
+          closeDisabled={busy}
           theme={t}
         />
       </DialogTitle>
@@ -320,11 +353,14 @@ const DimensionalParametersMasterFormDialog = ({
         {isEdit && editForm ? (
           <Stack spacing={2}>
             <Typography variant="body2">
+              <strong>{S.DIMENSIONAL_PARAMETERS.COL_PROJECT}:</strong> {String(projectLabel)}
+            </Typography>
+            <Typography variant="body2">
               <strong>{S.DIMENSIONAL_PARAMETERS.COL_MOTOR_STAGE}:</strong> {stageLabel}
             </Typography>
             <ParameterRowsEditor
               rows={editForm.parameters}
-              disabled={saving}
+              disabled={busy}
               isEditMode
               showErrors={showErrors}
               rowErrors={editFieldErrors.parameters}
@@ -332,51 +368,87 @@ const DimensionalParametersMasterFormDialog = ({
               unitLoading={unitLoading}
               theme={fieldTheme}
               onChange={(parameters) => onEditFormChange({ ...editForm, parameters })}
+              onExistingActiveChange={onExistingActiveChange}
             />
           </Stack>
         ) : (
           <Stack spacing={2}>
-            <AppDropdown
-              label={S.DIMENSIONAL_PARAMETERS.COL_MOTOR_STAGE}
-              value={createForm.motorType === "" ? "" : String(createForm.motorType)}
+            <AppSearchableDropdown
+              label={S.DIMENSIONAL_PARAMETERS.COL_PROJECT}
+              value={createForm.projectId}
               onChange={(value) => {
-                const nextMotorType = value === "" ? "" : Number(value);
-                const stageChanged =
-                  createForm.motorType !== "" && createForm.motorType !== nextMotorType;
                 onCreateFormChange({
                   ...createForm,
-                  motorType: nextMotorType,
-                  parameters:
-                    nextMotorType === ""
-                      ? []
-                      : stageChanged || createForm.parameters.length === 0
-                        ? [emptyDimensionalParameterRow()]
-                        : createForm.parameters,
+                  projectId: value,
+                  motorType: "",
+                  parameters: [],
                 });
               }}
-              options={motorStageOptions}
-              loading={motorStageLoading}
-              placeholder={S.DIMENSIONAL_PARAMETERS.MOTOR_STAGE_SELECT_PLACEHOLDER}
+              options={projectOptions}
+              loading={projectLoading}
+              placeholder={S.DIMENSIONAL_PARAMETERS.PROJECT_SELECT_PLACEHOLDER}
               required
-              error={Boolean(motorStageError)}
-              helperText={motorStageError}
-              disabled={saving}
+              error={Boolean(projectError)}
+              helperText={projectError}
+              disabled={busy}
+              renderOption={(props, option) => (
+                <Box component="li" {...props} key={option.value}>
+                  <Box sx={batchModal.projectOption}>
+                    <Typography sx={batchModal.projectOptionName}>{String(option.label)}</Typography>
+                    <Typography sx={batchModal.projectOptionId}>{option.value}</Typography>
+                  </Box>
+                </Box>
+              )}
             />
-            {createForm.motorType === "" ? (
+            {!createForm.projectId.trim() ? (
               <Typography variant="body2" color="text.secondary">
-                {S.DIMENSIONAL_PARAMETERS.MOTOR_STAGE_SELECT_FIRST_HINT}
+                {S.DIMENSIONAL_PARAMETERS.PROJECT_SELECT_FIRST_HINT}
               </Typography>
             ) : (
-              <ParameterRowsEditor
-                rows={createForm.parameters}
-                disabled={saving}
-                showErrors={showErrors}
-                rowErrors={createFieldErrors.parameters}
-                unitOptions={unitOptions}
-                unitLoading={unitLoading}
-                theme={fieldTheme}
-                onChange={(parameters) => onCreateFormChange({ ...createForm, parameters })}
-              />
+              <>
+                <AppDropdown
+                  label={S.DIMENSIONAL_PARAMETERS.COL_MOTOR_STAGE}
+                  value={createForm.motorType === "" ? "" : String(createForm.motorType)}
+                  onChange={(value) => {
+                    const nextMotorType = value === "" ? "" : Number(value);
+                    const stageChanged =
+                      createForm.motorType !== "" && createForm.motorType !== nextMotorType;
+                    onCreateFormChange({
+                      ...createForm,
+                      motorType: nextMotorType,
+                      parameters:
+                        nextMotorType === ""
+                          ? []
+                          : stageChanged || createForm.parameters.length === 0
+                            ? [emptyDimensionalParameterRow()]
+                            : createForm.parameters,
+                    });
+                  }}
+                  options={motorStageOptions}
+                  loading={motorStageLoading}
+                  placeholder={S.DIMENSIONAL_PARAMETERS.MOTOR_STAGE_SELECT_PLACEHOLDER}
+                  required
+                  error={Boolean(motorStageError)}
+                  helperText={motorStageError}
+                  disabled={busy || motorStageLoading}
+                />
+                {createForm.motorType === "" ? (
+                  <Typography variant="body2" color="text.secondary">
+                    {S.DIMENSIONAL_PARAMETERS.MOTOR_STAGE_SELECT_FIRST_HINT}
+                  </Typography>
+                ) : (
+                  <ParameterRowsEditor
+                    rows={createForm.parameters}
+                    disabled={busy}
+                    showErrors={showErrors}
+                    rowErrors={createFieldErrors.parameters}
+                    unitOptions={unitOptions}
+                    unitLoading={unitLoading}
+                    theme={fieldTheme}
+                    onChange={(parameters) => onCreateFormChange({ ...createForm, parameters })}
+                  />
+                )}
+              </>
             )}
           </Stack>
         )}
@@ -386,7 +458,7 @@ const DimensionalParametersMasterFormDialog = ({
         <Button
           variant="contained"
           onClick={handleSave}
-          disabled={saving}
+          disabled={busy}
           startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
         >
           {saving ? S.FORM.SAVING : S.FORM.SAVE}

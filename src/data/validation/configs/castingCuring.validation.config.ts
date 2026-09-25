@@ -48,7 +48,7 @@ export const castingCuringFieldRules = {
     valueType: "text" as const,
     requiredIn: ["SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.CASTING_BOWL_LABEL,
+    // pattern: S.PATTERNS.CASTING_BOWL_LABEL,
     minLength: 1,
     maxLength: 100,
   },
@@ -180,7 +180,7 @@ export const castingCuringFieldRules = {
     valueType: "text" as const,
     requiredIn: ["SUBMIT"],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
-    pattern: S.PATTERNS.CASTING_BOWL_LABEL,
+    // pattern: S.PATTERNS.CASTING_BOWL_LABEL,
     minLength: 1,
     maxLength: 100,
   },
@@ -321,8 +321,12 @@ export const castingCuringFieldRules = {
   },
 };
 const isSlurryTotalValidationRow = (row: { ROW_KEY?: unknown; FM_MOTOR_LABEL?: unknown }) => {
-  const rowKey = String(row?.ROW_KEY ?? "").trim().toUpperCase();
-  const label = String(row?.FM_MOTOR_LABEL ?? "").trim().toLowerCase();
+  const rowKey = String(row?.ROW_KEY ?? "")
+    .trim()
+    .toUpperCase();
+  const label = String(row?.FM_MOTOR_LABEL ?? "")
+    .trim()
+    .toLowerCase();
   return rowKey === "TOTAL" || label === "total slurry cast";
 };
 

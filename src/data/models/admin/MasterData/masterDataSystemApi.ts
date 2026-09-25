@@ -151,9 +151,12 @@ const SYSTEM_API_BY_TYPE: Record<string, SystemApiMeta> = {
     name: "Dimensional parameters list (ops, active only)",
     method: "POST",
     endpoint: USER_OPERATIONS_ENDPOINTS.DIMENSIONAL_PARAMETERS_LIST,
-    request: { motorType: "1" },
+    request: { projectId: "PRJ-2026-0028", motorType: "1" },
     fetch: async () => {
-      const resp = await operationsController.fetchDimensionalParametersList({ motorType: "1" });
+      const resp = await operationsController.fetchDimensionalParametersList({
+        projectId: "PRJ-2026-0028",
+        motorType: "1",
+      });
       if (!resp.success) throw new Error(resp.message || "Failed to load dimensional parameters");
       return resp.data;
     },
@@ -164,7 +167,7 @@ const SYSTEM_API_BY_TYPE: Record<string, SystemApiMeta> = {
     endpoint: SYSTEM.MIXING_CYCLE_LIST,
     request: { motorStage: "ALL" },
     fetch: async () => {
-      const resp = await generalController.getMixingCycles("ALL");
+      const resp = await generalController.getMixingCycles();
       if (!resp.success) throw new Error(resp.message || "Failed to load mixing cycles");
       return resp.data;
     },
@@ -173,9 +176,12 @@ const SYSTEM_API_BY_TYPE: Record<string, SystemApiMeta> = {
     name: "Curing cycles (ops, active only)",
     method: "POST",
     endpoint: USER_CASTING_CURING_FORM_ENDPOINTS.CURING_CYCLES,
-    request: { motorStage: 1 },
+    request: { projectId: "PRJ-2026-0028", motorStage: 1 },
     fetch: async () => {
-      const body = await fetchCuringCyclesApi({ motorStage: 1 });
+      const body = await fetchCuringCyclesApi({
+        projectId: "PRJ-2026-0028",
+        motorStage: 1,
+      });
       return (body as any)?.data ?? body;
     },
   },
@@ -196,7 +202,6 @@ const NESTED_ADMIN_LIST: Record<string, string> = {
   "insulation-specifications": ADMIN_ENDPOINTS.MASTER_DATA.INSULATION.LIST,
   "mixing-cycles": ADMIN_ENDPOINTS.MASTER_DATA.MIXING_CYCLES.LIST,
   "curing-cycles": ADMIN_ENDPOINTS.MASTER_DATA.CURING_CYCLES.LIST,
-  "quality-checks": ADMIN_ENDPOINTS.MASTER_DATA.QUALITY_CHECKS.LIST,
 };
 
 export const getAdminListApiDetails = (

@@ -18,6 +18,10 @@ import {
 import { buildRevalidationMaterialsPayload, buildRevalidationSectionPayload, hasRevalidationTableData } from "../../../hooks/user/qualityControl/qcRawMaterialRevalidationTable";
 import { buildProcessingPremixesPayload } from "../../../hooks/user/qualityControl/qcProcessingMaterials";
 import {
+  mapWeightmentSheetToApi,
+  type RawMaterialPrepWeightmentSheet,
+} from "./RawMaterialPreparationModel";
+import {
   buildHardwareMotorDetailPayload,
   isHardwareNestedMotorDetail,
   mergeHardwareMotorSchemaValues,
@@ -85,6 +89,11 @@ export type QualityControlFormState = {
   divisionEntryValues?: Record<string, QcDivisionEntryValues>;
   /** Shared final mix header/parameter table — common across all final mix entries. */
   mixingFinalMixDetailsValues?: SchemaFormValues;
+  /**
+   * QC-owned Raw Material Processing weighment sheet (editable when schema unavailable).
+   * Persisted under QC division data — does not update RMP.
+   */
+  processingWeightmentSheet?: RawMaterialPrepWeightmentSheet | null;
   solidPremixEntries?: QcPremixEntry[];
   solidPremixValuesByNo?: Record<number, SchemaFormValues>;
   liquidPremixEntries?: QcPremixEntry[];
@@ -877,6 +886,32 @@ export const mapQualityControlPayload = (
       (entry) => entry.kind === "PROCESSING_MATERIAL",
     );
     if (processingMaterialEntries.length > 0) {
+      const weightmentSheetApi = form.processingWeightmentSheet
+        ? mapWeightmentSheetToApi(form.processingWeightmentSheet)
+        : null;
+      // Always persist weighment when QC owns a sheet (even partial), so details returns it.
+      const weightmentPayload =
+        weightmentSheetApi && Object.keys(weightmentSheetApi).length > 0
+          ? weightmentSheetApi
+          : form.processingWeightmentSheet != null
+            ? {
+                mixerBuildingNumber:
+                  String(form.processingWeightmentSheet.mixerBuildingNumber ?? "").trim() ||
+                  null,
+                weightmentDetails: [],
+                validation: {
+                  compareWithIdentificationSheet:
+                    form.processingWeightmentSheet.validation?.compareWithIdentificationSheet ===
+                    true,
+                  deviationFound:
+                    form.processingWeightmentSheet.validation?.deviationFound === true,
+                  deviationMessage:
+                    String(
+                      form.processingWeightmentSheet.validation?.deviationMessage ?? "",
+                    ).trim() || null,
+                },
+              }
+            : null;
       divisionDetails.push({
         division: "RAW_MATERIAL",
         subType: "RAW_MATERIAL_PROCESSING",
@@ -885,6 +920,7 @@ export const mapQualityControlPayload = (
           premixes: buildProcessingPremixesPayload(form, processingMaterialEntries, {
             unitSubmissionType: options?.unitSubmissionType ?? null,
           }),
+          ...(weightmentPayload ? { weightmentSheet: weightmentPayload } : {}),
         },
       });
     }

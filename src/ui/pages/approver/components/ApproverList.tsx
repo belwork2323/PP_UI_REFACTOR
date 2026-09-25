@@ -53,7 +53,7 @@ const EMPTY_LIST_FILTERS: Record<string, string> = {};
 const EMPTY_SEARCH_KEYS: string[] = [];
 const EMPTY_ITEMS: Record<string, unknown>[] = [];
 
-const ApproverList = <T extends Record<string, unknown>,>({
+const ApproverList = <T extends Record<string, unknown>>({
   children,
   department,
   emptyIcon,
@@ -101,16 +101,22 @@ const ApproverList = <T extends Record<string, unknown>,>({
     }),
     [filters, listFilters],
   );
-  const { items: resolvedItems, loading, page, pagination, setPage, statusCounts } =
-    useApproverSubDepartmentBatchList<T>({
-      allLabel,
-      department,
-      extraFilters: mergedExtraFilters,
-      items,
-      searchText,
-      status: activeStatus,
-      subDepartment,
-    });
+  const {
+    items: resolvedItems,
+    loading,
+    page,
+    pagination,
+    setPage,
+    statusCounts,
+  } = useApproverSubDepartmentBatchList<T>({
+    allLabel,
+    department,
+    extraFilters: mergedExtraFilters,
+    items,
+    searchText,
+    status: activeStatus,
+    subDepartment,
+  });
 
   const filteredItems = useMemo(() => {
     const sourceItems = subDepartment ? resolvedItems : items;
@@ -138,18 +144,32 @@ const ApproverList = <T extends Record<string, unknown>,>({
           return true;
         }
 
-        const value = field.split(".").reduce<unknown>((current, part) => {
-          if (current && typeof current === "object") {
-            return (current as Record<string, unknown>)[part];
-          }
+        const value = field.split(".").reduce<unknown>(
+          (current, part) => {
+            if (current && typeof current === "object") {
+              return (current as Record<string, unknown>)[part];
+            }
 
-          return undefined;
-        }, item as Record<string, unknown>);
+            return undefined;
+          },
+          item as Record<string, unknown>,
+        );
 
         return String(value ?? "") === selectedValue;
       });
     });
-  }, [activeStatus, allLabel, filterFields, filters, items, resolvedItems, searchKeys, searchText, statusField, subDepartment]);
+  }, [
+    activeStatus,
+    allLabel,
+    filterFields,
+    filters,
+    items,
+    resolvedItems,
+    searchKeys,
+    searchText,
+    statusField,
+    subDepartment,
+  ]);
 
   const displayStatusTabs = useMemo(() => {
     if (statusTabsOverride?.length) {
@@ -202,10 +222,10 @@ const ApproverList = <T extends Record<string, unknown>,>({
       statusTabs={displayStatusTabs}
       theme={listTheme}
     >
-          {children(filteredItems)}
-          {subDepartment && pagination.totalPages > 1 ? (
-            <Pagination currentPage={page} totalPages={pagination.totalPages} onChange={setPage} />
-          ) : null}
+      {children(filteredItems)}
+      {subDepartment && pagination.totalPages > 1 ? (
+        <Pagination currentPage={page} totalPages={pagination.totalPages} onChange={setPage} />
+      ) : null}
     </BatchListShell>
   );
 };

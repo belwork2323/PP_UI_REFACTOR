@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -17,13 +17,15 @@ import {
 } from "@mui/material";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
+import { useThemeStore } from "@app/store/themeStore";
+import getBatchManagementTheme from "@app/theme/custom_themes/admin/BatchManagement/batchManagement_theme";
 import MasterDataToggleConfirmDialog from "./components/MasterDataToggleConfirmDialog";
 import SkeletonRow from "@ui/components/common/SkeletonRow";
 import useDimensionalParametersMasterHook from "@hooks/admin/MasterData/useDimensionalParametersMasterHook";
 import useMotorStageOptions from "@hooks/admin/MasterData/useMotorStageOptions";
+import useProjectForMotorStageOptions from "@hooks/admin/MasterData/useProjectForMotorStageOptions";
 import useUnitMasterOptions from "@hooks/admin/MasterData/useUnitMasterOptions";
 import {
-  formatDimensionalRangeLabel,
   formatMotorStageLabel,
   type DimensionalParametersMasterRecord,
 } from "@data/models/admin/MasterData/DimensionalParametersMasterModel";
@@ -59,7 +61,12 @@ const DimensionalParametersMasterPanel = ({
   t,
   onStatsChange,
 }: Props) => {
-  const { options: motorStageOptions, loading: motorStageLoading } = useMotorStageOptions(true);
+  const mode = useThemeStore((s) => s.mode);
+  const batchTheme = useMemo(() => getBatchManagementTheme(mode), [mode]);
+  const { modal: batchModal, tableCell: batchTableCell } = batchTheme;
+
+  const { projects: projectSelectOptions, options: projectOptions, loading: projectLoading } =
+    useProjectForMotorStageOptions(true);
   const { options: unitOptions, loading: unitLoading } = useUnitMasterOptions(true);
   const hook = useDimensionalParametersMasterHook({
     activeFilter,
@@ -68,16 +75,47 @@ const DimensionalParametersMasterPanel = ({
     onStatsChange,
     onRefresh,
   });
+
+  const createProjectId = hook.createForm.projectId || "";
+  const { options: createMotorStageOptions, loading: createMotorStageLoading } =
+    useMotorStageOptions(hook.inlineMode === "create", createProjectId || "");
+
   const { table, tableCell } = t;
   const formOpen = hook.inlineMode != null;
-  const columnCount = 5 + MASTER_DATA_AUDIT_COLUMN_COUNT + 2;
+  const columnCount = 6 + MASTER_DATA_AUDIT_COLUMN_COUNT + 2;
   const [viewTarget, setViewTarget] = useState<DimensionalParametersMasterRecord | null>(null);
+
+  const resolveProject = (projectId: string) => {
+    const match = projectSelectOptions.find((p) => p.projectId === projectId);
+    if (match) return match;
+    const opt = projectOptions.find((o) => o.value === projectId);
+    if (!opt) return null;
+    return { projectId, projectName: String(opt.label ?? projectId) };
+  };
+
+  const renderProjectCell = (projectId: string) => {
+    const id = String(projectId ?? "").trim();
+    if (!id) return <Typography sx={table.bodyText}>—</Typography>;
+    const project = resolveProject(id);
+    const projectName = project?.projectName?.trim() || id;
+    return (
+      <Box sx={batchTableCell.batchIdBox}>
+        <icons.batchMgmt.projectId
+          sx={{ ...batchTableCell.batchIdIcon, ...batchTableCell.projectIdIcon }}
+        />
+        <Box sx={batchTableCell.projectInfo}>
+          <Typography sx={batchTableCell.projectName}>{projectName}</Typography>
+          <Typography sx={batchTableCell.projectId}>{id}</Typography>
+        </Box>
+      </Box>
+    );
+  };
 
   useEffect(() => {
     if (!viewTarget) return;
-    const updated = hook.items.find((item) => item.parameterId === viewTarget.parameterId);
+    const updated = hook.allItems.find((item) => item.parameterId === viewTarget.parameterId);
     if (updated && updated !== viewTarget) setViewTarget(updated);
-  }, [hook.items, viewTarget]);
+  }, [hook.allItems, viewTarget]);
 
   return (
     <Box>
@@ -85,13 +123,24 @@ const DimensionalParametersMasterPanel = ({
         <DimensionalParametersTableToolbar
           search={hook.search}
           onSearchChange={hook.setSearch}
+          projectFilter={hook.projectFilter}
+          onProjectFilterChange={hook.setProjectFilter}
+          projectOptions={projectOptions}
+          projectLoading={projectLoading}
           motorStageFilter={hook.motorStageFilter}
           onMotorStageFilterChange={hook.setMotorStageFilter}
-          motorStageOptions={motorStageOptions}
-          motorStageLoading={motorStageLoading}
+          motorStageOptions={hook.motorStageFilterOptions}
           onRefresh={onRefresh}
           refreshDisabled={refreshDisabled || hook.loading}
           t={t}
+          renderProjectOption={(props, option) => (
+            <Box component="li" {...props} key={option.value}>
+              <Box sx={batchModal.projectOption}>
+                <Typography sx={batchModal.projectOptionName}>{String(option.label)}</Typography>
+                <Typography sx={batchModal.projectOptionId}>{option.value}</Typography>
+              </Box>
+            </Box>
+          )}
         />
         <Divider sx={table.divider} />
         <TableContainer>
@@ -99,6 +148,9 @@ const DimensionalParametersMasterPanel = ({
             <TableHead>
               <TableRow sx={table.headerRow}>
                 <TableCell sx={table.headerCell}>{S.DIMENSIONAL_PARAMETERS.COL_NAME}</TableCell>
+                <TableCell sx={{ ...table.headerCell, minWidth: 220 }}>
+                  {S.DIMENSIONAL_PARAMETERS.COL_PROJECT}
+                </TableCell>
                 <TableCell sx={table.headerCell}>{S.DIMENSIONAL_PARAMETERS.COL_MOTOR_STAGE}</TableCell>
                 <TableCell sx={table.headerCell}>{S.DIMENSIONAL_PARAMETERS.COL_MIN}</TableCell>
                 <TableCell sx={table.headerCell}>{S.DIMENSIONAL_PARAMETERS.COL_MAX}</TableCell>
@@ -129,9 +181,12 @@ const DimensionalParametersMasterPanel = ({
                         </Typography>
                       ) : null}
                     </TableCell>
+                    <TableCell sx={{ ...table.cell, minWidth: 220 }}>
+                      {renderProjectCell(row.projectId)}
+                    </TableCell>
                     <TableCell sx={table.cell}>
                       <Typography sx={table.bodyText}>
-                        {formatMotorStageLabel(row.motorType, motorStageOptions)}
+                        {formatMotorStageLabel(row.motorType, hook.motorStageFilterOptions)}
                       </Typography>
                     </TableCell>
                     <TableCell sx={table.cell}>
@@ -153,7 +208,12 @@ const DimensionalParametersMasterPanel = ({
                           <IconButton
                             size="small"
                             onClick={() => setViewTarget(row)}
-                            disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
+                            disabled={
+                              hook.saving ||
+                              formOpen ||
+                              hook.disabling ||
+                              hook.enabling
+                            }
                             aria-label={S.TABLE.VIEW}
                           >
                             <icons.visibility fontSize="small" />
@@ -163,7 +223,12 @@ const DimensionalParametersMasterPanel = ({
                           <IconButton
                             size="small"
                             onClick={() => hook.openEdit(row)}
-                            disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
+                            disabled={
+                              hook.saving ||
+                              formOpen ||
+                              hook.disabling ||
+                              hook.enabling
+                            }
                             aria-label={S.TABLE.EDIT}
                           >
                             <icons.Edit fontSize="small" />
@@ -171,7 +236,12 @@ const DimensionalParametersMasterPanel = ({
                         </Tooltip>
                         <MasterDataActiveSwitch
                           isActive={row.isActive}
-                          disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
+                          disabled={
+                            hook.saving ||
+                            formOpen ||
+                            hook.disabling ||
+                            hook.enabling
+                          }
                           onToggle={(nextActive) => hook.handleToggleActive(row, nextActive)}
                         />
                       </Box>
@@ -211,8 +281,11 @@ const DimensionalParametersMasterPanel = ({
         createForm={hook.createForm}
         editForm={hook.editForm}
         saving={hook.saving}
-        motorStageOptions={motorStageOptions}
-        motorStageLoading={motorStageLoading}
+        togglingActive={hook.disabling || hook.enabling}
+        projectOptions={projectOptions}
+        projectLoading={projectLoading}
+        motorStageOptions={createMotorStageOptions}
+        motorStageLoading={createMotorStageLoading}
         unitOptions={unitOptions}
         unitLoading={unitLoading}
         onClose={hook.closeInline}
@@ -221,13 +294,26 @@ const DimensionalParametersMasterPanel = ({
         }}
         onCreateFormChange={hook.setCreateForm}
         onEditFormChange={hook.setEditForm}
+        onExistingActiveChange={(parameterId, nextActive) => {
+          void hook.toggleExistingParameterActive(parameterId, nextActive);
+        }}
         t={t}
       />
 
       <DimensionalParametersMasterViewDialog
         open={viewTarget != null}
         record={viewTarget}
-        motorStageOptions={motorStageOptions}
+        stageRecords={
+          viewTarget
+            ? hook.allItems.filter(
+                (item) =>
+                  item.projectId === viewTarget.projectId &&
+                  item.motorType === viewTarget.motorType,
+              )
+            : []
+        }
+        motorStageOptions={hook.motorStageFilterOptions}
+        projectOptions={projectOptions}
         onClose={() => setViewTarget(null)}
         t={t}
       />

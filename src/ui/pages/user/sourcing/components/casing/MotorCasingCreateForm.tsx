@@ -217,6 +217,8 @@ const MotorCasingCreateForm = ({
 
   const receiptLabels = { received: S.RECEIVED, notReceived: S.NOT_RECEIVED };
 
+  const projectSelected = Boolean(String(form.projectId ?? "").trim());
+
   const stageOptions = lookups.motorStages.map((s) => ({
     value: s.motorStage,
     label: `Stage ${s.motorStage}`,
@@ -237,11 +239,16 @@ const MotorCasingCreateForm = ({
   const identificationStageOptions = useMemo(() => {
     const opts = [...stageOptions];
     const stage = String(form.motorStageApi ?? "").trim();
-    if (stage && !opts.some((o) => o.value === stage)) {
-      opts.unshift({ value: stage, label: `Stage ${stage}`, meta: null });
+    // Keep current stage visible while locked (edit) even if options briefly empty.
+    if (stage && !opts.some((o) => o.value === stage) && lockIdentification) {
+      opts.unshift({ value: stage, label: `Stage ${stage}`, meta: undefined });
     }
     return opts;
-  }, [stageOptions, form.motorStageApi]);
+  }, [stageOptions, form.motorStageApi, lockIdentification]);
+
+  useEffect(() => {
+    void lookups.loadMotorStages(String(form.projectId ?? "").trim());
+  }, [form.projectId, lookups.loadMotorStages]);
 
   const [step, setStep] = useState(0);
   const [stepError, setStepError] = useState<string | null>(null);
@@ -363,9 +370,18 @@ const MotorCasingCreateForm = ({
                 onChange={(v) => {
                   if (lockIdentification) return;
                   const match = identificationProjects.find((p) => p.projectId === v);
+                  const nextProjectId = String(v ?? "").trim();
+                  const projectChanged = nextProjectId !== String(form.projectId ?? "").trim();
                   patch({
                     projectId: v,
                     projectName: match?.projectName ?? "",
+                    ...(projectChanged
+                      ? {
+                          motorStageApi: "",
+                          mockTrial: createEmptyMockTrialSlot(),
+                          dimensionalData: [],
+                        }
+                      : {}),
                   });
                 }}
                 projects={identificationProjects}
@@ -390,7 +406,12 @@ const MotorCasingCreateForm = ({
                 }}
                 options={identificationStageOptions}
                 placeholder={S.SELECT_STAGE}
-                disabled={lockIdentification || lookups.loading || loadingDimensionalParams}
+                disabled={
+                  lockIdentification ||
+                  !projectSelected ||
+                  lookups.motorStagesLoading ||
+                  loadingDimensionalParams
+                }
                 theme={theme}
                 error={validationErrors.motorStageApi}
               />

@@ -65,7 +65,8 @@ export const qcHardwareValidationFields: Record<string, FieldRuleConfig> = {
   nePunctures: number(["SUBMIT"]),
   lfPunctures: number(["SUBMIT"]),
   dispatchDateTime: text(["SUBMIT"]),
-  visualObservations: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  // Preset visual-observation rows — notes optional (UI has no required asterisks)
+  visualObservations: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 };
 
 const asRecord = (v: unknown): Record<string, unknown> | null =>

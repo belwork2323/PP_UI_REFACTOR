@@ -50,6 +50,7 @@ export default function useCuringCycleMasterHook({
   const [stats, setStats] = useState(emptyMasterDataStats());
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [projectFilter, setProjectFilter] = useState("");
   const [motorStageFilter, setMotorStageFilter] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -66,6 +67,7 @@ export default function useCuringCycleMasterHook({
       if (search.trim()) body.search = search.trim();
       if (activeFilter === "ACTIVE") body.isActive = true;
       if (activeFilter === "INACTIVE") body.isActive = false;
+      if (projectFilter) body.projectId = projectFilter;
       if (motorStageFilter) body.motorStage = Number(motorStageFilter);
       const resp = new ApiResponseModel(await fetchCuringCycleMasterList(body), CuringCycleListModel.fromApi);
       if (resp.success && resp.data) {
@@ -90,11 +92,11 @@ export default function useCuringCycleMasterHook({
       onStatsChangeRef.current?.(emptyMasterDataStats());
       useAlertStore
         .getState()
-        .showAlert(getMasterDataErrorMessage(err?.response?.data, S.ERRORS.LOAD_LIST_FAILED), "error");
+        .showAlert(getMasterDataErrorMessage(err, S.ERRORS.LOAD_LIST_FAILED), "error");
     } finally {
       setLoading(false);
     }
-  }, [activeFilter, motorStageFilter, search]);
+  }, [activeFilter, motorStageFilter, projectFilter, search]);
 
   useEffect(() => {
     setPage(0);
@@ -150,7 +152,7 @@ export default function useCuringCycleMasterHook({
     } catch (e: any) {
       useAlertStore
         .getState()
-        .showAlert(getMasterDataErrorMessage(e?.response?.data, S.ERRORS.OPERATION_FAILED), "error");
+        .showAlert(getMasterDataErrorMessage(e, S.ERRORS.OPERATION_FAILED), "error");
     } finally {
       setSaving(false);
     }
@@ -172,7 +174,7 @@ export default function useCuringCycleMasterHook({
     } catch (e: any) {
       useAlertStore
         .getState()
-        .showAlert(getMasterDataErrorMessage(e?.response?.data, S.ERRORS.OPERATION_FAILED), "error");
+        .showAlert(getMasterDataErrorMessage(e, S.ERRORS.OPERATION_FAILED), "error");
     } finally {
       setEnabling(false);
     }
@@ -194,7 +196,7 @@ export default function useCuringCycleMasterHook({
     } catch (e: any) {
       useAlertStore
         .getState()
-        .showAlert(getMasterDataErrorMessage(e?.response?.data, S.ERRORS.OPERATION_FAILED), "error");
+        .showAlert(getMasterDataErrorMessage(e, S.ERRORS.OPERATION_FAILED), "error");
     } finally {
       setDisabling(false);
     }
@@ -230,6 +232,12 @@ export default function useCuringCycleMasterHook({
     motorStageFilter,
     setMotorStageFilter: (v: string) => {
       setMotorStageFilter(v);
+      setPage(0);
+    },
+    projectFilter,
+    setProjectFilter: (v: string) => {
+      setProjectFilter(v);
+      setMotorStageFilter("");
       setPage(0);
     },
     page,

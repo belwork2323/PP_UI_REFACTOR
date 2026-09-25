@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useApproverListRefreshStore } from "../../app/store/approverListRefreshStore";
 import { useAuthStore } from "../../app/store/authStore";
@@ -147,7 +147,9 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
   const refreshVersion = useApproverListRefreshStore((state) => state.version);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState<ApproverBatchPagination>(DEFAULT_PAGINATION);
-  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({ [allLabel]: items.length });
+  const [statusCounts, setStatusCounts] = useState<Record<string, number>>({
+    [allLabel]: items.length,
+  });
   const [remoteBatches, setRemoteBatches] = useState<ApproverBatchSummary[]>([]);
   const [loading, setLoading] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -201,204 +203,75 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
     hasLoadedOnceRef.current = false;
   }, [subDepartment, selectedSubDepartment?.subDepartmentId]);
 
-  useEffect(() => {
-    let cancelled = false;
+  const loadBatches = useCallback(async () => {
+    if (!selectedSubDepartment?.subDepartmentId || !subDepartment) {
+      setRemoteBatches([]);
+      setPagination(DEFAULT_PAGINATION);
+      setStatusCounts({ [allLabel]: items.length });
+      setLoading(false);
+      setIsRefreshing(false);
+      return;
+    }
 
-    const loadBatches = async () => {
-      if (!selectedSubDepartment?.subDepartmentId || !subDepartment) {
-        if (!cancelled) {
-          setRemoteBatches([]);
-          setPagination(DEFAULT_PAGINATION);
-          setStatusCounts({ [allLabel]: items.length });
-          setLoading(false);
-          setIsRefreshing(false);
-        }
-        return;
+    if (!SOURCING_REMOTE_LIST_SUBDEPTS.has(subDepartment ?? "") && !userId) {
+      setRemoteBatches([]);
+      setPagination(DEFAULT_PAGINATION);
+      setStatusCounts({ [allLabel]: items.length });
+      setLoading(false);
+      setIsRefreshing(false);
+      return;
+    }
+
+    const isInitialLoad = !hasLoadedOnceRef.current;
+    if (isInitialLoad) {
+      setLoading(true);
+    } else {
+      setIsRefreshing(true);
+    }
+
+    if (subDepartment === RAW_MATERIAL_PROCUREMENT_SUBDEPT) {
+      const apiStatus =
+        status !== allLabel ? toRawMaterialApproverListApiStatus(status, allLabel) : null;
+      const materialCode = String(extraFilters.materialCode ?? "").trim();
+      let fromDate = String(extraFilters.fromDate ?? "").trim();
+      let toDate = String(extraFilters.toDate ?? "").trim();
+      if (fromDate && toDate && fromDate > toDate) {
+        const swap = fromDate;
+        fromDate = toDate;
+        toDate = swap;
       }
 
-      if (!SOURCING_REMOTE_LIST_SUBDEPTS.has(subDepartment ?? "") && !userId) {
-        if (!cancelled) {
-          setRemoteBatches([]);
-          setPagination(DEFAULT_PAGINATION);
-          setStatusCounts({ [allLabel]: items.length });
-          setLoading(false);
-          setIsRefreshing(false);
-        }
-        return;
-      }
-
-      const isInitialLoad = !hasLoadedOnceRef.current;
-      if (isInitialLoad) {
-        setLoading(true);
-      } else {
-        setIsRefreshing(true);
-      }
-
-      if (subDepartment === RAW_MATERIAL_PROCUREMENT_SUBDEPT) {
-        const apiStatus = status !== allLabel ? toRawMaterialApproverListApiStatus(status, allLabel) : null;
-        const materialCode = String(extraFilters.materialCode ?? "").trim();
-        let fromDate = String(extraFilters.fromDate ?? "").trim();
-        let toDate = String(extraFilters.toDate ?? "").trim();
-        if (fromDate && toDate && fromDate > toDate) {
-          const swap = fromDate;
-          fromDate = toDate;
-          toDate = swap;
-        }
-
-        const payload = {
-          subDepartmentId: selectedSubDepartment.subDepartmentId,
-          page,
-          limit: DEFAULT_PAGINATION.limit,
-          ...(apiStatus ? { status: [apiStatus] } : {}),
-          ...(materialCode && materialCode !== allLabel ? { materialCode: [materialCode] } : {}),
-          ...(debouncedSearchText ? { search: debouncedSearchText } : {}),
-          ...(fromDate ? { fromDate } : {}),
-          ...(toDate ? { toDate } : {}),
-        };
-
-        const response = await rawMaterialProcurementApproverController.fetchLotList(payload);
-
-        if (cancelled) {
-          return;
-        }
-
-        if (response.success && response.data) {
-          const nextLots = response.data.lots ?? [];
-          const nextBatches = nextLots.map((lot, index) =>
-            mapRawMaterialProcurementApproverListItem(lot, index),
-          ) as unknown as ApproverBatchSummary[];
-
-          setRemoteBatches(nextBatches);
-          setPagination({
-            page: response.data.pagination?.page ?? page,
-            limit: response.data.pagination?.limit ?? DEFAULT_PAGINATION.limit,
-            totalRecords: response.data.pagination?.totalRecords ?? nextLots.length,
-            totalPages: response.data.pagination?.totalPages ?? 1,
-          });
-          setStatusCounts(
-            mapRawMaterialApproverStatusCountsForUi(
-              response.data.statusCounts,
-              allLabel,
-              response.data.pagination?.totalRecords ?? nextLots.length,
-            ),
-          );
-        } else {
-          setRemoteBatches([]);
-          setPagination(DEFAULT_PAGINATION);
-          setStatusCounts({ [allLabel]: 0 });
-        }
-
-        setLoading(false);
-        setIsRefreshing(false);
-        hasLoadedOnceRef.current = true;
-        return;
-      }
-
-      if (subDepartment === ROCKET_MOTOR_CASING_SUBDEPT) {
-        const apiStatus = status !== allLabel ? toOperationStatusApiValue(status, allLabel) : null;
-
-        let fromDate = String(extraFilters.fromDate ?? "").trim();
-        let toDate = String(extraFilters.toDate ?? "").trim();
-        if (fromDate && toDate && fromDate > toDate) {
-          const swap = fromDate;
-          fromDate = toDate;
-          toDate = swap;
-        }
-
-        const motorStage = String(extraFilters.motorStage ?? "").trim();
-        const casingType = String(extraFilters.casingType ?? "").trim();
-        const insulationType = String(extraFilters.insulationType ?? "").trim();
-
-        const payload = {
-          subDepartmentId: selectedSubDepartment.subDepartmentId,
-          page,
-          limit: DEFAULT_PAGINATION.limit,
-          ...(apiStatus ? { status: [apiStatus] } : {}),
-          ...(motorStage && motorStage !== allLabel ? { motorStage: [motorStage] } : {}),
-          ...(casingType && casingType !== allLabel ? { casingType: [casingType] } : {}),
-          ...(insulationType && insulationType !== allLabel ? { insulationType: [insulationType] } : {}),
-          ...(debouncedSearchText ? { search: debouncedSearchText } : {}),
-          ...(fromDate ? { fromDate } : {}),
-          ...(toDate ? { toDate } : {}),
-        };
-
-        const response = await rocketMotorCasingApproverController.fetchCasingList(payload);
-
-        if (cancelled) {
-          return;
-        }
-
-        if (response.success && response.data) {
-          const nextBatches = (response.data.casings ?? []) as unknown as ApproverBatchSummary[];
-
-          setRemoteBatches(nextBatches);
-          setPagination({
-            page: response.data.pagination?.page ?? page,
-            limit: response.data.pagination?.limit ?? DEFAULT_PAGINATION.limit,
-            totalRecords: response.data.pagination?.totalRecords ?? nextBatches.length,
-            totalPages: response.data.pagination?.totalPages ?? 1,
-          });
-          setStatusCounts(mapStatusCounts(response.data.statusCounts, allLabel, nextBatches));
-        } else {
-          setRemoteBatches([]);
-          setPagination(DEFAULT_PAGINATION);
-          setStatusCounts({ [allLabel]: 0 });
-        }
-
-        setLoading(false);
-        setIsRefreshing(false);
-        hasLoadedOnceRef.current = true;
-        return;
-      }
-
-      const payload = buildApproverBatchListPayload({
+      const payload = {
         subDepartmentId: selectedSubDepartment.subDepartmentId,
-        userId: String(userId),
         page,
         limit: DEFAULT_PAGINATION.limit,
-        statusFilter: status,
-        search: debouncedSearchText,
-        priority: extraFilters.priority,
-        advancedFilters: {
-          batchId: extraFilters.batchId,
-          batchType: extraFilters.batchType,
-          motorId: extraFilters.motorId,
-          motorStage: extraFilters.motorStage,
-          submittedBy: extraFilters.submittedBy,
-          fromDate: extraFilters.fromDate,
-          toDate: extraFilters.toDate,
-          projectId: extraFilters.projectId,
-        },
-        allLabel,
-      });
+        ...(apiStatus ? { status: [apiStatus] } : {}),
+        ...(materialCode && materialCode !== allLabel ? { materialCode: [materialCode] } : {}),
+        ...(debouncedSearchText ? { search: debouncedSearchText } : {}),
+        ...(fromDate ? { fromDate } : {}),
+        ...(toDate ? { toDate } : {}),
+      };
 
-      const response = await getApproverSubDepartmentBatchList(payload);
-      const data = (response.data ?? null) as ApproverBatchListResponse | null;
+      const response = await rawMaterialProcurementApproverController.fetchLotList(payload);
 
-      if (cancelled) {
-        return;
-      }
-
-      if (response.success && data) {
-        const nextBatches = (Array.isArray(data.batches) ? data.batches : []).map(
-          (batch: Record<string, unknown>) =>
-            mapApproverBatchListRow(
-              batch,
-              selectedSubDepartment.subDepartmentId,
-            ) as ApproverBatchSummary,
-        );
-        const resolvedPagination = resolveSubdepartmentBatchPagination(
-          data.pagination as Record<string, unknown> | undefined,
-          DEFAULT_PAGINATION.limit,
-        );
+      if (response.success && response.data) {
+        const nextLots = response.data.lots ?? [];
+        const nextBatches = nextLots.map((lot, index) =>
+          mapRawMaterialProcurementApproverListItem(lot, index),
+        ) as unknown as ApproverBatchSummary[];
 
         setRemoteBatches(nextBatches);
-        setPagination(resolvedPagination);
+        setPagination({
+          page: response.data.pagination?.page ?? page,
+          limit: response.data.pagination?.limit ?? DEFAULT_PAGINATION.limit,
+          totalRecords: response.data.pagination?.totalRecords ?? nextLots.length,
+          totalPages: response.data.pagination?.totalPages ?? 1,
+        });
         setStatusCounts(
-          mapApproverBatchStatusCounts(
-            data.statusCounts as Record<string, number> | undefined,
+          mapRawMaterialApproverStatusCountsForUi(
+            response.data.statusCounts,
             allLabel,
-            resolvedPagination.totalRecords || nextBatches.length,
+            response.data.pagination?.totalRecords ?? nextLots.length,
           ),
         );
       } else {
@@ -410,14 +283,137 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
       setLoading(false);
       setIsRefreshing(false);
       hasLoadedOnceRef.current = true;
-    };
+      return;
+    }
 
-    loadBatches();
+    if (subDepartment === ROCKET_MOTOR_CASING_SUBDEPT) {
+      const apiStatus = status !== allLabel ? toOperationStatusApiValue(status, allLabel) : null;
 
+      let fromDate = String(extraFilters.fromDate ?? "").trim();
+      let toDate = String(extraFilters.toDate ?? "").trim();
+      if (fromDate && toDate && fromDate > toDate) {
+        const swap = fromDate;
+        fromDate = toDate;
+        toDate = swap;
+      }
+
+      const motorStage = String(extraFilters.motorStage ?? "").trim();
+      const casingType = String(extraFilters.casingType ?? "").trim();
+      const insulationType = String(extraFilters.insulationType ?? "").trim();
+
+      const payload = {
+        subDepartmentId: selectedSubDepartment.subDepartmentId,
+        page,
+        limit: DEFAULT_PAGINATION.limit,
+        ...(apiStatus ? { status: [apiStatus] } : {}),
+        ...(motorStage && motorStage !== allLabel ? { motorStage: [motorStage] } : {}),
+        ...(casingType && casingType !== allLabel ? { casingType: [casingType] } : {}),
+        ...(insulationType && insulationType !== allLabel
+          ? { insulationType: [insulationType] }
+          : {}),
+        ...(debouncedSearchText ? { search: debouncedSearchText } : {}),
+        ...(fromDate ? { fromDate } : {}),
+        ...(toDate ? { toDate } : {}),
+      };
+
+      const response = await rocketMotorCasingApproverController.fetchCasingList(payload);
+
+      if (response.success && response.data) {
+        const nextBatches = (response.data.casings ?? []) as unknown as ApproverBatchSummary[];
+
+        setRemoteBatches(nextBatches);
+        setPagination({
+          page: response.data.pagination?.page ?? page,
+          limit: response.data.pagination?.limit ?? DEFAULT_PAGINATION.limit,
+          totalRecords: response.data.pagination?.totalRecords ?? nextBatches.length,
+          totalPages: response.data.pagination?.totalPages ?? 1,
+        });
+        setStatusCounts(mapStatusCounts(response.data.statusCounts, allLabel, nextBatches));
+      } else {
+        setRemoteBatches([]);
+        setPagination(DEFAULT_PAGINATION);
+        setStatusCounts({ [allLabel]: 0 });
+      }
+
+      setLoading(false);
+      setIsRefreshing(false);
+      hasLoadedOnceRef.current = true;
+      return;
+    }
+
+    const payload = buildApproverBatchListPayload({
+      subDepartmentId: selectedSubDepartment.subDepartmentId,
+      userId: String(userId),
+      page,
+      limit: DEFAULT_PAGINATION.limit,
+      statusFilter: status,
+      search: debouncedSearchText,
+      priority: extraFilters.priority,
+      advancedFilters: {
+        batchId: extraFilters.batchId,
+        batchType: extraFilters.batchType,
+        motorId: extraFilters.motorId,
+        motorStage: extraFilters.motorStage,
+        submittedBy: extraFilters.submittedBy,
+        fromDate: extraFilters.fromDate,
+        toDate: extraFilters.toDate,
+        projectId: extraFilters.projectId,
+      },
+      allLabel,
+    });
+
+    const response = await getApproverSubDepartmentBatchList(payload);
+    const data = (response.data ?? null) as ApproverBatchListResponse | null;
+
+    if (response.success && data) {
+      const nextBatches = (Array.isArray(data.batches) ? data.batches : []).map(
+        (batch: Record<string, unknown>) =>
+          mapApproverBatchListRow(
+            batch,
+            selectedSubDepartment.subDepartmentId,
+          ) as ApproverBatchSummary,
+      );
+      const resolvedPagination = resolveSubdepartmentBatchPagination(
+        data.pagination as Record<string, unknown> | undefined,
+        DEFAULT_PAGINATION.limit,
+      );
+
+      setRemoteBatches(nextBatches);
+      setPagination(resolvedPagination);
+      setStatusCounts(
+        mapApproverBatchStatusCounts(
+          data.statusCounts as Record<string, number> | undefined,
+          allLabel,
+          resolvedPagination.totalRecords || nextBatches.length,
+        ),
+      );
+    } else {
+      setRemoteBatches([]);
+      setPagination(DEFAULT_PAGINATION);
+      setStatusCounts({ [allLabel]: 0 });
+    }
+    setLoading(false);
+    setIsRefreshing(false);
+    hasLoadedOnceRef.current = true;
+  }, [
+    allLabel,
+    debouncedSearchText,
+    extraFilters,
+    items.length,
+    page,
+    refreshVersion,
+    selectedSubDepartment?.subDepartmentId,
+    status,
+    subDepartment,
+    userId,
+  ]);
+  useEffect(() => {
+    let cancelled = false;
+    void loadBatches();
     return () => {
       cancelled = true;
     };
-  }, [allLabel, debouncedSearchText, extraFilters.batchId, extraFilters.batchType, extraFilters.casingType, extraFilters.fromDate, extraFilters.insulationType, extraFilters.materialCode, extraFilters.motorId, extraFilters.motorStage, extraFilters.motorType, extraFilters.priority, extraFilters.projectId, extraFilters.submittedBy, extraFilters.toDate, items.length, page, refreshVersion, selectedSubDepartment?.subDepartmentId, status, subDepartment, userId]);
+  }, [loadBatches]);
 
   const mergedItems = useMemo(() => {
     if (remoteBatches.length === 0) {
@@ -481,6 +477,7 @@ export const useApproverSubDepartmentBatchList = <T extends Record<string, unkno
     pagination,
     setPage,
     statusCounts,
+    refresh: loadBatches,
   };
 };
 

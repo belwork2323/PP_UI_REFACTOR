@@ -563,7 +563,7 @@ const CastingMotorPanel = ({
               </TableCell>
               <TableCell
                 rowSpan={2}
-                sx={{ ...groupHeaderSx, verticalAlign: "middle", maxWidth: 120 }}
+                sx={{ ...groupHeaderSx, verticalAlign: "middle", maxWidth: "auto" }}
               >
                 <FieldLabelWithAsterisk
                   label="Bellow thickness (D)"

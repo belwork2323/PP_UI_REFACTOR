@@ -11,6 +11,7 @@ export type CuringCycleItem = {
 };
 
 export type CuringCycleConfig = {
+  projectId?: string;
   motorStage: number;
   motorStageName: string;
   curingType: string;
@@ -45,6 +46,7 @@ export class CuringCycleConfigModel {
     ).trim();
 
     return {
+      projectId: String(record.projectId ?? "").trim() || undefined,
       motorStage,
       motorStageName:
         motorStageNameRaw ||

@@ -39,12 +39,13 @@ export type QcMixingValidationTarget = {
 export const qcMixingValidationFields: Record<string, FieldRuleConfig> = {
   // Shared header (Premix / Final Mix details)
   // Bowl may be "Bowl No.2", numeric id, or master code from mixer config
-  bowlNo: text(["UNIT", "SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
-  dateOfPremix: date(["UNIT", "SUBMIT"]),
-  dateOfFinalMix: date(["UNIT", "SUBMIT"]),
+  // Mandatory on SUBMIT only — draft/save uses FORMAT (no required checks)
+  bowlNo: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  dateOfPremix: date(["SUBMIT"]),
+  dateOfFinalMix: date(["SUBMIT"]),
   // Auto-seeded as "MX-1 & BLD-1" (mixer + building), not a bare building code
-  mixerBldgNo: text(["UNIT", "SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
-  batchSize: number(["UNIT", "SUBMIT"]),
+  mixerBldgNo: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  batchSize: number(["SUBMIT"]),
 
   // Specs from quality-check master (e.g. "NA", "0 - 0.08 %") — not numeric
   specification: text(["SUBMIT"], S.PATTERNS.SPECIFICATION_WITH_TOLERANCE),

@@ -748,10 +748,19 @@ export const useNDTHook = () => {
         return false;
       }
 
-      // FORMAT on draft (type/pattern of filled fields); SUBMIT on submit — highlight + snackbar
+      // Draft/save: FORMAT only (no mandatory). Submit: SUBMIT enforces required fields.
       {
         const tier = intent === "draft" ? "FORMAT" : "SUBMIT";
-        const fieldErrors = validateNDTMotorSession(motor, tier);
+        let fieldErrors = validateNDTMotorSession(motor, tier);
+        if (intent === "draft") {
+          const kept: typeof fieldErrors = {};
+          for (const [path, msg] of Object.entries(fieldErrors)) {
+            const text = String(msg ?? "").trim().toLowerCase();
+            if (!text || text.includes("required")) continue;
+            kept[path] = msg;
+          }
+          fieldErrors = kept;
+        }
         if (Object.keys(fieldErrors).length > 0) {
           setMotorValidationErrors((prev) => ({ ...prev, [motorId]: fieldErrors }));
           notifyNdtValidationErrors(fieldErrors, intent);

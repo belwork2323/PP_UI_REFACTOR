@@ -176,12 +176,16 @@ const BemMotorListTable: React.FC<BemMotorListTableProps> = ({
 
   const thSx = useMemo(
     () => ({
-      ...uniformTableHeaderCellSx(p?.primary ?? "#1B4F72", p?.primaryLight ?? p?.primary ?? "#2E86C1", {
-        headerFontSize: fonts.size.xs,
-        headerLetterSpacing: "0.08em",
-        headerPaddingY: "11px",
-        headerPaddingX: "14px",
-      }),
+      ...uniformTableHeaderCellSx(
+        p?.primary ?? "#1B4F72",
+        p?.primaryLight ?? p?.primary ?? "#2E86C1",
+        {
+          headerFontSize: fonts.size.xs,
+          headerLetterSpacing: "0.08em",
+          headerPaddingY: "11px",
+          headerPaddingX: "14px",
+        },
+      ),
       ...(t?.tableHeaderBg ? { background: t.tableHeaderBg } : {}),
       ...(t?.tableHeaderText ? { color: t.tableHeaderText } : {}),
       ...(t?.tableHeaderBorder
@@ -238,7 +242,7 @@ const BemMotorListTable: React.FC<BemMotorListTableProps> = ({
         {
           id: "createdBy",
           label: "Created By",
-          render: (row) => row.createdBy ?? "—",
+          render: (row) => row?.createdBy?.fullName ?? "—",
         },
         {
           id: "status",
@@ -365,6 +369,7 @@ const BemMotorListTable: React.FC<BemMotorListTableProps> = ({
 
                   {columns.map((col) => {
                     const rawValue = row[col.id];
+                    console.log(rawValue);
 
                     return (
                       <TableCell

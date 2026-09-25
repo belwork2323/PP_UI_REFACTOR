@@ -6,13 +6,13 @@
 import { icons } from "@app/theme/icons";
 import type { MaterialsListGrade, MaterialsListItem } from "../../user/MaterialsListModel";
 import type { StageProgress } from "../../user/BatchStageTypes";
-import type { RawMaterialLotListRow } from "../../user/RawMaterialProcurementModel";
 import { formatToIsoDateInput, formatToUiDate } from "../../../../utils/dateUtils";
 import type { AdminBatchEditMode } from "@utils/batchManagementUtils";
 import {
   normalizeStageProgressArray,
   parseParallelFlowEnabled,
 } from "../../../../utils/batchStageUtils";
+import { RawMaterialLotListRow } from "@/hooks/admin/BatchManagement/useBatchManagementHook";
 
 /** Map display / list labels to form/API enum values */
 function normalizeBatchTypeForForm(raw: string | undefined | null): string {
@@ -556,7 +556,7 @@ export interface MaterialItem {
   materialName?: string;
   gradeCode?: string;
   gradeName?: string;
-  lotId: string;
+  lotIds: string[];
   make: string;
   manufacturerName?: string;
   requiredComposition: number;
@@ -634,11 +634,12 @@ function serializeMaterialForApi(material: Record<string, any>): Record<string, 
   const toDate = formatToIsoDateInput(
     material.revalidationToDate ?? material.revalidationDate ?? fromDate,
   );
+  console.log(material);
 
   return {
     srNo: material.srNo,
     materialCode: material.materialCode,
-    lotId: material.lotId ?? "",
+    lotIds: material.lotIds ?? [],
     make: String(material.make ?? material.manufacturerName ?? "").trim(),
     requiredComposition: material.requiredComposition ?? 0,
     quantityPerPremix: material.quantityPerPremix ?? 0,
@@ -652,10 +653,7 @@ function serializeMaterialForApi(material: Record<string, any>): Record<string, 
 
 /** API mixerType may be a code string or `{ id, code, name }`. */
 export type MasterDataRef =
-  | string
-  | { id?: number | null; code?: string | null; name?: string | null }
-  | null
-  | undefined;
+  string | { id?: number | null; code?: string | null; name?: string | null } | null | undefined;
 
 export const resolveMasterDataCode = (value: MasterDataRef): string => {
   if (value == null) return "";
@@ -673,8 +671,7 @@ export const resolveMasterDataName = (value: MasterDataRef): string => {
 };
 
 /** Display label for mixer/master refs — name only (never "Name (CODE)"). */
-export const formatMasterDataLabel = (value: MasterDataRef): string =>
-  resolveMasterDataName(value);
+export const formatMasterDataLabel = (value: MasterDataRef): string => resolveMasterDataName(value);
 
 /** Map form identification sheet to API request body */
 export function serializeIdentificationSheetForApi(
@@ -739,11 +736,19 @@ export function parseIdentificationSheetFromApi(
         materialName: m.materialName ?? "",
         gradeCode: String(m.gradeCode ?? m.grade?.gradeCode ?? "").trim() || undefined,
         gradeName: String(m.gradeName ?? m.grade?.gradeName ?? "").trim() || undefined,
-        lotId: m.lotId ?? "",
+        lotIds: m.lotIds ?? [],
         make: m.make ?? m.manufacturerName ?? "",
         manufacturerName: m.manufacturerName ?? m.make ?? "",
-        requiredComposition: m.requiredComposition ?? 0,
-        quantityPerPremix: m.quantityPerPremix ?? 0,
+        requiredComposition:
+          typeof m.requiredComposition === "object" && m.requiredComposition != null
+            ? Number(
+                (m.requiredComposition as { parsedValue?: unknown; source?: unknown })
+                  .parsedValue ??
+                  (m.requiredComposition as { source?: unknown }).source ??
+                  0,
+              ) || 0
+            : Number(m.requiredComposition ?? 0) || 0,
+        quantityPerPremix: Number(m.quantityPerPremix ?? 0) || 0,
         revalidationFromDate: formatToUiDate(m.revalidationFromDate ?? m.revalidationDate ?? ""),
         revalidationToDate: formatToUiDate(m.revalidationToDate ?? m.revalidationDate ?? ""),
         revalidationDate: formatToUiDate(m.revalidationFromDate ?? m.revalidationDate ?? ""),
@@ -1336,7 +1341,7 @@ const serializeMaterialForCompare = (material: MaterialItem): string =>
     materialName: material.materialName,
     gradeCode: material.gradeCode ?? "",
     gradeName: material.gradeName ?? "",
-    lotId: material.lotId ?? "",
+    lotId: material.lotId ?? [],
     manufacturerName: material.manufacturerName ?? material.make ?? "",
     requiredComposition: material.requiredComposition ?? 0,
     quantityPerPremix: material.quantityPerPremix ?? 0,

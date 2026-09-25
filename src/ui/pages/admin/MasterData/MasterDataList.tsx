@@ -3,6 +3,7 @@ import {
   Box,
   Button,
   Divider,
+  IconButton,
   Paper,
   Table,
   TableBody,
@@ -11,13 +12,17 @@ import {
   TableHead,
   TablePagination,
   TableRow,
+  Tooltip,
   Typography,
 } from "@mui/material";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
+import { useThemeStore } from "@app/store/themeStore";
+import getBatchManagementTheme from "@app/theme/custom_themes/admin/BatchManagement/batchManagement_theme";
 import SkeletonRow from "@ui/components/common/SkeletonRow";
 import AppTextField from "@ui/components/common/AppTextField";
 import AppSearchableDropdown from "@ui/components/common/AppSearchableDropdown";
+import type { AppDropdownOption } from "@ui/components/common/AppDropdown";
 import MasterDataTableToolbar from "./components/MasterDataTableToolbar";
 import MasterDataActiveSwitch from "./components/MasterDataActiveSwitch";
 import MasterDataEnableDisableField from "./components/MasterDataEnableDisableField";
@@ -27,7 +32,7 @@ import {
   MasterDataAuditHeaderCells,
   MasterDataAuditRowCells,
 } from "./components/MasterDataAuditColumns";
-import type { AppDropdownOption } from "@ui/components/common/AppDropdown";
+import type { MasterDataProjectOption } from "@/hooks/admin/MasterData/useProjectForMotorStageOptions";
 import {
   formatMasterDataAttributeValue,
   getMasterDataAttributeOptions,
@@ -71,6 +76,13 @@ type Props = {
   onPageChange: (event: unknown, page: number) => void;
   onRowsPerPageChange: (event: React.ChangeEvent<HTMLInputElement>) => void;
   dynamicAttributeOptions?: Record<string, AppDropdownOption[]>;
+  projectSelectOptions?: MasterDataProjectOption[];
+  projectSelectLoading?: boolean;
+  projectFilter?: string;
+  onProjectFilterChange?: (value: string) => void;
+  motorStageFilter?: string;
+  onMotorStageFilterChange?: (value: string) => void;
+  motorStageFilterOptions?: AppDropdownOption[];
 };
 
 const MasterDataList = ({
@@ -98,8 +110,18 @@ const MasterDataList = ({
   onPageChange,
   onRowsPerPageChange,
   dynamicAttributeOptions,
+  projectSelectOptions = [],
+  projectSelectLoading = false,
+  projectFilter = "",
+  onProjectFilterChange,
+  motorStageFilter = "",
+  onMotorStageFilterChange,
+  motorStageFilterOptions = [],
 }: Props) => {
   const { table, tableCell } = t;
+  const mode = useThemeStore((s) => s.mode);
+  const batchTheme = useMemo(() => getBatchManagementTheme(mode), [mode]);
+  const { modal: batchModal, tableCell: batchTableCell } = batchTheme;
   const cellSx = t.inlineFormCell ?? {
     "& .MuiOutlinedInput-root": {
       fontSize: "0.8rem",
@@ -142,7 +164,7 @@ const MasterDataList = ({
   const hideCodeColumn =
     selectedType === "mixers" || Boolean(codeField?.serverGenerated);
   const showNameInput = !nameField?.serverGenerated;
-  const showNameColumn = showNameInput || selectedType === "motor-stages";
+  const showNameColumn = showNameInput;
   const codeRequired = !hideCodeColumn && !codeField?.serverGenerated;
   const colCount =
     (hideCodeColumn ? 0 : 1) +
@@ -151,7 +173,77 @@ const MasterDataList = ({
     MASTER_DATA_AUDIT_COLUMN_COUNT +
     2;
 
+  const resolveProject = (projectId: string) =>
+    projectSelectOptions.find((p) => p.projectId === projectId) ??
+    (() => {
+      const opts = dynamicAttributeOptions?.projectId;
+      const match = opts?.find((o) => o.value === projectId);
+      if (!match) return null;
+      return {
+        projectId,
+        projectName: String(match.label ?? projectId),
+      };
+    })();
+
+  const projectDropdownOptions: AppDropdownOption[] = useMemo(
+    () =>
+      projectSelectOptions.map((project) => ({
+        value: project.projectId,
+        label: project.projectName || project.projectId,
+      })),
+    [projectSelectOptions],
+  );
+
+  const renderProjectCell = (rawProjectId: unknown) => {
+    const projectId = String(rawProjectId ?? "").trim();
+    if (!projectId) {
+      return <Typography sx={table.bodyText}>—</Typography>;
+    }
+    const project = resolveProject(projectId);
+    const projectName = project?.projectName?.trim() || projectId;
+    return (
+      <Box sx={batchTableCell.batchIdBox}>
+        <icons.batchMgmt.projectId
+          sx={{ ...batchTableCell.batchIdIcon, ...batchTableCell.projectIdIcon }}
+        />
+        <Box sx={batchTableCell.projectInfo}>
+          <Typography sx={batchTableCell.projectName}>{projectName}</Typography>
+          <Typography sx={batchTableCell.projectId}>{projectId}</Typography>
+        </Box>
+      </Box>
+    );
+  };
+
   const renderAttributeInput = (field: MasterDataFieldDef) => {
+    if (field.key === "projectId") {
+      const placeholder = projectSelectLoading
+        ? "Loading projects..."
+        : `Select ${requiredFieldLabel(getMasterDataFieldLabel(selectedType, field), Boolean(field.required))}`;
+      return (
+        <AppSearchableDropdown
+          compact
+          fullWidth
+          placeholder={placeholder}
+          loading={projectSelectLoading}
+          value={String(form.attributes[field.key] ?? "")}
+          onChange={(value) => onFormChange(field.key, value, true)}
+          disabled={saving || projectSelectLoading}
+          error={Boolean(visibleError(field.key))}
+          helperText={visibleError(field.key)}
+          options={projectDropdownOptions}
+          renderOption={(props, option) => (
+            <Box component="li" {...props} key={option.value}>
+              <Box sx={batchModal.projectOption}>
+                <Typography sx={batchModal.projectOptionName}>{String(option.label)}</Typography>
+                <Typography sx={batchModal.projectOptionId}>{option.value}</Typography>
+              </Box>
+            </Box>
+          )}
+          sx={cellSx}
+        />
+      );
+    }
+
     const dropdownOptions = getMasterDataAttributeOptions(selectedType, field, dynamicAttributeOptions);
     if (dropdownOptions) {
       return (
@@ -227,79 +319,98 @@ const MasterDataList = ({
     );
   };
 
+  const attributeCellSx = (field: MasterDataFieldDef) => {
+    if (field.key === "projectId") {
+      return { ...table.cell, minWidth: 280, width: 280 };
+    }
+    if (field.key === "motorStage") {
+      return { ...table.cell, minWidth: 120, width: 120, maxWidth: 140 };
+    }
+    return table.cell;
+  };
+  const attributeHeaderCellSx = (field: MasterDataFieldDef) => {
+    if (field.key === "projectId") {
+      return { ...table.headerCell, minWidth: 280, width: 280 };
+    }
+    if (field.key === "motorStage") {
+      return { ...table.headerCell, minWidth: 120, width: 120, maxWidth: 140 };
+    }
+    return table.headerCell;
+  };
+
   const renderInlineFields = () => {
     return (
-    <TableRow sx={{ ...table.row, bgcolor: (theme) => theme.palette.action.hover }}>
-      {!hideCodeColumn ? (
+      <TableRow sx={{ ...table.row, bgcolor: (theme) => theme.palette.action.hover }}>
+        {!hideCodeColumn ? (
+          <TableCell sx={table.cell}>
+            <AppTextField
+              compact
+              fullWidth
+              placeholder={requiredFieldLabel(S.TABLE.COL_CODE, codeRequired)}
+              value={form.code}
+              onChange={(e) => onFormChange("code", e.target.value)}
+              disabled={saving}
+              error={Boolean(visibleError("code"))}
+              helperText={visibleError("code")}
+              sx={cellSx}
+            />
+          </TableCell>
+        ) : null}
+        {showNameInput ? (
+          <TableCell sx={table.cell}>
+            <AppTextField
+              compact
+              fullWidth
+              placeholder={requiredFieldLabel(S.TABLE.COL_NAME, true)}
+              value={form.name}
+              onChange={(e) => onFormChange("name", e.target.value)}
+              disabled={saving}
+              error={Boolean(visibleError("name"))}
+              helperText={visibleError("name")}
+              sx={cellSx}
+            />
+          </TableCell>
+        ) : showNameColumn ? (
+          <TableCell sx={table.cell} />
+        ) : null}
+        {attributeFields.map((field) => (
+          <TableCell key={field.key} sx={attributeCellSx(field)}>
+            {renderAttributeInput(field)}
+          </TableCell>
+        ))}
+        <MasterDataAuditRowCells table={table} />
         <TableCell sx={table.cell}>
-          <AppTextField
-            compact
-            fullWidth
-            placeholder={requiredFieldLabel(S.TABLE.COL_CODE, codeRequired)}
-            value={form.code}
-            onChange={(e) => onFormChange("code", e.target.value)}
+          <MasterDataEnableDisableField
+            checked={Boolean(form.isActive)}
             disabled={saving}
-            error={Boolean(visibleError("code"))}
-            helperText={visibleError("code")}
-            sx={cellSx}
+            confirmName={
+              !showNameInput && form.attributes.motorStage !== "" && form.attributes.motorStage != null
+                ? `Stage ${form.attributes.motorStage}`
+                : form.name || form.code || "record"
+            }
+            labelVariant="caption"
+            minWidth={72}
+            onChange={(isActive) => onFormChange("isActive", isActive)}
           />
         </TableCell>
-      ) : null}
-      {showNameInput ? (
-        <TableCell sx={table.cell}>
-          <AppTextField
-            compact
-            fullWidth
-            placeholder={requiredFieldLabel(S.TABLE.COL_NAME, true)}
-            value={form.name}
-            onChange={(e) => onFormChange("name", e.target.value)}
-            disabled={saving}
-            error={Boolean(visibleError("name"))}
-            helperText={visibleError("name")}
-            sx={cellSx}
-          />
+        <TableCell sx={table.cellActionsWrapper}>
+          <Box sx={tableCell.actionsBox}>
+            <Button size="small" onClick={onCancelInline} disabled={saving}>
+              {S.FORM.CANCEL}
+            </Button>
+            <Button
+              size="small"
+              variant="contained"
+              onClick={handleSave}
+              disabled={saving}
+              sx={t.pageHeader?.newProjectButton}
+            >
+              {saving ? S.FORM.SAVING : S.FORM.SAVE}
+            </Button>
+          </Box>
         </TableCell>
-      ) : showNameColumn ? (
-        <TableCell sx={table.cell} />
-      ) : null}
-      {attributeFields.map((field) => (
-        <TableCell key={field.key} sx={table.cell}>
-          {renderAttributeInput(field)}
-        </TableCell>
-      ))}
-      <MasterDataAuditRowCells table={table} />
-      <TableCell sx={table.cell}>
-        <MasterDataEnableDisableField
-          checked={Boolean(form.isActive)}
-          disabled={saving}
-          confirmName={
-            !showNameInput && form.attributes.motorStage !== "" && form.attributes.motorStage != null
-              ? `Stage ${form.attributes.motorStage}`
-              : form.name || form.code || "record"
-          }
-          labelVariant="caption"
-          minWidth={72}
-          onChange={(isActive) => onFormChange("isActive", isActive)}
-        />
-      </TableCell>
-      <TableCell sx={table.cellActionsWrapper}>
-        <Box sx={tableCell.actionsBox}>
-          <Button size="small" onClick={onCancelInline} disabled={saving}>
-            {S.FORM.CANCEL}
-          </Button>
-          <Button
-            size="small"
-            variant="contained"
-            onClick={handleSave}
-            disabled={saving}
-            sx={t.pageHeader?.newProjectButton}
-          >
-            {saving ? S.FORM.SAVING : S.FORM.SAVE}
-          </Button>
-        </Box>
-      </TableCell>
-    </TableRow>
-  );
+      </TableRow>
+    );
   };
 
   return (
@@ -310,6 +421,22 @@ const MasterDataList = ({
         onRefresh={onRefresh}
         refreshDisabled={refreshDisabled}
         t={t}
+        showMotorStageFilters={selectedType === "motor-stages"}
+        projectFilter={projectFilter}
+        onProjectFilterChange={onProjectFilterChange}
+        projectOptions={projectDropdownOptions}
+        projectLoading={projectSelectLoading}
+        motorStageFilter={motorStageFilter}
+        onMotorStageFilterChange={onMotorStageFilterChange}
+        motorStageOptions={motorStageFilterOptions}
+        renderProjectOption={(props, option) => (
+          <Box component="li" {...props} key={option.value}>
+            <Box sx={batchModal.projectOption}>
+              <Typography sx={batchModal.projectOptionName}>{String(option.label)}</Typography>
+              <Typography sx={batchModal.projectOptionId}>{option.value}</Typography>
+            </Box>
+          </Box>
+        )}
       />
       <Divider sx={table.divider} />
       <TableContainer>
@@ -327,7 +454,7 @@ const MasterDataList = ({
                 </TableCell>
               ) : null}
               {attributeFields.map((field) => (
-                <TableCell key={field.key} sx={table.headerCell}>
+                <TableCell key={field.key} sx={attributeHeaderCellSx(field)}>
                   {requiredFieldLabel(
                     getMasterDataFieldLabel(selectedType, field),
                     Boolean(field.required),
@@ -368,15 +495,19 @@ const MasterDataList = ({
                     </TableCell>
                   ) : null}
                   {attributeFields.map((field) => (
-                    <TableCell key={field.key} sx={table.cell}>
-                      <Typography sx={table.bodyText}>
-                        {formatMasterDataAttributeValue(
-                          selectedType,
-                          field,
-                          row.attributes?.[field.key],
-                          dynamicAttributeOptions,
-                        )}
-                      </Typography>
+                    <TableCell key={field.key} sx={attributeCellSx(field)}>
+                      {field.key === "projectId" ? (
+                        renderProjectCell(row.attributes?.[field.key])
+                      ) : (
+                        <Typography sx={table.bodyText}>
+                          {formatMasterDataAttributeValue(
+                            selectedType,
+                            field,
+                            row.attributes?.[field.key],
+                            dynamicAttributeOptions,
+                          )}
+                        </Typography>
+                      )}
                     </TableCell>
                   ))}
                   <MasterDataAuditRowCells record={row} table={table} />

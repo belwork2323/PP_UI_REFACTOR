@@ -33,7 +33,10 @@ import {
   getStatus,
   getSystemManagerLabel,
 } from "@utils/batchManagementUtils";
-import { mixingCycleLabel, formatArticlesForDisplay } from "@data/models/admin/BatchManagement/BatchManagementModel";
+import {
+  mixingCycleLabel,
+  formatArticlesForDisplay,
+} from "@data/models/admin/BatchManagement/BatchManagementModel";
 
 const S = STRINGS.BATCH_MANAGEMENT.DETAILS;
 
@@ -121,7 +124,12 @@ const BatchDetailsView = ({ open, loading, batch, onClose, t }: BatchDetailsView
 
   const subDeptLabel = useMemo(() => {
     if (!batch?.subDepartments?.length) return "—";
-    return batch.subDepartments.map((sd) => sd.subDepartmentName).filter(Boolean).join(", ") || "—";
+    return (
+      batch.subDepartments
+        .map((sd) => sd.subDepartmentName)
+        .filter(Boolean)
+        .join(", ") || "—"
+    );
   }, [batch]);
 
   const isSubscale = Boolean(batch && String(batch.batchType).toUpperCase() !== "MAIN");
@@ -137,7 +145,10 @@ const BatchDetailsView = ({ open, loading, batch, onClose, t }: BatchDetailsView
         { label: S.MOTOR_STAGE, value: displayValue(getMotorStage(batch)) },
         { label: S.MIXING_CYCLE, value: mixingCycleLabel(batch.mixingCycle) },
         { label: S.MOTOR_COUNT, value: displayValue(batch.numberOfMotors) },
-        { label: S.MOTOR_IDS, value: displayValue(getMotorId(batch) || batch.motorIds?.join(", ")) },
+        {
+          label: S.MOTOR_IDS,
+          value: displayValue(getMotorId(batch) || batch.motorIds?.join(", ")),
+        },
         { label: S.PRIORITY, value: displayValue(getPriority(batch)) },
         { label: S.SYSTEM_MANAGER, value: displayValue(getSystemManagerLabel(batch)) },
         ...(isSubscale
@@ -171,9 +182,10 @@ const BatchDetailsView = ({ open, loading, batch, onClose, t }: BatchDetailsView
         { label: S.SHEET_DATE, value: formatDate(sheet.date) },
         { label: S.BATCH_SIZE, value: displayValue(sheet.batchSize) },
         { label: S.BONDING_SHEET_NO, value: displayValue(sheet.bondingSheetNo) },
-        { label: S.MIXER_TYPE, value: displayValue(
-          sheet.mixerTypeName || sheet.mixerType || sheet.mixerDetails,
-        ) },
+        {
+          label: S.MIXER_TYPE,
+          value: displayValue(sheet.mixerTypeName || sheet.mixerType || sheet.mixerDetails),
+        },
         { label: S.NUMBER_OF_PREMIX, value: displayValue(sheet.numberOfPremix) },
         { label: S.PRC_APPROVAL_DATE, value: formatDate(sheet.prcApprovalDate) },
         { label: S.REMARKS, value: displayValue(sheet.remarks) },
@@ -239,7 +251,11 @@ const BatchDetailsView = ({ open, loading, batch, onClose, t }: BatchDetailsView
                 <IconButton
                   onClick={onClose}
                   size="small"
-                  sx={{ color: "#fff", bgcolor: "rgba(255,255,255,0.12)", "&:hover": { bgcolor: "rgba(255,255,255,0.22)" } }}
+                  sx={{
+                    color: "#fff",
+                    bgcolor: "rgba(255,255,255,0.12)",
+                    "&:hover": { bgcolor: "rgba(255,255,255,0.22)" },
+                  }}
                 >
                   <CloseRoundedIcon fontSize="small" />
                 </IconButton>
@@ -305,7 +321,7 @@ const BatchDetailsView = ({ open, loading, batch, onClose, t }: BatchDetailsView
                         <TableBody>
                           {materials.map((material, idx) => (
                             <TableRow
-                              key={`${material.materialCode}-${material.lotId}-${idx}`}
+                              key={`${material.materialCode}-${material.lotIds}-${idx}`}
                               sx={dt.tableRow(idx)}
                             >
                               <TableCell sx={dt.tableCell}>{material.srNo || idx + 1}</TableCell>
@@ -319,7 +335,7 @@ const BatchDetailsView = ({ open, loading, batch, onClose, t }: BatchDetailsView
                                 {displayValue(material.gradeName || material.gradeCode)}
                               </TableCell>
                               <TableCell sx={dt.tableCell}>
-                                {displayValue(material.lotId)}
+                                {displayValue(material.lotIds)}
                               </TableCell>
                               <TableCell sx={dt.tableCell}>
                                 {displayValue(material.make || material.manufacturerName)}

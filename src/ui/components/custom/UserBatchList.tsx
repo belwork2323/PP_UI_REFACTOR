@@ -1,50 +1,3 @@
-// src/ui/components/custom/UserBatchList.jsx
-//
-// ─── Generic reusable table list ─────────────────────────────────────────────
-//
-// Props
-// ─────
-//   rows                {object[]}     Data rows. Each row must have a unique `id`.
-//
-//   columns             {ColumnDef[]}  Column definitions:
-//     {
-//       key      : string                     – field name (dot-notation supported: "a.b.c")
-//       label    : string                     – header text
-//       align?   : "left"|"center"|"right"    – default "left"
-//       width?   : number | string            – CSS width
-//       render?  : (value, row) => ReactNode  – custom cell renderer
-//     }
-//
-//   statusField?        string         Field that carries the status value.
-//                                      Default: "status"
-//
-//   statusConfig?       {[statusValue]: StatusCfg}
-//     StatusCfg = { color, bg, border, Icon, label }
-//     Renders a clickable status-filter strip above the table.
-//     Also adds a status dropdown beside the search bar.
-//
-//   filters?            {FilterDef[]}  Extra dropdown filters:
-//     {
-//       field     : string
-//       label?    : string
-//       options   : string[]   – selectable values (excl. "All")
-//       minWidth? : number     – dropdown width in px
-//     }
-//
-//   searchFields?       string[]       Fields to search. Omit to search all fields.
-//
-//   highlightRow?       (row) => boolean   Adds a left-border accent when true.
-//   highlightColor?     string             Border colour. Default: primary blue.
-//
-//   renderAction?       (row) => ReactNode  Renders the Action column cell.
-//                                           Column is hidden when not provided.
-//
-//   rowsPerPageOptions? number[]       Default [5, 10, 25]
-//   emptyText?          string         Message when no rows match filters.
-//   tableLabel?         string         Accessible aria-label for the <table>.
-//
-// ─────────────────────────────────────────────────────────────────────────────
-
 import React, { useState, useMemo } from "react";
 import {
   Box,
@@ -418,7 +371,9 @@ const UserBatchList = ({
                   </TableCell>
                 ))}
                 {showActionCol && (
-                  <TableCell sx={{ ...thSx, textAlign: "center", minWidth: 200, whiteSpace: "nowrap" }}>
+                  <TableCell
+                    sx={{ ...thSx, textAlign: "center", minWidth: 200, whiteSpace: "nowrap" }}
+                  >
                     {STRINGS.USER_BATCH_LIST.COL_ACTION}
                   </TableCell>
                 )}
@@ -443,74 +398,78 @@ const UserBatchList = ({
                 </TableRow>
               ) : (
                 paginated.map((row: any, idx: number) => {
-                const isHighlighted = highlightRow?.(row) ?? false;
-                const globalIdx = activePage * activeRowsPerPage + idx + 1;
+                  const isHighlighted = highlightRow?.(row) ?? false;
+                  const globalIdx = activePage * activeRowsPerPage + idx + 1;
 
-                return (
-                  <TableRow
-                    key={row.id ?? idx}
-                    sx={{
-                      background: isHighlighted
-                        ? alpha(hlColor, 0.02)
-                        : idx % 2 === 0
-                          ? t.stripedRowEven
-                          : t.stripedRowOdd,
-                      borderLeft: isHighlighted ? `3px solid ${hlColor}` : "3px solid transparent",
-                      "&:hover": { background: alpha(p.primaryLight || "#000", 0.04) },
-                      "&:last-child td": { borderBottom: "none" },
-                      animation: `${fadeUp} 0.25s ease both`,
-                      animationDelay: `${idx * 0.03}s`,
-                      transition: "background 0.15s",
-                    }}
-                  >
-                    {/* Row number */}
-                    <TableCell sx={{ ...tdSx, textAlign: "center" }}>
-                      <Typography
-                        sx={{
-                          fontSize: fonts.size.xs,
-                          fontWeight: fonts.weight.bold,
-                          color: p.textSub,
-                        }}
-                      >
-                        {globalIdx}
-                      </Typography>
-                    </TableCell>
-
-                    {/* Data cells */}
-                    {columns.map((col) => {
-                      const rawValue = getVal(row, col.key);
-                      return (
-                        <TableCell key={col.key} sx={{ ...tdSx, textAlign: col.align ?? "left" }}>
-                          {col.render ? (
-                            col.render(rawValue, row)
-                          ) : (
-                            <Typography sx={{ fontSize: fonts.size.sm }}>
-                              {rawValue ?? "—"}
-                            </Typography>
-                          )}
-                        </TableCell>
-                      );
-                    })}
-
-                    {/* Action cell */}
-                    {showActionCol && (
-                      <TableCell sx={{ ...tdSx, textAlign: "center", minWidth: 200, whiteSpace: "nowrap" }}>
-                        <Box
+                  return (
+                    <TableRow
+                      key={row.id ?? idx}
+                      sx={{
+                        background: isHighlighted
+                          ? alpha(hlColor, 0.02)
+                          : idx % 2 === 0
+                            ? t.stripedRowEven
+                            : t.stripedRowOdd,
+                        borderLeft: isHighlighted
+                          ? `3px solid ${hlColor}`
+                          : "3px solid transparent",
+                        "&:hover": { background: alpha(p.primaryLight || "#000", 0.04) },
+                        "&:last-child td": { borderBottom: "none" },
+                        animation: `${fadeUp} 0.25s ease both`,
+                        animationDelay: `${idx * 0.03}s`,
+                        transition: "background 0.15s",
+                      }}
+                    >
+                      {/* Row number */}
+                      <TableCell sx={{ ...tdSx, textAlign: "center" }}>
+                        <Typography
                           sx={{
-                            display: "flex",
-                            justifyContent: "center",
-                            alignItems: "center",
-                            width: "100%",
-                            flexWrap: "nowrap",
+                            fontSize: fonts.size.xs,
+                            fontWeight: fonts.weight.bold,
+                            color: p.textSub,
                           }}
                         >
-                          {renderAction(row)}
-                        </Box>
+                          {globalIdx}
+                        </Typography>
                       </TableCell>
-                    )}
-                  </TableRow>
-                );
-              })
+
+                      {/* Data cells */}
+                      {columns.map((col) => {
+                        const rawValue = getVal(row, col.key);
+                        return (
+                          <TableCell key={col.key} sx={{ ...tdSx, textAlign: col.align ?? "left" }}>
+                            {col.render ? (
+                              col.render(rawValue, row)
+                            ) : (
+                              <Typography sx={{ fontSize: fonts.size.sm }}>
+                                {rawValue ?? "—"}
+                              </Typography>
+                            )}
+                          </TableCell>
+                        );
+                      })}
+
+                      {/* Action cell */}
+                      {showActionCol && (
+                        <TableCell
+                          sx={{ ...tdSx, textAlign: "center", minWidth: 200, whiteSpace: "nowrap" }}
+                        >
+                          <Box
+                            sx={{
+                              display: "flex",
+                              justifyContent: "center",
+                              alignItems: "center",
+                              width: "100%",
+                              flexWrap: "nowrap",
+                            }}
+                          >
+                            {renderAction(row)}
+                          </Box>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                  );
+                })
               )}
             </TableBody>
           </Table>

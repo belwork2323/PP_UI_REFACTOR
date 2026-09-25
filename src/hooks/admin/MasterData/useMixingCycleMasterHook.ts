@@ -50,6 +50,7 @@ export default function useMixingCycleMasterHook({
   const [stats, setStats] = useState(emptyMasterDataStats());
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [projectFilter, setProjectFilter] = useState("");
   const [motorStageFilter, setMotorStageFilter] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -67,6 +68,7 @@ export default function useMixingCycleMasterHook({
       if (search.trim()) body.search = search.trim();
       if (activeFilter === "ACTIVE") body.isActive = true;
       if (activeFilter === "INACTIVE") body.isActive = false;
+      if (projectFilter) body.projectId = projectFilter;
       if (motorStageFilter) body.motorStage = Number(motorStageFilter);
       const resp = new ApiResponseModel(await fetchMixingCycleMasterList(body), MixingCycleListModel.fromApi);
       if (resp.success && resp.data) {
@@ -95,7 +97,7 @@ export default function useMixingCycleMasterHook({
     } finally {
       setLoading(false);
     }
-  }, [activeFilter, motorStageFilter, search]);
+  }, [activeFilter, motorStageFilter, projectFilter, search]);
 
   useEffect(() => {
     setPage(0);
@@ -126,13 +128,15 @@ export default function useMixingCycleMasterHook({
 
   const saveForm = async () => {
     const isEdit = inlineMode === "edit";
-    const err = validateMixingCycleForm(form, isEdit);
+    const err = validateMixingCycleForm(form, isEdit, items);
     if (err) {
       useAlertStore.getState().showValidationAlert(err);
       return;
     }
     setSaving(true);
-    useAlertStore.getState().showAlert(isEdit ? S.MESSAGES.UPDATING : S.MESSAGES.CREATING, "loading");
+    useAlertStore
+      .getState()
+      .showAlert(isEdit ? S.MESSAGES.UPDATING : S.MESSAGES.CREATING, "info", { loading: true });
     try {
       const raw = isEdit
         ? await updateMixingCycleMaster(buildMixingCycleUpdatePayload(form))
@@ -159,7 +163,7 @@ export default function useMixingCycleMasterHook({
 
   const enableRecord = useCallback(async (record: MixingCycleRecord) => {
     setEnabling(true);
-    useAlertStore.getState().showAlert(S.MESSAGES.ENABLING, "loading");
+    useAlertStore.getState().showAlert(S.MESSAGES.ENABLING, "info", { loading: true });
     try {
       const resp = new ApiResponseModel(
         await enableMixingCycleMaster(buildMixingCycleDeletePayload(record.id)),
@@ -181,7 +185,7 @@ export default function useMixingCycleMasterHook({
 
   const disableRecord = useCallback(async (record: MixingCycleRecord) => {
     setDisabling(true);
-    useAlertStore.getState().showAlert(S.MESSAGES.DISABLING, "loading");
+    useAlertStore.getState().showAlert(S.MESSAGES.DISABLING, "info", { loading: true });
     try {
       const resp = new ApiResponseModel(
         await deleteMixingCycleMaster(buildMixingCycleDeletePayload(record.id)),
@@ -226,6 +230,12 @@ export default function useMixingCycleMasterHook({
     search,
     setSearch: (v: string) => {
       setSearch(v);
+      setPage(0);
+    },
+    projectFilter,
+    setProjectFilter: (v: string) => {
+      setProjectFilter(v);
+      setMotorStageFilter("");
       setPage(0);
     },
     motorStageFilter,

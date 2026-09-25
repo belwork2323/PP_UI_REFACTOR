@@ -38,7 +38,10 @@ import {
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
 } from "../../../../components/custom/UserWorkflowStepPager";
-import { buildMotorNavGateHelpers, type PreviousStageApprovedUnits } from "../../../../../hooks/user/previousStageApproval";
+import {
+  buildMotorNavGateHelpers,
+  type PreviousStageApprovedUnits,
+} from "../../../../../hooks/user/previousStageApproval";
 import {
   findMotorUnit,
   getActiveStage,
@@ -197,7 +200,31 @@ const CasePreparationForm = ({
       insulationType: String(match?.insulationType ?? "").trim(),
     };
   }, [activeMotorEntry?.motorId, sheet]);
+  useEffect(() => {
+    if (!activeMotorEntry || !activeMotorSession) return;
 
+    const currentData = activeMotorSession.data ?? createEmptyCasePrepMotorData();
+    const targetCasing = activeMotorMeta.casingType;
+    const targetInsulation = activeMotorMeta.insulationType;
+
+    // Check against the correct nested properties
+    if (
+      currentData.abradingOperation?.typeOfCasing !== targetCasing ||
+      currentData.abradingOperation?.typeOfInsulation !== targetInsulation
+    ) {
+      onMotorSessionChange(activeMotorEntry.motorId, {
+        ...activeMotorSession,
+        data: {
+          ...currentData,
+          abradingOperation: {
+            ...currentData.abradingOperation, // Preserves abradingWheelType and other fields
+            typeOfCasing: targetCasing,
+            typeOfInsulation: targetInsulation,
+          },
+        },
+      });
+    }
+  }, [activeMotorMeta, activeMotorEntry?.motorId]);
   const motorTabs = useMemo<UserWorkflowNavTab[]>(
     () =>
       motorCards.map((entry, index) => {
@@ -282,7 +309,7 @@ const CasePreparationForm = ({
         </Typography>
       ) : null}
 
-      {isSubscaleBatch(batch?.batchType) && (
+      {/* {isSubscaleBatch(batch?.batchType) && (
         <Box
           sx={{
             borderRadius: 2.5,
@@ -301,7 +328,7 @@ const CasePreparationForm = ({
             theme={theme}
           />
         </Box>
-      )}
+      )} */}
 
       {isMainMotorBatch(batch?.batchType) &&
         motorCards.length > 0 &&
@@ -442,8 +469,6 @@ const CasePreparationForm = ({
                 }
                 motorId={activeMotorEntry.motorId}
                 batchId={batch?.batchId}
-                casingType={activeMotorMeta.casingType}
-                insulationType={activeMotorMeta.insulationType}
                 materials={sheetMaterials}
                 disabled={activeMotorLocked}
                 validationErrors={motorValidationErrors[activeMotorEntry.motorId]}

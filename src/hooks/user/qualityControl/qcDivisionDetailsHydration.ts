@@ -106,7 +106,9 @@ import {
   fetchQcProcessingMaterialSchema,
   hydrateProcessingMaterialValuesFromSeed,
   parseProcessingMaterialsFromDivisionDetails,
+  parseWeightmentSheetFromDivisionDetails,
 } from "./qcProcessingMaterials";
+import type { RawMaterialPrepWeightmentSheet } from "../../../data/models/user/RawMaterialPreparationModel";
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   value && typeof value === "object" && !Array.isArray(value)
@@ -186,6 +188,7 @@ export async function hydrateQcDivisionFormFromDetails(
   let resolvedData = QCDivisionDetailsModel.toFormState(detailsData);
   const entries: QcDivisionEntry[] = [];
   const entryValues: Record<string, QcDivisionEntryValues> = {};
+  let processingWeightmentSheet: RawMaterialPrepWeightmentSheet | null = null;
   const schemasByKey: Record<string, SchemaDocumentV2> = {};
   const schemaFetchQueue = new Map<
     string,
@@ -244,15 +247,22 @@ export async function hydrateQcDivisionFormFromDetails(
         : [];
 
     if (processingSeeds.length > 0) {
+      const detailSheet = parseWeightmentSheetFromDivisionDetails({ data: detailData });
+      if (
+        !processingWeightmentSheet &&
+        (detailSheet.mixerBuildingNumber || detailSheet.weightmentDetails.length > 0)
+      ) {
+        processingWeightmentSheet = detailSheet;
+      }
       for (const seed of processingSeeds) {
         try {
           const schema = await fetchQcProcessingMaterialSchema({
             subDepartmentId: effectiveSubDepartmentId,
             seed,
           });
-          const entry = buildProcessingMaterialEntry(seed);
-          entries.push(entry);
           if (schema) {
+            const entry = buildProcessingMaterialEntry(seed);
+            entries.push(entry);
             if (entry.schemaCacheKey) {
               schemasByKey[entry.schemaCacheKey] = schema;
             }
@@ -260,13 +270,14 @@ export async function hydrateQcDivisionFormFromDetails(
               schemaValues: hydrateProcessingMaterialValuesFromSeed(schema, seed),
             };
           } else {
-            // Keep entry + saved sections so details/approver can still render read-only data.
+            const entry = buildProcessingMaterialEntry(seed, { schemaUnavailable: true });
+            entries.push(entry);
             entryValues[entry.entryId] = { schemaValues: {} };
           }
         } catch {
           // Schema fetch failure should not drop the material entry for display.
           try {
-            const entry = buildProcessingMaterialEntry(seed);
+            const entry = buildProcessingMaterialEntry(seed, { schemaUnavailable: true });
             entries.push(entry);
             entryValues[entry.entryId] = { schemaValues: {} };
           } catch {
@@ -1049,6 +1060,7 @@ export async function hydrateQcDivisionFormFromDetails(
         ? mixingFinalMixDetailSections
         : resolvedData.savedSections,
     ...(mixingFinalMixDetailsValues && { mixingFinalMixDetailsValues }),
+    ...(processingWeightmentSheet && { processingWeightmentSheet }),
   };
 }
 

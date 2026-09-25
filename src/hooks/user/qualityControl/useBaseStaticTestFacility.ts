@@ -29,20 +29,20 @@ import {
   type StfMotorSubmissionStatus,
   type StfMotorSubmissionType,
 } from "../../../data/models/user/StaticTestFacilityFormModel";
-import { buildStfMotorStaticTestingDetails, type StfMotorData, collectTempFileIdsFromStfForm, hasIncompleteStfUploads } from "../../../data/models/user/StfMotorDataModel";
+import {
+  buildStfMotorStaticTestingDetails,
+  type StfMotorData,
+  collectTempFileIdsFromStfForm,
+  hasIncompleteStfUploads,
+} from "../../../data/models/user/StfMotorDataModel";
 import {
   validateStfMotorSession,
   type ValidationErrors as StfValidationErrors,
 } from "../../../data/validation/adapters/stf.validation";
 import { normalizeSubdepartmentBatchStatus } from "../../../data/models/user/SubdepartmentBatchModel";
-import {
-  mapStfSubType,
-  type StfSubType,
-} from "./stfFlowConfig";
+import { mapStfSubType, type StfSubType } from "./stfFlowConfig";
 import { QUALITY_CONTROL_STATUS } from "./qualityControlWorkflowData";
-import {
-  toOperationStatusApiValue,
-} from "../../operationStatus";
+import { toOperationStatusApiValue } from "../../operationStatus";
 import {
   isMotorEnabledByPreviousStage,
   isMotorEnabledForWorkflowWithBatch,
@@ -116,8 +116,7 @@ const normalizeBatch = (batch: any): STFBatch => {
     stfStatus: batch?.stfStatus ?? batch?.status ?? QUALITY_CONTROL_STATUS.TO_BE_INITIATED,
     formId: batch?.formId ?? null,
     subType:
-      batch?.subType ??
-      (shouldSeedStfMainMotors(batchType, subBatchType) ? "MAIN_MOTOR" : "BEM"),
+      batch?.subType ?? (shouldSeedStfMainMotors(batchType, subBatchType) ? "MAIN_MOTOR" : "BEM"),
     motorIdNo: batch?.bemNo ?? batch?.motorIdNo ?? null,
     rejectionReason: batch?.rejectionReason ?? null,
   };
@@ -257,8 +256,9 @@ export const useBaseStaticTestFacility = ({
   const [motorValidationErrors, setMotorValidationErrors] = useState<
     Record<string, StfValidationErrors>
   >({});
-  const [previousStageGate, setPreviousStageGate] =
-    useState<PreviousStageApprovedUnits | null>(null);
+  const [previousStageGate, setPreviousStageGate] = useState<PreviousStageApprovedUnits | null>(
+    null,
+  );
   const [savedStfTestNoByMotorId, setSavedStfTestNoByMotorId] = useState<Record<string, string>>(
     {},
   );
@@ -292,10 +292,7 @@ export const useBaseStaticTestFacility = ({
     setListLoading(true);
 
     try {
-      const apiStatus = toOperationStatusApiValue(
-        statusFilter,
-        STRINGS.USER_BATCH_LIST.FILTER_ALL,
-      );
+      const apiStatus = toOperationStatusApiValue(statusFilter, STRINGS.USER_BATCH_LIST.FILTER_ALL);
       const response = await stfController.listBemMotors({
         page: page + 1,
         limit: rowsPerPage,
@@ -590,44 +587,47 @@ export const useBaseStaticTestFacility = ({
     });
   }, []);
 
-  const handleDraftBemNoChange = useCallback((value: string) => {
-    setDraftBemNo(value);
-    if (facilityType === "OTHER_BEM") {
-      setFormData((prev) => {
-        const motors = prev.motors ?? [];
-        let nextMotors: StfMotorSession[];
-        if (!motors.length) {
-          nextMotors = [createEmptyStfMotorSession(value, "BEM")];
-        } else {
-          nextMotors = motors.map((motor, index) =>
-            index === 0 ? { ...motor, motorId: value } : motor,
-          );
-        }
-        const updated = nextMotors[0];
-        if (updated) {
-          const key = String(updated.motorId ?? "").trim() || "BEM_FORM";
-          const live = validateStfMotorSession(updated, "FORMAT");
-          setMotorValidationErrors((errs) => {
-            // Drop stale BEM_FORM key when motorId is assigned
-            const next = { ...errs };
-            delete next["BEM_FORM"];
-            if (Object.keys(live).length === 0) {
-              delete next[key];
+  const handleDraftBemNoChange = useCallback(
+    (value: string) => {
+      setDraftBemNo(value);
+      if (facilityType === "OTHER_BEM") {
+        setFormData((prev) => {
+          const motors = prev.motors ?? [];
+          let nextMotors: StfMotorSession[];
+          if (!motors.length) {
+            nextMotors = [createEmptyStfMotorSession(value, "BEM")];
+          } else {
+            nextMotors = motors.map((motor, index) =>
+              index === 0 ? { ...motor, motorId: value } : motor,
+            );
+          }
+          const updated = nextMotors[0];
+          if (updated) {
+            const key = String(updated.motorId ?? "").trim() || "BEM_FORM";
+            const live = validateStfMotorSession(updated, "FORMAT");
+            setMotorValidationErrors((errs) => {
+              // Drop stale BEM_FORM key when motorId is assigned
+              const next = { ...errs };
+              delete next["BEM_FORM"];
+              if (Object.keys(live).length === 0) {
+                delete next[key];
+                return next;
+              }
+              next[key] = live;
               return next;
-            }
-            next[key] = live;
-            return next;
-          });
-        }
-        return {
-          ...prev,
-          bemNo: value,
-          motors: nextMotors,
-          formLoaded: nextMotors.length > 0,
-        };
-      });
-    }
-  }, [facilityType]);
+            });
+          }
+          return {
+            ...prev,
+            bemNo: value,
+            motors: nextMotors,
+            formLoaded: nextMotors.length > 0,
+          };
+        });
+      }
+    },
+    [facilityType],
+  );
 
   const handleMotorDataChange = useCallback((motorId: string, stfData: StfMotorData) => {
     setFormData((prev) => {
@@ -763,21 +763,16 @@ export const useBaseStaticTestFacility = ({
       const navEntry =
         addedMotors.find((entry) => entry.motorId === motorId) ??
         batchMotorEntries.find((entry) => entry.motorId === motorId);
-      const sessionSubType = (formData.motors ?? []).find((motor) => motor.motorId === motorId)
-        ?.subType;
+      const sessionSubType = (formData.motors ?? []).find(
+        (motor) => motor.motorId === motorId,
+      )?.subType;
       const subType = navEntry?.subType ?? sessionSubType;
       if (!isStfMotorWorkflowEnabled(motorId, subType)) {
         return false;
       }
       return isStfMotorEditable(getMotorStatus(motorId));
     },
-    [
-      addedMotors,
-      batchMotorEntries,
-      formData.motors,
-      getMotorStatus,
-      isStfMotorWorkflowEnabled,
-    ],
+    [addedMotors, batchMotorEntries, formData.motors, getMotorStatus, isStfMotorWorkflowEnabled],
   );
 
   const handleRemoveMotor = useCallback(
@@ -786,8 +781,9 @@ export const useBaseStaticTestFacility = ({
         const navEntry =
           addedMotors.find((entry) => entry.motorId === motorId) ??
           batchMotorEntries.find((entry) => entry.motorId === motorId);
-        const sessionSubType = (formData.motors ?? []).find((motor) => motor.motorId === motorId)
-          ?.subType;
+        const sessionSubType = (formData.motors ?? []).find(
+          (motor) => motor.motorId === motorId,
+        )?.subType;
         const subType = navEntry?.subType ?? sessionSubType;
         if (subType !== "BEM") return;
 
@@ -840,46 +836,49 @@ export const useBaseStaticTestFacility = ({
     ],
   );
 
-  const handleStfTestNoChange = useCallback((motorId: string, stfTestNo: string) => {
-    const id = String(motorId ?? "").trim();
-    if (id && id !== "BEM_FORM" && String(savedStfTestNoByMotorId[id] ?? "").trim()) return;
+  const handleStfTestNoChange = useCallback(
+    (motorId: string, stfTestNo: string) => {
+      const id = String(motorId ?? "").trim();
+      if (id && id !== "BEM_FORM" && String(savedStfTestNoByMotorId[id] ?? "").trim()) return;
 
-    setFormData((prev) => {
-      if (!prev.motors || prev.motors.length === 0) {
+      setFormData((prev) => {
+        if (!prev.motors || prev.motors.length === 0) {
+          return {
+            ...prev,
+            stfTestNo,
+          };
+        }
+
+        const nextMotors = prev.motors.map((motor, index) =>
+          motor.motorId === id || (id === "BEM_FORM" && index === 0)
+            ? { ...motor, stfTestNo }
+            : motor,
+        );
+        const updated =
+          nextMotors.find((m) => m.motorId === id) ??
+          (id === "BEM_FORM" ? nextMotors[0] : undefined);
+        if (updated) {
+          const key = updated.motorId || id;
+          const live = validateStfMotorSession(updated, "FORMAT");
+          setMotorValidationErrors((errs) => {
+            if (Object.keys(live).length === 0) {
+              if (!errs[key]) return errs;
+              const copy = { ...errs };
+              delete copy[key];
+              return copy;
+            }
+            return { ...errs, [key]: live };
+          });
+        }
         return {
           ...prev,
           stfTestNo,
+          motors: nextMotors,
         };
-      }
-
-      const nextMotors = prev.motors.map((motor, index) =>
-        motor.motorId === id || (id === "BEM_FORM" && index === 0)
-          ? { ...motor, stfTestNo }
-          : motor,
-      );
-      const updated =
-        nextMotors.find((m) => m.motorId === id) ??
-        (id === "BEM_FORM" ? nextMotors[0] : undefined);
-      if (updated) {
-        const key = updated.motorId || id;
-        const live = validateStfMotorSession(updated, "FORMAT");
-        setMotorValidationErrors((errs) => {
-          if (Object.keys(live).length === 0) {
-            if (!errs[key]) return errs;
-            const copy = { ...errs };
-            delete copy[key];
-            return copy;
-          }
-          return { ...errs, [key]: live };
-        });
-      }
-      return {
-        ...prev,
-        stfTestNo,
-        motors: nextMotors,
-      };
-    });
-  }, [savedStfTestNoByMotorId]);
+      });
+    },
+    [savedStfTestNoByMotorId],
+  );
 
   const isStfTestNoLocked = useCallback(
     (motorId: string) => Boolean(String(savedStfTestNoByMotorId[motorId] ?? "").trim()),
@@ -909,11 +908,7 @@ export const useBaseStaticTestFacility = ({
 
   // Main Form Initialization & Detail Fetch
   const openFormWithResolvedData = useCallback(
-    async (
-      batch: STFBatch | BemMotor,
-      editMode: boolean,
-      options?: { silent?: boolean },
-    ) => {
+    async (batch: STFBatch | BemMotor, editMode: boolean, options?: { silent?: boolean }) => {
       const isOtherBem = facilityType === "OTHER_BEM";
       const bemMotorObj = batch as BemMotor;
       const stfBatchObj = batch as STFBatch;
@@ -922,14 +917,13 @@ export const useBaseStaticTestFacility = ({
       let resolvedFormId = stfBatchObj.formId || null;
       let resolvedData = createDefaultStaticTestFacilityFormState();
       let rejectionReason = batch.rejectionReason ?? null;
-      let fetchedBemNo =
-        String(
-          bemMotorObj.bemNo ??
-            stfBatchObj.motorIdNo ??
-            bemMotorObj.motorId ??
-            bemMotorObj.motorCode ??
-            "",
-        ).trim();
+      let fetchedBemNo = String(
+        bemMotorObj.bemNo ??
+          stfBatchObj.motorIdNo ??
+          bemMotorObj.motorId ??
+          bemMotorObj.motorCode ??
+          "",
+      ).trim();
       let detailsResponse: any = null;
       let autoMotorEntries: StfAddedMotor[] = [];
       let nextStatuses: Record<string, StfMotorStatusMeta> = {};
@@ -968,10 +962,7 @@ export const useBaseStaticTestFacility = ({
               stfBatchObj.subBatchType,
               batchDetails?.subBatchType,
             );
-            const seedMainMotors = shouldSeedStfMainMotors(
-              resolvedBatchType,
-              resolvedSubBatchType,
-            );
+            const seedMainMotors = shouldSeedStfMainMotors(resolvedBatchType, resolvedSubBatchType);
             const showBemSelection = shouldShowStfBemMotorSelection(
               resolvedBatchType,
               resolvedSubBatchType,
@@ -1029,7 +1020,7 @@ export const useBaseStaticTestFacility = ({
                 numberOfMotors: batchDetails?.numberOfMotors ?? stfBatchObj.numberOfMotors,
                 subType: seedMainMotors ? "MAIN_MOTOR" : "BEM",
               },
-              batchDetails as Record<string, unknown>,
+              batchDetails as unknown as Record<string, unknown>,
             ) as STFBatch;
           } catch (error) {
             console.error("Unable to resolve batch motor details", error);
@@ -1197,18 +1188,14 @@ export const useBaseStaticTestFacility = ({
       if (isOtherBem) {
         setActiveBemMotor({
           ...bemMotorObj,
-          motorId: String(
-            resolvedData.motorId ?? bemMotorObj.motorId ?? fetchedBemNo,
-          ).trim(),
+          motorId: String(resolvedData.motorId ?? bemMotorObj.motorId ?? fetchedBemNo).trim(),
           bemNo: fetchedBemNo,
           stfTestNo:
             resolvedData.motors?.[0]?.stfTestNo ??
             resolvedData.stfTestNo ??
             bemMotorObj.stfTestNo ??
             "",
-          status:
-            bemMotorObj.status ??
-            QUALITY_CONTROL_STATUS.IN_PROGRESS,
+          status: bemMotorObj.status ?? QUALITY_CONTROL_STATUS.IN_PROGRESS,
         });
       } else {
         setActiveBatch({
@@ -1234,9 +1221,7 @@ export const useBaseStaticTestFacility = ({
         : "BEM";
 
       setSelectedMotorType(
-        isOtherBem
-          ? nextMotorType ?? subTypesToHydrate[0] ?? defaultMotorType
-          : acemMotorType,
+        isOtherBem ? (nextMotorType ?? subTypesToHydrate[0] ?? defaultMotorType) : acemMotorType,
       );
       setAddedMotors(nextAddedMotors);
       setSavedStfTestNoByMotorId(nextSavedStfTestNoByMotorId);
@@ -1250,9 +1235,7 @@ export const useBaseStaticTestFacility = ({
         JSON.stringify({
           formData: { ...nextFormData, formLoaded: (nextFormData.motors ?? []).length > 0 },
           addedMotors: nextAddedMotors,
-          selectedMotorType: isOtherBem
-            ? nextMotorType ?? defaultMotorType
-            : acemMotorType,
+          selectedMotorType: isOtherBem ? (nextMotorType ?? defaultMotorType) : acemMotorType,
           draftBemNo: fetchedBemNo,
           motorStatusById: nextStatuses,
         }),
@@ -1319,13 +1302,24 @@ export const useBaseStaticTestFacility = ({
       return false;
     }
 
-    // Field validation for active motors (OTHER_BEM single session or all ACEM motors on full submit)
+    // Draft/save: FORMAT only (no mandatory). Submit: SUBMIT enforces required fields.
     {
-      const tier = intent === "draft" ? "UNIT" : "SUBMIT";
+      const tier = intent === "draft" ? "FORMAT" : "SUBMIT";
       const nextErrors: Record<string, StfValidationErrors> = {};
       for (const motor of formData.motors ?? []) {
         const id = String(motor.motorId ?? "").trim() || "BEM_FORM";
-        const errs = validateStfMotorSession(motor, tier);
+        let errs = validateStfMotorSession(motor, tier);
+        if (intent === "draft") {
+          const kept: StfValidationErrors = {};
+          for (const [path, msg] of Object.entries(errs)) {
+            const text = String(msg ?? "")
+              .trim()
+              .toLowerCase();
+            if (!text || text.includes("required")) continue;
+            kept[path] = msg;
+          }
+          errs = kept;
+        }
         if (Object.keys(errs).length > 0) nextErrors[id] = errs;
       }
       if (Object.keys(nextErrors).length > 0) {
@@ -1342,16 +1336,14 @@ export const useBaseStaticTestFacility = ({
       // 1. SINGLE BEM MOTOR FLOW (OTHER_BEM)
       if (facilityType === "OTHER_BEM") {
         const bemNo = draftBemNo?.trim() || formData.bemNo || formData.motors?.[0]?.motorId;
-        const stfNo =
-          formData.motors?.[0]?.stfTestNo ?? formData.stfTestNo ?? "";
+        const stfNo = formData.motors?.[0]?.stfTestNo ?? formData.stfTestNo ?? "";
         if (!bemNo) {
           showAlert("Please enter BEM Number", "warning");
           return false;
         }
 
         const isBemUpdate = Boolean(activeBemMotor?.motorId || formData?.motorId);
-        const bemSession =
-          formData.motors?.[0] ?? createEmptyStfMotorSession(String(bemNo), "BEM");
+        const bemSession = formData.motors?.[0] ?? createEmptyStfMotorSession(String(bemNo), "BEM");
         const staticTestingDetails = buildStfMotorStaticTestingDetails(bemSession.stfData);
 
         // Structure single motor inside an array to match the backend payload schema
@@ -1462,10 +1454,7 @@ export const useBaseStaticTestFacility = ({
           const stfNo = formData.motors?.[0]?.stfTestNo ?? formData.stfTestNo ?? "";
           lockStfTestNoForMotor(String(bemNo), String(stfNo));
           const returnedMotorId = String(
-            response.data?.bemMotorId ??
-              response.data?.motorId ??
-              response.data?.formId ??
-              bemNo,
+            response.data?.bemMotorId ?? response.data?.motorId ?? response.data?.formId ?? bemNo,
           );
           const statusForBanner = String(
             response.data?.status ?? activeBemMotor?.status ?? "IN_PROGRESS",
@@ -1574,14 +1563,15 @@ export const useBaseStaticTestFacility = ({
       const navEntry =
         addedMotors.find((entry) => entry.motorId === motorId) ??
         batchMotorEntries.find((entry) => entry.motorId === motorId);
-      const sessionSubType = (formData.motors ?? []).find((entry) => entry.motorId === motorId)
-        ?.subType;
+      const sessionSubType = (formData.motors ?? []).find(
+        (entry) => entry.motorId === motorId,
+      )?.subType;
       const gateSubType = navEntry?.subType ?? sessionSubType;
 
       if (!isStfMotorWorkflowEnabled(motorId, gateSubType)) {
         showAlert(
-          previousStageGate?.blockedMessage
-            ?? (isMotorEnabledByPreviousStage(motorId, previousStageGate)
+          previousStageGate?.blockedMessage ??
+            (isMotorEnabledByPreviousStage(motorId, previousStageGate)
               ? STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED
               : messages.PREVIOUS_STAGE_UNIT_DISABLED),
           "warning",
@@ -1619,8 +1609,20 @@ export const useBaseStaticTestFacility = ({
       }
 
       {
-        const tier = intent === "draft" ? "UNIT" : "SUBMIT";
-        const fieldErrors = validateStfMotorSession(motor, tier);
+        // Draft/save: FORMAT only (no mandatory). Submit: SUBMIT enforces required fields.
+        const tier = intent === "draft" ? "FORMAT" : "SUBMIT";
+        let fieldErrors = validateStfMotorSession(motor, tier);
+        if (intent === "draft") {
+          const kept: StfValidationErrors = {};
+          for (const [path, msg] of Object.entries(fieldErrors)) {
+            const text = String(msg ?? "")
+              .trim()
+              .toLowerCase();
+            if (!text || text.includes("required")) continue;
+            kept[path] = msg;
+          }
+          fieldErrors = kept;
+        }
         if (Object.keys(fieldErrors).length > 0) {
           setMotorValidationErrors((prev) => ({ ...prev, [motorId]: fieldErrors }));
           return false;
@@ -1633,8 +1635,7 @@ export const useBaseStaticTestFacility = ({
         });
       }
 
-      const motorSubmissionType: StfMotorSubmissionType =
-        intent === "draft" ? "DRAFT" : "SUBMIT";
+      const motorSubmissionType: StfMotorSubmissionType = intent === "draft" ? "DRAFT" : "SUBMIT";
       const isCreateFlow =
         activeBatch.stfStatus === QUALITY_CONTROL_STATUS.TO_BE_INITIATED && !activeBatch.formId;
       const payloadBody = mapStaticTestFacilityFormStateToPayload(formData, {
@@ -1712,8 +1713,7 @@ export const useBaseStaticTestFacility = ({
               if (!id) return;
               updated[id] = {
                 ...updated[id],
-                motorSubmissionType:
-                  entry.motorSubmissionType ?? updated[id]?.motorSubmissionType,
+                motorSubmissionType: entry.motorSubmissionType ?? updated[id]?.motorSubmissionType,
                 motorSubmissionStatus:
                   (String(entry.motorSubmissionStatus ?? "")
                     .toUpperCase()
@@ -1817,10 +1817,7 @@ export const useBaseStaticTestFacility = ({
         );
         if (handled) return false;
         showAlert(
-          getErrorMessage(
-            error,
-            isCreateFlow ? messages.CREATE_FAILED : messages.UPDATE_FAILED,
-          ),
+          getErrorMessage(error, isCreateFlow ? messages.CREATE_FAILED : messages.UPDATE_FAILED),
           "error",
         );
         return false;
@@ -1930,7 +1927,8 @@ export const useBaseStaticTestFacility = ({
     facilityType,
     batches,
     bemMotors,
-    loading: facilityType === "OTHER_BEM" ? listLoading : Boolean(acemListParams?.loading ?? listLoading),
+    loading:
+      facilityType === "OTHER_BEM" ? listLoading : Boolean(acemListParams?.loading ?? listLoading),
     isRefreshing: facilityType === "OTHER_BEM" ? false : Boolean(acemListParams?.isRefreshing),
     refetchList: loadListItems,
     view,

@@ -26,11 +26,13 @@ import {
   type RawMaterialPrepWeightmentSheet,
 } from "../../../../../data/models/user/RawMaterialPreparationModel";
 import type { IdentificationSheet } from "../../../../../data/models/admin/BatchManagement/BatchManagementModel";
+import { batchManagementController } from "../../../../../controllers/admin/BatchManagement/batchManagementController";
 import {
   findSheetMaterialForWeightmentRow,
   formatSheetMaterialLabel,
   getExpectedWeightmentForSheetMaterial,
   getWeightmentRowSheetKey,
+  normalizeSheetMaterialsForWeightmentCompare,
   validateWeightmentRowAgainstSheet,
   weightmentRowsHaveSheetDeviations,
   type WeightmentRowFieldErrors,
@@ -45,9 +47,11 @@ import useValidationDisplay, {
 } from "../../../../components/validation/useValidationDisplay";
 import IdentificationSheetCollapsible from "./components/IdentificationSheetCollapsible";
 import {
+  WeightmentSelectField,
   WeightmentTableInput,
   WeightmentTextField,
 } from "./components/RawMaterialWeightmentFormFields";
+import { useBuildingOptions } from "../../../../../hooks/user/useBuildingOptions";
 
 const RM = STRINGS.MANUFACTURING.RAW_MATERIAL_PREP;
 const CONTAINER_TYPES = ["Drum", "Bin", "Bag", "Other"];
@@ -61,6 +65,7 @@ const checkboxLabelSx = {
 
 const validationMessages = {
   materialNotInSheet: RM.WEIGHTMENT_MATERIAL_NOT_IN_SHEET,
+  nameMismatch: RM.WEIGHTMENT_NAME_MISMATCH,
   percentageMismatch: RM.WEIGHTMENT_PERCENTAGE_MISMATCH,
   weightMismatch: RM.WEIGHTMENT_WEIGHT_MISMATCH,
 };
@@ -83,11 +88,25 @@ type RawMaterialWeightmentSheetPanelProps = {
       | RawMaterialPrepWeightmentSheet
       | ((prev: RawMaterialPrepWeightmentSheet) => RawMaterialPrepWeightmentSheet),
   ) => void;
+  /**
+   * Optional validation-only updater (QC). Compare / deviation checkboxes must use this
+   * so filtered merge paths never rewrite weighment detail rows.
+   */
+  onValidationChange?: (
+    patch: Partial<RawMaterialPrepWeightmentSheet["validation"]>,
+  ) => void;
   theme: any;
   batchId?: string;
   identificationSheet?: IdentificationSheet | null;
   /** Shared across premixes — false when any premix is waiting for approval / approved. */
   disabled?: boolean;
+  /**
+   * QC mode: compare only highlights mismatches.
+   * Does not switch material to a dropdown, auto-fill/replace values, or auto-check deviation.
+   */
+  compareHighlightOnly?: boolean;
+  /** When false, hide Add Row / delete — weighment is fixed per material × premix. */
+  allowAddRemoveRows?: boolean;
   weightmentErrors?: ValidationErrors;
   validationAttempt?: ValidationAttemptFlags;
 };
@@ -95,10 +114,13 @@ type RawMaterialWeightmentSheetPanelProps = {
 const RawMaterialWeightmentSheetPanel = ({
   value,
   onChange,
+  onValidationChange,
   theme,
   batchId = "",
   identificationSheet = null,
   disabled = false,
+  compareHighlightOnly = false,
+  allowAddRemoveRows = true,
   weightmentErrors = {},
   validationAttempt = { format: false, unit: false, submit: false },
 }: RawMaterialWeightmentSheetPanelProps) => {
@@ -107,8 +129,23 @@ const RawMaterialWeightmentSheetPanel = ({
     validationAttempt,
   );
   const [identificationViewOpen, setIdentificationViewOpen] = useState(false);
+  const [resolvedIdentificationSheet, setResolvedIdentificationSheet] =
+    useState<IdentificationSheet | null>(identificationSheet ?? null);
+  const { dropdownOptions: buildingOptions, loadingBuildings } = useBuildingOptions(true);
+  const mixerBuildingSelectOptions = useMemo(() => {
+    const current = String(value.mixerBuildingNumber ?? "").trim();
+    if (!current) return buildingOptions;
+    if (buildingOptions.some((option) => option.value === current)) return buildingOptions;
+    return [{ value: current, label: current }, ...buildingOptions];
+  }, [buildingOptions, value.mixerBuildingNumber]);
   const compareEnabled = value.validation.compareWithIdentificationSheet === true;
-  const sheetMaterials = identificationSheet?.materials ?? [];
+  const sheetMaterials = useMemo(
+    () =>
+      normalizeSheetMaterialsForWeightmentCompare(
+        resolvedIdentificationSheet?.materials ?? identificationSheet?.materials ?? [],
+      ),
+    [identificationSheet?.materials, resolvedIdentificationSheet?.materials],
+  );
   const palette = theme.palette ?? {};
   const dt = theme.manufacturing?.rawMaterialPrep?.details ?? {};
   const primary = palette.primary ?? "#1B4F72";
@@ -121,14 +158,57 @@ const RawMaterialWeightmentSheetPanel = ({
   ) => {
     onChange((prev) => {
       const resolved = typeof patch === "function" ? patch(prev) : patch;
-      return { ...prev, ...resolved };
+      // Always preserve existing detail rows unless the patch explicitly replaces them.
+      return {
+        ...prev,
+        ...resolved,
+        weightmentDetails:
+          resolved.weightmentDetails !== undefined
+            ? resolved.weightmentDetails
+            : prev.weightmentDetails,
+        validation: resolved.validation
+          ? { ...prev.validation, ...resolved.validation }
+          : prev.validation,
+      };
     });
   };
 
   useEffect(() => {
+    if (identificationSheet) {
+      setResolvedIdentificationSheet(identificationSheet);
+    }
+  }, [identificationSheet]);
+
+  // Load identification materials for compare validation when prop is missing
+  // (QC often only has batchId; collapsible already fetches for display).
+  useEffect(() => {
+    if (!compareEnabled) return;
+    if (normalizeSheetMaterialsForWeightmentCompare(identificationSheet?.materials).length > 0) {
+      setResolvedIdentificationSheet(identificationSheet);
+      return;
+    }
+    const id = String(batchId ?? "").trim();
+    if (!id) return;
+
+    let cancelled = false;
+    void (async () => {
+      const batch = await batchManagementController.getBatchById(id);
+      if (cancelled || !batch?.identificationSheet) return;
+      setResolvedIdentificationSheet(batch.identificationSheet);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [batchId, compareEnabled, identificationSheet]);
+
+  useEffect(() => {
     if (!compareEnabled) {
       setIdentificationViewOpen(false);
+      return;
     }
+    // When compare is enabled, open the sheet so users can see expected values.
+    setIdentificationViewOpen(true);
   }, [compareEnabled]);
 
   const rowErrors = useMemo((): WeightmentRowFieldErrors[] => {
@@ -166,6 +246,8 @@ const RawMaterialWeightmentSheetPanel = ({
 
   useEffect(() => {
     if (!compareEnabled || !hasSheetDeviations || value.validation.deviationFound) return;
+    // QC highlight-only: never auto-toggle deviation / rewrite validation flags.
+    if (compareHighlightOnly) return;
 
     onChange((prev) => {
       if (prev.validation.compareWithIdentificationSheet !== true) return prev;
@@ -189,6 +271,7 @@ const RawMaterialWeightmentSheetPanel = ({
     });
   }, [
     compareEnabled,
+    compareHighlightOnly,
     hasSheetDeviations,
     onChange,
     sheetMaterials,
@@ -251,8 +334,9 @@ const RawMaterialWeightmentSheetPanel = ({
   const renderMaterialCodeField = (row: RawMaterialPrepWeightmentDetail, index: number) => {
     const materialCodeError = getRowFieldError(index, "materialCode");
 
-    // Dropdown + sheet matching only when the user checked "Compare with identification sheet".
-    if (compareEnabled === true && sheetMaterials.length > 0) {
+    // QC (compareHighlightOnly): always free-text; compare only highlights mismatches.
+    // RMP: when compare is on, use identification-sheet dropdown + auto-fill.
+    if (compareHighlightOnly !== true && compareEnabled === true && sheetMaterials.length > 0) {
       return (
         <WeightmentTableInput
           value={getWeightmentRowSheetKey(row, sheetMaterials)}
@@ -281,7 +365,7 @@ const RawMaterialWeightmentSheetPanel = ({
   };
 
   const renderExpectedHint = (row: RawMaterialPrepWeightmentDetail) => {
-    if (!compareEnabled) return null;
+    if (!compareEnabled || compareHighlightOnly) return null;
 
     const sheetMaterial = findSheetMaterialForWeightmentRow(row, sheetMaterials);
     if (!sheetMaterial) return null;
@@ -334,17 +418,25 @@ const RawMaterialWeightmentSheetPanel = ({
       </Box>
 
       <Box sx={{ p: { xs: 1.5, sm: 2 } }}>
-        <WeightmentTextField
-          label={RM.WEIGHTMENT_MIXER_BUILDING}
-          value={value.mixerBuildingNumber}
-          onChange={(next) => updateSheet({ mixerBuildingNumber: next })}
-          placeholder={RM.WEIGHTMENT_PLACEHOLDER_MIXER_BUILDING}
-          palette={palette}
-          width={{ xs: "100%", sm: 360 }}
-          disabled={disabled}
-          error={Boolean(mixerBuildingError)}
-          helperText={mixerBuildingError}
-        />
+        <Box sx={{ width: { xs: "100%", sm: 360 } }}>
+          <WeightmentSelectField
+            label={RM.WEIGHTMENT_MIXER_BUILDING}
+            value={value.mixerBuildingNumber}
+            onChange={(next) => updateSheet({ mixerBuildingNumber: next })}
+            placeholder={
+              loadingBuildings
+                ? "Loading buildings..."
+                : buildingOptions.length
+                  ? RM.WEIGHTMENT_PLACEHOLDER_MIXER_BUILDING
+                  : "No buildings available"
+            }
+            options={mixerBuildingSelectOptions}
+            palette={palette}
+            disabled={disabled || loadingBuildings}
+            error={Boolean(mixerBuildingError)}
+            helperText={mixerBuildingError}
+          />
+        </Box>
 
         {value.weightmentDetails.length === 0 ? (
           <Box
@@ -407,17 +499,19 @@ const RawMaterialWeightmentSheetPanel = ({
                       {header}
                     </TableCell>
                   ))}
-                  <TableCell
-                    sx={
-                      dt.tableHeaderCell
-                        ? dt.tableHeaderCell()
-                        : {
-                            background: `linear-gradient(180deg, ${primaryLight} 0%, ${primary} 100%)`,
-                            borderBottom: "none",
-                          }
-                    }
-                    align="center"
-                  />
+                  {allowAddRemoveRows ? (
+                    <TableCell
+                      sx={
+                        dt.tableHeaderCell
+                          ? dt.tableHeaderCell()
+                          : {
+                              background: `linear-gradient(180deg, ${primaryLight} 0%, ${primary} 100%)`,
+                              borderBottom: "none",
+                            }
+                      }
+                      align="center"
+                    />
+                  ) : null}
                 </TableRow>
               </TableHead>
               <TableBody>
@@ -433,8 +527,12 @@ const RawMaterialWeightmentSheetPanel = ({
                           value={row.materialName}
                           onChange={(next) => updateRow(index, { materialName: next })}
                           placeholder={RM.WEIGHTMENT_PLACEHOLDER_MATERIAL_NAME}
-                          readOnly={compareEnabled}
+                          // QC highlight-only: keep name editable when compare is on.
+                          // RMP compare mode: lock name when selecting from identification sheet.
+                          readOnly={compareEnabled && !compareHighlightOnly}
                           disabled={disabled}
+                          error={Boolean(getRowFieldError(index, "materialName"))}
+                          helperText={getRowFieldError(index, "materialName")}
                           palette={palette}
                         />
                       </TableCell>
@@ -507,20 +605,22 @@ const RawMaterialWeightmentSheetPanel = ({
                           helperText={getRowFieldError(index, "weighingDateTime")}
                         />
                       </TableCell>
-                      <TableCell align="center" sx={{ ...(dt.tableCell ?? {}), verticalAlign: "top", py: 1.1 }}>
-                        <IconButton
-                          size="small"
-                          color="error"
-                          disabled={disabled}
-                          onClick={() => removeRow(index)}
-                          sx={{
-                            border: `1px solid ${alpha(palette.danger ?? "#C0392B", 0.2)}`,
-                            background: alpha(palette.danger ?? "#C0392B", 0.04),
-                          }}
-                        >
-                          <DeleteOutlineRoundedIcon fontSize="small" />
-                        </IconButton>
-                      </TableCell>
+                      {allowAddRemoveRows ? (
+                        <TableCell align="center" sx={{ ...(dt.tableCell ?? {}), verticalAlign: "top", py: 1.1 }}>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            disabled={disabled}
+                            onClick={() => removeRow(index)}
+                            sx={{
+                              border: `1px solid ${alpha(palette.danger ?? "#C0392B", 0.2)}`,
+                              background: alpha(palette.danger ?? "#C0392B", 0.04),
+                            }}
+                          >
+                            <DeleteOutlineRoundedIcon fontSize="small" />
+                          </IconButton>
+                        </TableCell>
+                      ) : null}
                     </TableRow>
                   );
                 })}
@@ -529,31 +629,33 @@ const RawMaterialWeightmentSheetPanel = ({
           </TableContainer>
         )}
 
-        <Button
-          size="small"
-          variant="outlined"
-          startIcon={<AddRoundedIcon fontSize="small" />}
-          disabled={disabled}
-          onClick={() =>
-            updateSheet((prev) => ({
-              weightmentDetails: [...prev.weightmentDetails, createEmptyWeightmentDetail()],
-            }))
-          }
-          sx={{
-            mb: 2,
-            textTransform: "none",
-            fontWeight: 700,
-            fontSize: "0.78rem",
-            borderColor: alpha(primaryLight, 0.45),
-            color: primary,
-            "&:hover": {
-              borderColor: primaryLight,
-              background: alpha(primaryLight, 0.06),
-            },
-          }}
-        >
-          {RM.WEIGHTMENT_ADD_ROW}
-        </Button>
+        {allowAddRemoveRows ? (
+          <Button
+            size="small"
+            variant="outlined"
+            startIcon={<AddRoundedIcon fontSize="small" />}
+            disabled={disabled}
+            onClick={() =>
+              updateSheet((prev) => ({
+                weightmentDetails: [...prev.weightmentDetails, createEmptyWeightmentDetail()],
+              }))
+            }
+            sx={{
+              mb: 2,
+              textTransform: "none",
+              fontWeight: 700,
+              fontSize: "0.78rem",
+              borderColor: alpha(primaryLight, 0.45),
+              color: primary,
+              "&:hover": {
+                borderColor: primaryLight,
+                background: alpha(primaryLight, 0.06),
+              },
+            }}
+          >
+            {RM.WEIGHTMENT_ADD_ROW}
+          </Button>
+        ) : null}
 
         <Box
           sx={{
@@ -572,11 +674,20 @@ const RawMaterialWeightmentSheetPanel = ({
                 disabled={disabled}
                 onChange={(event) => {
                   const checked = event.target.checked;
+                  const validationPatch = {
+                    compareWithIdentificationSheet: checked,
+                    deviationFound: checked ? value.validation.deviationFound : false,
+                    deviationMessage: checked ? value.validation.deviationMessage : "",
+                  };
+                  // Prefer validation-only callback so parents never remap detail rows.
+                  if (onValidationChange) {
+                    onValidationChange(validationPatch);
+                    return;
+                  }
                   updateSheet((prev) => ({
                     validation: {
-                      compareWithIdentificationSheet: checked,
-                      deviationFound: checked ? prev.validation.deviationFound : false,
-                      deviationMessage: checked ? prev.validation.deviationMessage : "",
+                      ...prev.validation,
+                      ...validationPatch,
                     },
                   }));
                 }}
@@ -590,7 +701,7 @@ const RawMaterialWeightmentSheetPanel = ({
             {compareEnabled ? (
               <IdentificationSheetCollapsible
                 batchId={batchId}
-                identificationSheet={identificationSheet}
+                identificationSheet={resolvedIdentificationSheet ?? identificationSheet}
                 theme={theme}
                 open={identificationViewOpen}
                 onToggle={() => setIdentificationViewOpen((prev) => !prev)}
@@ -603,11 +714,18 @@ const RawMaterialWeightmentSheetPanel = ({
                 disabled={disabled}
                 onChange={(event) => {
                   const checked = event.target.checked;
+                  const validationPatch = {
+                    deviationFound: checked,
+                    deviationMessage: checked ? value.validation.deviationMessage : "",
+                  };
+                  if (onValidationChange) {
+                    onValidationChange(validationPatch);
+                    return;
+                  }
                   updateSheet((prev) => ({
                     validation: {
                       ...prev.validation,
-                      deviationFound: checked,
-                      deviationMessage: checked ? prev.validation.deviationMessage : "",
+                      ...validationPatch,
                     },
                   }));
                 }}
@@ -622,14 +740,18 @@ const RawMaterialWeightmentSheetPanel = ({
               <WeightmentTextField
                 label={RM.WEIGHTMENT_DEVIATION_MESSAGE}
                 value={value.validation.deviationMessage}
-                onChange={(next) =>
+                onChange={(next) => {
+                  if (onValidationChange) {
+                    onValidationChange({ deviationMessage: next });
+                    return;
+                  }
                   updateSheet((prev) => ({
                     validation: {
                       ...prev.validation,
                       deviationMessage: next,
                     },
-                  }))
-                }
+                  }));
+                }}
                 palette={palette}
                 width={{ xs: "100%", sm: 480 }}
                 disabled={disabled}

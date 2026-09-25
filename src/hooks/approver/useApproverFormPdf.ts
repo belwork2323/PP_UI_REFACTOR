@@ -32,7 +32,7 @@ const DEPARTMENT_SLUGS: Record<ApproverDepartmentKey, string> = {
 };
 
 const base64ToBlobUrl = (base64: string) => {
-  const normalizedBase64 = base64.includes(",") ? base64.split(",").pop() ?? "" : base64;
+  const normalizedBase64 = base64.includes(",") ? (base64.split(",").pop() ?? "") : base64;
   const binary = window.atob(normalizedBase64);
   const bytes = new Uint8Array(binary.length);
 
@@ -43,7 +43,12 @@ const base64ToBlobUrl = (base64: string) => {
   return URL.createObjectURL(new Blob([bytes], { type: "application/pdf" }));
 };
 
-export const useApproverFormPdf = ({ department, formId, open, subDepartment }: UseApproverFormPdfArgs) => {
+export const useApproverFormPdf = ({
+  department,
+  formId,
+  open,
+  subDepartment,
+}: UseApproverFormPdfArgs) => {
   const user = useAuthStore((state) => state.user);
   const showAlert = useAlertStore((state) => state.showAlert);
 
@@ -71,9 +76,12 @@ export const useApproverFormPdf = ({ department, formId, open, subDepartment }: 
     blobUrlRef.current = null;
   };
 
-  useEffect(() => () => {
-    revokeBlobUrl();
-  }, []);
+  useEffect(
+    () => () => {
+      revokeBlobUrl();
+    },
+    [],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -86,6 +94,7 @@ export const useApproverFormPdf = ({ department, formId, open, subDepartment }: 
         setLoading(false);
         return;
       }
+      console.log(selectedSubDepartment);
 
       if (!formId) {
         showAlert(STRINGS.APPROVER.PDF.FORM_ID_MISSING, "error", { autoCloseMs: 3000 });
@@ -193,7 +202,9 @@ export const useApproverFormPdf = ({ department, formId, open, subDepartment }: 
       window.setTimeout(() => URL.revokeObjectURL(href), 1000);
     }
 
-    showAlert(response.message || STRINGS.APPROVER.PDF.DOWNLOAD_LABEL, "success", { autoCloseMs: 2000 });
+    showAlert(response.message || STRINGS.APPROVER.PDF.DOWNLOAD_LABEL, "success", {
+      autoCloseMs: 2000,
+    });
   };
 
   return {

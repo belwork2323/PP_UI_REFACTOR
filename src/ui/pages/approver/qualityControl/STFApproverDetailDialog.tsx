@@ -59,7 +59,8 @@ type STFApproverDetailDialogProps = {
   onReject: (item: STFApproverDetailItem) => void;
   actionLoading?: boolean;
   theme: ReturnType<typeof getRawMaterialPreparationApproverTheme>;
-  subDepartment?: "static-test-facility" | "other-bem-motors" | string;
+  subDepartment?: "static-test-facility";
+  typeOfMotor: "acem" | "other-bem-motors";
 };
 
 const STFApproverDetailDialog = ({
@@ -75,19 +76,18 @@ const STFApproverDetailDialog = ({
   actionLoading = false,
   theme,
   subDepartment = "static-test-facility",
+  typeOfMotor = "acem",
 }: STFApproverDetailDialogProps) => {
   const [pdfOpen, setPdfOpen] = useState(false);
   const mode = useThemeStore((state) => state.mode);
   const qcTheme = useMemo(() => getQualityControlTheme(mode), [mode]);
   const strings = STRINGS.QUALITY_CONTROL.STATIC_TEST_FACILITY;
-  const isAcemFlow = subDepartment === "static-test-facility";
+  const isAcemFlow = typeOfMotor === "acem";
 
   if (!item) return null;
 
-  const detailView = (isAcemFlow ? item.detailView : detailViewProp ?? item.detailView) as
-    | StfDetailView
-    | OtherBemDetailView
-    | null;
+  const detailView = (isAcemFlow ? item.detailView : (detailViewProp ?? item.detailView)) as
+    StfDetailView | OtherBemDetailView | null;
 
   const rowStatus = String(
     item.stfStatus ?? item.bemStatus ?? item.status ?? detailView?.status ?? "",
@@ -95,7 +95,7 @@ const STFApproverDetailDialog = ({
   const canApproveOrReject = !isAcemFlow && isApproverActionableStatus(rowStatus);
 
   const displayId = item.batchId ?? item.motorId ?? (detailView as StfDetailView)?.batchId ?? "";
-  const formId = detailView?.formId ?? item.formId ?? null;
+  const formId = item.formId;
 
   return (
     <>
@@ -116,8 +116,7 @@ const STFApproverDetailDialog = ({
             <RocketLaunchRoundedIcon sx={theme.dialog.headerIcon} />
             <Box>
               <Typography sx={theme.dialog.headerTitle}>
-                {subDepartment === "other-bem-motors" ? "Other BEM Motor" : strings.TITLE}{" "}
-                Submission
+                {typeOfMotor === "other-bem-motors" ? "Other BEM Motor" : strings.TITLE} Submission
               </Typography>
               <Typography sx={theme.dialog.headerSubtitle}>
                 {displayId}
@@ -212,7 +211,7 @@ const STFApproverDetailDialog = ({
         formId={formId}
         department="qualityControl"
         subDepartment={subDepartment}
-        dialogTitle={`${subDepartment === "other-bem-motors" ? "Other BEM Motor" : strings.TITLE} Report — ${displayId}`}
+        dialogTitle={`${typeOfMotor === "other-bem-motors" ? "Other BEM Motor" : strings.TITLE} Report — ${displayId}`}
       />
     </>
   );

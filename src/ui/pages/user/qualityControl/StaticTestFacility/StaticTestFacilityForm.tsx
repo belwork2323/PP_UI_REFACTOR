@@ -1,13 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import {
-  Alert,
-  Box,
-  Button,
-  Chip,
-  Stack,
-  Typography,
-  alpha,
-} from "@mui/material";
+import { Alert, Box, Button, Chip, Stack, Typography, alpha } from "@mui/material";
 import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import { STATIC_TEST_FACILITY_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
@@ -156,13 +148,20 @@ const StaticTestFacilityForm = ({
 
   const stfMotorNavGate = useMemo(
     () =>
-      buildStfMotorNavGateHelpers(motorCards, previousStageGate, resolveMotorStatus, "ACEM", {
-        previousStage:
-          previousStageGate?.blockedMessage ?? S.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
-        notYetUnlocked:
-          previousStageGate?.blockedMessage ?? STRINGS.MANUFACTURING.NOT_YET_UNLOCKED,
-        sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
-      }, batch, SUB_DEPT.STF),
+      buildStfMotorNavGateHelpers(
+        motorCards,
+        previousStageGate,
+        resolveMotorStatus,
+        "ACEM",
+        {
+          previousStage: previousStageGate?.blockedMessage ?? S.PREVIOUS_STAGE_MOTOR_TAB_DISABLED,
+          notYetUnlocked:
+            previousStageGate?.blockedMessage ?? STRINGS.MANUFACTURING.NOT_YET_UNLOCKED,
+          sequential: STRINGS.MANUFACTURING.SEQUENTIAL_UNIT_TAB_DISABLED,
+        },
+        batch,
+        SUB_DEPT.STF,
+      ),
     [batch, motorCards, previousStageGate, resolveMotorStatus],
   );
 
@@ -237,7 +236,9 @@ const StaticTestFacilityForm = ({
     const found = (formData.motors ?? []).find(
       (motor) => motor.motorId === activeMotorEntry.motorId,
     );
-    return found ? normalizeStfMotorSession(found) : createEmptyStfMotorSession(activeMotorEntry.motorId, activeMotorEntry.subType);
+    return found
+      ? normalizeStfMotorSession(found)
+      : createEmptyStfMotorSession(activeMotorEntry.motorId, activeMotorEntry.subType);
   }, [activeMotorEntry, formData.motors]);
 
   const activeMotorId = activeMotorEntry?.motorId ?? "";
@@ -521,9 +522,7 @@ const StaticTestFacilityForm = ({
                 value={activeMotorSession?.stfTestNo || ""}
                 placeholder={S.STF_TEST_NO_PLACEHOLDER}
                 disabled={actionLoading || activeMotorLocked || activeStfTestNoLocked}
-                error={Boolean(
-                  motorValidationErrors[activeMotorId]?.stfTestNo,
-                )}
+                error={Boolean(motorValidationErrors[activeMotorId]?.stfTestNo)}
                 helperText={motorValidationErrors[activeMotorId]?.stfTestNo || " "}
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                   if (!activeMotorEntry?.motorId) return;

@@ -33,9 +33,9 @@ export type QcWeighmentValidationTarget = {
 };
 
 export const qcWeighmentValidationFields: Record<string, FieldRuleConfig> = {
-  // Sheet: alphanumeric (letters, digits, - _ only)
-  weighscaleNo: text(["UNIT", "SUBMIT"], S.PATTERNS.MASTER_CODE),
-  calibrationDueDate: date(["UNIT", "SUBMIT"]),
+  // Mandatory on SUBMIT only — draft/save uses FORMAT (no required checks)
+  weighscaleNo: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  calibrationDueDate: date(["SUBMIT"]),
   weightKg: number(["SUBMIT"]),
 };
 
@@ -44,17 +44,14 @@ const asRecord = (v: unknown): Record<string, unknown> | null =>
 
 const asArray = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 
-const deepFindScalar = (node: unknown, keys: string[], depth = 0): unknown => {
-  if (depth > 6 || node == null) return undefined;
-  const rec = asRecord(node);
-  if (!rec) return undefined;
-  for (const k of keys) {
-    if (k in rec && rec[k] != null) return rec[k];
+/** Resolve bare or section-scoped keys (`WEIGHTMENT_WEIGHSCALE_DETAILS::WEIGHSCALE_NO`). */
+const pickValue = (values: Record<string, unknown>, ...fieldIds: string[]): unknown => {
+  for (const id of fieldIds) {
+    if (values[id] !== undefined && values[id] !== null) return values[id];
   }
-  for (const val of Object.values(rec)) {
-    if (asRecord(val)) {
-      const found = deepFindScalar(val, keys, depth + 1);
-      if (found !== undefined) return found;
+  for (const [key, value] of Object.entries(values)) {
+    for (const id of fieldIds) {
+      if (key === id || key.endsWith(`::${id}`)) return value;
     }
   }
   return undefined;
@@ -69,12 +66,12 @@ export const qcWeighmentValidationConfig: SubDeptValidationConfig<QcWeighmentVal
 
     fields.push({
       path: "WEIGHSCALE_NO",
-      value: deepFindScalar(values, ["WEIGHSCALE_NO", "weighscaleNo"]),
+      value: pickValue(values, "WEIGHSCALE_NO", "weighscaleNo"),
       ruleKey: "weighscaleNo",
     });
     fields.push({
       path: "CALIBRATION_DUE_DATE",
-      value: deepFindScalar(values, ["CALIBRATION_DUE_DATE", "calibrationDueDate"]),
+      value: pickValue(values, "CALIBRATION_DUE_DATE", "calibrationDueDate"),
       ruleKey: "calibrationDueDate",
     });
 

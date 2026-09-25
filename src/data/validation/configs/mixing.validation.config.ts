@@ -7,6 +7,11 @@ import { VALIDATIONSTRING } from "./validationString";
 const M = VALIDATIONSTRING;
 
 export const mixingFieldRules = {
+  bldgNo: {
+    valueType: "text" as const,
+    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    messages: { required: M.FIELD_REQUIRED, invalid: M.INVALID },
+  },
   bowlId: {
     valueType: "text" as const,
     pattern: M.PATTERNS.BOWL_ID,
@@ -79,6 +84,7 @@ function resolveFieldPaths(data: MixingData) {
   const paths: Array<{ path: string; value: unknown; ruleKey: string }> = [];
 
   (data.premixes ?? []).forEach((p, i) => {
+    paths.push({ path: `premixes.${i}.bldgNo`, value: p.bldgNo, ruleKey: "bldgNo" });
     paths.push({ path: `premixes.${i}.bowlId`, value: p.bowlId, ruleKey: "bowlId" });
     paths.push({
       path: `premixes.${i}.bowlTrialDate`,
@@ -131,6 +137,7 @@ function resolveFieldPaths(data: MixingData) {
   });
 
   (data.finalMixes ?? []).forEach((p, i) => {
+    paths.push({ path: `finalMixes.${i}.bldgNo`, value: p.bldgNo, ruleKey: "bldgNo" });
     paths.push({ path: `finalMixes.${i}.bowlId`, value: p.bowlId, ruleKey: "bowlId" });
     (p.processParticulars ?? []).forEach((row, r) => {
       paths.push({

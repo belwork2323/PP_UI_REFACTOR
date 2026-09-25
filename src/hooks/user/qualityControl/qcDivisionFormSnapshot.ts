@@ -20,6 +20,7 @@ export type QcDivisionScopedFormState = {
   divisionEntryValues: Record<string, QcDivisionEntryValues>;
   schemasByKey: Partial<Record<string, SchemaDocumentV2>>;
   mixingFinalMixDetailsValues?: SchemaFormValues;
+  processingWeightmentSheet?: QualityControlFormState["processingWeightmentSheet"];
 };
 
 export const entryMatchesDivisionTab = (
@@ -60,6 +61,11 @@ const collectSchemaKeysForEntries = (entries: QcDivisionEntry[]): Set<string> =>
 const isMixingDivisionTab = (tab: QcDivisionCatalogNavTab) =>
   tab.flowKey === "MIXING" || tab.tabKey === "MIXING";
 
+const isProcessingDivisionTab = (tab: QcDivisionCatalogNavTab) =>
+  isRawMaterialProcessingType(tab.rawMaterialType) ||
+  tab.tabKey === "RAW_MATERIAL_PROCESSING" ||
+  (tab.flowKey === "RAW_MATERIAL" && isRawMaterialProcessingType(tab.rawMaterialType));
+
 export const scopeFormStateToDivisionTab = (
   form: QualityControlFormState,
   tab: QcDivisionCatalogNavTab,
@@ -86,6 +92,9 @@ export const scopeFormStateToDivisionTab = (
     ...(isMixingDivisionTab(tab)
       ? { mixingFinalMixDetailsValues: form.mixingFinalMixDetailsValues }
       : {}),
+    ...(isProcessingDivisionTab(tab)
+      ? { processingWeightmentSheet: form.processingWeightmentSheet }
+      : {}),
   };
 };
 
@@ -102,6 +111,9 @@ export const scopeQualityControlFormToDivisionTab = (
     schemasByKey: scoped.schemasByKey,
     mixingFinalMixDetailsValues: isMixingDivisionTab(tab)
       ? scoped.mixingFinalMixDetailsValues
+      : undefined,
+    processingWeightmentSheet: isProcessingDivisionTab(tab)
+      ? scoped.processingWeightmentSheet
       : undefined,
   };
 };
@@ -123,6 +135,9 @@ const stableScopedPayload = (scoped: QcDivisionScopedFormState) => ({
   ),
   ...(scoped.mixingFinalMixDetailsValues != null
     ? { mixingFinalMixDetailsValues: scoped.mixingFinalMixDetailsValues }
+    : {}),
+  ...(scoped.processingWeightmentSheet != null
+    ? { processingWeightmentSheet: scoped.processingWeightmentSheet }
     : {}),
 });
 
@@ -185,6 +200,9 @@ export const mergeDivisionBaselineIntoForm = (
     mixingFinalMixDetailsValues: isMixingDivisionTab(tab)
       ? baselineScoped.mixingFinalMixDetailsValues
       : fullForm.mixingFinalMixDetailsValues,
+    processingWeightmentSheet: isProcessingDivisionTab(tab)
+      ? baselineScoped.processingWeightmentSheet
+      : fullForm.processingWeightmentSheet,
   };
 };
 

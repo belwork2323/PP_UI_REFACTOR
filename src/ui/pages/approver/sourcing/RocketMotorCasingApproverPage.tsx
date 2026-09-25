@@ -50,6 +50,9 @@ import MockTrialDetailTables from "../../user/sourcing/components/MockTrialDetai
 import FilePreviewDialog from "../../../components/common/FilePreviewDialog";
 import { useFilePreview } from "../../../../hooks/useFilePreview";
 import OpenInNewRoundedIcon from "@mui/icons-material/OpenInNewRounded";
+import RefreshIconButton from "@/ui/components/common/RefreshIconButton";
+import { RefreshRounded } from "@mui/icons-material";
+import useApproverSubDepartmentBatchList from "@/hooks/approver/useApproverSubDepartmentBatchList";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 
@@ -352,6 +355,15 @@ const RocketMotorApproverPage = () => {
     filterAllLabel,
   } = useRocketMotorCasingApproverHook();
 
+  const { refresh } = useApproverSubDepartmentBatchList({
+    allLabel: filterAllLabel,
+    department: "sourcing",
+    extraFilters: listFiltersRecord,
+    searchText: "", // Pass search text if managed here, or leave empty/handled elsewhere
+    status: statusFilter,
+    subDepartment: "rocket-motor",
+  });
+
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftMotorStage, setDraftMotorStage] = useState(filterAllLabel);
   const [draftCasingType, setDraftCasingType] = useState(filterAllLabel);
@@ -441,20 +453,31 @@ const RocketMotorApproverPage = () => {
   };
 
   const searchBarEnd = (
-    <FilterToggleButton
-      label={BL.FILTERS_TOGGLE}
-      count={activeFilterCount}
-      isOpen={filterOpen}
-      onClick={() => {
-        if (!filterOpen) syncDraftFromApplied();
-        setFilterOpen((open) => !open);
-      }}
-      sx={filterToggleSx.filterBtn(filterOpen || activeFilterCount > 0)}
-      iconSx={filterToggleSx.filterBtnIcon}
-      textSx={filterToggleSx.filterBtnText}
-      badgeSx={filterToggleSx.filterBadgePill}
-      chevronSx={filterToggleSx.filterBtnChevron}
-    />
+    <Stack direction="row" spacing={1} alignItems="center">
+      <FilterToggleButton
+        label={BL.FILTERS_TOGGLE}
+        count={activeFilterCount}
+        isOpen={filterOpen}
+        onClick={() => {
+          if (!filterOpen) syncDraftFromApplied();
+          setFilterOpen((open) => !open);
+        }}
+        sx={filterToggleSx.filterBtn(filterOpen || activeFilterCount > 0)}
+        iconSx={filterToggleSx.filterBtnIcon}
+        textSx={filterToggleSx.filterBtnText}
+        badgeSx={filterToggleSx.filterBadgePill}
+        chevronSx={filterToggleSx.filterBtnChevron}
+      />
+      {typeof refresh === "function" ? (
+        <RefreshIconButton
+          onClick={() => {
+            void refresh();
+          }}
+          tooltip={STRINGS.SOURCING.BATCH_LIST.REFRESH_TOOLTIP}
+          icon={<RefreshRounded fontSize="small" />}
+        />
+      ) : null}
+    </Stack>
   );
 
   const filterExtension = filterOpen ? (
@@ -684,68 +707,72 @@ const RocketMotorApproverPage = () => {
                       allowWhenApproved: true,
                     });
                     return (
-                    <TableRow
-                      key={row.motorCasingId ?? row.id ?? row.formId ?? idx}
-                      sx={theme.table.row(idx)}
-                    >
-                      <TableCell sx={theme.table.bodyCell}>
-                        <Typography sx={theme.table.batchIdText}>
-                          {row.motorCasingId ?? row.batchId}
-                        </Typography>
-                      </TableCell>
-                      <TableCell sx={theme.table.bodyCell}>
-                        <Typography sx={theme.table.subtleText}>{row.projectId ?? "—"}</Typography>
-                      </TableCell>
-                      <TableCell sx={theme.table.bodyCell}>
-                        <Chip
-                          label={
-                            row.motorStageLabel ??
-                            formatMotorStageLabel(row.motorStage ?? row.motorType)
-                          }
-                          size="small"
-                          sx={theme.chips.type}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.subtleText }}>
-                        {row.motorId ?? row.motorNo ?? "—"}
-                      </TableCell>
-                      <TableCell sx={theme.table.bodyCell}>
-                        <Chip label={row.casingType ?? "—"} size="small" sx={theme.chips.type} />
-                      </TableCell>
-                      <TableCell sx={theme.table.bodyCell}>
-                        <Chip
-                          label={row.insulationType ?? "—"}
-                          size="small"
-                          sx={theme.chips.type}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.dateText }}>
-                        {formatListDate(row.receivingDate)}
-                      </TableCell>
-                      <TableCell sx={theme.table.bodyCell}>{row.submittedBy ?? "—"}</TableCell>
-                      <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.dateText }}>
-                        {formatListDate(row.createdOn)}
-                      </TableCell>
-                      <TableCell sx={theme.table.bodyCell}>
-                        <Chip
-                          label={row.status}
-                          size="small"
-                          sx={theme.chips.status(statusMeta[row.status])}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.actionCell }}>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          startIcon={<VisibilityRoundedIcon sx={{ fontSize: "13px !important" }} />}
-                          onClick={() => handleViewDetails(row)}
-                          disabled={!canViewDetails}
-                          sx={theme.table.actionButton(canViewDetails)}
-                        >
-                          View Details
-                        </Button>
-                      </TableCell>
-                    </TableRow>
+                      <TableRow
+                        key={row.motorCasingId ?? row.id ?? row.formId ?? idx}
+                        sx={theme.table.row(idx)}
+                      >
+                        <TableCell sx={theme.table.bodyCell}>
+                          <Typography sx={theme.table.batchIdText}>
+                            {row.motorCasingId ?? row.batchId}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={theme.table.bodyCell}>
+                          <Typography sx={theme.table.subtleText}>
+                            {row.projectId ?? "—"}
+                          </Typography>
+                        </TableCell>
+                        <TableCell sx={theme.table.bodyCell}>
+                          <Chip
+                            label={
+                              row.motorStageLabel ??
+                              formatMotorStageLabel(row.motorStage ?? row.motorType)
+                            }
+                            size="small"
+                            sx={theme.chips.type}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.subtleText }}>
+                          {row.motorId ?? row.motorNo ?? "—"}
+                        </TableCell>
+                        <TableCell sx={theme.table.bodyCell}>
+                          <Chip label={row.casingType ?? "—"} size="small" sx={theme.chips.type} />
+                        </TableCell>
+                        <TableCell sx={theme.table.bodyCell}>
+                          <Chip
+                            label={row.insulationType ?? "—"}
+                            size="small"
+                            sx={theme.chips.type}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.dateText }}>
+                          {formatListDate(row.receivingDate)}
+                        </TableCell>
+                        <TableCell sx={theme.table.bodyCell}>{row.submittedBy ?? "—"}</TableCell>
+                        <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.dateText }}>
+                          {formatListDate(row.createdOn)}
+                        </TableCell>
+                        <TableCell sx={theme.table.bodyCell}>
+                          <Chip
+                            label={row.status}
+                            size="small"
+                            sx={theme.chips.status(statusMeta[row.status])}
+                          />
+                        </TableCell>
+                        <TableCell sx={{ ...theme.table.bodyCell, ...theme.table.actionCell }}>
+                          <Button
+                            size="small"
+                            variant="outlined"
+                            startIcon={
+                              <VisibilityRoundedIcon sx={{ fontSize: "13px !important" }} />
+                            }
+                            onClick={() => handleViewDetails(row)}
+                            disabled={!canViewDetails}
+                            sx={theme.table.actionButton(canViewDetails)}
+                          >
+                            View Details
+                          </Button>
+                        </TableCell>
+                      </TableRow>
                     );
                   })}
                 </TableBody>

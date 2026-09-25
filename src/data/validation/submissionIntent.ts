@@ -15,7 +15,10 @@ export const isRequiredForTier = (
   requiredIn: ValidationTier[],
   tier: ValidationTier,
 ): boolean => {
+  // FORMAT = live/draft format checks only — never enforce mandatory
   if (tier === "FORMAT") return false;
+  // UNIT = optional legacy "min fields to persist" (manufacturing); QC draft uses FORMAT
   if (tier === "UNIT") return requiredIn.includes("UNIT");
+  // SUBMIT = full mandatory set (UNIT + SUBMIT listed fields)
   return requiredIn.includes("UNIT") || requiredIn.includes("SUBMIT");
 };

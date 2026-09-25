@@ -109,7 +109,10 @@ import {
   hydrateProcessingMaterialValuesFromSeed,
   parseProcessingMaterialsFromDivisionDetails,
   resolveProcessingMaterialSeedsForPremix,
+  resolveQcProcessingWeightmentSheet,
+  parseWeightmentSheetFromDivisionDetails,
 } from "./qcProcessingMaterials";
+import type { RawMaterialPrepWeightmentSheet } from "../../../data/models/user/RawMaterialPreparationModel";
 import {
   resolveDivisionSchemaRequest,
   canLoadDivisionSchema,
@@ -199,8 +202,10 @@ import {
 } from "./qcPostCureConfig";
 import {
   createInitialPostCureValues,
+  hydratePostCureValuesFromMotorDetail,
   hydratePostCureValuesFromSections,
   postCureFormValuesHaveUserData,
+  postCureMotorDetailToSections,
   hasIncompleteQcPostCureUploads,
   collectTempFileIdsFromQcPostCureValues,
 } from "./qcPostCureTables";
@@ -290,6 +295,11 @@ const asRecord = (value: unknown): Record<string, unknown> | null =>
     ? (value as Record<string, unknown>)
     : null;
 
+const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : []);
+
+const pickMotorIdFromUnknown = (rec: Record<string, unknown> | null | undefined) =>
+  String(rec?.motorIdNo ?? rec?.motorId ?? rec?.id ?? "").trim();
+
 const markQcDivisionEntryFilesPersisted = (
   entryValues: Record<string, QcDivisionEntryValues>,
 ): Record<string, QcDivisionEntryValues> =>
@@ -339,15 +349,21 @@ type WorkflowView = "list" | "form" | "details";
 
 type QualityControlFormBase = Omit<
   QualityControlFormState,
-  "divisionEntryValues" | "mixingFinalMixDetailsValues"
+  "divisionEntryValues" | "mixingFinalMixDetailsValues" | "processingWeightmentSheet"
 >;
 
 const splitFormState = (state: QualityControlFormState) => {
-  const { divisionEntryValues, mixingFinalMixDetailsValues, ...formBase } = state;
+  const {
+    divisionEntryValues,
+    mixingFinalMixDetailsValues,
+    processingWeightmentSheet,
+    ...formBase
+  } = state;
   return {
     formBase,
     divisionEntryValues: divisionEntryValues ?? {},
     mixingFinalMixDetailsValues,
+    processingWeightmentSheet,
   };
 };
 
@@ -355,10 +371,12 @@ const mergeFormState = (
   formBase: QualityControlFormBase,
   divisionEntryValues: Record<string, QcDivisionEntryValues>,
   mixingFinalMixDetailsValues?: SchemaFormValues,
+  processingWeightmentSheet?: QualityControlFormState["processingWeightmentSheet"],
 ): QualityControlFormState => ({
   ...formBase,
   divisionEntryValues,
   mixingFinalMixDetailsValues,
+  processingWeightmentSheet,
 });
 
 const normalizeBatch = (batch: any): QCBatch => ({
@@ -460,10 +478,19 @@ export const useQCDivisionHook = () => {
   const [mixingFinalMixDetailsValues, setMixingFinalMixDetailsValues] = useState<
     SchemaFormValues | undefined
   >(defaultSplit.mixingFinalMixDetailsValues);
+  const [processingWeightmentSheet, setProcessingWeightmentSheet] = useState<
+    QualityControlFormState["processingWeightmentSheet"]
+  >(defaultSplit.processingWeightmentSheet);
   const [divisionBaselines, setDivisionBaselines] = useState<Record<string, string>>({});
   const formData = useMemo(
-    () => mergeFormState(formBase, divisionEntryValues, mixingFinalMixDetailsValues),
-    [formBase, divisionEntryValues, mixingFinalMixDetailsValues],
+    () =>
+      mergeFormState(
+        formBase,
+        divisionEntryValues,
+        mixingFinalMixDetailsValues,
+        processingWeightmentSheet,
+      ),
+    [formBase, divisionEntryValues, mixingFinalMixDetailsValues, processingWeightmentSheet],
   );
   const formDataRef = useRef(formData);
   formDataRef.current = formData;
@@ -476,6 +503,7 @@ export const useQCDivisionHook = () => {
     setFormBase(split.formBase);
     setDivisionEntryValues(split.divisionEntryValues);
     setMixingFinalMixDetailsValues(split.mixingFinalMixDetailsValues);
+    setProcessingWeightmentSheet(split.processingWeightmentSheet);
   }, []);
 
   const updateFormData = useCallback(
@@ -2073,13 +2101,13 @@ export const useQCDivisionHook = () => {
         premixStatus,
       );
       if (!resolvedSeeds.length || !subDepartmentId) {
-        showAlert(messages.SCHEMA_FETCH_ERROR, "error");
+        showValidationAlert(messages.PROCESSING_NO_MATERIALS_MESSAGE);
         return;
       }
 
       const additions: Array<{
         entry: QcDivisionEntry;
-        schema: SchemaDocumentV2;
+        schema: SchemaDocumentV2 | null;
         values: SchemaFormValues;
       }> = [];
 
@@ -2093,8 +2121,13 @@ export const useQCDivisionHook = () => {
             catalog,
           });
           if (!schema) {
-            showAlert(messages.SCHEMA_FETCH_ERROR, "error");
-            return;
+            // Soft-fail: keep material entry; UI shows weighment fallback.
+            additions.push({
+              entry: buildProcessingMaterialEntry(seed, { schemaUnavailable: true }),
+              schema: null,
+              values: {},
+            });
+            continue;
           }
           additions.push({
             entry: buildProcessingMaterialEntry(seed),
@@ -2112,11 +2145,20 @@ export const useQCDivisionHook = () => {
         updateFormData((prev) => {
           let next = prev;
           additions.forEach(({ entry, schema, values }) => {
-            next = appendDivisionEntryToForm(next, entry, { schemaValues: values }, [
-              { schema, cacheKey: entry.schemaCacheKey },
-            ]);
+            next = appendDivisionEntryToForm(
+              next,
+              entry,
+              { schemaValues: values },
+              schema ? [{ schema, cacheKey: entry.schemaCacheKey }] : [],
+            );
           });
-          return next;
+          const sheet = resolveQcProcessingWeightmentSheet(
+            next.processingWeightmentSheet,
+            seedPayload,
+            divisionAutoPopulateData,
+            activeBatch,
+          );
+          return { ...next, processingWeightmentSheet: sheet };
         });
         navigateToEntry(nextEntries, additions[0].entry.entryId);
         resetFlowBarSelection();
@@ -3809,29 +3851,33 @@ export const useQCDivisionHook = () => {
               item.status,
             );
             if (!materialSeeds.length || !subDepartmentId) {
-              showAlert(messages.SCHEMA_FETCH_ERROR, "error");
+              showValidationAlert(messages.PROCESSING_NO_MATERIALS_MESSAGE);
               return;
             }
 
             const additions: Array<{
               entry: QcDivisionEntry;
-              schema: SchemaDocumentV2;
+              schema: SchemaDocumentV2 | null;
               values: SchemaFormValues;
             }> = [];
 
             for (const seed of materialSeeds) {
+              if (requestId !== partialNavLoadRequestIdRef.current) return;
               const schema = await fetchQcProcessingMaterialSchema({
                 subDepartmentId,
                 seed,
                 catalog,
               });
-              if (!schema || requestId !== partialNavLoadRequestIdRef.current) {
-                if (!schema) showAlert(messages.SCHEMA_FETCH_ERROR, "error");
-                return;
+              if (!schema) {
+                additions.push({
+                  entry: buildProcessingMaterialEntry(seed, { schemaUnavailable: true }),
+                  schema: null,
+                  values: {},
+                });
+                continue;
               }
-              const entry = buildProcessingMaterialEntry(seed);
               additions.push({
-                entry,
+                entry: buildProcessingMaterialEntry(seed),
                 schema,
                 values: hydrateProcessingMaterialValuesFromSeed(schema, seed),
               });
@@ -3846,11 +3892,20 @@ export const useQCDivisionHook = () => {
             updateFormData((prev) => {
               let next = prev;
               additions.forEach(({ entry, schema, values }) => {
-                next = appendDivisionEntryToForm(next, entry, { schemaValues: values }, [
-                  { schema, cacheKey: entry.schemaCacheKey },
-                ]);
+                next = appendDivisionEntryToForm(
+                  next,
+                  entry,
+                  { schemaValues: values },
+                  schema ? [{ schema, cacheKey: entry.schemaCacheKey }] : [],
+                );
               });
-              return next;
+              const sheet = resolveQcProcessingWeightmentSheet(
+                next.processingWeightmentSheet,
+                seedPayload,
+                divisionAutoPopulateDataRef.current,
+                activeBatch,
+              );
+              return { ...next, processingWeightmentSheet: sheet };
             });
             navigateToEntry(nextEntries, additions[0].entry.entryId);
           }
@@ -4181,6 +4236,35 @@ export const useQCDivisionHook = () => {
     };
   }, []);
 
+  const handleProcessingWeightmentSheetChange = useCallback(
+    (
+      next:
+        | RawMaterialPrepWeightmentSheet
+        | ((prev: RawMaterialPrepWeightmentSheet) => RawMaterialPrepWeightmentSheet),
+    ) => {
+      // Must go through updateFormData so formDataRef stays in sync for save/submit.
+      // Updating only setProcessingWeightmentSheet races with `formDataRef.current = formData`
+      // on render and can drop edits from the payload.
+      updateFormData((prev) => {
+        const current =
+          prev.processingWeightmentSheet ?? {
+            mixerBuildingNumber: "",
+            weightmentDetails: [],
+            validation: {
+              compareWithIdentificationSheet: false,
+              deviationFound: false,
+              deviationMessage: "",
+            },
+          };
+        const resolved = typeof next === "function" ? next(current) : next;
+        // Avoid re-render loops from ensure/seed effects that no-op.
+        if (resolved === prev.processingWeightmentSheet) return prev;
+        return { ...prev, processingWeightmentSheet: resolved };
+      });
+    },
+    [updateFormData],
+  );
+
   const handleDivisionEntryLiquidValuesChange = useCallback(
     (entryId: string, values: SchemaFormValues) => {
       setDivisionEntryValues((prev) => {
@@ -4362,6 +4446,7 @@ export const useQCDivisionHook = () => {
 
           const entries: QcDivisionEntry[] = [];
           const entryValues: Record<string, QcDivisionEntryValues> = {};
+          let processingWeightmentSheet: RawMaterialPrepWeightmentSheet | null = null;
           const schemasByKey: Record<string, SchemaDocumentV2> = {};
           const schemaFetchQueue = new Map<
             string,
@@ -4473,13 +4558,27 @@ export const useQCDivisionHook = () => {
                 : [];
 
             if (processingSeeds.length > 0) {
+              const detailSheet = parseWeightmentSheetFromDivisionDetails({ data: detailData });
+              if (
+                !processingWeightmentSheet &&
+                (detailSheet.mixerBuildingNumber || detailSheet.weightmentDetails.length > 0)
+              ) {
+                processingWeightmentSheet = detailSheet;
+              }
               for (const seed of processingSeeds) {
                 try {
                   const schema = await fetchQcProcessingMaterialSchema({
                     subDepartmentId,
                     seed,
                   });
-                  if (!schema) continue;
+                  if (!schema) {
+                    const entry = buildProcessingMaterialEntry(seed, {
+                      schemaUnavailable: true,
+                    });
+                    entries.push(entry);
+                    entryValues[entry.entryId] = { schemaValues: {} };
+                    continue;
+                  }
                   const entry = buildProcessingMaterialEntry(seed);
                   entries.push(entry);
                   if (entry.schemaCacheKey) {
@@ -4489,7 +4588,15 @@ export const useQCDivisionHook = () => {
                     schemaValues: hydrateProcessingMaterialValuesFromSeed(schema, seed),
                   };
                 } catch {
-                  // individual material schema fetch failure should not abort hydration
+                  try {
+                    const entry = buildProcessingMaterialEntry(seed, {
+                      schemaUnavailable: true,
+                    });
+                    entries.push(entry);
+                    entryValues[entry.entryId] = { schemaValues: {} };
+                  } catch {
+                    // ignore malformed seed
+                  }
                 }
               }
               continue;
@@ -4626,6 +4733,59 @@ export const useQCDivisionHook = () => {
                     ),
                   };
                 }
+                createdFromNested = true;
+              }
+
+              if (createdFromNested) continue;
+            }
+
+            if (division === "POST_CURE" || division === "POST_CURE_OPERATION") {
+              const dataRec = asRecord(detailData) ?? {};
+              const detailsRecord =
+                fetchedDetailsPayload && typeof fetchedDetailsPayload === "object"
+                  ? (fetchedDetailsPayload as Record<string, unknown>)
+                  : {};
+              const motors = [
+                ...asArray(dataRec.postCureMotorDetails),
+                ...asArray(dataRec.motors),
+                ...asArray(dataRec.motorDetails),
+              ];
+              let createdFromNested = false;
+
+              for (const motor of motors) {
+                const rec = asRecord(motor);
+                const motorId = pickMotorIdFromUnknown(rec);
+                if (!rec || !motorId) continue;
+
+                const selection =
+                  resolvePostCureSelectionFromMotorDetails(dataRec, motorId) ??
+                  resolvePostCureSelectionFromMotorDetails(detailsRecord, motorId) ??
+                  resolvePostCureSelectionFromMotorDetails(rec, motorId);
+                const entrySubType = (selection?.subType ?? detailSubType) as QcApiSubType;
+                const entryInhibitor = selection?.inhibitorType;
+                const nestedValues = hydratePostCureValuesFromMotorDetail(
+                  rec,
+                  entrySubType,
+                  entryInhibitor,
+                );
+                const schemaValues = postCureFormValuesHaveUserData(nestedValues)
+                  ? nestedValues
+                  : buildInitialPostCureValuesForMotor(
+                      dataRec,
+                      motorId,
+                      entrySubType,
+                      entryInhibitor,
+                    );
+                const savedSections = postCureMotorDetailToSections(rec, motorId);
+                const { entryId } = makeEntry(
+                  "POST_CURE_MOTOR",
+                  entrySubType,
+                  savedSections,
+                  undefined,
+                  motorId,
+                  entryInhibitor,
+                );
+                entryValues[entryId] = { schemaValues };
                 createdFromNested = true;
               }
 
@@ -5128,33 +5288,20 @@ export const useQCDivisionHook = () => {
                 motorStatus == null || isQcStatusAwaitingInitiation(motorStatus);
 
               // IN_PROGRESS+ → map from /qc-division/details data.postCureMotorDetails[]
+              // Same rule as Trimming/NDT: always rehydrate from details when available.
               if (!awaitingInitiation && entry.motorId && fetchedDetailsPayload) {
-                const nestedValues = buildInitialPostCureValuesForMotor(
-                  fetchedDetailsPayload,
-                  entry.motorId,
-                  entry.subType,
-                  entry.inhibitorType,
-                );
-                if (postCureFormValuesHaveUserData(nestedValues)) {
-                  entryValues[entry.entryId] = { schemaValues: nestedValues };
-                  continue;
-                }
-
                 const qcDetail = toDivisionAutoPopulateRecord(
                   findQcFormDivisionDetail(fetchedDetailsPayload, { flowKey: "POST_CURE" }),
                 );
-                if (qcDetail) {
-                  const fromDetail = buildInitialPostCureValuesForMotor(
-                    qcDetail,
+                entryValues[entry.entryId] = {
+                  schemaValues: buildInitialPostCureValuesForMotor(
+                    qcDetail ?? fetchedDetailsPayload,
                     entry.motorId,
                     entry.subType,
                     entry.inhibitorType,
-                  );
-                  if (postCureFormValuesHaveUserData(fromDetail)) {
-                    entryValues[entry.entryId] = { schemaValues: fromDetail };
-                    continue;
-                  }
-                }
+                  ),
+                };
+                continue;
               }
 
               const sectionsToHydrate =
@@ -5182,15 +5329,14 @@ export const useQCDivisionHook = () => {
                 });
 
               if (sectionsToHydrate.length > 0) {
-                const fromSections = hydratePostCureValuesFromSections(
-                  sectionsToHydrate,
-                  entry.subType,
-                  entry.inhibitorType,
-                );
-                if (postCureFormValuesHaveUserData(fromSections) || !awaitingInitiation) {
-                  entryValues[entry.entryId] = { schemaValues: fromSections };
-                  continue;
-                }
+                entryValues[entry.entryId] = {
+                  schemaValues: hydratePostCureValuesFromSections(
+                    sectionsToHydrate,
+                    entry.subType,
+                    entry.inhibitorType,
+                  ),
+                };
+                continue;
               }
 
               if (
@@ -5471,6 +5617,7 @@ export const useQCDivisionHook = () => {
             divisionEntryValues: entryValuesWithHardwareUploads,
             schemasByKey,
             ...(mixingFinalMixDetailsValues && { mixingFinalMixDetailsValues }),
+            ...(processingWeightmentSheet && { processingWeightmentSheet }),
           };
         } else {
           const resolvedFlow = resolveBatchFlowSelection(
@@ -5737,13 +5884,20 @@ export const useQCDivisionHook = () => {
     }
 
     const activeTab = divisionNavTabs.find((entry) => entry.tabKey === activeDivisionTabKey);
-    const submitFormState = activePartialItem
+    const scopedSubmitFormState = activePartialItem
       ? scopeFormStateToPartialItem(formDataRef.current, activePartialItem, {
           flowKey: selectedDivision,
         })
       : activeTab
         ? scopeQualityControlFormToDivisionTab(formDataRef.current, activeTab)
         : formDataRef.current;
+    // Weighment is shared across processing materials — never drop it when scoping a premix/unit.
+    const submitFormState = {
+      ...scopedSubmitFormState,
+      processingWeightmentSheet:
+        formDataRef.current.processingWeightmentSheet ??
+        scopedSubmitFormState.processingWeightmentSheet,
+    };
 
     if (!hasDivisionEntries(submitFormState) && !submitFormState.schemaFormLoaded) {
       showAlert(messages.EMPTY_FORM_ERROR, "warning");
@@ -5758,7 +5912,8 @@ export const useQCDivisionHook = () => {
       return false;
     }
 
-    // FORMAT on draft (filled values only); SUBMIT on unit / division submit
+    // Draft/save: FORMAT only (type/pattern of filled values) — never mandatory.
+    // Submit: SUBMIT tier enforces all required fields across QC divisions.
     const validationTier: ValidationTier = intent === "draft" ? "FORMAT" : "SUBMIT";
     // Prefer scoped entries; fall back to full form so validation never no-ops.
     const liveForm = formDataRef.current;
@@ -5797,6 +5952,22 @@ export const useQCDivisionHook = () => {
       );
       validationOk = result.ok;
       errorsByEntryId = result.errorsByEntryId;
+      // Draft must never block on mandatory/required — strip if any slip through.
+      if (intent === "draft") {
+        const stripped: typeof errorsByEntryId = {};
+        for (const [entryId, errs] of Object.entries(errorsByEntryId)) {
+          const kept: ValidationErrors = {};
+          for (const [path, msg] of Object.entries(errs ?? {})) {
+            const text = String(msg ?? "").trim().toLowerCase();
+            if (!text) continue;
+            if (text.includes("required")) continue;
+            kept[path] = msg;
+          }
+          if (Object.keys(kept).length) stripped[entryId] = kept;
+        }
+        errorsByEntryId = stripped;
+        validationOk = Object.keys(errorsByEntryId).length === 0;
+      }
       console.info(
         "[QC validation]",
         intent,
@@ -5994,9 +6165,15 @@ export const useQCDivisionHook = () => {
     }
 
     const activeTab = divisionNavTabs.find((entry) => entry.tabKey === activeDivisionTabKey);
-    const submitFormState = activeTab
+    const scopedSubmitFormState = activeTab
       ? scopeQualityControlFormToDivisionTab(formDataRef.current, activeTab)
       : formDataRef.current;
+    const submitFormState = {
+      ...scopedSubmitFormState,
+      processingWeightmentSheet:
+        formDataRef.current.processingWeightmentSheet ??
+        scopedSubmitFormState.processingWeightmentSheet,
+    };
 
     if (hasIncompleteQcFormUploads(submitFormState)) {
       showAlert(STRINGS.QUALITY_CONTROL.NDT.FILE_UPLOAD_PENDING, "warning");
@@ -6571,6 +6748,7 @@ export const useQCDivisionHook = () => {
     entryValidationErrors,
     handleDivisionEntryLiquidValuesChange,
     handleMixingFinalMixDetailsChange,
+    handleProcessingWeightmentSheetChange,
     handleRemoveDivisionEntry,
     setActiveDivisionGroupIndex,
     setActiveDivisionSubIndex,

@@ -19,9 +19,10 @@ import { STRINGS } from "@app/config/strings";
 import { useAlertStore } from "@app/store/alertStore";
 import { useThemeStore } from "@app/store/themeStore";
 import getManufacturingTheme from "@app/theme/custom_themes/user/manufacturing/manufacturing_theme";
+import getBatchManagementTheme from "@app/theme/custom_themes/admin/BatchManagement/batchManagement_theme";
 import AdminManagementFormHeader from "@ui/components/custom/admin/AdminManagementFormHeader";
 import AppDropdown from "@ui/components/common/AppDropdown";
-import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import AppSearchableDropdown from "@ui/components/common/AppSearchableDropdown";
 import CasePrepTextField from "@ui/pages/user/manufacturing/CasePreparation/CasePrepTextField";
 import MasterDataEnableDisableField from "./components/MasterDataEnableDisableField";
 import {
@@ -44,6 +45,8 @@ type Props = {
   isEdit: boolean;
   form: CuringCycleFormState;
   saving: boolean;
+  projectOptions: AppDropdownOption[];
+  projectLoading?: boolean;
   motorStageOptions: AppDropdownOption[];
   motorStageLoading?: boolean;
   curingTypeOptions: AppDropdownOption[];
@@ -210,6 +213,8 @@ const CuringCycleMasterFormDialog = ({
   isEdit,
   form,
   saving,
+  projectOptions,
+  projectLoading = false,
   motorStageOptions,
   motorStageLoading = false,
   curingTypeOptions,
@@ -222,13 +227,21 @@ const CuringCycleMasterFormDialog = ({
   const { modal } = t;
   const mode = useThemeStore((state) => state.mode);
   const fieldTheme = getManufacturingTheme(mode);
-  const flowBar = fieldTheme.manufacturing?.casePreparation?.flowBar ?? {};
+  const batchTheme = useMemo(() => getBatchManagementTheme(mode), [mode]);
+  const batchModal = batchTheme.modal;
   const [showErrors, setShowErrors] = useState(false);
+  const projectLabel =
+    projectOptions.find((o) => o.value === form.projectId)?.label || form.projectId || "—";
   const recordLabel =
     form.curingCycleCode || formatMotorStageLabel(form.motorStage, motorStageOptions) || "record";
   const fieldErrors = useMemo(
     () => getCuringCycleFieldErrors(form, isEdit, existingRecords),
     [form, isEdit, existingRecords],
+  );
+  const projectError = visibleValidationError(
+    fieldErrors.projectId,
+    form.projectId.trim().length > 0,
+    showErrors,
   );
   const stageError = visibleValidationError(
     fieldErrors.motorStage,
@@ -286,71 +299,114 @@ const CuringCycleMasterFormDialog = ({
             <Typography sx={modal.fieldLabel}>Curing cycle details</Typography>
             <Box
               sx={{
-                display: "grid",
-                gridTemplateColumns: {
-                  xs: "1fr",
-                  md: "minmax(180px, 200px) minmax(220px, 1fr) minmax(220px, 1fr) auto auto",
-                },
+                display: "flex",
+                flexWrap: { xs: "wrap", md: "nowrap" },
                 gap: 2,
-                alignItems: "start",
+                alignItems: "flex-start",
+                "& > *": { minWidth: 0 },
               }}
             >
-              {isEdit ? (
-                <CasePrepTextField
-                  label={S.CURING_CYCLES.COL_MOTOR_STAGE}
-                  value={formatMotorStageLabel(form.motorStage, motorStageOptions)}
-                  disabled
-                  width="100%"
-                  theme={fieldTheme}
-                  onChange={() => undefined}
-                />
-              ) : (
-                <Box sx={flowBar.selectField?.("100%")}>
-                  <Typography component="label" sx={flowBar.selectLabel}>
-                    <FieldLabelWithAsterisk label={S.CURING_CYCLES.COL_MOTOR_STAGE} required />
-                  </Typography>
+              <Box sx={{ flex: "1 1 160px", maxWidth: { md: "none" } }}>
+                {isEdit ? (
+                  <CasePrepTextField
+                    label={S.CURING_CYCLES.COL_PROJECT}
+                    value={String(projectLabel)}
+                    disabled
+                    width="100%"
+                    theme={fieldTheme}
+                    onChange={() => undefined}
+                  />
+                ) : (
+                  <AppSearchableDropdown
+                    label={S.CURING_CYCLES.COL_PROJECT}
+                    value={form.projectId}
+                    onChange={(value) =>
+                      onChange({
+                        ...form,
+                        projectId: value,
+                        motorStage: "",
+                        motorStageName: "",
+                        cycles: [],
+                      })
+                    }
+                    options={projectOptions}
+                    loading={projectLoading}
+                    placeholder={S.CURING_CYCLES.PROJECT_SELECT_PLACEHOLDER}
+                    required
+                    error={Boolean(projectError)}
+                    helperText={projectError}
+                    disabled={saving}
+                    renderOption={(props, option) => (
+                      <Box component="li" {...props} key={option.value}>
+                        <Box sx={batchModal.projectOption}>
+                          <Typography sx={batchModal.projectOptionName}>
+                            {String(option.label)}
+                          </Typography>
+                          <Typography sx={batchModal.projectOptionId}>{option.value}</Typography>
+                        </Box>
+                      </Box>
+                    )}
+                  />
+                )}
+              </Box>
+              <Box sx={{ flex: "1 1 140px" }}>
+                {isEdit ? (
+                  <CasePrepTextField
+                    label={S.CURING_CYCLES.COL_MOTOR_STAGE}
+                    value={formatMotorStageLabel(form.motorStage, motorStageOptions)}
+                    disabled
+                    width="100%"
+                    theme={fieldTheme}
+                    onChange={() => undefined}
+                  />
+                ) : (
                   <AppDropdown
+                    label={S.CURING_CYCLES.COL_MOTOR_STAGE}
                     value={form.motorStage === "" ? "" : String(form.motorStage)}
                     onChange={(value) =>
                       onChange({
                         ...form,
                         motorStage: value === "" ? "" : Number(value),
+                        cycles: [],
                       })
                     }
                     options={motorStageOptions}
                     loading={motorStageLoading}
                     placeholder={S.CURING_CYCLES.MOTOR_STAGE_SELECT_PLACEHOLDER}
-                    disabled={saving}
+                    required
+                    disabled={saving || motorStageLoading || !form.projectId.trim()}
                     error={Boolean(stageError)}
                     helperText={stageError}
                     fullWidth
-                    sx={{
-                      mb: 0,
-                      ...flowBar.selectInput?.(form.motorStage !== ""),
-                    }}
+                    sx={{ mb: 0 }}
                   />
-                </Box>
-              )}
-              <Box sx={flowBar.selectField?.("100%")}>
-                <Typography component="label" sx={flowBar.selectLabel}>
-                  <FieldLabelWithAsterisk label={S.CURING_CYCLES.COL_CURING_TYPE} required />
-                </Typography>
+                )}
+              </Box>
+              <Box sx={{ flex: "1 1 140px" }}>
                 <AppDropdown
+                  label={S.CURING_CYCLES.COL_CURING_TYPE}
                   value={form.curingType}
                   onChange={(value) => onChange({ ...form, curingType: value })}
                   options={curingTypeOptions}
                   placeholder={S.CURING_CYCLES.CURING_TYPE_SELECT_PLACEHOLDER}
-                  disabled={saving}
+                  required
+                  disabled={saving || isEdit}
                   error={Boolean(curingTypeError)}
                   helperText={curingTypeError}
                   fullWidth
-                  sx={{
-                    mb: 0,
-                    ...flowBar.selectInput?.(form.curingType.trim().length > 0),
-                  }}
+                  sx={{ mb: 0 }}
                 />
               </Box>
-              <Box sx={{ display: "flex", alignItems: "center", gap: 0.5, pt: 2.5 }}>
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.5,
+                  pt: 2.5,
+                  flex: "0 0 auto",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 <Typography variant="body2">{S.CURING_CYCLES.LABEL_SHOW_PRESSURE}</Typography>
                 <Switch
                   size="small"
@@ -359,13 +415,15 @@ const CuringCycleMasterFormDialog = ({
                   onChange={(e) => onChange({ ...form, showPropellantPressure: e.target.checked })}
                 />
               </Box>
-              <MasterDataEnableDisableField
-                checked={form.isActive}
-                disabled={saving}
-                minWidth={120}
-                confirmName={recordLabel}
-                onChange={(isActive) => onChange({ ...form, isActive })}
-              />
+              <Box sx={{ flex: "0 0 auto", pt: { xs: 0, md: 0.5 } }}>
+                <MasterDataEnableDisableField
+                  checked={form.isActive}
+                  disabled={saving}
+                  minWidth={120}
+                  confirmName={recordLabel}
+                  onChange={(isActive) => onChange({ ...form, isActive })}
+                />
+              </Box>
             </Box>
           </Box>
 

@@ -34,6 +34,7 @@ export type MaterialSpecificationPayload = {
 };
 
 export type DimensionalParametersPayload = {
+  projectId: string;
   motorType: string;
 };
 

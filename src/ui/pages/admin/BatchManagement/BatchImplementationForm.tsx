@@ -18,6 +18,7 @@ import {
   CircularProgress,
   Zoom,
   Divider,
+  Checkbox,
 } from "@mui/material";
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 
@@ -33,12 +34,13 @@ import type { SystemMasterOption } from "@data/api/common/generalAPI";
 import DateField from "@ui/components/common/DateField";
 import { formatToUiDate } from "@utils/dateUtils";
 import { appDenseControlSx } from "@ui/components/common/fieldStyles";
+import MultiSelect from "@/ui/components/common/MultiSelectCheckbox";
 
 const S = STRINGS.BATCH_MANAGEMENT.FORM;
 const S_EDIT = STRINGS.BATCH_MANAGEMENT.EDIT;
 
 const materialTrackingKey = (material: Material) =>
-  `${material.srNo}-${normalizeMaterialCodeKey(material.materialCode)}`;
+  `${material.srNo}-${normalizeMaterialCodeKey(material.materialCode)}-${material.gradeCode ?? ""}`;
 
 interface Material {
   srNo: number;
@@ -46,7 +48,7 @@ interface Material {
   materialName: string;
   gradeCode?: string;
   gradeName?: string;
-  lotId: string;
+  lotIds: string[];
   manufacturerName?: string;
   make?: string;
   requiredComposition: number;
@@ -55,7 +57,10 @@ interface Material {
   revalidationToDate: string;
 }
 
-const displayNumberValue = (value: number | string | undefined | null, emptyWhenZero = true): string => {
+const displayNumberValue = (
+  value: number | string | undefined | null,
+  emptyWhenZero = true,
+): string => {
   if (value == null || value === "") return "";
   if (emptyWhenZero && Number(value) === 0) return "";
   return String(value);
@@ -123,6 +128,8 @@ export default function BatchImplementationForm({
   onCompositionChange,
   setConfirmOpen,
 }: any) {
+  console.log(form);
+
   const { modal, input, materialSelectField, materialsTable } = t;
   const [selectedMaterialCode, setSelectedMaterialCode] = useState("");
   const [selectedGradeCode, setSelectedGradeCode] = useState("");
@@ -161,11 +168,29 @@ export default function BatchImplementationForm({
     }
   }, [open]);
 
+  const normalizedMaterials = (form.identificationSheet?.materials ?? []).map((material: any) => {
+    // If lotIds is missing or empty, but a legacy single lotId exists, convert it to an array
+    let lotIds = material.lotIds;
+    if (!Array.isArray(lotIds)) {
+      if (material.lotId) {
+        lotIds = [material.lotId];
+      } else {
+        lotIds = [];
+      }
+    }
+    return {
+      ...material,
+      lotIds,
+    };
+  });
+
   const selectedLotIdsElsewhere = useMemo(() => {
     const ids = new Set<string>();
     for (const material of form.identificationSheet?.materials ?? []) {
-      const lotId = String(material.lotId ?? "").trim();
-      if (lotId) ids.add(lotId);
+      const lotIds = material.lotIds ?? [];
+      for (const lotId of lotIds) {
+        if (lotId) ids.add(lotId);
+      }
     }
     return ids;
   }, [form.identificationSheet?.materials]);
@@ -178,18 +203,50 @@ export default function BatchImplementationForm({
     [materialOptions, selectedMaterialCode],
   );
 
-  const selectableMaterials = useMemo(() => {
-    return materialOptions as BatchMaterialOption[];
-  }, [materialOptions]);
+  // const selectableMaterials = useMemo(() => {
+  //   return materialOptions as BatchMaterialOption[];
+  // }, [materialOptions]);
 
   const showGradeSelect = Boolean(
     selectedMaterialOption && (selectedMaterialOption.grades?.length ?? 0) > 0,
   );
 
+  const addedMaterialKeys = useMemo(() => {
+    const set = new Set<string>();
+    const materials = form.identificationSheet?.materials ?? [];
+    for (const m of materials) {
+      if (m.gradeCode) {
+        set.add(`${m.materialCode}__${m.gradeCode}`);
+      } else {
+        set.add(m.materialCode);
+      }
+    }
+    return set;
+  }, [form.identificationSheet?.materials]);
+
+  const selectableMaterials = useMemo(() => {
+    return (materialOptions as BatchMaterialOption[]).filter((item) => {
+      const grades = item.grades ?? [];
+      if (grades.length === 0) {
+        // Without grade: disable if already added
+        return !addedMaterialKeys.has(item.materialCode);
+      } else {
+        // With grade: disable only if ALL grades are added
+        const allGradesAdded = grades.every((g) =>
+          addedMaterialKeys.has(`${item.materialCode}__${g.gradeCode}`),
+        );
+        return !allGradesAdded;
+      }
+    });
+  }, [materialOptions, addedMaterialKeys]);
+
   const selectableGrades = useMemo(() => {
     if (!showGradeSelect || !selectedMaterialOption) return [];
-    return selectedMaterialOption.grades ?? [];
-  }, [selectedMaterialOption, showGradeSelect]);
+    const grades = selectedMaterialOption.grades ?? [];
+    return grades.filter(
+      (g) => !addedMaterialKeys.has(`${selectedMaterialOption.materialCode}__${g.gradeCode}`),
+    );
+  }, [selectedMaterialOption, showGradeSelect, addedMaterialKeys]);
 
   const canAddMaterial =
     Boolean(selectedMaterialCode) && (!showGradeSelect || Boolean(selectedGradeCode));
@@ -213,7 +270,7 @@ export default function BatchImplementationForm({
 
     let changed = false;
     const synced = materials.map((material: Material) => {
-      const lotId = String(material.lotId ?? "").trim();
+      const lotId = String(material.lotIds ?? "").trim();
       if (!lotId) return material;
 
       const fromApi = getLotByMaterialAndId(material.materialCode, lotId)?.manufacturerName ?? "";
@@ -243,10 +300,9 @@ export default function BatchImplementationForm({
   const handleAddMaterial = () => {
     if (!canAddMaterial || !selectedMaterialOption) return;
 
-    const grade =
-      showGradeSelect
-        ? selectableGrades.find((item) => item.gradeCode === selectedGradeCode)
-        : undefined;
+    const grade = showGradeSelect
+      ? selectableGrades.find((item) => item.gradeCode === selectedGradeCode)
+      : undefined;
 
     const newMaterial: Material = {
       srNo: (form.identificationSheet?.materials?.length ?? 0) + 1,
@@ -254,9 +310,7 @@ export default function BatchImplementationForm({
       materialName: selectedMaterialOption.materialName,
       gradeCode: grade?.gradeCode,
       gradeName: grade?.gradeName || grade?.gradeCode,
-      lotId: "",
-      manufacturerName: "",
-      make: "",
+      lotIds: [],
       requiredComposition: 0,
       quantityPerPremix: 0,
       revalidationFromDate: "",
@@ -284,20 +338,43 @@ export default function BatchImplementationForm({
     onMaterialsChange(newMaterials);
   };
 
-  const handleLotIdChange = (index: number, lotId: string) => {
-    const material = (form.identificationSheet?.materials ?? [])[index] as Material | undefined;
+  const handleLotIdChange = (index: number, value: string | string[]) => {
+    const currentMaterials = form.identificationSheet?.materials ?? [];
+    const material = currentMaterials[index] as any | undefined;
     if (!material) return;
 
-    const lot = lotId ? getLotByMaterialAndId(material.materialCode, lotId) : undefined;
-    const manufacturerName = lot?.manufacturerName ?? "";
+    // Normalize the incoming value into a safe array of strings
+    const lotIdsArray = Array.isArray(value)
+      ? value.map((v) => String(v).trim()).filter(Boolean)
+      : String(value)
+          .split(",")
+          .map((v) => v.trim())
+          .filter(Boolean);
 
-    const newMaterials = [...(form.identificationSheet?.materials ?? [])];
+    // Fetch all matching lots using the specific material code
+    const matchedLots =
+      lotIdsArray.length > 0 ? getLotByMaterialAndId(material.materialCode, lotIdsArray) : [];
+
+    // Map directly based on the order of lotIdsArray to preserve selection order
+    const manufacturerNames = lotIdsArray
+      .map((lotId) => {
+        const foundLot = matchedLots.find((lot) => {
+          const lotIdValue = Array.isArray(lot.lotId) ? lot.lotId[0] : lot.lotId;
+          return String(lotIdValue).trim() === lotId;
+        });
+        return foundLot?.manufacturerName;
+      })
+      .filter((name): name is string => Boolean(name && String(name).trim() !== ""))
+      .join(", ");
+
+    const newMaterials = [...currentMaterials];
     newMaterials[index] = {
       ...newMaterials[index],
-      lotId,
-      manufacturerName,
-      make: manufacturerName,
+      lotIds: lotIdsArray,
+      manufacturerName: manufacturerNames,
+      make: manufacturerNames,
     };
+
     onMaterialsChange(newMaterials);
   };
   const totalComposition =
@@ -349,8 +426,7 @@ export default function BatchImplementationForm({
 
   const commitCompositionInput = (index: number, material: Material) => {
     const key = compositionMaterialKey(material, index);
-    const raw =
-      compositionDrafts[key] ?? displayNumberValue(material.requiredComposition);
+    const raw = compositionDrafts[key] ?? displayNumberValue(material.requiredComposition);
     const composition = parseCompositionFloat(raw);
     handleMaterialValuesChange(index, composition ?? 0);
     setCompositionDrafts((prev) => {
@@ -608,9 +684,7 @@ export default function BatchImplementationForm({
                         label: item.materialName || item.materialCode,
                       }))}
                       renderValue={(selected) => {
-                        const item = selectableMaterials.find(
-                          (m) => m.materialCode === selected,
-                        );
+                        const item = selectableMaterials.find((m) => m.materialCode === selected);
                         if (!item) return selected;
                         return (
                           <Box
@@ -684,167 +758,204 @@ export default function BatchImplementationForm({
 
             {(form.identificationSheet?.materials?.length ?? 0) > 0 ? (
               <>
-              <TableContainer sx={materialsTable?.container}>
-                <Table size="small" sx={{ minWidth: 980 }}>
-                  <TableHead>
-                    <TableRow sx={materialsTable?.headerRow}>
-                      {[
-                        "Sr. No",
-                        "Material Code",
-                        "Material Name",
-                        "Grade",
-                        "Lot ID",
-                        "Manufacturer",
-                        "Composition %",
-                        "Qty/Premix",
-                        "Revalidation From",
-                        "Revalidation To",
-                        ...(!readOnly ? ["Action"] : []),
-                      ].map((header) => (
-                        <TableCell key={header} sx={materialsTable?.headerCell}>
-                          {header}
-                        </TableCell>
-                      ))}
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {form.identificationSheet?.materials?.map((material: Material, idx: number) => {
-                      const rowLocked = isBaselineMaterial(material);
-                      const lotOptionsForRow = getLotOptionsForRow(
-                        material.materialCode,
-                        material.lotId,
-                        new Set([...selectedLotIdsElsewhere].filter((id) => id !== material.lotId)),
-                        material.gradeCode,
-                      );
-                      const lotPlaceholder = getLotSelectPlaceholder(
-                        material.materialCode,
-                        lotOptionsForRow.length,
-                      );
-                      const cellSx = materialsTable?.bodyCell;
-                      const textSx = materialsTable?.textCell;
+                <TableContainer sx={materialsTable?.container}>
+                  <Table size="small" sx={{ minWidth: 980 }}>
+                    <TableHead>
+                      <TableRow sx={materialsTable?.headerRow}>
+                        {[
+                          "Sr. No",
+                          "Material Code",
+                          "Material Name",
+                          "Grade",
+                          "Lot ID",
+                          "Manufacturer",
+                          "Composition %",
+                          "Qty/Premix",
+                          "Revalidation From",
+                          "Revalidation To",
+                          ...(!readOnly ? ["Action"] : []),
+                        ].map((header) => (
+                          <TableCell key={header} sx={materialsTable?.headerCell}>
+                            {header}
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {form.identificationSheet?.materials?.map(
+                        (material: Material, idx: number) => {
+                          const rowLocked = isBaselineMaterial(material);
+                          console.log(material);
 
-                      return (
-                        <TableRow
-                          key={`${material.materialCode}-${material.gradeCode ?? ""}-${idx}`}
-                          hover
-                        >
-                          <TableCell sx={{ ...cellSx, width: 56 }}>{material.srNo}</TableCell>
-                          <TableCell sx={cellSx}>
-                            <Typography sx={{ ...textSx, fontWeight: 700 }} noWrap>
-                              {material.materialCode || "—"}
-                            </Typography>
-                          </TableCell>
-                          <TableCell sx={{ ...cellSx, minWidth: 160, maxWidth: 220 }}>
-                            <Typography sx={textSx} noWrap title={material.materialName}>
-                              {material.materialName || "—"}
-                            </Typography>
-                          </TableCell>
-                          <TableCell sx={cellSx}>
-                            <Typography sx={textSx} noWrap>
-                              {material.gradeName || material.gradeCode || "—"}
-                            </Typography>
-                          </TableCell>
-                          <TableCell sx={{ ...cellSx, width: 150 }}>
-                            <AppDropdown
-                              value={material.lotId ?? ""}
-                              onChange={(value) => handleLotIdChange(idx, value)}
-                              disabled={fieldDisabled || rowLocked || loadingLots || !material.materialCode}
-                              loading={loadingLots}
-                              placeholder={lotPlaceholder}
-                              compact
-                              options={lotOptionsForRow.map((lot) => ({
-                                value: lot.lotId,
-                                label:
-                                  lot.grade?.gradeName || lot.grade?.gradeCode
-                                    ? `${lot.lotId} · ${lot.grade?.gradeName || lot.grade?.gradeCode}`
-                                    : lot.lotId,
-                              }))}
-                              MenuProps={t.menuPaper}
-                              sx={[appDenseControlSx, materialsTable?.lotControl]}
-                            />
-                          </TableCell>
-                          <TableCell sx={{ ...cellSx, minWidth: 110 }}>
-                            <Typography
-                              sx={{
-                                ...textSx,
-                                color: materialManufacturer(material)
-                                  ? undefined
-                                  : "text.secondary",
-                              }}
-                              noWrap
+                          const currentMaterialLotIds = Array.isArray(material.lotIds)
+                            ? material.lotIds
+                            : material.lotIds
+                              ? [material.lotIds]
+                              : [];
+
+                          const lotOptionsForRow = getLotOptionsForRow(
+                            material.materialCode,
+                            currentMaterialLotIds,
+                            new Set(
+                              [...selectedLotIdsElsewhere].filter(
+                                (id) => !currentMaterialLotIds.includes(id),
+                              ),
+                            ),
+                            material.gradeCode,
+                          );
+                          const lotPlaceholder = getLotSelectPlaceholder(
+                            material.materialCode,
+                            lotOptionsForRow.length,
+                          );
+                          const cellSx = materialsTable?.bodyCell;
+                          const textSx = materialsTable?.textCell;
+
+                          return (
+                            <TableRow
+                              key={`${material.materialCode}-${material.gradeCode ?? ""}-${idx}`}
+                              hover
                             >
-                              {materialManufacturer(material) || "—"}
-                            </Typography>
-                          </TableCell>
-                          <TableCell sx={{ ...cellSx, width: 130, minWidth: 130 }}>
-                            <AppTextField
-                              type="text"
-                              inputMode="decimal"
-                              value={getCompositionDisplayValue(material, idx)}
-                              onChange={(e) =>
-                                handleCompositionInputChange(idx, material, e.target.value)
-                              }
-                              onBlur={() => commitCompositionInput(idx, material)}
-                              disabled={fieldDisabled || rowLocked}
-                              compact
-                              sx={materialsTable?.compositionControl}
-                            />
-                          </TableCell>
-                          <TableCell sx={{ ...cellSx, width: 90 }}>
-                            <Typography sx={textSx} noWrap>
-                              {displayNumberValue(material.quantityPerPremix) || "—"}
-                            </Typography>
-                          </TableCell>
-                          <TableCell sx={{ ...cellSx, width: 150, minWidth: 150 }}>
-                            <DateField
-                              value={formatToUiDate(material.revalidationFromDate ?? "")}
-                              onChange={(date) =>
-                                handleMaterialChange(idx, "revalidationFromDate", date)
-                              }
-                              disabled={fieldDisabled || rowLocked}
-                              compact
-                              placeholder="DD-MM-YYYY"
-                              sx={materialsTable?.dateControl}
-                            />
-                          </TableCell>
-                          <TableCell sx={{ ...cellSx, width: 150, minWidth: 150 }}>
-                            <DateField
-                              value={formatToUiDate(material.revalidationToDate ?? "")}
-                              onChange={(date) =>
-                                handleMaterialChange(idx, "revalidationToDate", date)
-                              }
-                              disabled={fieldDisabled || rowLocked}
-                              compact
-                              placeholder="DD-MM-YYYY"
-                              sx={materialsTable?.dateControl}
-                            />
-                          </TableCell>
-                          {!readOnly && (
-                            <TableCell sx={{ ...cellSx, width: 80 }}>
-                              {!rowLocked && (
-                                <Button
-                                  size="small"
-                                  color="error"
-                                  onClick={() => handleRemoveMaterial(idx)}
+                              <TableCell sx={{ ...cellSx, width: 56 }}>{material.srNo}</TableCell>
+                              <TableCell sx={cellSx}>
+                                <Typography sx={{ ...textSx, fontWeight: 700 }} noWrap>
+                                  {material.materialCode || "—"}
+                                </Typography>
+                              </TableCell>
+                              <TableCell sx={{ ...cellSx, minWidth: 160, maxWidth: 220 }}>
+                                <Typography sx={textSx} noWrap title={material.materialName}>
+                                  {material.materialName || "—"}
+                                </Typography>
+                              </TableCell>
+                              <TableCell sx={cellSx}>
+                                <Typography sx={textSx} noWrap>
+                                  {material.gradeName || material.gradeCode || "—"}
+                                </Typography>
+                              </TableCell>
+                              <TableCell sx={{ ...cellSx, width: 150 }}>
+                                {/* <AppDropdown
+                                  value={material.lotId ?? ""}
+                                  onChange={(value) => handleLotIdChange(idx, value)}
+                                  disabled={
+                                    fieldDisabled ||
+                                    rowLocked ||
+                                    loadingLots ||
+                                    !material.materialCode
+                                  }
+                                  loading={loadingLots}
+                                  placeholder={lotPlaceholder}
+                                  compact
+                                  options={lotOptionsForRow.map((lot) => ({
+                                    value: lot.lotId,
+                                    label:
+                                      lot.grade?.gradeName || lot.grade?.gradeCode
+                                        ? `${lot.lotId} · ${lot.grade?.gradeName || lot.grade?.gradeCode}`
+                                        : lot.lotId,
+                                  }))}
+                                  MenuProps={t.menuPaper}
+                                  sx={[appDenseControlSx, materialsTable?.lotControl]}
+                                /> */}
+                                {/* {console.log(lotOptionsForRow)} */}
+                                <MultiSelect
+                                  value={currentMaterialLotIds ?? []}
+                                  onChange={(value) => handleLotIdChange(idx, value)}
+                                  disabled={
+                                    fieldDisabled ||
+                                    rowLocked ||
+                                    loadingLots ||
+                                    !material.materialCode
+                                  }
+                                  placeholder={lotPlaceholder}
+                                  options={lotOptionsForRow.map((lot) => ({
+                                    value: lot.lotId,
+                                    label: `${lot.lotId}${lot.grade?.gradeName ? ` · ${lot.grade.gradeName}` : ""}`,
+                                  }))}
+                                  MenuProps={t.menuPaper}
+                                  sx={[appDenseControlSx, materialsTable?.lotControl]}
+                                />
+                              </TableCell>
+                              <TableCell sx={{ ...cellSx, minWidth: 110 }}>
+                                <Typography
                                   sx={{
-                                    textTransform: "none",
-                                    fontWeight: 700,
-                                    minWidth: 0,
-                                    px: 1,
-                                    fontSize: "0.75rem",
+                                    ...textSx,
+                                    color: materialManufacturer(material)
+                                      ? undefined
+                                      : "text.secondary",
                                   }}
+                                  noWrap
                                 >
-                                  Remove
-                                </Button>
+                                  {materialManufacturer(material) || "—"}
+                                </Typography>
+                              </TableCell>
+                              <TableCell sx={{ ...cellSx, width: 130, minWidth: 130 }}>
+                                <AppTextField
+                                  type="text"
+                                  inputMode="decimal"
+                                  value={getCompositionDisplayValue(material, idx)}
+                                  onChange={(e) =>
+                                    handleCompositionInputChange(idx, material, e.target.value)
+                                  }
+                                  onBlur={() => commitCompositionInput(idx, material)}
+                                  disabled={fieldDisabled || rowLocked}
+                                  compact
+                                  sx={materialsTable?.compositionControl}
+                                />
+                              </TableCell>
+                              <TableCell sx={{ ...cellSx, width: 90 }}>
+                                <Typography sx={textSx} noWrap>
+                                  {displayNumberValue(material.quantityPerPremix) || "—"}
+                                </Typography>
+                              </TableCell>
+                              <TableCell sx={{ ...cellSx, width: 150, minWidth: 150 }}>
+                                <DateField
+                                  value={formatToUiDate(material.revalidationFromDate ?? "")}
+                                  onChange={(date) =>
+                                    handleMaterialChange(idx, "revalidationFromDate", date)
+                                  }
+                                  disabled={fieldDisabled || rowLocked}
+                                  compact
+                                  placeholder="DD-MM-YYYY"
+                                  sx={materialsTable?.dateControl}
+                                />
+                              </TableCell>
+                              <TableCell sx={{ ...cellSx, width: 150, minWidth: 150 }}>
+                                <DateField
+                                  value={formatToUiDate(material.revalidationToDate ?? "")}
+                                  onChange={(date) =>
+                                    handleMaterialChange(idx, "revalidationToDate", date)
+                                  }
+                                  disabled={fieldDisabled || rowLocked}
+                                  compact
+                                  placeholder="DD-MM-YYYY"
+                                  sx={materialsTable?.dateControl}
+                                />
+                              </TableCell>
+                              {!readOnly && (
+                                <TableCell sx={{ ...cellSx, width: 80 }}>
+                                  {!rowLocked && (
+                                    <Button
+                                      size="small"
+                                      color="error"
+                                      onClick={() => handleRemoveMaterial(idx)}
+                                      sx={{
+                                        textTransform: "none",
+                                        fontWeight: 700,
+                                        minWidth: 0,
+                                        px: 1,
+                                        fontSize: "0.75rem",
+                                      }}
+                                    >
+                                      Remove
+                                    </Button>
+                                  )}
+                                </TableCell>
                               )}
-                            </TableCell>
-                          )}
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+                            </TableRow>
+                          );
+                        },
+                      )}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
                 <Box sx={{ my: 2 }}>
                   {roundedTotal < 100 && (
                     <Typography color="error.main" variant="body2" fontWeight={800}>

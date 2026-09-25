@@ -5,8 +5,6 @@ import { STRINGS } from "@app/config/strings";
 import { masterDataController } from "@controllers/admin/MasterData/masterDataController";
 import {
   createMasterData,
-  deleteMasterData,
-  enableMasterData,
 } from "@data/api/admin/MasterData/masterDataApi";
 import { ApiResponseModel } from "@data/models/common/ApiResponseModel";
 import {
@@ -15,7 +13,7 @@ import {
 } from "@data/models/admin/MasterData/MasterDataModel";
 import {
   buildDimensionalParameterCreatePayload,
-  buildStageEditFormForMotorType,
+  buildStageEditFormForProjectAndMotorType,
   createEmptyDimensionalParametersCreateForm,
   dimensionalParametersRecordMatchesSearch,
   mapDimensionalRecordFromMasterData,
@@ -55,6 +53,7 @@ export default function useDimensionalParametersMasterHook({
   const [stats, setStats] = useState(emptyMasterDataStats());
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState("");
+  const [projectFilter, setProjectFilter] = useState("");
   const [motorStageFilter, setMotorStageFilter] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
@@ -66,7 +65,7 @@ export default function useDimensionalParametersMasterHook({
   const [disabling, setDisabling] = useState(false);
   const [enabling, setEnabling] = useState(false);
 
-  const loadList = useCallback(async () => {
+  const loadList = useCallback(async (): Promise<DimensionalParametersMasterRecord[]> => {
     setLoading(true);
     try {
       const body: { search?: string } = {};
@@ -76,24 +75,31 @@ export default function useDimensionalParametersMasterHook({
 
       if (resp.success && resp.data) {
         const mappedItems = resp.data.items.map(mapDimensionalRecordFromMasterData);
+        const nextStats = {
+          total: mappedItems.length,
+          active: mappedItems.filter((item) => item.isActive).length,
+          inactive: mappedItems.filter((item) => !item.isActive).length,
+        };
         setItems(mappedItems);
-        setStats(resp.data.stats);
-        onStatsChangeRef.current?.(resp.data.stats);
-      } else {
-        setItems([]);
-        setStats(emptyMasterDataStats());
-        onStatsChangeRef.current?.(emptyMasterDataStats());
-        useAlertStore
-          .getState()
-          .showAlert(getMasterDataErrorMessage(resp, S.ERRORS.LOAD_LIST_FAILED), "error");
+        setStats(nextStats);
+        onStatsChangeRef.current?.(nextStats);
+        return mappedItems;
       }
+      setItems([]);
+      setStats(emptyMasterDataStats());
+      onStatsChangeRef.current?.(emptyMasterDataStats());
+      useAlertStore
+        .getState()
+        .showAlert(getMasterDataErrorMessage(resp, S.ERRORS.LOAD_LIST_FAILED), "error");
+      return [];
     } catch (error: any) {
       setItems([]);
       setStats(emptyMasterDataStats());
       onStatsChangeRef.current?.(emptyMasterDataStats());
       useAlertStore
         .getState()
-        .showAlert(getMasterDataErrorMessage(error?.response?.data, S.ERRORS.LOAD_LIST_FAILED), "error");
+        .showAlert(getMasterDataErrorMessage(error, S.ERRORS.LOAD_LIST_FAILED), "error");
+      return [];
     } finally {
       setLoading(false);
     }
@@ -105,16 +111,34 @@ export default function useDimensionalParametersMasterHook({
     void loadList();
   }, [loadList, refreshKey]);
 
+  // Re-publish full-list counts when status chips change (table filters client-side only).
+  useEffect(() => {
+    onStatsChangeRef.current?.(stats);
+  }, [activeFilter, stats]);
+
   const filteredItems = useMemo(() => {
     return items.filter((record) => {
       if (activeFilter === "ACTIVE" && !record.isActive) return false;
       if (activeFilter === "INACTIVE" && record.isActive) return false;
+      if (projectFilter && record.projectId !== projectFilter) return false;
       if (motorStageFilter && String(record.motorType) !== motorStageFilter) {
         return false;
       }
       return dimensionalParametersRecordMatchesSearch(record, search);
     });
-  }, [items, activeFilter, motorStageFilter, search]);
+  }, [items, activeFilter, projectFilter, motorStageFilter, search]);
+
+  const motorStageFilterOptions = useMemo(() => {
+    const stages = new Set<string>();
+    for (const record of items) {
+      if (projectFilter && record.projectId !== projectFilter) continue;
+      if (record.motorType == null) continue;
+      stages.add(String(record.motorType));
+    }
+    return Array.from(stages)
+      .sort((a, b) => Number(a) - Number(b))
+      .map((value) => ({ value, label: `Stage ${value}` }));
+  }, [items, projectFilter]);
 
   const paginated = useMemo(() => {
     const start = page * rowsPerPage;
@@ -122,7 +146,13 @@ export default function useDimensionalParametersMasterHook({
   }, [filteredItems, page, rowsPerPage]);
 
   const closeInline = () => {
-    if (saving) return;
+    if (saving || enabling || disabling) return;
+    setInlineMode(null);
+    setCreateForm(createEmptyDimensionalParametersCreateForm());
+    setEditForm(null);
+  };
+
+  const forceCloseInline = () => {
     setInlineMode(null);
     setCreateForm(createEmptyDimensionalParametersCreateForm());
     setEditForm(null);
@@ -135,14 +165,47 @@ export default function useDimensionalParametersMasterHook({
   };
 
   const openEdit = (record: DimensionalParametersMasterRecord) => {
-    setEditForm(buildStageEditFormForMotorType(record.motorType, items, unitOptions));
+    setEditForm(
+      buildStageEditFormForProjectAndMotorType(
+        record.projectId,
+        record.motorType,
+        items,
+        unitOptions,
+      ),
+    );
     setInlineMode("edit");
   };
 
-  const refreshAfterMutation = useCallback(async () => {
-    await loadList();
-    onRefreshRef.current?.();
-  }, [loadList]);
+  const refreshAfterMutation = useCallback(
+    async (options?: { notifyParent?: boolean }): Promise<DimensionalParametersMasterRecord[]> => {
+      const nextItems = await loadList();
+      if (options?.notifyParent !== false) {
+        onRefreshRef.current?.();
+      }
+      return nextItems;
+    },
+    [loadList],
+  );
+
+  const syncEditFormAfterListRefresh = useCallback(
+    (nextItems: DimensionalParametersMasterRecord[]) => {
+      setEditForm((prev) => {
+        if (!prev) return prev;
+        const pendingNewRows = prev.parameters.filter((row) => !row.isExisting);
+        const rebuilt = buildStageEditFormForProjectAndMotorType(
+          prev.projectId,
+          prev.motorType,
+          nextItems,
+          unitOptions,
+        );
+        return {
+          ...rebuilt,
+          parameters: [...rebuilt.parameters, ...pendingNewRows],
+        };
+      });
+    },
+    [unitOptions],
+  );
 
   const saveForm = async (): Promise<boolean> => {
     if (inlineMode === "create") {
@@ -152,10 +215,11 @@ export default function useDimensionalParametersMasterHook({
         return false;
       }
       setSaving(true);
-      useAlertStore.getState().showAlert(S.MESSAGES.CREATING, "loading");
+      useAlertStore.getState().showAlert(S.MESSAGES.CREATING, "info", { loading: true });
       try {
         for (const row of createForm.parameters) {
           const payload = buildDimensionalParameterCreatePayload(
+            createForm.projectId.trim(),
             Number(createForm.motorType),
             row,
             unitOptions,
@@ -175,7 +239,7 @@ export default function useDimensionalParametersMasterHook({
       } catch (error: any) {
         useAlertStore
           .getState()
-          .showAlert(getMasterDataErrorMessage(error?.response?.data, S.ERRORS.OPERATION_FAILED), "error");
+          .showAlert(getMasterDataErrorMessage(error, S.ERRORS.OPERATION_FAILED), "error");
         return false;
       } finally {
         setSaving(false);
@@ -183,27 +247,24 @@ export default function useDimensionalParametersMasterHook({
     }
 
     if (inlineMode === "edit" && editForm) {
-      const stageRecords = items.filter((record) => record.motorType === editForm.motorType);
-      const err = validateDimensionalStageEditForm(editForm, stageRecords);
+      const err = validateDimensionalStageEditForm(editForm);
       if (err) {
         useAlertStore.getState().showValidationAlert(err);
         return false;
       }
 
+      const newRows = editForm.parameters.filter((row) => !row.isExisting);
       setSaving(true);
-      useAlertStore.getState().showAlert(S.MESSAGES.UPDATING, "loading");
+      useAlertStore.getState().showAlert(S.MESSAGES.UPDATING, "info", { loading: true });
       try {
-        const originalById = new Map(
-          stageRecords.map((record) => [record.parameterId, record]),
-        );
-
-        for (const row of editForm.parameters) {
-          if (!row.isExisting) {
-            const payload = buildDimensionalParameterCreatePayload(
-              editForm.motorType,
-              row,
-              unitOptions,
-            );
+        for (const row of newRows) {
+          const payload = buildDimensionalParameterCreatePayload(
+            editForm.projectId,
+            editForm.motorType,
+            row,
+            unitOptions,
+          );
+          try {
             const resp = new ApiResponseModel(await createMasterData(MASTER_TYPE, payload));
             if (!resp.success) {
               useAlertStore
@@ -211,44 +272,22 @@ export default function useDimensionalParametersMasterHook({
                 .showAlert(getMasterDataErrorMessage(resp, S.ERRORS.OPERATION_FAILED), "error");
               return false;
             }
-            continue;
-          }
-
-          if (row.parameterId == null) continue;
-          const original = originalById.get(row.parameterId);
-          if (!original || original.isActive === row.isActive) continue;
-
-          if (row.isActive) {
-            const resp = new ApiResponseModel(
-              await enableMasterData(MASTER_TYPE, { id: row.parameterId }),
-            );
-            if (!resp.success) {
-              useAlertStore
-                .getState()
-                .showAlert(getMasterDataErrorMessage(resp, S.ERRORS.OPERATION_FAILED), "error");
-              return false;
-            }
-          } else {
-            const resp = new ApiResponseModel(
-              await deleteMasterData(MASTER_TYPE, { id: row.parameterId }),
-            );
-            if (!resp.success) {
-              useAlertStore
-                .getState()
-                .showAlert(getMasterDataErrorMessage(resp, S.ERRORS.OPERATION_FAILED), "error");
-              return false;
-            }
+          } catch (error: any) {
+            useAlertStore
+              .getState()
+              .showAlert(getMasterDataErrorMessage(error, S.ERRORS.OPERATION_FAILED), "error");
+            return false;
           }
         }
 
         useAlertStore.getState().showAlert(S.MESSAGES.UPDATE_SUCCESS, "success");
-        closeInline();
+        forceCloseInline();
         await refreshAfterMutation();
         return true;
       } catch (error: any) {
         useAlertStore
           .getState()
-          .showAlert(getMasterDataErrorMessage(error?.response?.data, S.ERRORS.OPERATION_FAILED), "error");
+          .showAlert(getMasterDataErrorMessage(error, S.ERRORS.OPERATION_FAILED), "error");
         return false;
       } finally {
         setSaving(false);
@@ -261,14 +300,17 @@ export default function useDimensionalParametersMasterHook({
   const enableRecord = useCallback(
     async (record: DimensionalParametersMasterRecord) => {
       setEnabling(true);
-      useAlertStore.getState().showAlert(S.MESSAGES.ENABLING, "loading");
+      useAlertStore.getState().showAlert(S.MESSAGES.ENABLING, "info", { loading: true });
       try {
-        const resp = new ApiResponseModel(
-          await enableMasterData(MASTER_TYPE, { id: record.parameterId }),
-        );
+        const resp = await masterDataController.enable(MASTER_TYPE, record.parameterId);
         if (resp.success) {
           useAlertStore.getState().showAlert(S.MESSAGES.ENABLE_SUCCESS, "success");
-          await refreshAfterMutation();
+          // Avoid parent refreshKey bump while edit dialog is open — that clears inlineMode.
+          const keepDialogOpen = inlineMode === "edit";
+          const nextItems = await refreshAfterMutation({ notifyParent: !keepDialogOpen });
+          if (keepDialogOpen) {
+            syncEditFormAfterListRefresh(nextItems);
+          }
         } else {
           useAlertStore
             .getState()
@@ -277,25 +319,27 @@ export default function useDimensionalParametersMasterHook({
       } catch (error: any) {
         useAlertStore
           .getState()
-          .showAlert(getMasterDataErrorMessage(error?.response?.data, S.ERRORS.OPERATION_FAILED), "error");
+          .showAlert(getMasterDataErrorMessage(error, S.ERRORS.OPERATION_FAILED), "error");
       } finally {
         setEnabling(false);
       }
     },
-    [refreshAfterMutation],
+    [inlineMode, refreshAfterMutation, syncEditFormAfterListRefresh],
   );
 
   const disableRecord = useCallback(
     async (record: DimensionalParametersMasterRecord) => {
       setDisabling(true);
-      useAlertStore.getState().showAlert(S.MESSAGES.DISABLING, "loading");
+      useAlertStore.getState().showAlert(S.MESSAGES.DISABLING, "info", { loading: true });
       try {
-        const resp = new ApiResponseModel(
-          await deleteMasterData(MASTER_TYPE, { id: record.parameterId }),
-        );
+        const resp = await masterDataController.disable(MASTER_TYPE, record.parameterId);
         if (resp.success) {
           useAlertStore.getState().showAlert(S.MESSAGES.DISABLE_SUCCESS, "success");
-          await refreshAfterMutation();
+          const keepDialogOpen = inlineMode === "edit";
+          const nextItems = await refreshAfterMutation({ notifyParent: !keepDialogOpen });
+          if (keepDialogOpen) {
+            syncEditFormAfterListRefresh(nextItems);
+          }
         } else {
           useAlertStore
             .getState()
@@ -304,12 +348,26 @@ export default function useDimensionalParametersMasterHook({
       } catch (error: any) {
         useAlertStore
           .getState()
-          .showAlert(getMasterDataErrorMessage(error?.response?.data, S.ERRORS.OPERATION_FAILED), "error");
+          .showAlert(getMasterDataErrorMessage(error, S.ERRORS.OPERATION_FAILED), "error");
       } finally {
         setDisabling(false);
       }
     },
-    [refreshAfterMutation],
+    [inlineMode, refreshAfterMutation, syncEditFormAfterListRefresh],
+  );
+
+  const toggleExistingParameterActive = useCallback(
+    async (parameterId: number, nextActive: boolean) => {
+      if (saving || disabling || enabling) return;
+      const record = items.find((item) => item.parameterId === parameterId);
+      if (!record || record.isActive === nextActive) return;
+      if (nextActive) {
+        await enableRecord(record);
+      } else {
+        await disableRecord(record);
+      }
+    },
+    [disableRecord, disabling, enableRecord, enabling, items, saving],
   );
 
   const { toggleTarget, handleToggleActive, confirmToggle, cancelToggle } =
@@ -321,16 +379,33 @@ export default function useDimensionalParametersMasterHook({
 
   return {
     items: filteredItems,
+    allItems: items,
     stats,
     loading,
     search,
-    setSearch,
+    setSearch: (value: string) => {
+      setSearch(value);
+      setPage(0);
+    },
+    projectFilter,
+    setProjectFilter: (value: string) => {
+      setProjectFilter(value);
+      setMotorStageFilter("");
+      setPage(0);
+    },
     motorStageFilter,
-    setMotorStageFilter,
+    setMotorStageFilter: (value: string) => {
+      setMotorStageFilter(value);
+      setPage(0);
+    },
+    motorStageFilterOptions,
     page,
     setPage,
     rowsPerPage,
-    setRowsPerPage,
+    setRowsPerPage: (n: number) => {
+      setRowsPerPage(n);
+      setPage(0);
+    },
     paginated,
     inlineMode,
     createForm,
@@ -344,6 +419,7 @@ export default function useDimensionalParametersMasterHook({
     openEdit,
     closeInline,
     saveForm,
+    toggleExistingParameterActive,
     toggleTarget,
     handleToggleActive,
     confirmToggle,

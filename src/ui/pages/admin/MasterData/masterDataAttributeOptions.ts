@@ -51,6 +51,9 @@ export const formatMasterDataAttributeValue = (
 ): string => {
   const value = String(raw ?? "").trim();
   if (!value) return "—";
+  if (selectedType === "motor-stages" && field.key === "motorStage") {
+    return `Stage ${value}`;
+  }
   const options = getMasterDataAttributeOptions(selectedType, field, dynamicOptions);
   const match = findAttributeOption(options, value);
   return match ? String(match.label) : value;

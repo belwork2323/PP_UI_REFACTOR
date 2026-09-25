@@ -170,9 +170,9 @@ export const generalController = {
      Mixing cycle master (create batch — filter by motorStage)
      motorStage: 0 | 1 | 2 | 3 | "ALL"
   ───────────────────────────── */
-  getMixingCycles: async (motorStage: MixingCycleMotorStage = "ALL") => {
+  getMixingCycles: async () => {
     try {
-      const data = await fetchMixingCycles(motorStage);
+      const data = await fetchMixingCycles();
       return new ApiResponseModel({
         success: true,
         statusCode: 200,

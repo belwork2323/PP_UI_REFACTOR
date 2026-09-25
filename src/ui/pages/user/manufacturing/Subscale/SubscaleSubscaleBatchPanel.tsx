@@ -98,7 +98,6 @@ const fetchMixingCyclesForStageDeduped = async (
   motorStage: string,
 ): Promise<MixingCycleMasterItem[]> => {
   const stage = String(motorStage ?? "").trim();
-  if (!stage) return [];
 
   const cached = mixingCyclesByStageCache.get(stage);
   if (cached) return cached;
@@ -106,7 +105,7 @@ const fetchMixingCyclesForStageDeduped = async (
   let pending = mixingCyclesByStageRequest.get(stage);
   if (!pending) {
     pending = (async () => {
-      const response = await generalController.getMixingCycles(stage);
+      const response = await generalController.getMixingCycles();
       return response?.success && Array.isArray(response.data)
         ? (response.data as MixingCycleMasterItem[])
         : [];
@@ -688,7 +687,7 @@ const SubscaleSubscaleBatchPanel: React.FC<SubscaleSubscaleBatchPanelProps> = ({
 
           <AppDropdown
             label={S.MIXER_BLDG_NO}
-            required
+            // required
             value={String(values[SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO] ?? "").trim()}
             onChange={(value) => {
               clearFieldError?.(SUBSCALE_BATCH_FIELDS.MIXER_BLDG_NO);

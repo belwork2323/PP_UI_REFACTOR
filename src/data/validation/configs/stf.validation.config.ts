@@ -11,10 +11,7 @@ import { VALIDATIONSTRING } from "./validationString";
 
 const S = VALIDATIONSTRING;
 
-const text = (
-  requiredIn: ValidationTier[],
-  pattern?: RegExp,
-): FieldRuleConfig => ({
+const text = (requiredIn: ValidationTier[], pattern?: RegExp): FieldRuleConfig => ({
   valueType: "text",
   requiredIn,
   pattern,
@@ -34,8 +31,19 @@ const date = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
   messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
 
+const dateTime = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
+  valueType: "datetime",
+  requiredIn,
+  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+});
 const file = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
   valueType: "file",
+  requiredIn,
+  messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+});
+
+const dateTime = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
+  valueType: "datetime",
   requiredIn,
   messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
 });
@@ -43,11 +51,12 @@ const file = (requiredIn: ValidationTier[]): FieldRuleConfig => ({
 export type StfValidationTarget = StfMotorSession;
 
 export const stfValidationFields: Record<string, FieldRuleConfig> = {
-  bemMotorNo: text(["UNIT", "SUBMIT"], S.PATTERNS.ALPHANUMERIC),
-  stfTestNo: text(["UNIT", "SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  // Mandatory on SUBMIT only — draft/save uses FORMAT (no required checks)
+  bemMotorNo: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
+  stfTestNo: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
 
-  fromDateTime: date(["SUBMIT"]),
-  toDateTime: date(["SUBMIT"]),
+  fromDateTime: dateTime(["SUBMIT"]),
+  toDateTime: dateTime(["SUBMIT"]),
   conditioningTemp: number(["SUBMIT"]),
   conditioningRh: number(["SUBMIT"]),
   conditioningObservation: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
@@ -59,17 +68,17 @@ export const stfValidationFields: Record<string, FieldRuleConfig> = {
   grainLength: number(["SUBMIT"]),
   grainWeight: number(["SUBMIT"]),
 
-  headEndNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
-  nozzleEndNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
-  retainerRingNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
-  casingNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  headEndNo: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
+  nozzleEndNo: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
+  retainerRingNo: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
+  casingNo: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
   casingOd: number(["SUBMIT"]),
   casingId: number(["SUBMIT"]),
   casingLength: number(["SUBMIT"]),
-  firingNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  firingNo: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
 
-  containerType: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
-  composition: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  containerType: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  composition: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   weightOfComposition: number(["SUBMIT"]),
   squibResistance: number(["SUBMIT"]),
   igniterRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
@@ -97,12 +106,12 @@ export const stfValidationFields: Record<string, FieldRuleConfig> = {
   ambientTemp: number(["SUBMIT"]),
   testingRh: number(["SUBMIT"]),
 
-  sensor: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  sensor: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   sensitivity: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   maxRange: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   sensorRange: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   filterHz: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
-  iaNo: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
+  iaNo: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
   iaGain: number(["SUBMIT"]),
   extV: number(["SUBMIT"]),
   offsetValue: number(["SUBMIT"]),
@@ -139,6 +148,8 @@ const resolveBemFields = (
   push(fields, "CONDITIONING_DETAILS.OBSERVATION", c.OBSERVATION, "conditioningObservation");
 
   (data.GRAIN_DIMENSION ?? []).forEach((row, i) => {
+    const hasData = [row.OD, row.A, row.B, row.C, row.LENGTH, row.WEIGHT].some((v) => str(v));
+    if (!hasData) return;
     push(fields, `GRAIN_DIMENSION.${i}.OD`, row.OD, "grainOd");
     push(fields, `GRAIN_DIMENSION.${i}.A`, row.A, "grainA");
     push(fields, `GRAIN_DIMENSION.${i}.B`, row.B, "grainB");
@@ -160,12 +171,22 @@ const resolveBemFields = (
   const ig = data.IGNITER_DETAILS;
   push(fields, "IGNITER_DETAILS.CONTAINER_TYPE", ig.CONTAINER_TYPE, "containerType");
   push(fields, "IGNITER_DETAILS.COMPOSITION", ig.COMPOSITION, "composition");
-  push(fields, "IGNITER_DETAILS.WEIGHT_OF_COMPOSITION", ig.WEIGHT_OF_COMPOSITION, "weightOfComposition");
+  push(
+    fields,
+    "IGNITER_DETAILS.WEIGHT_OF_COMPOSITION",
+    ig.WEIGHT_OF_COMPOSITION,
+    "weightOfComposition",
+  );
   push(fields, "IGNITER_DETAILS.SQUIB_RESISTANCE", ig.SQUIB_RESISTANCE, "squibResistance");
   push(fields, "IGNITER_DETAILS.REMARKS", ig.REMARKS, "igniterRemarks");
 
   const n = data.NOZZLE_DETAILS;
-  push(fields, "NOZZLE_DETAILS.NOZZLE_CLOSURE_MATERIAL", n.NOZZLE_CLOSURE_MATERIAL, "nozzleClosureMaterial");
+  push(
+    fields,
+    "NOZZLE_DETAILS.NOZZLE_CLOSURE_MATERIAL",
+    n.NOZZLE_CLOSURE_MATERIAL,
+    "nozzleClosureMaterial",
+  );
   push(fields, "NOZZLE_DETAILS.THROAT_MATERIAL", n.THROAT_MATERIAL, "throatMaterial");
   push(fields, "NOZZLE_DETAILS.MOTHER_GRAPHITE", n.MOTHER_GRAPHITE, "motherGraphite");
   push(fields, "NOZZLE_DETAILS.NOZZLE_INSERT", n.NOZZLE_INSERT, "nozzleInsert");
@@ -185,6 +206,20 @@ const resolveBemFields = (
   push(fields, "TESTING_DETAILS.RH", t.RH, "testingRh");
 
   (data.SENSOR_CONFIGURATION ?? []).forEach((row, i) => {
+    const hasData = [
+      row.SENSOR,
+      row.SENSITIVITY,
+      row.MAX_RANGE,
+      row.SENSOR_RANGE,
+      row.FILTER_HZ,
+      row.IA_NO,
+      row.IA_GAIN,
+      (row as any).EXT_V ?? (row as any).EXT_VOLTAGE,
+      row.OFFSET_VALUE,
+      row.PRELOADING,
+    ].some((v) => str(v));
+    if (!hasData) return;
+
     push(fields, `SENSOR_CONFIGURATION.${i}.SENSOR`, row.SENSOR, "sensor");
     push(fields, `SENSOR_CONFIGURATION.${i}.SENSITIVITY`, row.SENSITIVITY, "sensitivity");
     push(fields, `SENSOR_CONFIGURATION.${i}.MAX_RANGE`, row.MAX_RANGE, "maxRange");
@@ -192,7 +227,12 @@ const resolveBemFields = (
     push(fields, `SENSOR_CONFIGURATION.${i}.FILTER_HZ`, row.FILTER_HZ, "filterHz");
     push(fields, `SENSOR_CONFIGURATION.${i}.IA_NO`, row.IA_NO, "iaNo");
     push(fields, `SENSOR_CONFIGURATION.${i}.IA_GAIN`, row.IA_GAIN, "iaGain");
-    push(fields, `SENSOR_CONFIGURATION.${i}.EXT_V`, (row as any).EXT_V ?? (row as any).EXT_VOLTAGE, "extV");
+    push(
+      fields,
+      `SENSOR_CONFIGURATION.${i}.EXT_V`,
+      (row as any).EXT_V ?? (row as any).EXT_VOLTAGE,
+      "extV",
+    );
     push(fields, `SENSOR_CONFIGURATION.${i}.OFFSET_VALUE`, row.OFFSET_VALUE, "offsetValue");
     push(fields, `SENSOR_CONFIGURATION.${i}.PRELOADING`, row.PRELOADING, "preloading");
   });
@@ -206,7 +246,12 @@ const resolveBemFields = (
   push(fields, "RESULT_DETAILS.ISP", r.ISP, "isp");
 
   const pt = data.UPLOAD_PT_CURVE as any;
-  push(fields, "UPLOAD_PT_CURVE.PT_CURVE_UPLOAD", pt?.PT_CURVE_UPLOAD ?? pt?.PT_CURVE_FILE, "ptCurve");
+  push(
+    fields,
+    "UPLOAD_PT_CURVE.PT_CURVE_UPLOAD",
+    pt?.PT_CURVE_UPLOAD ?? pt?.PT_CURVE_FILE,
+    "ptCurve",
+  );
 };
 
 const resolveMainFields = (
@@ -216,12 +261,22 @@ const resolveMainFields = (
   const ig = data.IGNITER_DETAILS;
   push(fields, "IGNITER_DETAILS.CONTAINER_TYPE", ig.CONTAINER_TYPE, "containerType");
   push(fields, "IGNITER_DETAILS.COMPOSITION", ig.COMPOSITION, "composition");
-  push(fields, "IGNITER_DETAILS.WEIGHT_OF_COMPOSITION", ig.WEIGHT_OF_COMPOSITION, "weightOfComposition");
+  push(
+    fields,
+    "IGNITER_DETAILS.WEIGHT_OF_COMPOSITION",
+    ig.WEIGHT_OF_COMPOSITION,
+    "weightOfComposition",
+  );
   push(fields, "IGNITER_DETAILS.SQUIB_RESISTANCE", ig.SQUIB_RESISTANCE, "squibResistance");
   push(fields, "IGNITER_DETAILS.REMARKS", ig.REMARKS, "igniterRemarks");
 
   const n = data.NOZZLE_DETAILS as any;
-  push(fields, "NOZZLE_DETAILS.NOZZLE_CLOSURE_MATERIAL", n.NOZZLE_CLOSURE_MATERIAL, "nozzleClosureMaterial");
+  push(
+    fields,
+    "NOZZLE_DETAILS.NOZZLE_CLOSURE_MATERIAL",
+    n.NOZZLE_CLOSURE_MATERIAL,
+    "nozzleClosureMaterial",
+  );
   push(fields, "NOZZLE_DETAILS.MOTHER_GRAPHITE", n.MOTHER_GRAPHITE, "motherGraphite");
   push(fields, "NOZZLE_DETAILS.NOZZLE_INSERT", n.NOZZLE_INSERT, "nozzleInsert");
   push(fields, "NOZZLE_DETAILS.DT_BEFORE", n.DT_BEFORE, "dtBefore");
@@ -232,28 +287,76 @@ const resolveMainFields = (
 
   const t = data.TESTING_DETAILS as any;
   push(fields, "TESTING_DETAILS.THROAT_DIAMETER", t.THROAT_DIAMETER, "throatDiameter");
-  push(fields, "TESTING_DETAILS.PROPELLANT_WEIGHT", t.PROPELLANT_WEIGHT ?? t.WT_OF_PROPELLANT, "propellantWeight");
+  push(
+    fields,
+    "TESTING_DETAILS.PROPELLANT_WEIGHT",
+    t.PROPELLANT_WEIGHT ?? t.WT_OF_PROPELLANT,
+    "propellantWeight",
+  );
   push(fields, "TESTING_DETAILS.WEB_THICKNESS", t.WEB_THICKNESS, "webThickness");
   push(fields, "TESTING_DETAILS.N_VALUE", t.N_VALUE, "nValue");
-  push(fields, "TESTING_DETAILS.CONDITIONING_TEMP", t.CONDITIONING_TEMP, "testingCondTemp");
-  push(fields, "TESTING_DETAILS.AMBIENT_TEMP", t.AMBIENT_TEMP, "ambientTemp");
-  push(fields, "TESTING_DETAILS.RH", t.RH, "testingRh");
+  // MAIN UI keys (with BEM-style fallbacks for legacy/hydrated payloads)
+  push(
+    fields,
+    "TESTING_DETAILS.CONDITIONING_TEMPERATURE",
+    t.CONDITIONING_TEMPERATURE ?? t.CONDITIONING_TEMP,
+    "testingCondTemp",
+  );
+  push(
+    fields,
+    "TESTING_DETAILS.AMBIENT_TEMPERATURE",
+    t.AMBIENT_TEMPERATURE ?? t.AMBIENT_TEMP,
+    "ambientTemp",
+  );
+  push(fields, "TESTING_DETAILS.RH_PERCENT", t.RH_PERCENT ?? t.RH, "testingRh");
 
   (data.SENSOR_CONFIGURATION ?? []).forEach((row: any, i) => {
+    const hasData = [
+      row.SENSOR,
+      row.SENSITIVITY,
+      row.MAX_EXPECTED,
+      row.MAX_RANGE,
+      row.SENSOR_RANGE,
+      row.FILTER_HZ,
+      row.IA_NO,
+      row.IA_GAIN,
+      row.EXT_VOLTAGE,
+      row.EXT_V,
+      row.OFFSET_VALUE,
+      row.PRELOADING,
+    ].some((v) => str(v));
+    // Skip empty placeholder channels so they do not block SUBMIT
+    if (!hasData) return;
+
     push(fields, `SENSOR_CONFIGURATION.${i}.SENSOR`, row.SENSOR, "sensor");
     push(fields, `SENSOR_CONFIGURATION.${i}.SENSITIVITY`, row.SENSITIVITY, "sensitivity");
-    push(fields, `SENSOR_CONFIGURATION.${i}.MAX_RANGE`, row.MAX_RANGE, "maxRange");
+    push(
+      fields,
+      `SENSOR_CONFIGURATION.${i}.MAX_EXPECTED`,
+      row.MAX_EXPECTED ?? row.MAX_RANGE,
+      "maxRange",
+    );
     push(fields, `SENSOR_CONFIGURATION.${i}.SENSOR_RANGE`, row.SENSOR_RANGE, "sensorRange");
     push(fields, `SENSOR_CONFIGURATION.${i}.FILTER_HZ`, row.FILTER_HZ, "filterHz");
     push(fields, `SENSOR_CONFIGURATION.${i}.IA_NO`, row.IA_NO, "iaNo");
     push(fields, `SENSOR_CONFIGURATION.${i}.IA_GAIN`, row.IA_GAIN, "iaGain");
-    push(fields, `SENSOR_CONFIGURATION.${i}.EXT_V`, row.EXT_V ?? row.EXT_VOLTAGE, "extV");
+    push(
+      fields,
+      `SENSOR_CONFIGURATION.${i}.EXT_VOLTAGE`,
+      row.EXT_VOLTAGE ?? row.EXT_V,
+      "extV",
+    );
     push(fields, `SENSOR_CONFIGURATION.${i}.OFFSET_VALUE`, row.OFFSET_VALUE, "offsetValue");
     push(fields, `SENSOR_CONFIGURATION.${i}.PRELOADING`, row.PRELOADING, "preloading");
   });
 
   const r = (data as any).STATIC_TEST_RESULT ?? (data as any).RESULT_DETAILS ?? {};
-  push(fields, "STATIC_TEST_RESULT.AVERAGE_PRESSURE", r.AVERAGE_PRESSURE ?? r.AVG_PRESSURE, "avgPressure");
+  push(
+    fields,
+    "STATIC_TEST_RESULT.AVERAGE_PRESSURE",
+    r.AVERAGE_PRESSURE ?? r.AVG_PRESSURE,
+    "avgPressure",
+  );
   push(fields, "STATIC_TEST_RESULT.PEAK_PRESSURE", r.PEAK_PRESSURE, "peakPressure");
   push(fields, "STATIC_TEST_RESULT.TB", r.TB, "tb");
   push(fields, "STATIC_TEST_RESULT.BURN_RATE", r.BURN_RATE, "burnRate");
@@ -261,7 +364,12 @@ const resolveMainFields = (
   push(fields, "STATIC_TEST_RESULT.ISP", r.ISP, "isp");
 
   const pt = data.UPLOAD_PT_CURVE as any;
-  push(fields, "UPLOAD_PT_CURVE.PT_CURVE_FILE", pt?.PT_CURVE_FILE ?? pt?.PT_CURVE_UPLOAD, "ptCurve");
+  push(
+    fields,
+    "UPLOAD_PT_CURVE.PT_CURVE_FILE",
+    pt?.PT_CURVE_FILE ?? pt?.PT_CURVE_UPLOAD,
+    "ptCurve",
+  );
 };
 
 export const stfValidationConfig: SubDeptValidationConfig<StfValidationTarget> = {
@@ -284,21 +392,21 @@ export const stfValidationConfig: SubDeptValidationConfig<StfValidationTarget> =
 
     return fields;
   },
-  customRules: [
-    (motor, tier, errors) => {
-      if (tier !== "SUBMIT") return;
-      const data = motor.stfData;
-      if (!data || data.variant !== "BEM") return;
-      const from = str((data as StfBemMotorData).CONDITIONING_DETAILS.FROM_DATE_TIME);
-      const to = str((data as StfBemMotorData).CONDITIONING_DETAILS.TO_DATE_TIME);
-      if (!from || !to) return;
-      const t0 = Date.parse(from);
-      const t1 = Date.parse(to);
-      if (Number.isFinite(t0) && Number.isFinite(t1) && t1 < t0) {
-        errors["CONDITIONING_DETAILS.TO_DATE_TIME"] = S.INVALID;
-      }
-    },
-  ],
+  // customRules: [
+  //   (motor, tier, errors) => {
+  //     if (tier !== "SUBMIT") return;
+  //     const data = motor.stfData;
+  //     if (!data || data.variant !== "BEM") return;
+  //     const from = str((data as StfBemMotorData).CONDITIONING_DETAILS.FROM_DATE_TIME);
+  //     const to = str((data as StfBemMotorData).CONDITIONING_DETAILS.TO_DATE_TIME);
+  //     if (!from || !to) return;
+  //     const t0 = Date.parse(from);
+  //     const t1 = Date.parse(to);
+  //     if (Number.isFinite(t0) && Number.isFinite(t1) && t1 < t0) {
+  //       errors["CONDITIONING_DETAILS.TO_DATE_TIME"] = S.INVALID;
+  //     }
+  //   },
+  // ],
   isUnitComplete: (motor) => Boolean(str(motor.motorId) && str(motor.stfTestNo)),
 };
 

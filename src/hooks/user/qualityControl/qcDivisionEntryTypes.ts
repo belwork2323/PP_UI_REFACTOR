@@ -48,6 +48,8 @@ export type QcDivisionEntry = {
   processSlot?: QcProcessingProcessSlot;
   /** Cache key for RAW_MATERIALS schema in schemasByKey. */
   schemaCacheKey?: string;
+  /** True when RMP schema fetch failed — UI shows weighment fallback instead. */
+  schemaUnavailable?: boolean;
   /** Sections from the details API grouped into this entry (used for hydration). */
   savedSections?: SchemaSectionSubmission[];
 };

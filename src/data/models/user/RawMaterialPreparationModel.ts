@@ -170,6 +170,13 @@ export type RawMaterialPreparationSubmitResponse = {
 export type RawMaterialPrepWeightmentDetail = {
   materialCode: string;
   materialName: string;
+  /** Premix this row belongs to — weighment is per material × premix. */
+  premixNo?: number | null;
+  /**
+   * Stable UI scope for per-material tabs. Lets users edit `materialCode` without
+   * the row disappearing from the active material filter. Not sent to API.
+   */
+  scopeMaterialCode?: string | null;
   percentage: string;
   weightTransferred: string;
   containerType: string;
@@ -188,15 +195,20 @@ export type RawMaterialPrepWeightmentSheet = {
   };
 };
 
-export const createEmptyWeightmentDetail = (): RawMaterialPrepWeightmentDetail => ({
+export const createEmptyWeightmentDetail = (
+  seed?: Partial<RawMaterialPrepWeightmentDetail>,
+): RawMaterialPrepWeightmentDetail => ({
   materialCode: "",
   materialName: "",
+  premixNo: null,
+  scopeMaterialCode: null,
   percentage: "",
   weightTransferred: "",
   containerType: "",
   containerNumber: "",
   weighScaleNumber: "",
   weighingDateTime: "",
+  ...seed,
 });
 
 export const createEmptyWeightmentSheet = (): RawMaterialPrepWeightmentSheet => ({
@@ -249,20 +261,30 @@ const unwrapApiScalar = (value: unknown): unknown => {
 
 const mapWeightmentDetailFromApi = (
   row: Record<string, unknown>,
-): RawMaterialPrepWeightmentDetail => ({
-  materialCode: String(row.materialCode ?? ""),
-  materialName: String(row.materialName ?? row.materialCode ?? ""),
-  percentage:
-    unwrapApiScalar(row.percentage) != null ? String(unwrapApiScalar(row.percentage)) : "",
-  weightTransferred:
-    unwrapApiScalar(row.weightTransferred) != null
-      ? String(unwrapApiScalar(row.weightTransferred))
-      : "",
-  containerType: String(row.containerType ?? ""),
-  containerNumber: String(row.containerNumber ?? ""),
-  weighScaleNumber: String(row.weighScaleNumber ?? ""),
-  weighingDateTime: formatDateTimeLocal(row.weighingDateTime),
-});
+): RawMaterialPrepWeightmentDetail => {
+  const premixRaw = row.premixNo ?? row.premix_no;
+  const premixNo =
+    premixRaw == null || premixRaw === ""
+      ? null
+      : Number.isFinite(Number(premixRaw))
+        ? Number(premixRaw)
+        : null;
+  return {
+    materialCode: String(row.materialCode ?? ""),
+    materialName: String(row.materialName ?? row.materialCode ?? ""),
+    premixNo,
+    percentage:
+      unwrapApiScalar(row.percentage) != null ? String(unwrapApiScalar(row.percentage)) : "",
+    weightTransferred:
+      unwrapApiScalar(row.weightTransferred) != null
+        ? String(unwrapApiScalar(row.weightTransferred))
+        : "",
+    containerType: String(row.containerType ?? ""),
+    containerNumber: String(row.containerNumber ?? ""),
+    weighScaleNumber: String(row.weighScaleNumber ?? ""),
+    weighingDateTime: formatDateTimeLocal(row.weighingDateTime),
+  };
+};
 
 export const mapWeightmentSheetFromApi = (value: unknown): RawMaterialPrepWeightmentSheet => {
   if (!value || typeof value !== "object") return createEmptyWeightmentSheet();
@@ -289,34 +311,42 @@ export const mapWeightmentSheetToApi = (
 ) => {
   if (!sheet) return {};
 
-  const rows = (sheet.weightmentDetails ?? []).filter(
-    (row) =>
-      row.materialCode.trim() ||
-      row.materialName.trim() ||
-      row.weightTransferred.trim() ||
-      row.percentage.trim(),
-  );
+  const rows = (sheet.weightmentDetails ?? []).filter((row) => {
+    const code = String(row.materialCode ?? "").trim();
+    const name = String(row.materialName ?? "").trim();
+    const weight = String(row.weightTransferred ?? "").trim();
+    const percentage = String(row.percentage ?? "").trim();
+    return Boolean(code || name || weight || percentage);
+  });
 
-  if (!sheet.mixerBuildingNumber.trim() && rows.length === 0) {
+  const mixer = String(sheet.mixerBuildingNumber ?? "").trim();
+  if (!mixer && rows.length === 0) {
     return {};
   }
 
   return {
-    mixerBuildingNumber: sheet.mixerBuildingNumber.trim() || null,
+    mixerBuildingNumber: mixer || null,
     weightmentDetails: rows.map((row) => ({
-      materialCode: row.materialCode.trim(),
-      materialName: row.materialName.trim() || row.materialCode.trim(),
-      percentage: row.percentage.trim() ? Number(row.percentage) : null,
-      weightTransferred: row.weightTransferred.trim() ? Number(row.weightTransferred) : null,
-      containerType: row.containerType.trim() || null,
-      containerNumber: row.containerNumber.trim() || null,
-      weighScaleNumber: row.weighScaleNumber.trim() || null,
+      materialCode: String(row.materialCode ?? "").trim(),
+      materialName:
+        String(row.materialName ?? "").trim() || String(row.materialCode ?? "").trim(),
+      ...(row.premixNo != null && Number.isFinite(Number(row.premixNo))
+        ? { premixNo: Number(row.premixNo) }
+        : {}),
+      percentage: String(row.percentage ?? "").trim() ? Number(row.percentage) : null,
+      weightTransferred: String(row.weightTransferred ?? "").trim()
+        ? Number(row.weightTransferred)
+        : null,
+      containerType: String(row.containerType ?? "").trim() || null,
+      containerNumber: String(row.containerNumber ?? "").trim() || null,
+      weighScaleNumber: String(row.weighScaleNumber ?? "").trim() || null,
       weighingDateTime: formatDateTimeForApi(row.weighingDateTime),
+      // scopeMaterialCode is UI-only — intentionally omitted from API payload
     })),
     validation: {
-      compareWithIdentificationSheet: sheet.validation.compareWithIdentificationSheet,
-      deviationFound: sheet.validation.deviationFound,
-      deviationMessage: sheet.validation.deviationMessage.trim() || null,
+      compareWithIdentificationSheet: sheet.validation.compareWithIdentificationSheet === true,
+      deviationFound: sheet.validation.deviationFound === true,
+      deviationMessage: String(sheet.validation.deviationMessage ?? "").trim() || null,
     },
   };
 };

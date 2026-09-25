@@ -1,6 +1,18 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
-import { alpha, Box, Button, Chip, CircularProgress, IconButton, MenuItem, Stack, TextField, Tooltip, Typography } from "@mui/material";
+import {
+  alpha,
+  Box,
+  Button,
+  Chip,
+  CircularProgress,
+  IconButton,
+  MenuItem,
+  Stack,
+  TextField,
+  Tooltip,
+  Typography,
+} from "@mui/material";
 import { icons } from "../../../../../app/theme/icons";
 import IconText from "../../../../components/common/IconText";
 import FilterPanelHeader from "@ui/components/common/FilterPanelHeader";
@@ -15,7 +27,11 @@ import UserWorkflowStatusCell from "../../../../components/custom/UserWorkflowSt
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import { useThemeStore } from "../../../../../app/store/themeStore";
 import getSourcingTheme from "../../../../../app/theme/custom_themes/user/sourcing/sourcing_theme";
-import { getOperationStatusConfig, OPERATION_STATUS, SOURCING_LOT_STATUS_FILTER_VALUES } from "../../../../../hooks/operationStatus";
+import {
+  getOperationStatusConfig,
+  OPERATION_STATUS,
+  SOURCING_LOT_STATUS_FILTER_VALUES,
+} from "../../../../../hooks/operationStatus";
 import { STRINGS } from "../../../../../app/config/strings";
 import {
   canDeleteRocketMotorCasing,
@@ -99,11 +115,19 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
   const [draftStatus, setDraftStatus] = useState(FILTER_ALL);
 
   const syncDraftsFromApplied = useCallback(() => {
-    setDraftProjectId(advancedFilters.projectIds.length === 1 ? advancedFilters.projectIds[0]! : FILTER_ALL);
-    setDraftMotorStage(advancedFilters.motorStages.length === 1 ? advancedFilters.motorStages[0]! : FILTER_ALL);
-    setDraftCasingType(advancedFilters.casingTypes.length === 1 ? advancedFilters.casingTypes[0]! : FILTER_ALL);
+    setDraftProjectId(
+      advancedFilters.projectIds.length === 1 ? advancedFilters.projectIds[0]! : FILTER_ALL,
+    );
+    setDraftMotorStage(
+      advancedFilters.motorStages.length === 1 ? advancedFilters.motorStages[0]! : FILTER_ALL,
+    );
+    setDraftCasingType(
+      advancedFilters.casingTypes.length === 1 ? advancedFilters.casingTypes[0]! : FILTER_ALL,
+    );
     setDraftInsulationType(
-      advancedFilters.insulationTypes.length === 1 ? advancedFilters.insulationTypes[0]! : FILTER_ALL
+      advancedFilters.insulationTypes.length === 1
+        ? advancedFilters.insulationTypes[0]!
+        : FILTER_ALL,
     );
     setDraftFrom(advancedFilters.fromDate);
     setDraftTo(advancedFilters.toDate);
@@ -136,10 +160,7 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
     [theme],
   );
 
-  const statusTabs = useMemo(
-    () => [FILTER_ALL, ...SOURCING_LOT_STATUS_FILTER_VALUES],
-    [],
-  );
+  const statusTabs = useMemo(() => [FILTER_ALL, ...SOURCING_LOT_STATUS_FILTER_VALUES], []);
 
   const filterToggleSx = useMemo(() => {
     const pl = theme.palette.primaryLight;
@@ -210,7 +231,7 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         "& .MuiChip-label": { px: 1.5 },
       },
     }),
-    [theme.palette]
+    [theme.palette],
   );
 
   const formatListDate = (v: string) => {
@@ -240,9 +261,7 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
             <Box sx={theme.batchList.projectCell}>
               <icons.batchMgmt.projectId sx={theme.batchList.projectIcon} />
               <Box sx={theme.batchList.projectInfo}>
-                <Typography sx={theme.batchList.projectName}>
-                  {projectName || "—"}
-                </Typography>
+                <Typography sx={theme.batchList.projectName}>{projectName || "—"}</Typography>
                 <Typography sx={theme.batchList.projectId}>{projectId || "—"}</Typography>
               </Box>
             </Box>
@@ -266,13 +285,17 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         key: "casingType",
         label: STRINGS.SOURCING.BATCH_LIST.COL_CASING_TYPE,
         align: "center",
-        render: (v: string) => <Chip label={v || "—"} size="small" sx={theme.batchList.batchTypeChip} />,
+        render: (v: string) => (
+          <Chip label={v || "—"} size="small" sx={theme.batchList.batchTypeChip} />
+        ),
       },
       {
         key: "insulationType",
         label: STRINGS.SOURCING.BATCH_LIST.COL_INSULATION_TYPE,
         align: "center",
-        render: (v: string) => <Chip label={v || "—"} size="small" sx={theme.batchList.batchTypeChip} />,
+        render: (v: string) => (
+          <Chip label={v || "—"} size="small" sx={theme.batchList.batchTypeChip} />
+        ),
       },
       {
         key: "createdBy.fullName",
@@ -311,7 +334,7 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         ),
       },
     ],
-    [statusConfig, theme]
+    [statusConfig, theme],
   );
 
   const handleApplyPanelFilters = () => {
@@ -421,7 +444,9 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
               },
             }}
           >
-            <MenuItem value={FILTER_ALL}>{STRINGS.SOURCING.BATCH_LIST.FILTERS_ALL_PROJECTS}</MenuItem>
+            <MenuItem value={FILTER_ALL}>
+              {STRINGS.SOURCING.BATCH_LIST.FILTERS_ALL_PROJECTS}
+            </MenuItem>
             {!projectsLoading &&
               projectOptions.map((p: { projectId: string; projectName: string }) => (
                 <MenuItem key={p.projectId} value={p.projectId}>
@@ -504,7 +529,9 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
             },
           }}
         >
-          <MenuItem value={FILTER_ALL}>{STRINGS.SOURCING.BATCH_LIST.FILTERS_ALL_CASING_TYPES}</MenuItem>
+          <MenuItem value={FILTER_ALL}>
+            {STRINGS.SOURCING.BATCH_LIST.FILTERS_ALL_CASING_TYPES}
+          </MenuItem>
           {CASING_TYPES.map((t) => (
             <MenuItem key={t} value={t}>
               {t}
@@ -533,7 +560,9 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
             },
           }}
         >
-          <MenuItem value={FILTER_ALL}>{STRINGS.SOURCING.BATCH_LIST.FILTERS_ALL_INSULATION}</MenuItem>
+          <MenuItem value={FILTER_ALL}>
+            {STRINGS.SOURCING.BATCH_LIST.FILTERS_ALL_INSULATION}
+          </MenuItem>
           {INSULATION_TYPES.map((t) => (
             <MenuItem key={t} value={t}>
               {t}
@@ -564,7 +593,7 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         >
           {STATUS_DROPDOWN_VALUES.map((s) => (
             <MenuItem key={s} value={s}>
-              {s === FILTER_ALL ? FILTER_ALL : statusConfig[s]?.label ?? s}
+              {s === FILTER_ALL ? FILTER_ALL : (statusConfig[s]?.label ?? s)}
             </MenuItem>
           ))}
         </TextField>
@@ -590,10 +619,20 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
       </Stack>
 
       <Stack direction="row" justifyContent="flex-end" spacing={1}>
-        <Button variant="outlined" size="small" onClick={() => setFilterOpen(false)} sx={{ textTransform: "none", fontWeight: 700 }}>
+        <Button
+          variant="outlined"
+          size="small"
+          onClick={() => setFilterOpen(false)}
+          sx={{ textTransform: "none", fontWeight: 700 }}
+        >
           {STRINGS.SOURCING.BATCH_LIST.FILTERS_CLOSE_PANEL}
         </Button>
-        <Button variant="contained" size="small" onClick={handleApplyPanelFilters} sx={{ ...theme.batchList.action.primary, textTransform: "none" }}>
+        <Button
+          variant="contained"
+          size="small"
+          onClick={handleApplyPanelFilters}
+          sx={{ ...theme.batchList.action.primary, textTransform: "none" }}
+        >
           {STRINGS.SOURCING.BATCH_LIST.FILTERS_APPLY}
         </Button>
       </Stack>
@@ -626,9 +665,7 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         onSearchChange={setSearch}
         onStatusFilterChange={setStatusFilter}
         isLoading={loading || isRefreshing}
-        loadingMessage={
-          isRefreshing ? STRINGS.SOURCING.BATCH_LIST.REFRESHING_MESSAGE : undefined
-        }
+        loadingMessage={isRefreshing ? STRINGS.SOURCING.BATCH_LIST.REFRESHING_MESSAGE : undefined}
         searchBarEnd={searchBarEnd}
         filterExtension={filterExtension}
         statusToolbarEnd={
@@ -641,7 +678,11 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
         renderAction={(row: any) => (
           <Stack direction="row" alignItems="center" spacing={0.75} flexWrap="nowrap">
             {canViewCasingDetails(row.rmStatus) ? (
-              <Tooltip title={STRINGS.SOURCING.BATCH_LIST.VIEW_CASING_DETAILS_TOOLTIP} arrow placement="top">
+              <Tooltip
+                title={STRINGS.SOURCING.BATCH_LIST.VIEW_CASING_DETAILS_TOOLTIP}
+                arrow
+                placement="top"
+              >
                 <IconButton
                   size="small"
                   onClick={() => handleViewCasingDetails(row)}
@@ -670,7 +711,11 @@ const RocketMotorBatchList = ({ hookState, rowsPerPageOptions }: any) => {
               />
             )}
             {canDeleteRocketMotorCasing(row.rmStatus) && (
-              <Tooltip title={STRINGS.SOURCING.BATCH_LIST.DELETE_CASING_TOOLTIP} arrow placement="top">
+              <Tooltip
+                title={STRINGS.SOURCING.BATCH_LIST.DELETE_CASING_TOOLTIP}
+                arrow
+                placement="top"
+              >
                 <IconButton
                   size="small"
                   onClick={() => handleDeleteCasingFromList(row)}

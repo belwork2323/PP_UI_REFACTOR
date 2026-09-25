@@ -4,6 +4,7 @@ import {
   createMasterData,
   updateMasterData,
   deleteMasterData,
+  enableMasterData,
 } from "@data/api/admin/MasterData/masterDataApi";
 import {
   MasterDataListModel,
@@ -61,6 +62,15 @@ export const masterDataController = {
   disable: async (type: string, id: number) => {
     try {
       const resp = await deleteMasterData(type, { id });
+      return new ApiResponseModel(resp);
+    } catch (error) {
+      return new ApiResponseModel<null>(error);
+    }
+  },
+
+  enable: async (type: string, id: number) => {
+    try {
+      const resp = await enableMasterData(type, { id });
       return new ApiResponseModel(resp);
     } catch (error) {
       return new ApiResponseModel<null>(error);

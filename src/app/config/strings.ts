@@ -1460,10 +1460,12 @@ export const STRINGS = {
       WEIGHTMENT_IDENTIFICATION_LOAD_FAILED: "Unable to load identification sheet.",
       WEIGHTMENT_IDENTIFICATION_EMPTY: "No identification sheet data found for this batch.",
       WEIGHTMENT_MATERIAL_NOT_IN_SHEET: "Material is not listed on the batch identification sheet.",
+      WEIGHTMENT_NAME_MISMATCH: (expected: string) =>
+        `Value mismatch with identification sheet (${expected}).`,
       WEIGHTMENT_PERCENTAGE_MISMATCH: (expected: number) =>
-        `Percentage must match identification sheet (${expected}%).`,
+        `Value mismatch with identification sheet (${expected}%).`,
       WEIGHTMENT_WEIGHT_MISMATCH: (expected: number) =>
-        `Weight must match identification sheet (${expected} kg).`,
+        `Value mismatch with identification sheet (${expected} kg).`,
       WEIGHTMENT_EXPECTED_HINT: (percentage: number, weightKg: number) =>
         `Identification sheet: ${percentage}% · ${weightKg} kg per premix`,
       WEIGHTMENT_DEVIATION_MESSAGE_REQUIRED:
@@ -1485,7 +1487,7 @@ export const STRINGS = {
       WEIGHTMENT_PLACEHOLDER_WEIGHT: "Weight in kg",
       WEIGHTMENT_PLACEHOLDER_CONTAINER_NO: "Container number",
       WEIGHTMENT_PLACEHOLDER_WEIGH_SCALE: "Scale number",
-      WEIGHTMENT_PLACEHOLDER_MIXER_BUILDING: "Enter mixer building number",
+      WEIGHTMENT_PLACEHOLDER_MIXER_BUILDING: "Select mixer building",
       WEIGHTMENT_DEVIATION_FOUND: "Deviation found",
       WEIGHTMENT_DEVIATION_MESSAGE: "Deviation message",
       PREMIX_STATUS_TO_BE_INITIATED: "To Be Initiated",
@@ -2202,8 +2204,7 @@ export const STRINGS = {
       VIEW_DETAILS: "View Details",
       VIEW_DETAILS_TOOLTIP: "View completed details",
       FORM_TITLE: "Post-Cure Operations",
-      FORM_SUBTITLE:
-        "Select a motor tab, enter received date & time, then load the form",
+      FORM_SUBTITLE: "Select a motor tab, enter received date & time, then load the form",
       PANEL_TITLE: "Post-Cure Setup",
       MOTOR_ID_LABEL: "Select Motor Id No.",
       MOTOR_ID_PLACEHOLDER: "Choose motor ID",
@@ -2231,8 +2232,7 @@ export const STRINGS = {
       LOAD_FORM: "Load Post Cure Form",
       ADD_MOTOR_ACTION: "Add Motor",
       MOTOR_NAV_TITLE: "Motor Navigation",
-      MOTOR_NAV_HINT:
-        "Select a motor tab, enter received date & time, then load the form.",
+      MOTOR_NAV_HINT: "Select a motor tab, enter received date & time, then load the form.",
       BATCH_MOTOR_DETAILS_MISSING:
         "Motor details are missing from the batch identification sheet. Complete the identification sheet before filling this form.",
       MOTOR_CARD_TITLE: "Motor",
@@ -2267,8 +2267,7 @@ export const STRINGS = {
       EMPTY_FORM_ERROR: "Add at least one value before saving or submitting.",
       SUBMIT_VALIDATION_FAILED:
         "Complete all required fields before submitting. Check the Loose Flap and Inhibition tabs for highlighted errors.",
-      DRAFT_VALIDATION_FAILED:
-        "Fix the highlighted field errors before saving the draft.",
+      DRAFT_VALIDATION_FAILED: "Fix the highlighted field errors before saving the draft.",
       CREATE_FAILED: "Failed to create post-cure form.",
       UPDATE_FAILED: "Failed to update post-cure form.",
       CREATE_DRAFT_SUCCESS: "Post-cure form saved as draft successfully.",
@@ -2661,8 +2660,7 @@ export const STRINGS = {
       EMPTY_FORM_ERROR: "Add at least one QC value before saving or submitting.",
       DRAFT_VALIDATION_FAILED: "Cannot save draft. Fix the validation errors first.",
       SUBMIT_VALIDATION_FAILED: "Cannot submit. Fix the validation errors first.",
-      DIVISION_VALIDATION_FAILED:
-        "Cannot submit division. Fix the validation errors first.",
+      DIVISION_VALIDATION_FAILED: "Cannot submit division. Fix the validation errors first.",
       CREATE_DRAFT_SUCCESS: "Quality Control draft saved successfully.",
       UPDATE_DRAFT_SUCCESS: "Quality Control draft updated successfully.",
       CREATE_SUBMIT_SUCCESS: "Quality Control record submitted for approval successfully.",
@@ -2822,6 +2820,9 @@ export const STRINGS = {
       MATERIAL_NAV_COUNTER: "Material {current} of {total}",
       PROCESSING_NO_MATERIALS_MESSAGE:
         "No materials were found for this premix in division details.",
+      SCHEMA_UNAVAILABLE_FOR_MATERIAL: "Schema unavailable for this material",
+      WEIGHTMENT_FALLBACK_EMPTY:
+        "No weighment details are available for this material in division details.",
       SUBDIVISION_NAV_TITLE: "Subdivision Navigation",
       SUBDIVISION_NAV_HINT:
         "Click any subdivision tab below to switch between added entries and continue filling details.",
@@ -3777,6 +3778,7 @@ export const STRINGS = {
       EMPTY: "No master data records found",
       COL_CODE: "Code",
       COL_NAME: "Name",
+      PROJECT: "Project Name",
       COL_ACTIVE: "Active",
       COL_CREATED_BY: "Created By",
       COL_CREATED_ON: "Created On",
@@ -3789,6 +3791,7 @@ export const STRINGS = {
       VIEW: "View",
       ENABLE: "Enable",
       DISABLE: "Disable",
+      DELETE: "Delete",
     },
     MATERIALS: {
       SEARCH_PLACEHOLDER: "Search by code or name…",
@@ -3807,30 +3810,56 @@ export const STRINGS = {
       GRADES_LOCKED_HINT: "Clear top-level specifications to add grades.",
       SPECS_LOCKED_HINT: "Clear grades to add top-level specifications.",
     },
+    MOTOR_STAGES: {
+      PROJECT_FILTER_LABEL: "Project",
+      PROJECT_FILTER_PLACEHOLDER: "All projects",
+      MOTOR_STAGE_FILTER_LABEL: "Motor stage",
+      MOTOR_STAGE_FILTER_PLACEHOLDER: "All stages",
+      DELETE_TOOLTIP: "Delete disabled motor stage",
+      DELETE_DIALOG_TITLE: "Delete motor stage?",
+      DELETE_DIALOG_BODY: (name: string) =>
+        `Permanently delete "${name}"? This cannot be undone.`,
+      DELETE_CONFIRM: "Delete",
+      DELETING: "Deleting…",
+    },
     DIMENSIONAL_PARAMETERS: {
       SEARCH_PLACEHOLDER: "Search by parameter name…",
+      PROJECT_FILTER_LABEL: "Project",
+      PROJECT_FILTER_PLACEHOLDER: "All projects",
+      PROJECT_SELECT_PLACEHOLDER: "Select project",
+      PROJECT_SELECT_FIRST_HINT: "Select a project above, then a motor stage.",
       MOTOR_STAGE_FILTER_LABEL: "Motor stage",
       MOTOR_STAGE_FILTER_PLACEHOLDER: "All stages",
       MOTOR_STAGE_FILTER_ALL: "All stages",
       MOTOR_STAGE_SELECT_PLACEHOLDER: "Select motor stage",
       MOTOR_STAGE_SELECT_FIRST_HINT: "Select a motor stage above to add parameters.",
       COL_NAME: "Parameter name",
+      COL_PROJECT: "Project",
       COL_MOTOR_STAGE: "Motor stage",
       COL_MIN: "Min value",
       COL_MAX: "Max value",
       COL_UNIT: "Unit",
       COL_RANGE: "Reference range",
       CREATE_TITLE: "Add dimensional parameters",
-      CREATE_SUBTITLE: "Select a motor stage, then add one or more parameters for that stage.",
+      CREATE_SUBTITLE:
+        "Select a project and motor stage, then add one or more parameters for that stage.",
       EDIT_TITLE: "Manage motor stage parameters",
       EDIT_SUBTITLE: (stageLabel: string) =>
-        `${stageLabel}: existing parameters can only be enabled or disabled. Add new parameters below.`,
+        `${stageLabel}: enable or disable existing parameters immediately. Add new parameters below, then Save.`,
       EXISTING_PARAMETER_LABEL: "Existing parameter",
       VIEW_TITLE: "Dimensional parameter details",
-      VIEW_SUBTITLE: (name: string) => `Parameter: ${name}`,
+      VIEW_SUBTITLE: (name: string) => `Stage parameters: ${name}`,
+      VIEW_PARAMETERS: "Parameters",
+      VIEW_NO_PARAMETERS: "No parameters defined for this project and motor stage.",
       ADD_PARAMETER: "Add parameter",
       REMOVE_PARAMETER: "Remove parameter",
       PARAMETER_ROW_LABEL: (index: number) => `Parameter #${index}`,
+      DELETE_TOOLTIP: "Delete disabled parameter",
+      DELETE_DIALOG_TITLE: "Delete dimensional parameter?",
+      DELETE_DIALOG_BODY: (name: string) =>
+        `Permanently delete "${name}"? This cannot be undone.`,
+      DELETE_CONFIRM: "Delete",
+      DELETING: "Deleting…",
     },
     INSULATION_SPEC: {
       COL_INSULATION_TYPE: "Insulation Type",
@@ -3874,17 +3903,22 @@ export const STRINGS = {
       PARAM_UNIT: "Unit",
     },
     CURING_CYCLES: {
-      SEARCH_PLACEHOLDER: "Search by code, stage, or curing type…",
+      SEARCH_PLACEHOLDER: "Search by code, project, stage, or curing type…",
+      PROJECT_FILTER_LABEL: "Project",
+      PROJECT_FILTER_PLACEHOLDER: "All projects",
+      PROJECT_SELECT_PLACEHOLDER: "Select project",
+      PROJECT_SELECT_FIRST_HINT: "Select a project above, then a motor stage.",
       MOTOR_STAGE_FILTER_LABEL: "Motor stage",
       MOTOR_STAGE_FILTER_PLACEHOLDER: "All stages",
       MOTOR_STAGE_SELECT_PLACEHOLDER: "Select motor stage",
       CURING_TYPE_SELECT_PLACEHOLDER: "Select curing type",
       COL_CODE: "Code",
+      COL_PROJECT: "Project",
       COL_MOTOR_STAGE: "Motor stage",
       COL_CURING_TYPE: "Curing type",
       COL_STEPS: "Steps",
       LABEL_SHOW_PRESSURE: "Show pressure",
-      CREATE_SUBTITLE: "Select motor stage and curing type, then define cycle steps.",
+      CREATE_SUBTITLE: "Select project and motor stage, then curing type and cycle steps.",
       EDIT_SUBTITLE: (name: string) => `Updating: ${name}`,
       EDIT_NESTED_HINT:
         "Existing steps cannot be changed or removed. Add new steps below or toggle active state.",
@@ -3897,28 +3931,45 @@ export const STRINGS = {
       STEP_TEMPERATURE: "Temperature",
       STEP_DURATION: "Duration (min)",
       STEP_PRESSURE: "Pressure",
+      DELETE_TOOLTIP: "Delete disabled curing cycle",
+      DELETE_DIALOG_TITLE: "Delete curing cycle?",
+      DELETE_DIALOG_BODY: (name: string) =>
+        `Permanently delete "${name}"? This cannot be undone.`,
+      DELETE_CONFIRM: "Delete",
+      DELETING: "Deleting…",
     },
     MIXING_CYCLES: {
-      SEARCH_PLACEHOLDER: "Search by code or name…",
+      SEARCH_PLACEHOLDER: "Search by code, name, project, or stage…",
+      PROJECT_FILTER_LABEL: "Project",
+      PROJECT_FILTER_PLACEHOLDER: "All projects",
+      PROJECT_SELECT_PLACEHOLDER: "Select project",
+      PROJECT_SELECT_FIRST_HINT: "Select a project above, then a motor stage.",
       MOTOR_STAGE_FILTER_LABEL: "Motor stage",
       MOTOR_STAGE_FILTER_PLACEHOLDER: "All stages",
       MOTOR_STAGE_SELECT_PLACEHOLDER: "Select motor stage",
       AUTO_CODE_HINT: "Code is auto-generated (MC-{id})",
       COL_CODE: "Code",
       COL_NAME: "Name",
+      COL_PROJECT: "Project",
       COL_MOTOR_STAGE: "Motor stage",
       COL_OPERATIONS: "Operations",
-      CREATE_SUBTITLE: "Select motor stage and define premix and final mix operations.",
+      CREATE_SUBTITLE:
+        "Select project and motor stage, then define premix/final mix operations and quality checks.",
       EDIT_SUBTITLE: (name: string) => `Updating: ${name}`,
       EDIT_NESTED_HINT:
-        "Existing operations cannot be changed or removed. Add new operations below.",
+        "Existing operations and quality-check parameters cannot be changed or removed. Add new ones below.",
       VIEW_TITLE: "Mixing cycle details",
       VIEW_SUBTITLE: (name: string) => `Mixing cycle: ${name}`,
       VIEW_PREMIX: "Premix operations",
       VIEW_FINAL_MIX: "Final mix operations",
+      VIEW_PREMIX_QC: "Premix quality checks",
+      VIEW_FINAL_MIX_QC: "Final mix quality checks",
       VIEW_NO_OPERATIONS: "No operations defined.",
+      VIEW_NO_QUALITY_CHECKS: "No quality checks defined.",
       PREMIX_OPERATIONS: "Premix operations",
+      PREMIX_QUALITY_CHECKS: "Premix quality checks",
       FINAL_MIX_OPERATIONS: "Final mix operations",
+      FINAL_MIX_QUALITY_CHECKS: "Final mix quality checks",
       ADD_OPERATION: "Add operation",
       REMOVE_OPERATION: "Remove operation",
       EXISTING_OPERATION_LABEL: "Existing operation",
@@ -3967,6 +4018,8 @@ export const STRINGS = {
       DISABLE_SUCCESS: "Master record disabled successfully",
       ENABLING: "Enabling master record…",
       ENABLE_SUCCESS: "Master record enabled successfully",
+      DELETING: "Deleting master record…",
+      DELETE_SUCCESS: "Master record deleted permanently",
     },
     ERRORS: {
       LOAD_TYPES_FAILED: "Failed to load master data types",
@@ -3975,7 +4028,7 @@ export const STRINGS = {
     },
   },
 
-    /* -------- ADMIN EXPLORE BLOCKCHAIN -------- */
+  /* -------- ADMIN EXPLORE BLOCKCHAIN -------- */
   BLOCKCHAIN_EXPLORER: {
     PAGE: {
       TITLE: "Explore Blockchain",

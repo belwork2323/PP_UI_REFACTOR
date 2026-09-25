@@ -27,13 +27,18 @@ export type QcPropellantValidationTarget = {
 };
 
 export const qcPropellantValidationFields: Record<string, FieldRuleConfig> = {
+  // Mandatory on SUBMIT only — draft/save uses FORMAT (no required checks)
   specification: number(["SUBMIT"]),
+  /** At least one FM sample value per row. */
   fmValue: number(["SUBMIT"]),
+  /** Extra FM columns beyond the first filled sample — format only. */
+  fmValueOptional: number([]),
   avg: number(["SUBMIT"]),
   stdDev: number(["SUBMIT"]),
   remarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   ballisticSpec: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
-  ballisticValue: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  // Ballistic FM/BEM cells are optional notes-style values (UI has no required asterisks)
+  ballisticValue: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 };
 
 const asRecord = (v: unknown): Record<string, unknown> | null =>
@@ -44,6 +49,19 @@ const asArray = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
 const isFmColumn = (key: string) =>
   /^FM[_-]?\d+/i.test(key) || /^BEM/i.test(key) || key.startsWith("FM_");
 
+/** `MECHANICAL_PROPERTIES::MECHANICAL_PROPERTIES` → `MECHANICAL_PROPERTIES` (matches panel error paths). */
+const sectionPathId = (formKey: string): string => {
+  if (formKey.includes("::")) return formKey.split("::")[0] || formKey;
+  return formKey;
+};
+
+const sortFmCols = (cols: string[]) =>
+  [...cols].sort((a, b) => {
+    const na = Number(String(a).match(/\d+/)?.[0] ?? 0);
+    const nb = Number(String(b).match(/\d+/)?.[0] ?? 0);
+    return na - nb || a.localeCompare(b);
+  });
+
 export const qcPropellantValidationConfig: SubDeptValidationConfig<QcPropellantValidationTarget> = {
   id: "qc-propellant",
   fields: qcPropellantValidationFields,
@@ -51,84 +69,77 @@ export const qcPropellantValidationConfig: SubDeptValidationConfig<QcPropellantV
     const values = asRecord(target.values) ?? {};
     const fields: Array<{ path: string; value: unknown; ruleKey: string }> = [];
 
-    const walkSection = (sectionKey: string, sectionVal: unknown) => {
-      const section = asRecord(sectionVal);
-      if (!section) return;
-
-      // Property-style rows
-      for (const [key, val] of Object.entries(section)) {
-        const arr = asArray(val);
-        if (!arr.length) continue;
-        const sample = asRecord(arr[0]);
-        if (!sample) continue;
-
-        if ("PROPERTY" in sample || "SPECIFICATION" in sample) {
-          arr.forEach((item, i) => {
-            const row = asRecord(item) ?? {};
-            if (row.kind === "mean" || row.kind === "std") return;
-            const base = `${sectionKey}.${key}.${i}`;
-            fields.push({
-              path: `${base}.SPECIFICATION`,
-              value: row.SPECIFICATION,
-              ruleKey: "specification",
-            });
-            Object.keys(row).forEach((col) => {
-              if (isFmColumn(col)) {
-                fields.push({ path: `${base}.${col}`, value: row[col], ruleKey: "fmValue" });
-              }
-            });
-            if ("AVG" in row || "AVERAGE" in row) {
-              fields.push({
-                path: `${base}.AVG`,
-                value: row.AVG ?? row.AVERAGE,
-                ruleKey: "avg",
-              });
-            }
-            if ("STD_DEV" in row || "STD" in row) {
-              fields.push({
-                path: `${base}.STD_DEV`,
-                value: row.STD_DEV ?? row.STD,
-                ruleKey: "stdDev",
-              });
-            }
-            if ("REMARKS" in row) {
-              fields.push({ path: `${base}.REMARKS`, value: row.REMARKS, ruleKey: "remarks" });
-            }
-          });
-        }
-
-        // Ballistic rows
-        if ("DETAILS" in sample) {
-          arr.forEach((item, i) => {
-            const row = asRecord(item) ?? {};
-            const base = `${sectionKey}.${key}.${i}`;
-            fields.push({
-              path: `${base}.SPECIFICATION`,
-              value: row.SPECIFICATION,
-              ruleKey: "ballisticSpec",
-            });
-            Object.keys(row).forEach((col) => {
-              if (col === "DETAILS" || col === "SPECIFICATION" || col === "SR_NO") return;
-              if (typeof row[col] === "object") return;
-              fields.push({ path: `${base}.${col}`, value: row[col], ruleKey: "ballisticValue" });
-            });
-          });
-        }
-      }
-    };
-
-    // Top-level may already be sections or nested under division keys
     for (const [key, val] of Object.entries(values)) {
-      if (asArray(val).length) {
-        // treat whole values as one section bag
-        walkSection("", values);
-        break;
-      }
-      walkSection(key, val);
-    }
+      const arr = asArray(val);
+      if (!arr.length) continue;
+      const sample = asRecord(arr[0]);
+      if (!sample) continue;
 
-    // Also walk root if property rows live at top level
-    walkSection("root", values);
+      const sectionId = sectionPathId(key);
+
+      if ("PROPERTY" in sample || "SPECIFICATION" in sample) {
+        arr.forEach((item, i) => {
+          const row = asRecord(item) ?? {};
+          if (row.kind === "mean" || row.kind === "std" || row.locked) return;
+          const base = `${sectionId}.${i}`;
+
+          fields.push({
+            path: `${base}.SPECIFICATION`,
+            value: row.SPECIFICATION,
+            ruleKey: "specification",
+          });
+
+          const fmCols = sortFmCols(Object.keys(row).filter(isFmColumn));
+          const hasAnyFm = fmCols.some((col) => str(row[col]));
+          fmCols.forEach((col) => {
+            const filled = Boolean(str(row[col]));
+            // Require values until at least one FM is present; empty extras stay optional.
+            fields.push({
+              path: `${base}.${col}`,
+              value: row[col],
+              ruleKey: filled || !hasAnyFm ? "fmValue" : "fmValueOptional",
+            });
+          });
+
+          if ("AVG" in row || "AVERAGE" in row) {
+            fields.push({
+              path: `${base}.AVG`,
+              value: row.AVG ?? row.AVERAGE,
+              ruleKey: "avg",
+            });
+          }
+          if ("STD_DEV" in row || "STD" in row) {
+            fields.push({
+              path: `${base}.STD_DEV`,
+              value: row.STD_DEV ?? row.STD,
+              ruleKey: "stdDev",
+            });
+          }
+          if ("REMARKS" in row) {
+            fields.push({ path: `${base}.REMARKS`, value: row.REMARKS, ruleKey: "remarks" });
+          }
+        });
+        continue;
+      }
+
+      if ("DETAILS" in sample) {
+        arr.forEach((item, i) => {
+          const row = asRecord(item) ?? {};
+          if (row.locked) return;
+          const base = `${sectionId}.${i}`;
+          fields.push({
+            path: `${base}.SPECIFICATION`,
+            value: row.SPECIFICATION,
+            ruleKey: "ballisticSpec",
+          });
+          Object.keys(row).forEach((col) => {
+            if (col === "DETAILS" || col === "SPECIFICATION" || col === "SR_NO") return;
+            if (typeof row[col] === "object") return;
+            fields.push({ path: `${base}.${col}`, value: row[col], ruleKey: "ballisticValue" });
+          });
+        });
+      }
+    }
 
     return fields;
   },

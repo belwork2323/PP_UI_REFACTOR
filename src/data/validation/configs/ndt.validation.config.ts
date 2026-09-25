@@ -45,17 +45,18 @@ export type NDTValidationTarget = NdtValidationTarget;
 
 export const ndtValidationFields: Record<string, FieldRuleConfig> = {
   // Radiography plan row
-  sections: number(["FORMAT", "SUBMIT"]),
-  orientations: number(["FORMAT", "SUBMIT"]),
-  sfd: number(["FORMAT", "SUBMIT"]),
-  normalExposure: number(["FORMAT", "SUBMIT"]),
-  tangentialExposure: number(["FORMAT", "SUBMIT"]),
+  // Mandatory on SUBMIT only — draft/save uses FORMAT (no required checks)
+  sections: number(["SUBMIT"]),
+  orientations: number(["SUBMIT"]),
+  sfd: number(["SUBMIT"]),
+  normalExposure: number(["SUBMIT"]),
+  tangentialExposure: number(["SUBMIT"]),
   detectorType: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 
   // Additional exposure
   sectionNumber: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),
   orientation: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
-  exposureCount: number(["FORMAT", "SUBMIT"]),
+  exposureCount: number(["SUBMIT"]),
 
   // Observation in radiography
   observationSection: text(["SUBMIT"], S.PATTERNS.ALPHANUMERIC),

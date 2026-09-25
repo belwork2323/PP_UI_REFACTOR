@@ -19,11 +19,19 @@ import { STRINGS } from "@app/config/strings";
 import { useAlertStore } from "@app/store/alertStore";
 import { useThemeStore } from "@app/store/themeStore";
 import getManufacturingTheme from "@app/theme/custom_themes/user/manufacturing/manufacturing_theme";
+import getBatchManagementTheme from "@app/theme/custom_themes/admin/BatchManagement/batchManagement_theme";
 import AdminManagementFormHeader from "@ui/components/custom/admin/AdminManagementFormHeader";
 import AppDropdown from "@ui/components/common/AppDropdown";
-import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
+import AppSearchableDropdown from "@ui/components/common/AppSearchableDropdown";
+import {
+  appDropdownInputProps,
+  appDropdownLabelProps,
+  appDropdownSx,
+} from "@ui/components/common/fieldStyles";
 import CasePrepTextField from "@ui/pages/user/manufacturing/CasePreparation/CasePrepTextField";
 import MasterDataEnableDisableField from "./components/MasterDataEnableDisableField";
+import MasterDataQualityCheckParamsEditor from "./components/MasterDataQualityCheckParamsEditor";
+import useUnitMasterOptions from "@hooks/admin/MasterData/useUnitMasterOptions";
 import {
   emptyMixingOperation,
   formatMotorStageLabel,
@@ -31,6 +39,7 @@ import {
   getMixingCycleValidationMessage,
   type MixingCycleFieldErrors,
   type MixingCycleFormState,
+  type MixingCycleRecord,
   type MixingOperationForm,
 } from "@data/models/admin/MasterData/MixingCycleMasterModel";
 import { visibleValidationError } from "./masterDataValidationUtils";
@@ -43,8 +52,11 @@ type Props = {
   isEdit: boolean;
   form: MixingCycleFormState;
   saving: boolean;
+  projectOptions: AppDropdownOption[];
+  projectLoading?: boolean;
   motorStageOptions: AppDropdownOption[];
   motorStageLoading?: boolean;
+  existingRecords?: MixingCycleRecord[];
   onClose: () => void;
   onSave: () => void;
   onChange: (next: MixingCycleFormState) => void;
@@ -153,8 +165,11 @@ const MixingCycleMasterFormDialog = ({
   isEdit,
   form,
   saving,
+  projectOptions,
+  projectLoading = false,
   motorStageOptions,
   motorStageLoading = false,
+  existingRecords = [],
   onClose,
   onSave,
   onChange,
@@ -163,23 +178,33 @@ const MixingCycleMasterFormDialog = ({
   const { modal } = t;
   const mode = useThemeStore((state) => state.mode);
   const fieldTheme = getManufacturingTheme(mode);
+  const batchTheme = useMemo(() => getBatchManagementTheme(mode), [mode]);
+  const batchModal = batchTheme.modal;
   const flowBar = fieldTheme.manufacturing?.casePreparation?.flowBar ?? {};
   const palette = fieldTheme.palette ?? {};
   const descriptionHasValue = form.description.trim().length > 0;
+  const { options: unitOptions, loading: unitLoading } = useUnitMasterOptions(open);
   const [showErrors, setShowErrors] = useState(false);
+  const projectLabel =
+    projectOptions.find((o) => o.value === form.projectId)?.label || form.projectId || "—";
   const recordLabel = form.mixingCycleName.trim() || form.mixingCycleCode || "record";
   const fieldErrors = useMemo(
-    () => getMixingCycleFieldErrors(form, isEdit),
-    [form, isEdit],
+    () => getMixingCycleFieldErrors(form, isEdit, existingRecords),
+    [form, isEdit, existingRecords],
   );
-  const nameError = visibleValidationError(
-    fieldErrors.mixingCycleName,
-    form.mixingCycleName.trim().length > 0,
+  const projectError = visibleValidationError(
+    fieldErrors.projectId,
+    form.projectId.trim().length > 0,
     showErrors,
   );
   const stageError = visibleValidationError(
     fieldErrors.motorStage,
     form.motorStage !== "",
+    showErrors,
+  );
+  const nameError = visibleValidationError(
+    fieldErrors.mixingCycleName,
+    form.mixingCycleName.trim().length > 0,
     showErrors,
   );
 
@@ -189,7 +214,9 @@ const MixingCycleMasterFormDialog = ({
 
   const handleSave = () => {
     setShowErrors(true);
-    const err = getMixingCycleValidationMessage(getMixingCycleFieldErrors(form, isEdit));
+    const err = getMixingCycleValidationMessage(
+      getMixingCycleFieldErrors(form, isEdit, existingRecords),
+    );
     if (err) {
       useAlertStore.getState().showValidationAlert(err);
       return;
@@ -226,94 +253,148 @@ const MixingCycleMasterFormDialog = ({
             <Typography sx={modal.fieldLabel}>Mixing cycle details</Typography>
             <Box
               sx={{
-                display: "grid",
-                gridTemplateColumns: {
-                  xs: "1fr",
-                  md: "minmax(180px, 200px) minmax(150px, 160px) minmax(220px, 1fr) auto",
-                },
+                display: "flex",
+                flexWrap: { xs: "wrap", md: "nowrap" },
                 gap: 2,
-                alignItems: "start",
+                alignItems: "flex-start",
+                mb: 2,
+                "& > *": { minWidth: 0 },
               }}
             >
-              <CasePrepTextField
-                label={S.MIXING_CYCLES.COL_NAME}
-                value={form.mixingCycleName}
-                disabled={saving}
-                required
-                error={Boolean(nameError)}
-                helperText={nameError ?? null}
-                width="100%"
-                theme={fieldTheme}
-                onChange={(value) => onChange({ ...form, mixingCycleName: value })}
-              />
-              {isEdit ? (
-                <CasePrepTextField
-                  label={S.MIXING_CYCLES.COL_MOTOR_STAGE}
-                  value={formatMotorStageLabel(form.motorStage, motorStageOptions)}
-                  disabled
-                  width="100%"
-                  theme={fieldTheme}
-                  onChange={() => undefined}
-                />
-              ) : (
-                <Box sx={flowBar.selectField?.("100%")}>
-                  <Typography component="label" sx={flowBar.selectLabel}>
-                    <FieldLabelWithAsterisk label={S.MIXING_CYCLES.COL_MOTOR_STAGE} required />
-                  </Typography>
+              <Box sx={{ flex: "1 1 160px" }}>
+                {isEdit ? (
+                  <TextField
+                    fullWidth
+                    size="small"
+                    variant="outlined"
+                    label={S.MIXING_CYCLES.COL_PROJECT}
+                    value={String(projectLabel)}
+                    disabled
+                    InputLabelProps={appDropdownLabelProps}
+                    inputProps={appDropdownInputProps}
+                    sx={{ ...appDropdownSx, mb: 0 }}
+                  />
+                ) : (
+                  <AppSearchableDropdown
+                    label={S.MIXING_CYCLES.COL_PROJECT}
+                    value={form.projectId}
+                    onChange={(value) =>
+                      onChange({
+                        ...form,
+                        projectId: value,
+                        motorStage: "",
+                        motorStageName: "",
+                      })
+                    }
+                    options={projectOptions}
+                    loading={projectLoading}
+                    placeholder={S.MIXING_CYCLES.PROJECT_SELECT_PLACEHOLDER}
+                    required
+                    error={Boolean(projectError)}
+                    helperText={projectError}
+                    disabled={saving}
+                    renderOption={(props, option) => (
+                      <Box component="li" {...props} key={option.value}>
+                        <Box sx={batchModal.projectOption}>
+                          <Typography sx={batchModal.projectOptionName}>
+                            {String(option.label)}
+                          </Typography>
+                          <Typography sx={batchModal.projectOptionId}>{option.value}</Typography>
+                        </Box>
+                      </Box>
+                    )}
+                  />
+                )}
+              </Box>
+              <Box sx={{ flex: "1 1 140px" }}>
+                {isEdit ? (
+                  <TextField
+                    fullWidth
+                    size="small"
+                    variant="outlined"
+                    label={S.MIXING_CYCLES.COL_MOTOR_STAGE}
+                    value={formatMotorStageLabel(form.motorStage, motorStageOptions)}
+                    disabled
+                    InputLabelProps={appDropdownLabelProps}
+                    inputProps={appDropdownInputProps}
+                    sx={{ ...appDropdownSx, mb: 0 }}
+                  />
+                ) : (
                   <AppDropdown
+                    label={S.MIXING_CYCLES.COL_MOTOR_STAGE}
                     value={form.motorStage === "" ? "" : String(form.motorStage)}
                     onChange={(value) =>
                       onChange({
                         ...form,
                         motorStage: value === "" ? "" : Number(value),
+                        motorStageName: value === "" ? "" : `Stage ${value}`,
                       })
                     }
                     options={motorStageOptions}
                     loading={motorStageLoading}
                     placeholder={S.MIXING_CYCLES.MOTOR_STAGE_SELECT_PLACEHOLDER}
-                    disabled={saving}
+                    required
+                    disabled={saving || motorStageLoading || !form.projectId.trim()}
                     error={Boolean(stageError)}
                     helperText={stageError}
                     fullWidth
-                    sx={{
-                      mb: 0,
-                      ...flowBar.selectInput?.(form.motorStage !== ""),
-                    }}
+                    sx={{ mb: 0 }}
                   />
-                </Box>
-              )}
-              <Box sx={{ minWidth: 0 }}>
-                <Box sx={flowBar.selectField?.("100%")}>
-                  <Typography component="label" sx={flowBar.selectLabel}>
-                    {S.MIXING_CYCLES.LABEL_DESCRIPTION}
-                  </Typography>
-                  <TextField
-                    fullWidth
-                    multiline
-                    minRows={3}
-                    size="small"
-                    variant="outlined"
-                    value={form.description}
-                    disabled={saving}
-                    onChange={(event) => onChange({ ...form, description: event.target.value })}
-                    sx={{
-                      ...flowBar.selectInput?.(descriptionHasValue),
-                      "& .MuiInputBase-input": {
-                        fontWeight: descriptionHasValue ? 600 : 500,
-                        color: descriptionHasValue ? palette.text : palette.textSub,
-                        fontSize: "0.82rem",
-                      },
-                    }}
-                  />
-                </Box>
+                )}
               </Box>
-              <MasterDataEnableDisableField
-                checked={form.isActive}
-                disabled={saving}
-                minWidth={120}
-                confirmName={form.mixingCycleName || form.mixingCycleCode || "mixing cycle"}
-                onChange={(isActive) => onChange({ ...form, isActive })}
-              />
+              <Box sx={{ flex: "1 1 160px" }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  variant="outlined"
+                  label={S.MIXING_CYCLES.COL_NAME}
+                  value={form.mixingCycleName}
+                  disabled={saving}
+                  required
+                  error={Boolean(nameError)}
+                  helperText={nameError ?? null}
+                  onChange={(event) =>
+                    onChange({ ...form, mixingCycleName: event.target.value })
+                  }
+                  InputLabelProps={appDropdownLabelProps}
+                  inputProps={appDropdownInputProps}
+                  sx={{ ...appDropdownSx, mb: 0 }}
+                />
+              </Box>
+              <Box sx={{ flex: "0 0 auto" }}>
+                <MasterDataEnableDisableField
+                  checked={form.isActive}
+                  disabled={saving}
+                  minWidth={120}
+                  confirmName={form.mixingCycleName || form.mixingCycleCode || "mixing cycle"}
+                  onChange={(isActive) => onChange({ ...form, isActive })}
+                />
+              </Box>
+            </Box>
+            <Box sx={{ minWidth: 0 }}>
+              <Box sx={flowBar.selectField?.("100%")}>
+                <Typography component="label" sx={flowBar.selectLabel}>
+                  {S.MIXING_CYCLES.LABEL_DESCRIPTION}
+                </Typography>
+                <TextField
+                  fullWidth
+                  multiline
+                  minRows={2}
+                  size="small"
+                  variant="outlined"
+                  value={form.description}
+                  disabled={saving}
+                  onChange={(event) => onChange({ ...form, description: event.target.value })}
+                  sx={{
+                    ...flowBar.selectInput?.(descriptionHasValue),
+                    "& .MuiInputBase-input": {
+                      fontWeight: descriptionHasValue ? 600 : 500,
+                      color: descriptionHasValue ? palette.text : palette.textSub,
+                      fontSize: "0.82rem",
+                    },
+                  }}
+                />
+              </Box>
             </Box>
           </Box>
 
@@ -342,6 +423,21 @@ const MixingCycleMasterFormDialog = ({
               }
             />
             <Box sx={{ mt: 2 }} />
+            <MasterDataQualityCheckParamsEditor
+              title={S.MIXING_CYCLES.PREMIX_QUALITY_CHECKS}
+              params={form.cycles.premixQualityChecks}
+              disabled={saving}
+              isEdit={isEdit}
+              showErrors={showErrors}
+              paramErrors={fieldErrors.premixQualityChecks}
+              unitOptions={unitOptions}
+              unitLoading={unitLoading}
+              theme={fieldTheme}
+              onChange={(premixQualityChecks) =>
+                onChange({ ...form, cycles: { ...form.cycles, premixQualityChecks } })
+              }
+            />
+            <Box sx={{ mt: 2 }} />
             <OperationsEditor
               title={S.MIXING_CYCLES.FINAL_MIX_OPERATIONS}
               ops={form.cycles.finalMixOperations}
@@ -352,6 +448,21 @@ const MixingCycleMasterFormDialog = ({
               theme={fieldTheme}
               onChange={(finalMixOperations) =>
                 onChange({ ...form, cycles: { ...form.cycles, finalMixOperations } })
+              }
+            />
+            <Box sx={{ mt: 2 }} />
+            <MasterDataQualityCheckParamsEditor
+              title={S.MIXING_CYCLES.FINAL_MIX_QUALITY_CHECKS}
+              params={form.cycles.finalMixQualityChecks}
+              disabled={saving}
+              isEdit={isEdit}
+              showErrors={showErrors}
+              paramErrors={fieldErrors.finalMixQualityChecks}
+              unitOptions={unitOptions}
+              unitLoading={unitLoading}
+              theme={fieldTheme}
+              onChange={(finalMixQualityChecks) =>
+                onChange({ ...form, cycles: { ...form.cycles, finalMixQualityChecks } })
               }
             />
           </Box>

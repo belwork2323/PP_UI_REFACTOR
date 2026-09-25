@@ -51,13 +51,19 @@ const MasterDataEnableDisableField = ({
           alignItems: "center",
           gap: 0.5,
           minWidth,
-          pt: labelVariant === "body2" ? 0.5 : 0,
         }}
       >
         <Typography
           variant={labelVariant}
           color="text.secondary"
-          sx={{ textAlign: "center", lineHeight: 1.2, whiteSpace: "nowrap" }}
+          sx={{
+            textAlign: "center",
+            fontSize: "0.72rem",
+            fontWeight: 600,
+            lineHeight: 1.25,
+            mb: 0.25,
+            whiteSpace: "nowrap",
+          }}
         >
           {S.FORM.ACTIVE_LABEL}
         </Typography>

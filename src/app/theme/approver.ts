@@ -5,11 +5,7 @@ import colors from "./colors";
 import fonts from "./fonts";
 import spacing from "./spacing";
 
-export type ApproverDepartmentKey =
-  | "sourcing"
-  | "manufacturing"
-  | "dispatch"
-  | "qualityControl";
+export type ApproverDepartmentKey = "sourcing" | "manufacturing" | "dispatch" | "qualityControl";
 
 export type ApproverStatusMeta = Record<
   string,
@@ -221,9 +217,8 @@ export const approverSpacing = {
   chipGap: spacing.xs,
 };
 
-export const getApproverBrand = (
-  department: ApproverDepartmentKey,
-): ApproverDepartmentBrand => APPROVER_DEPARTMENT_BRANDS[department];
+export const getApproverBrand = (department: ApproverDepartmentKey): ApproverDepartmentBrand =>
+  APPROVER_DEPARTMENT_BRANDS[department];
 
 export const isApproverActionableStatus = (status?: string | null) => {
   const api = toApiStatusEnum(status);
@@ -238,11 +233,7 @@ export const isApproverActionableStatus = (status?: string | null) => {
 
 export const isApproverApprovedStatus = (status?: string | null) => {
   const api = toApiStatusEnum(status);
-  return (
-    api === "APPROVED" ||
-    api === "COMPLETELY_APPROVED" ||
-    api === "FINAL_APPROVAL_COMPLETED"
-  );
+  return api === "APPROVED" || api === "COMPLETELY_APPROVED" || api === "FINAL_APPROVAL_COMPLETED";
 };
 
 export const isApproverRejectedStatus = (status?: string | null) =>

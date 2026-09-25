@@ -409,6 +409,7 @@ const renderSelectField = (
   onChange: (value: string) => void,
   readOnly: boolean,
   placeholder = "Select",
+  error = false,
 ) => {
   if (readOnly) {
     const label = options.find((option) => option.value === value)?.label ?? value;
@@ -421,6 +422,7 @@ const renderSelectField = (
       fullWidth
       value={value}
       onChange={(event) => onChange(event.target.value)}
+      error={error}
       sx={tableFieldSx}
       SelectProps={{ displayEmpty: true }}
     >
@@ -684,6 +686,7 @@ const QCCastingMotorPanel = ({
               })}
               readOnly={readOnly}
               validationErrors={validationErrors}
+              errorPrefix="MANDREL_ASSEMBLY"
             />
           </Stack>
         </SectionCard>
@@ -762,6 +765,7 @@ const QCCastingMotorPanel = ({
               })}
               readOnly={readOnly}
               validationErrors={validationErrors}
+              errorPrefix="CASTING_TABLE"
             />
           </Stack>
         </SectionCard>
@@ -785,6 +789,7 @@ const QCCastingMotorPanel = ({
             }
             readOnly={readOnly}
             validationErrors={validationErrors}
+            errorPrefix="WEIGHTMENT_DETAILS"
           />
         </SectionCard>
 
@@ -805,6 +810,7 @@ const QCCastingMotorPanel = ({
                   }
                   placeholder="HH:mm"
                   inputSx={tableTimeFieldSx}
+                  error={Boolean(err("SOAKING_DURATION"))}
                 />
               )}
             </FieldRow>
@@ -816,6 +822,7 @@ const QCCastingMotorPanel = ({
                   onChange(setCastingPostCastField(values, "PRESSURE_PLATE_ASSEMBLY_REQUIRED", next)),
                 readOnly,
                 "Select",
+                Boolean(err("PRESSURE_PLATE_ASSEMBLY_REQUIRED")),
               )}
             </FieldRow>
             {pressureRequired === "YES" ? (
@@ -833,6 +840,8 @@ const QCCastingMotorPanel = ({
                   OBSERVATIONS: "",
                 })}
                 readOnly={readOnly}
+                validationErrors={validationErrors}
+                errorPrefix="PRESSURE_PLATE_DETAILS"
               />
             ) : null}
           </Stack>

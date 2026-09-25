@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import { projectManagementController } from "@controllers/admin/ProjectManagement/projectManagementController";
 import { fetchUnitList } from "@data/api/common/generalAPI";
 import {
@@ -11,25 +11,33 @@ export type MotorStageOption = { motorStage: string; noOfmotors: number };
 export type UnitOption = { value: string; label: string };
 export type { InsulationTypeOption };
 
+const mapMotorStages = (stages: unknown[] | undefined): MotorStageOption[] =>
+  (stages ?? []).map((s: any) => ({
+    motorStage: String(s.motorStage ?? ""),
+    noOfmotors: Number(s.noOfmotors ?? 0),
+  }));
+
 export const useRocketMotorCasingLookups = () => {
   const [projects, setProjects] = useState<ProjectOption[]>([]);
   const [motorStages, setMotorStages] = useState<MotorStageOption[]>([]);
   const [insulationTypes, setInsulationTypes] = useState<InsulationTypeOption[]>([]);
   const [unitOptions, setUnitOptions] = useState<UnitOption[]>([]);
   const [loading, setLoading] = useState(false);
+  const [motorStagesLoading, setMotorStagesLoading] = useState(false);
   const [hasLoaded, setHasLoaded] = useState(false);
+  const [motorStagesProjectId, setMotorStagesProjectId] = useState("");
+  const motorStagesRequestRef = useRef(0);
 
   const loadLookups = useCallback(async () => {
     setLoading(true);
     try {
-      const [projectResp, motorStageResp, insulationTypeResp, units] = await Promise.all([
+      const [projectResp, insulationTypeResp, units] = await Promise.all([
         projectManagementController.getAllProjects({
           page: 1,
           limit: 1000,
           sortBy: "createdOn",
           sortOrder: "desc",
         }),
-        operationsController.fetchMotorsStageList(),
         operationsController.fetchInsulationTypeList(),
         fetchUnitList(),
       ]);
@@ -46,17 +54,6 @@ export const useRocketMotorCasingLookups = () => {
         setProjects([]);
       }
 
-      if (motorStageResp?.success && motorStageResp.data) {
-        setMotorStages(
-          (motorStageResp.data.stages ?? []).map((s: any) => ({
-            motorStage: String(s.motorStage ?? ""),
-            noOfmotors: Number(s.noOfmotors ?? 0),
-          })),
-        );
-      } else {
-        setMotorStages([]);
-      }
-
       if (insulationTypeResp?.success && insulationTypeResp.data) {
         setInsulationTypes(insulationTypeResp.data);
       } else {
@@ -64,18 +61,54 @@ export const useRocketMotorCasingLookups = () => {
       }
 
       setUnitOptions(
-        units.map((item) => {
-          const symbol = String(item.symbol || item.unitCode || "").trim();
-          const name = String(item.name || "").trim();
-          const value = symbol || name || String(item.unitCode || "").trim();
-          const label =
-            symbol && name ? `${symbol} — ${name}` : name || symbol || String(item.unitCode || "").trim();
-          return { value, label };
-        }).filter((item) => Boolean(item.value)),
+        units
+          .map((item) => {
+            const symbol = String(item.symbol || item.unitCode || "").trim();
+            const name = String(item.name || "").trim();
+            const value = symbol || name || String(item.unitCode || "").trim();
+            const label =
+              symbol && name
+                ? `${symbol} — ${name}`
+                : name || symbol || String(item.unitCode || "").trim();
+            return { value, label };
+          })
+          .filter((item) => Boolean(item.value)),
       );
       setHasLoaded(true);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  /** Load motor stages for a project; clear when projectId is empty. */
+  const loadMotorStages = useCallback(async (projectId: string) => {
+    const pid = projectId.trim();
+    const requestId = ++motorStagesRequestRef.current;
+
+    if (!pid) {
+      setMotorStages([]);
+      setMotorStagesProjectId("");
+      setMotorStagesLoading(false);
+      return;
+    }
+
+    setMotorStagesLoading(true);
+    setMotorStagesProjectId(pid);
+    try {
+      const motorStageResp = await operationsController.fetchMotorsStageList({ projectId: pid });
+      if (requestId !== motorStagesRequestRef.current) return;
+      if (motorStageResp?.success && motorStageResp.data) {
+        setMotorStages(mapMotorStages(motorStageResp.data.stages));
+      } else {
+        setMotorStages([]);
+      }
+    } catch {
+      if (requestId !== motorStagesRequestRef.current) return;
+      setMotorStages([]);
+    } finally {
+      if (requestId === motorStagesRequestRef.current) {
+        setMotorStagesLoading(false);
+      }
     }
   }, []);
 
@@ -98,15 +131,31 @@ export const useRocketMotorCasingLookups = () => {
     () => ({
       projects,
       motorStages,
+      motorStagesProjectId,
       insulationTypes,
       unitOptions,
       loading,
+      motorStagesLoading,
       hasLoaded,
       motorNoOptions,
       reload: loadLookups,
       ensureLoaded,
+      loadMotorStages,
     }),
-    [projects, motorStages, insulationTypes, unitOptions, loading, hasLoaded, motorNoOptions, loadLookups, ensureLoaded],
+    [
+      projects,
+      motorStages,
+      motorStagesProjectId,
+      insulationTypes,
+      unitOptions,
+      loading,
+      motorStagesLoading,
+      hasLoaded,
+      motorNoOptions,
+      loadLookups,
+      ensureLoaded,
+      loadMotorStages,
+    ],
   );
 };
 

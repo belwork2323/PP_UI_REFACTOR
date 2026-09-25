@@ -18,7 +18,10 @@ export const fetchMaterialSpecificationListApi = async (payload: {
   return await post(USER_OPERATIONS_ENDPOINTS.MATERIAL_SPECIFICATION_LIST, payload);
 };
 
-export const fetchDimensionalParametersListApi = async (payload: { motorType: string }) => {
+export const fetchDimensionalParametersListApi = async (payload: {
+  projectId: string;
+  motorType: string;
+}) => {
   return await post(USER_OPERATIONS_ENDPOINTS.DIMENSIONAL_PARAMETERS_LIST, payload);
 };
 

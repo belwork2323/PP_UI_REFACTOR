@@ -14,6 +14,7 @@ import { fetchCastingStationsApi } from "../../../../../data/api/users/operation
 import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
 import { DateField } from "../../../../components/common/DateField";
 import PostCureFileField from "./PostCureFileField";
+import QCDivisionFileField from "../../qualityControl/QCDivision/QCDivisionFileField";
 import {
   FieldGrid,
   SectionCard,
@@ -465,6 +466,7 @@ export const QualificationSection = ({
   clearFieldError,
   disabled = false,
   readOnly = false,
+  useQcDivisionFileField = false,
 }: {
   basePath: string;
   value?: any;
@@ -473,6 +475,7 @@ export const QualificationSection = ({
   clearFieldError?: (path: string) => void;
   disabled?: boolean;
   readOnly?: boolean;
+  useQcDivisionFileField?: boolean;
 }) => {
   const tableValues = value?.qualificationTable || [];
 
@@ -585,15 +588,25 @@ export const QualificationSection = ({
       <Box sx={{ mt: 1.5 }}>
         <FieldLabelWithAsterisk label="QC Report" required />
         <Box sx={{ mt: 1 }}>
-          <PostCureFileField
-            files={value?.qualificationQcReport || []}
-            onChange={handleQcReportChange}
-            multiple
-            acceptMode="imageVideoPdf"
-            disabled={disabled}
-            readOnly={readOnly}
-            required
-          />
+          {useQcDivisionFileField ? (
+            <QCDivisionFileField
+              files={value?.qualificationQcReport || []}
+              onChange={handleQcReportChange}
+              multiple
+              disabled={disabled}
+              readOnly={readOnly}
+            />
+          ) : (
+            <PostCureFileField
+              files={value?.qualificationQcReport || []}
+              onChange={handleQcReportChange}
+              multiple
+              acceptMode="imageVideoPdf"
+              disabled={disabled}
+              readOnly={readOnly}
+              required
+            />
+          )}
           {validationErrors[qcReportErrKey] && (
             <Typography variant="caption" color="error" sx={{ mt: 0.5, display: "block" }}>
               {validationErrors[qcReportErrKey]}
@@ -750,6 +763,7 @@ export const PostCureMotorPanel: React.FC<any> = ({
   disabled = false,
   readOnly = false,
   theme,
+  useQcDivisionFileField = false,
 }) => {
   const [stationOptions, setStationOptions] = useState<Array<{ value: string; label: string }>>([]);
 
@@ -875,6 +889,7 @@ export const PostCureMotorPanel: React.FC<any> = ({
             clearFieldError={clearFieldError}
             disabled={disabled}
             readOnly={readOnly}
+            useQcDivisionFileField={useQcDivisionFileField}
           />
         </SectionCard>
 
@@ -1023,6 +1038,7 @@ export const PostCureMotorPanel: React.FC<any> = ({
             clearFieldError={clearFieldError}
             disabled={disabled}
             readOnly={readOnly}
+            useQcDivisionFileField={useQcDivisionFileField}
           />
         </SectionCard>
 
@@ -1162,6 +1178,7 @@ export const PostCureMotorPanel: React.FC<any> = ({
             clearFieldError={clearFieldError}
             disabled={disabled}
             readOnly={readOnly}
+            useQcDivisionFileField={useQcDivisionFileField}
           />
         </SectionCard>
 

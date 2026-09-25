@@ -331,16 +331,10 @@ function useBatchLookupsSection() {
     setAvailableMotors([]);
   }, []);
 
-  const fetchMixingCycles = useCallback(async (motorStage?: string | number | null) => {
-    const stage = String(motorStage ?? "").trim();
-    if (!stage) {
-      setMixingCycles([]);
-      return;
-    }
-
+  const fetchMixingCycles = useCallback(async () => {
     setMixingCyclesLoading(true);
     try {
-      const resp = await generalController.getMixingCycles(stage);
+      const resp = await generalController.getMixingCycles();
       setMixingCycles(resp?.success && Array.isArray(resp.data) ? resp.data : []);
     } catch (err) {
       console.error("Failed to fetch mixing cycles:", err);

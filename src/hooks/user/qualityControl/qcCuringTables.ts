@@ -3,6 +3,8 @@ import {
   toApiDate,
   toApiDateTime,
   toApiTime,
+  toUiDateTime,
+  toUiTime,
 } from "../../../data/models/user/castingCuringFieldCodec";
 import { formatToUiDate } from "../../../utils/dateUtils";
 import {
@@ -80,6 +82,18 @@ const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : [
 
 const hasValue = (value: unknown) => Boolean(String(value ?? "").trim());
 
+/** Validation allows commas, not semicolons — normalize list separators. */
+export const normalizeVisualObservations = (value: unknown): string => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (!raw.includes(";")) return raw;
+  return raw
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(", ");
+};
+
 const normalizeRows = <T extends { SR_NO?: number | string }>(rows: T[]) =>
   rows.map((row, index) => ({
     ...row,
@@ -124,13 +138,9 @@ const defaultCycleRows = (): QcCuringCycleRow[] =>
     emptyCycleRow(index + 1),
   );
 
-const normalizeCycleTimeValue = (value: unknown): string => {
-  const trimmed = String(value ?? "").trim();
-  if (!trimmed) return "";
-  const match = trimmed.match(/^(\d{1,2}):(\d{2})/);
-  if (!match) return trimmed;
-  return `${match[1].padStart(2, "0")}:${match[2]}`;
-};
+const normalizeCycleTimeValue = (value: unknown): string => toUiTime(value);
+
+const normalizeUiDateTimeValue = (value: unknown): string => toUiDateTime(value);
 
 const emptyPressureRow = (): QcCuringPressureRow => ({
   PEAK_PRESSURE: "",
@@ -269,13 +279,22 @@ const setField = (
 export const getCuringSetupField = (
   values: SchemaFormValues | null | undefined,
   field: QcCuringSetupField,
-) => getField(values, QC_CURING_SECTION_IDS.MOTOR_SETUP, field);
+) => {
+  const value = getField(values, QC_CURING_SECTION_IDS.MOTOR_SETUP, field);
+  return field === "MOTOR_POSITIONING_DATE_TIME" ? normalizeUiDateTimeValue(value) : value;
+};
 
 export const setCuringSetupField = (
   values: SchemaFormValues | null | undefined,
   field: QcCuringSetupField,
   value: string,
-) => setField(values, QC_CURING_SECTION_IDS.MOTOR_SETUP, field, value);
+) =>
+  setField(
+    values,
+    QC_CURING_SECTION_IDS.MOTOR_SETUP,
+    field,
+    field === "MOTOR_POSITIONING_DATE_TIME" ? normalizeUiDateTimeValue(value) : value,
+  );
 
 export const getCuringTypeFromValues = (
   values: SchemaFormValues | null | undefined,
@@ -335,7 +354,14 @@ export const getCuringPostField = (
     | "PRESSURE_PLATE_REMOVAL_DATE_TIME"
     | "SHORE_A_HARDNESS"
     | "DISPATCH_DATE_TIME",
-) => getField(values, QC_CURING_SECTION_IDS.POST_CURING, field);
+) => {
+  const value = getField(values, QC_CURING_SECTION_IDS.POST_CURING, field);
+  if (field === "VISUAL_OBSERVATIONS") return normalizeVisualObservations(value);
+  if (field === "PRESSURE_PLATE_REMOVAL_DATE_TIME" || field === "DISPATCH_DATE_TIME") {
+    return normalizeUiDateTimeValue(value);
+  }
+  return value;
+};
 
 export const setCuringPostField = (
   values: SchemaFormValues | null | undefined,
@@ -345,18 +371,39 @@ export const setCuringPostField = (
     | "SHORE_A_HARDNESS"
     | "DISPATCH_DATE_TIME",
   value: string,
-) => setField(values, QC_CURING_SECTION_IDS.POST_CURING, field, value);
+) => {
+  let next = value;
+  if (field === "VISUAL_OBSERVATIONS") next = normalizeVisualObservations(value);
+  else if (field === "PRESSURE_PLATE_REMOVAL_DATE_TIME" || field === "DISPATCH_DATE_TIME") {
+    next = normalizeUiDateTimeValue(value);
+  }
+  return setField(values, QC_CURING_SECTION_IDS.POST_CURING, field, next);
+};
 
 export const getCuringSubscaleField = (
   values: SchemaFormValues | null | undefined,
   field: QcCuringSubscaleField,
-) => getField(values, QC_CURING_SECTION_IDS.SUBSCALE, field);
+) => {
+  const value = getField(values, QC_CURING_SECTION_IDS.SUBSCALE, field);
+  if (field === "SUBSCALE_VISUAL_OBSERVATIONS") return normalizeVisualObservations(value);
+  if (field === "CYCLE_START_TIME" || field === "CYCLE_END_TIME") {
+    return normalizeCycleTimeValue(value);
+  }
+  return value;
+};
 
 export const setCuringSubscaleField = (
   values: SchemaFormValues | null | undefined,
   field: QcCuringSubscaleField,
   value: string,
-) => setField(values, QC_CURING_SECTION_IDS.SUBSCALE, field, value);
+) => {
+  let next = value;
+  if (field === "SUBSCALE_VISUAL_OBSERVATIONS") next = normalizeVisualObservations(value);
+  else if (field === "CYCLE_START_TIME" || field === "CYCLE_END_TIME") {
+    next = normalizeCycleTimeValue(value);
+  }
+  return setField(values, QC_CURING_SECTION_IDS.SUBSCALE, field, next);
+};
 
 export const getCuringSubscaleParameterRows = (
   values: SchemaFormValues | null | undefined,
@@ -392,9 +439,9 @@ const sanitizeCycleRows = (rows: QcCuringCycleRow[]) =>
     TEMPERATURE: String(row.TEMPERATURE ?? "").trim(),
     DURATION: String(row.DURATION ?? "").trim(),
     START_DATE: String(row.START_DATE ?? "").trim(),
-    START_TIME: String(row.START_TIME ?? "").trim(),
+    START_TIME: normalizeCycleTimeValue(row.START_TIME),
     END_DATE: String(row.END_DATE ?? "").trim(),
-    END_TIME: String(row.END_TIME ?? "").trim(),
+    END_TIME: normalizeCycleTimeValue(row.END_TIME),
     ACTUAL_DURATION: String(row.ACTUAL_DURATION ?? "").trim(),
     PROPELLANT_PRESSURE: String(row.PROPELLANT_PRESSURE ?? "").trim(),
     PEAK_PRESSURE_ACHIEVED: String(row.PEAK_PRESSURE_ACHIEVED ?? "").trim(),
@@ -616,10 +663,11 @@ export const curingMotorDetailToSections = (
       OVEN: curingSetup?.oven ?? rec.oven,
       OVEN_NUMBER:
         curingSetup?.ovenNo ?? curingSetup?.ovenNumber ?? rec.ovenNumber ?? rec.ovenNo,
-      MOTOR_POSITIONING_DATE_TIME:
+      MOTOR_POSITIONING_DATE_TIME: normalizeUiDateTimeValue(
         rec.motorReceivedAt ??
-        rec.motorPositioningDateTime ??
-        curingSetup?.motorPositioningDateTime,
+          rec.motorPositioningDateTime ??
+          curingSetup?.motorPositioningDateTime,
+      ),
     });
     if (Object.keys(setup).length) {
       sections.push({
@@ -645,19 +693,21 @@ export const curingMotorDetailToSections = (
     if (post) {
       const visual = String(post.visualObservation ?? post.VISUAL_OBSERVATION ?? "").trim();
       const other = String(post.otherObservations ?? post.OTHER_OBSERVATIONS ?? "").trim();
-      const visualCombined = [visual, other && other.toLowerCase() !== "na" ? other : ""]
-        .filter(Boolean)
-        .join("; ");
+const visualCombined = normalizeVisualObservations(
+        [visual, other && other.toLowerCase() !== "na" ? other : ""]
+          .filter(Boolean)
+          .join(", "),
+      );
       sections.push({
         sectionId: QC_CURING_SECTION_IDS.POST_CURING,
         sectionData: [
           {
             VISUAL_OBSERVATIONS: visualCombined,
-            PRESSURE_PLATE_REMOVAL_DATE_TIME: String(
+            PRESSURE_PLATE_REMOVAL_DATE_TIME: normalizeUiDateTimeValue(
               post.pressurePlateRemovalDateTime ?? post.PRESSURE_PLATE_REMOVAL_DATE_TIME ?? "",
             ),
             SHORE_A_HARDNESS: String(post.shoreAHardness ?? post.SHORE_A_HARDNESS ?? ""),
-            DISPATCH_DATE_TIME: String(
+            DISPATCH_DATE_TIME: normalizeUiDateTimeValue(
               post.decoringDispatchDateTime ?? post.DISPATCH_DATE_TIME ?? "",
             ),
           },
@@ -676,12 +726,12 @@ export const curingMotorDetailToSections = (
         subscale.ovenNumber ?? subscale.numberOfOvens ?? rec.ovenNumber ?? "",
       ),
       CURING_START_DATE: String(subscale.curingStartDate ?? ""),
-      CYCLE_START_TIME: String(subscale.cycleStartTime ?? ""),
+      CYCLE_START_TIME: normalizeCycleTimeValue(subscale.cycleStartTime ?? ""),
       CURING_COMPLETE_DATE: String(subscale.curingCompleteDate ?? ""),
-      CYCLE_END_TIME: String(subscale.cycleEndTime ?? ""),
+      CYCLE_END_TIME: normalizeCycleTimeValue(subscale.cycleEndTime ?? ""),
       BEM_AVERAGE_SHORE_A_HARDNESS: String(subscale.bemAverageShoreAHardness ?? ""),
       CARTON_AVERAGE_SHORE_A_HARDNESS: String(subscale.cartonAverageShoreAHardness ?? ""),
-      SUBSCALE_VISUAL_OBSERVATIONS: String(subscale.visualObservations ?? ""),
+      SUBSCALE_VISUAL_OBSERVATIONS: normalizeVisualObservations(subscale.visualObservations ?? ""),
       ...(parameterRows.some((row) => String(row.BEM_NO ?? "").trim() || String(row.PARAMETER ?? "").trim())
         ? { CURING_PARAMETER_TABLE: parameterRows }
         : {}),
@@ -743,12 +793,14 @@ export const curingMotorDetailToSections = (
         sectionId: QC_CURING_SECTION_IDS.POST_CURING,
         sectionData: [
           {
-            VISUAL_OBSERVATIONS: String(post.visualObservations ?? post.VISUAL_OBSERVATIONS ?? ""),
-            PRESSURE_PLATE_REMOVAL_DATE_TIME: String(
+            VISUAL_OBSERVATIONS: normalizeVisualObservations(
+              post.visualObservations ?? post.VISUAL_OBSERVATIONS ?? "",
+            ),
+            PRESSURE_PLATE_REMOVAL_DATE_TIME: normalizeUiDateTimeValue(
               post.pressurePlateRemovalDateTime ?? post.PRESSURE_PLATE_REMOVAL_DATE_TIME ?? "",
             ),
             SHORE_A_HARDNESS: String(post.shoreAHardness ?? post.SHORE_A_HARDNESS ?? ""),
-            DISPATCH_DATE_TIME: String(
+            DISPATCH_DATE_TIME: normalizeUiDateTimeValue(
               post.deCoringDispatchDateTime ?? post.DISPATCH_DATE_TIME ?? "",
             ),
           },
@@ -767,18 +819,22 @@ export const curingMotorDetailToSections = (
           {
             NUMBER_OF_OVENS: String(subscale.numberOfOvens ?? subscale.NUMBER_OF_OVENS ?? ""),
             CURING_START_DATE: String(subscale.curingStartDate ?? subscale.CURING_START_DATE ?? ""),
-            CYCLE_START_TIME: String(subscale.cycleStartTime ?? subscale.CYCLE_START_TIME ?? ""),
+            CYCLE_START_TIME: normalizeCycleTimeValue(
+              subscale.cycleStartTime ?? subscale.CYCLE_START_TIME ?? "",
+            ),
             CURING_COMPLETE_DATE: String(
               subscale.curingCompleteDate ?? subscale.CURING_COMPLETE_DATE ?? "",
             ),
-            CYCLE_END_TIME: String(subscale.cycleEndTime ?? subscale.CYCLE_END_TIME ?? ""),
+            CYCLE_END_TIME: normalizeCycleTimeValue(
+              subscale.cycleEndTime ?? subscale.CYCLE_END_TIME ?? "",
+            ),
             BEM_AVERAGE_SHORE_A_HARDNESS: String(
               subscale.bemAverageShoreAHardness ?? subscale.BEM_AVERAGE_SHORE_A_HARDNESS ?? "",
             ),
             CARTON_AVERAGE_SHORE_A_HARDNESS: String(
               subscale.cartonAverageShoreAHardness ?? subscale.CARTON_AVERAGE_SHORE_A_HARDNESS ?? "",
             ),
-            SUBSCALE_VISUAL_OBSERVATIONS: String(
+            SUBSCALE_VISUAL_OBSERVATIONS: normalizeVisualObservations(
               subscale.visualObservations ?? subscale.SUBSCALE_VISUAL_OBSERVATIONS ?? "",
             ),
             ...(table.length
@@ -926,7 +982,7 @@ export const hydrateCuringValuesFromSections = (
       );
       values[formKey(sectionId, "OVEN")] = String(data.OVEN ?? "");
       values[formKey(sectionId, "OVEN_NUMBER")] = String(data.OVEN_NUMBER ?? "");
-      values[formKey(sectionId, "MOTOR_POSITIONING_DATE_TIME")] = String(
+      values[formKey(sectionId, "MOTOR_POSITIONING_DATE_TIME")] = normalizeUiDateTimeValue(
         data.MOTOR_POSITIONING_DATE_TIME ?? "",
       );
       continue;
@@ -975,12 +1031,16 @@ export const hydrateCuringValuesFromSections = (
     }
 
     if (sectionId === QC_CURING_SECTION_IDS.POST_CURING) {
-      values[formKey(sectionId, "VISUAL_OBSERVATIONS")] = String(data.VISUAL_OBSERVATIONS ?? "");
-      values[formKey(sectionId, "PRESSURE_PLATE_REMOVAL_DATE_TIME")] = String(
+      values[formKey(sectionId, "VISUAL_OBSERVATIONS")] = normalizeVisualObservations(
+        data.VISUAL_OBSERVATIONS ?? "",
+      );
+      values[formKey(sectionId, "PRESSURE_PLATE_REMOVAL_DATE_TIME")] = normalizeUiDateTimeValue(
         data.PRESSURE_PLATE_REMOVAL_DATE_TIME ?? "",
       );
       values[formKey(sectionId, "SHORE_A_HARDNESS")] = String(data.SHORE_A_HARDNESS ?? "");
-      values[formKey(sectionId, "DISPATCH_DATE_TIME")] = String(data.DISPATCH_DATE_TIME ?? "");
+      values[formKey(sectionId, "DISPATCH_DATE_TIME")] = normalizeUiDateTimeValue(
+        data.DISPATCH_DATE_TIME ?? "",
+      );
       continue;
     }
 
@@ -997,6 +1057,14 @@ export const hydrateCuringValuesFromSections = (
       ] as const;
       fields.forEach((field) => {
         const raw = data[field];
+        if (field === "SUBSCALE_VISUAL_OBSERVATIONS") {
+          values[formKey(sectionId, field)] = normalizeVisualObservations(raw);
+          return;
+        }
+        if (field === "CYCLE_START_TIME" || field === "CYCLE_END_TIME") {
+          values[formKey(sectionId, field)] = normalizeCycleTimeValue(raw);
+          return;
+        }
         values[formKey(sectionId, field)] =
           field.includes("DATE") && raw ? formatToUiDate(String(raw)) || String(raw) : String(raw ?? "");
       });

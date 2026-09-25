@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -17,10 +17,13 @@ import {
 } from "@mui/material";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
+import { useThemeStore } from "@app/store/themeStore";
+import getBatchManagementTheme from "@app/theme/custom_themes/admin/BatchManagement/batchManagement_theme";
 import MasterDataToggleConfirmDialog from "./components/MasterDataToggleConfirmDialog";
 import SkeletonRow from "@ui/components/common/SkeletonRow";
 import useCuringCycleMasterHook from "@hooks/admin/MasterData/useCuringCycleMasterHook";
 import useMotorStageOptions from "@hooks/admin/MasterData/useMotorStageOptions";
+import useProjectForMotorStageOptions from "@hooks/admin/MasterData/useProjectForMotorStageOptions";
 import useCuringTypeOptions from "@hooks/admin/MasterData/useCuringTypeOptions";
 import {
   formatMotorStageLabel,
@@ -62,7 +65,12 @@ const CuringCycleMasterPanel = ({
   onListPayloadChange,
   onStatsChange,
 }: Props) => {
-  const { options: motorStageOptions, loading: motorStageLoading } = useMotorStageOptions(true);
+  const mode = useThemeStore((s) => s.mode);
+  const batchTheme = useMemo(() => getBatchManagementTheme(mode), [mode]);
+  const { modal: batchModal, tableCell: batchTableCell } = batchTheme;
+
+  const { projects: projectSelectOptions, options: projectOptions, loading: projectLoading } =
+    useProjectForMotorStageOptions(true);
   const { options: curingTypeOptions } = useCuringTypeOptions();
   const hook = useCuringCycleMasterHook({
     activeFilter,
@@ -70,10 +78,50 @@ const CuringCycleMasterPanel = ({
     onListPayloadChange,
     onStatsChange,
   });
+
+  const filterProjectId = hook.projectFilter || "";
+  const { options: filterMotorStageOptions, loading: filterMotorStageLoading } =
+    useMotorStageOptions(true, filterProjectId || undefined);
+
+  const createProjectId = hook.form.projectId || "";
+  const { options: createMotorStageOptions, loading: createMotorStageLoading } =
+    useMotorStageOptions(hook.inlineMode === "create", createProjectId || "");
+
+  const { options: editMotorStageOptions } = useMotorStageOptions(
+    hook.inlineMode === "edit",
+    hook.form.projectId || undefined,
+  );
+
   const { table, tableCell } = t;
   const formOpen = hook.inlineMode != null;
-  const columnCount = 3 + MASTER_DATA_AUDIT_COLUMN_COUNT + 2;
+  const columnCount = 4 + MASTER_DATA_AUDIT_COLUMN_COUNT + 2;
   const [viewTarget, setViewTarget] = useState<CuringCycleRecord | null>(null);
+
+  const resolveProject = (projectId: string) => {
+    const match = projectSelectOptions.find((p) => p.projectId === projectId);
+    if (match) return match;
+    const opt = projectOptions.find((o) => o.value === projectId);
+    if (!opt) return null;
+    return { projectId, projectName: String(opt.label ?? projectId) };
+  };
+
+  const renderProjectCell = (projectId: string) => {
+    const id = String(projectId ?? "").trim();
+    if (!id) return <Typography sx={table.bodyText}>—</Typography>;
+    const project = resolveProject(id);
+    const projectName = project?.projectName?.trim() || id;
+    return (
+      <Box sx={batchTableCell.batchIdBox}>
+        <icons.batchMgmt.projectId
+          sx={{ ...batchTableCell.batchIdIcon, ...batchTableCell.projectIdIcon }}
+        />
+        <Box sx={batchTableCell.projectInfo}>
+          <Typography sx={batchTableCell.projectName}>{projectName}</Typography>
+          <Typography sx={batchTableCell.projectId}>{id}</Typography>
+        </Box>
+      </Box>
+    );
+  };
 
   return (
     <Box>
@@ -81,19 +129,34 @@ const CuringCycleMasterPanel = ({
         <CuringCycleMasterTableToolbar
           search={hook.search}
           onSearchChange={hook.setSearch}
+          projectFilter={hook.projectFilter}
+          onProjectFilterChange={hook.setProjectFilter}
+          projectOptions={projectOptions}
+          projectLoading={projectLoading}
           motorStageFilter={hook.motorStageFilter}
           onMotorStageFilterChange={hook.setMotorStageFilter}
-          motorStageOptions={motorStageOptions}
-          motorStageLoading={motorStageLoading}
+          motorStageOptions={filterMotorStageOptions}
+          motorStageLoading={filterMotorStageLoading}
           onRefresh={onRefresh}
           refreshDisabled={refreshDisabled || hook.loading}
           t={t}
+          renderProjectOption={(props, option) => (
+            <Box component="li" {...props} key={option.value}>
+              <Box sx={batchModal.projectOption}>
+                <Typography sx={batchModal.projectOptionName}>{String(option.label)}</Typography>
+                <Typography sx={batchModal.projectOptionId}>{option.value}</Typography>
+              </Box>
+            </Box>
+          )}
         />
         <Divider sx={table.divider} />
         <TableContainer>
           <Table size="small">
             <TableHead>
               <TableRow sx={table.headerRow}>
+                <TableCell sx={{ ...table.headerCell, minWidth: 220 }}>
+                  {S.CURING_CYCLES.COL_PROJECT}
+                </TableCell>
                 <TableCell sx={table.headerCell}>{S.CURING_CYCLES.COL_MOTOR_STAGE}</TableCell>
                 <TableCell sx={table.headerCell}>{S.CURING_CYCLES.COL_CURING_TYPE}</TableCell>
                 <TableCell sx={table.headerCell}>{S.CURING_CYCLES.COL_STEPS}</TableCell>
@@ -115,9 +178,12 @@ const CuringCycleMasterPanel = ({
               ) : (
                 hook.paginated.map((row) => (
                   <TableRow key={row.id} sx={table.row}>
+                    <TableCell sx={{ ...table.cell, minWidth: 220 }}>
+                      {renderProjectCell(row.projectId)}
+                    </TableCell>
                     <TableCell sx={table.cell}>
                       <Typography sx={table.bodyText}>
-                        {formatMotorStageLabel(row.motorStage, motorStageOptions)}
+                        {formatMotorStageLabel(row.motorStage, filterMotorStageOptions)}
                       </Typography>
                     </TableCell>
                     <TableCell sx={table.cell}>
@@ -136,7 +202,12 @@ const CuringCycleMasterPanel = ({
                           <IconButton
                             size="small"
                             onClick={() => setViewTarget(row)}
-                            disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
+                            disabled={
+                              hook.saving ||
+                              formOpen ||
+                              hook.disabling ||
+                              hook.enabling
+                            }
                             aria-label={S.TABLE.VIEW}
                           >
                             <icons.visibility fontSize="small" />
@@ -146,7 +217,12 @@ const CuringCycleMasterPanel = ({
                           <IconButton
                             size="small"
                             onClick={() => hook.openEdit(row)}
-                            disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
+                            disabled={
+                              hook.saving ||
+                              formOpen ||
+                              hook.disabling ||
+                              hook.enabling
+                            }
                             aria-label={S.TABLE.EDIT}
                           >
                             <icons.Edit fontSize="small" />
@@ -154,7 +230,12 @@ const CuringCycleMasterPanel = ({
                         </Tooltip>
                         <MasterDataActiveSwitch
                           isActive={row.isActive}
-                          disabled={hook.saving || formOpen || hook.disabling || hook.enabling}
+                          disabled={
+                            hook.saving ||
+                            formOpen ||
+                            hook.disabling ||
+                            hook.enabling
+                          }
                           onToggle={(nextActive) => hook.handleToggleActive(row, nextActive)}
                         />
                       </Box>
@@ -193,8 +274,12 @@ const CuringCycleMasterPanel = ({
         isEdit={hook.inlineMode === "edit"}
         form={hook.form}
         saving={hook.saving}
-        motorStageOptions={motorStageOptions}
-        motorStageLoading={motorStageLoading}
+        projectOptions={projectOptions}
+        projectLoading={projectLoading}
+        motorStageOptions={
+          hook.inlineMode === "edit" ? editMotorStageOptions : createMotorStageOptions
+        }
+        motorStageLoading={hook.inlineMode === "create" ? createMotorStageLoading : false}
         curingTypeOptions={curingTypeOptions}
         existingRecords={hook.items}
         onClose={hook.closeInline}
@@ -206,7 +291,8 @@ const CuringCycleMasterPanel = ({
       <CuringCycleMasterViewDialog
         open={viewTarget != null}
         record={viewTarget}
-        motorStageOptions={motorStageOptions}
+        projectOptions={projectOptions}
+        motorStageOptions={filterMotorStageOptions}
         onClose={() => setViewTarget(null)}
         t={t}
       />

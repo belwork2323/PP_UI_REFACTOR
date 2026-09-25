@@ -433,25 +433,43 @@ const SetupFieldCell = ({
   label,
   children,
   readOnly = false,
+  required = false,
+  error,
 }: {
   label: string;
   children: ReactNode;
   readOnly?: boolean;
+  required?: boolean;
+  error?: string;
 }) => (
   <Box sx={{ flex: 1, minWidth: 0 }}>
-    <Typography
-      sx={{
-        fontSize: readOnly ? "0.65rem" : "0.72rem",
-        fontWeight: readOnly ? 800 : 700,
-        letterSpacing: readOnly ? "0.02em" : undefined,
-        textTransform: readOnly ? "uppercase" : undefined,
-        color: readOnly ? BRAND.primary : BRAND.textSub,
-        mb: 0.5,
-      }}
-    >
-      {label}
-    </Typography>
+    {required && !readOnly ? (
+      <FieldLabelWithAsterisk
+        label={label}
+        required
+        sx={{
+          fontSize: "0.72rem",
+          fontWeight: 700,
+          color: BRAND.textSub,
+          mb: 0.5,
+        }}
+      />
+    ) : (
+      <Typography
+        sx={{
+          fontSize: readOnly ? "0.65rem" : "0.72rem",
+          fontWeight: readOnly ? 800 : 700,
+          letterSpacing: readOnly ? "0.02em" : undefined,
+          textTransform: readOnly ? "uppercase" : undefined,
+          color: readOnly ? BRAND.primary : BRAND.textSub,
+          mb: 0.5,
+        }}
+      >
+        {label}
+      </Typography>
+    )}
     {children}
+    {!readOnly && error ? <FieldErrorText message={error} /> : null}
   </Box>
 );
 
@@ -728,31 +746,24 @@ const QCCuringMotorPanel = ({
             <SetupFieldCell
               label="Date & Time of positioning of rocket motor in Oven"
               readOnly={readOnly}
+              required
+              error={err("MOTOR_POSITIONING_DATE_TIME")}
             >
-              {!readOnly ? (
-                <FieldLabelWithAsterisk
-                  label=""
-                  required
-                  sx={{ position: "absolute", width: 0, height: 0, overflow: "hidden" }}
-                />
-              ) : null}
               {readOnly ? (
                 <QCDivisionReadOnlyValue
                   value={motorPositioningDateTime}
                   muted={!motorPositioningDateTime.trim()}
                 />
               ) : (
-                <>
-                  <DateTimeField
-                    compact
-                    value={motorPositioningDateTime}
-                    onChange={(next) =>
-                      onChange(setCuringSetupField(values, "MOTOR_POSITIONING_DATE_TIME", next))
-                    }
-                    inputSx={setupDateTimeFieldSx}
-                  />
-                  <FieldErrorText message={err("MOTOR_POSITIONING_DATE_TIME")} />
-                </>
+                <DateTimeField
+                  compact
+                  value={motorPositioningDateTime}
+                  onChange={(next) =>
+                    onChange(setCuringSetupField(values, "MOTOR_POSITIONING_DATE_TIME", next))
+                  }
+                  inputSx={setupDateTimeFieldSx}
+                  error={Boolean(err("MOTOR_POSITIONING_DATE_TIME"))}
+                />
               )}
             </SetupFieldCell>
           </Stack>
@@ -772,6 +783,7 @@ const QCCuringMotorPanel = ({
             allowAdd={!readOnly}
             allowDelete={!readOnly}
             validationErrors={validationErrors}
+            errorPrefix="CURING_CYCLE_DETAILS"
           />
         </SectionCard>
 
@@ -841,6 +853,7 @@ const QCCuringMotorPanel = ({
               allowAdd={false}
               allowDelete={false}
               validationErrors={validationErrors}
+              errorPrefix="CURING_PARAMETER_TABLE"
             />
             <FieldRow label="Curing Start Date" readOnly={readOnly} required error={err("CURING_START_DATE")}>
               {readOnly ? (

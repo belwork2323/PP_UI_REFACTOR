@@ -1,8 +1,9 @@
 import { Box, InputAdornment, TextField } from "@mui/material";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import type { HTMLAttributes, ReactNode } from "react";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
-import AppDropdown from "@ui/components/common/AppDropdown";
+import AppSearchableDropdown from "@ui/components/common/AppSearchableDropdown";
 import RefreshIconButton from "@ui/components/common/RefreshIconButton";
 import type { AppDropdownOption } from "@ui/components/common/AppDropdown";
 
@@ -11,6 +12,10 @@ const S = STRINGS.MASTER_DATA;
 type Props = {
   search: string;
   onSearchChange: (value: string) => void;
+  projectFilter: string;
+  onProjectFilterChange: (value: string) => void;
+  projectOptions: AppDropdownOption[];
+  projectLoading?: boolean;
   motorStageFilter: string;
   onMotorStageFilterChange: (value: string) => void;
   motorStageOptions: AppDropdownOption[];
@@ -18,11 +23,19 @@ type Props = {
   onRefresh: () => void;
   refreshDisabled?: boolean;
   t: any;
+  renderProjectOption?: (
+    props: HTMLAttributes<HTMLLIElement>,
+    option: AppDropdownOption,
+  ) => ReactNode;
 };
 
 const MixingCycleMasterTableToolbar = ({
   search,
   onSearchChange,
+  projectFilter,
+  onProjectFilterChange,
+  projectOptions,
+  projectLoading = false,
   motorStageFilter,
   onMotorStageFilterChange,
   motorStageOptions,
@@ -30,8 +43,10 @@ const MixingCycleMasterTableToolbar = ({
   onRefresh,
   refreshDisabled = false,
   t,
+  renderProjectOption,
 }: Props) => {
   const searchTheme = t.batchListShell?.inputs;
+  const filterFieldSx = { ...t.filterPanel?.field, mb: 0 };
 
   return (
     <Box
@@ -64,8 +79,27 @@ const MixingCycleMasterTableToolbar = ({
           ),
         }}
       />
-      <Box sx={{ minWidth: 180, maxWidth: 240, flex: "0 0 220px" }}>
-        <AppDropdown
+      <Box sx={{ minWidth: 200, maxWidth: 280, flex: "0 0 240px" }}>
+        <AppSearchableDropdown
+          label={S.MIXING_CYCLES.PROJECT_FILTER_LABEL}
+          value={projectFilter}
+          onChange={onProjectFilterChange}
+          options={projectOptions}
+          loading={projectLoading}
+          placeholder={S.MIXING_CYCLES.PROJECT_FILTER_PLACEHOLDER}
+          filterPanel
+          fullWidth
+          size="small"
+          sx={filterFieldSx}
+          renderOption={
+            renderProjectOption
+              ? (props, option) => renderProjectOption(props, option)
+              : undefined
+          }
+        />
+      </Box>
+      <Box sx={{ minWidth: 160, maxWidth: 220, flex: "0 0 180px" }}>
+        <AppSearchableDropdown
           label={S.MIXING_CYCLES.MOTOR_STAGE_FILTER_LABEL}
           value={motorStageFilter}
           onChange={onMotorStageFilterChange}
@@ -74,9 +108,8 @@ const MixingCycleMasterTableToolbar = ({
           placeholder={S.MIXING_CYCLES.MOTOR_STAGE_FILTER_PLACEHOLDER}
           filterPanel
           fullWidth
-          sx={{ ...t.filterPanel?.field, mb: 0 }}
-          itemSx={t.filterPanel?.menuItem}
-          InputLabelProps={{ shrink: true }}
+          size="small"
+          sx={filterFieldSx}
         />
       </Box>
       <RefreshIconButton

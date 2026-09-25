@@ -451,19 +451,34 @@ export const useCastingAndCuringHook = () => {
   const fetchCuringCycleConfig = useCallback(async () => {
     if (!activeBatch) return null;
 
+    const projectId = String(activeBatch.projectId ?? "").trim();
     const motorStage = resolveMotorStage(activeBatch);
-    if (curingCycleConfigRef.current?.motorStage === motorStage) {
-      return curingCycleConfigRef.current;
+    if (!projectId) {
+      setCuringCyclesError("Project is required to load curing cycle configuration.");
+      return null;
+    }
+
+    const cached = curingCycleConfigRef.current;
+    if (
+      cached &&
+      cached.motorStage === motorStage &&
+      String(cached.projectId ?? "") === projectId
+    ) {
+      return cached;
     }
 
     setCuringCyclesLoading(true);
     setCuringCyclesError(null);
 
     try {
-      const response = await castingCuringController.fetchCuringCycles({ motorStage });
+      const response = await castingCuringController.fetchCuringCycles({
+        projectId,
+        motorStage,
+      });
       if (response?.success && response.data) {
-        setCuringCycleConfig(response.data);
-        return response.data;
+        const next = { ...response.data, projectId };
+        setCuringCycleConfig(next);
+        return next;
       }
 
       const message = response?.message ?? "Unable to load curing cycle configuration.";
@@ -514,10 +529,14 @@ export const useCastingAndCuringHook = () => {
       const draft = curingSetupDrafts[normalizedMotorId] ?? createDefaultCuringProcessSetup();
       if (!canLoadCuringForm({ setup: draft, curingFormLoaded: false })) return;
 
+      const projectId = String(activeBatch.projectId ?? "").trim();
       const motorStage = resolveMotorStage(activeBatch);
+      const cached = curingCycleConfigRef.current;
       let cycleConfig =
-        curingCycleConfigRef.current?.motorStage === motorStage
-          ? curingCycleConfigRef.current
+        cached &&
+        cached.motorStage === motorStage &&
+        String(cached.projectId ?? "") === projectId
+          ? cached
           : null;
       if (!cycleConfig) {
         cycleConfig = await fetchCuringCycleConfig();

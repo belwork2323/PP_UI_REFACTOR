@@ -306,7 +306,7 @@ const CastingAndCuringForm = ({
   useEffect(() => {
     if (activeProcessTab !== "CURING") return;
     void onFetchCuringCycleConfig?.();
-  }, [activeProcessTab, onFetchCuringCycleConfig, batch?.batchId, batch?.motorStage]);
+  }, [activeProcessTab, onFetchCuringCycleConfig, batch?.batchId, batch?.motorStage, batch?.projectId]);
 
   useEffect(() => {
     if (!curingFormLoaded) return;

@@ -161,8 +161,18 @@ export const mapRecordToForm = (
   };
 };
 
-export const getMasterDataErrorMessage = (resp: any, fallback: string) =>
-  resp?.message || resp?.error?.message || fallback;
+export const getMasterDataErrorMessage = (resp: any, fallback: string) => {
+  if (resp == null) return fallback;
+  const direct = typeof resp.message === "string" ? resp.message.trim() : "";
+  if (direct) return direct;
+  const nested =
+    (typeof resp?.error?.message === "string" && resp.error.message.trim()) ||
+    (typeof resp?.response?.data?.message === "string" &&
+      resp.response.data.message.trim()) ||
+    (typeof resp?.data?.message === "string" && resp.data.message.trim()) ||
+    "";
+  return nested || fallback;
+};
 
 /** Same wording as backend MasterDataValidation. */
 export const MASTER_DATA_CODE_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._/\\-]*$/;

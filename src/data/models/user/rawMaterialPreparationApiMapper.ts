@@ -320,22 +320,25 @@ export const normalizeProcessSubmissionFromApi = (
 export const formatDateTimeForApi = (value: string | null | undefined): string | null => {
   const raw = String(value ?? "").trim();
   if (!raw) return null;
-  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(raw)) return raw;
+  // Prefer offset-free local ISO — matches Jackson LocalDateTime / QC LocalDateTimeValue.
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?$/.test(raw)) return raw;
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?Z$/.test(raw)) {
+    return raw.replace(/Z$/, "");
+  }
 
   const dmyTime = raw.match(/^(\d{2})-(\d{2})-(\d{4}) (\d{2}):(\d{2})$/);
   if (dmyTime) {
     const [, day, month, year, hour, minute] = dmyTime;
-    const date = new Date(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute));
-    if (!Number.isNaN(date.getTime())) return date.toISOString();
+    return `${year}-${month}-${day}T${hour}:${minute}:00`;
   }
 
   if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(raw)) {
-    const date = new Date(`${raw}:00`);
-    if (!Number.isNaN(date.getTime())) return date.toISOString();
+    return `${raw}:00`;
   }
 
   const normalized = raw.length === 16 ? `${raw}:00` : raw;
   const date = new Date(normalized);
   if (Number.isNaN(date.getTime())) return raw;
-  return date.toISOString();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
 };

@@ -31,6 +31,7 @@ const S = STRINGS.MASTER_DATA;
 type Props = {
   open: boolean;
   record: CuringCycleRecord | null;
+  projectOptions?: AppDropdownOption[];
   motorStageOptions: AppDropdownOption[];
   onClose: () => void;
   t: any;
@@ -60,8 +61,19 @@ const DetailItem = ({ label, children }: { label: string; children: ReactNode })
   </Box>
 );
 
-const CuringCycleMasterViewDialog = ({ open, record, motorStageOptions, onClose, t }: Props) => {
+const CuringCycleMasterViewDialog = ({
+  open,
+  record,
+  projectOptions = [],
+  motorStageOptions,
+  onClose,
+  t,
+}: Props) => {
   const { modal, table } = t;
+  const projectLabel =
+    projectOptions.find((o) => o.value === record?.projectId)?.label ||
+    record?.projectId ||
+    "—";
   const recordLabel = record
     ? `${formatMotorStageLabel(record.motorStage, motorStageOptions)} · ${formatCuringTypeLabel(record.curingType)}`
     : "record";
@@ -96,11 +108,23 @@ const CuringCycleMasterViewDialog = ({ open, record, motorStageOptions, onClose,
                 gridTemplateColumns: {
                   xs: "1fr",
                   sm: "repeat(2, 1fr)",
-                  md: showPressure ? "repeat(4, 1fr)" : "repeat(3, 1fr)",
+                  md: showPressure ? "repeat(5, 1fr)" : "repeat(4, 1fr)",
                 },
                 gap: 1.5,
               }}
             >
+              <DetailItem label={S.CURING_CYCLES.COL_PROJECT}>
+                <Box>
+                  <Typography variant="body2" fontWeight={600}>
+                    {String(projectLabel)}
+                  </Typography>
+                  {record.projectId ? (
+                    <Typography variant="caption" color="text.secondary">
+                      {record.projectId}
+                    </Typography>
+                  ) : null}
+                </Box>
+              </DetailItem>
               <DetailItem label={S.CURING_CYCLES.COL_MOTOR_STAGE}>
                 <Typography variant="body2" fontWeight={600}>
                   {formatMotorStageLabel(record.motorStage, motorStageOptions)}

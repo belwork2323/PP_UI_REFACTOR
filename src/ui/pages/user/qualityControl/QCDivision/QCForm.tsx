@@ -4,6 +4,7 @@ import { icons } from "../../../../../app/theme/icons";
 import { STRINGS } from "../../../../../app/config/strings";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { QualityControlFormState } from "../../../../../data/models/user/QualityControlFormModel";
+import type { RawMaterialPrepWeightmentSheet } from "../../../../../data/models/user/RawMaterialPreparationModel";
 import type { QcDivisionCatalogNavTab } from "../../../../../hooks/user/qualityControl/qcFlowConfig";
 import type {
   QcPartialItemStatus,
@@ -113,6 +114,11 @@ type QCFormProps = {
   ) => void;
   onDivisionEntryLiquidValuesChange: (entryId: string, values: SchemaFormValues) => void;
   onMixingFinalMixDetailsChange: (values: SchemaFormValues) => void;
+  onProcessingWeightmentSheetChange?: (
+    next:
+      | RawMaterialPrepWeightmentSheet
+      | ((prev: RawMaterialPrepWeightmentSheet) => RawMaterialPrepWeightmentSheet),
+  ) => void;
   onRemoveDivisionEntry: (entryId: string) => void;
   navApprovalActions?: QCDivisionNavApprovalActions | null;
   unitActions?: QCDivisionEntryUnitActions | null;
@@ -195,6 +201,7 @@ const QCForm = ({
   onDivisionEntryValuesChange,
   onDivisionEntryLiquidValuesChange,
   onMixingFinalMixDetailsChange,
+  onProcessingWeightmentSheetChange,
   onRemoveDivisionEntry,
   navApprovalActions = null,
   unitActions = null,
@@ -478,6 +485,7 @@ const QCForm = ({
           onDivisionEntryValuesChange={onDivisionEntryValuesChange}
           onDivisionEntryLiquidValuesChange={onDivisionEntryLiquidValuesChange}
           onMixingFinalMixDetailsChange={onMixingFinalMixDetailsChange}
+          onProcessingWeightmentSheetChange={onProcessingWeightmentSheetChange}
           onRemoveDivisionEntry={onRemoveDivisionEntry}
           activePartialItem={activePartialItem}
           unitActions={unitActions}

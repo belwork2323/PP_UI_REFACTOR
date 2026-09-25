@@ -147,6 +147,8 @@ const resolvePostCureSelectionFromManufacturingMotor = (
     asRecord(motor.looseFlapFillingDetails) ?? asRecord(details.looseFlapFillingDetails);
   const inhibition = asRecord(motor.inhibitionDetails) ?? asRecord(details.inhibitionDetails);
   const inhibitorType = resolveInhibitorFromMotor(motor);
+  const hasLoose = Boolean(loose && Object.keys(loose).length > 0);
+  const hasInhibition = Boolean(inhibition && Object.keys(inhibition).length > 0);
 
   if (!hasLoose && !hasInhibition && !inhibitorType) {
     return null;

@@ -63,14 +63,20 @@ export const subscaleHardwareFieldRules = {
   },
 
   // General Batch Info / Process Fields
+
+  MIXER_BLDG_NO: {
+    valueType: "text" as const,
+    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
+    messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
+  },
   PREMIX_DATE: {
     valueType: "date" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
+    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   FINAL_MIX_DATE: {
     valueType: "date" as const,
-    requiredIn: ["SUBMIT"] as ValidationTier[],
+    requiredIn: ["UNIT", "SUBMIT"] as ValidationTier[],
     messages: { required: S.FIELD_REQUIRED, invalid: S.INVALID },
   },
   DATE_OF_CASTING: {
@@ -207,6 +213,9 @@ function resolveFieldPaths(data: any) {
 
   if (!isMain) {
     // 2. Subscale Conditional Fields
+    console.log(data);
+
+    paths.push({ path: "MIXER_BLDG_NO", value: data.MIXER_BLDG_NO, ruleKey: "MIXER_BLDG_NO" });
     paths.push({ path: "PREMIX_DATE", value: data.PREMIX_DATE, ruleKey: "PREMIX_DATE" });
     paths.push({ path: "FINAL_MIX_DATE", value: data.FINAL_MIX_DATE, ruleKey: "FINAL_MIX_DATE" });
 

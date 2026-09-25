@@ -13,6 +13,10 @@ import FilterToggleButton from "../../../components/common/FilterToggleButton";
 import DateField from "../../../components/common/DateField";
 import { formatToIsoDateInput, formatToUiDate } from "../../../../utils/dateUtils";
 import getApproverManufacturingFilterStyles from "../manufacturing/approverManufacturingFilterStyles";
+import RefreshIconButton from "@/ui/components/common/RefreshIconButton";
+import { RefreshRounded } from "@mui/icons-material";
+import useApproverSubDepartmentBatchList from "@/hooks/approver/useApproverSubDepartmentBatchList";
+import { ApproverDepartmentKey } from "@/app/theme/approver";
 
 const BL = STRINGS.MANUFACTURING.BATCH_LIST;
 
@@ -34,11 +38,18 @@ type FilterBarTheme = {
 type UseApproverSubdepartmentBatchListFilterBarArgs = {
   mode?: string;
   theme: FilterBarTheme;
+  refresh?: () => void;
+  department: ApproverDepartmentKey;
+  subDepartment: string;
+  items?: Record<string, unknown>[];
 };
 
 export const useApproverSubdepartmentBatchListFilterBar = ({
   mode = "light",
   theme,
+  department,
+  subDepartment,
+  items,
 }: UseApproverSubdepartmentBatchListFilterBarArgs) => {
   const filterStyles = useMemo(() => getApproverManufacturingFilterStyles(mode), [mode]);
   const {
@@ -59,6 +70,16 @@ export const useApproverSubdepartmentBatchListFilterBar = ({
     ensureProjectOptions,
     applyClientFilters,
   } = useApproverSubdepartmentBatchListFilters();
+
+  const { items: fetchedItems, refresh } = useApproverSubDepartmentBatchList({
+    allLabel: filterAllLabel,
+    department,
+    extraFilters: listFiltersRecord,
+    items,
+    searchText: "", // Pass search text if managed here, or leave empty/handled elsewhere
+    status: statusFilter,
+    subDepartment,
+  });
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftBatchId, setDraftBatchId] = useState("");
@@ -174,19 +195,29 @@ export const useApproverSubdepartmentBatchListFilterBar = ({
     setDraftTo("");
     setDraftStatus(filterAllLabel);
   };
-
   const searchBarEnd = (
-    <FilterToggleButton
-      label={BL.FILTERS_TOGGLE}
-      count={activeFilterCount}
-      isOpen={filterOpen}
-      onClick={() => setFilterOpen((open) => !open)}
-      sx={filterToggleSx.filterBtn(filterOpen || activeFilterCount > 0)}
-      iconSx={filterToggleSx.filterBtnIcon}
-      textSx={filterToggleSx.filterBtnText}
-      badgeSx={filterToggleSx.filterBadgePill}
-      chevronSx={filterToggleSx.filterBtnChevron}
-    />
+    <>
+      <FilterToggleButton
+        label={BL.FILTERS_TOGGLE}
+        count={activeFilterCount}
+        isOpen={filterOpen}
+        onClick={() => setFilterOpen((open) => !open)}
+        sx={filterToggleSx.filterBtn(filterOpen || activeFilterCount > 0)}
+        iconSx={filterToggleSx.filterBtnIcon}
+        textSx={filterToggleSx.filterBtnText}
+        badgeSx={filterToggleSx.filterBadgePill}
+        chevronSx={filterToggleSx.filterBtnChevron}
+      />
+      <Stack direction="row" spacing={1} alignItems="center">
+        <RefreshIconButton
+          onClick={() => {
+            void refresh();
+          }}
+          tooltip={STRINGS.USER_BATCH_LIST.REFRESH_TOOLTIP}
+          icon={<RefreshRounded fontSize="small" />}
+        />
+      </Stack>
+    </>
   );
 
   const filterExtension = filterOpen ? (

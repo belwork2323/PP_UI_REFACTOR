@@ -3,6 +3,8 @@ import { Box, Stack, Typography } from "@mui/material";
 import { STRINGS } from "../../../../../app/config/strings";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import type { QcDivisionEntry, QualityControlFormState } from "../../../../../data/models/user/QualityControlFormModel";
+import type { RawMaterialPrepWeightmentSheet } from "../../../../../data/models/user/RawMaterialPreparationModel";
+import type { SchemaFormValues } from "../../../../../schema-engine";
 import {
   buildDivisionNavGroups,
   resolveActiveNavContent,
@@ -24,7 +26,6 @@ import {
   type QcMixingQualityCheckDefinition,
 } from "../../../../../hooks/user/qualityControl/qcMixingTables";
 import QCMixingFinalMixPanel from "./QCMixingFinalMixPanel";
-import type { SchemaFormValues } from "../../../../../schema-engine";
 import {
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
@@ -80,6 +81,11 @@ export type QCDivisionFormBodyProps = {
   ) => void;
   onDivisionEntryLiquidValuesChange: (entryId: string, values: SchemaFormValues) => void;
   onMixingFinalMixDetailsChange: (values: SchemaFormValues) => void;
+  onProcessingWeightmentSheetChange?: (
+    next:
+      | RawMaterialPrepWeightmentSheet
+      | ((prev: RawMaterialPrepWeightmentSheet) => RawMaterialPrepWeightmentSheet),
+  ) => void;
   onRemoveDivisionEntry: (entryId: string) => void;
   /** When true, hide entry-group switcher (catalog division tabs + partial nav own navigation). */
   hideEntryGroupNav?: boolean;
@@ -111,6 +117,7 @@ const QCDivisionFormBody = ({
   onDivisionEntryValuesChange,
   onDivisionEntryLiquidValuesChange,
   onMixingFinalMixDetailsChange,
+  onProcessingWeightmentSheetChange,
   onRemoveDivisionEntry,
   unitActions = null,
   canResetPostCureSetup = false,
@@ -443,11 +450,14 @@ const QCDivisionFormBody = ({
               entryValuesById={formData.divisionEntryValues ?? {}}
               subDepartmentId={subDepartmentId}
               batchId={batch?.batchId}
+              batchPayload={batch}
+              divisionAutoPopulateData={divisionAutoPopulateData}
               readOnly={readOnly}
               fieldsDisabled={fieldsDisabled}
               schemaLoading={schemaLoading}
               schemaError={schemaError}
               onEntryValuesChange={onDivisionEntryValuesChange}
+              onProcessingWeightmentSheetChange={onProcessingWeightmentSheetChange}
               unitActions={resolveEntryUnitActions(processingMaterialEntries[0] ?? null)}
             />
         ) : (

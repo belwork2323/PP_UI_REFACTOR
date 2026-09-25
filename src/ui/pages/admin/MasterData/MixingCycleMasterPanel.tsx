@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import {
   Box,
   Button,
@@ -17,10 +17,13 @@ import {
 } from "@mui/material";
 import { icons } from "@app/theme/icons";
 import { STRINGS } from "@app/config/strings";
+import { useThemeStore } from "@app/store/themeStore";
+import getBatchManagementTheme from "@app/theme/custom_themes/admin/BatchManagement/batchManagement_theme";
 import MasterDataToggleConfirmDialog from "./components/MasterDataToggleConfirmDialog";
 import SkeletonRow from "@ui/components/common/SkeletonRow";
 import useMixingCycleMasterHook from "@hooks/admin/MasterData/useMixingCycleMasterHook";
 import useMotorStageOptions from "@hooks/admin/MasterData/useMotorStageOptions";
+import useProjectForMotorStageOptions from "@hooks/admin/MasterData/useProjectForMotorStageOptions";
 import {
   formatMotorStageLabel,
   type MixingCycleListPayload,
@@ -60,17 +63,68 @@ const MixingCycleMasterPanel = ({
   onListPayloadChange,
   onStatsChange,
 }: Props) => {
-  const { options: motorStageOptions, loading: motorStageLoading } = useMotorStageOptions(true);
+  const mode = useThemeStore((s) => s.mode);
+  const batchTheme = useMemo(() => getBatchManagementTheme(mode), [mode]);
+  const { modal: batchModal, tableCell: batchTableCell } = batchTheme;
+
+  const { projects: projectSelectOptions, options: projectOptions, loading: projectLoading } =
+    useProjectForMotorStageOptions(true);
   const hook = useMixingCycleMasterHook({
     activeFilter,
     refreshKey,
     onListPayloadChange,
     onStatsChange,
   });
+
+  const filterProjectId = hook.projectFilter || "";
+  const { options: filterMotorStageOptions, loading: filterMotorStageLoading } =
+    useMotorStageOptions(true, filterProjectId || undefined);
+
+  const createProjectId = hook.form.projectId || "";
+  const { options: createMotorStageOptions, loading: createMotorStageLoading } =
+    useMotorStageOptions(hook.inlineMode === "create", createProjectId || "");
+
+  const { options: editMotorStageOptions } = useMotorStageOptions(
+    hook.inlineMode === "edit",
+    hook.form.projectId || undefined,
+  );
+
   const { table, tableCell } = t;
   const formOpen = hook.inlineMode != null;
   const columnCount = 4 + MASTER_DATA_AUDIT_COLUMN_COUNT + 2;
   const [viewTarget, setViewTarget] = useState<MixingCycleRecord | null>(null);
+
+  const viewProjectId = viewTarget?.projectId || "";
+  const { options: viewMotorStageOptions } = useMotorStageOptions(
+    viewTarget != null,
+    viewProjectId || undefined,
+  );
+
+  const resolveProject = (projectId: string) => {
+    const match = projectSelectOptions.find((p) => p.projectId === projectId);
+    if (match) return match;
+    const opt = projectOptions.find((o) => o.value === projectId);
+    if (!opt) return null;
+    return { projectId, projectName: String(opt.label ?? projectId) };
+  };
+
+  const renderProjectCell = (projectId: string) => {
+    const id = String(projectId ?? "").trim();
+    if (!id) return <Typography sx={table.bodyText}>—</Typography>;
+    const project = resolveProject(id);
+    const projectName = project?.projectName?.trim() || id;
+    return (
+      <Box sx={batchTableCell.batchIdBox}>
+        <icons.batchMgmt.projectId
+          sx={{ ...batchTableCell.batchIdIcon, ...batchTableCell.projectIdIcon }}
+        />
+        <Box sx={batchTableCell.projectInfo}>
+          <Typography sx={batchTableCell.projectName}>{projectName}</Typography>
+          <Typography sx={batchTableCell.projectId}>{id}</Typography>
+        </Box>
+      </Box>
+    );
+  };
 
   return (
     <Box>
@@ -78,25 +132,42 @@ const MixingCycleMasterPanel = ({
         <MixingCycleMasterTableToolbar
           search={hook.search}
           onSearchChange={hook.setSearch}
+          projectFilter={hook.projectFilter}
+          onProjectFilterChange={hook.setProjectFilter}
+          projectOptions={projectOptions}
+          projectLoading={projectLoading}
           motorStageFilter={hook.motorStageFilter}
           onMotorStageFilterChange={hook.setMotorStageFilter}
-          motorStageOptions={motorStageOptions}
-          motorStageLoading={motorStageLoading}
+          motorStageOptions={filterMotorStageOptions}
+          motorStageLoading={filterMotorStageLoading}
           onRefresh={onRefresh}
           refreshDisabled={refreshDisabled || hook.loading}
           t={t}
+          renderProjectOption={(props, option) => (
+            <Box component="li" {...props} key={option.value}>
+              <Box sx={batchModal.projectOption}>
+                <Typography sx={batchModal.projectOptionName}>{String(option.label)}</Typography>
+                <Typography sx={batchModal.projectOptionId}>{option.value}</Typography>
+              </Box>
+            </Box>
+          )}
         />
         <Divider sx={table.divider} />
         <TableContainer>
           <Table size="small">
             <TableHead>
               <TableRow sx={table.headerRow}>
-                <TableCell sx={table.headerCell}>{S.MIXING_CYCLES.COL_NAME}</TableCell>
+                <TableCell sx={{ ...table.headerCell, minWidth: 220 }}>
+                  {S.MIXING_CYCLES.COL_PROJECT}
+                </TableCell>
                 <TableCell sx={table.headerCell}>{S.MIXING_CYCLES.COL_MOTOR_STAGE}</TableCell>
+                <TableCell sx={table.headerCell}>{S.MIXING_CYCLES.COL_NAME}</TableCell>
                 <TableCell sx={table.headerCell}>{S.MIXING_CYCLES.COL_OPERATIONS}</TableCell>
                 <MasterDataAuditHeaderCells table={table} />
                 <TableCell sx={table.headerCell}>{S.TABLE.COL_ACTIVE}</TableCell>
-                <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>Actions</TableCell>
+                <TableCell sx={{ ...table.headerCell, ...table.headerCellActions }}>
+                  Actions
+                </TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -112,16 +183,25 @@ const MixingCycleMasterPanel = ({
               ) : (
                 hook.paginated.map((row) => {
                   const opCount =
-                    (row.cycles.premixOperations?.length ?? 0) + (row.cycles.finalMixOperations?.length ?? 0);
+                    (row.cycles.premixOperations?.length ?? 0) +
+                    (row.cycles.finalMixOperations?.length ?? 0);
                   return (
                     <TableRow key={row.id} sx={table.row}>
-                      <TableCell sx={table.cell}>
-                        <Typography sx={table.bodyText}>{row.mixingCycleName}</Typography>
+                      <TableCell sx={{ ...table.cell, minWidth: 220 }}>
+                        {renderProjectCell(row.projectId)}
                       </TableCell>
                       <TableCell sx={table.cell}>
                         <Typography sx={table.bodyText}>
-                          {formatMotorStageLabel(row.motorStage, motorStageOptions)}
+                          {formatMotorStageLabel(row.motorStage, filterMotorStageOptions)}
                         </Typography>
+                      </TableCell>
+                      <TableCell sx={table.cell}>
+                        <Typography sx={table.bodyText}>{row.mixingCycleName}</Typography>
+                        {row.mixingCycleCode ? (
+                          <Typography variant="caption" color="text.secondary" display="block">
+                            {row.mixingCycleCode}
+                          </Typography>
+                        ) : null}
                       </TableCell>
                       <TableCell sx={table.cell}>
                         <Typography sx={table.bodyText}>{opCount}</Typography>
@@ -194,8 +274,13 @@ const MixingCycleMasterPanel = ({
         isEdit={hook.inlineMode === "edit"}
         form={hook.form}
         saving={hook.saving}
-        motorStageOptions={motorStageOptions}
-        motorStageLoading={motorStageLoading}
+        projectOptions={projectOptions}
+        projectLoading={projectLoading}
+        motorStageOptions={
+          hook.inlineMode === "edit" ? editMotorStageOptions : createMotorStageOptions
+        }
+        motorStageLoading={hook.inlineMode === "create" ? createMotorStageLoading : false}
+        existingRecords={hook.items}
         onClose={hook.closeInline}
         onSave={() => void hook.saveForm()}
         onChange={hook.setForm}
@@ -205,7 +290,8 @@ const MixingCycleMasterPanel = ({
       <MixingCycleMasterViewDialog
         open={viewTarget != null}
         record={viewTarget}
-        motorStageOptions={motorStageOptions}
+        projectOptions={projectOptions}
+        motorStageOptions={viewMotorStageOptions}
         onClose={() => setViewTarget(null)}
         t={t}
       />
@@ -215,7 +301,8 @@ const MixingCycleMasterPanel = ({
           hook.toggleTarget
             ? {
                 name:
-                  hook.toggleTarget.record.mixingCycleName || hook.toggleTarget.record.mixingCycleCode,
+                  hook.toggleTarget.record.mixingCycleName ||
+                  hook.toggleTarget.record.mixingCycleCode,
                 nextActive: hook.toggleTarget.nextActive,
               }
             : null

@@ -252,11 +252,11 @@ const PropertyTable = ({
                   sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
                 />
               </TableCell>
-              {columns.map((columnId) => (
+              {columns.map((columnId, columnIndex) => (
                 <TableCell key={columnId} sx={headerSx}>
                   <FieldLabelWithAsterisk
                     label={getQcPropellantFmColumnLabel(columnId)}
-                    required
+                    required={columnIndex === 0}
                     sx={{ display: "inline", fontSize: "inherit", fontWeight: "inherit", color: "inherit", mb: 0 }}
                   />
                 </TableCell>

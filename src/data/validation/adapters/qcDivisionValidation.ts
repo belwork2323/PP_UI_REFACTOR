@@ -114,7 +114,11 @@ export function validateQcDivisionEntry(
       case "SOLID_PREMIX":
       case "LIQUID_PREMIX":
       case "PROCESSING_MATERIAL":
-        // Schema-driven panels — enforce non-empty on SUBMIT only
+        // Schema-driven panels — enforce non-empty on SUBMIT only.
+        // Schema-unavailable materials show weighment fallback (no editable schema values).
+        if (kind === "PROCESSING_MATERIAL" && entry.schemaUnavailable) {
+          break;
+        }
         if (tier === "SUBMIT" && !hasMeaningfulValue(values)) {
           errors = { form: REQUIRED };
         }
@@ -136,7 +140,8 @@ export function validateQcDivisionEntry(
   if (tier === "SUBMIT" && Object.keys(errors).length === 0 && !hasMeaningfulValue(values)) {
     if (
       kind !== "SIMPLE" &&
-      kind !== "STF"
+      kind !== "STF" &&
+      !(kind === "PROCESSING_MATERIAL" && entry.schemaUnavailable)
     ) {
       errors = { form: REQUIRED };
     }

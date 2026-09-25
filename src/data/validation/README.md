@@ -6,9 +6,11 @@ Shared intent-based validation for workflow forms. Each subdepartment owns one c
 
 | Tier | When | What |
 |------|------|------|
-| `FORMAT` | Live on field change | Type/format on non-empty values only |
-| `UNIT` | Save draft, add lot, persist unit | Minimum fields to persist a lot/unit |
+| `FORMAT` | Live on field change; **QC Save as Draft** | Type/format on non-empty values only — **never mandatory** |
+| `UNIT` | Manufacturing persist / optional min fields | Minimum fields to persist a lot/unit |
 | `SUBMIT` | Submit for approval | All mandatory fields + business rules |
+
+**QC rule:** Save/draft → `FORMAT` (no required checks). Submit → `SUBMIT` (mandatory).
 
 ## Layout
 

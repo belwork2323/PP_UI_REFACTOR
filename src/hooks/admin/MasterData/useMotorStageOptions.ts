@@ -2,7 +2,14 @@ import { useEffect, useState } from "react";
 import { operationsController } from "@controllers/user/operationsController";
 import type { AppDropdownOption } from "@ui/components/common/AppDropdown";
 
-export default function useMotorStageOptions(enabled: boolean) {
+/**
+ * @param enabled When false, clears options.
+ * @param projectId
+ *   - `undefined`: load all stages (curing/quality/etc.)
+ *   - `""`: no project selected yet — empty options
+ *   - non-empty: stages for that project only
+ */
+export default function useMotorStageOptions(enabled: boolean, projectId?: string) {
   const [options, setOptions] = useState<AppDropdownOption[]>([]);
   const [loading, setLoading] = useState(false);
 
@@ -11,12 +18,17 @@ export default function useMotorStageOptions(enabled: boolean) {
       setOptions([]);
       return;
     }
+    if (projectId === "") {
+      setOptions([]);
+      setLoading(false);
+      return;
+    }
 
     let cancelled = false;
     setLoading(true);
 
     void operationsController
-      .fetchMotorsStageList()
+      .fetchMotorsStageList(projectId ? { projectId } : undefined)
       .then((response) => {
         if (cancelled) return;
         const stages = response?.success && response.data ? response.data.stages ?? [] : [];
@@ -37,7 +49,7 @@ export default function useMotorStageOptions(enabled: boolean) {
     return () => {
       cancelled = true;
     };
-  }, [enabled]);
+  }, [enabled, projectId]);
 
   return { options, loading };
 }

@@ -417,13 +417,9 @@ const mapMixingCycleMasterItem = (row: Record<string, unknown>): MixingCycleMast
  * Mixing cycle master — POST api/v1/system/mixing-cycle-list (authenticated)
  * Request body: `{ motorStage: "0" | "1" | "2" | "3" | "ALL" }` (always string)
  */
-export const fetchMixingCycles = async (
-  motorStage: MixingCycleMotorStage = "ALL",
-): Promise<MixingCycleMasterItem[]> => {
+export const fetchMixingCycles = async (): Promise<MixingCycleMasterItem[]> => {
   try {
-    const body = await post(SYSTEM.MIXING_CYCLE_LIST, {
-      motorStage: normalizeMixingCycleMotorStage(motorStage),
-    });
+    const body = await get(SYSTEM.MIXING_CYCLE_LIST);
     assertSuccessEnvelope(body);
     return asList(body)
       .map(mapMixingCycleMasterItem)

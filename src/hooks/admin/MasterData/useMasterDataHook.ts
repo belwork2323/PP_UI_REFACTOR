@@ -33,6 +33,8 @@ export default function useMasterDataHook() {
   const [loadingList, setLoadingList] = useState(false);
   const [search, setSearch] = useState("");
   const [activeFilter, setActiveFilter] = useState<"ALL" | "ACTIVE" | "INACTIVE">("ALL");
+  const [projectFilter, setProjectFilter] = useState("");
+  const [motorStageFilter, setMotorStageFilter] = useState("");
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [nestedRefreshKey, setNestedRefreshKey] = useState(0);
@@ -74,7 +76,10 @@ export default function useMasterDataHook() {
       setTypes([]);
       useAlertStore
         .getState()
-        .showAlert(getMasterDataErrorMessage(err?.response?.data, S.ERRORS.LOAD_TYPES_FAILED), "error");
+        .showAlert(
+          getMasterDataErrorMessage(err, S.ERRORS.LOAD_TYPES_FAILED),
+          "error",
+        );
     } finally {
       setLoadingTypes(false);
     }
@@ -87,7 +92,8 @@ export default function useMasterDataHook() {
       setSchema(typeMeta);
       setListPayload(null);
       setItems([]);
-      setStats(emptyMasterDataStats());
+      // Nested panels own stats via onStatsChange. Do not zero them here —
+      // activeFilter / search changes would wipe correct counts until a remount.
       setLoadingList(false);
       return;
     }
@@ -116,7 +122,10 @@ export default function useMasterDataHook() {
       setStats(emptyMasterDataStats());
       useAlertStore
         .getState()
-        .showAlert(getMasterDataErrorMessage(err?.response?.data, S.ERRORS.LOAD_LIST_FAILED), "error");
+        .showAlert(
+          getMasterDataErrorMessage(err, S.ERRORS.LOAD_LIST_FAILED),
+          "error",
+        );
     } finally {
       setLoadingList(false);
     }
@@ -126,6 +135,13 @@ export default function useMasterDataHook() {
     void loadTypes();
   }, [loadTypes]);
 
+  // Reset status cards when switching master type (nested panels re-push after load).
+  useEffect(() => {
+    if (!selectedType || isNestedMasterDataType(selectedType)) {
+      setStats(emptyMasterDataStats());
+    }
+  }, [selectedType]);
+
   useEffect(() => {
     setPage(0);
     setInlineMode(null);
@@ -133,7 +149,6 @@ export default function useMasterDataHook() {
     if (!selectedType) {
       setListPayload(null);
       setItems([]);
-      setStats(emptyMasterDataStats());
       setSchema(null);
       setLoadingList(false);
       return;
@@ -141,10 +156,39 @@ export default function useMasterDataHook() {
     void loadList();
   }, [loadList, selectedType, activeFilter, types]);
 
+  const filteredItems = useMemo(() => {
+    if (selectedType !== "motor-stages") return items;
+    return items.filter((record) => {
+      if (projectFilter && String(record.attributes?.projectId ?? "") !== projectFilter) {
+        return false;
+      }
+      if (motorStageFilter && String(record.attributes?.motorStage ?? "") !== motorStageFilter) {
+        return false;
+      }
+      return true;
+    });
+  }, [items, selectedType, projectFilter, motorStageFilter]);
+
+  const motorStageFilterOptions = useMemo(() => {
+    if (selectedType !== "motor-stages") return [];
+    const stages = new Set<string>();
+    for (const record of items) {
+      if (projectFilter && String(record.attributes?.projectId ?? "") !== projectFilter) {
+        continue;
+      }
+      const stage = record.attributes?.motorStage;
+      if (stage == null || stage === "") continue;
+      stages.add(String(stage));
+    }
+    return Array.from(stages)
+      .sort((a, b) => Number(a) - Number(b))
+      .map((value) => ({ value, label: `Stage ${value}` }));
+  }, [items, selectedType, projectFilter]);
+
   const paginated = useMemo(() => {
     const start = page * rowsPerPage;
-    return items.slice(start, start + rowsPerPage);
-  }, [items, page, rowsPerPage]);
+    return filteredItems.slice(start, start + rowsPerPage);
+  }, [filteredItems, page, rowsPerPage]);
 
   const openCreate = () => {
     setEditTarget(null);
@@ -179,7 +223,9 @@ export default function useMasterDataHook() {
     }
 
     setSaving(true);
-    useAlertStore.getState().showAlert(isEdit ? S.MESSAGES.UPDATING : S.MESSAGES.CREATING, "loading");
+    useAlertStore
+      .getState()
+      .showAlert(isEdit ? S.MESSAGES.UPDATING : S.MESSAGES.CREATING, "loading");
     try {
       const resp = isEdit
         ? await masterDataController.update(selectedType, form, schema)
@@ -200,72 +246,82 @@ export default function useMasterDataHook() {
     } catch (e: any) {
       useAlertStore
         .getState()
-        .showAlert(getMasterDataErrorMessage(e?.response?.data, S.ERRORS.OPERATION_FAILED), "error");
+        .showAlert(
+          getMasterDataErrorMessage(e, S.ERRORS.OPERATION_FAILED),
+          "error",
+        );
     } finally {
       setSaving(false);
     }
   };
 
-  const enableRecord = useCallback(async (record: MasterDataRecord) => {
-    setEnabling(true);
-    useAlertStore.getState().showAlert(S.MESSAGES.ENABLING, "loading");
-    try {
-      const nextForm = { ...mapRecordToForm(record, schema), isActive: true };
-      const resp = await masterDataController.update(selectedType, nextForm, schema);
-      if (resp.success) {
-        useAlertStore.getState().showAlert(S.MESSAGES.ENABLE_SUCCESS, "success");
-        await loadList();
-      } else {
+  const enableRecord = useCallback(
+    async (record: MasterDataRecord) => {
+      setEnabling(true);
+      useAlertStore.getState().showAlert(S.MESSAGES.ENABLING, "loading");
+      try {
+        const resp = await masterDataController.enable(selectedType, record.id);
+        if (resp.success) {
+          useAlertStore.getState().showAlert(S.MESSAGES.ENABLE_SUCCESS, "success");
+          await loadList();
+        } else {
+          useAlertStore
+            .getState()
+            .showAlert(getMasterDataErrorMessage(resp, S.ERRORS.OPERATION_FAILED), "error");
+        }
+      } catch (e: any) {
         useAlertStore
           .getState()
-          .showAlert(getMasterDataErrorMessage(resp, S.ERRORS.OPERATION_FAILED), "error");
+          .showAlert(
+            getMasterDataErrorMessage(e, S.ERRORS.OPERATION_FAILED),
+            "error",
+          );
+      } finally {
+        setEnabling(false);
       }
-    } catch (e: any) {
-      useAlertStore
-        .getState()
-        .showAlert(getMasterDataErrorMessage(e?.response?.data, S.ERRORS.OPERATION_FAILED), "error");
-    } finally {
-      setEnabling(false);
-    }
-  }, [loadList, schema, selectedType]);
+    },
+    [loadList, selectedType],
+  );
 
-  const disableRecord = useCallback(async (record: MasterDataRecord) => {
-    setDisabling(true);
-    useAlertStore.getState().showAlert(S.MESSAGES.DISABLING, "loading");
-    try {
-      const resp = await masterDataController.disable(selectedType, record.id);
-      if (resp.success) {
-        useAlertStore.getState().showAlert(S.MESSAGES.DISABLE_SUCCESS, "success");
-        await loadList();
-      } else {
+  const disableRecord = useCallback(
+    async (record: MasterDataRecord) => {
+      setDisabling(true);
+      useAlertStore.getState().showAlert(S.MESSAGES.DISABLING, "loading");
+      try {
+        const resp = await masterDataController.disable(selectedType, record.id);
+        if (resp.success) {
+          useAlertStore.getState().showAlert(S.MESSAGES.DISABLE_SUCCESS, "success");
+          await loadList();
+        } else {
+          useAlertStore
+            .getState()
+            .showAlert(getMasterDataErrorMessage(resp, S.ERRORS.OPERATION_FAILED), "error");
+        }
+      } catch (e: any) {
         useAlertStore
           .getState()
-          .showAlert(getMasterDataErrorMessage(resp, S.ERRORS.OPERATION_FAILED), "error");
+          .showAlert(
+            getMasterDataErrorMessage(e, S.ERRORS.OPERATION_FAILED),
+            "error",
+          );
+      } finally {
+        setDisabling(false);
       }
-    } catch (e: any) {
-      useAlertStore
-        .getState()
-        .showAlert(getMasterDataErrorMessage(e?.response?.data, S.ERRORS.OPERATION_FAILED), "error");
-    } finally {
-      setDisabling(false);
-    }
-  }, [loadList, selectedType]);
+    },
+    [loadList, selectedType],
+  );
 
   const canToggle = useCallback(
     () => inlineMode == null && !saving && !disabling && !enabling,
     [inlineMode, saving, disabling, enabling],
   );
 
-  const {
-    toggleTarget,
-    handleToggleActive,
-    confirmToggle,
-    cancelToggle,
-  } = useMasterDataActiveToggle({
-    canToggle,
-    enableRecord,
-    disableRecord,
-  });
+  const { toggleTarget, handleToggleActive, confirmToggle, cancelToggle } =
+    useMasterDataActiveToggle({
+      canToggle,
+      enableRecord,
+      disableRecord,
+    });
 
   const canSave = isMasterDataFormComplete(form, schema, inlineMode === "edit");
 
@@ -276,12 +332,15 @@ export default function useMasterDataHook() {
       setSelectedType(type);
       setSearch("");
       setActiveFilter("ALL");
+      setProjectFilter("");
+      setMotorStageFilter("");
       setInlineMode(null);
       setEditTarget(null);
     },
     loadingTypes,
     loadingList,
     items,
+    filteredItems,
     paginated,
     stats,
     schema,
@@ -295,6 +354,18 @@ export default function useMasterDataHook() {
       setActiveFilter(value);
       setPage(0);
     },
+    projectFilter,
+    setProjectFilter: (value: string) => {
+      setProjectFilter(value);
+      setMotorStageFilter("");
+      setPage(0);
+    },
+    motorStageFilter,
+    setMotorStageFilter: (value: string) => {
+      setMotorStageFilter(value);
+      setPage(0);
+    },
+    motorStageFilterOptions,
     page,
     setPage,
     rowsPerPage,

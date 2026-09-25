@@ -208,8 +208,9 @@ export const useRocketMotorCasingHook = () => {
       const detailsModel = detailsResponse.data as RocketMotorCasingDetailsModel;
       let resolvedForm = RocketMotorCasingDetailsModel.toCasingFormData(detailsModel);
       const stage = resolvedForm.motorStageApi || "";
+      const projectId = String(resolvedForm.projectId ?? "").trim();
 
-      await loadDimensionalForStage(stage, resolvedForm.dimensionalData);
+      await loadDimensionalForStage(projectId, stage, resolvedForm.dimensionalData);
 
       setActiveBatch((prev) =>
         prev
@@ -336,15 +337,16 @@ export const useRocketMotorCasingHook = () => {
   };
 
   const loadDimensionalForStage = async (
+    projectId: string,
     stage: string,
     currentRows: RocketMotorCasingFormData["dimensionalData"],
   ) => {
-    if (!stage) {
+    if (!projectId || !stage) {
       setDimensionalParameters([]);
       setDimensionalParametersErrorMessage("");
       return;
     }
-    const { parameters, errorMessage } = await fetchDimensionalParameters(stage);
+    const { parameters, errorMessage } = await fetchDimensionalParameters(projectId, stage);
     setDimensionalParameters(parameters);
     setDimensionalParametersErrorMessage(errorMessage ?? "");
     if (parameters.length) {
@@ -412,7 +414,8 @@ export const useRocketMotorCasingHook = () => {
     }
 
     const stage = resolvedForm.motorStageApi || resolvedBatch.motorType || "";
-    await loadDimensionalForStage(stage, resolvedForm.dimensionalData);
+    const projectId = String(resolvedForm.projectId ?? resolvedBatch.projectId ?? "").trim();
+    await loadDimensionalForStage(projectId, stage, resolvedForm.dimensionalData);
 
     setActiveBatch(resolvedBatch);
     setIsEditMode(editMode);
@@ -519,7 +522,8 @@ export const useRocketMotorCasingHook = () => {
   useEffect(() => {
     if (view !== "form") return;
     const stage = String(casingForm.motorStageApi ?? "").trim();
-    if (!stage) {
+    const projectId = String(casingForm.projectId ?? "").trim();
+    if (!projectId || !stage) {
       setFetchingMotorParams(false);
       return;
     }
@@ -529,7 +533,7 @@ export const useRocketMotorCasingHook = () => {
 
     (async () => {
       try {
-        const { parameters, errorMessage } = await fetchDimensionalParameters(stage);
+        const { parameters, errorMessage } = await fetchDimensionalParameters(projectId, stage);
         if (cancelled) return;
         setDimensionalParameters(parameters);
         setDimensionalParametersErrorMessage(errorMessage ?? "");
@@ -550,7 +554,7 @@ export const useRocketMotorCasingHook = () => {
     return () => {
       cancelled = true;
     };
-  }, [casingForm.motorStageApi, view]);
+  }, [casingForm.motorStageApi, casingForm.projectId, view, fetchDimensionalParameters]);
 
   const handleFillForm = async (batch: RocketMotorBatch) => openForm(batch, false);
   const handleEditForm = async (batch: RocketMotorBatch) => openForm(batch, true);

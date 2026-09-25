@@ -23,8 +23,8 @@ import {
 } from "@data/models/admin/BatchManagement/BatchManagementModel";
 import {
   mapLotListApiRow,
+  RawMaterialLotListGrade,
   toRawMaterialLotListApiStatus,
-  type RawMaterialLotListRow,
 } from "@data/models/user/RawMaterialProcurementModel";
 import { useAlertStore } from "@app/store/alertStore";
 import { STRINGS } from "@app/config/strings";
@@ -76,6 +76,24 @@ type BatchFilters = {
   filterType?: string;
   endDate?: string;
   startDate?: string;
+};
+
+export type RawMaterialLotListRow = {
+  id: string | number;
+  lotId: string[];
+  sourcingId: string;
+  materialCode: string;
+  materialName: string;
+  grade: RawMaterialLotListGrade | null;
+  supplyOrderNo: string;
+  receiptDate: string;
+  manufacturerName: string;
+  status: string;
+  createdBy?: { id: string; fullName: string } | null;
+  createdOn: string;
+  rmStatus: string;
+  formId?: string | null;
+  rejectionReason?: string;
 };
 
 function useBatchListSection(dateFilter: {
@@ -252,36 +270,62 @@ function useBatchLookupsSection() {
   const [projects, setProjects] = useState<any[]>([]);
   const [motorStages, setMotorStages] = useState<any[]>([]);
   const [availableMotors, setAvailableMotors] = useState<any[]>([]);
-  const [mixingCycles, setMixingCycles] = useState<MixingCycleMasterItem[]>([]);
   const [subscaleArticles, setSubscaleArticles] = useState<SubscaleArticleOption[]>([]);
   const [lookupsLoading, setLookupsLoading] = useState(true);
   const [availableMotorsLoading, setAvailableMotorsLoading] = useState(false);
-  const [mixingCyclesLoading, setMixingCyclesLoading] = useState(false);
+  const [motorStagesLoading, setMotorStagesLoading] = useState(false);
+
+  // Expose selected project state so it can be tracked and managed cleanly
+  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+
+  const fetchMotorStages = useCallback(async (projectId?: string) => {
+    const pid = String(projectId ?? "").trim();
+    if (!pid) {
+      setMotorStages([]);
+      return;
+    }
+
+    setMotorStagesLoading(true);
+    try {
+      // Pass the project ID as a payload/parameter to the motor stages API
+      const motorStageResp = await operationsController.fetchMotorsStageList({
+        projectId: pid,
+      });
+      if (motorStageResp?.success && motorStageResp.data) {
+        setMotorStages(motorStageResp.data.stages ?? []);
+      } else {
+        setMotorStages([]);
+      }
+    } catch (err) {
+      console.error("Failed to fetch motor stages for project:", err);
+      setMotorStages([]);
+    } finally {
+      setMotorStagesLoading(false);
+    }
+  }, []);
 
   const loadLookups = useCallback(async () => {
     setLookupsLoading(true);
     try {
-      const [deptResp, subDeptResp, userResp, projectResp, motorStageResp, articlesResp] =
-        await Promise.all([
-          generalController.getDepartments(),
-          generalController.getSubDepartments(),
-          userManagementController.getAllUsers({
-            search: "",
-            role: "System Manager",
-            department: "All",
-            status: "Active",
-            page: 1,
-            pageSize: 1000,
-          }),
-          projectManagementController.getAllProjects({
-            page: 1,
-            limit: 1000,
-            sortBy: "createdOn",
-            sortOrder: "desc",
-          }),
-          operationsController.fetchMotorsStageList(),
-          generalController.getSubscaleArticles(),
-        ]);
+      const [deptResp, subDeptResp, userResp, projectResp, articlesResp] = await Promise.all([
+        generalController.getDepartments(),
+        generalController.getSubDepartments(),
+        userManagementController.getAllUsers({
+          search: "",
+          role: "System Manager",
+          department: "All",
+          status: "Active",
+          page: 1,
+          pageSize: 1000,
+        }),
+        projectManagementController.getAllProjects({
+          page: 1,
+          limit: 1000,
+          sortBy: "createdOn",
+          sortOrder: "desc",
+        }),
+        generalController.getSubscaleArticles(),
+      ]);
 
       setDepartments(deptResp?.data || []);
       setSubDepts(subDeptResp?.data || []);
@@ -295,21 +339,20 @@ function useBatchLookupsSection() {
         setUsers([]);
       }
 
-      if (projectResp?.success && projectResp.data) {
-        setProjects(projectResp.data.projects ?? []);
-      } else {
-        setProjects([]);
-      }
-
-      if (motorStageResp?.success && motorStageResp.data) {
-        setMotorStages(motorStageResp.data.stages ?? []);
-      } else {
-        setMotorStages([]);
-      }
+      const fetchedProjects =
+        projectResp?.success && projectResp.data ? (projectResp.data.projects ?? []) : [];
+      setProjects(fetchedProjects);
 
       setSubscaleArticles(
         articlesResp?.success && Array.isArray(articlesResp.data) ? articlesResp.data : [],
       );
+
+      // Default to the 1st project if available and trigger motor stage fetch automatically
+      if (fetchedProjects.length > 0) {
+        const defaultPid = fetchedProjects[0].projectId ?? "";
+        setSelectedProjectId(defaultPid);
+        await fetchMotorStages(defaultPid);
+      }
     } catch (err) {
       console.error(S.ERRORS.LOAD_LOOKUPS_FAILED, err);
       setProjects([]);
@@ -318,7 +361,16 @@ function useBatchLookupsSection() {
     } finally {
       setLookupsLoading(false);
     }
-  }, []);
+  }, [fetchMotorStages]);
+
+  // Handler to update project selection and fetch corresponding motor stages
+  const handleProjectSelect = useCallback(
+    async (projectId: string) => {
+      setSelectedProjectId(projectId);
+      await fetchMotorStages(projectId);
+    },
+    [fetchMotorStages],
+  );
 
   const fetchApprovedMotors = useCallback(async (projectId: string, motorStage: string) => {
     const pid = String(projectId ?? "").trim();
@@ -351,29 +403,6 @@ function useBatchLookupsSection() {
     setAvailableMotors([]);
   }, []);
 
-  const fetchMixingCycles = useCallback(async (motorStage?: string | number | null) => {
-    const stage = String(motorStage ?? "").trim();
-    if (!stage) {
-      setMixingCycles([]);
-      return;
-    }
-
-    setMixingCyclesLoading(true);
-    try {
-      const resp = await generalController.getMixingCycles(stage);
-      setMixingCycles(resp?.success && Array.isArray(resp.data) ? resp.data : []);
-    } catch (err) {
-      console.error("Failed to fetch mixing cycles:", err);
-      setMixingCycles([]);
-    } finally {
-      setMixingCyclesLoading(false);
-    }
-  }, []);
-
-  const clearMixingCycles = useCallback(() => {
-    setMixingCycles([]);
-  }, []);
-
   useEffect(() => {
     void loadLookups();
   }, [loadLookups]);
@@ -388,15 +417,18 @@ function useBatchLookupsSection() {
     name: u.username || u.fullName || u.name || "",
     username: u.username,
   }));
+
   const projectOptions = projects.map((p: any) => ({
     projectId: p.projectId ?? "",
     projectName: p.projectName ?? p.projectId ?? "",
   }));
+
   const motorStageOptions = motorStages.map((stage: any) => ({
     motorStage: stage.motorStage ?? "",
     noOfmotors: stage.noOfmotors ?? 0,
     motorTypeId: stage.motorTypeId ?? 0,
   }));
+
   const availableMotorOptions = availableMotors.map((motor: any) => ({
     motorCasingId: motor.motorCasingId ?? "",
     motorId: motor.motorId ?? motor.motorNo ?? "",
@@ -406,16 +438,6 @@ function useBatchLookupsSection() {
     status: motor.status ?? "",
   }));
 
-  const mixingCycleOptions = mixingCycles.map((cycle) => ({
-    mixingCycleId: cycle.mixingCycleId,
-    mixingCycleCode: cycle.mixingCycleCode,
-    mixingCycleName: cycle.mixingCycleName,
-    motorStage: cycle.motorStage,
-    value: String(cycle.mixingCycleId),
-    label: cycle.mixingCycleName || cycle.mixingCycleCode,
-  }));
-
-  // Prefer article code as selected value (API write shape).
   const articleOptions = subscaleArticles.map((article) => ({
     value: article.subscaleArticleCode,
     label: article.subscaleArticleName,
@@ -432,14 +454,13 @@ function useBatchLookupsSection() {
     userOptions,
     projectOptions,
     motorStageOptions,
+    selectedProjectId,
+    handleProjectSelect,
+    motorStagesLoading,
     availableMotorOptions,
     availableMotorsLoading,
     fetchApprovedMotors,
     clearApprovedMotors,
-    mixingCycleOptions,
-    mixingCyclesLoading,
-    fetchMixingCycles,
-    clearMixingCycles,
     articleOptions,
     subscaleArticlesLoading: lookupsLoading,
     deptNames,
@@ -448,7 +469,6 @@ function useBatchLookupsSection() {
     loadLookups,
   };
 }
-
 function useBatchFormSection(onRefresh: () => void) {
   const [modalOpen, setModalOpen] = useState(false);
   const [implModalOpen, setImplModalOpen] = useState(false);
@@ -486,11 +506,9 @@ function useBatchFormSection(onRefresh: () => void) {
     setImplBaselineSnapshot(form);
   };
 
-  const isBatchFormDirty = () =>
-    serializeFormSnapshot(batchForm) !== batchFormBaselineRef.current;
+  const isBatchFormDirty = () => serializeFormSnapshot(batchForm) !== batchFormBaselineRef.current;
 
-  const isImplFormDirty = () =>
-    serializeFormSnapshot(implForm) !== implFormBaselineRef.current;
+  const isImplFormDirty = () => serializeFormSnapshot(implForm) !== implFormBaselineRef.current;
 
   const closeBatchModal = (afterClose?: () => void) => {
     setCloseBatchConfirmOpen(false);
@@ -687,7 +705,9 @@ function useBatchFormSection(onRefresh: () => void) {
 
   const getBatchFormBaseline = (): ReturnType<typeof createEmptyBatchFormState> => {
     try {
-      return JSON.parse(batchFormBaselineRef.current) as ReturnType<typeof createEmptyBatchFormState>;
+      return JSON.parse(batchFormBaselineRef.current) as ReturnType<
+        typeof createEmptyBatchFormState
+      >;
     } catch {
       return createEmptyBatchFormState();
     }
@@ -961,8 +981,7 @@ function useBatchFormSection(onRefresh: () => void) {
     }));
 
   const canSaveBatchChanges =
-    !editTarget ||
-    hasAdditionalBatchDetailsChanges(getBatchFormBaseline(), batchForm);
+    !editTarget || hasAdditionalBatchDetailsChanges(getBatchFormBaseline(), batchForm);
 
   const baselineMotorIds = useMemo(() => {
     if (!editTarget || editMode !== "append_only") return [];
@@ -1075,9 +1094,7 @@ function useBatchImplementationSection(implModalOpen: boolean) {
     setLoadingMasterLookups(true);
     try {
       const mixersRes = await generalController.getMixers();
-      setMixerOptions(
-        mixersRes?.success && Array.isArray(mixersRes.data) ? mixersRes.data : [],
-      );
+      setMixerOptions(mixersRes?.success && Array.isArray(mixersRes.data) ? mixersRes.data : []);
     } catch {
       setMixerOptions([]);
     } finally {
@@ -1101,55 +1118,75 @@ function useBatchImplementationSection(implModalOpen: boolean) {
   );
 
   const getLotByMaterialAndId = useCallback(
-    (materialCode: string, lotId: string): RawMaterialLotListRow | undefined => {
-      const trimmed = String(lotId ?? "").trim();
-      if (!trimmed) return undefined;
-      return getLotsForMaterial(materialCode).find((lot) => lot.lotId === trimmed);
+    (materialCode: string, lotIds: string[]): RawMaterialLotListRow[] => {
+      if (!Array.isArray(lotIds) || lotIds.length === 0) return [];
+      const trimmedIds = lotIds.map((id) => String(id ?? "").trim()).filter(Boolean);
+      if (trimmedIds.length === 0) return [];
+
+      const lots = getLotsForMaterial(materialCode);
+      return lots.filter((lot) => {
+        const lotIdValue = Array.isArray(lot.lotId) ? lot.lotId[0] : lot.lotId;
+        return lotIdValue ? trimmedIds.includes(String(lotIdValue).trim()) : false;
+      });
     },
     [getLotsForMaterial],
   );
 
   const getLotOptionsForRow = (
     materialCode: string,
-    currentLotId: string,
+    currentLotIds: string[],
     selectedElsewhere: Set<string>,
     gradeCode?: string | null,
   ): RawMaterialLotListRow[] => {
     const base = getLotsForMaterial(materialCode);
     const gradeKey = String(gradeCode ?? "").trim();
+
+    // Normalize currentLotIds to a safe array of strings
+    const activeLotIds = Array.isArray(currentLotIds)
+      ? currentLotIds.map((id) => String(id).trim()).filter(Boolean)
+      : [];
+
     const filtered = base.filter((lot) => {
       if (gradeKey) {
         const lotGrade = String(lot.grade?.gradeCode ?? "").trim();
         if (lotGrade && lotGrade !== gradeKey) return false;
       }
-      if (lot.lotId === currentLotId) return true;
-      return !selectedElsewhere.has(lot.lotId);
+
+      // Handle case where lot.lotId might be an array or string in the current interface
+      const lotIdValue = Array.isArray(lot.lotId) ? lot.lotId[0] : lot.lotId;
+
+      if (lotIdValue && activeLotIds.includes(lotIdValue)) return true;
+      return lotIdValue ? !selectedElsewhere.has(lotIdValue) : false;
     });
 
-    const trimmed = String(currentLotId ?? "").trim();
-    if (trimmed && !filtered.some((lot) => lot.lotId === trimmed)) {
-      return [
-        {
-          id: trimmed,
-          lotId: trimmed,
+    // Inject individual fallback rows for any selected lot ID not found in the base list
+    const missingLots: RawMaterialLotListRow[] = [];
+    for (const lotId of activeLotIds) {
+      const exists = filtered.some((lot) => {
+        const lotIdValue = Array.isArray(lot.lotId) ? lot.lotId[0] : lot.lotId;
+        return lotIdValue === lotId;
+      });
+
+      if (!exists) {
+        missingLots.push({
+          id: lotId,
+          // Match the type definition: cast or provide as array if RawMaterialLotListRow expects string[]
+          lotId: [lotId] as any,
           sourcingId: "",
           materialCode,
           materialName: "",
-          grade: gradeKey
-            ? { gradeId: 0, gradeCode: gradeKey, gradeName: gradeKey }
-            : null,
+          grade: gradeKey ? { gradeId: 0, gradeCode: gradeKey, gradeName: gradeKey } : null,
           supplyOrderNo: "",
           receiptDate: "",
           manufacturerName: "",
-          status: OPERATION_STATUS.APPROVED,
-          rmStatus: OPERATION_STATUS.APPROVED,
+          status: "APPROVED" as any,
+          rmStatus: "Approved",
           createdOn: "",
-        },
-        ...filtered,
-      ];
+        });
+      }
     }
 
-    return filtered;
+    return [...missingLots, ...filtered];
   };
 
   return {

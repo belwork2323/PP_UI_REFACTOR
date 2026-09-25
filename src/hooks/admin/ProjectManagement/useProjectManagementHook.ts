@@ -157,11 +157,11 @@ function useProjectStatsSection(
         endDate: appliedCustomEnd,
       };
     }
-
+    let filter = filterType === DEFAULT_DATE_FILTER_TYPE ? "custom" : filterType;
     const { startDate, endDate } = getDateRange(filterType);
 
     return {
-      filterType,
+      filterType: filter,
       startDate,
       endDate,
     };

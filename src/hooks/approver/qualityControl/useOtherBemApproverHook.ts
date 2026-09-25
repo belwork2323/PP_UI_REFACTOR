@@ -82,7 +82,7 @@ export const useOtherBemApproverHook = () => {
       if (response?.success && Array.isArray(response?.data?.motors)) {
         setItems(response.data.motors.map(mapOtherBemListRow));
         const pagination = (response.data as { pagination?: Record<string, number> }).pagination
-          ? (response.data as { pagination: Record<string, number> }).pagination
+          ? (response.data as unknown as { pagination: Record<string, number> }).pagination
           : (response.data as unknown as Record<string, number>);
         setTotalRecords(Number(pagination?.totalRecords ?? response.data.totalRecords ?? 0));
         setTotalPages(Number(pagination?.totalPages ?? response.data.totalPages ?? 0));
@@ -107,7 +107,7 @@ export const useOtherBemApproverHook = () => {
     setDetailView(null);
     setDetailsLoading(true);
 
-    const motorId = String(row?.motorId ?? row?.id ?? "").trim();
+    const motorId = String(row?.motorId ?? "").trim();
 
     if (!motorId) {
       setDetailsLoading(false);

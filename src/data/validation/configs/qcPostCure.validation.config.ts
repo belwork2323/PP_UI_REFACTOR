@@ -44,7 +44,7 @@ export const qcPostCureValidationFields: Record<string, FieldRuleConfig> = {
   location: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   fromDate: date(["SUBMIT"]),
   toDate: date(["SUBMIT"]),
-  batchNo: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
+  batchNo: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   preparationDate: date(["SUBMIT"]),
   specification: number(["SUBMIT"]),
   result: number(["SUBMIT"]),
@@ -53,8 +53,8 @@ export const qcPostCureValidationFields: Record<string, FieldRuleConfig> = {
   observations: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   qcReport: file(["SUBMIT"]),
   dispatchDate: date(["SUBMIT"]),
-  dispatchStation: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
-  remarks: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  dispatchStation: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  remarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
 };
 
 const asRecord = (v: unknown): Record<string, unknown> | null =>

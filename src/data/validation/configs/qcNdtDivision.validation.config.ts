@@ -33,15 +33,18 @@ export type QcNdtDivisionValidationTarget = {
 };
 
 export const qcNdtDivisionValidationFields: Record<string, FieldRuleConfig> = {
-  machineNo: text(["SUBMIT"], S.PATTERNS.MASTER_CODE),
-  noOfSections: number(["FORMAT", "SUBMIT"]),
-  noOfOrientations: number(["FORMAT", "SUBMIT"]),
-  normalExposures: number(["FORMAT", "SUBMIT"]),
-  tangentialExposures: number(["FORMAT", "SUBMIT"]),
+  // Composed display string from equipment + beam energies, e.g. "4 MeV LINAC (2 MeV)"
+  machineNo: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  // Mandatory on SUBMIT only — draft/save uses FORMAT (no required checks)
+  noOfSections: number(["SUBMIT"]),
+  noOfOrientations: number(["SUBMIT"]),
+  normalExposures: number(["SUBMIT"]),
+  tangentialExposures: number(["SUBMIT"]),
   typeOfDefect: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
-  observations: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  // Preset defect/visual rows — notes are optional; validate format only when filled
+  observations: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   location: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
-  visualObservation: text(["SUBMIT"], S.PATTERNS.ALPHABET_WITH_SPECIAL),
+  visualObservation: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
   uploadImage: file([]),
   signedReport: file(["SUBMIT"]),
   additionalRemarks: text([], S.PATTERNS.ALPHABET_WITH_SPECIAL),
@@ -51,6 +54,19 @@ const asRecord = (v: unknown): Record<string, unknown> | null =>
   v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null;
 
 const asArray = (v: unknown): unknown[] => (Array.isArray(v) ? v : []);
+
+/** Resolve bare or section-scoped keys (`SIGNED_NDT_REPORT::SIGNED_REPORT`). */
+const pickValue = (values: Record<string, unknown>, ...fieldIds: string[]): unknown => {
+  for (const id of fieldIds) {
+    if (values[id] !== undefined && values[id] !== null) return values[id];
+  }
+  for (const [key, value] of Object.entries(values)) {
+    for (const id of fieldIds) {
+      if (key === id || key.endsWith(`::${id}`)) return value;
+    }
+  }
+  return undefined;
+};
 
 export const qcNdtDivisionValidationConfig: SubDeptValidationConfig<QcNdtDivisionValidationTarget> =
   {
@@ -62,12 +78,12 @@ export const qcNdtDivisionValidationConfig: SubDeptValidationConfig<QcNdtDivisio
 
       fields.push({
         path: "SIGNED_REPORT",
-        value: values.SIGNED_REPORT ?? values.signedReport,
+        value: pickValue(values, "SIGNED_REPORT", "signedReport"),
         ruleKey: "signedReport",
       });
       fields.push({
         path: "ADDITIONAL_REMARKS",
-        value: values.ADDITIONAL_REMARKS ?? values.additionalRemarks,
+        value: pickValue(values, "ADDITIONAL_REMARKS", "additionalRemarks"),
         ruleKey: "additionalRemarks",
       });
 

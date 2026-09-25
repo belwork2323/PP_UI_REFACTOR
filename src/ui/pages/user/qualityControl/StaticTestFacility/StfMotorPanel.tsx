@@ -15,7 +15,7 @@ import type {
   StfMainSensorRow,
   StfMotorData,
 } from "../../../../../data/models/user/StfMotorDataModel";
-import { DateField } from "../../../../components/common/DateField";
+import { DateField, DateTimeField } from "../../../../components/common/DateField";
 import StfFileField, { type StfFileSubDeptSlug } from "./StfFileField";
 import {
   FieldGrid,
@@ -29,10 +29,7 @@ import {
   postCureTableRowSx,
 } from "./STFFormPrimitives";
 import FieldErrorText from "@/ui/components/validation/FieldErrorText";
-import {
-  fieldError,
-  type ValidationErrors,
-} from "@/data/validation/adapters/stf.validation";
+import { fieldError, type ValidationErrors } from "@/data/validation/adapters/stf.validation";
 
 type Props = {
   value: StfMotorData;
@@ -53,9 +50,7 @@ const patchSection = <T extends Record<string, string>>(section: T, key: keyof T
 });
 
 const formatFieldLabel = (key: string) =>
-  key
-    .replace(/_/g, " ")
-    .replace(/\b\w/g, (char) => char.toUpperCase());
+  key.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 
 const CompactDate = ({
   value,
@@ -68,7 +63,35 @@ const CompactDate = ({
   disabled?: boolean;
   readOnly?: boolean;
 }) => (
-  <DateField value={value} onChange={onChange} disabled={disabled} readOnly={readOnly} compact inputSx={postCureTableInputSx} />
+  <DateField
+    value={value}
+    onChange={onChange}
+    disabled={disabled}
+    readOnly={readOnly}
+    compact
+    inputSx={postCureTableInputSx}
+  />
+);
+
+const CompactDateTime = ({
+  value,
+  onChange,
+  disabled,
+  readOnly,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  disabled?: boolean;
+  readOnly?: boolean;
+}) => (
+  <DateTimeField
+    value={value}
+    onChange={onChange}
+    disabled={disabled}
+    readOnly={readOnly}
+    compact
+    inputSx={postCureTableInputSx}
+  />
 );
 
 const ScalarFields = <T extends Record<string, string>>({
@@ -327,10 +350,7 @@ const GrainDimensionTable = ({
                         readOnly={readOnly}
                       />
                       <FieldErrorText
-                        message={fieldError(
-                          validationErrors,
-                          `GRAIN_DIMENSION.${index}.${key}`,
-                        )}
+                        message={fieldError(validationErrors, `GRAIN_DIMENSION.${index}.${key}`)}
                       />
                     </Box>
                   )}
@@ -375,7 +395,8 @@ const MainMotorPanel = ({
         section={data.IGNITER_DETAILS}
         fields={[...IGNITER_FIELDS]}
         onChange={(next) => onChange({ ...data, IGNITER_DETAILS: next })}
-        disabled={disabled} readOnly={readOnly}
+        disabled={disabled}
+        readOnly={readOnly}
         columns={3}
 
         pathPrefix="IGNITER_DETAILS"
@@ -397,7 +418,8 @@ const MainMotorPanel = ({
           "REMARKS",
         ]}
         onChange={(next) => onChange({ ...data, NOZZLE_DETAILS: next })}
-        disabled={disabled} readOnly={readOnly}
+        disabled={disabled}
+        readOnly={readOnly}
         columns={3}
 
         pathPrefix="NOZZLE_DETAILS"
@@ -418,7 +440,8 @@ const MainMotorPanel = ({
           "RH_PERCENT",
         ]}
         onChange={(next) => onChange({ ...data, TESTING_DETAILS: next })}
-        disabled={disabled} readOnly={readOnly}
+        disabled={disabled}
+        readOnly={readOnly}
         columns={3}
 
         pathPrefix="TESTING_DETAILS"
@@ -441,7 +464,8 @@ const MainMotorPanel = ({
         section={data.STATIC_TEST_RESULT}
         fields={["AVERAGE_PRESSURE", "PEAK_PRESSURE", "TB", "BURN_RATE", "C_STAR", "ISP"]}
         onChange={(next) => onChange({ ...data, STATIC_TEST_RESULT: next })}
-        disabled={disabled} readOnly={readOnly}
+        disabled={disabled}
+        readOnly={readOnly}
         columns={3}
         multilineKeys={[]}
 
@@ -493,12 +517,16 @@ const BemMotorPanel = ({
       <FieldGrid columns={3}>
         <Box>
           <FieldLabel>{formatFieldLabel("FROM_DATE_TIME")}</FieldLabel>
-          <CompactDate
+          <CompactDateTime
             value={data.CONDITIONING_DETAILS.FROM_DATE_TIME}
             onChange={(next) =>
               onChange({
                 ...data,
-                CONDITIONING_DETAILS: patchSection(data.CONDITIONING_DETAILS, "FROM_DATE_TIME", next),
+                CONDITIONING_DETAILS: patchSection(
+                  data.CONDITIONING_DETAILS,
+                  "FROM_DATE_TIME",
+                  next,
+                ),
               })
             }
             disabled={disabled}
@@ -510,7 +538,7 @@ const BemMotorPanel = ({
         </Box>
         <Box>
           <FieldLabel>{formatFieldLabel("TO_DATE_TIME")}</FieldLabel>
-          <CompactDate
+          <CompactDateTime
             value={data.CONDITIONING_DETAILS.TO_DATE_TIME}
             onChange={(next) =>
               onChange({
@@ -603,7 +631,8 @@ const BemMotorPanel = ({
           "FIRING_NO",
         ]}
         onChange={(next) => onChange({ ...data, BEM_HARDWARE_DETAILS: next })}
-        disabled={disabled} readOnly={readOnly}
+        disabled={disabled}
+        readOnly={readOnly}
         columns={3}
         multilineKeys={[]}
 
@@ -617,7 +646,8 @@ const BemMotorPanel = ({
         section={data.IGNITER_DETAILS}
         fields={[...IGNITER_FIELDS]}
         onChange={(next) => onChange({ ...data, IGNITER_DETAILS: next })}
-        disabled={disabled} readOnly={readOnly}
+        disabled={disabled}
+        readOnly={readOnly}
         columns={3}
 
         pathPrefix="IGNITER_DETAILS"
@@ -640,7 +670,8 @@ const BemMotorPanel = ({
           "REMARKS",
         ]}
         onChange={(next) => onChange({ ...data, NOZZLE_DETAILS: next })}
-        disabled={disabled} readOnly={readOnly}
+        disabled={disabled}
+        readOnly={readOnly}
         columns={3}
 
         pathPrefix="NOZZLE_DETAILS"
@@ -661,7 +692,8 @@ const BemMotorPanel = ({
           "RH",
         ]}
         onChange={(next) => onChange({ ...data, TESTING_DETAILS: next })}
-        disabled={disabled} readOnly={readOnly}
+        disabled={disabled}
+        readOnly={readOnly}
         columns={3}
         multilineKeys={[]}
 
@@ -685,7 +717,8 @@ const BemMotorPanel = ({
         section={data.RESULT_DETAILS}
         fields={["AVG_PRESSURE", "PEAK_PRESSURE", "TB", "BURN_RATE", "C_STAR", "ISP"]}
         onChange={(next) => onChange({ ...data, RESULT_DETAILS: next })}
-        disabled={disabled} readOnly={readOnly}
+        disabled={disabled}
+        readOnly={readOnly}
         columns={3}
         multilineKeys={[]}
 
@@ -710,9 +743,7 @@ const BemMotorPanel = ({
         disabled={disabled}
         readOnly={readOnly}
       />
-      <FieldErrorText
-        message={fieldError(validationErrors, "UPLOAD_PT_CURVE.PT_CURVE_UPLOAD")}
-      />
+      <FieldErrorText message={fieldError(validationErrors, "UPLOAD_PT_CURVE.PT_CURVE_UPLOAD")} />
     </SectionCard>
   </Box>
 );

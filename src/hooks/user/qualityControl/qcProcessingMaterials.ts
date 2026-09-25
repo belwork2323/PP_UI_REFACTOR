@@ -18,6 +18,12 @@ import {
   normalizeSectionsForApiPayload,
   serializeProcessSubmissionForApi,
 } from "../../../data/models/user/rawMaterialPreparationApiMapper";
+import {
+  createEmptyWeightmentDetail,
+  createEmptyWeightmentSheet,
+  mapWeightmentSheetFromApi,
+  type RawMaterialPrepWeightmentSheet,
+} from "../../../data/models/user/RawMaterialPreparationModel";
 import { formatToIsoDateInput } from "../../../utils/dateUtils";
 import type { MaterialItem } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
 import { operationsController } from "../../../controllers/user/operationsController";
@@ -239,6 +245,216 @@ export const getQcProcessingMaterialLabel = (params: {
   premixNo: number;
   materialCode: string;
 }) => `Premix-${params.premixNo} ${params.materialCode}`;
+
+/** RMP weighment sheet from QC Raw Material Processing division-details autopopulate. */
+export const parseWeightmentSheetFromDivisionDetails = (
+  payload: unknown,
+): RawMaterialPrepWeightmentSheet => {
+  const roots = [
+    asRecord(payload),
+    asRecord(asRecord(payload)?.__manufacturingDivisionData),
+    asRecord(asRecord(payload)?.data),
+    asRecord(asRecord(payload)?.batch),
+    asRecord(asRecord(asRecord(payload)?.batch)?.identificationSheet),
+    asRecord(asRecord(payload)?.identificationSheet),
+  ].filter(Boolean) as Record<string, unknown>[];
+
+  for (const root of roots) {
+    const data = asRecord(root.data) ?? root;
+    const metadata = asRecord(data.metadata);
+    const rmpMeta = asRecord(metadata?.rawMaterialPreparation ?? metadata?.raw_material_preparation);
+    const sheet =
+      data.weightmentSheet ??
+      data.weightment_sheet ??
+      asRecord(data.preparationDetails)?.weightmentSheet ??
+      asRecord(data.preparation_details)?.weightmentSheet ??
+      rmpMeta?.weightmentSheet ??
+      rmpMeta?.weightment_sheet;
+    if (sheet != null && typeof sheet === "object") {
+      return mapWeightmentSheetFromApi(sheet);
+    }
+  }
+
+  return createEmptyWeightmentSheet();
+};
+
+/** Prefer an existing QC sheet; otherwise first non-empty source (autopopulate / batch). */
+export const resolveQcProcessingWeightmentSheet = (
+  existing: RawMaterialPrepWeightmentSheet | null | undefined,
+  ...sources: unknown[]
+): RawMaterialPrepWeightmentSheet => {
+  // Once QC form owns a sheet, keep it so edits / compare flags are not overwritten.
+  if (existing != null) return existing;
+
+  const hasContent = (sheet: RawMaterialPrepWeightmentSheet) =>
+    Boolean(
+      String(sheet.mixerBuildingNumber ?? "").trim() ||
+        (sheet.weightmentDetails?.length ?? 0) > 0,
+    );
+  for (const source of sources) {
+    const sheet = parseWeightmentSheetFromDivisionDetails(source);
+    if (hasContent(sheet)) return sheet;
+  }
+  return createEmptyWeightmentSheet();
+};
+
+/** Filter shared weighment sheet to rows for one material × premix. */
+export const filterWeightmentSheetForMaterial = (
+  sheet: RawMaterialPrepWeightmentSheet,
+  materialCode: string | null | undefined,
+  premixNo?: number | null,
+): RawMaterialPrepWeightmentSheet => {
+  const code = String(materialCode ?? "")
+    .trim()
+    .toUpperCase();
+  if (!code) return sheet;
+  const premix =
+    premixNo == null || !Number.isFinite(Number(premixNo)) ? null : Number(premixNo);
+  return {
+    ...sheet,
+    weightmentDetails: (sheet.weightmentDetails ?? []).filter((row) => {
+      const scopeCode = String(row.scopeMaterialCode ?? row.materialCode ?? "")
+        .trim()
+        .toUpperCase();
+      if (scopeCode && scopeCode !== code) return false;
+      if (!scopeCode) return true;
+      if (premix == null) return true;
+      const rowPremix =
+        row.premixNo == null || !Number.isFinite(Number(row.premixNo))
+          ? null
+          : Number(row.premixNo);
+      return rowPremix == null || rowPremix === premix;
+    }),
+  };
+};
+
+/** Stamp blank rows with the active material (+ premix) so they stay in scope. */
+export const stampWeightmentRowsForMaterial = (
+  sheet: RawMaterialPrepWeightmentSheet,
+  materialCode: string | null | undefined,
+  materialName?: string | null,
+  premixNo?: number | null,
+): RawMaterialPrepWeightmentSheet => {
+  const code = String(materialCode ?? "").trim();
+  if (!code) return sheet;
+  const name = String(materialName ?? "").trim() || code;
+  const premix =
+    premixNo == null || !Number.isFinite(Number(premixNo)) ? null : Number(premixNo);
+  return {
+    ...sheet,
+    weightmentDetails: (sheet.weightmentDetails ?? []).map((row) => {
+      const next = { ...row };
+      if (!String(next.scopeMaterialCode ?? "").trim()) {
+        next.scopeMaterialCode = code;
+      }
+      if (!String(next.materialCode ?? "").trim()) {
+        next.materialCode = code;
+      }
+      if (!String(next.materialName ?? "").trim()) {
+        next.materialName = name;
+      }
+      if (premix != null && (next.premixNo == null || !Number.isFinite(Number(next.premixNo)))) {
+        next.premixNo = premix;
+      }
+      return next;
+    }),
+  };
+};
+
+/** Merge a material×premix filtered sheet edit back into the full weighment sheet. */
+export const mergeWeightmentSheetForMaterial = (
+  full: RawMaterialPrepWeightmentSheet,
+  materialCode: string | null | undefined,
+  nextFiltered: RawMaterialPrepWeightmentSheet,
+  premixNo?: number | null,
+): RawMaterialPrepWeightmentSheet => {
+  const code = String(materialCode ?? "")
+    .trim()
+    .toUpperCase();
+  const premix =
+    premixNo == null || !Number.isFinite(Number(premixNo)) ? null : Number(premixNo);
+  const stamped = stampWeightmentRowsForMaterial(
+    nextFiltered,
+    materialCode,
+    undefined,
+    premix,
+  );
+  const otherRows = (full.weightmentDetails ?? []).filter((row) => {
+    const scopeCode = String(row.scopeMaterialCode ?? row.materialCode ?? "")
+      .trim()
+      .toUpperCase();
+    if (!code) return true;
+    if (scopeCode && scopeCode !== code) return true;
+    if (!scopeCode) return false;
+    if (premix == null) return false;
+    const rowPremix =
+      row.premixNo == null || !Number.isFinite(Number(row.premixNo))
+        ? null
+        : Number(row.premixNo);
+    return rowPremix != null && rowPremix !== premix;
+  });
+  return {
+    mixerBuildingNumber: stamped.mixerBuildingNumber,
+    weightmentDetails: [...otherRows, ...(stamped.weightmentDetails ?? [])],
+    validation: stamped.validation,
+  };
+};
+
+/** Ensure exactly one weighment row exists for the material × premix scope. */
+export const ensureWeightmentRowForMaterialPremix = (
+  sheet: RawMaterialPrepWeightmentSheet,
+  params: {
+    materialCode: string;
+    materialName?: string;
+    premixNo?: number | null;
+  },
+): RawMaterialPrepWeightmentSheet => {
+  const code = String(params.materialCode ?? "").trim();
+  if (!code) return sheet;
+  const premix =
+    params.premixNo == null || !Number.isFinite(Number(params.premixNo))
+      ? null
+      : Number(params.premixNo);
+  const scoped = filterWeightmentSheetForMaterial(sheet, code, premix);
+  if ((scoped.weightmentDetails?.length ?? 0) > 0) {
+    const first = scoped.weightmentDetails[0];
+    // Do not overwrite user-edited material code/name — only backfill scope once.
+    if (String(first.scopeMaterialCode ?? "").trim()) {
+      return sheet;
+    }
+    return mergeWeightmentSheetForMaterial(
+      sheet,
+      code,
+      {
+        ...scoped,
+        weightmentDetails: [
+          {
+            ...first,
+            scopeMaterialCode: code,
+            premixNo: first.premixNo ?? premix,
+          },
+        ],
+      },
+      premix,
+    );
+  }
+  return mergeWeightmentSheetForMaterial(
+    sheet,
+    code,
+    {
+      ...scoped,
+      weightmentDetails: [
+        createEmptyWeightmentDetail({
+          materialCode: code,
+          materialName: String(params.materialName ?? "").trim() || code,
+          scopeMaterialCode: code,
+          premixNo: premix,
+        }),
+      ],
+    },
+    premix,
+  );
+};
 
 export const parseProcessingMaterialsFromDivisionDetails = (
   payload: unknown,
@@ -585,6 +801,7 @@ export const hydrateProcessingMaterialValuesFromSeed = (
 
 export const buildProcessingMaterialEntry = (
   seed: QcProcessingMaterialSeed,
+  options?: { schemaUnavailable?: boolean },
 ): QcDivisionEntry => {
   const schemaCacheKey = getQcProcessingMaterialSchemaCacheKey(seed);
   return {
@@ -603,6 +820,7 @@ export const buildProcessingMaterialEntry = (
     gradeCode: seed.gradeCode,
     processSlot: seed.processSlot,
     schemaCacheKey,
+    schemaUnavailable: options?.schemaUnavailable === true,
     // Keep API-flat sections; normalize at hydrate time (same as RMP).
     savedSections: seed.sections,
   };

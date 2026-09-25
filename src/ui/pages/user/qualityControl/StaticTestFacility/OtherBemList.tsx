@@ -8,7 +8,10 @@ import getQualityControlTheme from "../../../../../app/theme/custom_themes/user/
 import { OPERATION_STATUS } from "../../../../../hooks/operationStatus";
 import { STRINGS } from "../../../../../app/config/strings";
 import { resolveBemMotorStatusTabs } from "../../../../../hooks/user/qualityControl/stfFlowConfig";
-import { createEmptyStfMotorSession, normalizeStfMotorSession } from "../../../../../data/models/user/StaticTestFacilityFormModel";
+import {
+  createEmptyStfMotorSession,
+  normalizeStfMotorSession,
+} from "../../../../../data/models/user/StaticTestFacilityFormModel";
 import StfMotorPanel from "./StfMotorPanel";
 import ConfirmAlertDialog from "@/ui/components/common/ConfirmAlertDialog";
 import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
@@ -26,7 +29,8 @@ const S = STRINGS.QUALITY_CONTROL;
 const { rocketLaunch: RocketLaunchRoundedIcon } = icons.user.qualityControl.staticTestFacility.form;
 
 const defaultCanViewDetails = (status: string) =>
-  status === OPERATION_STATUS.WAITING_FOR_APPROVAL || status === OPERATION_STATUS.APPROVED;
+  status.toLowerCase() === OPERATION_STATUS.WAITING_FOR_APPROVAL.toLowerCase() ||
+  status.toLowerCase() === OPERATION_STATUS.APPROVED.toLowerCase();
 
 const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => {
   const mode = useThemeStore((state) => state.mode);
@@ -140,9 +144,7 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
           .filter(Boolean)
           .join("   ·   ") || strings.OTHER_BEM_DETAILS_TITLE;
 
-    const headerSubtitle = isCreateMode
-      ? strings.FORM_HEADER_CREATE_OTHER_BEM_SUBTITLE
-      : undefined;
+    const headerSubtitle = isCreateMode ? strings.FORM_HEADER_CREATE_OTHER_BEM_SUBTITLE : undefined;
 
     const headerStatus = resolveWorkflowFormHeaderStatus({
       status: isEditMode
@@ -246,9 +248,7 @@ const OtherBemList = ({ hookState, handleBemBack, rowsPerPageOptions }: any) => 
                 disabled={isExistingRecord}
                 error={Boolean(activeValidationErrors.motorId || activeValidationErrors.bemMotorNo)}
                 helperText={
-                  activeValidationErrors.motorId ||
-                  activeValidationErrors.bemMotorNo ||
-                  " "
+                  activeValidationErrors.motorId || activeValidationErrors.bemMotorNo || " "
                 }
                 onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                   handleDraftBemNoChange?.(e.target.value);

@@ -35,6 +35,17 @@ const asArray = (value: unknown): unknown[] => (Array.isArray(value) ? value : [
 
 const hasValue = (value: unknown) => Boolean(String(value ?? "").trim());
 
+const normalizeVisualObservations = (value: unknown): string => {
+  const raw = String(value ?? "").trim();
+  if (!raw) return "";
+  if (!raw.includes(";")) return raw;
+  return raw
+    .split(";")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(", ");
+};
+
 const formKey = (sectionId: string, blockId: string) => `${sectionId}::${blockId}`;
 
 const isValueEmpty = (value: unknown): boolean => {
@@ -247,9 +258,11 @@ const mapPostCuringFromManufacturing = (
       "",
   ).trim();
   const other = String(post.OTHER_OBSERVATIONS ?? post.otherObservations ?? "").trim();
-  const visualCombined = [visual, other && other.toLowerCase() !== "na" ? other : ""]
-    .filter(Boolean)
-    .join("; ");
+  const visualCombined = normalizeVisualObservations(
+    [visual, other && other.toLowerCase() !== "na" ? other : ""]
+      .filter(Boolean)
+      .join(", "),
+  );
 
   return {
     VISUAL_OBSERVATIONS: visualCombined,
@@ -390,10 +403,12 @@ const mapSubscaleCuringFromManufacturing = (
   const avg = (nums: number[]) =>
     nums.length ? String(Number((nums.reduce((a, b) => a + b, 0) / nums.length).toFixed(2))) : "";
 
-  const visualObservations = articleRows
-    .map((row) => String(row.grainSurfaceObservations ?? row.GRAIN_SURFACE_OBSERVATIONS ?? "").trim())
-    .filter(Boolean)
-    .join("; ");
+  const visualObservations = normalizeVisualObservations(
+    articleRows
+      .map((row) => String(row.grainSurfaceObservations ?? row.GRAIN_SURFACE_OBSERVATIONS ?? "").trim())
+      .filter(Boolean)
+      .join(", "),
+  );
 
   return {
     numberOfOvens,

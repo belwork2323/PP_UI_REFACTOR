@@ -1,7 +1,7 @@
 export const ALPHA_NUM = /^[A-Za-z0-9][A-Za-z0-9 /_-]*$/;
 export const ALPHA_NUM_LOOSE = /^[A-Za-z0-9][A-Za-z0-9 \-_/.,()]*$/i;
 
-export type FieldValueType = "text" | "date" | "datetime" | "number" | "file";
+export type FieldValueType = "text" | "date" | "datetime" | "number" | "file" | "datetime";
 
 export type FieldValidationState =
   "valid" | "required" | "invalid" | "minLength" | "maxLength" | "minVal" | "maxVal";

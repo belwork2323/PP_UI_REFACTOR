@@ -67,8 +67,6 @@ type Props = {
   motorId: string;
   batchId?: string;
   /** From batch identification sheet */
-  casingType?: string;
-  insulationType?: string;
   materials?: MaterialInput[];
   disabled?: boolean;
   readOnly?: boolean;
@@ -227,7 +225,8 @@ const CompactDateTime = ({
   <DateTimeField
     value={value}
     onChange={onChange}
-    disabled={disabled} readOnly={readOnly}
+    disabled={disabled}
+    readOnly={readOnly}
     compact
     placeholder={placeholder}
     required={required}
@@ -249,7 +248,8 @@ const CompactTime = ({
   <TimeField
     value={value}
     onChange={onChange}
-    disabled={disabled} readOnly={readOnly}
+    disabled={disabled}
+    readOnly={readOnly}
     compact
     inputSx={casePrepTableInputSx}
   />
@@ -273,7 +273,8 @@ const CompactDate = ({
       label=""
       value={value}
       onChange={onChange}
-      disabled={disabled} readOnly={readOnly}
+      disabled={disabled}
+      readOnly={readOnly}
       theme={theme}
     />
   </Box>
@@ -335,20 +336,33 @@ const ValueByFieldType = ({
 }) => {
   const type = String(valueFieldType ?? "text").toLowerCase();
   if (type === "datetime") {
-    return <CompactDateTime value={value} onChange={onChange} disabled={disabled} readOnly={readOnly} />;
+    return (
+      <CompactDateTime value={value} onChange={onChange} disabled={disabled} readOnly={readOnly} />
+    );
   }
   if (type === "date") {
-    return <CompactDate value={value} onChange={onChange} disabled={disabled} readOnly={readOnly} theme={theme} />;
+    return (
+      <CompactDate
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        readOnly={readOnly}
+        theme={theme}
+      />
+    );
   }
   if (type === "time") {
-    return <CompactTime value={value} onChange={onChange} disabled={disabled} readOnly={readOnly} />;
+    return (
+      <CompactTime value={value} onChange={onChange} disabled={disabled} readOnly={readOnly} />
+    );
   }
   if (type === "textarea") {
     return (
       <TableTextInput
         value={value}
         onChange={onChange}
-        disabled={disabled} readOnly={readOnly}
+        disabled={disabled}
+        readOnly={readOnly}
         multiline
         minRows={2}
         placeholder="Enter value"
@@ -360,7 +374,8 @@ const ValueByFieldType = ({
       <TableTextInput
         value={value}
         onChange={onChange}
-        disabled={disabled} readOnly={readOnly}
+        disabled={disabled}
+        readOnly={readOnly}
         type="number"
         placeholder="0"
       />
@@ -370,7 +385,8 @@ const ValueByFieldType = ({
     <TableTextInput
       value={value}
       onChange={onChange}
-      disabled={disabled} readOnly={readOnly}
+      disabled={disabled}
+      readOnly={readOnly}
       placeholder="Enter value"
     />
   );
@@ -381,8 +397,6 @@ const CasePrepMotorPanel = ({
   onChange,
   motorId: _motorId,
   batchId: _batchId,
-  casingType,
-  insulationType,
   materials,
   disabled = false,
   readOnly = false,
@@ -409,32 +423,30 @@ const CasePrepMotorPanel = ({
       },
     });
   };
+  console.log(value);
 
   // Sync casing / insulation from identification sheet into abrading section
-  useEffect(() => {
-    const nextCasing = str(casingType).trim();
-    const nextInsulation = str(insulationType).trim();
-    const key = `${nextCasing}::${nextInsulation}`;
-    if (syncedCasingRef.current === key) return;
-    syncedCasingRef.current = key;
+  // useEffect(() => {
+  //   const nextCasing = str(casingType).trim();
+  //   const nextInsulation = str(insulationType).trim();
+  //   const key = `${nextCasing}::${nextInsulation}`;
+  //   if (syncedCasingRef.current === key) return;
+  //   syncedCasingRef.current = key;
 
-    const current = valueRef.current.abradingOperation;
-    if (
-      current.typeOfCasing === nextCasing &&
-      current.typeOfInsulation === nextInsulation
-    ) {
-      return;
-    }
+  //   const current = valueRef.current.abradingOperation;
+  //   if (current.typeOfCasing === nextCasing && current.typeOfInsulation === nextInsulation) {
+  //     return;
+  //   }
 
-    onChangeRef.current({
-      ...valueRef.current,
-      abradingOperation: {
-        ...current,
-        typeOfCasing: nextCasing || current.typeOfCasing,
-        typeOfInsulation: nextInsulation || current.typeOfInsulation,
-      },
-    });
-  }, [casingType, insulationType]);
+  //   onChangeRef.current({
+  //     ...valueRef.current,
+  //     abradingOperation: {
+  //       ...current,
+  //       typeOfCasing: nextCasing || current.typeOfCasing,
+  //       typeOfInsulation: nextInsulation || current.typeOfInsulation,
+  //     },
+  //   });
+  // }, [casingType, insulationType]);
 
   // Seed premix / final-mix ingredient rows from materials when empty
   useEffect(() => {
@@ -451,15 +463,16 @@ const CasePrepMotorPanel = ({
 
     seededIngredientsRef.current = true;
     const rows = materialsToIngredientRows(materials);
-    const batchSize =
-      str(liner.batchSize).trim() || sumQuantityPerPremix(materials);
+    const batchSize = str(liner.batchSize).trim() || sumQuantityPerPremix(materials);
 
     onChangeRef.current({
       ...valueRef.current,
       linerCoatingOperation: {
         ...liner,
         premixIngredients: premixEmpty ? rows : liner.premixIngredients,
-        finalMixIngredients: finalEmpty ? rows.map((row) => ({ ...row })) : liner.finalMixIngredients,
+        finalMixIngredients: finalEmpty
+          ? rows.map((row) => ({ ...row }))
+          : liner.finalMixIngredients,
         batchSize,
       },
     });
@@ -528,10 +541,7 @@ const CasePrepMotorPanel = ({
         ...partial,
       },
     };
-    if (
-      partial.preHeatingRecipe !== undefined ||
-      partial.otherDuration !== undefined
-    ) {
+    if (partial.preHeatingRecipe !== undefined || partial.otherDuration !== undefined) {
       onChange(syncPreHeatingTemperatureDurationRows(next));
       return;
     }
@@ -610,7 +620,8 @@ const CasePrepMotorPanel = ({
       value={row.value ?? ""}
       valueFieldType={row.valueFieldType}
       onChange={onValue}
-      disabled={disabled} readOnly={readOnly}
+      disabled={disabled}
+      readOnly={readOnly}
       theme={theme}
     />
   );
@@ -645,7 +656,10 @@ const CasePrepMotorPanel = ({
             <TableBody>
               {rows.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} sx={{ ...casePrepTableCellSx, color: BRAND.textSub, textAlign: "center" }}>
+                  <TableCell
+                    colSpan={7}
+                    sx={{ ...casePrepTableCellSx, color: BRAND.textSub, textAlign: "center" }}
+                  >
                     No ingredients
                   </TableCell>
                 </TableRow>
@@ -657,28 +671,32 @@ const CasePrepMotorPanel = ({
                       <TableTextInput
                         value={row.materialName}
                         onChange={(v) => updateIngredientRow(listKey, index, { materialName: v })}
-                        disabled={disabled} readOnly={readOnly}
+                        disabled={disabled}
+                        readOnly={readOnly}
                       />
                     </TableCell>
                     <TableCell sx={casePrepTableCellSx}>
                       <TableTextInput
                         value={row.ingredient}
                         onChange={(v) => updateIngredientRow(listKey, index, { ingredient: v })}
-                        disabled={disabled} readOnly={readOnly}
+                        disabled={disabled}
+                        readOnly={readOnly}
                       />
                     </TableCell>
                     <TableCell sx={casePrepTableCellSx}>
                       <TableTextInput
                         value={row.mfgLot}
                         onChange={(v) => updateIngredientRow(listKey, index, { mfgLot: v })}
-                        disabled={disabled} readOnly={readOnly}
+                        disabled={disabled}
+                        readOnly={readOnly}
                       />
                     </TableCell>
                     <TableCell sx={casePrepTableCellSx}>
                       <TableTextInput
                         value={row.partsByWeight}
                         onChange={(v) => updateIngredientRow(listKey, index, { partsByWeight: v })}
-                        disabled={disabled} readOnly={readOnly}
+                        disabled={disabled}
+                        readOnly={readOnly}
                         type="number"
                       />
                     </TableCell>
@@ -686,7 +704,8 @@ const CasePrepMotorPanel = ({
                       <TableTextInput
                         value={row.quantityTaken}
                         onChange={(v) => updateIngredientRow(listKey, index, { quantityTaken: v })}
-                        disabled={disabled} readOnly={readOnly}
+                        disabled={disabled}
+                        readOnly={readOnly}
                         type="number"
                       />
                     </TableCell>
@@ -694,7 +713,8 @@ const CasePrepMotorPanel = ({
                       <TableTextInput
                         value={row.totalQuantity}
                         onChange={(v) => updateIngredientRow(listKey, index, { totalQuantity: v })}
-                        disabled={disabled} readOnly={readOnly}
+                        disabled={disabled}
+                        readOnly={readOnly}
                         type="number"
                       />
                     </TableCell>
@@ -718,6 +738,7 @@ const CasePrepMotorPanel = ({
   const showVacuumApplied = str(preHeating.vacuumBaggingApplied).toUpperCase() === "YES";
   const showOtherRecipe = str(preHeating.preHeatingRecipe).toUpperCase() === "OTHERS";
   const showOtherLiner = str(liner.linerType).toUpperCase() === "OTHERS";
+  console.log(value, " val");
 
   return (
     <Box>
@@ -725,14 +746,15 @@ const CasePrepMotorPanel = ({
       <SectionCard title="Abrading Operation" theme={theme}>
         <SubsectionHeading>Abrading Configuration</SubsectionHeading>
         <FieldGrid columns={3}>
+          {console.log(abrading)}
           <ReadOnlyField
             label="Type of Casing"
-            value={abrading.typeOfCasing || casingType}
+            value={abrading.typeOfCasing}
             error={err("abradingOperation.typeOfCasing")}
           />
           <ReadOnlyField
             label="Type of Insulation"
-            value={abrading.typeOfInsulation || insulationType}
+            value={abrading.typeOfInsulation}
             error={err("abradingOperation.typeOfInsulation")}
           />
           <Box>
@@ -742,7 +764,8 @@ const CasePrepMotorPanel = ({
               placeholder="Select wheel type"
               options={[...ABRADING_WHEEL_OPTIONS]}
               onChange={(v) => patchSection("abradingOperation", { abradingWheelType: v })}
-              disabled={disabled} readOnly={readOnly}
+              disabled={disabled}
+              readOnly={readOnly}
               required
               theme={theme}
               error={Boolean(err("abradingOperation.abradingWheelType"))}
@@ -818,9 +841,7 @@ const CasePrepMotorPanel = ({
                             >
                               <TableTextInput
                                 value={cutObservation}
-                                onChange={(v) =>
-                                  updateAbradingCutObservation(group.dataIndices, v)
-                                }
+                                onChange={(v) => updateAbradingCutObservation(group.dataIndices, v)}
                                 disabled={disabled}
                                 readOnly={readOnly}
                                 placeholder="Observations"
@@ -897,7 +918,8 @@ const CasePrepMotorPanel = ({
             label="Adhesive Details"
             value={bellow.adhesiveDetails}
             onChange={(v) => patchSection("bellowBonding", { adhesiveDetails: v })}
-            disabled={disabled} readOnly={readOnly}
+            disabled={disabled}
+            readOnly={readOnly}
             theme={theme}
             width="100%"
           />
@@ -906,7 +928,8 @@ const CasePrepMotorPanel = ({
               label="Number of Spacers"
               value={bellow.numberOfSpacers}
               onChange={(v) => patchSection("bellowBonding", { numberOfSpacers: v })}
-              disabled={disabled} readOnly={readOnly}
+              disabled={disabled}
+              readOnly={readOnly}
               theme={theme}
               width="100%"
               required
@@ -918,7 +941,8 @@ const CasePrepMotorPanel = ({
               label="HE Bellow Dimension"
               value={bellow.heBellowDimension}
               onChange={(v) => patchSection("bellowBonding", { heBellowDimension: v })}
-              disabled={disabled} readOnly={readOnly}
+              disabled={disabled}
+              readOnly={readOnly}
               theme={theme}
               width="100%"
               required
@@ -930,7 +954,8 @@ const CasePrepMotorPanel = ({
             <CompactDateTime
               value={bellow.heMotorPastingDateTime}
               onChange={(v) => patchSection("bellowBonding", { heMotorPastingDateTime: v })}
-              disabled={disabled} readOnly={readOnly}
+              disabled={disabled}
+              readOnly={readOnly}
               required
             />
             <FieldErrorText message={err("bellowBonding.heMotorPastingDateTime")} />
@@ -940,7 +965,8 @@ const CasePrepMotorPanel = ({
               label="NE Bellow Dimension"
               value={bellow.neBellowDimension}
               onChange={(v) => patchSection("bellowBonding", { neBellowDimension: v })}
-              disabled={disabled} readOnly={readOnly}
+              disabled={disabled}
+              readOnly={readOnly}
               theme={theme}
               width="100%"
               required
@@ -952,7 +978,8 @@ const CasePrepMotorPanel = ({
             <CompactDateTime
               value={bellow.neMotorPastingDateTime}
               onChange={(v) => patchSection("bellowBonding", { neMotorPastingDateTime: v })}
-              disabled={disabled} readOnly={readOnly}
+              disabled={disabled}
+              readOnly={readOnly}
               required
             />
             <FieldErrorText message={err("bellowBonding.neMotorPastingDateTime")} />
@@ -986,7 +1013,8 @@ const CasePrepMotorPanel = ({
             <CompactDateTime
               value={tce.tceCleaningDateTime}
               onChange={(v) => patchSection("tceCleaning", { tceCleaningDateTime: v })}
-              disabled={disabled} readOnly={readOnly}
+              disabled={disabled}
+              readOnly={readOnly}
               required
             />
             <FieldErrorText message={err("tceCleaning.tceCleaningDateTime")} />
@@ -996,7 +1024,8 @@ const CasePrepMotorPanel = ({
               label="Solvent Used Qty (kg)"
               value={tce.solventUsedQtyKg}
               onChange={(v) => patchSection("tceCleaning", { solventUsedQtyKg: v })}
-              disabled={disabled} readOnly={readOnly}
+              disabled={disabled}
+              readOnly={readOnly}
               theme={theme}
               width="100%"
               placeholder="0"
@@ -1020,9 +1049,7 @@ const CasePrepMotorPanel = ({
           <CasePrepFileField
             label="Test Report"
             files={tce.testReport ? [tce.testReport] : []}
-            onChange={(next) =>
-              patchSection("tceCleaning", { testReport: next[0] ?? null })
-            }
+            onChange={(next) => patchSection("tceCleaning", { testReport: next[0] ?? null })}
             disabled={disabled}
             readOnly={readOnly}
             multiple={false}
@@ -1046,7 +1073,8 @@ const CasePrepMotorPanel = ({
                   ...(v.toUpperCase() !== "YES" ? { vacuumApplied: "" } : {}),
                 })
               }
-              disabled={disabled} readOnly={readOnly}
+              disabled={disabled}
+              readOnly={readOnly}
               required
               theme={theme}
             />
@@ -1058,7 +1086,8 @@ const CasePrepMotorPanel = ({
                 label="Vacuum Applied"
                 value={preHeating.vacuumApplied}
                 onChange={(v) => patchPreHeating({ vacuumApplied: v })}
-                disabled={disabled} readOnly={readOnly}
+                disabled={disabled}
+                readOnly={readOnly}
                 theme={theme}
                 width="100%"
                 required
@@ -1080,7 +1109,8 @@ const CasePrepMotorPanel = ({
                     : {}),
                 })
               }
-              disabled={disabled} readOnly={readOnly}
+              disabled={disabled}
+              readOnly={readOnly}
               required
               theme={theme}
             />
@@ -1092,7 +1122,8 @@ const CasePrepMotorPanel = ({
                 label="Other Temperature"
                 value={preHeating.otherTemperature}
                 onChange={(v) => patchPreHeating({ otherTemperature: v })}
-                disabled={disabled} readOnly={readOnly}
+                disabled={disabled}
+                readOnly={readOnly}
                 theme={theme}
                 width="100%"
                 required
@@ -1101,7 +1132,8 @@ const CasePrepMotorPanel = ({
                 label="Other Duration (hrs)"
                 value={preHeating.otherDuration}
                 onChange={(v) => patchPreHeating({ otherDuration: v })}
-                disabled={disabled} readOnly={readOnly}
+                disabled={disabled}
+                readOnly={readOnly}
                 theme={theme}
                 width="100%"
                 placeholder="Hours"
@@ -1113,7 +1145,8 @@ const CasePrepMotorPanel = ({
             label="Pre-heating Date"
             value={preHeating.preHeatingDate ?? ""}
             onChange={(v) => patchPreHeating({ preHeatingDate: v })}
-            disabled={disabled} readOnly={readOnly}
+            disabled={disabled}
+            readOnly={readOnly}
             theme={theme}
           />
         </FieldGrid>
@@ -1123,7 +1156,8 @@ const CasePrepMotorPanel = ({
           <ParameterTable
             rows={preHeating.temperatureDuration}
             requiredValue
-            disabled={disabled} readOnly={readOnly}
+            disabled={disabled}
+            readOnly={readOnly}
             emptyText="Select a recipe to generate temperature rows"
             onChangeValue={(index, v) =>
               updateParameterRow("preHeating", "temperatureDuration", index, { value: v })
@@ -1144,7 +1178,8 @@ const CasePrepMotorPanel = ({
           <ParameterTable
             rows={preHeating.preHeatingMonitoring}
             requiredValue
-            disabled={disabled} readOnly={readOnly}
+            disabled={disabled}
+            readOnly={readOnly}
             onChangeValue={(index, v) =>
               updateParameterRow("preHeating", "preHeatingMonitoring", index, { value: v })
             }
@@ -1175,7 +1210,8 @@ const CasePrepMotorPanel = ({
                   ...(v.toUpperCase() !== "OTHERS" ? { otherLinerType: "" } : {}),
                 })
               }
-              disabled={disabled} readOnly={readOnly}
+              disabled={disabled}
+              readOnly={readOnly}
               required
               theme={theme}
             />
@@ -1187,7 +1223,8 @@ const CasePrepMotorPanel = ({
                 label="Other Liner Type"
                 value={liner.otherLinerType}
                 onChange={(v) => patchSection("linerCoatingOperation", { otherLinerType: v })}
-                disabled={disabled} readOnly={readOnly}
+                disabled={disabled}
+                readOnly={readOnly}
                 theme={theme}
                 width="100%"
                 required
@@ -1200,7 +1237,8 @@ const CasePrepMotorPanel = ({
               label="Batch No"
               value={liner.batchNo}
               onChange={(v) => patchSection("linerCoatingOperation", { batchNo: v })}
-              disabled={disabled} readOnly={readOnly}
+              disabled={disabled}
+              readOnly={readOnly}
               theme={theme}
               width="100%"
               required
@@ -1215,7 +1253,8 @@ const CasePrepMotorPanel = ({
               onChange={(v) =>
                 patchSection("linerCoatingOperation", { qualifyingSubscaleBatchNo: v })
               }
-              disabled={disabled} readOnly={readOnly}
+              disabled={disabled}
+              readOnly={readOnly}
               theme={theme}
               width="100%"
               required
@@ -1226,7 +1265,8 @@ const CasePrepMotorPanel = ({
             label="Liner Coating Date"
             value={liner.linerCoatingDate ?? ""}
             onChange={(v) => patchSection("linerCoatingOperation", { linerCoatingDate: v })}
-            disabled={disabled} readOnly={readOnly}
+            disabled={disabled}
+            readOnly={readOnly}
             theme={theme}
           />
         </FieldGrid>
@@ -1284,7 +1324,8 @@ const CasePrepMotorPanel = ({
                         <TableTextInput
                           value={row.parameter}
                           onChange={(v) => updateQualificationRow(index, { parameter: v })}
-                          disabled={disabled} readOnly={readOnly}
+                          disabled={disabled}
+                          readOnly={readOnly}
                         />
                       )}
                     </TableCell>
@@ -1295,7 +1336,8 @@ const CasePrepMotorPanel = ({
                         <TableTextInput
                           value={row.specification}
                           onChange={(v) => updateQualificationRow(index, { specification: v })}
-                          disabled={disabled} readOnly={readOnly}
+                          disabled={disabled}
+                          readOnly={readOnly}
                         />
                       )}
                     </TableCell>
@@ -1303,7 +1345,8 @@ const CasePrepMotorPanel = ({
                       <TableTextInput
                         value={row.result}
                         onChange={(v) => updateQualificationRow(index, { result: v })}
-                        disabled={disabled} readOnly={readOnly}
+                        disabled={disabled}
+                        readOnly={readOnly}
                         placeholder="Result"
                       />
                       <FieldErrorText
@@ -1336,7 +1379,8 @@ const CasePrepMotorPanel = ({
           <ParameterTable
             rows={liner.linerApplicationLog}
             requiredValue
-            disabled={disabled} readOnly={readOnly}
+            disabled={disabled}
+            readOnly={readOnly}
             onChangeValue={(index, v) =>
               updateParameterRow("linerCoatingOperation", "linerApplicationLog", index, {
                 value: v,
@@ -1370,7 +1414,8 @@ const CasePrepMotorPanel = ({
             ]}
             rows={dispatch.dispatchVisualObservations}
             requiredValue
-            disabled={disabled} readOnly={readOnly}
+            disabled={disabled}
+            readOnly={readOnly}
             onChangeObservations={(index, v) => {
               const rows = dispatch.dispatchVisualObservations.map((row, i) =>
                 i === index ? { ...row, observations: v } : row,
@@ -1391,7 +1436,8 @@ const CasePrepMotorPanel = ({
           <ParameterTable
             rows={dispatch.dispatchToCastingDetails}
             requiredValue
-            disabled={disabled} readOnly={readOnly}
+            disabled={disabled}
+            readOnly={readOnly}
             onChangeValue={(index, v) =>
               updateParameterRow("dispatchToCasting", "dispatchToCastingDetails", index, {
                 value: v,

@@ -3,6 +3,18 @@ import type { QcApiSubType, QcInhibitorType } from "../../../schema-engine/adapt
 import { isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileRef } from "../../../data/models/common/FileUploadModel";
 import { formatToIsoDateInput, formatToUiDate } from "../../../utils/dateUtils";
 import {
+  collectPostCureFileRefsFromMotorSession,
+  createEmptyPostCureMotorData,
+  parseInhibitionMotorDataFromApi,
+  parseLooseFlapMotorDataFromApi,
+  postCureMotorDataHasUserInput,
+  type InhibitionHemcoatMotorData,
+  type InhibitionIr1MotorData,
+  type LooseFlapMotorData,
+  type PostCureMotorData,
+} from "../../../data/models/user/PostCureMotorDataModel";
+import { createInhibitionDataForType } from "../../../data/models/user/PostCureFormModel";
+import {
   QC_POST_CURE_FIELD_LABELS,
   QC_POST_CURE_HE_NE_PRESET,
   QC_POST_CURE_HEMCOAT_QUALIFICATION_PRESET,
@@ -16,6 +28,49 @@ import {
   type QcPostCureLocationRow,
   type QcPostCureQualificationRow,
 } from "./qcPostCureConfig";
+
+/** Manufacturing-shaped Post Cure session stored in QC division entry schemaValues. */
+export type QcPostCureSessionValues = {
+  inhibitorType: string;
+  looseFlapData: LooseFlapMotorData;
+  inhibitionData: PostCureMotorData | null;
+};
+
+/** Map QC / API inhibitor codes to manufacturing Post Cure UI option values. */
+export const toPostCureUiInhibitorType = (value: string | null | undefined): string => {
+  const normalized = normalizeQcInhibitorType(value);
+  if (normalized === "HEMCOAT-3K") return "Hemcoat-3K";
+  if (normalized === "NOT_APPLICABLE") return "not-applicable";
+  if (normalized === "IR1") return "IR1";
+  const raw = String(value ?? "").trim();
+  if (raw === "Hemcoat-3K" || raw === "not-applicable" || raw === "IR1") return raw;
+  return raw;
+};
+
+export const isPostCureSessionValues = (
+  values: SchemaFormValues | null | undefined,
+): values is SchemaFormValues & QcPostCureSessionValues =>
+  Boolean(values && typeof values === "object" && "looseFlapData" in values);
+
+export const createEmptyPostCureSession = (
+  inhibitorType?: string | null,
+): QcPostCureSessionValues => {
+  const uiInhibitor = toPostCureUiInhibitorType(inhibitorType) || "";
+  return {
+    inhibitorType: uiInhibitor,
+    looseFlapData: createEmptyPostCureMotorData("loose-flap-filling") as LooseFlapMotorData,
+    inhibitionData: uiInhibitor ? createInhibitionDataForType(uiInhibitor) : null,
+  };
+};
+
+export const setPostCureSessionValues = (
+  session: QcPostCureSessionValues,
+): SchemaFormValues =>
+  ({
+    inhibitorType: session.inhibitorType ?? "",
+    looseFlapData: session.looseFlapData,
+    inhibitionData: session.inhibitionData,
+  }) as SchemaFormValues;
 
 export type QcPostCureMotorSubmissionType = "DRAFT" | "SUBMIT";
 
@@ -198,6 +253,14 @@ const normalizeQualificationRows = (
 /** True when Post Cure form values contain user/API data beyond presets. */
 export const postCureFormValuesHaveUserData = (values: SchemaFormValues | null | undefined) => {
   if (!values) return false;
+  if (isPostCureSessionValues(values)) {
+    const session = getPostCureSessionFromValues(values);
+    return (
+      Boolean(String(session.inhibitorType ?? "").trim()) ||
+      postCureMotorDataHasUserInput(session.looseFlapData) ||
+      postCureMotorDataHasUserInput(session.inhibitionData)
+    );
+  }
   return Object.values(values).some((value) => {
     if (value == null || value === "") return false;
     if (!Array.isArray(value)) return String(value).trim().length > 0;
@@ -286,6 +349,11 @@ export const createInitialPostCureValues = (
 /** Scaffold both Loose Flap and Inhibition form keys for one motor session. */
 export const createInitialDualPostCureValues = (
   inhibitorType?: string | null,
+): SchemaFormValues => setPostCureSessionValues(createEmptyPostCureSession(inhibitorType));
+
+/** @deprecated Legacy section-key scaffold — used only to hydrate old QC saves into session shape. */
+const createInitialLegacyDualPostCureValues = (
+  inhibitorType?: string | null,
 ): SchemaFormValues => {
   const inhibitor = normalizeQcInhibitorType(inhibitorType);
   const inhibitionValues =
@@ -298,6 +366,63 @@ export const createInitialDualPostCureValues = (
     ...createInitialLooseFlapValues(),
     ...inhibitionValues,
   };
+};
+
+const convertLegacyPostCureValuesToSession = (
+  values: SchemaFormValues | null | undefined,
+  inhibitorType?: string | null,
+): QcPostCureSessionValues => {
+  const resolvedInhibitor =
+    normalizeQcInhibitorType(inhibitorType) ??
+    normalizeQcInhibitorType(String((values as Record<string, unknown> | null)?.inhibitorType ?? "")) ??
+    "IR1";
+  const uiInhibitor = toPostCureUiInhibitorType(resolvedInhibitor);
+  const apiMotor = {
+    inhibitorType:
+      resolvedInhibitor === "HEMCOAT-3K"
+        ? "HEMCOAT_3K"
+        : resolvedInhibitor === "NOT_APPLICABLE"
+          ? "NOT_APPLICABLE"
+          : "IR1",
+    looseFlapFillingDetails: buildLooseFlapFillingDetailsPayload(values),
+    inhibitionDetails: buildInhibitionDetailsPayload(values, resolvedInhibitor),
+  } as Record<string, unknown>;
+
+  return {
+    inhibitorType: uiInhibitor,
+    looseFlapData: parseLooseFlapMotorDataFromApi(apiMotor),
+    inhibitionData:
+      parseInhibitionMotorDataFromApi(apiMotor, uiInhibitor) ??
+      createInhibitionDataForType(uiInhibitor),
+  };
+};
+
+export const getPostCureSessionFromValues = (
+  values: SchemaFormValues | null | undefined,
+  fallbackInhibitorType?: string | null,
+): QcPostCureSessionValues => {
+  if (isPostCureSessionValues(values)) {
+    const rawInhibitor = String(values.inhibitorType ?? "").trim();
+    const uiInhibitor = rawInhibitor
+      ? toPostCureUiInhibitorType(rawInhibitor)
+      : Object.prototype.hasOwnProperty.call(values, "inhibitorType")
+        ? ""
+        : toPostCureUiInhibitorType(fallbackInhibitorType);
+    const looseFlapData =
+      (values.looseFlapData as LooseFlapMotorData | undefined) ??
+      (createEmptyPostCureMotorData("loose-flap-filling") as LooseFlapMotorData);
+    let inhibitionData = (values.inhibitionData as PostCureMotorData | null | undefined) ?? null;
+    if (!inhibitionData && uiInhibitor) {
+      inhibitionData = createInhibitionDataForType(uiInhibitor);
+    }
+    return {
+      inhibitorType: uiInhibitor,
+      looseFlapData,
+      inhibitionData,
+    };
+  }
+
+  return convertLegacyPostCureValuesToSession(values, fallbackInhibitorType);
 };
 
 export const getPostCureField = (
@@ -661,7 +786,7 @@ export const hydratePostCureValuesFromSections = (
   subType?: string | null,
   inhibitorType?: string | null,
 ): SchemaFormValues => {
-  const values = createInitialDualPostCureValues(inhibitorType);
+  const values = createInitialLegacyDualPostCureValues(inhibitorType);
   const resolvedSubType = String(subType ?? "").trim().toUpperCase();
   const resolvedInhibitor = normalizeQcInhibitorType(inhibitorType) ?? "";
 
@@ -762,7 +887,9 @@ export const hydratePostCureValuesFromSections = (
     mergeSectionRowIntoValues(values, sectionId, data);
   }
 
-  return values;
+  return setPostCureSessionValues(
+    convertLegacyPostCureValuesToSession(values, inhibitorType ?? resolvedInhibitor),
+  );
 };
 
 const omitEmpty = <T extends Record<string, unknown>>(record: T): Record<string, unknown> =>
@@ -1013,14 +1140,263 @@ const buildInhibitionDetailsPayload = (
 };
 
 const toApiInhibitorType = (value: string): string => {
-  const normalized = normalizeQcInhibitorType(value);
+  const normalized = normalizeQcInhibitorType(value) ?? normalizeQcInhibitorType(toPostCureUiInhibitorType(value));
   if (normalized === "HEMCOAT-3K") return "HEMCOAT_3K";
-  return normalized ?? value;
+  return normalized ?? "";
+};
+
+const toApiDateFromUi = (value: unknown) => formatToIsoDateInput(String(value ?? "")) || undefined;
+
+const toApiNumberFromUi = (value: unknown): number | undefined => {
+  if (value == null || value === "") return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+};
+
+const isIngredientTotalLabel = (srNo: unknown, ingredient: unknown) => {
+  const sr = String(srNo ?? "")
+    .trim()
+    .toUpperCase();
+  const name = String(ingredient ?? "")
+    .trim()
+    .toLowerCase();
+  return sr === "TOTAL" || name === "total quantity" || name === "total quanity";
+};
+
+const mapIngredientRowsForQcApi = (
+  rows: Array<{
+    srNo?: string | number;
+    ingredient?: string;
+    mfgLot?: string;
+    partsByWeight?: string;
+    quantity?: string;
+    qtyTaken?: string;
+  }>,
+  qtyKey: "quantity" | "qtyTaken",
+) => {
+  const mapped = rows
+    .map((row, index) => {
+      const ingredient = String(row.ingredient ?? "").trim();
+      const mfgLot = String(row.mfgLot ?? "").trim();
+      const partsByWeight = String(row.partsByWeight ?? "").trim();
+      const qtyRaw = qtyKey === "quantity" ? row.quantity : row.qtyTaken;
+      const quantityTaken = toApiNumberFromUi(qtyRaw);
+      const isTotal = isIngredientTotalLabel(row.srNo, ingredient);
+      // Skip untouched preset rows — empty ingredient payloads fail QC API validation.
+      if (!isTotal && !mfgLot && quantityTaken == null) return null;
+      const base = omitEmpty({
+        rowKey: String(row.srNo ?? index + 1),
+        ingredient: ingredient || undefined,
+        quantityTaken,
+      });
+      if (isTotal) return base;
+      return omitEmpty({
+        ...base,
+        mfgLot: mfgLot || undefined,
+        partsByWeight: partsByWeight || undefined,
+      });
+    })
+    .filter(Boolean);
+  return mapped.length ? mapped : undefined;
+};
+
+const mapLocationDateRowsForQcApi = (
+  rows: Array<{
+    location?: string;
+    fromDate?: string;
+    toDate?: string;
+    observations?: string;
+    qtyFilled?: string;
+    qtyApplied?: string;
+  }>,
+  qtyField?: "quantityFilled" | "quantityApplied",
+) =>
+  rows.map((row) =>
+    omitEmpty({
+      location: String(row.location ?? "").trim() || undefined,
+      fromDate: toApiDateFromUi(row.fromDate),
+      toDate: toApiDateFromUi(row.toDate),
+      observations: String(row.observations ?? "").trim() || undefined,
+      ...(qtyField === "quantityFilled"
+        ? { quantityFilled: toApiNumberFromUi(row.qtyFilled) }
+        : null),
+      ...(qtyField === "quantityApplied"
+        ? { quantityApplied: toApiNumberFromUi(row.qtyApplied) }
+        : null),
+    }),
+  );
+
+const mapQualificationRowsForQcApi = (
+  rows: Array<{
+    srNo?: number;
+    parameter?: string;
+    specification?: string;
+    result?: string;
+  }>,
+) =>
+  rows.map((row, index) =>
+    omitEmpty({
+      srNo: Number(row.srNo) || index + 1,
+      parameter: String(row.parameter ?? "").trim() || undefined,
+      specification: String(row.specification ?? "").trim() || undefined,
+      result: String(row.result ?? "").trim() || undefined,
+    }),
+  );
+
+const buildQcLooseFlapFromSession = (data: LooseFlapMotorData): Record<string, unknown> => {
+  const ingredientParams = mapIngredientRowsForQcApi(
+    data.looseFlapEpoxyPreparation?.preparationDetails ?? [],
+    "quantity",
+  );
+  const qcReport = toFileIdListPayload(data.qualificationDetails?.qualificationQcReport ?? []);
+  return omitEmpty({
+    bellowRemovalDetails: mapLocationDateRowsForQcApi(
+      data.bellowRemovalDetails?.bellowRemovalTable ?? [],
+    ),
+    epoxyPreparationIngredients: omitEmpty({
+      batchNo: String(data.looseFlapEpoxyPreparation?.epoxyBatchNo ?? "").trim() || undefined,
+      preparationDate: toApiDateFromUi(data.looseFlapEpoxyPreparation?.epoxyPreparationDate),
+      ...(ingredientParams ? { parameters: ingredientParams } : null),
+    }),
+    qualificationDetails: omitEmpty({
+      batchNo: String(data.qualificationDetails?.qualificationBatchNo ?? "").trim() || undefined,
+      preparationDate: toApiDateFromUi(data.qualificationDetails?.qualificationPreparationDate),
+      parameters: mapQualificationRowsForQcApi(data.qualificationDetails?.qualificationTable ?? []),
+      qcReport: qcReport.length ? qcReport : undefined,
+    }),
+    fillingDetails: mapLocationDateRowsForQcApi(
+      data.lfEpoxyFillingDetails?.lfFillingTable ?? [],
+      "quantityFilled",
+    ),
+  });
+};
+
+const buildQcInhibitionFromSession = (
+  session: QcPostCureSessionValues,
+): Record<string, unknown> => {
+  const apiInhibitor = toApiInhibitorType(session.inhibitorType) || "IR1";
+  const data = session.inhibitionData;
+
+  if (apiInhibitor === "NOT_APPLICABLE" || data?.variant === "inhibition-not-applicable") {
+    const remarks =
+      data?.variant === "inhibition-not-applicable"
+        ? String(data.inhibitionNotApplicable?.remarks ?? "").trim()
+        : "";
+    return {
+      inhibitorType: "NOT_APPLICABLE",
+      qualificationDetails: {},
+      applicationDetails: [],
+      ...omitEmpty({ remarks: remarks || undefined }),
+    };
+  }
+
+  if (data?.variant === "inhibition-hemcoat-3k" || apiInhibitor === "HEMCOAT_3K") {
+    const hem =
+      data?.variant === "inhibition-hemcoat-3k"
+        ? data
+        : (createEmptyPostCureMotorData("inhibition-hemcoat-3k") as InhibitionHemcoatMotorData);
+    const premixIngredients = mapIngredientRowsForQcApi(
+      hem.hemcoat3kPreparation?.premixPreparationTable ?? [],
+      "qtyTaken",
+    );
+    const finalMixIngredients = mapIngredientRowsForQcApi(
+      hem.hemcoat3kFinalMix?.finalMixTable ?? [],
+      "qtyTaken",
+    );
+    const qcReport = toFileIdListPayload(hem.hemcoat3kQualification?.qualificationQcReport ?? []);
+    const dispatchDate = toApiDateFromUi(hem.dispatchDetails?.dispatchDate);
+    const dispatchStation = String(hem.dispatchDetails?.dispatchStation ?? "").trim() || undefined;
+    return {
+      inhibitorType: "HEMCOAT_3K",
+      ...omitEmpty({
+        premixDetails: omitEmpty({
+          batchNo: String(hem.hemcoat3kPreparation?.hemcoatPremixBatchNo ?? "").trim() || undefined,
+          preparationDate: toApiDateFromUi(hem.hemcoat3kPreparation?.hemcoatPremixDate),
+          ...(premixIngredients ? { ingredients: premixIngredients } : null),
+        }),
+        finalMixDetails: omitEmpty({
+          batchNo: String(hem.hemcoat3kFinalMix?.hemcoatFinalMixBatchNo ?? "").trim() || undefined,
+          preparationDate: toApiDateFromUi(hem.hemcoat3kFinalMix?.hemcoatFinalMixDate),
+          ...(finalMixIngredients ? { ingredients: finalMixIngredients } : null),
+        }),
+        qualificationDetails: omitEmpty({
+          batchNo:
+            String(hem.hemcoat3kQualification?.qualificationBatchNo ?? "").trim() || undefined,
+          preparationDate: toApiDateFromUi(
+            hem.hemcoat3kQualification?.qualificationPreparationDate,
+          ),
+          parameters: mapQualificationRowsForQcApi(
+            hem.hemcoat3kQualification?.qualificationTable ?? [],
+          ),
+          qcReport: qcReport.length ? qcReport : undefined,
+        }),
+        inhibitorBatchDetails: omitEmpty({
+          batchNo: String(hem.inhibitionBatchDetails?.inhibitorBatchNo ?? "").trim() || undefined,
+          batchSize: toApiNumberFromUi(hem.inhibitionBatchDetails?.inhibitorBatchSize),
+        }),
+        applicationDetails: mapLocationDateRowsForQcApi(
+          hem.inhibitionApplicationDetails?.inhibitionApplicationTable ?? [],
+          "quantityApplied",
+        ),
+        dispatchDetails: omitEmpty({ dispatchDate, dispatchStation }),
+        // Flat fields for QC API validators that still expect the legacy shape.
+        dispatchDate,
+        dispatchStation,
+      }),
+    };
+  }
+
+  const ir1 =
+    data?.variant === "inhibition-ir1"
+      ? data
+      : (createEmptyPostCureMotorData("inhibition-ir1") as InhibitionIr1MotorData);
+  const premixIngredients = mapIngredientRowsForQcApi(ir1.ir1Premix?.ir1PremixTable ?? [], "qtyTaken");
+  const finalMixIngredients = mapIngredientRowsForQcApi(
+    ir1.ir1FinalMix?.ir1FinalMixTable ?? [],
+    "qtyTaken",
+  );
+  const qcReport = toFileIdListPayload(ir1.ir1Qualification?.qualificationQcReport ?? []);
+  const dispatchDate = toApiDateFromUi(ir1.dispatchDetails?.dispatchDate);
+  const dispatchStation = String(ir1.dispatchDetails?.dispatchStation ?? "").trim() || undefined;
+
+  return {
+    inhibitorType: apiInhibitor === "HEMCOAT_3K" ? "IR1" : apiInhibitor || "IR1",
+    ...omitEmpty({
+      premixDetails: omitEmpty({
+        batchNo: String(ir1.ir1Premix?.ir1PremixBatchNo ?? "").trim() || undefined,
+        preparationDate: toApiDateFromUi(ir1.ir1Premix?.ir1PremixDate),
+        ...(premixIngredients ? { ingredients: premixIngredients } : null),
+      }),
+      finalMixDetails: omitEmpty({
+        batchNo: String(ir1.ir1FinalMix?.ir1FinalMixBatchNo ?? "").trim() || undefined,
+        preparationDate: toApiDateFromUi(ir1.ir1FinalMix?.ir1FinalMixDate),
+        ...(finalMixIngredients ? { ingredients: finalMixIngredients } : null),
+      }),
+      qualificationDetails: omitEmpty({
+        batchNo: String(ir1.ir1Qualification?.qualificationBatchNo ?? "").trim() || undefined,
+        preparationDate: toApiDateFromUi(ir1.ir1Qualification?.qualificationPreparationDate),
+        parameters: mapQualificationRowsForQcApi(ir1.ir1Qualification?.qualificationTable ?? []),
+        qcReport: qcReport.length ? qcReport : undefined,
+      }),
+      inhibitorBatchDetails: omitEmpty({
+        batchNo: String(ir1.inhibitionBatchDetails?.inhibitorBatchNo ?? "").trim() || undefined,
+        batchSize: toApiNumberFromUi(ir1.inhibitionBatchDetails?.inhibitorBatchSize),
+      }),
+      applicationDetails: mapLocationDateRowsForQcApi(
+        ir1.inhibitionApplicationDetails?.inhibitionApplicationTable ?? [],
+        "quantityApplied",
+      ),
+      dispatchDetails: omitEmpty({ dispatchDate, dispatchStation }),
+      dispatchDate,
+      dispatchStation,
+    }),
+  };
 };
 
 /**
  * Nested Post Cure motor payload for create/update (`data.postCureMotorDetails[]`).
- * Always emits both `looseFlapFillingDetails` and `inhibitionDetails` (dual model).
+ * Always emits both `looseFlapFillingDetails` and `inhibitionDetails` (QC dual model).
+ * Built from manufacturing-shaped session values, but shaped for the QC API.
  */
 export const buildPostCureMotorDetailPayload = (
   values: SchemaFormValues | null | undefined,
@@ -1029,20 +1405,23 @@ export const buildPostCureMotorDetailPayload = (
   _subType?: string | null,
   inhibitorType?: string | null,
 ): Record<string, unknown> => {
-  const resolvedInhibitor = normalizeQcInhibitorType(inhibitorType) ?? "";
-  const apiInhibitor = resolvedInhibitor
-    ? toApiInhibitorType(resolvedInhibitor)
-    : "";
+  // Prefer session shape; fall back to legacy section keys via getPostCureSessionFromValues.
+  const session = getPostCureSessionFromValues(values, inhibitorType);
+  const apiInhibitor =
+    toApiInhibitorType(session.inhibitorType) ||
+    toApiInhibitorType(String(inhibitorType ?? "")) ||
+    "";
 
   return omitEmpty({
     motorId,
     motorSubmissionType,
     ...(apiInhibitor ? { inhibitorType: apiInhibitor } : {}),
-    looseFlapFillingDetails: buildLooseFlapFillingDetailsPayload(values),
-    inhibitionDetails: buildInhibitionDetailsPayload(
-      values,
-      resolvedInhibitor || "IR1",
-    ),
+    looseFlapFillingDetails: buildQcLooseFlapFromSession(session.looseFlapData),
+    // QC dual model always expects inhibitionDetails (even when empty / N/A).
+    inhibitionDetails: buildQcInhibitionFromSession({
+      ...session,
+      inhibitorType: session.inhibitorType || toPostCureUiInhibitorType(inhibitorType) || "IR1",
+    }),
   });
 };
 
@@ -1183,6 +1562,10 @@ export const postCureMotorDetailToSections = (
         motorId,
         subType: QC_POST_CURE_SUB_TYPE_INHIBITION,
         inhibitorType: "HEMCOAT-3K",
+      } as SchemaSectionSubmission);
+    } else {
+      sections.push({
+        sectionId: QC_POST_CURE_SECTION_IDS.IR1_QUALIFICATION,
         sectionData: [
           omitEmpty({
             IR1_BATCH_NO: pickString(
@@ -1253,26 +1636,35 @@ export const hydratePostCureValuesFromMotorDetail = (
   const hasInhibition = Boolean(inhibition && Object.keys(inhibition).length > 0);
   const resolvedInhibitor =
     normalizeQcInhibitorType(inhibitorType) ??
-    normalizeQcInhibitorType(pickString(inhibition?.inhibitorType, rec.inhibitorType, details.inhibitorType)) ??
+    normalizeQcInhibitorType(
+      pickString(inhibition?.inhibitorType, rec.inhibitorType, details.inhibitorType),
+    ) ??
     "";
+  const uiInhibitor = toPostCureUiInhibitorType(resolvedInhibitor);
 
-  const values = createInitialDualPostCureValues(resolvedInhibitor || null);
-  if (hasLoose && loose) {
-    hydrateLooseFlapFromData(values, loose, { replaceAll: true });
-  }
-  if (hasInhibition && inhibition) {
-    if (resolvedInhibitor === "NOT_APPLICABLE") {
-      hydrateNotApplicableFromData(values, inhibition);
-    } else if (resolvedInhibitor === "HEMCOAT-3K") {
-      hydrateHemcoatFromData(values, inhibition);
-      hydrateApplicationFromData(values, inhibition);
-    } else {
-      hydrateIr1FromData(values, inhibition);
-      hydrateApplicationFromData(values, inhibition);
-    }
-  }
+  if (hasLoose || hasInhibition) {
+    const apiMotor = {
+      ...rec,
+      inhibitorType:
+        resolvedInhibitor === "HEMCOAT-3K"
+          ? "HEMCOAT_3K"
+          : resolvedInhibitor === "NOT_APPLICABLE"
+            ? "NOT_APPLICABLE"
+            : resolvedInhibitor === "IR1"
+              ? "IR1"
+              : rec.inhibitorType,
+      looseFlapFillingDetails: loose ?? rec.looseFlapFillingDetails,
+      inhibitionDetails: inhibition ?? rec.inhibitionDetails,
+    } as Record<string, unknown>;
 
-  if (hasLoose || hasInhibition) return values;
+    return setPostCureSessionValues({
+      inhibitorType: uiInhibitor,
+      looseFlapData: parseLooseFlapMotorDataFromApi(apiMotor),
+      inhibitionData:
+        parseInhibitionMotorDataFromApi(apiMotor, uiInhibitor) ??
+        createInhibitionDataForType(uiInhibitor),
+    });
+  }
 
   return hydratePostCureValuesFromSections(
     postCureMotorDetailToSections(rec, pickString(rec.motorIdNo, rec.motorId) || "MOTOR"),
@@ -1463,6 +1855,9 @@ export const collectPostCureFileRefsFromQcValues = (
   values: SchemaFormValues | null | undefined,
 ): FileRef[] => {
   if (!values) return [];
+  if (isPostCureSessionValues(values)) {
+    return collectPostCureFileRefsFromMotorSession(getPostCureSessionFromValues(values));
+  }
   const refs: FileRef[] = [];
   const loose = QC_POST_CURE_SECTION_IDS.LOOSE_FLAP_FILLING;
   const ir1 = QC_POST_CURE_SECTION_IDS.IR1_QUALIFICATION;

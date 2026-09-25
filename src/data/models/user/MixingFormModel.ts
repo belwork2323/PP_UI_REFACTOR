@@ -504,6 +504,32 @@ export const resolveMixingCycleOperations = (
   };
 };
 
+/** Resolve premix/final-mix quality checks from mixing-cycle details payloads. */
+export const resolveMixingCycleQualityChecks = (
+  data: Record<string, unknown> | null | undefined,
+): {
+  premixQualityChecks: unknown[];
+  finalMixQualityChecks: unknown[];
+} => {
+  const root = (data ?? {}) as Record<string, any>;
+  const cycles = (root.cycles ?? root) as Record<string, any>;
+  const asList = (value: unknown) => (Array.isArray(value) ? value : []);
+  return {
+    premixQualityChecks: asList(
+      cycles.premixQualityChecks ??
+        cycles.premixCycle?.qualityChecks ??
+        cycles.premix?.qualityChecks ??
+        root.premixQualityChecks,
+    ),
+    finalMixQualityChecks: asList(
+      cycles.finalMixQualityChecks ??
+        cycles.finalMixCycle?.qualityChecks ??
+        cycles.finalMix?.qualityChecks ??
+        root.finalMixQualityChecks,
+    ),
+  };
+};
+
 export const createEmptyPremixEntry = (premixNo: number): PremixEntry => ({
   premixNo: String(premixNo),
   mixerType: "",

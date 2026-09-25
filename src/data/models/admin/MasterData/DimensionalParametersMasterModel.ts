@@ -15,6 +15,7 @@ export type DimensionalParametersMasterRecord = MasterDataAuditFields & {
   parameterId: number;
   paramId: string;
   paramName: string;
+  projectId: string;
   motorType: number;
   minValue: number | null;
   maxValue: number | null;
@@ -40,11 +41,13 @@ export type DimensionalParameterRowForm = {
 };
 
 export type DimensionalParametersCreateFormState = {
+  projectId: string;
   motorType: number | "";
   parameters: DimensionalParameterRowForm[];
 };
 
 export type DimensionalParametersStageEditFormState = {
+  projectId: string;
   motorType: number;
   parameters: DimensionalParameterRowForm[];
 };
@@ -70,6 +73,7 @@ export const emptyDimensionalParameterRow = (): DimensionalParameterRowForm => (
 
 export const createEmptyDimensionalParametersCreateForm =
   (): DimensionalParametersCreateFormState => ({
+    projectId: "",
     motorType: "",
     parameters: [],
   });
@@ -94,17 +98,30 @@ export const mapRecordToParameterRow = (
   };
 };
 
-export const buildStageEditFormForMotorType = (
+export const buildStageEditFormForProjectAndMotorType = (
+  projectId: string,
   motorType: number,
   records: DimensionalParametersMasterRecord[],
   unitOptions: AppDropdownOption[],
 ): DimensionalParametersStageEditFormState => ({
+  projectId,
   motorType,
   parameters: records
-    .filter((record) => record.motorType === motorType)
+    .filter(
+      (record) =>
+        record.projectId === projectId && record.motorType === motorType,
+    )
     .sort((left, right) => left.paramName.localeCompare(right.paramName))
     .map((record) => mapRecordToParameterRow(record, unitOptions)),
 });
+
+/** @deprecated Prefer buildStageEditFormForProjectAndMotorType */
+export const buildStageEditFormForMotorType = (
+  motorType: number,
+  records: DimensionalParametersMasterRecord[],
+  unitOptions: AppDropdownOption[],
+): DimensionalParametersStageEditFormState =>
+  buildStageEditFormForProjectAndMotorType("", motorType, records, unitOptions);
 
 export const formatMotorStageLabel = (
   motorType: number | null | undefined,
@@ -144,6 +161,7 @@ export const mapDimensionalRecordFromMasterData = (
   parameterId: Number(raw.id),
   paramId: String(raw.code ?? raw.attributes?.paramId ?? "").trim(),
   paramName: String(raw.name ?? "").trim(),
+  projectId: String(raw.attributes?.projectId ?? "").trim(),
   motorType: Number(raw.attributes?.motorType ?? 0),
   minValue: parseNumber(raw.attributes?.minValue),
   maxValue: parseNumber(raw.attributes?.maxValue),
@@ -182,12 +200,14 @@ const resolveUnitSymbol = (
 };
 
 export const buildDimensionalParameterCreatePayload = (
+  projectId: string,
   motorType: number,
   row: DimensionalParameterRowForm,
   unitOptions: AppDropdownOption[],
 ) => {
   const unit = resolveUnitSymbol(row.unitId, row.unit, unitOptions);
   const attributes: Record<string, unknown> = {
+    projectId,
     motorType,
     minValue: row.minValue,
     maxValue: row.maxValue,
@@ -203,6 +223,7 @@ export const buildDimensionalParameterCreatePayload = (
 };
 
 export const buildDimensionalParameterActiveUpdatePayload = (
+  projectId: string,
   motorType: number,
   row: DimensionalParameterRowForm,
   isActive: boolean,
@@ -212,6 +233,7 @@ export const buildDimensionalParameterActiveUpdatePayload = (
   name: row.paramName.trim(),
   isActive,
   attributes: {
+    projectId,
     motorType,
     paramId: row.paramId,
     minValue: row.minValue,
@@ -228,6 +250,7 @@ export const buildDimensionalParameterEnablePayload = (
   name: record.paramName,
   isActive: true,
   attributes: {
+    projectId: record.projectId,
     motorType: record.motorType,
     paramId: record.paramId,
     minValue: record.minValue,
@@ -262,9 +285,11 @@ const validateParameterRow = (
 export const getDimensionalCreateFormFieldErrors = (
   form: DimensionalParametersCreateFormState,
 ): {
+  projectId?: string;
   motorType?: string;
   parameters: DimensionalParameterRowFieldErrors[];
 } => ({
+  projectId: !form.projectId.trim() ? "Project is required" : undefined,
   motorType: form.motorType === "" ? "Motor stage is required" : undefined,
   parameters: form.parameters.map((row) => validateParameterRow(row)),
 });
@@ -280,9 +305,11 @@ export const getDimensionalStageEditFormFieldErrors = (
 export const validateDimensionalCreateForm = (
   form: DimensionalParametersCreateFormState,
 ): string | null => {
+  if (!form.projectId.trim()) return "Project is required";
   if (form.motorType === "") return "Motor stage is required";
   if (!form.parameters.length) return "Add at least one parameter";
   const errors = getDimensionalCreateFormFieldErrors(form);
+  if (errors.projectId) return errors.projectId;
   if (errors.motorType) return errors.motorType;
   for (const rowErrors of errors.parameters) {
     if (rowErrors.paramName) return rowErrors.paramName;
@@ -294,11 +321,7 @@ export const validateDimensionalCreateForm = (
 
 export const validateDimensionalStageEditForm = (
   form: DimensionalParametersStageEditFormState,
-  originalRecords: DimensionalParametersMasterRecord[],
 ): string | null => {
-  const originalById = new Map(
-    originalRecords.map((record) => [record.parameterId, record]),
-  );
   const fieldErrors = getDimensionalStageEditFormFieldErrors(form);
   for (const rowErrors of fieldErrors.parameters) {
     if (rowErrors.paramName) return rowErrors.paramName;
@@ -307,14 +330,8 @@ export const validateDimensionalStageEditForm = (
   }
 
   const hasNewRows = form.parameters.some((row) => !row.isExisting);
-  const hasActiveChanges = form.parameters.some((row) => {
-    if (!row.isExisting || row.parameterId == null) return false;
-    const original = originalById.get(row.parameterId);
-    return original != null && original.isActive !== row.isActive;
-  });
-
-  if (!hasNewRows && !hasActiveChanges) {
-    return "Add a new parameter or change active status to save.";
+  if (!hasNewRows) {
+    return "Add a new parameter to save. Enable/disable changes apply immediately.";
   }
   return null;
 };
@@ -325,7 +342,13 @@ export const dimensionalParametersRecordMatchesSearch = (
 ): boolean => {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  const parts = [record.paramName, record.paramId, record.unit, String(record.motorType)];
+  const parts = [
+    record.paramName,
+    record.paramId,
+    record.unit,
+    record.projectId,
+    String(record.motorType),
+  ];
   return parts.some((part) => String(part).toLowerCase().includes(q));
 };
 

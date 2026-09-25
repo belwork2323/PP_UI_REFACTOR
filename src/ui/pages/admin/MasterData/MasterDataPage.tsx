@@ -16,10 +16,10 @@ import MaterialsMasterPanel from "./MaterialsMasterPanel";
 import InsulationSpecMasterPanel from "./InsulationSpecMasterPanel";
 import MixingCycleMasterPanel from "./MixingCycleMasterPanel";
 import CuringCycleMasterPanel from "./CuringCycleMasterPanel";
-import QualityCheckMasterPanel from "./QualityCheckMasterPanel";
 import DimensionalParametersMasterPanel from "./DimensionalParametersMasterPanel";
 import { getMasterDataAddButtonLabel, stripMasterTypeSuffix } from "./masterDataLabels";
 import { masterDataStatusFilterChipProps } from "./components/masterDataStatusStyles";
+import useProjectForMotorStageOptions from "@/hooks/admin/MasterData/useProjectForMotorStageOptions";
 
 const S = STRINGS.MASTER_DATA;
 
@@ -39,7 +39,6 @@ const TYPE_NOUN: Record<string, string> = {
   "dimensional-parameters": "dimensional parameters",
   "mixing-cycles": "mixing cycles",
   "curing-cycles": "curing cycles",
-  "quality-checks": "quality checks",
 };
 
 const MasterDataPage = () => {
@@ -48,7 +47,7 @@ const MasterDataPage = () => {
   const hook = useMasterDataHook();
   const equipmentTypeOptions = useEquipmentTypeOptions(hook.selectedType === "equipment");
   const energyUnitOptions = useEnergyUnitOptions(hook.selectedType === "beam-energy");
-
+  const projectOptions = useProjectForMotorStageOptions(hook.selectedType === "motor-stages");
   const dynamicAttributeOptions = useMemo(() => {
     const options: Record<string, typeof equipmentTypeOptions.options> = {};
     if (hook.selectedType === "equipment" && equipmentTypeOptions.options.length > 0) {
@@ -57,8 +56,20 @@ const MasterDataPage = () => {
     if (hook.selectedType === "beam-energy" && energyUnitOptions.options.length > 0) {
       options.energyUnit = energyUnitOptions.options;
     }
+    if (hook.selectedType === "motor-stages" && projectOptions.options.length > 0) {
+      options.projectId = projectOptions.options;
+    }
     return Object.keys(options).length > 0 ? options : undefined;
-  }, [hook.selectedType, equipmentTypeOptions.options, energyUnitOptions.options]);
+  }, [
+    hook.selectedType,
+    equipmentTypeOptions.options,
+    energyUnitOptions.options,
+    projectOptions.options,
+  ]);
+  const projectSelectOptions =
+    hook.selectedType === "motor-stages" ? projectOptions.projects : undefined;
+  const projectSelectLoading =
+    hook.selectedType === "motor-stages" ? projectOptions.loading : false;
 
   const attributeFields = useMemo(
     () => (hook.schema?.fields ?? []).filter((f) => f.attribute),
@@ -104,125 +115,139 @@ const MasterDataPage = () => {
       </Box>
 
       {typeSelected ? (
-      <Box sx={t.content}>
-        <Box sx={t.statusRowAboveTable}>
-          <Chip
-            {...masterDataStatusFilterChipProps("ALL", hook.activeFilter === "ALL", () => hook.setActiveFilter("ALL"), t.statusChip)}
-            label={S.PAGE.STAT_TOTAL(noun, total)}
-          />
-          <Chip
-            {...masterDataStatusFilterChipProps("ACTIVE", hook.activeFilter === "ACTIVE", () => hook.setActiveFilter("ACTIVE"), t.statusChip)}
-            label={S.PAGE.STAT_ACTIVE(noun, active)}
-          />
-          <Chip
-            {...masterDataStatusFilterChipProps("INACTIVE", hook.activeFilter === "INACTIVE", () => hook.setActiveFilter("INACTIVE"), t.statusChip)}
-            label={S.PAGE.STAT_INACTIVE(noun, inactive)}
-          />
-        </Box>
+        <Box sx={t.content}>
+          <Box sx={t.statusRowAboveTable}>
+            <Chip
+              {...masterDataStatusFilterChipProps(
+                "ALL",
+                hook.activeFilter === "ALL",
+                () => hook.setActiveFilter("ALL"),
+                t.statusChip,
+              )}
+              label={S.PAGE.STAT_TOTAL(noun, total)}
+            />
+            <Chip
+              {...masterDataStatusFilterChipProps(
+                "ACTIVE",
+                hook.activeFilter === "ACTIVE",
+                () => hook.setActiveFilter("ACTIVE"),
+                t.statusChip,
+              )}
+              label={S.PAGE.STAT_ACTIVE(noun, active)}
+            />
+            <Chip
+              {...masterDataStatusFilterChipProps(
+                "INACTIVE",
+                hook.activeFilter === "INACTIVE",
+                () => hook.setActiveFilter("INACTIVE"),
+                t.statusChip,
+              )}
+              label={S.PAGE.STAT_INACTIVE(noun, inactive)}
+            />
+          </Box>
 
-        {hook.selectedType === "materials" ? (
-          <MaterialsMasterPanel
-            activeFilter={hook.activeFilter}
-            refreshKey={hook.nestedRefreshKey}
-            addButtonLabel={addButtonLabel}
-            t={t}
-            onStatsChange={hook.setStats}
-            onRefresh={hook.refresh}
-            refreshDisabled={hook.loadingList}
-          />
-        ) : hook.selectedType === "insulation-specifications" ? (
-          <InsulationSpecMasterPanel
-            activeFilter={hook.activeFilter}
-            refreshKey={hook.nestedRefreshKey}
-            addButtonLabel={addButtonLabel}
-            t={t}
-            onStatsChange={hook.setStats}
-            onRefresh={hook.refresh}
-            refreshDisabled={hook.loadingList}
-          />
-        ) : hook.selectedType === "dimensional-parameters" ? (
-          <DimensionalParametersMasterPanel
-            activeFilter={hook.activeFilter}
-            refreshKey={hook.nestedRefreshKey}
-            addButtonLabel={addButtonLabel}
-            t={t}
-            onStatsChange={hook.setStats}
-            onRefresh={hook.refresh}
-            refreshDisabled={hook.loadingList}
-          />
-        ) : hook.selectedType === "mixing-cycles" ? (
-          <MixingCycleMasterPanel
-            activeFilter={hook.activeFilter}
-            refreshKey={hook.nestedRefreshKey}
-            addButtonLabel={addButtonLabel}
-            t={t}
-            onStatsChange={hook.setStats}
-            onRefresh={hook.refresh}
-            refreshDisabled={hook.loadingList}
-          />
-        ) : hook.selectedType === "curing-cycles" ? (
-          <CuringCycleMasterPanel
-            activeFilter={hook.activeFilter}
-            refreshKey={hook.nestedRefreshKey}
-            addButtonLabel={addButtonLabel}
-            t={t}
-            onStatsChange={hook.setStats}
-            onRefresh={hook.refresh}
-            refreshDisabled={hook.loadingList}
-          />
-        ) : hook.selectedType === "quality-checks" ? (
-          <QualityCheckMasterPanel
-            activeFilter={hook.activeFilter}
-            refreshKey={hook.nestedRefreshKey}
-            addButtonLabel={addButtonLabel}
-            t={t}
-            onStatsChange={hook.setStats}
-            onRefresh={hook.refresh}
-            refreshDisabled={hook.loadingList}
-          />
-        ) : (
-          <>
-            <MasterDataList
-              rows={hook.paginated}
-              loading={hook.loadingList}
-              page={hook.page}
-              totalCount={hook.items.length}
-              rowsPerPage={hook.rowsPerPage}
-              attributeFields={attributeFields}
-              schema={hook.schema}
-              selectedType={hook.selectedType}
-              inlineMode={hook.inlineMode}
-              form={hook.form}
-              saving={hook.saving}
-              togglingStatus={hook.disabling || hook.enabling}
-              search={hook.search}
-              onSearchChange={hook.setSearch}
+          {hook.selectedType === "materials" ? (
+            <MaterialsMasterPanel
+              activeFilter={hook.activeFilter}
+              refreshKey={hook.nestedRefreshKey}
+              addButtonLabel={addButtonLabel}
+              t={t}
+              onStatsChange={hook.setStats}
               onRefresh={hook.refresh}
               refreshDisabled={hook.loadingList}
-              t={t}
-              onFormChange={hook.onFormChange}
-              onToggleActive={hook.handleToggleActive}
-              onSaveInline={hook.saveForm}
-              onCancelInline={hook.closeInline}
-              onPageChange={(_e, page) => hook.setPage(page)}
-              onRowsPerPageChange={(e) => hook.setRowsPerPage(Number(e.target.value))}
-              dynamicAttributeOptions={dynamicAttributeOptions}
             />
+          ) : hook.selectedType === "insulation-specifications" ? (
+            <InsulationSpecMasterPanel
+              activeFilter={hook.activeFilter}
+              refreshKey={hook.nestedRefreshKey}
+              addButtonLabel={addButtonLabel}
+              t={t}
+              onStatsChange={hook.setStats}
+              onRefresh={hook.refresh}
+              refreshDisabled={hook.loadingList}
+            />
+          ) : hook.selectedType === "dimensional-parameters" ? (
+            <DimensionalParametersMasterPanel
+              activeFilter={hook.activeFilter}
+              refreshKey={hook.nestedRefreshKey}
+              addButtonLabel={addButtonLabel}
+              t={t}
+              onStatsChange={hook.setStats}
+              onRefresh={hook.refresh}
+              refreshDisabled={hook.loadingList}
+            />
+          ) : hook.selectedType === "mixing-cycles" ? (
+            <MixingCycleMasterPanel
+              activeFilter={hook.activeFilter}
+              refreshKey={hook.nestedRefreshKey}
+              addButtonLabel={addButtonLabel}
+              t={t}
+              onStatsChange={hook.setStats}
+              onRefresh={hook.refresh}
+              refreshDisabled={hook.loadingList}
+            />
+          ) : hook.selectedType === "curing-cycles" ? (
+            <CuringCycleMasterPanel
+              activeFilter={hook.activeFilter}
+              refreshKey={hook.nestedRefreshKey}
+              addButtonLabel={addButtonLabel}
+              t={t}
+              onStatsChange={hook.setStats}
+              onRefresh={hook.refresh}
+              refreshDisabled={hook.loadingList}
+            />
+          ) : (
+            <>
+              <MasterDataList
+                rows={hook.paginated}
+                loading={hook.loadingList}
+                page={hook.page}
+                totalCount={hook.filteredItems.length}
+                rowsPerPage={hook.rowsPerPage}
+                attributeFields={attributeFields}
+                schema={hook.schema}
+                selectedType={hook.selectedType}
+                inlineMode={hook.inlineMode}
+                form={hook.form}
+                saving={hook.saving}
+                togglingStatus={hook.disabling || hook.enabling}
+                search={hook.search}
+                onSearchChange={hook.setSearch}
+                onRefresh={hook.refresh}
+                refreshDisabled={hook.loadingList}
+                t={t}
+                onFormChange={hook.onFormChange}
+                onToggleActive={hook.handleToggleActive}
+                onSaveInline={hook.saveForm}
+                onCancelInline={hook.closeInline}
+                onPageChange={(_e, page) => hook.setPage(page)}
+                onRowsPerPageChange={(e) => hook.setRowsPerPage(Number(e.target.value))}
+                dynamicAttributeOptions={dynamicAttributeOptions}
+                projectSelectOptions={projectSelectOptions}
+                projectSelectLoading={projectSelectLoading}
+                projectFilter={hook.projectFilter}
+                onProjectFilterChange={hook.setProjectFilter}
+                motorStageFilter={hook.motorStageFilter}
+                onMotorStageFilterChange={hook.setMotorStageFilter}
+                motorStageFilterOptions={hook.motorStageFilterOptions}
+              />
 
-            <Box sx={t.addRowBar}>
-              <Button
-                variant="contained"
-                startIcon={<icons.projectMgmt.add />}
-                onClick={hook.openCreate}
-                disabled={hook.loadingList || !hook.selectedType || hook.inlineMode != null || isNested}
-                sx={t.pageHeader.newProjectButton}
-              >
-                {addButtonLabel}
-              </Button>
-            </Box>
-          </>
-        )}
-      </Box>
+              <Box sx={t.addRowBar}>
+                <Button
+                  variant="contained"
+                  startIcon={<icons.projectMgmt.add />}
+                  onClick={hook.openCreate}
+                  disabled={
+                    hook.loadingList || !hook.selectedType || hook.inlineMode != null || isNested
+                  }
+                  sx={t.pageHeader.newProjectButton}
+                >
+                  {addButtonLabel}
+                </Button>
+              </Box>
+            </>
+          )}
+        </Box>
       ) : null}
 
       {!isNested ? (

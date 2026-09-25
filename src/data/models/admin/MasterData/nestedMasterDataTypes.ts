@@ -5,11 +5,10 @@ export const NESTED_MASTER_DATA_TYPES = [
   "dimensional-parameters",
   "mixing-cycles",
   "curing-cycles",
-  "quality-checks",
 ] as const;
 
 /** Master types hidden from admin Master Data Management UI. */
-export const EXCLUDED_MASTER_DATA_TYPES = ["qc-divisions"] as const;
+export const EXCLUDED_MASTER_DATA_TYPES = ["qc-divisions", "quality-checks"] as const;
 
 export type NestedMasterDataType = (typeof NESTED_MASTER_DATA_TYPES)[number];
 

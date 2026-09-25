@@ -52,10 +52,7 @@ interface DashboardDateFilterProps {
 /** Human-readable label for the active date filter (e.g. chip on FilterToggleButton). */
 export function getDateFilterDisplayLabel(
   filterType: string,
-  strings: Pick<
-    DateFilterStrings,
-    "LAST_SIX_MONTHS" | "LAST_ONE_YEAR" | "CUSTOM" | "VALUES"
-  >,
+  strings: Pick<DateFilterStrings, "LAST_SIX_MONTHS" | "LAST_ONE_YEAR" | "CUSTOM" | "VALUES">,
 ): string {
   if (filterType === strings.VALUES.SIX_MONTHS) return strings.LAST_SIX_MONTHS;
   if (filterType === strings.VALUES.ONE_YEAR) return strings.LAST_ONE_YEAR;

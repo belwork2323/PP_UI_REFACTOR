@@ -24,12 +24,13 @@ export interface OtherBemDetailsPayload {
 // ==========================================
 
 export interface OtherBemApiListRecord {
+  formId: string;
   motorId: string;
   motorCode: string;
   status: string;
   subType: string;
   stfTestNo: string;
-  createdBy: string;
+  createdBy: { id: string; fullName: string };
   createdOn: string;
   createdAt: string;
 }
@@ -106,12 +107,13 @@ export interface OtherBemDetailsApiResponse {
 // ==========================================
 
 export interface OtherBemApproverListRow {
+  formId: string;
   bemNo: string;
   motorId: string;
   motorCode: string;
   status: string;
   bemStatus: string;
-  createdBy: string;
+  createdBy: {};
   createdOn: string;
   raw: OtherBemApiListRecord;
   [key: string]: unknown; // <--- Add index signature here
@@ -164,6 +166,7 @@ export interface OtherBemDetailView {
 // ==========================================
 
 export const mapOtherBemListRow = (row: OtherBemApiListRecord): OtherBemApproverListRow => ({
+  formId: row.formId ?? "",
   bemNo: row.motorId ?? "",
   motorId: row.motorId ?? "",
   motorCode: row.motorCode ?? "",
@@ -171,7 +174,7 @@ export const mapOtherBemListRow = (row: OtherBemApiListRecord): OtherBemApprover
   stfTestNo: row.stfTestNo ?? "",
   status: row.status ?? "WAITING_FOR_APPROVAL",
   bemStatus: row.status ?? "WAITING_FOR_APPROVAL",
-  createdBy: row.createdBy ?? "",
+  createdBy: row.createdBy ?? row.createdBy.fullName ?? "",
   createdOn: row.createdOn || row.createdAt || "",
   createdAt: row.createdAt || row.createdOn || "",
   raw: row,

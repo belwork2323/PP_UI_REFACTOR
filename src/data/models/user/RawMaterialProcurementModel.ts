@@ -159,7 +159,9 @@ export const serializeAdductPreparationDetails = (
   };
 };
 
-export const parseBlendingStylePreparationDetails = (raw: unknown): BlendingStylePreparationDetails => {
+export const parseBlendingStylePreparationDetails = (
+  raw: unknown,
+): BlendingStylePreparationDetails => {
   const source = raw && typeof raw === "object" ? (raw as Record<string, unknown>) : {};
   return {
     mfgBatchLotNo: String(source.mfgBatchLotNo ?? "").trim(),
@@ -550,7 +552,9 @@ export function flattenMaterialGroups(groups: MaterialFormGroup[]): MaterialBloc
       certificates: lot.certificates ?? [],
       rows: lot.rows ?? [],
       ...(lot.adductPreparation ? { adductPreparation: lot.adductPreparation } : {}),
-      ...(lot.htpbBlendingPreparation ? { htpbBlendingPreparation: lot.htpbBlendingPreparation } : {}),
+      ...(lot.htpbBlendingPreparation
+        ? { htpbBlendingPreparation: lot.htpbBlendingPreparation }
+        : {}),
       ...(lot.apFinePreparation ? { apFinePreparation: lot.apFinePreparation } : {}),
       ...(lot.apUltrafinePreparation ? { apUltrafinePreparation: lot.apUltrafinePreparation } : {}),
     })),
@@ -711,7 +715,9 @@ export const isApPreparationSourceLot = (lot: RawMaterialLotListRow): boolean =>
   if (normalizePreparationSourceMaterialCode(lot.materialCode) !== PREPARATION_SOURCE_MATERIAL.AP) {
     return false;
   }
-  const grade = String(lot.grade?.gradeCode ?? "").trim().toUpperCase();
+  const grade = String(lot.grade?.gradeCode ?? "")
+    .trim()
+    .toUpperCase();
   return !grade || grade === "COARSE";
 };
 
@@ -1365,7 +1371,9 @@ function mapLotBlockToCreatePayload(lot: MaterialLotBlock): RawMaterialLotCreate
   if (adductPreparation) {
     payload.adductPreparation = adductPreparation;
   }
-  const htpbBlendingPreparation = serializeHtpbBlendingPreparationDetails(lot.htpbBlendingPreparation);
+  const htpbBlendingPreparation = serializeHtpbBlendingPreparationDetails(
+    lot.htpbBlendingPreparation,
+  );
   if (htpbBlendingPreparation) {
     payload.htpbBlendingPreparation = htpbBlendingPreparation;
   }
@@ -1436,13 +1444,21 @@ export function mapFirstBlockToLotUpdatePayload(
       ? { adductPreparation: serializeAdductPreparationDetails(block.adductPreparation) }
       : {}),
     ...(serializeHtpbBlendingPreparationDetails(block.htpbBlendingPreparation)
-      ? { htpbBlendingPreparation: serializeHtpbBlendingPreparationDetails(block.htpbBlendingPreparation) }
+      ? {
+          htpbBlendingPreparation: serializeHtpbBlendingPreparationDetails(
+            block.htpbBlendingPreparation,
+          ),
+        }
       : {}),
     ...(serializeApFinePreparationDetails(block.apFinePreparation)
       ? { apFinePreparation: serializeApFinePreparationDetails(block.apFinePreparation) }
       : {}),
     ...(serializeApUltrafinePreparationDetails(block.apUltrafinePreparation)
-      ? { apUltrafinePreparation: serializeApUltrafinePreparationDetails(block.apUltrafinePreparation) }
+      ? {
+          apUltrafinePreparation: serializeApUltrafinePreparationDetails(
+            block.apUltrafinePreparation,
+          ),
+        }
       : {}),
   };
 }

@@ -59,7 +59,11 @@ export function canEditUnit(
   submissionStatus?: string,
 ): boolean {
   if (unit?.locked === true) return false;
-  return EDITABLE_STATUSES.has(String(submissionStatus ?? "").trim().toUpperCase());
+  return EDITABLE_STATUSES.has(
+    String(submissionStatus ?? "")
+      .trim()
+      .toUpperCase(),
+  );
 }
 
 export function canSubmitUnit(
@@ -67,7 +71,11 @@ export function canSubmitUnit(
   submissionStatus?: string,
 ): boolean {
   if (unit?.locked === true) return false;
-  return SUBMITTABLE_STATUSES.has(String(submissionStatus ?? "").trim().toUpperCase());
+  return SUBMITTABLE_STATUSES.has(
+    String(submissionStatus ?? "")
+      .trim()
+      .toUpperCase(),
+  );
 }
 
 const normalizePremixNo = (value: number | string | null | undefined): number | null => {
@@ -85,7 +93,7 @@ export function findPremixUnit(
   if (targetNo == null) return undefined;
 
   const list =
-    stageType === "FINAL_MIX" ? stage.finalMixStatuses ?? [] : stage.premixStatuses ?? [];
+    stageType === "FINAL_MIX" ? (stage.finalMixStatuses ?? []) : (stage.premixStatuses ?? []);
 
   return list.find((item) => {
     const itemNo = normalizePremixNo(item.premixNo);
@@ -102,9 +110,7 @@ export function findMotorUnit(
   if (!stage) return undefined;
   const targetId = String(motorId ?? "").trim();
   if (!targetId) return undefined;
-  return (stage.motorStatuses ?? []).find(
-    (item) => String(item.motorId ?? "").trim() === targetId,
-  );
+  return (stage.motorStatuses ?? []).find((item) => String(item.motorId ?? "").trim() === targetId);
 }
 
 /** Infer parallel flow when API omits parallelFlowEnabled (e.g. SM dashboard). */
@@ -116,13 +122,20 @@ export function inferParallelFlowEnabled(batch: {
 }): boolean {
   if (batch.parallelFlowEnabled === true) return true;
   if (batch.parallelFlowEnabled === false) return false;
-  if (String(batch.batchType ?? "").trim().toUpperCase() !== "MAIN") return false;
+  if (
+    String(batch.batchType ?? "")
+      .trim()
+      .toUpperCase() !== "MAIN"
+  )
+    return false;
 
   const stages = [...(batch.currentStage ?? []), ...(batch.stageProgress ?? [])];
   return stages.some((stage) =>
-    [...(stage.premixStatuses ?? []), ...(stage.finalMixStatuses ?? []), ...(stage.motorStatuses ?? [])].some(
-      (unit) => unit.locked === true,
-    ),
+    [
+      ...(stage.premixStatuses ?? []),
+      ...(stage.finalMixStatuses ?? []),
+      ...(stage.motorStatuses ?? []),
+    ].some((unit) => unit.locked === true),
   );
 }
 
@@ -156,9 +169,7 @@ export function normalizeStageProgressArray(raw: unknown): StageProgress[] | nul
               premixSubmissionType:
                 row.premixSubmissionType != null ? String(row.premixSubmissionType) : undefined,
               premixSubmissionStatus:
-                row.premixSubmissionStatus != null
-                  ? String(row.premixSubmissionStatus)
-                  : undefined,
+                row.premixSubmissionStatus != null ? String(row.premixSubmissionStatus) : undefined,
               locked: row.locked === true ? true : row.locked === false ? false : null,
             };
           })
@@ -188,10 +199,8 @@ export function normalizeStageProgressArray(raw: unknown): StageProgress[] | nul
       };
 
       return {
-        departmentId:
-          source.departmentId != null ? Number(source.departmentId) : undefined,
-        departmentName:
-          source.departmentName != null ? String(source.departmentName) : undefined,
+        departmentId: source.departmentId != null ? Number(source.departmentId) : undefined,
+        departmentName: source.departmentName != null ? String(source.departmentName) : undefined,
         subDepartmentId,
         subDepartmentName:
           source.subDepartmentName != null ? String(source.subDepartmentName) : undefined,
@@ -289,7 +298,7 @@ export function mergeBatchStagesForLookup(
   });
 
   return merged;
-};
+}
 
 export type CastingUpstreamMixingGate = {
   /** False when RMP premixes or Mixing premix/final mix are not all approved. */
@@ -351,13 +360,10 @@ export function getCastingUpstreamMixingGate(
 }
 
 export async function fetchEnrichedBatchStageFields(batchId: string) {
-  const { batchManagementController } = await import(
-    "../controllers/admin/BatchManagement/batchManagementController"
-  );
-  const details = (await batchManagementController.getBatchById(batchId)) as
-    | Record<string, unknown>
-    | null
-    | undefined;
+  const { batchManagementController } =
+    await import("../controllers/admin/BatchManagement/batchManagementController");
+  const details = (await batchManagementController.getBatchById(batchId)) as unknown as
+    Record<string, unknown> | null | undefined;
   if (!details) return null;
   return {
     parallelFlowEnabled: parseParallelFlowEnabled(details.parallelFlowEnabled),

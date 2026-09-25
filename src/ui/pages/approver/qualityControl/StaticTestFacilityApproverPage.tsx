@@ -18,7 +18,9 @@ import ApproverSubdepartmentBatchListSection from "../components/ApproverSubdepa
 import ApproverActionDialog from "@/ui/components/custom/ApproverActionDialog";
 import STFApproverDetailDialog from "./STFApproverDetailDialog";
 import ToggleTabs, { ToggleTabOption } from "@/ui/components/common/ToggleTabs";
-import BemMotorListTable, { type ColumnConfig } from "../../user/qualityControl/StaticTestFacility/BemMotorListTable";
+import BemMotorListTable, {
+  type ColumnConfig,
+} from "../../user/qualityControl/StaticTestFacility/BemMotorListTable";
 import {
   mapBemMotorStatusCountsForUi,
   resolveBemMotorStatusTabs,
@@ -84,7 +86,7 @@ const buildBemApproverColumns = (
     id: "createdBy",
     label: "Created By",
     cellSx: { fontSize: "0.78rem" },
-    render: (row) => row.createdBy ?? "—",
+    render: (row) => row.createdBy?.fullName ?? "—",
   },
   {
     id: "createdAt",
@@ -97,7 +99,8 @@ const buildBemApproverColumns = (
     label: "Status",
     render: (row) => {
       const status = normalizeApproverBatchStatus(row.status);
-      const meta = statusMeta[status] as { bg?: string; color?: string; border?: string } | undefined;
+      const meta = statusMeta[status] as
+        { bg?: string; color?: string; border?: string } | undefined;
       return (
         <Chip
           label={getApproverBatchStatusDisplayLabel(status) || "—"}
@@ -196,7 +199,6 @@ const STFApproverPage = () => {
     handleViewDetails: otherBemHandleViewDetails,
     handleCloseDetail: otherBemHandleCloseDetail,
   } = useOtherBemApproverHook();
-
   return (
     <React.Fragment>
       <ToggleTabs value={activeMotorTab} options={MOTOR_TAB_OPTIONS} onChange={setActiveMotorTab} />
@@ -231,6 +233,7 @@ const STFApproverPage = () => {
             actionLoading={acemActionLoading}
             theme={approverTheme}
             subDepartment="static-test-facility"
+            typeOfMotor="acem"
           />
           <ApproverActionDialog {...acemDialogProps} />
         </ApproverSubdepartmentBatchListSection>
@@ -246,8 +249,14 @@ const STFApproverPage = () => {
             loading={otherBemLoading}
             statusMeta={QC_STATUS_META}
             statusCounts={mapBemMotorStatusCountsForUi(otherBemStatusCounts, otherBemTotal)}
-            statusTabs={resolveBemMotorStatusTabs(mapBemMotorStatusCountsForUi(otherBemStatusCounts, otherBemTotal))}
-            customColumns={buildBemApproverColumns(QC_STATUS_META, BRAND, otherBemHandleViewDetails)}
+            statusTabs={resolveBemMotorStatusTabs(
+              mapBemMotorStatusCountsForUi(otherBemStatusCounts, otherBemTotal),
+            )}
+            customColumns={buildBemApproverColumns(
+              QC_STATUS_META,
+              BRAND,
+              otherBemHandleViewDetails,
+            )}
             onPageChange={(newPage) => setOtherBemPage(newPage + 1)}
             onRowsPerPageChange={(newLimit) => {
               setOtherBemLimit(newLimit);
@@ -273,7 +282,8 @@ const STFApproverPage = () => {
             onApprove={otherBemRequestApprove}
             onReject={otherBemRequestReject}
             theme={approverTheme}
-            subDepartment="other-bem-motors"
+            subDepartment="static-test-facility"
+            typeOfMotor="other-bem-motors"
           />
           <ApproverActionDialog {...otherBemDialogProps} />
         </React.Fragment>

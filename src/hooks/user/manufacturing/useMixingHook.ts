@@ -19,9 +19,11 @@ import {
   isMixCardEditable,
   mapMixingDetailsToFormState,
   mapMixingFormStateToPayload,
+  mapBackendQualityChecksToRows,
   mergeProcessParticularsWithOperations,
   resolveApiMixingCycleDisplayValue,
   resolveMixingCycleOperations,
+  resolveMixingCycleQualityChecks,
   type FinalMixEntry,
   type MixCardStageType,
   type MixCardStatusMeta,
@@ -398,8 +400,17 @@ export const useMixingHook = () => {
               const { premixOperations, finalMixOperations } = resolveMixingCycleOperations(
                 res.data as Record<string, unknown>,
               );
+              const { premixQualityChecks, finalMixQualityChecks } =
+                resolveMixingCycleQualityChecks(res.data as Record<string, unknown>);
 
-              if (premixOperations.length || finalMixOperations.length) {
+              if (
+                premixOperations.length ||
+                finalMixOperations.length ||
+                premixQualityChecks.length ||
+                finalMixQualityChecks.length
+              ) {
+                const premixQcRows = mapBackendQualityChecksToRows(premixQualityChecks);
+                const finalQcRows = mapBackendQualityChecksToRows(finalMixQualityChecks);
                 const updated = {
                   ...nextFormData,
                   premixCards: nextFormData.premixCards.map((card) => ({
@@ -408,6 +419,16 @@ export const useMixingHook = () => {
                       premixOperations,
                       card.processParticulars,
                     ),
+                    qualityChecks: premixQcRows.length
+                      ? premixQcRows.map((row) => {
+                          const current = card.qualityChecks.find(
+                            (item) => item.parameterId === row.parameterId,
+                          );
+                          return current
+                            ? { ...row, observedValues: current.observedValues }
+                            : row;
+                        })
+                      : card.qualityChecks,
                   })),
                   finalMixCards: nextFormData.finalMixCards.map((card) => ({
                     ...card,
@@ -415,6 +436,16 @@ export const useMixingHook = () => {
                       finalMixOperations,
                       card.processParticulars,
                     ),
+                    qualityChecks: finalQcRows.length
+                      ? finalQcRows.map((row) => {
+                          const current = card.qualityChecks.find(
+                            (item) => item.parameterId === row.parameterId,
+                          );
+                          return current
+                            ? { ...row, observedValues: current.observedValues }
+                            : row;
+                        })
+                      : card.qualityChecks,
                   })),
                 };
 

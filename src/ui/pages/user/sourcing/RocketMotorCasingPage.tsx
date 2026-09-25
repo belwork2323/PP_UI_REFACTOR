@@ -83,7 +83,12 @@ const RocketMotorCasing = () => {
 
   const loadingDimensionalParams =
     Boolean(resolvedMotorStage) &&
-    (fetchingMotorParams || isDimensionalParamsLoading(resolvedMotorStage));
+    Boolean(String(casingForm.projectId ?? "").trim()) &&
+    (fetchingMotorParams ||
+      isDimensionalParamsLoading(
+        String(casingForm.projectId ?? "").trim(),
+        resolvedMotorStage,
+      ));
 
   const lockIdentification =
     formEntryMode === "edit" ||

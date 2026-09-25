@@ -59,13 +59,13 @@ const BatchFormModal = ({
   mixingCycleOptions = [],
   mixingCyclesLoading = false,
   onFetchMixingCycles,
-  onClearMixingCycles,
   articleOptions = [],
   articlesLoading = false,
   saving,
   canSaveBatchChanges = true,
   editMode = "full",
   baselineMotorIds = [],
+  handleProjectSelect,
   t,
 }: any) => {
   const { modal, input } = t;
@@ -91,8 +91,7 @@ const BatchFormModal = ({
     (hasMotorStageSelected && !mixingCyclesLoading && mixingCycleOptions.length === 0);
   const motorDetailsValid = isExperimental
     ? true
-    : (form.motorIds?.length ?? 0) > 0 &&
-      form.motorIds.every((id: string) => id?.trim());
+    : (form.motorIds?.length ?? 0) > 0 && form.motorIds.every((id: string) => id?.trim());
   const mixingCycleValid =
     !showsMotorStage ||
     (hasMotorStageSelected && Boolean(String(form.mixingCycleCode ?? "").trim()));
@@ -100,7 +99,6 @@ const BatchFormModal = ({
     !!form.batchType &&
     (isSubscale ? hasSubBatchTypeSelected : true) &&
     motorDetailsValid &&
-    mixingCycleValid &&
     !!form.systemManagerId &&
     (isMain || isSubscale ? !!form.projectId : true) &&
     (showsMotorStage ? !!form.motorStage : true) &&
@@ -139,20 +137,18 @@ const BatchFormModal = ({
   };
 
   const handleProjectChange = (projectId: string) => {
+    handleProjectSelect(projectId); // Calls the hook's handler which fetches new motor stages
     onFormChange("projectId")({ target: { value: projectId } });
     onFormChange("motorStage")({ target: { value: "" } });
-    onFormChange("mixingCycleCode")({ target: { value: "" } });
     resetMotorIdSlots();
     onClearApprovedMotors?.();
-    onClearMixingCycles?.();
   };
 
   const handleMotorStageChange = (motorStage: string) => {
     onFormChange("motorStage")({ target: { value: motorStage } });
-    onFormChange("mixingCycleCode")({ target: { value: "" } });
+    // onFormChange("mixingCycleCode")({ target: { value: "" } });
     resetMotorIdSlots();
     onClearApprovedMotors?.();
-    onClearMixingCycles?.();
   };
 
   const handleMixingCycleChange = (mixingCycleCode: string) => {
@@ -163,12 +159,10 @@ const BatchFormModal = ({
     if (batchType === form.batchType) return;
     onFormChange("batchType")({ target: { value: batchType } });
     onClearApprovedMotors?.();
-    onClearMixingCycles?.();
   };
 
   const motorsLookupReady =
-    Boolean(String(form.projectId ?? "").trim()) &&
-    Boolean(String(form.motorStage ?? "").trim());
+    Boolean(String(form.projectId ?? "").trim()) && Boolean(String(form.motorStage ?? "").trim());
 
   const motorIdsPrerequisitesMet = motorsLookupReady;
 
@@ -190,16 +184,11 @@ const BatchFormModal = ({
 
   useEffect(() => {
     if (!open) {
-      onClearMixingCycles?.();
       return;
     }
-    const stage = String(form.motorStage ?? "").trim();
-    if (!stage || !showsMotorStage) {
-      onClearMixingCycles?.();
-      return;
-    }
-    void onFetchMixingCycles?.(stage);
-  }, [open, form.motorStage, showsMotorStage, onFetchMixingCycles, onClearMixingCycles]);
+
+    void onFetchMixingCycles?.();
+  }, [open, onFetchMixingCycles]);
 
   useEffect(() => {
     if (!open || !showsMotorStage || !hasMotorStageSelected || mixingCyclesLoading) return;
@@ -238,7 +227,6 @@ const BatchFormModal = ({
   ]);
 
   const getMixingCyclePlaceholder = () => {
-    if (!hasMotorStageSelected) return S.SELECT_MOTOR_STAGE_FOR_MIXING_CYCLE;
     if (mixingCyclesLoading) return S.LOADING_MIXING_CYCLES;
     if (mixingCycleOptions.length) return S.SELECT_MIXING_CYCLE;
     return S.NO_MIXING_CYCLES;
@@ -444,123 +432,69 @@ const BatchFormModal = ({
               {/* Project / Purpose / Motor Information */}
               <Box>
                 <Stack direction={{ xs: "column", sm: "row" }} spacing={modal.fieldRowSpacing}>
-                  <AppDropdown
-                    label="Project Name"
-                    value={form.projectId}
-                    onChange={handleProjectChange}
-                    placeholder={projectsLoading ? "Loading projects..." : S.SELECT_PROJECT}
-                    loading={projectsLoading}
-                    disabled={projectsLoading || appendOnlyLocked}
-                    renderValue={renderProjectValue}
-                    sx={{ mb: 0, flex: 1, ...input }}
-                    MenuProps={t.menuPaper}
-                  >
-                    {projectOptions.map((project: { projectId: string; projectName: string }) => (
-                      <MenuItem key={project.projectId} value={project.projectId}>
-                        <Box sx={modal.projectOption}>
-                          <Typography sx={modal.projectOptionName}>{project.projectName}</Typography>
-                          <Typography sx={modal.projectOptionId}>{project.projectId}</Typography>
-                        </Box>
-                      </MenuItem>
-                    ))}
-                  </AppDropdown>
-
-                  {(!isSubscale || isQualification) && (
+                  {/* Project Name Dropdown */}
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
                     <AppDropdown
-                      label="Motor Type / Stage"
-                      value={form.motorStage}
-                      onChange={handleMotorStageChange}
-                      placeholder={motorStagesLoading ? "Loading motor stages..." : S.SELECT_MOTOR_STAGE}
-                      loading={motorStagesLoading}
-                      disabled={motorStagesLoading || appendOnlyLocked}
-                      renderValue={renderMotorStageValue}
-                      sx={{ mb: 0, flex: 1, ...input }}
+                      label="Project Name"
+                      value={form.projectId}
+                      onChange={handleProjectChange}
+                      placeholder={projectsLoading ? "Loading projects..." : S.SELECT_PROJECT}
+                      loading={projectsLoading}
+                      disabled={projectsLoading || appendOnlyLocked}
+                      renderValue={renderProjectValue}
+                      sx={{ mb: 0, width: "100%", ...input }}
                       MenuProps={t.menuPaper}
                     >
-                      {motorStageOptions.map(
-                        (stage: {
-                          motorStage: string;
-                          noOfmotors: number;
-                          motorTypeId: number;
-                        }) => (
-                          <MenuItem key={stage.motorStage} value={stage.motorStage}>
-                            <Box sx={modal.motorStageOption}>
-                              <Typography sx={modal.motorStageLabel}>
-                                Stage {stage.motorStage}
-                              </Typography>
-                            </Box>
-                          </MenuItem>
-                        ),
-                      )}
-                    </AppDropdown>
-                  )}
-
-                  {isExperimental && (
-                    <AppDropdown
-                      label="System Manager"
-                      value={form.systemManagerId}
-                      onChange={(value) => onFormChange("systemManagerId")({ target: { value } })}
-                      placeholder={S.SELECT_SYSTEM_MANAGER}
-                      renderValue={renderSystemManagerValue}
-                      disabled={appendOnlyLocked}
-                      sx={{ mb: 0, flex: 1, ...input }}
-                      MenuProps={t.menuPaper}
-                    >
-                      {(userOptions || []).map((u: any) => (
-                        <MenuItem key={u.id} value={u.id}>
-                          {u.fullName || u.username}
-                          {u.id ? ` (${u.id})` : ""}
+                      {projectOptions.map((project: { projectId: string; projectName: string }) => (
+                        <MenuItem key={project.projectId} value={project.projectId}>
+                          <Box sx={modal.projectOption}>
+                            <Typography sx={modal.projectOptionName}>
+                              {project.projectName}
+                            </Typography>
+                            <Typography sx={modal.projectOptionId}>{project.projectId}</Typography>
+                          </Box>
                         </MenuItem>
                       ))}
                     </AppDropdown>
-                  )}
-                </Stack>
+                  </Box>
 
-                {!isExperimental && (
-                  <Stack
-                    direction={{ xs: "column", sm: "row" }}
-                    spacing={modal.fieldRowSpacing}
-                    sx={{ mt: modal.fieldRowSpacing }}
-                  >
-                    {showsMixingCycleField && (
+                  {/* Motor Type / Stage Dropdown */}
+                  {(!isSubscale || isQualification) && (
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
                       <AppDropdown
-                        label={S.MIXING_CYCLE_LABEL}
-                        value={form.mixingCycleCode ?? ""}
-                        onChange={handleMixingCycleChange}
-                        placeholder={getMixingCyclePlaceholder()}
-                        loading={mixingCyclesLoading}
-                        disabled={mixingCycleDisabled || appendOnlyLocked}
-                        renderValue={renderMixingCycleValue}
-                        sx={{ mb: 0, flex: 1, ...input }}
+                        label="Motor Type / Stage"
+                        value={form.motorStage}
+                        onChange={handleMotorStageChange}
+                        placeholder={
+                          motorStagesLoading ? "Loading motor stages..." : S.SELECT_MOTOR_STAGE
+                        }
+                        loading={motorStagesLoading}
+                        disabled={!form.projectId || motorStagesLoading || appendOnlyLocked}
+                        renderValue={renderMotorStageValue}
+                        sx={{ mb: 0, width: "100%", ...input }}
                         MenuProps={t.menuPaper}
                       >
-                        {mixingCycleOptions.map(
-                          (cycle: {
-                            mixingCycleId: number;
-                            mixingCycleCode: string;
-                            mixingCycleName: string;
+                        {motorStageOptions.map(
+                          (stage: {
+                            motorStage: string;
+                            noOfmotors: number;
+                            motorTypeId: number;
                           }) => (
-                            <MenuItem
-                              key={`cycle-${cycle.mixingCycleId}-${cycle.mixingCycleCode}`}
-                              value={cycle.mixingCycleCode}
-                            >
+                            <MenuItem key={stage.motorStage} value={stage.motorStage}>
                               <Box sx={modal.motorStageOption}>
                                 <Typography sx={modal.motorStageLabel}>
-                                  {cycle.mixingCycleName || cycle.mixingCycleCode}
+                                  Stage {stage.motorStage}
                                 </Typography>
-                                {cycle.mixingCycleName &&
-                                cycle.mixingCycleName !== cycle.mixingCycleCode ? (
-                                  <Typography sx={modal.motorStageMeta}>
-                                    {cycle.mixingCycleCode}
-                                  </Typography>
-                                ) : null}
                               </Box>
                             </MenuItem>
                           ),
                         )}
                       </AppDropdown>
-                    )}
+                    </Box>
+                  )}
 
+                  {/* System Manager Dropdown (Experimental / Non-Experimental) */}
+                  <Box sx={{ flex: 1, minWidth: 0 }}>
                     <AppDropdown
                       label="System Manager"
                       value={form.systemManagerId}
@@ -568,7 +502,7 @@ const BatchFormModal = ({
                       placeholder={S.SELECT_SYSTEM_MANAGER}
                       renderValue={renderSystemManagerValue}
                       disabled={appendOnlyLocked}
-                      sx={{ mb: 0, flex: 1, ...input }}
+                      sx={{ mb: 0, width: "100%", ...input }}
                       MenuProps={t.menuPaper}
                     >
                       {(userOptions || []).map((u: any) => (
@@ -578,8 +512,8 @@ const BatchFormModal = ({
                         </MenuItem>
                       ))}
                     </AppDropdown>
-                  </Stack>
-                )}
+                  </Box>
+                </Stack>
               </Box>
 
               {isExperimental && (
@@ -679,8 +613,7 @@ const BatchFormModal = ({
                     <Stack spacing={1}>
                       {(form.motorIds ?? []).map((motorId: string, index: number) => {
                         const slotOptions = getMotorOptionsForSlot(index);
-                        const isBaselineMotor =
-                          appendOnlyLocked && index < baselineMotorIds.length;
+                        const isBaselineMotor = appendOnlyLocked && index < baselineMotorIds.length;
                         return (
                           <Box
                             key={`motor-slot-${index}`}
@@ -722,7 +655,12 @@ const BatchFormModal = ({
                                 size="small"
                                 color="error"
                                 onClick={() => removeMotorIdField(index)}
-                                sx={{ mt: 3.25, flexShrink: 0, textTransform: "none", fontWeight: 700 }}
+                                sx={{
+                                  mt: 3.25,
+                                  flexShrink: 0,
+                                  textTransform: "none",
+                                  fontWeight: 700,
+                                }}
                               >
                                 {S.REMOVE_MOTOR_ID}
                               </Button>
@@ -736,91 +674,91 @@ const BatchFormModal = ({
               )}
 
               {(isMain || isQualification || isExperimental) && (
-                  <Box
-                    sx={(theme) => ({
-                      display: "flex",
-                      alignItems: "flex-start",
-                      gap: 1,
-                      px: 1.5,
-                      py: 1.2,
-                      bgcolor: isIdentificationComplete
-                        ? alpha(theme.palette.success.main, 0.08)
-                        : alpha(theme.palette.warning.main, 0.08),
-                      border: "1px dashed",
-                      borderColor: isIdentificationComplete ? "success.light" : "warning.light",
-                      borderRadius: "8px",
-                    })}
-                  >
+                <Box
+                  sx={(theme) => ({
+                    display: "flex",
+                    alignItems: "flex-start",
+                    gap: 1,
+                    px: 1.5,
+                    py: 1.2,
+                    bgcolor: isIdentificationComplete
+                      ? alpha(theme.palette.success.main, 0.08)
+                      : alpha(theme.palette.warning.main, 0.08),
+                    border: "1px dashed",
+                    borderColor: isIdentificationComplete ? "success.light" : "warning.light",
+                    borderRadius: "8px",
+                  })}
+                >
+                  {isIdentificationComplete ? (
+                    <icons.batchMgmt.completedStatus
+                      sx={{ fontSize: 16, color: "success.main", flexShrink: 0, mt: 0.15 }}
+                    />
+                  ) : (
+                    <icons.userMgmt.info
+                      sx={{ fontSize: 14, color: "warning.main", flexShrink: 0 }}
+                    />
+                  )}
+                  <Box sx={{ flex: 1 }}>
+                    <Typography
+                      sx={{ fontSize: "0.8rem", color: "text.primary", fontWeight: 600, mb: 0.5 }}
+                    >
+                      {S.IMPLEMENTATION_DETAILS_TITLE}
+                    </Typography>
+                    <Stack
+                      direction="row"
+                      spacing={1}
+                      alignItems="center"
+                      sx={{ mb: 0.75, flexWrap: "wrap", gap: 0.75 }}
+                    >
+                      <Typography sx={{ fontSize: "0.75rem", color: "text.secondary" }}>
+                        {S.IDENTIFICATION_STATUS_LABEL}:
+                      </Typography>
+                      <Chip
+                        label={
+                          isIdentificationComplete
+                            ? S.IDENTIFICATION_STATUS_COMPLETE
+                            : S.IDENTIFICATION_STATUS_PENDING
+                        }
+                        size="small"
+                        color={isIdentificationComplete ? "success" : "warning"}
+                        variant="outlined"
+                        sx={{ height: 22, fontSize: "0.7rem", fontWeight: 700 }}
+                      />
+                    </Stack>
+                    <Typography sx={{ fontSize: "0.8rem", color: "text.secondary", mb: 1 }}>
+                      {isIdentificationComplete
+                        ? S.IMPLEMENTATION_DETAILS_COMPLETE
+                        : S.IMPLEMENTATION_DETAILS_PENDING}
+                    </Typography>
                     {isIdentificationComplete ? (
-                      <icons.batchMgmt.completedStatus
-                        sx={{ fontSize: 16, color: "success.main", flexShrink: 0, mt: 0.15 }}
-                      />
-                    ) : (
-                      <icons.userMgmt.info
-                        sx={{ fontSize: 14, color: "warning.main", flexShrink: 0 }}
-                      />
-                    )}
-                    <Box sx={{ flex: 1 }}>
-                      <Typography
-                        sx={{ fontSize: "0.8rem", color: "text.primary", fontWeight: 600, mb: 0.5 }}
-                      >
-                        {S.IMPLEMENTATION_DETAILS_TITLE}
-                      </Typography>
-                      <Stack
-                        direction="row"
-                        spacing={1}
-                        alignItems="center"
-                        sx={{ mb: 0.75, flexWrap: "wrap", gap: 0.75 }}
-                      >
-                        <Typography sx={{ fontSize: "0.75rem", color: "text.secondary" }}>
-                          {S.IDENTIFICATION_STATUS_LABEL}:
-                        </Typography>
-                        <Chip
-                          label={
-                            isIdentificationComplete
-                              ? S.IDENTIFICATION_STATUS_COMPLETE
-                              : S.IDENTIFICATION_STATUS_PENDING
-                          }
-                          size="small"
-                          color={isIdentificationComplete ? "success" : "warning"}
-                          variant="outlined"
-                          sx={{ height: 22, fontSize: "0.7rem", fontWeight: 700 }}
-                        />
-                      </Stack>
-                      <Typography sx={{ fontSize: "0.8rem", color: "text.secondary", mb: 1 }}>
-                        {isIdentificationComplete
-                          ? S.IMPLEMENTATION_DETAILS_COMPLETE
-                          : S.IMPLEMENTATION_DETAILS_PENDING}
-                      </Typography>
-                      {isIdentificationComplete ? (
-                        <Stack direction="row" spacing={1}>
-                          <Button
-                            size="small"
-                            variant="outlined"
-                            onClick={() => onOpenImplementation?.({ viewOnly: true })}
-                          >
-                            {S.VIEW_IDENTIFICATION_SHEET}
-                          </Button>
-                          <Button
-                            size="small"
-                            variant="contained"
-                            onClick={() => onOpenImplementation?.({ viewOnly: false })}
-                          >
-                            {S.EDIT_IDENTIFICATION_SHEET}
-                          </Button>
-                        </Stack>
-                      ) : (
+                      <Stack direction="row" spacing={1}>
                         <Button
                           size="small"
                           variant="outlined"
-                          onClick={() => onOpenImplementation?.({ viewOnly: false })}
-                          disabled={!basicFormValid}
+                          onClick={() => onOpenImplementation?.({ viewOnly: true })}
                         >
-                          {S.COMPLETE_IDENTIFICATION_NOW}
+                          {S.VIEW_IDENTIFICATION_SHEET}
                         </Button>
-                      )}
-                    </Box>
+                        <Button
+                          size="small"
+                          variant="contained"
+                          onClick={() => onOpenImplementation?.({ viewOnly: false })}
+                        >
+                          {S.EDIT_IDENTIFICATION_SHEET}
+                        </Button>
+                      </Stack>
+                    ) : (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        onClick={() => onOpenImplementation?.({ viewOnly: false })}
+                        disabled={!basicFormValid}
+                      >
+                        {S.COMPLETE_IDENTIFICATION_NOW}
+                      </Button>
+                    )}
                   </Box>
+                </Box>
               )}
             </>
           )}

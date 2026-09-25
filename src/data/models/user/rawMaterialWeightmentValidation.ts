@@ -3,6 +3,7 @@ import type { RawMaterialPrepWeightmentDetail } from "./RawMaterialPreparationMo
 
 export type WeightmentRowFieldErrors = {
   materialCode?: string;
+  materialName?: string;
   percentage?: string;
   weightTransferred?: string;
 };
@@ -73,9 +74,60 @@ export const formatSheetMaterialLabel = (material: MaterialItem): string => {
   return grade ? `${code} — ${name} (${grade})` : `${code} — ${name}`;
 };
 
+/** API may send plain numbers or `{ source, parsedValue }` wrappers. */
+export const unwrapSheetNumber = (value: unknown): number => {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const rec = value as Record<string, unknown>;
+    if (rec.parsedValue != null && rec.parsedValue !== "") {
+      const parsed = Number(rec.parsedValue);
+      if (Number.isFinite(parsed)) return parsed;
+    }
+    if (rec.source != null && rec.source !== "") {
+      const fromSource = Number(String(rec.source).replace(/,/g, "").trim());
+      if (Number.isFinite(fromSource)) return fromSource;
+    }
+  }
+  const text = String(value ?? "")
+    .replace(/,/g, "")
+    .trim();
+  if (!text) return 0;
+  const n = Number(text);
+  return Number.isFinite(n) ? n : 0;
+};
+
+export const normalizeSheetMaterialsForWeightmentCompare = (
+  materials: unknown,
+): MaterialItem[] => {
+  if (!Array.isArray(materials)) return [];
+  return materials
+    .map((raw, index) => {
+      if (!raw || typeof raw !== "object") return null;
+      const m = raw as Record<string, unknown>;
+      const materialCode = String(m.materialCode ?? m.material_code ?? "").trim();
+      if (!materialCode) return null;
+      return {
+        srNo: Number(m.srNo ?? m.sr_no ?? index + 1) || index + 1,
+        materialCode,
+        materialName: String(m.materialName ?? m.material_name ?? materialCode).trim(),
+        gradeCode: String(m.gradeCode ?? m.grade_code ?? "").trim() || undefined,
+        gradeName: String(m.gradeName ?? m.grade_name ?? "").trim() || undefined,
+        lotId: String(m.lotId ?? m.lot_id ?? "").trim(),
+        make: String(m.make ?? m.manufacturerName ?? "").trim(),
+        manufacturerName: String(m.manufacturerName ?? m.make ?? "").trim(),
+        requiredComposition: unwrapSheetNumber(m.requiredComposition ?? m.required_composition),
+        quantityPerPremix: unwrapSheetNumber(m.quantityPerPremix ?? m.quantity_per_premix),
+        revalidationFromDate: String(m.revalidationFromDate ?? "").trim(),
+        revalidationToDate: String(m.revalidationToDate ?? "").trim(),
+        revalidationDate: String(m.revalidationDate ?? m.revalidationFromDate ?? "").trim(),
+      } as MaterialItem;
+    })
+    .filter(Boolean) as MaterialItem[];
+};
+
 export const getExpectedWeightmentForSheetMaterial = (material: MaterialItem) => {
-  const percentage = Number(material.requiredComposition ?? 0);
-  const expectedWeightKg = Number(Number(material.quantityPerPremix ?? 0).toFixed(3));
+  const percentage = unwrapSheetNumber(material.requiredComposition);
+  const expectedWeightKg = Number(unwrapSheetNumber(material.quantityPerPremix).toFixed(3));
 
   return { percentage, expectedWeightKg };
 };
@@ -128,6 +180,7 @@ export const validateWeightmentRowAgainstSheet = (
   sheetMaterials: MaterialItem[],
   messages: {
     materialNotInSheet: string;
+    nameMismatch?: (expected: string) => string;
     percentageMismatch: (expected: number) => string;
     weightMismatch: (expected: number) => string;
   },
@@ -139,10 +192,26 @@ export const validateWeightmentRowAgainstSheet = (
     return errors;
   }
 
+  // Avoid false "not listed" errors while identification materials are still loading.
+  if (!sheetMaterials.length) {
+    return errors;
+  }
+
   const sheetMaterial = findSheetMaterialForWeightmentRow(row, sheetMaterials);
   if (!sheetMaterial) {
     errors.materialCode = messages.materialNotInSheet;
     return errors;
+  }
+
+  const sheetName = String(sheetMaterial.materialName ?? sheetMaterial.materialCode ?? "").trim();
+  const enteredName = String(row.materialName ?? "").trim();
+  if (
+    messages.nameMismatch &&
+    enteredName &&
+    sheetName &&
+    enteredName.toUpperCase() !== sheetName.toUpperCase()
+  ) {
+    errors.materialName = messages.nameMismatch(sheetName);
   }
 
   const { percentage, expectedWeightKg } = getExpectedWeightmentForSheetMaterial(sheetMaterial);

@@ -51,6 +51,9 @@ import type {
   MaterialBlock,
 } from "../../../../data/models/user/RawMaterialProcurementModel";
 import RawMaterialPreparationDetailsView from "./components/RawMaterialPreparationDetailsView";
+import useApproverSubDepartmentBatchList from "@/hooks/approver/useApproverSubDepartmentBatchList";
+import { RefreshRounded } from "@mui/icons-material";
+import RefreshIconButton from "@/ui/components/common/RefreshIconButton";
 
 const BL = STRINGS.SOURCING.BATCH_LIST;
 const SF = STRINGS.SOURCING.SPECIFICATION_FORM;
@@ -468,6 +471,15 @@ const RawMaterialApproverPage = () => {
     filterAllLabel,
   } = useRawMaterialApproverHook();
 
+  const { refresh } = useApproverSubDepartmentBatchList({
+    allLabel: filterAllLabel,
+    department: "sourcing",
+    extraFilters: listFiltersRecord,
+    searchText: "", // Pass search text if managed here, or leave empty/handled elsewhere
+    status: statusFilter,
+    subDepartment: "raw-material",
+  });
+
   const [filterOpen, setFilterOpen] = useState(false);
   const [draftMaterial, setDraftMaterial] = useState(filterAllLabel);
   const [draftFrom, setDraftFrom] = useState("");
@@ -569,17 +581,29 @@ const RawMaterialApproverPage = () => {
   };
 
   const searchBarEnd = (
-    <FilterToggleButton
-      label={STRINGS.SOURCING.BATCH_LIST.FILTERS_TOGGLE}
-      count={activeFilterCount}
-      isOpen={filterOpen}
-      onClick={() => setFilterOpen((open) => !open)}
-      sx={filterToggleSx.filterBtn(filterOpen || activeFilterCount > 0)}
-      iconSx={filterToggleSx.filterBtnIcon}
-      textSx={filterToggleSx.filterBtnText}
-      badgeSx={filterToggleSx.filterBadgePill}
-      chevronSx={filterToggleSx.filterBtnChevron}
-    />
+    <Stack direction="row" spacing={1} alignItems="center">
+      <FilterToggleButton
+        label={STRINGS.SOURCING.BATCH_LIST.FILTERS_TOGGLE}
+        count={activeFilterCount}
+        isOpen={filterOpen}
+        onClick={() => setFilterOpen((open) => !open)}
+        sx={filterToggleSx.filterBtn(filterOpen || activeFilterCount > 0)}
+        iconSx={filterToggleSx.filterBtnIcon}
+        textSx={filterToggleSx.filterBtnText}
+        badgeSx={filterToggleSx.filterBadgePill}
+        chevronSx={filterToggleSx.filterBtnChevron}
+      />
+
+      {typeof refresh === "function" ? (
+        <RefreshIconButton
+          onClick={() => {
+            void refresh();
+          }}
+          tooltip={STRINGS.SOURCING.BATCH_LIST.REFRESH_TOOLTIP}
+          icon={<RefreshRounded fontSize="small" />}
+        />
+      ) : null}
+    </Stack>
   );
 
   const filterExtension = filterOpen ? (

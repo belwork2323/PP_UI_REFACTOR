@@ -18,6 +18,7 @@ import { fileUtils } from "../../../../../utils/FileUtils";
 import CertificateFileInput from "./CertificateFileInput";
 import type { LotCertificate } from "../../../../../data/models/user/RawMaterialProcurementModel";
 import { mandatoryAsteriskSx, mandatoryFieldInputSx } from "./MandatoryFormField";
+import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 const {
   delete: DeleteOutlineRoundedIcon,
@@ -177,14 +178,19 @@ const CertificateUploadSection = ({
       >
         <Box sx={{ minWidth: 0 }}>
           <Typography sx={{ ...theme.workflow.formElements.fieldLabel, mb: 0.5 }}>
-            {formStrings.CERTIFICATES_TITLE}
+            <FieldLabelWithAsterisk label={formStrings.CERTIFICATES_TITLE} required />
           </Typography>
-          <Typography sx={{ fontSize: "0.72rem", color: theme.palette.textSub, lineHeight: 1.45, maxWidth: 520 }}>
+          <Typography
+            sx={{
+              fontSize: "0.72rem",
+              color: theme.palette.textSub,
+              lineHeight: 1.45,
+              maxWidth: 520,
+            }}
+          >
             {formStrings.CERTIFICATES_SUBTITLE}
           </Typography>
-          {error ? (
-            <Typography sx={sectionErrorSx}>{error}</Typography>
-          ) : null}
+          {error ? <Typography sx={sectionErrorSx}>{error}</Typography> : null}
         </Box>
         {hasCerts ? (
           <Button
@@ -206,7 +212,13 @@ const CertificateUploadSection = ({
           <Typography sx={{ fontSize: "0.8rem", fontWeight: 600, color: theme.palette.textSub }}>
             {formStrings.UPLOAD_CERTIFICATES}
           </Typography>
-          <Typography sx={{ fontSize: "0.7rem", color: alpha(theme.palette.textSub ?? "#5D6D7E", 0.85), mt: 0.5 }}>
+          <Typography
+            sx={{
+              fontSize: "0.7rem",
+              color: alpha(theme.palette.textSub ?? "#5D6D7E", 0.85),
+              mt: 0.5,
+            }}
+          >
             {formStrings.CERTIFICATES_SUBTITLE}
           </Typography>
         </Box>
@@ -215,214 +227,226 @@ const CertificateUploadSection = ({
           {certificates.map((cert, ci) => {
             const typeError = certificateTypeError?.(ci);
             return (
-            <Box
-              key={cert.localId || `${cert.fileName}-${ci}-${cert.fileId ?? ""}`}
-              sx={certCardSx}
-            >
-              <Stack
-                direction={{ xs: "column", sm: "row" }}
-                spacing={1.25}
-                alignItems={{ sm: "flex-start" }}
+              <Box
+                key={cert.localId || `${cert.fileName}-${ci}-${cert.fileId ?? ""}`}
+                sx={certCardSx}
               >
-                <Stack direction="row" spacing={1.25} alignItems="flex-start" sx={{ flex: 1, minWidth: 0 }}>
-                  <Box
-                    sx={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 1.5,
-                      flexShrink: 0,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      background: alpha(primaryLight, 0.1),
-                      border: `1px solid ${alpha(primaryLight, 0.2)}`,
-                    }}
+                <Stack
+                  direction={{ xs: "column", sm: "row" }}
+                  spacing={1.25}
+                  alignItems={{ sm: "flex-start" }}
+                >
+                  <Stack
+                    direction="row"
+                    spacing={1.25}
+                    alignItems="flex-start"
+                    sx={{ flex: 1, minWidth: 0 }}
                   >
-                    {cert.status === "uploading" ? (
-                      <UploadFileRoundedIcon sx={{ fontSize: 22, color: primaryLight }} />
-                    ) : (
-                      <InsertDriveFileOutlinedIcon sx={{ fontSize: 22, color: primaryLight }} />
-                    )}
-                  </Box>
-                  <Box sx={{ flex: 1, minWidth: 0 }}>
-                    <Typography
+                    <Box
                       sx={{
-                        fontSize: "0.82rem",
-                        fontWeight: 700,
-                        color: theme.palette.text,
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: "nowrap",
+                        width: 40,
+                        height: 40,
+                        borderRadius: 1.5,
+                        flexShrink: 0,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                        background: alpha(primaryLight, 0.1),
+                        border: `1px solid ${alpha(primaryLight, 0.2)}`,
                       }}
                     >
-                      {cert.fileName || formStrings.CERT_FILE_NAME}
-                    </Typography>
-                    <Stack direction="row" alignItems="center" gap={0.75} flexWrap="wrap" sx={{ mt: 0.75 }}>
-                      <Chip
-                        label={fileExtensionLabel(cert.fileName || "file")}
-                        size="small"
+                      {cert.status === "uploading" ? (
+                        <UploadFileRoundedIcon sx={{ fontSize: 22, color: primaryLight }} />
+                      ) : (
+                        <InsertDriveFileOutlinedIcon sx={{ fontSize: 22, color: primaryLight }} />
+                      )}
+                    </Box>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography
                         sx={{
-                          height: 20,
-                          fontSize: "0.6rem",
+                          fontSize: "0.82rem",
                           fontWeight: 700,
-                          background: alpha(primaryLight, 0.1),
-                          color: primaryLight,
-                          border: `1px solid ${alpha(primaryLight, 0.22)}`,
+                          color: theme.palette.text,
+                          overflow: "hidden",
+                          textOverflow: "ellipsis",
+                          whiteSpace: "nowrap",
                         }}
-                      />
-                      {cert.status === "failed" ? (
+                      >
+                        {cert.fileName || formStrings.CERT_FILE_NAME}
+                      </Typography>
+                      <Stack
+                        direction="row"
+                        alignItems="center"
+                        gap={0.75}
+                        flexWrap="wrap"
+                        sx={{ mt: 0.75 }}
+                      >
                         <Chip
-                          label={formStrings.STATUS_FAILED}
+                          label={fileExtensionLabel(cert.fileName || "file")}
                           size="small"
                           sx={{
                             height: 20,
                             fontSize: "0.6rem",
                             fontWeight: 700,
-                            color: theme.palette.danger,
+                            background: alpha(primaryLight, 0.1),
+                            color: primaryLight,
+                            border: `1px solid ${alpha(primaryLight, 0.22)}`,
                           }}
                         />
-                      ) : null}
-                      {cert.fileId && onOpen ? (
-                        <Link
-                          component="button"
-                          type="button"
-                          onClick={() => onOpen(ci)}
-                          sx={{
-                            fontSize: "0.75rem",
-                            fontWeight: 700,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 0.25,
-                            cursor: "pointer",
-                            color: primaryLight,
-                          }}
-                        >
-                          {fileUtils.getFileKind(cert.fileName) === "video"
-                            ? "Download"
-                            : formStrings.OPEN_CERT_LINK}
-                          <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
-                        </Link>
-                      ) : fileUtils.isOpenableCertificateUrl(cert.fileUrl) ? (
-                        <Link
-                          href={cert.fileUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          sx={{
-                            fontSize: "0.75rem",
-                            fontWeight: 700,
-                            display: "inline-flex",
-                            alignItems: "center",
-                            gap: 0.25,
-                            color: primaryLight,
-                          }}
-                        >
-                          {formStrings.OPEN_CERT_LINK}
-                          <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
-                        </Link>
-                      ) : null}
-                    </Stack>
-                    {cert.status === "uploading" ? (
-                      <Box sx={{ mt: 0.85 }}>
-                        <Stack direction="row" alignItems="center" spacing={1}>
-                          <LinearProgress
-                            variant="determinate"
-                            value={cert.uploadProgress ?? 0}
+                        {cert.status === "failed" ? (
+                          <Chip
+                            label={formStrings.STATUS_FAILED}
+                            size="small"
                             sx={{
-                              flex: 1,
-                              height: 6,
-                              borderRadius: 3,
-                              bgcolor: alpha(primaryLight, 0.12),
-                              "& .MuiLinearProgress-bar": {
-                                borderRadius: 3,
-                                bgcolor: primaryLight,
-                              },
+                              height: 20,
+                              fontSize: "0.6rem",
+                              fontWeight: 700,
+                              color: theme.palette.danger,
                             }}
                           />
-                          <Typography
+                        ) : null}
+                        {cert.fileId && onOpen ? (
+                          <Link
+                            component="button"
+                            type="button"
+                            onClick={() => onOpen(ci)}
                             sx={{
-                              fontSize: "0.7rem",
+                              fontSize: "0.75rem",
                               fontWeight: 700,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 0.25,
+                              cursor: "pointer",
                               color: primaryLight,
-                              minWidth: 34,
-                              textAlign: "right",
                             }}
                           >
-                            {cert.uploadProgress ?? 0}%
+                            {fileUtils.getFileKind(cert.fileName) === "video"
+                              ? "Download"
+                              : formStrings.OPEN_CERT_LINK}
+                            <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
+                          </Link>
+                        ) : fileUtils.isOpenableCertificateUrl(cert.fileUrl) ? (
+                          <Link
+                            href={cert.fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            sx={{
+                              fontSize: "0.75rem",
+                              fontWeight: 700,
+                              display: "inline-flex",
+                              alignItems: "center",
+                              gap: 0.25,
+                              color: primaryLight,
+                            }}
+                          >
+                            {formStrings.OPEN_CERT_LINK}
+                            <OpenInNewRoundedIcon sx={{ fontSize: 14 }} />
+                          </Link>
+                        ) : null}
+                      </Stack>
+                      {cert.status === "uploading" ? (
+                        <Box sx={{ mt: 0.85 }}>
+                          <Stack direction="row" alignItems="center" spacing={1}>
+                            <LinearProgress
+                              variant="determinate"
+                              value={cert.uploadProgress ?? 0}
+                              sx={{
+                                flex: 1,
+                                height: 6,
+                                borderRadius: 3,
+                                bgcolor: alpha(primaryLight, 0.12),
+                                "& .MuiLinearProgress-bar": {
+                                  borderRadius: 3,
+                                  bgcolor: primaryLight,
+                                },
+                              }}
+                            />
+                            <Typography
+                              sx={{
+                                fontSize: "0.7rem",
+                                fontWeight: 700,
+                                color: primaryLight,
+                                minWidth: 34,
+                                textAlign: "right",
+                              }}
+                            >
+                              {cert.uploadProgress ?? 0}%
+                            </Typography>
+                          </Stack>
+                          <Typography
+                            sx={{ fontSize: "0.68rem", color: theme.palette.textSub, mt: 0.35 }}
+                          >
+                            {formStrings.UPLOADING}
                           </Typography>
-                        </Stack>
-                        <Typography sx={{ fontSize: "0.68rem", color: theme.palette.textSub, mt: 0.35 }}>
-                          {formStrings.UPLOADING}
-                        </Typography>
-                      </Box>
+                        </Box>
+                      ) : null}
+                    </Box>
+                  </Stack>
+
+                  <Box sx={{ width: { xs: "100%", sm: 200 }, flexShrink: 0 }}>
+                    <Typography sx={{ ...theme.workflow.formElements.fieldLabel, mb: "4px" }}>
+                      <FieldLabelWithAsterisk label={formStrings.CERT_TYPE} required />
+                    </Typography>
+                    <TextField
+                      size="small"
+                      fullWidth
+                      value={cert.certificateType}
+                      onChange={(e) => onCertChange(ci, "certificateType", e.target.value)}
+                      placeholder={formStrings.CERT_TYPE}
+                      error={Boolean(typeError)}
+                      sx={mandatoryFieldInputSx(
+                        theme.workflow.formElements.textField,
+                        Boolean(typeError),
+                        theme,
+                      )}
+                    />
+                    {typeError ? (
+                      <FormHelperText
+                        error
+                        sx={{ mx: 0, mt: 0.5, fontSize: "0.85rem", fontWeight: 500 }}
+                      >
+                        {typeError}
+                      </FormHelperText>
                     ) : null}
                   </Box>
-                </Stack>
 
-                <Box sx={{ width: { xs: "100%", sm: 200 }, flexShrink: 0 }}>
-                  <Typography sx={{ ...theme.workflow.formElements.fieldLabel, mb: "4px" }}>
-                    {formStrings.CERT_TYPE}
-                    <Box component="span" sx={mandatoryAsteriskSx(theme)}>
-                      {" "}
-                      *
-                    </Box>
-                  </Typography>
-                  <TextField
-                    size="small"
-                    fullWidth
-                    value={cert.certificateType}
-                    onChange={(e) => onCertChange(ci, "certificateType", e.target.value)}
-                    placeholder={formStrings.CERT_TYPE}
-                    error={Boolean(typeError)}
-                    sx={mandatoryFieldInputSx(
-                      theme.workflow.formElements.textField,
-                      Boolean(typeError),
-                      theme,
-                    )}
-                  />
-                  {typeError ? (
-                    <FormHelperText error sx={{ mx: 0, mt: 0.5, fontSize: "0.85rem", fontWeight: 500 }}>
-                      {typeError}
-                    </FormHelperText>
-                  ) : null}
-                </Box>
-
-                <Tooltip title={formStrings.REMOVE_CERTIFICATE}>
-                  <span>
-                    <IconButton
-                      size="small"
-                      onClick={() => onRemove(ci)}
-                      disabled={cert.status === "uploading"}
-                      sx={{
-                        alignSelf: { xs: "flex-end", sm: "center" },
-                        flexShrink: 0,
-                        color: theme.palette.textSub,
-                        "&:hover": {
-                          color: theme.palette.danger,
-                          background: alpha(theme.palette.danger ?? "#C0392B", 0.08),
-                        },
-                      }}
-                    >
-                      <DeleteOutlineRoundedIcon fontSize="small" />
-                    </IconButton>
-                  </span>
-                </Tooltip>
-                {cert.status === "failed" && cert.file && onRetry ? (
-                  <Tooltip title={formStrings.REUPLOAD_CERTIFICATE}>
-                    <IconButton
-                      size="small"
-                      onClick={() => onRetry(ci)}
-                      sx={{
-                        alignSelf: { xs: "flex-end", sm: "center" },
-                        flexShrink: 0,
-                        color: primaryLight,
-                      }}
-                    >
-                      <RefreshRoundedIcon fontSize="small" />
-                    </IconButton>
+                  <Tooltip title={formStrings.REMOVE_CERTIFICATE}>
+                    <span>
+                      <IconButton
+                        size="small"
+                        onClick={() => onRemove(ci)}
+                        disabled={cert.status === "uploading"}
+                        sx={{
+                          alignSelf: { xs: "flex-end", sm: "center" },
+                          flexShrink: 0,
+                          color: theme.palette.textSub,
+                          "&:hover": {
+                            color: theme.palette.danger,
+                            background: alpha(theme.palette.danger ?? "#C0392B", 0.08),
+                          },
+                        }}
+                      >
+                        <DeleteOutlineRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </span>
                   </Tooltip>
-                ) : null}
-              </Stack>
-            </Box>
+                  {cert.status === "failed" && cert.file && onRetry ? (
+                    <Tooltip title={formStrings.REUPLOAD_CERTIFICATE}>
+                      <IconButton
+                        size="small"
+                        onClick={() => onRetry(ci)}
+                        sx={{
+                          alignSelf: { xs: "flex-end", sm: "center" },
+                          flexShrink: 0,
+                          color: primaryLight,
+                        }}
+                      >
+                        <RefreshRoundedIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  ) : null}
+                </Stack>
+              </Box>
             );
           })}
 

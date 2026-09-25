@@ -9,30 +9,39 @@ type FetchDimensionalParamsResult = {
   errorMessage: string | null;
 };
 
+const cacheKey = (projectId: string, motorType: string) => `${projectId}::${motorType}`;
+
 export const useDimensionalParametersHook = () => {
-  const [loadingByMotorType, setLoadingByMotorType] = useState<LoadingMap>({});
+  const [loadingByKey, setLoadingByKey] = useState<LoadingMap>({});
 
   const isLoading = useCallback(
-    (motorType: string) => Boolean(loadingByMotorType[motorType]),
-    [loadingByMotorType],
+    (projectId: string, motorType: string) =>
+      Boolean(loadingByKey[cacheKey(projectId, motorType)]),
+    [loadingByKey],
   );
 
   const fetchDimensionalParameters = useCallback(
-    async (motorType: string): Promise<FetchDimensionalParamsResult> => {
+    async (
+      projectId: string,
+      motorType: string,
+    ): Promise<FetchDimensionalParamsResult> => {
+      const pid = (projectId ?? "").trim();
       const mt = (motorType ?? "").trim();
-      if (!mt) {
+      if (!pid || !mt) {
         return { parameters: [], errorMessage: null };
       }
 
-      setLoadingByMotorType((prev) => ({ ...prev, [mt]: true }));
+      const key = cacheKey(pid, mt);
+      setLoadingByKey((prev) => ({ ...prev, [key]: true }));
       try {
-        // Always fetch fresh — admin master-data changes must appear without a full page reload.
         const response = await operationsController.fetchDimensionalParametersList({
+          projectId: pid,
           motorType: mt,
         });
 
         if (!response?.success || !response.data) {
-          const msg = response?.message || STRINGS.SOURCING.CASING_FORM.DIMENSIONAL_PARAMS_FETCH_ERROR;
+          const msg =
+            response?.message || STRINGS.SOURCING.CASING_FORM.DIMENSIONAL_PARAMS_FETCH_ERROR;
           return { parameters: [], errorMessage: msg };
         }
 
@@ -43,7 +52,7 @@ export const useDimensionalParametersHook = () => {
           errorMessage: STRINGS.SOURCING.CASING_FORM.DIMENSIONAL_PARAMS_FETCH_ERROR,
         };
       } finally {
-        setLoadingByMotorType((prev) => ({ ...prev, [mt]: false }));
+        setLoadingByKey((prev) => ({ ...prev, [key]: false }));
       }
     },
     [],

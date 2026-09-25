@@ -117,7 +117,7 @@ export const TimeField = ({
       <TimePicker
         {...appDatePickerFieldSlots}
         label={label}
-        value={value ? dayjs(value, "HH:mm") : null}
+        value={value ? dayjs(toUiTime(value) || String(value), "HH:mm") : null}
         disabled={disabled}
         onChange={(next) => onChange(next ? next.format("HH:mm") : "")}
         slotProps={buildAppDatePickerSlotProps({
@@ -159,7 +159,7 @@ export const DateTimeField = ({
         {...appDatePickerFieldSlots}
         label={label}
         format={UI_DATETIME_FORMAT}
-        value={parseUiDate(value)}
+        value={parseUiDate(toUiDateTime(value) || value || "")}
         disabled={disabled}
         onChange={(next) => onChange(next ? next.format(UI_DATETIME_FORMAT) : "")}
         slotProps={buildAppDatePickerSlotProps({

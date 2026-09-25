@@ -39,6 +39,7 @@ import {
   createDefaultMixingFormState,
   isMixCardLocked,
   mapBackendQualityChecksToRows,
+  resolveMixingCycleQualityChecks,
   type MixCardStageType,
   type MixCardStatusMeta,
   type MixCardSubmissionStatus,
@@ -281,12 +282,12 @@ const PremixStageCard = ({
               options={buildingOptions}
               disabled={readOnly || loadingBuildings}
               onChange={(value) => {
-                onClearFieldError?.(`premixes.${cardIdx}.mixerConfiguration.bldgNo`);
+                onClearFieldError?.(`premixes.${cardIdx}.bldgNo`);
                 onPremixFieldChange(premix.premixNo, "bldgNo", value);
               }}
               required
-              error={Boolean(getFieldError(`premixes.${cardIdx}.mixerConfiguration.bldgNo`))}
-              helperText={getFieldError(`premixes.${cardIdx}.mixerConfiguration.bldgNo`)}
+              error={Boolean(getFieldError(`premixes.${cardIdx}.bldgNo`))}
+              helperText={getFieldError(`premixes.${cardIdx}.bldgNo`)}
             />
             <MixingDateField
               label={S.LABEL_PREMIX_DATE}
@@ -654,12 +655,12 @@ const FinalMixStageCard = ({
             options={buildingOptions}
             disabled={readOnly || loadingBuildings}
             onChange={(value) => {
-              onClearFieldError?.(`finalMixes.${cardIdx}.mixerConfiguration.bldgNo`);
+              onClearFieldError?.(`finalMixes.${cardIdx}.bldgNo`);
               onFieldChange(entry.mixNo, "bldgNo", value);
             }}
             required
-            error={Boolean(getFieldError(`finalMixes.${cardIdx}.mixerConfiguration.bldgNo`))}
-            helperText={getFieldError(`finalMixes.${cardIdx}.mixerConfiguration.bldgNo`)}
+            error={Boolean(getFieldError(`finalMixes.${cardIdx}.bldgNo`))}
+            helperText={getFieldError(`finalMixes.${cardIdx}.bldgNo`)}
           />
           <MixingTextField
             label={S.LABEL_MIXING_CYCLE}
@@ -893,8 +894,15 @@ const MixingForm = ({
     });
   }, []);
 
-  const { loadingMixType, errorByMixType, ensureQualityChecks } =
-    useMixingQualityChecks(motorStage);
+  const mixingCycleCode = useMemo(() => {
+    const fromPremix = premixCards.find((card) => String(card.mixingCycleCode ?? "").trim())
+      ?.mixingCycleCode;
+    const fromFinal = finalMixCards.find((card) => String(card.mixingCycleCode ?? "").trim())
+      ?.mixingCycleCode;
+    return String(fromPremix || fromFinal || "").trim();
+  }, [finalMixCards, premixCards]);
+
+  const { loadingMixType, errorByMixType } = useMixingQualityChecks(motorStage, mixingCycleCode);
 
   const batchMixingStages = useMemo(
     () => identificationSheet?.metadata?.mixing?.stages ?? [],
@@ -954,25 +962,55 @@ const MixingForm = ({
     if (mixType !== "PREMIX" && mixType !== "FINAL_MIX") return;
     const loadQualityChecks = async () => {
       try {
-        const [premixResponse, finalMixResponse] = await Promise.all([
-          mixingController.fetchQualityChecks("PREMIX", motorStage),
-          mixingController.fetchQualityChecks("FINAL_MIX", motorStage),
-        ]);
+        let premixRows: ReturnType<typeof mapBackendQualityChecksToRows> = [];
+        let finalMixRows: ReturnType<typeof mapBackendQualityChecksToRows> = [];
+
+        if (mixingCycleCode) {
+          const response = await mixingController.fetchMixingCycleDetails(mixingCycleCode);
+          const payload =
+            response && typeof response === "object"
+              ? ((response as { data?: Record<string, unknown> }).data ??
+                (response as Record<string, unknown>))
+              : null;
+          const resolved = resolveMixingCycleQualityChecks(
+            payload as Record<string, unknown> | null,
+          );
+          premixRows = mapBackendQualityChecksToRows(resolved.premixQualityChecks);
+          finalMixRows = mapBackendQualityChecksToRows(resolved.finalMixQualityChecks);
+        }
+
+        if (!premixRows.length || !finalMixRows.length) {
+          const [premixResponse, finalMixResponse] = await Promise.all([
+            mixingController.fetchQualityChecks("PREMIX", motorStage),
+            mixingController.fetchQualityChecks("FINAL_MIX", motorStage),
+          ]);
+          if (!premixRows.length) {
+            premixRows = mapBackendQualityChecksToRows(
+              (Array.isArray((premixResponse as any)?.data?.data?.qualityChecks) &&
+                (premixResponse as any).data.data.qualityChecks) ||
+                (Array.isArray((premixResponse as any)?.data?.qualityChecks) &&
+                  (premixResponse as any).data.qualityChecks) ||
+                (Array.isArray((premixResponse as any)?.qualityChecks) &&
+                  (premixResponse as any).qualityChecks) ||
+                [],
+            );
+          }
+          if (!finalMixRows.length) {
+            finalMixRows = mapBackendQualityChecksToRows(
+              (Array.isArray((finalMixResponse as any)?.data?.data?.qualityChecks) &&
+                (finalMixResponse as any).data.data.qualityChecks) ||
+                (Array.isArray((finalMixResponse as any)?.data?.qualityChecks) &&
+                  (finalMixResponse as any).data.qualityChecks) ||
+                (Array.isArray((finalMixResponse as any)?.qualityChecks) &&
+                  (finalMixResponse as any).qualityChecks) ||
+                [],
+            );
+          }
+        }
 
         if (!isMounted) return;
-
-        const mapRows = (response: any) => {
-          const definitions =
-            (Array.isArray(response?.data?.data?.qualityChecks) &&
-              response.data.data.qualityChecks) ||
-            (Array.isArray(response?.data?.qualityChecks) && response.data.qualityChecks) ||
-            (Array.isArray(response?.qualityChecks) && response.qualityChecks) ||
-            [];
-          return mapBackendQualityChecksToRows(definitions);
-        };
-
-        applyPremixQualityChecks(mapRows(premixResponse));
-        applyFinalMixQualityChecks(mapRows(finalMixResponse));
+        applyPremixQualityChecks(premixRows);
+        applyFinalMixQualityChecks(finalMixRows);
       } catch (error) {
         console.warn("Failed to fetch quality checks", error);
       }
@@ -983,7 +1021,13 @@ const MixingForm = ({
     return () => {
       isMounted = false;
     };
-  }, [activeNavItem?.kind, applyFinalMixQualityChecks, applyPremixQualityChecks, motorStage]);
+  }, [
+    activeNavItem?.kind,
+    applyFinalMixQualityChecks,
+    applyPremixQualityChecks,
+    mixingCycleCode,
+    motorStage,
+  ]);
 
   const handleRemovePremix = useCallback(
     (premixNo: string) => {
@@ -1197,14 +1241,41 @@ const MixingForm = ({
       onSubmitMixCard?.(stageType, String(cardNo));
     }
   };
-
   useEffect(() => {
+    // Determine active card type and data
+    const activePremixItem = activePremix;
+    const activeFinalMixItem = activeFinalMix;
+
+    if (!activePremixItem && !activeFinalMixItem) return;
+
     const handler = setTimeout(() => {
-      const errs = validateMixing({ premixes: [activePremix] }, "UNIT");
-    }, 300);
+      if (activePremixItem) {
+        // Handle Premix Live Validation
+        const activeIndex = premixCards.findIndex((p) => p.premixNo === activePremixItem.premixNo);
+        if (activeIndex < 0) return;
+
+        const payload = { premixes: [activePremixItem] };
+        const errs = validateMixing(payload, "UNIT");
+
+        if (hasValidationErrors(errs)) {
+          mapAndSetErrors(errs, (p) => p.replace(/^premixes\.0\./, `premixes.${activeIndex}.`));
+        }
+      } else if (activeFinalMixItem) {
+        // Handle Final Mix Live Validation
+        const activeIndex = finalMixCards.findIndex((f) => f.mixNo === activeFinalMixItem.mixNo);
+        if (activeIndex < 0) return;
+
+        const payload = { finalMixes: [activeFinalMixItem] };
+        const errs = validateMixing(payload, "UNIT");
+
+        if (hasValidationErrors(errs)) {
+          mapAndSetErrors(errs, (p) => p.replace(/^finalMixes\.0\./, `finalMixes.${activeIndex}.`));
+        }
+      }
+    }, 200); // 300ms debounce prevents validating on every single keystroke
 
     return () => clearTimeout(handler);
-  }, [activePremix]);
+  }, [activePremix, activeFinalMix, premixCards, finalMixCards]);
 
   return (
     <Box sx={{ fontFamily: "'DM Sans', sans-serif" }}>

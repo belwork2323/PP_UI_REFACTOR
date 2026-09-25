@@ -94,6 +94,7 @@ const QualityControlPage = () => {
     entryValidationErrors,
     handleDivisionEntryLiquidValuesChange,
     handleMixingFinalMixDetailsChange,
+    handleProcessingWeightmentSheetChange,
     handleRemoveDivisionEntry,
     setActiveDivisionGroupIndex,
     setActiveDivisionSubIndex,
@@ -299,6 +300,7 @@ const QualityControlPage = () => {
             onDivisionEntryValuesChange={handleDivisionEntryValuesChange}
             onDivisionEntryLiquidValuesChange={handleDivisionEntryLiquidValuesChange}
             onMixingFinalMixDetailsChange={handleMixingFinalMixDetailsChange}
+            onProcessingWeightmentSheetChange={handleProcessingWeightmentSheetChange}
             onRemoveDivisionEntry={handleRemoveDivisionEntry}
             navApprovalActions={
               !readOnly

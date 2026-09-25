@@ -1,10 +1,5 @@
 import React, { useMemo } from "react";
-import {
-  Box,
-  Button,
-  Stack,
-  MenuItem,
-} from "@mui/material";
+import { Box, Button, Stack, MenuItem } from "@mui/material";
 import { icons } from "@app/theme/icons";
 import getBatchManagementTheme from "@app/theme/custom_themes/admin/BatchManagement/batchManagement_theme";
 import { STRINGS } from "@app/config/strings";
@@ -290,16 +285,14 @@ const BatchManagementPage = () => {
         availableMotorsLoading={lookups.availableMotorsLoading}
         onFetchApprovedMotors={lookups.fetchApprovedMotors}
         onClearApprovedMotors={lookups.clearApprovedMotors}
-        mixingCycleOptions={lookups.mixingCycleOptions}
-        mixingCyclesLoading={lookups.mixingCyclesLoading}
-        onFetchMixingCycles={lookups.fetchMixingCycles}
-        onClearMixingCycles={lookups.clearMixingCycles}
         articleOptions={lookups.articleOptions}
         articlesLoading={lookups.subscaleArticlesLoading}
         saving={form.saving}
         canSaveBatchChanges={form.canSaveBatchChanges}
         editMode={form.editMode}
         baselineMotorIds={form.baselineMotorIds}
+        handleProjectSelect={lookups.handleProjectSelect}
+
         t={t}
       />
 
