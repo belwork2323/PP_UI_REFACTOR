@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Box, Button, Chip, Stack, Typography } from "@mui/material";
-import RawMaterialPremixSchemaPanel from "./RawMaterialPremixSchemaPanel";
+import RawMaterialMaterialProcessPanel from "./materialProcess/RawMaterialMaterialProcessPanel";
 import RawMaterialWeightmentSheetPanel from "./RawMaterialWeightmentSheetPanel";
 import FlowBarDateField from "../../../../components/common/FlowBarDateField";
 import {
@@ -11,7 +11,7 @@ import {
 import { STRINGS } from "../../../../../app/config/strings";
 import { icons } from "../../../../../app/theme/icons";
 import {
-  createEmptyPremixSchemaSession,
+  createEmptyPremixProcessSession,
   isWeightmentSheetEditable,
   type PremixStatusMeta,
   type RawMaterialPrepPremixSelection,
@@ -191,15 +191,8 @@ const RawMaterialBuilderForm = ({
   const activeSession: RawMaterialPrepPremixSession = activeMaterialEntry
     ? premixSessions?.[
         getPremixMaterialSessionKey(activeMaterialEntry.premix, activeMaterialEntry.materialKey)
-      ] ?? createEmptyPremixSchemaSession()
-    : createEmptyPremixSchemaSession();
-
-  const schemaMaterials = (Array.isArray(allMaterials) && allMaterials.length > 0
-    ? allMaterials
-    : [
-        ...(Array.isArray(availableSolidMaterials) ? availableSolidMaterials : []),
-        ...(Array.isArray(availableLiquidMaterials) ? availableLiquidMaterials : []),
-      ]) as MaterialsListItem[];
+      ] ?? createEmptyPremixProcessSession()
+    : createEmptyPremixProcessSession();
 
   const sheetMaterialCount = identificationSheet?.materials?.length ?? 0;
   const statusConfig = rmTheme.details.bannerStatusConfig as Record<
@@ -478,23 +471,9 @@ const RawMaterialBuilderForm = ({
                     onChange={(value) => onPremixDateChange(activeMaterialEntry.premix, value)}
                   />
                 </Box>
-                <RawMaterialPremixSchemaPanel
-                  key={`schema-solid-${activeMaterialEntry.premix}-${activeMaterialEntry.materialKey}`}
-                  sessionKey={getPremixMaterialSessionKey(
-                    activeMaterialEntry.premix,
-                    activeMaterialEntry.materialKey,
-                  )}
-                  premixNo={activeMaterialEntry.premix}
-                  slot="solid"
-                  materialCode={activeMaterialEntry.solidMaterialCode}
-                  materialId={activeMaterialEntry.solidMaterialId}
-                  gradeCode={activeMaterialEntry.solidGradeCode}
-                  gradeId={activeMaterialEntry.solidGradeId}
-                  materials={schemaMaterials}
-                  subDepartmentId={subDepartmentId}
-                  batchId={activeBatch?.batchId}
+                <RawMaterialMaterialProcessPanel
+                  key={`process-solid-${activeMaterialEntry.premix}-${activeMaterialEntry.materialKey}`}
                   slotState={activeSession.solid}
-                  savedSections={activeSession.pendingSolidSections}
                   onSlotChange={(next) =>
                     onPremixSlotChange(
                       activeMaterialEntry.premix,
@@ -504,6 +483,7 @@ const RawMaterialBuilderForm = ({
                     )
                   }
                   readOnly={activePremixLocked}
+                  theme={theme}
                   validationErrors={
                     premixFieldErrors[
                       `${activeMaterialEntry.premix}:${activeMaterialEntry.materialKey}:solid`
@@ -532,21 +512,9 @@ const RawMaterialBuilderForm = ({
                     />
                   </Box>
                 ) : null}
-                <RawMaterialPremixSchemaPanel
-                  key={`schema-liquid-${activeMaterialEntry.premix}-${activeMaterialEntry.materialKey}`}
-                  sessionKey={getPremixMaterialSessionKey(
-                    activeMaterialEntry.premix,
-                    activeMaterialEntry.materialKey,
-                  )}
-                  premixNo={activeMaterialEntry.premix}
-                  slot="liquid"
-                  materialCode={activeMaterialEntry.liquidMaterialCode}
-                  materialId={activeMaterialEntry.liquidMaterialId}
-                  materials={schemaMaterials}
-                  subDepartmentId={subDepartmentId}
-                  batchId={activeBatch?.batchId}
+                <RawMaterialMaterialProcessPanel
+                  key={`process-liquid-${activeMaterialEntry.premix}-${activeMaterialEntry.materialKey}`}
                   slotState={activeSession.liquid}
-                  savedSections={activeSession.pendingLiquidSections}
                   onSlotChange={(next) =>
                     onPremixSlotChange(
                       activeMaterialEntry.premix,
@@ -556,6 +524,7 @@ const RawMaterialBuilderForm = ({
                     )
                   }
                   readOnly={activePremixLocked}
+                  theme={theme}
                   validationErrors={
                     premixFieldErrors[
                       `${activeMaterialEntry.premix}:${activeMaterialEntry.materialKey}:liquid`

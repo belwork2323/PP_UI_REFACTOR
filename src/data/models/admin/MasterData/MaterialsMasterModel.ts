@@ -39,11 +39,14 @@ export const getRawMaterialCategoryLabel = (type: RawMaterialTypeValue): string 
 export const PREPARATION_TYPE_OPTIONS: { value: PreparationTypeValue; label: string }[] = [
   { value: "ADDUCT", label: "ADDUCT" },
   { value: "HTPB Blending", label: "HTPB Blending" },
-  { value: "AP Fine", label: "AP Fine" },
-  { value: "AP ultrafine", label: "AP ultrafine" },
 ];
 
-const PREPARATION_TYPE_VALUES = new Set<string>(PREPARATION_TYPE_OPTIONS.map((o) => o.value));
+const LEGACY_PREPARATION_TYPE_VALUES = new Set<string>(["AP Fine", "AP ultrafine"]);
+
+const PREPARATION_TYPE_VALUES = new Set<string>([
+  ...PREPARATION_TYPE_OPTIONS.map((o) => o.value),
+  ...LEGACY_PREPARATION_TYPE_VALUES,
+]);
 
 export const parseRawMaterialType = (raw: unknown): RawMaterialTypeValue => {
   const value = String(raw ?? "NORMAL").trim().toUpperCase();

@@ -32,6 +32,10 @@ import {
   type DimensionalParametersCreateFormState,
   type DimensionalParametersStageEditFormState,
 } from "@data/models/admin/MasterData/DimensionalParametersMasterModel";
+import {
+  masterDataNumericFieldHasValue,
+  sanitizeMasterDataDecimalInput,
+} from "@data/models/admin/MasterData/masterDataNumericInput";
 import { visibleValidationError } from "./masterDataValidationUtils";
 import type { AppDropdownOption } from "@ui/components/common/AppDropdown";
 
@@ -93,12 +97,12 @@ const ParameterRowsEditor = ({
       );
       const minError = visibleValidationError(
         errors.minValue,
-        row.minValue != null,
+        masterDataNumericFieldHasValue(row.minValue),
         showErrors && editable,
       );
       const maxError = visibleValidationError(
         errors.maxValue,
-        row.maxValue != null,
+        masterDataNumericFieldHasValue(row.maxValue),
         showErrors && editable,
       );
 
@@ -155,31 +159,31 @@ const ParameterRowsEditor = ({
             )}
             <CasePrepTextField
               label={S.DIMENSIONAL_PARAMETERS.COL_MIN}
-              value={row.minValue != null ? String(row.minValue) : ""}
+              value={row.minValue}
               disabled={disabled || locked}
               error={Boolean(minError)}
               helperText={minError}
               width="100%"
               theme={theme}
-              onChange={(value) =>
-                updateRow({
-                  minValue: value === "" ? null : Number(value),
-                })
-              }
+              onChange={(value) => {
+                const next = sanitizeMasterDataDecimalInput(value);
+                if (next === null) return;
+                updateRow({ minValue: next });
+              }}
             />
             <CasePrepTextField
               label={S.DIMENSIONAL_PARAMETERS.COL_MAX}
-              value={row.maxValue != null ? String(row.maxValue) : ""}
+              value={row.maxValue}
               disabled={disabled || locked}
               error={Boolean(maxError)}
               helperText={maxError}
               width="100%"
               theme={theme}
-              onChange={(value) =>
-                updateRow({
-                  maxValue: value === "" ? null : Number(value),
-                })
-              }
+              onChange={(value) => {
+                const next = sanitizeMasterDataDecimalInput(value);
+                if (next === null) return;
+                updateRow({ maxValue: next });
+              }}
             />
             <CasePrepSearchableSelect
               label={S.DIMENSIONAL_PARAMETERS.COL_UNIT}

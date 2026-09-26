@@ -4,28 +4,30 @@ import type {
   PreparationProcessEntry,
 } from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
 import {
-  buildProcessSubmission,
   findGradeInMaterial,
   findMaterialInList,
   RMP_SCHEMA_TYPE,
   RMP_SCHEMA_VERSION,
 } from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
-import type {
-  SchemaDocumentV2,
-  SchemaFormValues,
-  SchemaSectionSubmission,
-} from "../../../schema-engine";
-import { schemaValuesHaveUserData } from "../../../schema-engine/state/formState";
+import type { SchemaSectionSubmission } from "../../../schema-engine";
+import { buildProcessFromTypedForm } from "./rmp/buildProcessFromTypedForm";
+import {
+  createEmptyProcessFormForUiKey,
+  processFormHasUserData,
+  type RmpMaterialProcessForm,
+} from "./rmp/defaultSolidProcessForm";
+import { hydrateProcessFormFromSections } from "./rmp/processFormMapper";
+import {
+  resolveMaterialUiKey,
+  type RmpMaterialUiKey,
+  type RmpProcessSlot,
+} from "./rmp/rmpMaterialUiRegistry";
 import { formatToIsoDateInput } from "../../../utils/dateUtils";
 import { OPERATION_STATUS, formatApiStatusForDisplay } from "../../../hooks/operationStatus";
 import { normalizeSubdepartmentBatchStatus } from "./SubdepartmentBatchModel";
-import {
-  formatDateTimeForApi,
-  normalizeProcessSubmissionFromApi,
-  serializeProcessSubmissionForApi,
-  toCamelCaseKey,
-} from "./rawMaterialPreparationApiMapper";
+import { formatDateTimeForApi, toCamelCaseKey } from "./rawMaterialPreparationApiMapper";
 import { weightmentHasMaterialData } from "./rawMaterialWeightmentValidation";
+import { cloneValue } from "../../../schema-engine/state/formState";
 
 export type PremixSubmissionType = "DRAFT" | "SUBMIT";
 export type PremixSubmissionStatus =
@@ -370,20 +372,21 @@ export type RawMaterialPrepPremixSelection = {
   liquidMaterialId?: number;
 };
 
-export type RawMaterialPrepMaterialSchemaSlot = {
-  schema: SchemaDocumentV2 | null;
-  schemaLoading: boolean;
-  schemaError: string | null;
-  formValues: SchemaFormValues;
+export type RawMaterialPrepMaterialProcessSlot = {
+  uiKey: RmpMaterialUiKey;
+  processForm: RmpMaterialProcessForm;
 };
+
+/** @deprecated Use RawMaterialPrepMaterialProcessSlot */
+export type RawMaterialPrepMaterialSchemaSlot = RawMaterialPrepMaterialProcessSlot;
 
 export type RawMaterialPrepPremixSession = {
   selectedProcesses: { solid: boolean; liquid: boolean };
   solidMaterialCode: string;
   solidGradeCode: string;
   liquidMaterialCode: string;
-  solid: RawMaterialPrepMaterialSchemaSlot;
-  liquid: RawMaterialPrepMaterialSchemaSlot;
+  solid: RawMaterialPrepMaterialProcessSlot;
+  liquid: RawMaterialPrepMaterialProcessSlot;
   pendingSolidSections?: SchemaSectionSubmission[];
   pendingLiquidSections?: SchemaSectionSubmission[];
 };
@@ -430,83 +433,49 @@ export type RawMaterialPreparationDetails = {
   };
 };
 
-const emptySlot = (): RawMaterialPrepMaterialSchemaSlot => ({
-  schema: null,
-  schemaLoading: false,
-  schemaError: null,
-  formValues: {},
-});
+const emptyProcessSlot = (slot: RmpProcessSlot, materialCode = ""): RawMaterialPrepMaterialProcessSlot => {
+  const uiKey = resolveMaterialUiKey({ materialCode, slot });
+  return {
+    uiKey,
+    processForm: createEmptyProcessFormForUiKey(uiKey),
+  };
+};
 
-export const createEmptyPremixSchemaSession = (): RawMaterialPrepPremixSession => ({
+export const createEmptyPremixProcessSession = (): RawMaterialPrepPremixSession => ({
   selectedProcesses: { solid: false, liquid: false },
   solidMaterialCode: "",
   solidGradeCode: "",
   liquidMaterialCode: "",
-  solid: emptySlot(),
-  liquid: emptySlot(),
+  solid: emptyProcessSlot("solid"),
+  liquid: emptyProcessSlot("liquid"),
 });
 
-const resolveMaterialNameFallback = (
-  schema: SchemaDocumentV2 | null,
-  material: MaterialsListItem | undefined,
-  materialCode: string,
-): string => {
-  const root = schema as
-    | (SchemaDocumentV2 & {
-        rawMaterialDetails?: { materialName?: string };
-        materialName?: string;
-      })
-    | null;
+/** @deprecated Use createEmptyPremixProcessSession */
+export const createEmptyPremixSchemaSession = createEmptyPremixProcessSession;
 
-  return (
-    root?.rawMaterialDetails?.materialName ??
-    root?.materialName ??
-    material?.materialName ??
-    materialCode
-  );
+export const hydratePremixProcessSlot = (
+  slot: RmpProcessSlot,
+  materialCode: string,
+  sections: SchemaSectionSubmission[] | undefined,
+): RawMaterialPrepMaterialProcessSlot => {
+  const uiKey = resolveMaterialUiKey({ materialCode, slot });
+  return {
+    uiKey,
+    processForm: hydrateProcessFormFromSections(uiKey, sections),
+  };
 };
 
-const buildProcessForSlot = (
-  schema: SchemaDocumentV2 | null,
-  values: SchemaFormValues,
-  material: MaterialsListItem | undefined,
-  gradeCode: string,
-  fallback?: {
-    materialId?: number;
-    materialCode?: string;
-    materialName?: string;
-    gradeId?: number;
-  },
-  options?: { allowEmptyValues?: boolean },
-): PreparationProcessEntry | null => {
-  if (!schema) return null;
-  if (!options?.allowEmptyValues && !schemaValuesHaveUserData(values)) return null;
-
-  const resolvedMaterial: MaterialsListItem | undefined =
-    material ??
-    (fallback?.materialId && fallback.materialCode
-      ? {
-          materialId: fallback.materialId,
-          materialCode: fallback.materialCode,
-          materialName: fallback.materialName ?? fallback.materialCode,
-          specCount: 0,
-          grades: [],
-        }
-      : undefined);
-
-  if (!resolvedMaterial) return null;
-
-  const grade =
-    findGradeInMaterial(resolvedMaterial, gradeCode) ??
-    (fallback?.gradeId
-      ? {
-          gradeId: fallback.gradeId,
-          gradeCode,
-          gradeName: gradeCode,
-        }
-      : undefined);
-
-  return buildProcessSubmission(schema, values, resolvedMaterial, grade ?? null);
+export const normalizeMaterialProcessSlot = (
+  slot: RmpProcessSlot,
+  materialCode: string,
+  partial?: Partial<RawMaterialPrepMaterialProcessSlot> | null,
+): RawMaterialPrepMaterialProcessSlot => {
+  const code = String(materialCode ?? "").trim();
+  const uiKey = partial?.uiKey ?? resolveMaterialUiKey({ materialCode: code, slot });
+  const processForm = partial?.processForm
+    ? (cloneValue(partial.processForm) as RmpMaterialProcessForm)
+    : createEmptyProcessFormForUiKey(uiKey);
+  return { uiKey, processForm };
 };
 
 /** Prefer saved API sections when local schema/formValues were never hydrated (locked premixes). */
@@ -657,34 +626,26 @@ export const mapPreparationDetailsPayload = (params: {
           gradeCode: entry.solidGradeCode,
         };
         const process =
-          buildProcessForSlot(
-            session.solid.schema,
-            session.solid.formValues,
-            solidMaterial,
-            entry.solidGradeCode,
-            {
+          buildProcessFromTypedForm({
+            uiKey: session.solid.uiKey,
+            processForm: session.solid.processForm,
+            material: solidMaterial,
+            gradeCode: entry.solidGradeCode,
+            fallback: {
               materialId: entry.solidMaterialId,
               materialCode: entry.solidMaterialCode,
-              materialName: resolveMaterialNameFallback(
-                session.solid.schema,
-                solidMaterial,
-                entry.solidMaterialCode,
-              ),
+              materialName: solidMaterial?.materialName ?? entry.materialName,
               gradeId: entry.solidGradeId,
             },
-            { allowEmptyValues: params.allowPartialProcesses },
-          ) ??
+            allowEmptyValues: params.allowPartialProcesses,
+          }) ??
           buildProcessFromPendingSections(session.pendingSolidSections, solidFallback) ??
           (weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode)
             ? buildWeightmentOnlyProcessEntry(solidFallback)
             : null);
 
         if (process) {
-          solidProcess.push(
-            session.solid.schema
-              ? serializeProcessSubmissionForApi(process, session.solid.schema)
-              : process,
-          );
+          solidProcess.push(process);
         }
       }
 
@@ -695,33 +656,25 @@ export const mapPreparationDetailsPayload = (params: {
           materialName: liquidMaterial?.materialName ?? entry.materialName,
         };
         const process =
-          buildProcessForSlot(
-            session.liquid.schema,
-            session.liquid.formValues,
-            liquidMaterial,
-            "",
-            {
+          buildProcessFromTypedForm({
+            uiKey: session.liquid.uiKey,
+            processForm: session.liquid.processForm,
+            material: liquidMaterial,
+            gradeCode: "",
+            fallback: {
               materialId: entry.liquidMaterialId,
               materialCode: entry.liquidMaterialCode,
-              materialName: resolveMaterialNameFallback(
-                session.liquid.schema,
-                liquidMaterial,
-                entry.liquidMaterialCode,
-              ),
+              materialName: liquidMaterial?.materialName ?? entry.materialName,
             },
-            { allowEmptyValues: params.allowPartialProcesses },
-          ) ??
+            allowEmptyValues: params.allowPartialProcesses,
+          }) ??
           buildProcessFromPendingSections(session.pendingLiquidSections, liquidFallback) ??
           (weightmentHasMaterialData(weightmentSheet, entry.liquidMaterialCode)
             ? buildWeightmentOnlyProcessEntry(liquidFallback)
             : null);
 
         if (process) {
-          liquidProcess.push(
-            session.liquid.schema
-              ? serializeProcessSubmissionForApi(process, session.liquid.schema)
-              : process,
-          );
+          liquidProcess.push(process);
         }
       }
     });
@@ -936,18 +889,31 @@ export const mapPreparationDetailsFromApi = (
         matchProcessToSelection(process, selection, "liquid"),
       );
 
+      const pendingSolid = solidEntry?.sections
+        ? (JSON.parse(JSON.stringify(solidEntry.sections)) as SchemaSectionSubmission[])
+        : undefined;
+      const pendingLiquid = liquidEntry?.sections
+        ? (JSON.parse(JSON.stringify(liquidEntry.sections)) as SchemaSectionSubmission[])
+        : undefined;
+
       premixSessions[`${premixNo}:${selection.materialKey}`] = {
-        ...createEmptyPremixSchemaSession(),
+        ...createEmptyPremixProcessSession(),
         selectedProcesses: selection.selectedProcesses,
         solidMaterialCode: selection.solidMaterialCode,
         solidGradeCode: selection.solidGradeCode,
         liquidMaterialCode: selection.liquidMaterialCode,
-        pendingSolidSections: solidEntry?.sections
-          ? (JSON.parse(JSON.stringify(solidEntry.sections)) as typeof solidEntry.sections)
-          : undefined,
-        pendingLiquidSections: liquidEntry?.sections
-          ? (JSON.parse(JSON.stringify(liquidEntry.sections)) as typeof liquidEntry.sections)
-          : undefined,
+        solid: hydratePremixProcessSlot(
+          "solid",
+          selection.solidMaterialCode,
+          pendingSolid,
+        ),
+        liquid: hydratePremixProcessSlot(
+          "liquid",
+          selection.liquidMaterialCode,
+          pendingLiquid,
+        ),
+        pendingSolidSections: pendingSolid,
+        pendingLiquidSections: pendingLiquid,
       };
     });
 
@@ -956,9 +922,10 @@ export const mapPreparationDetailsFromApi = (
       if (!code || !process.sections?.length) return;
       const grade = String(process.gradeCode ?? "").trim();
       const sessionKey = resolveProcessSessionKey(premixNo, process, selections, "solid");
+      const pendingSolid = JSON.parse(JSON.stringify(process.sections)) as SchemaSectionSubmission[];
       premixSessions[sessionKey] = {
         ...(premixSessions[sessionKey] ?? {
-          ...createEmptyPremixSchemaSession(),
+          ...createEmptyPremixProcessSession(),
           selectedProcesses: { solid: true, liquid: false },
           solidMaterialCode: code,
           solidGradeCode: grade,
@@ -966,7 +933,8 @@ export const mapPreparationDetailsFromApi = (
         }),
         solidMaterialCode: premixSessions[sessionKey]?.solidMaterialCode || code,
         solidGradeCode: premixSessions[sessionKey]?.solidGradeCode || grade,
-        pendingSolidSections: JSON.parse(JSON.stringify(process.sections)) as typeof process.sections,
+        solid: hydratePremixProcessSlot("solid", code, pendingSolid),
+        pendingSolidSections: pendingSolid,
       };
     });
 
@@ -974,16 +942,18 @@ export const mapPreparationDetailsFromApi = (
       const code = String(process.materialCode ?? "").trim();
       if (!code || !process.sections?.length) return;
       const sessionKey = resolveProcessSessionKey(premixNo, process, selections, "liquid");
+      const pendingLiquid = JSON.parse(JSON.stringify(process.sections)) as SchemaSectionSubmission[];
       premixSessions[sessionKey] = {
         ...(premixSessions[sessionKey] ?? {
-          ...createEmptyPremixSchemaSession(),
+          ...createEmptyPremixProcessSession(),
           selectedProcesses: { solid: false, liquid: true },
           solidMaterialCode: "",
           solidGradeCode: "",
           liquidMaterialCode: code,
         }),
         liquidMaterialCode: premixSessions[sessionKey]?.liquidMaterialCode || code,
-        pendingLiquidSections: JSON.parse(JSON.stringify(process.sections)) as typeof process.sections,
+        liquid: hydratePremixProcessSlot("liquid", code, pendingLiquid),
+        pendingLiquidSections: pendingLiquid,
       };
     });
   });
@@ -1042,9 +1012,9 @@ export const mapPreparationDetailsFromApi = (
 
 export const premixSessionHasData = (session: RawMaterialPrepPremixSession) => {
   const solidFilled =
-    session.selectedProcesses.solid && schemaValuesHaveUserData(session.solid.formValues);
+    session.selectedProcesses.solid && processFormHasUserData(session.solid.processForm);
   const liquidFilled =
-    session.selectedProcesses.liquid && schemaValuesHaveUserData(session.liquid.formValues);
+    session.selectedProcesses.liquid && processFormHasUserData(session.liquid.processForm);
   return solidFilled || liquidFilled;
 };
 

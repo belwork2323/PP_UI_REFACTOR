@@ -1,17 +1,11 @@
 import {
-  buildRawMaterialSchemaRequest,
-  buildRawMaterialSchemaRequestFromCodes,
   createInitialValues,
-  findGradeInMaterial,
-  findMaterialInList,
   hydrateValuesFromProcess,
-  rawMaterialPrepSchemaFetchConfig,
   RMP_SCHEMA_TYPE,
   RMP_SCHEMA_VERSION,
   type SchemaProcessSubmission,
 } from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
-import schemaEngineController, { toSectionSubmissions } from "../../../schema-engine";
-import { isSchemaDocumentReady } from "../../../schema-engine/utils/schemaMessages";
+import { toSectionSubmissions } from "../../../schema-engine";
 import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
 import {
   normalizeProcessSubmissionFromApi,
@@ -723,49 +717,12 @@ export const resolveProcessingMaterialSeedsForPremix = async (
   };
 };
 
-/** Same schema fetch path as manufacturing Raw Material Preparation premix slots. */
-export const fetchQcProcessingMaterialSchema = async (params: {
+/** RMP uses typed manufacturing UI; QC processing reads saved sections + weightment (no schema HTTP). */
+export const fetchQcProcessingMaterialSchema = async (_params: {
   subDepartmentId: number;
   seed: QcProcessingMaterialSeed;
   catalog?: QcProcessingMaterialCatalog;
-}): Promise<SchemaDocumentV2 | null> => {
-  const { subDepartmentId, seed } = params;
-  if (subDepartmentId <= 0) return null;
-
-  const isSolid = seed.processSlot === "solid";
-  const materialCode = pickString(seed.materialCode);
-  if (!materialCode) return null;
-
-  const catalog = params.catalog ?? (await fetchProcessingMaterialCatalog());
-  const allMaterials = mergeMaterialsLists(
-    catalog.solidMaterials,
-    catalog.liquidMaterials,
-  ) as RawMaterialPrepMaterialOption[];
-  const material = findMaterialInList(allMaterials, materialCode);
-  const materialId = material?.materialId ?? seed.materialId;
-  if (!materialId) return null;
-
-  const requestBody = material
-    ? buildRawMaterialSchemaRequest({
-        subDepartmentId,
-        material,
-        grade: isSolid ? findGradeInMaterial(material, seed.gradeCode ?? "") : null,
-      })
-    : buildRawMaterialSchemaRequestFromCodes({
-        subDepartmentId,
-        materialId,
-        materialCode,
-        gradeId: isSolid ? seed.gradeId : null,
-        gradeCode: isSolid ? seed.gradeCode || null : null,
-      });
-
-  const response = await schemaEngineController.fetchSchema(
-    rawMaterialPrepSchemaFetchConfig,
-    requestBody,
-  );
-  if (!response?.success || !isSchemaDocumentReady(response.data)) return null;
-  return response.data;
-};
+}): Promise<SchemaDocumentV2 | null> => null;
 
 export const hydrateProcessingMaterialValues = (
   schema: SchemaDocumentV2,

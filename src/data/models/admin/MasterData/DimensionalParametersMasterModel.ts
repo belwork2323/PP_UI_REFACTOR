@@ -9,6 +9,7 @@ import {
   validateMasterDataNameField,
   validateReferenceRangeFields,
 } from "@data/models/admin/MasterData/masterDataFieldValidators";
+import { parseMasterDataOptionalNumber } from "@data/models/admin/MasterData/masterDataNumericInput";
 import type { AppDropdownOption } from "@ui/components/common/AppDropdown";
 
 export type DimensionalParametersMasterRecord = MasterDataAuditFields & {
@@ -32,8 +33,8 @@ export type DimensionalParameterRowForm = {
   parameterId: number | null;
   paramId: string;
   paramName: string;
-  minValue: number | null;
-  maxValue: number | null;
+  minValue: string;
+  maxValue: string;
   unitId: string;
   unit: string;
   isActive: boolean;
@@ -63,8 +64,8 @@ export const emptyDimensionalParameterRow = (): DimensionalParameterRowForm => (
   parameterId: null,
   paramId: "",
   paramName: "",
-  minValue: null,
-  maxValue: null,
+  minValue: "",
+  maxValue: "",
   unitId: "",
   unit: "",
   isActive: true,
@@ -89,8 +90,8 @@ export const mapRecordToParameterRow = (
     parameterId: record.parameterId,
     paramId: record.paramId,
     paramName: record.paramName,
-    minValue: record.minValue,
-    maxValue: record.maxValue,
+    minValue: record.minValue != null ? String(record.minValue) : "",
+    maxValue: record.maxValue != null ? String(record.maxValue) : "",
     unitId: unitMatch?.value ?? "",
     unit: record.unit,
     isActive: record.isActive,
@@ -209,8 +210,8 @@ export const buildDimensionalParameterCreatePayload = (
   const attributes: Record<string, unknown> = {
     projectId,
     motorType,
-    minValue: row.minValue,
-    maxValue: row.maxValue,
+    minValue: parseMasterDataOptionalNumber(row.minValue),
+    maxValue: parseMasterDataOptionalNumber(row.maxValue),
   };
   if (unit) {
     attributes.unit = unit;
@@ -236,8 +237,8 @@ export const buildDimensionalParameterActiveUpdatePayload = (
     projectId,
     motorType,
     paramId: row.paramId,
-    minValue: row.minValue,
-    maxValue: row.maxValue,
+    minValue: parseMasterDataOptionalNumber(row.minValue),
+    maxValue: parseMasterDataOptionalNumber(row.maxValue),
     unit: row.unit,
   },
 });

@@ -1,3 +1,8 @@
+import {
+  isMasterDataDecimalInputIncomplete,
+  parseMasterDataOptionalNumber,
+} from "@data/models/admin/MasterData/masterDataNumericInput";
+
 export type MasterDataFieldDef = {
   key: string;
   label: string;
@@ -251,8 +256,14 @@ const fieldErrorForAttribute = (
       return field.required ? `${field.label} is required` : null;
     }
     if (typeof raw === "boolean") return `${field.label} must be a number`;
-    const num = typeof raw === "number" ? raw : Number(raw);
-    if (!Number.isFinite(num)) return `${field.label} must be a number`;
+    if (typeof raw === "string" && isMasterDataDecimalInputIncomplete(raw)) {
+      return `${field.label} must be a number`;
+    }
+    const num =
+      typeof raw === "number"
+        ? raw
+        : parseMasterDataOptionalNumber(String(raw ?? ""));
+    if (num == null) return `${field.label} must be a number`;
     return null;
   }
   const value = String(raw ?? "").trim();
@@ -315,7 +326,12 @@ export const buildCreatePayload = (form: MasterDataFormState, schema: MasterData
       const raw = form.attributes[f.key];
       if (f.dataType === "INTEGER" || f.dataType === "NUMBER" || f.dataType === "DOUBLE") {
         if (raw === "" || raw === null || raw === undefined) return;
-        attributes[f.key] = Number(raw);
+        if (f.dataType === "INTEGER") {
+          attributes[f.key] = Number(raw);
+        } else {
+          const num = parseMasterDataOptionalNumber(String(raw));
+          if (num != null) attributes[f.key] = num;
+        }
       } else {
         attributes[f.key] = String(raw ?? "").trim();
       }

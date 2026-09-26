@@ -23,6 +23,10 @@ import AppDropdown from "@ui/components/common/AppDropdown";
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 import CasePrepTextField from "@ui/pages/user/manufacturing/CasePreparation/CasePrepTextField";
 import CasePrepSearchableSelect from "@ui/pages/user/manufacturing/CasePreparation/CasePrepSearchableSelect";
+import {
+  masterDataNumericFieldHasValue,
+  sanitizeMasterDataDecimalInput,
+} from "@data/models/admin/MasterData/masterDataNumericInput";
 import MasterDataEnableDisableField from "./components/MasterDataEnableDisableField";
 import useUnitMasterOptions from "@hooks/admin/MasterData/useUnitMasterOptions";
 import {
@@ -104,12 +108,12 @@ const ParametersEditor = ({
       );
       const minError = visibleValidationError(
         rawErr?.minValue,
-        param.specification.minValue != null,
+        masterDataNumericFieldHasValue(param.specification.minValue),
         showErrors,
       );
       const maxError = visibleValidationError(
         rawErr?.maxValue,
-        param.specification.maxValue != null,
+        masterDataNumericFieldHasValue(param.specification.maxValue),
         showErrors,
       );
       const unitError = visibleValidationError(
@@ -192,40 +196,38 @@ const ParametersEditor = ({
             >
               <CasePrepTextField
                 label={S.QUALITY_CHECKS.PARAM_MIN}
-                value={param.specification.minValue != null ? String(param.specification.minValue) : ""}
+                value={param.specification.minValue}
                 disabled={disabled || locked}
                 error={Boolean(minError)}
                 helperText={minError ?? null}
                 width="100%"
                 theme={theme}
                 onChange={(value) => {
+                  const sanitized = sanitizeMasterDataDecimalInput(value);
+                  if (sanitized === null) return;
                   const next = [...params];
                   next[idx] = {
                     ...param,
-                    specification: {
-                      ...param.specification,
-                      minValue: value === "" ? null : Number(value),
-                    },
+                    specification: { ...param.specification, minValue: sanitized },
                   };
                   onChange(next);
                 }}
               />
               <CasePrepTextField
                 label={S.QUALITY_CHECKS.PARAM_MAX}
-                value={param.specification.maxValue != null ? String(param.specification.maxValue) : ""}
+                value={param.specification.maxValue}
                 disabled={disabled || locked}
                 error={Boolean(maxError)}
                 helperText={maxError ?? null}
                 width="100%"
                 theme={theme}
                 onChange={(value) => {
+                  const sanitized = sanitizeMasterDataDecimalInput(value);
+                  if (sanitized === null) return;
                   const next = [...params];
                   next[idx] = {
                     ...param,
-                    specification: {
-                      ...param.specification,
-                      maxValue: value === "" ? null : Number(value),
-                    },
+                    specification: { ...param.specification, maxValue: sanitized },
                   };
                   onChange(next);
                 }}

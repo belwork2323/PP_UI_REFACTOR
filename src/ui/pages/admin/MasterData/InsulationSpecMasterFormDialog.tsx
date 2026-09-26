@@ -34,6 +34,10 @@ import {
   type InsulationParameterForm,
   type InsulationSpecFormState,
 } from "@data/models/admin/MasterData/InsulationSpecMasterModel";
+import {
+  masterDataNumericFieldHasValue,
+  sanitizeMasterDataDecimalInput,
+} from "@data/models/admin/MasterData/masterDataNumericInput";
 import type { MasterDataReferenceRange } from "@data/models/admin/MasterData/nestedMasterDataTypes";
 import { visibleValidationError } from "./masterDataValidationUtils";
 
@@ -88,12 +92,12 @@ const ParameterEditor = ({
       );
       const minVisibleErr = visibleValidationError(
         rawErr?.minValue,
-        param.referenceRange.minValue != null,
+        masterDataNumericFieldHasValue(param.referenceRange.minValue),
         showErrors,
       );
       const maxVisibleErr = visibleValidationError(
         rawErr?.maxValue,
-        param.referenceRange.maxValue != null,
+        masterDataNumericFieldHasValue(param.referenceRange.maxValue),
         showErrors,
       );
       const nameError = Boolean(nameVisibleErr);
@@ -136,35 +140,33 @@ const ParameterEditor = ({
           />
           <CasePrepTextField
             label="Min"
-            value={param.referenceRange.minValue != null ? String(param.referenceRange.minValue) : ""}
+            value={param.referenceRange.minValue}
             disabled={disabled || locked}
             required={false}
             error={minError}
             helperText={minVisibleErr ?? null}
             width="100%"
             theme={theme}
-            onChange={(value) =>
-              updateRange({
-                ...param.referenceRange,
-                minValue: value === "" ? null : Number(value),
-              })
-            }
+            onChange={(value) => {
+              const next = sanitizeMasterDataDecimalInput(value);
+              if (next === null) return;
+              updateRange({ ...param.referenceRange, minValue: next });
+            }}
           />
           <CasePrepTextField
             label="Max"
-            value={param.referenceRange.maxValue != null ? String(param.referenceRange.maxValue) : ""}
+            value={param.referenceRange.maxValue}
             disabled={disabled || locked}
             required={false}
             error={maxError}
             helperText={maxVisibleErr ?? null}
             width="100%"
             theme={theme}
-            onChange={(value) =>
-              updateRange({
-                ...param.referenceRange,
-                maxValue: value === "" ? null : Number(value),
-              })
-            }
+            onChange={(value) => {
+              const next = sanitizeMasterDataDecimalInput(value);
+              if (next === null) return;
+              updateRange({ ...param.referenceRange, maxValue: next });
+            }}
           />
           <CasePrepSearchableSelect
             label="Unit"

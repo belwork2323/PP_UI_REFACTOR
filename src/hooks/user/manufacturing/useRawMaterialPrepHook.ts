@@ -15,10 +15,11 @@ import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import { useFileService } from "../../../hooks/useFileService";
 import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
 import rawMaterialPreparationController from "../../../controllers/user/manufacturing/rawMaterialPreparationController";
-import { cloneValue, schemaValuesHaveUserData } from "../../../schema-engine/state/formState";
+import { cloneValue } from "../../../schema-engine/state/formState";
 import {
-  createEmptyPremixSchemaSession,
+  createEmptyPremixProcessSession,
   createEmptyWeightmentSheet,
+  normalizeMaterialProcessSlot,
   isPremixEditable,
   mapPreparationDetailsFromApi,
   mapPreparationDetailsFromSavedForm,
@@ -47,20 +48,12 @@ import {
   type PremixMaterialOption,
   type RawMaterialPrepMaterialOption,
 } from "./rawMaterialPrepFlowConfig";
-import schemaEngineController from "../../../schema-engine/controller/schemaEngineController";
-import {
-  buildRawMaterialSchemaRequest,
-  buildRawMaterialSchemaRequestFromCodes,
-  findGradeInMaterial,
-  findMaterialInList,
-  rawMaterialPrepSchemaFetchConfig,
-} from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
-import type { SchemaDocumentV2 } from "../../../schema-engine";
-import { isSchemaDocumentReady } from "../../../schema-engine/utils/schemaMessages";
-import { validateSchemaFormValues } from "@/data/models/user/schemaFormValidation";
+import { processFormHasUserData } from "../../../data/models/user/rmp/defaultSolidProcessForm";
+import { validateMaterialProcessForm } from "../../../data/models/user/rmp/validateMaterialProcessForm";
+import { rmpUiKeyShowsProcessPanel } from "../../../data/models/user/rmp/rmpMaterialUiRegistry";
 import {
   getWeightmentIdentificationError,
-  isPremixSelectionSchemaReady,
+  isPremixSelectionProcessReady,
   premixSelectionHasSubmitData,
   validateRawMaterialPreparation,
 } from "@/data/validation/adapters/rawMaterialPreparation.validation";
@@ -130,8 +123,11 @@ const enrichRmpBatchFromDetails = (
 };
 
 const normalizePremixSession = (session?: Partial<PremixSession> | null): PremixSession => {
-  const base = createEmptyPremixSchemaSession();
+  const base = createEmptyPremixProcessSession();
   if (!session) return base;
+
+  const solidMaterialCode = String(session.solidMaterialCode ?? base.solidMaterialCode);
+  const liquidMaterialCode = String(session.liquidMaterialCode ?? base.liquidMaterialCode);
 
   return {
     ...base,
@@ -140,114 +136,18 @@ const normalizePremixSession = (session?: Partial<PremixSession> | null): Premix
       solid: Boolean(session.selectedProcesses?.solid),
       liquid: Boolean(session.selectedProcesses?.liquid),
     },
-    solid: { ...base.solid, ...(session.solid ?? {}) },
-    liquid: { ...base.liquid, ...(session.liquid ?? {}) },
+    solidMaterialCode,
+    solidGradeCode: String(session.solidGradeCode ?? base.solidGradeCode),
+    liquidMaterialCode,
+    solid: normalizeMaterialProcessSlot("solid", solidMaterialCode, session.solid),
+    liquid: normalizeMaterialProcessSlot("liquid", liquidMaterialCode, session.liquid),
+    pendingSolidSections: session.pendingSolidSections ?? base.pendingSolidSections,
+    pendingLiquidSections: session.pendingLiquidSections ?? base.pendingLiquidSections,
   };
 };
 
 const isSessionFilled = (session: PremixSession) =>
   premixSessionHasData(normalizePremixSession(session));
-
-const fetchPremixSlotSchema = async (
-  entry: RawMaterialPrepPremixSelection,
-  slot: "solid" | "liquid",
-  materials: MaterialsListItem[],
-  subDepartmentId: number,
-): Promise<SchemaDocumentV2 | null> => {
-  const materialCode = slot === "solid" ? entry.solidMaterialCode : entry.liquidMaterialCode;
-  if (!materialCode) return null;
-
-  const material = findMaterialInList(materials, materialCode);
-  const materialId =
-    material?.materialId ?? (slot === "solid" ? entry.solidMaterialId : entry.liquidMaterialId);
-  if (!materialId || subDepartmentId <= 0) return null;
-
-  const requestBody = material
-    ? buildRawMaterialSchemaRequest({
-        subDepartmentId,
-        material,
-        grade: slot === "solid" ? findGradeInMaterial(material, entry.solidGradeCode) : null,
-      })
-    : buildRawMaterialSchemaRequestFromCodes({
-        subDepartmentId,
-        materialId,
-        materialCode,
-        gradeId: slot === "solid" ? entry.solidGradeId : null,
-        gradeCode: slot === "solid" ? entry.solidGradeCode || null : null,
-      });
-
-  const response = await schemaEngineController.fetchSchema(
-    rawMaterialPrepSchemaFetchConfig,
-    requestBody,
-  );
-  if (!response?.success || !isSchemaDocumentReady(response.data)) return null;
-  return response.data;
-};
-
-const ensurePremixSchemasLoaded = async (
-  premixNo: number,
-  selections: RawMaterialPrepPremixSelection[],
-  sessions: Record<string, PremixSession>,
-  solidMaterials: MaterialsListItem[],
-  liquidMaterials: MaterialsListItem[],
-  subDepartmentId: number,
-): Promise<Record<string, PremixSession>> => {
-  const premixSelections = selections.filter((entry) => entry.premix === premixNo);
-  if (premixSelections.length === 0) return sessions;
-
-  const nextSessions = { ...sessions };
-  const allMaterials = mergeMaterialsLists(solidMaterials, liquidMaterials) as MaterialsListItem[];
-
-  for (const entry of premixSelections) {
-    const sessionKey = getPremixMaterialSessionKey(entry.premix, entry.materialKey);
-    const current = normalizePremixSession(nextSessions[sessionKey]);
-    let nextSession = current;
-
-    if (entry.selectedProcesses.solid && entry.solidMaterialCode && !current.solid.schema) {
-      const schema = await fetchPremixSlotSchema(entry, "solid", allMaterials, subDepartmentId);
-      nextSession = {
-        ...nextSession,
-        solid: schema
-          ? {
-              ...current.solid,
-              schema,
-              schemaLoading: false,
-              schemaError: null,
-            }
-          : {
-              ...current.solid,
-              schema: null,
-              schemaLoading: false,
-              schemaError: null,
-            },
-      };
-    }
-
-    if (entry.selectedProcesses.liquid && entry.liquidMaterialCode && !nextSession.liquid.schema) {
-      const schema = await fetchPremixSlotSchema(entry, "liquid", allMaterials, subDepartmentId);
-      nextSession = {
-        ...nextSession,
-        liquid: schema
-          ? {
-              ...nextSession.liquid,
-              schema,
-              schemaLoading: false,
-              schemaError: null,
-            }
-          : {
-              ...nextSession.liquid,
-              schema: null,
-              schemaLoading: false,
-              schemaError: null,
-            },
-      };
-    }
-
-    nextSessions[sessionKey] = nextSession;
-  }
-
-  return nextSessions;
-};
 
 const parseStatus = (status: string | undefined) => String(status ?? "").toLowerCase();
 
@@ -276,27 +176,19 @@ const mergePremixSessionsPreservingLocalInput = (
         ? session.pendingLiquidSections
         : prev.pendingLiquidSections,
       solid: {
-        ...session.solid,
-        schema: session.solid.schema ?? prev.solid.schema,
-        schemaLoading:
-          session.solid.schema || prev.solid.schema ? false : session.solid.schemaLoading,
-        schemaError: session.solid.schemaError ?? prev.solid.schemaError,
-        formValues: cloneValue(
-          schemaValuesHaveUserData(session.solid.formValues)
-            ? session.solid.formValues
-            : prev.solid.formValues,
+        uiKey: session.solid.uiKey ?? prev.solid.uiKey,
+        processForm: cloneValue(
+          processFormHasUserData(session.solid.processForm)
+            ? session.solid.processForm
+            : prev.solid.processForm,
         ),
       },
       liquid: {
-        ...session.liquid,
-        schema: session.liquid.schema ?? prev.liquid.schema,
-        schemaLoading:
-          session.liquid.schema || prev.liquid.schema ? false : session.liquid.schemaLoading,
-        schemaError: session.liquid.schemaError ?? prev.liquid.schemaError,
-        formValues: cloneValue(
-          schemaValuesHaveUserData(session.liquid.formValues)
-            ? session.liquid.formValues
-            : prev.liquid.formValues,
+        uiKey: session.liquid.uiKey ?? prev.liquid.uiKey,
+        processForm: cloneValue(
+          processFormHasUserData(session.liquid.processForm)
+            ? session.liquid.processForm
+            : prev.liquid.processForm,
         ),
       },
     };
@@ -679,7 +571,7 @@ export const useRawMaterialPrepHook = () => {
     [addedPremixSelections, premixSessions],
   );
 
-  const allPremixSchemasReady = useMemo(
+  const allPremixProcessReady = useMemo(
     () =>
       addedPremixSelections.length > 0 &&
       addedPremixSelections.every((entry) => {
@@ -689,7 +581,7 @@ export const useRawMaterialPrepHook = () => {
         const session =
           premixSessions[getPremixMaterialSessionKey(entry.premix, entry.materialKey)];
         if (!session) return false;
-        return isPremixSelectionSchemaReady(entry, session, weightmentSheet);
+        return isPremixSelectionProcessReady(entry, session, weightmentSheet);
       }),
     [addedPremixSelections, premixSessions, weightmentSheet],
   );
@@ -1051,15 +943,11 @@ export const useRawMaterialPrepHook = () => {
       nextSlot: PremixSession["solid"],
     ) => {
       if (!premix || !materialKey) return;
-      // Always allow slot updates (schema load + hydrate from API).
-      // User edits are blocked in SchemaPanel via readOnly when premix is locked.
       const sessionKey = getPremixMaterialSessionKey(premix, materialKey);
       const errorKey = `${sessionKey}:${slot}`;
-      // Deep-clone form values so Premix 1 / Premix 2 never share the same object
-      // when the same material (e.g. TDI) appears on multiple premixes.
       const isolatedSlot: PremixSession["solid"] = {
         ...nextSlot,
-        formValues: cloneValue(nextSlot.formValues ?? {}),
+        processForm: cloneValue(nextSlot.processForm),
       };
 
       setPremixSessionsByBatch((prev) => {
@@ -1078,7 +966,7 @@ export const useRawMaterialPrepHook = () => {
       });
 
       // Live type/format validation only (DRAFT) → red under fields, no toast
-      if (checkPremixEditable(premix) && isolatedSlot.schema && !isolatedSlot.schemaLoading) {
+      if (checkPremixEditable(premix) && rmpUiKeyShowsProcessPanel(isolatedSlot.uiKey)) {
         setValidationAttempt((prev) => ({ ...prev, format: true }));
         const selection = addedPremixSelections.find(
           (entry) => entry.premix === premix && entry.materialKey === materialKey,
@@ -1093,9 +981,9 @@ export const useRawMaterialPrepHook = () => {
                 materialCode: selection?.liquidMaterialCode,
                 gradeCode: selection?.liquidGradeCode,
               };
-        const liveErrors = validateSchemaFormValues(
-          isolatedSlot.schema,
-          isolatedSlot.formValues ?? {},
+        const liveErrors = validateMaterialProcessForm(
+          isolatedSlot.uiKey,
+          isolatedSlot.processForm,
           "DRAFT",
           materialContext,
         );
@@ -1167,25 +1055,7 @@ export const useRawMaterialPrepHook = () => {
       }
 
       const isDraft = intent === "draft";
-      let sessionsForPayload = premixSessions;
-
-      setActionLoading(true);
-      try {
-        sessionsForPayload = await ensurePremixSchemasLoaded(
-          premixNo,
-          addedPremixSelections,
-          premixSessions,
-          availableSolidMaterials as MaterialsListItem[],
-          availableLiquidMaterials as MaterialsListItem[],
-          subDepartmentId,
-        );
-        setPremixSessionsByBatch((prev) => ({
-          ...prev,
-          [activeFormBatchKey]: sessionsForPayload,
-        }));
-      } finally {
-        setActionLoading(false);
-      }
+      const sessionsForPayload = premixSessions;
 
       setValidationAttempt({
         format: true,
@@ -1240,18 +1110,6 @@ export const useRawMaterialPrepHook = () => {
           return false;
         }
 
-        const premixSchemasReady = premixSelections.every((entry) => {
-          const session =
-            sessionsForPayload[getPremixMaterialSessionKey(entry.premix, entry.materialKey)];
-          if (!session) return false;
-          return isPremixSelectionSchemaReady(entry, session, weightmentSheet);
-        });
-
-        if (!premixSchemasReady) {
-          showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.SCHEMA_LOAD_REQUIRED, "warning");
-          return false;
-        }
-
         const premixHasData = premixSelections.some((entry) => {
           const session =
             sessionsForPayload[getPremixMaterialSessionKey(entry.premix, entry.materialKey)];
@@ -1265,7 +1123,7 @@ export const useRawMaterialPrepHook = () => {
           return false;
         }
 
-        // Schema + weightment validation — red under fields, no toast
+        // Process + weightment validation — red under fields, no toast
         {
           const validationResult = validateRawMaterialPreparation(
             {
@@ -1602,13 +1460,6 @@ export const useRawMaterialPrepHook = () => {
       });
       if (!premixHasMaterial) return false;
 
-      const premixSchemasReady = premixSelections.every((entry) => {
-        const session = premixSessions[getPremixMaterialSessionKey(entry.premix, entry.materialKey)];
-        if (!session) return false;
-        return isPremixSelectionSchemaReady(entry, session, weightmentSheet);
-      });
-      if (!premixSchemasReady) return false;
-
       const premixHasData = premixSelections.some((entry) => {
         const session = premixSessions[getPremixMaterialSessionKey(entry.premix, entry.materialKey)];
         return session
@@ -1671,7 +1522,9 @@ export const useRawMaterialPrepHook = () => {
     completedPremixes,
     subDepartmentId,
     premixCardsHaveData,
-    allPremixSchemasReady,
+    allPremixProcessReady,
+    /** @deprecated Use allPremixProcessReady */
+    allPremixSchemasReady: allPremixProcessReady,
     allPremixesHaveMaterial,
     setBackConfirmOpen,
     handlePremixDateChange,

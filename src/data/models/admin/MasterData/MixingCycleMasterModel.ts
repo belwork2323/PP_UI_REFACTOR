@@ -7,6 +7,7 @@ import {
 import {
   firstFieldErrorMessage,
   validateMasterDataNameField,
+  validateReferenceRangeFields,
 } from "@data/models/admin/MasterData/masterDataFieldValidators";
 import {
   emptyQualityCheckParam,
@@ -264,12 +265,10 @@ const mapParamErrors = (
       paramErrors.parameterName = "Parameter name is required";
     }
     const label = name || "parameter";
-    const { minValue, maxValue, unitId, unit } = param.specification;
-    if (minValue == null) paramErrors.minValue = `Min value is required for "${label}"`;
-    if (maxValue == null) paramErrors.maxValue = `Max value is required for "${label}"`;
-    if (minValue != null && maxValue != null && minValue > maxValue) {
-      paramErrors.minValue = `Min value cannot exceed max value for "${label}"`;
-    }
+    const rangeErrors = validateReferenceRangeFields(param.specification, label, true);
+    if (rangeErrors.minValue) paramErrors.minValue = rangeErrors.minValue;
+    if (rangeErrors.maxValue) paramErrors.maxValue = rangeErrors.maxValue;
+    const { unitId, unit } = param.specification;
     if (unitId == null && !String(unit ?? "").trim()) {
       paramErrors.unit = `Unit is required for "${label}"`;
     }

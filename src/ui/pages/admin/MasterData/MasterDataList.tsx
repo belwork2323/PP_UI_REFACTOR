@@ -23,6 +23,7 @@ import SkeletonRow from "@ui/components/common/SkeletonRow";
 import AppTextField from "@ui/components/common/AppTextField";
 import AppSearchableDropdown from "@ui/components/common/AppSearchableDropdown";
 import type { AppDropdownOption } from "@ui/components/common/AppDropdown";
+import { sanitizeMasterDataDecimalInput } from "@data/models/admin/MasterData/masterDataNumericInput";
 import MasterDataTableToolbar from "./components/MasterDataTableToolbar";
 import MasterDataActiveSwitch from "./components/MasterDataActiveSwitch";
 import MasterDataEnableDisableField from "./components/MasterDataEnableDisableField";
@@ -271,7 +272,7 @@ const MasterDataList = ({
       <AppTextField
         compact
         fullWidth
-        type={isInteger ? "text" : isNumeric ? "number" : "text"}
+        type={isInteger || isNumeric ? "text" : "text"}
         placeholder={requiredFieldLabel(
           getMasterDataFieldLabel(selectedType, field),
           Boolean(field.required),
@@ -291,15 +292,9 @@ const MasterDataList = ({
             if (field.max != null && num > field.max) return;
             onFormChange(field.key, num, true);
           } else if (isNumeric) {
-            if (v === "") {
-              onFormChange(field.key, "", true);
-              return;
-            }
-            const num = Number(v);
-            if (!Number.isFinite(num)) return;
-            if (field.min != null && num < field.min) return;
-            if (field.max != null && num > field.max) return;
-            onFormChange(field.key, num, true);
+            const sanitized = sanitizeMasterDataDecimalInput(v);
+            if (sanitized === null) return;
+            onFormChange(field.key, sanitized, true);
           } else {
             onFormChange(field.key, v, true);
           }
@@ -309,7 +304,7 @@ const MasterDataList = ({
         helperText={visibleError(field.key)}
         sx={cellSx}
         inputProps={{
-          inputMode: isInteger ? "numeric" : undefined,
+          inputMode: isInteger ? "numeric" : isNumeric ? "decimal" : undefined,
           pattern: isInteger ? (allowNegativeInteger ? "[0-9-]*" : "[0-9]*") : undefined,
           min: !isInteger && field.min != null ? field.min : undefined,
           max: !isInteger && field.max != null ? field.max : undefined,

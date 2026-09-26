@@ -3,6 +3,11 @@ import {
   MASTER_DATA_CODE_PATTERN,
   MASTER_DATA_NAME_PATTERN,
 } from "@data/models/admin/MasterData/MasterDataModel";
+import {
+  isMasterDataDecimalInputIncomplete,
+  masterDataNumericFieldHasValue,
+  parseMasterDataOptionalNumber,
+} from "@data/models/admin/MasterData/masterDataNumericInput";
 import type { MasterDataReferenceRange } from "@data/models/admin/MasterData/nestedMasterDataTypes";
 
 export const masterDataNameFormatMessage = (label: string) =>
@@ -46,11 +51,26 @@ export const validateReferenceRangeFields = (
   requireAll = false,
 ): ReferenceRangeFieldErrors => {
   const errors: ReferenceRangeFieldErrors = {};
-  const { minValue, maxValue } = range;
+  const minText = range.minValue.trim();
+  const maxText = range.maxValue.trim();
+
+  if (masterDataNumericFieldHasValue(minText) && isMasterDataDecimalInputIncomplete(minText)) {
+    errors.minValue = `Enter a valid min value for "${label}"`;
+  }
+  if (masterDataNumericFieldHasValue(maxText) && isMasterDataDecimalInputIncomplete(maxText)) {
+    errors.maxValue = `Enter a valid max value for "${label}"`;
+  }
+
+  const minValue = parseMasterDataOptionalNumber(range.minValue);
+  const maxValue = parseMasterDataOptionalNumber(range.maxValue);
 
   if (requireAll) {
     if (minValue == null) errors.minValue = `Min value is required for "${label}"`;
     if (maxValue == null) errors.maxValue = `Max value is required for "${label}"`;
+  } else if (masterDataNumericFieldHasValue(minText) && minValue == null && !errors.minValue) {
+    errors.minValue = `Enter a valid min value for "${label}"`;
+  } else if (masterDataNumericFieldHasValue(maxText) && maxValue == null && !errors.maxValue) {
+    errors.maxValue = `Enter a valid max value for "${label}"`;
   }
 
   if (minValue != null && maxValue != null && minValue > maxValue) {

@@ -1,5 +1,11 @@
 import type { MaterialItem } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
-import { createEmptyPremixSchemaSession } from "../../../data/models/user/RawMaterialPreparationModel";
+import {
+  createEmptyPremixProcessSession,
+  createEmptyPremixSchemaSession,
+  hydratePremixProcessSlot,
+  normalizeMaterialProcessSlot,
+} from "../../../data/models/user/RawMaterialPreparationModel";
+import { processFormHasUserData } from "../../../data/models/user/rmp/defaultSolidProcessForm";
 import {
   buildRawMaterialSchemaRequestFromCodes,
   findGradeInMaterial,
@@ -372,17 +378,18 @@ export const buildPremixMaterialSessionsFromSelections = (
       entry.selectedProcesses.solid && (!gradesRequired || Boolean(entry.solidGradeCode));
 
     sessions[key] = {
-      ...createEmptyPremixSchemaSession(),
+      ...createEmptyPremixProcessSession(),
       selectedProcesses: entry.selectedProcesses,
       solidMaterialCode: entry.solidMaterialCode,
       solidGradeCode: entry.solidGradeCode,
       liquidMaterialCode: entry.liquidMaterialCode,
-      solid: solidSchemaReady
-        ? { schema: null, schemaLoading: true, schemaError: null, formValues: {} }
-        : { schema: null, schemaLoading: false, schemaError: null, formValues: {} },
+      solid: normalizeMaterialProcessSlot(
+        "solid",
+        solidSchemaReady ? entry.solidMaterialCode : "",
+      ),
       liquid: entry.selectedProcesses.liquid
-        ? { schema: null, schemaLoading: true, schemaError: null, formValues: {} }
-        : { schema: null, schemaLoading: false, schemaError: null, formValues: {} },
+        ? normalizeMaterialProcessSlot("liquid", entry.liquidMaterialCode)
+        : normalizeMaterialProcessSlot("liquid", ""),
     };
   });
 
@@ -472,18 +479,22 @@ export const alignPremixSessionsToSelections = (
               : section.sectionData,
           }))
         : current?.pendingLiquidSections,
-      solid: current?.solid
-        ? { ...current.solid, formValues: { ...(current.solid.formValues ?? {}) } }
-        : {
-            ...orphan.solid,
-            formValues: { ...(orphan.solid?.formValues ?? {}) },
-          },
-      liquid: current?.liquid
-        ? { ...current.liquid, formValues: { ...(current.liquid.formValues ?? {}) } }
-        : {
-            ...orphan.liquid,
-            formValues: { ...(orphan.liquid?.formValues ?? {}) },
-          },
+      solid:
+        current?.solid && processFormHasUserData(current.solid.processForm)
+          ? current.solid
+          : hydratePremixProcessSlot(
+              "solid",
+              String(selection.solidMaterialCode || orphan.solidMaterialCode || ""),
+              orphan.pendingSolidSections ?? current?.pendingSolidSections,
+            ),
+      liquid:
+        current?.liquid && processFormHasUserData(current.liquid.processForm)
+          ? current.liquid
+          : hydratePremixProcessSlot(
+              "liquid",
+              String(selection.liquidMaterialCode || orphan.liquidMaterialCode || ""),
+              orphan.pendingLiquidSections ?? current?.pendingLiquidSections,
+            ),
     };
   });
 
@@ -724,17 +735,18 @@ export const applyMaterialOptionToPremix = (
   };
 
   const session = {
-    ...createEmptyPremixSchemaSession(),
+    ...createEmptyPremixProcessSession(),
     selectedProcesses,
     solidMaterialCode: hasSolid ? option.materialCode : "",
     solidGradeCode: hasSolid ? option.gradeCode : "",
     liquidMaterialCode: hasLiquid ? option.materialCode : "",
-    solid: solidSchemaReady
-      ? { schema: null, schemaLoading: true, schemaError: null, formValues: {} }
-      : { schema: null, schemaLoading: false, schemaError: null, formValues: {} },
+    solid: normalizeMaterialProcessSlot(
+      "solid",
+      hasSolid && solidSchemaReady ? option.materialCode : "",
+    ),
     liquid: hasLiquid
-      ? { schema: null, schemaLoading: true, schemaError: null, formValues: {} }
-      : { schema: null, schemaLoading: false, schemaError: null, formValues: {} },
+      ? normalizeMaterialProcessSlot("liquid", option.materialCode)
+      : normalizeMaterialProcessSlot("liquid", ""),
   };
 
   return { entry, session };

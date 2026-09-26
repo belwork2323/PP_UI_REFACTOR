@@ -5,15 +5,15 @@ import type {
   RawMaterialPrepWeightmentDetail,
   RawMaterialPrepWeightmentSheet,
 } from "@/data/models/user/RawMaterialPreparationModel";
-import { validateSchemaFormValues } from "@/data/models/user/schemaFormValidation";
+import { processFormHasUserData } from "@/data/models/user/rmp/defaultSolidProcessForm";
+import { validateMaterialProcessForm } from "@/data/models/user/rmp/validateMaterialProcessForm";
+import { rmpUiKeyShowsProcessPanel } from "@/data/models/user/rmp/rmpMaterialUiRegistry";
 import {
   validateWeightmentSheetAgainstIdentification,
   validateWeightmentRowAgainstSheet,
   weightmentHasMaterialData,
 } from "@/data/models/user/rawMaterialWeightmentValidation";
-import { schemaValuesHaveUserData } from "@/schema-engine/state/formState";
 import { getPremixMaterialSessionKey } from "@/hooks/user/manufacturing/rawMaterialPrepFlowConfig";
-import type { SchemaDocumentV2 } from "@/schema-engine/types";
 import { ALPHA_NUM, validateFieldState } from "../fieldValidators";
 import {
   premixRequiresWeightmentOnSubmit,
@@ -54,21 +54,21 @@ const str = (v: unknown) => (v == null ? "" : String(v)).trim();
 
 type PremixProcessSlotState = RawMaterialPrepPremixSession["solid"];
 
-/** Schema loaded, or no schema and weightment covers this material. */
-export const isPremixProcessSlotSchemaReady = (
+/** Typed process UI is always ready once a material is selected (no schema fetch). */
+export const isPremixProcessSlotReady = (
   selected: boolean,
-  slot: PremixProcessSlotState,
+  _slot: PremixProcessSlotState,
   materialCode: string | undefined,
-  weightmentSheet: RawMaterialPrepWeightmentSheet,
+  _weightmentSheet: RawMaterialPrepWeightmentSheet,
 ): boolean => {
   if (!selected) return true;
-  if (!str(materialCode)) return false;
-  if (slot.schemaLoading) return false;
-  if (slot.schema) return true;
-  return weightmentHasMaterialData(weightmentSheet, materialCode);
+  return Boolean(str(materialCode));
 };
 
-/** Process has schema form data, or weightment-only coverage when no schema exists. */
+/** @deprecated Use isPremixProcessSlotReady */
+export const isPremixProcessSlotSchemaReady = isPremixProcessSlotReady;
+
+/** Process has typed form data, or weightment-only coverage when no process panel applies. */
 export const premixProcessSlotHasSubmitData = (
   selected: boolean,
   slot: PremixProcessSlotState,
@@ -77,29 +77,32 @@ export const premixProcessSlotHasSubmitData = (
 ): boolean => {
   if (!selected) return false;
   if (!str(materialCode)) return false;
-  if (slot.schema) {
-    return schemaValuesHaveUserData(slot.formValues);
+  if (rmpUiKeyShowsProcessPanel(slot.uiKey)) {
+    if (processFormHasUserData(slot.processForm)) return true;
   }
   return weightmentHasMaterialData(weightmentSheet, materialCode);
 };
 
-export const isPremixSelectionSchemaReady = (
+export const isPremixSelectionProcessReady = (
   entry: AddedPremixSelection,
   session: RawMaterialPrepPremixSession,
   weightmentSheet: RawMaterialPrepWeightmentSheet,
 ): boolean =>
-  isPremixProcessSlotSchemaReady(
+  isPremixProcessSlotReady(
     Boolean(entry.selectedProcesses.solid),
     session.solid,
     entry.solidMaterialCode,
     weightmentSheet,
   ) &&
-  isPremixProcessSlotSchemaReady(
+  isPremixProcessSlotReady(
     Boolean(entry.selectedProcesses.liquid),
     session.liquid,
     entry.liquidMaterialCode,
     weightmentSheet,
   );
+
+/** @deprecated Use isPremixSelectionProcessReady */
+export const isPremixSelectionSchemaReady = isPremixSelectionProcessReady;
 
 export const premixSelectionHasSubmitData = (
   entry: AddedPremixSelection,
@@ -124,7 +127,7 @@ const isFiniteNumber = (value: unknown): boolean => {
   return Boolean(text) && Number.isFinite(Number(text));
 };
 
-function validatePremixSchemaSessions(
+function validatePremixProcessSessions(
   input: RawMaterialPrepValidationInput,
   tier: ValidationTier,
 ): Record<string, Record<string, string>> {
@@ -140,11 +143,10 @@ function validatePremixSchemaSessions(
     const session = input.premixSessions[sessionKey];
     if (!session) continue;
 
-    if (entry.selectedProcesses.solid && session.solid.schema) {
-      const schema = session.solid.schema as SchemaDocumentV2;
-      const errs = validateSchemaFormValues(
-        schema,
-        session.solid.formValues ?? {},
+    if (entry.selectedProcesses.solid && rmpUiKeyShowsProcessPanel(session.solid.uiKey)) {
+      const errs = validateMaterialProcessForm(
+        session.solid.uiKey,
+        session.solid.processForm,
         intent,
         {
           materialCode: entry.solidMaterialCode,
@@ -157,11 +159,10 @@ function validatePremixSchemaSessions(
       }
     }
 
-    if (entry.selectedProcesses.liquid && session.liquid.schema) {
-      const schema = session.liquid.schema as SchemaDocumentV2;
-      const errs = validateSchemaFormValues(
-        schema,
-        session.liquid.formValues ?? {},
+    if (entry.selectedProcesses.liquid && rmpUiKeyShowsProcessPanel(session.liquid.uiKey)) {
+      const errs = validateMaterialProcessForm(
+        session.liquid.uiKey,
+        session.liquid.processForm,
         intent,
         {
           materialCode: entry.liquidMaterialCode,
@@ -202,8 +203,18 @@ function validateWeightmentForSubmit(
     isNumber?: boolean;
   }> = [
     { key: "materialCode", requiredMsg: M.weightmentMaterialCode.required },
-    { key: "percentage", requiredMsg: M.weightmentPercentage.required, invalidMsg: M.weightmentPercentage.invalid, isNumber: true },
-    { key: "weightTransferred", requiredMsg: M.weightmentWeight.required, invalidMsg: M.weightmentWeight.invalid, isNumber: true },
+    {
+      key: "percentage",
+      requiredMsg: M.weightmentPercentage.required,
+      invalidMsg: M.weightmentPercentage.invalid,
+      isNumber: true,
+    },
+    {
+      key: "weightTransferred",
+      requiredMsg: M.weightmentWeight.required,
+      invalidMsg: M.weightmentWeight.invalid,
+      isNumber: true,
+    },
     { key: "containerType", requiredMsg: M.weightmentContainerType.required },
     { key: "containerNumber", requiredMsg: M.weightmentContainerNumber.required },
     { key: "weighScaleNumber", requiredMsg: M.weightmentWeighScale.required },
@@ -212,8 +223,7 @@ function validateWeightmentForSubmit(
 
   sheet.weightmentDetails.forEach((row, rowIndex) => {
     const hasAny =
-      rowFieldChecks.some(({ key }) => str(row[key])) ||
-      str(row.materialName);
+      rowFieldChecks.some(({ key }) => str(row[key])) || str(row.materialName);
 
     if (!hasAny) return;
 
@@ -234,8 +244,12 @@ function validateWeightmentForSubmit(
         percentageMismatch: STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.WEIGHTMENT_PERCENTAGE_MISMATCH,
         weightMismatch: STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.WEIGHTMENT_WEIGHT_MISMATCH,
       });
-      if (sheetErrors.materialCode) errors[weightmentPath(rowIndex, "materialCode")] = sheetErrors.materialCode;
-      if (sheetErrors.percentage) errors[weightmentPath(rowIndex, "percentage")] = sheetErrors.percentage;
+      if (sheetErrors.materialCode) {
+        errors[weightmentPath(rowIndex, "materialCode")] = sheetErrors.materialCode;
+      }
+      if (sheetErrors.percentage) {
+        errors[weightmentPath(rowIndex, "percentage")] = sheetErrors.percentage;
+      }
       if (sheetErrors.weightTransferred) {
         errors[weightmentPath(rowIndex, "weightTransferred")] = sheetErrors.weightTransferred;
       }
@@ -249,7 +263,7 @@ export function validateRawMaterialPreparation(
   input: RawMaterialPrepValidationInput,
   tier: ValidationTier,
 ): RawMaterialPrepValidationResult {
-  const premixFieldErrors = validatePremixSchemaSessions(input, tier);
+  const premixFieldErrors = validatePremixProcessSessions(input, tier);
   const weightmentErrors =
     tier === "SUBMIT"
       ? validateWeightmentForSubmit(

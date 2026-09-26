@@ -31,6 +31,9 @@ import QCSchemaPanel from "./QCSchemaPanel";
 import QCSchemaBufferingLoader from "./QCSchemaBufferingLoader";
 import QCDivisionSavedSectionsDisplay from "./components/QCDivisionSavedSectionsDisplay";
 import type { QCDivisionEntryUnitActions } from "./QCDivisionEntryPanel";
+import { hydratePremixProcessSlot } from "../../../../../data/models/user/RawMaterialPreparationModel";
+import { rmpUiKeyShowsProcessPanel } from "../../../../../data/models/user/rmp/rmpMaterialUiRegistry";
+import RawMaterialMaterialProcessPanel from "../../manufacturing/RawMaterial/materialProcess/RawMaterialMaterialProcessPanel";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 
@@ -294,6 +297,14 @@ const QCProcessingMaterialsPanel = ({
     });
   };
 
+  const activeReadOnlyProcessSlot = useMemo(() => {
+    if (!activeEntry?.savedSections?.length) return null;
+    const materialCode = String(activeEntry.materialCode ?? "").trim();
+    if (!materialCode) return null;
+    const slot = activeEntry.processSlot === "liquid" ? "liquid" : "solid";
+    return hydratePremixProcessSlot(slot, materialCode, activeEntry.savedSections);
+  }, [activeEntry]);
+
   const savedSectionsSignature = useMemo(() => {
     const sections = activeEntry?.savedSections ?? [];
     if (!sections.length) return "";
@@ -467,19 +478,17 @@ const QCProcessingMaterialsPanel = ({
 
           {schemaUnavailable ? (
             <Stack spacing={1.25}>
-              <Box
-                sx={{
-                  borderRadius: 1.5,
-                  border: `1px solid ${BRAND.warn ?? "#D97706"}`,
-                  background: "rgba(217, 119, 6, 0.08)",
-                  px: 1.25,
-                  py: 1,
-                }}
-              >
-                <Typography sx={{ fontSize: "0.78rem", fontWeight: 700, color: BRAND.text }}>
-                  {S.SCHEMA_UNAVAILABLE_FOR_MATERIAL}
-                </Typography>
-              </Box>
+              {activeReadOnlyProcessSlot &&
+              rmpUiKeyShowsProcessPanel(activeReadOnlyProcessSlot.uiKey) ? (
+                <RawMaterialMaterialProcessPanel
+                  slotState={activeReadOnlyProcessSlot}
+                  onSlotChange={() => undefined}
+                  readOnly
+                  theme={manufacturingTheme}
+                />
+              ) : (activeEntry.savedSections?.length ?? 0) > 0 ? (
+                <QCDivisionSavedSectionsDisplay sections={activeEntry.savedSections ?? []} />
+              ) : null}
               {weightmentSheet ? (
                 <RawMaterialWeightmentSheetPanel
                   value={weightmentSheet}

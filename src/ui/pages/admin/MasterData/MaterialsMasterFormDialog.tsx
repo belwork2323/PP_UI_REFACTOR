@@ -42,6 +42,10 @@ import {
 } from "@data/models/admin/MasterData/MaterialsMasterModel";
 import { visibleValidationError } from "./masterDataValidationUtils";
 import useUnitMasterOptions from "@hooks/admin/MasterData/useUnitMasterOptions";
+import {
+  masterDataNumericFieldHasValue,
+  sanitizeMasterDataDecimalInput,
+} from "@data/models/admin/MasterData/masterDataNumericInput";
 import type { MasterDataReferenceRange } from "@data/models/admin/MasterData/nestedMasterDataTypes";
 
 const S = STRINGS.MASTER_DATA;
@@ -94,12 +98,12 @@ const SpecEditor = ({
       );
       const minVisibleErr = visibleValidationError(
         rawErr?.minValue,
-        spec.referenceRange.minValue != null,
+        masterDataNumericFieldHasValue(spec.referenceRange.minValue),
         showErrors,
       );
       const maxVisibleErr = visibleValidationError(
         rawErr?.maxValue,
-        spec.referenceRange.maxValue != null,
+        masterDataNumericFieldHasValue(spec.referenceRange.maxValue),
         showErrors,
       );
       const nameError = Boolean(nameVisibleErr);
@@ -148,35 +152,33 @@ const SpecEditor = ({
           />
           <CasePrepTextField
             label="Min"
-            value={spec.referenceRange.minValue != null ? String(spec.referenceRange.minValue) : ""}
+            value={spec.referenceRange.minValue}
             disabled={disabled || locked}
             required={false}
             error={minError}
             helperText={minVisibleErr ?? null}
             width="100%"
             theme={theme}
-            onChange={(value) =>
-              updateRange({
-                ...spec.referenceRange,
-                minValue: value === "" ? null : Number(value),
-              })
-            }
+            onChange={(value) => {
+              const next = sanitizeMasterDataDecimalInput(value);
+              if (next === null) return;
+              updateRange({ ...spec.referenceRange, minValue: next });
+            }}
           />
           <CasePrepTextField
             label="Max"
-            value={spec.referenceRange.maxValue != null ? String(spec.referenceRange.maxValue) : ""}
+            value={spec.referenceRange.maxValue}
             disabled={disabled || locked}
             required={false}
             error={maxError}
             helperText={maxVisibleErr ?? null}
             width="100%"
             theme={theme}
-            onChange={(value) =>
-              updateRange({
-                ...spec.referenceRange,
-                maxValue: value === "" ? null : Number(value),
-              })
-            }
+            onChange={(value) => {
+              const next = sanitizeMasterDataDecimalInput(value);
+              if (next === null) return;
+              updateRange({ ...spec.referenceRange, maxValue: next });
+            }}
           />
           <CasePrepSearchableSelect
             label="Unit"
