@@ -1,4 +1,4 @@
-import type { QcApiDivision } from "../../../schema-engine/adapters/qc.adapter";
+import type { QcApiDivision } from "@/data/models/user/qc/qcApiTypes";
 import type { FileRef } from "../../../data/models/common/FileUploadModel";
 
 export const QC_NDT_API_DIVISION = "NDT" as const satisfies QcApiDivision;

@@ -1,5 +1,5 @@
 
-import type { SchemaFormValues } from "@/schema-engine";
+import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import type { FieldRuleConfig, SubDeptValidationConfig } from "../runValidation";
 import type { ValidationTier } from "../submissionIntent";
 import { str } from "../fieldValidators";

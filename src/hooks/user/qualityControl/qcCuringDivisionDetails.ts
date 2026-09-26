@@ -1,6 +1,6 @@
 import dayjs from "dayjs";
-import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
-import type { QcApiSubType } from "../../../schema-engine/adapters/qc.adapter";
+import type { SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
+import type { QcApiSubType } from "@/data/models/user/qc/qcApiTypes";
 import { formatToUiDate, UI_DATETIME_FORMAT } from "../../../utils/dateUtils";
 import {
   createInitialCuringValues,

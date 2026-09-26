@@ -1,16 +1,13 @@
 import { useEffect, useMemo, useRef, useCallback } from "react";
 import { useFormContext } from "react-hook-form";
 import { Box } from "@mui/material";
-import {
-  SchemaUI,
-  createSubscaleInitialValues,
-  hydrateSubscaleValuesFromSections,
-  type SchemaDocumentV2,
-  type SchemaFormValues,
-  type SchemaSectionSubmission,
-} from "../../../../../schema-engine";
+import { createSubscaleInitialValues, hydrateSubscaleValuesFromSections } from "@/data/models/user/subscaleBatchType";
+import type {
+  SchemaDocumentV2,
+  SchemaFormValues,
+  SchemaSectionSubmission,
+} from "@/data/models/shared/sectionFormTypes";
 import { applySubscaleHardwareRowGeneration } from "../../../../../data/models/user/subscaleApiPayloadMapper";
-import { SUBSCALE_BRAND } from "../../../../../app/theme/custom_themes/user/manufacturing/subscale_theme";
 import { mergeSubscaleBatchFormValues } from "../../../../../hooks/user/manufacturing/subscaleBatchConfig";
 import { canSubscaleManageProcessTables } from "../../../../../hooks/operationStatus";
 import {
@@ -137,19 +134,6 @@ const SubscaleSchemaPanel = ({
     hydratedRef.current = true;
   }, [schema, savedSections, batchType, emitChange]);
 
-  const themeTokens = useMemo(
-    () => ({
-      primary: SUBSCALE_BRAND.ss,
-      primaryLight: SUBSCALE_BRAND.ssLight,
-      accent: SUBSCALE_BRAND.accent,
-      text: SUBSCALE_BRAND.text,
-      textSub: SUBSCALE_BRAND.textSub,
-      border: SUBSCALE_BRAND.border,
-      surface: SUBSCALE_BRAND.surface,
-      warn: SUBSCALE_BRAND.warn,
-    }),
-    [],
-  );
   return (
     <Box>
       {showMainScaleSetup ? (

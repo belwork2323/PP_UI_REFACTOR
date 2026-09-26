@@ -1,5 +1,5 @@
-import type { QcApiDivision, QcApiSubType } from "../../../schema-engine/adapters/qc.adapter";
-import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import type { QcApiDivision, QcApiSubType } from "@/data/models/user/qc/qcApiTypes";
+import type { SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 
 export type QcDivisionEntryKind =
   | "SIMPLE"

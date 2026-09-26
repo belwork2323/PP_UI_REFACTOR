@@ -1,11 +1,4 @@
-import {
-  buildQcSectionPayload,
-  createQcInitialValues,
-  hydrateQcValuesFromSections,
-  QC_SCHEMA_TYPE,
-  type QcApiDivision,
-  type QcApiSubType,
-} from "../../../schema-engine/adapters/qc.adapter";
+import { buildQcSectionPayload, createQcInitialValues, hydrateQcValuesFromSections, QC_SCHEMA_TYPE, QcApiDivision, QcApiSubType } from "@/data/models/user/qc/qcApiTypes";
 import { getQcSchemaCacheKey } from "../../../hooks/user/qualityControl/qcFlowConfig";
 import {
   buildMixingPremixesPayload,
@@ -61,12 +54,7 @@ import type {
   QcDivisionEntryValues,
 } from "../../../hooks/user/qualityControl/qcDivisionEntryTypes";
 import type { QcProcessingSlot } from "../../../hooks/user/qualityControl/qcProcessingConfig";
-import {
-  schemaValuesHaveUserData,
-  type SchemaDocumentV2,
-  type SchemaFormValues,
-  type SchemaSectionSubmission,
-} from "../../../schema-engine";
+import { schemaValuesHaveUserData, SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 
 export type { QcDivisionEntry, QcDivisionEntryValues } from "../../../hooks/user/qualityControl/qcDivisionEntryTypes";
 

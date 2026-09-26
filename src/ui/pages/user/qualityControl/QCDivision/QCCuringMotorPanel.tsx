@@ -18,7 +18,7 @@ import {
 import AddRoundedIcon from "@mui/icons-material/AddRounded";
 import DeleteOutlineRoundedIcon from "@mui/icons-material/DeleteOutlineRounded";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
-import type { SchemaFormValues } from "../../../../../schema-engine";
+import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import DateField, { DateTimeField, TimeField } from "../../../../components/common/DateField";
 import {
   QC_CURING_HOT_WATER_STATUS_OPTIONS,

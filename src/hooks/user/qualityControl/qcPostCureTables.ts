@@ -1,5 +1,5 @@
-import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
-import type { QcApiSubType, QcInhibitorType } from "../../../schema-engine/adapters/qc.adapter";
+import type { SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
+import type { QcApiSubType, QcInhibitorType } from "@/data/models/user/qc/qcApiTypes";
 import { isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileRef } from "../../../data/models/common/FileUploadModel";
 import { formatToIsoDateInput, formatToUiDate } from "../../../utils/dateUtils";
 import {

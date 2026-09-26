@@ -19,16 +19,25 @@ type Props = {
   disabled?: boolean;
   theme: any;
   fieldErrors?: Record<string, string>;
+  /** Defaults to "Drying in Tray Oven". */
+  title?: string;
 };
 
-const DryingTrayOvenSection = ({ value, onChange, disabled, theme, fieldErrors = {} }: Props) => {
+const DryingTrayOvenSection = ({
+  value,
+  onChange,
+  disabled,
+  theme,
+  fieldErrors = {},
+  title = "Drying in Tray Oven",
+}: Props) => {
   const patch = (patchValue: Partial<DryingTrayOvenForm>) =>
     onChange({ ...value, ...patchValue });
 
   return (
     <Box sx={{ mb: 2 }}>
       <Typography sx={{ fontSize: "0.82rem", fontWeight: 700, mb: 1 }}>
-        Drying in Tray Oven
+        {title}
       </Typography>
       <Box
         sx={{

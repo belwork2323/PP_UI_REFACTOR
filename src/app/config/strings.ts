@@ -1437,9 +1437,6 @@ export const STRINGS = {
       FORM_ID_MISSING: "Unable to continue. Form ID is missing for this batch.",
       BATCH_ID_MISSING: "Unable to create form. Batch ID is missing.",
       SUB_DEPARTMENT_MISSING: "Unable to proceed. Sub-department context is missing.",
-      EMPTY_FORM_ERROR: "Add at least one value before saving or submitting.",
-      SCHEMA_LOAD_REQUIRED:
-        "Complete preparation details for each material, or fill weightment for materials with no schema, before saving or submitting.",
       DELETE_PREMIX_TOOLTIP: "Remove this premix",
       WEIGHTMENT_SHEET_TITLE: "Weightment Sheet for Dispatch of Material to Mixing Station",
       WEIGHTMENT_SHEET_SUBTITLE:
@@ -3917,7 +3914,6 @@ export const STRINGS = {
       COL_MOTOR_STAGE: "Motor stage",
       COL_CURING_TYPE: "Curing type",
       COL_STEPS: "Steps",
-      LABEL_SHOW_PRESSURE: "Show pressure",
       CREATE_SUBTITLE: "Select project and motor stage, then curing type and cycle steps.",
       EDIT_SUBTITLE: (name: string) => `Updating: ${name}`,
       EDIT_NESTED_HINT:
@@ -3930,7 +3926,6 @@ export const STRINGS = {
       REMOVE_STEP: "Remove cycle step",
       STEP_TEMPERATURE: "Temperature",
       STEP_DURATION: "Duration (min)",
-      STEP_PRESSURE: "Pressure",
       DELETE_TOOLTIP: "Delete disabled curing cycle",
       DELETE_DIALOG_TITLE: "Delete curing cycle?",
       DELETE_DIALOG_BODY: (name: string) =>

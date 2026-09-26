@@ -26,7 +26,7 @@ type SubscaleFormProps = {
   subDepartmentId?: number;
   schemaLoading?: boolean;
   schemaError?: string | null;
-  onFormValuesChange: (values: import("../../../../../schema-engine").SchemaFormValues) => void;
+  onFormValuesChange: (values: import("@/data/models/shared/sectionFormTypes").SchemaFormValues) => void;
   theme: any;
   batchDetails: any;
   actionLoading?: boolean;

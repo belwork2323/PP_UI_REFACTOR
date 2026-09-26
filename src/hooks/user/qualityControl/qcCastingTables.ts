@@ -1,4 +1,4 @@
-import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import type { SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 import { formatToIsoDateInput, formatToUiDate } from "../../../utils/dateUtils";
 import { QC_CASTING_SECTION_IDS } from "./qcCastingConfig";
 

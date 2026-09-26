@@ -46,7 +46,7 @@ import CasePrepMultiSelect from "../../manufacturing/CasePreparation/CasePrepMul
 import CasePrepDateField from "../../manufacturing/CasePreparation/CasePrepDateField";
 import { DateTimeField } from "../../../../components/common/DateField";
 import { buildDivisionEntryDedupKey } from "../../../../../hooks/user/qualityControl/qcDivisionEntries";
-import type { QcApiSubType } from "../../../../../schema-engine/adapters/qc.adapter";
+import type { QcApiSubType } from "@/data/models/user/qc/qcApiTypes";
 import {
   QC_PROPELLANT_PROCESS_OPTIONS,
   mapQcPropellantProcessToApi,

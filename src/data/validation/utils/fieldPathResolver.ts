@@ -1,5 +1,5 @@
 /**
- * Utility for resolving field paths to DOM elements in the schema-engine rendered form
+ * Utility for resolving field paths to DOM elements in rendered forms
  * This handles paths like "rows.0.RESULT", "hardwareValues.OPTION_SELECTED", etc.
  */
 

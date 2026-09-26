@@ -855,7 +855,6 @@ const CastingAndCuringForm = ({
                             return next;
                           })
                         }
-                        showPropellantPressure={curingCycleConfig?.showPropellantPressure !== false}
                       />
                     </Box>
                   ) : null}

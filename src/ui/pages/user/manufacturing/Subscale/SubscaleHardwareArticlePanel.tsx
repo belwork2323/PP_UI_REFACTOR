@@ -81,7 +81,7 @@ import {
   LINER_TYPE_OPTIONS,
   isMainScaleSubscaleBatch,
 } from "../../../../../hooks/user/manufacturing/subscaleHardwareConfig";
-import type { SchemaFormValues } from "../../../../../schema-engine";
+import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import { FieldLabelWithAsterisk } from "@/ui/components/common/FieldLabelWithAsterisk";
 
 const S = STRINGS.MANUFACTURING.SUBSCALE.HARDWARE;

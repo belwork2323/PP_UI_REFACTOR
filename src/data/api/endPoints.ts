@@ -304,15 +304,12 @@ export const USER_RAW_MATERIAL_PREPARATION_ENDPOINTS = {
   CREATE_FORM: `${API_BASE}/user/raw-material-preparation/form/create`,
   FORM_DETAILS: `${API_BASE}/user/raw-material-preparation/form/details`,
   UPDATE_FORM: `${API_BASE}/user/raw-material-preparation/form/update`,
-  SCHEMA_RAW_MATERIAL: `${API_BASE}/user/raw-material-preparation/schema/raw-material`,
-  SCHEMA_MOCK_TRIAL: `${API_BASE}/user/raw-material-preparation/schema/mock-trial`,
 };
 
 export const USER_CASE_PREPARATION_ENDPOINTS = {
   CREATE_FORM: `${API_BASE}/user/case-preparation/form/create`,
   FORM_DETAILS: `${API_BASE}/user/case-preparation/form/details`,
   UPDATE_FORM: `${API_BASE}/user/case-preparation/form/update`,
-  SCHEMA: `${API_BASE}/user/case-preparation/schema`,
 };
 
 export const USER_MIXING_FORM_ENDPOINTS = {
@@ -325,8 +322,6 @@ export const USER_CASTING_CURING_FORM_ENDPOINTS = {
   CREATE_FORM: `${API_BASE}/user/casting-curing/form/create`,
   FORM_DETAILS: `${API_BASE}/user/casting-curing/form/details`,
   UPDATE_FORM: `${API_BASE}/user/casting-curing/form/update`,
-  CASTING_SCHEMA: `${API_BASE}/user/casting-curing/schema/casting`,
-  CURING_SCHEMA: `${API_BASE}/user/casting-curing/schema/curing`,
   CURING_CYCLES: `${API_BASE}/user/casting-curing/curing-cycles`,
 };
 
@@ -334,21 +329,18 @@ export const USER_POST_CURE_FORM_ENDPOINTS = {
   CREATE_FORM: `${API_BASE}/user/post-cure/form/create`,
   FORM_DETAILS: `${API_BASE}/user/post-cure/form/details`,
   UPDATE_FORM: `${API_BASE}/user/post-cure/form/update`,
-  SCHEMA: `${API_BASE}/user/post-cure/schema`,
 };
 
 export const USER_SUBSCALE_FORM_ENDPOINTS = {
   CREATE_FORM: `${API_BASE}/user/subscale/form/create`,
   FORM_DETAILS: `${API_BASE}/user/subscale/form/details`,
   UPDATE_FORM: `${API_BASE}/user/subscale/form/update`,
-  SCHEMA: `${API_BASE}/user/subscale-processing/schema`,
 };
 
 export const USER_TRIMMING_FORM_ENDPOINTS = {
   CREATE_FORM: `${API_BASE}/user/trimming/form/create`,
   FORM_DETAILS: `${API_BASE}/user/trimming/form/details`,
   UPDATE_FORM: `${API_BASE}/user/trimming/form/update`,
-  SCHEMA: `${API_BASE}/user/trimming/schema`,
 };
 
 export const USER_RAW_MATERIAL_REVALIDATION_ENDPOINTS = {
@@ -358,7 +350,6 @@ export const USER_RAW_MATERIAL_REVALIDATION_ENDPOINTS = {
 };
 
 export const USER_QC_DIVISION_ENDPOINTS = {
-  SCHEMA: `${API_BASE}/user/quality-control/schema`,
   DIVISIONS: `${API_BASE}/user/qc-division/divisions`,
   DIVISION_DETAILS: `${API_BASE}/user/qc-division/division-details`,
   CREATE_FORM: `${API_BASE}/user/qc-division/create`,

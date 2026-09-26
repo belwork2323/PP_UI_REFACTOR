@@ -1,4 +1,4 @@
-import type { QcApiDivision, QcApiSubType } from "../../../schema-engine/adapters/qc.adapter";
+import type { QcApiDivision, QcApiSubType } from "@/data/models/user/qc/qcApiTypes";
 import { getQcSchemaCacheKey } from "./qcFlowConfig";
 import { resolveDivisionFlowLabel } from "./qcDivisionRegistry";
 import type { QcDivisionEntry, QcDivisionEntryKind, QcDivisionEntryValues } from "./qcDivisionEntryTypes";
@@ -19,7 +19,7 @@ import {
   isQcMixingStage,
   type QcMixingStage,
 } from "./qcMixingConfig";
-import type { SchemaDocumentV2 } from "../../../schema-engine";
+import type { SchemaDocumentV2 } from "@/data/models/shared/sectionFormTypes";
 import type { QualityControlFormState } from "../../../data/models/user/QualityControlFormModel";
 
 export type QcDivisionPickerState = {

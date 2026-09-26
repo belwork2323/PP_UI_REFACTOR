@@ -1,8 +1,4 @@
-import type {
-  QcApiDivision,
-  QcApiSubType,
-  QcInhibitorType,
-} from "../../../schema-engine/adapters/qc.adapter";
+import type { QcApiDivision, QcApiSubType, QcInhibitorType } from "@/data/models/user/qc/qcApiTypes";
 import type { FileRef } from "../../../data/models/common/FileUploadModel";
 import { STRINGS } from "../../../app/config/strings";
 

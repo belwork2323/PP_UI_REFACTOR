@@ -44,9 +44,39 @@ const MasterDataQualityCheckParamsEditor = ({
   theme,
   onChange,
 }: Props) => (
-  <Stack spacing={1.5}>
-    <Typography variant="subtitle2">{title}</Typography>
-    {params.map((param, idx) => {
+  <Box
+    sx={{
+      border: "1px solid",
+      borderColor: "divider",
+      borderRadius: 1.5,
+      p: 1.5,
+      bgcolor: "background.paper",
+    }}
+  >
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 1,
+        flexWrap: "wrap",
+        mb: params.length ? 1.5 : 0,
+      }}
+    >
+      <Typography variant="subtitle2">{title}</Typography>
+      <Button
+        size="small"
+        startIcon={<icons.projectMgmt.add />}
+        disabled={disabled}
+        onClick={() => onChange([...params, emptyQualityCheckParam()])}
+        sx={{ flexShrink: 0 }}
+      >
+        {S.QUALITY_CHECKS.ADD_PARAMETER}
+      </Button>
+    </Box>
+    {params.length ? (
+      <Stack spacing={1.5}>
+        {params.map((param, idx) => {
       const locked = isEdit && Boolean(param.isExisting);
       const unitMissing =
         param.specification.unitId == null && !String(param.specification.unit ?? "").trim();
@@ -251,16 +281,10 @@ const MasterDataQualityCheckParamsEditor = ({
           ) : null}
         </Box>
       );
-    })}
-    <Button
-      size="small"
-      startIcon={<icons.projectMgmt.add />}
-      disabled={disabled}
-      onClick={() => onChange([...params, emptyQualityCheckParam()])}
-    >
-      {S.QUALITY_CHECKS.ADD_PARAMETER}
-    </Button>
-  </Stack>
+        })}
+      </Stack>
+    ) : null}
+  </Box>
 );
 
 export default MasterDataQualityCheckParamsEditor;

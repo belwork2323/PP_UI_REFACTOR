@@ -1,4 +1,4 @@
-import { scopedFormKey, type SchemaFormValues } from "../../../../../../schema-engine";
+import { scopedFormKey, SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import { ARTICLE_TYPE_TABLE_ID, HARDWARE_SECTION_ID } from "../../../../../../hooks/user/manufacturing/subscaleHardwareConfig";
 
 const PROCESS_TABLE_SECTION_IDS: Record<string, string> = {

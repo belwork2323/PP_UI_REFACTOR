@@ -1,4 +1,4 @@
-import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import type { SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 import { isEmptyManufacturingDivisionDetailsPayload } from "./qcDivisionApprovalUnits";
 import { shouldPreserveQcDivisionFileRefsOnSeed } from "./qcDivisionFileUpload";
 import {

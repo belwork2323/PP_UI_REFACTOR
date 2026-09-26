@@ -39,8 +39,6 @@ type Props = {
   disabled?: boolean;
   readOnly?: boolean;
   theme?: any;
-  /** From curing-cycles API — same visibility rule the schema used. */
-  showPropellantPressure?: boolean;
   validationErrors?: Record<string, string>;
   clearFieldError?: (path: string) => void;
 };
@@ -153,7 +151,6 @@ const CuringMotorPanel = ({
   disabled = false,
   readOnly = false,
   theme,
-  showPropellantPressure = true,
   validationErrors,
   clearFieldError,
 }: Props) => {
@@ -189,14 +186,14 @@ const CuringMotorPanel = ({
 
   const cycleHeaders = [
     ...CYCLE_HEADERS,
-    ...(showPropellantPressure ? (["Propellant Pressure (bar)"] as const) : []),
+    "Propellant Pressure (bar)",
     "Status Of Hot Water Circulation",
   ];
   return (
     <Box>
       <SectionCard title="Curing Cycles" theme={theme}>
         <TableContainer sx={{ ...castingCuringTableContainerSx, overflowX: "auto" }}>
-          <Table size="small" sx={{ minWidth: showPropellantPressure ? 1080 : 960 }}>
+          <Table size="small" sx={{ minWidth: 1080 }}>
             <TableHead>
               <TableRow>
                 {cycleHeaders.map((label, idx) => (
@@ -313,22 +310,20 @@ const CuringMotorPanel = ({
                         helperText={validationErrors?.[endTimePath]}
                       />
                     </TableCell>
-                    {showPropellantPressure ? (
-                      <TableCell sx={castingCuringTableCellSx}>
-                        <TableTextInput
-                          value={row.PROPELLANT_PRESSURE}
-                          onChange={(v) => {
-                            clearFieldError?.(pressurePath);
-                            updateCycleRow(index, { PROPELLANT_PRESSURE: v });
-                          }}
-                          disabled={disabled}
-                          readOnly={readOnly}
-                          type="number"
-                          error={Boolean(validationErrors?.[pressurePath])}
-                          helperText={validationErrors?.[pressurePath]}
-                        />
-                      </TableCell>
-                    ) : null}
+                    <TableCell sx={castingCuringTableCellSx}>
+                      <TableTextInput
+                        value={row.PROPELLANT_PRESSURE}
+                        onChange={(v) => {
+                          clearFieldError?.(pressurePath);
+                          updateCycleRow(index, { PROPELLANT_PRESSURE: v });
+                        }}
+                        disabled={disabled}
+                        readOnly={readOnly}
+                        type="number"
+                        error={Boolean(validationErrors?.[pressurePath])}
+                        helperText={validationErrors?.[pressurePath]}
+                      />
+                    </TableCell>
                     <TableCell sx={castingCuringTableCellSx}>
                       <TableSelectInput
                         value={str(row.HOT_WATER_STATUS)}

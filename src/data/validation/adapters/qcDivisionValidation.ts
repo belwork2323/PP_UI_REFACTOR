@@ -1,5 +1,5 @@
 
-import type { SchemaFormValues } from "@/schema-engine";
+import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import type { QcDivisionEntry } from "@/hooks/user/qualityControl/qcDivisionEntryTypes";
 import type { ValidationErrors, ValidationTier } from "../submissionIntent";
 import { VALIDATIONSTRING } from "../configs/validationString";

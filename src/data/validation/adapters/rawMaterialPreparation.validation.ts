@@ -5,13 +5,11 @@ import type {
   RawMaterialPrepWeightmentDetail,
   RawMaterialPrepWeightmentSheet,
 } from "@/data/models/user/RawMaterialPreparationModel";
-import { processFormHasUserData } from "@/data/models/user/rmp/defaultSolidProcessForm";
 import { validateMaterialProcessForm } from "@/data/models/user/rmp/validateMaterialProcessForm";
 import { rmpUiKeyShowsProcessPanel } from "@/data/models/user/rmp/rmpMaterialUiRegistry";
 import {
   validateWeightmentSheetAgainstIdentification,
   validateWeightmentRowAgainstSheet,
-  weightmentHasMaterialData,
 } from "@/data/models/user/rawMaterialWeightmentValidation";
 import { getPremixMaterialSessionKey } from "@/hooks/user/manufacturing/rawMaterialPrepFlowConfig";
 import { ALPHA_NUM, validateFieldState } from "../fieldValidators";
@@ -29,6 +27,8 @@ export type AddedPremixSelection = {
   solidGradeCode?: string;
   liquidMaterialCode?: string;
   liquidGradeCode?: string;
+  quantityPerPremix?: number;
+  lotIds?: string[];
   selectedProcesses: { solid?: boolean; liquid?: boolean };
 };
 
@@ -54,7 +54,7 @@ const str = (v: unknown) => (v == null ? "" : String(v)).trim();
 
 type PremixProcessSlotState = RawMaterialPrepPremixSession["solid"];
 
-/** Typed process UI is always ready once a material is selected (no schema fetch). */
+/** Typed process UI is ready once a material is selected. */
 export const isPremixProcessSlotReady = (
   selected: boolean,
   _slot: PremixProcessSlotState,
@@ -63,24 +63,6 @@ export const isPremixProcessSlotReady = (
 ): boolean => {
   if (!selected) return true;
   return Boolean(str(materialCode));
-};
-
-/** @deprecated Use isPremixProcessSlotReady */
-export const isPremixProcessSlotSchemaReady = isPremixProcessSlotReady;
-
-/** Process has typed form data, or weightment-only coverage when no process panel applies. */
-export const premixProcessSlotHasSubmitData = (
-  selected: boolean,
-  slot: PremixProcessSlotState,
-  materialCode: string | undefined,
-  weightmentSheet: RawMaterialPrepWeightmentSheet,
-): boolean => {
-  if (!selected) return false;
-  if (!str(materialCode)) return false;
-  if (rmpUiKeyShowsProcessPanel(slot.uiKey)) {
-    if (processFormHasUserData(slot.processForm)) return true;
-  }
-  return weightmentHasMaterialData(weightmentSheet, materialCode);
 };
 
 export const isPremixSelectionProcessReady = (
@@ -95,27 +77,6 @@ export const isPremixSelectionProcessReady = (
     weightmentSheet,
   ) &&
   isPremixProcessSlotReady(
-    Boolean(entry.selectedProcesses.liquid),
-    session.liquid,
-    entry.liquidMaterialCode,
-    weightmentSheet,
-  );
-
-/** @deprecated Use isPremixSelectionProcessReady */
-export const isPremixSelectionSchemaReady = isPremixSelectionProcessReady;
-
-export const premixSelectionHasSubmitData = (
-  entry: AddedPremixSelection,
-  session: RawMaterialPrepPremixSession,
-  weightmentSheet: RawMaterialPrepWeightmentSheet,
-): boolean =>
-  premixProcessSlotHasSubmitData(
-    Boolean(entry.selectedProcesses.solid),
-    session.solid,
-    entry.solidMaterialCode,
-    weightmentSheet,
-  ) ||
-  premixProcessSlotHasSubmitData(
     Boolean(entry.selectedProcesses.liquid),
     session.liquid,
     entry.liquidMaterialCode,
@@ -151,6 +112,7 @@ function validatePremixProcessSessions(
         {
           materialCode: entry.solidMaterialCode,
           gradeCode: entry.solidGradeCode,
+          quantityPerPremix: entry.quantityPerPremix,
         },
       );
       const errorKey = `${sessionKey}:solid`;
@@ -166,7 +128,8 @@ function validatePremixProcessSessions(
         intent,
         {
           materialCode: entry.liquidMaterialCode,
-          gradeCode: entry.liquidGradeCode,
+          gradeCode: "",
+          quantityPerPremix: entry.quantityPerPremix,
         },
       );
       const errorKey = `${sessionKey}:liquid`;
@@ -204,12 +167,6 @@ function validateWeightmentForSubmit(
   }> = [
     { key: "materialCode", requiredMsg: M.weightmentMaterialCode.required },
     {
-      key: "percentage",
-      requiredMsg: M.weightmentPercentage.required,
-      invalidMsg: M.weightmentPercentage.invalid,
-      isNumber: true,
-    },
-    {
       key: "weightTransferred",
       requiredMsg: M.weightmentWeight.required,
       invalidMsg: M.weightmentWeight.invalid,
@@ -246,9 +203,6 @@ function validateWeightmentForSubmit(
       });
       if (sheetErrors.materialCode) {
         errors[weightmentPath(rowIndex, "materialCode")] = sheetErrors.materialCode;
-      }
-      if (sheetErrors.percentage) {
-        errors[weightmentPath(rowIndex, "percentage")] = sheetErrors.percentage;
       }
       if (sheetErrors.weightTransferred) {
         errors[weightmentPath(rowIndex, "weightTransferred")] = sheetErrors.weightTransferred;

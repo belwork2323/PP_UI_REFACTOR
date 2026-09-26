@@ -6,14 +6,8 @@ import {
   type QCDivisionDetailView,
   type QualityControlFormState,
 } from "../../../data/models/user/QualityControlFormModel";
-import {
-  fetchQcSchema,
-  hydrateQcValuesFromSections,
-  type QcApiDivision,
-  type QcApiSubType,
-  type QcInhibitorType,
-} from "../../../schema-engine/adapters/qc.adapter";
-import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import { fetchQcSchema, hydrateQcValuesFromSections, QcApiDivision, QcApiSubType, QcInhibitorType } from "@/data/models/user/qc/qcApiTypes";
+import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 import { getQcSchemaCacheKey } from "./qcFlowConfig";
 import { shouldSkipQcSchemaFetch } from "./qcDivisionRegistry";
 import {

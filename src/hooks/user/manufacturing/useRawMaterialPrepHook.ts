@@ -15,7 +15,7 @@ import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
 import { useFileService } from "../../../hooks/useFileService";
 import { discardWorkflowSnapshotForm } from "../../../utils/workflowDiscard";
 import rawMaterialPreparationController from "../../../controllers/user/manufacturing/rawMaterialPreparationController";
-import { cloneValue } from "../../../schema-engine/state/formState";
+import { cloneValue } from "@/data/models/shared/sectionFormTypes";
 import {
   createEmptyPremixProcessSession,
   createEmptyWeightmentSheet,
@@ -54,7 +54,6 @@ import { rmpUiKeyShowsProcessPanel } from "../../../data/models/user/rmp/rmpMate
 import {
   getWeightmentIdentificationError,
   isPremixSelectionProcessReady,
-  premixSelectionHasSubmitData,
   validateRawMaterialPreparation,
 } from "@/data/validation/adapters/rawMaterialPreparation.validation";
 import { hasValidationErrors } from "@/data/validation/validationErrors";
@@ -139,8 +138,46 @@ const normalizePremixSession = (session?: Partial<PremixSession> | null): Premix
     solidMaterialCode,
     solidGradeCode: String(session.solidGradeCode ?? base.solidGradeCode),
     liquidMaterialCode,
-    solid: normalizeMaterialProcessSlot("solid", solidMaterialCode, session.solid),
+    solid: normalizeMaterialProcessSlot(
+      "solid",
+      solidMaterialCode,
+      session.solid,
+      String(session.solidGradeCode ?? ""),
+    ),
     liquid: normalizeMaterialProcessSlot("liquid", liquidMaterialCode, session.liquid),
+    apGradeSlots: (() => {
+      if (Array.isArray(session.apGradeSlots)) {
+        return session.apGradeSlots.map((card) => ({
+          gradeCode: card.gradeCode,
+          slot: normalizeMaterialProcessSlot(
+            "solid",
+            solidMaterialCode,
+            card.slot,
+            card.gradeCode,
+          ),
+        }));
+      }
+      // Legacy AP sessions (before host-managed cards): seed once from sheet grade.
+      // Never invent a card when solidGradeCode is empty (user deleted all grades).
+      if (solidMaterialCode.toUpperCase() === "AP") {
+        const grade = String(session.solidGradeCode ?? "").trim();
+        if (!grade) return [];
+        return [
+          {
+            gradeCode: grade,
+            slot: normalizeMaterialProcessSlot(
+              "solid",
+              solidMaterialCode,
+              session.solid,
+              grade,
+            ),
+          },
+        ];
+      }
+      return undefined;
+    })(),
+    pendingSolidProcess: session.pendingSolidProcess ?? base.pendingSolidProcess,
+    pendingLiquidProcess: session.pendingLiquidProcess ?? base.pendingLiquidProcess,
     pendingSolidSections: session.pendingSolidSections ?? base.pendingSolidSections,
     pendingLiquidSections: session.pendingLiquidSections ?? base.pendingLiquidSections,
   };
@@ -169,12 +206,22 @@ const mergePremixSessionsPreservingLocalInput = (
 
     merged[key] = {
       ...session,
+      pendingSolidProcess: session.pendingSolidProcess
+        ? session.pendingSolidProcess
+        : prev.pendingSolidProcess,
+      pendingLiquidProcess: session.pendingLiquidProcess
+        ? session.pendingLiquidProcess
+        : prev.pendingLiquidProcess,
       pendingSolidSections: session.pendingSolidSections?.length
         ? session.pendingSolidSections
         : prev.pendingSolidSections,
       pendingLiquidSections: session.pendingLiquidSections?.length
         ? session.pendingLiquidSections
         : prev.pendingLiquidSections,
+      // Prefer local AP grade cards (including intentional empty after delete-all).
+      apGradeSlots: Array.isArray(prev.apGradeSlots)
+        ? prev.apGradeSlots
+        : session.apGradeSlots,
       solid: {
         uiKey: session.solid.uiKey ?? prev.solid.uiKey,
         processForm: cloneValue(
@@ -263,7 +310,7 @@ export const useRawMaterialPrepHook = () => {
   const [premixStatusByNoByBatch, setPremixStatusByNoByBatch] = useState<
     Record<string, Record<number, PremixStatusMeta>>
   >({});
-  /** sessionKey:slot → field path errors (red under SchemaUI fields). */
+  /** sessionKey:slot → field path errors (red under process fields). */
   const [premixFieldErrorsByBatch, setPremixFieldErrorsByBatch] = useState<
     Record<string, Record<string, Record<string, string>>>
   >({});
@@ -979,34 +1026,83 @@ export const useRawMaterialPrepHook = () => {
               }
             : {
                 materialCode: selection?.liquidMaterialCode,
-                gradeCode: selection?.liquidGradeCode,
+                gradeCode: undefined,
               };
-        const liveErrors = validateMaterialProcessForm(
+        const errs = validateMaterialProcessForm(
           isolatedSlot.uiKey,
           isolatedSlot.processForm,
           "DRAFT",
-          materialContext,
+          {
+            ...materialContext,
+            quantityPerPremix: selection?.quantityPerPremix,
+          },
         );
         setPremixFieldErrorsByBatch((prev) => {
           const batchErrors = { ...(prev[activeFormBatchKey] ?? {}) };
-          if (Object.keys(liveErrors).length === 0) {
-            if (!batchErrors[errorKey]) return prev;
+          if (Object.keys(errs).length === 0) {
             delete batchErrors[errorKey];
           } else {
-            batchErrors[errorKey] = liveErrors;
+            batchErrors[errorKey] = errs;
           }
           return { ...prev, [activeFormBatchKey]: batchErrors };
         });
       }
 
       if (!checkPremixEditable(premix)) return;
-
       const session = premixSessions[sessionKey];
       if (session && isSessionFilled({ ...session, [slot]: isolatedSlot })) {
         markPremixComplete(activeBatchId, premix);
       }
     },
-    [activeFormBatchKey, activeBatchId, markPremixComplete, premixSessions, checkPremixEditable, addedPremixSelections],
+    [
+      activeFormBatchKey,
+      activeBatchId,
+      addedPremixSelections,
+      checkPremixEditable,
+      markPremixComplete,
+      premixSessions,
+    ],
+  );
+
+  const handleApGradeSlotsChange = useCallback(
+    (
+      premix: number,
+      materialKey: string,
+      cards: Array<{ gradeCode: string; slot: PremixSession["solid"] }>,
+    ) => {
+      if (!premix || !materialKey) return;
+      const sessionKey = getPremixMaterialSessionKey(premix, materialKey);
+      setPremixSessionsByBatch((prev) => {
+        const batchSessions = prev[activeFormBatchKey] ?? {};
+        const current = normalizePremixSession(batchSessions[sessionKey]);
+        const first = cards[0];
+        return {
+          ...prev,
+          [activeFormBatchKey]: {
+            ...batchSessions,
+            [sessionKey]: {
+              ...current,
+              // Always set (including []) so the host does not re-seed from solidGradeCode.
+              apGradeSlots: cards.map((card) => ({
+                gradeCode: card.gradeCode,
+                slot: {
+                  ...card.slot,
+                  processForm: cloneValue(card.slot.processForm),
+                },
+              })),
+              solid: first
+                ? {
+                    ...first.slot,
+                    processForm: cloneValue(first.slot.processForm),
+                  }
+                : normalizeMaterialProcessSlot("solid", current.solidMaterialCode || "AP", null, ""),
+              solidGradeCode: first?.gradeCode ?? "",
+            },
+          },
+        };
+      });
+    },
+    [activeFormBatchKey],
   );
 
   const handleWeightmentSheetChange = useCallback(
@@ -1110,19 +1206,6 @@ export const useRawMaterialPrepHook = () => {
           return false;
         }
 
-        const premixHasData = premixSelections.some((entry) => {
-          const session =
-            sessionsForPayload[getPremixMaterialSessionKey(entry.premix, entry.materialKey)];
-          return session
-            ? premixSelectionHasSubmitData(entry, session, weightmentSheet)
-            : false;
-        });
-
-        if (!premixHasData) {
-          showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.EMPTY_FORM_ERROR, "warning");
-          return false;
-        }
-
         // Process + weightment validation — red under fields, no toast
         {
           const validationResult = validateRawMaterialPreparation(
@@ -1144,11 +1227,11 @@ export const useRawMaterialPrepHook = () => {
             [activeFormBatchKey]: validationResult.weightmentErrors,
           }));
 
-          const hasSchemaFieldErrors =
+          const hasProcessFieldErrors =
             Object.keys(validationResult.premixFieldErrors).length > 0;
           const hasWeightmentFieldErrors = hasValidationErrors(validationResult.weightmentErrors);
 
-          if (hasSchemaFieldErrors || hasWeightmentFieldErrors) {
+          if (hasProcessFieldErrors || hasWeightmentFieldErrors) {
             return false;
           }
         }
@@ -1178,14 +1261,8 @@ export const useRawMaterialPrepHook = () => {
         weightmentSheet,
         targetPremixNos: [premixNo],
         premixSubmissionType,
-        includeEmptyPremixes: isDraft,
-        allowPartialProcesses: isDraft,
+        includeEmptyPremixes: true,
       });
-
-      if (!isDraft && !payloadBody.preparationDetails.premixes.length) {
-        showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.EMPTY_FORM_ERROR, "warning");
-        return false;
-      }
 
       setActionLoading(true);
       try {
@@ -1402,11 +1479,6 @@ export const useRawMaterialPrepHook = () => {
         premixStatusByNo: statuses,
       });
 
-      if (!payloadBody.preparationDetails.premixes.length) {
-        showAlert(STRINGS.MANUFACTURING.RAW_MATERIAL_PREP.EMPTY_FORM_ERROR, "warning");
-        return false;
-      }
-
       const response = await rawMaterialPreparationController.updateForm({
         formId: activeBatch.formId,
         formSubmissionType: "SUBMIT",
@@ -1460,14 +1532,6 @@ export const useRawMaterialPrepHook = () => {
       });
       if (!premixHasMaterial) return false;
 
-      const premixHasData = premixSelections.some((entry) => {
-        const session = premixSessions[getPremixMaterialSessionKey(entry.premix, entry.materialKey)];
-        return session
-          ? premixSelectionHasSubmitData(entry, session, weightmentSheet)
-          : false;
-      });
-      if (!premixHasData) return false;
-
       const validationResult = validateRawMaterialPreparation(
         {
           premixNo,
@@ -1479,10 +1543,10 @@ export const useRawMaterialPrepHook = () => {
         "SUBMIT",
       );
 
-      const hasSchemaFieldErrors = Object.values(validationResult.premixFieldErrors).some(
+      const hasProcessFieldErrors = Object.values(validationResult.premixFieldErrors).some(
         (errs) => Object.keys(errs).length > 0,
       );
-      if (hasSchemaFieldErrors) return false;
+      if (hasProcessFieldErrors) return false;
       if (hasValidationErrors(validationResult.weightmentErrors)) return false;
       if (getWeightmentIdentificationError(weightmentSheet, identificationSheet?.materials ?? [])) {
         return false;
@@ -1529,6 +1593,7 @@ export const useRawMaterialPrepHook = () => {
     setBackConfirmOpen,
     handlePremixDateChange,
     handlePremixSlotChange,
+    handleApGradeSlotsChange,
     addedPremixSelections,
     premixSessions,
     weightmentSheet,

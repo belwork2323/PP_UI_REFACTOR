@@ -1,4 +1,4 @@
-import type { QcApiDivision } from "../../../schema-engine/adapters/qc.adapter";
+import type { QcApiDivision } from "@/data/models/user/qc/qcApiTypes";
 
 export const QC_WEIGHMENT_API_DIVISION = "WEIGHTMENT" as const satisfies QcApiDivision;
 

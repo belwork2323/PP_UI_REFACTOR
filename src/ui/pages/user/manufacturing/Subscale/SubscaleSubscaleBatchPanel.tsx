@@ -45,7 +45,7 @@ import {
 } from "../../../../../hooks/user/manufacturing/subscaleBatchConfig";
 import { useBuildingOptions } from "../../../../../hooks/user/useBuildingOptions";
 import { resolveMasterDataName } from "../../../../../data/models/admin/BatchManagement/BatchManagementModel";
-import type { SchemaFormValues } from "../../../../../schema-engine";
+import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import { sectionCardSx, sectionHeaderSx } from "./utils/subscaleHardwareTableStyles";
 import { SubscaleProcessParticularRow } from "./components/SubscaleTableCells";
 import {

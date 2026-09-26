@@ -1,5 +1,5 @@
-import type { SchemaFormValues } from "../../../schema-engine";
-import { mapSubscaleBatchType } from "../../../schema-engine/adapters/subscale.adapter";
+import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
+import { mapSubscaleBatchType } from "@/data/models/user/subscaleBatchType";
 
 export const HARDWARE_SECTION_ID = "HARDWARE_PREPARATION_DETAILS";
 export const ARTICLE_TYPE_TABLE_ID = "ARTICLE_TYPE_TABLE";

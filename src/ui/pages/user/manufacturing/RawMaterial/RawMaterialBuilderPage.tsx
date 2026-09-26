@@ -55,6 +55,7 @@ const RawMaterialBuilderForm = ({
   addedPremixSelections,
   premixSessions,
   onPremixSlotChange,
+  onApGradeSlotsChange,
   allMaterials,
   availableSolidMaterials,
   availableLiquidMaterials,
@@ -474,6 +475,10 @@ const RawMaterialBuilderForm = ({
                 <RawMaterialMaterialProcessPanel
                   key={`process-solid-${activeMaterialEntry.premix}-${activeMaterialEntry.materialKey}`}
                   slotState={activeSession.solid}
+                  session={activeSession}
+                  materialCode={activeMaterialEntry.solidMaterialCode}
+                  lotOptions={activeMaterialEntry.lotIds ?? []}
+                  quantityPerPremix={Number(activeMaterialEntry.quantityPerPremix ?? 0)}
                   onSlotChange={(next) =>
                     onPremixSlotChange(
                       activeMaterialEntry.premix,
@@ -481,6 +486,16 @@ const RawMaterialBuilderForm = ({
                       "solid",
                       next,
                     )
+                  }
+                  onApGradeSlotsChange={
+                    onApGradeSlotsChange
+                      ? (cards) =>
+                          onApGradeSlotsChange(
+                            activeMaterialEntry.premix,
+                            activeMaterialEntry.materialKey,
+                            cards,
+                          )
+                      : undefined
                   }
                   readOnly={activePremixLocked}
                   theme={theme}
@@ -515,6 +530,8 @@ const RawMaterialBuilderForm = ({
                 <RawMaterialMaterialProcessPanel
                   key={`process-liquid-${activeMaterialEntry.premix}-${activeMaterialEntry.materialKey}`}
                   slotState={activeSession.liquid}
+                  lotOptions={activeMaterialEntry.lotIds ?? []}
+                  quantityPerPremix={Number(activeMaterialEntry.quantityPerPremix ?? 0)}
                   onSlotChange={(next) =>
                     onPremixSlotChange(
                       activeMaterialEntry.premix,
@@ -544,7 +561,7 @@ const RawMaterialBuilderForm = ({
               batchId={activeBatch?.batchId ?? ""}
               identificationSheet={identificationSheet}
               disabled={!weightmentSheetEditable || activePremixLocked}
-              allowAddRemoveRows={false}
+              allowAddRemoveRows={true}
               weightmentErrors={weightmentErrors}
               validationAttempt={validationAttempt}
             />

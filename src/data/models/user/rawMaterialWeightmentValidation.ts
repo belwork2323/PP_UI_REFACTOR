@@ -214,27 +214,8 @@ export const validateWeightmentRowAgainstSheet = (
     errors.materialName = messages.nameMismatch(sheetName);
   }
 
-  const { percentage, expectedWeightKg } = getExpectedWeightmentForSheetMaterial(sheetMaterial);
-
-  if (String(row.percentage ?? "").trim()) {
-    const enteredPercentage = Number(row.percentage);
-    if (
-      !Number.isFinite(enteredPercentage) ||
-      !numbersApproximatelyEqual(enteredPercentage, percentage, PERCENTAGE_TOLERANCE)
-    ) {
-      errors.percentage = messages.percentageMismatch(percentage);
-    }
-  }
-
-  if (String(row.weightTransferred ?? "").trim()) {
-    const enteredWeight = Number(row.weightTransferred);
-    if (
-      !Number.isFinite(enteredWeight) ||
-      !numbersApproximatelyEqual(enteredWeight, expectedWeightKg, WEIGHT_TOLERANCE_KG)
-    ) {
-      errors.weightTransferred = messages.weightMismatch(expectedWeightKg);
-    }
-  }
+  // Percentage column removed; multi-bin rows may each be less than sheet quantityPerPremix,
+  // so do not flag per-row percentage/weight against the full sheet expected values.
 
   return errors;
 };

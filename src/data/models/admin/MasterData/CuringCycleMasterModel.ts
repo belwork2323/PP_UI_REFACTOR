@@ -20,7 +20,6 @@ export type CuringCycleStepForm = {
   startTime: string;
   endDate: string;
   endTime: string;
-  propellantPressure: number | string;
   hotWaterCirculation: string;
   isActive: boolean;
   isExisting?: boolean;
@@ -33,7 +32,6 @@ export type CuringCycleRecord = MasterDataAuditFields & {
   motorStage: number;
   motorStageName: string;
   curingType: string;
-  showPropellantPressure: boolean;
   isActive: boolean;
   cycles: CuringCycleStepForm[];
 };
@@ -50,7 +48,6 @@ export type CuringCycleFormState = {
   motorStage: number | "";
   motorStageName: string;
   curingType: string;
-  showPropellantPressure: boolean;
   isActive: boolean;
   cycles: CuringCycleStepForm[];
 };
@@ -64,7 +61,6 @@ export const emptyCuringCycleStep = (): CuringCycleStepForm => ({
   startTime: "",
   endDate: "",
   endTime: "",
-  propellantPressure: "",
   hotWaterCirculation: "",
   isActive: true,
   isExisting: false,
@@ -77,7 +73,6 @@ export const createEmptyCuringCycleForm = (): CuringCycleFormState => ({
   motorStage: "",
   motorStageName: "",
   curingType: "",
-  showPropellantPressure: false,
   isActive: true,
   cycles: [],
 });
@@ -91,7 +86,6 @@ const mapStep = (raw: any): CuringCycleStepForm => ({
   startTime: String(raw?.startTime ?? ""),
   endDate: String(raw?.endDate ?? ""),
   endTime: String(raw?.endTime ?? ""),
-  propellantPressure: raw?.propellantPressure != null ? Number(raw.propellantPressure) : "",
   hotWaterCirculation: String(raw?.hotWaterCirculation ?? ""),
   isActive: raw?.isActive !== false,
 });
@@ -105,7 +99,6 @@ export const CuringCycleRecordModel = {
     motorStage: Number(raw?.motorStage ?? 0),
     motorStageName: String(raw?.motorStageName ?? ""),
     curingType: String(raw?.curingType ?? ""),
-    showPropellantPressure: Boolean(raw?.showPropellantPressure),
     isActive: raw?.isActive !== false,
     cycles: Array.isArray(raw?.cycles) ? raw.cycles.map(mapStep) : [],
   }),
@@ -132,7 +125,6 @@ export const mapCuringRecordToForm = (record: CuringCycleRecord): CuringCycleFor
   motorStage: record.motorStage,
   motorStageName: record.motorStageName,
   curingType: record.curingType,
-  showPropellantPressure: record.showPropellantPressure,
   isActive: record.isActive,
   cycles: record.cycles.map((c) => ({ ...c, isExisting: true })),
 });
@@ -146,10 +138,6 @@ const serializeStep = (c: CuringCycleStepForm) => ({
   startTime: c.startTime.trim() || undefined,
   endDate: c.endDate.trim() || undefined,
   endTime: c.endTime.trim() || undefined,
-  propellantPressure:
-    c.propellantPressure === "" || c.propellantPressure == null
-      ? undefined
-      : Number(c.propellantPressure),
   hotWaterCirculation: c.hotWaterCirculation.trim() || undefined,
   isActive: c.isActive,
 });
@@ -158,7 +146,6 @@ export const buildCuringCycleCreatePayload = (form: CuringCycleFormState) => ({
   projectId: form.projectId.trim(),
   motorStage: Number(form.motorStage),
   curingType: form.curingType.trim(),
-  showPropellantPressure: form.showPropellantPressure,
   isActive: form.isActive,
   cycles: form.cycles.map(serializeStep),
 });
@@ -168,7 +155,6 @@ export const buildCuringCycleUpdatePayload = (form: CuringCycleFormState) => ({
   projectId: form.projectId.trim(),
   motorStage: Number(form.motorStage),
   curingType: form.curingType.trim(),
-  showPropellantPressure: form.showPropellantPressure,
   isActive: form.isActive,
   cycles: form.cycles.map(serializeStep),
 });

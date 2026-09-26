@@ -20,14 +20,13 @@ import { normalizeSheetMaterialsForWeightmentCompare } from "../../../../../data
 import type { QualityControlFormState } from "../../../../../data/models/user/QualityControlFormModel";
 import type { RawMaterialPrepWeightmentSheet } from "../../../../../data/models/user/RawMaterialPreparationModel";
 import type { IdentificationSheet } from "../../../../../data/models/admin/BatchManagement/BatchManagementModel";
-import type { SchemaFormValues } from "../../../../../schema-engine";
+import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import {
   UserWorkflowTabNav,
   type UserWorkflowNavTab,
 } from "../../../../components/custom/UserWorkflowStepPager";
 import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
 import RawMaterialWeightmentSheetPanel from "../../manufacturing/RawMaterial/RawMaterialWeightmentSheetPanel";
-import QCSchemaPanel from "./QCSchemaPanel";
 import QCSchemaBufferingLoader from "./QCSchemaBufferingLoader";
 import QCDivisionSavedSectionsDisplay from "./components/QCDivisionSavedSectionsDisplay";
 import type { QCDivisionEntryUnitActions } from "./QCDivisionEntryPanel";
@@ -302,7 +301,15 @@ const QCProcessingMaterialsPanel = ({
     const materialCode = String(activeEntry.materialCode ?? "").trim();
     if (!materialCode) return null;
     const slot = activeEntry.processSlot === "liquid" ? "liquid" : "solid";
-    return hydratePremixProcessSlot(slot, materialCode, activeEntry.savedSections);
+    return hydratePremixProcessSlot(slot, materialCode, {
+      materialId: 0,
+      materialCode,
+      materialName: materialCode,
+      gradeId: null,
+      gradeCode: String(activeEntry.gradeCode ?? "").trim() || null,
+      lotDetails: [],
+      sections: activeEntry.savedSections,
+    });
   }, [activeEntry]);
 
   const savedSectionsSignature = useMemo(() => {
@@ -509,22 +516,7 @@ const QCProcessingMaterialsPanel = ({
             </Stack>
           ) : readOnly && (activeEntry.savedSections?.length ?? 0) > 0 ? (
             <QCDivisionSavedSectionsDisplay sections={activeEntry.savedSections ?? []} />
-          ) : !activeSchema && schemaLoading ? null : (
-            <QCSchemaPanel
-              schema={activeSchema}
-              formValues={activeValues?.schemaValues ?? {}}
-              persistedValues={activeValues?.schemaValues}
-              // Sections are already mapped into formValues above (with RMP normalize).
-              hydrationKey={`${activeEntry.entryId}:${savedSectionsSignature}`}
-              subDepartmentId={subDepartmentId}
-              batchId={batchId}
-              onChange={(values) => onEntryValuesChange(activeEntry.entryId, values)}
-              readOnly={inputsLocked}
-              lockStructure
-              loading={false}
-              error={null}
-            />
-          )}
+          ) : null}
         </Box>
       ) : activeEntry && readOnly && (activeEntry.savedSections?.length ?? 0) > 0 ? (
         <Box

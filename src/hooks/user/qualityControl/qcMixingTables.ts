@@ -1,4 +1,4 @@
-import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import type { SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 import {
   QC_MIXING_FINAL_MIX_DETAILS_SECTION_ID,
   QC_MIXING_PREMIX_SECTION_ID,

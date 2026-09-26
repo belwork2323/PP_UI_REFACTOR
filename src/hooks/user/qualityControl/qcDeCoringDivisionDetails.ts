@@ -1,5 +1,5 @@
 import dayjs from "dayjs";
-import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import type { SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 import { formatToUiDate, UI_DATETIME_FORMAT } from "../../../utils/dateUtils";
 import { resolveManufacturingDivisionDetailsPayload } from "./qcHardwareDivisionDetails";
 import {

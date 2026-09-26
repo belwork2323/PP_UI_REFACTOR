@@ -1,8 +1,4 @@
-import type {
-  QcApiDivision,
-  QcApiSubType,
-  QcInhibitorType,
-} from "../../../schema-engine/adapters/qc.adapter";
+import type { QcApiDivision, QcApiSubType, QcInhibitorType } from "@/data/models/user/qc/qcApiTypes";
 import { STF_MOTOR_TYPE_OPTIONS } from "./stfFlowConfig";
 import {
   canLoadQcForm,
@@ -93,47 +89,9 @@ export const getQcDivisionPanelType = (flowKey: string): QcDivisionPanelType =>
  * Do not call GET /user/quality-control/schema for these divisions.
  */
 export const shouldSkipQcSchemaFetch = (
-  division?: string | null,
-  subType?: string | null,
-): boolean => {
-  const div = String(division ?? "")
-    .trim()
-    .toUpperCase();
-  const type = String(subType ?? "")
-    .trim()
-    .toUpperCase();
-  if (!div) return true;
-  if (
-    div === "CASTING" ||
-    div === "CURING" ||
-    div === "DE_CORING" ||
-    div === "TRIMMING" ||
-    div === "POST_CURE" ||
-    div === "POST_CURE_OPERATION" ||
-    div === "NDT" ||
-    div === "PROPELLANT_PROPERTIES" ||
-    div === "QC" ||
-    div === "HARDWARE" ||
-    div === "MIXING" ||
-    div === "RAW_MATERIAL_REVALIDATION" ||
-    div === "RAW_MATERIAL_PROCESSING" ||
-    div === "WEIGHTMENT" ||
-    div === "WEIGHMENT"
-  ) {
-    return true;
-  }
-  if (div === "RAW_MATERIAL") {
-    return (
-      type === "RAW_MATERIAL_REVALIDATION" ||
-      type === "RAW_MATERIAL_PROCESSING" ||
-      type === "SOLID_PROCESSING" ||
-      type === "LIQUID_PROCESSING" ||
-      type === "BOTH" ||
-      type === ""
-    );
-  }
-  return false;
-};
+  _division?: string | null,
+  _subType?: string | null,
+): boolean => true;
 
 export type QcDivisionFlowState = {
   rawMaterialType: string;

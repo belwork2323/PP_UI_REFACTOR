@@ -19,7 +19,7 @@ import {
 import { MANUFACTURING_STATUS } from "./manufacturingWorkflowData";
 import { isManufacturingContinueFillingStatus } from "../../../hooks/operationStatus";
 import { useSubdepartmentBatches } from "../useSubdepartmentBatches";
-import type { SchemaFormValues } from "../../../schema-engine";
+import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import { batchManagementController } from "@/controllers/admin/BatchManagement/batchManagementController";
 import { fetchMixingCycleDetailsApi } from "@/data/api/common/generalAPI";
 import { useFileService } from "../../../hooks/useFileService";
@@ -268,7 +268,7 @@ export const useSubscaleHook = () => {
     setFormData((prev) => {
       const next = {
         ...prev,
-        schemaFormValues: values,
+        schemaFormValues: values as typeof prev.schemaFormValues,
         schemaFormLoaded: Boolean(values.IS_PROCESS_FORM_LOADED) || prev.schemaFormLoaded,
       };
       snapshotStateRef.current = next;

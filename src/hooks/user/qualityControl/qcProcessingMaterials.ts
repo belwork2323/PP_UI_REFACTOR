@@ -1,12 +1,11 @@
+import { createInitialValues, hydrateValuesFromProcess } from "@/data/models/shared/sectionFormTypes";
 import {
-  createInitialValues,
-  hydrateValuesFromProcess,
   RMP_SCHEMA_TYPE,
   RMP_SCHEMA_VERSION,
   type SchemaProcessSubmission,
-} from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
-import { toSectionSubmissions } from "../../../schema-engine";
-import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+} from "../../../data/models/user/rmp/rmpProcessTypes";
+import { toSectionSubmissions } from "@/data/models/shared/sectionFormTypes";
+import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 import {
   normalizeProcessSubmissionFromApi,
   normalizeSectionsForApiPayload,

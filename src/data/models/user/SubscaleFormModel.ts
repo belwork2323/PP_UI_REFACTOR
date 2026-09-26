@@ -1,8 +1,4 @@
-import type {
-  SchemaDocumentV2,
-  SchemaFormValues,
-  SchemaSectionSubmission,
-} from "../../../schema-engine";
+import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 import { STRINGS } from "../../../app/config/strings";
 import type { CasePrepDetailSection, CasePrepDetailTable } from "./CasePreparationFormModel";
 import {
@@ -380,7 +376,9 @@ export const hydrateSubscaleFormState = (
   return {
     ...state,
     subscaleSchema: schema,
-    schemaFormValues: hasSavedValues ? state.schemaFormValues : {},
+    schemaFormValues: hasSavedValues
+      ? state.schemaFormValues
+      : createDefaultSubscaleFormState().schemaFormValues,
   };
 };
 
@@ -392,8 +390,8 @@ export const mapSubscaleDetailsToFormState = (
 
   const hasStructuredApiPayload = hasSubscaleStructuredApiPayload(payload);
   const schemaFormValues = hasStructuredApiPayload
-    ? mapSubscaleApiDetailsToFormValues(payload)
-    : {};
+    ? (mapSubscaleApiDetailsToFormValues(payload) as SubscaleFormState["schemaFormValues"])
+    : defaults.schemaFormValues;
 
   const rawSections = (details as Record<string, unknown>).sections;
   const savedSections =

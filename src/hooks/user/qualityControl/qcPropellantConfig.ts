@@ -1,6 +1,6 @@
 import type { FileRef } from "../../../data/models/common/FileUploadModel";
 import { STRINGS } from "../../../app/config/strings";
-import type { QcApiDivision, QcApiSubType } from "../../../schema-engine/adapters/qc.adapter";
+import type { QcApiDivision, QcApiSubType } from "@/data/models/user/qc/qcApiTypes";
 import type { QcDivisionEntry } from "./qcDivisionEntryTypes";
 import { buildDivisionEntryDedupKey } from "./qcDivisionEntries";
 

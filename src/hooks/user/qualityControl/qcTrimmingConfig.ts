@@ -1,4 +1,4 @@
-import type { QcApiSubType } from "../../../schema-engine/adapters/qc.adapter";
+import type { QcApiSubType } from "@/data/models/user/qc/qcApiTypes";
 import { getTrimmingMotorCountOptions } from "../manufacturing/trimmingFlowConfig";
 import { resolveQcMotorIdOptions } from "./qcHardwareConfig";
 import { STRINGS } from "../../../app/config/strings";

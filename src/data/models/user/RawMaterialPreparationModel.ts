@@ -1,22 +1,21 @@
 import { materialSelectionKey, type MaterialsListItem } from "./MaterialsListModel";
-import type {
-  PreparationPremixEntry,
-  PreparationProcessEntry,
-} from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
 import {
   findGradeInMaterial,
   findMaterialInList,
-  RMP_SCHEMA_TYPE,
-  RMP_SCHEMA_VERSION,
-} from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
-import type { SchemaSectionSubmission } from "../../../schema-engine";
+  uiKeyToProcessType,
+  type PreparationPremixEntry,
+  type PreparationProcessEntry,
+} from "./rmp/rmpProcessTypes";
 import { buildProcessFromTypedForm } from "./rmp/buildProcessFromTypedForm";
 import {
   createEmptyProcessFormForUiKey,
   processFormHasUserData,
   type RmpMaterialProcessForm,
 } from "./rmp/defaultSolidProcessForm";
-import { hydrateProcessFormFromSections } from "./rmp/processFormMapper";
+import {
+  hydrateProcessFormFromEntry,
+  typedProcessToDisplaySections,
+} from "./rmp/processFormMapper";
 import {
   resolveMaterialUiKey,
   type RmpMaterialUiKey,
@@ -27,15 +26,12 @@ import { OPERATION_STATUS, formatApiStatusForDisplay } from "../../../hooks/oper
 import { normalizeSubdepartmentBatchStatus } from "./SubdepartmentBatchModel";
 import { formatDateTimeForApi, toCamelCaseKey } from "./rawMaterialPreparationApiMapper";
 import { weightmentHasMaterialData } from "./rawMaterialWeightmentValidation";
-import { cloneValue } from "../../../schema-engine/state/formState";
+import { cloneValue } from "@/data/models/shared/sectionFormTypes";
+import type { SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 
 export type PremixSubmissionType = "DRAFT" | "SUBMIT";
 export type PremixSubmissionStatus =
-  | "TO_BE_INITIATED"
-  | "IN_PROGRESS"
-  | "WAITING_FOR_APPROVAL"
-  | "APPROVED"
-  | "REJECTED";
+  "TO_BE_INITIATED" | "IN_PROGRESS" | "WAITING_FOR_APPROVAL" | "APPROVED" | "REJECTED";
 
 export type PremixStatusMeta = {
   premixSubmissionType?: PremixSubmissionType;
@@ -330,8 +326,7 @@ export const mapWeightmentSheetToApi = (
     mixerBuildingNumber: mixer || null,
     weightmentDetails: rows.map((row) => ({
       materialCode: String(row.materialCode ?? "").trim(),
-      materialName:
-        String(row.materialName ?? "").trim() || String(row.materialCode ?? "").trim(),
+      materialName: String(row.materialName ?? "").trim() || String(row.materialCode ?? "").trim(),
       ...(row.premixNo != null && Number.isFinite(Number(row.premixNo))
         ? { premixNo: Number(row.premixNo) }
         : {}),
@@ -360,6 +355,7 @@ export type RawMaterialPrepPremixSelection = {
   sheetSrNo: number;
   materialName: string;
   lotId: string;
+  lotIds: string[];
   make: string;
   quantityPerPremix: number;
   requiredComposition: number;
@@ -377,9 +373,6 @@ export type RawMaterialPrepMaterialProcessSlot = {
   processForm: RmpMaterialProcessForm;
 };
 
-/** @deprecated Use RawMaterialPrepMaterialProcessSlot */
-export type RawMaterialPrepMaterialSchemaSlot = RawMaterialPrepMaterialProcessSlot;
-
 export type RawMaterialPrepPremixSession = {
   selectedProcesses: { solid: boolean; liquid: boolean };
   solidMaterialCode: string;
@@ -387,7 +380,20 @@ export type RawMaterialPrepPremixSession = {
   liquidMaterialCode: string;
   solid: RawMaterialPrepMaterialProcessSlot;
   liquid: RawMaterialPrepMaterialProcessSlot;
+  /**
+   * AP multi-grade process cards (Coarse / Fine / Ultra Fine).
+   * When present, payload emits one solidProcess entry per card.
+   */
+  apGradeSlots?: Array<{
+    gradeCode: string;
+    slot: RawMaterialPrepMaterialProcessSlot;
+  }>;
+  /** Saved API process when local form was never edited (locked premixes). */
+  pendingSolidProcess?: PreparationProcessEntry;
+  pendingLiquidProcess?: PreparationProcessEntry;
+  /** @deprecated Prefer pendingSolidProcess */
   pendingSolidSections?: SchemaSectionSubmission[];
+  /** @deprecated Prefer pendingLiquidProcess */
   pendingLiquidSections?: SchemaSectionSubmission[];
 };
 
@@ -433,8 +439,12 @@ export type RawMaterialPreparationDetails = {
   };
 };
 
-const emptyProcessSlot = (slot: RmpProcessSlot, materialCode = ""): RawMaterialPrepMaterialProcessSlot => {
-  const uiKey = resolveMaterialUiKey({ materialCode, slot });
+const emptyProcessSlot = (
+  slot: RmpProcessSlot,
+  materialCode = "",
+  gradeCode = "",
+): RawMaterialPrepMaterialProcessSlot => {
+  const uiKey = resolveMaterialUiKey({ materialCode, slot, gradeCode });
   return {
     uiKey,
     processForm: createEmptyProcessFormForUiKey(uiKey),
@@ -450,18 +460,28 @@ export const createEmptyPremixProcessSession = (): RawMaterialPrepPremixSession 
   liquid: emptyProcessSlot("liquid"),
 });
 
-/** @deprecated Use createEmptyPremixProcessSession */
-export const createEmptyPremixSchemaSession = createEmptyPremixProcessSession;
-
 export const hydratePremixProcessSlot = (
   slot: RmpProcessSlot,
   materialCode: string,
-  sections: SchemaSectionSubmission[] | undefined,
+  entry: PreparationProcessEntry | undefined,
+  gradeCode?: string,
 ): RawMaterialPrepMaterialProcessSlot => {
-  const uiKey = resolveMaterialUiKey({ materialCode, slot });
+  const resolvedGrade = gradeCode ?? entry?.gradeCode ?? "";
+  const uiKey = entry?.processType
+    ? (() => {
+        const fromType = String(entry.processType).toUpperCase();
+        if (fromType === "AP_COARSE") return "apCoarse" as const;
+        if (fromType === "AP_FINE") return "apFine" as const;
+        if (fromType === "AP_ULTRA_FINE") return "apUltraFine" as const;
+          if (fromType === "ALUMINUM" || fromType === "ALUMINIUM") return "aluminum" as const;
+          if (fromType === "DOA") return "doa" as const;
+          if (fromType === "DEFAULT_LIQUID" || fromType === "LIQUID") return "defaultLiquid" as const;
+        return resolveMaterialUiKey({ materialCode, slot, gradeCode: resolvedGrade });
+      })()
+    : resolveMaterialUiKey({ materialCode, slot, gradeCode: resolvedGrade });
   return {
     uiKey,
-    processForm: hydrateProcessFormFromSections(uiKey, sections),
+    processForm: hydrateProcessFormFromEntry(uiKey, entry),
   };
 };
 
@@ -469,18 +489,19 @@ export const normalizeMaterialProcessSlot = (
   slot: RmpProcessSlot,
   materialCode: string,
   partial?: Partial<RawMaterialPrepMaterialProcessSlot> | null,
+  gradeCode = "",
 ): RawMaterialPrepMaterialProcessSlot => {
   const code = String(materialCode ?? "").trim();
-  const uiKey = partial?.uiKey ?? resolveMaterialUiKey({ materialCode: code, slot });
+  const uiKey = partial?.uiKey ?? resolveMaterialUiKey({ materialCode: code, slot, gradeCode });
   const processForm = partial?.processForm
     ? (cloneValue(partial.processForm) as RmpMaterialProcessForm)
     : createEmptyProcessFormForUiKey(uiKey);
   return { uiKey, processForm };
 };
 
-/** Prefer saved API sections when local schema/formValues were never hydrated (locked premixes). */
-const buildProcessFromPendingSections = (
-  sections: SchemaSectionSubmission[] | undefined,
+/** Prefer saved API process when local process form was never hydrated (locked premixes). */
+const buildProcessFromPending = (
+  pending: PreparationProcessEntry | undefined,
   fallback: {
     materialId?: number;
     materialCode?: string;
@@ -488,31 +509,42 @@ const buildProcessFromPendingSections = (
     gradeId?: number;
     gradeCode?: string;
   },
+  processType: string,
 ): PreparationProcessEntry | null => {
-  if (!sections?.length) return null;
-  const materialCode = String(fallback.materialCode ?? "").trim();
+  if (!pending) return null;
+  const materialCode = String(fallback.materialCode ?? pending.materialCode ?? "").trim();
   if (!materialCode) return null;
 
   return {
-    materialId: Number(fallback.materialId ?? 0),
+    materialId: Number(fallback.materialId ?? pending.materialId ?? 0),
     materialCode,
-    materialName: String(fallback.materialName ?? materialCode).trim() || materialCode,
-    gradeId: fallback.gradeId ?? null,
-    gradeCode: fallback.gradeCode?.trim() ? fallback.gradeCode : null,
-    schemaVersion: RMP_SCHEMA_VERSION,
-    schemaType: RMP_SCHEMA_TYPE,
-    sections,
+    materialName:
+      String(fallback.materialName ?? pending.materialName ?? materialCode).trim() || materialCode,
+    gradeId: fallback.gradeId ?? pending.gradeId ?? null,
+    gradeCode: fallback.gradeCode?.trim() ? fallback.gradeCode : (pending.gradeCode ?? null),
+    processType: pending.processType || processType,
+    lotDetails: pending.lotDetails ?? [],
+    drying: pending.drying ?? null,
+    sieving: pending.sieving ?? null,
+    apCoarse: pending.apCoarse ?? null,
+    apFine: pending.apFine ?? null,
+    apUltraFine: pending.apUltraFine ?? null,
+    aluminum: pending.aluminum ?? null,
+    doa: pending.doa ?? null,
   };
 };
 
-/** Materials with no preparation schema still appear on the premix when weightment is recorded. */
-const buildWeightmentOnlyProcessEntry = (fallback: {
-  materialId?: number;
-  materialCode?: string;
-  materialName?: string;
-  gradeId?: number;
-  gradeCode?: string;
-}): PreparationProcessEntry | null => {
+/** Materials with empty process data still appear on the premix when weightment is recorded. */
+const buildWeightmentOnlyProcessEntry = (
+  fallback: {
+    materialId?: number;
+    materialCode?: string;
+    materialName?: string;
+    gradeId?: number;
+    gradeCode?: string;
+  },
+  processType: string,
+): PreparationProcessEntry | null => {
   const materialCode = String(fallback.materialCode ?? "").trim();
   if (!materialCode) return null;
 
@@ -522,9 +554,15 @@ const buildWeightmentOnlyProcessEntry = (fallback: {
     materialName: String(fallback.materialName ?? materialCode).trim() || materialCode,
     gradeId: fallback.gradeId ?? null,
     gradeCode: fallback.gradeCode?.trim() ? fallback.gradeCode : null,
-    schemaVersion: RMP_SCHEMA_VERSION,
-    schemaType: RMP_SCHEMA_TYPE,
-    sections: [],
+    processType,
+    lotDetails: [],
+    drying: null,
+    sieving: null,
+    apCoarse: null,
+    apFine: null,
+    apUltraFine: null,
+    aluminum: null,
+    doa: null,
   };
 };
 
@@ -594,7 +632,6 @@ export const mapPreparationDetailsPayload = (params: {
   targetPremixNos?: number[];
   premixSubmissionType?: PremixSubmissionType;
   includeEmptyPremixes?: boolean;
-  allowPartialProcesses?: boolean;
 }) => {
   const premixes: PreparationPremixEntry[] = [];
   const grouped = new Map<number, RawMaterialPrepPremixSelection[]>();
@@ -613,7 +650,7 @@ export const mapPreparationDetailsPayload = (params: {
 
     entries.forEach((entry) => {
       const sessionKey = `${entry.premix}:${entry.materialKey}`;
-      const session = params.premixSessions[sessionKey] ?? createEmptyPremixSchemaSession();
+      const session = params.premixSessions[sessionKey] ?? createEmptyPremixProcessSession();
       const solidMaterial = findMaterialInList(params.solidMaterials, entry.solidMaterialCode);
       const liquidMaterial = findMaterialInList(params.liquidMaterials, entry.liquidMaterialCode);
 
@@ -625,27 +662,75 @@ export const mapPreparationDetailsPayload = (params: {
           gradeId: entry.solidGradeId,
           gradeCode: entry.solidGradeCode,
         };
-        const process =
-          buildProcessFromTypedForm({
-            uiKey: session.solid.uiKey,
-            processForm: session.solid.processForm,
-            material: solidMaterial,
-            gradeCode: entry.solidGradeCode,
-            fallback: {
-              materialId: entry.solidMaterialId,
-              materialCode: entry.solidMaterialCode,
-              materialName: solidMaterial?.materialName ?? entry.materialName,
-              gradeId: entry.solidGradeId,
-            },
-            allowEmptyValues: params.allowPartialProcesses,
-          }) ??
-          buildProcessFromPendingSections(session.pendingSolidSections, solidFallback) ??
-          (weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode)
-            ? buildWeightmentOnlyProcessEntry(solidFallback)
-            : null);
 
-        if (process) {
-          solidProcess.push(process);
+        const apSlots = session.apGradeSlots;
+        const isAp =
+          String(entry.solidMaterialCode ?? "")
+            .trim()
+            .toUpperCase() === "AP";
+
+        if (isAp && Array.isArray(apSlots)) {
+          // Host-managed AP grades (may be empty after user deleted all).
+          apSlots.forEach((gradeSlot) => {
+            const gradeCode = String(gradeSlot.gradeCode ?? "").trim();
+            const process =
+              buildProcessFromTypedForm({
+                uiKey: gradeSlot.slot.uiKey,
+                processForm: gradeSlot.slot.processForm,
+                material: solidMaterial,
+                gradeCode,
+                fallback: {
+                  materialId: entry.solidMaterialId,
+                  materialCode: entry.solidMaterialCode,
+                  materialName: solidMaterial?.materialName ?? entry.materialName,
+                  gradeId: entry.solidGradeId,
+                },
+              }) ??
+              (weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode)
+                ? buildWeightmentOnlyProcessEntry(
+                    { ...solidFallback, gradeCode },
+                    uiKeyToProcessType(gradeSlot.slot.uiKey),
+                  )
+                : null);
+            if (process) solidProcess.push(process);
+          });
+          // If all grades deleted but weightment exists, keep a weightment-only identity row.
+          if (
+            apSlots.length === 0 &&
+            weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode)
+          ) {
+            const process = buildWeightmentOnlyProcessEntry(solidFallback, "DEFAULT_SOLID");
+            if (process) solidProcess.push(process);
+          }
+        } else {
+          const process =
+            buildProcessFromTypedForm({
+              uiKey: session.solid.uiKey,
+              processForm: session.solid.processForm,
+              material: solidMaterial,
+              gradeCode: entry.solidGradeCode,
+              fallback: {
+                materialId: entry.solidMaterialId,
+                materialCode: entry.solidMaterialCode,
+                materialName: solidMaterial?.materialName ?? entry.materialName,
+                gradeId: entry.solidGradeId,
+              },
+            }) ??
+            buildProcessFromPending(
+              session.pendingSolidProcess,
+              solidFallback,
+              uiKeyToProcessType(session.solid.uiKey),
+            ) ??
+            (weightmentHasMaterialData(weightmentSheet, entry.solidMaterialCode)
+              ? buildWeightmentOnlyProcessEntry(
+                  solidFallback,
+                  uiKeyToProcessType(session.solid.uiKey),
+                )
+              : null);
+
+          if (process) {
+            solidProcess.push(process);
+          }
         }
       }
 
@@ -666,11 +751,17 @@ export const mapPreparationDetailsPayload = (params: {
               materialCode: entry.liquidMaterialCode,
               materialName: liquidMaterial?.materialName ?? entry.materialName,
             },
-            allowEmptyValues: params.allowPartialProcesses,
           }) ??
-          buildProcessFromPendingSections(session.pendingLiquidSections, liquidFallback) ??
+          buildProcessFromPending(
+            session.pendingLiquidProcess,
+            liquidFallback,
+            uiKeyToProcessType(session.liquid.uiKey),
+          ) ??
           (weightmentHasMaterialData(weightmentSheet, entry.liquidMaterialCode)
-            ? buildWeightmentOnlyProcessEntry(liquidFallback)
+            ? buildWeightmentOnlyProcessEntry(
+                liquidFallback,
+                uiKeyToProcessType(session.liquid.uiKey),
+              )
             : null);
 
         if (process) {
@@ -823,6 +914,7 @@ export const mapPreparationDetailsFromApi = (
       const resolvedGradeCode = gradeMatch?.gradeCode ?? gradeRaw;
       const materialKey =
         materialSelectionKey(materialCode, resolvedGradeCode || undefined) || `sr-${row.srNo}`;
+      const lotIds = (row.lotIds ?? []).map((id) => String(id ?? "").trim()).filter(Boolean);
 
       return {
         premix: premixNo,
@@ -830,7 +922,8 @@ export const mapPreparationDetailsFromApi = (
         materialKey,
         sheetSrNo: Number(row.srNo ?? 0),
         materialName: String(row.materialName ?? materialCode).trim(),
-        lotId: String(row.lotId ?? "").trim(),
+        lotId: lotIds.join(", "),
+        lotIds,
         make: String(row.make ?? "").trim(),
         quantityPerPremix: Number(row.quantityPerPremix ?? 0),
         requiredComposition: Number(row.requiredComposition ?? 0),
@@ -889,40 +982,83 @@ export const mapPreparationDetailsFromApi = (
         matchProcessToSelection(process, selection, "liquid"),
       );
 
-      const pendingSolid = solidEntry?.sections
-        ? (JSON.parse(JSON.stringify(solidEntry.sections)) as SchemaSectionSubmission[])
+      const pendingSolid = solidEntry
+        ? (JSON.parse(JSON.stringify(solidEntry)) as PreparationProcessEntry)
         : undefined;
-      const pendingLiquid = liquidEntry?.sections
-        ? (JSON.parse(JSON.stringify(liquidEntry.sections)) as SchemaSectionSubmission[])
+      const pendingLiquid = liquidEntry
+        ? (JSON.parse(JSON.stringify(liquidEntry)) as PreparationProcessEntry)
         : undefined;
+
+      const solidSlot = hydratePremixProcessSlot(
+        "solid",
+        selection.solidMaterialCode,
+        pendingSolid,
+        selection.solidGradeCode,
+      );
+
+      let apGradeSlots:
+        Array<{ gradeCode: string; slot: RawMaterialPrepMaterialProcessSlot }> | undefined;
+      if (
+        String(selection.solidMaterialCode ?? "")
+          .trim()
+          .toUpperCase() === "AP"
+      ) {
+        const apProcesses = (apiPremix?.solidProcess ?? []).filter(
+          (process) =>
+            String(process.materialCode ?? "")
+              .trim()
+              .toUpperCase() === "AP",
+        );
+        if (apProcesses.length > 0) {
+          apGradeSlots = apProcesses.map((process) => {
+            const gradeCode = String(
+              process.gradeCode ?? selection.solidGradeCode ?? "COARSE",
+            ).trim();
+            return {
+              gradeCode,
+              slot: hydratePremixProcessSlot("solid", "AP", process, gradeCode),
+            };
+          });
+        } else if (selection.solidGradeCode) {
+          apGradeSlots = [
+            {
+              gradeCode: selection.solidGradeCode,
+              slot: solidSlot,
+            },
+          ];
+        }
+      }
 
       premixSessions[`${premixNo}:${selection.materialKey}`] = {
         ...createEmptyPremixProcessSession(),
         selectedProcesses: selection.selectedProcesses,
         solidMaterialCode: selection.solidMaterialCode,
-        solidGradeCode: selection.solidGradeCode,
+        solidGradeCode: apGradeSlots?.[0]?.gradeCode ?? selection.solidGradeCode,
         liquidMaterialCode: selection.liquidMaterialCode,
-        solid: hydratePremixProcessSlot(
-          "solid",
-          selection.solidMaterialCode,
-          pendingSolid,
-        ),
-        liquid: hydratePremixProcessSlot(
-          "liquid",
-          selection.liquidMaterialCode,
-          pendingLiquid,
-        ),
-        pendingSolidSections: pendingSolid,
-        pendingLiquidSections: pendingLiquid,
+        solid: apGradeSlots?.[0]?.slot ?? solidSlot,
+        liquid: hydratePremixProcessSlot("liquid", selection.liquidMaterialCode, pendingLiquid),
+        apGradeSlots,
+        pendingSolidProcess: pendingSolid,
+        pendingLiquidProcess: pendingLiquid,
       };
     });
 
     (apiPremix?.solidProcess ?? []).forEach((process) => {
       const code = String(process.materialCode ?? "").trim();
-      if (!code || !process.sections?.length) return;
+      const hasTyped =
+        (process.lotDetails?.length ?? 0) > 0 ||
+        Boolean(process.drying) ||
+        Boolean(process.sieving) ||
+        Boolean(process.apCoarse) ||
+        Boolean(process.apFine) ||
+        Boolean(process.apUltraFine) ||
+        Boolean(process.aluminum) ||
+        Boolean(process.doa) ||
+        (process.sections?.length ?? 0) > 0;
+      if (!code || !hasTyped) return;
       const grade = String(process.gradeCode ?? "").trim();
       const sessionKey = resolveProcessSessionKey(premixNo, process, selections, "solid");
-      const pendingSolid = JSON.parse(JSON.stringify(process.sections)) as SchemaSectionSubmission[];
+      const pendingSolid = JSON.parse(JSON.stringify(process)) as PreparationProcessEntry;
       premixSessions[sessionKey] = {
         ...(premixSessions[sessionKey] ?? {
           ...createEmptyPremixProcessSession(),
@@ -933,16 +1069,21 @@ export const mapPreparationDetailsFromApi = (
         }),
         solidMaterialCode: premixSessions[sessionKey]?.solidMaterialCode || code,
         solidGradeCode: premixSessions[sessionKey]?.solidGradeCode || grade,
-        solid: hydratePremixProcessSlot("solid", code, pendingSolid),
-        pendingSolidSections: pendingSolid,
+        solid: hydratePremixProcessSlot("solid", code, pendingSolid, grade),
+        pendingSolidProcess: pendingSolid,
       };
     });
 
     (apiPremix?.liquidProcess ?? []).forEach((process) => {
       const code = String(process.materialCode ?? "").trim();
-      if (!code || !process.sections?.length) return;
+      const hasTyped =
+        (process.lotDetails?.length ?? 0) > 0 ||
+        Boolean(process.drying) ||
+        Boolean(process.sieving) ||
+        (process.sections?.length ?? 0) > 0;
+      if (!code || !hasTyped) return;
       const sessionKey = resolveProcessSessionKey(premixNo, process, selections, "liquid");
-      const pendingLiquid = JSON.parse(JSON.stringify(process.sections)) as SchemaSectionSubmission[];
+      const pendingLiquid = JSON.parse(JSON.stringify(process)) as PreparationProcessEntry;
       premixSessions[sessionKey] = {
         ...(premixSessions[sessionKey] ?? {
           ...createEmptyPremixProcessSession(),
@@ -953,7 +1094,7 @@ export const mapPreparationDetailsFromApi = (
         }),
         liquidMaterialCode: premixSessions[sessionKey]?.liquidMaterialCode || code,
         liquid: hydratePremixProcessSlot("liquid", code, pendingLiquid),
-        pendingLiquidSections: pendingLiquid,
+        pendingLiquidProcess: pendingLiquid,
       };
     });
   });
@@ -1406,14 +1547,9 @@ const mapProcessSections = (
   materialCode: String(process.materialCode ?? ""),
   materialName: String(process.materialName ?? process.materialCode ?? ""),
   gradeCode: process.gradeCode ?? null,
-  sections: (process.sections ?? [])
-    .map((section) => ({
-      sectionId: String(section.sectionId ?? ""),
-      sectionData: Array.isArray(section.sectionData)
-        ? (section.sectionData as Record<string, unknown>[])
-        : [],
-    }))
-    .filter((section) => expandRawMaterialPrepSectionRows(section.sectionData).length > 0),
+  sections: typedProcessToDisplaySections(process).filter(
+    (section) => expandRawMaterialPrepSectionRows(section.sectionData).length > 0,
+  ),
 });
 
 export const mapRawMaterialPreparationApproverDetailView = (

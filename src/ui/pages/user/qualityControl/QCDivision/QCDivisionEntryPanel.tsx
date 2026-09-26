@@ -1,13 +1,12 @@
 import { memo, useCallback, useEffect, useMemo, type ReactNode } from "react";
 import { Box, Button, Stack, Typography, alpha } from "@mui/material";
 import type { QcDivisionEntry, QcDivisionEntryValues } from "../../../../../data/models/user/QualityControlFormModel";
-import { createQcInitialValues } from "../../../../../schema-engine/adapters/qc.adapter";
-import type { SchemaDocumentV2, SchemaFormValues } from "../../../../../schema-engine";
+import { createQcInitialValues } from "@/data/models/user/qc/qcApiTypes";
+import type { SchemaDocumentV2, SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import { STRINGS } from "../../../../../app/config/strings";
 import RemoveProcessButton from "../../../../components/common/RemoveProcessButton";
 import SubmitForApprovalButton from "../../../../components/common/SubmitForApprovalButton";
-import QCSchemaPanel from "./QCSchemaPanel";
 import QCSchemaBufferingLoader from "./QCSchemaBufferingLoader";
 import QCDivisionSavedSectionsDisplay from "./components/QCDivisionSavedSectionsDisplay";
 import QCRawMaterialRevalidationTable from "./QCRawMaterialRevalidationTable";
@@ -79,8 +78,6 @@ import {
   createInitialRevalidationSchemaValues,
   hydrateRevalidationValuesFromSections,
 } from "../../../../../hooks/user/qualityControl/qcRawMaterialRevalidationTable";
-import { mergeValidationRequirementsIntoSchema } from "../../../../../data/validation/utils/validationToSchemaMapper";
-
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 
 export type QCDivisionEntryUnitActions = {
@@ -174,9 +171,7 @@ const QCDivisionEntryPanel = ({
       return null;
     }
 
-    // Merge validation requirements into the schema to show asterisks on required fields
-    const schemaWithValidation = mergeValidationRequirementsIntoSchema(schema, entry, "SUBMIT");
-    return schemaWithValidation;
+    return schema;
   }, [entry.kind, schema, entry.entryId]);
 
   const mixingPremixValues = useMemo(() => {
@@ -829,43 +824,14 @@ const QCDivisionEntryPanel = ({
           {headerActions}
         </Stack>
 
-        <Stack spacing={2}>
-          <Box>
-            <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: BRAND.primary, mb: 1 }}>
-              {S.SOLID_SECTION_TITLE}
+                <Stack spacing={2}>
+          {(entry.savedSections?.length ?? 0) > 0 ? (
+            <QCDivisionSavedSectionsDisplay sections={entry.savedSections ?? []} />
+          ) : (
+            <Typography sx={{ fontSize: "0.76rem", color: BRAND.textSub }}>
+              {schemaError || S.SCHEMA_FETCH_ERROR}
             </Typography>
-            <QCSchemaPanel
-              schema={solidSchema}
-              formValues={solidValues}
-              persistedValues={entryValues.schemaValues}
-              savedSections={entry.savedSections}
-              hydrationKey={entry.entryId}
-              subDepartmentId={subDepartmentId}
-              batchId={batchId}
-              onChange={handleValuesChange}
-              readOnly={fieldsDisabled}
-              loading={schemaLoading}
-              error={schemaError}
-            />
-          </Box>
-          <Box>
-            <Typography sx={{ fontSize: "0.8rem", fontWeight: 700, color: BRAND.primary, mb: 1 }}>
-              {S.LIQUID_SECTION_TITLE}
-            </Typography>
-            <QCSchemaPanel
-              schema={liquidSchema}
-              formValues={liquidValues}
-              persistedValues={entryValues.liquidSchemaValues}
-              savedSections={entry.savedSections}
-              hydrationKey={`${entry.entryId}-liquid`}
-              subDepartmentId={subDepartmentId}
-              batchId={batchId}
-              onChange={handleLiquidValuesChange}
-              readOnly={fieldsDisabled}
-              loading={schemaLoading}
-              error={schemaError}
-            />
-          </Box>
+          )}
         </Stack>
       </Box>
     );
@@ -892,19 +858,13 @@ const QCDivisionEntryPanel = ({
         {headerActions}
       </Stack>
 
-      <QCSchemaPanel
-        schema={resolvedSchema}
-        formValues={formValues}
-        persistedValues={entryValues.schemaValues}
-        savedSections={entry.savedSections}
-        hydrationKey={entry.entryId}
-        subDepartmentId={subDepartmentId}
-        batchId={batchId}
-        onChange={handleValuesChange}
-        readOnly={fieldsDisabled}
-        loading={schemaLoading}
-        error={schemaError}
-      />
+      {(entry.savedSections?.length ?? 0) > 0 ? (
+        <QCDivisionSavedSectionsDisplay sections={entry.savedSections ?? []} />
+      ) : (
+        <Typography sx={{ fontSize: "0.76rem", color: BRAND.textSub }}>
+          {schemaError || S.SCHEMA_FETCH_ERROR}
+        </Typography>
+      )}
     </Box>
   );
 };

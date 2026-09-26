@@ -318,11 +318,10 @@ export const WeightmentSheetDetailBlock = ({
                 {[
                   "Material Code",
                   "Material Name",
-                  "Percentage",
-                  "Weight Transferred (Kg)",
                   "Container Type",
                   "Container No.",
                   "Weigh Scale No.",
+                  "Weight Transferred (Kg)",
                   "Weighing Date & Time",
                 ].map((header, headerIndex) => (
                   <TableCell key={header} sx={dt.tableHeaderCell(headerIndex === 0)}>
@@ -336,11 +335,10 @@ export const WeightmentSheetDetailBlock = ({
                 <TableRow key={rowIndex} sx={dt.tableRow(rowIndex)}>
                   <TableCell sx={dt.tableCell}>{entry.materialCode || "—"}</TableCell>
                   <TableCell sx={dt.tableCell}>{entry.materialName || "—"}</TableCell>
-                  <TableCell sx={dt.tableCell}>{entry.percentage || "—"}</TableCell>
-                  <TableCell sx={dt.tableCell}>{entry.weightTransferred || "—"}</TableCell>
                   <TableCell sx={dt.tableCell}>{entry.containerType || "—"}</TableCell>
                   <TableCell sx={dt.tableCell}>{entry.containerNumber || "—"}</TableCell>
                   <TableCell sx={dt.tableCell}>{entry.weighScaleNumber || "—"}</TableCell>
+                  <TableCell sx={dt.tableCell}>{entry.weightTransferred || "—"}</TableCell>
                   <TableCell sx={dt.tableCell}>{formatDateTime(entry.weighingDateTime)}</TableCell>
                 </TableRow>
               ))}

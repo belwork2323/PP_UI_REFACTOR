@@ -1,4 +1,4 @@
-import type { SchemaDocumentV2, SchemaFormValues } from "../../../schema-engine";
+import type { SchemaDocumentV2, SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import type { QualityControlFormState } from "../../../data/models/user/QualityControlFormModel";
 import { parseFileRefs } from "../../../data/models/common/FileUploadModel";
 import type { QcDivisionEntry, QcDivisionEntryValues } from "./qcDivisionEntryTypes";

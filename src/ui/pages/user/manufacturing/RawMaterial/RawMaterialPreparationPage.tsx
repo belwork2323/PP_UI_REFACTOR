@@ -49,6 +49,7 @@ const RawMaterialPreparationPage = () => {
     weightmentSheet,
     handleWeightmentSheetChange,
     handlePremixSlotChange,
+    handleApGradeSlotsChange,
     handleBack,
     handleDiscardAndBack,
     formHydrationKey,
@@ -115,6 +116,7 @@ const RawMaterialPreparationPage = () => {
             weightmentSheet={weightmentSheet}
             onWeightmentSheetChange={handleWeightmentSheetChange}
             onPremixSlotChange={handlePremixSlotChange}
+            onApGradeSlotsChange={handleApGradeSlotsChange}
             subDepartmentId={subDepartmentId}
             theme={theme}
             premixStatusByNo={premixStatusByNo}

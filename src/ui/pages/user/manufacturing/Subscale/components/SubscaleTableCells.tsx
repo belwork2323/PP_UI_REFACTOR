@@ -6,7 +6,7 @@ import { uniformTableBodyCellSx } from "../../../../../../app/theme/custom_theme
 import type { ProcessParticularRow } from "../../../../../../hooks/user/manufacturing/subscaleBatchConfig";
 import { registerSubscalePendingDraft } from "../utils/subscalePendingDrafts";
 import { Control, Controller, useFormContext } from "react-hook-form";
-import { SchemaFormValues } from "@/schema-engine";
+import { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 
 export type SubscaleCellChangeHandler = (
   tableId: string,

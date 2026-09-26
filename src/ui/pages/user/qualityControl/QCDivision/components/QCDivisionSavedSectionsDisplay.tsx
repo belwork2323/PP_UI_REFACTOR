@@ -10,7 +10,7 @@ import {
   Typography,
 } from "@mui/material";
 import { alpha } from "@mui/material/styles";
-import type { SchemaSectionSubmission } from "../../../../../../schema-engine";
+import type { SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 import { QC_DIVISION_BRAND } from "../../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import {
   uniformTableBodyCellSx,

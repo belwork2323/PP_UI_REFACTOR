@@ -15,21 +15,9 @@ import {
   mapQualityControlPayload,
   type QualityControlFormState,
 } from "../../../data/models/user/QualityControlFormModel";
-import {
-  createQcInitialValues,
-  fetchQcSchema,
-  hydrateQcValuesFromSections,
-} from "../../../schema-engine/adapters/qc.adapter";
-import type {
-  QcApiDivision,
-  QcApiSubType,
-  QcInhibitorType,
-} from "../../../schema-engine/adapters/qc.adapter";
-import type {
-  SchemaDocumentV2,
-  SchemaFormValues,
-  SchemaSectionSubmission,
-} from "../../../schema-engine";
+import { createQcInitialValues, fetchQcSchema, hydrateQcValuesFromSections } from "@/data/models/user/qc/qcApiTypes";
+import type { QcApiDivision, QcApiSubType, QcInhibitorType } from "@/data/models/user/qc/qcApiTypes";
+import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 import {
   getQcSchemaCacheKey,
   mapQcDivisionsFromApi,

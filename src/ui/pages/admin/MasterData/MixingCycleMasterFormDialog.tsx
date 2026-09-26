@@ -82,82 +82,106 @@ const OperationsEditor = ({
   theme: any;
   onChange: (next: MixingOperationForm[]) => void;
 }) => (
-  <Stack spacing={1.5}>
-    <Typography variant="subtitle2">{title}</Typography>
-    {ops.map((op, idx) => {
-      const locked = isEdit && Boolean(op.isExisting);
-      const opError = visibleValidationError(
-        operationErrors?.[idx]?.operationName,
-        op.operationName.trim().length > 0,
-        showErrors,
-      );
-      return (
-        <Box
-          key={`${op.operationId ?? "new"}-${idx}`}
-          sx={{
-            display: "flex",
-            gap: 1,
-            alignItems: "flex-start",
-            p: 1.5,
-            border: "1px solid",
-            borderColor: opError ? "error.main" : "divider",
-            borderRadius: 1.5,
-            bgcolor: locked ? "action.hover" : "background.paper",
-            opacity: !op.isActive ? 0.72 : 1,
-          }}
-        >
-          <Box sx={{ flex: 1, minWidth: 0 }}>
-            <CasePrepTextField
-              label={S.MIXING_CYCLES.COL_NAME}
-              value={op.operationName}
-              disabled={disabled || locked}
-              error={Boolean(opError)}
-              helperText={opError ?? null}
-              width="100%"
-              theme={theme}
-              onChange={(value) => {
-                const next = [...ops];
-                next[idx] = { ...op, operationName: value };
-                onChange(next);
-              }}
-            />
-          </Box>
-          <MasterDataEnableDisableField
-            checked={op.isActive}
-            disabled={disabled}
-            labelVariant="caption"
-            minWidth={96}
-            requireConfirmation={locked}
-            confirmName={op.operationName || "operation"}
-            onChange={(isActive) => {
-              const next = [...ops];
-              next[idx] = { ...op, isActive };
-              onChange(next);
-            }}
-          />
-          {!locked ? (
-            <IconButton
-              size="small"
-              disabled={disabled}
-              onClick={() => onChange(ops.filter((_, i) => i !== idx))}
-              aria-label={S.MIXING_CYCLES.REMOVE_OPERATION}
-              sx={{ mt: 2.75, flexShrink: 0 }}
-            >
-              <icons.Delete fontSize="small" />
-            </IconButton>
-          ) : null}
-        </Box>
-      );
-    })}
-    <Button
-      size="small"
-      startIcon={<icons.projectMgmt.add />}
-      disabled={disabled}
-      onClick={() => onChange([...ops, emptyMixingOperation()])}
+  <Box
+    sx={{
+      border: "1px solid",
+      borderColor: "divider",
+      borderRadius: 1.5,
+      p: 1.5,
+      bgcolor: "background.paper",
+    }}
+  >
+    <Box
+      sx={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 1,
+        flexWrap: "wrap",
+        mb: ops.length ? 1.5 : 0,
+      }}
     >
-      {S.MIXING_CYCLES.ADD_OPERATION}
-    </Button>
-  </Stack>
+      <Typography variant="subtitle2">{title}</Typography>
+      <Button
+        size="small"
+        startIcon={<icons.projectMgmt.add />}
+        disabled={disabled}
+        onClick={() => onChange([...ops, emptyMixingOperation()])}
+        sx={{ flexShrink: 0 }}
+      >
+        {S.MIXING_CYCLES.ADD_OPERATION}
+      </Button>
+    </Box>
+    {ops.length ? (
+      <Stack spacing={1.5}>
+        {ops.map((op, idx) => {
+          const locked = isEdit && Boolean(op.isExisting);
+          const opError = visibleValidationError(
+            operationErrors?.[idx]?.operationName,
+            op.operationName.trim().length > 0,
+            showErrors,
+          );
+          return (
+            <Box
+              key={`${op.operationId ?? "new"}-${idx}`}
+              sx={{
+                display: "flex",
+                gap: 1,
+                alignItems: "flex-start",
+                p: 1.5,
+                border: "1px solid",
+                borderColor: opError ? "error.main" : "divider",
+                borderRadius: 1.5,
+                bgcolor: locked ? "action.hover" : "background.paper",
+                opacity: !op.isActive ? 0.72 : 1,
+              }}
+            >
+              <Box sx={{ flex: 1, minWidth: 0 }}>
+                <CasePrepTextField
+                  label={S.MIXING_CYCLES.COL_NAME}
+                  value={op.operationName}
+                  disabled={disabled || locked}
+                  error={Boolean(opError)}
+                  helperText={opError ?? null}
+                  width="100%"
+                  theme={theme}
+                  onChange={(value) => {
+                    const next = [...ops];
+                    next[idx] = { ...op, operationName: value };
+                    onChange(next);
+                  }}
+                />
+              </Box>
+              <MasterDataEnableDisableField
+                checked={op.isActive}
+                disabled={disabled}
+                labelVariant="caption"
+                minWidth={96}
+                requireConfirmation={locked}
+                confirmName={op.operationName || "operation"}
+                onChange={(isActive) => {
+                  const next = [...ops];
+                  next[idx] = { ...op, isActive };
+                  onChange(next);
+                }}
+              />
+              {!locked ? (
+                <IconButton
+                  size="small"
+                  disabled={disabled}
+                  onClick={() => onChange(ops.filter((_, i) => i !== idx))}
+                  aria-label={S.MIXING_CYCLES.REMOVE_OPERATION}
+                  sx={{ mt: 2.75, flexShrink: 0 }}
+                >
+                  <icons.Delete fontSize="small" />
+                </IconButton>
+              ) : null}
+            </Box>
+          );
+        })}
+      </Stack>
+    ) : null}
+  </Box>
 );
 
 const MixingCycleMasterFormDialog = ({
@@ -410,61 +434,60 @@ const MixingCycleMasterFormDialog = ({
               </Typography>
             ) : null}
             <Divider sx={{ mb: 1.5 }} />
-            <OperationsEditor
-              title={S.MIXING_CYCLES.PREMIX_OPERATIONS}
-              ops={form.cycles.premixOperations}
-              disabled={saving}
-              isEdit={isEdit}
-              showErrors={showErrors}
-              operationErrors={fieldErrors.premixOperations}
-              theme={fieldTheme}
-              onChange={(premixOperations) =>
-                onChange({ ...form, cycles: { ...form.cycles, premixOperations } })
-              }
-            />
-            <Box sx={{ mt: 2 }} />
-            <MasterDataQualityCheckParamsEditor
-              title={S.MIXING_CYCLES.PREMIX_QUALITY_CHECKS}
-              params={form.cycles.premixQualityChecks}
-              disabled={saving}
-              isEdit={isEdit}
-              showErrors={showErrors}
-              paramErrors={fieldErrors.premixQualityChecks}
-              unitOptions={unitOptions}
-              unitLoading={unitLoading}
-              theme={fieldTheme}
-              onChange={(premixQualityChecks) =>
-                onChange({ ...form, cycles: { ...form.cycles, premixQualityChecks } })
-              }
-            />
-            <Box sx={{ mt: 2 }} />
-            <OperationsEditor
-              title={S.MIXING_CYCLES.FINAL_MIX_OPERATIONS}
-              ops={form.cycles.finalMixOperations}
-              disabled={saving}
-              isEdit={isEdit}
-              showErrors={showErrors}
-              operationErrors={fieldErrors.finalMixOperations}
-              theme={fieldTheme}
-              onChange={(finalMixOperations) =>
-                onChange({ ...form, cycles: { ...form.cycles, finalMixOperations } })
-              }
-            />
-            <Box sx={{ mt: 2 }} />
-            <MasterDataQualityCheckParamsEditor
-              title={S.MIXING_CYCLES.FINAL_MIX_QUALITY_CHECKS}
-              params={form.cycles.finalMixQualityChecks}
-              disabled={saving}
-              isEdit={isEdit}
-              showErrors={showErrors}
-              paramErrors={fieldErrors.finalMixQualityChecks}
-              unitOptions={unitOptions}
-              unitLoading={unitLoading}
-              theme={fieldTheme}
-              onChange={(finalMixQualityChecks) =>
-                onChange({ ...form, cycles: { ...form.cycles, finalMixQualityChecks } })
-              }
-            />
+            <Stack spacing={2}>
+              <OperationsEditor
+                title={S.MIXING_CYCLES.PREMIX_OPERATIONS}
+                ops={form.cycles.premixOperations}
+                disabled={saving}
+                isEdit={isEdit}
+                showErrors={showErrors}
+                operationErrors={fieldErrors.premixOperations}
+                theme={fieldTheme}
+                onChange={(premixOperations) =>
+                  onChange({ ...form, cycles: { ...form.cycles, premixOperations } })
+                }
+              />
+              <MasterDataQualityCheckParamsEditor
+                title={S.MIXING_CYCLES.PREMIX_QUALITY_CHECKS}
+                params={form.cycles.premixQualityChecks}
+                disabled={saving}
+                isEdit={isEdit}
+                showErrors={showErrors}
+                paramErrors={fieldErrors.premixQualityChecks}
+                unitOptions={unitOptions}
+                unitLoading={unitLoading}
+                theme={fieldTheme}
+                onChange={(premixQualityChecks) =>
+                  onChange({ ...form, cycles: { ...form.cycles, premixQualityChecks } })
+                }
+              />
+              <OperationsEditor
+                title={S.MIXING_CYCLES.FINAL_MIX_OPERATIONS}
+                ops={form.cycles.finalMixOperations}
+                disabled={saving}
+                isEdit={isEdit}
+                showErrors={showErrors}
+                operationErrors={fieldErrors.finalMixOperations}
+                theme={fieldTheme}
+                onChange={(finalMixOperations) =>
+                  onChange({ ...form, cycles: { ...form.cycles, finalMixOperations } })
+                }
+              />
+              <MasterDataQualityCheckParamsEditor
+                title={S.MIXING_CYCLES.FINAL_MIX_QUALITY_CHECKS}
+                params={form.cycles.finalMixQualityChecks}
+                disabled={saving}
+                isEdit={isEdit}
+                showErrors={showErrors}
+                paramErrors={fieldErrors.finalMixQualityChecks}
+                unitOptions={unitOptions}
+                unitLoading={unitLoading}
+                theme={fieldTheme}
+                onChange={(finalMixQualityChecks) =>
+                  onChange({ ...form, cycles: { ...form.cycles, finalMixQualityChecks } })
+                }
+              />
+            </Stack>
           </Box>
         </Stack>
       </DialogContent>

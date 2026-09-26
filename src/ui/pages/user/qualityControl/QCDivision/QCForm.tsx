@@ -10,7 +10,7 @@ import type {
   QcPartialItemStatus,
   QcPartialNavItem,
 } from "../../../../../hooks/user/qualityControl/qcDivisionApprovalUnits";
-import type { SchemaFormValues } from "../../../../../schema-engine";
+import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import QCDivisionFormBody from "./QCDivisionFormBody";
 import QCDivisionNavPanel, { type QCDivisionNavApprovalActions } from "./QCDivisionNavPanel";
 import type { QCDivisionEntryUnitActions } from "./QCDivisionEntryPanel";

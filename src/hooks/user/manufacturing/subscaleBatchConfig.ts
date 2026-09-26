@@ -1,4 +1,4 @@
-import type { SchemaFormValues } from "../../../schema-engine";
+import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import {
   ARTICLE_TYPE_TABLE_ID,
   createDefaultHardwareValues,

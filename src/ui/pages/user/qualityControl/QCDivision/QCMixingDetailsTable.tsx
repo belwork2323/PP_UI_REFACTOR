@@ -13,7 +13,7 @@ import {
 } from "@mui/material";
 import { STRINGS } from "../../../../../app/config/strings";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
-import type { SchemaFormValues } from "../../../../../schema-engine";
+import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import DateField from "../../../../components/common/DateField";
 import {
   QC_MIXING_FINAL_MIX_MERGE_COLUMNS,

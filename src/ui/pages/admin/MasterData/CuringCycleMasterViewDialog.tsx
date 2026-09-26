@@ -77,8 +77,6 @@ const CuringCycleMasterViewDialog = ({
   const recordLabel = record
     ? `${formatMotorStageLabel(record.motorStage, motorStageOptions)} · ${formatCuringTypeLabel(record.curingType)}`
     : "record";
-  const showPressure = Boolean(record?.showPropellantPressure);
-
   return (
     <Dialog
       open={open}
@@ -108,7 +106,7 @@ const CuringCycleMasterViewDialog = ({
                 gridTemplateColumns: {
                   xs: "1fr",
                   sm: "repeat(2, 1fr)",
-                  md: showPressure ? "repeat(5, 1fr)" : "repeat(4, 1fr)",
+                  md: "repeat(4, 1fr)",
                 },
                 gap: 1.5,
               }}
@@ -133,11 +131,6 @@ const CuringCycleMasterViewDialog = ({
               <DetailItem label={S.CURING_CYCLES.COL_CURING_TYPE}>
                 <Typography variant="body2" fontWeight={600}>
                   {formatCuringTypeLabel(record.curingType)}
-                </Typography>
-              </DetailItem>
-              <DetailItem label={S.CURING_CYCLES.LABEL_SHOW_PRESSURE}>
-                <Typography variant="body2" fontWeight={600}>
-                  {record.showPropellantPressure ? "Yes" : "No"}
                 </Typography>
               </DetailItem>
               <DetailItem label={S.TABLE.COL_ACTIVE}>
@@ -168,9 +161,6 @@ const CuringCycleMasterViewDialog = ({
                       <TableRow sx={table?.headerRow}>
                         <TableCell sx={table?.headerCell}>{S.CURING_CYCLES.STEP_TEMPERATURE}</TableCell>
                         <TableCell sx={table?.headerCell}>{S.CURING_CYCLES.STEP_DURATION}</TableCell>
-                        {showPressure ? (
-                          <TableCell sx={table?.headerCell}>{S.CURING_CYCLES.STEP_PRESSURE}</TableCell>
-                        ) : null}
                         <TableCell sx={table?.headerCell} align="right">
                           {S.TABLE.COL_ACTIVE}
                         </TableCell>
@@ -195,13 +185,6 @@ const CuringCycleMasterViewDialog = ({
                               {formatValue(step.durationMinutes, " min")}
                             </Typography>
                           </TableCell>
-                          {showPressure ? (
-                            <TableCell sx={table?.cell}>
-                              <Typography sx={table?.bodyText}>
-                                {formatValue(step.propellantPressure)}
-                              </Typography>
-                            </TableCell>
-                          ) : null}
                           <TableCell sx={table?.cell} align="right">
                             <Box sx={{ display: "inline-flex" }}>
                               <MasterDataActiveStatusChip isActive={step.isActive} />

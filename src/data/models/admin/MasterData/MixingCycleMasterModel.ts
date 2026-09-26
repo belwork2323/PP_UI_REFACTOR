@@ -327,12 +327,20 @@ export const getMixingCycleFieldErrors = (
     }
   }
 
-  if (!isEdit && form.cycles.premixOperations.length === 0) {
+  if (form.cycles.premixOperations.length === 0) {
     errors.form = "Add at least one premix operation";
     return errors;
   }
-  if (!isEdit && form.cycles.finalMixOperations.length === 0) {
+  if (form.cycles.premixQualityChecks.length === 0) {
+    errors.form = "Add at least one premix quality check";
+    return errors;
+  }
+  if (form.cycles.finalMixOperations.length === 0) {
     errors.form = "Add at least one final mix operation";
+    return errors;
+  }
+  if (form.cycles.finalMixQualityChecks.length === 0) {
+    errors.form = "Add at least one final mix quality check";
     return errors;
   }
   errors.premixOperations = mapOperationErrors(form.cycles.premixOperations, isEdit);

@@ -1,15 +1,11 @@
 import type { MaterialItem } from "../../../data/models/admin/BatchManagement/BatchManagementModel";
 import {
   createEmptyPremixProcessSession,
-  createEmptyPremixSchemaSession,
   hydratePremixProcessSlot,
   normalizeMaterialProcessSlot,
 } from "../../../data/models/user/RawMaterialPreparationModel";
 import { processFormHasUserData } from "../../../data/models/user/rmp/defaultSolidProcessForm";
-import {
-  buildRawMaterialSchemaRequestFromCodes,
-  findGradeInMaterial,
-} from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
+import { findGradeInMaterial } from "../../../data/models/user/rmp/rmpProcessTypes";
 import {
   materialSelectionKey,
   normalizeMaterialsListResponse,
@@ -84,7 +80,7 @@ export type PremixMaterialOption = {
   processType: RawMaterialPrepProcessKey | "both";
 };
 
-type RawMaterialPrepPremixSession = ReturnType<typeof createEmptyPremixSchemaSession>;
+type RawMaterialPrepPremixSession = ReturnType<typeof createEmptyPremixProcessSession>;
 
 export const resolveMaterialProcessType = (
   materialCode: string,
@@ -160,6 +156,7 @@ export const createEmptyPremixSelection = (premix: number) => ({
   sheetSrNo: 0,
   materialName: "",
   lotId: "",
+  lotIds: [] as string[],
   make: "",
   quantityPerPremix: 0,
   requiredComposition: 0,
@@ -190,6 +187,8 @@ export const normalizePremixSessionKeys = <
   T extends {
     pendingSolidSections?: unknown;
     pendingLiquidSections?: unknown;
+    pendingSolidProcess?: unknown;
+    pendingLiquidProcess?: unknown;
   },
 >(
   sessions: Record<string, T>,
@@ -224,6 +223,12 @@ export const normalizePremixSessionKeys = <
         ? {
             ...existing,
             ...session,
+            pendingSolidProcess:
+              (session as { pendingSolidProcess?: unknown }).pendingSolidProcess ??
+              (existing as { pendingSolidProcess?: unknown }).pendingSolidProcess,
+            pendingLiquidProcess:
+              (session as { pendingLiquidProcess?: unknown }).pendingLiquidProcess ??
+              (existing as { pendingLiquidProcess?: unknown }).pendingLiquidProcess,
             pendingSolidSections:
               (session as { pendingSolidSections?: unknown }).pendingSolidSections ??
               (existing as { pendingSolidSections?: unknown }).pendingSolidSections,
@@ -280,6 +285,7 @@ export const buildMaterialSelectionFromSheetRow = (
   sheetSrNo: number;
   materialName: string;
   lotId: string;
+  lotIds: string[];
   make: string;
   quantityPerPremix: number;
   requiredComposition: number;
@@ -306,6 +312,9 @@ export const buildMaterialSelectionFromSheetRow = (
   const grade = resolveGradeFromSheetRow(row, solidMaterial);
   const materialKey =
     materialSelectionKey(materialCode, grade.gradeCode || undefined) || `sr-${row.srNo}`;
+  const lotIds = (row.lotIds ?? [])
+    .map((id) => String(id ?? "").trim())
+    .filter(Boolean);
 
   return {
     premix,
@@ -313,7 +322,8 @@ export const buildMaterialSelectionFromSheetRow = (
     materialKey,
     sheetSrNo: Number(row.srNo ?? 0),
     materialName: String(row.materialName ?? listMaterial?.materialName ?? materialCode).trim(),
-    lotId: String(row.lotId ?? "").trim(),
+    lotId: lotIds.join(", "),
+    lotIds,
     make: String(row.make ?? row.manufacturerName ?? "").trim(),
     quantityPerPremix: Number(row.quantityPerPremix ?? 0),
     requiredComposition: Number(row.requiredComposition ?? 0),
@@ -374,7 +384,7 @@ export const buildPremixMaterialSessionsFromSelections = (
     const gradesRequired =
       entry.selectedProcesses.solid &&
       materialRequiresGradeSelection(solidMaterials, entry.solidMaterialCode);
-    const solidSchemaReady =
+    const solidMaterialReady =
       entry.selectedProcesses.solid && (!gradesRequired || Boolean(entry.solidGradeCode));
 
     sessions[key] = {
@@ -385,11 +395,31 @@ export const buildPremixMaterialSessionsFromSelections = (
       liquidMaterialCode: entry.liquidMaterialCode,
       solid: normalizeMaterialProcessSlot(
         "solid",
-        solidSchemaReady ? entry.solidMaterialCode : "",
+        solidMaterialReady ? entry.solidMaterialCode : "",
+        null,
+        entry.solidGradeCode,
       ),
       liquid: entry.selectedProcesses.liquid
         ? normalizeMaterialProcessSlot("liquid", entry.liquidMaterialCode)
         : normalizeMaterialProcessSlot("liquid", ""),
+      apGradeSlots:
+        String(entry.solidMaterialCode ?? "")
+          .trim()
+          .toUpperCase() === "AP"
+          ? entry.solidGradeCode
+            ? [
+                {
+                  gradeCode: entry.solidGradeCode,
+                  slot: normalizeMaterialProcessSlot(
+                    "solid",
+                    entry.solidMaterialCode,
+                    null,
+                    entry.solidGradeCode,
+                  ),
+                },
+              ]
+            : []
+          : undefined,
     };
   });
 
@@ -417,6 +447,8 @@ export const alignPremixSessionsToSelections = (
     const key = getPremixMaterialSessionKey(selection.premix, selection.materialKey);
     const current = next[key];
     const hasPending =
+      Boolean(current?.pendingSolidProcess) ||
+      Boolean(current?.pendingLiquidProcess) ||
       Boolean(current?.pendingSolidSections?.length) ||
       Boolean(current?.pendingLiquidSections?.length);
     if (hasPending) return;
@@ -431,7 +463,7 @@ export const alignPremixSessionsToSelections = (
         selection.solidMaterialCode &&
         String(session.solidMaterialCode ?? "").toUpperCase() ===
           selection.solidMaterialCode.toUpperCase() &&
-        Boolean(session.pendingSolidSections?.length)
+        (Boolean(session.pendingSolidProcess) || Boolean(session.pendingSolidSections?.length))
       ) {
         return true;
       }
@@ -440,7 +472,7 @@ export const alignPremixSessionsToSelections = (
         selection.liquidMaterialCode &&
         String(session.liquidMaterialCode ?? "").toUpperCase() ===
           selection.liquidMaterialCode.toUpperCase() &&
-        Boolean(session.pendingLiquidSections?.length)
+        (Boolean(session.pendingLiquidProcess) || Boolean(session.pendingLiquidSections?.length))
       ) {
         return true;
       }
@@ -452,13 +484,15 @@ export const alignPremixSessionsToSelections = (
     const [, orphan] = orphanEntry;
 
     next[key] = {
-      ...(current ?? createEmptyPremixSchemaSession()),
+      ...(current ?? createEmptyPremixProcessSession()),
       selectedProcesses: selection.selectedProcesses ??
         orphan.selectedProcesses ??
         current?.selectedProcesses ?? { solid: false, liquid: false },
       solidMaterialCode: selection.solidMaterialCode || orphan.solidMaterialCode,
       solidGradeCode: selection.solidGradeCode || orphan.solidGradeCode,
       liquidMaterialCode: selection.liquidMaterialCode || orphan.liquidMaterialCode,
+      pendingSolidProcess: orphan.pendingSolidProcess ?? current?.pendingSolidProcess,
+      pendingLiquidProcess: orphan.pendingLiquidProcess ?? current?.pendingLiquidProcess,
       pendingSolidSections: orphan.pendingSolidSections
         ? orphan.pendingSolidSections.map((section) => ({
             ...section,
@@ -485,7 +519,8 @@ export const alignPremixSessionsToSelections = (
           : hydratePremixProcessSlot(
               "solid",
               String(selection.solidMaterialCode || orphan.solidMaterialCode || ""),
-              orphan.pendingSolidSections ?? current?.pendingSolidSections,
+              orphan.pendingSolidProcess ?? current?.pendingSolidProcess,
+              selection.solidGradeCode || orphan.solidGradeCode,
             ),
       liquid:
         current?.liquid && processFormHasUserData(current.liquid.processForm)
@@ -493,7 +528,7 @@ export const alignPremixSessionsToSelections = (
           : hydratePremixProcessSlot(
               "liquid",
               String(selection.liquidMaterialCode || orphan.liquidMaterialCode || ""),
-              orphan.pendingLiquidSections ?? current?.pendingLiquidSections,
+              orphan.pendingLiquidProcess ?? current?.pendingLiquidProcess,
             ),
     };
   });
@@ -622,29 +657,9 @@ export const resolvePremixMaterialOptionFromEntry = (
   return baseOption;
 };
 
-export const resolveSchemaSlotForProcessType = (
+export const resolveProcessSlotForProcessType = (
   processType: PremixMaterialOption["processType"],
 ): RawMaterialPrepProcessKey => (processType === "liquid" ? "liquid" : "solid");
-
-export const resolvePremixSchemaParams = (
-  option: PremixMaterialOption,
-  subDepartmentId: number,
-) => {
-  const slot = resolveSchemaSlotForProcessType(option.processType);
-  const materialId = Number(option.materialId ?? 0);
-  if (!option.materialCode || !subDepartmentId || !materialId) return null;
-
-  return {
-    slot,
-    request: buildRawMaterialSchemaRequestFromCodes({
-      subDepartmentId,
-      materialId,
-      materialCode: option.materialCode,
-      gradeId: slot === "solid" ? option.gradeId ?? null : null,
-      gradeCode: slot === "solid" ? option.gradeCode || null : null,
-    }),
-  };
-};
 
 export const buildPremixSessionsFromSelections = (
   selections: Array<{ premix: number }>,
@@ -653,7 +668,7 @@ export const buildPremixSessionsFromSelections = (
   const sessions = { ...existing };
   selections.forEach((entry) => {
     if (!sessions[entry.premix]) {
-      sessions[entry.premix] = createEmptyPremixSchemaSession();
+      sessions[entry.premix] = createEmptyPremixProcessSession();
     }
   });
   return sessions;
@@ -720,7 +735,7 @@ export const applyMaterialOptionToPremix = (
     ? findGradeInMaterial(solidMaterial, option.gradeCode)
     : undefined;
   const gradesRequired = hasSolid && (solidMaterial?.grades?.length ?? 0) > 0;
-  const solidSchemaReady = hasSolid && (!gradesRequired || Boolean(option.gradeCode));
+  const solidMaterialReady = hasSolid && (!gradesRequired || Boolean(option.gradeCode));
 
   const entry = {
     premix,
@@ -742,7 +757,9 @@ export const applyMaterialOptionToPremix = (
     liquidMaterialCode: hasLiquid ? option.materialCode : "",
     solid: normalizeMaterialProcessSlot(
       "solid",
-      hasSolid && solidSchemaReady ? option.materialCode : "",
+      hasSolid && solidMaterialReady ? option.materialCode : "",
+      null,
+      hasSolid ? option.gradeCode : "",
     ),
     liquid: hasLiquid
       ? normalizeMaterialProcessSlot("liquid", option.materialCode)

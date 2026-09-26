@@ -1,4 +1,4 @@
-import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import type { SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 import dayjs from "dayjs";
 import { UI_DATETIME_FORMAT } from "../../../utils/dateUtils";
 import {

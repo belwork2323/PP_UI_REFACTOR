@@ -14,7 +14,7 @@ import {
   type SxProps,
   type Theme,
 } from "@mui/material";
-import type { SchemaFormValues } from "../../../../../schema-engine";
+import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import {
   uniformTableBodyCellSx,

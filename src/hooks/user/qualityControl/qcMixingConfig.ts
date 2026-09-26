@@ -1,7 +1,7 @@
 import { STRINGS } from "../../../app/config/strings";
-import type { QcApiSubType } from "../../../schema-engine/adapters/qc.adapter";
-import { createQcInitialValues, hydrateQcValuesFromSections } from "../../../schema-engine/adapters/qc.adapter";
-import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import type { QcApiSubType } from "@/data/models/user/qc/qcApiTypes";
+import { createQcInitialValues, hydrateQcValuesFromSections } from "@/data/models/user/qc/qcApiTypes";
+import type { SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 import type { QcDivisionEntry } from "./qcDivisionEntryTypes";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;

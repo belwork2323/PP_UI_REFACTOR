@@ -15,7 +15,7 @@ import {
 import DateField from "../../../../components/common/DateField";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
 import { STRINGS } from "../../../../../app/config/strings";
-import type { SchemaFormValues } from "../../../../../schema-engine";
+import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import type { FileRef } from "../../../../../data/models/common/FileUploadModel";
 import {
   QC_WEIGHMENT_FIELD_LABELS,

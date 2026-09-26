@@ -1,11 +1,5 @@
-import {
-  scopedFormKey,
-  syncRowGenerationTables,
-  type SchemaDocumentV2,
-  type SchemaFormValues,
-  type SchemaSectionSubmission,
-} from "../../../schema-engine";
-import { mapSubscaleBatchType } from "../../../schema-engine/adapters/subscale.adapter";
+import { scopedFormKey, syncRowGenerationTables, SchemaDocumentV2, SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
+import { mapSubscaleBatchType } from "@/data/models/user/subscaleBatchType";
 import {
   ARTICLE_TYPE_TABLE_ID,
   HARDWARE_COUNT_FIELDS,

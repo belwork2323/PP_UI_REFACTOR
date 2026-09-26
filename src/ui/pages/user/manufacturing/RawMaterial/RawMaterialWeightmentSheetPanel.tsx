@@ -73,11 +73,10 @@ const validationMessages = {
 const TABLE_COLUMNS = [
   RM.WEIGHTMENT_TABLE_COL_MATERIAL_CODE,
   RM.WEIGHTMENT_TABLE_COL_MATERIAL_NAME,
-  RM.WEIGHTMENT_TABLE_COL_PERCENTAGE,
-  RM.WEIGHTMENT_TABLE_COL_WEIGHT,
   RM.WEIGHTMENT_TABLE_COL_CONTAINER_TYPE,
   RM.WEIGHTMENT_TABLE_COL_CONTAINER_NO,
   RM.WEIGHTMENT_TABLE_COL_WEIGH_SCALE,
+  RM.WEIGHTMENT_TABLE_COL_WEIGHT,
   RM.WEIGHTMENT_TABLE_COL_WEIGHING_TIME,
 ] as const;
 
@@ -105,7 +104,7 @@ type RawMaterialWeightmentSheetPanelProps = {
    * Does not switch material to a dropdown, auto-fill/replace values, or auto-check deviation.
    */
   compareHighlightOnly?: boolean;
-  /** When false, hide Add Row / delete — weighment is fixed per material × premix. */
+  /** When false, hide Add Row / delete. Default true so users can add bin/container rows. */
   allowAddRemoveRows?: boolean;
   weightmentErrors?: ValidationErrors;
   validationAttempt?: ValidationAttemptFlags;
@@ -287,9 +286,35 @@ const RawMaterialWeightmentSheetPanel = ({
   };
 
   const removeRow = (index: number) => {
-    updateSheet((prev) => ({
-      weightmentDetails: prev.weightmentDetails.filter((_, rowIndex) => rowIndex !== index),
-    }));
+    updateSheet((prev) => {
+      // Keep at least one row so the material still has a weighment slot.
+      if (prev.weightmentDetails.length <= 1) return {};
+      return {
+        weightmentDetails: prev.weightmentDetails.filter((_, rowIndex) => rowIndex !== index),
+      };
+    });
+  };
+
+  const addRow = () => {
+    updateSheet((prev) => {
+      const seedFrom = prev.weightmentDetails[0];
+      return {
+        weightmentDetails: [
+          ...prev.weightmentDetails,
+          createEmptyWeightmentDetail(
+            seedFrom
+              ? {
+                  materialCode: seedFrom.materialCode,
+                  materialName: seedFrom.materialName,
+                  premixNo: seedFrom.premixNo,
+                  scopeMaterialCode: seedFrom.scopeMaterialCode ?? seedFrom.materialCode,
+                  percentage: seedFrom.percentage,
+                }
+              : undefined,
+          ),
+        ],
+      };
+    });
   };
 
   const handleMaterialSelect = (index: number, srNo: string) => {
@@ -309,23 +334,14 @@ const RawMaterialWeightmentSheetPanel = ({
     });
   };
 
-  const getUsedSheetSrNos = (excludeIndex: number) => {
-    const used = new Set<string>();
-    value.weightmentDetails.forEach((entry, rowIndex) => {
-      if (rowIndex === excludeIndex) return;
-      const sheetKey = getWeightmentRowSheetKey(entry, sheetMaterials);
-      if (sheetKey) used.add(sheetKey);
-    });
-    return used;
-  };
-
-  const getMaterialSelectOptionsForRow = (rowIndex: number) =>
+  const getMaterialSelectOptionsForRow = (_rowIndex: number) =>
     sheetMaterials.map((material) => {
       const sheetKey = String(material.srNo);
       return {
         value: sheetKey,
         label: formatSheetMaterialLabel(material),
-        disabled: getUsedSheetSrNos(rowIndex).has(sheetKey),
+        // Same material may appear on multiple bin/container rows.
+        disabled: false,
       };
     });
 
@@ -536,30 +552,6 @@ const RawMaterialWeightmentSheetPanel = ({
                           palette={palette}
                         />
                       </TableCell>
-                      <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 120, py: 1.1, verticalAlign: "top" }}>
-                        <WeightmentTableInput
-                          type="number"
-                          value={row.percentage}
-                          onChange={(next) => updateRow(index, { percentage: next })}
-                          placeholder={RM.WEIGHTMENT_PLACEHOLDER_PERCENTAGE}
-                          error={Boolean(getRowFieldError(index, "percentage"))}
-                          helperText={getRowFieldError(index, "percentage")}
-                          palette={palette}
-                          disabled={disabled}
-                        />
-                      </TableCell>
-                      <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 150, py: 1.1, verticalAlign: "top" }}>
-                        <WeightmentTableInput
-                          type="number"
-                          value={row.weightTransferred}
-                          onChange={(next) => updateRow(index, { weightTransferred: next })}
-                          placeholder={RM.WEIGHTMENT_PLACEHOLDER_WEIGHT}
-                          error={Boolean(getRowFieldError(index, "weightTransferred"))}
-                          helperText={getRowFieldError(index, "weightTransferred")}
-                          palette={palette}
-                          disabled={disabled}
-                        />
-                      </TableCell>
                       <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 140, py: 1.1, verticalAlign: "top" }}>
                         <WeightmentTableInput
                           value={row.containerType}
@@ -594,6 +586,18 @@ const RawMaterialWeightmentSheetPanel = ({
                           helperText={getRowFieldError(index, "weighScaleNumber")}
                         />
                       </TableCell>
+                      <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 150, py: 1.1, verticalAlign: "top" }}>
+                        <WeightmentTableInput
+                          type="number"
+                          value={row.weightTransferred}
+                          onChange={(next) => updateRow(index, { weightTransferred: next })}
+                          placeholder={RM.WEIGHTMENT_PLACEHOLDER_WEIGHT}
+                          error={Boolean(getRowFieldError(index, "weightTransferred"))}
+                          helperText={getRowFieldError(index, "weightTransferred")}
+                          palette={palette}
+                          disabled={disabled}
+                        />
+                      </TableCell>
                       <TableCell sx={{ ...(dt.tableCell ?? {}), minWidth: 200, py: 1.1, verticalAlign: "top" }}>
                         <WeightmentTableInput
                           type="datetime"
@@ -610,7 +614,7 @@ const RawMaterialWeightmentSheetPanel = ({
                           <IconButton
                             size="small"
                             color="error"
-                            disabled={disabled}
+                            disabled={disabled || value.weightmentDetails.length <= 1}
                             onClick={() => removeRow(index)}
                             sx={{
                               border: `1px solid ${alpha(palette.danger ?? "#C0392B", 0.2)}`,
@@ -635,11 +639,7 @@ const RawMaterialWeightmentSheetPanel = ({
             variant="outlined"
             startIcon={<AddRoundedIcon fontSize="small" />}
             disabled={disabled}
-            onClick={() =>
-              updateSheet((prev) => ({
-                weightmentDetails: [...prev.weightmentDetails, createEmptyWeightmentDetail()],
-              }))
-            }
+            onClick={addRow}
             sx={{
               mb: 2,
               textTransform: "none",

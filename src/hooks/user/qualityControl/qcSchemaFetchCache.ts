@@ -1,4 +1,4 @@
-import type { SchemaDocumentV2 } from "../../../schema-engine";
+import type { SchemaDocumentV2 } from "@/data/models/shared/sectionFormTypes";
 
 const inflightSchemaFetches = new Map<string, Promise<SchemaDocumentV2 | null>>();
 const resolvedSchemaCache = new Map<string, SchemaDocumentV2>();

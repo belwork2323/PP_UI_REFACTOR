@@ -6,7 +6,6 @@ export type CuringCycleItem = {
   startTime: string;
   endDate: string;
   endTime: string;
-  propellantPressure?: number;
   hotWaterCirculation: string;
 };
 
@@ -15,7 +14,6 @@ export type CuringCycleConfig = {
   motorStage: number;
   motorStageName: string;
   curingType: string;
-  showPropellantPressure: boolean;
   cycles: CuringCycleItem[];
 };
 
@@ -27,8 +25,6 @@ const mapCycleItem = (item: Record<string, unknown>): CuringCycleItem => ({
   startTime: String(item.startTime ?? ""),
   endDate: String(item.endDate ?? ""),
   endTime: String(item.endTime ?? ""),
-  propellantPressure:
-    item.propellantPressure == null ? undefined : Number(item.propellantPressure),
   hotWaterCirculation: String(item.hotWaterCirculation ?? ""),
 });
 
@@ -54,7 +50,6 @@ export class CuringCycleConfigModel {
           ? `Stage ${motorStage}`
           : ""),
       curingType: String(record.curingType ?? ""),
-      showPropellantPressure: Boolean(record.showPropellantPressure),
       cycles,
     };
   }

@@ -10,7 +10,6 @@ import {
   Divider,
   IconButton,
   Stack,
-  Switch,
   Typography,
   Zoom,
 } from "@mui/material";
@@ -62,7 +61,6 @@ const StepsEditor = ({
   disabled,
   isEdit,
   showErrors,
-  showPressure,
   stepErrors,
   theme,
   onChange,
@@ -71,7 +69,6 @@ const StepsEditor = ({
   disabled?: boolean;
   isEdit: boolean;
   showErrors: boolean;
-  showPressure: boolean;
   stepErrors?: CuringCycleFieldErrors["cycles"];
   theme: any;
   onChange: (next: CuringCycleStepForm[]) => void;
@@ -111,7 +108,7 @@ const StepsEditor = ({
               display: "grid",
               gridTemplateColumns: {
                 xs: "1fr",
-                md: showPressure ? "1fr 1fr 1fr" : "1fr 1fr",
+                md: "1fr 1fr",
               },
               gap: 1,
             }}
@@ -150,25 +147,6 @@ const StepsEditor = ({
                 onChange(next);
               }}
             />
-            {showPressure ? (
-              <CasePrepTextField
-                label={S.CURING_CYCLES.STEP_PRESSURE}
-                value={step.propellantPressure === "" ? "" : String(step.propellantPressure)}
-                disabled={disabled || locked}
-                width="100%"
-                theme={theme}
-                onChange={(value) => {
-                  // Keep in-progress decimals (e.g. "2.") — Number("2.") would drop the dot.
-                  if (value !== "" && !/^-?\d*\.?\d*$/.test(value)) return;
-                  const next = [...steps];
-                  next[idx] = {
-                    ...step,
-                    propellantPressure: value,
-                  };
-                  onChange(next);
-                }}
-              />
-            ) : null}
           </Box>
           <MasterDataEnableDisableField
             checked={step.isActive}
@@ -397,24 +375,6 @@ const CuringCycleMasterFormDialog = ({
                   sx={{ mb: 0 }}
                 />
               </Box>
-              <Box
-                sx={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 0.5,
-                  pt: 2.5,
-                  flex: "0 0 auto",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                <Typography variant="body2">{S.CURING_CYCLES.LABEL_SHOW_PRESSURE}</Typography>
-                <Switch
-                  size="small"
-                  checked={form.showPropellantPressure}
-                  disabled={saving}
-                  onChange={(e) => onChange({ ...form, showPropellantPressure: e.target.checked })}
-                />
-              </Box>
               <Box sx={{ flex: "0 0 auto", pt: { xs: 0, md: 0.5 } }}>
                 <MasterDataEnableDisableField
                   checked={form.isActive}
@@ -444,7 +404,6 @@ const CuringCycleMasterFormDialog = ({
               disabled={saving}
               isEdit={isEdit}
               showErrors={showErrors}
-              showPressure={form.showPropellantPressure}
               stepErrors={fieldErrors.cycles}
               theme={fieldTheme}
               onChange={(cycles) => onChange({ ...form, cycles })}

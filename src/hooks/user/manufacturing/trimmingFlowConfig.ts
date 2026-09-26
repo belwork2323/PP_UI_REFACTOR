@@ -1,5 +1,5 @@
 import { STRINGS } from "../../../app/config/strings";
-import { resolveTrimmingMotorStageNumber } from "../../../schema-engine";
+import { resolveTrimmingMotorStageNumber } from "@/data/models/user/trimmingMotorStage";
 
 const S = STRINGS.MANUFACTURING.TRIMMING;
 

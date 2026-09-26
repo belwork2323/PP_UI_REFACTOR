@@ -1,7 +1,7 @@
 import { useMemo, type ReactNode } from "react";
 import { Box, Stack, TextField, Typography, alpha } from "@mui/material";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
-import type { SchemaFormValues } from "../../../../../schema-engine";
+import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import { DateTimeField } from "../../../../components/common/DateField";
 import {
   QC_DE_CORING_FIELD_LABELS,

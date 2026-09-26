@@ -1,6 +1,6 @@
 import type { QualityControlFormState } from "./QualityControlFormModel";
 import { mapQualityControlDetailsToFormState } from "./QualityControlFormModel";
-import type { SchemaSectionSubmission } from "../../../schema-engine";
+import type { SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 
 export type QCDivisionSubmissionType = "DRAFT" | "SUBMIT" | "UPDATE";
 

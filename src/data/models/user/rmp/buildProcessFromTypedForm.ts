@@ -1,16 +1,15 @@
 import type { MaterialsListItem } from "../MaterialsListModel";
-import type { PreparationProcessEntry } from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
 import {
-  RMP_SCHEMA_TYPE,
-  RMP_SCHEMA_VERSION,
   findGradeInMaterial,
   findMaterialInList,
-} from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
-import { normalizeSectionsForApiPayload } from "../rawMaterialPreparationApiMapper";
+  uiKeyToProcessType,
+  type PreparationProcessEntry,
+} from "./rmpProcessTypes";
 import type { RmpMaterialUiKey } from "./rmpMaterialUiRegistry";
-import { processFormHasUserData, type RmpMaterialProcessForm } from "./defaultSolidProcessForm";
-import { processFormToSections } from "./processFormMapper";
+import type { RmpMaterialProcessForm } from "./defaultSolidProcessForm";
+import { processFormToTypedFields } from "./processFormMapper";
 
+/** Build typed API process entry from UI form. Liquid always emits an entry. */
 export const buildProcessFromTypedForm = (params: {
   uiKey: RmpMaterialUiKey;
   processForm: RmpMaterialProcessForm;
@@ -22,29 +21,8 @@ export const buildProcessFromTypedForm = (params: {
     materialName?: string;
     gradeId?: number;
   };
-  allowEmptyValues?: boolean;
 }): PreparationProcessEntry | null => {
-  const {
-    uiKey,
-    processForm,
-    material,
-    gradeCode,
-    fallback,
-    allowEmptyValues = false,
-  } = params;
-
-  if (uiKey === "defaultLiquid") {
-    return null;
-  }
-
-  if (!allowEmptyValues && !processFormHasUserData(processForm)) {
-    return null;
-  }
-
-  const sections = processFormToSections(processForm);
-  if (!allowEmptyValues && sections.length === 0) {
-    return null;
-  }
+  const { uiKey, processForm, material, gradeCode, fallback } = params;
 
   const resolvedMaterial: MaterialsListItem | undefined =
     material ??
@@ -70,7 +48,7 @@ export const buildProcessFromTypedForm = (params: {
         }
       : undefined);
 
-  const normalizedSections = normalizeSectionsForApiPayload(sections);
+  const typed = processFormToTypedFields(processForm);
 
   return {
     materialId: resolvedMaterial.materialId,
@@ -78,12 +56,15 @@ export const buildProcessFromTypedForm = (params: {
     materialName: resolvedMaterial.materialName,
     gradeId: grade?.gradeId ?? null,
     gradeCode: grade?.gradeCode ?? (gradeCode.trim() ? gradeCode : null),
-    schemaVersion: RMP_SCHEMA_VERSION,
-    schemaType: RMP_SCHEMA_TYPE,
-    sections: normalizedSections.map((section) => ({
-      sectionId: section.sectionId,
-      sectionData: section.sectionData,
-    })),
+    processType: typed.processType || uiKeyToProcessType(uiKey),
+    lotDetails: typed.lotDetails ?? [],
+    drying: typed.drying ?? null,
+    sieving: typed.sieving ?? null,
+    apCoarse: typed.apCoarse ?? null,
+    apFine: typed.apFine ?? null,
+    apUltraFine: typed.apUltraFine ?? null,
+    aluminum: typed.aluminum ?? null,
+    doa: typed.doa ?? null,
   };
 };
 

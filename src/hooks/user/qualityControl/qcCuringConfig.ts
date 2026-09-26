@@ -1,5 +1,5 @@
 import { STRINGS } from "../../../app/config/strings";
-import type { QcApiSubType } from "../../../schema-engine/adapters/qc.adapter";
+import type { QcApiSubType } from "@/data/models/user/qc/qcApiTypes";
 
 const S = STRINGS.QUALITY_CONTROL.QC_DIVISION;
 

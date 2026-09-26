@@ -1,6 +1,6 @@
-import type { SchemaDocumentV2, SchemaSectionSubmission } from "../../../schema-engine";
-import type { SchemaProcessSubmission } from "../../../schema-engine/adapters/rawMaterialPreparation.adapter";
-import type { SchemaBlock } from "../../../schema-engine/types/schema.types";
+import type { SchemaDocumentV2, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
+import type { SchemaProcessSubmission } from "./rmp/rmpProcessTypes";
+import type { SchemaBlock } from "@/data/models/shared/sectionFormTypes";
 
 const RUNTIME_KEYS = new Set(["srNo", "SR_NO", "sr_no"]);
 
@@ -304,7 +304,9 @@ export const serializeProcessSubmissionForApi = (
   schema: SchemaDocumentV2,
 ): SchemaProcessSubmission => ({
   ...process,
-  sections: process.sections.map((section) => serializeSectionSubmissionForApi(schema, section)),
+  sections: (process.sections ?? []).map((section) =>
+    serializeSectionSubmissionForApi(schema, section),
+  ),
 });
 
 export const normalizeProcessSubmissionFromApi = (

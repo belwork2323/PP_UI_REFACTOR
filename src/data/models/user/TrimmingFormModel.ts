@@ -1,8 +1,5 @@
-import {
-  mapTrimmingMotorStage,
-  resolveTrimmingMotorStageNumber,
-  type SchemaSectionSubmission,
-} from "../../../schema-engine";
+import { mapTrimmingMotorStage, resolveTrimmingMotorStageNumber } from "@/data/models/user/trimmingMotorStage";
+import { SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 import type { CasePrepDetailSection } from "./CasePreparationFormModel";
 import { isFileReady, isFileUploadIncomplete, parseFileRefs, toFileIdListPayload, type FileRef } from "../common/FileUploadModel";
 import {

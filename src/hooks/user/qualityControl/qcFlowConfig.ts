@@ -1,8 +1,4 @@
-import {
-  getQcSchemaTypeForDivision,
-  type QcApiDivision,
-  type QcApiSubType,
-} from "../../../schema-engine/adapters/qc.adapter";
+import { getQcSchemaTypeForDivision, QcApiDivision, QcApiSubType } from "@/data/models/user/qc/qcApiTypes";
 import {
   isBothProcessingType,
   isPremixProcessingFlow,

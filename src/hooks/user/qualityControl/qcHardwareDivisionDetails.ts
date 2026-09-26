@@ -1,5 +1,5 @@
 import dayjs from "dayjs";
-import type { SchemaFormValues, SchemaSectionSubmission } from "../../../schema-engine";
+import type { SchemaFormValues, SchemaSectionSubmission } from "@/data/models/shared/sectionFormTypes";
 import {
   parseFileRefs,
   type FileRef,

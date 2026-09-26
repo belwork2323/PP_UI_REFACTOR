@@ -1,7 +1,7 @@
 import { useCallback, useMemo, type ReactNode } from "react";
 import { Box, Stack, Typography } from "@mui/material";
 import { QC_DIVISION_BRAND } from "../../../../../app/theme/custom_themes/user/qualityControl/tokens";
-import type { SchemaFormValues } from "../../../../../schema-engine";
+import type { SchemaFormValues } from "@/data/models/shared/sectionFormTypes";
 import { TrimmingCommonTable } from "../../manufacturing/Trimming/TrimmingCommonTable";
 import { getQcTrimmingMotorLabel } from "../../../../../hooks/user/qualityControl/qcTrimmingConfig";
 import {
